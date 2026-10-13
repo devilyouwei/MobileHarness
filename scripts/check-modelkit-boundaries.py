@@ -5,10 +5,33 @@ import os
 from pathlib import Path
 import re
 import subprocess
+import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
 KIT = ROOT / 'MobileHarness/ModelKit'
 FORBIDDEN = {'AgentCore', 'Agents', 'Gateway', 'Storage', 'StorageChat', 'StorageAudio', 'Actions', 'Tools', 'PlatformKit', 'SwiftUI', 'UIKit', 'HarnessKit', 'UI', 'AppWorkflows', 'BehaviorAssembly', 'Types'}
+SYSTEM_MODULES = {
+    'Foundation', 'Synchronization', 'CoreFoundation', 'Darwin', 'os',
+    'AVFAudio', 'Speech', 'CoreVideo', 'CoreML', 'CoreAI', 'Metal',
+    'Accelerate', 'Vision', 'ImageIO', 'Compression', 'CryptoKit',
+}
+THIRD_PARTY_PRODUCTS = {
+    'ModelKitGemma4': {'CoreAILM': 'coreai-models', 'Tokenizers': 'swift-transformers'},
+    'ModelKitNemotron': {'FluidAudio': 'fluidaudio'},
+    'ModelKitKokoro': {'FluidAudio': 'fluidaudio'},
+    'ModelKitHub': {'HuggingFace': 'swift-huggingface'},
+}
+THIRD_PARTY_IMPORTS = {
+    'ModelKitGemma4': {'CoreAILanguageModels', 'Tokenizers'},
+    'ModelKitNemotron': {'FluidAudio'}, 'ModelKitKokoro': {'FluidAudio'},
+    'ModelKitHub': {'HuggingFace'},
+}
+
+
+def imported_modules(content):
+    return set(re.findall(r'\bimport\s+(?:(?:class|struct|enum|protocol|func|var|let|typealias)\s+)?(\w+)', content))
+
+
 errors = []
 for folder, directories, files in os.walk(KIT):
     directories[:] = [d for d in directories if not d.startswith('.')]
@@ -24,7 +47,10 @@ for folder, directories, files in os.walk(KIT):
                 errors.append(f'Business import {module}: {source.relative_to(ROOT)}')
 if (KIT / 'Package.swift').exists() or (KIT / 'Tests').exists():
     errors.append('ModelKit must use the root project package and root Tests directory')
-package = json.loads(subprocess.check_output(['swift', 'package', 'dump-package'], cwd=ROOT))
+# Manifest inspection needs no dependency resolution or the application's active build cache.
+with tempfile.TemporaryDirectory(prefix='modelkit-boundary-') as scratch:
+    package = json.loads(subprocess.check_output(
+        ['swift', 'package', '--scratch-path', scratch, 'dump-package'], cwd=ROOT))
 for target in package['targets']:
     if not target['name'].startswith('ModelKit') or target['type'] != 'regular':
         continue
@@ -36,8 +62,13 @@ for target in package['targets']:
         name = values[0]
         if kind in ('byName', 'target') and not name.startswith('ModelKit'):
             errors.append(f"{target['name']} depends on external project target {name}")
-        if kind == 'product' and target['name'] not in {'ModelKitCoreAI', 'ModelKitFluidAudio', 'ModelKitHub'}:
-            errors.append(f"Third-party dependency outside a backend: {target['name']} -> {name}")
+        if kind == 'product':
+            expected_package = THIRD_PARTY_PRODUCTS.get(target['name'], {}).get(name)
+            actual_package = values[1].lower() if values[1] else None
+            if expected_package is None or actual_package != expected_package:
+                errors.append(f"Third-party dependency outside its owner/package: {target['name']} -> {name} ({actual_package})")
+        elif kind not in {'byName', 'target'}:
+            errors.append(f"Unsupported ModelKit dependency kind: {target['name']} -> {kind}")
         if name in FORBIDDEN:
             errors.append(f"Forbidden target dependency: {target['name']} -> {name}")
     if target['name'] == 'ModelKitRuntime':
@@ -47,6 +78,130 @@ for target in package['targets']:
 hub_target = next(t for t in package['targets'] if t['name'] == 'ModelKitHub')
 if {next(iter(d.values()))[0] for d in hub_target['dependencies']} != {'ModelKitRuntime', 'HuggingFace'}:
     errors.append('ModelKitHub must depend only on Management contracts and the concrete Hub SDK')
+# Shared directory grouping must not erase compilation or domain ownership.
+model_targets = {t['name']: t for t in package['targets'] if t['name'].startswith('ModelKit') and t['type'] == 'regular'}
+all_targets = {t['name']: t for t in package['targets']}
+external_project_targets = set(all_targets) - set(model_targets)
+remote_packages = {
+    dependency['sourceControl'][0]['identity'].lower()
+    for dependency in package['dependencies'] if 'sourceControl' in dependency
+}
+for name, target in model_targets.items():
+    if not (ROOT / target['path']).resolve().is_relative_to(KIT.resolve()):
+        errors.append(f'ModelKit target sources outside SDK: {name}')
+    for dependency in target.get('dependencies', []):
+        kind, values = next(iter(dependency.items()))
+        if kind == 'product' and (not values[1] or values[1].lower() not in remote_packages):
+            errors.append(f'ModelKit product must come from a declared remote package: {name} -> {values[0]}')
+
+# Check every production target and SDK product, even if a future intermediate target
+# has a ModelKit-looking name. Host product bundling creates no reverse SDK dependency.
+def audit_sdk_closure(root_name, roots):
+    pending = list(roots)
+    visited = set()
+    while pending:
+        name = pending.pop()
+        if name in visited:
+            continue
+        visited.add(name)
+        if name not in model_targets:
+            errors.append(f'SDK dependency reaches non-ModelKit target: {root_name} -> {name}')
+            continue
+        for dependency in model_targets[name].get('dependencies', []):
+            kind, values = next(iter(dependency.items()))
+            if kind in {'byName', 'target'}:
+                pending.append(values[0])
+
+
+for name in model_targets:
+    audit_sdk_closure(name, [name])
+for product in package['products']:
+    if product['name'].startswith('ModelKit'):
+        audit_sdk_closure(product['name'], product['targets'])
+# Every implementation target has an explicit layer; providers must never import each other.
+expected_model_dependencies = {
+    'ModelKit': set(), 'ModelKitRuntime': {'ModelKit'},
+    'ModelKitDefaults': {'ModelKit', 'ModelKitRuntime', 'ModelKitNemotron', 'ModelKitSilero',
+        'ModelKitMossNano', 'ModelKitGemma4', 'ModelKitYOLOPose', 'ModelKitOpenAI', 'ModelKitAppleSpeech', 'ModelKitEnergy'},
+    'ModelKitHub': {'ModelKitRuntime'},
+    'ModelKitCoreAI': set(), 'ModelKitCoreML': set(),
+    'ModelKitAppleSpeech': {'ModelKit'}, 'ModelKitEnergy': {'ModelKit'},
+    'ModelKitNemotron': {'ModelKit'}, 'ModelKitKokoro': {'ModelKit'}, 'ModelKitMossNano': {'ModelKit'},
+    'ModelKitGemma4': {'ModelKit'}, 'ModelKitOpenAI': {'ModelKit'},
+    'ModelKitSilero': {'ModelKit', 'ModelKitCoreML'}, 'ModelKitYOLOPose': {'ModelKit', 'ModelKitCoreML'},
+}
+if set(model_targets) != set(expected_model_dependencies):
+    errors.append('Every ModelKit target requires an explicit foundation/shared/assembly/provider classification')
+for name, target in model_targets.items():
+    project_dependencies = {
+        next(iter(d.values()))[0] for d in target.get('dependencies', [])
+        if next(iter(d)) in {'byName', 'target'}
+    }
+    if project_dependencies != expected_model_dependencies.get(name):
+        errors.append(f'ModelKit layer dependency mismatch: {name} -> {project_dependencies}')
+owners = {}
+for name, target in model_targets.items():
+    base = ROOT / target['path']
+    excluded = [base / path for path in target.get('exclude', [])]
+    sources = target.get('sources') or ['.']
+    for relative in sources:
+        path = base / relative
+        candidates = [path] if path.is_file() else path.rglob('*.swift')
+        for source in candidates:
+            if source.suffix != '.swift' or any(source == path or path in source.parents for path in excluded):
+                continue
+            if not source.resolve().is_relative_to(KIT.resolve()):
+                errors.append(f'ModelKit source outside SDK: {source}')
+            previous = owners.setdefault(source, name)
+            if previous != name:
+                errors.append(f'Duplicate ModelKit source ownership: {source.relative_to(ROOT)} ({previous}, {name})')
+for source in KIT.rglob('*.swift'):
+    if source not in owners:
+        errors.append(f'Unowned ModelKit source: {source.relative_to(ROOT)}')
+management = 'MobileHarness/ModelKit/Support/Management'
+for name in ('ModelKitRuntime', 'ModelKitDefaults'):
+    if model_targets[name]['path'] != management or not model_targets[name].get('sources'):
+        errors.append(f'{name} requires an explicit source list in the unified Management directory')
+for source, name in owners.items():
+    imports = imported_modules(source.read_text())
+    permitted = expected_model_dependencies.get(name, set()) | {name}
+    for module in imports & external_project_targets:
+        errors.append(f'External project import {module}: {source.relative_to(ROOT)}')
+    for module in imports - permitted - SYSTEM_MODULES - THIRD_PARTY_IMPORTS.get(name, set()):
+        errors.append(f'Unapproved SDK import {module}: {source.relative_to(ROOT)}')
+    if {i for i in imports if i.startswith('ModelKit')} - permitted:
+        errors.append(f'ModelKit source imports outside its layer: {source.relative_to(ROOT)}')
+    if name == 'ModelKitRuntime' and any(i.startswith('ModelKit') and i != 'ModelKit' for i in imports):
+        errors.append(f'Concrete/default dependency in Runtime: {source.relative_to(ROOT)}')
+    if KIT / 'Support/Core' in source.parents and imports - {'Foundation', 'Synchronization', 'CoreVideo'}:
+        errors.append(f'Non-neutral Core dependency: {source.relative_to(ROOT)}')
+for source in (KIT / 'Support/Core').glob('*.swift'):
+    content = source.read_text()
+    if re.search(r'\b(?:conversationID|ModelState|ProvidedCapability|ModelManager|ModelID)\b', content):
+        errors.append(f'Business/management identity in Core: {source.relative_to(ROOT)}')
+    if re.search(r'guard (?:active|waiters) < \d+', content):
+        errors.append(f'Hardcoded runtime loading policy in Core: {source.relative_to(ROOT)}')
+# Typecheck Core alone: same-target capability declarations must not hide a reverse dependency.
+core_sources = sorted(str(source) for source in (KIT / 'Support/Core').glob('*.swift'))
+try:
+    subprocess.run(['swiftc', '-swift-version', '6', '-parse-as-library', '-typecheck',
+        '-module-name', 'ModelKitCoreBoundary', *core_sources], cwd=ROOT, check=True)
+except subprocess.CalledProcessError:
+    errors.append('Core must typecheck without domain contracts, Management or provider sources')
+
+for source in (KIT / 'Support/Backends').rglob('*.swift'):
+    if re.search(r'\b(?:Gemma|GemmaResponseText|LocalNemotronEngine|LocalKokoroEngine|LocalMossEngine|PoseTensorReader|YOLOImageGraph)\b|gemma4_|YOLO26|\[1, 300, 57\]', source.read_text()):
+        errors.append(f'Model-specific implementation in generic backend: {source.relative_to(ROOT)}')
+for name in ('ModelKitFluidAudio', 'ModelKitMossCoreML'):
+    if name in model_targets:
+        errors.append(f'Retired mixed-model target: {name}')
+for relative in ('Core', 'Backends', 'Management', 'Defaults', 'Speech/Shared'):
+    if (KIT / relative).exists():
+        errors.append(f'Retired ModelKit directory: {relative}')
+for source in KIT.rglob('*.swift'):
+    if re.search(r'\b(?:GenerationControl|MossCancellation|KokoroCancellation)\b', source.read_text()):
+        errors.append(f'Duplicate worker cancellation implementation: {source.relative_to(ROOT)}')
+
 # Consolidated source ownership must retain an acyclic, non-overlapping build map.
 targets = {t['name']: t for t in package['targets']}
 for target_name, path, dependencies in (
@@ -91,7 +246,7 @@ for path in ('Gateway/Runtime/ActionDeadline.swift', 'Gateway/Output/Protocols/T
         errors.append(f'Execution lifetime must use the shared ActionRuntime mechanism: {path}')
 if targets['AgentCore'].get('path') != 'MobileHarness/Agents/Support/Core':
     errors.append('AgentCore must compile Agents/Support/Core')
-if 'Support/Core' not in targets['Agents'].get('exclude', []):
+if 'Agents/Support/Core' not in targets['Agents'].get('exclude', []):
     errors.append('Agents must exclude the separately compiled Core directory')
 if not (ROOT / 'MobileHarness/Gateway/Runtime/README.md').is_file():
     errors.append('Missing consolidated execution Runtime')
@@ -133,7 +288,7 @@ for source in (ROOT / 'MobileHarness/Gateway').rglob('*.swift'):
     if re.search(r'\b(?:UIActions|SpeechPlayback|UITools|SystemTools|CameraTools)\b', source.read_text()):
         errors.append(f'Gateway directly uses a concrete behavior: {source.relative_to(ROOT)}')
 # Agents may compute with the base ModelKit SDK, never invoke business/UI/device modules.
-agent_allowed = {'AgentCore', 'ModelKit', 'Storage', 'StorageChat', 'StorageAudio', 'PlatformKit', 'Foundation'}
+agent_allowed = {'FunctionContracts', 'AgentCore', 'ModelKit', 'Storage', 'StorageChat', 'StorageAudio', 'PlatformKit', 'Foundation'}
 for source in (ROOT / 'MobileHarness/Agents').rglob('*.swift'):
     if 'Core' in source.relative_to(ROOT / 'MobileHarness/Agents').parts:
         continue
@@ -143,7 +298,7 @@ for source in (ROOT / 'MobileHarness/Agents').rglob('*.swift'):
 agent_target = next(t for t in package['targets'] if t['name'] == 'Agents')
 for dependency in agent_target.get('dependencies', []):
     name = next(iter(dependency.values()))[0]
-    if name not in {'AgentCore', 'ModelKit', 'Storage', 'StorageChat', 'StorageAudio', 'PlatformKit'}:
+    if name not in {'FunctionContracts', 'AgentCore', 'ModelKit', 'Storage', 'StorageChat', 'StorageAudio', 'PlatformKit'}:
         errors.append(f'Forbidden Agents dependency: {name}')
 # Storage owns its values/functions; domain targets may use only the internal core.
 storage_target = next(t for t in package['targets'] if t['name'] == 'Storage')
@@ -200,10 +355,15 @@ ui_dependencies = [next(iter(d.values()))[0] for d in ui.get('dependencies', [])
 if ui_dependencies:
     errors.append('UI must have no project dependencies')
 allowed_ui = {'Foundation', 'CoreGraphics', 'Observation', 'SwiftUI', 'UIKit'}
+# Public rendering frameworks are confined to the native companion implementation.
+native_ui_imports = {
+    'Components/NativeCompanionSurface.swift': {'QuartzCore'},
+    'Components/MetalHaloRenderer.swift': {'Metal', 'QuartzCore', 'Synchronization'},
+}
 for source in (ROOT / 'MobileHarness/UI').rglob('*.swift'):
     content = source.read_text()
     for imported in re.findall(r'\bimport\s+(\w+)', content):
-        if imported not in allowed_ui:
+        if imported not in allowed_ui | native_ui_imports.get(str(source.relative_to(ROOT / 'MobileHarness/UI')), set()):
             errors.append(f'Forbidden UI import {imported}: {source.relative_to(ROOT)}')
     if re.search(r'\b(?:VoiceSessionCoordinator|CameraCoordinator|ApplicationRuntime|AppContainer|AppAssembly|ConversationHistoryStore|LocalDocumentStore|MemoryLeaseStore)\b', content):
         errors.append(f'UI uses a runtime/service implementation: {source.relative_to(ROOT)}')
@@ -300,7 +460,9 @@ for name in sorted(expected_domains):
             entries.setdefault(function, []).append(source)
         expected_module = source.stem.removesuffix('Actions')
         for declared_domain, declared_module in re.findall(r'@Action\(\s*domain: "([^"]+)", module: "([^"]+)"', content):
-            if (declared_domain, declared_module) != (name, expected_module):
+            # System owns the neutral task-control host port; its public protocol address remains Agent.Task.
+            expected_domain = 'Agent' if name == 'System' and expected_module == 'Task' else name
+            if (declared_domain, declared_module) != (expected_domain, expected_module):
                 errors.append(f'Invalid three-level Action metadata owner: {source.relative_to(ROOT)}')
         if '@Tool(' in content:
             errors.append(f'Capability entries must use unified @Action: {source.relative_to(ROOT)}')
@@ -314,40 +476,19 @@ for retired in ('ActionModules.swift', 'ToolModules.swift'):
 assembly = (ROOT / 'MobileHarness/App/Composition/Behaviors/BehaviorAssembly.swift').read_text()
 if 'CapabilityModules.builtIn' not in assembly or 'CapabilityCatalog(modules:' not in assembly or 'bindings.actions' not in assembly or 'bindings.tools' not in assembly or 'BehaviorProtocolBindings.bind' not in assembly:
     errors.append('BehaviorAssembly must project both registries from one business-domain catalog')
-# Directory/module-file/function ownership is explicit while invocation paths migrate separately.
-entry_modules = {
-    'UI': {'Navigation': {'open'}, 'Expression': {'express', 'setExpression'}, 'Gaze': {'moveEyes'},
-           'Caption': {'print', 'setTranscript', 'finishTranscript', 'beginReplyTurn'},
-           'VoiceState': {'setVoiceState'}, 'Pose': {'showPose'}, 'HistoryPresentation': {'showHistory'},
-           'ResourcePresentation': {'showResources', 'showResourceFailure', 'showResourceOperationFailure', 'showResourcePreferenceFailure', 'showProviderResult'}},
-    'Speech': {'Playback': {'speak'}, 'Listening': {'update'}}, 'Camera': {'Capture': {'open', 'close', 'flip', 'retry', 'takePhoto', 'savePhoto', 'ignorePhoto'}},
-    'History': {'Conversation': {'list', 'read', 'delete', 'startNew', 'summarize'}}, 'System': {'Device': {'control', 'readStatus', 'readEnvironment'}, 'Provider': {'discoverModels', 'restoreSettings', 'saveSettings', 'readSettings'}, 'Runtime': {'runtimeInfo'}, 'ModelResources': {'download', 'cancel', 'remove', 'configureSpeech', 'restoreSource', 'saveSource', 'snapshotResources'}},
-    'NexArm': {'Motion': {'moveMotor', 'resetMotor', 'reset', 'shakeBase'},
-               'Gesture': {'nodHead', 'shakeHead', 'waveWrist', 'tiltWrist', 'lookAround', 'celebrate', 'dance'},
-               'Tracking': {'aim'}},
-}
-for domain, modules in entry_modules.items():
+# Derive callable file ownership locally, without a second centralized per-function list.
+for domain in expected_domains:
     facade = actions_root / domain / (domain + 'Actions.swift')
     if re.search(r'public static func', facade.read_text()):
         errors.append(f'Domain facade must not regain callable implementations: {domain}')
-    expected_files = {domain + 'Actions.swift'} | {module + 'Actions.swift' for module in modules}
-    actual_files = {source.name for source in (actions_root / domain).glob('*.swift')}
-    if actual_files != expected_files:
-        errors.append(f'Cohesive module file ownership differs from design: {domain}: {actual_files}')
-    for module, functions in modules.items():
-        source = actions_root / domain / (module + 'Actions.swift')
-        if not source.exists() or set(re.findall(r'public static func (\w+)\(', source.read_text())) != functions:
-            errors.append(f'Invalid directory/module/function ownership: {domain}.{module}')
-
-# Production exclusion scopes stay explicit when path modules are renamed.
-for domain in ('UI', 'Speech', 'NexArm'):
     for source in (actions_root / domain).glob('*.swift'):
-        for metadata in re.findall(r'@Action\((.*?)\)\s*public static func', source.read_text(), re.S):
-            if any(f'module: "{module}"' in metadata for module in ('Expression', 'Playback', 'Motion', 'Gesture')) and f'serializationKey: "{domain}"' not in metadata:
-                errors.append(f'Production serialization identity must remain explicit: {source.relative_to(ROOT)}')
-scheduler = (ROOT / 'MobileHarness/Gateway/Output/Scheduling/ChannelScheduler.swift').read_text()
-if 'busyModules' in scheduler or 'definition.serializationKey' not in scheduler or 'busySerializationKeys.contains(job.serializationKey)' not in scheduler:
-    errors.append('Channel exclusion must use definition-owned keys, independently of paths')
+        if not re.fullmatch(r'[A-Z][A-Za-z0-9]*Actions\.swift', source.name):
+            errors.append(f'Noncanonical capability entry filename: {source.relative_to(ROOT)}')
+        content = source.read_text()
+        if source != facade and ('@Action(' not in content or not re.search(r'public static func', content)):
+            errors.append(f'Empty or unregistered capability entry: {source.relative_to(ROOT)}')
+if any((actions_root / 'Contracts' / name).exists() for name in ('FunctionMetadata.swift', 'FunctionMetadata.json')):
+    errors.append('Retired centralized function metadata must not return')
 
 # Compile-time generation must never acquire business/runtime dependencies.
 macro = targets.get('BehaviorDefinitions')
@@ -372,7 +513,7 @@ workflow_boundaries = {
     'Settings': ('AppSettingsWorkflow', {'UI', 'AgentCore', 'Agents', 'Gateway', 'AppPresentationWorkflow'}),
     'History': ('AppHistoryWorkflow', {'UI', 'StorageChat', 'AgentCore', 'Agents', 'Gateway', 'AppPresentationWorkflow', 'Actions', 'FunctionContracts', 'ExecutionRuntime', 'CallRuntime'}),
     'Bluetooth': ('AppBluetoothWorkflow', {'UI', 'AgentCore', 'Storage', 'Actions', 'FunctionContracts', 'ExecutionRuntime', 'CallRuntime', 'PlatformKit'}),
-    'Speech': ('AppSpeechPlayback', {'FunctionContracts', 'StorageAudio'}),
+    'Speech': ('AppSpeechPlayback', {'FunctionContracts', 'StorageAudio', 'Actions', 'ExecutionRuntime'}),
     'Presentation': ('AppPresentationWorkflow', {'UI', 'AgentCore', 'FunctionContracts'}),
     'Diagnostics': ('AppDiagnosticWorkflow', {'UI', 'ModelKit', 'PlatformKit'}),
 }
@@ -430,7 +571,7 @@ for name, allowed in history_source_boundaries.items():
         errors.append(f'Unexpected history role import: {source.relative_to(ROOT)}')
 for source in (ROOT / 'MobileHarness/Agents/Memory').glob('*.swift'):
     imports = set(re.findall(r'\bimport\s+(\w+)', source.read_text()))
-    allowed = {'Foundation', 'ModelKit', 'StorageChat'} if source.name == 'ConversationTitleGenerator.swift' else {'Foundation', 'AgentCore', 'ModelKit', 'StorageChat'}
+    allowed = {'Foundation', 'AgentCore', 'ModelKit', 'StorageChat'} if source.name == 'ConversationTitleGenerator.swift' else {'Foundation', 'AgentCore', 'ModelKit', 'StorageChat'}
     if imports - allowed:
         errors.append(f'Unexpected memory computation/coordination imports: {source.relative_to(ROOT)}')
     if source.name == 'ConversationTitleGenerator.swift' and re.search(r'\.(?:setTitle|startNew|deleteArchived)\(|\b(?:Gateway|ActionCall|ToolCall)\b', source.read_text()):
@@ -536,10 +677,38 @@ for source in (ROOT / 'MobileHarness/Actions/History').rglob('*.swift'):
 if (ROOT / "MobileHarness/Agents/Support/Core/Output/PoseOverlay.swift").exists():
     errors.append("PoseOverlay belongs to UI/Camera, not AgentCore")
 
+# Xcode navigation must not point to retired role assets or moved Support sources.
+project = json.loads(subprocess.check_output([
+    'plutil', '-convert', 'json', '-o', '-', str(ROOT / 'MobileHarness.xcodeproj/project.pbxproj')
+], text=True))
+for item in project['objects'].values():
+    path = item.get('path', '')
+    if item.get('isa') == 'PBXFileReference' and path.startswith('MobileHarness/Agents/') and not (ROOT / path).is_file():
+        errors.append(f'Stale Xcode Agent navigation reference: {path}')
+
+# Source naming and shared-component ownership are architectural contracts.
+for source in (ROOT / 'MobileHarness').rglob('*.swift'):
+    if not re.fullmatch(r'[A-Z][A-Za-z0-9]*\.swift', source.name):
+        errors.append(f'Swift source must use UpperCamelCase: {source.relative_to(ROOT)}')
+support = ROOT / 'MobileHarness/Agents/Support'
+for source in support.glob('*.swift'):
+    imports = set(re.findall(r'\bimport\s+(\w+)', source.read_text()))
+    if imports - {'Foundation', 'AgentCore', 'FunctionContracts'}:
+        errors.append(f'Support root must remain immutable configuration/catalog helpers: {source.name}')
+for filename in ['AgentConfigurations.swift', 'AgentSkillLoader.swift']:
+    if not (support / filename).is_file():
+        errors.append(f'Missing Support configuration helper: {filename}')
+for filename in ['AgentTaskSkillState.swift', 'AgentFixedTaskCoordinator.swift']:
+    if not (support / 'Context' / filename).is_file():
+        errors.append(f'Task context/lifecycle must belong to Context: {filename}')
+for source in (support / 'Communication').glob('*.swift'):
+    if re.search(r'\b(?:AgentContextRepository|AgentTaskSkillState|AgentFixedTaskCoordinator|AgentSkillLoader|AgentConfigurations)\b', source.read_text()):
+        errors.append(f'Communication content cannot own resources or context lifecycle: {source.name}')
+
 # Physical consolidation preserves distinct framework/contracts/capability/persistence layers.
 for layer, allowed in {
     'Core': {'Foundation'},
-    'Communication': {'Foundation', 'AgentCore'},
+    'Communication': {'Foundation', 'AgentCore', 'FunctionContracts'},
     'Context': {'Foundation', 'AgentCore', 'Storage'},
     'Chat': {'Foundation', 'AgentCore', 'ModelKit', 'StorageChat'},
 }.items():
@@ -547,6 +716,10 @@ for layer, allowed in {
         imports = set(re.findall(r'\bimport\s+(\w+)', source.read_text()))
         if imports - allowed:
             errors.append(f'Forbidden Support/{layer} imports {sorted(imports - allowed)}: {source.relative_to(ROOT)}')
+
+for source in (support / 'Chat').glob('*.swift'):
+    if re.search(r'\b(?:AssistantContextState|AssistantContextBuilder|PhotographerAgent|MemoryAgent|ApplicationControlAgent|CameraStateObservation)\b', source.read_text()):
+        errors.append(f'Shared Chat must not interpret a concrete role schema: {source.name}')
 
 # Core owns generic contracts, never built-in application Agents or speech policy.
 core_dependencies = [next(iter(d.values()))[0] for d in targets['AgentCore'].get('dependencies', [])]
@@ -633,27 +806,48 @@ for source in actions_root.glob('*/Support/*Module.swift'):
 for registry in ('ActionRegistry.swift', 'ToolRegistry.swift'):
     if 'definition.validate()' not in (ROOT / 'MobileHarness/Gateway/Output/Registration' / registry).read_text():
         errors.append(f'Registry must use shared executable metadata validation: {registry}')
-for source in (ROOT / 'MobileHarness/Agents').rglob('*.agent.json'):
-    configuration = json.loads(source.read_text())
-    agents_root = ROOT / 'MobileHarness/Agents'
-    if source.parent != agents_root:
-        role = source.parent.name
-        actor = source.parent / f'{role}Agent.swift'
-        if source.name != f'{role}.agent.json' or configuration.get('id') != role[:1].lower() + role[1:]:
-            errors.append(f'Agent directory/configuration/identity naming mismatch: {source.relative_to(ROOT)}')
-        if not actor.is_file() or not (re.search(rf'public actor {re.escape(role)}Agent\s*:\s*Agent\b', actor.read_text()) or (role == 'Assistant' and 'public typealias AssistantAgent = AgentChatWorker<AssistantContextState>' in actor.read_text())):
-            errors.append(f'Agent role lacks its canonical actor: {source.relative_to(ROOT)}')
-    else:
-        errors.append(f'Concrete Agent configuration belongs in its role directory: {source.relative_to(ROOT)}')
-    if configuration.get('version') != 6:
-        errors.append(f'Agent configuration must use explicit v6 bindings: {source.relative_to(ROOT)}')
-    for actions in configuration.get('actions', {}).values():
-        for action in actions:
-            if set(action.get('path', {})) != {'domain', 'module', 'function'}:
-                errors.append(f'Action address lacks three fields: {source.relative_to(ROOT)}')
-    for tool in configuration.get('tools', []):
-        if set(tool) != {'path', 'definition'} or set(tool.get('path', {})) != {'domain', 'module', 'function'}:
-            errors.append(f'Native Tool binding lacks explicit address/definition: {source.relative_to(ROOT)}')
+if targets['Agents'].get('path') != 'MobileHarness' or targets['Agents'].get('sources') != ['Agents']:
+    errors.append('Agents must compile only Agents sources while packaging shared assets')
+asset_root = ROOT / 'MobileHarness/Resources'
+asset_catalog = json.loads((asset_root / 'Catalog.json').read_text())
+for group, version in [('agents', 7), ('skills', 1)]:
+    for name, relative in asset_catalog[group].items():
+        source = asset_root / relative
+        parts = Path(relative).parts
+        if parts[0] != group.title() or source.name != ('Agent.json' if group == 'agents' else 'Skill.json') or not re.fullmatch(r'[A-Z][A-Za-z0-9]*', parts[1]):
+            errors.append(f'Noncanonical Agent/Skill resource name: {relative}')
+        if not source.resolve().is_relative_to(asset_root.resolve()):
+            errors.append(f'Unconfined Agent resource: {relative}')
+            continue
+        configuration = json.loads(source.read_text())
+        if configuration.get('version') != version:
+            errors.append(f'Invalid {group} version: {relative}')
+        if group == 'agents':
+            actor = ROOT / 'MobileHarness/Agents' / name / f'{name}Agent.swift'
+            if not actor.is_file(): errors.append(f'Missing canonical Agent: {name}')
+            if 'permissions' in configuration or (source.parent / 'Permissions.json').exists():
+                errors.append(f'Retired per-Agent Permissions remain: {relative}')
+            if any(key in configuration for key in ('functions', 'actions', 'tools')):
+                errors.append(f'Agent function registration must belong to Skills: {relative}')
+            base = configuration.get('baseSkills', [])
+            if not isinstance(base, list) or any(skill not in asset_catalog['skills'] for skill in base):
+                errors.append(f'Unknown Agent base Skill: {relative}')
+            functions = []
+        elif group == 'skills': functions = configuration['functions']
+        else: continue
+        paths = [f['path'] for f in functions]
+        aliases = [f['alias'] for f in functions]
+        if len(paths) != len(set(paths)) or len(aliases) != len(set(aliases)):
+            errors.append(f'Duplicate function registration: {relative}')
+        for function in functions:
+            if len(function['path'].split('.')) != 3 or function['callType'] not in ('action', 'tool'):
+                errors.append(f'Invalid function binding: {relative}')
+            if function['path'] == 'Agent.Communication.send' and function['callType'] != 'action':
+                errors.append(f'send must be Action: {relative}')
+if any(p for group in ('Agents', 'Skills') for p in (asset_root / group).rglob('*.swift')):
+    errors.append('Agent Resources must not contain compiled code')
+if any((ROOT / 'MobileHarness/Agents').rglob('*.agent.json')):
+    errors.append('Retired Agent configuration remains outside Resources')
 for source in (ROOT / 'MobileHarness').rglob('*'):
     if source.is_file() and source.suffix in {'.swift', '.json'} and re.search(r'\b(?:ConversationMemoryAgent|conversationMemory|ConversationMemoryIntent|ResourceManagementAgent|resourceManagement|ResourceIntentRuntime|ResourceIntentFailure)\b', source.read_text()):
         errors.append(f'Retired Memory role alias: {source.relative_to(ROOT)}')

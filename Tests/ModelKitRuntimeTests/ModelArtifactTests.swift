@@ -36,7 +36,7 @@ private func fixtureCatalog(path: String = "config.json", prefix: String? = nil)
 }
 
 @Test func retainedResourceHandleIsBlockedThroughMaintenance() async throws {
-    let context = ModelContext()
+    let context = try ModelContext(loadGate: ModelLoadGate(maximumConcurrentLoads: 4), maximumLoadWaiters: 32)
     let resource = try context.resource { 42 }
     let first = try await resource.acquire()
     await resource.release(first.id)
@@ -62,7 +62,7 @@ private actor ArtifactFixtureStorage: ModelArtifactStorage {
 }
 @Test func resourceRemovalPersistsDiskStateWithoutClosingManager() async throws {
     let storage = ArtifactFixtureStorage()
-    let manager = ModelManager()
+    let manager = try ModelManager()
     try await manager.configureArtifacts(catalog: fixtureCatalog(), storage: storage)
     let before = try await manager.artifactSnapshots()
     #expect(before.first?.phase == .installed)

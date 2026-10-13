@@ -2,7 +2,7 @@
 
 ## Summary
 
-Strict JSON v6 configuration, model alias resolution and separate code-owned runtime grants.
+Strict JSON v6/v7 configuration, model alias resolution and separate code-owned runtime grants.
 
 ## Ownership and boundaries
 
@@ -14,7 +14,7 @@ The graph shows declaration validation and context construction; dashed arrows s
 
 ```mermaid
 flowchart LR
- JSON[Bounded JSON v6] --> Validation
+ JSON[Bounded JSON v6/v7] --> Validation
  Catalog[Injected communication schemas] --> Validation
  Validation --> Config[Immutable model declarations]
  Config --> Resolver[Alias and native-name resolution]
@@ -37,14 +37,26 @@ InternalAction/InternalTool carry code-owned paths/parameter names; permits incl
 
 The native definition retains a legacy function envelope as a neutral declaration; provider adapters convert it to their wire protocol. It does not imply Chat Completions transport. Communication configuration validates against the supplied catalog; Core has no speech/pose domains.
 
-✅ Strict v6 validation and separate model/runtime permissions are implemented.
+✅ Strict v6/v7 validation and separate model/runtime permissions are implemented.
 
 ❌ Full JSON Schema and configuration hot reload are not implemented.
 
 ## Model context construction
 
-CapabilityContextBuilder renders protocol and capability-description templates from [FunctionToken.prompts.json](../Generation/FunctionToken.prompts.json), using the current visible registry only. Roles supply natural-text interpretation and special speech/action ordering examples in their own system templates. Native definitions and internal grants remain outside the XML catalog. Channels are rendered in sorted order; Action metadata, parameter constraints and examples come from the current registrations. The final catalog is bounded to 65536 UTF-8 bytes. Resource/render failures propagate rather than substituting instructions.
+CapabilityContextBuilder renders protocol and capability-description templates from [FunctionTokenPrompts.json](../Generation/FunctionTokenPrompts.json), using the current visible registry only. Roles supply identity and style; Skill instructions own procedural examples. Native definitions and internal grants remain outside the XML catalog. Channels are rendered in sorted order; Action metadata, parameter constraints and examples come from the current registrations. The final catalog is bounded to 65536 UTF-8 bytes. Resource/render failures propagate rather than substituting instructions.
 
 ## Related design
 
 [Parent design](../README.md)
+
+## Action-owned documentation and Skill instruction contract
+
+✅ CapabilityDocumentation 只保留 doc/parameters，目录不渲染函数 examples。旧版配置导入时仍验证其历史 examples，但不进入实时元数据。新投影可省略该字段；参数、别名、容量及目录校验继续严格执行。
+
+
+✅ 输出协议不再提前显示函数目录标题；真正目录末尾明确只有已列Action别名可作自闭合标签，Skill名称不是函数。
+
+✅ 目录边界明确操作请求的回复必须推进执行；参数 description 与 constraints 完全相同则只展示一次，不删除独立约束。
+
+
+✅ 提示词精简已实现：目录按Channel分组，只显示Action别名、doc和参数类型/必填性；不重复path、Channel和必填/可选总表。真实注册与参数契约不变。

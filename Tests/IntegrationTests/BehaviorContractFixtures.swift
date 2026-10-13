@@ -51,7 +51,7 @@ extension ActionBinding {
         self.init(
             path: .init(domain: path.domain, module: path.module, function: path.function), displayName: displayName,
             kind: kind,
-            completion: completion, serializationKey: path.domain,
+            completion: completion,
             resources: Set(resources.map { ActionResource(rawValue: $0.rawValue) }),
             handler: handler)
     }
@@ -62,7 +62,7 @@ extension ActionBinding {
         self.init(
             path: .init(domain: path.domain, module: path.module, function: path.function), displayName: displayName,
             kind: kind,
-            completion: completion, serializationKey: path.domain,
+            completion: completion,
             resources: Set(resources.map { ActionResource(rawValue: $0.rawValue) }),
             completing: completing)
     }

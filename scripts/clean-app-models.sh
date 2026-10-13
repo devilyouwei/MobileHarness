@@ -13,3 +13,10 @@ case "$agent_bundle" in
     /*.app/HarnessKit_Agents.bundle) /bin/rm -rf "$agent_bundle" ;;
     *) echo 'error: Refusing to clean outside the generated Agents bundle.' >&2; exit 1 ;;
 esac
+
+# Function contracts now carry compiled values only; retire their old metadata resource bundle.
+contracts_bundle="${TARGET_BUILD_DIR:?}/${UNLOCALIZED_RESOURCES_FOLDER_PATH:?}/HarnessKit_FunctionContracts.bundle"
+case "$contracts_bundle" in
+    /*.app/HarnessKit_FunctionContracts.bundle) /bin/rm -rf "$contracts_bundle" ;;
+    *) echo 'error: Refusing to clean outside the generated FunctionContracts bundle.' >&2; exit 1 ;;
+esac

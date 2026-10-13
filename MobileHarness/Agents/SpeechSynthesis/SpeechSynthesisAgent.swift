@@ -20,7 +20,6 @@ public actor SpeechSynthesisAgent: Agent {
     private let continuation: AsyncStream<OutputEnvelope>.Continuation
     private let synthesis: any SpeechSynthesisCapability
     private let store: SpeechAudioStore
-    private let executionTimeout: Duration
     private var lifecycle: AgentLifecycle = .registered
     private var queue: [(SpeechSynthesisInput, AgentInput)] = []
     private var admitting = 0
@@ -32,7 +31,7 @@ public actor SpeechSynthesisAgent: Agent {
 
     public init(
         synthesis: any SpeechSynthesisCapability, store: SpeechAudioStore,
-        executionTimeout: Duration = .seconds(60), configuration: AgentConfiguration? = nil,
+        configuration: AgentConfiguration? = nil,
         context: AgentContextRepository<SpeechSynthesisContextState>? = nil
     ) throws {
         self.contextRepository =
@@ -42,9 +41,6 @@ public actor SpeechSynthesisAgent: Agent {
         guard contextRepository.agentID.rawValue == "speechSynthesis" else {
             throw AgentConfigurationError.identityMismatch
         }
-        guard executionTimeout > .zero else {
-            throw CapabilityError.invalidRequest("Synthesis execution timeout must be positive")
-        }
         let config = try configuration ?? AgentConfigurations.load(named: "SpeechSynthesis")
         guard config.agentID.rawValue == "speechSynthesis" else { throw AgentConfigurationError.identityMismatch }
         descriptor = AgentDescriptor(
@@ -52,7 +48,6 @@ public actor SpeechSynthesisAgent: Agent {
             inputs: Set(config.communication.inputs.map(\.kind)), outputs: [], capabilities: config.capabilities)
         self.synthesis = synthesis
         self.store = store
-        self.executionTimeout = executionTimeout
         let stream = AsyncStream<OutputEnvelope>.makeStream(
             bufferingPolicy: .bufferingOldest(SpeechSynthesisSignalPreprocessor.outputCapacity))
         outputs = stream.stream
@@ -155,11 +150,6 @@ public actor SpeechSynthesisAgent: Agent {
             processed += 1
             drain()
         }
-        let deadline = Task {
-            do { try await Task.sleep(for: executionTimeout) } catch { return }
-            await store.fail(request.audioID, error: SpeechSynthesisError.timedOut)
-        }
-        defer { deadline.cancel() }
         do {
             let audio = try await store.begin(request.audioID)
             try Task.checkCancellation()
@@ -271,7 +261,7 @@ public actor SpeechSynthesisAgent: Agent {
 
 /// Producer failures, independent of storage format and lease errors.
 public enum SpeechSynthesisError: Error, Equatable, Sendable {
-    case timedOut, invalidOutput
+    case invalidOutput
 }
 
 // A producer must not join itself when its failure closes the registered audio handle.

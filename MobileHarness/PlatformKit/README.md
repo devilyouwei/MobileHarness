@@ -57,3 +57,15 @@ Device acceptance evidence is recorded in [validation history](../../docs/Valida
 ## Related design
 
 [Parent design](../README.md) · [Audio](Audio/README.md) · [Connectivity](Connectivity/README.md) · [Core](Core/README.md) · [Vision](Vision/README.md)
+
+
+✅ Implemented: AppleAudioIO exposes generic playClip for bounded PCM before capture, reusing the existing native drain/cancellation implementation. No app chime/music or presentation policy enters PlatformKit.
+
+
+✅ Implemented: native PCM continuity evidence is distinguished from bounded queue overflow; stopPlayback cancels/wakes the owned native playback operation without stopping capture. Upper-layer consent/reply policy remains in App.
+
+
+✅ Implemented: Audio owns generic NativeHapticFeedback with public UIKit/CoreHaptics support checks, one bounded operation, cached prepared generators and explicit busy/unavailable/invalid-request failures. It owns no listening policy or cue selection. AppleAudioIO enables supported haptics during recording through the public AVAudioSession API.
+
+
+✅ Implemented: Audio adds generic bounded PCMClipEncoding and one NativeCuePlayback using public AVAudioPlayer. It plays alongside existing audio under the current session, without reconfiguring/deactivating AVAudioSession or touching another player/capture owner. One active clip; overlap fails; callbacks/errors/cancellation complete its wait.

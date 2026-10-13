@@ -95,3 +95,30 @@ import UI
     #expect(!accept(context, update: .transcript, state: state))
     #expect(state.liveTranscript == "新输入")
 }
+
+@Test func userOffRejectsLateReplyCaptionAndPlaybackUntilFreshRecognition() {
+    let session = UUID()
+    let turn = AgentTurn(ordinal: 1)
+    func context(_ turn: AgentTurn, _ sequence: UInt64, source: String = "assistant") -> ActionExecutionContext {
+        .init(
+            source: source, sessionID: session, inputID: UUID(), sequence: sequence,
+            correlationID: turn.id, ordinal: turn.ordinal)
+    }
+    var presentation = ConversationPresentation()
+    func accept(_ context: ActionExecutionContext, update: ConversationPresentation.Update) -> Bool {
+        presentation.accept(context, update: update)
+    }
+    #expect(accept(context(turn, 1, source: "speechPerception"), update: .transcript))
+    #expect(accept(context(turn, 1), update: .beginReply))
+    presentation.suspendReplies()
+    #expect(!accept(context(turn, 2), update: .reply))
+    #expect(!accept(context(turn, 3), update: .expression))
+    #expect(!presentation.acceptsPlayback(context(turn, 4), activeSessions: [session]))
+    presentation.beginRecognitionScope()
+    #expect(!accept(context(turn, 5), update: .reply))
+    #expect(!presentation.acceptsPlayback(context(turn, 6), activeSessions: [session]))
+    let next = AgentTurn(ordinal: 2)
+    #expect(accept(context(next, 2, source: "speechPerception"), update: .transcript))
+    #expect(accept(context(next, 7), update: .beginReply))
+    #expect(presentation.acceptsPlayback(context(next, 8), activeSessions: [session]))
+}

@@ -37,3 +37,30 @@ public struct MicrophoneFrame: Sendable {
         return sqrt(values.reduce(Float(0)) { $0 + $1 * $1 } / Float(values.count))
     }
 }
+
+/// Native timeline evidence, distinct from the bounded stream queue becoming full.
+public struct AudioCaptureDiscontinuity: Error, Sendable, Equatable {
+    public let expectedTimestamp: Double
+    public let actualTimestamp: Double
+    public let previousSampleRate: Double
+    public let actualSampleRate: Double
+    public var gapSeconds: Double { actualTimestamp - expectedTimestamp }
+}
+
+enum AudioPCMContinuityError: Error { case invalidFrame }
+struct AudioPCMContinuity: Sendable {
+    private var end: Double?
+    private var rate: Double?
+    mutating func accept(timestamp: Double, frameCount: Int, sampleRate: Double) throws {
+        guard timestamp.isFinite, timestamp >= 0, frameCount > 0, sampleRate.isFinite, sampleRate > 0 else {
+            throw AudioPCMContinuityError.invalidFrame
+        }
+        if let end, let rate, rate != sampleRate || abs(timestamp - end) > 2 / sampleRate {
+            throw AudioCaptureDiscontinuity(
+                expectedTimestamp: end, actualTimestamp: timestamp,
+                previousSampleRate: rate, actualSampleRate: sampleRate)
+        }
+        end = timestamp + Double(frameCount) / sampleRate
+        rate = sampleRate
+    }
+}

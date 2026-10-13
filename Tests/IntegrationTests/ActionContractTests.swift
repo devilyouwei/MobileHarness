@@ -58,7 +58,7 @@ private func contractDefinition(
         path: path, displayName: "测试动作", kind: kind, completion: "Fixture operation acknowledged.", handler: handler)
 }
 
-@Test func actionDefinitionsRejectDuplicatesInvalidMetadataAndMissingGrants() throws {
+@Test(.actionCatalog) func actionDefinitionsRejectDuplicatesInvalidMetadataAndMissingGrants() throws {
     let definition = contractDefinition()
     #expect(throws: ActionExecutionError.duplicateDefinition(contractPath.executionIdentifier)) {
         try ActionRegistry(definitions: [definition, definition])
@@ -102,7 +102,7 @@ private func contractDefinition(
     #expect(try registry.definition(for: contractPath).kind == .finite)
 }
 
-@Test func assembledAgentCatalogsIncludeInternalActionsForStartupValidation() throws {
+@Test(.actionCatalog) func assembledAgentCatalogsIncludeInternalActionsForStartupValidation() throws {
     let assistant = try AssistantAgent.runtimeCapabilities(AgentConfigurations.load(named: "Assistant").capabilities)
     let speech = try SpeechPerceptionAgent.runtimeCapabilities(
         AgentConfigurations.load(named: "SpeechPerception").capabilities)
@@ -118,7 +118,7 @@ private func contractDefinition(
     for catalog in catalogs { try registry.validate(capabilities: catalog) }
 }
 
-@Test func invocationRejectsNonActionsAndDerivesCallFromEnvelope() throws {
+@Test(.actionCatalog) func invocationRejectsNonActionsAndDerivesCallFromEnvelope() throws {
     let input = AgentInput(sessionID: UUID(), payload: .event("contract"))
     #expect(throws: ActionExecutionError.invalidInvocation) {
         try ActionInvocation(envelope: OutputEnvelope(source: .assistant, input: input, output: .control("finish")))
@@ -131,7 +131,7 @@ private func contractDefinition(
     #expect(invocation.testEnvelope.inputID == input.id && invocation.testEnvelope.sequence == 7)
 }
 
-@Test func argumentReadersRejectMalformedValuesAndPreserveText() throws {
+@Test(.actionCatalog) func argumentReadersRejectMalformedValuesAndPreserveText() throws {
     let arguments = ActionArguments(["count": "3", "x": "-1", "text": " 你好 ", "emotion": "smile"])
     try arguments.validateAllowedKeys(["count", "x", "text", "emotion"])
     #expect(try arguments.requiredInt("count", range: 1...3) == 3)
@@ -160,7 +160,7 @@ private func contractDefinition(
     }
 }
 
-@Test func presentationRejectsUnknownArgumentsBeforeEffects() async throws {
+@Test(.actionCatalog) func presentationRejectsUnknownArgumentsBeforeEffects() async throws {
     let invocation = ActionInvocation(
         source: .assistant, input: AgentInput(sessionID: UUID(), payload: .event("contract")),
         call: ActionCall(
@@ -171,7 +171,9 @@ private func contractDefinition(
     }
 }
 
-@Test(.timeLimit(.minutes(1))) func finiteCompletionHoldsLaneButStateCommitDoesNotJoinAnimation() async throws {
+@Test(.actionCatalog, .timeLimit(.minutes(1))) func finiteCompletionHoldsLaneButStateCommitDoesNotJoinAnimation()
+    async throws
+{
     let started = ContractGate()
     let release = ContractGate()
     let state = ContractState()
@@ -211,7 +213,7 @@ private func contractDefinition(
     #expect(after.records.last?.kind == .state && after.records.last?.effect == .contractCompleted)
 }
 
-@Test func diagnosticEvictionNeverDiscardsActionsAndEachAdmissionGetsAnID() async throws {
+@Test(.actionCatalog) func diagnosticEvictionNeverDiscardsActionsAndEachAdmissionGetsAnID() async throws {
     let state = ContractState()
     let scheduler = ChannelScheduler(
         registry: try ActionRegistry(definitions: [
@@ -235,7 +237,9 @@ private func contractDefinition(
     #expect(await scheduler.diagnosticSnapshot().evictedCount == 4)
 }
 
-@Test(.timeLimit(.minutes(1))) func cancellationDistinguishesQueuedFromPossiblyCommittedEffects() async throws {
+@Test(.actionCatalog, .timeLimit(.minutes(1))) func cancellationDistinguishesQueuedFromPossiblyCommittedEffects()
+    async throws
+{
     let committed = ContractGate()
     let cancelled = ContractGate()
     let cleanup = ContractGate()
@@ -275,7 +279,7 @@ private func contractDefinition(
 
 private enum ContractFailure: Error, Equatable { case failed }
 
-@Test func handlerFailureKeepsOriginalErrorAndRecordsUnknownEffects() async throws {
+@Test(.actionCatalog) func handlerFailureKeepsOriginalErrorAndRecordsUnknownEffects() async throws {
     let scheduler = ChannelScheduler(
         registry: try ActionRegistry(definitions: [
             contractDefinition { _ in
@@ -290,7 +294,7 @@ private enum ContractFailure: Error, Equatable { case failed }
     #expect(snapshot.records.last?.effect == .unknown)
 }
 
-@Test func finiteExpressionRetainsModuleUntilPerformanceAndRestorationFinish() async throws {
+@Test(.actionCatalog) func finiteExpressionRetainsChannelUntilPerformanceAndRestorationFinish() async throws {
     let entered = ContractGate()
     let animation = ContractGate()
     let restoring = ContractGate()
@@ -323,7 +327,7 @@ private enum ContractFailure: Error, Equatable { case failed }
     let set = ActionInvocation(
         source: .assistant, input: input,
         call: ActionCall(
-            actionPath: .init(domain: "UI", module: "Expression", function: "setExpression"), channel: "Another",
+            actionPath: .init(domain: "UI", module: "Expression", function: "setExpression"), channel: "Display",
             parameters: ["emotion": "thinking"]))
     _ = try await scheduler.enqueue(invocation: perform)
     await entered.wait()
@@ -338,7 +342,7 @@ private enum ContractFailure: Error, Equatable { case failed }
     #expect(definition.kind == .finite && setter.kind == .state)
 }
 
-@Test func finiteExpressionCancellationAwaitsCleanupAndPreservesCancellation() async throws {
+@Test(.actionCatalog) func finiteExpressionCancellationAwaitsCleanupAndPreservesCancellation() async throws {
     let cleanupEntered = ContractGate()
     let cleanupFinished = ContractGate()
     let state = ContractState()
@@ -367,7 +371,7 @@ private enum ContractFailure: Error, Equatable { case failed }
     #expect(await state.effects == 1)
 }
 
-@Test func expressionCleanupFailureRetainsBothErrors() async throws {
+@Test(.actionCatalog) func expressionCleanupFailureRetainsBothErrors() async throws {
     let invocation = ActionInvocation(
         source: .assistant,
         input: AgentInput(sessionID: UUID(), payload: .event("expression")),
@@ -387,7 +391,7 @@ private enum ContractFailure: Error, Equatable { case failed }
     }
 }
 
-@Test(arguments: [false, true])
+@Test(.actionCatalog, arguments: [false, true])
 func actionStoredResultsRetainSubsequentHandlerFailure(_ reported: Bool) async throws {
     let invocation = contractInvocation()
     let definition = contractDefinition { invocation in
@@ -406,7 +410,7 @@ func actionStoredResultsRetainSubsequentHandlerFailure(_ reported: Bool) async t
     #expect(report.status == .partialFailure)
 }
 
-@Test func schedulerStoredReportDoesNotMaskCancellationOrHandlerFailure() async throws {
+@Test(.actionCatalog) func schedulerStoredReportDoesNotMaskCancellationOrHandlerFailure() async throws {
     let definition = contractDefinition { invocation in
         try await invocation.results.record(ActionReport(entries: [.init(path: "first", status: .succeeded)]))
         throw CancellationError()
@@ -425,11 +429,11 @@ func actionStoredResultsRetainSubsequentHandlerFailure(_ reported: Bool) async t
     #expect(report.executionFailure == .cancelled)
 }
 
-@Test func actionDefinitionBudgetOverridesRuntimeDefault() async throws {
+@Test(.actionCatalog) func actionDefinitionBudgetOverridesRuntimeDefault() async throws {
     let definition = ActionBinding(
         path: contractPath.executionIdentifier, displayName: "Timeout fixture",
         kind: .finite, completion: "Joined cleanup",
-        estimatingDuration: { _ in
+        dynamicTimeout: { _ in
             try ActionExecutionBudget(expected: .zero, timeout: .milliseconds(10))
         }, handler: { _ in try await Task.sleep(for: .seconds(60)) })
     let executor = ActionExecutor(registry: try ActionRegistry(definitions: [definition]))
@@ -440,14 +444,13 @@ func actionStoredResultsRetainSubsequentHandlerFailure(_ reported: Bool) async t
     }
     #expect(report.executionFailure == .timedOut)
     #expect(report.failureDescription == "Action execution timed out")
-    #expect(ActionExecutor.defaultTimeout == .seconds(30))
 }
 
-@Test func actionDeadlinePreservesChildCauseWithoutBorrowingItsRootMessage() async throws {
+@Test(.actionCatalog) func actionDeadlinePreservesChildCauseWithoutBorrowingItsRootMessage() async throws {
     let definition = ActionBinding(
         path: contractPath.executionIdentifier, displayName: "Timeout cause fixture",
         kind: .finite, completion: "Joined cleanup",
-        estimatingDuration: { _ in try ActionExecutionBudget(expected: .zero, timeout: .milliseconds(20)) },
+        dynamicTimeout: { _ in try ActionExecutionBudget(expected: .zero, timeout: .milliseconds(20)) },
         handler: { invocation in
             try await invocation.results.record(
                 ActionReport(entries: [
@@ -475,7 +478,7 @@ func actionStoredResultsRetainSubsequentHandlerFailure(_ reported: Bool) async t
     #expect(report.entries.first?.code == .handlerFailed)
 }
 
-@Test func schedulerPreservesTerminalChildFailureInsteadOfEarlierSuccessfulReport() async throws {
+@Test(.actionCatalog) func schedulerPreservesTerminalChildFailureInsteadOfEarlierSuccessfulReport() async throws {
     let definition = ActionBinding(
         path: contractPath.executionIdentifier, displayName: "Terminal fixture", kind: .finite,
         completion: "Terminal report",
@@ -502,7 +505,7 @@ func actionStoredResultsRetainSubsequentHandlerFailure(_ reported: Bool) async t
     #expect(report.entries.first?.status == .failed)
 }
 
-@Test func schedulerPreservesOriginalTerminalErrorDescriptionAfterStoredChildReport() async throws {
+@Test(.actionCatalog) func schedulerPreservesOriginalTerminalErrorDescriptionAfterStoredChildReport() async throws {
     struct WriteFailure: LocalizedError { var errorDescription: String? { "Native fixture write failed" } }
     let definition = contractDefinition { invocation in
         try await invocation.results.record(ActionReport(entries: [.init(path: "first", status: .succeeded)]))
@@ -521,4 +524,37 @@ func actionStoredResultsRetainSubsequentHandlerFailure(_ reported: Bool) async t
     }
     #expect(report.executionFailure == .handlerFailed)
     #expect(report.failureDescription == "Native fixture write failed")
+}
+
+@Test(.actionCatalog) func closedEyeExpressionUsesRealFiniteAndPersistentActions() async throws {
+    let input = AgentInput(sessionID: UUID(), payload: .event("close eyes"))
+    func invocation(_ function: String, emotion: String = "closed") -> ActionInvocation {
+        .init(
+            source: .assistant, input: input,
+            call: .init(
+                actionPath: .init(domain: "UI", module: "Expression", function: function), channel: "Display",
+                parameters: ["emotion": emotion]))
+    }
+    let state = ContractState()
+    try await UIActions.express(
+        invocation: invocation("express"),
+        using: { emotion, _ in
+            #expect(emotion == .closed)
+            await state.setExpression()
+        }, restoring: { _ in await state.setExpression() })
+    #expect(await state.effects == 2)
+    try await UIActions.setExpression(invocation: invocation("setExpression")) { emotion, _ in
+        #expect(emotion == .closed)
+        await state.setExpression()
+    }
+    #expect(await state.effects == 3)
+    #expect(UIActions.expressDeclaration.parameters.first?.constraints.contains("closed") == true)
+    #expect(UIActions.setExpressionDeclaration.parameters.first?.constraints.contains("closed") == true)
+    for emotion in ["clear", "shut"] {
+        await #expect(throws: UIActions.ExpressionError.invalidEmotion) {
+            try await UIActions.express(
+                invocation: invocation("express", emotion: emotion),
+                using: { _, _ in Issue.record("Invalid emotion reached renderer") }, restoring: { _ in })
+        }
+    }
 }

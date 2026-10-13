@@ -29,22 +29,23 @@ public actor MemoryLeaseStore<Value: Sendable> {
     private struct Terminal {
         let owner: StorageOwner
         let error: any Error
-        let expires: ContinuousClock.Instant
+        let expires: ContinuousClock.Instant?
+        let createdAt: ContinuousClock.Instant
     }
     private var entries: [UUID: Entry] = [:]
     private var terminal: [UUID: Terminal] = [:]
     private let capacity: Int
     private let queueTTL: Duration?
     private let readyTTL: Duration?
-    private let errorTTL: Duration
+    private let errorTTL: Duration?
     private let onRemove: @Sendable (Value, any Error) async -> Void
     private var closed = false
 
     public init(
-        capacity: Int, queueTTL: Duration?, readyTTL: Duration?, errorTTL: Duration,
+        capacity: Int, queueTTL: Duration?, readyTTL: Duration?, errorTTL: Duration?,
         onRemove: @escaping @Sendable (Value, any Error) async -> Void
     ) {
-        precondition(capacity > 0 && errorTTL > .zero)
+        precondition(capacity > 0 && (errorTTL.map { $0 > .zero } ?? true))
         precondition(queueTTL.map { $0 > .zero } ?? true)
         precondition(readyTTL.map { $0 > .zero } ?? true)
         self.capacity = capacity
@@ -129,10 +130,11 @@ public actor MemoryLeaseStore<Value: Sendable> {
         guard let entry = entries.removeValue(forKey: id) else { return }
         entry.timer?.cancel()
         prune()
-        if terminal.count >= 128, let oldest = terminal.min(by: { $0.value.expires < $1.value.expires })?.key {
+        if terminal.count >= 128, let oldest = terminal.min(by: { $0.value.createdAt < $1.value.createdAt })?.key {
             terminal.removeValue(forKey: oldest)
         }
-        terminal[id] = Terminal(owner: entry.owner, error: error, expires: .now.advanced(by: errorTTL))
+        terminal[id] = Terminal(
+            owner: entry.owner, error: error, expires: errorTTL.map { .now.advanced(by: $0) }, createdAt: .now)
         await onRemove(entry.value, error)
         await entry.cancel()
     }
@@ -150,6 +152,19 @@ public actor MemoryLeaseStore<Value: Sendable> {
             $0.value.owner.session == sessionID && $0.value.owner.namespace == namespace
         }.map(\.key)
         for id in ids { await fail(id, error: CancellationError()) }
+    }
+
+    /// Scope retirement removes error metadata after readers/producers have been cancelled.
+    public func forgetTerminals(inputID: UUID, source: String, namespace: String) {
+        terminal = terminal.filter {
+            !($0.value.owner.input == inputID && $0.value.owner.source == source
+                && $0.value.owner.namespace == namespace)
+        }
+    }
+    public func forgetTerminals(sessionID: UUID, namespace: String) {
+        terminal = terminal.filter {
+            !($0.value.owner.session == sessionID && $0.value.owner.namespace == namespace)
+        }
     }
 
     public func shutdown() async {
@@ -181,5 +196,5 @@ public actor MemoryLeaseStore<Value: Sendable> {
         }
     }
 
-    private func prune() { terminal = terminal.filter { $0.value.expires > .now } }
+    private func prune() { terminal = terminal.filter { $0.value.expires.map { $0 > .now } ?? true } }
 }

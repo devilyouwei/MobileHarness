@@ -4,7 +4,7 @@ import FunctionContracts
 /// UI.Caption function ownership; current invocation paths remain compatible.
 extension UIActions {
     @Action(
-        domain: "UI", module: "Caption", title: "beginReplyTurn", serializationKey: "UI")
+        domain: "UI", module: "Caption", title: "beginReplyTurn", timeout: .seconds(5))
     public static func beginReplyTurn(
         invocation: any FunctionInput,
         using present: @escaping @Sendable (any FunctionInput) async throws -> Void
@@ -19,7 +19,7 @@ extension UIActions {
 
     /// Replace the recognition caption; unlike UI.print, empty text is an explicit clear.
     @Action(
-        domain: "UI", module: "Caption", title: "setTranscript", serializationKey: "UI")
+        domain: "UI", module: "Caption", title: "setTranscript", timeout: .seconds(5))
     public static func setTranscript(
         invocation: any FunctionInput,
         using present: @escaping @Sendable (String, any FunctionInput) async throws -> Void
@@ -36,7 +36,7 @@ extension UIActions {
     }
 
     @Action(
-        domain: "UI", module: "Caption", title: "finishTranscript", serializationKey: "UI")
+        domain: "UI", module: "Caption", title: "finishTranscript", timeout: .seconds(5))
     public static func finishTranscript(
         invocation: any FunctionInput,
         using present: @escaping @Sendable (any FunctionInput) async throws -> Void
@@ -50,7 +50,7 @@ extension UIActions {
     }
 
     @Action(
-        domain: "UI", module: "Caption", title: "print", serializationKey: "UI")
+        domain: "UI", module: "Caption", title: "print", timeout: .seconds(5))
     public static func print(
         invocation: any FunctionInput,
         using present: @escaping @Sendable (String, any FunctionInput) async throws -> Void

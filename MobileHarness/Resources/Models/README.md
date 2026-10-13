@@ -23,7 +23,7 @@ flowchart LR
 
 ## Catalog and selection
 
-`model-catalog.json` schema v2 defines package IDs, capability, destination directory, compatibility, license, advisory size and source declaration. Hugging Face sources pin repository/revision, path selection and optional prefix stripping; per-file size/LFS hash is resolved at acquisition. ZIP sources supply archive hash and required files. [Management](../../ModelKit/Management/README.md) owns validation, bounded installation, receipts and removal.
+`model-catalog.json` schema v2 defines package IDs, capability, destination directory, compatibility, license, advisory size and source declaration. Hugging Face sources pin repository/revision, path selection and optional prefix stripping; per-file size/LFS hash is resolved at acquisition. ZIP sources supply archive hash and required files. [Management](../../ModelKit/Support/Management/README.md) owns validation, bounded installation, receipts and removal.
 
 | Package / local directory | Use |
 | --- | --- |

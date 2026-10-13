@@ -8,7 +8,6 @@ actor SpeechRecognitionTurn {
     private let preview: @Sendable (String) async throws -> Void
     private var queue: [VoiceStreamEvent] = []
     private var queuedSamples = 0
-    private var totalSamples = 0
     private var worker: Task<Void, Error>?
     private var reader: Task<String, Error>?
     private var session: SpeechRecognitionSession?
@@ -26,7 +25,7 @@ actor SpeechRecognitionTurn {
         self.preview = preview
     }
 
-    /// At most 128 work items / four seconds of queued PCM, one minute per turn.
+    /// At most 128 work items / four seconds of queued PCM; no total utterance time limit.
     func enqueue(_ events: [VoiceStreamEvent]) throws {
         guard !sealed, !cancelled else { throw CapabilityError.sessionClosed }
         if let failure { throw failure }
@@ -42,10 +41,8 @@ actor SpeechRecognitionTurn {
                 count += frames.reduce(0) { $0 + $1.sampleCount }
             }
         }
-        guard queue.count + events.count <= 128, queuedSamples + count <= 64000,
-            totalSamples + count <= 960000
+        guard queue.count + events.count <= 128, queuedSamples + count <= 64000
         else { throw CapabilityError.bufferOverflow }
-        totalSamples += count
         queuedSamples += count
         queue += events
         if worker == nil { worker = Task { try await self.drain() } }
@@ -56,7 +53,7 @@ actor SpeechRecognitionTurn {
         let stream = try await recognition.transcribe(
             SpeechRecognitionRequest(
                 locale: "auto", format: AudioFormat(sampleRate: 16000, channels: 1, encoding: .float32),
-                context: InferenceContext(conversationID: sessionID)))
+                context: InferenceContext(scopeID: sessionID)))
         if cancelled || Task.isCancelled {
             await stream.cancel()
             throw CancellationError()
@@ -116,16 +113,7 @@ actor SpeechRecognitionTurn {
         guard !sealed, !cancelled else { throw CapabilityError.sessionClosed }
         sealed = true
         return try await withTaskCancellationHandler {
-            try await withThrowingTaskGroup(of: String.self) { group in
-                group.addTask { try await self.finishAccepted() }
-                group.addTask {
-                    try await Task.sleep(for: .seconds(20))
-                    await self.cancel()
-                    throw CapabilityError.unavailable("语音识别超时")
-                }
-                defer { group.cancelAll() }
-                return try await group.next() ?? ""
-            }
+            try await finishAccepted()
         } onCancel: {
             Task { await self.cancel() }
         }

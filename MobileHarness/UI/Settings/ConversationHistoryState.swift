@@ -10,7 +10,7 @@ public final class ConversationHistoryState {
     public var tasks: [HistoryTask] = []
     public var status: String?
     public var isBusy = false
-    public init(title: String = "对话历史", allowsMutations: Bool = true, groupsByTask: Bool = false) {
+    public init(title: String = "历史记录", allowsMutations: Bool = true, groupsByTask: Bool = false) {
         self.title = title
         self.allowsMutations = allowsMutations
         self.groupsByTask = groupsByTask
@@ -23,16 +23,19 @@ public struct HistoryTask: Identifiable, Sendable {
     public let title: String
     public let status: String
     public let createdAt: Date?
-    public let isAssociated: Bool
     public let turns: [HistoryTurn]
+    public var execution: String?
+    public var executor: String?
+    public var resultText: String?
+    public var parentTaskID: UUID?
+    public var skills: [String] = []
     public init(
-        id: UUID, title: String, status: String, createdAt: Date?, isAssociated: Bool, turns: [HistoryTurn]
+        id: UUID, title: String, status: String, createdAt: Date?, turns: [HistoryTurn]
     ) {
         self.id = id
         self.title = title
         self.status = status
         self.createdAt = createdAt
-        self.isAssociated = isAssociated
         self.turns = turns
     }
 }
@@ -94,11 +97,26 @@ public struct HistoryNativeToolCall: Codable, Sendable, Equatable {
     public let argumentsJSON: String
 }
 
+public struct HistoryDecisionMetadata: Codable, Sendable {
+    public var taskGoal: String? = nil
+    public var execution: String? = nil
+    public let taskID: UUID?
+    public let mode: String
+    public let skills: [String: Int]
+    public let catalogJSON: String
+    public var summary: String {
+        (execution == nil ? "默认对话" : (execution == "background" ? "后台任务" : "前台任务") + " · " + (taskGoal ?? ""))
+            + " · Skills: "
+            + skills.keys.sorted().map { "\($0)@\(skills[$0] ?? 0)" }.joined(separator: ", ")
+    }
+}
+
 public struct HistoryModelRequest: Codable, Sendable, Identifiable {
     public let id: UUID
     public let date: Date
     public let input: String
     public let requestJSON: String
+    public var decisionMetadata: HistoryDecisionMetadata? = nil
     public let modelRequestStartedAt: Date?
     public let firstTokenLatency: Double?
     public let firstTokenAt: Date?
@@ -149,14 +167,11 @@ public struct HistoryTurn: Codable, Sendable, Identifiable {
     public let model: String
     public let maximumOutputTokens: Int?
     public let temperature: Double
-    // Optional additions keep version-1 records readable without migration.
     public let modelRequests: [HistoryModelRequest]?
     public let firstTokenAt: Date?
     public let requestJSON: String?
     public let ownerInputID: UUID?
     public let isReACT: Bool?
-    public let generationMetadataAvailable: Bool?
-    public let continuationRequests: [String]?
     public let toolDefinitions: [String]?
     public let toolCalls: [HistoryToolCall]?
     public let tokenUsage: HistoryTokenUsage?
@@ -165,6 +180,7 @@ public struct HistoryTurn: Codable, Sendable, Identifiable {
     public let finishReason: String?
     public let error: String?
     public let executionError: String?
+    public var decisionMetadata: HistoryDecisionMetadata? = nil
     public var modelRequestStartedAt: Date?
     public var firstTokenLatency: Double?
     public var raw: String { fragments.joined() }
@@ -188,8 +204,8 @@ public struct HistoryConversation: Codable, Sendable, Identifiable {
 
 public struct HistorySnapshot: Codable, Sendable {
     public let version: Int
-    public let current: HistoryConversation
-    public let past: [HistoryConversation]
+    public var current: HistoryConversation
+    public var past: [HistoryConversation]
     public init() {
         version = 1
         current = HistoryConversation()

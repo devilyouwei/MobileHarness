@@ -119,6 +119,6 @@ public struct PromptTemplates: Sendable {
 
 /// Generic protocol guidance is owned by AgentCore, independently of role resources.
 public enum FunctionTokenPrompts {
-    private static let stored = Result { try PromptTemplates.load(named: "FunctionToken.prompts", bundle: .module) }
+    private static let stored = Result { try PromptTemplates.load(named: "FunctionTokenPrompts", bundle: .module) }
     public static func load() throws -> PromptTemplates { try stored.get() }
 }

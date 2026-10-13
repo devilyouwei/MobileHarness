@@ -99,7 +99,7 @@ Purpose: verify contracts and application integration in separate test targets. 
 
 ✅ ADR0152: production registers one six-domain CapabilityModules catalog, with unified UI/NexArm ownership and unchanged call paths/permissions. Registry projections preserve existing execution policy; regression coverage checks expression and gaze through the same UI catalog. ❌ Unified call definitions and compatibility removal remain pending.
 
-✅ ADR0155 adds deterministic coverage for shared serialization keys across different paths/Channels, independent-key progress, rejected invalid registration and generated macro metadata.
+✅ ADR0213 replaces obsolete key tests with same-function concurrency across Channels/tasks and explicit resource-conflict failure coverage.
 
 ❌ Three-level runtime paths and unified Action/Tool definitions are not completed by this stage.
 
@@ -108,3 +108,17 @@ Purpose: verify contracts and application integration in separate test targets. 
 ✅ ADR0159 — Unified invocation: all business functions, injected capabilities and registered handlers receive FunctionInput with ActionExecutionContext. Native request/result normalization stays in Runtime/Gateway; no protocol-specific implementation signature remains.
 
 ✅ ADR0163: integration fixtures cover feedback causality and hop boundaries plus typed history schema rejection and existing cancellation/continuation paths.
+
+## Channel-owned Action ordering
+
+✅ Channel/task concurrency and resource-conflict regressions replace the retired key fixtures. Test/build evidence is recorded in [Validation-History.md](../docs/Validation-History.md).
+
+## ModelKit Support ownership
+
+✅ Provider tests now import their model-owned engine targets. ModelKit contract tests exercise the shared worker cancellation lifecycle; real-model opt-ins remain separate.
+
+## 历史记录收敛（2026-10-13）
+
+✅ 已实现：历史记录页面仅保留 Assistant 聊天记录与任务记录。Assistant context 是聊天持久化事实源，任务按持久化身份关联；页面板块重新设计另行开展。
+
+❌ 历史记录页面板块重新设计及原生 UI/真机验收。

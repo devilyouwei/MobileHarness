@@ -1,6 +1,6 @@
 # Kokoro 验证记录
 
-> Historical evidence scope (updated 2026-10-03): packaging/download statements below describe the revision tested at the time. Current App bundles source metadata/licenses only and installs weights through Settings; HF foreground requests restart after process relaunch. Current synthesis is MOSS. Kokoro is unregistered; its downloader/profile/local weights are removed and its optional real-model test needs HARNESS_KOKORO_MODEL_ROOT. See [current resource contract](../MobileHarness/ModelKit/Management/README.md#local-model-resources--current-contract).
+> Historical evidence scope (updated 2026-10-03): packaging/download statements below describe the revision tested at the time. Current App bundles source metadata/licenses only and installs weights through Settings; HF foreground requests restart after process relaunch. Current synthesis is MOSS. Kokoro is unregistered; its downloader/profile/local weights are removed and its optional real-model test needs HARNESS_KOKORO_MODEL_ROOT. See [current resource contract](../MobileHarness/ModelKit/Support/Management/README.md#local-model-resources--current-contract).
 
 历史默认：FluidAudio Core ML 中英双语；已因反复真机闪退由 MOSS 替换，见 ADR 0058 与 Moss-Validation.md。下面 CoreAI / 英语单语数据为历史记录，不能代表当前模型的结果。
 

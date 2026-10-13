@@ -255,7 +255,7 @@ private actor ProtocolDispatchGate {
     outputs.continuation.finish()
 }
 
-@Test func nativeOverflowRejectsWithoutDispatchingRoundSeal() async throws {
+@Test func nativeBurstBeyondSixteenJoinsEveryCallBeforeDispatchingRoundSeal() async throws {
     let input = AgentInput(sessionID: UUID(), payload: .text("native overflow"))
     let round = UUID()
     let outputs = AsyncStream<OutputEnvelope>.makeStream(bufferingPolicy: .bufferingOldest(18))
@@ -269,13 +269,13 @@ private actor ProtocolDispatchGate {
         OutputEnvelope(source: .assistant, input: input, output: .roundFinished(round), sequence: 18, roundID: round))
     outputs.continuation.finish()
     let record = OutputRecord()
-    await #expect(throws: HarnessError.queueFull) {
-        try await IndependentOutputWorkflow.consumeGeneration(outputs.stream) { envelope in
-            await record.accept(envelope.sequence)
-        }
+    try await IndependentOutputWorkflow.consumeGeneration(outputs.stream) { envelope in
+        await record.accept(envelope.sequence)
     }
-    #expect(!(await record.accepted).contains(17))
-    #expect(!(await record.accepted).contains(18))
+    let accepted = await record.accepted
+    #expect(Set(accepted) == Set(UInt64(1)...18))
+    #expect(accepted.last == 18)
+
 }
 
 @Test(.timeLimit(.minutes(1))) func protocolDispatchFailureCancelsSiblingWithoutWaitingForMoreModelOutput()
@@ -309,4 +309,50 @@ private actor ProtocolDispatchGate {
     await #expect(throws: TrackingUnavailable.offline) { try await consumer.value }
     #expect(await gate.active == 0)
     outputs.continuation.finish()
+}
+
+@Test(.timeLimit(.minutes(1))) func hostCancellationJoinsHeldProtocolsBeforeNextRound() async throws {
+    let input = AgentInput(sessionID: UUID(), payload: .text("cancel reply"))
+    let next = AgentInput(sessionID: input.sessionID, payload: .text("next reply"))
+    let round = UUID()
+    let outputs = AsyncStream<OutputEnvelope>.makeStream(bufferingPolicy: .bufferingOldest(8))
+    let gate = ProtocolDispatchGate()
+    for (sequence, output) in [
+        (UInt64(1), AgentOutput.toolCall(ToolCall(toolPath: "Fixture.read"))),
+        (
+            2,
+            .actionCall(
+                ActionCall(
+                    actionPath: ActionPath(domain: "UI", module: "Expression", function: "express"), channel: "Display")
+            )
+        ),
+    ] {
+        outputs.continuation.yield(
+            OutputEnvelope(source: .assistant, input: input, output: output, sequence: sequence, roundID: round))
+    }
+    let consumer = Task {
+        try await IndependentOutputWorkflow.consumeGeneration(outputs.stream) { envelope in
+            if envelope.sequence == 3 { #expect(await gate.active == 0) }
+            try await gate.dispatch(envelope.sequence, hold: envelope.sequence <= 2)
+        }
+    }
+    var events = gate.events.stream.makeAsyncIterator()
+    _ = await events.next()
+    _ = await events.next()
+    #expect(await gate.active == 2)
+    outputs.continuation.yield(
+        OutputEnvelope(
+            source: .assistant, input: input, output: .control("agent.cancelled"), sequence: 3, roundID: round))
+    let nextRound = UUID()
+    outputs.continuation.yield(
+        OutputEnvelope(
+            source: .assistant, input: next, output: .toolCall(ToolCall(toolPath: "Fixture.read")),
+            sequence: 4, roundID: nextRound))
+    outputs.continuation.yield(
+        OutputEnvelope(
+            source: .assistant, input: next, output: .control("agent.finished"), sequence: 5, roundID: nextRound))
+    outputs.continuation.finish()
+    try await consumer.value
+    #expect(await gate.active == 0)
+    #expect((await gate.accepted).suffix(3) == [3, 4, 5])
 }

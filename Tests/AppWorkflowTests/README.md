@@ -34,7 +34,7 @@ Purpose: test cross-module history operations using the real journal and a contr
 
 ✅ ModelResourcesWorkflowTests verifies source persistence and download use of saved endpoint/cellular policy; invalid edits leave prior durable configuration intact.
 
-❌ Full device/background acceptance and remaining enhancement items are tracked in [Management](../../MobileHarness/ModelKit/Management/README.md). Earlier planned sections describe the full proposal; this current contract supersedes claims that downloads are entirely unimplemented.
+❌ Full device/background acceptance and remaining enhancement items are tracked in [Management](../../MobileHarness/ModelKit/Support/Management/README.md). Earlier planned sections describe the full proposal; this current contract supersedes claims that downloads are entirely unimplemented.
 
 
 ✅ Model resources preferences persist forced-system speech before apply; invalid edits do not change saved policy. Restore applies the default once and cache avoids redundant effects.
@@ -61,9 +61,9 @@ Purpose: test cross-module history operations using the real journal and a contr
 
 ✅ ModelResourceInteractionWorkflowTests migrates resource admission/cancel/source/rollback regressions from UITests and adds cancelled-page-caller acceptance. Fixtures use the owning ModelResourcesOperating contract and no network/model weights. ❌ Native UI interaction remains separate.
 
-✅ History fixtures now inject explicit deleteArchive operations; production legacy workflow cannot directly delete the journal. Archive/title regressions remain unchanged. ❌ Native confirmation and conversational deletion acceptance remain pending.
+✅ History fixtures now inject explicit deleteArchive operations; production workflow cannot directly delete the journal. Archive/title regressions remain unchanged. ❌ Native confirmation and conversational deletion acceptance remain pending.
 
-✅ ADR0156: canonical execution addresses use domain/module/function; Agent v6 bindings resolve native names separately. Existing serialization/resource and output permissions are preserved.
+✅ ADR0156: canonical execution addresses use domain/module/function; Agent v6 bindings resolve native names separately. Canonical resource requirements and output permissions are preserved.
 
 
 ✅ ADR0157: canonical executable definitions and shared outcomes replace duplicate protocol metadata; consumers import Actions/ActionRuntime. Protocol request views remain adapters, and production permission/resource boundaries are preserved.
@@ -117,7 +117,7 @@ Source application failure is projected using the last confirmed view flags; err
 
 ## Independent history presentation values
 
-✅ Implemented: UI has no project dependencies, including StorageChat. History rendering receives UI-owned immutable HistorySnapshot/HistoryConversation/HistoryTurn values with matching data fields, not Storage types or stores. App HistoryPresentationAdapter copies the bounded stored snapshot through an explicit Codable boundary and propagates adaptation failure; Agent history mutations/queries are unchanged. Preview receives only fragments/finish reason from the view value. Per-request model evidence is presented as peer history rows; legacy continuation records remain readable with explicit missing-evidence labels. UI target has zero project dependencies.
+✅ Implemented: UI has no project dependencies, including StorageChat. History rendering receives UI-owned immutable HistorySnapshot/HistoryConversation/HistoryTurn values with matching data fields, not Storage types or stores. App HistoryPresentationAdapter copies the bounded stored snapshot through an explicit Codable boundary and propagates adaptation failure; Agent history mutations/queries are unchanged. Preview receives only fragments/finish reason from the view value. Per-request model evidence is presented as peer history rows; rows come exclusively from current modelRequests. UI target has zero project dependencies.
 
 
 ## Camera command entry
@@ -186,7 +186,50 @@ ADR0181 regression coverage: CameraInteractionWorkflow emits Photographer typed 
 
 ## Task-scoped specialist history
 
-✅ Implemented: Assistant keeps current/archived conversation navigation. Specialist destinations show task lists and task-scoped detail/export instead of current/past conversation summaries. App HistoryPresentationAdapter projects one immutable repository snapshot using task identity, durable Signal evidence and task state; UI owns display-only task values. ReACT and later task inputs belong to the same task. Original task requests provide titles, not the latest reply. Records lacking retained task association remain separately labeled unassociated inputs, without inventing task identity. Task reads reuse the existing single load slot and photo authorization; no second writable history, LLM summary, directory or dependency is added. Regressions cover isolation, continuation grouping across old archives, task status, legacy/unassociated records and empty tasks. Missing task dates stay empty; terminal/recovered status takes precedence over stale waiting-user reports. ❌ Native UI/device acceptance remains separate from automated checks.
+✅ History regressions verify Assistant current/archive Codable adaptation, foreground/background task identity and input/ReACT grouping across archives, scoped photo reads and read-only task mutation controls. Native UI/device acceptance remains separate.
 
 
 ✅ Reply/lifecycle regression correction: caption focus is presentation only and cannot cancel an authorized queued/playing reply from another Agent. Playback checks active session and explicit task cancellation, retaining Gateway owner/task/function authorization and the shared serialized Speech Channel. ApplicationControl accepts environment facts and correlated feedback while paused; fresh business commands still require running. Assistant delegation prompts emit send without redundant spoken acknowledgments and leave specialist speech to its executor. Scope/result delivery failures retain actual evidence; no silent error suppression or action replay is added. Add owner-switch playback admission and paused environment regressions.
+
+
+✅ Camera interaction regression: a fresh default-off CameraState emits open on the first toggle, retains explicit overlap failure and can retry/switch afterward.
+
+
+✅ Implemented: feedback regressions verify deterministic finite/bounded/ramped PCM, native-drain-before-tail ordering, cancellation, playback failure and tail failure without following admission.
+
+
+✅ Implemented: native-transition fixtures cover pause-before-playback, off during pending start, rapid resume replacement and failure cleanup; caption/playback tests reject cancelled turns and accept a new recognition scope. Transport tests ensure cancellation joins held actions/tools and permits the next input.
+
+
+✅ Implemented: two simultaneous identical native pause/start requests both finish successfully after the single held transition, with one start and one stop. This covers overlapping reply-policy and playback pauses.
+
+
+✅ Implemented: canonical listening-composition fixtures replace retired fixed-tone tests: child identity/parameters, actual drain-before-capture, gating on readiness/cue/haptic failure, cancellation and preserved partial reports. Native audio/haptics are injected and not physical acceptance.
+
+
+✅ Implemented: PhotoDispositionWorkflowTests verify native commit gates effects, both effects join before removal, failed commit retains image, feedback failure preserves actual commit plus bounded issue, and cancellation joins cleanup once.
+
+
+✅ Implemented: independent native transport admits all seventeen calls and dispatches the seal after every call completes; existing four-way concurrency, cancellation and failure-wakeup checks remain required.
+
+## 历史记录收敛（2026-10-13）
+
+✅ 回归更新：Assistant 前台 TaskRecord 的 inputIDs 关联归档内真实模型请求；后台任务从 registry/taskViews 投影。验证 read-only 任务权限、失败隔离及照片读取/取消边界。
+
+❌ 历史记录页面板块重新设计及原生 UI/真机验收。
+
+
+✅ Implemented: verify readiness and cue/haptic children overlap before any completes, capture waits for successful readiness plus feedback drain/tail, failed preparation prevents capture while preserving real partial feedback, and a single-waiter playback-start gate releases/cancels/fails without a timeout or leaked waiter.
+
+✅ Implemented regressions: independent Notice/Light canonical metadata, strict argument rejection, expiry/replacement/session fencing, error priority and light/eye/consent separation regressions. Native physical appearance remains separate acceptance.
+
+
+✅ Implemented (2026-10-13 caption/error lifecycle): mask bottom ASR and reply/status immediately while a notice is visible, restore retained text after dismissal, and preserve pinned Task/promoted ASR layout. Consent-off clears both captions; root HomeEffectsWorkflow owns one UUID/text-fenced350ms reply fade/removal task, cancelled by new text/turn/off/shutdown, scheduled only after reply-policy/playback/native-resume barriers. Agent errors stay in factual root failure notices, not persistent voiceStatus copies. App root contexts explicitly choose afterFirstUnlock file protection, including their directory; repository persistent factory accepts protection while its SDK default remains whileUnlocked. This mitigates lock-boundary writes, without claiming the screenshot proves that cause or hiding other storage failures.
+
+
+✅ 直接记录和 Gateway 失败快照均验证语音识别错误 toast 只显示“我没听清”，原始 SFSpeechErrorDomain/RecogRejected 消息、输入ID仍保留日志；其他 Agent 错误展示不受影响。
+
+
+## Streaming TTS latency
+
+✅ Canonical activation/cue tests remain. Reply-policy and PCM drain/lease/cancellation regressions belong to IntegrationTests. There is no playback acoustic-tail helper or associated test suite.

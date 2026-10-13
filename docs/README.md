@@ -1,5 +1,10 @@
 # Project documentation
 
+[Unified listening interruption validation](Validation-History.md#2026-10-13--unified-listening-interruption-and-terminal-cancellationagent-failures) records cancellation without incidents/ReACT, terminal Agent errors, full check/device build evidence and Simulator/physical acceptance limits.
+
+[历史记录收敛验证](Validation-History.md#2026-10-13--assistant-history-only-without-obsolete-record-compatibility) records Assistant 聊天记录/任务记录 ownership, removed compatibility, passing targeted/device checks and full-suite/simulator limitations.
+
+
 ✅ [ADR0124](adr/0124-sound-source-perception.md) records bounded microphone first-frame startup, pre-admission mono fallback and capture-failure presentation. ❌ Physical acoustic and coexistence acceptance remains separate from builds and synthetic tests.
 
 ✅ [iPhone 17 Pro spatial-capture investigation](Validation-History.md#2026-10-05--open-issue-supported-iphone-foa-capture-falls-back-to-mono): device logs confirm native 48 kHz/four-channel Float32 ACN/SN3D delivery; failure was AudioBufferList extraction. Build `2026100505` queries the actual list size within a fixed four-buffer bound, passed native regressions/full checks and was installed/launched. The user confirmed direction angles and uncertain/quiet states during Settings detection. ❌ Physical axes/precision and coexistence acceptance remain pending.
@@ -24,6 +29,36 @@
 
 ## Current technical design
 
+[Interrupted voice-state cancellation](Validation-History.md#2026-10-13--interrupted-voice-state-cancellation-is-not-a-runtime-incident) distinguishes normal cancellation from mixed execution/delivery failures and records validation plus build2026101311 deployment.
+
+[Preparatory speech wait](Validation-History.md#2026-10-12--mandatory-wait-for-preparatory-speech) records mandatory cue ordering in prompts and validation limits.
+
+[Terminal finishTask](Validation-History.md#2026-10-12--terminal-finishtask-without-replaying-user-input) records normal decision termination, explicit replacement continuation and post-barrier transition facts.
+
+[Quiet Task entry and photographer feedback](Validation-History.md#2026-10-12--quiet-task-entry-and-photographer-feedback-prompts) records prompt-only speech sequencing and grounded aesthetic feedback.
+
+[Task context boundary and photo ownership](Validation-History.md#2026-10-12--task-context-boundary-and-immutable-photo-ownership) records the earlier model projection and photo isolation. [Closure-only context contraction](Validation-History.md#2026-10-13--preserve-task-entry-context-and-contract-only-after-closure) corrects premature Task-entry history loss. [Task-optional camera calls and recognition toast](Validation-History.md#2026-10-13--registered-camera-functions-without-task-authorization-and-friendly-recognition-toast) removes the extra Task/photo authorization and keeps recognition details in logs while displaying “我没听清”.
+
+[ApplicationControl operation Action bindings](Validation-History.md#2026-10-12--applicationcontrol-operation-action-bindings) records Skill call-type changes, shared host execution projections and validation.
+
+[Consecutive foreground Task entry](Validation-History.md#2026-10-12--consecutive-foreground-task-entry) records capture/task selection, explicit closure then restart, result continuation and verification limits.
+
+[Assistant prompt compaction](Validation-History.md#2026-10-12--assistant-prompt-compaction) records prompt/catalog changes, transcript regression, offline comparisons and incomplete live acceptance pending API credits.
+
+[ModelKit decoupling audit](ModelKit-Decoupling-Audit.md) records neutral Core contracts, SDK independence and all 66 source/15 target owners. [The latest SDK checks](Validation-History.md#2026-10-12--complete-modelkit-sdk-dependency-enforcement) distinguish the passing full automated run from the simulator dependency limitation; [current documentation/diagram verification](Validation-History.md#2026-10-12--modelkit-current-documentation-and-diagram-alignment) covers every ModelKit directory README. Earlier validation outcomes remain dated historical evidence.
+
+[ModelKit Support reorganization](ModelKit-Support-Plan.md) records the implemented ownership and compilation-boundary migration; [validation evidence](Validation-History.md#2026-10-12--modelkit-support-reorganization) distinguishes passing provider/device-target checks from full-suite timing failures and the simulator dependency limitation.
+
+[Task controls through Action Calls](Validation-History.md#2026-10-12--task-and-skill-controls-through-action-calls) records the protocol change, concrete capture/save acceptance and build/test limitations.
+
+[Startup publication and Task arguments](Validation-History.md#startup-publication-and-responses-task-argument-regression) records lifecycle suppression, Responses optional-field handling and regression/build evidence.
+
+[Skill-owned function registration validation](Validation-History.md#2026-10-11--skill-owned-function-registration-and-basicskill) records BasicSkill, expression Skill isolation, role-only instructions and Agent → Skill → function composition.
+
+[Action documentation and procedural Skills](Action-Documentation-Skills-Plan.md) records Action-owned declarations, automatic module projections and Skill teaching rules.
+
+[Assistant Skills/task-mode migration](Agents-Skills-Task-Modes-Plan.md) records the implementation boundary, Assistant conversation/task history ownership and remaining device acceptance. [ADR0212](adr/0212-assistant-skills-task-modes.md) defines the current architecture.
+
 The [19-document Agents design audit](Validation-History.md#2026-10-11--agents-technical-design-alignment) records role/shared/Core diagram, table and contract checks against the latest source and prompt resources.
 
 The [role-owned prompt validation](Validation-History.md#2026-10-11--role-owned-prompt-templates-and-shared-function-token-guidance) records the separate role and Function Token resources, strict rendering and final packaging checks.
@@ -46,6 +81,10 @@ The [original-structure restoration](Validation-History.md#2026-10-11--original-
 | Nested module READMEs | Domain-specific values, callable entries, adapters and processing policies. |
 
 ## Experiments, tests and acceptance
+
+[Immediate post-reply listening](Validation-History.md#2026-10-13--immediate-listening-after-reply-without-an-acoustic-timer) supersedes the earlier idle acoustic timer: SpeechPerception retains policy authority, App joins immediate native restoration after playback/cleanup, and the retired timer/helper/tests are removed. Focused/device-build results and full-suite/simulator limits remain explicit.
+
+[Streaming Apple TTS validation](Validation-History.md#2026-10-13--streaming-apple-tts-latency-and-continuous-playback) records immediate initial PCM, first-segment policy, synthesizer reuse and continuous-playback idle-tail ownership, with passing focused/native/device-build checks and explicit whole-suite/simulator limits. Physical acoustic and latency acceptance remains separate.
 
 | Evidence | Scope |
 | --- | --- |
@@ -251,3 +290,11 @@ Agent role organization: [ADR0180](adr/0180-memory-photographer-service-organiza
 ✅ [SpeechPerception listening and one-way publication](adr/0190-assistant-listening-and-one-way-publication.md): resident perception authority, fixed listening Action, unacknowledged publication and recoverable speech errors. ❌ Physical acoustic acceptance pending.
 
 ✅ [SpeechPerception listening authority validation](Validation-History.md#2026-10-09--speechperception-listening-authority):651 integration and67 workflow tests plus unsigned iOS device build passed. ❌ Simulator CoreAI dependency, installation and physical acoustic acceptance remain outstanding.
+
+✅ [Task continuation and history regression validation](Validation-History.md#2026-10-12--task-continuation-complete-dialogue-history-and-new-conversation-regression): complete dialogue projection, new-conversation cancellation, production policy regression and real GPT-4.1 Responses Task/Skill/title evidence; native device acceptance remains separate.
+
+[Photography deadline boundary](Validation-History.md#2026-10-12--photography-generation-deadline-boundary) records the separate generation/feedback limits and validation evidence.
+
+[Lifecycle-owned conversation and audio](Validation-History.md#2026-10-12--lifecycle-owned-conversation-and-audio) records removal of extra timers and lifecycle cleanup acceptance.
+
+[Prompt audit and Task failure visibility](Validation-History.md#2026-10-12--prompt-audit-and-visible-foreground-task-failures) records source/assembled-prompt boundaries, actual GPT-4.1 Responses acceptance, retained failure causes and real Task timestamps.

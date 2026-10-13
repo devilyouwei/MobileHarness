@@ -15,14 +15,25 @@ public struct ConversationPresentation: Sendable {
     public private(set) var replyDecisionID: UUID?
     public private(set) var replyTaskID: UUID?
     public private(set) var transcriptClosed = false
+    private var repliesEnabled = true
+    private var cancelledTurns: [UUID] = []
     private var sequences: [Update: UInt64] = [:]
     private var producerSequences: [String: UInt64] = [:]
     public init() {}
     /// Caption ownership is independent of the lifetime of accepted Speech Channel work.
     public func acceptsPlayback(_ context: ActionExecutionContext, activeSessions: Set<UUID>) -> Bool {
-        activeSessions.contains(context.sessionID)
+        repliesEnabled && activeSessions.contains(context.sessionID)
+            && !(context.correlationID.map { cancelledTurns.contains($0) } ?? false)
+    }
+    public mutating func suspendReplies() {
+        repliesEnabled = false
+        for id in [turn?.id, replyTurn?.id].compactMap({ $0 }) where !cancelledTurns.contains(id) {
+            cancelledTurns.append(id)
+        }
+        cancelledTurns = Array(cancelledTurns.suffix(32))
     }
     public mutating func beginRecognitionScope() {
+        repliesEnabled = true
         turn = nil
         transcriptClosed = false
         for key in [Update.transcript, .finishTranscript, .voiceState] { sequences[key] = nil }
@@ -81,6 +92,7 @@ public struct ConversationPresentation: Sendable {
             if update == .transcript && transcriptClosed { return false }
             if update == .finishTranscript { transcriptClosed = true }
         } else {
+            guard repliesEnabled, !cancelledTurns.contains(incoming.id) else { return false }
             guard source == "assistant" || authorizedTask else { return false }
             if update == .beginReply {
                 guard sequence > (producerSequences[source] ?? 0),

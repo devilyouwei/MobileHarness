@@ -1,21 +1,29 @@
 import FunctionContracts
 
 /// One presentation domain of protocol-neutral callable functions.
+@ActionCatalog
 public struct UIModule: CapabilityModule {
     private let expression: any UIPresentationCapability
     private let pose: any PosePresentationCapability
     private let updates: any UIUpdateCapability
     private let history: any HistoryPresentationCapability
+    private let effects: (any UIEffectCapability)?
+    private let feedback: (any UIFeedbackCapability)?
     public init(
         expression: any UIPresentationCapability, pose: any PosePresentationCapability,
-        updates: any UIUpdateCapability, history: any HistoryPresentationCapability
+        updates: any UIUpdateCapability, history: any HistoryPresentationCapability,
+        feedback: (any UIFeedbackCapability)? = nil, effects: (any UIEffectCapability)? = nil
     ) {
         self.expression = expression
         self.pose = pose
         self.updates = updates
         self.history = history
+        self.feedback = feedback
+        self.effects = effects
     }
-    public var definitions: [ActionFunction] { expressionFunctions + presentationFunctions }
+    public var definitions: [ActionFunction] {
+        expressionFunctions + presentationFunctions + feedbackFunctions + effectFunctions
+    }
     private var expressionFunctions: [ActionFunction] {
         [
             UIActions.expressDefinition(handler: { [expression] invocation in
@@ -83,6 +91,41 @@ public struct UIModule: CapabilityModule {
                         try await pose.present($0, sessionID: $1.sessionID)
                     }
                 }),
+        ]
+    }
+    private var feedbackFunctions: [ActionFunction] { Self.feedbackDefinitions(feedback: feedback) }
+    public static func feedbackDefinitions(feedback: (any UIFeedbackCapability)?) -> [ActionFunction] {
+        [
+            UIActions.playCueDefinition(handler: { [feedback] invocation in
+                guard let feedback else { throw UIActions.FeedbackError.unavailable }
+                try await UIActions.playCue(
+                    invocation: invocation, using: { try await feedback.playCue($0, invocation: $1) })
+            }),
+            UIActions.vibrateDefinition(handler: { [feedback] invocation in
+                guard let feedback else { throw UIActions.FeedbackError.unavailable }
+                try await UIActions.vibrate(
+                    invocation: invocation, using: { try await feedback.vibrate($0, invocation: $1) })
+            }),
+        ]
+    }
+    private var effectFunctions: [ActionFunction] { Self.effectDefinitions(effects: effects) }
+    public static func effectDefinitions(effects: (any UIEffectCapability)?) -> [ActionFunction] {
+        [
+            UIActions.showNoticeDefinition(handler: { [effects] invocation in
+                guard let effects else { throw UIActions.EffectError.unavailable }
+                try await UIActions.showNotice(
+                    invocation: invocation, using: { try await effects.showNotice($0, invocation: $1) })
+            }),
+            UIActions.dismissNoticeDefinition(handler: { [effects] invocation in
+                guard let effects else { throw UIActions.EffectError.unavailable }
+                try await UIActions.dismissNotice(
+                    invocation: invocation, using: { try await effects.dismissNotice(invocation: $0) })
+            }),
+            UIActions.updateLightDefinition(handler: { [effects] invocation in
+                guard let effects else { throw UIActions.EffectError.unavailable }
+                try await UIActions.updateLight(
+                    invocation: invocation, using: { try await effects.updateLight($0, invocation: $1) })
+            }),
         ]
     }
 }

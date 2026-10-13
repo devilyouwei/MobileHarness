@@ -9,24 +9,31 @@ struct BehaviorProtocolBindings {
         if (function.path.domain == "Camera" && function.path.module == "Capture")
             || (function.path.domain == "UI" && function.path.module == "Navigation")
             || (function.path.domain == "System" && function.path.module == "Device"
-                && function.path.function == "readEnvironment")
+                && ["readEnvironment", "control"].contains(function.path.function))
+            || (function.path.domain == "System" && function.path.module == "ModelResources"
+                && ["download", "cancel"].contains(function.path.function))
         {
             return ActionBinding(
                 function: function, protocols: [.action, .tool], executionPolicy: .direct,
-                directResultPolicy: .returning, feedbackPolicy: .observation)
+                directResultPolicy: .returning)
+        }
+        if function.path.domain == "Agent", function.path.module == "Task" {
+            return ActionBinding(
+                function: function, protocols: [.action], executionPolicy: .direct,
+                directResultPolicy: .returning)
         }
         let group = function.path.domain + "." + function.path.module
         if group == "UI.Caption", ["print", "beginReplyTurn"].contains(function.path.function) {
             return ActionBinding(function: function, protocols: [.action, .tool], executionPolicy: .direct)
         }
         switch group {
-        case "UI.Expression", "Speech.Playback", "Speech.Listening", "NexArm.Motion", "NexArm.Gesture":
+        case "UI.Expression", "UI.Feedback", "UI.Notice", "UI.Light", "Speech.Playback", "Speech.Listening",
+            "NexArm.Motion", "NexArm.Gesture":
             return ActionBinding(function: function)
         case "History.Conversation", "System.Runtime", "System.ModelResources", "System.Provider",
             "UI.ResourcePresentation", "System.Device":
             return ActionBinding(
-                function: function, protocols: [.tool], executionPolicy: .direct, directResultPolicy: .returning,
-                feedbackPolicy: .observation)
+                function: function, protocols: [.tool], executionPolicy: .direct, directResultPolicy: .returning)
         case "UI.Gaze", "UI.Caption", "UI.VoiceState", "UI.Pose", "UI.HistoryPresentation",
             "NexArm.Tracking":
             return ActionBinding(function: function, protocols: [.tool], executionPolicy: .direct)

@@ -9,17 +9,15 @@ public enum CommunicationError: Error, Equatable, Sendable {
 public struct CommunicationContract: Sendable {
     public let name: String
     public let kind: InputKind
-    public let lifetime: TimeInterval
     public let maximumBytes: Int
     public let startsNewWork: Bool
     fileprivate let validateMessage: (@Sendable (AgentMessage) throws -> Void)?
     public init(
-        name: String, kind: InputKind, lifetime: TimeInterval = 10, maximumBytes: Int = 16_384,
+        name: String, kind: InputKind, maximumBytes: Int = 16_384,
         startsNewWork: Bool = false, validateMessage: (@Sendable (AgentMessage) throws -> Void)? = nil
     ) {
         self.name = name
         self.kind = kind
-        self.lifetime = lifetime
         self.maximumBytes = maximumBytes
         self.startsNewWork = startsNewWork
         self.validateMessage = validateMessage
@@ -53,7 +51,6 @@ public struct CommunicationContracts: Sendable {
                 contract.name.split(separator: ".", omittingEmptySubsequences: false).allSatisfy({
                     CapabilityRegistry.validName(String($0))
                 }),
-                contract.lifetime.isFinite, contract.lifetime > 0, contract.lifetime <= 60,
                 (1...262_144).contains(contract.maximumBytes),
                 contract.kind == .observation, contract.validateMessage != nil,
                 entries[contract.name] == nil

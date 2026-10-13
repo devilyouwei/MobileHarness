@@ -39,7 +39,7 @@ private actor CaptionEndpoint {
     }
 }
 
-@Test func immediateCaptionToolsPreserveAppendReplacementAndTurnFences() async throws {
+@Test(.actionCatalog) func immediateCaptionToolsPreserveAppendReplacementAndTurnFences() async throws {
     let endpoint = CaptionEndpoint()
     let input = AgentInput(sessionID: UUID(), payload: .event("fixture"), turn: AgentTurn(ordinal: 1))
     func invocation(_ function: String, text: String? = nil, source: AgentID, sequence: UInt64) -> ActionInvocation {

@@ -21,6 +21,14 @@ public enum AgentActionCompletion: Codable, Equatable, Sendable {
     case report(AgentActionReport)
     case activityStarted(UUID)
     case activityStopped(UUID)
+
+    /// Business output is distinct from terminal acknowledgment and execution-ledger identity.
+    public var hasBusinessOutput: Bool {
+        switch self {
+        case .value: true
+        case .completed, .report, .activityStarted, .activityStopped: false
+        }
+    }
 }
 
 /// Causal identity only; retaining feedback never retains the initiating media or service lifetime.

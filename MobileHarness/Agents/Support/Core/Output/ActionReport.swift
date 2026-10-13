@@ -67,13 +67,17 @@ public struct AgentActionReport: Codable, Equatable, Sendable {
     public func withExecutionFailure(_ code: Entry.Code, description: String? = nil) -> Self {
         Self(validatedEntries: entries, executionFailure: code, failureDescription: description ?? failureDescription)
     }
-    public var hasFailures: Bool { executionFailure != nil || entries.contains { $0.status == .failed } }
+    public var hasFailures: Bool {
+        (executionFailure != nil && executionFailure != .cancelled)
+            || entries.contains { $0.status == .failed && $0.code != .cancelled }
+    }
     public var isCancelled: Bool {
         executionFailure == .cancelled || entries.contains { $0.status == .cancelled || $0.code == .cancelled }
     }
+    public var isCancellationOnly: Bool { isCancelled && !hasFailures }
     public var status: ActionResult.Status {
-        if isCancelled && executionFailure != .timedOut { return .cancelled }
         if hasFailures { return entries.contains { $0.status == .succeeded } ? .partialFailure : .failed }
+        if isCancelled { return .cancelled }
         return .succeeded
     }
 }

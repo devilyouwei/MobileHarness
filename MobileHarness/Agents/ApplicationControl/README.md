@@ -1,99 +1,57 @@
-# ApplicationControl — Application Configuration and Device Decisions
+# ApplicationControl
 
-## Summary
+## 职责与边界
 
-Owns provider, model-resource, navigation, Bluetooth and fixed device transaction policy plus environment context.
+✅ 配置、模型资源和设备事务、环境事实；不承担普通对话。 Agents 管业务策略和上下文，Gateway 管权限/传输，Actions 管函数实现；原生设备与 UI 端口由 App 注入。没有跨 Agent 共享可写聊天历史。
 
-## Ownership and boundaries
+## 文件分工
 
-App injects native primitives and retains immediate safety/lifecycle fences. Photographer owns camera policy; Memory owns history. Model declarations expose seven business Tools plus scheduled Actions; code grants fixed transaction calls separately.
+ApplicationControlAgent.swift 管生命周期/事务和环境；ApplicationControlWorkflow.swift 管确定性步骤；ApplicationControlProcessing.swift 管状态与预处理。
 
-## External relationships and data flow
+## 输入、输出与流程
 
-Runtime arrows show data or capability calls; dashed arrows show injection.
+UI 数据操作直接提交可信事务；导航、展开和筛选留在 UI。Assistant application-control Skill 可以调用同一批 Action 控制 UI 或设备；函数复用不要求委派 Agent。
 
-```mermaid
-flowchart LR
- Gateway -->|Admitted input and executor feedback| ApplicationControl
- App -.->|Capabilities and repository| ApplicationControl
- ApplicationControl -->|Registered calls and communication| Gateway
- ApplicationControl -->|Private inference| ModelKit
- ApplicationControl -->|Atomic context and evidence| Storage
-```
+## Context 与 Builder
 
-## Fixed transactions and reasoning
+待执行调用、环境契约、事务关联。 状态通过独立 Repository 原子提交；Builder 选择确定版本，不修改已发出的请求。写入失败不产生依赖未提交状态的新调用。
 
-ApplicationControlAgent.swift owns staged calls and independent Chat relay; ApplicationControlProcessing.swift owns schema, preprocessing, internal grants and pure result classification. Natural tasks use a per-decision configured binding pinned across continuation. Typed user-source subscriptions run deterministic transactions without creating delegation tasks.
+## 生命周期、容量与失败
 
-Pending calls and environment categories are each bounded to 32. A 32-waiter AgentAdmissionGate serializes short state commits; inference/native work never holds it. Provider/preference/presentation stages retain their own call limits and exact failure codes. Environment/resource facts have no completion receipt and do not trigger implicit binding retries.
+设置页机械臂测试仍保留自身注册。环境 publish 单向、目标拒绝不影响发送者；有确认的 send 仅用于真正独立的后台事务。 事务/输出消费由 App 根生命周期持有，独立于页面。输出最多 256，状态提交等待最多 32；通信消费者最多 16 待处理、4 并发。超限明确失败。取消加入已接纳工作清理；重启标记未完成任务中断，不重放设备动作。共享 Chat 的输入、调用和执行预算见 [Chat](../Support/Chat/README.md)。
 
-Paused state accepts environment facts and correlated feedback; fresh business requests require running. Validated business admission failure emits correlated agent.error; authentication failures emit no effects. Late manual device results enter bounded 128-result history separately from command acceptance. Resource error presentation cannot recursively diagnose itself or replay operations.
+## 函数权限与注册
 
-The model uses openPage as a scheduled Action; code-owned fixed navigation remains InternalTool. One model address is not exposed through both protocols. The eleven Robot Actions are shared implementations registered under this role for Settings command tests.
+[Agent.json](../../Resources/Agents/ApplicationControl/Agent.json) 声明固定函数；业务模型目录由加载 Skill 决定。实际实现/参数契约以 [owning @Action declarations](../../Actions/README.md) 为准。Internal 固定函数不会自动向模型开放。
 
-## Internal components
+本角色没有对话 worker。以下为本角色固定函数声明；实际固定调用由该角色 workflow 注册，不能把固定函数表误认为普通对话目录。
 
-The following graph shows source composition and local data selection. Cross-role delivery and effect execution use Gateway.
-
-```mermaid
-flowchart LR
- Agent[ApplicationControlAgent] --> Chat[AgentChatWorker with ApplicationControlContextState]
- Processing[State, preprocessor, grants and result classifiers] --> Agent
- Processing --> Chat
- Prompts[ApplicationControl.prompts.json] -.-> Processing
- Agent --> Transactions[Pending provider, resource, device and presentation stages]
- Transactions -->|Correlated calls| Fixed[Code-owned InternalTools]
- Facts[Admitted environment and resource facts] --> Processing
-```
-
-## Context, bounds and failure
-
-The role owns its schema/repository, preprocessing, immutable request builder and task outcomes. Evidence commits before dependent output; storage failure ends dependent processing. Legacy business contexts without Chat fields may import once; partial/null/unsupported fields fail. Restart interrupts unfinished work and does not replay native effects. Media is referenced by authorized IDs.
-
-Shared model admission, request/call budgets, protocol consumers and overflow are defined in [Chat](../Support/Chat/README.md#bounds-and-overflow). Role communication retains 16 pending outputs with four runtime deliveries. Task views retain 256 identities with at most 32 live; terminal records may be retired, live tasks may not. Excess work rejects explicitly.
-
-Pause cancels/joins model work; resume admits future work without replay. Stop joins worker/relay. App registration and output consumption outlive UI pages and microphone capture. Each reply's actual executor owns its results and speech; display focus does not change execution authority.
-
-## Prompt resources
-
-[ApplicationControl.prompts.json](ApplicationControl.prompts.json) owns application-control role/style and task/history/execution message templates. Protocol grammar is included through the shared Function Token guide; no role-specific prompt prose remains in shared Worker code.
-
-## Function and communication registration
-
-Model exposure comes from [ApplicationControl.agent.json](ApplicationControl.agent.json); code-owned internal permissions are separate. Empty Channel groups declare Channels without exposing a function.
-
-### Model functions
-
-| Protocol / Channel | Model name | Canonical function | Parameters and constraints | Behavior |
+| 类型 / Channel | 别名 | 函数 | 参数 | 说明 |
 | --- | --- | --- | --- | --- |
-| Action / Display | `openPage` | `UI.Navigation.open` | `destination` required: string; home, settings, language, recognition, synthesis, vision, bluetooth or history. | On a conversational request, open the requested application page through authorized UI presentation. Touch navigation is local and does not call this Agent. |
-| Action / Robot | `shakeBase` | `NexArm.Motion.shakeBase` | `cycles` required: integer; Integer 1 through 3 only.; `speed` optional: integer; Native motor speed, 1–1400; default1400.; `acceleration` optional: integer; Native acceleration register value, 1–254; default30. | Perform the requested finite gesture using motors1–5, starting and ending at their home; never command or wait for the gripper. Accept optional native speed1–1400 and acceleration1–254. Stable arrival advances immediately. Stable off-target positions, send errors and missing feedback end only affected atomic steps and are collected in the final report; subsequent composition steps and Channel actions continue. Unavailable-device steps fail without blind writes, queries or replay. Explicit cancellation stops remaining work. Use only on user request with a connected arm and clear space. |
-| Action / Robot | `waveWrist` | `NexArm.Gesture.waveWrist` | `count` required: integer; Integer 1 through 3. No default.; `speed` optional: integer; Native motor speed, 1–1400; default1400.; `acceleration` optional: integer; Native acceleration register value, 1–254; default30. | Perform the requested finite gesture using motors1–5, starting and ending at their home; never command or wait for the gripper. Accept optional native speed1–1400 and acceleration1–254. Stable arrival advances immediately. Stable off-target positions, send errors and missing feedback end only affected atomic steps and are collected in the final report; subsequent composition steps and Channel actions continue. Unavailable-device steps fail without blind writes, queries or replay. Explicit cancellation stops remaining work. Use only on user request with a connected arm and clear space. |
-| Action / Robot | `tiltWrist` | `NexArm.Gesture.tiltWrist` | `direction` required: string; Exactly left or right.; `speed` optional: integer; Native motor speed, 1–1400; default1400.; `acceleration` optional: integer; Native acceleration register value, 1–254; default30. | Perform the requested finite gesture using motors1–5, starting and ending at their home; never command or wait for the gripper. Accept optional native speed1–1400 and acceleration1–254. Stable arrival advances immediately. Stable off-target positions, send errors and missing feedback end only affected atomic steps and are collected in the final report; subsequent composition steps and Channel actions continue. Unavailable-device steps fail without blind writes, queries or replay. Explicit cancellation stops remaining work. Use only on user request with a connected arm and clear space. |
-| Action / Robot | `lookAround` | `NexArm.Gesture.lookAround` | `cycles` required: integer; Integer 1 through 3. No default.; `speed` optional: integer; Native motor speed, 1–1400; default1400.; `acceleration` optional: integer; Native acceleration register value, 1–254; default30. | Perform the requested finite gesture using motors1–5, starting and ending at their home; never command or wait for the gripper. Accept optional native speed1–1400 and acceleration1–254. Stable arrival advances immediately. Stable off-target positions, send errors and missing feedback end only affected atomic steps and are collected in the final report; subsequent composition steps and Channel actions continue. Unavailable-device steps fail without blind writes, queries or replay. Explicit cancellation stops remaining work. Use only on user request with a connected arm and clear space. |
-| Action / Robot | `celebrate` | `NexArm.Gesture.celebrate` | `cycles` required: integer; Integer 1 through 3. No default.; `speed` optional: integer; Native motor speed, 1–1400; default1400.; `acceleration` optional: integer; Native acceleration register value, 1–254; default30. | Perform the requested finite gesture using motors1–5, starting and ending at their home; never command or wait for the gripper. Accept optional native speed1–1400 and acceleration1–254. Stable arrival advances immediately. Stable off-target positions, send errors and missing feedback end only affected atomic steps and are collected in the final report; subsequent composition steps and Channel actions continue. Unavailable-device steps fail without blind writes, queries or replay. Explicit cancellation stops remaining work. Use only on user request with a connected arm and clear space. |
-| Action / Robot | `dance` | `NexArm.Gesture.dance` | `cycles` required: integer; Integer 1 through 3. No default.; `speed` optional: integer; Native motor speed, 1–1400; default1400.; `acceleration` optional: integer; Native acceleration register value, 1–254; default30. | Perform the requested finite gesture using motors1–5, starting and ending at their home; never command or wait for the gripper. Accept optional native speed1–1400 and acceleration1–254. Stable arrival advances immediately. Stable off-target positions, send errors and missing feedback end only affected atomic steps and are collected in the final report; subsequent composition steps and Channel actions continue. Unavailable-device steps fail without blind writes, queries or replay. Explicit cancellation stops remaining work. Use only on user request with a connected arm and clear space. |
-| Action / Robot | `nodHead` | `NexArm.Gesture.nodHead` | `cycles` required: integer; Integer 1 through 3 only; no default.; `speed` optional: integer; Native motor speed, 1–1400; default1400.; `acceleration` optional: integer; Native acceleration register value, 1–254; default30. | Compose home, sweeps and return using only motor4. Leave all other motors untouched. Accept optional native speed1–1400 and acceleration1–254. Stable arrival advances immediately. Stable off-target positions, send errors and missing feedback end only affected atomic steps and are collected in the final report; subsequent composition steps and Channel actions continue. Unavailable-device steps fail without blind writes, queries or replay. Explicit cancellation stops remaining work. Use only on user request with a connected arm and clear space. |
-| Action / Robot | `shakeHead` | `NexArm.Gesture.shakeHead` | `cycles` required: integer; Integer 1 through 3 only; no default.; `speed` optional: integer; Native motor speed, 1–1400; default1400.; `acceleration` optional: integer; Native acceleration register value, 1–254; default30. | Compose home, sweeps and return using only motor5. Leave all other motors untouched. Accept optional native speed1–1400 and acceleration1–254. Stable arrival advances immediately. Stable off-target positions, send errors and missing feedback end only affected atomic steps and are collected in the final report; subsequent composition steps and Channel actions continue. Unavailable-device steps fail without blind writes, queries or replay. Explicit cancellation stops remaining work. Use only on user request with a connected arm and clear space. |
-| Action / Robot | `resetArm` | `NexArm.Motion.reset` | `speed` optional: integer; Native motor speed, 1–1400; default1400.; `acceleration` optional: integer; Native acceleration register value, 1–254; default30. | Reset motors1–5 only; do not command or wait for the gripper. Accept optional native speed1–1400 and acceleration1–254. Stable arrival advances immediately. Stable off-target positions, send errors and missing feedback end only affected atomic steps and are collected in the final report; subsequent composition steps and Channel actions continue. Unavailable-device steps fail without blind writes, queries or replay. Explicit cancellation stops remaining work. Use only on user request with a connected arm and clear space. |
-| Action / Robot | `moveMotor` | `NexArm.Motion.moveMotor` | `motor` required: integer; Motor ID1–6. Reset requires a configured home; current arm homes cover1–5.; `target` required: integer; Native encoder target, restricted to configured motor limits.; `speed` optional: integer; Native speed1–1400, default1400.; `acceleration` optional: integer; Native acceleration1–254, default30. | Move only the explicitly selected motor to its native encoder target. Accept optional native speed1–1400 and acceleration1–254. Stable arrival advances immediately. Stable off-target positions, send errors and missing feedback end only affected atomic steps and are collected in the final report; subsequent composition steps and Channel actions continue. Unavailable-device steps fail without blind writes, queries or replay. Explicit cancellation stops remaining work. Use only on user request with a connected arm and clear space. |
-| Action / Robot | `resetMotor` | `NexArm.Motion.resetMotor` | `motor` required: integer; Motor ID1–6. Reset requires a configured home; current arm homes cover1–5.; `speed` optional: integer; Native speed1–1400, default1400.; `acceleration` optional: integer; Native acceleration1–254, default30. | Reset only the selected motor to its configured home; motor6 requires an explicitly configured home. Accept optional native speed1–1400 and acceleration1–254. Stable arrival advances immediately. Stable off-target positions, send errors and missing feedback end only affected atomic steps and are collected in the final report; subsequent composition steps and Channel actions continue. Unavailable-device steps fail without blind writes, queries or replay. Explicit cancellation stops remaining work. Use only on user request with a connected arm and clear space. |
-| Tool / — | `ModelResources.snapshot` | `System.ModelResources.snapshotResources` | — | Read current shared model resource inventory, installed groups and progress. Does not download, remove or switch a model. |
-| Tool / — | `Provider.readSettings` | `System.Provider.readSettings` | — | Read confirmed cloud-enabled status and selected cloud model. Contains no URL/key. Does not probe provider availability or change configuration. |
-| Tool / — | `Bluetooth.readStatus` | `System.Device.readStatus` | — | Read current Bluetooth power/connection and discovered device IDs. Does not scan or move a robot. |
-| Tool / — | `Bluetooth.control` | `System.Device.control` | `operation` required: string;  enum=scan,stopScan,connect,reconnect,disconnect,forget,refresh; `id` optional: string;  | Submit an explicit Bluetooth connection/discovery command. Accepted is not connected or physically completed. Read status to confirm actual state. |
-| Tool / — | `App.readEnvironment` | `System.Device.readEnvironment` | — | Read latest sequenced scene, navigation and device capability facts admitted by the root Agent. Facts are observations, not proof of physical completion. |
-| Tool / — | `ModelResources.download` | `System.ModelResources.download` | `id` required: string; ; `endpoint` required: string; ; `allowsCellular` required: string;  enum=true,false | Admit a model download using an explicit source. Admission does not mean installed; read the shared inventory for progress. |
-| Tool / — | `ModelResources.cancel` | `System.ModelResources.cancel` | `id` required: string;  | Cancel and join an admitted model transfer. Failure is returned without replay. |
-| Action / Communication | `send` | `Agent.Communication.send` | target, kind, content; taskID/artifactID as applicable; authorized pairs: `assistant/progress`, `assistant/result` | Directed admission receipt; task outcome is separate. |
+| action / Display | `openPage` | `UI.Navigation.open` | destination 必填 | On a conversational request, open the requested application page through authorized UI presentation. Touch navigation is local and does not call this Agent. |
+| action / Robot | `shakeBase` | `NexArm.Motion.shakeBase` | cycles 必填, speed, acceleration | Perform the configured base-shaking gesture and return home. |
+| action / Robot | `waveWrist` | `NexArm.Gesture.waveWrist` | count 必填, speed, acceleration | Wave the wrist with the configured arm gesture, then return home. |
+| action / Robot | `tiltWrist` | `NexArm.Gesture.tiltWrist` | direction 必填, speed, acceleration | Tilt the wrist in the requested direction and return home. |
+| action / Robot | `lookAround` | `NexArm.Gesture.lookAround` | cycles 必填, speed, acceleration | Perform the configured arm look-around gesture and return home. |
+| action / Robot | `celebrate` | `NexArm.Gesture.celebrate` | cycles 必填, speed, acceleration | Perform the configured celebration gesture and return home. |
+| action / Robot | `dance` | `NexArm.Gesture.dance` | cycles 必填, speed, acceleration | Perform the configured arm dance and return home. |
+| action / Robot | `nodHead` | `NexArm.Gesture.nodHead` | cycles 必填, speed, acceleration | Nod using motor4, returning home; leave other motors untouched. |
+| action / Robot | `shakeHead` | `NexArm.Gesture.shakeHead` | cycles 必填, speed, acceleration | Shake the head using motor5, returning home; leave other motors untouched. |
+| action / Robot | `resetArm` | `NexArm.Motion.reset` | speed, acceleration | Reset configured homes for motors1–5; never move the gripper. |
+| action / Robot | `moveMotor` | `NexArm.Motion.moveMotor` | motor 必填, target 必填, speed, acceleration | Move only the selected motor to its native encoder target. |
+| action / Robot | `resetMotor` | `NexArm.Motion.resetMotor` | motor 必填, speed, acceleration | Reset only the selected motor to its configured home; motor6 needs an explicitly configured home. |
+| tool / — | `ModelResources.snapshot` | `System.ModelResources.snapshotResources` | — | Read current shared model resource inventory, installed groups and progress. Does not download, remove or switch a model. |
+| tool / — | `Provider.readSettings` | `System.Provider.readSettings` | — | Read confirmed cloud-enabled status and selected cloud model. Contains no URL/key. Does not probe provider availability or change configuration. |
+| tool / — | `Bluetooth.readStatus` | `System.Device.readStatus` | — | Read current Bluetooth power/connection and discovered device IDs. Does not scan or move a robot. |
+| action / System | `Bluetooth.control` | `System.Device.control` | operation 必填, id | Submit an explicit Bluetooth connection/discovery command. Accepted is not connected or physically completed. Read status to confirm actual state. |
+| tool / — | `App.readEnvironment` | `System.Device.readEnvironment` | — | Read the latest admitted scene, navigation and device capability facts only when needed and absent from context. These are observations, not proof of physical completion. Wait for the result before deciding dependent actions. |
+| action / System | `ModelResources.download` | `System.ModelResources.download` | id 必填, endpoint 必填, allowsCellular 必填 | Admit a model download using an explicit source. Admission does not mean installed; read the shared inventory for progress. |
+| action / System | `ModelResources.cancel` | `System.ModelResources.cancel` | id 必填 | Cancel and join an admitted model transfer. Failure is returned without replay. |
 
-### Internal fixed functions
+## 固定内部权限
 
 | Protocol | Canonical function | Channel | Parameters | Registration source |
 | --- | --- | --- | --- | --- |
-| InternalAction | `UI.Caption.beginReplyTurn` | Display | — | [AgentChatWorker.swift](../Support/Chat/AgentChatWorker.swift) |
-| InternalAction | `Speech.Playback.speak` | Speech | `audioID` | [AgentChatWorker.swift](../Support/Chat/AgentChatWorker.swift) |
-| InternalAction | `UI.Caption.print` | Display | `text` | [AgentChatWorker.swift](../Support/Chat/AgentChatWorker.swift) |
 | InternalTool | `System.Device.control` | — | `operation`, `id?`, `value?`, `action?`, `fence?` | [ApplicationControlProcessing.swift](ApplicationControlProcessing.swift) |
 | InternalTool | `UI.Navigation.open` | — | `destination` | [ApplicationControlProcessing.swift](ApplicationControlProcessing.swift) |
 | InternalTool | `System.ModelResources.download` | — | `id`, `endpoint`, `allowsCellular` | [ApplicationControlProcessing.swift](ApplicationControlProcessing.swift) |
@@ -136,29 +94,63 @@ Model exposure comes from [ApplicationControl.agent.json](ApplicationControl.age
 
 Directed input schemas and static subscriptions are distinct; admission also validates the runtime sender and scope.
 
-### Input subscriptions and communication grants
+## 状态与验收
 
-Publication is one-way and has no recipient acknowledgment. Directed send returns admission; explicit task results report completion.
+✅ 动态 Skill/确定性职责拆分已实现。❌ 摄影、保存、尾音、语音竞争及模式切换的真机验收仍需单独进行。
 
-| Input contract | Source | Topic |
+✅ 收紧资源中的普通文本/模型反馈和语音对话通信，保留确定性协议。
+
+## 输入与通信授权
+
+| 输入契约 | 类型 |
+| --- | --- |
+| `app.environment` | observation |
+| `app.interaction` | observation |
+| `provider.settings` | observation |
+| `provider.discovery` | observation |
+| `model.resource.hostFailure` | observation |
+| `model.resource.state` | observation |
+| `model.resource.intent` | observation |
+| `tool.result` | toolResult |
+| `task.request` | observation |
+| `task.input` | observation |
+| `task.progress` | observation |
+| `task.result` | observation |
+| `task.cancel` | observation |
+| `communication.receipt` | communicationReceipt |
+
+| 方式 | 契约 | 目标/来源 |
 | --- | --- | --- |
-| `model.resource.intent` | `runtime` | `model.resource.intent` |
-| `model.resource.state` | `model.resources` | `model.resource.state` |
-| `model.resource.hostFailure` | `app.resources` | `model.resource.hostFailure` |
-| `app.environment` | `app.environment` | `app.environment` |
-| `app.interaction` | `user` | `app.interaction` |
-| `model.resource.intent` | `user` | `model.resource.intent` |
-| `provider.settings` | `user` | `provider.settings` |
-| `provider.discovery` | `user` | `provider.discovery` |
+| send Action | `task.progress` | `assistant` |
+| send Action | `task.result` | `assistant` |
+| subscribe | `model.resource.intent` | `runtime` |
+| subscribe | `model.resource.state` | `model.resources` |
+| subscribe | `model.resource.hostFailure` | `app.resources` |
+| subscribe | `app.environment` | `app.environment` |
+| subscribe | `app.interaction` | `user` |
+| subscribe | `model.resource.intent` | `user` |
+| subscribe | `provider.settings` | `user` |
+| subscribe | `provider.discovery` | `user` |
 
-| Output | Contract | Destination |
-| --- | --- | --- |
-| publish | `interaction.replyActivity` | Exact static subscribers |
-| send | `task.progress` | `assistant` |
-| send | `task.result` | `assistant` |
-| send | `speech.synthesize` | `speechSynthesis` |
-| send | `speech.cancel` | `speechSynthesis` |
 
-## Related design
+## 固定函数与 Skill
 
-[Parent design](../README.md)
+✅ 资源不再包含 Permissions.json，Agent.json 的 baseSkills 引用 Skill，Skill.json 声明函数。业务模型函数由已加载 Skill 提供；固定调用与模型轮次分别验证，详见 [资源规范](../../Resources/Agents/README.md)。
+
+## Agent → Skill → Function registration
+
+✅ Implemented: Agent.json references baseSkills; Skill.json alone registers model Actions/Tools. BasicSkill owns task orchestration and environment reading; ExpressionInteraction owns expression Actions. Role instructions retain identity/responsibility/style. Business roles reuse existing Skills; internal trusted bindings remain separate. Fixed transaction/task snapshots remain authoritative.
+
+角色基础函数目录由资源中的 baseSkills（application-control）组合；上表供函数 review 使用，不是 Agent.json 中的另一份注册。函数说明属于实现，流程教学属于 Skill。
+
+✅ 本次提示词精简同步注册函数说明，保持职责、类型和参数不变；公共执行语义见Actions owning README。
+
+✅ ApplicationControl注册调整：Bluetooth.control、ModelResources.download/cancel改为System Channel的Action Call；snapshot/readSettings/readStatus保持原生Tool，11个NexArm对话动作仅由RobotInteraction注册，ApplicationControl Skill不再重复注册。别名、参数、函数实现与内部固定调用不变；模型加载后的XML教学、revision和组合/解析回归同步更新。
+
+## 历史记录收敛（2026-10-13）
+
+✅ 已实现：历史记录页面仅保留 Assistant 聊天记录与任务记录。Assistant context 是聊天持久化事实源，任务按持久化身份关联；页面板块重新设计另行开展。
+
+❌ 历史记录页面板块重新设计及原生 UI/真机验收。
+
+✅ Skill scope review: application-control exposes seven navigation/status/System entries only. Removing robot model bindings does not remove trusted device-operation or settings Action implementations.

@@ -37,7 +37,11 @@ extension SystemActions {
         try await settings.saveSettings(requestID: id, sessionID: invocation.context.sessionID)
         return id.uuidString
     }
-    @Action(domain: "System", module: "Provider", title: "readSettings")
+    @Action(
+        domain: "System", module: "Provider", title: "readSettings",
+        doc:
+            "Read confirmed cloud-enabled status and selected cloud model. Contains no URL/key. Does not probe provider availability or change configuration.",
+        parameters: [])
     public static func readSettings(invocation: any FunctionInput, using settings: any ProviderSettingsCapability)
         async throws -> String
     {

@@ -7,7 +7,7 @@ private func frame(_ samples: [Float], format: AudioFormat) throws -> AudioFrame
     try AudioFrame(data: samples.withUnsafeBytes { Data($0) }, format: format, sequence: 0, timestamp: 0)
 }
 @Test func energyDetectionIsPacketIndependentAndReleasesExclusiveLease() async throws {
-    let context = ModelContext()
+    let context = try ModelContext(loadGate: ModelLoadGate(maximumConcurrentLoads: 4), maximumLoadWaiters: 32)
     let detector = try EnergyVoiceActivity(context: context)
     let format = try AudioFormat(sampleRate: 16000, channels: 1, encoding: .float32)
     let samples =
@@ -32,7 +32,8 @@ private func frame(_ samples: [Float], format: AudioFormat) throws -> AudioFrame
     #expect(await context.status == .unloaded)
 }
 @Test func energyRejectsNonFiniteInputAndResetClearsWindowHistory() async throws {
-    let detector = try EnergyVoiceActivity(context: ModelContext())
+    let detector = try EnergyVoiceActivity(
+        context: ModelContext(loadGate: ModelLoadGate(maximumConcurrentLoads: 4), maximumLoadWaiters: 32))
     let format = try AudioFormat(sampleRate: 16000, channels: 1, encoding: .float32)
     let session = try await detector.detectVoiceActivity(format: format)
     await #expect(throws: CapabilityError.self) { try await session.process(frame([Float.nan], format: format)) }

@@ -13,7 +13,7 @@ private actor CompositionCounter {
     func increment() { count += 1 }
 }
 
-@Test func compositionPreservesEveryFailureAndContinuesNestedActions() async throws {
+@Test(.actionCatalog) func compositionPreservesEveryFailureAndContinuesNestedActions() async throws {
     let counter = CompositionCounter()
     let first = try ActionReport(entries: [
         .init(
@@ -41,7 +41,7 @@ private actor CompositionCounter {
     #expect(composition.resources == [ActionResource(rawValue: "nexarm.motor.3")])
 }
 
-@Test func compositionRejectsOverlappingParallelMotorsAndExcessResultsBeforeEffects() throws {
+@Test(.actionCatalog) func compositionRejectsOverlappingParallelMotorsAndExcessResultsBeforeEffects() throws {
     let resource = ActionResource(rawValue: "nexarm.motor.4")
     let leaf = ActionComposition.Node.action("move", [resource]) { .completed }
     #expect(throws: ActionComposition.ConfigurationError.self) {
@@ -52,7 +52,7 @@ private actor CompositionCounter {
     }
 }
 
-@Test func reportedPartialFailureReleasesWaitAndDeliversAllIssues() async throws {
+@Test(.actionCatalog) func reportedPartialFailureReleasesWaitAndDeliversAllIssues() async throws {
     let counter = CompositionCounter()
     let path = ActionPath(domain: "Composite", module: "Control", function: "run")
     let owner = ExecutionOwner(agent: .assistant, incarnation: UUID(), sessionID: UUID())
@@ -87,7 +87,7 @@ private actor CompositionCounter {
     #expect(results.last?.status == .succeeded)
 }
 
-@Test func compositionCancellationKeepsPriorResultsAndDoesNotStartRemainingChildren() async throws {
+@Test(.actionCatalog) func compositionCancellationKeepsPriorResultsAndDoesNotStartRemainingChildren() async throws {
     let counter = CompositionCounter()
     let composition = try ActionComposition(
         .sequence([

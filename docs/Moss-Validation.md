@@ -1,6 +1,6 @@
 # MOSS-TTS-Nano validation
 
-> Historical evidence scope (updated 2026-10-03): packaging/download statements below describe the revision tested at the time. Current App bundles source metadata/licenses only and installs weights through Settings; HF foreground requests restart after process relaunch. Current synthesis is MOSS. Kokoro is unregistered; its downloader/profile/local weights are removed and its optional real-model test needs HARNESS_KOKORO_MODEL_ROOT. See [current resource contract](../MobileHarness/ModelKit/Management/README.md#local-model-resources--current-contract).
+> Historical evidence scope (updated 2026-10-03): packaging/download statements below describe the revision tested at the time. Current App bundles source metadata/licenses only and installs weights through Settings; HF foreground requests restart after process relaunch. Current synthesis is MOSS. Kokoro is unregistered; its downloader/profile/local weights are removed and its optional real-model test needs HARNESS_KOKORO_MODEL_ROOT. See [current resource contract](../MobileHarness/ModelKit/Support/Management/README.md#local-model-resources--current-contract).
 
 Current default: local Core ML MOSS-TTS-Nano beta, sandbox installed/MossTTSNano, zh_1/en_2 voices. The repository Models/MossTTSNano directory is used only by opt-in Mac tests. Kokoro is not registered or packaged. Original design documents and historical Kokoro results are preserved.
 

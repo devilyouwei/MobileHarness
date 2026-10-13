@@ -6,7 +6,7 @@ Resident listening policy, streaming VAD/ASR and native sound-source observation
 
 ## Ownership and boundaries
 
-User consent and revisioned reply occupancy are interpreted here. App executes physical capture, confirmed-utterance/playback/tail barriers. ModelKit supplies VAD/ASR; PlatformKit supplies generic PCM conversion. The diagnostic soundSourceOnly mode has no recognition/presentation grants.
+User consent and revisioned reply occupancy are interpreted here. App executes physical capture, confirmed-utterance/playback barriers. ModelKit supplies VAD/ASR; PlatformKit supplies generic PCM conversion. The diagnostic soundSourceOnly mode has no recognition/presentation grants.
 
 ## External relationships and data flow
 
@@ -43,13 +43,13 @@ This role uses typed media requests and deterministic policy, with no Chat syste
 
 Native interleaved Float32 AudioInput retains rate 8–192 kHz, mono or ACN/SN3D FOA, sequence, timestamp and monotonic capture instant. Validate capture epoch, increasing sequence/nondecreasing time and expiry. Inputs retain 128 packets/64,000 scalar samples; each packet is at most 64,000 bytes. FOA accounting includes all channels. Controls bypass audio capacity.
 
-Select mono/W and process at most 8192 samples per conversion chunk through a stateful StreamingMonoPCMResampler to 16 kHz ModelKit.AudioFrame. VAD boundary policy owns onset/pre-roll/silence/padding and maximum segment length. SpeechRecognitionTurn owns ASR events, segment revisions and final sealing: 128 events/64,000 mono samples, at most 60 seconds per turn and a 20-second finish watchdog. Rejected updates do not mutate transcript state.
+Select mono/W and process at most 8192 samples per conversion chunk through a stateful StreamingMonoPCMResampler to 16 kHz ModelKit.AudioFrame. VAD boundary policy owns onset/pre-roll/silence/padding and maximum segment length. SpeechRecognitionTurn owns ASR events, segment revisions and final sealing: 128 events/64,000 queued mono samples, with no utterance duration cap or finish watchdog. Internal 12-second ASR segment boundaries do not end the user utterance. Rejected updates do not mutate transcript state.
 
 ## Segmentation algorithm
 
-`VoiceActivitySegmenter` validates contiguous scores over 16 kHz mono Float32: at most 16000 samples per frame, 32000 pending samples and 64 scores per process call. Default probability threshold is 0.5, valid 0.05…0.95. Overlap rejects inputBusy; failure closes/cancels the VAD session and clears damaged state.
+`VoiceActivitySegmenter` validates contiguous scores over 16 kHz mono Float32: at most 16000 samples per frame, 32000 pending samples and 64 scores per process call. Default probability threshold is 0.5, valid 0.05…0.95. Overlap rejects inputBusy; failure closes/cancels the VAD session and clears damaged state. ✅ The unused `SpeechBoundaryPolicy.consume` return value is explicitly discarded; segmentation continues to use the policy's ordered `streamEvents`, without changing behavior.
 
-`SpeechBoundaryPolicy` uses sample counts: confirmed onset 1536 (96 ms), pre-roll budget 4096 (256 ms), endpoint silence 12800 (800 ms), endpoint padding 3072 (192 ms), and model-sized segment 192000 (12 s). Silence is held back, then preserved in full if speech resumes; only endpoint padding is forwarded at utterance end. Prefix/suffix operations preserve whole frames, so padding is quantized to VAD windows. Maximum-duration boundaries keep speaking/hysteresis and stable utterance identity; the separate complete-turn bound is 960000 samples (60 s). Finish includes pending speaking tail and an explicit inputFinished event. Reset clears DSP/segmentation state without choosing a new device.
+`SpeechBoundaryPolicy` uses sample counts: confirmed onset 1536 (96 ms), pre-roll budget 4096 (256 ms), endpoint silence 12800 (800 ms), endpoint padding 3072 (192 ms), and model-sized segment 192000 (12 s). Silence is held back, then preserved in full if speech resumes; only endpoint padding is forwarded at utterance end. Prefix/suffix operations preserve whole frames, so padding is quantized to VAD windows. Maximum-duration boundaries keep speaking/hysteresis and stable utterance identity; there is no sixty-second complete-turn cutoff. Finish includes pending speaking tail and an explicit inputFinished event. Reset clears DSP/segmentation state without choosing a new device.
 
 ## Output contracts
 
@@ -67,9 +67,9 @@ Publication is one-way. A subscriber rejection cannot stop inference; output pro
 
 ## Listening state and recovery
 
-speech.listening controls session-only consent. Up to four source/incarnation/revision-fenced interaction.replyActivity snapshots and one pending final root suppress new utterance admission. Final ASR closes admission before publication; matching Assistant acknowledgment transfers the hold to occupancy. One owned 120-second recovery task expires lost terminal facts and reports agent.error. Generic busy is not reply occupancy.
+speech.listening controls session-only consent. Up to four source/incarnation/revision-fenced interaction.replyActivity snapshots and one pending final root suppress new utterance admission. Final ASR closes admission before publication; matching Assistant acknowledgment transfers the hold to occupancy. Occupancy ends on explicit terminal/activity or lifecycle facts; there is no lease timer. Generic busy is not reply occupancy.
 
-Native speech.captureEnded clears consent only for the current revision. User-off stops physical capture; policy pause retains capture and closes recognition admission. App additionally waits for confirmed utterance completion, playback drain and a 350 ms tail. Policy is not restored after process restart. openCapture/closeCapture cancel/join a capture epoch without stopping the resident Agent; full stop also joins recovery/publisher and closes output.
+Native speech.captureEnded clears consent only for the current revision. User-off stops physical capture; policy pause closes recognition admission and App stops native capture after confirmed utterance completion while retaining logical consent. App additionally joins confirmed utterance completion and playback drain/audio cleanup; capture resumes immediately when policy and these barriers permit. Policy is not restored after process restart. openCapture/closeCapture cancel/join a capture epoch without stopping the resident Agent; full stop also joins recovery/publisher and closes output.
 
 ## Sound-source algorithm
 
@@ -85,7 +85,7 @@ Mono publishes unavailable once per format/listening epoch and still supports AS
 
 ## Function and communication registration
 
-Model exposure comes from [SpeechPerception.agent.json](SpeechPerception.agent.json); code-owned internal permissions are separate. Empty Channel groups declare Channels without exposing a function.
+Model exposure comes from [../../Resources/Agents/SpeechPerception/Agent.json](../../Resources/Agents/SpeechPerception/Agent.json); code-owned internal permissions are separate. Empty Channel groups declare Channels without exposing a function.
 
 ### Model functions
 
@@ -138,3 +138,26 @@ Publication is one-way and has no recipient acknowledgment. Directed send return
 ## Related design
 
 [Parent design](../README.md)
+
+✅ 对话占用订阅收敛为唯一对话生产者 Assistant；确定性角色不再发布对话占用。框架仍可容纳多生产者，但当前业务配置不授权闲置来源。
+
+
+## 固定函数与 Skill
+
+✅ 资源不再包含 Permissions.json，Agent.json 的 baseSkills 引用 Skill，Skill.json 声明函数。业务模型函数由已加载 Skill 提供；固定调用与模型轮次分别验证，详见 [资源规范](../../Resources/Agents/README.md)。
+
+## Lifecycle-owned conversation and audio (2026-10-12)
+
+✅ 已移除对话生成、ReACT、收件箱排队、结果屏障、ASR 收尾、TTS 合成及回复占用租约的计时终止。Signal 默认无过期时间，框架不再按通信契约附加 TTL。保留显式实时感知数据的新鲜度和网络传输自身超时；它们不作为对话/语音缓存生命周期。Action 自身超时通过原始执行者的 ActionResult 返回。请求/调用数及队列/PCM 容量仍有界，不以计时自动删除已接纳输入。语音句柄无读等待或错误记录 TTL，按播放完成、输入/会话正常结束、异常或显式取消清理；取消加入生成和播放工作。
+
+✅ 无占用租约后，用户关闭聆听/采集异常清除本 Agent 的 pending-final；识别或发布异常也清除该轮等待并重新发布聆听事实。其他 Agent 的实际忙状态仍由其终态事实释放，不能被计时或用户录音开关伪造。
+
+✅ ModelKit requests retain input/request identity and pass the Agent-owned session as opaque InferenceContext.scopeID. Conversation/session validation and policy stay in this calling Agent; no business scope semantics are delegated to ModelKit.
+
+
+✅ Implemented: listening intent may set explicit consent idempotently; absent enabled retains toggle behavior. Physical reply pause is now owned by App rather than leaving the mic running. Reply terminal facts never restore revoked consent; policy revision and capture-end fences remain intact.
+
+
+## Immediate post-reply listening
+
+✅ SpeechPerception keeps consent/reply occupancy and emits revisioned Speech.Listening.update when the last reply finishes. App executes physical microphone start/stop and playback/utterance barriers, without a fixed post-playback wait. No Agent timer or physical audio driver is owned here.

@@ -33,7 +33,9 @@ private func soundEstimates(_ samples: [Float], rate: Int, timestamp: Double = 0
     return values
 }
 
-@Test(arguments: [(Float(1), Float(0), Float(0)), (-1, 0, 0), (0, 1, 0), (0, -1, 0), (0, 0, 1), (0, 0, -1)])
+@Test(
+    .actionCatalog,
+    arguments: [(Float(1), Float(0), Float(0)), (-1, 0, 0), (0, 1, 0), (0, -1, 0), (0, 0, 1), (0, 0, -1)])
 func soundSourceAxesUseACNOrderAndRadians(_ axis: (Float, Float, Float)) throws {
     var estimator = SoundSourceEstimator()
     let value = try #require(
@@ -47,7 +49,7 @@ func soundSourceAxesUseACNOrderAndRadians(_ axis: (Float, Float, Float)) throws 
     #expect(abs(direction.z - Double(axis.2)) < 0.000001)
 }
 
-@Test(arguments: [8000, 11025, 16000, 44100, 48000, 192000])
+@Test(.actionCatalog, arguments: [8000, 11025, 16000, 44100, 48000, 192000])
 func soundSourceCadenceAndQuietClearUseSamples(_ rate: Int) throws {
     var estimator = SoundSourceEstimator()
     let size = (rate + 9) / 10
@@ -59,7 +61,7 @@ func soundSourceCadenceAndQuietClearUseSamples(_ rate: Int) throws {
     #expect(quiet.allSatisfy { $0.direction == nil })
 }
 
-@Test func soundSourceRejectsNonFiniteAndResetsRateAndWindow() throws {
+@Test(.actionCatalog) func soundSourceRejectsNonFiniteAndResetsRateAndWindow() throws {
     var estimator = SoundSourceEstimator()
     _ = try soundEstimates(soundPCM(direction: (1, 0, 0), count: 800), rate: 16000, estimator: &estimator)
     #expect(throws: SoundSourceValidationError.self) {
@@ -71,7 +73,7 @@ func soundSourceCadenceAndQuietClearUseSamples(_ rate: Int) throws {
     #expect(result.count == 1 && result[0].direction?.z == 1)
 }
 
-@Test func soundSourceMixedOppositeDirectionsAreUncertainAndPacketIndependent() throws {
+@Test(.actionCatalog) func soundSourceMixedOppositeDirectionsAreUncertainAndPacketIndependent() throws {
     var mixed: [Float] = []
     for index in 0..<1600 {
         let w: Float = index.isMultiple(of: 2) ? 0.1 : -0.1
@@ -92,7 +94,7 @@ func soundSourceCadenceAndQuietClearUseSamples(_ rate: Int) throws {
     #expect(fragmentedValues == result)
 }
 
-@Test func soundSourceTransportValidatesAllChannelsAndRetainsNativeDuration() throws {
+@Test(.actionCatalog) func soundSourceTransportValidatesAllChannelsAndRetainsNativeDuration() throws {
     let values = soundPCM(direction: (0, 1, 0), count: 1600)
     let input = try AudioInput(
         samples: values.withUnsafeBytes { Data($0) }, sampleRate: 16000, sequence: 1, timestamp: 0,
@@ -174,7 +176,7 @@ private func waitForSound(_ predicate: () async -> Bool) async throws {
     Issue.record("Timed out waiting for sound perception")
 }
 
-@Test func soundSourceOnlyDiagnosticCrossesGatewaysWithoutModelsOrPresentationGrants() async throws {
+@Test(.actionCatalog) func soundSourceOnlyDiagnosticCrossesGatewaysWithoutModelsOrPresentationGrants() async throws {
     let configuration = try AgentConfigurations.load(named: "SpeechPerception")
     let policy = try CommunicationPolicy(
         contracts: AgentContracts.communication,
@@ -217,7 +219,7 @@ private func waitForSound(_ predicate: () async -> Bool) async throws {
     await output.shutdown()
 }
 
-@Test func soundSourceNonSpeechBroadcastDoesNotRequireSubscribersOrOpenASR() async throws {
+@Test(.actionCatalog) func soundSourceNonSpeechBroadcastDoesNotRequireSubscribersOrOpenASR() async throws {
     let session = UUID()
     let vad = SoundVADSession()
     let values = SoundPublications()
@@ -251,7 +253,9 @@ private func waitForSound(_ predicate: () async -> Bool) async throws {
     #expect(await values.values.count == 1)
 }
 
-@Test(.timeLimit(.minutes(1))) func soundSourceContextWriteFailureReportsWithoutStoppingOrSelfJoin() async throws {
+@Test(.actionCatalog, .timeLimit(.minutes(1))) func soundSourceContextWriteFailureReportsWithoutStoppingOrSelfJoin()
+    async throws
+{
     let session = UUID()
     let context = AgentContextRepository(
         agent: .speechPerception, scope: UUID(), state: SpeechPerceptionContextState(),
@@ -280,7 +284,7 @@ private func waitForSound(_ predicate: () async -> Bool) async throws {
     #expect(await iterator.next() == nil)
 }
 
-@Test func soundSourceMonoIsUnavailableAndRejectedPublicationDoesNotStopRecognition() async throws {
+@Test(.actionCatalog) func soundSourceMonoIsUnavailableAndRejectedPublicationDoesNotStopRecognition() async throws {
     let session = UUID()
     let values = SoundPublications()
     let agent = try SpeechPerceptionAgent(
@@ -300,7 +304,7 @@ private func waitForSound(_ predicate: () async -> Bool) async throws {
     await agent.stop()
 }
 
-@Test func soundSourceBroadcastCrossesGatewaysWithBoundIdentityAndCaptureDeadline() async throws {
+@Test(.actionCatalog) func soundSourceBroadcastCrossesGatewaysWithBoundIdentityAndCaptureDeadline() async throws {
     let speechConfiguration = try AgentConfigurations.load(named: "SpeechPerception")
     let listenerData: [String: Any] = [
         "version": 6, "id": "soundListener", "actions": [:], "tools": [],
@@ -344,9 +348,8 @@ private func waitForSound(_ predicate: () async -> Bool) async throws {
     #expect(received.metadata.source == "speechPerception")
     #expect(received.metadata.parentID == parent.id && received.metadata.rootID == parent.metadata.rootID)
     #expect(received.sessionID == session && received.turn == nil)
-    #expect(received.metadata.deadline <= capturedAt.advanced(by: .milliseconds(600)))
+    #expect(try #require(received.metadata.deadline) <= capturedAt.advanced(by: .milliseconds(600)))
     #expect(received.payload.perception?.contract == "sound.source")
-    #expect(try AgentContracts.communication["sound.source"]?.lifetime == 0.5)
     await manager.stopAll()
     await output.shutdown()
 }
@@ -365,7 +368,7 @@ private actor SoundPublicationGate {
     }
 }
 
-@Test func soundSourceSlowSubscriberDoesNotBlockFollowingDirections() async throws {
+@Test(.actionCatalog) func soundSourceSlowSubscriberDoesNotBlockFollowingDirections() async throws {
     let session = UUID()
     let values = SoundPublications()
     let gate = SoundPublicationGate()
@@ -396,7 +399,7 @@ private actor SoundPublicationGate {
     await agent.stop()
 }
 
-@Test func soundSourceOldCaptureNeverPublishesDirection() async throws {
+@Test(.actionCatalog) func soundSourceOldCaptureNeverPublishesDirection() async throws {
     let session = UUID()
     let values = SoundPublications()
     let agent = try SpeechPerceptionAgent(
@@ -416,7 +419,7 @@ private actor SoundPublicationGate {
     #expect(await values.values.isEmpty)
 }
 
-@Test func soundSourceNoGatewayRecipientsIsAnOrdinaryDeliveryOutcome() async throws {
+@Test(.actionCatalog) func soundSourceNoGatewayRecipientsIsAnOrdinaryDeliveryOutcome() async throws {
     let manager = AgentManager()
     let session = UUID()
     let speech = try SpeechPerceptionAgent(
@@ -475,7 +478,7 @@ private struct SoundEndpoint: VoiceActivityCapability {
     func detectVoiceActivity(format: AudioFormat) -> any VoiceActivitySession { SoundEndpointSession() }
 }
 
-@Test func soundSourceReplyGateClearsDirectionAndResumeStartsANewWindow() async throws {
+@Test(.actionCatalog) func soundSourceReplyGateClearsDirectionAndResumeStartsANewWindow() async throws {
     let session = UUID()
     let values = SoundPublications()
     let finals = SoundPublications()
@@ -523,7 +526,7 @@ private struct SoundEndpoint: VoiceActivityCapability {
     await outputs.value
 }
 
-@Test func soundSourceStopCancelsAndJoinsAnInFlightPublisher() async throws {
+@Test(.actionCatalog) func soundSourceStopCancelsAndJoinsAnInFlightPublisher() async throws {
     let session = UUID()
     let values = SoundPublications()
     let gate = SoundPublicationGate()

@@ -9,7 +9,7 @@ import Testing
 
 @testable import Gateway
 
-@Test func behaviorTranslationPreservesCorrelationWithoutAgentObjectsInExecution() throws {
+@Test(.actionCatalog) func behaviorTranslationPreservesCorrelationWithoutAgentObjectsInExecution() throws {
     let turn = AgentTurn(ordinal: 9)
     let input = AgentInput(sessionID: UUID(), payload: .event("boundary"), turn: turn)
     let owner = ExecutionOwner(agent: .assistant, incarnation: UUID(), sessionID: input.sessionID)
@@ -30,7 +30,7 @@ import Testing
     #expect(envelope.executionContext.inputID == input.id)
 }
 
-@Test func behaviorResultTranslationPreservesChildDetailsAndExecutionFailure() throws {
+@Test(.actionCatalog) func behaviorResultTranslationPreservesChildDetailsAndExecutionFailure() throws {
     let report = try ActionReport(entries: [
         .init(path: "root.first", status: .succeeded, details: ["motor": "4", "target": "1238", "observed": "1240"]),
         .init(
@@ -53,7 +53,7 @@ import Testing
     }
 }
 
-@Test func genericAgentReportRetainsOpaqueProviderDetailsAndCancellation() throws {
+@Test(.actionCatalog) func genericAgentReportRetainsOpaqueProviderDetailsAndCancellation() throws {
     let report = try AgentActionReport(entries: [
         .init(
             path: "Fixture.Control.fixture", status: .failed, code: .init(rawValue: "fixture.sensorUnavailable"),
@@ -66,7 +66,7 @@ import Testing
     #expect(successful.withExecutionFailure(.cancelled).status == .cancelled)
 }
 
-@Test func actionFailureTranslationPreservesProducerIdentifiers() {
+@Test(.actionCatalog) func actionFailureTranslationPreservesProducerIdentifiers() {
     let failures: [ActionFailure] = [
         .operationFailed, .resourceUnavailable, .invalidArguments,
         .init(rawValue: "fixture.customFailure"), .init(rawValue: "feedbackTimeout"),
@@ -76,7 +76,7 @@ import Testing
     }
 }
 
-@Test func runtimeTransportsProducerReportCodeWithoutInterpretingFailureIdentity() {
+@Test(.actionCatalog) func runtimeTransportsProducerReportCodeWithoutInterpretingFailureIdentity() {
     struct FixtureError: ActionReportFailureProviding {
         let actionExecutionFailure = ActionFailure(rawValue: "feedbackTimeout")
         let actionReportCode = ActionReport.Entry.Code(rawValue: "fixture.customOutcome")

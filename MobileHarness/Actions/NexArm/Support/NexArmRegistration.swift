@@ -41,26 +41,45 @@ enum NexArmRegistration {
             default: throw error
             }
         }
-        let steps: Int
+        let gesture: NexArmGesture?
         switch call.actionPath.function {
-        case "reset", "resetMotor", "moveMotor": steps = 1
-        case "nodHead", "shakeHead": steps = 1 + 5 * cycles
-        case "dance": steps = 2 + 6 * cycles
-        case "celebrate", "waveWrist": steps = 2 + 4 * cycles
-        case "tiltWrist": steps = 3
-        case "lookAround": steps = 2 + 3 * cycles
-        default: steps = 2 + 3 * cycles
+        case "reset", "resetMotor", "moveMotor": gesture = nil
+        case "nodHead": gesture = .nod
+        case "shakeHead": gesture = .shakeHead
+        case "dance": gesture = .dance
+        case "celebrate": gesture = .celebrate
+        case "waveWrist": gesture = .wave
+        case "tiltWrist": gesture = .tiltLeft
+        case "lookAround": gesture = .lookAround
+        case "shakeBase": gesture = .baseSway
+        default: throw NexArmExecutionError.invalidArguments
+        }
+        let steps: Int
+        if let gesture {
+            steps =
+                try gesture.motorID != nil
+                ? NexArmSimpleActions.frames(
+                    gesture, home: NexArmGesture.referenceHomeJoints, repetitions: cycles
+                ).count
+                : gesture.cartesianPlaybackFrames(repetitions: gesture == .tiltLeft ? 1 : cycles).count
+        } else {
+            steps = 1
         }
         let ids = try resources(call).compactMap { Int($0.rawValue.split(separator: ".").last ?? "") }
-        let children = ids.map { motor in
+        let children = try ids.map { motor in
             let limits = NexArmMotorCommands.positionLimits[motor - 1]
-            return NexArmMotorProfiles.budget(motor: motor, from: nil, target: limits.upperBound, options: options)
+            let estimate = NexArmMotorProfiles.budget(
+                motor: motor, from: nil, target: limits.upperBound, options: options)
+            return try ActionExecutionBudget(
+                expected: .milliseconds(estimate.expectedMilliseconds),
+                timeout: .milliseconds(estimate.timeoutMilliseconds + 1000))
         }
         // Unknown live pose/IK before admission: reserve maximum legal travel per group.
         // Device setup and cooperative cleanup get 5s total; queue time is excluded.
-        let expected = children.map(\.expectedMilliseconds).max() ?? 0
-        let maximum = children.map(\.timeoutMilliseconds).max() ?? 0
-        return try ActionExecutionBudget(
-            expected: .milliseconds(expected * steps), timeout: .milliseconds((maximum + 1000) * steps + 5000))
+        let group = try ActionExecutionBudget.parallel(children)
+        let motion = try ActionExecutionBudget.sequence(Array(repeating: group, count: steps))
+        return try ActionExecutionBudget.sequence([
+            motion, ActionExecutionBudget(expected: .zero, timeout: .seconds(5)),
+        ])
     }
 }

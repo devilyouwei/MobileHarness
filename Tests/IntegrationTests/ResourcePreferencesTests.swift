@@ -42,14 +42,14 @@ private actor PreferenceBindingFixture: ModelResourceCapability {
     func cancel(_ id: String) async throws {}
     func remove(_ id: String) async throws {}
 }
-@Test func preferenceLegacyDocumentAndViewDraftRemainWireCompatible() throws {
+@Test(.actionCatalog) func preferenceLegacyDocumentAndViewDraftRemainWireCompatible() throws {
     let raw = Data(#"{"endpoint":"https://hf-mirror.com","allowsCellular":false,"preferDownloadedSpeech":true}"#.utf8)
     let value = try JSONDecoder().decode(ModelResourcePreferences.self, from: raw)
     #expect(value.useCustomRecognition && value.useCustomSynthesis && !value.allowsCellular)
     let view = try JSONDecoder().decode(ModelResourceSourceDraft.self, from: JSONEncoder().encode(value))
     #expect(view.endpoint == value.endpoint && view.useCustomSynthesis)
 }
-@Test func preferenceServiceValidatesBeforeCommitAndRestoreMigratesMissingModels() async throws {
+@Test(.actionCatalog) func preferenceServiceValidatesBeforeCommitAndRestoreMigratesMissingModels() async throws {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     defer { try? FileManager.default.removeItem(at: root) }
     let store = try LocalDocumentStore<ModelResourcePreferences>(
@@ -73,7 +73,7 @@ private actor PreferenceBindingFixture: ModelResourceCapability {
     #expect(restored.endpoint == "https://hf-mirror.com")
     #expect(try await store.refresh()?.value == restored)
 }
-@Test func preferencePipelineKeepsCommitOnBindingFailureAndExplicitRestoreRetries() async throws {
+@Test(.actionCatalog) func preferencePipelineKeepsCommitOnBindingFailureAndExplicitRestoreRetries() async throws {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     defer { try? FileManager.default.removeItem(at: root) }
     let store = try LocalDocumentStore<ModelResourcePreferences>(
@@ -95,7 +95,7 @@ private actor PreferenceBindingFixture: ModelResourceCapability {
     #expect(await runtime.agent.status().queuedInputs == 0)
     await runtime.shutdown()
 }
-@Test func preferenceRestoreMigratesNetworkAndFlagsBeforeReturningBinding() async throws {
+@Test(.actionCatalog) func preferenceRestoreMigratesNetworkAndFlagsBeforeReturningBinding() async throws {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     defer { try? FileManager.default.removeItem(at: root) }
     let store = try LocalDocumentStore<ModelResourcePreferences>(
@@ -112,7 +112,7 @@ private actor PreferenceBindingFixture: ModelResourceCapability {
     await runtime.shutdown()
 }
 
-@Test func preferenceAgentRejectsMalformedFeedbackAndRetirementReleasesTransaction() async throws {
+@Test(.actionCatalog) func preferenceAgentRejectsMalformedFeedbackAndRetirementReleasesTransaction() async throws {
     let session = UUID()
     let agent = try ApplicationControlAgent(sessionID: session)
     try await agent.start()
@@ -190,7 +190,7 @@ private actor PreferencePresentationFixture: ResourcePresentationCapability {
         if fails { throw PreferencePresentationError.preferencePresentation }
     }
 }
-@Test func preferenceFailureCodesSelectRegisteredNoticeReasonsWithoutBindingOrCommit() async throws {
+@Test(.actionCatalog) func preferenceFailureCodesSelectRegisteredNoticeReasonsWithoutBindingOrCommit() async throws {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     defer { try? FileManager.default.removeItem(at: root) }
     let store = try LocalDocumentStore<ModelResourcePreferences>(
@@ -214,7 +214,7 @@ private actor PreferencePresentationFixture: ResourcePresentationCapability {
     #expect(await runtime.agent.status().queuedInputs == 0)
     await runtime.shutdown()
 }
-@Test func bindingFailureUsesThirdPresentationCallAndPreservesDurablePreference() async throws {
+@Test(.actionCatalog) func bindingFailureUsesThirdPresentationCallAndPreservesDurablePreference() async throws {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     defer { try? FileManager.default.removeItem(at: root) }
     let store = try LocalDocumentStore<ModelResourcePreferences>(
@@ -243,7 +243,8 @@ private actor PreferencePresentationFixture: ResourcePresentationCapability {
     #expect(await presentation.reasons == [.execution])
     await runtime.shutdown()
 }
-@Test(.timeLimit(.minutes(1)), arguments: [false, true]) func preferenceGateStaysHeldUntilFailurePresentationCompletes(
+@Test(.actionCatalog, .timeLimit(.minutes(1)), arguments: [false, true])
+func preferenceGateStaysHeldUntilFailurePresentationCompletes(
     bindingFailure: Bool
 ) async throws {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
@@ -283,7 +284,7 @@ private actor PreferencePresentationFixture: ResourcePresentationCapability {
     #expect(await runtime.agent.status().queuedInputs == 0)
     await runtime.shutdown()
 }
-@Test func preferencePresentationFailureAndMissingHandlerRetainCausesAndReleaseGate() async throws {
+@Test(.actionCatalog) func preferencePresentationFailureAndMissingHandlerRetainCausesAndReleaseGate() async throws {
     for missing in [false, true] {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: root) }
@@ -320,7 +321,7 @@ private struct SpoofedPreferenceFailure: ModelResourcePreferencesCapability {
     }
     func saveSource(_ preferences: ModelResourcePreferences) throws -> ModelResourcePreferences { try restoreSource() }
 }
-@Test func preferenceFailureTextDoesNotSubstituteForProducerCode() async throws {
+@Test(.actionCatalog) func preferenceFailureTextDoesNotSubstituteForProducerCode() async throws {
     let presentation = PreferencePresentationFixture()
     let runtime = try resourceRuntime(
         UnusedModelResourceCapability(), preferences: SpoofedPreferenceFailure(), presentation: presentation)
@@ -331,7 +332,7 @@ private struct SpoofedPreferenceFailure: ModelResourcePreferencesCapability {
     #expect(await presentation.reasons == [.execution])
     await runtime.shutdown()
 }
-@Test func preferenceFailureFunctionValidatesReasonsAndMessageBeforeEndpoint() async throws {
+@Test(.actionCatalog) func preferenceFailureFunctionValidatesReasonsAndMessageBeforeEndpoint() async throws {
     let presentation = PreferencePresentationFixture()
     func invocation(_ reason: String, message: String = "fixture failure") -> FunctionInvocation {
         FunctionInvocation(

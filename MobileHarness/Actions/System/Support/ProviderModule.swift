@@ -63,6 +63,7 @@ public enum ProviderModelList {
         return String(decoding: data, as: UTF8.self)
     }
 }
+@ActionCatalog
 public struct ProviderModule: CapabilityModule {
     private let provider: any ProviderDiscoveryCapability
     private let settings: any ProviderSettingsCapability

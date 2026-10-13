@@ -78,18 +78,16 @@ public actor ToolRegistry {
     }
     public func timeout(for call: ToolRequest) throws -> Duration? {
         guard let definition = handler(for: call.toolPath) else { return nil }
-        return try definition.estimatingDuration?(Self.request(call)).timeout ?? definition.timeout
+        return try definition.function.executionBudget(for: Self.request(call)).timeout
     }
     public func handler(for path: String) -> ActionBinding? {
         guard let binding = definitions[path], let function = functions.find(binding.path) else { return nil }
         return ActionBinding(
             function: function, protocols: binding.protocols,
-            executionPolicy: binding.executionPolicy, directResultPolicy: binding.directResultPolicy,
-            feedbackPolicy: binding.feedbackPolicy)
+            executionPolicy: binding.executionPolicy, directResultPolicy: binding.directResultPolicy)
     }
     public func returnsResult(for path: String) -> Bool {
-        definitions[path]?.feedbackPolicy == .observation
-            || (definitions[path]?.directResultPolicy ?? .returning) == .returning
+        (definitions[path]?.directResultPolicy ?? .returning) == .returning
     }
     private static func request(_ call: ToolRequest) -> FunctionRequest {
         let parts = call.toolPath.split(separator: ".").map(String.init)

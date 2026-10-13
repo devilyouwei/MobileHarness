@@ -48,3 +48,11 @@ Memory model grants list/read only; fixed archive/delete/title permission is cod
 ## Related design
 
 [Parent design](../README.md) · [Support](Support/README.md)
+
+## Action-owned documentation and Skill instruction contract
+
+✅ 本域函数用 `@Action(doc:parameters:)` 维护说明与参数契约。所属模块注册自动生成声明投影；业务顺序和调用示例由 Skill Instructions.md 教学，不再登记 examples。
+
+## Channel-owned Action ordering
+
+✅ Function metadata and business attributes have no serialization key. Scheduled ordering belongs to [ChannelScheduler](../../Gateway/Output/Scheduling/README.md); resources/budgets and native capability admission remain explicit.

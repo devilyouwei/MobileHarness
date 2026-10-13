@@ -4,7 +4,7 @@ import ExecutionRuntime
 import Foundation
 import FunctionContracts
 
-/// Task-local structured execution groups with process-wide definition-owned serialization exclusion.
+/// Task-local structured execution groups with Channel FIFO and independent resource arbitration.
 public actor ChannelScheduler {
     struct InputKey: Hashable {
         let source: AgentID
@@ -19,7 +19,6 @@ public actor ChannelScheduler {
         var id: UUID { invocation.executionID }
         let sequence: UInt64
         let phase: Int
-        let serializationKey: String
         let kind: ActionBinding.Kind
         let resources: Set<ResourceID>
         var path: ActionPath { invocation.call.actionPath }
@@ -60,6 +59,8 @@ public actor ChannelScheduler {
         var failure: (any Error)?
         var finishing = false
         var cancelling = false
+        var retainCancelledBoundary = false
+        var producerIncarnation: UUID?
         // Failed tasks remain fenced until their producer finishes or explicit cancellation joins them.
         var settled = false
 
@@ -94,7 +95,6 @@ public actor ChannelScheduler {
     private var channelCounts: [String: Int] = [:]
     private var isShutdown = false
     private var sequence: UInt64 = 0
-    private var busySerializationKeys: Set<String> = []
     private var executionLedger = ActionExecutionLedger()
     private var executionObservers: [UUID: AsyncStream<ActionExecutionSnapshot>.Continuation] = [:]
     public enum ObservationError: Error { case capacityExceeded }
@@ -146,7 +146,7 @@ public actor ChannelScheduler {
         while true {
             try Task.checkCancellation()
             let records = resultLedger.snapshot().filter { $0.result?.roundID == roundID }
-            if let failed = records.first(where: { [.closed, .expired, .exhausted].contains($0.state) }) {
+            if let failed = records.first(where: { $0.state == .closed }) {
                 throw ActionSchedulingError.resultDeliveryFailed(
                     executionID: failed.executionID.uuidString,
                     path: failed.result?.path.description ?? "unknown", state: failed.state.rawValue)
@@ -232,6 +232,12 @@ public actor ChannelScheduler {
         }
         let state = try state(for: invocation.envelope)
         guard state.acceptedActions < 120 else { throw ActionSchedulingError.taskActionLimitExceeded }
+        if let incarnation = invocation.owner?.incarnation {
+            guard state.producerIncarnation == nil || state.producerIncarnation == incarnation else {
+                throw ActionExecutionError.invalidInvocation
+            }
+            state.producerIncarnation = incarnation
+        }
         resultLedger.reserve(invocation)
         state.acceptedActions += 1
         state.pending += 1
@@ -239,7 +245,7 @@ public actor ChannelScheduler {
         sequence += 1
         state.phases[state.writePhase].lanes[channel, default: Channel()].queued.append(
             Job(
-                sequence: sequence, phase: state.writePhase, serializationKey: definition.serializationKey,
+                sequence: sequence, phase: state.writePhase,
                 kind: definition.kind, resources: required,
                 invocation: invocation))
         executionLedger.admit(invocation, definition: definition)
@@ -330,17 +336,12 @@ public actor ChannelScheduler {
         executionObservers.removeAll()
     }
 
-    public func cancel(agent: AgentID, incarnation: UUID) async {
+    public func cancel(agent: AgentID, incarnation: UUID, sessionID: UUID? = nil) async {
         let selected = inputs.filter { key, state in
-            key.source == agent
-                && state.phases.contains { phase in
-                    phase.lanes.values.contains { lane in
-                        lane.queued.contains { $0.invocation.owner?.incarnation == incarnation }
-                            || lane.running?.job.invocation.owner?.incarnation == incarnation
-                    }
-                }
+            key.source == agent && (sessionID == nil || state.sessionID == sessionID)
+                && state.producerIncarnation == incarnation
         }
-        for key in selected.keys { beginCancellation(key) }
+        for key in selected.keys { beginCancellation(key, retainBoundary: sessionID != nil) }
         for state in selected.values { _ = await state.completion.value }
     }
 
@@ -366,12 +367,11 @@ public actor ChannelScheduler {
             }
         }
         for job in candidates.sorted(by: { $0.sequence < $1.sequence }) {
-            guard !busySerializationKeys.contains(job.serializationKey), let state = inputs[job.inputKey] else {
+            guard let state = inputs[job.inputKey] else {
                 continue
             }
             let channel = job.invocation.channel
             state.phases[job.phase].lanes[channel]?.queued.removeFirst()
-            busySerializationKeys.insert(job.serializationKey)
             let task = Task {
                 var outcome: Outcome
                 var started = false
@@ -420,7 +420,6 @@ public actor ChannelScheduler {
             state.phases[job.phase].lanes[job.invocation.channel]?.running?.job.id == job.id
         else { return }
         state.phases[job.phase].lanes[job.invocation.channel]?.running = nil
-        busySerializationKeys.remove(job.serializationKey)
         decrementChannel(job.invocation.channel, by: 1)
         state.pending -= 1
         switch outcome {
@@ -438,7 +437,7 @@ public actor ChannelScheduler {
             let description = report?.failureDescription ?? issues.joined(separator: "; ")
             executionTransition(
                 job.id, to: phase, completion: completion,
-                failure: status == .succeeded ? nil : .operationFailed,
+                failure: status == .succeeded || status == .cancelled ? nil : .operationFailed,
                 failureDescription: description)
             resultLedger.complete(
                 job.invocation, status: status.agentValue,
@@ -450,28 +449,30 @@ public actor ChannelScheduler {
                 effect: status == .succeeded ? .contractCompleted : .unknown)
         case .failure(let error):
             let report = FunctionExecutor.failureReport(for: error)
+            let cancelled = report.isCancellationOnly
             executionTransition(
-                job.id, to: error is CancellationError ? .cancelled : .failed, completion: .report(report),
-                failure: error is CancellationError
+                job.id, to: cancelled ? .cancelled : .failed, completion: .report(report),
+                failure: cancelled
                     ? nil
                     : ((error as? any ActionReportFailureProviding)?.actionExecutionFailure.observationFailure
                         ?? (error is ResourceError ? .resourceUnavailable : .operationFailed)),
-                failureDescription: error is CancellationError ? nil : ActionReport.description(for: error))
+                failureDescription: cancelled ? nil : ActionReport.description(for: error))
             resultLedger.complete(
-                job.invocation, status: error is CancellationError ? .cancelled : .failed,
+                job.invocation, status: cancelled ? .cancelled : .failed,
                 effect: started ? .unknown : .notStarted, completion: .report(report),
-                failure: error is CancellationError
+                failure: cancelled
                     ? .cancelled : (error is ResourceError ? .resourceUnavailable : .handlerFailed))
             diagnostics.record(
-                job.invocation, kind: job.kind, phase: error is CancellationError ? .cancelled : .failed,
+                job.invocation, kind: job.kind, phase: cancelled ? .cancelled : .failed,
                 effect: started ? .unknown : .notStarted)
         }
         finalizeIfReady(job.inputKey)
         startEligibleChannels()
         startResultDelivery()
     }
-    private func beginCancellation(_ key: InputKey) {
+    private func beginCancellation(_ key: InputKey, retainBoundary: Bool = false) {
         guard let state = inputs[key] else { return }
+        state.retainCancelledBoundary = retainBoundary
         state.cancelling = true
         state.failure = state.failure ?? CancellationError()
         cancelJobs(key: key)
@@ -514,7 +515,7 @@ public actor ChannelScheduler {
             state.signal.yield(state.failure.map { .failure($0) } ?? .success(.completed))
             state.signal.finish()
         }
-        if state.finishing || state.cancelling { inputs.removeValue(forKey: key) }
+        if state.finishing || (state.cancelling && !state.retainCancelledBoundary) { inputs.removeValue(forKey: key) }
     }
 }
 
@@ -538,14 +539,8 @@ extension ChannelScheduler {
                     pair.continuation.finish()
                     self.finishDeliveryAttempt(attemptID)
                 }
-                let timeout = Task {
-                    do { try await Task.sleep(for: .seconds(1)) } catch { return }
-                    pair.continuation.yield(.retry)
-                    pair.continuation.finish()
-                }
                 var iterator = pair.stream.makeAsyncIterator()
                 let outcome = await iterator.next() ?? .closed
-                timeout.cancel()
                 resultLedger.delivered(result.executionID, outcome: outcome)
                 if deliveryAttemptID == attemptID { deliveryAttempt?.cancel() }
             } else {

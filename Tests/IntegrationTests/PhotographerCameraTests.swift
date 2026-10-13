@@ -111,7 +111,8 @@ private actor CameraCaller: Agent {
     init() throws {
         descriptor = AgentDescriptor(
             id: .assistant, name: "Assistant fixture", inputs: [], outputs: [.toolCall, .actionCall, .control],
-            capabilities: try AgentConfigurations.load(named: "Assistant").capabilities)
+            capabilities: try AgentSkillLoader.registry(
+                ["photography"], fixed: AgentConfigurations.load(named: "Assistant").capabilities))
     }
     func start() {}
     func pause() {}
@@ -155,7 +156,8 @@ private struct CameraFixture {
             agent: try PhotographerAgent(sessionID: root))
     }
 }
-@Test(.timeLimit(.minutes(1))) func photographerCameraUsesSharedFunctionsAndRetainsFailuresBeforeRecovering()
+@Test(.actionCatalog, .timeLimit(.minutes(1)))
+func photographerCameraUsesSharedFunctionsAndRetainsFailuresBeforeRecovering()
     async throws
 {
     let f = try await CameraFixture()
@@ -186,7 +188,9 @@ private struct CameraFixture {
     #expect(await f.probe.sources.allSatisfy { $0 == "photographer" })
     await f.runtime.shutdown()
 }
-@Test(.timeLimit(.minutes(1))) func photographerCameraCancellationJoinsBeforeRetryAndRejectsOverlap() async throws {
+@Test(.actionCatalog, .timeLimit(.minutes(1))) func photographerCameraCancellationJoinsBeforeRetryAndRejectsOverlap()
+    async throws
+{
     let f = try await CameraFixture()
     await f.probe.holdNext()
     var entered = f.probe.entered.stream.makeAsyncIterator()
@@ -202,7 +206,9 @@ private struct CameraFixture {
     try await f.runtime.perform(.retry)
     await f.runtime.shutdown()
 }
-@Test(.timeLimit(.minutes(1))) func photographerSurvivesVisionDetachAndRejectsRetiredPoseScopes() async throws {
+@Test(.actionCatalog, .timeLimit(.minutes(1))) func photographerSurvivesVisionDetachAndRejectsRetiredPoseScopes()
+    async throws
+{
     let f = try await CameraFixture()
     let vision = UUID()
     try await f.runtime.attachTracking(sessionID: vision)
@@ -217,7 +223,7 @@ private struct CameraFixture {
     try await f.runtime.perform(.open)
     await f.runtime.shutdown()
 }
-@Test func assistantCannotExecutePhotographyFunctions() async throws {
+@Test(.actionCatalog) func assistantCannotExecutePhotographyFunctions() async throws {
     let f = try await CameraFixture()
     try await f.manager.register(CameraCaller())
     try await f.manager.start(.assistant)
@@ -232,7 +238,7 @@ private struct CameraFixture {
     await f.runtime.shutdown()
 }
 
-@Test func photographerCameraRejectsForeignScopeAndFeedbackWithoutLosingPendingWork() async throws {
+@Test(.actionCatalog) func photographerCameraRejectsForeignScopeAndFeedbackWithoutLosingPendingWork() async throws {
     let root = UUID()
     let agent = try PhotographerAgent(sessionID: root)
     try await agent.start()
@@ -274,7 +280,7 @@ private struct CameraFixture {
     await agent.stop()
 }
 
-@Test func photographerCameraFacingIsRequiredOnlyForFlip() throws {
+@Test(.actionCatalog) func photographerCameraFacingIsRequiredOnlyForFlip() throws {
     for facing in [PhotographerCameraIntent.Facing.front, .back] {
         _ = try PhotographerCameraIntent(.flip, facing: facing).message.validatedSize()
         #expect(throws: CommunicationError.invalidPayload) {
@@ -286,7 +292,7 @@ private struct CameraFixture {
     }
 }
 
-@Test func photoButtonsRouteExactIdentityAndRetainFailureBeforeRetry() async throws {
+@Test(.actionCatalog) func photoButtonsRouteExactIdentityAndRetainFailureBeforeRetry() async throws {
     let fixture = try await CameraFixture()
     let id = await fixture.probe.photoID
     await fixture.probe.denyNextSave()
@@ -312,7 +318,7 @@ private struct CameraFixture {
     await fixture.runtime.shutdown()
 }
 
-@Test func photographerActionsReturnActualDisposition() async throws {
+@Test(.actionCatalog) func photographerActionsReturnActualDisposition() async throws {
     let fixture = try await CameraFixture()
     try await fixture.runtime.prepareForInteraction()
     let caller = fixture.runtime.agent
@@ -341,7 +347,7 @@ private struct CameraFixture {
     await fixture.runtime.shutdown()
 }
 
-@Test func malformedPhotoCommandsCannotReachNativeEffect() async throws {
+@Test(.actionCatalog) func malformedPhotoCommandsCannotReachNativeEffect() async throws {
     let fixture = try await CameraFixture()
     try await fixture.runtime.prepareForInteraction()
     let caller = fixture.runtime.agent

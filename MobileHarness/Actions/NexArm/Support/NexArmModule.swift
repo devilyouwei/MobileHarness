@@ -1,6 +1,7 @@
 import FunctionContracts
 
 /// Motor, gesture, base and tracking behavior share one domain catalog.
+@ActionCatalog
 public struct NexArmModule: CapabilityModule {
     private let perform: @Sendable (NexArmActions.GestureRequest, any FunctionInput) async throws -> Void
     private let move: @Sendable (Int, any FunctionInput) async throws -> Void

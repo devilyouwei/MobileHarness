@@ -23,7 +23,7 @@ private func faceObservation(
         timestamp: time, rotation: rotation, people: people)
 }
 
-@Test func gazeMirrorsOnceAndIgnoresLowConfidenceFaces() throws {
+@Test(.actionCatalog) func gazeMirrorsOnceAndIgnoresLowConfidenceFaces() throws {
     var front = FaceGazeTracker(mirrored: true)
     var back = FaceGazeTracker(mirrored: false)
     let observation = try faceObservation([0.8], time: 0)
@@ -35,7 +35,7 @@ private func faceObservation(
     #expect(uncertain.update(try faceObservation([0.8], time: 0, confidence: 0.2)) == .init())
 }
 
-@Test func gazeHoldsTargetAcrossReorderingAndBriefLossThenReturnsToCenter() throws {
+@Test(.actionCatalog) func gazeHoldsTargetAcrossReorderingAndBriefLossThenReturnsToCenter() throws {
     var tracker = FaceGazeTracker(mirrored: false)
     _ = tracker.update(try faceObservation([0.75], time: 0))
     let locked = tracker.update(try faceObservation([0.2, 0.76], time: 0.1))
@@ -50,7 +50,7 @@ private func faceObservation(
     #expect(reacquired.x < 0)
 }
 
-@Test func gazeSuppressesJitterAndReacquiresAfterOrientationChange() throws {
+@Test(.actionCatalog) func gazeSuppressesJitterAndReacquiresAfterOrientationChange() throws {
     var tracker = FaceGazeTracker(mirrored: false)
     for i in 0...20 { _ = tracker.update(try faceObservation([0.7], time: Double(i) / 10)) }
     let still = tracker.update(try faceObservation([0.7], time: 2.1))
@@ -60,7 +60,7 @@ private func faceObservation(
     #expect((-1...1).contains(turned.x) && (-1...1).contains(turned.y))
 }
 
-@Test(arguments: [[:], ["x": "nan", "y": "0"], ["x": "0", "y": "inf"], ["x": "1.1", "y": "0"]])
+@Test(.actionCatalog, arguments: [[:], ["x": "nan", "y": "0"], ["x": "0", "y": "inf"], ["x": "1.1", "y": "0"]])
 func moveEyesRejectsInvalidTarget(parameters: [String: String]) async throws {
     let valid = ActionCall(
         actionPath: .init(domain: "UI", module: "Gaze", function: "moveEyes"), channel: "Gaze",
@@ -75,7 +75,7 @@ func moveEyesRejectsInvalidTarget(parameters: [String: String]) async throws {
     }
 }
 
-@Test func moveEyesAcceptsBoundaryAndPropagatesPresentationFailure() async throws {
+@Test(.actionCatalog) func moveEyesAcceptsBoundaryAndPropagatesPresentationFailure() async throws {
     let call = ActionCall(
         actionPath: .init(domain: "UI", module: "Gaze", function: "moveEyes"), channel: "Gaze",
         parameters: ["x": "-1", "y": "1"])

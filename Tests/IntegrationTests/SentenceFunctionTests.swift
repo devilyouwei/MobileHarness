@@ -29,7 +29,7 @@ private actor StreamingSentenceChat: ChatCapability {
     }
 }
 
-@Test func sentenceTokensArriveBeforeModelCompletionAndFlushFinalTail() async throws {
+@Test(.actionCatalog) func sentenceTokensArriveBeforeModelCompletionAndFlushFinalTail() async throws {
     let model = StreamingSentenceChat()
     let agent = try AssistantAgent(chat: model)
     let speechRequests = try await bindSpeechRequests(agent)
@@ -55,7 +55,7 @@ private actor StreamingSentenceChat: ChatCapability {
     await agent.stop()
 }
 
-@Test func cancellationDiscardsUnfinishedSentenceAndTurnCompletion() async throws {
+@Test(.actionCatalog) func cancellationDiscardsUnfinishedSentenceAndTurnCompletion() async throws {
     let model = StreamingSentenceChat()
     let agent = try AssistantAgent(chat: model)
     _ = try await bindSpeechRequests(agent)
@@ -66,6 +66,10 @@ private actor StreamingSentenceChat: ChatCapability {
     _ = try #require(try await outputs.next())
     _ = try #require(try await outputs.next())
     try await agent.receive(AssistantControl.cancelSession.input(sessionID: input.sessionID))
+    let cancelled = try #require(try await outputs.next())
+    #expect(cancelled.inputID == input.id)
+    #expect(cancelled.output == .control("agent.cancelled"))
+    #expect(cancelled.roundID != nil)
     let next = AgentInput(sessionID: UUID(), payload: .text("next"))
     try await agent.receive(next)
     for _ in 0..<3 {
@@ -75,7 +79,7 @@ private actor StreamingSentenceChat: ChatCapability {
     await agent.stop()
 }
 
-@Test func multilingualSentencesPreserveTextAcrossEveryUnicodeScalarBoundary() throws {
+@Test(.actionCatalog) func multilingualSentencesPreserveTextAcrossEveryUnicodeScalarBoundary() throws {
     let text = "“你好👨‍👩‍👧！ ”English 3.14, U.S. test; العربية، نعم؟ हिन्दी। 次へ、最後\n尾巴 e\u{301}"
     var buffer = SentenceFunctionBuffer(policy: try AssistantAgent.textSegmentation)
     var sentences: [String] = []
@@ -88,7 +92,7 @@ private actor StreamingSentenceChat: ChatCapability {
     #expect(sentences.allSatisfy { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty })
 }
 
-@Test func sentenceBufferRejectsUnboundedUnpunctuatedText() throws {
+@Test(.actionCatalog) func sentenceBufferRejectsUnboundedUnpunctuatedText() throws {
     var buffer = SentenceFunctionBuffer(policy: try AssistantAgent.textSegmentation)
     _ = try buffer.append(String(repeating: "a", count: 2000))
     #expect(throws: GenerationError.limitExceeded) { try buffer.append("b") }
@@ -105,7 +109,7 @@ private struct ExcessiveSentencesChat: ChatCapability {
     }
 }
 
-@Test func assistantSentenceBudgetFailsExplicitlyAfterSixtyPairs() async throws {
+@Test(.actionCatalog) func assistantSentenceBudgetFailsExplicitlyAfterSixtyPairs() async throws {
     let agent = try AssistantAgent(chat: ExcessiveSentencesChat())
     _ = try await bindSpeechRequests(agent)
     try await agent.start()
@@ -131,8 +135,8 @@ private struct ExcessiveSentencesChat: ChatCapability {
     await agent.stop()
 }
 
-@Test func speechChunksKeepWeakPunctuationAndWaitForSentenceContinuation() throws {
-    var buffer = SentenceFunctionBuffer(policy: try AssistantAgent.textSegmentation)
+@Test(.actionCatalog) func speechChunksKeepWeakPunctuationAndWaitForSentenceContinuation() throws {
+    var buffer = SentenceFunctionBuffer(policy: try TextSegmentationPolicy(hanziLimit: 60, otherLimit: 120))
     #expect(try buffer.append("你好，我想说：苹果、香蕉，还有梨，").isEmpty)
     #expect(try buffer.append("都很好。” ").isEmpty)
     #expect(try buffer.append("下一句") == ["你好，我想说：苹果、香蕉，还有梨，都很好。” "])
@@ -142,15 +146,16 @@ private struct ExcessiveSentencesChat: ChatCapability {
     #expect(symbols.finish().isEmpty)
 }
 
-@Test func speechLengthBoundariesAreIndependentOfFragmentation() throws {
+@Test(.actionCatalog) func speechLengthBoundariesAreIndependentOfFragmentation() throws {
     let chinese = String(repeating: "你", count: 125)
     let english = String(repeating: "hello ", count: 25) + "world"
     let decimalAtLimit = String(repeating: "a ", count: 59) + " 3.14 is a number. Next"
     for source in [chinese, english, decimalAtLimit, "Dr. Smith says 3.14 is fine, really: yes! Next"] {
-        var whole = SentenceFunctionBuffer(policy: try AssistantAgent.textSegmentation)
+        let policy = try TextSegmentationPolicy(hanziLimit: 60, otherLimit: 120)
+        var whole = SentenceFunctionBuffer(policy: policy)
         let expected = try whole.append(source) + whole.finish()
         for split in 0...source.count {
-            var streaming = SentenceFunctionBuffer(policy: try AssistantAgent.textSegmentation)
+            var streaming = SentenceFunctionBuffer(policy: policy)
             let index = source.index(source.startIndex, offsetBy: split)
             let actual =
                 try streaming.append(String(source[..<index]))
@@ -168,10 +173,55 @@ private struct ExcessiveSentencesChat: ChatCapability {
     }
 }
 
-@Test func speechXMLBoundariesFlushShortUnpunctuatedTextInOrder() throws {
+@Test(.actionCatalog) func firstSpeechSegmentArrivesEarlyAndLaterSegmentsKeepSteadyLimits() throws {
+    var buffer = SentenceFunctionBuffer(policy: try AssistantAgent.textSegmentation)
+    let first = String(repeating: "你", count: 20)
+    #expect(try buffer.append(first).isEmpty)
+    #expect(try buffer.append("好") == [first])
+    #expect(try buffer.append(String(repeating: "你", count: 60)) == ["好" + String(repeating: "你", count: 59)])
+    #expect(buffer.finish() == ["你"])
+}
+
+@Test(.actionCatalog) func firstSpeechPolicyPreservesWordsTextAndFragmentation() throws {
+    let sources = [
+        String(repeating: "你", count: 125), String(repeating: "hello ", count: 40) + "world",
+        String(repeating: "a", count: 75) + " next words", "短句。” " + String(repeating: "你", count: 125),
+    ]
+    for source in sources {
+        var whole = SentenceFunctionBuffer(policy: try AssistantAgent.textSegmentation)
+        let expected = try whole.append(source) + whole.finish()
+        for split in 0...source.count {
+            var streaming = SentenceFunctionBuffer(policy: try AssistantAgent.textSegmentation)
+            let index = source.index(source.startIndex, offsetBy: split)
+            let actual =
+                try streaming.append(String(source[..<index]))
+                + streaming.append(String(source[index...])) + streaming.finish()
+            #expect(actual == expected)
+        }
+        #expect(expected.joined() == source)
+        if source == sources[0] { #expect(expected.map(\.count) == [20, 60, 45]) }
+        if source == sources[1] { #expect(expected.map(\.count) == [60, 120, 65]) }
+        if source == sources[2] { #expect(expected.first?.hasPrefix(String(repeating: "a", count: 75)) == true) }
+    }
+}
+
+@Test(.actionCatalog) func firstSpeechPolicyDoesNotRestartAfterScopeFlush() throws {
+    var buffer = SentenceFunctionBuffer(policy: try AssistantAgent.textSegmentation)
+    #expect(try buffer.append("先说一句").isEmpty)
+    #expect(buffer.finish() == ["先说一句"])
+    #expect(try buffer.append(String(repeating: "你", count: 21)).isEmpty)
+    #expect(try buffer.append(String(repeating: "你", count: 40)) == [String(repeating: "你", count: 60)])
+    #expect(buffer.finish() == ["你"])
+    #expect(throws: GenerationError.limitExceeded) {
+        try TextSegmentationPolicy(hanziLimit: 60, otherLimit: 120, firstHanziLimit: 0)
+    }
+}
+
+@Test(.actionCatalog) func speechXMLBoundariesFlushShortUnpunctuatedTextInOrder() throws {
     let config = try AgentConfigurations.load(named: "Assistant")
     var generator = AgentGenerator(
-        capabilities: config.capabilities, textMapping: AssistantAgent.mapText,
+        capabilities: try AgentSkillLoader.registry(["expression-interaction"], fixed: config.capabilities),
+        textMapping: AssistantAgent.mapText,
         segmentation: try AssistantAgent.textSegmentation)
     #expect(try generator.append("你好，先想一下").isEmpty)
     let events =
@@ -184,7 +234,7 @@ private struct ExcessiveSentencesChat: ChatCapability {
     #expect(calls[3].parameters["text"] == "尾巴")
 }
 
-@Test func sharedSegmentationDefaultsToSentenceBoundariesAndAcceptsExplicitLimits() throws {
+@Test(.actionCatalog) func sharedSegmentationDefaultsToSentenceBoundariesAndAcceptsExplicitLimits() throws {
     let text = String(repeating: "你", count: 125)
     var shared = SentenceFunctionBuffer()
     #expect(try shared.append(text).isEmpty)

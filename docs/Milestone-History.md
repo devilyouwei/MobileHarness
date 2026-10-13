@@ -371,7 +371,7 @@ Validation: `scripts/check.sh` passed, including 114 IntegrationTests and four l
 
 ✅ Following MOSS playback buffer overflow, the production per-handle PCM cache was increased from 2 MiB to 8 MiB at the user’s request, matching the synthesis output limit. ❌ This does not add backpressure or remove long-reply limits; sustained conversation acceptance remains pending.
 
-## LLM 原始输出测试（2026-09-28，已由对话历史取代）
+## LLM 原始输出测试（2026-09-28，已由历史记录取代）
 
 ✅ 设置新增独立 LLM 测试页：复用已保存模型、Assistant 提示词和 JSON，展示完整接收原文、分片、结束原因、解析错误及解析出的 Action/Channel，可显式导出。解析失败继续收集；取消、传输失败、token 上限和保留上限均明确标记。生产 Agent/Gateway 契约未改变。
 
@@ -386,9 +386,9 @@ Validation: `scripts/check.sh` passed, including 114 IntegrationTests and four l
 
 Validation: final repository checks passed, including 129 IntegrationTests; all four simulator schemes and the signed generic-iOS Debug build passed. Device app signature verification passed. No device installation or live-model acceptance was performed; see [validation history](Validation-History.md).
 
-## 持久化对话历史（2026-09-28）
+## 持久化历史记录（2026-09-28）
 
-✅ “对话历史”取代单轮原始输出测试页，接入真实 Assistant 请求，持久化用户原文、模型文本分片、实际上下文和错误。当前会话按最近十轮完整对话构建上下文，停止录音或重启不清空；开始新对话后原子归档，单独生成历史标题，失败可重试。当前标题取最新用户输入。见 [ADR 0060](adr/0060-persistent-conversation-history.md)。
+✅ “历史记录”取代单轮原始输出测试页，接入真实 Assistant 请求，持久化用户原文、模型文本分片、实际上下文和错误。当前会话按最近十轮完整对话构建上下文，停止录音或重启不清空；开始新对话后原子归档，单独生成历史标题，失败可重试。当前标题取最新用户输入。见 [ADR 0060](adr/0060-persistent-conversation-history.md)。
 
 ❌ GPT-4.1 wait 遵循率、真实标题质量、真机页面交互和持久化写入性能尚待验收。此版本之前未落盘的聊天无法恢复。
 

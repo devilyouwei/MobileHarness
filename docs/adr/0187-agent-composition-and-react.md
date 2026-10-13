@@ -12,7 +12,7 @@ TaskRequest, TaskInput, TaskProgress, TaskResult and TaskCancel are typed, permi
 
 AgentContext<State> stores business input, batch consumption, tasks, decisions, calls and outcomes. Store adapters use atomic versioned Storage documents; media and native sessions remain bounded transient state. Corrupt/unsupported/oversized documents fail explicitly. On restart unfinished work becomes interrupted without model/device replay. Context builders create capability-specific requests from immutable snapshots; provider serialization stays in ModelKit.
 
-Assistant history is imported once into authoritative structured context; legacy records remain source evidence, and queries/mutations use a compatibility view of the same writable authority. Keep exact native call/result pairing and request evidence; exclude credentials and media bytes.
+Assistant history queries and mutations use the authoritative structured context transaction; restart interrupts unfinished work without replay.
 
 A reusable Core round coordinator joins calls and receipts. A model-aware driver in Agents invokes ChatCapability without Assistant-specific assumptions. Each worker executes one round and requeues continuation at FIFO tail. Keep four requests/sixteen native calls per task, thirty seconds cumulative execution and sixty seconds per queue wait, without resetting budgets on continuation. User-final admission, not VAD onset, determines order.
 

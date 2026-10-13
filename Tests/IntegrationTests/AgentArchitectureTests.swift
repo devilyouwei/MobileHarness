@@ -177,9 +177,12 @@ private actor TaskFixtureAgent: Agent {
             guard input.metadata.origin == .runtime, result.owner.agent == descriptor.id,
                 input.metadata.parentID == active?.id, let callID = result.callID, let roundID = result.roundID
             else { throw CommunicationError.unauthorized }
-            try round?.accept(callID: callID, roundID: roundID)
             let value: String
             if case .value(let text) = result.completion { value = text } else { value = result.status.rawValue }
+            try round?.accept(
+                ToolResult(
+                    callID: callID, value: value, isError: result.status != .succeeded,
+                    completion: result.completion, roundID: roundID), roundID: roundID)
             try await context.update { $0.state.effects.append(value) }
         case .roundResult(let result):
             guard input.metadata.origin == .runtime, result.roundID == round?.id, result.failure == nil,
@@ -202,7 +205,7 @@ private actor TaskFixtureAgent: Agent {
             let text = try await AgentChatDriver.collect(
                 ChatRequest(
                     messages: messages,
-                    context: InferenceContext(requestID: decision, conversationID: scope.id)), using: model,
+                    context: InferenceContext(requestID: decision, scopeID: scope.id)), using: model,
                 consumers: .init(
                     text: { fragments in
                         var text = ""
@@ -219,7 +222,7 @@ private actor TaskFixtureAgent: Agent {
                 let call = try descriptor.capabilities.resolveAction("fixtureCapture", parameters: [:])
                 let id = UUID()
                 round = AgentRoundCoordinator(id: decision, taskID: scope.id)
-                try round?.register(id: id, policy: .observation)
+                try round?.register(id: id)
                 try round?.seal()
                 try emit(.actionCall(call), input: input, roundID: decision, callID: id)
                 try emit(.roundFinished(decision), input: input, roundID: decision)
@@ -247,7 +250,9 @@ private func waitForArchitecture(_ condition: @escaping @Sendable () async throw
     }
 }
 
-@Test(.timeLimit(.minutes(1))) func taskChildOwnsActionResultsChatHistoryAndExplicitParentReports() async throws {
+@Test(.actionCatalog, .timeLimit(.minutes(1))) func taskChildOwnsActionResultsChatHistoryAndExplicitParentReports()
+    async throws
+{
     let parentConfig = try taskFixtureConfiguration(parent: true)
     let childConfig = try taskFixtureConfiguration(parent: false)
     let model = TaskFixtureChat()
@@ -325,43 +330,40 @@ private func waitForArchitecture(_ condition: @escaping @Sendable () async throw
     _ = await childPump.result
 }
 
-@Test func ownedContextImportIsOnceAtomicAndRestartsInterruptWithoutReplay() async throws {
+@Test(.actionCatalog) func ownedContextIgnoresSeparateJournalAndRestartsInterruptWithoutReplay() async throws {
     let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     defer { try? FileManager.default.removeItem(at: directory) }
-    let source = directory.appendingPathComponent("history.json")
-    let legacy = ConversationHistoryStore(
-        document: try LocalDocumentStore(url: source, maximumBytes: ConversationHistoryStore.maximumBytes))
-    let id = UUID()
-    let token = try await legacy.readCurrent().token
-    _ = try await legacy.begin(
-        id: id, user: "retained input", request: [.init(role: .user, content: "retained input")], expecting: token,
-        model: "fixture")
-    try await legacy.append("partial", to: id)
-    let original = try Data(contentsOf: source)
     let scope = UUID()
     let url = directory.appendingPathComponent("assistant.context.json")
     let repository = try AgentContextRepository.persistent(
         agent: .assistant, scope: scope, state: AssistantContextState(), url: url)
-    let projected = AssistantHistoryContext.store(repository: repository, legacy: legacy)
-    #expect(try await projected.snapshot().current.turns.first?.state == .interrupted)
-    #expect(try await repository.snapshot().state.historyImported)
+    try await repository.update { _ in }
+    // An obsolete sibling file must never participate in the context load.
+    let source = directory.appendingPathComponent("history.json")
+    let original = Data("invalid obsolete journal".utf8)
+    try original.write(to: source)
+    let projected = AssistantHistoryContext.store(repository: repository)
+    #expect(try await projected.snapshot().current.turns.isEmpty)
     let read = try await projected.readCurrent()
-    let newID = UUID()
+    let id = UUID()
     _ = try await projected.begin(
-        id: newID, user: "another input", request: [.init(role: .user, content: "another input")],
+        id: id, user: "retained input", request: [.init(role: .user, content: "retained input")],
         expecting: read.token, model: "fixture")
+    try await projected.beginModelRequest(.init(id: UUID(), input: "retained input", requestJSON: "[]"), for: id)
+    try await projected.append("partial", to: id)
     #expect(try Data(contentsOf: source) == original)
     let restarted = try AgentContextRepository.persistent(
         agent: .assistant, scope: scope, state: AssistantContextState(), url: url)
     let recovered = try await restarted.snapshot()
-    #expect(recovered.state.history.current.turns.last?.state == .interrupted)
+    #expect(recovered.state.history.current.turns.first?.state == .interrupted)
+    #expect(recovered.state.history.current.turns.first?.modelRequests?.first?.state == .interrupted)
     #expect(recovered.state.history.current.turns.first?.raw == "partial")
     let foreign = try AgentContextRepository.persistent(
         agent: .assistant, scope: UUID(), state: AssistantContextState(), url: url)
     await #expect(throws: CommunicationError.invalidPayload) { _ = try await foreign.snapshot() }
 }
 
-@Test func signalInboxFusionOwnershipExpiryAndRoundBudgetAreBounded() throws {
+@Test(.actionCatalog) func signalInboxFusionOwnershipExpiryAndRoundBudgetAreBounded() throws {
     let session = UUID()
     let root = UUID()
     func input(_ text: String, rootID: UUID = UUID()) -> AgentInput {
@@ -382,30 +384,31 @@ private func waitForArchitecture(_ condition: @escaping @Sendable () async throw
     try inbox.admit(input("separate task"), disposition: .merge(key: "observations"))
     #expect(inbox.takeBatch().count == 1 && inbox.count == 1)
     var budget = try AgentTaskBudget()
-    try budget.reserveRequest()
-    try budget.charge(.seconds(10))
-    try budget.reserveRequest()
-    try budget.charge(.seconds(10))
-    #expect(budget.remainingExecution == .seconds(10))
-    try budget.reserveRequest()
-    try budget.reserveRequest()
-    #expect(throws: CommunicationError.capacityExceeded) { try budget.reserveRequest() }
-    for _ in 0..<16 { try budget.reserveNativeCall() }
-    #expect(throws: CommunicationError.capacityExceeded) { try budget.reserveNativeCall() }
-    #expect(throws: CommunicationError.expired) { try budget.charge(.seconds(11)) }
+    for _ in 0..<256 { try budget.reserveRequest() }
+    for _ in 0..<2048 { try budget.reserveNativeCall() }
+    #expect(budget.requests == 256 && budget.nativeCalls == 2048)
+    try budget.validate()
+    var explicit = try AgentTaskBudget(maximumRequests: 1, maximumNativeCalls: 2)
+    try explicit.reserveRequest()
+    #expect(throws: CommunicationError.capacityExceeded) { try explicit.reserveRequest() }
+    try explicit.reserveNativeCall()
+    try explicit.reserveNativeCall()
+    #expect(throws: CommunicationError.capacityExceeded) { try explicit.reserveNativeCall() }
     var round = AgentRoundCoordinator(taskID: root)
     let call = UUID()
-    try round.register(id: call, policy: .observation)
+    try round.register(id: call)
     try round.seal()
     #expect(!round.complete)
-    try round.accept(callID: call, roundID: round.id)
-    #expect(round.needsObservation)
-    #expect(throws: CommunicationError.unauthorized) { try round.accept(callID: call, roundID: round.id) }
+    try round.accept(.init(callID: call, value: "actual", completion: .value("actual")), roundID: round.id)
+    #expect(round.needsReasoning)
+    #expect(throws: CommunicationError.unauthorized) {
+        try round.accept(.init(callID: call, value: "actual", completion: .value("actual")), roundID: round.id)
+    }
     round.cancel()
-    #expect(!round.needsObservation)
+    #expect(!round.needsReasoning)
 }
 
-@Test func rollingContextEvidenceRejectsDuplicatesBeforeEviction() throws {
+@Test(.actionCatalog) func rollingContextEvidenceRejectsDuplicatesBeforeEviction() throws {
     var context = AgentContext(agentID: .assistant, scopeID: UUID(), state: TaskFixtureState())
     let first = try AgentContext<TaskFixtureState>.Record(kind: "first")
     let second = try AgentContext<TaskFixtureState>.Record(kind: "second")
@@ -425,7 +428,7 @@ private func waitForArchitecture(_ condition: @escaping @Sendable () async throw
     #expect(context.consumedBatches == [next] && context.evictedBatchCount == 1)
 }
 
-@Test func replyIdentitySurvivesNewRecognitionAndRequiresChildGrant() {
+@Test(.actionCatalog) func replyIdentitySurvivesNewRecognitionAndRequiresChildGrant() {
     let session = UUID()
     let old = AgentTurn(ordinal: 1)
     let new = AgentTurn(ordinal: 2)
@@ -455,7 +458,7 @@ private func waitForArchitecture(_ condition: @escaping @Sendable () async throw
     #expect(accepted7)
 }
 
-@Test func boundOutputRejectsStoppedProducerAndTaskCancellationRejectsNewEffects() async throws {
+@Test(.actionCatalog) func boundOutputRejectsStoppedProducerAndTaskCancellationRejectsNewEffects() async throws {
     let configuration = try taskFixtureConfiguration(parent: true)
     let childConfiguration = try taskFixtureConfiguration(parent: false)
     let parent = try TaskFixtureAgent(configuration: configuration)
@@ -496,7 +499,7 @@ private func waitForArchitecture(_ condition: @escaping @Sendable () async throw
     await manager.stopAll()
 }
 
-@Test func failedCommunicationReceiptDoesNotCompleteRemoteTask() async throws {
+@Test(.actionCatalog) func failedCommunicationReceiptDoesNotCompleteRemoteTask() async throws {
     let parentConfiguration = try taskFixtureConfiguration(parent: true)
     let childConfiguration = try taskFixtureConfiguration(parent: false)
     let parent = try TaskFixtureAgent(configuration: parentConfiguration)
@@ -525,7 +528,7 @@ private func waitForArchitecture(_ condition: @escaping @Sendable () async throw
     await manager.stopAll()
 }
 
-@Test func communicationReceiptsAreBoundedDeduplicatedAndFailedWritesDoNotAcknowledge() async throws {
+@Test(.actionCatalog) func communicationReceiptsAreBoundedDeduplicatedAndFailedWritesDoNotAcknowledge() async throws {
     let receipts = CommunicationReceipts()
     let ids = (0..<16).map { _ in UUID() }
     for id in ids { try await receipts.register(id) }
@@ -548,7 +551,7 @@ private func waitForArchitecture(_ condition: @escaping @Sendable () async throw
     await #expect(throws: CommunicationError.scopeClosed) { _ = try await receipts.wait(ids[1]) }
 }
 
-@Test func contextRejectedCommitAndCorruptStateLeaveNoWritableFallback() async throws {
+@Test(.actionCatalog) func contextRejectedCommitAndCorruptStateLeaveNoWritableFallback() async throws {
     let repository = AgentContextRepository(
         agent: .assistant, scope: UUID(), state: AssistantContextState(),
         persistence: .init(load: { nil }, commit: { _, _ in throw CommunicationError.invalidPayload }))
@@ -589,7 +592,7 @@ private actor TaskStopProbe {
         }
     }
 }
-@Test(.timeLimit(.minutes(1)), arguments: [false, true])
+@Test(.actionCatalog, .timeLimit(.minutes(1)), arguments: [false, true])
 func parentOrChildStopJoinsEffectsAndRecordsDistinctTerminal(_ stopParent: Bool) async throws {
     let parentConfiguration = try taskFixtureConfiguration(parent: true)
     let childConfiguration = try taskFixtureConfiguration(parent: false)
@@ -654,7 +657,7 @@ func parentOrChildStopJoinsEffectsAndRecordsDistinctTerminal(_ stopParent: Bool)
     _ = await childPump.result
 }
 
-@Test func deletedHistoryErasesItsOwnedSignalEvidenceAndProtectsActiveWork() async throws {
+@Test(.actionCatalog) func deletedHistoryErasesItsOwnedSignalEvidenceAndProtectsActiveWork() async throws {
     let store = ConversationHistoryStore()
     let repository = AgentContextRepository(agent: .assistant, scope: UUID(), state: AssistantContextState())
     try await AssistantHistoryContext.attach(repository: repository, store: store)
@@ -678,7 +681,7 @@ func parentOrChildStopJoinsEffectsAndRecordsDistinctTerminal(_ stopParent: Bool)
     #expect(context.state.history.past.isEmpty && context.records.isEmpty && context.work[id] == nil)
 }
 
-@Test func duplicateTaskRequestCannotRevokeThePreviouslyAcceptedGrant() async throws {
+@Test(.actionCatalog) func duplicateTaskRequestCannotRevokeThePreviouslyAcceptedGrant() async throws {
     let parentConfiguration = try taskFixtureConfiguration(parent: true)
     let childConfiguration = try taskFixtureConfiguration(parent: false)
     let parent = try TaskFixtureAgent(configuration: parentConfiguration)
@@ -728,7 +731,7 @@ private actor HeldAdmissionCommit {
     }
 }
 
-@Test(.timeLimit(.minutes(1)))
+@Test(.actionCatalog, .timeLimit(.minutes(1)))
 func concurrentEnvironmentFactsWaitForStateCommitInsteadOfRejectingAsCapacity() async throws {
     let session = UUID()
     let held = HeldAdmissionCommit()
@@ -760,7 +763,7 @@ func concurrentEnvironmentFactsWaitForStateCommitInsteadOfRejectingAsCapacity() 
     await agent.stop()
 }
 
-@Test func admissionGateCancelsAndClosesWaitingInputsWithoutLeakingPermit() async throws {
+@Test(.actionCatalog) func admissionGateCancelsAndClosesWaitingInputsWithoutLeakingPermit() async throws {
     let gate = AgentAdmissionGate(capacity: 2)
     try await gate.acquire()
     let waiting = Task {
@@ -781,7 +784,7 @@ func concurrentEnvironmentFactsWaitForStateCommitInsteadOfRejectingAsCapacity() 
     gate.release()
 }
 
-@Test func communicationCatalogDefinesRequestKindsAndExcludesTelemetryPublish() throws {
+@Test(.actionCatalog) func communicationCatalogDefinesRequestKindsAndExcludesTelemetryPublish() throws {
     let configuration = try AgentConfigurations.load(named: "Assistant")
     for role in try AgentConfigurations.all() {
         let catalog = try AgentCommunicationAdapter.catalog(role.capabilities, policy: role.communication)
@@ -789,9 +792,11 @@ func concurrentEnvironmentFactsWaitForStateCommitInsteadOfRejectingAsCapacity() 
         #expect(!catalog.tools.contains { $0.alias == "Agent.send" || $0.path.hasPrefix("Agent.Communication.") })
         #expect(
             catalog.actions.contains { $0.alias == "send" }
-                == role.communication.sends.contains { $0.contract.hasPrefix("task.") })
+                == (role.capabilities.actions.contains { $0.path.description == "Agent.Communication.send" }
+                    && role.communication.sends.contains { $0.contract.hasPrefix("task.") }))
     }
-    let catalog = try AgentCommunicationAdapter.catalog(configuration.capabilities, policy: configuration.communication)
+    let catalog = try AgentCommunicationAdapter.catalog(
+        fixtureCatalogWithCommunication(configuration.capabilities), policy: configuration.communication)
     let send = try #require(catalog.actions.first { $0.alias == "send" })
     #expect(!catalog.actions.contains { $0.alias == "publish" })
     #expect(send.documentation?.doc.contains("request") == true)
@@ -807,4 +812,13 @@ func concurrentEnvironmentFactsWaitForStateCommitInsteadOfRejectingAsCapacity() 
             arguments: ["kind": "task", "target": "photographer", "content": "关闭摄像头"], sender: .assistant,
             input: .init(sessionID: UUID(), payload: .text("close")), policy: configuration.communication)
     }
+}
+
+@Test(.actionCatalog) func userSignalsHaveNoImplicitDeadline() throws {
+    let text = InputMetadata(payload: .text("hello"))
+    #expect(text.deadline == nil && !text.expired)
+    let audio = InputMetadata(payload: .event("voice-turn"))
+    #expect(audio.deadline == nil && !audio.expired)
+    let explicit = InputMetadata(payload: .event("perception"), deadline: .now.advanced(by: .seconds(-1)))
+    #expect(explicit.expired)
 }

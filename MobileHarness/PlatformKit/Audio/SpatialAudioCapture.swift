@@ -105,7 +105,7 @@
         let continuation: AsyncThrowingStream<MicrophoneFrame, Error>.Continuation
         let readiness: AudioCaptureReadiness
         private let sequence = Mutex<UInt64>(0)
-        private let timeline = Mutex<(end: Double?, rate: Double?)>((nil, nil))
+        private let timeline = Mutex(AudioPCMContinuity())
         private let reported = Mutex((format: false, failure: false))
         private let log = Logger(subsystem: "dev.mobileharness", category: "AudioCapture")
         init(
@@ -173,13 +173,9 @@
                     let hostTime = CMTimeGetSeconds(CMClockGetTime(CMClockGetHostTimeClock()))
                     guard timestamp.isFinite, timestamp >= 0 else { throw AudioIOError.invalidFormat }
                     stage = "PCM continuity"
-                    let contiguous = timeline.withLock { value in
-                        defer { value = (timestamp + Double(count) / asbd.mSampleRate, asbd.mSampleRate) }
-                        guard let end = value.end else { return true }
-                        return value.rate == asbd.mSampleRate && abs(timestamp - end) <= 2 / asbd.mSampleRate
+                    try timeline.withLock {
+                        try $0.accept(timestamp: timestamp, frameCount: count, sampleRate: asbd.mSampleRate)
                     }
-                    // AVFoundation may discard sufficiently late callbacks; never hide a PCM gap.
-                    guard contiguous else { throw AudioIOError.overflow }
                     stage = "PCM samples/stream admission"
                     let capturedAt = ContinuousClock.now.advanced(by: .seconds(min(0, timestamp - hostTime)))
                     // Split large native callbacks into transport packets of at most 16,000 scalar samples.

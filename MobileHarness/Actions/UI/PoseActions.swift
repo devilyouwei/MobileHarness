@@ -5,7 +5,7 @@ import FunctionContracts
 extension UIActions {
     /// Atomically replaces all displayed skeletons; an empty people list clears them.
     @Action(
-        domain: "UI", module: "Pose", title: "showPose", serializationKey: "UI")
+        domain: "UI", module: "Pose", title: "showPose", timeout: .seconds(5))
     public static func showPose(
         invocation: any FunctionInput,
         present: @escaping @Sendable (PoseOverlay, ActionExecutionContext) async throws -> Void

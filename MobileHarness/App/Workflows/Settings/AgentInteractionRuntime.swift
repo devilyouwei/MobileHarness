@@ -59,6 +59,9 @@ public actor AgentInteractionRuntime {
                                     await self.report(
                                         outcome.failure ?? outcome.tool?.value ?? "Agent execution failed")
                                 }
+                            } catch is CancellationError {
+                                // Explicit host cancellation releases a playback seal without closing this reader.
+                                try Task.checkCancellation()
                             } catch { await self.report("Agent output failed: \(error)") }
                         }
                     } catch is CancellationError {} catch { await report("Agent output transport stopped: \(error)") }
@@ -105,6 +108,14 @@ public actor AgentInteractionRuntime {
                 metadata: signal.metadata, turn: AgentTurn(ordinal: textOrdinal), taskScope: signal.taskScope)
         }
         try await input.publish(signal)
+    }
+
+    /// Trusted host interruption; retain the resident Agent and unrelated session work.
+    public func cancelConversation(sessionID: UUID) async throws {
+        guard started, !closed else { return }
+        async let calls: Void = output.cancelCalls(for: agent, sessionID: sessionID)
+        async let model: Void = agent.receive(AgentSessionControl.cancelSession.input(sessionID: sessionID))
+        _ = try await (model, calls)
     }
 
     public func shutdown() async {

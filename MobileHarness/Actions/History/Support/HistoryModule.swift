@@ -12,6 +12,7 @@ public protocol HistoryMutationCapability: Sendable {
     func summarizeArchived(_ id: UUID) async throws
 }
 
+@ActionCatalog
 public struct HistoryModule: CapabilityModule {
     private let history: any HistoryQueryCapability
     private let mutations: any HistoryMutationCapability

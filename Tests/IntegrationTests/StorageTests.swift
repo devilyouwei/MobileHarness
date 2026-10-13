@@ -2,7 +2,7 @@ import Foundation
 import Storage
 import Testing
 
-@Test func memoryHandleExpiryRemainsOptInForOtherDomains() async throws {
+@Test(.actionCatalog) func memoryHandleExpiryRemainsOptInForOtherDomains() async throws {
     let store = MemoryLeaseStore<String>(
         capacity: 3, queueTTL: .milliseconds(20), readyTTL: .milliseconds(20), errorTTL: .seconds(1),
         onRemove: { _, _ in })
@@ -20,7 +20,7 @@ import Testing
     await store.shutdown()
 }
 
-@Test func boundedMemoryStreamUsesBytesAndSingleReaderWithoutAudioTypes() async throws {
+@Test(.actionCatalog) func boundedMemoryStreamUsesBytesAndSingleReaderWithoutAudioTypes() async throws {
     let stream = BoundedMemoryStream<Data>(maximumBytes: 4, maximumItems: 2, waitTimeout: .seconds(1)) {
         $0.count
     }
@@ -33,7 +33,7 @@ import Testing
     #expect(try await stream.next() == nil)
 }
 
-@Test func memoryHandlesFenceNamespaceAndRetainCheckedOutValuePastExpiry() async throws {
+@Test(.actionCatalog) func memoryHandlesFenceNamespaceAndRetainCheckedOutValuePastExpiry() async throws {
     let store = MemoryLeaseStore<String>(
         capacity: 1, queueTTL: .seconds(1), readyTTL: .milliseconds(20), errorTTL: .seconds(1),
         onRemove: { _, _ in })
@@ -52,7 +52,7 @@ import Testing
     await store.shutdown()
 }
 
-@Test func documentCacheRefreshAndConflictPreserveDurableValues() async throws {
+@Test(.actionCatalog) func documentCacheRefreshAndConflictPreserveDurableValues() async throws {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     defer { try? FileManager.default.removeItem(at: root) }
     let url = root.appendingPathComponent("settings.json")
@@ -73,7 +73,7 @@ import Testing
     #expect(try await reopened.load()?.value == "second")
 }
 
-@Test func documentLimitsAndCorruptionNeverReplaceValidCache() async throws {
+@Test(.actionCatalog) func documentLimitsAndCorruptionNeverReplaceValidCache() async throws {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     defer { try? FileManager.default.removeItem(at: root) }
     let url = root.appendingPathComponent("settings.json")
@@ -90,7 +90,7 @@ import Testing
     #expect(try await store.load()?.value == "valid")
 }
 
-@Test func documentConcurrentWritersHaveOneWinner() async throws {
+@Test(.actionCatalog) func documentConcurrentWritersHaveOneWinner() async throws {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     defer { try? FileManager.default.removeItem(at: root) }
     let url = root.appendingPathComponent("settings.json")
@@ -112,7 +112,7 @@ import Testing
     #expect(successes == 1)
 }
 
-@Test func documentUnsupportedVersionsAndNonFilesFailExplicitly() async throws {
+@Test(.actionCatalog) func documentUnsupportedVersionsAndNonFilesFailExplicitly() async throws {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     defer { try? FileManager.default.removeItem(at: root) }
     try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
@@ -128,7 +128,7 @@ import Testing
     await #expect(throws: DocumentStorageError.invalidFile) { try await store.save("new", expecting: nil) }
 }
 
-@Test func authoritativeDocumentReplacementAllowsConcurrentSnapshots() async throws {
+@Test(.actionCatalog) func authoritativeDocumentReplacementAllowsConcurrentSnapshots() async throws {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     defer { try? FileManager.default.removeItem(at: root) }
     let url = root.appendingPathComponent("document.json")

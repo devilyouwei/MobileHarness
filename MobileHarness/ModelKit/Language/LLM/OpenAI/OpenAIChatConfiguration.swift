@@ -149,6 +149,7 @@ public struct OpenAIChatConfiguration: Sendable, Equatable, CustomStringConverti
             "stream": true, "store": false,
         ]
         if let maximum = chat.maximumOutputTokens { body["max_output_tokens"] = maximum }
+        try disableThinking(in: &body)
         if !chat.tools.isEmpty {
             body["tools"] = try chat.tools.map { tool in
                 guard let object = try JSONSerialization.jsonObject(with: tool.declaration) as? [String: Any],
@@ -165,6 +166,36 @@ public struct OpenAIChatConfiguration: Sendable, Equatable, CustomStringConverti
         }
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
         return request
+    }
+
+    private func disableThinking(in body: inout [String: Any]) throws {
+        let host = baseURL.host?.lowercased() ?? ""
+        let name = model.lowercased()
+        let isAliyun =
+            host.hasSuffix(".maas.aliyuncs.com")
+            || [
+                "dashscope.aliyuncs.com", "dashscope-intl.aliyuncs.com", "dashscope-us.aliyuncs.com",
+                "cn-hongkong.dashscope.aliyuncs.com", "coding.dashscope.aliyuncs.com",
+            ].contains(host)
+        if isAliyun {
+            body["reasoning"] = ["effort": "none"]
+            body["enable_thinking"] = false
+            return
+        }
+        let isOpenAIReasoning =
+            name == "gpt-5" || name.hasPrefix("gpt-5-") || name.hasPrefix("gpt-5.")
+            || name == "gpt-6" || name.hasPrefix("gpt-6-") || name.hasPrefix("gpt-6.")
+            || ["o1", "o3", "o4"].contains(where: { name == $0 || name.hasPrefix($0 + "-") })
+        guard isOpenAIReasoning, !name.hasSuffix("-chat-latest") else { return }
+        guard name != "gpt-5", !name.hasPrefix("gpt-5-"),
+            !name.contains("-pro"), !name.contains("-codex"),
+            !name.hasPrefix("gpt-6-astra"), !name.hasPrefix("gpt-6.1-sol"),
+            !["o1", "o3", "o4"].contains(where: { name == $0 || name.hasPrefix($0 + "-") })
+        else {
+            throw CapabilityError.invalidRequest(
+                "Selected OpenAI model cannot disable thinking; choose a non-thinking model")
+        }
+        body["reasoning"] = ["effort": "none"]
     }
 }
 

@@ -33,12 +33,25 @@ FunctionInput carries canonical domain/module/function, string arguments and Act
 
 ## Outcomes and failures
 
-Exceptions normalize into reports preserving child entries, bounded producer code and terminal cause. Native error text is only a projection; it never replaces the structured completion/report. Caller cancellation propagates after join. Generated calls retain terminal outcomes even for void handlers; observation policy controls continuation. Deterministic completion-only success produces no model-facing result.
+Exceptions normalize into reports preserving child entries, bounded producer code and terminal cause. Native error text is only a projection; it never replaces the structured completion/report. Caller cancellation propagates after join. Generated calls retain terminal outcomes even for void handlers; actual business output or failure controls continuation in the owning Agent. Deterministic completion-only success produces no model-facing result.
 
-Execution failure and later delivery failure remain separate. No adapter retries the effect or treats message admission as physical completion. ToolExecutor default execution timeout is 30 seconds; explicit validated caller/definition budgets control the operation as described by shared Runtime.
+Execution failure and later delivery failure remain separate. No adapter retries the effect or treats message admission as physical completion. ToolExecutor uses the canonical function budget, including its intrinsic 30-second default; there is no separate caller timeout.
 
 ✅ Standard input and shared execution adaptation are implemented.
 
 ## Related design
 
 [Parent design](../README.md)
+
+✅ ActionFunction 基础默认执行超时为 30 秒，dynamicTimeout 优先于静态 timeout；未声明也有默认预算。Speech.Playback 使用显式 300 秒。超时取消并加入清理，保留真实效果，以 ActionResult 返回；工具复用同一函数契约。通信转发不制造 TTL，队列和整个对话不附加默认时限。
+
+
+## Result-driven ReACT (ADR0214)
+
+✅ ADR0214：ToolExecutor 不再用反馈属性强制 returning；模型调用由调用轮次要求真实终态，固定调用按 DirectResultPolicy 投递。业务值和无输出完成由 Agent 统一解释。
+
+## Action timeout contract (2026-10-12)
+
+✅ ActionExecutor/ToolExecutor 共用基础 30 秒默认超时和业务覆盖预算，timeout 触发取消并加入清理，保留实际报告；不存在未声明即可无限等待的执行分支。
+
+✅ Native Tool failureCode classifies pure cancellation as cancelled and mixed reports by the actual non-cancellation failure. Canonical reports retain every child effect; cancellation cannot request model recovery.

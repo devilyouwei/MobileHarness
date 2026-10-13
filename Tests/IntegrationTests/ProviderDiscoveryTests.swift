@@ -21,7 +21,7 @@ private actor DiscoveryNativeFixture: ModelResourceCapability {
     func download(_ id: String, endpoint: String, allowsCellular: Bool) async throws { throw CancellationError() }
     func configureSpeech(recognition: Bool, synthesis: Bool) async throws { throw CancellationError() }
 }
-@Test func providerDiscoveryUsesOpaqueIntentAndReturningPipeline() async throws {
+@Test(.actionCatalog) func providerDiscoveryUsesOpaqueIntentAndReturningPipeline() async throws {
     let session = UUID()
     let recorder = DiscoveryRecorder()
     let requests = ProviderDiscoveryRequests { await recorder.query($0) }
@@ -57,7 +57,7 @@ private final class DiscoveryClock: @unchecked Sendable {
     func now() -> ContinuousClock.Instant { lock.withLock { instant } }
     func advance() { lock.withLock { instant = instant.advanced(by: .seconds(11)) } }
 }
-@Test func providerDiscoveryStagingRejectsOverflowWrongSessionAndExpiry() async throws {
+@Test(.actionCatalog) func providerDiscoveryStagingRejectsOverflowWrongSessionAndExpiry() async throws {
     let clock = DiscoveryClock()
     let recorder = DiscoveryRecorder()
     let requests = ProviderDiscoveryRequests(clock: { clock.now() }, discover: { await recorder.query($0) })
@@ -85,7 +85,7 @@ private final class DiscoveryClock: @unchecked Sendable {
 private struct SecretDiscoveryFailure: LocalizedError {
     var errorDescription: String? { "fixture-private-credential" }
 }
-@Test func providerDiscoveryFailureDoesNotLeakCredentialsOrRetry() async throws {
+@Test(.actionCatalog) func providerDiscoveryFailureDoesNotLeakCredentialsOrRetry() async throws {
     let session = UUID()
     let requests = ProviderDiscoveryRequests { _ in throw SecretDiscoveryFailure() }
     let runtime = try resourceRuntime(UnusedModelResourceCapability(), providerDiscovery: requests, sessionID: session)
@@ -115,7 +115,7 @@ private enum InvalidProviderModels: CaseIterable, Sendable {
         }
     }
 }
-@Test(arguments: InvalidProviderModels.allCases)
+@Test(.actionCatalog, arguments: InvalidProviderModels.allCases)
 private func providerDiscoveryRejectsMalformedModelLists(value: InvalidProviderModels) async throws {
     let models = value.models
     let session = UUID()
@@ -128,7 +128,7 @@ private func providerDiscoveryRejectsMalformedModelLists(value: InvalidProviderM
     } catch let error as ProviderIntentFailure { #expect(error.failureCode == "provider.models") }
     await runtime.shutdown()
 }
-@Test func providerDiscoveryFunctionRejectsSecretsInArgumentsBeforeQuery() async throws {
+@Test(.actionCatalog) func providerDiscoveryFunctionRejectsSecretsInArgumentsBeforeQuery() async throws {
     let recorder = DiscoveryRecorder()
     let requests = ProviderDiscoveryRequests { await recorder.query($0) }
     let invocation = FunctionInvocation(
@@ -142,7 +142,7 @@ private func providerDiscoveryRejectsMalformedModelLists(value: InvalidProviderM
     #expect(await recorder.queries == 0)
 }
 
-@Test func providerDiscoveryAgentEmitsOnlyOpaqueRequestArgument() async throws {
+@Test(.actionCatalog) func providerDiscoveryAgentEmitsOnlyOpaqueRequestArgument() async throws {
     let session = UUID()
     let agent = try ApplicationControlAgent(sessionID: session)
     try await agent.start()
@@ -172,7 +172,7 @@ private actor HeldDiscovery {
         waiter = nil
     }
 }
-@Test func providerDiscoveryAdmissionSurvivesCancelledPageCaller() async throws {
+@Test(.actionCatalog) func providerDiscoveryAdmissionSurvivesCancelledPageCaller() async throws {
     let session = UUID()
     let native = HeldDiscovery()
     let requests = ProviderDiscoveryRequests { await native.query($0) }
@@ -190,7 +190,7 @@ private actor HeldDiscovery {
     await runtime.shutdown()
 }
 
-@Test func providerDiscoveryPreservesSDKCompatibleLargeLists() async throws {
+@Test(.actionCatalog) func providerDiscoveryPreservesSDKCompatibleLargeLists() async throws {
     let session = UUID()
     let models = (0..<256).map { "model-\($0)" }
     let requests = ProviderDiscoveryRequests { _ in models }

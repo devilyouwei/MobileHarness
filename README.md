@@ -1,22 +1,24 @@
 <p align="center">
-  <img src="MobileHarness/Resources/AppIconVariants/original.png" alt="MobileHarness app icon" width="160" style="border-radius: 32px;">
+  <img src="MobileHarness/Resources/Assets.xcassets/AppIcon.appiconset/AppIcon.png" alt="MobileHarness app icon" width="160" style="border-radius: 32px;">
 </p>
 
 <h1 align="center">MobileHarness</h1>
 
-<p align="center"><em>Your phone is the best brain for a robot!</em></p>
+<p align="center"><em>Your phone is the best robot brain!</em></p>
 
 ![MobileHarness concept banner: an iPhone coordinates a robotic arm, rover, drone and a humanoid reaching for the phone in a futuristic laboratory.](output/mobileharness-lab-banner-v2.png)
 
 MobileHarness is an Apple-native, bio-inspired multimodal Agent app that turns your iPhone into a harness for independent, stateful Agents. Built around a **Signal → Cognition → Action** loop, it coordinates the phone's hardware and sensors, such as its camera, microphone and speaker, so Agents can perceive the world, understand users, reason, converse and act. Its current robotic-body integration targets **NexArm**, allowing the phone to serve as the brain of an embodied Agent. The banner illustrates the broader vision of coordinating different kinds of robots.
 
+![Signal, Cognition and Action form a counterclockwise triangular feedback loop.](./agent-loop.svg)
+
 **In MobileHarness, every input is a _Signal_, and every output is an _Action_.** Human interaction requests, multimodal data from the real world, system events, _inter-Agent_ messages and _Action_ results are all unified as _Signals_. _InputGateway_ delivers these _Signals_ to the _Agents_, which interpret them and decide what _Action_ to take next through direct logic or model reasoning. _OutputGateway_ coordinates execution through the _Actions_ module, and execution results return through _InputGateway_ as new _Signals_, closing the loop.
 
-The **Assistant** owns user conversation and can load bundled **Skills** for photography, history queries and application control. Skills combine callable functions with workflow instructions. One foreground **Task** keeps a goal, context and loaded Skills across turns, including while waiting for the user; actual execution results guide the next decision. Specialized Agents own camera/tracking, history, application transactions and media processing. See the [Agent design](MobileHarness/Agents/README.md) and [Skill catalog](MobileHarness/Resources/Skills/README.md).
+![An Agent manages a Task and loads Skills. A Task combines Skills, which expose Actions; Action results return to the Agent to inform its next decision.](./agent-task-skill-action.svg)
 
-The biological inspiration comes from the feedback between perception, cognition and behavior, and from the division of labor across brain regions. Perception informs cognition, while behavior changes what can be perceived next. Each Agent resembles a specialized brain region, with its own context, state and role, cooperating with others while making independent decisions.
+MobileHarness supports **Skills** and **Tasks** to help Agents carry out complex, long-running work. **Tasks** preserve goals, context and loaded Skills across conversation turns, including while waiting for user input. **Skills** combine callable functions with workflow instructions, teaching Agents to understand their own state, operate the phone's software and hardware, and control connected robotic bodies such as **NexArm**. The **Assistant** manages user conversation and one foreground Task at a time, loading Skills as needed. **Action Results** carrying business output, along with recoverable execution or Agent errors, trigger a **ReACT** loop: once the current round's accepted calls have completed, the Agent observes the actual outcomes, reasons about what to do next, and continues with a new conversation turn. See the [Agent design](MobileHarness/Agents/README.md) and [Skill catalog](MobileHarness/Resources/Skills/README.md).
 
-![Signal, Cognition and Action form a counterclockwise triangular feedback loop.](MobileHarness/agent-loop.svg)
+Biological inspiration runs throughout MobileHarness. **Agents** resemble specialized parts of the human brain, processing different **Signals** through capabilities such as speech recognition, visual pose detection and reasoning. **Gateway** acts like a central nervous system, carrying Signals to Agents and routing their Actions to the phone and connected robotic bodies.
 
 **Keywords:** Apple-native · Bio-inspired · Embodied Agent · Multimodal · Multi-Agent · Agent Harness · Mobile Agent
 

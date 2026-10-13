@@ -6,7 +6,7 @@ public struct AudioDetectionSnapshot: Sendable, Equatable {
     public enum Input: Sendable { case unknown, builtInMicrophone, headset, external }
     public enum Support: Sendable { case unknown, supported, unsupported, inputUnavailable }
     public enum Capture: Sendable { case waiting, spatial, mono }
-    public enum Fallback: Sendable { case inputUnavailable, unsupported, startupTimeout, startupFailed }
+    public enum Fallback: Sendable { case inputUnavailable, unsupported, startupFailed }
     public enum Signal: Sendable { case waiting, receiving, noAudio }
     public enum Direction: Sendable { case waiting, active, inactive, uncertain, unavailable }
     public var permissionGranted: Bool?

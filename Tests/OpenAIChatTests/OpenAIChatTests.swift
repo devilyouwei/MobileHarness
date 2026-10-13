@@ -12,6 +12,155 @@ private func config(replyFragments: Int? = nil) throws -> OpenAIChatConfiguratio
         apiKey: "test-only", model: "third-party")
 }
 
+@Test(.enabled(if: ProcessInfo.processInfo.environment["HARNESS_LIVE_CHAT"] == "1"))
+func liveProviderPreservesConsecutiveUsers() async throws {
+    let environment = ProcessInfo.processInfo.environment
+    let endpoint = try #require(environment["HARNESS_LIVE_CHAT_URL"])
+    let key = try #require(environment["HARNESS_LIVE_CHAT_KEY"])
+    let model = try #require(environment["HARNESS_LIVE_CHAT_MODEL"])
+    let configuration = try OpenAIChatConfiguration(
+        baseURL: OpenAIChatConfiguration.endpoint(endpoint), apiKey: key, model: model, timeout: 60)
+    let context = try ModelContext(loadGate: ModelLoadGate(maximumConcurrentLoads: 4), maximumLoadWaiters: 32)
+    let capability = try OpenAIChat(context: context, configuration: configuration)
+    var chat = try ChatRequest(
+        messages: [
+            .init(role: .system, content: "Respond briefly in Chinese."),
+            .init(role: .user, content: "请记住数字 12。"),
+            .init(role: .user, content: "只回答：收到。"),
+            .init(role: .assistant, content: "收到。"),
+            .init(role: .user, content: "把刚才的数字加 3。"),
+            .init(role: .user, content: "只回答最终数字。"),
+        ], maximumOutputTokens: 64, temperature: 0)
+    let timing = ChatTiming()
+    chat.timing = timing
+    let http = try configuration.request(chat)
+    let data = try #require(http.httpBody)
+    let body = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
+    let input = try #require(body["input"] as? [[String: Any]])
+    let roles = input.compactMap { $0["role"] as? String }
+    #expect(roles == chat.messages.map { $0.role.rawValue })
+    #expect(input.count == chat.messages.count)
+    print("LIVE_CHAT model=\(model) source_messages=\(chat.messages.count) encoded_roles=\(roles)")
+    do {
+        let session = try await capability.chat(chat)
+        var text = ""
+        var completed = false
+        for try await event in session.events {
+            if case .text(let delta) = event { text += delta }
+            if case .finished = event { completed = true }
+        }
+        #expect(completed)
+        #expect(!text.isEmpty)
+        #expect(text.trimmingCharacters(in: .whitespacesAndNewlines) == "15")
+        print(
+            "LIVE_CHAT completed=\(completed) text_bytes=\(text.utf8.count) ttft=\(String(describing: timing.snapshot?.firstTokenLatency))"
+        )
+        try await context.unload()
+    } catch {
+        try await context.unload()
+        print("LIVE_CHAT capability_error=\(error)")
+        // Explicit diagnostic only: this is not a production retry or fallback.
+        let (data, response) = try await URLSession.shared.data(for: http)
+        let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+        print("LIVE_CHAT diagnostic_status=\(status)")
+        if data.count <= 65536,
+            let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+        {
+            let detail = object["error"] as? [String: Any] ?? object
+            for field in ["code", "type", "message"] {
+                if let value = detail[field] as? String {
+                    print(
+                        "LIVE_CHAT \(field)=\(String(value.replacingOccurrences(of: key, with: "[REDACTED]").prefix(2048)))"
+                    )
+                }
+            }
+        }
+        if status == 200, data.count <= 65536 {
+            var seen: Set<String> = []
+            for line in String(decoding: data, as: UTF8.self).components(separatedBy: .newlines)
+            where line.hasPrefix("data:") {
+                guard
+                    let object = try? JSONSerialization.jsonObject(with: Data(line.dropFirst(5).utf8)) as? [String: Any]
+                else { continue }
+                let item = object["item"] as? [String: Any] ?? [:]
+                let response = object["response"] as? [String: Any] ?? [:]
+                let output = response["output"] as? [[String: Any]] ?? []
+                let summary =
+                    "event=\(object["type"] ?? "missing") item=\(item["type"] ?? "none") "
+                    + "status=\(response["status"] ?? "none") output_types=\(output.compactMap { $0["type"] as? String })"
+                if seen.insert(summary).inserted {
+                    print(
+                        "LIVE_CHAT SSE \(String(summary.replacingOccurrences(of: key, with: "[REDACTED]").prefix(2048)))"
+                    )
+                }
+            }
+        }
+        throw error
+    }
+}
+
+@Test func aliyunRequestsDisableThinkingForChatAndTitles() throws {
+    for endpoint in [
+        "https://dashscope.aliyuncs.com/compatible-mode/v1",
+        "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
+        "https://workspace.cn-beijing.maas.aliyuncs.com/compatible-mode/v1",
+    ] {
+        let configuration = try OpenAIChatConfiguration(
+            baseURL: OpenAIChatConfiguration.endpoint(endpoint), apiKey: "test-only", model: "qwen3.8-flash")
+        for budget: Int? in [nil, 64] {
+            let request = try configuration.request(
+                ChatRequest(
+                    messages: [.init(role: .system, content: "Instructions"), .init(role: .user, content: "Input")],
+                    maximumOutputTokens: budget, temperature: 0))
+            let data = try #require(request.httpBody)
+            let body = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
+            #expect((body["reasoning"] as? [String: String])?["effort"] == "none")
+            #expect(body["enable_thinking"] as? Bool == false)
+            #expect(body["max_output_tokens"] as? Int == budget)
+            #expect(body["extra_body"] == nil && body["reasoning_effort"] == nil)
+            #expect(body["temperature"] as? Double == 0)
+        }
+    }
+}
+
+@Test func openAINonThinkingParametersRespectModelAndProviderCompatibility() throws {
+    for model in ["gpt-5.1", "gpt-5.2", "gpt-5.4", "gpt-5.4-2026-03-05", "gpt-5.5", "gpt-6-sol", "gpt-6-luna"] {
+        for endpoint in ["https://api.openai.com/v1", "https://example.test/proxy/v1"] {
+            let configuration = try OpenAIChatConfiguration(
+                baseURL: OpenAIChatConfiguration.endpoint(endpoint), apiKey: "test-only", model: model)
+            let request = try configuration.request(ChatRequest(messages: [.init(role: .user, content: "Hi")]))
+            let data = try #require(request.httpBody)
+            let body = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
+            #expect((body["reasoning"] as? [String: String])?["effort"] == "none")
+            #expect(body["enable_thinking"] == nil)
+        }
+    }
+    for model in ["gpt-4.1", "gpt-4o-mini", "gpt-3.5-turbo", "gpt-5-chat-latest", "third-party"] {
+        let configuration = try OpenAIChatConfiguration(
+            baseURL: OpenAIChatConfiguration.endpoint("https://example.test/v1"), apiKey: "test-only", model: model)
+        let request = try configuration.request(ChatRequest(messages: [.init(role: .user, content: "Hi")]))
+        let data = try #require(request.httpBody)
+        let body = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        #expect(body["reasoning"] == nil && body["enable_thinking"] == nil)
+    }
+}
+
+@Test func mandatoryThinkingModelsFailWithoutSilentlyLoweringEffort() throws {
+    for model in [
+        "gpt-5", "gpt-5-mini", "gpt-5-nano", "gpt-5.4-pro", "gpt-5.1-codex", "gpt-6-astra", "gpt-6.1-sol", "o1", "o3",
+        "o4-mini",
+    ] {
+        let configuration = try OpenAIChatConfiguration(
+            baseURL: OpenAIChatConfiguration.endpoint("https://api.openai.com/v1"), apiKey: "test-only", model: model)
+        #expect(
+            throws: CapabilityError.invalidRequest(
+                "Selected OpenAI model cannot disable thinking; choose a non-thinking model")
+        ) {
+            try configuration.request(ChatRequest(messages: [.init(role: .user, content: "Hi")]))
+        }
+    }
+}
+
 @Test func configurationAndRequest() throws {
     let configuration = try config()
     let request = try configuration.request(
@@ -85,7 +234,7 @@ private final class StubProtocol: URLProtocol, @unchecked Sendable {
 }
 
 @Test func managedCapabilityStreamsAndShutsDown() async throws {
-    let manager = ModelManager()
+    let manager = try ModelManager()
     let configuration = try config()
     try await manager.register(
         ModelRegistration(id: ModelID("cloud"), capabilities: [.chat]) { context in
@@ -151,7 +300,7 @@ private final class LongReplyProtocol: URLProtocol, @unchecked Sendable {
 
 @Test(.timeLimit(.minutes(1)), arguments: [127, 128, 1024])
 func longCloudReplyDrainsWithDelayedConsumer(fragmentCount: Int) async throws {
-    let manager = ModelManager()
+    let manager = try ModelManager()
     let configuration = try config(replyFragments: fragmentCount)
     try await manager.register(
         ModelRegistration(id: ModelID("long-cloud"), capabilities: [.chat]) { context in
@@ -181,7 +330,7 @@ func longCloudReplyDrainsWithDelayedConsumer(fragmentCount: Int) async throws {
 
 @Test(.timeLimit(.minutes(1)), arguments: [false, true])
 func pausedLongCloudReplyCanCancelOrShutdown(shutdown: Bool) async throws {
-    let manager = ModelManager()
+    let manager = try ModelManager()
     let configuration = try config()
     try await manager.register(
         ModelRegistration(id: ModelID("paused-cloud"), capabilities: [.chat]) { context in
@@ -218,7 +367,7 @@ func pausedLongCloudReplyCanCancelOrShutdown(shutdown: Bool) async throws {
 }
 
 @Test func overlapCancellationAndShutdown() async throws {
-    let manager = ModelManager()
+    let manager = try ModelManager()
     let configuration = try config()
     try await manager.register(
         ModelRegistration(id: ModelID("cloud"), capabilities: [.chat]) { context in
@@ -262,7 +411,8 @@ private final class ErrorProtocol: URLProtocol, @unchecked Sendable {
 
 @Test func httpErrorsAreSanitized() async throws {
     let chat = try OpenAIChat(
-        context: ModelContext(), configuration: config(),
+        context: ModelContext(loadGate: ModelLoadGate(maximumConcurrentLoads: 4), maximumLoadWaiters: 32),
+        configuration: config(),
         sessionConfiguration: {
             let settings = URLSessionConfiguration.ephemeral
             settings.protocolClasses = [ErrorProtocol.self]
@@ -285,7 +435,7 @@ private final class ErrorProtocol: URLProtocol, @unchecked Sendable {
 }
 
 @Test func replacementClosesOldCapabilityAndPreservesOtherModels() async throws {
-    let manager = ModelManager()
+    let manager = try ModelManager()
     let configuration = try config()
     func registration(_ id: String) throws -> ModelRegistration {
         try ModelRegistration(id: ModelID(id), capabilities: [.chat]) { context in
@@ -459,7 +609,7 @@ private final class UsageProtocol: URLProtocol, @unchecked Sendable {
 }
 
 @Test func capabilityEmitsResponseUsageBeforeTerminalEvent() async throws {
-    let manager = ModelManager()
+    let manager = try ModelManager()
     let configuration = try config()
     try await manager.register(
         ModelRegistration(id: ModelID("usage-fixture"), capabilities: [.chat]) { context in
@@ -501,6 +651,33 @@ private final class UsageProtocol: URLProtocol, @unchecked Sendable {
     }
 }
 
+@Test func consecutiveUsersRetainOriginalMessageAndImageBoundaries() throws {
+    let image = try ChatImage(id: UUID(), mimeType: "image/png", data: Data([1, 2]))
+    let messages: [ChatMessage] = [
+        .init(role: .system, content: "Instructions"),
+        .init(role: .user, content: "你好", images: [image]),
+        .init(role: .user, content: "补充条件"),
+        .init(role: .assistant, content: "Answer"),
+        .init(role: .user, content: "Next"),
+        .init(role: .user, content: "More"),
+    ]
+    let chat = try ChatRequest(messages: messages)
+    let data = try #require(try config().request(chat).httpBody)
+    let body = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
+    let input = try #require(body["input"] as? [[String: Any]])
+    try #require(input.count == messages.count)
+    #expect(input.compactMap { $0["role"] as? String } == messages.map { $0.role.rawValue })
+    for (index, message) in messages.enumerated() {
+        let parts = try #require(input[index]["content"] as? [[String: Any]])
+        #expect(parts.first?["text"] as? String == message.content)
+        #expect(parts.count == 1 + (message.images?.count ?? 0))
+        if index == 1 {
+            #expect(parts[1]["image_url"] as? String == "data:image/png;base64,AQI=")
+        }
+    }
+    #expect(chat.messages == messages)
+}
+
 @Test func nativeContinuationSerializesMatchingAliasesAndToolReceipt() throws {
     let declaration = try ChatToolDefinition(
         declaration: Data(
@@ -525,6 +702,7 @@ private final class UsageProtocol: URLProtocol, @unchecked Sendable {
     let tools = try #require(body["tools"] as? [[String: Any]])
     #expect(tools[0]["name"] as? String == "Read_State_0")
     #expect(tools[0]["function"] == nil)
+    #expect(tools[0]["strict"] as? Bool == false)
     #expect(throws: CapabilityError.self) {
         try ChatRequest(messages: [.init(role: .tool, content: "forged", toolCallID: "missing")])
     }
@@ -591,6 +769,104 @@ private final class UsageProtocol: URLProtocol, @unchecked Sendable {
 
 private func eventWire(_ object: [String: Any]) throws -> String {
     "data: " + String(decoding: try JSONSerialization.data(withJSONObject: object), as: UTF8.self) + "\n\n"
+}
+
+private func reasoningWire() throws -> String {
+    try eventWire([
+        "type": "response.output_item.added", "output_index": 0,
+        "item": ["type": "reasoning", "id": "reason-1", "summary": []],
+    ])
+        + eventWire([
+            "type": "response.reasoning_text.delta", "output_index": 0, "item_id": "reason-1",
+            "delta": "private thought",
+        ])
+        + eventWire([
+            "type": "response.reasoning_text.done", "output_index": 0, "item_id": "reason-1", "text": "private thought",
+        ])
+        + eventWire([
+            "type": "response.output_item.done", "output_index": 0,
+            "item": [
+                "type": "reasoning", "id": "reason-1",
+                "summary": [["type": "summary_text", "text": "private thought"]],
+            ],
+        ])
+}
+
+@Test func responsesReasoningDoesNotBecomePublicText() throws {
+    let prefix = try reasoningWire()
+    #expect(try decode(prefix).isEmpty)
+    let reasoning: [String: Any] = [
+        "type": "reasoning", "id": "reason-1", "summary": [["type": "summary_text", "text": "private thought"]],
+    ]
+    let message: [String: Any] = ["type": "message", "content": [["type": "output_text", "text": "15"]]]
+    let wire =
+        try prefix + eventWire(["type": "response.output_text.delta", "delta": "15"])
+        + eventWire(["type": "response.output_item.done", "output_index": 1, "item": message])
+        + eventWire([
+            "type": "response.completed",
+            "response": [
+                "status": "completed", "output": [reasoning, message],
+                "usage": ["input_tokens": 10, "output_tokens": 20, "total_tokens": 30],
+            ],
+        ])
+    #expect(
+        try decode(wire) == [
+            .text("15"), .usage(try ChatTokenUsage(input: 10, generated: 20, total: 30)), .finished(.stop),
+        ])
+    #expect(
+        try decode(
+            prefix
+                + eventWire([
+                    "type": "response.incomplete",
+                    "response": [
+                        "status": "incomplete", "output": [reasoning],
+                        "incomplete_details": ["reason": "max_output_tokens"],
+                    ],
+                ])) == [.finished(.lengthLimit)])
+    #expect(throws: OpenAIChatError.truncatedStream) { try decode(prefix + "data: [DONE]\n\n") }
+}
+
+@Test func reasoningBeforeNativeCallPreservesOriginalCallIndex() throws {
+    let reasoning: [String: Any] = ["type": "reasoning", "id": "reason-1", "summary": []]
+    let call: [String: Any] = [
+        "type": "function_call", "id": "item-1", "call_id": "call-1", "name": "Read_State_0", "arguments": "{}",
+    ]
+    let wire =
+        try reasoningWire() + eventWire(["type": "response.output_item.added", "output_index": 1, "item": call])
+        + eventWire([
+            "type": "response.function_call_arguments.delta", "output_index": 1, "item_id": "item-1", "delta": "{}",
+        ]) + eventWire(["type": "response.output_item.done", "output_index": 1, "item": call])
+        + eventWire([
+            "type": "response.completed", "response": ["status": "completed", "output": [reasoning, call]],
+        ])
+    var decoder = ChatEventDecoder(toolNames: ["Read_State_0": "Read.State"])
+    var events: [ChatEvent] = []
+    for byte in wire.utf8 { events += try decoder.consume(byte) }
+    #expect(events == [.toolCall(.init(id: "call-1", name: "Read.State", argumentsJSON: "{}")), .finished(.toolCalls)])
+}
+
+@Test func malformedReasoningMetadataIsRejected() throws {
+    for item: [String: Any] in [
+        ["type": "reasoning", "id": "", "summary": []],
+        ["type": "reasoning", "id": "reason-1", "summary": [["type": "output_text", "text": "bad"]]],
+        ["type": "reasoning", "id": "reason-1", "summary": [["type": "summary_text", "text": 1]]],
+        ["type": "reasoning", "id": "reason-1"],
+    ] {
+        for type in ["response.output_item.added", "response.output_item.done"] {
+            #expect(throws: OpenAIChatError.invalidResponse) {
+                try decode(try eventWire(["type": type, "output_index": 0, "item": item]))
+            }
+        }
+        #expect(throws: OpenAIChatError.invalidResponse) {
+            try decode(
+                try eventWire(["type": "response.completed", "response": ["status": "completed", "output": [item]]]))
+        }
+    }
+    for type in ["response.reasoning_text.delta", "response.reasoning_text.done"] {
+        #expect(throws: OpenAIChatError.invalidResponse) {
+            try decode(try eventWire(["type": type, "output_index": 0, "item_id": "reason-1", "delta": 1, "text": 1]))
+        }
+    }
 }
 
 @Test func responsesFunctionCallsRequireCompletedValidatedPairs() throws {
@@ -664,7 +940,7 @@ private final class ReusableProtocol: URLProtocol, @unchecked Sendable {
 
 @Test(.timeLimit(.minutes(1))) func cancelledRequestDoesNotDestroyReusableSession() async throws {
     let count = Mutex(0)
-    let manager = ModelManager()
+    let manager = try ModelManager()
     let configuration = try config()
     try await manager.register(
         ModelRegistration(id: ModelID("reuse"), capabilities: [.chat]) { context in
@@ -704,5 +980,60 @@ private final class ReusableProtocol: URLProtocol, @unchecked Sendable {
     await manager.shutdown()
     await #expect(throws: CapabilityError.sessionClosed) {
         try await capability.chat(ChatRequest(messages: [.init(role: .user, content: "closed")]))
+    }
+}
+
+@Test func responsesDoesNotPromoteOptionalTaskFieldsToRequired() throws {
+    let declaration = try ChatToolDefinition(
+        declaration: Data(
+            #"{"type":"function","function":{"name":"startTask","parameters":{"type":"object","additionalProperties":false,"properties":{"goal":{"type":"string"},"target":{"type":"string"}},"required":["goal"]}}}"#
+                .utf8))
+    let request = try config().request(
+        ChatRequest(messages: [.init(role: .user, content: "Take a photo")], tools: [declaration]))
+    let encoded = try #require(request.httpBody)
+    let body = try #require(JSONSerialization.jsonObject(with: encoded) as? [String: Any])
+    let tools = try #require(body["tools"] as? [[String: Any]])
+    #expect(tools[0]["strict"] as? Bool == false)
+    let schema = try #require(tools[0]["parameters"] as? [String: Any])
+    #expect(schema["required"] as? [String] == ["goal"])
+    #expect((schema["properties"] as? [String: Any])?["target"] != nil)
+}
+
+@Test func historicalToolPairsSurviveReleasedCurrentCatalog() throws {
+    let call = try ChatToolCall(id: "prior-call", name: "History.list", argumentsJSON: "{}")
+    let request = try ChatRequest(messages: [
+        .init(role: .system, content: "Current catalog has no native tools"),
+        .init(role: .assistant, content: "", toolCalls: [call]),
+        .init(role: .tool, content: "stored results", toolCallID: call.id),
+        .init(role: .user, content: "new action request"),
+    ])
+    let data = try #require(config().request(request).httpBody)
+    let body = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
+    #expect(body["tools"] == nil)
+    let items = try #require(body["input"] as? [[String: Any]])
+    #expect(items[1]["type"] as? String == "function_call")
+    #expect(items[1]["name"] as? String == "History_list_0")
+    #expect(items[2]["call_id"] as? String == call.id)
+    #expect(items[2]["output"] as? String == "stored results")
+    #expect(OpenAIChatConfiguration.toolNames(request.tools).isEmpty)
+}
+
+@Test func providerQuotaCodeSurvivesFailedSSEWithoutMessageLeakage() throws {
+    for event in [
+        ["type": "error", "error": ["code": "credit_balance_exhausted", "message": "private provider detail"]],
+        [
+            "type": "response.failed",
+            "response": [
+                "status": "failed",
+                "error": ["code": "credit_balance_exhausted", "message": "private provider detail"],
+            ],
+        ],
+    ] as [[String: Any]] {
+        var decoder = ChatEventDecoder()
+        let json = try JSONSerialization.data(withJSONObject: event)
+        let wire = "data: " + String(decoding: json, as: UTF8.self) + "\n\n"
+        #expect(throws: OpenAIChatError.providerCode("credit_balance_exhausted")) {
+            for byte in wire.utf8 { _ = try decoder.consume(byte) }
+        }
     }
 }

@@ -45,7 +45,7 @@ public struct VisionPerceptionContextBuilder: ContextBuilder {
                 throw ImageInputError.invalidFrame
             }
             return PoseRequest(
-                image: resolved, context: InferenceContext(requestID: input.id, conversationID: input.sessionID))
+                image: resolved, context: InferenceContext(requestID: input.id, scopeID: input.sessionID))
         }
     }
     public init() {}

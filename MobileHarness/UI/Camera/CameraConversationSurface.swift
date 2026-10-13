@@ -10,7 +10,7 @@
         let preview: () -> Preview
         @Environment(\.openURL) private var openURL
         let openSettings: () -> Void
-        @State private var statisticsExpanded = true
+        @State private var statisticsExpanded = false
         @Environment(\.accessibilityReduceMotion) private var reduceMotion
         @ViewBuilder let content: () -> Content
 

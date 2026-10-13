@@ -8,12 +8,17 @@ struct SynthesisPCMAccumulator {
     private var sequence: UInt64 = 0
     private var timestamp = 0.0
     private let chunkBytes = 16_384
+    private var emittedInitialPCM = false
 
     mutating func append(_ frame: AudioFrame) throws -> [AudioFrame] {
         if let format, format != frame.format { throw CapabilityError.invalidRequest("TTS PCM format changed") }
         format = frame.format
         pending.append(frame.data)
         var result: [AudioFrame] = []
+        if !emittedInitialPCM {
+            result.append(try take(min(pending.count, chunkBytes)))
+            emittedInitialPCM = true
+        }
         while pending.count >= chunkBytes {
             result.append(try take(chunkBytes))
         }

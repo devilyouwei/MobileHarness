@@ -5,6 +5,79 @@ import StorageChat
 
 /// Preserve provider call/result blocks when interleaving independent task rounds.
 public enum AgentChatContextBuilder {
+    /// Retire oldest complete blocks in the model projection; durable history is unchanged.
+    public static func retainingRecent(
+        _ messages: [ChatMessage], preservingUser user: String, protectedSuffixCount: Int = 1,
+        reservingMessages: Int = 0, reservingBytes: Int = 0
+    ) throws -> [ChatMessage] {
+        var groups: [[Int]] = []
+        var index = 0
+        while index < messages.count {
+            let start = index
+            let message = messages[index]
+            if message.role == .tool { throw CapabilityError.invalidRequest("Uncorrelated tool result") }
+            index += 1
+            if !message.toolCalls.isEmpty {
+                var pending = Set(message.toolCalls.map(\.id))
+                while index < messages.count, messages[index].role == .tool {
+                    guard let id = messages[index].toolCallID, pending.remove(id) != nil else {
+                        throw CapabilityError.invalidRequest("Uncorrelated tool result")
+                    }
+                    index += 1
+                }
+                guard pending.isEmpty else { throw CapabilityError.invalidRequest("Incomplete tool transcript") }
+            }
+            groups.append(Array(start..<index))
+        }
+        let intent = messages.lastIndex { $0.role == .user && $0.content == user }
+        let suffixStart = max(0, messages.count - protectedSuffixCount)
+        func protected(_ group: [Int]) -> Bool {
+            group.contains { messages[$0].role == .system || $0 == intent || $0 >= suffixStart }
+        }
+        while true {
+            let selected = groups.flatMap { $0.map { messages[$0] } }
+            let bytes = selected.reduce(0) { $0 + textBytes($1) }
+            let images = selected.reduce(0) { $0 + ($1.images?.count ?? 0) }
+            if selected.count + reservingMessages <= 64 && bytes + reservingBytes <= 65_536 && images <= 4 {
+                return selected
+            }
+            guard let oldest = groups.firstIndex(where: { !protected($0) }) else {
+                throw CapabilityError.invalidRequest("Current intent/results exceed model request capacity")
+            }
+            groups.remove(at: oldest)
+        }
+    }
+    static func textBytes(_ message: ChatMessage) -> Int {
+        message.content.utf8.count + (message.toolCallID?.utf8.count ?? 0)
+            + message.toolCalls.reduce(0) { $0 + $1.id.utf8.count + $1.name.utf8.count + $1.argumentsJSON.utf8.count }
+    }
+
+    /// Runtime facts are scoped data; retained task history is not an instruction catalog.
+    static func taskReports(
+        views: [UUID: AgentTaskView], tasks: AgentTaskRegistry, input: AgentInput, templates: PromptTemplates
+    ) throws -> String {
+        let selected = views.values.filter { view in
+            guard view.scope.sessionID == input.sessionID else { return false }
+            if view.scope.id == input.taskScope?.id { return true }
+            guard view.scope.execution == .background, !view.terminal,
+                let record = tasks.task(view.scope.id)
+            else { return false }
+            return ![.succeeded, .failed, .cancelled, .interrupted].contains(record.state)
+        }.sorted { $0.scope.id.uuidString < $1.scope.id.uuidString }.prefix(17)
+        guard !selected.isEmpty else { return "" }
+        let reports = try selected.map { view in
+            try templates.render(
+                "taskReport",
+                variables: [
+                    "taskID": view.scope.id.uuidString, "executor": view.scope.executor.rawValue,
+                    "status": tasks.task(view.scope.id)?.state.rawValue ?? "unknown", "stage": view.stage.rawValue,
+                    "interaction": view.interactionID?.uuidString ?? "none",
+                    "artifact": view.artifactID?.uuidString ?? "none", "report": String(view.text.prefix(128)),
+                ])
+        }.joined(separator: "\n")
+        return try templates.render("taskReports", variables: ["reports": reports])
+    }
+
     public static func historyProjection(
         system: String, user: String, conversation: StoredConversation, templates: PromptTemplates
     ) throws -> [ConversationMessage] {
@@ -28,15 +101,6 @@ public enum AgentChatContextBuilder {
                     selected.append(
                         (request.date, try messages(for: request, nativeHistory: nativeHistory, templates: templates)))
                 }
-            } else if turn.state == .completed {
-                selected.append(
-                    (
-                        turn.date,
-                        [
-                            ChatMessage(role: .user, content: turn.user),
-                            ChatMessage(role: .assistant, content: turn.raw),
-                        ]
-                    ))
             }
         }
         return [ChatMessage(role: .system, content: system)] + selected.sorted { $0.0 < $1.0 }.suffix(10).flatMap(\.1)

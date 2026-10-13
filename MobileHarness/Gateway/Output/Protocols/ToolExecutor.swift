@@ -5,18 +5,7 @@ import FunctionContracts
 /// Direct execution with a cooperative deadline; cleanup joins before returning an outcome.
 public struct ToolExecutor: Sendable {
     private let registry: ToolRegistry
-    public static let defaultTimeout: Duration = .seconds(30)
-    private let timeout: Duration
-    public enum ConfigurationError: Error { case invalidTimeout }
-    public init(registry: ToolRegistry) {
-        self.registry = registry
-        self.timeout = Self.defaultTimeout
-    }
-    public init(registry: ToolRegistry, timeout: Duration) throws {
-        guard timeout > .zero && timeout <= .seconds(300) else { throw ConfigurationError.invalidTimeout }
-        self.registry = registry
-        self.timeout = timeout
-    }
+    public init(registry: ToolRegistry) { self.registry = registry }
     public func execute(_ call: ToolRequest, context: ActionExecutionContext, returning: Bool = false) async throws
         -> ToolResponse?
     {
@@ -29,12 +18,11 @@ public struct ToolExecutor: Sendable {
         do {
             let completion = try await FunctionExecutor.perform(
                 FunctionInvocation(tool: call, context: context),
-                definition: definition.function, defaultTimeout: timeout)
+                definition: definition.function)
             try Task.checkCancellation()
             return try Self.response(
                 completion,
-                policy: returning || definition.feedbackPolicy == .observation
-                    ? .returning : definition.directResultPolicy, callID: call.id)
+                policy: returning ? .returning : definition.directResultPolicy, callID: call.id)
         } catch {
             try Task.checkCancellation()
             let report = FunctionExecutor.failureReport(for: error)
@@ -81,8 +69,10 @@ public struct ToolExecutor: Sendable {
         guard isError else { return nil }
         if case .report(let report) = completion {
             if report.executionFailure == .timedOut { return .timedOut }
-            if report.isCancelled { return .cancelled }
-            if let code = report.executionFailure ?? report.entries.first(where: { $0.status == .failed })?.code {
+            if report.isCancellationOnly { return .cancelled }
+            if let code = report.executionFailure
+                ?? report.entries.first(where: { $0.status == .failed && $0.code != .cancelled })?.code
+            {
                 return .init(rawValue: code.rawValue)
             }
         }

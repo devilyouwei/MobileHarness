@@ -4,30 +4,47 @@ import Foundation
 import UI
 
 enum HistoryAgentAdapter {
-    static func preview(_ turn: HistoryTurn) -> String { preview(turn, agent: "assistant") }
-
-    static func preview(_ turn: HistoryTurn, agent: String) -> String {
+    static func preview(_ turn: HistoryTurn) -> String {
         do {
-            let name: String
-            switch agent {
-            case "assistant": name = "Assistant"
-            case "photographer": name = "Photographer"
-            case "memory": name = "Memory"
-            case "applicationControl": name = "ApplicationControl"
-            default: throw HarnessError.unknownAgent
+            guard let snapshot = turn.decisionMetadata else {
+                throw GenerationError.invalidParameters
             }
-            let configuration = try AgentConfigurations.load(named: name)
-            let capabilities: CapabilityRegistry
-            switch agent {
-            case "photographer":
-                capabilities = try PhotographerContextState.runtimeCapabilities(configuration.capabilities)
-            case "memory": capabilities = try MemoryContextState.runtimeCapabilities(configuration.capabilities)
-            case "applicationControl":
-                capabilities = try ApplicationControlContextState.runtimeCapabilities(configuration.capabilities)
-            default: capabilities = try AssistantAgent.runtimeCapabilities(configuration.capabilities)
+            struct Catalog: Decodable {
+                struct Action: Decodable {
+                    let path: String
+                    let alias: String
+                    let channel: String
+                    let required: [String]
+                    let optional: [String]
+                }
+                struct Tool: Decodable {
+                    let definitionJSON: String?
+                    let path: String
+                    let alias: String
+                    let required: [String]
+                    let optional: [String]
+                }
+                let actions: [Action]
+                let tools: [Tool]
             }
-            let modelCapabilities = try AgentCommunicationAdapter.catalog(
-                capabilities, policy: configuration.communication)
+            let catalog = try JSONDecoder().decode(Catalog.self, from: Data(snapshot.catalogJSON.utf8))
+            let modelCapabilities = try CapabilityRegistry(
+                actions: catalog.actions.map {
+                    let parts = $0.path.split(separator: ".").map(String.init)
+                    guard parts.count == 3 else { throw GenerationError.invalidParameters }
+                    return ActionRegistration(
+                        alias: $0.alias, path: .init(domain: parts[0], module: parts[1], function: parts[2]),
+                        defaultChannel: $0.channel, requiredParameters: Set($0.required),
+                        optionalParameters: Set($0.optional))
+                },
+                tools: try catalog.tools.map {
+                    ToolRegistration(
+                        alias: $0.alias, path: $0.path,
+                        requiredParameters: Set($0.required), optionalParameters: Set($0.optional),
+                        definition: try $0.definitionJSON.flatMap {
+                            $0.isEmpty ? nil : try JSONDecoder().decode(NativeToolDefinition.self, from: Data($0.utf8))
+                        })
+                }, channels: ["Speech", "Display"])
             var trace = try GenerationTrace(
                 capabilities: modelCapabilities,
                 textMapping: AssistantAgent.mapText, segmentation: try AssistantAgent.textSegmentation)

@@ -1,5 +1,5 @@
 /// An explicitly registered three-level capability address; never a reflected source path.
-public struct ActionIdentifier: Hashable, Sendable, CustomStringConvertible {
+public struct ActionIdentifier: Hashable, Codable, Sendable, CustomStringConvertible {
     public let domain: String
     public let module: String
     public let function: String

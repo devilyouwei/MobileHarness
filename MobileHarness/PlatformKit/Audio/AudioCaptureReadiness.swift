@@ -2,7 +2,6 @@ import Foundation
 import Synchronization
 
 enum AudioCaptureReadinessError: Error, Equatable {
-    case timedOut
     case alreadyWaiting
 }
 
@@ -25,20 +24,13 @@ final class AudioCaptureReadiness: Sendable {
         waiter?.resume(with: result)
     }
 
-    func wait(timeout: Duration = .seconds(3)) async throws {
+    func wait() async throws {
         let admitted = state.withLock { state in
             guard !state.claimed else { return false }
             state.claimed = true
             return true
         }
         guard admitted else { throw AudioCaptureReadinessError.alreadyWaiting }
-        let timer = Task {
-            do {
-                try await Task.sleep(for: timeout)
-                resolve(.failure(AudioCaptureReadinessError.timedOut))
-            } catch {}
-        }
-        defer { timer.cancel() }
         try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { (waiter: CheckedContinuation<Void, any Error>) in
                 let result = state.withLock { state -> Result<Void, any Error>? in

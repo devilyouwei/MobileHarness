@@ -325,6 +325,7 @@ import UI
     }
 
     @Test(
+        .actionCatalog,
         .enabled(if: ProcessInfo.processInfo.environment["NEXARM_SERIAL_TRACKING_ACCEPTANCE"] == "1"),
         .timeLimit(.minutes(3)))
     @MainActor
@@ -498,7 +499,9 @@ import UI
         }
     }
 
-    @Test(.enabled(if: ProcessInfo.processInfo.environment["NEXARM_SERIAL_ACCEPTANCE"] == "1"), .timeLimit(.minutes(3)))
+    @Test(
+        .actionCatalog, .enabled(if: ProcessInfo.processInfo.environment["NEXARM_SERIAL_ACCEPTANCE"] == "1"),
+        .timeLimit(.minutes(3)))
     @MainActor
     func nexArmSerialSettingsAndAgentAcceptance() async throws {
         let path = try #require(ProcessInfo.processInfo.environment["NEXARM_PORT"])
@@ -592,6 +595,7 @@ import UI
     }
 
     @Test(
+        .actionCatalog,
         .enabled(if: ProcessInfo.processInfo.environment["NEXARM_SERIAL_PRESETS_ACCEPTANCE"] == "1"),
         .timeLimit(.minutes(5)))
     @MainActor
@@ -663,7 +667,7 @@ import UI
         }
     }
 
-    @Test(.enabled(if: ProcessInfo.processInfo.environment["NEXARM_SERIAL_PREFLIGHT"] == "1"))
+    @Test(.actionCatalog, .enabled(if: ProcessInfo.processInfo.environment["NEXARM_SERIAL_PREFLIGHT"] == "1"))
     func nexArmSerialReadOnlyPreflight() async throws {
         let link = try NexArmSerial(path: #require(ProcessInfo.processInfo.environment["NEXARM_PORT"]))
         do {

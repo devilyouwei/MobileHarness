@@ -42,7 +42,7 @@ private func actionInvocation(
     return ActionInvocation(source: source, input: input, call: token)
 }
 
-@Test func actionsSerializeEachModuleAndAllowIndependentModulesToProgress() async throws {
+@Test(.actionCatalog) func actionsSerializeEachChannelAndAllowIndependentChannelsToProgress() async throws {
     let firstStarted = ActionTestGate()
     let releaseSpeech = ActionTestGate()
     let displayFinished = ActionTestGate()
@@ -76,7 +76,7 @@ private func actionInvocation(
     #expect(await log.values == ["first:start", "print", "first:end", "second:start", "second:end"])
 }
 
-@Test func actionAdmissionBoundsIncludeRunningWorkAndRetainedInputs() async throws {
+@Test(.actionCatalog) func actionAdmissionBoundsIncludeRunningWorkAndRetainedInputs() async throws {
     let gate = ActionTestGate()
     let executor = ChannelScheduler(
         registry: try testActionRegistry(handlers: [sayPath: { _ in await gate.wait() }, printPath: { _ in }]),
@@ -106,7 +106,7 @@ private func actionInvocation(
 
 private enum ActionTestFailure: Error, Equatable { case playback }
 
-@Test func duplicateActionFinishWaiterIsRejectedAndOriginalWaiterCompletes() async throws {
+@Test(.actionCatalog) func duplicateActionFinishWaiterIsRejectedAndOriginalWaiterCompletes() async throws {
     let gate = ActionTestGate()
     let executor = ChannelScheduler(registry: try testActionRegistry(handlers: [sayPath: { _ in await gate.wait() }]))
     let input = AgentInput(sessionID: UUID(), payload: .text("first"))
@@ -130,7 +130,7 @@ private enum ActionTestFailure: Error, Equatable { case playback }
     }
 }
 
-@Test func actionFailureRecordsErrorAndRunsFollowingActions() async throws {
+@Test(.actionCatalog) func actionFailureRecordsErrorAndRunsFollowingActions() async throws {
     let started = ActionTestGate()
     let release = ActionTestGate()
     let log = ActionTestLog()
@@ -155,10 +155,12 @@ private enum ActionTestFailure: Error, Equatable { case playback }
     await release.open()
     try await executor.finish(inputID: failedInput.id, source: AgentID(rawValue: "assistant"))
     try await executor.finish(inputID: otherInput.id, source: AgentID(rawValue: "assistant"))
-    #expect(await log.values == ["fail", "must not run", "other input"])
+    let values = await log.values
+    #expect(values.count == 3 && Set(values) == ["fail", "must not run", "other input"])
+    #expect(values.first == "fail")
 }
 
-@Test func cancellingFinishWaitsForHandlerCleanupAndSuppressesQueuedActions() async throws {
+@Test(.actionCatalog) func cancellingFinishWaitsForHandlerCleanupAndSuppressesQueuedActions() async throws {
     let started = ActionTestGate()
     let sawCancellation = ActionTestGate()
     let releaseCleanup = ActionTestGate()
@@ -184,19 +186,35 @@ private enum ActionTestFailure: Error, Equatable { case playback }
     try await executor.enqueue(invocation: actionInvocation("old", input: old))
     await started.wait()
     try await executor.enqueue(invocation: actionInvocation("discard", input: old))
-    let finishing = Task { try await executor.finish(inputID: old.id, source: AgentID(rawValue: "assistant")) }
+    let finishing = Task {
+        do {
+            try await executor.finish(inputID: old.id, source: AgentID(rawValue: "assistant"))
+        } catch {
+            await log.append("finish:returned")
+            throw error
+        }
+        await log.append("finish:returned")
+    }
     finishing.cancel()
     await sawCancellation.wait()
-    #expect(await log.values == ["old:start"])
+    let before = await log.values
+    #expect(!before.contains("old:end") && !before.contains("finish:returned") && !before.contains("discard:start"))
     try await executor.enqueue(invocation: actionInvocation("new", input: next))
-    #expect(await log.values == ["old:start"])
+    // Independent inputs may run concurrently; cancellation joins only the old input.
+    let afterAdmission = await log.values
+    #expect(!afterAdmission.contains("old:end") && !afterAdmission.contains("finish:returned"))
     await releaseCleanup.open()
     await #expect(throws: CancellationError.self) { try await finishing.value }
     try await executor.finish(inputID: next.id, source: AgentID(rawValue: "assistant"))
-    #expect(await log.values == ["old:start", "old:end", "new:start", "new:end"])
+    let values = await log.values
+    #expect(Set(values) == ["old:start", "old:end", "new:start", "new:end", "finish:returned"])
+    let oldEnd = try #require(values.firstIndex(of: "old:end"))
+    let finish = try #require(values.firstIndex(of: "finish:returned"))
+    #expect(oldEnd < finish)
+    #expect(try #require(values.firstIndex(of: "new:start")) < #require(values.firstIndex(of: "new:end")))
 }
 
-@Test func sessionCancellationCleansAllModuleLanesAndAllowsNextSession() async throws {
+@Test(.actionCatalog) func sessionCancellationCleansAllChannelLanesAndAllowsNextSession() async throws {
     let release = ActionTestGate()
     let speechStarted = ActionTestGate()
     let displayStarted = ActionTestGate()
@@ -250,7 +268,7 @@ private enum ActionTestFailure: Error, Equatable { case playback }
     }
 }
 
-@Test func sharedInputFinishDoesNotSealAnotherAgentsActions() async throws {
+@Test(.actionCatalog) func sharedInputFinishDoesNotSealAnotherAgentsActions() async throws {
     let release = ActionTestGate()
     let started = ActionTestGate()
     let log = ActionTestLog()
@@ -276,7 +294,7 @@ private enum ActionTestFailure: Error, Equatable { case playback }
     #expect(await log.values == ["first agent", "second:one", "second:two"])
 }
 
-@Test func sharedInputFailureDoesNotCancelEitherAgent() async throws {
+@Test(.actionCatalog) func sharedInputFailureDoesNotCancelEitherAgent() async throws {
     let started = ActionTestGate()
     let release = ActionTestGate()
     let log = ActionTestLog()
@@ -301,10 +319,12 @@ private enum ActionTestFailure: Error, Equatable { case playback }
     await release.open()
     try await executor.finish(inputID: shared.id, source: AgentID(rawValue: "assistant"))
     try await executor.finish(inputID: shared.id, source: secondAgent)
-    #expect(await log.values == ["fail", "must not run", "other agent"])
+    let values = await log.values
+    #expect(values.count == 3 && Set(values) == ["fail", "must not run", "other agent"])
+    #expect(values.first == "fail")
 }
 
-@Test func explicitChannelSerializesDifferentModulesAndRestoresIndependentDefaults() async throws {
+@Test(.actionCatalog) func explicitChannelSerializesDifferentModulesAndRestoresIndependentDefaults() async throws {
     let started = ActionTestGate()
     let release = ActionTestGate()
     let independent = ActionTestGate()
@@ -336,7 +356,7 @@ private enum ActionTestFailure: Error, Equatable { case playback }
     #expect(await log.values == ["say:start", "default", "say:end", "same-channel"])
 }
 
-@Test func channelCountBoundRejectsNewLaneWithoutDroppingExistingWork() async throws {
+@Test(.actionCatalog) func channelCountBoundRejectsNewLaneWithoutDroppingExistingWork() async throws {
     let release = ActionTestGate()
     let executor = ChannelScheduler(
         registry: try testActionRegistry(handlers: [sayPath: { _ in await release.wait() }]), maximumChannels: 1)
@@ -351,9 +371,10 @@ private enum ActionTestFailure: Error, Equatable { case playback }
     try await executor.finish(inputID: input.id, source: AgentID(rawValue: "assistant"))
 }
 
-@Test func samePhysicalModuleNeverOverlapsAcrossDifferentChannels() async throws {
+@Test(.actionCatalog, .timeLimit(.minutes(1))) func sameFunctionRunsConcurrentlyAcrossDifferentChannels() async throws {
     let started = ActionTestGate()
     let release = ActionTestGate()
+    let secondFinished = ActionTestGate()
     let log = ActionTestLog()
     let executor = ChannelScheduler(
         registry: try testActionRegistry(handlers: [
@@ -365,23 +386,115 @@ private enum ActionTestFailure: Error, Equatable { case playback }
                     await release.wait()
                 }
                 await log.append("\(text):end")
+                if text == "second" { await secondFinished.open() }
             }
         ]))
     let input = AgentInput(sessionID: UUID(), payload: .text("test"))
     try await executor.enqueue(invocation: actionInvocation("first", input: input, channel: "main"))
     await started.wait()
     try await executor.enqueue(invocation: actionInvocation("second", input: input, channel: "Speech"))
-    #expect(await log.values == ["first:start"])
+    await secondFinished.wait()
+    #expect(await log.values == ["first:start", "second:start", "second:end"])
     await release.open()
-    try await executor.finish(inputID: input.id, source: AgentID(rawValue: "assistant"))
-    #expect(await log.values == ["first:start", "first:end", "second:start", "second:end"])
+    try await executor.finish(inputID: input.id, source: .assistant)
+    #expect(await log.values == ["first:start", "second:start", "second:end", "first:end"])
+}
+
+@Test(.actionCatalog, .timeLimit(.minutes(1))) func sameChannelInDifferentTasksRunsConcurrently() async throws {
+    let started = ActionTestGate()
+    let release = ActionTestGate()
+    let secondFinished = ActionTestGate()
+    let log = ActionTestLog()
+    let scheduler = ChannelScheduler(
+        registry: try testActionRegistry(handlers: [
+            sayPath: { invocation in
+                let text = invocation.call.parameters["text"] ?? ""
+                await log.append(text)
+                if text == "first" {
+                    await started.open()
+                    await release.wait()
+                } else {
+                    await secondFinished.open()
+                }
+            }
+        ]))
+    let session = UUID()
+    let first = AgentInput(sessionID: session, payload: .text("first"))
+    let second = AgentInput(sessionID: session, payload: .text("second"))
+    try await scheduler.enqueue(invocation: actionInvocation("first", input: first, channel: "shared"))
+    await started.wait()
+    try await scheduler.enqueue(invocation: actionInvocation("second", input: second, channel: "shared"))
+    await secondFinished.wait()
+    try await scheduler.finish(inputID: second.id, source: .assistant)
+    #expect(await log.values == ["first", "second"])
+    await release.open()
+    try await scheduler.finish(inputID: first.id, source: .assistant)
+}
+
+@Test(.actionCatalog, .timeLimit(.minutes(1)), arguments: [false, true])
+func resourceConflictFailsWithoutWaitingAndAdvancesItsChannel(sharedWriterGroup: Bool) async throws {
+    let started = ActionTestGate()
+    let release = ActionTestGate()
+    let followingFinished = ActionTestGate()
+    let log = ActionTestLog()
+    let firstResource = ResourceID(rawValue: "fixture.first")
+    let secondResource = sharedWriterGroup ? ResourceID(rawValue: "fixture.second") : firstResource
+    let resourceIDs: Set<ResourceID> = [firstResource, secondResource]
+    let coordinator = try ResourceCoordinator(
+        definitions: resourceIDs.map {
+            ResourceDefinition(
+                id: $0, allowedOwners: [.assistant],
+                executionGroup: sharedWriterGroup ? ResourceID(rawValue: "fixture.writer") : nil
+            ) {}
+        })
+    let firstPath = ActionPath(domain: "Fixture", module: "Work", function: "first")
+    let secondPath = ActionPath(domain: "Fixture", module: "Work", function: "second")
+    let followingPath = ActionPath(domain: "Fixture", module: "Work", function: "following")
+    let registry = try ActionRegistry(definitions: [
+        ActionBinding(
+            path: firstPath, displayName: "First", kind: .finite, completion: "Joined", resources: [firstResource]
+        ) { _ async throws -> Void in
+            await log.append("first:start")
+            await started.open()
+            await release.wait()
+            await log.append("first:end")
+        },
+        ActionBinding(
+            path: secondPath, displayName: "Second", kind: .finite, completion: "Joined", resources: [secondResource]
+        ) { _ async throws -> Void in
+            await log.append("conflicting handler must not run")
+        },
+        ActionBinding(path: followingPath, displayName: "Following", kind: .finite, completion: "Joined") {
+            _ async throws -> Void in
+            await log.append("following")
+            await followingFinished.open()
+        },
+    ])
+    let scheduler = ChannelScheduler(registry: registry, resources: coordinator)
+    let input = AgentInput(sessionID: UUID(), payload: .event("resource conflict"))
+    try await scheduler.enqueue(invocation: actionInvocation("first", input: input, path: firstPath, channel: "one"))
+    await started.wait()
+    try await scheduler.enqueue(invocation: actionInvocation("second", input: input, path: secondPath, channel: "two"))
+    try await scheduler.enqueue(
+        invocation: actionInvocation("following", input: input, path: followingPath, channel: "two"))
+    await followingFinished.wait()
+    #expect(await log.values == ["first:start", "following"])
+    let snapshot = await scheduler.executionSnapshot()
+    let failed = try #require(snapshot.records.first { $0.path == secondPath })
+    #expect(failed.phase == .failed && failed.failure == .resourceUnavailable)
+    #expect(failed.failureDescription?.contains("busy") == true)
+    #expect(await coordinator.snapshot()[firstResource] != .unlocked)
+    await release.open()
+    try await scheduler.finish(inputID: input.id, source: .assistant)
+    #expect(await log.values == ["first:start", "following", "first:end"])
+    #expect(await coordinator.snapshot()[firstResource] == .unlocked)
 }
 
 private func boundary(_ directive: SchedulingDirective, _ input: AgentInput) -> OutputEnvelope {
     OutputEnvelope(source: .assistant, input: input, output: .scheduling(directive))
 }
 
-@Test func waitGroupsJoinBeforeAndAfterWithoutBlockingIndependentTasks() async throws {
+@Test(.actionCatalog) func waitGroupsJoinBeforeAndAfterWithoutBlockingIndependentTasks() async throws {
     let beforeStarted = ActionTestGate()
     let releaseBefore = ActionTestGate()
     let insideStarted = ActionTestGate()
@@ -439,7 +552,7 @@ private func boundary(_ directive: SchedulingDirective, _ input: AgentInput) -> 
     #expect(values.firstIndex(of: "after:start")! > values.firstIndex(of: "display:end")!)
 }
 
-@Test func nestedWaitIsStreamingButUnclosedGroupCannotReleaseParentContinuation() async throws {
+@Test(.actionCatalog) func nestedWaitIsStreamingButUnclosedGroupCannotReleaseParentContinuation() async throws {
     let ran = ActionTestGate()
     let release = ActionTestGate()
     let log = ActionTestLog()
@@ -472,7 +585,7 @@ private func boundary(_ directive: SchedulingDirective, _ input: AgentInput) -> 
     #expect(await log.values == ["A", "B", "C", "D"])
 }
 
-@Test func malformedSchedulesAndGroupCapacityFailAndCleanup() async throws {
+@Test(.actionCatalog) func malformedSchedulesAndGroupCapacityFailAndCleanup() async throws {
     let scheduler = ChannelScheduler(registry: try testActionRegistry(handlers: [:]))
     let input = AgentInput(sessionID: UUID(), payload: .text("limits"))
     await #expect(throws: ActionSchedulingError.invalidSchedule) {
@@ -497,7 +610,7 @@ private func boundary(_ directive: SchedulingDirective, _ input: AgentInput) -> 
     await scheduler.cancel(inputID: input.id, source: AgentID(rawValue: "assistant"))
 }
 
-@Test func waitFailureReleasesDormantGroupsAndAllowsLateAdmission() async throws {
+@Test(.actionCatalog) func waitFailureReleasesDormantGroupsAndAllowsLateAdmission() async throws {
     let started = ActionTestGate()
     let release = ActionTestGate()
     let log = ActionTestLog()
@@ -520,7 +633,7 @@ private func boundary(_ directive: SchedulingDirective, _ input: AgentInput) -> 
     try await scheduler.enqueue(invocation: actionInvocation("dormant", input: input, path: printPath))
     try await scheduler.schedule(.endWait, envelope: boundary(.endWait, input))
     await release.open()
-    // Acquiring the same module proves the failed handler was released and its task fenced.
+    // An independent task can finish; late same-task work still follows the wait tree.
     let probe = AgentInput(sessionID: UUID(), payload: .text("probe"))
     try await scheduler.enqueue(invocation: actionInvocation("probe", input: probe))
     try await scheduler.finish(inputID: probe.id, source: AgentID(rawValue: "assistant"))
@@ -529,7 +642,7 @@ private func boundary(_ directive: SchedulingDirective, _ input: AgentInput) -> 
     #expect(await log.values == ["unexpected", "unexpected"])
 }
 
-@Test func nestedWaitCancellationJoinsRunningCleanupAndDropsFuturePhases() async throws {
+@Test(.actionCatalog) func nestedWaitCancellationJoinsRunningCleanupAndDropsFuturePhases() async throws {
     let started = ActionTestGate()
     let cancelling = ActionTestGate()
     let release = ActionTestGate()
@@ -569,7 +682,7 @@ private func boundary(_ directive: SchedulingDirective, _ input: AgentInput) -> 
     #expect(await log.values == ["other", "cleaned", "cancel returned"])
 }
 
-@Test func dormantActionsCountTowardGlobalChannelAndTaskBounds() async throws {
+@Test(.actionCatalog) func dormantActionsCountTowardGlobalChannelAndTaskBounds() async throws {
     let input = AgentInput(sessionID: UUID(), payload: .text("bounds"))
     let scheduler = ChannelScheduler(
         registry: try testActionRegistry(handlers: [sayPath: { _ in }]), capacityPerChannel: 128)
@@ -596,7 +709,7 @@ private func boundary(_ directive: SchedulingDirective, _ input: AgentInput) -> 
     await bounded.cancel(inputID: input.id, source: AgentID(rawValue: "assistant"))
 }
 
-@Test func schedulingCompletionRequiresTheActualCustomAgentSource() async throws {
+@Test(.actionCatalog) func schedulingCompletionRequiresTheActualCustomAgentSource() async throws {
     let log = ActionTestLog()
     let scheduler = ChannelScheduler(
         registry: try testActionRegistry(handlers: [printPath: { _ in await log.append("custom") }]))
@@ -608,74 +721,12 @@ private func boundary(_ directive: SchedulingDirective, _ input: AgentInput) -> 
     await scheduler.shutdown()
 }
 
-@Test(.timeLimit(.minutes(1))) func definitionSerializationKeyFencesDifferentPathsAcrossChannels() async throws {
+@Test(.actionCatalog, .timeLimit(.minutes(1))) func parentAndChildSpeechRunIndependentlyWithoutCancellingParent()
+    async throws
+{
     let started = ActionTestGate()
     let release = ActionTestGate()
-    let independentFinished = ActionTestGate()
-    let log = ActionTestLog()
-    let first = ActionPath(domain: "First", module: "Control", function: "run")
-    let second = ActionPath(domain: "Second", module: "Control", function: "run")
-    let independent = ActionPath(domain: "Independent", module: "Control", function: "run")
-    let registry = try ActionRegistry(definitions: [
-        ActionBinding(
-            path: ActionIdentifier(domain: first.domain, module: first.module, function: first.function),
-            displayName: "First",
-            kind: .finite, completion: "Completed", serializationKey: "shared"
-        ) { _ async throws -> Void in
-            await log.append("first:start")
-            await started.open()
-            await release.wait()
-            await log.append("first:end")
-        },
-        ActionBinding(
-            path: ActionIdentifier(domain: second.domain, module: second.module, function: second.function),
-            displayName: "Second",
-            kind: .finite, completion: "Completed", serializationKey: "shared"
-        ) { _ async throws -> Void in
-            await log.append("second")
-        },
-        ActionBinding(
-            path: ActionIdentifier(
-                domain: independent.domain, module: independent.module, function: independent.function),
-            displayName: "Independent", kind: .finite, completion: "Completed"
-        ) { _ async throws -> Void in
-            await log.append("independent")
-            await independentFinished.open()
-        },
-    ])
-    let scheduler = ChannelScheduler(registry: registry)
-    let input = AgentInput(sessionID: UUID(), payload: .event("fixture"))
-    try await scheduler.enqueue(invocation: actionInvocation("first", input: input, path: first, channel: "one"))
-    await started.wait()
-    let attemptedOverride = ActionInvocation(
-        source: actionTestAgent, input: input,
-        call: ActionCall(actionPath: second, channel: "two", parameters: ["serializationKey": "Independent"]))
-    try await scheduler.enqueue(invocation: attemptedOverride)
-    try await scheduler.enqueue(
-        invocation: actionInvocation("independent", input: input, path: independent, channel: "three"))
-    await independentFinished.wait()
-    #expect(await log.values == ["first:start", "independent"])
-    let finish = Task { try await scheduler.finish(inputID: input.id, source: actionTestAgent) }
-    await release.open()
-    try await finish.value
-    #expect(await log.values == ["first:start", "independent", "first:end", "second"])
-}
-
-@Test(arguments: ["", "bad key", String(repeating: "x", count: 65)])
-func registryRejectsInvalidSerializationKeyBeforeExecution(_ key: String) {
-    let path = ActionIdentifier(domain: "Fixture", module: "Control", function: "run")
-    #expect(throws: ActionExecutionError.invalidDefinition(path)) {
-        try ActionRegistry(definitions: [
-            ActionBinding(
-                path: path, displayName: "Fixture", kind: .finite, completion: "Completed", serializationKey: key
-            ) { _ async throws -> Void in Issue.record("Invalid registration must not execute") }
-        ])
-    }
-}
-
-@Test(.timeLimit(.minutes(1))) func parentAndChildSpeechQueueWithoutCancellingParent() async throws {
-    let started = ActionTestGate()
-    let release = ActionTestGate()
+    let childFinished = ActionTestGate()
     let log = ActionTestLog()
     let scheduler = ChannelScheduler(
         registry: try testActionRegistry(handlers: [
@@ -687,6 +738,7 @@ func registryRejectsInvalidSerializationKeyBeforeExecution(_ key: String) {
                     try Task.checkCancellation()
                 }
                 await log.append("\(invocation.context.source):end")
+                if invocation.context.source == "photographer" { await childFinished.open() }
             }
         ]))
     let session = UUID()
@@ -695,12 +747,13 @@ func registryRejectsInvalidSerializationKeyBeforeExecution(_ key: String) {
     try await scheduler.enqueue(invocation: actionInvocation("parent", input: parent, source: .assistant))
     await started.wait()
     try await scheduler.enqueue(invocation: actionInvocation("child", input: child, source: .photographer))
-    #expect(await log.values == ["assistant:start"])
+    await childFinished.wait()
+    #expect(await log.values == ["assistant:start", "photographer:start", "photographer:end"])
     let parentFinish = Task { try await scheduler.finish(inputID: parent.id, source: .assistant) }
     let childFinish = Task { try await scheduler.finish(inputID: child.id, source: .photographer) }
     await release.open()
     try await parentFinish.value
     try await childFinish.value
-    #expect(await log.values == ["assistant:start", "assistant:end", "photographer:start", "photographer:end"])
+    #expect(await log.values == ["assistant:start", "photographer:start", "photographer:end", "assistant:end"])
     await scheduler.shutdown()
 }

@@ -8,8 +8,6 @@ public struct BehaviorAssembly: Sendable {
     public let functions: FunctionRegistry
     public let actions: ActionRegistry
     public let tools: ToolRegistry
-    public let actionFeedbackPolicies: [String: ActionBinding.FeedbackPolicy]
-    public let toolFeedbackPolicies: [String: ActionBinding.FeedbackPolicy]
     public let toolPaths: Set<String>
 
     public init(
@@ -60,10 +58,6 @@ public struct BehaviorAssembly: Sendable {
         self.functions = store
         self.actions = actions
         self.tools = tools
-        actionFeedbackPolicies = Dictionary(
-            uniqueKeysWithValues: actionModules.flatMap(\.definitions).map { ($0.path.description, $0.feedbackPolicy) })
-        toolFeedbackPolicies = Dictionary(
-            uniqueKeysWithValues: toolModules.flatMap(\.definitions).map { ($0.path.description, $0.feedbackPolicy) })
         toolPaths = Set(toolModules.flatMap { $0.definitions.map { $0.path.description } })
     }
 }

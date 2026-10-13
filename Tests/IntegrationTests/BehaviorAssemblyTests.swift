@@ -11,8 +11,14 @@ import StorageChat
 import Testing
 
 private actor BehaviorEndpoint: UIPresentationCapability, UIUpdateCapability, SpeechPlaybackCapability,
-    PosePresentationCapability, CameraControlCapability, HistoryPresentationCapability, ResourcePresentationCapability
+    PosePresentationCapability, CameraControlCapability, HistoryPresentationCapability, ResourcePresentationCapability,
+    TaskControlCapability
 {
+    func controlTask(_ operation: String, arguments: [String: String], invocation: any FunctionInput) async throws
+        -> String
+    {
+        throw CancellationError()
+    }
     func presentResources(_ inventory: ModelResourceInventory, generation: UInt64, invocation: any FunctionInput)
         async throws
     {}
@@ -67,7 +73,7 @@ private func behaviorInvocation(_ function: String, parameters: [String: String]
             parameters: parameters))
 }
 
-@Test func builtInBehaviorAssemblyCoversAllAgentCatalogsAndPreservesTypedValidation() async throws {
+@Test(.actionCatalog) func builtInBehaviorAssemblyCoversAllAgentCatalogsAndPreservesTypedValidation() async throws {
     let endpoint = BehaviorEndpoint()
     let assembly = try BehaviorAssembly(
         presentation: endpoint, playback: endpoint, pose: endpoint, historyPresentation: endpoint, camera: endpoint,
@@ -116,7 +122,7 @@ private func behaviorInvocation(_ function: String, parameters: [String: String]
     #expect(await endpoint.pose?.people.isEmpty == true)
 }
 
-@Test func behaviorAssemblyRejectsMissingInternalToolBeforeRuntimeStarts() throws {
+@Test(.actionCatalog) func behaviorAssemblyRejectsMissingInternalToolBeforeRuntimeStarts() throws {
     let permissions = try CapabilityRegistry(internalTools: [InternalTool(path: "Missing.Control.tool")])
     #expect(throws: ToolRegistrationError.missingHandler("Missing.Control.tool")) {
         let assembly = try BehaviorAssembly(actionModules: [], toolModules: [])
@@ -125,7 +131,7 @@ private func behaviorInvocation(_ function: String, parameters: [String: String]
     }
 }
 
-@Test func behaviorModulesRejectDuplicatesInvalidPathsAndExcessCapacity() throws {
+@Test(.actionCatalog) func behaviorModulesRejectDuplicatesInvalidPathsAndExcessCapacity() throws {
     let tool = FixtureToolModule(definitions: [ActionBinding(path: "Fixture.Control.fixture", handler: { _ in "ok" })])
     #expect(throws: ToolRegistryError.duplicateHandler) { try ToolRegistry(modules: [tool, tool]) }
     #expect(throws: ToolRegistrationError.invalidDefinition("bad path")) {
@@ -149,7 +155,7 @@ private func behaviorInvocation(_ function: String, parameters: [String: String]
     }
 }
 
-@Test func additionalBehaviorModulesExecuteWithoutAnApplicationHost() async throws {
+@Test(.actionCatalog) func additionalBehaviorModulesExecuteWithoutAnApplicationHost() async throws {
     let endpoint = BehaviorEndpoint()
     let path = ActionPath(domain: "Fixture", module: "Control", function: "smile")
     let resource = ResourceID(rawValue: "fixture.output")
@@ -180,7 +186,7 @@ private func behaviorInvocation(_ function: String, parameters: [String: String]
     #expect(result?.value == "smile")
 }
 
-@Test func cameraToolsValidateBeforeEffectsAndKeepCompletionSemantics() async throws {
+@Test(.actionCatalog) func cameraToolsValidateBeforeEffectsAndKeepCompletionSemantics() async throws {
     let endpoint = BehaviorEndpoint()
     let executor = ToolExecutor(registry: try ToolRegistry(modules: [CameraModule(camera: endpoint)]))
     let envelope = behaviorInvocation("express").testEnvelope
@@ -227,7 +233,7 @@ private struct UnavailableCameraEndpoint: CameraControlCapability {
     }
 }
 
-@Test func cameraToolsRecordHostFailureWithoutSuccessFeedback() async throws {
+@Test(.actionCatalog) func cameraToolsRecordHostFailureWithoutSuccessFeedback() async throws {
     let executor = ToolExecutor(
         registry: try ToolRegistry(modules: [CameraModule(camera: UnavailableCameraEndpoint())]))
     let envelope = behaviorInvocation("express").testEnvelope
@@ -240,7 +246,7 @@ private struct UnavailableCameraEndpoint: CameraControlCapability {
     #expect(flip.isError && flip.failureCode?.rawValue == "disabled")
 }
 
-@Test func unifiedUIDomainBindsExpressionAndGazeWithoutChangingValidation() async throws {
+@Test(.actionCatalog) func unifiedUIDomainBindsExpressionAndGazeWithoutChangingValidation() async throws {
     let endpoint = BehaviorEndpoint()
     let module = UIModule(expression: endpoint, pose: endpoint, updates: endpoint, history: endpoint)
     let assembly = try BehaviorAssembly(capabilityModules: [module])

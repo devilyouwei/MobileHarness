@@ -1,0 +1,80 @@
+{
+  "version": 1,
+  "id": "robot-interaction",
+  "revision": 6,
+  "description": "User-requested arm gestures and movements with explicit ordering, device checks and actual motion feedback.",
+  "dependencies": [],
+  "functions": [
+    {
+      "path": "NexArm.Motion.shakeBase",
+      "callType": "action",
+      "alias": "shakeBase",
+      "channel": "Robot"
+    },
+    {
+      "path": "NexArm.Gesture.waveWrist",
+      "callType": "action",
+      "alias": "waveWrist",
+      "channel": "Robot"
+    },
+    {
+      "path": "NexArm.Gesture.tiltWrist",
+      "callType": "action",
+      "alias": "tiltWrist",
+      "channel": "Robot"
+    },
+    {
+      "path": "NexArm.Gesture.lookAround",
+      "callType": "action",
+      "alias": "lookAround",
+      "channel": "Robot"
+    },
+    {
+      "path": "NexArm.Gesture.celebrate",
+      "callType": "action",
+      "alias": "celebrate",
+      "channel": "Robot"
+    },
+    {
+      "path": "NexArm.Gesture.dance",
+      "callType": "action",
+      "alias": "dance",
+      "channel": "Robot"
+    },
+    {
+      "path": "NexArm.Gesture.nodHead",
+      "callType": "action",
+      "alias": "nodHead",
+      "channel": "Robot"
+    },
+    {
+      "path": "NexArm.Gesture.shakeHead",
+      "callType": "action",
+      "alias": "shakeHead",
+      "channel": "Robot"
+    },
+    {
+      "path": "NexArm.Motion.reset",
+      "callType": "action",
+      "alias": "resetArm",
+      "channel": "Robot"
+    },
+    {
+      "path": "NexArm.Motion.moveMotor",
+      "callType": "action",
+      "alias": "moveMotor",
+      "channel": "Robot"
+    },
+    {
+      "path": "NexArm.Motion.resetMotor",
+      "callType": "action",
+      "alias": "resetMotor",
+      "channel": "Robot"
+    }
+  ],
+  "contextFields": [
+    "runtimeFacts",
+    "taskState",
+    "actionResults"
+  ]
+}

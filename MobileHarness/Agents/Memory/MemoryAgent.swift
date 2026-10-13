@@ -1,7 +1,5 @@
 import AgentCore
 import Foundation
-import ModelKit
-import StorageChat
 
 /// Memory business service entry point; domain workflows own their processing policy.
 public actor MemoryAgent: Agent {
@@ -24,26 +22,20 @@ public actor MemoryAgent: Agent {
     private var sequence: UInt64 = 0
     private var history = MemoryHistoryWorkflow()
 
-    private let chatWorker: AgentChatWorker<MemoryContextState>
-    private var chatPump: Task<Void, Never>?
+    private let taskCoordinator: AgentFixedTaskCoordinator<MemoryContextState>
+    private var taskPump: Task<Void, Never>?
     private var fixedTaskInputs: [UUID: AgentInput] = [:]
     private let admission = AgentAdmissionGate(capacity: 32)
 
     // MARK: - Registration
 
     public static func runtimeCapabilities(_ capabilities: CapabilityRegistry) throws -> CapabilityRegistry {
-        try AgentChatWorker<MemoryContextState>.runtimeCapabilities(
-            MemoryHistoryWorkflow.runtimeCapabilities(capabilities))
+        try MemoryHistoryWorkflow.runtimeCapabilities(capabilities)
     }
 
     public init(
         sessionID: UUID, configuration: AgentConfiguration? = nil,
-        context: AgentContextRepository<MemoryContextState>? = nil,
-        chat: (any ChatCapability)? = nil,
-        reportsReplyActivity: Bool = false,
-        chatProvider: (@Sendable () async throws -> any ChatCapability)? = nil,
-        modelName: @escaping @Sendable () async throws -> String = { "Unspecified model" },
-        generationPolicies: GenerationPolicies? = nil
+        context: AgentContextRepository<MemoryContextState>? = nil
     ) throws {
         self.contextRepository =
             context ?? AgentContextRepository(agent: .memory, scope: UUID(), state: MemoryContextState())
@@ -54,11 +46,7 @@ public actor MemoryAgent: Agent {
             id: .memory, name: "Memory", inputs: Set(configuration.communication.inputs.map(\.kind)),
             outputs: [.communication, .actionCall, .toolCall, .control, .scheduling],
             capabilities: try Self.runtimeCapabilities(configuration.capabilities))
-        chatWorker = try AgentChatWorker(
-            reportsReplyActivity: reportsReplyActivity, chat: chat, chatProvider: chatProvider,
-            configuration: configuration,
-            modelName: modelName, generationPolicies: generationPolicies,
-            context: self.contextRepository, capabilities: descriptor.capabilities)
+        taskCoordinator = AgentFixedTaskCoordinator(context: self.contextRepository)
         self.sessionID = sessionID
         let stream = AsyncStream<OutputEnvelope>.makeStream(
             bufferingPolicy: .bufferingOldest(MemorySignalPreprocessor.outputCapacity))
@@ -71,13 +59,13 @@ public actor MemoryAgent: Agent {
     public func start() async throws {
         guard lifecycle == .registered else { throw HarnessError.invalidTransition }
         _ = try await contextRepository.snapshot()
-        try await chatWorker.start()
+        try await taskCoordinator.start()
         lifecycle = .running
-        chatPump = Task { [chatWorker] in
-            for await envelope in chatWorker.outputs {
+        taskPump = Task { [taskCoordinator] in
+            for await envelope in taskCoordinator.outputs {
                 guard !Task.isCancelled else { return }
                 if !relay(envelope) {
-                    await chatWorker.stop()
+                    await taskCoordinator.stop()
                     return
                 }
             }
@@ -86,13 +74,13 @@ public actor MemoryAgent: Agent {
 
     public func pause() async throws {
         guard lifecycle == .running else { throw HarnessError.invalidTransition }
-        try await chatWorker.pause()
+        await taskCoordinator.pause()
         lifecycle = .paused
     }
 
     public func resume() async throws {
         guard lifecycle == .paused else { throw HarnessError.invalidTransition }
-        try await chatWorker.resume()
+        await taskCoordinator.resume()
         lifecycle = .running
     }
 
@@ -101,18 +89,18 @@ public actor MemoryAgent: Agent {
         lifecycle = .stopped
         history.reset()
         fixedTaskInputs.removeAll()
-        await chatWorker.stop()
-        chatPump?.cancel()
-        await chatPump?.value
-        chatPump = nil
+        await taskCoordinator.stop()
+        taskPump?.cancel()
+        await taskPump?.value
+        taskPump = nil
         continuation.finish()
     }
 
     // MARK: - Input processing
 
     public func receive(_ input: AgentInput) async throws {
-        if await chatWorker.ownsFeedback(input) {
-            try await chatWorker.receive(input)
+        if await taskCoordinator.ownsFeedback(input) {
+            try await taskCoordinator.receive(input)
             return
         }
         var input = input
@@ -120,12 +108,12 @@ public actor MemoryAgent: Agent {
             if signal.kind == .cancel,
                 let original = fixedTaskInputs.values.first(where: { $0.taskScope?.id == signal.scope.id })
             {
-                try await chatWorker.admitFixedTask(signal, input: input)
+                try await taskCoordinator.admitFixedTask(signal, input: input)
                 try await contextRepository.update { $0.state.pendingRequestIDs.removeAll() }
                 history.reset()
                 fixedTaskInputs[original.id] = nil
                 try emit(.control("agent.error: task cancelled"), for: original)
-                try await chatWorker.reportFixedTask(
+                try await taskCoordinator.reportFixedTask(
                     signal.scope, input: original,
                     result: ToolResult(callID: original.id, value: "Task cancelled", isError: true), status: .cancelled)
                 return
@@ -134,12 +122,12 @@ public actor MemoryAgent: Agent {
                 || signal.businessContract == AgentTaskContent.contract
                 || signal.businessContract == "agent.parentCommitted"
             {
-                try await chatWorker.receive(input)
+                try await taskCoordinator.receive(input)
                 return
             }
             let fixed = try AgentFixedTaskInput.unwrap(signal, input: input, executor: descriptor.id)
             guard fixedTaskInputs.count < 32 else { throw CommunicationError.capacityExceeded }
-            try await chatWorker.admitFixedTask(signal, input: input)
+            try await taskCoordinator.admitFixedTask(signal, input: input)
             fixedTaskInputs[fixed.id] = fixed
             input = fixed
         }
@@ -214,7 +202,7 @@ public actor MemoryAgent: Agent {
         guard let original = fixedTaskInputs.removeValue(forKey: inputID), let scope = original.taskScope else {
             return
         }
-        try await chatWorker.reportFixedTask(
+        try await taskCoordinator.reportFixedTask(
             scope, input: original,
             result: ToolResult(callID: inputID, value: failure ?? value ?? "Completed", isError: failure != nil))
     }

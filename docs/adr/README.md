@@ -236,11 +236,11 @@ Model-resource history: ADR0006/0007/0016/0031/0034/0050/0052 preserve earlier m
 
 ✅ ADR0149 implements origin admission and owner-fenced Tool feedback. ❌ Action/activity causal roots and typed host controls remain pending.
 
-✅ [ADR0155 — Explicit Action serialization identity](0155-explicit-action-serialization-identity.md): definition-owned exclusion preserves existing scopes before three-field path/configuration migration.
+Historical [ADR0155 — Explicit Action serialization identity](0155-explicit-action-serialization-identity.md): superseded by ADR0213; preserved as original decision evidence.
 
 ❌ Three-level runtime paths and unified Action/Tool definitions are not completed by this stage.
 
-✅ [ADR0156 — Three-level capability addresses](0156-three-level-capability-addresses.md): explicit fields and Agent configuration v6 bindings implemented; serialization/resource scopes preserved. ❌ Unified definitions/adapters and compatibility removal remain pending.
+✅ [ADR0156 — Three-level capability addresses](0156-three-level-capability-addresses.md): explicit fields and Agent configuration v6 bindings implemented; resource scopes preserved. ❌ Unified definitions/adapters and compatibility removal remain pending.
 
 ✅ [ADR0157 — Canonical executable definitions](0157-canonical-executable-definitions.md): completes shared definition/outcome/execution, protocol projections, scheduled native routing, typed feedback and compatibility retirement. Remaining work is broader Agent-driven input/feature migration and physical acceptance.
 
@@ -308,3 +308,10 @@ Model-resource history: ADR0006/0007/0016/0031/0034/0050/0052 preserve earlier m
 ✅ [Shared Agent source hierarchy - ADR0189](0189-agent-support-hierarchy.md): implemented; repository checks and unsigned iOS device build passed.
 
 ✅ [ADR0190 — SpeechPerception listening authority and one-way publication](0190-assistant-listening-and-one-way-publication.md): resident perception authority, fixed listening Action, unacknowledged publication and recoverable speech errors. ❌ Physical acoustic acceptance pending.
+
+- [ADR0212: Assistant Skills and task modes](0212-assistant-skills-task-modes.md) — ❌ pending.
+
+✅ [ADR0213 — Channel-owned Action ordering](0213-channel-owned-action-ordering.md): definition serialization keys removed; retain task-local Channel/wait ordering and explicit resource conflict/takeover outcomes.
+
+
+- ✅ [ADR0214 — Result-driven ReACT](0214-result-driven-react.md): actual business output and failures replace registration-selected continuation; automated checks and generic iOS-device build verified, Simulator dependency blocked.

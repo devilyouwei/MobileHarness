@@ -1,6 +1,6 @@
 # Nemotron 接入验证（2026-09-23）
 
-> Historical evidence scope (updated 2026-10-03): packaging/download statements below describe the revision tested at the time. Current App bundles source metadata/licenses only and installs weights through Settings; HF foreground requests restart after process relaunch. Current synthesis is MOSS. Kokoro is unregistered; its downloader/profile/local weights are removed and its optional real-model test needs HARNESS_KOKORO_MODEL_ROOT. See [current resource contract](../MobileHarness/ModelKit/Management/README.md#local-model-resources--current-contract).
+> Historical evidence scope (updated 2026-10-03): packaging/download statements below describe the revision tested at the time. Current App bundles source metadata/licenses only and installs weights through Settings; HF foreground requests restart after process relaunch. Current synthesis is MOSS. Kokoro is unregistered; its downloader/profile/local weights are removed and its optional real-model test needs HARNESS_KOKORO_MODEL_ROOT. See [current resource contract](../MobileHarness/ModelKit/Support/Management/README.md#local-model-resources--current-contract).
 
 这是分阶段验证记录：开头的“未注入 App”仅指首次独立能力测试；下方“App 切换后的追加验证”记录了后续接入。当前语音链路见 [Voice.md](Voice.md)。
 

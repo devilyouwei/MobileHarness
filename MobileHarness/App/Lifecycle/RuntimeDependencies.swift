@@ -17,6 +17,7 @@ struct VoiceRuntimeDependencies {
     let conversations: ConversationHistoryStore
     let interactionSessionID: UUID
     let startInteraction: @MainActor () async throws -> Void
+    let cancelReply: @MainActor () async throws -> Void
     let stopInteraction: @MainActor () async -> Void
     let makeSynthesis: (any SpeechSynthesisCapability, SpeechAudioStore) throws -> SpeechSynthesisAgent
     let makePerception:

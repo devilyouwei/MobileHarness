@@ -25,7 +25,7 @@ private actor InteractionPresentation: ResourcePresentationCapability {
     func presentResourceOperationFailure(_ message: String, invocation: any FunctionInput) {}
     func presentResourceFailure(_ message: String, generation: UInt64, invocation: any FunctionInput) {}
 }
-@Test func deviceAndNavigationIntentsUseRegisteredFunctionsAndRecover() async throws {
+@Test(.actionCatalog) func deviceAndNavigationIntentsUseRegisteredFunctionsAndRecover() async throws {
     let device = InteractionDevice()
     let presentation = InteractionPresentation()
     let runtime = try resourceRuntime(UnusedModelResourceCapability(), presentation: presentation, device: device)
@@ -44,7 +44,7 @@ private actor InteractionPresentation: ResourcePresentationCapability {
     #expect(await runtime.agent.status().queuedInputs == 0)
     await runtime.shutdown()
 }
-@Test func environmentFactsAreBoundedOrderedAndDoNotInvokeDeviceCommands() async throws {
+@Test(.actionCatalog) func environmentFactsAreBoundedOrderedAndDoNotInvokeDeviceCommands() async throws {
     let device = InteractionDevice()
     let manager = AgentManager()
     let input = InputGateway(manager: manager, policy: try resourceFixturePolicy())
@@ -70,7 +70,7 @@ private actor InteractionPresentation: ResourcePresentationCapability {
     await runtime.shutdown()
 }
 
-@Test func independentManualTerminalResultIsRetainedWithoutSchedulingAnotherAction() async throws {
+@Test(.actionCatalog) func independentManualTerminalResultIsRetainedWithoutSchedulingAnotherAction() async throws {
     let session = UUID()
     let agent = try ApplicationControlAgent(sessionID: session)
     try await agent.start()

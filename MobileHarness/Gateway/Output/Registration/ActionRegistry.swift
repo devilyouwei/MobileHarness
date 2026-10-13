@@ -54,8 +54,7 @@ public struct ActionRegistry: Sendable {
         guard let definition = definitions[path] else { throw ActionExecutionError.missingHandler(path) }
         return ActionBinding(
             function: try functions.definition(for: path), protocols: definition.protocols,
-            executionPolicy: definition.executionPolicy, directResultPolicy: definition.directResultPolicy,
-            feedbackPolicy: definition.feedbackPolicy)
+            executionPolicy: definition.executionPolicy, directResultPolicy: definition.directResultPolicy)
     }
 
     public func handler(for path: ActionIdentifier) throws -> ActionCompletionHandler {

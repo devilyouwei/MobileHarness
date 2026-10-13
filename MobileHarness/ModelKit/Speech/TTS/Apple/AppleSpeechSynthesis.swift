@@ -6,7 +6,8 @@ import Synchronization
 @MainActor
 public final class AppleSpeechSynthesis: SpeechSynthesisCapability {
     private let resource: ModelResource<Void>
-    private var activeWorker: (id: UUID, worker: SynthesisWorker)?
+    private let synthesizer = AVSpeechSynthesizer()
+    private var activeWorker: (id: UUID, worker: SynthesisWorker, completion: SynthesisCompletion)?
     public init(context: ModelContext) throws {
         resource = try context.resource { () }
     }
@@ -39,36 +40,62 @@ public final class AppleSpeechSynthesis: SpeechSynthesisCapability {
         guard let voice = AVSpeechSynthesisVoice(language: language) else {
             throw CapabilityError.unavailable("No system synthesis voice is available for locale \(language)")
         }
+        if let activeWorker {
+            guard activeWorker.completion.termination != nil else { throw CapabilityError.inputBusy }
+            await retireWorker(activeWorker.id)
+        }
+        try Task.checkCancellation()
         guard activeWorker == nil else { throw CapabilityError.inputBusy }
         let lease = try await resource.acquire()
         let token = lease.id
         let resource = resource
+        let completion = SynthesisCompletion()
         let pair = InferenceSession<SynthesisEvent>.make(
             context: request.context, limits: try StreamLimits(capacity: 256, maximumEventBytes: 16_448),
             estimatedBytes: { $0.estimatedBytes },
-            onTermination: { [weak self] _ in
+            onTermination: { [weak self] termination in
+                completion.end(termination)
                 Task { @MainActor in
-                    if let self, self.activeWorker?.id == token {
-                        self.activeWorker?.worker.stop()
-                        self.activeWorker = nil
-                    }
-                    await resource.release(token)
+                    if let self { await self.retireWorker(token) } else { await resource.release(token) }
                 }
             })
-        let worker = SynthesisWorker(text: request.text, voice: voice, emitter: pair.emitter)
-        activeWorker = (token, worker)
+        let worker = SynthesisWorker(
+            synthesizer: synthesizer, text: request.text, voice: voice, emitter: pair.emitter)
+        activeWorker = (token, worker, completion)
         worker.start()
         await resource.setCancellation(token) { [weak session = pair.session] in session?.cancel() }
         return pair.session
     }
+
+    private func retireWorker(_ token: UUID) async {
+        if let activeWorker, activeWorker.id == token {
+            // Normal completion has no more PCM; stop only cancelled/failed native work.
+            switch activeWorker.completion.termination {
+            case .finished?: break
+            default: activeWorker.worker.stop()
+            }
+            self.activeWorker = nil
+        }
+        await resource.release(token)
+    }
+}
+
+private final class SynthesisCompletion: Sendable {
+    private let state = Mutex<SessionTermination?>(nil)
+    var termination: SessionTermination? { state.withLock { $0 } }
+    func end(_ termination: SessionTermination) { state.withLock { $0 = termination } }
 }
 
 @MainActor
 private final class SynthesisWorker {
-    private let synthesizer = AVSpeechSynthesizer()
+    private let synthesizer: AVSpeechSynthesizer
     private let utterance: AVSpeechUtterance
     private let emitter: InferenceEmitter<SynthesisEvent>
-    init(text: String, voice: AVSpeechSynthesisVoice, emitter: InferenceEmitter<SynthesisEvent>) {
+    init(
+        synthesizer: AVSpeechSynthesizer, text: String, voice: AVSpeechSynthesisVoice,
+        emitter: InferenceEmitter<SynthesisEvent>
+    ) {
+        self.synthesizer = synthesizer
         utterance = AVSpeechUtterance(string: text)
         utterance.voice = voice
         self.emitter = emitter

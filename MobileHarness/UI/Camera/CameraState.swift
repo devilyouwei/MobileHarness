@@ -12,7 +12,7 @@ public final class CameraState {
     public var photoBusy = false
     public var photoMessage: String?
     public var savedPhotoID: UUID?
-    public var isEnabled = true
+    public var isEnabled = false
     public var facing: CameraDirection = .front
     public var isVisible = false
     public var isBusy = false

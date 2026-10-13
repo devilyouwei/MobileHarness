@@ -38,3 +38,5 @@ Update this README when test scope or lifecycle contracts change.
 
 
 ✅ Restored HF generations preserve staging before reattachment; failed requests retain resumable records and explicit cancellation removes them. This supersedes the previous discard-before-restart contract.
+
+✅ RuntimeBoundaryTests cover invalid manager configuration, nondefault limits reaching Core resources, manager state projection, failed admission and unload/shutdown. Isolated contexts specify their gate/waiter limits explicitly; ModelManager initialization propagates configuration errors.

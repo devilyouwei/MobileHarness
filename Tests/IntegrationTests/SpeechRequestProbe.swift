@@ -35,13 +35,23 @@ func bindSpeechRequests(_ agent: any Agent) async throws -> SpeechRequestProbe {
 struct FixtureGenerationOutputs: AsyncSequence {
     typealias Element = OutputEnvelope
     let agent: any Agent
-    func makeAsyncIterator() -> Iterator { Iterator(base: fixtureOutputs(agent).makeAsyncIterator(), agent: agent) }
+    let observer: @Sendable (OutputEnvelope) async -> Void
+    init(agent: any Agent, observer: @escaping @Sendable (OutputEnvelope) async -> Void = { _ in }) {
+        self.agent = agent
+        self.observer = observer
+    }
+    func makeAsyncIterator() -> Iterator {
+        Iterator(base: fixtureOutputs(agent).makeAsyncIterator(), agent: agent, observer: observer)
+    }
     struct Iterator: AsyncIteratorProtocol {
         var base: AsyncStream<OutputEnvelope>.Iterator
         let agent: any Agent
+        let observer: @Sendable (OutputEnvelope) async -> Void
         mutating func next() async throws -> OutputEnvelope? {
             while let envelope = await base.next() {
+                await observer(envelope)
                 if case .communication(let action) = envelope.output {
+                    guard action.target != nil else { continue }
                     let payload = InputPayload.communicationReceipt(
                         .init(
                             callID: action.id,

@@ -81,6 +81,8 @@ struct ChatEventDecoder {
                     let name = item["name"] as? String, toolNames[name] != nil
                 else { throw OpenAIChatError.invalidResponse }
                 calls[index] = Pending(itemID: id, callID: callID, name: name)
+            } else if type == "reasoning" {
+                try validateReasoning(item)
             } else if type != "message" {
                 throw OpenAIChatError.unsupportedOutput
             }
@@ -107,7 +109,7 @@ struct ChatEventDecoder {
                 pending.completed = try functionCall(item)
                 calls[index] = pending
             } else {
-                try validateMessage(item)
+                try validateNonCallItem(item)
             }
             return []
         case "response.completed", "response.incomplete":
@@ -125,7 +127,7 @@ struct ChatEventDecoder {
                     }
                     completed.append(call)
                 } else {
-                    try validateMessage(item)
+                    try validateNonCallItem(item)
                 }
             }
             guard calls.count == completed.count else { throw OpenAIChatError.truncatedStream }
@@ -155,6 +157,14 @@ struct ChatEventDecoder {
             }
             finished = true
             return events
+        case "response.reasoning_text.delta", "response.reasoning_text.done":
+            let field = type == "response.reasoning_text.delta" ? "delta" : "text"
+            guard let index = object["output_index"] as? Int, (0..<128).contains(index),
+                let id = object["item_id"] as? String, !id.isEmpty, id.utf8.count <= 512,
+                object[field] is String
+            else { throw OpenAIChatError.invalidResponse }
+            // Reasoning is provider-private metadata, never public answer text or a native call.
+            return []
         case "response.refusal.delta", "response.refusal.done": throw OpenAIChatError.unsupportedOutput
         case "response.failed", "error":
             let failure =
@@ -189,9 +199,20 @@ struct ChatEventDecoder {
         return ChatToolCall(id: id, name: name, argumentsJSON: arguments)
     }
 
-    private func validateMessage(_ item: [String: Any]) throws {
+    private func validateNonCallItem(_ item: [String: Any]) throws {
+        if item["type"] as? String == "reasoning" {
+            try validateReasoning(item)
+            return
+        }
         guard item["type"] as? String == "message", let content = item["content"] as? [[String: Any]],
             content.allSatisfy({ $0["type"] as? String == "output_text" && $0["text"] is String })
         else { throw OpenAIChatError.unsupportedOutput }
+    }
+
+    private func validateReasoning(_ item: [String: Any]) throws {
+        guard let id = item["id"] as? String, !id.isEmpty, id.utf8.count <= 512,
+            let summary = item["summary"] as? [[String: Any]], summary.count <= 128,
+            summary.allSatisfy({ $0["type"] as? String == "summary_text" && $0["text"] is String })
+        else { throw OpenAIChatError.invalidResponse }
     }
 }

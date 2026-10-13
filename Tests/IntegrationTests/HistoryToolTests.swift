@@ -26,7 +26,7 @@ private func historyTurn(_ store: ConversationHistoryStore, user: String, respon
     try await store.finish(id, state: .completed)
 }
 
-@Test func historyToolsPageRawRecordsWithoutMutationOrReplay() async throws {
+@Test(.actionCatalog) func historyToolsPageRawRecordsWithoutMutationOrReplay() async throws {
     let store = ConversationHistoryStore()
     try await historyTurn(store, user: "past", response: "<express emotion=\"happy\"/>")
     let archived = try #require(try await store.startNew())
@@ -56,7 +56,7 @@ private func historyTurn(_ store: ConversationHistoryStore, user: String, respon
     #expect(try historyObject(await history.list(offset: 64, limit: 5))["items"] as? [String] == [])
 }
 
-@Test func historyToolsReportTruncationAndRejectMissingOrOversizedResults() async throws {
+@Test(.actionCatalog) func historyToolsReportTruncationAndRejectMissingOrOversizedResults() async throws {
     let store = ConversationHistoryStore()
     try await historyTurn(store, user: String(repeating: "中", count: 100), response: String(repeating: "答", count: 200))
     let read = try await store.readCurrent()
@@ -91,7 +91,7 @@ private actor HistoryQueryProbe: HistoryQueryCapability {
         return "{}"
     }
 }
-@Test func historyToolsValidateArgumentsBeforeQuerying() async throws {
+@Test(.actionCatalog) func historyToolsValidateArgumentsBeforeQuerying() async throws {
     let probe = HistoryQueryProbe()
     for arguments in [
         ["offset": "-1", "limit": "1"], ["offset": "0", "limit": "6"], ["offset": "0"],
@@ -116,7 +116,7 @@ private actor HistoryQueryProbe: HistoryQueryCapability {
     #expect(await probe.calls == 0)
 }
 
-@Test func historyDeclarationsResolveNativeStringArgumentsAndReturnCorrelatedResults() async throws {
+@Test(.actionCatalog) func historyDeclarationsResolveNativeStringArgumentsAndReturnCorrelatedResults() async throws {
     let configuration = try AgentConfigurations.load(named: "Memory")
     let id = UUID()
     let call = try ToolCallParser.parse(

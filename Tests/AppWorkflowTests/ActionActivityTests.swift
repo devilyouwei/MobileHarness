@@ -274,3 +274,34 @@ extension ActionActivityState {
     #expect(state.tasks.first?.events.count == 4)
     pair.continuation.finish()
 }
+
+@Test @MainActor func speechRecognitionToastIsFriendlyAndDirectFailureDetailsStayInLog() {
+    let state = ActionActivityState()
+    let workflow = ActionActivityWorkflow(state: state)
+    let raw = "agent.error: speech perception: Error Domain=SFSpeechErrorDomain Code=1 RecogRejected"
+    workflow.recordFailure(title: "Output", source: "speechPerception", message: raw)
+    #expect(state.visibleNotice?.text == "我没听清")
+    #expect(state.backgroundIssues.first?.message == raw)
+    #expect(state.errorToast?.message == raw)
+    workflow.recordFailure(title: "Output", source: "assistant", message: "agent.error: Fixture failure")
+    #expect(state.visibleNotice?.text == "Fixture failure")
+    #expect(state.backgroundIssues.last?.message == "agent.error: Fixture failure")
+}
+
+@Test @MainActor func speechRecognitionSnapshotToastPreservesDetailedRecordAndInput() async {
+    let state = ActionActivityState()
+    let workflow = ActionActivityWorkflow(state: state)
+    let pair = AsyncStream<OutputFailureSnapshot>.makeStream(bufferingPolicy: .bufferingNewest(1))
+    workflow.startFailures { pair.stream }
+    let inputID = UUID()
+    let raw = "agent.error: speech perception: Error Domain=SFSpeechErrorDomain Code=1 RecogRejected"
+    let issue = OutputFailureRecord(source: .speechPerception, title: "Output", message: raw, inputID: inputID)
+    pair.continuation.yield(.init(revision: 1, records: [issue], evictedCount: 0))
+    let deadline = ContinuousClock.now.advanced(by: .seconds(2))
+    while state.outputIssues.isEmpty && ContinuousClock.now < deadline { await Task.yield() }
+    #expect(state.visibleNotice?.text == "我没听清")
+    #expect(state.visibleNotice?.id == issue.id)
+    #expect(state.outputIssues.first?.message == raw && state.outputIssues.first?.inputID == inputID)
+    #expect(state.errorToast?.message == raw)
+    pair.continuation.finish()
+}

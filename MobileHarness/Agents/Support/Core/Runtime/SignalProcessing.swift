@@ -8,7 +8,6 @@ public enum SignalDisposition: Sendable, Equatable {
     case updateState
     case feedback
     case control
-    case recordOnly
 }
 
 public protocol SignalPreprocessor: Sendable {

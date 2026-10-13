@@ -35,48 +35,45 @@ struct NexArmBehaviorAdapter {
         }
     }
     func gesture(_ request: NexArmActions.GestureRequest, _ invocation: any FunctionInput) async throws {
-        let composition = try ActionComposition(
-            .action("gesture", [], maximumResults: 100) {
-                let reports = ActionReportStore()
-                do {
-                    switch request.gesture {
-                    case .reset:
-                        try await bluetooth.resetArm(
-                            speed: request.speed, acceleration: request.acceleration,
-                            recordReport: { try await reports.record($0) })
-                    case .moveMotor, .resetMotor:
-                        guard let motor = request.motor else { throw NexArmExecutionError.invalidArguments }
-                        try await bluetooth.moveMotor(
-                            id: motor, target: request.target, speed: request.speed,
-                            acceleration: request.acceleration, recordReport: { try await reports.record($0) })
-                    default:
-                        let gesture: NexArmGesture
-                        switch request.gesture {
-                        case .nod: gesture = .nod
-                        case .shakeHead: gesture = .shakeHead
-                        case .wave: gesture = .wave
-                        case .tiltLeft: gesture = .tiltLeft
-                        case .tiltRight: gesture = .tiltRight
-                        case .lookAround: gesture = .lookAround
-                        case .celebrate: gesture = .celebrate
-                        case .dance: gesture = .dance
-                        default: throw NexArmExecutionError.invalidArguments
-                        }
-                        try await bluetooth.performGesture(
-                            gesture, repetitions: request.repetitions,
-                            speed: request.speed, acceleration: request.acceleration,
-                            recordReport: { try await reports.record($0) })
-                    }
-                } catch {
-                    if let report = await reports.snapshot() {
-                        return .report(report.recordingFailure(error))
-                    }
-                    throw error
+        let reports = ActionReportStore()
+        do {
+            switch request.gesture {
+            case .reset:
+                try await bluetooth.resetArm(
+                    speed: request.speed, acceleration: request.acceleration,
+                    recordReport: { try await reports.record($0) })
+            case .moveMotor, .resetMotor:
+                guard let motor = request.motor else { throw NexArmExecutionError.invalidArguments }
+                try await bluetooth.moveMotor(
+                    id: motor, target: request.target, speed: request.speed,
+                    acceleration: request.acceleration, recordReport: { try await reports.record($0) })
+            default:
+                let gesture: NexArmGesture
+                switch request.gesture {
+                case .nod: gesture = .nod
+                case .shakeHead: gesture = .shakeHead
+                case .wave: gesture = .wave
+                case .tiltLeft: gesture = .tiltLeft
+                case .tiltRight: gesture = .tiltRight
+                case .lookAround: gesture = .lookAround
+                case .celebrate: gesture = .celebrate
+                case .dance: gesture = .dance
+                default: throw NexArmExecutionError.invalidArguments
                 }
-                if let report = await reports.snapshot() { return .report(report) }
-                return .completed
-            })
-        try await invocation.results.record(composition.run())
+                try await bluetooth.performGesture(
+                    gesture, repetitions: request.repetitions,
+                    speed: request.speed, acceleration: request.acceleration,
+                    recordReport: { try await reports.record($0) })
+            }
+        } catch {
+            if let report = await reports.snapshot() {
+                try await invocation.results.record(report.recordingFailure(error))
+                if error is CancellationError { throw error }
+                return
+            }
+            throw error
+        }
+        if let report = await reports.snapshot() { try await invocation.results.record(report) }
     }
     func shakeBase(_ cycles: Int, _ invocation: any FunctionInput) async throws {
         let reports = ActionReportStore()

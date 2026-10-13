@@ -24,9 +24,9 @@ flowchart LR
 
 ## Policy and provenance
 
-JSON v6 declares supported inputs, exact contract/source/topic subscriptions, publications and target-specific sends. Supporting a contract is not subscribing. Unknown identities, wildcard/default-Agent fallback and incompatible declarations reject. Catalog capacity is 128; external source allowlist 16; policy bounds 64 Agents/topics and 16 subscriptions/recipients.
+JSON v6/v7 declares supported inputs, exact contract/source/topic subscriptions, publications and target-specific sends. Supporting a contract is not subscribing. Unknown identities, wildcard/default-Agent fallback and incompatible declarations reject. Catalog capacity is 128; external source allowlist 16; policy bounds 64 Agents/topics and 16 subscriptions/recipients.
 
-AgentMessage captures checked immutable content and encoded size. Schemas declare expected type, validator, byte limit, lifetime and whether publication starts work. Generated work gets its declared fresh lifetime; forwarded observations cannot extend parent validity. Causal metadata preserves incarnation, root/parent/session/turn and at most eight hops. Runtime feedback authority cannot be supplied externally.
+AgentMessage captures checked immutable content and encoded size. Schemas declare expected type, validator, byte limit and whether publication starts work. Signals have no default TTL; explicit perception freshness remains producer-owned. Causal metadata preserves incarnation, root/parent/session/turn and at most eight hops. Runtime feedback authority cannot be supplied externally.
 
 ## Delivery and task state
 
@@ -43,3 +43,11 @@ Compatibility AgentMessaging is limited to Gateway/isolated hosts; production ro
 ## Related design
 
 [Parent design](../README.md)
+
+## 泛化 Task 与独立 Skill
+
+Core provides business-neutral AgentTaskExecution and backward-readable scope.execution, plus bounded goal/requestedSkills evidence. Registry owns admission, delivery and cancellation transitions: 256 records and 16 nonterminal background tasks. Core does not load Skill resources or compose prompts. Missing legacy execution decodes as foreground.
+
+## Lifecycle-owned conversation and audio (2026-10-12)
+
+✅ 已移除对话生成、ReACT、收件箱排队、结果屏障、ASR 收尾、TTS 合成及回复占用租约的计时终止。Signal 默认无过期时间，框架不再按通信契约附加 TTL。保留显式实时感知数据的新鲜度和网络传输自身超时；它们不作为对话/语音缓存生命周期。Action 自身超时通过原始执行者的 ActionResult 返回。请求/调用数及队列/PCM 容量仍有界，不以计时自动删除已接纳输入。语音句柄无读等待或错误记录 TTL，按播放完成、输入/会话正常结束、异常或显式取消清理；取消加入生成和播放工作。

@@ -61,7 +61,9 @@ private actor ResourcePresentationFixture: ResourcePresentationCapability {
         errors.append(message)
     }
 }
-@Test func resourceRefreshPresentsOnceThroughGatewayAndReportsQueryFailureBeforeTerminalCompletion() async throws {
+@Test(.actionCatalog) func resourceRefreshPresentsOnceThroughGatewayAndReportsQueryFailureBeforeTerminalCompletion()
+    async throws
+{
     let inventory = PresentedInventoryFixture()
     let presentation = ResourcePresentationFixture()
     let runtime = try resourceRuntime(UnusedModelResourceCapability(), inventory: inventory, presentation: presentation)
@@ -84,7 +86,7 @@ private actor ResourcePresentationFixture: ResourcePresentationCapability {
     #expect(await runtime.agent.status().queuedInputs == 0)
     await runtime.shutdown()
 }
-@Test func resourcePresentationFailureRetainsBothCausesAndDoesNotBlockNextRefresh() async throws {
+@Test(.actionCatalog) func resourcePresentationFailureRetainsBothCausesAndDoesNotBlockNextRefresh() async throws {
     let inventory = PresentedInventoryFixture()
     let presentation = ResourcePresentationFixture()
     let runtime = try resourceRuntime(UnusedModelResourceCapability(), inventory: inventory, presentation: presentation)
@@ -105,7 +107,7 @@ private actor ResourcePresentationFixture: ResourcePresentationCapability {
     #expect(await runtime.agent.status().queuedInputs == 0)
     await runtime.shutdown()
 }
-@Test func zeroRefreshGenerationRejectsBeforeResourceOrPresentationEffects() async throws {
+@Test(.actionCatalog) func zeroRefreshGenerationRejectsBeforeResourceOrPresentationEffects() async throws {
     let inventory = PresentedInventoryFixture()
     let presentation = ResourcePresentationFixture()
     let runtime = try resourceRuntime(UnusedModelResourceCapability(), inventory: inventory, presentation: presentation)
@@ -116,7 +118,7 @@ private actor ResourcePresentationFixture: ResourcePresentationCapability {
     await runtime.shutdown()
 }
 
-@Test func resourcePresentationRejectsUnknownKeysAndOversizedMessagesBeforeEndpoints() async throws {
+@Test(.actionCatalog) func resourcePresentationRejectsUnknownKeysAndOversizedMessagesBeforeEndpoints() async throws {
     let inventory = PresentedInventoryFixture()
     let presentation = ResourcePresentationFixture()
     for parameters in [["generation": "1", "unknown": "value"], ["generation": "0"]] {
@@ -144,7 +146,9 @@ private actor ResourcePresentationFixture: ResourcePresentationCapability {
     #expect(await presentation.errors.isEmpty)
 }
 
-@Test func registeredResourcePresentationReturnsLargeInventoryWithoutPuttingItInCallArguments() async throws {
+@Test(.actionCatalog) func registeredResourcePresentationReturnsLargeInventoryWithoutPuttingItInCallArguments()
+    async throws
+{
     let inventory = PresentedInventoryFixture()
     await inventory.useLargeInventory()
     let presentation = ResourcePresentationFixture()
@@ -157,7 +161,7 @@ private actor ResourcePresentationFixture: ResourcePresentationCapability {
     await runtime.shutdown()
 }
 
-@Test func unavailableErrorPresentationRetainsPrimaryFailureAndAllowsNextRead() async throws {
+@Test(.actionCatalog) func unavailableErrorPresentationRetainsPrimaryFailureAndAllowsNextRead() async throws {
     let inventory = PresentedInventoryFixture()
     let presentation = ResourcePresentationFixture()
     let runtime = try resourceRuntime(
@@ -176,7 +180,9 @@ private actor ResourcePresentationFixture: ResourcePresentationCapability {
     #expect(await runtime.agent.status().queuedInputs == 0)
     await runtime.shutdown()
 }
-@Test func applicationControlAgentBoundsCombiningCharacterFailureBeforeConstructingPresentationCall() async throws {
+@Test(.actionCatalog) func applicationControlAgentBoundsCombiningCharacterFailureBeforeConstructingPresentationCall()
+    async throws
+{
     let session = UUID()
     let agent = try ApplicationControlAgent(sessionID: session)
     try await agent.start()
@@ -240,7 +246,7 @@ private actor OperationFailurePresentation: ResourcePresentationCapability {
         if fails { throw CommandFailureFixtureError.operationPresentation }
     }
 }
-@Test func resourceCommandFailuresPresentThroughGatewayWithoutReplayingNativeCommands() async throws {
+@Test(.actionCatalog) func resourceCommandFailuresPresentThroughGatewayWithoutReplayingNativeCommands() async throws {
     let native = FailingResourceCommands()
     let presentation = OperationFailurePresentation()
     let runtime = try resourceRuntime(native, presentation: presentation)
@@ -265,7 +271,7 @@ private actor OperationFailurePresentation: ResourcePresentationCapability {
     #expect(await presentation.errors.count == 3)
     await runtime.shutdown()
 }
-@Test func resourceCommandPresentationFailureRetainsBothCausesAndDoesNotRecurse() async throws {
+@Test(.actionCatalog) func resourceCommandPresentationFailureRetainsBothCausesAndDoesNotRecurse() async throws {
     let native = FailingResourceCommands()
     let presentation = OperationFailurePresentation()
     await presentation.fail()
@@ -285,7 +291,7 @@ private actor OperationFailurePresentation: ResourcePresentationCapability {
     #expect(await presentation.errors.count == 1)
     await runtime.shutdown()
 }
-@Test func unavailableResourceCommandPresentationRetainsCauseAndReleasesAgentRequest() async throws {
+@Test(.actionCatalog) func unavailableResourceCommandPresentationRetainsCauseAndReleasesAgentRequest() async throws {
     let native = FailingResourceCommands()
     let presentation = OperationFailurePresentation()
     let runtime = try resourceRuntime(native, presentation: presentation, includeOperationFailurePresentation: false)
@@ -302,7 +308,9 @@ private actor OperationFailurePresentation: ResourcePresentationCapability {
     try await runtime.perform(.remove("model"))
     await runtime.shutdown()
 }
-@Test func operationFailureFunctionRejectsInvalidArgumentsAndReturnsEndpointAcknowledgment() async throws {
+@Test(.actionCatalog) func operationFailureFunctionRejectsInvalidArgumentsAndReturnsEndpointAcknowledgment()
+    async throws
+{
     let presentation = OperationFailurePresentation()
     func invocation(_ parameters: [String: String]) -> FunctionInvocation {
         FunctionInvocation(

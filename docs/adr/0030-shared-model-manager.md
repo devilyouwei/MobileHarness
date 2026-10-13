@@ -1,6 +1,6 @@
 # 0030 — Shared Model Manager
 
-> Historical scope: Historical assembly stage. [ADR 0034](0034-modelkit-default-assembly.md) moved production provider registration to ModelKitDefaults; current management contracts live in [ModelKit/Management](../../MobileHarness/ModelKit/Management/README.md).
+> Historical scope: Historical assembly stage. [ADR 0034](0034-modelkit-default-assembly.md) moved production provider registration to ModelKitDefaults; current management contracts live in [ModelKit/Management](../../MobileHarness/ModelKit/Support/Management/README.md).
 
 Status: implemented; sustained device acceptance pending.
 
@@ -22,4 +22,4 @@ ModelManifest is immutable artifact metadata and validation. Catalog lookup is p
 - End-of-turn, XML errors and voice stop do not decide model residency.
 - Initial policy retains resources until explicit unload/shutdown. Automatic eviction and measured global-memory budgets are not implemented.
 
-Detailed API, bounds, algorithms and diagrams: [ModelKitRuntime](../../MobileHarness/ModelKit/Management/README.md).
+Detailed API, bounds, algorithms and diagrams: [ModelKitRuntime](../../MobileHarness/ModelKit/Support/Management/README.md).

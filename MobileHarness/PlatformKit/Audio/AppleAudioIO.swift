@@ -4,7 +4,12 @@
     import OSLog
     import Synchronization
 
-    public enum AudioIOError: Error { case microphoneDenied, invalidFormat, overflow, captureTimeout, playbackTimeout }
+    public enum AudioIOError: Error, Equatable { case microphoneDenied, invalidFormat, overflow, busy }
+
+    public struct AudioIOCleanupError: Error, Sendable {
+        public let primary: any Error
+        public let cleanup: any Error
+    }
 
     private final class PlaybackTelemetry: Sendable {
         let value = Mutex((samples: [Float](), sampleRate: 24_000))
@@ -25,6 +30,7 @@
         private let captureEngine = AVAudioEngine()
         private let playbackEngine = AVAudioEngine()
         private let player = AVAudioPlayerNode()
+        private var preparedClipRate: Int?
         private var captureToken: UUID?
         public private(set) var captureContext = AudioCaptureContext()
         private var captureReadiness: AudioCaptureReadiness?
@@ -36,7 +42,7 @@
         private var playbackWaiter: CheckedContinuation<Void, Error>?
         private var playbackToken: UUID?
         private var spaceWaiter: CheckedContinuation<Void, Error>?
-        private var scheduled: [UUID: (duration: Double, timeout: Task<Void, Never>)] = [:]
+        private var scheduled: Set<UUID> = []
         private var playbackFailure: (any Error)?
         private let telemetry = PlaybackTelemetry()
         public init() {
@@ -78,6 +84,7 @@
             try Task.checkCancellation()
             let audio = AVAudioSession.sharedInstance()
             try audio.setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker, .allowBluetoothHFP])
+            try audio.setAllowHapticsAndSystemSoundsDuringRecording(true)
             try audio.setActive(true)
             let input = captureInput(audio)
             var spatialSupport: AudioCaptureContext.SpatialSupport = .unknown
@@ -103,7 +110,7 @@
                         throw CancellationError()
                     }
                     spatialSupport = await backend.supportsSpatialCapture == true ? .supported : .unknown
-                    fallback = error as? AudioCaptureReadinessError == .timedOut ? .startupTimeout : .startupFailed
+                    fallback = .startupFailed
                     log.warning(
                         "Spatial capture startup failed; retrying mono: \(String(describing: error), privacy: .public)")
                 }
@@ -111,6 +118,7 @@
                 spatialCapture = nil
                 // Release the failed spatial graph before reconfiguring and starting the mono engine.
                 try audio.setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker, .allowBluetoothHFP])
+                try audio.setAllowHapticsAndSystemSoundsDuringRecording(true)
                 try audio.setActive(true)
             } else if preferSpatial {
                 spatialSupport = .inputUnavailable
@@ -166,7 +174,6 @@
                     input: captureInput(audio), spatialSupport: spatialSupport, fallback: fallback)
             } catch {
                 if captureToken == token { await stop() }
-                if error as? AudioCaptureReadinessError == .timedOut { throw AudioIOError.captureTimeout }
                 throw error
             }
             return pair.stream
@@ -181,16 +188,110 @@
             }
         }
 
+        /// Output-only warmup; no buffers are scheduled and microphone admission is untouched.
+        public func prepareClip(_ pcm: PlaybackPCM) throws {
+            guard captureToken == nil, playbackToken == nil else { throw AudioIOError.busy }
+            guard !pcm.samples.isEmpty, pcm.samples.count <= 262_144, pcm.samples.allSatisfy(\.isFinite),
+                (8000...192000).contains(pcm.sampleRate),
+                let format = AVAudioFormat(
+                    commonFormat: .pcmFormatFloat32, sampleRate: Double(pcm.sampleRate), channels: 1, interleaved: false
+                )
+            else { throw AudioIOError.invalidFormat }
+            preparedClipRate = pcm.sampleRate
+            do {
+                try configureClipSession()
+                try connectPlayback(format)
+                playbackEngine.prepare()
+                if !playbackEngine.isRunning { try playbackEngine.start() }
+            } catch {
+                let primary = error
+                do { try discardPreparedClip() } catch {
+                    throw AudioIOCleanupError(primary: primary, cleanup: error)
+                }
+                throw primary
+            }
+        }
+        public func discardPreparedClip() throws {
+            guard preparedClipRate != nil, captureToken == nil, playbackToken == nil else { return }
+            preparedClipRate = nil
+            player.stop()
+            playbackEngine.stop()
+            playbackFormat = nil
+            try AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        }
+        private func configureClipSession() throws {
+            let session = AVAudioSession.sharedInstance()
+            try session.setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker, .allowBluetoothHFP])
+            try session.setAllowHapticsAndSystemSoundsDuringRecording(true)
+            try session.setActive(true)
+        }
+        private func connectPlayback(_ format: AVAudioFormat) throws {
+            if playbackFormat?.sampleRate != format.sampleRate {
+                guard scheduled.isEmpty else { throw AudioIOError.invalidFormat }
+                player.stop()
+                playbackEngine.stop()
+                playbackEngine.connect(player, to: playbackEngine.mainMixerNode, format: format)
+                playbackFormat = format
+            }
+        }
+
+        /// Generic standalone PCM before capture; refuses to replace another native operation.
+        public func playClip(_ pcm: PlaybackPCM, onStarted: (@MainActor () -> Void)? = nil) async throws {
+            try Task.checkCancellation()
+            guard captureToken == nil, playbackToken == nil else { throw AudioIOError.busy }
+            guard !pcm.samples.isEmpty, pcm.samples.count <= 262_144, pcm.samples.allSatisfy(\.isFinite),
+                (8000...192000).contains(pcm.sampleRate)
+            else { throw AudioIOError.invalidFormat }
+            let session = AVAudioSession.sharedInstance()
+            if preparedClipRate != pcm.sampleRate || !playbackEngine.isRunning { try configureClipSession() }
+            preparedClipRate = nil
+            func releaseClip() throws {
+                // A replacement stream owns its own graph/session, even after this clip was cancelled.
+                guard playbackToken == nil else { return }
+                player.stop()
+                playbackEngine.stop()
+                playbackFormat = nil
+                if captureToken == nil {
+                    try session.setActive(false, options: .notifyOthersOnDeactivation)
+                }
+            }
+            var sent = false
+            do {
+                try await playStream(onStarted: onStarted) {
+                    guard !sent else { return nil }
+                    sent = true
+                    return pcm
+                }
+            } catch {
+                let primary = error
+                do { try releaseClip() } catch {
+                    throw AudioIOCleanupError(primary: primary, cleanup: error)
+                }
+                throw primary
+            }
+            try releaseClip()
+        }
+
         /// At most three PCM buffers scheduled; wait for hardware capacity, not each individual packet.
-        public func playStream(next: @escaping @MainActor () async throws -> PlaybackPCM?) async throws {
+        public func playStream(
+            onStarted: (@MainActor () -> Void)? = nil, next: @escaping @MainActor () async throws -> PlaybackPCM?
+        ) async throws {
             try Task.checkCancellation()
             guard playbackToken == nil else { throw AudioIOError.invalidFormat }
+            if captureToken == nil && !playbackEngine.isRunning {
+                let session = AVAudioSession.sharedInstance()
+                try session.setCategory(
+                    .playAndRecord, mode: .default, options: [.defaultToSpeaker, .allowBluetoothHFP])
+                try session.setAllowHapticsAndSystemSoundsDuringRecording(true)
+                try session.setActive(true)
+            }
             let token = UUID()
             playbackToken = token
             playbackFailure = nil
             do {
                 try await withTaskCancellationHandler {
                     var streamRate: Int?
+                    var started = false
                     while true {
                         if scheduled.count >= 3 {
                             try await withCheckedThrowingContinuation { spaceWaiter = $0 }
@@ -203,6 +304,10 @@
                         }
                         streamRate = pcm.sampleRate
                         try schedule(pcm, token: token)
+                        if !started {
+                            started = true
+                            onStarted?()
+                        }
                     }
                     if !scheduled.isEmpty {
                         try await withCheckedThrowingContinuation { playbackWaiter = $0 }
@@ -232,33 +337,19 @@
                 let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(pcm.samples.count)),
                 let destination = buffer.floatChannelData?[0]
             else { throw AudioIOError.invalidFormat }
-            if playbackFormat?.sampleRate != format.sampleRate {
-                guard scheduled.isEmpty else { throw AudioIOError.invalidFormat }
-                player.stop()
-                playbackEngine.stop()
-                playbackEngine.connect(player, to: playbackEngine.mainMixerNode, format: format)
-                playbackFormat = format
-            }
+            try connectPlayback(format)
             buffer.frameLength = AVAudioFrameCount(pcm.samples.count)
             for index in pcm.samples.indices { destination[index] = pcm.samples[index] }
             if !playbackEngine.isRunning { try playbackEngine.start() }
             let id = UUID()
-            let duration = Double(pcm.samples.count) / Double(pcm.sampleRate)
-            let maximumWait = scheduled.values.reduce(duration + 3) { $0 + $1.duration }
-            let timeout = Task { [weak self] in
-                do { try await Task.sleep(for: .seconds(maximumWait)) } catch { return }
-                guard self?.scheduled[id] != nil else { return }
-                self?.failPlayback(token: token, error: AudioIOError.playbackTimeout)
-            }
-            scheduled[id] = (duration, timeout)
+            scheduled.insert(id)
             player.scheduleBuffer(buffer, completionCallbackType: .dataPlayedBack) { @Sendable [weak self] _ in
                 Task { @MainActor in self?.played(id, token: token) }
             }
             if !player.isPlaying { player.play() }
         }
         private func played(_ id: UUID, token: UUID) {
-            guard playbackToken == token, let completed = scheduled.removeValue(forKey: id) else { return }
-            completed.timeout.cancel()
+            guard playbackToken == token, scheduled.remove(id) != nil else { return }
             let space = spaceWaiter
             spaceWaiter = nil
             space?.resume()
@@ -274,7 +365,6 @@
             playbackFailure = error
             playbackToken = nil
             player.stop()
-            for value in scheduled.values { value.timeout.cancel() }
             scheduled.removeAll()
             let drained = playbackWaiter
             let space = spaceWaiter
@@ -283,6 +373,13 @@
             drained?.resume(throwing: error)
             space?.resume(throwing: error)
             telemetry.value.withLock { $0.samples.removeAll() }
+        }
+        public func stopPlayback() {
+            preparedClipRate = nil
+            if let token = playbackToken { cancelPlayback(token: token) }
+            player.stop()
+            playbackEngine.stop()
+            playbackFormat = nil
         }
         public func stopCapture() async {
             captureToken = nil
@@ -300,6 +397,7 @@
             capture = nil
         }
         public func stop() async {
+            preparedClipRate = nil
             await stopCapture()
             if let token = playbackToken { cancelPlayback(token: token) }
             player.stop()

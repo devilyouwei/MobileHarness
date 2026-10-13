@@ -3,10 +3,25 @@ import FunctionContracts
 /// NexArm.Gesture function ownership; current invocation paths remain compatible.
 extension NexArmActions {
     @Action(
-        domain: "NexArm", module: "Gesture", title: "点头", kind: .finite,
+        domain: "NexArm", module: "Gesture", title: "点头",
+        doc:
+            "Nod using motor4, returning home; leave other motors untouched.",
+        parameters: [
+            .init(
+                "cycles", type: .integer, required: true,
+                description: "Number of complete gestures, each containing two back-and-forth sweeps.",
+                constraints: "Integer 1 through 3 only; no default."),
+            .init(
+                "speed", type: .integer, required: false, description: "Native motor speed, 1–1400; default1400.",
+                constraints: "Native motor speed, 1–1400; default1400."),
+            .init(
+                "acceleration", type: .integer, required: false,
+                description: "Native acceleration register value, 1–254; default30.",
+                constraints: "Native acceleration register value, 1–254; default30."),
+        ], kind: .finite,
         completion: "Fresh arrival completes each motor; failures are aggregated and later steps continue.",
-        serializationKey: "NexArm", resolvingResources: NexArmRegistration.resources,
-        estimatingDuration: NexArmRegistration.budget)
+        resolvingResources: NexArmRegistration.resources,
+        dynamicTimeout: NexArmRegistration.budget)
     public static func nodHead(
         invocation: any FunctionInput,
         using perform: @escaping @Sendable (GestureRequest, any FunctionInput) async throws -> Void
@@ -27,10 +42,25 @@ extension NexArmActions {
     }
 
     @Action(
-        domain: "NexArm", module: "Gesture", title: "摇头", kind: .finite,
+        domain: "NexArm", module: "Gesture", title: "摇头",
+        doc:
+            "Shake the head using motor5, returning home; leave other motors untouched.",
+        parameters: [
+            .init(
+                "cycles", type: .integer, required: true,
+                description: "Number of complete gestures, each containing two back-and-forth sweeps.",
+                constraints: "Integer 1 through 3 only; no default."),
+            .init(
+                "speed", type: .integer, required: false, description: "Native motor speed, 1–1400; default1400.",
+                constraints: "Native motor speed, 1–1400; default1400."),
+            .init(
+                "acceleration", type: .integer, required: false,
+                description: "Native acceleration register value, 1–254; default30.",
+                constraints: "Native acceleration register value, 1–254; default30."),
+        ], kind: .finite,
         completion: "Fresh arrival completes each motor; failures are aggregated and later steps continue.",
-        serializationKey: "NexArm", resolvingResources: NexArmRegistration.resources,
-        estimatingDuration: NexArmRegistration.budget)
+        resolvingResources: NexArmRegistration.resources,
+        dynamicTimeout: NexArmRegistration.budget)
     public static func shakeHead(
         invocation: any FunctionInput,
         using perform: @escaping @Sendable (GestureRequest, any FunctionInput) async throws -> Void
@@ -51,10 +81,24 @@ extension NexArmActions {
     }
 
     @Action(
-        domain: "NexArm", module: "Gesture", title: "挥手", kind: .finite,
+        domain: "NexArm", module: "Gesture", title: "挥手",
+        doc:
+            "Wave the wrist with the configured arm gesture, then return home.",
+        parameters: [
+            .init(
+                "count", type: .integer, required: true, description: "Number of complete gesture repetitions.",
+                constraints: "Integer 1 through 3. No default."),
+            .init(
+                "speed", type: .integer, required: false, description: "Native motor speed, 1–1400; default1400.",
+                constraints: "Native motor speed, 1–1400; default1400."),
+            .init(
+                "acceleration", type: .integer, required: false,
+                description: "Native acceleration register value, 1–254; default30.",
+                constraints: "Native acceleration register value, 1–254; default30."),
+        ], kind: .finite,
         completion: "Fresh arrival completes each motor; failures are aggregated and later steps continue.",
-        serializationKey: "NexArm", resolvingResources: NexArmRegistration.resources,
-        estimatingDuration: NexArmRegistration.budget)
+        resolvingResources: NexArmRegistration.resources,
+        dynamicTimeout: NexArmRegistration.budget)
     public static func waveWrist(
         invocation: any FunctionInput,
         using perform: @escaping @Sendable (GestureRequest, any FunctionInput) async throws -> Void
@@ -75,10 +119,24 @@ extension NexArmActions {
     }
 
     @Action(
-        domain: "NexArm", module: "Gesture", title: "歪头", kind: .finite,
+        domain: "NexArm", module: "Gesture", title: "歪头",
+        doc:
+            "Tilt the wrist in the requested direction and return home.",
+        parameters: [
+            .init(
+                "direction", type: .string, required: true, description: "Tilt direction relative to the arm.",
+                constraints: "Exactly left or right."),
+            .init(
+                "speed", type: .integer, required: false, description: "Native motor speed, 1–1400; default1400.",
+                constraints: "Native motor speed, 1–1400; default1400."),
+            .init(
+                "acceleration", type: .integer, required: false,
+                description: "Native acceleration register value, 1–254; default30.",
+                constraints: "Native acceleration register value, 1–254; default30."),
+        ], kind: .finite,
         completion: "Fresh arrival completes each motor; failures are aggregated and later steps continue.",
-        serializationKey: "NexArm", resolvingResources: NexArmRegistration.resources,
-        estimatingDuration: NexArmRegistration.budget)
+        resolvingResources: NexArmRegistration.resources,
+        dynamicTimeout: NexArmRegistration.budget)
     public static func tiltWrist(
         invocation: any FunctionInput,
         using perform: @escaping @Sendable (GestureRequest, any FunctionInput) async throws -> Void
@@ -99,10 +157,24 @@ extension NexArmActions {
     }
 
     @Action(
-        domain: "NexArm", module: "Gesture", title: "左右张望", kind: .finite,
+        domain: "NexArm", module: "Gesture", title: "左右张望",
+        doc:
+            "Perform the configured arm look-around gesture and return home.",
+        parameters: [
+            .init(
+                "cycles", type: .integer, required: true, description: "Number of complete gesture repetitions.",
+                constraints: "Integer 1 through 3. No default."),
+            .init(
+                "speed", type: .integer, required: false, description: "Native motor speed, 1–1400; default1400.",
+                constraints: "Native motor speed, 1–1400; default1400."),
+            .init(
+                "acceleration", type: .integer, required: false,
+                description: "Native acceleration register value, 1–254; default30.",
+                constraints: "Native acceleration register value, 1–254; default30."),
+        ], kind: .finite,
         completion: "Fresh arrival completes each motor; failures are aggregated and later steps continue.",
-        serializationKey: "NexArm", resolvingResources: NexArmRegistration.resources,
-        estimatingDuration: NexArmRegistration.budget)
+        resolvingResources: NexArmRegistration.resources,
+        dynamicTimeout: NexArmRegistration.budget)
     public static func lookAround(
         invocation: any FunctionInput,
         using perform: @escaping @Sendable (GestureRequest, any FunctionInput) async throws -> Void
@@ -123,10 +195,24 @@ extension NexArmActions {
     }
 
     @Action(
-        domain: "NexArm", module: "Gesture", title: "庆祝", kind: .finite,
+        domain: "NexArm", module: "Gesture", title: "庆祝",
+        doc:
+            "Perform the configured celebration gesture and return home.",
+        parameters: [
+            .init(
+                "cycles", type: .integer, required: true, description: "Number of complete gesture repetitions.",
+                constraints: "Integer 1 through 3. No default."),
+            .init(
+                "speed", type: .integer, required: false, description: "Native motor speed, 1–1400; default1400.",
+                constraints: "Native motor speed, 1–1400; default1400."),
+            .init(
+                "acceleration", type: .integer, required: false,
+                description: "Native acceleration register value, 1–254; default30.",
+                constraints: "Native acceleration register value, 1–254; default30."),
+        ], kind: .finite,
         completion: "Fresh arrival completes each motor; failures are aggregated and later steps continue.",
-        serializationKey: "NexArm", resolvingResources: NexArmRegistration.resources,
-        estimatingDuration: NexArmRegistration.budget)
+        resolvingResources: NexArmRegistration.resources,
+        dynamicTimeout: NexArmRegistration.budget)
     public static func celebrate(
         invocation: any FunctionInput,
         using perform: @escaping @Sendable (GestureRequest, any FunctionInput) async throws -> Void
@@ -147,10 +233,24 @@ extension NexArmActions {
     }
 
     @Action(
-        domain: "NexArm", module: "Gesture", title: "跳舞", kind: .finite,
+        domain: "NexArm", module: "Gesture", title: "跳舞",
+        doc:
+            "Perform the configured arm dance and return home.",
+        parameters: [
+            .init(
+                "cycles", type: .integer, required: true, description: "Number of complete gesture repetitions.",
+                constraints: "Integer 1 through 3. No default."),
+            .init(
+                "speed", type: .integer, required: false, description: "Native motor speed, 1–1400; default1400.",
+                constraints: "Native motor speed, 1–1400; default1400."),
+            .init(
+                "acceleration", type: .integer, required: false,
+                description: "Native acceleration register value, 1–254; default30.",
+                constraints: "Native acceleration register value, 1–254; default30."),
+        ], kind: .finite,
         completion: "Fresh arrival completes each motor; failures are aggregated and later steps continue.",
-        serializationKey: "NexArm", resolvingResources: NexArmRegistration.resources,
-        estimatingDuration: NexArmRegistration.budget)
+        resolvingResources: NexArmRegistration.resources,
+        dynamicTimeout: NexArmRegistration.budget)
     public static func dance(
         invocation: any FunctionInput,
         using perform: @escaping @Sendable (GestureRequest, any FunctionInput) async throws -> Void

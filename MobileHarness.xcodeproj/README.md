@@ -9,7 +9,7 @@ Purpose: build/sign the iOS application host and maintain physical-device, simul
 - ✅ UI owns iOS pages/components and portable presentation state/operation interfaces. AppWorkflows owns history, configuration and explicit speech/chat diagnostics. Native preview/image/value adapters compile with App.
 - ✅ App source membership includes CurrentChatCapability; ChatDiagnosticWorkflow is package-owned navigation only. VoiceSessionCoordinator, VisionSession, ApplicationRuntime and UI component file references match their current responsibilities.
 - ✅ Shared configuration, entitlements and privacy declarations retain their existing values. Local signing remains in ignored Config/Local.xcconfig.
-- ✅ Platform input/output file lists stage only the shared source catalog/license notices on both device and simulator. Physical inference uses sandbox-installed Nemotron, Qwen3.5, Silero, YOLO and MOSS; Kokoro is unregistered. Simulator local models report unavailable; explicitly configured cloud chat remains supported.
+- ✅ Platform input/output file lists stage only the shared source catalog/license notices on both device and simulator. Physical inference uses sandbox-installed Nemotron, Gemma4, Silero, YOLO and MOSS; Kokoro is unregistered. Simulator local models report unavailable; explicitly configured cloud chat remains supported.
 
 ## Validation
 
@@ -73,7 +73,7 @@ Purpose: build/sign the iOS application host and maintain physical-device, simul
 
 ✅ Both App source phases include the new Storage/settings adapters. Navigation references the new Management/Storage/Settings source files; package-owned sources still compile only through existing root targets. Model staging inputs/outputs are metadata-only for device and simulator.
 
-❌ Full device/background acceptance and remaining enhancement items are tracked in [Management](../MobileHarness/ModelKit/Management/README.md). The independent ModelKitHub target is included in HarnessKit; App entry and composition inject it. HF durable background transfer is not implemented.
+❌ Full device/background acceptance and remaining enhancement items are tracked in [Management](../MobileHarness/ModelKit/Support/Management/README.md). The independent ModelKitHub target is included in HarnessKit; App entry and composition inject it. HF persisted native background transfer is implemented; OS/server behavior and full iPhone acceptance remain conditional.
 
 ✅ Models navigator references now show the shared catalog and separate Nemotron Mac profile; removed Audio8/Silero development references are cleaned up. Metadata-only staging is unchanged. ❌ Full Xcode build acceptance remains pending.
 
@@ -102,3 +102,20 @@ Purpose: build/sign the iOS application host and maintain physical-device, simul
 ✅ Navigator references now match Actions/Contracts, Gateway/Runtime and Gateway/Output/Registration and Protocols. Package targets independently compile FunctionContracts, ExecutionRuntime and CallRuntime; shared sources are compiled once. Business endpoints use FunctionInput without Channel or calling protocol. ❌ Simulator CoreAI availability and physical acceptance remain separate.
 
 ✅ Actions navigator follows all six physical domain trees and Contracts; the obsolete ToolCall Entries/runtime group is removed. Gateway runtime and protocol groups are attached under their owning directories.
+
+## ModelKit Support ownership
+
+✅ The ModelKit navigator mirrors Support/Core, Backends, Management and Speech plus provider-owned engine sources. SwiftPM remains the sole shared-source compiler; no App Sources memberships or signing settings changed.
+
+✅ CoreBoundaryTests and RuntimeBoundaryTests are navigation-only references. Core/management state ownership changed within existing source files; package ownership and App source memberships are preserved.
+
+
+✅ Implemented: UI packages Components/ListeningHalo.metal via SwiftPM resource processing, producing its own default shader library; App imports the existing UI product. Shader resource compilation requires full Xcode and its installed Metal toolchain; use the matching DEVELOPER_DIR when the default xcode-select still points to Command Line Tools. No new target/dependency/directory or signing changes.
+
+
+✅ Implemented: AppSpeechPlayback adds existing Actions and ExecutionRuntime products for child composition; new Swift files remain in existing package-owned directories. No source signing changes or new directories.
+
+
+✅ App and simulator configurations use Config/AppInfo.plist to opt into ProMotion with public CADisableMinimumFrameDurationOnPhone; final bundle verification confirms the Boolean value. Native renderer requests device-supported high refresh for transitions, 60 Hz for settled flow, and pauses when off; requested FPS is not a guaranteed physical acceptance result.
+
+✅ Implemented ProMotion packaging: Config/AppInfo.plist explicitly supplies CADisableMinimumFrameDurationOnPhone=true to both App targets. Generated standard/permission metadata remains enabled; remove the ineffective custom INFOPLIST_KEY setting and verify the final signed plist, not only build settings. No local signing edits.

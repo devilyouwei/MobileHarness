@@ -16,7 +16,7 @@ private actor UnifiedFixtureLog {
     func record(_ value: String) { values.append(value) }
 }
 
-@Test func oneImplementationReturnsTheSameValueThroughBothProtocols() async throws {
+@Test(.actionCatalog) func oneImplementationReturnsTheSameValueThroughBothProtocols() async throws {
     let session = UUID()
     let input = UUID()
     let correlation = UUID()
@@ -27,10 +27,9 @@ private actor UnifiedFixtureLog {
     let path = ActionIdentifier(domain: "Fixture", module: "Query", function: "read")
     let function = ActionFunction(
         path: path, displayName: "Read", kind: .finite, completion: "Return the selected value.",
-        serializationKey: "fixture.query",
         resolvingResources: { request in
             [ActionResource(rawValue: "fixture." + (request.parameters["target"] ?? "missing"))]
-        }, estimatingDuration: { _ in try .init(expected: .zero, timeout: .seconds(2)) },
+        }, dynamicTimeout: { _ in try .init(expected: .zero, timeout: .seconds(2)) },
         completing: { invocation in
             #expect(invocation.context == context)
             await log.record(invocation.context.source)
@@ -58,7 +57,7 @@ private actor UnifiedFixtureLog {
     #expect(await log.values == ["fixture", "fixture"])
 }
 
-@Test func oneGazeFunctionRunsScheduledAndDirectWithPreservedContext() async throws {
+@Test(.actionCatalog) func oneGazeFunctionRunsScheduledAndDirectWithPreservedContext() async throws {
     let log = UnifiedFixtureLog()
     let definition = ActionBinding(
         function: UIActions.moveEyesDefinition(handler: { invocation in
@@ -84,7 +83,7 @@ private actor UnifiedFixtureLog {
     #expect(await log.values == ["fixture:7", "fixture:8"])
 }
 
-@Test func implementationProtocolAvailabilityDoesNotGrantAgentPermission() throws {
+@Test(.actionCatalog) func implementationProtocolAvailabilityDoesNotGrantAgentPermission() throws {
     let path = ActionPath(domain: "Fixture", module: "Query", function: "read")
     let module = UnifiedFixtureModule(definitions: [
         ActionBinding(path: path.description, handler: { _ in "ok" })
@@ -137,7 +136,9 @@ private actor UnifiedReceiptAgent: Agent {
     }
 }
 
-@Test(.timeLimit(.minutes(1))) func nativeToolUsesSharedResourcesAndJoinsCancellationCleanup() async throws {
+@Test(.actionCatalog, .timeLimit(.minutes(1))) func nativeToolUsesSharedResourcesAndJoinsCancellationCleanup()
+    async throws
+{
     let started = UnifiedGate()
     let release = UnifiedGate()
     let nativeStarted = UnifiedGate()
@@ -146,7 +147,7 @@ private actor UnifiedReceiptAgent: Agent {
     let path = ActionIdentifier(domain: "Fixture", module: "Work", function: "run")
     let definition = ActionBinding(
         path: path, displayName: "Work", kind: .finite,
-        completion: "Return after work or joined cleanup.", serializationKey: "fixture.work",
+        completion: "Return after work or joined cleanup.",
         protocols: [.action, .tool], executionPolicy: .direct, directResultPolicy: .returning,
         resources: [.init(rawValue: "fixture.work")],
         completing: { invocation in
@@ -228,7 +229,7 @@ private actor UnifiedReceiptAgent: Agent {
     await gateway.shutdown()
 }
 
-@Test func canonicalCatalogRejectsCrossProtocolDuplicatesAndHiddenInvalidMetadata() throws {
+@Test(.actionCatalog) func canonicalCatalogRejectsCrossProtocolDuplicatesAndHiddenInvalidMetadata() throws {
     let path = ActionIdentifier(domain: "Fixture", module: "Work", function: "run")
     let scheduled = ActionBinding(
         path: path, displayName: "Run", kind: .finite, completion: "Completed.", handler: { _ in })
@@ -242,7 +243,7 @@ private actor UnifiedReceiptAgent: Agent {
     }
 }
 
-@Test func normalizedNativeInvocationRetainsReportPrecedenceAndCallIdentity() async throws {
+@Test(.actionCatalog) func normalizedNativeInvocationRetainsReportPrecedenceAndCallIdentity() async throws {
     let id = UUID()
     let context = ActionExecutionContext(
         source: "fixture", sessionID: UUID(), inputID: UUID(), sequence: 7,
@@ -251,7 +252,7 @@ private actor UnifiedReceiptAgent: Agent {
     let definition = ActionBinding(
         path: .init(domain: "Fixture", module: "Query", function: "read"),
         displayName: "Read", kind: .finite, completion: "Read acknowledged.",
-        serializationKey: "fixture", protocols: [.tool], executionPolicy: .direct,
+        protocols: [.tool], executionPolicy: .direct,
         directResultPolicy: .returning,
         completing: { invocation in
             #expect(invocation.executionID == id)
@@ -272,7 +273,7 @@ private struct PureFunctionFixture: CapabilityModule {
     let definitions: [ActionFunction]
 }
 
-@Test func pureCatalogValidatesBeforeRegistrationAndHostRejectsUnknownModules() throws {
+@Test(.actionCatalog) func pureCatalogValidatesBeforeRegistrationAndHostRejectsUnknownModules() throws {
     let path = ActionIdentifier(domain: "Fixture", module: "Query", function: "read")
     let function = ActionFunction(
         path: path, displayName: "Read", kind: .finite, completion: "Read completed.", handler: { _ in })
@@ -289,7 +290,7 @@ private struct PureFunctionFixture: CapabilityModule {
     }
 }
 
-@Test func producerFailureCodeIsIndependentOfCallProtocol() async throws {
+@Test(.actionCatalog) func producerFailureCodeIsIndependentOfCallProtocol() async throws {
     let log = UnifiedFixtureLog()
     let function = UIActions.moveEyesDefinition(handler: { invocation in
         try await UIActions.moveEyes(invocation: invocation) { _, _ in await log.record("effect") }
@@ -313,7 +314,8 @@ private struct PureFunctionFixture: CapabilityModule {
     #expect(await log.values.isEmpty)
 }
 
-@Test func sharedFunctionRegistryOwnsImplementationResourcesAndBudgetAcrossProtocolViews() async throws {
+@Test(.actionCatalog) func sharedFunctionRegistryOwnsImplementationResourcesAndBudgetAcrossProtocolViews() async throws
+{
     let path = ActionIdentifier(domain: "Fixture", module: "Query", function: "read")
     let log = UnifiedFixtureLog()
     let function = ActionFunction(
@@ -346,7 +348,7 @@ private struct PureFunctionFixture: CapabilityModule {
     #expect(await log.values == ["fixture", "fixture"])
 }
 
-@Test func invocationFailurePreservesReportAndAllowsNextCall() async throws {
+@Test(.actionCatalog) func invocationFailurePreservesReportAndAllowsNextCall() async throws {
     let path = ActionIdentifier(domain: "Fixture", module: "Work", function: "run")
     let report = try ActionReport(entries: [
         .init(path: "step.motor1", status: .succeeded),

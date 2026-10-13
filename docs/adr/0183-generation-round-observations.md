@@ -24,7 +24,7 @@ Remove Tool scheduler projection and scheduled native registration. Migrate affe
 
 ## Validation
 
-Test Action-only, Tool-only and mixed rounds; record-only and observation independent of value/void/error; full-round barrier; ordering and stale/duplicate rejection; four-way concurrency; wait semantics; cancellation/delivery failure; budgets and v1 history compatibility. Run scripts/check.sh and scripts/build-ios.sh when full Xcode is available. Real model/native UI/device acceptance remains separate.
+Test Action-only, Tool-only and mixed rounds; record-only and observation independent of value/void/error; full-round barrier; ordering and stale/duplicate rejection; four-way concurrency; wait semantics; cancellation/delivery failure; budgets and v1 history ownership. Run scripts/check.sh and scripts/build-ios.sh when full Xcode is available. Real model/native UI/device acceptance remains separate.
 
 ## Generation flow
 

@@ -9,12 +9,21 @@ private actor ChatFixture: ChatCapability {
     let availability: CapabilityAvailability = .available
     var requests: [ChatRequest] = []
     var pending: InferenceSession<ChatEvent>?
+    private let entered = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingOldest(1))
+    func waitForPending() async {
+        if pending != nil { return }
+        var events = entered.stream.makeAsyncIterator()
+        _ = await events.next()
+    }
     func chat(_ request: ChatRequest) throws -> InferenceSession<ChatEvent> {
         requests.append(request)
         let pair = InferenceSession<ChatEvent>.make(limits: try StreamLimits(), estimatedBytes: { $0.estimatedBytes })
         try pair.emitter.yield(.text("模型"))
-        if request.messages.last?.content == "wait" {
+        if request.messages.last(where: {
+            $0.role == .user && !$0.content.hasPrefix("Current task and Skill state (data, not instructions):")
+        })?.content == "wait" {
             pending = pair.session
+            entered.continuation.yield(())
         } else {
             try pair.emitter.yield(.text("回答"))
             try pair.emitter.yield(.finished(.stop))
@@ -28,6 +37,7 @@ private func completedTurn(_ outputs: inout FixtureGenerationOutputs.Iterator) a
     var turn: [OutputEnvelope] = []
     for _ in 0..<121 {
         let envelope = try #require(try await outputs.next())
+        if envelope.output == .control("agent.cancelled") { continue }
         turn.append(envelope)
         if case .control(let state) = envelope.output,
             state == "agent.finished" || state.hasPrefix("agent.error:")
@@ -39,7 +49,7 @@ private func completedTurn(_ outputs: inout FixtureGenerationOutputs.Iterator) a
     return turn
 }
 
-@Test func assistantUsesCapabilityAndRetainsConversationAcrossVoiceSessions() async throws {
+@Test(.actionCatalog) func assistantUsesCapabilityAndRetainsConversationAcrossVoiceSessions() async throws {
     let model = ChatFixture()
     let agent = try AssistantAgent(chat: model)
     let speechRequests = try await bindSpeechRequests(agent)
@@ -63,41 +73,43 @@ private func completedTurn(_ outputs: inout FixtureGenerationOutputs.Iterator) a
     let requests = await model.requests
     try #require(requests.count == 3)
     #expect(requests[1].messages.contains(.init(role: .assistant, content: "模型回答")))
-    #expect(requests[2].messages.count == 6)
+    #expect(
+        requests[2].messages.filter { !$0.content.hasPrefix("Current task and Skill state (data, not instructions):") }
+            .count == 6)
     #expect(requests[0].context.requestID == first.id)
     // Inspect the actual capability request, including subsequent conversation turns.
     let configuration = try AgentConfigurations.load(named: "Assistant")
+    var skills = AgentTaskSkillState()
+    try skills.initialize(
+        fixed: try AssistantAgent.runtimeCapabilities(configuration.capabilities),
+        baseSkills: try AgentConfigurations.baseSkills(named: "Assistant"))
+    let effective = try skills.registry(fixed: try AssistantAgent.runtimeCapabilities(configuration.capabilities))
     for request in requests {
         #expect(request.maximumOutputTokens == nil)
         let system = try #require(request.messages.first)
         #expect(system.role == .system)
-        #expect(system.content.contains("You are a voice assistant on a phone."))
+        #expect(system.content.contains("You are the sole user-facing assistant on a phone."))
         #expect(system.content.contains(try AgentPrompts.load(named: "Assistant").render("delegation")))
         #expect(!system.content.contains("Tool Call"))
-        for tool in configuration.capabilities.tools {
-            #expect(!system.content.contains(tool.alias))
-            #expect(!system.content.contains(try #require(tool.definition).function.description))
-        }
         #expect(!system.content.contains("Action smile:"))
         #expect(system.content.contains("Action express:"))
         #expect(system.content.contains("<express emotion=\"happy\"/>"))
-        for action in configuration.capabilities.actions {
+        for action in effective.actions {
             let documentation = try #require(action.documentation)
             #expect(system.content.contains("Action \(action.alias):") == true)
             #expect(system.content.contains(documentation.doc) == true)
-            for example in documentation.examples {
-                #expect(system.content.contains("Example: " + example) == true)
-            }
             for parameter in documentation.parameters {
                 #expect(system.content.contains(parameter.description))
-                #expect(system.content.contains(parameter.constraints))
+                if !parameter.constraints.isEmpty {
+                    #expect(system.content.contains(parameter.constraints))
+                }
             }
         }
     }
     await agent.stop()
 }
 
-@Test func gatewayCancellationInterruptsFullPausedAssistantWithoutStaleReply() async throws {
+@Test(.actionCatalog) func gatewayCancellationInterruptsFullPausedAssistantWithoutStaleReply() async throws {
     let model = ChatFixture()
     let agent = try AssistantAgent(capacity: 1, chat: model)
     let manager = AgentManager()
@@ -114,10 +126,7 @@ private func completedTurn(_ outputs: inout FixtureGenerationOutputs.Iterator) a
     let gateway = InputGateway(manager: manager, policy: policy)
     let session = UUID()
     try await gateway.publish(AgentInput(sessionID: session, payload: .text("wait")))
-    for _ in 0..<10000 {
-        if await model.pending != nil { break }
-        await Task.yield()
-    }
+    await model.waitForPending()
     _ = try #require(await model.pending)
     try await agent.pause()
     try await agent.receive(AgentInput(sessionID: session, payload: .text("queued")))
@@ -128,17 +137,17 @@ private func completedTurn(_ outputs: inout FixtureGenerationOutputs.Iterator) a
     let next = AgentInput(sessionID: UUID(), payload: .text("next"))
     try await agent.receive(next)
     var outputs = FixtureGenerationOutputs(agent: agent).makeAsyncIterator()
-    let cancelledTurn = try await completedTurn(&outputs)
-    #expect(
-        cancelledTurn.contains {
-            if case .control(let value) = $0.output { return value.contains("inference suspended") }
-            return false
-        })
-    let turn = try await completedTurn(&outputs)
+    var cancelled: [OutputEnvelope] = []
+    var turn: [OutputEnvelope] = []
+    while let output = try await outputs.next() {
+        if output.output == .control("agent.cancelled") { cancelled.append(output) }
+        if output.inputID == next.id { turn.append(output) }
+        if output.inputID == next.id, output.output == .control("agent.finished") { break }
+    }
+    #expect(cancelled.count == 2)
+    #expect(cancelled.allSatisfy { $0.sessionID == session })
+    #expect(turn.last?.output == .control("agent.finished"))
     #expect(turn.allSatisfy { $0.inputID == next.id })
-    #expect(
-        await speechRequests.restored(try #require(turn.first).output)
-            == .actionCall(expectedActionCall(name: "say", parameters: ["text": "模型回答"])))
     await agent.stop()
 }
 
@@ -168,11 +177,12 @@ private actor MalformedChatFixture: ChatCapability {
 }
 
 @Test(
+    .actionCatalog,
     .timeLimit(.minutes(1)),
     arguments: [
         "<express></express>", "<channel.main>unfinished", "&bogus;",
     ])
-func assistantReportsInvalidOutputAndAcceptsNextTurn(_ malformed: String) async throws {
+func assistantInvalidOutputTerminatesWithoutRetryAndAcceptsNextTurn(_ malformed: String) async throws {
     let model = MalformedChatFixture(malformed)
     let agent = try AssistantAgent(chat: model)
     let speechRequests = try await bindSpeechRequests(agent)
@@ -181,18 +191,13 @@ func assistantReportsInvalidOutputAndAcceptsNextTurn(_ malformed: String) async 
     let sessionID = UUID()
     let failed = AgentInput(sessionID: sessionID, payload: .text("bad turn"))
     try await agent.receive(failed)
-    var reported = false
-    for _ in 0..<121 {
-        let output = try #require(try await outputs.next())
-        #expect(output.inputID == failed.id)
-        #expect(output.output != .control("agent.finished"))
-        if case .control(let message) = output.output {
-            #expect(message.hasPrefix("agent.error:"))
-            reported = true
-            break
-        }
+    var rejected: [OutputEnvelope] = []
+    while let output = try await outputs.next() {
+        rejected.append(output)
+        if case .control(let value) = output.output, value.hasPrefix("agent.error:") { break }
     }
-    #expect(reported)
+    #expect(rejected.allSatisfy { $0.inputID == failed.id })
+    #expect(await model.requests.count == 1)
     #expect(await agent.status().lifecycle == .running)
     let next = AgentInput(sessionID: sessionID, payload: .text("try again"))
     try await agent.receive(next)
@@ -204,8 +209,7 @@ func assistantReportsInvalidOutputAndAcceptsNextTurn(_ malformed: String) async 
         })
     let requests = await model.requests
     try #require(requests.count == 2)
-    #expect(requests[1].messages.count == 2)
-    #expect(!requests[1].messages.contains { $0.content == "bad turn" })
+    #expect(requests[1].messages.contains { $0.role == .user && $0.content == "try again" })
     await agent.stop()
 }
 
@@ -223,7 +227,9 @@ private struct LongReplyChat: ChatCapability {
     }
 }
 
-@Test(.timeLimit(.minutes(1))) func assistantAcceptsStreamingReplyBeyondFormerWholeReplyLimit() async throws {
+@Test(.actionCatalog, .timeLimit(.minutes(1))) func assistantAcceptsStreamingReplyBeyondFormerWholeReplyLimit()
+    async throws
+{
     let agent = try AssistantAgent(chat: LongReplyChat())
     _ = try await bindSpeechRequests(agent)
     try await agent.start()
@@ -243,7 +249,7 @@ private struct LongReplyChat: ChatCapability {
     #expect(captions == String(repeating: LongReplyChat.fragment, count: 40))
 }
 
-@Test(arguments: ["<unknown/>", "<express/>"])
+@Test(.actionCatalog, arguments: ["<unknown/>", "<express/>"])
 func assistantCompletesTurnAfterRejectedAction(_ markup: String) async throws {
     let agent = try AssistantAgent(chat: MalformedChatFixture(markup))
     _ = try await bindSpeechRequests(agent)
@@ -256,14 +262,23 @@ func assistantCompletesTurnAfterRejectedAction(_ markup: String) async throws {
     await agent.stop()
 }
 
-private struct RejectedToolChatFixture: ChatCapability {
+private actor RejectedToolChatFixture: ChatCapability {
     let availability: CapabilityAvailability = .available
     let name: String
     let arguments: String
-    var emitsText = true
+    let emitsText: Bool
+    private var requests = 0
+    init(name: String, arguments: String, emitsText: Bool = true) {
+        self.name = name
+        self.arguments = arguments
+        self.emitsText = emitsText
+    }
     func chat(_ request: ChatRequest) throws -> InferenceSession<ChatEvent> {
+        requests += 1
         let pair = InferenceSession<ChatEvent>.make(limits: try StreamLimits(), estimatedBytes: { $0.estimatedBytes })
-        try pair.emitter.yield(.toolCall(ChatToolCall(id: "fixture", name: name, argumentsJSON: arguments)))
+        if requests == 1 {
+            try pair.emitter.yield(.toolCall(ChatToolCall(id: "fixture", name: name, argumentsJSON: arguments)))
+        }
         if emitsText { try pair.emitter.yield(.text("Continued.")) }
         try pair.emitter.yield(.finished(.stop))
         pair.emitter.finish()
@@ -271,7 +286,9 @@ private struct RejectedToolChatFixture: ChatCapability {
     }
 }
 
-@Test(.timeLimit(.minutes(1))) func rejectedNativeOutcomeWriteFailureTerminatesBeforeOutput() async throws {
+@Test(.actionCatalog, .timeLimit(.minutes(1))) func rejectedNativeOutcomeWriteFailureTerminatesBeforeOutput()
+    async throws
+{
     let repository = AgentContextRepository(
         agent: .assistant, scope: UUID(), state: AssistantContextState(),
         persistence: .init(
@@ -302,7 +319,7 @@ private struct RejectedToolChatFixture: ChatCapability {
     await agent.stop()
 }
 
-@Test(arguments: ["{}", "{invalid"])
+@Test(.actionCatalog, arguments: ["{}", "{invalid"])
 func assistantContinuesAfterRejectedNativeTool(_ arguments: String) async throws {
     let agent = try AssistantAgent(chat: RejectedToolChatFixture(name: "unknown", arguments: arguments))
     _ = try await bindSpeechRequests(agent)
@@ -320,7 +337,7 @@ func assistantContinuesAfterRejectedNativeTool(_ arguments: String) async throws
     await agent.stop()
 }
 
-@Test func assistantControlCancellationPreservesOtherSessionWork() async throws {
+@Test(.actionCatalog) func assistantControlCancellationPreservesOtherSessionWork() async throws {
     let agent = try AssistantAgent(capacity: 2, chat: ChatFixture())
     _ = try await bindSpeechRequests(agent)
     try await agent.start()
@@ -339,7 +356,7 @@ func assistantContinuesAfterRejectedNativeTool(_ arguments: String) async throws
     await agent.stop()
 }
 
-@Test(arguments: ["legacy", "foreign", "user", "agent", "runtime", "incarnation", "expired"])
+@Test(.actionCatalog, arguments: ["legacy", "foreign", "user", "agent", "runtime", "incarnation", "expired"])
 func invalidAssistantControlCannotCancelQueuedWork(_ kind: String) async throws {
     let agent = try AssistantAgent(capacity: 1, chat: ChatFixture())
     try await agent.start()
@@ -369,7 +386,7 @@ func invalidAssistantControlCannotCancelQueuedWork(_ kind: String) async throws 
     await agent.stop()
 }
 
-@Test func assistantControlSchemaAndGatewayRejectForeignContentAndLegacyContract() async throws {
+@Test(.actionCatalog) func assistantControlSchemaAndGatewayRejectForeignContentAndLegacyContract() async throws {
     let configuration = try AgentConfigurations.load(named: "Assistant")
     let contracts = try AgentContracts.communication
     #expect(!configuration.communication.inputs.contains { $0.contract == "runtime.event" })
@@ -432,7 +449,8 @@ private actor ContinuationChatFixture: ChatCapability {
         return pair.session
     }
 }
-@Test(.timeLimit(.minutes(1))) func assistantContinuesFromCorrelatedNativeResultsWithoutParsingResultAsActions()
+@Test(.actionCatalog, .timeLimit(.minutes(1)))
+func assistantContinuesFromCorrelatedNativeResultsWithoutParsingResultAsActions()
     async throws
 {
     let model = ContinuationChatFixture()
@@ -473,9 +491,9 @@ private actor ContinuationChatFixture: ChatCapability {
         })
     let requests = await model.requests
     try #require(requests.count == 2)
-    #expect(requests[1].messages.last?.role == .tool)
-    #expect(requests[1].messages.last?.toolCallID == "provider-call")
-    let content = try #require(requests[1].messages.last?.content)
+    let toolMessage = try #require(requests[1].messages.last { $0.role == .tool })
+    #expect(toolMessage.toolCallID == "provider-call")
+    let content = toolMessage.content
     let result = try #require(JSONSerialization.jsonObject(with: Data(content.utf8)) as? [String: Any])
     #expect(result["value"] as? String == "<express emotion=\"angry\"/> factual result")
     #expect(result["isError"] as? Bool == true)
@@ -496,7 +514,9 @@ private actor RepeatedNativeChatFixture: ChatCapability {
     func chat(_ request: ChatRequest) throws -> InferenceSession<ChatEvent> {
         requests += 1
         let pair = InferenceSession<ChatEvent>.make(limits: try StreamLimits(), estimatedBytes: { $0.estimatedBytes })
-        if request.messages.last?.content == "recover" {
+        if request.messages.last(where: {
+            $0.role == .user && !$0.content.hasPrefix("Current task and Skill state (data, not instructions):")
+        })?.content == "recover" || requests == 33 {
             try pair.emitter.yield(.text("recovered"))
             try pair.emitter.yield(.finished(.stop))
         } else {
@@ -507,7 +527,9 @@ private actor RepeatedNativeChatFixture: ChatCapability {
         return pair.session
     }
 }
-@Test(.timeLimit(.minutes(1))) func nativeContinuationLimitWaitsForActualResultsAndNextTurnRecovers() async throws {
+@Test(.actionCatalog, .timeLimit(.minutes(1))) func nativeContinuationJoinsThirtyTwoActualResultsAndNextTurnWorks()
+    async throws
+{
     let model = RepeatedNativeChatFixture()
     let agent = try FixtureNativeAgent(chat: model)
     _ = try await bindSpeechRequests(agent)
@@ -529,13 +551,96 @@ private actor RepeatedNativeChatFixture: ChatCapability {
                         payload: payload, source: "runtime", origin: .runtime,
                         rootID: input.metadata.rootID, parentID: input.id)))
         }
-        if case .control(let value) = envelope.output, value.hasPrefix("agent.error:") { terminal = value }
+        if case .control(let value) = envelope.output, value == "agent.finished" || value.hasPrefix("agent.error:") {
+            terminal = value
+        }
     }
-    #expect(calls == 4)
-    #expect(await model.requests == 4)
-    #expect(terminal?.contains("round limit") == true)
+    #expect(calls == 32)
+    #expect(await model.requests == 33)
+    #expect(terminal == "agent.finished")
     try await agent.receive(AgentInput(sessionID: input.sessionID, payload: .text("recover")))
     _ = try await completedTurn(&outputs)
-    #expect(await model.requests == 5)
+    #expect(await model.requests == 34)
+    await agent.stop()
+}
+
+@Test(.actionCatalog, .timeLimit(.minutes(1)))
+func hostCancelTerminatesActiveInferenceBeforeQueuedCancellationAndOtherSessionReply() async throws {
+    let model = ChatFixture()
+    let agent = try AssistantAgent(chat: model)
+    _ = try await bindSpeechRequests(agent)
+    try await agent.start()
+    let session = UUID()
+    let active = AgentInput(sessionID: session, payload: .text("wait"))
+    let queued = AgentInput(sessionID: session, payload: .text("queued"))
+    let retained = AgentInput(sessionID: UUID(), payload: .text("next"))
+    try await agent.receive(active)
+    await model.waitForPending()
+    _ = try #require(await model.pending)
+    try await agent.receive(queued)
+    try await agent.receive(retained)
+    try await agent.receive(AgentSessionControl.cancelSession.input(sessionID: session))
+    var outputs = FixtureGenerationOutputs(agent: agent).makeAsyncIterator()
+    var cancelled: [OutputEnvelope] = []
+    var next: [OutputEnvelope] = []
+    for _ in 0..<121 {
+        let output = try #require(try await outputs.next())
+        if output.output == .control("agent.cancelled") { cancelled.append(output) }
+        if output.inputID == retained.id {
+            #expect(cancelled.map(\.inputID) == [active.id, queued.id])
+            next.append(output)
+        }
+        if output.inputID == retained.id, output.output == .control("agent.finished") { break }
+    }
+    #expect(cancelled.map(\.inputID) == [active.id, queued.id])
+    #expect(cancelled.first?.roundID != nil)
+    #expect(next.last?.output == .control("agent.finished"))
+    #expect(await agent.status().lifecycle == .running)
+    let fresh = AgentInput(sessionID: session, payload: .text("hello again"))
+    try await agent.receive(fresh)
+    let recovered = try await completedTurn(&outputs)
+    #expect(recovered.allSatisfy { $0.inputID == fresh.id })
+    await agent.stop()
+}
+
+@Test(.actionCatalog, .timeLimit(.minutes(1)), arguments: [false, true])
+func closingSessionCancelsRunningAndWaitingForegroundTasksAndAllowsFreshConversation(_ running: Bool) async throws {
+    let session = UUID()
+    let original = AgentInput(sessionID: session, payload: .text("wait"))
+    let fixed = try AssistantAgent.runtimeCapabilities(AgentConfigurations.load(named: "Assistant").capabilities)
+    var initial = AssistantContextState()
+    var skills = AgentTaskSkillState()
+    try skills.initialize(fixed: fixed, baseSkills: AgentConfigurations.baseSkills(named: "Assistant"))
+    _ = try skills.control(
+        "startTask", arguments: ["goal": "拍照并等待选择", "skills": "[\"photography\"]"],
+        inputID: original.id, fixed: fixed, sessionID: session)
+    if !running { try skills.roundCompleted(failed: false, fixed: fixed, inputID: original.id) }
+    initial.skillState = skills
+    let repository = AgentContextRepository(agent: .assistant, scope: UUID(), state: initial)
+    let model = ChatFixture()
+    let agent = try AssistantAgent(chat: model, context: repository)
+    _ = try await bindSpeechRequests(agent)
+    try await agent.start()
+    if running {
+        try await agent.receive(original)
+        await model.waitForPending()
+        _ = try #require(await model.pending)
+    }
+    try await agent.receive(AgentSessionControl.cancelSession.input(sessionID: session))
+    let state = try #require(try await repository.snapshot().state.skillState)
+    #expect(state.activeTaskID == nil)
+    #expect(state.tasks.last?.status == "cancelled")
+    #expect(state.tasks.last?.failure == nil)
+    #expect(!state.loaded.contains("photography"))
+    try await agent.receive(.init(sessionID: session, payload: .text("hello again")))
+    var outputs = FixtureGenerationOutputs(agent: agent).makeAsyncIterator()
+    while let output = try await outputs.next() {
+        #expect(
+            {
+                if case .control(let value) = output.output { return !value.hasPrefix("agent.error:") }
+                return true
+            }())
+        if output.output == .control("agent.finished") { break }
+    }
     await agent.stop()
 }

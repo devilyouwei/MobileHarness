@@ -49,7 +49,7 @@ private func armSpeeds(in frame: [UInt8]) throws -> [Int] {
     return (0..<5).map { Int(packet.payload[8 + $0 * 8]) | Int(packet.payload[9 + $0 * 8]) << 8 }
 }
 
-@Test func aimFrameAddressesFiveArmMotorsAtHome() throws {
+@Test(.actionCatalog) func aimFrameAddressesFiveArmMotorsAtHome() throws {
     let frame = try NexArmJointCommand.frame(positions: NexArmJointCommand.armHome)
     #expect(try armTargets(in: frame) == [2047, 2087, 1984, 2045, 2048])
     #expect(throws: NexArmControlError.invalidPosition) {
@@ -57,7 +57,7 @@ private func armSpeeds(in frame: [UInt8]) throws -> [Int] {
     }
 }
 
-@Test func followUpStepUsesItsOwnDistanceForSpeed() throws {
+@Test(.actionCatalog) func followUpStepUsesItsOwnDistanceForSpeed() throws {
     let home = NexArmJointCommand.armHome
     var previous = home
     previous[0] = home[0] - 200
@@ -72,7 +72,7 @@ private func armSpeeds(in frame: [UInt8]) throws -> [Int] {
     #expect(speeds[4] == 1)
 }
 
-@Test func leftAndHighTargetsMoveOnlyPanAndWrist() throws {
+@Test(.actionCatalog) func leftAndHighTargetsMoveOnlyPanAndWrist() throws {
     let home = NexArmJointCommand.armHome
     let left = try NexArmJointCommand.positions(base: -0.32, pitch: 0)
     #expect(left[0] < home[0])
@@ -85,7 +85,7 @@ private func armSpeeds(in frame: [UInt8]) throws -> [Int] {
     #expect(throws: NexArmControlError.invalidAngle) { try NexArmJointCommand.positions(base: .nan, pitch: 0) }
 }
 
-@Test func lookingDownExtendsTheArmAndTheElbowKeepsTheForearmLevel() throws {
+@Test(.actionCatalog) func lookingDownExtendsTheArmAndTheElbowKeepsTheForearmLevel() throws {
     let home = NexArmJointCommand.armHome
     let level = NexArmJointCommand.forearmLevelSum
     #expect(level == 4071)
@@ -107,7 +107,7 @@ private func armSpeeds(in frame: [UInt8]) throws -> [Int] {
     _ = try NexArmJointCommand.packet(positions: low)
 }
 
-@Test func forearmLevelerLeadsOnlyWhileTheArmExtends() {
+@Test(.actionCatalog) func forearmLevelerLeadsOnlyWhileTheArmExtends() {
     var leveler = NexArmForearmLeveler()
     let home = NexArmJointCommand.armHome
     #expect(leveler.elbow(forLift: home[1]) == home[2])
@@ -116,7 +116,7 @@ private func armSpeeds(in frame: [UInt8]) throws -> [Int] {
     #expect(leveler.elbow(forLift: home[1] - 50) == home[2] + 50)
 }
 
-@Test func photographerPolicyAcceptsVisionPose() throws {
+@Test(.actionCatalog) func photographerPolicyAcceptsVisionPose() throws {
     let policy = try CommunicationPolicy(
         contracts: AgentContracts.communication,
         externalSources: [
@@ -128,7 +128,7 @@ private func armSpeeds(in frame: [UInt8]) throws -> [Int] {
     #expect(policy.destinations(for: input) == [.photographer])
 }
 
-@Test func photographerOnTheLeftAimsBaseAndHoldsTheOtherJoints() async throws {
+@Test(.actionCatalog) func photographerOnTheLeftAimsBaseAndHoldsTheOtherJoints() async throws {
     let session = UUID()
     let agent = try PhotographerAgent(sessionID: session, controlsArm: true)
     try await agent.start()
@@ -160,7 +160,7 @@ private func armSpeeds(in frame: [UInt8]) throws -> [Int] {
     await agent.stop()
 }
 
-@Test func photographerFreshnessUsesActualPoseAdmissionAndStopsWithLifecycle() async throws {
+@Test(.actionCatalog) func photographerFreshnessUsesActualPoseAdmissionAndStopsWithLifecycle() async throws {
     let session = UUID()
     let agent = try PhotographerAgent(sessionID: session, controlsArm: true)
     try await agent.start()
@@ -183,7 +183,7 @@ private func armSpeeds(in frame: [UInt8]) throws -> [Int] {
     #expect(await outputs.next() == nil)
 }
 
-@Test func hiddenNoseUsesTheVisibleJointMidpoint() async throws {
+@Test(.actionCatalog) func hiddenNoseUsesTheVisibleJointMidpoint() async throws {
     let session = UUID()
     let agent = try PhotographerAgent(sessionID: session, controlsArm: true)
     try await agent.start()
@@ -205,7 +205,7 @@ private func armSpeeds(in frame: [UInt8]) throws -> [Int] {
     await agent.stop()
 }
 
-@Test func emptyPoseDoesNotAim() async throws {
+@Test(.actionCatalog) func emptyPoseDoesNotAim() async throws {
     let session = UUID()
     let agent = try PhotographerAgent(sessionID: session, controlsArm: true)
     try await agent.start()
@@ -216,7 +216,7 @@ private func armSpeeds(in frame: [UInt8]) throws -> [Int] {
     #expect(await stream.next() == nil)
 }
 
-@Test func centeredPersonDoesNotAim() async throws {
+@Test(.actionCatalog) func centeredPersonDoesNotAim() async throws {
     let session = UUID()
     let agent = try PhotographerAgent(sessionID: session, controlsArm: true)
     try await agent.start()
@@ -226,7 +226,7 @@ private func armSpeeds(in frame: [UInt8]) throws -> [Int] {
     #expect(await stream.next() == nil)
 }
 
-@Test func baseKeepsSteppingWhileThePersonStaysOffCenter() async throws {
+@Test(.actionCatalog) func baseKeepsSteppingWhileThePersonStaysOffCenter() async throws {
     let session = UUID()
     let agent = try PhotographerAgent(sessionID: session, controlsArm: true)
     try await agent.start()
@@ -247,7 +247,7 @@ private func armSpeeds(in frame: [UInt8]) throws -> [Int] {
     await agent.stop()
 }
 
-@Test func aimWaitsForTimeAndMovement() async throws {
+@Test(.actionCatalog) func aimWaitsForTimeAndMovement() async throws {
     let session = UUID()
     let agent = try PhotographerAgent(sessionID: session, controlsArm: true)
     try await agent.start()
@@ -259,7 +259,7 @@ private func armSpeeds(in frame: [UInt8]) throws -> [Int] {
     #expect(await stream.next() == nil)
 }
 
-@Test func aimActionRejectsANonFiniteAngleBeforeSend() async throws {
+@Test(.actionCatalog) func aimActionRejectsANonFiniteAngleBeforeSend() async throws {
     let input = AgentInput(sessionID: UUID(), payload: .text("test"))
     let call = ToolCall(toolPath: "NexArm.Tracking.aim", arguments: ["base": "nan", "pitch": "0"])
     let envelope = OutputEnvelope(source: .photographer, input: input, output: .toolCall(call))
@@ -304,7 +304,7 @@ private actor AimLink: NexArmWritableLink {
     func close() {}
 }
 
-@Test func controllerAimWritesFiveAxesAfterVerification() async throws {
+@Test(.actionCatalog) func controllerAimWritesFiveAxesAfterVerification() async throws {
     let link = AimLink()
     let controller = NexArmActionController(link: link, compatibilityPolicy: .nexArmBLEProtocol)
     await #expect(throws: NexArmExecutionError.firmwareUnavailable) {
@@ -320,7 +320,7 @@ private actor AimLink: NexArmWritableLink {
     #expect(await link.exchanges == reads)
 }
 
-@Test func trackingWriteFailureRequiresExplicitRecoveryAndNeverReplays() async throws {
+@Test(.actionCatalog) func trackingWriteFailureRequiresExplicitRecoveryAndNeverReplays() async throws {
     let link = AimLink()
     let controller = NexArmActionController(link: link, compatibilityPolicy: .nexArmBLEProtocol)
     _ = try await controller.verifyCompatibility()
@@ -335,7 +335,7 @@ private actor AimLink: NexArmWritableLink {
     #expect(await link.writes.count == 2)
 }
 
-@Test func photographerOverflowRejectsWithoutStoppingOrReplacingAcceptedAims() async throws {
+@Test(.actionCatalog) func photographerOverflowRejectsWithoutStoppingOrReplacingAcceptedAims() async throws {
     let session = UUID()
     let agent = try PhotographerAgent(sessionID: session, controlsArm: true, outputCapacity: 8)
     try await agent.start()
@@ -358,7 +358,7 @@ private actor AimLink: NexArmWritableLink {
     #expect(accepted == 8)
 }
 
-@Test func photographerRejectsMalformedDecodedPoseBeforeIndexingJoints() async throws {
+@Test(.actionCatalog) func photographerRejectsMalformedDecodedPoseBeforeIndexingJoints() async throws {
     let session = UUID()
     let agent = try PhotographerAgent(sessionID: session, controlsArm: true)
     try await agent.start()
@@ -373,7 +373,7 @@ private actor AimLink: NexArmWritableLink {
     await agent.stop()
 }
 
-@Test func robotAimPublishesIntentWithoutHoldingTheWorkersMotorFence() async throws {
+@Test(.actionCatalog) func robotAimPublishesIntentWithoutHoldingTheWorkersMotorFence() async throws {
     let module = NexArmTrackingModule { _, _, _ in }
     let registry = try ToolRegistry(modules: [module])
     let resources = await registry.resources(for: "NexArm.Tracking.aim")
@@ -385,7 +385,7 @@ private actor ArmAvailability {
     func enable() { ready = true }
 }
 
-@Test func photographerSuppressesOfflineCommandsAndResumesFromFreshPose() async throws {
+@Test(.actionCatalog) func photographerSuppressesOfflineCommandsAndResumesFromFreshPose() async throws {
     let session = UUID()
     let availability = ArmAvailability()
     let agent = try PhotographerAgent(
@@ -400,7 +400,7 @@ private actor ArmAvailability {
     #expect(sequences == [2])
 }
 
-@Test func controllerTrackingSpeedUsesPreviousAcceptedTarget() async throws {
+@Test(.actionCatalog) func controllerTrackingSpeedUsesPreviousAcceptedTarget() async throws {
     let link = AimLink()
     let controller = NexArmActionController(link: link, compatibilityPolicy: .nexArmBLEProtocol)
     _ = try await controller.verifyCompatibility()
@@ -415,7 +415,7 @@ private actor ArmAvailability {
     #expect(speeds.dropFirst().allSatisfy { $0 == 1 })
 }
 
-@Test func rejectedTrackingOutputDoesNotAdvanceAccumulatedTarget() async throws {
+@Test(.actionCatalog) func rejectedTrackingOutputDoesNotAdvanceAccumulatedTarget() async throws {
     let session = UUID()
     let agent = try PhotographerAgent(sessionID: session, controlsArm: true, outputCapacity: 8)
     try await agent.start()

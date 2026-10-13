@@ -40,7 +40,7 @@ private final class ProviderTransactionFixture: ProviderSettingsPersistence {
                 }, beginChange: { self.events.append("begin") }, endChange: { self.events.append("end") }))
     }
 }
-@Test @MainActor func providerSettingsFailureRollsBackBeforeReleasingChangeBarrier() async throws {
+@Test(.actionCatalog) @MainActor func providerSettingsFailureRollsBackBeforeReleasingChangeBarrier() async throws {
     let fixture = ProviderTransactionFixture()
     let service = fixture.service()
     _ = try await service.restore()
@@ -53,7 +53,7 @@ private final class ProviderTransactionFixture: ProviderSettingsPersistence {
     #expect(fixture.value?.model == "old")
     #expect(try await service.restore().model == "old")
 }
-@Test @MainActor func providerSettingsValidationPrecedesPersistenceAndBarrier() async throws {
+@Test(.actionCatalog) @MainActor func providerSettingsValidationPrecedesPersistenceAndBarrier() async throws {
     let fixture = ProviderTransactionFixture()
     let service = fixture.service()
     _ = try await service.restore()
@@ -65,7 +65,9 @@ private final class ProviderTransactionFixture: ProviderSettingsPersistence {
     #expect(fixture.events == ["prepare:invalid"])
     #expect(fixture.value?.model == "old")
 }
-@Test @MainActor func providerSettingsReturningPipelineKeepsPrivateResultsAndRollbackCauses() async throws {
+@Test(.actionCatalog) @MainActor func providerSettingsReturningPipelineKeepsPrivateResultsAndRollbackCauses()
+    async throws
+{
     let fixture = ProviderTransactionFixture()
     let requests = ProviderSettingsRequests(service: fixture.service())
     let session = UUID()
@@ -96,7 +98,7 @@ private final class ProviderTransactionFixture: ProviderSettingsPersistence {
     #expect(try requests.take(again, sessionID: session).model == "old")
     await runtime.shutdown()
 }
-@Test @MainActor func providerSettingsCancelledApplyStillRollsBackBeforeRelease() async throws {
+@Test(.actionCatalog) @MainActor func providerSettingsCancelledApplyStillRollsBackBeforeRelease() async throws {
     let fixture = ProviderTransactionFixture()
     fixture.applyCancelled = true
     let service = fixture.service()
@@ -110,7 +112,7 @@ private final class ProviderTransactionFixture: ProviderSettingsPersistence {
     #expect(fixture.events == ["prepare:new", "begin", "persist:new", "apply:new", "persist:old", "end"])
     #expect(fixture.value?.model == "old")
 }
-@Test func providerSettingsAgentSharesConfigurationGateAndKeepsCallsOpaque() async throws {
+@Test(.actionCatalog) func providerSettingsAgentSharesConfigurationGateAndKeepsCallsOpaque() async throws {
     let session = UUID()
     let agent = try ApplicationControlAgent(sessionID: session)
     try await agent.start()
@@ -140,7 +142,9 @@ private final class ProviderSettingsClock: @unchecked Sendable {
     func now() -> ContinuousClock.Instant { lock.withLock { value } }
     func advance() { lock.withLock { value = value.advanced(by: .seconds(11)) } }
 }
-@Test @MainActor func providerSettingsPrivateSlotsCheckSessionOperationExpiryAndCompletedCapacity() async throws {
+@Test(.actionCatalog) @MainActor func providerSettingsPrivateSlotsCheckSessionOperationExpiryAndCompletedCapacity()
+    async throws
+{
     let fixture = ProviderTransactionFixture()
     let clock = ProviderSettingsClock()
     let requests = ProviderSettingsRequests(service: fixture.service(), clock: { clock.now() })
@@ -199,7 +203,7 @@ private final class ProviderCredentialFixture: ProviderCredentialStorage, @unche
     var events: [String] { lock.withLock { actions } }
     var keyCount: Int { lock.withLock { keys.count } }
 }
-@Test func providerSettingsStoreVerifiesLegacyMigrationAndCleansFailedCredentialCommit() async throws {
+@Test(.actionCatalog) func providerSettingsStoreVerifiesLegacyMigrationAndCleansFailedCredentialCommit() async throws {
     let url = FileManager.default.temporaryDirectory.appendingPathComponent("provider-settings-\(UUID()).json")
     defer { try? FileManager.default.removeItem(at: url) }
     let credentials = try ProviderCredentialFixture()
@@ -244,7 +248,8 @@ private final class ProviderCredentialFixture: ProviderCredentialStorage, @unche
         throw CancellationError()
     }
 }
-@Test @MainActor func providerPresentationPipelineCommitsOneEffectAndKeepsOriginalFailure() async throws {
+@Test(.actionCatalog) @MainActor func providerPresentationPipelineCommitsOneEffectAndKeepsOriginalFailure() async throws
+{
     let fixture = ProviderTransactionFixture()
     let requests = ProviderSettingsRequests(service: fixture.service())
     let presenter = ProviderResultPresentationFixture(requests)
@@ -281,7 +286,7 @@ private final class ProviderCredentialFixture: ProviderCredentialStorage, @unche
     #expect(await runtime.agent.status().queuedInputs == 0)
     await runtime.shutdown()
 }
-@Test func providerEligibilityBelongsToActionsAndPreservesOrder() throws {
+@Test(.actionCatalog) func providerEligibilityBelongsToActionsAndPreservesOrder() throws {
     let values = ["gpt-4o-mini", "embedding-model", "my-deployment", "gpt-5-pro", "gpt-4o-mini", "whisper-1"]
     #expect(try ProviderModelList.eligible(values) == ["gpt-4o-mini", "my-deployment"])
     #expect(!ProviderModelList.isLikelyChatModel("GPT-5-Pro-2026"))

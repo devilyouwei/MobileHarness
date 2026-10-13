@@ -2,7 +2,7 @@ import Foundation
 import Storage
 import Testing
 
-@Test func localFileStoreRejectsTraversalAndSymbolicLinks() async throws {
+@Test(.actionCatalog) func localFileStoreRejectsTraversalAndSymbolicLinks() async throws {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     defer { try? FileManager.default.removeItem(at: root) }
     let store = try LocalFileStore(root: root)
@@ -12,7 +12,7 @@ import Testing
         at: root.appendingPathComponent("escape"), withDestinationURL: root.deletingLastPathComponent())
     await #expect(throws: FileStorageError.self) { try await store.directory("escape/directory") }
 }
-@Test func localFileStorePublishesDirectoryWithoutOverwritingPriorInstall() async throws {
+@Test(.actionCatalog) func localFileStorePublishesDirectoryWithoutOverwritingPriorInstall() async throws {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     defer { try? FileManager.default.removeItem(at: root) }
     let store = try LocalFileStore(root: root)
@@ -29,7 +29,7 @@ import Testing
     #expect(try await store.read("installed/model/file", maximumBytes: 16) == nil)
 }
 
-@Test func enumeratedFilePathsRemainRelativeAcrossTrustedRootAliases() async throws {
+@Test(.actionCatalog) func enumeratedFilePathsRemainRelativeAcrossTrustedRootAliases() async throws {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     defer { try? FileManager.default.removeItem(at: root) }
     let store = try LocalFileStore(root: root)

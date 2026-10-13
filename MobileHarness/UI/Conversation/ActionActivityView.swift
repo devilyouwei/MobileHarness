@@ -5,7 +5,6 @@
     @MainActor
     public struct ActionActivityView: View {
         @Bindable private var state: ActionActivityState
-        @State private var showingHistory = false
         @State private var taskPath: [UUID] = []
         private let taskHistory: ((String, Set<UUID>) -> AnyView?)?
         public init(state: ActionActivityState, taskHistory: ((String, Set<UUID>) -> AnyView?)? = nil) {
@@ -22,7 +21,7 @@
                             ForEach(Array(channels.prefix(3))) { channel in
                                 HStack(spacing: 10) {
                                     Button {
-                                        showingHistory = true
+                                        state.showsExecutionHistory = true
                                     } label: {
                                         HStack(alignment: .top, spacing: 8) {
                                             Image(systemName: channel.item.symbol)
@@ -63,7 +62,7 @@
                     }
                     if state.hasRecords {
                         Button {
-                            showingHistory = true
+                            state.showsExecutionHistory = true
                         } label: {
                             Image(systemName: "list.bullet.rectangle")
                                 .font(.system(size: 20, weight: .medium))
@@ -78,7 +77,7 @@
                 }
             }
             .accessibilityIdentifier("conversation.actions.status")
-            .sheet(isPresented: $showingHistory) {
+            .sheet(isPresented: $state.showsExecutionHistory) {
                 NavigationStack(path: $taskPath) {
                     VStack(spacing: 0) {
                         Picker("记录类型", selection: $state.selectedTab) {
@@ -118,7 +117,9 @@
                     .navigationTitle("执行记录")
                     .navigationBarTitleDisplayMode(.inline)
                     .toolbar {
-                        ToolbarItem(placement: .confirmationAction) { Button("完成") { showingHistory = false } }
+                        ToolbarItem(placement: .confirmationAction) {
+                            Button("完成") { state.showsExecutionHistory = false }
+                        }
                     }
                 }
                 .presentationDetents([.medium, .large])
@@ -140,9 +141,17 @@
                         VStack(alignment: .leading, spacing: 6) {
                             Text(task.title.isEmpty ? "任务 " + String(task.id.uuidString.prefix(8)) : task.title)
                                 .lineLimit(2)
-                            Text(task.requester + " → " + task.executor).font(.caption).foregroundStyle(.secondary)
+                            Text(
+                                task.execution == nil
+                                    ? task.requester + " → " + task.executor
+                                    : (task.execution == "background" ? "后台任务" : "前台任务") + " · " + task.executor
+                            ).font(.caption).foregroundStyle(.secondary)
                             Text(task.phase.rawValue).font(.subheadline).foregroundStyle(
                                 task.phase == .failed ? .orange : .secondary)
+                            if !task.skills.isEmpty {
+                                Text("Skills: " + task.skills.joined(separator: ", ")).font(.caption).foregroundStyle(
+                                    .secondary)
+                            }
                         }.padding(.vertical, 4)
                     }
                 }
@@ -183,10 +192,20 @@
                 List {
                     Section("任务") {
                         Text(task.title)
-                        Text(task.requester + " → " + task.executor)
+                        Text(
+                            task.execution == nil
+                                ? task.requester + " → " + task.executor
+                                : (task.execution == "background" ? "后台任务" : "前台任务") + " · " + task.executor)
                         Text(task.phase.rawValue)
+                        if !task.skills.isEmpty { Text("Skills: " + task.skills.joined(separator: ", ")) }
                         if let parentID = task.parentID {
                             Text("父任务 / 输入：" + parentID.uuidString).font(.caption).textSelection(.enabled)
+                        }
+                    }
+                    if task.phase == .failed {
+                        Section("失败原因") {
+                            Text(task.failure ?? "该记录未保存失败原因，请查看关联 Action 和模型记录；记录已移除时无法还原。")
+                                .textSelection(.enabled)
                         }
                     }
                     Section("时间线") {
@@ -210,7 +229,7 @@
                         Button("查看 Action") { selectRelated(.action, task: id) }
                         if let destination = taskHistory?(
                             task.executor,
-                            Set(task.events.map(\.id)))
+                            task.mode == nil ? Set(task.events.map(\.id)) : Set(task.inputIDs))
                         {
                             NavigationLink {
                                 destination

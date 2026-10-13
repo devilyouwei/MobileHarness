@@ -7,9 +7,12 @@ public protocol SpeechPlaybackCapability: Sendable {
 }
 
 public protocol SpeechListeningCapability: Sendable {
-    func updateListening(enabled: Bool, paused: Bool, revision: UInt64, invocation: any FunctionInput) async throws
+    func updateListening(
+        enabled: Bool, paused: Bool, revision: UInt64, feedback: SpeechActions.ListeningFeedback,
+        invocation: any FunctionInput) async throws
 }
 
+@ActionCatalog
 public struct SpeechModule: CapabilityModule {
     private let listening: (any SpeechListeningCapability)?
     private let playback: any SpeechPlaybackCapability
@@ -26,9 +29,9 @@ public struct SpeechModule: CapabilityModule {
             }),
             SpeechActions.updateDefinition(handler: { [listening] invocation in
                 guard let listening else { throw SpeechActionError.listeningUnavailable }
-                try await SpeechActions.update(invocation: invocation) { enabled, paused, revision in
+                try await SpeechActions.update(invocation: invocation) { enabled, paused, revision, feedback in
                     try await listening.updateListening(
-                        enabled: enabled, paused: paused, revision: revision,
+                        enabled: enabled, paused: paused, revision: revision, feedback: feedback,
                         invocation: invocation)
                 }
             }),

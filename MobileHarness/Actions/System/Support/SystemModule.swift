@@ -1,5 +1,6 @@
 import FunctionContracts
 
+@ActionCatalog
 public struct SystemModule: CapabilityModule {
     public init() {}
     public var definitions: [ActionFunction] {

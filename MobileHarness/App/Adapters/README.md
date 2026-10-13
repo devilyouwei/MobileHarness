@@ -62,3 +62,37 @@ History preview combines the producing role's effective function and communicati
 ## Related design
 
 [Parent design](../README.md)
+
+## Skill/task-mode contract
+
+✅ History preview uses the persisted per-request catalog, including exact native schema, instead of current configuration. Missing catalogs fail preview explicitly. Camera/UI execution accepts authorized Assistant scopes as well as fixed deterministic owner scopes.
+
+✅ 固定 Task 控制复用同一 Action：App 验证 Assistant/root-session；worker 仅在没有当前 worker、队列和接纳操作时接受无 decisionID 的可信控制。模型控制仍要求当前 input/session/round。固定终态在空闲清理条件下提交，不启动模型。
+
+✅ SpeechFailurePresentation 删除不存在的 Agent 合成/缓存超时分类；超时展示来自 ActionResult 的真实函数结果，网络失败保留底层来源。
+
+## Action timeout contract (2026-10-12)
+
+✅ NexArmBehaviorAdapter 删除包裹单个 gesture 的冗余 ActionComposition，直接记录 invocation 私有报告；避免新默认叶子 30 秒覆盖有限动作动态总预算。
+
+
+✅ Implemented: EyeExpression.swift maps Actions.closed to UI.closed; App endpoints reject nonclosed finite expression performances while no voice session is active. Persistent expression acceptance remains separate from resting visual state.
+
+
+✅ Implemented: RuntimePresentation forwards validated UIFeedbackCapability and listening feedback parameters to the bound VoiceOutputHandling owner; missing bindings and invalid session/source reject. It owns no native player/generator or second composition.
+
+## 历史记录收敛（2026-10-13）
+
+✅ 已实现：HistoryAgentAdapter.preview 只使用 Assistant 当轮持久化目录；缺失或无效目录明确返回预览失败。删除角色选择与旧文本回退，不执行历史调用。
+
+❌ 历史记录页面板块重新设计及原生 UI/真机验收。
+
+
+✅ Implemented (2026-10-13): UI.Notice.showNotice/dismissNotice and UI.Light.updateLight are canonical presentation Actions for trusted business calls, currently registered by no Skill. Neutral Actions values cross RuntimePresentation into root-owned HomeEffectsWorkflow, which retains one replaceable notice expiry and one light expiry, UUID-fenced cleanup, and explicit stop. Notices remain separate from factual ExecutionIssue history; actual upper-layer errors have display priority and Action failures remain panel-only. Decorative light accepts normalized origin, initial opacity/intensity and duration; it never changes consent, microphone or eyes. Native renderer separates light generations from listening eye generations and preserves existing exit fade. RuntimePresentation adapts Action requests into UI-owned values; AppPresentationWorkflow keeps its existing UI/AgentCore/FunctionContracts boundary. No UI project dependencies or new directories.
+
+✅ Native build reconciled: UI values for Notice/Light use explicit Actions.PoseOverlay qualification at the neutral pose boundary, preserving the existing protocol signatures.
+
+
+✅ Implemented (2026-10-13 caption/error lifecycle): mask bottom ASR and reply/status immediately while a notice is visible, restore retained text after dismissal, and preserve pinned Task/promoted ASR layout. Consent-off clears both captions; root HomeEffectsWorkflow owns one UUID/text-fenced350ms reply fade/removal task, cancelled by new text/turn/off/shutdown, scheduled only after reply-policy/playback/native-resume barriers. Agent errors stay in factual root failure notices, not persistent voiceStatus copies. App root contexts explicitly choose afterFirstUnlock file protection, including their directory; repository persistent factory accepts protection while its SDK default remains whileUnlocked. This mitigates lock-boundary writes, without claiming the screenshot proves that cause or hiding other storage failures.
+
+✅ VoiceOutputHandling.show is async; terminal cancellation/Agent failure joins matching input audio cleanup before output transport completes. RuntimePresentation forwards this lifecycle acknowledgment without admitting inference.

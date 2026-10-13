@@ -17,7 +17,7 @@ Local user settings now use Storage-backed cached persistence in the application
 
 ✅ Function Token output supports nested `<wait>...</wait>` execution groups. Wait joins earlier parent work and all internal Actions while preserving ordinary Channel concurrency; it does not block unrelated Agent tasks. See [scheduling](../MobileHarness/Gateway/Output/Scheduling/README.md). ❌ Physical-device acceptance of the new coordination behavior is pending.
 
-✅ Settings → 对话历史 stores actual user inputs, raw model text, exact request context and failures locally. Current context retains the latest ten completed rounds; Start New archives it and generates a title. See [conversation history](../MobileHarness/UI/Settings/README.md). ❌ Live-model title quality and device acceptance remain pending.
+✅ Settings → 历史记录 stores actual user inputs, raw model text, exact request context and failures locally. Current context retains the latest ten completed rounds; Start New archives it and generates a title. See [conversation history](../MobileHarness/UI/Settings/README.md). ❌ Live-model title quality and device acceptance remain pending.
 
 ## Action runtime migration
 
@@ -427,7 +427,7 @@ Only the overall source README and existing documentation history/index/validati
 
 ## 2026-10-10 — Project introduction and Agent-loop concepts
 
-The root project README now carries the conceptual introduction formerly embedded in the overall technical design: biological inspiration, Signal → Cognition → Action feedback, specialist cooperation, the governing questions for App/Agents/Gateway, and the distinction between computation, authorized effects and native/UI lifetimes. The existing MobileHarness/agent-loop.svg is embedded through its repository-relative path; the original asset is unchanged. The complete current technical design remains in MobileHarness/README.md.
+The root project README now carries the conceptual introduction formerly embedded in the overall technical design: biological inspiration, Signal → Cognition → Action feedback, specialist cooperation, the governing questions for App/Agents/Gateway, and the distinction between computation, authorized effects and native/UI lifetimes. The existing `agent-loop.svg` is embedded through its repository-relative path; the original asset is unchanged. The complete current technical design remains in MobileHarness/README.md.
 
 The introduction qualifies the former “every input is a Signal, every output is an Action” slogan at the Agent boundary: local frontend state and immediate native lifecycle work are not implicit backend tasks. Actual results, bounded continuation, publication versus directed admission and private specialist ownership are now described consistently with current source.
 
@@ -462,3 +462,23 @@ Only the overall design and existing docs index/history/validation records chang
 ## 2026-10-11 — Agents design documentation alignment
 
 Reviewed and revised all 19 Agents technical READMEs for the current prompt/resource design, independent output consumers and exact role/runtime contracts. Integrated trailing prompt notes into owning design sections, separated runtime routing from source composition, preserved function/parameter/communication tables and corrected queue, identity, cancellation and tracking descriptions. Technical READMEs contain current contracts and the confirmed ❗ diagnostic-delivery issue; the complete inspection register and static results are in [validation history](Validation-History.md#2026-10-11--agents-technical-design-alignment). Implementation and project/overall introductions were unchanged.
+
+
+## 2026-10-12 — ModelKit current-design documentation reconciliation
+
+Reviewed all 28 ModelKit directory READMEs, revised 27, and retained the already accurate CoreML graph contract. Current source documents contain source ownership, SDK boundaries, interfaces, runtime state/lifecycle, failure/cleanup, provider limits and outstanding capability/acceptance work. Dependency diagrams and runtime flows have separate legends; the complete internal target graph now names all 15 production targets and its 23 edges match Package.swift.
+
+Source README chronology was removed or integrated into current owning contracts: Support migration/retired-target descriptions remain in [the Support plan](ModelKit-Support-Plan.md); Core and SDK probe/build evidence remain in [the layer audit](ModelKit-Decoupling-Audit.md) and [validation history](Validation-History.md); the OpenAI startup/regression notes now describe strict=false, safe historical-call names and bounded provider error codes in request/decoder contracts. Apple completion notes no longer describe downstream playback or removed presentation branches. SDK helper documents describe consumers rather than prescribing Agent/Storage business flows.
+
+The former Support README's full-suite perception-failure statement was a result of its earlier run, not a permanent implementation constraint. Its evidence remains in the dated validation history alongside the later passing full check. The former MOSS README compared its provider audio bound to an application timer and StorageAudio capacity; that cross-module policy statement was removed from the provider design. For historical source fidelity, its original wording was:
+
+> Explicit voice/diagnostic warmup drains synthetic real PCM without playback. Adapter's 60-second audio-duration limit differs from Agent's 60-second execution timer and StorageAudio's eight MiB bound (about 43.7 seconds at this rate). Synthesis completion is not playback completion.
+
+That quotation is archived source material, not the current application timer contract. Original ADRs, model validation reports and Technical_Design.docx remain preserved. [Audit evidence](Validation-History.md#2026-10-12--modelkit-current-documentation-and-diagram-alignment) records directory coverage, diagram parsing, manifest comparison and scope.
+
+
+## 2026-10-12 — ReACT technical contract consolidated in Part III
+
+Checked AgentChatWorker collect/observation recovery boundaries, result classification, round coordinator, Task controls, AgentTaskBudget, ChatRequest, XML/native parsing, Gateway closure/result delivery and OpenAI/Gemma limits against the current source. Added a central ownership/flow diagram, full trigger matrix, layered bounds and stop/gap sections. Budget is per admitted input and its continuation chain, not an entire multi-input foreground Goal Task. finishTask restores default scope before a possible remaining-goal continuation; cancelTask terminates its chain. Distinguish invocation cancellation from owner cancellation and transport retries from model requests.
+
+Reconciled Shared Chat/Core Runtime current descriptions and linked duplicate overall summaries to the central contract. Removed outdated total-execution/queue/feedback TTL and four-attempt delivery claims. Original overall three-Part structure and unrelated designs are preserved. No new directory or runtime implementation was added. Targeted verification is recorded in Validation-History.

@@ -24,7 +24,23 @@ public struct OutputExecutionResult: Sendable {
         self.failure = failure
         self.failureCode = failureCode
     }
-    public var isError: Bool { failure != nil || tool?.isError == true }
+    public var isError: Bool { !isCancellationOnly && (failure != nil || tool?.isError == true) }
+
+    /// Cancellation remains an unsuccessful outcome, but is not itself a runtime incident.
+    public var isCancellationOnly: Bool {
+        guard failure == nil || failureCode == .cancelled,
+            failureCode == nil || failureCode == .cancelled,
+            tool?.deliveryFailure == nil,
+            tool?.failureCode == nil || tool?.failureCode == .cancelled
+        else { return false }
+        if case .report(let report) = tool?.completion {
+            guard report.executionFailure == nil || report.executionFailure == .cancelled,
+                !report.entries.contains(where: { $0.status == .failed && $0.code != .cancelled })
+            else { return false }
+            return report.isCancelled || failureCode == .cancelled || tool?.failureCode == .cancelled
+        }
+        return failureCode == .cancelled || tool?.failureCode == .cancelled
+    }
 }
 
 public struct OutputExecutionSnapshot: Sendable {

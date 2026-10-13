@@ -4,7 +4,7 @@ import FunctionContracts
 /// UI.VoiceState function ownership; current invocation paths remain compatible.
 extension UIActions {
     @Action(
-        domain: "UI", module: "VoiceState", title: "setVoiceState", serializationKey: "UI")
+        domain: "UI", module: "VoiceState", title: "setVoiceState", timeout: .seconds(5))
     public static func setVoiceState(
         invocation: any FunctionInput,
         using present: @escaping @Sendable (VoiceState, any FunctionInput) async throws -> Void

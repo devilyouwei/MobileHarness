@@ -38,3 +38,7 @@ No additional implementation work is declared for the documented contract values
 ## Related design
 
 [Parent design](../README.md) · [Gemma4](Gemma4/README.md) · [OpenAI](OpenAI/README.md)
+
+## Consecutive user message boundaries
+
+✅ Implemented: Provider serialization preserves every original caller message boundary. Each caller user message keeps its original boundary and content; ChatRequest.messages remains authoritative. Providers retain their existing wire/token representation, input bounds and explicit unsupported-input failures. Responses reasoning parsing remains implemented. Role-order compatibility remains provider/model-specific.

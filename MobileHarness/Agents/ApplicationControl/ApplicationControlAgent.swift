@@ -1,7 +1,5 @@
 import AgentCore
 import Foundation
-import ModelKit
-import StorageChat
 
 /// Root-session application operations; shared transaction state with no native or callable implementation imports.
 public actor ApplicationControlAgent: Agent {
@@ -40,8 +38,8 @@ public actor ApplicationControlAgent: Agent {
     private var sequence: UInt64 = 0
     private var processed = 0
     private var deviceResults = ActionResultInbox()
-    private let chatWorker: AgentChatWorker<ApplicationControlContextState>
-    private var chatPump: Task<Void, Never>?
+    private let taskCoordinator: AgentFixedTaskCoordinator<ApplicationControlContextState>
+    private var taskPump: Task<Void, Never>?
     private var fixedTaskInputs: [UUID: AgentInput] = [:]
     private let admission = AgentAdmissionGate(capacity: 32)
     private var stagedOutputs: [OutputEnvelope]?
@@ -50,12 +48,7 @@ public actor ApplicationControlAgent: Agent {
 
     public init(
         sessionID: UUID, configuration: AgentConfiguration? = nil,
-        context: AgentContextRepository<ApplicationControlContextState>? = nil,
-        chat: (any ChatCapability)? = nil,
-        reportsReplyActivity: Bool = false,
-        chatProvider: (@Sendable () async throws -> any ChatCapability)? = nil,
-        modelName: @escaping @Sendable () async throws -> String = { "Unspecified model" },
-        generationPolicies: GenerationPolicies? = nil
+        context: AgentContextRepository<ApplicationControlContextState>? = nil
     ) throws {
         self.contextRepository =
             context
@@ -68,24 +61,19 @@ public actor ApplicationControlAgent: Agent {
             id: .applicationControl, name: "ApplicationControl",
             inputs: Set(configuration.communication.inputs.map(\.kind)),
             outputs: [.communication, .actionCall, .toolCall, .control, .scheduling],
-            capabilities: try AgentChatWorker<ApplicationControlContextState>.runtimeCapabilities(
-                configuration.capabilities.adding(internalTools: [
-                    ApplicationControlFunctions.download, ApplicationControlFunctions.cancellation,
-                    ApplicationControlFunctions.removal, ApplicationControlFunctions.speechBinding,
-                    ApplicationControlFunctions.restoration, ApplicationControlFunctions.saving,
-                    ApplicationControlFunctions.inventory,
-                    ApplicationControlFunctions.presentation, ApplicationControlFunctions.failurePresentation,
-                    ApplicationControlFunctions.operationFailurePresentation,
-                    ApplicationControlFunctions.preferenceFailurePresentation,
-                    ApplicationControlFunctions.providerDiscovery, ApplicationControlFunctions.providerRestoration,
-                    ApplicationControlFunctions.providerSaving, ApplicationControlFunctions.providerPresentation,
-                    ApplicationControlFunctions.deviceControl, ApplicationControlFunctions.navigation,
-                ])))
-        chatWorker = try AgentChatWorker(
-            reportsReplyActivity: reportsReplyActivity, chat: chat, chatProvider: chatProvider,
-            configuration: configuration,
-            modelName: modelName, generationPolicies: generationPolicies,
-            context: self.contextRepository, capabilities: descriptor.capabilities)
+            capabilities: try configuration.capabilities.adding(internalTools: [
+                ApplicationControlFunctions.download, ApplicationControlFunctions.cancellation,
+                ApplicationControlFunctions.removal, ApplicationControlFunctions.speechBinding,
+                ApplicationControlFunctions.restoration, ApplicationControlFunctions.saving,
+                ApplicationControlFunctions.inventory,
+                ApplicationControlFunctions.presentation, ApplicationControlFunctions.failurePresentation,
+                ApplicationControlFunctions.operationFailurePresentation,
+                ApplicationControlFunctions.preferenceFailurePresentation,
+                ApplicationControlFunctions.providerDiscovery, ApplicationControlFunctions.providerRestoration,
+                ApplicationControlFunctions.providerSaving, ApplicationControlFunctions.providerPresentation,
+                ApplicationControlFunctions.deviceControl, ApplicationControlFunctions.navigation,
+            ]))
+        taskCoordinator = AgentFixedTaskCoordinator(context: self.contextRepository)
         self.sessionID = sessionID
         let pair = AsyncStream<OutputEnvelope>.makeStream(
             bufferingPolicy: .bufferingOldest(ApplicationControlSignalPreprocessor.outputCapacity))
@@ -98,13 +86,13 @@ public actor ApplicationControlAgent: Agent {
     public func start() async throws {
         guard lifecycle == .registered else { throw HarnessError.invalidTransition }
         _ = try await contextRepository.snapshot()
-        try await chatWorker.start()
+        try await taskCoordinator.start()
         lifecycle = .running
-        chatPump = Task { [chatWorker] in
-            for await envelope in chatWorker.outputs {
+        taskPump = Task { [taskCoordinator] in
+            for await envelope in taskCoordinator.outputs {
                 guard !Task.isCancelled else { return }
                 if !relay(envelope) {
-                    await chatWorker.stop()
+                    await taskCoordinator.stop()
                     return
                 }
             }
@@ -112,12 +100,12 @@ public actor ApplicationControlAgent: Agent {
     }
     public func pause() async throws {
         guard lifecycle == .running else { throw HarnessError.invalidTransition }
-        try await chatWorker.pause()
+        await taskCoordinator.pause()
         lifecycle = .paused
     }
     public func resume() async throws {
         guard lifecycle == .paused else { throw HarnessError.invalidTransition }
-        try await chatWorker.resume()
+        await taskCoordinator.resume()
         lifecycle = .running
     }
     public func stop() async {
@@ -135,10 +123,10 @@ public actor ApplicationControlAgent: Agent {
         providerPresentationCalls.removeAll()
         terminalFailureCalls.removeAll()
         fixedTaskInputs.removeAll()
-        await chatWorker.stop()
-        chatPump?.cancel()
-        await chatPump?.value
-        chatPump = nil
+        await taskCoordinator.stop()
+        taskPump?.cancel()
+        await taskPump?.value
+        taskPump = nil
         continuation.finish()
     }
 
@@ -160,8 +148,8 @@ public actor ApplicationControlAgent: Agent {
     }
 
     private func receiveSignal(_ input: AgentInput) async throws {
-        if await chatWorker.ownsFeedback(input) {
-            try await chatWorker.receive(input)
+        if await taskCoordinator.ownsFeedback(input) {
+            try await taskCoordinator.receive(input)
             return
         }
         var input = input
@@ -169,7 +157,7 @@ public actor ApplicationControlAgent: Agent {
             if signal.kind == .cancel,
                 let original = fixedTaskInputs.values.first(where: { $0.taskScope?.id == signal.scope.id })
             {
-                try await chatWorker.admitFixedTask(signal, input: input)
+                try await taskCoordinator.admitFixedTask(signal, input: input)
                 let calls = Set(pending.filter { $0.value.taskScope?.id == signal.scope.id }.keys)
                 try await contextRepository.update { $0.state.pendingCallIDs.removeAll { calls.contains($0) } }
                 for call in calls {
@@ -190,7 +178,7 @@ public actor ApplicationControlAgent: Agent {
                         OutputEnvelope(
                             source: descriptor.id, input: original, output: .control("agent.error: task cancelled")))
                 else { throw CommunicationError.capacityExceeded }
-                try await chatWorker.reportFixedTask(
+                try await taskCoordinator.reportFixedTask(
                     signal.scope, input: original,
                     result: ToolResult(callID: original.id, value: "Task cancelled", isError: true), status: .cancelled)
                 return
@@ -198,12 +186,12 @@ public actor ApplicationControlAgent: Agent {
             if signal.kind == .cancel || signal.businessContract == "runtime.taskTermination"
                 || signal.businessContract == AgentTaskContent.contract
             {
-                try await chatWorker.receive(input)
+                try await taskCoordinator.receive(input)
                 return
             }
             let fixed = try AgentFixedTaskInput.unwrap(signal, input: input, executor: descriptor.id)
             guard fixedTaskInputs.count < 32 else { throw CommunicationError.capacityExceeded }
-            try await chatWorker.admitFixedTask(signal, input: input)
+            try await taskCoordinator.admitFixedTask(signal, input: input)
             fixedTaskInputs[fixed.id] = fixed
             input = fixed
         }
@@ -648,7 +636,7 @@ public actor ApplicationControlAgent: Agent {
         guard let original = fixedTaskInputs.removeValue(forKey: inputID), let scope = original.taskScope else {
             return
         }
-        try await chatWorker.reportFixedTask(
+        try await taskCoordinator.reportFixedTask(
             scope, input: original,
             result: ToolResult(callID: inputID, value: failure ?? value ?? "Completed", isError: failure != nil))
     }

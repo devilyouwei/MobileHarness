@@ -94,15 +94,18 @@ extension VisionPerceptionAgent {
     func bind(_ port: AgentMessaging) throws { try FixtureCommunicationStreams.bind(self, port: port) }
 }
 
-/// Explicit synthetic native-call role. Production Assistant grants stay Action-only.
+/// Explicit synthetic native-call role; its fixture catalog is independent of production Skill loading.
 struct FixtureNativeChatState: AgentChatContextState {
     static let agentID = AgentID.assistant
     static let configurationName = "Assistant"
     static func runtimeCapabilities(_ capabilities: CapabilityRegistry) throws -> CapabilityRegistry {
+        let fixture =
+            capabilities.actions.allSatisfy { $0.path.domain == "Agent" && $0.path.module == "Task" }
+            ? try AgentSkillLoader.registry(["expression-interaction"], fixed: capabilities) : capabilities
         let native = try CapabilityRegistry(
-            actions: capabilities.actions, tools: capabilities.tools + [fixtureRuntimeTool()],
-            channels: capabilities.channels,
-            internalActions: capabilities.internalActions, internalTools: capabilities.internalTools)
+            actions: fixture.actions, tools: fixture.tools + [fixtureRuntimeTool()],
+            channels: fixture.channels,
+            internalActions: fixture.internalActions, internalTools: fixture.internalTools)
         return try AssistantAgent.runtimeCapabilities(native)
     }
     static func preprocess(_ input: AgentInput, state: Self) throws -> SignalDisposition {
@@ -115,7 +118,6 @@ struct FixtureNativeChatState: AgentChatContextState {
         try AssistantAgent.systemPrompt(capabilities: capabilities)
     }
     var history = ConversationArchive()
-    var historyImported = false
     var admissionSequence: UInt64 = 0
     var taskViews: [UUID: AgentTaskView]?
     init() {}
@@ -132,4 +134,19 @@ func fixtureRuntimeTool() throws -> ToolRegistration {
             #"{"type":"function","function":{"name":"runtimeInfo","description":"Synthetic native result fixture","parameters":{"type":"object","properties":{},"required":[],"additionalProperties":false},"strict":true}}"#
                 .utf8))
     return ToolRegistration(alias: "runtimeInfo", path: "System.Runtime.runtimeInfo", definition: definition)
+}
+
+/// Communication protocol tests explicitly opt in; production BasicSkill does not grant send.
+func fixtureCatalogWithCommunication(_ base: CapabilityRegistry) throws -> CapabilityRegistry {
+    let bindings = try JSONDecoder().decode(
+        [AgentConfigurations.Binding].self,
+        from: Data(
+            """
+            [{"path":"Agent.Communication.send","callType":"action","alias":"send","channel":"Communication"}]
+            """.utf8))
+    let communication = try AgentConfigurations.registry(bindings)
+    return try CapabilityRegistry(
+        actions: base.actions.filter { $0.path.description != "Agent.Communication.send" } + communication.actions,
+        tools: base.tools, channels: base.channels, internalActions: base.internalActions,
+        internalTools: base.internalTools)
 }

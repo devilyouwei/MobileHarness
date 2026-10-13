@@ -65,3 +65,12 @@ Photographer cancellation joins the function, then asks the Agent to retire the 
 ## Related design
 
 [Parent design](../README.md)
+
+
+✅ Implemented: AgentInteractionRuntime.cancelConversation delivers the trusted runtime cancelSession control to its actual resident Assistant and joins inference cancellation. It retains registration and the output consumer; unrelated sessions/Agents remain intact.
+
+
+✅ Implemented: cancelConversation concurrently joins Agent cancellation and a trusted OutputGateway.cancelCalls(for:sessionID:) operation. This releases an already-blocked round seal without stopping/re-registering the output pump.
+
+
+✅ Implemented: the output owner recognizes explicit cancelled seal completion while its own task is live, retains its reader, and awaits the following cancellation terminal. Owner-task cancellation still propagates and joins shutdown.

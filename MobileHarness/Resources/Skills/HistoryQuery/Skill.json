@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "id": "history-query",
+  "revision": 5,
+  "description": "Read-only paged conversation search and recall with native history Tools; no history mutation.",
+  "dependencies": [],
+  "functions": [
+    {
+      "path": "History.Conversation.list",
+      "callType": "tool",
+      "alias": "History.list"
+    },
+    {
+      "path": "History.Conversation.read",
+      "callType": "tool",
+      "alias": "History.read"
+    }
+  ],
+  "contextFields": [
+    "runtimeFacts",
+    "taskState",
+    "actionResults"
+  ]
+}

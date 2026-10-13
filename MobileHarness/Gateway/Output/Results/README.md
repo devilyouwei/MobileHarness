@@ -32,12 +32,12 @@ Feedback is none/failuresOnly/terminal and requires supported actionResult input
 | --- | --- |
 | Reserved plus pending results | Default 512; configurable 1–1024 |
 | Delivery work | One worker and at most one active callback |
-| Attempt | One-second cooperative bound; at most four attempts, 100/200/300 ms delays |
-| Terminal validity | Ten seconds from termination |
+| Attempt | One owned callback; retry backoff grows to 1 second without a retry-count cutoff |
+| Terminal validity | Until accepted, owner/session closed or explicit shutdown; no TTL |
 | Delivery history | 256 entries with counted oldest eviction |
 | Agent terminal history | Default 128; configurable 1–512, retained-ID deduplication |
 
-accepted means inbox admission. retry means bounded temporary admission exhaustion; closed means stale/missing owner/session/contract. A cancelled slow callback remains joined until return, preventing abandoned task accumulation; other results may expire. Session/shutdown closes matching results. Generated round acknowledgment waits for scoped delivery and fails explicitly on closed/expired/exhausted state.
+accepted means inbox admission. retry means bounded temporary admission exhaustion; closed means stale/missing owner/session/contract. A cancelled slow callback remains joined until return, preventing abandoned task accumulation; other results remain pending until admission or scope closure. Session/shutdown closes matching results. Generated round acknowledgment waits for scoped delivery and fails explicitly on closed state.
 
 ## Effect and failure evidence
 
@@ -52,3 +52,10 @@ OutputExecutionResult retains 256 correlated output outcomes with counted evicti
 ## Related design
 
 [Parent design](../README.md)
+
+✅ 待投递 ActionResult 无 10 秒 TTL 或四次重试耗尽。保留有界 outbox 与退避，直到确认接纳、目标关闭或拥有会话清理；投递不以一秒尝试超时取消。
+
+
+✅ OutputExecutionResult 已增加 isCancellationOnly 纯取消分类。原始调用结果、Tool isError 和取消报告仍保留在 executionResults；仅 cancelled 且不含其他执行/投递失败的结果不进入运行异常快照/首页 toast。不能按 CancellationError 文本过滤；读取类型化代码和完整报告，混合失败/超时/投递失败照常记录。OutputGateway 将局部抛出的 CancellationError 归为 cancelled，调用方真实任务取消仍传播并加入清理。
+
+✅ OutputExecutionResult.isError excludes pure cancellation while preserving raw cancelled code/report/outcome. Independent real execution or result-delivery failures remain errors; no string-based filtering.

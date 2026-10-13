@@ -2,7 +2,7 @@ import Foundation
 import Storage
 
 public enum SpeechAudioError: Error, Equatable, Sendable {
-    case capacityExceeded, missingAudio, timedOut, invalidAudio, duplicate, closed, expired, forbidden
+    case capacityExceeded, missingAudio, invalidAudio, duplicate, closed, forbidden
 }
 
 extension SpeechAudioError {
@@ -11,10 +11,10 @@ extension SpeechAudioError {
         switch error {
         case .capacityExceeded: return SpeechAudioError.capacityExceeded
         case .missing: return SpeechAudioError.missingAudio
-        case .timedOut: return SpeechAudioError.timedOut
+        case .timedOut: return error
         case .duplicate: return SpeechAudioError.duplicate
         case .closed: return SpeechAudioError.closed
-        case .expired: return SpeechAudioError.expired
+        case .expired: return error
         case .forbidden: return SpeechAudioError.forbidden
         }
     }
@@ -25,9 +25,9 @@ public final class SpeechAudio: Sendable {
     public let id: UUID
     private let stream: BoundedMemoryStream<SpeechPCMFrame>
 
-    public init(id: UUID = UUID(), maximumBytes: Int = 1_048_576, waitTimeout: Duration? = nil) {
+    public init(id: UUID = UUID(), maximumBytes: Int = 1_048_576) {
         self.id = id
-        stream = BoundedMemoryStream(maximumBytes: maximumBytes, maximumItems: 2048, waitTimeout: waitTimeout) {
+        stream = BoundedMemoryStream(maximumBytes: maximumBytes, maximumItems: 2048, waitTimeout: nil) {
             $0.data.count
         }
     }

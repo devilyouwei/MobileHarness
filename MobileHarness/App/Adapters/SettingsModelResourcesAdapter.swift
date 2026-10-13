@@ -164,7 +164,7 @@ enum SettingsModelResourcesAdapter {
     }
     func navigate(_ destination: String, invocation: any FunctionInput) async throws {
         let context = invocation.context
-        guard context.source == "applicationControl",
+        guard ["applicationControl", "assistant"].contains(context.source),
             context.sessionID == sessionID
                 || (context.taskID != nil && context.taskExecutor == context.source)
         else { throw ResourcePresentationError.staleGeneration }

@@ -1,0 +1,53 @@
+{
+  "version": 1,
+  "id": "application-control",
+  "revision": 6,
+  "description": "Conversational page navigation, resource/provider/Bluetooth status and explicit supported device/resource operations.",
+  "dependencies": [],
+  "functions": [
+    {
+      "path": "UI.Navigation.open",
+      "callType": "action",
+      "alias": "openPage",
+      "channel": "Display"
+    },
+    {
+      "path": "System.ModelResources.snapshotResources",
+      "callType": "tool",
+      "alias": "ModelResources.snapshot"
+    },
+    {
+      "path": "System.Provider.readSettings",
+      "callType": "tool",
+      "alias": "Provider.readSettings"
+    },
+    {
+      "path": "System.Device.readStatus",
+      "callType": "tool",
+      "alias": "Bluetooth.readStatus"
+    },
+    {
+      "path": "System.Device.control",
+      "callType": "action",
+      "alias": "Bluetooth.control",
+      "channel": "System"
+    },
+    {
+      "path": "System.ModelResources.download",
+      "callType": "action",
+      "alias": "ModelResources.download",
+      "channel": "System"
+    },
+    {
+      "path": "System.ModelResources.cancel",
+      "callType": "action",
+      "alias": "ModelResources.cancel",
+      "channel": "System"
+    }
+  ],
+  "contextFields": [
+    "runtimeFacts",
+    "taskState",
+    "actionResults"
+  ]
+}

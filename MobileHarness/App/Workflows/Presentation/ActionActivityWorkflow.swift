@@ -22,8 +22,14 @@ public final class ActionActivityWorkflow {
         context: ExecutionIssue.Context? = nil
     ) {
         state.recordIssue(
-            .init(title: title, source: source, message: message, failureCode: failureCode, context: context))
+            .init(
+                title: title, source: source, message: message, failureCode: failureCode, context: context,
+                userMessage: Self.userMessage(source: source, message: message)))
     }
+    private static func userMessage(source: String, message: String) -> String? {
+        source == "speechPerception" && message.hasPrefix("agent.error: speech perception:") ? "我没听清" : nil
+    }
+
     public func startFailures(observe: @escaping @Sendable () async throws -> AsyncStream<OutputFailureSnapshot>) {
         guard failureObservation == nil else { return }
         let state = state
@@ -37,7 +43,8 @@ public final class ActionActivityWorkflow {
                         records: snapshot.records.map {
                             .init(
                                 id: $0.id, title: $0.title, source: $0.source.rawValue, message: $0.message,
-                                time: $0.time, failureCode: $0.failureCode, inputID: $0.inputID)
+                                time: $0.time, failureCode: $0.failureCode, inputID: $0.inputID,
+                                userMessage: Self.userMessage(source: $0.source.rawValue, message: $0.message))
                         }, evictedCount: snapshot.evictedCount)
                 }
             } catch {
@@ -94,10 +101,12 @@ public final class ActionActivityWorkflow {
                         }
                         // Unaccepted non-request reports cannot change task progress.
                         guard signal.kind == .request || record.phase == .accepted else { continue }
-                        let value = TaskLogItem(
+                        var value = TaskLogItem(
                             id: signal.scope.id, parentID: signal.scope.parentID,
                             requester: signal.scope.requester.rawValue, executor: signal.scope.executor.rawValue,
-                            title: signal.kind == .request ? text : "", phase: phase)
+                            title: signal.kind == .request ? (signal.goal ?? text) : "", phase: phase)
+                        value.execution = signal.scope.execution.rawValue
+                        value.skills = signal.requestedSkills ?? []
                         state.updateTask(
                             value,
                             event: .init(

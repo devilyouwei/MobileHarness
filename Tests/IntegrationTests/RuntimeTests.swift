@@ -9,7 +9,7 @@ import Gateway
 import ModelKit
 import Testing
 
-@Test func lifecycleAndBoundedQueue() async throws {
+@Test(.actionCatalog) func lifecycleAndBoundedQueue() async throws {
     let agent = try AssistantAgent(capacity: 1, chat: FixedTextChat())
     let input = AgentInput(sessionID: UUID(), payload: .text("hello"))
     await #expect(throws: HarnessError.notRunning) { try await agent.receive(input) }
@@ -25,7 +25,7 @@ import Testing
     await #expect(throws: HarnessError.invalidTransition) { try await agent.start() }
 }
 
-@Test func outputOverflowFailsAgent() async throws {
+@Test(.actionCatalog) func outputOverflowFailsAgent() async throws {
     let agent = try AssistantAgent(
         outputCapacity: 2,
         chat: FixedTextChat(text: "<express emotion=\"happy\"/><express emotion=\"sad\"/><express emotion=\"love\"/>"))
@@ -42,7 +42,7 @@ import Testing
     await agent.stop()
 }
 
-@Test func capabilitiesRejectUndeclaredActions() throws {
+@Test(.actionCatalog) func capabilitiesRejectUndeclaredActions() throws {
     let descriptor = try AssistantAgent(chat: FixedTextChat()).descriptor
     #expect(throws: HarnessError.forbiddenFunction) {
         try OutputValidator.validate(.actionCall(expectedActionCall(name: "move")), descriptor: descriptor)
@@ -75,7 +75,7 @@ private func textRoutingConfiguration(_ id: String, subscribes: Bool = true) thr
         ]))
 }
 
-@Test func subscriptionRoutingIsolatesUnavailableTargets() async throws {
+@Test(.actionCatalog) func subscriptionRoutingIsolatesUnavailableTargets() async throws {
     let manager = AgentManager()
     let agent = try AssistantAgent(chat: FixedTextChat())
     try await manager.register(agent)
@@ -97,7 +97,7 @@ private func textRoutingConfiguration(_ id: String, subscribes: Bool = true) thr
     await manager.stopAll()
 }
 
-@Test func publicationWithoutPolicyDoesNotFallBackToAssistant() async throws {
+@Test(.actionCatalog) func publicationWithoutPolicyDoesNotFallBackToAssistant() async throws {
     let manager = AgentManager()
     let agent = try AssistantAgent(chat: FixedTextChat())
     try await manager.register(agent)
@@ -112,7 +112,7 @@ private func textRoutingConfiguration(_ id: String, subscribes: Bool = true) thr
     await manager.stopAll()
 }
 
-@Test func directedAdmissionBypassesSubscriptionsButEnforcesInputSupport() async throws {
+@Test(.actionCatalog) func directedAdmissionBypassesSubscriptionsButEnforcesInputSupport() async throws {
     let manager = AgentManager()
     let agent = try AssistantAgent(chat: FixedTextChat())
     try await manager.register(agent)
@@ -165,7 +165,8 @@ private struct StatusRoundTripChat: ChatCapability {
     }
 }
 
-@Test(arguments: [false, true]) func toolRoundTripPreservesSessionAndCallID(_ fails: Bool) async throws {
+@Test(.actionCatalog, arguments: [false, true]) func toolRoundTripPreservesSessionAndCallID(_ fails: Bool) async throws
+{
     let manager = AgentManager()
     let agent = try FixtureNativeAgent(chat: StatusRoundTripChat())
     try await manager.register(agent)
@@ -215,9 +216,9 @@ private struct StatusRoundTripChat: ChatCapability {
     await responses.shutdown()
 }
 
-@Test func functionDispatchResolvesAgentTagThroughRegisteredPath() async throws {
+@Test(.actionCatalog) func functionDispatchResolvesAgentTagThroughRegisteredPath() async throws {
     let manager = AgentManager()
-    try await manager.register(AssistantAgent(chat: FixedTextChat()))
+    try await manager.register(FixtureNativeAgent(chat: FixedTextChat()))
     let requests = InputGateway(manager: manager, allowsExternalSend: true)
     let recorder = Recorder()
     let missing = OutputGateway(manager: manager, requests: requests, tools: ToolRegistry()) { _ in }
@@ -247,7 +248,7 @@ private struct StatusRoundTripChat: ChatCapability {
     await responses.shutdown()
 }
 
-@Test func unknownAndFailingToolsReturnCorrelatedErrors() async throws {
+@Test(.actionCatalog) func unknownAndFailingToolsReturnCorrelatedErrors() async throws {
     let registry = ToolRegistry()
     let unknown = ToolCall(toolPath: "Fixture.Control.unknown")
     let input = AgentInput(sessionID: UUID(), payload: .text("tool"))
@@ -263,7 +264,7 @@ private struct StatusRoundTripChat: ChatCapability {
     #expect(failure.isError)
 }
 
-@Test func completionToolsReturnFailureOutcomesAndPropagateCancellation() async throws {
+@Test(.actionCatalog) func completionToolsReturnFailureOutcomesAndPropagateCancellation() async throws {
     let registry = ToolRegistry()
     let input = AgentInput(sessionID: UUID(), payload: .text("tool"))
     let call = ToolCall(toolPath: "UI.Pose.showPose")
@@ -300,9 +301,9 @@ private struct StatusRoundTripChat: ChatCapability {
     #expect(cancelled.failureCode == .cancelled)
 }
 
-@Test func gatewayForwardsWaitBoundariesAndRejectsUnbalancedCompletion() async throws {
+@Test(.actionCatalog) func gatewayForwardsWaitBoundariesAndRejectsUnbalancedCompletion() async throws {
     let manager = AgentManager()
-    try await manager.register(AssistantAgent(chat: FixedTextChat()))
+    try await manager.register(FixtureNativeAgent(chat: FixedTextChat()))
     let recorder = Recorder()
     let scheduler = ChannelScheduler(
         registry: try ActionRegistry(definitions: [
@@ -344,7 +345,7 @@ private struct StatusRoundTripChat: ChatCapability {
     await gateway.shutdown()
 }
 
-@Test func messageFailureIsRecordedWithoutFailingProducer() async throws {
+@Test(.actionCatalog) func messageFailureIsRecordedWithoutFailingProducer() async throws {
     let port = AgentMessaging { _, _, _ in throw CommunicationError.scopeClosed }
     let input = AgentInput(sessionID: UUID(), payload: .text("fixture"))
     let report = try await port.sendResult(.transcript("hello", final: true), parent: input, to: .assistant)
@@ -360,7 +361,7 @@ private struct StatusRoundTripChat: ChatCapability {
     #expect(await port.history.evictedCount == 1)
 }
 
-@Test func gatewayAccumulatesCompletionToolFailureAndContinuesOtherOutputs() async throws {
+@Test(.actionCatalog) func gatewayAccumulatesCompletionToolFailureAndContinuesOtherOutputs() async throws {
     let manager = AgentManager()
     let agent = try RuntimeToolFixture()
     try await manager.register(agent)
@@ -423,10 +424,10 @@ private struct StatusRoundTripChat: ChatCapability {
 
 }
 
-@Test func toolDeadlineJoinsCleanupAndExplicitCancellationPropagates() async throws {
+@Test(.actionCatalog) func toolDeadlineJoinsCleanupAndExplicitCancellationPropagates() async throws {
     let registry = ToolRegistry()
     let cleanup = Recorder()
-    try await registry.registerCompletion("Fixture.Control.slow") { _ in
+    try await registry.registerCompletion("Fixture.Control.slow", timeout: .milliseconds(10)) { _ in
         do { try await Task.sleep(for: .seconds(60)) } catch {
             await cleanup.act()
             throw error
@@ -435,7 +436,7 @@ private struct StatusRoundTripChat: ChatCapability {
     let call = ToolRequest(toolPath: "Fixture.Control.slow")
     let context = ActionExecutionContext(source: "fixture", sessionID: UUID(), inputID: UUID(), sequence: 1)
     let result = try #require(
-        try await ToolExecutor(registry: registry, timeout: .milliseconds(10)).execute(
+        try await ToolExecutor(registry: registry).execute(
             call, context: context))
     #expect(result.isError)
     #expect(result.value.contains("timed out"))
@@ -446,7 +447,7 @@ private struct StatusRoundTripChat: ChatCapability {
     await #expect(throws: CancellationError.self) { try await task.value }
 }
 
-@Test func toolFeedbackRejectionPreservesSuccessfulExecutionValue() async throws {
+@Test(.actionCatalog) func toolFeedbackRejectionPreservesSuccessfulExecutionValue() async throws {
     let manager = AgentManager()
     let agent = try RuntimeToolFixture()
     try await manager.register(agent)
@@ -474,14 +475,14 @@ private struct StatusRoundTripChat: ChatCapability {
 
 private enum ToolTimeoutFixture {
     @Action(
-        domain: "Fixture", module: "Control", title: "Slow fixture", serializationKey: "Fixture",
+        domain: "Fixture", module: "Control", title: "Slow fixture",
         timeout: .milliseconds(10))
     static func slow() {}
 }
 private struct ToolTimeoutModule: ToolModule {
     let definitions: [ActionBinding]
 }
-@Test func toolDefinitionTimeoutOverridesRuntimeDefaultAndRejectsInvalidDefinition() async throws {
+@Test(.actionCatalog) func toolDefinitionTimeoutOverridesRuntimeDefaultAndRejectsInvalidDefinition() async throws {
     let definition = ActionBinding(
         function: ToolTimeoutFixture.slowDefinition(handler: { _ in
             try await Task.sleep(for: .seconds(60))
@@ -502,7 +503,7 @@ private struct ToolTimeoutModule: ToolModule {
     }
 }
 
-@Test func toolFailureCapturesProducerDescriptionWithoutDeviceClassification() async throws {
+@Test(.actionCatalog) func toolFailureCapturesProducerDescriptionWithoutDeviceClassification() async throws {
     struct FixtureFailure: LocalizedError { var errorDescription: String? { String(repeating: "业务资源异常", count: 200) } }
     let registry = ToolRegistry()
     try await registry.registerCompletion("Fixture.Control.failure") { _ in throw FixtureFailure() }
@@ -515,7 +516,7 @@ private struct ToolTimeoutModule: ToolModule {
     #expect(result.value.hasPrefix("业务资源异常"))
 }
 
-@Test func toolProducerCodesPreserveAdmissionAndArgumentSemantics() async throws {
+@Test(.actionCatalog) func toolProducerCodesPreserveAdmissionAndArgumentSemantics() async throws {
     let registry = ToolRegistry()
     try await registry.registerCompletion("Fixture.Control.argument") { _ in
         _ = try ActionArguments([:]).requiredInt("count", range: 1...3)
@@ -569,7 +570,7 @@ private actor SignalFeedbackRecorder: Agent {
     }
 }
 
-@Test func externalAdmissionCannotForgeRuntimeOrAgentOrigin() async throws {
+@Test(.actionCatalog) func externalAdmissionCannotForgeRuntimeOrAgentOrigin() async throws {
     let manager = AgentManager()
     let agent = try SignalFeedbackRecorder()
     let session = UUID()
@@ -594,7 +595,9 @@ private actor SignalFeedbackRecorder: Agent {
     await manager.stopAll()
 }
 
-@Test(arguments: [false, true]) func returningToolPreservesCausalityAndRuntimeOrigin(_ fails: Bool) async throws {
+@Test(.actionCatalog, arguments: [false, true]) func returningToolPreservesCausalityAndRuntimeOrigin(_ fails: Bool)
+    async throws
+{
     let manager = AgentManager()
     let agent = try SignalFeedbackRecorder()
     let session = UUID()
@@ -668,7 +671,9 @@ private actor HeldSignalTool {
     func finish() { release.continuation.yield(()) }
 }
 
-@Test(.timeLimit(.minutes(1))) func returningToolDoesNotDeliverToReplacementAgent() async throws {
+@Test(.actionCatalog, .timeLimit(.minutes(1))) func returningToolOwnerStopCancelsWithoutDeliveringToReplacementAgent()
+    async throws
+{
     let manager = AgentManager()
     let original = try SignalFeedbackRecorder()
     let session = UUID()
@@ -695,17 +700,16 @@ private actor HeldSignalTool {
     await replacement.start()
     await held.finish()
     let result = try await operation.value
-    #expect(result.tool?.value == "Committed effect")
-    #expect(result.tool?.isError == false)
-    #expect(result.tool?.deliveryFailure != nil)
-    #expect(result.failureCode == .deliveryFailed)
+    #expect(result.isCancellationOnly && !result.isError)
+    #expect(result.failureCode == .cancelled)
+    #expect(result.tool == nil)
     #expect(await replacement.inputs.isEmpty)
     #expect(await held.executions == 1)
     await gateway.shutdown()
     await manager.stopAll()
 }
 
-@Test func toolFeedbackHopExhaustionPreservesEffectWithoutReplay() async throws {
+@Test(.actionCatalog) func toolFeedbackHopExhaustionPreservesEffectWithoutReplay() async throws {
     let manager = AgentManager()
     let agent = try SignalFeedbackRecorder()
     let session = UUID()
@@ -740,14 +744,15 @@ private actor HeldSignalTool {
 private actor RuntimeToolFixture: Agent {
     nonisolated let outputs = AsyncStream<OutputEnvelope> { $0.finish() }
     nonisolated let descriptor: AgentDescriptor
-    init() throws {
+    init(id: AgentID = .assistant, extraTools: [InternalTool] = []) throws {
         descriptor = AgentDescriptor(
-            id: .assistant, name: "Native fixture", inputs: [.text, .toolResult],
+            id: id, name: "Native fixture", inputs: [.text, .toolResult],
             outputs: [.actionCall, .toolCall, .control],
-            capabilities: try CapabilityRegistry(internalTools: [
-                InternalTool(path: "UI.Caption.print", required: ["text"]),
-                InternalTool(path: "UI.Caption.beginReplyTurn"),
-            ]))
+            capabilities: try CapabilityRegistry(
+                internalTools: [
+                    InternalTool(path: "UI.Caption.print", required: ["text"]),
+                    InternalTool(path: "UI.Caption.beginReplyTurn"),
+                ] + extraTools))
     }
     private var lifecycle: AgentLifecycle = .registered
     private var queued = 0
@@ -760,4 +765,63 @@ private actor RuntimeToolFixture: Agent {
         guard queued < 1 else { throw HarnessError.queueFull }
         queued += 1
     }
+}
+
+@Test(.actionCatalog, arguments: ["cancel", "mixed", "delivery"])
+func interruptedVoiceStateIsCancelledWithoutHidingRealFailures(mode: String) async throws {
+    let voiceState = InternalTool(path: "UI.VoiceState.setVoiceState", required: ["state"])
+    let manager = AgentManager()
+    let agent = try RuntimeToolFixture(id: .speechPerception, extraTools: [voiceState])
+    try await manager.register(agent)
+    try await manager.start(.speechPerception)
+    let input = AgentInput(sessionID: UUID(), payload: .text("interrupted recognition"))
+    let registry = ToolRegistry()
+    if mode == "delivery" {
+        // A cancelled handler plus failed feedback delivery remains a real incident.
+        try await agent.pause()
+        try await agent.receive(input)
+        try await registry.register("UI.VoiceState.setVoiceState") { _ in throw CancellationError() }
+    } else {
+        try await registry.registerCompletion("UI.VoiceState.setVoiceState") { invocation in
+            if invocation.call.parameters["state"] == "listening" { return }
+            if mode == "mixed" {
+                throw ActionReportedError(
+                    try ActionReport(entries: [
+                        .init(path: "update", status: .cancelled, code: .cancelled),
+                        .init(
+                            path: "cleanup", status: .failed, code: .handlerFailed,
+                            details: ["failureDescription": "Actual cleanup failure"]),
+                    ]))
+            }
+            throw CancellationError()
+        }
+    }
+    let gateway = OutputGateway(
+        manager: manager, requests: InputGateway(manager: manager, allowsExternalSend: true), tools: registry,
+        sink: { _ in })
+    let call = try voiceState.call(["state": "processing"])
+    let outcome = try await gateway.execute(
+        OutputEnvelope(source: .speechPerception, input: input, output: .toolCall(call)))
+    #expect(outcome.isError == (mode != "cancel"))  // Cancelled evidence is not a runtime incident.
+    #expect(outcome.tool?.failureCode == (mode == "mixed" ? .handlerFailed : .cancelled))
+    #expect(outcome.isCancellationOnly == (mode == "cancel"))
+    let observed = try await gateway.observeFailures()
+    var iterator = observed.makeAsyncIterator()
+    let snapshot = try #require(await iterator.next())
+    #expect(snapshot.records.isEmpty == (mode == "cancel"))
+    if mode == "mixed" { #expect(outcome.tool?.value.contains("Actual cleanup failure") == true) }
+    if mode == "delivery" {
+        #expect(outcome.failureCode == .deliveryFailed && outcome.tool?.deliveryFailure != nil)
+    } else {
+        let next = try await gateway.execute(
+            OutputEnvelope(
+                source: .speechPerception, input: input,
+                output: .toolCall(try voiceState.call(["state": "listening"])), sequence: 2))
+        #expect(!next.isError && !next.isCancellationOnly)
+    }
+    let retained = await gateway.executionResults(source: .speechPerception, inputID: input.id)
+    #expect(retained.outputs.first?.tool?.callID == call.id)
+    #expect(retained.outputs.first?.tool?.failureCode == (mode == "mixed" ? .handlerFailed : .cancelled))
+    await gateway.shutdown()
+    await manager.stopAll()
 }

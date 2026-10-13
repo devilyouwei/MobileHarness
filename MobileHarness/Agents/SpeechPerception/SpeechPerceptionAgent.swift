@@ -33,7 +33,6 @@ public actor SpeechPerceptionAgent: Agent {
     private let residentListening: Bool
     private var captureOpen: Bool
     private var listeningPolicy = SpeechListeningPolicy()
-    private var policyRecovery: Task<Void, Never>?
     private static let listeningAction = InternalAction(
         domain: "Speech", module: "Listening", function: "update", channel: "Listening",
         required: ["enabled", "paused", "revision"])
@@ -165,9 +164,6 @@ public actor SpeechPerceptionAgent: Agent {
     }
     public func stop() async {
         lifecycle = .stopped
-        policyRecovery?.cancel()
-        await policyRecovery?.value
-        policyRecovery = nil
         clearPendingAudio()
         worker?.cancel()
         await recognitionTurn?.cancel()
@@ -222,10 +218,11 @@ public actor SpeechPerceptionAgent: Agent {
         guard residentListening, input.sessionID == interactionSessionID else { throw CommunicationError.scopeClosed }
         if message.contract == ListeningIntent.contract {
             guard input.metadata.origin == .external, input.metadata.source == "user",
-                message.content(as: ListeningIntent.self) != nil
+                let intent = message.content(as: ListeningIntent.self)
             else { throw CommunicationError.unauthorized }
             try await prepareSignal(input)
-            listeningPolicy.enabled.toggle()
+            listeningPolicy.enabled = intent.enabled ?? !listeningPolicy.enabled
+            if !listeningPolicy.enabled { listeningPolicy.pendingFinal = nil }
         } else if message.contract == SpeechCaptureEnded.contract {
             guard input.metadata.origin == .external, input.metadata.source == "phone.microphone",
                 let ended = message.content(as: SpeechCaptureEnded.self)
@@ -233,6 +230,7 @@ public actor SpeechPerceptionAgent: Agent {
             try await prepareSignal(input)
             guard ended.revision == listeningPolicy.revision, listeningPolicy.enabled else { return }
             listeningPolicy.enabled = false
+            listeningPolicy.pendingFinal = nil
         } else {
             guard input.metadata.origin == .agent, let incarnation = input.metadata.incarnation,
                 let activity = message.content(as: ReplyActivity.self),
@@ -260,15 +258,6 @@ public actor SpeechPerceptionAgent: Agent {
             awaitingReply = true
             clearPendingAudio()
         }
-        policyRecovery?.cancel()
-        policyRecovery = nil
-        if let deadline = listeningPolicy.deadline {
-            policyRecovery = Task { [weak self] in
-                do { try await ContinuousClock().sleep(until: deadline) } catch { return }
-                guard !Task.isCancelled else { return }
-                await self?.recoverListening(parent: parent)
-            }
-        }
         try emit(
             .actionCall(
                 Self.listeningAction.call([
@@ -276,11 +265,6 @@ public actor SpeechPerceptionAgent: Agent {
                     "revision": String(listeningPolicy.revision),
                 ])), input: command)
         try emit(.control("agent.finished"), input: command)
-    }
-    private func recoverListening(parent: AgentInput) {
-        guard lifecycle == .running, listeningPolicy.expire(at: .now) else { return }
-        reportError(CommunicationError.expired, input: parent)
-        do { try applyListeningPolicy(parent: parent) } catch { reportError(error, input: parent) }
     }
 
     // MARK: - Input processing
@@ -555,7 +539,7 @@ public actor SpeechPerceptionAgent: Agent {
         }
         phase = .listening
         if residentListening {
-            listeningPolicy.pendingFinal = (input.metadata.rootID, .now.advanced(by: SpeechListeningPolicy.lease))
+            listeningPolicy.pendingFinal = input.metadata.rootID
             try applyListeningPolicy(parent: input)
         }
         try await communicate(.transcript(text, final: true), parent: input)
@@ -571,7 +555,13 @@ public actor SpeechPerceptionAgent: Agent {
 
     /// A failed utterance does not close the resident Agent, microphone or output stream.
     private func recoverRecognition(_ error: any Error) async {
-        if let activeInput { reportError(error, input: activeInput) }
+        if let activeInput {
+            reportError(error, input: activeInput)
+            if listeningPolicy.pendingFinal == activeInput.metadata.rootID {
+                listeningPolicy.pendingFinal = nil
+                do { try applyListeningPolicy(parent: activeInput) } catch { reportError(error, input: activeInput) }
+            }
+        }
         clearPendingAudio()
         await recognitionTurn?.cancel()
         await segmenter?.cancel()
@@ -597,7 +587,9 @@ public actor SpeechPerceptionAgent: Agent {
                 origin: metadata.origin,
                 capturedAt: metadata.capturedAt, sequence: metadata.sequence, rootID: metadata.rootID,
                 parentID: metadata.parentID, hops: metadata.hops,
-                deadline: min(metadata.deadline, capturedAt.advanced(by: .milliseconds(500)))),
+                deadline: min(
+                    metadata.deadline ?? capturedAt.advanced(by: .milliseconds(500)),
+                    capturedAt.advanced(by: .milliseconds(500)))),
             turn: parent.turn)
         pendingSound = (value, scopedParent, capturedAt)
         if soundPublisher == nil { soundPublisher = Task { await self.publishSound() } }

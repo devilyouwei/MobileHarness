@@ -5,7 +5,7 @@ import Testing
 
 @testable import PlatformKit
 
-@Test func cameraGraySamplePreservesStrideAndOrientation() throws {
+@Test(.actionCatalog) func cameraGraySamplePreservesStrideAndOrientation() throws {
     let source: [UInt8] = [
         10, 10, 10, 255, 20, 20, 20, 255, 99, 99, 99, 99,
         30, 30, 30, 255, 40, 40, 40, 255, 99, 99, 99, 99,
@@ -23,7 +23,7 @@ import Testing
 }
 
 private struct SampleAttachment: ImageAttachment {}
-@Test func sampledNativeInputPreservesTransportAndValidatesSampleSize() throws {
+@Test(.actionCatalog) func sampledNativeInputPreservesTransportAndValidatesSampleSize() throws {
     let sample = Data(repeating: 7, count: 4096)
     let input = try ImageInput(
         width: 720, height: 1280, gray64: sample, attachment: SampleAttachment(),

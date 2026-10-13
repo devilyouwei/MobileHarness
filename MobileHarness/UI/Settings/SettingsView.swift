@@ -25,7 +25,7 @@
                 }
                 Section("用户") {
                     destination(
-                        .history, title: "对话历史", icon: "clock.arrow.circlepath",
+                        .history, title: "历史记录", icon: "clock.arrow.circlepath",
                         identifier: "settings.conversation.history")
                 }
             }

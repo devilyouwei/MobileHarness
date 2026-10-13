@@ -15,7 +15,7 @@ struct AgentModelEvaluationTests {
             let messages: [[String: String]]
         }
         let root = URL(fileURLWithPath: try #require(ProcessInfo.processInfo.environment["HARNESS_GEMMA4_ROOT"]))
-        let modelContext = ModelContext()
+        let modelContext = try ModelContext(loadGate: ModelLoadGate(maximumConcurrentLoads: 4), maximumLoadWaiters: 32)
         let model = try Gemma4Chat(
             context: modelContext,
             artifacts: root)

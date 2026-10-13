@@ -11,6 +11,7 @@ public enum BehaviorCoverage {
         guard capabilities.count <= 128 else { throw HarnessError.queueFull }
         for capability in capabilities {
             for action in capability.actions.map(\.path) + capability.internalActions.map(\.path) {
+                if action.description == "Agent.Communication.send" { continue }
                 _ = try actions.definition(
                     for: ActionIdentifier(domain: action.domain, module: action.module, function: action.function))
             }

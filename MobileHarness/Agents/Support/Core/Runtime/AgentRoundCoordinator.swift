@@ -4,8 +4,8 @@ import Foundation
 public struct AgentRoundCoordinator: Sendable {
     public struct Call: Sendable {
         public let id: UUID
-        public let policy: GenerationFeedbackPolicy
-        public var terminal: Bool
+        public var result: ToolResult?
+        public var terminal: Bool { result != nil }
     }
     public let id: UUID
     public let taskID: UUID
@@ -13,24 +13,25 @@ public struct AgentRoundCoordinator: Sendable {
     private var sealed = false
     private var cancelled = false
     public var complete: Bool { !cancelled && sealed && calls.allSatisfy(\.terminal) }
-    public var needsObservation: Bool { complete && calls.contains { $0.policy == .observation } }
+    public var needsReasoning: Bool { complete && calls.contains { $0.result?.requiresReasoning == true } }
     public init(id: UUID = UUID(), taskID: UUID) {
         self.id = id
         self.taskID = taskID
     }
-    public mutating func register(id: UUID, policy: GenerationFeedbackPolicy) throws {
+    public mutating func register(id: UUID) throws {
         guard !cancelled, !sealed, calls.count < 120, !calls.contains(where: { $0.id == id }) else {
             throw CommunicationError.invalidPayload
         }
-        calls.append(Call(id: id, policy: policy, terminal: false))
+        calls.append(Call(id: id))
     }
-    public mutating func accept(callID: UUID, roundID: UUID) throws {
-        guard !cancelled, roundID == id, let index = calls.firstIndex(where: { $0.id == callID }),
+    public mutating func accept(_ result: ToolResult, roundID: UUID) throws {
+        guard !cancelled, roundID == id, result.roundID == nil || result.roundID == id,
+            result.value.utf8.count <= 65_536, let index = calls.firstIndex(where: { $0.id == result.callID }),
             !calls[index].terminal
         else {
             throw CommunicationError.unauthorized
         }
-        calls[index].terminal = true
+        calls[index].result = result
     }
     public mutating func cancel() { cancelled = true }
     public mutating func seal() throws {

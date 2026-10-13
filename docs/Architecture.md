@@ -15,7 +15,7 @@ flowchart LR
 
 ## Perception and cognition
 
-SpeechPerception and VisionPerception share recognition/pose processing and publish typed observations. Assistant is the default user entry, combines input with its own context and delegates specialist tasks; each interactive specialist owns its private model history and streaming response. SpeechSynthesis is a separate directed service preparing PCM; playback follows scheduled Actions.
+SpeechPerception and VisionPerception share recognition/pose processing and publish typed observations. Assistant is the default user entry, combines input with its own context and executes Skill decisions; deterministic specialists own fixed transactions and task state. Assistant context supplies chat and task history. SpeechSynthesis is a separate directed service preparing PCM; playback follows scheduled Actions.
 
 Agents own their cognitive state and processing. Communication carries trusted source, session and causal context. Gateways validate admission and requested behavior, while Agent inboxes own pending messages.
 
@@ -51,7 +51,7 @@ The [technical design](../MobileHarness/README.md) defines dependencies and full
 
 Camera.open/close/flip Tools use Photographer delegation to request the App camera owner after active Assistant session validation. Flip requires facing=front/back and selects that target rather than toggling. The same foreground permission and capture lease lifecycle governs UI and Tool controls; Tool dispatch does not create a second device owner.
 
-Cloud chat supports native function declarations from Agent JSON v6. Complete calls are resolved by the Agent and dispatched through OutputGateway; local chat remains text-only. Tool results use the existing InputGateway feedback contract, without automatic model continuation.
+Cloud chat supports native declarations from the Assistant effective Skill catalog, bounded by v7 Agent permissions. Complete calls resolve in the Agent and execute through OutputGateway. Result policy controls ReACT after the same round barrier; local providers remain text-only unless they explicitly support native calls.
 
 Photographer subscribes to VisionPerception pose observations and emits internal Robot.aim through OutputGateway. App binds the foreground BLE workflow; Actions owns aim mapping and admission, while PlatformKit supplies native command encoding. Transport acceptance does not establish physical arrival.
 
@@ -65,7 +65,7 @@ Expression Actions have explicit lifetime contracts: UI.express awaits one targe
 
 ## Local model resource separation
 
-✅ First release bundles a versioned model catalog rather than inference artifacts; Settings requests download/removal through App into ModelKit Management. Management owns verification and safe mutation; App injects generic Storage primitives and the separate concrete ModelKitHub adapter, preserving Management’s ModelKit-only dependency. Resource admission spans quiescence/unload and disk deletion. Settings/history remain available without weights. See the [technical workflow](../MobileHarness/README.md#local-model-resource-acquisition-and-removal) and [Management current contract](../MobileHarness/ModelKit/Management/README.md#local-model-resources--current-contract).
+✅ First release bundles a versioned model catalog rather than inference artifacts; Settings requests download/removal through App into ModelKit Management. Management owns verification and safe mutation; App injects generic Storage primitives and the separate concrete ModelKitHub adapter, preserving Management’s ModelKit-only dependency. Resource admission spans quiescence/unload and disk deletion. Settings/history remain available without weights. See the [technical workflow](../MobileHarness/README.md#local-model-resource-acquisition-and-removal) and [Management current contract](../MobileHarness/ModelKit/Support/Management/README.md#local-model-resources--current-contract).
 
 Conversation history now retains actual native Tool declarations/calls and App-observed Gateway outcomes separately from generation state. Optional usage values retain provider/backend input/generated/total token counts. App adapts StorageChat records into independently owned UI values; no history replay is introduced. See [ADR0106](adr/0106-conversation-tool-diagnostics.md).
 
@@ -224,11 +224,11 @@ The same design separates external facts, internal Agent messages and internal r
 
 ✅ ADR0154 implements cohesive module entry files with one copy of each function and unchanged protocol behavior. File ownership is checked explicitly. ❌ Three-field path/configuration/registration migration remains outstanding.
 
-✅ ADR0155: scheduled Actions use immutable definition-owned serialization keys, independently of path/module names. Production preserves existing exclusion scopes; resource ownership and Agent permissions remain separate.
+✅ ADR0213 supersedes ADR0155: definition-owned exclusion is removed; Channels provide task-local ordering and unconfigured resource conflicts fail without queuing. Explicit host takeover retains joined cleanup.
 
 ❌ Three-level runtime paths and unified Action/Tool definitions are not completed by this stage.
 
-✅ [ADR0156 — Three-level capability addresses](adr/0156-three-level-capability-addresses.md): explicit fields and Agent configuration v6 bindings implemented; serialization/resource scopes preserved. ❌ Unified definitions/adapters and compatibility removal remain pending.
+✅ [ADR0156 — Three-level capability addresses](adr/0156-three-level-capability-addresses.md): explicit fields and Agent configuration v6 bindings implemented; resource scopes preserved. ❌ Unified definitions/adapters and compatibility removal remain pending.
 
 ✅ [ADR0157 — Canonical executable definitions](adr/0157-canonical-executable-definitions.md): completes shared definition/outcome/execution, protocol projections, scheduled native routing, typed feedback and compatibility retirement. Remaining work is broader Agent-driven input/feature migration and physical acceptance.
 
@@ -311,7 +311,7 @@ The root service outlives preview. One attached vision session supplies pose tra
 
 ✅ [ADR0189](adr/0189-agent-support-hierarchy.md): reusable Agent sources group under Support/Core, Communication, Chat and Context. Core retains independent Foundation-only compilation; the seven role directories own business decisions. Target names and dependency boundaries are unchanged; full checks and unsigned iOS device build passed.
 
-✅ [ADR0190](adr/0190-assistant-listening-and-one-way-publication.md): SpeechPerception owns listening consent and admission policy through fixed Actions; interactive Agents publish reply occupancy and App executes native/playback barriers. External facts publish one-way, internal send retains admission receipts, and recoverable speech errors do not stop recording. Physical recording stops on user-off/native interruption; policy pause suppresses recognition input while preserving capture.
+✅ [ADR0190](adr/0190-assistant-listening-and-one-way-publication.md): SpeechPerception owns listening consent and admission policy through fixed Actions; interactive Agents publish reply occupancy and App executes native/playback barriers. External facts publish one-way, internal send retains admission receipts, and recoverable speech errors do not stop recording. Physical recording stops on user-off/native interruption and after confirmed utterance completion during a reply pause. Consent stays enabled through the pause; App immediately resumes fresh native capture after policy clearance and actual playback/audio cleanup, with no fixed post-playback timer. Manual hold-off also cancels the current Assistant reply and fences late effects.
 
 ## Basic mechanical-arm interaction ownership
 
@@ -323,3 +323,17 @@ The root service outlives preview. One attached vision session supplies pose tra
 ## Responses transport and Action-only Assistant
 
 ✅ Implemented: Cloud Chat uses Responses input/typed SSE under the existing ModelKit capability boundary. Model resource residency owns a reusable HTTP Session; each operation owns cancellation and never invalidates another request. Assistant has no Tool grants: environment observation and directed delegation use Action calls. Other Agent/host protocol grants remain role-owned. Historical native-call pairs stay in storage and become inert text evidence in Assistant requests. No server-side conversation ownership, protocol fallback or new modules/dependencies are introduced.
+
+## Assistant Skills / Task Modes（2026-10-11）
+
+✅ 当前对话入口收敛为 Assistant，通过纯资源 Skill 加载动态函数和单前台任务上下文；三个专用角色保留确定性流程。旧多 Chat Agent 对话委派说明由 [ADR0212](adr/0212-assistant-skills-task-modes.md) 替代。❌ 真机摄影、语音竞争与模式切换验收待完成；没有远程 Skill、任务栈或新第三方依赖。
+
+## 泛化 Task 与独立 Skill（2026-10-11）
+
+✅ 固定模式资源已删除。Task 目标是运行时数据；startTask 原子加载可选 Skill 组。默认临时 Skill 归属决策链，前台 Task Skill 保持到终态清理。Core 任务协议增加 execution 和目标/请求 Skill 证据，最多 16 个非终态后台任务；后台复用通信 Action/send，无前台抢占或自动推理。生产 backgroundTasks 声明为空，公共链由合成执行者验证。当前契约见 Agents README；真机验收仍待完成。
+
+## ModelKit shared support ownership
+
+✅ ModelKit shared infrastructure is grouped under Support. Core owns neutral contracts/concurrency, Backends owns generic native graphs, Management groups separate lifecycle/default-assembly targets and injected artifact transfer, and Speech/Apple owns shared PCM conversion. Concrete model algorithms remain with their providers. Directory consolidation does not broaden ModelKitRuntime dependencies. See [approved migration](ModelKit-Support-Plan.md) and [current design](../MobileHarness/ModelKit/Support/README.md).
+
+✅ [ModelKit Core refinement and decoupling audit](ModelKit-Decoupling-Audit.md) separates opaque inference scopes, Core resource residency and Management registration/construction policy. Core is independently typechecked, and the complete target graph enforces one-way foundational/shared/provider/assembly dependencies.

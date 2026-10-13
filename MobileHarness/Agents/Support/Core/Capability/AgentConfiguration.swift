@@ -10,6 +10,7 @@ public enum AgentConfigurationError: Error, Equatable, Sendable {
 
 /// Versioned model-callable catalog and communication policy; internal behavior is assembled by the Agent.
 public struct AgentConfiguration: Sendable {
+    public let version: Int
     public let communication: CommunicationDeclaration
     public let agentID: AgentID
     public let capabilities: CapabilityRegistry
@@ -27,9 +28,10 @@ public struct AgentConfiguration: Sendable {
         do { decoded = try JSONDecoder().decode(Document.self, from: data) } catch {
             throw AgentConfigurationError.invalidFormat
         }
-        guard decoded.version == 6 else {
+        guard decoded.version == 6 || decoded.version == 7 else {
             throw AgentConfigurationError.unsupportedVersion(decoded.version)
         }
+        version = decoded.version
         let communicationObject = try Self.dictionary(
             root["communication"] ?? NSNull(),
             keys: ["inputs", "subscriptions", "publications", "sends"], field: "communication")
@@ -89,9 +91,15 @@ public struct AgentConfiguration: Sendable {
                     optionalParameters: Set(tool.function.parameters.properties.keys)
                         .subtracting(tool.function.parameters.required), definition: tool)
             }, channels: Set(decoded.actions.keys))
-        for action in capabilities.actions {
-            for example in action.documentation?.examples ?? [] {
-                try Self.validateExample(example, for: action, registry: capabilities)
+        // Legacy imported configurations may carry examples; validate them without rendering or storing them in live metadata.
+        for entries in decoded.actions.values {
+            for entry in entries {
+                guard let action = capabilities.actions.first(where: { $0.alias == entry.alias }) else {
+                    throw AgentConfigurationError.invalidField("actions.alias")
+                }
+                for example in entry.examples ?? [] {
+                    try Self.validateExample(example, for: action, registry: capabilities)
+                }
             }
         }
         agentID = AgentID(rawValue: decoded.id)
@@ -129,10 +137,12 @@ public struct AgentConfiguration: Sendable {
         let keys: Set<String> = [
             "alias", "path", "doc", "parameters", "examples",
         ]
-        let value = try dictionary(raw, keys: keys, field: field)
+        guard let rawValue = raw as? [String: Any] else { throw AgentConfigurationError.invalidField(field) }
+        let value = try dictionary(
+            raw, keys: rawValue["examples"] == nil ? keys.subtracting(["examples"]) : keys, field: field)
         try prose(value["doc"], field: "\(field).doc")
         guard let parameters = value["parameters"] as? [Any], parameters.count <= 32,
-            let examples = value["examples"] as? [Any], (1...8).contains(examples.count)
+            value["examples"] == nil || (value["examples"] as? [Any]).map { (1...8).contains($0.count) } == true
         else { throw AgentConfigurationError.invalidField(field) }
         var names = Set<String>()
         for rawParameter in parameters {
@@ -145,7 +155,7 @@ public struct AgentConfiguration: Sendable {
             try prose(parameter["description"], field: "\(field).parameters.description")
             try prose(parameter["constraints"], field: "\(field).parameters.constraints", allowEmpty: true)
         }
-        for example in examples { try prose(example, field: "\(field).examples") }
+        for example in value["examples"] as? [Any] ?? [] { try prose(example, field: "\(field).examples") }
         return value
     }
 
@@ -202,9 +212,9 @@ public struct AgentConfiguration: Sendable {
             let path: Path
             let doc: String
             let parameters: [CapabilityDocumentation.Parameter]
-            let examples: [String]
+            let examples: [String]?
             var documentation: CapabilityDocumentation {
-                CapabilityDocumentation(doc: doc, parameters: parameters, examples: examples)
+                CapabilityDocumentation(doc: doc, parameters: parameters)
             }
             struct Path: Decodable {
                 let domain: String

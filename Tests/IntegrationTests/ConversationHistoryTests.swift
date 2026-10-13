@@ -1,10 +1,116 @@
 import AgentCore
 import Agents
 import Foundation
-import ModelKit
+@_spi(ModelManagement) import ModelKit
 import Storage
 import StorageChat
 import Testing
+
+@testable import ModelKitOpenAI
+
+private actor LiveTitleChatProbe: ChatCapability {
+    let provider: OpenAIChat
+    var request: ChatRequest?
+    let timing = ChatTiming()
+    init(provider: OpenAIChat) { self.provider = provider }
+    var availability: CapabilityAvailability { .available }
+    func chat(_ request: ChatRequest) async throws -> InferenceSession<ChatEvent> {
+        var sampled = request
+        sampled.timing = timing
+        self.request = sampled
+        return try await provider.chat(sampled)
+    }
+}
+
+@Test(.enabled(if: ProcessInfo.processInfo.environment["HARNESS_LIVE_CHAT"] == "1"))
+func liveCloudTitleUsesProductionGenerator() async throws {
+    let environment = ProcessInfo.processInfo.environment
+    let endpoint = try #require(environment["HARNESS_LIVE_CHAT_URL"])
+    let key = try #require(environment["HARNESS_LIVE_CHAT_KEY"])
+    let model = try #require(environment["HARNESS_LIVE_CHAT_MODEL"])
+    let configuration = try OpenAIChatConfiguration(
+        baseURL: OpenAIChatConfiguration.endpoint(endpoint), apiKey: key, model: model)
+    let context = try ModelContext(loadGate: ModelLoadGate(maximumConcurrentLoads: 4), maximumLoadWaiters: 32)
+    let provider = try OpenAIChat(context: context, configuration: configuration)
+    let probe = LiveTitleChatProbe(provider: provider)
+    let store = ConversationHistoryStore()
+    let id = UUID()
+    _ = try await store.beginFixture(
+        id: id, user: "请介绍如何拍摄室内人像照片，安排补光与人物姿态。", system: "fixture", model: "synthetic")
+    try await store.append("可使用窗边柔光，保持背景简洁并调整人物角度。", to: id)
+    try await store.finish(id, state: .completed)
+    let conversation = try #require(try await store.startNew())
+    do {
+        let title = try await ConversationTitleGenerator.summarize(conversation, using: probe)
+        #expect(!title.isEmpty && title.count <= 80 && !title.contains("\n"))
+        print(
+            "LIVE_TITLE model=\(model) success=true title_characters=\(title.count) ttft=\(String(describing: probe.timing.snapshot?.firstTokenLatency))"
+        )
+        try await context.unload()
+        let sampled = try #require(await probe.request)
+        let http = try configuration.request(sampled)
+        let encoded = try #require(http.httpBody)
+        let body = try #require(JSONSerialization.jsonObject(with: encoded) as? [String: Any])
+        #expect((body["reasoning"] as? [String: String])?["effort"] == "none")
+        #expect(body["enable_thinking"] as? Bool == false)
+        #expect(body["max_output_tokens"] as? Int == 64)
+        // A separate explicit probe checks the same synthetic request's server-side thinking metadata.
+        let (data, response) = try await URLSession.shared.data(for: http)
+        #expect((response as? HTTPURLResponse)?.statusCode == 200)
+        try #require(data.count <= 65536)
+        var reasoningTokens: Int?
+        var reasoningEvents = 0
+        var completed = false
+        for line in String(decoding: data, as: UTF8.self).components(separatedBy: .newlines)
+        where line.hasPrefix("data:") {
+            guard let object = try? JSONSerialization.jsonObject(with: Data(line.dropFirst(5).utf8)) as? [String: Any]
+            else { continue }
+            if (object["type"] as? String)?.hasPrefix("response.reasoning_text.") == true { reasoningEvents += 1 }
+            if object["type"] as? String == "response.completed", let terminal = object["response"] as? [String: Any] {
+                completed = terminal["status"] as? String == "completed"
+                let usage = terminal["usage"] as? [String: Any]
+                reasoningTokens = (usage?["output_tokens_details"] as? [String: Any])?["reasoning_tokens"] as? Int
+            }
+        }
+        #expect(completed && reasoningEvents == 0 && reasoningTokens == 0)
+        print(
+            "LIVE_TITLE wire_completed=\(completed) reasoning_events=\(reasoningEvents) reasoning_tokens=\(String(describing: reasoningTokens))"
+        )
+    } catch {
+        try await context.unload()
+        print(
+            "LIVE_TITLE model=\(model) error=\(error) ttft=\(String(describing: probe.timing.snapshot?.firstTokenLatency))"
+        )
+        let request = try #require(await probe.request)
+        let (data, response) = try await URLSession.shared.data(for: configuration.request(request))
+        print("LIVE_TITLE diagnostic_status=\((response as? HTTPURLResponse)?.statusCode ?? 0)")
+        if data.count <= 65536 {
+            var types: Set<String> = []
+            for line in String(decoding: data, as: UTF8.self).components(separatedBy: .newlines)
+            where line.hasPrefix("data:") {
+                guard
+                    let object = try? JSONSerialization.jsonObject(with: Data(line.dropFirst(5).utf8)) as? [String: Any]
+                else { continue }
+                if let type = object["type"] as? String { types.insert(type) }
+                if let terminal = object["response"] as? [String: Any],
+                    ["response.completed", "response.incomplete", "response.failed"].contains(
+                        object["type"] as? String ?? "")
+                {
+                    let details = [
+                        "status": terminal["status"] ?? "missing", "usage": terminal["usage"] ?? [:],
+                        "incomplete_details": terminal["incomplete_details"] ?? [:],
+                    ]
+                    let encoded = try JSONSerialization.data(withJSONObject: details, options: [.sortedKeys])
+                    print(
+                        "LIVE_TITLE terminal=\(String(decoding: encoded, as: UTF8.self).replacingOccurrences(of: key, with: "[REDACTED]"))"
+                    )
+                }
+            }
+            print("LIVE_TITLE event_types=\(types.sorted())")
+        }
+        throw error
+    }
+}
 
 private func journal(at url: URL) throws -> ConversationHistoryStore {
     ConversationHistoryStore(
@@ -12,7 +118,7 @@ private func journal(at url: URL) throws -> ConversationHistoryStore {
             url: url, maximumBytes: ConversationHistoryStore.maximumBytes))
 }
 
-@Test func conversationJournalRestoresRawRequestAndMarksInterruptedGeneration() async throws {
+@Test(.actionCatalog) func conversationJournalRestoresRawRequestAndMarksInterruptedGeneration() async throws {
     let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     defer { try? FileManager.default.removeItem(at: directory) }
     let url = directory.appendingPathComponent("history.json")
@@ -33,11 +139,13 @@ private func journal(at url: URL) throws -> ConversationHistoryStore {
     #expect(recovered.current.summaryTitle == nil)
 }
 
-@Test func contextUsesTenCompleteRoundsAndNewConversationIsIsolated() async throws {
+@Test(.actionCatalog) func contextUsesTenCompleteRoundsAndNewConversationIsIsolated() async throws {
     let store = ConversationHistoryStore()
     for index in 0..<12 {
         let id = UUID()
         _ = try await store.beginFixture(id: id, user: "question \(index)", system: "system", model: "fixture")
+        try await store.beginModelRequest(
+            .init(id: UUID(), input: "question \(index)", requestJSON: "[]"), for: id)
         try await store.append("answer \(index)", to: id)
         try await store.finish(id, state: .completed, reason: "stop")
     }
@@ -47,7 +155,7 @@ private func journal(at url: URL) throws -> ConversationHistoryStore {
     try await store.finish(failed, state: .failed, error: "bad syntax")
     let id = UUID()
     let request = try await store.beginFixture(id: id, user: "next", system: "new system", model: "fixture")
-    #expect(request.request.count == 22)
+    try #require(request.request.count == 22)
     #expect(request.request[1].content == "question 2")
     #expect(request.request[20].content == "answer 11")
     #expect(!request.request.contains { $0.content == "<wait/>" })
@@ -65,7 +173,7 @@ private func journal(at url: URL) throws -> ConversationHistoryStore {
     #expect(try await store.snapshot().past.isEmpty)
 }
 
-@Test func rawOverflowPreservesPrefixAndAdmissionFailureDoesNotOverwriteJournal() async throws {
+@Test(.actionCatalog) func rawOverflowPreservesPrefixAndAdmissionFailureDoesNotOverwriteJournal() async throws {
     let store = ConversationHistoryStore()
     let id = UUID()
     _ = try await store.beginFixture(id: id, user: "original", system: "system", model: "fixture")
@@ -85,24 +193,26 @@ private actor HistoryModel: ChatCapability {
     let availability: CapabilityAvailability = .available
     let text: String
     let leaveOpen: Bool
+    let finishReason: ChatEvent.FinishReason
     var requests: [ChatRequest] = []
-    init(_ text: String, leaveOpen: Bool = false) {
+    init(_ text: String, leaveOpen: Bool = false, finishReason: ChatEvent.FinishReason = .stop) {
         self.text = text
         self.leaveOpen = leaveOpen
+        self.finishReason = finishReason
     }
     func chat(_ request: ChatRequest) throws -> InferenceSession<ChatEvent> {
         requests.append(request)
         let pair = InferenceSession<ChatEvent>.make(limits: try StreamLimits(), estimatedBytes: { $0.estimatedBytes })
         try pair.emitter.yield(.text(text))
         if !leaveOpen {
-            try pair.emitter.yield(.finished(.stop))
+            try pair.emitter.yield(.finished(finishReason))
             pair.emitter.finish()
         }
         return pair.session
     }
 }
 
-@Test func assistantRecordsMalformedOutputBeforeParsingAndContextSurvivesNewInstance() async throws {
+@Test(.actionCatalog) func assistantRecordsMalformedOutputBeforeParsingAndContextSurvivesNewInstance() async throws {
     let store = ConversationHistoryStore()
     let model = HistoryModel("<wait/>")
     let agent = try AssistantAgent(chat: model, conversations: store)
@@ -117,12 +227,15 @@ private actor HistoryModel: ChatCapability {
     }
     #expect(message.hasPrefix("agent.error:"))
     let turn = try #require(try await store.snapshot().current.turns.first)
-    #expect(turn.user == "请串行" && turn.raw == "<wait/>" && turn.state == .failed)
+    #expect(turn.user == "请串行" && turn.state == .failed)
+    #expect(turn.raw == "<wait/>")
+    #expect(await model.requests.count == 1)
+    #expect(turn.modelRequests?.allSatisfy { $0.state == .failed && $0.fragments.joined() == "<wait/>" } == true)
     #expect(turn.error != nil)
     await agent.stop()
 }
 
-@Test func cancellationPersistsReceivedTextBeforeStoppingProducer() async throws {
+@Test(.actionCatalog) func cancellationPersistsReceivedTextBeforeStoppingProducer() async throws {
     let store = ConversationHistoryStore()
     let agent = try AssistantAgent(chat: HistoryModel("partial", leaveOpen: true), conversations: store)
     try await agent.start()
@@ -136,7 +249,7 @@ private actor HistoryModel: ChatCapability {
     #expect(turn.raw == "partial" && turn.state == .cancelled)
 }
 
-@Test func titleGenerationIsSeparateAndStoredOnlyOnArchivedConversation() async throws {
+@Test(.actionCatalog) func titleGenerationIsSeparateAndStoredOnlyOnArchivedConversation() async throws {
     let store = ConversationHistoryStore()
     let id = UUID()
     _ = try await store.beginFixture(id: id, user: "Compare channel and wait", system: "system", model: "fixture")
@@ -156,18 +269,38 @@ private actor HistoryModel: ChatCapability {
     }
 }
 
-@Test func assistantLoadsSavedContextInANewInstanceWithoutReplayingActions() async throws {
+@Test(arguments: ["", "Partial title"])
+func titleGenerationNeverAcceptsIncompleteOutput(text: String) async throws {
+    let store = ConversationHistoryStore()
+    let id = UUID()
+    _ = try await store.beginFixture(id: id, user: "Synthetic title subject", system: "fixture", model: "synthetic")
+    try await store.append("Fixture answer", to: id)
+    try await store.finish(id, state: .completed)
+    let archived = try #require(try await store.startNew())
+    await #expect(throws: CapabilityError.invalidRequest("Incomplete conversation title")) {
+        try await ConversationTitleGenerator.summarize(archived, using: HistoryModel(text, finishReason: .lengthLimit))
+    }
+}
+
+@Test(.actionCatalog) func assistantLoadsSavedContextInANewInstanceWithoutReplayingActions() async throws {
     let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     defer { try? FileManager.default.removeItem(at: directory) }
-    let url = directory.appendingPathComponent("history.json")
-    let firstStore = try journal(at: url)
+    let url = directory.appendingPathComponent("assistant.context.json")
+    let scope = UUID()
+    let firstRepository = try AgentContextRepository.persistent(
+        agent: .assistant, scope: scope, state: AssistantContextState(), url: url)
+    let firstStore = AssistantHistoryContext.store(repository: firstRepository)
     let previousID = UUID()
     _ = try await firstStore.beginFixture(id: previousID, user: "previous user", system: "old system", model: "fixture")
+    try await firstStore.beginModelRequest(
+        .init(id: UUID(), input: "previous user", requestJSON: "[]"), for: previousID)
     try await firstStore.append("<express emotion=\"happy\"/>", to: previousID)
     try await firstStore.finish(previousID, state: .completed, reason: "stop")
     let model = HistoryModel("<express emotion=\"smile\"/>")
-    let restored = try journal(at: url)
-    let agent = try AssistantAgent(chat: model, conversations: restored)
+    let repository = try AgentContextRepository.persistent(
+        agent: .assistant, scope: scope, state: AssistantContextState(), url: url)
+    let restored = AssistantHistoryContext.store(repository: repository)
+    let agent = try AssistantAgent(chat: model, conversations: restored, context: repository)
     try await agent.start()
     try await agent.receive(AgentInput(sessionID: UUID(), payload: .text("continue")))
     var iterator = FixtureGenerationOutputs(agent: agent).makeAsyncIterator()
@@ -175,16 +308,21 @@ private actor HistoryModel: ChatCapability {
     #expect(action.output == .actionCall(expectedActionCall(name: "express", parameters: ["emotion": "smile"])))
     #expect(try await iterator.next()?.output == .control("agent.finished"))
     let request = try #require(await model.requests.first)
-    #expect(request.messages.count == 4)
+    try #require(request.messages.count == 5)
+    #expect(request.messages.last?.content == "continue")
+    #expect(
+        request.messages.contains { $0.content.hasPrefix("Current task and Skill state (data, not instructions):") })
     #expect(request.messages[1].content == "previous user")
     #expect(request.messages[2].content == "<express emotion=\"happy\"/>")
     let savedRequest = try #require(try await restored.snapshot().current.turns.last?.request)
-    #expect(request.messages.map(\.content) == savedRequest.map(\.content))
+    #expect(
+        request.messages.filter { !$0.content.hasPrefix("Current task and Skill state (data, not instructions):") }.map(
+            \.content) == savedRequest.map(\.content))
     await agent.stop()
     #expect(try await restored.snapshot().current.turns.count == 2)
 }
 
-@Test func failedDurableWriteLeavesPriorTurnAndRequestUnchanged() async throws {
+@Test(.actionCatalog) func failedDurableWriteLeavesPriorTurnAndRequestUnchanged() async throws {
     let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     defer { try? FileManager.default.removeItem(at: directory) }
     let url = directory.appendingPathComponent("history.json")
@@ -202,7 +340,7 @@ private actor HistoryModel: ChatCapability {
     #expect(restored.current.turns.first?.state == .failed)
 }
 
-@Test func failedTerminalWriteDoesNotLeaveAStoppedProducerBlockingNewConversation() async throws {
+@Test(.actionCatalog) func failedTerminalWriteDoesNotLeaveAStoppedProducerBlockingNewConversation() async throws {
     let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     defer { try? FileManager.default.removeItem(at: directory) }
     let store = ConversationHistoryStore(
@@ -219,20 +357,20 @@ private actor HistoryModel: ChatCapability {
     #expect(try await store.snapshot().current.turns.isEmpty)
 }
 
-@Test func conversationTokenBudgetPreservesOldExplicitValuesAndNewDefault() async throws {
+@Test(.actionCatalog) func conversationTokenBudgetPreservesExplicitValuesAndDefault() async throws {
     let store = ConversationHistoryStore()
     let record = try await store.beginFixture(id: UUID(), user: "hello", system: "system", model: "fixture")
     #expect(record.maximumOutputTokens == nil)
     let encoded = try JSONEncoder().encode(record)
     #expect(try JSONDecoder().decode(ConversationRecord.self, from: encoded).maximumOutputTokens == nil)
-    var legacy = try #require(JSONSerialization.jsonObject(with: encoded) as? [String: Any])
-    legacy["maximumOutputTokens"] = 256
+    var fields = try #require(JSONSerialization.jsonObject(with: encoded) as? [String: Any])
+    fields["maximumOutputTokens"] = 256
     let restored = try JSONDecoder().decode(
-        ConversationRecord.self, from: JSONSerialization.data(withJSONObject: legacy))
+        ConversationRecord.self, from: JSONSerialization.data(withJSONObject: fields))
     #expect(restored.maximumOutputTokens == 256)
 }
 
-@Test func toolJournalPersistsInputsUsageAndLateArchivedOutcomes() async throws {
+@Test(.actionCatalog) func toolJournalPersistsInputsUsageAndLateArchivedOutcomes() async throws {
     let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     defer { try? FileManager.default.removeItem(at: directory) }
     let url = directory.appendingPathComponent("history.json")
@@ -259,9 +397,9 @@ private actor HistoryModel: ChatCapability {
     try await store.recordToolOutcome(UUID(), for: UUID(), state: .completed)
 }
 
-@Test func oldConversationRecordDecodesWithoutToolOrUsageFields() async throws {
+@Test(.actionCatalog) func admittedConversationRecordHasNoToolOrUsageEvidence() async throws {
     let store = ConversationHistoryStore()
-    let record = try await store.beginFixture(id: UUID(), user: "legacy", system: "system", model: "fixture")
+    let record = try await store.beginFixture(id: UUID(), user: "input", system: "system", model: "fixture")
     let restored = try JSONDecoder().decode(ConversationRecord.self, from: JSONEncoder().encode(record))
     #expect(restored.toolCalls == nil && restored.toolDefinitions == nil && restored.tokenUsage == nil)
 }
@@ -289,7 +427,7 @@ private struct NativeRuntimeHistoryChat: ChatCapability {
     }
 }
 
-@Test func assistantJournalsMixedActionNativeToolAndUsageWithRuntimeCorrelation() async throws {
+@Test(.actionCatalog) func assistantJournalsMixedActionNativeToolAndUsageWithRuntimeCorrelation() async throws {
     let store = ConversationHistoryStore()
     let agent = try FixtureNativeAgent(chat: NativeRuntimeHistoryChat(), conversations: store)
     try await agent.start()
@@ -329,14 +467,14 @@ private struct NativeRuntimeHistoryChat: ChatCapability {
     let conversation = try await store.snapshot().current
     let actionOnly = try AssistantContextState.buildChatMessages(
         system: "actions", user: "next", conversation: conversation)
-    #expect(actionOnly.allSatisfy { $0.role != .tool && $0.toolCalls.isEmpty })
-    #expect(actionOnly.contains { $0.content.contains("Historical execution observation: runtimeInfo") })
+    #expect(actionOnly.contains { $0.role == .tool && $0.content == "completed" })
+    #expect(actionOnly.contains { !$0.toolCalls.isEmpty })
     #expect(try ChatRequest(messages: actionOnly).tools.isEmpty)
 
     await agent.stop()
 }
 
-@Test func concurrentGenerationAndToolOutcomesPreserveBothDurableUpdates() async throws {
+@Test(.actionCatalog) func concurrentGenerationAndToolOutcomesPreserveBothDurableUpdates() async throws {
     let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     defer { try? FileManager.default.removeItem(at: directory) }
     let url = directory.appendingPathComponent("history.json")
@@ -370,7 +508,7 @@ extension ConversationHistoryStore {
     }
 }
 
-@Test func historyRejectsStaleAndForeignReadTokens() async throws {
+@Test(.actionCatalog) func historyRejectsStaleAndForeignReadTokens() async throws {
     let store = ConversationHistoryStore()
     let read = try await store.readCurrent()
     let request = [ConversationMessage(role: .user, content: "exact caller payload")]
@@ -394,11 +532,8 @@ extension ConversationHistoryStore {
     #expect(try await store.snapshot().current.turns.isEmpty)
 }
 
-@Test func assistantConflictDoesNotCallModelOrWriteNewTurn() async throws {
+@Test(.actionCatalog) func assistantConflictDoesNotCallModelOrWriteNewTurn() async throws {
     let store = ConversationHistoryStore()
-    let previous = UUID()
-    _ = try await store.beginFixture(id: previous, user: "previous", system: "system", model: "fixture")
-    try await store.finish(previous, state: .completed)
     let model = HistoryModel("should not run")
     let agent = try AssistantAgent(
         chat: model, conversations: store,
@@ -407,6 +542,9 @@ extension ConversationHistoryStore {
             return "fixture"
         })
     try await agent.start()
+    let previous = UUID()
+    _ = try await store.beginFixture(id: previous, user: "previous", system: "system", model: "fixture")
+    try await store.finish(previous, state: .completed)
     try await agent.receive(AgentInput(sessionID: UUID(), payload: .text("next")))
     var iterator = FixtureGenerationOutputs(agent: agent).makeAsyncIterator()
     guard case .control(let message) = try await iterator.next()?.output else {
@@ -420,7 +558,7 @@ extension ConversationHistoryStore {
     await agent.stop()
 }
 
-@Test func assistantPersistenceFailureDoesNotCallModel() async throws {
+@Test(.actionCatalog) func assistantPersistenceFailureDoesNotCallModel() async throws {
     let store = ConversationHistoryStore()
     let repository = AgentContextRepository(
         agent: .assistant, scope: UUID(), state: AssistantContextState(),
@@ -441,7 +579,7 @@ extension ConversationHistoryStore {
     await agent.stop()
 }
 
-@Test func modelRequestJournalKeepsFirstTokenUsageAndLateOutcomesWithTheirRequest() async throws {
+@Test(.actionCatalog) func modelRequestJournalKeepsFirstTokenUsageAndLateOutcomesWithTheirRequest() async throws {
     let store = ConversationHistoryStore()
     let id = UUID()
     _ = try await store.beginFixture(id: id, user: "question", system: "system", model: "fixture")
@@ -471,16 +609,16 @@ extension ConversationHistoryStore {
     #expect(requests[0].tokenUsage?.total == 5 && requests[1].tokenUsage?.total == 13)
 }
 
-@Test func interruptedModelRequestsRetainPartialOutputAndRequestAdmissionIsBounded() async throws {
+@Test(.actionCatalog) func interruptedModelRequestsRetainPartialOutputAndOnlyOneGeneratingRequest() async throws {
     let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     defer { try? FileManager.default.removeItem(at: directory) }
     let url = directory.appendingPathComponent("history.json")
     let store = try journal(at: url)
     let id = UUID()
     _ = try await store.beginFixture(id: id, user: "question", system: "system", model: "fixture")
-    for index in 0..<4 {
+    for index in 0..<8 {
         try await store.beginModelRequest(.init(id: UUID(), input: "round \(index)", requestJSON: "[]"), for: id)
-        if index == 3 {
+        if index == 7 {
             try await store.append("partial", to: id)
         } else {
             try await store.finishModelRequest(id, reason: "toolCalls")
@@ -497,7 +635,7 @@ extension ConversationHistoryStore {
     #expect(try await store.snapshot().current.turns.first?.modelRequests?.last?.state == .cancelled)
 }
 
-@Test func requestInterfaceTimingIsImmutableAndPersistsSeparatelyFromAdmissionDate() async throws {
+@Test(.actionCatalog) func requestInterfaceTimingIsImmutableAndPersistsSeparatelyFromAdmissionDate() async throws {
     let store = ConversationHistoryStore()
     let read = try await store.readCurrent()
     let id = UUID()
@@ -516,4 +654,25 @@ extension ConversationHistoryStore {
     await #expect(throws: ConversationHistoryError.invalidRecord) {
         try await store.recordModelTiming(startedAt: start, firstTokenAt: first, latency: -1, for: id)
     }
+}
+
+@Test(.actionCatalog) func failedModelAttemptAllowsNextRequestWithoutCompletingItsTurn() async throws {
+    let store = ConversationHistoryStore()
+    let input = UUID()
+    _ = try await store.beginFixture(id: input, user: "goal", system: "system", model: "fixture")
+    try await store.beginModelRequest(.init(id: UUID(), input: "goal", requestJSON: "[]"), for: input)
+    try await store.append("partial", to: input)
+    try await store.finishModelRequest(input, reason: "error", error: "HTTP 500")
+    let failed = try #require(try await store.snapshot().current.turns.first)
+    #expect(failed.state == .generating)
+    #expect(failed.modelRequests?.first?.state == .failed)
+    #expect(failed.modelRequests?.first?.error == "HTTP 500")
+    try await store.beginModelRequest(.init(id: UUID(), input: "HTTP 500", requestJSON: "[]"), for: input)
+    try await store.append("recovered", to: input)
+    try await store.finishModelRequest(input, reason: "stop")
+    try await store.finish(input, state: .completed)
+    let completed = try #require(try await store.snapshot().current.turns.first)
+    #expect(completed.state == .completed)
+    #expect(completed.modelRequests?.map(\.state) == [.failed, .completed])
+    #expect(completed.modelRequests?.last?.error == nil)
 }

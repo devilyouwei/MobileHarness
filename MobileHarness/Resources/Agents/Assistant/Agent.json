@@ -1,0 +1,170 @@
+{
+  "version": 7,
+  "id": "assistant",
+  "communication": {
+    "inputs": [
+      {
+        "contract": "user.text",
+        "version": 1,
+        "kind": "text"
+      },
+      {
+        "contract": "assistant.control",
+        "version": 1,
+        "kind": "observation"
+      },
+      {
+        "contract": "tool.result",
+        "version": 1,
+        "kind": "toolResult"
+      },
+      {
+        "contract": "speech.final",
+        "version": 1,
+        "kind": "observation"
+      },
+      {
+        "contract": "speech.phase",
+        "version": 1,
+        "kind": "observation"
+      },
+      {
+        "contract": "action.result",
+        "version": 1,
+        "kind": "actionResult"
+      },
+      {
+        "contract": "generation.round.result",
+        "version": 1,
+        "kind": "roundResult"
+      },
+      {
+        "contract": "communication.receipt",
+        "version": 1,
+        "kind": "communicationReceipt"
+      },
+      {
+        "contract": "task.request",
+        "version": 1,
+        "kind": "observation"
+      },
+      {
+        "contract": "task.input",
+        "version": 1,
+        "kind": "observation"
+      },
+      {
+        "contract": "task.progress",
+        "version": 1,
+        "kind": "observation"
+      },
+      {
+        "contract": "task.result",
+        "version": 1,
+        "kind": "observation"
+      },
+      {
+        "contract": "task.cancel",
+        "version": 1,
+        "kind": "observation"
+      },
+      {
+        "contract": "agent.userInput",
+        "version": 1,
+        "kind": "observation"
+      },
+      {
+        "contract": "camera.state",
+        "version": 1,
+        "kind": "observation"
+      }
+    ],
+    "subscriptions": [
+      {
+        "contract": "speech.final",
+        "source": "speechPerception",
+        "topic": "speech.final"
+      },
+      {
+        "contract": "user.text",
+        "source": "user",
+        "topic": "user.text"
+      },
+      {
+        "contract": "speech.phase",
+        "source": "speechPerception",
+        "topic": "speech.phase"
+      },
+      {
+        "contract": "agent.userInput",
+        "source": "user",
+        "topic": "agent.userInput"
+      },
+      {
+        "contract": "assistant.control",
+        "source": "runtime",
+        "topic": "assistant.control"
+      },
+      {
+        "contract": "camera.state",
+        "source": "phone.camera",
+        "topic": "camera.state"
+      }
+    ],
+    "publications": [
+      "interaction.replyActivity"
+    ],
+    "sends": [
+      {
+        "contract": "speech.synthesize",
+        "target": "speechSynthesis"
+      },
+      {
+        "contract": "speech.cancel",
+        "target": "speechSynthesis"
+      },
+      {
+        "contract": "task.request",
+        "target": "photographer"
+      },
+      {
+        "contract": "task.input",
+        "target": "photographer"
+      },
+      {
+        "contract": "task.cancel",
+        "target": "photographer"
+      },
+      {
+        "contract": "task.request",
+        "target": "memory"
+      },
+      {
+        "contract": "task.input",
+        "target": "memory"
+      },
+      {
+        "contract": "task.cancel",
+        "target": "memory"
+      },
+      {
+        "contract": "task.request",
+        "target": "applicationControl"
+      },
+      {
+        "contract": "task.input",
+        "target": "applicationControl"
+      },
+      {
+        "contract": "task.cancel",
+        "target": "applicationControl"
+      }
+    ]
+  },
+  "baseSkills": [
+    "basic-skill",
+    "expression-interaction",
+    "robot-interaction"
+  ],
+  "backgroundTasks": []
+}

@@ -41,7 +41,7 @@ Release/expiry/owner closure/shutdown observing an existing handoff uses bounded
 | Active uses / retained cleanup attempts | 256 / 32; unfinished cleanup retained |
 | Cleanup subscribers | Eight capacity-one completion streams |
 | Lease duration | >0 through 60 seconds, explicit renewal |
-| Cleanup acknowledgment | Default five seconds; >0 through 30 seconds |
+| Cleanup acknowledgment | Actual stop/join; no elapsed-time deadline |
 | Resource waiting queue | None; conflicts/capacity explicitly fail |
 
 Production camera capture requires its persistent lease. NexArm's six motors share a writer group; concrete takeover is composed by App. Manual Settings control is an explicit host bypass. Software cleanup never proves hardware stop/arrival/clearance.
@@ -53,3 +53,9 @@ Production camera capture requires its persistent lease. NexArm's six motors sha
 ## Related design
 
 [Parent design](../README.md)
+
+## Channel-owned Action ordering
+
+✅ Action metadata has no serialization key. [ChannelScheduler](../Scheduling/README.md) owns task-local FIFO/wait ordering; ResourceCoordinator rejects unconfigured conflicts without a queue and preserves explicitly configured joined takeover.
+
+✅ 资源交接/关闭无默认五秒清理超时，等待停止与真实 join 后确认资源释放；取消不伪造清理完成。设备显式安全租约的期限保持独立，不作为对话时限。

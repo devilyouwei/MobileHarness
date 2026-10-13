@@ -1,0 +1,234 @@
+import AgentCore
+import Foundation
+import FunctionContracts
+
+/// Confined, versioned pure assets. Canonical function schemas come from FunctionContracts.
+public enum AgentConfigurations {
+    private final class Cache: @unchecked Sendable {
+        let lock = NSLock()
+        var assets: [String: Data] = [:]
+        var declarations: [ActionDeclaration]?
+        var agents: [String: AgentConfiguration] = [:]
+        var skills: [String: Skill] = [:]
+    }
+    private static let cache = Cache()
+    /// Install the production projection before loading any Agent or Skill registry.
+    /// Identical reinstallation is harmless; replacement cannot mutate cached/in-flight catalogs.
+    public static func installDeclarations(_ declarations: [ActionDeclaration]) throws {
+        guard !declarations.isEmpty, declarations.count <= 256,
+            Set(declarations.map(\.path)).count == declarations.count
+        else {
+            throw AgentConfigurationError.invalidField("function declarations")
+        }
+        for declaration in declarations { try declaration.validate() }
+        let sorted = declarations.sorted { $0.path.description < $1.path.description }
+        try cache.lock.withLock {
+            if let installed = cache.declarations {
+                guard installed == sorted else {
+                    throw AgentConfigurationError.invalidField("catalog already installed")
+                }
+            } else {
+                cache.declarations = sorted
+            }
+        }
+    }
+    public struct Binding: Codable, Sendable, Equatable {
+        public let path: String
+        public let callType: String
+        public let alias: String
+        public let channel: String?
+    }
+    public struct Skill: Codable, Sendable {
+        public let version: Int
+        public let id: String
+        public let revision: Int
+        public let description: String
+        public let dependencies: [String]
+        public let functions: [Binding]
+        public let contextFields: [String]
+    }
+    private struct Catalog: Decodable {
+        let version: Int
+        let agents: [String: String]
+        let skills: [String: String]
+    }
+    private static func catalog() throws -> Catalog {
+        let value = try JSONDecoder().decode(Catalog.self, from: data("Catalog.json"))
+        guard value.version == 1, value.agents.count <= 32, value.skills.count <= 64 else {
+            throw AgentConfigurationError.invalidFormat
+        }
+        return value
+    }
+    static func resourceRoot(in bundle: Bundle) throws -> URL {
+        guard let catalog = bundle.url(forResource: "Catalog", withExtension: "json") else {
+            throw AgentConfigurationError.resourceMissing("Catalog.json")
+        }
+        return catalog.deletingLastPathComponent()
+    }
+    static func data(_ path: String) throws -> Data {
+        guard !path.hasPrefix("/"), !path.contains("\\"),
+            path.split(separator: "/").allSatisfy({ $0 != ".." && $0 != "." })
+        else { throw AgentConfigurationError.resourceMissing(path) }
+        let root = try resourceRoot(in: Bundle.module)
+        if let cached = cache.lock.withLock({ cache.assets[path] }) { return cached }
+        let file = try FileHandle(forReadingFrom: root.appendingPathComponent(path))
+        defer { try? file.close() }
+        let data = try file.read(upToCount: 65_537) ?? Data()
+        guard data.count <= 65_536 else { throw AgentConfigurationError.invalidFormat }
+        try cache.lock.withLock {
+            guard cache.assets.count < 256 || cache.assets[path] != nil else {
+                throw AgentConfigurationError.invalidFormat
+            }
+            cache.assets[path] = data
+        }
+        return data
+    }
+    public static func all() throws -> [AgentConfiguration] {
+        try catalog().agents.keys.sorted().map { try load(named: $0) }
+    }
+    public static func skill(_ id: String) throws -> Skill {
+        if let cached = cache.lock.withLock({ cache.skills[id] }) { return cached }
+        guard let path = try catalog().skills[id] else { throw AgentConfigurationError.resourceMissing(id) }
+        let value = try JSONDecoder().decode(Skill.self, from: data(path))
+        guard value.version == 1, value.id == id, value.revision > 0, value.dependencies.count <= 16,
+            value.functions.count <= 128, Set(value.functions.map(\.path)).count == value.functions.count,
+            Set(value.contextFields).isSubset(of: ["runtimeFacts", "taskState", "actionResults"])
+        else { throw AgentConfigurationError.invalidFormat }
+        cache.lock.withLock { cache.skills[id] = value }
+        return value
+    }
+    /// Independent catalogs for implementation coverage; Skills need not all compose together.
+    public static func skillRegistries() throws -> [CapabilityRegistry] {
+        try catalog().skills.keys.sorted().map { try registry(skill($0).functions) }
+    }
+    public static func baseSkills(named name: String) throws -> [String] {
+        guard let path = try catalog().agents[name],
+            let root = try JSONSerialization.jsonObject(with: data(path)) as? [String: Any],
+            let ids = root["baseSkills"] as? [String], ids.count <= 16, Set(ids).count == ids.count
+        else { throw AgentConfigurationError.invalidFormat }
+        return ids
+    }
+    public static func backgroundSupport(target: AgentID, contract: String, skills: [String]) throws {
+        struct Declaration: Decodable {
+            let contract: String
+            let skills: [String]
+        }
+        struct Resource: Decodable { let backgroundTasks: [Declaration] }
+        guard
+            let path = try catalog().agents.values.first(where: { path in
+                guard let root = try? JSONSerialization.jsonObject(with: data(path)) as? [String: Any] else {
+                    return false
+                }
+                return root["id"] as? String == target.rawValue
+            })
+        else { throw CommunicationError.unavailableTarget }
+        let resource = try JSONDecoder().decode(Resource.self, from: data(path))
+        guard resource.backgroundTasks.count <= 32,
+            resource.backgroundTasks.contains(where: {
+                $0.contract == contract && Set(skills).isSubset(of: Set($0.skills))
+            })
+        else { throw CommunicationError.unsupportedContract }
+        guard let name = try catalog().agents.keys.first(where: { try load(named: $0).agentID == target }) else {
+            throw CommunicationError.unavailableTarget
+        }
+        let expanded = try AgentSkillLoader.expand(skills)
+        _ = try AgentSkillLoader.registry(expanded, fixed: load(named: name).capabilities)
+    }
+    public static func skillInstructions(_ id: String) throws -> String {
+        guard let path = try catalog().skills[id],
+            let text = String(
+                data: try data(String(path.dropLast("Skill.json".count)) + "Instructions.md"), encoding: .utf8)
+        else { throw AgentConfigurationError.invalidFormat }
+        return text
+    }
+    public static func skillOverview() throws -> String {
+        try catalog().skills.keys.sorted().map { id in
+            let s = try skill(id)
+            return "Skill ID=\(id); description=\(s.description)"
+        }
+        .joined(separator: "\n")
+    }
+    public static func identityInstructions(named name: String) throws -> String {
+        guard let path = try catalog().agents[name],
+            let text = String(
+                data: try data(String(path.dropLast("Agent.json".count)) + "Instructions.md"), encoding: .utf8)
+        else { throw AgentConfigurationError.resourceMissing(name) }
+        return text
+    }
+    public static func titlePromptData() throws -> Data { try data("Agents/Memory/TitlePrompts.json") }
+    public static func promptData(named name: String) throws -> Data {
+        guard let path = try catalog().agents[name] else { throw AgentConfigurationError.resourceMissing(name) }
+        // Shared Chat templates are used only by Assistant; old histories are never reinterpreted.
+        return try data(String(path.dropLast("Agent.json".count)) + "Prompts.json")
+    }
+    public static func load(named name: String) throws -> AgentConfiguration {
+        if let cached = cache.lock.withLock({ cache.agents[name] }) { return cached }
+        guard let path = try catalog().agents[name] else { throw AgentConfigurationError.resourceMissing(name) }
+        guard var root = try JSONSerialization.jsonObject(with: data(path)) as? [String: Any],
+            root["version"] as? Int == 7, root["permissions"] == nil,
+            root["functions"] == nil, root["actions"] == nil, root["tools"] == nil
+        else { throw AgentConfigurationError.invalidFormat }
+        let expanded = try AgentSkillLoader.expand(baseSkills(named: name))
+        let generated = try declaration(AgentSkillLoader.bindings(expanded))
+        root.removeValue(forKey: "baseSkills")
+        root.removeValue(forKey: "backgroundTasks")
+        root["actions"] = generated.actions
+        root["tools"] = generated.tools
+        let configuration = try AgentConfiguration(
+            contracts: AgentContracts.communication,
+            data: JSONSerialization.data(withJSONObject: root, options: [.sortedKeys]))
+        cache.lock.withLock { cache.agents[name] = configuration }
+        return configuration
+    }
+    public static func registry(_ bindings: [Binding]) throws -> CapabilityRegistry {
+        let d = try declaration(bindings)
+        let root: [String: Any] = [
+            "version": 7, "id": "catalog", "actions": d.actions, "tools": d.tools,
+            "communication": ["inputs": [], "subscriptions": [], "publications": [], "sends": []],
+        ]
+        let configuration = try AgentConfiguration(data: JSONSerialization.data(withJSONObject: root))
+        return configuration.capabilities
+    }
+    private static func declaration(_ bindings: [Binding]) throws -> (
+        actions: [String: [[String: Any]]], tools: [[String: Any]]
+    ) {
+        guard bindings.count <= 128, Set(bindings.map(\.path)).count == bindings.count else {
+            throw GenerationError.duplicateAlias
+        }
+        guard let definitions = cache.lock.withLock({ cache.declarations }) else {
+            throw AgentConfigurationError.resourceMissing("injected Action declarations")
+        }
+        var actions: [String: [[String: Any]]] = ["Speech": [], "Display": []]
+        var tools: [[String: Any]] = []
+        for binding in bindings {
+            guard
+                let declaration = binding.path == "Agent.Communication.send"
+                    ? AgentTaskCommunication.sendDeclaration
+                    : definitions.first(where: { $0.path.description == binding.path }),
+                ["action", "tool"].contains(binding.callType)
+            else {
+                throw AgentConfigurationError.invalidField(binding.path)
+            }
+            let definition = try declaration.actionObject(alias: binding.alias)
+            if binding.callType == "action" {
+                guard let channel = binding.channel else { throw AgentConfigurationError.invalidField("channel") }
+                actions[channel, default: []].append(definition)
+            } else {
+                guard binding.path != "Agent.Communication.send" else {
+                    throw AgentConfigurationError.invalidField("send must be Action")
+                }
+                tools.append([
+                    "path": definition["path"] ?? [:],
+                    "definition": [
+                        "type": "function",
+                        "function": [
+                            "name": binding.alias, "description": definition["doc"] ?? "",
+                            "parameters": declaration.nativeSchema,
+                        ],
+                    ],
+                ])
+            }
+        }
+        return (actions, tools)
+    }
+}

@@ -48,3 +48,15 @@ ActionExecutionRecord/Snapshot contains payload-free identity/path/Channel/state
 ## Related design
 
 [Parent design](../README.md)
+
+
+## Result-driven ReACT (ADR0214)
+
+✅ ADR0214：删除 GenerationFeedbackPolicy/GenerationPolicies；AgentActionCompletion 推导 hasBusinessOutput，ToolResult 推导 requiresReasoning（真实失败、failureCode 或真实失败 report 优先；纯取消不算失败/不续推；仅 value 为业务输出；所有成功 report、活动句柄和 completed 均为完成证据）。不新增可配置/序列化的 ReACT 标志。
+
+
+✅ Implemented: legacy control vocabulary includes agent.cancelled as explicit cancellation completion for the envelope input/round, distinct from successful agent.finished and failed agent.error. Ownership remains bound by the host.
+
+✅ 2026-10-13 已实现：收窄 hasBusinessOutput 到显式 value；保留 ToolResult.hasFailure 对 report 真实失败、非取消 isError 与 failureCode 的优先判定，旧原生 value 兼容与报告结构保持不变。
+
+✅ ToolResult and both report contracts distinguish pure cancellation from real failure. cancelled status/code/report remain evidence; hasFailure/requiresReasoning exclude pure cancellation. Mixed real failures take precedence over cancelled leaves and preserve partial effects.

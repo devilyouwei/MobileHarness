@@ -53,23 +53,3 @@ extension NexArmMotionPlan.Step {
             speed: Int(p[offset + 6]) | Int(p[offset + 7]) << 8, acceleration: Int(p[offset + 1]))
     }
 }
-
-extension NexArmMotionPlan {
-    /// Execution uses fresh current positions again for each group; this estimate uses preceding targets.
-    public func executionBudget(from positions: [Int: Int]) throws -> ActionExecutionBudget {
-        var positions = positions
-        var groups: [ActionExecutionBudget] = []
-        for step in steps {
-            let children = try step.targets.map { motor, target in
-                let budget = NexArmMotorProfiles.budget(
-                    motor: motor, from: positions[motor], target: target, options: try step.options(for: motor))
-                return try ActionExecutionBudget(
-                    expected: .milliseconds(budget.expectedMilliseconds),
-                    timeout: .milliseconds(budget.timeoutMilliseconds + 1000))
-            }
-            groups.append(try .parallel(children))
-            positions.merge(step.targets) { _, next in next }
-        }
-        return try .sequence(groups)
-    }
-}

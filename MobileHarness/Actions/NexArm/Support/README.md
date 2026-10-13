@@ -51,3 +51,11 @@ Manual recipes use the same performPlan segment executor as scheduled functions;
 ## Related design
 
 [Parent design](../README.md)
+
+## Action-owned documentation and Skill instruction contract
+
+✅ 本目录 CapabilityModule 的 `@ActionCatalog` 从实际 `*Definition` 注册调用（含本类型的本地 helper）生成静态 declarations。添加已有域函数只需修改所属实现及本地依赖绑定，不再同步公共元数据列表。声明投影不捕获设备、处理器或运行会话。
+
+## Action timeout contract (2026-10-12)
+
+✅ NexArmRegistration 使用共享预算组合算法和动作帧数，避免单独维护段数公式；MotorProfiles 的未接入 plan 预算方法删除，实际电机 deadline 仍由 ActionController 逐段用实时位置计算。

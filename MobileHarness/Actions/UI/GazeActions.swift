@@ -4,7 +4,7 @@ import FunctionContracts
 /// UI.Gaze function ownership; current invocation paths remain compatible.
 extension UIActions {
     @Action(
-        domain: "UI", module: "Gaze", title: "moveEyes", serializationKey: "UI")
+        domain: "UI", module: "Gaze", title: "moveEyes", timeout: .seconds(5))
     public static func moveEyes(
         invocation: any FunctionInput,
         using present: @escaping @Sendable (Gaze, any FunctionInput) async throws -> Void

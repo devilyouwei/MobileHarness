@@ -64,7 +64,7 @@ private func intentRuntime(
         agent: MemoryAgent(sessionID: sessionID))
 }
 
-@Test @MainActor func historyRefreshTravelsThroughBothGatewaysWithoutVoiceOrModels() async throws {
+@Test(.actionCatalog) @MainActor func historyRefreshTravelsThroughBothGatewaysWithoutVoiceOrModels() async throws {
     let session = UUID()
     let store = ConversationHistoryStore()
     let state = ConversationHistoryState()
@@ -104,7 +104,7 @@ private actor HeldHistoryPresentation: HistoryPresentationCapability {
         release = nil
     }
 }
-@Test func historyRefreshRejectsOverlapAndJoinsCancellationBeforeRetry() async throws {
+@Test(.actionCatalog) func historyRefreshRejectsOverlapAndJoinsCancellationBeforeRetry() async throws {
     let endpoint = HeldHistoryPresentation()
     let runtime = try intentRuntime(sessionID: UUID(), presentation: endpoint)
     var started = endpoint.started.stream.makeAsyncIterator()
@@ -122,7 +122,7 @@ private actor HeldHistoryPresentation: HistoryPresentationCapability {
     #expect(await runtime.agent.status().lifecycle == .running)
 }
 
-@Test func memoryAgentRejectsUnknownIntentsAndBoundsPendingOutputs() async throws {
+@Test(.actionCatalog) func memoryAgentRejectsUnknownIntentsAndBoundsPendingOutputs() async throws {
     let session = UUID()
     let agent = try MemoryAgent(sessionID: session)
     try await agent.start()
@@ -143,7 +143,7 @@ private actor HeldHistoryPresentation: HistoryPresentationCapability {
     await agent.stop()
 }
 
-@Test @MainActor func historyPresentationRejectsForeignScopeWithoutChangingState() async throws {
+@Test(.actionCatalog) @MainActor func historyPresentationRejectsForeignScopeWithoutChangingState() async throws {
     let state = ConversationHistoryState()
     let adapter = HistoryPresentationAdapter(state: state, store: ConversationHistoryStore(), sessionID: UUID())
     let invocation = ActionInvocation(
@@ -161,8 +161,8 @@ private func archivedHistory(_ store: ConversationHistoryStore) async throws -> 
     return try #require(await store.startNew()).id
 }
 
-@Test(.timeLimit(.minutes(1))) @MainActor func historyDeleteUsesCorrelatedRuntimeResultBeforePresentation() async throws
-{
+@Test(.actionCatalog, .timeLimit(.minutes(1))) @MainActor
+func historyDeleteUsesCorrelatedRuntimeResultBeforePresentation() async throws {
     let store = ConversationHistoryStore()
     let id = try await archivedHistory(store)
     let session = UUID()
@@ -179,7 +179,8 @@ private func archivedHistory(_ store: ConversationHistoryStore) async throws -> 
     #expect(await runtime.agent.status().processedInputs == 3)
 }
 
-@Test(.timeLimit(.minutes(1))) @MainActor func historyDeleteRejectsCurrentAndMissingIDsAndAllowsRefreshAfterFailure()
+@Test(.actionCatalog, .timeLimit(.minutes(1))) @MainActor
+func historyDeleteRejectsCurrentAndMissingIDsAndAllowsRefreshAfterFailure()
     async throws
 {
     let store = ConversationHistoryStore()
@@ -224,7 +225,8 @@ private actor HeldHistoryMutation: HistoryMutationCapability {
         release = nil
     }
 }
-@Test(.timeLimit(.minutes(1))) @MainActor func historyDeleteCancellationJoinsCleanupWithoutRollingBackCommittedData()
+@Test(.actionCatalog, .timeLimit(.minutes(1))) @MainActor
+func historyDeleteCancellationJoinsCleanupWithoutRollingBackCommittedData()
     async throws
 {
     let store = ConversationHistoryStore()
@@ -251,8 +253,8 @@ private actor HeldHistoryMutation: HistoryMutationCapability {
     #expect(state.archive?.past.isEmpty == true)
 }
 
-@Test(.timeLimit(.minutes(1))) func memoryDeleteRejectsUncorrelatedOrForeignFeedbackAndOverlappingIntent() async throws
-{
+@Test(.actionCatalog, .timeLimit(.minutes(1)))
+func memoryDeleteRejectsUncorrelatedOrForeignFeedbackAndOverlappingIntent() async throws {
     let session = UUID()
     let agent = try MemoryAgent(sessionID: session)
     try await agent.start()
@@ -296,7 +298,7 @@ private actor HeldHistoryMutation: HistoryMutationCapability {
     await agent.stop()
 }
 
-@Test func typedHistorySchemaRejectsForeignContentAndLegacyStringIntent() async throws {
+@Test(.actionCatalog) func typedHistorySchemaRejectsForeignContentAndLegacyStringIntent() async throws {
     let contracts = try AgentContracts.communication
     let invalid = AgentMessage(
         contract: MemoryHistoryIntent.contract, content: "history.refresh", validate: { _ in })
@@ -343,7 +345,7 @@ private func completedConversation() async throws -> ConversationHistoryStore {
     return store
 }
 
-@Test(.timeLimit(.minutes(1))) @MainActor
+@Test(.actionCatalog, .timeLimit(.minutes(1))) @MainActor
 func archiveCommitsBeforeTitleAndRejectsOverlappingPageOperations() async throws {
     let store = try await completedConversation()
     let state = ConversationHistoryState()
@@ -378,7 +380,7 @@ func archiveCommitsBeforeTitleAndRejectsOverlappingPageOperations() async throws
     #expect(finished.past.first?.turns.first?.raw == "<wait>原始模型输出</wait>")
 }
 
-@Test(.timeLimit(.minutes(1))) @MainActor
+@Test(.actionCatalog, .timeLimit(.minutes(1))) @MainActor
 func leavingHistoryCancelsTitleButPreservesArchivedConversationAndSupportsRetry() async throws {
     let store = try await completedConversation()
     let chat = ControlledTitle()
@@ -411,7 +413,8 @@ func leavingHistoryCancelsTitleButPreservesArchivedConversationAndSupportsRetry(
     #expect(try await store.snapshot().past.first?.summaryTitle == "重新生成的标题")
 }
 
-@Test(.timeLimit(.minutes(1))) @MainActor func emptyHistoryArchiveDoesNotInferOrReplaceCurrentConversation()
+@Test(.actionCatalog, .timeLimit(.minutes(1))) @MainActor
+func emptyHistoryArchiveDoesNotInferOrReplaceCurrentConversation()
     async throws
 {
     let store = ConversationHistoryStore()
@@ -432,7 +435,9 @@ func leavingHistoryCancelsTitleButPreservesArchivedConversationAndSupportsRetry(
     try await runtime.refresh()
 }
 
-@Test(.timeLimit(.minutes(1))) @MainActor func titleFailureRefreshesRetryStateAndAllowsNewAttempt() async throws {
+@Test(.actionCatalog, .timeLimit(.minutes(1))) @MainActor func titleFailureRefreshesRetryStateAndAllowsNewAttempt()
+    async throws
+{
     let store = ConversationHistoryStore()
     let id = try await archivedHistory(store)
     let state = ConversationHistoryState()
@@ -457,8 +462,8 @@ func leavingHistoryCancelsTitleButPreservesArchivedConversationAndSupportsRetry(
     #expect(state.archive?.past.first?.titleError == nil)
 }
 
-@Test(.timeLimit(.minutes(1))) @MainActor func summarizeRejectsCurrentAndMissingArchivesWithoutInference() async throws
-{
+@Test(.actionCatalog, .timeLimit(.minutes(1))) @MainActor
+func summarizeRejectsCurrentAndMissingArchivesWithoutInference() async throws {
     let store = ConversationHistoryStore()
     let session = UUID()
     let state = ConversationHistoryState()
@@ -480,7 +485,9 @@ func leavingHistoryCancelsTitleButPreservesArchivedConversationAndSupportsRetry(
 private struct FailedArchivePresentation: HistoryPresentationCapability {
     func showHistory(invocation: any FunctionInput) async throws { throw CommunicationError.scopeClosed }
 }
-@Test(.timeLimit(.minutes(1))) func archivePresentationFailureStopsTitleWithoutRollingBackTheCommit() async throws {
+@Test(.actionCatalog, .timeLimit(.minutes(1))) func archivePresentationFailureStopsTitleWithoutRollingBackTheCommit()
+    async throws
+{
     let store = try await completedConversation()
     let old = try await store.snapshot().current.id
     let runtime = try intentRuntime(
@@ -497,7 +504,7 @@ private struct FailedArchivePresentation: HistoryPresentationCapability {
     #expect(snapshot.past.first?.summaryTitle == nil)
 }
 
-@Test func titleInferenceAndRetryPersistenceFailuresPreserveBothCauses() async throws {
+@Test(.actionCatalog) func titleInferenceAndRetryPersistenceFailuresPreserveBothCauses() async throws {
     let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     defer { try? FileManager.default.removeItem(at: directory) }
     let document = try LocalDocumentStore<ConversationArchive>(
@@ -522,7 +529,7 @@ private struct FailedArchivePresentation: HistoryPresentationCapability {
     #expect(try await store.snapshot().past.first?.id == id)
 }
 
-@Test func memoryAndPhotographerHaveCanonicalIndependentRoleIdentities() throws {
+@Test(.actionCatalog) func memoryAndPhotographerHaveCanonicalIndependentRoleIdentities() throws {
     let memory = try AgentConfigurations.load(named: "Memory")
     let photographer = try AgentConfigurations.load(named: "Photographer")
     #expect(memory.agentID == .memory)
@@ -537,7 +544,7 @@ private struct FailedArchivePresentation: HistoryPresentationCapability {
     }
 }
 
-@Test func memoryOverflowRetainsAcceptedOutputsAndFailsOnlyItsActor() async throws {
+@Test(.actionCatalog) func memoryOverflowRetainsAcceptedOutputsAndFailsOnlyItsActor() async throws {
     let session = UUID()
     let memory = try MemoryAgent(sessionID: session)
     let photographer = try PhotographerAgent(sessionID: session)
@@ -562,4 +569,41 @@ private struct FailedArchivePresentation: HistoryPresentationCapability {
     }
     #expect(retained == accepted)
     await photographer.stop()
+}
+
+@Test(.actionCatalog) @MainActor func taskDialogueRemainsVisibleAndNewConversationPreservesItsEvidence() async throws {
+    let session = UUID()
+    let repository = AgentContextRepository(agent: AgentID.assistant, scope: UUID(), state: AssistantContextState())
+    let store = AgentChatHistoryContext.store(repository: repository)
+    let agent = try AssistantAgent(conversations: store, context: repository)
+    try await agent.start()
+    let input = UUID()
+    _ = try await agent.controlTask(
+        "startTask", arguments: ["goal": "拍照并等待保存", "skills": "[\"photography\"]"],
+        source: "assistant", sessionID: session, inputID: input, decisionID: nil)
+    let read = try await store.readCurrent()
+    _ = try await store.begin(id: input, user: "帮我拍照", request: [], expecting: read.token, model: "fixture")
+    try await store.beginModelRequest(.init(id: UUID(), input: "帮我拍照", requestJSON: "[]"), for: input)
+    try await store.append("照片已拍摄，要保存吗？", to: input)
+    try await store.finish(input, state: .completed)
+    let state = ConversationHistoryState()
+    let adapter = HistoryPresentationAdapter(state: state, store: store, sessionID: session)
+    let invocation = ActionInvocation(
+        call: ToolRequest(toolPath: "UI.HistoryPresentation.showHistory"),
+        context: ActionExecutionContext(source: "memory", sessionID: session, inputID: UUID()))
+    try await adapter.showHistory(invocation: invocation)
+    #expect(state.archive?.current.turns.first?.user == "帮我拍照")
+    #expect(state.archive?.current.turns.first?.raw == "照片已拍摄，要保存吗？")
+    #expect(try HistoryPresentationAdapter.assistantTasks(await repository.snapshot()).tasks.first?.turns.count == 1)
+    _ = try await agent.controlTask(
+        "cancelTask", arguments: ["reason": "用户开始新对话"], source: "assistant", sessionID: session,
+        inputID: UUID(), decisionID: nil)
+    let archived = try #require(try await store.startNew())
+    #expect(archived.turns.first?.id == input)
+    #expect(try await repository.snapshot().state.skillState?.tasks.last?.status == "cancelled")
+    #expect(try HistoryPresentationAdapter.assistantTasks(await repository.snapshot()).tasks.first?.turns.count == 1)
+    try await adapter.showHistory(invocation: invocation)
+    #expect(state.archive?.current.turns.isEmpty == true)
+    #expect(state.archive?.past.first?.turns.first?.raw == "照片已拍摄，要保存吗？")
+    await agent.stop()
 }

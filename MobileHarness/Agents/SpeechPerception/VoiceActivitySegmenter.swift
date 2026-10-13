@@ -16,7 +16,6 @@ public actor VoiceActivitySegmenter {
     private var busy = false
     private var closed = false
     private var probability: Float = 0
-    private var turnSamples = 0
     public init(session: any VoiceActivitySession) { self.session = session }
 
     public func process(_ frame: AudioFrame, threshold: Float = 0.5) async throws -> VoiceSegmentation {
@@ -48,12 +47,8 @@ public actor VoiceActivitySegmenter {
                 let window = try AudioFrame(
                     data: slice.withUnsafeBytes { Data($0) }, format: frame.format,
                     sequence: UInt64(position), timestamp: Double(position) / 16000)
-                let wasSpeaking = policy.isSpeaking
-                let end = policy.consume(window, probability: score.probability, threshold: threshold)
+                _ = policy.consume(window, probability: score.probability, threshold: threshold)
                 streamEvents += policy.streamEvents
-                if wasSpeaking || policy.isSpeaking { turnSamples += score.sampleCount }
-                guard turnSamples <= 960000 else { throw CapabilityError.bufferOverflow }
-                if end == .silence { turnSamples = 0 }
                 consumed += score.sampleCount
                 position += Int64(score.sampleCount)
                 probability = score.probability
@@ -93,7 +88,6 @@ public actor VoiceActivitySegmenter {
         try await session.reset()
         pending.removeAll(keepingCapacity: true)
         position = 0
-        turnSamples = 0
         probability = 0
         policy.reset()
     }

@@ -36,3 +36,14 @@ BehaviorCoverage accepts at most 128 capability snapshots, resolves every model/
 ## Related design
 
 [Parent design](../README.md)
+
+## Skill/task-mode contract
+
+✅ Maximum capabilities cannot authorize an unloaded model function. OutputGateway obtains the immutable current round catalog from the trusted Agent and checks Action/Tool permission there. Stale round scopes fail explicitly.
+
+
+## Skill 函数目录
+
+✅ OutputValidator 的 descriptor 由 Gateway 按调用来源选择：模型轮次使用冻结 Skill 目录，固定调用使用角色目录。保留参数和 Channel 校验，不额外要求业务权限白名单。
+
+✅ Function coverage recognizes the exact Agent.Communication.send runtime-routed Action, which is now registered by Skill rather than synthesized afterward. Other functions still require native handlers; communication execution keeps target/contract checks in the existing Gateway path.

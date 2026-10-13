@@ -142,6 +142,7 @@ flowchart TB
     App --> PlatformKit
 
     Agents --> AgentCore
+    Agents --> FunctionContracts
     Agents --> PlatformKit
     Agents --> ModelKit
     Agents --> StorageChat
@@ -188,7 +189,7 @@ flowchart TB
     Adapters --> ModelKit
 ```
 
-The `AppWorkflows` node is a facade over six independent feature targets; its summarized arrows are the union of those targets. `FunctionContracts`, `Storage` and `AgentCore` have no project dependencies. FunctionContracts is the independent function-contract leaf; ExecutionRuntime owns shared execution, and CallRuntime owns registration and call adapters. Gateway depends on execution contracts, never concrete Actions or Tools. Base ModelKit and PlatformKit have no project dependencies and own their input/output types. Agents adapts across their boundaries.
+The `AppWorkflows` node is a facade over six independent feature targets; its summarized arrows are the union of those targets. `FunctionContracts`, `Storage` and `AgentCore` have no project dependencies. FunctionContracts is the independent function-contract leaf; ExecutionRuntime owns shared execution, and CallRuntime owns registration and call adapters. Gateway depends on execution contracts, never concrete Actions or Tools. Base ModelKit and PlatformKit have no project dependencies and own their input/output types. Agents adapts across their boundaries. The complete ModelKit SDK, including Runtime, Defaults, download adapters and concrete providers, may depend only on its own targets, approved third-party SDKs and system frameworks. Its direct and transitive target dependencies must never reach another project module; host adapters implement ModelKit-owned protocols.
 
 <a id="37-project-structure"></a>
 <a id="project-structure"></a>
@@ -245,20 +246,21 @@ MobileHarness/
 │   ├── Audio/                   # StorageAudio: transient PCM ownership
 │   └── Chat/                    # StorageChat: conversation journal
 ├── ModelKit/
-│   ├── Core/                    # Capability and media contracts
-│   ├── Management/              # ModelKitRuntime
-│   ├── Defaults/                # ModelKitDefaults assembly
-│   ├── Language/                 # Language capability and adapters
-│   ├── Speech/                   # Speech capabilities and adapters
-│   ├── Vision/                   # Vision capability and adapters
-│   └── Backends/                # Engine and resource acquisition targets
-│       └── HuggingFace/         # ModelKitHub: concrete Hub SDK adapter
+│   ├── Support/
+│   │   ├── Core/                # Capability/media/concurrency mechanisms
+│   │   ├── Backends/            # Generic CoreAI/CoreML graph execution
+│   │   ├── Management/          # Separate Runtime/Defaults source ownership
+│   │   │   └── HuggingFace/     # ModelKitHub: injected artifact transfer
+│   │   └── Speech/Apple/        # Shared Apple ASR/TTS PCM conversion
+│   ├── Language/                # Capability contracts and model-owned engines
+│   ├── Speech/                  # ASR/TTS/VAD contracts and model implementations
+│   └── Vision/                  # Capability contracts and YOLO image/pose pipeline
 ├── PlatformKit/
 │   ├── Core/                    # Boundary documentation; no compiled placeholder
 │   ├── Audio/                   # OS audio capture and output
 │   ├── Vision/                  # Camera capture and native preview
 │   └── Connectivity/            # Links, protocols and device feedback
-└── Resources/                   # Privacy, assets and local model profiles
+└── Resources/                   # Agent/Skill configuration, privacy, assets and model profiles
 
 Tests/                           # Root module and integration tests
 Package.swift                    # Shared-source target map
@@ -279,12 +281,12 @@ Directory nesting expresses ownership; `Package.swift` defines the actual compil
 | `App/Workflows/Settings/` | AppSettingsWorkflow | UI, AgentCore, Agents, Gateway, AppPresentationWorkflow |
 | `App/Workflows/History/` | AppHistoryWorkflow | UI, StorageChat, AgentCore, Agents, Gateway, Actions, AppPresentationWorkflow, FunctionContracts, ExecutionRuntime, CallRuntime |
 | `App/Workflows/Bluetooth/` | AppBluetoothWorkflow | UI, AgentCore, Storage, Actions, FunctionContracts, ExecutionRuntime, CallRuntime, PlatformKit |
-| `App/Workflows/Speech/` | AppSpeechPlayback | FunctionContracts, StorageAudio |
+| `App/Workflows/Speech/` | AppSpeechPlayback | FunctionContracts, StorageAudio, Actions, ExecutionRuntime |
 | `App/Workflows/Presentation/` | AppPresentationWorkflow | UI, AgentCore, FunctionContracts |
 | `App/Workflows/Diagnostics/` | AppDiagnosticWorkflow | UI, ModelKit, PlatformKit |
 | `UI/` | UI | None |
 | `Agents/Support/Core/` | AgentCore | None |
-| `Agents/` excluding `Support/Core/` | Agents | AgentCore, ModelKit, PlatformKit, Storage, StorageChat, StorageAudio |
+| `Agents/` excluding `Support/Core/` | Agents | AgentCore, ModelKit, PlatformKit, Storage, StorageChat, StorageAudio, FunctionContracts |
 | `Gateway/` excluding Runtime/Registration/Protocols | Gateway | AgentCore, FunctionContracts, ExecutionRuntime, CallRuntime |
 | `Actions/Contracts/` | FunctionContracts | None |
 | `Gateway/Runtime/` | ExecutionRuntime | FunctionContracts |
@@ -295,23 +297,21 @@ Directory nesting expresses ownership; `Package.swift` defines the actual compil
 | `Storage/Audio/` | StorageAudio | Storage |
 | `PlatformKit/` | PlatformKit | None |
 | ModelKit shared capability sources | ModelKit | None |
-| `ModelKit/Management/` | ModelKitRuntime | ModelKit |
-| `ModelKit/Defaults/` | ModelKitDefaults | ModelKit, ModelKitRuntime, registered adapters |
+| `ModelKit/Support/Management/` (runtime source list) | ModelKitRuntime | ModelKit |
+| `ModelKit/Support/Management/` (assembly source list) | ModelKitDefaults | ModelKit, ModelKitRuntime, registered adapters |
 | `ModelKit/Speech/VAD/Energy/` | ModelKitEnergy | ModelKit |
-| `ModelKit/Backends/HuggingFace/` | ModelKitHub | ModelKitRuntime, HuggingFace product |
+| `ModelKit/Support/Management/HuggingFace/` | ModelKitHub | ModelKitRuntime, HuggingFace product |
 | `Macros/BehaviorDefinitions/` | BehaviorDefinitions | SwiftCompilerPlugin, SwiftSyntax, SwiftSyntaxBuilder, SwiftSyntaxMacros products |
 | `ModelKit/Language/LLM/OpenAI/` | ModelKitOpenAI | ModelKit |
-| `ModelKit/Speech/ASR/Apple/`, `TTS/Apple/`, `Shared/Apple/` | ModelKitAppleSpeech | ModelKit |
+| `ModelKit/Speech/ASR/Apple/`, `TTS/Apple/`, `ModelKit/Support/Speech/Apple/` | ModelKitAppleSpeech | ModelKit |
 | `ModelKit/Vision/YOLO/` | ModelKitYOLOPose | ModelKit, ModelKitCoreML |
-| `ModelKit/Backends/FluidAudio/` | ModelKitFluidAudio | FluidAudio product |
-| `ModelKit/Backends/CoreML/` | ModelKitCoreML | None |
+| `ModelKit/Support/Backends/CoreML/` | ModelKitCoreML | None |
 | `ModelKit/Speech/VAD/Silero/` | ModelKitSilero | ModelKit, ModelKitCoreML |
-| `ModelKit/Backends/CoreAI/` | ModelKitCoreAI | CoreAILM, Tokenizers products |
-| `ModelKit/Speech/ASR/Nemotron/` | ModelKitNemotron | ModelKit, ModelKitFluidAudio |
-| `ModelKit/Backends/MossCoreML/` | ModelKitMossCoreML | None |
-| `ModelKit/Speech/TTS/MossNano/` | ModelKitMossNano | ModelKit, ModelKitMossCoreML |
-| `ModelKit/Speech/TTS/Kokoro/` | ModelKitKokoro | ModelKit, ModelKitFluidAudio |
-| `ModelKit/Language/LLM/Gemma4/` | ModelKitGemma4 | ModelKit, ModelKitCoreAI |
+| `ModelKit/Support/Backends/CoreAI/` | ModelKitCoreAI | None |
+| `ModelKit/Speech/ASR/Nemotron/` | ModelKitNemotron | ModelKit, FluidAudio product |
+| `ModelKit/Speech/TTS/MossNano/` | ModelKitMossNano | ModelKit |
+| `ModelKit/Speech/TTS/Kokoro/` | ModelKitKokoro | ModelKit, FluidAudio product |
+| `ModelKit/Language/LLM/Gemma4/` | ModelKitGemma4 | ModelKit, CoreAILM and Tokenizers products |
 
 ### Module README contract
 
@@ -360,7 +360,7 @@ This section is an architectural directory. It describes why each module exists 
 
 **App.** [Composition](App/Composition/README.md) builds the graph and validates registrations. [Lifecycle](App/Lifecycle/README.md) owns long-running voice/camera work and cleanup. [Workflows](App/Workflows/README.md) is a state-free facade over independent Settings, History, Bluetooth, Speech, Presentation and Diagnostics targets. [Adapters](App/Adapters/README.md) translate module contracts to host capabilities.
 
-**Agents.** AgentCore supplies the common runtime and protocol vocabulary. Assistant owns conversation, response policy and model-callable mechanical-arm Actions; SpeechPerception owns listening consent/reply occupancy and VAD/ASR interpretation; SpeechSynthesis owns directed text-to-PCM work; VisionPerception owns pose interpretation and its bounded latest-state presentation outputs; Photographer owns photography reasoning, camera/disposition and tracking policy; Memory owns history reasoning and confirmed deterministic transactions; ApplicationControl owns settings/resource/provider/device transactions and environment facts. Assistant delegates specialist work; each interactive role retains independent context. Each Agent's JSON v6 file declares model-callable capabilities and communication permissions.
+**Agents.** Assistant owns all user conversation, dynamic bundled Skills, one foreground goal-based Task and ReACT. Photographer owns deterministic camera/tracking workflows; Memory owns history/title transactions; ApplicationControl owns configuration/device/environment transactions. Media Agents retain VAD/ASR, synthesis and visual inference. Resources catalog contains v7 Agent fixed-function declarations and v1 Skill configuration. Functions remain in Actions; neutral metadata is supplied through FunctionContracts. Effective catalogs are frozen per model request and checked by Gateway. Independent background work can still use directed send; ordinary photography stays in Assistant.
 
 **Behavior.** Actions owns protocol-neutral callable functions. FunctionContracts defines their inputs/outcomes; Gateway owns independent ExecutionRuntime and CallRuntime. ActionCall follows Channel scheduling; ToolCall executes directly outside Channel/wait. BehaviorAssembly freezes one canonical function store and explicit host bindings without importing AgentCore. [Protocol routing](Gateway/Output/Protocols/README.md) explains registration, Agent transport/parsing and shared execution/feedback.
 
@@ -368,9 +368,9 @@ This section is an architectural directory. It describes why each module exists 
 
 <a id="part-iii--key-techniques"></a>
 
-**Shared Agent mechanisms.** Support/Core remains the independent AgentCore target; Support/Communication owns application schemas, Support/Chat owns reusable bounded decisions and Support/Context owns atomic role repositories. Each role supplies its own State, SignalPreprocessor, ContextBuilder, prompt, grant projection and completion policy.
+**Shared Agent mechanisms.** Support/Core remains the independent AgentCore target; Support root owns immutable resource/catalog helpers; Support/Communication owns application message schemas, Support/Chat owns role-neutral bounded decisions and Support/Context owns task/Skill state, fixed-task coordination and atomic role repositories. Each role supplies State, SignalPreprocessor, ContextBuilder, grants and completion policy; conversational prompts/Skills belong to MobileHarness/Resources.
 
-Four chat roles own `<Role>.prompts.json` resources for system identity, response style and workflow messages. Shared Chat discovers bounded immutable template sets and renders runtime variables; it supplies no role/style prose. AgentCore owns the generic Function Token grammar, Channel/wait guide and capability-catalog templates. Strict single-pass rendering rejects malformed/missing templates, mismatched variables and oversized output; inserted data is never interpreted again as a template. Native Tool declarations remain separate in ChatRequest.tools.
+MobileHarness/Resources owns pure Agent identity, Skill workflows and conversation template assets; Memory has separate title-only templates. AgentCore owns reusable Function Token grammar and Channel/wait rules. Protocol rendering precedes identity, Skill overview, background Agent capabilities, mode and loaded instructions, then the effective Action catalog; native Tools use the same immutable catalog. Runtime/user facts are data messages, never trusted policy. Strict single-pass rendering rejects missing variables and oversized output.
 
 ## Part III — Cross-module Technical Design
 
@@ -440,7 +440,7 @@ State, selection and completion are role-owned. Fixed camera/history/settings tr
 
 AgentContextRepository serializes copy-before-commit updates with sixteen commit waiters. Persistent contexts use a 64 MiB LocalDocumentStore. Storage CAS token and logical revision must both match. In-memory state is published only after atomic persistence. No model/native await holds the repository write slot.
 
-Initial load validates identity/schema, marks unfinished work interrupted, advances revision and commits recovery before exposure. It never replays effects. Missing whole legacy context may import once; partial/null/unsupported state fails explicitly. Current histories read these same repositories without dual-writing old journals.
+Initial load validates identity/schema, marks unfinished work interrupted, advances revision and commits recovery before exposure. It never replays effects. Current histories read the Assistant repository; invalid context state fails explicitly. No separate history-file import is performed.
 
 **Work and task states.**
 
@@ -476,14 +476,13 @@ The shared context builder selects up to ten completed request blocks in date or
 | Worker | One inference worker per role |
 | Inbox | 32 FIFO inputs plus one reserved continuation; excess rejects |
 | Output | 256 envelopes; excess fails owned processing |
-| Requests | Four model invocations total |
-| Calls | 120 generated calls, including rejection accounting; sixteen native calls |
-| Feedback/transcript | 64 KiB aggregate |
-| Execution | Thirty-second cumulative decision execution |
-| Queue | Sixty-second expiry, separate from running budget |
+| Requests | Four model invocations per admitted input and its continuation chain, including retries |
+| Calls | 120 generated calls and sixteen native calls cumulatively in that chain, including rejections |
+| Feedback / request | Separate 64 KiB execution-feedback and request-text bounds; see [ReACT limits](#react-limits-and-time-ownership) |
+| Lifetime | No Agent generation, queue or round-barrier timer; owner cancellation and terminal state govern lifetime |
 | Communication relay | Sixteen pending outputs, four live runtime deliveries |
 
-Every continuation selects a fresh role context projection and stores the exact immutable request. Action-only roles project old native call/result pairs as inert evidence rather than re-enabling Tools. Native consumers retain complete request-local pairing. Unknown/invalid calls can produce bounded observation continuation; successful send admission is record-only. Uncertain output delivery ends processing without repeating a delegation.
+Every continuation selects a fresh role context projection and stores the exact immutable request. Action-only roles project old native call/result pairs as inert evidence rather than re-enabling Tools. Native consumers retain complete request-local pairing. Unknown/invalid calls can produce bounded observation continuation; successful send admission is completion evidence without business output. Uncertain output delivery ends processing without repeating a delegation.
 
 Pause cancels/joins current model work; resume admits future inputs without replay. Stop joins model/relay/output cleanup and clears occupancy. ApplicationControl continues accepting environment facts and matching feedback while paused; fresh business requests still require running.
 
@@ -514,7 +513,7 @@ Origin and payload meaning are independent dimensions. All origins share the `Ag
 | Contract element | Canonical structure / rule |
 | --- | --- |
 | Identity and scope | `AgentInput.id`, `sessionID`, optional `AgentTurn`; distinguish delivery identity, session and interaction. |
-| Schema | `InputMetadata.contract` and `version` identify payload semantics; `topic` currently equals contract. Agent configuration JSON v6 is a separate format version. |
+| Schema | `InputMetadata.contract` and `version` identify payload semantics; `topic` currently equals contract. Agent configuration JSON v7 is a separate format version. |
 | Producer | `source` and optional `incarnation`; App input adapters assign external sources, and the runtime binds Agent identity. Model text cannot assign trusted identity or permissions. |
 | Time and order | `capturedAt` uses process uptime; `sequence` is producer-scoped; `deadline` uses `ContinuousClock`. These are process-local values, not wall-clock timestamps or a remote wire format. |
 | Causality | `rootID`, optional `parentID`, `hops`; forwarded messages preserve their root and identify their parent. Execution feedback also preserves its call/execution correlation and owning session. |
@@ -588,7 +587,7 @@ Communication covers external input, Agent publications and directed messages, r
 
 ```mermaid
 flowchart TD
-    Config[Agent JSON v6] --> Policy[Immutable communication policy]
+    Config[Agent JSON v7] --> Policy[Immutable communication policy]
     External[App: user / microphone / camera / runtime] --> Input[InputGateway]
     Sender[CommunicationAction from bound output producer] --> Output[OutputGateway]
     Output -->|Validated internal event| Input
@@ -610,7 +609,7 @@ Gateways validate metadata and bound transport. publish submits one-way fan-out 
 | `user` | External | `speech.listening/1` | Resident SpeechPerception listening-consent input |
 | `phone.microphone` | External | `speech.captureEnded/1` | SpeechPerception current-revision capture-termination fact |
 | `phone.camera` | External | `media.image` | VisionPerception subscription |
-| `phone.camera` | External | `camera.state/1` | Photographer committed camera/native state |
+| `phone.camera` | External | `camera.state/1` | Assistant and Photographer passive camera/native state |
 | `user` | External | `user.text` | Assistant subscription; the current production UI has no text-entry field |
 | `user` | External | `agent.userInput/1` | Assistant scoped answer/confirmation input; forwarded as task input where applicable |
 | `speechPerception` | Agent | `speech.final`, `speech.phase` | Assistant subscription |
@@ -661,7 +660,7 @@ The registry retains 256 identities and at most 128 accepted Signal IDs per task
 
 Assistant owns one foreground question plus bounded pending task questions. Scoped answers retain task/session/question/artifact identity. Waiting-user releases reply occupancy only after the renderer/reply terminal fact; explicit task terminal state releases remaining holds. A question's presentation is not a user answer.
 
-Specialists speak and execute under their own identity. Assistant does not emit a redundant delegation acknowledgment or consume child private history. Explicit task artifacts/content form the collaboration boundary. Parent evidence commits before Memory receives parentCommitted and starts dependent reasoning.
+Assistant owns one local foreground conversational task. waitingUser retains its independent history and Skills; another specialized task requires explicit completion/cancellation. finish/cancel joins the current round and accepted replies before restoring default. Task outcomes become concise default-context summaries. Background fixed tasks keep explicit requester/executor scopes and never copy private contexts.
 
 ### Communication and execution contract ownership
 
@@ -678,11 +677,11 @@ See [communication contracts](Agents/Support/Communication/README.md) and [media
 
 External Signals enter through App → InputGateway. Agent messages use outputs CommunicationAction → bound consumer → OutputGateway → InputGateway. Agent-driven business effects, including UI changes, use Agent → OutputGateway → registered Action/Tool → capability endpoint; actual returning feedback enters InputGateway again.
 
-Each Agent declares model-callable Actions/Tools and communication permissions in JSON v6. Fixed internal behavior and output permissions belong to Agent code. App binds concrete handlers; Gateway validates coverage and authorization. Runtime control notices describe protocol completion/failure, not unregistered business effects.
+Each Agent declares model-callable Actions/Tools and communication permissions in JSON v7. Fixed internal behavior and output permissions belong to Agent code. App binds concrete handlers; Gateway validates coverage and authorization. Runtime control notices describe protocol completion/failure, not unregistered business effects.
 
 1. Contracts and permissions are explicit: validate payload/schema, allowed source, live identity, session, deadline and capacity before admission. Publish selects exact static subscriptions; send selects an explicit recipient. Unknown contracts and incompatible versions reject, with no fallback recipient.
 2. Admission means accepted for processing. It does not imply inference, rendering or physical completion. Returning Tools provide correlated results; completion-only Tools return execution outcomes without injecting a ToolResult. Actions retain their execution/lifecycle semantics.
-3. Forwarded observations cannot extend the parent's deadline. Registered newly generated work receives a fresh bounded admission deadline while retaining causal association. Runtime result/cancellation producers follow their explicitly owned feedback contracts. Admission expiry is not an execution timeout or a hardware stop guarantee.
+3. Signals have no implicit TTL. Explicit producer freshness/expiry remains part of its declared contract; forwarding preserves that constraint rather than extending it. Runtime results retain causal association and owner-fenced delivery. Provider/Action timeouts are independent of Agent lifetime and do not guarantee physical stop.
 4. Agents fence feedback by session and call/execution identity before continuation. Failed delivery is separate from failed execution; delivery retry must not repeat a completed effect. Cancellation uses the owning execution protocol and joins cleanup; a durable effect remains committed.
 5. Every admission, inbox and output buffer has an explicit bound and overflow policy. Gateway has bounded active admission and no waiting Signal queue or FIFO guarantee. Only explicitly declared latest-state observations may coalesce; intents, results and device actions must have explicit rejection/retry/failure handling rather than silent replacement.
 
@@ -707,7 +706,7 @@ Rendering a state change does not automatically produce a new Signal. Only meani
 
 ```mermaid
 flowchart LR
-    JSON[Agent JSON v6] --> Catalog[Agent-local callable catalog]
+    JSON[Agent JSON v7] --> Catalog[Agent-local callable catalog]
     Catalog --> Prompt[Model-visible aliases and schemas]
     Prompt --> Model[Generation]
     Model --> Parser[AgentCore generation parsers]
@@ -754,7 +753,7 @@ Native ToolCallParser consumes complete provider-native calls independently of X
 
 ### Canonical Functions and Protocol Bindings
 
-Actions owns six business domains: UI, Speech, Camera, History, System and NexArm. Queries and effects are both callable business functions. A capability address is exactly `Domain.Module.function`: the domain identifies its directory, the module identifies a cohesive entry file, and the function identifies the operation. Channels, serialization keys, resources and call protocols are separate properties.
+Actions owns six business domains: UI, Speech, Camera, History, System and NexArm. Queries and effects are both callable business functions. A capability address is exactly `Domain.Module.function`: the domain identifies its directory, the module identifies a cohesive entry file, and the function identifies the operation. Channels, resources and call protocols are separate properties.
 
 | Domain | Module | Canonical functions |
 | --- | --- | --- |
@@ -780,9 +779,9 @@ Actions owns six business domains: UI, Speech, Camera, History, System and NexAr
 
 `System.Runtime.runtimeInfo` currently returns fixed descriptive text, not live diagnostics or verified model/device availability. Current state reads use explicit System.Device, System.Provider and System.ModelResources functions.
 
-`@Action` produces one protocol-neutral `ActionFunction` with a `FunctionInput` handler, completion metadata, serialization key, resources and static/dynamic execution budgets. `ActionCompletion` carries a value, structured child report/terminal issue or declared completion/activity identity. FunctionRequest contains canonical address and parameters, without Channel, wait membership or a protocol discriminator. Opaque execution context and a host-supplied report sink preserve correlation without granting permission.
+`@Action` produces one protocol-neutral `ActionFunction` with a `FunctionInput` handler, completion metadata, resources and static/dynamic execution budgets. `ActionCompletion` carries a value, structured child report/terminal issue or declared completion/activity identity. FunctionRequest contains canonical address and parameters, without Channel, wait membership or a protocol discriminator. Opaque execution context and a host-supplied report sink preserve correlation without granting permission.
 
-App freezes one validated catalog (at most 32 supplied catalog modules and 256 functions) and creates `ActionBinding` values. Bindings independently select protocol availability, direct native execution and native feedback policy. Unknown modules, duplicate addresses and invalid metadata fail startup. Neither protocol projection nor an Agent argument may weaken intrinsic constraints. Registration availability does not grant Agent permission.
+App freezes one validated catalog (at most 32 supplied catalog modules and 256 functions) and creates `ActionBinding` values. Bindings independently select protocol availability, direct native execution and fixed-caller result delivery. Unknown modules, duplicate addresses and invalid metadata fail startup. Neither protocol projection nor an Agent argument may weaken intrinsic constraints. Registration availability does not grant Agent permission.
 
 ```mermaid
 flowchart LR
@@ -808,9 +807,9 @@ The [target map](#target-map) separates FunctionContracts, ExecutionRuntime, Cal
 | Model input | Selected capabilities | Action catalog in context prompt versus declarations in ChatRequest.tools |
 | Output parsing | Canonical address and validated parameters | Text tags become ActionCall; native events become ToolCall |
 | Execution | Resources, budgets, reports and joined cleanup | Channel/wait scheduling versus direct native execution |
-| Feedback | Actual outcome and causal context | ActionResult versus ToolResponse/ToolResult and declared feedback policy |
+| Feedback | Actual outcome and causal context | ActionResult versus ToolResponse/ToolResult and actual business output or failure |
 
-Agent JSON v6 uses three-field Action paths and native declarations shaped as `{path: {domain, module, function}, definition: ...}`. Only the native definition reaches the provider; its name is an Agent-local alias. Incompatible configuration versions fail explicitly. Text deltas pass through AgentGenerator and native events through ToolCallParser; both resolve inside Agents. Tool results never implicitly become executable markup. Unsupported providers receive no native declarations.
+Agent JSON v7 uses three-field Action paths and native declarations shaped as `{path: {domain, module, function}, definition: ...}`. Only the native definition reaches the provider; its name is an Agent-local alias. Incompatible configuration versions fail explicitly. Text deltas pass through AgentGenerator and native events through ToolCallParser; both resolve inside Agents. Tool results never implicitly become executable markup. Unsupported providers receive no native declarations.
 
 Returned values are limited to 64 KiB UTF-8 and reject explicitly before delivery. Structured report limits are independent; oversize values are not silently truncated or replayed.
 
@@ -820,11 +819,11 @@ The matrix follows [BehaviorProtocolBindings](App/Composition/Behaviors/Behavior
 | --- | --- | --- |
 | Camera.Capture; UI.Navigation; System.Device.readEnvironment | Action and direct Tool | Returning direct result; observation |
 | UI.Caption.print / beginReplyTurn | Action and direct Tool | Fixed caption/reply maintenance projection |
-| UI.Expression; Speech.Playback; Speech.Listening; NexArm.Motion/Gesture | Action | Scheduled business/state effect contract |
+| UI.Expression/Feedback; Speech.Playback; Speech.Listening; NexArm.Motion/Gesture | Action | Scheduled business/state effect contract |
 | History.Conversation; System.Runtime/ModelResources/Provider; UI.ResourcePresentation; other System.Device | Direct Tool | Returning result; observation |
 | UI.Gaze/VoiceState/Pose/HistoryPresentation; remaining UI.Caption; NexArm.Tracking | Direct Tool | Fixed completion-only projection |
 
-A canonical implementation may be registered by multiple Agents or support both host protocols. A role's model catalog must not expose the same address as both model Action and model Tool. Code-owned internal reuse is separate and permitted. Current Assistant is Action-only; Memory has two read-only history Tools; Photographer exposes seven Camera Actions. ApplicationControl exposes native environment/resource/provider/device reads, Bluetooth control, download and cancel. Exact role grants are declared in each Agent JSON.
+A canonical implementation may be registered by multiple Agents or support both host protocols. A role's model catalog must not expose the same address as both model Action and model Tool. Code-owned internal reuse is separate and permitted. Assistant default mode uses Actions; dynamically loaded history-query exposes native read-only Tools. Skills reference canonical metadata without redefining parameter contracts. Specialist Agent JSON describes fixed function declarations and workflows, not conversational model exposure. The Resources catalog is the sole active configuration source.
 
 ### Action and Tool execution
 
@@ -843,8 +842,7 @@ flowchart LR
     Calls[Resolved Actions / wait controls] --> Admission[Output validation and bounded admission]
     Admission --> Tree[Per-input nested execution tree]
     Tree --> Heads[Eligible Channel FIFO heads]
-    Heads --> Module[Process-wide serialization-key exclusion]
-    Module --> Resource[Declared resource coordinator]
+    Heads --> Resource[Declared resource coordinator]
     Resource --> Runtime[ExecutionRuntime / canonical handler]
     Runtime --> Result[Completion, failure or activity]
     Result --> Tree
@@ -854,11 +852,11 @@ flowchart LR
     Presentation --> UI[Generic execution presentation]
 ```
 
-Each input owns a scheduling tree. Channels order work within that tree; equal names in other tasks do not create a global FIFO. A wait group joins its parent's preceding work and all children before releasing the continuation. Serialization-key exclusion is process-wide and independent of canonical path and Channel. Production scheduled UI, Speech and NexArm functions declare their exclusion keys explicitly; the key remains held until handler cleanup joins. Resource leases/fences coordinate Actions, Tools and App-owned paths across module boundaries. Capacity exhaustion rejects explicitly, and cancellation joins cooperative handlers.
+Each input owns a scheduling tree. Channels order work within that tree; equal names in other tasks do not create a global FIFO. A wait group joins its parent's preceding work and all children before releasing the continuation. Different Channels and tasks may run concurrently. Unconfigured resource conflicts fail explicitly rather than queue; configured takeover joins old cleanup before execution. Resource leases/fences coordinate Actions, Tools and App-owned paths across module boundaries. Capacity exhaustion rejects explicitly, and cancellation joins cooperative handlers.
 
 Action feedback follows the reservation and causality contract [below](#execution-feedback-causality). Separately, the scheduler publishes payload-free `ActionExecutionSnapshot` values for App/UI diagnostics. Display names come from validated metadata; raw arguments, device telemetry and permission decisions are excluded.
 
-App's generation transport drains Tool and Action/control branches independently. Tools have sixteen queued envelopes and at most four concurrent executions; Actions/control retain 256 ordered envelopes. The current reader and accepted child tasks remain owned so a handler failure wakes processing even when the output stream has no next element.
+App's generation transport drains Tool and Action/control branches independently. Tools have 128 queued envelopes and at most four concurrent executions; Actions/control retain 256 ordered envelopes. The current reader and accepted child tasks remain owned so a handler failure wakes processing even when the output stream has no next element.
 
 No native Tool enters a Channel or wait tree. roundFinished seals both branches, joins accepted work and scoped feedback, then acknowledges the merge barrier. Final completion uses the same drain. Input-local error/cancellation joins only that input; it does not terminate unrelated role admission or silently drop device work.
 
@@ -880,14 +878,102 @@ sequenceDiagram
  Agent->>Host: roundFinished
  Host->>Gateway: seal Action tree and join Tool branch
  Gateway-->>Agent: scoped round result
- alt Registered observation and budget remain
+ alt Actual output or failure requires reasoning and budget remains
  Agent->>Model: fresh-context continuation with actual results
- else No observation or terminal decision
+ else Void success, cancellation or terminal decision
  Agent->>Host: owner completion
  end
 ```
 
-`recordOnly` and `observation` are independent of returning value type. Generated void calls still retain terminal round evidence. Only declared observation enables another model request; record-only success remains history. Function failure becomes actual model evidence rather than automatic replay. Model terminal state does not declare its emitted functions successful, and a business task can continue after one model invocation ends.
+ReACT follows actual outcomes: successful business output and execution failures enable another model request after every accepted call joins. Successful completion without business output remains terminal history/barrier evidence. Explicit values (including empty strings) are business output; successful execution reports, activity handles, completed and admission receipts are completion evidence only. Function failure becomes actual model evidence rather than automatic replay. Model terminal state does not declare its emitted functions successful, and a business task can continue after one model invocation ends.
+
+### ReACT continuation and Agent recovery
+
+✅ 2026-10-13 clarification implemented: successful reports and lifecycle handles are no longer classified as business output. Explicit values and actual business failures continue. Pure cancellation and Agent-internal failures never request another model round.
+
+✅ Shared Chat implements result-driven reasoning → call → joined result → reasoning. [AgentChatWorker](Agents/Support/Chat/AgentChatWorker.swift) owns requests, context refresh, history and continuation admission. Foundation-only [AgentRoundCoordinator](Agents/Support/Core/Runtime/AgentRoundCoordinator.swift) owns the sealed/all-results barrier; [ToolResult](Agents/Support/Core/Output/ToolResult.swift) derives `requiresReasoning` from actual outcomes. Gateway owns authorization, Channel/wait scheduling, resources and result delivery. ModelKit supplies inference events and provider diagnostics. Registration attributes, role defaults and App policy tables no longer select ReACT.
+
+Agent-internal errors terminate the input. Otherwise the decision is `roundCoordinator.needsReasoning`, after sealing, execution/delivery join, result verification and durable round evidence. `needsReasoning` requires an uncancelled sealed round with every registered call terminal and at least one failed result or business output. Continuation also requires a live owner, remaining cumulative budget and a valid next request.
+
+```mermaid
+flowchart TD
+    Input[Admitted input / selected Chat capability] --> Request[Fresh facts, Skill catalog and exact request history]
+    Request --> Model[Model stream / XML Actions / native Tools]
+    Model --> Seal[Record request completion or error; seal round]
+    Seal --> Join[Gateway joins calls and terminal result delivery]
+    Join --> Evidence[Validate identities; persist actual outcomes]
+    Evidence --> Safe{No Agent error; results and persistence reliable?}
+    Safe -->|No| Fail[Fail input; retain evidence; no effect replay]
+    Safe -->|Yes| Cancel{Task cancelling or owner cancelled?}
+    Cancel -->|Yes| End[Join cleanup and end decision]
+    Cancel -->|No| Reason{Business output or real call failure?}
+    Reason -->|No| Done[Complete input; no extra model request]
+    Reason -->|Yes| Limits{Budget and next-request bounds allow?}
+    Limits -->|No| Fail
+    Limits -->|Yes| Queue[Store continuation with same input and Chat capability]
+    Queue --> FIFO[Already admitted inputs run first]
+    FIFO --> Request
+```
+
+#### All continuation triggers
+
+| Actual condition | ReACT / recovery behavior |
+| --- | --- |
+| Successful `.value`, including `""` | Business output; continue after the full barrier. Empty string is an explicit value, not absence of a value. |
+| Successful `.report`, empty or nonempty | Execution evidence only; keep all steps/details/history and join the barrier, without requesting ReACT. A report is not a business value. |
+| Successful `.activityStarted` / `.activityStopped` | Lifecycle acknowledgment only; the identity does not independently request ReACT. Business data must be returned explicitly as `.value`. Later activity events have no generic automatic continuation integration. |
+| Legacy native ToolResult with `value` and no `completion` | Preserve value semantics and continue, including an empty value. Legacy ActionResult without completion is normalized to `.completed`. |
+| Failed/partially failed Action invocation | Preserve actual failures/effects and continue while the input owner remains live. |
+| Cancelled Action/Tool invocation | Preserve cancelled evidence; no incident or ReACT. Independent real failures in a mixed report remain failures. |
+| Tool `isError`, nonnil non-cancellation `failureCode`, failed report | Real failure takes precedence over absence of business output; continue. |
+| Unknown Action/Tool alias or invalid parameters | Parser-local rejection becomes a correlated error result (`invalidInvocation` or `communicationRejected`), without executing the call. Forbidden Channel/malformed markup ends the generation as a real Agent failure. |
+| Handler exception, Action timeout, resource/permission/admission rejection with reliable terminal feedback | Continue from the real failure. A closed scheduling tree alone does not authorize continuation: call results and the round receipt must remain reliable. |
+| Failed model communication | Continue from the error. Successful send/publish admission is a `.completed` acknowledgment. Background progress/results update state without independently invoking Chat. |
+| Chat request/stream/consumer failure within `collect` | Record the failed attempt, join admitted effects and terminate the decision. Includes HTTP/network/provider errors, output parsing, unsupported output and per-request limits. No automatic Agent retry. |
+| Observation/image enrichment construction failure | Terminate the decision with the real error and retained execution evidence; never fabricate an image or repeat capture. |
+| Round closure failure with a prior generation error and every call result already present | Retain both causes and terminate the input; round closure/delivery uncertainty never authorizes a retry. |
+
+Success with `.completed`, any successful execution report, activity handles, execution IDs, acknowledgments, normal speech/playback completion or presentation completion alone does not continue. In a mixed round, one qualifying result is sufficient, but every accepted call must join. Native call/result pairs remain complete even for void successes when another result continues the round; ordinary Action acknowledgments remain history/barrier evidence.
+
+Model finish reasons (`stop`, `toolCalls`, `lengthLimit`) record provider termination; none independently requests ReACT. Length-limited incomplete markup terminates the generation; complete void-success output can finish normally. An active Task, passive camera/environment facts or a waiting-user prompt does not start a polling loop. New user input starts a new decision chain; scoped foreground task requests/questions can admit new input through explicit routing.
+
+#### Context, evidence and Task boundaries
+
+Continuation retains the original input/session, request options, cumulative budget and selected ChatCapability, then rejoins FIFO behind admitted inputs. Resumption rebuilds the effective Skill system prompt/native definitions, refreshes facts/task reports and incorporates eligible intervening completed requests. Facts remain user-role data before the current input or the complete native-call/result group. A request catalog is immutable during its invocation; `loadSkills`/`startTask` can expose new functions only in later requests.
+
+The next request includes assistant output, every native call/result pair, qualifying Action observations and optional owned photo attachments. Failed Agent attempts retain error text, partial output and actual call/effect evidence in history and terminate the chain. No automatic effect replay occurs; the model chooses a new authorized action, asks the user or stops. History preserves the failed input and allows a fresh user input; journals store derived `requiresReasoning` rather than configurable policy.
+
+✅ `finishTask` joins work/reply cleanup and commits closure/default Skill restoration before allowing result-driven continuation for remaining goals in the same input. It does not reopen the completed Task. `cancelTask` commits cancellation and ends the chain. `startTask` cannot overwrite a running/waiting/finishing Task. Closure failures are reported. Completing an input after void success does not itself declare an active Task goal complete.
+
+#### ReACT limits and time ownership
+
+`AgentTaskBudget` is initialized per new admitted input and restored across that input's continuations. A later human input in the same foreground Task gets a new decision budget. Production uses the defaults below; there is no separate user-configured ReACT policy. Optional caller budgets validate explicit bounds; production defaults impose no cumulative request/native-call stop. Completion, cancellation, genuine failure and lack of progress own the decision lifetime.
+
+| Scope | Current bound and consequence |
+| --- | --- |
+| Decision-chain requests | **No fixed count cap**. Continue after joined business output/failure until completion/cancellation. Repeated identical generation failure without a successful business output ends with the actual error. |
+| Decision-chain native calls | **No cumulative cap** by default. Optional explicitly supplied Core budgets remain supported; production does not supply one. |
+| Each generation generated calls | **120 per round**, including natural-text mappings, rejected calls and internal reply-start calls; each round coordinator holds at most 120 calls. Scheduling boundaries have separate parser/output capacity. |
+| Each generation feedback | **65,536 UTF-8 bytes** of serialized results plus new error/partial-output text. Error/partial-output fields each retain at most **2,048 Characters**. This counter excludes image bytes and is separate from the whole-request bound. Overflow terminates without replaying effects. |
+| Each constructed ChatRequest | **64 messages / 65,536 text and native-ID/name/argument bytes**, complete unique native call/result pairing. The Agent projection retires oldest complete call/result blocks while preserving system/current intent/latest round and reserving fresh facts. Durable history is unchanged. A malformed or individually unrepresentable current payload still fails explicitly. |
+| Request images / Tool definitions | **4 images**, **4 MiB each / 16 MiB total**; **128 unique Tool definitions / 64 KiB total declarations**, each declaration ≤64 KiB. |
+| Each Chat text stream | **64 KiB text / 8,192 fragments**; text/native event queues hold **8,192/128** elements. Overflow is `GenerationError.limitExceeded`; per-request recovery retains actual execution evidence. |
+| XML/parser | **64 KiB input**, **4 KiB/tag**, **1,024 tags**, **32 attributes/tag**, **16 Characters/incomplete entity**, **8 combined Channel/wait levels / 32 waits**. Sentence buffer: **2,000 UTF-8 bytes**; one text mapping: **8 events**. Native argument JSON: **4 KiB**. |
+| Admission / scheduling | Text input ≤**4 KiB**; one Chat worker; **32 queued inputs plus one continuation slot / 256 output envelopes**. Output consumption: **128 pending / 4 concurrent** native deliveries. ChannelScheduler defaults: **32/channel, 16 channels, 64 tracked inputs**. Overflow explicitly rejects/fails; continuation requires reliable feedback. |
+| Action terminal delivery | Reserve before effects: **512 pending/reserved results** by default (configurable 1…1024), one active callback. `.retry` resends the same result with 100 ms increments capped at 1 second; **no retry-count limit or expiry**. Acceptance or owner/scope closure ends delivery. Tool delivery makes one admission attempt. Transport retry is separate from model ReACT and effect replay. |
+| Agent lifetime | **No generation deadline, cumulative elapsed deadline, queue TTL or result-barrier timeout.** Completion, explicit cancellation, failure or scope closure ends work. A blocked producer/admission can keep a barrier pending; request limits are not elapsed-time bounds. |
+| Action execution | FunctionContracts default: **30 seconds per execution**, dynamic before static budget; declaration range `(0, 86,400]` seconds. UI commonly uses 5 seconds, playback 300 seconds; compound budgets compose separately. Timeout joins cleanup and returns failure; it does not prove physical stop. Queueing is excluded. |
+| Providers | OpenAI HTTP timeout defaults to **60 seconds** (configuration 1…600), independent of Agent lifetime. Responses SSE: **8 MiB total / 64 KiB line or event**, native arguments ≤4 KiB. Explicit `maximumOutputTokens` ≤**32,768**, otherwise omitted. Gemma: **4,096-token prompt + output** context; images/native Tools are rejected. |
+
+Exact lower-layer contracts: [Generation](Agents/Support/Core/Generation/README.md#bounds-and-errors), [ChatCapability](ModelKit/Language/LLM/ChatCapability.swift), [scheduling](Gateway/Output/Scheduling/README.md) and [delivery ledger](Gateway/Output/Results/ActionResultLedger.swift). Provider and Action limits must not be described as an Agent-wide ReACT timer.
+
+#### Recovery stop conditions and current limits
+
+✅ Owner/input/session cancellation and lifecycle closure join cleanup without requesting another model response; `cancelTask` ends its chain. Missing/mismatched/closed feedback, unsafe round completion, aggregate overflow, invalid next-request construction or failed durable context/history commits terminate explicitly. Startup/provider-selection/context/prompt failures outside `collect` and observation-construction recovery also terminate; not every Agent exception is retried.
+
+✅ The three-result strategy, joined barrier, evidence-preserving recovery, FIFO continuation, catalog refresh, native pairing and cumulative bounds are implemented. Fixtures cover Action/Tool/mixed results, rejection, cancellation, delivery failure, request/native limits, malformed/partial/HTTP failures, admitted-input priority and no automatic effect replay. Live/device evidence remains in [validation history](../docs/Validation-History.md), separate from these fixtures.
+
+❌ Recovery does not classify transient/permanent provider errors, apply HTTP Retry-After/backoff, switch providers or shrink an oversized request automatically. Repeated permanent errors can consume all four attempts. HTTP retains status only; network errors become `transport`; bounded valid SSE error codes are preserved as `providerCode`, without raw bodies or credential-bearing diagnostics. Error/partial-output fields are truncated. Generic activity/progress-driven Chat continuation is absent. These are explicit limits of completeness rather than additional implemented recovery mechanisms.
 
 ### Call failure and deadline semantics
 
@@ -895,7 +981,7 @@ Agents resolve model aliases. Unknown calls and invalid invocation parameters em
 
 Action handler reports preserve completed child entries and attach later exceptions/cancellation as an execution-level issue. Invocation lookup, argument and resource availability rejection remain local. Permission rejection, all ActionSchedulingError cases (including capacity/limits), communication identity failure and actual task cancellation still close the owning Action tree; execute records ordinary failures without automatically stopping the producer.
 
-ToolExecutor converts ordinary exceptions and operation-local cancellation into ToolResponse errors; caller cancellation propagates. Both protocols use the declared static/dynamic function budget before the Runtime's thirty-second fallback. Static timeouts must be in (0,86400] seconds; invalid declarations fail, and NexArm retains request-dependent estimates. Timeout cancels and joins cleanup before returning. [Feedback causality](#execution-feedback-causality) defines separate delivery failures and completion-only behavior.
+ToolExecutor converts ordinary exceptions and operation-local cancellation into ToolResponse errors; caller cancellation propagates. Both protocols use dynamicTimeout before static timeout, with the mandatory thirty-second default owned by FunctionContracts. Static timeouts must be in (0,86400] seconds; invalid declarations fail, and NexArm retains request-dependent estimates. Timeout cancels and joins cleanup before returning. [Feedback causality](#execution-feedback-causality) defines separate delivery failures and completion-only behavior.
 
 The executing conversational role records rejected calls when possible; failure to write that outcome produces a separate agent.historyError result and preserves the original rejection. Conversation admission, raw history and terminal durability remain strict. See [result fields and failure boundaries](Gateway/Output/Results/README.md#effect-and-failure-evidence).
 
@@ -909,7 +995,7 @@ The executing conversational role records rejected calls when possible; failure 
 
 ### Execution Feedback Causality
 
-`SignalCausality` captures immutable inputID, rootID, hops, turn and sequence from the initiating OutputEnvelope. ActionResult and ActivityEvent require that context. InputGateway preserves the original root, uses the initiating inputID as parent, increments hops once and creates a fresh bounded feedback admission deadline. Returning Tool feedback follows the same causal rules. Invalid/exhausted hops or a stale Agent incarnation/session close delivery without replaying the effect.
+`SignalCausality` captures immutable inputID, rootID, hops, turn and sequence from the initiating OutputEnvelope. ActionResult and ActivityEvent require that context. InputGateway preserves the original root, uses the initiating inputID as parent and increments hops once; framework feedback has no implicit admission TTL. Returning Tool feedback follows the same causal rules. Invalid/exhausted hops or a stale Agent incarnation/session close delivery without replaying the effect.
 
 Action terminal feedback reserves capacity before effects. Its bounded outbox retries delivery of the same result and execution identity; it never re-executes the operation. Execution outcome and delivery outcome remain distinct. Host-originated camera activity has an explicit lease-scoped causal root. AgentInput remains an in-process contract, not a remote authentication or durable transport format.
 
@@ -926,9 +1012,9 @@ flowchart LR
     Feedback --> Input
 ```
 
-Action feedback policies are none/failuresOnly/terminal. Ordinary production defaults to failuresOnly; generated rounds request terminal evidence. Reserve capacity before effects. Successful failuresOnly releases the reservation without delivery. Terminal feedback validity is ten seconds from termination.
+Action delivery policies are none/failuresOnly/terminal; these govern transport, not model ReACT. Ordinary production defaults to failuresOnly; generated rounds request terminal evidence. Reserve capacity before effects. Successful failuresOnly releases the reservation without delivery. Terminal feedback has no implicit expiry and remains owned until admission or scope closure.
 
-The Action result ledger defaults to 512 reserved/pending entries (configurable 1…1024). One worker has at most one active callback; each cooperative attempt is one second, at most four attempts with 100/200/300 ms delays. A cancelled slow callback is still joined, preventing abandoned-task accumulation. Accepted means admission, retry means temporary bounded exhaustion, and closed means the owner/scope/contract no longer exists. Scoped round completion explicitly fails on closed/expired/exhausted delivery.
+The Action result ledger defaults to 512 reserved/pending entries (configurable 1…1024). One worker has at most one active callback and joins it during cancellation. Accepted means admission; retry means temporary capacity rejection and schedules the same result again, with 100 ms increments capped at one second and no count/deadline cutoff; closed means the owner/scope/contract no longer exists. Scoped round completion waits for admission and fails on closed delivery. This transport retry never re-executes the effect or independently invokes a model.
 
 Tool value/isError/call ID/original code survives a separate deliveryFailure, also copied into output.failure. Cancellation before execution is notStarted; failure/cancellation after start conservatively has unknown effects; success is contractCompleted at the function's declared boundary. Activity start confirms only started activity.
 
@@ -992,7 +1078,7 @@ SpeechPerception converts admitted PCM into phase and transcript observations. I
 
 `AgentTurn` and trusted output sequences travel through input, observations, calls and returned results. AppPresentationWorkflow admits only the active session/turn/sequence. Recognition previews may be replaced within their declared latest-state path; reply chunks and discrete behavior are preserved. Playback state reflects actual audio output rather than model generation completion.
 
-SpeechPerception owns session-only consent and revisioned reply occupancy. Assistant/Photographer/Memory/ApplicationControl report complete interaction.replyActivity snapshots but have no listening grant. Four source/incarnation-fenced occupancy snapshots and one pending final root suppress new utterance admission. Final recognition closes admission before publication; matching reply acknowledgment transfers that hold to actual occupancy.
+SpeechPerception owns session-only consent and revisioned reply occupancy. Assistant reports complete interaction.replyActivity snapshots; deterministic specialists have no conversation worker but have no listening grant. Four source/incarnation-fenced occupancy snapshots and one pending final root suppress new utterance admission. Final recognition closes admission before publication; matching reply acknowledgment transfers that hold to actual occupancy.
 
 ```mermaid
 flowchart TD
@@ -1004,25 +1090,25 @@ flowchart TD
  Action --> Host[App validates real producer and revision]
  Host --> Capture[Native capture or recognition gate]
  Utterance[Confirmed utterance drain] --> Resume[Additional native resume barrier]
- Playback[Playback drain plus 350 ms tail] --> Resume
+ Playback[Playback drain and audio cleanup] --> Resume
  Resume --> Capture
 ```
 
-User-off stops physical capture; policy pause may retain capture while rejecting new recognition. App additionally joins confirmed utterance completion, actual playback and a 350 ms tail. One owned 120-second recovery task handles lost terminal/occupancy facts and reports the failure, without accepting arbitrary busy as reply state. Restart does not restore consent or replay speech.
+User-off stops physical capture and cancels the current Assistant reply. Policy pause preserves consent while stopping native capture after confirmed utterance completion. App additionally joins confirmed utterance completion and actual playback/audio cleanup, then immediately restores capture when the listening policy permits; no fixed post-playback delay exists. Occupancy is released by matching terminal/lifecycle facts or explicit user cancellation; there is no recovery timer. Restart does not restore consent or replay speech.
 
 ### Speech capability selection and recognition
 
-Nemotron recognition uses the shared multilingual/2240ms Core ML export through Management → Hub → App storage. The receipt fixes the installed revision; stale revisions prompt explicit deletion. ModelKitFluidAudio preloads shared graphs, the ASR adapter obtains a fresh recurrent session under one lease, ordered 16 kHz PCM produces bounded revisions, and finish/cancel drains native work before release. macOS and iOS use the same files.
+Nemotron recognition uses the shared multilingual/2240ms Core ML export through Management → Hub → App storage. The receipt fixes the installed revision; stale revisions prompt explicit deletion. Nemotron-owned LocalNemotronEngine preloads shared graphs, the ASR adapter obtains a fresh recurrent session under one lease, ordered 16 kHz PCM produces bounded revisions, and finish/cancel drains native work before release. macOS and iOS use the same files.
 
 Speech resource workflow: restore independent useCustomRecognition/useCustomSynthesis (defaults false; persisted choices require installation validation) → Defaults stable capability facades → installed/available local Nemotron/MOSS/Silero or Apple SpeechAnalyzer/AVSpeechSynthesizer/energy VAD → existing SpeechPerception endpoint → normal conversation. Disabled ASR/TTS choices select Apple speech independently and preserve weights; VAD selects installed available Silero regardless of those choices, otherwise Energy; Gemma 4 E2B/YOLO retain independent model selection. App stops voice before policy changes. Apple language assets are system-managed and may download during first warmup. ModelKitEnergy is the independent ModelKit-only VAD adapter; SpeechFallback.swift belongs to Defaults, not Management.
 
 SpeechPerception holds 128 packets/64000 scalar samples; control facts bypass audio capacity. VoiceActivitySegmenter requires ordered contiguous 16 kHz mono Float32, at most 16000 samples per process frame, 32000 pending samples and 64 scores. Probability threshold defaults to 0.5 (valid 0.05…0.95).
 
-Segmentation uses sample counts: onset 1536 (96 ms), pre-roll 4096 (256 ms), endpoint silence 12800 (800 ms), endpoint padding 3072 (192 ms) and model-sized segment 192000 (12 s). In-sentence silence is retained; endpoint tail is trimmed by whole VAD windows. A maximum-duration segment retains speaking/hysteresis and the same utterance identity. A complete turn is limited to sixty seconds, with ASR queue 128 events/64000 mono samples and a twenty-second finish watchdog.
+Segmentation uses sample counts: onset 1536 (96 ms), pre-roll 4096 (256 ms), endpoint silence 12800 (800 ms), endpoint padding 3072 (192 ms) and model-sized segment 192000 (12 s). In-sentence silence is retained; endpoint tail is trimmed by whole VAD windows. A maximum-duration segment retains speaking/hysteresis and the same utterance identity. A turn has no elapsed-time limit; the ASR queue remains bounded to 128 events/64000 mono samples.
 
 Recognition merges revisions within its real segment. Partial/final observations are distinct: partial encoded size at most 16 KiB and two-second validity; final nonblank text at most 4096 UTF-8 bytes and ten-second validity, published once. Empty final seals the caption but does not invent user content. Recoverable recognition/queue failures reset only the damaged utterance and surface agent.error; native capture termination is a separate current-revision fact.
 
-Apple recognition owns one transcriber/detector/analyzer request, bounded native input and a separate twenty-five-second finalization watchdog. Normal native detector activity callbacks are not assumed to supply the endpoint; external VAD remains the silence source. Nemotron's model window is not a promise of end-to-end conversation latency.
+Apple recognition owns one transcriber/detector/analyzer request, bounded native input and cancellation-aware finalization without a watchdog. Normal native detector activity callbacks are not assumed to supply the endpoint; external VAD remains the silence source. Nemotron's model window is not a promise of end-to-end conversation latency.
 
 ### Sound source direction and capture readiness
 
@@ -1073,11 +1159,11 @@ SpeechPerception owns recognition captions and voice phase presentation; each co
 
 Expression behavior follows Actions Perform/Set: UI.Expression.express is finite and awaits enter/restore transaction acknowledgments; UI.Expression.setExpression is state and commits the persistent base (clear resets it). App adapts session/turn ownership with one pending acknowledgment; UI supplies display-only callbacks. Cancellation/new-turn teardown invalidates old callbacks.
 
-CompanionEyes preserves shape topology and interpolates pose properties. Normal expression uses a 0.65-second spring; reduced motion uses a 0.2-second acknowledgment transaction. Repeating the base still produces a finite performance; clear applies only to setExpression. App invalidates the pending continuation on renderer disappearance/inactivity or session/turn reset.
+NativeCompanionSurface preserves eye path topology and uses explicit Core Animation interpolation. Normal expression uses a 0.65-second eased layer transition; reduced motion uses a 0.2-second acknowledgment transaction. Repeating the base still produces a finite performance; clear applies only to setExpression. App invalidates the pending continuation on renderer disappearance/inactivity or session/turn reset.
 
 ### Synthesis and playback ownership
 
-Speech synthesis and playback are separate, correlated paths. The originating Agent sends a directed `speech.synthesize(audioID, text, locale)` message and schedules `Speech.Playback.speak(audioID)` on its chosen Channel.
+Speech synthesis and playback are separate, correlated paths. Shared Chat segments the first reply text at 20 Han/60 other Characters and later text at 60/120, preserving sentence/word boundaries; no timed text flush exists. The originating Agent sends a directed `speech.synthesize(audioID, text, locale)` message and schedules `Speech.Playback.speak(audioID)` on its chosen Channel.
 
 ```mermaid
 sequenceDiagram
@@ -1109,13 +1195,13 @@ sequenceDiagram
     end
 ```
 
-Admission of the synthesis request does not mean synthesis completed. SpeechSynthesis owns a serial bounded FIFO and a per-job execution deadline; it does not inspect Action Channels. Playback can consume frames while synthesis continues. StorageAudio validates ownership and provides a single-use, reply-owned handle with no pending/ready expiry timer. Reply completion or session cleanup retires unused handles. Successful `Speech.Playback.speak` completion means platform playback drained and the lease was released. SpeechSynthesisError carries producer timeout/invalid-output failures through StorageAudio unchanged; neutral PCM/cache errors remain storage-owned. App maps known failures to user wording after playback cleanup.
+Admission of the synthesis request does not mean synthesis completed. SpeechSynthesis owns a serial bounded FIFO and waits for provider termination or owner cancellation; it does not inspect Action Channels. Playback can consume frames while synthesis continues. StorageAudio validates ownership and provides a single-use, reply-owned handle with no pending/ready expiry timer. Reply completion or session cleanup retires unused handles. Successful `Speech.Playback.speak` completion means platform playback drained and the lease was released. App joins immediate listening restoration after playback/audio cleanup when the SpeechPerception policy permits. There is no acoustic idle timer. Restoration is joined even after caller cancellation; original playback failures remain primary and additional restoration failures are logged explicitly. Apple emits initial PCM immediately and reuses one request-fenced synthesizer. SpeechSynthesisError carries invalid-output failures through StorageAudio unchanged; neutral PCM/cache errors remain storage-owned. App maps known failures to user wording after playback cleanup.
 
-SpeechSynthesis admits thirty-two queued/live jobs, reserves a unique handle before receipt and executes serially. Text is nonblank, at most 2000 UTF-8 bytes with supported locale. It requires mono Float32, stable format, increasing sequence, nonempty audio, explicit finished and at most 8 MiB output. The sixty-second execution deadline begins at dequeue and excludes queue/playback waiting.
+SpeechSynthesis admits thirty-two queued/live jobs, reserves a unique handle before receipt and executes serially. Text is nonblank, at most 2000 UTF-8 bytes with supported locale. It requires mono Float32, stable format, increasing sequence, nonempty audio, explicit finished and at most 8 MiB output. No Agent timer ends synthesis.
 
-StorageAudio permits thirty-two handles and per-stream 8 MiB/2048 items. It rejects excess writes, provides one exact-owner checkout and retains terminal errors in 128 tombstones for thirty seconds. Queued/ready PCM has no automatic expiry or empty-read timeout: the input/session owner must retire it. Producer finish is not player drain.
+StorageAudio permits thirty-two handles and per-stream 8 MiB/2048 items. It rejects excess writes, provides one exact-owner checkout and retains terminal errors in at most 128 tombstones until owner cleanup or bounded metadata eviction. Queued/ready PCM has no automatic expiry or empty-read timeout: the input/session owner must retire it. Producer finish is not player drain.
 
-AppleAudioIO schedules at most three finite mono buffers, each at most 262144 samples. Capacity suspends the player; final completion waits for dataPlayedBack. Each scheduled buffer has queued-duration-plus-three-second watchdog. Cancellation stops the node and wakes waiters; already audible samples cannot be retracted. Output-route acoustic latency is outside render completion.
+AppleAudioIO schedules at most three finite mono buffers, each at most 262144 samples. Capacity suspends the player; final completion waits for dataPlayedBack. Native callback, actual error or scope cancellation completes each scheduled buffer; no playback-completion fallback fabricates success. Cancellation stops the node and wakes waiters; already audible samples cannot be retracted. Output-route acoustic latency is outside render completion.
 
 ### Camera perception and UI projection
 
@@ -1134,7 +1220,7 @@ flowchart LR
 
 App owns capture, the persistent camera resource lease and native-image resolution. VisionPerception owns frame selection, pose interpretation and replaceable display/gaze outputs. Model inference, observation publication and presentation acceptance have separate completion boundaries. App rejects stale session/frame updates before UI mutation.
 
-CameraCoordinator owns native capture/permission/foreground revision, persistent camera.capture lease, preview and photo/export state. AppleCamera owns graph mutation on its actor. Photographer selects business operations; VisionPerception owns inference admission. Opening camera confirms native capture, not pose-model readiness.
+CameraCoordinator owns native capture/permission/foreground revision, persistent camera.capture lease, preview and photo/export state. AppleCamera owns graph mutation on its actor. Assistant photography Skills and fixed Photographer workflows select camera operations; VisionPerception owns inference admission. Opening camera confirms native capture, not pose-model readiness.
 
 ```mermaid
 sequenceDiagram
@@ -1157,7 +1243,7 @@ sequenceDiagram
 
 A healthy flip replaces only native input under retained session/lease, validates no photo in flight and restores old input on admission failure. It avoids stop/start and output/microphone replacement. Native acknowledgment is independent of joined vision replacement; full off/background/model maintenance invalidates and joins both. Failure stops capture for explicit retry.
 
-App samples committed camera state every 100 ms while foreground and publishes changed `camera.state/1` with `phone.camera` identity and monotonic sequence. Photographer selects enabled/visible/busy/permission/lens/photo/error facts into fresh requests, including continuations. Passive state alone never invokes a model or device; publication is not an admission acknowledgment.
+App samples committed camera state every 100 ms while foreground and publishes changed `camera.state/1` with `phone.camera` identity and monotonic sequence. Assistant selects enabled/visible/busy/permission/lens/photo/error facts into fresh task requests and continuations; Photographer retains its fixed workflow state. Passive state alone never invokes a model or device; publication is not an admission acknowledgment.
 
 ```mermaid
 flowchart LR
@@ -1169,13 +1255,16 @@ flowchart LR
  Context --> Read[Authorized multimodal read on continuation]
  Render --> Save[Explicit save of displayed UUID]
  Save --> Photos[Joined add-only Photos import]
- Photos --> Saved[Actual saved receipt and duplicate fence]
- Render --> Ignore[Explicit ignore hides current surface]
+ Photos --> Saved[Actual saved state and duplicate fence]
+ Saved --> Departure[Joined renderer exit and canonical cue]
+ Departure --> Removed[Remove matching image component / receipt with optional feedbackIssues]
+ Render --> Ignore[Explicit ignore joins shrinking exit and discard cue]
+ Ignore --> Removed
 ```
 
-Native capture has one delegate and ten-second terminal bound; photoBusy spans one owned task and clears on every terminal path. Nonempty JPEG is at most 4 MiB, with store bounds thirty-two files/128 MiB. Capture remains durable if later presentation fails. Model/history context stores metadata-only image references, not bytes; selected reads validate the original source/session/input and exact photo identity.
+Native capture has one delegate and ten-second terminal bound; photoBusy spans one owned task and clears on every terminal path. Nonempty JPEG is at most 4 MiB, with caller-owned store bounds of 1024 files/2 GiB and a 512 KiB owner index. SDK defaults remain 32 files/128 MiB/16 KiB with reject policy; App explicitly uses evictOldest. Committed new cache records retire oldest JPEGs, and historical retired references return absent. Capture remains durable if later presentation fails. Model/history context stores metadata-only image references, not bytes; selected reads validate the original source/session/input and exact photo identity.
 
-One current photo fades/holds/shrinks into a thumbnail and reports actual animation acknowledgment. Only the positioned thumbnail controls intercept touch. Save validates displayed identity, foreground and original owner, joins one add-only native transaction and sets savedPhotoID only after success. Repeated save of that displayed photo is alreadySaved. Ignore hides the surface without deleting album data or private evidence. Export requires foreground, not an open camera. Camera/save overlap rejects; neither failure nor continuation automatically repeats the shutter.
+One current photo fades/holds/shrinks into a thumbnail and reports actual animation acknowledgment. Only the positioned thumbnail controls intercept touch. Save validates displayed identity, foreground and original owner, joins one add-only native transaction and sets savedPhotoID only after success. The exact saved UUID remains alreadySaved after component removal, without duplicate import or replayed feedback. Save enlarges the photo to 1.16 before sliding right without shrinking; ignore shrinks/slides beyond the lower-right edge. Both join renderer/cue before removal, and feedbackIssues preserves any nonfatal feedback failures independently from committed save/ignore. Import failure retains the photo. Ignore does not delete album data; private cached evidence remains until the explicit FIFO retention policy retires it. Export requires foreground, not an open camera. Camera/save overlap rejects; neither failure nor continuation automatically repeats the shutter.
 
 ### Adaptive vision cadence and projection
 
@@ -1193,7 +1282,7 @@ UI/Camera owns PoseOverlay and display statistics. VisionPerception owns its Enc
 
 ### Photographer tracking and control handoff
 
-Photographer consumes validated `vision.pose` through InputGateway and emits internal `NexArm.Tracking.aim` through OutputGateway. Its JSON v6 contains the pose subscription and seven model Camera Actions; private Chat reasoning and fixed internal tracking permission have separate ownership. The tracking output buffer holds eight calls and fails explicitly on overflow.
+Photographer consumes validated `vision.pose` through InputGateway and emits internal `NexArm.Tracking.aim` through OutputGateway. Its Resources v7 configuration contains the pose subscription and maximum reusable Camera permissions; there is no private photography Chat worker. Assistant photography Skill exposes the scheduled Camera Actions; fixed tracking retains its internal permission. The tracking output buffer holds eight calls and fails explicitly on overflow.
 
 NexArmActions validates intent arguments; Gateway authorizes source/session and Tool permission. The App worker holds motors1–4 through ResourceCoordinator, with monotonic usable-pose freshness from Photographer; one second without fresh input joins/releases the writer. App groups all six motors under nexarm.writer and explicitly allows Assistant interaction Actions and fixed ApplicationControl operations to preempt Photographer after joined cleanup, including disjoint motor5/6 actions. Queued same-owner Actions survive the takeover gate; no scheduler/session cancellation or radio recovery occurs. VisionSession camera closure removes its owned work; old targets never replay. Actions owns mapping/motion, PlatformKit native encoding; return is target admission, not physical arrival.
 
@@ -1296,9 +1385,9 @@ After joining a failed original resource worker, eligible host admission/dispatc
 
 `System.Device.control` validates operation-specific fields before native invocation; submission is acceptance, while late finite/jog/tracking outcomes remain independent. ApplicationControl retains sequenced environment categories and accepts facts/feedback while paused without starting model work. App samples device/camera capability facts once per second while foreground and publishes scene/navigation changes separately. `runtimeInfo` retains the fixed behavior described in the [function inventory](#canonical-functions-and-protocol-bindings).
 
-Assistant, Photographer, Memory and ApplicationControl have independent durable contexts. HistoryPresentationAdapter reads one immutable snapshot from the same repository used by that role, converts into UI-owned values and never creates a second writable history. Streaming perception/synthesis evidence has no conversation archive UI.
+Assistant, Photographer, Memory and ApplicationControl have independent durable contexts. HistoryPresentationAdapter reads the Assistant repository and converts one immutable snapshot into UI-owned values. Fixed specialists retain transaction/task state without a chat schema. Streaming perception/synthesis evidence has no conversation archive UI.
 
-Assistant exposes current/archive navigation and confirmed mutations. Specialists expose read-only task lists and task-scoped detail/export. Original request/evidence/task state determines membership/title; continuation and later task inputs stay grouped across archives. Missing associations remain separate; missing dates remain absent. Terminal/recovered state outranks stale waiting-user reports.
+历史记录 exposes only Assistant 聊天记录 and 任务记录. Assistant supports current/archive navigation and confirmed mutations. Task records project persisted foreground input membership and registered background-task state; continuation and later inputs stay grouped across archives. Missing task dates remain absent.
 
 <a id="deterministic-history-mutation-contract"></a>
 
@@ -1306,7 +1395,7 @@ Assistant exposes current/archive navigation and confirmed mutations. Specialist
 
 Refresh, confirmed archive deletion, startNew, summarize and cancellation use typed `MemoryHistoryIntent` under `history.intent/1`, carried by AgentMessage. Legacy string history commands reject. User-source refresh/delete/startNew/summarize and trusted host runtime-source cancel remain external-origin input, not forged runtime execution feedback.
 
-Memory handles typed history intent deterministically without loading a model; delegated natural tasks use its private Chat context. Its title computation helper is injected into registered History functions. Refresh emits UI.HistoryPresentation.showHistory; deletion emits History.Conversation.delete and waits for runtime feedback matching session and callID before requesting presentation. Actions/History validates archive-only deletion and invokes the same Assistant repository atomic transaction. App composes the repository and carries intents/results without selecting the next business call.
+Memory handles typed history intent deterministically without ordinary Chat. Assistant history-query Skill owns conversational history queries; independent title generation still uses a model. Its title computation helper is injected into registered History functions. Refresh emits UI.HistoryPresentation.showHistory; deletion emits History.Conversation.delete and waits for runtime feedback matching session and callID before requesting presentation. Actions/History validates archive-only deletion and invokes the same Assistant repository atomic transaction. App composes the repository and carries intents/results without selecting the next business call.
 
 One pending mutation and one root request reject overlap without backlog. Root transport executes at most two business calls for refresh/delete; new archive/title sequences allow at most six outputs, including terminal controls. Cancellation joins execution, sends the typed cancellation input and drains at most eight buffered outputs until a non-business acknowledgment crosses OutputGateway. Cancelled presentation is retired before retry. A committed deletion survives later cancellation or presentation failure; missing/current archive IDs fail explicitly. There is no automatic deletion retry.
 
@@ -1322,13 +1411,13 @@ Existing history records retain actual request Tool declarations, complete nativ
 
 Each model request stores exact metadata-only request JSON, input, fragments, calls/results, model finish/failure, optional provider usage and adapter timing. Four request rounds, 512 KiB exact-request JSON and 64 KiB current input are separate from whole context limits. Model completion, call outcome and task-owner completion remain separate. Late call outcomes update their original request, including archived records.
 
-Model timing samples request start immediately before provider invocation and first nonempty text before yield, using monotonic elapsed time. Consumer persistence, ASR/TTS and UI are excluded. Native-only and unsupported/legacy timing remains empty; record arrival does not invent TTFT. Generated continuations appear as ReACT without overwriting the original request. Historical native evidence is retained even when current role grants are Action-only.
+Model timing samples request start immediately before provider invocation and first nonempty text before yield, using monotonic elapsed time. Consumer persistence, ASR/TTS and UI are excluded. Native-only and unavailable provider timing remains empty; record arrival does not invent TTFT. Generated continuations appear as ReACT without overwriting the original request. Historical native evidence is retained even when current role grants are Action-only.
 
-Parser preview uses the selected producer's effective grants and shared parsing/segmentation, including authorized send Actions. It reports syntax/resolved/rejected/wait behavior without executing. Export preserves actual evidence and failures; missing legacy fields do not gain invented storage explanations.
+Parser preview uses the exact persisted Assistant request catalog and shared parsing/segmentation. It reports syntax/resolved/rejected/wait behavior without executing. Export preserves actual evidence and failures; unavailable fields remain absent.
 
 History images are authorized metadata references, up to four per context. Reads validate selected producer/input association before accessing CapturedPhotoStore. UI page reads cancel with their owner, permit at most 4 MiB each and prepare 320-pixel thumbnails/2048-pixel full preview. Missing files return absent; wrong ownership/corrupt length fails visibly.
 
-Storage uses atomic, revision-checked documents (64 KiB by default; Agent contexts explicitly use 64 MiB). File storage confines paths, rejects descendant symlinks and validates reservations/free space before non-overwriting publication. Current histories use the [atomic context contract](#composition-startup-and-lifetime); StorageChat retains bounded legacy import compatibility. Cross-process writers, cross-device sync and semantic retrieval remain absent. See [Storage](Storage/README.md) for the underlying mechanisms.
+Storage uses atomic, revision-checked documents (64 KiB by default; Agent contexts explicitly use 64 MiB). File storage confines paths, rejects descendant symlinks and validates reservations/free space before non-overwriting publication. Current histories use the [atomic context contract](#composition-startup-and-lifetime); StorageChat supplies bounded transactional history values. Cross-process writers, cross-device sync and semantic retrieval remain absent. See [Storage](Storage/README.md) for the underlying mechanisms.
 
 ### Settings audio detection
 
@@ -1461,7 +1550,7 @@ This table summarizes system-wide pressure points; local designs remain authorit
 | SpeechSynthesis / PCM | Thirty-two jobs/handles, 8 MiB/2048 items per stream | Fail original producer/reader; exact-owner single checkout |
 | Native audio | 64 capture packets; three player buffers | Capture gap fails; player suspends and waits for native drain |
 | Camera / vision | Newest-one frame, one inference + one pending | Explicit replacement/freshness; cleanup releases native retention |
-| Photo storage/capture | Thirty-two files/128 MiB, one photo and one export | Reject overlap/capacity; actual capture/export persists |
+| Photo storage/capture | Host archive 1024 files/2 GiB, SDK defaults 32/128 MiB; one photo and one export | Reject overlap/capacity; actual capture/export persists |
 | Feature requests | ApplicationControl 32/64 output; camera/history one operation | Independent 120-second business watchdog; no automatic replay |
 | Provider staging | Thirty-two slots, ten-second unclaimed lifetime | Claim once, reject/discard, no secret exposure |
 | Artifact acquisition | Two active/eight queued | Reject excess; cancel/delete joins staging owners |
@@ -1691,7 +1780,7 @@ The implemented `AgentTaskSignal` registry, task bounds and scoped question rout
 | Signal and host facts | ✅ Unified envelope/origins, schemas, causal results, typed history/resource/provider/device/navigation/camera input, sequenced scene/navigation/device facts | ❌ Additional sensor adapters and video/binary payload codecs |
 | Executable capabilities | ✅ Protocol-neutral Actions, shared execution, three-level addresses, explicit Action/Tool bindings and isolated errors | ❌ General activity producers/subscriptions |
 | UI and history | ✅ Agent-selected queries/mutations, registered resource/provider error presentation, shared navigation and camera/device functions | ❌ General system pickers, movie capture and background camera execution |
-| Conversation | ✅ Four-round policy-driven Action/Tool continuation, correlated results, exact history and scoped specialist task replies | ❌ Automatic request/reply for arbitrary domain contracts and local-model native Tool support |
+| Conversation | ✅ Completion-owned result-driven Action/Tool continuation and terminal Agent failures, correlated results, exact history and scoped specialist task replies | ❌ Automatic request/reply for arbitrary domain contracts and local-model native Tool support |
 | Execution lifecycle | ✅ Owned cancellation/join, causal ActionResult, independent manual-worker failure feedback and bounded result retention | ❌ General long-task progress/activity subscriptions |
 | Model/provider resources | ✅ Agent-routed commands/preferences/inventory/observations/errors and private provider transactions/presentation; ApplicationControl current facts are model-readable | ❌ Model-initiated provider configuration changes with safe session handoff |
 | Decision context | ✅ Bounded root environment facts plus registered current inventory/provider/device reads | ❌ Full resource-state-store plan and push adapters |
@@ -1785,3 +1874,137 @@ sequenceDiagram
 ```
 
 [Feature-workflow call budgets](#settings-history-and-feature-workflows) bound each transaction. Eligible host admission/dispatch failures use one correlated `hostFailure` input only after joining the failed worker. Startup, closed/cancelled/capacity or unavailable-presentation failures retain the explicit App fallback. Fixed error routes grant no model configuration permission.
+
+## 泛化 Task 与独立 Skill
+
+✅ 泛化 Task 与独立 Skill 已接入：任意目标、单前台任务，基础/交互链/任务 Skill 作用域；后台复用 send，不抢占前台。详见所属 Agents 与公共机制设计。
+
+✅ Resource-path contract: pure Agent and Skill assets move to MobileHarness/Resources/{Agents,Skills} with Catalog.json. Agents retains loading and policy ownership. Package sources remain limited to Agents; explicit copies exclude unrelated app/model assets. Bundle catalog lookup establishes the runtime root without repeating Resources. Regression covers flat and Resources-containing Bundle lookup plus missing catalog failure; final packaging checks compare indexed asset bytes. Device acceptance is recorded separately.
+
+
+✅ Task control/context correction: canonical Agent.Task controls return finite transaction values accepted by FunctionExecutor. Runtime task reports are data, never system instructions; archived/legacy tasks are not an always-present model context.
+
+
+✅ Source organization audit (2026-10-11): Resources/Agents and Resources/Skills use UpperCamelCase directories and resource filenames. Support root owns immutable AgentConfigurations/AgentSkillLoader; Context owns AgentTaskSkillState/AgentFixedTaskCoordinator and persistence; Communication owns only business message contracts. Runtime Agent/Skill IDs and persistent field names are unchanged.
+
+
+## Skill 函数目录：取消资源权限上限
+
+✅ 已删除 Permissions.json 和 Agent.json 的 permissions 字段。Agent.json 不声明函数；基础和动态模型函数完全由已加载 Skill 组合，不再与 Agent 权限上限求交。保留 canonical 元数据、重复/冲突、容量、通信授权、真实执行身份和任务范围校验。Gateway 对有轮次快照的调用使用该快照，对无模型轮次的固定调用使用 Agent 固定目录。App 对所有 Skill 目录检查真实实现覆盖，不把全局 Skill 合并成权限白名单。后台 Skill 校验仍要求目标业务契约支持，但不再校验 Permissions。历史快照不重写。
+
+## Action-owned documentation and Skill instruction contract
+
+✅ 函数 doc/parameters 由所属 @Action 声明；域模块从实际注册生成中立目录，App 在加载 Agent/Skill 配置前注入。Skill 负责业务流程及示例，Core 负责协议。函数实现和说明只有一个源，不再使用公共 FunctionMetadata 文件。
+
+## Channel-owned Action ordering
+
+✅ Action metadata has no serialization key. [ChannelScheduler](Gateway/Output/Scheduling/README.md) owns task-local FIFO/wait ordering; ResourceCoordinator rejects unconfigured conflicts without a queue and preserves explicitly configured joined takeover.
+
+## Task controls through Action Calls
+
+✅ BasicSkill 的五个 Task/Skill 控制函数使用 Control Channel Action Call；App 通过 ChannelScheduler 返回已提交状态。startTask/loadSkills/releaseSkills 返回的已提交业务状态在结果屏障后重建目录并 ReACT，finishTask/cancelTask 加入回复及清理屏障后恢复默认。新目录仅影响后续请求，不允许加载轮提前调用新函数。可信固定调用复用同一实现。
+
+## Agent → Skill → Function registration
+
+✅ Implemented: Agent.json references baseSkills; Skill.json alone registers model Actions/Tools. BasicSkill owns task orchestration and environment reading; ExpressionInteraction owns expression Actions. Role instructions retain identity/responsibility/style. Business roles reuse existing Skills; internal trusted bindings remain separate. Historical snapshots are preserved.
+
+```mermaid
+flowchart LR
+ A[Agent.json: identity and baseSkills] --> S[Skill.json: Action / Tool bindings]
+ S --> L[Skill loader: dependency / conflict validation]
+ M[Action-owned function metadata] --> L
+ C[Skill Instructions: procedures and examples] --> P[Request context builder]
+ R[Agent Instructions: role and style] --> P
+ L --> F[Immutable request catalog]
+ F --> P
+ F --> G[Gateway: scope and protocol validation]
+ G --> E[Actions / communication runtime]
+ E --> O[Results to actual owner]
+ O --> P
+```
+
+✅ Task/history correction: Task continuation follows actual committed control results. Assistant history displays all persisted user/assistant Task turns; the Task destination additionally groups them. Starting a new conversation cancels an idle foreground Task through existing controls before Memory archives the conversation; generating/queued work remains protected. No device effect is undone or replayed.
+
+
+## Agent request failure continuation
+
+✅ 业务结果续推、取消/Agent异常终止、证据和单轮容量边界统一见第三部分 [ReACT continuation and Agent recovery](#react-continuation-and-agent-recovery)。
+
+## Lifecycle-owned conversation and audio (2026-10-12)
+
+✅ 已移除对话生成、ReACT、收件箱排队、结果屏障、ASR 收尾、TTS 合成及回复占用租约的计时终止。Signal 默认无过期时间，框架不再按通信契约附加 TTL。保留显式实时感知数据的新鲜度和网络传输自身超时；它们不作为对话/语音缓存生命周期。Action 自身超时通过原始执行者的 ActionResult 返回。请求/调用数及队列/PCM 容量仍有界，不以计时自动删除已接纳输入。语音句柄无读等待或错误记录 TTL，按播放完成、输入/会话正常结束、异常或显式取消清理；取消加入生成和播放工作。
+
+
+## Result-driven ReACT (ADR0214)
+
+✅ [ADR0214](../docs/adr/0214-result-driven-react.md) 的当前系统契约已汇总到第三部分 [ReACT continuation and Agent recovery](#react-continuation-and-agent-recovery)，包含结果策略、全部触发条件、Task 收尾/取消、各层 limit 和能力缺口。
+
+
+✅ 提示词精简已实现：保留 Agent→Skill→Action 和动态目录快照；模型目录仅展示别名、简短用途与参数，完整地址保留执行/历史证据。规则按 Core 协议、Agent 角色、Skill 流程分工，事实与输入保持数据消息及原生配对。
+
+## Action timeout contract (2026-10-12)
+
+✅ 基础 FunctionContracts 统一提供 30 秒默认 Action 执行超时；dynamicTimeout（返回 expected/timeout 预算）优先于静态 timeout。UI 快速展示默认 5 秒，Speech.Playback 显式 300 秒，NexArm 有限动作保留参数相关预算。复合节点缺省预算使用基础默认值，组合串行求和、并行取最大、重复乘次数，并在 run 时执行整体 deadline；按函数定义构建叶子及组合函数时复用同一预算解析。计时不包含调度排队；取消加入清理，超时不代表物理停止。App 设置的 120 秒业务结果等待属于独立交互传输契约。
+
+## ModelKit Core identity and lifecycle boundary
+
+✅ Caller-owned sessions are mapped to opaque ModelKit scopeID values. ModelKit does not own conversation identity or task policy. Core ModelResourceState covers resource residency; Management ModelState adds registration/construction state. Management injects validated loading bounds and preserves four-loader/32-waiter production defaults. Concrete providers consume the base SDK without importing the manager/default assembly. See [whole-module audit](../docs/ModelKit-Decoupling-Audit.md).
+
+✅ 前台任务切换：finishTask在已接纳动作/回复收尾后恢复默认目录并结束决策；仅显式continueDecision=true时ReACT继续同一输入中的新目标；cancelTask结束当前决策链。startTask不覆盖运行/等待/收尾中的任务，关闭提交后方可启动新的独立任务。✅ Task 只组织持续目标与上下文；已加载注册的 Camera 函数可在默认模式执行，包括一次拍照且不要后续操作。
+
+✅ Task 上下文收缩时机已修正：startTask 成功后保留进入前的普通对话、启动轮输出及完整调用/结果，只刷新当前 Skill/函数目录；后续任务输入继续携带普通对话背景和当前任务过程。仅旧 Task 关闭后收缩其原始过程为有界终态摘要；摘要在新 Task 中仍可作为历史背景，不能变成当前产物。完整持久化历史与不可变 taskID 保持不变；照片操作不再通过 Task 归属额外鉴权；同输入换任务先收缩已结束旧任务，再完整保留新任务入口。10 个历史请求块和64消息/64KiB/4图片容量保护仍独立生效。
+
+
+✅ Listening activation: home holds for 0.5 s to submit explicit listening consent; release keeps continuous listening enabled; native capture pauses through replies. App owns one pending intent and cancellable startup. Speech.Listening.update joins a staged composition: permission/model readiness alongside canonical UI.Feedback.playCue (original 0.94 s wake PCM, volume 0.85) and UI.Feedback.vibrate (heavy, intensity 1). App prewarms the haptic generator and releases its single context-fenced waiter from PlatformKit first-buffer/player-start acknowledgment. All activation children, actual cue drain and the existing 120 ms acoustic tail precede native microphone readiness. Failed stages prevent later capture and preserve actual child reports. UI renders an active-session edge halo and smooth closed resting eyes; UI.Expression adds closed. Siri timing/original sound are not public API guarantees.
+
+
+✅ Implemented: conversation microphone capture becomes half-duplex at native I/O, not merely ASR admission. A joined latest-intent capture workflow stops PCM after the confirmed utterance and before reply playback, and resumes only after policy/playback clearance. Manual hold-off immediately fences old captions/effects and stops native playback/capture, then joins cancellation of the current Assistant interaction. agent.cancelled closes the original input/round without an error row. UI uses one packaged native Metal halo pass and removes per-character caption timelines.
+
+
+✅ Implemented: host cancellation must preempt a roundFinished dispatch already waiting for scheduled playback. App invokes a producer-bound Gateway cancelCalls operation concurrently with Agent cancel/join; selection includes actual Agent incarnation and session and preserves other producers/sessions/resources.
+
+✅ Task关闭续轮修正：finishTask默认在收尾后结束当前决策，不重新提交已处理用户输入。仅显式continueDecision=true允许同一输入中尚未执行的新目标续轮；cancelTask始终结束。该可选参数在Action声明和Task状态中严格验证，默认false。跨边界模型回执使用实际终态/default目录，保留原始执行回执为历史证据。
+
+
+✅ Implemented: reusable UI.Feedback.playCue/vibrate functions own bounded parameters; Actions has no native UI imports. App injects audio/haptics, and Speech.Listening.update awaits root-owned startup with a real composed report. Readiness, cue and native-start-gated haptic run in parallel; successful readiness plus cue/native drain, haptic completion and acoustic tail gate capture. UI uses asymmetric fast waking (180 ms) and soft closing, a fresh blink epoch and native opacity transitions for the GPU rim; ordinary activation starts at 0.85 visibility while the existing exit curve is preserved.
+
+
+✅ Implemented: Camera disposition joins committed save/ignore, renderer departure and canonical cue, then destroys only the matching current photo component. Actual save success is separate from bounded feedbackIssues in the receipt. UI owns renderer geometry/acknowledgment; App owns lifetime/gating; PlatformKit owns short native PCM playback without resetting the microphone/player session.
+
+
+✅ App configures a bounded 1024-photo/2 GiB archive with a 512 KiB index, loading earlier 32-photo evidence and using FIFO retention when full; Storage supplies limits and validation only. Conversation task goal is pinned independently above the promoted ASR area. Native companion surface commits eyes and Metal halo from one generation/monotonic epoch. GPU display-link work is isolated from SwiftUI/MainActor bodies; UIView owns lifecycle and disposal, not devices/models.
+
+
+✅ Implemented correction: default decision chains have no cumulative request/native-call limit. Per-generation work stays bounded, reset each round; immutable request projection drops oldest complete call/result blocks while preserving system/current user/latest result. Identical repeated generation failure without progress surfaces its real error instead of looping. App photo cache opts into FIFO retirement, preserving newest entries and reporting historical images as absent. Fresh Agent/Action failures appear in a root-projected home toast independently of voicePhase.
+
+## 历史记录收敛（2026-10-13）
+
+✅ 已实现：历史记录页面仅保留 Assistant 聊天记录与任务记录。Assistant context 是聊天持久化事实源，任务按持久化身份关联；页面板块重新设计另行开展。
+
+❌ 历史记录页面板块重新设计及原生 UI/真机验收。
+
+
+✅ Implemented: UI forwards press begin/end as passive warmup intent. Lifecycle owns one cancellable cue-preparation task and one cached default PCM clip; PlatformKit warms only the bounded output graph, never capture. The canonical Listening Actions remain the sole cue/haptic execution, reusing warm resources at recognized hold. Actual listening consent/admission remains Agent-routed.
+
+
+✅ Implemented (2026-10-13): UI.Notice.showNotice/dismissNotice and UI.Light.updateLight are canonical presentation Actions for trusted business calls, currently registered by no Skill. Neutral Actions values cross RuntimePresentation into root-owned HomeEffectsWorkflow, which retains one replaceable notice expiry and one light expiry, UUID-fenced cleanup, and explicit stop. Notices remain separate from factual ExecutionIssue history; actual upper-layer errors have display priority and Action failures remain panel-only. Decorative light accepts normalized origin, initial opacity/intensity and duration; it never changes consent, microphone or eyes. Native renderer separates light generations from listening eye generations and preserves existing exit fade. RuntimePresentation adapts Action requests into UI-owned values; AppPresentationWorkflow keeps its existing UI/AgentCore/FunctionContracts boundary. No UI project dependencies or new directories.
+
+
+✅ Implemented (2026-10-13 Skill scope review): canonical Actions unify trusted business calls and model calls; Skill exposure is optional and must serve an actual procedure. ExpressionInteraction retains two expression functions; Feedback/Notice/Light model exposure is removed while implementations and business bindings remain. ApplicationControl keeps navigation/status/resource/Bluetooth operations, removing duplicate robot functions; RobotInteraction owns them. BasicSkill removes unused send while production background contracts are absent. Affected instructions/revisions and explicit communication-only test catalogs are aligned; all six Skills were audited for prerequisites, result handling and cross-Skill references.
+
+
+✅ Implemented (2026-10-13 caption/error lifecycle): mask bottom ASR and reply/status immediately while a notice is visible, restore retained text after dismissal, and preserve pinned Task/promoted ASR layout. Consent-off clears both captions; root HomeEffectsWorkflow owns one UUID/text-fenced350ms reply fade/removal task, cancelled by new text/turn/off/shutdown, scheduled only after reply-policy/playback/native-resume barriers. Agent errors stay in factual root failure notices, not persistent voiceStatus copies. App root contexts explicitly choose afterFirstUnlock file protection, including their directory; repository persistent factory accepts protection while its SDK default remains whileUnlocked. This mitigates lock-boundary writes, without claiming the screenshot proves that cause or hiding other storage failures.
+
+
+✅ 长按打断后的旧语音呈现调用可返回正常取消；Gateway 在保留原始输出终态的同时，不将纯取消投影为运行异常。App/UI 继续消费真正失败快照，不新增取消重试、Task 权限或生命周期限制。
+
+## Cloud non-thinking requests
+
+✅ Implemented: ModelKit provider request encoding disables thinking for recognized Alibaba Cloud endpoints and supported OpenAI reasoning model IDs, for both ordinary chat and the existing independent title-generation flow. Memory retains its 64-token title budget and rejects incomplete/empty output; it does not duplicate provider-specific flags. Original message boundaries, native call authority and lifecycle ownership remain unchanged. See [provider encoding](ModelKit/Language/LLM/OpenAI/README.md#non-thinking-request-policy) for supported identities and failure limits.
+
+
+
+
+## Streaming TTS latency
+
+✅ Apple initial PCM, smaller first text segments and fenced native synthesizer reuse remain implemented. SpeechPerception owns listening policy; App resumes capture immediately after playback/lease cleanup and policy release, with no fixed post-reply wait. Native acknowledgments, consent, session/revision fences and confirmed-utterance barriers remain.

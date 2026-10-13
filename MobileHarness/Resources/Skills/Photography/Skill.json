@@ -1,0 +1,56 @@
+{
+  "version": 1,
+  "id": "photography",
+  "revision": 16,
+  "description": "Camera opening/closing/lens selection and photo capture/save/discard/reshoot within Assistant. Load photography for direct camera operations, including capture-only requests; use a local Task for continuing photo decisions. Never delegate this conversation.",
+  "dependencies": [],
+  "functions": [
+    {
+      "path": "Camera.Capture.flip",
+      "callType": "action",
+      "alias": "flipCamera",
+      "channel": "Camera"
+    },
+    {
+      "path": "Camera.Capture.close",
+      "callType": "action",
+      "alias": "closeCamera",
+      "channel": "Camera"
+    },
+    {
+      "path": "Camera.Capture.open",
+      "callType": "action",
+      "alias": "openCamera",
+      "channel": "Camera"
+    },
+    {
+      "path": "Camera.Capture.takePhoto",
+      "callType": "action",
+      "alias": "takePhoto",
+      "channel": "Camera"
+    },
+    {
+      "path": "Camera.Capture.savePhoto",
+      "callType": "action",
+      "alias": "savePhoto",
+      "channel": "Camera"
+    },
+    {
+      "path": "Camera.Capture.ignorePhoto",
+      "callType": "action",
+      "alias": "ignorePhoto",
+      "channel": "Camera"
+    },
+    {
+      "path": "Camera.Capture.retry",
+      "callType": "action",
+      "alias": "retryCamera",
+      "channel": "Camera"
+    }
+  ],
+  "contextFields": [
+    "runtimeFacts",
+    "taskState",
+    "actionResults"
+  ]
+}

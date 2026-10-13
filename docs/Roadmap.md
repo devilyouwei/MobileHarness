@@ -4,7 +4,7 @@
 
 | Area | Delivered scope |
 | --- | --- |
-| Agent runtime | Seven business Agents, JSON v6 permissions, static communication and independent AgentCore. |
+| Agent runtime | Seven business Agents, sole conversational Assistant, v7 maximum permissions, bundled dynamic Skills/task modes and independent AgentCore. |
 | Processing | Local speech/chat/pose capabilities, explicit cloud chat configuration and shared model management. |
 | Behavior | Shared callable Actions, scheduled/native protocols, nested wait, structured results and declared-resource coordination. |
 | Host | Independent UI, role-specific lifecycle dependencies, six feature workflows and typed App adapters. |
@@ -56,9 +56,9 @@ No delivery dates or physical safety certification are implied. Requirements bel
 
 ## Local model resource management
 
-✅ Declarative source metadata, ModelKitHub SDK adapter, receipt-based installation, Settings source controls and safe removal are implemented. ❌ HF durable background/partial resume, batch acquisition and physical-device acceptance remain. See [Management](../MobileHarness/ModelKit/Management/README.md#local-model-resources--current-contract) and [ADR0105](adr/0105-local-model-resource-management.md).
+✅ Declarative source metadata, ModelKitHub SDK adapter, receipt-based installation, Settings source controls and safe removal are implemented. ❌ HF durable background/partial resume, batch acquisition and physical-device acceptance remain. See [Management](../MobileHarness/ModelKit/Support/Management/README.md#local-model-resources--current-contract) and [ADR0105](adr/0105-local-model-resource-management.md).
 
-✅ Native Tool call history and input/generated/total token diagnostics are implemented in the existing Settings history flow, with backward-compatible optional records and actual Gateway execution outcomes. ❌ Physical Camera/provider usage/UI acceptance and partial native-stream diagnostics remain pending.
+✅ Native Tool call history and input/generated/total token diagnostics are implemented in the existing Settings history flow, with optional provider evidence and actual Gateway execution outcomes. ❌ Physical Camera/provider usage/UI acceptance and partial native-stream diagnostics remain pending.
 
 ✅ Local model resource first release: metadata-only packaging, bounded verified download/installation, persistent official/mirror/custom source settings, explicit stop-and-delete and sandbox-only loading. ❌ Full iOS build/device acceptance, partial-file resumeData, batch download, orphan-staging collection and derived compilation-byte accounting remain. See Management current contract for proposal deviations.
 
@@ -319,7 +319,7 @@ Final verification: changed sound-source Swift files, boundary checks and projec
 
 ✅ 第一阶段包含统一 Signal 预处理、独立持久化 Context、Builder、共享 Chat 驱动、任务契约和输出通信；七个现有 Agent 的业务职责保持现状。
 
-❌ 下一阶段调整 Assistant/Photographer 分工和持续对话路由，摄影 LLM 不在当前实现范围。
+✅ Assistant/Photographer 职责已收敛：摄影对话由 Assistant 的本地任务/Skill 承担，Photographer 保留确定性执行与追踪，不引入专用摄影 Chat worker。
 
 参见 [ADR0187](adr/0187-agent-composition-and-react.md) 与 [Agents 当前设计](../MobileHarness/Agents/README.md)。
 
@@ -327,7 +327,7 @@ Final verification: changed sound-source Swift files, boundary checks and projec
 
 ✅ [ADR0189](adr/0189-agent-support-hierarchy.md): shared Agent sources consolidate under Support/Core, Communication, Chat and Context; Core retains independent Foundation-only compilation. Source-only migration preserves role/runtime behavior.
 
-✅ ADR0190 resident SpeechPerception listening policy, reply-activity snapshots, microphone epoch isolation and one-way Signal publication implemented. ❌ Verify real-device echo suppression, reply/delegation timing, first-frame pause/resume, route changes and350ms tail acoustics with actual models; automated tests/builds do not establish physical acceptance.
+✅ ADR0190 resident SpeechPerception listening policy, reply-activity snapshots, microphone epoch isolation and one-way Signal publication implemented. ❌ Verify real-device echo behavior, reply/delegation timing, first-frame pause/resume, route changes and immediate post-reply microphone resumption with actual models; automated tests/builds do not establish physical acceptance.
 
 ✅ Frontend/backend input separation is implemented: local navigation/page cleanup and direct owner subscriptions replace mandatory UI-to-Assistant task delegation. Agent-driven conversation and callable UI effects remain. ❌ Native touch, dialog routing and actual data/device operations need separate on-device acceptance.
 
@@ -335,3 +335,11 @@ Final verification: changed sound-source Swift files, boundary checks and projec
 ## Photographer camera context (2026-10-10)
 
 ✅ Passive revisioned camera.state subscription and independent latest Context, selected facts on every model request/continuation, and photography phase projection from existing task/work/artifact state. No automatic model invocation on state changes. ❌ Live-model and physical-device capture/save/ignore/background-race acceptance remain outstanding; sampled facts never replace native readiness checks.
+
+## Assistant Skills / Task Modes（2026-10-11）
+
+✅ 当前对话入口收敛为 Assistant，通过纯资源 Skill 加载动态函数和单前台任务上下文；三个专用角色保留确定性流程。旧多 Chat Agent 对话委派说明由 [ADR0212](adr/0212-assistant-skills-task-modes.md) 替代。❌ 真机摄影、语音竞争与模式切换验收待完成；没有远程 Skill、任务栈或新第三方依赖。
+
+✅ 泛化目标、Skill 组合和作用域、后台公共协议/容量、首页目标/Skill/后台投影已实现。❌ 本版没有真实后台业务，摄影/语音/前台切换仍待真机验收。
+
+❌ 历史记录页面板块后续重新设计；当前仅保留 Assistant 聊天记录与任务记录入口。

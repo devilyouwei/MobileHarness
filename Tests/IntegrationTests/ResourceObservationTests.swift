@@ -41,7 +41,7 @@ private func waitForResourceFacts(_ runtime: ApplicationControlIntentRuntime, pr
     }
     Issue.record("Resource fact did not finish independent processing")
 }
-@Test func nativeResourceObservationsReuseRegisteredActionsAndFailedFactsDoNotQuery() async throws {
+@Test(.actionCatalog) func nativeResourceObservationsReuseRegisteredActionsAndFailedFactsDoNotQuery() async throws {
     let inventory = ObservationInventory()
     let presentation = ObservationPresentation()
     let runtime = try resourceRuntime(UnusedModelResourceCapability(), inventory: inventory, presentation: presentation)
@@ -58,7 +58,7 @@ private func waitForResourceFacts(_ runtime: ApplicationControlIntentRuntime, pr
     #expect(await runtime.agent.status().queuedInputs == 0)
     await runtime.shutdown()
 }
-@Test func resourceStateRejectsReplayAndWrongProvenanceWithoutBlockingLaterSample() async throws {
+@Test(.actionCatalog) func resourceStateRejectsReplayAndWrongProvenanceWithoutBlockingLaterSample() async throws {
     let inventory = ObservationInventory()
     let presentation = ObservationPresentation()
     let runtime = try resourceRuntime(UnusedModelResourceCapability(), inventory: inventory, presentation: presentation)
@@ -81,7 +81,7 @@ private func waitForResourceFacts(_ runtime: ApplicationControlIntentRuntime, pr
     #expect(await agent.status().queuedInputs == 1)
     await agent.stop()
 }
-@Test func invalidResourceFailureFactsRejectBeforeEffects() async throws {
+@Test(.actionCatalog) func invalidResourceFailureFactsRejectBeforeEffects() async throws {
     let inventory = ObservationInventory()
     let presentation = ObservationPresentation()
     let runtime = try resourceRuntime(UnusedModelResourceCapability(), inventory: inventory, presentation: presentation)

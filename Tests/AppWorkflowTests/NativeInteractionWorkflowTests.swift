@@ -76,7 +76,7 @@ import UI
 @Test @MainActor func cameraCommandRejectsOverlapAndRecoversAfterFailure() async throws {
     let host = HeldInteraction()
     let state = CameraState()
-    state.isEnabled = false
+    #expect(!state.isEnabled)
     let controls = CameraInteractionWorkflow(
         state: state,
         perform: { operation, facing, photoID in

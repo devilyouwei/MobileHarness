@@ -1,0 +1,6 @@
+Use case: precise-object-edit.
+PRIMARY EDIT TARGET: attached MobileHarness icon v12.
+Make ONE narrowly scoped change: remove the multicolor luminous halo/border from around the INSIDE perimeter of the iPhone display. Remove all magenta, violet, cyan and amber glowing screen-edge lines and their colored bloom. Restore a clean nearly black/navy glass display, with only a soft natural glass reflection, no luminous border of any color.
+Preserve the TWO cyan-blue cheeky eye graphics EXACTLY: large filled rounded dome on viewer-left and narrow winking eyelid on viewer-right, their current shapes, color, spacing, screen-plane alignment and small glow.
+Keep all geometry and composition unchanged: current clockwise phone tilt, titanium rim and Dynamic Island, left-bending white arm projecting slightly forward, full round base, two visible lower joints and rear magnetic top joint fully hidden behind phone. Keep original cool-blue studio rim highlights on metal and mechanical joints; these are hardware lighting and may remain. Remove only any warm-magenta/amber reflections caused by the deleted rainbow screen halo, returning those small reflected areas to neutral/cool white.
+No added elements, no text, no UI, no new halo. Plain opaque dark square backdrop and premium 3D render. Phone, arm, eyes and base must not be repositioned or redesigned.

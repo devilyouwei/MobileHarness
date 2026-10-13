@@ -1,6 +1,5 @@
 import Foundation
 @_spi(ModelManagement) import ModelKit
-import ModelKitCoreAI
 import Testing
 
 @testable import ModelKitGemma4
@@ -10,11 +9,27 @@ struct Gemma4ProviderTests {
     @Test func promptRetainsRolesAndOpensModelTurn() {
         guard #available(iOS 27, macOS 27, *) else { return }
         #expect(
-            CoreAILanguageEngine.render([
+            GemmaLanguageEngine.render([
                 .init(role: "system", content: "instructions"), .init(role: "user", content: "hello"),
                 .init(role: "assistant", content: "answer"), .init(role: "user", content: "again"),
             ])
                 == "<bos><|turn>system\ninstructions<turn|>\n<|turn>user\nhello<turn|>\n<|turn>model\nanswer<turn|>\n<|turn>user\nagain<turn|>\n<|turn>model\n"
+        )
+    }
+
+    @Test func promptPreservesConsecutiveUserTurns() {
+        guard #available(iOS 27, macOS 27, *) else { return }
+        #expect(
+            GemmaLanguageEngine.render([
+                .init(role: "system", content: "instructions"),
+                .init(role: "user", content: "你好"),
+                .init(role: "user", content: "补充"),
+                .init(role: "user", content: "原有\n换行"),
+                .init(role: "assistant", content: "answer"),
+                .init(role: "user", content: "again"),
+                .init(role: "user", content: "more"),
+            ])
+                == "<bos><|turn>system\ninstructions<turn|>\n<|turn>user\n你好<turn|>\n<|turn>user\n补充<turn|>\n<|turn>user\n原有\n换行<turn|>\n<|turn>model\nanswer<turn|>\n<|turn>user\nagain<turn|>\n<|turn>user\nmore<turn|>\n<|turn>model\n"
         )
     }
 
@@ -46,7 +61,7 @@ struct Gemma4ProviderTests {
     func realInferenceCancellationAndReload() async throws {
         guard #available(iOS 27, macOS 27, *) else { return }
         let path = try #require(ProcessInfo.processInfo.environment["HARNESS_GEMMA4_ROOT"])
-        let context = ModelContext()
+        let context = try ModelContext(loadGate: ModelLoadGate(maximumConcurrentLoads: 4), maximumLoadWaiters: 32)
         let model = try Gemma4Chat(context: context, artifacts: URL(fileURLWithPath: path))
         func reply() async throws -> String {
             let session = try await model.chat(

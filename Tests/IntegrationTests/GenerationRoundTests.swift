@@ -17,16 +17,21 @@ private actor RoundModel: ChatCapability {
     let supportsToolCalls: Bool
     let action: Bool
     let toolCount: Int
+    let requestRounds: Int
     let photo: Bool
     let photoCommand: String?
     let supportsImages: Bool
     private(set) var requests: [ChatRequest] = []
-    init(action: Bool, toolCount: Int, photo: Bool = false, supportsImages: Bool = false, photoCommand: String? = nil) {
+    init(
+        action: Bool, toolCount: Int, photo: Bool = false, supportsImages: Bool = false, photoCommand: String? = nil,
+        requestRounds: Int = 1
+    ) {
         self.photoCommand = photoCommand
         self.action = action
         self.photo = photo
         self.supportsImages = supportsImages
         self.toolCount = toolCount
+        self.requestRounds = requestRounds
         supportsToolCalls = toolCount > 0
     }
     func chat(_ request: ChatRequest) throws -> InferenceSession<ChatEvent> {
@@ -37,13 +42,16 @@ private actor RoundModel: ChatCapability {
             request.timing?.recordText(value)
             try pair.emitter.yield(.text(value))
         }
-        if requests.count == 1 {
+        if requests.count <= requestRounds {
             if photo { try text("<takePhoto/>") }
             if let photoCommand { try text("<" + photoCommand + "/>") }
             if action { try text("<wait><express emotion=\"happy\"/></wait>") }
             for index in 0..<toolCount {
                 try pair.emitter.yield(
-                    .toolCall(.init(id: "native-\(index)", name: "runtimeInfo", argumentsJSON: "{}")))
+                    .toolCall(
+                        .init(
+                            id: (requests.count == 1 ? "native-\(index)" : "round-\(requests.count)-native-\(index)"),
+                            name: "runtimeInfo", argumentsJSON: "{}")))
             }
             try pair.emitter.yield(.finished(toolCount == 0 ? .stop : .toolCalls))
         } else {
@@ -58,6 +66,8 @@ private actor RoundModel: ChatCapability {
 private struct RoundTools: ToolModule { let definitions: [ActionBinding] }
 private enum RoundFailure: Error { case expected }
 private actor RoundLog {
+    let seals = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingOldest(4))
+    func sealEntered() { seals.continuation.yield(()) }
     private(set) var outputs: [OutputEnvelope] = []
     private(set) var failures: [String] = []
     func record(_ output: OutputEnvelope, result: OutputExecutionResult) {
@@ -78,10 +88,13 @@ private struct RoundHarness {
         try await agent.receive(input)
         return Task {
             try await IndependentOutputWorkflow.consumeGeneration(fixtureOutputs(agent)) { envelope in
-                let result = try await gateway.execute(envelope)
-                await log.record(envelope, result: result)
+                if case .roundFinished = envelope.output { await log.sealEntered() }
+                do {
+                    let result = try await gateway.execute(envelope)
+                    await log.record(envelope, result: result)
+                } catch is CancellationError { try Task.checkCancellation() }
                 if case .control(let value) = envelope.output,
-                    value == "agent.finished" || value.hasPrefix("agent.error:")
+                    value == "agent.finished" || value == "agent.cancelled" || value.hasPrefix("agent.error:")
                 {
                     await agent.stop()
                 }
@@ -94,44 +107,37 @@ private struct RoundHarness {
     }
 }
 private func roundHarness(
-    action: Bool, toolCount: Int, observeAction: Bool, observeTool: Bool,
+    action: Bool, toolCount: Int,
     deliverActionFeedback: Bool = true, photo: Bool = false, supportsImages: Bool = false, photoCommand: String? = nil,
-    environment: Bool = false,
+    environment: Bool = false, playbackDelay: Duration = .zero, requestRounds: Int = 1,
     photoObservation: (@Sendable (UUID, AgentInput) async throws -> ChatImage)? = nil,
     handler: @escaping ActionCompletionHandler
 ) async throws -> RoundHarness {
     let model = RoundModel(
         action: action, toolCount: toolCount, photo: photo, supportsImages: supportsImages,
-        photoCommand: environment ? "readEnvironment" : photoCommand)
+        photoCommand: environment ? "readEnvironment" : photoCommand, requestRounds: requestRounds)
     let store = ConversationHistoryStore()
-    let actionPolicies: [String: GenerationFeedbackPolicy] = [
-        "UI.Expression.express": observeAction ? .observation : .recordOnly,
-        "UI.Caption.print": .recordOnly, "UI.Caption.beginReplyTurn": .recordOnly,
-        "Speech.Playback.speak": .recordOnly, "Camera.Capture.takePhoto": .observation,
-        "Camera.Capture.savePhoto": .observation, "Camera.Capture.ignorePhoto": .observation,
-        "System.Device.readEnvironment": .observation,
-    ]
     let agent: any Agent
-    let policies = GenerationPolicies(
-        actions: actionPolicies,
-        tools: ["System.Runtime.runtimeInfo": observeTool ? .observation : .recordOnly])
     if photo || photoCommand != nil {
-        let declared = try AgentConfigurations.load(named: "Photographer").capabilities
-        let runtime = try [fixtureRuntimeTool()]
-        let capabilities = try CapabilityRegistry(
-            actions: declared.actions,
-            tools: declared.tools + runtime, channels: declared.channels)
-        agent = try AgentChatWorker<PhotographerContextState>(
+        let declared = try AgentConfigurations.registry(AgentConfigurations.skill("photography").functions)
+        let capabilities = try CapabilityRegistry(actions: declared.actions, channels: declared.channels)
+        agent = try FixtureNativeAgent(
             chat: model, conversations: store,
-            generationPolicies: policies,
             observations: { values, input, chat in
-                try await PhotographerContextBuilder.photoObservations(
-                    values, input: input, chat: chat, read: photoObservation)
+                guard let photoObservation else { return [] }
+                if values.contains(where: { $0.path == "Camera.Capture.takePhoto" && !$0.result.isError }),
+                    !(await chat.supportsImages)
+                {
+                    throw CapabilityError.invalidRequest("Model lacks image support")
+                }
+                return try await AssistantContextBuilder.photoObservations(
+                    values, input: input, chat: chat,
+                    read: photoObservation)
             }, capabilities: capabilities)
     } else if toolCount > 0 {
-        agent = try FixtureNativeAgent(chat: model, conversations: store, generationPolicies: policies)
+        agent = try FixtureNativeAgent(chat: model, conversations: store)
     } else {
-        agent = try AssistantAgent(chat: model, conversations: store, generationPolicies: policies)
+        agent = try AssistantAgent(chat: model, conversations: store)
     }
     _ = try await bindSpeechRequests(agent)
     let manager = AgentManager()
@@ -147,9 +153,8 @@ private func roundHarness(
         return ActionBinding(
             path: .init(domain: parts[0], module: parts[1], function: parts[2]),
             displayName: path, kind: .finite, completion: "Actual fixture completion.",
-            feedbackPolicy: (path == "UI.Expression.express" && observeAction)
-                || path == "System.Device.readEnvironment" ? .observation : .recordOnly,
             completing: { invocation in
+                if path == "Speech.Playback.speak" { try await Task.sleep(for: playbackDelay) }
                 if path == "UI.Expression.express" || path.hasPrefix("Camera.Capture.")
                     || path == "System.Device.readEnvironment"
                 {
@@ -162,7 +167,7 @@ private func roundHarness(
         path: .init(domain: "System", module: "Runtime", function: "runtimeInfo"),
         displayName: "Runtime", kind: .finite, completion: "Actual completion.", protocols: [.tool],
         executionPolicy: .direct,
-        feedbackPolicy: observeTool ? .observation : .recordOnly, completing: handler)
+        completing: handler)
     let scheduler = ChannelScheduler(registry: try ActionRegistry(definitions: definitions)) {
         deliverActionFeedback ? await input.deliverActionResult($0) : .closed
     }
@@ -174,17 +179,17 @@ private func roundHarness(
         log: RoundLog())
 }
 
-@Test(arguments: ["action", "tool", "mixed"], [false, true])
-func generationRoundPolicyControlsContinuationForAllThreeRoutes(_ route: String, _ observe: Bool) async throws {
+@Test(.actionCatalog, arguments: ["action", "tool", "mixed"], [false, true])
+func generationRoundActualOutputControlsContinuationForAllThreeRoutes(_ route: String, _ hasValue: Bool) async throws {
     let harness = try await roundHarness(
         action: route != "tool", toolCount: route == "action" ? 0 : 1,
-        observeAction: observe, observeTool: observe, handler: { _ in .value("actual-result") })
+        handler: { _ in hasValue ? .value("actual-result") : .completed })
     let input = AgentInput(sessionID: UUID(), payload: .text("test"))
     let pump = try await harness.start(input)
     try await pump.value
     let requests = await harness.model.requests
-    try #require(requests.count == (observe ? 2 : 1))
-    if observe {
+    try #require(requests.count == (hasValue ? 2 : 1))
+    if hasValue {
         if route != "action" {
             #expect(requests[1].messages.contains { $0.role == .tool && $0.content == "actual-result" })
         }
@@ -194,7 +199,7 @@ func generationRoundPolicyControlsContinuationForAllThreeRoutes(_ route: String,
     }
     let record = try #require(try await harness.store.snapshot().current.turns.first)
     #expect(record.state == .completed)
-    #expect(record.generationRounds?.count == (observe ? 2 : 1))
+    #expect(record.generationRounds?.count == (hasValue ? 2 : 1))
     let modelRequests = try #require(record.modelRequests)
     try #require(modelRequests.count == requests.count)
     for (stored, sent) in zip(modelRequests, requests) {
@@ -206,8 +211,10 @@ func generationRoundPolicyControlsContinuationForAllThreeRoutes(_ route: String,
     #expect(modelRequests.first?.toolCalls.count == (route == "action" ? 0 : 1))
     #expect(modelRequests.first?.firstTokenAt != nil || route == "tool")
     if route == "tool" { #expect(modelRequests.first?.firstTokenAt == nil) }
-    if route != "action" { #expect(modelRequests.first?.toolCalls.first?.output == "actual-result") }
-    if observe {
+    if route != "action" {
+        #expect(modelRequests.first?.toolCalls.first?.output == (hasValue ? "actual-result" : "completed"))
+    }
+    if hasValue {
         #expect(modelRequests[1].input.contains("actual-result"))
         #expect(!modelRequests[1].input.contains("已观察真实结果"))
         #expect(modelRequests[1].fragments.joined() == "已观察真实结果。")
@@ -226,10 +233,10 @@ func generationRoundPolicyControlsContinuationForAllThreeRoutes(_ route: String,
     await harness.close()
 }
 
-@Test(arguments: ["action", "tool", "mixed"], [false, true])
-func generationRoundObservesVoidAndFailureWithoutReplayingFunctions(_ route: String, _ fail: Bool) async throws {
+@Test(.actionCatalog, arguments: ["action", "tool", "mixed"], [false, true])
+func generationRoundVoidSuccessStopsAndFailuresContinueWithoutReplay(_ route: String, _ fail: Bool) async throws {
     let harness = try await roundHarness(
-        action: route != "tool", toolCount: route == "action" ? 0 : 1, observeAction: true, observeTool: true,
+        action: route != "tool", toolCount: route == "action" ? 0 : 1,
         handler: { _ in
             if fail { throw RoundFailure.expected }
             return .completed
@@ -237,9 +244,11 @@ func generationRoundObservesVoidAndFailureWithoutReplayingFunctions(_ route: Str
     let pump = try await harness.start(.init(sessionID: UUID(), payload: .text("observe")))
     try await pump.value
     let requests = await harness.model.requests
-    try #require(requests.count == 2)
-    let observations = requests[1].messages.map(\.content).joined()
-    #expect(observations.contains(fail ? "handlerFailed" : "completed"))
+    try #require(requests.count == (fail ? 2 : 1))
+    if fail {
+        let observations = requests[1].messages.map(\.content).joined()
+        #expect(observations.contains("handlerFailed"))
+    }
     let records = await harness.scheduler.executionSnapshot().records
     #expect(records.filter { $0.path.description == "UI.Expression.express" }.count == (route == "tool" ? 0 : 1))
     #expect(try await harness.store.snapshot().current.turns.first?.state == .completed)
@@ -276,11 +285,12 @@ private actor RoundConcurrencyGate {
     }
 }
 
-@Test(.timeLimit(.minutes(1))) func generationRoundToolsHaveFourWayBoundAndFullRoundBarrier() async throws {
+@Test(.actionCatalog, .timeLimit(.minutes(1))) func generationRoundToolsHaveFourWayBoundAndFullRoundBarrier()
+    async throws
+{
     let gate = RoundConcurrencyGate()
     let harness = try await roundHarness(
-        action: false, toolCount: 6, observeAction: false, observeTool: true,
-        handler: { _ in await gate.run() })
+        action: false, toolCount: 6, handler: { _ in await gate.run() })
     let pump = try await harness.start(.init(sessionID: UUID(), payload: .text("parallel")))
     await gate.waitForFour()
     #expect(await gate.active == 4)
@@ -297,7 +307,7 @@ private actor RoundConcurrencyGate {
     await harness.close()
 }
 
-@Test func generationRoundScheduledToolRegistrationIsRejected() throws {
+@Test(.actionCatalog) func generationRoundScheduledToolRegistrationIsRejected() throws {
     let binding = ActionBinding(
         path: .init(domain: "Fixture", module: "Work", function: "run"),
         displayName: "Run", kind: .finite, completion: "Completed.", protocols: [.action, .tool],
@@ -332,13 +342,13 @@ private actor MixedRoundGate {
     }
 }
 
-@Test(.timeLimit(.minutes(1))) func generationRoundToolBypassesWaitButContinuationWaitsForRecordOnlyAction()
+@Test(.actionCatalog, .timeLimit(.minutes(1)))
+func generationRoundToolBypassesWaitButContinuationJoinsEveryAction()
     async throws
 {
     let gate = MixedRoundGate()
     let harness = try await roundHarness(
-        action: true, toolCount: 1, observeAction: false, observeTool: true,
-        handler: { await gate.run($0) })
+        action: true, toolCount: 1, handler: { await gate.run($0) })
     let pump = try await harness.start(.init(sessionID: UUID(), payload: .text("mixed")))
     await gate.waitForBoth()
     #expect(await harness.model.requests.count == 1)
@@ -346,12 +356,13 @@ private actor MixedRoundGate {
     try await pump.value
     let requests = await harness.model.requests
     try #require(requests.count == 2)
-    #expect(requests[1].messages.last?.content == "tool-observation")
+    #expect(requests[1].messages.contains { $0.role == .tool && $0.content == "tool-observation" })
+    #expect(requests[1].messages.last?.content.contains("action-observation") == true)
     let first = try #require(try await harness.store.snapshot().current.turns.first?.generationRounds?.first)
-    let outcomes = try #require(JSONSerialization.jsonObject(with: Data(first.resultsJSON.utf8)) as? [[String: String]])
+    let outcomes = try #require(JSONSerialization.jsonObject(with: Data(first.resultsJSON.utf8)) as? [[String: Any]])
     #expect(outcomes.count == 2)
-    #expect(outcomes.first { $0["protocol"] == "action" }?["result"] == "action-observation")
-    #expect(outcomes.first { $0["protocol"] == "tool" }?["result"] == "tool-observation")
+    #expect(outcomes.first { $0["protocol"] as? String == "action" }?["result"] as? String == "action-observation")
+    #expect(outcomes.first { $0["protocol"] as? String == "tool" }?["result"] as? String == "tool-observation")
     await harness.close()
 }
 
@@ -375,12 +386,11 @@ private actor CancellableRoundGate {
     }
 }
 
-@Test(.timeLimit(.minutes(1))) func generationRoundCancellationJoinsNativeCleanupAndPersistsCancellation() async throws
-{
+@Test(.actionCatalog, .timeLimit(.minutes(1)))
+func generationRoundCancellationJoinsNativeCleanupAndPersistsCancellation() async throws {
     let gate = CancellableRoundGate()
     let harness = try await roundHarness(
-        action: false, toolCount: 1, observeAction: false, observeTool: true,
-        handler: { _ in try await gate.run() })
+        action: false, toolCount: 1, handler: { _ in try await gate.run() })
     let pump = try await harness.start(.init(sessionID: UUID(), payload: .text("cancel")))
     await gate.waitUntilEntered()
     pump.cancel()
@@ -394,24 +404,21 @@ private actor CancellableRoundGate {
     await harness.close()
 }
 
-@Test func generationRoundRejectsExcessNativeCallsWithoutAnotherModelRequest() async throws {
+@Test(.actionCatalog) func generationRoundAcceptsSeventeenNativeCallsWithoutCumulativeQuota() async throws {
     let harness = try await roundHarness(
-        action: false, toolCount: 17, observeAction: false, observeTool: true,
-        handler: { _ in .completed })
+        action: false, toolCount: 17, handler: { _ in .completed })
     let pump = try await harness.start(.init(sessionID: UUID(), payload: .text("excess")))
     try await pump.value
     let record = try #require(try await harness.store.snapshot().current.turns.first)
-    #expect(record.state == .failed)
-    #expect(record.error?.contains("limitExceeded") == true)
+    #expect(record.state == .completed && record.error == nil)
     #expect(await harness.model.requests.count == 1)
-    #expect(await harness.log.outputs.filter { if case .toolCall = $0.output { true } else { false } }.count <= 16)
+    #expect(await harness.log.outputs.filter { if case .toolCall = $0.output { true } else { false } }.count == 17)
     await harness.close()
 }
 
-@Test func generationRoundRejectsMismatchedSealIdentity() async throws {
+@Test(.actionCatalog) func generationRoundRejectsMismatchedSealIdentity() async throws {
     let harness = try await roundHarness(
-        action: false, toolCount: 0, observeAction: false, observeTool: false,
-        handler: { _ in .completed })
+        action: false, toolCount: 0, handler: { _ in .completed })
     let envelope = OutputEnvelope(
         source: harness.agent.descriptor.id,
         input: .init(sessionID: UUID(), payload: .text("seal")),
@@ -423,10 +430,9 @@ private actor CancellableRoundGate {
     await harness.close()
 }
 
-@Test func generationRoundFeedbackDeliveryFailureStopsWithoutReplayingEffect() async throws {
+@Test(.actionCatalog) func generationRoundFeedbackDeliveryFailureStopsWithoutReplayingEffect() async throws {
     let harness = try await roundHarness(
-        action: true, toolCount: 0, observeAction: true, observeTool: false,
-        deliverActionFeedback: false, handler: { _ in .value("committed") })
+        action: true, toolCount: 0, deliverActionFeedback: false, handler: { _ in .value("committed") })
     let pump = try await harness.start(.init(sessionID: UUID(), payload: .text("delivery failure")))
     try await pump.value
     #expect(await harness.model.requests.count == 1)
@@ -441,24 +447,15 @@ private actor CancellableRoundGate {
     await harness.close()
 }
 
-@Test func generationRoundObservationRegistrationDoesNotDependOnReturnShape() {
-    let value = ActionBinding(path: "System.Runtime.value", handler: { _ in "value" })
-    let completion = ActionBinding(path: "System.Runtime.void", completing: { _ in })
-    let observation = ActionBinding(
-        path: "System.Runtime.void", feedbackPolicy: .observation, completing: { _ in })
-    #expect(value.feedbackPolicy == .recordOnly)
-    #expect(completion.feedbackPolicy == .recordOnly)
-    #expect(observation.feedbackPolicy == .observation)
-}
-
-@Test(arguments: [false, true]) func photographerPhotoActionAttachesOwnedImageAfterRoundBarrier(_ mixed: Bool)
+@Test(.actionCatalog, arguments: [false, true]) func photographerPhotoActionAttachesOwnedImageAfterRoundBarrier(
+    _ mixed: Bool
+)
     async throws
 {
     let photoID = UUID()
     let bytes = Data([0xff, 0xd8, 0xff, 0xd9])
     let harness = try await roundHarness(
-        action: false, toolCount: mixed ? 1 : 0, observeAction: false,
-        observeTool: mixed, photo: true, supportsImages: true,
+        action: false, toolCount: mixed ? 1 : 0, photo: true, supportsImages: true,
         photoObservation: { id, input in
             #expect(id == photoID)
             #expect(input.payload.kind == .text)
@@ -483,7 +480,6 @@ private actor CancellableRoundGate {
     #expect(records.filter { $0.path.description == "Camera.Capture.takePhoto" }.count == 1)
     let turn = try #require(try await harness.store.snapshot().current.turns.first)
     let history = try #require(turn.modelRequests?.last?.requestJSON)
-    #expect(turn.continuationRequests == nil)
     #expect(history.contains(photoID.uuidString))
     #expect(history.contains("imageReferences"))
     #expect(history.contains("byteCount"))
@@ -492,13 +488,13 @@ private actor CancellableRoundGate {
     await harness.close()
 }
 
-@Test(arguments: ["capture", "reader", "provider"]) func photographerPhotoFailuresDoNotFabricateVisionOrRepeatCapture(
+@Test(.actionCatalog, arguments: ["capture", "reader", "provider"])
+func photographerPhotoFailuresDoNotFabricateVisionOrRepeatCapture(
     _ failure: String
 ) async throws {
     let id = UUID()
     let harness = try await roundHarness(
-        action: false, toolCount: 0, observeAction: false, observeTool: false,
-        photo: true, supportsImages: failure != "provider",
+        action: false, toolCount: 0, photo: true, supportsImages: failure != "provider",
         photoObservation: { id, _ in
             if failure == "reader" { throw RoundFailure.expected }
             return try ChatImage(id: id, data: Data([1]))
@@ -511,6 +507,8 @@ private actor CancellableRoundGate {
     try await pump.value
     let requests = await harness.model.requests
     try #require(requests.count == (failure == "capture" ? 2 : 1))
+    let record = try #require(try await harness.store.snapshot().current.turns.first)
+    #expect(record.state == (failure == "capture" ? .completed : .failed))
     #expect(requests.allSatisfy { $0.messages.allSatisfy { $0.images == nil } })
     #expect(
         await harness.scheduler.executionSnapshot().records.filter { $0.path.description == "Camera.Capture.takePhoto" }
@@ -518,7 +516,7 @@ private actor CancellableRoundGate {
     await harness.close()
 }
 
-@Test func capturedPhotoStorePersistsOwnedBytesAndRejectsOverflow() async throws {
+@Test(.actionCatalog) func capturedPhotoStorePersistsOwnedBytesAndRejectsOverflow() async throws {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     defer { try? FileManager.default.removeItem(at: root) }
     let owner = StorageOwner(namespace: "photos", source: "assistant", session: UUID(), input: UUID())
@@ -547,13 +545,13 @@ private actor PhotoFunctionEndpoint: CameraControlCapability {
     func flip(_ facing: CameraActions.Facing, invocation: any FunctionInput) {}
 }
 
-@Test func photoFunctionPreservesValueCompletionAndValidatesBeforeCapture() async throws {
+@Test(.actionCatalog) func photoFunctionPreservesValueCompletionAndValidatesBeforeCapture() async throws {
     let endpoint = PhotoFunctionEndpoint()
     let definition = try #require(
         CameraModule(camera: endpoint).definitions.first { $0.path.description == "Camera.Capture.takePhoto" })
     let tool = ActionBinding(
         function: definition, protocols: [.tool], executionPolicy: .direct,
-        directResultPolicy: .returning, feedbackPolicy: .observation)
+        directResultPolicy: .returning)
     let executor = ToolExecutor(registry: try ToolRegistry(modules: [RoundTools(definitions: [tool])]))
     let envelope = OutputEnvelope(
         source: .assistant, input: .init(sessionID: UUID(), payload: .text("photo")), output: .control("fixture"))
@@ -569,15 +567,14 @@ private actor PhotoFunctionEndpoint: CameraControlCapability {
     #expect(await endpoint.captures == 1)
 }
 
-@Test(arguments: ["savePhoto", "ignorePhoto"], [false, true])
+@Test(.actionCatalog, arguments: ["savePhoto", "ignorePhoto"], [false, true])
 func photoDispositionObservationDrivesReplyWithoutAnotherImageOrCapture(_ command: String, _ denied: Bool) async throws
 {
     let id = UUID()
     let receipt = CameraPhotoCommandReceipt(photoID: id, state: command == "savePhoto" ? .saved : .ignored)
     let value = String(decoding: try JSONEncoder().encode(receipt), as: UTF8.self)
     let harness = try await roundHarness(
-        action: false, toolCount: 0, observeAction: false, observeTool: false,
-        photoCommand: command + " photoID=\"" + id.uuidString + "\"",
+        action: false, toolCount: 0, photoCommand: command + " photoID=\"" + id.uuidString + "\"",
         handler: { _ in
             if denied { throw CameraControlError.permissionDenied }
             return .value(value)
@@ -608,7 +605,8 @@ private struct IndependentProtocolModel: ChatCapability {
     }
 }
 
-@Test(.timeLimit(.minutes(1))) func nativeParsingAndEmissionDoNotWaitForSpeechPreparation() async throws {
+@Test(.actionCatalog, .timeLimit(.minutes(1))) func nativeParsingAndEmissionDoNotWaitForSpeechPreparation() async throws
+{
     let agent = try FixtureNativeAgent(chat: IndependentProtocolModel())
     let entered = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingOldest(1))
     let release = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingOldest(1))
@@ -678,7 +676,8 @@ private struct OpenMalformedProtocolModel: ChatCapability {
     }
 }
 
-@Test(.timeLimit(.minutes(1))) func actionParserFailureCancelsOpenModelStreamWithoutWaitingForAnotherEvent()
+@Test(.actionCatalog, .timeLimit(.minutes(1)))
+func actionParserFailureCancelsOpenModelStreamWithoutWaitingForAnotherEvent()
     async throws
 {
     let termination = AsyncStream<SessionTermination>.makeStream(bufferingPolicy: .bufferingOldest(1))
@@ -686,8 +685,8 @@ private struct OpenMalformedProtocolModel: ChatCapability {
     try await agent.start()
     try await agent.receive(.init(sessionID: UUID(), payload: .text("malformed action")))
     var sawFailure = false
-    for await envelope in fixtureOutputs(agent) {
-        if case .roundFinished = envelope.output { Issue.record("Malformed Action parser sealed a successful round") }
+    var outputs = FixtureGenerationOutputs(agent: agent).makeAsyncIterator()
+    while let envelope = try await outputs.next() {
         if case .control(let value) = envelope.output, value.hasPrefix("agent.error:") {
             sawFailure = true
             #expect(!value.contains("timed out"))
@@ -700,7 +699,7 @@ private struct OpenMalformedProtocolModel: ChatCapability {
     if case .cancelled = ended {} else { Issue.record("Failed protocol did not cancel the open model stream") }
 }
 
-@Test func capturedPhotoHistoryReadsSurviveSessionsAndEnforceProducingInput() async throws {
+@Test(.actionCatalog) func capturedPhotoHistoryReadsSurviveSessionsAndEnforceProducingInput() async throws {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     defer { try? FileManager.default.removeItem(at: root) }
     let store = CapturedPhotoStore(root: root)
@@ -720,11 +719,13 @@ private struct OpenMalformedProtocolModel: ChatCapability {
     #expect(try await restarted.readForInput(id, source: owner.source, input: owner.input) == nil)
 }
 
-@Test(.timeLimit(.minutes(1))) func admittedUserRunsBeforeReadyContinuationAndPreservesNativePairs() async throws {
+@Test(.actionCatalog, .timeLimit(.minutes(1))) func admittedUserRunsBeforeReadyContinuationAndPreservesNativePairs()
+    async throws
+{
     let started = RoundAdmissionGate()
     let release = RoundAdmissionGate()
     let harness = try await roundHarness(
-        action: false, toolCount: 1, observeAction: false, observeTool: true,
+        action: false, toolCount: 1,
         handler: { _ in
             await started.open()
             await release.wait()
@@ -774,10 +775,11 @@ private actor RoundAdmissionGate {
     }
 }
 
-@Test(.timeLimit(.minutes(1))) func assistantEnvironmentQueryUsesActionAndObservedContinuation() async throws {
+@Test(.actionCatalog, .timeLimit(.minutes(1))) func assistantEnvironmentQueryUsesActionAndObservedContinuation()
+    async throws
+{
     let harness = try await roundHarness(
-        action: false, toolCount: 0, observeAction: false, observeTool: false,
-        environment: true, handler: { _ in .value("actual-environment") })
+        action: false, toolCount: 0, environment: true, handler: { _ in .value("actual-environment") })
     let input = AgentInput(sessionID: UUID(), payload: .text("Read the current environment"))
     let pump = try await harness.start(input)
     try await pump.value
@@ -795,4 +797,531 @@ private actor RoundAdmissionGate {
         })
     #expect(!outputs.contains { if case .toolCall = $0.output { true } else { false } })
     await harness.close()
+}
+
+@Test(.actionCatalog, .timeLimit(.minutes(1)))
+func photographySequenceMayExceedThirtySecondsWhenEachActionFitsItsBudget() async throws {
+    let harness = try await roundHarness(
+        action: false, toolCount: 0, photo: true, playbackDelay: .seconds(16),
+        handler: { _ in
+            try await Task.sleep(for: .seconds(16))
+            return .value("captured photo fixture")
+        })
+    let pump = try await harness.start(.init(sessionID: UUID(), payload: .text("拍照")))
+    _ = try await pump.value
+    let history = try await harness.store.snapshot()
+    let turn = try #require(history.current.turns.first)
+    #expect(turn.state == .completed && turn.error == nil)
+    #expect(turn.modelRequests?.count == 2)
+    #expect(await harness.log.failures.isEmpty)
+    let records = await harness.scheduler.executionSnapshot().records
+    #expect(records.filter { $0.path.description == "Camera.Capture.takePhoto" }.count == 1)
+    #expect(records.contains { $0.path.description == "Speech.Playback.speak" && $0.phase == .succeeded })
+    await harness.close()
+}
+
+private struct UnfinishedGenerationModel: ChatCapability {
+    let availability: CapabilityAvailability = .available
+    func chat(_ request: ChatRequest) throws -> InferenceSession<ChatEvent> {
+        let pair = InferenceSession<ChatEvent>.make(limits: try StreamLimits(), estimatedBytes: { $0.estimatedBytes })
+        try pair.emitter.yield(.text("正在生成。"))
+        return pair.session
+    }
+}
+
+@Test(.actionCatalog, .timeLimit(.minutes(1)))
+func modelGenerationWaitsPastThirtySecondsUntilUserCancellation() async throws {
+    let store = ConversationHistoryStore()
+    let agent = try AssistantAgent(chat: UnfinishedGenerationModel(), conversations: store)
+    _ = try await bindSpeechRequests(agent)
+    try await agent.start()
+    try await agent.receive(.init(sessionID: UUID(), payload: .text("fixture")))
+    let outputs = Task { () throws -> [OutputEnvelope] in
+        var collected: [OutputEnvelope] = []
+        for try await envelope in FixtureGenerationOutputs(agent: agent) { collected.append(envelope) }
+        return collected
+    }
+    try await Task.sleep(for: .seconds(31))
+    #expect(try await store.snapshot().current.turns.first?.state == .generating)
+    await agent.stop()
+    let collected = try await outputs.value
+    #expect(
+        !collected.contains {
+            if case .control(let message) = $0.output { message.hasPrefix("agent.error:") } else { false }
+        })
+    #expect(try await store.snapshot().current.turns.first?.state == .cancelled)
+}
+
+private actor FailedAttemptModel: ChatCapability {
+    enum Failure: String, Sendable {
+        case http, taskHTTP, partial, malformed, native, nativeAtLimit, cancelled, exhausted
+    }
+    let availability: CapabilityAvailability = .available
+    var supportsToolCalls: Bool { failure == .native || failure == .nativeAtLimit }
+    let failure: Failure
+    private(set) var requests: [ChatRequest] = []
+    private let effect = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingOldest(1))
+    private var producer: Task<Void, Never>?
+    private var effects = 0
+    init(_ failure: Failure) { self.failure = failure }
+    func effectCompleted() {
+        effects += 1
+        if effects == (failure == .nativeAtLimit ? 16 : 1) { effect.continuation.yield(()) }
+    }
+    private func cancelProducer() {
+        producer?.cancel()
+        effect.continuation.finish()
+    }
+    func chat(_ request: ChatRequest) throws -> InferenceSession<ChatEvent> {
+        requests.append(request)
+        if failure == .cancelled { throw CancellationError() }
+        if failure == .exhausted || ([.http, .taskHTTP].contains(failure) && requests.count == 1) {
+            throw CapabilityError.unavailable("HTTP 429: rate_limit_exceeded; Retry-After=1")
+        }
+        let pair = InferenceSession<ChatEvent>.make(
+            limits: try StreamLimits(), estimatedBytes: { $0.estimatedBytes },
+            onTermination: { _ in Task { await self.cancelProducer() } })
+        if requests.count == 1 {
+            if failure == .native || failure == .nativeAtLimit {
+                for index in 0..<(failure == .nativeAtLimit ? 16 : 1) {
+                    let id = failure == .native ? "before-error" : "before-error-\(index)"
+                    try pair.emitter.yield(.toolCall(.init(id: id, name: "runtimeInfo", argumentsJSON: "{}")))
+                }
+            } else {
+                try pair.emitter.yield(.text("<express emotion=\"happy\"/>"))
+            }
+            if failure == .malformed {
+                try pair.emitter.yield(.text("<express></express>"))
+                try pair.emitter.yield(.finished(.stop))
+                pair.emitter.finish()
+            } else {
+                let effects = effect.stream
+                producer = Task {
+                    var iterator = effects.makeAsyncIterator()
+                    _ = await iterator.next()
+                    pair.emitter.fail(CapabilityError.unavailable("HTTP stream disconnected after output"))
+                }
+            }
+        } else {
+            try pair.emitter.yield(.text("已根据真实结果继续。"))
+            try pair.emitter.yield(.finished(.stop))
+            pair.emitter.finish()
+        }
+        return pair.session
+    }
+}
+
+@Test(
+    .actionCatalog, .timeLimit(.minutes(1)),
+    arguments: [
+        FailedAttemptModel.Failure.http, .taskHTTP, .partial, .malformed, .native, .nativeAtLimit, .cancelled,
+        .exhausted,
+    ])
+private func agentRequestFailuresTerminateWithoutRetryOrEffectReplay(_ failure: FailedAttemptModel.Failure) async throws
+{
+    let model = FailedAttemptModel(failure)
+    let store = ConversationHistoryStore()
+    let input = AgentInput(sessionID: UUID(), payload: .text("继续完成原目标"))
+    let context: AgentContextRepository<AssistantContextState>?
+    if failure == .taskHTTP {
+        let fixed = try AssistantAgent.runtimeCapabilities(AgentConfigurations.load(named: "Assistant").capabilities)
+        var initial = AssistantContextState()
+        var skills = AgentTaskSkillState()
+        try skills.initialize(fixed: fixed, baseSkills: AgentConfigurations.baseSkills(named: "Assistant"))
+        _ = try skills.control("startTask", arguments: ["goal": "保留跨轮目标"], inputID: input.id, fixed: fixed)
+        initial.skillState = skills
+        context = AgentContextRepository(agent: .assistant, scope: UUID(), state: initial)
+    } else {
+        context = nil
+    }
+    let agent: any Agent =
+        failure == .native || failure == .nativeAtLimit
+        ? try FixtureNativeAgent(chat: model, conversations: store)
+        : try AssistantAgent(chat: model, conversations: store, context: context)
+    _ = try await bindSpeechRequests(agent)
+    let manager = AgentManager()
+    try await manager.register(agent)
+    let inputGateway = InputGateway(manager: manager, allowsExternalSend: true)
+    let actions = ["UI.Expression.express", "UI.Caption.print", "UI.Caption.beginReplyTurn", "Speech.Playback.speak"]
+        .map { path -> ActionBinding in
+            let parts = path.split(separator: ".").map(String.init)
+            return ActionBinding(
+                path: .init(domain: parts[0], module: parts[1], function: parts[2]),
+                displayName: path, kind: .finite, completion: "Confirmed completion",
+                completing: { _ in
+                    if path == "UI.Expression.express" { await model.effectCompleted() }
+                    return .completed
+                })
+        }
+    let scheduler = ChannelScheduler(registry: try ActionRegistry(definitions: actions)) {
+        await inputGateway.deliverActionResult($0)
+    }
+    let tool = ActionBinding(
+        path: .init(domain: "System", module: "Runtime", function: "runtimeInfo"), displayName: "Runtime",
+        kind: .finite, completion: "Actual fixture result", protocols: [.tool], executionPolicy: .direct,
+        completing: { _ in
+            await model.effectCompleted()
+            return .value("confirmed-native-result")
+        })
+    let gateway = OutputGateway(
+        manager: manager, requests: inputGateway, tools: try ToolRegistry(modules: [RoundTools(definitions: [tool])]),
+        actions: scheduler, sink: { _ in })
+    try await agent.start()
+    try await agent.receive(input)
+    try await IndependentOutputWorkflow.consumeGeneration(fixtureOutputs(agent)) { envelope in
+        _ = try await gateway.execute(envelope)
+        if case .control(let value) = envelope.output,
+            value == "agent.finished" || value == "agent.cancelled" || value.hasPrefix("agent.error:")
+        {
+            await agent.stop()
+        }
+    }
+    let requests = await model.requests
+    try #require(requests.count == 1)
+    let record = try #require(try await store.snapshot().current.turns.first)
+    #expect(record.state == (failure == .cancelled ? .cancelled : .failed))
+    #expect(record.modelRequests?.first?.state == (failure == .cancelled ? .cancelled : .failed))
+    if failure == .partial || failure == .malformed {
+        #expect(
+            await scheduler.executionSnapshot().records.filter { $0.path.description == "UI.Expression.express" }
+                .count == 1)
+    }
+    if let context {
+        let state = try await context.snapshot().state.skillState
+        #expect(state?.activeTaskID == nil)
+        #expect(state?.tasks.last?.status == "failed")
+        #expect(
+            record.modelRequests?.first?.decisionMetadata?.taskID
+                == record.modelRequests?.last?.decisionMetadata?.taskID)
+    }
+    await gateway.shutdown()
+    await manager.stopAll()
+}
+
+@Test(
+    .actionCatalog, arguments: ["action", "tool", "mixed"],
+    [
+        "emptyValue", "emptyReport", "report", "failedReport", "partialReport", "cancelledReport", "cancelledThrow",
+        "typedCancelledThrow", "mixedCancellationReport", "executionFailure",
+    ])
+func generationRoundUsesBusinessOutputRatherThanAcknowledgment(_ route: String, _ shape: String) async throws {
+    let harness = try await roundHarness(
+        action: route != "tool", toolCount: route == "action" ? 0 : 1,
+        handler: { _ in
+            if shape == "emptyValue" { return .value("") }
+            if shape == "emptyReport" { return .report(.empty) }
+            if shape == "failedReport" { return .report(.failure(.handlerFailed)) }
+            if shape == "cancelledReport" { return .report(.failure(.cancelled)) }
+            if shape == "cancelledThrow" { throw CancellationError() }
+            if shape == "typedCancelledThrow" {
+                throw ActionReportedError(.failure(.cancelled))
+            }
+            if shape == "mixedCancellationReport" {
+                return .report(
+                    try ActionReport(entries: [
+                        .init(path: "cancelled", status: .cancelled, code: .cancelled),
+                        .init(path: "failed", status: .failed, code: .handlerFailed),
+                    ]))
+            }
+            if shape == "executionFailure" { return .report(.executionFailed(.timedOut)) }
+            if shape == "partialReport" {
+                return .report(
+                    try ActionReport(entries: [
+                        .init(path: "first", status: .succeeded),
+                        .init(path: "second", status: .failed, code: .handlerFailed),
+                    ]))
+            }
+            return .report(
+                try ActionReport(entries: [.init(path: "measured", status: .succeeded, details: ["position": "12"])]))
+        })
+    let pump = try await harness.start(.init(sessionID: UUID(), payload: .text("actual output")))
+    try await pump.value
+    let requests = await harness.model.requests
+    let cancellation = ["cancelledReport", "cancelledThrow", "typedCancelledThrow"].contains(shape)
+    let continues = shape != "emptyReport" && shape != "report" && !cancellation
+    try #require(requests.count == (continues ? 2 : 1))
+    let record = try #require(try await harness.store.snapshot().current.turns.first)
+    if shape == "report" {
+        #expect(record.generationRounds?.first?.resultsJSON.contains("position") == true)
+        if route != "action" {
+            #expect(record.modelRequests?.first?.toolCalls.first?.output?.contains("position") == true)
+        }
+    } else if shape == "partialReport" {
+        #expect(requests[1].messages.contains { $0.content.contains("first") && $0.content.contains("second") })
+    } else if shape == "failedReport" || shape == "executionFailure" {
+        let code = shape == "failedReport" ? "handlerFailed" : (shape == "executionFailure" ? "timedOut" : "cancelled")
+        #expect(requests[1].messages.contains { $0.content.contains(code) })
+    }
+    #expect(record.state == .completed)
+    if cancellation && route != "action" {
+        #expect(record.modelRequests?.first?.toolCalls.first?.state == .cancelled)
+    }
+    await harness.close()
+}
+
+@Test(.actionCatalog) func generationRoundKeepsSuccessfulReportEvidenceWhenOnlyNativeValueContinues() async throws {
+    let harness = try await roundHarness(
+        action: true, toolCount: 1,
+        handler: { invocation in
+            if invocation.call.actionPath.domain == "System" { return .value("actual-business-value") }
+            return .report(
+                try ActionReport(entries: [
+                    .init(path: "motor", status: .succeeded, details: ["motionEvidence": "retained-success-report"])
+                ]))
+        })
+    let pump = try await harness.start(.init(sessionID: UUID(), payload: .text("mixed evidence and value")))
+    try await pump.value
+    let requests = await harness.model.requests
+    try #require(requests.count == 2)
+    #expect(requests[1].messages.contains { $0.role == .tool && $0.content == "actual-business-value" })
+    #expect(!requests[1].messages.contains { $0.content.contains("retained-success-report") })
+    let record = try #require(try await harness.store.snapshot().current.turns.first)
+    #expect(record.generationRounds?.first?.resultsJSON.contains("retained-success-report") == true)
+    let actions = await harness.scheduler.executionSnapshot().records.filter { $0.path.function == "express" }
+    try #require(actions.count == 1)
+    #expect(actions.first?.phase == .succeeded)
+    await harness.close()
+}
+
+@Test(.actionCatalog) func generationRoundRejectedActionAlwaysReturnsErrorToModel() async throws {
+    let harness = try await roundHarness(
+        action: false, toolCount: 0, photoCommand: "unknownAction", handler: { _ in .completed })
+    let pump = try await harness.start(.init(sessionID: UUID(), payload: .text("reject then correct")))
+    try await pump.value
+    let requests = await harness.model.requests
+    try #require(requests.count == 2)
+    #expect(
+        requests[1].messages.contains {
+            $0.content.contains("invalidInvocation") && $0.content.contains("unknownAction")
+        })
+    #expect(await harness.scheduler.executionSnapshot().records.allSatisfy { $0.path.function != "unknownAction" })
+    await harness.close()
+}
+
+@Test(.actionCatalog) func resultClassifierExcludesReportsAndHandlesButPreservesErrorsAndLegacyValues() throws {
+    let call = UUID()
+    #expect(!ToolResult(callID: call, value: "completed", completion: .completed).requiresReasoning)
+    #expect(
+        !ToolResult(callID: call, value: "", completion: .report(try AgentActionReport(entries: []))).requiresReasoning)
+    #expect(ToolResult(callID: call, value: "", completion: .value("")).requiresReasoning)
+    #expect(ToolResult(callID: call, value: "", isError: true, completion: .completed).requiresReasoning)
+    #expect(ToolResult(callID: call, value: "", failureCode: "busy", completion: .completed).requiresReasoning)
+    #expect(ToolResult(callID: call, value: "", completion: .report(.executionFailed(.timedOut))).requiresReasoning)
+    #expect(!ToolResult(callID: call, value: "", completion: .report(.failure(.cancelled))).requiresReasoning)
+    #expect(
+        !ToolResult(
+            callID: call, value: "succeeded",
+            completion: .report(try AgentActionReport(entries: [.init(path: "motor", status: .succeeded)]))
+        ).requiresReasoning)
+    #expect(!ToolResult(callID: call, value: "", completion: .activityStarted(UUID())).requiresReasoning)
+    #expect(!ToolResult(callID: call, value: "", completion: .activityStopped(UUID())).requiresReasoning)
+    #expect(
+        ToolResult(callID: call, value: "", isError: true, completion: .activityStarted(UUID())).requiresReasoning)
+    #expect(ToolResult(callID: call, value: "legacy value").requiresReasoning)
+    var round = AgentRoundCoordinator(taskID: UUID())
+    let acknowledged = UUID()
+    try round.register(id: acknowledged)
+    try round.register(id: call)
+    try round.accept(.init(callID: call, value: "", completion: .value("")), roundID: round.id)
+    try round.seal()
+    #expect(!round.needsReasoning)
+    try round.accept(.init(callID: acknowledged, value: "completed", completion: .completed), roundID: round.id)
+    #expect(round.needsReasoning)
+    #expect(throws: CommunicationError.unauthorized) {
+        try round.accept(.init(callID: call, value: "duplicate"), roundID: round.id)
+    }
+    round.cancel()
+    #expect(!round.needsReasoning)
+}
+
+@Test(.actionCatalog, .timeLimit(.minutes(1)), arguments: [false, true])
+func hostCancellationTerminalStopsAdmittedActionThroughActualGateway(_ alreadySealed: Bool) async throws {
+    let gate = CancellableRoundGate()
+    let harness = try await roundHarness(action: true, toolCount: 0, handler: { _ in try await gate.run() })
+    let input = AgentInput(sessionID: UUID(), payload: .text("cancel active action"))
+    let pump = try await harness.start(input)
+    await gate.waitUntilEntered()
+    if alreadySealed {
+        var seals = harness.log.seals.stream.makeAsyncIterator()
+        _ = await seals.next()
+    }
+    async let model: Void = harness.agent.receive(AgentSessionControl.cancelSession.input(sessionID: input.sessionID))
+    async let calls: Void = harness.gateway.cancelCalls(for: harness.agent, sessionID: input.sessionID)
+    _ = try await (model, calls)
+    try await pump.value
+    #expect(await gate.cleaned)
+    #expect(await harness.model.requests.count == 1)
+    #expect((await harness.log.outputs).contains { $0.output == .control("agent.cancelled") && $0.roundID != nil })
+    let failures = await harness.log.failures
+    #expect(failures == [])
+    #expect(try await harness.store.snapshot().current.turns.first?.state == .cancelled)
+    #expect((await harness.scheduler.diagnosticSnapshot().records).contains { $0.phase == .cancelled })
+    await harness.close()
+}
+
+@Test func photoArchiveMigratesFullLegacyIndexWithoutDiscardingEvidence() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let owner = StorageOwner(namespace: "photos", source: "assistant", session: UUID(), input: UUID())
+    let legacy = CapturedPhotoStore(root: root)
+    let fixture = Data([0xff, 0xd8, 0xff, 0xd9])  // Storage fixture; no camera or JPEG decoder.
+    var ids: [UUID] = []
+    for _ in 0..<32 { ids.append(try await legacy.save(fixture, owner: owner)) }
+    await #expect(throws: FileStorageError.capacityExceeded) { _ = try await legacy.save(fixture, owner: owner) }
+    let limits = CapturedPhotoStore.Limits(
+        maximumPhotos: 1024, maximumBytes: 2 * 1024 * 1024 * 1024, maximumIndexBytes: 512 * 1024)
+    let undersized = CapturedPhotoStore(root: root, limits: .init(maximumPhotos: 1))
+    await #expect(throws: FileStorageError.capacityExceeded) { _ = try await undersized.read(ids[0], owner: owner) }
+    let migrated = CapturedPhotoStore(root: root, limits: limits)
+    ids.append(try await migrated.save(fixture, owner: owner))
+    let restarted = CapturedPhotoStore(root: root, limits: limits)
+    for id in ids { #expect(try await restarted.read(id, owner: owner) == fixture) }
+    #expect(ids.count == 33)
+}
+
+@Test func photoArchiveRejectsPolicyAndIndexOverflowBeforeAddingEvidence() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let owner = StorageOwner(namespace: "photos", source: "assistant", session: UUID(), input: UUID())
+    let fixture = Data([0xff, 0xd8, 0xff, 0xd9])
+    let invalid = CapturedPhotoStore(root: root, limits: .init(maximumPhotos: 0))
+    await #expect(throws: FileStorageError.invalidFile) { _ = try await invalid.save(fixture, owner: owner) }
+    #expect(!FileManager.default.fileExists(atPath: root.path))
+    let bounded = CapturedPhotoStore(root: root, limits: .init(maximumPhotos: 20, maximumIndexBytes: 1024))
+    var saved: [UUID] = []
+    while saved.count < 20 {
+        do { saved.append(try await bounded.save(fixture, owner: owner)) } catch FileStorageError.capacityExceeded {
+            break
+        }
+    }
+    #expect(!saved.isEmpty && saved.count < 20)
+    let count = try FileManager.default.contentsOfDirectory(atPath: root.path).filter { $0.hasSuffix(".jpg") }.count
+    #expect(count == saved.count)
+    let restarted = CapturedPhotoStore(root: root, limits: .init(maximumPhotos: 20, maximumIndexBytes: 1024))
+    for id in saved { #expect(try await restarted.read(id, owner: owner) == fixture) }
+    await #expect(throws: FileStorageError.capacityExceeded) { _ = try await restarted.save(fixture, owner: owner) }
+}
+
+@Test(.actionCatalog, .timeLimit(.minutes(1)))
+func decisionContinuesThroughThirtySixRoundsAndOneHundredFortyFourNativeEffects() async throws {
+    let harness = try await roundHarness(
+        action: false, toolCount: 4, requestRounds: 36, handler: { _ in .value("actual effect") })
+    let pump = try await harness.start(.init(sessionID: UUID(), payload: .text("complete the long goal")))
+    try await pump.value
+    let record = try #require(try await harness.store.snapshot().current.turns.first)
+    #expect(record.state == .completed && record.error == nil)
+    #expect(record.modelRequests?.count == 37 && record.generationRounds?.count == 37)
+    #expect(record.toolCalls?.count == 144)
+    let requests = await harness.model.requests
+    #expect(requests.count == 37)
+    for request in requests {
+        #expect(request.messages.contains { $0.role == .user && $0.content == "complete the long goal" })
+        #expect(request.messages.count <= 64)
+        _ = try ChatRequest(messages: request.messages, tools: request.tools)
+    }
+    #expect(requests.last?.messages.flatMap(\.toolCalls).count ?? 0 < 144)
+    await harness.close()
+}
+
+@Test func photoFIFOReclaimsOldestCacheFilesAndRetainsNewestAcrossRestart() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let owner = StorageOwner(namespace: "photos", source: "assistant", session: UUID(), input: UUID())
+    let limits = CapturedPhotoStore.Limits(maximumPhotos: 3, maximumBytes: 12, overflowPolicy: .evictOldest)
+    let store = CapturedPhotoStore(root: root, limits: limits)
+    var ids: [UUID] = []
+    for index in 0..<8 { ids.append(try await store.save(Data(repeating: UInt8(index), count: 4), owner: owner)) }
+    let restarted = CapturedPhotoStore(root: root, limits: limits)
+    for (index, id) in ids.enumerated() {
+        let bytes = try await restarted.readForInput(id, source: owner.source, input: owner.input)
+        #expect(bytes == (index < 5 ? nil : Data(repeating: UInt8(index), count: 4)))
+        #expect(
+            FileManager.default.fileExists(atPath: root.appendingPathComponent(id.uuidString + ".jpg").path)
+                == (index >= 5))
+    }
+    #expect(try FileManager.default.contentsOfDirectory(atPath: root.path).filter { $0.hasSuffix(".jpg") }.count == 3)
+}
+
+@Test func photoFIFOIndexFailureKeepsOriginalFilesAndRollsBackIncomingJPEG() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let owner = StorageOwner(namespace: "photos", source: "assistant", session: UUID(), input: UUID())
+    let store = CapturedPhotoStore(root: root, limits: .init(maximumPhotos: 2, overflowPolicy: .evictOldest))
+    let first = try await store.save(Data([1]), owner: owner)
+    let second = try await store.save(Data([2]), owner: owner)
+    let index = root.appendingPathComponent("index.json")
+    try FileManager.default.removeItem(at: index)
+    try FileManager.default.createDirectory(at: index, withIntermediateDirectories: false)
+    await #expect(throws: (any Error).self) { _ = try await store.save(Data([3]), owner: owner) }
+    #expect(try await store.read(first, owner: owner) == Data([1]))
+    #expect(try await store.read(second, owner: owner) == Data([2]))
+    #expect(try FileManager.default.contentsOfDirectory(atPath: root.path).filter { $0.hasSuffix(".jpg") }.count == 2)
+}
+
+@Test func photoFIFOEncodedIndexRetiresOldestWithoutCapacityFailure() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let owner = StorageOwner(namespace: "photos", source: "assistant", session: UUID(), input: UUID())
+    let limits = CapturedPhotoStore.Limits(maximumPhotos: 20, maximumIndexBytes: 1024, overflowPolicy: .evictOldest)
+    let store = CapturedPhotoStore(root: root, limits: limits)
+    var ids: [UUID] = []
+    for index in 0..<20 { ids.append(try await store.save(Data([UInt8(index)]), owner: owner)) }
+    let restarted = CapturedPhotoStore(root: root, limits: limits)
+    #expect(try await restarted.readForInput(ids[0], source: owner.source, input: owner.input) == nil)
+    #expect(try await restarted.read(ids[19], owner: owner) == Data([19]))
+    #expect(try Data(contentsOf: root.appendingPathComponent("index.json")).count <= 1024)
+}
+
+@Test func rollingModelContextKeepsIntentAndWholeLatestNativeResultBlock() throws {
+    var messages = [ChatMessage(role: .system, content: "fixture"), .init(role: .user, content: "original goal")]
+    for index in 0..<80 {
+        let id = "fixture-\(index)"
+        messages.append(
+            .init(role: .assistant, content: "", toolCalls: [.init(id: id, name: "read", argumentsJSON: "{}")]))
+        messages.append(.init(role: .tool, content: "actual result \(index)", toolCallID: id))
+    }
+    let retained = try AgentChatContextBuilder.retainingRecent(
+        messages, preservingUser: "original goal", protectedSuffixCount: 2)
+    #expect(retained.count <= 64 && retained.first?.role == .system)
+    #expect(retained.contains { $0.content == "original goal" })
+    #expect(retained.last?.toolCallID == "fixture-79")
+    #expect(!retained.flatMap(\.toolCalls).contains { $0.id == "fixture-0" })
+    _ = try ChatRequest(messages: retained)
+}
+
+@Test(.actionCatalog, .timeLimit(.minutes(1)))
+func hostCancellationJoinsDirectNativeToolWithoutWaitingForItsRoundBoundary() async throws {
+    let gate = CancellableRoundGate()
+    let harness = try await roundHarness(action: false, toolCount: 1, handler: { _ in try await gate.run() })
+    let input = AgentInput(sessionID: UUID(), payload: .text("interrupt native work"))
+    let pump = try await harness.start(input)
+    await gate.waitUntilEntered()
+    async let calls: Void = harness.gateway.cancelCalls(for: harness.agent, sessionID: input.sessionID)
+    async let model: Void = harness.agent.receive(AgentSessionControl.cancelSession.input(sessionID: input.sessionID))
+    _ = try await (calls, model)
+    try await pump.value
+    #expect(await gate.cleaned)
+    #expect(await harness.model.requests.count == 1)
+    #expect((await harness.log.outputs).contains { $0.output == .control("agent.cancelled") })
+    let stream = try await harness.gateway.observeFailures()
+    var failures = stream.makeAsyncIterator()
+    #expect(try #require(await failures.next()).records.isEmpty)
+    await harness.close()
+}
+
+@Test(.actionCatalog, arguments: ["cancelled", "mixed"])
+func cancellationReportsKeepIndependentFailuresAndNeverRequestCancellationRecovery(_ mode: String) throws {
+    let entries: [ActionReport.Entry] =
+        [
+            .init(path: "done", status: .succeeded),
+            .init(path: "cancelled", status: .cancelled, code: .cancelled),
+        ] + (mode == "mixed" ? [.init(path: "failed", status: .failed, code: .handlerFailed)] : [])
+    let report = try ActionReport(entries: entries).withExecutionFailure(.cancelled)
+    let result = ToolResult(callID: UUID(), value: "evidence", isError: true, completion: .report(report.agentValue))
+    #expect(report.isCancellationOnly == (mode == "cancelled"))
+    #expect(result.isCancellationOnly == (mode == "cancelled"))
+    #expect(result.hasFailure == (mode == "mixed"))
+    #expect(result.requiresReasoning == (mode == "mixed"))
+    #expect(report.status == (mode == "cancelled" ? .cancelled : .partialFailure))
+    #expect(report.agentValue.status == (mode == "cancelled" ? .cancelled : .partialFailure))
 }

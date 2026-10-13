@@ -35,6 +35,7 @@ public enum DeviceControlError: String, Error, Sendable, ActionExecutionFailureP
     case stale = "device.stale"
     public var executionFailureCode: ActionExecutionFailureCode { .init(rawValue: rawValue) }
 }
+@ActionCatalog
 public struct DeviceModule: CapabilityModule {
     private let device: any DeviceControlCapability
     public init(device: any DeviceControlCapability) { self.device = device }

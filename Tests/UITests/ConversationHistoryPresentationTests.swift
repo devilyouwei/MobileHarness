@@ -19,6 +19,12 @@ private func conversation(archived: Bool = false, title: String? = nil, user: St
             [
                 "id": UUID().uuidString, "date": 0, "user": user, "request": [], "model": "fixture", "temperature": 0.7,
                 "fragments": [], "state": "completed",
+                "modelRequests": [
+                    [
+                        "id": UUID().uuidString, "date": 0, "input": user, "requestJSON": "[]",
+                        "fragments": [], "toolCalls": [], "state": "completed",
+                    ]
+                ],
             ]
         ]
     }
@@ -88,42 +94,25 @@ private func conversation(archived: Bool = false, title: String? = nil, user: St
     #expect(rows[0].diagnosticReport().contains("Output: actual-result"))
 }
 
-@Test func legacyReACTRowsDoNotInventPerRequestOutputOrTiming() throws {
-    let contexts: [[String: String]] = [
-        ["role": "user", "content": "question"], ["role": "assistant", "content": "prior output"],
-        ["role": "user", "content": "actual-result"],
-    ]
-    let json = String(decoding: try JSONSerialization.data(withJSONObject: contexts), as: UTF8.self)
+@Test func historyKeepsSentDefinitionsEvenWithoutCallsAndMalformedRequestIsVisible() throws {
     let conversation = try historyFixture(extra: [
-        "request": [["role": "user", "content": "question"]], "continuationRequests": [json],
-        "fragments": ["combined-output"], "executionError": "actual failure",
+        "toolDefinitions": ["unused tool"],
+        "modelRequests": [
+            [
+                "id": UUID().uuidString, "date": 0, "input": "question", "requestJSON": "invalid JSON",
+                "fragments": [], "toolCalls": [], "state": "completed",
+            ]
+        ],
     ])
     let rows = ConversationHistoryPresentation.turns(conversation)
-    #expect(rows.count == 2 && rows[0].raw == "combined-output")
-    #expect(!rows[0].diagnosticReport().contains("旧记录"))
-    #expect(rows[1].isReACT == true && rows[1].user == "[user]\nactual-result")
-    #expect(rows[1].raw.isEmpty && rows[1].tokenUsage == nil && rows[1].firstTokenAt == nil)
-    #expect(rows[1].outputSummary.isEmpty)
-    #expect(rows[1].dateReport.isEmpty && rows[1].stateReport.isEmpty)
-    #expect(!rows[1].diagnosticReport().contains(rows[1].id.uuidString))
-    #expect(rows[1].tokenReport == "Token 用量：" && rows[1].firstTokenReport == "首 token 耗时：")
-    #expect(rows[1].toolReport.isEmpty)
-    #expect(rows[0].executionError == "actual failure" && rows[1].executionError == nil)
-    #expect(!rows[1].diagnosticReport().contains("旧记录"))
-    #expect(!rows[1].diagnosticReport().contains("未提供"))
-    #expect(!rows[1].diagnosticReport().contains("未保存"))
-    #expect(rows.map(\.id) == ConversationHistoryPresentation.turns(conversation).map(\.id))
-    #expect(rows[0].id != rows[1].id)
+    #expect(rows.count == 1 && rows[0].toolCalls?.isEmpty == true && rows[0].toolDefinitions == ["unused tool"])
+    #expect(rows[0].requestJSON == "invalid JSON" && rows[0].request.isEmpty)
+    #expect(rows[0].diagnosticReport().contains("invalid JSON"))
 }
 
-@Test func historyKeepsSentDefinitionsEvenWithoutCallsAndMalformedLegacyContextIsVisible() throws {
-    let conversation = try historyFixture(extra: [
-        "toolDefinitions": ["unused tool"], "continuationRequests": ["invalid JSON"],
-    ])
-    let rows = ConversationHistoryPresentation.turns(conversation)
-    #expect(rows[0].toolCalls == nil && rows[0].toolDefinitions == ["unused tool"])
-    #expect(rows[1].user == "invalid JSON" && rows[1].requestJSON == "invalid JSON")
-    #expect(rows[1].diagnosticReport().contains("invalid JSON"))
+@Test func historyDoesNotSynthesizeRequestsFromInputAggregate() throws {
+    let conversation = try historyFixture(extra: ["modelRequests": [], "fragments": ["aggregate"]])
+    #expect(ConversationHistoryPresentation.turns(conversation).isEmpty)
 }
 
 private func historyFixture(extra: [String: Any]) throws -> HistoryConversation {
@@ -136,21 +125,21 @@ private func historyFixture(extra: [String: Any]) throws -> HistoryConversation 
     return try JSONDecoder().decode(HistoryConversation.self, from: JSONSerialization.data(withJSONObject: value))
 }
 
-@Test func historyImageReferencesSupportStructuredAndLegacyMetadataWithoutEmbeddingBytes() throws {
+@Test func historyImageReferencesUseOnlyStructuredMetadataWithoutEmbeddingBytes() throws {
     let image = HistoryImageReference(id: UUID(), mimeType: "image/jpeg", byteCount: 8)
     let marker = "\nImage attachments (bytes omitted): \(image.id.uuidString) image/jpeg 8 bytes"
-    let legacy = HistoryMessage(role: .user, content: "photo" + marker)
-    #expect(legacy.attachedImages == [image] && legacy.displayContent == "photo")
+    let textOnly = HistoryMessage(role: .user, content: "photo" + marker)
+    #expect(textOnly.attachedImages.isEmpty && textOnly.displayContent == "photo" + marker)
     let structured = HistoryMessage(role: .user, content: "actual input", imageReferences: [image])
     #expect(structured.attachedImages == [image] && structured.displayContent == "actual input")
     #expect(
         HistoryMessage(role: .assistant, content: "photo" + marker, imageReferences: [image]).attachedImages.isEmpty)
-    let messages = String(decoding: try JSONEncoder().encode([legacy, structured]), as: UTF8.self)
+    let messages = String(decoding: try JSONEncoder().encode([textOnly, structured]), as: UTF8.self)
     let turn = try historyFixture(extra: [
         "request": try JSONSerialization.jsonObject(with: Data(messages.utf8)), "user": "photo" + marker,
     ])
     let row = try #require(turn.turns.first)
-    #expect(row.attachedImages == [image] && row.displayInput == "photo")
+    #expect(row.attachedImages == [image] && row.displayInput == "photo" + marker)
     #expect(row.request.first?.content.contains("bytes omitted") == true)
 }
 
@@ -176,7 +165,7 @@ private func historyFixture(extra: [String: Any]) throws -> HistoryConversation 
     #expect(ConversationHistoryPresentation.turns(value).count == 1)
 }
 
-@Test func legacyFirstTextArrivalDoesNotInventInterfaceLatency() throws {
+@Test func missingProviderTimingDoesNotInventInterfaceLatency() throws {
     let id = UUID().uuidString
     let conversation = try historyFixture(extra: [
         "modelRequests": [

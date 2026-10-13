@@ -16,7 +16,7 @@ import UIKit
 
 /// Scene-owned camera intent, independent of voice/model startup and recording state.
 @MainActor
-final class CameraCoordinator: CameraOutputHandling, CameraControlCapability {
+final class CameraCoordinator: CameraOutputHandling, CameraControlCapability, UIFeedbackCapability {
     static let captureResource = ResourceID(rawValue: "camera.capture")
     static let resourceOwnerID = AgentID(rawValue: "runtime.camera")
     private let captureOwner: ExecutionOwner
@@ -51,6 +51,8 @@ final class CameraCoordinator: CameraOutputHandling, CameraControlCapability {
     private var photoOwner: (id: UUID, owner: StorageOwner)?
     private let photos: CapturedPhotoStore
     private var presentationFinished: (id: UUID, success: Bool)?
+    private let photoCues = NativeCuePlayback()
+    private var photoFeedbackContext: ActionExecutionContext?
 
     init(
         camera: AppleCamera, state: CameraState, photos: CapturedPhotoStore,
@@ -84,34 +86,52 @@ final class CameraCoordinator: CameraOutputHandling, CameraControlCapability {
         guard foreground else { throw CameraControlError.notForeground }
         guard photoTask == nil, photoCommand == nil else { throw CameraControlError.busy }
         let selected = try selectedPhoto(id)
-        state.capturedPhoto = nil
-        photoOwner = nil
-        state.photoMessage = nil
-        return CameraPhotoCommandReceipt(photoID: selected.id, state: .ignored)
+        guard let photo = state.capturedPhoto else { throw CameraControlError.photoUnavailable }
+        let task = Task<CameraPhotoCommandReceipt, Error> {
+            let issues = try await departPhoto(photo, kind: .discard, invocation: invocation, commit: {})
+            return CameraPhotoCommandReceipt(
+                photoID: selected.id, state: .ignored, feedbackIssues: issues.isEmpty ? nil : issues)
+        }
+        photoCommand = task
+        state.photoBusy = true
+        defer {
+            photoCommand = nil
+            state.photoBusy = false
+        }
+        return try await withTaskCancellationHandler {
+            try await task.value
+        } onCancel: {
+            task.cancel()
+        }
     }
 
     func savePhoto(_ id: UUID?, invocation: any FunctionInput) async throws -> CameraPhotoCommandReceipt {
         try Task.checkCancellation()
         guard foreground else { throw CameraControlError.notForeground }
         guard photoTask == nil, photoCommand == nil else { throw CameraControlError.busy }
-        let selected = try selectedPhoto(id)
-        if state.savedPhotoID == selected.id {
-            return CameraPhotoCommandReceipt(photoID: selected.id, state: .saved, alreadySaved: true)
+        if let id, state.savedPhotoID == id {
+            return CameraPhotoCommandReceipt(photoID: id, state: .saved, alreadySaved: true)
         }
+        let selected = try selectedPhoto(id)
+        guard let photo = state.capturedPhoto else { throw CameraControlError.photoUnavailable }
         state.photoBusy = true
         state.photoMessage = "正在保存到相册…"
         let task = Task<CameraPhotoCommandReceipt, Error> {
-            let data = try await photos.read(selected.id, owner: selected.owner)
-            try Task.checkCancellation()
-            guard foreground, state.capturedPhoto?.id == selected.id else { throw CancellationError() }
-            do { try await ApplePhotoLibrary.saveJPEG(data) } catch ApplePhotoLibrary.Failure.permissionDenied {
-                throw CameraControlError.permissionDenied
-            } catch ApplePhotoLibrary.Failure.invalidImage {
-                throw CameraControlError.photoUnavailable
+            let issues = try await departPhoto(photo, kind: .save, invocation: invocation) { [self] in
+                let data = try await photos.read(selected.id, owner: selected.owner)
+                try Task.checkCancellation()
+                guard foreground, state.capturedPhoto?.id == selected.id else { throw CancellationError() }
+                do { try await ApplePhotoLibrary.saveJPEG(data) } catch ApplePhotoLibrary.Failure.permissionDenied {
+                    throw CameraControlError.permissionDenied
+                } catch ApplePhotoLibrary.Failure.invalidImage {
+                    throw CameraControlError.photoUnavailable
+                }
+                // An actual import remains committed if feedback subsequently fails or is cancelled.
+                state.savedPhotoID = selected.id
+                state.photoMessage = "已保存到相册"
             }
-            state.savedPhotoID = selected.id
-            state.photoMessage = "已保存到相册"
-            return CameraPhotoCommandReceipt(photoID: selected.id, state: .saved)
+            return CameraPhotoCommandReceipt(
+                photoID: selected.id, state: .saved, feedbackIssues: issues.isEmpty ? nil : issues)
         }
         photoCommand = task
         defer {
@@ -125,9 +145,60 @@ final class CameraCoordinator: CameraOutputHandling, CameraControlCapability {
                 task.cancel()
             }
         } catch {
-            state.photoMessage = "保存失败：" + error.localizedDescription
+            state.photoMessage =
+                state.savedPhotoID == selected.id
+                ? "已保存到相册，退场反馈已中断" : "保存失败：" + error.localizedDescription
             throw error
         }
+    }
+
+    private func departPhoto(
+        _ photo: CapturedPhotoPresentation, kind: PhotoDeparture.Kind, invocation: any FunctionInput,
+        commit: @escaping @MainActor @Sendable () async throws -> Void
+    ) async throws -> [String] {
+        let cue: UIActions.Cue = kind == .save ? .save : .discard
+        photoFeedbackContext = invocation.context
+        defer { photoFeedbackContext = nil }
+        let issues = try await PhotoDispositionWorkflow.run(
+            commit: commit,
+            animation: { try await photo.departure.perform(kind) },
+            sound: { [self] in
+                guard
+                    let definition = UIModule.feedbackDefinitions(feedback: self).first(where: {
+                        $0.path.function == "playCue"
+                    })
+                else { throw UIActions.FeedbackError.unavailable }
+                let child = FunctionInvocation(
+                    call: FunctionRequest(
+                        actionPath: definition.path, parameters: ["cue": cue.rawValue, "volume": "0.85"]),
+                    context: invocation.context, results: ActionReportStore())
+                let completion = try await FunctionExecutor.perform(child, definition: definition)
+                if case .report(let report) = completion, report.hasFailures || report.isCancelled {
+                    throw PhotoCueFailure(description: report.failureDescription ?? "Photo cue failed")
+                }
+            },
+            remove: { [self] in
+                guard state.capturedPhoto?.id == photo.id else { return }
+                state.capturedPhoto = nil
+                photoOwner = nil
+                state.photoMessage = nil
+            })
+        if !issues.isEmpty { log.error("照片已处理，退场反馈异常：\(issues.joined(separator: "; "), privacy: .public)") }
+        return issues
+    }
+    private struct PhotoCueFailure: Error, Sendable { let description: String }
+    func playCue(_ request: UIActions.CueRequest, invocation: any FunctionInput) async throws {
+        try Task.checkCancellation()
+        guard foreground, photoCommand != nil, photoFeedbackContext == invocation.context,
+            request.cue == .save || request.cue == .discard
+        else { throw CancellationError() }
+        let samples = try await Task.detached(priority: .userInitiated) { try FeedbackTone.samples(for: request) }.value
+        try Task.checkCancellation()
+        guard foreground, photoFeedbackContext == invocation.context else { throw CancellationError() }
+        try await photoCues.play(PlaybackPCM(samples: samples, sampleRate: FeedbackTone.sampleRate))
+    }
+    func vibrate(_ request: UIActions.HapticRequest, invocation: any FunctionInput) async throws {
+        throw UIActions.FeedbackError.unavailable
     }
 
     func takePhoto(invocation: any FunctionInput) async throws -> CameraPhotoReceipt {
@@ -268,6 +339,7 @@ final class CameraCoordinator: CameraOutputHandling, CameraControlCapability {
     func setForeground(_ value: Bool) {
         guard foreground != value else { return }
         foreground = value
+        if !value { photoCues.stop() }
         if value { failed = false }
         reconcile()
     }

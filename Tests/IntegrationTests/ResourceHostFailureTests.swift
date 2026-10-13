@@ -38,7 +38,7 @@ private actor HostPresentationFixture: ResourcePresentationCapability {
         if failing { throw ApplicationControlIntentFailure.execution("diagnostic fixture failed") }
     }
 }
-@Test func resourceHostDispatchPresentsWithoutReplayingNativeEffect() async throws {
+@Test(.actionCatalog) func resourceHostDispatchPresentsWithoutReplayingNativeEffect() async throws {
     let native = HostResourceFixture()
     let ui = HostPresentationFixture()
     let runtime = try resourceRuntime(native, presentation: ui, nonReturningPaths: ["System.ModelResources.download"])
@@ -55,7 +55,9 @@ private actor HostPresentationFixture: ResourcePresentationCapability {
     #expect(await runtime.agent.status().queuedInputs == 0)
     await runtime.shutdown()
 }
-@Test(arguments: [false, true]) func resourceHostDiagnosticFailureDoesNotRecurse(missing: Bool) async throws {
+@Test(.actionCatalog, arguments: [false, true]) func resourceHostDiagnosticFailureDoesNotRecurse(missing: Bool)
+    async throws
+{
     let native = HostResourceFixture()
     let ui = HostPresentationFixture(failing: true)
     let runtime = try resourceRuntime(
@@ -73,7 +75,7 @@ private actor HostPresentationFixture: ResourcePresentationCapability {
     #expect(await runtime.agent.status().queuedInputs == 0)
     await runtime.shutdown()
 }
-@Test func resourceHostFailureSchemaAndScopeAreValidated() async throws {
+@Test(.actionCatalog) func resourceHostFailureSchemaAndScopeAreValidated() async throws {
     let session = UUID()
     let agent = try ApplicationControlAgent(sessionID: session)
     try await agent.start()
@@ -113,7 +115,7 @@ private actor HostPreferencesFixture: ModelResourcePreferencesCapability {
     func saveSource(_ preferences: ModelResourcePreferences) async throws -> ModelResourcePreferences { preferences }
     func repair() { malformed = false }
 }
-@Test func resourceHostMalformedFeedbackReleasesGateBeforeDiagnostic() async throws {
+@Test(.actionCatalog) func resourceHostMalformedFeedbackReleasesGateBeforeDiagnostic() async throws {
     let native = HostResourceFixture()
     let ui = HostPresentationFixture()
     let preferences = HostPreferencesFixture()
@@ -150,7 +152,7 @@ private actor HeldHostBinding: ModelResourceCapability {
     func cancel(_ id: String) async throws { throw CancellationError() }
     func remove(_ id: String) async throws { throw CancellationError() }
 }
-@Test func resourceHostRejectedAdmissionPresentsWithoutReleasingActiveBinding() async throws {
+@Test(.actionCatalog) func resourceHostRejectedAdmissionPresentsWithoutReleasingActiveBinding() async throws {
     let native = HeldHostBinding()
     let ui = HostPresentationFixture()
     let runtime = try resourceRuntime(native, presentation: ui)
@@ -172,7 +174,7 @@ private actor HeldHostBinding: ModelResourceCapability {
     await runtime.shutdown()
 }
 
-@Test func resourceHostAcknowledgmentContinuesThroughPause() async throws {
+@Test(.actionCatalog) func resourceHostAcknowledgmentContinuesThroughPause() async throws {
     let native = HostResourceFixture()
     let ui = HostPresentationFixture()
     let runtime = try resourceRuntime(native, presentation: ui, nonReturningPaths: ["System.ModelResources.download"])

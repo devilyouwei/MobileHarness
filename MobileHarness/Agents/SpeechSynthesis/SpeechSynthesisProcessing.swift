@@ -49,7 +49,7 @@ public struct SpeechSynthesisContextBuilder: ContextBuilder {
             try request.validate()
             return try SpeechSynthesisRequest(
                 text: request.text, locale: request.locale,
-                context: InferenceContext(requestID: request.audioID, conversationID: input.sessionID))
+                context: InferenceContext(requestID: request.audioID, scopeID: input.sessionID))
         }
     }
     public init() {}

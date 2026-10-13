@@ -1,6 +1,102 @@
 # Documentation and architecture change history
 
+## 2026-10-13 — Immediate listening after reply
+
+✅ Removed the 350 ms playback guard and its helper/tests. SpeechPerception retains policy and App retains physical capture ownership; listening restoration joins native playback/lease cleanup as soon as policy permits, with explicit error/cancellation handling. This supersedes the idle-tail portion of the earlier TTS optimization; PCM/segmentation/synthesizer changes remain. Nine focused regressions, 96 App workflow tests and the unsigned iOS device build pass; full-suite sound-source failures and the simulator dependency limitation are recorded in [validation](Validation-History.md#2026-10-13--immediate-listening-after-reply-without-an-acoustic-timer).
+
+## 2026-10-13 — Streaming TTS latency
+
+✅ Implemented: immediate initial Apple PCM with subsequent bounded coalescing, 20/60 first speech segments followed by 60/120, reusable fenced system synthesizer, and a root-owned replaceable 350 ms acoustic idle tail instead of per-segment blocking. Default voice/rate and bounded failure contracts remain. Focused regressions, opt-in Mac system synthesis and unsigned iOS device builds pass. Whole-suite failures/stall and the CoreAI simulator limitation are recorded in [validation](Validation-History.md#2026-10-13--streaming-apple-tts-latency-and-continuous-playback). Phone acoustic/latency acceptance remains pending.
+
+## 2026-10-13 — 关闭云端 thinking 并修复阿里云标题生成
+
+- 真实 qwen3.8-flash 标题请求复现：64 个输出 token 全部用于 reasoning，返回 incomplete/max_output_tokens，Memory 正确拒绝空标题。共享 OpenAIChatConfiguration 请求编码对已识别阿里云地址发送 reasoning.effort=none、enable_thinking=false；普通聊天和标题生成同时生效，保持原来的 64-token 标题预算和原始消息边界。
+- OpenAI 支持关闭推理的规范 GPT-5.x/GPT-6 模型 ID 发送 reasoning.effort=none；旧非推理模型保留原参数，不添加阿里云字段。已知不能关闭 thinking 的 OpenAI 模型明确拒绝，不用低推理强度冒充关闭。未知别名/模型能力仍需单独验证。
+- 保留 reasoning 响应解析、取消/资源清理、原生调用配对和标题失败契约。新增编码、未完成标题及 opt-in 真实标题回归；验证与部署范围见[验证历史](Validation-History.md#2026-10-13--cloud-thinking-off-and-qwen38-title-generation)。
+
+## 2026-10-13 — 撤回连续 user 请求适配
+
+- 按用户要求，撤回 OpenAI Responses 与 Gemma 提示词生成中的连续 user 合并，恢复原始消息边界和文本；删除合并专用回归，改为检查原始连续 user 与图片边界。
+- 保留阿里云 Responses reasoning 兼容修复。使用已授权本地配置，经 OpenAIChat.chat() 直接发送 system/user/user/assistant/user/user，qwen3.5-35b-a3b 成功返回预期答案；这只证明该模型接受此请求，不推广为所有模型都支持连续 user。验证范围见[验证历史](Validation-History.md#2026-10-13--restore-original-user-message-boundaries)。
+
+## 2026-10-13 — 阿里云 Responses reasoning 兼容
+
+- 使用用户授权的本地阿里云配置，通过真实 OpenAIChat.chat() 复现 HTTP 200 后 unsupportedOutput：阿里云默认输出 reasoning 项及 response.reasoning_text.delta/done。实发六条历史消息已经合并为 system/user/assistant/user，未复现该请求的连续 user 编码错误。
+- ChatEventDecoder 新增 reasoning 项及事件的格式验证与私有通道过滤；仅最终 output_text 进入回复和首 token 采样，保留原生调用的原始 output_index、配对、终态与有界失败契约。新增三个离线回归和显式 opt-in 真实接口测试；本地密钥未写入源码或证据。验证与部署范围见[验证历史](Validation-History.md#2026-10-13--aliyun-responses-reasoning-compatibility)。
+
+## 2026-10-13 — 请求层合并连续 user 消息
+
+历史阶段：该适配已由同日“撤回连续 user 请求适配”移除；以下保留当时的变更记录。
+
+- OpenAI Responses 编码与 Gemma 本地提示词生成在模型边界合并连续 user 消息；相邻文本以两个换行分隔，图片保持原有文本/图片顺序。system、assistant、原生工具调用及结果保留边界，不自动补造 assistant 消息。
+- 保留 ChatRequest.messages 和调用方聊天记录；原始消息数量、文本、图片和工具配对验证不变，云端插入的分隔符计入 64 KiB 文本上限。新增离线序列化和本地提示词回归；没有新增目录、模块或依赖。验证范围见[验证历史](Validation-History.md#2026-10-13--consecutive-user-request-adaptation)。
+
+## 2026-10-13 — 平滑眼睛表情轮廓
+
+- 修复笑眼等表情侧边控制点反向弯折，以及不同轮廓锚点在动画插值时产生的异常突出。EyeGeometry 统一为八段三次曲线，共用连接点与切线；笑眼、斜眼和闭眼变形同步调整切线，爱心使用对应的语义锚点。
+- 保留原生 path/shadowPath 插值、动画时长、打断接续与完成回执。增加所有双眼表情组合及中途打断的几何回归；没有新增目录、模块或依赖。检查、预览和构建范围见[验证历史](Validation-History.md#2026-10-13--smooth-eye-contours-through-expression-transitions)。
+
+
+## 2026-10-13 — 历史记录收敛
+
+- 将“对话历史”改为“历史记录”，页面仅保留 Assistant 聊天记录与任务记录；任务包括 Assistant 的前台任务及已登记后台任务。
+- 移除独立历史文件导入、导入标记、旧续轮字段及合成行、图片文本解析、旧 Mode 标签、三个 specialist 历史入口及投影。固定执行者只持久化事务/任务状态，Assistant 通过自身 context 事务保存聊天历史。
+- 清理相应文档与旧回归，补充当前模型请求、任务归属、独立旧文件不参与加载及重启中断的验证。页面板块重新设计另行开展；构建与测试结果见验证记录。
+
+
+## 2026-10-12 — Centered lamp-arm icon composition
+
+- Recenter the selected first expression-refinement design as one phone/arm/base group, balancing opposing canvas margins while retaining the tilted phone, cyan expression and hidden rear magnetic mount. Preserve the earlier selected source and the new built-in ImageGen edit/prompt in output/icon-concepts.
+- Refresh the opaque 1024×1024 lamp-arm variant and selected AppIcon.png through the unchanged selector; the root README already shares that selected image. Asset/link checks are recorded in [validation history](Validation-History.md#2026-10-12--centered-lamp-arm-icon-composition).
+
+## 2026-10-12 — Selected lamp-arm app icon
+
+- Select the first image from the latest expression-refinement turn: white lamp-like arm, tilted iPhone face with cyan open/winking eyes, rear magnetic joint hidden behind the phone and no screen halo. Preserve the full-resolution approved source and prior alternatives in output/icon-concepts.
+- Package the approved image as opaque 1024×1024 AppIconVariants/lamp-arm.png. Extend the existing selector with lamp-arm and copy it into the universal AppIcon.png asset without changing asset declarations or runtime behavior.
+- Point the root README logo at the selected AppIcon.png so documentation and app share one selected image; retain old icon sources and existing logo sizing/style. Checks and build limitations are recorded in [validation history](Validation-History.md#2026-10-12--selected-lamp-arm-app-icon).
+
+## 2026-10-12 — 回复切换时录音暂停、长按打断与 GPU 光环
+
+- 确认语句完成后停止原生麦克风，回复策略与播放／350 ms 尾音全部结束后重新采集；持续聆听授权和睁眼状态保留。采集启停串行、取消后加入清理，旧帧／错误按采集 epoch 隔离。
+- 用户长按关闭立即停止播放、采集并屏蔽迟到呈现，明确关闭聆听授权。当前 Assistant 的模型取消与按实际 Agent incarnation／session 选择的已接纳 Action 取消并行加入，能打断等待播放的 round seal；不关闭共享 session 的其他 Agent／摄像资源。显式 agent.cancelled 终态保留原 input／round，取消不伪装成成功或普通错误。
+- 空间 PCM 时间不连续／采样率变更使用独立类型与实际证据，64 包真实队列溢出仍显式失败。
+- 光环用 UI 自有 Metal 单次绘制，增加彩色流动光场、移动亮点、侧边启动闪光和 850 ms 内收回的泛光。字幕用两个 Text 段与原生透明度插值；闭眼时暂停重复 Timeline 更新。
+- 自动测试、原生目标编译、视觉预览与物理设备验收分别记录在 [验证历史](Validation-History.md#2026-10-12--reply-capture-interruption-and-gpu-halo)。未增加目录或第三方依赖。
+
+## 2026-10-12 — Project banner and README review
+
+- Place the approved 3:1 laboratory banner below the English italic slogan in the root README. Retain the source artwork and prompt in output; identify diverse robot coordination as the vision and NexArm as the current integration.
+- Describe Assistant-owned conversation, bundled Skills and the single foreground Task. Correct Quick Start to use the half-second eye hold and default-off camera preview; document local Gemma hardware, image and native-Tool limits.
+- Repair the module-design anchor, update Agent/Skill packaging wording and condense download recovery details into owning-document links. Preserve unrelated changes. Documentation verification is recorded in [validation history](Validation-History.md#2026-10-12--project-banner-and-readme-review).
+
+## 2026-10-12 — 长按聆听、边缘光环与闭眼表情
+
+- 首页双眼改为按住 0.5 秒切换持续聆听，松手保持开启；无障碍操作保留直接激活。提示、后台/中断恢复文字统一为按住。
+- 开启后显示青蓝/紫粉/橙金流动边缘光环，使用多层柔光与细亮边；关闭时淡出，降低动态效果时使用静态光环。
+- 未开启聆听时双眼呈柔和闭眼弧线，开启时平滑展开。Expression Action 新增 closed，有限演出仍等待进入/恢复的真实动画回执；关闭聆听时不将其他不可见表情报告为成功。
+- App 在启动接纳时触发轻柔振动，在模型/权限准备完成后播放原创 420 ms 启动音；等待原生播放完成和 120 ms 余音间隔后才打开采集。PlatformKit 接收通用有界 PCM，不持有应用配乐/策略；失败、重叠和取消均明确处理。
+- 回归、静态视觉核对、iPhone 编译及 Simulator 限制见 [验证记录](Validation-History.md#2026-10-12--press-and-hold-listening-feedback-and-closed-eyes)。Siri 精确长按时长及原声没有作为公开接口复制，本次采用明确的应用时长和相近风格原创提示音。
+
+## 2026-10-12 — 首页任务与字幕布局优化
+
+- 摄像头初始关闭；开启后 YOLO/FPS 头部保留，性能详情默认收起。
+- 首页移除任务/Skill 卡片、Skill 数量和展开内容。前台任务改为用户 ASR 字幕上方的目标图标与单行 `任务：<goal>`，长目标省略并保留完整无障碍描述；无前台任务隐藏该行。
+- 任务行与 ASR 字幕共享位置及固定间距，一起完成字幕上移动画，并为顶部摄像头控件预留空间。任务历史继续通过已有执行日志查看。
+- 回归覆盖默认关闭状态、首次开启、紧凑/高屏幕字幕位置、任务与字幕间距、日志占位和无任务布局。构建及检查结果见 [验证记录](Validation-History.md#2026-10-12--home-task-and-asr-layout)。
+
+## 2026-10-12 — Task context contraction
+
+- Preserve full history while projecting ended Tasks as bounded historical summaries.
+- Rebuild ReACT at Task boundaries and bind photos to producing Tasks; reject unscoped capture/cross-task operations. See [validation](Validation-History.md#2026-10-12--task-context-boundary-and-immutable-photo-ownership).
+
 Purpose: retain dated documentation corrections and architecture changes without turning source-directory READMEs into change logs. For decisions that alter runtime contracts, follow the linked ADR; current behavior remains in the owning module README.
+
+## 2026-10-11 — Assistant Skills and Task Modes
+
+- Consolidate ordinary conversation into Assistant; replace specialist dialogue workers with fixed task coordinators while retaining camera/tracking, history/title and application transactions.
+- Move Agent configuration into approved pure Resources assets; add dynamic Skill catalogs, one local foreground task and immutable per-request mode/Skill/function evidence. Controls reuse real Actions; send/publish semantics remain distinct.
+- Separate Assistant conversations and task history; add bounded home task/Skill state without restoring Signal logs. Retire unused dialogue/voice grants and dependent subscriptions.
+- Preserve canonical Actions and neutral module dependencies; cache immutable assets/configuration to protect short-lived perception inputs under parallel load. See [ADR0212](adr/0212-assistant-skills-task-modes.md) and [migration record](Agents-Skills-Task-Modes-Plan.md).
 
 ## 2026-10-11 — Role-owned model prompts
 
@@ -50,15 +146,15 @@ Purpose: retain dated documentation corrections and architecture changes without
 
 - Migrated seven Agents to explicit preprocessing, structured context and context builders, retaining current business roles. Foundation-only Core owns bounded inboxes, batches, round/budget/task contracts; Agents owns atomic Storage adaptation and shared Chat capability/context drivers.
 - Communication now leaves the Agent output stream as authorized Actions with distinct owner-directed admission receipts. Producer consumers bind actor/incarnation; task grants, parent/child reports, cancellation and runtime-stop cleanup preserve task ownership and causal identity.
-- Assistant executes one model round per worker and queues ready continuation with user inputs. Exact native call/result pairs, independent task history and cumulative budgets survive interleaving. Legacy history imports once, uses one writable context façade, and deletion removes associated closed-task evidence atomically.
+- Assistant executes one model round per worker and queues ready continuation with user inputs. Exact native call/result pairs, independent task history and cumulative budgets survive interleaving. Deletion removes associated closed-task evidence atomically through the authoritative context.
 - Recognition advances independently of reply source/task/decision. Listening follows actual playback with atomic utterance/playback admission and350ms tail cleanup. Current Photographer remains deterministic; photography LLM, active input focus and final role redistribution belong to phase two.
 - No new directory, module or third-party dependency. Tests and build limits are recorded in [Validation-History](Validation-History.md); contract is [ADR0187](adr/0187-agent-composition-and-react.md).
 
 ## 2026-10-09 — History image thumbnails
 
-- History details show images sent to the model as thumbnails in the actual context section; tapping opens a read-only full-screen preview. Legacy metadata-only image references remain readable, and missing photos stay blank without storage explanations.
+- History details show images sent to the model as thumbnails in the actual context section; tapping opens a read-only full-screen preview. Missing photos stay blank.
 - Assistant writes structured imageReferences alongside exact request text/native calls; image bytes remain outside the JSON journal. Composition shares the existing photo store with camera and history. The history reader validates selected turn/reference ownership, reads by original producing input, admits at most four concurrent loads and propagates cancellation/failure.
-- UI bounds retained image data to4MiB, thumbnail decoding to320 pixels and preview decoding to2048 pixels. Tests cover structured/legacy metadata, deduplication, ownership, missing/corrupt references, failure, read bounds and cancellation. No new directory, module, dependency or storage path.
+- UI bounds retained image data to4MiB, thumbnail decoding to320 pixels and preview decoding to2048 pixels. Tests cover structured image metadata, deduplication, ownership, missing/corrupt references, failure, read bounds and cancellation. No new directory, module, dependency or storage path.
 - Build, test and installation evidence is recorded in Validation-History; native visual acceptance remains separate.
 
 ## 2026-10-09 — Orange ReACT presentation
@@ -69,14 +165,14 @@ Purpose: retain dated documentation corrections and architecture changes without
 ## 2026-10-09 — Empty values in conversation history
 
 - Removed legacy storage explanations from history lists, details and export. Missing model text, usage, first-token timing, finish reason and Tool outcomes are empty instead of synthetic placeholder text.
-- Legacy continuations no longer display copied parent time/state or execution errors. Actual stored request content, model output, ReACT styling and recorded failures remain available. Persistence is unchanged.
+- Actual stored request content, model output, ReACT styling and recorded failures remain available. Persistence is unchanged.
 - Removed the obsolete evidenceNote presentation field and retained a UI-only metadata-availability flag. Regression and build/install evidence is recorded in Validation-History.
 
 ## 2026-10-08 — Conversation history per model request
 
 - Reordered details to current input, model text/native Tool Calls, generation evidence including first text-token arrival, actual context, then actual Tools. Removed inline raw sharing and the detail continuation section; retained one upper-right export.
 - Flattened model invocations into peer list items, with ReACT badge, purple text/background and actual fresh execution observations as input. Details/export retain both model-round and owning-input identities and distinguish model completion from owner/execution errors.
-- Added optional nested modelRequests evidence under the original input, preserving existing runtime/context ownership and v1 decoding. New records stop writing duplicate continuationRequests; legacy continuations explicitly disclose unavailable per-request outputs/timing/status. Attachment bytes remain excluded.
+- Added optional nested modelRequests evidence under the original input, preserving existing runtime/context ownership and current schema. Attachment bytes remain excluded.
 - Final full checks and unsigned device-target compilation passed; Simulator remains blocked by the external CoreAI module. See [validation evidence](Validation-History.md#2026-10-08--per-request-conversation-history); native UI/live-provider/physical acceptance remains pending.
 
 ## 2026-10-08 — Signal classification documentation
@@ -90,7 +186,7 @@ Purpose: retain dated documentation corrections and architecture changes without
 - Assistant exposes Camera.Capture.takePhoto on Camera Channel, registered observation. It directly invokes the camera host, without Photographer delegation, to validate ActionResult plus optional native ToolResult through the existing sealed-round loop.
 - AppleCamera adds bounded joined JPEG capture; CameraCoordinator scopes capture/save/presentation to the originating invocation. Photos persist in a bounded owner-checked Storage store. The UI fades the complete image, shrinks it to the lower-right thumbnail and supports inspection; success waits for animation completion. Native shutter audio remains platform-owned.
 - ChatMessage supports bounded user-role image attachments. Cloud serialization emits text/image_url parts; current provider capability is explicit and Gemma rejects image chat. Assistant resolves only successful owned photo results and attaches bytes to its next request; history retains attachment metadata and omits bytes.
-- Synthetic Gateway/mixed-route, capture/read/provider failure, owned persistent storage, exact image JSON and legacy transcript regressions passed. See [ADR0184](adr/0184-assistant-photo-observation.md) and [validation history](Validation-History.md#2026-10-08--assistant-photo-observation-loop).
+- Synthetic Gateway/mixed-route, capture/read/provider failure, owned persistent storage, exact image JSON and request transcript regressions passed. See [ADR0184](adr/0184-assistant-photo-observation.md) and [validation history](Validation-History.md#2026-10-08--assistant-photo-observation-loop).
 
 ## 2026-10-08 — Registered Action/Tool generation rounds (ADR0183)
 
@@ -338,7 +434,7 @@ Home history now contains Action / Task / Agent. Removed Signal rows, passive UI
 
 ## 2026-10-10 — Provider-interface first-text timing
 
-Conversation request TTFT now uses provider-side sampling: OpenAI HTTP invocation to the first nonempty decoded text delta, before stream buffering/Agent consumption. Optional per-request ChatTiming retains monotonic elapsed time and timestamps; Gemma uses native generation invocation. Context/history stores exact evidence rather than consumer arrival, and the old timing writer is removed. Details/export expose actual model request start and interface latency; legacy timestamps remain labeled without inferred interface duration. ASR, TTS, persistence and UI rendering are excluded. Streaming persistence behavior is unchanged; no live API request or dependency/directory change. Validation and physical latency limits are recorded separately.
+Conversation request TTFT now uses provider-side sampling: OpenAI HTTP invocation to the first nonempty decoded text delta, before stream buffering/Agent consumption. Optional per-request ChatTiming retains monotonic elapsed time and timestamps; Gemma uses native generation invocation. Context/history stores exact evidence rather than consumer arrival, and the old timing writer is removed. Details/export expose actual model request start and interface latency; unavailable provider timing remains absent. ASR, TTS, persistence and UI rendering are excluded. Streaming persistence behavior is unchanged; no live API request or dependency/directory change. Validation and physical latency limits are recorded separately.
 
 
 ## 2026-10-10 — Recognition subtitle rollover
@@ -348,7 +444,7 @@ Fixed new ASR previews inheriting the previous finalized upper-slot flag and rep
 
 ## 2026-10-10 — Responses transport and Assistant Action-only calls
 
-✅ Implemented: replace cloud Chat Completions with Responses streaming, reuse resource-owned HTTP sessions, remove Assistant native Tools and duplicate /status handling, preserve old history as inert evidence. Full repository checks and unsigned iOS device build passed; the required Simulator build remains blocked by external CoreAI. Offline regressions cover protocol/cancellation/reuse, Action-only Assistant and legacy-history compatibility. Real-provider latency, installation and physical acceptance remain separate; see Validation-History.
+✅ Implemented: replace cloud Chat Completions with Responses streaming, reuse resource-owned HTTP sessions, remove Assistant native Tools and duplicate /status handling. Full repository checks and unsigned iOS device build passed; the required Simulator build remains blocked by external CoreAI. Offline regressions cover protocol/cancellation/reuse, Action-only Assistant and history ownership. Real-provider latency, installation and physical acceptance remain separate; see Validation-History.
 
 
 ## 2026-10-10 — Responses assistant-history HTTP400 fix
@@ -361,3 +457,141 @@ Fixed new ASR previews inheriting the previous finalized upper-slot flag and rep
 
 - Settings history retains Assistant conversations/archives; Photographer, Memory and ApplicationControl show task-scoped input/model records, status and export. Original task-request titles replace conversation-summary headings.
 - Read-only App projection uses one immutable Agent context snapshot, task scope and retained input evidence; related inputs/ReACT remain together across old conversation archives. Missing associations are separately labeled and missing dates remain empty. No context mutation, model summarization or second history store is introduced. Validation evidence is recorded in Validation-History.md.
+
+## 2026-10-11 — 泛化 Task 与独立 Skill
+
+任意任务目标替代固定 Task Mode，原子批量加载/释放 Skill、默认临时能力自动释放；单前台上下文与独立后台 send 协议、容量/取消证据分离。首页和历史展示目标、实际 Skills、执行者和父任务关系。旧状态恢复中断且不重放。自动及构建验收记录见 Validation-History.md。
+
+## 2026-10-11 — Decentralized Action documentation and Skill teaching
+
+Removed the central FunctionMetadata resources. @Action owns canonical doc and parameters; existing module registrations compile into neutral declaration projections injected by App. Examples belong to Skill Instructions.md, whose five built-in workflows now include prerequisites, branches, completion, failure handling and multi-round examples. History system-message limits match the existing 64 KiB prompt limit. Validation and Simulator limitations are recorded in Validation-History.md.
+
+## 2026-10-11 — Channel-owned Action ordering
+
+✅ ADR0213: deleted Action serialization keys and implicit cross-Channel/task exclusion. Preserve task-local Channel/wait FIFO and resource conflict/explicit takeover behavior. Supersede ADR0155 without rewriting historical validation evidence.
+
+## 2026-10-11 — BasicSkill Task selection and goal completion
+
+BasicSkill revision 2 explicitly separates short default-chain loadSkills from startTask for continuing multi-turn goals. Instructions require an explicit goal/completion condition, retain Tasks while waiting for user decisions, and distinguish confirmed completion, user cancellation, runtime failure and restart interruption. One-shot history query and multi-turn confirmation examples now follow these scopes. No runtime implementation changes; validation evidence is recorded separately.
+
+
+## 2026-10-12 — Agent request errors continue with evidence
+
+Shared Chat decisions now carry HTTP/provider, parsing and observation-construction failures into bounded next-request retries. Failed attempts remain failed in history while the same input/Task may recover; accepted executions join before continuation and native call/result pairs stay complete. BasicSkill revision 6 teaches this boundary. No provider switch or automatic device-effect replay; cancellation, budget exhaustion and unavailable durable/feedback evidence terminate explicitly. Validation is recorded separately.
+
+
+## 2026-10-12 — Result-driven ReACT (ADR0214)
+
+Removed explicit feedback registration attributes, host projections and role defaults. Joined rounds now continue on actual business output or execution failure and stop after successful completion without business output. Empty values remain values; empty successful reports/admission receipts remain acknowledgments. Preserve Task terminal/cancellation rules, native pairing and Agent failure retries. BasicSkill revision 7 teaches these rules. Validation is recorded separately.
+
+
+## 2026-10-12 — Assistant prompt compaction
+
+Keep resident RobotInteraction and all function/runtime contracts. Compact Core/role/Skill/catalog layers and Task fact projections; validate identical capabilities and model workflows against exported baseline (6593 default / 8754 first photography continuation input tokens). Targets 4500/6000 are acceptance metrics, not runtime limits. No new module, directory or project dependency.
+
+## 2026-10-12 — ModelKit Support ownership
+
+Shared code moves into Support/Core, Support/Backends, Support/Management and Support/Speech/Apple. Management and Defaults share a directory while retaining explicit independent compilation; HuggingFace remains a separately injected downloader. Concrete Gemma/Nemotron/Kokoro/MOSS/YOLO engines move to their model owners, mixed-model FluidAudio/MossCoreML targets are removed, and inference workers reuse one cancellation controller. Current source/build/test documentation is reconciled; historical model evidence and the original Word design are preserved. Validation successes and limitations are recorded in [the migration record](ModelKit-Support-Plan.md).
+
+## 2026-10-12 — Intrinsic Action timeouts
+
+Restore a mandatory base-layer execution budget, rename estimatingDuration to dynamicTimeout, execute composed budgets automatically, reuse child function contracts and remove redundant NexArm composition/unused estimates. Explicit UI and playback budgets preserve their completion boundaries; cooperative cleanup and physical-stop limitations remain.
+
+## 2026-10-12 — Neutral ModelKit Core contracts and layer audit
+
+Replaced inference conversation naming with opaque scopeID, separated resource residency from manager registration state, and moved production loader/waiter defaults to Management through explicit validated Core injection. Added independent Core typechecking and complete target dependency/import guards, migrated callers/fixtures, and added six boundary regressions. [The complete audit](ModelKit-Decoupling-Audit.md) records all 66 source owners and distinguishes a unified base SDK from independently compiled implementation targets. Full-suite timing and simulator dependency limitations remain explicit.
+
+
+## 2026-10-12 — Complete ModelKit SDK dependency enforcement
+
+Confirmed the entire 15-target ModelKit SDK has no other project-module dependencies. Strengthened the checker with explicit system/third-party import allowlists, third-party product/package ownership, source confinement and SDK target/product transitive closure; eight in-memory invalid cases are rejected. Model algorithms and runtime behavior are unchanged. The shared repository package remains; no standalone publishing package was added. [SDK audit](ModelKit-Decoupling-Audit.md) records ownership and [validation](Validation-History.md#2026-10-12--complete-modelkit-sdk-dependency-enforcement) separates the latest successful full automated run from iOS and runtime acceptance.
+
+
+## 2026-10-12 — ModelKit current documentation and diagram alignment
+
+Audited all 28 ModelKit directory READMEs, revised 27 and retained the accurate CoreML contract. Reconciled the complete 15-target/23-edge dependency diagram, provider/helper runtime flows, configurable Management limits, CoreAI actor/admission semantics, PCM downmixing and worker/terminal-event cancellation. Integrated current OpenAI protocol contracts and removed migration/regression records, obsolete implementation descriptions and application timer/storage policy from SDK source READMEs. Historical evidence remains under docs; no production code or interface changed. [Documentation history](Documentation-History.md#2026-10-12--modelkit-current-design-documentation-reconciliation) and [validation](Validation-History.md#2026-10-12--modelkit-current-documentation-and-diagram-alignment) record the review.
+
+
+## 2026-10-12 — ReACT mechanism and limit design audit
+
+Consolidated current ReACT contracts in MobileHarness/README.md Part III: result/error triggers, complete barrier, FIFO/context/Skill refresh, finishTask versus cancelTask, per-input cumulative budgets, request/parser/provider limits and terminal failure boundaries. Removed obsolete policy-driven and 30-second/60-second Agent timing descriptions, and corrected result-delivery retries to match current lifetime ownership. The design explicitly records absent transient-error classification/backoff, automatic context shrinking and generic activity-driven Chat continuation. Runtime code was not changed by this documentation audit.
+
+
+## 2026-10-12 — Composed listening feedback Actions and wake animation
+
+UI.Feedback.playCue and vibrate are canonical bounded Actions registered by UIModule and taught by ExpressionInteraction revision 7. Cue selection supports wake/confirm/cancel/error/soft and volume 0…1; haptics support five styles, intensity 0…1, 1…3 pulses and 40…250 ms spacing. Unsupported hardware, overlap, invalid arguments and missing bindings fail explicitly. App owns actual audio/haptics, and PlatformKit remains a generic native capability.
+
+Speech.Listening.update now validates configurable wake feedback and awaits the root-owned startup composition. Canonical child invocations inherit trusted causal/session context with separate execution IDs. Haptic/readiness join in parallel, followed by cue/native drain and a 120 ms acoustic tail, then microphone readiness. Stage failure blocks later capture and retains actual child outcomes. The parent declares 90 seconds; readiness/capture each use the existing 30-second default and feedback children 5 seconds. Startup cancellation invalidates only the matching startup ID and joins native cleanup. Ordinary reply pause/resume does not replay effects; existing half-duplex, user-off interruption and closed resting eyes remain intact.
+
+The default haptic changes from soft/0.8 to heavy/1. Original wake synthesis changes from the 420 ms ascending cue to a 0.94 s bell-like F-major profile using the supplied video as a spectral/timing reference. No user recording, private system sound or third-party sound asset is packaged. Public Siri sound demonstrations exist, but no official downloadable activation asset or precise Apple Intelligence haptic parameters were found; similarity is a recreation and needs audible/physical comparison.
+
+Waking eyelids now use a fast 180 ms cubic ease-out, retain stable shape identity and start a new blink/breath epoch. Closure remains a softer 460 ms transition. The first 1.2 seconds suppress blinking, and loading no longer scales the eyes. The single-pass GPU rim has stable full-screen bounds, a 320 ms native fade in/out and a softer 1.05 s multicolor activation bloom. Reduce Motion remains static with 200 ms fades. Source-derived previews and actual device acceptance are distinct.
+
+The generic activation helper moved from Presentation to existing Speech workflows; AppSpeechPlayback adds the existing Actions/ExecutionRuntime dependencies. Shared boundary guards reflect that narrow dependency change, and the robot test-only UI fixture registers the new canonical feedback definitions with explicit unavailable native support. No new directory, dependency package, credential or signing-source change was introduced. Validation and installation evidence is recorded in [Validation History](Validation-History.md#2026-10-12--feedback-actions-and-fast-wake-validation).
+
+
+## 2026-10-12 — VAD and ActionCatalog compiler-warning cleanup
+
+VoiceActivitySegmenter explicitly discards the unused SpeechBoundaryPolicy.consume result while retaining the existing streamEvents path. ActionCatalogMacro implements the current MemberMacro expansion signature with conformingTo instead of relying on the deprecated compatibility default; generated declarations and factory collection remain unchanged. Reconciled the owning READMEs and removed their stale sixty-second utterance-limit statement. Existing unrelated working-tree changes were preserved.
+
+
+## 2026-10-12 — Saved and discarded photo departure effects
+
+The current photo now exits on both successful save and ignore. Save commits the add-only Photos import first, enlarges the thumbnail to 1.16 over 180 ms, then slides wholly past the right edge over 420 ms without shrinking. Ignore slides toward the lower-right outside both screen edges and shrinks to 0.06 over 520 ms. Controls disappear when departure is admitted; full-screen inspection waits for actual dismissal before starting the thumbnail animation, with one request-ID fence. Reduce Motion uses a 200 ms fade.
+
+PhotoDeparture owns one identity-fenced renderer acknowledgment; PhotoDispositionWorkflow joins the committed native decision, visual completion and sound, then CameraCoordinator removes only the matching current photo component. New capture creates a fresh UUID/component. A failed import retains the photo and starts no success feedback. Cancellation after actual import preserves the save and joins effects/cleanup. Exact duplicate saved UUIDs return alreadySaved after UI removal, without replaying import or effects. Ignore removes preview UI, not album images or private reasoning evidence.
+
+UI.Feedback.playCue gains save/discard profiles: an original rising save chime and a falling filtered-air/crumpling discard cue. The camera reuses the canonical Action factory and 5-second execution budget through a private scoped native capability. NativeCuePlayback owns one AVAudioPlayer with a UUID-fenced immutable delegate; it does not explicitly reconfigure/deactivate the shared audio session and never resets recording or the speech player. Portable PCM16 encoding validates format and one-second bounds before native playback. All seven cue profiles remain finite, ramped and generated from source; no media asset/dependency package was added.
+
+CameraPhotoCommandReceipt optionally carries bounded feedbackIssues so a feedback problem cannot be reported as a failed album import. ExpressionInteraction revision 8 exposes the expanded cue vocabulary; Photography revision 13 teaches automatic effects, actual-save versus feedback issues and no duplicate cue. Source directories/module dependencies are unchanged. Validation distinguishes portable contracts, source-derived motion preview, native build and physical-device acceptance in [Validation History](Validation-History.md#2026-10-12--photo-disposition-animation-and-cue-validation).
+
+## 2026-10-13 — Photo archive capacity and coordinated native home animation
+
+The device photo metadata audit found exactly 32 durable records totaling 4,493,177 bytes: the default count bound caused repeated takePhoto capacityExceeded. App now supplies a bounded 1024-photo/2 GiB archive and 512 KiB index. Storage retains reusable validated caller limits and original 32-photo defaults. Existing IDs/owners/files survive migration; encoded-index overflow rejects before adding a JPEG. Under the explicit App FIFO policy, oldest private cached JPEGs retire after a committed new record when count/bytes/index are full; album images are unaffected. SDK default reject policy remains available.
+
+The foreground goal now owns a fixed small line above the promoted ASR slot; only ASR moves between live/final positions. NativeCompanionSurface replaces separate SwiftUI eye/halo clocks with one monotonic, listening-generation-scoped commit. CAShapeLayer interpolates identical cubic eye paths on Core Animation, with 180 ms waking, 460 ms closing and presentation-value interruption. Metal uses a cached compiled pipeline, one premultiplied pass and CAMetalDisplayLink on an owned render thread. The rounded activation front converges from center to rim every generation, with one reversible fade envelope. Work is bounded to one latest snapshot/coalesced wake and three GPU commands; disposal invalidates and joins off MainActor. ProMotion is enabled through public configuration; actual frame pacing remains measured separately from requested refresh.
+
+Apple primary references informed the implementation: [Core Animation](https://developer.apple.com/documentation/QuartzCore), [explicit CAShapeLayer path animation](https://developer.apple.com/documentation/quartzcore/cashapelayer/path), [SwiftUI performance](https://developer.apple.com/documentation/Xcode/understanding-and-improving-swiftui-performance), [Metal display link](https://developer.apple.com/documentation/quartzcore/cametaldisplaylink) and [ProMotion](https://developer.apple.com/documentation/quartzcore/optimizing-iphone-and-ipad-apps-to-support-promotion-displays). A DEBUG-only isolated six-cycle preview supports native tracing without mic/camera/model startup. Required checks, signed installation and separate synthetic-device acceptance are recorded in Validation History. No new directory/module/dependency or data reset is introduced.
+
+
+## 2026-10-13 — Completion-owned decisions, FIFO photo cache and visible home failures
+
+Removed the fixed four-request cap in shared Chat and both history request/round arrays, cumulative sixteen-native caps in Chat/transport, and the history-wide 128-call stop. Production AgentTaskBudget records usage with nil optional count limits; explicitly configured SDK limits remain valid. Per-generation call/feedback bounds reset. Native queues admit one complete bounded generation (128 envelopes) while preserving four concurrent executions and sealed-round joins. Completed model-context blocks retire oldest first when space is needed; original intent, system, latest result and complete native pairing remain, while exact durable history stays intact. Repeated identical failed recovery with no successful business output returns the real error rather than looping indefinitely.
+
+App photo retention now selects evictOldest. Count/bytes/index overflow retires oldest cached records automatically; commit happens before file reclamation, and failed index publication removes only the incoming JPEG. Unindexed-file reconciliation retries cleanup after interruption; historical retired references are absent. Agent/Action failures, including HTTP 400, additionally appear in a fresh, deduplicated home toast below the eyes, independent of voicePhase. Close/expiry/new live ASR dismiss only the toast and preserve detailed evidence.
+
+
+## 2026-10-13 — Execution evidence no longer requests ReACT
+
+Per user-approved clarification, AgentActionCompletion business-output classification now recognizes only explicit value, including an empty value. Successful execution reports and activity handles remain terminal execution evidence without extra model calls; actual failures/partial failures/cancellation, failure codes and Agent request/observation recovery still trigger reasoning. Reports are retained in history, ledgers and the full barrier. BasicSkill revision 14 teaches the distinction. Expanded Action/Tool/mixed report regressions and synthetic NexArm recovery assert continuation from actual values/errors rather than report presence. No report deletion, per-Action feedback flag, effect replay or unrelated runtime/quota change was introduced.
+
+
+## 2026-10-13 — Contact-origin listening light
+
+- Replaced the hollow expanding rounded rectangle with a soft contact-point flash, circular radial wave and filled luminous tail. Edge arrival is based on distance from the source; cyan/blue/violet/pink/amber rim flow and reversible fade remain in the same Metal pass.
+- Added UI-owned `ListeningLightOrigin` normalized parameters and `ConversationState.listeningLightOrigin`. Production captures the initial hold location in content coordinates; the native surface maps through safe-area offsets to the full-window layer. Accessibility uses the eye-center default. The source is latched to each new listening generation, preventing passive state updates or a later press from moving an active wave.
+- Retained shared native eye/light timing, reduced-motion behavior, one coalesced state slot and three in-flight GPU frames. No device or Action lifetime changes.
+- Live underwater refraction is not implemented: Apple's SwiftUI distortion API warns UIKit-backed views may not render into its filtered layer; this surface includes native camera, Metal and eye layers. No frozen backdrop or per-frame screenshot fallback is used.
+
+
+## 2026-10-13 — Compact upper-layer home notices
+
+- Action snapshot failures remain in the colored current Action panel and no longer create or replace a toast. Call-scoped native issues retain full execution evidence without offering a toast; mixed failure snapshots select the newest eligible upper-layer issue.
+- Fresh Agent output and App/runtime/system failures continue to offer a bounded, deduplicated notice. Historical/stale snapshots do not replay notices; dismissal remains identity-fenced and does not remove logs.
+- Replaced the large material card, heading, scroll area and close button with centered yellow text and an inline warning icon, up to three lines. The lower reply/hint slot yields during the eight-second notice; no touch interception or task/ASR movement is introduced.
+
+
+## 2026-10-13 — Immediate contact flash and native-start feedback
+
+- Listening activation admits readiness and the canonical cue/haptic children together. A context-fenced, single-waiter native-start gate holds the haptic until the first cue buffer is scheduled and the native player is started. The requested haptic generator prewarms before waiting; cue generation remains off MainActor. Real cue failure/cancellation releases the gate with that error, and startup cleanup retires only its own gate.
+- Platform audio exposes an optional once-per-operation first-buffer/player-start acknowledgment. Existing PCM bounds, actual drain and cancellation/session cleanup remain intact. This is a native admission boundary, not a guarantee of exact acoustic onset on every route.
+- Preparation, cue drain and haptic completion must all succeed before the existing acoustic tail and microphone admission. A failed preparation can retain real intent feedback while still preventing capture; canonical partial reports are not rolled back or fabricated.
+- Normal light activation starts at at least 0.5 opacity, with a larger/brighter contact flash and radial front. Entry rises to full opacity; reduced-motion behavior, settled terms and the existing exit smoothstep/duration are unchanged. Activation-only flash terms disappear by 0.9 s.
+
+
+## 2026-10-13 — Hold-time output prewarm and stronger source flash
+
+- Home forwards touch-down/release through an injected callback. Lifecycle owns one coalesced cancellable warmup and one default wake PCM cache; the output-only playback graph is connected/prepared/started during the hold. No microphone capture or sound is admitted by preparation.
+- A recognized hold retains warm output ownership across Agent intent delivery. The canonical Listening cue/haptic Actions reuse prepared PCM/native output resources, avoiding cold graph/session setup after the light starts; native cue-start still releases the haptic. No extra confirmation playback or vibration path is introduced.
+- Aborted press, stop and shutdown cancel/retire warmup; output preparation failure performs explicit rollback. Unconsumed warm resources are released only while no native capture/playback owner is active. Platform queues and PCM bounds remain unchanged.
+- Normal activation begins at 0.85 visibility. Its existing Metal pulse temporarily composites above the eyes for 0.9 seconds, then returns to the original settled stacking, so the source cannot be hidden by opening eyes. Reduced-motion/static and the existing exit curve remain unchanged.

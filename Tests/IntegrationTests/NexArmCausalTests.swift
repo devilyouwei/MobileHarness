@@ -200,7 +200,7 @@ import Testing
         }
     }
 
-    @Test func nexArmCausalPlansChangeOnlyTheirDeclaredFactors() throws {
+    @Test(.actionCatalog) func nexArmCausalPlansChangeOnlyTheirDeclaredFactors() throws {
         for gesture in [NexArmGesture.dance, .celebrate] {
             let baseline = try causalFrames(gesture, trial: .baseline)
             for trial in [CausalTrial.queries, .wait] {
@@ -214,7 +214,7 @@ import Testing
         }
     }
 
-    @Test(.enabled(if: ProcessInfo.processInfo.environment["NEXARM_CAUSAL_TEST"] == "1"))
+    @Test(.actionCatalog, .enabled(if: ProcessInfo.processInfo.environment["NEXARM_CAUSAL_TEST"] == "1"))
     func nexArmUSBPhysicalCausalTrial() async throws {
         let env = ProcessInfo.processInfo.environment
         let trialName = try #require(env["NEXARM_CAUSAL_TRIAL"])

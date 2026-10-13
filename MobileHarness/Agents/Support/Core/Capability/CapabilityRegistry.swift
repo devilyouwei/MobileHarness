@@ -16,6 +16,8 @@ public struct CapabilityRegistry: Sendable {
     {
         guard actions.count + tools.count + internalActions.count + internalTools.count <= 128, channels.count <= 16
         else { throw GenerationError.limitExceeded }
+        let paths = actions.map { $0.path.description } + tools.map(\.path)
+        guard Set(paths).count == paths.count else { throw GenerationError.duplicateAlias }
         let aliases = actions.map(\.alias) + tools.map(\.alias)
         guard Set(aliases).count == aliases.count else { throw GenerationError.duplicateAlias }
         guard aliases.allSatisfy({ Self.validName($0) && $0 != "wait" && !$0.hasPrefix("channel.") }),

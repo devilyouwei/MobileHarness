@@ -7,7 +7,7 @@ import Testing
 
 @Test func modernAppleRecognitionRejectsInvalidPCMWithoutLoading() async throws {
     guard #available(macOS 26, iOS 26, *) else { return }
-    let context = ModelContext()
+    let context = try ModelContext(loadGate: ModelLoadGate(maximumConcurrentLoads: 4), maximumLoadWaiters: 32)
     let provider = try AppleSpeechRecognition(context: context)
     let format = try AudioFormat(sampleRate: 24000, channels: 1, encoding: .float32)
     await #expect(throws: CapabilityError.self) {
@@ -50,7 +50,8 @@ import Testing
 /// Opt-in integration test: synthesizes real system audio into memory without opening a speaker or microphone.
 @Test(.enabled(if: ProcessInfo.processInfo.environment["HARNESS_TEST_SYSTEM_TTS"] == "1"))
 @MainActor func systemChineseTTSProducesPCM() async throws {
-    let provider = try AppleSpeechSynthesis(context: ModelContext())
+    let provider = try AppleSpeechSynthesis(
+        context: ModelContext(loadGate: ModelLoadGate(maximumConcurrentLoads: 4), maximumLoadWaiters: 32))
     let session = try await provider.synthesize(
         SpeechSynthesisRequest(text: "收到，我听到了。这是语音对话测试，暂未接入大语言模型。", locale: "zh-CN"))
     defer { session.cancel() }
@@ -81,12 +82,41 @@ import Testing
             AudioFrame(data: payload, format: format, sequence: UInt64(index), timestamp: 0))
     }
     chunks += try accumulator.finish()
-    #expect(chunks.count == 10)
+    #expect(chunks.count == 11)
+    #expect(chunks.first?.data.count == 512)
     #expect(chunks.reduce(0, { $0 + $1.data.count }) == 300 * 512)
     #expect(chunks.allSatisfy { $0.data.count <= 16_384 })
-    #expect(chunks.map(\.sequence) == Array(UInt64(0)..<UInt64(10)))
+    #expect(chunks.map(\.sequence) == Array(UInt64(0)..<UInt64(11)))
     #expect(chunks.last!.timestamp > chunks.first!.timestamp)
     #expect(try accumulator.finish().isEmpty)
+}
+
+@Test func firstSystemPCMIsAvailableBeforeSynthesisFinishes() throws {
+    var accumulator = SynthesisPCMAccumulator()
+    let format = try AudioFormat(sampleRate: 24_000, channels: 1, encoding: .float32)
+    let first = Data(repeating: 1, count: 512)
+    let early = try accumulator.append(AudioFrame(data: first, format: format, sequence: 0, timestamp: 0))
+    #expect(early.count == 1 && early[0].data == first)
+    #expect(early[0].sequence == 0 && early[0].timestamp == 0)
+    #expect(try accumulator.finish().isEmpty)
+}
+
+@Test func initialPCMAndCoalescedTailPreserveBytesAndMediaTime() throws {
+    var accumulator = SynthesisPCMAccumulator()
+    let format = try AudioFormat(sampleRate: 24_000, channels: 1, encoding: .float32)
+    let large = Data(repeating: 2, count: 40_000)
+    var chunks = try accumulator.append(AudioFrame(data: large, format: format, sequence: 0, timestamp: 0))
+    #expect(chunks.map { $0.data.count } == [16_384, 16_384])
+    let small = Data(repeating: 3, count: 512)
+    #expect(try accumulator.append(AudioFrame(data: small, format: format, sequence: 1, timestamp: 0)).isEmpty)
+    chunks += try accumulator.finish()
+    #expect(chunks.reduce(into: Data(), { $0.append($1.data) }) == large + small)
+    #expect(chunks.map(\.sequence) == [0, 1, 2])
+    #expect(chunks[2].timestamp == chunks[0].duration + chunks[1].duration)
+    let changed = try AudioFormat(sampleRate: 48_000, channels: 1, encoding: .float32)
+    #expect(throws: CapabilityError.self) {
+        try accumulator.append(AudioFrame(data: small, format: changed, sequence: 2, timestamp: 0))
+    }
 }
 
 /// Real modern on-device ASR; opt-in because Apple may install system language assets.
@@ -102,7 +132,7 @@ func systemAnalyzerTranscribesFixtureAndReleasesLease() async throws {
     let encoded = try PCMCodec.encode(buffer, sequence: 0)
     let frame = try AudioFrame(
         data: encoded.data + Data(repeating: 0, count: 32000 * 4), format: encoded.format, sequence: 0, timestamp: 0)
-    let context = ModelContext()
+    let context = try ModelContext(loadGate: ModelLoadGate(maximumConcurrentLoads: 4), maximumLoadWaiters: 32)
     let provider = try AppleSpeechRecognition(context: context)
     try await provider.warmup()
     let session = try await provider.transcribe(SpeechRecognitionRequest(locale: "zh-CN", format: frame.format))
@@ -140,7 +170,8 @@ func systemAnalyzerTranscribesFixtureAndReleasesLease() async throws {
 
 @Test(.enabled(if: ProcessInfo.processInfo.environment["HARNESS_TEST_SYSTEM_TTS"] == "1"))
 @MainActor func consecutiveSystemRepliesReleaseAdmissionBeforeNextRequest() async throws {
-    let provider = try AppleSpeechSynthesis(context: ModelContext())
+    let provider = try AppleSpeechSynthesis(
+        context: ModelContext(loadGate: ModelLoadGate(maximumConcurrentLoads: 4), maximumLoadWaiters: 32))
     for _ in 0..<4 {
         let session = try await provider.synthesize(SpeechSynthesisRequest(text: "你好。", locale: "auto"))
         var completed = false
@@ -148,6 +179,26 @@ func systemAnalyzerTranscribesFixtureAndReleasesLease() async throws {
         session.cancel()
         #expect(completed)
     }
+}
+
+@Test(.enabled(if: ProcessInfo.processInfo.environment["HARNESS_TEST_SYSTEM_TTS"] == "1"))
+@MainActor func cancelledSystemSynthesisDoesNotStopItsReplacement() async throws {
+    let provider = try AppleSpeechSynthesis(
+        context: ModelContext(loadGate: ModelLoadGate(maximumConcurrentLoads: 4), maximumLoadWaiters: 32))
+    let cancelled = try await provider.synthesize(
+        SpeechSynthesisRequest(text: String(repeating: "这是待取消的语音。", count: 20), locale: "auto"))
+    cancelled.cancel()
+    let replacement = try await provider.synthesize(SpeechSynthesisRequest(text: "接下来继续。", locale: "auto"))
+    defer { replacement.cancel() }
+    var bytes = 0
+    var finished = false
+    for try await event in replacement.events {
+        switch event {
+        case .audio(let frame): bytes += frame.data.count
+        case .finished: finished = true
+        }
+    }
+    #expect(bytes > 0 && finished)
 }
 
 @Test func systemSpeechAutoLocaleResolvesChineseEnglishAndAliases() {

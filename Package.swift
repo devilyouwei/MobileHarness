@@ -40,7 +40,7 @@ let package = Package(
         .target(
             name: "ModelKitHub",
             dependencies: ["ModelKitRuntime", .product(name: "HuggingFace", package: "swift-huggingface")],
-            path: "MobileHarness/ModelKit/Backends/HuggingFace", exclude: ["README.md"]),
+            path: "MobileHarness/ModelKit/Support/Management/HuggingFace", exclude: ["README.md"]),
         .macro(
             name: "BehaviorDefinitions",
             dependencies: [
@@ -58,7 +58,7 @@ let package = Package(
             exclude: [
                 "README.md", "Camera/README.md", "Components/README.md", "Conversation/README.md",
                 "Settings/README.md", "Diagnostics/README.md",
-            ]),
+            ], resources: [.process("Components/ListeningHalo.metal")]),
         .target(
             name: "AppSettingsWorkflow",
             dependencies: ["UI", "AgentCore", "Agents", "Gateway", "AppPresentationWorkflow"],
@@ -80,10 +80,12 @@ let package = Package(
             ],
             path: "MobileHarness/App/Workflows/Bluetooth", exclude: ["README.md"]),
         .target(
-            name: "AppSpeechPlayback", dependencies: ["FunctionContracts", "StorageAudio"],
+            name: "AppSpeechPlayback",
+            dependencies: ["FunctionContracts", "StorageAudio", "Actions", "ExecutionRuntime"],
             path: "MobileHarness/App/Workflows/Speech", exclude: ["README.md"]),
         .target(
-            name: "AppPresentationWorkflow", dependencies: ["UI", "AgentCore", "FunctionContracts"],
+            name: "AppPresentationWorkflow",
+            dependencies: ["UI", "AgentCore", "FunctionContracts"],
             path: "MobileHarness/App/Workflows/Presentation", exclude: ["README.md"]),
         .target(
             name: "AppDiagnosticWorkflow", dependencies: ["UI", "ModelKit", "PlatformKit"],
@@ -114,7 +116,7 @@ let package = Package(
                 "Output/README.md",
                 "README.md",
                 "Runtime/README.md",
-            ], resources: [.process("Generation/FunctionToken.prompts.json")]),
+            ], resources: [.process("Generation/FunctionTokenPrompts.json")]),
         .target(
             name: "FunctionContracts", path: "MobileHarness/Actions/Contracts", exclude: ["README.md"]),
         .target(
@@ -148,28 +150,23 @@ let package = Package(
             ]),
         .target(
             name: "Agents",
-            dependencies: ["AgentCore", "ModelKit", "PlatformKit", "Storage", "StorageChat", "StorageAudio"],
-            path: "MobileHarness/Agents",
-            exclude: [
-                "Support/Core", "Support/Communication/README.md", "SpeechSynthesis/README.md", "Assistant/README.md",
-                "SpeechPerception/README.md",
-                "VisionPerception/README.md", "Photographer/README.md", "Memory/README.md",
-                "ApplicationControl/README.md", "Support/README.md", "Support/Chat/README.md",
-                "Support/Context/README.md", "README.md",
+            dependencies: [
+                "AgentCore", "FunctionContracts", "ModelKit", "PlatformKit", "Storage", "StorageChat", "StorageAudio",
             ],
-            resources: [
-                .process("Assistant/Assistant.agent.json"),
-                .process("SpeechSynthesis/SpeechSynthesis.agent.json"),
-                .process("SpeechPerception/SpeechPerception.agent.json"),
-                .process("VisionPerception/VisionPerception.agent.json"),
-                .process("Photographer/Photographer.agent.json"),
-                .process("Memory/Memory.agent.json"),
-                .process("ApplicationControl/ApplicationControl.agent.json"),
-                .process("Assistant/Assistant.prompts.json"),
-                .process("Photographer/Photographer.prompts.json"),
-                .process("Memory/Memory.prompts.json"),
-                .process("ApplicationControl/ApplicationControl.prompts.json"),
-            ]),
+            path: "MobileHarness",
+            exclude: [
+                "Actions", "App", "Gateway", "ModelKit", "PlatformKit", "Storage", "UI", "README.md",
+                "Resources/README.md", "Resources/Models", "Resources/Assets.xcassets",
+                "Resources/AppIconVariants", "Resources/PrivacyInfo.xcprivacy",
+                "Agents/Support/Core", "Agents/Support/Communication/README.md", "Agents/SpeechSynthesis/README.md",
+                "Agents/Assistant/README.md",
+                "Agents/SpeechPerception/README.md",
+                "Agents/VisionPerception/README.md", "Agents/Photographer/README.md", "Agents/Memory/README.md",
+                "Agents/ApplicationControl/README.md", "Agents/Support/README.md", "Agents/Support/Chat/README.md",
+                "Agents/Support/Context/README.md", "Agents/README.md",
+            ],
+            sources: ["Agents"],
+            resources: [.copy("Resources/Agents"), .copy("Resources/Skills"), .copy("Resources/Catalog.json")]),
         .target(
             name: "Storage", path: "MobileHarness/Storage",
             exclude: ["README.md", "Audio", "Chat"]),
@@ -184,10 +181,11 @@ let package = Package(
             exclude: [
                 "README.md", "Language/README.md", "Language/JEV/README.md",
                 "Speech/README.md", "Speech/ASR/README.md", "Speech/TTS/README.md", "Speech/VAD/README.md",
-                "Language/LLM/Gemma4", "Language/LLM/OpenAI", "Language/LLM/README.md", "Backends",
-                "Core/README.md", "Management", "Defaults", "Speech/ASR/Apple", "Speech/TTS/Apple", "Speech/TTS/Kokoro",
+                "Language/LLM/Gemma4", "Language/LLM/OpenAI", "Language/LLM/README.md", "Support/Backends",
+                "Support/README.md", "Support/Speech",
+                "Support/Core/README.md", "Support/Management", "Speech/ASR/Apple", "Speech/TTS/Apple",
+                "Speech/TTS/Kokoro",
                 "Speech/TTS/MossNano",
-                "Speech/Shared",
                 "Speech/ASR/Nemotron", "Speech/VAD/Silero", "Speech/VAD/Energy", "Vision/YOLO", "Vision/README.md",
             ]),
         .target(
@@ -203,33 +201,46 @@ let package = Package(
                 "ModelKitMossNano", "ModelKitGemma4", "ModelKitYOLOPose", "ModelKitOpenAI", "ModelKitAppleSpeech",
                 "ModelKitEnergy",
             ],
-            path: "MobileHarness/ModelKit/Defaults", exclude: ["README.md"]),
+            path: "MobileHarness/ModelKit/Support/Management",
+            exclude: [
+                "README.md", "HuggingFace", "ModelManager.swift", "ModelRegistration.swift",
+                "ModelArtifactContracts.swift", "ModelArtifactStore.swift", "ArtifactDownloadTransport.swift",
+            ],
+            sources: [
+                "ModelKitDefaults.swift", "ChatDefaults.swift", "SpeechDefaults.swift", "VisionDefaults.swift",
+                "SpeechProviderSelection.swift",
+            ]),
         .target(
-            name: "ModelKitRuntime", dependencies: ["ModelKit"], path: "MobileHarness/ModelKit/Management",
-            exclude: ["README.md"]),
+            name: "ModelKitRuntime", dependencies: ["ModelKit"], path: "MobileHarness/ModelKit/Support/Management",
+            exclude: [
+                "README.md", "HuggingFace", "ModelKitDefaults.swift", "ChatDefaults.swift", "SpeechDefaults.swift",
+                "VisionDefaults.swift", "SpeechProviderSelection.swift",
+            ],
+            sources: [
+                "ModelManager.swift", "ModelRegistration.swift", "ModelArtifactContracts.swift",
+                "ModelArtifactStore.swift", "ArtifactDownloadTransport.swift",
+            ]),
         .target(
             name: "ModelKitEnergy", dependencies: ["ModelKit"], path: "MobileHarness/ModelKit/Speech/VAD/Energy",
             exclude: ["README.md"]),
         .target(
-            name: "ModelKitAppleSpeech", dependencies: ["ModelKit"], path: "MobileHarness/ModelKit/Speech",
+            name: "ModelKitAppleSpeech", dependencies: ["ModelKit"], path: "MobileHarness/ModelKit",
             exclude: [
-                "README.md", "ASR/README.md", "TTS/README.md", "Shared/README.md",
-                "Shared/Apple/README.md", "ASR/Apple/README.md", "TTS/Apple/README.md",
-                "ASR/SpeechRecognitionCapability.swift",
-                "TTS/SpeechSynthesisCapability.swift", "TTS/Kokoro", "TTS/MossNano", "ASR/Nemotron", "VAD",
+                "README.md", "Language", "Vision", "Support/README.md", "Support/Core", "Support/Backends",
+                "Support/Management", "Support/Speech/README.md", "Support/Speech/Apple/README.md", "Speech/README.md",
+                "Speech/ASR/README.md", "Speech/TTS/README.md", "Speech/ASR/Apple/README.md",
+                "Speech/TTS/Apple/README.md", "Speech/ASR/SpeechRecognitionCapability.swift",
+                "Speech/TTS/SpeechSynthesisCapability.swift", "Speech/TTS/Kokoro", "Speech/TTS/MossNano",
+                "Speech/ASR/Nemotron", "Speech/VAD",
             ],
-            sources: ["ASR/Apple", "TTS/Apple", "Shared/Apple"]),
+            sources: ["Speech/ASR/Apple", "Speech/TTS/Apple", "Support/Speech/Apple"]),
         .target(
             name: "ModelKitYOLOPose", dependencies: ["ModelKit", "ModelKitCoreML"],
             path: "MobileHarness/ModelKit/Vision/YOLO", exclude: ["README.md"]),
         .testTarget(
             name: "YOLOPoseTests", dependencies: ["ModelKit", "ModelKitYOLOPose", "ModelKitCoreML", "ModelKitRuntime"],
             exclude: ["README.md"]),
-        .target(
-            name: "ModelKitFluidAudio",
-            dependencies: [.product(name: "FluidAudio", package: "FluidAudio")],
-            path: "MobileHarness/ModelKit/Backends/FluidAudio", exclude: ["README.md"]),
-        .target(name: "ModelKitCoreML", path: "MobileHarness/ModelKit/Backends/CoreML", exclude: ["README.md"]),
+        .target(name: "ModelKitCoreML", path: "MobileHarness/ModelKit/Support/Backends/CoreML", exclude: ["README.md"]),
         .target(
             name: "ModelKitSilero", dependencies: ["ModelKit", "ModelKitCoreML"],
             path: "MobileHarness/ModelKit/Speech/VAD/Silero", exclude: ["README.md"]),
@@ -239,27 +250,22 @@ let package = Package(
                 "ModelKit", "ModelKitSilero", "ModelKitNemotron", "ModelKitKokoro", "Agents", "PlatformKit",
             ], exclude: ["README.md"]),
         .target(
-            name: "ModelKitCoreAI",
-            dependencies: [
-                .product(name: "CoreAILM", package: "coreai-models"),
-                .product(name: "Tokenizers", package: "swift-transformers"),
-            ], path: "MobileHarness/ModelKit/Backends/CoreAI", exclude: ["README.md"]),
+            name: "ModelKitCoreAI", path: "MobileHarness/ModelKit/Support/Backends/CoreAI", exclude: ["README.md"]),
         .target(
-            name: "ModelKitNemotron", dependencies: ["ModelKit", "ModelKitFluidAudio"],
+            name: "ModelKitNemotron", dependencies: ["ModelKit", .product(name: "FluidAudio", package: "FluidAudio")],
             path: "MobileHarness/ModelKit/Speech/ASR/Nemotron", exclude: ["README.md"]),
         .testTarget(name: "EnergyVADTests", dependencies: ["ModelKit", "ModelKitEnergy"], exclude: ["README.md"]),
         .testTarget(
-            name: "NemotronTests", dependencies: ["ModelKit", "ModelKitNemotron", "ModelKitFluidAudio"],
+            name: "NemotronTests", dependencies: ["ModelKit", "ModelKitNemotron"],
             exclude: ["README.md"]),
-        .target(name: "ModelKitMossCoreML", path: "MobileHarness/ModelKit/Backends/MossCoreML", exclude: ["README.md"]),
         .target(
-            name: "ModelKitMossNano", dependencies: ["ModelKit", "ModelKitMossCoreML"],
+            name: "ModelKitMossNano", dependencies: ["ModelKit"],
             path: "MobileHarness/ModelKit/Speech/TTS/MossNano", exclude: ["README.md"]),
         .testTarget(
-            name: "MossNanoTests", dependencies: ["ModelKit", "ModelKitMossNano", "ModelKitMossCoreML"],
+            name: "MossNanoTests", dependencies: ["ModelKit", "ModelKitMossNano"],
             exclude: ["README.md"]),
         .target(
-            name: "ModelKitKokoro", dependencies: ["ModelKit", "ModelKitFluidAudio"],
+            name: "ModelKitKokoro", dependencies: ["ModelKit", .product(name: "FluidAudio", package: "FluidAudio")],
             path: "MobileHarness/ModelKit/Speech/TTS/Kokoro", exclude: ["README.md"]),
         .testTarget(name: "KokoroTests", dependencies: ["ModelKit", "ModelKitKokoro"], exclude: ["README.md"]),
         .target(
@@ -276,16 +282,20 @@ let package = Package(
             dependencies: [
                 "BehaviorAssembly", "AppWorkflows", "UI",
                 "AgentCore", "Gateway", "Agents", "Actions", "FunctionContracts", "ExecutionRuntime", "CallRuntime",
-                "ModelKit",
+                "ModelKit", "ModelKitOpenAI",
                 "Storage", "StorageChat", "StorageAudio",
                 "PlatformKit",
             ],
             exclude: ["README.md"]),
         .target(
-            name: "ModelKitGemma4", dependencies: ["ModelKit", "ModelKitCoreAI"],
+            name: "ModelKitGemma4",
+            dependencies: [
+                "ModelKit", .product(name: "CoreAILM", package: "coreai-models"),
+                .product(name: "Tokenizers", package: "swift-transformers"),
+            ],
             path: "MobileHarness/ModelKit/Language/LLM/Gemma4", exclude: ["README.md"]),
         .testTarget(
-            name: "Gemma4Tests", dependencies: ["ModelKit", "ModelKitGemma4", "ModelKitCoreAI"],
+            name: "Gemma4Tests", dependencies: ["ModelKit", "ModelKitGemma4"],
             exclude: ["README.md"]),
         .testTarget(
             name: "AgentModelEvaluationTests", dependencies: ["AgentCore", "Agents", "ModelKit", "ModelKitGemma4"],

@@ -1,5 +1,6 @@
 import AgentCore
 import Foundation
+import FunctionContracts
 
 /// Public task content, separate from private inference history and trusted UI commands.
 public struct AgentTaskContent: Codable, Sendable, Equatable {
@@ -40,6 +41,9 @@ public struct AgentTaskView: Codable, Sendable {
     public var text: String
     public var interactionID: UUID?
     public var artifactID: UUID?
+    public var goal: String?
+    public var skills: [String]?
+    public var createdAt: Date?
     public var terminal: Bool
     public init(scope: AgentTaskScope, content: AgentTaskContent, terminal: Bool = false) {
         self.scope = scope
@@ -136,4 +140,66 @@ public struct AgentTaskInputIntent: Codable, Sendable, Equatable {
             id: id, sessionID: sessionID, payload: payload,
             metadata: InputMetadata(payload: payload, source: "user", rootID: id))
     }
+}
+
+/// Validated background request; target capability declarations are injected by the host.
+public struct AgentBackgroundTaskRequest: Sendable {
+    public let goal: String
+    public let skills: [String]
+    public let target: AgentID
+    public let businessContract: String
+    public let data: Data
+    public init(arguments: [String: String]) throws {
+        let required: Set<String> = ["goal", "execution", "target", "businessContract", "payload"]
+        guard required.isSubset(of: Set(arguments.keys)), Set(arguments.keys).isSubset(of: required.union(["skills"])),
+            arguments["execution"] == "background", let goal = arguments["goal"],
+            !goal.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, goal.utf8.count <= 4096,
+            let target = arguments["target"], !target.isEmpty, target.utf8.count <= 64,
+            let contract = arguments["businessContract"], !contract.isEmpty, contract.utf8.count <= 64,
+            let payload = arguments["payload"], payload.utf8.count <= 65_536,
+            (try? JSONSerialization.jsonObject(with: Data(payload.utf8))) != nil
+        else { throw CommunicationError.invalidPayload }
+        self.goal = goal
+        self.skills = try AgentTaskSkillIDs.decode(arguments["skills"])
+        self.target = AgentID(rawValue: target)
+        self.businessContract = contract
+        self.data = Data(payload.utf8)
+    }
+    public func signal(requester: AgentID, parent: UUID?, session: UUID) throws -> AgentTaskSignal {
+        guard target != requester else { throw CommunicationError.unauthorized }
+        return try AgentTaskSignal(
+            kind: .request,
+            scope: AgentTaskScope(
+                parentID: parent, requester: requester, executor: target, sessionID: session, execution: .background),
+            businessContract: businessContract, data: data, goal: goal, requestedSkills: skills)
+    }
+}
+
+/// Input-only validation shared by local and remote task requests.
+enum AgentTaskSkillIDs {
+    static func decode(_ text: String?) throws -> [String] {
+        guard let text else { return [] }
+        guard text.utf8.count <= 4096, let ids = try? JSONDecoder().decode([String].self, from: Data(text.utf8)),
+            ids.count <= 16, ids.allSatisfy({ !$0.isEmpty && $0.utf8.count <= 64 }), Set(ids).count == ids.count
+        else { throw CommunicationError.invalidPayload }
+        return ids
+    }
+}
+
+/// Model registration metadata for the task communication protocol.
+enum AgentTaskCommunication {
+    /// Runtime-owned communication declaration; model exposure is selected only by Skills.
+    static let sendDeclaration = ActionDeclaration(
+        path: .init(domain: "Agent", module: "Communication", function: "send"),
+        doc: "Send directed task communication to a declared target. Admission is not task completion.",
+        parameters: [
+            .init("target", description: "Declared target Agent ID"),
+            .init("kind", description: "Declared task message kind"),
+            .init("content", description: "Public task content"),
+            .init("taskID", required: false, description: "Existing task identity"),
+            .init("artifactID", required: false, description: "Authorized artifact reference"),
+            .init("businessContract", required: false, description: "Declared background business contract"),
+            .init("payload", required: false, description: "Business input encoded as a JSON string"),
+        ])
+
 }

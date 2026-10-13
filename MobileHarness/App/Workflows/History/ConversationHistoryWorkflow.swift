@@ -1,4 +1,5 @@
 import Foundation
+import StorageChat
 import UI
 
 public enum HistoryImageLoadingError: Error { case invalidReference, busy, oversizedImage }
@@ -65,7 +66,9 @@ public final class ConversationHistoryWorkflow: ConversationHistoryControlling {
                 state.isBusy = false
                 task = nil
             }
-            do { try await operation() } catch { state.status = "历史操作失败：\(error)" }
+            do { try await operation() } catch ConversationHistoryError.busy {
+                state.status = "正在回复或处理输入，请结束后再开始新对话。"
+            } catch { state.status = "历史操作失败：\(error)" }
         }
     }
     public func cancel() { task?.cancel() }

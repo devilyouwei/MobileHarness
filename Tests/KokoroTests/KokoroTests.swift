@@ -58,7 +58,8 @@ import Testing
     func realKokoroSynthesis() async throws {
         let path = try #require(ProcessInfo.processInfo.environment["HARNESS_KOKORO_MODEL_ROOT"])
         let models = URL(fileURLWithPath: path)
-        let providerContext = ModelContext()
+        let providerContext = try ModelContext(
+            loadGate: ModelLoadGate(maximumConcurrentLoads: 4), maximumLoadWaiters: 32)
         let provider = try KokoroSpeechSynthesis(
             context: providerContext,
             artifacts: models)

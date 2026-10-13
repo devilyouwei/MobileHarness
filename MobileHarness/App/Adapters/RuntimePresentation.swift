@@ -6,11 +6,16 @@ import CallRuntime
 import ExecutionRuntime
 import Foundation
 import FunctionContracts
+import UI
 
 @MainActor
 protocol VoiceOutputHandling: AnyObject, Sendable {
     func validateCameraControl(invocation: any FunctionInput) throws
-    func updateListening(enabled: Bool, paused: Bool, revision: UInt64, invocation: any FunctionInput) async throws
+    func updateListening(
+        enabled: Bool, paused: Bool, revision: UInt64, feedback: SpeechActions.ListeningFeedback,
+        invocation: any FunctionInput) async throws
+    func playCue(_ request: UIActions.CueRequest, invocation: any FunctionInput) async throws
+    func vibrate(_ request: UIActions.HapticRequest, invocation: any FunctionInput) async throws
     func play(audioID: UUID, invocation: any FunctionInput) async throws
     func present(_ text: String, invocation: any FunctionInput) throws
     func presentTranscript(_ text: String, invocation: any FunctionInput) throws
@@ -21,26 +26,65 @@ protocol VoiceOutputHandling: AnyObject, Sendable {
     func restoreExpression(invocation: any FunctionInput) async throws
     func setExpression(_ emotion: UIActions.Emotion, invocation: any FunctionInput) throws
     func observeSpeech(_ input: AgentInput)
-    func show(_ envelope: OutputEnvelope)
+    func show(_ envelope: OutputEnvelope) async
 }
 
 @MainActor
 protocol CameraOutputHandling: AnyObject, Sendable {
     func present(_ target: UIActions.Gaze, invocation: any FunctionInput) throws
-    func present(_ overlay: PoseOverlay, sessionID: UUID) throws
+    func present(_ overlay: Actions.PoseOverlay, sessionID: UUID) throws
     func visionStatus(_ message: String?, sessionID: UUID)
 }
 
 /// A whole role binds atomically. Closures in the handler registry never own session resources.
 @MainActor
 final class RuntimePresentation: UIPresentationCapability, UIUpdateCapability, SpeechPlaybackCapability,
-    PosePresentationCapability, CameraControlCapability, SpeechListeningCapability
+    PosePresentationCapability, CameraControlCapability, SpeechListeningCapability, TaskControlCapability,
+    UIFeedbackCapability, UIEffectCapability
 {
+    var taskControl: (@Sendable (String, [String: String], String, UUID, UUID, UUID?) async throws -> String)?
+    func controlTask(_ operation: String, arguments: [String: String], invocation: any FunctionInput) async throws
+        -> String
+    {
+        guard let taskControl else { throw CommunicationError.scopeClosed }
+        if invocation.context.decisionID == nil {
+            guard invocation.context.source == "assistant", invocation.context.sessionID == rootSessionID else {
+                throw CommunicationError.unauthorized
+            }
+        }
+        return try await taskControl(
+            operation, arguments, invocation.context.source, invocation.context.sessionID,
+            invocation.context.inputID, invocation.context.decisionID)
+    }
     private let cameraControl: any CameraControlCapability
     private let rootSessionID: UUID
-    init(cameraControl: any CameraControlCapability, rootSessionID: UUID) {
+    let homeEffects: HomeEffectsWorkflow
+    init(cameraControl: any CameraControlCapability, rootSessionID: UUID, activity: ActionActivityState) {
+        homeEffects = HomeEffectsWorkflow(activity: activity)
         self.cameraControl = cameraControl
         self.rootSessionID = rootSessionID
+    }
+    private func validateEffects(_ invocation: any FunctionInput) throws {
+        guard invocation.context.source == "assistant", let voice else { throw CommunicationError.unauthorized }
+        try voice.validateCameraControl(invocation: invocation)
+    }
+    func showNotice(_ request: UIActions.NoticeRequest, invocation: any FunctionInput) async throws {
+        try validateEffects(invocation)
+        try await homeEffects.showNotice(
+            HomeNotice(text: request.text, tone: HomeNotice.Tone(rawValue: request.tone.rawValue) ?? .warning),
+            durationMS: request.durationMS, invocation: invocation)
+    }
+    func dismissNotice(invocation: any FunctionInput) async throws {
+        try validateEffects(invocation)
+        try await homeEffects.dismissNotice(invocation: invocation)
+    }
+    func updateLight(_ request: UIActions.LightRequest, invocation: any FunctionInput) async throws {
+        try validateEffects(invocation)
+        try await homeEffects.updateLight(
+            request.enabled
+                ? DecorativeLight(
+                    origin: .init(x: request.x, y: request.y), initialOpacity: request.initialOpacity,
+                    intensity: request.intensity) : nil, durationMS: request.durationMS, invocation: invocation)
     }
     private func cameraOperation(
         _ operation: PhotographerCameraIntent.Operation, facing: CameraActions.Facing? = nil, photoID: UUID? = nil,
@@ -48,7 +92,7 @@ final class RuntimePresentation: UIPresentationCapability, UIUpdateCapability, S
     )
         async throws -> String?
     {
-        if invocation.context.source == "photographer" {
+        if ["photographer", "assistant"].contains(invocation.context.source) {
             if invocation.context.sessionID != rootSessionID {
                 guard let voice else { throw CommunicationError.scopeClosed }
                 try voice.validateCameraControl(invocation: invocation)
@@ -87,7 +131,9 @@ final class RuntimePresentation: UIPresentationCapability, UIUpdateCapability, S
         return try JSONDecoder().decode(CameraPhotoCommandReceipt.self, from: Data(result.utf8))
     }
     func takePhoto(invocation: any FunctionInput) async throws -> CameraPhotoReceipt {
-        guard invocation.context.source == "photographer" else { throw CommunicationError.unauthorized }
+        guard ["photographer", "assistant"].contains(invocation.context.source) else {
+            throw CommunicationError.unauthorized
+        }
         if invocation.context.sessionID != rootSessionID {
             guard let voice else { throw CommunicationError.scopeClosed }
             try voice.validateCameraControl(invocation: invocation)
@@ -113,7 +159,10 @@ final class RuntimePresentation: UIPresentationCapability, UIUpdateCapability, S
         voice = value
     }
     func unbindVoice(_ value: any VoiceOutputHandling) {
-        if voice === value { voice = nil }
+        if voice === value {
+            homeEffects.stop()
+            voice = nil
+        }
     }
     func bindCamera(_ value: any CameraOutputHandling) throws {
         guard camera == nil else { throw CommunicationError.scopeClosed }
@@ -122,11 +171,23 @@ final class RuntimePresentation: UIPresentationCapability, UIUpdateCapability, S
     func unbindCamera(_ value: any CameraOutputHandling) {
         if camera === value { camera = nil }
     }
-    func updateListening(enabled: Bool, paused: Bool, revision: UInt64, invocation: any FunctionInput) async throws {
+    func updateListening(
+        enabled: Bool, paused: Bool, revision: UInt64, feedback: SpeechActions.ListeningFeedback,
+        invocation: any FunctionInput
+    ) async throws {
         guard invocation.context.source == "speechPerception", invocation.context.sessionID == rootSessionID,
             let voice
         else { throw CommunicationError.unauthorized }
-        try await voice.updateListening(enabled: enabled, paused: paused, revision: revision, invocation: invocation)
+        try await voice.updateListening(
+            enabled: enabled, paused: paused, revision: revision, feedback: feedback, invocation: invocation)
+    }
+    func playCue(_ request: UIActions.CueRequest, invocation: any FunctionInput) async throws {
+        guard let voice else { throw CommunicationError.scopeClosed }
+        try await voice.playCue(request, invocation: invocation)
+    }
+    func vibrate(_ request: UIActions.HapticRequest, invocation: any FunctionInput) async throws {
+        guard let voice else { throw CommunicationError.scopeClosed }
+        try await voice.vibrate(request, invocation: invocation)
     }
     func play(audioID: UUID, invocation: any FunctionInput) async throws {
         guard let voice else { throw CommunicationError.scopeClosed }
@@ -168,7 +229,7 @@ final class RuntimePresentation: UIPresentationCapability, UIUpdateCapability, S
         guard let camera else { throw CommunicationError.scopeClosed }
         try camera.present(target, invocation: invocation)
     }
-    func present(_ overlay: PoseOverlay, sessionID: UUID) async throws {
+    func present(_ overlay: Actions.PoseOverlay, sessionID: UUID) async throws {
         guard let camera else { throw CommunicationError.scopeClosed }
         try camera.present(overlay, sessionID: sessionID)
     }
@@ -181,6 +242,6 @@ final class RuntimePresentation: UIPresentationCapability, UIUpdateCapability, S
             ["assistant", "photographer", "memory", "applicationControl", "speechPerception"].contains(
                 envelope.source.rawValue)
         else { return }
-        voice?.show(envelope)
+        await voice?.show(envelope)
     }
 }

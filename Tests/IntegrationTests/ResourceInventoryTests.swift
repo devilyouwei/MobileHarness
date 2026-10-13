@@ -18,7 +18,7 @@ private actor InventoryFixture: ModelResourceInventoryCapability {
         return items
     }
 }
-@Test func inventoryRefreshCrossesGatewaysAndFailureDoesNotBlockLaterRead() async throws {
+@Test(.actionCatalog) func inventoryRefreshCrossesGatewaysAndFailureDoesNotBlockLaterRead() async throws {
     let fixture = InventoryFixture()
     await fixture.set([
         .init(id: "nemotron", name: "ASR", bytes: 100, completedBytes: 150, phase: .installed),
@@ -39,7 +39,9 @@ private actor InventoryFixture: ModelResourceInventoryCapability {
     #expect(await runtime.agent.status().queuedInputs == 0)
     await runtime.shutdown()
 }
-@Test func inventoryRejectsDuplicateIDsOverflowAndNegativeFactsBeforeReturningPartialState() async throws {
+@Test(.actionCatalog) func inventoryRejectsDuplicateIDsOverflowAndNegativeFactsBeforeReturningPartialState()
+    async throws
+{
     let fixture = InventoryFixture()
     let runtime = try resourceRuntime(UnusedModelResourceCapability(), inventory: fixture)
     let item = ModelResourceFact(id: "model", name: "Model", bytes: 10, phase: .notInstalled)
@@ -53,7 +55,7 @@ private actor InventoryFixture: ModelResourceInventoryCapability {
     #expect(try ModelResourceInventory.decode(await runtime.inventory()).items == [item])
     await runtime.shutdown()
 }
-@Test func installedGroupsShareActualPrerequisitesAndIgnoreOptionalVAD() throws {
+@Test(.actionCatalog) func installedGroupsShareActualPrerequisitesAndIgnoreOptionalVAD() throws {
     #expect(ResourceModelGroup.recognition.isInstalled(in: ["nemotron"]))
     #expect(!ResourceModelGroup.recognition.isInstalled(in: ["silero"]))
     let inventory = ModelResourceInventory(items: [.init(id: "moss-tts-nano", name: "TTS", bytes: 10, phase: .deleting)]
@@ -61,7 +63,7 @@ private actor InventoryFixture: ModelResourceInventoryCapability {
     #expect(inventory.installedGroups.isEmpty)
     #expect(try ModelResourceInventory.decode(inventory.encoded()).installedGroups.isEmpty)
 }
-@Test func inventoryEnforcesEncodedByteCapacityInAdditionToItemBound() throws {
+@Test(.actionCatalog) func inventoryEnforcesEncodedByteCapacityInAdditionToItemBound() throws {
     let inventory = ModelResourceInventory(
         items: (0..<64).map {
             .init(
@@ -73,7 +75,7 @@ private actor InventoryFixture: ModelResourceInventoryCapability {
     #expect(throws: ResourceInventoryError.capacityExceeded) { try inventory.encoded() }
 }
 
-@Test func largeInventoryReturnsIntactAndByteOverflowDoesNotBlockLaterRead() async throws {
+@Test(.actionCatalog) func largeInventoryReturnsIntactAndByteOverflowDoesNotBlockLaterRead() async throws {
     let fixture = InventoryFixture()
     let items: [ModelResourceFact] = (0..<22).map {
         .init(

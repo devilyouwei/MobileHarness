@@ -3,7 +3,10 @@ import FunctionContracts
 
 extension SystemActions {
     @Action(
-        domain: "System", module: "ModelResources", title: "snapshotResources", serializationKey: "ModelResources",
+        domain: "System", module: "ModelResources", title: "snapshotResources",
+        doc:
+            "Read current shared model resource inventory, installed groups and progress. Does not download, remove or switch a model.",
+        parameters: [],
         timeout: .seconds(60))
     public static func snapshotResources(
         invocation: any FunctionInput, using inventory: any ModelResourceInventoryCapability
@@ -13,7 +16,7 @@ extension SystemActions {
     }
 
     @Action(
-        domain: "System", module: "ModelResources", title: "restoreSource", serializationKey: "ModelResources",
+        domain: "System", module: "ModelResources", title: "restoreSource",
         timeout: .seconds(60))
     public static func restoreSource(
         invocation: any FunctionInput, using preferences: any ModelResourcePreferencesCapability
@@ -23,7 +26,7 @@ extension SystemActions {
         return try await preferences.restoreSource().encoded()
     }
     @Action(
-        domain: "System", module: "ModelResources", title: "saveSource", serializationKey: "ModelResources",
+        domain: "System", module: "ModelResources", title: "saveSource",
         timeout: .seconds(60))
     public static func saveSource(
         invocation: any FunctionInput, using preferences: any ModelResourcePreferencesCapability
@@ -47,7 +50,7 @@ extension SystemActions {
 
     @Action(
         domain: "System", module: "ModelResources", title: "configureSpeech",
-        serializationKey: "ModelResources", timeout: .seconds(60))
+        timeout: .seconds(60))
     public static func configureSpeech(invocation: any FunctionInput, using resources: any ModelResourceCapability)
         async throws -> String
     {
@@ -65,7 +68,16 @@ extension SystemActions {
     }
 
     @Action(
-        domain: "System", module: "ModelResources", title: "download", serializationKey: "ModelResources",
+        domain: "System", module: "ModelResources", title: "download",
+        doc:
+            "Admit a model download using an explicit source. Admission does not mean installed; read the shared inventory for progress.",
+        parameters: [
+            .init("id", type: .string, required: true, description: "id", constraints: ""),
+            .init("endpoint", type: .string, required: true, description: "endpoint", constraints: ""),
+            .init(
+                "allowsCellular", type: .string, required: true, description: "allowsCellular",
+                constraints: "One of: true, false", values: ["true", "false"]),
+        ],
         timeout: .seconds(60))
     public static func download(invocation: any FunctionInput, using resources: any ModelResourceCapability)
         async throws -> String
@@ -85,7 +97,9 @@ extension SystemActions {
     }
 
     @Action(
-        domain: "System", module: "ModelResources", title: "cancel", serializationKey: "ModelResources",
+        domain: "System", module: "ModelResources", title: "cancel",
+        doc: "Cancel and join an admitted model transfer. Failure is returned without replay.",
+        parameters: [.init("id", type: .string, required: true, description: "id", constraints: "")],
         timeout: .seconds(60))
     public static func cancel(invocation: any FunctionInput, using resources: any ModelResourceCapability) async throws
         -> String
@@ -100,7 +114,7 @@ extension SystemActions {
     }
 
     @Action(
-        domain: "System", module: "ModelResources", title: "remove", serializationKey: "ModelResources",
+        domain: "System", module: "ModelResources", title: "remove",
         timeout: .seconds(60))
     public static func remove(invocation: any FunctionInput, using resources: any ModelResourceCapability) async throws
         -> String

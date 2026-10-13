@@ -1,0 +1,75 @@
+{
+  "version": 7,
+  "id": "memory",
+  "communication": {
+    "inputs": [
+      {
+        "contract": "history.intent",
+        "version": 1,
+        "kind": "observation"
+      },
+      {
+        "contract": "tool.result",
+        "version": 1,
+        "kind": "toolResult"
+      },
+      {
+        "contract": "task.request",
+        "version": 1,
+        "kind": "observation"
+      },
+      {
+        "contract": "task.input",
+        "version": 1,
+        "kind": "observation"
+      },
+      {
+        "contract": "task.progress",
+        "version": 1,
+        "kind": "observation"
+      },
+      {
+        "contract": "task.result",
+        "version": 1,
+        "kind": "observation"
+      },
+      {
+        "contract": "task.cancel",
+        "version": 1,
+        "kind": "observation"
+      },
+      {
+        "contract": "communication.receipt",
+        "version": 1,
+        "kind": "communicationReceipt"
+      }
+    ],
+    "subscriptions": [
+      {
+        "contract": "history.intent",
+        "source": "runtime",
+        "topic": "history.intent"
+      },
+      {
+        "contract": "history.intent",
+        "source": "user",
+        "topic": "history.intent"
+      }
+    ],
+    "publications": [],
+    "sends": [
+      {
+        "contract": "task.progress",
+        "target": "assistant"
+      },
+      {
+        "contract": "task.result",
+        "target": "assistant"
+      }
+    ]
+  },
+  "baseSkills": [
+    "history-query"
+  ],
+  "backgroundTasks": []
+}

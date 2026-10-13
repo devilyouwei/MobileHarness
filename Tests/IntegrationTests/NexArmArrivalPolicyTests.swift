@@ -9,7 +9,7 @@ import Gateway
 import PlatformKit
 import Testing
 
-@Test func arrivalWinsWithoutStabilityAndStaleSamplesCannotComplete() throws {
+@Test(.actionCatalog) func arrivalWinsWithoutStabilityAndStaleSamplesCannotComplete() throws {
     let start = ContinuousClock.now
     let policy = try NexArmMotorCompletion(tolerance: 20)
     var tracker = NexArmSegmentTracker(
@@ -23,7 +23,7 @@ import Testing
     #expect(tracker.outcome(at: start + .milliseconds(1)) == .arrived)
 }
 
-@Test func offTargetRequiresFreshStableSpanAndResetsWhenMotorMoves() throws {
+@Test(.actionCatalog) func offTargetRequiresFreshStableSpanAndResetsWhenMotorMoves() throws {
     let start = ContinuousClock.now
     let policy = try NexArmMotorCompletion(tolerance: 16, offTargetMilliseconds: 600)
     var tracker = NexArmSegmentTracker(
@@ -46,7 +46,7 @@ import Testing
     #expect(moving.outcome(at: start + .seconds(1)) == .timedOut)
 }
 
-@Test func measuredMotorProfilesAndDynamicBudgetsCoverErrorAndParameterChanges() throws {
+@Test(.actionCatalog) func measuredMotorProfilesAndDynamicBudgetsCoverErrorAndParameterChanges() throws {
     #expect(NexArmMotorProfiles.profile(for: 3).tolerance >= 26)
     #expect(NexArmMotorProfiles.profile(for: 4).tolerance >= 22)
     let options = try NexArmMotorOptions(speed: 800, acceleration: 50)
@@ -64,7 +64,7 @@ import Testing
     #expect(unknown.timeoutMilliseconds > baseline.timeoutMilliseconds)
 }
 
-@Test func compositionBudgetsAddSequenceRepeatAndDelayButMaximizeParallel() throws {
+@Test(.actionCatalog) func compositionBudgetsAddSequenceRepeatAndDelayButMaximizeParallel() throws {
     let one = try ActionExecutionBudget(expected: .seconds(1), timeout: .seconds(2))
     let two = try ActionExecutionBudget(expected: .seconds(2), timeout: .seconds(4))
     let composition = try ActionComposition(
@@ -76,26 +76,26 @@ import Testing
             .repeated(3, .action("repeated", [], budget: one) { .completed }),
             .delay(.seconds(1)),
         ]))
-    let budget = try #require(try composition.executionBudget)
+    let budget = try composition.executionBudget
     #expect(budget.expected == .seconds(6))
     #expect(budget.timeout == .milliseconds(11_100))
-    let unbounded = try ActionComposition(.action("unknown", []) { .completed })
-    #expect(try unbounded.executionBudget == nil)
+    let defaulted = try ActionComposition(.action("unknown", []) { .completed })
+    #expect(try defaulted.executionBudget == .default)
 }
 
 private enum MacroFixture {
     @Action(
         domain: "Fixture", module: "Control", title: "Generated action", kind: .finite, completion: "Done",
-        serializationKey: "fixture.control", resolvingResources: { _ in [.init(rawValue: "fixture")] },
-        estimatingDuration: { _ in try .init(expected: .zero, timeout: .milliseconds(30)) })
+        resolvingResources: { _ in [.init(rawValue: "fixture")] },
+        dynamicTimeout: { _ in try .init(expected: .zero, timeout: .milliseconds(30)) })
     public static func run() {}
     @Action(
-        domain: "Fixture", module: "Control", title: "Generated tool", serializationKey: "Fixture",
+        domain: "Fixture", module: "Control", title: "Generated tool",
         resources: [.init(rawValue: "fixture")])
     public static func tool() {}
 }
 
-@Test func macroFactoriesPreserveTitlesResourcesAndTimeoutReportsThroughCleanup() async throws {
+@Test(.actionCatalog) func macroFactoriesPreserveTitlesResourcesAndTimeoutReportsThroughCleanup() async throws {
     let tool = MacroFixture.toolDefinition(completing: { _ in .value("ok") })
     #expect(tool.path.description == "Fixture.Control.tool" && tool.displayName == "Generated tool")
     #expect(tool.resources == [.init(rawValue: "fixture")])
@@ -111,7 +111,6 @@ private enum MacroFixture {
             }
             return .completed
         }))
-    #expect(action.serializationKey == "fixture.control")
     let call = ActionCall(
         actionPath: ActionPath(domain: action.path.domain, module: action.path.module, function: action.path.function),
         channel: "Fixture")
@@ -135,7 +134,7 @@ private enum MacroFixture {
 }
 
 #if os(macOS)
-    @Test(.enabled(if: ProcessInfo.processInfo.environment["NEXARM_ARRIVAL_TEST"] == "1"))
+    @Test(.actionCatalog, .enabled(if: ProcessInfo.processInfo.environment["NEXARM_ARRIVAL_TEST"] == "1"))
     func nexArmUSBPhysicalArrivalProfiles() async throws {
         let link = try NexArmSerial(path: #require(ProcessInfo.processInfo.environment["NEXARM_PORT"]))
         let controller = NexArmActionController(link: link)
@@ -163,7 +162,7 @@ private enum MacroFixture {
     }
 #endif
 
-@Test func channelPreservesDeadlineOverStoredReportAndContinuesNextAction() async throws {
+@Test(.actionCatalog) func channelPreservesDeadlineOverStoredReportAndContinuesNextAction() async throws {
     let action = ActionBinding(
         function: MacroFixture.runDefinition(completing: { invocation in
             if invocation.call.parameters["quick"] == "true" { return .completed }
@@ -202,7 +201,7 @@ private enum MacroFixture {
     #expect(results.last?.status == .succeeded)
 }
 
-@Test func compositionLeafDeadlineContinuesWithoutDuplicatingTheTimeout() async throws {
+@Test(.actionCatalog) func compositionLeafDeadlineContinuesWithoutDuplicatingTheTimeout() async throws {
     let deadline = try ActionExecutionBudget(expected: .zero, timeout: .milliseconds(20))
     let composition = try ActionComposition(
         .sequence([
@@ -219,7 +218,7 @@ private enum MacroFixture {
     #expect(report.entries.last?.status == .succeeded)
 }
 
-@Test func nativeAdmissionRejectsRetiredFullEncoderRangeFallback() throws {
+@Test(.actionCatalog) func nativeAdmissionRejectsRetiredFullEncoderRangeFallback() throws {
     for motor in 1...6 {
         let limits = NexArmMotorCommands.positionLimits[motor - 1]
         for target in [limits.lowerBound, limits.upperBound] {
@@ -233,4 +232,116 @@ private enum MacroFixture {
             #expect(!packet.isLiveControl && !packet.isObservedControl)
         }
     }
+}
+
+@Test(.actionCatalog) func composedFunctionUsesChildBudgetsInsteadOfThirtySecondDefault() async throws {
+    let child = ActionFunction(
+        path: .init(domain: "Fixture", module: "Budget", function: "child"), displayName: "Child", kind: .finite,
+        completion: "Actual completion", timeout: .seconds(45),
+        dynamicTimeout: { _ in try .init(expected: .seconds(2), timeout: .seconds(60)) },
+        completing: { _ in .value("actual child value") })
+    let input = FunctionInvocation(
+        call: .init(actionPath: child.path),
+        context: .init(source: "fixture", sessionID: UUID(), inputID: UUID()), results: ActionReportStore())
+    let composition = try ActionComposition(
+        .sequence([
+            .action(function: child, invocation: input),
+            .action("defaulted", []) { .completed },
+        ]))
+    #expect(try composition.executionBudget.timeout == .seconds(90))
+    let function = ActionComposition.function(
+        path: .init(domain: "Fixture", module: "Budget", function: "parent"), displayName: "Parent",
+        composing: { _ in composition })
+    #expect(try function.executionBudget(for: .init(actionPath: function.path)).timeout == .seconds(90))
+    let parent = FunctionInvocation(
+        call: .init(actionPath: function.path), context: input.context, results: ActionReportStore())
+    let result = try await FunctionExecutor.perform(parent, definition: function)
+    guard case .report(let report) = result else {
+        Issue.record("Missing composite result")
+        return
+    }
+    #expect(report.status == .succeeded && report.entries.count == 2)
+    let empty = try ActionComposition(.sequence([]))
+    #expect(try empty.executionBudget.timeout == .milliseconds(100))
+    #expect(try await empty.run() == .empty)
+}
+
+@Test(.actionCatalog) func compositionRejectsAggregateOverflowBeforeEffects() throws {
+    let huge = try ActionExecutionBudget(expected: .zero, timeout: .seconds(50_000))
+    #expect(throws: ActionExecutionBudget.InvalidBudget.self) {
+        try ActionComposition(
+            .sequence([
+                .action("one", [], budget: huge) {
+                    Issue.record("Effects must not run")
+                    return .completed
+                },
+                .action("two", [], budget: huge) {
+                    Issue.record("Effects must not run")
+                    return .completed
+                },
+            ]))
+    }
+}
+
+@Test(.actionCatalog, .timeLimit(.minutes(1))) func undeclaredActionAndToolTimeoutJoinCleanup() async throws {
+    actor Cleanup {
+        var count = 0
+        func finish() { count += 1 }
+    }
+    let cleanup = Cleanup()
+    let function = ActionFunction(
+        path: .init(domain: "Fixture", module: "Budget", function: "defaultTimeout"), displayName: "Default",
+        kind: .finite, completion: "Joined",
+        handler: { _ in
+            do { try await Task.sleep(for: .seconds(60)) } catch {
+                await cleanup.finish()
+                throw error
+            }
+        })
+    let context = ActionExecutionContext(source: "fixture", sessionID: UUID(), inputID: UUID())
+    let invocation = FunctionInvocation(
+        call: .init(actionPath: function.path), context: context, results: ActionReportStore())
+    async let action = FunctionExecutor.perform(invocation, definition: function)
+    let tools = try ToolRegistry(modules: [
+        DefaultTimeoutTools(definitions: [
+            ActionBinding(
+                function: function, protocols: [.tool], executionPolicy: .direct, directResultPolicy: .returning)
+        ])
+    ])
+    async let tool = ToolExecutor(registry: tools).execute(
+        .init(toolPath: function.path.description), context: context)
+    let (actionResult, toolResult) = try await (action, tool)
+    guard case .report(let report) = actionResult else {
+        Issue.record("Missing default timeout")
+        return
+    }
+    #expect(report.executionFailure == .timedOut)
+    #expect(toolResult?.failureCode == .timedOut)
+    #expect(await cleanup.count == 2)
+}
+private struct DefaultTimeoutTools: ToolModule { let definitions: [ActionBinding] }
+
+@Test(.actionCatalog) func aggregateDeadlineRetainsCleanupReportAndPreventsLaterEffects() async throws {
+    let first = try ActionExecutionBudget(expected: .zero, timeout: .milliseconds(20))
+    let next = try ActionExecutionBudget(expected: .zero, timeout: .milliseconds(10))
+    let composition = try ActionComposition(
+        .sequence([
+            .action("slow", [], budget: first) {
+                do { try await Task.sleep(for: .seconds(10)) } catch {
+                    // Cleanup has its own owner and must finish even after aggregate cancellation.
+                    await Task.detached { try? await Task.sleep(for: .milliseconds(60)) }.value
+                    return .report(try ActionReport(entries: [.init(path: "committed", status: .succeeded)]))
+                }
+                return .completed
+            },
+            .action("later", [], budget: next) {
+                Issue.record("Aggregate deadline must prevent later effects")
+                return .completed
+            },
+        ]))
+    let report = try await composition.run()
+    #expect(report.executionFailure == .timedOut)
+    #expect(report.status == .partialFailure)
+    #expect(report.entries.first?.status == .succeeded)
+    #expect(report.entries.last?.status == .notStarted)
 }

@@ -474,7 +474,7 @@ private func bluetoothTestFile() -> URL {
     FileManager.default.temporaryDirectory.appendingPathComponent("bluetooth-tests-\(UUID()).json")
 }
 
-@Test func bluetoothReplyRequiresACKAndMatchingReassembledPacket() throws {
+@Test(.actionCatalog) func bluetoothReplyRequiresACKAndMatchingReassembledPacket() throws {
     var reply = NexArmBLEReply(id: 255, command: 1, count: 6)
     let packet = try NexArmPacket(command: 1, payload: [1, 0, 2, 1, 0, 2])
     try reply.receive(try NexArmPacket(command: 11, payload: [1, 2]).bytes)
@@ -490,7 +490,7 @@ private func bluetoothTestFile() -> URL {
     #expect(throws: NexArmError.overflow) { try wrong.receive(Array(repeating: 0, count: 16_385)) }
 }
 
-@Test(.timeLimit(.minutes(1))) @MainActor
+@Test(.actionCatalog, .timeLimit(.minutes(1))) @MainActor
 func bluetoothSettingsConnectionPersistsAcrossNavigationAndAssistantExecutes() async throws {
     let file = bluetoothTestFile()
     defer { try? FileManager.default.removeItem(at: file) }
@@ -536,7 +536,7 @@ func bluetoothSettingsConnectionPersistsAcrossNavigationAndAssistantExecutes() a
     await restoreObserver.value
 }
 
-@Test(.timeLimit(.minutes(1))) @MainActor
+@Test(.actionCatalog, .timeLimit(.minutes(1))) @MainActor
 func bluetoothRejectsIncompatibleServiceAndCancelsConnectingOnBackground() async throws {
     let file = bluetoothTestFile()
     defer { try? FileManager.default.removeItem(at: file) }
@@ -563,7 +563,7 @@ func bluetoothRejectsIncompatibleServiceAndCancelsConnectingOnBackground() async
     await observer.value
 }
 
-@Test(.timeLimit(.minutes(1))) @MainActor
+@Test(.actionCatalog, .timeLimit(.minutes(1))) @MainActor
 func bluetoothBackgroundJoinsCommittedLegAndDoesNotResumeMotion() async throws {
     let file = bluetoothTestFile()
     defer { try? FileManager.default.removeItem(at: file) }
@@ -592,7 +592,7 @@ func bluetoothBackgroundJoinsCommittedLegAndDoesNotResumeMotion() async throws {
     await observer.value
 }
 
-@Test(.timeLimit(.minutes(1))) @MainActor
+@Test(.actionCatalog, .timeLimit(.minutes(1))) @MainActor
 func bluetoothFailedWriteRecoversConnectionWithoutReplayingTheGesture() async throws {
     let file = bluetoothTestFile()
     defer { try? FileManager.default.removeItem(at: file) }
@@ -621,7 +621,7 @@ func bluetoothFailedWriteRecoversConnectionWithoutReplayingTheGesture() async th
     await observer.value
 }
 
-@Test func bluetoothFailureIdentifiesNativeStep() {
+@Test(.actionCatalog) func bluetoothFailureIdentifiesNativeStep() {
     #expect(BluetoothPresentation.failure(.timeout(.connecting)) == "建立蓝牙连接超时")
     #expect(BluetoothPresentation.failure(.timeout(.notifications)) == "开启设备通知超时")
     #expect(BluetoothPresentation.failure(.timeout(.response)) == "等待设备回复超时")
@@ -632,7 +632,7 @@ func bluetoothFailedWriteRecoversConnectionWithoutReplayingTheGesture() async th
     #expect(BluetoothPresentation.failure(.disconnectUnconfirmed) == "蓝牙断开尚未确认，请关闭系统蓝牙后重试")
 }
 
-@Test(.timeLimit(.minutes(1))) @MainActor
+@Test(.actionCatalog, .timeLimit(.minutes(1))) @MainActor
 func bluetoothPoseProtocolConnectsWithoutFirmwareQueriesAndAssistantExecutes() async throws {
     let file = bluetoothTestFile()
     defer { try? FileManager.default.removeItem(at: file) }
@@ -664,7 +664,7 @@ func bluetoothPoseProtocolConnectsWithoutFirmwareQueriesAndAssistantExecutes() a
     await observer.value
 }
 
-@Test(.timeLimit(.minutes(1))) @MainActor
+@Test(.actionCatalog, .timeLimit(.minutes(1))) @MainActor
 func bluetoothPassiveConnectionDoesNotValidateBusinessPose() async throws {
     let file = bluetoothTestFile()
     defer { try? FileManager.default.removeItem(at: file) }
@@ -687,7 +687,7 @@ func bluetoothPassiveConnectionDoesNotValidateBusinessPose() async throws {
     await observer.value
 }
 
-@Test(.timeLimit(.minutes(1))) @MainActor
+@Test(.actionCatalog, .timeLimit(.minutes(1))) @MainActor
 func bluetoothBackgroundCancelsPendingConnectionWithoutSendingAnIndication() async throws {
     let file = bluetoothTestFile()
     defer { try? FileManager.default.removeItem(at: file) }
@@ -709,7 +709,7 @@ func bluetoothBackgroundCancelsPendingConnectionWithoutSendingAnIndication() asy
     await observer.value
 }
 
-@Test func bluetoothWriteAcknowledgmentDoesNotMasqueradeAsPositionFeedback() throws {
+@Test(.actionCatalog) func bluetoothWriteAcknowledgmentDoesNotMasqueradeAsPositionFeedback() throws {
     let outgoing = try NexArmPacket(command: 54, payload: [0xD0, 0x07])
     var reply = NexArmBLEReply(id: 255, command: 54, count: 0, acknowledgmentOnly: true, response: outgoing)
     try reply.receive(try NexArmPacket(command: 11, payload: Array(repeating: 0, count: 24)).bytes)
@@ -718,7 +718,7 @@ func bluetoothBackgroundCancelsPendingConnectionWithoutSendingAnIndication() asy
     #expect(reply.completed == outgoing)  // Private ACK token, not public position data.
 }
 
-@Test(.timeLimit(.minutes(1))) @MainActor
+@Test(.actionCatalog, .timeLimit(.minutes(1))) @MainActor
 func bluetoothConnectionFeedbackFailureKeepsLinkAndDoesNotReplayGesture() async throws {
     let file = bluetoothTestFile()
     defer { try? FileManager.default.removeItem(at: file) }
@@ -746,7 +746,7 @@ func bluetoothConnectionFeedbackFailureKeepsLinkAndDoesNotReplayGesture() async 
     await observer.value
 }
 
-@Test func nexArmStrictFirmwareAndBLEPosePoliciesRejectInvalidInputs() async throws {
+@Test(.actionCatalog) func nexArmStrictFirmwareAndBLEPosePoliciesRejectInvalidInputs() async throws {
     for version: [UInt8] in [[1, 0, 2, 1, 0, 3], [1, 0, 3, 0, 0, 0], [0, 0, 0, 0, 0, 0]] {
         let link = BluetoothArmFixture()
         await link.setVersion(version)
@@ -767,7 +767,7 @@ func bluetoothConnectionFeedbackFailureKeepsLinkAndDoesNotReplayGesture() async 
     await moving.close()
 }
 
-@Test func bluetoothDiscoveryPrioritizesNamesButKeepsRenamedAndOtherDevices() {
+@Test(.actionCatalog) func bluetoothDiscoveryPrioritizesNamesButKeepsRenamedAndOtherDevices() {
     let renamed = NexArmBluetoothDevice(id: UUID(), name: "桌上的手臂", rssi: -20)
     let other = NexArmBluetoothDevice(id: UUID(), name: "温度计", rssi: -30)
     let arm = NexArmBluetoothDevice(id: UUID(), name: "Nex_Arm", rssi: -80)
@@ -776,7 +776,7 @@ func bluetoothConnectionFeedbackFailureKeepsLinkAndDoesNotReplayGesture() async 
     #expect(rows.map(\.id) == [arm.id, renamed.id, other.id, unnamed.id])
 }
 
-@Test(.timeLimit(.minutes(1))) @MainActor
+@Test(.actionCatalog, .timeLimit(.minutes(1))) @MainActor
 func bluetoothRenamedDeviceResumesWithoutSettingsOrMovementAndManualDisconnectPersists() async throws {
     let file = bluetoothTestFile()
     defer { try? FileManager.default.removeItem(at: file) }
@@ -815,7 +815,7 @@ func bluetoothRenamedDeviceResumesWithoutSettingsOrMovementAndManualDisconnectPe
     await observer.value
 }
 
-@Test(.timeLimit(.minutes(1))) @MainActor
+@Test(.actionCatalog, .timeLimit(.minutes(1))) @MainActor
 func bluetoothColdStartRestoresPreviouslyVerifiedDeviceWithoutGesture() async throws {
     let file = bluetoothTestFile()
     defer { try? FileManager.default.removeItem(at: file) }
@@ -839,7 +839,7 @@ func bluetoothColdStartRestoresPreviouslyVerifiedDeviceWithoutGesture() async th
     await observer.value
 }
 
-@Test(.timeLimit(.minutes(1))) @MainActor
+@Test(.actionCatalog, .timeLimit(.minutes(1))) @MainActor
 func bluetoothManualDisconnectDuringBackgroundCleanupDisablesPersistedRecovery() async throws {
     let file = bluetoothTestFile()
     defer { try? FileManager.default.removeItem(at: file) }
@@ -866,7 +866,7 @@ func bluetoothManualDisconnectDuringBackgroundCleanupDisablesPersistedRecovery()
     await observer.value
 }
 
-@Test(.timeLimit(.minutes(1))) @MainActor
+@Test(.actionCatalog, .timeLimit(.minutes(1))) @MainActor
 func bluetoothGestureBackgroundCancelsRemainingLegsAndNeverReplays() async throws {
     let file = bluetoothTestFile()
     defer { try? FileManager.default.removeItem(at: file) }
@@ -895,7 +895,7 @@ func bluetoothGestureBackgroundCancelsRemainingLegsAndNeverReplays() async throw
     await observer.value
 }
 
-@Test func bluetoothJogPlannerUsesSpeedCurveAndVendorJointLimits() throws {
+@Test(.actionCatalog) func bluetoothJogPlannerUsesSpeedCurveAndVendorJointLimits() throws {
     for id in 1...6 {
         var planner = try NexArmJogPlanner(positions: NexArmGesture.referenceHomeJoints)
         #expect(try planner.proposal(id: id, deflection: 0) == nil)
@@ -909,7 +909,7 @@ func bluetoothGestureBackgroundCancelsRemainingLegsAndNeverReplays() async throw
     }
 }
 
-@Test(.timeLimit(.minutes(1))) @MainActor
+@Test(.actionCatalog, .timeLimit(.minutes(1))) @MainActor
 func bluetoothAllSixJoysticksStreamWithoutTelemetryAndReleaseDoesNotReset() async throws {
     let file = bluetoothTestFile()
     defer { try? FileManager.default.removeItem(at: file) }
@@ -945,7 +945,7 @@ func bluetoothAllSixJoysticksStreamWithoutTelemetryAndReleaseDoesNotReset() asyn
     await observer.value
 }
 
-@Test(.timeLimit(.minutes(1))) @MainActor
+@Test(.actionCatalog, .timeLimit(.minutes(1))) @MainActor
 func bluetoothLiveBackpressureDoesNotAccumulateCommandsAndResetPreemptsPreset() async throws {
     let file = bluetoothTestFile()
     defer { try? FileManager.default.removeItem(at: file) }
@@ -987,7 +987,7 @@ func bluetoothLiveBackpressureDoesNotAccumulateCommandsAndResetPreemptsPreset() 
     await observer.value
 }
 
-@Test(.timeLimit(.minutes(1)))
+@Test(.actionCatalog, .timeLimit(.minutes(1)))
 func bluetoothControllerPropagatesNativeFailureWithoutReplaying() async throws {
     let link = BluetoothArmFixture()
     try await link.connect(link.id)
@@ -1001,7 +1001,7 @@ func bluetoothControllerPropagatesNativeFailureWithoutReplaying() async throws {
     await link.close()
 }
 
-@Test(.timeLimit(.minutes(1))) @MainActor
+@Test(.actionCatalog, .timeLimit(.minutes(1))) @MainActor
 func bluetoothJoysticksAcceptOnlyNewInputAfterFailedWriteRecovery() async throws {
     let file = bluetoothTestFile()
     defer { try? FileManager.default.removeItem(at: file) }
@@ -1034,7 +1034,7 @@ func bluetoothJoysticksAcceptOnlyNewInputAfterFailedWriteRecovery() async throws
     await observer.value
 }
 
-@Test(.timeLimit(.minutes(1)))
+@Test(.actionCatalog, .timeLimit(.minutes(1)))
 func bluetoothRecoveryRequiresStationaryFeedbackAndSendsNoCommands() async throws {
     let link = BluetoothArmFixture()
     try await link.connect(link.id)
@@ -1059,7 +1059,7 @@ func bluetoothRecoveryRequiresStationaryFeedbackAndSendsNoCommands() async throw
     #expect(await link.writes == attempted)
 }
 
-@Test func bluetoothDiscoverySeparatesDeviceNamesFromPresentationPolicy() {
+@Test(.actionCatalog) func bluetoothDiscoverySeparatesDeviceNamesFromPresentationPolicy() {
     #expect(BluetoothPresentation.deviceName("未命名设备") == nil)
     #expect(NexArmBluetoothDevice.discoveryName(advertised: nil, cached: nil) == nil)
     #expect(NexArmBluetoothDevice.discoveryName(advertised: "  \n", cached: "未命名设备") == "未命名设备")
@@ -1067,7 +1067,7 @@ func bluetoothRecoveryRequiresStationaryFeedbackAndSendsNoCommands() async throw
     #expect(NexArmBluetoothDevice.discoveryName(advertised: "桌上的机械臂", cached: "旧名字") == "桌上的机械臂")
 }
 
-@Test(.timeLimit(.minutes(1))) @MainActor
+@Test(.actionCatalog, .timeLimit(.minutes(1))) @MainActor
 func bluetoothConnectAndForgetClearDiscoveryAndSavedState() async throws {
     let file = bluetoothTestFile()
     defer { try? FileManager.default.removeItem(at: file) }
@@ -1118,7 +1118,7 @@ func bluetoothConnectAndForgetClearDiscoveryAndSavedState() async throws {
     await relaunchObserver.value
 }
 
-@Test(.timeLimit(.minutes(1))) @MainActor
+@Test(.actionCatalog, .timeLimit(.minutes(1))) @MainActor
 func bluetoothTransportLossRecoversOnceWithoutMotionReplay() async throws {
     let file = bluetoothTestFile()
     defer { try? FileManager.default.removeItem(at: file) }
@@ -1150,7 +1150,7 @@ func bluetoothTransportLossRecoversOnceWithoutMotionReplay() async throws {
     await observer.value
 }
 
-@Test(.timeLimit(.minutes(1))) @MainActor
+@Test(.actionCatalog, .timeLimit(.minutes(1))) @MainActor
 func bluetoothPassiveConnectionDoesNotInvokeFailedIndication() async throws {
     let file = bluetoothTestFile()
     defer { try? FileManager.default.removeItem(at: file) }
@@ -1173,7 +1173,7 @@ func bluetoothPassiveConnectionDoesNotInvokeFailedIndication() async throws {
     await observer.value
 }
 
-@Test(.timeLimit(.minutes(1))) @MainActor
+@Test(.actionCatalog, .timeLimit(.minutes(1))) @MainActor
 func bluetoothResetRetiresPendingObservationWithoutClosingLiveControls() async throws {
     let file = bluetoothTestFile()
     defer { try? FileManager.default.removeItem(at: file) }
@@ -1207,7 +1207,7 @@ func bluetoothResetRetiresPendingObservationWithoutClosingLiveControls() async t
     await observer.value
 }
 
-@Test(.timeLimit(.minutes(1))) @MainActor
+@Test(.actionCatalog, .timeLimit(.minutes(1))) @MainActor
 func bluetoothResetWithoutCompletionReplyDoesNotBlockNextPresetAndPreservesFailureDetail() async throws {
     let file = bluetoothTestFile()
     defer { try? FileManager.default.removeItem(at: file) }
@@ -1239,7 +1239,7 @@ func bluetoothResetWithoutCompletionReplyDoesNotBlockNextPresetAndPreservesFailu
     await observer.value
 }
 
-@Test func aimFollowApproachesTheLatestCountWithoutJumpingThere() throws {
+@Test(.actionCatalog) func aimFollowApproachesTheLatestCountWithoutJumpingThere() throws {
     var planner = try NexArmJogPlanner(positions: NexArmGesture.referenceHomeJoints)
     let start = Int(planner.targets[0])
     let goal = start - 80
@@ -1264,7 +1264,7 @@ func bluetoothResetWithoutCompletionReplyDoesNotBlockNextPresetAndPreservesFailu
     #expect(throws: NexArmExecutionError.invalidArguments) { try planner.approach(id: 6, target: goal) }
 }
 
-@Test func aimFollowBrakesBeforeReversing() throws {
+@Test(.actionCatalog) func aimFollowBrakesBeforeReversing() throws {
     var planner = try NexArmJogPlanner(positions: NexArmGesture.referenceHomeJoints)
     let start = Int(planner.targets[3])
     for _ in 0..<25 {
@@ -1285,7 +1285,7 @@ func bluetoothResetWithoutCompletionReplyDoesNotBlockNextPresetAndPreservesFailu
     #expect(planner.targets[3] <= lead)
 }
 
-@Test(arguments: 1...5, [-2, -1, 1, 2])
+@Test(.actionCatalog, arguments: 1...5, [-2, -1, 1, 2])
 func aimFinalCountRemainsPendingUntilNativeAdmission(motor: Int, delta: Int) throws {
     let initial = NexArmGesture.referenceHomeJoints
     var planner = try NexArmJogPlanner(positions: initial)
@@ -1305,7 +1305,7 @@ func aimFinalCountRemainsPendingUntilNativeAdmission(motor: Int, delta: Int) thr
     }
 }
 
-@Test func aimReachMotorsStayBelowTheirSlowerSpeedLimit() throws {
+@Test(.actionCatalog) func aimReachMotorsStayBelowTheirSlowerSpeedLimit() throws {
     var planner = try NexArmJogPlanner(positions: NexArmGesture.referenceHomeJoints)
     let start = Int(planner.targets[1])
     for _ in 0..<80 {
@@ -1322,7 +1322,7 @@ func aimFinalCountRemainsPendingUntilNativeAdmission(motor: Int, delta: Int) thr
     }
 }
 
-@Test func bluetoothJogShapesVelocityAndRejectsConfigurationWrites() throws {
+@Test(.actionCatalog) func bluetoothJogShapesVelocityAndRejectsConfigurationWrites() throws {
     var planner = try NexArmJogPlanner(positions: NexArmGesture.referenceHomeJoints)
     var previousAcceleration = 0.0
     var duplicates = 0
@@ -1343,7 +1343,7 @@ func aimFinalCountRemainsPendingUntilNativeAdmission(motor: Int, delta: Int) thr
     #expect(try !NexArmPacket(command: 51, payload: [1, 0, 8, 20, 0]).isLiveControl)
 }
 
-@Test func bluetoothJogStickExtentControlsCruiseSpeedAndStallsDoNotCatchUp() throws {
+@Test(.actionCatalog) func bluetoothJogStickExtentControlsCruiseSpeedAndStallsDoNotCatchUp() throws {
     var slow = try NexArmJogPlanner(positions: NexArmGesture.referenceHomeJoints)
     var fast = slow
     for _ in 0..<40 {
@@ -1357,7 +1357,7 @@ func aimFinalCountRemainsPendingUntilNativeAdmission(motor: Int, delta: Int) thr
     #expect(stalled.target - fast.targets[0] <= 37)
 }
 
-@Test(.timeLimit(.minutes(1))) @MainActor
+@Test(.actionCatalog, .timeLimit(.minutes(1))) @MainActor
 func bluetoothActionFeedbackTimeoutDoesNotRecoverOrBlockNextPreset() async throws {
     let file = bluetoothTestFile()
     defer { try? FileManager.default.removeItem(at: file) }
@@ -1390,7 +1390,7 @@ func bluetoothActionFeedbackTimeoutDoesNotRecoverOrBlockNextPreset() async throw
     await observer.value
 }
 
-@Test(.timeLimit(.minutes(1))) @MainActor
+@Test(.actionCatalog, .timeLimit(.minutes(1))) @MainActor
 func bluetoothSettingsSharesFeedbackRecipeAndPreemptsPendingCompletion() async throws {
     let file = bluetoothTestFile()
     defer { try? FileManager.default.removeItem(at: file) }
@@ -1415,7 +1415,7 @@ func bluetoothSettingsSharesFeedbackRecipeAndPreemptsPendingCompletion() async t
     await observer.value
 }
 
-@Test(.timeLimit(.minutes(1))) @MainActor
+@Test(.actionCatalog, .timeLimit(.minutes(1))) @MainActor
 func bluetoothSettingsCongestionRetainsOnlyLatestTestAndResetCancelsEnding() async throws {
     let file = bluetoothTestFile()
     defer { try? FileManager.default.removeItem(at: file) }
@@ -1446,7 +1446,7 @@ func bluetoothSettingsCongestionRetainsOnlyLatestTestAndResetCancelsEnding() asy
     await observer.value
 }
 
-@Test(.timeLimit(.minutes(1))) @MainActor
+@Test(.actionCatalog, .timeLimit(.minutes(1))) @MainActor
 func bluetoothFeedbackHealthDoesNotCancelExecutionOrDisableManualControl() async throws {
     let file = bluetoothTestFile()
     defer { try? FileManager.default.removeItem(at: file) }
@@ -1484,7 +1484,7 @@ func bluetoothFeedbackHealthDoesNotCancelExecutionOrDisableManualControl() async
     await observer.value
 }
 
-@Test(.timeLimit(.minutes(1))) @MainActor
+@Test(.actionCatalog, .timeLimit(.minutes(1))) @MainActor
 func bluetoothSettingsBypassesHeldResourcesAndAgentCleanupWithFeedback() async throws {
     let file = bluetoothTestFile()
     defer { try? FileManager.default.removeItem(at: file) }
@@ -1530,14 +1530,14 @@ func bluetoothSettingsBypassesHeldResourcesAndAgentCleanupWithFeedback() async t
     await observer.value
 }
 
-@Test func bluetoothResponseTimeoutRetainsQueryAndSeparatesNotificationBytesFromPayload() {
+@Test(.actionCatalog) func bluetoothResponseTimeoutRetainsQueryAndSeparatesNotificationBytesFromPayload() {
     let missing = NexArmBluetoothFailure.responseTimeout(command: 11, expectedBytes: 24, receivedBytes: 0)
     #expect(BluetoothPresentation.failure(missing) == "读取机械臂位置回复超时（0x0B，期望载荷24字节，收到通知0字节）")
     let unmatched = NexArmBluetoothFailure.responseTimeout(command: 7, expectedBytes: 24, receivedBytes: 30)
     #expect(BluetoothPresentation.failure(unmatched) == "设备查询回复超时（0x07，期望载荷24字节，收到通知30字节）")
 }
 
-@Test(.timeLimit(.minutes(1))) @MainActor
+@Test(.actionCatalog, .timeLimit(.minutes(1))) @MainActor
 func bluetoothPassiveConnectionDoesNotQueryAndActualQueryTimeoutRecovers() async throws {
     let file = bluetoothTestFile()
     defer { try? FileManager.default.removeItem(at: file) }
@@ -1568,7 +1568,7 @@ func bluetoothPassiveConnectionDoesNotQueryAndActualQueryTimeoutRecovers() async
     await observer.value
 }
 
-@Test func bluetoothSharedBudgetBoundsMixedProducerBurstsAndDoesNotCatchUp() {
+@Test(.actionCatalog) func bluetoothSharedBudgetBoundsMixedProducerBurstsAndDoesNotCatchUp() {
     let start = ContinuousClock.now
     var budget = NexArmBLETrafficBudget(started: start)
     var accepted: [ContinuousClock.Instant] = []
@@ -1591,7 +1591,7 @@ func bluetoothPassiveConnectionDoesNotQueryAndActualQueryTimeoutRecovers() async
     #expect(budget.statistics.sentBytes == 35 * 14)
 }
 
-@Test func bluetoothSystemBackpressurePreservesBudgetForTheNextAcceptedWrite() {
+@Test(.actionCatalog) func bluetoothSystemBackpressurePreservesBudgetForTheNextAcceptedWrite() {
     let now = ContinuousClock.now
     var budget = NexArmBLETrafficBudget(started: now)
     for _ in 0..<100 {
@@ -1611,7 +1611,7 @@ func bluetoothPassiveConnectionDoesNotQueryAndActualQueryTimeoutRecovers() async
     #expect(!earlyAdmission && nextAdmission)
 }
 
-@Test func bluetoothDiagnosticsDistinguishNotificationTrafficFromValidFeedback() {
+@Test(.actionCatalog) func bluetoothDiagnosticsDistinguishNotificationTrafficFromValidFeedback() {
     let start = ContinuousClock.now
     var budget = NexArmBLETrafficBudget(started: start)
     budget.received(bytes: 30, feedbackSamples: 1, at: start)
@@ -1628,7 +1628,7 @@ func bluetoothPassiveConnectionDoesNotQueryAndActualQueryTimeoutRecovers() async
     #expect(NexArmBLETrafficBudget(started: start).statistics.sentPackets == 0)
 }
 
-@Test(.timeLimit(.minutes(1))) @MainActor
+@Test(.actionCatalog, .timeLimit(.minutes(1))) @MainActor
 func bluetoothAimSharesBackpressureFairlyAcrossAllFourMotors() async throws {
     let file = bluetoothTestFile()
     defer { try? FileManager.default.removeItem(at: file) }
@@ -1657,7 +1657,7 @@ func bluetoothAimSharesBackpressureFairlyAcrossAllFourMotors() async throws {
     await observer.value
 }
 
-@Test(.timeLimit(.minutes(1))) @MainActor
+@Test(.actionCatalog, .timeLimit(.minutes(1))) @MainActor
 func bluetoothFeedbackLossShowsCurrentIssueWithoutRecoveryOrReplay() async throws {
     let file = bluetoothTestFile()
     defer { try? FileManager.default.removeItem(at: file) }
@@ -1686,7 +1686,7 @@ func bluetoothFeedbackLossShowsCurrentIssueWithoutRecoveryOrReplay() async throw
     await observer.value
 }
 
-@Test(.timeLimit(.minutes(1))) @MainActor
+@Test(.actionCatalog, .timeLimit(.minutes(1))) @MainActor
 func bluetoothCongestionResetsInputsAndOnlyNewIntentCanSendAfterRecovery() async throws {
     let file = bluetoothTestFile()
     defer { try? FileManager.default.removeItem(at: file) }
@@ -1713,7 +1713,7 @@ func bluetoothCongestionResetsInputsAndOnlyNewIntentCanSendAfterRecovery() async
     await observer.value
 }
 
-@Test(.timeLimit(.minutes(1))) @MainActor
+@Test(.actionCatalog, .timeLimit(.minutes(1))) @MainActor
 func bluetoothQueryIsolationIsClearedByANewVerifiedConnection() async throws {
     let file = bluetoothTestFile()
     defer { try? FileManager.default.removeItem(at: file) }
@@ -1741,7 +1741,7 @@ func bluetoothQueryIsolationIsClearedByANewVerifiedConnection() async throws {
     await observer.value
 }
 
-@Test(.timeLimit(.minutes(1))) @MainActor
+@Test(.actionCatalog, .timeLimit(.minutes(1))) @MainActor
 func bluetoothLatestCommunicationIssueClearsWhenFeedbackRecovers() async throws {
     let file = bluetoothTestFile()
     defer { try? FileManager.default.removeItem(at: file) }
@@ -1775,7 +1775,7 @@ func bluetoothLatestCommunicationIssueClearsWhenFeedbackRecovers() async throws 
     await observer.value
 }
 
-@Test(.timeLimit(.minutes(1))) @MainActor
+@Test(.actionCatalog, .timeLimit(.minutes(1))) @MainActor
 func bluetoothRecoveryStopsAfterThreeFailuresAndManualReconnectStartsAFreshEpisode() async throws {
     let file = bluetoothTestFile()
     defer { try? FileManager.default.removeItem(at: file) }
@@ -1806,7 +1806,7 @@ func bluetoothRecoveryStopsAfterThreeFailuresAndManualReconnectStartsAFreshEpiso
     await observer.value
 }
 
-@Test(.timeLimit(.minutes(1))) @MainActor
+@Test(.actionCatalog, .timeLimit(.minutes(1))) @MainActor
 func bluetoothUnconfirmedDisconnectNeverOpensASecondConnection() async throws {
     let file = bluetoothTestFile()
     defer { try? FileManager.default.removeItem(at: file) }
@@ -1840,7 +1840,7 @@ func bluetoothUnconfirmedDisconnectNeverOpensASecondConnection() async throws {
     await observer.value
 }
 
-@Test(.timeLimit(.minutes(1))) @MainActor
+@Test(.actionCatalog, .timeLimit(.minutes(1))) @MainActor
 func bluetoothRecoveryWaitsForPowerAndUserDisconnectCancelsPendingRetries() async throws {
     let file = bluetoothTestFile()
     defer { try? FileManager.default.removeItem(at: file) }
@@ -1868,7 +1868,7 @@ func bluetoothRecoveryWaitsForPowerAndUserDisconnectCancelsPendingRetries() asyn
     await observer.value
 }
 
-@Test(.timeLimit(.minutes(1))) @MainActor
+@Test(.actionCatalog, .timeLimit(.minutes(1))) @MainActor
 func bluetoothOldSnapshotsCannotReviveOrFloodARecovery() async throws {
     let file = bluetoothTestFile()
     defer { try? FileManager.default.removeItem(at: file) }
@@ -1902,7 +1902,7 @@ func bluetoothOldSnapshotsCannotReviveOrFloodARecovery() async throws {
     await observer.value
 }
 
-@Test(.timeLimit(.minutes(1))) @MainActor
+@Test(.actionCatalog, .timeLimit(.minutes(1))) @MainActor
 func bluetoothEveryRecoverySuccessResetsItsEpisodeBudget() async throws {
     let file = bluetoothTestFile()
     defer { try? FileManager.default.removeItem(at: file) }
@@ -1927,7 +1927,7 @@ func bluetoothEveryRecoverySuccessResetsItsEpisodeBudget() async throws {
     await observer.value
 }
 
-@Test(.timeLimit(.minutes(1))) @MainActor
+@Test(.actionCatalog, .timeLimit(.minutes(1))) @MainActor
 func bluetoothForegroundAfterExhaustionAlwaysStartsANewEligibleEpisode() async throws {
     let file = bluetoothTestFile()
     defer { try? FileManager.default.removeItem(at: file) }
@@ -1962,7 +1962,7 @@ func bluetoothForegroundAfterExhaustionAlwaysStartsANewEligibleEpisode() async t
     await observer.value
 }
 
-@Test(.timeLimit(.minutes(1))) @MainActor
+@Test(.actionCatalog, .timeLimit(.minutes(1))) @MainActor
 func bluetoothRepeatedBackgroundPreservesHealthyLinkAndNeverResumesOldJog() async throws {
     let file = bluetoothTestFile()
     defer { try? FileManager.default.removeItem(at: file) }
@@ -1998,7 +1998,7 @@ func bluetoothRepeatedBackgroundPreservesHealthyLinkAndNeverResumesOldJog() asyn
     await observer.value
 }
 
-@Test(.timeLimit(.minutes(1))) @MainActor
+@Test(.actionCatalog, .timeLimit(.minutes(1))) @MainActor
 func bluetoothForegroundJoinsSuspendedWriterBeforeAdmittingNewControl() async throws {
     let file = bluetoothTestFile()
     defer { try? FileManager.default.removeItem(at: file) }
@@ -2034,7 +2034,7 @@ func bluetoothForegroundJoinsSuspendedWriterBeforeAdmittingNewControl() async th
     await observer.value
 }
 
-@Test(.timeLimit(.minutes(1))) @MainActor
+@Test(.actionCatalog, .timeLimit(.minutes(1))) @MainActor
 func bluetoothLossWhileBackgroundedWaitsForForegroundThenReconnects() async throws {
     let file = bluetoothTestFile()
     defer { try? FileManager.default.removeItem(at: file) }
@@ -2062,7 +2062,7 @@ func bluetoothLossWhileBackgroundedWaitsForForegroundThenReconnects() async thro
     await observer.value
 }
 
-@Test(.timeLimit(.minutes(1))) @MainActor
+@Test(.actionCatalog, .timeLimit(.minutes(1))) @MainActor
 func bluetoothBackgroundCancelsRecoveryAndForegroundResumesWithoutOldAim() async throws {
     let file = bluetoothTestFile()
     defer { try? FileManager.default.removeItem(at: file) }
@@ -2097,7 +2097,7 @@ func bluetoothBackgroundCancelsRecoveryAndForegroundResumesWithoutOldAim() async
     await observer.value
 }
 
-@Test(.timeLimit(.minutes(1))) @MainActor
+@Test(.actionCatalog, .timeLimit(.minutes(1))) @MainActor
 func bluetoothForgetDuringBackoffDisablesSavedRecovery() async throws {
     let file = bluetoothTestFile()
     defer { try? FileManager.default.removeItem(at: file) }
@@ -2124,7 +2124,7 @@ func bluetoothForgetDuringBackoffDisablesSavedRecovery() async throws {
     await observer.value
 }
 
-@Test(.timeLimit(.minutes(1))) @MainActor
+@Test(.actionCatalog, .timeLimit(.minutes(1))) @MainActor
 func bluetoothRevokedExecutionPermitCannotBypassAgentGuard() async throws {
     let file = bluetoothTestFile()
     defer { try? FileManager.default.removeItem(at: file) }
@@ -2174,7 +2174,7 @@ func bluetoothResourceGuard(_ resources: ResourceCoordinator)
     }
 }
 
-@Test(.timeLimit(.minutes(1)), arguments: [1, 5]) @MainActor
+@Test(.actionCatalog, .timeLimit(.minutes(1)), arguments: [1, 5]) @MainActor
 func bluetoothAssistantActionPreemptsTrackingAndKeepsQueuedActions(motor: Int) async throws {
     let file = bluetoothTestFile()
     defer { try? FileManager.default.removeItem(at: file) }
@@ -2247,7 +2247,7 @@ func bluetoothAssistantActionPreemptsTrackingAndKeepsQueuedActions(motor: Int) a
     await observer.value
 }
 
-@Test(.timeLimit(.minutes(1))) @MainActor
+@Test(.actionCatalog, .timeLimit(.minutes(1))) @MainActor
 func bluetoothTrackingInputExpiryJoinsWriterAndReleasesMotorResources() async throws {
     let file = bluetoothTestFile()
     defer { try? FileManager.default.removeItem(at: file) }
@@ -2295,7 +2295,7 @@ func bluetoothTrackingInputExpiryJoinsWriterAndReleasesMotorResources() async th
     await observer.value
 }
 
-@Test(.timeLimit(.minutes(1))) @MainActor
+@Test(.actionCatalog, .timeLimit(.minutes(1))) @MainActor
 func bluetoothGatewayAimUpdatesUseOneWorkerAndKeepActualMotorExclusion() async throws {
     let file = bluetoothTestFile()
     defer { try? FileManager.default.removeItem(at: file) }
@@ -2352,7 +2352,7 @@ func bluetoothGatewayAimUpdatesUseOneWorkerAndKeepActualMotorExclusion() async t
     await observer.value
 }
 
-@Test(.timeLimit(.minutes(1))) @MainActor
+@Test(.actionCatalog, .timeLimit(.minutes(1))) @MainActor
 func bluetoothAimResourceConflictDoesNotChangeNativeStateAndFreshTargetCanStart() async throws {
     let file = bluetoothTestFile()
     defer { try? FileManager.default.removeItem(at: file) }
@@ -2396,7 +2396,7 @@ func bluetoothAimResourceConflictDoesNotChangeNativeStateAndFreshTargetCanStart(
     await observer.value
 }
 
-@Test @MainActor
+@Test(.actionCatalog) @MainActor
 func bluetoothManualControlsStayEnabledDuringActiveMotionAndRefresh() {
     let state = BluetoothSettingsState()
     state.phase = .connected
@@ -2408,7 +2408,7 @@ func bluetoothManualControlsStayEnabledDuringActiveMotionAndRefresh() {
     #expect(state.canControl)
 }
 
-@Test(.timeLimit(.minutes(1))) @MainActor
+@Test(.actionCatalog, .timeLimit(.minutes(1))) @MainActor
 func bluetoothSettingsOverridesAgentMotionAndAimWithSharedRecipe() async throws {
     let file = bluetoothTestFile()
     defer { try? FileManager.default.removeItem(at: file) }
@@ -2457,7 +2457,7 @@ func bluetoothSettingsOverridesAgentMotionAndAimWithSharedRecipe() async throws 
     await observer.value
 }
 
-@Test(.timeLimit(.minutes(1))) @MainActor
+@Test(.actionCatalog, .timeLimit(.minutes(1))) @MainActor
 func bluetoothPassiveRefreshNeverBlocksManualResetOrIssuesQuery() async throws {
     let file = bluetoothTestFile()
     defer { try? FileManager.default.removeItem(at: file) }
@@ -2491,7 +2491,7 @@ func bluetoothPassiveRefreshNeverBlocksManualResetOrIssuesQuery() async throws {
     await observer.value
 }
 
-@Test(.timeLimit(.minutes(1))) @MainActor
+@Test(.actionCatalog, .timeLimit(.minutes(1))) @MainActor
 func bluetoothLatestSliderSupersedesPresetWhileOldAimCleanupIsJoining() async throws {
     let file = bluetoothTestFile()
     defer { try? FileManager.default.removeItem(at: file) }
@@ -2530,8 +2530,16 @@ func bluetoothLatestSliderSupersedesPresetWhileOldAimCleanupIsJoining() async th
 private actor BluetoothRecoveryChat: ChatCapability {
     let availability: CapabilityAvailability = .available
     private var emitter: InferenceEmitter<ChatEvent>?
+    private(set) var requests = 0
     func chat(_ request: ChatRequest) throws -> InferenceSession<ChatEvent> {
+        requests += 1
         let pair = InferenceSession<ChatEvent>.make(limits: try StreamLimits(), estimatedBytes: { $0.estimatedBytes })
+        if requests > 1 {
+            try pair.emitter.yield(.text("已收到机械臂执行结果，不会自动重复动作。"))
+            try pair.emitter.yield(.finished(.stop))
+            pair.emitter.finish()
+            return pair.session
+        }
         emitter = pair.emitter
         try pair.emitter.yield(
             .text("第一句。<shakeBase cycles=\"1\"/><shakeBase cycles=\"1\"/>第二句。<wait></wait>"))
@@ -2549,7 +2557,7 @@ private enum BluetoothRecoveryTestFault: Sendable, CaseIterable {
     case disconnected, congestion, radioOff, exhausted
 }
 
-@Test(.timeLimit(.minutes(1)), arguments: BluetoothRecoveryTestFault.allCases) @MainActor
+@Test(.actionCatalog, .timeLimit(.minutes(1)), arguments: BluetoothRecoveryTestFault.allCases) @MainActor
 private func bluetoothRecoveryPreservesAssistantGenerationSpeechAndOtherActions(
     fault: BluetoothRecoveryTestFault
 ) async throws {
@@ -2685,8 +2693,11 @@ private func bluetoothRecoveryPreservesAssistantGenerationSpeechAndOtherActions(
     releaseSpeech.continuation.finish()
     #expect(try await pump.value)
     await scheduler.finishResultDelivery()
-    #expect(spoken == ["第一句。", "第二句。", "第三句。"])
-    #expect(expressions == 3)
+    let armResults = await assistant.actionResults().filter { $0.path.domain == "NexArm" }
+    let needsReply = armResults.contains { $0.status != .succeeded }
+    #expect(await chat.requests == (needsReply ? 2 : 1))
+    #expect(spoken == ["第一句。", "第二句。", "第三句。"] + (needsReply ? ["已收到机械臂执行结果，不会自动重复动作。"] : []))
+    #expect(expressions == (needsReply ? 4 : 3))
     #expect(await link.writes == writesAfterRecovery)
     let records = await scheduler.executionSnapshot().records
     let otherSucceeded = records.filter { $0.path == speechPath || $0.path == expressionPath }.allSatisfy {
@@ -2706,7 +2717,7 @@ private func bluetoothRecoveryPreservesAssistantGenerationSpeechAndOtherActions(
     await observer.value
 }
 
-@Test(.timeLimit(.minutes(1))) @MainActor
+@Test(.actionCatalog, .timeLimit(.minutes(1))) @MainActor
 func bluetoothManualSegmentsRequireFeedbackAndResetCanReplacePendingArrival() async throws {
     let file = bluetoothTestFile()
     defer { try? FileManager.default.removeItem(at: file) }
@@ -2749,7 +2760,7 @@ func bluetoothManualSegmentsRequireFeedbackAndResetCanReplacePendingArrival() as
     await observer.value
 }
 
-@Test(.timeLimit(.minutes(1))) @MainActor
+@Test(.actionCatalog, .timeLimit(.minutes(1))) @MainActor
 func bluetoothManualNodAdvancesOnArrivalWithoutNominalFrameDelay() async throws {
     let file = bluetoothTestFile()
     defer { try? FileManager.default.removeItem(at: file) }
@@ -2774,7 +2785,7 @@ func bluetoothManualNodAdvancesOnArrivalWithoutNominalFrameDelay() async throws 
     await observer.value
 }
 
-@Test(.timeLimit(.minutes(1))) @MainActor
+@Test(.actionCatalog, .timeLimit(.minutes(1))) @MainActor
 func bluetoothPassiveConnectionDoesNotProbeAndFeedbackLossKeepsManualControl() async throws {
     let file = bluetoothTestFile()
     defer { try? FileManager.default.removeItem(at: file) }
@@ -2814,7 +2825,7 @@ func bluetoothPassiveConnectionDoesNotProbeAndFeedbackLossKeepsManualControl() a
     await observer.value
 }
 
-@Test @MainActor
+@Test(.actionCatalog) @MainActor
 func bluetoothManualButtonsOnlyRequireConnectedLink() {
     let state = BluetoothSettingsState()
     state.phase = .connected
@@ -2824,7 +2835,7 @@ func bluetoothManualButtonsOnlyRequireConnectedLink() {
 }
 
 /// Recovery can finish while a failed handler is still publishing its result.
-@Test(.timeLimit(.minutes(1))) @MainActor
+@Test(.actionCatalog, .timeLimit(.minutes(1))) @MainActor
 func bluetoothRecoveryLeavesQueuedActionsForNormalChannelExecution() async throws {
     let file = bluetoothTestFile()
     defer { try? FileManager.default.removeItem(at: file) }
@@ -2915,7 +2926,7 @@ func bluetoothRecoveryLeavesQueuedActionsForNormalChannelExecution() async throw
     await observer.value
 }
 
-@Test(.timeLimit(.minutes(1))) @MainActor
+@Test(.actionCatalog, .timeLimit(.minutes(1))) @MainActor
 func bluetoothReconnectDoesNotWaitForOldActionCompletionToShowConnected() async throws {
     let file = bluetoothTestFile()
     defer { try? FileManager.default.removeItem(at: file) }
@@ -2949,7 +2960,7 @@ func bluetoothReconnectDoesNotWaitForOldActionCompletionToShowConnected() async 
     await observer.value
 }
 
-@Test func bluetoothNativeBlockingResetsWithoutBusinessTimeouts() {
+@Test(.actionCatalog) func bluetoothNativeBlockingResetsWithoutBusinessTimeouts() {
     let now = ContinuousClock.now
     var budget = NexArmBLETrafficBudget(started: now)
     let blocked = budget.canSend(at: now, systemReady: false)
@@ -2964,7 +2975,7 @@ func bluetoothReconnectDoesNotWaitForOldActionCompletionToShowConnected() async 
     #expect(!budget.isSendBlocked(at: now.advanced(by: .seconds(8))))
 }
 
-@Test(.timeLimit(.minutes(1))) @MainActor
+@Test(.actionCatalog, .timeLimit(.minutes(1))) @MainActor
 func bluetoothBusinessRejectionDoesNotRecordOrRecoverAndManualBypassesResources() async throws {
     let file = bluetoothTestFile()
     defer { try? FileManager.default.removeItem(at: file) }
@@ -3010,7 +3021,7 @@ func bluetoothBusinessRejectionDoesNotRecordOrRecoverAndManualBypassesResources(
     await observer.value
 }
 
-@Test(.timeLimit(.minutes(1))) @MainActor
+@Test(.actionCatalog, .timeLimit(.minutes(1))) @MainActor
 func bluetoothLateAimExecutionFailureIsIndependentOfDeviceRecordsAndCompletedTool() async throws {
     let file = bluetoothTestFile()
     defer { try? FileManager.default.removeItem(at: file) }
@@ -3042,7 +3053,7 @@ func bluetoothLateAimExecutionFailureIsIndependentOfDeviceRecordsAndCompletedToo
 }
 
 /// A rejected concurrent call cannot clear or borrow the running invocation's report.
-@Test(.timeLimit(.minutes(1))) @MainActor
+@Test(.actionCatalog, .timeLimit(.minutes(1))) @MainActor
 func bluetoothInvocationReportsAreIndependentDuringNativeRecovery() async throws {
     let file = bluetoothTestFile()
     defer { try? FileManager.default.removeItem(at: file) }
@@ -3083,7 +3094,7 @@ func bluetoothInvocationReportsAreIndependentDuringNativeRecovery() async throws
     await observer.value
 }
 
-@Test func bluetoothProtocolFailuresAreNotNativeSystemErrorsOrExecutionTimeouts() {
+@Test(.actionCatalog) func bluetoothProtocolFailuresAreNotNativeSystemErrorsOrExecutionTimeouts() {
     let invalid = NexArmBluetoothFailure(step: .response, error: NexArmError.invalidPacket)
     let overflow = NexArmBluetoothFailure(step: .response, error: NexArmError.overflow)
     #expect(invalid == .protocolViolation(.invalidPacket))
@@ -3093,7 +3104,7 @@ func bluetoothInvocationReportsAreIndependentDuringNativeRecovery() async throws
     #expect(NexArmBluetoothFailure(step: .response, error: NexArmError.timeout) == .timeout(.response))
 }
 
-@Test func bluetoothObservationAdmissionFailurePreservesDependencyClassification() async throws {
+@Test(.actionCatalog) func bluetoothObservationAdmissionFailurePreservesDependencyClassification() async throws {
     let link = BluetoothArmFixture()
     try await link.connect(link.id)
     await link.rejectObservation(.busy)
@@ -3109,7 +3120,7 @@ func bluetoothInvocationReportsAreIndependentDuringNativeRecovery() async throws
 }
 
 /// Execution observation survives a connection-generation change without touching replacement state.
-@Test(.timeLimit(.minutes(1))) @MainActor
+@Test(.actionCatalog, .timeLimit(.minutes(1))) @MainActor
 func bluetoothLateNativeAimErrorIsReportedAfterRecoveryFencesTheConnection() async throws {
     let file = bluetoothTestFile()
     defer { try? FileManager.default.removeItem(at: file) }
@@ -3151,7 +3162,7 @@ func bluetoothLateNativeAimErrorIsReportedAfterRecoveryFencesTheConnection() asy
     await observer.value
 }
 
-@Test func bluetoothFeedbackReadFailureDoesNotChangeNativeStateOrBecomeSendFailure() async throws {
+@Test(.actionCatalog) func bluetoothFeedbackReadFailureDoesNotChangeNativeStateOrBecomeSendFailure() async throws {
     let link = BluetoothArmFixture()
     try await link.connect(link.id)
     await link.rejectObservationRead(.invalidPacket)
@@ -3166,7 +3177,7 @@ func bluetoothLateNativeAimErrorIsReportedAfterRecoveryFencesTheConnection() asy
     await link.close()
 }
 
-@Test func bluetoothRecoveryRequiresKnownNativeEvidenceAndIgnoresBusinessErrors() {
+@Test(.actionCatalog) func bluetoothRecoveryRequiresKnownNativeEvidenceAndIgnoresBusinessErrors() {
     struct UnknownFailure: Error {}
     var snapshot = NexArmBluetoothSnapshot()
     snapshot.power = .poweredOn
@@ -3187,7 +3198,7 @@ func bluetoothLateNativeAimErrorIsReportedAfterRecoveryFencesTheConnection() asy
     #expect(!BluetoothRecoveryPolicy.canRetry(NexArmBluetoothError.unavailable, snapshot: snapshot))
 }
 
-@Test func bluetoothWriteCapabilitySelectionAndAcknowledgmentWindowAreBounded() throws {
+@Test(.actionCatalog) func bluetoothWriteCapabilitySelectionAndAcknowledgmentWindowAreBounded() throws {
     #expect(
         try NexArmBLEWriteMode.select(withResponse: true, withoutResponse: false, preferred: .unacknowledged)
             == .acknowledged)
@@ -3214,7 +3225,7 @@ func bluetoothLateNativeAimErrorIsReportedAfterRecoveryFencesTheConnection() asy
     #expect(try #require(nextReservation) != first)
 }
 
-@Test func bluetoothSimpleActionsAndResetDoNotRequireUnavailableIKQueries() async throws {
+@Test(.actionCatalog) func bluetoothSimpleActionsAndResetDoNotRequireUnavailableIKQueries() async throws {
     let link = BluetoothArmFixture()
     try await link.connect(link.id)
     await link.rejectIKQueries()
@@ -3235,7 +3246,7 @@ func bluetoothLateNativeAimErrorIsReportedAfterRecoveryFencesTheConnection() asy
     await link.close()
 }
 
-@Test func bluetoothOrdinaryResetIgnoresTrackingFeedbackAndPreparedIKHome() async throws {
+@Test(.actionCatalog) func bluetoothOrdinaryResetIgnoresTrackingFeedbackAndPreparedIKHome() async throws {
     let link = BluetoothArmFixture()
     try await link.connect(link.id)
     let controller = NexArmActionController(link: link, compatibilityPolicy: .passiveBLE)
@@ -3264,7 +3275,7 @@ func bluetoothLateNativeAimErrorIsReportedAfterRecoveryFencesTheConnection() asy
     await link.close()
 }
 
-@Test func bluetoothRequestedRecipeDoesNotPrepareUnrelatedPresets() async throws {
+@Test(.actionCatalog) func bluetoothRequestedRecipeDoesNotPrepareUnrelatedPresets() async throws {
     let link = BluetoothArmFixture()
     try await link.connect(link.id)
     let controller = NexArmActionController(link: link, compatibilityPolicy: .passiveBLE)
@@ -3278,7 +3289,7 @@ func bluetoothLateNativeAimErrorIsReportedAfterRecoveryFencesTheConnection() asy
     await link.close()
 }
 
-@Test func bluetoothInterruptedQueryUsesOnlyTheCurrentNativeReason() {
+@Test(.actionCatalog) func bluetoothInterruptedQueryUsesOnlyTheCurrentNativeReason() {
     var snapshot = NexArmBluetoothSnapshot()
     snapshot.failure = .requestInterrupted(command: 7)
     let message = BluetoothPresentation.currentIssue(snapshot)
@@ -3289,7 +3300,7 @@ func bluetoothLateNativeAimErrorIsReportedAfterRecoveryFencesTheConnection() asy
     #expect(BluetoothPresentation.currentIssue(snapshot) == nil)
 }
 
-@Test(.timeLimit(.minutes(1))) @MainActor
+@Test(.actionCatalog, .timeLimit(.minutes(1))) @MainActor
 func bluetoothManualSimpleCommandsRemainUsableWithoutIKOrResourceAdmission() async throws {
     let file = bluetoothTestFile()
     defer { try? FileManager.default.removeItem(at: file) }
@@ -3320,7 +3331,9 @@ func bluetoothManualSimpleCommandsRemainUsableWithoutIKOrResourceAdmission() asy
     await observer.value
 }
 
-@Test @MainActor func callableDeviceAdmissionRejectsBackgroundAndUnknownDeviceWithoutEffects() async throws {
+@Test(.actionCatalog) @MainActor func callableDeviceAdmissionRejectsBackgroundAndUnknownDeviceWithoutEffects()
+    async throws
+{
     let file = bluetoothTestFile()
     defer { try? FileManager.default.removeItem(at: file) }
     let link = BluetoothArmFixture()

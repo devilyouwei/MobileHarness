@@ -2,7 +2,6 @@ import Foundation
 @_spi(ModelManagement) import ModelKit
 import Testing
 
-@testable import ModelKitMossCoreML
 @testable import ModelKitMossNano
 
 @Test func mossVoiceSelectionAndInputBounds() throws {
@@ -45,7 +44,7 @@ import Testing
 
 @Test func mossMissingResourcesFailWithoutFallback() async throws {
     guard #available(macOS 27, iOS 27, *) else { return }
-    let context = ModelContext()
+    let context = try ModelContext(loadGate: ModelLoadGate(maximumConcurrentLoads: 4), maximumLoadWaiters: 32)
     let provider = try MossSpeechSynthesis(context: context, artifacts: URL(fileURLWithPath: "/missing-moss-models"))
     if case .available = await provider.availability { Issue.record("Missing resources must be unavailable") }
     let session = try await provider.synthesize(SpeechSynthesisRequest(text: "你好", locale: "auto"))
@@ -66,7 +65,7 @@ func realMossChineseEnglishAndLifecycle() async throws {
             8651, 2691, 11099, 10670, 7669, 10508, 4627, 11074, 11315, 6439, 10617, 10859, 11643, 2957, 1531, 4139,
             2305, 4146, 11255, 10382,
         ])
-    let context = ModelContext()
+    let context = try ModelContext(loadGate: ModelLoadGate(maximumConcurrentLoads: 4), maximumLoadWaiters: 32)
     let provider = try MossSpeechSynthesis(context: context, artifacts: root)
     try await provider.warmup()
     for text in ["你好，欢迎使用语音助手。", "Hello, welcome to our voice assistant.", "今天是九月二十八日，Hello world。"] {

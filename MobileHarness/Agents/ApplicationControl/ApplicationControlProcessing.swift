@@ -1,63 +1,29 @@
 import AgentCore
 import Foundation
-import ModelKit
-import StorageChat
 
 // MARK: - State
 
-public struct ApplicationControlContextState: AgentChatContextState {
+public struct ApplicationControlContextState: AgentTaskContextState {
     public static let agentID = AgentID.applicationControl
     public static let configurationName = "ApplicationControl"
-    public static func runtimeCapabilities(_ capabilities: CapabilityRegistry) throws -> CapabilityRegistry {
-        try AgentChatWorker<Self>.runtimeCapabilities(capabilities)
-    }
+
     public static func preprocess(_ input: AgentInput, state: Self) throws -> SignalDisposition {
         try ApplicationControlSignalPreprocessor().classify(input, state: state)
     }
-    public static func systemPrompt(_ capabilities: CapabilityRegistry) throws -> String {
-        try AgentPrompts.load(named: configurationName).render(
-            "system", variables: ["functionToken": try CapabilityContextBuilder.build(capabilities)])
-    }
-    public var chatSchemaVersion = 1
-    public var history = ConversationArchive()
-    public var historyImported = false
-    public var admissionSequence: UInt64 = 0
+
     public var taskViews: [UUID: AgentTaskView]?
 
     public var pendingCallIDs: [UUID] = []
     public var environmentContracts: [String] = []
     public init() {}
-    private enum CodingKeys: String, CodingKey {
-        case pendingCallIDs, environmentContracts, history, historyImported, admissionSequence, taskViews,
-            chatSchemaVersion
-    }
-    public init(from decoder: any Decoder) throws {
-        let values = try decoder.container(keyedBy: CodingKeys.self)
-        pendingCallIDs = try values.decode([UUID].self, forKey: .pendingCallIDs)
-        environmentContracts = try values.decode([String].self, forKey: .environmentContracts)
-        let hasChat = [.history, .historyImported, .admissionSequence, .taskViews, .chatSchemaVersion].contains {
-            values.contains($0)
-        }
-        if hasChat {
-            chatSchemaVersion =
-                values.contains(.chatSchemaVersion) ? try values.decode(Int.self, forKey: .chatSchemaVersion) : 1
-            guard chatSchemaVersion == 1 else { throw CommunicationError.invalidPayload }
-            history = try values.decode(ConversationArchive.self, forKey: .history)
-            historyImported = try values.decode(Bool.self, forKey: .historyImported)
-            admissionSequence = try values.decode(UInt64.self, forKey: .admissionSequence)
-            taskViews = try values.decodeIfPresent([UUID: AgentTaskView].self, forKey: .taskViews)
-        }
-    }
-
     public func validateContextState() throws {
-        guard chatSchemaVersion == 1 else { throw CommunicationError.invalidPayload }
-        try validateChatState()
+        try validateTaskState()
         guard pendingCallIDs.count <= 32, environmentContracts.count <= 32 else {
             throw CommunicationError.invalidPayload
         }
     }
     public mutating func recoverInterruptedWork() {
-        recoverChatState()
+        recoverTaskState()
         pendingCallIDs.removeAll()
     }
 }

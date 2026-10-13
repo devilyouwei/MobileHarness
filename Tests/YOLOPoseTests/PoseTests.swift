@@ -2,26 +2,26 @@ import CoreML
 import CoreVideo
 import Foundation
 import ModelKit
+import ModelKitCoreML
 @_spi(ModelAssembly) import ModelKitRuntime
 import Testing
 
-@testable import ModelKitCoreML
 @testable import ModelKitYOLOPose
 
 @Test func imageBoundsAndLetterbox() throws {
     #expect(throws: CapabilityError.self) { try ImageFrame(width: Int.max, height: 1, rgb: Data()) }
     #expect(throws: CapabilityError.self) { try ImageFrame(width: 1, height: 1, rgb: Data()) }
     let image = try ImageFrame(width: 2, height: 1, rgb: Data([255, 0, 0, 255, 0, 0]))
-    let box = try CoreMLImageLayout(width: image.width, height: image.height)
+    let box = try YOLOImageLayout(width: image.width, height: image.height)
     #expect(box.top == 160 && box.left == 0)
-    let preparation = CoreMLImagePreparation()
+    let preparation = YOLOImagePreparation()
     let pixels = try preparation.prepare(rgb: image.rgb!, layout: box)
     #expect(pixel(pixels, x: 0, y: 0) == [114, 114, 114, 255])
     #expect(pixel(pixels, x: 0, y: 160) == [0, 0, 255, 255])
 }
 
 @Test func poseEndToEndCoordinatesAndNoDuplicateSuppression() throws {
-    let layout = try CoreMLImageLayout(width: 1280, height: 640)
+    let layout = try YOLOImageLayout(width: 1280, height: 640)
     var values = [Float](repeating: 0, count: 300 * 57)
     for row in 0..<3 {
         let i = row * 57
@@ -63,7 +63,7 @@ import Testing
 }
 
 @Test func missingPoseArtifactsFailAndBindingIsTyped() async throws {
-    let manager = ModelManager()
+    let manager = try ModelManager()
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     try await manager.register(
         ModelRegistration(id: ModelID("pose-test"), capabilities: [.pose]) { context in
@@ -78,7 +78,7 @@ import Testing
 @Test(.enabled(if: ProcessInfo.processInfo.environment["YOLO_POSE_MODEL_ROOT"] != nil))
 func realPoseModel() async throws {
     let path = try #require(ProcessInfo.processInfo.environment["YOLO_POSE_MODEL_ROOT"])
-    let manager = ModelManager()
+    let manager = try ModelManager()
     try await manager.register(
         ModelRegistration(id: ModelID("real-pose"), capabilities: [.pose]) { context in
             ProvidedCapabilities(pose: try YOLOPose(context: context, artifacts: URL(fileURLWithPath: path)))
@@ -105,18 +105,18 @@ private func pixel(_ buffer: CVPixelBuffer, x: Int, y: Int) -> [UInt8] {
 }
 
 @Test func imagePreparationReusesBufferAndClearsOldPadding() throws {
-    let preparation = CoreMLImagePreparation()
-    let landscape = try CoreMLImageLayout(width: 640, height: 320)
+    let preparation = YOLOImagePreparation()
+    let landscape = try YOLOImageLayout(width: 640, height: 320)
     let first = try preparation.prepare(rgb: Data(repeating: 80, count: 640 * 320 * 3), layout: landscape)
     #expect(pixel(first, x: 0, y: 160) == [80, 80, 80, 255])
-    let portrait = try CoreMLImageLayout(width: 320, height: 640)
+    let portrait = try YOLOImageLayout(width: 320, height: 640)
     let second = try preparation.prepare(rgb: Data(repeating: 30, count: 320 * 640 * 3), layout: portrait)
     #expect(first === second)
     #expect(pixel(second, x: 0, y: 160) == [114, 114, 114, 255])
     #expect(pixel(second, x: 160, y: 0) == [30, 30, 30, 255])
     #expect(throws: CoreMLGraphError.self) { try preparation.prepare(rgb: Data(), layout: portrait) }
-    #expect(throws: CoreMLGraphError.self) { try CoreMLImageLayout(width: 0, height: 640) }
-    #expect(throws: CoreMLGraphError.self) { try CoreMLImageLayout(width: Int.max, height: 640) }
+    #expect(throws: CoreMLGraphError.self) { try YOLOImageLayout(width: 0, height: 640) }
+    #expect(throws: CoreMLGraphError.self) { try YOLOImageLayout(width: Int.max, height: 640) }
 }
 
 @Test func poseTensorBulkReadSupportsTypesAndStrides() throws {
@@ -170,20 +170,20 @@ private func nativePixels(width: Int, height: Int) throws -> CVPixelBuffer {
         #expect(image.rgb == nil)
         #expect(image.width == (rotation % 2 == 0 ? 1280 : 720))
         #expect(image.height == (rotation % 2 == 0 ? 720 : 1280))
-        let layout = try CoreMLImageLayout(width: image.width, height: image.height, visionScaleFit: true)
+        let layout = try YOLOImageLayout(width: image.width, height: image.height, visionScaleFit: true)
         #expect(layout.scaleX == 0.5 && layout.scaleY == 0.5)
         #expect(layout.offsetX == (rotation % 2 == 0 ? 0 : 140))
         #expect(layout.offsetY == (rotation % 2 == 0 ? 140 : 0))
     }
     #expect(throws: CapabilityError.self) { try ImageFrame(pixelBuffer: pixels, rotation: 4) }
-    let odd = try CoreMLImageLayout(width: 641, height: 360, visionScaleFit: true)
+    let odd = try YOLOImageLayout(width: 641, height: 360, visionScaleFit: true)
     #expect(abs((odd.offsetY + Float(360) * odd.scaleY / 2) - 320) < 0.001)
 }
 
 @Test(.enabled(if: ProcessInfo.processInfo.environment["YOLO_POSE_MODEL_ROOT"] != nil))
 func realVisionNativePoseModel() async throws {
     let root = try #require(ProcessInfo.processInfo.environment["YOLO_POSE_MODEL_ROOT"])
-    let manager = ModelManager()
+    let manager = try ModelManager()
     try await manager.register(
         ModelRegistration(id: ModelID("vision-pose"), capabilities: [.pose]) { context in
             ProvidedCapabilities(pose: try YOLOPose(context: context, artifacts: URL(fileURLWithPath: root)))

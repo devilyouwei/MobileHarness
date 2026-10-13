@@ -34,7 +34,7 @@ private actor ManagedChat: ChatCapability {
 }
 
 private func registeredManager(_ counter: LoadCounter) async throws -> ModelManager {
-    let manager = ModelManager()
+    let manager = try ModelManager()
     try await manager.register(
         ModelRegistration(id: ModelID("model"), capabilities: [.chat]) { context in
             await counter.constructed()
@@ -111,7 +111,7 @@ private func registeredManager(_ counter: LoadCounter) async throws -> ModelMana
 
 @Test(.timeLimit(.minutes(1))) func failedLoadRetriesWithoutReconstructingProvider() async throws {
     let counter = LoadCounter()
-    let manager = ModelManager()
+    let manager = try ModelManager()
     let id = ModelID("retry-load")
     try await manager.register(
         ModelRegistration(id: id, capabilities: [.chat]) { context in
@@ -131,7 +131,7 @@ private func registeredManager(_ counter: LoadCounter) async throws -> ModelMana
 }
 
 @Test func registrationCapacityIsExplicit() async throws {
-    let manager = ModelManager()
+    let manager = try ModelManager()
     for index in 0..<32 {
         try await manager.register(
             ModelRegistration(id: ModelID("model-\(index)"), capabilities: [.chat]) { context in
@@ -165,7 +165,7 @@ private actor LoadLatch {
 }
 
 @Test(.timeLimit(.minutes(1))) func cancelledGetDoesNotCancelSharedWeightLoad() async throws {
-    let manager = ModelManager()
+    let manager = try ModelManager()
     let latch = LoadLatch()
     let counter = LoadCounter()
     let id = ModelID("shared-load")
@@ -191,7 +191,7 @@ private actor LoadLatch {
 }
 
 @Test(.timeLimit(.minutes(1))) func managerBoundsConcurrentWeightLoadsAcrossModels() async throws {
-    let manager = ModelManager()
+    let manager = try ModelManager()
     let latch = LoadLatch()
     for index in 0..<5 {
         let id = ModelID("load-\(index)")
@@ -218,7 +218,7 @@ private actor LoadLatch {
 }
 
 @Test(.timeLimit(.minutes(1))) func shutdownWaitsForActualBackendCleanup() async throws {
-    let context = ModelContext()
+    let context = try ModelContext(loadGate: ModelLoadGate(maximumConcurrentLoads: 4), maximumLoadWaiters: 32)
     let resource = try context.resource { 42 }
     let lease = try await resource.acquire()
     let cleanup = LoadLatch()
@@ -245,7 +245,7 @@ private actor LoadLatch {
 }
 
 @Test(.timeLimit(.minutes(1))) func shutdownCancelsLoadingEvenWhileUnloadIsWaiting() async throws {
-    let context = ModelContext()
+    let context = try ModelContext(loadGate: ModelLoadGate(maximumConcurrentLoads: 4), maximumLoadWaiters: 32)
     let entered = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingOldest(1))
     let _: ModelResource<Int> = try context.resource {
         entered.continuation.yield(())
@@ -265,7 +265,7 @@ private actor LoadLatch {
 }
 
 @Test func memoryPressureReleasesOnlyEligibleIdleResources() async throws {
-    let manager = ModelManager()
+    let manager = try ModelManager()
     let counter = LoadCounter()
     let eligible = ModelID("eligible")
     let retained = ModelID("retained")
@@ -301,7 +301,7 @@ private struct UnavailableChat: ChatCapability {
 }
 
 @Test func availabilityIsSeparateFromResidencyAndNeverLoadsWeights() async throws {
-    let manager = ModelManager()
+    let manager = try ModelManager()
     let id = ModelID("unsupported")
     try await manager.register(
         ModelRegistration(id: id, capabilities: [.chat]) { _ in
@@ -320,7 +320,7 @@ private struct UnavailableChat: ChatCapability {
 }
 
 @Test(.timeLimit(.minutes(1))) func memoryPressureSkipsLoadingWithoutWaitingOrCancelling() async throws {
-    let manager = ModelManager()
+    let manager = try ModelManager()
     let latch = LoadLatch()
     let id = ModelID("loading")
     try await manager.register(
@@ -345,7 +345,7 @@ private struct UnavailableChat: ChatCapability {
 
 @Test func modelLeaseRejectsOverlapUntilReleasedAndReusesWeights() async throws {
     let counter = LoadCounter()
-    let context = ModelContext()
+    let context = try ModelContext(loadGate: ModelLoadGate(maximumConcurrentLoads: 4), maximumLoadWaiters: 32)
     let resource = try context.resource { await counter.load() }
     let first = try await resource.acquire()
     await #expect(throws: CapabilityError.inputBusy) { _ = try await resource.acquire() }
@@ -359,7 +359,7 @@ private struct UnavailableChat: ChatCapability {
 }
 
 @Test(.timeLimit(.minutes(1))) func staleLeaseCallbacksCannotReleaseOrReplaceCurrentLease() async throws {
-    let context = ModelContext()
+    let context = try ModelContext(loadGate: ModelLoadGate(maximumConcurrentLoads: 4), maximumLoadWaiters: 32)
     let resource = try context.resource { 1 }
     let old = try await resource.acquire()
     await resource.release(old.id)

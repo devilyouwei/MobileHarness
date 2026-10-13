@@ -34,3 +34,6 @@ Terminal/error controls join or cancel their scoped work. Round controls retain 
 ## Related design
 
 [Parent design](../README.md)
+
+
+✅ Implemented: ExecutionRouter maps agent.cancelled to cancel; success and producer-error mappings remain distinct.

@@ -9,21 +9,19 @@ public enum AgentCommunicationAdapter {
         guard !functions.tools.contains(where: { isCommunication($0.path) || $0.alias == "Agent.send" }) else {
             throw CommunicationError.invalidPayload
         }
-        var actions = functions.actions
+        guard let registration = functions.actions.first(where: { $0.path.description == "Agent.Communication.send" })
+        else { return functions }
+        guard registration.alias == "send", registration.defaultChannel == "Communication" else {
+            throw CommunicationError.invalidPayload
+        }
+        var actions = functions.actions.filter { $0.path.description != "Agent.Communication.send" }
         let taskSends = policy.sends.filter { $0.contract.hasPrefix("task.") }
         if !taskSends.isEmpty {
             let required: Set<String> = ["target", "kind", "content"]
-            let optional: Set<String> = ["taskID", "artifactID"]
+            let optional: Set<String> = ["taskID", "artifactID", "businessContract", "payload"]
             let kinds = Set(taskSends.map { $0.contract.replacingOccurrences(of: "task.", with: "") }).sorted()
             let targets = Set(taskSends.map(\.target)).sorted()
-            guard let exampleSend = taskSends.first else { throw CommunicationError.invalidPayload }
-            let exampleKind = exampleSend.contract.replacingOccurrences(of: "task.", with: "")
             let templates = try FunctionTokenPrompts.load()
-            let example =
-                try exampleKind == "request"
-                ? templates.render("communicationRequestExample", variables: ["target": exampleSend.target])
-                : templates.render(
-                    "communicationTaskExample", variables: ["target": exampleSend.target, "kind": exampleKind])
             actions.append(
                 ActionRegistration(
                     alias: "send", path: ActionPath(domain: "Agent", module: "Communication", function: "send"),
@@ -31,13 +29,22 @@ public enum AgentCommunicationAdapter {
                     documentation: try JSONDecoder().decode(
                         CapabilityDocumentation.self,
                         from: JSONSerialization.data(withJSONObject: [
-                            "doc": try templates.render(
-                                "communicationDescription",
-                                variables: [
-                                    "targets": targets.joined(separator: ", "), "kinds": kinds.joined(separator: ", "),
-                                ]),
-                            "parameters": [],
-                            "examples": [example],
+                            "doc": (registration.documentation?.doc ?? "") + "\n"
+                                + (try templates.render(
+                                    "communicationDescription",
+                                    variables: [
+                                        "targets": targets.joined(separator: ", "),
+                                        "kinds": kinds.joined(separator: ", "),
+                                        "usage": try kinds.map { try templates.render("communication." + $0) }.joined(
+                                            separator: " "),
+                                    ])),
+                            "parameters": (registration.documentation?.parameters ?? []).map {
+                                [
+                                    "name": $0.name, "valueType": $0.valueType.rawValue,
+                                    "required": $0.required, "description": $0.description,
+                                    "constraints": $0.constraints,
+                                ] as [String: Any]
+                            },
                         ]))))
         }
         return try CapabilityRegistry(
@@ -79,6 +86,17 @@ public enum AgentCommunicationAdapter {
             else { throw CommunicationError.scopeClosed }
             scope = existing
         }
+        if arguments["businessContract"] != nil || arguments["payload"] != nil {
+            guard kind == .input, scope.execution == .background,
+                let contract = arguments["businessContract"], let payload = arguments["payload"],
+                payload.utf8.count <= 65_536,
+                (try? JSONSerialization.jsonObject(with: Data(payload.utf8))) != nil
+            else { throw CommunicationError.invalidPayload }
+            let signal = try AgentTaskSignal(
+                kind: kind, scope: scope, businessContract: contract, data: Data(payload.utf8))
+            return (try CommunicationAction(message: signal.message(), target: target), signal)
+        }
+        if kind == .input, scope.execution == .background { throw CommunicationError.invalidPayload }
         let content = try AgentTaskContent(
             text: text,
             stage: kind == .progress ? .waitingUser : (kind == .result ? .completed : .running),

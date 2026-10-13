@@ -3,7 +3,7 @@ import FunctionContracts
 
 extension UIActions {
     @Action(
-        domain: "UI", module: "ResourcePresentation", title: "showResources", serializationKey: "UI",
+        domain: "UI", module: "ResourcePresentation", title: "showResources",
         timeout: .seconds(60))
     public static func showResources(
         invocation: any FunctionInput, inventory: any ModelResourceInventoryCapability,
@@ -20,7 +20,7 @@ extension UIActions {
         return encoded
     }
 
-    @Action(domain: "UI", module: "ResourcePresentation", title: "showResourceFailure", serializationKey: "UI")
+    @Action(domain: "UI", module: "ResourcePresentation", title: "showResourceFailure", timeout: .seconds(5))
     public static func showResourceFailure(
         invocation: any FunctionInput, using presentation: any ResourcePresentationCapability
     ) async throws -> String {
@@ -34,7 +34,7 @@ extension UIActions {
         return "presented"
     }
 
-    @Action(domain: "UI", module: "ResourcePresentation", title: "showResourceOperationFailure", serializationKey: "UI")
+    @Action(domain: "UI", module: "ResourcePresentation", title: "showResourceOperationFailure", timeout: .seconds(5))
     public static func showResourceOperationFailure(
         invocation: any FunctionInput, using presentation: any ResourcePresentationCapability
     ) async throws -> String {
@@ -48,7 +48,7 @@ extension UIActions {
     }
 
     @Action(
-        domain: "UI", module: "ResourcePresentation", title: "showResourcePreferenceFailure", serializationKey: "UI")
+        domain: "UI", module: "ResourcePresentation", title: "showResourcePreferenceFailure", timeout: .seconds(5))
     public static func showResourcePreferenceFailure(
         invocation: any FunctionInput, using presentation: any ResourcePresentationCapability
     ) async throws -> String {
@@ -67,7 +67,7 @@ extension UIActions {
         return "presented"
     }
 
-    @Action(domain: "UI", module: "ResourcePresentation", title: "showProviderResult", serializationKey: "UI")
+    @Action(domain: "UI", module: "ResourcePresentation", title: "showProviderResult", timeout: .seconds(5))
     public static func showProviderResult(
         invocation: any FunctionInput, using presentation: any ResourcePresentationCapability
     ) async throws -> String {

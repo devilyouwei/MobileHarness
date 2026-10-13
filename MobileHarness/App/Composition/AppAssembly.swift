@@ -250,7 +250,10 @@ final class AppAssembly {
                 url: root.appendingPathComponent("MobileHarness/Bluetooth/device.json"), maximumBytes: 4096)
         })
     @ObservationIgnored private let capturedPhotos = CapturedPhotoStore(
-        root: URL.applicationSupportDirectory.appendingPathComponent("MobileHarness/CapturedPhotos", isDirectory: true))
+        root: URL.applicationSupportDirectory.appendingPathComponent("MobileHarness/CapturedPhotos", isDirectory: true),
+        limits: .init(
+            maximumPhotos: 1024, maximumBytes: 2 * 1024 * 1024 * 1024, maximumIndexBytes: 512 * 1024,
+            overflowPolicy: .evictOldest))
     @ObservationIgnored lazy var camera = makeCamera()
     private func makeCamera() -> CameraCoordinator {
         let device = cameraDevice
@@ -295,7 +298,7 @@ final class AppAssembly {
             },
             startNew: { [weak self] in
                 guard let self else { throw CancellationError() }
-                try await self.runtime().historyIntents.startNew()
+                try await self.runtime().startNewConversation()
             },
             summarize: { [weak self] id in
                 guard let self else { throw CancellationError() }
@@ -310,14 +313,15 @@ final class AppAssembly {
             startNew: {}, summarize: { _ in }, previewOutput: { _ in "" }, readPhoto: { _, _ in nil })
         root.agents = [
             HistoryAgentDestination(
-                id: "assistant", name: "Assistant", summary: "用户交互与任务委派", state: historyState, controls: assistant)
+                id: "assistant", name: "Assistant 聊天记录", summary: "当前聊天与已归档聊天", state: historyState, controls: assistant
+            )
         ]
-        for (id, name, summary) in [
-            ("photographer", "Photographer", "拍摄任务与照片处理"),
-            ("memory", "Memory", "历史与记忆任务"),
-            ("applicationControl", "ApplicationControl", "应用、资源与设备任务"),
-        ] {
-            let state = ConversationHistoryState(title: name, allowsMutations: false, groupsByTask: true)
+        let id = "assistant.tasks"
+        let name = "任务记录"
+        let summary = "Assistant 的前台与后台任务"
+        do {
+            let state = ConversationHistoryState(
+                title: name, allowsMutations: false, groupsByTask: true)
             let workflow = ConversationHistoryWorkflow(
                 state: state,
                 prepare: { [weak self] in
@@ -332,14 +336,16 @@ final class AppAssembly {
                     state.archive = snapshot.archive
                     state.tasks = snapshot.tasks
                 }, deleteArchive: { _ in }, startNew: {}, summarize: { _ in },
-                previewOutput: { HistoryAgentAdapter.preview($0, agent: id) },
+                previewOutput: { HistoryAgentAdapter.preview($0) },
                 readPhoto: { [weak self] photo, input in
                     guard let self else { throw CancellationError() }
-                    return try await self.capturedPhotos.readForInput(photo, source: id, input: input)
+                    return try await self.capturedPhotos.readForInput(
+                        photo, source: "assistant", input: input)
                 })
             root.agents.append(
                 HistoryAgentDestination(
-                    id: id, name: name, summary: summary, state: state, controls: workflow))
+                    id: id, name: name, summary: summary, state: state,
+                    controls: workflow))
         }
         return root
     }

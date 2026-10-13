@@ -10,7 +10,7 @@ public enum IndependentOutputWorkflow {
     ) async throws {
         let reader = OutputStreamReader(outputs)
         while true {
-            let tools = AsyncStream<OutputEnvelope>.makeStream(bufferingPolicy: .bufferingOldest(16))
+            let tools = AsyncStream<OutputEnvelope>.makeStream(bufferingPolicy: .bufferingOldest(128))
             let communications = AsyncStream<OutputEnvelope>.makeStream(bufferingPolicy: .bufferingOldest(16))
             let actions = AsyncStream<OutputEnvelope>.makeStream(bufferingPolicy: .bufferingOldest(256))
             let boundary = try await withThrowingTaskGroup(
@@ -76,7 +76,7 @@ public enum IndependentOutputWorkflow {
 
     fileprivate static func isFailure(_ output: AgentOutput) -> Bool {
         guard case .control(let value) = output else { return false }
-        return value.hasPrefix("assistant.error:") || value.hasPrefix("agent.error:")
+        return value == "agent.cancelled" || value.hasPrefix("assistant.error:") || value.hasPrefix("agent.error:")
     }
 
     private enum ToolCompletion: Sendable {
@@ -183,8 +183,6 @@ public enum IndependentOutputWorkflow {
 private actor OutputStreamReader {
     private var iterator: AsyncStream<OutputEnvelope>.Iterator?
     private var inputID: UUID?
-    private var nativeCalls = 0
-    private var taskCounts: [UUID: Int] = [:]
 
     init(_ outputs: AsyncStream<OutputEnvelope>) { iterator = outputs.makeAsyncIterator() }
 
@@ -209,7 +207,6 @@ private actor OutputStreamReader {
                     guard inputID == envelope.inputID else { throw HarnessError.invalidTransition }
                 } else {
                     inputID = envelope.inputID
-                    nativeCalls = taskCounts[envelope.inputID, default: 0]
                 }
             }
             let terminal: Bool
@@ -221,7 +218,6 @@ private actor OutputStreamReader {
                 terminal = false
             }
             if terminal, inputID == nil || inputID == envelope.inputID {
-                taskCounts[envelope.inputID] = nil
                 inputID = nil
                 return envelope
             }
@@ -234,12 +230,6 @@ private actor OutputStreamReader {
             case .toolCall: native = envelope.roundID != nil
             case .rejectedCall(let rejection): native = rejection.kind == .tool && envelope.roundID != nil
             default: native = false
-            }
-            if native {
-                guard nativeCalls < 16 else { throw HarnessError.queueFull }
-                nativeCalls += 1
-                guard taskCounts[envelope.inputID] != nil || taskCounts.count < 32 else { throw HarnessError.queueFull }
-                taskCounts[envelope.inputID] = nativeCalls
             }
             let destination: AsyncStream<OutputEnvelope>.Continuation
             if case .communication = envelope.output {

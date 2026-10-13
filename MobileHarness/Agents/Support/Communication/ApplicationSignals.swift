@@ -59,7 +59,8 @@ extension AgentMessage { public var appInteraction: AppInteractionIntent? { cont
 /// User intent only; SpeechPerception decides listening state without a model request.
 public struct ListeningIntent: Codable, Sendable {
     public static let contract = "speech.listening"
-    public init() {}
+    public let enabled: Bool?
+    public init(enabled: Bool? = nil) { self.enabled = enabled }
     public func input(sessionID: UUID) -> AgentInput {
         let payload = InputPayload.observation(
             AgentMessage(

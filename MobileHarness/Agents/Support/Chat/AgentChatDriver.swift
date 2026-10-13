@@ -30,7 +30,7 @@ public enum AgentChatDriver {
         let session = try await capability.chat(measured)
         defer { session.cancel() }
         let text = AsyncThrowingStream<String, any Error>.makeStream(bufferingPolicy: .bufferingOldest(8192))
-        let native = AsyncThrowingStream<ChatToolCall, any Error>.makeStream(bufferingPolicy: .bufferingOldest(16))
+        let native = AsyncThrowingStream<ChatToolCall, any Error>.makeStream(bufferingPolicy: .bufferingOldest(128))
         return try await withTaskCancellationHandler {
             try await withThrowingTaskGroup(of: String.self) { group in
                 group.addTask { try await consumers.text(text.stream) }

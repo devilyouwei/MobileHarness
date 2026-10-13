@@ -68,3 +68,20 @@ Manual preset/jog submission is not arrival. App reports late native-worker fail
 ## Related design
 
 [Parent design](../README.md) · [Support](Support/README.md)
+
+## Action-owned documentation and Skill instruction contract
+
+✅ 本域函数用 `@Action(doc:parameters:)` 维护说明与参数契约。所属模块注册自动生成声明投影；业务顺序和调用示例由 Skill Instructions.md 教学，不再登记 examples。
+
+## Channel-owned Action ordering
+
+✅ Function metadata and business attributes have no serialization key. Scheduled ordering belongs to [ChannelScheduler](../../Gateway/Output/Scheduling/README.md); resources/budgets and native capability admission remain explicit.
+
+
+✅ 提示词精简已实现：11项模型机械臂函数doc精简为用途/独有动作，参数范围由参数说明提供，公共使用约束由RobotInteraction教学；本目录反馈、失败聚合、取消等算法及执行代码不变。
+
+## Action timeout contract (2026-10-12)
+
+✅ 有限动作属性命名为 dynamicTimeout；外层按实际编排种类的段数及保守电机预算组合（段内并行最大、段间串行求和）并加入 5 秒准备/清理余量。每电机仍按实时反馈计算超时，aim 目标发布使用基础默认、持续 worker 保持独立所有权。
+
+✅ 2026-10-13 已实现：成功的逐电机/动作段 report 属于执行证据，不因其非空而触发模型 ReACT；失败/部分失败/取消仍触发错误处理。报告采集、到位判定和失败聚合保持原实现，不删除报告或重放动作。

@@ -82,17 +82,22 @@ public struct ActionReport: Equatable, Sendable {
         let reported = (error as? any ActionReportProviding)?.actionReport
         let code =
             reported?.executionFailure
-            ?? (reported?.isCancelled == true ? .cancelled : reported?.entries.first { $0.status == .failed }?.code)
+            ?? reported?.entries.first { $0.status == .failed && $0.code != .cancelled }?.code
+            ?? (reported?.isCancelled == true ? .cancelled : nil)
             ?? Self.code(for: error)
         return withExecutionFailure(code, description: reported?.failureDescription ?? Self.description(for: error))
     }
-    public var hasFailures: Bool { executionFailure != nil || entries.contains { $0.status == .failed } }
+    public var hasFailures: Bool {
+        (executionFailure != nil && executionFailure != .cancelled)
+            || entries.contains { $0.status == .failed && $0.code != .cancelled }
+    }
     public var isCancelled: Bool {
         executionFailure == .cancelled || entries.contains { $0.status == .cancelled || $0.code == .cancelled }
     }
+    public var isCancellationOnly: Bool { isCancelled && !hasFailures }
     public var status: ActionStatus {
-        if isCancelled && executionFailure != .timedOut { return .cancelled }
         if hasFailures { return entries.contains { $0.status == .succeeded } ? .partialFailure : .failed }
+        if isCancelled { return .cancelled }
         return .succeeded
     }
 }

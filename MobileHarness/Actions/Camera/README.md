@@ -39,3 +39,17 @@ Host binds scheduled Actions and fixed returning Tools; Photographer model decla
 ## Related design
 
 [Parent design](../README.md) · [Support](Support/README.md)
+
+## Action-owned documentation and Skill instruction contract
+
+✅ 本域函数用 `@Action(doc:parameters:)` 维护说明与参数契约。所属模块注册自动生成声明投影；业务顺序和调用示例由 Skill Instructions.md 教学，不再登记 examples。
+
+## Channel-owned Action ordering
+
+✅ Function metadata and business attributes have no serialization key. Scheduled ordering belongs to [ChannelScheduler](../../Gateway/Output/Scheduling/README.md); resources/budgets and native capability admission remain explicit.
+
+
+✅ 提示词精简已实现：摄影函数doc保留实际效果、结果及独有边界，移除重复流程/调度教学；Photography集中编排，参数/执行/超时不变。
+
+
+✅ Implemented: savePhoto/ignorePhoto join host departure effects after native success. Actual saved/ignored receipts can carry optional feedbackIssues; errors in effects cannot undo album import. Explicit duplicate saved UUID is idempotent after UI removal. Permission/import failure retains the current photo.

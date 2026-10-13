@@ -2,7 +2,7 @@
 public struct AudioCaptureContext: Sendable, Equatable {
     public enum Input: Sendable { case builtInMicrophone, headset, external, unknown }
     public enum SpatialSupport: Sendable { case unknown, supported, unsupported, inputUnavailable }
-    public enum Fallback: Sendable { case inputUnavailable, unsupported, startupTimeout, startupFailed }
+    public enum Fallback: Sendable { case inputUnavailable, unsupported, startupFailed }
     public let input: Input
     public let spatialSupport: SpatialSupport
     public let fallback: Fallback?

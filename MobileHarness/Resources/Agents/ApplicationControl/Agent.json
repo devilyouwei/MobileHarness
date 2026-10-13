@@ -1,0 +1,135 @@
+{
+  "version": 7,
+  "id": "applicationControl",
+  "communication": {
+    "inputs": [
+      {
+        "contract": "app.environment",
+        "version": 1,
+        "kind": "observation"
+      },
+      {
+        "contract": "app.interaction",
+        "version": 1,
+        "kind": "observation"
+      },
+      {
+        "contract": "provider.settings",
+        "version": 1,
+        "kind": "observation"
+      },
+      {
+        "contract": "provider.discovery",
+        "version": 1,
+        "kind": "observation"
+      },
+      {
+        "contract": "model.resource.hostFailure",
+        "version": 1,
+        "kind": "observation"
+      },
+      {
+        "contract": "model.resource.state",
+        "version": 1,
+        "kind": "observation"
+      },
+      {
+        "contract": "model.resource.intent",
+        "version": 1,
+        "kind": "observation"
+      },
+      {
+        "contract": "tool.result",
+        "version": 1,
+        "kind": "toolResult"
+      },
+      {
+        "contract": "task.request",
+        "version": 1,
+        "kind": "observation"
+      },
+      {
+        "contract": "task.input",
+        "version": 1,
+        "kind": "observation"
+      },
+      {
+        "contract": "task.progress",
+        "version": 1,
+        "kind": "observation"
+      },
+      {
+        "contract": "task.result",
+        "version": 1,
+        "kind": "observation"
+      },
+      {
+        "contract": "task.cancel",
+        "version": 1,
+        "kind": "observation"
+      },
+      {
+        "contract": "communication.receipt",
+        "version": 1,
+        "kind": "communicationReceipt"
+      }
+    ],
+    "subscriptions": [
+      {
+        "contract": "model.resource.intent",
+        "source": "runtime",
+        "topic": "model.resource.intent"
+      },
+      {
+        "contract": "model.resource.state",
+        "source": "model.resources",
+        "topic": "model.resource.state"
+      },
+      {
+        "contract": "model.resource.hostFailure",
+        "source": "app.resources",
+        "topic": "model.resource.hostFailure"
+      },
+      {
+        "contract": "app.environment",
+        "source": "app.environment",
+        "topic": "app.environment"
+      },
+      {
+        "contract": "app.interaction",
+        "source": "user",
+        "topic": "app.interaction"
+      },
+      {
+        "contract": "model.resource.intent",
+        "source": "user",
+        "topic": "model.resource.intent"
+      },
+      {
+        "contract": "provider.settings",
+        "source": "user",
+        "topic": "provider.settings"
+      },
+      {
+        "contract": "provider.discovery",
+        "source": "user",
+        "topic": "provider.discovery"
+      }
+    ],
+    "publications": [],
+    "sends": [
+      {
+        "contract": "task.progress",
+        "target": "assistant"
+      },
+      {
+        "contract": "task.result",
+        "target": "assistant"
+      }
+    ]
+  },
+  "baseSkills": [
+    "application-control"
+  ],
+  "backgroundTasks": []
+}

@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "id": "expression-interaction",
+  "revision": 10,
+  "description": "双眼表情互动：按对话需要或用户要求展示短暂表情、设置持续表情。",
+  "dependencies": [],
+  "functions": [
+    {
+      "path": "UI.Expression.express",
+      "callType": "action",
+      "alias": "express",
+      "channel": "Display"
+    },
+    {
+      "path": "UI.Expression.setExpression",
+      "callType": "action",
+      "alias": "setExpression",
+      "channel": "Display"
+    }
+  ],
+  "contextFields": [
+    "runtimeFacts",
+    "taskState",
+    "actionResults"
+  ]
+}

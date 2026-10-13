@@ -3,7 +3,7 @@ import FunctionContracts
 
 /// History.Conversation function ownership; current invocation paths remain compatible.
 extension HistoryActions {
-    @Action(domain: "History", module: "Conversation", title: "startNew", serializationKey: "History")
+    @Action(domain: "History", module: "Conversation", title: "startNew")
     public static func startNew(invocation: any FunctionInput, using history: any HistoryMutationCapability)
         async throws -> String
     {
@@ -15,7 +15,7 @@ extension HistoryActions {
     }
 
     @Action(
-        domain: "History", module: "Conversation", title: "summarize", serializationKey: "History",
+        domain: "History", module: "Conversation", title: "summarize",
         timeout: .seconds(60))
     public static func summarize(invocation: any FunctionInput, using history: any HistoryMutationCapability)
         async throws -> String
@@ -31,7 +31,7 @@ extension HistoryActions {
     }
 
     @Action(
-        domain: "History", module: "Conversation", title: "delete", serializationKey: "History")
+        domain: "History", module: "Conversation", title: "delete")
     public static func delete(invocation: any FunctionInput, using history: any HistoryMutationCapability) async throws
         -> String
     {
@@ -46,7 +46,17 @@ extension HistoryActions {
     }
 
     @Action(
-        domain: "History", module: "Conversation", title: "list", serializationKey: "History")
+        domain: "History", module: "Conversation", title: "list",
+        doc:
+            "List current and archived conversations, current first then newest archives. Returns paged JSON metadata with IDs and explicitly truncated title/input previews. Start at offset 0; use nextOffset for more.",
+        parameters: [
+            .init(
+                "offset", type: .string, required: true,
+                description: "Decimal integer from 0 through 64, encoded as a string.", constraints: ""),
+            .init(
+                "limit", type: .string, required: true,
+                description: "Decimal integer from 1 through 5, encoded as a string.", constraints: ""),
+        ])
     public static func list(invocation: any FunctionInput, using history: any HistoryQueryCapability) async throws
         -> String
     {
@@ -62,7 +72,20 @@ extension HistoryActions {
     }
 
     @Action(
-        domain: "History", module: "Conversation", title: "read", serializationKey: "History")
+        domain: "History", module: "Conversation", title: "read",
+        doc:
+            "Read a conversation by an ID returned by History.list. Turns are oldest first. Returns paged JSON with bounded user/response previews and truncation flags, not complete text; never replays behavior. Start at offset 0.",
+        parameters: [
+            .init(
+                "id", type: .string, required: true, description: "Conversation UUID from History.list", constraints: ""
+            ),
+            .init(
+                "offset", type: .string, required: true,
+                description: "Decimal integer from 0 through 256, encoded as a string.", constraints: ""),
+            .init(
+                "limit", type: .string, required: true,
+                description: "Decimal integer from 1 through 2, encoded as a string.", constraints: ""),
+        ])
     public static func read(invocation: any FunctionInput, using history: any HistoryQueryCapability) async throws
         -> String
     {

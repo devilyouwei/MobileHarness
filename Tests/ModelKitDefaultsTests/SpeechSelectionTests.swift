@@ -32,7 +32,7 @@ private actor SelectionStorage: ModelArtifactStorage {
     func remove(_ artifact: ModelArtifact) { present = false }
 }
 @Test func speechSelectionRespectsInstallationAvailabilityAndExplicitSystemPreference() async throws {
-    let manager = ModelManager()
+    let manager = try ModelManager()
     let storage = SelectionStorage()
     let catalog = try ModelArtifactCatalog.decode(
         Data(
@@ -71,7 +71,7 @@ private actor SelectionStorage: ModelArtifactStorage {
 }
 
 @Test func recognitionSelectionIsIndependentOfVADInstallationAndSynthesisChoice() async throws {
-    let manager = ModelManager()
+    let manager = try ModelManager()
     let storage = SelectionStorage()
     let packages = [("nemotron", "recognition"), ("silero", "voiceActivity"), ("moss-tts-nano", "synthesis")].map {
         id, capability in

@@ -8,6 +8,7 @@ extension EyeExpression {
     init(_ emotion: UIActions.Emotion) {
         switch emotion {
         case .clear: self = .clear
+        case .closed: self = .closed
         case .smile: self = .smile
         case .happy: self = .happy
         case .laugh: self = .laugh

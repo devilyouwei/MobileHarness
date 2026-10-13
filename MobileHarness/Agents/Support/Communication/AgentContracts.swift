@@ -122,9 +122,9 @@ public enum AgentContracts {
                             }
                             try value.validate()
                         }),
-                    contract("speech.final"), contract("speech.partial", lifetime: 2), contract("speech.phase"),
-                    contract("sound.source", lifetime: 0.5),
-                    contract("vision.pose", lifetime: 1, maximumBytes: 262_144),
+                    contract("speech.final"), contract("speech.partial"), contract("speech.phase"),
+                    contract("sound.source"),
+                    contract("vision.pose", maximumBytes: 262_144),
                     contract("speech.synthesize", startsNewWork: true), contract("speech.cancel", startsNewWork: true),
                     CommunicationContract(
                         name: ProviderSettingsIntent.contract, kind: .observation, maximumBytes: 512,
@@ -185,7 +185,7 @@ public enum AgentContracts {
                             try value.validate()
                         }),
                     CommunicationContract(
-                        name: PhotographerCameraIntent.contract, kind: .observation, lifetime: 10, maximumBytes: 512,
+                        name: PhotographerCameraIntent.contract, kind: .observation, maximumBytes: 512,
                         startsNewWork: true,
                         validateMessage: { message in
                             guard message.contract == PhotographerCameraIntent.contract,
@@ -207,10 +207,10 @@ public enum AgentContracts {
         }
     }
     private static func contract(
-        _ name: String, lifetime: TimeInterval = 10, maximumBytes: Int = 16_384, startsNewWork: Bool = false
+        _ name: String, maximumBytes: Int = 16_384, startsNewWork: Bool = false
     ) -> CommunicationContract {
         CommunicationContract(
-            name: name, kind: .observation, lifetime: lifetime, maximumBytes: maximumBytes,
+            name: name, kind: .observation, maximumBytes: maximumBytes,
             startsNewWork: startsNewWork,
             validateMessage: { message in
                 guard let value = message.perception, value.contract == name else {

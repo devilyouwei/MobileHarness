@@ -2,7 +2,7 @@
     import SwiftUI
     import UIKit
 
-    /// Agent selection followed by isolated durable request history.
+    /// Assistant chat and task history destinations.
     @MainActor
     public struct ConversationHistoryView: View {
         @Bindable var state: ConversationHistoryState
@@ -27,7 +27,8 @@
                     }
                     .accessibilityIdentifier("history.agent.\(agent.id)")
                 }
-                .navigationTitle("对话历史")
+                .task { for destination in controls.agents { await destination.controls.load() } }
+                .navigationTitle("历史记录")
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar(.visible, for: .navigationBar)
             }
@@ -61,6 +62,9 @@
                     } label: {
                         VStack(alignment: .leading, spacing: 5) {
                             if turn.isReACT == true { Text("ReACT").font(.caption).foregroundStyle(.orange) }
+                            if let metadata = turn.decisionMetadata {
+                                Text(metadata.summary).font(.caption).foregroundStyle(.secondary).lineLimit(2)
+                            }
                             Text(turn.displayInput).lineLimit(3)
                             Text(turn.outputSummary).lineLimit(3).foregroundStyle(.secondary)
                             Text(turn.dateReport).font(.caption).foregroundStyle(.secondary)
@@ -138,7 +142,7 @@
                         } header: {
                             Text("过去的对话")
                         } footer: {
-                            Text("对话历史仅保存在此设备。")
+                            Text("历史记录仅保存在此设备。")
                         }
                     }
                 }
@@ -190,7 +194,7 @@
                     }
                 }
                 Section("任务") {
-                    ForEach(state.tasks.filter(\.isAssociated)) { task in row(task) }
+                    ForEach(state.tasks) { task in row(task) }
                     if state.tasks.isEmpty {
                         if state.isBusy {
                             ProgressView("加载任务…")
@@ -199,12 +203,7 @@
                         }
                     }
                 }
-                let unassociated = state.tasks.filter { !$0.isAssociated }
-                if !unassociated.isEmpty {
-                    Section("未关联任务的记录") {
-                        ForEach(unassociated) { task in row(task) }
-                    }
-                }
+
             }
         }
         private func row(_ task: HistoryTask) -> some View {
@@ -213,6 +212,14 @@
             } label: {
                 VStack(alignment: .leading, spacing: 6) {
                     Text(verbatim: task.title).lineLimit(2)
+                    if let execution = task.execution {
+                        Text((execution == "background" ? "后台任务" : "前台任务") + " · " + (task.executor ?? "assistant"))
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                    if !task.skills.isEmpty {
+                        Text("Skills: " + task.skills.joined(separator: ", ")).font(.caption).foregroundStyle(
+                            .secondary)
+                    }
                     Text(
                         [
                             task.status, "\(task.turns.count) 轮",
@@ -248,10 +255,19 @@
         var body: some View {
             List {
                 if let task {
-                    Section(task.isAssociated ? "任务信息" : "记录信息") {
+                    Section("任务信息") {
+                        Text("目标：" + task.title)
                         Text(task.status)
+                        if let execution = task.execution {
+                            Text((execution == "background" ? "后台任务" : "前台任务") + " · " + (task.executor ?? "assistant"))
+                        }
+                        if !task.skills.isEmpty { Text("Skills: " + task.skills.joined(separator: ", ")) }
+                        if let parent = task.parentTaskID {
+                            Text("父任务：" + parent.uuidString).font(.caption).textSelection(.enabled)
+                        }
+                        if let result = task.resultText { Text("结果 / 进度：" + result).textSelection(.enabled) }
                         Text(task.createdAt?.formatted(date: .abbreviated, time: .shortened) ?? "")
-                        Text("\(task.isAssociated ? "任务 ID" : "输入 ID")：\(task.id)").font(.caption).textSelection(
+                        Text("任务 ID：\(task.id)").font(.caption).textSelection(
                             .enabled)
                     }
                     if turns.isEmpty { Text("此任务暂无模型对话记录").foregroundStyle(.secondary) }
@@ -285,7 +301,7 @@
         }
         private var export: String {
             (task.map {
-                "\($0.isAssociated ? "任务" : "记录")：\($0.title)\n\($0.isAssociated ? "任务 ID" : "输入 ID")：\($0.id)\n状态：\($0.status)\n\n"
+                "任务：\($0.title)\n任务 ID：\($0.id)\n状态：\($0.status)\n\n"
             } ?? "")
                 + turns.map { $0.diagnosticReport() }
                 .joined(separator: "\n\n---\n\n")
@@ -320,6 +336,21 @@
                         }
                     }
                 }
+                if let metadata = turn.decisionMetadata {
+                    Section("任务与 Skill") {
+                        if let execution = metadata.execution {
+                            Text(execution == "foreground" ? "前台任务" : "后台任务")
+                            if let goal = metadata.taskGoal { selectable("目标：" + goal) }
+                        } else {
+                            Text("默认对话")
+                        }
+                        if let id = metadata.taskID { selectable("任务：" + id.uuidString) }
+                        ForEach(metadata.skills.keys.sorted(), id: \.self) { id in
+                            Text("\(id) · v\(metadata.skills[id] ?? 0)")
+                        }
+                        DisclosureGroup("本轮函数目录") { selectable(metadata.catalogJSON) }
+                    }
+                }
                 Section("实际发送的上下文（含系统提示词）") {
                     if !turn.attachedImages.isEmpty {
                         ScrollView(.horizontal) {
@@ -341,14 +372,15 @@
                         }
                     }
                 }
-                if let definitions = turn.toolDefinitions, !definitions.isEmpty {
+                if !turn.effectiveToolDefinitions.isEmpty {
+                    let definitions = turn.effectiveToolDefinitions
                     Section("实际发送的 Tools") {
                         ForEach(Array(definitions.enumerated()), id: \.offset) { index, definition in
                             DisclosureGroup("Tool \(index + 1)") { selectable(definition) }
                         }
                     }
                 }
-                Section("解析预览（按当前协议，未执行）") { selectable(interpretation) }
+                Section("解析预览（按本轮目录，未执行）") { selectable(interpretation) }
                 Section {
                     DisclosureGroup("原始分片（转义显示）") {
                         selectable(
@@ -364,7 +396,7 @@
                 }
                 Section {
                     DisclosureGroup("生成信息", isExpanded: $generationInfoExpanded) {
-                        Text("轮次：\(turn.generationMetadataAvailable == false ? "" : turn.id.uuidString)")
+                        Text("轮次：\(turn.id.uuidString)")
                             .font(.caption).textSelection(.enabled)
                         Text("所属输入：\(turn.ownerInputID?.uuidString ?? "")")
                             .font(.caption).textSelection(.enabled)

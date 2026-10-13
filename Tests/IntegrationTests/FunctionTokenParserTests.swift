@@ -6,11 +6,13 @@ import Testing
 
 private func generator() throws -> AgentGenerator {
     try AgentGenerator(
-        capabilities: AgentConfigurations.load(named: "Assistant").capabilities, textMapping: AssistantAgent.mapText,
+        capabilities: AgentSkillLoader.registry(
+            ["expression-interaction", "robot-interaction", "photography"],
+            fixed: AgentConfigurations.load(named: "Assistant").capabilities), textMapping: AssistantAgent.mapText,
         segmentation: try AssistantAgent.textSegmentation)
 }
 
-@Test func functionTokenParserEveryByteSplitPreservesActionsTextAndNestedChannels() throws {
+@Test(.actionCatalog) func functionTokenParserEveryByteSplitPreservesActionsTextAndNestedChannels() throws {
     let source =
         "前👨‍👩‍👧。<channel.Speech>你好 &amp; 世界<express emotion='smile'/><channel.Display><express emotion='a&gt;b &quot;引号&quot;'/></channel.Display>再见</channel.Speech>默认。"
     let data = Data(source.utf8)
@@ -34,7 +36,7 @@ private func generator() throws -> AgentGenerator {
     #expect(expected[5].actionCall?.parameters["emotion"] == "a>b \"引号\"")
 }
 
-@Test func functionTokenParserStreamsCompleteActionsWithoutWaitingForChannelClose() throws {
+@Test(.actionCatalog) func functionTokenParserStreamsCompleteActionsWithoutWaitingForChannelClose() throws {
     var parser = try generator()
     #expect(try parser.append("<channel.Spe").isEmpty)
     #expect(try parser.append("ech><express emotion='smile'").isEmpty)
@@ -46,12 +48,14 @@ private func generator() throws -> AgentGenerator {
     #expect(try parser.finish().isEmpty)
 }
 
-@Test(arguments: [
-    "<express></express>", "</express>", "<channel.Speech/>", "<channel.Speech></channel.Display>",
-    "</channel.Speech>", "<!-- comment -->", "<!DOCTYPE x>", "<?xml version='1.0'?>", "<![CDATA[x]]>",
-    "<say text='a' text='b'/>", "<say text='a'other='b'/>", "<say text='a<b'/>", "<say text=no/>",
-    "&bogus;", "&#+65;", "&#x+41;", "&#0;", "&#xD800;", "\u{0}",
-])
+@Test(
+    .actionCatalog,
+    arguments: [
+        "<express></express>", "</express>", "<channel.Speech/>", "<channel.Speech></channel.Display>",
+        "</channel.Speech>", "<!-- comment -->", "<!DOCTYPE x>", "<?xml version='1.0'?>", "<![CDATA[x]]>",
+        "<say text='a' text='b'/>", "<say text='a'other='b'/>", "<say text='a<b'/>", "<say text=no/>",
+        "&bogus;", "&#+65;", "&#x+41;", "&#0;", "&#xD800;", "\u{0}",
+    ])
 func functionTokenParserRejectsMalformedXMLAndNeverReusesFailedParser(_ source: String) throws {
     var parser = FunctionTokenParser()
     #expect(throws: (any Error).self) {
@@ -61,14 +65,14 @@ func functionTokenParserRejectsMalformedXMLAndNeverReusesFailedParser(_ source: 
     #expect(throws: GenerationError.closed) { try parser.append("<express emotion='smile'/>") }
 }
 
-@Test(arguments: ["<express", "<say text='unfinished", "&amp", "<channel.Speech>text"])
+@Test(.actionCatalog, arguments: ["<express", "<say text='unfinished", "&amp", "<channel.Speech>text"])
 func functionTokenParserRejectsTruncatedCompletion(_ source: String) throws {
     var parser = FunctionTokenParser()
     _ = try parser.append(source)
     #expect(throws: GenerationError.incompleteDocument) { try parser.finish() }
 }
 
-@Test func parserLimitsAndInvalidUTF8FailExplicitly() throws {
+@Test(.actionCatalog) func parserLimitsAndInvalidUTF8FailExplicitly() throws {
     var invalid = FunctionTokenParser()
     #expect(throws: GenerationError.invalidUTF8) { try invalid.append(Data([0xF0, 0x28])) }
     var partial = FunctionTokenParser()
@@ -88,7 +92,7 @@ func functionTokenParserRejectsTruncatedCompletion(_ source: String) throws {
     }
 }
 
-@Test func capabilityAliasesAreAgentLocalAndToolsUseSeparateProtocol() throws {
+@Test(.actionCatalog) func capabilityAliasesAreAgentLocalAndToolsUseSeparateProtocol() throws {
     let camera = try CapabilityRegistry(
         actions: [
             ActionRegistration(
@@ -151,7 +155,7 @@ private struct MarkupChat: ChatCapability {
     }
 }
 
-@Test func assistantEmitsResolvedMarkupAndLiteralToolResultsCannotExecuteTags() async throws {
+@Test(.actionCatalog) func assistantEmitsResolvedMarkupAndLiteralToolResultsCannotExecuteTags() async throws {
     let agent = try AssistantAgent(
         chat: MarkupChat(markup: "<channel.Speech>你好<express emotion='smile'/></channel.Speech>尾巴"))
     let speechRequests = try await bindSpeechRequests(agent)
@@ -180,7 +184,7 @@ private struct MarkupChat: ChatCapability {
     await agent.stop()
 }
 
-@Test func incompleteModelMarkupFailsTurnAndFreshTurnGetsFreshParser() async throws {
+@Test(.actionCatalog) func incompleteModelMarkupFailsTurnAndFreshTurnGetsFreshParser() async throws {
     let agent = try AssistantAgent(chat: MarkupChat(markup: "<channel.Speech>未结束"))
     let speechRequests = try await bindSpeechRequests(agent)
     try await agent.start()
@@ -204,11 +208,13 @@ private struct MarkupChat: ChatCapability {
 private func generationTrace() throws -> GenerationTrace {
     let configuration = try AgentConfigurations.load(named: "Assistant")
     return GenerationTrace(
-        capabilities: configuration.capabilities, textMapping: AssistantAgent.mapText,
+        capabilities: try AgentSkillLoader.registry(
+            ["expression-interaction", "robot-interaction", "photography"], fixed: configuration.capabilities),
+        textMapping: AssistantAgent.mapText,
         segmentation: try AssistantAgent.textSegmentation)
 }
 
-@Test func generationTraceRetainsRawFragmentsAndResolvedChannels() throws {
+@Test(.actionCatalog) func generationTraceRetainsRawFragmentsAndResolvedChannels() throws {
     let fragments = [" 你好 &amp; ", "世界。<channel.Spe", "ech><express emotion='smile'/>", "再见", "</channel.Speech>默认。\n"]
     var trace = try generationTrace()
     var expected = try generator()
@@ -230,7 +236,7 @@ private func generationTrace() throws -> GenerationTrace {
     #expect(trace.finished)
 }
 
-@Test func generationTraceKeepsCollectingAfterParserFailure() throws {
+@Test(.actionCatalog) func generationTraceKeepsCollectingAfterParserFailure() throws {
     var trace = try generationTrace()
     try trace.append("<express emotion='smile'/>")
     try trace.append("<channel.unknown><express emotion='smile'/>broken")
@@ -247,7 +253,7 @@ private func generationTrace() throws -> GenerationTrace {
     #expect(trace.parserError == failure)
 }
 
-@Test func generationTraceReportsUnclosedMarkupAtFinish() throws {
+@Test(.actionCatalog) func generationTraceReportsUnclosedMarkupAtFinish() throws {
     var trace = try generationTrace()
     try trace.append("<express emotion='")
     #expect(trace.parserError == nil)
@@ -258,7 +264,7 @@ private func generationTrace() throws -> GenerationTrace {
     #expect(throws: GenerationError.closed) { try trace.append("smile'/>") }
 }
 
-@Test func generationTraceBoundsFailExplicitlyWithoutEvictingExistingText() throws {
+@Test(.actionCatalog) func generationTraceBoundsFailExplicitlyWithoutEvictingExistingText() throws {
     var bytes = try generationTrace()
     let source = String(repeating: "x", count: GenerationTrace.maximumBytes)
     try bytes.append(source)
@@ -272,7 +278,7 @@ private func generationTrace() throws -> GenerationTrace {
     #expect(fragments.raw.isEmpty)
 }
 
-@Test func waitGenerationPreservesNestedBoundariesAcrossEveryByteSplit() throws {
+@Test(.actionCatalog) func waitGenerationPreservesNestedBoundariesAcrossEveryByteSplit() throws {
     let source = "前。<wait><channel.Speech>甲<wait><express emotion='smile'/>乙</wait>丙</channel.Speech></wait>后。"
     let bytes = Data(source.utf8)
     var whole = try generator()
@@ -300,16 +306,18 @@ private func generationTrace() throws -> GenerationTrace {
     #expect(trace.raw == source)
 }
 
-@Test(arguments: [
-    "<wait/>", "<wait x='1'>", "</wait>", "<wait><channel.Speech></wait></channel.Speech>",
-    "<channel.Speech><wait></channel.Speech></wait>",
-])
+@Test(
+    .actionCatalog,
+    arguments: [
+        "<wait/>", "<wait x='1'>", "</wait>", "<wait><channel.Speech></wait></channel.Speech>",
+        "<channel.Speech><wait></channel.Speech></wait>",
+    ])
 func invalidWaitSyntaxIsRejected(_ source: String) throws {
     var parser = FunctionTokenParser()
     #expect(throws: GenerationError.malformedMarkup) { try parser.append(source) }
 }
 
-@Test func waitLimitsEmptyScopesAndReservedAlias() throws {
+@Test(.actionCatalog) func waitLimitsEmptyScopesAndReservedAlias() throws {
     var empty = try generator()
     #expect(try empty.append("<wait></wait>") == [.scheduling(.beginWait), .scheduling(.endWait)])
     #expect(try empty.finish().isEmpty)
@@ -333,7 +341,7 @@ func invalidWaitSyntaxIsRejected(_ source: String) throws {
     #expect(!((try AgentConfigurations.load(named: "Assistant")).capabilities.channels.contains("main")))
 }
 
-@Test func assistantPreservesWaitEventsAroundSpeechHandleConversion() async throws {
+@Test(.actionCatalog) func assistantPreservesWaitEventsAroundSpeechHandleConversion() async throws {
     let agent = try AssistantAgent(chat: MarkupChat(markup: "<wait>你好。</wait><wait><express emotion='smile'/></wait>"))
     let probe = try await bindSpeechRequests(agent)
     try await agent.start()
@@ -355,7 +363,7 @@ func invalidWaitSyntaxIsRejected(_ source: String) throws {
     await agent.stop()
 }
 
-@Test func rejectedActionsPreserveValidCallsAndWaitBoundaries() throws {
+@Test(.actionCatalog) func rejectedActionsPreserveValidCallsAndWaitBoundaries() throws {
     var parser = try generator()
     let events =
         try parser.append(

@@ -277,11 +277,13 @@ public actor InputGateway {
                         finishSignal(traceID, phase: .unobserved)
                         report = DeliveryReport()
                     } else {
-                        report = try await deliver(input, targets: targets, traceID: traceID)
+                        report = try await deliver(input, targets: targets, traceID: traceID, publication: true)
                     }
                     for (target, reason) in report.rejected {
                         // Expected paused media admission is suppression, not an execution issue.
-                        if reason != "inputBusy" { await publicationFailure(input, target, reason) }
+                        if !["inputBusy", "notRunning"].contains(reason) {
+                            await publicationFailure(input, target, reason)
+                        }
                     }
                 } catch is CancellationError {
                     finishSignal(traceID, phase: .dropped, reason: "Publication cancelled")
@@ -454,13 +456,15 @@ public actor InputGateway {
         } catch CommunicationError.capacityExceeded { return .retry } catch { return .closed }
     }
 
-    private func deliver(_ input: AgentInput, targets: [(AgentID, UUID?)], traceID: UUID? = nil) async throws
+    private func deliver(
+        _ input: AgentInput, targets: [(AgentID, UUID?)], traceID: UUID? = nil, publication: Bool = false
+    ) async throws
         -> DeliveryReport
     {
         let mode: SignalTraceRecord.Mode = input.metadata.origin == .runtime ? .feedback : .send
         let id = traceID ?? beginSignal(input, mode: mode, targets: targets.map(\.0))
         do {
-            let report = try await admit(input, targets: targets)
+            let report = try await admit(input, targets: targets, publication: publication)
             finishSignal(id, report: report)
             return report
         } catch {
@@ -468,7 +472,9 @@ public actor InputGateway {
             throw error
         }
     }
-    private func admit(_ input: AgentInput, targets: [(AgentID, UUID?)]) async throws -> DeliveryReport {
+    private func admit(_ input: AgentInput, targets: [(AgentID, UUID?)], publication: Bool = false) async throws
+        -> DeliveryReport
+    {
         try Task.checkCancellation()
         let encodedBytes = try validatePayload(input)
         guard !targets.isEmpty else { throw CommunicationError.noRecipients }
@@ -512,6 +518,10 @@ public actor InputGateway {
                         }
                         try await manager.validate(target, incarnation: incarnation, sessionID: input.sessionID)
                         let agent = try await manager.agent(target)
+                        if publication {
+                            let lifecycle = await agent.status().lifecycle
+                            guard lifecycle == .running || lifecycle == .paused else { return (target, "notRunning") }
+                        }
                         guard agent.descriptor.inputs.contains(input.payload.kind) else {
                             throw HarnessError.unsupportedInput
                         }

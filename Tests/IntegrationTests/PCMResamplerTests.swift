@@ -2,7 +2,7 @@ import Foundation
 import PlatformKit
 import Testing
 
-@Test func microphoneResamplingPreservesDurationAndPacketContinuity() async throws {
+@Test(.actionCatalog) func microphoneResamplingPreservesDurationAndPacketContinuity() async throws {
     for rate in [16000, 44100, 48000] {
         let samples = (0..<rate).map { Float(sin(2 * Double.pi * 440 * Double($0) / Double(rate))) * 0.2 }
         let frames = stride(from: 0, to: samples.count, by: 1024).enumerated().map { index, offset in
@@ -23,7 +23,7 @@ import Testing
     }
 }
 
-@Test func microphoneResamplingRejectsChangingFormats() async throws {
+@Test(.actionCatalog) func microphoneResamplingRejectsChangingFormats() async throws {
     let frames = [
         MicrophoneFrame(samples: [0.1], sampleRate: 48000, sequence: 0),
         MicrophoneFrame(samples: [0.1], sampleRate: 44100, sequence: 1),
@@ -35,7 +35,7 @@ import Testing
     }
 }
 
-@Test func microphoneResamplingUsesCallerRateAndResetAcceptsNewHardwareFormat() async throws {
+@Test(.actionCatalog) func microphoneResamplingUsesCallerRateAndResetAcceptsNewHardwareFormat() async throws {
     let converter = try StreamingMonoPCMResampler(outputSampleRate: 24000)
     let first = try await converter.process(
         MicrophoneFrame(samples: Array(repeating: 0.1, count: 4800), sampleRate: 48000, sequence: 0))

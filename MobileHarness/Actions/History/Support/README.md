@@ -33,3 +33,7 @@ HistoryMutationService validates archive-only mutation and awaits atomic journal
 ## Related design
 
 [Parent design](../README.md)
+
+## Action-owned documentation and Skill instruction contract
+
+✅ 本目录 CapabilityModule 的 `@ActionCatalog` 从实际 `*Definition` 注册调用（含本类型的本地 helper）生成静态 declarations。添加已有域函数只需修改所属实现及本地依赖绑定，不再同步公共元数据列表。声明投影不捕获设备、处理器或运行会话。

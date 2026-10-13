@@ -1,5 +1,6 @@
 import FunctionContracts
 
+@ActionCatalog
 public struct ResourcePresentationModule: CapabilityModule {
     private let inventory: any ModelResourceInventoryCapability
     private let presentation: any ResourcePresentationCapability

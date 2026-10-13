@@ -68,15 +68,14 @@ private func diagnosticError(_ error: any Error) -> any Error {
         case .microphoneDenied: return AudioDetectionError.microphoneDenied
         case .invalidFormat: return AudioDetectionError.invalidFormat
         case .overflow: return AudioDetectionError.overflow
-        case .captureTimeout: return AudioDetectionError.captureEnded
-        case .playbackTimeout: break
+        case .busy: return AudioDetectionError.busy
         }
     }
     return error
 }
 
 private enum AudioDetectionError: LocalizedError {
-    case captureEnded, perceptionFailed, microphoneDenied, invalidFormat, overflow, routeChanged, interrupted
+    case captureEnded, perceptionFailed, microphoneDenied, invalidFormat, overflow, busy, routeChanged, interrupted
     var errorDescription: String? {
         switch self {
         case .captureEnded: "未收到音频，请重新检测。"
@@ -84,6 +83,7 @@ private enum AudioDetectionError: LocalizedError {
         case .microphoneDenied: "请在系统设置中允许麦克风访问。"
         case .invalidFormat: "当前音频格式不可用，请重新检测。"
         case .overflow: "音频处理未跟上，请重新检测。"
+        case .busy: "音频正在使用中，请稍后重新检测。"
         case .routeChanged: "音频设备已变化，请重新检测。"
         case .interrupted: "录音被中断，请重新检测。"
         }
@@ -174,7 +174,6 @@ private enum AudioDetectionError: LocalizedError {
         case .none: snapshot.fallback = nil
         case .inputUnavailable: snapshot.fallback = .inputUnavailable
         case .unsupported: snapshot.fallback = .unsupported
-        case .startupTimeout: snapshot.fallback = .startupTimeout
         case .startupFailed: snapshot.fallback = .startupFailed
         }
         update(snapshot)

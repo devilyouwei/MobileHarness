@@ -7,6 +7,7 @@ public protocol ModelResourceCapability: Sendable {
     func remove(_ id: String) async throws
 }
 
+@ActionCatalog
 public struct ModelResourcesModule: CapabilityModule {
     private let resources: any ModelResourceCapability
     private let preferences: any ModelResourcePreferencesCapability

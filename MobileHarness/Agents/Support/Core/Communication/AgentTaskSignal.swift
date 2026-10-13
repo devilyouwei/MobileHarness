@@ -1,5 +1,7 @@
 import Foundation
 
+public enum AgentTaskExecution: String, Codable, Sendable { case foreground, background }
+
 /// Task identity is distinct from runtime execution ownership and causal routing hops.
 public struct AgentTaskScope: Codable, Sendable, Equatable {
     public let id: UUID
@@ -7,13 +9,30 @@ public struct AgentTaskScope: Codable, Sendable, Equatable {
     public let requester: AgentID
     public let executor: AgentID
     public let sessionID: UUID
-    public init(id: UUID = UUID(), parentID: UUID? = nil, requester: AgentID, executor: AgentID, sessionID: UUID) {
+    public let execution: AgentTaskExecution
+    public init(
+        id: UUID = UUID(), parentID: UUID? = nil, requester: AgentID, executor: AgentID, sessionID: UUID,
+        execution: AgentTaskExecution = .foreground
+    ) {
+        self.execution = execution
         self.id = id
         self.parentID = parentID
         self.requester = requester
         self.executor = executor
         self.sessionID = sessionID
     }
+    private enum CodingKeys: String, CodingKey { case id, parentID, requester, executor, sessionID, execution }
+    public init(from decoder: any Decoder) throws {
+        let value = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(
+            id: try value.decode(UUID.self, forKey: .id),
+            parentID: try value.decodeIfPresent(UUID.self, forKey: .parentID),
+            requester: try value.decode(AgentID.self, forKey: .requester),
+            executor: try value.decode(AgentID.self, forKey: .executor),
+            sessionID: try value.decode(UUID.self, forKey: .sessionID),
+            execution: try value.decodeIfPresent(AgentTaskExecution.self, forKey: .execution) ?? .foreground)
+    }
+
 }
 
 public struct AgentTaskSignal: Codable, Sendable, Equatable {
@@ -24,8 +43,15 @@ public struct AgentTaskSignal: Codable, Sendable, Equatable {
     public let businessContract: String
     public let data: Data
     public let status: Status?
+    public let goal: String?
+    public let requestedSkills: [String]?
     public var contract: String { "task." + kind.rawValue }
-    public init(kind: Kind, scope: AgentTaskScope, businessContract: String, data: Data, status: Status? = nil) throws {
+    public init(
+        kind: Kind, scope: AgentTaskScope, businessContract: String, data: Data, status: Status? = nil,
+        goal: String? = nil, requestedSkills: [String]? = nil
+    ) throws {
+        self.goal = goal
+        self.requestedSkills = requestedSkills
         self.kind = kind
         self.scope = scope
         self.businessContract = businessContract
@@ -34,7 +60,11 @@ public struct AgentTaskSignal: Codable, Sendable, Equatable {
         try validate()
     }
     public func validate() throws {
-        guard !businessContract.isEmpty, businessContract.utf8.count <= 64, data.count <= 65_536,
+        guard goal == nil || (!(goal?.isEmpty ?? true) && (goal?.utf8.count ?? 0) <= 4096),
+            (requestedSkills?.count ?? 0) <= 16,
+            Set(requestedSkills ?? []).count == (requestedSkills?.count ?? 0),
+            (requestedSkills ?? []).allSatisfy({ CapabilityRegistry.validName($0) }),
+            !businessContract.isEmpty, businessContract.utf8.count <= 64, data.count <= 65_536,
             (kind == .result) == (status != nil), scope.id != scope.parentID,
             CapabilityRegistry.validName(scope.requester.rawValue),
             CapabilityRegistry.validName(scope.executor.rawValue)
@@ -73,6 +103,16 @@ public struct AgentTaskRegistry: Codable, Sendable {
     private var tasks: [UUID: Task] = [:]
     public init() {}
     public func task(_ id: UUID) -> Task? { tasks[id] }
+    public var records: [Task] { tasks.values.sorted { $0.scope.id.uuidString < $1.scope.id.uuidString } }
+    private func validateBackgroundCapacity(_ scope: AgentTaskScope) throws {
+        if scope.execution == .background {
+            let active = tasks.values.filter {
+                $0.scope.execution == .background
+                    && ![State.succeeded, .failed, .cancelled, .interrupted].contains($0.state)
+            }
+            guard active.count < 16 else { throw CommunicationError.capacityExceeded }
+        }
+    }
     public mutating func accept(_ signal: AgentTaskSignal, input: AgentInput, agent: AgentID) throws {
         try signal.validate()
         let runtimeTermination =
@@ -93,6 +133,7 @@ public struct AgentTaskRegistry: Codable, Sendable {
             throw CommunicationError.unauthorized
         }
         if signal.kind == .request {
+            try validateBackgroundCapacity(signal.scope)
             try reserve(signal.scope.id)
             guard tasks[signal.scope.id] == nil else { throw CommunicationError.capacityExceeded }
             tasks[signal.scope.id] = Task(
@@ -126,6 +167,7 @@ public struct AgentTaskRegistry: Codable, Sendable {
         tasks[task.scope.id] = task
     }
     public mutating func register(_ scope: AgentTaskScope) throws {
+        try validateBackgroundCapacity(scope)
         try reserve(scope.id)
         guard tasks[scope.id] == nil else { throw CommunicationError.capacityExceeded }
         tasks[scope.id] = Task(scope: scope, state: .requested, lastSignalID: scope.id)
@@ -137,6 +179,14 @@ public struct AgentTaskRegistry: Codable, Sendable {
             task.state = accepted ? .accepted : .failed
             tasks[id] = task
         }
+    }
+    /// Sender-side delivery evidence is distinct from executor completion.
+    public mutating func delivered(_ id: UUID, kind: AgentTaskSignal.Kind, accepted: Bool) throws {
+        guard var task = tasks[id] else { throw CommunicationError.scopeClosed }
+        guard accepted, ![State.succeeded, .failed, .cancelled, .interrupted].contains(task.state) else { return }
+        if kind == .cancel { task.state = .cancelling }
+        if kind == .input && task.state != .cancelling { task.state = .running }
+        tasks[id] = task
     }
     public mutating func report(_ signal: AgentTaskSignal, agent: AgentID) throws {
         guard signal.kind == .result, signal.scope.executor == agent,

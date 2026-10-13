@@ -50,7 +50,7 @@ private func reply(using capability: any ChatCapability) async throws -> String 
 }
 
 @Test func swappingModelsDoesNotChangeConsumer() async throws {
-    let manager = ModelManager()
+    let manager = try ModelManager()
     for name in ["first", "second"] {
         try await manager.register(
             ModelRegistration(id: ModelID(name), capabilities: [.chat]) { _ in
@@ -62,7 +62,7 @@ private func reply(using capability: any ChatCapability) async throws -> String 
 }
 
 @Test func oneProviderSupportsCompositionAndConstructsOnce() async throws {
-    let manager = ModelManager()
+    let manager = try ModelManager()
     let counter = Counter()
     let id = ModelID("multimodal-fixture")
     try await manager.register(
@@ -89,7 +89,7 @@ private func reply(using capability: any ChatCapability) async throws -> String 
 }
 
 @Test func failedFactoryCanRetry() async throws {
-    let manager = ModelManager()
+    let manager = try ModelManager()
     let counter = Counter()
     let id = ModelID("retry")
     try await manager.register(
@@ -103,7 +103,7 @@ private func reply(using capability: any ChatCapability) async throws -> String 
 }
 
 @Test func registrationAndAcquisitionErrorsAreExplicit() async throws {
-    let manager = ModelManager()
+    let manager = try ModelManager()
     let id = ModelID("fixture")
     let registration = try ModelRegistration(id: id, capabilities: [.chat]) { _ in ProvidedCapabilities() }
     try await manager.register(registration)
@@ -133,7 +133,7 @@ private actor FactoryGate {
 }
 
 @Test func cancelledGetDoesNotCancelSharedConstruction() async throws {
-    let manager = ModelManager()
+    let manager = try ModelManager()
     let id = ModelID("shared-construction")
     let gate = FactoryGate()
     let counter = Counter()
@@ -165,7 +165,7 @@ private struct FixtureVAD: VoiceActivityCapability {
 }
 
 @Test func voiceActivityCanBeRetrievedWithoutConcreteModelDependency() async throws {
-    let manager = ModelManager()
+    let manager = try ModelManager()
     let id = ModelID("test-vad")
     try await manager.register(
         ModelRegistration(id: id, capabilities: [.voiceActivity]) { _ in
@@ -176,7 +176,7 @@ private struct FixtureVAD: VoiceActivityCapability {
 }
 
 @Test func defaultsAreUniqueAtomicAndReuseExplicitInstances() async throws {
-    let manager = ModelManager()
+    let manager = try ModelManager()
     let id = ModelID("default")
     try await manager.register(
         ModelRegistration(id: id, capabilities: [.chat]) { _ in

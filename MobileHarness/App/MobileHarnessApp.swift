@@ -77,7 +77,7 @@ struct MobileHarnessApp: App {
                     assembly.setResourceObservationForeground(phase == .active)
                     assembly.reportEnvironment(.scene, value: String(describing: phase))
                     if phase == .background || phase == .active { assembly.setAgentForeground(phase == .active) }
-                    if phase == .background { container?.lifecycle.stopVoice(message: "已进入后台，轻触重新开始") }
+                    if phase == .background { container?.lifecycle.stopVoice(message: "已进入后台，按住双眼重新开始") }
                     if phase != .active { container?.audioDetection.stop() }
                 }
             }
@@ -138,7 +138,8 @@ struct MobileHarnessApp: App {
 
     private var isVisualPreview: Bool {
         #if DEBUG
-            ProcessInfo.processInfo.arguments.contains("-conversation-preview")
+            (ProcessInfo.processInfo.arguments.contains("-conversation-preview")
+                || ProcessInfo.processInfo.arguments.contains("-companion-cycle-preview"))
                 || ProcessInfo.processInfo.arguments.contains("-actions-preview")
         #else
             false
@@ -194,7 +195,7 @@ struct MobileHarnessApp: App {
         } else {
             ConversationView(
                 state: container.conversation, activity: container.actionActivity,
-                toggleVoice: container.lifecycle.toggleVoice,
+                toggleVoice: container.lifecycle.toggleVoice, voicePressChanged: container.lifecycle.voicePressChanged,
                 taskHistory: { agentID, inputIDs in
                     guard let destination = assembly.history.agents.first(where: { $0.id == agentID }) else {
                         return nil

@@ -50,26 +50,26 @@ Root Package.swift compiles this directory as UITests against the UI module. The
 
 ## Independent history presentation values
 
-✅ Implemented: UI has no project dependencies, including StorageChat. History rendering receives UI-owned immutable HistorySnapshot/HistoryConversation/HistoryTurn values with matching data fields, not Storage types or stores. App HistoryPresentationAdapter copies the bounded stored snapshot through an explicit Codable boundary and propagates adaptation failure; Agent history mutations/queries are unchanged. Preview receives only fragments/finish reason from the view value. Per-request model evidence is presented as peer history rows; legacy continuation records remain readable and missing values stay empty. UI target has zero project dependencies.
+✅ Implemented: UI has no project dependencies, including StorageChat. History rendering receives UI-owned immutable HistorySnapshot/HistoryConversation/HistoryTurn values with matching data fields, not Storage types or stores. App HistoryPresentationAdapter copies the bounded stored snapshot through an explicit Codable boundary and propagates adaptation failure; Agent history mutations/queries are unchanged. Preview receives only fragments/finish reason from the view value. Per-request model evidence is presented as peer history rows; rows come exclusively from current modelRequests and missing values stay empty. UI target has zero project dependencies.
 
 ✅ Interaction refinement: ConversationState regressions verify finalized user text persists beside streamed assistant text and resets together on next turn.
 
 
 ## Per-request conversation history
 
-✅ Implemented: ConversationHistoryPresentationTests cover request flattening/order, ReACT input/output/calls/timing, native correlation, exports, declarations without calls, stable legacy row identity, empty missing values without technical explanations, and preservation of malformed legacy context.
+✅ Implemented: ConversationHistoryPresentationTests cover request flattening/order, ReACT input/output/calls/timing, native correlation, exports, declarations without calls, stable model-request identity, empty missing values without technical explanations, and preservation of malformed actual request JSON.
 
 ❌ Native UI, live-provider and physical-device acceptance remain separate from automated validation.
 
 
 ## Empty history values
 
-✅ Implemented: removed legacy storage/missing-evidence explanations from user-facing history list/detail/export. Missing model text, usage, timing, finish reason and Tool outcome values remain empty. UI-only generationMetadataAvailable distinguishes legacy continuation rows so their missing date/state are blank rather than copied from the parent. Retain real request content, ReACT styling and actual execution failures. Presentation regressions cover empty values and absence of legacy wording.
+✅ History presentation uses exact modelRequests only, preserves actual malformed request JSON and unavailable provider values, and recognizes only structured image references. Aggregate input fields do not synthesize request rows.
 
 
 ## History image thumbnails
 
-✅ Implemented: History presentation regressions cover structured/legacy image references, deduplication/bounds, valid user-role attachments and missing legacy fields.
+✅ Implemented: History presentation regressions cover structured image references, deduplication/bounds, valid user-role attachments and missing provider evidence.
 
 ❌ Native image/layout and live-model acceptance remain separate from automated verification.
 
@@ -80,6 +80,56 @@ Root Package.swift compiles this directory as UITests against the UI module. The
 ✅ Home-log regression: tabs are exactly Action / Task / Agent. Without Signal rows, independent Agent failures remain visible and identical source/input/message failures deduplicate. Related Action filtering uses retained task timeline input identities. Native visual/performance acceptance remains separate.
 
 
-✅ Interface timing regressions: a record created at20 with interface start20.1/arrival20.125 displays0.025 seconds from provider evidence. Legacy arrival-only records show missing interface timing rather than a duration derived from record date.
+✅ Interface timing regressions: a record created at20 with interface start20.1/arrival20.125 displays0.025 seconds from provider evidence. Arrival-only records show missing interface timing rather than a duration derived from record date.
 
 ✅ First-token presentation regression verifies elapsed-only interface timing and empty timing for historical records lacking interface evidence. Native default-collapsed generation disclosure and role-only context headings require separate UI acceptance.
+
+✅ Task 日志满额时优先淘汰终态记录，保留活跃后台计数；验证筛选、100 条容量和真实保留的活跃行。
+
+✅ 本次回归：任务失败原因持久化及日志真实时间，不把历史恢复时间当作执行时间。
+
+
+✅ Home regressions: initial camera intent is off; shared task/caption geometry reserves a nonoverlapping row, clears top controls and preserves live/final caption placement.
+
+
+✅ Implemented: home resting-eye regressions cover off/failure/stop, active-neutral/requested expressions and closed enum parity. Native hold threshold, halo, eyelid interpolation, haptic and audio acceptance remain separate.
+
+
+✅ Passive reply state/wording uses the existing eye/goal presentation contract. ❌ Full native animation/physical microphone/playback acceptance remains separate from automated fixtures; shader compilation and visual video QA are recorded under docs.
+
+
+✅ Implemented: retain resting/active-expression contracts; source-derived animation previews check eyelid geometry and rim fade. Native device frame pacing, physical haptic strength and audible comparison remain separate acceptance; builds and installation do not prove those outcomes.
+
+
+✅ Implemented: PhotoDepartureTests verify request/ack identity, stale callback fencing, cancellation/unavailable completion and pure layout endpoints. Save scale remains 1.16 at right-edge departure; discard is fully outside bottom-right bounds at 0.06. Physical SwiftUI pacing/inspector gesture acceptance remains separate.
+
+
+✅ Regression covers independent fixed goal geometry, ASR clearance across viewport/finalization/activity, fresh wake epochs/fade reversals, and all eye contour topologies. Device GPU frame pacing/combined effects remain separate native acceptance.
+
+
+✅ Implemented: toast regressions cover upper-layer Agent/HTTP/App/system failures, panel-only Action failures, semantic dedup, historical snapshot suppression, stale revisions and UUID-fenced expiry without clearing logs.
+
+## 历史记录收敛（2026-10-13）
+
+✅ 回归更新：仅展示真实 modelRequests，保留错误请求 JSON，缺失 provider timing 不推算耗时；图片引用只接受结构化元数据，文本标记按原文显示。
+
+❌ 历史记录页面板块重新设计及原生 UI/真机验收。
+
+
+✅ Implemented: regression verifies finite/clamped light-origin parameters and generation-latched origin across repeated state commits, close/fade and reactivation. Native shader compilation and device performance remain separate acceptance.
+
+
+✅ Implemented: the Action-toast regression now requires panel-only presentation and verifies Action updates cannot replace a current Agent notice, call-scoped issues remain retained without a toast, and App/system errors still show with existing freshness/dedup/expiry contracts.
+
+
+✅ Implemented: waking starts at 0.5 visibility, rises to full brightness and replays per generation. Add exact exit-curve checks to ensure the user-approved close fade is unchanged.
+
+
+✅ Implemented: update waking visibility regression to 0.85 and preserve exact existing exit samples. Native warmup timing, output-only behavior and actual hold-to-onset latency require device acceptance.
+
+✅ Implemented regressions: independent Notice/Light canonical metadata, strict argument rejection, expiry/replacement/session fencing, error priority and light/eye/consent separation regressions. Native physical appearance remains separate acceptance.
+
+
+✅ `EyeGeometryTests.swift` samples both eyes for all 144 expression pairs at 17 transition fractions (4,896 contours), plus 408 frames after an interrupted clear-to-love transition. It verifies eight-cubic topology, continuous nonzero join tangents, finite in-bounds outlines, positive area and no sampled edge self-intersections. `ListeningMotionTests.swift` retains topology parity and the open/closed height distinction. Sampling is regression evidence, not a mathematical proof of every possible frame.
+
+❌ Native frame pacing and physical visual acceptance remain separate from geometry regression and source-path previews.

@@ -38,7 +38,8 @@ private func observationCall(_ path: ActionPath, input: AgentInput, channel: Str
     ScheduledAction(source: .assistant, input: input, call: ActionCall(actionPath: path, channel: channel))
 }
 
-@Test(.timeLimit(.minutes(1))) func actionObservationTracksParallelChannelsAndQueuedWorkWithoutFeedbackOptIn()
+@Test(.actionCatalog, .timeLimit(.minutes(1)))
+func actionObservationTracksParallelChannelsAndQueuedWorkWithoutFeedbackOptIn()
     async throws
 {
     let arm = ObservationGate()
@@ -79,7 +80,9 @@ private func observationCall(_ path: ActionPath, input: AgentInput, channel: Str
     await scheduler.shutdown()
 }
 
-@Test(.timeLimit(.minutes(1))) func actionObservationKeepsCancellingUntilCommittedHandlerJoins() async throws {
+@Test(.actionCatalog, .timeLimit(.minutes(1))) func actionObservationKeepsCancellingUntilCommittedHandlerJoins()
+    async throws
+{
     let gate = ObservationGate()
     let path = ActionPath(domain: "NexArm", module: "Gesture", function: "dance")
     let scheduler = ChannelScheduler(
@@ -110,7 +113,7 @@ private func observationCall(_ path: ActionPath, input: AgentInput, channel: Str
     await scheduler.shutdown()
 }
 
-@Test func actionObservationRetainsActiveWorkBoundsHistoryAndIgnoresLateTransitions() {
+@Test(.actionCatalog) func actionObservationRetainsActiveWorkBoundsHistoryAndIgnoresLateTransitions() {
     var ledger = ActionExecutionLedger(terminalCapacity: 2)
     let input = AgentInput(sessionID: UUID(), payload: .event("bounds"))
     let path = ActionPath(domain: "Fixture", module: "Control", function: "work")
@@ -137,7 +140,7 @@ private func observationCall(_ path: ActionPath, input: AgentInput, channel: Str
     #expect(ledger.snapshot().revision == snapshot.revision)
 }
 
-@Test func actionObservationPublishesStructuredFailureAndRejectsExcessSubscribers() async throws {
+@Test(.actionCatalog) func actionObservationPublishesStructuredFailureAndRejectsExcessSubscribers() async throws {
     let path = ActionPath(domain: "NexArm", module: "Gesture", function: "dance")
     let scheduler = ChannelScheduler(
         registry: try ActionRegistry(definitions: [
@@ -164,7 +167,9 @@ private func observationCall(_ path: ActionPath, input: AgentInput, channel: Str
     #expect(end == nil)
 }
 
-@Test @MainActor func unfamiliarActionDisplaysItsRegisteredNameThroughTheWholeObservationPath() async throws {
+@Test(.actionCatalog) @MainActor func unfamiliarActionDisplaysItsRegisteredNameThroughTheWholeObservationPath()
+    async throws
+{
     // Explicit test-only behavior: no device, model or media access.
     let path = ActionPath(domain: "NewDomain", module: "Control", function: "newOperation")
     let registry = try ActionRegistry(definitions: [
@@ -189,7 +194,7 @@ private func observationCall(_ path: ActionPath, input: AgentInput, channel: Str
     await scheduler.shutdown()
 }
 
-@Test func actionsOwnExecutionFailureMappingWithoutBluetoothDiagnostics() {
+@Test(.actionCatalog) func actionsOwnExecutionFailureMappingWithoutBluetoothDiagnostics() {
     let cases: [(NexArmExecutionError, String, String)] = [
         (.disconnected, "disconnected", "disconnected"),
         (.busy, "busy", "unavailable"),
@@ -205,7 +210,7 @@ private func observationCall(_ path: ActionPath, input: AgentInput, channel: Str
     }
 }
 
-@Test func composedFailurePreservesProducerMessageThroughSchedulerDelivery() async throws {
+@Test(.actionCatalog) func composedFailurePreservesProducerMessageThroughSchedulerDelivery() async throws {
     enum FixtureFailure: LocalizedError {
         case failed
         var errorDescription: String? { "Fixture transport cause" }
@@ -236,4 +241,24 @@ private func observationCall(_ path: ActionPath, input: AgentInput, channel: Str
     #expect(report.failureDescription == "Fixture transport cause")
     #expect(report.entries.count == 2)
     await scheduler.shutdown()
+}
+
+@Test(.actionCatalog, arguments: [false, true])
+func cancelledActionPresentationRetainsOnlyIndependentRealIssues(_ mixed: Bool) throws {
+    let report = try AgentActionReport(
+        entries: [
+            .init(
+                path: "cancelled", status: .cancelled, code: .cancelled,
+                details: ["failureDescription": "CancellationError()"])
+        ] + (mixed ? [.init(path: "failed", status: .failed, code: .handlerFailed)] : [])
+    )
+    .withExecutionFailure(.cancelled, description: "CancellationError()")
+    let record = ActionExecutionRecord(
+        id: UUID(), path: .init(domain: "UI", module: "Caption", function: "print"),
+        displayName: "Caption", source: .assistant, sessionID: UUID(), inputID: UUID(), channel: "Display",
+        semantics: .finite, phase: mixed ? .failed : .cancelled, completion: .report(report))
+    let item = ActionActivityItem(execution: record)
+    #expect(item.isFailure == mixed)
+    #expect(item.issueDescriptions.count == (mixed ? 1 : 0))
+    #expect(!item.issueDescriptions.contains { $0.contains("CancellationError") })
 }

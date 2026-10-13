@@ -2,7 +2,6 @@ import Foundation
 import FunctionContracts
 
 public struct FunctionExecutor: Sendable {
-    public static let defaultTimeout: Duration = .seconds(30)
     private let registry: FunctionRegistry
     public init(registry: FunctionRegistry) { self.registry = registry }
     @discardableResult
@@ -17,19 +16,23 @@ public struct FunctionExecutor: Sendable {
 
     /// Shared execution semantics; callers separately enforce permission, queues and resources.
     public static func perform(
-        _ invocation: any FunctionInput, definition: ActionFunction,
-        defaultTimeout: Duration = Self.defaultTimeout
+        _ invocation: any FunctionInput, definition: ActionFunction
+    ) async throws -> ActionCompletion {
+        try Task.checkCancellation()
+        let budget = try definition.executionBudget(for: invocation.call)
+        return try await ActionDeadline.run(
+            budget: budget, report: { await invocation.results.snapshot() },
+            body: { try await invoke(invocation, definition: definition) })
+    }
+    /// A composition leaf already owns its resolved deadline; share completion/report semantics only.
+    static func invoke(
+        _ invocation: any FunctionInput, definition: ActionFunction
     ) async throws -> ActionCompletion {
         try Task.checkCancellation()
         let handler = definition.handler
         let returned: ActionCompletion
         do {
-            let budget =
-                try definition.estimatingDuration?(invocation.call)
-                ?? ActionExecutionBudget(expected: .zero, timeout: definition.timeout ?? defaultTimeout)
-            returned = try await ActionDeadline.run(
-                budget: budget, report: { await invocation.results.snapshot() },
-                body: { try await handler(invocation) })
+            returned = try await handler(invocation)
         } catch {
             try Task.checkCancellation()
             if let report = await invocation.results.snapshot(), definition.kind == .finite {

@@ -20,23 +20,19 @@ public final class SpeechAudioStore: Sendable {
 
     private let handles: MemoryLeaseStore<SpeechAudio>
     private let audioBytes: Int
-    private let waitTimeout: Duration?
 
     public init(
-        capacity: Int = 32, audioBytes: Int = 8_388_608,
-        errorTTL: Duration = .seconds(30), waitTimeout: Duration? = nil
+        capacity: Int = 32, audioBytes: Int = 8_388_608
     ) {
         precondition(audioBytes > 0)
-        precondition(waitTimeout.map { $0 > .zero } ?? true)
         self.audioBytes = audioBytes
-        self.waitTimeout = waitTimeout
         handles = MemoryLeaseStore(
-            capacity: capacity, queueTTL: nil, readyTTL: nil, errorTTL: errorTTL
+            capacity: capacity, queueTTL: nil, readyTTL: nil, errorTTL: nil
         ) { audio, error in await audio.fail(error) }
     }
 
     public func register(_ id: UUID, owner: Owner, cancel: @escaping @Sendable () async -> Void) async throws {
-        let audio = SpeechAudio(id: id, maximumBytes: audioBytes, waitTimeout: waitTimeout)
+        let audio = SpeechAudio(id: id, maximumBytes: audioBytes)
         do { try await handles.register(id, owner: owner.storage, value: audio, cancel: cancel) } catch {
             throw SpeechAudioError.translating(error)
         }
@@ -73,7 +69,11 @@ public final class SpeechAudioStore: Sendable {
     public func fail(_ id: UUID, error: any Error) async { await handles.fail(id, error: error) }
     public func cancel(inputID: UUID, source: String) async {
         await handles.cancel(inputID: inputID, source: source, namespace: "speech.pcm")
+        await handles.forgetTerminals(inputID: inputID, source: source, namespace: "speech.pcm")
     }
-    public func cancel(sessionID: UUID) async { await handles.cancel(sessionID: sessionID, namespace: "speech.pcm") }
+    public func cancel(sessionID: UUID) async {
+        await handles.cancel(sessionID: sessionID, namespace: "speech.pcm")
+        await handles.forgetTerminals(sessionID: sessionID, namespace: "speech.pcm")
+    }
     public func shutdown() async { await handles.shutdown() }
 }

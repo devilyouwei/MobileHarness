@@ -5,16 +5,27 @@ public struct TextSegmentationPolicy: Sendable {
     public static let sentences = Self()
     let hanziLimit: Int?
     let otherLimit: Int?
+    let firstHanziLimit: Int?
+    let firstOtherLimit: Int?
     private init() {
         hanziLimit = nil
         otherLimit = nil
+        firstHanziLimit = nil
+        firstOtherLimit = nil
     }
-    public init(hanziLimit: Int, otherLimit: Int) throws {
-        guard (1...2000).contains(hanziLimit), (1...2000).contains(otherLimit) else {
+    public init(
+        hanziLimit: Int, otherLimit: Int, firstHanziLimit: Int? = nil, firstOtherLimit: Int? = nil
+    ) throws {
+        guard
+            [hanziLimit, otherLimit, firstHanziLimit, firstOtherLimit].compactMap({ $0 })
+                .allSatisfy({ (1...2000).contains($0) })
+        else {
             throw GenerationError.limitExceeded
         }
         self.hanziLimit = hanziLimit
         self.otherLimit = otherLimit
+        self.firstHanziLimit = firstHanziLimit
+        self.firstOtherLimit = firstOtherLimit
     }
 }
 
@@ -23,6 +34,7 @@ public struct TextSegmentationPolicy: Sendable {
 struct SentenceFunctionBuffer {
     private var buffer = ""
     private let policy: TextSegmentationPolicy
+    private var emittedText = false
     init(policy: TextSegmentationPolicy = .sentences) { self.policy = policy }
     private static let punctuation = Set<Character>(",，、;；:：.!?。！？؛،؟।॥\n\r")
     private static let sentenceEnds = Set<Character>(";；.!?。！？؛؟।॥\n\r")
@@ -46,7 +58,9 @@ struct SentenceFunctionBuffer {
         while index < characters.count {
             let prefix = characters[start...index]
             containsHanzi = containsHanzi || Self.isCJK(characters[index])
-            let threshold = containsHanzi ? policy.hanziLimit : policy.otherLimit
+            let steadyLimit = containsHanzi ? policy.hanziLimit : policy.otherLimit
+            let firstLimit = containsHanzi ? policy.firstHanziLimit : policy.firstOtherLimit
+            let threshold = emittedText ? steadyLimit : firstLimit ?? steadyLimit
             let lengthBoundary =
                 threshold.map { index - start + 1 >= $0 } == true && index + 1 < characters.count
                 && Self.canSplit(after: characters[index], before: characters[index + 1])
@@ -70,6 +84,7 @@ struct SentenceFunctionBuffer {
             // A later delta may contain a closing quote, another mark, or whitespace belonging to this sentence.
             guard end < characters.count else { break }
             output.append(String(characters[start..<end]))
+            emittedText = true
             start = end
             index = end
             containsHanzi = false
@@ -78,6 +93,7 @@ struct SentenceFunctionBuffer {
         if finishing, !buffer.isEmpty {
             if Self.hasContent(buffer) {
                 output.append(buffer)
+                emittedText = true
             } else if !output.isEmpty {
                 // Keep punctuation/whitespace attached to text, never create an empty chunk.
                 output[output.count - 1] += buffer

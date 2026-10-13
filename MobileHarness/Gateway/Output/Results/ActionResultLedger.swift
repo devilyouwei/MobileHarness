@@ -6,7 +6,7 @@ import FunctionContracts
 
 /// Scheduler-owned bounded outbox: every feedback-producing admission reserves its terminal slot.
 struct ActionResultLedger {
-    enum DeliveryState: String, Sendable { case reserved, pending, accepted, closed, expired, exhausted }
+    enum DeliveryState: String, Sendable { case reserved, pending, accepted, closed }
     struct Record: Sendable {
         let executionID: UUID
         let result: ActionResult?
@@ -18,7 +18,6 @@ struct ActionResultLedger {
         var result: ActionResult?
         var attempts = 0
         var nextAttempt: ContinuousClock.Instant = .now
-        var deadline: ContinuousClock.Instant = .now
     }
     private var entries: [UUID: Entry] = [:]
     private var history: [Record] = []
@@ -57,13 +56,10 @@ struct ActionResultLedger {
             causality: SignalCausality(envelope: invocation.envelope),
             status: status, effect: effect, completion: completion?.agentValue, failure: failure,
             callID: invocation.envelope.callID, roundID: invocation.envelope.roundID)
-        entry.deadline = .now.advanced(by: .seconds(10))
         entries[invocation.executionID] = entry
     }
 
     mutating func ready() -> ActionResult? {
-        let expired = entries.filter { $0.value.result != nil && $0.value.deadline <= .now }.map(\.key)
-        for id in expired { finish(id, state: .expired) }
         return entries.values.filter { $0.result != nil && $0.nextAttempt <= .now }
             .min(by: { $0.order < $1.order })?.result
     }
@@ -76,13 +72,9 @@ struct ActionResultLedger {
         case .accepted: finish(id, state: .accepted)
         case .closed: finish(id, state: .closed)
         case .retry:
-            entry.attempts += 1
-            if entry.attempts >= 4 {
-                finish(id, state: .exhausted)
-            } else {
-                entry.nextAttempt = .now.advanced(by: .milliseconds(100 * entry.attempts))
-                entries[id] = entry
-            }
+            entry.attempts = min(entry.attempts + 1, 10)
+            entry.nextAttempt = .now.advanced(by: .milliseconds(100 * entry.attempts))
+            entries[id] = entry
         }
     }
 

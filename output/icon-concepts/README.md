@@ -1,7 +1,13 @@
 # Icon concepts
 
 Purpose: visual exploration of a phone controlling a robotic body.
-Design goals: landscape phone, friendly eyes, compact cartoon robotic arm, transparent foreground suitable for later app icon composition.
+Design goals: landscape phone, friendly eyes and a compact robotic body; explore transparent foregrounds and complete opaque app-icon compositions while preserving the current icon's visual identity.
+
+## Selected production artwork
+
+✅ The user selected the **first** image from the v14 expression-refinement turn, preserved as [mobile-robot-lamp-arm-v14-first.png](mobile-robot-lamp-arm-v14-first.png). Its prompt is the initial edit in [v14 prompts](mobile-robot-lamp-arm-v14-prompt.txt), before the second refinement. The latest production composition is its [centered revision](mobile-robot-lamp-arm-centered.png), edited with built-in ImageGen using the preserved [centering prompt](mobile-robot-lamp-arm-centered-prompt.txt). It is resized to opaque 1024×1024 [lamp-arm.png](../../MobileHarness/Resources/AppIconVariants/lamp-arm.png), selected into the AppIcon asset, and shared by the project README. Earlier designs, original production artwork and generation prompts remain preserved. Candidate status statements below describe their historical stage; the separately refined mobile-robot-lamp-arm-v14.png is not the selected design.
+
+❌ Native icon appearance after app rebuild/installation remains separate from source-asset selection.
 
 - ✅ `mobile-robot-transparent-v2.png`: generated PNG with alpha, revised cartoon concept.
 - ❌ Final design selection and integration into the app icon assets.
@@ -42,3 +48,45 @@ Built-in image generation prompt: recompose to show a complete silver-white robo
 - ❌ Final design approval and app icon integration.
 
 Built-in image generation prompt: radically simplify v6 into a flat geometric Apple-ecosystem-inspired brand symbol. Three circular joints and two rounded arm links, a simple hand silhouette gripping a landscape blue phone with a white wink and smile. Remove metallic texture, layered bezels, decorative lights, motion marks and mechanical detailing. Preserve complete arm and true transparent alpha.
+
+## White lamp-arm revision v8
+
+- ✅ [mobile-robot-lamp-arm-v8.png](mobile-robot-lamp-arm-v8.png): square opaque icon candidate edited from the currently selected original app icon using the built-in image generation tool. A complete white articulated lamp-like arm and round base support a landscape iPhone through a rear mounting pad; the screen retains two glowing blue-white happy eyes. There is no gripping hand, text or baked-in outer corner mask.
+- ✅ The complete [source prompt](mobile-robot-lamp-arm-v8-prompt.txt) is preserved. The reference is `MobileHarness/Resources/Assets.xcassets/AppIcon.appiconset/AppIcon.png`, which matched `original.png` when this candidate was created.
+- ❌ Candidate selection, conversion to the production 1024×1024 asset and app-icon integration remain pending. The current production icon is preserved.
+
+## Playful reversed-elbow revision v9
+
+- ✅ [mobile-robot-lamp-arm-v9.png](mobile-robot-lamp-arm-v9.png): built-in ImageGen edit of v8 using the user's lamp screenshot solely as a pose reference. The elbow points left, the lower link rises left from the base, and the upper link rises right to the phone mount. The iPhone face tilts toward the viewer with two slightly asymmetric blue-white happy eyes; white materials, dark square background and complete round base remain.
+- ✅ The complete [source prompt](mobile-robot-lamp-arm-v9-prompt.txt) is preserved. The user's reference screenshot remains outside the repository.
+- ❌ Final candidate selection, production sizing and app-icon integration remain pending; previous variants and the production icon are preserved.
+
+## Screen-aligned eyes revision v10
+
+- ✅ [mobile-robot-lamp-arm-v10.png](mobile-robot-lamp-arm-v10.png): built-in ImageGen edit of v9 correcting the happy eyes to a shared row along the display's long axis. The phone retains its tilted pose, and the left-bending white arm, base, materials and background are preserved. Visual review followed an additional targeted eye-alignment refinement.
+- ✅ Both the initial edit and refinement [prompts](mobile-robot-lamp-arm-v10-prompt.txt) are preserved.
+- ❌ Final selection, production sizing and app-icon integration remain pending. Historical candidates and the production icon remain preserved.
+
+## Hidden rear magnetic mount revision v11
+
+- ✅ [mobile-robot-lamp-arm-v11.png](mobile-robot-lamp-arm-v11.png): built-in ImageGen edit of v10. The iPhone sits in front of the uppermost arm joint and attaches magnetically at its back. The upper link disappears behind the phone; the wrist disk and underside cradle are no longer visible. Only the elbow and base hinge remain exposed, while the tilted phone and screen-aligned eyes are retained.
+- ✅ The complete [source prompt](mobile-robot-lamp-arm-v11-prompt.txt) is preserved. The rear magnetic connection is a concept-art design, not an implemented hardware attachment.
+- ❌ Final selection, production sizing and app-icon integration remain pending; earlier artwork and the current production icon remain preserved.
+
+## Blue wink and forward reach revision v12
+
+- ✅ [mobile-robot-lamp-arm-v12.png](mobile-robot-lamp-arm-v12.png): built-in ImageGen edit of v11, referencing the user's app screenshot for the cheeky filled blue open eye, narrow winking eyelid and multicolor screen-edge glow. The eyes follow the tilted screen plane. Slight elbow enlargement, hinge depth and link foreshortening give the white arm a forward reach; the top magnetic wrist stays hidden behind the phone.
+- ✅ Both the initial edit and targeted alignment/depth refinement [prompts](mobile-robot-lamp-arm-v12-prompt.txt) are preserved. The screenshot remains outside the repository; its text and interface controls are not reproduced in the icon.
+- ❌ Final selection, production sizing and app-icon integration remain pending; previous candidates and the production icon are preserved.
+
+## Clean-screen blue wink revision v13
+
+- ✅ [mobile-robot-lamp-arm-v13.png](mobile-robot-lamp-arm-v13.png): built-in ImageGen edit of v12 removing the multicolor screen-perimeter halo. Only the user's reference eye shapes and blue color remain on the dark display. Phone tilt, hidden rear magnetic mount, white arm's forward reach and complete base are retained; cool hardware highlights remain distinct from a screen border.
+- ✅ The complete [source prompt](mobile-robot-lamp-arm-v13-prompt.txt) is preserved.
+- ❌ Final selection, production sizing and app-icon integration remain pending; earlier candidates and the current production icon are preserved.
+
+## Expressive lifted wink revision v14
+
+- ✅ [mobile-robot-lamp-arm-v14.png](mobile-robot-lamp-arm-v14.png): built-in ImageGen expression refinement of v13. The cyan right eyelid rises from its lower inner/left end to its higher outer/right end, giving the open-eye/wink pair a cheekier expression. Phone tilt, clean dark display, hidden rear magnetic mount, forward-reaching white arm and complete base remain.
+- ✅ The initial expression edit and targeted right-eyelid refinement [prompts](mobile-robot-lamp-arm-v14-prompt.txt) are preserved; the final image was visually checked for the lifted outer corner.
+- ❌ Final selection, production sizing and app-icon integration remain pending; previous candidates and the production icon are preserved.

@@ -51,3 +51,7 @@ Each request resets cache, performs single-token prefill and fits prompt/generat
 ## Backend dependency and platform constraints
 
 Stateful generation uses the pinned coreai-models 0.2.8-zoo CoreAILM product and Tokenizers with static-input buffers; generic ModelKitCoreAI is a separate target. ❌ The third-party CoreAIShared runtime imports CoreAI unconditionally and cannot currently compile against the simulator SDK. ModelKitDefaults' simulator source branch does not eliminate that package dependency. Build and live-model acceptance evidence belongs in docs.
+
+## Consecutive user message boundaries
+
+✅ Implemented: GemmaLanguageEngine.render emits one prompt turn for each caller message, including consecutive users, without inserted text separators. Assistant still maps to model; original input validation and prompt-plus-output token bounds remain. A weight-free exact rendering regression checks preserved user boundaries; real-model role-order acceptance remains unverified.

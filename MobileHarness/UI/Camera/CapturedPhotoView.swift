@@ -9,6 +9,7 @@
         public var isThumbnail = false
         public var opacity = 0.0
         public private(set) var didReachThumbnail = false
+        public let departure = PhotoDeparture()
         private let completed: @MainActor (Bool) -> Void
         private var acknowledged = false
         public init(id: UUID, image: UIImage, completed: @escaping @MainActor (Bool) -> Void) {
@@ -29,10 +30,19 @@
         @Bindable var camera: CameraState
         let controls: any CameraControlling
         @Environment(\.accessibilityReduceMotion) private var reduceMotion
+        @Environment(\.scenePhase) private var scenePhase
         @State private var inspecting = false
+        @State private var inspectorVisible = false
+        @State private var animatedDepartureID: UUID?
+        @State private var departureKind: PhotoDeparture.Kind?
+        @State private var departurePhase: PhotoDeparturePhase = .resting
+        @State private var departureOpacity = 1.0
         var body: some View {
             GeometryReader { geometry in
                 let small = photo.isThumbnail
+                let departure = PhotoDepartureLayout.pose(
+                    size: geometry.size, bottomInset: geometry.safeAreaInsets.bottom,
+                    kind: departureKind, phase: departurePhase)
                 Image(uiImage: photo.image)
                     .resizable()
                     .scaledToFit()
@@ -44,19 +54,19 @@
                             .white.opacity(small ? 0.85 : 0), lineWidth: 2)
                     )
                     .shadow(radius: small ? 8 : 0)
-                    .opacity(photo.opacity)
+                    .opacity(photo.opacity * departureOpacity)
+                    .scaleEffect(departure.scale)
                     .position(
-                        x: small ? max(48, geometry.size.width - 68) : geometry.size.width / 2,
-                        y: small
-                            ? max(64, geometry.size.height - geometry.safeAreaInsets.bottom - 84)
-                            : geometry.size.height / 2
+                        x: small ? departure.center.x : geometry.size.width / 2,
+                        y: small ? departure.center.y : geometry.size.height / 2
                     )
                     .allowsHitTesting(false)
                     .accessibilityHidden(true)
 
-                if photo.didReachThumbnail {
+                if photo.didReachThumbnail, departureKind == nil {
                     ZStack {
                         Button {
+                            inspectorVisible = true
                             inspecting = true
                         } label: {
                             Color.clear.frame(width: 96, height: 128)
@@ -133,26 +143,81 @@
                     }
                 }
             }
-            .onDisappear { photo.finish() }
+            .onAppear { photo.departure.setAvailable(scenePhase == .active) }
+            .onDisappear {
+                photo.finish()
+                if !inspectorVisible { photo.departure.setAvailable(false) }
+            }
+            .onChange(of: scenePhase) { _, phase in photo.departure.setAvailable(phase == .active) }
+            .onChange(of: photo.departure.request) { _, request in
+                guard let request else { return }
+                departureKind = request.kind
+                if inspectorVisible {
+                    inspecting = false
+                } else {
+                    animateDeparture(request)
+                }
+            }
             .onChange(of: camera.capturedPhoto?.id) { _, id in
                 if id != photo.id { inspecting = false }
             }
-            .fullScreenCover(isPresented: $inspecting) {
-                ZStack(alignment: .topTrailing) {
-                    Color.black.ignoresSafeArea()
-                    Image(uiImage: photo.image).resizable().scaledToFit()
-                    HStack(spacing: 20) {
-                        Button("保存到相册") { controls.savePhoto(photo.id) }
+            .fullScreenCover(
+                isPresented: $inspecting,
+                onDismiss: {
+                    inspectorVisible = false
+                    if let request = photo.departure.request { animateDeparture(request) }
+                },
+                content: {
+                    ZStack(alignment: .topTrailing) {
+                        Color.black.ignoresSafeArea()
+                        Image(uiImage: photo.image).resizable().scaledToFit()
+                        HStack(spacing: 20) {
+                            Button("保存到相册") {
+                                inspecting = false
+                                controls.savePhoto(photo.id)
+                            }
                             .disabled(camera.photoBusy || camera.savedPhotoID == photo.id)
-                        Button("忽略") { controls.ignorePhoto(photo.id) }
+                            Button("忽略") {
+                                inspecting = false
+                                controls.ignorePhoto(photo.id)
+                            }
                             .disabled(camera.photoBusy)
-                        Button("返回") { inspecting = false }
-                    }.padding(20)
-                    VStack {
-                        Spacer()
-                        if let message = camera.photoMessage { Text(message).padding(20) }
-                    }.allowsHitTesting(false)
-                }.foregroundStyle(.white)
+                            Button("返回") { inspecting = false }
+                        }.padding(20)
+                        VStack {
+                            Spacer()
+                            if let message = camera.photoMessage { Text(message).padding(20) }
+                        }.allowsHitTesting(false)
+                    }.foregroundStyle(.white)
+                })
+        }
+
+        private func animateDeparture(_ request: PhotoDeparture.Request) {
+            guard photo.departure.request?.id == request.id, animatedDepartureID != request.id else { return }
+            animatedDepartureID = request.id
+            if reduceMotion {
+                withAnimation(.easeOut(duration: 0.2), completionCriteria: .removed) {
+                    departureOpacity = 0
+                } completion: {
+                    photo.departure.complete(id: request.id, success: true)
+                }
+            } else if request.kind == .save {
+                withAnimation(.easeOut(duration: 0.18), completionCriteria: .removed) {
+                    departurePhase = .enlarged
+                } completion: {
+                    guard photo.departure.request?.id == request.id else { return }
+                    withAnimation(.timingCurve(0.25, 0, 0.65, 1, duration: 0.42), completionCriteria: .removed) {
+                        departurePhase = .exited
+                    } completion: {
+                        photo.departure.complete(id: request.id, success: true)
+                    }
+                }
+            } else {
+                withAnimation(.timingCurve(0.34, 0, 0.68, 1, duration: 0.52), completionCriteria: .removed) {
+                    departurePhase = .exited
+                } completion: {
+                    photo.departure.complete(id: request.id, success: true)
+                }
             }
         }
     }

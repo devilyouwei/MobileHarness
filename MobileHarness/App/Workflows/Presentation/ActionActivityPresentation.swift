@@ -13,16 +13,18 @@ private struct ActionActivityMapping: Identifiable, Equatable, Sendable {
     }
     public var issueDescriptions: [String] {
         guard let report else { return [] }
-        let executionIssues =
-            report.executionFailure.map {
-                [
-                    report.failureDescription ?? execution.failureDescription
-                        ?? ($0 == .timedOut ? "动作执行超时，已结束并保留各步骤结果" : "动作执行失败")
-                ]
+        let executionIssues: [String] =
+            report.executionFailure.flatMap {
+                guard $0 != .cancelled else { return nil }
+                return
+                    [
+                        report.failureDescription ?? execution.failureDescription
+                            ?? ($0 == .timedOut ? "动作执行超时，已结束并保留各步骤结果" : "动作执行失败")
+                    ]
             } ?? []
         return executionIssues
             + report.entries.enumerated().compactMap { index, entry in
-                guard entry.status != .succeeded else { return nil }
+                guard entry.status == .failed, entry.code?.rawValue != "cancelled" else { return nil }
                 let reason: String
                 switch entry.code?.rawValue {
                 case "targetNotReached": reason = "稳定后仍未到位"

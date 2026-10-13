@@ -83,7 +83,7 @@ private actor NexArmFixture: NexArmWritableLink {
     func close() {}
 }
 
-@Test func nexArmFramingHandlesFragmentationLogsAndChecksum() throws {
+@Test(.actionCatalog) func nexArmFramingHandlesFragmentationLogsAndChecksum() throws {
     let request = try NexArmPacket(command: 1)
     #expect(request.bytes == [255, 255, 255, 2, 1, 253])
     let response = try NexArmPacket(command: 1, payload: [1, 0, 2, 1, 0, 2])
@@ -104,7 +104,7 @@ private actor NexArmFixture: NexArmWritableLink {
     }
 }
 
-@Test func nexArmLegacyMotionVerifiesAndAllowsOnlyOneNudge() async throws {
+@Test(.actionCatalog) func nexArmLegacyMotionVerifiesAndAllowsOnlyOneNudge() async throws {
     let link = NexArmFixture()
     let controller = NexArmLegacyDiagnosticController(link: link)
     try await controller.nudgeWrist(delta: 1)
@@ -114,7 +114,7 @@ private actor NexArmFixture: NexArmWritableLink {
     #expect(await link.writes == 1)
 }
 
-@Test func nexArmLegacyMotionRefusesUnknownFirmwareAndMovingDevice() async throws {
+@Test(.actionCatalog) func nexArmLegacyMotionRefusesUnknownFirmwareAndMovingDevice() async throws {
     let wrong = NexArmFixture()
     await wrong.configure(wrong: true)
     await #expect(throws: NexArmExecutionError.unsupportedFirmware) {
@@ -129,7 +129,7 @@ private actor NexArmFixture: NexArmWritableLink {
     #expect(await moving.writes == 0)
 }
 
-@Test func nexArmLegacyUncertainWriteIsNeverRetried() async throws {
+@Test(.actionCatalog) func nexArmLegacyUncertainWriteIsNeverRetried() async throws {
     let link = NexArmFixture()
     await link.configure(fail: true)
     let controller = NexArmLegacyDiagnosticController(link: link)
@@ -139,7 +139,7 @@ private actor NexArmFixture: NexArmWritableLink {
 }
 
 #if os(macOS)
-    @Test(.enabled(if: ProcessInfo.processInfo.environment["NEXARM_MOTION_TEST"] == "1"))
+    @Test(.actionCatalog, .enabled(if: ProcessInfo.processInfo.environment["NEXARM_MOTION_TEST"] == "1"))
     func nexArmUSBLegacyPhysicalWristDiagnostic() async throws {
         let path = try #require(ProcessInfo.processInfo.environment["NEXARM_PORT"])
         let serial = try NexArmSerial(path: path)
@@ -157,7 +157,7 @@ private actor NexArmFixture: NexArmWritableLink {
     }
 #endif
 
-@Test func nexArmLegacyCancellationJoinsCommittedMotionAndRejectsConcurrentCommands() async throws {
+@Test(.actionCatalog) func nexArmLegacyCancellationJoinsCommittedMotionAndRejectsConcurrentCommands() async throws {
     let link = NexArmFixture()
     let controller = NexArmLegacyDiagnosticController(link: link)
     let operation = Task { try await controller.nudgeWrist(delta: 1) }
@@ -212,7 +212,7 @@ private actor NexArmBaseFixture: NexArmWritableLink {
     func close() {}
 }
 
-@Test func nexArmBaseValidatesCyclesAndRejectsExtraParameters() async throws {
+@Test(.actionCatalog) func nexArmBaseValidatesCyclesAndRejectsExtraParameters() async throws {
     for parameters in [
         [:], ["cycles": "0"], ["cycles": "4"], ["cycles": "1.5"], ["cycles": "-1"], ["cycles": "1", "degrees": "90"],
     ] {
@@ -229,7 +229,7 @@ private actor NexArmBaseFixture: NexArmWritableLink {
     }
 }
 
-@Test func nexArmLegacyBaseRejectsPreflightAndLatchesUncertainWrite() async throws {
+@Test(.actionCatalog) func nexArmLegacyBaseRejectsPreflightAndLatchesUncertainWrite() async throws {
     let wrong = NexArmBaseFixture(wrongFirmware: true)
     await #expect(throws: NexArmExecutionError.unsupportedFirmware) {
         try await NexArmLegacyDiagnosticController(link: wrong).shakeBase(cycles: 1)
@@ -250,7 +250,7 @@ private actor NexArmBaseFixture: NexArmWritableLink {
     #expect(await controller.baseTarget.count == 6)
 }
 
-@Test func nexArmLegacyBaseCancellationJoinsOneLegAndDoesNotStartTheNext() async throws {
+@Test(.actionCatalog) func nexArmLegacyBaseCancellationJoinsOneLegAndDoesNotStartTheNext() async throws {
     let link = NexArmBaseFixture()
     let controller = NexArmLegacyDiagnosticController(link: link)
     let task = Task { try await controller.shakeBase(cycles: 3) }
@@ -323,7 +323,11 @@ private func runNexArmAssistantMarkup(
         throw NexArmError.invalidMotion
     }
 ) async throws {
-    let assistant = try AgentChatWorker<AssistantContextState>(chat: FixedTextChat(text: markup))
+    let defaultBindings =
+        try AgentConfigurations.skill("expression-interaction").functions
+        + AgentConfigurations.skill("robot-interaction").functions
+    let assistant = try AgentChatWorker<AssistantContextState>(
+        chat: FixedTextChat(text: markup), capabilities: AgentConfigurations.registry(defaultBindings))
     let manager = AgentManager()
     let session = UUID()
     try await manager.register(assistant, sessionID: session)
@@ -395,7 +399,7 @@ private func runNexArmAssistantMarkup(
     }
 }
 
-@Test func nexArmLegacyAssistantBaseDiagnosticRunsRequestedCyclesAndReturns() async throws {
+@Test(.actionCatalog) func nexArmLegacyAssistantBaseDiagnosticRunsRequestedCyclesAndReturns() async throws {
     let link = NexArmBaseFixture()
     let sweep = try await runNexArmAssistantBase(link: link, cycles: 2)
     #expect(sweep.cycles == 2)
@@ -404,7 +408,7 @@ private func runNexArmAssistantMarkup(
 }
 
 #if os(macOS)
-    @Test(.enabled(if: ProcessInfo.processInfo.environment["NEXARM_BASE_TEST"] == "1"))
+    @Test(.actionCatalog, .enabled(if: ProcessInfo.processInfo.environment["NEXARM_BASE_TEST"] == "1"))
     func nexArmUSBLegacyPhysicalBaseAction() async throws {
         let path = try #require(ProcessInfo.processInfo.environment["NEXARM_PORT"])
         let raw = ProcessInfo.processInfo.environment["NEXARM_CYCLES"] ?? "1"
@@ -434,7 +438,7 @@ private actor NexArmFirmwareFixture: NexArmLink {
     }
 }
 
-@Test func nexArmFirmwareReadRetriesOnlyExplicitMissingSubcontrollerVersion() async throws {
+@Test(.actionCatalog) func nexArmFirmwareReadRetriesOnlyExplicitMissingSubcontrollerVersion() async throws {
     let link = NexArmFirmwareFixture(missingReplies: 3)
     let controller = NexArmActionController(link: link)
     try await controller.verifyCompatibility()
@@ -448,7 +452,7 @@ private actor NexArmFirmwareFixture: NexArmLink {
     #expect(await exhausted.reads == 4)
 }
 
-@Test func nexArmFirmwareReadDoesNotRetryTransportFailure() async throws {
+@Test(.actionCatalog) func nexArmFirmwareReadDoesNotRetryTransportFailure() async throws {
     let link = NexArmFirmwareFixture(missingReplies: 0, transportFailure: true)
     await #expect(throws: NexArmError.timeout) {
         try await NexArmActionController(link: link).verifyCompatibility()
@@ -576,7 +580,8 @@ private actor GestureArmFixture: NexArmObservableLink {
     func close() {}
 }
 
-@Test(arguments: ["waveWrist", "lookAround", "celebrate", "dance", "tiltWrist", "nodHead", "shakeHead"])
+@Test(
+    .actionCatalog, arguments: ["waveWrist", "lookAround", "celebrate", "dance", "tiltWrist", "nodHead", "shakeHead"])
 func nexArmGestureActionsRejectMalformedArgumentsBeforeEffects(_ function: String) async throws {
     let key = function == "waveWrist" ? "count" : "cycles"
     let invalid =
@@ -602,7 +607,7 @@ func nexArmGestureActionsRejectMalformedArgumentsBeforeEffects(_ function: Strin
     }
 }
 
-@Test(arguments: NexArmGesture.allCases.filter { $0 != .baseSway })
+@Test(.actionCatalog, arguments: NexArmGesture.allCases.filter { $0 != .baseSway })
 func nexArmAssistantGesturesReachTelemetryAndReturn(_ gesture: NexArmGesture) async throws {
     let fixture = GestureArmFixture()
     let controller = NexArmActionController(link: fixture, compatibilityPolicy: .nexArmBLEProtocol)
@@ -686,7 +691,7 @@ func nexArmAssistantGesturesReachTelemetryAndReturn(_ gesture: NexArmGesture) as
 
 }
 
-@Test func nexArmGestureCancellationJoinsCommittedLegAndRejectsConcurrentOwner() async throws {
+@Test(.actionCatalog) func nexArmGestureCancellationJoinsCommittedLegAndRejectsConcurrentOwner() async throws {
     let fixture = GestureArmFixture()
     await fixture.configure(hold: true)
     let controller = NexArmActionController(link: fixture, compatibilityPolicy: .nexArmBLEProtocol)
@@ -700,7 +705,7 @@ func nexArmAssistantGesturesReachTelemetryAndReturn(_ gesture: NexArmGesture) as
     #expect(await fixture.pose == [200, 0, 200, 0, 0, 0])  // Only the scoped home was committed.
 }
 
-@Test(arguments: [false, true])
+@Test(.actionCatalog, arguments: [false, true])
 func nexArmGestureFailureContinuesAndNextExplicitRequestCanStart(_ disturb: Bool) async throws {
     let fixture = GestureArmFixture()
     await fixture.configure(fail: !disturb, disturb: disturb)
@@ -717,7 +722,7 @@ func nexArmGestureFailureContinuesAndNextExplicitRequestCanStart(_ disturb: Bool
     #expect(await controller.lastFailure == nil)
 }
 
-@Test func nexArmGestureValidatesWholePlanAndCountBeforeFirstWrite() async throws {
+@Test(.actionCatalog) func nexArmGestureValidatesWholePlanAndCountBeforeFirstWrite() async throws {
     let fixture = GestureArmFixture()
     await fixture.configure(wrist: 4000)
     let controller = NexArmActionController(link: fixture, compatibilityPolicy: .nexArmBLEProtocol)
@@ -733,7 +738,7 @@ func nexArmGestureFailureContinuesAndNextExplicitRequestCanStart(_ disturb: Bool
     #expect(await fixture.commands.isEmpty == true)
 }
 
-@Test func nexArmGestureWriteAcknowledgmentCannotSubstituteForArrival() async throws {
+@Test(.actionCatalog) func nexArmGestureWriteAcknowledgmentCannotSubstituteForArrival() async throws {
     let fixture = GestureArmFixture()
     await fixture.configure(ignore: true, wrist: 2700)
     let controller = NexArmActionController(link: fixture, compatibilityPolicy: .nexArmBLEProtocol)
@@ -749,7 +754,7 @@ func nexArmGestureFailureContinuesAndNextExplicitRequestCanStart(_ disturb: Bool
     #expect(await fixture.commands.count == 9)
 }
 
-@Test func nexArmGestureMaximumRepetitionsRemainBoundedAndDoNotAccumulateOffset() async throws {
+@Test(.actionCatalog) func nexArmGestureMaximumRepetitionsRemainBoundedAndDoNotAccumulateOffset() async throws {
     let fixture = GestureArmFixture()
     let controller = NexArmActionController(link: fixture, compatibilityPolicy: .nexArmBLEProtocol)
     try await controller.performGesture(.dance, repetitions: 3)
@@ -757,7 +762,7 @@ func nexArmGestureFailureContinuesAndNextExplicitRequestCanStart(_ disturb: Bool
     #expect(await fixture.pose == [200, 0, 200, 0, 0, 0])
 }
 
-@Test func nexArmChoreographyTargetsAreIndependentOfStartingPose() async throws {
+@Test(.actionCatalog) func nexArmChoreographyTargetsAreIndependentOfStartingPose() async throws {
     let first = GestureArmFixture()
     let second = GestureArmFixture()
     await second.configure(wrist: 2700)
@@ -770,7 +775,7 @@ func nexArmGestureFailureContinuesAndNextExplicitRequestCanStart(_ disturb: Bool
 
 }
 
-@Test func nexArmGestureMissingFinalHomeFailsAfterTimedPlayback() async throws {
+@Test(.actionCatalog) func nexArmGestureMissingFinalHomeFailsAfterTimedPlayback() async throws {
     let fixture = GestureArmFixture()
     await fixture.configure(ignoreFrom: 3)
     let controller = NexArmActionController(link: fixture, compatibilityPolicy: .nexArmBLEProtocol)
@@ -782,7 +787,7 @@ func nexArmGestureFailureContinuesAndNextExplicitRequestCanStart(_ disturb: Bool
     #expect(await fixture.pose != [200, 0, 200, 0, 0, 0])
 }
 
-@Test func nexArmBasePerformanceIsLargeFastAndIndependentOfEncoderCalibration() async throws {
+@Test(.actionCatalog) func nexArmBasePerformanceIsLargeFastAndIndependentOfEncoderCalibration() async throws {
     let fixture = GestureArmFixture()
     let controller = NexArmActionController(link: fixture, compatibilityPolicy: .nexArmBLEProtocol)
     try await controller.performGesture(.baseSway, repetitions: 1)
@@ -861,7 +866,7 @@ func nexArmGestureFailureContinuesAndNextExplicitRequestCanStart(_ disturb: Bool
         func close() async { await serial.close() }
     }
 
-    @Test(.enabled(if: ProcessInfo.processInfo.environment["NEXARM_PRESETS_TEST"] == "1"))
+    @Test(.actionCatalog, .enabled(if: ProcessInfo.processInfo.environment["NEXARM_PRESETS_TEST"] == "1"))
     func nexArmUSBPhysicalPresetsSharedWithPhone() async throws {
         let path = try #require(ProcessInfo.processInfo.environment["NEXARM_PORT"])
         let link = try NexArmPhysicalTrace(path: path)
@@ -894,7 +899,7 @@ func nexArmGestureFailureContinuesAndNextExplicitRequestCanStart(_ disturb: Bool
     }
 #endif
 
-@Test func nexArmGestureAcceptsMeasuredIntermediateAccuracyWithoutAccumulatingOffsets() async throws {
+@Test(.actionCatalog) func nexArmGestureAcceptsMeasuredIntermediateAccuracyWithoutAccumulatingOffsets() async throws {
     let fixture = GestureArmFixture()
     await fixture.configure(measuredBias: true)
     let controller = NexArmActionController(link: fixture, compatibilityPolicy: .nexArmBLEProtocol)
@@ -907,7 +912,7 @@ func nexArmGestureFailureContinuesAndNextExplicitRequestCanStart(_ disturb: Bool
 }
 
 #if os(macOS)
-    @Test(.enabled(if: ProcessInfo.processInfo.environment["NEXARM_JOG_TEST"] == "1"))
+    @Test(.actionCatalog, .enabled(if: ProcessInfo.processInfo.environment["NEXARM_JOG_TEST"] == "1"))
     func nexArmUSBPhysicalJogSharedWithPhone() async throws {
         let link = try NexArmSerial(path: #require(ProcessInfo.processInfo.environment["NEXARM_PORT"]))
         let controller = NexArmActionController(link: link)
@@ -956,7 +961,7 @@ func nexArmGestureFailureContinuesAndNextExplicitRequestCanStart(_ disturb: Bool
     }
 #endif
 
-@Test(arguments: [NexArmGesture.tiltLeft, .tiltRight])
+@Test(.actionCatalog, arguments: [NexArmGesture.tiltLeft, .tiltRight])
 func nexArmTiltHomesOwnedMotorsBeforeAndAfterItsBody(_ gesture: NexArmGesture) async throws {
     let fixture = GestureArmFixture()
     await fixture.configure(measuredBias: true)
@@ -975,7 +980,7 @@ func nexArmTiltHomesOwnedMotorsBeforeAndAfterItsBody(_ gesture: NexArmGesture) a
 }
 
 #if os(macOS)
-    @Test(.enabled(if: ProcessInfo.processInfo.environment["NEXARM_SETTINGS_TEST"] == "1"))
+    @Test(.actionCatalog, .enabled(if: ProcessInfo.processInfo.environment["NEXARM_SETTINGS_TEST"] == "1"))
     func nexArmUSBSettingsSequenceWithoutFeedbackWaits() async throws {
         let link = try NexArmPhysicalTrace(path: #require(ProcessInfo.processInfo.environment["NEXARM_PORT"]))
         let controller = NexArmActionController(link: link)
@@ -1005,7 +1010,7 @@ func nexArmTiltHomesOwnedMotorsBeforeAndAfterItsBody(_ gesture: NexArmGesture) a
     }
 #endif
 
-@Test func nexArmInvalidDanceArgumentsReportValidationWithoutDeviceEffects() async throws {
+@Test(.actionCatalog) func nexArmInvalidDanceArgumentsReportValidationWithoutDeviceEffects() async throws {
     let registry = try ActionRegistry(modules: [
         NexArmGestureModule { _, _ in Issue.record("Invalid parameters must not reach the device") }
     ])
@@ -1023,7 +1028,7 @@ func nexArmTiltHomesOwnedMotorsBeforeAndAfterItsBody(_ gesture: NexArmGesture) a
     }
 }
 
-@Test(arguments: [NexArmGesture.nod, .shakeHead])
+@Test(.actionCatalog, arguments: [NexArmGesture.nod, .shakeHead])
 func headSettingsUseOnlyRequestedMotorWithLargeFiniteSweeps(_ gesture: NexArmGesture) throws {
     let motor = try #require(gesture.motorID)
     let frames = try gesture.settingsTestFrames()
@@ -1035,7 +1040,7 @@ func headSettingsUseOnlyRequestedMotorWithLargeFiniteSweeps(_ gesture: NexArmGes
     #expect(targets[2] - targets[1] == (gesture == .nod ? 760 : 1000))
 }
 
-@Test func headMotionArrivalRequiresEncoderTargetNotUnchangedCartesianFeedback() {
+@Test(.actionCatalog) func headMotionArrivalRequiresEncoderTargetNotUnchangedCartesianFeedback() {
     let start = ContinuousClock.now
     let center = NexArmGesture.referenceHomeJoints
     var target = center
@@ -1054,7 +1059,7 @@ func headSettingsUseOnlyRequestedMotorWithLargeFiniteSweeps(_ gesture: NexArmGes
     #expect(tracker.outcome(at: start.advanced(by: .milliseconds(850))) == .arrived)
 }
 
-@Test(arguments: [NexArmGesture.nod, .shakeHead])
+@Test(.actionCatalog, arguments: [NexArmGesture.nod, .shakeHead])
 func headPreparationAndReturnLeaveUnrelatedMotorsUntouched(_ gesture: NexArmGesture) async throws {
     let fixture = GestureArmFixture()
     await fixture.configure(wrist: 2700, preparationBias: true)
@@ -1070,7 +1075,7 @@ func headPreparationAndReturnLeaveUnrelatedMotorsUntouched(_ gesture: NexArmGest
     #expect(await controller.lockedMotors.isEmpty)
 }
 
-@Test(arguments: [NexArmGesture.nod, .shakeHead])
+@Test(.actionCatalog, arguments: [NexArmGesture.nod, .shakeHead])
 func headEndingVerifiesOnlyItsOwnMotor(_ gesture: NexArmGesture) async throws {
     let fixture = GestureArmFixture()
     await fixture.configure(ignoreFrom: 6)
@@ -1082,7 +1087,7 @@ func headEndingVerifiesOnlyItsOwnMotor(_ gesture: NexArmGesture) async throws {
     #expect(await controller.unreachedSegments == [6])
 }
 
-@Test(arguments: [NexArmGesture.nod, .shakeHead])
+@Test(.actionCatalog, arguments: [NexArmGesture.nod, .shakeHead])
 func headFeedbackAdvancesWithoutCartesianOrNominalWait(_ gesture: NexArmGesture) async throws {
     let fixture = GestureArmFixture()
     let controller = NexArmActionController(link: fixture, compatibilityPolicy: .nexArmBLEProtocol)
@@ -1095,7 +1100,7 @@ func headFeedbackAdvancesWithoutCartesianOrNominalWait(_ gesture: NexArmGesture)
     #expect(await fixture.reached.isEmpty)
 }
 
-@Test func headHandoffRequiresFreshFeedbackAfterTrajectoryDuration() {
+@Test(.actionCatalog) func headHandoffRequiresFreshFeedbackAfterTrajectoryDuration() {
     let start = ContinuousClock.now
     let pose = [200, 0, 240, 0, 0, 0]
     let joints = NexArmGesture.referenceHomeJoints
@@ -1111,7 +1116,7 @@ func headFeedbackAdvancesWithoutCartesianOrNominalWait(_ gesture: NexArmGesture)
     #expect(tracker.outcome(at: start.advanced(by: .milliseconds(900))) == .arrived)
 }
 
-@Test func nexArmAllPresetsCompileToArmOnlyTargetsAndRejectWholeDeviceCommands() throws {
+@Test(.actionCatalog) func nexArmAllPresetsCompileToArmOnlyTargetsAndRejectWholeDeviceCommands() throws {
     var fixture = NexArmTestIK()
     var plan = NexArmArmPlan()
     for gesture in NexArmGesture.allCases {
@@ -1157,7 +1162,7 @@ func headFeedbackAdvancesWithoutCartesianOrNominalWait(_ gesture: NexArmGesture)
     }
 }
 
-@Test func nexArmIKValidationFailsBeforeMotionForWrongPoseOrInvalidArmJoint() throws {
+@Test(.actionCatalog) func nexArmIKValidationFailsBeforeMotionForWrongPoseOrInvalidArmJoint() throws {
     let frame = try #require(NexArmGesture.dance.settingsTestFrames().first)
     var fixture = NexArmTestIK()
     let response = try fixture.reply(NexArmPacket(command: 7, payload: frame.packet.payload))
@@ -1179,7 +1184,7 @@ func nexArmTestResources() throws -> ResourceCoordinator {
         })
 }
 
-@Test func atomicMotorOptionsResetAndScopeUseTheSameExecutor() async throws {
+@Test(.actionCatalog) func atomicMotorOptionsResetAndScopeUseTheSameExecutor() async throws {
     let link = GestureArmFixture()
     let controller = NexArmActionController(link: link, compatibilityPolicy: .nexArmBLEProtocol)
     let options = try NexArmMotorOptions(speed: 900, acceleration: 80)
@@ -1196,7 +1201,7 @@ func nexArmTestResources() throws -> ResourceCoordinator {
     #expect(await controller.cachedJoints[3] == 1500)
 }
 
-@Test func atomicStableOffTargetEndsBeforeOverallDeadlineAndKeepsError() async throws {
+@Test(.actionCatalog) func atomicStableOffTargetEndsBeforeOverallDeadlineAndKeepsError() async throws {
     let link = GestureArmFixture()
     await link.configure(ignore: true)
     let controller = NexArmActionController(link: link, compatibilityPolicy: .nexArmBLEProtocol)
@@ -1212,7 +1217,7 @@ func nexArmTestResources() throws -> ResourceCoordinator {
     #expect(await controller.motorResults.first?.failure == nil)
 }
 
-@Test func composedAtomicMotorGroupsOwnUnionAndTrackEachMotor() async throws {
+@Test(.actionCatalog) func composedAtomicMotorGroupsOwnUnionAndTrackEachMotor() async throws {
     let options = try NexArmMotorOptions(speed: 750, acceleration: 50)
     let first = try NexArmMotorCommands.move(motor: 4, target: 1500, options: options)
     let second = try NexArmMotorCommands.move(motor: 5, target: 1900, options: options)
@@ -1231,7 +1236,7 @@ func nexArmTestResources() throws -> ResourceCoordinator {
 }
 
 #if os(macOS)
-    @Test(.enabled(if: ProcessInfo.processInfo.environment["NEXARM_ATOMIC_TEST"] == "1"))
+    @Test(.actionCatalog, .enabled(if: ProcessInfo.processInfo.environment["NEXARM_ATOMIC_TEST"] == "1"))
     func nexArmUSBPhysicalAtomicGroupAndReset() async throws {
         let link = try NexArmPhysicalTrace(path: #require(ProcessInfo.processInfo.environment["NEXARM_PORT"]))
         let controller = NexArmActionController(link: link)

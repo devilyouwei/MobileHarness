@@ -33,6 +33,7 @@ actor ObservationRecorder: Agent {
     nonisolated let descriptor: AgentDescriptor
     nonisolated let outputs = AsyncStream<OutputEnvelope> { $0.finish() }
     var inputs: [AgentInput] = []
+    var attempts = 0
     var lifecycle: AgentLifecycle = .registered
     let reject: Bool
     let blockText: String?
@@ -48,6 +49,7 @@ actor ObservationRecorder: Agent {
     func stop() { lifecycle = .stopped }
     func status() -> AgentStatus { AgentStatus(lifecycle: lifecycle, queuedInputs: 0, processedInputs: inputs.count) }
     func receive(_ input: AgentInput) async throws {
+        attempts += 1
         guard lifecycle == .running else { throw HarnessError.notRunning }
         guard !reject else { throw HarnessError.queueFull }
         admissions.continuation.yield(input.id)
@@ -59,7 +61,7 @@ actor ObservationRecorder: Agent {
     }
 }
 
-@Test func eventSubscriptionsDirectDeliveryAndIdentityFencing() async throws {
+@Test(.actionCatalog) func eventSubscriptionsDirectDeliveryAndIdentityFencing() async throws {
     let configurations = try [
         communicationConfiguration("producer", publishes: true),
         communicationConfiguration("consumer", subscribes: true), communicationConfiguration("direct"),
@@ -128,7 +130,7 @@ private func directFixture(blockText: String? = nil, reject: Bool = false) async
     return (manager, input, output, try await output.messaging(for: source.descriptor.id), direct, session)
 }
 
-@Test func directMessagingRejectsExpiredParentWrongSessionAndStoppedTarget() async throws {
+@Test(.actionCatalog) func directMessagingRejectsExpiredParentWrongSessionAndStoppedTarget() async throws {
     let (manager, _, output, port, target, session) = try await directFixture()
     let payload = InputPayload.text("parent")
     let expired = AgentInput(
@@ -150,7 +152,7 @@ private func directFixture(blockText: String? = nil, reject: Bool = false) async
     await output.shutdown()
 }
 
-@Test(.timeLimit(.minutes(1))) func directCallsOverlapAndCancellationBelongsToCaller() async throws {
+@Test(.actionCatalog, .timeLimit(.minutes(1))) func directCallsOverlapAndCancellationBelongsToCaller() async throws {
     let (manager, _, output, port, target, session) = try await directFixture(blockText: "block")
     let parent = AgentInput(sessionID: session, payload: .text("parent"))
     let first = Task {
@@ -171,7 +173,9 @@ private func directFixture(blockText: String? = nil, reject: Bool = false) async
     await output.shutdown()
 }
 
-@Test(.timeLimit(.minutes(1))) func directOutputCapacityRejectsAndRecoversAfterCallerCancellation() async throws {
+@Test(.actionCatalog, .timeLimit(.minutes(1))) func directOutputCapacityRejectsAndRecoversAfterCallerCancellation()
+    async throws
+{
     let (manager, _, output, port, target, session) = try await directFixture(blockText: "block")
     let parent = AgentInput(sessionID: session, payload: .text("parent"))
     var tasks: [Task<DeliveryReport, Error>] = []
@@ -192,7 +196,7 @@ private func directFixture(blockText: String? = nil, reject: Bool = false) async
     await output.shutdown()
 }
 
-@Test(.timeLimit(.minutes(1))) func inputCapacityIsSharedByExternalAndInternalAdmission() async throws {
+@Test(.actionCatalog, .timeLimit(.minutes(1))) func inputCapacityIsSharedByExternalAndInternalAdmission() async throws {
     let (manager, input, output, port, target, session) = try await directFixture(blockText: "block")
     var tasks: [Task<DeliveryReport, Error>] = []
     var events = target.admissions.stream.makeAsyncIterator()
@@ -220,7 +224,7 @@ private func directFixture(blockText: String? = nil, reject: Bool = false) async
     await output.shutdown()
 }
 
-@Test func publicationReportsReceiverRejectionIndependently() async throws {
+@Test(.actionCatalog) func publicationReportsReceiverRejectionIndependently() async throws {
     let policy = try CommunicationPolicy(
         contracts: AgentContracts.communication,
         externalSources: [
@@ -252,7 +256,7 @@ private func directFixture(blockText: String? = nil, reject: Bool = false) async
     await output.shutdown()
 }
 
-@Test func communicationSchemaRejectsOldVersionsUnknownFieldsAndUnknownSources() throws {
+@Test(.actionCatalog) func communicationSchemaRejectsOldVersionsUnknownFieldsAndUnknownSources() throws {
     let config = try communicationConfiguration("receiver")
     #expect(config.agentID.rawValue == "receiver")
     var root: [String: Any] = [
@@ -280,7 +284,7 @@ private func directFixture(blockText: String? = nil, reject: Bool = false) async
     }
 }
 
-@Test func gatewayRejectsMismatchedMetadataAndForgedInternalSource() async throws {
+@Test(.actionCatalog) func gatewayRejectsMismatchedMetadataAndForgedInternalSource() async throws {
     let manager = AgentManager()
     let gateway = InputGateway(manager: manager, allowsExternalSend: true)
     let input = AgentInput(
@@ -292,7 +296,7 @@ private func directFixture(blockText: String? = nil, reject: Bool = false) async
     await #expect(throws: CommunicationError.unauthorized) { try await gateway.send(forged, to: .assistant) }
 }
 
-@Test func domainValueErrorsPreserveCommunicationAdmissionRejection() throws {
+@Test(.actionCatalog) func domainValueErrorsPreserveCommunicationAdmissionRejection() throws {
     #expect(throws: SpeechValidationError.invalidRequest) { try SpeechSynthesisInput(text: "") }
     #expect(throws: VisionValidationError.invalidObservation) {
         try PoseObservation(width: 0, height: 480, sequence: 1, timestamp: 0, rotation: 0, people: [])
@@ -313,10 +317,10 @@ private func directFixture(blockText: String? = nil, reject: Bool = false) async
 
 private struct RegisteredFixtureMessage: Codable, Sendable, Equatable { let value: Int }
 private func registeredFixtureContract(
-    lifetime: TimeInterval = 2, startsNewWork: Bool = false, maximumBytes: Int = 64
+    startsNewWork: Bool = false, maximumBytes: Int = 64
 ) -> CommunicationContract {
     CommunicationContract(
-        name: "fixture.custom", kind: .observation, lifetime: lifetime, maximumBytes: maximumBytes,
+        name: "fixture.custom", kind: .observation, maximumBytes: maximumBytes,
         startsNewWork: startsNewWork,
         validateMessage: { message in
             guard let value = message.content(as: RegisteredFixtureMessage.self), value.value >= 0 else {
@@ -340,7 +344,7 @@ private func registeredFixtureConfiguration(
         ]))
 }
 
-@Test(arguments: [false, true])
+@Test(.actionCatalog, arguments: [false, true])
 func registeredMessagesRouteAndUseDeclaredDeadlinePolicy(startsNewWork: Bool) async throws {
     let contracts = try CommunicationContracts(additional: [registeredFixtureContract(startsNewWork: startsNewWork)])
     let policy = try CommunicationPolicy(
@@ -365,7 +369,6 @@ func registeredMessagesRouteAndUseDeclaredDeadlinePolicy(startsNewWork: Bool) as
     let expired = AgentInput(
         sessionID: session, payload: payload,
         metadata: InputMetadata(payload: payload, deadline: .now.advanced(by: .seconds(-1))))
-    let admittedAfter = ContinuousClock.now
     let content = RegisteredFixtureMessage(value: 7)
     let message = AgentMessage(contract: "fixture.custom", content: content, validate: { _ in })
     if startsNewWork {
@@ -382,13 +385,11 @@ func registeredMessagesRouteAndUseDeclaredDeadlinePolicy(startsNewWork: Bool) as
     }
     #expect(received.content(as: RegisteredFixtureMessage.self) == content)
     #expect(received.perception == nil)
-    // Check the assigned deadline, independent of how long a loaded test executor takes to resume.
-    #expect(delivered.metadata.deadline > admittedAfter)
-    #expect(delivered.metadata.deadline <= ContinuousClock.now.advanced(by: .seconds(2)))
+    #expect(delivered.metadata.deadline == nil)
     await manager.stopAll()
 }
 
-@Test func registeredSchemasRejectUnknownSpoofedOversizedAndInvalidAssembly() throws {
+@Test(.actionCatalog) func registeredSchemasRejectUnknownSpoofedOversizedAndInvalidAssembly() throws {
     let contracts = try CommunicationContracts(additional: [registeredFixtureContract()])
     let spoof = AgentMessage(contract: "fixture.custom", content: "wrong type", validate: { _ in })
     #expect(throws: CommunicationError.invalidPayload) { try contracts.validatedSize(spoof) }
@@ -409,14 +410,16 @@ func registeredMessagesRouteAndUseDeclaredDeadlinePolicy(startsNewWork: Bool) as
         try CommunicationContracts(additional: [registeredFixtureContract(), registeredFixtureContract()])
     }
     #expect(throws: CommunicationError.invalidPayload) {
-        try CommunicationContracts(additional: [registeredFixtureContract(lifetime: .nan)])
+        try CommunicationContracts(additional: [registeredFixtureContract(maximumBytes: -1)])
     }
     #expect(throws: CommunicationError.invalidPayload) {
         try CommunicationContracts(additional: [CommunicationContract(name: "fixture.custom", kind: .observation)])
     }
 }
 
-@Test(.timeLimit(.minutes(1))) func publicationReturnsBeforeSubscribersFinishAndShutdownJoinsDelivery() async throws {
+@Test(.actionCatalog, .timeLimit(.minutes(1))) func publicationReturnsBeforeSubscribersFinishAndShutdownJoinsDelivery()
+    async throws
+{
     let session = UUID()
     let manager = AgentManager()
     let policy = try CommunicationPolicy(
@@ -452,7 +455,7 @@ func registeredMessagesRouteAndUseDeclaredDeadlinePolicy(startsNewWork: Bool) as
     await manager.stopAll()
 }
 
-@Test func signalLogPublicationRecordsBranchesWithoutPublisherAcknowledgment() async throws {
+@Test(.actionCatalog) func signalLogPublicationRecordsBranchesWithoutPublisherAcknowledgment() async throws {
     let policy = try CommunicationPolicy(
         contracts: AgentContracts.communication, externalSources: ["producer"],
         configurations: [
@@ -485,7 +488,7 @@ func registeredMessagesRouteAndUseDeclaredDeadlinePolicy(startsNewWork: Bool) as
     #expect(await iterator.next() == nil)
 }
 
-@Test func signalLogBoundsHistoryAndAggregatesOnlyMatchingOutcomes() async throws {
+@Test(.actionCatalog) func signalLogBoundsHistoryAndAggregatesOnlyMatchingOutcomes() async throws {
     let policy = try CommunicationPolicy(
         contracts: AgentContracts.communication, externalSources: ["producer"],
         configurations: [communicationConfiguration("consumer")])
@@ -511,7 +514,7 @@ func registeredMessagesRouteAndUseDeclaredDeadlinePolicy(startsNewWork: Bool) as
     await gateway.shutdown()
 }
 
-@Test func signalLogDroppedPublicationRetainsFailureWithoutBackpressureResponse() async throws {
+@Test(.actionCatalog) func signalLogDroppedPublicationRetainsFailureWithoutBackpressureResponse() async throws {
     let policy = try CommunicationPolicy(
         contracts: AgentContracts.communication, externalSources: ["producer"],
         configurations: [communicationConfiguration("consumer", subscribes: true)])
@@ -531,7 +534,7 @@ func registeredMessagesRouteAndUseDeclaredDeadlinePolicy(startsNewWork: Bool) as
     await gateway.shutdown()
 }
 
-@Test func taskObservationIgnoresOrdinaryTrafficAndRetainsIndependentHistory() async throws {
+@Test(.actionCatalog) func taskObservationIgnoresOrdinaryTrafficAndRetainsIndependentHistory() async throws {
     let policy = try CommunicationPolicy(
         contracts: AgentContracts.communication, externalSources: ["producer"],
         configurations: [communicationConfiguration("consumer")])
@@ -552,7 +555,7 @@ func registeredMessagesRouteAndUseDeclaredDeadlinePolicy(startsNewWork: Bool) as
     #expect(await afterTraffic.next() == nil)
 }
 
-@Test(.timeLimit(.minutes(1)), arguments: [false, true])
+@Test(.actionCatalog, .timeLimit(.minutes(1)), arguments: [false, true])
 func publicationDoesNotWaitForAppObserverOrTurnItsFailureIntoAReceipt(blocking: Bool) async throws {
     let session = UUID()
     let manager = AgentManager()
@@ -595,7 +598,8 @@ func publicationDoesNotWaitForAppObserverOrTurnItsFailureIntoAReceipt(blocking: 
     await manager.stopAll()
 }
 
-@Test(.timeLimit(.minutes(1))) func publicationOverflowDoesNotWaitForDiagnosticCallbacks() async throws {
+@Test(.actionCatalog, .timeLimit(.minutes(1))) func publicationOverflowDoesNotWaitForDiagnosticCallbacks() async throws
+{
     let session = UUID()
     let manager = AgentManager()
     let policy = try CommunicationPolicy(
@@ -632,5 +636,31 @@ func publicationDoesNotWaitForAppObserverOrTurnItsFailureIntoAReceipt(blocking: 
     #expect(latest.records.last?.phase == .dropped)
     #expect(await port.history.snapshot().isEmpty)
     await output.shutdown()
+    await manager.stopAll()
+}
+
+@Test(.actionCatalog, .timeLimit(.minutes(1))) func startupPublicationSkipsUnstartedRecipientButSendStillRejects()
+    async throws
+{
+    let configuration = try communicationConfiguration("consumer", subscribes: true)
+    let policy = try CommunicationPolicy(
+        contracts: AgentContracts.communication, externalSources: ["producer"], configurations: [configuration])
+    let manager = AgentManager()
+    let target = ObservationRecorder(id: "consumer")
+    let session = UUID()
+    try await manager.register(target, sessionID: session)
+    let gateway = InputGateway(manager: manager, policy: policy, allowsExternalSend: true)
+    var snapshots = try await gateway.observeSignals().makeAsyncIterator()
+    let payload = InputPayload.observation(.transcript("hello", final: true))
+    let input = AgentInput(sessionID: session, payload: payload, metadata: .init(payload: payload, source: "producer"))
+    try await gateway.publish(input)
+    while let snapshot = await snapshots.next() {
+        if snapshot.records.contains(where: { $0.branches.contains { $0.reason == "notRunning" } }) { break }
+    }
+    #expect(await target.attempts == 0)
+    let report = try await gateway.send(input, to: .init(rawValue: "consumer"))
+    #expect(report.rejected[.init(rawValue: "consumer")] == "notRunning")
+    #expect(await target.attempts == 1)
+    await gateway.shutdown()
     await manager.stopAll()
 }

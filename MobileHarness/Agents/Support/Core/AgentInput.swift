@@ -74,7 +74,7 @@ public struct InputMetadata: Sendable {
     public let rootID: UUID
     public let parentID: UUID?
     public let hops: Int
-    public let deadline: ContinuousClock.Instant
+    public let deadline: ContinuousClock.Instant?
     public init(
         payload: InputPayload, source: String? = nil, incarnation: UUID? = nil, origin: SignalOrigin = .external,
         capturedAt: TimeInterval? = nil, sequence: UInt64 = 0, rootID: UUID = UUID(),
@@ -82,7 +82,6 @@ public struct InputMetadata: Sendable {
     ) {
         let contract: String
         var defaultSource = "runtime"
-        let lifetime: Double = 10
         switch payload {
         case .communicationReceipt: contract = "communication.receipt"
         case .text:
@@ -113,7 +112,7 @@ public struct InputMetadata: Sendable {
         self.rootID = rootID
         self.parentID = parentID
         self.hops = hops
-        self.deadline = min(deadline ?? .now.advanced(by: .seconds(lifetime)), .now.advanced(by: .seconds(60)))
+        self.deadline = deadline
     }
-    public var expired: Bool { ContinuousClock.now >= deadline }
+    public var expired: Bool { deadline.map { ContinuousClock.now >= $0 } ?? false }
 }

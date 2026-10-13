@@ -52,12 +52,34 @@ public struct ConversationGenerationRound: Codable, Sendable, Identifiable {
     }
 }
 
+/// Exact per-request Skill and task evidence.
+public struct ConversationDecisionMetadata: Codable, Sendable {
+    public let taskID: UUID?
+    public let mode: String
+    public let skills: [String: Int]
+    public let catalogJSON: String
+    public let taskGoal: String?
+    public let execution: String?
+    public init(
+        taskID: UUID?, mode: String, skills: [String: Int], catalogJSON: String, taskGoal: String? = nil,
+        execution: String? = nil
+    ) {
+        self.taskGoal = taskGoal
+        self.execution = execution
+        self.taskID = taskID
+        self.mode = mode
+        self.skills = skills
+        self.catalogJSON = catalogJSON
+    }
+}
+
 /// One model invocation, nested under the input that owns its execution lifecycle.
 public struct ConversationModelRequest: Codable, Sendable, Identifiable {
     public let id: UUID
     public let date: Date
     public let input: String
     public let requestJSON: String
+    public var decisionMetadata: ConversationDecisionMetadata?
     public var modelRequestStartedAt: Date?
     public var firstTokenLatency: Double?
     public var firstTokenAt: Date?
@@ -67,7 +89,8 @@ public struct ConversationModelRequest: Codable, Sendable, Identifiable {
     public var state: ConversationRecord.State = .generating
     public var finishReason: String?
     public var error: String?
-    public init(id: UUID, input: String, requestJSON: String) {
+    public init(id: UUID, input: String, requestJSON: String, decisionMetadata: ConversationDecisionMetadata? = nil) {
+        self.decisionMetadata = decisionMetadata
         self.id = id
         date = Date()
         self.input = input
@@ -84,10 +107,8 @@ public struct ConversationRecord: Codable, Sendable, Identifiable {
     public let model: String
     public let maximumOutputTokens: Int?
     public let temperature: Double
-    // Optional additions keep version-1 records readable without migration.
     public var modelRequests: [ConversationModelRequest]?
     public var generationRounds: [ConversationGenerationRound]?
-    public var continuationRequests: [String]?
     public var toolDefinitions: [String]?
     public var toolCalls: [ConversationToolCall]?
     public var tokenUsage: ConversationTokenUsage?
@@ -167,7 +188,7 @@ public actor ConversationHistoryStore {
         contextLoad = nil
         contextCommit = nil
     }
-    /// Compatibility facade over the Agent-owned authoritative context; no second writer.
+    /// Transactional projection over the Agent-owned authoritative context; no second writer.
     public init(
         contextIdentity: UUID? = nil,
         contextLoad: @escaping @Sendable () async throws -> ConversationArchive,
@@ -179,7 +200,7 @@ public actor ConversationHistoryStore {
         self.contextCommit = contextCommit
     }
 
-    /// The host attaches an authoritative projection only after importing this facade's legacy snapshot.
+    /// The host attaches the authoritative context without importing another journal.
     public func attachContext(
         identity: UUID,
         load: @escaping @Sendable () async throws -> ConversationArchive,
@@ -263,7 +284,7 @@ public actor ConversationHistoryStore {
         guard value.current.turns.count < 256 else { throw ConversationHistoryError.capacityExceeded }
         guard user.utf8.count <= 4096, model.utf8.count <= 512,
             request.count <= 514,
-            request.allSatisfy({ $0.content.utf8.count <= ($0.role == .system ? 32768 : 262144) }),
+            request.allSatisfy({ $0.content.utf8.count <= ($0.role == .system ? 65536 : 262144) }),
             temperature.isFinite, maximumOutputTokens.map({ $0 > 0 }) ?? true,
             !value.current.turns.contains(where: { $0.id == id })
         else { throw ConversationHistoryError.invalidRecord }
@@ -302,7 +323,7 @@ public actor ConversationHistoryStore {
         }
         try await updateTurn(id) { turn in
             var requests = turn.modelRequests ?? []
-            guard turn.state == .generating, requests.count < 4,
+            guard turn.state == .generating,
                 !requests.contains(where: { $0.id == request.id || $0.state == .generating })
             else { throw ConversationHistoryError.invalidRecord }
             requests.append(request)
@@ -330,13 +351,14 @@ public actor ConversationHistoryStore {
         }
     }
 
-    public func finishModelRequest(_ id: UUID, reason: String?) async throws {
+    public func finishModelRequest(_ id: UUID, reason: String?, error: String? = nil) async throws {
         try await updateTurn(id) { turn in
             guard let index = turn.modelRequests?.indices.last,
                 turn.modelRequests?[index].state == .generating
             else { throw ConversationHistoryError.invalidRecord }
-            turn.modelRequests?[index].state = .completed
+            turn.modelRequests?[index].state = error == nil ? .completed : .failed
             turn.modelRequests?[index].finishReason = reason
+            turn.modelRequests?[index].error = error.map { String($0.prefix(4096)) }
             return true
         }
     }
@@ -358,7 +380,7 @@ public actor ConversationHistoryStore {
         else { throw ConversationHistoryError.invalidRecord }
         try await updateTurn(id) { turn in
             var calls = turn.toolCalls ?? []
-            guard calls.count < 128, !calls.contains(where: { $0.id == call.id }) else {
+            guard !calls.contains(where: { $0.id == call.id }) else {
                 throw ConversationHistoryError.capacityExceeded
             }
             calls.append(call)
@@ -374,7 +396,7 @@ public actor ConversationHistoryStore {
         guard round.resultsJSON.utf8.count <= 262_144 else { throw ConversationHistoryError.invalidRecord }
         try await updateTurn(id, required: true) { turn in
             var rounds = turn.generationRounds ?? []
-            guard rounds.count < 4, !rounds.contains(where: { $0.id == round.id }) else {
+            guard !rounds.contains(where: { $0.id == round.id }) else {
                 throw ConversationHistoryError.invalidRecord
             }
             rounds.append(round)

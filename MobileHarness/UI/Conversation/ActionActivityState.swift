@@ -67,16 +67,18 @@ public struct ExecutionIssue: Identifiable, Sendable, Equatable {
     public let title: String
     public let source: String
     public let message: String
+    public let userMessage: String?
     public let time: Date
     public init(
         id: UUID = UUID(), title: String, source: String, message: String, time: Date = Date(),
-        failureCode: String? = nil, context: Context? = nil, inputID: UUID? = nil
+        failureCode: String? = nil, context: Context? = nil, inputID: UUID? = nil, userMessage: String? = nil
     ) {
         self.inputID = inputID ?? context?.inputID
         self.id = id
         self.title = String(title.prefix(128))
         self.source = String(source.prefix(64))
         self.message = String(message.prefix(512))
+        self.userMessage = userMessage.map { String($0.prefix(512)) }
         precondition(failureCode.map { !$0.isEmpty && $0.utf8.count <= 64 } ?? true)
         self.failureCode = failureCode
         self.context = context
@@ -95,6 +97,13 @@ public struct ActionChannelSummary: Identifiable {
 /// Presentation only. The root-owned workflow consumes snapshots; views never own observation tasks.
 @MainActor @Observable
 public final class ActionActivityState {
+    public var currentTaskID: UUID?
+    public var skillOwnership: [String: String] = [:]
+    public var backgroundTaskCount: Int { tasks.filter { $0.execution == "background" && !$0.isTerminal }.count }
+    public var currentTaskTitle = ""
+    public var currentTaskStatus = ""
+    public var loadedSkills: [String] = []
+    public var showsExecutionHistory = false
     public var selectedTab: ExecutionLogTab = .action
     public var selectedTaskID: UUID?
     public private(set) var agentEvents: [AgentRuntimeLogItem] = []
@@ -108,6 +117,28 @@ public final class ActionActivityState {
     public private(set) var revision: UInt64?
     public private(set) var evictedCount: UInt64 = 0
     public var observationUnavailable = false
+    public var notice: HomeNotice?
+    public var visibleNotice: HomeNotice? {
+        if let errorToast {
+            return HomeNotice(
+                id: errorToast.id,
+                text: errorToast.userMessage ?? errorToast.message.replacingOccurrences(of: "agent.error: ", with: ""),
+                tone: .error)
+        }
+        return notice
+    }
+    public private(set) var errorToast: ExecutionIssue?
+    private var toastKeys: [String] = []
+    public func dismissErrorToast(id: UUID) { if errorToast?.id == id { errorToast = nil } }
+    private func offerToast(_ issue: ExecutionIssue, now: Date = Date()) {
+        // Initial/repeated retained snapshots do not replay old failures as new incidents.
+        guard issue.context?.callID == nil, now.timeIntervalSince(issue.time) <= 15 else { return }
+        let key = "\(issue.source)|\(issue.inputID?.uuidString ?? issue.id.uuidString)|\(issue.message)"
+        guard !toastKeys.contains(key) else { return }
+        toastKeys.append(key)
+        toastKeys = Array(toastKeys.suffix(100))
+        errorToast = issue
+    }
     public private(set) var outputIssues: [ExecutionIssue] = []
     public private(set) var backgroundIssues: [ExecutionIssue] = []
     private var outputEvictions: UInt64 = 0
@@ -117,10 +148,17 @@ public final class ActionActivityState {
     public func replaceIssues(revision: UInt64, records: [ExecutionIssue], evictedCount: UInt64) {
         guard issueRevision == nil || revision > issueRevision! else { return }
         issueRevision = revision
+        let previous = Set(outputIssues.map(\.id))
+        if let newest = records.filter({ !previous.contains($0.id) && $0.context?.callID == nil }).max(by: {
+            $0.time < $1.time
+        }) {
+            offerToast(newest)
+        }
         outputIssues = Array(records.suffix(100))
         outputEvictions = evictedCount
     }
     public func recordIssue(_ issue: ExecutionIssue) {
+        offerToast(issue)
         if backgroundIssues.count == 100 {
             backgroundIssues.removeFirst()
             backgroundEvictions &+= 1
@@ -194,11 +232,17 @@ public final class ActionActivityState {
                 }
                 tasks[index].events.append(event)
             }
+            tasks[index].execution = incoming.execution ?? tasks[index].execution
+            tasks[index].mode = incoming.mode
+            if !incoming.skills.isEmpty { tasks[index].skills = incoming.skills }
+            tasks[index].inputIDs = incoming.inputIDs
+            tasks[index].failure = incoming.failure
             if !tasks[index].isTerminal { tasks[index].phase = incoming.phase }
             if tasks[index].title.isEmpty { tasks[index].title = incoming.title }
         } else {
             if tasks.count == 100 {
-                tasks.removeFirst()
+                let retired = tasks.firstIndex(where: { $0.isTerminal }) ?? 0
+                tasks.remove(at: retired)
                 taskEvictions &+= 1
             }
             var value = incoming
@@ -249,5 +293,18 @@ public final class ActionActivityState {
             if $0.item.isActive != $1.item.isActive { return $0.item.isActive }
             return $0.item.execution.admittedAt < $1.item.execution.admittedAt
         }
+    }
+}
+
+/// A display notice is never an ExecutionIssue or a task goal.
+public struct HomeNotice: Sendable, Equatable {
+    public enum Tone: String, Sendable { case info, warning, error }
+    public let id: UUID
+    public let text: String
+    public let tone: Tone
+    public init(id: UUID = UUID(), text: String, tone: Tone) {
+        self.id = id
+        self.text = text
+        self.tone = tone
     }
 }

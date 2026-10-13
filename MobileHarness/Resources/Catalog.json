@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "agents": {
+    "Assistant": "Agents/Assistant/Agent.json",
+    "Photographer": "Agents/Photographer/Agent.json",
+    "Memory": "Agents/Memory/Agent.json",
+    "ApplicationControl": "Agents/ApplicationControl/Agent.json",
+    "SpeechPerception": "Agents/SpeechPerception/Agent.json",
+    "SpeechSynthesis": "Agents/SpeechSynthesis/Agent.json",
+    "VisionPerception": "Agents/VisionPerception/Agent.json"
+  },
+  "skills": {
+    "basic-skill": "Skills/BasicSkill/Skill.json",
+    "expression-interaction": "Skills/ExpressionInteraction/Skill.json",
+    "robot-interaction": "Skills/RobotInteraction/Skill.json",
+    "photography": "Skills/Photography/Skill.json",
+    "history-query": "Skills/HistoryQuery/Skill.json",
+    "application-control": "Skills/ApplicationControl/Skill.json"
+  }
+}

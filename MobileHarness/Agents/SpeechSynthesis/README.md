@@ -30,7 +30,7 @@ flowchart LR
  Queue --> Builder[SpeechSynthesisContextBuilder]
  Builder --> Producer[Single owned TTS producer]
  Producer -->|Validated PCM or terminal failure| Store
- Cancel[Scoped cancellation or execution timeout] --> Producer
+ Cancel[Scoped cancellation or producer failure] --> Producer
  Store -->|Checkout and read| Playback[App SpeechPlayback]
 ```
 
@@ -46,7 +46,7 @@ One serial synthesis worker has at most 32 queued/in-flight admissions in additi
 
 Build the request from role context and validate request identity, mono Float32, stable format, increasing sequence, explicit finished event, nonempty audio and ≤8 MiB total output. Convert ModelKit.AudioFrame into StorageAudio.SpeechPCMFrame without a dependency from Storage to ModelKit. Producer errors are SpeechSynthesisError; storage errors remain SpeechAudioError.
 
-A per-request execution timeout defaults to 60 seconds (injected values must be positive); it starts at FIFO dequeue, excludes queue/playback waiting and never resets on PCM. On timeout, fail the audio handle with timedOut, clear unread PCM, wake blocked readers and cancel/join the producer. The first failure survives later cancellation. Store terminal errors retain at most 128 records for 30 seconds; later checkout may report missingAudio after expiry/eviction. Already audible samples cannot be retracted. There is no independent empty-PCM read timeout.
+Synthesis waits for provider completion, failure or owner cancellation without an Agent timer. Cancellation fails the audio handle, wakes readers and joins the producer. Failed handles retain the original error until scope cleanup or bounded metadata eviction; no audio/cache TTL or reader timeout exists. Already audible samples cannot be retracted.
 
 The worker advances after synthesis terminal state without waiting for playback. Pause retains queued requests and lets an already active producer finish; resume drains the FIFO. Stop joins work and closes/fails owned handles. Cancellation cannot discard another source's request. Context write failure prevents dependent synthesis; recent evidence retains 256 summaries. Restart does not restore audio or replay speech.
 
@@ -54,7 +54,7 @@ The worker advances after synthesis terminal state without waiting for playback.
 
 ## Function and communication registration
 
-Model exposure comes from [SpeechSynthesis.agent.json](SpeechSynthesis.agent.json); code-owned internal permissions are separate. Empty Channel groups declare Channels without exposing a function.
+Model exposure comes from [../../Resources/Agents/SpeechSynthesis/Agent.json](../../Resources/Agents/SpeechSynthesis/Agent.json); code-owned internal permissions are separate. Empty Channel groups declare Channels without exposing a function.
 
 ### Model functions
 
@@ -92,3 +92,14 @@ Publication is one-way and has no recipient acknowledgment. Directed send return
 ## Related design
 
 [Parent design](../README.md)
+
+
+## 固定函数与 Skill
+
+✅ 资源不再包含 Permissions.json，Agent.json 的 baseSkills 引用 Skill，Skill.json 声明函数。业务模型函数由已加载 Skill 提供；固定调用与模型轮次分别验证，详见 [资源规范](../../Resources/Agents/README.md)。
+
+## Lifecycle-owned conversation and audio (2026-10-12)
+
+✅ 已移除对话生成、ReACT、收件箱排队、结果屏障、ASR 收尾、TTS 合成及回复占用租约的计时终止。Signal 默认无过期时间，框架不再按通信契约附加 TTL。保留显式实时感知数据的新鲜度和网络传输自身超时；它们不作为对话/语音缓存生命周期。Action 自身超时通过原始执行者的 ActionResult 返回。请求/调用数及队列/PCM 容量仍有界，不以计时自动删除已接纳输入。语音句柄无读等待或错误记录 TTL，按播放完成、输入/会话正常结束、异常或显式取消清理；取消加入生成和播放工作。
+
+✅ ModelKit requests retain input/request identity and pass the Agent-owned session as opaque InferenceContext.scopeID. Conversation/session validation and policy stay in this calling Agent; no business scope semantics are delegated to ModelKit.

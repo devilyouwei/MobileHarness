@@ -1,3 +1,4 @@
+import AgentCore
 import Foundation
 import ModelKit
 import StorageChat
@@ -13,7 +14,7 @@ public enum ConversationTitleGenerator {
         let selected = (0..<count).map { index in
             conversation.turns[count == 1 ? 0 : index * (conversation.turns.count - 1) / (count - 1)]
         }
-        let templates = try AgentPrompts.load(named: "Memory")
+        let templates = try PromptTemplates(data: AgentConfigurations.titlePromptData())
         let excerpts = try selected.map {
             try templates.render(
                 "title.excerpt",

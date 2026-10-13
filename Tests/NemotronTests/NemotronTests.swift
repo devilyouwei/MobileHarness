@@ -1,7 +1,6 @@
 import AVFAudio
 import Foundation
 @_spi(ModelManagement) import ModelKit
-import ModelKitFluidAudio
 import Testing
 
 @testable import ModelKitNemotron
@@ -32,7 +31,7 @@ private func metadata(chunkFrames: Int = 224) throws -> Data {
     }
 }
 @Test func coreMLRecognitionReportsMissingResourcesWithoutLoading() async throws {
-    let context = ModelContext()
+    let context = try ModelContext(loadGate: ModelLoadGate(maximumConcurrentLoads: 4), maximumLoadWaiters: 32)
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     let provider = try NemotronASR(context: context, artifacts: root)
     if case .available = await provider.availability { Issue.record("Missing files must not report available") }
@@ -44,7 +43,7 @@ private func metadata(chunkFrames: Int = 224) throws -> Data {
 }
 
 @Test func modelLeaseRejectsConcurrentAdmissionAndAllowsUnload() async throws {
-    let context = ModelContext()
+    let context = try ModelContext(loadGate: ModelLoadGate(maximumConcurrentLoads: 4), maximumLoadWaiters: 32)
     let manager = try context.resource { 42 }
     let first = try await manager.acquire()
     #expect(first.model == 42)
@@ -61,7 +60,7 @@ private func metadata(chunkFrames: Int = 224) throws -> Data {
 @available(macOS 15, iOS 18, *)
 func realModelStreamingPacketParityAndCancellation() async throws {
     let models = repository.appendingPathComponent("MobileHarness/Resources/Models")
-    let providerContext = ModelContext()
+    let providerContext = try ModelContext(loadGate: ModelLoadGate(maximumConcurrentLoads: 4), maximumLoadWaiters: 32)
     let provider = try NemotronASR(
         context: providerContext,
         artifacts: models.appendingPathComponent("Nemotron"))

@@ -20,7 +20,7 @@ private func authoringInvocation(_ parameters: [String: String]) -> ActionInvoca
             parameters: parameters))
 }
 
-@Test func speechEntryRejectsInvalidTransportBeforeInvokingPlayback() async throws {
+@Test(.actionCatalog) func speechEntryRejectsInvalidTransportBeforeInvokingPlayback() async throws {
     let probe = SpeechEntryProbe()
     let id = UUID()
     for parameters in [
@@ -40,7 +40,7 @@ private func authoringInvocation(_ parameters: [String: String]) -> ActionInvoca
 }
 
 private enum AuthoringFailure: Error { case device }
-@Test func speechEntryPreservesDependencyFailureAndPostEffectCancellation() async throws {
+@Test(.actionCatalog) func speechEntryPreservesDependencyFailureAndPostEffectCancellation() async throws {
     let invocation = authoringInvocation(["audioID": UUID().uuidString])
     await #expect(throws: AuthoringFailure.self) {
         try await SpeechActions.speak(invocation: invocation) { _, _ in throw AuthoringFailure.device }
@@ -62,12 +62,12 @@ private struct UnifiedAuthoringToolModule: ToolModule {
 
 private enum UnifiedAuthoringFixture {
     @Action(
-        domain: "Fixture", module: "Control", title: "Shared native value", serializationKey: "fixture",
+        domain: "Fixture", module: "Control", title: "Shared native value",
         resources: [.init(rawValue: "fixtureResource")], timeout: .seconds(2))
     public static func shared() {}
 }
 
-@Test func unifiedActionAttributeExecutesOneNativeHandlerThroughBothProtocols() async throws {
+@Test(.actionCatalog) func unifiedActionAttributeExecutesOneNativeHandlerThroughBothProtocols() async throws {
     let definition = ActionBinding(
         function: UnifiedAuthoringFixture.sharedDefinition(completing: { invocation in
             .value(try ActionArguments(invocation.call.parameters).requiredString("value", maximumUTF8Bytes: 32))
@@ -89,7 +89,6 @@ private enum UnifiedAuthoringFixture {
     #expect(scheduled == .value("same outcome"))
     #expect(native.completion == scheduled && native.value == "same outcome")
     #expect(definition.protocols == [.action, .tool])
-    #expect(definition.serializationKey == "fixture")
     #expect(definition.resources == [.init(rawValue: "fixtureResource")])
     #expect(definition.timeout == .seconds(2))
 }

@@ -1,0 +1,95 @@
+{
+  "version": 7,
+  "id": "photographer",
+  "communication": {
+    "inputs": [
+      {
+        "contract": "camera.state",
+        "version": 1,
+        "kind": "observation"
+      },
+      {
+        "contract": "vision.pose",
+        "version": 1,
+        "kind": "observation"
+      },
+      {
+        "contract": "photography.camera",
+        "version": 1,
+        "kind": "observation"
+      },
+      {
+        "contract": "tool.result",
+        "version": 1,
+        "kind": "toolResult"
+      },
+      {
+        "contract": "task.request",
+        "version": 1,
+        "kind": "observation"
+      },
+      {
+        "contract": "task.input",
+        "version": 1,
+        "kind": "observation"
+      },
+      {
+        "contract": "task.progress",
+        "version": 1,
+        "kind": "observation"
+      },
+      {
+        "contract": "task.result",
+        "version": 1,
+        "kind": "observation"
+      },
+      {
+        "contract": "task.cancel",
+        "version": 1,
+        "kind": "observation"
+      },
+      {
+        "contract": "communication.receipt",
+        "version": 1,
+        "kind": "communicationReceipt"
+      }
+    ],
+    "subscriptions": [
+      {
+        "contract": "camera.state",
+        "source": "phone.camera",
+        "topic": "camera.state"
+      },
+      {
+        "contract": "vision.pose",
+        "source": "visionPerception",
+        "topic": "vision.pose"
+      },
+      {
+        "contract": "photography.camera",
+        "source": "runtime",
+        "topic": "photography.camera"
+      },
+      {
+        "contract": "photography.camera",
+        "source": "user",
+        "topic": "photography.camera"
+      }
+    ],
+    "publications": [],
+    "sends": [
+      {
+        "contract": "task.progress",
+        "target": "assistant"
+      },
+      {
+        "contract": "task.result",
+        "target": "assistant"
+      }
+    ]
+  },
+  "baseSkills": [
+    "photography"
+  ],
+  "backgroundTasks": []
+}

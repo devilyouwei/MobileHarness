@@ -24,3 +24,8 @@ Update this README when test scope or lifecycle contracts change.
 
 
 ✅ Combined Apple native ASR+VAD integration sends dense 137-sample Chinese PCM plus two seconds of silence through one analyzer. The temporary reportResults probe emitted no VAD activities, consistent with documented error-only results; no fake positive event test is shipped.
+
+
+## Streaming TTS latency
+
+✅ Regressions cover for immediate first PCM including short output, byte/sequence/timestamp preservation, format rejection, and opt-in consecutive/cancelled native synthesizer reuse. Controlled PCM checks do not certify phone latency.

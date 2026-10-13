@@ -111,7 +111,7 @@ func resourceRuntime(
         sessionID: session, manager: manager, input: input, output: output,
         agent: try ApplicationControlAgent(sessionID: session))
 }
-@Test func modelResourceCommandsCrossGatewaysAndRecoverAfterNativeFailure() async throws {
+@Test(.actionCatalog) func modelResourceCommandsCrossGatewaysAndRecoverAfterNativeFailure() async throws {
     let fixture = ResourceFixture()
     let runtime = try resourceRuntime(fixture)
     try await runtime.perform(.download(id: "model", endpoint: "https://example.invalid/model", allowsCellular: false))
@@ -126,7 +126,7 @@ func resourceRuntime(
     await runtime.shutdown()
     await #expect(throws: CommunicationError.scopeClosed) { try await runtime.perform(.cancel("model")) }
 }
-@Test func modelResourceAgentRejectsDuplicateAndOverflowAndRetiresFailedDispatch() async throws {
+@Test(.actionCatalog) func modelResourceAgentRejectsDuplicateAndOverflowAndRetiresFailedDispatch() async throws {
     let session = UUID()
     let agent = try ApplicationControlAgent(sessionID: session)
     try await agent.start()
@@ -166,7 +166,7 @@ private actor HeldResourceFixture: ModelResourceCapability {
         release = nil
     }
 }
-@Test func resourcePageCancellationPreservesAdmissionAndExplicitCancelIsIndependent() async throws {
+@Test(.actionCatalog) func resourcePageCancellationPreservesAdmissionAndExplicitCancelIsIndependent() async throws {
     let fixture = HeldResourceFixture()
     let runtime = try resourceRuntime(fixture)
     var started = fixture.started.stream.makeAsyncIterator()
@@ -180,7 +180,7 @@ private actor HeldResourceFixture: ModelResourceCapability {
     #expect(await runtime.agent.status().queuedInputs == 0)
     await runtime.shutdown()
 }
-@Test func resourceShutdownCancelsAndJoinsWorkersBeforeReturning() async throws {
+@Test(.actionCatalog) func resourceShutdownCancelsAndJoinsWorkersBeforeReturning() async throws {
     let fixture = HeldResourceFixture()
     let runtime = try resourceRuntime(fixture)
     var started = fixture.started.stream.makeAsyncIterator()
@@ -198,7 +198,7 @@ private actor HeldResourceFixture: ModelResourceCapability {
     await runtime.shutdown()
 }
 
-@Test func pausedApplicationControlRetainsEnvironmentAdmissionWithoutStartingBusiness() async throws {
+@Test(.actionCatalog) func pausedApplicationControlRetainsEnvironmentAdmissionWithoutStartingBusiness() async throws {
     let session = UUID()
     let agent = try ApplicationControlAgent(sessionID: session)
     try await agent.start()
@@ -217,7 +217,7 @@ private actor HeldResourceFixture: ModelResourceCapability {
     await agent.stop()
 }
 
-@Test func resourceIntentRejectsForeignSessionAndMalformedResourceBeforeEffects() async throws {
+@Test(.actionCatalog) func resourceIntentRejectsForeignSessionAndMalformedResourceBeforeEffects() async throws {
     let session = UUID()
     let agent = try ApplicationControlAgent(sessionID: session)
     try await agent.start()
@@ -231,7 +231,7 @@ private actor HeldResourceFixture: ModelResourceCapability {
     await agent.stop()
 }
 
-@Test func speechModelPreferenceTravelsThroughResourceAgentAndReturningFeedback() async throws {
+@Test(.actionCatalog) func speechModelPreferenceTravelsThroughResourceAgentAndReturningFeedback() async throws {
     let fixture = ResourceFixture()
     let runtime = try resourceRuntime(fixture)
     try await runtime.perform(.configureSpeech(recognition: true, synthesis: false))
@@ -240,7 +240,9 @@ private actor HeldResourceFixture: ModelResourceCapability {
     #expect(await runtime.agent.status().queuedInputs == 0)
     await runtime.shutdown()
 }
-@Test func speechBindingOverlapIsRejectedWithoutBlockingOtherResourceIntentsAndRetirementReleasesIt() async throws {
+@Test(.actionCatalog) func speechBindingOverlapIsRejectedWithoutBlockingOtherResourceIntentsAndRetirementReleasesIt()
+    async throws
+{
     let session = UUID()
     let agent = try ApplicationControlAgent(sessionID: session)
     try await agent.start()
@@ -258,7 +260,7 @@ private actor HeldResourceFixture: ModelResourceCapability {
     await agent.stop()
 }
 
-@Test func speechBindingFailureIsInvocationLocalAndNextPreferenceCanExecute() async throws {
+@Test(.actionCatalog) func speechBindingFailureIsInvocationLocalAndNextPreferenceCanExecute() async throws {
     let fixture = ResourceFixture()
     let runtime = try resourceRuntime(fixture)
     await fixture.failNextSpeech()
@@ -270,7 +272,7 @@ private actor HeldResourceFixture: ModelResourceCapability {
     #expect(await runtime.agent.status().queuedInputs == 0)
     await runtime.shutdown()
 }
-@Test func speechFunctionRejectsInvalidBooleansBeforeCallingNativeCapability() async throws {
+@Test(.actionCatalog) func speechFunctionRejectsInvalidBooleansBeforeCallingNativeCapability() async throws {
     let fixture = ResourceFixture()
     let invocation = ActionInvocation(
         source: .applicationControl,
@@ -302,7 +304,8 @@ struct UnusedCameraControl: CameraControlCapability {
     }
 }
 
-@Test(.timeLimit(.minutes(1))) func environmentPublicationHasNoCompletionWaitAndReceiverErrorsStayIndependent()
+@Test(.actionCatalog, .timeLimit(.minutes(1)))
+func environmentPublicationHasNoCompletionWaitAndReceiverErrorsStayIndependent()
     async throws
 {
     let session = UUID()

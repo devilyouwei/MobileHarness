@@ -110,7 +110,9 @@ private func lifecycleResources(stop: @escaping @Sendable () async throws -> Voi
     ])
 }
 
-@Test(.timeLimit(.minutes(1))) func failedResourceUseUnlocksAndOldPermitCannotAffectNewOwner() async throws {
+@Test(.actionCatalog, .timeLimit(.minutes(1))) func failedResourceUseUnlocksAndOldPermitCannotAffectNewOwner()
+    async throws
+{
     let resources = try lifecycleResources()
     let permitBox = LifecyclePermitBox()
     let first = lifecycleOwner()
@@ -140,7 +142,7 @@ private func lifecycleResources(stop: @escaping @Sendable () async throws -> Voi
     #expect(await resources.snapshot()[armResource] == .unlocked)
 }
 
-@Test func cancelledResourceExecutionReleasesWithoutReportingSuccess() async throws {
+@Test(.actionCatalog) func cancelledResourceExecutionReleasesWithoutReportingSuccess() async throws {
     let resources = try lifecycleResources()
     await #expect(throws: CancellationError.self) {
         try await resources.run(resources: [armResource], owner: lifecycleOwner(), lease: nil) {
@@ -152,7 +154,8 @@ private func lifecycleResources(stop: @escaping @Sendable () async throws -> Voi
     try await resources.run(resources: [armResource], owner: lifecycleOwner(), lease: nil) {}
 }
 
-@Test(.timeLimit(.minutes(1))) func stopErrorAfterWriterJoinDoesNotPreventNextResourceUse() async throws {
+@Test(.actionCatalog, .timeLimit(.minutes(1))) func stopErrorAfterWriterJoinDoesNotPreventNextResourceUse() async throws
+{
     let resources = try ResourceCoordinator(definitions: [
         ResourceDefinition(
             id: armResource, allowedOwners: [.assistant, .photographer], preempts: [.assistant: [.photographer]]
@@ -181,7 +184,7 @@ private func lifecycleResources(stop: @escaping @Sendable () async throws -> Voi
     #expect(await executions.value == 1)
 }
 
-@Test(.timeLimit(.minutes(1)), arguments: ["agent", "session", "shutdown"])
+@Test(.actionCatalog, .timeLimit(.minutes(1)), arguments: ["agent", "session", "shutdown"])
 func cancelledResourceOwnerCleanupWaitsForAcknowledgmentAndAllowsAssistant(scope: String) async throws {
     let started = LifecycleGate()
     let stopping = LifecycleGate()
@@ -226,7 +229,7 @@ func cancelledResourceOwnerCleanupWaitsForAcknowledgmentAndAllowsAssistant(scope
     }
 }
 
-@Test(.timeLimit(.minutes(1)), arguments: ["release", "acquire"])
+@Test(.actionCatalog, .timeLimit(.minutes(1)), arguments: ["release", "acquire"])
 func cancelledLeaseCleanupPreservesAcknowledgedUnlock(operation: String) async throws {
     let stops = LifecycleCounter()
     let stopping = LifecycleGate()
@@ -263,7 +266,8 @@ func cancelledLeaseCleanupPreservesAcknowledgedUnlock(operation: String) async t
     try await resources.run(resources: [armResource], owner: lifecycleOwner(), lease: nil) {}
 }
 
-@Test(.timeLimit(.minutes(1))) func cancelledVisionOwnerRemovalAllowsNextAssistantAction() async throws {
+@Test(.actionCatalog, .timeLimit(.minutes(1))) func cancelledVisionOwnerRemovalAllowsNextAssistantAction() async throws
+{
     let started = LifecycleGate()
     let stopping = LifecycleGate()
     let finishStop = LifecycleGate()
@@ -329,16 +333,18 @@ func cancelledLeaseCleanupPreservesAcknowledgedUnlock(operation: String) async t
     await output.shutdown()
 }
 
-@Test(.timeLimit(.minutes(1))) func cancelledOwnerCleanupTimeoutEventuallyUnlocks() async throws {
+@Test(.actionCatalog, .timeLimit(.minutes(1))) func cancelledOwnerCleanupJoinsActualStopBeforeUnlocking() async throws {
     let started = LifecycleGate()
     let finishStop = LifecycleGate()
+    let stopStarted = LifecycleGate()
     let owner = lifecycleOwner(.photographer)
     let resources = try ResourceCoordinator(
         definitions: [
             ResourceDefinition(id: armResource, allowedOwners: [.assistant, .photographer]) {
+                await stopStarted.release()
                 await finishStop.wait()
             }
-        ], cleanupDeadline: .milliseconds(30))
+        ])
     let tracking = Task {
         try await resources.run(resources: [armResource], owner: owner, lease: nil) {
             await started.release()
@@ -350,13 +356,14 @@ func cancelledLeaseCleanupPreservesAcknowledgedUnlock(operation: String) async t
         withUnsafeCurrentTask { $0?.cancel() }
         await resources.close(sessionID: owner.sessionID)
     }
-    await closing.value
+    await stopStarted.wait()
     #expect(await resources.snapshot()[armResource] == .locked(owner))
     #expect(await resources.activeCleanupCount() == 1)
     await #expect(throws: ResourceError.busy) {
         try await resources.run(resources: [armResource], owner: lifecycleOwner(), lease: nil) {}
     }
     await finishStop.release()
+    await closing.value
     _ = await tracking.result
     for _ in 0..<10000 {
         if await resources.activeCleanupCount() == 0 { break }
@@ -367,7 +374,9 @@ func cancelledLeaseCleanupPreservesAcknowledgedUnlock(operation: String) async t
     try await resources.run(resources: [armResource], owner: lifecycleOwner(), lease: nil) {}
 }
 
-@Test(.timeLimit(.minutes(1))) func resourcePreemptionJoinsOldWriterAndRejectsReverseTakeover() async throws {
+@Test(.actionCatalog, .timeLimit(.minutes(1))) func resourcePreemptionJoinsOldWriterAndRejectsReverseTakeover()
+    async throws
+{
     let permitBox = LifecyclePermitBox()
     let group = ResourceID(rawValue: "device.writer")
     let resources = try ResourceCoordinator(
@@ -425,9 +434,12 @@ func cancelledLeaseCleanupPreservesAcknowledgedUnlock(operation: String) async t
     try await resources.run(resources: [armResource], owner: lifecycleOwner(.photographer), lease: nil) {}
 }
 
-@Test(.timeLimit(.minutes(1))) func resourcePreemptionTimeoutKeepsWholeWriterLockedUntilJoin() async throws {
+@Test(.actionCatalog, .timeLimit(.minutes(1))) func resourcePreemptionKeepsWholeWriterLockedUntilJoin()
+    async throws
+{
     let started = LifecycleGate()
     let releaseCleanup = LifecycleGate()
+    let cleanupStarted = LifecycleGate()
     let count = LifecycleCounter()
     let resources = try ResourceCoordinator(
         definitions: [armResource, secondResource].map {
@@ -435,22 +447,24 @@ func cancelledLeaseCleanupPreservesAcknowledgedUnlock(operation: String) async t
                 id: $0, allowedOwners: [.assistant, .photographer], executionGroup: armResource,
                 preempts: [.assistant: [.photographer]]
             ) {}
-        }, cleanupDeadline: .milliseconds(30))
+        })
     let old = Task {
         try await resources.run(resources: [armResource], owner: lifecycleOwner(.photographer), lease: nil) {
             await started.release()
             do { try await Task.sleep(for: .seconds(60)) } catch {
+                await cleanupStarted.release()
                 await releaseCleanup.wait()
                 throw error
             }
         }
     }
     await started.wait()
-    await #expect(throws: ResourceError.cleanupTimedOut) {
+    let replacement = Task {
         try await resources.run(resources: [secondResource], owner: lifecycleOwner(), lease: nil) {
             await count.increment()
         }
     }
+    await cleanupStarted.wait()
     #expect(await count.value == 0)
     #expect(await resources.snapshot().values.allSatisfy { lifecycleIsLocked($0) })
     await #expect(throws: ResourceError.busy) {
@@ -458,6 +472,7 @@ func cancelledLeaseCleanupPreservesAcknowledgedUnlock(operation: String) async t
     }
     await releaseCleanup.release()
     _ = await old.result
+    try await replacement.value
     for _ in 0..<100 {
         if await resources.activeCleanupCount() == 0 { break }
         try await Task.sleep(for: .milliseconds(10))
@@ -467,10 +482,10 @@ func cancelledLeaseCleanupPreservesAcknowledgedUnlock(operation: String) async t
     try await resources.run(resources: [secondResource], owner: lifecycleOwner(), lease: nil) {
         await count.increment()
     }
-    #expect(await count.value == 1)
+    #expect(await count.value == 2)
 }
 
-@Test(.timeLimit(.minutes(1))) func actionResultsRetryDeliveryWithoutRepeatingEffects() async throws {
+@Test(.actionCatalog, .timeLimit(.minutes(1))) func actionResultsRetryDeliveryWithoutRepeatingEffects() async throws {
     let manager = AgentManager()
     let agent = try ReceiptAgent(rejectOnce: true)
     let session = UUID()
@@ -505,7 +520,7 @@ func cancelledLeaseCleanupPreservesAcknowledgedUnlock(operation: String) async t
     }
 }
 
-@Test func resultAndActivityDeliveryNeverCrossAgentIncarnations() async throws {
+@Test(.actionCatalog) func resultAndActivityDeliveryNeverCrossAgentIncarnations() async throws {
     let manager = AgentManager()
     let old = try ReceiptAgent()
     let session = UUID()
@@ -536,7 +551,9 @@ func cancelledLeaseCleanupPreservesAcknowledgedUnlock(operation: String) async t
             == .accepted)
 }
 
-@Test(.timeLimit(.minutes(1))) func terminalSlotIsReservedBeforeActionAdmissionAndDoesNotHoldLane() async throws {
+@Test(.actionCatalog, .timeLimit(.minutes(1))) func terminalSlotIsReservedBeforeActionAdmissionAndDoesNotHoldLane()
+    async throws
+{
     let deliveryStarted = LifecycleGate()
     let releaseDelivery = LifecycleGate()
     let counter = LifecycleCounter()
@@ -566,7 +583,7 @@ func cancelledLeaseCleanupPreservesAcknowledgedUnlock(operation: String) async t
     await scheduler.finishResultDelivery()
 }
 
-@Test func activityStartReturnsAHandleWithoutWaitingForActivityTermination() async throws {
+@Test(.actionCatalog) func activityStartReturnsAHandleWithoutWaitingForActivityTermination() async throws {
     let activityID = UUID()
     let registry = try ActionRegistry(definitions: [
         ActionBinding(
@@ -583,7 +600,7 @@ func cancelledLeaseCleanupPreservesAcknowledgedUnlock(operation: String) async t
     #expect(await scheduler.resultSnapshot().last?.result?.completion == .activityStarted(activityID))
 }
 
-@Test func resourceGroupsRejectUnauthorizedPartialAcquisitionAndStaleRelease() async throws {
+@Test(.actionCatalog) func resourceGroupsRejectUnauthorizedPartialAcquisitionAndStaleRelease() async throws {
     let resources = try lifecycleResources()
     let owner = lifecycleOwner()
     await #expect(throws: ResourceError.unknownResource) {
@@ -635,7 +652,9 @@ private actor RevocationDevice {
     }
 }
 
-@Test(.timeLimit(.minutes(1))) func takeoverCancelsQueuedWorkAndJoinsDeviceStopBeforeGrant() async throws {
+@Test(.actionCatalog, .timeLimit(.minutes(1))) func takeoverCancelsQueuedWorkAndJoinsDeviceStopBeforeGrant()
+    async throws
+{
     let device = RevocationDevice()
     let resources = try lifecycleResources { await device.stop() }
     let registry = try ActionRegistry(definitions: [
@@ -669,15 +688,20 @@ private actor RevocationDevice {
     try await resources.release(replacement, owner: next)
 }
 
-@Test(.timeLimit(.minutes(1))) func cleanupTimeoutKeepsLockOnlyUntilActualCleanupFinishes() async throws {
+@Test(.actionCatalog, .timeLimit(.minutes(1))) func cleanupKeepsLockUntilActualCleanupFinishes() async throws {
     let releaseStop = LifecycleGate()
+    let stopStarted = LifecycleGate()
     let resources = try ResourceCoordinator(
         definitions: [
-            ResourceDefinition(id: armResource, allowedOwners: [.assistant]) { await releaseStop.wait() }
-        ], cleanupDeadline: .milliseconds(20))
-    await #expect(throws: ResourceError.cleanupTimedOut) {
+            ResourceDefinition(id: armResource, allowedOwners: [.assistant]) {
+                await stopStarted.release()
+                await releaseStop.wait()
+            }
+        ])
+    let acquiring = Task {
         try await resources.acquire(resources: [armResource], owner: lifecycleOwner(), duration: .seconds(10)) { _ in }
     }
+    await stopStarted.wait()
     #expect(lifecycleIsLocked(await resources.snapshot()[armResource]))
     await #expect(throws: ResourceError.busy) {
         _ = try await resources.acquire(resources: [armResource], owner: lifecycleOwner(), duration: .seconds(10)) {
@@ -685,6 +709,8 @@ private actor RevocationDevice {
         }
     }
     await releaseStop.release()
+    let acquired = try await acquiring.value
+    try await resources.release(acquired, owner: acquired.owner)
     for _ in 0..<10000 {
         if await resources.activeCleanupCount() == 0 { break }
         await Task.yield()
@@ -696,7 +722,7 @@ private actor RevocationDevice {
     try await resources.release(lease, owner: owner)
 }
 
-@Test(.timeLimit(.minutes(1))) func leasesExpireAndStopWithoutAnotherCaller() async throws {
+@Test(.actionCatalog, .timeLimit(.minutes(1))) func leasesExpireAndStopWithoutAnotherCaller() async throws {
     let expirationStop = LifecycleGate()
     let count = LifecycleCounter()
     let resources = try lifecycleResources {
@@ -717,7 +743,7 @@ private actor RevocationDevice {
     }
 }
 
-@Test func protectedToolResolvesSharedDefinitionResourcesBeforeExecution() async throws {
+@Test(.actionCatalog) func protectedToolResolvesSharedDefinitionResourcesBeforeExecution() async throws {
     let resources = try lifecycleResources()
     let original = lifecycleOwner()
     let lease = try await resources.acquire(resources: [armResource], owner: original, duration: .seconds(10)) { _ in }
@@ -748,7 +774,7 @@ private actor RevocationDevice {
     try await resources.release(lease, owner: original)
 }
 
-@Test func controlPortsAreBoundToTheirAgentIncarnation() async throws {
+@Test(.actionCatalog) func controlPortsAreBoundToTheirAgentIncarnation() async throws {
     let resources = try lifecycleResources()
     let manager = AgentManager()
     let agent = try ReceiptAgent()
@@ -767,7 +793,9 @@ private actor RevocationDevice {
     #expect(await resources.snapshot()[armResource] == .unlocked)
 }
 
-@Test(.timeLimit(.minutes(1))) func sessionCloseStopsResourceBeforeJoiningCancelledHandler() async throws {
+@Test(.actionCatalog, .timeLimit(.minutes(1))) func sessionCloseStopsResourceBeforeJoiningCancelledHandler()
+    async throws
+{
     let device = RevocationDevice()
     let resources = try lifecycleResources { await device.stop() }
     let registry = try ActionRegistry(definitions: [
@@ -792,7 +820,7 @@ private actor RevocationDevice {
     #expect(await scheduler.diagnosticSnapshot().records.last?.phase == .cancelled)
 }
 
-@Test func activityCompletionMustMatchItsRegisteredKind() async throws {
+@Test(.actionCatalog) func activityCompletionMustMatchItsRegisteredKind() async throws {
     let registry = try ActionRegistry(definitions: [
         ActionBinding(
             path: lifecyclePath, displayName: "测试动作", kind: .finite, completion: "Finite operation.",
@@ -805,7 +833,7 @@ private actor RevocationDevice {
     }
 }
 
-@Test func failedActionReportsReachTheAgentWithoutAllowingSuccessOnlyCompletion() async throws {
+@Test(.actionCatalog) func failedActionReportsReachTheAgentWithoutAllowingSuccessOnlyCompletion() async throws {
     let manager = AgentManager()
     let agent = try ReceiptAgent()
     let session = UUID()
@@ -840,7 +868,7 @@ private actor RevocationDevice {
 
 private struct DynamicResourceToolFixture: ToolModule { let definitions: [ActionBinding] }
 
-@Test func scheduledFeedbackPreservesInitiatingCausalChainAfterInputExpiry() async throws {
+@Test(.actionCatalog) func scheduledFeedbackPreservesInitiatingCausalChainAfterInputExpiry() async throws {
     let session = UUID()
     let agent = try ReceiptAgent()
     let manager = AgentManager()
@@ -880,8 +908,9 @@ private struct DynamicResourceToolFixture: ToolModule { let definitions: [Action
     try await manager.stop(.assistant)
 }
 
-@Test(arguments: [-1, 0, 7, 8]) func activityFeedbackPreservesCausalityAndClosesExhaustedHops(_ hops: Int) async throws
-{
+@Test(.actionCatalog, arguments: [-1, 0, 7, 8]) func activityFeedbackPreservesCausalityAndClosesExhaustedHops(
+    _ hops: Int
+) async throws {
     let session = UUID()
     let agent = try ReceiptAgent()
     let manager = AgentManager()
@@ -907,4 +936,65 @@ private struct DynamicResourceToolFixture: ToolModule { let definitions: [Action
         status: .succeeded, effect: .contractCompleted, completion: .completed)
     #expect(await gateway.deliverActionResult(action) == ((0..<8).contains(hops) ? .accepted : .closed))
     try await manager.stop(.assistant)
+}
+
+private actor ProducerCancellationProbe {
+    let entered = AsyncStream<String>.makeStream(bufferingPolicy: .bufferingOldest(4))
+    var cleaned: Set<String> = []
+    func run(_ id: String) async throws -> ActionCompletion {
+        entered.continuation.yield(id)
+        do { try await Task.sleep(for: .seconds(60)) } catch {
+            cleaned.insert(id)
+            throw error
+        }
+        return .completed
+    }
+}
+
+@Test(.actionCatalog, .timeLimit(.minutes(1)))
+func hostProducerCancellationPreservesOtherSessionAndOtherAgent() async throws {
+    let probe = ProducerCancellationProbe()
+    let manager = AgentManager()
+    let agent = try ReceiptAgent()
+    let other = try ReceiptAgent(id: otherAgent)
+    try await manager.register(agent)
+    try await manager.register(other)
+    try await manager.start(.assistant)
+    try await manager.start(otherAgent)
+    let registry = try ActionRegistry(definitions: [
+        ActionBinding(
+            path: lifecyclePath, displayName: "Fixture", kind: .finite, completion: "Actual completion.",
+            completing: { invocation in try await probe.run(try #require(invocation.call.parameters["id"])) })
+    ])
+    let scheduler = ChannelScheduler(registry: registry)
+    let gateway = OutputGateway(
+        manager: manager, requests: InputGateway(manager: manager), tools: ToolRegistry(),
+        actions: scheduler, sink: { _ in })
+    let session = UUID()
+    let assistantIdentity = try await manager.identity(.assistant)
+    let otherIdentity = try await manager.identity(otherAgent)
+    var original: OutputEnvelope?
+    for (id, owner) in [
+        ("current", ExecutionOwner(agent: .assistant, incarnation: assistantIdentity, sessionID: session)),
+        ("otherSession", ExecutionOwner(agent: .assistant, incarnation: assistantIdentity, sessionID: UUID())),
+        ("otherAgent", ExecutionOwner(agent: otherAgent, incarnation: otherIdentity, sessionID: session)),
+    ] {
+        let input = AgentInput(sessionID: owner.sessionID, payload: .text(id))
+        let envelope = OutputEnvelope(
+            source: owner.agent, input: input,
+            output: .actionCall(ActionCall(actionPath: lifecyclePath, channel: "Control", parameters: ["id": id])))
+        if id == "current" { original = envelope }
+        try await scheduler.enqueue(invocation: ScheduledAction(envelope: envelope, owner: owner, feedback: .none))
+    }
+    var entered = probe.entered.stream.makeAsyncIterator()
+    for _ in 0..<3 { _ = await entered.next() }
+    try await gateway.cancelCalls(for: agent, sessionID: session)
+    #expect(await probe.cleaned == ["current"])
+    let cancelled = try #require(original)
+    await #expect(throws: CancellationError.self) {
+        try await scheduler.finish(inputID: cancelled.schedulingID, source: .assistant)
+    }
+    await gateway.shutdown()
+    #expect(await probe.cleaned == ["current", "otherSession", "otherAgent"])
+    await manager.stopAll()
 }

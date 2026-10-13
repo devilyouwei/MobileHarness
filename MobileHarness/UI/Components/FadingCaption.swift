@@ -7,25 +7,20 @@
         let text: String
         let reduceMotion: Bool
         var color: Color = .white
-        @State private var characters: [Character] = []
-        @State private var arrivals: [Date] = []
-        @State private var animating = false
+        @State private var displayed = ""
+        @State private var prefix = ""
+        @State private var suffix = ""
+        @State private var suffixOpacity = 1.0
 
         var body: some View {
             ScrollViewReader { proxy in
                 ScrollView {
-                    TimelineView(.animation(minimumInterval: 1.0 / 30, paused: !animating || reduceMotion)) {
-                        timeline in
-                        characters.indices.reduce(Text("")) { result, index in
-                            let age = timeline.date.timeIntervalSince(arrivals[index])
-                            let opacity = reduceMotion ? 1 : min(1, max(0.1, age / 0.4))
-                            return result + Text(String(characters[index])).foregroundColor(color.opacity(opacity))
-                        }
+                    (Text(prefix).foregroundColor(color)
+                        + Text(suffix).foregroundColor(color.opacity(suffixOpacity)))
                         .font(.system(.title3, design: .default, weight: .medium))
                         .multilineTextAlignment(.center).lineSpacing(7)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 18)
-                    }
                     Color.clear.frame(height: 1).id("captionEnd")
                 }
                 .scrollIndicators(.hidden)
@@ -45,17 +40,21 @@
                 }
                 .onChange(of: text, initial: true) { _, new in
                     let next = Array(new.suffix(320))
-                    let prefix = zip(characters, next).prefix { $0 == $1 }.count
-                    arrivals = Array(arrivals.prefix(prefix)) + Array(repeating: Date(), count: next.count - prefix)
-                    characters = next
-                    animating = true
+                    let stable = zip(Array(displayed), next).prefix { $0 == $1 }.count
+                    prefix = String(next.prefix(stable))
+                    suffix = String(next.dropFirst(stable))
+                    displayed = String(next)
+                    var transaction = Transaction()
+                    transaction.disablesAnimations = true
+                    withTransaction(transaction) { suffixOpacity = reduceMotion ? 1 : 0.15 }
                     withAnimation(reduceMotion ? nil : .easeOut(duration: 0.25)) {
                         proxy.scrollTo("captionEnd", anchor: .bottom)
                     }
                 }
                 .task(id: text) {
-                    do { try await Task.sleep(for: .milliseconds(450)) } catch { return }
-                    animating = false
+                    await Task.yield()
+                    guard !Task.isCancelled else { return }
+                    withAnimation(reduceMotion ? nil : .easeOut(duration: 0.25)) { suffixOpacity = 1 }
                 }
             }
             .accessibilityElement(children: .ignore)

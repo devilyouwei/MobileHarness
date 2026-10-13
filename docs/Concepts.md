@@ -19,7 +19,7 @@ The biological analogy describes functional organization: sensing provides signa
 
 Publication selects declared subscribers; directed delivery selects an explicit recipient. Admission means acceptance for processing rather than completed inference or behavior. Agent messages and Tool/Action results return through the input boundary.
 
-Function Token is a mixed natural-text/XML behavior protocol, not a tokenizer token. Agents interpret it and resolve aliases before execution. A Channel is a task-local Action ordering scope. A wait group joins relevant Action work without making unrelated tasks share a global barrier. Native ToolCall bypasses Channel queues only when its binding selects direct execution; scheduled native bindings use the shared scheduler. Both enforce permission/resource checks.
+Function Token is a mixed natural-text/XML behavior protocol, not a tokenizer token. Agents interpret it and resolve aliases before execution. A Channel is a task-local Action ordering scope. A wait group joins relevant Action work without making unrelated tasks share a global barrier. Native ToolCall executes directly outside Channel queues; scheduled native bindings reject. Both enforce permission/resource checks. Different Channels/tasks may run concurrently; resource conflicts fail explicitly unless host policy configures takeover.
 
 A capability call is foundational processing, such as inference or data retention. A business effect, such as playback, UI presentation or robot movement, is a registered Action invoked through an authorized call protocol. This distinction keeps model computation separate from effect authorization.
 
@@ -54,3 +54,11 @@ The active [Signal contract](../MobileHarness/README.md#unified-signal-contract)
 ## Frontend and Agent backend
 
 ✅ Signal/Action describes the Agent boundary, not every UI event. Like a web frontend, UI owns local navigation, drafts, filtering, selection and rendering. Explicit data/resource/history/camera/device requests publish directly to their owning Agent. Conversation enters Assistant, which may delegate actual tasks. Agent-initiated presentation still uses authorized UI Action functions over the same presentation state; local touch interaction does not create a backend task merely to reuse a UI operation. App owns native lifecycle and immediate cleanup.
+
+## Assistant Skills / Task Modes（2026-10-11）
+
+✅ 当前对话入口收敛为 Assistant，通过纯资源 Skill 加载动态函数和单前台任务上下文；三个专用角色保留确定性流程。旧多 Chat Agent 对话委派说明由 [ADR0212](adr/0212-assistant-skills-task-modes.md) 替代。❌ 真机摄影、语音竞争与模式切换验收待完成；没有远程 Skill、任务栈或新第三方依赖。
+
+## Task 与 Skill 的独立语义
+
+Task 表示任意目标及其状态/上下文；Skill 表示可复用流程和函数绑定。单前台任务与独立后台任务分离；后台通过 send 接纳、显式进度和终态通信。Skill 有基础、决策链、任务三种所有权。Mode 不再是资源配置，任务执行类型按前台/后台记录。

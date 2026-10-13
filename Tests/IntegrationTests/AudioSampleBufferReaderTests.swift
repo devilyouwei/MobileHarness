@@ -48,7 +48,7 @@ private func makeNativeAudioSample(channels: Int = 4, planar: Bool) throws -> CM
     return try #require(sample)
 }
 
-@Test func nativeAudioReaderAcceptsFourInterleavedChannelsInOneBuffer() throws {
+@Test(.actionCatalog) func nativeAudioReaderAcceptsFourInterleavedChannelsInOneBuffer() throws {
     let sample = try makeNativeAudioSample(planar: false)
     let values = try AudioSampleBufferReader.withAudioBuffers(from: sample) { buffers in
         #expect(buffers.count == 1)
@@ -60,7 +60,7 @@ private func makeNativeAudioSample(channels: Int = 4, planar: Bool) throws -> CM
     #expect(values == (0..<32).map { Float($0) / 64 })
 }
 
-@Test func nativeAudioReaderPreservesFourPlanarBuffersAndTheirSamples() throws {
+@Test(.actionCatalog) func nativeAudioReaderPreservesFourPlanarBuffersAndTheirSamples() throws {
     let sample = try makeNativeAudioSample(planar: true)
     let values = try AudioSampleBufferReader.withAudioBuffers(from: sample) { buffers in
         #expect(buffers.count == 4)
@@ -74,7 +74,7 @@ private func makeNativeAudioSample(channels: Int = 4, planar: Bool) throws -> CM
     #expect(values == (0..<32).map { Float($0) / 64 })
 }
 
-@Test func nativeAudioReaderRejectsMoreThanFourBuffersBeforeCallingReader() throws {
+@Test(.actionCatalog) func nativeAudioReaderRejectsMoreThanFourBuffersBeforeCallingReader() throws {
     let sample = try makeNativeAudioSample(channels: 5, planar: true)
     #expect(throws: AudioSampleBufferReader.BufferListError.invalidSize(AudioBufferList.sizeInBytes(maximumBuffers: 5)))
     {
@@ -84,7 +84,7 @@ private func makeNativeAudioSample(channels: Int = 4, planar: Bool) throws -> CM
     }
 }
 
-@Test func nativeAudioReaderPreservesReadFailureAndCanReadAgain() throws {
+@Test(.actionCatalog) func nativeAudioReaderPreservesReadFailureAndCanReadAgain() throws {
     let sample = try makeNativeAudioSample(planar: false)
     #expect(throws: NativeAudioReaderFixtureError.self) {
         try AudioSampleBufferReader.withAudioBuffers(from: sample) { _ in

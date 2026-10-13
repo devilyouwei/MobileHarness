@@ -58,7 +58,7 @@ private actor ControlledPose: PoseCapability {
     }
 }
 
-@Test(.timeLimit(.minutes(1))) func visionKeepsOnlyLatestAndNeverOverlapsOrReplays() async throws {
+@Test(.actionCatalog, .timeLimit(.minutes(1))) func visionKeepsOnlyLatestAndNeverOverlapsOrReplays() async throws {
     let model = ControlledPose()
     let session = UUID()
     let agent = try VisionPerceptionAgent(
@@ -102,7 +102,8 @@ private actor ControlledPose: PoseCapability {
     await agent.stop()
 }
 
-@Test(.timeLimit(.minutes(1))) func visionInfersNewestCaptureRegardlessOfGrayscaleChange() async throws {
+@Test(.actionCatalog, .timeLimit(.minutes(1))) func visionInfersNewestCaptureRegardlessOfGrayscaleChange() async throws
+{
     let model = ControlledPose()
     let session = UUID()
     let agent = try VisionPerceptionAgent(pose: model, sessionID: session)
@@ -127,7 +128,9 @@ private actor ControlledPose: PoseCapability {
     await stopping.value
 }
 
-@Test(.timeLimit(.minutes(1))) func visionPauseKeepsLatestAndStopSuppressesLateModelOutput() async throws {
+@Test(.actionCatalog, .timeLimit(.minutes(1))) func visionPauseKeepsLatestAndStopSuppressesLateModelOutput()
+    async throws
+{
     let model = ControlledPose()
     let session = UUID()
     let agent = try VisionPerceptionAgent(
@@ -168,7 +171,7 @@ private actor OverlayRecorder {
     func record(_ value: UInt64) { sequences.append(value) }
 }
 
-@Test(.timeLimit(.minutes(1)), arguments: [false, true])
+@Test(.actionCatalog, .timeLimit(.minutes(1)), arguments: [false, true])
 func sharedPosePublishesAndVisualizesWithoutRequiringSubscribers(withSubscribers: Bool) async throws {
     let session = UUID()
     let manager = AgentManager()
@@ -267,7 +270,7 @@ func sharedPosePublishesAndVisualizesWithoutRequiringSubscribers(withSubscribers
     await output.shutdown()
 }
 
-@Test func poseToolRejectsMalformedPayloadBeforePresentation() async throws {
+@Test(.actionCatalog) func poseToolRejectsMalformedPayloadBeforePresentation() async throws {
     let input = AgentInput(sessionID: UUID(), payload: .text("test"))
     let call = ToolCall(
         toolPath: "UI.Pose.showPose",
@@ -289,7 +292,7 @@ func sharedPosePublishesAndVisualizesWithoutRequiringSubscribers(withSubscribers
     #expect(point.sensorPoint(rotation: 3).x == 0.25)
 }
 
-@Test func visionOutputsAreCodeOwnedPermissions() throws {
+@Test(.actionCatalog) func visionOutputsAreCodeOwnedPermissions() throws {
     let config = try AgentConfigurations.load(named: "VisionPerception")
     #expect(config.capabilities.actions.isEmpty && config.capabilities.tools.isEmpty)
     let agent = try VisionPerceptionAgent(pose: CrowdPose(), sessionID: UUID())
@@ -309,7 +312,8 @@ private struct CrowdPose: PoseCapability {
     }
 }
 
-@Test(.timeLimit(.minutes(1))) func visionCrowdFitsToolProtocolWithoutSubscribersAndRejectsForeignSession()
+@Test(.actionCatalog, .timeLimit(.minutes(1)))
+func visionCrowdFitsToolProtocolWithoutSubscribersAndRejectsForeignSession()
     async throws
 {
     let session = UUID()
@@ -350,7 +354,9 @@ private struct CrowdPose: PoseCapability {
     await agent.stop()
 }
 
-@Test(.timeLimit(.minutes(1))) func visionSlowDisplayKeepsOnlyLatestWithoutFailingPerception() async throws {
+@Test(.actionCatalog, .timeLimit(.minutes(1))) func visionSlowDisplayKeepsOnlyLatestWithoutFailingPerception()
+    async throws
+{
     let session = UUID()
     let agent = try VisionPerceptionAgent(pose: EmptyPose(), sessionID: session)
     try await agent.start()
@@ -400,7 +406,9 @@ private func nativeCameraInput(
         width: width, height: height, gray64: sample, attachment: CameraImageAttachment(frame: frame),
         sequence: sequence, timestamp: time, rotation: rotation, capturedAt: capturedAt)
 }
-@Test(.timeLimit(.minutes(1))) func visionResolvesOpaqueInputWithoutCopyingMediaIntoObservation() async throws {
+@Test(.actionCatalog, .timeLimit(.minutes(1))) func visionResolvesOpaqueInputWithoutCopyingMediaIntoObservation()
+    async throws
+{
     let model = ControlledPose()
     let session = UUID()
     let agent = try VisionPerceptionAgent(pose: model, sessionID: session)
@@ -431,7 +439,7 @@ private func nativeCameraInput(
     await agent.stop()
 }
 
-@Test func visionCadenceAdmitsStationaryFramesAndLimitsChangedFrames() throws {
+@Test(.actionCatalog) func visionCadenceAdmitsStationaryFramesAndLimitsChangedFrames() throws {
     var cadence = FrameCadence(configuration: try FrameSamplingConfiguration())
     func frame(_ sequence: UInt64, _ time: Double, _ gray: UInt8) throws -> ImageInput {
         try ImageInput(
@@ -475,7 +483,9 @@ private actor BlockedPosePublication {
     }
 }
 
-@Test(.timeLimit(.minutes(1))) func slowSubscriberDoesNotBlockInferenceDisplayOrLaterPublications() async throws {
+@Test(.actionCatalog, .timeLimit(.minutes(1))) func slowSubscriberDoesNotBlockInferenceDisplayOrLaterPublications()
+    async throws
+{
     let session = UUID()
     let port = BlockedPosePublication()
     let agent = try VisionPerceptionAgent(pose: EmptyPose(), sessionID: session)
@@ -526,7 +536,8 @@ private struct FailingSecondPose: PoseCapability {
     }
 }
 
-@Test(.timeLimit(.minutes(1))) func visualTerminalErrorSurvivesPendingSkeletonReplacement() async throws {
+@Test(.actionCatalog, .timeLimit(.minutes(1))) func visualTerminalErrorSurvivesPendingSkeletonReplacement() async throws
+{
     let session = UUID()
     let agent = try VisionPerceptionAgent(pose: FailingSecondPose(), sessionID: session)
     try await agent.start()
@@ -556,7 +567,9 @@ private struct FailingSecondPose: PoseCapability {
     await agent.stop()
 }
 
-@Test(.timeLimit(.minutes(1))) func visionAcceptsTerminalReceiptsWithoutBlockingFrameAdmission() async throws {
+@Test(.actionCatalog, .timeLimit(.minutes(1))) func visionAcceptsTerminalReceiptsWithoutBlockingFrameAdmission()
+    async throws
+{
     let session = UUID()
     let agent = try VisionPerceptionAgent(pose: EmptyPose(), sessionID: session)
     let manager = AgentManager()
@@ -586,7 +599,7 @@ private struct FailingSecondPose: PoseCapability {
     try await manager.remove(.visionPerception)
 }
 
-@Test(.timeLimit(.minutes(1))) func rejectingPhotographerCannotStopPoseDisplay() async throws {
+@Test(.actionCatalog, .timeLimit(.minutes(1))) func rejectingPhotographerCannotStopPoseDisplay() async throws {
     let session = UUID()
     let agent = try VisionPerceptionAgent(pose: CrowdPose(), sessionID: session)
     try await agent.bind(
@@ -614,7 +627,8 @@ private struct FailingSecondPose: PoseCapability {
     await agent.stop()
 }
 
-@Test(.timeLimit(.minutes(1))) func visionStatisticsMeasureCaptureToResultThroughPoseTool() async throws {
+@Test(.actionCatalog, .timeLimit(.minutes(1))) func visionStatisticsMeasureCaptureToResultThroughPoseTool() async throws
+{
     let session = UUID()
     let agent = try VisionPerceptionAgent(pose: EmptyPose(), sessionID: session)
     try await agent.bind(AgentMessaging { _, _, _ in DeliveryReport() })
@@ -653,7 +667,7 @@ private struct FailingSecondPose: PoseCapability {
     await agent.stop()
 }
 
-@Test func poseStatisticsRemainOptionalAndRejectInvalidMeasurements() throws {
+@Test(.actionCatalog) func poseStatisticsRemainOptionalAndRejectInvalidMeasurements() throws {
     let legacy = Data(#"{"sequence":1,"timestamp":0,"rotation":0,"people":[]}"#.utf8)
     #expect(try JSONDecoder().decode(UI.PoseOverlay.self, from: legacy).statistics == nil)
     #expect(try JSONDecoder().decode(Actions.PoseOverlay.self, from: legacy).statistics == nil)
@@ -686,7 +700,7 @@ private func cadencePose(
         })
 }
 
-@Test func visionAdaptiveCadenceSlowsStablePoseThenAcceleratesMotionAndConfidenceLoss() throws {
+@Test(.actionCatalog) func visionAdaptiveCadenceSlowsStablePoseThenAcceleratesMotionAndConfidenceLoss() throws {
     var cadence = FrameCadence(configuration: try FrameSamplingConfiguration())
     for step in 0...20 {
         try cadence.observe(cadencePose(time: Double(step) * 0.1), inferenceDuration: 0.01)
@@ -699,7 +713,7 @@ private func cadencePose(
     #expect(cadence.interval == 0)
 }
 
-@Test func visionAdaptiveCadenceAssociatesReorderedPeopleAndIgnoresSmallJitter() throws {
+@Test(.actionCatalog) func visionAdaptiveCadenceAssociatesReorderedPeopleAndIgnoresSmallJitter() throws {
     var cadence = FrameCadence(configuration: try FrameSamplingConfiguration())
     for step in 0...20 {
         let offsets: [Float] = step.isMultiple(of: 2) ? [0, 200] : [201, 1]
@@ -710,7 +724,7 @@ private func cadencePose(
     #expect(cadence.interval == 0)
 }
 
-@Test func visionAdaptiveCadenceRecoversLostPeopleThenKeepsSearching() throws {
+@Test(.actionCatalog) func visionAdaptiveCadenceRecoversLostPeopleThenKeepsSearching() throws {
     var cadence = FrameCadence(configuration: try FrameSamplingConfiguration())
     try cadence.observe(cadencePose(time: 0), inferenceDuration: 0.01)
     try cadence.observe(cadencePose(time: 0.1, offsets: []), inferenceDuration: 0.01)
@@ -725,7 +739,7 @@ private func cadencePose(
     #expect(cadence.interval == 0)
 }
 
-@Test func visionAdaptiveCadenceRespectsInferenceCostBoundsAndResetsGeometry() throws {
+@Test(.actionCatalog) func visionAdaptiveCadenceRespectsInferenceCostBoundsAndResetsGeometry() throws {
     var cadence = FrameCadence(configuration: try FrameSamplingConfiguration())
     try cadence.observe(cadencePose(time: 0), inferenceDuration: 0.4, totalLatency: 0.6)
     #expect(cadence.interval == 0.25)
@@ -746,7 +760,7 @@ private func cadencePose(
     #expect(throws: ImageInputError.invalidFrame) { try FrameSamplingConfiguration(initialInterval: .infinity) }
 }
 
-@Test func visionAdaptiveCadenceUsesMonotonicStartGapWithoutReplayingSkippedFrames() throws {
+@Test(.actionCatalog) func visionAdaptiveCadenceUsesMonotonicStartGapWithoutReplayingSkippedFrames() throws {
     var cadence = FrameCadence(configuration: try FrameSamplingConfiguration())
     let now = ContinuousClock.now
     #expect(try cadence.accepts(image(0, sequence: 1), at: now))
@@ -758,7 +772,7 @@ private func cadencePose(
     }
 }
 
-@Test func visionAdaptiveUrgentCadenceAdmitsNextFreshFrameWithoutArtificialGap() throws {
+@Test(.actionCatalog) func visionAdaptiveUrgentCadenceAdmitsNextFreshFrameWithoutArtificialGap() throws {
     var cadence = FrameCadence(configuration: try FrameSamplingConfiguration())
     let now = ContinuousClock.now
     let baseline = [UInt8](repeating: 100, count: 4096)
@@ -778,7 +792,7 @@ private func cadencePose(
             at: now.advanced(by: .milliseconds(16))))
 }
 
-@Test func poseAdaptiveIntervalStatisticsPreserveLegacyPayloadsAndBounds() throws {
+@Test(.actionCatalog) func poseAdaptiveIntervalStatisticsPreserveLegacyPayloadsAndBounds() throws {
     let legacy = UI.PoseOverlay(
         sequence: 1, timestamp: 0, rotation: 0, people: [],
         statistics: UI.PoseOverlay.Statistics(
@@ -829,7 +843,7 @@ private func motionPatch(_ value: UInt8, x: ClosedRange<Int>, y: ClosedRange<Int
     return pixels
 }
 
-@Test func visionImageMotionWeightsPersonRegionsAndDiscoversGlobalChanges() throws {
+@Test(.actionCatalog) func visionImageMotionWeightsPersonRegionsAndDiscoversGlobalChanges() throws {
     let baseline = [UInt8](repeating: 100, count: 4096)
     var person = try quietMotionCadence()
     #expect(try person.accepts(motionFrame(baseline, sequence: 1, time: 2)))
@@ -845,7 +859,7 @@ private func motionPatch(_ value: UInt8, x: ClosedRange<Int>, y: ClosedRange<Int
     #expect(background.interval < 0.1)
 }
 
-@Test func visionImageMotionAccumulatesAgainstInferenceReferenceInsteadOfSkippedFrames() throws {
+@Test(.actionCatalog) func visionImageMotionAccumulatesAgainstInferenceReferenceInsteadOfSkippedFrames() throws {
     var cadence = try quietMotionCadence()
     #expect(try cadence.accepts(motionFrame([UInt8](repeating: 100, count: 4096), sequence: 1, time: 2)))
     for (sequence, change) in [(2, 2), (3, 4), (4, 6)] {
@@ -858,7 +872,7 @@ private func motionPatch(_ value: UInt8, x: ClosedRange<Int>, y: ClosedRange<Int
     #expect(try #require(cadence.imageActivity) >= 0.1)
 }
 
-@Test func visionImageMotionSuppressesExposureContrastNoiseAndGeometryMismatch() throws {
+@Test(.actionCatalog) func visionImageMotionSuppressesExposureContrastNoiseAndGeometryMismatch() throws {
     var cadence = try quietMotionCadence()
     let baseline = (0..<4096).map { UInt8(30 + ($0 % 64) * 2) }
     #expect(try cadence.accepts(motionFrame(baseline, sequence: 1, time: 2)))
@@ -872,7 +886,7 @@ private func motionPatch(_ value: UInt8, x: ClosedRange<Int>, y: ClosedRange<Int
     #expect(cadence.imageActivity == nil)
 }
 
-@Test func visionImageMotionCannotOverrideComputeOrFreshnessBudgets() throws {
+@Test(.actionCatalog) func visionImageMotionCannotOverrideComputeOrFreshnessBudgets() throws {
     var cadence = try quietMotionCadence()
     try cadence.observeTiming(inferenceDuration: 0.4, totalLatency: 0.6)
     let now = ContinuousClock.now
@@ -893,7 +907,7 @@ private func motionPatch(_ value: UInt8, x: ClosedRange<Int>, y: ClosedRange<Int
             at: now.advanced(by: .seconds(1))))
 }
 
-@Test func visionLatencyFeedbackDistinguishesUpstreamDelayFromInferencePressure() throws {
+@Test(.actionCatalog) func visionLatencyFeedbackDistinguishesUpstreamDelayFromInferencePressure() throws {
     var delayed = try quietMotionCadence()
     try delayed.observe(cadencePose(time: 2.1), inferenceDuration: 0.01, totalLatency: 0.6)
     #expect(delayed.interval <= 0.1)
@@ -906,7 +920,9 @@ private func motionPatch(_ value: UInt8, x: ClosedRange<Int>, y: ClosedRange<Int
     #expect(throws: ImageInputError.invalidFrame) { try FrameSamplingConfiguration(maximumObservationLatency: .nan) }
 }
 
-@Test(.timeLimit(.minutes(1))) func visionDiscardsOverBudgetResultsWithoutPublishingAndRecovers() async throws {
+@Test(.actionCatalog, .timeLimit(.minutes(1))) func visionDiscardsOverBudgetResultsWithoutPublishingAndRecovers()
+    async throws
+{
     // A small RGB fixture and wider capture-to-result budget tolerate parallel admission load.
     let model = ControlledPose()
     let session = UUID()
@@ -942,7 +958,7 @@ private func motionPatch(_ value: UInt8, x: ClosedRange<Int>, y: ClosedRange<Int
     await agent.stop()
 }
 
-@Test func poseImageMotionStatisticsRejectOutOfRangeAndNonfiniteActivity() throws {
+@Test(.actionCatalog) func poseImageMotionStatisticsRejectOutOfRangeAndNonfiniteActivity() throws {
     for activity in [-0.1, 1.1, Double.nan, Double.infinity] {
         let statistics = Actions.PoseOverlay.Statistics(
             queueMilliseconds: nil, inferenceMilliseconds: 1, totalMilliseconds: nil,
@@ -959,7 +975,7 @@ private func motionPatch(_ value: UInt8, x: ClosedRange<Int>, y: ClosedRange<Int
     #expect(decoded.statistics?.isValid == true)
 }
 
-@Test func poseSharedJointRejectsMalformedArraysWithoutAgentErrors() throws {
+@Test(.actionCatalog) func poseSharedJointRejectsMalformedArraysWithoutAgentErrors() throws {
     let decoder = JSONDecoder()
     #expect(
         try decoder.decode(UI.PoseOverlay.Joint.self, from: Data("[1,2,3]".utf8))
@@ -972,7 +988,7 @@ private func motionPatch(_ value: UInt8, x: ClosedRange<Int>, y: ClosedRange<Int
     }
 }
 
-@Test(.timeLimit(.minutes(1))) func visionRejectsMismatchedCaptureBeforeCallingModel() async throws {
+@Test(.actionCatalog, .timeLimit(.minutes(1))) func visionRejectsMismatchedCaptureBeforeCallingModel() async throws {
     let model = ControlledPose()
     let session = UUID()
     let agent = try VisionPerceptionAgent(pose: model, sessionID: session)

@@ -95,7 +95,7 @@ OutputMailbox has 18 total slots shared by discrete output and the `overlay`/`ga
 
 ## Function and communication registration
 
-Model exposure comes from [VisionPerception.agent.json](VisionPerception.agent.json); code-owned internal permissions are separate. Empty Channel groups declare Channels without exposing a function.
+Model exposure comes from [../../Resources/Agents/VisionPerception/Agent.json](../../Resources/Agents/VisionPerception/Agent.json); code-owned internal permissions are separate. Empty Channel groups declare Channels without exposing a function.
 
 ### Model functions
 
@@ -134,3 +134,10 @@ Publication is one-way and has no recipient acknowledgment. Directed send return
 ## Related design
 
 [Parent design](../README.md)
+
+
+## 固定函数与 Skill
+
+✅ 资源不再包含 Permissions.json，Agent.json 的 baseSkills 引用 Skill，Skill.json 声明函数。业务模型函数由已加载 Skill 提供；固定调用与模型轮次分别验证，详见 [资源规范](../../Resources/Agents/README.md)。
+
+✅ ModelKit requests retain input/request identity and pass the Agent-owned session as opaque InferenceContext.scopeID. Conversation/session validation and policy stay in this calling Agent; no business scope semantics are delegated to ModelKit.

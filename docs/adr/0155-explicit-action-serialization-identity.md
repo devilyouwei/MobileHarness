@@ -1,6 +1,6 @@
 # ADR0155 — Explicit Action serialization identity
 
-Status: implemented scheduling prerequisite; three-level Path migration remains pending.
+Status: historical; superseded by [ADR0213](0213-channel-owned-action-ordering.md). The decision and verification below describe the earlier implementation.
 
 ## Context
 

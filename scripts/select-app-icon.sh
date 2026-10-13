@@ -3,12 +3,12 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 if [[ $# -ne 1 ]]; then
-    echo "Usage: $0 {original|robot-camera}" >&2
+    echo "Usage: $0 {original|robot-camera|lamp-arm}" >&2
     exit 1
 fi
 case "$1" in
-    original|robot-camera) ;;
-    *) echo "Unknown icon: $1. Choose original or robot-camera." >&2; exit 1 ;;
+    original|robot-camera|lamp-arm) ;;
+    *) echo "Unknown icon: $1. Choose original, robot-camera or lamp-arm." >&2; exit 1 ;;
 esac
 
 cp "MobileHarness/Resources/AppIconVariants/$1.png" \

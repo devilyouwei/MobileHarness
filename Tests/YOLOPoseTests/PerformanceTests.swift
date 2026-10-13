@@ -1,16 +1,17 @@
 import CoreML
 import Foundation
 import ModelKit
+import ModelKitCoreML
 import Testing
 
-@testable import ModelKitCoreML
+@testable import ModelKitYOLOPose
 
 /// Opt-in local microbenchmark. Timings are diagnostic, never flaky pass/fail thresholds.
 @Test(.enabled(if: ProcessInfo.processInfo.environment["POSE_PERFORMANCE_CHECK"] == "1"))
 func poseProcessingPerformance() throws {
     let image = try ImageFrame(width: 360, height: 640, rgb: Data(repeating: 114, count: 360 * 640 * 3))
-    let preparation = CoreMLImagePreparation()
-    let layout = try CoreMLImageLayout(width: image.width, height: image.height)
+    let preparation = YOLOImagePreparation()
+    let layout = try YOLOImageLayout(width: image.width, height: image.height)
     let reference = ReferenceLetterbox(image: image)
     let tensor = try MLMultiArray(shape: [1, 300, 57], dataType: .float32)
     tensor.withUnsafeMutableBytes { bytes, _ in bytes.initializeMemory(as: UInt8.self, repeating: 0) }
@@ -94,13 +95,13 @@ func visionVersusVImageModelBaseline() async throws {
     let root = try #require(ProcessInfo.processInfo.environment["YOLO_POSE_MODEL_ROOT"])
     let url = URL(fileURLWithPath: root).appendingPathComponent("yolo26n-pose.mlpackage")
     // Constant fixture is reproducible, but not an accuracy or sustained-camera benchmark.
-    let preparation = CoreMLImagePreparation()
-    let square = try CoreMLImageLayout(width: 640, height: 640)
+    let preparation = YOLOImagePreparation()
+    let square = try YOLOImageLayout(width: 640, height: 640)
     let pixels = try preparation.prepare(rgb: Data(repeating: 114, count: 640 * 640 * 3), layout: square)
     let native = try NativeImageBuffer(pixelBuffer: pixels, rotation: 0)
     let rgb = Data(repeating: 114, count: 640 * 640 * 3)
-    for compute in [CoreMLImageGraph.Compute.cpuAndNeuralEngine, .all] {
-        let graph = try CoreMLImageGraph(contentsOf: url, compute: compute)
+    for compute in [YOLOImageGraph.Compute.cpuAndNeuralEngine, .all] {
+        let graph = try YOLOImageGraph(contentsOf: url, compute: compute)
         for vision in [true, false] {
             var times: [Double] = []
             for iteration in 0..<8 {

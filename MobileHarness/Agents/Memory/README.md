@@ -1,83 +1,40 @@
-# Memory — History Decisions and Transactions
+# Memory
 
-## Summary
+## 职责与边界
 
-Owns history reasoning, refresh, confirmed deletion and archive/title sequencing.
+✅ 历史读写、归档、删除及标题生成事务；不生成普通对话。 Agents 管业务策略和上下文，Gateway 管权限/传输，Actions 管函数实现；原生设备与 UI 端口由 App 注入。没有跨 Agent 共享可写聊天历史。
 
-## Ownership and boundaries
+## 文件分工
 
-Model exposure is bounded history list/read, not deletion authority. Trusted UI confirmation remains mandatory for fixed deletion. Assistant history is accessed only through the canonical history capability; Memory retains its own private decision context.
+MemoryAgent.swift 管接纳和事务；MemoryHistoryWorkflow.swift 管固定关联步骤；MemoryProcessing.swift 管状态；ConversationTitleGenerator.swift 仅生成标题。
 
-## External relationships and data flow
+## 输入、输出与流程
 
-Runtime arrows show data or capability calls; dashed arrows show injection.
+UI 历史事务经固定函数执行；归档提交后才生成标题，失败保留已提交归档。Assistant 的 history-query Skill 使用历史查询原生 Tools。
 
-```mermaid
-flowchart LR
- Gateway -->|Admitted input and executor feedback| Memory
- App -.->|Capabilities and repository| Memory
- Memory -->|Registered calls and communication| Gateway
- Memory -->|Private inference| ModelKit
- Memory -->|Atomic context and evidence| Storage
-```
+## Context 与 Builder
 
-## Deterministic and model workflows
+调用关联、事务状态；标题请求不写普通历史记录。 状态通过独立 Repository 原子提交；Builder 选择确定版本，不修改已发出的请求。写入失败不产生依赖未提交状态的新调用。
 
-MemoryAgent.swift owns admission/Chat relay; MemoryProcessing.swift owns schema/preprocessing; MemoryHistoryWorkflow.swift owns fixed correlated calls; ConversationTitleGenerator.swift performs bounded title-only computation without mutation.
+## 生命周期、容量与失败
 
-Typed history requests bypass model loading. Natural tasks wait for the authorized parentCommitted input after parent evidence has committed, then use the private Chat context. One deterministic history call is pending. Archive commits before title computation; title or presentation failure preserves the archive. Cancellation joins work and never rolls back committed deletion.
+标题独立注入 ChatCapability，采样最多 32 轮，每段 80 Characters，输出最多 64 tokens，30 秒超时。标题必须单行非空、≤80 Characters，拒绝动作和原生调用。 事务/输出消费由 App 根生命周期持有，独立于页面。输出最多 256，状态提交等待最多 32；通信消费者最多 16 待处理、4 并发。超限明确失败。取消加入已接纳工作清理；重启标记未完成任务中断，不重放设备动作。共享 Chat 的输入、调用和执行预算见 [Chat](../Support/Chat/README.md)。
 
-Only explicit task content/artifacts crosses delegation. Fixed state/commit admission uses a 32-waiter gate. Interactive reply occupancy is reported as interaction.replyActivity; this role has no listening permission.
+## 函数权限与注册
 
-❌ Rich semantic short/long-term memory beyond the implemented history operations is not implemented.
+[Agent.json](../../Resources/Agents/Memory/Agent.json) 声明固定函数；业务模型目录由加载 Skill 决定。实际实现/参数契约以 [owning @Action declarations](../../Actions/README.md) 为准。Internal 固定函数不会自动向模型开放。
 
-## Internal components
+本角色没有对话 worker。以下为本角色固定函数声明；实际固定调用由该角色 workflow 注册，不能把固定函数表误认为普通对话目录。
 
-The following graph shows source composition and local data selection. Cross-role delivery and effect execution use Gateway.
-
-```mermaid
-flowchart LR
- Agent[MemoryAgent] --> Chat[AgentChatWorker with MemoryContextState]
- Agent --> Workflow[MemoryHistoryWorkflow]
- Processing[State, preprocessor and context builder] --> Chat
- Prompts[Memory.prompts.json] -.-> Processing
- Prompts -.-> Title[ConversationTitleGenerator]
- Workflow -->|Correlated fixed calls| Tools[History and presentation Tools]
- Title -->|Text-only request| Model[Injected ChatCapability]
- Tools -->|Runtime results| Workflow
-```
-
-## Context, bounds and failure
-
-The role owns its schema/repository, preprocessing, immutable request builder and task outcomes. Evidence commits before dependent output; storage failure ends dependent processing. Legacy business contexts without Chat fields may import once; partial/null/unsupported fields fail. Restart interrupts unfinished work and does not replay native effects. Media is referenced by authorized IDs.
-
-Shared model admission, request/call budgets, protocol consumers and overflow are defined in [Chat](../Support/Chat/README.md#bounds-and-overflow). Role communication retains 16 pending outputs with four runtime deliveries. Task views retain 256 identities with at most 32 live; terminal records may be retired, live tasks may not. Excess work rejects explicitly.
-
-Pause cancels/joins model work; resume admits future work without replay. Stop joins worker/relay. App registration and output consumption outlive UI pages and microphone capture. Each reply's actual executor owns its results and speech; display focus does not change execution authority.
-
-## Prompt resources
-
-[Memory.prompts.json](Memory.prompts.json) owns the role system/style and task/history/execution message templates. Separate `title.system`, `title.excerpt` and `title.user` templates serve title-only inference. The generator evenly samples up to 32 turns, truncates each user/assistant excerpt to 80 Characters, requests at most 64 output tokens and uses a 30-second timeout. It accepts only a completed nonempty single-line title of at most 80 Characters, with no XML delimiters or native calls; stream text is limited to 1024 UTF-8 bytes. Sampling, cancellation and output validation remain code-owned.
-
-## Function and communication registration
-
-Model exposure comes from [Memory.agent.json](Memory.agent.json); code-owned internal permissions are separate. Empty Channel groups declare Channels without exposing a function.
-
-### Model functions
-
-| Protocol / Channel | Model name | Canonical function | Parameters and constraints | Behavior |
+| 类型 / Channel | 别名 | 函数 | 参数 | 说明 |
 | --- | --- | --- | --- | --- |
-| Tool / — | `History.list` | `History.Conversation.list` | `offset` required: string; Decimal integer from 0 through 64, encoded as a string.; `limit` required: string; Decimal integer from 1 through 5, encoded as a string. | List current and archived conversations, current first then newest archives. Returns paged JSON metadata with IDs and explicitly truncated title/input previews. Start at offset 0; use nextOffset for more. |
-| Tool / — | `History.read` | `History.Conversation.read` | `id` required: string; Conversation UUID from History.list; `offset` required: string; Decimal integer from 0 through 256, encoded as a string.; `limit` required: string; Decimal integer from 1 through 2, encoded as a string. | Read a conversation by an ID returned by History.list. Turns are oldest first. Returns paged JSON with bounded user/response previews and truncation flags, not complete text; never replays behavior. Start at offset 0. |
-| Action / Communication | `send` | `Agent.Communication.send` | target, kind, content; taskID/artifactID as applicable; authorized pairs: `assistant/progress`, `assistant/result` | Directed admission receipt; task outcome is separate. |
+| tool / — | `History.list` | `History.Conversation.list` | offset 必填, limit 必填 | List current and archived conversations, current first then newest archives. Returns paged JSON metadata with IDs and explicitly truncated title/input previews. Start at offset 0; use nextOffset for more. |
+| tool / — | `History.read` | `History.Conversation.read` | id 必填, offset 必填, limit 必填 | Read a conversation by an ID returned by History.list. Turns are oldest first. Returns paged JSON with bounded user/response previews and truncation flags, not complete text; never replays behavior. Start at offset 0. |
 
-### Internal fixed functions
+## 固定内部权限
 
 | Protocol | Canonical function | Channel | Parameters | Registration source |
 | --- | --- | --- | --- | --- |
-| InternalAction | `UI.Caption.beginReplyTurn` | Display | — | [AgentChatWorker.swift](../Support/Chat/AgentChatWorker.swift) |
-| InternalAction | `Speech.Playback.speak` | Speech | `audioID` | [AgentChatWorker.swift](../Support/Chat/AgentChatWorker.swift) |
-| InternalAction | `UI.Caption.print` | Display | `text` | [AgentChatWorker.swift](../Support/Chat/AgentChatWorker.swift) |
 | InternalTool | `History.Conversation.startNew` | — | — | [MemoryHistoryWorkflow.swift](MemoryHistoryWorkflow.swift) |
 | InternalTool | `History.Conversation.summarize` | — | `id` | [MemoryHistoryWorkflow.swift](MemoryHistoryWorkflow.swift) |
 | InternalTool | `History.Conversation.delete` | — | `id` | [MemoryHistoryWorkflow.swift](MemoryHistoryWorkflow.swift) |
@@ -101,23 +58,49 @@ Model exposure comes from [Memory.agent.json](Memory.agent.json); code-owned int
 
 Directed input schemas and static subscriptions are distinct; admission also validates the runtime sender and scope.
 
-### Input subscriptions and communication grants
+## 状态与验收
 
-Publication is one-way and has no recipient acknowledgment. Directed send returns admission; explicit task results report completion.
+✅ 动态 Skill/确定性职责拆分已实现。❌ 摄影、保存、尾音、语音竞争及模式切换的真机验收仍需单独进行。
 
-| Input contract | Source | Topic |
+✅ 收紧资源中的普通文本/模型反馈和语音对话通信，保留确定性协议。
+
+## 输入与通信授权
+
+| 输入契约 | 类型 |
+| --- | --- |
+| `history.intent` | observation |
+| `tool.result` | toolResult |
+| `task.request` | observation |
+| `task.input` | observation |
+| `task.progress` | observation |
+| `task.result` | observation |
+| `task.cancel` | observation |
+| `communication.receipt` | communicationReceipt |
+
+| 方式 | 契约 | 目标/来源 |
 | --- | --- | --- |
-| `history.intent` | `runtime` | `history.intent` |
-| `history.intent` | `user` | `history.intent` |
+| send Action | `task.progress` | `assistant` |
+| send Action | `task.result` | `assistant` |
+| subscribe | `history.intent` | `runtime` |
+| subscribe | `history.intent` | `user` |
 
-| Output | Contract | Destination |
-| --- | --- | --- |
-| publish | `interaction.replyActivity` | Exact static subscribers |
-| send | `task.progress` | `assistant` |
-| send | `task.result` | `assistant` |
-| send | `speech.synthesize` | `speechSynthesis` |
-| send | `speech.cancel` | `speechSynthesis` |
 
-## Related design
+## 固定函数与 Skill
 
-[Parent design](../README.md)
+✅ 资源不再包含 Permissions.json，Agent.json 的 baseSkills 引用 Skill，Skill.json 声明函数。业务模型函数由已加载 Skill 提供；固定调用与模型轮次分别验证，详见 [资源规范](../../Resources/Agents/README.md)。
+
+## Agent → Skill → Function registration
+
+✅ Implemented: Agent.json references baseSkills; Skill.json alone registers model Actions/Tools. BasicSkill owns task orchestration and environment reading; ExpressionInteraction owns expression Actions. Role instructions retain identity/responsibility/style. Business roles reuse existing Skills; internal trusted bindings remain separate. Fixed transaction/task snapshots remain authoritative.
+
+角色基础函数目录由资源中的 baseSkills（history-query）组合；上表供函数 review 使用，不是 Agent.json 中的另一份注册。函数说明属于实现，流程教学属于 Skill。
+
+## 历史记录收敛（2026-10-13）
+
+✅ 已实现：历史记录页面仅保留 Assistant 聊天记录与任务记录。Assistant context 是聊天持久化事实源，任务按持久化身份关联；页面板块重新设计另行开展。
+
+❌ 历史记录页面板块重新设计及原生 UI/真机验收。
+
+## Cloud title thinking policy
+
+✅ Implemented: title generation retains the existing two-message request, 64-token budget, 30-second joined deadline and explicit rejection of incomplete/empty titles. The shared [cloud request encoder](../../ModelKit/Language/LLM/OpenAI/README.md#non-thinking-request-policy) disables provider thinking before execution, preventing supported models from spending the title budget on reasoning. Memory does not own vendor-specific fields or retry with a larger budget. Existing archive/title persistence and failure presentation remain unchanged; opt-in synthetic provider evidence is recorded separately from native UI/device acceptance.

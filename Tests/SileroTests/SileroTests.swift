@@ -102,7 +102,7 @@ func realSileroStreamingResetTailAndSilence() async throws {
     let repo = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
         .deletingLastPathComponent()
     let models = repo.appendingPathComponent("MobileHarness/Resources/Models")
-    let providerContext = ModelContext()
+    let providerContext = try ModelContext(loadGate: ModelLoadGate(maximumConcurrentLoads: 4), maximumLoadWaiters: 32)
     let provider = try SileroVAD(
         context: providerContext,
         artifacts: models.appendingPathComponent("Silero"))
@@ -155,7 +155,7 @@ func realSileroStreamingResetTailAndSilence() async throws {
     #expect(utterances.count == 1)
     #expect(utterances[0].reduce(0) { $0 + $1.duration } < 6)
     if #available(macOS 27, *), ProcessInfo.processInfo.environment["HARNESS_TEST_NEMOTRON"] == "1" {
-        let asrContext = ModelContext()
+        let asrContext = try ModelContext(loadGate: ModelLoadGate(maximumConcurrentLoads: 4), maximumLoadWaiters: 32)
         let asr = try NemotronASR(
             context: asrContext,
             artifacts: models.appendingPathComponent(
@@ -274,18 +274,12 @@ private actor ConstantVAD: VoiceActivitySession {
     await #expect(throws: CapabilityError.self) { try await cancelled.finishStreaming() }
 }
 
-@Test func continuousTurnLimitFailsRatherThanSilentlySubmittingTruncatedText() async throws {
+@Test func continuousTurnBeyondSixtySecondsDoesNotEndUtterance() async throws {
     let segmenter = VoiceActivitySegmenter(session: ConstantVAD())
-    var failed = false
     for index in 0..<62 {
-        do {
-            _ = try await segmenter.process(pcm(Array(repeating: 0.2, count: 16000), sequence: UInt64(index)))
-        } catch CapabilityError.bufferOverflow {
-            failed = true
-            break
-        }
+        let value = try await segmenter.process(pcm(Array(repeating: 0.2, count: 16000), sequence: UInt64(index)))
+        #expect(value.isSpeaking)
     }
-    #expect(failed)
     await segmenter.cancel()
 }
 

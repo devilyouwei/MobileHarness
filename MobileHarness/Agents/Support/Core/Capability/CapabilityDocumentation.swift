@@ -2,7 +2,6 @@
 public struct CapabilityDocumentation: Decodable, Sendable {
     public let doc: String
     public let parameters: [Parameter]
-    public let examples: [String]
 
     public struct Parameter: Decodable, Sendable {
         public let name: String

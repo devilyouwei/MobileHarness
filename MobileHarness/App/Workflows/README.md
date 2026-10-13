@@ -6,7 +6,7 @@ State-free AppWorkflows facade over six independent feature targets, with operat
 
 ## Ownership and boundaries
 
-Each feature target owns its injected operation lifetime. Settings transports typed business intent; Bluetooth hosts native recovery/manual work; History adapts read-only snapshots and Memory intent; Presentation projects observations; Speech owns PCM checkout/playback; Diagnostics owns explicit diagnostic attempts.
+Each feature target owns its injected operation lifetime. Settings transports typed business intent; Bluetooth hosts native recovery/manual work; History adapts read-only snapshots and Memory intent; Presentation projects observations; Speech owns PCM checkout/playback and canonical activation composition; Diagnostics owns explicit diagnostic attempts.
 
 ## External relationships and data flow
 
@@ -53,3 +53,29 @@ Output generation uses independent bounded Action and Tool consumers, joined at 
 ## Related design
 
 [Parent design](../README.md) · [Bluetooth](Bluetooth/README.md) · [Diagnostics](Diagnostics/README.md) · [History](History/README.md) · [Presentation](Presentation/README.md) · [Settings](Settings/README.md) · [Speech](Speech/README.md)
+
+
+✅ Listening-feedback composition is owned by Speech and original cue PCM by Actions/UI. Presentation retains output/state projection and the generic injected native-transition worker. The facade re-exports the existing feature targets.
+
+
+✅ Implemented: Presentation adds ListeningCaptureWorkflow for one cancellable native-start operation, one transition worker and one latest desired state. Settings entry transport exposes a trusted session interruption operation; ownership remains root-owned.
+
+
+✅ Implemented: Speech owns bounded canonical activation composition; AppSpeechPlayback additionally depends on Actions and ExecutionRuntime. Presentation retains its generic transport/display boundary. App owns activation order/report gating; UI and PlatformKit retain rendering/native primitives respectively.
+
+
+✅ Implemented: Presentation adds an injected PhotoDispositionWorkflow for commit-before-effects, joined visual/sound acknowledgment and identity-owned cleanup. It has no domain/native dependencies or queued work.
+
+## 历史记录收敛（2026-10-13）
+
+✅ 已实现：历史记录页面仅保留 Assistant 聊天记录与任务记录。Assistant context 是聊天持久化事实源，任务按持久化身份关联；页面板块重新设计另行开展。
+
+❌ 历史记录页面板块重新设计及原生 UI/真机验收。
+
+
+✅ Implemented (2026-10-13): UI.Notice.showNotice/dismissNotice and UI.Light.updateLight are canonical presentation Actions for trusted business calls, currently registered by no Skill. Neutral Actions values cross RuntimePresentation into root-owned HomeEffectsWorkflow, which retains one replaceable notice expiry and one light expiry, UUID-fenced cleanup, and explicit stop. Notices remain separate from factual ExecutionIssue history; actual upper-layer errors have display priority and Action failures remain panel-only. Decorative light accepts normalized origin, initial opacity/intensity and duration; it never changes consent, microphone or eyes. Native renderer separates light generations from listening eye generations and preserves existing exit fade. RuntimePresentation adapts Action requests into UI-owned values; AppPresentationWorkflow keeps its existing UI/AgentCore/FunctionContracts boundary. No UI project dependencies or new directories.
+
+
+## Streaming TTS latency
+
+✅ Speech owns PCM checkout/playback and activation composition. Physical listening restoration stays with Lifecycle; no post-playback timer or idle-task owner is provided.

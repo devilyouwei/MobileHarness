@@ -50,3 +50,19 @@ DeviceControlRequest validates finite known operation categories and operation-s
 ## Related design
 
 [Parent design](../README.md)
+
+✅ TaskControlModule assembles finite Agent.Task functions over an injected neutral TaskControlCapability; it contains no Agent state or decision policy.
+
+## Skill/task-mode contract
+
+✅ TaskControlModule implements real canonical Agent.Task functions. Model and trusted fixed callers reuse the same injected TaskControlCapability; permission/session/round validation belongs to the host and Gateway.
+
+## 泛化 Task 与独立 Skill
+
+✅ TaskControlModule exposes loadSkills/releaseSkills/startTask/finishTask/cancelTask; model and trusted fixed callers share implementations. Backend send orchestration and persistence remain in Agents, not in this adapter.
+
+✅ 2026-10-11 correction: TaskControl functions are finite committed transactions returning a bounded value, not state/completed-only operations. Regression executes each through FunctionExecutor. Task reports move out of system instructions into data messages; include only same-session live declared background tasks or the exact current directed task, not legacy terminal delegation records. Completed local outcomes are selected only for the current input. Persistent/UI task history is retained.
+
+## Action-owned documentation and Skill instruction contract
+
+✅ 本目录 CapabilityModule 的 `@ActionCatalog` 从实际 `*Definition` 注册调用（含本类型的本地 helper）生成静态 declarations。添加已有域函数只需修改所属实现及本地依赖绑定，不再同步公共元数据列表。声明投影不捕获设备、处理器或运行会话。

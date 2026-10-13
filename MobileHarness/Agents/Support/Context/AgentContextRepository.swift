@@ -21,11 +21,13 @@ public actor AgentContextRepository<State: AgentContextState> {
         value = AgentContext(agentID: agent, scopeID: scope, state: state)
         self.persistence = persistence
     }
-    public static func persistent(agent: AgentID, scope: UUID, state: State, url: URL) throws -> AgentContextRepository<
+    public static func persistent(
+        agent: AgentID, scope: UUID, state: State, url: URL, protection: DocumentFileProtection = .whileUnlocked
+    ) throws -> AgentContextRepository<
         State
     > {
         let adapter = ContextDocumentAdapter<State>(
-            document: try LocalDocumentStore(url: url, maximumBytes: 64 * 1024 * 1024))
+            document: try LocalDocumentStore(url: url, maximumBytes: 64 * 1024 * 1024, protection: protection))
         return AgentContextRepository(
             agent: agent, scope: scope, state: state,
             persistence: AgentContextPersistence(
@@ -73,16 +75,23 @@ public actor AgentContextRepository<State: AgentContextState> {
         return committedRevision != nil
     }
     public func update(_ mutation: @Sendable (inout AgentContext<State>) throws -> Void) async throws {
+        try await transaction(mutation)
+    }
+
+    public func transaction<Result: Sendable>(
+        _ mutation: @Sendable (inout AgentContext<State>) throws -> Result
+    ) async throws -> Result {
         try await acquire()
         defer { release() }
         try await load()
         var next = value
-        try mutation(&next)
+        let result = try mutation(&next)
         try next.advanceRevision()
         try next.validate(agent: value.agentID, scope: value.scopeID)
         try await persistence?.commit(next, committedRevision)
         value = next
         committedRevision = next.revision
+        return result
     }
 
     /// The caller owns classification, ordering, consumption and retention policy.

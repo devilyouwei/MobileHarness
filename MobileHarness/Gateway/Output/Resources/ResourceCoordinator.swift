@@ -3,7 +3,7 @@ import Foundation
 
 public enum ResourceError: Error, Equatable, Sendable {
     case invalidDefinition, unknownResource, unauthorized, busy, staleLease, staleUse, capacityExceeded
-    case invalidDuration, cleanupTimedOut, shutdown
+    case invalidDuration, shutdown
 }
 
 public struct ResourceDefinition: Sendable {
@@ -79,10 +79,9 @@ public actor ResourceCoordinator {
     private var cleanups: [UUID: Cleanup] = [:]
     private var expiry: Task<Void, Never>?
     private var closed = false
-    private let cleanupDeadline: Duration
 
-    public init(definitions: [ResourceDefinition], cleanupDeadline: Duration = .seconds(5)) throws {
-        guard definitions.count <= 64, cleanupDeadline > .zero, cleanupDeadline <= .seconds(30) else {
+    public init(definitions: [ResourceDefinition]) throws {
+        guard definitions.count <= 64 else {
             throw ResourceError.invalidDefinition
         }
         var catalog: [ResourceID: ResourceDefinition] = [:]
@@ -96,7 +95,6 @@ public actor ResourceCoordinator {
             catalog[definition.id] = definition
         }
         self.definitions = catalog
-        self.cleanupDeadline = cleanupDeadline
     }
 
     deinit { expiry?.cancel() }
@@ -460,12 +458,6 @@ public actor ResourceCoordinator {
             pair.continuation.finish()
         }
         cleanups[id] = Cleanup(resources: resources, retiredUses: Set(selected.keys), nextOwner: nextOwner, task: task)
-        let timeout = Task {
-            do { try await Task.sleep(for: cleanupDeadline) } catch { return }
-            pair.continuation.yield(.failure(ResourceError.cleanupTimedOut))
-            pair.continuation.finish()
-        }
-        defer { timeout.cancel() }
         let acknowledgment = Task {
             var iterator = pair.stream.makeAsyncIterator()
             return await iterator.next()
@@ -511,13 +503,7 @@ public actor ResourceCoordinator {
         let pair = AsyncStream<CleanupResult>.makeStream(bufferingPolicy: .bufferingOldest(1))
         cleanup.observers[observerID] = pair.continuation
         cleanups[id] = cleanup
-        let timeout = Task {
-            do { try await Task.sleep(for: cleanupDeadline) } catch { return }
-            pair.continuation.yield(.failure(ResourceError.cleanupTimedOut))
-            pair.continuation.finish()
-        }
         defer {
-            timeout.cancel()
             cleanups[id]?.observers[observerID] = nil
             pair.continuation.finish()
         }

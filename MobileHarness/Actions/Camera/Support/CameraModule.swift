@@ -39,10 +39,12 @@ public struct CameraPhotoCommandReceipt: Codable, Sendable, Equatable {
     public let photoID: UUID
     public let state: State
     public let alreadySaved: Bool
-    public init(photoID: UUID, state: State, alreadySaved: Bool = false) {
+    public let feedbackIssues: [String]?
+    public init(photoID: UUID, state: State, alreadySaved: Bool = false, feedbackIssues: [String]? = nil) {
         self.photoID = photoID
         self.state = state
         self.alreadySaved = alreadySaved
+        self.feedbackIssues = feedbackIssues
     }
 }
 
@@ -85,6 +87,7 @@ public enum CameraControlError: Error, Equatable, Sendable, ActionExecutionFailu
     }
 }
 
+@ActionCatalog
 public struct CameraModule: CapabilityModule {
     private let camera: any CameraControlCapability
     public init(camera: any CameraControlCapability) { self.camera = camera }

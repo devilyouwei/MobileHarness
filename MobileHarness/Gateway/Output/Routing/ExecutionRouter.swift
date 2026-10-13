@@ -22,6 +22,7 @@ enum ExecutionRouter {
         case .scheduling(let directive): .scheduling(directive)
         case .toolCall(let call): .tool(call)
         case .control("assistant.finished"), .control("agent.finished"): .finish
+        case .control("agent.cancelled"): .cancel
         case .control(let state) where state.hasPrefix("assistant.error:") || state.hasPrefix("agent.error:"): .cancel
         case .control(let state)
         where state.hasPrefix("assistant.historyError:") || state.hasPrefix("agent.historyError:"):

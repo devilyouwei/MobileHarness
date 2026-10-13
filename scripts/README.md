@@ -5,7 +5,7 @@ Purpose: validate code, download local models and stage selected resources. Desi
 Implemented Agent business-source audit: speech boundary validation maps TranscriptAccumulator to its owning SpeechRecognitionTurn source, requires the helper declaration and preserves the Foundation/ModelKit-only import rule. File co-location does not relax module isolation.
 
 - ✅ check.sh runs formatting, root tests and metadata validation; build-ios.sh builds four simulator schemes.
-- ✅ select-app-icon.sh accepts `original` or `robot-camera`, copying a preserved 1024 × 1024 variant into the shared app icon slot; rebuild/install after selection.
+- ✅ select-app-icon.sh accepts `original`, `robot-camera` or `lamp-arm`, copying a preserved 1024 × 1024 variant into the shared app icon slot; rebuild/install after selection. `lamp-arm` is the user-selected white articulated arm/iPhone icon. Explicit-name validation and the existing copy/exit behavior are retained. The root README references the shared selected image.
 - ✅ model_download.py reads production sources from model-catalog.json and resolves selected HF files through paginated Hub metadata. Only Gemma 4 E2B4B retains a separate test profile; Nemotron macos/ios options select the same Core ML catalog entry. Gemma 4 E2B defaults to 2B; --size 4b selects comparison. The inactive Audio8 wrapper/profile is removed.
 - ✅ Downloads use four workers, safe relative paths, .partial files and atomic replacement. Existing files are reused; --force refreshes them after a revision change or corruption. Errors propagate; no checksum catalog is generated.
 - ✅ clean-app-models.sh removes generated app Models resources and the embedded Agents bundle in the scheme pre-build action. stage-voice-models.sh copies only the source catalog/license notices for both device and simulator; no weights are packaged.
@@ -168,7 +168,7 @@ flowchart LR
 
 ✅ ADR0154 implements cohesive module entry files with one copy of each function and unchanged protocol behavior. File ownership is checked explicitly. ❌ Three-field path/configuration/registration migration remains outstanding.
 
-✅ Boundary checks require explicit production serialization keys for UI/Speech/NexArm Actions and definition-owned scheduler exclusion before three-level path migration.
+✅ Obsolete definition-key checks are removed; behavioral regressions verify task-local Channel ordering and cross-Channel/task concurrency.
 
 ❌ Three-level runtime paths and unified Action/Tool definitions are not completed by this stage.
 
@@ -254,4 +254,41 @@ ADR0189 layer checks require Core imports to remain Foundation-only, Communicati
 
 ✅ Task-history boundary update: HistoryPresentationAdapter may import AgentCore/Agents solely to project immutable context/task contracts to UI-owned values. It does not invoke Agents, mutate history, select context for inference or own task policy. The boundary allowlist remains file-specific; UI retains zero project dependencies.
 
-verify-app-agent-resources.py also verifies all role prompt resources and the independent AgentCore Function Token resource against source bytes, rejecting missing/stale prompt assets.
+verify-app-agent-resources.py verifies the exact Resources tree, independent AgentCore Function Token resource and FunctionContracts canonical metadata against source bytes, rejecting missing/stale assets.
+
+✅ Skill migration checks validate Resources/Catalog.json, confined v7 Agent/v1 Skill assets and final preserved resource paths, with canonical function metadata packaged separately by FunctionContracts.
+
+
+✅ Resource-path contract: pure Agent and Skill assets move to MobileHarness/Resources/{Agents,Skills} with Catalog.json. Agents retains loading and policy ownership. Package sources remain limited to Agents; explicit copies exclude unrelated app/model assets. Bundle catalog lookup establishes the runtime root without repeating Resources. Regression covers flat and Resources-containing Bundle lookup plus missing catalog failure; final packaging checks compare indexed asset bytes. Device acceptance is recorded separately.
+
+
+❌ Pending source organization audit (2026-10-11): Update resource boundary and final bundle verifier for canonical UpperCamelCase names; enforce Swift source names and Support placement to prevent this drift. Scripts retain existing kebab-case naming.
+
+## Action-owned documentation and Skill instruction contract
+
+✅ 边界检查保留 System 命名空间，显式认定 Agent.Task 是 System 的宿主控制协议地址。最终 App 资源检查拒绝遗留 FunctionMetadata.json，函数声明由编译代码提供。
+
+✅ clean-app-models.sh also cleans only the exact generated .app/HarnessKit_FunctionContracts.bundle path; the current FunctionContracts target contains no resources.
+
+## Channel-owned Action ordering
+
+✅ Retired serialization-key boundary checks are removed; full check.sh continues to validate imports, formatting, observable scheduling behavior and metadata. build-ios.sh verifies the simulator schemes and packaged assets.
+
+## Agent → Skill → Function registration
+
+✅ Implemented: Agent.json declares baseSkills and communication, never functions/actions/tools. Base and dynamic Skills are the single model function registration source. BasicSkill owns Task/Skill native Tools, environment reading and orchestration teaching; ExpressionInteraction owns expression Actions. Photographer, Memory and ApplicationControl reuse their existing business Skills for fixed catalog composition. Role instructions define identity/responsibilities/style; workflows and named function teaching belong to Skill Instructions. Internal trusted code bindings remain separate. Legacy request evidence is not rewritten.
+
+## ModelKit Support ownership
+
+✅ Boundary checks require unique ModelKit source ownership, explicit disjoint Management source lists, model-local third-party dependencies, no model-specific code in generic backends and no retired mixed-model targets/cancellation helpers.
+
+
+✅ Boundary audits inspect the package manifest in a disposable build cache, without dependency resolution/version changes or the application workspace lock. The audit typechecks Core alone, rejects conversation/manager identity in Core, and enforces the complete target-layer dependency map and permitted source imports.
+
+
+✅ Independent ModelKit SDK enforcement: reject unknown external imports and all non-ModelKit project targets without relying on a name denylist; validate third-party product/package ownership, target source confinement and SDK product transitive closure. Eight in-memory manifest/source mutation probes verify rejection without changing production sources.
+
+
+✅ Implemented: AppSpeechPlayback allowlist adds only Actions and ExecutionRuntime for canonical activation composition. Presentation remains UI/AgentCore/FunctionContracts; ModelKit and foundational-module dependency guards are unchanged.
+
+✅ UI boundary audit permits only public QuartzCore in NativeCompanionSurface.swift and Metal/QuartzCore/Synchronization in MetalHaloRenderer.swift, confined to Components. UI target still has zero project dependencies and service/other-module imports remain rejected.

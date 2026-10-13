@@ -89,7 +89,6 @@
             switch fallback {
             case .inputUnavailable: "当前麦克风不支持空间采集，使用普通录音。"
             case .unsupported: "设备不支持空间采集，使用普通录音。"
-            case .startupTimeout: "空间采集未收到音频，改用普通录音。"
             case .startupFailed: "空间采集启动失败，改用普通录音。"
             }
         }

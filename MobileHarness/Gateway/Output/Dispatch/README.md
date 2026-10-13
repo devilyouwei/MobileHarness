@@ -28,7 +28,7 @@ flowchart LR
 
 Action dispatch builds ScheduledAction from the envelope and allocates fresh execution identity on admission. Typed wait directives enter the same task tree without waiting for execution. App consumes Action/Tool outputs independently; Tool saturation cannot block ordered Action admission.
 
-Tools await ToolExecutor directly and have no waiting queue here. Shared declared resources and inherited permit/owner apply even to intent functions that start a separately owned host worker. Outside generation rounds, returning handlers send ToolResult; completion-only success returns no result input, while failure remains an explicit ToolResponse. Generated calls always retain terminal feedback and declared observation policy.
+Tools await ToolExecutor directly and have no waiting queue here. Shared declared resources and inherited permit/owner apply even to intent functions that start a separately owned host worker. Outside generation rounds, returning handlers send ToolResult; completion-only success returns no result input, while failure remains an explicit ToolResponse. Generated calls always retain terminal feedback; the owning Agent derives continuation from the actual result.
 
 ## Result and cancellation contract
 
@@ -43,3 +43,10 @@ BehaviorTranslation copies bounded producer codes/details/child reports without 
 ## Related design
 
 [Parent design](../README.md)
+
+
+## Result-driven ReACT (ADR0214)
+
+✅ ADR0214：生成调用的终态投递与模型继续决策分离；固定 Tool 返回契约保留，调度/资源及所有者回传不增加业务判断。
+
+✅ Native calls are joined cancellable dispatches owned by OutputGateway for both ordinary model inputs and task scopes. Host interruption no longer depends on reaching a later ordered terminal to cancel a blocked native handler.
