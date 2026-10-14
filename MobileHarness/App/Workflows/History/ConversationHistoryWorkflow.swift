@@ -7,7 +7,6 @@ public enum HistoryImageLoadingError: Error { case invalidReference, busy, overs
 /// One root-owned history operation slot. Cancel keeps admission closed until cleanup finishes.
 @MainActor
 public final class ConversationHistoryWorkflow: ConversationHistoryControlling {
-    public var agents: [HistoryAgentDestination] = []
     public let state: ConversationHistoryState
     private let deleteArchive: @MainActor (UUID) async throws -> Void
     private let refresh: @MainActor () async throws -> Void
@@ -15,7 +14,7 @@ public final class ConversationHistoryWorkflow: ConversationHistoryControlling {
     private let startNewArchive: @MainActor () async throws -> Void
     private let summarizeArchive: @MainActor (UUID) async throws -> Void
     private let previewOutput: @MainActor (HistoryTurn) -> String
-    private let readConversation: (@MainActor (UUID) async throws -> HistoryConversation)?
+    private let readConversation: @MainActor (UUID) async throws -> HistoryConversation
     private let readPhoto: @MainActor (UUID, UUID) async throws -> Data?
     private var photoReads: Set<UUID> = []
     private var loaded = false
@@ -27,7 +26,7 @@ public final class ConversationHistoryWorkflow: ConversationHistoryControlling {
         startNew: @escaping @MainActor () async throws -> Void,
         summarize: @escaping @MainActor (UUID) async throws -> Void,
         previewOutput: @escaping @MainActor (HistoryTurn) -> String,
-        readConversation: (@MainActor (UUID) async throws -> HistoryConversation)? = nil,
+        readConversation: @escaping @MainActor (UUID) async throws -> HistoryConversation,
         readPhoto: @escaping @MainActor (UUID, UUID) async throws -> Data?
     ) {
         self.deleteArchive = deleteArchive
@@ -53,7 +52,6 @@ public final class ConversationHistoryWorkflow: ConversationHistoryControlling {
         } catch { state.status = "历史读取失败：\(error)" }
     }
     public func loadConversation(_ id: UUID) async throws -> HistoryConversation {
-        guard let readConversation else { throw HistoryDetailError.unavailable }
         let selected = try await readConversation(id)
         guard selected.id == id else { throw HistoryDetailError.unavailable }
         state.selectedConversation = selected
@@ -69,7 +67,7 @@ public final class ConversationHistoryWorkflow: ConversationHistoryControlling {
         perform { try await self.deleteArchive(id) }
     }
     private func perform(_ operation: @escaping @MainActor () async throws -> Void) {
-        guard state.allowsMutations, !state.isBusy, loaded else { return }
+        guard !state.isBusy, loaded else { return }
         state.isBusy = true
         task = Task {
             defer {

@@ -25,8 +25,8 @@
                 }
                 Section("用户") {
                     destination(
-                        .history, title: "历史记录", icon: "clock.arrow.circlepath",
-                        identifier: "settings.conversation.history")
+                        .history, title: "Agent 记录", icon: "doc.text.magnifyingglass",
+                        identifier: "settings.agent.records")
                 }
             }
             .navigationTitle("设置").navigationBarTitleDisplayMode(.inline)

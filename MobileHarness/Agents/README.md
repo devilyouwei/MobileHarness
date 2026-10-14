@@ -58,7 +58,7 @@ Skill 加载验证依赖、canonical 函数、别名、Channel 后整体提交�
 
 ## 历史与可视化
 
-唯一持久化事实源是角色 Context。Assistant 默认对话和任务选择独立历史；每请求记录任务目标、执行类型、Skill revision、taskID 和目录 JSON。固定执行者仅持久化事务和任务状态；重启标记中断且不重放。UI 展示 Assistant 聊天记录与任务记录，首页只有有界 Task/Skill 投影和 Action/Task/Agent 日志。
+Assistant 运行时 Context 持有内存对话，完整请求与 Task 压缩按会话文件 checkpoint；其他角色保留独立持久化 Context。每请求记录任务目标、执行类型、Skill revision、taskID 和目录 JSON。固定执行者只持久化自身事务/任务状态，重启标记中断且不重放。设置的 Agent 记录当前只展示 Assistant 聊天记录；首页保留有界 Task/Skill 投影和 Action/Task/Agent 执行诊断，未提供其他 Agent 的伪聊天页面。
 
 ✅ 资源、动态授权、Assistant 任务与 ReACT、确定性角色和历史/UI 投影已接入。❌ 真机摄影、语音竞争、模式切换及历史展示仍需验收。详细实现见各目录 README。
 
@@ -125,11 +125,6 @@ flowchart LR
 
 ✅ 2026-10-13 已实现：ReACT 业务输出仅为显式 value（含空字符串），成功执行报告和活动句柄仅保留完成证据；失败报告仍由错误判定触发续轮，既有 Agent 异常恢复不变。详见 [总体设计](../README.md#react-continuation-and-agent-recovery)。
 
-## 历史记录收敛（2026-10-13）
-
-✅ 已实现：历史记录页面仅保留 Assistant 聊天记录与任务记录。Assistant context 是聊天持久化事实源，任务按持久化身份关联；页面板块重新设计另行开展。
-
-❌ 历史记录页面板块重新设计及原生 UI/真机验收。
 
 
 ✅ Implemented (2026-10-13 Skill scope review): canonical Actions unify trusted business calls and model calls; Skill exposure is optional and must serve an actual procedure. ExpressionInteraction retains two expression functions; Feedback/Notice/Light model exposure is removed while implementations and business bindings remain. ApplicationControl keeps navigation/status/resource/Bluetooth operations, removing duplicate robot functions; RobotInteraction owns them. BasicSkill removes unused send while production background contracts are absent. Affected instructions/revisions and explicit communication-only test catalogs are aligned; all six Skills were audited for prerequisites, result handling and cross-Skill references.

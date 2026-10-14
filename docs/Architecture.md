@@ -340,3 +340,6 @@ The root service outlives preview. One attached vision session supplies pose tra
 
 
 Current conversation persistence (2026-10-13): schema v3 keeps full response strings in memory during generation. User admission and whole-decision terminal events checkpoint current.json and bounded Agent recovery state. Each archive is a separate conversation-ID file; index.json contains metadata only. Logical conversation identity survives voice restarts. Rotation is recoverable and title jobs are root-owned, independent of history page lifetime. No old schema/import or fragment durability remains. Assistant does not persist its high-frequency context or reload archived bodies on ordinary list/context paths.
+
+
+✅ Agent records (2026-10-14): Settings uses a generic record-destination hub with one implemented Assistant conversation page. Foreground Task sources/terminal compression are canonical conversation evidence. Delete duplicate task-history pages/projections and their old subset-navigation hook; preserve Agent task lifecycle state and independent execution diagnostics. Other Agent record types remain future work.

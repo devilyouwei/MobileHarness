@@ -940,7 +940,7 @@ Model finish reasons (`stop`, `toolCalls`, `lengthLimit`) record provider termin
 
 #### Context, evidence and Task boundaries
 
-History v2 explicitly separates immutable request-start decisionMetadata from request historyTaskID. The startTask-producing request is assigned to the new Task in the same transaction. Terminal Task status and a conversation-owned compression (stable input/request source IDs, goal, reported summary and real failure) commit together after barriers. Model, UI and query projections replace only those indexed sources at their first historyOrder; current/ordinary/raw execution evidence remains durable. New inputs and same-input Task-boundary continuations share this projection. App exclusively opens assistant.history-v2.context.json; previous Assistant contexts are unused without decoding/import/migration. Compression is derived from existing finish/cancel summary plus host terminal facts, without extra inference.
+Indexed Task history explicitly separates immutable request-start decisionMetadata from request historyTaskID. The startTask-producing request is assigned to the new Task in the same transaction. Terminal Task status and a conversation-owned compression (stable input/request source IDs, goal, reported summary and real failure) commit together after barriers. Model, UI and query projections replace only those indexed sources at their first historyOrder; current/ordinary/raw execution evidence remains durable. New inputs and same-input Task-boundary continuations share this projection. App checkpoints current.json with independent conversation-ID archives and index.json; previous Assistant contexts are unused without decoding/import/migration. Compression is derived from existing finish/cancel summary plus host terminal facts, without extra inference.
 
 Continuation retains the original input/session, request options, cumulative budget and selected ChatCapability, then rejoins FIFO behind admitted inputs. Resumption rebuilds the effective Skill system prompt/native definitions, refreshes facts/task reports and incorporates eligible intervening completed requests. Facts remain user-role data before the current input or the complete native-call/result group. A request catalog is immutable during its invocation; `loadSkills`/`startTask` can expose new functions only in later requests.
 
@@ -1390,7 +1390,7 @@ After joining a failed original resource worker, eligible host admission/dispatc
 
 Assistant owns an in-memory context and conversation checkpoints; Photographer, Memory and ApplicationControl have independent durable contexts. HistoryPresentationAdapter reads the Assistant repository and converts one immutable snapshot into UI-owned values. Fixed specialists retain transaction/task state without a chat schema. Streaming perception/synthesis evidence has no conversation archive UI.
 
-历史记录 exposes only Assistant 聊天记录 and 任务记录. Assistant supports current/archive navigation and confirmed mutations. Task records project persisted foreground input membership and registered background-task state; continuation and later inputs stay grouped across archives. Missing task dates remain absent.
+✅ Implemented: Agent 记录 exposes a generic Agent-specific view hub with Assistant conversations as its only implemented destination. Assistant supports current/archive navigation and confirmed mutations; canonical foreground Task compressions expand all original request sources in place, including after task-state retirement. Runtime/background task diagnostics remain on Home; there is no second task-history collection. Other Agent record schemas are not fabricated.
 
 <a id="deterministic-history-mutation-contract"></a>
 
@@ -1980,11 +1980,9 @@ flowchart LR
 
 ✅ Implemented correction: default decision chains have no cumulative request/native-call limit. Per-generation work stays bounded, reset each round; immutable request projection drops oldest complete call/result blocks while preserving system/current user/latest result. Identical repeated generation failure without progress surfaces its real error instead of looping. App photo cache opts into FIFO retirement, preserving newest entries and reporting historical images as absent. Fresh Agent/Action failures appear in a root-projected home toast independently of voicePhase.
 
-## 历史记录收敛（2026-10-13）
+## Agent records
 
-✅ 已实现：历史记录页面仅保留 Assistant 聊天记录与任务记录。Assistant context 是聊天持久化事实源，任务按持久化身份关联；页面板块重新设计另行开展。
-
-❌ 历史记录页面板块重新设计及原生 UI/真机验收。
+✅ Implemented: 设置的 Agent 记录入口由各 Agent 注入自己的记录页面，目前只有 Assistant 聊天记录。前台 Task 的摘要、终态与原始请求包含在同一会话文件；任务运行状态与后台委派仍由 Agents/首页执行记录持有。删除重复任务历史页面与聚合接口。其他 Agent 的记录类型尚未实现。
 
 
 ✅ Implemented: UI forwards press begin/end as passive warmup intent. Lifecycle owns one cancellable cue-preparation task and one cached default PCM clip; PlatformKit warms only the bounded output graph, never capture. The canonical Listening Actions remain the sole cue/haptic execution, reusing warm resources at recognized hold. Actual listening consent/admission remains Agent-routed.

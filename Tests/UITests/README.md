@@ -146,4 +146,11 @@ Root Package.swift compiles this directory as UITests against the UI module. The
 
 ✅ HistoryRequestNavigation regression covers admission, ignored duplicate/different taps while presented, dismissal and reopening the same/different request. These pure state tests complement device compilation; native expansion layout and navigation gestures require separate acceptance.
 
-✅ JSON export regressions round-trip complete conversations/tasks/displayed requests, preserve exact malformed request JSON and output/native context evidence, reject non-finite values/size overflow, and replace formatted diagnostic report assertions. Native share-target file acceptance remains separate.
+✅ JSON export regressions round-trip complete conversations/displayed requests, preserve exact malformed request JSON and output/native context evidence, reject non-finite values/size overflow, and replace formatted diagnostic report assertions. Native share-target file acceptance remains separate.
+
+✅ Task reference regressions: verify equal IDs merge roles, distinct IDs remain separately labelled, record-only/request-only/absent evidence stays accurate, and JSON export retains the original fields. Native responsive/chip layout requires separate preview/device evidence.
+
+✅ Catalog projection regressions: decode recorded Action/Tool fields and counts, preserve both groups/entries and original export JSON, support genuine empty groups and reject malformed/missing required snapshot fields. No production registry policy changes.
+
+
+✅ Task-history surface removal: conversation/request export replaces obsolete subset/task-only export coverage. Preserve conversation/request JSON round trips, chronological Task expansion, IDs/Skills/catalog metadata and single request navigation regressions.

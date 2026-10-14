@@ -13,7 +13,7 @@ MobileHarness connects perception, cognition and behavior in one Apple-native ap
 | Expressive companion | Present semantic eye expressions, gaze, voice phase and actual audio spectrum state. |
 | Connected robot | Discover/connect a supported device and request bounded, supervised movement with truthful execution status. |
 | Provider choice | Use local chat or explicitly configure a compatible cloud provider; surface configuration/provider failures. |
-| Conversation history | Inspect retained raw exchanges, start a new conversation, archive and retry title generation without replaying behavior. |
+| Agent records | Inspect Agent-specific retained evidence for user/developer traceability. Current Assistant conversations include raw exchanges and foreground Task summaries/sources; start a new conversation, archive and retry titles without replaying behavior. Separate execution diagnostics retain runtime tasks. |
 | Diagnostics | Explicitly run diagnostic operations and distinguish synthetic previews from real processing. |
 
 ## Behavioral requirements

@@ -36,6 +36,8 @@ flowchart TB
 
 ## Packaging contract
 
+✅ HistoryQuery revision6: prefer exact stable ref returned by History.list, use full id only when ref is absent, and recover one notFound by listing again before one exact read. Preserve historical failure evidence and distinguish a corrected later success from the earlier failure. Function aliases, read-only scope and resource paths stay the same.
+
 The bundle contains source declarations/license notices, not model weights. Catalog declarations identify acquirable artifacts; installed receipts record actual sandbox installation. Neither proves capability readiness or selects an active provider. App injects paths; ModelKit Defaults combines installation state, compatibility and preferences.
 
 ✅ Pure Agent/Skill assets live here as Agents/, Skills/ and Catalog.json. Agents owns their schema and runtime policy; Resources owns source asset organization. The Agents package target compiles only Agents sources and copy these explicit resources without adding a new module. Runtime lookup must locate Catalog.json with Bundle APIs rather than append Resources to resourceURL. Build staging uses [license notices](../../docs/licenses/README.md). `PrivacyInfo.xcprivacy` and the asset catalog supply platform declarations. Original icon artwork is retained separately from the selected build icon.

@@ -34,15 +34,15 @@ flowchart LR
 
 ## History
 
-Agent destinations are Assistant, Photographer, Memory and ApplicationControl. Each has independent state and one host-owned load slot. Assistant renders current/archive controls; specialists render read-only task lists and task-scoped detail/export. Original task requests supply titles; missing task association stays separate. UI does not invent dates, usage, timing or outcomes.
+✅ Implemented: Settings Agent 记录 is a generic view-injection hub; currently only Assistant has a record destination. Each future Agent provides its own record schema/view. Assistant renders canonical current/archive conversations, with Task sources in the conversation timeline. Conversation titles use canonical metadata; Task association stays bound to indexed request identities. UI does not invent dates, usage, timing or outcomes.
 
-`History*` values are presentation-owned. Actual request order, ReACT (orange), native calls/results, usage and optional adapter-recorded request-start/first-token latency are retained. Generation metadata renders directly under Generation Meta. Timing is never inferred from record arrival. Unavailable provider values remain blank. Exports preserve supplied evidence and real failures, without injecting storage-migration explanations.
+`History*` values are presentation-owned. Actual request order, ReACT (orange type markers), native calls/results, usage and optional adapter-recorded request-start/first-token latency are retained. Generation metadata renders directly under Generation Meta. Timing is never inferred from record arrival. Unavailable provider values remain blank. Exports preserve supplied evidence and real failures, without injecting storage-migration explanations.
 
 Up to four image references are deduplicated from actual context. Page-cancellable reads allow at most 4 MiB per image; asynchronous UIKit preparation bounds thumbnails to 320 pixels and preview to 2048 while preserving aspect ratio. Actual failures offer retry; absent photos remain blank. Only structured imageReferences supply image identity; displayed text stays literal.
 
 ✅ Local drafts/navigation, independent resource/device/history values and bounded image presentation.
 
-❌ History page layout redesign.
+❌ Other Agent record schemas and native navigation/physical acceptance remain separate.
 
 ## Related design
 
@@ -50,17 +50,17 @@ Up to four image references are deduplicated from actual context. Page-cancellab
 
 ## Skill/task-mode contract
 
-✅ “历史记录” contains Assistant 聊天记录 and 任务记录. Request details show immutable task/Skill/function evidence outside collapsed generation information; only stored modelRequests become request rows.
+✅ Implemented: “Agent 记录” contains Assistant 聊天记录 only. Request details show immutable task/Skill/function evidence separately from generation information; only stored modelRequests become request rows.
 
 ## 泛化 Task 与独立 Skill
 
-✅ Task rows/details display execution type, goal, Skills, executor, parent task and last result/progress. Model rounds show immutable taskGoal/execution/Skill revisions separately from collapsed generation information. Unavailable evidence remains absent.
+✅ Conversation Task summaries display recorded goal/terminal status/result and source count; request details show immutable taskGoal/execution/Skill revisions separately from generation information. Task executor/parent/progress belongs to the separate execution diagnostics. Unavailable evidence remains absent.
 
 ✅ 音频完成等待使用原生回调、实际错误及作用域取消，不设置 ASR/TTS 收尾、PCM 首帧或播放 buffer 兜底计时器；移除相应不存在的 timeout/fallback 展示分支，完成仍须真实完成回调，不能伪造成功。
 
 ## 历史记录收敛（2026-10-13）
 
-✅ 已实现：SettingsView/ConversationHistoryView 显示“历史记录”，仅有 Assistant 聊天记录与任务记录。ConversationHistoryPresentation 仅展开 modelRequests、只解析结构化图片引用；删除旧续轮合成、虚构身份、缺失元数据标签与 Mode 回退。HistoryTask 只表示实际任务，取消未关联输入分区。
+✅ Implemented: SettingsView opens AgentRecordsView under “Agent 记录”; ConversationHistoryView is the Assistant conversation page only. ConversationHistoryPresentation 仅展开 modelRequests、只解析结构化图片引用；删除旧续轮合成、虚构身份、缺失元数据标签与 Mode 回退。未关联输入不合成为虚构任务。
 
 ❌ 历史记录页面板块重新设计及原生 UI/真机验收。
 
@@ -80,18 +80,35 @@ Up to four image references are deduplicated from actual context. Page-cancellab
 
 ## 历史列表布局与单级详情导航
 
-✅ ConversationHistoryView keeps task metadata, expansion controls and original-request cells independent, but renders the complete timeline in one contiguous Section without inter-item margins or task headers. Request rows use 12-point top/bottom insets plus 8-point internal vertical padding and native separators. Task goals/checklist icons remain blue; ordinary timeline requests use text bubbles, expanded task requests have no icon. ReACT text stays orange and its badge follows the bottom date/status text. Expansion remains immediate with the existing single-destination navigation.
+✅ Task-row disclosure: ConversationHistoryView renders Task metadata as one plain Button that toggles the existing expandedTasks state with animations disabled. The separate expansion-control row is removed. Status and source count read completed · N 轮对话; the trailing chevron uses request-row style/position, right when collapsed and down when expanded. Request/source cells stay independent in the contiguous timeline; source rows keep icon-free indentation and ReACT styling.
 
-✅ ConversationHistoryState defines a UI-local HistoryRequestNavigation value with one selected request and one presentation flag; repeated taps during an active destination do not replace or append it. ConversationHistoryDetail registers exactly one navigationDestination outside List rows, uses plain Buttons to select requests, and retains expansion state after Back/interactive dismissal. Task-scoped request lists use the same single-destination contract. Async detail loading checks cancellation before applying results. No storage, backend or module interfaces change.
+✅ ReACT visual hierarchy: top-level ReACT requests use an orange arrow.clockwise single-arrow cycle symbol instead of the ordinary text bubble. ReACT input text retains its original orange color; ordinary input uses primary color and all responses use secondary color. ReACT icons/badges remain orange. Task summaries place a blue Task capsule after the status/count, sharing the caption2/bold, horizontal6/vertical2 and 15%-tint styling of ReACT badges through one private view helper. Expanded source rows retain their icon-free layout. No data/navigation/storage contracts change.
+
+✅ ConversationHistoryState defines a UI-local HistoryRequestNavigation value with one selected request and one presentation flag; repeated taps during an active destination do not replace or append it. ConversationHistoryDetail registers exactly one navigationDestination outside List rows, uses plain Buttons to select requests, and retains expansion state after Back/interactive dismissal. Async detail loading checks cancellation before applying results. No storage, backend or module interfaces change.
 
 ❌ Native expansion layout, interactive Back and repeated navigation acceptance remain separate from state regressions and iOS compilation.
 
-✅ Timeline outer/top edges remain hidden. First-level conversation/task boundaries span both card edges. Task metadata/internal source boundaries start at the primary text column (16-point padding + 24-point icon + 12-point gap); expanded source text uses that same 52-point leading inset. The last source closes the task with a full-width separator. Expansion control aligns with task text, using an inset line when expanded and a full-width boundary when collapsed. HistoryTimelineRowSeparator accepts a leading alignment offset and extends its trailing edge through the 20-point content inset. Native simulator screenshots of production page code with synthetic records verify collapsed/expanded static geometry; provider/persistence and gesture acceptance remain separate.
+✅ Hierarchical separators: keep timeline outer/top edges hidden and first-level boundaries full width. The Task summary's bottom separator is inset to the 52-point primary text column while expanded with sources, and full width while collapsed. Expanded source text/lines align to that text column; the last source closes the task with a full-width boundary. There is no expansion-control cell. Updated native simulator screenshots of production page code with synthetic records verify collapsed/expanded static geometry; model/storage and gesture acceptance remain separate.
 
 ## Detail headings and JSON sharing
 
 ✅ ConversationTurnDetail retains the six English section titles. decisionMetadata.catalogJSON's Function Catalog disclosure belongs to Tasks and Skills; Prompts retains actual context messages and sent declarations. Parsed Output and Metadata disclosure rows and the obsolete generationInfoExpanded state are removed. Their existing contents render directly in Action Execution and Generation Meta. Parsed interpretation still comes from controls.preview and is not execution evidence; no data/share/navigation contract changes.
 
-✅ HistoryTask is Codable; the presentation JSON encoder uses pretty printed/sorted keys, default Codable dates and a 32 MiB output limit. A native Transferable JSON document uses the unmodified UI-owned conversation/task/request value, including original requestJSON strings and evidence. Encoding happens only when the share provider requests data, with cancellation checks and thrown failures; no file writes, view-body serialization, diagnostic report, fabricated empty export or storage API change. Conversation timelines share loaded full conversation JSON, task timelines share task JSON and request details share the displayed request JSON. Metadata is not substituted for a conversation that is still loading.
+✅ Conversation/request values are Codable; the presentation JSON encoder uses pretty printed/sorted keys, default Codable dates and a 32 MiB output limit. A native Transferable JSON document uses the unmodified UI-owned conversation/request value, including original requestJSON strings and evidence. Encoding happens only when the share provider requests data, with cancellation checks and thrown failures; no file writes, view-body serialization, diagnostic report, fabricated empty export or storage API change. Conversation timelines share loaded full conversation JSON, request details share the displayed request JSON; the duplicate task-only export is removed. Metadata is not substituted for a conversation that is still loading.
 
 ❌ Native receiving-app file acceptance remains separate from Codable regressions, simulator layout and Transferable/device compilation.
+
+## Request Task and Skills panel
+
+✅ ConversationHistoryPresentation.taskReferences(for:) projects immutable record ownership and request-time task snapshots into unique UUID references with explicit role flags. Equal historyTaskID/decisionMetadata.taskID merges both roles; distinct IDs remain separate, in record-owner then snapshot order. Active at request describes recorded request state only, never live task status. No storage/backend or Codable schema changes.
+
+✅ ConversationTurnDetail keeps one Tasks and Skills section. ViewThatFits renders Task/Skills subpanels side-by-side only when their minimum readable widths fit, otherwise vertically with an internal divider. Task goal, request execution mode and selectable unique IDs are grouped together. Sorted Skill ID/revision labels use a private wrapping Layout and tinted capsules rather than separate Form rows. Function Catalog remains a separate disclosure row within the same section; the panel native separator aligns with its internal divider at the content leading edge. Layout recomputes from available width and measured subviews; no async work/state/cache owner is added.
+
+## Structured Function Catalog
+
+✅ HistoryFunctionCatalog/HistoryFunctionRegistration are UI-local Decodable projections of the current request snapshot schema. ConversationHistoryPresentation.functionCatalog(_:) strictly requires Actions/Tools and recorded registration fields; no old format import. ConversationTurnDetail decodes once on construction and retains the explicit failure message for malformed snapshots. Function Catalog stays in Tasks and Skills with grouped Actions/Tools counts, sorted alias/path rows and per-function Channel/required/optional/definition disclosure. Empty groups show actual zero counts; corrupted snapshots show the error and original JSON rather than fabricated empty success. Raw JSON sharing remains unchanged and catalog origin is the recorded request, never the live registry.
+
+
+✅ AgentRecordDestination carries stable identity, display text and a MainActor view factory. AgentRecordsView renders those independently injected record pages; it has no conversation state or load/mutation workflow. ConversationHistoryView renders only canonical Assistant conversations, with no task-only state, subset page or separate export. Real Task compression/source schemas remain intact.
+
+✅ Required conversation reader: selected-conversation reads are a required injected interface, with no optional/default unavailable implementation. Tests inject explicit readers/failures.

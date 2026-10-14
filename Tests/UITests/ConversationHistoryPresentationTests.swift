@@ -170,14 +170,6 @@ private func historyFixture(extra: [String: Any]) throws -> HistoryConversation 
             .attachedImages.isEmpty)
 }
 
-@Test func taskHistoryFiltersOriginalInputBeforeExpandingRequests() throws {
-    let value = try conversation(user: "task input")
-    let id = try #require(value.turns.first?.id)
-    #expect(ConversationHistoryPresentation.turns(value, inputIDs: [id]).count == 1)
-    #expect(ConversationHistoryPresentation.turns(value, inputIDs: [UUID()]).isEmpty)
-    #expect(ConversationHistoryPresentation.turns(value).count == 1)
-}
-
 @Test func historyRequestNavigationIgnoresExtraTapsUntilSingleDestinationDismisses() throws {
     let first = try #require(ConversationHistoryPresentation.turns(try conversation(user: "first")).first)
     let second = try #require(ConversationHistoryPresentation.turns(try conversation(user: "second")).first)
@@ -212,24 +204,13 @@ private func historyFixture(extra: [String: Any]) throws -> HistoryConversation 
     #expect(!row.firstTokenReport.contains("3.000"))
 }
 
-@Test func historyJSONExportRoundTripsFullConversationAndDisplayedTask() throws {
+@Test func historyJSONExportRoundTripsFullConversation() throws {
     let original = try conversation(user: "原始输入\n\"quoted\" / path")
     let data = try ConversationHistoryPresentation.jsonData(original)
     let exported = try JSONDecoder().decode(HistoryConversation.self, from: data)
     #expect(exported.id == original.id && exported.turns.count == original.turns.count)
     #expect(exported.turns.first?.user == original.turns.first?.user)
     #expect(exported.turns.first?.modelRequests?.first?.input == original.turns.first?.modelRequests?.first?.input)
-    let rows = ConversationHistoryPresentation.turns(original)
-    var task = HistoryTask(id: UUID(), title: "目标", status: "completed", createdAt: original.createdAt, turns: rows)
-    task.skills = ["photography"]
-    task.execution = "foreground"
-    task.executor = "assistant"
-    task.resultText = "实际结果"
-    task.parentTaskID = UUID()
-    let decoded = try JSONDecoder().decode(HistoryTask.self, from: ConversationHistoryPresentation.jsonData(task))
-    #expect(decoded.id == task.id && decoded.title == task.title && decoded.parentTaskID == task.parentTaskID)
-    #expect(decoded.skills == task.skills && decoded.resultText == task.resultText)
-    #expect(decoded.turns.map(\.id) == rows.map(\.id))
     let object = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
     #expect(object["turns"] != nil && object["taskCompressions"] != nil)
     #expect(object["interpretation"] == nil && object["diagnosticReport"] == nil)
@@ -243,4 +224,83 @@ private func historyFixture(extra: [String: Any]) throws -> HistoryConversation 
     #expect(throws: EncodingError.self) {
         try ConversationHistoryPresentation.jsonData(["temperature": Double.nan])
     }
+}
+
+@Test func historyTaskReferencesMergeMatchingIDsWithoutChangingExport() throws {
+    let id = UUID()
+    let turn = try taskReferenceFixture(owner: id, snapshot: id)
+    let references = ConversationHistoryPresentation.taskReferences(for: turn)
+    #expect(references.count == 1)
+    #expect(references.first?.id == id)
+    #expect(references.first?.isHistoryOwner == true && references.first?.wasActiveAtRequest == true)
+    let exported = try JSONDecoder().decode(HistoryTurn.self, from: ConversationHistoryPresentation.jsonData(turn))
+    #expect(exported.historyTaskID == id && exported.decisionMetadata?.taskID == id)
+}
+
+@Test func historyTaskReferencesRetainDifferentOwnerAndRequestSnapshot() throws {
+    let owner = UUID()
+    let snapshot = UUID()
+    let references = ConversationHistoryPresentation.taskReferences(
+        for: try taskReferenceFixture(owner: owner, snapshot: snapshot))
+    #expect(references.map(\.id) == [owner, snapshot])
+    #expect(references[0].isHistoryOwner && !references[0].wasActiveAtRequest)
+    #expect(!references[1].isHistoryOwner && references[1].wasActiveAtRequest)
+}
+
+@Test func historyTaskReferencesDoNotInventMissingOwnershipOrActivity() throws {
+    let id = UUID()
+    let ownerOnly = ConversationHistoryPresentation.taskReferences(
+        for: try taskReferenceFixture(owner: id, snapshot: nil))
+    #expect(ownerOnly.count == 1 && ownerOnly.first?.isHistoryOwner == true)
+    #expect(ownerOnly.first?.wasActiveAtRequest == false)
+    let snapshotOnly = ConversationHistoryPresentation.taskReferences(
+        for: try taskReferenceFixture(owner: nil, snapshot: id))
+    #expect(snapshotOnly.count == 1 && snapshotOnly.first?.wasActiveAtRequest == true)
+    #expect(snapshotOnly.first?.isHistoryOwner == false)
+    let absent = ConversationHistoryPresentation.taskReferences(
+        for: try taskReferenceFixture(owner: nil, snapshot: nil))
+    #expect(absent.isEmpty)
+}
+
+private func taskReferenceFixture(owner: UUID?, snapshot: UUID?) throws -> HistoryTurn {
+    var turn = try #require(conversation(user: "fixture").turns.first)
+    turn.historyTaskID = owner
+    if let snapshot {
+        turn.decisionMetadata = try JSONDecoder().decode(
+            HistoryDecisionMetadata.self,
+            from: JSONSerialization.data(withJSONObject: [
+                "taskID": snapshot.uuidString, "mode": "task", "skills": ["photography": 16], "catalogJSON": "{}",
+            ]))
+    }
+    return turn
+}
+
+@Test func historyFunctionCatalogSeparatesRecordedActionsAndToolsWithoutChangingExport() throws {
+    let source =
+        #"{"actions":[{"path":"Camera.Preview.open","alias":"openCamera","channel":"Display","required":[],"optional":["lens"]},{"path":"Camera.Preview.close","alias":"closeCamera","channel":"Display","required":[],"optional":[]}],"tools":[{"path":"History.Conversation.read","alias":"readHistory","required":["id"],"optional":["offset"],"definitionJSON":"{\"type\":\"function\"}"}]}"#
+    let catalog = try ConversationHistoryPresentation.functionCatalog(source)
+    #expect(catalog.actions.map(\.alias) == ["openCamera", "closeCamera"])
+    #expect(catalog.tools.count == 1 && catalog.tools[0].path == "History.Conversation.read")
+    #expect(catalog.actions[0].channel == "Display" && catalog.actions[0].optional == ["lens"])
+    #expect(catalog.tools[0].channel == nil && catalog.tools[0].required == ["id"])
+    #expect(catalog.tools[0].definitionJSON == #"{"type":"function"}"#)
+    var turn = try taskReferenceFixture(owner: nil, snapshot: nil)
+    turn.decisionMetadata = try JSONDecoder().decode(
+        HistoryDecisionMetadata.self,
+        from: JSONSerialization.data(withJSONObject: ["mode": "default", "skills": [:], "catalogJSON": source]))
+    let exported = try JSONDecoder().decode(HistoryTurn.self, from: ConversationHistoryPresentation.jsonData(turn))
+    #expect(exported.decisionMetadata?.catalogJSON == source)
+}
+
+@Test func historyFunctionCatalogShowsGenuineEmptyGroups() throws {
+    let catalog = try ConversationHistoryPresentation.functionCatalog(#"{"actions":[],"tools":[]}"#)
+    #expect(catalog.actions.isEmpty && catalog.tools.isEmpty)
+}
+
+@Test(arguments: [
+    "invalid JSON", #"{"tools":[]}"#, #"{"actions":[],"tools":{}}"#,
+    #"{"actions":[{"path":"Camera.Preview.open","alias":"openCamera"}],"tools":[]}"#,
+])
+func historyFunctionCatalogRejectsCorruptSnapshotsRatherThanInventingEmptyGroups(_ json: String) {
+    #expect(throws: DecodingError.self) { try ConversationHistoryPresentation.functionCatalog(json) }
 }

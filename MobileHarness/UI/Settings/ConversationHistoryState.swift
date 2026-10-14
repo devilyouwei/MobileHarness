@@ -4,17 +4,12 @@ import Observation
 @MainActor @Observable
 public final class ConversationHistoryState {
     public let title: String
-    public let allowsMutations: Bool
-    public let groupsByTask: Bool
     public var selectedConversation: HistoryConversation?
     public var archive: HistorySnapshot?
-    public var tasks: [HistoryTask] = []
     public var status: String?
     public var isBusy = false
-    public init(title: String = "历史记录", allowsMutations: Bool = true, groupsByTask: Bool = false) {
+    public init(title: String = "Assistant 聊天记录") {
         self.title = title
-        self.allowsMutations = allowsMutations
-        self.groupsByTask = groupsByTask
     }
 }
 
@@ -30,42 +25,8 @@ public struct HistoryRequestNavigation {
     }
 }
 
-/// Immutable task projection; identity and membership are resolved by App from Agent context.
-public struct HistoryTask: Codable, Identifiable, Sendable {
-    public let id: UUID
-    public let title: String
-    public let status: String
-    public let createdAt: Date?
-    public let turns: [HistoryTurn]
-    public var execution: String?
-    public var executor: String?
-    public var resultText: String?
-    public var parentTaskID: UUID?
-    public var skills: [String] = []
-    public var compression: HistoryTaskCompression?
-    public init(
-        id: UUID, title: String, status: String, createdAt: Date?, turns: [HistoryTurn]
-    ) {
-        self.id = id
-        self.title = title
-        self.status = status
-        self.createdAt = createdAt
-        self.turns = turns
-    }
-}
-
-public struct HistoryAgentSnapshot: Sendable {
-    public let archive: HistorySnapshot
-    public let tasks: [HistoryTask]
-    public init(archive: HistorySnapshot, tasks: [HistoryTask]) {
-        self.archive = archive
-        self.tasks = tasks
-    }
-}
-
 @MainActor
 public protocol ConversationHistoryControlling: AnyObject {
-    var agents: [HistoryAgentDestination] { get }
     func load() async
     func loadConversation(_ id: UUID) async throws -> HistoryConversation
     func startNew()
@@ -235,30 +196,6 @@ public struct HistorySnapshot: Codable, Sendable {
     }
 }
 
-/// UI-owned navigation values; repositories and Agent implementations stay in App.
-@MainActor
-public struct HistoryAgentDestination: Identifiable {
-    public let id: String
-    public let name: String
-    public let summary: String
-    public let state: ConversationHistoryState
-    public let controls: any ConversationHistoryControlling
-    public init(
-        id: String, name: String, summary: String, state: ConversationHistoryState,
-        controls: any ConversationHistoryControlling
-    ) {
-        self.id = id
-        self.name = name
-        self.summary = summary
-        self.state = state
-        self.controls = controls
-    }
-}
-
-extension ConversationHistoryControlling {
-    public var agents: [HistoryAgentDestination] { [] }
-}
-
 public struct HistorySourceReference: Codable, Sendable, Equatable {
     public let inputID: UUID
     public let requestID: UUID
@@ -290,8 +227,3 @@ public enum HistoryTimelineItem: Identifiable, Sendable {
 }
 
 public enum HistoryDetailError: Error { case unavailable }
-extension ConversationHistoryControlling {
-    public func loadConversation(_ id: UUID) async throws -> HistoryConversation {
-        throw HistoryDetailError.unavailable
-    }
-}

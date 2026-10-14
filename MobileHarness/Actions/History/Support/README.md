@@ -31,6 +31,8 @@ flowchart TB
 
 ## 查询算法与数据约束
 
+✅ HistoryConversationReference validates a full UUID or eight ASCII hex characters at the entry boundary, normalizing case. HistoryQueryCapability.read consumes that typed reference. list computes prefix uniqueness across the metadata list and exposes ref only for a unique prefix. read resolves a short ref against metadata, then loads exactly the matched conversation; zero matches remain missingConversation, multiple matches report ambiguousConversationReference/invalidArguments. Exact full UUID requests keep normal missing-conversation semantics. No fuzzy matching, persistent alias table, title/index-based selection or automatic fallback.
+
 list 使用 store.listConversations 的当前会话与归档元数据，顺序沿用按 archivedAt 排序的索引，不加载归档正文。标题和 latestUser 预览各最多 40 UTF-8 字节，turnCount 取输入块数。
 
 read 查找当前或归档会话并调用 `indexedHistory()`，按项目分页。request 项取请求输入与 完整 response 字符串，带请求状态及输入/Task 关联；task 项取 goal 与 reportedSummary/failure 的组合，带实际终态和 Task 身份。user/response 分别限 80/160 UTF-8 字节，total 计算投影项数。

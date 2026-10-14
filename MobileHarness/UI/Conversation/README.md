@@ -8,7 +8,7 @@ Render conversation phases/captions/eyes and bounded Action, Task and Agent log 
 
 ## Ownership and boundaries
 
-App owns input/output lifetimes and supplies validated values. Views forward listening/retry/history intents and own only local presentation selection. Device connection policy is confined to Settings.
+App owns input/output lifetimes and supplies validated values. Views forward listening/retry/navigation intents and own only local presentation selection. Device connection policy is confined to Settings.
 
 ## External relationships and data flow
 
@@ -34,13 +34,13 @@ Startup is noninteractive while preparation runs and exposes progress/error/retr
 
 Home summaries show up to three exact Channel names, concurrent/queued counts and recent nonfailure terminal state for three seconds. Failures are shown in the scheduling issue list. Dismissal affects retained display identities only, never execution/cancellation. Internal maintenance success is hidden by default while failures remain visible. Direct Tools have no synthetic scheduled rows.
 
-Task details use retained input/call identities for related Action and executor model history. Missing/evicted evidence remains explicit. Outcome strings distinguish accepting state, native completion, cancellation before/after execution and retained child failures; they do not imply physical rollback.
+Task details use retained task/call identities for related Action filtering; canonical Agent request records are available separately in Settings. Missing/evicted evidence remains explicit. Outcome strings distinguish accepting state, native completion, cancellation before/after execution and retained child failures; they do not imply physical rollback.
 
 ## Preview boundary
 
 Debug conversation/Action previews explicitly use synthetic state and bypass model/camera/audio/Bluetooth startup. Release ignores their launch flags. Page-owned refresh only drives display hiding; observers and long-lived work belong to App.
 
-✅ Independent conversation/log values, request-scoped expression callbacks and read-only task/history navigation.
+✅ Independent conversation/log values, request-scoped expression callbacks and read-only task execution navigation and independent Agent records.
 
 ❌ Durable execution audit and device-specific stage progress.
 
@@ -93,3 +93,6 @@ Debug conversation/Action previews explicitly use synthetic state and bypass mod
 
 
 ✅ ExecutionIssue 已增加可选 userMessage 展示值，日志 message 不变；首页 visibleNotice 优先使用宿主提供的 userMessage，错误 toast 的身份、去重、到期和日志面板保持现有行为。UI 不解析语音 SDK 错误。
+
+
+✅ Execution-history navigation: ConversationView/ActionActivityView have no task-history view factory; TaskLogItem carries only execution display fields. Task details retain requester/executor/mode/Skills/parent/state/failure/event timeline and related Action filtering. Background task evidence remains execution diagnostics and is not described as conversation history.

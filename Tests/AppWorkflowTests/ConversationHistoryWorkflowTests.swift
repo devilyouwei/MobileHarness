@@ -6,7 +6,7 @@ import StorageChat
 import Testing
 import UI
 
-@Test @MainActor func assistantHistoryGroupsForegroundAndBackgroundTasksByPersistedIdentity() async throws {
+@Test @MainActor func canonicalConversationRetainsTaskSourcesAfterLiveStateRetirement() async throws {
     let store = ConversationHistoryStore()
     let input = UUID()
     let foreground = UUID()
@@ -30,25 +30,24 @@ import UI
     _ = try await store.startNew()
     context.state.history = try await store.snapshot()
     context.state.reconcileTaskCompressions()
-    let background = AgentTaskScope(
-        requester: .assistant, executor: .photographer, sessionID: UUID(), execution: .background)
-    try context.tasks.register(background)
-    context.state.taskViews = [
-        background.id: AgentTaskView(scope: background, content: try AgentTaskContent(text: "后台拍摄"))
-    ]
-    let snapshot = try HistoryPresentationAdapter.assistantTasks(context)
-    #expect(snapshot.tasks.count == 2)
-    let photo = try #require(snapshot.tasks.first { $0.id == foreground })
-    #expect(photo.title == "帮我拍照" && photo.execution == "foreground" && photo.executor == "assistant")
-    #expect(photo.turns.count == 2 && photo.turns[1].isReACT == true)
-    #expect(Set(photo.turns.compactMap(\.ownerInputID)) == [input])
-    let delegated = try #require(snapshot.tasks.first { $0.id == background.id })
-    #expect(delegated.execution == "background" && delegated.executor == "photographer" && delegated.turns.isEmpty)
-    #expect(snapshot.archive.past.count == 1)
-    #expect(photo.compression?.sources.count == 2)
+    let conversation = try HistoryPresentationAdapter.conversation(context.state.history.past[0])
+    let requests = ConversationHistoryPresentation.turns(conversation)
+    #expect(requests.count == 2 && requests[1].isReACT == true)
+    #expect(Set(requests.compactMap(\.ownerInputID)) == [input])
+    let items = ConversationHistoryPresentation.timeline(conversation)
+    guard case .task(let compression, let sources) = try #require(items.first) else {
+        Issue.record("Canonical conversation must contain Task compression and original sources")
+        return
+    }
+    #expect(compression.taskID == foreground && compression.goal == "帮我拍照")
+    #expect(sources.count == 2 && sources.allSatisfy { $0.raw == "回复" })
+    let list = try await HistoryPresentationAdapter.listPresentation(store)
+    #expect(list.past.count == 1 && list.past[0].turns.isEmpty)
     context.state.skillState?.tasks = []
-    let retired = try HistoryPresentationAdapter.assistantTasks(context)
-    #expect(retired.tasks.first(where: { $0.id == foreground })?.turns.count == 2)
+    let retired = try HistoryPresentationAdapter.conversation(context.state.history.past[0])
+    #expect(ConversationHistoryPresentation.turns(retired).map(\.id) == requests.map(\.id))
+    #expect(ConversationHistoryPresentation.timeline(retired).count == 1)
+
 }
 
 @Test @MainActor func failedHistoryLoadDoesNotCreateAnEphemeralStore() async {
@@ -59,10 +58,25 @@ import UI
         deleteArchive: { _ in Issue.record("Must not delete after failed preparation") },
         startNew: { Issue.record("Must not archive after failed preparation") },
         summarize: { _ in Issue.record("Must not summarize after failed preparation") }, previewOutput: { _ in "" },
+        readConversation: { _ in throw CancellationError() },
         readPhoto: { _, _ in nil })
     await workflow.load()
     workflow.startNew()
     #expect(state.archive == nil && state.status != nil && !state.isBusy)
+}
+
+@Test @MainActor func requiredConversationReaderRejectsForeignIdentityWithoutReplacingSelection() async throws {
+    let state = ConversationHistoryState()
+    let previous = HistoryConversation()
+    let supplied = HistoryConversation()
+    state.selectedConversation = previous
+    let workflow = ConversationHistoryWorkflow(
+        state: state, prepare: {}, refresh: {}, deleteArchive: { _ in }, startNew: {}, summarize: { _ in },
+        previewOutput: { _ in "" }, readConversation: { _ in supplied }, readPhoto: { _, _ in nil })
+    await #expect(throws: HistoryDetailError.unavailable) { try await workflow.loadConversation(UUID()) }
+    #expect(state.selectedConversation?.id == previous.id)
+    let selected = try await workflow.loadConversation(supplied.id)
+    #expect(selected.id == supplied.id && state.selectedConversation?.id == supplied.id)
 }
 
 @Test(.timeLimit(.minutes(1))) @MainActor func historyFacadeForwardsOperationsAndJoinsCancellation() async {
@@ -77,7 +91,8 @@ import UI
             archives += 1
             started.continuation.yield(())
             try await Task.sleep(for: .seconds(60))
-        }, summarize: { summaries.append($0) }, previewOutput: { _ in "" }, readPhoto: { _, _ in nil })
+        }, summarize: { summaries.append($0) }, previewOutput: { _ in "" },
+        readConversation: { _ in throw HistoryDetailError.unavailable }, readPhoto: { _, _ in nil })
     await workflow.load()
     var readiness = started.stream.makeAsyncIterator()
     workflow.startNew()
@@ -157,7 +172,11 @@ private enum HistoryPhotoFixtureError: Error { case failed }
     state.archive = try JSONDecoder().decode(HistorySnapshot.self, from: JSONSerialization.data(withJSONObject: value))
     let workflow = ConversationHistoryWorkflow(
         state: state, prepare: {}, refresh: {}, deleteArchive: { _ in }, startNew: {}, summarize: { _ in },
-        previewOutput: { _ in "" }, readPhoto: read)
+        previewOutput: { _ in "" },
+        readConversation: { id in
+            guard let value = state.archive?.current, value.id == id else { throw HistoryDetailError.unavailable }
+            return value
+        }, readPhoto: read)
     return (workflow, photo, round, owner)
 }
 
@@ -218,45 +237,7 @@ private enum HistoryPhotoFixtureError: Error { case failed }
     #expect(try await replacement.value == Data([1]))
 }
 
-@Test @MainActor func taskHistoryDestinationKeepsStateAndMutationAuthoritySeparate() async {
-    let first = ConversationHistoryState(title: "Assistant")
-    let second = ConversationHistoryState(title: "任务记录", allowsMutations: false)
-    var reads = 0
-    var mutations = 0
-    let workflow = ConversationHistoryWorkflow(
-        state: second, prepare: {},
-        refresh: {
-            reads += 1
-            second.archive = HistorySnapshot()
-        },
-        deleteArchive: { _ in mutations += 1 }, startNew: { mutations += 1 },
-        summarize: { _ in mutations += 1 }, previewOutput: { _ in "photo preview" }, readPhoto: { _, _ in nil })
-    let destination = HistoryAgentDestination(
-        id: "assistant.tasks", name: "任务记录", summary: "任务", state: second, controls: workflow)
-    await destination.controls.load()
-    destination.controls.startNew()
-    destination.controls.delete(UUID())
-    destination.controls.summarize(UUID())
-    await workflow.waitUntilIdle()
-    #expect(reads == 1 && mutations == 0)
-    #expect(first.archive == nil && second.archive != nil)
-    #expect(destination.state.title == "任务记录")
-}
-
-@Test @MainActor func failedTaskHistoryReadPreservesAssistantSnapshot() async {
-    let assistant = ConversationHistoryState(title: "Assistant")
-    assistant.archive = HistorySnapshot()
-    let specialist = ConversationHistoryState(title: "任务记录", allowsMutations: false)
-    let workflow = ConversationHistoryWorkflow(
-        state: specialist, prepare: {}, refresh: { throw HistoryPhotoFixtureError.failed },
-        deleteArchive: { _ in }, startNew: {}, summarize: { _ in }, previewOutput: { _ in "" },
-        readPhoto: { _, _ in nil })
-    await workflow.load()
-    #expect(specialist.archive == nil && specialist.status != nil)
-    #expect(assistant.archive != nil && assistant.status == nil)
-}
-
-@Test @MainActor func taskHistorySeparatesTwoTasksWithinOneInput() async throws {
+@Test @MainActor func canonicalConversationSeparatesTwoTasksWithinOneInput() async throws {
     let store = ConversationHistoryStore()
     let input = UUID()
     let taskA = UUID()
@@ -280,12 +261,8 @@ private enum HistoryPhotoFixtureError: Error { case failed }
                 taskID: id, goal: id.uuidString, status: .completed, reportedSummary: "done", failure: nil,
                 completedAt: Date(), sources: [.init(inputID: input, requestID: request.id)]))
     }
-    let snapshot = try HistoryPresentationAdapter.assistantTasks(context)
-    #expect(snapshot.tasks.count == 2)
-    for task in snapshot.tasks {
-        #expect(task.turns.count == 1 && task.turns[0].historyTaskID == task.id)
-    }
-    let items = ConversationHistoryPresentation.timeline(snapshot.archive.current)
+    let conversation = try HistoryPresentationAdapter.conversation(context.state.history.current)
+    let items = ConversationHistoryPresentation.timeline(conversation)
     #expect(items.count == 2 && Set(items.map(\.id)) == [taskA, taskB])
     for item in items {
         guard case .task(let compression, let sources) = item else {

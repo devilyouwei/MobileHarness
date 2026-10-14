@@ -90,11 +90,9 @@ Healthy camera flips retain the native session/lease and acknowledge input repla
 
 ✅ Home failure contract: failures remain in root execution snapshots; only Agent/App/system failures project a fresh toast independent of voicePhase. Action failures remain panel-only. Photo storage selects FIFO cache retention; decision continuation has no four-round/16-native host limit.
 
-## 历史记录收敛（2026-10-13）
+## Agent records
 
-✅ 已实现：历史记录页面仅保留 Assistant 聊天记录与任务记录。Assistant context 是聊天持久化事实源，任务按持久化身份关联；页面板块重新设计另行开展。
-
-❌ 历史记录页面板块重新设计及原生 UI/真机验收。
+✅ Implemented: 设置的 Agent 记录入口由各 Agent 注入自己的记录页面，目前只有 Assistant 聊天记录。前台 Task 的摘要、终态与原始请求包含在同一会话文件；任务运行状态与后台委派仍由 Agents/首页执行记录持有。删除重复任务历史页面与聚合接口。其他 Agent 的记录类型尚未实现。
 
 
 ✅ Implemented: root VoiceSessionCoordinator warms the default cue/haptic on touch-down through an injected UI callback, retires aborted/background preparation, and reuses warm native resources for canonical activation. No second cue/haptic playback path is added.
@@ -115,9 +113,12 @@ Healthy camera flips retain the native session/lease and acknowledge input repla
 
 ## Task history v2 and in-place compression
 
-✅ Implemented: App uses a fresh assistant.history-v2.context.json repository and adapts the new history schema to passive UI. Historical Task membership uses historyTaskID rather than all requests under inputIDs.
+✅ Implemented: App adapts canonical current.json / conversation-ID archive checkpoints into passive UI. Historical Task membership uses historyTaskID rather than all requests under inputIDs.
 
 
 ## 会话存储性能重构 v3
 
 ✅ 已实现：组合层注入会话文件仓库与 Assistant 恢复编解码闭包，旧 Assistant 文件不参与启动。历史工作流按需加载单会话，列表读索引。
+
+
+✅ Agent records: MobileHarnessApp renders a generic record hub composed by AppAssembly; Assistant keeps one root-owned ConversationHistoryWorkflow. No task-history reader/adaptation, dummy root conversation workflow or task-scoped conversation jump remains. Retain Memory history operations, per-conversation lazy reads, photos, actual task state and execution diagnostics.

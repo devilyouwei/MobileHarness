@@ -2,85 +2,54 @@
     import SwiftUI
     import UIKit
 
-    /// Assistant chat and task history destinations.
+    /// Each Agent supplies its own record view and schema; no history workflow lives in the hub.
+    @MainActor
+    public struct AgentRecordDestination: Identifiable {
+        public let id: String
+        public let name: String
+        public let summary: String
+        private let content: () -> AnyView
+        public init<Content: View>(
+            id: String, name: String, summary: String, @ViewBuilder content: @escaping () -> Content
+        ) {
+            self.id = id
+            self.name = name
+            self.summary = summary
+            self.content = { AnyView(content()) }
+        }
+        public func makeView() -> AnyView { content() }
+    }
+
+    @MainActor
+    public struct AgentRecordsView: View {
+        private let destinations: [AgentRecordDestination]
+        public init(destinations: [AgentRecordDestination]) { self.destinations = destinations }
+        public var body: some View {
+            List(destinations) { destination in
+                NavigationLink {
+                    destination.makeView()
+                } label: {
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text(destination.name)
+                        Text(destination.summary).font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+                .accessibilityIdentifier("records.agent.\(destination.id)")
+            }
+            .navigationTitle("Agent 记录").navigationBarTitleDisplayMode(.inline)
+            .preferredColorScheme(.dark)
+        }
+    }
+
     @MainActor
     public struct ConversationHistoryView: View {
-        @Bindable var state: ConversationHistoryState
-        let controls: any ConversationHistoryControlling
+        @Bindable private var state: ConversationHistoryState
+        private let controls: any ConversationHistoryControlling
         public init(state: ConversationHistoryState, controls: any ConversationHistoryControlling) {
             self.state = state
             self.controls = controls
         }
-
-        public var body: some View {
-            if controls.agents.isEmpty {
-                AgentConversationHistoryList(state: state, controls: controls)
-            } else {
-                List(controls.agents) { agent in
-                    NavigationLink {
-                        AgentConversationHistoryList(state: agent.state, controls: agent.controls)
-                    } label: {
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text(agent.name)
-                            Text(agent.summary).font(.caption).foregroundStyle(.secondary)
-                        }
-                    }
-                    .accessibilityIdentifier("history.agent.\(agent.id)")
-                }
-                .navigationTitle("历史记录")
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar(.visible, for: .navigationBar)
-            }
-        }
-    }
-
-    /// Task-scoped read-only projection using the owning Agent's existing history and controls.
-    @MainActor
-    public struct TaskConversationHistoryView: View {
-        @Bindable private var state: ConversationHistoryState
-        private let controls: any ConversationHistoryControlling
-        private let inputIDs: Set<UUID>
-        @State private var requestNavigation = HistoryRequestNavigation()
-        public init(state: ConversationHistoryState, controls: any ConversationHistoryControlling, inputIDs: Set<UUID>)
-        {
-            self.state = state
-            self.controls = controls
-            self.inputIDs = inputIDs
-        }
-        private var turns: [HistoryTurn] {
-            guard let archive = state.archive else { return [] }
-            return ([archive.current] + archive.past).flatMap {
-                ConversationHistoryPresentation.turns($0, inputIDs: inputIDs)
-            }
-        }
-        public var body: some View {
-            List {
-                if let status = state.status { Text(status).foregroundStyle(.secondary) }
-                ForEach(turns) { turn in
-                    Button {
-                        requestNavigation.open(turn)
-                    } label: {
-                        VStack(alignment: .leading, spacing: 5) {
-                            Label("对话", systemImage: "text.bubble").font(.caption).foregroundStyle(.secondary)
-                            if turn.isReACT == true { Text("ReACT").font(.caption).foregroundStyle(.orange) }
-                            if let metadata = turn.decisionMetadata {
-                                Text(metadata.summary).font(.caption).foregroundStyle(.secondary).lineLimit(2)
-                            }
-                            Text(turn.displayInput).lineLimit(3)
-                            Text(turn.outputSummary).lineLimit(3).foregroundStyle(.secondary)
-                            Text(turn.dateReport).font(.caption).foregroundStyle(.secondary)
-                        }
-                    }
-                    .buttonStyle(.plain)
-                }
-                if turns.isEmpty && !state.isBusy { Text("暂无匹配的模型记录，关联输入可能已超出保留范围").foregroundStyle(.secondary) }
-            }
-            .navigationTitle("模型与 Tool 记录")
-            .navigationDestination(isPresented: $requestNavigation.isPresented) {
-                if let turn = requestNavigation.turn { ConversationTurnDetail(turn: turn, controls: controls) }
-            }
-            .task { await controls.load() }
-        }
+        public var body: some View { AgentConversationHistoryList(state: state, controls: controls) }
     }
 
     @MainActor
@@ -90,66 +59,57 @@
         @Environment(\.scenePhase) private var scenePhase
         @State private var deleting: HistoryConversation?
         var body: some View {
-            Group {
-                if state.groupsByTask {
-                    SpecialistTaskHistoryList(state: state, controls: controls)
-                } else {
-                    List {
-                        if let status = state.status {
-                            Section { Text(status).foregroundStyle(.secondary).textSelection(.enabled) }
-                        }
-                        Section {
-                            if let current = state.archive?.current {
-                                if (current.turnCount ?? current.turns.count) == 0 {
-                                    Text("此 Agent 尚无对话记录。").foregroundStyle(.secondary)
-                                } else {
-                                    NavigationLink {
-                                        ConversationHistoryDetail(conversation: current, controls: controls)
-                                    } label: {
-                                        row(current)
-                                    }
-                                }
-                                if state.allowsMutations {
-                                    Button("开始新对话", systemImage: "square.and.pencil") { controls.startNew() }
-                                        .disabled(state.isBusy || (current.turnCount ?? current.turns.count) == 0)
-                                        .accessibilityIdentifier("history.new")
-                                }
-                            } else if state.status == nil {
-                                ProgressView("加载对话…")
-                            } else {
-                                Button("重试加载") { Task { await controls.load() } }
+            List {
+                if let status = state.status {
+                    Section { Text(status).foregroundStyle(.secondary).textSelection(.enabled) }
+                }
+                Section {
+                    if let current = state.archive?.current {
+                        if (current.turnCount ?? current.turns.count) == 0 {
+                            Text("此 Agent 尚无对话记录。").foregroundStyle(.secondary)
+                        } else {
+                            NavigationLink {
+                                ConversationHistoryDetail(conversation: current, controls: controls)
+                            } label: {
+                                row(current)
                             }
-                        } header: {
-                            Text("当前对话")
-                        } footer: {
-                            Text(state.allowsMutations ? "开始新对话后，当前对话会移至历史记录。" : "此 Agent 的记录可查看和导出。")
                         }
-                        Section {
-                            if state.archive?.past.isEmpty == true { Text("暂无历史对话").foregroundStyle(.secondary) }
-                            ForEach(state.archive?.past ?? []) { conversation in
-                                NavigationLink {
-                                    ConversationHistoryDetail(conversation: conversation, controls: controls)
-                                } label: {
-                                    row(conversation)
-                                }
-                                .swipeActions {
-                                    if state.allowsMutations {
-                                        Button("删除", role: .destructive) { deleting = conversation }
-                                    }
-                                }
-                                if state.allowsMutations, conversation.summaryTitle == nil {
-                                    Button("重新生成标题") { controls.summarize(conversation.id) }.disabled(state.isBusy)
-                                    if let error = conversation.titleError {
-                                        Text("标题生成失败：\(error)").font(.caption).foregroundStyle(.secondary)
-                                    }
-                                }
+
+                        Button("开始新对话", systemImage: "square.and.pencil") { controls.startNew() }
+                            .disabled(state.isBusy || (current.turnCount ?? current.turns.count) == 0)
+                            .accessibilityIdentifier("history.new")
+                    } else if state.status == nil {
+                        ProgressView("加载对话…")
+                    } else {
+                        Button("重试加载") { Task { await controls.load() } }
+                    }
+                } header: {
+                    Text("当前对话")
+                } footer: {
+                    Text("开始新对话后，当前对话会移至已归档记录。")
+                }
+                Section {
+                    if state.archive?.past.isEmpty == true { Text("暂无历史对话").foregroundStyle(.secondary) }
+                    ForEach(state.archive?.past ?? []) { conversation in
+                        NavigationLink {
+                            ConversationHistoryDetail(conversation: conversation, controls: controls)
+                        } label: {
+                            row(conversation)
+                        }
+                        .swipeActions {
+                            Button("删除", role: .destructive) { deleting = conversation }
+                        }
+                        if conversation.summaryTitle == nil {
+                            Button("重新生成标题") { controls.summarize(conversation.id) }.disabled(state.isBusy)
+                            if let error = conversation.titleError {
+                                Text("标题生成失败：\(error)").font(.caption).foregroundStyle(.secondary)
                             }
-                        } header: {
-                            Text("过去的对话")
-                        } footer: {
-                            Text("历史记录仅保存在此设备。")
                         }
                     }
+                } header: {
+                    Text("过去的对话")
+                } footer: {
+                    Text("历史记录仅保存在此设备。")
                 }
             }
             .navigationTitle(state.title)
@@ -190,165 +150,22 @@
     }
 
     @MainActor
-    private struct SpecialistTaskHistoryList: View {
-        @Bindable var state: ConversationHistoryState
-        let controls: any ConversationHistoryControlling
-        var body: some View {
-            List {
-                if let status = state.status {
-                    Section {
-                        Text(status).foregroundStyle(.secondary)
-                        Button("重试加载") { Task { await controls.load() } }
-                    }
-                }
-                Section("任务") {
-                    ForEach(state.tasks) { task in row(task) }
-                    if state.tasks.isEmpty {
-                        if state.isBusy {
-                            ProgressView("加载任务…")
-                        } else if state.status == nil {
-                            Text("暂无任务记录").foregroundStyle(.secondary)
-                        }
-                    }
-                }
-                Section("历史任务按会话") {
-                    ForEach(state.archive?.past ?? []) { conversation in
-                        NavigationLink {
-                            ArchivedTaskHistoryList(conversation: conversation, controls: controls)
-                        } label: {
-                            Text(ConversationHistoryPresentation.title(conversation))
-                        }
-                    }
-                }
-
-            }
-        }
-        private func row(_ task: HistoryTask) -> some View {
-            NavigationLink {
-                ConversationHistoryDetail(task: task, controls: controls)
-            } label: {
-                VStack(alignment: .leading, spacing: 6) {
-                    Label(task.title, systemImage: "checklist").foregroundStyle(.blue).lineLimit(2)
-                    if let execution = task.execution {
-                        Text((execution == "background" ? "后台任务" : "前台任务") + " · " + (task.executor ?? "assistant"))
-                            .font(.caption).foregroundStyle(.secondary)
-                    }
-                    if !task.skills.isEmpty {
-                        Text("Skills: " + task.skills.joined(separator: ", ")).font(.caption).foregroundStyle(
-                            .secondary)
-                    }
-                    Text(
-                        [
-                            task.status, "\(task.turns.count) 轮",
-                            task.createdAt?.formatted(date: .abbreviated, time: .shortened) ?? "",
-                        ]
-                        .filter { !$0.isEmpty }.joined(separator: " · ")
-                    )
-                    .font(.caption).foregroundStyle(.secondary)
-                }
-            }
-            .accessibilityIdentifier("history.task.\(task.id)")
-        }
-    }
-
-    @MainActor
-    private struct ArchivedTaskHistoryList: View {
-        let conversation: HistoryConversation
-        let controls: any ConversationHistoryControlling
-        @State private var loaded: HistoryConversation?
-        @State private var failure: String?
-        var body: some View {
-            List {
-                if let failure { Text(failure) }
-                if let loaded {
-                    ForEach(loaded.taskCompressions) { compression in
-                        let turns = ConversationHistoryPresentation.turns(loaded).filter {
-                            $0.historyTaskID == compression.taskID
-                        }
-                        let task = makeTask(compression, turns: turns)
-                        NavigationLink {
-                            ConversationHistoryDetail(task: task, controls: controls)
-                        } label: {
-                            VStack(alignment: .leading) {
-                                Label(compression.goal, systemImage: "checklist").foregroundStyle(.blue)
-                                Text(compression.status.rawValue).font(.caption).foregroundStyle(.secondary)
-                            }
-                        }
-                    }
-                    if loaded.taskCompressions.isEmpty { Text("此会话暂无任务记录") }
-                } else if failure == nil {
-                    ProgressView("加载任务…")
-                }
-            }
-            .navigationTitle("历史任务")
-            .task(id: conversation.id) {
-                do { loaded = try await controls.loadConversation(conversation.id) } catch {
-                    failure = "任务读取失败：\(error)"
-                }
-            }
-        }
-        private func makeTask(_ compression: HistoryTaskCompression, turns: [HistoryTurn]) -> HistoryTask {
-            var task = HistoryTask(
-                id: compression.taskID, title: compression.goal, status: compression.status.rawValue,
-                createdAt: turns.first?.date, turns: turns)
-            task.compression = compression
-            task.resultText = compression.text
-            task.execution = "foreground"
-            task.executor = "assistant"
-            return task
-        }
-    }
-
-    @MainActor
     private struct ConversationHistoryDetail: View {
-        private let seed: HistoryConversation?
+        private let seed: HistoryConversation
         @State private var loaded: HistoryConversation?
         @State private var loadError: String?
         @State private var expandedTasks: Set<UUID> = []
         @State private var requestNavigation = HistoryRequestNavigation()
-        private var turns: [HistoryTurn] {
-            if let conversation = loaded ?? seed { return ConversationHistoryPresentation.turns(conversation) }
-            return task?.turns ?? []
-        }
-        private var items: [HistoryTimelineItem] {
-            if let conversation = loaded ?? seed { return ConversationHistoryPresentation.timeline(conversation) }
-            return task?.compression.map { [.task($0, sources: turns)] } ?? turns.map { .request($0) }
-        }
+        private var items: [HistoryTimelineItem] { ConversationHistoryPresentation.timeline(loaded ?? seed) }
         let title: String
-        let task: HistoryTask?
         let controls: any ConversationHistoryControlling
         init(conversation: HistoryConversation, controls: any ConversationHistoryControlling) {
             seed = conversation
             title = ConversationHistoryPresentation.title(conversation)
-            task = nil
-            self.controls = controls
-        }
-        init(task: HistoryTask, controls: any ConversationHistoryControlling) {
-            seed = nil
-            title = task.title
-            self.task = task
             self.controls = controls
         }
         var body: some View {
             List {
-                if let task {
-                    Section("任务信息") {
-                        Text("目标：" + task.title)
-                        Text(task.status)
-                        if let execution = task.execution {
-                            Text((execution == "background" ? "后台任务" : "前台任务") + " · " + (task.executor ?? "assistant"))
-                        }
-                        if !task.skills.isEmpty { Text("Skills: " + task.skills.joined(separator: ", ")) }
-                        if let parent = task.parentTaskID {
-                            Text("父任务：" + parent.uuidString).font(.caption).textSelection(.enabled)
-                        }
-                        if let result = task.resultText { Text("结果 / 进度：" + result).textSelection(.enabled) }
-                        Text(task.createdAt?.formatted(date: .abbreviated, time: .shortened) ?? "")
-                        Text("任务 ID：\(task.id)").font(.caption).textSelection(
-                            .enabled)
-                    }
-                    if turns.isEmpty { Text("此任务暂无模型对话记录").foregroundStyle(.secondary) }
-                }
                 Section {
                     ForEach(items) { item in
                         switch item {
@@ -356,39 +173,7 @@
                             requestRow(turn)
                         case .task(let compression, let sources):
                             Group {
-                                taskSummary(compression)
-                                Button {
-                                    var transaction = Transaction(animation: nil)
-                                    transaction.disablesAnimations = true
-                                    withTransaction(transaction) {
-                                        if !expandedTasks.insert(compression.taskID).inserted {
-                                            expandedTasks.remove(compression.taskID)
-                                        }
-                                    }
-                                } label: {
-                                    HStack {
-                                        Text(
-                                            "\(expandedTasks.contains(compression.taskID) ? "收起" : "展开")任务内对话（\(sources.count) 轮）"
-                                        )
-                                        .font(.subheadline)
-                                        Spacer()
-                                        Image(
-                                            systemName: expandedTasks.contains(compression.taskID)
-                                                ? "chevron.up" : "chevron.down"
-                                        )
-                                        .font(.caption.weight(.semibold))
-                                    }
-                                    .foregroundStyle(.secondary).padding(.vertical, 4)
-                                    .contentShape(Rectangle())
-                                }
-                                .buttonStyle(.plain)
-                                .accessibilityIdentifier("history.expand.\(compression.taskID)")
-                                .accessibilityValue(expandedTasks.contains(compression.taskID) ? "已展开" : "已收起")
-                                .listRowInsets(EdgeInsets(top: 8, leading: 52, bottom: 8, trailing: 20))
-                                .modifier(
-                                    HistoryTimelineRowSeparator(
-                                        leading: expandedTasks.contains(compression.taskID) && !sources.isEmpty
-                                            ? 0 : -52))
+                                taskSummary(compression, sourceCount: sources.count)
                                 if expandedTasks.contains(compression.taskID) {
                                     ForEach(Array(sources.enumerated()), id: \.element.id) { index, turn in
                                         requestRow(turn, showsIcon: false, endsTask: index == sources.count - 1)
@@ -400,8 +185,7 @@
                 }
                 .listSectionSeparator(.hidden)
             }
-            .task(id: seed?.id) {
-                guard let seed else { return }
+            .task(id: seed.id) {
                 do {
                     let conversation = try await controls.loadConversation(seed.id)
                     try Task.checkCancellation()
@@ -412,36 +196,55 @@
                 }
             }
             .overlay {
-                if let loadError { Text(loadError) } else if seed != nil && loaded == nil { ProgressView("加载对话…") }
+                if let loadError { Text(loadError) } else if loaded == nil { ProgressView("加载对话…") }
             }
             .navigationTitle(String(title.prefix(40)))
             .navigationDestination(isPresented: $requestNavigation.isPresented) {
                 if let turn = requestNavigation.turn { ConversationTurnDetail(turn: turn, controls: controls) }
             }
             .toolbar {
-                if let task {
-                    HistoryJSONShareButton(value: task, filename: "task-\(task.id).json")
-                } else if let loaded {
+                if let loaded {
                     HistoryJSONShareButton(value: loaded, filename: "conversation-\(loaded.id).json")
                 }
             }
         }
-        private func taskSummary(_ compression: HistoryTaskCompression) -> some View {
-            HStack(alignment: .top, spacing: 12) {
-                Image(systemName: "checklist").foregroundStyle(.blue).frame(width: 24)
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(verbatim: compression.goal).font(.headline).foregroundStyle(.blue)
-                    Text(compression.status.rawValue).font(.caption).foregroundStyle(.secondary)
-                    if !compression.text.isEmpty {
-                        Text(verbatim: compression.text).font(.subheadline).textSelection(.enabled)
+        private func taskSummary(_ compression: HistoryTaskCompression, sourceCount: Int) -> some View {
+            let expanded = expandedTasks.contains(compression.taskID)
+            return Button {
+                var transaction = Transaction(animation: nil)
+                transaction.disablesAnimations = true
+                withTransaction(transaction) {
+                    if !expandedTasks.insert(compression.taskID).inserted {
+                        expandedTasks.remove(compression.taskID)
                     }
                 }
+            } label: {
+                HStack(alignment: .top, spacing: 12) {
+                    Image(systemName: "checklist").foregroundStyle(.blue).frame(width: 24)
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(verbatim: compression.goal).font(.headline).foregroundStyle(.blue)
+                        HStack(spacing: 6) {
+                            Text("\(compression.status.rawValue) · \(sourceCount) 轮对话")
+                                .font(.caption).foregroundStyle(.secondary)
+                            typeBadge("Task", color: .blue)
+                        }
+                        if !compression.text.isEmpty {
+                            Text(verbatim: compression.text).font(.subheadline).textSelection(.enabled)
+                        }
+                    }
+                    Spacer(minLength: 0)
+                    Image(systemName: expanded ? "chevron.down" : "chevron.right")
+                        .font(.caption.weight(.semibold)).foregroundStyle(.tertiary).padding(.top, 4)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.vertical, 8).contentShape(Rectangle())
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.vertical, 8)
+            .buttonStyle(.plain)
+            .foregroundStyle(.primary)
             .accessibilityIdentifier("history.compression.\(compression.taskID)")
+            .accessibilityValue(expanded ? "已展开" : "已收起")
             .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 20))
-            .modifier(HistoryTimelineRowSeparator(leading: 36))
+            .modifier(HistoryTimelineRowSeparator(leading: expanded && sourceCount > 0 ? 36 : -16))
         }
         private func requestRow(_ turn: HistoryTurn, showsIcon: Bool = true, endsTask: Bool = false) -> some View {
             Button {
@@ -449,22 +252,19 @@
             } label: {
                 HStack(alignment: .top, spacing: 12) {
                     if showsIcon {
-                        Image(systemName: "text.bubble")
+                        Image(systemName: turn.isReACT == true ? "arrow.clockwise" : "text.bubble")
                             .foregroundStyle(turn.isReACT == true ? Color.orange : Color.secondary).frame(width: 24)
                     }
                     VStack(alignment: .leading, spacing: 6) {
                         Text(verbatim: turn.displayInput).lineLimit(2)
                             .foregroundStyle(turn.isReACT == true ? Color.orange : Color.primary)
                         Text(verbatim: turn.outputSummary).font(.subheadline).lineLimit(2)
-                            .foregroundStyle(turn.isReACT == true ? Color.orange : Color.secondary)
+                            .foregroundStyle(.secondary)
                         HStack(spacing: 6) {
                             Text([turn.dateReport, turn.stateReport].filter { !$0.isEmpty }.joined(separator: " · "))
                                 .font(.caption).foregroundStyle(.secondary)
                             if turn.isReACT == true {
-                                Text("ReACT").font(.caption2.bold())
-                                    .foregroundStyle(.orange)
-                                    .padding(.horizontal, 6).padding(.vertical, 2)
-                                    .background(.orange.opacity(0.15), in: Capsule())
+                                typeBadge("ReACT", color: .orange)
                             }
                         }
                     }
@@ -479,6 +279,13 @@
             .listRowInsets(EdgeInsets(top: 12, leading: showsIcon ? 16 : 52, bottom: 12, trailing: 20))
             .modifier(HistoryTimelineRowSeparator(leading: showsIcon ? -16 : (endsTask ? -52 : 0)))
             .foregroundStyle(.primary)
+        }
+
+        private func typeBadge(_ title: String, color: Color) -> some View {
+            Text(verbatim: title).font(.caption2.bold())
+                .foregroundStyle(color)
+                .padding(.horizontal, 6).padding(.vertical, 2)
+                .background(color.opacity(0.15), in: Capsule())
         }
 
     }
@@ -522,7 +329,27 @@
     private struct ConversationTurnDetail: View {
         let turn: HistoryTurn
         let controls: any ConversationHistoryControlling
+        private let catalog: HistoryFunctionCatalog?
+        private let catalogError: String?
         @State private var interpretation = ""
+
+        init(turn: HistoryTurn, controls: any ConversationHistoryControlling) {
+            self.turn = turn
+            self.controls = controls
+            if let metadata = turn.decisionMetadata {
+                do {
+                    catalog = try ConversationHistoryPresentation.functionCatalog(metadata.catalogJSON)
+                    catalogError = nil
+                } catch {
+                    catalog = nil
+                    catalogError = error.localizedDescription
+                }
+            } else {
+                catalog = nil
+                catalogError = nil
+            }
+        }
+
         var body: some View {
             Form {
                 Section("User Request") {
@@ -534,19 +361,28 @@
                 Section("Assistant Response") { selectable(turn.raw) }
                 if turn.historyTaskID != nil || turn.decisionMetadata != nil {
                     Section("Tasks and Skills") {
-                        if let id = turn.historyTaskID { selectable("History Task: " + id.uuidString) }
-                        if let metadata = turn.decisionMetadata {
-                            if let execution = metadata.execution {
-                                Text(execution == "foreground" ? "Foreground task" : "Background task")
-                                if let goal = metadata.taskGoal { selectable("Goal: " + goal) }
-                            } else {
-                                Text("Default conversation")
+                        ViewThatFits(in: .horizontal) {
+                            HStack(alignment: .top, spacing: 20) {
+                                taskInformation.frame(
+                                    minWidth: 220, idealWidth: 240, maxWidth: .infinity, alignment: .leading)
+                                if turn.decisionMetadata != nil {
+                                    Divider()
+                                    skillsInformation.frame(
+                                        minWidth: 200, idealWidth: 240, maxWidth: .infinity, alignment: .leading)
+                                }
                             }
-                            if let id = metadata.taskID { selectable("Active Task: " + id.uuidString) }
-                            ForEach(metadata.skills.keys.sorted(), id: \.self) { id in
-                                Text("\(id) · v\(metadata.skills[id] ?? 0)")
+                            VStack(alignment: .leading, spacing: 16) {
+                                taskInformation
+                                if turn.decisionMetadata != nil {
+                                    Divider()
+                                    skillsInformation
+                                }
                             }
-                            DisclosureGroup("Function Catalog") { selectable(metadata.catalogJSON) }
+                        }
+                        .padding(.vertical, 8)
+                        .alignmentGuide(.listRowSeparatorLeading) { _ in 0 }
+                        if turn.decisionMetadata != nil {
+                            functionCatalog
                         }
                     }
                 }
@@ -615,9 +451,157 @@
             }
             .task { interpretation = controls.preview(turn) }
         }
+
+        private var taskInformation: some View {
+            VStack(alignment: .leading, spacing: 10) {
+                Label("Task", systemImage: "checklist").font(.subheadline.weight(.semibold)).foregroundStyle(.blue)
+                if let metadata = turn.decisionMetadata {
+                    Text(
+                        metadata.execution.map { $0 == "foreground" ? "Foreground task" : "Background task" }
+                            ?? "Default conversation at request"
+                    ).font(.caption).foregroundStyle(.secondary)
+                    if let goal = metadata.taskGoal, !goal.isEmpty {
+                        Text(verbatim: goal).font(.subheadline).textSelection(.enabled)
+                    }
+                }
+                ForEach(ConversationHistoryPresentation.taskReferences(for: turn)) { reference in
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(
+                            reference.isHistoryOwner
+                                ? (reference.wasActiveAtRequest ? "Task ID · Active at request" : "Task ID")
+                                : "Active task ID at request"
+                        ).font(.caption).foregroundStyle(.secondary)
+                        selectable(reference.id.uuidString)
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+
+        private var functionCatalog: some View {
+            DisclosureGroup {
+                if let catalog {
+                    VStack(alignment: .leading, spacing: 16) {
+                        catalogGroup("Actions", entries: catalog.actions, color: .blue)
+                        Divider()
+                        catalogGroup("Tools", entries: catalog.tools, color: .purple)
+                    }
+                    .padding(.vertical, 8)
+                } else if let catalogError {
+                    Text("Unable to read Function Catalog").foregroundStyle(.orange)
+                    selectable(catalogError)
+                    DisclosureGroup("Raw JSON") { selectable(turn.decisionMetadata?.catalogJSON ?? "") }
+                }
+            } label: {
+                HStack {
+                    Text("Function Catalog")
+                    Spacer()
+                    if let catalog {
+                        Text("\(catalog.actions.count) Actions · \(catalog.tools.count) Tools")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+            }
+        }
+
+        private func catalogGroup(_ title: String, entries: [HistoryFunctionRegistration], color: Color) -> some View {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("\(title) · \(entries.count)").font(.subheadline.weight(.semibold)).foregroundStyle(color)
+                ForEach(Array(entries.sorted { ($0.alias, $0.path) < ($1.alias, $1.path) }.enumerated()), id: \.offset)
+                {
+                    index, entry in
+                    if index > 0 { Divider() }
+                    DisclosureGroup {
+                        VStack(alignment: .leading, spacing: 8) {
+                            if let channel = entry.channel { selectable("Channel: " + channel) }
+                            if !entry.required.isEmpty {
+                                selectable("Required: " + entry.required.sorted().joined(separator: ", "))
+                            }
+                            if !entry.optional.isEmpty {
+                                selectable("Optional: " + entry.optional.sorted().joined(separator: ", "))
+                            }
+                            if entry.required.isEmpty && entry.optional.isEmpty {
+                                Text("No parameters").font(.caption).foregroundStyle(.secondary)
+                            }
+                            if let definition = entry.definitionJSON, !definition.isEmpty {
+                                DisclosureGroup("Definition") { selectable(definition) }
+                            }
+                        }
+                        .padding(.vertical, 6)
+                    } label: {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(verbatim: entry.alias).font(.system(.subheadline, design: .monospaced))
+                            Text(verbatim: entry.path).font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
+                }
+            }
+        }
+
+        @ViewBuilder private var skillsInformation: some View {
+            if let metadata = turn.decisionMetadata {
+                VStack(alignment: .leading, spacing: 10) {
+                    Label("Skills", systemImage: "square.stack.3d.up")
+                        .font(.subheadline.weight(.semibold)).foregroundStyle(.blue)
+                    HistorySkillFlowLayout(spacing: 8) {
+                        ForEach(metadata.skills.keys.sorted(), id: \.self) { id in
+                            Text("\(id) · v\(metadata.skills[id] ?? 0)")
+                                .font(.caption).textSelection(.enabled)
+                                .padding(.horizontal, 10).padding(.vertical, 6)
+                                .background(.blue.opacity(0.12), in: Capsule())
+                        }
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+
         private func selectable(_ text: String) -> some View {
             Text(verbatim: text)
                 .font(.system(.caption, design: .monospaced)).textSelection(.enabled)
+        }
+    }
+
+    private struct HistorySkillFlowLayout: Layout {
+        let spacing: CGFloat
+
+        func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+            let idealWidth = subviews.reduce(CGFloat.zero) { $0 + $1.sizeThatFits(.unspecified).width + spacing }
+            let width = proposal.width.flatMap { $0.isFinite ? $0 : nil } ?? max(0, idealWidth - spacing)
+            return arrangement(subviews, width: width).size
+        }
+
+        func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+            let result = arrangement(subviews, width: bounds.width)
+            for (index, subview) in subviews.enumerated() {
+                subview.place(
+                    at: CGPoint(x: bounds.minX + result.origins[index].x, y: bounds.minY + result.origins[index].y),
+                    anchor: .topLeading, proposal: ProposedViewSize(result.sizes[index]))
+            }
+        }
+
+        private func arrangement(_ subviews: Subviews, width: CGFloat)
+            -> (origins: [CGPoint], sizes: [CGSize], size: CGSize)
+        {
+            let availableWidth = max(0, width)
+            var origins: [CGPoint] = []
+            var sizes: [CGSize] = []
+            var x: CGFloat = 0
+            var y: CGFloat = 0
+            var rowHeight: CGFloat = 0
+            for subview in subviews {
+                let size = subview.sizeThatFits(ProposedViewSize(width: availableWidth, height: nil))
+                if x > 0, x + size.width > availableWidth {
+                    x = 0
+                    y += rowHeight + spacing
+                    rowHeight = 0
+                }
+                origins.append(CGPoint(x: x, y: y))
+                sizes.append(size)
+                x += size.width + spacing
+                rowHeight = max(rowHeight, size.height)
+            }
+            return (origins, sizes, CGSize(width: availableWidth, height: y + rowHeight))
         }
     }
 

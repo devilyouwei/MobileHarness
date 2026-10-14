@@ -41,7 +41,6 @@ public struct TaskLogItem: Identifiable, Equatable, Sendable {
     public let executor: String
     public var title: String
     public var phase: Phase
-    public var inputIDs: [UUID] = []
     public var execution: String?
     public var mode: String?
     public var skills: [String] = []

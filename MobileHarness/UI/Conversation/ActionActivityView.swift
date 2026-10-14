@@ -6,10 +6,8 @@
     public struct ActionActivityView: View {
         @Bindable private var state: ActionActivityState
         @State private var taskPath: [UUID] = []
-        private let taskHistory: ((String, Set<UUID>) -> AnyView?)?
-        public init(state: ActionActivityState, taskHistory: ((String, Set<UUID>) -> AnyView?)? = nil) {
+        public init(state: ActionActivityState) {
             self.state = state
-            self.taskHistory = taskHistory
         }
 
         public var body: some View {
@@ -204,7 +202,7 @@
                     }
                     if task.phase == .failed {
                         Section("失败原因") {
-                            Text(task.failure ?? "该记录未保存失败原因，请查看关联 Action 和模型记录；记录已移除时无法还原。")
+                            Text(task.failure ?? "该记录未保留失败原因，请查看关联 Action；可用的 Agent 请求记录见设置中的 Agent 记录。")
                                 .textSelection(.enabled)
                         }
                     }
@@ -227,16 +225,7 @@
                     }
                     Section("关联记录") {
                         Button("查看 Action") { selectRelated(.action, task: id) }
-                        if let destination = taskHistory?(
-                            task.executor,
-                            task.mode == nil ? Set(task.events.map(\.id)) : Set(task.inputIDs))
-                        {
-                            NavigationLink {
-                                destination
-                            } label: {
-                                Text("查看模型与 Tool 记录")
-                            }
-                        }
+
                     }
                 }.navigationTitle("任务详情")
             } else {

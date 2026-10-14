@@ -1,9 +1,24 @@
 import Foundation
 import FunctionContracts
 
+public struct HistoryConversationReference: Sendable, Equatable {
+    public let value: String
+    public init(id: UUID) { value = id.uuidString }
+    public init(_ raw: String) throws {
+        if let id = UUID(uuidString: raw) {
+            value = id.uuidString
+        } else {
+            guard raw.utf8.count == 8,
+                raw.utf8.allSatisfy({ (48...57).contains($0) || (65...70).contains($0) || (97...102).contains($0) })
+            else { throw ActionArguments.ValidationError.invalidValue("id") }
+            value = raw.uppercased()
+        }
+    }
+}
+
 public protocol HistoryQueryCapability: Sendable {
     func list(offset: Int, limit: Int) async throws -> String
-    func read(id: UUID, offset: Int, limit: Int) async throws -> String
+    func read(reference: HistoryConversationReference, offset: Int, limit: Int) async throws -> String
 }
 
 public protocol HistoryMutationCapability: Sendable {

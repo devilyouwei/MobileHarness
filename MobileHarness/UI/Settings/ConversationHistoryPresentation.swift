@@ -1,6 +1,43 @@
 import Foundation
 
+public struct HistoryTaskReference: Equatable, Sendable, Identifiable {
+    public let id: UUID
+    public let isHistoryOwner: Bool
+    public let wasActiveAtRequest: Bool
+}
+
+public struct HistoryFunctionRegistration: Decodable, Sendable {
+    public let path: String
+    public let alias: String
+    public let channel: String?
+    public let required: [String]
+    public let optional: [String]
+    public let definitionJSON: String?
+}
+
+public struct HistoryFunctionCatalog: Decodable, Sendable {
+    public let actions: [HistoryFunctionRegistration]
+    public let tools: [HistoryFunctionRegistration]
+}
+
 public enum ConversationHistoryPresentation {
+    public static func functionCatalog(_ json: String) throws -> HistoryFunctionCatalog {
+        try JSONDecoder().decode(HistoryFunctionCatalog.self, from: Data(json.utf8))
+    }
+
+    public static func taskReferences(for turn: HistoryTurn) -> [HistoryTaskReference] {
+        var references: [HistoryTaskReference] = []
+        if let id = turn.historyTaskID {
+            references.append(
+                HistoryTaskReference(
+                    id: id, isHistoryOwner: true, wasActiveAtRequest: id == turn.decisionMetadata?.taskID))
+        }
+        if let id = turn.decisionMetadata?.taskID, id != turn.historyTaskID {
+            references.append(HistoryTaskReference(id: id, isHistoryOwner: false, wasActiveAtRequest: true))
+        }
+        return references
+    }
+
     public static func title(_ conversation: HistoryConversation) -> String {
         if conversation.archivedAt != nil { return conversation.summaryTitle ?? "待生成标题" }
         return conversation.latestUser ?? conversation.turns.last?.user ?? "新对话"
@@ -14,9 +51,8 @@ public enum ConversationHistoryPresentation {
         return data
     }
     /// Presentation peers preserve the original input's nested execution ownership on disk.
-    public static func turns(_ conversation: HistoryConversation, inputIDs: Set<UUID>? = nil) -> [HistoryTurn] {
+    public static func turns(_ conversation: HistoryConversation) -> [HistoryTurn] {
         conversation.turns.flatMap { turn -> [HistoryTurn] in
-            guard inputIDs == nil || inputIDs!.contains(turn.id) else { return [] }
             return (turn.modelRequests ?? []).enumerated().map { index, request in
                 project(
                     turn, id: request.id, date: request.date, input: request.input,

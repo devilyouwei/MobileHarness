@@ -1,5 +1,11 @@
 # Documentation and architecture change history
 
+## 2026-10-14 — Stable short references for model history reads
+
+- Physical history confirms the model copied a listed conversation UUID suffix incorrectly, received notFound, then read the correct UUID successfully. The query backend did not lose the conversation; the historical failure remains real evidence.
+- History.list now exposes an eight-hex ref only when its stable UUID prefix is unique across current/archives. History.read validates a typed short/full reference, resolves only exact unique metadata matches and rejects missing/ambiguous references. No guessed UUID correction, persistent alias table, file-schema change or UI change.
+- HistoryQuery revision6 prefers exact returned refs and permits one fresh-list/corrected-read recovery after notFound. Canonical UUIDs remain available for collision disambiguation and other history operations. Validation is recorded in [validation history](Validation-History.md#2026-10-14--stable-short-history-reference-regression).
+
 ## 2026-10-14 — Function Catalog placement and direct detail contents
 
 - Return the request's decision-snapshot Function Catalog to Tasks and Skills; retain actual messages/declarations under Prompts.
@@ -654,3 +660,40 @@ Rewrote all 15 Actions READMEs from current implementations, with direct upstrea
 ## 2026-10-13 — Per-conversation checkpoint storage v3
 
 Replace Assistant aggregate context persistence with current.json, independent conversation-ID archives, a metadata index and recoverable rotation. Delta boundaries are removed; complete response strings and execution evidence update memory, with user admission and decision terminal checkpoints. Explicit close/cancellation saves changed recovery state; crash may lose unsaved output. Archived bodies load only on selection, including archive Task browsing. Shared prompt/request text is deduplicated on disk; file locks are isolated per path. Title work is root-owned and independent of new-conversation/page completion. No old format decoder/import remains. Earlier Task indexing and exact native call/result evidence remain intact.
+
+
+## 2026-10-14 — Whole-row Task disclosure
+
+Task timeline summaries now toggle their source rows as one plain Button. Remove the separate expansion-control cell; align the trailing chevron with request rows, right when collapsed and down when expanded. Source count follows status as completed · N 轮对话. Preserve blue task metadata, icon-free child indentation, orange ReACT text/bottom badges, hierarchical separators and the existing single request destination. No persistence/backend contracts change.
+
+
+## 2026-10-14 — History type icons and capsules
+
+Top-level ReACT requests now use an orange cycle-arrow icon distinct from ordinary conversation bubbles and blue task checklists. Task summaries show a blue Task capsule immediately after status/source count. Task and ReACT capsules share one private styling helper. Expanded task sources retain their icon-free hierarchy. No data, sharing or navigation contracts change.
+
+
+## 2026-10-14 — ReACT text hierarchy and single cycle arrow
+
+All timeline requests now use primary color for input and secondary color for response, including ReACT source rows. ReACT remains identifiable by its orange type icon/capsule; replace the double-arrow loop with arrow.clockwise for a simpler single-arrow symbol. Task blue metadata/capsules, source indentation and navigation are unchanged.
+
+
+## 2026-10-14 — Restore ReACT request tint
+
+Restore orange ReACT request text in both timeline and expanded source rows per the clarified design. Response text remains secondary gray, providing distinct input/output emphasis. Single-arrow icon, ReACT/Task capsules and navigation remain unchanged.
+
+
+## 2026-10-14 — Grouped request Task and Skills evidence
+
+Tasks and Skills now contains responsive Task/Skills subpanels within one card: stacked on narrow layouts and side-by-side when readable minimum widths fit. Skill IDs/revisions become sorted, wrapping tinted capsules. Task mode/goal and selectable references stay together; Function Catalog remains in this section. Equal record-owner and request-time Task snapshot IDs render once with Active at request; distinct IDs preserve each role without claiming live activity. UI-only reference projection does not alter stored values or raw JSON sharing.
+
+
+## 2026-10-14 — Structured request Function Catalog
+
+Replace raw catalog JSON as the default presentation with grouped Actions/Tools counts and sorted alias/path entries. Per-function disclosure exposes recorded Channel, required/optional parameter names and Tool definition. Decode the request snapshot at view construction; malformed data remains a visible error with raw diagnostic JSON. Original Codable export and current registration/conflict policy remain unchanged: identical Skill bindings deduplicate; same path with differing callType/alias/channel, or a shared alias across distinct model functions, rejects without Action priority.
+
+
+## 2026-10-14 — Agent records hub and canonical Assistant history
+
+Settings now opens Agent 记录, a UI-local destination/view-injection hub with Assistant conversations as the sole implemented entry. Each future Agent can supply its own record type and page. Remove the duplicate Assistant task-history destination and archived-task pages, task aggregation reader/adapter API, task-only UI models/state/constructors/export, input-ID subset filtering, task-to-model-history callback chain and unused log input-ID payload. One root-owned Assistant ConversationHistoryWorkflow replaces the previous dummy root/second task workflow; selected-conversation readers are mandatory and enforce returned identity before caching.
+
+Foreground Task requests, compression summaries and terminal status remain in canonical conversation files and expand in place, including after live TaskRecord retirement. Background/delegated execution state is not claimed as conversation data: real Task registries/Skill state and Home Task/Action/Agent diagnostic projections remain intact. No storage schema, old-format compatibility/import, model function or task execution policy changes. Current module documentation removes duplicated/superseded task-page and v2-file claims; historical evidence remains in the validation/change documents.

@@ -37,10 +37,12 @@ flowchart LR
 | 函数 | 参数 | 完成值 |
 | --- | --- | --- |
 | list | offset 0…64、limit 1…5 | 当前会话优先的会话元数据页 |
-| read | id UUID、offset 0…1000000、limit 1…2 | 按仓库索引顺序排列的请求/压缩 Task 项目页 |
+| read | id为list返回的ref或完整UUID、offset 0…1000000、limit 1…2 | 按仓库索引顺序排列的请求/压缩 Task 项目页 |
 | startNew | 无 | archived UUID 或 null |
 | summarize | 已归档会话 id | 标题提交后返回 summarized UUID |
 | delete | 已归档会话 id | 删除提交后返回 deleted UUID |
+
+✅ list adds an optional eight-hex-character ref derived from the stable UUID prefix, only when unique among current/archives. read's id string accepts that ref or an exact full UUID, with a typed HistoryConversationReference passed to the query service. A missing ref returns notFound; an ambiguous ref rejects with invalidArguments and requires the full UUID. Short references remain stable after archiving, not list offsets. No storage schema or UI changes.
 
 ✅ 参数来自字符串传输，未知键被拒绝。list/read 结果最多 1800 UTF-8 字节，超过上限抛 resultTooLarge，不能裁掉 JSON 结构。页包含 items、total，存在更多内容时带 nextOffset；每次调用重新读取快照，不承诺跨调用分页稳定。
 

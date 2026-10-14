@@ -70,6 +70,8 @@ flowchart TB
 
 ## 关键技术
 
+✅ History read-reference contract: History owns stable short references derived from conversation UUIDs, validates them into a typed query value and resolves exact unique matches through StorageChat metadata. It does not guess, rewrite stored IDs or map missing references to another conversation.
+
 - 参数的传输值统一为字符串；整数、有限数值、布尔、枚举、UUID 和 JSON 的业务约束由入口或注入端口解析。大多数入口拒绝未知键；个别入口的实际差异见所属域文档。
 - `ActionFunction` 的动态预算优先于静态 timeout；缺省静态预算为 30 秒。资源解析器最多返回八个资源。执行与清理机制位于 Gateway，估计耗时不构成最低等待时间。
 - 完成语义由业务定义：状态接纳、动画恢复、音频排空、命令准入和电机到位分别属于不同边界。定义存在不等于发生了效果。

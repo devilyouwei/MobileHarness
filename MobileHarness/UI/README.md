@@ -73,7 +73,7 @@ Native visual acceptance is recorded in [validation history](../../docs/Validati
 
 ## 历史记录收敛（2026-10-13）
 
-✅ 已实现：历史记录页面仅保留 Assistant 聊天记录与任务记录。Assistant context 是聊天持久化事实源，任务按持久化身份关联；页面板块重新设计另行开展。
+✅ Implemented: 设置入口改为 Agent 记录，仅提供真实 Assistant 聊天记录；前台 Task 按持久化身份在对话内展开，不再提供重复任务页面。
 
 ❌ 历史记录页面板块重新设计及原生 UI/真机验收。
 
@@ -99,10 +99,21 @@ Native visual acceptance is recorded in [validation history](../../docs/Validati
 
 ✅ 已实现：历史列表使用元数据计数和标题，正文详情异步按ID加载；删除 delta/fragments UI 字段，使用完整 response。
 
-✅ Settings renders task metadata and requests as independent cells in a contiguous timeline with increased internal padding and native separators, without per-item Section margins or task headings. Only ordinary timeline requests/task metadata have distinct icons; expanded task requests omit icons and place the orange ReACT badge after bottom status. One page-local request destination and immediate expansion remain implemented. Native layout/gesture acceptance remains pending.
+✅ Settings renders task metadata and requests as independent cells in a contiguous timeline with increased internal padding and native separators, without per-item Section margins or task headings. Timeline requests/task metadata have distinct type icons; expanded task requests omit icons and place the orange ReACT badge after bottom status. One page-local request destination and immediate expansion remain implemented. Native layout/gesture acceptance remains pending.
 
 ✅ First-level boundaries span the full card, while Task source text/internal separators align to the primary icon-adjacent text column. Native simulator screenshots verify collapsed/expanded static layout using real UI code and synthetic data independently of unavailable model runtime dependencies; gestures and model/storage acceptance remain separate.
 
 ✅ Settings history detail uses User Request / Assistant Response / Tasks and Skills / Prompts / Action Execution / Generation Meta headings. Share exports the Codable value shown by each page as public.json with a stable .json filename, preserving raw fields. Native transfer requests perform bounded encoding on demand; no formatted diagnostic-text export remains. Native share-target acceptance remains separate.
 
 ✅ Function Catalog belongs to Tasks and Skills; Parsed Output and Generation Meta contents are shown directly without their disclosure wrapper rows or expansion state. JSON sharing and single-level navigation retain their existing contracts.
+
+✅ Task-row disclosure: the full Task summary cell toggles its source rows. The separate expansion-control cell is removed, source count follows status, and the trailing chevron aligns with request rows (right when collapsed, down when expanded). Hierarchical separators retain full-width outer boundaries and inset expanded source boundaries.
+
+✅ ReACT visual hierarchy: top-level ReACT requests use a single-arrow orange cycle symbol; ReACT input text retains orange while responses use secondary color and ordinary input uses primary color; task summaries add a blue Task capsule after task status/count using the existing ReACT capsule styling. Expanded task requests remain icon-free.
+
+✅ Request Task/Skills layout: retain one Tasks and Skills section with responsive Task/Skills subpanels and wrapping Skill revision capsules. Deduplicate equal record-owner/request-snapshot Task IDs and label snapshot activity as Active at request; show distinct IDs only when evidence differs. Function Catalog stays in the same section; raw JSON exports remain unchanged.
+
+✅ Structured Function Catalog: request details decode their immutable catalogJSON once into UI-local Action/Tool entries, grouped with counts and alias/path labels. Per-function disclosure shows recorded Channel, parameter names and Tool definition; malformed snapshots retain visible errors/raw JSON. No live registration or export mutation.
+
+
+✅ Agent records: AgentRecordsView/AgentRecordDestination form a UI-local view-injection hub, distinct from ConversationHistoryView. Conversation/task duplication is absent: conversation state has no task collection or task-group flags, and task-only pages/filtering/exports are removed. Conversation Task compressions still expand raw sources. Execution logs have no task-history view callback/input-ID payload; task execution details and related Actions remain.

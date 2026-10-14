@@ -5,17 +5,14 @@
     public struct ConversationView: View {
         @Bindable var state: ConversationState
         @Bindable var activity: ActionActivityState
-        private let taskHistory: ((String, Set<UUID>) -> AnyView?)?
         private let toggleVoice: () -> Void
         private let voicePressChanged: ((Bool) -> Void)?
         public init(
             state: ConversationState, activity: ActionActivityState,
-            toggleVoice: @escaping () -> Void, voicePressChanged: ((Bool) -> Void)? = nil,
-            taskHistory: ((String, Set<UUID>) -> AnyView?)? = nil
+            toggleVoice: @escaping () -> Void, voicePressChanged: ((Bool) -> Void)? = nil
         ) {
             self.state = state
             self.activity = activity
-            self.taskHistory = taskHistory
             self.toggleVoice = toggleVoice
             self.voicePressChanged = voicePressChanged
         }
@@ -217,7 +214,7 @@
                     VStack {
                         Spacer(minLength: 0)
                         if activity.hasRecords || activity.observationUnavailable {
-                            ActionActivityView(state: activity, taskHistory: taskHistory)
+                            ActionActivityView(state: activity)
                         }
                     }
                     .frame(width: geometry.size.width - 40)

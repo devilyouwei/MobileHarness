@@ -243,3 +243,8 @@ ADR0181 regression coverage: CameraInteractionWorkflow emits Photographer typed 
 ## 会话存储性能重构 v3
 
 ✅ 已实现：历史详情按ID加载、元数据列表、取消保存与标题任务不阻塞新会话。
+
+
+✅ Records regressions: canonical conversation metadata/detail regressions verify retention of archived Task sources after live TaskRecord retirement and two Tasks within one input. Required-reader identity rejection protects the selected cache; retain cancellation, archive/title, selected-body/photo association and failure regressions.
+
+✅ Required conversation reader: selected-conversation reads are a required injected interface; foreign identity fails without replacing the previous selection. Tests inject explicit readers/failures.

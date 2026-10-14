@@ -715,7 +715,9 @@ extension ConversationHistoryStore {
     #expect(rows.filter { $0.role == .assistant }.map(\.content) == ["A1 output", "B1 output", "A2 output"])
     let result =
         try JSONSerialization.jsonObject(
-            with: Data(try await HistoryQueryService(store: store).read(id: current.id, offset: 1, limit: 2).utf8))
+            with: Data(
+                try await HistoryQueryService(store: store).read(reference: .init(id: current.id), offset: 1, limit: 2)
+                    .utf8))
         as? [String: Any]
     let items = try #require(result?["items"] as? [[String: Any]])
     #expect(items.count == 2 && (items[0]["user"] as? [String: Any])?["value"] as? String == "B1")

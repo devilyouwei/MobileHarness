@@ -112,7 +112,7 @@ Preparation errors propagate before admitting dependent work. Interactive scene 
 
 ## 历史记录收敛（2026-10-13）
 
-✅ 已实现：AppAssembly 的历史入口为 Assistant 聊天记录与任务记录；ApplicationRuntime 只注入 Assistant context 历史及任务读取，不构造独立 history.json store，也不提供 specialist 历史读取器。
+✅ Implemented: AppAssembly 注入 Agent 记录入口与唯一的 Assistant 聊天记录工作流；ApplicationRuntime 不再聚合任务历史，其他 Agent 暂无记录页面。
 
 ❌ 历史记录页面板块重新设计及原生 UI/真机验收。
 
@@ -132,4 +132,7 @@ Preparation errors propagate before admitting dependent work. Interactive scene 
 
 ✅ 已实现：ApplicationRuntime 构造纯内存 assistantContext，连接新 ConversationFileStore（current.json/index.json/独立归档）及恢复闭包。Assistant 当前状态与会话以相同捕获快照保存，所有归档不载入 context。
 
-✅ AppAssembly 同步注入按会话ID的历史详情读取闭包；任务页只有显式打开时才遍历归档任务，普通列表不加载正文。
+✅ AppAssembly 注入按会话ID的详情读取闭包；普通列表不加载正文，选中会话后才加载包含 Task 摘要和完整请求的单个文件。
+
+
+✅ Records composition: AppAssembly.history owns only the Assistant conversation workflow; recordDestinations injects its real ConversationHistoryView into a generic AgentRecordsView. ApplicationRuntime has no duplicate task-history reader. MobileHarnessApp/ConversationView/ActionActivityView have no task-history callback chain or unused log inputIDs projection. No Task registry, Skill state, foreground/background observer or lifecycle behavior is removed.

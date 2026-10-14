@@ -279,7 +279,7 @@ final class AppAssembly {
     private let historyState = ConversationHistoryState(title: "Assistant")
     @ObservationIgnored lazy var history = makeHistory()
     private func makeHistory() -> ConversationHistoryWorkflow {
-        let assistant = ConversationHistoryWorkflow(
+        return ConversationHistoryWorkflow(
             state: historyState,
             prepare: { [weak self] in
                 guard let self else { throw CancellationError() }
@@ -312,52 +312,20 @@ final class AppAssembly {
                 guard let self else { throw CancellationError() }
                 return try await self.capturedPhotos.readForInput(id, source: "assistant", input: inputID)
             })
-        let root = ConversationHistoryWorkflow(
-            state: ConversationHistoryState(), prepare: {}, refresh: {}, deleteArchive: { _ in },
-            startNew: {}, summarize: { _ in }, previewOutput: { _ in "" }, readPhoto: { _, _ in nil })
-        root.agents = [
-            HistoryAgentDestination(
-                id: "assistant", name: "Assistant 聊天记录", summary: "当前聊天与已归档聊天", state: historyState, controls: assistant
-            )
-        ]
-        let id = "assistant.tasks"
-        let name = "任务记录"
-        let summary = "Assistant 的前台与后台任务"
-        do {
-            let state = ConversationHistoryState(
-                title: name, allowsMutations: false, groupsByTask: true)
-            let workflow = ConversationHistoryWorkflow(
-                state: state,
-                prepare: { [weak self] in
-                    guard let self else { throw CancellationError() }
-                    _ = try self.runtime()
-                },
-                refresh: { [weak self] in
-                    guard let self else { throw CancellationError() }
-                    guard let read = try self.runtime().historyReaders[id] else { throw CancellationError() }
-                    let snapshot = try await read()
-                    try Task.checkCancellation()
-                    state.archive = snapshot.archive
-                    state.tasks = snapshot.tasks
-                }, deleteArchive: { _ in }, startNew: {}, summarize: { _ in },
-                previewOutput: { HistoryAgentAdapter.preview($0) },
-                readConversation: { [weak self] id in
-                    guard let self else { throw CancellationError() }
-                    return try HistoryPresentationAdapter.conversation(
-                        await self.runtime().conversations.conversation(id))
-                },
-                readPhoto: { [weak self] photo, input in
-                    guard let self else { throw CancellationError() }
-                    return try await self.capturedPhotos.readForInput(
-                        photo, source: "assistant", input: input)
-                })
-            root.agents.append(
-                HistoryAgentDestination(
-                    id: id, name: name, summary: summary, state: state,
-                    controls: workflow))
-        }
-        return root
     }
+    #if os(iOS)
+        var recordDestinations: [AgentRecordDestination] {
+            let state = historyState
+            let controls = history
+            return [
+                AgentRecordDestination(
+                    id: "assistant", name: "Assistant 聊天记录", summary: "对话、Task 摘要与完整请求记录"
+                ) {
+                    ConversationHistoryView(state: state, controls: controls)
+                }
+            ]
+        }
+    #endif
     private func makeHistoryChat() async throws -> any ChatCapability {
         try await settingsControls.restore()
         await container?.lifecycle.beginSettingsChange()

@@ -869,4 +869,9 @@ Camera observation request coverage inspects the complete message list for the o
 
 ## Isolated audio-detection startup coverage
 
+✅ History-reference regressions: list/ref/read native routing, ref stability after archiving, retained notFound for a mistyped full UUID, invalid/ambiguous ref rejection, unique-prefix omission on collisions, case normalization and file-backed reopen. Preserve existing pagination/truncation and non-mutating queries.
+
 ✅ SoundSourceTests reproduces unauthorized construction with the full SpeechPerception declaration in a single-Agent policy, then uses the production media.audio/sound.source restriction with only phone.microphone allowed. It verifies exact permissions, immutable original configuration, sole PCM recipient, real Gateway direction delivery and running lifecycle without model or presentation calls. This covers policy assembly with synthetic PCM; native microphone/device acceptance remains separate.
+
+
+✅ Canonical history assertions: HistoryIntent regressions inspect canonical current/archived conversation sources directly. Task cancellation and archive compression must retain full source evidence.

@@ -106,9 +106,3 @@ flowchart LR
 
 
 ✅ Chat owns rolling request projection and unlimited default cumulative decisions; Core retains optional caller budgets and usage validation only.
-
-## 历史记录收敛（2026-10-13）
-
-✅ 已实现：历史记录页面仅保留 Assistant 聊天记录与任务记录。Assistant context 是聊天持久化事实源，任务按持久化身份关联；页面板块重新设计另行开展。
-
-❌ 历史记录页面板块重新设计及原生 UI/真机验收。

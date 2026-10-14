@@ -1,7 +1,7 @@
 import Foundation
 import FunctionContracts
 
-/// History.Conversation function ownership; current invocation paths remain compatible.
+/// History.Conversation function ownership.
 extension HistoryActions {
     @Action(domain: "History", module: "Conversation", title: "startNew")
     public static func startNew(invocation: any FunctionInput, using history: any HistoryMutationCapability)
@@ -48,7 +48,7 @@ extension HistoryActions {
     @Action(
         domain: "History", module: "Conversation", title: "list",
         doc:
-            "List current and archived conversations, current first then newest archives. Returns paged JSON metadata with IDs and explicitly truncated title/input previews. Start at offset 0; use nextOffset for more.",
+            "List current and archived conversations, current first then newest archives. Returns paged JSON metadata with full IDs, stable short ref when unique, and truncated title/input previews. Prefer the exact returned ref for History.read. Start at offset 0; use nextOffset for more.",
         parameters: [
             .init(
                 "offset", type: .string, required: true,
@@ -74,10 +74,13 @@ extension HistoryActions {
     @Action(
         domain: "History", module: "Conversation", title: "read",
         doc:
-            "Read a conversation by an ID returned by History.list. Request blocks and compressed Tasks are oldest first. Returns paged JSON with bounded user/response previews and truncation flags, not complete text; never replays behavior. Start at offset 0.",
+            "Read a conversation using the exact short ref returned by History.list, or the full id when ref is absent. Never invent or repair an identifier. Request blocks and compressed Tasks are oldest first. Returns paged JSON with bounded user/response previews and truncation flags; never replays behavior. Start at offset 0.",
         parameters: [
             .init(
-                "id", type: .string, required: true, description: "Conversation UUID from History.list", constraints: ""
+                "id", type: .string, required: true,
+                description:
+                    "Exact eight-hex ref from History.list; use the full conversation UUID only when ref is absent.",
+                constraints: ""
             ),
             .init(
                 "offset", type: .string, required: true,
@@ -93,10 +96,10 @@ extension HistoryActions {
         let arguments = ActionArguments(invocation.call.parameters)
         try arguments.validateAllowedKeys(["id", "offset", "limit"])
         let rawID = try arguments.requiredString("id", maximumUTF8Bytes: 36)
-        guard let id = UUID(uuidString: rawID) else { throw ActionArguments.ValidationError.invalidValue("id") }
+        let reference = try HistoryConversationReference(rawID)
         let offset = try arguments.requiredInt("offset", range: 0...1_000_000)
         let limit = try arguments.requiredInt("limit", range: 1...2)
-        let result = try await history.read(id: id, offset: offset, limit: limit)
+        let result = try await history.read(reference: reference, offset: offset, limit: limit)
         try Task.checkCancellation()
         guard result.utf8.count <= 1800 else { throw HistoryQueryError.resultTooLarge }
         return result

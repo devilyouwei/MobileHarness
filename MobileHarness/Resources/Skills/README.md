@@ -2,6 +2,8 @@
 
 ## 职责与边界
 
+✅ HistoryQuery revision6: teach exact short-ref selection and bounded one-time recovery through a fresh list after notFound. Short refs are returned data, never examples to invent; missing/ambiguous references never imply empty history or permit guessing UUID suffixes.
+
 ✅ 每个 Skill 目录是完整的运行时加载单元：`Skill.json` 注册可用函数及依赖，`Instructions.md` 教学业务流程、规则和注意事项。本层集中维护开发规范，Skill 子目录不放 README。
 
 Skill 是可复用的流程与能力集合，Task 是运行时目标、状态和上下文的拥有者。一个 Task 可组合多个 Skill，同一 Skill 可服务不同目标。Skill 不包含 Swift、可执行脚本、Action 实现、凭据或用户数据；[Actions](../../Actions/README.md) 独立实现函数，[Agent 配置](../Agents/README.md) 声明身份、通信和基础 Skill。
@@ -264,7 +266,7 @@ sequenceDiagram
 | ExpressionInteraction revision10 | express / setExpression | 短暂/持续双眼表情。移除提示音、振动、通知和光效绑定及教学；这些仍是 App 可用 Action。 |
 | RobotInteraction revision6 | 11 NexArm Actions | 明确用户意图的手势/电机操作及真实完成/失败反馈。说明 readEnvironment/可选 express 来自 Assistant 的已加载基础 Skill，不能假设独立宿主拥有。 |
 | Photography revision16 | 7 Camera.Capture Actions | 镜头/开关、实际拍摄、保存/忽略/重拍、显式重试。保留所有必要入口；Task/环境读取来自 Assistant BasicSkill，原生保存/忽略反馈由业务编排提供。 |
-| HistoryQuery revision5 | History.list / read native Tools | 只读分页查找与证据回答。保留两项；finishTask 只适用于具备 BasicSkill 的 Assistant 查询任务，独立宿主只返回查询结果。 |
+| HistoryQuery revision6 | History.list / read native Tools | 只读分页查找与证据回答。保留两项；finishTask 只适用于具备 BasicSkill 的 Assistant 查询任务，独立宿主只返回查询结果。 |
 | ApplicationControl revision6 | openPage + 3 status Tools + 3 System Actions | 页面导航、资源/Provider/蓝牙状态、蓝牙操作和资源下载/取消。移除11个重复机械臂动作，运动流程由 RobotInteraction 管理。 |
 
 ✅ 当前没有 Skill 注册 UI.Feedback、UI.Notice、UI.Light 或 Agent.Communication.send。可信业务调用、聆听复合 Action、拍照反馈、实际错误展示和底层通信实现保留。测试需要通信暴露时使用显式测试目录，不依赖生产 BasicSkill。❌ 实际 LLM 操作与真机交互效果仍须单独验收。

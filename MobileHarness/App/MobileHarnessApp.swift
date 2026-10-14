@@ -100,7 +100,7 @@ struct MobileHarnessApp: App {
                 modelResources: assembly.modelResources, modelResourceControls: assembly.modelResourceControls,
                 save: saveSettings)
         case .bluetooth: BluetoothSettingsView(state: assembly.bluetooth.state, controls: assembly.bluetoothControls)
-        case .history: ConversationHistoryView(state: assembly.history.state, controls: assembly.history)
+        case .history: AgentRecordsView(destinations: assembly.recordDestinations)
         case .recognition, .synthesis, .vision:
             ModelResourcesView(
                 state: assembly.modelResources, controls: assembly.modelResourceControls,
@@ -195,15 +195,7 @@ struct MobileHarnessApp: App {
         } else {
             ConversationView(
                 state: container.conversation, activity: container.actionActivity,
-                toggleVoice: container.lifecycle.toggleVoice, voicePressChanged: container.lifecycle.voicePressChanged,
-                taskHistory: { agentID, inputIDs in
-                    guard let destination = assembly.history.agents.first(where: { $0.id == agentID }) else {
-                        return nil
-                    }
-                    return AnyView(
-                        TaskConversationHistoryView(
-                            state: destination.state, controls: destination.controls, inputIDs: inputIDs))
-                })
+                toggleVoice: container.lifecycle.toggleVoice, voicePressChanged: container.lifecycle.voicePressChanged)
         }
     }
 

@@ -235,7 +235,6 @@ public final class ActionActivityState {
             tasks[index].execution = incoming.execution ?? tasks[index].execution
             tasks[index].mode = incoming.mode
             if !incoming.skills.isEmpty { tasks[index].skills = incoming.skills }
-            tasks[index].inputIDs = incoming.inputIDs
             tasks[index].failure = incoming.failure
             if !tasks[index].isTerminal { tasks[index].phase = incoming.phase }
             if tasks[index].title.isEmpty { tasks[index].title = incoming.title }

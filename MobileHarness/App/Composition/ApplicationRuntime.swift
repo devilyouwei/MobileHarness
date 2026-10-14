@@ -60,7 +60,6 @@ final class ApplicationRuntime {
         await output.shutdown()
     }
     private let assistantContext: AgentContextRepository<AssistantContextState>
-    let historyReaders: [String: @MainActor () async throws -> HistoryAgentSnapshot]
     let conversations: ConversationHistoryStore
     let manager: AgentManager
     let input: InputGateway
@@ -172,13 +171,6 @@ final class ApplicationRuntime {
         let applicationContext = try Self.context(directory, .applicationControl, ApplicationControlContextState())
         let photographerContext = try Self.context(directory, .photographer, PhotographerContextState())
         let memoryContext = try Self.context(directory, .memory, MemoryContextState())
-        historyReaders = [
-            "assistant.tasks": {
-                let history = try await historyStore.snapshot()
-                return try HistoryPresentationAdapter.assistantTasks(
-                    await assistantContext.snapshot(), history: history)
-            }
-        ]
         let applicationControlAgent = try ApplicationControlAgent(
             sessionID: applicationControlSessionID,
             context: applicationContext)
@@ -433,7 +425,6 @@ final class ApplicationRuntime {
                     item.execution = "foreground"
                     item.mode = task.mode
                     item.skills = task.skills
-                    item.inputIDs = task.inputIDs
                     item.failure = task.failure
                     activity.state.updateTask(
                         item,
