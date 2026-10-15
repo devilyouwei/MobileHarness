@@ -485,6 +485,30 @@ private actor ArmAvailability {
     #expect(try registeredSpeed(capped.packet, motor: 1) == 600)
 }
 
+@Test func trackingCommandLevelsTheForearmOnceThenAimsWithMotorsOneAndFour() throws {
+    var command = NexArmAimCommand()
+    let start = ContinuousClock.now
+    try command.seed(base: 2047, pitch: 2045)
+    let levelOnly = try #require(try command.command(base: 2050, pitch: 2045, at: start))
+    let levelTargets = try #require(levelOnly.packet.motorTargets)
+    #expect(levelOnly.levelsForearm)
+    #expect(Set(levelTargets.keys) == Set([2, 3]))
+    #expect(levelTargets[2] == NexArmJointCommand.armHome[1])
+    #expect(levelTargets[3] == NexArmJointCommand.armHome[2])
+    let first = try #require(try command.command(base: 2200, pitch: 2100, at: start))
+    let firstTargets = try #require(first.packet.motorTargets)
+    #expect(first.levelsForearm)
+    #expect(Set(firstTargets.keys) == Set([1, 2, 3, 4]))
+    #expect(firstTargets[2] == 2087 && firstTargets[3] == 1984)
+    #expect(firstTargets[1] == 2200 && firstTargets[4] == 2100)
+    command.accept(first)
+    let later = try #require(
+        try command.command(base: 2300, pitch: 2100, at: start.advanced(by: .milliseconds(200))))
+    let laterTargets = try #require(later.packet.motorTargets)
+    #expect(!later.levelsForearm)
+    #expect(Set(laterTargets.keys) == Set([1, 4]))
+}
+
 private func registeredSpeed(_ packet: NexArmPacket, motor: Int) throws -> Int {
     let payload = packet.payload
     let start = try #require(stride(from: 2, to: payload.count, by: 8).first { payload[$0] == UInt8(motor) })

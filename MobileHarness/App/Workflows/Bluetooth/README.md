@@ -69,7 +69,7 @@ flowchart LR
 
 ## Tracking freshness and takeover — ADR0139
 
-✅ ADR0142: each admitted pan/tilt target becomes one motors 1 and 4 synchronous write. Motors 2, 3 and 5 are not commanded. Changes below 12 counts produce no write. The worker still checks usable-pose freshness before native startup and on its 30 ms poll; a one-second production gap or stopped Agent exits through joined live-session cleanup and releases resources. Old targets are cleared. Expected interruption creates neither a device fault nor an execution warning. Camera close also removes/joins its session through existing ownership.
+✅ ADR0142/0143: the first admitted tracking write places motors 2 and 3 at the calibrated level rest and carries the current motors 1 and 4 target. Later pan/tilt writes are motors 1 and 4 only. Motor 5 is not commanded. Changes below 12 counts produce no write. The worker still checks usable-pose freshness before native startup and on its 30 ms poll; a one-second production gap or stopped Agent exits through joined live-session cleanup and releases resources. Old targets are cleared. Expected interruption creates neither a device fault nor an execution warning. Camera close also removes/joins its session through existing ownership.
 
 ✅ Assistant takeover cancels and joins the old writer before executing the Action, including motor5/6 through the common writer group. Subsequent Channel Actions remain queued. Settings takeover continues bypassing Agent fences. ❌ Cooperative cleanup does not guarantee immediate physical stop.
 

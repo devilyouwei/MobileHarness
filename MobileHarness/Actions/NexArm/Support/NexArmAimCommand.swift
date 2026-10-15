@@ -2,7 +2,8 @@ import Foundation
 import PlatformKit
 
 /// One pan/tilt command for tracking. Motors 1 and 4 share a single admitted write.
-/// Motors 2, 3 and 5 are not addressed. A sent packet is not physical arrival.
+/// The first admitted command also places motors 2 and 3 on the calibrated level rest.
+/// Motor 5 is not addressed. A sent packet is not physical arrival.
 public struct NexArmAimCommand: Sendable {
     public struct Parameters: Sendable, Equatable {
         /// Logical-target change, in encoder counts, required before another write.
@@ -50,6 +51,13 @@ public struct NexArmAimCommand: Sendable {
         public let pitchGoal: Int
     }
 
+    /// One native write. The first admitted command of a session also levels the forearm.
+    public struct Command: Sendable, Equatable {
+        public let packet: NexArmPacket
+        public let levelsForearm: Bool
+        fileprivate let aim: Proposal?
+    }
+
     private var parameters: Parameters
     private var seeded = false
     private var originBase = 0
@@ -62,6 +70,7 @@ public struct NexArmAimCommand: Sendable {
     private var previousPitch: Int?
     private var sampleTime: ContinuousClock.Instant?
     private var pending: Proposal?
+    private var forearmAdmitted = false
 
     public init(parameters: Parameters = .tracking) {
         self.parameters = parameters
@@ -131,6 +140,23 @@ public struct NexArmAimCommand: Sendable {
         return proposal
     }
 
+    /// Pan/tilt, or only the forearm when pan/tilt is inside the dead zone and the level rest is not yet admitted.
+    /// The first command that is admitted includes motors 2 and 3 at the calibrated rest.
+    public mutating func command(base: Int, pitch: Int, at time: ContinuousClock.Instant) throws -> Command? {
+        let aim = try propose(base: base, pitch: pitch, at: time)
+        if forearmAdmitted {
+            guard let aim else { return nil }
+            return Command(packet: aim.packet, levelsForearm: false, aim: aim)
+        }
+        let level = try Self.forearmLevelMoves()
+        if let aim {
+            let packet = try NexArmMotorCommands.simultaneous(try Self.moves(in: aim.packet) + level)
+            return Command(packet: packet, levelsForearm: true, aim: aim)
+        }
+        return Command(
+            packet: try NexArmMotorCommands.simultaneous(level), levelsForearm: true, aim: nil)
+    }
+
     public mutating func accept(_ proposal: Proposal) {
         guard pending == proposal else { return }
         lastSentBase = proposal.baseTarget
@@ -138,6 +164,47 @@ public struct NexArmAimCommand: Sendable {
         lastGoalBase = proposal.baseGoal
         lastGoalPitch = proposal.pitchGoal
         pending = nil
+    }
+
+    public mutating func accept(_ command: Command) {
+        if let aim = command.aim {
+            guard pending == aim else { return }
+            accept(aim)
+        }
+        if command.levelsForearm { forearmAdmitted = true }
+    }
+
+    /// Shoulder and elbow of the calibrated tracking rest. Their sum holds the forearm level.
+    private static func forearmLevelMoves() throws -> [NexArmPacket] {
+        let home = NexArmJointCommand.armHome
+        let options = try NexArmMotorOptions(speed: 400, acceleration: 30)
+        return [
+            try NexArmMotorCommands.move(motor: 2, target: home[1], options: options),
+            try NexArmMotorCommands.move(motor: 3, target: home[2], options: options),
+        ]
+    }
+
+    private static func moves(in packet: NexArmPacket) throws -> [NexArmPacket] {
+        guard let targets = packet.motorTargets else { throw NexArmExecutionError.invalidArguments }
+        var moves: [NexArmPacket] = []
+        for motor in targets.keys.sorted() {
+            guard let target = targets[motor] else { throw NexArmExecutionError.invalidArguments }
+            let start = try motorOffset(in: packet, motor: motor)
+            let speed = Int(packet.payload[start + 6]) | Int(packet.payload[start + 7]) << 8
+            let acceleration = Int(packet.payload[start + 1])
+            moves.append(
+                try NexArmMotorCommands.move(
+                    motor: motor, target: target,
+                    options: try NexArmMotorOptions(speed: speed, acceleration: acceleration)))
+        }
+        return moves
+    }
+
+    private static func motorOffset(in packet: NexArmPacket, motor: Int) throws -> Int {
+        guard let start = stride(from: 2, to: packet.payload.count, by: 8).first(where: {
+            packet.payload[$0] == UInt8(motor)
+        }) else { throw NexArmExecutionError.invalidArguments }
+        return start
     }
 
     private func lead(_ step: Int, elapsed: Double) -> Int {

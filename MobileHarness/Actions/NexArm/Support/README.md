@@ -32,7 +32,7 @@ flowchart LR
 
 ✅ ADR0137: Ordinary passive-link reset uses `NexArmGesture.referenceHomeJoints` for motors1–5 (`[2048,2087,1198,1238,2048]`), independently of tracking/current feedback/prepared IK. Manual and Agent reset share this target without queries; explicit single-motor software homes remain honored. ❌ Restored phone posture has not been physically revalidated.
 
-✅ Tracking rest and reach remain on `NexArmJointCommand`: `armHome` is `[2047, 2087, 1984, 2045, 2048]`; `reachLift` and `NexArmForearmLeveler` still describe the diagnostic five-axis packet. Live tracking does not command that reach. `NexArmAimCommand` writes motors 1 and 4 once per admitted target (ADR0142). `NexArmJogPlanner.approach` keeps its 200/100 counts/s shaping for tests only. Native encoding remains in PlatformKit.
+✅ Tracking rest and reach remain on `NexArmJointCommand`: `armHome` is `[2047, 2087, 1984, 2045, 2048]`; `reachLift` and `NexArmForearmLeveler` still describe the diagnostic five-axis packet. Live tracking does not follow pitch with that reach. ADR0143 admits motors 2 and 3 at 2087 and 1984 once, then `NexArmAimCommand` writes motors 1 and 4 once per admitted target (ADR0142). `NexArmJogPlanner.approach` keeps its 200/100 counts/s shaping for tests only. Native encoding remains in PlatformKit.
 
 ✅ ADR0122: Runtime resource values contain no camera constants. ActionFailure and ActionReport.Entry.Code are bounded opaque identifiers (1–64 UTF-8 bytes); Runtime provides generic execution codes only. NexArm owns its result vocabulary, Actions-owned NexArmExecutionError owns its execution failure-to-report mapping, and Gateway preserves producer identifiers. Existing device failure/report identifiers and presentation are unchanged.
 

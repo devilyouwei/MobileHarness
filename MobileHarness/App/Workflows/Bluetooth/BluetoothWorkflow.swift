@@ -941,7 +941,8 @@ public final class BluetoothWorkflow: BluetoothControlling {
             worker?.cancel()
         }
     }
-    /// Polls the latest pan/tilt target. Motors 1 and 4 share one write; motors 2, 3 and 5 stay uncommanded.
+    /// Polls the latest pan/tilt target. The first admitted write also places motors 2 and 3 on the calibrated
+    /// level rest. Later writes move only motors 1 and 4. Motor 5 stays uncommanded.
     /// A newer aim replaces an unsent target. The 30 ms pause only checks freshness and admission.
     private func startAimFollow(
         _ controller: NexArmActionController, origin: NexArmControlOrigin?,
@@ -999,11 +1000,13 @@ public final class BluetoothWorkflow: BluetoothControlling {
                             throw CancellationError()
                         }
                         guard let goal = aimGoal else { break }
-                        if let proposed = try aimCommand.propose(base: goal.base, pitch: goal.pitch, at: tickStart) {
+                        if let command = try aimCommand.command(
+                            base: goal.base, pitch: goal.pitch, at: tickStart)
+                        {
                             idleSince = nil
                             try await validateAgentWriter(ResourceExecutionContext.held)
-                            if try await link.sendLive(proposed.packet, session: token) {
-                                aimCommand.accept(proposed)
+                            if try await link.sendLive(command.packet, session: token) {
+                                aimCommand.accept(command)
                             }
                         } else {
                             idleSince = idleSince ?? .now

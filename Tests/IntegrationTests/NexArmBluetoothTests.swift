@@ -1627,7 +1627,9 @@ func bluetoothAimSendsOnePanTiltPacketAndStopsWhenTheTargetHolds() async throws 
     #expect(packet.isSynchronousPositionWrite && packet.isLiveControl)
     let addressed = try #require(packet.motorTargets)
     #expect(addressed[1] == expected[0] && addressed[4] == expected[3])
-    #expect(Set(addressed.keys) == Set([1, 4]))
+    #expect(addressed[2] == NexArmJointCommand.armHome[1])
+    #expect(addressed[3] == NexArmJointCommand.armHome[2])
+    #expect(Set(addressed.keys) == Set([1, 2, 3, 4]))
     #expect(workflow.state.controlReady)
     let count = commands.count
     try await Task.sleep(for: .milliseconds(100))

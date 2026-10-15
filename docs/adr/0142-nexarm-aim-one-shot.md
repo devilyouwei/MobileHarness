@@ -1,6 +1,6 @@
 # ADR0142 — One pan/tilt packet per tracking target
 
-Status: accepted, 2026-10-13. Supersedes the live streaming path in ADR0102 and the production use of `NexArmJogPlanner.approach` described by ADR0135. The planner function remains for manual-jog shaping and its existing tests.
+Status: accepted, 2026-10-13. Supersedes the live streaming path in ADR0102 and the production use of `NexArmJogPlanner.approach` described by ADR0135. ADR0143 supersedes the decision that motors 2 and 3 are never written: tracking now admits those two counts once, at the calibrated level rest. The planner function remains for manual-jog shaping and its existing tests.
 
 ## Context
 
