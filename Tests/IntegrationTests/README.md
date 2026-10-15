@@ -23,7 +23,7 @@
 | PhotographyPipelineTests / CameraSamplingTests | 原生帧输入、最新态替换、共享姿态推理、skeleton/gaze 投影 |
 | Resource/Provider/Settings 用例 | 私有参数暂存、保存/绑定/呈现顺序、版本冲突、资源准入及失败后状态 |
 | Storage 用例 | domain 仓库、配置文档、提交身份、完整消息 checkpoint、容量/损坏/并发与缓存 |
-| NexArm/Bluetooth 用例 | 包与几何、反馈/归位、断连与恢复、资源接管、机械臂状态和协议隔离 |
+| NexArm/Bluetooth 用例 | 包与几何、反馈/归位、断连与恢复、资源接管、机械臂状态和协议隔离；包括电机 1/4 单包、死区、准入重试/替换、保持无重发、显式新目标触发的迟到发送异常及清理后新目标 |
 
 Task/Skill 的边界矩阵包括四种预加载接管方式（指定、加载、Action、Tool）和完成/失败/取消终态；最后一次闲置时使用/重载、零后重载、独立计数、错误快照、32 个在途 Decision、精确字节/数量预算、批量失败回滚、跨会话取消权及失败提交重试。通过实际 Assistant 请求检查后续目录到期、历史证据保留与内部 ReACT 单次结算。用例数量从源码/测试运行报告获取，不在 README 保存某次执行的计数或通过结论。
 

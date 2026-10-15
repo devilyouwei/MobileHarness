@@ -954,7 +954,7 @@ Cadence is Agent policy, not a PlatformKit capture rule, ModelKit scheduling ser
 
 ### Photographer tracking and control handoff
 
-Photographer consumes vision.pose through InputGateway and issues internal NexArm.Tracking.aim through OutputGateway. Actions maps the target; App owns the tracking worker and concrete resource authority; PlatformKit encodes native commands. The command receipt reports target admission, not physical arrival.
+Photographer consumes vision.pose through InputGateway and issues internal NexArm.Tracking.aim through OutputGateway. Actions maps the target; App owns the tracking worker and concrete resource authority; PlatformKit encodes native commands. The command receipt reports target admission, not physical arrival. Each admitted tracking target uses one motors 1/4 synchronous packet; Actions owns shaping while App retains latest-target replacement, native sessions and the existing motors 1–4 resource fence.
 
 App groups robot writers and declares when Assistant/manual interaction may take over Photographer. Takeover joins the previous writer without cancelling unrelated scheduler trees or triggering Bluetooth recovery. Missing/stale pose ends owned tracking; camera closure detaches its scope without stopping resident Photographer. Offline tracking suppression does not stop vision presentation.
 

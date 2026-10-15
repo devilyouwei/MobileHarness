@@ -315,3 +315,5 @@ Historical [ADR0155 — Explicit Action serialization identity](0155-explicit-ac
 
 
 - ✅ [ADR0214 — Result-driven ReACT](0214-result-driven-react.md): actual business output and failures replace registration-selected continuation; automated checks and generic iOS-device build verified, Simulator dependency blocked.
+
+- ✅ [ADR0215 — One pan/tilt packet per tracking target](0215-nexarm-aim-one-shot.md): one synchronous motors 1/4 packet per admitted target, bounded lead/dead zone and native-admission commit; main framework and lifecycle contracts retained. Physical acceptance limits remain in the decision.

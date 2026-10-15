@@ -20,7 +20,7 @@
 | 连续语音 | 中文/英文识别与合成、首次音频、播放衔接、打断/重启、路由变化、内存与热状态；流程见 [Voice](validation/Voice.md)。 |
 | 提供者与模型 | 真实配置、模型资源版本、下载/切换、错误恢复与本地/云端结果；入口见 [验证索引](validation/README.md)。 |
 | 原生界面与生命周期 | 当前设置/历史展示、导航、可访问性、页面离开、前后台与迟到回调；编译或静态预览不能代替原生交互。 |
-| 机器人与连接 | 目标硬件/负载下的 BLE 通信、真实动作/反馈、断连、接管与停止；已有 [USB 实测](validation/NexArm_Physical_Acceptance.md) 和 [原始数据](measurements/README.md) 不泛化到其他环境。 |
+| 机器人与连接 | 目标硬件/负载下的 BLE 通信、真实动作/反馈、断连、接管与停止；单包云台跟踪仍需 motor 4、2.2 速度比例、真实视觉与持续运行验收（[ADR0215](adr/0215-nexarm-aim-one-shot.md)）；已有 [USB/BLE 实测](validation/NexArm_Physical_Acceptance.md) 和 [原始数据](measurements/README.md) 不泛化到其他环境。 |
 | 流式执行与清理 | 在实际模型输出、播放和设备效果下检查等待、部分失败、取消及晚到结果。 |
 
 各次通过、失败和未执行范围以 [验证记录](validation/Validation-History.md) 为准；上表是验收维度，不表示所有版本均未测试，也不抹去已有的有限验收。

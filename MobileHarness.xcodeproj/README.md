@@ -13,6 +13,8 @@ Purpose: build/sign the iOS application host and maintain physical-device, simul
 - ✅ Shared configuration, entitlements and privacy declarations retain their existing values. Local signing remains in ignored Config/Local.xcconfig.
 - ✅ Platform input/output file lists stage only the shared source catalog/license notices on both device and simulator. Physical inference uses sandbox-installed Nemotron, Gemma4, Silero, YOLO and MOSS; Kokoro is unregistered. Simulator local models report unavailable; explicitly configured cloud chat remains supported.
 
+NexArmAimCommand 的导航引用指向 Actions/Support；文件由现有 Actions SwiftPM target 唯一编译。
+
 ## Validation
 
 ✅ scripts/check.sh validates source/target boundaries, tests and project metadata. scripts/build-ios.sh builds the simulator App plus the ModelKitRuntime/Nemotron/Silero schemes. The MobileHarness scheme provides signed physical-device builds; installation and interaction acceptance are separate actions.

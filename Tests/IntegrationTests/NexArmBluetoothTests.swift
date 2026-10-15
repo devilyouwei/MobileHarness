@@ -1639,7 +1639,7 @@ func bluetoothPassiveConnectionDoesNotQueryAndActualQueryTimeoutRecovers() async
 }
 
 @Test(.actionCatalog, .timeLimit(.minutes(1))) @MainActor
-func bluetoothAimSharesBackpressureFairlyAcrossAllFourMotors() async throws {
+func bluetoothAimSendsOnePanTiltPacketAndStopsWhenTheTargetHolds() async throws {
     let file = bluetoothTestFile()
     defer { try? FileManager.default.removeItem(at: file) }
     let link = BluetoothArmFixture()
@@ -1652,11 +1652,18 @@ func bluetoothAimSharesBackpressureFairlyAcrossAllFourMotors() async throws {
     await workflow.waitUntilIdle()
     await link.throttleLive()
     try await workflow.aim(base: 0.6, pitch: 0.5)
-    try await until { await link.liveCommands.count >= 20 }
-    await workflow.stopActions()
+    try await until { await link.liveCommands.count >= 1 }
+    // Hold the target through the worker's idle window before explicit cancellation.
+    try await Task.sleep(for: .milliseconds(400))
     let commands = await link.liveCommands
-    #expect(Set(commands.map(\.id)) == Set(UInt8(1)...UInt8(4)))
-    #expect(commands.allSatisfy { $0.isLiveControl })
+    let packet = try #require(commands.first)
+    let expected = try NexArmJointCommand.positions(base: 0.6, pitch: 0.5)
+    #expect(commands.count == 1)
+    #expect(packet.isSynchronousPositionWrite && packet.isLiveControl)
+    let addressed = try #require(packet.motorTargets)
+    #expect(addressed[1] == expected[0] && addressed[4] == expected[3])
+    #expect(Set(addressed.keys) == Set([1, 4]))
+    await workflow.stopActions()
     #expect(workflow.state.controlReady)
     let count = commands.count
     try await Task.sleep(for: .milliseconds(100))
@@ -3065,6 +3072,8 @@ func bluetoothLateAimExecutionFailureIsIndependentOfDeviceRecordsAndCompletedToo
     }
     try await until { await !link.liveCommands.isEmpty }
     await link.failLiveValidationOnce()
+    // A held target does not send again; the next target exercises the worker's late failure path.
+    try await workflow.aim(base: -0.6, pitch: 0.5)
     try await until { activity.state.backgroundIssues.count == 1 }
     await workflow.waitUntilIdle()
     #expect(activity.state.backgroundIssues.first?.message == "invalidMotion")
@@ -3171,6 +3180,8 @@ func bluetoothLateNativeAimErrorIsReportedAfterRecoveryFencesTheConnection() asy
                 inputID: failure.origin?.inputID, callID: failure.origin?.callID))
     }
     await link.failLiveAfterNativeDisconnect()
+    // Trigger a new write whether the first target was already admitted or is still pending.
+    try await workflow.aim(base: -0.6, pitch: 0.5, origin: origin)
     try await until(context: "native failure before caller returns") { await link.waitingForLiveFailure }
     try await until(context: "recovery fences old generation") { workflow.state.recoveryStage == .cleaning }
     await link.releaseLiveFailure()

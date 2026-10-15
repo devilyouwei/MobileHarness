@@ -32,11 +32,12 @@ flowchart TB
     Tracker --> Profiles
     Controller --> Results[MotorCompletion / MotorResult / Errors]
     Controller --> Joint[NexArmJointCommand / ForearmLeveler]
-    Jog[NexArmJogPlanner] --> Native[原生电机协议接口]
+    Aim[NexArmAimCommand] --> Native[原生电机协议接口]
+    Jog[NexArmJogPlanner] --> Native
     Joint --> Native
 ```
 
-JogPlanner 与 JointCommand/ForearmLeveler 由宿主组合使用，分别负责渐进提案与跟踪目标；两者独立使用原生电机协议。
+JogPlanner 提供手动渐进提案，JointCommand 保留关节几何与诊断控制器路径；ForearmLeveler 保留公开的诊断几何接口及其回归，不参与实时 worker。NexArmAimCommand 接收映射后的 base/pitch count、生成电机 1/4 同步包，以 propose/accept 分离目标提议与实际准入；宿主保留资源与生命周期所有权。
 
 ## 目录、值与连接所有权
 
@@ -55,7 +56,8 @@ NexArmActionController 是每条连接的 actor：保存 busy、lockedMotors、I
 | NexArmMotionPlan | 1…20 步，锁定集合非空且位于 1…6；每步目标在集合内，全部目标并集必须等于锁定集合 |
 | NexArmMotorProfiles | 电机容差和基于原生速度/加速度值的经验预算 |
 | NexArmRegistration | 调用前资源集合和整体动态预算解析 |
-| NexArmJogPlanner / JointCommand | 手动速度整形、渐进跟踪和关节目标映射 |
+| NexArmJogPlanner / JointCommand | 手动速度整形及关节目标映射 |
+| NexArmAimCommand | 单包跟踪、死区、有限前视和准入后提交 |
 
 普通 passiveBLE 整臂归位使用参考 count `[2048,2087,1198,1238,2048]`；显式软件 motorHomes 用于单电机 reset。其它归位路径可由设备 IK 的 home `[200,0,200,0,0,0]` 解析。跟踪 rest 独立为 `[2047,2087,1984,2045,2048]`，不等同于普通 home。
 
@@ -86,13 +88,17 @@ NexArmMotorResult 保存 step/motor/target/observed/failure/started；最多 20 
 
 有限 execute 开始时重置 faulted，不把旧失败永久封锁为新的运动准入。独立 aim/readState/verifyCompatibility 路径对 faulted 有限制；recoverState 是只读测量恢复，加入稳定样本检查后清除该状态，不重发运动。
 
-## 手动与跟踪渐进规划
+## 手动渐进规划与跟踪目标
 
 JogPlanner 保存六个位置/速度/加速度/最后已提交 count。周期 30 毫秒，输入死区 4%，死区外平方映射；上限为 600 count/s、1800 count/s²、12000 count/s³。单次积分 dt 最多 60 毫秒，有限目标采用 60 毫秒前视，相同目标不重复发送。提案由 accept 提交；stop 保留最后有限目标并清零后续速度，不生成回零动作。
 
-approach 仅允许电机 1…5，默认跟踪上限 200 count/s；供肩/肘使用的 aimReachSpeed 为 100。反向且仍有明显速度时先提议保持当前位置并清零速度；最后 1…2 count 只有在 accept 后才视为完成，避免未准入目标被误认为已经提交。
+approach 保留有限 count 渐进规划接口和对应回归，不用于实时跟踪：仅允许电机 1…5，默认上限 200 count/s，aimReachSpeed 为 100。反向且仍有明显速度时先提议保持当前位置并清零速度；最后 1…2 count 只有在 accept 后才视为完成，避免未准入目标被误认为已经提交。
 
-JointCommand 将 base/pitch 按 `4096/(2π)` 映射到跟踪 rest。pitch 超过 0.25 弧度开始伸出，至 0.7 达到 shoulder_lift 最小 1150；elbow 用固定肩肘和保持前臂水平。ForearmLeveler 用 40 count lead 与六 count 滞回补偿伸出方向，目标受电机范围夹取。五轴包的速度由相邻目标距离及 200 毫秒名义值选取，上限 700；该名义值不是到位等待。
+实时跟踪的 NexArmAimCommand 只写电机 1/4，肩、肘、腕滚转和夹爪不寻址。两轴逻辑目标相对上次已准入目标的变化均小于 12 count 时不发送；首包无前视，后续包按 0.2 秒前视但不超过最近一次逻辑步长，目标受硬件范围夹取。寄存器速度为到上次已准入 goal 的距离除以 0.2 秒再乘 2.2，限制为 10…600，加速度 30。Parameters 在 propose 时校验合法范围和有限值。
+
+状态只保留初始两轴参考、上次准入的逻辑目标/goal、最近提议样本和一个 pending 包。未准入时重复提议同一包；新目标替换 pending，旧提案的 accept 不会提交新状态。reset 清除参考、前视历史和未准入包；宿主在取消/失败、连接清理或手动接管后调用。起点来自最新六轴反馈，否则显式使用跟踪 rest；发出的 goal 是规划估计，不能冒充实测位置。
+
+JointCommand 将 base/pitch 按 `4096/(2π)` 映射到跟踪 rest。pitch 超过 0.25 弧度开始伸出，至 0.7 达到 shoulder_lift 最小 1150；elbow 用固定肩肘和保持前臂水平。ForearmLeveler 用 40 count lead 与六 count 滞回补偿伸出方向，目标受电机范围夹取。五轴包保留于诊断控制器接口，不用于实时跟踪；速度由相邻目标距离及 200 毫秒名义值选取，上限 700；该名义值不是到位等待。
 
 这些组件只提供有限计划、提案与接纳状态。长期跟踪 worker、资源接管、写入公平性、连接恢复及手动替换/加入清理由 App 负责，不能用 planner 完成替代真实到位。
 
