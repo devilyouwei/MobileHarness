@@ -41,9 +41,11 @@ This role uses typed media requests and deterministic policy, with no Chat syste
 
 ## Input and processing
 
-Native interleaved Float32 AudioInput retains rate 8–192 kHz, mono or ACN/SN3D FOA, sequence, timestamp and monotonic capture instant. Validate capture epoch, increasing sequence/nondecreasing time and expiry. Inputs retain 128 packets/64,000 scalar samples; each packet is at most 64,000 bytes. FOA accounting includes all channels. Controls bypass audio capacity.
+Native interleaved Float32 AudioInput retains rate 8–192 kHz, mono or ACN/SN3D FOA, sequence, timestamp and monotonic capture instant. Validate capture epoch, increasing sequence/nondecreasing time and expiry. ✅ Inputs retain at most 4096 packets, 30 seconds of queued media and 8,388,608 scalar samples (32 MiB); each packet is at most 64,000 bytes. FOA accounting includes all channels. Controls bypass audio capacity.
 
-Select mono/W and process at most 8192 samples per conversion chunk through a stateful StreamingMonoPCMResampler to 16 kHz ModelKit.AudioFrame. VAD boundary policy owns onset/pre-roll/silence/padding and maximum segment length. SpeechRecognitionTurn owns ASR events, segment revisions and final sealing: 128 events/64,000 queued mono samples, with no utterance duration cap or finish watchdog. Internal 12-second ASR segment boundaries do not end the user utterance. Rejected updates do not mutate transcript state.
+Select mono/W and process at most 8192 samples per conversion chunk through a stateful StreamingMonoPCMResampler to 16 kHz ModelKit.AudioFrame. VAD boundary policy owns onset/pre-roll/silence/padding and maximum segment length. SpeechRecognitionTurn owns ASR events, segment revisions and final sealing: 2048 events/480,000 queued mono samples (30 seconds), with no utterance duration cap or finish watchdog. Internal 12-second ASR segment boundaries do not end the user utterance. Rejected updates do not mutate transcript state.
+
+✅ Resident capture opens before model loading. The first PCM starts VAD resource acquisition; its worker retains the first packet while subsequent packets enter the native FIFO. Confirmed speech starts ASR acquisition in SpeechRecognitionTurn; committed PCM stays ordered in that FIFO until the session is ready. Both queues reject new work explicitly at their bounds, preserving previously accepted input and sequence state. Close/cancel joins workers/model acquisition and clears queues; no PCM crosses capture epochs. These limits bound pending work, not total utterance duration or model-load latency.
 
 ## Segmentation algorithm
 

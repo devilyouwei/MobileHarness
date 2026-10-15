@@ -69,11 +69,11 @@ Stable interaction runtime, resident SpeechPerception, independent feature targe
 
 App binds real Agent.Task control functions to Assistant and projects current task/Skill state. Photography model results return to Assistant. Assistant conversations include all persisted inputs; task history additionally groups foreground/background tasks from Assistant state. UI navigation remains local; conversation-requested UI changes remain Actions.
 
-home hold intents remain routed to resident SpeechPerception. Lifecycle owns a bounded toggle publication and activation feedback before capture; Speech owns canonical feedback composition; Actions/UI owns bounded original PCM synthesis, and PlatformKit owns generic clip playback and native impact requests.
+home hold intents remain routed to resident SpeechPerception. Lifecycle owns a bounded toggle publication and native capture before activation feedback; Speech owns canonical feedback composition; Actions/UI owns bounded original PCM synthesis, and PlatformKit owns generic clip playback and native impact requests.
 
 Lifecycle owns native half-duplex capture and immediate interruption; Composition injects trusted current-conversation cancellation. Presentation owns a single native-transition worker and bounded stale-turn fencing. Native I/O owns stopPlayback and distinct PCM continuity failure facts.
 
-App forwards reusable feedback capabilities to its root voice owner. Listening activation joins parallel readiness/cue/native-start-gated haptic, then the acoustic tail and capture. Lifecycle owns the single context-fenced waiter; PlatformKit reports first-buffer/player-start admission, without owning listening policy. Output-independent native capture ownership and manual interruption remain intact.
+App forwards reusable feedback capabilities to its root voice owner. ✅ Listening activation validates capabilities/permissions, starts native capture, then joins canonical cue/native-start-gated haptic. The first PCM enables the active animation. SpeechPerception buffers PCM while lazy VAD/ASR loading completes; model weights and TTS preparation do not gate recording. Lifecycle owns the context-fenced waiter and an independent NativeCuePlayback, which leaves capture running. No acoustic tail or cue mute window discards overlapping user speech.
 
 Camera save/ignore shares the same native disposition path from UI and Agents. Successful import gates feedback; one root-owned task joins animation/cue and removes the matching photo. Feedback issues never fabricate a failed album transaction.
 
@@ -87,7 +87,7 @@ Home failure contract: failures remain in root execution snapshots; only Agent/A
 
 设置的 Agent 记录入口由各 Agent 注入自己的记录页面，目前只有 Assistant 聊天记录。前台 Task 的摘要、终态与原始请求包含在同一 dialog 的 SQL 记录；任务运行状态与后台委派仍由 Agents/首页执行记录持有。其他 Agent 的记录类型尚未实现。
 
-root VoiceSessionCoordinator warms the default cue/haptic on touch-down through an injected UI callback, retires aborted/background preparation, and reuses warm native resources for canonical activation. No second cue/haptic playback path is added.
+VoiceSessionCoordinator prepares bounded default cue PCM and the haptic generator on touch-down through an injected UI callback. Aborted/background preparation is cancelled and joined. It does not prewarm an output graph or load model weights; canonical activation reuses the prepared PCM.
 
 根持有的 HomeEffectsWorkflow 管理 notice/light 的有界状态、UUID 隔离到期与 stop；RuntimePresentation 适配中立 Action 请求。详见 [Presentation](Workflows/Presentation/README.md)。
 

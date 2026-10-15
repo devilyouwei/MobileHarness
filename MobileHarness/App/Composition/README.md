@@ -127,6 +127,10 @@ ApplicationRuntime 的云配置位于 MobileHarness/Settings/settings.json，App
 
 所有角色使用内存 AgentContextRepository；配置文档由 File 后端保存，业务记录由 SQLite 仓库保存。
 
+## Voice model admission
+
+✅ AppContainer resolves stable speech capability handles with load:false. VAD, ASR and TTS acquire/load their own model resources on the actual request; no prepareRecognition warmup closure gates native recording. Lifecycle owns permissions and capture, and SpeechPerception owns the bounded model-wait queues.
+
 ## 待实现
 
 - Independently active window runtimes and a unified audio-resource arbitration mapping are not implemented.

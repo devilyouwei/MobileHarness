@@ -42,6 +42,7 @@ public actor SpeechPerceptionAgent: Agent {
     private var lifecycle: AgentLifecycle = .registered
     private var queue: [AgentInput] = []
     private var queuedSamples = 0
+    private var queuedDuration: TimeInterval = 0
     private var worker: Task<Void, Never>?
     private var lastSequence: UInt64?
     private var lastTimestamp: TimeInterval?
@@ -311,7 +312,9 @@ public actor SpeechPerceptionAgent: Agent {
             lastTimestamp.map({ audio.timestamp >= $0 }) ?? true
         else { throw CommunicationError.outOfOrder }
         guard queue.count < SpeechPerceptionSignalPreprocessor.inputCapacity,
-            queuedSamples + audio.sampleCount <= SpeechPerceptionSignalPreprocessor.maximumQueuedSamples
+            queuedSamples + audio.sampleCount <= SpeechPerceptionSignalPreprocessor.maximumQueuedSamples,
+            queuedDuration + Double(audio.frameCount) / Double(audio.sampleRate)
+                <= SpeechPerceptionSignalPreprocessor.maximumQueuedDuration + 1e-9
         else {
             reportError(HarnessError.queueFull, input: input)
             throw HarnessError.queueFull
@@ -320,6 +323,7 @@ public actor SpeechPerceptionAgent: Agent {
         lastTimestamp = audio.timestamp
         queue.append(input)
         queuedSamples += audio.sampleCount
+        queuedDuration += Double(audio.frameCount) / Double(audio.sampleRate)
         drain()
     }
     private func prepareRecognitionTurn() {
@@ -379,6 +383,7 @@ public actor SpeechPerceptionAgent: Agent {
     private func clearPendingAudio() {
         queue.removeAll()
         queuedSamples = 0
+        queuedDuration = 0
     }
 
     // MARK: - Decision workers
@@ -407,6 +412,7 @@ public actor SpeechPerceptionAgent: Agent {
         let decision = try contextBuilder.build(state: selection, batch: selection.batch())
         guard case .audio(let audio) = decision.input.payload else { throw HarnessError.unsupportedInput }
         queuedSamples -= audio.sampleCount
+        queuedDuration = max(0, queuedDuration - Double(audio.frameCount) / Double(audio.sampleRate))
         guard !input.metadata.expired else { throw CommunicationError.expired }
         if mode == .speechAndSoundSource, segmenter == nil {
             let session = try await vad.detectVoiceActivity(

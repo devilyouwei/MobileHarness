@@ -26,7 +26,7 @@ actor SpeechRecognitionTurn {
         self.preview = preview
     }
 
-    /// At most 128 work items / four seconds of queued PCM; no total utterance time limit.
+    /// At most 2048 work items / thirty seconds of queued PCM; no total utterance time limit.
     func enqueue(_ events: [VoiceStreamEvent]) throws {
         guard !sealed, !cancelled else { throw CapabilityError.sessionClosed }
         if let failure { throw failure }
@@ -42,7 +42,7 @@ actor SpeechRecognitionTurn {
                 count += frames.reduce(0) { $0 + $1.sampleCount }
             }
         }
-        guard queue.count + events.count <= 128, queuedSamples + count <= 64000
+        guard queue.count + events.count <= 2048, queuedSamples + count <= 480_000
         else { throw CapabilityError.bufferOverflow }
         queuedSamples += count
         queue += events

@@ -11,18 +11,18 @@ private actor WakeProbe: UIFeedbackCapability {
     let failure: WakeFixtureFailure?
     let holdCue: Bool
     let holdHaptic: Bool
-    let holdPreparation: Bool
+    let holdCapture: Bool
     let entered = AsyncStream<String>.makeStream(bufferingPolicy: .bufferingOldest(3))
     var events: [String] = []
     var children: [(FunctionRequest, ActionExecutionContext)] = []
     init(
         failure: WakeFixtureFailure? = nil, holdCue: Bool = false, holdHaptic: Bool = false,
-        holdPreparation: Bool = false
+        holdCapture: Bool = false
     ) {
         self.failure = failure
         self.holdCue = holdCue
         self.holdHaptic = holdHaptic
-        self.holdPreparation = holdPreparation
+        self.holdCapture = holdCapture
     }
     func vibrate(_ request: UIActions.HapticRequest, invocation: any FunctionInput) async throws {
         children.append((invocation.call, invocation.context))
@@ -36,10 +36,6 @@ private actor WakeProbe: UIFeedbackCapability {
     func prepare() async throws {
         events.append("prepare")
         if failure == .prepare { throw WakeFixtureFailure.prepare }
-        if holdPreparation {
-            entered.continuation.yield("prepare")
-            try await Task.sleep(for: .seconds(60))
-        }
     }
     func playCue(_ request: UIActions.CueRequest, invocation: any FunctionInput) async throws {
         children.append((invocation.call, invocation.context))
@@ -51,9 +47,14 @@ private actor WakeProbe: UIFeedbackCapability {
         }
         events.append("drained")
     }
-    func capture() throws {
+    func capture() async throws {
         events.append("capture")
         if failure == .capture { throw WakeFixtureFailure.capture }
+        if holdCapture {
+            entered.continuation.yield("capture")
+            try await Task.sleep(for: .seconds(60))
+        }
+        events.append("recording")
     }
 }
 private func wakeInput() -> FunctionInvocation {
@@ -68,14 +69,14 @@ private func wakeConfiguration() throws -> SpeechActions.ListeningFeedback {
     try .init(cue: .init(cue: .soft, volume: 0.6), haptic: .init(style: .rigid, intensity: 0.9))
 }
 
-@Test func listeningCompositionUsesCanonicalChildrenAndDrainsBeforeCapture() async throws {
+@Test func listeningCompositionStartsRecordingBeforeCanonicalFeedback() async throws {
     let probe = WakeProbe()
     let input = wakeInput()
     try await ListeningActivationFeedback.run(
         invocation: input, configuration: wakeConfiguration(), feedback: probe,
-        prepare: { try await probe.prepare() }, capture: { try await probe.capture() }, tail: .zero)
+        prepare: { try await probe.prepare() }, capture: { try await probe.capture() })
     let events = await probe.events
-    #expect(events.last == "capture" && events.contains("prepare"))
+    #expect(Array(events.prefix(3)) == ["prepare", "capture", "recording"])
     #expect(events.contains("haptic") && events.contains("drained"))
     let children = await probe.children
     #expect(Set(children.map { $0.0.actionPath.description }) == ["UI.Feedback.vibrate", "UI.Feedback.playCue"])
@@ -85,58 +86,77 @@ private func wakeConfiguration() throws -> SpeechActions.ListeningFeedback {
     let report = try #require(await input.results.snapshot())
     #expect(!report.hasFailures && !report.isCancelled)
     #expect(report.entries.contains { $0.path.contains("playCue") && $0.status == .succeeded })
-    #expect(report.entries.last?.path == "capture.root.open")
+    #expect(report.entries.contains { $0.path == "capture.root.open" && $0.status == .succeeded })
 }
 
 @Test(arguments: [WakeFixtureFailure.haptic, .prepare, .cue, .capture])
-func failedListeningPrerequisiteBlocksCaptureAndRetainsActualChildren(_ failure: WakeFixtureFailure) async throws {
+func failedListeningStageBlocksLaterEffectsAndRetainsActualChildren(_ failure: WakeFixtureFailure) async throws {
     let probe = WakeProbe(failure: failure)
     let input = wakeInput()
     await #expect(throws: ListeningActivationFeedback.Failure.self) {
         try await ListeningActivationFeedback.run(
             invocation: input, configuration: wakeConfiguration(), feedback: probe,
-            prepare: { try await probe.prepare() }, capture: { try await probe.capture() }, tail: .zero)
+            prepare: { try await probe.prepare() }, capture: { try await probe.capture() })
     }
     let events = await probe.events
-    if failure != .capture { #expect(!events.contains("capture")) }
-    #expect(events.contains("cue") && events.contains("haptic"))
+    #expect(events.contains("capture") == (failure != .prepare))
+    #expect(events.contains("cue") == (failure == .cue || failure == .haptic))
+    #expect(events.contains("haptic") == (failure == .cue || failure == .haptic))
+    #expect(events.contains("recording") == (failure == .cue || failure == .haptic))
     let report = try #require(await input.results.snapshot())
     #expect(report.hasFailures)
     #expect(report.entries.contains { $0.status == .failed })
     if failure == .cue { #expect(report.entries.contains { $0.path.contains("vibrate") && $0.status == .succeeded }) }
 }
 
-@Test(.timeLimit(.minutes(1))) func cancellationOfListeningCueJoinsAndNeverAdmitsCapture() async throws {
+@Test(.timeLimit(.minutes(1))) func cancellationOfListeningCueRetainsStartedCaptureEvidence() async throws {
     let probe = WakeProbe(holdCue: true)
     let input = wakeInput()
     let task = Task {
         try await ListeningActivationFeedback.run(
             invocation: input, configuration: wakeConfiguration(), feedback: probe,
-            prepare: { try await probe.prepare() }, capture: { try await probe.capture() }, tail: .zero)
+            prepare: { try await probe.prepare() }, capture: { try await probe.capture() })
     }
     var entered = probe.entered.stream.makeAsyncIterator()
     _ = await entered.next()
     task.cancel()
     await #expect(throws: CancellationError.self) { try await task.value }
-    #expect(!(await probe.events).contains("capture"))
+    #expect((await probe.events).contains("recording"))
     #expect((await input.results.snapshot())?.isCancelled == true)
 }
 
-@Test(.timeLimit(.minutes(1))) func listeningReadinessCueAndHapticOverlapBeforeAnyChildCompletes() async throws {
-    let probe = WakeProbe(holdCue: true, holdHaptic: true, holdPreparation: true)
+@Test(.timeLimit(.minutes(1))) func listeningFeedbackWaitsForNativeFirstFrame() async throws {
+    let probe = WakeProbe(holdCapture: true)
     let input = wakeInput()
     let task = Task {
         try await ListeningActivationFeedback.run(
             invocation: input, configuration: wakeConfiguration(), feedback: probe,
-            prepare: { try await probe.prepare() }, capture: { try await probe.capture() }, tail: .zero)
+            prepare: { try await probe.prepare() }, capture: { try await probe.capture() })
+    }
+    var entered = probe.entered.stream.makeAsyncIterator()
+    #expect(await entered.next() == "capture")
+    #expect(await probe.events == ["prepare", "capture"])
+    task.cancel()
+    await #expect(throws: CancellationError.self) { try await task.value }
+    #expect(!(await probe.events).contains("cue"))
+    #expect(!(await probe.events).contains("haptic"))
+    #expect((await input.results.snapshot())?.isCancelled == true)
+}
+
+@Test(.timeLimit(.minutes(1))) func listeningCueAndHapticOverlapWhileRecording() async throws {
+    let probe = WakeProbe(holdCue: true, holdHaptic: true)
+    let input = wakeInput()
+    let task = Task {
+        try await ListeningActivationFeedback.run(
+            invocation: input, configuration: wakeConfiguration(), feedback: probe,
+            prepare: { try await probe.prepare() }, capture: { try await probe.capture() })
     }
     var entered = probe.entered.stream.makeAsyncIterator()
     let first = await entered.next()
     let second = await entered.next()
-    let third = await entered.next()
-    #expect(Set([first, second, third].compactMap { $0 }) == ["prepare", "haptic", "cue"])
+    #expect(Set([first, second].compactMap { $0 }) == ["haptic", "cue"])
+    #expect((await probe.events).contains("recording"))
     #expect(!(await probe.events).contains("drained"))
-    #expect(!(await probe.events).contains("capture"))
     task.cancel()
     await #expect(throws: CancellationError.self) { try await task.value }
     #expect((await input.results.snapshot())?.isCancelled == true)

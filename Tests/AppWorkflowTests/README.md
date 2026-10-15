@@ -15,7 +15,7 @@
 | ModelResourcesWorkflowTests / ModelResourceInteractionWorkflowTests | 保存源、偏好、资源准入/删除、配置前置条件与页面无关 lifetime |
 | ResourceObservationWorkflowTests | 根采样、指纹/版本、失败/恢复、单工作者及 shutdown join |
 | AudioDetectionWorkflowTests | 权限/首帧、自动完成、单次接纳、取消清理和晚到回调 |
-| ListeningActivationTests / ListeningCaptureWorkflowTests | 唤醒准备、真实播放/首帧屏障、同意/占用、半双工与快速切换 |
+| ListeningActivationTests / ListeningCaptureWorkflowTests | 能力/权限准备→首帧收音→并行 cue/haptic、阶段失败保留实际效果、取消 join、同意/占用、半双工与快速切换 |
 | NativeInteractionWorkflowTests | UI 手势到 root intent、角色/会话围栏与取消 |
 | CameraVisionRestartTests | camera/vision 代际替换、取消加入、失效回调和重启次序 |
 | PhotoDispositionWorkflowTests | 保存/忽略提交、原生退出/反馈、错误与已发生效果分离 |

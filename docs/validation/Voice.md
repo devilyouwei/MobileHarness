@@ -20,12 +20,14 @@ Purpose: record how to verify the current voice experience and what remains unpr
 
 Record the device model, iOS version, model resource revisions, audio route and test date for each run. Verify:
 
-1. First load, microphone permission, permission denial and unavailable model handling. Recording must not start when prerequisites fail.
+1. First load, microphone permission, permission denial and unavailable model handling. Capability/permission denial must prevent recording; model resource loading may occur after recording starts, with explicit load failure. Immediately speak at the first listening animation/cue, including during a cold VAD/ASR load, and compare the complete recognized prefix with the spoken sentence. Repeat on built-in mic, headphones and Bluetooth. Verify the wake cue does not become a user utterance and speech overlapping the cue remains intact; no blanket cue mute window is used.
 2. Offline Mandarin and English utterances. Recognition previews should update during speech, and one final utterance should yield one response. Listen for clipped starts, missing endings and language changes.
 3. Multi-sentence replies. Captions may lead playback, but each admitted sentence should speak once, in Channel order, and recognition admission and physical recording should pause during actual playback; capture resumes immediately after playback/audio cleanup and reply-policy clearance, without an added acoustic wait, including model/ReACT wait. A confirmed utterance must finish bounded recognition before playback begins; no playback barge-in is supported.
 4. Twenty or more consecutive turns. Check that the device does not recognize its own output, repeat stale audio or accumulate unacceptable delay, memory use or heat.
 5. Stop during recognition, generation, synthesis and playback; restart and confirm no old transcript, expression, audio ID or queued sentence appears. Repeat across backgrounding, interruptions and headphones/Bluetooth route changes.
 6. Speak during model wait and between Action results/continuation. Verify that final user text accepted before a ready continuation is handled first; later text stays queued, with separate recognition and current-reply identities. Repeat onset immediately before playback, any self-output recognition after immediate resume and cancelled playback; record actual admission behavior.
 7. VoiceOver, Dynamic Type and Reduce Motion. Confirm eyes remain operable and captions/status remain understandable.
+
+Exercise the bounded model-wait queues with controlled delayed resources: reject overflow explicitly, cancel during VAD/ASR loading, then restart and verify no old prefix is replayed. These synthetic trials do not establish device cold-load duration or acoustic quality.
 
 Log first-audio latency, playback gaps, peak memory, thermal state and failures alongside the corresponding model/device versions. Device acceptance remains open until these observations are recorded.

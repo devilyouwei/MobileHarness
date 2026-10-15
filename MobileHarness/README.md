@@ -777,6 +777,8 @@ flowchart LR
 
 PlatformKit captures PCM; App owns native admission and scope; Gateway delivers it to SpeechPerception; ModelKit supplies VAD/ASR; Assistant interprets final text and emits resolved outputs. App adapts permitted presentation calls into UI values. Recognition, model completion, captions and actual playback remain separate facts.
 
+✅ Listening admission validates capabilities/permission and starts native capture before loading model weights. First PCM enables the listening animation and canonical cue/haptic. SpeechPerception buffers ordered PCM while its VAD/ASR resource acquisition loads the selected models; App does not prewarm recognition, VAD or synthesis before recording. Queue limits and overflow belong to [SpeechPerception](Agents/SpeechPerception/README.md#input-and-processing); cue/recording coexistence still requires physical-device acceptance.
+
 ```mermaid
 flowchart TD
  Consent[Explicit user consent] --> Policy[Resident SpeechPerception policy]

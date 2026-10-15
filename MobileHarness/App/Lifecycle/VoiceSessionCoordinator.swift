@@ -40,18 +40,20 @@ final class VoiceSessionCoordinator: VoiceOutputHandling, UIFeedbackCapability {
     private var startupID: String?
     private var listeningIntentTask: Task<Void, Never>?
     private let activationHaptic = NativeHapticFeedback()
+    private let activationCue = NativeCuePlayback()
     private var voiceGeneration: String? {
         didSet {
-            state.isVoiceActive = voiceGeneration != nil
-            state.listeningAnimationID = voiceGeneration
-            if voiceGeneration == nil { runtime.presentation.homeEffects.replyDidBegin() }
+            if voiceGeneration == nil {
+                state.isVoiceActive = false
+                state.listeningAnimationID = nil
+                runtime.presentation.homeEffects.replyDidBegin()
+            }
         }
     }
     private let audio: AppleAudioIO
     private let voiceActivity: any VoiceActivityCapability
     private let recognition: any SpeechRecognitionCapability
     private let synthesis: any SpeechSynthesisCapability
-    private let prepareRecognition: @Sendable () async throws -> Void
     private var requests: InputGateway?
     private var manager: AgentManager?
     private var captureTask: Task<Void, Never>?
@@ -87,7 +89,7 @@ final class VoiceSessionCoordinator: VoiceOutputHandling, UIFeedbackCapability {
     init(
         runtime: VoiceRuntimeDependencies, state: ConversationState,
         audio: AppleAudioIO, recognition: any SpeechRecognitionCapability,
-        synthesis: any SpeechSynthesisCapability, prepareRecognition: @escaping @Sendable () async throws -> Void,
+        synthesis: any SpeechSynthesisCapability,
         voiceActivity: any VoiceActivityCapability
     ) {
         self.runtime = runtime
@@ -96,7 +98,6 @@ final class VoiceSessionCoordinator: VoiceOutputHandling, UIFeedbackCapability {
         self.audio = audio
         self.recognition = recognition
         self.synthesis = synthesis
-        self.prepareRecognition = prepareRecognition
         self.voiceActivity = voiceActivity
     }
 
@@ -155,7 +156,6 @@ final class VoiceSessionCoordinator: VoiceOutputHandling, UIFeedbackCapability {
         voiceCuePreparation?.cancel()
         await voiceCuePreparation?.value
         voiceCuePreparation = nil
-        discardVoiceCueWarmup()
         listeningIntentTask?.cancel()
         await listeningIntentTask?.value
         listeningIntentTask = nil
@@ -212,8 +212,10 @@ final class VoiceSessionCoordinator: VoiceOutputHandling, UIFeedbackCapability {
                 prepare: { [self] in try await prepareVoice(generation: generation) },
                 capture: { [self] in try await admitVoice(generation: generation) })
             guard voiceGeneration == generation, !Task.isCancelled else { throw CancellationError() }
-            presentationPhase = handlingTurn ? .processing : .listening
-            state.voiceStatus = handlingTurn ? "正在回复 · 聆听已暂停" : "正在聆听 · 停顿后自动识别"
+            if presentationPhase == .loading {
+                presentationPhase = handlingTurn ? .processing : .listening
+                state.voiceStatus = handlingTurn ? "正在回复 · 聆听已暂停" : "正在聆听 · 停顿后自动识别"
+            }
             interruptionTask = Task { [weak self] in
                 for await _ in NotificationCenter.default.notifications(named: AVAudioSession.interruptionNotification)
                 {
@@ -261,10 +263,6 @@ final class VoiceSessionCoordinator: VoiceOutputHandling, UIFeedbackCapability {
             throw CapabilityError.unavailable(reason)
         }
         guard voiceGeneration == generation else { throw CancellationError() }
-        state.voiceStatus = "正在加载本地语音模型，首次加载可能较慢…"
-        try await prepareRecognition()
-        guard voiceGeneration == generation else { throw CancellationError() }
-        try Task.checkCancellation()
         if case .unavailable(let reason) = await voiceActivity.availability {
             throw CapabilityError.unavailable(reason)
         }
@@ -317,8 +315,10 @@ final class VoiceSessionCoordinator: VoiceOutputHandling, UIFeedbackCapability {
                 pcm = PlaybackPCM(samples: samples, sampleRate: FeedbackTone.sampleRate)
             }
             try validateFeedback(invocation)
-            try await audio.playClip(pcm) {
-                started?.resolve(.success(()))
+            if let started {
+                try await activationCue.play(pcm) { started.resolve(.success(())) }
+            } else {
+                try await audio.playClip(pcm)
             }
         } catch {
             started?.resolve(.failure(error))
@@ -348,6 +348,8 @@ final class VoiceSessionCoordinator: VoiceOutputHandling, UIFeedbackCapability {
         guard voiceGeneration == generation, !listeningPaused, !hasPlaybackBarrier else { throw CancellationError() }
         let epoch = UUID().uuidString
         captureEpoch = epoch
+        state.isVoiceActive = true
+        state.listeningAnimationID = generation
         captureTask = Task { [weak self] in
             var meterSamples: [Float] = []
             let meterClock = ContinuousClock()
@@ -451,7 +453,6 @@ final class VoiceSessionCoordinator: VoiceOutputHandling, UIFeedbackCapability {
         if !pressing {
             guard voiceGeneration == nil, listeningIntentTask == nil, !voiceActivationPending else { return }
             voiceCuePreparation?.cancel()
-            if voiceCuePreparation == nil { discardVoiceCueWarmup() }
             return
         }
         guard voiceGeneration == nil, listeningIntentTask == nil, !voiceActivationPending, !playbackActive,
@@ -462,9 +463,6 @@ final class VoiceSessionCoordinator: VoiceOutputHandling, UIFeedbackCapability {
             guard let self else { return }
             defer {
                 voiceCuePreparation = nil
-                if !voicePressing && voiceGeneration == nil && listeningIntentTask == nil && !voiceActivationPending {
-                    discardVoiceCueWarmup()
-                }
                 // A newer press can arrive while its predecessor is cancelling; coalesce to one replacement.
                 if Task.isCancelled, voicePressing, voiceGeneration == nil, listeningIntentTask == nil {
                     voicePressing = false
@@ -489,7 +487,6 @@ final class VoiceSessionCoordinator: VoiceOutputHandling, UIFeedbackCapability {
                 }
                 try Task.checkCancellation()
                 guard voiceGeneration == nil else { return }
-                try audio.prepareClip(pcm)
                 preparedVoiceCue = (request, pcm)
             } catch is CancellationError {} catch {
                 state.listeningControlMessage = "提示音准备失败：\(error)"
@@ -497,13 +494,6 @@ final class VoiceSessionCoordinator: VoiceOutputHandling, UIFeedbackCapability {
             }
         }
     }
-    private func discardVoiceCueWarmup() {
-        do { try audio.discardPreparedClip() } catch {
-            state.listeningControlMessage = "提示音清理失败：\(error)"
-            record(state.listeningControlMessage ?? "提示音清理失败")
-        }
-    }
-
     func toggleVoice() {
         guard state.isReady, !changingSettings else { return }
         guard listeningIntentTask == nil, !voiceActivationPending else {
@@ -530,10 +520,8 @@ final class VoiceSessionCoordinator: VoiceOutputHandling, UIFeedbackCapability {
                     ListeningIntent(enabled: true).input(sessionID: runtime.interactionSessionID))
             } catch is CancellationError {
                 voiceActivationPending = false
-                discardVoiceCueWarmup()
             } catch {
                 voiceActivationPending = false
-                discardVoiceCueWarmup()
                 state.voiceStatus = "聆听切换失败：\(error)"
                 if voiceGeneration == nil { presentationPhase = .failed }
                 record(state.voiceStatus)
@@ -665,13 +653,13 @@ final class VoiceSessionCoordinator: VoiceOutputHandling, UIFeedbackCapability {
         voiceActivationPending = false
         voicePressing = false
         voiceCuePreparation?.cancel()
-        if voiceCuePreparation == nil { discardVoiceCueWarmup() }
         let oldGeneration = voiceGeneration
         if oldGeneration != nil || startupTask != nil || handlingTurn || hasPlaybackBarrier || state.isReplyActive {
             manualListeningOff = true
             requestReplyCancellation()
         }
         conversationPresentation.suspendReplies()
+        activationCue.stop()
         audio.stopPlayback()
         playbackActive = false
         voiceGeneration = nil

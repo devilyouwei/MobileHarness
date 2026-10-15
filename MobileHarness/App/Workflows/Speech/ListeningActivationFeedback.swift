@@ -13,10 +13,8 @@ public enum ListeningActivationFeedback {
         invocation: any FunctionInput, configuration: SpeechActions.ListeningFeedback,
         feedback: any UIFeedbackCapability,
         prepare: @escaping @Sendable () async throws -> Void,
-        capture: @escaping @Sendable () async throws -> Void,
-        tail: Duration = .milliseconds(120)
+        capture: @escaping @Sendable () async throws -> Void
     ) async throws {
-        guard tail >= .zero, tail <= .seconds(1) else { throw ActionComposition.ConfigurationError.invalidDelay }
         let definitions = UIModule.feedbackDefinitions(feedback: feedback)
         guard let haptic = definitions.first(where: { $0.path.function == "vibrate" }),
             let cue = definitions.first(where: { $0.path.function == "playCue" })
@@ -38,18 +36,13 @@ public enum ListeningActivationFeedback {
             cue, parameters: ["cue": configuration.cue.cue.rawValue, "volume": String(configuration.cue.volume)])
         let stages: [(String, ActionComposition)] = [
             (
-                "activation",
+                "preparation",
                 try ActionComposition(
-                    .parallel([
-                        .action("prepare", [], budget: .default) {
-                            try await prepare()
-                            return .completed
-                        },
-                        .action(function: cue, invocation: cueInput),
-                        .action(function: haptic, invocation: hapticInput),
-                    ]))
+                    .action("prepare", [], budget: .default) {
+                        try await prepare()
+                        return .completed
+                    })
             ),
-            ("tail", try ActionComposition(.delay(tail))),
             (
                 "capture",
                 try ActionComposition(
@@ -57,6 +50,14 @@ public enum ListeningActivationFeedback {
                         try await capture()
                         return .completed
                     })
+            ),
+            (
+                "feedback",
+                try ActionComposition(
+                    .parallel([
+                        .action(function: cue, invocation: cueInput),
+                        .action(function: haptic, invocation: hapticInput),
+                    ]))
             ),
         ]
         var entries: [ActionReport.Entry] = []

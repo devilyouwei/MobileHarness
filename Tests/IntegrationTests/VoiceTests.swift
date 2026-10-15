@@ -274,7 +274,7 @@ private actor BlockedRecognition: SpeechRecognitionCapability {
     _ = await started.next()
     // A single oversized admission fails regardless of worker scheduling.
     await #expect(throws: CapabilityError.self) {
-        try await turn.enqueue(Array(repeating: .end(.maximumDuration), count: 129))
+        try await turn.enqueue(Array(repeating: .end(.maximumDuration), count: 2049))
     }
     await turn.cancel()
     await #expect(throws: CapabilityError.self) { try await turn.finish() }
@@ -552,14 +552,14 @@ private actor EndpointVADSession: VoiceActivitySession {
     try await speech.bind(AgentMessaging { _, _, _ in DeliveryReport(delivered: [.assistant]) })
     try await speech.start()
     try await speech.pause()
-    for i: UInt64 in 0..<4 {
+    for i: UInt64 in 0..<30 {
         let audio = try AudioInput(
             samples: Data(repeating: 0, count: 64000), sampleRate: 16000, sequence: i, timestamp: Double(i))
         try await speech.receive(
             AgentInput(id: UUID().uuidString, sessionID: session, payload: .audio(audio)))
     }
     let payload = InputPayload.audio(
-        try AudioInput(samples: Data(repeating: 0, count: 4), sampleRate: 16000, sequence: 4, timestamp: 4))
+        try AudioInput(samples: Data(repeating: 0, count: 4), sampleRate: 16000, sequence: 30, timestamp: 30))
     await #expect(throws: HarnessError.queueFull) {
         try await speech.receive(AgentInput(id: UUID().uuidString, sessionID: session, payload: payload))
     }
@@ -569,7 +569,7 @@ private actor EndpointVADSession: VoiceActivitySession {
         metadata: InputMetadata(
             payload: payload, rootID: UUID().uuidString, deadline: .now.advanced(by: .seconds(-1))))
     await #expect(throws: CommunicationError.expired) { try await speech.receive(expired) }
-    #expect(await speech.status().queuedInputs == 4)
+    #expect(await speech.status().queuedInputs == 30)
     await speech.stop()
     #expect(await speech.status().queuedInputs == 0)
 }
@@ -1275,4 +1275,204 @@ func finalASRGatesNextUtteranceBeforePublicationUntilReplyCompletes() async thro
     await pump.value
     #expect(await probe.values.map(\.enabled) == [true, true, false, false, false, true, false])
     #expect(try JSONDecoder().decode(ListeningIntent.self, from: Data("{}".utf8)).enabled == nil)
+}
+
+/// Controlled cold resources: no model weights, native microphone or timing assumptions.
+private struct ColdVoiceGate: Sendable {
+    let entered = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingOldest(1))
+    let release = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingOldest(1))
+    func wait() async throws {
+        entered.continuation.yield(())
+        for await _ in release.stream { break }
+        try Task.checkCancellation()
+    }
+    func open() { release.continuation.yield(()) }
+}
+
+private actor ColdVoiceRecognition: SpeechRecognitionCapability {
+    nonisolated let availability: CapabilityAvailability = .available
+    nonisolated let gate = ColdVoiceGate()
+    private(set) var received = Data()
+    func transcribe(_ request: SpeechRecognitionRequest) async throws -> SpeechRecognitionSession {
+        try await gate.wait()
+        let pair = InferenceSession<TranscriptionEvent>.make(
+            context: request.context, limits: try StreamLimits(), estimatedBytes: { $0.estimatedBytes })
+        return SpeechRecognitionSession(
+            output: pair.session, format: request.format,
+            sendAudio: { [self] frame in await append(frame.data) },
+            finishInput: {
+                try pair.emitter.yield(
+                    TranscriptionEvent(segmentID: "cold", revision: 0, text: "cold-start", isFinal: true))
+                pair.emitter.finish()
+            })
+    }
+    private func append(_ data: Data) { received.append(data) }
+}
+
+private actor ColdVoiceActivity: VoiceActivityCapability, VoiceActivitySession {
+    nonisolated let availability: CapabilityAvailability = .available
+    nonisolated let gate = ColdVoiceGate()
+    nonisolated let caughtUp = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingOldest(1))
+    private var position: Int64 = 0
+    func detectVoiceActivity(format: AudioFormat) async throws -> any VoiceActivitySession {
+        try await gate.wait()
+        return self
+    }
+    func process(_ frame: AudioFrame) throws -> [VoiceActivityScore] {
+        let probability: Float = frame.data.withUnsafeBytes {
+            $0.loadUnaligned(as: Float.self) > 0 ? 1 : 0
+        }
+        let score = try VoiceActivityScore(
+            startSample: position, sampleCount: frame.sampleCount, probability: probability)
+        position += Int64(frame.sampleCount)
+        if position == 128_000 { caughtUp.continuation.yield(()) }
+        return [score]
+    }
+    func finish() -> [VoiceActivityScore] { [] }
+    func reset() { position = 0 }
+    func cancel() {}
+}
+
+@Test(.actionCatalog, .timeLimit(.minutes(1)))
+func coldVADAndASRPreserveRecordedPrefixAndJoinLiveAudioInOrder() async throws {
+    let recognition = ColdVoiceRecognition()
+    let vad = ColdVoiceActivity()
+    let root = UUID().uuidString
+    let epoch = UUID().uuidString
+    let speech = try SpeechPerceptionAgent(
+        recognition: recognition, vad: vad, sessionID: root, interactionSessionID: root, residentListening: true)
+    let final = AsyncStream<String>.makeStream(bufferingPolicy: .bufferingOldest(1))
+    try await speech.start()
+    let output = Task {
+        for await envelope in speech.outputs {
+            if case .communication(let action) = envelope.output,
+                case .transcript(let text, final: true)? = action.message.perception
+            {
+                final.continuation.yield(text)
+            }
+        }
+    }
+    try await speech.receive(ListeningIntent(enabled: true).input(sessionID: root))
+    try await speech.openCapture(sessionID: epoch)
+    var expected = Data()
+    func packet(_ sequence: UInt64, silent: Bool = false) throws -> AgentInput {
+        let samples = [Float](repeating: silent ? 0 : Float(sequence + 1) / 100, count: 4000)
+        let data = samples.withUnsafeBytes { Data($0) }
+        return AgentInput(
+            id: UUID().uuidString, sessionID: epoch,
+            payload: .audio(
+                try AudioInput(
+                    samples: data, sampleRate: 16000, sequence: sequence,
+                    timestamp: Double(sequence) / 4)))
+    }
+    // Eight seconds, uniquely marked by packet, exceeds both previous PCM queue bounds.
+    for sequence: UInt64 in 0..<32 {
+        let input = try packet(sequence)
+        if case .audio(let audio) = input.payload { expected.append(audio.samples) }
+        try await speech.receive(input)
+        if sequence == 0 {
+            var entered = vad.gate.entered.stream.makeAsyncIterator()
+            await entered.next()
+        }
+    }
+    #expect(await speech.status().queuedInputs == 31)
+    vad.gate.open()
+    var recognizing = recognition.gate.entered.stream.makeAsyncIterator()
+    await recognizing.next()
+    var caughtUp = vad.caughtUp.stream.makeAsyncIterator()
+    await caughtUp.next()
+    #expect(await recognition.received.isEmpty)
+    recognition.gate.open()
+    // Live input follows the buffered prefix through exactly the same model session.
+    let live = try packet(32)
+    if case .audio(let audio) = live.payload { expected.append(audio.samples) }
+    try await speech.receive(live)
+    for sequence: UInt64 in 33..<37 { try await speech.receive(packet(sequence, silent: true)) }
+    var result = final.stream.makeAsyncIterator()
+    #expect(await result.next() == "cold-start")
+    let received = await recognition.received
+    #expect(received.prefix(expected.count) == expected)
+    #expect(received.dropFirst(expected.count).allSatisfy { $0 == 0 })
+    await speech.stop()
+    await output.value
+    #expect(await speech.status().queuedInputs == 0)
+}
+
+@Test(.actionCatalog, .timeLimit(.minutes(1)))
+func cancellingColdRecognitionClearsBufferedPrefixBeforeNextTurn() async throws {
+    let recognition = ColdVoiceRecognition()
+    let turn = SpeechRecognitionTurn(recognition: recognition, sessionID: UUID().uuidString) { _ in }
+    try await turn.enqueue([.audio([sampleFrame()])])
+    var entered = recognition.gate.entered.stream.makeAsyncIterator()
+    await entered.next()
+    try await turn.enqueue([.audio(Array(repeating: sampleFrame(), count: 64))])
+    await turn.cancel()
+    recognition.gate.open()
+    #expect(await recognition.received.isEmpty)
+    await #expect(throws: CapabilityError.sessionClosed) { try await turn.finish() }
+    let next = SpeechRecognitionTurn(recognition: recognition, sessionID: UUID().uuidString) { _ in }
+    let samples: [Float] = [0.25, 0.5]
+    let frame = try AudioFrame(
+        data: samples.withUnsafeBytes { Data($0) },
+        format: AudioFormat(sampleRate: 16000, channels: 1, encoding: .float32), sequence: 0, timestamp: 0)
+    recognition.gate.open()
+    try await next.enqueue([.audio([frame]), .end(.silence)])
+    #expect(try await next.finish() == "cold-start")
+    #expect(await recognition.received == frame.data)
+}
+
+@Test(.actionCatalog, .timeLimit(.minutes(1)))
+func coldRecognitionRejectsOverflowWithoutDroppingPreviouslyQueuedPCM() async throws {
+    let recognition = ColdVoiceRecognition()
+    let turn = SpeechRecognitionTurn(recognition: recognition, sessionID: UUID().uuidString) { _ in }
+    try await turn.enqueue([.audio([sampleFrame()])])
+    var entered = recognition.gate.entered.stream.makeAsyncIterator()
+    await entered.next()
+    let samples = [Float](repeating: 0.25, count: 16000)
+    let data = samples.withUnsafeBytes { Data($0) }
+    let frames = try (0..<30).map { sequence in
+        try AudioFrame(
+            data: data, format: AudioFormat(sampleRate: 16000, channels: 1, encoding: .float32),
+            sequence: UInt64(sequence + 1), timestamp: Double(sequence + 1))
+    }
+    try await turn.enqueue([.audio(frames)])
+    await #expect(throws: CapabilityError.bufferOverflow) { try await turn.enqueue([.audio([sampleFrame()])]) }
+    recognition.gate.open()
+    #expect(try await turn.finish() == "cold-start")
+    let received = await recognition.received
+    #expect(received.count == 480_000 * 4 + 320)
+    #expect(received.prefix(320) == Data(repeating: 0, count: 320))
+    #expect(received.dropFirst(320) == frames.reduce(into: Data()) { $0.append($1.data) })
+}
+
+@Test(.actionCatalog, arguments: [false, true])
+func speechRawAudioQueueEnforcesPacketAndMemoryBounds(memoryBound: Bool) async throws {
+    let root = UUID().uuidString
+    let speech = try SpeechPerceptionAgent(
+        recognition: RecognitionFixture(text: "", includeFinal: false), vad: EndpointVAD(), sessionID: root)
+    try await speech.start()
+    try await speech.pause()
+    let capacity = memoryBound ? SpeechPerceptionSignalPreprocessor.maximumQueuedSamples : 4096
+    let packetSize = memoryBound ? 16000 : 1
+    var count = 0
+    var sequence: UInt64 = 0
+    while count < capacity {
+        let amount = min(packetSize, capacity - count)
+        let audio = try AudioInput(
+            samples: Data(repeating: 0, count: amount * 4), sampleRate: 192000,
+            sequence: sequence, timestamp: Double(sequence),
+            layout: memoryBound ? .firstOrderAmbisonicsACNSN3D : .mono)
+        try await speech.receive(AgentInput(id: UUID().uuidString, sessionID: root, payload: .audio(audio)))
+        count += amount
+        sequence += 1
+    }
+    let queued = await speech.status().queuedInputs
+    let audio = try AudioInput(
+        samples: Data(repeating: 0, count: 16), sampleRate: 192000, sequence: sequence, timestamp: Double(sequence))
+    await #expect(throws: HarnessError.queueFull) {
+        try await speech.receive(AgentInput(id: UUID().uuidString, sessionID: root, payload: .audio(audio)))
+    }
+    #expect(await speech.status().queuedInputs == queued)
+    await speech.stop()
+    #expect(await speech.status().queuedInputs == 0)
 }

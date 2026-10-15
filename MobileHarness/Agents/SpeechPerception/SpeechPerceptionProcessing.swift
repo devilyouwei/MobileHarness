@@ -20,8 +20,9 @@ public struct SpeechPerceptionContextState: AgentContextState {
 
 public struct SpeechPerceptionSignalPreprocessor: SignalPreprocessor {
     public static let evidenceCapacity = 256
-    public static let inputCapacity = 128
-    public static let maximumQueuedSamples = 64000
+    public static let inputCapacity = 4096
+    public static let maximumQueuedSamples = 8_388_608
+    public static let maximumQueuedDuration: TimeInterval = 30
     public static let outputCapacity = 32
 
     public init() {}

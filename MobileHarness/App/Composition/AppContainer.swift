@@ -71,13 +71,7 @@ final class AppContainer {
         let state = ConversationState()
         let lifecycle = VoiceSessionCoordinator(
             runtime: runtime.voiceDependencies, state: state,
-            audio: AppleAudioIO(), recognition: recognition, synthesis: synthesis,
-            prepareRecognition: {
-                // Reload only resources evicted after startup; get/load reuse resident weights.
-                try await models.warmup(.recognition)
-                try await models.warmup(.voiceActivity)
-                try await models.warmup(.synthesis)
-            }, voiceActivity: vad)
+            audio: AppleAudioIO(), recognition: recognition, synthesis: synthesis, voiceActivity: vad)
         self.lifecycle = lifecycle
         let audioDetection = AudioDetectionWorkflow(
             state: AudioDetectionState(),

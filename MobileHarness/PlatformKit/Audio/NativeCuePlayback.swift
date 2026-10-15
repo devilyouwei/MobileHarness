@@ -13,7 +13,7 @@
         private var delegate: CueCompletionDelegate?
         private var waiter: CheckedContinuation<Void, any Error>?
         public init() {}
-        public func play(_ pcm: PlaybackPCM) async throws {
+        public func play(_ pcm: PlaybackPCM, onStarted: (@MainActor () -> Void)? = nil) async throws {
             try Task.checkCancellation()
             guard operationID == nil else { throw Failure.busy }
             let id = UUID().uuidString
@@ -45,6 +45,7 @@
                         finish(id: id, result: .failure(Failure.failed))
                         return
                     }
+                    onStarted?()
                 }
                 try Task.checkCancellation()
             } onCancel: {
