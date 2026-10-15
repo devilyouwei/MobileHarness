@@ -34,12 +34,12 @@ Transient file errors retry at most three times. Available system resume data �
 
 Progress is actual byte-weighted delegate state including reused files. The host supplies background event completion; any foreground preparation deadline belongs to that host, not this downloader. User force-quit may cancel OS transfers; no durable uninterrupted network guarantee is claimed.
 
-✅ Persisted bounded file plans, native transfer reattachment and explicit cleanup are implemented.
-
-## Outstanding work
-
-❌ Full iPhone relaunch, force-quit and server-dependent resume acceptance remains outstanding; native transfer guarantees are limited by the OS and server. [Resource acceptance roadmap](../../../../../docs/Roadmap.md) tracks those trials.
+Persisted bounded file plans, native transfer reattachment and explicit cleanup are implemented.
 
 ## Related design
 
 [Parent design](../README.md)
+
+## 待实现
+
+- Full iPhone relaunch, force-quit and server-dependent resume acceptance remains outstanding; native transfer guarantees are limited by the OS and server. [Resource acceptance roadmap](../../../../../docs/Roadmap.md) tracks those trials.

@@ -32,29 +32,22 @@ Tools await ToolExecutor directly and have no waiting queue here. Shared declare
 
 ## Result and cancellation contract
 
-Capture ExecutionOwner and original causality before execution. Return feedback to that incarnation/session under a fresh ten-second deadline with root/parent/turn/hops preserved. Rejection of delivery retains the original value/isError/callID/code plus separate deliveryFailure. Completion-only callers without ToolResult support still receive explicit execution outcomes.
+Capture ExecutionOwner and original causality before execution. Return feedback to that incarnation/session using a fresh runtime input identity with root/parent/turn/hops preserved and no implicit deadline. Rejection of delivery retains the original value/isError/callID/code plus separate deliveryFailure. Completion-only callers without ToolResult support still receive explicit execution outcomes.
 
 BehaviorTranslation copies bounded producer codes/details/child reports without interpreting motor fields. Late manual-worker terminal results are distinct from original submission receipt. Detached root output pumps do not inherit a caller's invocation authority. Cancellation is checked before/after handlers and joins cleanup; delivery failure cannot roll back or replay an effect.
 
-✅ Separate scheduled/direct dispatch, inherited authority and retained execution/delivery failures are implemented.
-
-❌ Durable result transport is not implemented.
+Separate scheduled/direct dispatch, inherited authority and retained execution/delivery failures are implemented.
 
 ## Related design
 
 [Parent design](../README.md)
 
+## Result-driven ReACT
 
-## Result-driven ReACT (ADR0214)
+生成调用的终态投递与模型继续决策分离；固定 Tool 返回契约保留，调度/资源及所有者回传不增加业务判断。
 
-✅ ADR0214：生成调用的终态投递与模型继续决策分离；固定 Tool 返回契约保留，调度/资源及所有者回传不增加业务判断。
+Native calls are joined cancellable dispatches owned by OutputGateway for both ordinary model inputs and task scopes. Host interruption directly cancels and joins the owned native handler, independently of ordered terminal arrival.
 
-✅ Native calls are joined cancellable dispatches owned by OutputGateway for both ordinary model inputs and task scopes. Host interruption no longer depends on reaching a later ordered terminal to cancel a blocked native handler.
+## 待实现
 
-
-
-
-
-## SQLite records and runtime identity
-
-✅ Implemented: technical identities are opaque UUID strings; committed business entities use dialog/message/task/media/device SQLite IDs. Consumers use Storage repositories while preserving ownership, cancellation and independent foundation boundaries. Complete messages, including each ReACT message, persist at termination; delta fragments do not persist. The custom allocator and replaced file/index implementation are removed. See the project SQLite business-record plan.
+- Durable result transport is not implemented.

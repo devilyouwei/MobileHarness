@@ -33,7 +33,7 @@ flowchart TB
  Conversation --> Logs[Action, Task and Agent values]
 ```
 
-✅ Home refinement: camera intent initially off, YOLO details initially collapsed, and a single unboxed foreground goal above the user caption; Conversation owns separate pinned-goal and moving-caption geometry.
+Home refinement: camera intent initially off, YOLO details initially collapsed, and a single unboxed foreground goal above the user caption; Conversation owns separate pinned-goal and moving-caption geometry.
 
 ## Interaction and acceptance
 
@@ -43,9 +43,7 @@ App rejects stale session/turn/request/frame updates before converting them to U
 
 Finite expressions carry renderer identity and completion acknowledgment; setting a persistent base expression only commits state. Passive pose/gaze/spectrum updates have no long-lived UI queue. View disappearance cancels page-scoped reads/diagnostics and renderer availability, not root-owned execution.
 
-✅ State-driven conversation/camera/settings/history/log/diagnostic surfaces, native local navigation, accessibility and Reduce Motion paths.
-
-❌ Multistage character performance and persistent UI audit storage.
+State-driven conversation/camera/settings/history/log/diagnostic surfaces, native local navigation, accessibility and Reduce Motion paths.
 
 Native visual acceptance is recorded in [validation history](../../docs/validation/Validation-History.md).
 
@@ -53,49 +51,40 @@ Native visual acceptance is recorded in [validation history](../../docs/validati
 
 [Parent design](../README.md) · [Camera](Camera/README.md) · [Components](Components/README.md) · [Conversation](Conversation/README.md) · [Diagnostics](Diagnostics/README.md) · [Settings](Settings/README.md)
 
+Listening presentation: long-press interaction/accessibility remain local; UI displays active-session halo and resting open/closed eyes from passive state, without native audio/haptic ownership.
 
-✅ Listening presentation: long-press interaction/accessibility remain local; UI displays active-session halo and resting open/closed eyes from passive state, without native audio/haptic ownership.
+UI packages a native Metal vertex/fragment edge-light resource with no cross-module dependencies. Conversation submits long-hold stop during replies; halo follows consent while native capture pauses. A GPU edge field and two-span caption fade replace full-screen layered blur and per-character 30 Hz reconstruction.
 
+waking eye transition is rapid and separate from slow closure; first blink is delayed after a fresh wake epoch, and loading does not scale the eyes. Halo keeps one stable native layer and generation-scoped GPU opacity envelope with no App/Action dependencies.
 
-✅ Implemented: UI packages a native Metal vertex/fragment edge-light resource with no cross-module dependencies. Conversation submits long-hold stop during replies; halo follows consent while native capture pauses. A GPU edge field and two-span caption fade replace full-screen layered blur and per-character 30 Hz reconstruction.
+Camera adds an identity-fenced PhotoDeparture acknowledgment and pure numeric departure layout. Saving enlarges to 1.16 then translates wholly right without shrinking; ignoring shrinks toward the lower-right outside screen bounds. UI owns no audio or album transactions.
 
+Conversation separates pinned goal and moving ASR. Components use an atomic native Core Animation/Metal companion surface; UI still has no cross-module dependencies. UIKit owns state-to-layer commits, immutable Metal snapshots cross one isolated rendering thread; no 60 Hz SwiftUI body loop for eyes/rim.
 
-✅ Implemented: waking eye transition is rapid and separate from slow closure; first blink is delayed after a fresh wake epoch, and loading no longer scales the eyes. Halo keeps one stable native layer and generation-scoped GPU opacity envelope with no App/Action dependencies.
+Conversation provides passive error-toast presentation, driven by root-owned failure projections. No Agent/provider dependency is added.
 
+## 历史记录接口
 
-✅ Implemented: Camera adds an identity-fenced PhotoDeparture acknowledgment and pure numeric departure layout. Saving enlarges to 1.16 then translates wholly right without shrinking; ignoring shrinks toward the lower-right outside screen bounds. UI owns no audio or album transactions.
+设置入口改为 Agent 记录，仅提供真实 Assistant 聊天记录；前台 Task 按持久化身份在对话内展开，不再提供重复任务页面。
 
+listening light origin is a UI-owned normalized presentation parameter, captured from the actual hold and latched per activation. No new device/Action lifetime or module dependency is introduced.
 
-✅ Conversation separates pinned goal and moving ASR. Components use an atomic native Core Animation/Metal companion surface; UI still has no cross-module dependencies. UIKit owns state-to-layer commits, immutable Metal snapshots cross one isolated rendering thread; no 60 Hz SwiftUI body loop for eyes/rim.
+home notices are restricted to upper-layer Agent/App/system failures; Action failure color/status stays in the current Action panel. Notice is plain centered yellow icon/text, with no card or close control.
 
+UI 消费宿主注入的 notice/light 值；实际错误优先于装饰提示，装饰光与聆听 generation 独立。原生渲染见 [Components](Components/README.md)，会话投影见 [Conversation](Conversation/README.md)。
 
-✅ Implemented: Conversation adds passive error-toast presentation, driven by root-owned failure projections. No Agent/provider dependency is added.
-
-## 历史记录收敛（2026-10-13）
-
-✅ Implemented: 设置入口改为 Agent 记录，仅提供真实 Assistant 聊天记录；前台 Task 按持久化身份在对话内展开，不再提供重复任务页面。
-
-❌ 历史记录页面板块重新设计及原生 UI/真机验收。
-
-
-✅ Implemented: listening light origin is a UI-owned normalized presentation parameter, captured from the actual hold and latched per activation. No new device/Action lifetime or module dependency is introduced.
-
-
-✅ Implemented: home notices are restricted to upper-layer Agent/App/system failures; Action failure color/status stays in the current Action panel. Notice is plain centered yellow icon/text, with no card or close control.
-
-
-✅ Implemented (2026-10-13): UI.Notice.showNotice/dismissNotice and UI.Light.updateLight are canonical presentation Actions for trusted business calls, currently registered by no Skill. Neutral Actions values cross RuntimePresentation into root-owned HomeEffectsWorkflow, which retains one replaceable notice expiry and one light expiry, UUID-fenced cleanup, and explicit stop. Notices remain separate from factual ExecutionIssue history; actual upper-layer errors have display priority and Action failures remain panel-only. Decorative light accepts normalized origin, initial opacity/intensity and duration; it never changes consent, microphone or eyes. Native renderer separates light generations from listening eye generations and preserves existing exit fade. RuntimePresentation converts neutral Action requests into UI-owned values; AppPresentationWorkflow retains existing dependencies. No UI capability/business dependencies or new directories.
-
-
-✅ ExecutionIssue 已增加可选 userMessage 展示值，日志 message 不变；首页 visibleNotice 优先使用宿主提供的 userMessage，错误 toast 的身份、去重、到期和日志面板保持现有行为。UI 不解析语音 SDK 错误。
-
+ExecutionIssue 已增加可选 userMessage 展示值，日志 message 不变；首页 visibleNotice 优先使用宿主提供的 userMessage，错误 toast 的身份、去重、到期和日志面板保持现有行为。UI 不解析语音 SDK 错误。
 
 ## Task history v2 and in-place compression
 
-✅ Implemented: UI exposes passive indexed history compressions and a chronological timeline. Task summaries expand to original model request details; UI never chooses persistence or constructs business summaries.
+UI exposes passive indexed history compressions and a chronological timeline. Task summaries expand to original model request details; UI never chooses persistence or constructs business summaries.
 
+History must fold a terminal Task when the loaded paginated source subset matches its exact input/request references. Complete source evidence remains independently pageable. Subsequent timeline pages must merge Task compression metadata as well as request rows, without changing row styling/navigation.
 
-✅ Implemented (2026-10-15 Task record visibility): History must fold a terminal Task when the loaded paginated source subset matches its exact input/request references. Complete source evidence remains independently pageable. Subsequent timeline pages must merge Task compression metadata as well as request rows, without changing row styling/navigation.
+History pagination becomes appearance-driven for archive lists, dialog timelines and expanded Task sources. UI-local cursor/ticket state prevents overlapping/duplicate attempts; page-owned tasks cancel on disappearance, while long-lived business operations remain root-owned.
 
+## 待实现
 
-✅ Implemented (2026-10-15 automatic history paging): History pagination becomes appearance-driven for archive lists, dialog timelines and expanded Task sources. UI-local cursor/ticket state prevents overlapping/duplicate attempts; page-owned tasks cancel on disappearance, while long-lived business operations remain root-owned.
+- Multistage character performance and persistent UI audit storage.
+
+- 历史记录页面板块重新设计及原生 UI/真机验收。

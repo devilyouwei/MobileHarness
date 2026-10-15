@@ -6,7 +6,7 @@ Actions 定义应用的业务操作与查询：参数校验、函数说明、资
 
 ## 职责与边界
 
-✅ 六个业务域和共享 Support 构成当前实现。业务域入口使用 `FunctionInput`，不读取 Channel、Agent 权限或调用协议。Gateway 负责授权、调度、资源仲裁与结果传递；App 负责注入能力、原生服务及其生命周期。
+六个业务域和共享 Support 构成当前实现。业务域入口使用 `FunctionInput`，不读取 Channel、Agent 权限或调用协议。Gateway 负责授权、调度、资源仲裁与结果传递；App 负责注入能力、原生服务及其生命周期。
 
 `Package.swift` 将 `Support/Contracts` 单独编译为无项目依赖的 FunctionContracts；其余 Swift 源码编译为 Actions。Actions 的项目依赖为 FunctionContracts、PlatformKit、BehaviorDefinitions、Storage、StorageChat。PlatformKit 导入限于 NexArm/Support，StorageChat 导入限于 History，Storage 导入限于 System 的持久化服务。Actions 不导入 Agents、Gateway、UI 或 App 的实现。
 
@@ -70,7 +70,6 @@ flowchart TB
 
 ## 关键技术
 
-
 - 参数的传输值统一为字符串；整数、有限数值、布尔、枚举、ID 和 JSON 的业务约束由入口或注入端口解析。大多数入口拒绝未知键；个别入口的实际差异见所属域文档。
 - `ActionFunction` 的动态预算优先于静态 timeout；缺省静态预算为 30 秒。资源解析器最多返回八个资源。执行与清理机制位于 Gateway，估计耗时不构成最低等待时间。
 - 完成语义由业务定义：状态接纳、动画恢复、音频排空、命令准入和电机到位分别属于不同边界。定义存在不等于发生了效果。
@@ -83,3 +82,7 @@ flowchart TB
 直接调用函数体不自动获得 Gateway 的权限、Channel 排序、资源租约或超时机制。需要这些机制的调用方必须通过对应执行接口；端点仍独立验证其运行所有权。
 
 [整体技术设计](../README.md) · [函数协议](Support/Contracts/README.md) · [Gateway 执行](../Gateway/Runtime/README.md)
+
+## 待实现
+
+- 暂无本目录独立的实现待办；跨模块及实际模型/设备验收见所属模块说明。

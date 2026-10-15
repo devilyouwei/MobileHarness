@@ -22,8 +22,10 @@ flowchart LR
 
 No interfaces, queues or runtime lifecycle exist here. A shared abstraction requires concrete cross-domain consumers and must remain independent of application policy.
 
-❌ Shared Core capability implementation.
-
 ## Related design
 
 [Parent design](../README.md)
+
+## 待实现
+
+- Shared Core capability implementation.

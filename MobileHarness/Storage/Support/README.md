@@ -2,7 +2,7 @@
 
 ## Responsibility and implementation
 
-✅ Contracts owns backend-neutral interfaces/values; Memory owns bounded process-local stores/streams/leases/admission; Persistence owns concrete File and SQLite mechanisms. Domain schemas/queries remain in Chat/Tasks/Media/Devices.
+Contracts owns backend-neutral interfaces/values; Memory owns bounded process-local stores/streams/leases/admission; Persistence owns concrete File and SQLite mechanisms. Domain schemas/queries remain in Chat/Tasks/Media/Devices.
 
 ## Direct relationships
 
@@ -12,8 +12,8 @@ The Storage target compiles Contracts/Memory/File only and depends on no project
 
 No global discovery, universal SQL/query DSL, business state transitions or backend fallback. Protocol completion/error/durability contracts are explicit. Individual source files expose public APIs through Swift modules; no umbrella Storage.swift is needed.
 
-## Outstanding work
-
-❌ General state-transition/subscription feature and new persistent backends remain outside this refactor.
-
 [Storage](../README.md)
+
+## 待实现
+
+- General state-transition/subscription feature and new persistent backends are not implemented.

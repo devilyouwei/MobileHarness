@@ -89,63 +89,12 @@ FaceGazeTracker requires two confident nose/eye points, prefers large reliable c
 
 OutputMailbox has 18 total slots shared by discrete output and the `overlay`/`gaze` replacement keys; there is no per-kind reservation. Same-key state replaces its pending predecessor with counted coalescing. New entries at full capacity reject explicitly; accepted discrete entries are never replaced. Evidence retains 256 summaries. Stop cancels/joins inference and publication, closes receipts and never restores inference on restart.
 
-✅ Adaptive newest-frame inference, independent pose publication and bounded gaze/skeleton projection are implemented.
+## Registration and authority
 
-❌ Person identity tracking, separate face/depth models and thermal feedback are not implemented.
+[Agent.json](../../Resources/Agents/VisionPerception/Agent.json) subscribes to phone.camera media.image and publishes vision.pose. Internal UI.Pose.showPose and UI.Gaze.moveEyes are code-bound completion-only Tools; no model-callable functions or ordinary Chat worker exist. ModelKit request/scope identities are opaque SDK correlation values; session validation and business policy remain here.
 
-## Function and communication registration
+## 待实现
 
-Model exposure comes from [../../Resources/Agents/VisionPerception/Agent.json](../../Resources/Agents/VisionPerception/Agent.json); code-owned internal permissions are separate. Empty Channel groups declare Channels without exposing a function.
+- Person identity tracking, separate face/depth models and thermal feedback are not implemented.
 
-### Model functions
-
-| Protocol / Channel | Model name | Canonical function | Parameters and constraints | Behavior |
-| --- | --- | --- | --- | --- |
-| — | — | — | — | No model-callable functions. |
-
-### Internal fixed functions
-
-| Protocol | Canonical function | Channel | Parameters | Registration source |
-| --- | --- | --- | --- | --- |
-| InternalTool | `UI.Gaze.moveEyes` | — | `x`, `y` | [VisionPerceptionAgent.swift](VisionPerceptionAgent.swift) |
-| InternalTool | `UI.Pose.showPose` | — | `payload` | [VisionPerceptionAgent.swift](VisionPerceptionAgent.swift) |
-
-### Declared input schemas
-
-| Contract | Version | Kind |
-| --- | --- | --- |
-| `media.image` | 1 | `image` |
-| `action.result` | 1 | `actionResult` |
-
-Directed input schemas and static subscriptions are distinct; admission also validates the runtime sender and scope.
-
-### Input subscriptions and communication grants
-
-Publication is one-way and has no recipient acknowledgment. Directed send returns admission; explicit task results report completion.
-
-| Input contract | Source | Topic |
-| --- | --- | --- |
-| `media.image` | `phone.camera` | `media.image` |
-
-| Output | Contract | Destination |
-| --- | --- | --- |
-| publish | `vision.pose` | Exact static subscribers |
-
-## Related design
-
-[Parent design](../README.md)
-
-
-## 固定函数与 Skill
-
-✅ 资源不再包含 Permissions.json，Agent.json 的 baseSkills 引用 Skill，Skill.json 声明函数。业务模型函数由已加载 Skill 提供；固定调用与模型轮次分别验证，详见 [资源规范](../../Resources/Agents/README.md)。
-
-✅ ModelKit requests retain input/request identity and pass the Agent-owned session as opaque InferenceContext.scopeID. Conversation/session validation and policy stay in this calling Agent; no business scope semantics are delegated to ModelKit.
-
-
-
-
-
-## SQLite records and runtime identity
-
-✅ Implemented: technical identities are opaque UUID strings; committed business entities use dialog/message/task/media/device SQLite IDs. Consumers use Storage repositories while preserving ownership, cancellation and independent foundation boundaries. Complete messages, including each ReACT message, persist at termination; delta fragments do not persist. The custom allocator and replaced file/index implementation are removed. See the project SQLite business-record plan.
+[Agents](../README.md) · [Communication](../Support/Communication/README.md)

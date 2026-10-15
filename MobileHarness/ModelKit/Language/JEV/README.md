@@ -24,10 +24,12 @@ flowchart LR
 
 Text/candidate array must be nonempty; every candidate is nonempty and unique. Result is selected(label, score?) or abstained. Selected label must be in the exact request candidates; optional score must be finite within 0–1. Score is a provider estimate, not calibrated probability. Request retains InferenceContext; session admission/cancellation belongs to a future supplied provider, not these values.
 
-✅ Candidate/result validation is implemented.
-
-❌ Concrete model provider and calibrated confidence guarantees are not implemented.
+Candidate/result validation is implemented.
 
 ## Related design
 
 [Parent design](../README.md)
+
+## 待实现
+
+- Concrete model provider and calibrated confidence guarantees are not implemented.

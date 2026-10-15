@@ -31,9 +31,7 @@ Common function registry permits 256 functions. Action view permits 256 bindings
 
 Generated calls retain their actual completion/outcome even for void handlers. AgentCore determines ReACT from actual business output or failure. Fixed deterministic completion-only delivery retains its no-result-input contract and does not configure reasoning. Frozen views own no worker, transport queue or execution lifetime.
 
-✅ Shared canonical storage, explicit protocol metadata and strict view validation are implemented.
-
-❌ Dynamic registration/hot reload is not implemented.
+Shared canonical storage, explicit protocol metadata and strict view validation are implemented.
 
 ## Related design
 
@@ -41,13 +39,16 @@ Generated calls retain their actual completion/outcome even for void handlers. A
 
 ## Channel-owned Action ordering
 
-✅ Action metadata has no serialization key. [ChannelScheduler](../Scheduling/README.md) owns task-local FIFO/wait ordering; ResourceCoordinator rejects unconfigured conflicts without a queue and preserves explicitly configured joined takeover.
+Action metadata has no serialization key. [ChannelScheduler](../Scheduling/README.md) owns task-local FIFO/wait ordering; ResourceCoordinator rejects unconfigured conflicts without a queue and preserves explicitly configured joined takeover.
 
+## Result-driven ReACT
 
-## Result-driven ReACT (ADR0214)
+ActionBinding、ActionRegistry 和 ToolRegistry 保存执行注册信息。DirectResultPolicy 仅定义固定调用的结果投递契约；生成调用保留终态，ReACT 根据实际结果决定。
 
-✅ ADR0214：ActionBinding、ActionRegistry 和 ToolRegistry 移除反馈枚举/字段/初始化参数及拷贝。DirectResultPolicy 仅保留固定调用的结果投递契约，生成调用仍保留终态，不决定 ReACT。
+## Action timeout contract
 
-## Action timeout contract (2026-10-12)
+ActionBinding 投影具体静态 timeout 和 dynamicTimeout；ToolRegistry 请求预算委托 ActionFunction.executionBudget(for:)，不重复实现优先级。
 
-✅ ActionBinding 投影具体静态 timeout 和 dynamicTimeout；ToolRegistry 请求预算委托 ActionFunction.executionBudget(for:)，不重复实现优先级。
+## 待实现
+
+- Dynamic registration/hot reload is not implemented.

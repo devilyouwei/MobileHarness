@@ -31,18 +31,17 @@ flowchart LR
 
 Validate the audio handle and trusted execution ownership, check out the producer's stream, await native drain, then release it. Cancellation joins playback/stream cleanup before propagating. Producer/storage failures retain their underlying cause; App adaptation supplies localized wording after cleanup. There is no playback queue, synthesis, retry, replay or audio mixing in this directory.
 
-✅ Owner-scoped checkout, cancellation cleanup and actual playback completion are implemented.
+Owner-scoped checkout, cancellation cleanup and actual playback completion are implemented.
 
 ## Related design
 
 [Parent design](../README.md)
 
-## Lifecycle-owned conversation and audio (2026-10-12)
+## Lifecycle-owned conversation and audio
 
-✅ 已移除对话生成、ReACT、收件箱排队、结果屏障、ASR 收尾、TTS 合成及回复占用租约的计时终止。Signal 默认无过期时间，框架不再按通信契约附加 TTL。保留显式实时感知数据的新鲜度和网络传输自身超时；它们不作为对话/语音缓存生命周期。Action 自身超时通过原始执行者的 ActionResult 返回。请求/调用数及队列/PCM 容量仍有界，不以计时自动删除已接纳输入。语音句柄无读等待或错误记录 TTL，按播放完成、输入/会话正常结束、异常或显式取消清理；取消加入生成和播放工作。
+语音句柄由根工作流拥有，按播放完成、输入/会话结束、实际异常或显式取消清理；取消须加入生成和播放工作。PCM 缓冲有界，ASR 收尾、TTS 合成和回复占用不依赖兜底计时器。函数超时来自执行者的 ActionResult，网络超时由传输拥有。
 
-
-✅ Implemented: ListeningActivationFeedback.swift owns bounded staged canonical Action composition for speech activation. Readiness and native-start-synchronized cue/haptic run together; all children and the acoustic tail join successfully before capture. AppSpeechPlayback imports Actions and ExecutionRuntime, while UI rendering/transport Presentation keeps its existing independent dependencies. Speech policy and native implementation remain injected.
+ListeningActivationFeedback.swift owns bounded staged canonical Action composition for speech activation. Readiness and native-start-synchronized cue/haptic run together; all children and the acoustic tail join successfully before capture. AppSpeechPlayback imports Actions and ExecutionRuntime, while UI rendering/transport Presentation keeps its existing independent dependencies. Speech policy and native implementation remain injected.
 
 ## Activation composition and failure contract
 
@@ -52,18 +51,12 @@ Three bounded stages execute in order: parallel readiness/canonical cue/haptic a
 
 At most four executed leaves produce one aggregate report with activation/tail/capture path prefixes. Real partial outcomes remain available after a failure. A failed prerequisite prevents capture, records the report once and throws an ActionReportProviding failure. Cancellation joins children, records cancellation and propagates CancellationError. Native cleanup remains with the root VoiceSessionCoordinator and its startup-ID/generation fences. No activation queue, audio sample asset, retry or fabricated success is owned here.
 
-
-✅ Implemented: one activation stage admits readiness and canonical cue/haptic children together, so model loading does not delay intent feedback. Native-start-gated haptic and cue start together. All three children join successfully before the existing 120 ms tail and capture. Add a single-waiter MainActor ListeningFeedbackStart gate: native playback-start acknowledgment releases the matching haptic child, actual cue failure/cancellation wakes the waiter with that failure. No timers, extra Action admission or queue. Child partial reports remain real; a failed preparation prevents capture while retaining any feedback that actually occurred.
-
+one activation stage admits readiness and canonical cue/haptic children together, so model loading does not delay intent feedback. Native-start-gated haptic and cue start together. All three children join successfully before the existing 120 ms tail and capture. Add a single-waiter MainActor ListeningFeedbackStart gate: native playback-start acknowledgment releases the matching haptic child, actual cue failure/cancellation wakes the waiter with that failure. No timers, extra Action admission or queue. Child partial reports remain real; a failed preparation prevents capture while retaining any feedback that actually occurred.
 
 ## Streaming TTS latency
 
-✅ Owner-scoped playback completes after native drain and lease cleanup. No post-playback timer or replacement task is owned here. App Lifecycle restores listening immediately when policy/session/native barriers permit.
+Owner-scoped playback completes after native drain and lease cleanup. No post-playback timer or replacement task is owned here. App Lifecycle restores listening immediately when policy/session/native barriers permit.
 
+## 待实现
 
-
-
-
-## SQLite records and runtime identity
-
-✅ Implemented: technical identities are opaque UUID strings; committed business entities use dialog/message/task/media/device SQLite IDs. Consumers use Storage repositories while preserving ownership, cancellation and independent foundation boundaries. Complete messages, including each ReACT message, persist at termination; delta fragments do not persist. The custom allocator and replaced file/index implementation are removed. See the project SQLite business-record plan.
+- 暂无本目录独立的实现待办；跨模块及实际模型/设备验收见所属模块说明。

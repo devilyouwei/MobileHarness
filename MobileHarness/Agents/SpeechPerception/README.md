@@ -47,7 +47,7 @@ Select mono/W and process at most 8192 samples per conversion chunk through a st
 
 ## Segmentation algorithm
 
-`VoiceActivitySegmenter` validates contiguous scores over 16 kHz mono Float32: at most 16000 samples per frame, 32000 pending samples and 64 scores per process call. Default probability threshold is 0.5, valid 0.05…0.95. Overlap rejects inputBusy; failure closes/cancels the VAD session and clears damaged state. ✅ The unused `SpeechBoundaryPolicy.consume` return value is explicitly discarded; segmentation continues to use the policy's ordered `streamEvents`, without changing behavior.
+`VoiceActivitySegmenter` validates contiguous scores over 16 kHz mono Float32: at most 16000 samples per frame, 32000 pending samples and 64 scores per process call. Default probability threshold is 0.5, valid 0.05…0.95. Overlap rejects inputBusy; failure closes/cancels the VAD session and clears damaged state.
 
 `SpeechBoundaryPolicy` uses sample counts: confirmed onset 1536 (96 ms), pre-roll budget 4096 (256 ms), endpoint silence 12800 (800 ms), endpoint padding 3072 (192 ms), and model-sized segment 192000 (12 s). Silence is held back, then preserved in full if speech resumes; only endpoint padding is forwarded at utterance end. Prefix/suffix operations preserve whole frames, so padding is quantized to VAD windows. Maximum-duration boundaries keep speaking/hysteresis and stable utterance identity; there is no sixty-second complete-turn cutoff. Finish includes pending speaking tail and an explicit inputFinished event. Reset clears DSP/segmentation state without choosing a new device.
 
@@ -56,8 +56,8 @@ Select mono/W and process at most 8192 samples per conversion chunk through a st
 | Contract / function | Payload and semantics |
 | --- | --- |
 | speech.partial | Latest transcript preview ≤16 KiB encoded, two-second validity |
-| speech.final | Nonempty final text ≤4096 UTF-8 bytes, ten-second validity; published once per nonempty turn |
-| speech.phase | Discrete listening/speaking/processing/empty transitions; ten-second validity |
+| speech.final | Nonempty final text ≤4096 UTF-8 bytes; published once per nonempty turn, with lifecycle-owned completion |
+| speech.phase | Discrete listening/speaking/processing/empty transitions; lifecycle-owned completion |
 | sound.source | Native direction/quality/RMS and active/inactive/uncertain/unavailable; ≤10 Hz and 500 ms freshness |
 | UI.Caption.setTranscript / finishTranscript | Internal completion-only calls; final text precedes sealing, including explicit empty result |
 | UI.VoiceState.setVoiceState | Internal hearing/processing/listening display, no device control |
@@ -77,95 +77,15 @@ SoundSourceEstimator retains scalar statistics for one 100 ms native-rate window
 
 Mono publishes unavailable once per format/listening epoch and still supports ASR. Format/resume resets DSP; reply pause clears FOA direction. One publisher and one latest pending sound observation retain 500 ms window-end freshness. No subscribers is allowed loss. Stop joins publisher and processing without self-joining a failure path.
 
-✅ Bounded speech processing, resident listening authority and independent sound observations are implemented.
+## Registration and authority
 
-❌ Barge-in and background listening are not implemented.
+[Agent.json](../../Resources/Agents/SpeechPerception/Agent.json) admits native audio, user listening consent, Assistant reply occupancy and matching capture-ended facts. Only Assistant currently publishes authorized reply occupancy. Internal caption/voice-state Tools and Speech.Listening.update are code-bound; there are no model-callable functions. App owns physical microphone/playback and confirmed-utterance barriers; the Agent owns consent/occupancy and revisioned listening policy. Consent is explicit/idempotent when enabled is supplied; otherwise the input toggles consent. Reply termination never restores revoked consent.
 
-❗ `reportError` ignores the output stream's yield result. When its 32-slot buffer is full or closed, an `agent.error` diagnostic can be lost. Normal output emission checks yield failure; reliable diagnostic delivery is not guaranteed by this implementation.
+Input/request identity is retained in ModelKit requests; scopeID is opaque to the SDK. Final-ASR admission rejection or recognition/publication failure releases this input's pending-final hold and publishes current policy; it does not forge another Agent's terminal fact. No fixed post-reply wait, occupancy lease timer or whole-utterance watchdog is used.
 
-## Function and communication registration
+## 待实现
 
-Model exposure comes from [../../Resources/Agents/SpeechPerception/Agent.json](../../Resources/Agents/SpeechPerception/Agent.json); code-owned internal permissions are separate. Empty Channel groups declare Channels without exposing a function.
+- Barge-in and background listening are not implemented.
+- `reportError` ignores the output stream's yield result. When its 32-slot buffer is full or closed, an `agent.error` diagnostic can be lost. Normal output emission checks yield failure; reliable diagnostic delivery is not guaranteed by this implementation.
 
-### Model functions
-
-| Protocol / Channel | Model name | Canonical function | Parameters and constraints | Behavior |
-| --- | --- | --- | --- | --- |
-| — | — | — | — | No model-callable functions. |
-
-### Internal fixed functions
-
-| Protocol | Canonical function | Channel | Parameters | Registration source |
-| --- | --- | --- | --- | --- |
-| InternalTool | `UI.Caption.setTranscript` | — | `text` | [SpeechPerceptionAgent.swift](SpeechPerceptionAgent.swift) |
-| InternalTool | `UI.VoiceState.setVoiceState` | — | `state` | [SpeechPerceptionAgent.swift](SpeechPerceptionAgent.swift) |
-| InternalTool | `UI.Caption.finishTranscript` | — | — | [SpeechPerceptionAgent.swift](SpeechPerceptionAgent.swift) |
-| InternalAction | `Speech.Listening.update` | Listening | `enabled`, `paused`, `revision` | [SpeechPerceptionAgent.swift](SpeechPerceptionAgent.swift) |
-
-### Declared input schemas
-
-| Contract | Version | Kind |
-| --- | --- | --- |
-| `media.audio` | 1 | `audio` |
-| `action.result` | 1 | `actionResult` |
-| `speech.listening` | 1 | `observation` |
-| `interaction.replyActivity` | 1 | `observation` |
-| `speech.captureEnded` | 1 | `observation` |
-
-Directed input schemas and static subscriptions are distinct; admission also validates the runtime sender and scope.
-
-### Input subscriptions and communication grants
-
-Publication is one-way and has no recipient acknowledgment. Directed send returns admission; explicit task results report completion.
-
-| Input contract | Source | Topic |
-| --- | --- | --- |
-| `media.audio` | `phone.microphone` | `media.audio` |
-| `speech.listening` | `user` | `speech.listening` |
-| `interaction.replyActivity` | `assistant` | `interaction.replyActivity` |
-| `interaction.replyActivity` | `photographer` | `interaction.replyActivity` |
-| `interaction.replyActivity` | `memory` | `interaction.replyActivity` |
-| `interaction.replyActivity` | `applicationControl` | `interaction.replyActivity` |
-| `speech.captureEnded` | `phone.microphone` | `speech.captureEnded` |
-
-| Output | Contract | Destination |
-| --- | --- | --- |
-| publish | `speech.partial` | Exact static subscribers |
-| publish | `speech.final` | Exact static subscribers |
-| publish | `speech.phase` | Exact static subscribers |
-| publish | `sound.source` | Exact static subscribers |
-
-## Related design
-
-[Parent design](../README.md)
-
-✅ 对话占用订阅收敛为唯一对话生产者 Assistant；确定性角色不再发布对话占用。框架仍可容纳多生产者，但当前业务配置不授权闲置来源。
-
-
-## 固定函数与 Skill
-
-✅ 资源不再包含 Permissions.json，Agent.json 的 baseSkills 引用 Skill，Skill.json 声明函数。业务模型函数由已加载 Skill 提供；固定调用与模型轮次分别验证，详见 [资源规范](../../Resources/Agents/README.md)。
-
-## Lifecycle-owned conversation and audio (2026-10-12)
-
-✅ 已移除对话生成、ReACT、收件箱排队、结果屏障、ASR 收尾、TTS 合成及回复占用租约的计时终止。Signal 默认无过期时间，框架不再按通信契约附加 TTL。保留显式实时感知数据的新鲜度和网络传输自身超时；它们不作为对话/语音缓存生命周期。Action 自身超时通过原始执行者的 ActionResult 返回。请求/调用数及队列/PCM 容量仍有界，不以计时自动删除已接纳输入。语音句柄无读等待或错误记录 TTL，按播放完成、输入/会话正常结束、异常或显式取消清理；取消加入生成和播放工作。
-
-✅ 无占用租约后，用户关闭聆听/采集异常清除本 Agent 的 pending-final；识别或发布异常也清除该轮等待并重新发布聆听事实。其他 Agent 的实际忙状态仍由其终态事实释放，不能被计时或用户录音开关伪造。
-
-✅ ModelKit requests retain input/request identity and pass the Agent-owned session as opaque InferenceContext.scopeID. Conversation/session validation and policy stay in this calling Agent; no business scope semantics are delegated to ModelKit.
-
-
-✅ Implemented: listening intent may set explicit consent idempotently; absent enabled retains toggle behavior. Physical reply pause is now owned by App rather than leaving the mic running. Reply terminal facts never restore revoked consent; policy revision and capture-end fences remain intact.
-
-
-## Immediate post-reply listening
-
-✅ SpeechPerception keeps consent/reply occupancy and emits revisioned Speech.Listening.update when the last reply finishes. App executes physical microphone start/stop and playback/utterance barriers, without a fixed post-playback wait. No Agent timer or physical audio driver is owned here.
-
-
-
-
-
-## SQLite records and runtime identity
-
-✅ Implemented: technical identities are opaque UUID strings; committed business entities use dialog/message/task/media/device SQLite IDs. Consumers use Storage repositories while preserving ownership, cancellation and independent foundation boundaries. Complete messages, including each ReACT message, persist at termination; delta fragments do not persist. The custom allocator and replaced file/index implementation are removed. See the project SQLite business-record plan.
+[Agents](../README.md) · [Communication](../Support/Communication/README.md)

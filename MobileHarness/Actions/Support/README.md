@@ -34,7 +34,7 @@ flowchart LR
 | `ActionMacro.swift` | 对外声明 `@Action`、`@ActionCatalog` | Actions，调用 BehaviorDefinitions 插件 |
 | `CapabilityModules.swift` | 汇总声明及构造已注入的业务目录 | Actions |
 
-✅ Actions 目标排除 `Support/Contracts`，通过导入 FunctionContracts 使用它；公共契约只编译一次。
+Actions 目标排除 `Support/Contracts`，通过导入 FunctionContracts 使用它；公共契约只编译一次。
 
 ## 关键技术
 
@@ -51,3 +51,7 @@ flowchart LR
 本目录的宏声明和目录组合不持有异步任务、队列或设备会话。生成的工厂闭包捕获注入能力；其使用寿命由已构造目录和宿主负责。重复地址、无效定义与目录容量由 CapabilityCatalog 校验，不由声明汇总函数自动处理。
 
 [Actions 设计](../README.md) · [编译目标地图](../../README.md#target-map) · [宏插件设计](../../../Macros/BehaviorDefinitions/README.md)
+
+## 待实现
+
+- 暂无本目录独立的实现待办；跨模块及实际模型/设备验收见所属模块说明。

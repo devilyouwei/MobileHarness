@@ -41,30 +41,20 @@ ResourceID is device-neutral. ResourceExecutionContext carries held IDs, trusted
 
 ActionExecutionRecord/Snapshot contains payload-free identity/path/Channel/state/completion facts, immutable displayName and bounded 512-character captured failure text. OutputFailure snapshots carry bounded opaque producer codes and optional inputID. UI interpretation is outside Core. No raw arguments, credentials or error objects are retained; observations cannot resume reasoning or acknowledge publication.
 
-✅ Resolved values, causal feedback, bounded mailboxes and independent execution observations are implemented.
-
-❌ Durable execution delivery and full typed replacement of legacy control strings are not implemented.
+Resolved values, causal feedback, bounded mailboxes and independent execution observations are implemented.
 
 ## Related design
 
 [Parent design](../README.md)
 
+## Result-driven ReACT
 
-## Result-driven ReACT (ADR0214)
+AgentActionCompletion.hasBusinessOutput 仅识别显式 value。ToolResult.requiresReasoning 结合业务值和真实失败：failureCode、非取消 isError 或失败 report 优先；成功 report、活动句柄和 completed 只作为完成证据。纯取消不算失败，也不触发续推。
 
-✅ ADR0214：删除 GenerationFeedbackPolicy/GenerationPolicies；AgentActionCompletion 推导 hasBusinessOutput，ToolResult 推导 requiresReasoning（真实失败、failureCode 或真实失败 report 优先；纯取消不算失败/不续推；仅 value 为业务输出；所有成功 report、活动句柄和 completed 均为完成证据）。不新增可配置/序列化的 ReACT 标志。
+legacy control vocabulary includes agent.cancelled as explicit cancellation completion for the envelope input/round, distinct from successful agent.finished and failed agent.error. Ownership remains bound by the host.
 
+ToolResult and both report contracts distinguish pure cancellation from real failure. cancelled status/code/report remain evidence; hasFailure/requiresReasoning exclude pure cancellation. Mixed real failures take precedence over cancelled leaves and preserve partial effects.
 
-✅ Implemented: legacy control vocabulary includes agent.cancelled as explicit cancellation completion for the envelope input/round, distinct from successful agent.finished and failed agent.error. Ownership remains bound by the host.
+## 待实现
 
-✅ 2026-10-13 已实现：收窄 hasBusinessOutput 到显式 value；保留 ToolResult.hasFailure 对 report 真实失败、非取消 isError 与 failureCode 的优先判定，旧原生 value 兼容与报告结构保持不变。
-
-✅ ToolResult and both report contracts distinguish pure cancellation from real failure. cancelled status/code/report remain evidence; hasFailure/requiresReasoning exclude pure cancellation. Mixed real failures take precedence over cancelled leaves and preserve partial effects.
-
-
-
-
-
-## SQLite records and runtime identity
-
-✅ Implemented: technical identities are opaque UUID strings; committed business entities use dialog/message/task/media/device SQLite IDs. Consumers use Storage repositories while preserving ownership, cancellation and independent foundation boundaries. Complete messages, including each ReACT message, persist at termination; delta fragments do not persist. The custom allocator and replaced file/index implementation are removed. See the project SQLite business-record plan.
+- Durable execution delivery and full typed replacement of legacy control strings are not implemented.

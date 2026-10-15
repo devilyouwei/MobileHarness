@@ -27,10 +27,12 @@ LLM defines context-bearing ChatRequest, messages/images/native function data, C
 
 Adapters advertise native-call/image support explicitly and reject unsupported payloads before native work. Caller-owned history is authoritative. Decisions/continuations use new requests; the capability does not retain application task state.
 
-✅ Conversation and judgment contracts are implemented.
-
-❌ A concrete judgment provider is not implemented.
+Conversation and judgment contracts are implemented.
 
 ## Related design
 
 [Parent design](../README.md) · [JEV](JEV/README.md) · [LLM](LLM/README.md)
+
+## 待实现
+
+- A concrete judgment provider is not implemented.

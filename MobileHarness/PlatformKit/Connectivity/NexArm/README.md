@@ -62,10 +62,12 @@ The table references host recovery consequences; retry classification and episod
 
 Fixed-size saturating traffic counters distinguish actual writes, pacing/system deferrals, raw notification bytes and valid feedback/gaps. Snapshots contain only latest native state, quarantine and failure; there is no exception history, business metadata or packet payload log. Native domain/code and operation step are preserved.
 
-✅ Framing, hardware limits, passive telemetry, shared pacing, session fencing and USB/BLE I/O.
-
-❌ Autonomous safety control and arbitrary register configuration. Physical endurance/calibration evidence belongs in [validation history](../../../../docs/validation/Validation-History.md).
+Framing, hardware limits, passive telemetry, shared pacing, session fencing and USB/BLE I/O.
 
 ## Related design
 
 [Parent design](../README.md)
+
+## 待实现
+
+- Autonomous safety control and arbitrary register configuration. Physical endurance/calibration evidence belongs in [validation history](../../../../docs/validation/Validation-History.md).

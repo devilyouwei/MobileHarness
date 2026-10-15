@@ -10,6 +10,10 @@ GraphModel actor loads a local AIModel, validates a named stateless function and
 
 ComputeUnits expresses public specialization preferences; cpuOnly restricts the allowed set. Graph loading, tensor mismatches and native allocation/execution failures propagate explicitly. Native references are actor-isolated; run awaits the native API, so callers enforce operation admission through their resource lease. Cancellation is cooperative; native work is not forcibly interrupted.
 
-✅ Generic graph/tensor execution is implemented. ❌ A general stateful graph abstraction is not implemented.
+Generic graph/tensor execution is implemented.
 
 [CoreAIKit notice](../../../../../docs/licenses/CoreAIKit-BSD-3-Clause.txt) · [Parent design](../README.md)
+
+## 待实现
+
+- A general stateful graph abstraction is not implemented.

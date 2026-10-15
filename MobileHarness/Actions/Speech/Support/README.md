@@ -34,7 +34,7 @@ SpeechPlaybackCapability 的 `play(audioID:invocation:)` 接受 ID 与标准输�
 
 ListeningFeedback 在 `ListeningFeedback.swift` 中组合已校验的 UI 提示音与触觉请求，不含设备句柄。`SpeechModule.swift` 保存 capability 并绑定 speak/update；前者必需，后者可选。`SpeechTypes.swift` 当前只有 Foundation 导入，没有独立值类型。
 
-✅ 两项定义通过 Void handler 返回 completed。如果子工作已向 invocation.results 记录报告，报告由执行层保存；目录本身不把报告重编码成字符串。
+两项定义通过 Void handler 返回 completed。如果子工作已向 invocation.results 记录报告，报告由执行层保存；目录本身不把报告重编码成字符串。
 
 ## 生命周期与失败
 
@@ -42,10 +42,6 @@ ListeningFeedback 在 `ListeningFeedback.swift` 中组合已校验的 UI 提示�
 
 [Speech 入口设计](../README.md) · [UI 反馈接口](../../UI/Support/README.md) · [共享契约](../../Support/Contracts/README.md)
 
+## 待实现
 
-
-
-
-## SQLite records and runtime identity
-
-✅ Implemented: technical identities are opaque UUID strings; committed business entities use dialog/message/task/media/device SQLite IDs. Consumers use Storage repositories while preserving ownership, cancellation and independent foundation boundaries. Complete messages, including each ReACT message, persist at termination; delta fragments do not persist. The custom allocator and replaced file/index implementation are removed. See the project SQLite business-record plan.
+- 暂无本目录独立的实现待办；跨模块及实际模型/设备验收见所属模块说明。

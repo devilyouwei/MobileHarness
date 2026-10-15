@@ -57,7 +57,7 @@ NexArm reports are invocation-private and preserve every child outcome plus late
 
 History preview combines the producing role's effective function and communication catalogs and shared segmentation. It parses the stored complete response string and rejected calls without executing them or claiming task delivery.
 
-✅ Narrow typed adaptation, owner validation and neutral failure propagation are implemented.
+Narrow typed adaptation, owner validation and neutral failure propagation are implemented.
 
 ## Related design
 
@@ -65,47 +65,38 @@ History preview combines the producing role's effective function and communicati
 
 ## Skill/task-mode contract
 
-✅ History preview uses the persisted per-request catalog, including exact native schema, instead of current configuration. Missing catalogs fail preview explicitly. Camera/UI execution accepts authorized Assistant scopes as well as fixed deterministic owner scopes.
+History preview uses the persisted per-request catalog, including exact native schema, instead of current configuration. Missing catalogs fail preview explicitly. Camera/UI execution accepts authorized Assistant scopes as well as fixed deterministic owner scopes.
 
-✅ 固定 Task 控制复用同一 Action：App 验证 Assistant/root-session；worker 仅在没有当前 worker、队列和接纳操作时接受无 decisionID 的可信控制。模型控制仍要求当前 input/session/round。固定终态在空闲清理条件下提交，不启动模型。
+固定 Task 控制复用同一 Action：App 验证 Assistant/root-session；worker 仅在没有当前 worker、队列和接纳操作时接受无 decisionID 的可信控制。模型控制仍要求当前 input/session/round。固定终态在空闲清理条件下提交，不启动模型。
 
-✅ SpeechFailurePresentation 删除不存在的 Agent 合成/缓存超时分类；超时展示来自 ActionResult 的真实函数结果，网络失败保留底层来源。
+SpeechFailurePresentation 展示 ActionResult 的真实函数超时和保留底层来源的网络失败；不将等待语音完成映射为虚构超时。
 
-## Action timeout contract (2026-10-12)
+## Action timeout contract
 
-✅ NexArmBehaviorAdapter 删除包裹单个 gesture 的冗余 ActionComposition，直接记录 invocation 私有报告；避免新默认叶子 30 秒覆盖有限动作动态总预算。
+NexArmBehaviorAdapter 直接执行单个 gesture 并记录 invocation 私有报告，使用有限动作动态总预算。
 
+EyeExpression.swift maps Actions.closed to UI.closed; App endpoints reject nonclosed finite expression performances while no voice session is active. Persistent expression acceptance remains separate from resting visual state.
 
-✅ Implemented: EyeExpression.swift maps Actions.closed to UI.closed; App endpoints reject nonclosed finite expression performances while no voice session is active. Persistent expression acceptance remains separate from resting visual state.
+RuntimePresentation forwards validated UIFeedbackCapability and listening feedback parameters to the bound VoiceOutputHandling owner; missing bindings and invalid session/source reject. It owns no native player/generator or second composition.
 
+## 历史记录接口
 
-✅ Implemented: RuntimePresentation forwards validated UIFeedbackCapability and listening feedback parameters to the bound VoiceOutputHandling owner; missing bindings and invalid session/source reject. It owns no native player/generator or second composition.
+HistoryAgentAdapter.preview 只使用 Assistant 当轮持久化目录；缺失或无效目录明确返回预览失败。不执行历史调用；角色选择和文本内容不能替代有效目录。
 
-## 历史记录收敛（2026-10-13）
+RuntimePresentation 将 notice/light 中立参数映射为 UI 值，通过根持有的 [Presentation](../Workflows/Presentation/README.md) 执行；不向 UI 注入业务服务。
 
-✅ 已实现：HistoryAgentAdapter.preview 只使用 Assistant 当轮持久化目录；缺失或无效目录明确返回预览失败。删除角色选择与旧文本回退，不执行历史调用。
+Native build reconciled: UI values for Notice/Light use explicit Actions.PoseOverlay qualification at the neutral pose boundary, preserving the existing protocol signatures.
 
-❌ 历史记录页面板块重新设计及原生 UI/真机验收。
+mask bottom ASR and reply/status immediately while a notice is visible, restore retained text after dismissal, and preserve pinned Task/promoted ASR layout. Consent-off clears both captions; root HomeEffectsWorkflow owns one ID/text-fenced350ms reply fade/removal task, cancelled by new text/turn/off/shutdown, scheduled only after reply-policy/playback/native-resume barriers. Agent errors stay in factual root failure notices, not persistent voiceStatus copies. App root contexts explicitly choose afterFirstUnlock file protection, including their directory; repository persistent factory accepts protection while its SDK default remains whileUnlocked. This mitigates lock-boundary writes, without claiming the screenshot proves that cause or hiding other storage failures.
 
+VoiceOutputHandling.show is async; terminal cancellation/Agent failure joins matching input audio cleanup before output transport completes. RuntimePresentation forwards this lifecycle acknowledgment without admitting inference.
 
-✅ Implemented (2026-10-13): UI.Notice.showNotice/dismissNotice and UI.Light.updateLight are canonical presentation Actions for trusted business calls, currently registered by no Skill. Neutral Actions values cross RuntimePresentation into root-owned HomeEffectsWorkflow, which retains one replaceable notice expiry and one light expiry, UUID-fenced cleanup, and explicit stop. Notices remain separate from factual ExecutionIssue history; actual upper-layer errors have display priority and Action failures remain panel-only. Decorative light accepts normalized origin, initial opacity/intensity and duration; it never changes consent, microphone or eyes. Native renderer separates light generations from listening eye generations and preserves existing exit fade. RuntimePresentation adapts Action requests into UI-owned values; AppPresentationWorkflow keeps its existing UI/AgentCore/FunctionContracts boundary. No UI capability/business dependencies or new directories.
-
-✅ Native build reconciled: UI values for Notice/Light use explicit Actions.PoseOverlay qualification at the neutral pose boundary, preserving the existing protocol signatures.
-
-
-✅ Implemented (2026-10-13 caption/error lifecycle): mask bottom ASR and reply/status immediately while a notice is visible, restore retained text after dismissal, and preserve pinned Task/promoted ASR layout. Consent-off clears both captions; root HomeEffectsWorkflow owns one ID/text-fenced350ms reply fade/removal task, cancelled by new text/turn/off/shutdown, scheduled only after reply-policy/playback/native-resume barriers. Agent errors stay in factual root failure notices, not persistent voiceStatus copies. App root contexts explicitly choose afterFirstUnlock file protection, including their directory; repository persistent factory accepts protection while its SDK default remains whileUnlocked. This mitigates lock-boundary writes, without claiming the screenshot proves that cause or hiding other storage failures.
-
-✅ VoiceOutputHandling.show is async; terminal cancellation/Agent failure joins matching input audio cleanup before output transport completes. RuntimePresentation forwards this lifecycle acknowledgment without admitting inference.
-
-✅ 已实现：HistoryAgentAdapter.preview 不再遍历 delta 分片，只向临时 GenerationTrace 提交一次完整 response；预览不执行函数，不声称复现历史分片到达时间。
-
-
-
-
+HistoryAgentAdapter.preview 不再遍历 delta 分片，只向临时 GenerationTrace 提交一次完整 response；预览不执行函数，不声称复现历史分片到达时间。
 
 ## SQLite records and runtime identity
 
-✅ Implemented: technical identities are opaque UUID strings; committed business entities use dialog/message/task/media/device SQLite IDs. Consumers use Storage repositories while preserving ownership, cancellation and independent foundation boundaries. Complete messages, including each ReACT message, persist at termination; delta fragments do not persist. The custom allocator and replaced file/index implementation are removed. See the project SQLite business-record plan.
+ModelArtifactStorageAdapter 使用 Models/transfers.json；传输标识以 JSON 字符串保存，安装回执和模型目录由 ModelManagement/Storage 契约管理。
 
+## 待实现
 
-✅ Configuration preservation: ModelArtifactStorageAdapter uses the original Models/transfers.json. UUID and String generations share the same JSON string representation, so no transfer-schema migration or alternate numeric file is required. Installed receipts and model directories remain unchanged.
+- 历史记录页面板块重新设计及原生 UI/真机验收。

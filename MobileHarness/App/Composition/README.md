@@ -58,9 +58,7 @@ RuntimePresentation binds complete voice/camera endpoints with source/session/ta
 
 Preparation errors propagate before admitting dependent work. Interactive scene transitions join root/child startup before lifecycle lookup. Reconfiguration cancels/joins affected owners and applies the native binding barrier; durable commits survive later application failure. Scene background fences native work and cancels inference without introducing background robot execution.
 
-✅ One shared runtime, independent role contexts and Assistant history, explicit native endpoints and current-binding chat are implemented.
-
-❌ Independently active window runtimes and a unified audio-resource arbitration mapping are not implemented.
+One shared runtime, independent role contexts and Assistant history, explicit native endpoints and current-binding chat are implemented.
 
 ## Related design
 
@@ -68,84 +66,69 @@ Preparation errors propagate before admitting dependent work. Interactive scene 
 
 ## Skill/task-mode contract
 
-✅ ApplicationRuntime constructs one conversational Assistant, three fixed deterministic coordinators and media Agents; owns a bufferingNewest(1) Skill/task observer independent of pages. Per-task log rows carry local mode/Skills/input IDs rather than Assistant→Assistant delegation.
+ApplicationRuntime constructs one conversational Assistant, three fixed deterministic coordinators and media Agents; owns a bufferingNewest(1) Skill/task observer independent of pages. Per-task log rows carry local mode/Skills/input IDs rather than Assistant→Assistant delegation.
 
 ## 泛化 Task 与独立 Skill
 
-✅ Root-owned bounded Skill projections populate task ID/goal/status and Skill ownership. Task Signal projections supply independent background state. UI local expansion/navigation uses no Agent commands.
+Root-owned bounded Skill projections populate task ID/goal/status and Skill ownership. Task Signal projections supply independent background state. UI local expansion/navigation uses no Agent commands.
 
 ## Skill 函数目录
 
-✅ ApplicationRuntime 对固定角色目录及每个 bundled Skill 独立检查实现覆盖，避免把所有 Skill 合并为静态权限上限或强制彼此可组合。
+ApplicationRuntime 对固定角色目录及每个 bundled Skill 独立检查实现覆盖，避免把所有 Skill 合并为静态权限上限或强制彼此可组合。
 
 ## Action-owned documentation and Skill instruction contract
 
-✅ ApplicationRuntime 在创建 Agent 或读取配置前安装 CapabilityModules.declarations；投影无宿主设备依赖。后续真实执行模块仍绑定 App 能力，Agents 不导入 Actions 实现。
+ApplicationRuntime 在创建 Agent 或读取配置前安装 CapabilityModules.declarations；投影无宿主设备依赖。后续真实执行模块仍绑定 App 能力，Agents 不导入 Actions 实现。
 
-## Task/history regression correction
+## Task 与历史边界
 
-✅ 本次修复：历史开始新对话入口复用 Assistant 固定 cancelTask Action 能力结束等待任务，再调用 Memory 归档；保留数据，不直接写 Agent 上下文。
+历史开始新对话入口复用 Assistant 固定 cancelTask Action 能力结束等待任务，再调用 Memory 归档；保留数据，不直接写 Agent 上下文。
 
+## Result-driven ReACT
 
-## Result-driven ReACT (ADR0214)
+ApplicationRuntime 不再构造或注入 GenerationPolicies，BehaviorAssembly 不再输出 Action/Tool 反馈策略表；函数/协议/资源/权限覆盖及生命周期装配保持原职责。
 
-✅ ADR0214：ApplicationRuntime 不再构造或注入 GenerationPolicies，BehaviorAssembly 不再输出 Action/Tool 反馈策略表；函数/协议/资源/权限覆盖及生命周期装配保持原职责。
+前台任务日志使用持久化更新时间（无此字段使用创建时间），投影携带失败原因，启动恢复不显示为新发生的任务。
 
+ApplicationControl操作型绑定：Device.control、ModelResources.download/cancel增加Action协议投影并保留固定调用Tool投影，均复用原canonical handler和返回语义。模型当前目录只开放Skill声明的一种类型，宿主双协议不导致模型重复注册。
 
-✅ 本次修复：前台任务日志使用持久化更新时间（无此字段使用创建时间），投影携带失败原因，启动恢复不显示为新发生的任务。
+Task 上下文由 Agents 选择：进入 Task 保留已有普通背景、启动轮及完整调用/结果；Task 终态后按源索引收敛为摘要。拍摄图片直接 enrichment，当前照片事实来自原生相机，完整执行历史独立持久化。详见 [Chat](../../Agents/Support/Chat/README.md)。
 
-✅ ApplicationControl操作型绑定：Device.control、ModelResources.download/cancel增加Action协议投影并保留固定调用Tool投影，均复用原canonical handler和返回语义。模型当前目录只开放Skill声明的一种类型，宿主双协议不导致模型重复注册。
+VoiceRuntimeDependencies.cancelReply is injected from the existing AgentInteractionRuntime and scoped to interactionSessionID. No new provider/service/global dependency or pause/remove/re-register of the Assistant.
 
-✅ Task上下文由 Agents 选择：进入 Task 保留已有普通背景、启动轮及完整调用/结果；旧 Task 结束后才将其过程收敛为终态摘要。✅ 已删除拍摄结果的 Assistant Task 登记回调，实际图片结果直接 enrichment；当前照片事实由原生相机提供；完整持久化历史不变。详见 [Chat](../../Agents/Support/Chat/README.md)。
+existing RuntimePresentation supplies feedback to UIModule, while UI.Feedback uses the existing scheduled Action binding profile. No new target, directory, native service locator or whole-session cancellation.
 
-
-✅ Implemented: VoiceRuntimeDependencies.cancelReply is injected from the existing AgentInteractionRuntime and scoped to interactionSessionID. No new provider/service/global dependency or pause/remove/re-register of the Assistant.
-
-
-✅ Implemented: existing RuntimePresentation supplies feedback to UIModule, while UI.Feedback uses the existing scheduled Action binding profile. No new target, directory, native service locator or whole-session cancellation.
+AppAssembly supplies CapturedPhotoStore.Limits(maximumPhotos: 1024, maximumBytes: 2 GiB, overflowPolicy: evictOldest). Limits are validated on first I/O; media metadata is stored through the injected MediaRepository.
 
 
-✅ AppAssembly supplies CapturedPhotoStore.Limits of 1024 photos/2 GiB/512 KiB index; first I/O propagates invalid/capacity errors. No existing file deletion or new source directory.
+## 历史记录接口
 
+AppAssembly 注入 Agent 记录入口与唯一的 Assistant 聊天记录工作流；ApplicationRuntime 不再聚合任务历史，其他 Agent 暂无记录页面。
 
-✅ Implemented: CapturedPhotoStore uses existing 1024/2 GiB/512 KiB limits with evictOldest policy, retaining a recent photo queue instead of stopping capture.
+装配向 notice/light Actions 注入 RuntimePresentation 端口，根持有 HomeEffectsWorkflow；输出投影和停止清理见 [Presentation](../Workflows/Presentation/README.md)。
 
-## 历史记录收敛（2026-10-13）
-
-✅ Implemented: AppAssembly 注入 Agent 记录入口与唯一的 Assistant 聊天记录工作流；ApplicationRuntime 不再聚合任务历史，其他 Agent 暂无记录页面。
-
-❌ 历史记录页面板块重新设计及原生 UI/真机验收。
-
-
-✅ Implemented (2026-10-13): UI.Notice.showNotice/dismissNotice and UI.Light.updateLight are canonical presentation Actions for trusted business calls, currently registered by no Skill. Neutral Actions values cross RuntimePresentation into root-owned HomeEffectsWorkflow, which retains one replaceable notice expiry and one light expiry, UUID-fenced cleanup, and explicit stop. Notices remain separate from factual ExecutionIssue history; actual upper-layer errors have display priority and Action failures remain panel-only. Decorative light accepts normalized origin, initial opacity/intensity and duration; it never changes consent, microphone or eyes. Native renderer separates light generations from listening eye generations and preserves existing exit fade. RuntimePresentation adapts Action requests into UI-owned values; AppPresentationWorkflow keeps its existing UI/AgentCore/FunctionContracts boundary. No UI capability/business dependencies or new directories.
-
-
-✅ Implemented (2026-10-13 caption/error lifecycle): mask bottom ASR and reply/status immediately while a notice is visible, restore retained text after dismissal, and preserve pinned Task/promoted ASR layout. Consent-off clears both captions; root HomeEffectsWorkflow owns one ID/text-fenced350ms reply fade/removal task, cancelled by new text/turn/off/shutdown, scheduled only after reply-policy/playback/native-resume barriers. Agent errors stay in factual root failure notices, not persistent voiceStatus copies. Durable configuration documents retain explicit file protection. Agent runtime state uses memory; business records use SQLite. This does not infer the cause of historical lock-boundary failures.
-
+mask bottom ASR and reply/status immediately while a notice is visible, restore retained text after dismissal, and preserve pinned Task/promoted ASR layout. Consent-off clears both captions; root HomeEffectsWorkflow owns one ID/text-fenced350ms reply fade/removal task, cancelled by new text/turn/off/shutdown, scheduled only after reply-policy/playback/native-resume barriers. Agent errors stay in factual root failure notices, not persistent voiceStatus copies. Durable configuration documents retain explicit file protection. Agent runtime state uses memory; business records use SQLite. This does not infer the cause of historical lock-boundary failures.
 
 ## Task history v2 and in-place compression
 
-✅ Implemented: ApplicationRuntime uses SQLite dialogs/messages and a bounded memory Assistant context. Old assistant.context.json and assistant.history-v2.context.json are unused; no import or migration.
-
-
+ApplicationRuntime 使用 SQLite 保存 dialogs/messages，Assistant 热上下文保存在有界内存仓库；启动从规范化业务记录恢复终态事实，不导入运行时 Context 文件或重放执行。
 
 ## Model photo input capability wiring
 
-✅ Implemented: ApplicationRuntime installs AssistantContextBuilder.photoObservationHandler with read and prepareJPEG closures. The role-owned factory builds the observation worker callback; App does not interpret observation results. read only retrieves the owned original via CameraControlCapability and wraps its original MIME/data/identity. prepareJPEG maps the caller's AssistantPhotoInputPolicy fields to generic NativeImageCompression.Limits, awaits the native capability and returns its bytes. No hardcoded analysis thresholds, workflow decision or ChatImage preparation remain in App. Assistant owns policy choice, invocation, cancellation/error checks and output construction; PlatformKit owns native encoding. See [Assistant policy](../../Agents/Assistant/README.md#model-photo-preparation-policy).
-
-
-
+ApplicationRuntime installs AssistantContextBuilder.photoObservationHandler with read and prepareJPEG closures. The role-owned factory builds the observation worker callback; App does not interpret observation results. read only retrieves the owned original via CameraControlCapability and wraps its original MIME/data/identity. prepareJPEG maps the caller's AssistantPhotoInputPolicy fields to generic NativeImageCompression.Limits, awaits the native capability and returns its bytes. No hardcoded analysis thresholds, workflow decision or ChatImage preparation remain in App. Assistant owns policy choice, invocation, cancellation/error checks and output construction; PlatformKit owns native encoding. See [Assistant policy](../../Agents/Assistant/README.md#model-photo-preparation-policy).
 
 ## SQLite records and runtime identity
 
-✅ Implemented: technical identities are opaque UUID strings; committed business entities use dialog/message/task/media/device SQLite IDs. Consumers use Storage repositories while preserving ownership, cancellation and independent foundation boundaries. Complete messages, including each ReACT message, persist at termination; delta fragments do not persist. The custom allocator and replaced file/index implementation are removed. See the project SQLite business-record plan.
+AppAssembly constructs one SQLiteRepositories family, repairs in-flight facts before runtime admission and injects domain protocols into conversation, media and Bluetooth owners. Initialization failure is retained and propagated. Every Agent runtime context uses Storage memory state; no Context JSON is loaded or saved. Title sampling positions come from Memory, SQL supplies lightweight snippets. Existing user media, credentials and model artifacts remain outside cleanup.
 
-✅ AppAssembly constructs one SQLiteRepositories family, repairs in-flight facts before runtime admission and injects domain protocols into conversation, media and Bluetooth owners. Initialization failure is retained and propagated. Every Agent runtime context uses Storage memory state; no Context JSON is loaded or saved. Title sampling positions come from Memory, SQL supplies lightweight snippets. Existing user media, credentials and model artifacts remain outside cleanup.
+AppAssembly creates SQLiteRepositories and domain adapters, runs startup recovery before runtime admission, then injects chat/task/media/device protocols. Media also receives a BinaryObjectStore.
 
-✅ Storage repository refactor: AppAssembly creates SQLiteRepositories and domain adapters, runs startup recovery before runtime admission, then injects chat/task/media/device protocols. Media also receives a BinaryObjectStore. Existing native/model lifecycle and user files remain unchanged.
+ApplicationRuntime 的云配置位于 MobileHarness/Settings/settings.json，AppAssembly 注入 Models/download-source.json、CapturedPhotos、Keychain 和 records.sqlite 的路径。运行热状态仅在内存，不导入 Context 文件。
 
+所有角色使用内存 AgentContextRepository；配置文档由 File 后端保存，业务记录由 SQLite 仓库保存。
 
-✅ Configuration preservation: ApplicationRuntime constructs the cloud document at MobileHarness/Settings/settings.json. AppAssembly retains Models/download-source.json and CapturedPhotos roots. Runtime state uses memory only; old Context JSON is not imported. Keychain, installed-weight and SQLite paths remain unchanged.
+## 待实现
 
+- Independently active window runtimes and a unified audio-resource arbitration mapping are not implemented.
 
-✅ Removed contextDirectory and context file factories; construct all roles with memory-only AgentContextRepository. No Conversations/*.runtime-context.json writes remain. Configuration documents stay File-backed, business records SQLite-backed.
+- 历史记录页面板块重新设计及原生 UI/真机验收。

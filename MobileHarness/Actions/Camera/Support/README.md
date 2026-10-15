@@ -42,7 +42,7 @@ CameraPhotoCommandReceipt 自身不限制 feedbackIssues 的数量或字符串�
 
 ## 目录绑定与失败处理
 
-✅ `@ActionCatalog` 从 CameraModule 中的七个 definition 调用生成声明；模块持有注入 capability，工厂闭包调用 CameraActions。retry 使用 Void handler；其余六个函数产生 value completion。
+`@ActionCatalog` 从 CameraModule 中的七个 definition 调用生成声明；模块持有注入 capability，工厂闭包调用 CameraActions。retry 使用 Void handler；其余六个函数产生 value completion。
 
 CameraControlError 区分 notForeground、busy、disabled、permissionDenied、unavailable、photoUnavailable，并映射有界执行失败代码与本地化说明。协议扩展中，未实现的保存、忽略、拍摄、读取明确抛 unavailable；默认 retry 转为 `setEnabled(true)`。生产端点可覆盖这些方法。
 
@@ -50,10 +50,6 @@ CameraControlError 区分 notForeground、busy、disabled、permissionDenied、u
 
 [Camera 设计与参数](../README.md) · [共享契约](../../Support/Contracts/README.md)
 
+## 待实现
 
-
-
-
-## SQLite records and runtime identity
-
-✅ Implemented: technical identities are opaque UUID strings; committed business entities use dialog/message/task/media/device SQLite IDs. Consumers use Storage repositories while preserving ownership, cancellation and independent foundation boundaries. Complete messages, including each ReACT message, persist at termination; delta fragments do not persist. The custom allocator and replaced file/index implementation are removed. See the project SQLite business-record plan.
+- 暂无本目录独立的实现待办；跨模块及实际模型/设备验收见所属模块说明。

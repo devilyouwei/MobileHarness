@@ -6,7 +6,7 @@ independent runtime framework contracts and bounded mechanisms for identity, lif
 
 ## Ownership and boundaries
 
-AgentCore imports Storage for neutral business identity values/allocation, but owns no concrete role identities, business schemas, model sessions, persistence adapters or UI/device policy. Agents supplies role processing; Gateway supplies transport/execution; App supplies assembly/lifetime.
+AgentCore is Foundation-only and owns no concrete role identities, business schemas, model sessions, Storage dependency, persistence adapters or UI/device policy. Agents supplies role processing; Gateway supplies transport/execution; App supplies assembly/lifetime.
 
 ## External relationships and data flow
 
@@ -38,7 +38,7 @@ flowchart LR
 
 SignalOrigin separates external, Agent and runtime provenance. Output and feedback carry session/incarnation/causal/task/round identities rather than trusting model parameters. Call parsing resolves permissions inside the Agent; effects execute through Gateway. Task admission, task completion and native effect completion are distinct.
 
-AgentContext and AgentDecisionContext are generic immutable snapshots/evidence contracts; Core persistence is injected load/CAS commit only. Directory arrows describe source use; the Capability builder uses Generation templates while the Generation interpreter uses the Capability resolver, all within one target. SignalInbox and AgentAdmissionGate provide explicit bounded admission. AgentRoundCoordinator registers calls, seals and merges results; AgentTaskBudget validates cumulative request/call/execution budgets. Runtime defaults are mechanism limits, not concrete role policy.
+AgentContext and AgentDecisionContext are generic immutable snapshots/evidence contracts; Repository and durable checkpoint implementations are outside Core. Directory arrows describe source use; the Capability builder uses Generation templates while the Generation interpreter uses the Capability resolver, all within one target. SignalInbox and AgentAdmissionGate provide explicit bounded admission. AgentRoundCoordinator registers calls, seals and merges results; AgentTaskBudget records per-input cumulative usage and enforces only explicitly supplied request/native limits; production defaults are nil. Runtime defaults are mechanism limits, not concrete role policy.
 
 The independent target also packages FunctionTokenPrompts.json and provides bounded, strict PromptTemplates rendering. Role prompt assets live in Agents; Core knows no role names or business instructions.
 
@@ -46,29 +46,49 @@ The independent target also packages FunctionTokenPrompts.json and provides boun
 
 AgentManager/registry owns live instances/incarnations. Stop revokes authority before joining work; replacement waits for cleanup. Roles own their workers and interpret pause. No framework retry, effect replay, role-specific business context or implicit subscriber acknowledgment is added.
 
-✅ Independent neutral framework, structured context/task/round contracts and bounded mechanisms are implemented.
-
-❌ Generic factory/automatic restart, remote transport and durable execution delivery are not implemented.
+Independent neutral framework, structured context/task/round contracts and bounded mechanisms are implemented.
 
 ## Related design
 
 [Parent design](../README.md) · [Capability](Capability/README.md) · [Communication](Communication/README.md) · [Generation](Generation/README.md) · [Input](Input/README.md) · [Output](Output/README.md) · [Runtime](Runtime/README.md)
 
-✅ Agent.effectiveCapabilities(roundID) 是中立不可变轮次授权查询，默认 nil 保留固定执行者契约；Core 不认识 Skill 或 Task Mode。CapabilityContextBuilder 分别提供协议和目录渲染，策略层控制组合顺序。
+## Runtime capability snapshots
 
-✅ ADR0213: shared FunctionTokenPrompts guidance describes task-local Channel/wait ordering, independent same-name Channels across tasks and explicit resource conflict/takeover outcomes. Canonical addresses do not create queues; prompt text grants no execution authority.
+Agent.effectiveCapabilities(roundID) supplies an immutable invocation catalog; nil uses the fixed-executor contract. Core has no Skill/Task Mode policy. CapabilityContextBuilder separates protocol and catalog rendering; roles choose the composition. Channels order work within one task, while same-name Channels across tasks remain independent and resources still constrain execution.
 
-## Lifecycle-owned conversation and audio (2026-10-12)
+## Lifetime and bounds
 
-✅ 已移除对话生成、ReACT、收件箱排队、结果屏障、ASR 收尾、TTS 合成及回复占用租约的计时终止。Signal 默认无过期时间，框架不再按通信契约附加 TTL。保留显式实时感知数据的新鲜度和网络传输自身超时；它们不作为对话/语音缓存生命周期。Action 自身超时通过原始执行者的 ActionResult 返回。请求/调用数及队列/PCM 容量仍有界，不以计时自动删除已接纳输入。语音句柄无读等待或错误记录 TTL，按播放完成、输入/会话正常结束、异常或显式取消清理；取消加入生成和播放工作。
+Signal/inbox/round lifetime has no implicit TTL or generation timer. Explicit freshness and provider/Action deadlines retain their own owners. AgentTaskBudget counts requests/native calls with representation-safe saturation; positive optional bounds are validated and enforced when supplied. Context evidence is bounded to 32 MiB logical Data before publication without whole-context encoding.
 
+## Signal envelope and payloads
 
-✅ Core decision budget has optional caller-supplied request/native bounds; nil defaults record cumulative usage without an arbitrary business stop.
+AgentInput.swift 定义 AgentInput、InputMetadata、AgentTurn、InputPayload 和 SignalOrigin。它们是进程内契约；capturedAt 使用 uptime，deadline 使用 ContinuousClock，不是远程 wire format。元数据默认值不能证明生产者权威。
 
+| Contract element | Canonical structure / rule |
+| --- | --- |
+| Identity and scope | `AgentInput.id`, `sessionID`, optional `AgentTurn`; distinguish delivery identity, session and interaction. |
+| Schema | `InputMetadata.contract` and `version` identify payload semantics; `topic` currently equals contract. Agent configuration JSON v7 is a separate format version. |
+| Producer | `source` and optional `incarnation`; App input adapters assign external sources, and the runtime binds Agent identity. Model text cannot assign trusted identity or permissions. |
+| Time and order | `capturedAt` uses process uptime; `sequence` is producer-scoped; `deadline` uses `ContinuousClock`. These are process-local values, not wall-clock timestamps or a remote wire format. |
+| Causality | `rootID`, optional `parentID`, `hops`; forwarded messages preserve their root and identify their parent. Execution feedback also preserves its call/execution correlation and owning session. |
+| Content | `InputPayload` selects typed text, event, audio, image, Agent message, Tool result, Action result, generation-round result or activity feedback. A kind declaration alone does not implement a payload or adapter. |
+| Domain message | `AgentMessage` carries immutable `Encodable & Sendable` content. Domain-owned schemas validate concrete type, fields, units, encoded size and freshness through `CommunicationContracts`. |
 
+| Payload | Meaning / contract | Current origin |
+| --- | --- | --- |
+| `.communicationReceipt(CommunicationReceipt)` | Directed target admission | Internal Runtime; not processing/effect/task completion |
+| `.text(String)` | User text, `user.text` | External; supported input, but no production text-entry field |
+| `.event(String)` | Legacy host event, `runtime.event` | External; new business intents use typed messages |
+| `.audio(AudioInput)` | Captured microphone audio, `media.audio` | External |
+| `.image(ImageInput)` | Captured camera image, `media.image` | External |
+| `.observation(AgentMessage)` | Typed user/host intent, native fact, Agent observation or command; domain contract identifies meaning | External or internal Agent |
+| `.toolResult(ToolResult)` | Actual returning Tool outcome, `tool.result` | Internal Runtime |
+| `.actionResult(ActionResult)` | Actual Action outcome, `action.result` | Internal Runtime |
+| `.roundResult(GenerationRoundResult)` | Sealed generation-round completion, `generation.round.result` | Internal Runtime; current generation-round implementation |
+| `.activityEvent(ActivityEvent)` | Persistent activity lifecycle, `activity.event` | Internal Runtime admission supported; camera events remain local |
 
+InputKind 的 video/binary 尚无 InputPayload 分支或 codec。输入支持、订阅、通信授权和执行反馈准入分别验证；外部调用不能靠 source="runtime" 构造内部执行权。媒体几何/PCM 校验见 [Input](Input/README.md)，身份和消息权见 [Communication](Communication/README.md)。
 
+## 待实现
 
-## SQLite records and runtime identity
-
-✅ Implemented: technical identities are opaque UUID strings; committed business entities use dialog/message/task/media/device SQLite IDs. Consumers use Storage repositories while preserving ownership, cancellation and independent foundation boundaries. Complete messages, including each ReACT message, persist at termination; delta fragments do not persist. The custom allocator and replaced file/index implementation are removed. See the project SQLite business-record plan.
+- Generic factory/automatic restart, remote transport and durable execution delivery are not implemented.

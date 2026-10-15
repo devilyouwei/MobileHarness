@@ -8,6 +8,10 @@ This directory owns helpers reused by speech providers, not generic Core mechani
 
 Native Speech buffers are copied to/from validated ModelKit mono Float32 values. Providers own mutable buffers, callback serialization, resource leases and session completion. The helper owns no worker, queue, capture or playback.
 
-✅ Shared Apple PCM conversion lives here. ❌ General resampling and multichannel output preservation are not implemented.
+Shared Apple PCM conversion lives here.
 
 [Apple conversion](Apple/README.md) · [Parent design](../README.md)
+
+## 待实现
+
+- General resampling and multichannel output preservation are not implemented.

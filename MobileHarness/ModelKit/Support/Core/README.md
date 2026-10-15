@@ -43,18 +43,20 @@ AudioFormat/AudioFrame validates model PCM and metadata, separate from PlatformK
 
 ModelResourceState is residency (unloaded/loading/ready/unloading/closed or unmanaged), not availability. CapabilityError/Availability provide neutral typed diagnostics; consumers localize and choose recovery.
 
-✅ Explicit session backpressure, media boundaries and matching-ID resource admission are implemented.
-
-❌ Durable event replay, inference waiting queues and forced native interruption are not implemented.
+Explicit session backpressure, media boundaries and matching-ID resource admission are implemented.
 
 ## Shared worker cancellation
 
-✅ InferenceTaskControl provides install/cancel/finish for one worker per request across Gemma, MOSS, Kokoro and OpenAI. Duplicate installation cancels the rejected worker and throws CapabilityError.inputBusy. Cancellation is idempotent, reaches late installation and runs outside the mutex. Finish releases the task reference and prevents a fast worker's late installation from retaining it again. Providers own joined cleanup and lease release; HTTP registration/cancellation remains OpenAI-owned. No worker queue or forced native interruption is introduced.
+InferenceTaskControl provides install/cancel/finish for one worker per request across Gemma, MOSS, Kokoro and OpenAI. Duplicate installation cancels the rejected worker and throws CapabilityError.inputBusy. Cancellation is idempotent, reaches late installation and runs outside the mutex. Finish releases the task reference and prevents a fast worker's late installation from retaining it again. Providers own joined cleanup and lease release; HTTP registration/cancellation remains OpenAI-owned. No worker queue or forced native interruption is introduced.
 
 ## Initialization and layer isolation
 
-✅ ModelLoadGate requires an explicit positive maximumConcurrentLoads. ModelContext requires an injected gate and positive maximumLoadWaiters; invalid configuration throws CapabilityError.invalidRequest. Context creation and resource acquisition do not choose production defaults. Owning runtimes share a gate when cross-resource admission is needed. Core's seven files typecheck together independently of the Language/Speech/Vision contract sources, Management and provider implementations.
+ModelLoadGate requires an explicit positive maximumConcurrentLoads. ModelContext requires an injected gate and positive maximumLoadWaiters; invalid configuration throws CapabilityError.invalidRequest. Context creation and resource acquisition do not choose production defaults. Owning runtimes share a gate when cross-resource admission is needed. Core's seven files typecheck together independently of the Language/Speech/Vision contract sources, Management and provider implementations.
 
 ## Related design
 
 [Parent design](../README.md)
+
+## 待实现
+
+- Durable event replay, inference waiting queues and forced native interruption are not implemented.

@@ -23,10 +23,12 @@ flowchart LR
 
 encode accepts 1–262,144 frames in native Float32 or Int16 buffers, handles interleaved or planar storage and averages input channels into mono Float32 at the original sample rate. Unsupported encoding, invalid frame count or invalid model samples fail explicitly. decode accepts mono Float32 AudioFrame and copies it into a newly allocated native buffer at the same sample rate. Caller-retained model payloads are not mutated.
 
-✅ Explicit native/model PCM copying is implemented.
-
-❌ Resampling and multichannel output preservation are not implemented. Recognition owns its native-format converter; consumers own playback adaptation.
+Explicit native/model PCM copying is implemented.
 
 ## Related design
 
 [Parent design](../README.md)
+
+## 待实现
+
+- Resampling and multichannel output preservation are not implemented. Recognition owns its native-format converter; consumers own playback adaptation.

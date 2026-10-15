@@ -41,22 +41,18 @@ Manual work retains one latest preset/reset intent and six latest velocities. Su
 
 Agent finite actions use inherited ResourceExecutionPermit and invocation-private report sinks. Tracking retains latest aim, holds motors 1–4 through the coordinator, checks availability each 30 ms tick and exits on a one-second usable-pose gap. Expected cancellation clears targets and joins release without creating a Bluetooth fault. Settings takeover is an explicit native bypass; Assistant takeover joins the previous writer group before execution. Cooperative cleanup is not physical stop.
 
-✅ Passive connection, bounded native recovery, fenced manual execution and independent late terminal reporting are implemented.
-
-❌ Bluetooth state restoration and background execution are not implemented.
+Passive connection, bounded native recovery, fenced manual execution and independent late terminal reporting are implemented.
 
 ## Related design
 
 [Parent design](../README.md)
 
-
-
-
-
 ## SQLite records and runtime identity
 
-✅ Implemented: technical identities are opaque UUID strings; committed business entities use dialog/message/task/media/device SQLite IDs. Consumers use Storage repositories while preserving ownership, cancellation and independent foundation boundaries. Complete messages, including each ReACT message, persist at termination; delta fragments do not persist. The custom allocator and replaced file/index implementation are removed. See the project SQLite business-record plan.
+devices 行保存 native/business 标识映射、选中设备与重连事实。App 将系统 UUID 映射到 device_N，仅向 PlatformKit 传入原生身份；生命周期、恢复和手动执行遵循上述根所有者契约。
 
-✅ devices rows now own native/business mapping, selected-device and reconnect facts. App maps system UUID strings to device_N and passes native identities only to PlatformKit. The selected-device JSON and counter associations are removed. Lifecycle/recovery/manual execution contracts above remain the same.
+BluetoothWorkflow receives a DeviceRepository factory rather than a database. Native/business mapping, selected device, reconnect state and all link lifecycle policy retain their contracts.
 
-✅ Storage repository refactor: BluetoothWorkflow receives a DeviceRepository factory rather than a database. Native/business mapping, selected device, reconnect state and all link lifecycle policy retain their contracts.
+## 待实现
+
+- Bluetooth state restoration and background execution are not implemented.

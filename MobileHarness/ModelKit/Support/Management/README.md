@@ -68,10 +68,7 @@ Valid settled receipts determine installed state. Identity/revision/path/actual 
 
 Delete gates every referencing resource before host quiescence, drains/unloads, joins transfer cancellation, removes files, then reopens admission. Retained handles cannot reload mid-delete. Installing never starts inference. Background native transfer/OS reattachment belongs to the injected downloader; Manager retains package state independently of pages. Force-quit/server resume behavior remains conditional rather than guaranteed.
 
-✅ Shared providers, bounded lifecycle/replace and receipt-based artifact management are implemented.
-
-❌ Timed eviction, global inference scheduling, general orphan-stage collection and batch acquisition are not implemented.
-
+Shared providers, bounded lifecycle/replace and receipt-based artifact management are implemented.
 
 ## Default assembly and provider selection
 
@@ -98,10 +95,14 @@ Registration is lazy. Explicit voice admission/diagnostics prepares selected cap
 
 Large local Gemma/Nemotron/MOSS and pose releaseWhenIdle opt into memory-pressure policy; Silero/system speech retain. Local Gemma requires supported OS/hardware/artifacts; explicit cloud works without Gemma artifacts. Native simulator CoreAI support is a separate backend constraint.
 
-✅ Lazy process assembly, independent speech switches and explicit current-binding replacement are implemented.
-
-❌ Active-inference provider fallback, automatic variant/quantization selection and judgment provider are not implemented.
+Lazy process assembly, independent speech switches and explicit current-binding replacement are implemented.
 
 [HuggingFace transfer](HuggingFace/README.md) · [Core lifecycle mechanisms](../Core/README.md)
 
 [Parent design](../README.md)
+
+## 待实现
+
+- Timed eviction, global inference scheduling, general orphan-stage collection and batch acquisition are not implemented.
+
+- Active-inference provider fallback, automatic variant/quantization selection and judgment provider are not implemented.

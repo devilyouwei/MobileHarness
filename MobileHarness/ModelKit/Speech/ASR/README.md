@@ -26,12 +26,12 @@ Recognition input retains AudioFormat/InferenceContext and requested locale. Sen
 
 Defaults selects enabled installed available Nemotron, otherwise modern Apple. Apple includes its native detector but external Silero/Energy supplies acoustic scores for caller-owned endpoint timing. No active-failure system/cloud fallback exists.
 
-✅ Streaming transcript contract and two providers are implemented.
-
-## Outstanding work
-
-No additional implementation work is declared for this streaming contract. Provider-specific native behavior and acceptance work are documented below.
+Streaming transcript contract and two providers are implemented.
 
 ## Related design
 
 [Parent design](../README.md) · [Apple](Apple/README.md) · [Nemotron](Nemotron/README.md)
+
+## 待实现
+
+- No additional implementation work is declared for this streaming contract. Provider-specific native behavior and acceptance work are documented below.

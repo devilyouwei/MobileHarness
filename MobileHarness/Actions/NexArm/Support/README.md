@@ -94,6 +94,10 @@ approach 仅允许电机 1…5，默认跟踪上限 200 count/s；供肩/肘使�
 
 JointCommand 将 base/pitch 按 `4096/(2π)` 映射到跟踪 rest。pitch 超过 0.25 弧度开始伸出，至 0.7 达到 shoulder_lift 最小 1150；elbow 用固定肩肘和保持前臂水平。ForearmLeveler 用 40 count lead 与六 count 滞回补偿伸出方向，目标受电机范围夹取。五轴包的速度由相邻目标距离及 200 毫秒名义值选取，上限 700；该名义值不是到位等待。
 
-✅ 这些组件只提供有限计划、提案与接纳状态。长期跟踪 worker、资源接管、写入公平性、连接恢复及手动替换/加入清理由 App 负责，不能用 planner 完成替代真实到位。
+这些组件只提供有限计划、提案与接纳状态。长期跟踪 worker、资源接管、写入公平性、连接恢复及手动替换/加入清理由 App 负责，不能用 planner 完成替代真实到位。
 
 [入口、资源与完成](../README.md) · [原生链路接口](../../../PlatformKit/Connectivity/NexArm/README.md) · [共享契约](../../Support/Contracts/README.md)
+
+## 待实现
+
+- 暂无本目录独立的实现待办；跨模块及实际模型/设备验收见所属模块说明。

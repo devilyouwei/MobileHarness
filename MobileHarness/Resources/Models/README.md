@@ -41,8 +41,12 @@ Existing download wrappers use the production catalog except `gemma4-e2b-macos.d
 
 Ignored Nemotron/Gemma4/Silero/MossTTSNano/YOLOPose directories support opt-in tests, are not build prerequisites and are never committed. Model packages and binary graph subdirectories do not acquire application README contracts. Historical measurements are in [validation history](../../../docs/validation/Validation-History.md).
 
-✅ Production declarations and explicit developer provisioning.
+Production declarations and explicit developer provisioning.
 
 ## Related design
 
 [Parent design](../README.md)
+
+## 待实现
+
+- 暂无本目录独立的实现待办；跨模块及实际模型/设备验收见所属模块说明。

@@ -27,12 +27,12 @@ One actor operation rejects reentrant process/reset/finish overlap. Ordered 16 k
 
 Cancel waits for active graph work before lease release; it cannot interrupt a running kernel. Local files are supplied by installed resource root; no runtime download or endpoint timer exists. HARNESS_TEST_SILERO=1 opts isolated tests into real artifacts, not production registration.
 
-✅ Bounded window/recurrent scoring and joined cancellation are implemented.
-
-## Outstanding work
-
-❌ Physical acoustic accuracy and sustained ASR/VAD coexistence acceptance remains outstanding. [Voice acceptance](../../../../../docs/validation/Voice.md) defines host-level trials.
+Bounded window/recurrent scoring and joined cancellation are implemented.
 
 ## Related design
 
 [Parent design](../README.md)
+
+## 待实现
+
+- Physical acoustic accuracy and sustained ASR/VAD coexistence acceptance remains outstanding. [Voice acceptance](../../../../../docs/validation/Voice.md) defines host-level trials.

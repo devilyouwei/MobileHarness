@@ -1,34 +1,19 @@
 # Build configuration
 
-Purpose: own shared Xcode settings, local-signing templates and explicit metadata resource inputs/outputs. Design goals: reproducible builds without local model weights, confined staging and private signing configuration.
+## 职责与输入
 
-- ✅ Shared Swift 6 / iOS 27 settings; local signing stays in ignored Local.xcconfig.
-- ✅ Both device and simulator Voice-Models file lists stage only model-catalog.json and license notices. No model graphs, weights, tokenizers or voice assets are build inputs or packaged outputs.
-- ✅ Regenerate lists with scripts/update-model-filelists.py after changing staging metadata/licenses. The pre-build cleanup removes obsolete Models output from incremental App builds; staging never removes developer source artifacts.
-- ✅ Physical App requests com.apple.developer.kernel.increased-memory-limit. It is not a memory-availability guarantee; simulator does not request it.
-- ✅ NSCameraUsageDescription covers local preview and pose inference. Camera denial does not block Settings/history or voice preparation.
-- ❌ Signed-device performance, export compatibility and background transfer acceptance require separate validation; configuration/build success is not that evidence.
+共享 Xcode 设置、私有本地签名模板及显式资源 sandbox 文件清单。Swift 6 / iOS 27 设置来自共享配置；本地签名只保存在被忽略的 Local.xcconfig。模型图、权重、tokenizer 不属于 App 构建输入或包内资源，运行时由 Settings/ModelKit 安装。
 
-Weights are acquired in Settings through Management/ModelKitHub and installed in the sandbox. Separate Mac/comparison provisioning profiles are not App resource inputs. See [Management](../MobileHarness/ModelKit/Support/Management/README.md#local-model-resources--current-contract).
+## 打包与平台契约
 
-✅ Local chat configuration now targets Gemma 4 E2B CoreAI; Qwen/MLX production bindings are removed. ❌ Real-model/device acceptance is separate from compilation and contract tests.
+- device/simulator 的 Voice-Models 清单只包含 model-catalog.json 和许可；修改元数据后运行 scripts/update-model-filelists.py。Scheme 预构建清理仅作用生成产物。
+- 实机请求 increased-memory-limit，不能据此推断可用内存；Simulator 不请求此 entitlement。
+- 相机用途说明覆盖本地预览、用户拍摄及请求的模型图像观察；Photos 仅请求添加显式保存照片，不请求相册读取/枚举。
+- Config/AppInfo.plist 向 App 目标提供 CADisableMinimumFrameDurationOnPhone；签名包中的最终 plist 是平台元数据事实源。
+- Xcode 导航与 Agents/Support、Resources/Agents/Skills 源位置一致；SwiftPM 拥有框架编译与资源复制，不重复加入 App target membership。
 
-## Photo save and ignore — ADR0185
+[Model management](../MobileHarness/ModelKit/Support/Management/README.md) 拥有制品安装与资源选择，[Resources](../MobileHarness/Resources/README.md) 拥有包内容。
 
-✅ NSPhotoLibraryAddUsageDescription requests only adding explicitly saved photos. Camera purpose text covers user-requested still capture and sending a requested observation to the configured model service. No Photos read permission or album enumeration is added.
+## 待实现
 
-
-✅ Navigation audit: Xcode file references/groups must mirror current Agents/Support and Resources/Agents/Skills locations. Remove retired Agent JSON navigation entries and add new metadata/control/state references. SwiftPM remains sole owner of these framework sources/assets; navigation changes do not duplicate target membership or resource phases.
-
-
-## Skill 函数目录
-
-✅ Xcode 导航删除七个 Permissions.json 引用，资源仍由既有 SwiftPM target 打包，无新增编译成员或签名配置。
-
-## Action-owned documentation and Skill instruction contract
-
-✅ Xcode 导航移除公共 FunctionMetadata 文件，登记 ActionDeclaration、TaskActions 和目录回归夹具。SPM 编译声明，FunctionContracts 不再打包具体函数 JSON 资源。
-
-✅ Scheme pre-build cleanup removes the retired generated HarnessKit_FunctionContracts.bundle from incremental App output, so obsolete FunctionMetadata.json cannot survive a source migration. Source files are never cleaned.
-
-✅ Implemented ProMotion packaging: Config/AppInfo.plist explicitly supplies CADisableMinimumFrameDurationOnPhone=true to both App targets. Generated standard/permission metadata remains enabled; remove the ineffective custom INFOPLIST_KEY setting and verify the final signed plist, not only build settings. No local signing edits.
+- 签名设备性能、导出兼容性及后台传输的独立验收。

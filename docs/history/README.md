@@ -6,6 +6,7 @@
 | --- | --- |
 | [Change log](Change-Log.md) | 按日期描述做了什么及原因，验证细节链接到验证记录。 |
 | [Documentation history](Documentation-History.md) | 从当前说明中迁出的旧术语、架构叙述与文档审计上下文；不重复持有当前设计。 |
+| [代码 README 历史摘录](Code-README-History.md) | 从代码目录 README 迁出的修改经过、旧契约与历史验证摘要；只用于追溯，不定义当前能力或待办。 |
 | [Milestone history](Milestone-History.md) | 早期交付阶段、旧路线图和当时的待办；不能直接作为当前路线图。 |
 | [原始 Markdown 设计](Tech_Design.md) | 2026-09-23 的历史技术基线，保留原始设想与示例供追溯。 |
 

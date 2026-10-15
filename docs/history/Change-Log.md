@@ -1,5 +1,24 @@
 # Documentation and architecture change history
 
+## 2026-10-15 — 总体第三部分与模块细节归位
+
+- 按用户要求收敛 MobileHarness/README.md 第三部分：保留跨模块链路、数据流、注入接口、权限/所有权和完成/失败语义；局部算法、状态机、完整函数清单及参数引用所属目录 README。第一、二部分和第三部分章节入口保持不变。
+- 在 Agents/Core/Chat、宿主 Behaviors、Gateway Resources、ModelKit Chat、UI Conversation 和 Settings 文档中补齐缺失细节；语音分段/声源、视觉调度、机械臂、模型资源、媒体和持久化已有完整契约时直接链接，避免再复制一份。角色处理、工作状态和资源交接内部图归位，总体保留并校正跨模块图。
+- 对照源码修正四轮/十六原生调用上限、持久化热 Context、资源清理确认时限、语音发布者、宿主协议投影及照片旧索引/保留配置等过期说法。此前 system 来源图和 Task/Skill 生命周期图保持原样。
+- 本轮仅调整文档。范围、完整性与链接检查见 [验证记录](../validation/Validation-History.md#2026-10-15--part-iii-detail-ownership-reconciliation)。
+
+## 2026-10-15 — 代码 README 只维护现行技术契约
+
+- 按用户要求整理 142 份受版本控制的目录 README，覆盖 MobileHarness、Tests、Macros、Config 和 scripts。保留当前职责、接口、算法、状态、生命周期、容量与失败契约，集中列出待实现项。Assistant 的 system 提示词来源图保留。
+- 迁出的旧契约和演进原文归入 [README 历史摘录](Code-README-History.md)，测试、构建和设备证据归入 [README 验证摘录](../validation/Code-README-Validation-History.md)。重复原文合并列出来源，保留原日期、数值、失败和证据限制；更新维护规则与索引。
+- 修正过期章节引用及自动重试、反馈期限、调用预算的矛盾说明。本轮只改文档，此前未提交的实现和测试修改保持原样；见 [检查记录](../validation/Validation-History.md#2026-10-15--code-readme-current-contract-audit)。
+
+## 2026-10-15 — Task 完成与目标转移教学、紧凑 ReACT 观察
+
+- BasicSkill21 以当前 activeTaskID 与匹配目标决定 finishTask/cancelTask；无 Task 的拍照/保存/查询直接完成回复。目标转移不明确时先问是否继续实际旧目标并保留 Task；明确替换不重复问，按需用 continueDecision 处理同一输入剩余请求。无 Task 的明确目标转移可主动释放无关近期 Skill，保留基础和仍需要的能力。Photography20 / HistoryQuery9 同步规则及条件示例。
+- 共享 Chat 在模型正文中使用轮内调用序号、当前别名、真实状态和结构化 value；不再输出内部 callID 或把业务 JSON 二次编码为 result 字符串。拒绝明确未执行，失败/部分成功保留效果与全部叶子证据，去掉空报告字段；业务空值/null、业务引用、native 配对及完整内部日志保留，续轮分类不变。
+- 新增/更新生产示例解析、同名调用、Action/Tool 混合、拒绝/失败/取消和日志隔离回归。相关 123 个函数 / 224 个场景通过；完整检查及 iOS 构建边界见[验证记录](../validation/Validation-History.md#2026-10-15--task-intent-teaching-and-compact-react-observations)。没有修改设备执行/Task 状态机协议或进行真实模型验收。
+
 ## 2026-10-15 — 多轮对话、Task 与 Skill 边界测试补强
 
 - 盘点核心 40 个测试函数（含 1 个真实模型 opt-in），新增 21 个离线函数 / 43 个场景；补齐预加载接管与三种终态、计数暂停/最后一轮续期、容量精确边界/失败回滚、会话隔离及提交失败重试。

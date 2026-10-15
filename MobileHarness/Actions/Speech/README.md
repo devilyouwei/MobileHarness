@@ -43,7 +43,7 @@ speak 将所有参数解析错误映射为 missingAudio，并在播放前后检�
 
 update 拒绝未知键。cue 可选 wake/confirm/cancel/error/soft/save/discard（默认 wake），volume 为有限 0…1（默认 0.85），hapticStyle 可选 light/medium/heavy/rigid/soft（默认 heavy），hapticIntensity 为有限 0…1（默认 1）。解析结果包装为 ListeningFeedback，并连同真实 invocation 交给宿主。
 
-✅ update 的固定使用者是 SpeechPerception；实际 source/session/revision 准入由宿主验证，Actions 本身不解释权限。新启动的反馈与捕获由端点组合，子结果通过父 invocation 的报告端口保存。策略更新不等于每次都播放启动反馈。
+update 的固定使用者是 SpeechPerception；实际 source/session/revision 准入由宿主验证，Actions 本身不解释权限。新启动的反馈与捕获由端点组合，子结果通过父 invocation 的报告端口保存。策略更新不等于每次都播放启动反馈。
 
 ## 生命周期与失败处理
 
@@ -53,10 +53,6 @@ SpeechModule 必须注入播放能力，聆听能力可选；缺少聆听能力�
 
 [Actions 设计](../README.md) · [能力目录](Support/README.md) · [宿主语音生命周期](../../App/Lifecycle/README.md)
 
+## 待实现
 
-
-
-
-## SQLite records and runtime identity
-
-✅ Implemented: technical identities are opaque UUID strings; committed business entities use dialog/message/task/media/device SQLite IDs. Consumers use Storage repositories while preserving ownership, cancellation and independent foundation boundaries. Complete messages, including each ReACT message, persist at termination; delta fragments do not persist. The custom allocator and replaced file/index implementation are removed. See the project SQLite business-record plan.
+- 暂无本目录独立的实现待办；跨模块及实际模型/设备验收见所属模块说明。

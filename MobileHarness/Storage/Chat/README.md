@@ -2,7 +2,7 @@
 
 ## Ownership and direct relationships
 
-✅ Depends on Storage mechanisms and StorageTasks contracts. Agents own admission, summaries/context selection and execution. Actions/App consume history operations; App injects ChatRepository and TaskRepository from one backend family. SQLiteChatRepository remains in this directory but compiles solely in StorageSQLite and owns dialog/message/evidence/source schema and SQL.
+Depends on Storage mechanisms and StorageTasks contracts. Agents own admission, summaries/context selection and execution. Actions/App consume history operations; App injects ChatRepository and TaskRepository from one backend family. SQLiteChatRepository remains in this directory but compiles solely in StorageSQLite and owns dialog/message/evidence/source schema and SQL.
 
 ```mermaid
 flowchart LR
@@ -33,21 +33,20 @@ TaskRepository commits running records before activation. SQLite checkpoints lin
 
 Current/archive rotation is atomic in the backend; asynchronous titles read at most32 caller-selected excerpts and never block creation of a new current dialog. Durable archive/turn counts have no old64/256 file-format cap. Memory history remains bounded32MiB; user/system/model limits4KiB/64KiB/512B, single-input response256KiB, request JSON512KiB/observation64KiB and single Task8192 sources. Overflows fail explicitly.
 
-❌ Additional persistent Chat backends and cross-process/sync/replay semantics are unimplemented. Real model/native UI acceptance is separate from contract tests.
-
 [Storage](../README.md) · [Tasks](../Tasks/README.md) · [Agent Chat](../../Agents/Support/Chat/README.md)
 
-✅ Cancellation completion: ordinary gate callers reject cancellation before their body; captured Chat checkpoints instead run a joined, store-owned operation independent of the cancelled caller, so cancelled/failed messages still commit. An actual cancelled-Task terminal checkpoint regression verifies received text and both terminal message states.
+Cancellation completion: ordinary gate callers reject cancellation before their body; captured Chat checkpoints instead run a joined, store-owned operation independent of the cancelled caller, so cancelled/failed messages still commit. An actual cancelled-Task terminal checkpoint regression verifies received text and both terminal message states.
 
+insert completed user messages and reserve Assistant identities before model admission, attach user/Assistant/observation message IDs to memory values, and never persist generating response bodies. User acceptance is its completion boundary; Assistant generation completes independently of action outcomes; each ReACT observation completes before the next model admission. Empty reserved rows recover as interrupted with truthful empty content. Interrupted Task compression is rebuilt from normalized SQL facts; live Task/Skill worker state is not serialized. Message/dialog writes use private GRDB records.
 
-✅ Implemented: insert completed user messages and reserve Assistant identities before model admission, attach user/Assistant/observation message IDs to memory values, and never persist generating response bodies. User acceptance is its completion boundary; Assistant generation completes independently of action outcomes; each ReACT observation completes before the next model admission. Empty reserved rows recover as interrupted with truthful empty content. Serialized live Task/Skill recovery blobs are removed; interrupted Task compression is rebuilt from normalized SQL facts. Message/dialog writes use private GRDB records.
+ConversationHistory.begin commits a complete user message directly, then attaches the returned SQL identity to memory. ChatRepository.save and ConversationRecordStore.saveCurrent return committed identity receipts in submitted-message order. Evidence fingerprints omit the separately stored user primary key. Failed publication retries the same runtime UUID idempotently. Assistant reservations and per-observation checkpoints use their own completion boundaries.
 
+ConversationHistory tracks pending current synchronization, reloads SQL current before read/admission/rotation, and rejects mismatches with active/dirty work. A committed rotation clears persisted old dirty inputs, then publishes the new window; publication failure retains the synchronization fence for retry without a second rotation. Synchronization uses exact-ID comparison. SQLiteChatRepository rejects new message rows on archived dialogs, validates Agent ownership during rotation and permits existing-row late updates. Missing current is created transactionally; failures propagate rather than fabricating a draft.
 
-✅ Implemented (2026-10-15): ConversationHistory.begin commits a complete user message directly, then attaches the returned SQL identity to memory. ChatRepository.save and ConversationRecordStore.saveCurrent return committed identity receipts in submitted-message order. Evidence fingerprints omit the separately stored user primary key. Failed publication retries the same runtime UUID idempotently. Assistant reservations and per-observation checkpoints remain unchanged.
+paging that can initialize/recover current and dirty-input checkpoint publication use the same history operation gate; memory-only paging delegates to the existing gated conversation read.
 
+HistoryPaging.pageSize supplies the shared20-item default for archived dialogs and timeline/Task previews; App uses the same value for archive EOF validation. Internal raw-message enumeration retains its independent50-row batch and complete-record reads remain complete.
 
-✅ Implemented (2026-10-15 current-dialog hardening): ConversationHistory tracks pending current synchronization, reloads SQL current before read/admission/rotation, and rejects mismatches with active/dirty work. A committed rotation clears persisted old dirty inputs, then publishes the new window; publication failure retains the synchronization fence for retry without a second rotation. The old currentExists helper is replaced by exact-ID comparison. SQLiteChatRepository rejects new message rows on archived dialogs, validates Agent ownership during rotation and permits existing-row late updates. Missing current is created transactionally; failures propagate rather than fabricating a draft.
+## 待实现
 
-✅ Implemented: paging that can initialize/recover current and dirty-input checkpoint publication use the same history operation gate; memory-only paging delegates to the existing gated conversation read.
-
-✅ Implemented: HistoryPaging.pageSize supplies the shared20-item default for archived dialogs and timeline/Task previews; App uses the same value for archive EOF validation. Internal raw-message enumeration retains its independent50-row batch and complete-record reads remain complete. No schema/data migration.
+- Additional persistent Chat backends and cross-process/sync/replay semantics are unimplemented. Real model/native UI acceptance is separate from contract tests.

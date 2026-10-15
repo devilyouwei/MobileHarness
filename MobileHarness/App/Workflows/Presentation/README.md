@@ -43,48 +43,32 @@ Delivery receipt means admission; task completion requires explicit accepted res
 
 CameraVisionRestartWorkflow owns one worker, one retiring/current pipeline and one latest pending intent. replace cancels old admission and returns; the worker joins cleanup before starting the newest pipeline. stop invalidates and joins it. Native lens acknowledgment is independent of this replacement barrier.
 
-✅ Independent consumers, fenced presentation and bounded passive observations are implemented.
-
-❌ Durable execution-log storage is not implemented.
+Independent consumers, fenced presentation and bounded passive observations are implemented.
 
 ## Related design
 
 [Parent design](../README.md)
 
-✅ 泛化任务投影：展示 execution 与 request goal/Skill；后台终态来自 task.result，进度不能抢占前台。首页后台入口复用 UI 本地执行记录 sheet。
+泛化任务投影：展示 execution 与 request goal/Skill；后台终态来自 task.result，进度不能抢占前台。首页后台入口复用 UI 本地执行记录 sheet。
 
+ListeningCaptureWorkflow.swift serializes injected native capture start/stop, joins cancelled startup before replacement, reports actual start failures, and never starts a superseded pending intent. ConversationPresentation.suspendReplies records at most 32 cancelled turn IDs and rejects late captions/expressions/playback while retaining visible text. IndependentOutputWorkflow treats agent.cancelled as a cancel/join terminal boundary rather than a transport error.
 
+identical simultaneous capture requests coalesce into the same desired-state revision; a reply-policy pause and playback pause must join each other rather than cancel one another. Only a changed desired state supersedes the preceding caller. Disabled-state joins ignore a previous startup failure; explicit enabled retry retains it until a new request.
 
+Listening activation composition belongs to [Speech](../Speech/README.md). This target retains generic presentation and the injected ListeningCaptureWorkflow state machine; it owns no cue synthesis or feedback composition.
 
-✅ Implemented: ListeningCaptureWorkflow.swift serializes injected native capture start/stop, joins cancelled startup before replacement, reports actual start failures, and never starts a superseded pending intent. ConversationPresentation.suspendReplies records at most 32 cancelled turn IDs and rejects late captions/expressions/playback while retaining visible text. IndependentOutputWorkflow treats agent.cancelled as a cancel/join terminal boundary rather than a transport error.
+PhotoDispositionWorkflow.run checks cancellation, joins injected commit, then runs renderer/sound concurrently. Successful commit always owns final removal even if later feedback fails/cancels. A commit failure starts no feedback and performs no removal. Ordinary effect failures return up to two bounded issues; cancellation joins both children and propagates. Domain Action selection, album import and ID cleanup stay in CameraCoordinator.
 
+OutputStreamReader 的 Tool 投递队列容量为 128，最多四个并发执行，全部加入后才能 seal；生成接纳和累计预算由 Chat 管理。已接纳工作不被淘汰或重放。
 
-✅ Implemented: identical simultaneous capture requests coalesce into the same desired-state revision; a reply-policy pause and playback pause must join each other rather than cancel one another. Only a changed desired state supersedes the preceding caller. Disabled-state joins ignore a previous startup failure; explicit enabled retry retains it until a new request.
+UI.Notice.showNotice/dismissNotice and UI.Light.updateLight are canonical presentation Actions for trusted business calls, currently registered by no Skill. Neutral Actions values cross RuntimePresentation into root-owned HomeEffectsWorkflow, which retains one replaceable notice expiry and one light expiry, UUID-fenced cleanup, and explicit stop. Notices remain separate from factual ExecutionIssue history; actual upper-layer errors have display priority and Action failures remain panel-only. Decorative light accepts normalized origin, initial opacity/intensity and duration; it never changes consent, microphone or eyes. Native renderer separates light generations from listening eye generations and preserves existing exit fade. RuntimePresentation adapts Action requests into UI-owned values; AppPresentationWorkflow keeps its existing UI/AgentCore/FunctionContracts boundary. UI consumes injected presentation values without a business-service dependency.
 
+mask bottom ASR and reply/status immediately while a notice is visible, restore retained text after dismissal, and preserve pinned Task/promoted ASR layout. Consent-off clears both captions; root HomeEffectsWorkflow owns one ID/text-fenced350ms reply fade/removal task, cancelled by new text/turn/off/shutdown, scheduled only after reply-policy/playback/native-resume barriers. Agent errors stay in factual root failure notices, not persistent voiceStatus copies. Runtime contexts are process-memory state. Business repositories and configuration/media adapters own their separate persistence and file-protection contracts; UI presentation does not diagnose storage failure causes.
 
-✅ Listening activation composition belongs to [Speech](../Speech/README.md). This target retains generic presentation and the injected ListeningCaptureWorkflow state machine; it owns no cue synthesis or feedback composition.
+ActionActivityWorkflow 在日志→展示边界为 speechPerception 的 recognition 错误设置用户文案“我没听清”；原始消息、来源、输入关联仍原样保存在日志。recordFailure 和 startFailures 快照使用同一映射，其他错误不改文案。
 
+ActionActivityMapping keeps cancelled phase as normal completion history; cancelled leaves/execution markers do not become issue descriptions. Independent real failed leaves remain visible. Input output ownership/terminal cancellation remains in IndependentOutputWorkflow and Gateway.
 
-✅ Implemented: PhotoDispositionWorkflow.run checks cancellation, joins injected commit, then runs renderer/sound concurrently. Successful commit always owns final removal even if later feedback fails/cancels. A commit failure starts no feedback and performs no removal. Ordinary effect failures return up to two bounded issues; cancellation joins both children and propagates. Domain Action selection, album import and ID cleanup stay in CameraCoordinator.
+## 待实现
 
-
-✅ Removed per-input cumulative native-call accounting from OutputStreamReader. Each generation is already bounded by Chat; its tool delivery queue admits 128 envelopes, retains four concurrent executions and joins before sealing. Accepted work is never evicted or replayed.
-
-
-✅ Implemented (2026-10-13): UI.Notice.showNotice/dismissNotice and UI.Light.updateLight are canonical presentation Actions for trusted business calls, currently registered by no Skill. Neutral Actions values cross RuntimePresentation into root-owned HomeEffectsWorkflow, which retains one replaceable notice expiry and one light expiry, UUID-fenced cleanup, and explicit stop. Notices remain separate from factual ExecutionIssue history; actual upper-layer errors have display priority and Action failures remain panel-only. Decorative light accepts normalized origin, initial opacity/intensity and duration; it never changes consent, microphone or eyes. Native renderer separates light generations from listening eye generations and preserves existing exit fade. RuntimePresentation adapts Action requests into UI-owned values; AppPresentationWorkflow keeps its existing UI/AgentCore/FunctionContracts boundary. No UI capability/business dependencies or new directories.
-
-
-✅ Implemented (2026-10-13 caption/error lifecycle): mask bottom ASR and reply/status immediately while a notice is visible, restore retained text after dismissal, and preserve pinned Task/promoted ASR layout. Consent-off clears both captions; root HomeEffectsWorkflow owns one ID/text-fenced350ms reply fade/removal task, cancelled by new text/turn/off/shutdown, scheduled only after reply-policy/playback/native-resume barriers. Agent errors stay in factual root failure notices, not persistent voiceStatus copies. App root contexts explicitly choose afterFirstUnlock file protection, including their directory; repository persistent factory accepts protection while its SDK default remains whileUnlocked. This mitigates lock-boundary writes, without claiming the screenshot proves that cause or hiding other storage failures.
-
-
-✅ ActionActivityWorkflow 在日志→展示边界为 speechPerception 的 recognition 错误设置用户文案“我没听清”；原始消息、来源、输入关联仍原样保存在日志。recordFailure 和 startFailures 快照使用同一映射，其他错误不改文案。
-
-✅ ActionActivityMapping keeps cancelled phase as normal completion history; cancelled leaves/execution markers do not become issue descriptions. Independent real failed leaves remain visible. Input output ownership/terminal cancellation remains in IndependentOutputWorkflow and Gateway.
-
-
-
-
-
-## SQLite records and runtime identity
-
-✅ Implemented: technical identities are opaque UUID strings; committed business entities use dialog/message/task/media/device SQLite IDs. Consumers use Storage repositories while preserving ownership, cancellation and independent foundation boundaries. Complete messages, including each ReACT message, persist at termination; delta fragments do not persist. The custom allocator and replaced file/index implementation are removed. See the project SQLite business-record plan.
+- Durable execution-log storage is not implemented.

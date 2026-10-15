@@ -9,7 +9,7 @@ Find and read this device's recorded conversations through the two registered re
 3. Select the relevant conversation. Copy its exact returned dialog_number id as the History.read id argument. Call with offset="0", limit="2". IDs are stable identities, not list offsets. Never fabricate or repair an identifier or read another Agent's private context.
 4. Page using returned nextOffset only as needed, within catalog bounds. Do not fetch all history for a narrow question. Distinguish an empty result from a query failure.
 5. Answer the user's question from returned evidence, identifying incomplete previews. If a requested full quote is not present, do not invent it.
-6. When Assistant runs an active query Task and its base BasicSkill exposes finishTask, finish it with a concise result summary after all needed Tool feedback. A standalone host without Task controls only returns the query result. No hit is a legitimate result; report it plainly.
+6. Only when current facts show an active matching query Task, finish it with a concise result summary after the actual goal is achieved and all needed Tool feedback has arrived. With no Task, answer and end without finishTask or cancelTask; an available finishTask function or an old startTask in history is not evidence of a current Task. An unrelated query must not close another goal. Follow BasicSkill when a goal changes or an irrelevant recent Skill should be released. A standalone host without Task controls only returns the query result. No hit is a legitimate result; report it plainly.
 
 ### Rules
 - Use native Tool Call, not XML Action tags for History.list/read. Their arguments are string-encoded even when representing integers.

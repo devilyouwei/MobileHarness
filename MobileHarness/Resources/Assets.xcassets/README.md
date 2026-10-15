@@ -23,8 +23,12 @@ flowchart LR
 
 `Contents.json` uses asset-catalog version 1 and Xcode author metadata. [AppIcon](AppIcon.appiconset/README.md) provides the universal iOS icon. Build-time asset compilation resolves packaging; this directory has no model weights, prompt catalog or dynamic resource loader.
 
-✅ Asset catalog and selected icon.
+Asset catalog and selected icon.
 
 ## Related design
 
 [Parent design](../README.md) · [AppIcon.appiconset](AppIcon.appiconset/README.md)
+
+## 待实现
+
+- 暂无本目录独立的实现待办；跨模块及实际模型/设备验收见所属模块说明。

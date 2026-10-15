@@ -37,29 +37,24 @@ Exceptions normalize into reports preserving child entries, bounded producer cod
 
 Execution failure and later delivery failure remain separate. No adapter retries the effect or treats message admission as physical completion. ToolExecutor uses the canonical function budget, including its intrinsic 30-second default; there is no separate caller timeout.
 
-✅ Standard input and shared execution adaptation are implemented.
+Standard input and shared execution adaptation are implemented.
 
 ## Related design
 
 [Parent design](../README.md)
 
-✅ ActionFunction 基础默认执行超时为 30 秒，dynamicTimeout 优先于静态 timeout；未声明也有默认预算。Speech.Playback 使用显式 300 秒。超时取消并加入清理，保留真实效果，以 ActionResult 返回；工具复用同一函数契约。通信转发不制造 TTL，队列和整个对话不附加默认时限。
+ActionFunction 基础默认执行超时为 30 秒，dynamicTimeout 优先于静态 timeout；未声明也有默认预算。Speech.Playback 使用显式 300 秒。超时取消并加入清理，保留真实效果，以 ActionResult 返回；工具复用同一函数契约。通信转发不制造 TTL，队列和整个对话不附加默认时限。
 
+## Result-driven ReACT
 
-## Result-driven ReACT (ADR0214)
+ToolExecutor 不再用反馈属性强制 returning；模型调用由调用轮次要求真实终态，固定调用按 DirectResultPolicy 投递。业务值和无输出完成由 Agent 统一解释。
 
-✅ ADR0214：ToolExecutor 不再用反馈属性强制 returning；模型调用由调用轮次要求真实终态，固定调用按 DirectResultPolicy 投递。业务值和无输出完成由 Agent 统一解释。
+## Action timeout contract
 
-## Action timeout contract (2026-10-12)
+ActionExecutor/ToolExecutor 共用基础 30 秒默认超时和业务覆盖预算，timeout 触发取消并加入清理，保留实际报告；不存在未声明即可无限等待的执行分支。
 
-✅ ActionExecutor/ToolExecutor 共用基础 30 秒默认超时和业务覆盖预算，timeout 触发取消并加入清理，保留实际报告；不存在未声明即可无限等待的执行分支。
+Native Tool failureCode classifies pure cancellation as cancelled and mixed reports by the actual non-cancellation failure. Canonical reports retain every child effect; cancellation cannot request model recovery.
 
-✅ Native Tool failureCode classifies pure cancellation as cancelled and mixed reports by the actual non-cancellation failure. Canonical reports retain every child effect; cancellation cannot request model recovery.
+## 待实现
 
-
-
-
-
-## SQLite records and runtime identity
-
-✅ Implemented: technical identities are opaque UUID strings; committed business entities use dialog/message/task/media/device SQLite IDs. Consumers use Storage repositories while preserving ownership, cancellation and independent foundation boundaries. Complete messages, including each ReACT message, persist at termination; delta fragments do not persist. The custom allocator and replaced file/index implementation are removed. See the project SQLite business-record plan.
+- 暂无本目录独立的实现待办；跨模块及实际模型/设备验收见所属模块说明。

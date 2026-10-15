@@ -48,11 +48,9 @@ The session uses `StreamLimits(capacity: 128, maximumEventBytes: 65568)` and ser
 
 Explicit GET /models is separate, optionally authenticated, 30 seconds, no redirects/cache/cookies, one MiB response and 2048 IDs each ≤512 bytes, deduplicated in server order. Empty key omits Authorization; blank endpoint uses configured default. Discovery checks raw IDs only; the consumer owns model eligibility and selection policy. Reconfiguration replaces the chat binding and consumers resolve current provider each request.
 
-✅ Responses encoding, typed streaming, pooled residency and explicit discovery are implemented.
+Responses encoding, typed streaming, pooled residency and explicit discovery are implemented.
 
-✅ The 128-event queue uses producer backpressure, including terminal delivery; cancellation releases waiting production.
-
-❌ Cloud ASR/TTS/video and automatic retry policies are not implemented.
+The 128-event queue uses producer backpressure, including terminal delivery; cancellation releases waiting production.
 
 ## Related design
 
@@ -60,14 +58,18 @@ Explicit GET /models is separate, optionally authenticated, 30 seconds, no redir
 
 ## Consecutive user message boundaries
 
-✅ Implemented: OpenAIChatConfiguration.request emits one Responses message per original user message, preserving original text and attached-image order without inserted text separators. System/assistant/native call/result encoding and existing source count/text/image/pairing limits remain unchanged. Keep the implemented Responses reasoning decoder. Offline and opt-in live regressions verify unmerged consecutive users; acceptance applies only to the tested model.
+OpenAIChatConfiguration.request emits one Responses message per original user message, preserving original text and attached-image order without inserted text separators. System/assistant/native call/result encoding and existing source count/text/image/pairing limits remain unchanged. Keep the implemented Responses reasoning decoder. Offline and opt-in live regressions verify unmerged consecutive users; acceptance applies only to the tested model.
 
 ## Responses reasoning compatibility
 
-✅ Implemented: ChatEventDecoder accepts bounded reasoning output items and response.reasoning_text.delta/done metadata used by Alibaba Cloud Responses. Validate reasoning identity/summary shape and incremental text fields, then discard this private channel; only output_text contributes ChatEvent.text and first-token timing. Reasoning items in output_item.added/done and terminal output must not be mistaken for unsupported assistant output. Native call indices/pairing, usage/completion, explicit refusal/unknown-output failures and existing stream limits remain unchanged. No protocol switch or provider retry is introduced. Offline fixtures and an explicit live synthetic-context probe verify the behavior; provider documentation: [Alibaba Cloud Responses](https://www.alibabacloud.com/help/en/model-studio/qwen-api-via-openai-responses).
+ChatEventDecoder accepts bounded reasoning output items and response.reasoning_text.delta/done metadata used by Alibaba Cloud Responses. Validate reasoning identity/summary shape and incremental text fields, then discard this private channel; only output_text contributes ChatEvent.text and first-token timing. Reasoning items in output_item.added/done and terminal output must not be mistaken for unsupported assistant output. Native call indices/pairing, usage/completion, explicit refusal/unknown-output failures and existing stream limits remain unchanged. No protocol switch or provider retry is introduced. Offline fixtures and an explicit live synthetic-context probe verify the behavior; provider documentation: [Alibaba Cloud Responses](https://www.alibabacloud.com/help/en/model-studio/qwen-api-via-openai-responses).
 
 ## Non-thinking request policy
 
-✅ Implemented: OpenAIChatConfiguration.request sends reasoning.effort=none and top-level enable_thinking=false for official dashscope endpoints and workspace *.maas.aliyuncs.com endpoints. OpenAI GPT-5.x/GPT-6 reasoning IDs receive reasoning.effort=none where the policy supports disabling; ordinary GPT-4/older non-reasoning models and unknown provider/model identities retain their original fields. Canonical OpenAI IDs also work through proxies. Known mandatory-thinking o-series, original GPT-5/mini/nano, Codex/Pro variants and GPT-6 Astra/GPT-6.1 Sol reject explicitly at request encoding; no minimal/low fallback, automatic retry, endpoint switch or hidden output-budget increase is introduced. Unrecognized aliases and future capabilities require explicit follow-up validation; provider rejection remains an error. Alibaba parameters never go to OpenAI.
+OpenAIChatConfiguration.request sends reasoning.effort=none and top-level enable_thinking=false for official dashscope endpoints and workspace *.maas.aliyuncs.com endpoints. OpenAI GPT-5.x/GPT-6 reasoning IDs receive reasoning.effort=none where the policy supports disabling; ordinary GPT-4/older non-reasoning models and unknown provider/model identities retain their original fields. Canonical OpenAI IDs also work through proxies. Known mandatory-thinking o-series, original GPT-5/mini/nano, Codex/Pro variants and GPT-6 Astra/GPT-6.1 Sol reject explicitly at request encoding; no minimal/low fallback, automatic retry, endpoint switch or hidden output-budget increase is introduced. Unrecognized aliases and future capabilities require explicit follow-up validation; provider rejection remains an error. Alibaba parameters never go to OpenAI.
 
 All consumers, including Memory title requests (64 output tokens), pass through this same encoding. Temperature and source message/media/native-call limits remain unchanged for admitted requests. Retain reasoning parsing for explicit failure/compatibility handling; filtering an incoming reasoning channel is not evidence that thinking was disabled. Offline encoding regressions and live synthetic title/chat probes inspect the actual wire flags and returned reasoning-token/event metadata. References: [Alibaba Cloud Responses](https://www.alibabacloud.com/help/en/model-studio/qwen-api-via-openai-responses), [OpenAI reasoning](https://developers.openai.com/api/docs/guides/reasoning), [GPT-5.1](https://developers.openai.com/cookbook/examples/gpt-5/gpt-5-1_prompting_guide).
+
+## 待实现
+
+- Cloud ASR/TTS/video and automatic retry policies are not implemented.

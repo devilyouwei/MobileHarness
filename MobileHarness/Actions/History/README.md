@@ -42,8 +42,7 @@ flowchart LR
 | summarize | 已归档会话 id | 标题提交后返回 summarized ID |
 | delete | 已归档会话 id | 删除提交后返回 deleted ID |
 
-
-✅ 参数来自字符串传输，未知键被拒绝。list/read 结果最多 1800 UTF-8 字节，超过上限抛 resultTooLarge，不能裁掉 JSON 结构。页包含 items、total，存在更多内容时带 nextOffset；每次调用重新读取快照，不承诺跨调用分页稳定。
+参数来自字符串传输，未知键被拒绝。list/read 结果最多 1800 UTF-8 字节，超过上限抛 resultTooLarge，不能裁掉 JSON 结构。页包含 items、total，存在更多内容时带 nextOffset；每次调用重新读取快照，不承诺跨调用分页稳定。
 
 list 的 turnCount 是存储的输入块数量；read 的 total 是 indexedHistory 投影项数量，二者含义不同。read 项包含 kind=request/task、状态及适用的 taskID/inputID，读取已经持久化的请求片段或任务摘要，不生成摘要，也不执行历史函数。
 
@@ -53,12 +52,8 @@ list 的 turnCount 是存储的输入块数量；read 的 total 是 indexedHisto
 
 标题计算由注入闭包执行，本域只声明 summarize 的 60 秒函数预算。失败或取消时先加入标题错误状态的持久化，再传播原始原因；如果记录错误本身失败，保留两个原因的报告。异常不触发这里的写入重放。
 
-❌ 本接口没有全文搜索或完整会话导出；返回内容是显式截断的预览。
-
 [Actions 设计](../README.md) · [查询与事务实现](Support/README.md) · [共享会话仓库](../../Storage/Chat/README.md)
 
+## 待实现
 
-
-## SQLite records and runtime identity
-
-✅ Implemented: technical identities are opaque UUID strings; committed business entities use dialog/message/task/media/device SQLite IDs. Consumers use Storage repositories while preserving ownership, cancellation and independent foundation boundaries. Complete messages, including each ReACT message, persist at termination; delta fragments do not persist. The custom allocator and replaced file/index implementation are removed. See the project SQLite business-record plan.
+- 本接口没有全文搜索或完整会话导出；返回内容是显式截断的预览。

@@ -52,9 +52,7 @@ Messaging allows at most 16 active emissions per source. send freezes live targe
 
 OutputExecutionResult retains original Tool outcome separately from deliveryFailure and output failureCode. executionResults keeps 256 correlated output outcomes with counted eviction and bounded descriptions; source/input filters do not erase global eviction evidence. Failure observation keeps 100 records and eight newest-one full-snapshot observers. These are in-memory diagnostics, not durable business history.
 
-✅ Validated output categories, independent failures and joined final/round barriers are implemented.
-
-❌ Durable outcome transport and automatic effect replay are not implemented.
+Validated output categories, independent failures and joined final/round barriers are implemented.
 
 ## Related design
 
@@ -62,44 +60,34 @@ OutputExecutionResult retains original Tool outcome separately from deliveryFail
 
 ## Skill/task-mode contract
 
-✅ Model-origin Action/Tool calls validate against the real Agent effectiveCapabilities(roundID) immutable snapshot, without a static business allowlist. Calls without a model-round snapshot validate against the fixed descriptor. Mode changes do not reopen an in-flight catalog.
-
+Model-origin Action/Tool calls validate against the real Agent effectiveCapabilities(roundID) immutable snapshot, without a static business allowlist. Calls without a model-round snapshot validate against the fixed descriptor. Mode changes do not reopen an in-flight catalog.
 
 ## Skill 函数目录
 
-✅ OutputGateway 先获取本轮有效目录，再交给 OutputValidator 验证输出种类与函数；固定调用沿用 descriptor。轮次过期明确失败，不退回宽松目录。
+OutputGateway 先获取本轮有效目录，再交给 OutputValidator 验证输出种类与函数；固定调用沿用 descriptor。轮次过期明确失败，不退回宽松目录。
 
 ## Channel-owned Action ordering
 
-✅ Action metadata has no serialization key. [ChannelScheduler](Scheduling/README.md) owns task-local FIFO/wait ordering; ResourceCoordinator rejects unconfigured conflicts without a queue and preserves explicitly configured joined takeover.
+Action metadata has no serialization key. [ChannelScheduler](Scheduling/README.md) owns task-local FIFO/wait ordering; ResourceCoordinator rejects unconfigured conflicts without a queue and preserves explicitly configured joined takeover.
 
-## Lifecycle-owned conversation and audio (2026-10-12)
+## Lifecycle-owned conversation and audio
 
-✅ 已移除对话生成、ReACT、收件箱排队、结果屏障、ASR 收尾、TTS 合成及回复占用租约的计时终止。Signal 默认无过期时间，框架不再按通信契约附加 TTL。保留显式实时感知数据的新鲜度和网络传输自身超时；它们不作为对话/语音缓存生命周期。Action 自身超时通过原始执行者的 ActionResult 返回。请求/调用数及队列/PCM 容量仍有界，不以计时自动删除已接纳输入。语音句柄无读等待或错误记录 TTL，按播放完成、输入/会话正常结束、异常或显式取消清理；取消加入生成和播放工作。
+已接纳输出由执行 owner、结果屏障及显式取消管理，不因排队时间自动丢弃。容量超限明确拒绝；Action 执行超时由原执行者返回 ActionResult，网络传输超时不等于对话结束。
 
+## Result-driven ReACT
 
-## Result-driven ReACT (ADR0214)
+注册不再选择模型观察；所有模型调用仍传回真实终态，Agent 按业务输出或失败继续，completed 无业务值只用于屏障/日志。
 
-✅ ADR0214：注册不再选择模型观察；所有模型调用仍传回真实终态，Agent 按业务输出或失败继续，completed 无业务值只用于屏障/日志。
+agent.cancelled cancels/joins only the original source/input/round through the existing dispatcher and remains a terminal scope-validation exception. It adds no error observation or whole-session resource closure.
 
+cancelCalls validates the actual producer object/incarnation and session, then cancels/joins only its matching scheduled calls. It does not close the session resource coordinator, cancel other Agents or depend on the ordered output reader reaching a terminal. Explicit agent.cancelled still retires the original transport boundary.
 
-✅ Implemented: agent.cancelled cancels/joins only the original source/input/round through the existing dispatcher and remains a terminal scope-validation exception. It adds no error observation or whole-session resource closure.
+an explicitly cancelled round seal propagates CancellationError instead of generating a failed round receipt or recording handler failure. Other execution/admission failures remain visible.
 
+OutputExecutionResult 已增加 isCancellationOnly 纯取消分类。原始调用结果、Tool isError 和取消报告仍保留在 executionResults；仅 cancelled 且不含其他执行/投递失败的结果不进入运行异常快照/首页 toast。不能按 CancellationError 文本过滤；读取类型化代码和完整报告，混合失败/超时/投递失败照常记录。OutputGateway 将局部抛出的 CancellationError 归为 cancelled，调用方真实任务取消仍传播并加入清理。
 
-✅ Implemented: cancelCalls validates the actual producer object/incarnation and session, then cancels/joins only its matching scheduled calls. It does not close the session resource coordinator, cancel other Agents or depend on the ordered output reader reaching a terminal. Explicit agent.cancelled still retires the original transport boundary.
+Direct Tool/communication dispatch has an owned cancellable Task, with at most128 active dispatches and128 model input scopes; overflow rejects explicitly. cancelCalls fences the matching producer/session, cancels/joins direct and scheduled work, and retains cancelled input fences until terminal output. Trusted host child-cancellation messages can drain cleanup. Producer stop joins direct work (an invoking handler cannot join itself; its enclosing transport owns that join); shutdown drains direct work; unrelated producers/sessions retain admission. Pure cancellation produces no error outcome/incident; terminal Agent errors cancel work without another model request.
 
+## 待实现
 
-✅ Implemented: an explicitly cancelled round seal propagates CancellationError instead of generating a failed round receipt or recording handler failure. Other execution/admission failures remain visible.
-
-
-✅ OutputExecutionResult 已增加 isCancellationOnly 纯取消分类。原始调用结果、Tool isError 和取消报告仍保留在 executionResults；仅 cancelled 且不含其他执行/投递失败的结果不进入运行异常快照/首页 toast。不能按 CancellationError 文本过滤；读取类型化代码和完整报告，混合失败/超时/投递失败照常记录。OutputGateway 将局部抛出的 CancellationError 归为 cancelled，调用方真实任务取消仍传播并加入清理。
-
-✅ Direct Tool/communication dispatch has an owned cancellable Task, with at most128 active dispatches and128 model input scopes; overflow rejects explicitly. cancelCalls fences the matching producer/session, cancels/joins direct and scheduled work, and retains cancelled input fences until terminal output. Trusted host child-cancellation messages can drain cleanup. Producer stop joins direct work (an invoking handler cannot join itself; its enclosing transport owns that join); shutdown drains direct work; unrelated producers/sessions retain admission. Pure cancellation produces no error outcome/incident; terminal Agent errors cancel work without another model request.
-
-
-
-
-
-## SQLite records and runtime identity
-
-✅ Implemented: technical identities are opaque UUID strings; committed business entities use dialog/message/task/media/device SQLite IDs. Consumers use Storage repositories while preserving ownership, cancellation and independent foundation boundaries. Complete messages, including each ReACT message, persist at termination; delta fragments do not persist. The custom allocator and replaced file/index implementation are removed. See the project SQLite business-record plan.
+- Durable outcome transport and automatic effect replay are not implemented.

@@ -29,16 +29,12 @@ AudioDetectionWorkflow owns one endpoint task, one 100 ms freshness/deadline mon
 
 ChatDiagnosticWorkflow validates an explicitly selected provider with a bounded request. SpeechDiagnosticWorkflow retains its operation, injected synthesis and real playback; shutdown awaits AppleAudioIO before unloading/replacing resources. Reports are diagnostic evidence, not production conversation success. Terminal phases follow cleanup and slot release; cancellation never fabricates successful model/device output.
 
-✅ Explicit diagnostic ownership, bounded capture monitoring and joined native cleanup are implemented.
+Explicit diagnostic ownership, bounded capture monitoring and joined native cleanup are implemented.
 
 ## Related design
 
 [Parent design](../README.md)
 
+## 待实现
 
-
-
-
-## SQLite records and runtime identity
-
-✅ Implemented: technical identities are opaque UUID strings; committed business entities use dialog/message/task/media/device SQLite IDs. Consumers use Storage repositories while preserving ownership, cancellation and independent foundation boundaries. Complete messages, including each ReACT message, persist at termination; delta fragments do not persist. The custom allocator and replaced file/index implementation are removed. See the project SQLite business-record plan.
+- 暂无本目录独立的实现待办；跨模块及实际模型/设备验收见所属模块说明。

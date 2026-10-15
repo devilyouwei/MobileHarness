@@ -1,212 +1,108 @@
 # Assistant
 
-✅ 已实现：无 Task 的已加载 Skill 跨输入复用，加载/实际 Action 或 Tool 使用重置 5，五次完整用户决策未使用才回收；Task 结束仍确定回收持有项。当前事实增加 Skill 归属与剩余次数，只有目录缺失才重新 loadSkills。
-
 ## 职责与边界
 
-✅ 唯一用户对话入口，负责动态 Skill、一个前台目标任务、模型决策和 ReACT。 Agents 管业务策略和上下文，Gateway 管权限/传输，Actions 管函数实现；原生设备与 UI 端口由 App 注入。没有跨 Agent 共享可写聊天历史。
+唯一普通用户对话执行者，拥有动态 Skill、一个前台目标 Task、Chat/ReACT、会话历史选择及照片模型输入策略。通过注入的 ModelKit/Storage 接口计算和记录，通过 Gateway 发出已解析调用；App 提供 native 能力，Actions 实现效果。角色间没有共享可写上下文。
 
-## 文件分工
+## 文件与直接接口
 
-AssistantAgent.swift 是共享 worker 的业务类型别名；AssistantProcessing.swift 定义预处理、结构化状态、请求策略与照片所有权。
+| 文件 | 职责 |
+| --- | --- |
+| AssistantAgent.swift | 共享 Chat worker 的角色类型绑定 |
+| AssistantProcessing.swift | State、预处理、Context Builder、system 拼接与照片输入策略 |
 
-## 输入、输出与流程
-
-用户文本与最终 ASR FIFO；起音绑定当时任务，迟到识别不能改投新任务。camera.state 更新被动事实。每轮选择不可变 Context、Skill 和有效函数目录，输出经 Gateway 执行，结果只回 Assistant。
+用户文本及最终 ASR 经 Gateway FIFO 进入；起音绑定当时 Task，迟到识别不得改投新目标。camera.state 只更新经来源/序号验证的被动事实。输出包括 Action、native Tool、通信及轮次屏障，执行反馈回原输入/轮次。模型函数来自 [Agent.json](../../Resources/Agents/Assistant/Agent.json) 的 baseSkills 和动态 Skill，真实函数参数见 [Actions](../../Actions/README.md)。
 
 ## Context 与 Builder
 
-history、skillState（任务/加载事件/输入关联）、cameraState 和后台任务报告；普通对话与任务选择各自历史，任务结束只向默认请求提供简短结果摘要。 状态通过独立 Repository 原子提交；Builder 选择确定版本，不修改已发出的请求。写入失败不产生依赖未提交状态的新调用。
+根拥有的仓库保存 history、skillState、cameraState 与后台任务报告。Builder 读取不可变快照；运行事实作为 user-role 数据注入，不能覆盖用户意图或拆开 native 配对。普通对话背景和完整当前 Task 过程保留在容量窗口内；终态 Task 在原始来源位置投影摘要，不修改原始证据。
 
-## 生命周期、容量与失败
+## System 提示词结构与来源
 
-基础 Skill 来自 Agent 配置（basic-skill、expression-interaction、robot-interaction）；任意任务目标按需组合 Skill，无 Task 的近期能力按五次用户 Decision 闲置倒计数保留。startTask 后下一轮才开放新函数；waitingUser 不关闭任务。finish/cancel 在本轮反馈和回复屏障完成后恢复默认。 事务/输出消费由 App 根生命周期持有，独立于页面。输出最多 256，状态提交等待最多 32；通信消费者最多 16 待处理、4 并发。超限明确失败。取消加入已接纳工作清理；重启标记未完成任务中断，不重放设备动作。共享 Chat 的输入、调用和执行预算见 [Chat](../Support/Chat/README.md)。
+实际拼接入口为 [AssistantContextState.systemPrompt](AssistantProcessing.swift)。下图左侧是来源与获取方式，右侧按 system 正文中的章节顺序从上到下排列。蓝色实线表示固定内容，橙色虚线表示动态章节，紫色虚线表示固定规则中包含动态字段；固定指同一 App 资源版本内固定。
 
-## 函数权限与注册
+```mermaid
+block-beta
+    columns 3
 
-✅ 已实现：基础 Skill 明确保存/忽略当前预览及关闭相机也必须先检查当前目录；photography 仅在五次闲置回收、容量回收或 Task 终态回收后才需重新加载。无 Task 的当前预览可使用实时 displayedMediaID 处理，不创建虚假摄影目标；历史标签不提供当前权限。忽略只使用当前 ignorePhoto 别名。
+    H1["来源 / 获取方式"] space H2["System 章节：从上到下"]
 
-[Agent.json](../../Resources/Agents/Assistant/Agent.json) 声明固定函数；业务模型目录由加载 Skill 决定。实际实现/参数契约以 [owning @Action declarations](../../Actions/README.md) 为准。Internal 固定函数不会自动向模型开放。
+    A["FunctionTokenPrompts.json<br/>读取 protocol 模板<br/>填入当前 Registry.channels"] space S1["① OUTPUT FORMAT<br/>输出语法、Channel、wait 规则<br/>规则固定，Channel 列表动态"]
 
-下表为可通过 Skill 使用的业务函数及固定控制总览，不代表全部同时开放。Assistant 的当前模型目录由默认能力、已加载 Skill 与控制 Actions 组成；send 由授权通信契约派生且只使用 Action Call。
+    B["Resources/Agents/Assistant/<br/>Instructions.md<br/>读取完整正文"] space S2["② ASSISTANT ROLE<br/>角色、语气、表达风格<br/>固定"]
 
-| 类型 / Channel | 别名 | 函数 | 参数 | 说明 |
-| --- | --- | --- | --- | --- |
-| action / Display | `express` | `UI.Expression.express` | emotion 必填 | Perform one eye expression, awaiting its transition and return to the current base expression. Each call is a fresh performance. Does not change captions or speech. |
-| action / Display | `setExpression` | `UI.Expression.setExpression` | emotion 必填 | Set the persistent base eye expression until replaced, cleared or reset on new user speech. Completes on state acceptance, not animation completion. Repeating the same emotion is idempotent. |
-| action / System | `readEnvironment` | `System.Device.readEnvironment` | — | Read the latest admitted scene, navigation and device capability facts only when needed and absent from context. These are observations, not proof of physical completion. Wait for the result before deciding dependent actions. |
-| action / Robot | `shakeBase` | `NexArm.Motion.shakeBase` | cycles 必填, speed, acceleration | Perform the configured base-shaking gesture and return home. |
-| action / Robot | `waveWrist` | `NexArm.Gesture.waveWrist` | count 必填, speed, acceleration | Wave the wrist with the configured arm gesture, then return home. |
-| action / Robot | `tiltWrist` | `NexArm.Gesture.tiltWrist` | direction 必填, speed, acceleration | Tilt the wrist in the requested direction and return home. |
-| action / Robot | `lookAround` | `NexArm.Gesture.lookAround` | cycles 必填, speed, acceleration | Perform the configured arm look-around gesture and return home. |
-| action / Robot | `celebrate` | `NexArm.Gesture.celebrate` | cycles 必填, speed, acceleration | Perform the configured celebration gesture and return home. |
-| action / Robot | `dance` | `NexArm.Gesture.dance` | cycles 必填, speed, acceleration | Perform the configured arm dance and return home. |
-| action / Robot | `nodHead` | `NexArm.Gesture.nodHead` | cycles 必填, speed, acceleration | Nod using motor4, returning home; leave other motors untouched. |
-| action / Robot | `shakeHead` | `NexArm.Gesture.shakeHead` | cycles 必填, speed, acceleration | Shake the head using motor5, returning home; leave other motors untouched. |
-| action / Robot | `resetArm` | `NexArm.Motion.reset` | speed, acceleration | Reset configured homes for motors1–5; never move the gripper. |
-| action / Robot | `moveMotor` | `NexArm.Motion.moveMotor` | motor 必填, target 必填, speed, acceleration | Move only the selected motor to its native encoder target. |
-| action / Robot | `resetMotor` | `NexArm.Motion.resetMotor` | motor 必填, speed, acceleration | Reset only the selected motor to its configured home; motor6 needs an explicitly configured home. |
-| action / Camera | `flipCamera` | `Camera.Capture.flip` | facing 必填 | Select the requested lens on an enabled camera. Already-selected lens is unchanged; disabled/busy/unavailable fails. Returns lens state. |
-| action / Camera | `closeCamera` | `Camera.Capture.close` | — | Disable camera preview/vision and join cleanup. Returns the resulting camera state. |
-| action / Camera | `openCamera` | `Camera.Capture.open` | — | Enable camera preview/vision; permission is required. Returns capture readiness, not pose-model readiness. |
-| action / Camera | `takePhoto` | `Camera.Capture.takePhoto` | — | Capture once with the ready foreground camera, show preview and return mediaID/image evidence. Does not save to Photos. |
-| action / Camera | `savePhoto` | `Camera.Capture.savePhoto` | mediaID 必填 | Save the displayed captured photo to Photos; permission denial fails. Returns the save receipt. Repeated saves do not duplicate it. |
-| action / Camera | `ignorePhoto` | `Camera.Capture.ignorePhoto` | mediaID 必填 | Discard the displayed preview without exporting or deleting an album photo. Returns the discard receipt; camera remains open. |
-| action / Camera | `retryCamera` | `Camera.Capture.retry` | — | Retry a failed foreground camera operation on explicit user request. |
-| tool / — | `History.list` | `History.Conversation.list` | offset 必填, limit 必填 | List current and archived conversations, current first then newest archives. Returns paged JSON metadata with IDs and explicitly truncated title/input previews. Start at offset 0; use nextOffset for more. |
-| tool / — | `History.read` | `History.Conversation.read` | id 必填, offset 必填, limit 必填 | Read a conversation by an ID returned by History.list. Turns are oldest first. Returns paged JSON with bounded user/response previews and truncation flags, not complete text; never replays behavior. Start at offset 0. |
-| action / Display | `openPage` | `UI.Navigation.open` | destination 必填 | On a conversational request, open the requested application page through authorized UI presentation. Touch navigation is local and does not call this Agent. |
-| tool / — | `ModelResources.snapshot` | `System.ModelResources.snapshotResources` | — | Read current shared model resource inventory, installed groups and progress. Does not download, remove or switch a model. |
-| tool / — | `Provider.readSettings` | `System.Provider.readSettings` | — | Read confirmed cloud-enabled status and selected cloud model. Contains no URL/key. Does not probe provider availability or change configuration. |
-| tool / — | `Bluetooth.readStatus` | `System.Device.readStatus` | — | Read current Bluetooth power/connection and discovered device IDs. Does not scan or move a robot. |
-| action / System | `Bluetooth.control` | `System.Device.control` | operation 必填, id | Submit an explicit Bluetooth connection/discovery command. Accepted is not connected or physically completed. Read status to confirm actual state. |
-| action / System | `ModelResources.download` | `System.ModelResources.download` | id 必填, endpoint 必填, allowsCellular 必填 | Admit a model download using an explicit source. Admission does not mean installed; read the shared inventory for progress. |
-| action / System | `ModelResources.cancel` | `System.ModelResources.cancel` | id 必填 | Cancel and join an admitted model transfer. Failure is returned without replay. |
-| action · Control | `loadSkills` | `Agent.Task.loadSkills` | skills 必填 | Atomically load Skills; returns committed state for the following request. |
-| action · Control | `releaseSkills` | `Agent.Task.releaseSkills` | skills 必填 | Atomically release non-base Skills; returns committed state for the following request. |
-| action · Control | `startTask` | `Agent.Task.startTask` | goal 必填, skills 可选, execution 可选, target 可选, businessContract 可选, payload 可选 | Start a goal and load its Skills; returns committed task state. Foreground omits all background-only fields. |
-| action · Control | `finishTask` | `Agent.Task.finishTask` | summary 必填, continueDecision | Close the current Task. Ends this decision by default; continueDecision is only for an explicit remaining new goal. Summary describes the actual outcome. |
-| action · Control | `cancelTask` | `Agent.Task.cancelTask` | reason 必填 | Cancel the active Task after cleanup joins; returns committed state. Completed effects are not undone. |
+    C["Resources/Catalog.json<br/>→ 各 Skill.json<br/>提取 id / description，排序"] space S3["③ AVAILABLE SKILLS<br/>所有已登记 Skill 的简要说明<br/>固定；不随 load/release 改变"]
 
-## 固定内部权限
+    D["Resources/Agents/Assistant/<br/>Prompts.json · delegation<br/>渲染职责说明模板"] space S4["④ INDEPENDENT AGENT<br/>RESPONSIBILITIES<br/>其他 Agent 的职责：固定"]
 
-### Internal fixed functions
+    E["Agent.json · baseSkills<br/>＋当前状态中的 loaded<br/>展开依赖，读取 Instructions.md"] space S5["⑤ LOADED SKILL INSTRUCTIONS<br/>当前已加载 Skill 的完整教学<br/>基础项常驻，其他项动态增减"]
 
-| Protocol | Canonical function | Channel | Parameters | Registration source |
-| --- | --- | --- | --- | --- |
-| InternalAction | `UI.Caption.beginReplyTurn` | Display | — | [AgentChatWorker.swift](../Support/Chat/AgentChatWorker.swift) |
-| InternalAction | `Speech.Playback.speak` | Speech | `audioID` | [AgentChatWorker.swift](../Support/Chat/AgentChatWorker.swift) |
-| InternalAction | `UI.Caption.print` | Display | `text` | [AgentChatWorker.swift](../Support/Chat/AgentChatWorker.swift) |
+    F["已加载 Skill.json · functions<br/>＋真实 @Action 声明<br/>组合 Registry，按 Channel 渲染"] space S6["⑥ EFFECTIVE ACTION CATALOG<br/>当前 Action 的别名、描述、参数<br/>随 Skill 加载与回收动态改变"]
 
-### Declared input schemas
+    G["FunctionTokenPrompts.json<br/>读取 catalogBoundary 模板<br/>由目录渲染器追加"] space S7["⑦ RESPONSE CHECK<br/>输出前检查规则<br/>固定"]
 
-| Contract | Version | Kind |
-| --- | --- | --- |
-| `user.text` | 1 | `text` |
-| `assistant.control` | 1 | `observation` |
-| `tool.result` | 1 | `toolResult` |
-| `speech.final` | 1 | `observation` |
-| `speech.phase` | 1 | `observation` |
-| `action.result` | 1 | `actionResult` |
-| `generation.round.result` | 1 | `roundResult` |
-| `communication.receipt` | 1 | `communicationReceipt` |
-| `task.request` | 1 | `observation` |
-| `task.input` | 1 | `observation` |
-| `task.progress` | 1 | `observation` |
-| `task.result` | 1 | `observation` |
-| `task.cancel` | 1 | `observation` |
-| `agent.userInput` | 1 | `observation` |
+    A --> S1
+    B --> S2
+    C --> S3
+    D --> S4
+    E --> S5
+    F --> S6
+    G --> S7
 
-Directed input schemas and static subscriptions are distinct; admission also validates the runtime sender and scope.
+    S1 --> S2
+    S2 --> S3
+    S3 --> S4
+    S4 --> S5
+    S5 --> S6
+    S6 --> S7
 
-### Input subscriptions and communication grants
+    classDef fixed fill:#eaf3ff,stroke:#5489bd,color:#173c60
+    classDef dynamic fill:#fff1db,stroke:#cf882b,color:#65400d,stroke-dasharray:6 4
+    classDef mixed fill:#f0eaff,stroke:#9170bc,color:#493269,stroke-dasharray:6 4
+    classDef heading fill:transparent,stroke:transparent
 
-Publication is one-way and has no recipient acknowledgment. Directed send returns admission; explicit task results report completion.
+    class B,C,D,G,S2,S3,S4,S7 fixed
+    class E,F,S5,S6 dynamic
+    class A,S1 mixed
+    class H1,H2 heading
+```
 
-| Input contract | Source | Topic |
-| --- | --- | --- |
-| `speech.final` | `speechPerception` | `speech.final` |
-| `user.text` | `user` | `user.text` |
-| `speech.phase` | `speechPerception` | `speech.phase` |
-| `agent.userInput` | `user` | `agent.userInput` |
-| `assistant.control` | `runtime` | `assistant.control` |
+资源由 [AgentConfigurations](../Support/AgentConfigurations.swift) 按打包 Bundle 中的 [Catalog.json](../../Resources/Catalog.json) 显式映射读取并缓存，不扫描目录或热更新。协议与短检查来自 [FunctionTokenPrompts.json](../Support/Core/Generation/FunctionTokenPrompts.json)，角色来自 [Instructions.md](../../Resources/Agents/Assistant/Instructions.md)，独立 Agent 职责来自 [Prompts.json](../../Resources/Agents/Assistant/Prompts.json) 的 delegation。Skill 概览读取各 Skill.json 的 id/description，按 ID 排序，总预算 4 KiB，必要时截短描述并保留 ID。
 
-| Output | Contract | Destination |
-| --- | --- | --- |
-| publish | `interaction.replyActivity` | Exact static subscribers |
-| send | `speech.synthesize` | `speechSynthesis` |
-| send | `speech.cancel` | `speechSynthesis` |
-| send | `task.request` | `photographer` |
-| send | `task.input` | `photographer` |
-| send | `task.cancel` | `photographer` |
-| send | `task.request` | `memory` |
-| send | `task.input` | `memory` |
-| send | `task.cancel` | `memory` |
-| send | `task.request` | `applicationControl` |
-| send | `task.input` | `applicationControl` |
-| send | `task.cancel` | `applicationControl` |
+基础列表来自 [Agent.json](../../Resources/Agents/Assistant/Agent.json) 的 baseSkills；[AgentSkillLoader](../Support/AgentSkillLoader.swift) 展开当前激活项的依赖并合并函数绑定，⑤拼接对应 Instructions.md，⑥通过 [CapabilityContextBuilder](../Support/Core/Capability/CapabilityContextBuilder.swift) 渲染当前 Action 目录。别名/Channel 来自 Skill 绑定，描述、参数与约束来自真实 @Action 声明；⑦由同一目录渲染器追加。
 
-## Related design
+[共享 Chat Worker](../Support/Chat/README.md) 在每次新输入及 ReACT 请求中按当前 Skill 快照重新组装 system/工具定义；已发出的请求与历史证据不重写。system 正文最多 64 KiB，超限明确失败。Task 目标/状态、Skill 归属/剩余次数、相机事实、历史与 ReACT 观察通过其他 messages 注入；原生 Tool 定义放在 request.tools，仅模型支持 Tool Calls 时提供，均不属于上图的 system 正文。
 
-[Parent design](../README.md)
+## Task 与 Skill 生命周期
 
-## 状态与验收
+基础 Skill 为 basic-skill、expression-interaction、robot-interaction。无 Task 的加载/合法使用将近期项计数重置为 5，每次完整闲置用户 Decision 扣 1；Task 等待期间暂停无关近期项计数。Task 只接管指定、加载或实际使用的项，等待用户时保留，终态屏障后回收。生命周期合图及容量/LRU、依赖与原子回滚见 [Context](../Support/Context/README.md#task-and-skill-lifecycle)。
 
-✅ 动态 Skill/确定性职责拆分已实现。❌ 摄影、保存、尾音、语音竞争及模式切换的真机验收仍需单独进行。
+已注册 Camera 函数不要求 Task。单次拍照、保存/忽略当前预览或相机控制可直接使用 Skill；必须先确认当前目录存在函数，缺失才加载 photography。媒体引用来自实际捕获结果或当前 displayedMediaID，忽略别名为 ignorePhoto。
 
-## 泛化 Task 与独立 Skill
+教学只允许以当前活跃且匹配的 Task/目标决定 finishTask/cancelTask。无 Task 操作完成直接回复；不确定是否放弃旧目标时先询问并保留 Task，明确切换时关闭旧目标或释放无关近期 Skill。finishTask 通常结束决策，显式 continueDecision=true 才继续同一输入剩余新目标，cancelTask 结束该决策。Skill 释放不代表保存、忽略或关闭相机。
 
-✅ 泛化 Task 与独立 Skill 已接入：任意目标、单前台任务，基础/会话近期/任务 Skill 作用域；后台复用 send，不抢占前台。详见所属 Agents 与公共机制设计。
+## ReACT、历史与失败
 
-✅ Audit correction: shared Chat worker must not cast AssistantContextState or interpret camera business facts. Role hooks select/apply passive context observations; Assistant owns provenance/sequence validation and camera/task data-message construction through its own Context Builder. Existing lifecycle, persistence and request snapshot semantics remain unchanged.
+共享 [Chat](../Support/Chat/README.md) 根据真实业务值/失败和轮次屏障继续；Agent/Provider/解析异常不自动重试。Action 模型观察使用轮内序号、别名、状态、结构化值；拒绝明确未执行，失败保留效果不确定性和部分结果。原生 Tool 配对及完整执行日志保持完整。
 
+Task/dialog/message 身份先经注入仓库提交；delta、Skill 计数、在途 Decision 和队列只保存在内存。完整消息和真实终态按边界提交；Task 原始来源由 SQL 查询，重启不重放 Action。存储实现及职责见 [Storage](../../Storage/README.md)。
 
-## 固定函数与 Skill
+## 输出与清理
 
-✅ 资源不再包含 Permissions.json，Agent.json 的 baseSkills 引用 Skill，Skill.json 声明函数。业务模型函数由已加载 Skill 提供；固定调用与模型轮次分别验证，详见 [资源规范](../../Resources/Agents/README.md)。
+输出容量 256；共享 worker 的接纳、driver/native 队列、结果与上下文容量见 [Chat](../Support/Chat/README.md#bounds-and-overflow)。Speech.Caption 的内部 beginReplyTurn/print 和 Speech.Playback.speak 分别服务 Display/Speech Channel，不因内部注册而向模型开放。聆听权由 SpeechPerception 拥有，实际播放/采集由 App 生命周期协调。
 
-## Action-owned documentation and Skill instruction contract
-
-✅ Assistant 提示词分别组装 Core 协议、身份、Skill 概述、当前任务/Skill 指令及有效函数 doc/parameters。移除 orderingExample/concurrentExample 模板插值；顺序及业务示例由基础交互、机器人和摄影 Skill 教学。
-
-## Task controls through Action Calls
-
-✅ BasicSkill 的五个 Task/Skill 控制函数使用 Control Channel Action Call；App 通过 ChannelScheduler 返回已提交状态。startTask/loadSkills/releaseSkills 返回的已提交业务状态在结果屏障后重建目录并 ReACT，finishTask/cancelTask 加入回复及清理屏障后恢复默认。新目录仅影响后续请求，不允许加载轮提前调用新函数。可信固定调用复用同一实现。
-
-## Agent → Skill → Function registration
-
-✅ Implemented: Agent.json references baseSkills; Skill.json alone registers model Actions/Tools. BasicSkill owns task orchestration and environment reading; ExpressionInteraction owns expression Actions. Role instructions retain identity/responsibility/style. Business roles reuse existing Skills; internal trusted bindings remain separate. Historical snapshots are preserved.
-
-角色基础函数目录由资源中的 baseSkills（basic-skill、expression-interaction、robot-interaction）组合；上表供函数 review 使用，不是 Agent.json 中的另一份注册。函数说明属于实现，流程教学属于 Skill。
-
-
-## Lifecycle-owned conversation and audio (2026-10-12)
-
-✅ 已移除对话生成、ReACT、收件箱排队、结果屏障、ASR 收尾、TTS 合成及回复占用租约的计时终止。Signal 默认无过期时间，框架不再按通信契约附加 TTL。保留显式实时感知数据的新鲜度和网络传输自身超时；它们不作为对话/语音缓存生命周期。Action 自身超时通过原始执行者的 ActionResult 返回。请求/调用数及队列/PCM 容量仍有界，不以计时自动删除已接纳输入。语音句柄无读等待或错误记录 TTL，按播放完成、输入/会话正常结束、异常或显式取消清理；取消加入生成和播放工作。
-
-
-## Result-driven ReACT (ADR0214)
-
-✅ ADR0214：删除 AssistantContextState.actionFeedback，具体模块/路径不决定继续策略；由实际输出和错误进入 ReACT。照片 enrichment 与 Task 目标/收尾继续由本角色拥有。
-
-
-✅ 本次提示词核对：保留协议、角色、Skill概述、独立Agent职责、已加载Skill、有效目录顺序；为各段增加明确标题，运行状态以 user 数据说明当前没有任务/已加载Skill。
-
-
-✅ 提示词精简已实现：合并角色/风格，删除重复system模板；维持协议→角色→Skill概述→独立Agent→已加载Skill→目录→短检查。Task事实投影只含必要状态，不发送完整TaskRecord；RobotInteraction常驻且11项函数不变。
-
-✅ ApplicationControl注册调整：Bluetooth.control、ModelResources.download/cancel改为System Channel的Action Call；snapshot/readSettings/readStatus保持原生Tool，11个NexArm只由常驻RobotInteraction注册，ApplicationControl不再重复注册。别名、参数、函数实现与内部固定调用不变；模型加载后的XML教学、revision和组合/解析回归同步更新。
-
-✅ Task 上下文收缩时机已修正：startTask 成功后保留进入前的普通对话、启动轮输出及完整调用/结果，只刷新当前 Skill/函数目录；后续任务输入继续携带普通对话背景和当前任务过程。仅旧 Task 关闭后收缩其原始过程为有界终态摘要；摘要在新 Task 中仍可作为历史背景，不能变成当前产物。完整持久化历史与不可变 taskID 保持不变；照片操作不再通过 Task 归属额外鉴权；同输入换任务先收缩已结束旧任务，再完整保留新任务入口。10 个历史请求块和64消息/64KiB/4图片容量保护仍独立生效。
-
-✅ 已删除 Assistant 自定义 validateAction、registerPhoto 与 photoOwners；Camera 操作由当前 Skill/函数目录解析执行，无 Task 也能拍摄、接收图片结果、保存或忽略。设备前台/权限/相机就绪由实际函数处理。
-
-照片事实直接来自当前相机快照中的 displayedMediaID / savedMediaID；图片证据按拍摄结果的 media_N 与产生输入读取，不需要额外 Task 登记。终态摘要从同一持久化Task记录投影，reportedSummary仅为总结说明，实际执行证据仍保留完整历史。新对话不会注入已归档对话的Task摘要。
-
-
-
-✅ Implemented (2026-10-13 Skill scope review): canonical Actions unify trusted business calls and model calls; Skill exposure is optional and must serve an actual procedure. ExpressionInteraction retains two expression functions; Feedback/Notice/Light model exposure is removed while implementations and business bindings remain. ApplicationControl keeps navigation/status/resource/Bluetooth operations, removing duplicate robot functions; RobotInteraction owns them. BasicSkill removes unused send while production background contracts are absent. Affected instructions/revisions and explicit communication-only test catalogs are aligned; all six Skills were audited for prerequisites, result handling and cross-Skill references.
-
-
-## Task history indexing and in-place compression
-
-✅ Implemented: Assistant validates history schema v2 and projects request-owned task history through conversation compressions. Startup recovery marks unfinished work interrupted and produces terminal history evidence without replay. Camera and media policy remain unchanged.
-
-
+取消必须加入模型与已接纳工作清理；状态/历史提交失败显式报告，不能执行依赖未提交状态的后续步骤。根 scope 与 worker 独立于页面生命周期。
 
 ## Model photo preparation policy
 
-✅ Implemented: AssistantPhotoInputPolicy in AssistantProcessing.swift owns analysis budgets: maximum dimension 1568, maximum pixels 1,048,576, maximum JPEG bytes 1 MiB and initial quality 0.82. photoObservations checks successful takePhoto evidence and model image support, reads the original, validates photo identity, invokes an injected prepareJPEG(Data, policy) capability and constructs the JPEG ChatImage itself. photoObservationHandler builds the worker callback inside Agents from those injected capabilities. Raw read and preparation are separate required capabilities; there is no implicit/no-op production preparation fallback. App only binds capabilities, while PlatformKit retains Image I/O internals. Agent code imports no native codec/framework.
+AssistantPhotoInputPolicy in AssistantProcessing.swift owns analysis budgets: maximum dimension 1568, maximum pixels 1,048,576, maximum JPEG bytes 1 MiB and initial quality 0.82. photoObservations checks successful takePhoto evidence and model image support, reads the original, validates photo identity, invokes an injected prepareJPEG(Data, policy) capability and constructs the JPEG ChatImage itself. photoObservationHandler builds the worker callback inside Agents from those injected capabilities. Raw read and preparation are separate required capabilities; there is no implicit/no-op production preparation fallback. App only binds capabilities, while PlatformKit retains Image I/O internals. Agent code imports no native codec/framework.
 
 Check cancellation before reading, before preparation and before retaining results. Native preparation failure/cancellation propagates through the current decision; empty/over-budget results reject without uploading the original. The existing worker invokes observations after the round barrier and retains prepared images in ReACT requests, so later business-result continuations do not recompress. Original storage, preview and album import remain independent.
 
 These scene/composition defaults are based on [OpenAI vision sizing](https://developers.openai.com/api/docs/guides/images-vision), [Claude client resizing guidance](https://platform.claude.com/docs/en/build-with-claude/vision) and [Alibaba vision](https://www.alibabacloud.com/help/en/model-studio/vision); 1 MiB is a local transport budget, not a vendor-wide recommendation or an OCR quality guarantee. Native mechanics are described in [PlatformKit/Vision](../../PlatformKit/Vision/README.md#native-image-compression).
 
-## SQLite records and runtime identity
+## 待实现
 
-✅ Implemented: technical identities are opaque UUID strings; committed business entities use dialog/message/task/media/device SQLite IDs. Consumers use Storage repositories while preserving ownership, cancellation and independent foundation boundaries. Complete messages, including each ReACT message, persist at termination; delta fragments do not persist. The custom allocator and replaced file/index implementation are removed. See the project SQLite business-record plan.
-
-✅ Storage repository refactor: AssistantConversationStorage receives ChatRepository and TaskRepository, constructs ConversationRecordStore and captures/restores the same Agent-owned state. Concrete backend creation moves entirely to App.
-
-
-✅ Removed AssistantConversationRecovery (duplicated Task/Skill/registry/views). Restore history from SQL only; fresh runtime starts with no active Task, while SQL recovery closes interrupted records and builds source-linked summaries.
+- 真实模型对无 Task 完成、目标转移询问、主动释放及多轮摄影教学的遵循验收。
+- 场景挂起期间保留前台目标及最终 checkpoint 的完整落盘；公共限制见 [Chat](../Support/Chat/README.md#待实现)。
+- 相机/Photos、图像质量、原生历史交互、语音竞争及持续真机验收。

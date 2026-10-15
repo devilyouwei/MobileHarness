@@ -2,7 +2,7 @@
 
 ## Ownership and boundaries
 
-✅ Storage owns record persistence and bounded process memory, without Agent decisions, model selection, device execution or UI orchestration. ModelKit, PlatformKit and UI remain independent. App chooses backends, paths and lifecycle, then injects domain protocols; consumers do not discover stores globally.
+Storage owns record persistence and bounded process memory, without Agent decisions, model selection, device execution or UI orchestration. ModelKit, PlatformKit and UI remain independent. App chooses backends, paths and lifecycle, then injects domain protocols; consumers do not discover stores globally.
 
 Directory ownership differs from compilation ownership: each business directory contains its contracts/policy and its SQLite adapter, but backend files compile only in StorageSQLite. The common Storage target compiles Support excluding SQLite and has no project or third-party target dependency. StorageSQLite alone links GRDB.swift7.11.1; its SQL/GRDB values are internal. There is no Storage.swift umbrella or Storage.shared locator.
 
@@ -48,7 +48,7 @@ StorageOperationGate provides FIFO admission across async backend calls: one act
 
 ## SQLite records and performance
 
-✅ One App-owned records.sqlite uses WAL, foreign keys, synchronous FULL, four readers and one writer plus16 waiters. Generic SQLiteDatabase executes caller-supplied migrations/transactions; business schemas and queries stay in owning domain files. The records-v1 tables are retained; record-lifecycle-v2 adds an unfinished-message index. Named migrations come from domain assembly; no legacy JSON import exists.
+One App-owned records.sqlite uses WAL, foreign keys, synchronous FULL, four readers and one writer plus16 waiters. Generic SQLiteDatabase executes caller-supplied migrations/transactions; business schemas and queries stay in owning domain files. The records-v1 tables are retained; record-lifecycle-v2 adds an unfinished-message index. Named migrations come from domain assembly; no legacy JSON import exists.
 
 Business tables allocate independently committed AUTOINCREMENT keys and format dialog_/message_/task_/media_/device_ references. Deleted committed keys do not repeat and gaps are allowed. BusinessRecordID validates/formats references only. Technical scopes/calls/requests/audio/revisions/temp files use UUID or original protocol strings; there is no application-wide ID generator/counter file. Standalone memory conversation/Task consumers allocate ephemeral business records locally and open no SQLite connection.
 
@@ -60,22 +60,20 @@ App injects MediaRepository and BinaryObjectStore independently. CapturedPhotoSt
 
 ## Completion and outstanding work
 
-✅ Old aggregate RecordDatabase and database-bound conversation facade are removed. Generic settings/model documents, credentials, original media and model assets remain unchanged. Agent runtime documents are replaced by process-memory state. Repository, publication, concurrency and corruption failures propagate without backend fallback.
-
-❌ Additional chat/document-database backends, semantic memory extraction/query, durable PCM and video/audio/document producers remain separate work. Current controlled tests/builds do not establish physical camera/Bluetooth/UI or live-model acceptance. See [validation history](../../docs/validation/Validation-History.md).
+Agent 热状态使用进程内存；配置/偏好文档使用 File 后端，业务记录使用领域仓库注入的 SQLite 后端。仓库、提交、并发与损坏错误显式传播，不自动切换后端。
 
 [Chat](Chat/README.md) · [Tasks](Tasks/README.md) · [Media](Media/README.md) · [Devices](Devices/README.md) · [Audio](Audio/README.md) · [Support](Support/README.md)
 
 [Repository refactor decision](../../docs/completed/Storage-Repository-Plan.md)
 
+File 文档 envelope version 为 1，以 UUID revision 和 value 保存配置。媒体原件位于 CapturedPhotos；SQLite 索引业务媒体记录，不自动导入或删除未被索引的用户文件。
 
-✅ Configuration preservation: the shared File document envelope retains its original version1 (UUID revision/value unchanged). Application configuration is not reset by SQLite adoption. Media bytes keep the existing CapturedPhotos root; SQLite indexes only new business media, without deleting/importing old user files.
+Lifecycle and ORM: StateRepository<Value: Sendable> and single-snapshot MemoryStateStore own hot runtime state without Codable or per-update encoding. ChatRepository.beginMessage reserves an idempotent empty Assistant/observation identity row; message completion/checkpoint saves content by that identity. Accepted user messages insert completed content directly. SQL row mappings use GRDB FetchableRecord/MutablePersistableRecord; specialized indexed reads remain SQL. No GRDB object or shared mutable reference crosses modules. Task start rows/terminal updates and atomic dialog rotation remain.
 
+User acceptance inserts the complete completed message in one transaction, with no empty user placeholder. Checkpoints return backend-neutral committed message identities; Chat memory publishes the returned ID before inference. Assistant identities are reserved before inference.
 
-✅ Lifecycle and ORM: StateRepository<Value: Sendable> and single-snapshot MemoryStateStore own hot runtime state without Codable or per-update encoding. ChatRepository.beginMessage reserves an idempotent empty Assistant/observation identity row; message completion/checkpoint saves content by that identity. Accepted user messages insert completed content directly. SQL row mappings use GRDB FetchableRecord/MutablePersistableRecord; specialized indexed reads remain SQL. No GRDB object or shared mutable reference crosses modules. Task start rows/terminal updates and atomic dialog rotation remain.
+Current-dialog synchronization: one current per Agent remains constrained by the existing partial unique index. Failed post-rotation memory publication fences subsequent operations until authoritative current reload succeeds. New message rows and identity reservations require a current dialog in the same write transaction; existing archived-message evidence may still update.
 
+## 待实现
 
-✅ Implemented (2026-10-15): User acceptance inserts the complete completed message in one transaction, with no empty user placeholder. Checkpoints return backend-neutral committed message identities; Chat memory publishes the returned ID before inference. Assistant identity reservation remains unchanged.
-
-
-✅ Implemented (2026-10-15 current-dialog hardening): Current-dialog synchronization: one current per Agent remains constrained by the existing partial unique index. Failed post-rotation memory publication fences subsequent operations until authoritative current reload succeeds. New message rows and identity reservations require a current dialog in the same write transaction; existing archived-message evidence may still update.
+- Additional chat/document-database backends, semantic memory extraction/query, durable PCM and video/audio/document producers remain separate work. Current controlled tests/builds do not establish physical camera/Bluetooth/UI or live-model acceptance. See [validation history](../../docs/validation/Validation-History.md).

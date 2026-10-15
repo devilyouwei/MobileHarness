@@ -38,10 +38,12 @@ Native Vision retains BGRA and scaleFit with orientation, avoiding full-frame RG
 
 One lease spans preparation/prediction/decoding; cancel/unload/shutdown joins synchronous native work. Consumer display limits and geometric identity policy are outside this adapter. Artifact metadata declares AGPL-3.0; licensing notices remain with Resources/docs.
 
-✅ Native/RGB bounded end-to-end pose decoding and reload-aware resource selection are implemented.
-
-❌ Temporal tracking and additional model size variants are not implemented.
+Native/RGB bounded end-to-end pose decoding and reload-aware resource selection are implemented.
 
 ## Related design
 
 [Parent design](../README.md)
+
+## 待实现
+
+- Temporal tracking and additional model size variants are not implemented.

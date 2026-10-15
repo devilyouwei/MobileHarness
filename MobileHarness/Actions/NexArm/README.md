@@ -53,7 +53,7 @@ flowchart TB
 
 有限运动可选 speed 1…1400（默认 1400）、acceleration 1…254（默认 30）；未知键拒绝。target 在执行编码时进一步受设备电机范围约束。入口不接受时间、减速度、力矩、模式或校准参数。
 
-✅ 运动请求以 GestureRequest 或注入闭包传递。调用者实际获得的效果来自宿主绑定：有限动作的定义要求新鲜反馈判定完成；aim 只确认目标发布，常驻跟踪和资源持有属于宿主 worker。
+运动请求以 GestureRequest 或注入闭包传递。调用者实际获得的效果来自宿主绑定：有限动作的定义要求新鲜反馈判定完成；aim 只确认目标发布，常驻跟踪和资源持有属于宿主 worker。
 
 ## 资源与预算
 
@@ -72,3 +72,7 @@ Controller 提供 motorResults 与 revision；宿主将逐电机结果写入本�
 本域没有另一套 Channel 队列或 Bluetooth 重连策略。取消加入软件清理不证明设备物理停止，已有运动不会通过隐式补偿或重发撤销；手动/跟踪操作的持续寿命与替换由宿主负责。
 
 [NexArm 算法与状态](Support/README.md) · [Actions 设计](../README.md) · [原生协议与链路](../../PlatformKit/Connectivity/NexArm/README.md)
+
+## 待实现
+
+- 暂无本目录独立的实现待办；跨模块及实际模型/设备验收见所属模块说明。

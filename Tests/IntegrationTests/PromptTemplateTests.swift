@@ -232,6 +232,11 @@ private func skillResponseExamples(_ id: String) throws -> [String] {
         #expect(prompt.contains("exactly one self-closing startTask tag and nothing else"))
         #expect(prompt.contains("including saving/discarding an existing preview or closing the camera"))
         #expect(prompt.contains("Five unrelated user decisions or capacity eviction can remove it"))
+        #expect(prompt.contains("If activeTaskID is \"none\" or absent, never emit finishTask or cancelTask"))
+        #expect(prompt.contains("An unrelated operation must not finish the current Task"))
+        #expect(prompt.contains("Keep the Task and its Skills while awaiting the answer"))
+        #expect(prompt.contains("do not ask again"))
+        #expect(prompt.contains("SAME user input after Task closure"))
         #expect(prompt.contains("including text INSIDE wait"))
         #expect(prompt.contains("Never copy or paraphrase it outside wait"))
         if loaded {
@@ -242,5 +247,48 @@ private func skillResponseExamples(_ id: String) throws -> [String] {
             #expect(prompt.contains("<savePhoto mediaID=\"media_1\"/>"))
             #expect(!prompt.contains("11111111-2222-4333-8444-555555555555"))
         }
+    }
+}
+
+@Test(.actionCatalog) func bundledCompletionAndIntentExamplesSeparateTaskClosureFromStandaloneSuccess() throws {
+    let config = try AgentConfigurations.load(named: "Assistant")
+    let catalog = try AgentSkillLoader.registry(
+        AgentConfigurations.baseSkills(named: "Assistant") + ["photography"], fixed: config.capabilities)
+    let basic = try skillResponseExamples("basic-skill")
+    let photo = try skillResponseExamples("photography")
+    for examples in [basic, photo] {
+        let standalone = try #require(examples.first { $0 == "照片已保存。" })
+        var trace = GenerationTrace(capabilities: catalog, textMapping: AssistantAgent.mapText)
+        try trace.append(standalone)
+        trace.finish()
+        #expect(trace.parserError == nil)
+        #expect(!trace.calls.contains { $0.actionPath.domain == "Agent" })
+    }
+    let question = try #require(basic.first { $0.hasPrefix("还要继续") })
+    #expect(question.contains("拍照并选择保存、忽略或重拍"))
+    var clarification = GenerationTrace(capabilities: catalog, textMapping: AssistantAgent.mapText)
+    try clarification.append(question)
+    clarification.finish()
+    #expect(clarification.parserError == nil && !clarification.calls.contains { $0.actionPath.domain == "Agent" })
+    let replacement = try #require(basic.first { $0.contains("照片尚未保存或忽略") })
+    var closure = GenerationTrace(capabilities: catalog, textMapping: AssistantAgent.mapText)
+    try closure.append(replacement)
+    closure.finish()
+    #expect(closure.calls.count == 1 && closure.calls[0].actionPath.description == "Agent.Task.finishTask")
+    #expect(closure.calls[0].parameters["continueDecision"] == "true")
+    #expect(basic.contains("<releaseSkills skills='[\"photography\"]'/>"))
+}
+
+@Test(.actionCatalog, arguments: ["photography", "history-query"])
+func businessSkillTeachingCannotFinishAnAbsentOrUnrelatedTask(skill: String) throws {
+    let text = try AgentConfigurations.skillInstructions(skill)
+    if skill == "photography" {
+        #expect(text.contains("current facts still show an active matching capture-only Task"))
+        #expect(text.contains("No finishTask or cancelTask"))
+        #expect(text.contains("unclear replacement asks whether to continue the actual goal"))
+    } else {
+        #expect(text.contains("current facts show an active matching query Task"))
+        #expect(text.contains("With no Task, answer and end without finishTask or cancelTask"))
+        #expect(text.contains("An unrelated query must not close another goal"))
     }
 }

@@ -6,6 +6,83 @@ import StorageChat
 
 /// Preserve provider call/result blocks when interleaving independent task rounds.
 public enum AgentChatContextBuilder {
+    /// Model-only projection. Causal IDs and full execution journals remain owned by the worker.
+    static func actionObservation(
+        index: Int, name: String, result: ToolResult, action: ActionResult? = nil,
+        rejection: CallRejection? = nil
+    ) -> [String: Any] {
+        var value = compactResult(result, action: action, rejection: rejection)
+        value["call"] = index
+        value["action"] = name
+        return value
+    }
+
+    static func nativeObservation(_ result: ToolResult, rejection: CallRejection? = nil) throws -> String {
+        let isReport: Bool
+        if case .report = result.completion { isReport = true } else { isReport = false }
+        if !result.hasFailure && !result.isCancellationOnly && rejection == nil && !isReport { return result.value }
+        return String(
+            decoding: try JSONSerialization.data(
+                withJSONObject: compactResult(result, rejection: rejection), options: [.sortedKeys]), as: UTF8.self)
+    }
+
+    private static func compactResult(
+        _ result: ToolResult, action: ActionResult? = nil, rejection: CallRejection? = nil
+    ) -> [String: Any] {
+        let report: AgentActionReport?
+        if case .report(let value) = result.completion { report = value } else { report = nil }
+        let status =
+            rejection != nil
+            ? "rejected"
+            : action?.status.rawValue
+                ?? (result.hasFailure
+                    ? (report?.status.rawValue == "partialFailure" ? "partialFailure" : "failed")
+                    : (result.isCancellationOnly ? "cancelled" : "succeeded"))
+        var value: [String: Any] = ["status": status]
+        // Decode only containers: scalar text, explicit empty values and opaque IDs remain exact.
+        let business: Any =
+            (try? JSONSerialization.jsonObject(with: Data(result.value.utf8))) ?? result.value
+        if !result.hasFailure || business is [String: Any] || business is [Any] {
+            value["value"] = business
+        } else if case .value = result.completion {
+            value["value"] = business
+        }
+        if rejection != nil {
+            value["executed"] = false
+        } else if let action, action.effect != .contractCompleted || action.status != .succeeded {
+            value["effect"] = action.effect.rawValue
+        } else if result.hasFailure && action == nil {
+            value["effect"] = "unknown"
+        }
+        if result.hasFailure || rejection != nil {
+            var error: [String: Any] = [:]
+            if let code = rejection.map({ String(describing: $0.reason) }) ?? result.failureCode
+                ?? report?.executionFailure?.rawValue ?? action?.failure?.rawValue
+            {
+                error["code"] = code
+            }
+            if !result.value.isEmpty, business is String { error["message"] = result.value }
+            if !error.isEmpty { value["error"] = error }
+        }
+        if let report {
+            var detail: [String: Any] = [:]
+            if !report.entries.isEmpty {
+                detail["entries"] = report.entries.map { entry -> [String: Any] in
+                    var leaf: [String: Any] = ["path": entry.path, "status": entry.status.rawValue]
+                    if let code = entry.code { leaf["code"] = code.rawValue }
+                    if !entry.details.isEmpty { leaf["details"] = entry.details }
+                    return leaf
+                }
+            }
+            if let code = report.executionFailure { detail["executionFailure"] = code.rawValue }
+            if let description = report.failureDescription, !description.isEmpty {
+                detail["failureDescription"] = description
+            }
+            if !detail.isEmpty { value["report"] = detail }
+        }
+        return value
+    }
+
     /// Retire oldest complete blocks in the model projection; durable history is unchanged.
     public static func retainingRecent(
         _ messages: [ChatMessage], preservingUser user: String, protectedSuffixCount: Int = 1,

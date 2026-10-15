@@ -27,10 +27,12 @@ Input is unmirrored upright geometry in RGB or retained native BGRA with orienta
 
 Shared manager supplies .pose under one operation lease. Native scaleFit/end-to-end candidates are filtered/restored by the adapter without second NMS. Consumers independently choose presentation/semantic policies.
 
-✅ Typed image pose inference and concrete YOLO provider are implemented.
-
-❌ Temporal identity and general model video sessions are not implemented.
+Typed image pose inference and concrete YOLO provider are implemented.
 
 ## Related design
 
 [Parent design](../README.md) · [YOLO](YOLO/README.md)
+
+## 待实现
+
+- Temporal identity and general model video sessions are not implemented.

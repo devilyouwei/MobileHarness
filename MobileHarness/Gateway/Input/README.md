@@ -39,29 +39,24 @@ Optional App observers run independently within the same owned bounds. shutdown 
 
 ## Feedback and observation
 
-Tool feedback uses a fresh ten-second admission deadline, preserved root/parent/turn and one added hop. Action/activity/round feedback uses the same captured causality and owner fences. Invalid/exhausted hops close delivery; capacity may retry feedback without replaying effects. Completion-only support is checked before delivering unsupported ToolResult.
+Tool feedback uses a fresh runtime input identity, preserved root/parent/turn and one added hop; no implicit admission deadline is attached. Action/activity/round feedback uses the same captured causality and owner fences. Invalid/exhausted hops close delivery; capacity may retry feedback without replaying effects. Completion-only support is checked before delivering unsupported ToolResult.
 
 General Signal diagnostics and task-only snapshots each retain 256 bounded rows with counted eviction, at most 16 branch summaries and a combined eight observers using newest-one buffers. Raw media/credentials are omitted. Ordinary audio/image/activity observations aggregate within one-second identity windows after matching outcomes. Task-only revision/retention is independent; ordinary traffic cannot wake its observers or evict its records. Bounded task payload backing has a combined worst-case 32 MiB across both collections. Admission observation never means business consumption or task completion.
 
-✅ Strict provenance, bounded one-way delivery and independent task diagnostics are implemented.
-
-❌ Remote inputs, dynamic subscriptions and durable feedback delivery are not implemented.
+Strict provenance, bounded one-way delivery and independent task diagnostics are implemented.
 
 ## Related design
 
 [Parent design](../README.md)
 
-## Startup publication and foreground task regression
+## 接纳与前台 Task
 
-✅ publish 在投递前检查接收者生命周期；registered/stopped 等未运行目标只留下有界投递诊断，不调用 receive，也不调用应用 publicationFailure。停止竞争返回的 notRunning 亦按广播抑制处理。send 和运行时反馈继续使用原来的明确接纳/拒绝链路，不套用广播跳过策略。
-
-
-
-
+publish 在投递前检查接收者生命周期；registered/stopped 等未运行目标只留下有界投递诊断，不调用 receive，也不调用应用 publicationFailure。停止竞争返回的 notRunning 亦按广播抑制处理。send 和运行时反馈继续使用原来的明确接纳/拒绝链路，不套用广播跳过策略。
 
 ## SQLite records and runtime identity
 
-✅ Implemented: technical identities are opaque UUID strings; committed business entities use dialog/message/task/media/device SQLite IDs. Consumers use Storage repositories while preserving ownership, cancellation and independent foundation boundaries. Complete messages, including each ReACT message, persist at termination; delta fragments do not persist. The custom allocator and replaced file/index implementation are removed. See the project SQLite business-record plan.
+deliverFeedback 创建运行时 UUID，并校验 hops、执行 owner、实时 Agent incarnation、订阅契约与策略。容量不足返回 retry，scope/owner/契约失效返回 closed；传输重试不重复执行效果。
 
+## 待实现
 
-✅ Implemented (2026-10-15): deliverFeedback creates a runtime UUID without a throwing allocator. Its unreachable ID-allocation catch/duplicate rejection envelope is removed; hop validation and deliverRuntime ownership/policy/capacity diagnostics remain unchanged.
+- Remote inputs, dynamic subscriptions and durable feedback delivery are not implemented.

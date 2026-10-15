@@ -48,32 +48,28 @@ Page cancellation retires unsubmitted presentation/discovery work; admitted busi
 
 Output generation uses independent bounded Action and Tool consumers, joined at round sealing. Observation streams use latest snapshots; device actions and business requests reject overflow explicitly. Failures stay with their producing feature and retain primary plus cleanup/delivery causes.
 
-✅ Independent feature compilation, explicit controls and joined operation ownership are implemented.
+Independent feature compilation, explicit controls and joined operation ownership are implemented.
 
 ## Related design
 
 [Parent design](../README.md) · [Bluetooth](Bluetooth/README.md) · [Diagnostics](Diagnostics/README.md) · [History](History/README.md) · [Presentation](Presentation/README.md) · [Settings](Settings/README.md) · [Speech](Speech/README.md)
 
+Listening-feedback composition is owned by Speech and original cue PCM by Actions/UI. Presentation retains output/state projection and the generic injected native-transition worker. The facade re-exports the existing feature targets.
 
-✅ Listening-feedback composition is owned by Speech and original cue PCM by Actions/UI. Presentation retains output/state projection and the generic injected native-transition worker. The facade re-exports the existing feature targets.
+Presentation adds ListeningCaptureWorkflow for one cancellable native-start operation, one transition worker and one latest desired state. Settings entry transport exposes a trusted session interruption operation; ownership remains root-owned.
 
+Speech owns bounded canonical activation composition; AppSpeechPlayback additionally depends on Actions and ExecutionRuntime. Presentation retains its generic transport/display boundary. App owns activation order/report gating; UI and PlatformKit retain rendering/native primitives respectively.
 
-✅ Implemented: Presentation adds ListeningCaptureWorkflow for one cancellable native-start operation, one transition worker and one latest desired state. Settings entry transport exposes a trusted session interruption operation; ownership remains root-owned.
+Presentation adds an injected PhotoDispositionWorkflow for commit-before-effects, joined visual/sound acknowledgment and identity-owned cleanup. It has no domain/native dependencies or queued work.
 
-
-✅ Implemented: Speech owns bounded canonical activation composition; AppSpeechPlayback additionally depends on Actions and ExecutionRuntime. Presentation retains its generic transport/display boundary. App owns activation order/report gating; UI and PlatformKit retain rendering/native primitives respectively.
-
-
-✅ Implemented: Presentation adds an injected PhotoDispositionWorkflow for commit-before-effects, joined visual/sound acknowledgment and identity-owned cleanup. It has no domain/native dependencies or queued work.
-
-
-
-✅ Implemented (2026-10-13): UI.Notice.showNotice/dismissNotice and UI.Light.updateLight are canonical presentation Actions for trusted business calls, currently registered by no Skill. Neutral Actions values cross RuntimePresentation into root-owned HomeEffectsWorkflow, which retains one replaceable notice expiry and one light expiry, UUID-fenced cleanup, and explicit stop. Notices remain separate from factual ExecutionIssue history; actual upper-layer errors have display priority and Action failures remain panel-only. Decorative light accepts normalized origin, initial opacity/intensity and duration; it never changes consent, microphone or eyes. Native renderer separates light generations from listening eye generations and preserves existing exit fade. RuntimePresentation adapts Action requests into UI-owned values; AppPresentationWorkflow keeps its existing UI/AgentCore/FunctionContracts boundary. No UI capability/business dependencies or new directories.
-
+HomeEffectsWorkflow 归 [Presentation](Presentation/README.md) 所有，管理 notice/light 的替换、到期及关闭；工作流不改变麦克风同意或听写状态。
 
 ## Streaming TTS latency
 
-✅ Speech owns PCM checkout/playback and activation composition. Physical listening restoration stays with Lifecycle; no post-playback timer or idle-task owner is provided.
+Speech owns PCM checkout/playback and activation composition. Physical listening restoration stays with Lifecycle; no post-playback timer or idle-task owner is provided.
 
+History exports canonical conversation metadata/detail adaptation and Memory intent transport only, without a duplicate task aggregation API or placeholder destination.
 
-✅ History interfaces: feature ownership remains unchanged; History exports canonical conversation metadata/detail adaptation and Memory intent transport only, without a duplicate task aggregation API or placeholder destination.
+## 待实现
+
+- 暂无本目录独立的实现待办；跨模块及实际模型/设备验收见所属模块说明。

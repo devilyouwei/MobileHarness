@@ -1,154 +1,83 @@
-# Agents — Assistant、Skills 与业务执行
-
-✅ 已实现：区分用户 Decision（整条 ReACT）和 Round（单次模型请求）。Task 终态回收持有 Skill；无 Task 的会话 Skill 使用后续期 5 次用户 Decision，闲置递减，不按内部 Round 或墙钟释放。Task 不继承全部近期能力，显式加载或实际调用时才取得持有关系；Agents 管理预算和使用，Gateway 继续验证不可变目录。
+# Agents — 业务决策与运行上下文
 
 ## 职责与边界
 
-✅ Assistant 是唯一普通对话 Agent，动态组合 Skill 和一个前台目标任务。Photographer 管确定性摄影/追踪，Memory 管历史/标题事务，ApplicationControl 管配置/设备/环境；语音和视觉 Agent 保持独立流式生命周期。所有输入为 Signal，业务输出为 Action；ReACT 消费真实结果，不是向自己广播。
+Agents 解释 Signal、维护业务目标与上下文，并选择下一步动作。Assistant 是唯一普通对话执行者；Photographer、Memory、ApplicationControl、SpeechPerception、SpeechSynthesis、VisionPerception 按各自确定性流程处理输入。App 提供能力及生命周期，Gateway 校验和传输，Actions 实现被调用函数。角色之间不共享可写聊天历史。
 
-Agents 依赖 AgentCore、ModelKit、PlatformKit、Storage/Chat/Audio 和中立 FunctionContracts；不依赖具体 Actions、Gateway 或 UI。App 注入能力及端口；Gateway 校验身份、输入/通信权限和执行目录；Actions 实现函数。
-
-## 上下游与数据流
+## 直接上下游与数据流
 
 ```mermaid
 flowchart LR
- App -.->|能力与持久化端口| Agents
- Gateway -->|Signal 和执行者定向结果| Agents
- Agents -->|Action、Tool、通信及轮次屏障| Gateway
- Agents -->|模型/感知请求| ModelKit
- Agents -->|原子上下文和媒体引用| Storage
+ App -.->|能力和仓库接口| Agents
+ Gateway -->|Signal 与原执行者定向反馈| Agents
+ Agents -->|ActionCall / ToolCall / 通信 / 轮次屏障| Gateway
+ Agents -->|推理与感知请求| ModelKit
+ Agents -->|运行时内存及业务记录接口| Storage
 ```
 
-```mermaid
-sequenceDiagram
- participant User
- participant Assistant
- participant Runtime as Gateway / Actions
- User->>Assistant: 帮我拍照
- Assistant->>Runtime: startTask(photography)
- Runtime-->>Assistant: 已提交，新目录下一请求生效
- Assistant->>Runtime: takePhoto Action
- Runtime-->>Assistant: 真实照片结果
- Assistant-->>User: 保存还是忽略？
- Note over Assistant: waitingUser，保留任务/Skill/独立历史
- User->>Assistant: 保存
- Assistant->>Runtime: savePhoto Action
- Runtime-->>Assistant: 保存结果
- Assistant->>Runtime: finishTask
- Note over Assistant,Runtime: 加入本轮执行和回复屏障，恢复 default
-```
+语义解释和业务协调由角色拥有；Gateway 不推断用户目标，基础模块不持有 Agent 业务策略。执行接纳、任务完成和物理效果完成是不同事实。
 
-Photographer 自己产生的追踪调用仍回 Photographer；Assistant 摄影 Action 的结果回 Assistant。send 仅用于独立确定性后台任务，投递接纳和任务完成不同；publish 单向，接收错误不反馈发送者。
+## 内部结构与接口
 
-## 内部结构
-
-| 目录 | 职责 |
+| 目录 | 职责及接口 |
 | --- | --- |
-| [../Resources](../Resources/README.md) | v7 Agent 权限、v1 Skills 与显式 catalog；配置/指令无编译代码 |
-| Support/Core | independent runtime framework AgentCore，身份、Signal、权限、队列、轮次和 Context 契约 |
-| Support | 纯资源加载与不可变 Skill/函数目录组装 |
-| Support/Communication | 业务 Signal 和任务通信 Schema |
-| Support/Chat | 组合式 Chat worker、快照目录、提示词、原生协议、ReACT 与证据 |
-| Support/Context | Task/Skill 结构化状态、固定任务协调与原子内存状态提交 |
-| 七角色目录 | Actor/生命周期、Processing（状态、预处理、Builder）及本角色策略/固定流程 |
+| [Assistant](Assistant/README.md) | 用户文本/最终 ASR、动态 Skill、单前台 Task、Chat/ReACT、照片模型输入 |
+| [Photographer](Photographer/README.md) | 固定摄影事务、相机事实、姿态跟踪与设备调用 |
+| [Memory](Memory/README.md) | 历史事务与独立标题生成 |
+| [ApplicationControl](ApplicationControl/README.md) | 设置、资源、Provider、设备和环境事务 |
+| [SpeechPerception](SpeechPerception/README.md) | 听取意图、VAD/ASR、声源与聆听策略 |
+| [SpeechSynthesis](SpeechSynthesis/README.md) | 有界定向合成及 PCM 生产 |
+| [VisionPerception](VisionPerception/README.md) | 最新帧姿态推理、检测节奏与注视/骨架投影 |
+| [Support](Support/README.md) | 资源读取与不可变目录组合 |
+| [Support/Core](Support/Core/README.md) | Foundation-only AgentCore：身份、Signal、接纳、解析与轮次契约 |
+| [Support/Communication](Support/Communication/README.md) | 不可变业务消息与 schema |
+| [Support/Chat](Support/Chat/README.md) | Chat 请求、配对、执行屏障、观察及历史投影 |
+| [Support/Context](Support/Context/README.md) | 原子内存仓库、Task/Skill 状态与固定任务协调 |
 
-## 开发契约
+角色资源位于 [Resources/Agents](../Resources/Agents/README.md)，流程和模型函数绑定位于 [Resources/Skills](../Resources/Skills/README.md)。Agent.json 声明身份、通信和 baseSkills；Skill.json 声明函数；参数和说明由真实 @Action 提供。
 
-每个角色明确输入/输出权限、队列/替换策略、Context Schema、Builder、调用/任务状态、容量、取消、失败与恢复。模型函数由已加载 Skill 决定，无额外权限上限。Skill 只能引用 Actions 参数契约；send 仅 Action，同路径不能同时注册 Action/Tool。函数可被多角色复用。
+## Task、Skill 与不可变请求
 
-Skill 加载验证依赖、canonical 函数、别名、Channel 后整体提交；最多 16 Skill、8 层依赖。一个前台任务，不自动挂起。请求冻结任务身份/Skill/函数目录，切换只作用后续请求。每次用户决策链不设固定模型轮数或累计原生调用上限；按真实结果继续、完成或取消，重复同一失败且无进展则返回实际错误。单轮执行/传输仍有界，模型上下文淘汰最早完整调用组。模型等待用户不计入执行时间。
+一个前台 Task 管理持续目标。startTask 的 goal 必填，skills 为可选 JSON ID 数组；已有运行、等待或收尾 Task 时拒绝覆盖。finishTask 在执行/回复屏障后关闭，通常结束当前决策；continueDecision=true 只处理同一输入剩余的新目标。cancelTask 关闭并结束当前决策，已发生效果不会撤销。
 
-## 历史与可视化
+Skill 所有权分 base、recent、task。基础项常驻；无 Task 加载/合法调用将近期项计数重置为 5，每个完整未使用用户 Decision 扣 1；内部 ReACT 不扣数。Task 只接管指定、加载或实际使用的项，等待用户时持有，终态回收持有项；无关近期项暂停计数。预算为展开后 3 个非基础 Skill、24 KiB 指令/增量目录，非保护项按 LRU 淘汰。生命周期合图、算法与原子失败契约见 [Context](Support/Context/README.md#task-and-skill-lifecycle)。
 
-所有角色的运行时 Context 都通过 Storage 内存接口持有状态，不读写 Context JSON。Task/Message 先在 SQLite 创建身份记录，运行时仅修改内存，完整消息、终态与证据按各自完成边界提交。每请求记录任务目标、执行类型、Skill revision、taskID 和目录快照。重启从 SQL 标记未完成业务记录中断，不恢复运行状态或重放动作。设置的 Agent 记录当前只展示 Assistant 聊天记录；首页保留有界 Task/Skill 投影和 Action/Task/Agent 执行诊断，未提供其他 Agent 的伪聊天页面。
+每个模型请求冻结 Task 身份、Skill revisions 和函数目录。加载/释放仅影响后续请求；固定调用使用执行者的固定目录。模型教学以当前 Task/目录事实为准，Skill 加载不创建 Task。
 
-✅ 资源、动态授权、Assistant 任务与 ReACT、确定性角色和历史/UI 投影已接入。❌ 真机摄影、语音竞争、模式切换及历史展示仍需验收。详细实现见各目录 README。
+后台任务通过定向 send 与独立执行者的业务契约处理，不抢占前台；投递接纳、取消确认和最终结果分别记录。后台 Registry 最多 16 个非终态、256 条记录；父任务结束不自动取消子工作。当前生产未声明通用后台契约，不能凭配置创造执行能力。
 
-## 泛化 Task 与独立 Skill
+## 多轮、失败与历史
 
-✅ 泛化 Task 与独立 Skill 已接入：任意目标、单前台任务，基础/会话近期/任务 Skill 作用域；后台复用 send，不抢占前台。详见所属 Agents 与公共机制设计。
-### 公共任务控制契约
+ReACT 在本轮调用及回复屏障后由显式业务 value（包括空值）或真实调用失败驱动；成功报告、活动句柄及投递接纳是完成证据。单轮生成/反馈有界，完整决策不以累计轮数或计时器结束。Provider、流、解析、观察构造等 Agent 异常结束当前决策，不自动重试或重放副作用；调用拒绝保留未执行证据，可由模型重新选择合法步骤。
 
-startTask 的 goal 为必填；skills 为可选 JSON ID 数组，execution 缺省 foreground。后台还需要 target、businessContract、payload，校验目标声明后通过通信 Action/send 提交。一个前台任务；最多 16 个非终态后台任务，Registry 保留 256 条记录。投递确认、取消确认和最终结果严格区分。父任务结束不自动取消后台工作。后台消息不触发前台推理、抢占或播放。生产后台契约暂未声明，公共路径由合成执行者验证。
+每个角色使用根拥有的 Storage 内存状态仓库。SQLite 是 dialog/message/task/media/device 业务事实的持久化来源；完整模型消息与真实终态在各自边界提交，delta 与运行时队列留内存。Task 原始过程仅在终态投影成有界摘要，来源可查询。重启标记未完成业务记录 interrupted，不恢复热状态或重放效果。详细历史契约由 [Chat](Support/Chat/README.md) 与 [Storage](../Storage/README.md) 拥有。
 
-Skill 所有权分为 base、recent、task。无 Task 的近期能力跨决策复用并按五次闲置倒计数回收；startTask 只持有指定 Skill，后续显式加载或实际使用才加入任务。任务等待用户保持持有能力；终态经过执行/回复清理回收持有项，不转为近期能力；无关近期项保留。不提供任务栈。只接受当前格式，不导入旧 Task 或会话状态。
+## 生命周期与开发约束
 
+每个异步生产者、队列、缓存与活动都必须有 owner、容量及溢出/取消/完成策略；页面退出不终止根服务拥有的业务工作。事务先提交状态，再执行依赖步骤；配置、执行与持久化失败显式传播。确定性事务角色保留最近 4096 条 Signal 证据，核心未指定滚动策略时上限 8192 且拒绝溢出；业务关联独立保存。
 
-✅ Resource-path contract: pure Agent and Skill assets move to MobileHarness/Resources/{Agents,Skills} with Catalog.json. Agents retains loading and policy ownership. Package sources remain limited to Agents; explicit copies exclude unrelated app/model assets. Bundle catalog lookup establishes the runtime root without repeating Resources. Regression covers flat and Resources-containing Bundle lookup plus missing catalog failure; final packaging checks compare indexed asset bytes. Device acceptance is recorded separately.
+模型调用、私有固定调用、通信权和实际设备授权分别验证。Speech/vision 的 freshness 不等于任务超时；App 的物理停机及权限保护不等待模型。
 
-
-✅ Source organization audit (2026-10-11): No new directories/modules. Move resource loading/catalog composition to Support root, task/Skill structured state and fixed-task lifecycle to Context. Canonical resource directories and filenames become UpperCamelCase while IDs keep existing contracts.
-
-
-## Skill 函数目录：取消资源权限上限
-
-✅ 已删除 Permissions.json 和 Agent.json 的 permissions 字段。Agent.json 不声明函数；基础和动态模型函数完全由已加载 Skill 组合，不再与 Agent 权限上限求交。保留 canonical 元数据、重复/冲突、容量、通信授权、真实执行身份和任务范围校验。Gateway 对有轮次快照的调用使用该快照，对无模型轮次的固定调用使用 Agent 固定目录。App 对所有 Skill 目录检查真实实现覆盖，不把全局 Skill 合并成权限白名单。后台 Skill 校验仍要求目标业务契约支持，但不再校验 Permissions。历史快照不重写。
-
-✅ ADR0213: shared FunctionTokenPrompts guidance describes task-local Channel/wait ordering, independent same-name Channels across tasks and explicit resource conflict/takeover outcomes. Canonical addresses do not create queues; prompt text grants no execution authority.
-
-## Agent → Skill → Function registration
-
-✅ Implemented: Agent.json references baseSkills; Skill.json alone registers model Actions/Tools. BasicSkill owns task orchestration and environment reading; ExpressionInteraction owns expression Actions. Role instructions retain identity/responsibility/style. Business roles reuse existing Skills; internal trusted bindings remain separate. Historical snapshots are preserved.
+## Role processing pipeline
 
 ```mermaid
 flowchart LR
- A[Agent.json: identity and baseSkills] --> S[Skill.json: Action / Tool bindings]
- S --> L[Skill loader: dependency / conflict validation]
- M[Action-owned function metadata] --> L
- C[Skill Instructions: procedures and examples] --> P[Request context builder]
- R[Agent Instructions: role and style] --> P
- L --> F[Immutable request catalog]
- F --> P
- F --> G[Gateway: scope and protocol validation]
- G --> E[Actions / communication runtime]
- E --> O[Results to actual owner]
- O --> P
+ Signal[Admitted Signal] --> Preprocess[Role SignalPreprocessor]
+ Preprocess --> Batch[Validated SignalBatch and role-state update]
+ Batch --> Commit[Atomic role context commit]
+ Commit --> Snapshot[Immutable selected snapshot]
+ Snapshot --> Builder[Role ContextBuilder and grant projection]
+ Builder --> Decide[Fixed workflow or ChatCapability]
+ Decide --> Evidence[Persist exact request and received evidence]
+ Evidence --> Output[Resolved calls and communication]
+ Output --> Feedback[Owner-directed feedback]
+ Feedback --> Preprocess
 ```
 
+角色预处理、批次选择和状态转换由角色拥有。Context 仓库先验证并提交热状态，再提供不可变快照；固定事务直接选择已注册调用，Assistant 的模型分支还记录精确请求与实际结果。业务持久化通过注入仓库完成，不将流式证据或整个热状态反复编码落盘。状态机与存储机制分别见 [Core Runtime](Support/Core/Runtime/README.md#processing-work-state) 和 [Context](Support/Context/README.md)。
 
-## Agent request failure continuation
+## 待实现
 
-✅ 已实现：AgentChatWorker 在同一决策链内携带上一轮 HTTP/provider 或解析异常重试，加入已接纳执行的结果而不重放副作用。Core 预算和 Gateway 屏障继续生效，未恢复或不能确认结果时才进入终态失败。
-
-## Lifecycle-owned conversation and audio (2026-10-12)
-
-✅ 已移除对话生成、ReACT、收件箱排队、结果屏障、ASR 收尾、TTS 合成及回复占用租约的计时终止。Signal 默认无过期时间，框架不再按通信契约附加 TTL。保留显式实时感知数据的新鲜度和网络传输自身超时；它们不作为对话/语音缓存生命周期。Action 自身超时通过原始执行者的 ActionResult 返回。请求/调用数及队列/PCM 容量仍有界，不以计时自动删除已接纳输入。语音句柄无读等待或错误记录 TTL，按播放完成、输入/会话正常结束、异常或显式取消清理；取消加入生成和播放工作。
-
-
-## Result-driven ReACT (ADR0214)
-
-✅ ADR0214：模型决策按实际业务输出/失败继续，取消角色与宿主注入的反馈策略。Core 统一解释结果；Worker 保留原生配对、请求快照、Task 收尾、取消和已有错误重试。
-
-
-✅ Implemented: explicit host session cancellation emits agent.cancelled for the original active/queued input and captured round identity after joining the cancelled model; this terminates its output transport and effects without fabricating failure or cancelling other sessions.
-
-
-✅ Shared Chat removes fixed four-round/16-native decision limits and uses result-driven completion/cancellation. Per-round counters reset, continuation context retains a bounded recent window, complete native pairs and current user intent. Duplicate failed recovery terminates with its original error.
-
-✅ 2026-10-13 已实现：ReACT 业务输出仅为显式 value（含空字符串），成功执行报告和活动句柄仅保留完成证据；失败报告仍由错误判定触发续轮，既有 Agent 异常恢复不变。详见 [总体设计](../README.md#react-continuation-and-agent-recovery)。
-
-
-
-✅ Implemented (2026-10-13 Skill scope review): canonical Actions unify trusted business calls and model calls; Skill exposure is optional and must serve an actual procedure. ExpressionInteraction retains two expression functions; Feedback/Notice/Light model exposure is removed while implementations and business bindings remain. ApplicationControl keeps navigation/status/resource/Bluetooth operations, removing duplicate robot functions; RobotInteraction owns them. BasicSkill removes unused send while production background contracts are absent. Affected instructions/revisions and explicit communication-only test catalogs are aligned; all six Skills were audited for prerequisites, result handling and cross-Skill references.
-
-
-## Streaming TTS latency
-
-✅ Shared Chat owns first-segment speech policy (20 Han / 60 other Characters, subsequent 60/120); Generation keeps generic segmentation state. Directed synthesis, identities, FIFO and rejection bounds stay unchanged.
-
-
-## Task history v2 and in-place compression
-
-✅ Implemented: Agents own request history membership and terminal compression policy; StorageChat supplies neutral records only. Task closure builds an indexed compression from reported finish summary and actual terminal status/failure in the same repository transaction. No additional inference or compatibility migration is added.
-
-
-✅ 确定性角色 ApplicationControl、Memory、Photographer 显式选择最近 4096 条 Signal 证据和消费批次的滚动保留并在内存记录淘汰计数，避免根服务运行累计记录到 8192 条后终止。业务关联和任务独立保存；策略由角色拥有，Assistant 聊天/Task 历史和 Core 默认溢出拒绝策略不受此策略影响。
-
-
-
-## Assistant model-photo ownership
-
-✅ Implemented: Assistant owns model-photo preparation policy and invokes separate injected original-read and JPEG-preparation capabilities before building the observation image. App only wires/bridges capability values; PlatformKit retains generic native codecs. No native image framework dependency or new module is introduced. Policy and lifecycle details belong to [Assistant](Assistant/README.md#model-photo-preparation-policy).
-
-
-✅ Implemented: every production Agent Context uses Storage process-memory state, with no context JSON writer. SQLite is the durable owner of Task/dialog/message facts; crash discards hot state and never replays effects.
+- 通用生产后台业务契约与对应独立执行者能力。
+- 运行中 Task 跨场景挂起的目标保留与统一终态 checkpoint；详见 [Chat](Support/Chat/README.md#待实现)。
+- 真实模型的流程遵循、原生交互、摄影/Photos、语音竞争及持续设备验收。

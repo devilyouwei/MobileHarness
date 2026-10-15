@@ -506,7 +506,7 @@ private func photographyAcceptance(
                 #expect(await effects.failures.isEmpty)
                 #expect(
                     requests.dropFirst(4).allSatisfy { request in
-                        request.messages.last?.content.contains("Agent.Task.loadSkills") != true
+                        request.messages.last?.content.contains("\"action\":\"loadSkills\"") != true
                     })
             }
             let path =
@@ -660,14 +660,14 @@ private func photographyAcceptance(
         #expect(requests[0].toolCalls.isEmpty)
         #expect(
             requests[start + 1].decisionMetadata?.taskID == active
-                && requests[start + 1].decisionMetadata?.skills["photography"] == 19)
+                && requests[start + 1].decisionMetadata?.skills["photography"] == 20)
         #expect(archive.current.turns.last?.modelRequests?.count == 2)
         #expect(archive.current.turns.first?.generationRounds?.count == (rejectFirst ? 4 : 3))
         let calls = await stub.requests
         #expect(calls[0].messages.first?.content.contains("<takePhoto") == false)
         #expect(calls[start + 1].messages.first?.content.contains("<takePhoto") == true)
         #expect(calls[start + 1].messages.contains { $0.role == .assistant && $0.content.contains("<startTask") })
-        #expect(calls[start + 1].messages.contains { $0.content.contains("Agent.Task.startTask") })
+        #expect(calls[start + 1].messages.contains { $0.content.contains("\"action\":\"startTask\"") })
         // A later human input in the still-active Task keeps its entry round too.
         #expect(calls[start + 3].messages.contains { $0.role == .assistant && $0.content.contains("<startTask") })
         if !rejectFirst {

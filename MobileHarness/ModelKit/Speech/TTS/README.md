@@ -26,12 +26,12 @@ Request rejects blank text/locale and retains InferenceContext. audio events car
 
 Defaults selects enabled installed available MOSS, otherwise Apple. Kokoro is an optional isolated provider without production registration/download. Output admission, language conversion and native cleanup are provider-specific and documented below.
 
-✅ Managed text-to-PCM contract and local/system adapters are implemented.
-
-## Outstanding work
-
-No additional implementation work is declared for this text-to-PCM contract. Language, native-engine and output limitations are documented by each provider.
+Managed text-to-PCM contract and local/system adapters are implemented.
 
 ## Related design
 
 [Parent design](../README.md) · [Apple](Apple/README.md) · [Kokoro](Kokoro/README.md) · [MossNano](MossNano/README.md)
+
+## 待实现
+
+- No additional implementation work is declared for this text-to-PCM contract. Language, native-engine and output limitations are documented by each provider.

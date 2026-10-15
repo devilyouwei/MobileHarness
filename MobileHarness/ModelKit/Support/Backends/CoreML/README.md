@@ -12,6 +12,10 @@ Loading and prediction are actor-isolated. Cancellation is checked around synchr
 
 YOLO's 640-pixel image layout, padding, Vision execution and fixed end-to-end output reader belong to [YOLO](../../../Vision/YOLO/README.md).
 
-✅ Generic tensor execution is implemented. ❌ Universal image/model interchange is not implemented.
+Generic tensor execution is implemented.
 
 [Parent design](../README.md)
+
+## 待实现
+
+- Universal image/model interchange is not implemented.

@@ -45,7 +45,7 @@ flowchart TB
 | UIActionTypes / UIPresentationTypes | Emotion、VoiceState、Gaze 和类型化错误 |
 | UIFeedbackTypes / UIEffectTypes | 带范围校验的反馈、Notice、Light 值 |
 
-✅ UIModule 组合表情、一般呈现、反馈和装饰定义；ResourcePresentationModule 绑定五项资源呈现，NavigationModule 绑定 open。`feedbackDefinitions`、`effectDefinitions` 提供相同工厂集合供独立宿主复用，避免另造一份实现。
+UIModule 组合表情、一般呈现、反馈和装饰定义；ResourcePresentationModule 绑定五项资源呈现，NavigationModule 绑定 open。`feedbackDefinitions`、`effectDefinitions` 提供相同工厂集合供独立宿主复用，避免另造一份实现。
 
 反馈与装饰能力可为 nil，但对应调用会明确抛 unavailable；资源协议扩展中，未实现的 navigate/presentProviderResult 也抛 unavailable。其余必需端点由注入者提供。目录声明来自本类型实际 definition 调用，不捕获运行时设备状态。
 
@@ -56,8 +56,6 @@ PoseOverlay 是独立 Codable 调用数据，不是模型后端或 UI 页面类�
 showPose 入口要求 payload 最多 3000 UTF-8 字节、timestamp 有限且非负、rotation 为 0…3、最多六人、每人完整 17 个 COCO 关节。坐标范围 −10000…20000，confidence 为 0…1000。空 people 用于清除。PoseOverlay 构造器本身不自动执行这些入口校验。
 
 Statistics 要求各项存在值有限且非负、replacements 非负；detectionIntervalMilliseconds 最多 1000，imageMotion 最多 1。queueMilliseconds 与 totalMilliseconds 必须同时存在或同时缺省；存在时 total 至少覆盖 queue+inference（允许 0.001 毫秒误差）。这些是推理结果返回前的统计，不包含 UI 绘制确认。
-
-❌ showPose 当前只读取 payload，没有统一拒绝其它参数键；调用规范应只发送 payload。
 
 ## 反馈音频算法
 
@@ -81,10 +79,6 @@ FeedbackTone 的不可变静态 bank 缓存七种原始单声道 Float PCM，采
 
 [UI 入口与完成](../README.md) · [System 资源类型](../../System/Support/README.md) · [共享契约](../../Support/Contracts/README.md)
 
+## 待实现
 
-
-
-
-## SQLite records and runtime identity
-
-✅ Implemented: technical identities are opaque UUID strings; committed business entities use dialog/message/task/media/device SQLite IDs. Consumers use Storage repositories while preserving ownership, cancellation and independent foundation boundaries. Complete messages, including each ReACT message, persist at termination; delta fragments do not persist. The custom allocator and replaced file/index implementation are removed. See the project SQLite business-record plan.
+- showPose 当前只读取 payload，没有统一拒绝其它参数键；调用规范应只发送 payload。

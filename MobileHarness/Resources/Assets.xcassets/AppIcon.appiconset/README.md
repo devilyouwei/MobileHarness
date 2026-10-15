@@ -23,12 +23,14 @@ flowchart LR
 
 `Contents.json` references `AppIcon.png` with universal idiom, iOS platform and 1024×1024 size. Asset-catalog version is 1. The selected image must remain square and compatible with Xcode app-icon compilation.
 
-✅ AppIcon.png is refreshed from the centered lamp-arm.png composition through the existing selector. It retains the selected first expression-refinement design's white articulated arm, tilted iPhone face, cyan open/winking eyes, hidden rear magnetic mount and clean dark display. The root README uses this same AppIcon.png; the declaration remains unchanged. Native home-screen appearance requires a rebuilt/installed app.
+AppIcon.png 由选择器从居中的 lamp-arm.png 生成：白色机械臂、倾斜手机、青色表情、隐藏背部磁吸座和暗色屏幕。根 README 使用同一图标；原生桌面效果须构建并安装 App 验收。
 
-✅ Universal icon image and metadata.
-
-❌ Separate dark/tinted appearance entries.
+Universal icon image and metadata.
 
 ## Related design
 
 [Parent design](../README.md)
+
+## 待实现
+
+- Separate dark/tinted appearance entries.

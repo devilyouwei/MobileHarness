@@ -46,9 +46,7 @@ Release/expiry/owner closure/shutdown observing an existing handoff uses bounded
 
 Production camera capture requires its persistent lease. NexArm's six motors share a writer group; concrete takeover is composed by App. Manual Settings control is an explicit host bypass. Software cleanup never proves hardware stop/arrival/clearance.
 
-✅ Live occupancy, revocable permits and late-cleanup-safe handoff are implemented.
-
-❌ Durable leases, global fairness and forced unlock of unfinished native work are not implemented.
+Live occupancy, revocable permits and late-cleanup-safe handoff are implemented.
 
 ## Related design
 
@@ -56,14 +54,29 @@ Production camera capture requires its persistent lease. NexArm's six motors sha
 
 ## Channel-owned Action ordering
 
-✅ Action metadata has no serialization key. [ChannelScheduler](../Scheduling/README.md) owns task-local FIFO/wait ordering; ResourceCoordinator rejects unconfigured conflicts without a queue and preserves explicitly configured joined takeover.
+Action metadata has no serialization key. [ChannelScheduler](../Scheduling/README.md) owns task-local FIFO/wait ordering; ResourceCoordinator rejects unconfigured conflicts without a queue and preserves explicitly configured joined takeover.
 
-✅ 资源交接/关闭无默认五秒清理超时，等待停止与真实 join 后确认资源释放；取消不伪造清理完成。设备显式安全租约的期限保持独立，不作为对话时限。
+资源交接/关闭无默认五秒清理超时，等待停止与真实 join 后确认资源释放；取消不伪造清理完成。设备显式安全租约的期限保持独立，不作为对话时限。
 
+## Handoff state flow
 
+```mermaid
+flowchart TD
+    Request[Requested resource set] --> Conflict{Live conflicting owner?}
+    Conflict -->|No| Grant[Grant matching live token]
+    Conflict -->|No configured takeover| Busy[Reject busy]
+    Conflict -->|Authorized takeover| Reserve[Reserve affected siblings]
+    Reserve --> Revoke[Revoke old permits and cancel / stop]
+    Revoke --> Join[Join old writers and cleanup]
+    Join --> Valid{Requester and cleanup still valid?}
+    Valid -->|Yes| Grant
+    Valid -->|Caller cancelled / scope closed| Retire[Retire requester without granting]
+    Join -->|Old work has not ended| Retained[Keep coordinator-owned occupancy]
+    Retained -->|Actual old completion| Unlock[Remove only matching tokens]
+```
 
+没有默认清理确认时限。取消调用者不会将未完成 cleanup 当作完成；独立 coordinator owner 继续持有资源直到旧 writer 实际退出。显式安全租约期限与清理 join 是不同机制。
 
+## 待实现
 
-## SQLite records and runtime identity
-
-✅ Implemented: technical identities are opaque UUID strings; committed business entities use dialog/message/task/media/device SQLite IDs. Consumers use Storage repositories while preserving ownership, cancellation and independent foundation boundaries. Complete messages, including each ReACT message, persist at termination; delta fragments do not persist. The custom allocator and replaced file/index implementation are removed. See the project SQLite business-record plan.
+- Durable leases, global fairness and forced unlock of unfinished native work are not implemented.

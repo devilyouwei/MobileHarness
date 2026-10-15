@@ -1,124 +1,38 @@
-# Project tests
+# Tests
 
-✅ Opt-in `IntegrationTests/NexArmSerialAcceptanceTests.swift` exercises physical USB writes/feedback through the production Settings workflow and Agent Action/Tool boundaries. Four independent gates remain disabled in normal checks; the test-only connection façade does not establish BLE or SwiftUI touch acceptance. See [IntegrationTests](IntegrationTests/README.md#supervised-serial-appagent-acceptance) for bounds, fixtures and supervision requirements. ❌ Sustained wireless/load/native UI acceptance remains separate.
+## 职责与边界
 
-Purpose: verify contracts and application integration in separate test targets. Design goals: one source tree and explicit test dependencies.
+测试源统一位于本目录，由根 Package.swift 的独立 target 编译。单元/合成集成测试验证协议、状态及失败契约；真实模型、网络、原生 UI 和物理设备使用各自显式 gate，不能用替身通过代替验收。每次执行的环境、数字、失败和日志只记录到 [validation](../docs/validation/README.md)。
 
-❌ Test success alone does not establish physical-device acceptance.
+## 当前测试分工
 
-✅ All model tests live under this root. Gemma4Tests contains model-only checks; AgentModelEvaluationTests contains application prompt experiments. No tests live inside MobileHarness/ModelKit.
+| 目录 | 测试职责 |
+| --- | --- |
+| [IntegrationTests](IntegrationTests/README.md) | Agents/Gateway/Actions/Storage 真实边界与注入执行/模型替身 |
+| [AppWorkflowTests](AppWorkflowTests/README.md) | 根生命周期、Feature workflows、独立输出与 UI 数据映射 |
+| [UITests](UITests/README.md) | UI-owned 状态、分页、布局值和交互；不是原生触摸自动化 |
+| [FunctionContractTests](FunctionContractTests/README.md) | 中立函数定义、参数、预算及结果 |
+| [ModelKitTests](ModelKitTests/README.md) | 基础推理 SDK 的类型、流及并发契约 |
+| [ModelKitDefaultsTests](ModelKitDefaultsTests/README.md) | 模型选择、缺失资源与默认组装 |
+| [ModelKitRuntimeTests](ModelKitRuntimeTests/README.md) | 管理器注册、准备、卸载与替换 |
+| [ModelKitHubTests](ModelKitHubTests/README.md) | 下载/制品、安全边界、可选真实网络传输 |
+| [ModelKitAppleSpeechTests](ModelKitAppleSpeechTests/README.md) | Apple 音频请求与 PCM 转换 |
+| [OpenAIChatTests](OpenAIChatTests/README.md) | 请求编码、Responses SSE、原生调用配对与取消 |
+| [Gemma4Tests](Gemma4Tests/README.md) | 本地语言适配契约和显式启用的真实推理 |
+| [NemotronTests](NemotronTests/README.md) / [SileroTests](SileroTests/README.md) | ASR/VAD 模型适配 |
+| [EnergyVADTests](EnergyVADTests/README.md) | 纯 RMS/hysteresis、分包边界与复位 |
+| [MossNanoTests](MossNanoTests/README.md) / [KokoroTests](KokoroTests/README.md) | TTS 适配、PCM 和显式真实模型检查 |
+| [YOLOPoseTests](YOLOPoseTests/README.md) | RGB、预处理、解码、NMS、pose 和可选模型 smoke |
+| [AgentModelEvaluationTests](AgentModelEvaluationTests/README.md) | 与 SDK 测试分离的应用提示词实验 |
+| test_model_download.py | 离线下载清单、安全路径、ZIP 校验和原子替换 |
 
-✅ ModelKitDefaultsTests checks internal production assembly independently of App; model factory and capability-mapping contract tests remain isolated from business Agents.
+## 运行与用例设计
 
-✅ YOLOPoseTests covers RGB boundaries, letterbox geometry, NMS and pose registration; YOLO_POSE_MODEL_ROOT enables real-model smoke and lifecycle checks. ❌ Human-image/device accuracy remains manual acceptance.
+常规入口为 ../scripts/check.sh；配置完整 Xcode 后按单个 target/函数过滤 swift test 可复现专项。真实网络、模型及设备 gate 见所属 README，不在普通检查中自动启用，不提交凭据、权重或用户媒体。
 
-✅ IntegrationTests/PhotographyPipelineTests exercises camera input, shared pose inference and the VisionPerception skeleton display path with injected model doubles; native camera/device visual quality still requires device acceptance. The test filename records the earlier Photographer design.
+异步测试用明确 gate/确认信号控制顺序，检查可观察行为、失败、隔离、取消与清理；注入的执行者和数据必须明确标为合成。构建成功、协议测试通过与原生/物理验收分别报告。
 
-✅ test_model_download.py contains offline ZIP hash/member/path/symlink and replacement-preservation tests, invoked by scripts/check.sh. YOLOPoseTests use the new end-to-end model/output contract.
+## 待实现
 
-✅ Integration coverage includes shared inference, v4 policy, event bounds, latest-state replacement, deadlines and independent session cleanup. VAD boundary tests import Agents; model adapter tests remain separate.
-
-✅ Skeleton visualization regression coverage belongs to VisionPerception in IntegrationTests; no Photographer runtime is required.
-
-✅ IntegrationTests covers direct no-feedback skeleton Tool calls while preserving normal ToolResult round trips.
-
-✅ OpenAIChatTests independently checks cloud chat encoding, bounded SSE and managed lifecycle with local URLProtocol fixtures. ❌ Live-provider acceptance is separate.
-
-✅ IntegrationTests cover Storage document cache/disk synchronization, concurrent revision conflicts, bounded I/O, unsupported schemas and invalid files. ❌ Device Keychain migration acceptance is separate.
-
-
-✅ MossNanoTests covers input/PCM bounds and an opt-in local-model synthesis/lifecycle smoke test. ❌ Mac smoke does not establish iPhone quality or stability.
-
-✅ UITests and AppWorkflowTests exercise form-save lifetime, archive-before-title, operation admission and cancellation/retry with controlled completion signals; they create no device or real model. ❌ Device interaction acceptance remains separate.
-
-✅ IntegrationTests includes Action runtime stage 1 contract checks and preserves existing Channel/wait, speech and presentation regressions. ❌ Activity owners, resource leases and physical-device timing remain later acceptance.
-
-## Action runtime stage 2
-
-✅ IntegrationTests/ActionLifecycleTests adds stage-2 contract coverage for bounded Action feedback and resource leases/fences. ❌ Real-device lifetime/takeover tests remain separate.
-
-## Domain-owned behavior assembly
-
-✅ IntegrationTests depends on the pure BehaviorAssembly target to test module construction without compiling the iOS App. ❌ These tests do not validate native effects.
-
-## Action implementation audit
-
-✅ IntegrationTests now includes the Action authoring audit regression cases; no physical-device acceptance is implied.
-
-## Storage domain organization
-
-✅ Storage core and domain tests retain existing root test locations; the source reorganization changes only the build/import map.
-
-❌ Image/video/semantic-memory stores remain planned; this migration adds no storage behavior.
-
-## Local model provisioning cleanup
-
-✅ Six offline Python provisioning tests cover catalog routing, shared Nemotron Mac/iOS catalog and optional Gemma 4 E2B4B profile, mirror/prefix selection, metadata-derived sizes/hashes, missing-file/pagination rejection and safe ZIP replacement. Mac real-model test roots remain locally available: Nemotron, Gemma4, Silero, MossTTSNano and YOLOPose. ❌ Full model runs still require their opt-in flags, platform frameworks and complete Xcode where applicable.
-
-✅ ModelKitHubTests covers regular-file selection and remote metadata bounds. HARNESS_TEST_HUB_ENDPOINT opts into a real production-adapter Silero download with intermediate-progress/file assertions. ❌ macOS network integration is separate from iPhone UI acceptance.
-
-✅ HARNESS_TEST_YOLO_ARCHIVE verifies the real production ZIP checksum/native extraction, while Storage regressions cover aliased relative paths and concurrent authoritative snapshots. Actual App adapter host probing additionally verifies receipt publication, exact legacy-path repair and damaged-file rejection. ❌ Physical iPhone evidence remains separate.
-
-
-✅ EnergyVADTests covers packet-independent RMS/hysteresis, reset, invalid PCM and exclusive admission. Defaults selection fixtures cover installed/unavailable/missing resources and explicit system preference. UI/workflow tests cover legacy JSON and durable speech policy.
-
-
-✅ Settings policy tests cover independent flags, full-prerequisite enable admission, legacy migration, deletion reconciliation and concurrent restoration. Real Apple combined ASR/VAD test remains opt-in.
-
-✅ Local chat configuration now targets Gemma 4 E2B CoreAI; Qwen/MLX production bindings are removed. ❌ Real-model/device acceptance is separate from compilation and contract tests.
-
-✅ ADR0128: Settings preset/reset submission returns immediately; a cancellable background worker uses the shared Actions segment-feedback executor. Replacement joins software cleanup without waiting for arrival. ❌ Physical takeover/rhythm acceptance remains pending.
-
-✅ ADR0129: simulated recovery tests verify Assistant/speech continuation, ordinary disconnected reports and accepted queued Actions executing once after reconnect. Physical coexistence remains outstanding.
-
-❌ Final ADR0129 audit: selected recovery/queue regressions pass, but the full suite remains failing. Legacy BLE connection-indication, active-refresh and feedback-silence recovery assumptions/fixture classification require migration to ADR0130; manual-segment, aim-planner, vision timing and audio retry failures remain recorded in Validation-History. No whole-suite or physical acceptance is claimed.
-
-✅ Bluetooth UI-state and held-operation regressions distinguish connection labels from device Action diagnostics and verify native reconnection without waiting for prior business completion.
-
-✅ Connected Bluetooth feedback-error regression verifies malformed passive packets and explicit refresh failures enter the per-device cache, unchanged packets do not log again on unrelated native snapshots, and clearing records preserves connection/control without reconnecting. These simulated checks do not validate native sheet rendering.
-
-✅ ADR0131 adds independent execution/native diagnostic regression coverage without moving physical hardware. Full verification outcome is recorded in docs/validation/Validation-History.md; ❌ physical endurance remains pending.
-
-✅ ADR0132: Independent producer codes, timeout root/child causes, App worker provenance and native-only recovery evidence have regression coverage. ❌ Physical acceptance and persistent error history remain pending.
-
-✅ ADR0134: Bluetooth exception history is removed at SDK/App/UI layers. Latest native connection, communication issue and recovery state alone appear in Settings; healthy snapshots/new connections replace prior faults. ADR0138 uses one row to connect while unconnected or open detail when already connected; connection success stays on the list, disconnect appears only when connected, and remembered devices remain forgettable; an already-open disconnected detail disables actions/motor gestures. Execution results/home issues and bounded automatic recovery remain independently owned. ❌ Physical BLE/navigation/touch acceptance remains pending.
-
-✅ Optional `NEXARM_SERIAL_AIM_STRESS=1` extends the tracking acceptance gate with three supervised six-second Robot.aim fixtures: 5Hz bounded base sweep (−0.08…0.08 rad), 50Hz identical target, then 5Hz ±0.01 rad target alternation. Centered poses pass InputGateway to maintain real Photographer freshness; explicit internal Tool envelopes pass OutputGateway into the production worker. SDK 30ms pacing and 512-write bound remain active. Stress mode skips the unrelated manual takeover trial. ❌ Encoder samples do not determine visible/high-frequency vibration; user observation and BLE acceptance remain separate.
-
-✅ Storage boundary migration regressions cover fenced admission, Agent-owned context, producer failures and UI title rules. ❌ These tests do not establish device acceptance.
-
-✅ Shared history Tool tests verify real journal queries and native declaration/execution compatibility. ❌ Full conversational task continuation remains a later stage.
-
-✅ IntegrationTests adds deterministic history intent/Gateway lifecycle coverage. ❌ This does not establish native navigation or model-driven history continuation.
-
-✅ Model-resource task/admission regressions now run in AppWorkflowTests, matching their AppSettingsWorkflow ownership; UITests remains UI-only. ❌ Native download/form interaction acceptance remains separate.
-
-✅ IntegrationTests covers deterministic history mutation continuation through both Gateways and cancellation after commit; feature fixtures inject deletion explicitly. ❌ Physical UI behavior remains unverified.
-
-✅ ADR0149 adds Signal provenance, returning Tool causal continuity and replacement-owner fencing regressions. ❌ Original-root Action/activity migration and native acceptance remain pending.
-
-✅ ADR0152: production registers one six-domain CapabilityModules catalog, with unified UI/NexArm ownership and unchanged call paths/permissions. Registry projections preserve existing execution policy; regression coverage checks expression and gaze through the same UI catalog. ❌ Unified call definitions and compatibility removal remain pending.
-
-✅ ADR0213 replaces obsolete key tests with same-function concurrency across Channels/tasks and explicit resource-conflict failure coverage.
-
-❌ Three-level runtime paths and unified Action/Tool definitions are not completed by this stage.
-
-✅ ADR0159 unifies @Action metadata and invocation contracts; all business and injected endpoints receive one FunctionInput/ActionExecutionContext. Three-level ownership, existing availability/resources/deadlines and independent Agent grants are preserved.
-
-✅ ADR0159 — Unified invocation: all business functions, injected capabilities and registered handlers receive FunctionInput with ActionExecutionContext. Native request/result normalization stays in Runtime/Gateway; no protocol-specific implementation signature remains.
-
-✅ ADR0163: integration fixtures cover feedback causality and hop boundaries plus typed history schema rejection and existing cancellation/continuation paths.
-
-## Channel-owned Action ordering
-
-✅ Channel/task concurrency and resource-conflict regressions replace the retired key fixtures. Test/build evidence is recorded in [Validation-History.md](../docs/validation/Validation-History.md).
-
-## ModelKit Support ownership
-
-✅ Provider tests now import their model-owned engine targets. ModelKit contract tests exercise the shared worker cancellation lifecycle; real-model opt-ins remain separate.
-
-## 历史记录收敛（2026-10-13）
-
-✅ 已实现：历史记录页面仅保留 Assistant 聊天记录与任务记录。Assistant context 是聊天持久化事实源，任务按持久化身份关联；页面板块重新设计另行开展。
-
-❌ 历史记录页面板块重新设计及原生 UI/真机验收。
+- 各模型及设备 README 列出的真实准确率、持续运行、声学/图像质量和资源压力验收。
+- 原生 UI 导航、手势、辅助功能及长历史交互验收。

@@ -22,10 +22,14 @@ flowchart LR
 
 The [existing selector](../../../scripts/select-app-icon.sh) copies the explicitly selected 1024×1024 artwork into the current asset catalog. Previous sources remain preserved for subsequent builds. The project README references the selected asset-catalog image so its logo follows icon selection. There is no Swift implementation, runtime state or alternate-icon entitlement here.
 
-✅ lamp-arm.png uses the centered composition of the user's chosen first expression-refinement design. It retains the phone's tilt, cyan open/winking eyes and white arm while balancing opposing canvas margins. The existing selector and opaque 1024×1024 contract remain unchanged; full-resolution prior and revised artwork remain in [icon concepts](../../../output/icon-concepts/README.md).
+lamp-arm.png 为居中的白色机械臂与倾斜手机构图，手机显示青色睁眼/眨眼表情；选择器要求不透明 1024×1024 图像。构图原稿见 [icon concepts](../../../output/icon-concepts/README.md)。
 
-✅ Preserved artwork and build-time selection.
+Preserved artwork and build-time selection.
 
 ## Related design
 
 [Parent design](../README.md)
+
+## 待实现
+
+- 暂无本目录独立的实现待办；跨模块及实际模型/设备验收见所属模块说明。

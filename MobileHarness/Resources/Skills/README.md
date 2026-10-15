@@ -1,12 +1,8 @@
 # Skill 配置与撰写规范
 
-✅ 已实现：BasicSkill revision20 / Photography revision19 教学改为无 Task 的 5 次闲置 Decision 保留和 Task 终态确定回收，保留原注册与调用协议；仅当前目录缺失时加载。更新修订号，移除“每条决策结束即过期”的旧说明。
-
 ## 职责与边界
 
-✅ HistoryQuery revision8: copy the exact dialog_number id returned by list; one fresh list/corrected read is allowed after notFound. Never guess or truncate an ID; failed recovery remains explicit.
-
-✅ 每个 Skill 目录是完整的运行时加载单元：`Skill.json` 注册可用函数及依赖，`Instructions.md` 教学业务流程、规则和注意事项。本层集中维护开发规范，Skill 子目录不放 README。
+每个 Skill 目录是完整的运行时加载单元：`Skill.json` 注册可用函数及依赖，`Instructions.md` 教学业务流程、规则和注意事项。本层集中维护开发规范，Skill 子目录不放 README。
 
 Skill 是可复用的流程与能力集合，Task 是运行时目标、状态和上下文的拥有者。一个 Task 可组合多个 Skill，同一 Skill 可服务不同目标。Skill 不包含 Swift、可执行脚本、Action 实现、凭据或用户数据；[Actions](../../Actions/README.md) 独立实现函数，[Agent 配置](../Agents/README.md) 声明身份、通信和基础 Skill。
 
@@ -55,7 +51,7 @@ Skill 是可复用的流程与能力集合，Task 是运行时目标、状态和
 | `taskState` | 当前任务目标、状态、等待事项及任务关联。 |
 | `actionResults` | 已完成的真实动作反馈及产物引用。 |
 
-✅ 当前加载器校验合法值。❌ 当前没有根据此数组自动过滤、查询或注入数据；实际上下文仍由 Agent 的 Context Builder 选择和组装。新增类别须先实现读取和组装契约，不能只改 JSON。此字段不是订阅声明，也不是读取其他 Agent 私有状态的权限。
+加载器校验合法值，但 contextFields 不自动过滤、查询或注入数据；实际上下文仍由 Agent 的 Context Builder 选择和组装。新增类别须先实现读取和组装契约，不能只改 JSON。此字段不是订阅声明，也不是读取其他 Agent 私有状态的权限。
 
 ## Instructions.md 撰写标准
 
@@ -102,9 +98,9 @@ Skill 是可复用的流程与能力集合，Task 是运行时目标、状态和
 
 ## 加载、释放与 Task 生命周期
 
-✅ 默认基础能力由 Agent 的 baseSkills 初始化。`loadSkills` / `releaseSkills` 是 Control Channel Action Call；`startTask(goal, skills, ...)` 可在创建任意目标任务时同时加载 Skill 组。输入参数及数组编码以 Agent.Task canonical 元数据为准。
+默认基础能力由 Agent 的 baseSkills 初始化。`loadSkills` / `releaseSkills` 是 Control Channel Action Call；`startTask(goal, skills, ...)` 可在创建任意目标任务时同时加载 Skill 组。输入参数及数组编码以 Agent.Task canonical 元数据为准。
 
-✅ BasicSkill Instructions.md明确单步相机控制/只读查询使用 loadSkills，多轮持续目标使用 startTask；✅ 一次拍照且无后续操作也使用 loadSkills，不强制创建 Task。直接加载只扩展能力，不建立任务目标；默认决策链可包含多次模型请求；无 Task 的 Skill 跨链保留，加载/合法调用重置为 5，未使用的完整用户决策扣 1。Task 先设定目标及可判断的完成条件，等待用户时持续保留；模型根据真实结果判断目标达成或用户明确替换目标后使用 finishTask，并如实记录结果；用户取消使用 cancelTask。可恢复动作失败不等于任务结束；运行时决策异常进入 failed，重启进入 interrupted。在已有 Task 中 loadSkills 仅补充任务能力，不创建或替换目标。一次性历史查询使用直接加载，多轮筛选与确认示例使用 Task。
+BasicSkill Instructions.md明确单步相机控制/只读查询使用 loadSkills，多轮持续目标使用 startTask；一次拍照且无后续操作也使用 loadSkills，不强制创建 Task。直接加载只扩展能力，不建立任务目标；默认决策链可包含多次模型请求；无 Task 的 Skill 跨链保留，加载/合法调用重置为 5，未使用的完整用户决策扣 1。Task 先设定目标及可判断的完成条件，等待用户时持续保留；模型根据真实结果判断目标达成或用户明确替换目标后使用 finishTask，并如实记录结果；用户取消使用 cancelTask。可恢复动作失败不等于任务结束；运行时决策异常进入 failed，重启进入 interrupted。在已有 Task 中 loadSkills 仅补充任务能力，不创建或替换目标。一次性历史查询使用直接加载，多轮筛选与确认示例使用 Task。
 
 加载先展开依赖，再验证资源、canonical 函数、别名和 Channel，全部成功后提交；任一失败保持原状态。依赖链最多 8 层，展开后最多 16 个 Skill，有效函数含内部能力最多 128 项，Channel 最多 16 个。
 
@@ -132,154 +128,18 @@ Skill 是可复用的流程与能力集合，Task 是运行时目标、状态和
 | history-query / HistoryQuery | 历史查询的原生 Tools。 |
 | application-control / ApplicationControl | 应用配置、资源、设备及 UI 能力。 |
 
-✅ 仅随包加载纯资源，无远程下载或热更新。❌ contextFields 自动筛选、生产后台流程、多前台任务栈尚未实现。
+资源仅随 App 打包，无远程下载或热更新。
 
 [Resources 总览](../README.md) · [Agent 规范](../Agents/README.md) · [Skill 组合实现](../../Agents/Support/AgentSkillLoader.swift) · [Task / Context](../../Agents/Support/Context/README.md)
 
+## 当前流程规则
 
-## Action-owned documentation and Skill instruction contract
+BasicSkill 要求以当前 activeTaskID 和匹配目标判断关闭：无 Task 单步完成只回复，不生成 finishTask/cancelTask。明确目标切换可释放无关非基础近期 Skill；不确定是否放弃旧目标时先问是否继续实际 Task，保持等待状态。明确替换或正常目标完成不重复询问。continueDecision 只继续同一输入剩余新目标；释放 Skill 不代表相机/照片清理。Photography 与 HistoryQuery 的完成示例遵循同一规则。
 
-✅ Skill.json 只选择函数、调用类型、别名与 Channel；Instructions.md 包含用途、条件、流程、规则、失败处理及多轮示例。五个内置 Skill 的 revision 已升至 2。函数 doc/parameters 不重复配置；示例不再来自公共函数元数据。
+历史查询只复制 list 返回的完整 dialog_number；notFound 允许一次重新 list 和一次基于实际 ID 的修正 read，不猜测 ID 或无限重试。业务参数与 media_N 等引用来自真实反馈。语法、Channel/wait 和资源冲突由 Core/Gateway 契约决定，Skill 不重复定义。
 
-### Instructions.md 撰写标准
+## 待实现
 
-每个 Skill 必须包含：目的与适用场景、需要的事实与前置条件、有分支的执行流程、等待/完成条件、失败与重试规则、基于真实函数的多轮示例。避免把“调用工具完成任务”作为全部教学。示例必须解释执行前条件与结果到达后的下一步，ID 使用真实反馈值，占位符必须显式标为不可执行。摄影流程须检查相机、等待拍摄结果、仅描述真实图像、询问保存/忽略/重拍，并在确认处理结果后结束任务。
-
-只加载概述用于选择 Skill；加载后才注入全文。保留 Skill.json + Instructions.md 的本项目配置格式，目录内不加入编译代码或脚本。参考 [Agent Skills 规范](https://agentskills.io/specification)与[编写实践](https://agentskills.io/skill-creation/best-practices)：具体步骤、输入输出示例、边界情况和逐步披露。避免重复 Core 协议或复制全部函数文档；每个指令文件保持紧凑且低于资源加载上限。
-
-✅ ADR0213: RobotInteraction instructions teach Channel/wait ordering and explicit resource conflicts; the arm writer group remains authoritative.
-
-## Task controls through Action Calls
-
-✅ BasicSkill 的五个 Task/Skill 控制函数使用 Control Channel Action Call；App 通过 ChannelScheduler 返回已提交状态。startTask/loadSkills/releaseSkills 返回的已提交业务状态在结果屏障后重建目录并 ReACT，finishTask/cancelTask 加入回复及清理屏障后恢复默认。新目录仅影响后续请求，不允许加载轮提前调用新函数。可信固定调用复用同一实现。
-
-## Agent → Skill → Function registration
-
-✅ Implemented: Agent.json references baseSkills; Skill.json alone registers model Actions/Tools. BasicSkill owns task orchestration and environment reading; ExpressionInteraction owns expression Actions. Role instructions retain identity/responsibility/style. Business roles reuse existing Skills; internal trusted bindings remain separate. Historical snapshots are preserved.
-
-```mermaid
-flowchart LR
- A[Agent.json: identity and baseSkills] --> S[Skill.json: Action / Tool bindings]
- S --> L[Skill loader: dependency / conflict validation]
- M[Action-owned function metadata] --> L
- C[Skill Instructions: procedures and examples] --> P[Request context builder]
- R[Agent Instructions: role and style] --> P
- L --> F[Immutable request catalog]
- F --> P
- F --> G[Gateway: scope and protocol validation]
- G --> E[Actions / communication runtime]
- E --> O[Results to actual owner]
- O --> P
-```
-
-## Agent 和 Skill 撰写标准
-
-- Agent.json 只引用 Skill，不允许 functions/actions/tools；空 baseSkills 用于无需模型函数的感知 Agent。
-- Agent Instructions 只定义角色、职责和风格，不写具体函数参数、例子或业务执行流程。
-- Skill.json 是函数注册的唯一配置来源；参数与 doc 引用实际函数声明，不在 Skill 重新定义。
-- Skill Instructions 必须包含目的/范围、输入和前提、操作流程、规则与失败处理、完成条件、可执行协议一致的例子。
-- BasicSkill 常驻需要任务编排的 Agent；ExpressionInteraction 专注表情，不能混入任务控制、设备查询或机械臂动作。
-- 确定性 Agent 也通过 baseSkills 组合其函数目录，不因此新增模型 worker。
-- 同一函数可被不同 Skill/Agent 复用；完全一致的绑定合并，类型/别名/Channel 冲突整体拒绝。
-- 通信函数同样需要 Skill 注册；通信契约只限定目标与消息种类。可信内部固定调用保持代码绑定，不自动成为模型函数。
-
-## Startup publication and foreground task regression
-
-✅ BasicSkill revision 2 的教学明确摄影为本 Agent 的前台任务，必须省略所有后台字段；其他 Skill 的注册和权限保持原契约。
-
-✅ 摄影 Skill 补充自动推进规则：用户已授权拍照时，加载后必须执行下一项前置检查/摄影 Action；口头承诺不算执行，不能无故结束为等待用户。
-
-✅ BasicSkill 明确下一次 ReACT 已使用成功加载后的目录，禁止重复 startTask 或重复加载已有 Skill；Action tags 与原生 Tools 是并存的输出形式。
-
-Task/Skill 控制沿用同一函数实现与真实结果，不通过自发 send 切换模式：
-
-```mermaid
-sequenceDiagram
-    participant M as Assistant模型
-    participant C as Control Channel
-    participant A as Assistant任务状态
-    M->>C: startTask / loadSkills Action
-    C->>A: 验证来源并原子提交
-    A-->>C: 已提交结果
-    C-->>M: ActionResult + 轮次屏障
-    Note over M: 重建Skill指令与函数目录
-    M->>C: 后续任务Action或终态控制
-```
-
-
-## Agent request failure continuation
-
-✅ 已实现：BasicSkill revision 10 包含有界 Agent 异常重试；首个 HTTP/生成/解析异常可继续 Task，无法恢复或预算耗尽才 failed，取消/重启语义不变。
-
-
-## Result-driven ReACT (ADR0214)
-
-✅ ADR0214：BasicSkill revision 14 教学三种实际结果驱动规则；结束回复或完成回执不生成无意义观察轮，异常与业务输出可继续。注册 JSON 不加入反馈策略。
-
-
-✅ BasicSkill修订8：精简重复说明，把入口和可执行示例前置，明确Skill ID通过skills参数加载，不是可执行标签；保持任务/临时/后台、等待和错误规则。
-
-✅ Photography修订7补充加载后的直接Action示例，明确拍照前不得以口头准备结束，等待用户只适用于真实需要用户决策的节点。
-
-
-✅ 提示词精简已实现：统一为## Skill及###范围、流程、规则/例外、示例；BasicSkill负责控制，业务Skill负责流程。Robot共性规则集中教学，Action doc仅独有含义。编辑Skill增加revision，历史证据不重写。
-
-✅ 示例核对：RobotInteraction挥手例子必须使用函数实际参数count；不能沿用其他动作的cycles。注册与执行签名不变。
-
-✅ 真实模型回归补充：摄影概述明确覆盖关闭相机；BasicSkill声明无后台契约时不发送send，前台用户操作加载Skill。保存/忽略回执按真实CameraPhotoCommandReceipt的state提供。
-
-✅ 路由示例补充：关闭摄像头在默认目录用loadSkills(photography)，不通过send。实际操作仍必须由加载后的closeCamera完成。
-
-✅ 本次修正：普通拍照并等待保存/忽略/重拍时创建/继续前台Task；✅ 明确不要后续操作的一次拍摄用临时加载，Task 不作为 Camera 授权前提。用户明确换任务时先finishTask并等待关闭结果，再startTask；完成历史不限制新任务。
-
-✅ ApplicationControl注册调整：Bluetooth.control、ModelResources.download/cancel改为System Channel的Action Call；snapshot/readSettings/readStatus保持原生Tool，11个NexArm只由常驻RobotInteraction注册，ApplicationControl不再重复注册。别名、参数、函数实现与内部固定调用不变；模型加载后的XML教学、revision和组合/解析回归同步更新。
-
-
-✅ Implemented: ExpressionInteraction teaches closed for transient or persistent eyelids and bumps revision; registration paths/channels remain the same.
-
-✅ BasicSkill revision17 / Photography revision16 已实现：BasicSkill 的 startTask 入口严格只输出一个自闭合标签，删除极短确认例外；所有准备话术仅在 wait 内输出一次，结果续轮只说新增事实，不复述任务、上一轮话术或观察数据。Photography 按真实就绪/镜头结果分轮打开、切换、拍摄，避免前序失败仍执行依赖动作；提供可独立解析的静默入口、一次准备、disabled 恢复、保存/重拍/权限失败示例。已更新两项 revision；函数注册及运行时 Swift 不变。
-
-✅ Task关闭续轮修正：finishTask默认在收尾后结束当前决策，不重新提交已处理用户输入。仅显式continueDecision=true允许同一输入中尚未执行的新目标续轮；cancelTask始终结束。该可选参数在Action声明和Task状态中严格验证，默认false。跨边界模型回执使用实际终态/default目录，保留原始执行回执为历史证据。
-
-✅ 前置话术顺序教学修正：准备/预告语本身表示说完再操作，必须把整句放入wait，不能用文字位置表达先后。摄影示例覆盖打开摄像头与拍照；静默动作和真正独立的并行操作不加wait。只修改提示词/revision及测试修订预期，不增加执行器自动改写。
-
-
-✅ Implemented: ExpressionInteraction exposes only the two expression Actions. Cue/haptic canonical Actions remain available to trusted business composition without Skill registration. No new Skill directory or user-media asset.
-
-
-✅ Implemented: Seven cue profiles remain canonical business capabilities, absent from Skill instruction/exposure. Photography revision 13 documents automatic save/ignore departure/cues and actual-success versus feedbackIssues, without duplicate model-selected cues.
-
-✅ 2026-10-13 已实现：BasicSkill revision 14 明确成功执行报告/活动句柄不是业务返回，失败仍需 ReACT；查询或其他所需数据用显式 value。
-
-
-✅ Implemented (2026-10-13): UI.Notice.showNotice/dismissNotice and UI.Light.updateLight are canonical presentation Actions for trusted business calls, currently registered by no Skill. Neutral Actions values cross RuntimePresentation into root-owned HomeEffectsWorkflow, which retains one replaceable notice expiry and one light expiry, UUID-fenced cleanup, and explicit stop. Notices remain separate from factual ExecutionIssue history; actual upper-layer errors have display priority and Action failures remain panel-only. Decorative light accepts normalized origin, initial opacity/intensity and duration; it never changes consent, microphone or eyes. Native renderer separates light generations from listening eye generations and preserves existing exit fade. RuntimePresentation converts neutral Action requests into UI-owned values; AppPresentationWorkflow retains existing dependencies. No UI capability/business dependencies or new directories.
-
-
-✅ Implemented (2026-10-13 Skill scope review): canonical Actions unify trusted business calls and model calls; Skill exposure is optional and must serve an actual procedure. ExpressionInteraction retains two expression functions; Feedback/Notice/Light model exposure is removed while implementations and business bindings remain. ApplicationControl keeps navigation/status/resource/Bluetooth operations, removing duplicate robot functions; RobotInteraction owns them. BasicSkill removes unused send while production background contracts are absent. Affected instructions/revisions and explicit communication-only test catalogs are aligned; all six Skills were audited for prerequisites, result handling and cross-Skill references.
-
-
-## Current Skill scope audit (2026-10-13)
-
-✅ 六个 Skill 的提示词、注册、前置检查、结果/失败处理和引用关系已逐项核对。Action 定义与 Skill 暴露独立：可执行协议可以服务业务代码而不提供给 LLM。
-
-| Skill | Current functions | Procedure and decision |
-| --- | --- | --- |
-| BasicSkill revision17 | 5 Task/Skill controls + readEnvironment | 创建/关闭/取消真实任务、加载/释放流程能力、读取缺失事实。没有生产后台契约，移除 send 注册；通信协议本身保留。 |
-| ExpressionInteraction revision10 | express / setExpression | 短暂/持续双眼表情。移除提示音、振动、通知和光效绑定及教学；这些仍是 App 可用 Action。 |
-| RobotInteraction revision6 | 11 NexArm Actions | 明确用户意图的手势/电机操作及真实完成/失败反馈。说明 readEnvironment/可选 express 来自 Assistant 的已加载基础 Skill，不能假设独立宿主拥有。 |
-| Photography revision16 | 7 Camera.Capture Actions | 镜头/开关、实际拍摄、保存/忽略/重拍、显式重试。保留所有必要入口；Task/环境读取来自 Assistant BasicSkill，原生保存/忽略反馈由业务编排提供。 |
-| HistoryQuery revision6 | History.list / read native Tools | 只读分页查找与证据回答。保留两项；finishTask 只适用于具备 BasicSkill 的 Assistant 查询任务，独立宿主只返回查询结果。 |
-| ApplicationControl revision6 | openPage + 3 status Tools + 3 System Actions | 页面导航、资源/Provider/蓝牙状态、蓝牙操作和资源下载/取消。移除11个重复机械臂动作，运动流程由 RobotInteraction 管理。 |
-
-✅ 当前没有 Skill 注册 UI.Feedback、UI.Notice、UI.Light 或 Agent.Communication.send。可信业务调用、聆听复合 Action、拍照反馈、实际错误展示和底层通信实现保留。测试需要通信暴露时使用显式测试目录，不依赖生产 BasicSkill。❌ 实际 LLM 操作与真机交互效果仍须单独验收。
-
-
-✅ BasicSkill revision17 / Photography revision16 已新增“拍照但不要后续操作”分支与完整分轮示例：临时加载、按真实状态打开/拍摄、成功后简短确认并结束，不自动保存/忽略、不追问、不创建 Task。普通多轮摄影保留 Task 流程；更新两项 revision。
-
-✅ BasicSkill revision18 teaches cancellation as terminal evidence: never regenerate speech or replay effects for cancellation. Agent provider/generation/parser/observation errors end the decision without automatic retry. Successful acknowledgments remain non-business evidence.
-
-## SQLite business references
-
-✅ 已实现：BasicSkill revision19 / Photography revision18 补齐独立保存、忽略、关闭的按需加载流程，明确 unknownCapability 是调用前拒绝，不得换猜测别名反复尝试。Photography 保存/重拍示例使用 media_N，覆盖无 Task 的当前预览；注册函数和 Channel 不变。
-
-✅ Photography uses media_N/mediaID in instructions and catalog declarations; task/dialog/message references are committed SQLite business records. Runtime UUID strings are opaque technical identities, not model-readable business references. Photography revision17 records the field change.
+- contextFields 的自动选择/注入机制。
+- 声明并实现生产后台业务流程；多前台任务栈尚不提供。
+- 真实模型对完成/等待/目标转移、恢复及主动释放教学的遵循验收。

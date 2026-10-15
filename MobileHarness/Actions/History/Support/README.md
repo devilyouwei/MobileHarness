@@ -31,7 +31,6 @@ flowchart TB
 
 ## 查询算法与数据约束
 
-
 list 使用 store.listConversations 的当前会话与归档元数据，顺序沿用按 archivedAt 排序的索引，不加载归档正文。标题和 latestUser 预览各最多 40 UTF-8 字节，turnCount 取输入块数。
 
 read 查找当前或归档会话并调用 `indexedHistory()`，按项目分页。request 项取请求输入与 完整 response 字符串，带请求状态及输入/Task 关联；task 项取 goal 与 reportedSummary/failure 的组合，带实际终态和 Task 身份。user/response 分别限 80/160 UTF-8 字节，total 计算投影项数。
@@ -44,12 +43,10 @@ startNew 等待可恢复归档与新 current 创建，返回可选旧会话 ID�
 
 summarizeArchived 读取并验证归档会话，执行注入的异步标题计算，检查取消后调用 setTitle。计算或提交失败时尝试保存 nil 标题与最多 1024 字符的错误状态；该记录加入结束后才抛出原始错误。若记录失败，抛 ActionReportedError，包含 title 与 retryState 两条结果，保留主要和次要失败。
 
-✅ 服务持有共享 actor 仓库和一个根所有者可取消/加入的标题 worker。自动标题与显式重试共用单个准入槽，溢出明确记录可重试失败；不创建第二个历史仓库或自动重试。取消不能撤销已经完成的持久化；并发与仓库一致性规则由 StorageChat 负责。查询和目录本身不授予历史访问或删除确认。
+服务持有共享 actor 仓库和一个根所有者可取消/加入的标题 worker。自动标题与显式重试共用单个准入槽，溢出明确记录可重试失败；不创建第二个历史仓库或自动重试。取消不能撤销已经完成的持久化；并发与仓库一致性规则由 StorageChat 负责。查询和目录本身不授予历史访问或删除确认。
 
 [History 参数与完成](../README.md) · [StorageChat 设计](../../../Storage/Chat/README.md) · [共享契约](../../Support/Contracts/README.md)
 
+## 待实现
 
-
-## SQLite records and runtime identity
-
-✅ Implemented: technical identities are opaque UUID strings; committed business entities use dialog/message/task/media/device SQLite IDs. Consumers use Storage repositories while preserving ownership, cancellation and independent foundation boundaries. Complete messages, including each ReACT message, persist at termination; delta fragments do not persist. The custom allocator and replaced file/index implementation are removed. See the project SQLite business-record plan.
+- 暂无本目录独立的实现待办；跨模块及实际模型/设备验收见所属模块说明。

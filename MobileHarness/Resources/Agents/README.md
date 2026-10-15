@@ -2,7 +2,7 @@
 
 ## 职责与边界
 
-✅ 本目录保存随 App 打包的 Agent 身份、基础 Skill、通信声明及必要的运行时提示词。加载与组合由 [AgentConfigurations](../../Agents/Support/AgentConfigurations.swift)、[AgentSkillLoader](../../Agents/Support/AgentSkillLoader.swift) 负责，业务实现与生命周期由 [Agents](../../Agents/README.md) 负责。
+本目录保存随 App 打包的 Agent 身份、基础 Skill、通信声明及必要的运行时提示词。加载与组合由 [AgentConfigurations](../../Agents/Support/AgentConfigurations.swift)、[AgentSkillLoader](../../Agents/Support/AgentSkillLoader.swift) 负责，业务实现与生命周期由 [Agents](../../Agents/README.md) 负责。
 
 Assistant 是唯一面向用户的对话 Agent；摄影、历史查询、应用控制的对话流程通过 Skill 执行。Photographer、Memory、ApplicationControl 保留确定性事务，Memory 可在独立标题事务中调用模型。感知、合成 Agent 不因此变成对话 Agent。
 
@@ -22,7 +22,7 @@ Assistant 是唯一面向用户的对话 Agent；摄影、历史查询、应用�
 
 ## Agent.json 字段
 
-所有下列顶层字段应显式填写；空集合写 `[]`，不得用缺失或 null 表示。不要在文件中新增旧版 `actions` / `tools`、函数文档或未实现字段；加载器展开 baseSkills，并从 Skill 函数绑定和 canonical 元数据生成目录；Agent.json 出现 functions/actions/tools 会明确拒绝。
+所有下列顶层字段应显式填写；空集合写 `[]`，不得用缺失或 null 表示。配置不接受 `actions` / `tools`、函数文档或未实现字段；加载器展开 baseSkills，并从 Skill 函数绑定和 canonical 元数据生成目录；Agent.json 出现 functions/actions/tools 会明确拒绝。
 
 | 字段 | 类型 | 作用 |
 | --- | --- | --- |
@@ -65,7 +65,7 @@ Skill.json 声明 path、callType、alias，以及 Action 的 channel。具体�
 
 `Instructions.md` 是 UTF-8 的可信静态指令。应说明身份、职责、交互约束及与 Skill / 独立 Agent 的关系；不要写具体用户目标、历史任务、设备当前状态或执行结果。那些内容由结构化 Context Builder 作为数据组装。不要复制 Core 协议或 Skill 流程，避免重复指令和 token 膨胀。
 
-✅ Assistant/Instructions.md 已明确：无最少回复句数，遵守 Skill 要求的纯 Action 输出；已发送上下文中的重复话术不是新回复范例。Task 入口和 wait 的具体约束继续由 BasicSkill 拥有，业务分轮示例由 Photography 拥有，不增加结果去重或输出改写器。
+Assistant/Instructions.md 已明确：无最少回复句数，遵守 Skill 要求的纯 Action 输出；已发送上下文中的重复话术不是新回复范例。Task 入口和 wait 的具体约束继续由 BasicSkill 拥有，业务分轮示例由 Photography 拥有，不增加结果去重或输出改写器。
 
 模板 JSON 只有 `version` 和 `templates`：version 为 1，templates 为名称到字符串的映射，1–64 项；每段最多 16 KiB。变量写作 `{{name}}`，渲染调用提供的变量集合必须与模板完全一致；插入值不会再次作为模板解析。修改变量名必须同步修改调用点。单次模板渲染及 Assistant system 输出均最多 64 KiB。
 
@@ -95,24 +95,21 @@ Assistant 当前模板契约：
 
 ## 当前约束与相关设计
 
-✅ Catalog 最多 32 个 Agent / 64 个 Skill；单资源最多 64 KiB；资产缓存最多 256 项。无远程下载或热更新，错误明确传播，不以空配置兜底。✅ Skill / 目录快照与任务历史由 Agent Context 保存，资源文件不保存运行时状态。
-
-❌ 生产后台任务契约仍为空；远程资源更新和多前台任务栈未实现。
+Catalog 最多 32 个 Agent / 64 个 Skill；单资源最多 64 KiB；资产缓存最多 256 项。无远程下载或热更新，错误明确传播，不以空配置兜底。Skill / 目录快照与任务历史由 Agent Context 保存，资源文件不保存运行时状态。
 
 [Resources 总览](../README.md) · [Skill 规范](../Skills/README.md) · [Support](../../Agents/Support/README.md) · [Task / Context](../../Agents/Support/Context/README.md)
 
-
 ## Action-owned documentation and Skill instruction contract
 
-✅ Agent.json 保留身份、基础 Skill 与通信契约。App 安装各 Action 编译生成的中立目录后，加载器解析 canonical path 并生成模型目录。角色 Instructions 不包含函数示例；示例由加载 Skill 注入。
+Agent.json 保留身份、基础 Skill 与通信契约。App 安装各 Action 编译生成的中立目录后，加载器解析 canonical path 并生成模型目录。角色 Instructions 不包含函数示例；示例由加载 Skill 注入。
 
 ## Task controls through Action Calls
 
-✅ BasicSkill 的五个 Task/Skill 控制函数使用 Control Channel Action Call；App 通过 ChannelScheduler 返回已提交状态。startTask/loadSkills/releaseSkills 返回的已提交业务状态在结果屏障后重建目录并 ReACT，finishTask/cancelTask 加入回复及清理屏障后恢复默认。新目录仅影响后续请求，不允许加载轮提前调用新函数。可信固定调用复用同一实现。
+BasicSkill 的五个 Task/Skill 控制函数使用 Control Channel Action Call；App 通过 ChannelScheduler 返回已提交状态。startTask/loadSkills/releaseSkills 返回的已提交业务状态在结果屏障后重建目录并 ReACT，finishTask/cancelTask 加入回复及清理屏障后恢复默认。新目录仅影响后续请求，不允许加载轮提前调用新函数。可信固定调用复用同一实现。
 
 ## Agent → Skill → Function registration
 
-✅ Implemented: Agent.json references baseSkills; Skill.json alone registers model Actions/Tools. BasicSkill owns task orchestration and environment reading; ExpressionInteraction owns expression Actions. Role instructions retain identity/responsibility/style. Business roles reuse existing Skills; internal trusted bindings remain separate. Historical snapshots are preserved.
+Agent.json references baseSkills; Skill.json alone registers model Actions/Tools. BasicSkill owns task orchestration and environment reading; ExpressionInteraction owns expression Actions. Role instructions retain identity/responsibility/style. Business roles reuse existing Skills; internal trusted bindings remain separate. Historical snapshots are preserved.
 
 ```mermaid
 flowchart LR
@@ -129,12 +126,12 @@ flowchart LR
  O --> P
 ```
 
+## 提示词职责与失败
 
-## Agent request failure continuation
+角色与风格定义在 Instructions.md；Assistant Prompts.json 提供请求/结果/异常等模板，不包含 system 角色正文。
 
-✅ Assistant/Prompts.json 不再提供 decisionFailure 自动重试模板；Agent 自身异常保留在失败请求/历史中并结束决策，业务执行错误继续使用 executionObservations。
+Assistant 的 Agent/Provider 异常终止当前 Decision 并保留历史/效果证据；真实业务失败通过 executionObservations 提供给后续推理。
 
+## 待实现
 
-✅ 提示词精简已实现：角色与风格统一在Instructions.md，Assistant Prompts.json移除system键，其余请求/结果/异常模板保留。
-
-✅ Assistant no longer registers decisionFailure; failed Agent attempts terminate and retain history/effects. Business failures still use executionObservations.
+- 生产后台任务契约仍为空；远程资源更新和多前台任务栈未实现。

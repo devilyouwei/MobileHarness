@@ -63,16 +63,10 @@ Task 声明描述 JSON 数组 Skills、前台/后台 Task 字段和终态控制�
 
 ## 生命周期与约束
 
-✅ 资源和 Provider 服务有独立准入及事务状态，见 Support。普通入口没有统一队列、原生设备 worker 或重试循环；异步异常和已经提交的结果按各端点契约返回。
-
-❌ runtimeInfo 没有实时诊断实现。声明参数与可信入口解析的开放范围不是同一个集合，不能据函数存在推断模型权限或原生能力可用。
+资源和 Provider 服务有独立准入及事务状态，见 Support。普通入口没有统一队列、原生设备 worker 或重试循环；异步异常和已经提交的结果按各端点契约返回。
 
 [Actions 设计](../README.md) · [System 服务实现](Support/README.md) · [共享契约](../Support/Contracts/README.md)
 
+## 待实现
 
-
-
-
-## SQLite records and runtime identity
-
-✅ Implemented: technical identities are opaque UUID strings; committed business entities use dialog/message/task/media/device SQLite IDs. Consumers use Storage repositories while preserving ownership, cancellation and independent foundation boundaries. Complete messages, including each ReACT message, persist at termination; delta fragments do not persist. The custom allocator and replaced file/index implementation are removed. See the project SQLite business-record plan.
+- runtimeInfo 没有实时诊断实现。声明参数与可信入口解析的开放范围不是同一个集合，不能据函数存在推断模型权限或原生能力可用。

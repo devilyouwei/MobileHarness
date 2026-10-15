@@ -4,26 +4,20 @@ Purpose: verify ModelKit-owned registration without requiring weights or device 
 
 Default registration tests require no downloaded weights and do not initialize a GPU engine.
 
-- ✅ Default capability registrations remain lightweight with an absent resource directory.
-- ✅ Repeated synthesis retrieval shares one instance; default synthesis and explicit MOSS-TTS-Nano retrieval share one instance. Missing resources fail without system speech fallback.
-- ✅ Missing judgment is explicit. Mapping conflicts and lifecycle routing are covered by ModelKitRuntimeTests.
-- ❌ These tests do not establish real inference or physical-device acceptance.
+- Default capability registrations remain lightweight with an absent resource directory.
+- Repeated synthesis retrieval shares one instance; default synthesis and explicit MOSS-TTS-Nano retrieval share one instance. Missing resources fail without system speech fallback.
+- Missing judgment is explicit. Mapping conflicts and lifecycle routing are covered by ModelKitRuntimeTests.
 
-✅ Production assembly tests cover concurrent first access, shared manager identity, conflicting roots and terminal shutdown. Runtime tests use ModelAssembly SPI for isolated containers; production has no public manager constructor.
+Production assembly tests cover concurrent first access, shared manager identity, conflicting roots and terminal shutdown. Runtime tests use ModelAssembly SPI for isolated containers; production has no public manager constructor.
 
-✅ Pose default registration remains lazy and typed acquisition does not load absent weights.
+Pose default registration remains lazy and typed acquisition does not load absent weights.
 
-✅ Repeated .pose acquisition returns the identical provider; camera pipeline incarnations share its model lifecycle.
+Repeated .pose acquisition returns the identical provider; camera pipeline incarnations share its model lifecycle.
 
+SpeechSelectionTests uses isolated registration/storage fixtures to verify installed local selection, unavailable/missing artifact fallback and forced system preference. Default assembly tests verify stable facades and separate explicit MOSS identity.
 
-✅ SpeechSelectionTests uses isolated registration/storage fixtures to verify installed local selection, unavailable/missing artifact fallback and forced system preference. Default assembly tests verify stable facades and separate explicit MOSS identity.
+SpeechSelection uses independent recognition/synthesis choices. Recognition depends only on Nemotron, VAD selects installed available Silero regardless of recognition preference, and synthesis depends only on MOSS. Concrete provider registrations remain separate.
 
+## 待实现
 
-✅ SpeechSelection uses independent recognition/synthesis choices. Recognition depends only on Nemotron, VAD selects installed available Silero regardless of recognition preference, and synthesis depends only on MOSS. Concrete provider registrations remain separate.
-
-
-✅ Fixtures use UUID/opaque runtime strings and committed database business references; concurrency, restart, invalid-ID and failure behavior remain covered.
-
-## Identity ownership
-
-✅ Runtime and foundation identities use opaque protocol strings or Foundation UUID; no project ID-generator dependency exists. SQLite-backed Storage publishes committed business references and App injects repositories/maps native Bluetooth identities. Tests preserve caller identity, cancellation and failure semantics. See [current storage design](../../MobileHarness/Storage/README.md) for relational allocation and persistence.
+- These tests do not establish real inference or physical-device acceptance.

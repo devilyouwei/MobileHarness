@@ -1,164 +1,34 @@
 # ApplicationControl
 
-## 职责与边界
+## 职责与直接关系
 
-✅ 配置、模型资源和设备事务、环境事实；不承担普通对话。 Agents 管业务策略和上下文，Gateway 管权限/传输，Actions 管函数实现；原生设备与 UI 端口由 App 注入。没有跨 Agent 共享可写聊天历史。
+拥有设置、模型资源、Provider、设备、导航及环境事实的确定性事务，不承担普通对话。UI/App 提交类型化意图，Gateway 校验和投递，本角色发出固定函数调用，Actions 使用注入能力完成读写或呈现。Assistant 可以通过 application-control Skill 调用相同函数，不需要创建本角色的对话。
 
-## 文件分工
+## 内部结构
 
-ApplicationControlAgent.swift 管生命周期/事务和环境；ApplicationControlWorkflow.swift 管确定性步骤；ApplicationControlProcessing.swift 管状态与预处理。
-
-## 输入、输出与流程
-
-UI 数据操作直接提交可信事务；导航、展开和筛选留在 UI。Assistant application-control Skill 可以调用同一批 Action 控制 UI 或设备；函数复用不要求委派 Agent。
-
-## Context 与 Builder
-
-待执行调用、环境契约、事务关联。 状态通过独立 Repository 原子提交；Builder 选择确定版本，不修改已发出的请求。写入失败不产生依赖未提交状态的新调用。
-
-## 生命周期、容量与失败
-
-✅ 已实现（2026-10-13 scopeClosed 修复）：ApplicationControlAgent.prepareSignal 明确选择最近 4096 条 Signal 证据及消费批次，超限从最旧记录淘汰并累计淘汰计数。已有 8192 条有效 context 在首次新输入的原子提交中收敛，不清空模型配置或任务状态。pending 调用、任务和环境当前值由独立状态持有，证据不是待执行队列；保留现有写入失败传播和终止语义。容量饱和不应终止服务或关闭根设置通信 scope。
-
-设置页机械臂测试仍保留自身注册。环境 publish 单向、目标拒绝不影响发送者；有确认的 send 仅用于真正独立的后台事务。 事务/输出消费由 App 根生命周期持有，独立于页面。输出最多 256，状态提交等待最多 32；通信消费者最多 16 待处理、4 并发。超限明确失败。取消加入已接纳工作清理；重启标记未完成任务中断，不重放设备动作。共享 Chat 的输入、调用和执行预算见 [Chat](../Support/Chat/README.md)。
-
-## 函数权限与注册
-
-[Agent.json](../../Resources/Agents/ApplicationControl/Agent.json) 声明固定函数；业务模型目录由加载 Skill 决定。实际实现/参数契约以 [owning @Action declarations](../../Actions/README.md) 为准。Internal 固定函数不会自动向模型开放。
-
-本角色没有对话 worker。以下为本角色固定函数声明；实际固定调用由该角色 workflow 注册，不能把固定函数表误认为普通对话目录。
-
-| 类型 / Channel | 别名 | 函数 | 参数 | 说明 |
-| --- | --- | --- | --- | --- |
-| action / Display | `openPage` | `UI.Navigation.open` | destination 必填 | On a conversational request, open the requested application page through authorized UI presentation. Touch navigation is local and does not call this Agent. |
-| action / Robot | `shakeBase` | `NexArm.Motion.shakeBase` | cycles 必填, speed, acceleration | Perform the configured base-shaking gesture and return home. |
-| action / Robot | `waveWrist` | `NexArm.Gesture.waveWrist` | count 必填, speed, acceleration | Wave the wrist with the configured arm gesture, then return home. |
-| action / Robot | `tiltWrist` | `NexArm.Gesture.tiltWrist` | direction 必填, speed, acceleration | Tilt the wrist in the requested direction and return home. |
-| action / Robot | `lookAround` | `NexArm.Gesture.lookAround` | cycles 必填, speed, acceleration | Perform the configured arm look-around gesture and return home. |
-| action / Robot | `celebrate` | `NexArm.Gesture.celebrate` | cycles 必填, speed, acceleration | Perform the configured celebration gesture and return home. |
-| action / Robot | `dance` | `NexArm.Gesture.dance` | cycles 必填, speed, acceleration | Perform the configured arm dance and return home. |
-| action / Robot | `nodHead` | `NexArm.Gesture.nodHead` | cycles 必填, speed, acceleration | Nod using motor4, returning home; leave other motors untouched. |
-| action / Robot | `shakeHead` | `NexArm.Gesture.shakeHead` | cycles 必填, speed, acceleration | Shake the head using motor5, returning home; leave other motors untouched. |
-| action / Robot | `resetArm` | `NexArm.Motion.reset` | speed, acceleration | Reset configured homes for motors1–5; never move the gripper. |
-| action / Robot | `moveMotor` | `NexArm.Motion.moveMotor` | motor 必填, target 必填, speed, acceleration | Move only the selected motor to its native encoder target. |
-| action / Robot | `resetMotor` | `NexArm.Motion.resetMotor` | motor 必填, speed, acceleration | Reset only the selected motor to its configured home; motor6 needs an explicitly configured home. |
-| tool / — | `ModelResources.snapshot` | `System.ModelResources.snapshotResources` | — | Read current shared model resource inventory, installed groups and progress. Does not download, remove or switch a model. |
-| tool / — | `Provider.readSettings` | `System.Provider.readSettings` | — | Read confirmed cloud-enabled status and selected cloud model. Contains no URL/key. Does not probe provider availability or change configuration. |
-| tool / — | `Bluetooth.readStatus` | `System.Device.readStatus` | — | Read current Bluetooth power/connection and discovered device IDs. Does not scan or move a robot. |
-| action / System | `Bluetooth.control` | `System.Device.control` | operation 必填, id | Submit an explicit Bluetooth connection/discovery command. Accepted is not connected or physically completed. Read status to confirm actual state. |
-| tool / — | `App.readEnvironment` | `System.Device.readEnvironment` | — | Read the latest admitted scene, navigation and device capability facts only when needed and absent from context. These are observations, not proof of physical completion. Wait for the result before deciding dependent actions. |
-| action / System | `ModelResources.download` | `System.ModelResources.download` | id 必填, endpoint 必填, allowsCellular 必填 | Admit a model download using an explicit source. Admission does not mean installed; read the shared inventory for progress. |
-| action / System | `ModelResources.cancel` | `System.ModelResources.cancel` | id 必填 | Cancel and join an admitted model transfer. Failure is returned without replay. |
-
-## 固定内部权限
-
-| Protocol | Canonical function | Channel | Parameters | Registration source |
-| --- | --- | --- | --- | --- |
-| InternalTool | `System.Device.control` | — | `operation`, `id?`, `value?`, `action?`, `fence?` | [ApplicationControlProcessing.swift](ApplicationControlProcessing.swift) |
-| InternalTool | `UI.Navigation.open` | — | `destination` | [ApplicationControlProcessing.swift](ApplicationControlProcessing.swift) |
-| InternalTool | `System.ModelResources.download` | — | `id`, `endpoint`, `allowsCellular` | [ApplicationControlProcessing.swift](ApplicationControlProcessing.swift) |
-| InternalTool | `System.ModelResources.cancel` | — | `id` | [ApplicationControlProcessing.swift](ApplicationControlProcessing.swift) |
-| InternalTool | `System.ModelResources.remove` | — | `id` | [ApplicationControlProcessing.swift](ApplicationControlProcessing.swift) |
-| InternalTool | `System.Provider.restoreSettings` | — | `requestID` | [ApplicationControlProcessing.swift](ApplicationControlProcessing.swift) |
-| InternalTool | `System.Provider.saveSettings` | — | `requestID` | [ApplicationControlProcessing.swift](ApplicationControlProcessing.swift) |
-| InternalTool | `UI.ResourcePresentation.showProviderResult` | — | `requestID`, `failureCode?` | [ApplicationControlProcessing.swift](ApplicationControlProcessing.swift) |
-| InternalTool | `System.Provider.discoverModels` | — | `requestID` | [ApplicationControlProcessing.swift](ApplicationControlProcessing.swift) |
-| InternalTool | `System.ModelResources.snapshotResources` | — | — | [ApplicationControlProcessing.swift](ApplicationControlProcessing.swift) |
-| InternalTool | `UI.ResourcePresentation.showResources` | — | `generation` | [ApplicationControlProcessing.swift](ApplicationControlProcessing.swift) |
-| InternalTool | `UI.ResourcePresentation.showResourceFailure` | — | `generation`, `message` | [ApplicationControlProcessing.swift](ApplicationControlProcessing.swift) |
-| InternalTool | `UI.ResourcePresentation.showResourceOperationFailure` | — | `message` | [ApplicationControlProcessing.swift](ApplicationControlProcessing.swift) |
-| InternalTool | `UI.ResourcePresentation.showResourcePreferenceFailure` | — | `reason`, `message` | [ApplicationControlProcessing.swift](ApplicationControlProcessing.swift) |
-| InternalTool | `System.ModelResources.restoreSource` | — | — | [ApplicationControlProcessing.swift](ApplicationControlProcessing.swift) |
-| InternalTool | `System.ModelResources.saveSource` | — | `endpoint`, `allowsCellular`, `recognition`, `synthesis` | [ApplicationControlProcessing.swift](ApplicationControlProcessing.swift) |
-| InternalTool | `System.ModelResources.configureSpeech` | — | `recognition`, `synthesis` | [ApplicationControlProcessing.swift](ApplicationControlProcessing.swift) |
-
-### Declared input schemas
-
-| Contract | Version | Kind |
-| --- | --- | --- |
-| `action.result` | 1 | `actionResult` |
-| `app.environment` | 1 | `observation` |
-| `app.interaction` | 1 | `observation` |
-| `provider.settings` | 1 | `observation` |
-| `provider.discovery` | 1 | `observation` |
-| `model.resource.hostFailure` | 1 | `observation` |
-| `model.resource.state` | 1 | `observation` |
-| `model.resource.intent` | 1 | `observation` |
-| `tool.result` | 1 | `toolResult` |
-| `task.request` | 1 | `observation` |
-| `task.input` | 1 | `observation` |
-| `task.progress` | 1 | `observation` |
-| `task.result` | 1 | `observation` |
-| `task.cancel` | 1 | `observation` |
-| `generation.round.result` | 1 | `roundResult` |
-| `communication.receipt` | 1 | `communicationReceipt` |
-| `user.text` | 1 | `text` |
-
-Directed input schemas and static subscriptions are distinct; admission also validates the runtime sender and scope.
-
-## 状态与验收
-
-✅ 动态 Skill/确定性职责拆分已实现。❌ 摄影、保存、尾音、语音竞争及模式切换的真机验收仍需单独进行。
-
-✅ 收紧资源中的普通文本/模型反馈和语音对话通信，保留确定性协议。
-
-## 输入与通信授权
-
-| 输入契约 | 类型 |
+| 文件 | 职责 |
 | --- | --- |
-| `app.environment` | observation |
-| `app.interaction` | observation |
-| `provider.settings` | observation |
-| `provider.discovery` | observation |
-| `model.resource.hostFailure` | observation |
-| `model.resource.state` | observation |
-| `model.resource.intent` | observation |
-| `tool.result` | toolResult |
-| `task.request` | observation |
-| `task.input` | observation |
-| `task.progress` | observation |
-| `task.result` | observation |
-| `task.cancel` | observation |
-| `communication.receipt` | communicationReceipt |
+| ApplicationControlAgent.swift | 根生命周期、接纳、环境及事务结果 |
+| ApplicationControlWorkflow.swift | 查询、提交、配置和失败呈现的固定步骤 |
+| ApplicationControlProcessing.swift | State、预处理及固定调用绑定 |
 
-| 方式 | 契约 | 目标/来源 |
-| --- | --- | --- |
-| send Action | `task.progress` | `assistant` |
-| send Action | `task.result` | `assistant` |
-| subscribe | `model.resource.intent` | `runtime` |
-| subscribe | `model.resource.state` | `model.resources` |
-| subscribe | `model.resource.hostFailure` | `app.resources` |
-| subscribe | `app.environment` | `app.environment` |
-| subscribe | `app.interaction` | `user` |
-| subscribe | `model.resource.intent` | `user` |
-| subscribe | `provider.settings` | `user` |
-| subscribe | `provider.discovery` | `user` |
+状态保存待执行调用、类型化环境值与事务关联；Builder/执行器只使用已提交快照。具体资源、Provider 和设备函数契约见 [System Actions](../../Actions/System/README.md)，UI/原生实现由 App 注入。
 
+## 输入与事务流程
 
-## 固定函数与 Skill
+[Agent.json](../../Resources/Agents/ApplicationControl/Agent.json) 声明 model.resource.intent/state/hostFailure、app.environment/interaction、provider.settings/discovery 的可信来源及 task.progress/result 通信。baseSkills 为 application-control；当前模型绑定是导航、状态查询、蓝牙操作与资源下载/取消，机械臂对话动作属于 robot-interaction。固定设置/设备实现与模型暴露分别注册。
 
-✅ 资源不再包含 Permissions.json，Agent.json 的 baseSkills 引用 Skill，Skill.json 声明函数。业务模型函数由已加载 Skill 提供；固定调用与模型轮次分别验证，详见 [资源规范](../../Resources/Agents/README.md)。
+资源刷新验证 root session/revision，读取并提交有界库存；失败先调用相应失败呈现，再释放事务 gate。下载/取消/删除的接纳不是安装或物理完成，结果保留实际状态。偏好先持久化，再应用 speech binding；后续失败不伪造回滚。Provider 凭据通过私有 requestID 暂存，不出现在 Signal/模型上下文中。
 
-## Agent → Skill → Function registration
+环境 publish 单向，订阅方拒绝不反馈发送方；有确认的 send 只用于声明的独立业务工作。导航展开、滚动与未提交草稿留在 UI，提交后的业务调用有根 owner，独立于页面。
 
-✅ Implemented: Agent.json references baseSkills; Skill.json alone registers model Actions/Tools. BasicSkill owns task orchestration and environment reading; ExpressionInteraction owns expression Actions. Role instructions retain identity/responsibility/style. Business roles reuse existing Skills; internal trusted bindings remain separate. Fixed transaction/task snapshots remain authoritative.
+## 容量、取消与失败
 
-角色基础函数目录由资源中的 baseSkills（application-control）组合；上表供函数 review 使用，不是 Agent.json 中的另一份注册。函数说明属于实现，流程教学属于 Skill。
+最近 4096 条 Signal 证据/消费批次滚动保留并累计淘汰计数；pending 调用、任务和当前环境独立保存，证据不是执行队列。输出容量 256、状态提交等待及通信消费者有界，溢出明确拒绝。原子提交失败保留原状态并传播，不重放不确定效果或关闭无关根 scope。
 
-✅ 本次提示词精简同步注册函数说明，保持职责、类型和参数不变；公共执行语义见Actions owning README。
+取消加入已接纳调用和呈现清理；重启不恢复热队列或重放设备动作。仓库只通过中立协议注入，运行时状态位于进程内存；设置/资源偏好、凭据及设备事实按各自 owning 模块持久化。
 
-✅ ApplicationControl注册调整：Bluetooth.control、ModelResources.download/cancel改为System Channel的Action Call；snapshot/readSettings/readStatus保持原生Tool，11个NexArm对话动作仅由RobotInteraction注册，ApplicationControl Skill不再重复注册。别名、参数、函数实现与内部固定调用不变；模型加载后的XML教学、revision和组合/解析回归同步更新。
+## 待实现
 
-
-✅ Skill scope review: application-control exposes seven navigation/status/System entries only. Removing robot model bindings does not remove trusted device-operation or settings Action implementations.
-
-
-✅ scopeClosed 修复验证：真实手机的原 8192 条 context 在修复版启动后自动收敛为 4096 条，restoreSource 与后续 Tool 结果成功；满额持久化回归和完整串行测试通过。❌ 模型推理/原生页面显示及声学效果仍是独立验收。详见 [验证记录](../../../docs/validation/Validation-History.md#2026-10-13--saturated-applicationcontrol-context-and-scopeclosed-recovery)。
-
-
-
-
-
-## SQLite records and runtime identity
-
-✅ Implemented: technical identities are opaque UUID strings; committed business entities use dialog/message/task/media/device SQLite IDs. Consumers use Storage repositories while preserving ownership, cancellation and independent foundation boundaries. Complete messages, including each ReACT message, persist at termination; delta fragments do not persist. The custom allocator and replaced file/index implementation are removed. See the project SQLite business-record plan.
+- 共享 push 型资源状态源及对应的观察适配能力。
+- 真实模型调用、原生配置/设备交互与后台资源传输的独立验收。

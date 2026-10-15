@@ -45,25 +45,18 @@ Queued cancellation is notStarted; failure/cancellation after start conservative
 
 OutputExecutionResult retains 256 correlated output outcomes with counted eviction and ≤512-character descriptions. Rejected calls have no fabricated scheduled execution record. Tool value/isError/callID/producer code survive separate deliveryFailure. Handler failure is call-local; identity/scheduling structure failure cancels its Action tree. Explicit executing-task cancellation propagates rather than appending fabricated success.
 
-✅ Pre-effect reservation, bounded message-only retry and separate effect/delivery evidence are implemented.
-
-❌ Durable result delivery, crash recovery and generic activity outbox are not implemented.
+Pre-effect reservation, bounded message-only retry and separate effect/delivery evidence are implemented.
 
 ## Related design
 
 [Parent design](../README.md)
 
-✅ 待投递 ActionResult 无 10 秒 TTL 或四次重试耗尽。保留有界 outbox 与退避，直到确认接纳、目标关闭或拥有会话清理；投递不以一秒尝试超时取消。
+待投递 ActionResult 保存在有界 outbox，容量拒绝按退避重试，直到确认接纳、目标关闭或拥有会话清理；投递没有独立计时终止，不重放效果。
 
+OutputExecutionResult 已增加 isCancellationOnly 纯取消分类。原始调用结果、Tool isError 和取消报告仍保留在 executionResults；仅 cancelled 且不含其他执行/投递失败的结果不进入运行异常快照/首页 toast。不能按 CancellationError 文本过滤；读取类型化代码和完整报告，混合失败/超时/投递失败照常记录。OutputGateway 将局部抛出的 CancellationError 归为 cancelled，调用方真实任务取消仍传播并加入清理。
 
-✅ OutputExecutionResult 已增加 isCancellationOnly 纯取消分类。原始调用结果、Tool isError 和取消报告仍保留在 executionResults；仅 cancelled 且不含其他执行/投递失败的结果不进入运行异常快照/首页 toast。不能按 CancellationError 文本过滤；读取类型化代码和完整报告，混合失败/超时/投递失败照常记录。OutputGateway 将局部抛出的 CancellationError 归为 cancelled，调用方真实任务取消仍传播并加入清理。
+OutputExecutionResult.isError excludes pure cancellation while preserving raw cancelled code/report/outcome. Independent real execution or result-delivery failures remain errors; no string-based filtering.
 
-✅ OutputExecutionResult.isError excludes pure cancellation while preserving raw cancelled code/report/outcome. Independent real execution or result-delivery failures remain errors; no string-based filtering.
+## 待实现
 
-
-
-
-
-## SQLite records and runtime identity
-
-✅ Implemented: technical identities are opaque UUID strings; committed business entities use dialog/message/task/media/device SQLite IDs. Consumers use Storage repositories while preserving ownership, cancellation and independent foundation boundaries. Complete messages, including each ReACT message, persist at termination; delta fragments do not persist. The custom allocator and replaced file/index implementation are removed. See the project SQLite business-record plan.
+- Durable result delivery, crash recovery and generic activity outbox are not implemented.

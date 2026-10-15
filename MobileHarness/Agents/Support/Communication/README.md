@@ -43,7 +43,7 @@ Sound freshness is 500 ms, pose one second and partial transcript two seconds. C
 
 Configuration declares model exposure separately from internal functions. Many-to-many Action registration does not alter schemas or share role histories. New task send uses kind=request without taskID; follow-up/cancellation requires existing scoped task identity.
 
-✅ Typed business catalog and passive fact schemas are implemented.
+Typed business catalog and passive fact schemas are implemented.
 
 ## Related design
 
@@ -55,17 +55,12 @@ AgentBackgroundTaskRequest validates bounded target/contract/payload and constru
 
 AgentTaskSkillIDs decodes the bounded Skill ID array in task/control input. It is content validation only; it does not read Skill assets or call Context. Context reuses this decoder, so message contracts never depend on task lifecycle implementations.
 
-✅ AgentTasks.swift owns the neutral send function declaration alongside task message contracts. BasicSkill selects model exposure; Chat adapter only refines documentation to permitted targets and kinds. No automatic model registration is derived from communication rights.
+AgentTasks.swift owns the neutral send function declaration alongside task message contracts. BasicSkill selects model exposure; Chat adapter only refines documentation to permitted targets and kinds. No automatic model registration is derived from communication rights.
 
-✅ ActionFunction 基础默认执行超时为 30 秒，dynamicTimeout 优先于静态 timeout；未声明也有默认预算。Speech.Playback 使用显式 300 秒。超时取消并加入清理，保留真实效果，以 ActionResult 返回；工具复用同一函数契约。通信转发不制造 TTL，队列和整个对话不附加默认时限。
+ActionFunction 基础默认执行超时为 30 秒，dynamicTimeout 优先于静态 timeout；未声明也有默认预算。Speech.Playback 使用显式 300 秒。超时取消并加入清理，保留真实效果，以 ActionResult 返回；工具复用同一函数契约。通信转发不制造 TTL，队列和整个对话不附加默认时限。
 
+ListeningIntent accepts optional explicit enabled consent; absence retains the existing toggle contract. Host user-off uses enabled=false and next hold uses enabled=true, preventing stale reply occupancy from changing user consent. The v1 payload remains bounded to 128 bytes and provenance stays user-only.
 
-✅ Implemented: ListeningIntent accepts optional explicit enabled consent; absence retains the existing toggle contract. Host user-off uses enabled=false and next hold uses enabled=true, preventing stale reply occupancy from changing user consent. The v1 payload remains bounded to 128 bytes and provenance stays user-only.
+## 待实现
 
-
-
-
-
-## SQLite records and runtime identity
-
-✅ Implemented: technical identities are opaque UUID strings; committed business entities use dialog/message/task/media/device SQLite IDs. Consumers use Storage repositories while preserving ownership, cancellation and independent foundation boundaries. Complete messages, including each ReACT message, persist at termination; delta fragments do not persist. The custom allocator and replaced file/index implementation are removed. See the project SQLite business-record plan.
+- 暂无本目录独立的实现待办；跨模块及实际模型/设备验收见所属模块说明。

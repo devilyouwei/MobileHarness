@@ -52,7 +52,7 @@ flowchart TB
 | ResourcePresentation | showResources、showResourceFailure、showResourceOperationFailure、showResourcePreferenceFailure、showProviderResult | 端点呈现接纳，保留实际资源结果或 presented |
 | Navigation | open：destination | 导航端点完成后返回 presented |
 
-✅ 普通呈现函数静态预算为 5 秒，showResources 为 60 秒。setExpression 是 state kind，其余入口是 finite；finite 不表示所有视觉插值都要结束，应按各函数的 completion 理解。
+普通呈现函数静态预算为 5 秒，showResources 为 60 秒。setExpression 是 state kind，其余入口是 finite；finite 不表示所有视觉插值都要结束，应按各函数的 completion 理解。
 
 ## 关键参数与算法
 
@@ -74,10 +74,6 @@ Notice 的非空文字限 1024 UTF-8 字节，tone 为 info/warning/error（默�
 
 [Actions 设计](../README.md) · [值类型与目录](Support/README.md) · [App 呈现适配](../../App/Adapters/README.md)
 
+## 待实现
 
-
-
-
-## SQLite records and runtime identity
-
-✅ Implemented: technical identities are opaque UUID strings; committed business entities use dialog/message/task/media/device SQLite IDs. Consumers use Storage repositories while preserving ownership, cancellation and independent foundation boundaries. Complete messages, including each ReACT message, persist at termination; delta fragments do not persist. The custom allocator and replaced file/index implementation are removed. See the project SQLite business-record plan.
+- 暂无本目录独立的实现待办；跨模块及实际模型/设备验收见所属模块说明。

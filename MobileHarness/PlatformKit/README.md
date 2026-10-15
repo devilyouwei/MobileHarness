@@ -48,9 +48,7 @@ Capture layout is fixed for an admitted audio stream. Spatial-to-mono fallback i
 
 Callbacks use serial native queues or short mutex sections, never UI state. App owns foreground fences and joins teardown; physical safety cannot rely on background scheduling. SDK diagnostics retain bounded format/traffic/error facts, not media or business context.
 
-✅ Audio capture/playback/conversion, camera/photo/library capabilities and USB/BLE transports.
-
-❌ Movie recording and an autonomous hardware safety controller.
+Audio capture/playback/conversion, camera/photo/library capabilities and USB/BLE transports.
 
 Device acceptance evidence is recorded in [validation history](../../docs/validation/Validation-History.md).
 
@@ -58,18 +56,18 @@ Device acceptance evidence is recorded in [validation history](../../docs/valida
 
 [Parent design](../README.md) · [Audio](Audio/README.md) · [Connectivity](Connectivity/README.md) · [Core](Core/README.md) · [Vision](Vision/README.md)
 
+AppleAudioIO exposes generic playClip for bounded PCM before capture, reusing the existing native drain/cancellation implementation. No app chime/music or presentation policy enters PlatformKit.
 
-✅ Implemented: AppleAudioIO exposes generic playClip for bounded PCM before capture, reusing the existing native drain/cancellation implementation. No app chime/music or presentation policy enters PlatformKit.
+native PCM continuity evidence is distinguished from bounded queue overflow; stopPlayback cancels/wakes the owned native playback operation without stopping capture. Upper-layer consent/reply policy remains in App.
 
+Audio owns generic NativeHapticFeedback with public UIKit/CoreHaptics support checks, one bounded operation, cached prepared generators and explicit busy/unavailable/invalid-request failures. It owns no listening policy or cue selection. AppleAudioIO enables supported haptics during recording through the public AVAudioSession API.
 
-✅ Implemented: native PCM continuity evidence is distinguished from bounded queue overflow; stopPlayback cancels/wakes the owned native playback operation without stopping capture. Upper-layer consent/reply policy remains in App.
-
-
-✅ Implemented: Audio owns generic NativeHapticFeedback with public UIKit/CoreHaptics support checks, one bounded operation, cached prepared generators and explicit busy/unavailable/invalid-request failures. It owns no listening policy or cue selection. AppleAudioIO enables supported haptics during recording through the public AVAudioSession API.
-
-
-✅ Implemented: Audio adds generic bounded PCMClipEncoding and one NativeCuePlayback using public AVAudioPlayer. It plays alongside existing audio under the current session, without reconfiguring/deactivating AVAudioSession or touching another player/capture owner. One active clip; overlap fails; callbacks/errors/cancellation complete its wait.
+Audio adds generic bounded PCMClipEncoding and one NativeCuePlayback using public AVAudioPlayer. It plays alongside existing audio under the current session, without reconfiguring/deactivating AVAudioSession or touching another player/capture owner. One active clip; overlap fails; callbacks/errors/cancellation complete its wait.
 
 ## Native image preparation
 
-✅ Implemented: Vision adds NativeImageCompression, a generic caller-configured JPEG downsampling/encoding capability using public Image I/O. It has no model, Agent or persistence policy. One detached native operation per invocation is cancelled and joined by its caller; no retained queue/cache or UI lifetime. Callers select dimension/pixel/byte limits; malformed input, invalid limits, decoding, encoding and exhausted size budgets fail explicitly.
+Vision adds NativeImageCompression, a generic caller-configured JPEG downsampling/encoding capability using public Image I/O. It has no model, Agent or persistence policy. One detached native operation per invocation is cancelled and joined by its caller; no retained queue/cache or UI lifetime. Callers select dimension/pixel/byte limits; malformed input, invalid limits, decoding, encoding and exhausted size budgets fail explicitly.
+
+## 待实现
+
+- Movie recording and an autonomous hardware safety controller.

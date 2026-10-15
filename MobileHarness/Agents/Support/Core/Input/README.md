@@ -26,8 +26,12 @@ AudioInput carries native-rate interleaved Float32 data, mono or four-channel AC
 
 ImageInput carries geometry, rotation, sequence/time and optional monotonic capture instant. Content is RGB bytes or an opaque Sendable ImageAttachment. Input errors describe malformed transport only; outOfOrder/scopeClosed belong to receiver/Gateway policy. RGB input is exact RGB8 with each dimension 1–640; opaque attachments allow dimensions 1–4096 with at most 4,194,304 pixels. Timestamps must be finite/nonnegative and rotation is 0–3 clockwise quarter turns. Values own no worker or queue.
 
-✅ Validated rate/layout/geometry and opaque media attachments are implemented.
+Validated rate/layout/geometry and opaque media attachments are implemented.
 
 ## Related design
 
 [Parent design](../README.md)
+
+## 待实现
+
+- 暂无本目录独立的实现待办；跨模块及实际模型/设备验收见所属模块说明。

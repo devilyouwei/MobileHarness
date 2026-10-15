@@ -36,7 +36,7 @@ flowchart TB
 
 ## 目录与值接口
 
-✅ ModelResourcesModule、ProviderModule、DeviceModule、TaskControlModule、SystemModule 各绑定其实际函数。目录不选择调用协议或模型权限。TaskControlModule 只注入中立端口，SystemModule 只提供固定信息函数。
+ModelResourcesModule、ProviderModule、DeviceModule、TaskControlModule、SystemModule 各绑定其实际函数。目录不选择调用协议或模型权限。TaskControlModule 只注入中立端口，SystemModule 只提供固定信息函数。
 
 DeviceControlRequest 保存 operation、可选 id/value/action/fence；它的构造器不校验操作组合，校验位于 DeviceActions。DeviceControlCapability 接收标准输入，并提供状态/环境字符串；默认 readEnvironment 明确抛 unavailable。
 
@@ -54,7 +54,7 @@ ModelResourcePreferencesService 是 actor，惰性获取注入的 DocumentReposi
 
 ProviderDiscoveryConfiguration 不可 Codable，保存 URL/key 私有值。ProviderDiscoveryRequests 是 actor：stage 校验 URL/key 最大 2048/4096 字节，为待领取请求设置 10 秒期限；领取前核对 sessionID，领取时移除待领取项，再执行注入发现工作。完成结果由相同会话读取或 discard；错误转换为安全 Provider 分类。
 
-stage 以待领取项加 completed 项少于 32 作为准入条件。❌ 发现中的请求已经移出 entries，未占用容量槽，所以此条件不是待领取/执行中/完成的总量硬上限；并发总量控制仍需宿主约束。
+stage 以待领取项加 completed 项少于 32 作为准入条件。
 
 ProviderSettingsRequests 是 MainActor 所有者，共最多 32 个 staged/executing/completed 条目。未领取期限为 10 秒；session、操作种类、阶段与期限必须匹配才能执行。active 不能被 discard，完成值可 result/take，take 移除记录；执行失败移除记录。没有自动过期 worker，过期待领取项在 stage 时过滤。
 
@@ -72,12 +72,10 @@ ProviderSettingsStore 是 actor，以 busy 排斥重叠读写，保存 version=1
 
 [System 入口与参数](../README.md) · [Storage 文档一致性](../../../Storage/README.md) · [共享契约](../../Support/Contracts/README.md)
 
-
-
-
-
 ## SQLite records and runtime identity
 
-✅ Implemented: technical identities are opaque UUID strings; committed business entities use dialog/message/task/media/device SQLite IDs. Consumers use Storage repositories while preserving ownership, cancellation and independent foundation boundaries. Complete messages, including each ReACT message, persist at termination; delta fragments do not persist. The custom allocator and replaced file/index implementation are removed. See the project SQLite business-record plan.
+Settings/model-preference services consume DocumentRepository protocols; concrete file construction stays in App/test composition factories. Preserve revision conflicts and producer-owned rollback policy.
 
-✅ Storage repository refactor: Settings/model-preference services consume DocumentRepository protocols; concrete file construction stays in App/test composition factories. Preserve revision conflicts and producer-owned rollback policy.
+## 待实现
+
+- 发现中的请求已经移出 entries，未占用容量槽，所以此条件不是待领取/执行中/完成的总量硬上限；并发总量控制仍需宿主约束。

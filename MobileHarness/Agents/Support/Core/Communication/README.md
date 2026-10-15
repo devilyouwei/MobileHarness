@@ -36,9 +36,7 @@ TaskRequest/Input/Progress/Result/Cancel carry scoped business data: at most 655
 
 Compatibility AgentMessaging is limited to Gateway/isolated hosts; production roles emit CommunicationAction. Directed receipt history retains 128 entries with counted oldest eviction. SignalTrace snapshots are payload-free passive diagnostics, never publisher acknowledgments.
 
-✅ Strict messaging declarations, scoped task state and distinct admission/terminal contracts are implemented.
-
-❌ Dynamic subscriptions, remote serialization and durable delivery are not implemented.
+Strict messaging declarations, scoped task state and distinct admission/terminal contracts are implemented.
 
 ## Related design
 
@@ -48,14 +46,10 @@ Compatibility AgentMessaging is limited to Gateway/isolated hosts; production ro
 
 Core provides business-neutral AgentTaskExecution and backward-readable scope.execution, plus bounded goal/requestedSkills evidence. Registry owns admission, delivery and cancellation transitions: 256 records and 16 nonterminal background tasks. Core does not load Skill resources or compose prompts. Missing legacy execution decodes as foreground.
 
-## Lifecycle-owned conversation and audio (2026-10-12)
+## Lifecycle-owned conversation and audio
 
-✅ 已移除对话生成、ReACT、收件箱排队、结果屏障、ASR 收尾、TTS 合成及回复占用租约的计时终止。Signal 默认无过期时间，框架不再按通信契约附加 TTL。保留显式实时感知数据的新鲜度和网络传输自身超时；它们不作为对话/语音缓存生命周期。Action 自身超时通过原始执行者的 ActionResult 返回。请求/调用数及队列/PCM 容量仍有界，不以计时自动删除已接纳输入。语音句柄无读等待或错误记录 TTL，按播放完成、输入/会话正常结束、异常或显式取消清理；取消加入生成和播放工作。
+Signal 默认没有过期时间；通信授权不附加隐式 TTL。实时感知输入可以声明新鲜度，接收方仍须校验来源、会话和作用域。Task 的终态、显式取消与 owner 清理决定生命周期；请求/调用数和队列容量独立受限。
 
+## 待实现
 
-
-
-
-## SQLite records and runtime identity
-
-✅ Implemented: technical identities are opaque UUID strings; committed business entities use dialog/message/task/media/device SQLite IDs. Consumers use Storage repositories while preserving ownership, cancellation and independent foundation boundaries. Complete messages, including each ReACT message, persist at termination; delta fragments do not persist. The custom allocator and replaced file/index implementation are removed. See the project SQLite business-record plan.
+- Dynamic subscriptions, remote serialization and durable delivery are not implemented.

@@ -24,8 +24,12 @@ flowchart LR
 
 Discrete operations reject excess work explicitly. Live control returns whether a packet was actually admitted; the caller owns its latest intent. Disconnect invalidates old observation/control sessions, and no failed command is replayed.
 
-✅ NexArm transports and protocol values.
+NexArm transports and protocol values.
 
 ## Related design
 
 [Parent design](../README.md) · [NexArm](NexArm/README.md)
+
+## 待实现
+
+- 暂无本目录独立的实现待办；跨模块及实际模型/设备验收见所属模块说明。

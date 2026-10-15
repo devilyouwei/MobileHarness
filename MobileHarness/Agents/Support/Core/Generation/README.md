@@ -60,9 +60,7 @@ Unknown aliases/parameter resolution produce ordered non-executable CallRejectio
 
 GenerationTrace retains exact raw fragments up to 256 KiB/8192 fragments, including empties, without eviction. It retains the first parse error/location, stops interpretation and continues bounded raw collection. append throwing does not partially recover events. Trace retains ordered action/rejection/wait events and owns no worker, persistence or dispatch.
 
-✅ Incremental parsing, explicit text mapping and bounded non-executing traces are implemented.
-
-❌ Automatic syntax repair and timer-based flushing are not implemented.
+Incremental parsing, explicit text mapping and bounded non-executing traces are implemented.
 
 ## Prompt resources and rendering
 
@@ -79,36 +77,28 @@ flowchart LR
  Renderer --> Failure[Explicit template or size error]
 ```
 
-Role assets are described by [shared Chat](../../Chat/README.md#prompt-ownership-and-rendering). Templates change model instructions; grants and executable call validation remain code/configuration contracts.
+Role assets are described by [shared Chat](../../Chat/README.md#请求提示词与快照). Templates change model instructions; grants and executable call validation remain code/configuration contracts.
 
 ## Related design
 
 [Parent design](../README.md)
 
-✅ 后台补充输入：send 保留 content 摘要，新增 businessContract/payload 可选参数（必须配对）。后台 input 使用已声明类型化业务契约，后台取消继续通过 scoped send；不能因等待状态隐式捕获前台语音。
+后台补充输入：send 包含 content 摘要与 businessContract/payload 可选参数（必须配对）。后台 input 使用已声明类型化业务契约，后台取消继续通过 scoped send；不能因等待状态隐式捕获前台语音。
 
+FunctionTokenPrompts.json 是 Core Bundle 中的 Function Token 模板资源，加载器通过 Bundle API 定位并校验。
 
-✅ Naming alignment: FunctionTokenPrompts.json is the canonical Function Token template filename; the resource loader and package declarations change together.
+Core 提供语法、Channel/wait 与通信协议教学。具体函数与业务示例放在已加载 Skill 的 Instructions.md。
 
-✅ Core 只保留语法、Channel/wait 与通信协议教学；删除未使用的函数示例模板。具体函数与业务示例放在已加载 Skill 的 Instructions.md。
+shared FunctionTokenPrompts guidance describes task-local Channel/wait ordering, independent same-name Channels across tasks and explicit resource conflict/takeover outcomes. Canonical addresses do not create queues; prompt text grants no execution authority.
 
-✅ ADR0213: shared FunctionTokenPrompts guidance describes task-local Channel/wait ordering, independent same-name Channels across tasks and explicit resource conflict/takeover outcomes. Canonical addresses do not create queues; prompt text grants no execution authority.
+FunctionTokenPrompts 分别提供 protocol、catalog 标题与末尾 catalogBoundary；Channel/wait 语义由 protocol 定义。
 
-
-✅ FunctionTokenPrompts 的协议与目录标题分离，新增末尾目录边界说明；保持既有Channel/wait语义。
-
-
-✅ 提示词精简已实现：精简XML、Channel、wait说明及末尾检查；共同规则只定义一次，保留依赖顺序、资源不可绕过、嵌套/转义约束。通信模板按实际消息kind生成。
-
+协议模板定义 XML、Channel、wait 与回复前检查；依赖顺序、嵌套/转义和资源边界各有单一规则来源。通信模板按实际消息 kind 生成。
 
 ## Streaming TTS latency
 
-✅ SentenceFunctionBuffer accepts optional first-segment length limits, retains the first-emission state across XML/scope flushes, and then uses steady limits. Safe word/sentence boundaries, exact text and explicit overflow remain; no timed text flush.
+SentenceFunctionBuffer accepts optional first-segment length limits, retains the first-emission state across XML/scope flushes, and then uses steady limits. Safe word/sentence boundaries, exact text and explicit overflow remain; no timed text flush.
 
+## 待实现
 
-
-
-
-## SQLite records and runtime identity
-
-✅ Implemented: technical identities are opaque UUID strings; committed business entities use dialog/message/task/media/device SQLite IDs. Consumers use Storage repositories while preserving ownership, cancellation and independent foundation boundaries. Complete messages, including each ReACT message, persist at termination; delta fragments do not persist. The custom allocator and replaced file/index implementation are removed. See the project SQLite business-record plan.
+- Automatic syntax repair and timer-based flushing are not implemented.

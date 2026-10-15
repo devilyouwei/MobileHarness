@@ -41,7 +41,7 @@ One playback stream schedules at most three buffers, each up to 262144 finite mo
 
 `AudioSpectrum` uses the latest 2048 samples, removes DC, applies Hann/FFT and aggregates 32 logarithmic bands from 80 Hz to min(8 kHz, Nyquist). Invalid samples become zero; fixed −66…−6 dB mapping preserves level differences. Attack/release factors are 0.78/0.32. The mixer tap retains at most 2048 samples; callers sample telemetry rather than retaining audio.
 
-✅ Bounded native capture, pre-admission fallback, streaming conversion, continuous playback and numeric spectrum telemetry.
+Bounded native capture, pre-admission fallback, streaming conversion, continuous playback and numeric spectrum telemetry.
 
 Physical route, FOA and coexistence evidence belongs in [validation history](../../../docs/validation/Validation-History.md).
 
@@ -49,22 +49,20 @@ Physical route, FOA and coexistence evidence belongs in [validation history](../
 
 [Parent design](../README.md)
 
-✅ 音频完成等待使用原生回调、实际错误及作用域取消，不设置 ASR/TTS 收尾、PCM 首帧或播放 buffer 兜底计时器；移除相应不存在的 timeout/fallback 展示分支，完成仍须真实完成回调，不能伪造成功。
+音频完成等待使用原生回调、实际错误及作用域取消，不设置 ASR/TTS 收尾、PCM 首帧或播放 buffer 兜底计时器；完成依赖真实回调，失败保留实际来源。
 
+playClip(PlaybackPCM) rejects capture/playback overlap with busy, validates a single bounded finite PCM clip before session changes, configures public playAndRecord speaker/HFP routing, and awaits native dataPlayedBack using playStream. All exit paths stop/reset the clip graph and deactivate its unused session, without touching a replacement capture/playback owner; cancellation retains token fencing. Primary and cleanup errors remain separately retained. It has no queue, synthesized sound or capture admission policy.
 
-✅ Implemented: playClip(PlaybackPCM) rejects capture/playback overlap with busy, validates a single bounded finite PCM clip before session changes, configures public playAndRecord speaker/HFP routing, and awaits native dataPlayedBack using playStream. All exit paths stop/reset the clip graph and deactivate its unused session, without touching a replacement capture/playback owner; cancellation retains token fencing. Primary and cleanup errors remain separately retained. It has no queue, synthesized sound or capture admission policy.
+PCM continuity validation reports a typed timestamp/rate discontinuity with measured gap instead of overflow. Existing 64-packet queue overflow remains fatal/explicit. A portable continuity state in MicrophoneFrame.swift is tested for contiguous callbacks, gaps, rate changes and reset. AppleAudioIO.stopPlayback stops the player graph and wakes native playback waits independently of capture; the caller owns async handler join; playStream configures speaker/HFP output when no capture is running.
 
+NativeHapticFeedback.swift accepts five generic impact styles, finite intensity, up to three pulses and bounded intervals; rejects concurrent calls and unsupported hardware, honors cancellation between pulses and has no pending queue. UIKit only confirms request issuance. Audio session setup allows haptics during recording; PCM/startup ownership stays unchanged.
 
-✅ Implemented: PCM continuity validation reports a typed timestamp/rate discontinuity with measured gap instead of overflow. Existing 64-packet queue overflow remains fatal/explicit. A portable continuity state in MicrophoneFrame.swift is tested for contiguous callbacks, gaps, rate changes and reset. AppleAudioIO.stopPlayback stops the player graph and wakes native playback waits independently of capture; the caller owns async handler join; playStream configures speaker/HFP output when no capture is running.
+PCMClipEncoding.wav16(samples:sampleRate:) is portable and rejects invalid inputs with its own invalidFormat failure. It validates mono finite samples, 8…192 kHz, <=192000 samples and <=1 s; emits bounded PCM16 WAV. NativeCuePlayback owns one AVAudioPlayer/delegate wait with a per-operation ID captured by a retained immutable delegate, so late callbacks cannot complete a replacement clip. It rejects overlap, joins cancellation by stopping only its own player, propagates decode/start/completion failure, and does not explicitly reconfigure or deactivate AVAudioSession. Native completion does not prove perceived volume.
 
+playClip/playStream accept an optional MainActor onStarted callback, fired once after the first buffer is successfully scheduled and the player started. No callback on setup failure or empty streams; it acknowledges native admission rather than audible hardware time. Existing bounded buffering, drain, cancellation and cleanup remain unchanged.
 
-✅ Implemented: NativeHapticFeedback.swift accepts five generic impact styles, finite intensity, up to three pulses and bounded intervals; rejects concurrent calls and unsupported hardware, honors cancellation between pulses and has no pending queue. UIKit only confirms request issuance. Audio session setup allows haptics during recording; PCM/startup ownership stays unchanged.
+AppleAudioIO.prepareClip validates bounded PCM, connects/prepares/starts only its output graph and retains one prepared sample-rate marker. Successful warm playback skips repeated category/session activation; playStream reuses a running graph. discardPreparedClip affects only an unconsumed warm marker with no capture/playback owner. Stop/cleanup clear the marker; failed preparation rolls back and propagates cleanup errors. No recording/buffer scheduling/sound occurs during prewarm.
 
+## 待实现
 
-✅ Implemented: PCMClipEncoding.wav16(samples:sampleRate:) is portable and rejects invalid inputs with its own invalidFormat failure. It validates mono finite samples, 8…192 kHz, <=192000 samples and <=1 s; emits bounded PCM16 WAV. NativeCuePlayback owns one AVAudioPlayer/delegate wait with a per-operation ID captured by a retained immutable delegate, so late callbacks cannot complete a replacement clip. It rejects overlap, joins cancellation by stopping only its own player, propagates decode/start/completion failure, and does not explicitly reconfigure or deactivate AVAudioSession. Native completion does not prove perceived volume.
-
-
-✅ Implemented: playClip/playStream accept an optional MainActor onStarted callback, fired once after the first buffer is successfully scheduled and the player started. No callback on setup failure or empty streams; it acknowledges native admission rather than audible hardware time. Existing bounded buffering, drain, cancellation and cleanup remain unchanged.
-
-
-✅ Implemented: AppleAudioIO.prepareClip validates bounded PCM, connects/prepares/starts only its output graph and retains one prepared sample-rate marker. Successful warm playback skips repeated category/session activation; playStream reuses a running graph. discardPreparedClip affects only an unconsumed warm marker with no capture/playback owner. Stop/cleanup clear the marker; failed preparation rolls back and propagates cleanup errors. No recording/buffer scheduling/sound occurs during prewarm.
+- 暂无本目录独立的实现待办；跨模块及实际模型/设备验收见所属模块说明。

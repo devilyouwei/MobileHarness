@@ -32,17 +32,16 @@ Stream retains 256 events of ≤16,448 estimated bytes; full buffer fails withou
 
 Auto locale resolves Han text to zh-CN, otherwise en-US; explicit locales preserve region with normalized script aliases. Missing voice reports the resolved language. Physical playback and its deadline remain downstream. Manager resource owns usage/cleanup without claiming ownership of Apple's system voice files.
 
-✅ Bounded callback PCM, native worker fencing and system locale selection are implemented.
-
-## Outstanding work
-
-❌ Physical-device voice availability and sustained native synthesis/playback coexistence acceptance remains outstanding. [Voice acceptance](../../../../../docs/validation/Voice.md) defines host-level trials.
+Bounded callback PCM, native worker fencing and system locale selection are implemented.
 
 ## Related design
 
 [Parent design](../README.md)
 
-
 ## Streaming TTS latency
 
-✅ SynthesisPCMAccumulator emits up to 16,384 bytes on the first nonempty callback immediately, then coalesces subsequent PCM to 16,384-byte chunks and flushes the tail on completion. AppleSpeechSynthesis reuses one native synthesizer; terminal-state/request-ID fencing joins retirement before reuse and prevents old cleanup from stopping a newer request. Existing 256-event bounds, overflow errors, mono Float32 and default speaking rate remain.
+SynthesisPCMAccumulator emits up to 16,384 bytes on the first nonempty callback immediately, then coalesces subsequent PCM to 16,384-byte chunks and flushes the tail on completion. AppleSpeechSynthesis reuses one native synthesizer; terminal-state/request-ID fencing joins retirement before reuse and prevents old cleanup from stopping a newer request. Existing 256-event bounds, overflow errors, mono Float32 and default speaking rate remain.
+
+## 待实现
+
+- Physical-device voice availability and sustained native synthesis/playback coexistence acceptance remains outstanding. [Voice acceptance](../../../../../docs/validation/Voice.md) defines host-level trials.

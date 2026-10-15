@@ -52,7 +52,7 @@ flowchart TB
 | ActionReport | 有界逐叶结果、独立执行失败及失败描述 |
 | TaskControlCapability | 传递操作名、原始字符串参数及真实 invocation 的宿主控制端口 |
 
-✅ 协议只描述数据和接口。FunctionReporting 的存储、资源租约、超时取消、执行身份授权和 Task 状态都由消费者实现。
+协议只描述数据和接口。FunctionReporting 的存储、资源租约、超时取消、执行身份授权和 Task 状态都由消费者实现。
 
 ## 定义与声明校验
 
@@ -78,10 +78,6 @@ ActionReport.empty 表示没有叶子记录；其 status 运算为 succeeded，�
 
 [共享 Support](../README.md) · [Actions 设计](../../README.md) · [执行实现](../../../Gateway/Runtime/README.md)
 
+## 待实现
 
-
-
-
-## SQLite records and runtime identity
-
-✅ Implemented: technical identities are opaque UUID strings; committed business entities use dialog/message/task/media/device SQLite IDs. Consumers use Storage repositories while preserving ownership, cancellation and independent foundation boundaries. Complete messages, including each ReACT message, persist at termination; delta fragments do not persist. The custom allocator and replaced file/index implementation are removed. See the project SQLite business-record plan.
+- 暂无本目录独立的实现待办；跨模块及实际模型/设备验收见所属模块说明。

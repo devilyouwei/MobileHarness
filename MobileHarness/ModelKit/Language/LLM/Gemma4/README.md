@@ -31,14 +31,11 @@ Each request resets backend cache. Event stream currently retains 4096 events of
 
 One model lease rejects overlap; cancellation joins backend cleanup before release; unload drains the lease. There is no waiting request queue. Sample optional model-interface start immediately before native generate after resource/tokenization, then first nonempty delta before emission. Loading, tokenization, persistence/UI/voice are excluded; missing timing is not fabricated.
 
-✅ Managed local text generation, explicit unsupported inputs and provider timing are implemented.
-
-❌ Local native calls and image inference are not implemented.
+Managed local text generation, explicit unsupported inputs and provider timing are implemented.
 
 ## Related design
 
 [Parent design](../README.md)
-
 
 ## Local Gemma engine
 
@@ -50,8 +47,14 @@ Each request resets cache, performs single-token prefill and fits prompt/generat
 
 ## Backend dependency and platform constraints
 
-Stateful generation uses the pinned coreai-models 0.2.8-zoo CoreAILM product and Tokenizers with static-input buffers; generic ModelKitCoreAI is a separate target. ❌ The third-party CoreAIShared runtime imports CoreAI unconditionally and cannot currently compile against the simulator SDK. ModelKitDefaults' simulator source branch does not eliminate that package dependency. Build and live-model acceptance evidence belongs in docs.
+Stateful generation uses the pinned coreai-models 0.2.8-zoo CoreAILM product and Tokenizers with static-input buffers; generic ModelKitCoreAI is a separate target.
 
 ## Consecutive user message boundaries
 
-✅ Implemented: GemmaLanguageEngine.render emits one prompt turn for each caller message, including consecutive users, without inserted text separators. Assistant still maps to model; original input validation and prompt-plus-output token bounds remain. A weight-free exact rendering regression checks preserved user boundaries; real-model role-order acceptance remains unverified.
+GemmaLanguageEngine.render emits one prompt turn for each caller message, including consecutive users, without inserted text separators. Assistant still maps to model; original input validation and prompt-plus-output token bounds remain. A weight-free exact rendering regression checks preserved user boundaries; real-model role-order acceptance remains unverified.
+
+## 待实现
+
+- Local native calls and image inference are not implemented.
+
+- The third-party CoreAIShared runtime imports CoreAI unconditionally and cannot currently compile against the simulator SDK. ModelKitDefaults' simulator source branch does not eliminate that package dependency. Build and live-model acceptance evidence belongs in docs.

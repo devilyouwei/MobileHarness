@@ -39,9 +39,7 @@ One active photo delegate has a ten-second terminal bound. Cancellation checks o
 
 `ApplePhotoLibrary.saveJPEG` performs add-only authorization and bounded PHAsset creation. It checks cancellation before authorization and commit. Once issued, import is joined and cannot be rolled back by caller cancellation. It returns technical permission/image failures; photo selection/export receipts belong to App.
 
-✅ Foreground camera, native preview/frame transport, healthy input switch, JPEG capture and Photos import.
-
-❌ Movie recording and background capture. Physical camera/permission/latency evidence is tracked in [validation history](../../../docs/validation/Validation-History.md).
+Foreground camera, native preview/frame transport, healthy input switch, JPEG capture and Photos import.
 
 ## Related design
 
@@ -49,8 +47,12 @@ One active photo delegate has a ten-second terminal bound. Cancellation checks o
 
 ## Native image compression
 
-✅ Implemented: NativeImageCompression.swift exposes async jpeg(from:limits:) and caller-owned dimension/pixel/byte limits. Image I/O creates a transformed thumbnail directly from encoded data with source caching disabled, then encodes JPEG from the reduced CGImage. This avoids a full-size UIImage decode/redraw and keeps output oriented, aspect-preserving and unscaled above source size. One detached task runs outside MainActor; cancellation is checked before/after native work and between bounded attempts, and the parent always joins it. There is no queue or persistent cache.
+NativeImageCompression.swift exposes async jpeg(from:limits:) and caller-owned dimension/pixel/byte limits. Image I/O creates a transformed thumbnail directly from encoded data with source caching disabled, then encodes JPEG from the reduced CGImage. This avoids a full-size UIImage decode/redraw and keeps output oriented, aspect-preserving and unscaled above source size. One detached task runs outside MainActor; cancellation is checked before/after native work and between bounded attempts, and the parent always joins it. There is no queue or persistent cache.
 
 Input is one JPEG/PNG, at most 4 MiB, with bounded valid dimensions. Upright JPEG data already within all budgets is reused without decoding/re-encoding; output uses at most four descending thumbnail sizes and three quality attempts per size (initial quality then bounded lower qualities). Native failures and exhausted byte budgets throw; preparation errors never fall back to oversized/untransformed originals. Each attempt releases intermediate allocations through autoreleasepool. Pixels/bytes must satisfy the caller budget. Original input Data is immutable and never written.
 
 [Apple memory guidance](https://developer.apple.com/documentation/xcode/making-changes-to-reduce-memory-use) recommends Image I/O transforms to minimize image memory impact; [thumbnail API](https://developer.apple.com/documentation/imageio/cgimagesourcecreatethumbnailatindex(_:_:_:)) supports bounded native downsampling/orientation, and [destination API](https://developer.apple.com/library/archive/documentation/GraphicsImaging/Conceptual/ImageIOGuide/ikpg_dest/ikpg_dest.html) supports JPEG quality selection. No claim that JPEG encoding always runs on a GPU or is the fastest on every device; native latency/quality acceptance remains separate.
+
+## 待实现
+
+- Movie recording and background capture. Physical camera/permission/latency evidence is tracked in [validation history](../../../docs/validation/Validation-History.md).

@@ -78,6 +78,7 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
         let native: ChatToolCall?
         var result: ToolResult?
         var actionResult: ActionResult?
+        var rejection: CallRejection?
     }
     private var roundID: String?
     private var roundCalls: [RoundCall] = []
@@ -1065,15 +1066,18 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
                     throw CommunicationError.invalidPayload
                 }
                 messages.append(
-                    ChatMessage(role: .tool, content: try Self.observationText(result), toolCallID: native.id))
+                    ChatMessage(
+                        role: .tool,
+                        content: try AgentChatContextBuilder.nativeObservation(result, rejection: call.rejection),
+                        toolCallID: native.id))
             }
-            let actions = try roundCalls.filter {
-                !$0.tool
-                    && $0.result?.requiresReasoning == true
-            }.map {
-                call -> [String: String] in
+            let actions = try roundCalls.enumerated().filter {
+                !$0.element.tool && $0.element.result?.requiresReasoning == true
+            }.map { index, call -> [String: Any] in
                 guard let result = call.result else { throw CommunicationError.invalidPayload }
-                return ["callID": call.id, "path": call.path, "result": try Self.observationText(result)]
+                return AgentChatContextBuilder.actionObservation(
+                    index: index + 1, name: observationName(call), result: result,
+                    action: call.actionResult, rejection: call.rejection)
             }
             if !actions.isEmpty {
                 let data = try JSONSerialization.data(withJSONObject: actions, options: [.sortedKeys])
@@ -1110,10 +1114,13 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
     }
 
     private func taskBoundaryMessages() async throws -> [ChatMessage] {
-        guard let call = roundCalls.last(where: { !$0.tool && $0.path.hasPrefix("Agent.Task.") }),
-            let result = call.result
+        guard let index = roundCalls.lastIndex(where: { !$0.tool && $0.path.hasPrefix("Agent.Task.") }),
+            let result = roundCalls[index].result
         else { return [] }
-        var value: [String: Any] = ["path": call.path, "result": try Self.observationText(result)]
+        let call = roundCalls[index]
+        var value = AgentChatContextBuilder.actionObservation(
+            index: index + 1, name: observationName(call), result: result,
+            action: call.actionResult, rejection: call.rejection)
         if ["Agent.Task.finishTask", "Agent.Task.cancelTask"].contains(call.path), !result.isError {
             let state = try await contextRepository.snapshot().state.skillState
             guard let state, state.activeTaskID == nil,
@@ -1123,12 +1130,18 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
                 ["completed", "cancelled", "failed", "interrupted"].contains(task.status)
             else { throw CommunicationError.invalidPayload }
             value = [
-                "path": call.path, "mode": state.mode, "activeTaskID": "none", "skills": state.loaded,
+                "action": observationName(call), "call": index + 1,
+                "mode": state.mode, "activeTaskID": "none", "skills": state.loaded,
                 "closedTaskID": task.id, "status": task.status,
             ]
         }
         let data = try JSONSerialization.data(withJSONObject: value, options: [.sortedKeys])
         return [.init(role: .user, content: "Task transition result (data): " + String(decoding: data, as: UTF8.self))]
+    }
+
+    private func observationName(_ call: RoundCall) -> String {
+        call.rejection?.alias
+            ?? requestCatalog?.actions.first(where: { $0.path.description == call.path })?.alias ?? call.path
     }
 
     private struct HistoryImageReference: Encodable {
@@ -1381,7 +1394,10 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
                     modelCapabilities.tools.first(where: { $0.alias == native.name })?.path ?? native.name
 
                 try roundCoordinator?.register(id: callID)
-                roundCalls.append(.init(id: callID, path: path, tool: true, native: native))
+                roundCalls.append(
+                    .init(
+                        id: callID, path: path, tool: true, native: native,
+                        rejection: CallRejection(kind: .tool, alias: native.name, callID: callID, reason: reason)))
                 try acceptResult(
                     .init(
                         callID: callID,
@@ -1474,7 +1490,7 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
                     roundCalls.append(
                         .init(
                             id: id, path: path, tool: false,
-                            native: nil))
+                            native: nil, rejection: rejection))
                     try acceptResult(
                         .init(
                             callID: id, value: invocationRejectionValue(rejection), isError: true,

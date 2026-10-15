@@ -29,11 +29,14 @@ Preserve the exact call and its trusted envelope; dispatch rejects inconsistency
 
 Terminal/error controls join or cancel their scoped work. Round controls retain task/round/call correlation and owner-directed feedback. Communication uses declared send/publish policy, not an invocation proxy. Unknown categories fail explicitly. Routing owns no queue, inference, retry or device-specific interpretation.
 
-✅ Explicit resolved-category routing is implemented.
+Explicit resolved-category routing is implemented.
 
 ## Related design
 
 [Parent design](../README.md)
 
+ExecutionRouter maps agent.cancelled to cancel; success and producer-error mappings remain distinct.
 
-✅ Implemented: ExecutionRouter maps agent.cancelled to cancel; success and producer-error mappings remain distinct.
+## 待实现
+
+- 暂无本目录独立的实现待办；跨模块及实际模型/设备验收见所属模块说明。

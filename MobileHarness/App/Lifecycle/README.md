@@ -56,86 +56,66 @@ ConversationPresentation separates recognition turns, visible reply focus and ex
 
 ## Camera, perception and photo ownership
 
-Camera commands execute for actual Photographer in its root or active task scope. Healthy flips atomically replace native input under the retained lease, acknowledge native completion, retire old pose/gaze and replace vision through a latest-intent joined worker. Off/background/model maintenance invalidates and joins replacement; failed switches stop capture for explicit retry.
+Camera commands validate the actual Assistant/Photographer execution owner and root or active task scope. Healthy flips atomically replace native input under the retained lease, acknowledge native completion, retire old pose/gaze and replace vision through a latest-intent joined worker. Off/background/model maintenance invalidates and joins replacement; failed switches stop capture for explicit retry.
 
-Photo capture freezes foreground/session/revision and owns one task; photoBusy spans that task and clears on every terminal path. JPEG storage is bounded to 32 files/128 MiB; actual capture persists even if presentation fails. Display animation completion is distinct from capture. Camera facts are published from committed native/presentation state, without invoking a model.
+Photo capture freezes foreground/session/revision and owns one task; photoBusy spans that task and clears on every terminal path. App selects a FIFO JPEG retention policy through composition; exact host limits are owned by [Composition](../Composition/README.md), while [StorageMedia](../../Storage/Media/README.md) owns store defaults and overflow. Actual capture persists even if presentation fails. Display animation completion is distinct from capture. Camera facts are published from committed native/presentation state, without invoking a model.
 
 Save validates the displayed photo ID and original StorageOwner, reads the original JPEG and joins one Photos transaction. Capture/export overlap fails busy. Confirmed import sets savedMediaID; the exact saved ID remains idempotent after departure. Successful save/ignore joins renderer and cue, then clears only the matching current surface; optional receipt feedbackIssues distinguish presentation failure from committed disposition. Permission failure keeps the thumbnail. Ignore hides the current acknowledged thumbnail without deleting album data or private reasoning evidence. Foreground is required; an open camera is not.
 
 ## Cleanup and diagnostics
 
-Close admission; cancel/join pumps, model/handler/pause/startup work and native operations; remove matching registrations; release bindings/leases. Resource cleanup uses coordinator-owned bounded acknowledgment even when initiated by a cancelled task. No cancellation result fabricates physical stop.
+Close admission; cancel/join pumps, model/handler/pause/startup work and native operations; remove matching registrations; release bindings/leases. Resource cleanup uses coordinator-owned joined acknowledgment even when initiated by a cancelled task; it has no default acknowledgment deadline. No cancellation result fabricates physical stop.
 
 Voice and diagnostics use mutual cleanup barriers. AudioDetectionSession owns all capture/perception work; route/interruption ends the attempt for explicit retry. Meter observations are latest values at most 10 Hz; PCM rejection is explicit. Diagnostics never registers Assistant, Photographer, playback or robot execution.
 
-✅ Separate interaction/capture lifetimes, native scope fences, photo disposition and independent lens/vision replacement are implemented.
-
-❌ Video recording and photo-gallery lifecycle are not implemented.
+Separate interaction/capture lifetimes, native scope fences, photo disposition and independent lens/vision replacement are implemented.
 
 ## Related design
 
 [Parent design](../README.md)
 
-✅ 音频完成等待使用原生回调、实际错误及作用域取消，不设置 ASR/TTS 收尾、PCM 首帧或播放 buffer 兜底计时器；移除相应不存在的 timeout/fallback 展示分支，完成仍须真实完成回调，不能伪造成功。
+音频完成等待使用原生回调、实际错误及作用域取消，不设置 ASR/TTS 收尾、PCM 首帧或播放 buffer 兜底计时器；完成依赖真实回调，失败保留实际来源。
 
+VoiceSessionCoordinator bounds UI toggle publication to one operation (overlap is rejected), cancels/joins it on shutdown, and keeps activation in its generation-fenced startup worker. Stop invalidates pending expression callbacks and renders closed resting eyes; full startup resets base expression. Native route/interruption restart text uses 按住. Canonical feedback and cancellation contracts are described below.
 
-✅ Implemented: VoiceSessionCoordinator bounds UI toggle publication to one operation (overlap is rejected), cancels/joins it on shutdown, and keeps activation in its generation-fenced startup worker. Stop invalidates pending expression callbacks and renders closed resting eyes; full startup resets base expression. Native route/interruption restart text uses 按住. Canonical feedback and cancellation contracts are described below.
+AudioDetectionSession maps the new generic native busy error to an explicit localized busy result, preserving its isolated capture/diagnostic contract.
 
-✅ Implemented: AudioDetectionSession maps the new generic native busy error to an explicit localized busy result, preserving its isolated capture/diagnostic contract.
+VoiceSessionCoordinator uses ListeningCaptureWorkflow to serialize native start/stop, cancels and joins old pumps on pause, preserves monotonic input sequence across physical resumes and fences errors by capture epoch. Confirmed VAD/ASR completion precedes physical pause; both reply-policy pause and playback stop the microphone. Resume joins policy/native readiness, with no new activation chime. UI off immediately invalidates capture/old-turn captions and native playback and starts one root-owned reply cancellation task; new voice startup joins it. RuntimeDependencies adds injected cancelReply, with no global lookup in Lifecycle.
 
+manual off latches local admission closed immediately, publishes explicit disabled consent, and cancels Assistant independently even if consent publication fails. Next hold joins cancellation and native cleanup before publishing explicit enabled consent. Stale enabled policy outputs cannot reopen capture during user-off. Native resume failure terminates the logical capture with an explicit error.
 
-✅ Implemented: VoiceSessionCoordinator uses ListeningCaptureWorkflow to serialize native start/stop, cancels and joins old pumps on pause, preserves monotonic input sequence across physical resumes and fences errors by capture epoch. Confirmed VAD/ASR completion precedes physical pause; both reply-policy pause and playback stop the microphone. Resume joins policy/native readiness, with no new activation chime. UI off immediately invalidates capture/old-turn captions and native playback and starts one root-owned reply cancellation task; new voice startup joins it. RuntimeDependencies adds injected cancelReply, with no global lookup in Lifecycle.
+VoiceSessionCoordinator owns NativeHapticFeedback and an error-returning startup worker. Listening update joins startup under cancellation handler, preserving generation fences and native cleanup. Startup composition overlaps model/permission readiness with canonical cue/native-start-gated haptic, then joins all children, the 120 ms acoustic tail and actual microphone readiness; composed failures stop capture and surface evidence. Cue samples are generated off MainActor. Automatic pause/resume has no activation effects.
 
+cancellation of the parent Listening Action cancels its matching startup worker and invalidates native capture immediately under a startup-ID fence. Cleanup can then join a pending first-frame wait without cancelling a replacement generation.
 
-✅ Implemented: manual off latches local admission closed immediately, publishes explicit disabled consent, and cancels Assistant independently even if consent publication fails. Next hold joins cancellation and native cleanup before publishing explicit enabled consent. Stale enabled policy outputs cannot reopen capture during user-off. Native resume failure terminates the logical capture with an explicit error.
+CameraCoordinator owns one joined photo command, canonical UIModule cue child using a private photo-native capability, and NativeCuePlayback for overlay cues. Save commits Photos before feedback; ignore commits the selected preview decision. PhotoDispositionWorkflow joins visual/audio effects, retains bounded issues and removes only the original ID after completion/cancellation. Save failure retains the thumbnail. Explicit duplicate saved ID returns alreadySaved after departure, without replaying feedback. Foreground shutdown cancels/joins command and stops its cue without resetting voice capture or speech.
 
+Voice generation publishes the same optional listeningAnimationID as active consent to the UI. Native visual epochs reset every new generation and are independent of microphone/model readiness. Photo archive bound reflects explicit composition policy.
 
-✅ Implemented: VoiceSessionCoordinator owns NativeHapticFeedback and an error-returning startup worker. Listening update joins startup under cancellation handler, preserving generation fences and native cleanup. Startup composition overlaps model/permission readiness with canonical cue/native-start-gated haptic, then joins all children, the 120 ms acoustic tail and actual microphone readiness; composed failures stop capture and surface evidence. Cue samples are generated off MainActor. Automatic pause/resume has no activation effects.
+VoiceSessionCoordinator owns one context-fenced ListeningFeedbackStart gate for a fresh activation. playCue releases it from AppleAudioIO first-buffer/player-start callback and fails it on actual errors; vibrate prewarms its requested native generator, waits only for the matching activation context, revalidates after await, and ordinary feedback remains independent. Startup cleanup cancels any outstanding gate and clears only the matching owner. Prompt PCM generation stays off MainActor; native onset latency remains hardware/route controlled.
 
+add voicePressChanged to own one coalesced prewarm Task and cached default wake PCM. Begin joins diagnostics/native cleanup before preparing output-only audio; end before recognition cancels/discards warm resources, accepted hold latches pending-activation ownership across intent delivery until the Listening Action arrives, fails or stops, and retains preparation until canonical playCue consumes it. Shutdown/stop cancel preparation and never release another active audio operation. Failures remain explicit. playCue joins pending warmup and avoids generating the same PCM on the trigger path.
 
-✅ Implemented: cancellation of the parent Listening Action cancels its matching startup worker and invalidates native capture immediately under a startup-ID fence. Cleanup can then join a pending first-frame wait without cancelling a replacement generation.
+根生命周期负责停止 HomeEffectsWorkflow 并加入其到期任务清理；展示策略与状态归 [Presentation](../Workflows/Presentation/README.md)。
 
-
-✅ Implemented: CameraCoordinator owns one joined photo command, canonical UIModule cue child using a private photo-native capability, and NativeCuePlayback for overlay cues. Save commits Photos before feedback; ignore commits the selected preview decision. PhotoDispositionWorkflow joins visual/audio effects, retains bounded issues and removes only the original ID after completion/cancellation. Save failure retains the thumbnail. Explicit duplicate saved ID returns alreadySaved after departure, without replaying feedback. Foreground shutdown cancels/joins command and stops its cue without resetting voice capture or speech.
-
-
-✅ Voice generation publishes the same optional listeningAnimationID as active consent to the UI. Native visual epochs reset every new generation and are independent of microphone/model readiness. Photo archive bound reflects explicit composition policy.
-
-
-✅ Implemented: VoiceSessionCoordinator owns one context-fenced ListeningFeedbackStart gate for a fresh activation. playCue releases it from AppleAudioIO first-buffer/player-start callback and fails it on actual errors; vibrate prewarms its requested native generator, waits only for the matching activation context, revalidates after await, and ordinary feedback remains independent. Startup cleanup cancels any outstanding gate and clears only the matching owner. Prompt PCM generation stays off MainActor; native onset latency remains hardware/route controlled.
-
-
-✅ Implemented: add voicePressChanged to own one coalesced prewarm Task and cached default wake PCM. Begin joins diagnostics/native cleanup before preparing output-only audio; end before recognition cancels/discards warm resources, accepted hold latches pending-activation ownership across intent delivery until the Listening Action arrives, fails or stops, and retains preparation until canonical playCue consumes it. Shutdown/stop cancel preparation and never release another active audio operation. Failures remain explicit. playCue joins pending warmup and avoids generating the same PCM on the trigger path.
-
-
-✅ Implemented (2026-10-13): UI.Notice.showNotice/dismissNotice and UI.Light.updateLight are canonical presentation Actions for trusted business calls, currently registered by no Skill. Neutral Actions values cross RuntimePresentation into root-owned HomeEffectsWorkflow, which retains one replaceable notice expiry and one light expiry, UUID-fenced cleanup, and explicit stop. Notices remain separate from factual ExecutionIssue history; actual upper-layer errors have display priority and Action failures remain panel-only. Decorative light accepts normalized origin, initial opacity/intensity and duration; it never changes consent, microphone or eyes. Native renderer separates light generations from listening eye generations and preserves existing exit fade. RuntimePresentation adapts Action requests into UI-owned values; AppPresentationWorkflow keeps its existing UI/AgentCore/FunctionContracts boundary. No UI capability/business dependencies or new directories.
-
-
-✅ Implemented (2026-10-13 caption/error lifecycle): mask bottom ASR and reply/status immediately while a notice is visible, restore retained text after dismissal, and preserve pinned Task/promoted ASR layout. Consent-off clears both captions; root HomeEffectsWorkflow owns one ID/text-fenced350ms reply fade/removal task, cancelled by new text/turn/off/shutdown, scheduled only after reply-policy/playback/native-resume barriers. Agent errors stay in factual root failure notices, not persistent voiceStatus copies. Durable configuration documents retain explicit file protection. Agent runtime state uses memory; business records use SQLite. This does not infer the cause of historical lock-boundary failures.
-
-
-
+mask bottom ASR and reply/status immediately while a notice is visible, restore retained text after dismissal, and preserve pinned Task/promoted ASR layout. Consent-off clears both captions; root HomeEffectsWorkflow owns one ID/text-fenced350ms reply fade/removal task, cancelled by new text/turn/off/shutdown, scheduled only after reply-policy/playback/native-resume barriers. Agent errors stay in factual root failure notices, not persistent voiceStatus copies. Durable configuration documents retain explicit file protection. Agent runtime state uses memory; business records use SQLite. This does not infer the cause of historical lock-boundary failures.
 
 ## Streaming TTS latency
 
-✅ Playback is counted from admission through audio cleanup, then immediate listening restoration is joined if consent/session/policy permit. The joined restoration task does not inherit a cancelled playback caller; original playback failure is preserved, additional restoration failure is logged, and a standalone restoration failure is propagated. No idle acoustic task or fixed post-playback delay remains.
+Playback is counted from admission through audio cleanup, then immediate listening restoration is joined if consent/session/policy permit. The joined restoration task does not inherit a cancelled playback caller; original playback failure is preserved, additional restoration failure is logged, and a standalone restoration failure is propagated. No idle acoustic task or fixed post-playback delay remains.
 
 ## Isolated audio-detection communication
 
-✅ AudioDetectionScope restricts the loaded SpeechPerception declaration to media.audio and sound.source before constructing its single-Agent CommunicationPolicy. Only phone.microphone PCM is subscribed; conversational consent, reply occupancy and speech outputs are excluded. The same projected configuration constructs the Agent. This removes the absent Assistant publication dependency that previously threw CommunicationError.unauthorized during initialization, before microphone permission/capture. Existing cancellation, bounds and joined cleanup remain in force.
-
-
-
-
+AudioDetectionScope restricts the loaded SpeechPerception declaration to media.audio and sound.source before constructing its single-Agent CommunicationPolicy. Only phone.microphone PCM is subscribed; conversational consent, reply occupancy and speech outputs are excluded. The same projected configuration constructs the Agent. This scope has no Assistant publication dependency. Cancellation, bounds and joined cleanup apply to the scope owner.
 
 ## SQLite records and runtime identity
 
-✅ Implemented: technical identities are opaque UUID strings; committed business entities use dialog/message/task/media/device SQLite IDs. Consumers use Storage repositories while preserving ownership, cancellation and independent foundation boundaries. Complete messages, including each ReACT message, persist at termination; delta fragments do not persist. The custom allocator and replaced file/index implementation are removed. See the project SQLite business-record plan.
+CameraCoordinator consumes Media-owned JPEG store; File/SQLite creation remains in App composition. Preserve capture/save ownership and truthful cancellation outcomes.
 
-✅ Storage repository refactor: CameraCoordinator consumes Media-owned JPEG store; File/SQLite creation remains in App composition. Preserve capture/save ownership and truthful cancellation outcomes.
+Isolated AudioDetectionSession uses a fresh process-memory context. It does not load or save diagnostic JSON.
 
+AudioDetectionSession uses a fresh process-memory SpeechPerception context; it neither loads nor writes diagnostic context JSON.
 
-✅ Isolated AudioDetectionSession uses a fresh process-memory context. It does not load or save diagnostic JSON.
+## 待实现
 
-
-✅ Implemented: AudioDetectionSession uses a fresh process-memory SpeechPerception context; it neither loads nor writes diagnostic context JSON.
+- Video recording and photo-gallery lifecycle are not implemented.

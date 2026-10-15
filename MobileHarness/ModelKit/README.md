@@ -114,9 +114,7 @@ Artifacts have an independent schema-v2 catalog, bounded transfer state, validat
 
 ## Coverage and platform constraints
 
-✅ Typed contracts, concrete providers, independent runtime/assembly targets, shared PCM conversion and explicit bounded lifecycles are implemented. SDK products use the root repository Package.swift; no separate publishing package exists.
-
-❌ Production judgment, embeddings, general video sessions and cross-model fairness/thermal scheduling are not implemented. Gemma requires CoreAI on supported OS/hardware; its third-party CoreAIShared dependency currently cannot resolve CoreAI in the simulator SDK. Runtime/device acceptance evidence belongs in docs.
+Typed contracts, concrete providers, independent runtime/assembly targets, shared PCM conversion and explicit bounded lifecycles are implemented. SDK products use the root repository Package.swift; no separate publishing package exists.
 
 ## Related design
 
@@ -124,9 +122,12 @@ Artifacts have an independent schema-v2 catalog, bounded transfer state, validat
 
 ## Cloud non-thinking requests
 
-✅ Implemented: the OpenAI adapter owns provider/model-specific non-thinking request options for all SDK consumers, including title generation. Alibaba Cloud endpoint identity and OpenAI model identity determine legal wire fields; mandatory-thinking models fail explicitly instead of using a lower reasoning fallback. The base ChatRequest and module interfaces remain unchanged. See [the adapter contract](Language/LLM/OpenAI/README.md#non-thinking-request-policy).
-
+the OpenAI adapter owns provider/model-specific non-thinking request options for all SDK consumers, including title generation. Alibaba Cloud endpoint identity and OpenAI model identity determine legal wire fields; mandatory-thinking models fail explicitly instead of using a lower reasoning fallback. The base ChatRequest and module interfaces remain unchanged. See [the adapter contract](Language/LLM/OpenAI/README.md#non-thinking-request-policy).
 
 ## Streaming TTS latency
 
-✅ Apple TTS retains one native synthesizer per capability, fence request cleanup, and emit the first bounded PCM portion without coalescing delay. Provider ownership and neutral text-to-PCM interface remain unchanged.
+Apple TTS retains one native synthesizer per capability, fence request cleanup, and emit the first bounded PCM portion without coalescing delay. Provider ownership and neutral text-to-PCM interface remain unchanged.
+
+## 待实现
+
+- Production judgment, embeddings, general video sessions and cross-model fairness/thermal scheduling are not implemented. Gemma requires CoreAI on supported OS/hardware; its third-party CoreAIShared dependency currently cannot resolve CoreAI in the simulator SDK. Runtime/device acceptance evidence belongs in docs.

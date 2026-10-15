@@ -31,8 +31,10 @@ flowchart LR
  Host[Host implementations] -.-> Contracts
 ```
 
-✅ Independent source ownership, neutral Core mechanisms, generic native execution, lifecycle/assembly boundaries and shared Apple PCM conversion are implemented.
-
-❌ General engine interchange and cross-model scheduling are not implemented. Capability and platform-specific limits are documented by the owning directory.
+Independent source ownership, neutral Core mechanisms, generic native execution, lifecycle/assembly boundaries and shared Apple PCM conversion are implemented.
 
 [Core](Core/README.md) · [Backends](Backends/README.md) · [Management](Management/README.md) · [Speech](Speech/README.md) · [Parent design](../README.md)
+
+## 待实现
+
+- General engine interchange and cross-model scheduling are not implemented. Capability and platform-specific limits are documented by the owning directory.

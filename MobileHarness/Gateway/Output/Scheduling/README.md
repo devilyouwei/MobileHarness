@@ -56,9 +56,7 @@ Diagnostics retains 256 records by default (configurable 1–4096), counted olde
 
 Eight observers receive newest-one complete snapshots, including initial/final state. No observer await can block execution. displayName and ≤512-character failure text are captured from validated definition/throw boundary. Tools never appear in this Action ledger.
 
-✅ Bounded wait/FIFO scheduling, scoped feedback barriers and passive observation are implemented.
-
-❌ Global fairness/priority, cross-task barriers and Channel-level leases are not implemented. Channel.swift retains always-unlocked metadata only; ResourceCoordinator is authoritative.
+Bounded wait/FIFO scheduling, scoped feedback barriers and passive observation are implemented.
 
 ## Related design
 
@@ -66,26 +64,20 @@ Eight observers receive newest-one complete snapshots, including initial/final s
 
 ## Channel-owned Action ordering
 
-✅ No definition/path/module exclusion remains. Same-lane execution stays occupied through joined cleanup; different Channels/tasks may progress independently. Resource busy failures are terminal call outcomes and allow following lane work.
+No definition/path/module exclusion remains. Same-lane execution stays occupied through joined cleanup; different Channels/tasks may progress independently. Resource busy failures are terminal call outcomes and allow following lane work.
 
-✅ ActionFunction 基础默认执行超时为 30 秒，dynamicTimeout 优先于静态 timeout；未声明也有默认预算。Speech.Playback 使用显式 300 秒。超时取消并加入清理，保留真实效果，以 ActionResult 返回；工具复用同一函数契约。通信转发不制造 TTL，队列和整个对话不附加默认时限。
+ActionFunction 基础默认执行超时为 30 秒，dynamicTimeout 优先于静态 timeout；未声明也有默认预算。Speech.Playback 使用显式 300 秒。超时取消并加入清理，保留真实效果，以 ActionResult 返回；工具复用同一函数契约。通信转发不制造 TTL，队列和整个对话不附加默认时限。
 
-## Action timeout contract (2026-10-12)
+## Action timeout contract
 
-✅ Action 执行采用基础默认或业务静态/动态预算，计时从执行开始；Channel/wait 自身不附加固定总时限，组合使用自身合成预算。
+Action 执行采用基础默认或业务静态/动态预算，计时从执行开始；Channel/wait 自身不附加固定总时限，组合使用自身合成预算。
 
+cancel(agent:incarnation:sessionID:) adds optional session selection to existing producer-incarnation cancellation; nil retains lifecycle closure behavior. It cancels/joins selected trees without whole-session result-ledger/resource closure.
 
-✅ Implemented: cancel(agent:incarnation:sessionID:) adds optional session selection to existing producer-incarnation cancellation; nil retains lifecycle closure behavior. It cancels/joins selected trees without whole-session result-ledger/resource closure.
+producer/session host cancellation retains an already-settled cancelled tree until its ordered round seal or cancel terminal arrives, so a late finish reports cancellation instead of success. Retained trees still count toward the existing 64-task bound; terminal/lifecycle/full shutdown releases them. No tombstone/replay queue is added.
 
+Handler throws and returned reports share typed cancellation classification. Cancellation has cancelled phase and no observation failure; independent failures remain failed/partialFailure. Queue cancellation remains notStarted and active cancellation joins actual cleanup without rollback.
 
-✅ Implemented: producer/session host cancellation retains an already-settled cancelled tree until its ordered round seal or cancel terminal arrives, so a late finish reports cancellation instead of success. Retained trees still count toward the existing 64-task bound; terminal/lifecycle/full shutdown releases them. No tombstone/replay queue is added.
+## 待实现
 
-✅ Handler throws and returned reports share typed cancellation classification. Cancellation has cancelled phase and no observation failure; independent failures remain failed/partialFailure. Queue cancellation remains notStarted and active cancellation joins actual cleanup without rollback.
-
-
-
-
-
-## SQLite records and runtime identity
-
-✅ Implemented: technical identities are opaque UUID strings; committed business entities use dialog/message/task/media/device SQLite IDs. Consumers use Storage repositories while preserving ownership, cancellation and independent foundation boundaries. Complete messages, including each ReACT message, persist at termination; delta fragments do not persist. The custom allocator and replaced file/index implementation are removed. See the project SQLite business-record plan.
+- Global fairness/priority, cross-task barriers and Channel-level leases are not implemented. Channel.swift retains always-unlocked metadata only; ResourceCoordinator is authoritative.

@@ -25,8 +25,12 @@ flowchart LR
 
 No separate microphone/player/model backend exists in this target. Production controls and native telemetry are reused by the host. Debug/synthetic results remain visibly distinct from actual model and physical-device evidence.
 
-✅ Injected chat/MOSS diagnostic presentation.
+Injected chat/MOSS diagnostic presentation.
 
 ## Related design
 
 [Parent design](../README.md)
+
+## 待实现
+
+- 暂无本目录独立的实现待办；跨模块及实际模型/设备验收见所属模块说明。

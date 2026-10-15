@@ -2,7 +2,7 @@
 
 ## Responsibility and implementation
 
-✅ File implements confined binary objects and JSON documents. SQLite implements shared pool/configuration, bounded write admission and migration execution; domain adapters supply schemas and operations.
+File implements confined binary objects and JSON documents. SQLite implements shared pool/configuration, bounded write admission and migration execution; domain adapters supply schemas and operations.
 
 ## Direct relationships
 
@@ -12,8 +12,8 @@ File belongs to dependency-free Storage. SQLite belongs to StorageSQLite, which 
 
 Durability and atomicity are capability-specific. A database transaction cannot include file publication, model generation or device effects. Failures retain original causes and never switch to an in-memory success.
 
-## Outstanding work
-
-❌ Additional relational/document backends are not stubbed out.
-
 [Parent](../README.md)
+
+## 待实现
+
+- 暂无本目录独立实现待办；其他后端尚无具体实现计划。

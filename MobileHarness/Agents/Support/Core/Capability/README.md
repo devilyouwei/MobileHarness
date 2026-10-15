@@ -37,9 +37,7 @@ InternalAction/InternalTool carry code-owned paths/parameter names; permits incl
 
 The native definition retains a legacy function envelope as a neutral declaration; provider adapters convert it to their wire protocol. It does not imply Chat Completions transport. Communication configuration validates against the supplied catalog; Core has no speech/pose domains.
 
-✅ Strict v6/v7 validation and separate model/runtime permissions are implemented.
-
-❌ Full JSON Schema and configuration hot reload are not implemented.
+Strict v6/v7 validation and separate model/runtime permissions are implemented.
 
 ## Model context construction
 
@@ -51,24 +49,18 @@ CapabilityContextBuilder renders protocol and capability-description templates f
 
 ## Action-owned documentation and Skill instruction contract
 
-✅ CapabilityDocumentation 只保留 doc/parameters，目录不渲染函数 examples。旧版配置导入时仍验证其历史 examples，但不进入实时元数据。新投影可省略该字段；参数、别名、容量及目录校验继续严格执行。
+CapabilityDocumentation 只保留 doc/parameters，目录不渲染函数 examples。旧版配置导入时仍验证其历史 examples，但不进入实时元数据。新投影可省略该字段；参数、别名、容量及目录校验继续严格执行。
 
+输出协议不再提前显示函数目录标题；真正目录末尾明确只有已列Action别名可作自闭合标签，Skill名称不是函数。
 
-✅ 输出协议不再提前显示函数目录标题；真正目录末尾明确只有已列Action别名可作自闭合标签，Skill名称不是函数。
+目录边界明确操作请求的回复必须推进执行；参数 description 与 constraints 完全相同则只展示一次，不删除独立约束。
 
-✅ 目录边界明确操作请求的回复必须推进执行；参数 description 与 constraints 完全相同则只展示一次，不删除独立约束。
-
-
-✅ 提示词精简已实现：目录按Channel分组，只显示Action别名、doc和参数类型/必填性；不重复path、Channel和必填/可选总表。真实注册与参数契约不变。
+模型目录按 Channel 分组，展示 Action 别名、doc 和参数类型/必填性；真实注册、canonical path 与执行校验由不可变目录保留。
 
 ## Isolated communication scopes
 
-✅ AgentConfiguration.restrictingCommunication(to:contracts:) derives a new immutable configuration by retaining only existing inputs, subscriptions, publications and sends whose contract is explicitly allowed. Revalidate the projected declaration against the injected schema catalog; preserve identity, version and function capabilities. Never add a source, target, grant or cached-resource mutation. Core owns only this neutral restriction; App chooses diagnostic contracts.
+AgentConfiguration.restrictingCommunication(to:contracts:) derives a new immutable configuration by retaining only existing inputs, subscriptions, publications and sends whose contract is explicitly allowed. Revalidate the projected declaration against the injected schema catalog; preserve identity, version and function capabilities. Never add a source, target, grant or cached-resource mutation. Core owns only this neutral restriction; App chooses diagnostic contracts.
 
+## 待实现
 
-
-
-
-## SQLite records and runtime identity
-
-✅ Implemented: technical identities are opaque UUID strings; committed business entities use dialog/message/task/media/device SQLite IDs. Consumers use Storage repositories while preserving ownership, cancellation and independent foundation boundaries. Complete messages, including each ReACT message, persist at termination; delta fragments do not persist. The custom allocator and replaced file/index implementation are removed. See the project SQLite business-record plan.
+- Full JSON Schema and configuration hot reload are not implemented.
