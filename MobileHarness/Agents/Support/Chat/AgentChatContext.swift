@@ -91,6 +91,9 @@ public enum AgentChatHistoryContext {
                 throw ConversationHistoryError.conflict
             }
             if $0.state.history.current.id != history.current.id, var skills = $0.state.skillState {
+                if $0.state.history.current.id != "draft" {
+                    try skills.resetConversation()
+                }
                 let ended = Set(skills.tasks.filter { $0.id != skills.activeTaskID }.map(\.id))
                 skills.tasks.removeAll { ended.contains($0.id) }
                 skills.events.removeAll { $0.taskID.map(ended.contains) == true }

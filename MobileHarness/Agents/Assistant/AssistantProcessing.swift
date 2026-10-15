@@ -140,6 +140,9 @@ public struct AssistantContextBuilder: ContextBuilder {
             var state: [String: Any] = [
                 "mode": skills.mode, "activeTaskID": skills.activeTaskID ?? "none",
                 "loadedSkills": skills.loaded,
+                "skillOwnership": try Dictionary(
+                    uniqueKeysWithValues: skills.loaded.map { ($0, try skills.ownership($0)) }),
+                "remainingSkillDecisions": skills.recentSkills.mapValues(\.remainingDecisions),
             ]
             if let task {
                 state["goal"] = task.goal

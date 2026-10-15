@@ -49,6 +49,7 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
     private let capacity: Int
     private let chatProvider: @Sendable () async throws -> any ChatCapability
     private let communicationPolicy: CommunicationDeclaration
+    private var requestSkillIDs: [String] = []
     private var modelCapabilities: CapabilityRegistry
     private let backgroundSupport: @Sendable (AgentID, String, [String]) throws -> Void
     private let usesSkills: Bool
@@ -274,7 +275,7 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
         }
         let fixed = descriptor.capabilities
         try await contextRepository.update {
-            try $0.state.skillState?.roundCompleted(failed: false, fixed: fixed, cancelled: true)
+            try $0.state.skillState?.resetSession(fixed: fixed)
             $0.state.reconcileTaskCompressions()
         }
         if let skills = try await contextRepository.snapshot().state.skillState { skillContinuation.yield(skills) }
@@ -632,6 +633,23 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
         }
         worker = Task {
             do {
+                if usesSkills && continuationRounds[input.id] == nil {
+                    let countsIdle: Bool
+                    switch input.payload {
+                    case .text: countsIdle = input.taskScope == nil
+                    case .observation(let observation):
+                        if case .transcript(_, final: true)? = observation.perception {
+                            countsIdle = true
+                        } else {
+                            countsIdle = false
+                        }
+                    default: countsIdle = false
+                    }
+                    try await contextRepository.update {
+                        try $0.state.skillState?.beginDecision(
+                            input.id, sessionID: input.sessionID, countsIdle: countsIdle)
+                    }
+                }
                 let binding: any ChatCapability
                 if let resumed = continuationRounds[input.id] {
                     binding = resumed.capability
@@ -926,6 +944,7 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
                             ])))
             }
             requestCatalog = modelCapabilities
+            requestSkillIDs = decisionContext.state.skillState?.loaded ?? []
             var providerMessages = try AgentChatContextBuilder.retainingRecent(
                 request.messages, preservingUser: userIntent, protectedSuffixCount: protectedSuffixCount,
                 reservingMessages: facts.count,
@@ -1030,7 +1049,7 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
                         "Task closure failed at \(failed.path): \(try Self.observationText(result))")
                 }
                 let cancelled = task.status == "cancelling"
-                try await finishLocalDecision(input: input, failed: false)
+                try await finishLocalDecision(input: input, failed: false, taskBoundaryOnly: true)
                 if cancelled || task.continueDecision != true { return nil }
             }
             guard roundCoordinator?.needsReasoning == true else {
@@ -1476,6 +1495,7 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
                 guard emit(.toolCall(call), for: input, callID: roundID == nil ? nil : call.id) else {
                     throw HarnessError.queueFull
                 }
+                try await recordSkillUse(path: call.toolPath, callType: "tool", input: input)
                 continue
             }
             guard case .action(let original) = event else { continue }
@@ -1539,6 +1559,21 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
                 continue
             }
             guard try emitAction(call, for: input) else { throw HarnessError.queueFull }
+            try await recordSkillUse(path: call.actionPath.description, callType: "action", input: input)
+        }
+    }
+
+    private func recordSkillUse(path: String, callType: String, input: AgentInput) async throws {
+        guard usesSkills, roundID != nil, let catalog = requestCatalog else { return }
+        let visible =
+            callType == "action"
+            ? catalog.actions.contains { $0.path.description == path }
+            : catalog.tools.contains { $0.path == path }
+        guard visible else { return }
+        let snapshotSkills = requestSkillIDs
+        try await contextRepository.update {
+            try $0.state.skillState?.recordUse(
+                path: path, callType: callType, inputID: input.id, snapshotSkills: snapshotSkills)
         }
     }
 
@@ -2134,7 +2169,7 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
                     operation, arguments: arguments, inputID: inputID, fixed: fixedCapabilities, sessionID: sessionID,
                     taskID: committedTaskID)
                 if fixed && ["finishTask", "cancelTask"].contains(operation) {
-                    try skills.roundCompleted(failed: false, fixed: fixedCapabilities)
+                    try skills.settleTask(failed: false, fixed: fixedCapabilities)
                     result =
                         "Mode=\(skills.mode); task=none; Skills=\(skills.loaded.joined(separator: ",")); transition committed."
                 }
@@ -2213,16 +2248,25 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
         }
     }
     private func finishLocalDecision(
-        input: AgentInput, failed: Bool, failure: String? = nil, cancelled: Bool = false
+        input: AgentInput, failed: Bool, failure: String? = nil, cancelled: Bool = false,
+        taskBoundaryOnly: Bool = false
     ) async throws {
         guard usesSkills else { return }
         let fixedCapabilities = descriptor.capabilities
         try await contextRepository.update {
             guard let skills = $0.state.skillState,
                 skills.activeTaskID == nil || skills.taskID(for: input.id) == skills.activeTaskID
-            else { return }
-            try $0.state.skillState?.roundCompleted(
-                failed: failed, fixed: fixedCapabilities, inputID: input.id, failure: failure, cancelled: cancelled)
+            else {
+                $0.state.skillState?.discardDecision(input.id)
+                return
+            }
+            if taskBoundaryOnly {
+                try $0.state.skillState?.settleTask(
+                    failed: failed, fixed: fixedCapabilities, failure: failure, cancelled: cancelled)
+            } else {
+                try $0.state.skillState?.decisionCompleted(
+                    failed: failed, fixed: fixedCapabilities, inputID: input.id, failure: failure, cancelled: cancelled)
+            }
             $0.state.reconcileTaskCompressions()
         }
         if let skills = try await contextRepository.snapshot().state.skillState {

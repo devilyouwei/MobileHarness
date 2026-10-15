@@ -1,6 +1,37 @@
 # IntegrationTests
 
-✅ Scripted capture-only → later save/ignore/close inputs cover photography release, pre-execution unknown aliases (including discardPhoto), explicit correction feedback, reloading on a subsequent request, canonical alias execution exactly once, and no fabricated Task. Prompt regressions verify current-preview/media_N guidance. These are synthetic runtime checks, not real-model/device acceptance.
+## Task / Skill 多轮边界专项（2026-10-15）
+
+✅ 已实现并通过：原有 `AgentTaskSkillTests` 共 40 个测试函数（39 个离线、1 个 opt-in 真实模型）；新增 21 个离线测试函数 / 43 个展开场景，目前核心文件共 61 个测试函数。本次按下表选取相关离线回归，共 116 个函数 / 208 个展开场景全部通过；新增前同一筛选范围为 95 个离线函数 / 165 个展开场景。
+
+| 文件 | 本次测试函数 | 展开场景 | 覆盖范围 |
+| --- | ---: | ---: | --- |
+| [AgentTaskSkillTests.swift](AgentTaskSkillTests.swift) | 60 | 93 | 基础/近期/Task 归属、五轮回收、相机跨输入、Task 替换/终态、容量/原子性、历史压缩及下列新增边界 |
+| [AssistantChatTests.swift](AssistantChatTests.swift) | 14 | 25 | 跨语音会话继续、多轮非法输出恢复、native 结果配对、取消隔离、运行/等待 Task 关闭 |
+| [ConversationHistoryTests.swift](ConversationHistoryTests.swift) | 17 | 17 | 请求/结果证据、历史窗口/新会话隔离、重启不重放、写入/并发冲突、交错 continuation |
+| [PromptTemplateTests.swift](PromptTemplateTests.swift) | 5 | 5 | 已加载指令与函数目录、Skill ID 区分、Task 事实/进入/退出教学 |
+| [GenerationRoundTests.swift](GenerationRoundTests.swift) | 20 | 68 | ReACT 屏障、Action/Tool/混合返回、拒绝/失败/取消、第二输入优先、36 轮/144 次调用、完整 native 配对 |
+
+新增边界按可观察行为划分：
+
+| 边界 | 新增测试函数（同一文件） | 展开场景 |
+| --- | --- | ---: |
+| 先加载后由指定/加载/Action/Tool 接管，分别完成/失败/取消；屏障前保留、结束只回收持有项、旧快照不变、重复收尾幂等 | `preloadedSkillAdoptionReleasesOnlyTaskOwnedSkills` | 12 |
+| 等待用户六轮暂停无关计数、Task 前同一 Decision 使用不自动接管 | `waitingTaskPausesUnrelatedSkillUntilFirstPostTaskDecision` / `skillUsedBeforeTaskInSameDecisionIsNotImplicitlyAdopted` | 2 |
+| 剩一次/已到零时重新加载、最后一轮多次 Action 使用只续期所属 Skill | `skillReloadAtLastChanceOrAfterExpiryStartsFreshFiveDecisionWindow` / `lastChanceActionRenewsOnlyItsProvidingSkill` | 3 |
+| 错误调用类型、缺失来源快照、未知路径和基础函数不续期业务 Skill | `unrelatedOrUnexposedCallsCannotRenewOrAdoptSkill` | 4 |
+| 32 个在途 Decision 上限、重复登记不替换身份、丢弃后解除保护 | `pendingDecisionCapacityRejectsAtomicallyAndDiscardReleasesProtection` | 1 |
+| 非法/混合释放原子拒绝；Task 主动释放不篡改历史，旧请求不复活能力 | `invalidSkillReleaseCannotPartiallyRemoveRecentSkills` / `explicitTaskSkillReleaseKeepsHistoricalEvidenceAndNeverResurrects` | 4 |
+| 字节预算恰好达到/少一字节、三项恰好满额、重复加载无重复目录、Task 不可被淘汰、批量超限撤销中途淘汰和事件 | `skillByteBudgetAcceptsExactLimitAndRejectsOneByteLess` / `allThreeNonBaseSkillsFitAndRepeatedLoadDoesNotDuplicateCatalog` / `capacityCannotEvictTaskSkillAndRecoversAfterTaskEnds` / `oversizedBatchLoadRollsBackTentativeEvictionsAndEvents` | 5 |
+| 最后使用会话接管取消权、无关会话关闭保留 Task、全局关闭回收近期和 Task 项但保留基础项 | `recentSkillLatestUsingSessionOwnsCancellation` / `cancellingUnrelatedSessionKeepsTaskAndClearsOnlyItsPendingDecision` / `globalSessionResetReleasesRecentAndTaskSkillsButKeepsBaseAndEvidence` | 3 |
+| 运行/等待 Task 重启变 interrupted；闲置/显式释放/Task 终态提交失败后原状态保留且可重试；活跃 Task 拒绝新对话 | `restartInterruptsTaskAndDiscardsAllNonBaseActivation` / `failedLifecycleCommitCanRetryWithoutDoubleReleaseOrCountdown` / `activeTaskRejectsConversationResetWithoutLosingSkills` | 7 |
+| 真实 Assistant 处理链的七轮输入验证第五轮后下一请求不再带摄影目录、早期证据仍保留；连续八次 native ReACT 只扣一次无关计数，下一用户输入再扣一次 | `assistantIdleExpiryChangesNextRequestCatalogButKeepsEarlierConversationEvidence` / `assistantLongReACTRenewsUsedSkillAndDecrementsUnusedSkillOnlyOnce` | 2 |
+
+本次专项按测试函数清单筛选现有 Task/Skill、多轮 Assistant、对话历史和 ReACT 测试；清单及通过日志见[验证记录](../../docs/validation/Validation-History.md#2026-10-15--taskskill-multiturn-boundary-test-audit)。仅运行这些内容，不运行全仓 `check.sh` 或 iOS 构建；范围遵循用户本次“只测上述这些内容”的要求。所有新增场景使用状态机或注入模型/执行结果，不调用真实模型、不操作设备。现有生产 Skill 均无依赖；本次不声称验证虚构依赖图。场景数量将每个普通测试记一次、每个参数组合记一次，不重复计算参数化函数本身。
+
+✅ 已实现：覆盖跨输入相机复用、五次倒计数/使用续期、Action/Tool 合法接纳与拒绝区分、Task 归属/终态回收、在途 Decision 使用保护、容量/LRU/字节原子失败及新会话清理；保持旧目录证据与 native 配对。合成验证不等于真实模型/真机验收。
+
+✅ Scripted capture-only → later save/ignore/close inputs cover cross-decision photography reuse and five-decision idle release, pre-execution unknown aliases (including discardPhoto), explicit correction feedback, reloading on a subsequent request, canonical alias execution exactly once, and no fabricated Task. Prompt regressions verify current-preview/media_N guidance. These are synthetic runtime checks, not real-model/device acceptance.
 
 ✅ 已实现（2026-10-13）：AgentArchitectureTests 用有效、已达 8192 条上限的内存 context 覆盖三个确定性角色首次输入收敛、淘汰计数、第二次输入继续服务及设置恢复函数输出；ResourcePreferencesTests 覆盖真实本地文档重开、根 Gateway 设置恢复和原语音配置保留；同时验证未显式选择保留策略时仍拒绝溢出。合成证据不包含用户记录或模型文件。
 
@@ -674,7 +705,7 @@ Camera observation request coverage inspects the complete message list for the o
 
 ## 泛化 Task 与独立 Skill（实施中）
 
-❌ 本次替换固定 Task Mode：Task 保存目标、前台/后台执行身份与生命周期；Skill 提供流程和函数，按基础/交互链/任务作用域管理。startTask(goal, skills?, execution?) 原子组合任务创建与 Skill 加载，loadSkills/releaseSkills 独立支持数组；后台通过现有 send 和父子协议，不抢占前台。删除生效 task-modes，基础 Skill 移至 Agent 资源。请求目录和历史证据保持不可变，旧 Mode 仅作历史证据。UI 显示任务状态、目标、实际加载 Skill 及后台数量。
+❌ 本次替换固定 Task Mode：Task 保存目标、前台/后台执行身份与生命周期；Skill 提供流程和函数，按基础/会话近期/任务作用域管理。startTask(goal, skills?, execution?) 原子组合任务创建与 Skill 加载，loadSkills/releaseSkills 独立支持数组；后台通过现有 send 和父子协议，不抢占前台。删除生效 task-modes，基础 Skill 移至 Agent 资源。请求目录和历史证据保持不可变，旧 Mode 仅作历史证据。UI 显示任务状态、目标、实际加载 Skill 及后台数量。
 
 
 ✅ Resource-path contract: pure Agent and Skill assets move to MobileHarness/Resources/{agents,skills} with Catalog.json. Agents retains loading and policy ownership. Package sources remain limited to Agents; explicit copies exclude unrelated app/model assets. Bundle catalog lookup establishes the runtime root without repeating Resources. Regression covers flat and Resources-containing Bundle lookup plus missing catalog failure; final packaging checks compare indexed asset bytes. Device acceptance is recorded separately.

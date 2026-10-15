@@ -38,4 +38,22 @@ public enum AgentSkillLoader {
             channels: selected.channels, internalActions: fixed.internalActions,
             internalTools: fixed.internalTools)
     }
+    /// Actual UTF-8 prompt cost; shared/base bindings are counted only once.
+    static func nonBaseBytes(_ loaded: [String], base: [String]) throws -> Int {
+        let baseRegistry = try AgentConfigurations.registry(bindings(base))
+        let allRegistry = try AgentConfigurations.registry(bindings(loaded))
+        let instructionBytes = try loaded.filter { !base.contains($0) }.reduce(0) {
+            try $0 + AgentConfigurations.skillInstructions($1).utf8.count
+        }
+        let actionBytes = max(
+            0,
+            try CapabilityContextBuilder.catalog(allRegistry).utf8.count
+                - CapabilityContextBuilder.catalog(baseRegistry).utf8.count)
+        let baseTools = Set(baseRegistry.tools.map(\.path))
+        let toolBytes = try allRegistry.tools.filter { !baseTools.contains($0.path) }.reduce(0) { bytes, tool in
+            try bytes + (tool.definition.map { try JSONEncoder().encode($0).count } ?? 0)
+        }
+        return instructionBytes + actionBytes + toolBytes
+    }
+
 }

@@ -129,3 +129,9 @@ Up to four image references are deduplicated from actual context. Page-cancellab
 ## Native history refresh
 
 ✅ Implemented: archive and conversation Lists use native refreshable indicators; paging uses the system ProgressView without custom movement/insert animations. Pulling the timeline reloads its first page and preserves Task expansion/navigation. It cancels and joins its one timeline reader and at most sixteen Task readers before resetting paging tickets, so rapid refresh cannot overlap old/new read generations. Expanded source caches are discarded only after a successful refresh and reload through their visible paging footers; failed refresh retains visible records with an inline retryable error. Disable paging during refresh so late cancelled reads cannot append.
+
+## Preserve history while returning from detail
+
+✅ Implemented: separate per-page initial appearance from explicit refresh. A view-local HistoryInitialLoad gate admits the first successful read once and permits retry after failure/cancellation. Dialog-list and message-list .task callbacks must not replace loaded pages when a child destination is popped. Keep List identity/row IDs, expanded Task pages and cursor state intact; native List retains its offset without a forced scrollTo. Explicit pull-to-refresh/retry still reloads the first page. A newly created page gets a fresh initial-load gate; conversation destination identity is keyed by the stable dialog ID so a different dialog never reuses another dialog’s page cache.
+
+❌ Native scroll-offset retention and interactive Back after multiple pages still require device acceptance; lifecycle-state tests and iOS compilation are distinct evidence.

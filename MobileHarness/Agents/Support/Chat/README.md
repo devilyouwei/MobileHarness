@@ -1,5 +1,7 @@
 # Shared Chat Decision Worker
 
+✅ 已实现：首次用户处理在选择模型 Provider 前注册原始 Decision，ReACT 复用同一输入使用集合；XML Actions 与 native Tools 仅在合法解析且输出已接纳后按不可变 Skill 来源快照记录使用（执行失败仍算使用，解析拒绝不算）。Task 关闭屏障只收尾 Task，最终用户 Decision 收尾一次才结算闲置计数；系统/被动观察不扣次数。取消清理在途使用集合，新对话清理非基础激活；历史请求目录保持原证据。
+
 ## Summary
 
 Adapts an injected ChatCapability into bounded role-specific model decisions and observation continuations. Assistant specializes this worker with dynamic Skills; deterministic roles use AgentFixedTaskCoordinator and have no conversational worker.
@@ -105,7 +107,7 @@ AgentTaskSkillState 控制经过真实 Agent.Task Actions 和原子 repository t
 
 ## 泛化 Task 与独立 Skill
 
-✅ Each Agent injects base Skills from its resource. The worker retains temporary Skills through ReACT, transfers same-chain loads to a new Task, and releases scopes after the reply/result barrier. Background reports update evidence without starting Chat or foreground interaction. Request metadata stores exact taskGoal, execution and Skill/catalog snapshots.
+✅ Each Agent injects base Skills from its resource. The worker retains recent Skills across Decisions with a five-unused-user-decision countdown. Tasks adopt only explicitly loaded or actually used roots and release their held non-base Skills after terminal barriers; unrelated recent roots are not adopted. Background reports update evidence without starting Chat or foreground interaction. Request metadata stores exact taskGoal, execution and Skill/catalog snapshots.
 ✅ 后台补充输入：send 保留 content 摘要，新增 businessContract/payload 可选参数（必须配对）。后台 input 使用已声明类型化业务契约，后台取消继续通过 scoped send；不能因等待状态隐式捕获前台语音。
 
 

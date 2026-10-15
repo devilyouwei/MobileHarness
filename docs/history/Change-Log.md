@@ -1,5 +1,17 @@
 # Documentation and architecture change history
 
+## 2026-10-15 — 多轮对话、Task 与 Skill 边界测试补强
+
+- 盘点核心 40 个测试函数（含 1 个真实模型 opt-in），新增 21 个离线函数 / 43 个场景；补齐预加载接管与三种终态、计数暂停/最后一轮续期、容量精确边界/失败回滚、会话隔离及提交失败重试。
+- 通过真实 Assistant 处理链的七轮目录到期和八次 Tool ReACT，验证回收只影响后续请求、历史证据保留、内部循环不重复扣数；本次未改生产实现。
+- 按用户要求只执行相关专项：116 个函数 / 208 个展开场景全部通过。覆盖矩阵在 Tests/IntegrationTests/README.md，[验证记录](../validation/Validation-History.md#2026-10-15--taskskill-multiturn-boundary-test-audit) 区分合成检查与真实模型/设备验收。
+
+## 2026-10-15 — Task 终态回收与无 Task Skill 五次闲置保留
+
+- Task 只取得指定/实际使用的 Skill，终态回收持有项；无 Task 的加载和合法 Action/Tool 使用续期为五次完整用户决策，内部 ReACT 不扣数。移除按单输入立即释放的旧实现。
+- 加入三项/24 KiB 非基础激活预算、受保护使用集合、确定性 LRU、4 KiB 发现目录和原子失败。新对话/重启清理，定向取消保留其他会话；当前目录与完整指令一起生效/回收。
+- 当前 owning READMEs、Skill 教学/修订及 ADR0212 已同步；[验证记录](../validation/Validation-History.md#2026-10-15--task-owned-cleanup-and-five-decision-skill-retention) 区分通过的合成回归、设备目标编译、全量检查失败和真机验收缺口。
+
 ## 2026-10-15 — 按文档职责整理当前说明与历史证据
 
 - 验证报告及语音验收指南归入 validation，变更、里程碑、旧说明与原始 Markdown 设计归入 history；原始 Word 设计源保持原路径与内容，原始测量继续由 measurements 保留。
@@ -814,3 +826,10 @@ Move analysis budgets and preparation invocation from ApplicationRuntime's hidde
 
 - Archive dialogs, conversation timeline and expanded Task sources now default to20 rows through StorageChat.HistoryPaging.pageSize. Archive EOF and response-size validation share the same constant. Raw-message internal enumeration batches and existing query limits remain independent; no stored records/schema change.
 - Regressions use20-row archive boundaries, a32-source Task across20+12 pages, later-page Task folding, complete raw reads, and an unchanged100000-message corpus with20-row preview assertions. Native loading/refresh styles remain unchanged.
+
+
+## 2026-10-15 — Retain paged history when returning from details
+
+- Both archive dialog List and message timeline previously performed first-page refresh on every .task reappearance. Popping a child destination replaced accumulated pages and Task source caches, shrinking the List and losing the prior scroll range.
+- Add a view-scoped initial-load gate shared by both page types. Successful initial reads are not repeated on Back; failed/cancelled initial reads remain retryable. Explicit refresh/retry retains its existing first-page reload contract, and failed refresh cannot reopen automatic initial loading. Conversation destinations use stable dialog identities so a different dialog creates its own page state. No query, schema, pagination size or navigation-stack redesign.
+- Keep native List identity/row identifiers and existing Task expansion/source pages on child return; do not introduce forced scrollTo or custom Back animations. Added lifecycle-state regressions; actual native offset/gesture acceptance remains separate.

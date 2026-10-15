@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="MobileHarness/Resources/Assets.xcassets/AppIcon.appiconset/AppIcon.png" alt="MobileHarness app icon" width="160" style="border-radius: 32px;">
+  <img src="MobileHarness/Resources/Assets.xcassets/AppIcon.appiconset/AppIcon.png" alt="MobileHarness app icon" width="100" style="border-radius: 32px;">
 </p>
 
 <h1 align="center">MobileHarness</h1>

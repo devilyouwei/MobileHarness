@@ -60,6 +60,7 @@ import Foundation
         let controls: any ConversationHistoryControlling
         @Environment(\.scenePhase) private var scenePhase
         @State private var deleting: HistoryConversation?
+        @State private var initialLoad = HistoryInitialLoad()
         var body: some View {
             List {
                 if let status = state.status {
@@ -71,7 +72,7 @@ import Foundation
                             Text("此 Agent 尚无对话记录。").foregroundStyle(.secondary)
                         } else {
                             NavigationLink {
-                                ConversationHistoryDetail(conversation: current, controls: controls)
+                                ConversationHistoryDetail(conversation: current, controls: controls).id(current.id)
                             } label: {
                                 row(current)
                             }
@@ -83,7 +84,7 @@ import Foundation
                     } else if state.status == nil {
                         ProgressView("加载对话…")
                     } else {
-                        Button("重试加载") { Task { await controls.load() } }
+                        Button("重试加载") { Task { await reload() } }
                     }
                 } header: {
                     Text("当前对话")
@@ -94,7 +95,8 @@ import Foundation
                     if state.archive?.past.isEmpty == true { Text("暂无历史对话").foregroundStyle(.secondary) }
                     ForEach(state.archive?.past ?? []) { conversation in
                         NavigationLink {
-                            ConversationHistoryDetail(conversation: conversation, controls: controls)
+                            ConversationHistoryDetail(conversation: conversation, controls: controls).id(
+                                conversation.id)
                         } label: {
                             row(conversation)
                         }
@@ -123,8 +125,11 @@ import Foundation
             .navigationTitle(state.title)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar(.visible, for: .navigationBar)
-            .task { await controls.load() }
-            .refreshable { await controls.load() }
+            .task {
+                guard initialLoad.begin() else { return }
+                await reload()
+            }
+            .refreshable { await reload() }
             .onDisappear { controls.cancel() }
             .onChange(of: scenePhase) { _, phase in if phase != .active { controls.cancel() } }
             .alert(
@@ -140,6 +145,11 @@ import Foundation
             } message: {
                 Text("删除后无法恢复。")
             }
+        }
+
+        private func reload() async {
+            await controls.load()
+            initialLoad.finish(succeeded: !Task.isCancelled && state.archive != nil && state.status == nil)
         }
 
         private func row(_ conversation: HistoryConversation) -> some View {
@@ -204,6 +214,7 @@ import Foundation
     private struct ConversationHistoryDetail: View {
         private let seed: HistoryConversation
         @State private var loaded: HistoryConversation?
+        @State private var initialLoad = HistoryInitialLoad()
         @State private var loadError: String?
         @State private var isRefreshing = false
         @State private var expandedTasks: Set<String> = []
@@ -267,7 +278,11 @@ import Foundation
                 }
                 .listSectionSeparator(.hidden)
             }
-            .task(id: seed.id) { await reload() }
+            .task(id: seed.id) {
+                guard loaded == nil, initialLoad.begin() else { return }
+                await reload()
+                initialLoad.finish(succeeded: !Task.isCancelled && loaded != nil)
+            }
             .refreshable { await reload() }
             .overlay {
                 if loaded == nil && loadError == nil { ProgressView("加载对话…") }
@@ -379,6 +394,7 @@ import Foundation
                 loaded = conversation
                 taskPages.removeAll()
                 loadError = nil
+                initialLoad.finish(succeeded: true)
             } catch {
                 if !Task.isCancelled { loadError = "读取失败：\(error)" }
             }

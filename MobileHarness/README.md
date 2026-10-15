@@ -1,5 +1,7 @@
 # MobileHarness Technical Design
 
+✅ 已实现（Task/Skill 生命周期修订）：Task 只持有明确加载或实际使用的非基础 Skill，终态屏障后回收其持有项；无 Task 的 Skill 跨用户 Decision 复用，使用/加载重置 5，完整 Decision 未使用扣 1，到零移出后续请求。按 3 个非基础 Skill 和 24 KiB 正文/函数目录预算回收非保护 LRU，原请求快照不变；新对话/会话关闭清理。具体算法由 Agents/Support/Context 拥有。
+
 This document defines the current framework architecture, module responsibilities, cross-module flows and key technical contracts.
 
 This technical document has three parts:
@@ -1899,7 +1901,7 @@ sequenceDiagram
 
 ## 泛化 Task 与独立 Skill
 
-✅ 泛化 Task 与独立 Skill 已接入：任意目标、单前台任务，基础/交互链/任务 Skill 作用域；后台复用 send，不抢占前台。详见所属 Agents 与公共机制设计。
+✅ 泛化 Task 与独立 Skill 已接入：任意目标、单前台任务，基础/会话近期/任务 Skill 作用域；后台复用 send，不抢占前台。详见所属 Agents 与公共机制设计。
 
 ✅ Resource-path contract: pure Agent and Skill assets move to MobileHarness/Resources/{Agents,Skills} with Catalog.json. Agents retains loading and policy ownership. Package sources remain limited to Agents; explicit copies exclude unrelated app/model assets. Bundle catalog lookup establishes the runtime root without repeating Resources. Regression covers flat and Resources-containing Bundle lookup plus missing catalog failure; final packaging checks compare indexed asset bytes. Device acceptance is recorded separately.
 

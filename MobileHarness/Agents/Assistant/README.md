@@ -1,5 +1,7 @@
 # Assistant
 
+✅ 已实现：无 Task 的已加载 Skill 跨输入复用，加载/实际 Action 或 Tool 使用重置 5，五次完整用户决策未使用才回收；Task 结束仍确定回收持有项。当前事实增加 Skill 归属与剩余次数，只有目录缺失才重新 loadSkills。
+
 ## 职责与边界
 
 ✅ 唯一用户对话入口，负责动态 Skill、一个前台目标任务、模型决策和 ReACT。 Agents 管业务策略和上下文，Gateway 管权限/传输，Actions 管函数实现；原生设备与 UI 端口由 App 注入。没有跨 Agent 共享可写聊天历史。
@@ -18,11 +20,11 @@ history、skillState（任务/加载事件/输入关联）、cameraState 和后�
 
 ## 生命周期、容量与失败
 
-基础 Skill 来自 Agent 配置（basic-skill、expression-interaction、robot-interaction）；任意任务目标按需组合 Skill，默认交互链临时加载的能力在链结束释放。startTask 后下一轮才开放新函数；waitingUser 不关闭任务。finish/cancel 在本轮反馈和回复屏障完成后恢复默认。 事务/输出消费由 App 根生命周期持有，独立于页面。输出最多 256，状态提交等待最多 32；通信消费者最多 16 待处理、4 并发。超限明确失败。取消加入已接纳工作清理；重启标记未完成任务中断，不重放设备动作。共享 Chat 的输入、调用和执行预算见 [Chat](../Support/Chat/README.md)。
+基础 Skill 来自 Agent 配置（basic-skill、expression-interaction、robot-interaction）；任意任务目标按需组合 Skill，无 Task 的近期能力按五次用户 Decision 闲置倒计数保留。startTask 后下一轮才开放新函数；waitingUser 不关闭任务。finish/cancel 在本轮反馈和回复屏障完成后恢复默认。 事务/输出消费由 App 根生命周期持有，独立于页面。输出最多 256，状态提交等待最多 32；通信消费者最多 16 待处理、4 并发。超限明确失败。取消加入已接纳工作清理；重启标记未完成任务中断，不重放设备动作。共享 Chat 的输入、调用和执行预算见 [Chat](../Support/Chat/README.md)。
 
 ## 函数权限与注册
 
-✅ 已实现：基础 Skill 明确保存/忽略当前预览及关闭相机也必须先检查当前目录；临时 photography 在上一决策链结束后释放时须重新加载。无 Task 的当前预览可使用实时 displayedMediaID 处理，不创建虚假摄影目标；历史标签不提供当前权限。忽略只使用当前 ignorePhoto 别名。
+✅ 已实现：基础 Skill 明确保存/忽略当前预览及关闭相机也必须先检查当前目录；photography 仅在五次闲置回收、容量回收或 Task 终态回收后才需重新加载。无 Task 的当前预览可使用实时 displayedMediaID 处理，不创建虚假摄影目标；历史标签不提供当前权限。忽略只使用当前 ignorePhoto 别名。
 
 [Agent.json](../../Resources/Agents/Assistant/Agent.json) 声明固定函数；业务模型目录由加载 Skill 决定。实际实现/参数契约以 [owning @Action declarations](../../Actions/README.md) 为准。Internal 固定函数不会自动向模型开放。
 
@@ -134,7 +136,7 @@ Publication is one-way and has no recipient acknowledgment. Directed send return
 
 ## 泛化 Task 与独立 Skill
 
-✅ 泛化 Task 与独立 Skill 已接入：任意目标、单前台任务，基础/交互链/任务 Skill 作用域；后台复用 send，不抢占前台。详见所属 Agents 与公共机制设计。
+✅ 泛化 Task 与独立 Skill 已接入：任意目标、单前台任务，基础/会话近期/任务 Skill 作用域；后台复用 send，不抢占前台。详见所属 Agents 与公共机制设计。
 
 ✅ Audit correction: shared Chat worker must not cast AssistantContextState or interpret camera business facts. Role hooks select/apply passive context observations; Assistant owns provenance/sequence validation and camera/task data-message construction through its own Context Builder. Existing lifecycle, persistence and request snapshot semantics remain unchanged.
 

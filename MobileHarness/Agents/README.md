@@ -1,5 +1,7 @@
 # Agents — Assistant、Skills 与业务执行
 
+✅ 已实现：区分用户 Decision（整条 ReACT）和 Round（单次模型请求）。Task 终态回收持有 Skill；无 Task 的会话 Skill 使用后续期 5 次用户 Decision，闲置递减，不按内部 Round 或墙钟释放。Task 不继承全部近期能力，显式加载或实际调用时才取得持有关系；Agents 管理预算和使用，Gateway 继续验证不可变目录。
+
 ## 职责与边界
 
 ✅ Assistant 是唯一普通对话 Agent，动态组合 Skill 和一个前台目标任务。Photographer 管确定性摄影/追踪，Memory 管历史/标题事务，ApplicationControl 管配置/设备/环境；语音和视觉 Agent 保持独立流式生命周期。所有输入为 Signal，业务输出为 Action；ReACT 消费真实结果，不是向自己广播。
@@ -64,12 +66,12 @@ Skill 加载验证依赖、canonical 函数、别名、Channel 后整体提交�
 
 ## 泛化 Task 与独立 Skill
 
-✅ 泛化 Task 与独立 Skill 已接入：任意目标、单前台任务，基础/交互链/任务 Skill 作用域；后台复用 send，不抢占前台。详见所属 Agents 与公共机制设计。
+✅ 泛化 Task 与独立 Skill 已接入：任意目标、单前台任务，基础/会话近期/任务 Skill 作用域；后台复用 send，不抢占前台。详见所属 Agents 与公共机制设计。
 ### 公共任务控制契约
 
 startTask 的 goal 为必填；skills 为可选 JSON ID 数组，execution 缺省 foreground。后台还需要 target、businessContract、payload，校验目标声明后通过通信 Action/send 提交。一个前台任务；最多 16 个非终态后台任务，Registry 保留 256 条记录。投递确认、取消确认和最终结果严格区分。父任务结束不自动取消后台工作。后台消息不触发前台推理、抢占或播放。生产后台契约暂未声明，公共路径由合成执行者验证。
 
-Skill 所有权分为 base、decision、task。默认决策链结束释放临时能力；startTask 转移同链加载的能力并原子添加指定 Skill；任务等待用户保持能力。任务结束经过执行/回复清理恢复基础能力。不提供任务栈。只接受当前格式，不导入旧 Task 或会话状态。
+Skill 所有权分为 base、recent、task。无 Task 的近期能力跨决策复用并按五次闲置倒计数回收；startTask 只持有指定 Skill，后续显式加载或实际使用才加入任务。任务等待用户保持持有能力；终态经过执行/回复清理回收持有项，不转为近期能力；无关近期项保留。不提供任务栈。只接受当前格式，不导入旧 Task 或会话状态。
 
 
 ✅ Resource-path contract: pure Agent and Skill assets move to MobileHarness/Resources/{Agents,Skills} with Catalog.json. Agents retains loading and policy ownership. Package sources remain limited to Agents; explicit copies exclude unrelated app/model assets. Bundle catalog lookup establishes the runtime root without repeating Resources. Regression covers flat and Resources-containing Bundle lookup plus missing catalog failure; final packaging checks compare indexed asset bytes. Device acceptance is recorded separately.

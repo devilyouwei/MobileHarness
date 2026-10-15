@@ -2,6 +2,39 @@ import Foundation
 import Testing
 import UI
 
+@Test func historyReturningFromChildKeepsInitialLoadClosedUntilPageIsRecreated() {
+    var lifecycle = HistoryInitialLoad()
+    let first = lifecycle.begin()
+    let overlapping = lifecycle.begin()
+    #expect(first && !overlapping)
+    lifecycle.finish(succeeded: true)
+    for _ in 0..<3 {
+        let returningFromDetail = lifecycle.begin()
+        #expect(!returningFromDetail)
+    }
+    // A failed explicit refresh must not turn navigation return into another refresh.
+    lifecycle.finish(succeeded: false)
+    let afterRefreshFailure = lifecycle.begin()
+    #expect(!afterRefreshFailure)
+    var newPage = HistoryInitialLoad()
+    let enteringNewPage = newPage.begin()
+    #expect(enteringNewPage)
+}
+
+@Test func historyInitialFailureOrCancellationCanRetryAndExplicitRefreshCanCompleteLoad() {
+    var lifecycle = HistoryInitialLoad()
+    let first = lifecycle.begin()
+    #expect(first)
+    lifecycle.finish(succeeded: false)
+    let retry = lifecycle.begin()
+    #expect(retry)
+    lifecycle.finish(succeeded: false)
+    // Pull-to-refresh or the retry button can load successfully outside the appearance callback.
+    lifecycle.finish(succeeded: true)
+    let afterManualRetry = lifecycle.begin()
+    #expect(!afterManualRetry)
+}
+
 @Test func historyRefreshInvalidatesPreviousPagingTickets() throws {
     var state = HistoryPageLoading<UInt64>()
     let first = state.begin(after: 50)

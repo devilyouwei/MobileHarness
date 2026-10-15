@@ -1,5 +1,7 @@
 # Shared Agent Components
 
+✅ 已实现：AgentSkillLoader 增加纯函数的激活预算计算；Context 管理根 Skill/依赖、Task 持有、Decision 使用及会话倒计数；Chat 记录合法接纳的模型 Action/Tool 使用并在完整用户 Decision 结束扣数。资源定义缓存与模型激活状态分离，不新增目录或依赖。
+
 ## Summary
 
 Groups business-independent framework contracts, application schemas, reusable Chat adaptation and atomic context storage.
@@ -55,7 +57,7 @@ Workers stay with their owning role/worker; shared placement creates no global h
 
 ## 泛化 Task 与独立 Skill
 
-✅ 泛化 Task 与独立 Skill 已接入：任意目标、单前台任务，基础/交互链/任务 Skill 作用域；后台复用 send，不抢占前台。详见所属 Agents 与公共机制设计。
+✅ 泛化 Task 与独立 Skill 已接入：任意目标、单前台任务，基础/会话近期/任务 Skill 作用域；后台复用 send，不抢占前台。详见所属 Agents 与公共机制设计。
 
 ✅ Source organization audit (2026-10-11): Support root: AgentConfigurations and AgentSkillLoader (immutable asset lookup/catalog construction). Context: AgentTaskSkillState (renamed from AgentSkillState, persisted fields unchanged), AgentFixedTaskCoordinator and repository. Communication: business values/contracts only. Chat remains capability adaptation and model-round execution.
 

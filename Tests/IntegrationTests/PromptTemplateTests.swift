@@ -231,7 +231,7 @@ private func skillResponseExamples(_ id: String) throws -> [String] {
         #expect(prompt.contains(basic) && prompt.contains(identity))
         #expect(prompt.contains("exactly one self-closing startTask tag and nothing else"))
         #expect(prompt.contains("including saving/discarding an existing preview or closing the camera"))
-        #expect(prompt.contains("A previous temporary load expires at the end of its decision chain"))
+        #expect(prompt.contains("Five unrelated user decisions or capacity eviction can remove it"))
         #expect(prompt.contains("including text INSIDE wait"))
         #expect(prompt.contains("Never copy or paraphrase it outside wait"))
         if loaded {

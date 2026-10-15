@@ -1,5 +1,7 @@
 # Agent Runtime Context and Task State
 
+✅ 已实现：热状态升级为 v4，移除 temporaryInputID，分别保存 Task 根 Skill、会话根 Skill 的 remainingDecisions/最近使用顺序/最后使用会话和最多 32 个在途 Decision 使用集合。基础常驻；Task 持有项在终态回收，不转近期；无 Task 合法调用/显式加载续期为 5，整条用户 Decision 未使用扣 1，到零回收。Task 期间暂停未持有会话项倒计数。按展开后非基础总数 3、正文/增量函数目录 24 KiB 淘汰非保护 LRU；已在途 Decision 用过的项受保护。回收事件记录 idle/capacity/taskEnded/explicit/conversationClosed/sessionClosed 原因；定义缓存保留不意味着模型激活。共享依赖保留引用；所有加载验证/回收原子提交，失败不改变旧状态。新对话和重启清理全部会话保留；定向会话关闭只清理属于该会话的近期项，不影响其他会话。Task 收尾与用户 Decision 结算分离，防止 finishTask 屏障及最终收尾重复扣数。
+
 ## Responsibility and direct relationships
 
 ✅ AgentContextRepository compiles in Agents and adapts AgentCore state to Storage StateRepository/MemoryStateStore. AgentTaskSkillState owns Skill/task transitions; AgentFixedTaskCoordinator joins fixed-task results. Roles own schemas, admission, classification and retention. SQLite writes belong to injected Chat/Task repositories, not this directory.
@@ -14,7 +16,7 @@ Generic injected load/commit hooks support atomicity/failure fixtures and preser
 
 ## Task and Skill lifecycle
 
-A pure Skill transition receives an already committed Task ID. The Chat worker validates a candidate, inserts running in SQLite, binds memory, and explicitly closes a failed binding. Temporary Skills, Task registries/views, queues and awaiting-feedback stages remain memory-only. Finish/cancel/failure waits for actual execution barriers, then persists terminal state/summary and sources through normalized repositories.
+A pure Skill transition receives an already committed Task ID. The Chat worker validates a candidate, inserts running in SQLite, binds memory, and explicitly closes a failed binding. Recent Skill counters/Decision-use sets, Task registries/views, queues and awaiting-feedback stages remain memory-only. Finish/cancel/failure waits for actual execution barriers, then persists terminal state/summary and sources through normalized repositories.
 
 Task entry preserves ordinary background context and complete current-task evidence. Only terminal Tasks compress their process at the first source position; sources remain queryable. finishTask ends the decision unless continueDecision=true explicitly authorizes another objective; cancelTask ends it. Camera/media access does not require a Task authorization record.
 

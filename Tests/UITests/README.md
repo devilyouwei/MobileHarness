@@ -169,3 +169,5 @@ Root Package.swift compiles this directory as UITests against the UI module. The
 ✅ Implemented (2026-10-15 automatic history paging): Verify paging-state admission, same-cursor suppression, explicit retry, cancellation/re-entry and stale ticket rejection. These are portable state tests; native lazy-footer visibility is separate acceptance.
 
 ✅ Implemented: refresh-reset paging-ticket regression rejects completions from the previous list generation and permits the refreshed cursor to load. Native List refresh gestures/spinner and Task expansion remain separate acceptance.
+
+✅ Implemented: history appearance regressions verify one initial load across child-navigation reappearances, failed/cancelled initial retry, explicit-refresh success/failure and fresh-page admission. Native List scroll-offset/interactive-Back acceptance remains separate from these lifecycle-state tests.

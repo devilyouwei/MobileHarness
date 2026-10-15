@@ -142,11 +142,19 @@ public enum AgentConfigurations {
         return text
     }
     public static func skillOverview() throws -> String {
-        try catalog().skills.keys.sorted().map { id in
-            let s = try skill(id)
-            return "Skill ID=\(id); description=\(s.description)"
-        }
-        .joined(separator: "\n")
+        let skills = try catalog().skills.keys.sorted().map { try skill($0) }
+        let prefixes = skills.map { "Skill ID=\($0.id); description=" }
+        let overhead = prefixes.reduce(0) { $0 + $1.utf8.count } + max(0, skills.count - 1)
+        guard overhead <= 4096 else { throw AgentConfigurationError.invalidField("Skill discovery capacity") }
+        let perDescription = (4096 - overhead) / max(1, skills.count)
+        return zip(skills, prefixes).map { skill, prefix in
+            var description = ""
+            for character in skill.description {
+                guard description.utf8.count + String(character).utf8.count <= perDescription else { break }
+                description.append(character)
+            }
+            return prefix + description
+        }.joined(separator: "\n")
     }
     public static func identityInstructions(named name: String) throws -> String {
         guard let path = try catalog().agents[name],

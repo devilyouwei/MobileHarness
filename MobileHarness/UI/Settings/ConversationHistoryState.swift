@@ -16,6 +16,25 @@ public final class ConversationHistoryState {
     }
 }
 
+/// Scoped to a page's identity: returning from a child does not request its first page again.
+public struct HistoryInitialLoad: Sendable {
+    private enum Phase: Sendable { case idle, loading, loaded }
+    private var phase = Phase.idle
+    public init() {}
+    public mutating func begin() -> Bool {
+        guard phase == .idle else { return false }
+        phase = .loading
+        return true
+    }
+    public mutating func finish(succeeded: Bool) {
+        if succeeded {
+            phase = .loaded
+        } else if phase == .loading {
+            phase = .idle
+        }
+    }
+}
+
 /// One attempt per cursor unless the user explicitly retries; tickets fence late completions.
 public struct HistoryPageLoading<Cursor: Hashable & Sendable>: Sendable {
     public private(set) var error: String?

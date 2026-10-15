@@ -647,7 +647,7 @@ func closingSessionCancelsRunningAndWaitingForegroundTasksAndAllowsFreshConversa
     _ = try skills.control(
         "startTask", arguments: ["goal": "拍照并等待选择", "skills": "[\"photography\"]"],
         inputID: original.id, fixed: fixed, sessionID: session, taskID: try fixtureTaskID())
-    if !running { try skills.roundCompleted(failed: false, fixed: fixed, inputID: original.id) }
+    if !running { try skills.decisionCompleted(failed: false, fixed: fixed, inputID: original.id) }
     initial.skillState = skills
     let repository = AgentContextRepository(agent: .assistant, scope: UUID().uuidString, state: initial)
     let model = ChatFixture()
