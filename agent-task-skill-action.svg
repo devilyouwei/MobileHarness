@@ -14,11 +14,11 @@
     <path d="M 430 225 L 520 225"/>
     <path d="M 598 270 V 310 H 98 V 195" stroke-dasharray="5 5"/>
   </g>
-  <g fill="#f8fafc" stroke="#64748b" stroke-width="1.5">
-    <rect x="24" y="95" width="148" height="100" rx="20"/>
-    <rect x="254" y="24" width="176" height="90" rx="20"/>
-    <rect x="254" y="180" width="176" height="90" rx="20"/>
-    <rect x="520" y="180" width="156" height="90" rx="20"/>
+  <g stroke-width="1.5">
+    <rect x="24" y="95" width="148" height="100" rx="20" fill="#ede9fe" stroke="#a397c6"/>
+    <rect x="254" y="24" width="176" height="90" rx="20" fill="#e0f2fe" stroke="#7ba6c4"/>
+    <rect x="254" y="180" width="176" height="90" rx="20" fill="#dcfce7" stroke="#80af94"/>
+    <rect x="520" y="180" width="156" height="90" rx="20" fill="#ffedd5" stroke="#c7a17b"/>
   </g>
   <g font-family="-apple-system, BlinkMacSystemFont, sans-serif" text-anchor="middle" dominant-baseline="middle">
     <g fill="#1e293b" font-size="20" font-weight="600">

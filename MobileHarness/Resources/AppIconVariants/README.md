@@ -20,7 +20,7 @@ flowchart LR
 
 ## Selection contract
 
-The [existing selector](../../../scripts/select-app-icon.sh) copies the explicitly selected 1024×1024 artwork into the current asset catalog. Previous sources remain preserved for subsequent builds. The project README references the selected asset-catalog image so its logo follows icon selection. There is no Swift implementation, runtime state or alternate-icon entitlement here.
+The [existing selector](../../../scripts/select-app-icon.sh) copies the explicitly selected 1024×1024 artwork into the current asset catalog. Previous sources remain preserved for subsequent builds. The project README embeds the selected artwork within its [generated banner](../../../output/README.md); subsequent icon selection does not automatically update that image. There is no Swift implementation, runtime state or alternate-icon entitlement here.
 
 lamp-arm.png 为居中的白色机械臂与倾斜手机构图，手机显示青色睁眼/眨眼表情；选择器要求不透明 1024×1024 图像。构图原稿见 [icon concepts](../../../output/icon-concepts/README.md)。
 

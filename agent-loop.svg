@@ -10,10 +10,10 @@
     <path d="M 150 200 L 270 200"/>
     <path d="M 316 170 L 245 72"/>
   </g>
-  <g fill="#f8fafc" stroke="#64748b" stroke-width="1.5">
-    <rect x="150" y="24" width="120" height="48" rx="24"/>
-    <rect x="20" y="176" width="130" height="48" rx="24"/>
-    <rect x="270" y="176" width="130" height="48" rx="24"/>
+  <g stroke-width="1.5">
+    <rect x="150" y="24" width="120" height="48" rx="24" fill="#e0f2fe" stroke="#7ba6c4"/>
+    <rect x="20" y="176" width="130" height="48" rx="24" fill="#ede9fe" stroke="#a397c6"/>
+    <rect x="270" y="176" width="130" height="48" rx="24" fill="#ffedd5" stroke="#c7a17b"/>
   </g>
   <g fill="#1e293b" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="17" text-anchor="middle" dominant-baseline="middle">
     <text x="210" y="48">Signal</text>
