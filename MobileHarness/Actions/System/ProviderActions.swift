@@ -1,5 +1,6 @@
 import Foundation
 import FunctionContracts
+import Storage
 
 extension SystemActions {
     @Action(domain: "System", module: "Provider", title: "discoverModels", timeout: .seconds(60))
@@ -12,7 +13,8 @@ extension SystemActions {
             throw ProviderDiscoveryError.invalidRequest
         }
         try Task.checkCancellation()
-        let models = try await provider.discoverModels(requestID: id, sessionID: invocation.context.sessionID)
+        let models = try await provider.discoverModels(
+            requestID: id.uuidString, sessionID: invocation.context.sessionID)
         try Task.checkCancellation()
         return try ProviderModelList.encoded(models)
     }
@@ -26,7 +28,7 @@ extension SystemActions {
         let id = try providerSettingsRequest(invocation)
         try Task.checkCancellation()
         try await settings.restoreSettings(requestID: id, sessionID: invocation.context.sessionID)
-        return id.uuidString
+        return id
     }
     @Action(domain: "System", module: "Provider", title: "saveSettings", timeout: .seconds(60))
     public static func saveSettings(invocation: any FunctionInput, using settings: any ProviderSettingsCapability)
@@ -35,7 +37,7 @@ extension SystemActions {
         let id = try providerSettingsRequest(invocation)
         try Task.checkCancellation()
         try await settings.saveSettings(requestID: id, sessionID: invocation.context.sessionID)
-        return id.uuidString
+        return id
     }
     @Action(
         domain: "System", module: "Provider", title: "readSettings",
@@ -49,12 +51,12 @@ extension SystemActions {
         try Task.checkCancellation()
         return try await settings.readSettings()
     }
-    private static func providerSettingsRequest(_ invocation: any FunctionInput) throws -> UUID {
+    private static func providerSettingsRequest(_ invocation: any FunctionInput) throws -> String {
         let arguments = ActionArguments(invocation.call.parameters)
         try arguments.validateAllowedKeys(["requestID"])
         guard let id = UUID(uuidString: try arguments.requiredString("requestID", maximumUTF8Bytes: 36)) else {
             throw ProviderSettingsError.invalidConfiguration
         }
-        return id
+        return id.uuidString
     }
 }

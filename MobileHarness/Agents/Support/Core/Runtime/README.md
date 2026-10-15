@@ -6,7 +6,7 @@ Bounded lifecycle registration, generic decision context, input admission and ta
 
 ## Ownership and boundaries
 
-AgentManager owns live identity and grants; concrete roles own workers and lifecycle behavior. This Foundation-only directory has no role/model/Storage implementation. AgentContextPersistence supplies injected load/CAS commit.
+AgentManager owns live identity and grants; concrete roles own workers and lifecycle behavior. This independent runtime framework directory has no role/model/Storage implementation. AgentContextPersistence supplies injected load/CAS commit.
 
 ## External relationships and data flow
 
@@ -25,7 +25,7 @@ flowchart LR
 
 ## Identity and lifecycle
 
-Registry permits 64 Agents and rejects duplicates/full capacity. Registration issues an incarnation UUID and optional session binding. Stop revokes identity/task grants before joining Agent work and resource cleanup; repeat stop joins the same cleanup. Up to four stop observers are supported. A stopped instance is terminal; replacement requires a new instance after removal. Pause semantics belong to each role.
+Registry permits 64 Agents and rejects duplicates/full capacity. Registration issues an incarnation ID and optional session binding. Stop revokes identity/task grants before joining Agent work and resource cleanup; repeat stop joins the same cleanup. Up to four stop observers are supported. A stopped instance is terminal; replacement requires a new instance after removal. Pause semantics belong to each role.
 
 Manager retains at most 32 active task grants and 32 execution scopes per task, validating both participant incarnations and full scope. Stop revokes descendants and joins cleanup. ActionResultInbox retains 128 terminal results by default (configurable 1–512), deduplicates execution IDs and counts history eviction; it is not a work queue.
 
@@ -65,3 +65,13 @@ AgentTaskBudget defaults to nil request/native limits and records cumulative cou
 
 
 ✅ AgentTaskBudget defaults maximumRequests/maximumNativeCalls to nil (unlimited), records counts with representation-safe saturation, still validates and enforces explicitly supplied bounds/legacy records. Shared Chat removes its direct fixed caps.
+
+
+
+
+
+## SQLite records and runtime identity
+
+✅ Implemented: technical identities are opaque UUID strings; committed business entities use dialog/message/task/media/device SQLite IDs. Consumers use Storage repositories while preserving ownership, cancellation and independent foundation boundaries. Complete messages, including each ReACT message, persist at termination; delta fragments do not persist. The custom allocator and replaced file/index implementation are removed. See the project SQLite business-record plan.
+
+✅ Memory-budget contract: bound AgentContext evidence payloads to32MiB before publication, independently of filesystem encoding. Count logical Data bytes without serializing a context; count/owner retention and explicit capacity failures remain.

@@ -72,11 +72,6 @@ Up to four image references are deduplicated from actual context. Page-cancellab
 ✅ Ordering: each admitted model request receives a monotonic historyOrder from the archive revision. Order the flattened timeline and compression sources by this value, not parent turn order or wall-clock timestamps; a continuation can interleave with later user inputs. History facade refreshes authoritative revisions and rejects stale commits.
 
 
-## 会话存储性能重构 v3
-
-✅ 已实现：HistoryModelRequest/HistoryTurn 用 response 字符串替代 fragments；归档列表占位保留ID、时间、标题和计数。详情进入后加载单个会话并显示加载/失败状态。
-
-✅ 普通列表的当前会话也只投影元数据；正文仅保留一个 selectedConversation，标题异步刷新列表不清除所选正文或照片关联。
 
 ## 历史列表布局与单级详情导航
 
@@ -100,7 +95,7 @@ Up to four image references are deduplicated from actual context. Page-cancellab
 
 ## Request Task and Skills panel
 
-✅ ConversationHistoryPresentation.taskReferences(for:) projects immutable record ownership and request-time task snapshots into unique UUID references with explicit role flags. Equal historyTaskID/decisionMetadata.taskID merges both roles; distinct IDs remain separate, in record-owner then snapshot order. Active at request describes recorded request state only, never live task status. No storage/backend or Codable schema changes.
+✅ ConversationHistoryPresentation.taskReferences(for:) projects immutable record ownership and request-time task snapshots into unique ID references with explicit role flags. Equal historyTaskID/decisionMetadata.taskID merges both roles; distinct IDs remain separate, in record-owner then snapshot order. Active at request describes recorded request state only, never live task status. No storage/backend or Codable schema changes.
 
 ✅ ConversationTurnDetail keeps one Tasks and Skills section. ViewThatFits renders Task/Skills subpanels side-by-side only when their minimum readable widths fit, otherwise vertically with an internal divider. Task goal, request execution mode and selectable unique IDs are grouped together. Sorted Skill ID/revision labels use a private wrapping Layout and tinted capsules rather than separate Form rows. Function Catalog remains a separate disclosure row within the same section; the panel native separator aligns with its internal divider at the content leading edge. Layout recomputes from available width and measured subviews; no async work/state/cache owner is added.
 
@@ -112,3 +107,25 @@ Up to four image references are deduplicated from actual context. Page-cancellab
 ✅ AgentRecordDestination carries stable identity, display text and a MainActor view factory. AgentRecordsView renders those independently injected record pages; it has no conversation state or load/mutation workflow. ConversationHistoryView renders only canonical Assistant conversations, with no task-only state, subset page or separate export. Real Task compression/source schemas remain intact.
 
 ✅ Required conversation reader: selected-conversation reads are a required injected interface, with no optional/default unavailable implementation. Tests inject explicit readers/failures.
+
+
+
+
+
+## SQLite records and runtime identity
+
+✅ Implemented: technical identities are opaque UUID strings; committed business entities use dialog/message/task/media/device SQLite IDs. Consumers use Storage repositories while preserving ownership, cancellation and independent foundation boundaries. Complete messages, including each ReACT message, persist at termination; delta fragments do not persist. The custom allocator and replaced file/index implementation are removed. See the project SQLite business-record plan.
+
+✅ History controls expose explicit page/detail reads; UI remains independent of Storage/GRDB. The existing icons/colors/separators/navigation are preserved, with automatic paging footers for20-item pages and explicit retry after failure. Task source counts come from complete source indexes; expanded sources paginate independently. Sharing uses the corresponding displayed Codable values. Raw detail evidence loads only on row selection.
+
+
+✅ Implemented (2026-10-15 Task record visibility): ConversationHistoryPresentation.timeline now validates each loaded Task source pair against recorded sources instead of requiring all source input IDs to be loaded. HistoryConversation has a page-append operation that checks dialog identity and merges compression metadata/cursor with message previews; ConversationHistoryView uses it for list and expanded Task pages. Keep blue Task rows, source count, right/down chevrons and raw-request expansion.
+
+
+✅ Implemented (2026-10-15 automatic history paging): Manual load-more rows are replaced with an automatic paging footer that starts when the lazy List reaches its row. Render loading and scoped error/manual retry without hiding existing rows. HistoryPageLoading provides cursor/ticket state in ConversationHistoryState.swift, use independent timeline/Task state, retain sixteen active Task-page reads and reject overflow explicitly. Cancellation releases only the matching attempt; stale responses cannot mutate replacement state. Archive controls accept an explicit retry flag. Keep20-item SQL cursor pages, source metadata merging, existing cell styling and navigation.
+
+✅ Implemented: a completion-only paging revision re-arms a visible footer when a cancelled previous read finally releases its slot (rapid collapse/re-expand or navigation return); starting a read never changes that revision, so it cannot cancel itself.
+
+## Native history refresh
+
+✅ Implemented: archive and conversation Lists use native refreshable indicators; paging uses the system ProgressView without custom movement/insert animations. Pulling the timeline reloads its first page and preserves Task expansion/navigation. It cancels and joins its one timeline reader and at most sixteen Task readers before resetting paging tickets, so rapid refresh cannot overlap old/new read generations. Expanded source caches are discarded only after a successful refresh and reload through their visible paging footers; failed refresh retains visible records with an inline retryable error. Disable paging during refresh so late cancelled reads cannot append.

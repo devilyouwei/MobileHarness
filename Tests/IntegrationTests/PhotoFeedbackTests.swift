@@ -1,14 +1,15 @@
 import Actions
 import Foundation
 import PlatformKit
+import Storage
 import Testing
 
 @Test func photoFeedbackReceiptsDecodeOlderDataAndKeepActualSaveSeparateFromIssues() throws {
-    let id = UUID()
-    let old = Data("{\"photoID\":\"\(id)\",\"state\":\"saved\",\"alreadySaved\":true}".utf8)
+    let id = UUID().uuidString
+    let old = Data("{\"mediaID\":\"\(id)\",\"state\":\"saved\",\"alreadySaved\":true}".utf8)
     let receipt = try JSONDecoder().decode(CameraPhotoCommandReceipt.self, from: old)
-    #expect(receipt.photoID == id && receipt.alreadySaved && receipt.feedbackIssues == nil)
-    let committed = CameraPhotoCommandReceipt(photoID: id, state: .saved, feedbackIssues: ["sound: failed"])
+    #expect(receipt.mediaID == id && receipt.alreadySaved && receipt.feedbackIssues == nil)
+    let committed = CameraPhotoCommandReceipt(mediaID: id, state: .saved, feedbackIssues: ["sound: failed"])
     #expect(
         try JSONDecoder().decode(CameraPhotoCommandReceipt.self, from: JSONEncoder().encode(committed)) == committed)
     #expect(committed.state == .saved)

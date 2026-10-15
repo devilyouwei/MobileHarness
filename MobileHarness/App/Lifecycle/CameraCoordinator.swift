@@ -11,6 +11,7 @@ import Gateway
 import OSLog
 import PlatformKit
 import Storage
+import StorageMedia
 import UI
 import UIKit
 
@@ -39,7 +40,7 @@ final class CameraCoordinator: CameraOutputHandling, CameraControlCapability, UI
         self?.startVision(intent)
     }
     private var hotSwitchRevision: Int?
-    private var visionSession: UUID?
+    private var visionSession: String?
     private let log = Logger(subsystem: "dev.mobileharness", category: "CameraPipeline")
     private let camera: AppleCamera
     private var foreground = false
@@ -48,9 +49,9 @@ final class CameraCoordinator: CameraOutputHandling, CameraControlCapability, UI
     private var worker: Task<Void, Never>?
     private var photoTask: Task<CameraPhotoReceipt, Error>?
     private var photoCommand: Task<CameraPhotoCommandReceipt, Error>?
-    private var photoOwner: (id: UUID, owner: StorageOwner)?
+    private var photoOwner: (id: String, owner: StorageOwner)?
     private let photos: CapturedPhotoStore
-    private var presentationFinished: (id: UUID, success: Bool)?
+    private var presentationFinished: (id: String, success: Bool)?
     private let photoCues = NativeCuePlayback()
     private var photoFeedbackContext: ActionExecutionContext?
 
@@ -59,7 +60,9 @@ final class CameraCoordinator: CameraOutputHandling, CameraControlCapability, UI
         makeRuntime: @escaping () throws -> CameraRuntimeDependencies,
         makeSession: @escaping () async throws -> VisionSession
     ) {
-        self.captureOwner = ExecutionOwner(agent: Self.resourceOwnerID, incarnation: UUID(), sessionID: UUID())
+        self.captureOwner = ExecutionOwner(
+            agent: Self.resourceOwnerID, incarnation: UUID().uuidString,
+            sessionID: UUID().uuidString)
         self.makeRuntime = makeRuntime
         self.state = state
         self.makeSession = makeSession
@@ -68,12 +71,12 @@ final class CameraCoordinator: CameraOutputHandling, CameraControlCapability, UI
         preview = camera.preview
     }
 
-    func readPhoto(_ id: UUID, source: String, sessionID: UUID, inputID: UUID) async throws -> Data {
+    func readPhoto(_ id: String, source: String, sessionID: String, inputID: String) async throws -> Data {
         try await photos.read(
             id, owner: StorageOwner(namespace: "photos", source: source, session: sessionID, input: inputID))
     }
 
-    private func selectedPhoto(_ requested: UUID?) throws -> (id: UUID, owner: StorageOwner) {
+    private func selectedPhoto(_ requested: String?) throws -> (id: String, owner: StorageOwner) {
         guard let selected = photoOwner, state.capturedPhoto?.id == selected.id,
             requested == nil || requested == selected.id,
             state.capturedPhoto?.didReachThumbnail == true
@@ -81,7 +84,7 @@ final class CameraCoordinator: CameraOutputHandling, CameraControlCapability, UI
         return selected
     }
 
-    func ignorePhoto(_ id: UUID?, invocation: any FunctionInput) async throws -> CameraPhotoCommandReceipt {
+    func ignorePhoto(_ id: String?, invocation: any FunctionInput) async throws -> CameraPhotoCommandReceipt {
         try Task.checkCancellation()
         guard foreground else { throw CameraControlError.notForeground }
         guard photoTask == nil, photoCommand == nil else { throw CameraControlError.busy }
@@ -90,7 +93,7 @@ final class CameraCoordinator: CameraOutputHandling, CameraControlCapability, UI
         let task = Task<CameraPhotoCommandReceipt, Error> {
             let issues = try await departPhoto(photo, kind: .discard, invocation: invocation, commit: {})
             return CameraPhotoCommandReceipt(
-                photoID: selected.id, state: .ignored, feedbackIssues: issues.isEmpty ? nil : issues)
+                mediaID: selected.id, state: .ignored, feedbackIssues: issues.isEmpty ? nil : issues)
         }
         photoCommand = task
         state.photoBusy = true
@@ -105,12 +108,12 @@ final class CameraCoordinator: CameraOutputHandling, CameraControlCapability, UI
         }
     }
 
-    func savePhoto(_ id: UUID?, invocation: any FunctionInput) async throws -> CameraPhotoCommandReceipt {
+    func savePhoto(_ id: String?, invocation: any FunctionInput) async throws -> CameraPhotoCommandReceipt {
         try Task.checkCancellation()
         guard foreground else { throw CameraControlError.notForeground }
         guard photoTask == nil, photoCommand == nil else { throw CameraControlError.busy }
-        if let id, state.savedPhotoID == id {
-            return CameraPhotoCommandReceipt(photoID: id, state: .saved, alreadySaved: true)
+        if let id, state.savedMediaID == id {
+            return CameraPhotoCommandReceipt(mediaID: id, state: .saved, alreadySaved: true)
         }
         let selected = try selectedPhoto(id)
         guard let photo = state.capturedPhoto else { throw CameraControlError.photoUnavailable }
@@ -127,11 +130,11 @@ final class CameraCoordinator: CameraOutputHandling, CameraControlCapability, UI
                     throw CameraControlError.photoUnavailable
                 }
                 // An actual import remains committed if feedback subsequently fails or is cancelled.
-                state.savedPhotoID = selected.id
+                state.savedMediaID = selected.id
                 state.photoMessage = "已保存到相册"
             }
             return CameraPhotoCommandReceipt(
-                photoID: selected.id, state: .saved, feedbackIssues: issues.isEmpty ? nil : issues)
+                mediaID: selected.id, state: .saved, feedbackIssues: issues.isEmpty ? nil : issues)
         }
         photoCommand = task
         defer {
@@ -146,7 +149,7 @@ final class CameraCoordinator: CameraOutputHandling, CameraControlCapability, UI
             }
         } catch {
             state.photoMessage =
-                state.savedPhotoID == selected.id
+                state.savedMediaID == selected.id
                 ? "已保存到相册，退场反馈已中断" : "保存失败：" + error.localizedDescription
             throw error
         }
@@ -171,7 +174,8 @@ final class CameraCoordinator: CameraOutputHandling, CameraControlCapability, UI
                 let child = FunctionInvocation(
                     call: FunctionRequest(
                         actionPath: definition.path, parameters: ["cue": cue.rawValue, "volume": "0.85"]),
-                    context: invocation.context, results: ActionReportStore())
+                    context: invocation.context, executionID: UUID().uuidString,
+                    results: ActionReportStore())
                 let completion = try await FunctionExecutor.perform(child, definition: definition)
                 if case .report(let report) = completion, report.hasFailures || report.isCancelled {
                     throw PhotoCueFailure(description: report.failureDescription ?? "Photo cue failed")
@@ -221,12 +225,12 @@ final class CameraCoordinator: CameraOutputHandling, CameraControlCapability, UI
             let id = try await photos.save(data, owner: owner)
             // Durable capture is retained if subsequent presentation or turn delivery fails.
             let receipt = try CameraPhotoReceipt(
-                photoID: id, width: Int(image.size.width * image.scale), height: Int(image.size.height * image.scale))
+                mediaID: id, width: Int(image.size.width * image.scale), height: Int(image.size.height * image.scale))
             try Task.checkCancellation()
             guard foreground, revision == expectedRevision else { throw CancellationError() }
             presentationFinished = nil
             photoOwner = (id, owner)
-            state.savedPhotoID = nil
+            state.savedMediaID = nil
             state.photoMessage = nil
             state.capturedPhoto = CapturedPhotoPresentation(id: id, image: image) { [weak self] success in
                 guard let self, self.state.capturedPhoto?.id == id else { return }
@@ -237,10 +241,10 @@ final class CameraCoordinator: CameraOutputHandling, CameraControlCapability, UI
                 while presentationFinished?.id != id {
                     try Task.checkCancellation()
                     guard foreground, revision == expectedRevision else { throw CancellationError() }
-                    guard ContinuousClock.now < deadline else { throw CameraPhotoDisplayFailure(photoID: id) }
+                    guard ContinuousClock.now < deadline else { throw CameraPhotoDisplayFailure(mediaID: id) }
                     try await Task.sleep(for: .milliseconds(10))
                 }
-                guard presentationFinished?.success == true else { throw CameraPhotoDisplayFailure(photoID: id) }
+                guard presentationFinished?.success == true else { throw CameraPhotoDisplayFailure(mediaID: id) }
                 return receipt
             } catch {
                 if state.capturedPhoto?.id == id {
@@ -392,7 +396,7 @@ final class CameraCoordinator: CameraOutputHandling, CameraControlCapability, UI
 
     private func startVision(_ intent: VisionIntent) -> Task<Void, Never>? {
         guard foreground, state.isEnabled, state.isVisible, revision == intent.revision else { return nil }
-        let id = UUID()
+        let id = UUID().uuidString
         visionSession = id
         let mirrored = intent.mirrored
         return Task { [weak self] in
@@ -414,7 +418,7 @@ final class CameraCoordinator: CameraOutputHandling, CameraControlCapability, UI
             }
         }
     }
-    func visionStatus(_ message: String?, sessionID: UUID) {
+    func visionStatus(_ message: String?, sessionID: String) {
         guard visionSession == sessionID, foreground, state.isEnabled else { return }
         state.visionMessage = message
         if message != nil { state.skeleton = nil }
@@ -429,7 +433,7 @@ final class CameraCoordinator: CameraOutputHandling, CameraControlCapability, UI
         state.gaze = CGSize(width: target.x, height: target.y)
     }
 
-    func present(_ overlay: Actions.PoseOverlay, sessionID: UUID) throws {
+    func present(_ overlay: Actions.PoseOverlay, sessionID: String) throws {
         try Task.checkCancellation()
         guard visionSession == sessionID, foreground, state.isEnabled, state.isVisible else {
             throw CancellationError()
@@ -449,7 +453,7 @@ final class CameraCoordinator: CameraOutputHandling, CameraControlCapability, UI
             })
     }
 
-    private func recordCapture(_ state: ActivityEvent.State, id: UUID) {
+    private func recordCapture(_ state: ActivityEvent.State, id: String) {
         eventSequence &+= 1
         let causality = captureEvent.flatMap { $0.activityID == id ? $0.causality : nil } ?? .root(id: id)
         captureEvent = ActivityEvent(
@@ -617,7 +621,7 @@ final class CameraCoordinator: CameraOutputHandling, CameraControlCapability, UI
 }
 
 private struct CameraPhotoDisplayFailure: Error, LocalizedError, ActionExecutionFailureProviding {
-    let photoID: UUID
+    let mediaID: String
     var executionFailureCode: ActionExecutionFailureCode { .init(rawValue: "photoPresentationFailed") }
-    var errorDescription: String? { "Photo \(photoID.uuidString) was saved, but its presentation did not complete." }
+    var errorDescription: String? { "Photo \(mediaID) was saved, but its presentation did not complete." }
 }

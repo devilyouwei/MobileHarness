@@ -9,6 +9,7 @@ import FunctionContracts
 import Gateway
 import ModelKit
 import PlatformKit
+import Storage
 import UI
 
 /// Isolated capture/perception endpoint. No conversation, camera or robot consumer is registered.
@@ -91,7 +92,7 @@ private enum AudioDetectionError: LocalizedError {
 }
 
 @MainActor private final class AudioDetectionScope {
-    let id = UUID()
+    let id = UUID().uuidString
     let audio = AppleAudioIO()
     let manager = AgentManager()
     let policy: CommunicationPolicy
@@ -121,13 +122,9 @@ private enum AudioDetectionError: LocalizedError {
             contracts: AgentContracts.communication, externalSources: MediaInputAdapter.externalSources,
             configurations: [configuration])
         input = InputGateway(manager: manager, policy: policy)
-        let root = try FileManager.default.url(
-            for: .applicationSupportDirectory, in: .userDomainMask,
-            appropriateFor: nil, create: true)
-        let context = try AgentContextRepository.persistent(
+        let context = AgentContextRepository(
             agent: .speechPerception,
-            scope: UUID(uuid: (0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2)), state: SpeechPerceptionContextState(),
-            url: root.appendingPathComponent("MobileHarness/Conversations/speechPerception.diagnostic.context.json"))
+            scope: "00000000-0000-0000-0000-000000000002", state: SpeechPerceptionContextState())
         speech = try SpeechPerceptionAgent(
             recognition: recognition, vad: vad, sessionID: id, configuration: configuration, mode: .soundSourceOnly,
             context: context)

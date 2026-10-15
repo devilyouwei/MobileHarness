@@ -5,8 +5,8 @@ public enum ActionCompletion: Equatable, Sendable {
     case completed
     case value(String)
     case report(ActionReport)
-    case activityStarted(UUID)
-    case activityStopped(UUID)
+    case activityStarted(String)
+    case activityStopped(String)
 }
 /// Opaque producer failure identity. Runtime knows only generic execution failures.
 public struct ActionFailure: RawRepresentable, Equatable, Hashable, Sendable {

@@ -2,6 +2,7 @@ import Actions
 import ExecutionRuntime
 import Foundation
 import FunctionContracts
+import Storage
 
 /// Bounded staged child composition. Only a successful stage permits the next native effect.
 public enum ListeningActivationFeedback {
@@ -20,19 +21,20 @@ public enum ListeningActivationFeedback {
         guard let haptic = definitions.first(where: { $0.path.function == "vibrate" }),
             let cue = definitions.first(where: { $0.path.function == "playCue" })
         else { throw UIActions.FeedbackError.unavailable }
-        func child(_ function: ActionFunction, parameters: [String: String]) -> FunctionInvocation {
+        func child(_ function: ActionFunction, parameters: [String: String]) throws -> FunctionInvocation {
             FunctionInvocation(
                 call: FunctionRequest(actionPath: function.path, parameters: parameters),
-                context: invocation.context, results: ActionReportStore())
+                context: invocation.context, executionID: UUID().uuidString,
+                results: ActionReportStore())
         }
-        let hapticInput = child(
+        let hapticInput = try child(
             haptic,
             parameters: [
                 "style": configuration.haptic.style.rawValue,
                 "intensity": String(configuration.haptic.intensity), "count": String(configuration.haptic.count),
                 "intervalMS": String(configuration.haptic.intervalMS),
             ])
-        let cueInput = child(
+        let cueInput = try child(
             cue, parameters: ["cue": configuration.cue.cue.rawValue, "volume": String(configuration.cue.volume)])
         let stages: [(String, ActionComposition)] = [
             (

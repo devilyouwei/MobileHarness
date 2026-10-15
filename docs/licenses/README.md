@@ -16,3 +16,5 @@ Purpose: preserve license notices for model artifacts and runtime dependencies. 
 ✅ MOSS-TTS-Nano model notices are retained in MOSS-TTS-Nano-Apache-2.0.txt. Narrowly adapted FluidAudio source retains its Apache-2.0 attribution. ❌ No license claim is made for user-supplied voice recordings.
 
 ✅ Gemma4-Apache-2.0.txt and CoreAIModels-BSD-3-Clause.txt accompany the new Gemma/CoreAILM integration; current file lists stage these notices. ❌ Notices do not establish model quality/device acceptance.
+
+✅ GRDB.swift7.11.1 is the Storage-owned SQLite adapter. [GRDB-MIT.txt](GRDB-MIT.txt) preserves its original MIT notice. GRDB uses Apple’s system SQLite; no database engine or dependency is exposed to UI/ModelKit/PlatformKit.

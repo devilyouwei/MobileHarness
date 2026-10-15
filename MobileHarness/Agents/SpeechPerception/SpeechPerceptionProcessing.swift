@@ -1,5 +1,6 @@
 import AgentCore
 import Foundation
+import Storage
 
 // MARK: - State
 
@@ -58,15 +59,15 @@ public struct SpeechPerceptionContextBuilder: ContextBuilder {
 struct SpeechListeningPolicy {
     struct Activity {
         var revision: UInt64
-        var incarnation: UUID
+        var incarnation: String
         var occupied: Bool
     }
     var enabled = false
     var revision: UInt64 = 0
     var activities: [String: Activity] = [:]
-    var pendingFinal: UUID?
+    var pendingFinal: String?
     var paused: Bool { pendingFinal != nil || activities.values.contains { $0.occupied } }
-    mutating func accept(_ value: ReplyActivity, source: String, incarnation: UUID) throws -> Bool {
+    mutating func accept(_ value: ReplyActivity, source: String, incarnation: String) throws -> Bool {
         try value.validate()
         guard ["assistant", "photographer", "memory", "applicationControl"].contains(source) else {
             throw CommunicationError.unauthorized

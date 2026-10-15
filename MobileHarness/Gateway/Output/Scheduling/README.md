@@ -81,3 +81,11 @@ Eight observers receive newest-one complete snapshots, including initial/final s
 ✅ Implemented: producer/session host cancellation retains an already-settled cancelled tree until its ordered round seal or cancel terminal arrives, so a late finish reports cancellation instead of success. Retained trees still count toward the existing 64-task bound; terminal/lifecycle/full shutdown releases them. No tombstone/replay queue is added.
 
 ✅ Handler throws and returned reports share typed cancellation classification. Cancellation has cancelled phase and no observation failure; independent failures remain failed/partialFailure. Queue cancellation remains notStarted and active cancellation joins actual cleanup without rollback.
+
+
+
+
+
+## SQLite records and runtime identity
+
+✅ Implemented: technical identities are opaque UUID strings; committed business entities use dialog/message/task/media/device SQLite IDs. Consumers use Storage repositories while preserving ownership, cancellation and independent foundation boundaries. Complete messages, including each ReACT message, persist at termination; delta fragments do not persist. The custom allocator and replaced file/index implementation are removed. See the project SQLite business-record plan.

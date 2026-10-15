@@ -6,7 +6,7 @@ import Synchronization
 /// Two active packages, eight pending; explicit user retries. Complete snapshots preserve outcomes.
 public actor ModelArtifactStore {
     private struct Transfer {
-        let generation: UUID
+        let generation: String
         let source: ModelDownloadSource
         var task: Task<Void, Never>?
     }
@@ -130,7 +130,8 @@ public actor ModelArtifactStore {
             guard !artifact.requiresPhysicalDevice else { throw ModelArtifactError.incompatible }
         #endif
         guard queue.count < 8 else { throw ModelArtifactError.busy }
-        transfers[id] = Transfer(generation: transfers[id]?.generation ?? UUID(), source: source)
+        transfers[id] = Transfer(
+            generation: transfers[id]?.generation ?? UUID().uuidString, source: source)
         phases[id] = .queued
         failures[id] = nil
         progress[id] = 0
@@ -150,7 +151,7 @@ public actor ModelArtifactStore {
             transfers[id]?.task = Task { await self.run(id, generation: transfer.generation, source: transfer.source) }
         }
     }
-    private func run(_ id: String, generation: UUID, source: ModelDownloadSource) async {
+    private func run(_ id: String, generation: String, source: ModelDownloadSource) async {
         do {
             let artifact = try package(id)
             if try await storage.installed(artifact) {

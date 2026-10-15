@@ -150,9 +150,9 @@ public protocol ModelArtifactStorage: Sendable {
     func saveTransfers(_ records: [ModelArtifactTransferRecord]) async throws
     func installed(_ artifact: ModelArtifact) async throws -> Bool
     func installedBytes(_ artifact: ModelArtifact) async throws -> Int64?
-    func stage(_ artifact: ModelArtifact, task: UUID) async throws -> URL
-    func publish(_ artifact: ModelArtifact, task: UUID) async throws
-    func discard(task: UUID) async throws
+    func stage(_ artifact: ModelArtifact, task: String) async throws -> URL
+    func publish(_ artifact: ModelArtifact, task: String) async throws
+    func discard(task: String) async throws
     func remove(_ artifact: ModelArtifact) async throws
 }
 
@@ -162,9 +162,9 @@ extension ModelArtifactStorage {
 
 public struct ModelArtifactTransferRecord: Codable, Sendable {
     public let id: String
-    public let generation: UUID
+    public let generation: String
     public let source: ModelDownloadSource
-    public init(id: String, generation: UUID, source: ModelDownloadSource) {
+    public init(id: String, generation: String, source: ModelDownloadSource) {
         self.id = id
         self.generation = generation
         self.source = source

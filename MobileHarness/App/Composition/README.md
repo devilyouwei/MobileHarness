@@ -42,11 +42,11 @@ flowchart TD
 | Component | Responsibility |
 | --- | --- |
 | AppAssembly.swift | Resource roots, lazy runtime, shared AppleCamera and BluetoothWorkflow, history/settings operations and AppContainer |
-| ApplicationRuntime.swift | Seven Agent roles, role-specific durable contexts, communication policy, function bindings, scheduler/resources and root observations |
+| ApplicationRuntime.swift | Seven Agent roles, role-specific memory contexts, communication policy, function bindings, scheduler/resources and root observations |
 | AppContainer.swift | Managed capability handles, model preparation, voice/diagnostic construction, memory warnings and retained interaction lifetime |
 | Behaviors | Frozen business catalog and explicit protocol projections |
 
-ModelKitDefaults is the process-wide registration/manager owner. CurrentChatCapability resolves the configured binding per request; each role receives its own context repository. History reads the current Assistant memory repository and separate archive files through the shared history facade. Camera and history share the bounded CapturedPhotoStore. Audio ownership uses StorageAudio.
+ModelKitDefaults is the process-wide registration/manager owner. CurrentChatCapability resolves the configured binding per request; each role receives its own context repository. History reads bounded live memory and indexed SQLite archive pages through the shared history facade. Camera and history share the bounded CapturedPhotoStore. Audio ownership uses StorageAudio.
 
 ## Resource and endpoint wiring
 
@@ -117,22 +117,35 @@ Preparation errors propagate before admitting dependent work. Interactive scene 
 ❌ 历史记录页面板块重新设计及原生 UI/真机验收。
 
 
-✅ Implemented (2026-10-13): UI.Notice.showNotice/dismissNotice and UI.Light.updateLight are canonical presentation Actions for trusted business calls, currently registered by no Skill. Neutral Actions values cross RuntimePresentation into root-owned HomeEffectsWorkflow, which retains one replaceable notice expiry and one light expiry, UUID-fenced cleanup, and explicit stop. Notices remain separate from factual ExecutionIssue history; actual upper-layer errors have display priority and Action failures remain panel-only. Decorative light accepts normalized origin, initial opacity/intensity and duration; it never changes consent, microphone or eyes. Native renderer separates light generations from listening eye generations and preserves existing exit fade. RuntimePresentation adapts Action requests into UI-owned values; AppPresentationWorkflow keeps its existing UI/AgentCore/FunctionContracts boundary. No UI project dependencies or new directories.
+✅ Implemented (2026-10-13): UI.Notice.showNotice/dismissNotice and UI.Light.updateLight are canonical presentation Actions for trusted business calls, currently registered by no Skill. Neutral Actions values cross RuntimePresentation into root-owned HomeEffectsWorkflow, which retains one replaceable notice expiry and one light expiry, UUID-fenced cleanup, and explicit stop. Notices remain separate from factual ExecutionIssue history; actual upper-layer errors have display priority and Action failures remain panel-only. Decorative light accepts normalized origin, initial opacity/intensity and duration; it never changes consent, microphone or eyes. Native renderer separates light generations from listening eye generations and preserves existing exit fade. RuntimePresentation adapts Action requests into UI-owned values; AppPresentationWorkflow keeps its existing UI/AgentCore/FunctionContracts boundary. No UI capability/business dependencies or new directories.
 
 
-✅ Implemented (2026-10-13 caption/error lifecycle): mask bottom ASR and reply/status immediately while a notice is visible, restore retained text after dismissal, and preserve pinned Task/promoted ASR layout. Consent-off clears both captions; root HomeEffectsWorkflow owns one UUID/text-fenced350ms reply fade/removal task, cancelled by new text/turn/off/shutdown, scheduled only after reply-policy/playback/native-resume barriers. Agent errors stay in factual root failure notices, not persistent voiceStatus copies. App root contexts explicitly choose afterFirstUnlock file protection, including their directory; repository persistent factory accepts protection while its SDK default remains whileUnlocked. This mitigates lock-boundary writes, without claiming the screenshot proves that cause or hiding other storage failures.
+✅ Implemented (2026-10-13 caption/error lifecycle): mask bottom ASR and reply/status immediately while a notice is visible, restore retained text after dismissal, and preserve pinned Task/promoted ASR layout. Consent-off clears both captions; root HomeEffectsWorkflow owns one ID/text-fenced350ms reply fade/removal task, cancelled by new text/turn/off/shutdown, scheduled only after reply-policy/playback/native-resume barriers. Agent errors stay in factual root failure notices, not persistent voiceStatus copies. Durable configuration documents retain explicit file protection. Agent runtime state uses memory; business records use SQLite. This does not infer the cause of historical lock-boundary failures.
 
 
 ## Task history v2 and in-place compression
 
-✅ Implemented: ApplicationRuntime uses current.json with independent archives and a pure-memory Assistant context. Old assistant.context.json and assistant.history-v2.context.json are unused; no import or migration.
+✅ Implemented: ApplicationRuntime uses SQLite dialogs/messages and a bounded memory Assistant context. Old assistant.context.json and assistant.history-v2.context.json are unused; no import or migration.
 
 
-## 会话存储性能重构 v3
 
-✅ 已实现：ApplicationRuntime 构造纯内存 assistantContext，连接新 ConversationFileStore（current.json/index.json/独立归档）及恢复闭包。Assistant 当前状态与会话以相同捕获快照保存，所有归档不载入 context。
+## Model photo input capability wiring
 
-✅ AppAssembly 注入按会话ID的详情读取闭包；普通列表不加载正文，选中会话后才加载包含 Task 摘要和完整请求的单个文件。
+✅ Implemented: ApplicationRuntime installs AssistantContextBuilder.photoObservationHandler with read and prepareJPEG closures. The role-owned factory builds the observation worker callback; App does not interpret observation results. read only retrieves the owned original via CameraControlCapability and wraps its original MIME/data/identity. prepareJPEG maps the caller's AssistantPhotoInputPolicy fields to generic NativeImageCompression.Limits, awaits the native capability and returns its bytes. No hardcoded analysis thresholds, workflow decision or ChatImage preparation remain in App. Assistant owns policy choice, invocation, cancellation/error checks and output construction; PlatformKit owns native encoding. See [Assistant policy](../../Agents/Assistant/README.md#model-photo-preparation-policy).
 
 
-✅ Records composition: AppAssembly.history owns only the Assistant conversation workflow; recordDestinations injects its real ConversationHistoryView into a generic AgentRecordsView. ApplicationRuntime has no duplicate task-history reader. MobileHarnessApp/ConversationView/ActionActivityView have no task-history callback chain or unused log inputIDs projection. No Task registry, Skill state, foreground/background observer or lifecycle behavior is removed.
+
+
+## SQLite records and runtime identity
+
+✅ Implemented: technical identities are opaque UUID strings; committed business entities use dialog/message/task/media/device SQLite IDs. Consumers use Storage repositories while preserving ownership, cancellation and independent foundation boundaries. Complete messages, including each ReACT message, persist at termination; delta fragments do not persist. The custom allocator and replaced file/index implementation are removed. See the project SQLite business-record plan.
+
+✅ AppAssembly constructs one SQLiteRepositories family, repairs in-flight facts before runtime admission and injects domain protocols into conversation, media and Bluetooth owners. Initialization failure is retained and propagated. Every Agent runtime context uses Storage memory state; no Context JSON is loaded or saved. Title sampling positions come from Memory, SQL supplies lightweight snippets. Existing user media, credentials and model artifacts remain outside cleanup.
+
+✅ Storage repository refactor: AppAssembly creates SQLiteRepositories and domain adapters, runs startup recovery before runtime admission, then injects chat/task/media/device protocols. Media also receives a BinaryObjectStore. Existing native/model lifecycle and user files remain unchanged.
+
+
+✅ Configuration preservation: ApplicationRuntime constructs the cloud document at MobileHarness/Settings/settings.json. AppAssembly retains Models/download-source.json and CapturedPhotos roots. Runtime state uses memory only; old Context JSON is not imported. Keychain, installed-weight and SQLite paths remain unchanged.
+
+
+✅ Removed contextDirectory and context file factories; construct all roles with memory-only AgentContextRepository. No Conversations/*.runtime-context.json writes remain. Configuration documents stay File-backed, business records SQLite-backed.

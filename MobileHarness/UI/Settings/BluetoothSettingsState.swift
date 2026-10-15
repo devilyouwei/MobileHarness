@@ -7,16 +7,16 @@ public enum BluetoothConnectionPhase: Sendable {
 }
 public enum BluetoothDeviceRowIntent: Sendable { case connect, openDetail, unavailable }
 public struct BluetoothDeviceRow: Identifiable, Sendable, Hashable {
-    public let id: UUID
+    public let id: String
     public let name: String
-    public init(id: UUID, name: String) {
+    public init(id: String, name: String) {
         self.id = id
         self.name = name
     }
 }
 @MainActor
 public protocol BluetoothControlling: AnyObject {
-    func reconnect(_ id: UUID)
+    func reconnect(_ id: String)
     func refreshDevice() async
     func tryAction(_ action: BluetoothArmAction)
     func setMotorVelocity(id: Int, value: Double)
@@ -25,7 +25,7 @@ public protocol BluetoothControlling: AnyObject {
     func closePage()
     func scan()
     func stopScan()
-    func connect(_ id: UUID)
+    func connect(_ id: String)
     func disconnect()
     func forget()
     func openSystemSettings()
@@ -81,7 +81,7 @@ public final class BluetoothSettingsState {
     public var nearby: [BluetoothDeviceRow] = []
     public var selected: BluetoothDeviceRow?
     public var recoveryStage: BluetoothRecoveryStage = .idle
-    public var recoveryDeviceID: UUID?
+    public var recoveryDeviceID: String?
     public var recoveryAttempt = 0
     /// Latest native communication issue, independently adapted by App.
     public var transportIssue: String?
@@ -98,14 +98,14 @@ public final class BluetoothSettingsState {
         }
         return rows
     }
-    public func rowIntent(for id: UUID) -> BluetoothDeviceRowIntent {
+    public func rowIntent(for id: String) -> BluetoothDeviceRowIntent {
         if isConnected(id) { return .openDetail }
         return canConnect ? .connect : .unavailable
     }
-    public func isConnected(_ id: UUID) -> Bool { selected?.id == id && phase == .connected }
-    public func hasConnectionIssue(_ id: UUID) -> Bool { isConnected(id) && transportIssue != nil }
-    public func canControl(_ id: UUID) -> Bool { isConnected(id) && canControl }
-    public func currentMessage(for id: UUID) -> String? {
+    public func isConnected(_ id: String) -> Bool { selected?.id == id && phase == .connected }
+    public func hasConnectionIssue(_ id: String) -> Bool { isConnected(id) && transportIssue != nil }
+    public func canControl(_ id: String) -> Bool { isConnected(id) && canControl }
+    public func currentMessage(for id: String) -> String? {
         let currentID = selected?.id ?? (recoveryStage == .idle ? nil : recoveryDeviceID) ?? remembered?.id
         guard currentID == id else { return nil }
         if isConnected(id) { return transportIssue }
@@ -134,7 +134,7 @@ public final class BluetoothSettingsState {
     }
     /// Latest connection/communication status never consumes Action/Tool execution outcomes.
     public var summary: String { connectionTitle }
-    public func status(for id: UUID) -> String {
+    public func status(for id: String) -> String {
         (selected?.id ?? (recoveryStage == .idle ? nil : recoveryDeviceID)) == id ? connectionTitle : "未连接"
     }
     private var connectionTitle: String {

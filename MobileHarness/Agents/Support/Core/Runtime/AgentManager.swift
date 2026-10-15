@@ -4,22 +4,22 @@ public struct AgentTaskTermination: Sendable {
     public let scope: AgentTaskScope
     public let recipient: ExecutionOwner
     public let requesterStopped: Bool
-    public let executionIDs: Set<UUID>
+    public let executionIDs: Set<String>
     public let reason: String
 }
 
 public actor AgentManager {
     private struct TaskGrant: Sendable {
         let scope: AgentTaskScope
-        let admissionID = UUID()
-        let requester: UUID
-        let executor: UUID
-        var executionIDs: Set<UUID> = []
+        let admissionID = UUID().uuidString
+        let requester: String
+        let executor: String
+        var executionIDs: Set<String> = []
         var cancelling = false
         var finishing = false
     }
-    private var taskGrants: [UUID: TaskGrant] = [:]
-    @discardableResult public func grantTask(_ scope: AgentTaskScope, sender: AgentID) throws -> UUID {
+    private var taskGrants: [String: TaskGrant] = [:]
+    @discardableResult public func grantTask(_ scope: AgentTaskScope, sender: AgentID) throws -> String {
         guard sender == scope.requester, scope.requester != scope.executor,
             taskGrants[scope.id] == nil, taskGrants.count < 32,
             let requester = identities[scope.requester], let executor = identities[scope.executor]
@@ -29,8 +29,8 @@ public actor AgentManager {
         if let parentID = scope.parentID, let parent = taskGrants[parentID] {
             try validateTaskInput(parent.scope, agent: scope.requester)
             guard parent.scope.executor == scope.requester else { throw CommunicationError.unauthorized }
-            var visited: Set<UUID> = [scope.id]
-            var ancestor: UUID? = parentID
+            var visited: Set<String> = [scope.id]
+            var ancestor: String? = parentID
             while let id = ancestor {
                 guard visited.insert(id).inserted else { throw CommunicationError.unauthorized }
                 ancestor = taskGrants[id]?.scope.parentID
@@ -40,7 +40,7 @@ public actor AgentManager {
         taskGrants[scope.id] = grant
         return grant.admissionID
     }
-    private func validatedGrant(_ id: UUID, agent: AgentID, sessionID: UUID) throws -> TaskGrant {
+    private func validatedGrant(_ id: String, agent: AgentID, sessionID: String) throws -> TaskGrant {
         guard let grant = taskGrants[id], grant.scope.sessionID == sessionID,
             agent == grant.scope.executor || agent == grant.scope.requester
         else { throw CommunicationError.scopeClosed }
@@ -48,7 +48,7 @@ public actor AgentManager {
         try validate(grant.scope.executor, incarnation: grant.executor, sessionID: sessionID)
         return grant
     }
-    public func validateTask(_ id: UUID, agent: AgentID, sessionID: UUID) throws {
+    public func validateTask(_ id: String, agent: AgentID, sessionID: String) throws {
         guard try !validatedGrant(id, agent: agent, sessionID: sessionID).finishing else {
             throw CommunicationError.scopeClosed
         }
@@ -61,7 +61,7 @@ public actor AgentManager {
         }
         taskGrants[scope.id]?.finishing = true
     }
-    public func validateTask(_ scope: AgentTaskScope, agent: AgentID, sessionID: UUID) throws {
+    public func validateTask(_ scope: AgentTaskScope, agent: AgentID, sessionID: String) throws {
         guard let grant = taskGrants[scope.id] else { throw CommunicationError.scopeClosed }
         guard grant.scope == scope else { throw CommunicationError.unauthorized }
         try validateTask(scope.id, agent: agent, sessionID: sessionID)
@@ -75,12 +75,12 @@ public actor AgentManager {
         guard requester == scope.requester else { throw CommunicationError.unauthorized }
         taskGrants[scope.id]?.cancelling = true
     }
-    public func taskExecutions(_ scope: AgentTaskScope) throws -> Set<UUID> {
+    public func taskExecutions(_ scope: AgentTaskScope) throws -> Set<String> {
         let grant = try validatedGrant(scope.id, agent: scope.executor, sessionID: scope.sessionID)
         guard grant.scope == scope else { throw CommunicationError.unauthorized }
         return grant.executionIDs
     }
-    public func registerExecution(_ id: UUID, scope: AgentTaskScope, agent: AgentID) throws {
+    public func registerExecution(_ id: String, scope: AgentTaskScope, agent: AgentID) throws {
         try validateTaskInput(scope, agent: agent)
         guard agent == scope.executor, var grant = taskGrants[scope.id] else { throw CommunicationError.unauthorized }
         guard grant.executionIDs.contains(id) || grant.executionIDs.count < 32 else {
@@ -89,14 +89,14 @@ public actor AgentManager {
         grant.executionIDs.insert(id)
         taskGrants[scope.id] = grant
     }
-    public func failTask(_ scope: AgentTaskScope, executor: AgentID, incarnation: UUID, reason: String) throws
+    public func failTask(_ scope: AgentTaskScope, executor: AgentID, incarnation: String, reason: String) throws
         -> [AgentTaskTermination]
     {
         let root = try validatedGrant(scope.id, agent: executor, sessionID: scope.sessionID)
         guard root.scope == scope, scope.executor == executor, root.executor == incarnation else {
             throw CommunicationError.unauthorized
         }
-        var ids: Set<UUID> = [scope.id]
+        var ids: Set<String> = [scope.id]
         var prior = -1
         while prior != ids.count {
             prior = ids.count
@@ -116,29 +116,29 @@ public actor AgentManager {
         for id in ids { taskGrants[id] = nil }
         return events
     }
-    public func retireTask(_ id: UUID, admissionID: UUID? = nil) {
+    public func retireTask(_ id: String, admissionID: String? = nil) {
         if let admissionID, taskGrants[id]?.admissionID != admissionID { return }
         taskGrants[id] = nil
     }
-    private var identities: [AgentID: UUID] = [:]
-    private var sessions: [AgentID: UUID] = [:]
+    private var identities: [AgentID: String] = [:]
+    private var sessions: [AgentID: String] = [:]
     private var registry = AgentRegistry()
-    private var stopObservers: [UUID: @Sendable (AgentID, UUID, [AgentTaskTermination]) async -> Void] = [:]
+    private var stopObservers: [String: @Sendable (AgentID, String, [AgentTaskTermination]) async -> Void] = [:]
 
     public func observeStops(
-        id: UUID, observer: @escaping @Sendable (AgentID, UUID, [AgentTaskTermination]) async -> Void
+        id: String, observer: @escaping @Sendable (AgentID, String, [AgentTaskTermination]) async -> Void
     ) throws {
         if stopObservers[id] != nil { return }
         guard stopObservers.count < 4 else { throw CommunicationError.capacityExceeded }
         stopObservers[id] = observer
     }
 
-    public func removeStopObserver(_ id: UUID) { stopObservers[id] = nil }
+    public func removeStopObserver(_ id: String) { stopObservers[id] = nil }
     public init() {}
-    public func register(_ agent: any Agent, sessionID: UUID? = nil) throws {
+    public func register(_ agent: any Agent, sessionID: String? = nil) throws {
         guard stopping[agent.descriptor.id] == nil else { throw CommunicationError.scopeClosed }
         try registry.register(agent)
-        identities[agent.descriptor.id] = UUID()
+        identities[agent.descriptor.id] = UUID().uuidString
         sessions[agent.descriptor.id] = sessionID
     }
     public func agent(_ id: AgentID) throws -> any Agent {
@@ -150,16 +150,16 @@ public actor AgentManager {
     public func start(_ id: AgentID) async throws { try await agent(id).start() }
     public func pause(_ id: AgentID) async throws { try await agent(id).pause() }
     public func resume(_ id: AgentID) async throws { try await agent(id).resume() }
-    public func outputIdentity(for producer: any Agent) throws -> UUID {
+    public func outputIdentity(for producer: any Agent) throws -> String {
         let registered = try agent(producer.descriptor.id)
         guard registered === producer else { throw CommunicationError.staleIncarnation }
         return try identity(producer.descriptor.id)
     }
-    public func identity(_ id: AgentID) throws -> UUID {
+    public func identity(_ id: AgentID) throws -> String {
         guard let identity = identities[id] else { throw CommunicationError.unavailableTarget }
         return identity
     }
-    public func validate(_ id: AgentID, incarnation: UUID, sessionID: UUID) throws {
+    public func validate(_ id: AgentID, incarnation: String, sessionID: String) throws {
         guard identities[id] == incarnation else { throw CommunicationError.staleIncarnation }
         guard sessions[id].map({ $0 == sessionID }) ?? true else { throw CommunicationError.scopeClosed }
     }

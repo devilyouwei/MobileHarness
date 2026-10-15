@@ -31,7 +31,6 @@ flowchart TB
 
 ## 查询算法与数据约束
 
-✅ HistoryConversationReference validates a full UUID or eight ASCII hex characters at the entry boundary, normalizing case. HistoryQueryCapability.read consumes that typed reference. list computes prefix uniqueness across the metadata list and exposes ref only for a unique prefix. read resolves a short ref against metadata, then loads exactly the matched conversation; zero matches remain missingConversation, multiple matches report ambiguousConversationReference/invalidArguments. Exact full UUID requests keep normal missing-conversation semantics. No fuzzy matching, persistent alias table, title/index-based selection or automatic fallback.
 
 list 使用 store.listConversations 的当前会话与归档元数据，顺序沿用按 archivedAt 排序的索引，不加载归档正文。标题和 latestUser 预览各最多 40 UTF-8 字节，turnCount 取输入块数。
 
@@ -50,6 +49,7 @@ summarizeArchived 读取并验证归档会话，执行注入的异步标题计�
 [History 参数与完成](../README.md) · [StorageChat 设计](../../../Storage/Chat/README.md) · [共享契约](../../Support/Contracts/README.md)
 
 
-## 会话存储性能重构 v3
 
-✅ 已实现：查询服务调用 store.listConversations / conversation(id)，修改服务按ID操作。标题任务独立于新会话事务；保存失败显示具体原因。
+## SQLite records and runtime identity
+
+✅ Implemented: technical identities are opaque UUID strings; committed business entities use dialog/message/task/media/device SQLite IDs. Consumers use Storage repositories while preserving ownership, cancellation and independent foundation boundaries. Complete messages, including each ReACT message, persist at termination; delta fragments do not persist. The custom allocator and replaced file/index implementation are removed. See the project SQLite business-record plan.

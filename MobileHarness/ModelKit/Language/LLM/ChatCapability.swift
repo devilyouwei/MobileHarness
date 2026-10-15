@@ -3,10 +3,10 @@ import Synchronization
 
 /// Bounded image bytes, independent of platform images and Agent storage.
 public struct ChatImage: Codable, Equatable, Sendable {
-    public let id: UUID
+    public let id: String
     public let mimeType: String
     public let data: Data
-    public init(id: UUID, mimeType: String = "image/jpeg", data: Data) throws {
+    public init(id: String, mimeType: String = "image/jpeg", data: Data) throws {
         guard ["image/jpeg", "image/png"].contains(mimeType), !data.isEmpty, data.count <= 4 * 1024 * 1024 else {
             throw CapabilityError.invalidRequest("Image attachment exceeds limits or has unsupported MIME")
         }

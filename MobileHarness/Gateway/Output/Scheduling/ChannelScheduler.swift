@@ -8,7 +8,7 @@ import FunctionContracts
 public actor ChannelScheduler {
     struct InputKey: Hashable {
         let source: AgentID
-        let inputID: UUID
+        let inputID: String
     }
     enum Outcome: Sendable {
         case success(ActionCompletion)
@@ -16,7 +16,7 @@ public actor ChannelScheduler {
         func get() throws { if case .failure(let error) = self { throw error } }
     }
     struct Job: Sendable {
-        var id: UUID { invocation.executionID }
+        var id: String { invocation.executionID }
         let sequence: UInt64
         let phase: Int
         let kind: ActionBinding.Kind
@@ -47,7 +47,7 @@ public actor ChannelScheduler {
     }
     /// Reference state is owned exclusively by this actor; it never crosses an executor boundary.
     private final class InputState {
-        let sessionID: UUID
+        let sessionID: String
         let completion: Task<Outcome, Never>
         let signal: AsyncStream<Outcome>.Continuation
         var phases = [Phase()]
@@ -60,11 +60,11 @@ public actor ChannelScheduler {
         var finishing = false
         var cancelling = false
         var retainCancelledBoundary = false
-        var producerIncarnation: UUID?
+        var producerIncarnation: String?
         // Failed tasks remain fenced until their producer finishes or explicit cancellation joins them.
         var settled = false
 
-        init(sessionID: UUID) {
+        init(sessionID: String) {
             self.sessionID = sessionID
             let pair = AsyncStream<Outcome>.makeStream(bufferingPolicy: .bufferingOldest(1))
             signal = pair.continuation
@@ -96,13 +96,13 @@ public actor ChannelScheduler {
     private var isShutdown = false
     private var sequence: UInt64 = 0
     private var executionLedger = ActionExecutionLedger()
-    private var executionObservers: [UUID: AsyncStream<ActionExecutionSnapshot>.Continuation] = [:]
+    private var executionObservers: [String: AsyncStream<ActionExecutionSnapshot>.Continuation] = [:]
     public enum ObservationError: Error { case capacityExceeded }
 
     /// Full snapshots coalesce safely: a slow observer never blocks execution or needs delta replay.
     public func observeExecutions() throws -> AsyncStream<ActionExecutionSnapshot> {
         guard executionObservers.count < 8 else { throw ObservationError.capacityExceeded }
-        let id = UUID()
+        let id = UUID().uuidString
         let pair = AsyncStream<ActionExecutionSnapshot>.makeStream(bufferingPolicy: .bufferingNewest(1))
         pair.continuation.yield(executionLedger.snapshot())
         if isShutdown {
@@ -116,14 +116,14 @@ public actor ChannelScheduler {
         return pair.stream
     }
     public func executionSnapshot() -> ActionExecutionSnapshot { executionLedger.snapshot() }
-    private func removeExecutionObserver(_ id: UUID) { executionObservers.removeValue(forKey: id) }
+    private func removeExecutionObserver(_ id: String) { executionObservers.removeValue(forKey: id) }
     private func publishExecutions() {
         guard !executionObservers.isEmpty else { return }
         let snapshot = executionLedger.snapshot()
         for observer in executionObservers.values { observer.yield(snapshot) }
     }
     private func executionTransition(
-        _ id: UUID, to phase: ActionExecutionRecord.Phase,
+        _ id: String, to phase: ActionExecutionRecord.Phase,
         completion: ActionCompletion? = nil, failure: ActionExecutionRecord.Failure? = nil,
         failureDescription: String? = nil
     ) {
@@ -140,15 +140,15 @@ public actor ChannelScheduler {
     private let deliverResult: @Sendable (ActionResult) async -> ActionResultDelivery
     private var deliveryWorker: Task<Void, Never>?
     private var deliveryAttempt: Task<Void, Never>?
-    private var deliveryAttemptID: UUID?
+    private var deliveryAttemptID: String?
 
-    public func finishRoundDelivery(_ roundID: UUID) async throws {
+    public func finishRoundDelivery(_ roundID: String) async throws {
         while true {
             try Task.checkCancellation()
             let records = resultLedger.snapshot().filter { $0.result?.roundID == roundID }
             if let failed = records.first(where: { $0.state == .closed }) {
                 throw ActionSchedulingError.resultDeliveryFailed(
-                    executionID: failed.executionID.uuidString,
+                    executionID: failed.executionID,
                     path: failed.result?.path.description ?? "unknown", state: failed.state.rawValue)
             }
             if !records.contains(where: { $0.state == .pending || $0.state == .reserved }) { return }
@@ -158,7 +158,7 @@ public actor ChannelScheduler {
 
     public func finishResultDelivery() async { await deliveryWorker?.value }
 
-    public func resultSnapshot() -> [(executionID: UUID, result: ActionResult?, delivery: String)] {
+    public func resultSnapshot() -> [(executionID: String, result: ActionResult?, delivery: String)] {
         resultLedger.snapshot().map { ($0.executionID, $0.result, $0.state.rawValue) }
     }
 
@@ -203,10 +203,10 @@ public actor ChannelScheduler {
     }
     /// Returns after admission, never after execution. All dormant jobs count toward capacity.
     @discardableResult
-    public func enqueue(invocation submitted: ScheduledAction) async throws -> UUID {
+    public func enqueue(invocation submitted: ScheduledAction) async throws -> String {
         try await admit(submitted)
     }
-    private func admit(_ submitted: ScheduledAction) async throws -> UUID {
+    private func admit(_ submitted: ScheduledAction) async throws -> String {
         let invocation = try ScheduledAction(
             envelope: submitted.envelope, owner: submitted.owner, feedback: submitted.feedback, lease: submitted.lease,
             context: submitted.execution.context)
@@ -287,7 +287,7 @@ public actor ChannelScheduler {
         startEligibleChannels()
     }
     /// Seals the root group and joins all accepted work. Only one finish waiter is admitted.
-    public func finish(inputID: UUID, source: AgentID) async throws {
+    public func finish(inputID: String, source: AgentID) async throws {
         let key = InputKey(source: source, inputID: inputID)
         guard let state = inputs[key] else {
             try Task.checkCancellation()
@@ -312,13 +312,13 @@ public actor ChannelScheduler {
         try outcome.get()
         try Task.checkCancellation()
     }
-    public func cancel(inputID: UUID, source: AgentID) async {
+    public func cancel(inputID: String, source: AgentID) async {
         let key = InputKey(source: source, inputID: inputID)
         guard let completion = inputs[key]?.completion else { return }
         beginCancellation(key)
         _ = await completion.value
     }
-    public func cancel(sessionID: UUID) async {
+    public func cancel(sessionID: String) async {
         let selected = inputs.filter { $0.value.sessionID == sessionID }
         for key in selected.keys { beginCancellation(key) }
         for state in selected.values { _ = await state.completion.value }
@@ -336,7 +336,7 @@ public actor ChannelScheduler {
         executionObservers.removeAll()
     }
 
-    public func cancel(agent: AgentID, incarnation: UUID, sessionID: UUID? = nil) async {
+    public func cancel(agent: AgentID, incarnation: String, sessionID: String? = nil) async {
         let selected = inputs.filter { key, state in
             key.source == agent && (sessionID == nil || state.sessionID == sessionID)
                 && state.producerIncarnation == incarnation
@@ -531,7 +531,7 @@ extension ChannelScheduler {
             let next = resultLedger.ready()
             if let result = next, deliveryAttempt == nil {
                 let pair = AsyncStream<ActionResultDelivery>.makeStream(bufferingPolicy: .bufferingOldest(1))
-                let attemptID = UUID()
+                let attemptID = UUID().uuidString
                 deliveryAttemptID = attemptID
                 deliveryAttempt = Task {
                     let outcome = await deliverResult(result)
@@ -549,7 +549,7 @@ extension ChannelScheduler {
         }
     }
 
-    private func finishDeliveryAttempt(_ id: UUID) {
+    private func finishDeliveryAttempt(_ id: String) {
         guard deliveryAttemptID == id else { return }
         deliveryAttempt = nil
         deliveryAttemptID = nil

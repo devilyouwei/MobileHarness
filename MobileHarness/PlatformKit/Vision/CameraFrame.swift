@@ -36,7 +36,7 @@ public struct CameraFrame: @unchecked Sendable {
     final class CameraFrameReceiver: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate, Sendable {
         private struct State {
             var output: AsyncThrowingStream<CameraFrame, Error>.Continuation?
-            var generation = UUID()
+            var generation = UUID().uuidString
             var sequence: UInt64 = 0
             var timestamp: Double = -1
             var rotation = 1
@@ -46,7 +46,7 @@ public struct CameraFrame: @unchecked Sendable {
         func setRotation(_ rotation: Int) { state.withLock { $0.rotation = rotation } }
         func begin() -> AsyncThrowingStream<CameraFrame, Error> {
             let stream = AsyncThrowingStream<CameraFrame, Error>.makeStream(bufferingPolicy: .bufferingNewest(1))
-            let generation = UUID()
+            let generation = UUID().uuidString
             stream.continuation.onTermination = { [weak self] _ in
                 self?.state.withLock { value in
                     if value.generation == generation { value.output = nil }

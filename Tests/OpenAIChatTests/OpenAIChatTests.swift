@@ -652,7 +652,7 @@ private final class UsageProtocol: URLProtocol, @unchecked Sendable {
 }
 
 @Test func consecutiveUsersRetainOriginalMessageAndImageBoundaries() throws {
-    let image = try ChatImage(id: UUID(), mimeType: "image/png", data: Data([1, 2]))
+    let image = try ChatImage(id: UUID().uuidString, mimeType: "image/png", data: Data([1, 2]))
     let messages: [ChatMessage] = [
         .init(role: .system, content: "Instructions"),
         .init(role: .user, content: "你好", images: [image]),
@@ -726,7 +726,7 @@ private final class UsageProtocol: URLProtocol, @unchecked Sendable {
 
 @Test func photoAttachmentsEncodeAsNativeImageContentAndHaveSeparateBounds() throws {
     let bytes = Data([0xff, 0xd8, 0xff, 0xd9])
-    let image = try ChatImage(id: UUID(), data: bytes)
+    let image = try ChatImage(id: UUID().uuidString, data: bytes)
     let chat = try ChatRequest(messages: [.init(role: .user, content: "Describe the captured photo", images: [image])])
     let encoded = try #require(try config().request(chat).httpBody)
     let body = try #require(JSONSerialization.jsonObject(with: encoded) as? [String: Any])
@@ -743,7 +743,9 @@ private final class UsageProtocol: URLProtocol, @unchecked Sendable {
     #expect(throws: (any Error).self) {
         try ChatRequest(messages: [.init(role: .user, content: "bad", images: Array(repeating: image, count: 5))])
     }
-    #expect(throws: (any Error).self) { try ChatImage(id: UUID(), data: Data(count: 4 * 1024 * 1024 + 1)) }
+    #expect(throws: (any Error).self) {
+        try ChatImage(id: UUID().uuidString, data: Data(count: 4 * 1024 * 1024 + 1))
+    }
     let old = Data("{\"role\":\"user\",\"content\":\"old\",\"toolCalls\":[]}".utf8)
     #expect(try JSONDecoder().decode(ChatMessage.self, from: old).images == nil)
 }

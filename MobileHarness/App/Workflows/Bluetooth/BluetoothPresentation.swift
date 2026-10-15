@@ -1,5 +1,6 @@
 import Foundation
 import PlatformKit
+import Storage
 
 /// App presentation policy, independent of packet admission and motion execution.
 public enum BluetoothPresentation {
@@ -9,7 +10,7 @@ public enum BluetoothPresentation {
         }
         if preferred(lhs.name) != preferred(rhs.name) { return preferred(lhs.name) }
         if lhs.rssi != rhs.rssi { return lhs.rssi > rhs.rssi }
-        return lhs.id.uuidString < rhs.id.uuidString
+        return lhs.id < rhs.id
     }
 
     public static func deviceName(_ value: String) -> String? {

@@ -1,6 +1,7 @@
 import AgentCore
 import Foundation
 import ModelKit
+import Storage
 import StorageChat
 
 /// Preserve provider call/result blocks when interleaving independent task rounds.
@@ -54,7 +55,7 @@ public enum AgentChatContextBuilder {
 
     /// Runtime facts are scoped data; retained task history is not an instruction catalog.
     static func taskReports(
-        views: [UUID: AgentTaskView], tasks: AgentTaskRegistry, input: AgentInput, templates: PromptTemplates
+        views: [String: AgentTaskView], tasks: AgentTaskRegistry, input: AgentInput, templates: PromptTemplates
     ) throws -> String {
         let selected = views.values.filter { view in
             guard view.scope.sessionID == input.sessionID else { return false }
@@ -63,16 +64,17 @@ public enum AgentChatContextBuilder {
                 let record = tasks.task(view.scope.id)
             else { return false }
             return ![.succeeded, .failed, .cancelled, .interrupted].contains(record.state)
-        }.sorted { $0.scope.id.uuidString < $1.scope.id.uuidString }.prefix(17)
+        }.sorted { ($0.createdAt ?? .distantPast, $0.scope.id) < ($1.createdAt ?? .distantPast, $1.scope.id) }.prefix(
+            17)
         guard !selected.isEmpty else { return "" }
         let reports = try selected.map { view in
             try templates.render(
                 "taskReport",
                 variables: [
-                    "taskID": view.scope.id.uuidString, "executor": view.scope.executor.rawValue,
+                    "taskID": view.scope.id, "executor": view.scope.executor.rawValue,
                     "status": tasks.task(view.scope.id)?.state.rawValue ?? "unknown", "stage": view.stage.rawValue,
-                    "interaction": view.interactionID?.uuidString ?? "none",
-                    "artifact": view.artifactID?.uuidString ?? "none", "report": String(view.text.prefix(128)),
+                    "interaction": view.interactionID ?? "none",
+                    "artifact": view.artifactID ?? "none", "report": String(view.text.prefix(128)),
                 ])
         }.joined(separator: "\n")
         return try templates.render("taskReports", variables: ["reports": reports])
@@ -113,7 +115,7 @@ public enum AgentChatContextBuilder {
     }
     public static func compressionMessage(_ compression: ConversationTaskCompression) throws -> ChatMessage {
         var value = [
-            "taskID": compression.taskID.uuidString, "goal": compression.goal, "status": compression.status.rawValue,
+            "taskID": compression.taskID, "goal": compression.goal, "status": compression.status.rawValue,
         ]
         if let summary = compression.reportedSummary { value["reportedSummary"] = summary }
         if let failure = compression.failure { value["failure"] = failure }

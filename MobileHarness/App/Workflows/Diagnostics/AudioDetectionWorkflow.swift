@@ -1,4 +1,5 @@
 import Foundation
+import Storage
 import UI
 
 /// One operation and one freshness/deadline monitor; no pending diagnostic queue.
@@ -10,7 +11,7 @@ import UI
     private var monitor: Task<Void, Never>?
     private var captureStart: ContinuousClock.Instant?
     private var completed = false
-    private var generation: UUID?
+    private var generation: String?
     public init(state: AudioDetectionState, endpoint: any AudioDetectionRunning, duration: Duration = .seconds(10)) {
         self.state = state
         self.endpoint = endpoint
@@ -23,7 +24,7 @@ import UI
         state.phase = .preparing
         captureStart = nil
         completed = false
-        let generation = UUID()
+        let generation = UUID().uuidString
         self.generation = generation
         operation = Task {
             var terminalPhase: AudioDetectionState.Phase = .finished

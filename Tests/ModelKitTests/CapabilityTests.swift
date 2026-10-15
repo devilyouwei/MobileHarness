@@ -14,7 +14,7 @@ private actor AudioRecorder {
     let pair = InferenceSession<TranscriptionEvent>.make(
         limits: try StreamLimits(), estimatedBytes: { $0.estimatedBytes })
     let recorder = AudioRecorder()
-    let segment = UUID()
+    let segment = UUID().uuidString
     let session = SpeechRecognitionSession(
         output: pair.session, format: format,
         sendAudio: { await recorder.record($0) },

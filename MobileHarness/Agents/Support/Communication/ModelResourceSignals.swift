@@ -1,5 +1,6 @@
 import AgentCore
 import Foundation
+import Storage
 
 public enum ModelResourceIntent: Codable, Sendable, Equatable {
     case refreshResources
@@ -7,7 +8,7 @@ public enum ModelResourceIntent: Codable, Sendable, Equatable {
     case restoreSource
     case saveSource(endpoint: String, allowsCellular: Bool, recognition: Bool, synthesis: Bool)
     case configureSpeech(recognition: Bool, synthesis: Bool)
-    case retire(UUID)
+    case retire(String)
     case download(id: String, endpoint: String, allowsCellular: Bool)
     case cancel(String)
     case remove(String)
@@ -33,14 +34,14 @@ public enum ModelResourceIntent: Codable, Sendable, Equatable {
             })
         else { throw CommunicationError.invalidPayload }
     }
-    public func input(sessionID: UUID) -> AgentInput {
-        let id: UUID
+    public func input(sessionID: String) throws -> AgentInput {
+        let id: String
         let source: String
         if case .retire(let requestID) = self {
             id = requestID
             source = "runtime"
         } else {
-            id = UUID()
+            id = UUID().uuidString
             source = "user"
         }
         let message = AgentMessage(
@@ -78,8 +79,8 @@ public enum ModelResourceObservation: Codable, Sendable, Equatable {
             }
         }
     }
-    public func input(sessionID: UUID, sequence: UInt64) -> AgentInput {
-        let id = UUID()
+    public func input(sessionID: String, sequence: UInt64) throws -> AgentInput {
+        let id = UUID().uuidString
         let message = AgentMessage(
             contract: Self.contract, content: self, maximumBytes: 16_384, validate: { try $0.validate() })
         let payload = InputPayload.observation(message)
@@ -102,11 +103,11 @@ public struct ModelResourceHostFailure: Codable, Sendable, Equatable {
     }
     public static let contract = "model.resource.hostFailure"
     public static let source = "app.resources"
-    public let requestID: UUID
+    public let requestID: String
     public let phase: Phase
     public let scope: Scope
     public let message: String
-    public init(requestID: UUID, phase: Phase, scope: Scope, message: String) {
+    public init(requestID: String, phase: Phase, scope: Scope, message: String) {
         self.requestID = requestID
         self.phase = phase
         self.scope = scope
@@ -118,8 +119,8 @@ public struct ModelResourceHostFailure: Codable, Sendable, Equatable {
         }
         if case .refresh(let generation) = scope, generation == 0 { throw CommunicationError.invalidPayload }
     }
-    public func input(sessionID: UUID) -> AgentInput {
-        let id = UUID()
+    public func input(sessionID: String) throws -> AgentInput {
+        let id = UUID().uuidString
         let payload = InputPayload.observation(
             AgentMessage(contract: Self.contract, content: self, maximumBytes: 16_384, validate: { try $0.validate() }))
         return AgentInput(

@@ -11,6 +11,7 @@ import Gateway
 import ModelKit
 import OSLog
 import PlatformKit
+import Storage
 import StorageAudio
 import UI
 import UIKit
@@ -29,17 +30,17 @@ final class VoiceSessionCoordinator: VoiceOutputHandling, UIFeedbackCapability {
     private var playbackActive = false { didSet { updatePhase() } }
     private var conversationPresentation = ConversationPresentation()
     private var baseExpression: EyeExpression?
-    private var expressionOwner: UUID?
+    private var expressionOwner: String?
     private var expressionWaiter: CheckedContinuation<Void, Error>?
-    private var expressionWaitID: UUID?
+    private var expressionWaitID: String?
     private func updatePhase() { state.voicePhase = playbackActive ? .speaking : presentationPhase }
     private var changingSettings = false
     var beforeVoiceStart: @MainActor () async -> Void = {}
     private var startupTask: Task<Void, Error>?
-    private var startupID: UUID?
+    private var startupID: String?
     private var listeningIntentTask: Task<Void, Never>?
     private let activationHaptic = NativeHapticFeedback()
-    private var voiceGeneration: UUID? {
+    private var voiceGeneration: String? {
         didSet {
             state.isVoiceActive = voiceGeneration != nil
             state.listeningAnimationID = voiceGeneration
@@ -54,7 +55,7 @@ final class VoiceSessionCoordinator: VoiceOutputHandling, UIFeedbackCapability {
     private var requests: InputGateway?
     private var manager: AgentManager?
     private var captureTask: Task<Void, Never>?
-    private var captureEpoch: UUID?
+    private var captureEpoch: String?
     private var captureSequence: UInt64 = 0
     private var replyCancellationTask: Task<Void, Never>?
     private var manualListeningOff = false
@@ -189,7 +190,7 @@ final class VoiceSessionCoordinator: VoiceOutputHandling, UIFeedbackCapability {
         await cleanupTask?.value
         try Task.checkCancellation()
         guard state.isReady, !changingSettings, voiceGeneration == nil else { throw CancellationError() }
-        let generation = UUID()
+        let generation = UUID().uuidString
         voiceGeneration = generation
         voiceActivationPending = false
         resetExpression()
@@ -250,7 +251,7 @@ final class VoiceSessionCoordinator: VoiceOutputHandling, UIFeedbackCapability {
         }
     }
 
-    private func prepareVoice(generation: UUID) async throws {
+    private func prepareVoice(generation: String) async throws {
         try Task.checkCancellation()
         guard voiceGeneration == generation else { throw CancellationError() }
         if case .unavailable(let reason) = await recognition.availability {
@@ -274,7 +275,7 @@ final class VoiceSessionCoordinator: VoiceOutputHandling, UIFeedbackCapability {
         guard manager != nil, requests != nil, responses != nil else { throw CapabilityError.sessionClosed }
     }
 
-    private func admitVoice(generation: UUID) async throws {
+    private func admitVoice(generation: String) async throws {
         try Task.checkCancellation()
         guard voiceGeneration == generation, let speech else { throw CancellationError() }
         try await speech.openCapture(sessionID: generation)
@@ -345,7 +346,7 @@ final class VoiceSessionCoordinator: VoiceOutputHandling, UIFeedbackCapability {
         let frames = try await audio.startCapture(preferSpatial: true)
         try Task.checkCancellation()
         guard voiceGeneration == generation, !listeningPaused, !hasPlaybackBarrier else { throw CancellationError() }
-        let epoch = UUID()
+        let epoch = UUID().uuidString
         captureEpoch = epoch
         captureTask = Task { [weak self] in
             var meterSamples: [Float] = []
@@ -600,7 +601,7 @@ final class VoiceSessionCoordinator: VoiceOutputHandling, UIFeedbackCapability {
         guard !manualListeningOff else { return }
         if voiceGeneration == nil {
             startupTask?.cancel()
-            let id = UUID()
+            let id = UUID().uuidString
             startupID = id
             let task = Task { [weak self] in
                 guard let self else { throw CancellationError() }
@@ -632,7 +633,7 @@ final class VoiceSessionCoordinator: VoiceOutputHandling, UIFeedbackCapability {
         }
     }
 
-    private func pauseListening(generation: UUID, revision: UInt64) async throws {
+    private func pauseListening(generation: String, revision: UInt64) async throws {
         // Finish a confirmed utterance before closing host capture admission.
         if let speech {
             while !(await speech.acquirePlaybackAdmission()) {
@@ -729,7 +730,7 @@ final class VoiceSessionCoordinator: VoiceOutputHandling, UIFeedbackCapability {
         case .soundSource, .pose, .speechSynthesis, .cancelSpeech: break
         }
     }
-    private func resumeListening(generation: UUID) async throws {
+    private func resumeListening(generation: String) async throws {
         func canResume() -> Bool {
             voiceGeneration == generation && !listeningPaused && !hasPlaybackBarrier
         }
@@ -756,7 +757,7 @@ final class VoiceSessionCoordinator: VoiceOutputHandling, UIFeedbackCapability {
         state.voiceStatus = "正在聆听 · 停顿后自动识别"
         runtime.presentation.homeEffects.replyDidFinish()
     }
-    func play(audioID: UUID, invocation: any FunctionInput) async throws {
+    func play(audioID: String, invocation: any FunctionInput) async throws {
         guard let speechPlayback else { throw CommunicationError.scopeClosed }
         guard acceptsPlayback(invocation.context) else { throw CancellationError() }
         playbackCount += 1
@@ -845,7 +846,7 @@ final class VoiceSessionCoordinator: VoiceOutputHandling, UIFeedbackCapability {
             return PlaybackPCM(samples: samples, sampleRate: frame.format.sampleRate)
         }
     }
-    private func accepts(session: UUID) -> Bool {
+    private func accepts(session: String) -> Bool {
         session == runtime.interactionSessionID || session == voiceGeneration
     }
     private func acceptsPlayback(_ context: ActionExecutionContext) -> Bool {
@@ -961,7 +962,7 @@ final class VoiceSessionCoordinator: VoiceOutputHandling, UIFeedbackCapability {
         try Task.checkCancellation()
         guard state.expressionRendererAvailable else { throw UIActions.ExpressionError.rendererUnavailable }
         guard expressionWaiter == nil else { throw UIActions.ExpressionError.busy }
-        let id = UUID()
+        let id = UUID().uuidString
         try await withTaskCancellationHandler {
             try Task.checkCancellation()
             try await withCheckedThrowingContinuation { continuation in
@@ -979,7 +980,7 @@ final class VoiceSessionCoordinator: VoiceOutputHandling, UIFeedbackCapability {
         }
     }
 
-    private func finishExpressionTransition(id: UUID?, completed: Bool) {
+    private func finishExpressionTransition(id: String?, completed: Bool) {
         guard let id, expressionWaitID == id else { return }
         let waiter = expressionWaiter
         expressionWaiter = nil

@@ -1,3 +1,5 @@
+import Foundation
+
 #if os(iOS)
     import SwiftUI
     import UIKit
@@ -9,17 +11,17 @@
         var reduceMotion: Bool
         var expression: EyeExpression
         var emphasized = false
-        var transitionID: UUID?
+        var transitionID: String?
         var gaze: CGSize = .zero
         var faceWidth: CGFloat
         var eyeCenter: CGPoint
         var haloEnabled = true
         var active: Bool
-        var generation: UUID?
+        var generation: String?
         var lightOrigin: ListeningLightOrigin?
         var decorativeLight: DecorativeLight?
         var held = false
-        var completion: (@MainActor (UUID, Bool) -> Void)?
+        var completion: (@MainActor (String, Bool) -> Void)?
         var availability: (@MainActor (Bool) -> Void)?
         var failure: (@MainActor (String?) -> Void)?
         @Environment(\.scenePhase) private var scenePhase

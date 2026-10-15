@@ -5,6 +5,7 @@ import AppWorkflows
 import ExecutionRuntime
 import Foundation
 import FunctionContracts
+import Storage
 import Testing
 
 private actor DiscoveryRecorder {
@@ -22,7 +23,7 @@ private actor DiscoveryNativeFixture: ModelResourceCapability {
     func configureSpeech(recognition: Bool, synthesis: Bool) async throws { throw CancellationError() }
 }
 @Test(.actionCatalog) func providerDiscoveryUsesOpaqueIntentAndReturningPipeline() async throws {
-    let session = UUID()
+    let session = UUID().uuidString
     let recorder = DiscoveryRecorder()
     let requests = ProviderDiscoveryRequests { await recorder.query($0) }
     let native = DiscoveryNativeFixture()
@@ -34,7 +35,7 @@ private actor DiscoveryNativeFixture: ModelResourceCapability {
     let json = String(decoding: data, as: UTF8.self)
     #expect(!json.contains(secret))
     #expect(!json.contains("provider.example"))
-    #expect(json.contains(id.uuidString))
+    #expect(json.contains(id))
     let raw = try await runtime.discoverProvider(requestID: id)
     #expect(try JSONDecoder().decode([String].self, from: Data(raw.utf8)) == ["chat-small", "chat-large"])
     #expect(await recorder.queries == 1)
@@ -61,8 +62,8 @@ private final class DiscoveryClock: @unchecked Sendable {
     let clock = DiscoveryClock()
     let recorder = DiscoveryRecorder()
     let requests = ProviderDiscoveryRequests(clock: { clock.now() }, discover: { await recorder.query($0) })
-    let session = UUID()
-    var ids: [UUID] = []
+    let session = UUID().uuidString
+    var ids: [String] = []
     for _ in 0..<32 {
         ids.append(try await requests.stage(.init(url: "https://provider.example", key: "fixture"), sessionID: session))
     }
@@ -70,11 +71,11 @@ private final class DiscoveryClock: @unchecked Sendable {
         _ = try await requests.stage(.init(url: "https://provider.example", key: "fixture"), sessionID: session)
     }
     await #expect(throws: ProviderDiscoveryError.self) {
-        _ = try await requests.discoverModels(requestID: ids[0], sessionID: UUID())
+        _ = try await requests.discoverModels(requestID: ids[0], sessionID: UUID().uuidString)
     }
     _ = try await requests.discoverModels(requestID: ids[0], sessionID: session)
     #expect(await recorder.queries == 1)
-    await requests.discard(ids[1], sessionID: UUID())
+    await requests.discard(ids[1], sessionID: UUID().uuidString)
     clock.advance()
     await #expect(throws: ProviderDiscoveryError.self) {
         _ = try await requests.discoverModels(requestID: ids[1], sessionID: session)
@@ -86,7 +87,7 @@ private struct SecretDiscoveryFailure: LocalizedError {
     var errorDescription: String? { "fixture-private-credential" }
 }
 @Test(.actionCatalog) func providerDiscoveryFailureDoesNotLeakCredentialsOrRetry() async throws {
-    let session = UUID()
+    let session = UUID().uuidString
     let requests = ProviderDiscoveryRequests { _ in throw SecretDiscoveryFailure() }
     let runtime = try resourceRuntime(UnusedModelResourceCapability(), providerDiscovery: requests, sessionID: session)
     let id = try await requests.stage(
@@ -118,7 +119,7 @@ private enum InvalidProviderModels: CaseIterable, Sendable {
 @Test(.actionCatalog, arguments: InvalidProviderModels.allCases)
 private func providerDiscoveryRejectsMalformedModelLists(value: InvalidProviderModels) async throws {
     let models = value.models
-    let session = UUID()
+    let session = UUID().uuidString
     let requests = ProviderDiscoveryRequests { _ in models }
     let runtime = try resourceRuntime(UnusedModelResourceCapability(), providerDiscovery: requests, sessionID: session)
     let id = try await requests.stage(.init(url: "https://provider.example", key: "fixture"), sessionID: session)
@@ -135,7 +136,9 @@ private func providerDiscoveryRejectsMalformedModelLists(value: InvalidProviderM
         call: FunctionRequest(
             actionPath: .init(domain: "System", module: "Provider", function: "discoverModels"),
             parameters: ["requestID": UUID().uuidString, "key": "fixture-secret"]),
-        context: .init(source: "fixture", sessionID: UUID(), inputID: UUID()), results: ActionReportStore())
+        context: .init(
+            source: "fixture", sessionID: UUID().uuidString, inputID: UUID().uuidString),
+        executionID: UUID().uuidString, results: ActionReportStore())
     await #expect(throws: ActionArguments.ValidationError.self) {
         _ = try await SystemActions.discoverModels(invocation: invocation, using: requests)
     }
@@ -143,10 +146,10 @@ private func providerDiscoveryRejectsMalformedModelLists(value: InvalidProviderM
 }
 
 @Test(.actionCatalog) func providerDiscoveryAgentEmitsOnlyOpaqueRequestArgument() async throws {
-    let session = UUID()
+    let session = UUID().uuidString
     let agent = try ApplicationControlAgent(sessionID: session)
     try await agent.start()
-    let intent = ProviderDiscoveryIntent(requestID: UUID())
+    let intent = ProviderDiscoveryIntent(requestID: UUID().uuidString)
     try await agent.receive(intent.input(sessionID: session))
     var iterator = agent.outputs.makeAsyncIterator()
     guard case .toolCall(let call) = await iterator.next()?.output else {
@@ -154,7 +157,7 @@ private func providerDiscoveryRejectsMalformedModelLists(value: InvalidProviderM
         return
     }
     #expect(call.toolPath == "System.Provider.discoverModels")
-    #expect(call.arguments == ["requestID": intent.requestID.uuidString])
+    #expect(call.arguments == ["requestID": intent.requestID])
     await agent.stop()
 }
 private actor HeldDiscovery {
@@ -173,7 +176,7 @@ private actor HeldDiscovery {
     }
 }
 @Test(.actionCatalog) func providerDiscoveryAdmissionSurvivesCancelledPageCaller() async throws {
-    let session = UUID()
+    let session = UUID().uuidString
     let native = HeldDiscovery()
     let requests = ProviderDiscoveryRequests { await native.query($0) }
     let runtime = try resourceRuntime(UnusedModelResourceCapability(), providerDiscovery: requests, sessionID: session)
@@ -191,7 +194,7 @@ private actor HeldDiscovery {
 }
 
 @Test(.actionCatalog) func providerDiscoveryPreservesSDKCompatibleLargeLists() async throws {
-    let session = UUID()
+    let session = UUID().uuidString
     let models = (0..<256).map { "model-\($0)" }
     let requests = ProviderDiscoveryRequests { _ in models }
     let runtime = try resourceRuntime(UnusedModelResourceCapability(), providerDiscovery: requests, sessionID: session)

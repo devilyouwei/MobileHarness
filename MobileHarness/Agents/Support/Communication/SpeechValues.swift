@@ -1,4 +1,5 @@
 import Foundation
+import Storage
 
 public enum SpeechValidationError: Error, Equatable, Sendable { case invalidRequest }
 
@@ -6,11 +7,11 @@ public enum SpeechPhase: String, Codable, Sendable { case listening, speaking, p
 
 /// A synthesis unit selected by its originating Agent; audio IDs are application-generated.
 public struct SpeechSynthesisInput: Codable, Sendable, Equatable {
-    public let audioID: UUID
+    public let audioID: String
     public let text: String
     public let locale: String
-    public init(audioID: UUID = UUID(), text: String, locale: String = "auto") throws {
-        self.audioID = audioID
+    public init(audioID: String? = nil, text: String, locale: String = "auto") throws {
+        self.audioID = try audioID ?? UUID().uuidString
         self.text = text
         self.locale = locale
         try validate()

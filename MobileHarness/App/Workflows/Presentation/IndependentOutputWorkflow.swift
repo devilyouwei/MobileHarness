@@ -1,5 +1,6 @@
 import AgentCore
 import Foundation
+import Storage
 
 /// Consume an optional subscriber independently; failures are reported, never silently discarded.
 public enum IndependentOutputWorkflow {
@@ -182,7 +183,7 @@ public enum IndependentOutputWorkflow {
 /// One transport reader only demultiplexes; protocol consumers never wait on each other's slots.
 private actor OutputStreamReader {
     private var iterator: AsyncStream<OutputEnvelope>.Iterator?
-    private var inputID: UUID?
+    private var inputID: String?
 
     init(_ outputs: AsyncStream<OutputEnvelope>) { iterator = outputs.makeAsyncIterator() }
 

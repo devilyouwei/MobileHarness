@@ -1,7 +1,7 @@
 {
   "version": 1,
   "id": "history-query",
-  "revision": 6,
+  "revision": 8,
   "description": "Read-only paged conversation search and recall with native history Tools; no history mutation.",
   "dependencies": [],
   "functions": [

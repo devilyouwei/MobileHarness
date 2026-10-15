@@ -8,8 +8,12 @@ import Foundation
 import FunctionContracts
 import Gateway
 import ModelKit
+import PlatformKit
 import Storage
 import StorageChat
+import StorageMedia
+import StorageSQLite
+import StorageTasks
 import Testing
 
 private actor RoundModel: ChatCapability {
@@ -43,7 +47,7 @@ private actor RoundModel: ChatCapability {
             try pair.emitter.yield(.text(value))
         }
         if requests.count <= requestRounds {
-            if photo { try text("<takePhoto/>") }
+            if photo, requests.count == 1 { try text("<takePhoto/>") }
             if let photoCommand { try text("<" + photoCommand + "/>") }
             if action { try text("<wait><express emotion=\"happy\"/></wait>") }
             for index in 0..<toolCount {
@@ -110,7 +114,7 @@ private func roundHarness(
     action: Bool, toolCount: Int,
     deliverActionFeedback: Bool = true, photo: Bool = false, supportsImages: Bool = false, photoCommand: String? = nil,
     environment: Bool = false, playbackDelay: Duration = .zero, requestRounds: Int = 1,
-    photoObservation: (@Sendable (UUID, AgentInput) async throws -> ChatImage)? = nil,
+    photoObservation: (@Sendable (String, AgentInput) async throws -> ChatImage)? = nil,
     handler: @escaping ActionCompletionHandler
 ) async throws -> RoundHarness {
     let model = RoundModel(
@@ -132,7 +136,14 @@ private func roundHarness(
                 }
                 return try await AssistantContextBuilder.photoObservations(
                     values, input: input, chat: chat,
-                    read: photoObservation)
+                    read: photoObservation,
+                    prepareJPEG: { data, policy in
+                        try await NativeImageCompression.jpeg(
+                            from: data,
+                            limits: .init(
+                                maximumDimension: policy.maximumDimension, maximumPixels: policy.maximumPixels,
+                                maximumBytes: policy.maximumBytes, quality: policy.quality))
+                    })
             }, capabilities: capabilities)
     } else if toolCount > 0 {
         agent = try FixtureNativeAgent(chat: model, conversations: store)
@@ -184,7 +195,8 @@ func generationRoundActualOutputControlsContinuationForAllThreeRoutes(_ route: S
     let harness = try await roundHarness(
         action: route != "tool", toolCount: route == "action" ? 0 : 1,
         handler: { _ in hasValue ? .value("actual-result") : .completed })
-    let input = AgentInput(sessionID: UUID(), payload: .text("test"))
+    let input = AgentInput(
+        id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("test"))
     let pump = try await harness.start(input)
     try await pump.value
     let requests = await harness.model.requests
@@ -241,7 +253,8 @@ func generationRoundVoidSuccessStopsAndFailuresContinueWithoutReplay(_ route: St
             if fail { throw RoundFailure.expected }
             return .completed
         })
-    let pump = try await harness.start(.init(sessionID: UUID(), payload: .text("observe")))
+    let pump = try await harness.start(
+        .init(id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("observe")))
     try await pump.value
     let requests = await harness.model.requests
     try #require(requests.count == (fail ? 2 : 1))
@@ -291,7 +304,8 @@ private actor RoundConcurrencyGate {
     let gate = RoundConcurrencyGate()
     let harness = try await roundHarness(
         action: false, toolCount: 6, handler: { _ in await gate.run() })
-    let pump = try await harness.start(.init(sessionID: UUID(), payload: .text("parallel")))
+    let pump = try await harness.start(
+        .init(id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("parallel")))
     await gate.waitForFour()
     #expect(await gate.active == 4)
     #expect(await gate.started == 4)
@@ -349,7 +363,8 @@ func generationRoundToolBypassesWaitButContinuationJoinsEveryAction()
     let gate = MixedRoundGate()
     let harness = try await roundHarness(
         action: true, toolCount: 1, handler: { await gate.run($0) })
-    let pump = try await harness.start(.init(sessionID: UUID(), payload: .text("mixed")))
+    let pump = try await harness.start(
+        .init(id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("mixed")))
     await gate.waitForBoth()
     #expect(await harness.model.requests.count == 1)
     await gate.release()
@@ -391,7 +406,8 @@ func generationRoundCancellationJoinsNativeCleanupAndPersistsCancellation() asyn
     let gate = CancellableRoundGate()
     let harness = try await roundHarness(
         action: false, toolCount: 1, handler: { _ in try await gate.run() })
-    let pump = try await harness.start(.init(sessionID: UUID(), payload: .text("cancel")))
+    let pump = try await harness.start(
+        .init(id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("cancel")))
     await gate.waitUntilEntered()
     pump.cancel()
     await #expect(throws: CancellationError.self) { try await pump.value }
@@ -407,7 +423,8 @@ func generationRoundCancellationJoinsNativeCleanupAndPersistsCancellation() asyn
 @Test(.actionCatalog) func generationRoundAcceptsSeventeenNativeCallsWithoutCumulativeQuota() async throws {
     let harness = try await roundHarness(
         action: false, toolCount: 17, handler: { _ in .completed })
-    let pump = try await harness.start(.init(sessionID: UUID(), payload: .text("excess")))
+    let pump = try await harness.start(
+        .init(id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("excess")))
     try await pump.value
     let record = try #require(try await harness.store.snapshot().current.turns.first)
     #expect(record.state == .completed && record.error == nil)
@@ -421,8 +438,8 @@ func generationRoundCancellationJoinsNativeCleanupAndPersistsCancellation() asyn
         action: false, toolCount: 0, handler: { _ in .completed })
     let envelope = OutputEnvelope(
         source: harness.agent.descriptor.id,
-        input: .init(sessionID: UUID(), payload: .text("seal")),
-        output: .roundFinished(UUID()), roundID: UUID())
+        input: .init(id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("seal")),
+        output: .roundFinished(UUID().uuidString), roundID: UUID().uuidString)
     let result = try await harness.gateway.execute(envelope)
     #expect(result.failure != nil)
     #expect(await harness.model.requests.isEmpty)
@@ -433,7 +450,10 @@ func generationRoundCancellationJoinsNativeCleanupAndPersistsCancellation() asyn
 @Test(.actionCatalog) func generationRoundFeedbackDeliveryFailureStopsWithoutReplayingEffect() async throws {
     let harness = try await roundHarness(
         action: true, toolCount: 0, deliverActionFeedback: false, handler: { _ in .value("committed") })
-    let pump = try await harness.start(.init(sessionID: UUID(), payload: .text("delivery failure")))
+    let pump = try await harness.start(
+        .init(
+            id: UUID().uuidString, sessionID: UUID().uuidString,
+            payload: .text("delivery failure")))
     try await pump.value
     #expect(await harness.model.requests.count == 1)
     let records = await harness.scheduler.executionSnapshot().records
@@ -452,35 +472,44 @@ func generationRoundCancellationJoinsNativeCleanupAndPersistsCancellation() asyn
 )
     async throws
 {
-    let photoID = UUID()
-    let bytes = Data([0xff, 0xd8, 0xff, 0xd9])
+    let mediaID = "media_1"
+    let bytes = try compressionFixture(width: 4000, height: 3000)
+    let reads = ModelPhotoReadCounter()
     let harness = try await roundHarness(
         action: false, toolCount: mixed ? 1 : 0, photo: true, supportsImages: true,
+        requestRounds: mixed ? 2 : 1,
         photoObservation: { id, input in
-            #expect(id == photoID)
+            #expect(id == mediaID)
             #expect(input.payload.kind == .text)
+            await reads.read()
             return try ChatImage(id: id, data: bytes)
         },
         handler: { invocation in
             if invocation.call.actionPath.description == "Camera.Capture.takePhoto" {
                 return .value(
-                    "{\"photoID\":\"\(photoID.uuidString)\",\"width\":640,\"height\":480,\"mimeType\":\"image/jpeg\"}")
+                    "{\"mediaID\":\"\(mediaID)\",\"width\":4000,\"height\":3000,\"mimeType\":\"image/jpeg\"}"
+                )
             }
             return .value("native actual result")
         })
-    let pump = try await harness.start(.init(sessionID: UUID(), payload: .text("拍一张照片并告诉我看到了什么")))
+    let pump = try await harness.start(
+        .init(
+            id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("拍一张照片并告诉我看到了什么"))
+    )
     try await pump.value
     let requests = await harness.model.requests
-    try #require(requests.count == 2)
+    try #require(requests.count == (mixed ? 3 : 2))
     let image = try #require(requests[1].messages.flatMap { $0.images ?? [] }.first)
-    #expect(image.id == photoID && image.data == bytes)
+    #expect(image.id == mediaID && image.data != bytes && image.data.count <= 1024 * 1024)
+    #expect(await reads.count == 1)
+    if mixed { #expect(requests[2].messages.flatMap { $0.images ?? [] }.first == image) }
     #expect(requests[0].messages.allSatisfy { $0.images == nil })
     if mixed { #expect(requests[1].messages.contains { $0.role == .tool && $0.content == "native actual result" }) }
     let records = await harness.scheduler.executionSnapshot().records
     #expect(records.filter { $0.path.description == "Camera.Capture.takePhoto" }.count == 1)
     let turn = try #require(try await harness.store.snapshot().current.turns.first)
     let history = try #require(turn.modelRequests?.last?.requestJSON)
-    #expect(history.contains(photoID.uuidString))
+    #expect(history.contains(mediaID))
     #expect(history.contains("imageReferences"))
     #expect(history.contains("byteCount"))
     #expect(!history.contains("bytes omitted"))
@@ -492,7 +521,7 @@ func generationRoundCancellationJoinsNativeCleanupAndPersistsCancellation() asyn
 func photographerPhotoFailuresDoNotFabricateVisionOrRepeatCapture(
     _ failure: String
 ) async throws {
-    let id = UUID()
+    let id = UUID().uuidString
     let harness = try await roundHarness(
         action: false, toolCount: 0, photo: true, supportsImages: failure != "provider",
         photoObservation: { id, _ in
@@ -501,9 +530,10 @@ func photographerPhotoFailuresDoNotFabricateVisionOrRepeatCapture(
         },
         handler: { _ in
             if failure == "capture" { throw RoundFailure.expected }
-            return .value("{\"photoID\":\"\(id.uuidString)\"}")
+            return .value("{\"mediaID\":\"\(id)\"}")
         })
-    let pump = try await harness.start(.init(sessionID: UUID(), payload: .text("photo")))
+    let pump = try await harness.start(
+        .init(id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("photo")))
     try await pump.value
     let requests = await harness.model.requests
     try #require(requests.count == (failure == "capture" ? 2 : 1))
@@ -519,15 +549,19 @@ func photographerPhotoFailuresDoNotFabricateVisionOrRepeatCapture(
 @Test(.actionCatalog) func capturedPhotoStorePersistsOwnedBytesAndRejectsOverflow() async throws {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     defer { try? FileManager.default.removeItem(at: root) }
-    let owner = StorageOwner(namespace: "photos", source: "assistant", session: UUID(), input: UUID())
-    let store = CapturedPhotoStore(root: root)
+    let owner = StorageOwner(
+        namespace: "photos", source: "assistant", session: UUID().uuidString,
+        input: UUID().uuidString)
+    let store = try fixtureMediaStore(root: root)
     let bytes = Data([0xff, 0xd8, 0xff, 0xd9])
     let id = try await store.save(bytes, owner: owner)
-    let restarted = CapturedPhotoStore(root: root)
+    let restarted = try fixtureMediaStore(root: root)
     #expect(try await restarted.read(id, owner: owner) == bytes)
     await #expect(throws: FileStorageError.self) {
         try await restarted.read(
-            id, owner: StorageOwner(namespace: "photos", source: owner.source, session: owner.session, input: UUID()))
+            id,
+            owner: StorageOwner(
+                namespace: "photos", source: owner.source, session: owner.session, input: UUID().uuidString))
     }
     for _ in 1..<32 { _ = try await store.save(bytes, owner: owner) }
     await #expect(throws: FileStorageError.self) { _ = try await store.save(bytes, owner: owner) }
@@ -535,11 +569,11 @@ func photographerPhotoFailuresDoNotFabricateVisionOrRepeatCapture(
 }
 
 private actor PhotoFunctionEndpoint: CameraControlCapability {
-    let id = UUID()
+    let id = UUID().uuidString
     private(set) var captures = 0
     func takePhoto(invocation: any FunctionInput) throws -> CameraPhotoReceipt {
         captures += 1
-        return try CameraPhotoReceipt(photoID: id, width: 640, height: 480)
+        return try CameraPhotoReceipt(mediaID: id, width: 640, height: 480)
     }
     func setEnabled(_ enabled: Bool, invocation: any FunctionInput) {}
     func flip(_ facing: CameraActions.Facing, invocation: any FunctionInput) {}
@@ -554,38 +588,45 @@ private actor PhotoFunctionEndpoint: CameraControlCapability {
         directResultPolicy: .returning)
     let executor = ToolExecutor(registry: try ToolRegistry(modules: [RoundTools(definitions: [tool])]))
     let envelope = OutputEnvelope(
-        source: .assistant, input: .init(sessionID: UUID(), payload: .text("photo")), output: .control("fixture"))
+        source: .assistant,
+        input: .init(
+            id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("photo")),
+        output: .control("fixture"))
     let invalid = try #require(
         try await executor.execute(
-            ToolCall(toolPath: "Camera.Capture.takePhoto", arguments: ["unexpected": "yes"]), envelope: envelope))
+            ToolCall(
+                id: UUID().uuidString, toolPath: "Camera.Capture.takePhoto", arguments: ["unexpected": "yes"]
+            ), envelope: envelope))
     #expect(invalid.isError)
     #expect(await endpoint.captures == 0)
     let valid = try #require(
-        try await executor.execute(ToolCall(toolPath: "Camera.Capture.takePhoto"), envelope: envelope))
+        try await executor.execute(
+            ToolCall(id: UUID().uuidString, toolPath: "Camera.Capture.takePhoto"), envelope: envelope))
     let receipt = try JSONDecoder().decode(CameraPhotoReceipt.self, from: Data(valid.value.utf8))
-    #expect(receipt.photoID == endpoint.id)
+    #expect(receipt.mediaID == endpoint.id)
     #expect(await endpoint.captures == 1)
 }
 
 @Test(.actionCatalog, arguments: ["savePhoto", "ignorePhoto"], [false, true])
 func photoDispositionObservationDrivesReplyWithoutAnotherImageOrCapture(_ command: String, _ denied: Bool) async throws
 {
-    let id = UUID()
-    let receipt = CameraPhotoCommandReceipt(photoID: id, state: command == "savePhoto" ? .saved : .ignored)
+    let id = UUID().uuidString
+    let receipt = CameraPhotoCommandReceipt(mediaID: id, state: command == "savePhoto" ? .saved : .ignored)
     let value = String(decoding: try JSONEncoder().encode(receipt), as: UTF8.self)
     let harness = try await roundHarness(
-        action: false, toolCount: 0, photoCommand: command + " photoID=\"" + id.uuidString + "\"",
+        action: false, toolCount: 0, photoCommand: command + " mediaID=\"" + id + "\"",
         handler: { _ in
             if denied { throw CameraControlError.permissionDenied }
             return .value(value)
         })
-    let pump = try await harness.start(.init(sessionID: UUID(), payload: .text(command)))
+    let pump = try await harness.start(
+        .init(id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text(command)))
     try await pump.value
     let requests = await harness.model.requests
     try #require(requests.count == 2)
     #expect(requests.allSatisfy { $0.messages.allSatisfy { $0.images == nil } })
     #expect(
-        requests.last?.messages.contains { $0.content.contains(denied ? "permissionDenied" : id.uuidString) } == true)
+        requests.last?.messages.contains { $0.content.contains(denied ? "permissionDenied" : id) } == true)
     let records = await harness.scheduler.executionSnapshot().records
     #expect(records.filter { $0.path.description == "Camera.Capture." + command }.count == 1)
     #expect(records.allSatisfy { $0.path.description != "Camera.Capture.takePhoto" })
@@ -633,7 +674,10 @@ private struct IndependentProtocolModel: ChatCapability {
         }
         observed.continuation.finish()
     }
-    try await agent.receive(.init(sessionID: UUID(), payload: .text("independent parsing")))
+    try await agent.receive(
+        .init(
+            id: UUID().uuidString, sessionID: UUID().uuidString,
+            payload: .text("independent parsing")))
     var speechStartup = entered.stream.makeAsyncIterator()
     _ = await speechStartup.next()
     var outputs = observed.stream.makeAsyncIterator()
@@ -683,7 +727,10 @@ func actionParserFailureCancelsOpenModelStreamWithoutWaitingForAnotherEvent()
     let termination = AsyncStream<SessionTermination>.makeStream(bufferingPolicy: .bufferingOldest(1))
     let agent = try AssistantAgent(chat: OpenMalformedProtocolModel(termination: termination.continuation))
     try await agent.start()
-    try await agent.receive(.init(sessionID: UUID(), payload: .text("malformed action")))
+    try await agent.receive(
+        .init(
+            id: UUID().uuidString, sessionID: UUID().uuidString,
+            payload: .text("malformed action")))
     var sawFailure = false
     var outputs = FixtureGenerationOutputs(agent: agent).makeAsyncIterator()
     while let envelope = try await outputs.next() {
@@ -702,20 +749,24 @@ func actionParserFailureCancelsOpenModelStreamWithoutWaitingForAnotherEvent()
 @Test(.actionCatalog) func capturedPhotoHistoryReadsSurviveSessionsAndEnforceProducingInput() async throws {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     defer { try? FileManager.default.removeItem(at: root) }
-    let store = CapturedPhotoStore(root: root)
-    let owner = StorageOwner(namespace: "photos", source: "assistant", session: UUID(), input: UUID())
+    let store = try fixtureMediaStore(root: root)
+    let owner = StorageOwner(
+        namespace: "photos", source: "assistant", session: UUID().uuidString,
+        input: UUID().uuidString)
     let bytes = Data([1, 2, 3])
     let id = try await store.save(bytes, owner: owner)
-    let restarted = CapturedPhotoStore(root: root)
+    let restarted = try fixtureMediaStore(root: root)
     #expect(try await restarted.readForInput(id, source: owner.source, input: owner.input) == bytes)
     await #expect(throws: FileStorageError.invalidFile) {
         try await restarted.readForInput(id, source: "other", input: owner.input)
     }
     await #expect(throws: FileStorageError.invalidFile) {
-        try await restarted.readForInput(id, source: owner.source, input: UUID())
+        try await restarted.readForInput(id, source: owner.source, input: UUID().uuidString)
     }
-    #expect(try await restarted.readForInput(UUID(), source: owner.source, input: owner.input) == nil)
-    try FileManager.default.removeItem(at: root.appendingPathComponent(id.uuidString + ".jpg"))
+    #expect(
+        try await restarted.readForInput("media_999999", source: owner.source, input: owner.input) == nil)
+    try FileManager.default.removeItem(
+        at: root.appendingPathComponent(try #require(try testSQLiteRepositories(root).media.media(id)).path))
     #expect(try await restarted.readForInput(id, source: owner.source, input: owner.input) == nil)
 }
 
@@ -732,8 +783,9 @@ func actionParserFailureCancelsOpenModelStreamWithoutWaitingForAnotherEvent()
             return .value("owned observation")
         })
     try await harness.agent.start()
-    let first = AgentInput(sessionID: UUID(), payload: .text("first user"))
-    let second = AgentInput(sessionID: first.sessionID, payload: .text("second user"))
+    let first = AgentInput(
+        id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("first user"))
+    let second = AgentInput(id: UUID().uuidString, sessionID: first.sessionID, payload: .text("second user"))
     try await harness.agent.receive(first)
     let pump = Task {
         try await IndependentOutputWorkflow.consumeGeneration(fixtureOutputs(harness.agent)) { envelope in
@@ -780,7 +832,9 @@ private actor RoundAdmissionGate {
 {
     let harness = try await roundHarness(
         action: false, toolCount: 0, environment: true, handler: { _ in .value("actual-environment") })
-    let input = AgentInput(sessionID: UUID(), payload: .text("Read the current environment"))
+    let input = AgentInput(
+        id: UUID().uuidString, sessionID: UUID().uuidString,
+        payload: .text("Read the current environment"))
     let pump = try await harness.start(input)
     try await pump.value
     let requests = await harness.model.requests
@@ -807,7 +861,8 @@ func photographySequenceMayExceedThirtySecondsWhenEachActionFitsItsBudget() asyn
             try await Task.sleep(for: .seconds(16))
             return .value("captured photo fixture")
         })
-    let pump = try await harness.start(.init(sessionID: UUID(), payload: .text("拍照")))
+    let pump = try await harness.start(
+        .init(id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("拍照")))
     _ = try await pump.value
     let history = try await harness.store.snapshot()
     let turn = try #require(history.current.turns.first)
@@ -835,7 +890,8 @@ func modelGenerationWaitsPastThirtySecondsUntilUserCancellation() async throws {
     let agent = try AssistantAgent(chat: UnfinishedGenerationModel(), conversations: store)
     _ = try await bindSpeechRequests(agent)
     try await agent.start()
-    try await agent.receive(.init(sessionID: UUID(), payload: .text("fixture")))
+    try await agent.receive(
+        .init(id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("fixture")))
     let outputs = Task { () throws -> [OutputEnvelope] in
         var collected: [OutputEnvelope] = []
         for try await envelope in FixtureGenerationOutputs(agent: agent) { collected.append(envelope) }
@@ -921,16 +977,18 @@ private func agentRequestFailuresTerminateWithoutRetryOrEffectReplay(_ failure: 
 {
     let model = FailedAttemptModel(failure)
     let store = ConversationHistoryStore()
-    let input = AgentInput(sessionID: UUID(), payload: .text("继续完成原目标"))
+    let input = AgentInput(
+        id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("继续完成原目标"))
     let context: AgentContextRepository<AssistantContextState>?
     if failure == .taskHTTP {
         let fixed = try AssistantAgent.runtimeCapabilities(AgentConfigurations.load(named: "Assistant").capabilities)
         var initial = AssistantContextState()
         var skills = AgentTaskSkillState()
         try skills.initialize(fixed: fixed, baseSkills: AgentConfigurations.baseSkills(named: "Assistant"))
-        _ = try skills.control("startTask", arguments: ["goal": "保留跨轮目标"], inputID: input.id, fixed: fixed)
+        _ = try skills.control(
+            "startTask", arguments: ["goal": "保留跨轮目标"], inputID: input.id, fixed: fixed, taskID: try fixtureTaskID())
         initial.skillState = skills
-        context = AgentContextRepository(agent: .assistant, scope: UUID(), state: initial)
+        context = AgentContextRepository(agent: .assistant, scope: UUID().uuidString, state: initial)
     } else {
         context = nil
     }
@@ -1034,7 +1092,9 @@ func generationRoundUsesBusinessOutputRatherThanAcknowledgment(_ route: String, 
             return .report(
                 try ActionReport(entries: [.init(path: "measured", status: .succeeded, details: ["position": "12"])]))
         })
-    let pump = try await harness.start(.init(sessionID: UUID(), payload: .text("actual output")))
+    let pump = try await harness.start(
+        .init(
+            id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("actual output")))
     try await pump.value
     let requests = await harness.model.requests
     let cancellation = ["cancelledReport", "cancelledThrow", "typedCancelledThrow"].contains(shape)
@@ -1069,7 +1129,10 @@ func generationRoundUsesBusinessOutputRatherThanAcknowledgment(_ route: String, 
                     .init(path: "motor", status: .succeeded, details: ["motionEvidence": "retained-success-report"])
                 ]))
         })
-    let pump = try await harness.start(.init(sessionID: UUID(), payload: .text("mixed evidence and value")))
+    let pump = try await harness.start(
+        .init(
+            id: UUID().uuidString, sessionID: UUID().uuidString,
+            payload: .text("mixed evidence and value")))
     try await pump.value
     let requests = await harness.model.requests
     try #require(requests.count == 2)
@@ -1086,20 +1149,25 @@ func generationRoundUsesBusinessOutputRatherThanAcknowledgment(_ route: String, 
 @Test(.actionCatalog) func generationRoundRejectedActionAlwaysReturnsErrorToModel() async throws {
     let harness = try await roundHarness(
         action: false, toolCount: 0, photoCommand: "unknownAction", handler: { _ in .completed })
-    let pump = try await harness.start(.init(sessionID: UUID(), payload: .text("reject then correct")))
+    let pump = try await harness.start(
+        .init(
+            id: UUID().uuidString, sessionID: UUID().uuidString,
+            payload: .text("reject then correct")))
     try await pump.value
     let requests = await harness.model.requests
     try #require(requests.count == 2)
     #expect(
         requests[1].messages.contains {
             $0.content.contains("invalidInvocation") && $0.content.contains("unknownAction")
+                && $0.content.contains("No function was executed for this rejected call")
+                && $0.content.contains("historical calls do not grant capabilities")
         })
     #expect(await harness.scheduler.executionSnapshot().records.allSatisfy { $0.path.function != "unknownAction" })
     await harness.close()
 }
 
 @Test(.actionCatalog) func resultClassifierExcludesReportsAndHandlesButPreservesErrorsAndLegacyValues() throws {
-    let call = UUID()
+    let call = UUID().uuidString
     #expect(!ToolResult(callID: call, value: "completed", completion: .completed).requiresReasoning)
     #expect(
         !ToolResult(callID: call, value: "", completion: .report(try AgentActionReport(entries: []))).requiresReasoning)
@@ -1113,13 +1181,18 @@ func generationRoundUsesBusinessOutputRatherThanAcknowledgment(_ route: String, 
             callID: call, value: "succeeded",
             completion: .report(try AgentActionReport(entries: [.init(path: "motor", status: .succeeded)]))
         ).requiresReasoning)
-    #expect(!ToolResult(callID: call, value: "", completion: .activityStarted(UUID())).requiresReasoning)
-    #expect(!ToolResult(callID: call, value: "", completion: .activityStopped(UUID())).requiresReasoning)
     #expect(
-        ToolResult(callID: call, value: "", isError: true, completion: .activityStarted(UUID())).requiresReasoning)
+        !ToolResult(callID: call, value: "", completion: .activityStarted(UUID().uuidString))
+            .requiresReasoning)
+    #expect(
+        !ToolResult(callID: call, value: "", completion: .activityStopped(UUID().uuidString))
+            .requiresReasoning)
+    #expect(
+        ToolResult(callID: call, value: "", isError: true, completion: .activityStarted(UUID().uuidString))
+            .requiresReasoning)
     #expect(ToolResult(callID: call, value: "legacy value").requiresReasoning)
-    var round = AgentRoundCoordinator(taskID: UUID())
-    let acknowledged = UUID()
+    var round = AgentRoundCoordinator(taskID: UUID().uuidString)
+    let acknowledged = UUID().uuidString
     try round.register(id: acknowledged)
     try round.register(id: call)
     try round.accept(.init(callID: call, value: "", completion: .value("")), roundID: round.id)
@@ -1138,7 +1211,9 @@ func generationRoundUsesBusinessOutputRatherThanAcknowledgment(_ route: String, 
 func hostCancellationTerminalStopsAdmittedActionThroughActualGateway(_ alreadySealed: Bool) async throws {
     let gate = CancellableRoundGate()
     let harness = try await roundHarness(action: true, toolCount: 0, handler: { _ in try await gate.run() })
-    let input = AgentInput(sessionID: UUID(), payload: .text("cancel active action"))
+    let input = AgentInput(
+        id: UUID().uuidString, sessionID: UUID().uuidString,
+        payload: .text("cancel active action"))
     let pump = try await harness.start(input)
     await gate.waitUntilEntered()
     if alreadySealed {
@@ -1159,54 +1234,14 @@ func hostCancellationTerminalStopsAdmittedActionThroughActualGateway(_ alreadySe
     await harness.close()
 }
 
-@Test func photoArchiveMigratesFullLegacyIndexWithoutDiscardingEvidence() async throws {
-    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-    defer { try? FileManager.default.removeItem(at: root) }
-    let owner = StorageOwner(namespace: "photos", source: "assistant", session: UUID(), input: UUID())
-    let legacy = CapturedPhotoStore(root: root)
-    let fixture = Data([0xff, 0xd8, 0xff, 0xd9])  // Storage fixture; no camera or JPEG decoder.
-    var ids: [UUID] = []
-    for _ in 0..<32 { ids.append(try await legacy.save(fixture, owner: owner)) }
-    await #expect(throws: FileStorageError.capacityExceeded) { _ = try await legacy.save(fixture, owner: owner) }
-    let limits = CapturedPhotoStore.Limits(
-        maximumPhotos: 1024, maximumBytes: 2 * 1024 * 1024 * 1024, maximumIndexBytes: 512 * 1024)
-    let undersized = CapturedPhotoStore(root: root, limits: .init(maximumPhotos: 1))
-    await #expect(throws: FileStorageError.capacityExceeded) { _ = try await undersized.read(ids[0], owner: owner) }
-    let migrated = CapturedPhotoStore(root: root, limits: limits)
-    ids.append(try await migrated.save(fixture, owner: owner))
-    let restarted = CapturedPhotoStore(root: root, limits: limits)
-    for id in ids { #expect(try await restarted.read(id, owner: owner) == fixture) }
-    #expect(ids.count == 33)
-}
-
-@Test func photoArchiveRejectsPolicyAndIndexOverflowBeforeAddingEvidence() async throws {
-    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-    defer { try? FileManager.default.removeItem(at: root) }
-    let owner = StorageOwner(namespace: "photos", source: "assistant", session: UUID(), input: UUID())
-    let fixture = Data([0xff, 0xd8, 0xff, 0xd9])
-    let invalid = CapturedPhotoStore(root: root, limits: .init(maximumPhotos: 0))
-    await #expect(throws: FileStorageError.invalidFile) { _ = try await invalid.save(fixture, owner: owner) }
-    #expect(!FileManager.default.fileExists(atPath: root.path))
-    let bounded = CapturedPhotoStore(root: root, limits: .init(maximumPhotos: 20, maximumIndexBytes: 1024))
-    var saved: [UUID] = []
-    while saved.count < 20 {
-        do { saved.append(try await bounded.save(fixture, owner: owner)) } catch FileStorageError.capacityExceeded {
-            break
-        }
-    }
-    #expect(!saved.isEmpty && saved.count < 20)
-    let count = try FileManager.default.contentsOfDirectory(atPath: root.path).filter { $0.hasSuffix(".jpg") }.count
-    #expect(count == saved.count)
-    let restarted = CapturedPhotoStore(root: root, limits: .init(maximumPhotos: 20, maximumIndexBytes: 1024))
-    for id in saved { #expect(try await restarted.read(id, owner: owner) == fixture) }
-    await #expect(throws: FileStorageError.capacityExceeded) { _ = try await restarted.save(fixture, owner: owner) }
-}
-
 @Test(.actionCatalog, .timeLimit(.minutes(1)))
 func decisionContinuesThroughThirtySixRoundsAndOneHundredFortyFourNativeEffects() async throws {
     let harness = try await roundHarness(
         action: false, toolCount: 4, requestRounds: 36, handler: { _ in .value("actual effect") })
-    let pump = try await harness.start(.init(sessionID: UUID(), payload: .text("complete the long goal")))
+    let pump = try await harness.start(
+        .init(
+            id: UUID().uuidString, sessionID: UUID().uuidString,
+            payload: .text("complete the long goal")))
     try await pump.value
     let record = try #require(try await harness.store.snapshot().current.turns.first)
     #expect(record.state == .completed && record.error == nil)
@@ -1226,50 +1261,24 @@ func decisionContinuesThroughThirtySixRoundsAndOneHundredFortyFourNativeEffects(
 @Test func photoFIFOReclaimsOldestCacheFilesAndRetainsNewestAcrossRestart() async throws {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     defer { try? FileManager.default.removeItem(at: root) }
-    let owner = StorageOwner(namespace: "photos", source: "assistant", session: UUID(), input: UUID())
+    let owner = StorageOwner(
+        namespace: "photos", source: "assistant", session: UUID().uuidString,
+        input: UUID().uuidString)
     let limits = CapturedPhotoStore.Limits(maximumPhotos: 3, maximumBytes: 12, overflowPolicy: .evictOldest)
-    let store = CapturedPhotoStore(root: root, limits: limits)
-    var ids: [UUID] = []
+    let store = try fixtureMediaStore(root: root, limits: limits)
+    var ids: [String] = []
     for index in 0..<8 { ids.append(try await store.save(Data(repeating: UInt8(index), count: 4), owner: owner)) }
-    let restarted = CapturedPhotoStore(root: root, limits: limits)
+    let restarted = try fixtureMediaStore(root: root, limits: limits)
     for (index, id) in ids.enumerated() {
         let bytes = try await restarted.readForInput(id, source: owner.source, input: owner.input)
         #expect(bytes == (index < 5 ? nil : Data(repeating: UInt8(index), count: 4)))
         #expect(
-            FileManager.default.fileExists(atPath: root.appendingPathComponent(id.uuidString + ".jpg").path)
+            FileManager.default.fileExists(
+                atPath: root.appendingPathComponent(try #require(try testSQLiteRepositories(root).media.media(id)).path)
+                    .path)
                 == (index >= 5))
     }
     #expect(try FileManager.default.contentsOfDirectory(atPath: root.path).filter { $0.hasSuffix(".jpg") }.count == 3)
-}
-
-@Test func photoFIFOIndexFailureKeepsOriginalFilesAndRollsBackIncomingJPEG() async throws {
-    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-    defer { try? FileManager.default.removeItem(at: root) }
-    let owner = StorageOwner(namespace: "photos", source: "assistant", session: UUID(), input: UUID())
-    let store = CapturedPhotoStore(root: root, limits: .init(maximumPhotos: 2, overflowPolicy: .evictOldest))
-    let first = try await store.save(Data([1]), owner: owner)
-    let second = try await store.save(Data([2]), owner: owner)
-    let index = root.appendingPathComponent("index.json")
-    try FileManager.default.removeItem(at: index)
-    try FileManager.default.createDirectory(at: index, withIntermediateDirectories: false)
-    await #expect(throws: (any Error).self) { _ = try await store.save(Data([3]), owner: owner) }
-    #expect(try await store.read(first, owner: owner) == Data([1]))
-    #expect(try await store.read(second, owner: owner) == Data([2]))
-    #expect(try FileManager.default.contentsOfDirectory(atPath: root.path).filter { $0.hasSuffix(".jpg") }.count == 2)
-}
-
-@Test func photoFIFOEncodedIndexRetiresOldestWithoutCapacityFailure() async throws {
-    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-    defer { try? FileManager.default.removeItem(at: root) }
-    let owner = StorageOwner(namespace: "photos", source: "assistant", session: UUID(), input: UUID())
-    let limits = CapturedPhotoStore.Limits(maximumPhotos: 20, maximumIndexBytes: 1024, overflowPolicy: .evictOldest)
-    let store = CapturedPhotoStore(root: root, limits: limits)
-    var ids: [UUID] = []
-    for index in 0..<20 { ids.append(try await store.save(Data([UInt8(index)]), owner: owner)) }
-    let restarted = CapturedPhotoStore(root: root, limits: limits)
-    #expect(try await restarted.readForInput(ids[0], source: owner.source, input: owner.input) == nil)
-    #expect(try await restarted.read(ids[19], owner: owner) == Data([19]))
-    #expect(try Data(contentsOf: root.appendingPathComponent("index.json")).count <= 1024)
 }
 
 @Test func rollingModelContextKeepsIntentAndWholeLatestNativeResultBlock() throws {
@@ -1293,7 +1302,9 @@ func decisionContinuesThroughThirtySixRoundsAndOneHundredFortyFourNativeEffects(
 func hostCancellationJoinsDirectNativeToolWithoutWaitingForItsRoundBoundary() async throws {
     let gate = CancellableRoundGate()
     let harness = try await roundHarness(action: false, toolCount: 1, handler: { _ in try await gate.run() })
-    let input = AgentInput(sessionID: UUID(), payload: .text("interrupt native work"))
+    let input = AgentInput(
+        id: UUID().uuidString, sessionID: UUID().uuidString,
+        payload: .text("interrupt native work"))
     let pump = try await harness.start(input)
     await gate.waitUntilEntered()
     async let calls: Void = harness.gateway.cancelCalls(for: harness.agent, sessionID: input.sessionID)
@@ -1317,7 +1328,8 @@ func cancellationReportsKeepIndependentFailuresAndNeverRequestCancellationRecove
             .init(path: "cancelled", status: .cancelled, code: .cancelled),
         ] + (mode == "mixed" ? [.init(path: "failed", status: .failed, code: .handlerFailed)] : [])
     let report = try ActionReport(entries: entries).withExecutionFailure(.cancelled)
-    let result = ToolResult(callID: UUID(), value: "evidence", isError: true, completion: .report(report.agentValue))
+    let result = ToolResult(
+        callID: UUID().uuidString, value: "evidence", isError: true, completion: .report(report.agentValue))
     #expect(report.isCancellationOnly == (mode == "cancelled"))
     #expect(result.isCancellationOnly == (mode == "cancelled"))
     #expect(result.hasFailure == (mode == "mixed"))

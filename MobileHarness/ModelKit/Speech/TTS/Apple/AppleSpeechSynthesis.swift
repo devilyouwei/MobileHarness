@@ -7,7 +7,7 @@ import Synchronization
 public final class AppleSpeechSynthesis: SpeechSynthesisCapability {
     private let resource: ModelResource<Void>
     private let synthesizer = AVSpeechSynthesizer()
-    private var activeWorker: (id: UUID, worker: SynthesisWorker, completion: SynthesisCompletion)?
+    private var activeWorker: (id: String, worker: SynthesisWorker, completion: SynthesisCompletion)?
     public init(context: ModelContext) throws {
         resource = try context.resource { () }
     }
@@ -67,7 +67,7 @@ public final class AppleSpeechSynthesis: SpeechSynthesisCapability {
         return pair.session
     }
 
-    private func retireWorker(_ token: UUID) async {
+    private func retireWorker(_ token: String) async {
         if let activeWorker, activeWorker.id == token {
             // Normal completion has no more PCM; stop only cancelled/failed native work.
             switch activeWorker.completion.termination {

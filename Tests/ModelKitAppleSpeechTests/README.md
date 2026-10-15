@@ -29,3 +29,7 @@ Update this README when test scope or lifecycle contracts change.
 ## Streaming TTS latency
 
 ✅ Regressions cover for immediate first PCM including short output, byte/sequence/timestamp preservation, format rejection, and opt-in consecutive/cancelled native synthesizer reuse. Controlled PCM checks do not certify phone latency.
+
+## Identity ownership
+
+✅ Runtime and foundation identities use opaque protocol strings or Foundation UUID; no project ID-generator dependency exists. SQLite-backed Storage publishes committed business references and App injects repositories/maps native Bluetooth identities. Tests preserve caller identity, cancellation and failure semantics. See [current storage design](../../MobileHarness/Storage/README.md) for relational allocation and persistence.

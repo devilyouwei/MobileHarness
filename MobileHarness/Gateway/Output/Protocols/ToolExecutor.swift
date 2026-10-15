@@ -34,15 +34,15 @@ public struct ToolExecutor: Sendable {
     }
     public static func response(
         _ completion: ActionCompletion, policy: ActionBinding.DirectResultPolicy,
-        callID: UUID
+        callID: String
     ) throws -> ToolResponse? {
         let value: String
         var isError = false
         switch completion {
         case .completed: value = "completed"
         case .value(let returned): value = returned
-        case .activityStarted(let id): value = "activityStarted:\(id.uuidString)"
-        case .activityStopped(let id): value = "activityStopped:\(id.uuidString)"
+        case .activityStarted(let id): value = "activityStarted:\(id)"
+        case .activityStopped(let id): value = "activityStopped:\(id)"
         case .report(let report):
             isError = report.hasFailures || report.isCancelled
             let object: [String: Any] = [

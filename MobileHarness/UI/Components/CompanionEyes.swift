@@ -1,3 +1,5 @@
+import Foundation
+
 #if os(iOS)
     import SwiftUI
 
@@ -12,8 +14,8 @@
         let reduceMotion: Bool
         var expression: EyeExpression? = nil
         var expressionEmphasized = false
-        var expressionTransitionID: UUID? = nil
-        var expressionCompletion: (@MainActor (UUID, Bool) -> Void)? = nil
+        var expressionTransitionID: String? = nil
+        var expressionCompletion: (@MainActor (String, Bool) -> Void)? = nil
         var expressionAvailability: (@MainActor (Bool) -> Void)? = nil
         var gaze: CGSize = .zero
         var faceWidth: CGFloat = 390

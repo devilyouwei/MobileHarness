@@ -1,5 +1,6 @@
 import AgentCore
 import Foundation
+import Storage
 
 public struct AppEnvironmentFact: Codable, Sendable, Equatable {
     public enum Category: String, Codable, Sendable { case scene, devices, navigation, capabilities }
@@ -16,8 +17,8 @@ public struct AppEnvironmentFact: Codable, Sendable, Equatable {
     public func validate() throws {
         guard sequence > 0, value.utf8.count <= 16_384 else { throw CommunicationError.invalidPayload }
     }
-    public func input(sessionID: UUID) -> AgentInput {
-        let id = UUID()
+    public func input(sessionID: String) throws -> AgentInput {
+        let id = UUID().uuidString
         let payload = InputPayload.observation(
             AgentMessage(contract: Self.contract, content: self, maximumBytes: 65_536, validate: { try $0.validate() }))
         return AgentInput(
@@ -37,8 +38,8 @@ public struct AppInteractionIntent: Codable, Sendable, Equatable {
         self.kind = kind
         self.parameters = parameters
     }
-    public func input(sessionID: UUID) -> AgentInput {
-        let id = UUID()
+    public func input(sessionID: String) throws -> AgentInput {
+        let id = UUID().uuidString
         let payload = InputPayload.observation(
             AgentMessage(contract: Self.contract, content: self, maximumBytes: 2048, validate: { try $0.validate() }))
         return AgentInput(
@@ -61,13 +62,15 @@ public struct ListeningIntent: Codable, Sendable {
     public static let contract = "speech.listening"
     public let enabled: Bool?
     public init(enabled: Bool? = nil) { self.enabled = enabled }
-    public func input(sessionID: UUID) -> AgentInput {
+    public func input(sessionID: String) throws -> AgentInput {
         let payload = InputPayload.observation(
             AgentMessage(
                 contract: Self.contract, content: self, maximumBytes: 128, validate: { _ in }))
+        let id = UUID().uuidString
         return AgentInput(
+            id: id,
             sessionID: sessionID, payload: payload,
-            metadata: InputMetadata(payload: payload, source: "user"))
+            metadata: InputMetadata(payload: payload, source: "user", rootID: id))
     }
 }
 
@@ -75,10 +78,10 @@ public struct ListeningIntent: Codable, Sendable {
 public struct ReplyActivity: Codable, Sendable {
     public static let contract = "interaction.replyActivity"
     public let revision: UInt64
-    public let inputs: [UUID]
-    public let tasks: [UUID]
-    public let acknowledgedRoot: UUID
-    public init(revision: UInt64, inputs: [UUID], tasks: [UUID], acknowledgedRoot: UUID) {
+    public let inputs: [String]
+    public let tasks: [String]
+    public let acknowledgedRoot: String
+    public init(revision: UInt64, inputs: [String], tasks: [String], acknowledgedRoot: String) {
         self.revision = revision
         self.inputs = inputs
         self.tasks = tasks
@@ -99,13 +102,15 @@ public struct SpeechCaptureEnded: Codable, Sendable {
     public static let contract = "speech.captureEnded"
     public let revision: UInt64
     public init(revision: UInt64) { self.revision = revision }
-    public func input(sessionID: UUID) -> AgentInput {
+    public func input(sessionID: String) throws -> AgentInput {
         let payload = InputPayload.observation(
             AgentMessage(
                 contract: Self.contract, content: self, maximumBytes: 128,
                 validate: { guard $0.revision > 0 else { throw CommunicationError.invalidPayload } }))
+        let id = UUID().uuidString
         return AgentInput(
+            id: id,
             sessionID: sessionID, payload: payload,
-            metadata: InputMetadata(payload: payload, source: "phone.microphone"))
+            metadata: InputMetadata(payload: payload, source: "phone.microphone", rootID: id))
     }
 }

@@ -7,6 +7,7 @@ import FunctionContracts
 import Gateway
 import ModelKit
 import PlatformKit
+import Storage
 import Testing
 
 @testable import Agents
@@ -158,7 +159,7 @@ private actor SoundPublications {
     func append(_ value: SoundSourceObservation) { values.append(value) }
 }
 private func soundInput(
-    _ samples: [Float], session: UUID, sequence: UInt64, timestamp: Double,
+    _ samples: [Float], session: String, sequence: UInt64, timestamp: Double,
     layout: AudioChannelLayout = .firstOrderAmbisonicsACNSN3D,
     capturedAt: ContinuousClock.Instant = .now
 ) throws -> AgentInput {
@@ -166,8 +167,10 @@ private func soundInput(
         samples: samples.withUnsafeBytes { Data($0) }, sampleRate: 16000, sequence: sequence, timestamp: timestamp,
         layout: layout, capturedAt: capturedAt)
     return AgentInput(
+        id: UUID().uuidString,
         sessionID: session, payload: .audio(audio),
-        metadata: InputMetadata(payload: .audio(audio), source: "phone.microphone"))
+        metadata: InputMetadata(
+            payload: .audio(audio), source: "phone.microphone", rootID: UUID().uuidString))
 }
 private func waitForSound(_ predicate: () async -> Bool) async throws {
     for _ in 0..<2000 {
@@ -196,7 +199,7 @@ private func waitForSound(_ predicate: () async -> Bool) async throws {
         contracts: AgentContracts.communication,
         externalSources: ["phone.microphone"], configurations: [configuration])
     let manager = AgentManager()
-    let session = UUID()
+    let session = UUID().uuidString
     let values = SoundPublications()
     let speech = try SpeechPerceptionAgent(
         recognition: NoSoundASR(), vad: ForbiddenSoundVAD(), sessionID: session,
@@ -243,7 +246,7 @@ private func waitForSound(_ predicate: () async -> Bool) async throws {
 }
 
 @Test(.actionCatalog) func soundSourceNonSpeechBroadcastDoesNotRequireSubscribersOrOpenASR() async throws {
-    let session = UUID()
+    let session = UUID().uuidString
     let vad = SoundVADSession()
     let values = SoundPublications()
     let agent = try SpeechPerceptionAgent(recognition: NoSoundASR(), vad: SoundVAD(session: vad), sessionID: session)
@@ -279,9 +282,9 @@ private func waitForSound(_ predicate: () async -> Bool) async throws {
 @Test(.actionCatalog, .timeLimit(.minutes(1))) func soundSourceContextWriteFailureReportsWithoutStoppingOrSelfJoin()
     async throws
 {
-    let session = UUID()
+    let session = UUID().uuidString
     let context = AgentContextRepository(
-        agent: .speechPerception, scope: UUID(), state: SpeechPerceptionContextState(),
+        agent: .speechPerception, scope: UUID().uuidString, state: SpeechPerceptionContextState(),
         persistence: .init(
             load: { nil },
             commit: { value, _ in
@@ -308,7 +311,7 @@ private func waitForSound(_ predicate: () async -> Bool) async throws {
 }
 
 @Test(.actionCatalog) func soundSourceMonoIsUnavailableAndRejectedPublicationDoesNotStopRecognition() async throws {
-    let session = UUID()
+    let session = UUID().uuidString
     let values = SoundPublications()
     let agent = try SpeechPerceptionAgent(
         recognition: NoSoundASR(), vad: SoundVAD(session: SoundVADSession()), sessionID: session)
@@ -349,7 +352,7 @@ private func waitForSound(_ predicate: () async -> Bool) async throws {
             speechConfiguration, listener,
         ])
     let manager = AgentManager()
-    let session = UUID()
+    let session = UUID().uuidString
     let speech = try SpeechPerceptionAgent(
         recognition: NoSoundASR(), vad: SoundVAD(session: SoundVADSession()), sessionID: session)
     let recorder = ObservationRecorder(id: "soundListener")
@@ -392,7 +395,7 @@ private actor SoundPublicationGate {
 }
 
 @Test(.actionCatalog) func soundSourceSlowSubscriberDoesNotBlockFollowingDirections() async throws {
-    let session = UUID()
+    let session = UUID().uuidString
     let values = SoundPublications()
     let gate = SoundPublicationGate()
     let vad = SoundVADSession()
@@ -423,7 +426,7 @@ private actor SoundPublicationGate {
 }
 
 @Test(.actionCatalog) func soundSourceOldCaptureNeverPublishesDirection() async throws {
-    let session = UUID()
+    let session = UUID().uuidString
     let values = SoundPublications()
     let agent = try SpeechPerceptionAgent(
         recognition: NoSoundASR(), vad: SoundVAD(session: SoundVADSession()), sessionID: session)
@@ -444,7 +447,7 @@ private actor SoundPublicationGate {
 
 @Test(.actionCatalog) func soundSourceNoGatewayRecipientsIsAnOrdinaryDeliveryOutcome() async throws {
     let manager = AgentManager()
-    let session = UUID()
+    let session = UUID().uuidString
     let speech = try SpeechPerceptionAgent(
         recognition: NoSoundASR(), vad: SoundVAD(session: SoundVADSession()), sessionID: session)
     let policy = try CommunicationPolicy(
@@ -478,7 +481,9 @@ private struct SoundRecognition: SpeechRecognitionCapability {
         return SpeechRecognitionSession(
             output: pair.session, format: request.format, sendAudio: { _ in },
             finishInput: {
-                try pair.emitter.yield(TranscriptionEvent(segmentID: UUID(), revision: 1, text: "hello", isFinal: true))
+                try pair.emitter.yield(
+                    TranscriptionEvent(
+                        segmentID: UUID().uuidString, revision: 1, text: "hello", isFinal: true))
                 pair.emitter.finish()
             })
     }
@@ -502,7 +507,7 @@ private struct SoundEndpoint: VoiceActivityCapability {
 }
 
 @Test(.actionCatalog) func soundSourceReplyGateClearsDirectionAndResumeStartsANewWindow() async throws {
-    let session = UUID()
+    let session = UUID().uuidString
     let values = SoundPublications()
     let finals = SoundPublications()
     let speech = try SpeechPerceptionAgent(recognition: SoundRecognition(), vad: SoundEndpoint(), sessionID: session)
@@ -550,7 +555,7 @@ private struct SoundEndpoint: VoiceActivityCapability {
 }
 
 @Test(.actionCatalog) func soundSourceStopCancelsAndJoinsAnInFlightPublisher() async throws {
-    let session = UUID()
+    let session = UUID().uuidString
     let values = SoundPublications()
     let gate = SoundPublicationGate()
     let speech = try SpeechPerceptionAgent(

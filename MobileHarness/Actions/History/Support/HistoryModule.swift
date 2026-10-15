@@ -1,18 +1,15 @@
 import Foundation
 import FunctionContracts
+import Storage
 
 public struct HistoryConversationReference: Sendable, Equatable {
     public let value: String
-    public init(id: UUID) { value = id.uuidString }
+    public init(id: String) { value = id }
     public init(_ raw: String) throws {
-        if let id = UUID(uuidString: raw) {
-            value = id.uuidString
-        } else {
-            guard raw.utf8.count == 8,
-                raw.utf8.allSatisfy({ (48...57).contains($0) || (65...70).contains($0) || (97...102).contains($0) })
-            else { throw ActionArguments.ValidationError.invalidValue("id") }
-            value = raw.uppercased()
+        guard let id = BusinessRecordID(rawValue: raw), id.kind == .dialog else {
+            throw ActionArguments.ValidationError.invalidValue("id")
         }
+        value = id.rawValue
     }
 }
 
@@ -22,9 +19,9 @@ public protocol HistoryQueryCapability: Sendable {
 }
 
 public protocol HistoryMutationCapability: Sendable {
-    func deleteArchived(_ id: UUID) async throws
-    func startNew() async throws -> UUID?
-    func summarizeArchived(_ id: UUID) async throws
+    func deleteArchived(_ id: String) async throws
+    func startNew() async throws -> String?
+    func summarizeArchived(_ id: String) async throws
 }
 
 @ActionCatalog

@@ -1,5 +1,6 @@
 import AgentCore
 import Foundation
+import Storage
 
 /// Memory-owned history sequencing; no I/O, model execution or runtime scheduling.
 struct MemoryHistoryWorkflow {
@@ -8,7 +9,7 @@ struct MemoryHistoryWorkflow {
         let input: AgentInput
     }
     private enum Step { case deletion, archive, title }
-    private var pending: (input: AgentInput, callID: UUID, step: Step)?
+    private var pending: (input: AgentInput, callID: String, step: Step)?
     private static let archive = InternalTool(path: "History.Conversation.startNew")
     private static let title = InternalTool(path: "History.Conversation.summarize", required: ["id"])
     private static let deletion = InternalTool(path: "History.Conversation.delete", required: ["id"])
@@ -17,7 +18,7 @@ struct MemoryHistoryWorkflow {
         try capabilities.adding(internalTools: [presentation, deletion, archive, title])
     }
 
-    var pendingRequestIDs: [UUID] { pending.map { [$0.callID] } ?? [] }
+    var pendingRequestIDs: [String] { pending.map { [$0.callID] } ?? [] }
 
     mutating func reset() { pending = nil }
 
@@ -53,7 +54,7 @@ struct MemoryHistoryWorkflow {
                 let record = try? JSONSerialization.jsonObject(with: Data(result.value.utf8)) as? [String: Any],
                 record.count == 1, let archived = record["archived"]
             else { throw CommunicationError.invalidPayload }
-            guard archived is NSNull || (archived as? String).flatMap(UUID.init(uuidString:)) != nil else {
+            guard archived is NSNull || (archived as? String).flatMap(BusinessRecordID.init(rawValue:)) != nil else {
                 throw CommunicationError.invalidPayload
             }
             outputs.append(StepOutput(output: .toolCall(try Self.presentation.call([:])), input: active.input))
@@ -101,7 +102,7 @@ struct MemoryHistoryWorkflow {
                 throw CommunicationError.invalidPayload
             }
             guard pending == nil else { throw CommunicationError.capacityExceeded }
-            let call = try Self.title.call(["id": id.uuidString])
+            let call = try Self.title.call(["id": id])
             pending = (input, call.id, .title)
             outputs.append(StepOutput(output: .toolCall(call), input: input))
         case .delete(let id):
@@ -109,7 +110,7 @@ struct MemoryHistoryWorkflow {
                 throw CommunicationError.invalidPayload
             }
             guard pending == nil else { throw CommunicationError.capacityExceeded }
-            let call = try Self.deletion.call(["id": id.uuidString])
+            let call = try Self.deletion.call(["id": id])
             pending = (input, call.id, .deletion)
             outputs.append(StepOutput(output: .toolCall(call), input: input))
         }

@@ -2,7 +2,7 @@ import Foundation
 
 /// Consumes a complete model-native tool call; XML actions do not enter this protocol.
 public enum ToolCallParser {
-    public static func parse(id: UUID, alias: String, argumentsJSON: Data, capabilities: CapabilityRegistry) throws
+    public static func parse(id: String, alias: String, argumentsJSON: Data, capabilities: CapabilityRegistry) throws
         -> ToolCall
     {
         guard argumentsJSON.count <= 4096 else { throw GenerationError.limitExceeded }

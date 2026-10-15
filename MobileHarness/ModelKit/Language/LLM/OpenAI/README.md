@@ -6,7 +6,7 @@ Responses-only streaming ChatCapability with caller-owned history, bounded SSE/n
 
 ## Ownership and boundaries
 
-Foundation-only adapter depends on ModelKit. Host supplies HTTPS endpoint/credentials/model/timeout; credentials stay private/redacted. Registration performs no network generation. Configured availability does not prove authentication/reachability.
+independent runtime framework adapter depends on ModelKit. Host supplies HTTPS endpoint/credentials/model/timeout; credentials stay private/redacted. Registration performs no network generation. Configured availability does not prove authentication/reachability.
 
 ## External relationships and data flow
 

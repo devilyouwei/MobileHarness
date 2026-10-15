@@ -9,7 +9,7 @@ public protocol ProviderCredentialStorage: Sendable {
     func removeKey(id: String) throws
 }
 
-private struct UserSettingsDocument: Codable, Sendable {
+public struct UserSettingsDocument: Codable, Sendable {
     let version: Int
     let cloud: CloudRecord?
 
@@ -23,29 +23,21 @@ private struct UserSettingsDocument: Codable, Sendable {
 
 /// Business schema and credential migration; Storage owns document consistency.
 public actor ProviderSettingsStore: ProviderSettingsPersistence {
-    private var document: LocalDocumentStore<UserSettingsDocument>?
+    private var document: (any DocumentRepository<UserSettingsDocument>)?
     private var snapshot: DocumentSnapshot<UserSettingsDocument>?
     private var loaded = false
     private var busy = false
     private let credentials: any ProviderCredentialStorage
-    private let makeDocument: @Sendable () throws -> LocalDocumentStore<UserSettingsDocument>
-    public init(credentials: any ProviderCredentialStorage, documentURL: URL? = nil) {
+    private let makeDocument: @Sendable () throws -> any DocumentRepository<UserSettingsDocument>
+    public init(
+        credentials: any ProviderCredentialStorage,
+        document: @escaping @Sendable () throws -> any DocumentRepository<UserSettingsDocument>
+    ) {
         self.credentials = credentials
-        makeDocument = {
-            if let documentURL { return try LocalDocumentStore<UserSettingsDocument>(url: documentURL) }
-            let root = try FileManager.default.url(
-                for: .applicationSupportDirectory, in: .userDomainMask,
-                appropriateFor: nil, create: true)
-            var directory = root.appendingPathComponent("MobileHarness/Settings", isDirectory: true)
-            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-            var attributes = URLResourceValues()
-            attributes.isExcludedFromBackup = true
-            try directory.setResourceValues(attributes)
-            return try LocalDocumentStore<UserSettingsDocument>(url: directory.appendingPathComponent("settings.json"))
-        }
+        makeDocument = document
     }
 
-    private func documents() throws -> LocalDocumentStore<UserSettingsDocument> {
+    private func documents() throws -> any DocumentRepository<UserSettingsDocument> {
         if let document { return document }
         let document = try makeDocument()
         self.document = document

@@ -29,14 +29,14 @@ flowchart TB
 
 ## 接口与值约束
 
-CameraControlCapability 接受 FunctionInput，提供启闭、重试、镜头选择、拍摄、保存、忽略，以及按 photoID/source/sessionID/inputID 读取 JPEG 的接口。照片处置接收可选 UUID，由端点选择和校验实际目标。
+CameraControlCapability 接受 FunctionInput，提供启闭、重试、镜头选择、拍摄、保存、忽略，以及按 mediaID/source/sessionID/inputID 读取 JPEG 的接口。照片处置接收可选 ID，由端点选择和校验实际目标。
 
 | 值类型 | 内容与校验 |
 | --- | --- |
 | Facing | front/back |
 | CameraCommandReceipt | operation 及可选 enabled/facing；描述命令结果，不描述模型就绪 |
-| CameraPhotoReceipt | photoID、尺寸、MIME；显式构造要求尺寸为 1…4096 且 MIME 为 image/jpeg |
-| CameraPhotoCommandReceipt | saved/ignored、photoID、alreadySaved（默认 false）、可选 feedbackIssues |
+| CameraPhotoReceipt | mediaID、尺寸、MIME；显式构造要求尺寸为 1…4096 且 MIME 为 image/jpeg |
+| CameraPhotoCommandReceipt | saved/ignored、mediaID、alreadySaved（默认 false）、可选 feedbackIssues |
 
 CameraPhotoCommandReceipt 自身不限制 feedbackIssues 的数量或字符串长度；宿主负责产生实际问题列表，通用执行结果仍受执行层大小限制。Codable 数据与显式构造校验是不同入口，调用方不能把任意解码数据视为已验证的原生回执。
 
@@ -49,3 +49,11 @@ CameraControlError 区分 notForeground、busy、disabled、permissionDenied、u
 目录没有自动替代相机、失败重试循环或请求队列；异步完成及清理由能力实现者负责。
 
 [Camera 设计与参数](../README.md) · [共享契约](../../Support/Contracts/README.md)
+
+
+
+
+
+## SQLite records and runtime identity
+
+✅ Implemented: technical identities are opaque UUID strings; committed business entities use dialog/message/task/media/device SQLite IDs. Consumers use Storage repositories while preserving ownership, cancellation and independent foundation boundaries. Complete messages, including each ReACT message, persist at termination; delta fragments do not persist. The custom allocator and replaced file/index implementation are removed. See the project SQLite business-record plan.

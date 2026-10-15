@@ -8,7 +8,7 @@ import Synchronization
 
         private let resource: ModelResource<LocalMossEngine>
         private let root: URL
-        private var worker: (id: UUID, task: Task<Void, Never>)?
+        private var worker: (id: String, task: Task<Void, Never>)?
 
         public init(context: ModelContext, artifacts: URL) throws {
             root = artifacts
@@ -39,7 +39,7 @@ import Synchronization
             if let previous = worker, previous.task.isCancelled { await previous.task.value }
             try Task.checkCancellation()
             guard worker == nil else { throw CapabilityError.inputBusy }
-            let id = UUID()
+            let id = UUID().uuidString
             let cancellation = InferenceTaskControl()
             let pair = InferenceSession<SynthesisEvent>.make(
                 context: request.context,
@@ -86,7 +86,7 @@ import Synchronization
             return pair.session
         }
 
-        private func completed(_ id: UUID) { if worker?.id == id { worker = nil } }
+        private func completed(_ id: String) { if worker?.id == id { worker = nil } }
 
     }
 #else

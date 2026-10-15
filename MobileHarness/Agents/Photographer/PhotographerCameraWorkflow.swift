@@ -1,10 +1,11 @@
 import AgentCore
 import Foundation
+import Storage
 
 /// One camera operation, correlated completion and no native I/O.
 struct PhotographerCameraWorkflow {
     private struct Pending {
-        let requestID: UUID
+        let requestID: String
         let input: AgentInput
     }
     private var pending: Pending?
@@ -12,17 +13,17 @@ struct PhotographerCameraWorkflow {
     private static let permissions = ["open", "close", "flip", "retry", "savePhoto", "ignorePhoto"].map {
         InternalTool(
             path: "Camera.Capture." + $0, required: $0 == "flip" ? ["facing"] : [],
-            optional: $0 == "savePhoto" || $0 == "ignorePhoto" ? ["photoID"] : [])
+            optional: $0 == "savePhoto" || $0 == "ignorePhoto" ? ["mediaID"] : [])
     }
     static func runtimeCapabilities(_ capabilities: CapabilityRegistry) throws -> CapabilityRegistry {
         try capabilities.adding(internalTools: permissions)
     }
-    var requestID: UUID? { pending?.requestID }
+    var requestID: String? { pending?.requestID }
     mutating func reset() { pending = nil }
-    mutating func retire(_ id: UUID) {
+    mutating func retire(_ id: String) {
         if pending?.requestID == id { pending = nil }
     }
-    mutating func receive(_ input: AgentInput, rootSessionID: UUID) throws -> (AgentOutput, AgentInput) {
+    mutating func receive(_ input: AgentInput, rootSessionID: String) throws -> (AgentOutput, AgentInput) {
         switch input.payload {
         case .toolResult(let result):
             guard input.metadata.origin == .runtime, input.metadata.source == "runtime",
@@ -62,7 +63,7 @@ struct PhotographerCameraWorkflow {
                 throw CommunicationError.invalidPayload
             }
             var arguments = intent.facing.map { ["facing": $0.rawValue] } ?? [:]
-            if let id = intent.photoID { arguments["photoID"] = id.uuidString }
+            if let id = intent.mediaID { arguments["mediaID"] = id }
             let permitted = try permission.call(arguments)
             let call = ToolCall(id: intent.requestID, toolPath: permitted.toolPath, arguments: permitted.arguments)
             pending = Pending(requestID: intent.requestID, input: input)

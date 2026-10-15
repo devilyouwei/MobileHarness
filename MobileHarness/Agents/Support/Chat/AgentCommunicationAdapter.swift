@@ -1,5 +1,6 @@
 import AgentCore
 import Foundation
+import Storage
 
 /// Model-only declarations. These paths are intercepted before function execution or validation.
 public enum AgentCommunicationAdapter {
@@ -77,10 +78,11 @@ public enum AgentCommunicationAdapter {
         if kind == .request {
             guard arguments["taskID"] == nil, let target else { throw CommunicationError.invalidPayload }
             scope = AgentTaskScope(
+                id: UUID().uuidString,
                 parentID: input.taskScope?.id ?? input.id, requester: sender,
                 executor: target, sessionID: input.sessionID)
         } else {
-            guard let existing, arguments["taskID"].flatMap(UUID.init(uuidString:)) == existing.id,
+            guard let existing, arguments["taskID"].flatMap(BusinessRecordID.parse) == existing.id,
                 existing.sessionID == input.sessionID,
                 target == (kind == .input || kind == .cancel ? existing.executor : existing.requester)
             else { throw CommunicationError.scopeClosed }
@@ -100,8 +102,8 @@ public enum AgentCommunicationAdapter {
         let content = try AgentTaskContent(
             text: text,
             stage: kind == .progress ? .waitingUser : (kind == .result ? .completed : .running),
-            interactionID: kind == .progress ? UUID() : nil,
-            artifactID: arguments["artifactID"].flatMap(UUID.init(uuidString:)))
+            interactionID: kind == .progress ? UUID().uuidString : nil,
+            artifactID: arguments["artifactID"].flatMap(BusinessRecordID.parse))
         let signal = try content.signal(kind, scope: scope, status: kind == .result ? .succeeded : nil)
         return (try CommunicationAction(message: signal.message(), target: target), signal)
     }

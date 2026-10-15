@@ -3,6 +3,7 @@ import Agents
 import AppPresentationWorkflow
 import Foundation
 import Gateway
+import Storage
 
 /// One root-owned output consumer; camera and tracking workers cannot block each other's admission.
 public actor PhotographerIntentRuntime {
@@ -11,7 +12,7 @@ public actor PhotographerIntentRuntime {
     private let input: InputGateway
     private let output: OutputGateway
     private var consumer: GatewayOutputConsumer?
-    private let sessionID: UUID
+    private let sessionID: String
     private let report: @Sendable (String) async -> Void
 
     public func prepareForInteraction() async throws { try await prepare() }
@@ -21,14 +22,14 @@ public actor PhotographerIntentRuntime {
     private var cleanup: Task<Void, Never>?
     private var closing: Task<Void, Never>?
     private var starting: Task<Void, Error>?
-    private var trackingSession: UUID?
+    private var trackingSession: String?
     private var trackingWorker: Task<Void, Never>?
     private var trackingQueue: [OutputEnvelope] = []
     private struct Request {
-        let id: UUID
+        let id: String
         let waiter: CheckedContinuation<String?, any Error>
-        var inputID: UUID?
-        var sessionID: UUID?
+        var inputID: String?
+        var sessionID: String?
         var delivery: Task<Void, Never>?
         var cancelAcknowledged = false
         var worker: Task<Void, Never>?
@@ -38,7 +39,7 @@ public actor PhotographerIntentRuntime {
     }
     private var request: Request?
     public init(
-        sessionID: UUID, manager: AgentManager, input: InputGateway, output: OutputGateway,
+        sessionID: String, manager: AgentManager, input: InputGateway, output: OutputGateway,
         agent: PhotographerAgent, report: @escaping @Sendable (String) async -> Void = { _ in }
     ) {
         self.sessionID = sessionID
@@ -48,7 +49,7 @@ public actor PhotographerIntentRuntime {
         self.agent = agent
         self.report = report
     }
-    public func rejectInput(_ id: UUID, reason: String) async {
+    public func rejectInput(_ id: String, reason: String) async {
         await cancel(id, failure: PhotographerIntentFailure.rejected(reason))
     }
     private func boundConsumer() throws -> GatewayOutputConsumer {
@@ -100,7 +101,7 @@ public actor PhotographerIntentRuntime {
 
     @discardableResult public func perform(
         _ operation: PhotographerCameraIntent.Operation,
-        facing: PhotographerCameraIntent.Facing? = nil, photoID: UUID? = nil
+        facing: PhotographerCameraIntent.Facing? = nil, mediaID: String? = nil
     ) async throws -> String? {
         guard operation != .cancel else { throw CommunicationError.unauthorized }
         try Task.checkCancellation()
@@ -108,7 +109,8 @@ public actor PhotographerIntentRuntime {
         try Task.checkCancellation()
         guard !closed else { throw CommunicationError.scopeClosed }
         guard request == nil else { throw CommunicationError.capacityExceeded }
-        let intent = PhotographerCameraIntent(operation, facing: facing, photoID: photoID)
+        let intent = PhotographerCameraIntent(
+            operation, facing: facing, mediaID: mediaID, requestID: UUID().uuidString)
         _ = try intent.message.validatedSize()
         let watchdog = Task {
             do { try await Task.sleep(for: .seconds(120)) } catch { return }
@@ -212,7 +214,7 @@ public actor PhotographerIntentRuntime {
             } catch is CancellationError { return } catch { await report(String(describing: error)) }
         }
     }
-    private func completed(_ id: UUID, outcome: OutputExecutionResult) async {
+    private func completed(_ id: String, outcome: OutputExecutionResult) async {
         guard request?.id == id, request?.cancelling == false else { return }
         request?.outcome = outcome
         if outcome.failure != nil {
@@ -239,7 +241,7 @@ public actor PhotographerIntentRuntime {
             active.waiter.resume(returning: result.tool?.value)
         }
     }
-    private func cancel(_ id: UUID, failure: any Error) async {
+    private func cancel(_ id: String, failure: any Error) async {
         guard request?.id == id, request?.cancelling == false else { return }
         request?.cancelling = true
         let worker = request?.worker
@@ -269,13 +271,13 @@ public actor PhotographerIntentRuntime {
             active.waiter.resume(throwing: failure)
         }
     }
-    public func attachTracking(sessionID: UUID) async throws {
+    public func attachTracking(sessionID: String) async throws {
         try await prepare()
         guard trackingSession == nil else { throw CommunicationError.capacityExceeded }
         try await agent.bindTracking(sessionID: sessionID)
         trackingSession = sessionID
     }
-    public func detachTracking(sessionID: UUID) async {
+    public func detachTracking(sessionID: String) async {
         guard trackingSession == sessionID else { return }
         trackingSession = nil
         do { try await agent.unbindTracking(sessionID: sessionID) } catch { await report("保存追踪结束状态失败：\(error)") }

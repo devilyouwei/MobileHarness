@@ -1,84 +1,81 @@
-# Storage — Bounded Data and Persistence
-
-## Summary
-
-Independent atomic documents, confined files, scoped memory handles and raw domain schemas.
+# Storage — Contracts, Domain Repositories and Backends
 
 ## Ownership and boundaries
 
-Foundation module with no upper-layer dependencies. Agents choose context/retrieval; App owns schemas and adapters; Actions consumes injected capabilities. UI receives independently owned presentation values. Storage never routes Signals or chooses models.
+✅ Storage owns record persistence and bounded process memory, without Agent decisions, model selection, device execution or UI orchestration. ModelKit, PlatformKit and UI remain independent. App chooses backends, paths and lifecycle, then injects domain protocols; consumers do not discover stores globally.
 
-## External relationships and data flow
-
-Runtime arrows show data or capability calls; dashed arrows show injection.
+Directory ownership differs from compilation ownership: each business directory contains its contracts/policy and its SQLite adapter, but backend files compile only in StorageSQLite. The common Storage target compiles Support excluding SQLite and has no project or third-party target dependency. StorageSQLite alone links GRDB.swift7.11.1; its SQL/GRDB values are internal. There is no Storage.swift umbrella or Storage.shared locator.
 
 ```mermaid
 flowchart LR
- App -->|generic documents, files, photos and PCM reads| Storage
- Agents -->|context persistence, raw history and PCM writes| Storage
- Actions -->|injected raw-history reads| Storage
- Storage -->|atomic files| Sandbox[Application sandbox]
- Storage -->|bounded owned values and explicit errors| App
- Storage -->|records and scoped handles| Agents
+ App -->|Construct| SQL[SQLiteRepositories]
+ SQL --> ChatSQL[SQLiteChatRepository]
+ SQL --> TaskSQL[SQLiteTaskRepository]
+ SQL --> MediaSQL[SQLiteMediaRepository]
+ SQL --> DeviceSQL[SQLiteDeviceRepository]
+ Consumer[Agents / Actions / feature workflows] -->|Injected protocol| Contracts[Chat / Task / Media / Device repositories]
+ ChatSQL -.-> Contracts
+ TaskSQL -.-> Contracts
+ MediaSQL -.-> Contracts
+ DeviceSQL -.-> Contracts
+ Media[CapturedPhotoStore] --> Contracts
+ Media --> Binary[BinaryObjectStore]
+ File[LocalFileStore] -.-> Binary
+ Memory[MemoryBinaryObjectStore] -.-> Binary
 ```
 
-## Internal structure
+## Direct relationships and internal components
 
-```mermaid
-flowchart TB
- Chat[Chat domain] --> Documents[LocalDocumentStore]
- Audio[Audio domain] --> Leases[MemoryLeaseStore]
- Audio --> Streams[BoundedMemoryStream]
- Photos[CapturedPhotoStore] --> Files[Protected confined files]
- Documents --> Disk[Atomic JSON]
- LocalFiles[LocalFileStore] --> Files
-```
+| Directory / target | Owns | Direct relationships |
+| --- | --- | --- |
+| Support / Storage | Document/binary contracts, ownership/errors/identity/fingerprints; File/Memory mechanisms | Foundation, Synchronization, CryptoKit; used by all domains and injected App document consumers |
+| Chat / StorageChat | Dialog/message values, ChatRepository, ConversationRecordStore, memory history/checkpoints/windows | Storage and StorageTasks; Agents/Actions/App consume it |
+| Tasks / StorageTasks | TaskRepository and explicit ephemeral MemoryTaskRepository | Storage; Agents/Chat consume it |
+| Audio / StorageAudio | Single-use PCM handles and producer/player ownership | Storage; synthesis/playback owners consume it |
+| Media / StorageMedia | MediaRepository and JPEG delivery/recovery/FIFO policy | Storage; App camera/history readers consume it |
+| Devices / StorageDevices | DeviceRepository mapping/selection/reconnect contract | Storage; App Bluetooth workflow consumes it |
+| SQLite files / StorageSQLite | Domain schemas/queries, shared connection pool, explicit construction owner | Storage plus Chat/Tasks/Media/Devices contracts and GRDB; only App construction and backend tests use it |
 
-## Core contracts
+Individual products expose common/domain libraries without requiring the aggregate application product. New backends implement the same domain/capability interfaces; there are no empty MongoDB/document-database adapters or additional ORM dependency.
 
-| Mechanism | Current contract |
-| --- | --- |
-| `LocalDocumentStore` | One cached snapshot; default 64 KiB encoded envelope; versioned atomic write and revision-checked save |
-| `LocalFileStore` | Confined root, traversal/symlink rejection, bounded read, reservation and non-overwriting directory publication |
-| `MemoryLeaseStore` | Capacity chosen by caller; one checkout; exact namespace/source/session/input owner; optional queue/ready TTL |
-| `BoundedMemoryStream` | Item/byte bounds, one suspended reader, explicit overflow, finish/drain and failure |
-| `CapturedPhotoStore` | Caller Limits default to 32 JPEG files/128 MiB/16 KiB index; 4 MiB per photo, persisted owner index |
+## Contracts and consistency
 
-`save(expecting:)` rereads durable revision under a process-wide lock, atomically writes and publishes cache only after success. `replace` is explicit authoritative last-writer-wins. Corruption/version/capacity/conflict errors preserve previous valid state; there is no empty-data fallback. Cross-process transactions are unsupported.
+DocumentRepository<Value> supplies load/refresh/invalidate, UUID-revision compare-and-replace and explicit replacement. LocalDocumentStore and MemoryDocumentStore share that contract; durability is persistent or memory, respectively. BinaryObjectStore supplies bounded reads/info, non-overwriting publication, deletion and bounded object listing; LocalFileStore and MemoryBinaryObjectStore implement it. Success in memory never promises survival after restart. Native model-artifact directory materialization remains a File capability chosen in App's adapter, rather than a fabricated memory filesystem URL.
 
-Memory stream append rejects excess rather than suspending; finish drains admitted items, while failure clears them and wakes its reader. Lease removal joins caller cancellation and failure hooks. Terminal errors have separate bounded retention (128 records with caller TTL). Nil TTL delegates lifetime to the owning scope.
+Domain protocols are async and return owned values, never SQL predicates, table handles or GRDB rows. ChatRepository checkpoint commits messages and Task compression/source facts atomically. Its paired TaskRepository must have the same opaque runtime storageScope; mismatched namespaces reject construction even if their task_N strings coincide. App uses one SQLiteRepositories family. There is no file/database combined transaction or transaction across model/device awaits.
 
-File store default reservation budget is 32 GiB; it checks free space and trusted-root confinement. Atomic publication does not overwrite an installed destination. File/directory protection and backup exclusion are technical storage policy, independent of model selection.
+StorageOperationGate provides FIFO admission across async backend calls: one active operation and at most16 waiters; overflow busy. Ordinary cancelled queued callers release admission without executing their body; captured checkpoints run a joined store-owned operation so cancellation terminal data still persists. Chat checkpoint/rotation cache updates and Media publication/recovery reuse it. Caller lifecycle remains responsible for joining accepted work; no page owns database lifetime.
 
-Photo reads require exact owner or authorized source/input for archived references. Missing historical files return nil; wrong owner/corrupt size fails. Caller evictOldest policy automatically retires oldest private cache files after a new index commit; default reject policy preserves its old semantics. Native capture/library writes are outside Storage.
+## SQLite records and performance
 
-✅ Atomic documents, confined files, bounded process memory, raw chat/PCM schemas and owned JPEG storage.
+✅ One App-owned records.sqlite uses WAL, foreign keys, synchronous FULL, four readers and one writer plus16 waiters. Generic SQLiteDatabase executes caller-supplied migrations/transactions; business schemas and queries stay in owning domain files. The records-v1 tables are retained; record-lifecycle-v2 adds an unfinished-message index. Named migrations come from domain assembly; no legacy JSON import exists.
 
-❌ Cross-process/device synchronization, semantic retrieval/forgetting, persistent video/audio libraries and general reclaimable disk caches.
+Business tables allocate independently committed AUTOINCREMENT keys and format dialog_/message_/task_/media_/device_ references. Deleted committed keys do not repeat and gaps are allowed. BusinessRecordID validates/formats references only. Technical scopes/calls/requests/audio/revisions/temp files use UUID or original protocol strings; there is no application-wide ID generator/counter file. Standalone memory conversation/Task consumers allocate ephemeral business records locally and open no SQLite connection.
 
-## Related design
+Message identities commit before references escape. Complete user/Assistant/ReACT observation content commits separately; delta stays in memory. A completed user message stays completed even if its Assistant response is cancelled. Dirty-input hashes and window-bounded fingerprints skip unchanged messages. List/pair/title reads use stored240-character previews and omit large body/evidence/recovery data. Details restore exact text; UTF-8 chunks deduplicate shared request/catalog content. Position plus primary-key tie-breaking preserves history order; UI/Task pages have20 items and context retains ten projected blocks. Full Task source indexes survive memory offloading. Startup recovery repairs unfinished facts without replaying actions.
 
-[Parent design](../README.md) · [Audio](Audio/README.md) · [Chat](Chat/README.md)
+## Media lifecycle
 
-✅ Raw conversation system-message byte bounds match the existing 64 KiB Agent prompt bound. Storage continues to store evidence without interpreting Skills; encoded history capacity and other bounds remain enforced.
+App injects MediaRepository and BinaryObjectStore independently. CapturedPhotoStore currently produces JPEG: at most4MiB each, application1024 files/2GiB and FIFO eviction; default32 files/128MiB. Pending metadata reserves a committed key/path, binary bytes publish outside SQL, then ready commits before media_N is returned. Formal names are UTC yyyyMMdd_HHmmss_primaryKey.jpg; File backend temp names use UUID. Failure preserves prior destinations and records truthful failed/unavailable states. Startup checks pending regular-file size; bounded128-object cleanup resumes by cursor and ignores unrelated old/user filenames. Historical references remain after FIFO removal; deleting a dialog does not delete other media files.
 
-## Lifecycle-owned conversation and audio (2026-10-12)
+## Completion and outstanding work
 
-✅ 已移除对话生成、ReACT、收件箱排队、结果屏障、ASR 收尾、TTS 合成及回复占用租约的计时终止。Signal 默认无过期时间，框架不再按通信契约附加 TTL。保留显式实时感知数据的新鲜度和网络传输自身超时；它们不作为对话/语音缓存生命周期。Action 自身超时通过原始执行者的 ActionResult 返回。请求/调用数及队列/PCM 容量仍有界，不以计时自动删除已接纳输入。语音句柄无读等待或错误记录 TTL，按播放完成、输入/会话正常结束、异常或显式取消清理；取消加入生成和播放工作。
+✅ Old aggregate RecordDatabase and database-bound conversation facade are removed. Generic settings/model documents, credentials, original media and model assets remain unchanged. Agent runtime documents are replaced by process-memory state. Repository, publication, concurrency and corruption failures propagate without backend fallback.
 
+❌ Additional chat/document-database backends, semantic memory extraction/query, durable PCM and video/audio/document producers remain separate work. Current controlled tests/builds do not establish physical camera/Bluetooth/UI or live-model acceptance. See [validation history](../../docs/validation/Validation-History.md).
 
-✅ CapturedPhotoStore accepts caller-owned Limits (defaults remain 32 photos/128 MiB/16 KiB index; 4 MiB photo cap). App opts into FIFO cache limits. Validate bounds at first I/O, preserve old index/owner records, validate encoded index before file effects and retain transactional rollback. SDK reject policy remains explicit; App FIFO policy retires oldest cache entries instead of failing normal capture at capacity.
+[Chat](Chat/README.md) · [Tasks](Tasks/README.md) · [Media](Media/README.md) · [Devices](Devices/README.md) · [Audio](Audio/README.md) · [Support](Support/README.md)
+
+[Repository refactor decision](../../docs/completed/Storage-Repository-Plan.md)
 
 
-✅ Caller OverflowPolicy adds evictOldest for retained photo caches. Trim earliest index entries until count/bytes/encoded-index fit; atomically commit new JPEG/index before deleting retired JPEGs. Index failure removes only new uncommitted file; cleanup failure is explicit and retryable through unindexed-file reconciliation. Historical retired references return nil. SDK default remains reject; App chooses FIFO. Never evict the incoming photo or delete album data.
+✅ Configuration preservation: the shared File document envelope retains its original version1 (UUID revision/value unchanged). Application configuration is not reset by SQLite adoption. Media bytes keep the existing CapturedPhotos root; SQLite indexes only new business media, without deleting/importing old user files.
 
 
-
-## Task history indexing and in-place compression
-
-✅ Implemented: StorageChat history v3 deliberately breaks old history encoding; it retains original execution evidence plus separate conversation-owned compression records. No old-format decoder/import or business summary generation exists in Storage.
+✅ Lifecycle and ORM: StateRepository<Value: Sendable> and single-snapshot MemoryStateStore own hot runtime state without Codable or per-update encoding. ChatRepository.beginMessage reserves an idempotent empty Assistant/observation identity row; message completion/checkpoint saves content by that identity. Accepted user messages insert completed content directly. SQL row mappings use GRDB FetchableRecord/MutablePersistableRecord; specialized indexed reads remain SQL. No GRDB object or shared mutable reference crosses modules. Task start rows/terminal updates and atomic dialog rotation remain.
 
 
-## 会话存储性能重构 v3
+✅ Implemented (2026-10-15): User acceptance inserts the complete completed message in one transaction, with no empty user placeholder. Checkpoints return backend-neutral committed message identities; Chat memory publishes the returned ID before inference. Assistant identity reservation remains unchanged.
 
-✅ 已实现：LocalDocumentStore 改为按文件隔离 compare-and-replace 锁。StorageChat 使用 current/独立归档/元数据索引和单个归档事务标记；current 缺失可以原子建立，损坏或读写失败明确传播。
+
+✅ Implemented (2026-10-15 current-dialog hardening): Current-dialog synchronization: one current per Agent remains constrained by the existing partial unique index. Failed post-rotation memory publication fences subsequent operations until authoritative current reload succeeds. New message rows and identity reservations require a current dialog in the same write transaction; existing archived-message evidence may still update.

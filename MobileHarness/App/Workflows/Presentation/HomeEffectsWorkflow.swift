@@ -1,5 +1,6 @@
 import Foundation
 import FunctionContracts
+import Storage
 import UI
 
 /// Root-owned latest-state decorations. Expiry is independent of page lifetime.
@@ -9,14 +10,14 @@ public final class HomeEffectsWorkflow {
     private let activity: ActionActivityState
     private weak var conversation: ConversationState?
     private var replyExpiry: Task<Void, Never>?
-    private var replyFadeID: UUID?
+    private var replyFadeID: String?
     private var noticeExpiry: Task<Void, Never>?
     private var lightExpiry: Task<Void, Never>?
     private var noticeOwner: Owner?
     private var lightOwner: Owner?
     private struct Owner: Equatable {
         let source: String
-        let session: UUID
+        let session: String
         init(_ input: any FunctionInput) {
             source = input.context.source
             session = input.context.sessionID
@@ -38,7 +39,7 @@ public final class HomeEffectsWorkflow {
     public func replyDidFinish() {
         guard replyExpiry == nil, let conversation, conversation.isVoiceActive, !conversation.assistantReply.isEmpty
         else { return }
-        let id = UUID()
+        let id = UUID().uuidString
         let text = conversation.assistantReply
         replyFadeID = id
         conversation.assistantReplyOpacity = 0

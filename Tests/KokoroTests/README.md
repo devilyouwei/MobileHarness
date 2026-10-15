@@ -15,3 +15,10 @@ Update this README when test scope or lifecycle contracts change.
 ✅ Current tests cover auto Mandarin/English routing, ordered mixed scripts, unsupported scripts, bounded segmentation and English dictionary behavior. Opt-in real Core ML tests synthesize English, Mandarin, mixed text and Chinese numeric/date input, then verify PCM, concurrent rejection and cancellation/unload. ❌ These are not iPhone endurance or listening-quality acceptance.
 
 Validation: KokoroTests target builds after the external-root change; real synthesis was not run and no Kokoro weights are retained locally.
+
+
+✅ Fixtures use UUID/opaque runtime strings and committed database business references; concurrency, restart, invalid-ID and failure behavior remain covered.
+
+## Identity ownership
+
+✅ Runtime and foundation identities use opaque protocol strings or Foundation UUID; no project ID-generator dependency exists. SQLite-backed Storage publishes committed business references and App injects repositories/maps native Bluetooth identities. Tests preserve caller identity, cancellation and failure semantics. See [current storage design](../../MobileHarness/Storage/README.md) for relational allocation and persistence.

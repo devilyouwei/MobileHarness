@@ -8,7 +8,7 @@ import FunctionContracts
 struct ActionResultLedger {
     enum DeliveryState: String, Sendable { case reserved, pending, accepted, closed }
     struct Record: Sendable {
-        let executionID: UUID
+        let executionID: String
         let result: ActionResult?
         let state: DeliveryState
     }
@@ -19,7 +19,7 @@ struct ActionResultLedger {
         var attempts = 0
         var nextAttempt: ContinuousClock.Instant = .now
     }
-    private var entries: [UUID: Entry] = [:]
+    private var entries: [String: Entry] = [:]
     private var history: [Record] = []
     private var order: UInt64 = 0
     private(set) var evictedHistory: UInt64 = 0
@@ -66,7 +66,7 @@ struct ActionResultLedger {
 
     var hasPending: Bool { entries.values.contains { $0.result != nil } }
 
-    mutating func delivered(_ id: UUID, outcome: ActionResultDelivery) {
+    mutating func delivered(_ id: String, outcome: ActionResultDelivery) {
         guard var entry = entries[id] else { return }
         switch outcome {
         case .accepted: finish(id, state: .accepted)
@@ -78,7 +78,7 @@ struct ActionResultLedger {
         }
     }
 
-    mutating func close(sessionID: UUID? = nil) {
+    mutating func close(sessionID: String? = nil) {
         let selected = entries.filter { sessionID == nil || $0.value.invocation.envelope.sessionID == sessionID }.map(
             \.key)
         for id in selected { finish(id, state: .closed) }
@@ -93,7 +93,7 @@ struct ActionResultLedger {
             }
     }
 
-    private mutating func finish(_ id: UUID, state: DeliveryState) {
+    private mutating func finish(_ id: String, state: DeliveryState) {
         guard let entry = entries.removeValue(forKey: id) else { return }
         if history.count == 256 {
             history.removeFirst()

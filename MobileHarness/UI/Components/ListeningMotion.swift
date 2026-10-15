@@ -12,7 +12,7 @@ public struct ListeningLightOrigin: Sendable, Equatable {
 
 /// Monotonic, generation-scoped motion; no view identity or wall-clock dependency.
 struct ListeningMotion: Sendable {
-    private(set) var generation: UUID?
+    private(set) var generation: String?
     private(set) var origin = ListeningLightOrigin(x: 0.5, y: 0.4)
     private(set) var activatedAt: Double = 0
     private(set) var fadeStartedAt: Double = 0
@@ -22,7 +22,7 @@ struct ListeningMotion: Sendable {
     private(set) var intensity = 1.0
 
     mutating func update(
-        active: Bool, generation: UUID?, reduceMotion: Bool, origin: ListeningLightOrigin? = nil,
+        active: Bool, generation: String?, reduceMotion: Bool, origin: ListeningLightOrigin? = nil,
         initialOpacity: Double = 0.85, intensity: Double = 1, replayEntry: Bool = true, at time: Double
     ) {
         let current = opacity(at: time)

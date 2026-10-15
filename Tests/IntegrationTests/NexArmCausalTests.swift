@@ -4,6 +4,7 @@ import ExecutionRuntime
 import Foundation
 import FunctionContracts
 import PlatformKit
+import Storage
 import Testing
 
 #if os(macOS)
@@ -90,7 +91,7 @@ import Testing
                 try record("motion", values: packetValues(packet))
             }
         }
-        func beginObservation() async throws -> UUID {
+        func beginObservation() async throws -> String {
             guard sampler == nil else { throw NexArmError.busy }
             let token = try await serial.beginObservation()
             loggedSequence = 0
@@ -110,7 +111,7 @@ import Testing
             }
             return token
         }
-        func sendObserved(_ packet: NexArmPacket, session: UUID) async throws -> Bool {
+        func sendObserved(_ packet: NexArmPacket, session: String) async throws -> Bool {
             if let sampleFailure { throw sampleFailure }
             let admitted = try await serial.sendObserved(packet, session: session)
             if admitted {
@@ -123,7 +124,7 @@ import Testing
             }
             return admitted
         }
-        func latestObservation(after sequence: UInt64, session: UUID) async throws -> NexArmTelemetry? {
+        func latestObservation(after sequence: UInt64, session: String) async throws -> NexArmTelemetry? {
             if let sampleFailure { throw sampleFailure }
             let sample = try await serial.latestObservation(after: sequence, session: session)
             if let sample, sample.sequence > loggedSequence {
@@ -132,7 +133,7 @@ import Testing
             }
             return sample
         }
-        func endObservation(_ session: UUID) async {
+        func endObservation(_ session: String) async {
             sampler?.cancel()
             await sampler?.value
             sampler = nil

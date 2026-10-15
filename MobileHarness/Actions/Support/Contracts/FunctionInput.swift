@@ -3,7 +3,7 @@ import Foundation
 /// Business handlers see only this shared interface, never a call protocol or Channel.
 public protocol FunctionInput: Sendable {
     var results: any FunctionReporting { get }
-    var executionID: UUID { get }
+    var executionID: String { get }
     var context: ActionExecutionContext { get }
     var call: FunctionRequest { get }
 }
@@ -13,11 +13,11 @@ public protocol FunctionReporting: Sendable {
 }
 public struct FunctionInvocation: FunctionInput {
     public let results: any FunctionReporting
-    public let executionID: UUID
+    public let executionID: String
     public let context: ActionExecutionContext
     public let call: FunctionRequest
     public init(
-        call: FunctionRequest, context: ActionExecutionContext, executionID: UUID = UUID(),
+        call: FunctionRequest, context: ActionExecutionContext, executionID: String,
         results: any FunctionReporting
     ) {
         self.call = call

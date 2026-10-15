@@ -123,3 +123,14 @@ Purpose: build/sign the iOS application host and maintain physical-device, simul
 ✅ Implemented ProMotion packaging: Config/AppInfo.plist explicitly supplies CADisableMinimumFrameDurationOnPhone=true to both App targets. Generated standard/permission metadata remains enabled; remove the ineffective custom INFOPLIST_KEY setting and verify the final signed plist, not only build settings. No local signing edits.
 
 ✅ Shared Actions file references are grouped under Support, with Contracts as its own child and macro/catalog utilities directly under Support. SwiftPM remains the only compiler of these shared sources.
+
+
+## Prefix-number identity migration
+
+Implemented: business IDs are allocated by Storage; Foundation libraries use native UUID tokens and accept opaque caller IDs without project dependencies. Identity is no longer a package target. See [identity design](../docs/completed/Prefix-Numeric-ID-Plan.md).
+
+## SQLite records migration
+
+✅ StorageSQLite compiles GRDB.swift 7.11.1 privately through a separate adapter target; common Storage/domain consumers have no GRDB dependency. The lockfile pins it and App owns records.sqlite initialization. New internal Storage directories/targets implement approved ownership boundaries; signing is unchanged. Required simulator/device build outcomes are recorded separately in docs/validation/Validation-History.md.
+
+✅ Storage repository refactor: HarnessKit/App composition links the explicit StorageSQLite adapter product and existing domain targets; no new first-level application module or signing change.

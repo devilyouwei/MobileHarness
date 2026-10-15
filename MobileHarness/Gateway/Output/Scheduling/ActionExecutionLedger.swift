@@ -6,9 +6,9 @@ import FunctionContracts
 
 /// Owned only by ChannelScheduler. Active records share scheduling bounds; only terminal history evicts.
 struct ActionExecutionLedger {
-    private var records: [UUID: ActionExecutionRecord] = [:]
-    private var order: [UUID] = []
-    private var terminalOrder: [UUID] = []
+    private var records: [String: ActionExecutionRecord] = [:]
+    private var order: [String] = []
+    private var terminalOrder: [String] = []
     private var revision: UInt64 = 0
     private var evictedCount: UInt64 = 0
     let terminalCapacity: Int
@@ -38,7 +38,7 @@ struct ActionExecutionLedger {
 
     @discardableResult
     mutating func transition(
-        _ id: UUID, to phase: ActionExecutionRecord.Phase,
+        _ id: String, to phase: ActionExecutionRecord.Phase,
         completion: ActionCompletion? = nil, failure: ActionExecutionRecord.Failure? = nil,
         failureDescription: String? = nil
     ) -> Bool {

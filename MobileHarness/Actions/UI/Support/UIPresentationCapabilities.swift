@@ -1,5 +1,6 @@
 import Foundation
 import FunctionContracts
+import Storage
 
 /// Finite transition/restore acknowledgments and independent persistent-state commitment.
 public protocol UIPresentationCapability: Sendable {
@@ -19,7 +20,7 @@ public protocol UIUpdateCapability: Sendable {
 }
 
 public protocol PosePresentationCapability: Sendable {
-    func present(_ overlay: PoseOverlay, sessionID: UUID) async throws
+    func present(_ overlay: PoseOverlay, sessionID: String) async throws
 }
 
 public protocol HistoryPresentationCapability: Sendable {
@@ -28,7 +29,7 @@ public protocol HistoryPresentationCapability: Sendable {
 
 public protocol ResourcePresentationCapability: Sendable {
     func navigate(_ destination: String, invocation: any FunctionInput) async throws
-    func presentProviderResult(requestID: UUID, failureCode: String?, invocation: any FunctionInput) async throws
+    func presentProviderResult(requestID: String, failureCode: String?, invocation: any FunctionInput) async throws
     func presentResources(_ inventory: ModelResourceInventory, generation: UInt64, invocation: any FunctionInput)
         async throws
     func presentResourcePreferenceFailure(
@@ -41,7 +42,8 @@ extension ResourcePresentationCapability {
     public func navigate(_ destination: String, invocation: any FunctionInput) async throws {
         throw ResourcePresentationError.unavailable
     }
-    public func presentProviderResult(requestID: UUID, failureCode: String?, invocation: any FunctionInput) async throws
+    public func presentProviderResult(requestID: String, failureCode: String?, invocation: any FunctionInput)
+        async throws
     {
         throw ResourcePresentationError.unavailable
     }

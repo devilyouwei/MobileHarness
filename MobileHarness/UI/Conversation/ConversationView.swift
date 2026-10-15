@@ -1,3 +1,5 @@
+import Foundation
+
 #if os(iOS)
     import SwiftUI
 
@@ -330,7 +332,7 @@
         @State private var awake =
             ProcessInfo.processInfo.arguments.contains("-preview-listening")
             || ProcessInfo.processInfo.arguments.contains("-preview-speaking")
-        @State private var generation = UUID()
+        @State private var generation = UUID().uuidString
         @State private var lightOrigin: ListeningLightOrigin?
         @State private var expression: EyeExpression = .clear
         @State private var tone = 500.0
@@ -344,7 +346,7 @@
         }
         private func togglePreview() {
             awake.toggle()
-            if awake { generation = UUID() }
+            if awake { generation = UUID().uuidString }
         }
         public var body: some View {
             GeometryReader { geometry in
@@ -408,7 +410,7 @@
                                 try await Task.sleep(for: .milliseconds(800))
                                 lightOrigin = ListeningLightOrigin(
                                     x: [0.24, 0.76, 0.5][cycle % 3], y: cycle < 3 ? 0.30 : 0.52)
-                                generation = UUID()
+                                generation = UUID().uuidString
                                 awake = true
                                 try await Task.sleep(for: .milliseconds(1300))
                                 awake = false

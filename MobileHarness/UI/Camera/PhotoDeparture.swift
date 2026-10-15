@@ -6,7 +6,7 @@ import Observation
 @MainActor @Observable public final class PhotoDeparture {
     public enum Kind: String, Sendable { case save, discard }
     public struct Request: Equatable, Sendable {
-        public let id: UUID
+        public let id: String
         public let kind: Kind
     }
     public enum Failure: Error, Sendable { case rendererUnavailable, busy }
@@ -23,7 +23,7 @@ import Observation
         try Task.checkCancellation()
         guard available else { throw Failure.rendererUnavailable }
         guard request == nil, !finished else { throw Failure.busy }
-        let id = UUID()
+        let id = UUID().uuidString
         try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, any Error>) in
                 guard !Task.isCancelled else {
@@ -37,11 +37,11 @@ import Observation
             Task { @MainActor [weak self] in self?.cancel(id: id) }
         }
     }
-    public func complete(id: UUID, success: Bool) {
+    public func complete(id: String, success: Bool) {
         guard request?.id == id else { return }
         finish(success ? .success(()) : .failure(Failure.rendererUnavailable))
     }
-    private func cancel(id: UUID) {
+    private func cancel(id: String) {
         guard request?.id == id else { return }
         finish(.failure(CancellationError()))
     }

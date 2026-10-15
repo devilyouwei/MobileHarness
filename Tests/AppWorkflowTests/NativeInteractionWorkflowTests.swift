@@ -1,13 +1,14 @@
 import Agents
 import AppSettingsWorkflow
 import Foundation
+import Storage
 import Testing
 import UI
 
 @MainActor private final class HeldInteraction {
     var calls: [AppInteractionIntent] = []
     var cameraFacings: [PhotographerCameraIntent.Facing?] = []
-    var cameraPhotoIDs: [UUID?] = []
+    var cameraMediaIDs: [String?] = []
     var cameraCalls: [PhotographerCameraIntent.Operation] = []
     var pending: CheckedContinuation<Void, any Error>?
     let started = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingOldest(1))
@@ -17,11 +18,12 @@ import UI
         try await wait()
     }
     func performCamera(
-        _ operation: PhotographerCameraIntent.Operation, facing: PhotographerCameraIntent.Facing?, photoID: UUID? = nil
+        _ operation: PhotographerCameraIntent.Operation, facing: PhotographerCameraIntent.Facing?,
+        mediaID: String? = nil
     )
         async throws
     {
-        cameraPhotoIDs.append(photoID)
+        cameraMediaIDs.append(mediaID)
         cameraCalls.append(operation)
         cameraFacings.append(facing)
         try await wait()
@@ -47,10 +49,10 @@ import UI
     var pageVisibility: [Bool] = []
     var openedSettings = 0
     let controls = BluetoothInteractionWorkflow(
-        state: state, initialFence: UUID(),
+        state: state, initialFence: UUID().uuidString,
         fenceStop: {
             fences += 1
-            return UUID()
+            return UUID().uuidString
         }, pageVisibility: { pageVisibility.append($0) }, openSettings: { openedSettings += 1 },
         perform: { try await host.perform($0) })
     var started = host.started.stream.makeAsyncIterator()
@@ -79,8 +81,8 @@ import UI
     #expect(!state.isEnabled)
     let controls = CameraInteractionWorkflow(
         state: state,
-        perform: { operation, facing, photoID in
-            try await host.performCamera(operation, facing: facing, photoID: photoID)
+        perform: { operation, facing, mediaID in
+            try await host.performCamera(operation, facing: facing, mediaID: mediaID)
         })
     var started = host.started.stream.makeAsyncIterator()
     controls.toggle()
@@ -107,15 +109,15 @@ import UI
     let state = CameraState()
     let controls = CameraInteractionWorkflow(
         state: state,
-        perform: { operation, facing, id in try await host.performCamera(operation, facing: facing, photoID: id) })
-    let original = UUID()
-    let replacement = UUID()
+        perform: { operation, facing, id in try await host.performCamera(operation, facing: facing, mediaID: id) })
+    let original = "media_1"
+    let replacement = "media_2"
     var started = host.started.stream.makeAsyncIterator()
     controls.savePhoto(original)
     await started.next()
     controls.ignorePhoto(replacement)
     #expect(host.cameraCalls == [.savePhoto])
-    #expect(host.cameraPhotoIDs == [original])
+    #expect(host.cameraMediaIDs == [original])
     #expect(state.photoMessage != nil)
     #expect(state.message == nil)
     host.finish(throwing: CancellationError())
@@ -123,23 +125,23 @@ import UI
     controls.ignorePhoto(replacement)
     await controls.waitUntilIdle()
     #expect(host.cameraCalls == [.savePhoto, .ignorePhoto])
-    #expect(host.cameraPhotoIDs == [original, replacement])
+    #expect(host.cameraMediaIDs == [original, replacement])
 }
 
 @Test @MainActor func committedPhotoSaveIsVisibleWhenLaterRequestCompletionFails() async throws {
     let state = CameraState()
-    let id = UUID()
+    let id = "media_1"
     var calls = 0
     let controls = CameraInteractionWorkflow(
         state: state,
         perform: { _, _, selected in
             calls += 1
-            state.savedPhotoID = selected
+            state.savedMediaID = selected
             throw CancellationError()
         })
     controls.savePhoto(id)
     await controls.waitUntilIdle()
     #expect(calls == 1)
-    #expect(state.savedPhotoID == id)
+    #expect(state.savedMediaID == id)
     #expect(state.photoMessage?.hasPrefix("已保存到相册") == true)
 }

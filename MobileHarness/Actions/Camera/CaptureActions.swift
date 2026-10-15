@@ -1,21 +1,22 @@
 import Foundation
 import FunctionContracts
+import Storage
 
 /// Camera.Capture function ownership; current invocation paths remain compatible.
 extension CameraActions {
     @Action(
         domain: "Camera", module: "Capture", title: "savePhoto",
         doc:
-            "Save the displayed photo to Photos, join departure animation/cue and remove the preview. Import failure retains the photo. Receipt distinguishes committed save from feedbackIssues; repeated exact saved UUID does not duplicate import.",
+            "Save the displayed photo to Photos, join departure animation/cue and remove the preview. Import failure retains the photo. Receipt distinguishes committed save from feedbackIssues; repeated exact saved String does not duplicate import.",
         parameters: [
             .init(
-                "photoID", type: .string, required: true, description: "Exact captured photo UUID.",
-                constraints: "A photoID from actual capture feedback.")
+                "mediaID", type: .string, required: true, description: "Exact captured photo String.",
+                constraints: "A mediaID from actual capture feedback.")
         ], timeout: .seconds(60))
     public static func savePhoto(invocation: any FunctionInput, using camera: any CameraControlCapability) async throws
         -> String
     {
-        let id = try selectedPhotoID(invocation)
+        let id = try selectedMediaID(invocation)
         try Task.checkCancellation()
         return String(
             decoding: try JSONEncoder().encode(await camera.savePhoto(id, invocation: invocation)), as: UTF8.self)
@@ -27,32 +28,34 @@ extension CameraActions {
             "Join the displayed preview's discard animation/cue and remove it. Does not delete album photos or private image evidence. Receipt includes optional feedbackIssues; camera remains open.",
         parameters: [
             .init(
-                "photoID", type: .string, required: true, description: "Exact captured photo UUID.",
-                constraints: "A photoID from actual capture feedback.")
+                "mediaID", type: .string, required: true, description: "Exact captured photo String.",
+                constraints: "A mediaID from actual capture feedback.")
         ])
     public static func ignorePhoto(invocation: any FunctionInput, using camera: any CameraControlCapability)
         async throws
         -> String
     {
-        let id = try selectedPhotoID(invocation)
+        let id = try selectedMediaID(invocation)
         try Task.checkCancellation()
         return String(
             decoding: try JSONEncoder().encode(await camera.ignorePhoto(id, invocation: invocation)), as: UTF8.self)
     }
 
-    private static func selectedPhotoID(_ invocation: any FunctionInput) throws -> UUID? {
+    private static func selectedMediaID(_ invocation: any FunctionInput) throws -> String? {
         let arguments = ActionArguments(invocation.call.parameters)
-        try arguments.validateAllowedKeys(["photoID"])
-        guard invocation.call.parameters["photoID"] != nil else { return nil }
-        let raw = try arguments.requiredString("photoID", maximumUTF8Bytes: 36)
-        guard let id = UUID(uuidString: raw) else { throw ActionArguments.ValidationError.invalidValue("photoID") }
-        return id
+        try arguments.validateAllowedKeys(["mediaID"])
+        guard invocation.call.parameters["mediaID"] != nil else { return nil }
+        let raw = try arguments.requiredString("mediaID", maximumUTF8Bytes: 36)
+        guard let id = BusinessRecordID(rawValue: raw), id.kind == .media else {
+            throw ActionArguments.ValidationError.invalidValue("mediaID")
+        }
+        return id.rawValue
     }
 
     @Action(
         domain: "Camera", module: "Capture", title: "takePhoto",
         doc:
-            "Capture once with the ready foreground camera, show preview and return photoID/image evidence. Does not save to Photos.",
+            "Capture once with the ready foreground camera, show preview and return mediaID/image evidence. Does not save to Photos.",
         parameters: [], timeout: .seconds(15))
     public static func takePhoto(invocation: any FunctionInput, using camera: any CameraControlCapability) async throws
         -> String

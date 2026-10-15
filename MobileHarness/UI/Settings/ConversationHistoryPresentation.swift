@@ -1,7 +1,7 @@
 import Foundation
 
 public struct HistoryTaskReference: Equatable, Sendable, Identifiable {
-    public let id: UUID
+    public let id: String
     public let isHistoryOwner: Bool
     public let wasActiveAtRequest: Bool
 }
@@ -55,12 +55,12 @@ public enum ConversationHistoryPresentation {
         conversation.turns.flatMap { turn -> [HistoryTurn] in
             return (turn.modelRequests ?? []).enumerated().map { index, request in
                 project(
-                    turn, id: request.id, date: request.date, input: request.input,
+                    turn, messageID: request.messageID, id: request.id, date: request.date, input: request.input,
                     requestJSON: request.requestJSON, firstTokenAt: request.firstTokenAt,
                     calls: request.toolCalls, usage: request.tokenUsage, response: request.response,
                     state: request.state, reason: request.finishReason,
                     error: request.error ?? (index == (turn.modelRequests?.count ?? 0) - 1 ? turn.error : nil),
-                    react: index > 0, modelRequestStartedAt: request.modelRequestStartedAt,
+                    react: request.isObservation ?? (index > 0), modelRequestStartedAt: request.modelRequestStartedAt,
                     firstTokenLatency: request.firstTokenLatency, decisionMetadata: request.decisionMetadata,
                     historyTaskID: request.historyTaskID, historyOrder: request.historyOrder)
             }
@@ -68,14 +68,15 @@ public enum ConversationHistoryPresentation {
     }
 
     private static func project(
-        _ parent: HistoryTurn, id: UUID, date: Date, input: String, requestJSON: String?, firstTokenAt: Date?,
+        _ parent: HistoryTurn, messageID: String? = nil, id: String, date: Date, input: String, requestJSON: String?,
+        firstTokenAt: Date?,
         calls: [HistoryToolCall]?, usage: HistoryTokenUsage?, response: String, state: HistoryTurn.State,
         reason: String?, error: String?, react: Bool,
         modelRequestStartedAt: Date? = nil, firstTokenLatency: Double? = nil,
-        decisionMetadata: HistoryDecisionMetadata? = nil, historyTaskID: UUID? = nil, historyOrder: UInt64 = 0
+        decisionMetadata: HistoryDecisionMetadata? = nil, historyTaskID: String? = nil, historyOrder: UInt64 = 0
     ) -> HistoryTurn {
         HistoryTurn(
-            historyOrder: historyOrder, id: id, date: date, user: input,
+            messageID: messageID, historyOrder: historyOrder, id: id, date: date, user: input,
             request: requestJSON.flatMap { try? JSONDecoder().decode([HistoryMessage].self, from: Data($0.utf8)) }
                 ?? [],
             model: parent.model, maximumOutputTokens: parent.maximumOutputTokens, temperature: parent.temperature,
@@ -91,17 +92,20 @@ public enum ConversationHistoryPresentation {
 
     public static func timeline(_ conversation: HistoryConversation) -> [HistoryTimelineItem] {
         let requests = turns(conversation)
-        var replacements: [UUID: HistoryTaskCompression] = [:]
+        var replacements: [String: HistoryTaskCompression] = [:]
         for compression in conversation.taskCompressions {
             let owned = requests.filter { $0.historyTaskID == compression.taskID }
-            if !owned.isEmpty, owned.map(\.id) == compression.sources.map(\.requestID),
-                owned.map({ $0.ownerInputID ?? $0.id }) == compression.sources.map(\.inputID),
-                owned.allSatisfy({ $0.state != .generating })
+            let references = Set(compression.sources)
+            if !owned.isEmpty, compression.status != .generating,
+                owned.allSatisfy({
+                    $0.state != .generating
+                        && references.contains(.init(inputID: $0.ownerInputID ?? $0.id, requestID: $0.id))
+                })
             {
                 replacements[compression.taskID] = compression
             }
         }
-        var emitted: Set<UUID> = []
+        var emitted: Set<String> = []
         return requests.compactMap { turn in
             if let taskID = turn.historyTaskID, let compression = replacements[taskID] {
                 return emitted.insert(taskID).inserted
@@ -159,7 +163,7 @@ extension HistoryMessage {
 extension HistoryTurn {
     public var displayInput: String { user }
     public var attachedImages: [HistoryImageReference] {
-        var seen: Set<UUID> = []
+        var seen: Set<String> = []
         return Array(request.flatMap(\.attachedImages).filter { seen.insert($0.id).inserted }.prefix(4))
     }
 }

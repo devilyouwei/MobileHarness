@@ -3,6 +3,7 @@ import Agents
 import AppPresentationWorkflow
 import Foundation
 import Gateway
+import Storage
 
 /// Application-owned entry transport. Admission never waits for reasoning or child completion.
 public actor AgentInteractionRuntime {
@@ -11,7 +12,7 @@ public actor AgentInteractionRuntime {
     private let input: InputGateway
     private let output: OutputGateway
     private let startChildren: @Sendable () async throws -> Void
-    private let inputRejected: @Sendable (UUID, String) async -> Void
+    private let inputRejected: @Sendable (String, String) async -> Void
     private let report: @Sendable (String) async -> Void
     private var starting: Task<Void, Error>?
     private var pump: Task<Void, Never>?
@@ -23,7 +24,7 @@ public actor AgentInteractionRuntime {
         agent: AssistantAgent, manager: AgentManager, input: InputGateway, output: OutputGateway,
         startChildren: @escaping @Sendable () async throws -> Void,
         report: @escaping @Sendable (String) async -> Void = { _ in },
-        inputRejected: @escaping @Sendable (UUID, String) async -> Void = { _, _ in }
+        inputRejected: @escaping @Sendable (String, String) async -> Void = { _, _ in }
     ) {
         self.agent = agent
         self.manager = manager
@@ -105,13 +106,14 @@ public actor AgentInteractionRuntime {
             textOrdinal += 1
             signal = AgentInput(
                 id: signal.id, sessionID: signal.sessionID, payload: signal.payload,
-                metadata: signal.metadata, turn: AgentTurn(ordinal: textOrdinal), taskScope: signal.taskScope)
+                metadata: signal.metadata, turn: AgentTurn(id: UUID().uuidString, ordinal: textOrdinal),
+                taskScope: signal.taskScope)
         }
         try await input.publish(signal)
     }
 
     /// Trusted host interruption; retain the resident Agent and unrelated session work.
-    public func cancelConversation(sessionID: UUID) async throws {
+    public func cancelConversation(sessionID: String) async throws {
         guard started, !closed else { return }
         async let calls: Void = output.cancelCalls(for: agent, sessionID: sessionID)
         async let model: Void = agent.receive(AgentSessionControl.cancelSession.input(sessionID: sessionID))

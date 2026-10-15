@@ -92,13 +92,13 @@ Healthy camera flips retain the native session/lease and acknowledge input repla
 
 ## Agent records
 
-✅ Implemented: 设置的 Agent 记录入口由各 Agent 注入自己的记录页面，目前只有 Assistant 聊天记录。前台 Task 的摘要、终态与原始请求包含在同一会话文件；任务运行状态与后台委派仍由 Agents/首页执行记录持有。删除重复任务历史页面与聚合接口。其他 Agent 的记录类型尚未实现。
+✅ Implemented: 设置的 Agent 记录入口由各 Agent 注入自己的记录页面，目前只有 Assistant 聊天记录。前台 Task 的摘要、终态与原始请求包含在同一 dialog 的 SQL 记录；任务运行状态与后台委派仍由 Agents/首页执行记录持有。删除重复任务历史页面与聚合接口。其他 Agent 的记录类型尚未实现。
 
 
 ✅ Implemented: root VoiceSessionCoordinator warms the default cue/haptic on touch-down through an injected UI callback, retires aborted/background preparation, and reuses warm native resources for canonical activation. No second cue/haptic playback path is added.
 
 
-✅ Implemented (2026-10-13): UI.Notice.showNotice/dismissNotice and UI.Light.updateLight are canonical presentation Actions for trusted business calls, currently registered by no Skill. Neutral Actions values cross RuntimePresentation into root-owned HomeEffectsWorkflow, which retains one replaceable notice expiry and one light expiry, UUID-fenced cleanup, and explicit stop. Notices remain separate from factual ExecutionIssue history; actual upper-layer errors have display priority and Action failures remain panel-only. Decorative light accepts normalized origin, initial opacity/intensity and duration; it never changes consent, microphone or eyes. Native renderer separates light generations from listening eye generations and preserves existing exit fade. RuntimePresentation adapts Action requests into UI-owned values; AppPresentationWorkflow keeps its existing UI/AgentCore/FunctionContracts boundary. No UI project dependencies or new directories.
+✅ Implemented (2026-10-13): UI.Notice.showNotice/dismissNotice and UI.Light.updateLight are canonical presentation Actions for trusted business calls, currently registered by no Skill. Neutral Actions values cross RuntimePresentation into root-owned HomeEffectsWorkflow, which retains one replaceable notice expiry and one light expiry, UUID-fenced cleanup, and explicit stop. Notices remain separate from factual ExecutionIssue history; actual upper-layer errors have display priority and Action failures remain panel-only. Decorative light accepts normalized origin, initial opacity/intensity and duration; it never changes consent, microphone or eyes. Native renderer separates light generations from listening eye generations and preserves existing exit fade. RuntimePresentation adapts Action requests into UI-owned values; AppPresentationWorkflow keeps its existing UI/AgentCore/FunctionContracts boundary. No UI capability/business dependencies or new directories.
 
 
 ✅ ActionActivityWorkflow 在日志→展示边界为 speechPerception 的 recognition 错误设置用户文案“我没听清”；原始消息、来源、输入关联仍原样保存在日志。recordFailure 和 startFailures 快照使用同一映射，其他错误不改文案。
@@ -113,12 +113,23 @@ Healthy camera flips retain the native session/lease and acknowledge input repla
 
 ## Task history v2 and in-place compression
 
-✅ Implemented: App adapts canonical current.json / conversation-ID archive checkpoints into passive UI. Historical Task membership uses historyTaskID rather than all requests under inputIDs.
+✅ Implemented: App adapts canonical SQLite dialog/message projections into passive UI. Historical Task membership uses historyTaskID rather than all requests under inputIDs.
 
 
-## 会话存储性能重构 v3
 
-✅ 已实现：组合层注入会话文件仓库与 Assistant 恢复编解码闭包，旧 Assistant 文件不参与启动。历史工作流按需加载单会话，列表读索引。
+## Model-only photo preparation
+
+✅ Implemented: ApplicationRuntime injects two distinct capabilities into Assistant photo observations: read returns the owned original ChatImage; prepareJPEG translates the Agent-supplied policy into native codec limits. App holds no compression thresholds, decides no analysis precision and never performs preparation as a hidden side effect of reading. Assistant constructs the prepared ChatImage and retains it through ReACT; camera/photo storage and album import continue with the original.
 
 
-✅ Agent records: MobileHarnessApp renders a generic record hub composed by AppAssembly; Assistant keeps one root-owned ConversationHistoryWorkflow. No task-history reader/adaptation, dummy root conversation workflow or task-scoped conversation jump remains. Retain Memory history operations, per-conversation lazy reads, photos, actual task state and execution diagnostics.
+
+
+## SQLite records and runtime identity
+
+✅ Implemented: technical identities are opaque UUID strings; committed business entities use dialog/message/task/media/device SQLite IDs. Consumers use Storage repositories while preserving ownership, cancellation and independent foundation boundaries. Complete messages, including each ReACT message, persist at termination; delta fragments do not persist. The custom allocator and replaced file/index implementation are removed. See the project SQLite business-record plan.
+
+
+✅ Configuration preservation: retain Settings/settings.json, Models/download-source.json, Models/transfers.json and CapturedPhotos. Runtime contexts use Storage process-memory state; only business record metadata belongs in records.sqlite.
+
+
+✅ Removed Agent runtime-context JSON construction and its directory/protection setup; App injects process-memory contexts for all roles and the isolated diagnostic. Keep SQLite business repositories and original settings/model/media paths unchanged.

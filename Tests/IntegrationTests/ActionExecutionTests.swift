@@ -6,6 +6,7 @@ import ExecutionRuntime
 import Foundation
 import FunctionContracts
 import Gateway
+import Storage
 import Testing
 
 private actor ActionTestGate {
@@ -63,7 +64,8 @@ private func actionInvocation(
                 await displayFinished.open()
             },
         ]))
-    let input = AgentInput(sessionID: UUID(), payload: .text("question"))
+    let input = AgentInput(
+        id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("question"))
     try await executor.enqueue(invocation: actionInvocation("first", input: input))
     await firstStarted.wait()
     try await executor.enqueue(invocation: actionInvocation("second", input: input))
@@ -81,8 +83,10 @@ private func actionInvocation(
     let executor = ChannelScheduler(
         registry: try testActionRegistry(handlers: [sayPath: { _ in await gate.wait() }, printPath: { _ in }]),
         capacityPerChannel: 1, maximumTrackedInputs: 1)
-    let first = AgentInput(sessionID: UUID(), payload: .text("first"))
-    let second = AgentInput(sessionID: UUID(), payload: .text("second"))
+    let first = AgentInput(
+        id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("first"))
+    let second = AgentInput(
+        id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("second"))
     try await executor.enqueue(invocation: actionInvocation("one", input: first))
     await #expect(throws: ActionSchedulingError.channelCapacityExceeded("Speech")) {
         try await executor.enqueue(invocation: actionInvocation("two", input: first))
@@ -109,7 +113,8 @@ private enum ActionTestFailure: Error, Equatable { case playback }
 @Test(.actionCatalog) func duplicateActionFinishWaiterIsRejectedAndOriginalWaiterCompletes() async throws {
     let gate = ActionTestGate()
     let executor = ChannelScheduler(registry: try testActionRegistry(handlers: [sayPath: { _ in await gate.wait() }]))
-    let input = AgentInput(sessionID: UUID(), payload: .text("first"))
+    let input = AgentInput(
+        id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("first"))
     try await executor.enqueue(invocation: actionInvocation("first", input: input))
     await withTaskGroup(of: String.self) { group in
         for _ in 0..<2 {
@@ -146,8 +151,10 @@ private enum ActionTestFailure: Error, Equatable { case playback }
                 }
             }
         ]))
-    let failedInput = AgentInput(sessionID: UUID(), payload: .text("first"))
-    let otherInput = AgentInput(sessionID: UUID(), payload: .text("second"))
+    let failedInput = AgentInput(
+        id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("first"))
+    let otherInput = AgentInput(
+        id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("second"))
     try await executor.enqueue(invocation: actionInvocation("fail", input: failedInput))
     await started.wait()
     try await executor.enqueue(invocation: actionInvocation("must not run", input: failedInput))
@@ -181,8 +188,10 @@ private enum ActionTestFailure: Error, Equatable { case playback }
                 await log.append("\(text):end")
             }
         ]), capacityPerChannel: 2)
-    let old = AgentInput(sessionID: UUID(), payload: .text("old"))
-    let next = AgentInput(sessionID: UUID(), payload: .text("new"))
+    let old = AgentInput(
+        id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("old"))
+    let next = AgentInput(
+        id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("new"))
     try await executor.enqueue(invocation: actionInvocation("old", input: old))
     await started.wait()
     try await executor.enqueue(invocation: actionInvocation("discard", input: old))
@@ -244,8 +253,9 @@ private enum ActionTestFailure: Error, Equatable { case playback }
                 await log.append("display")
             },
         ]))
-    let first = AgentInput(sessionID: UUID(), payload: .text("first"))
-    let second = AgentInput(sessionID: first.sessionID, payload: .text("second"))
+    let first = AgentInput(
+        id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("first"))
+    let second = AgentInput(id: UUID().uuidString, sessionID: first.sessionID, payload: .text("second"))
     try await executor.enqueue(invocation: actionInvocation("first", input: first))
     try await executor.enqueue(invocation: actionInvocation("second", input: second, path: printPath))
     await speechStarted.wait()
@@ -258,7 +268,8 @@ private enum ActionTestFailure: Error, Equatable { case playback }
     await release.open()
     await cancellation.value
     await alsoCancel.value
-    let next = AgentInput(sessionID: UUID(), payload: .text("next"))
+    let next = AgentInput(
+        id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("next"))
     try await executor.enqueue(invocation: actionInvocation("next", input: next, path: printPath))
     try await executor.finish(inputID: next.id, source: AgentID(rawValue: "assistant"))
     #expect(await log.values == ["display"])
@@ -282,7 +293,8 @@ private enum ActionTestFailure: Error, Equatable { case playback }
                 await log.append(invocation.call.parameters["text"] ?? "")
             },
         ]))
-    let shared = AgentInput(sessionID: UUID(), payload: .text("fan out"))
+    let shared = AgentInput(
+        id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("fan out"))
     try await executor.enqueue(invocation: actionInvocation("first", input: shared, path: printPath))
     try await executor.enqueue(invocation: actionInvocation("second:one", input: shared, source: secondAgent))
     await started.wait()
@@ -311,7 +323,8 @@ private enum ActionTestFailure: Error, Equatable { case playback }
                 }
             }
         ]))
-    let shared = AgentInput(sessionID: UUID(), payload: .text("fan out"))
+    let shared = AgentInput(
+        id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("fan out"))
     try await executor.enqueue(invocation: actionInvocation("fail", input: shared))
     await started.wait()
     try await executor.enqueue(invocation: actionInvocation("must not run", input: shared))
@@ -343,7 +356,8 @@ private enum ActionTestFailure: Error, Equatable { case playback }
                 if text == "default" { await independent.open() }
             },
         ]))
-    let input = AgentInput(sessionID: UUID(), payload: .text("test"))
+    let input = AgentInput(
+        id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("test"))
     try await executor.enqueue(invocation: actionInvocation("hello", input: input, channel: "main"))
     await started.wait()
     try await executor.enqueue(
@@ -360,7 +374,8 @@ private enum ActionTestFailure: Error, Equatable { case playback }
     let release = ActionTestGate()
     let executor = ChannelScheduler(
         registry: try testActionRegistry(handlers: [sayPath: { _ in await release.wait() }]), maximumChannels: 1)
-    let input = AgentInput(sessionID: UUID(), payload: .text("test"))
+    let input = AgentInput(
+        id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("test"))
     try await executor.enqueue(invocation: actionInvocation("one", input: input, channel: "main"))
     await #expect(throws: ActionSchedulingError.channelCountExceeded) {
         try await executor.enqueue(invocation: actionInvocation("two", input: input, channel: "other"))
@@ -389,7 +404,8 @@ private enum ActionTestFailure: Error, Equatable { case playback }
                 if text == "second" { await secondFinished.open() }
             }
         ]))
-    let input = AgentInput(sessionID: UUID(), payload: .text("test"))
+    let input = AgentInput(
+        id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("test"))
     try await executor.enqueue(invocation: actionInvocation("first", input: input, channel: "main"))
     await started.wait()
     try await executor.enqueue(invocation: actionInvocation("second", input: input, channel: "Speech"))
@@ -418,9 +434,9 @@ private enum ActionTestFailure: Error, Equatable { case playback }
                 }
             }
         ]))
-    let session = UUID()
-    let first = AgentInput(sessionID: session, payload: .text("first"))
-    let second = AgentInput(sessionID: session, payload: .text("second"))
+    let session = UUID().uuidString
+    let first = AgentInput(id: UUID().uuidString, sessionID: session, payload: .text("first"))
+    let second = AgentInput(id: UUID().uuidString, sessionID: session, payload: .text("second"))
     try await scheduler.enqueue(invocation: actionInvocation("first", input: first, channel: "shared"))
     await started.wait()
     try await scheduler.enqueue(invocation: actionInvocation("second", input: second, channel: "shared"))
@@ -471,7 +487,8 @@ func resourceConflictFailsWithoutWaitingAndAdvancesItsChannel(sharedWriterGroup:
         },
     ])
     let scheduler = ChannelScheduler(registry: registry, resources: coordinator)
-    let input = AgentInput(sessionID: UUID(), payload: .event("resource conflict"))
+    let input = AgentInput(
+        id: UUID().uuidString, sessionID: UUID().uuidString, payload: .event("resource conflict"))
     try await scheduler.enqueue(invocation: actionInvocation("first", input: input, path: firstPath, channel: "one"))
     await started.wait()
     try await scheduler.enqueue(invocation: actionInvocation("second", input: input, path: secondPath, channel: "two"))
@@ -527,8 +544,10 @@ private func boundary(_ directive: SchedulingDirective, _ input: AgentInput) -> 
                 await log.append(value + ":end")
             },
         ]))
-    let input = AgentInput(sessionID: UUID(), payload: .text("wait"))
-    let other = AgentInput(sessionID: UUID(), payload: .text("independent"))
+    let input = AgentInput(
+        id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("wait"))
+    let other = AgentInput(
+        id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("independent"))
     try await scheduler.enqueue(invocation: actionInvocation("before", input: input))
     await beforeStarted.wait()
     try await scheduler.schedule(.beginWait, envelope: boundary(.beginWait, input))
@@ -567,7 +586,8 @@ private func boundary(_ directive: SchedulingDirective, _ input: AgentInput) -> 
                 }
             }
         ]))
-    let input = AgentInput(sessionID: UUID(), payload: .text("nested"))
+    let input = AgentInput(
+        id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("nested"))
     try await scheduler.schedule(.beginWait, envelope: boundary(.beginWait, input))
     try await scheduler.enqueue(invocation: actionInvocation("A", input: input))
     try await scheduler.schedule(.beginWait, envelope: boundary(.beginWait, input))
@@ -587,7 +607,8 @@ private func boundary(_ directive: SchedulingDirective, _ input: AgentInput) -> 
 
 @Test(.actionCatalog) func malformedSchedulesAndGroupCapacityFailAndCleanup() async throws {
     let scheduler = ChannelScheduler(registry: try testActionRegistry(handlers: [:]))
-    let input = AgentInput(sessionID: UUID(), payload: .text("limits"))
+    let input = AgentInput(
+        id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("limits"))
     await #expect(throws: ActionSchedulingError.invalidSchedule) {
         try await scheduler.schedule(.endWait, envelope: boundary(.endWait, input))
     }
@@ -624,7 +645,8 @@ private func boundary(_ directive: SchedulingDirective, _ input: AgentInput) -> 
             },
             printPath: { _ in await log.append("unexpected") },
         ]))
-    let input = AgentInput(sessionID: UUID(), payload: .text("failure"))
+    let input = AgentInput(
+        id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("failure"))
     try await scheduler.schedule(.beginWait, envelope: boundary(.beginWait, input))
     try await scheduler.enqueue(invocation: actionInvocation("fail", input: input))
     await started.wait()
@@ -634,7 +656,8 @@ private func boundary(_ directive: SchedulingDirective, _ input: AgentInput) -> 
     try await scheduler.schedule(.endWait, envelope: boundary(.endWait, input))
     await release.open()
     // An independent task can finish; late same-task work still follows the wait tree.
-    let probe = AgentInput(sessionID: UUID(), payload: .text("probe"))
+    let probe = AgentInput(
+        id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("probe"))
     try await scheduler.enqueue(invocation: actionInvocation("probe", input: probe))
     try await scheduler.finish(inputID: probe.id, source: AgentID(rawValue: "assistant"))
     try await scheduler.enqueue(invocation: actionInvocation("late", input: input, path: printPath))
@@ -660,7 +683,8 @@ private func boundary(_ directive: SchedulingDirective, _ input: AgentInput) -> 
             },
             printPath: { invocation in await log.append(invocation.call.parameters["text"]!) },
         ]))
-    let input = AgentInput(sessionID: UUID(), payload: .text("cancel"))
+    let input = AgentInput(
+        id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("cancel"))
     try await scheduler.schedule(.beginWait, envelope: boundary(.beginWait, input))
     try await scheduler.schedule(.beginWait, envelope: boundary(.beginWait, input))
     try await scheduler.enqueue(invocation: actionInvocation("active", input: input))
@@ -673,7 +697,8 @@ private func boundary(_ directive: SchedulingDirective, _ input: AgentInput) -> 
     }
     await cancelling.wait()
     #expect(await log.values.isEmpty)
-    let other = AgentInput(sessionID: UUID(), payload: .text("other"))
+    let other = AgentInput(
+        id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("other"))
     try await scheduler.enqueue(invocation: actionInvocation("other", input: other, path: printPath))
     try await scheduler.finish(inputID: other.id, source: AgentID(rawValue: "assistant"))
     #expect(await log.values == ["other"])
@@ -683,7 +708,8 @@ private func boundary(_ directive: SchedulingDirective, _ input: AgentInput) -> 
 }
 
 @Test(.actionCatalog) func dormantActionsCountTowardGlobalChannelAndTaskBounds() async throws {
-    let input = AgentInput(sessionID: UUID(), payload: .text("bounds"))
+    let input = AgentInput(
+        id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("bounds"))
     let scheduler = ChannelScheduler(
         registry: try testActionRegistry(handlers: [sayPath: { _ in }]), capacityPerChannel: 128)
     for _ in 0..<120 {
@@ -701,7 +727,8 @@ private func boundary(_ directive: SchedulingDirective, _ input: AgentInput) -> 
     try await bounded.enqueue(invocation: actionInvocation("before", input: input))
     try await bounded.schedule(.beginWait, envelope: boundary(.beginWait, input))
     try await bounded.enqueue(invocation: actionInvocation("dormant", input: input, path: printPath))
-    let other = AgentInput(sessionID: UUID(), payload: .text("other"))
+    let other = AgentInput(
+        id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("other"))
     await #expect(throws: ActionSchedulingError.channelCapacityExceeded("UI")) {
         try await bounded.enqueue(invocation: actionInvocation("overflow", input: other, path: printPath))
     }
@@ -714,7 +741,8 @@ private func boundary(_ directive: SchedulingDirective, _ input: AgentInput) -> 
     let scheduler = ChannelScheduler(
         registry: try testActionRegistry(handlers: [printPath: { _ in await log.append("custom") }]))
     let source = AgentID(rawValue: "customAgent")
-    let input = AgentInput(sessionID: UUID(), payload: .text("test"))
+    let input = AgentInput(
+        id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("test"))
     try await scheduler.enqueue(invocation: actionInvocation("test", input: input, source: source, path: printPath))
     try await scheduler.finish(inputID: input.id, source: source)
     #expect(await log.values == ["custom"])
@@ -741,9 +769,9 @@ private func boundary(_ directive: SchedulingDirective, _ input: AgentInput) -> 
                 if invocation.context.source == "photographer" { await childFinished.open() }
             }
         ]))
-    let session = UUID()
-    let parent = AgentInput(sessionID: session, payload: .text("parent"))
-    let child = AgentInput(sessionID: session, payload: .text("child"))
+    let session = UUID().uuidString
+    let parent = AgentInput(id: UUID().uuidString, sessionID: session, payload: .text("parent"))
+    let child = AgentInput(id: UUID().uuidString, sessionID: session, payload: .text("child"))
     try await scheduler.enqueue(invocation: actionInvocation("parent", input: parent, source: .assistant))
     await started.wait()
     try await scheduler.enqueue(invocation: actionInvocation("child", input: child, source: .photographer))

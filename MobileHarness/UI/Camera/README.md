@@ -17,7 +17,7 @@ flowchart LR
  App -->|CameraState, CameraControlling and preview view| Surface[CameraConversationSurface]
  Surface -->|typed user intent| App
  Surface --> Photo[CapturedPhotoView]
- Photo -->|photo UUID and renderer receipt| App
+ Photo -->|photo ID and renderer receipt| App
  Surface -->|normalized gaze environment| Conversation
 ```
 
@@ -33,9 +33,9 @@ CameraState contains camera/vision failures. Execution failures belong to the ho
 
 ## Photo rendering
 
-One current UUID fades in 150 ms, holds 250 ms and shrinks to a 96×128 thumbnail over 450 ms. New identity replaces the old surface. Animation completion is one-shot and distinct from target state; disappearance during shrink reports failure. Inspection becomes available after acknowledgment. The full transition layer ignores touches; only the positioned thumbnail/control buttons intercept them.
+One current ID fades in 150 ms, holds 250 ms and shrinks to a 96×128 thumbnail over 450 ms. New identity replaces the old surface. Animation completion is one-shot and distinct from target state; disappearance during shrink reports failure. Inspection becomes available after acknowledgment. The full transition layer ignores touches; only the positioned thumbnail/control buttons intercept them.
 
-Inspect/save/ignore forward the rendered UUID. Busy/error/confirmed saved identity come from App. Save and ignore join distinct departure animations/cues, then App removes the current image component. Import failure retains it for retry; successful save enlarges before sliding out and ignore shrinks toward the lower-right. Identity replacement dismisses full-screen inspection. Reduced motion uses fade/direct-thumbnail completion. No gallery or export worker is owned here.
+Inspect/save/ignore forward the rendered ID. Busy/error/confirmed saved identity come from App. Save and ignore join distinct departure animations/cues, then App removes the current image component. Import failure retains it for retry; successful save enlarges before sliding out and ignore shrinks toward the lower-right. Identity replacement dismisses full-screen inspection. Reduced motion uses fade/direct-thumbnail completion. No gallery or export worker is owned here.
 
 ✅ Camera controls, injected preview, pose statistics, identity-fenced photo animation and export affordances.
 

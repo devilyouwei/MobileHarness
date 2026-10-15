@@ -31,7 +31,7 @@
         private let playbackEngine = AVAudioEngine()
         private let player = AVAudioPlayerNode()
         private var preparedClipRate: Int?
-        private var captureToken: UUID?
+        private var captureToken: String?
         public private(set) var captureContext = AudioCaptureContext()
         private var captureReadiness: AudioCaptureReadiness?
         private var spatialCapture: SpatialAudioCapture?
@@ -40,9 +40,9 @@
         private var hasTap = false
         private var playbackFormat: AVAudioFormat?
         private var playbackWaiter: CheckedContinuation<Void, Error>?
-        private var playbackToken: UUID?
+        private var playbackToken: String?
         private var spaceWaiter: CheckedContinuation<Void, Error>?
-        private var scheduled: Set<UUID> = []
+        private var scheduled: Set<String> = []
         private var playbackFailure: (any Error)?
         private let telemetry = PlaybackTelemetry()
         public init() {
@@ -79,7 +79,7 @@
             MicrophoneFrame, Error
         > {
             await stop()
-            let token = UUID()
+            let token = UUID().uuidString
             captureToken = token
             try Task.checkCancellation()
             let audio = AVAudioSession.sharedInstance()
@@ -285,7 +285,7 @@
                 try session.setAllowHapticsAndSystemSoundsDuringRecording(true)
                 try session.setActive(true)
             }
-            let token = UUID()
+            let token = UUID().uuidString
             playbackToken = token
             playbackFailure = nil
             do {
@@ -323,12 +323,12 @@
                 throw error
             }
         }
-        private func checkPlayback(_ token: UUID) throws {
+        private func checkPlayback(_ token: String) throws {
             try Task.checkCancellation()
             if let playbackFailure { throw playbackFailure }
             guard playbackToken == token else { throw CancellationError() }
         }
-        private func schedule(_ pcm: PlaybackPCM, token: UUID) throws {
+        private func schedule(_ pcm: PlaybackPCM, token: String) throws {
             guard !pcm.samples.isEmpty, pcm.samples.count <= 262_144, pcm.samples.allSatisfy(\.isFinite),
                 (8000...192000).contains(pcm.sampleRate),
                 let format = AVAudioFormat(
@@ -341,14 +341,14 @@
             buffer.frameLength = AVAudioFrameCount(pcm.samples.count)
             for index in pcm.samples.indices { destination[index] = pcm.samples[index] }
             if !playbackEngine.isRunning { try playbackEngine.start() }
-            let id = UUID()
+            let id = UUID().uuidString
             scheduled.insert(id)
             player.scheduleBuffer(buffer, completionCallbackType: .dataPlayedBack) { @Sendable [weak self] _ in
                 Task { @MainActor in self?.played(id, token: token) }
             }
             if !player.isPlaying { player.play() }
         }
-        private func played(_ id: UUID, token: UUID) {
+        private func played(_ id: String, token: String) {
             guard playbackToken == token, scheduled.remove(id) != nil else { return }
             let space = spaceWaiter
             spaceWaiter = nil
@@ -359,8 +359,8 @@
                 drained?.resume()
             }
         }
-        private func cancelPlayback(token: UUID) { failPlayback(token: token, error: CancellationError()) }
-        private func failPlayback(token: UUID, error: any Error) {
+        private func cancelPlayback(token: String) { failPlayback(token: token, error: CancellationError()) }
+        private func failPlayback(token: String, error: any Error) {
             guard playbackToken == token else { return }
             playbackFailure = error
             playbackToken = nil

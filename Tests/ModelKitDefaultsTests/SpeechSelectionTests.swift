@@ -26,9 +26,9 @@ private actor SelectionStorage: ModelArtifactStorage {
     func restoreTransfers() -> [ModelArtifactTransferRecord] { [] }
     func saveTransfers(_ records: [ModelArtifactTransferRecord]) {}
     func installed(_ artifact: ModelArtifact) -> Bool { present && !missing.contains(artifact.id) }
-    func stage(_ artifact: ModelArtifact, task: UUID) throws -> URL { throw ModelArtifactError.storage }
-    func publish(_ artifact: ModelArtifact, task: UUID) {}
-    func discard(task: UUID) {}
+    func stage(_ artifact: ModelArtifact, task: String) throws -> URL { throw ModelArtifactError.storage }
+    func publish(_ artifact: ModelArtifact, task: String) {}
+    func discard(task: String) {}
     func remove(_ artifact: ModelArtifact) { present = false }
 }
 @Test func speechSelectionRespectsInstallationAvailabilityAndExplicitSystemPreference() async throws {

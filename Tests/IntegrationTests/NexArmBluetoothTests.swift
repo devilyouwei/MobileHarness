@@ -9,6 +9,9 @@ import FunctionContracts
 import Gateway
 import ModelKit
 import Storage
+import StorageMedia
+import StorageSQLite
+import StorageTasks
 import Testing
 import UI
 
@@ -22,15 +25,15 @@ private actor BluetoothArmFixture: NexArmBluetoothLink {
     private var rejectIK = false
     func rejectIKQueries() { rejectIK = true }
     private(set) var observedCommands: [NexArmPacket] = []
-    var observation: UUID?
+    var observation: String?
     var telemetry = NexArmTelemetryCache()
     var lastPush = ContinuousClock.now.advanced(by: .seconds(-1))
     var observationAdmissionError: NexArmError?
     func rejectObservation(_ error: NexArmError) { observationAdmissionError = error }
-    func beginObservation() throws -> UUID {
+    func beginObservation() throws -> String {
         if let observationAdmissionError { throw observationAdmissionError }
         liveSession = nil
-        let token = UUID()
+        let token = UUID().uuidString
         observation = token
         return token
     }
@@ -43,14 +46,14 @@ private actor BluetoothArmFixture: NexArmBluetoothLink {
         pendingObservationEnd?.resume()
         pendingObservationEnd = nil
     }
-    func endObservation(_ session: UUID) async {
+    func endObservation(_ session: String) async {
         if holdObservationEnd {
             precondition(pendingObservationEnd == nil)
             await withCheckedContinuation { pendingObservationEnd = $0 }
         }
         if observation == session { observation = nil }
     }
-    func sendObserved(_ packet: NexArmPacket, session: UUID) throws -> Bool {
+    func sendObserved(_ packet: NexArmPacket, session: String) throws -> Bool {
         try Task.checkCancellation()
         guard observation == session, snapshot.phase == .connected else { throw NexArmError.disconnected }
         guard try admitFixtureWrite() else { return false }
@@ -60,7 +63,7 @@ private actor BluetoothArmFixture: NexArmBluetoothLink {
     }
     private var observationReadError: NexArmError?
     func rejectObservationRead(_ error: NexArmError) { observationReadError = error }
-    func latestObservation(after sequence: UInt64, session: UUID) async throws -> NexArmTelemetry? {
+    func latestObservation(after sequence: UInt64, session: String) async throws -> NexArmTelemetry? {
         try Task.checkCancellation()
         if let observationReadError { throw observationReadError }
         guard observation == session, snapshot.phase == .connected else { throw NexArmError.disconnected }
@@ -88,7 +91,11 @@ private actor BluetoothArmFixture: NexArmBluetoothLink {
     }
     nonisolated let updates: AsyncStream<NexArmBluetoothSnapshot>
     private let emit: AsyncStream<NexArmBluetoothSnapshot>.Continuation
-    nonisolated let id = UUID()
+    nonisolated let id = UUID().uuidString
+    nonisolated let records = Result { try SQLiteRepositories.temporary() }
+    nonisolated var businessID: String {
+        get throws { "device_1" }
+    }
     var snapshot = NexArmBluetoothSnapshot()
     var dropPositionReplies = false
     func dropPositions() { dropPositionReplies = true }
@@ -128,7 +135,7 @@ private actor BluetoothArmFixture: NexArmBluetoothLink {
     var z = 350
     var pitch = -180
     var claw = -35
-    var liveSession: UUID?
+    var liveSession: String?
     var failNextLiveValidation = false
     func failLiveValidationOnce() { failNextLiveValidation = true }
     var liveBlocked = false
@@ -166,10 +173,10 @@ private actor BluetoothArmFixture: NexArmBluetoothLink {
         if !value { blockedSince = nil }
     }
     func disableTelemetry() { telemetryUnavailable = true }
-    func beginLiveControl() throws -> UUID {
+    func beginLiveControl() throws -> String {
         guard snapshot.phase == .connected else { throw NexArmError.disconnected }
         observation = nil
-        let id = UUID()
+        let id = UUID().uuidString
         liveSession = id
         pendingPose?.resume(throwing: NexArmError.sessionReplaced)
         pendingPose = nil
@@ -183,7 +190,7 @@ private actor BluetoothArmFixture: NexArmBluetoothLink {
         pendingLiveFailure?.resume()
         pendingLiveFailure = nil
     }
-    func sendLive(_ packet: NexArmPacket, session: UUID) async throws -> Bool {
+    func sendLive(_ packet: NexArmPacket, session: String) async throws -> Bool {
         guard liveSession == session, snapshot.phase == .connected else { throw NexArmError.disconnected }
         if failNextLiveValidation {
             failNextLiveValidation = false
@@ -218,7 +225,7 @@ private actor BluetoothArmFixture: NexArmBluetoothLink {
         pendingLiveEnd?.resume()
         pendingLiveEnd = nil
     }
-    func endLiveControl(_ session: UUID) async {
+    func endLiveControl(_ session: String) async {
         if holdLiveEnd { await withCheckedContinuation { pendingLiveEnd = $0 } }
         if liveSession == session { liveSession = nil }
     }
@@ -289,10 +296,10 @@ private actor BluetoothArmFixture: NexArmBluetoothLink {
         snapshot.failure = nil
         emit.yield(snapshot)
     }
-    func connect(_ id: UUID) async throws {
+    func connect(_ id: String) async throws {
         guard id == self.id else { throw NexArmBluetoothError.unknownDevice }
         connects += 1
-        snapshot.connectionID = UUID()
+        snapshot.connectionID = UUID().uuidString
         snapshot.selected = .init(id: id, name: displayName, rssi: -45)
         if failedConnectionsRemaining > 0 {
             failedConnectionsRemaining -= 1
@@ -459,7 +466,7 @@ private actor BluetoothArmFixture: NexArmBluetoothLink {
 private func bluetoothTestWorkflow(_ link: BluetoothArmFixture, file: URL) -> BluetoothWorkflow {
     BluetoothWorkflow(
         state: BluetoothSettingsState(), link: link,
-        makeStore: { try LocalDocumentStore<BluetoothDeviceRecord>(url: file, maximumBytes: 4096) })
+        makeDeviceRepository: { try SQLiteRepositories(url: file).devices })
 }
 @MainActor
 private func until(attempts: Int = 1500, context: String = "", _ predicate: @MainActor () async -> Bool) async throws {
@@ -471,7 +478,8 @@ private func until(attempts: Int = 1500, context: String = "", _ predicate: @Mai
     throw NexArmError.timeout
 }
 private func bluetoothTestFile() -> URL {
-    FileManager.default.temporaryDirectory.appendingPathComponent("bluetooth-tests-\(UUID()).json")
+    FileManager.default.temporaryDirectory.appendingPathComponent(
+        "bluetooth-tests-\(UUID().uuidString).json")
 }
 
 @Test(.actionCatalog) func bluetoothReplyRequiresACKAndMatchingReassembledPacket() throws {
@@ -500,12 +508,12 @@ func bluetoothSettingsConnectionPersistsAcrossNavigationAndAssistantExecutes() a
     workflow.openPage()
     try await until { !workflow.state.nearby.isEmpty }
     await workflow.waitUntilIdle()
-    workflow.connect(link.id)
+    workflow.connect(try link.businessID)
     await workflow.waitUntilIdle()
     #expect(workflow.state.phase == .connected)
-    #expect(workflow.state.remembered?.id == link.id)
-    let connectedRecord = try await LocalDocumentStore<BluetoothDeviceRecord>(url: file).load()
-    #expect(connectedRecord?.value.automaticallyReconnect == true)
+    #expect(workflow.state.remembered?.id == (try link.businessID))
+    let connectedRecord = try SQLiteRepositories(url: file).devices.selectedDevice()
+    #expect(connectedRecord?.reconnect == true)
     #expect(await link.feedbackCommands.isEmpty)
     #expect(await link.observedCommands.isEmpty)
     workflow.openPage()
@@ -520,18 +528,19 @@ func bluetoothSettingsConnectionPersistsAcrossNavigationAndAssistantExecutes() a
     workflow.disconnect()
     await workflow.waitUntilIdle()
     #expect(workflow.state.phase == .idle)
-    #expect(workflow.state.remembered?.id == link.id)
+    #expect(workflow.state.remembered?.id == (try link.businessID))
     await #expect(throws: NexArmExecutionError.self) { try await workflow.shakeBase(cycles: 1) }
     observer.cancel()
     await observer.value
     let restored = bluetoothTestWorkflow(BluetoothArmFixture(), file: file)
     let restoreObserver = Task { await restored.run() }
-    try await until { restored.state.remembered?.id == link.id }
+    let rememberedID = try link.businessID
+    try await until { restored.state.remembered?.id == rememberedID }
     restored.forget()
     await restored.waitUntilIdle()
     #expect(restored.state.remembered == nil)
-    let saved = try await LocalDocumentStore<BluetoothDeviceRecord>(url: file).load()
-    #expect(saved?.value.id == nil)
+    let saved = try SQLiteRepositories(url: file).devices.selectedDevice()
+    #expect(saved?.id == nil)
     restoreObserver.cancel()
     await restoreObserver.value
 }
@@ -546,14 +555,14 @@ func bluetoothRejectsIncompatibleServiceAndCancelsConnectingOnBackground() async
     workflow.openPage()
     try await until { !workflow.state.nearby.isEmpty }
     await link.configure(wrong: true)
-    workflow.connect(link.id)
+    workflow.connect(try link.businessID)
     await workflow.waitUntilIdle()
     #expect(workflow.state.phase == .failed)
     #expect(workflow.state.remembered == nil)
     await #expect(throws: NexArmExecutionError.self) { try await workflow.shakeBase(cycles: 1) }
     #expect(await link.writes == 0)
     await link.configure(hold: true)
-    workflow.connect(link.id)
+    workflow.connect(try link.businessID)
     try await until { await link.status().phase == .connecting }
     workflow.setForeground(false)
     await workflow.waitUntilIdle()
@@ -573,7 +582,7 @@ func bluetoothBackgroundJoinsCommittedLegAndDoesNotResumeMotion() async throws {
     workflow.openPage()
     try await until { !workflow.state.nearby.isEmpty }
     await workflow.waitUntilIdle()
-    workflow.connect(link.id)
+    workflow.connect(try link.businessID)
     await workflow.waitUntilIdle()
     let movement = Task { try await workflow.shakeBase(cycles: 3) }
     try await until { await link.writes == 1 }
@@ -602,7 +611,7 @@ func bluetoothFailedWriteRecoversConnectionWithoutReplayingTheGesture() async th
     workflow.openPage()
     try await until { !workflow.state.nearby.isEmpty }
     await workflow.waitUntilIdle()
-    workflow.connect(link.id)
+    workflow.connect(try link.businessID)
     await workflow.waitUntilIdle()
     await link.configure(fail: true)
     await #expect(throws: NexArmError.timeout) { try await workflow.shakeBase(cycles: 1) }
@@ -643,7 +652,7 @@ func bluetoothPoseProtocolConnectsWithoutFirmwareQueriesAndAssistantExecutes() a
     workflow.openPage()
     try await until { !workflow.state.nearby.isEmpty }
     await workflow.waitUntilIdle()
-    workflow.connect(link.id)
+    workflow.connect(try link.businessID)
     await workflow.waitUntilIdle()
     #expect(workflow.state.controlReady)
     #expect(workflow.state.error == nil)
@@ -676,7 +685,7 @@ func bluetoothPassiveConnectionDoesNotValidateBusinessPose() async throws {
     workflow.openPage()
     try await until { !workflow.state.nearby.isEmpty }
     await workflow.waitUntilIdle()
-    workflow.connect(link.id)
+    workflow.connect(try link.businessID)
     await workflow.waitUntilIdle()
     #expect(workflow.state.controlReady)
     #expect(await link.feedbackCommands.isEmpty)
@@ -697,7 +706,7 @@ func bluetoothBackgroundCancelsPendingConnectionWithoutSendingAnIndication() asy
     workflow.openPage()
     try await until { !workflow.state.nearby.isEmpty }
     await link.configure(hold: true)
-    workflow.connect(link.id)
+    workflow.connect(try link.businessID)
     try await until { await link.status().phase == .connecting }
     #expect(workflow.state.phase == .connecting && !workflow.state.controlReady)
     workflow.setForeground(false)
@@ -729,7 +738,7 @@ func bluetoothConnectionFeedbackFailureKeepsLinkAndDoesNotReplayGesture() async 
     workflow.openPage()
     try await until { !workflow.state.nearby.isEmpty }
     await workflow.waitUntilIdle()
-    workflow.connect(link.id)
+    workflow.connect(try link.businessID)
     await workflow.waitUntilIdle()
     #expect(workflow.state.phase == .connected && workflow.state.controlReady)
     workflow.openPage()
@@ -768,10 +777,10 @@ func bluetoothConnectionFeedbackFailureKeepsLinkAndDoesNotReplayGesture() async 
 }
 
 @Test(.actionCatalog) func bluetoothDiscoveryPrioritizesNamesButKeepsRenamedAndOtherDevices() {
-    let renamed = NexArmBluetoothDevice(id: UUID(), name: "桌上的手臂", rssi: -20)
-    let other = NexArmBluetoothDevice(id: UUID(), name: "温度计", rssi: -30)
-    let arm = NexArmBluetoothDevice(id: UUID(), name: "Nex_Arm", rssi: -80)
-    let unnamed = NexArmBluetoothDevice(id: UUID(), name: "未命名设备", rssi: -60)
+    let renamed = NexArmBluetoothDevice(id: UUID().uuidString, name: "桌上的手臂", rssi: -20)
+    let other = NexArmBluetoothDevice(id: UUID().uuidString, name: "温度计", rssi: -30)
+    let arm = NexArmBluetoothDevice(id: UUID().uuidString, name: "Nex_Arm", rssi: -80)
+    let unnamed = NexArmBluetoothDevice(id: UUID().uuidString, name: "未命名设备", rssi: -60)
     let rows = [renamed, other, arm, unnamed].sorted(by: BluetoothPresentation.discoveryOrder)
     #expect(rows.map(\.id) == [arm.id, renamed.id, other.id, unnamed.id])
 }
@@ -787,7 +796,7 @@ func bluetoothRenamedDeviceResumesWithoutSettingsOrMovementAndManualDisconnectPe
     workflow.openPage()
     try await until { !workflow.state.nearby.isEmpty }
     await workflow.waitUntilIdle()
-    workflow.connect(link.id)
+    workflow.connect(try link.businessID)
     await workflow.waitUntilIdle()
     workflow.closePage()
     #expect(workflow.state.controlReady)
@@ -809,8 +818,8 @@ func bluetoothRenamedDeviceResumesWithoutSettingsOrMovementAndManualDisconnectPe
     await workflow.waitUntilIdle()
     #expect(await link.connects == 1)
     #expect(!workflow.state.controlReady)
-    let saved = try await LocalDocumentStore<BluetoothDeviceRecord>(url: file).load()
-    #expect(saved?.value.automaticallyReconnect == false)
+    let saved = try SQLiteRepositories(url: file).devices.selectedDevice()
+    #expect(saved?.reconnect == false)
     observer.cancel()
     await observer.value
 }
@@ -820,8 +829,9 @@ func bluetoothColdStartRestoresPreviouslyVerifiedDeviceWithoutGesture() async th
     let file = bluetoothTestFile()
     defer { try? FileManager.default.removeItem(at: file) }
     let link = BluetoothArmFixture()
-    let store = try LocalDocumentStore<BluetoothDeviceRecord>(url: file)
-    _ = try await store.save(.init(id: link.id, name: "已改名机械臂", automaticallyReconnect: true), expecting: nil)
+    let store = try SQLiteRepositories(url: file)
+    let selected = try store.devices.device(nativeID: link.id, name: "已改名机械臂")
+    try store.devices.selectDevice(selected, reconnect: true)
     let workflow = bluetoothTestWorkflow(link, file: file)
     let observer = Task { await workflow.run() }
     try await until { workflow.state.controlReady }
@@ -849,7 +859,7 @@ func bluetoothManualDisconnectDuringBackgroundCleanupDisablesPersistedRecovery()
     workflow.openPage()
     try await until { !workflow.state.nearby.isEmpty }
     await workflow.waitUntilIdle()
-    workflow.connect(link.id)
+    workflow.connect(try link.businessID)
     await workflow.waitUntilIdle()
     let movement = Task { try await workflow.shakeBase(cycles: 2) }
     try await until { await link.writes == 1 }
@@ -860,8 +870,8 @@ func bluetoothManualDisconnectDuringBackgroundCleanupDisablesPersistedRecovery()
     await #expect(throws: CancellationError.self) { try await movement.value }
     #expect(await link.connects == 1)
     #expect(await link.writes == 1)
-    let saved = try await LocalDocumentStore<BluetoothDeviceRecord>(url: file).load()
-    #expect(saved?.value.automaticallyReconnect == false)
+    let saved = try SQLiteRepositories(url: file).devices.selectedDevice()
+    #expect(saved?.reconnect == false)
     observer.cancel()
     await observer.value
 }
@@ -876,7 +886,7 @@ func bluetoothGestureBackgroundCancelsRemainingLegsAndNeverReplays() async throw
     workflow.openPage()
     try await until { !workflow.state.nearby.isEmpty }
     await workflow.waitUntilIdle()
-    workflow.connect(link.id)
+    workflow.connect(try link.businessID)
     await workflow.waitUntilIdle()
     let movement = Task { try await workflow.performGesture(.wave, repetitions: 3) }
     try await until { await link.writes >= 1 }
@@ -919,7 +929,7 @@ func bluetoothAllSixJoysticksStreamWithoutTelemetryAndReleaseDoesNotReset() asyn
     workflow.openPage()
     try await until { !workflow.state.nearby.isEmpty }
     await workflow.waitUntilIdle()
-    workflow.connect(link.id)
+    workflow.connect(try link.businessID)
     await workflow.waitUntilIdle()
     let reads = await link.poseReads
     await link.disableTelemetry()
@@ -955,7 +965,7 @@ func bluetoothLiveBackpressureDoesNotAccumulateCommandsAndResetPreemptsPreset() 
     workflow.openPage()
     try await until { !workflow.state.nearby.isEmpty }
     await workflow.waitUntilIdle()
-    workflow.connect(link.id)
+    workflow.connect(try link.businessID)
     await workflow.waitUntilIdle()
     let initial = NexArmGesture.referenceHomeJoints[1]
     await link.blockLive(true)
@@ -1011,7 +1021,7 @@ func bluetoothJoysticksAcceptOnlyNewInputAfterFailedWriteRecovery() async throws
     workflow.openPage()
     try await until { !workflow.state.nearby.isEmpty }
     await workflow.waitUntilIdle()
-    workflow.connect(link.id)
+    workflow.connect(try link.businessID)
     await workflow.waitUntilIdle()
     await link.configure(feedbackFailure: true)
     await #expect(throws: NexArmError.timeout) {
@@ -1078,13 +1088,13 @@ func bluetoothConnectAndForgetClearDiscoveryAndSavedState() async throws {
     try await until { !workflow.state.nearby.isEmpty }
     let rows: [NexArmBluetoothDevice] = [
         .init(id: link.id, name: "NexArm", rssi: -40),
-        .init(id: UUID(), name: "未命名设备", rssi: -20),
-        .init(id: UUID(), name: " ", rssi: -20),
-        .init(id: UUID(), name: "温度计", rssi: -20),
+        .init(id: UUID().uuidString, name: "未命名设备", rssi: -20),
+        .init(id: UUID().uuidString, name: " ", rssi: -20),
+        .init(id: UUID().uuidString, name: "温度计", rssi: -20),
     ]
     await link.simulateDiscovery(rows)
     try await until { workflow.state.nearby.count == 2 }
-    workflow.connect(link.id)
+    workflow.connect(try link.businessID)
     #expect(workflow.state.nearby.isEmpty && !workflow.state.scanning)
     await workflow.waitUntilIdle()
     #expect(workflow.state.controlReady)
@@ -1128,7 +1138,7 @@ func bluetoothTransportLossRecoversOnceWithoutMotionReplay() async throws {
     workflow.openPage()
     try await until { !workflow.state.nearby.isEmpty }
     await workflow.waitUntilIdle()
-    workflow.connect(link.id)
+    workflow.connect(try link.businessID)
     await workflow.waitUntilIdle()
     await link.loseConnectionOnNextMotion()
     await #expect(throws: (any Error).self) { try await workflow.shakeBase(cycles: 3) }
@@ -1161,7 +1171,7 @@ func bluetoothPassiveConnectionDoesNotInvokeFailedIndication() async throws {
     workflow.openPage()
     try await until { !workflow.state.nearby.isEmpty }
     await workflow.waitUntilIdle()
-    workflow.connect(link.id)
+    workflow.connect(try link.businessID)
     await workflow.waitUntilIdle()
     #expect(workflow.state.controlReady)
     #expect(workflow.state.error == nil)
@@ -1183,7 +1193,7 @@ func bluetoothResetRetiresPendingObservationWithoutClosingLiveControls() async t
     workflow.openPage()
     try await until { !workflow.state.nearby.isEmpty }
     await workflow.waitUntilIdle()
-    workflow.connect(link.id)
+    workflow.connect(try link.businessID)
     await workflow.waitUntilIdle()
     try await link.pushPosition()
     try await until { workflow.state.sampledAt != nil }
@@ -1217,7 +1227,7 @@ func bluetoothResetWithoutCompletionReplyDoesNotBlockNextPresetAndPreservesFailu
     workflow.openPage()
     try await until { !workflow.state.nearby.isEmpty }
     await workflow.waitUntilIdle()
-    workflow.connect(link.id)
+    workflow.connect(try link.businessID)
     await workflow.waitUntilIdle()
     await link.configure(feedbackFailure: true)
     await #expect(throws: NexArmError.timeout) {
@@ -1367,7 +1377,7 @@ func bluetoothActionFeedbackTimeoutDoesNotRecoverOrBlockNextPreset() async throw
     workflow.openPage()
     try await until { !workflow.state.nearby.isEmpty }
     await workflow.waitUntilIdle()
-    workflow.connect(link.id)
+    workflow.connect(try link.businessID)
     await workflow.waitUntilIdle()
     try await link.pushPosition()
     try await until { workflow.state.sampledAt != nil }
@@ -1400,7 +1410,7 @@ func bluetoothSettingsSharesFeedbackRecipeAndPreemptsPendingCompletion() async t
     workflow.openPage()
     try await until { !workflow.state.nearby.isEmpty }
     await workflow.waitUntilIdle()
-    workflow.connect(link.id)
+    workflow.connect(try link.businessID)
     await workflow.waitUntilIdle()
     workflow.tryAction(.wave)
     try await until { await link.observedCommands.count == 1 }
@@ -1425,7 +1435,7 @@ func bluetoothSettingsCongestionRetainsOnlyLatestTestAndResetCancelsEnding() asy
     workflow.openPage()
     try await until { !workflow.state.nearby.isEmpty }
     await workflow.waitUntilIdle()
-    workflow.connect(link.id)
+    workflow.connect(try link.businessID)
     await workflow.waitUntilIdle()
     await link.blockLive(true)
     workflow.tryAction(.dance)
@@ -1456,7 +1466,7 @@ func bluetoothFeedbackHealthDoesNotCancelExecutionOrDisableManualControl() async
     workflow.openPage()
     try await until { !workflow.state.nearby.isEmpty }
     await workflow.waitUntilIdle()
-    workflow.connect(link.id)
+    workflow.connect(try link.businessID)
     await workflow.waitUntilIdle()
     let before = await link.observedCommands.count
     await link.health(false)
@@ -1496,7 +1506,7 @@ func bluetoothSettingsBypassesHeldResourcesAndAgentCleanupWithFeedback() async t
     workflow.openPage()
     try await until { !workflow.state.nearby.isEmpty }
     await workflow.waitUntilIdle()
-    workflow.connect(link.id)
+    workflow.connect(try link.businessID)
     await workflow.waitUntilIdle()
     try await resources.run(
         resources: Set((1...6).map { ResourceID(rawValue: "nexarm.motor.\($0)") }),
@@ -1548,7 +1558,7 @@ func bluetoothPassiveConnectionDoesNotQueryAndActualQueryTimeoutRecovers() async
     workflow.openPage()
     try await until { !workflow.state.nearby.isEmpty }
     await workflow.waitUntilIdle()
-    workflow.connect(link.id)
+    workflow.connect(try link.businessID)
     await workflow.waitUntilIdle()
     #expect(workflow.state.phase == .connected && workflow.state.controlReady)
     #expect(await link.poseReads == 0)
@@ -1638,7 +1648,7 @@ func bluetoothAimSharesBackpressureFairlyAcrossAllFourMotors() async throws {
     workflow.openPage()
     try await until { !workflow.state.nearby.isEmpty }
     await workflow.waitUntilIdle()
-    workflow.connect(link.id)
+    workflow.connect(try link.businessID)
     await workflow.waitUntilIdle()
     await link.throttleLive()
     try await workflow.aim(base: 0.6, pitch: 0.5)
@@ -1667,7 +1677,7 @@ func bluetoothFeedbackLossShowsCurrentIssueWithoutRecoveryOrReplay() async throw
     workflow.openPage()
     try await until { !workflow.state.nearby.isEmpty }
     await workflow.waitUntilIdle()
-    workflow.connect(link.id)
+    workflow.connect(try link.businessID)
     await workflow.waitUntilIdle()
     let gestureCount = await link.feedbackCommands.count
     await link.health(false)
@@ -1696,7 +1706,7 @@ func bluetoothCongestionResetsInputsAndOnlyNewIntentCanSendAfterRecovery() async
     workflow.openPage()
     try await until { !workflow.state.nearby.isEmpty }
     await workflow.waitUntilIdle()
-    workflow.connect(link.id)
+    workflow.connect(try link.businessID)
     await workflow.waitUntilIdle()
     await link.blockLive(true)
     workflow.setMotorVelocity(id: 1, value: 1)
@@ -1723,7 +1733,7 @@ func bluetoothQueryIsolationIsClearedByANewVerifiedConnection() async throws {
     workflow.openPage()
     try await until { !workflow.state.nearby.isEmpty }
     await workflow.waitUntilIdle()
-    workflow.connect(link.id)
+    workflow.connect(try link.businessID)
     await workflow.waitUntilIdle()
     await link.failPositionOnce()
     await #expect(throws: NexArmError.timeout) {
@@ -1751,18 +1761,18 @@ func bluetoothLatestCommunicationIssueClearsWhenFeedbackRecovers() async throws 
     workflow.openPage()
     try await until { !workflow.state.nearby.isEmpty }
     await workflow.waitUntilIdle()
-    workflow.connect(link.id)
+    workflow.connect(try link.businessID)
     await workflow.waitUntilIdle()
     await link.publishFeedback(try NexArmPacket(command: 11, payload: [0]))
     await workflow.refreshDevice()
     #expect(workflow.state.transportIssue == nil)
     await link.health(false)
     try await until { workflow.state.transportIssue != nil }
-    #expect(workflow.state.status(for: link.id) == "已连接，异常")
-    #expect(workflow.state.canControl(link.id))
+    #expect(workflow.state.status(for: try link.businessID) == "已连接，异常")
+    #expect(workflow.state.canControl(try link.businessID))
     await link.health(true)
     try await until { workflow.state.transportIssue == nil }
-    #expect(workflow.state.status(for: link.id) == "已连接")
+    #expect(workflow.state.status(for: try link.businessID) == "已连接")
     #expect(await link.connects == 1)
     await link.health(false)
     try await until { workflow.state.transportIssue != nil }
@@ -1770,7 +1780,7 @@ func bluetoothLatestCommunicationIssueClearsWhenFeedbackRecovers() async throws 
     try await until { workflow.state.transportIssue == nil }
     workflow.disconnect()
     await workflow.waitUntilIdle()
-    #expect(!workflow.state.canControl(link.id))
+    #expect(!workflow.state.canControl(try link.businessID))
     observer.cancel()
     await observer.value
 }
@@ -1785,7 +1795,7 @@ func bluetoothRecoveryStopsAfterThreeFailuresAndManualReconnectStartsAFreshEpiso
     workflow.openPage()
     try await until { !workflow.state.nearby.isEmpty }
     await workflow.waitUntilIdle()
-    workflow.connect(link.id)
+    workflow.connect(try link.businessID)
     await workflow.waitUntilIdle()
     await link.failConnections(3)
     await link.loseConnection()
@@ -1795,7 +1805,7 @@ func bluetoothRecoveryStopsAfterThreeFailuresAndManualReconnectStartsAFreshEpiso
     #expect(workflow.state.recoveryAttempt == 3 && !workflow.state.controlReady)
     try await Task.sleep(for: .milliseconds(150))
     #expect(await link.connects == 4)
-    workflow.reconnect(link.id)
+    workflow.reconnect(try link.businessID)
     await workflow.waitUntilIdle()
     #expect(await link.connects == 5)
     #expect(workflow.state.controlReady && workflow.state.recoveryAttempt == 0)
@@ -1816,7 +1826,7 @@ func bluetoothUnconfirmedDisconnectNeverOpensASecondConnection() async throws {
     workflow.openPage()
     try await until { !workflow.state.nearby.isEmpty }
     await workflow.waitUntilIdle()
-    workflow.connect(link.id)
+    workflow.connect(try link.businessID)
     await workflow.waitUntilIdle()
     await link.refuseDisconnect(true)
     await link.loseConnection()
@@ -1850,7 +1860,7 @@ func bluetoothRecoveryWaitsForPowerAndUserDisconnectCancelsPendingRetries() asyn
     workflow.openPage()
     try await until { !workflow.state.nearby.isEmpty }
     await workflow.waitUntilIdle()
-    workflow.connect(link.id)
+    workflow.connect(try link.businessID)
     await workflow.waitUntilIdle()
     await link.power(.poweredOff)
     try await until { workflow.state.recoveryStage == .waitingForBluetooth }
@@ -1878,7 +1888,7 @@ func bluetoothOldSnapshotsCannotReviveOrFloodARecovery() async throws {
     workflow.openPage()
     try await until { !workflow.state.nearby.isEmpty }
     await workflow.waitUntilIdle()
-    workflow.connect(link.id)
+    workflow.connect(try link.businessID)
     await workflow.waitUntilIdle()
     await link.setRevision(100)
     var old = await link.status()
@@ -1892,7 +1902,7 @@ func bluetoothOldSnapshotsCannotReviveOrFloodARecovery() async throws {
     await link.setRevision(0)
     await link.loseConnection()
     try await until { workflow.state.recoveryStage == .waiting }
-    let ids = (0..<5).map { _ in UUID() }
+    let ids = (0..<5).map { _ in UUID().uuidString }
     for id in ids { for _ in 0..<40 { workflow.connect(id) } }
     #expect(workflow.state.error == "正在恢复连接，请等待完成或先断开")
     #expect(await link.connects == 1)
@@ -1912,7 +1922,7 @@ func bluetoothEveryRecoverySuccessResetsItsEpisodeBudget() async throws {
     workflow.openPage()
     try await until { !workflow.state.nearby.isEmpty }
     await workflow.waitUntilIdle()
-    workflow.connect(link.id)
+    workflow.connect(try link.businessID)
     await workflow.waitUntilIdle()
     for count in 2...6 {
         await link.loseConnection()
@@ -1937,7 +1947,7 @@ func bluetoothForegroundAfterExhaustionAlwaysStartsANewEligibleEpisode() async t
     workflow.openPage()
     try await until { !workflow.state.nearby.isEmpty }
     await workflow.waitUntilIdle()
-    workflow.connect(link.id)
+    workflow.connect(try link.businessID)
     await workflow.waitUntilIdle()
     for count in [4, 7] {
         await link.failConnections(3)
@@ -1972,7 +1982,7 @@ func bluetoothRepeatedBackgroundPreservesHealthyLinkAndNeverResumesOldJog() asyn
     workflow.openPage()
     try await until { !workflow.state.nearby.isEmpty }
     await workflow.waitUntilIdle()
-    workflow.connect(link.id)
+    workflow.connect(try link.businessID)
     await workflow.waitUntilIdle()
     workflow.setMotorVelocity(id: 1, value: 0.8)
     try await until(context: "initial jog before repeated background") { await !link.liveCommands.isEmpty }
@@ -2008,7 +2018,7 @@ func bluetoothForegroundJoinsSuspendedWriterBeforeAdmittingNewControl() async th
     workflow.openPage()
     try await until { !workflow.state.nearby.isEmpty }
     await workflow.waitUntilIdle()
-    workflow.connect(link.id)
+    workflow.connect(try link.businessID)
     await workflow.waitUntilIdle()
     await link.blockLiveEnd()
     workflow.setMotorVelocity(id: 1, value: 0.8)
@@ -2044,7 +2054,7 @@ func bluetoothLossWhileBackgroundedWaitsForForegroundThenReconnects() async thro
     workflow.openPage()
     try await until { !workflow.state.nearby.isEmpty }
     await workflow.waitUntilIdle()
-    workflow.connect(link.id)
+    workflow.connect(try link.businessID)
     await workflow.waitUntilIdle()
     workflow.setForeground(false)
     await workflow.waitUntilIdle()
@@ -2072,7 +2082,7 @@ func bluetoothBackgroundCancelsRecoveryAndForegroundResumesWithoutOldAim() async
     workflow.openPage()
     try await until { !workflow.state.nearby.isEmpty }
     await workflow.waitUntilIdle()
-    workflow.connect(link.id)
+    workflow.connect(try link.businessID)
     await workflow.waitUntilIdle()
     try await workflow.aim(base: 0.8, pitch: 0.5)
     try await until { await !link.liveCommands.isEmpty }
@@ -2107,7 +2117,7 @@ func bluetoothForgetDuringBackoffDisablesSavedRecovery() async throws {
     workflow.openPage()
     try await until { !workflow.state.nearby.isEmpty }
     await workflow.waitUntilIdle()
-    workflow.connect(link.id)
+    workflow.connect(try link.businessID)
     await workflow.waitUntilIdle()
     await link.loseConnection()
     try await until { workflow.state.recoveryStage == .waiting }
@@ -2135,7 +2145,7 @@ func bluetoothRevokedExecutionPermitCannotBypassAgentGuard() async throws {
     workflow.openPage()
     try await until { !workflow.state.nearby.isEmpty }
     await workflow.waitUntilIdle()
-    workflow.connect(link.id)
+    workflow.connect(try link.businessID)
     await workflow.waitUntilIdle()
     let oldPermit = ResourceExecutionPermit { _ in throw HarnessError.notRunning }
     let held = Set((1...5).map { ResourceID(rawValue: "nexarm.motor.\($0)") })
@@ -2192,9 +2202,10 @@ func bluetoothAssistantActionPreemptsTrackingAndKeepsQueuedActions(motor: Int) a
     workflow.openPage()
     try await until { !workflow.state.nearby.isEmpty }
     await workflow.waitUntilIdle()
-    workflow.connect(link.id)
+    workflow.connect(try link.businessID)
     await workflow.waitUntilIdle()
-    let photographer = ExecutionOwner(agent: .photographer, incarnation: UUID(), sessionID: UUID())
+    let photographer = ExecutionOwner(
+        agent: .photographer, incarnation: UUID().uuidString, sessionID: UUID().uuidString)
     try await ResourceExecutionContext.$owner.withValue(photographer) {
         try await workflow.aim(base: -0.8, pitch: 0.4)
     }
@@ -2208,9 +2219,10 @@ func bluetoothAssistantActionPreemptsTrackingAndKeepsQueuedActions(motor: Int) a
             recordReport: { try await invocation.results.record($0) })
     }
     let scheduler = ChannelScheduler(registry: try ActionRegistry(modules: [module]), resources: resources)
-    let session = UUID()
-    let input = AgentInput(sessionID: session, payload: .text("Explicit user movement"))
-    let owner = ExecutionOwner(agent: .assistant, incarnation: UUID(), sessionID: session)
+    let session = UUID().uuidString
+    let input = AgentInput(
+        id: UUID().uuidString, sessionID: session, payload: .text("Explicit user movement"))
+    let owner = ExecutionOwner(agent: .assistant, incarnation: UUID().uuidString, sessionID: session)
     for target in [2000, 2100] {
         let call = ActionCall(
             actionPath: ActionPath(domain: "NexArm", module: "Motion", function: "moveMotor"), channel: "Robot",
@@ -2255,7 +2267,7 @@ func bluetoothTrackingInputExpiryJoinsWriterAndReleasesMotorResources() async th
     let workflow = bluetoothTestWorkflow(link, file: file)
     let resources = try nexArmTestResources()
     workflow.withMotorResources = bluetoothResourceGuard(resources)
-    let session = UUID()
+    let session = UUID().uuidString
     let photographer = try PhotographerAgent(sessionID: session, controlsArm: true)
     try await photographer.start()
     let pose = try PoseObservation(
@@ -2267,12 +2279,14 @@ func bluetoothTrackingInputExpiryJoinsWriterAndReleasesMotorResources() async th
     workflow.openPage()
     try await until { !workflow.state.nearby.isEmpty }
     await workflow.waitUntilIdle()
-    workflow.connect(link.id)
+    workflow.connect(try link.businessID)
     await workflow.waitUntilIdle()
     try await photographer.receive(
         AgentInput(
+            id: UUID().uuidString,
             sessionID: session, payload: payload,
-            metadata: InputMetadata(payload: payload, source: "visionPerception")))
+            metadata: InputMetadata(payload: payload, source: "visionPerception", rootID: UUID().uuidString))
+    )
     await link.blockLiveEnd()
     try await workflow.aim(base: -0.8, pitch: 0.4)
     try await until { await !link.liveCommands.isEmpty }
@@ -2307,9 +2321,9 @@ func bluetoothGatewayAimUpdatesUseOneWorkerAndKeepActualMotorExclusion() async t
     workflow.openPage()
     try await until { !workflow.state.nearby.isEmpty }
     await workflow.waitUntilIdle()
-    workflow.connect(link.id)
+    workflow.connect(try link.businessID)
     await workflow.waitUntilIdle()
-    let session = UUID()
+    let session = UUID().uuidString
     let photographer = try PhotographerAgent(sessionID: session, controlsArm: true)
     let manager = AgentManager()
     try await manager.register(photographer, sessionID: session)
@@ -2322,10 +2336,13 @@ func bluetoothGatewayAimUpdatesUseOneWorkerAndKeepActualMotorExclusion() async t
         actions: ChannelScheduler(registry: ActionRegistry(), resources: resources), sink: { _ in })
     for sequence: UInt64 in 1...8 {
         let call = ToolCall(
+            id: UUID().uuidString,
             toolPath: "NexArm.Tracking.aim", arguments: ["base": String(0.5 + Double(sequence) / 100), "pitch": "0.5"])
         let result = try await output.dispatch(
             OutputEnvelope(
-                source: .photographer, input: AgentInput(sessionID: session, payload: .text("Test tracking intent")),
+                source: .photographer,
+                input: AgentInput(
+                    id: UUID().uuidString, sessionID: session, payload: .text("Test tracking intent")),
                 output: .toolCall(call), sequence: sequence))
         #expect(result == nil)
     }
@@ -2364,7 +2381,7 @@ func bluetoothAimResourceConflictDoesNotChangeNativeStateAndFreshTargetCanStart(
     workflow.openPage()
     try await until { !workflow.state.nearby.isEmpty }
     await workflow.waitUntilIdle()
-    workflow.connect(link.id)
+    workflow.connect(try link.businessID)
     await workflow.waitUntilIdle()
     let entered = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingOldest(1))
     let release = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingOldest(1))
@@ -2420,7 +2437,7 @@ func bluetoothSettingsOverridesAgentMotionAndAimWithSharedRecipe() async throws 
     workflow.openPage()
     try await until { !workflow.state.nearby.isEmpty }
     await workflow.waitUntilIdle()
-    workflow.connect(link.id)
+    workflow.connect(try link.businessID)
     await workflow.waitUntilIdle()
     try await link.pushPosition()
     try await until { workflow.state.sampledAt != nil }
@@ -2467,7 +2484,7 @@ func bluetoothPassiveRefreshNeverBlocksManualResetOrIssuesQuery() async throws {
     workflow.openPage()
     try await until { !workflow.state.nearby.isEmpty }
     await workflow.waitUntilIdle()
-    workflow.connect(link.id)
+    workflow.connect(try link.businessID)
     await workflow.waitUntilIdle()
     await link.holdTelemetry()
     let refresh = Task { await workflow.refreshDevice() }
@@ -2503,7 +2520,7 @@ func bluetoothLatestSliderSupersedesPresetWhileOldAimCleanupIsJoining() async th
     workflow.openPage()
     try await until { !workflow.state.nearby.isEmpty }
     await workflow.waitUntilIdle()
-    workflow.connect(link.id)
+    workflow.connect(try link.businessID)
     await workflow.waitUntilIdle()
     try await workflow.aim(base: -0.6, pitch: 0.3)
     try await until { await link.liveCommands.count > 0 }
@@ -2569,7 +2586,7 @@ private func bluetoothRecoveryPreservesAssistantGenerationSpeechAndOtherActions(
     let assistant = try AgentChatWorker<AssistantContextState>(chat: chat)
     let speech = try await bindSpeechRequests(assistant)
     let manager = AgentManager()
-    let session = UUID()
+    let session = UUID().uuidString
     try await manager.register(assistant, sessionID: session)
     try await assistant.start()
     let photographer = try PhotographerAgent(sessionID: session, controlsArm: true)
@@ -2623,13 +2640,15 @@ private func bluetoothRecoveryPreservesAssistantGenerationSpeechAndOtherActions(
     workflow.openPage()
     try await until { !workflow.state.nearby.isEmpty }
     await workflow.waitUntilIdle()
-    workflow.connect(link.id)
+    workflow.connect(try link.businessID)
     await workflow.waitUntilIdle()
     let observedBefore = await link.observedCommands.count
     try await link.pushPosition()
     try await until { workflow.state.joints.count == 6 }
     await link.holdTelemetry()
-    let request = AgentInput(sessionID: session, payload: .text("Continue a reply while the robot recovers"))
+    let request = AgentInput(
+        id: UUID().uuidString, sessionID: session,
+        payload: .text("Continue a reply while the robot recovers"))
     let pump = Task { () throws -> Bool in
         for await envelope in fixtureOutputs(assistant) {
             let result = try await output.execute(envelope)
@@ -2663,8 +2682,13 @@ private func bluetoothRecoveryPreservesAssistantGenerationSpeechAndOtherActions(
     await link.resumeTelemetry()
     let failedTool = try await output.execute(
         OutputEnvelope(
-            source: .photographer, input: AgentInput(sessionID: session, payload: .text("Unavailable robot")),
-            output: .toolCall(ToolCall(toolPath: "NexArm.Tracking.aim", arguments: ["base": "0.5", "pitch": "0.5"])),
+            source: .photographer,
+            input: AgentInput(
+                id: UUID().uuidString, sessionID: session, payload: .text("Unavailable robot")),
+            output: .toolCall(
+                ToolCall(
+                    id: UUID().uuidString, toolPath: "NexArm.Tracking.aim",
+                    arguments: ["base": "0.5", "pitch": "0.5"])),
             sequence: 1)
     )
     #expect(failedTool.isError && failedTool.tool?.isError == true)
@@ -2675,7 +2699,7 @@ private func bluetoothRecoveryPreservesAssistantGenerationSpeechAndOtherActions(
         try await until { workflow.state.recoveryStage == .failed }
         #expect(await link.connects == 4)
         #expect(await assistant.status().lifecycle == .running && spoken.count == 1)
-        workflow.reconnect(link.id)
+        workflow.reconnect(try link.businessID)
     }
     let expectedConnections = fault == .exhausted ? 5 : 2
     try await until(context: "verified replacement connection") {
@@ -2727,7 +2751,7 @@ func bluetoothManualSegmentsRequireFeedbackAndResetCanReplacePendingArrival() as
     workflow.openPage()
     try await until { !workflow.state.nearby.isEmpty }
     await workflow.waitUntilIdle()
-    workflow.connect(link.id)
+    workflow.connect(try link.businessID)
     await workflow.waitUntilIdle()
     let baseline = await link.observedCommands.count
     await link.holdTelemetry()
@@ -2770,7 +2794,7 @@ func bluetoothManualNodAdvancesOnArrivalWithoutNominalFrameDelay() async throws 
     workflow.openPage()
     try await until { !workflow.state.nearby.isEmpty }
     await workflow.waitUntilIdle()
-    workflow.connect(link.id)
+    workflow.connect(try link.businessID)
     await workflow.waitUntilIdle()
     let baseline = await link.observedCommands.count
     let start = ContinuousClock.now
@@ -2795,7 +2819,7 @@ func bluetoothPassiveConnectionDoesNotProbeAndFeedbackLossKeepsManualControl() a
     workflow.openPage()
     try await until { !workflow.state.nearby.isEmpty }
     await workflow.waitUntilIdle()
-    workflow.connect(link.id)
+    workflow.connect(try link.businessID)
     await workflow.waitUntilIdle()
     #expect(workflow.state.phase == .connected && workflow.state.canControl)
     #expect(await link.poseReads == 0)
@@ -2843,7 +2867,7 @@ func bluetoothRecoveryLeavesQueuedActionsForNormalChannelExecution() async throw
     let workflow = bluetoothTestWorkflow(link, file: file)
     let assistant = try AgentChatWorker<AssistantContextState>(chat: BluetoothRecoveryChat())
     let manager = AgentManager()
-    let session = UUID()
+    let session = UUID().uuidString
     try await manager.register(assistant, sessionID: session)
     try await assistant.start()
     let inputGateway = InputGateway(manager: manager, allowsExternalSend: true)
@@ -2876,12 +2900,13 @@ func bluetoothRecoveryLeavesQueuedActionsForNormalChannelExecution() async throw
     workflow.openPage()
     try await until { !workflow.state.nearby.isEmpty }
     await workflow.waitUntilIdle()
-    workflow.connect(link.id)
+    workflow.connect(try link.businessID)
     await workflow.waitUntilIdle()
     try await link.pushPosition()
     try await until { workflow.state.joints.count == 6 }
     await link.holdTelemetry()
-    let input = AgentInput(sessionID: session, payload: .text("Two accepted robot actions"))
+    let input = AgentInput(
+        id: UUID().uuidString, sessionID: session, payload: .text("Two accepted robot actions"))
     let owner = ExecutionOwner(
         agent: .assistant, incarnation: try await manager.identity(.assistant), sessionID: session)
     let call = ActionCall(
@@ -2936,7 +2961,7 @@ func bluetoothReconnectDoesNotWaitForOldActionCompletionToShowConnected() async 
     workflow.openPage()
     try await until { !workflow.state.nearby.isEmpty }
     await workflow.waitUntilIdle()
-    workflow.connect(link.id)
+    workflow.connect(try link.businessID)
     await workflow.waitUntilIdle()
     try await link.pushPosition()
     try await until { workflow.state.joints.count == 6 }
@@ -2950,7 +2975,8 @@ func bluetoothReconnectDoesNotWaitForOldActionCompletionToShowConnected() async 
     // The old business operation has not returned, but the native session is already closed.
     try await until { await link.connects == 2 && workflow.state.phase == .connected }
     #expect(await link.waitingForObservationEnd)
-    #expect(workflow.state.summary == "已连接" && workflow.state.status(for: link.id) == "已连接")
+    let currentDeviceID = try link.businessID
+    #expect(workflow.state.summary == "已连接" && workflow.state.status(for: currentDeviceID) == "已连接")
     await link.releaseObservationEnd()
     await #expect(throws: NexArmError.disconnected) { try await action.value }
     #expect(workflow.state.phase == .connected && workflow.state.summary == "已连接")
@@ -2985,7 +3011,7 @@ func bluetoothBusinessRejectionDoesNotRecordOrRecoverAndManualBypassesResources(
     workflow.openPage()
     try await until { !workflow.state.nearby.isEmpty }
     await workflow.waitUntilIdle()
-    workflow.connect(link.id)
+    workflow.connect(try link.businessID)
     await workflow.waitUntilIdle()
     let reports = ActionReportStore()
     try await workflow.performGesture(.nod, repetitions: 1, recordReport: { try await reports.record($0) })
@@ -3032,7 +3058,7 @@ func bluetoothLateAimExecutionFailureIsIndependentOfDeviceRecordsAndCompletedToo
     workflow.openPage()
     try await until { !workflow.state.nearby.isEmpty }
     await workflow.waitUntilIdle()
-    workflow.connect(link.id)
+    workflow.connect(try link.businessID)
     await workflow.waitUntilIdle()
     try await workflow.aim(base: -0.8, pitch: 0.5) { message in
         await activity.recordFailure(title: "NexArm.Tracking.aim", source: "Fixture", message: message.message)
@@ -3063,7 +3089,7 @@ func bluetoothInvocationReportsAreIndependentDuringNativeRecovery() async throws
     workflow.openPage()
     try await until { !workflow.state.nearby.isEmpty }
     await workflow.waitUntilIdle()
-    workflow.connect(link.id)
+    workflow.connect(try link.businessID)
     await workflow.waitUntilIdle()
     try await link.pushPosition()
     try await until(context: "passive seed") { workflow.state.joints.count == 6 }
@@ -3131,9 +3157,11 @@ func bluetoothLateNativeAimErrorIsReportedAfterRecoveryFencesTheConnection() asy
     workflow.openPage()
     try await until { !workflow.state.nearby.isEmpty }
     await workflow.waitUntilIdle()
-    workflow.connect(link.id)
+    workflow.connect(try link.businessID)
     await workflow.waitUntilIdle()
-    let origin = NexArmControlOrigin(source: "Fixture", sessionID: UUID(), inputID: UUID(), callID: UUID())
+    let origin = NexArmControlOrigin(
+        source: "Fixture", sessionID: UUID().uuidString, inputID: UUID().uuidString,
+        callID: UUID().uuidString)
     try await workflow.aim(base: -0.8, pitch: 0.5, origin: origin) { failure in
         await activity.recordFailure(
             title: "NexArm.Tracking.aim", source: failure.origin?.source ?? "", message: failure.message,
@@ -3310,7 +3338,7 @@ func bluetoothManualSimpleCommandsRemainUsableWithoutIKOrResourceAdmission() asy
     workflow.openPage()
     try await until { !workflow.state.nearby.isEmpty }
     await workflow.waitUntilIdle()
-    workflow.connect(link.id)
+    workflow.connect(try link.businessID)
     await workflow.waitUntilIdle()
     await link.rejectIKQueries()
     workflow.withMotorResources = { _, _ in throw NexArmExecutionError.resourceBusy }

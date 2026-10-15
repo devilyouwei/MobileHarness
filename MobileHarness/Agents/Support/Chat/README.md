@@ -50,6 +50,8 @@ History orders request blocks by monotonic historyOrder and replaces indexed ter
 
 Unknown/invalid invocations may produce bounded observation continuation. Successful send admission is completion evidence without business output. Persistence failure or uncertain delivery after validation ends the decision without re-delegating. A sealed round joins Action and Tool results before actual business output or failure starts another request.
 
+✅ Implemented camera-call rejection correction: AgentChatWorker returns explicit pre-execution rejection evidence for XML Actions and native Tools, including the rejected alias/reason, the fact that this call did not execute, and guidance to consult the current catalog and Skill-loading procedure. It does not resolve historical aliases, load Skills automatically or replay other calls. The existing immutable request catalog and result barrier remain authoritative.
+
 ## Prompt ownership and rendering
 
 `AgentPrompts.load(named:)` reads Assistant templates through the explicit Resources catalog. Specialists have no ordinary conversation templates. Memory title templates are loaded separately. It caches immutable resources and load errors. The Assistant template set must contain `activeTask`, `taskReports`, `taskReport`, `executionObservations`, `historicalExecution`, `toolFailure`; role hooks select any additional templates.
@@ -228,6 +230,19 @@ AgentTaskSkillState 控制经过真实 Agent.Task Actions 和原子 repository t
 ✅ Ordering: each admitted model request receives a monotonic historyOrder from the archive revision. Order the flattened timeline and compression sources by this value, not parent turn order or wall-clock timestamps; a continuation can interleave with later user inputs. History facade refreshes authoritative revisions and rejects stale commits.
 
 
-## 会话存储性能重构 v3
 
-✅ 已实现：文本消费把 delta 累加成完整 response，内存记录后立即解析/发出函数；usage、timing、Tool 与结果证据均在内存。用户接纳和决策终态（完成、失败、取消、中断）才 checkpoint；ReACT中间请求不落盘。Task压缩仍按原位置替换，先选最近10个投影项再构造消息。
+## SQLite records and runtime identity
+
+✅ Implemented: technical identities are opaque UUID strings; committed business entities use dialog/message/task/media/device SQLite IDs. Consumers use Storage repositories while preserving ownership, cancellation and independent foundation boundaries. Complete messages, including each ReACT message, persist at termination; delta fragments do not persist. The custom allocator and replaced file/index implementation are removed. See the project SQLite business-record plan.
+
+✅ Implemented performance refinement: checkpoint only dirty input records and changed terminal summaries; persisted current context reloads ten recent projected blocks, not the complete dialog. Full Task source indexes are joined from committed SQL relationships; a bounded context window is not deletion. Detail/UI pages stay separate from authoritative context projection.
+
+✅ Task activation validates the copied transition, commits its SQL running row and then binds context. A failed binding closes the row explicitly. Background rows retain requester/executor/execution/parent facts. Complete model messages checkpoint before continuation; complete observation messages checkpoint on next-request admission. Dirty-input tracking avoids encoding previous inputs, and completed decisions contract the memory window without deleting SQL records.
+
+✅ Storage repository refactor: AgentChatWorker uses injected TaskRepository for committed Task creation/completion; concrete backend access is removed. Preserve activation-after-commit, binding failure cleanup and no action replay.
+
+
+✅ Implemented: model-request admission obtains an Assistant message ID before generation; observation IDs link ReACT input to the response. State mutations/deltas only change bounded memory. Generation completion, execution evidence and terminal Task handling keep separate checkpoints.
+
+
+❌ Identified lifecycle gap (2026-10-15): scene background currently invokes pause and voice cancelSession independently. pause terminates even a waiting-user foreground Task and creates terminal compression after the per-input checkpoints, without a unified final Task/checkpoint flush. Goal preservation across scene suspension and complete host-terminal persistence need a separate fix; the SQL-paged UI Task folding correction does not change these semantics.

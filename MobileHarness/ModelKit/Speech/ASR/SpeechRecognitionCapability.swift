@@ -14,11 +14,11 @@ public struct SpeechRecognitionRequest: Sendable {
 }
 
 public struct TranscriptionEvent: Equatable, Sendable {
-    public let segmentID: UUID
+    public let segmentID: String
     public let revision: UInt64
     public let text: String
     public let isFinal: Bool
-    public init(segmentID: UUID, revision: UInt64, text: String, isFinal: Bool) {
+    public init(segmentID: String, revision: UInt64, text: String, isFinal: Bool) {
         self.segmentID = segmentID
         self.revision = revision
         self.text = text

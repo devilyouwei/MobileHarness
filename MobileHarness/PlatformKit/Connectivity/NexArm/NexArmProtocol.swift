@@ -132,10 +132,10 @@ public struct NexArmTelemetryCache: Sendable {
 
 /// Observation sessions are fenced by live/manual takeover and disconnect.
 public protocol NexArmObservableLink: NexArmWritableLink {
-    func beginObservation() async throws -> UUID
-    func sendObserved(_ packet: NexArmPacket, session: UUID) async throws -> Bool
-    func latestObservation(after sequence: UInt64, session: UUID) async throws -> NexArmTelemetry?
-    func endObservation(_ session: UUID) async
+    func beginObservation() async throws -> String
+    func sendObserved(_ packet: NexArmPacket, session: String) async throws -> Bool
+    func latestObservation(after sequence: UInt64, session: String) async throws -> NexArmTelemetry?
+    func endObservation(_ session: String) async
 }
 
 /// Connection-level health counts fresh receipts even when all positions are unchanged.

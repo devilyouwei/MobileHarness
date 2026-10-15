@@ -91,7 +91,7 @@
         private let photoOutput = AVCapturePhotoOutput()
         private var photoOutputInstalled = false
         private var photoTask: Task<Data, Error>?
-        private var photoID: UUID?
+        private var mediaID: String?
         private var photoTimedOut = false
         private let receiver: CameraFrameReceiver
         private let frameQueue = DispatchQueue(label: "dev.mobileharness.camera.frames", qos: .userInitiated)
@@ -231,8 +231,8 @@
             try Task.checkCancellation()
             guard photoTask == nil else { throw CameraError.photoBusy }
             guard photoOutputInstalled, session.isRunning, !session.isInterrupted else { throw CameraError.unavailable }
-            let id = UUID()
-            photoID = id
+            let id = UUID().uuidString
+            mediaID = id
             photoTimedOut = false
             if let connection = photoOutput.connection(with: .video) {
                 if connection.isVideoRotationAngleSupported(rotation) { connection.videoRotationAngle = rotation }
@@ -257,7 +257,7 @@
             let deadline = Task {
                 do {
                     try await Task.sleep(for: .seconds(10))
-                    guard photoID == id else { return }
+                    guard mediaID == id else { return }
                     photoTimedOut = true
                     stop()
                 } catch {}
@@ -265,7 +265,7 @@
             defer {
                 deadline.cancel()
                 photoTask = nil
-                photoID = nil
+                mediaID = nil
             }
             return try await withTaskCancellationHandler {
                 let data = try await task.value
@@ -278,8 +278,8 @@
                 Task { await self.cancelPhoto(id) }
             }
         }
-        private func cancelPhoto(_ id: UUID) {
-            guard photoID == id else { return }
+        private func cancelPhoto(_ id: String) {
+            guard mediaID == id else { return }
             stop()
         }
 

@@ -10,6 +10,9 @@ import FunctionContracts
 import Gateway
 import ModelKit
 import Storage
+import StorageMedia
+import StorageSQLite
+import StorageTasks
 import Testing
 import UI
 
@@ -26,14 +29,18 @@ import UI
     /// Test-only connection façade: all packets and telemetry use the real serial SDK.
     /// It exercises App's BLE-specific injection seam, not CoreBluetooth/radio behavior.
     private actor SerialSettingsLink: NexArmBluetoothLink {
-        nonisolated let id = UUID()
+        nonisolated let id = UUID().uuidString
+        nonisolated let records = Result { try SQLiteRepositories.temporary() }
+        nonisolated var businessID: String {
+            get throws { "device_1" }
+        }
         nonisolated let updates: AsyncStream<NexArmBluetoothSnapshot>
         private let continuation: AsyncStream<NexArmBluetoothSnapshot>.Continuation
         private let path: String
         private var serial: NexArmSerial?
-        private var wireSession: UUID?
-        private var observation: UUID?
-        private var live: UUID?
+        private var wireSession: String?
+        private var observation: String?
+        private var live: String?
         private var reader: Task<Void, Never>?
         private var exchanging = false
         private var wireSequence: UInt64 = 0
@@ -76,7 +83,7 @@ import UI
             snapshot.selected = nil
             publish()
         }
-        func connect(_ id: UUID) async throws {
+        func connect(_ id: String) async throws {
             guard id == self.id, serial == nil else { throw NexArmError.busy }
             let link = try NexArmSerial(path: path)
             serial = link
@@ -84,7 +91,7 @@ import UI
             budget = NexArmBLETrafficBudget()
             wireSequence = 0
             wireSession = try await link.beginObservation()
-            snapshot.connectionID = UUID()
+            snapshot.connectionID = UUID().uuidString
             snapshot.phase = .connected
             snapshot.selected = device
             snapshot.failure = nil
@@ -135,34 +142,34 @@ import UI
                 print("SERIAL RX t=\(sample.receivedAt - started) joints=\(joints)")
             }
         }
-        func beginObservation() throws -> UUID {
+        func beginObservation() throws -> String {
             guard serial != nil else { throw NexArmError.disconnected }
             guard !exchanging, observation == nil, live == nil else { throw NexArmError.busy }
-            let token = UUID()
+            let token = UUID().uuidString
             observation = token
             return token
         }
-        func endObservation(_ session: UUID) { if observation == session { observation = nil } }
-        func latestObservation(after sequence: UInt64, session: UUID) async throws -> NexArmTelemetry? {
+        func endObservation(_ session: String) { if observation == session { observation = nil } }
+        func latestObservation(after sequence: UInt64, session: String) async throws -> NexArmTelemetry? {
             guard serial != nil, observation == session else { throw NexArmError.disconnected }
             try await readAvailable()
             guard let sample = cache.latest, sample.sequence > sequence else { return nil }
             return sample
         }
-        func beginLiveControl() throws -> UUID {
+        func beginLiveControl() throws -> String {
             guard serial != nil else { throw NexArmError.disconnected }
             guard !exchanging else { throw NexArmError.busy }
             observation = nil
-            let token = UUID()
+            let token = UUID().uuidString
             live = token
             return token
         }
-        func endLiveControl(_ session: UUID) { if live == session { live = nil } }
-        func sendObserved(_ packet: NexArmPacket, session: UUID) async throws -> Bool {
+        func endLiveControl(_ session: String) { if live == session { live = nil } }
+        func sendObserved(_ packet: NexArmPacket, session: String) async throws -> Bool {
             guard observation == session else { throw NexArmError.disconnected }
             return try await send(packet)
         }
-        func sendLive(_ packet: NexArmPacket, session: UUID) async throws -> Bool {
+        func sendLive(_ packet: NexArmPacket, session: String) async throws -> Bool {
             guard live == session else { throw NexArmError.disconnected }
             return try await send(packet)
         }
@@ -231,7 +238,7 @@ import UI
     ) async throws {
         let assistant = try AgentChatWorker<AssistantContextState>(chat: FixedTextChat(text: markup))
         let manager = AgentManager()
-        let session = UUID()
+        let session = UUID().uuidString
         try await manager.register(assistant, sessionID: session)
         let policy = try CommunicationPolicy(
             contracts: AgentContracts.communication,
@@ -295,7 +302,8 @@ import UI
             try await assistant.bind(output.messaging(for: .assistant))
             try await assistant.start()
             let report = try await input.send(
-                AgentInput(sessionID: session, payload: .text("执行串口验收动作")), to: .assistant)
+                AgentInput(id: UUID().uuidString, sessionID: session, payload: .text("执行串口验收动作")),
+                to: .assistant)
             try #require(report.rejected.isEmpty)
             for await envelope in fixtureOutputs(assistant) {
                 try await output.dispatch(envelope)
@@ -331,12 +339,13 @@ import UI
     @MainActor
     func nexArmSerialSettingsTakeoverAndPhotographerToolAcceptance() async throws {
         let path = try #require(ProcessInfo.processInfo.environment["NEXARM_PORT"])
-        let file = FileManager.default.temporaryDirectory.appendingPathComponent("serial-tracking-\(UUID()).json")
+        let file = FileManager.default.temporaryDirectory.appendingPathComponent(
+            "serial-tracking-\(UUID().uuidString).json")
         defer { try? FileManager.default.removeItem(at: file) }
         let link = SerialSettingsLink(path: path)
         let workflow = BluetoothWorkflow(
             state: BluetoothSettingsState(), link: link,
-            makeStore: { try LocalDocumentStore<BluetoothDeviceRecord>(url: file, maximumBytes: 4096) })
+            makeDeviceRepository: { try SQLiteRepositories(url: file).devices })
         let observer = Task { await workflow.run() }
         let resources = try ResourceCoordinator(
             definitions: (1...6).map {
@@ -345,7 +354,7 @@ import UI
                 ) {}
             })
         let manager = AgentManager()
-        let session = UUID()
+        let session = UUID().uuidString
         let photographer = try PhotographerAgent(
             sessionID: session, controlsArm: true, controlAvailable: { await workflow.trackingAvailable })
         try await manager.register(photographer, sessionID: session)
@@ -371,7 +380,7 @@ import UI
         do {
             workflow.openPage()
             try await serialWait("discovery") { !workflow.state.nearby.isEmpty }
-            workflow.connect(link.id)
+            workflow.connect(try link.businessID)
             await workflow.waitUntilIdle()
             try await serialWait(seconds: 5, "passive feedback") { workflow.state.joints.count == 6 }
             // Tracking setup explicitly selects its own rest; ordinary reset keeps the legacy home.
@@ -393,8 +402,11 @@ import UI
                 let payload = InputPayload.observation(.pose(pose))
                 let delivery = try await input.send(
                     AgentInput(
+                        id: UUID().uuidString,
                         sessionID: session, payload: payload,
-                        metadata: InputMetadata(payload: payload, source: "runtime", sequence: sequence)),
+                        metadata: InputMetadata(
+                            payload: payload, source: "runtime", sequence: sequence,
+                            rootID: UUID().uuidString)),
                     to: .photographer)
                 try #require(delivery.rejected.isEmpty)
                 let envelope = try #require(await iterator.next())
@@ -435,8 +447,11 @@ import UI
                             people: [Array(repeating: .init(x: 50, y: 50, confidence: 0.9), count: 17)])
                         let payload = InputPayload.observation(.pose(pose))
                         let observation = AgentInput(
+                            id: UUID().uuidString,
                             sessionID: session, payload: payload,
-                            metadata: InputMetadata(payload: payload, source: "runtime", sequence: sequence))
+                            metadata: InputMetadata(
+                                payload: payload, source: "runtime", sequence: sequence,
+                                rootID: UUID().uuidString))
                         let delivery = try await input.send(observation, to: .photographer)
                         try #require(delivery.rejected.isEmpty)
                         let base: Double
@@ -459,7 +474,8 @@ import UI
                 }
             } else {
                 // Hold an Agent-side lease with no motion; manual controls must bypass it.
-                let owner = ExecutionOwner(agent: .assistant, incarnation: UUID(), sessionID: session)
+                let owner = ExecutionOwner(
+                    agent: .assistant, incarnation: UUID().uuidString, sessionID: session)
                 let lease = try await resources.acquire(
                     resources: [ResourceID(rawValue: "nexarm.motor.5")], owner: owner, duration: .seconds(30),
                     revoke: { _ in })
@@ -505,12 +521,13 @@ import UI
     @MainActor
     func nexArmSerialSettingsAndAgentAcceptance() async throws {
         let path = try #require(ProcessInfo.processInfo.environment["NEXARM_PORT"])
-        let file = FileManager.default.temporaryDirectory.appendingPathComponent("serial-acceptance-\(UUID()).json")
+        let file = FileManager.default.temporaryDirectory.appendingPathComponent(
+            "serial-acceptance-\(UUID().uuidString).json")
         defer { try? FileManager.default.removeItem(at: file) }
         let link = SerialSettingsLink(path: path)
         let workflow = BluetoothWorkflow(
             state: BluetoothSettingsState(), link: link,
-            makeStore: { try LocalDocumentStore<BluetoothDeviceRecord>(url: file, maximumBytes: 4096) })
+            makeDeviceRepository: { try SQLiteRepositories(url: file).devices })
         let observer = Task { await workflow.run() }
         do {
             workflow.openPage()
@@ -518,7 +535,7 @@ import UI
             let row = try #require(workflow.state.nearby.first)
             workflow.connect(row.id)
             await workflow.waitUntilIdle()
-            try #require(workflow.state.isConnected(link.id))
+            try #require(workflow.state.isConnected(try link.businessID))
             try await serialWait(seconds: 5, "real passive feedback") { workflow.state.joints.count == 6 }
             let initial = workflow.state.joints
             print("SERIAL APP CONNECTED joints=\(initial)")
@@ -571,7 +588,7 @@ import UI
 
             workflow.disconnect()
             await workflow.waitUntilIdle()
-            try #require(!workflow.state.canControl(link.id))
+            try #require(!workflow.state.canControl(try link.businessID))
             let beforeOffline = await link.writes
             workflow.tryAction(.nod)
             workflow.setMotorVelocity(id: 5, value: 0.5)
@@ -601,12 +618,13 @@ import UI
     @MainActor
     func nexArmSerialAllSettingsAndAssistantPresetsAcceptance() async throws {
         let path = try #require(ProcessInfo.processInfo.environment["NEXARM_PORT"])
-        let file = FileManager.default.temporaryDirectory.appendingPathComponent("serial-presets-\(UUID()).json")
+        let file = FileManager.default.temporaryDirectory.appendingPathComponent(
+            "serial-presets-\(UUID().uuidString).json")
         defer { try? FileManager.default.removeItem(at: file) }
         let link = SerialSettingsLink(path: path)
         let workflow = BluetoothWorkflow(
             state: BluetoothSettingsState(), link: link,
-            makeStore: { try LocalDocumentStore<BluetoothDeviceRecord>(url: file, maximumBytes: 4096) })
+            makeDeviceRepository: { try SQLiteRepositories(url: file).devices })
         let observer = Task { await workflow.run() }
         let presets: [(BluetoothArmAction, NexArmGesture, String)] = [
             (.nod, .nod, "<nodHead cycles=\"1\"/>"),
@@ -622,7 +640,7 @@ import UI
         do {
             workflow.openPage()
             try await serialWait("discovery") { !workflow.state.nearby.isEmpty }
-            workflow.connect(link.id)
+            workflow.connect(try link.businessID)
             await workflow.waitUntilIdle()
             try await serialWait(seconds: 5, "passive feedback") { workflow.state.joints.count == 6 }
             for (manual, gesture, markup) in presets {

@@ -8,7 +8,7 @@ public struct ScheduledAction: Sendable {
     public var channel: String { call.channel }
     public var results: any FunctionReporting { execution.results }
     public let execution: ActionInvocation
-    public let executionID: UUID
+    public let executionID: String
     public let envelope: OutputEnvelope
     public let call: ActionCall
     public let owner: ExecutionOwner?
@@ -37,19 +37,19 @@ public struct ScheduledAction: Sendable {
         self.owner = owner
         self.feedback = feedback
         self.lease = lease
-        self.executionID = UUID()
+        self.executionID = UUID().uuidString
         self.execution = ActionInvocation(
             call: call.executionRequest, context: context, executionID: self.executionID)
         self.envelope = envelope
         self.call = call
     }
 
-    public init(source: AgentID, input: AgentInput, call: ActionCall, sequence: UInt64 = 0) {
+    public init(source: AgentID, input: AgentInput, call: ActionCall, sequence: UInt64 = 0, executionID: String) {
         let envelope = OutputEnvelope(source: source, input: input, output: .actionCall(call), sequence: sequence)
         self.owner = nil
         self.feedback = .none
         self.lease = nil
-        self.executionID = UUID()
+        self.executionID = executionID
         self.envelope = envelope
         self.call = call
         self.execution = ActionInvocation(

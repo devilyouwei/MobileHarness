@@ -1,5 +1,6 @@
 import AgentCore
 import Foundation
+import Storage
 
 // MARK: - State
 
@@ -11,9 +12,9 @@ public struct ApplicationControlContextState: AgentTaskContextState {
         try ApplicationControlSignalPreprocessor().classify(input, state: state)
     }
 
-    public var taskViews: [UUID: AgentTaskView]?
+    public var taskViews: [String: AgentTaskView]?
 
-    public var pendingCallIDs: [UUID] = []
+    public var pendingCallIDs: [String] = []
     public var environmentContracts: [String] = []
     public init() {}
     public func validateContextState() throws {

@@ -44,3 +44,9 @@ Append rejects capacity overflow; it has no producer backpressure wait. One `nex
 ## Lifecycle-owned conversation and audio (2026-10-12)
 
 ✅ 已移除对话生成、ReACT、收件箱排队、结果屏障、ASR 收尾、TTS 合成及回复占用租约的计时终止。Signal 默认无过期时间，框架不再按通信契约附加 TTL。保留显式实时感知数据的新鲜度和网络传输自身超时；它们不作为对话/语音缓存生命周期。Action 自身超时通过原始执行者的 ActionResult 返回。请求/调用数及队列/PCM 容量仍有界，不以计时自动删除已接纳输入。语音句柄无读等待或错误记录 TTL，按播放完成、输入/会话正常结束、异常或显式取消清理；取消加入生成和播放工作。
+
+
+
+
+
+✅ Storage repository refactor: Audio continues using common bounded memory/lease contracts; no SQLite, file backend or third-party package dependency is introduced.

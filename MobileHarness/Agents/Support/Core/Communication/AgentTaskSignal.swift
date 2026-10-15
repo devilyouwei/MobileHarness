@@ -4,14 +4,14 @@ public enum AgentTaskExecution: String, Codable, Sendable { case foreground, bac
 
 /// Task identity is distinct from runtime execution ownership and causal routing hops.
 public struct AgentTaskScope: Codable, Sendable, Equatable {
-    public let id: UUID
-    public let parentID: UUID?
+    public let id: String
+    public let parentID: String?
     public let requester: AgentID
     public let executor: AgentID
-    public let sessionID: UUID
+    public let sessionID: String
     public let execution: AgentTaskExecution
     public init(
-        id: UUID = UUID(), parentID: UUID? = nil, requester: AgentID, executor: AgentID, sessionID: UUID,
+        id: String, parentID: String? = nil, requester: AgentID, executor: AgentID, sessionID: String,
         execution: AgentTaskExecution = .foreground
     ) {
         self.execution = execution
@@ -25,11 +25,11 @@ public struct AgentTaskScope: Codable, Sendable, Equatable {
     public init(from decoder: any Decoder) throws {
         let value = try decoder.container(keyedBy: CodingKeys.self)
         self.init(
-            id: try value.decode(UUID.self, forKey: .id),
-            parentID: try value.decodeIfPresent(UUID.self, forKey: .parentID),
+            id: try value.decode(String.self, forKey: .id),
+            parentID: try value.decodeIfPresent(String.self, forKey: .parentID),
             requester: try value.decode(AgentID.self, forKey: .requester),
             executor: try value.decode(AgentID.self, forKey: .executor),
-            sessionID: try value.decode(UUID.self, forKey: .sessionID),
+            sessionID: try value.decode(String.self, forKey: .sessionID),
             execution: try value.decodeIfPresent(AgentTaskExecution.self, forKey: .execution) ?? .foreground)
     }
 
@@ -97,13 +97,13 @@ public struct AgentTaskRegistry: Codable, Sendable {
     public struct Task: Codable, Sendable {
         public let scope: AgentTaskScope
         public var state: State
-        public var lastSignalID: UUID
-        public var signalIDs: [UUID] = []
+        public var lastSignalID: String
+        public var signalIDs: [String] = []
     }
-    private var tasks: [UUID: Task] = [:]
+    private var tasks: [String: Task] = [:]
     public init() {}
-    public func task(_ id: UUID) -> Task? { tasks[id] }
-    public var records: [Task] { tasks.values.sorted { $0.scope.id.uuidString < $1.scope.id.uuidString } }
+    public func task(_ id: String) -> Task? { tasks[id] }
+    public var records: [Task] { tasks.values.sorted { $0.scope.id < $1.scope.id } }
     private func validateBackgroundCapacity(_ scope: AgentTaskScope) throws {
         if scope.execution == .background {
             let active = tasks.values.filter {
@@ -172,7 +172,7 @@ public struct AgentTaskRegistry: Codable, Sendable {
         guard tasks[scope.id] == nil else { throw CommunicationError.capacityExceeded }
         tasks[scope.id] = Task(scope: scope, state: .requested, lastSignalID: scope.id)
     }
-    public mutating func acknowledge(_ id: UUID, accepted: Bool) throws {
+    public mutating func acknowledge(_ id: String, accepted: Bool) throws {
         guard var task = tasks[id] else { throw CommunicationError.scopeClosed }
         // A fast child's terminal report can precede the request's admission receipt.
         if task.state == .requested {
@@ -181,7 +181,7 @@ public struct AgentTaskRegistry: Codable, Sendable {
         }
     }
     /// Sender-side delivery evidence is distinct from executor completion.
-    public mutating func delivered(_ id: UUID, kind: AgentTaskSignal.Kind, accepted: Bool) throws {
+    public mutating func delivered(_ id: String, kind: AgentTaskSignal.Kind, accepted: Bool) throws {
         guard var task = tasks[id] else { throw CommunicationError.scopeClosed }
         guard accepted, ![State.succeeded, .failed, .cancelled, .interrupted].contains(task.state) else { return }
         if kind == .cancel { task.state = .cancelling }
@@ -201,11 +201,11 @@ public struct AgentTaskRegistry: Codable, Sendable {
         }
         tasks[signal.scope.id] = task
     }
-    private mutating func reserve(_ id: UUID) throws {
+    private mutating func reserve(_ id: String) throws {
         guard tasks[id] == nil else { throw CommunicationError.scopeClosed }
         if tasks.count == 256 {
             let retired = tasks.filter { [.succeeded, .failed, .cancelled, .interrupted].contains($0.value.state) }
-                .keys.sorted { $0.uuidString < $1.uuidString }.first
+                .keys.sorted { $0 < $1 }.first
             guard let retired else { throw CommunicationError.capacityExceeded }
             tasks[retired] = nil
         }

@@ -5,7 +5,7 @@ import UI
 @Test @MainActor
 func bluetoothConnectionLabelsIgnoreExecutionMessagesAndManualActivity() {
     let state = BluetoothSettingsState()
-    let device = BluetoothDeviceRow(id: UUID(), name: "Nex_Arm")
+    let device = BluetoothDeviceRow(id: UUID().uuidString, name: "Nex_Arm")
     state.selected = device
     state.phase = .connected
     state.jogging = true
@@ -13,7 +13,7 @@ func bluetoothConnectionLabelsIgnoreExecutionMessagesAndManualActivity() {
     state.notice = "未收到位置反馈"
     #expect(state.summary == "已连接")
     #expect(state.status(for: device.id) == "已连接")
-    #expect(state.status(for: UUID()) == "未连接")
+    #expect(state.status(for: UUID().uuidString) == "未连接")
     // Execution presentation messages do not change native connection status.
     state.error = nil
     state.notice = nil
@@ -23,7 +23,7 @@ func bluetoothConnectionLabelsIgnoreExecutionMessagesAndManualActivity() {
 @Test @MainActor
 func bluetoothConnectionLabelsFollowCurrentRecovery() {
     let state = BluetoothSettingsState()
-    let device = BluetoothDeviceRow(id: UUID(), name: "Nex_Arm")
+    let device = BluetoothDeviceRow(id: UUID().uuidString, name: "Nex_Arm")
     state.selected = device
     state.error = "旧动作异常"
     state.phase = .connecting
@@ -45,7 +45,7 @@ func bluetoothConnectionLabelsFollowCurrentRecovery() {
 @Test @MainActor
 func bluetoothDetailEntryRequiresMatchingConnectedDevice() {
     let state = BluetoothSettingsState()
-    let device = BluetoothDeviceRow(id: UUID(), name: "Remembered arm")
+    let device = BluetoothDeviceRow(id: UUID().uuidString, name: "Remembered arm")
     state.remembered = device
     #expect(!state.isConnected(device.id) && state.canConnect)
     #expect(state.rowIntent(for: device.id) == .connect)
@@ -56,8 +56,8 @@ func bluetoothDetailEntryRequiresMatchingConnectedDevice() {
     state.phase = .connected
     #expect(state.isConnected(device.id) && !state.canConnect)
     #expect(state.rowIntent(for: device.id) == .openDetail)
-    #expect(!state.isConnected(UUID()))
-    #expect(state.rowIntent(for: UUID()) == .unavailable)
+    #expect(!state.isConnected(UUID().uuidString))
+    #expect(state.rowIntent(for: UUID().uuidString) == .unavailable)
     state.phase = .disconnecting
     #expect(!state.isConnected(device.id) && !state.canConnect)
     state.phase = .idle
@@ -85,8 +85,8 @@ func bluetoothDeviceRowRejectsUnavailableRadioAndBusyRecovery() {
 @Test @MainActor
 func bluetoothDeviceGroupsKeepUnsuccessfulSelectionsOutOfMyDevices() {
     let state = BluetoothSettingsState()
-    let saved = BluetoothDeviceRow(id: UUID(), name: "Saved arm")
-    let candidate = BluetoothDeviceRow(id: UUID(), name: "Nearby arm")
+    let saved = BluetoothDeviceRow(id: UUID().uuidString, name: "Saved arm")
+    let candidate = BluetoothDeviceRow(id: UUID().uuidString, name: "Nearby arm")
     state.remembered = saved
     state.selected = candidate
     state.phase = .connecting
@@ -116,7 +116,7 @@ func bluetoothDeviceGroupsKeepUnsuccessfulSelectionsOutOfMyDevices() {
 @Test @MainActor
 func bluetoothConnectedWarningUsesOnlyCurrentNativeIssue() {
     let state = BluetoothSettingsState()
-    let device = BluetoothDeviceRow(id: UUID(), name: "Requested arm")
+    let device = BluetoothDeviceRow(id: UUID().uuidString, name: "Requested arm")
     state.selected = device
     state.phase = .connected
     state.error = "Old execution error"
@@ -127,8 +127,8 @@ func bluetoothConnectedWarningUsesOnlyCurrentNativeIssue() {
     #expect(state.status(for: device.id) == "已连接，异常")
     #expect(state.hasConnectionIssue(device.id))
     #expect(state.currentMessage(for: device.id) == nativeIssue)
-    #expect(!state.hasConnectionIssue(UUID()))
-    #expect(state.currentMessage(for: UUID()) == nil)
+    #expect(!state.hasConnectionIssue(UUID().uuidString))
+    #expect(state.currentMessage(for: UUID().uuidString) == nil)
     state.transportIssue = nil
     #expect(state.status(for: device.id) == "已连接")
     #expect(!state.hasConnectionIssue(device.id))
@@ -138,7 +138,7 @@ func bluetoothConnectedWarningUsesOnlyCurrentNativeIssue() {
 @Test @MainActor
 func bluetoothOpenDetailDisablesAllMotorAdmissionAfterDisconnect() {
     let state = BluetoothSettingsState()
-    let device = BluetoothDeviceRow(id: UUID(), name: "Nex_Arm")
+    let device = BluetoothDeviceRow(id: UUID().uuidString, name: "Nex_Arm")
     state.selected = device
     state.phase = .connected
     #expect(state.canControl(device.id))
@@ -150,14 +150,14 @@ func bluetoothOpenDetailDisablesAllMotorAdmissionAfterDisconnect() {
     state.phase = .idle
     #expect(state.status(for: device.id) == "未连接")
     #expect(!state.canControl(device.id))
-    #expect(!state.canControl(UUID()))
+    #expect(!state.canControl(UUID().uuidString))
 }
 
 @Test @MainActor
 func bluetoothCurrentStateDoesNotBorrowAnotherDevicesRecoveryOrRetainIdleError() {
     let state = BluetoothSettingsState()
-    let old = BluetoothDeviceRow(id: UUID(), name: "Old arm")
-    let current = BluetoothDeviceRow(id: UUID(), name: "Current arm")
+    let old = BluetoothDeviceRow(id: UUID().uuidString, name: "Old arm")
+    let current = BluetoothDeviceRow(id: UUID().uuidString, name: "Current arm")
     state.selected = current
     state.recoveryDeviceID = old.id
     state.phase = .connected

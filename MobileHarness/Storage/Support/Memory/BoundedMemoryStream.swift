@@ -1,9 +1,5 @@
 import Foundation
 
-public enum StorageError: Error, Equatable, Sendable {
-    case capacityExceeded, missing, timedOut, duplicate, closed, expired, forbidden
-}
-
 /// Single-producer/single-consumer process-local stream with explicit byte and item limits.
 public actor BoundedMemoryStream<Element: Sendable> {
     private let maximumBytes: Int

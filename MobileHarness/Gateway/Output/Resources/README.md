@@ -59,3 +59,11 @@ Production camera capture requires its persistent lease. NexArm's six motors sha
 ✅ Action metadata has no serialization key. [ChannelScheduler](../Scheduling/README.md) owns task-local FIFO/wait ordering; ResourceCoordinator rejects unconfigured conflicts without a queue and preserves explicitly configured joined takeover.
 
 ✅ 资源交接/关闭无默认五秒清理超时，等待停止与真实 join 后确认资源释放；取消不伪造清理完成。设备显式安全租约的期限保持独立，不作为对话时限。
+
+
+
+
+
+## SQLite records and runtime identity
+
+✅ Implemented: technical identities are opaque UUID strings; committed business entities use dialog/message/task/media/device SQLite IDs. Consumers use Storage repositories while preserving ownership, cancellation and independent foundation boundaries. Complete messages, including each ReACT message, persist at termination; delta fragments do not persist. The custom allocator and replaced file/index implementation are removed. See the project SQLite business-record plan.

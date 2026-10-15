@@ -1,5 +1,6 @@
 import Foundation
 import FunctionContracts
+import Storage
 
 extension SystemActions {
     @Action(
@@ -30,7 +31,7 @@ extension SystemActions {
         }
         switch operation {
         case .connect, .reconnect:
-            guard id.flatMap(UUID.init(uuidString:)) != nil, value == nil, action == nil else {
+            guard id.flatMap(BusinessRecordID.parse) != nil, value == nil, action == nil else {
                 throw DeviceControlError.invalidRequest
             }
         case .motorVelocity:

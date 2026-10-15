@@ -36,7 +36,7 @@ flowchart LR
 
 | Directory | Ownership |
 | --- | --- |
-| Core | Foundation-only identity, lifecycle, generic Signal/task/round/context/output contracts and parsing |
+| Core | independent runtime framework identity, lifecycle, generic Signal/task/round/context/output contracts and parsing |
 | Communication | Immutable business messages and contract catalog |
 | Chat | Role-injected worker, independent text/Tool consumers, context projection, prompt-resource loading and Action-call communication adaptation |
 | Context | Structured task/Skill state, fixed-task result coordination, atomic repository and durable evidence |
@@ -65,7 +65,7 @@ Root files are immutable composition helpers only: AgentConfigurations loads ver
 
 ## Source organization standard
 
-Swift source filenames and primary types use UpperCamelCase; members/parameters use lowerCamelCase. Role directories keep Actor entry and Processing (State/Preprocessor/Builder) as the existing template. Shared files group one cohesive concern; plural schema files may contain related business values. Support root is limited to stateless resource/catalog helpers. Context holds mutable/persisted task state and lifecycle coordination; Communication holds serialized message validation. Core remains Foundation-only; Chat depends on role hooks, never concrete role casts.
+Swift source filenames and primary types use UpperCamelCase; members/parameters use lowerCamelCase. Role directories keep Actor entry and Processing (State/Preprocessor/Builder) as the existing template. Shared files group one cohesive concern; plural schema files may contain related business values. Support root is limited to stateless resource/catalog helpers. Context holds mutable/persisted task state and lifecycle coordination; Communication holds serialized message validation. Core remains independent runtime framework; Chat depends on role hooks, never concrete role casts.
 
 Runtime IDs are protocol/persistence data, not filenames. Resources uses UpperCamelCase directories/files; the explicit Catalog maps stable IDs to paths. Xcode navigation mirrors the filesystem but does not add duplicate SwiftPM membership.
 

@@ -5,9 +5,9 @@ extension ChannelScheduler {
     /// Ownership metadata for a channel lease. This is not a device stop/hold command.
     struct ChannelLockOwner: Equatable, Sendable {
         let agentID: AgentID
-        let instanceID: UUID
-        let sessionID: UUID
-        let leaseID: UUID
+        let instanceID: String
+        let sessionID: String
+        let leaseID: String
         let deadline: ContinuousClock.Instant
     }
 

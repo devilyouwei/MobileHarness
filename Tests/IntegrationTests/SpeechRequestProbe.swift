@@ -1,13 +1,14 @@
 import AgentCore
 import Agents
 import Foundation
+import Storage
 
 /// Tests inspect the text-to-handle boundary without running a model or device.
 actor SpeechRequestProbe {
     var requests: [String: String] = [:]
     func receive(_ message: AgentMessage) {
         if case .speechSynthesis(let request)? = message.perception {
-            requests[request.audioID.uuidString] = request.text
+            requests[request.audioID] = request.text
         }
     }
     func text(_ id: String) -> String? { requests[id] }
@@ -57,12 +58,16 @@ struct FixtureGenerationOutputs: AsyncSequence {
                             callID: action.id,
                             report: DeliveryReport(delivered: action.target.map { [$0] } ?? []),
                             owner: ExecutionOwner(
-                                agent: envelope.source, incarnation: UUID(), sessionID: envelope.sessionID),
+                                agent: envelope.source, incarnation: UUID().uuidString,
+                                sessionID: envelope.sessionID),
                             causality: SignalCausality(envelope: envelope)))
                     try await agent.receive(
                         AgentInput(
+                            id: UUID().uuidString,
                             sessionID: envelope.sessionID, payload: payload,
-                            metadata: InputMetadata(payload: payload, source: "runtime", origin: .runtime)))
+                            metadata: InputMetadata(
+                                payload: payload, source: "runtime", origin: .runtime,
+                                rootID: UUID().uuidString)))
                     continue
                 }
                 if let roundID = envelope.roundID {
@@ -70,10 +75,11 @@ struct FixtureGenerationOutputs: AsyncSequence {
                     switch envelope.output {
                     case .actionCall(let call):
                         let owner = ExecutionOwner(
-                            agent: envelope.source, incarnation: UUID(), sessionID: envelope.sessionID)
+                            agent: envelope.source, incarnation: UUID().uuidString,
+                            sessionID: envelope.sessionID)
                         payload = .actionResult(
                             .init(
-                                executionID: UUID(), owner: owner, path: call.actionPath,
+                                executionID: UUID().uuidString, owner: owner, path: call.actionPath,
                                 causality: SignalCausality(envelope: envelope), status: .succeeded,
                                 effect: .contractCompleted,
                                 completion: .completed, callID: envelope.callID, roundID: roundID))
@@ -85,6 +91,7 @@ struct FixtureGenerationOutputs: AsyncSequence {
                         do {
                             try await agent.receive(
                                 AgentInput(
+                                    id: UUID().uuidString,
                                     sessionID: envelope.sessionID, payload: payload,
                                     metadata: InputMetadata(
                                         payload: payload, source: "runtime", origin: .runtime,

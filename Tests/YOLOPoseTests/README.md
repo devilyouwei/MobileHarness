@@ -12,3 +12,10 @@ Purpose: validate pose transport, preprocessing, raw decoding and lifecycle. Des
 ✅ Native tests cover dimensions/orientation, continuous scaleFit offsets and opt-in real Vision inference in four orientations. POSE_VISION_BENCH=1 plus YOLO_POSE_MODEL_ROOT enables an isolated warmed Vision vs vImage/direct and CPU+ANE vs all host baseline (five samples after three warmups). Square constant input excludes realistic resampling/accuracy claims; total includes tensor extraction, and is not sustained camera FPS.
 
 ✅ All real-model tests and benchmarks now load yolo26n-pose only. Tensor fixtures are [1,300,57] in contiguous, padded and transposed layouts. Earlier YOLOv8 benchmark values are historical; rerun before making new performance claims.
+
+
+✅ Fixtures use UUID/opaque runtime strings and committed database business references; concurrency, restart, invalid-ID and failure behavior remain covered.
+
+## Identity ownership
+
+✅ Runtime and foundation identities use opaque protocol strings or Foundation UUID; no project ID-generator dependency exists. SQLite-backed Storage publishes committed business references and App injects repositories/maps native Bluetooth identities. Tests preserve caller identity, cancellation and failure semantics. See [current storage design](../../MobileHarness/Storage/README.md) for relational allocation and persistence.

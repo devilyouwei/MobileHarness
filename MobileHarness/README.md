@@ -181,7 +181,18 @@ flowchart TB
     Actions --> StorageChat
     Actions --> Storage
     StorageChat --> Storage
+    StorageChat --> StorageTasks
+    Agents --> StorageTasks
+    StorageTasks --> Storage
+    StorageMedia --> Storage
+    StorageDevices --> Storage
     StorageAudio --> Storage
+    App --> StorageSQLite
+    StorageSQLite --> StorageChat
+    StorageSQLite --> StorageTasks
+    StorageSQLite --> StorageMedia
+    StorageSQLite --> StorageDevices
+    StorageSQLite --> GRDB
     Defaults --> ModelKit
     Defaults --> ModelKitRuntime
     Defaults --> Adapters[Model adapters]
@@ -189,7 +200,7 @@ flowchart TB
     Adapters --> ModelKit
 ```
 
-The `AppWorkflows` node is a facade over six independent feature targets; its summarized arrows are the union of those targets. `FunctionContracts`, `Storage` and `AgentCore` have no project dependencies. FunctionContracts is the independent function-contract leaf; ExecutionRuntime owns shared execution, and CallRuntime owns registration and call adapters. Gateway depends on execution contracts, never concrete Actions or Tools. Base ModelKit and PlatformKit have no project dependencies and own their input/output types. Agents adapts across their boundaries. The complete ModelKit SDK, including Runtime, Defaults, download adapters and concrete providers, may depend only on its own targets, approved third-party SDKs and system frameworks. Its direct and transitive target dependencies must never reach another project module; host adapters implement ModelKit-owned protocols.
+The `AppWorkflows` node is a facade over six independent feature targets; its summarized arrows are the union of those targets. `FunctionContracts`, `Storage` and `AgentCore` have no cross-module dependencies. FunctionContracts is the independent function-contract leaf; ExecutionRuntime owns shared execution, and CallRuntime owns registration and call adapters. Gateway depends on execution contracts, never concrete Actions or Tools. Base ModelKit and PlatformKit have no cross-module dependencies and own their input/output types. Agents adapts across their boundaries. The complete ModelKit SDK, including Runtime, Defaults, download adapters and concrete providers, may depend only on its own targets, approved third-party SDKs and system frameworks. Its direct and transitive target dependencies must never reach another project module; host adapters implement ModelKit-owned protocols.
 
 <a id="37-project-structure"></a>
 <a id="project-structure"></a>
@@ -244,8 +255,12 @@ MobileHarness/
 │   ├── Camera/
 │   └── UI/
 ├── Storage/
-│   ├── Audio/                   # StorageAudio: transient PCM ownership
-│   └── Chat/                    # StorageChat: conversation journal
+│   ├── Audio/                   # Transient PCM ownership
+│   ├── Chat/                    # Message contracts/windows and domain SQL
+│   ├── Tasks/                   # Task records and lifecycle persistence
+│   ├── Media/                   # Media records and JPEG delivery
+│   ├── Devices/                 # Native/business identity mapping
+│   └── Support/                 # Contracts, Memory and File/SQLite mechanisms
 ├── ModelKit/
 │   ├── Support/
 │   │   ├── Core/                # Capability/media/concurrency mechanisms
@@ -281,21 +296,25 @@ Directory nesting expresses ownership; `Package.swift` defines the actual compil
 | `App/Workflows/` facade | AppWorkflows | Six feature workflow targets |
 | `App/Workflows/Settings/` | AppSettingsWorkflow | UI, AgentCore, Agents, Gateway, AppPresentationWorkflow |
 | `App/Workflows/History/` | AppHistoryWorkflow | UI, StorageChat, AgentCore, Agents, Gateway, Actions, AppPresentationWorkflow, FunctionContracts, ExecutionRuntime, CallRuntime |
-| `App/Workflows/Bluetooth/` | AppBluetoothWorkflow | UI, AgentCore, Storage, Actions, FunctionContracts, ExecutionRuntime, CallRuntime, PlatformKit |
+| `App/Workflows/Bluetooth/` | AppBluetoothWorkflow | UI, AgentCore, Storage, Actions, FunctionContracts, ExecutionRuntime, CallRuntime, PlatformKit, StorageDevices |
 | `App/Workflows/Speech/` | AppSpeechPlayback | FunctionContracts, StorageAudio, Actions, ExecutionRuntime |
 | `App/Workflows/Presentation/` | AppPresentationWorkflow | UI, AgentCore, FunctionContracts |
 | `App/Workflows/Diagnostics/` | AppDiagnosticWorkflow | UI, ModelKit, PlatformKit |
 | `UI/` | UI | None |
 | `Agents/Support/Core/` | AgentCore | None |
-| `Agents/` excluding `Support/Core/` | Agents | AgentCore, ModelKit, PlatformKit, Storage, StorageChat, StorageAudio, FunctionContracts |
+| `Agents/` excluding `Support/Core/` | Agents | AgentCore, ModelKit, PlatformKit, Storage, StorageChat, StorageAudio, StorageTasks, FunctionContracts |
 | `Gateway/` excluding Runtime/Registration/Protocols | Gateway | AgentCore, FunctionContracts, ExecutionRuntime, CallRuntime |
 | `Actions/Support/Contracts/` | FunctionContracts | None |
 | `Gateway/Runtime/` | ExecutionRuntime | FunctionContracts |
 | `Gateway/Output/Registration/` and `Protocols/` | CallRuntime | FunctionContracts, ExecutionRuntime |
 | `Actions/` excluding `Support/Contracts/` | Actions | FunctionContracts, PlatformKit, BehaviorDefinitions, StorageChat, Storage |
-| `Storage/` core | Storage | None |
-| `Storage/Chat/` | StorageChat | Storage |
+| `Storage/Support/` excluding SQLite | Storage | None |
+| `Storage/Chat/` excluding SQLite adapter | StorageChat | Storage, StorageTasks |
 | `Storage/Audio/` | StorageAudio | Storage |
+| `Storage/Tasks/` excluding SQLite adapter | StorageTasks | Storage |
+| `Storage/Media/` excluding SQLite adapter | StorageMedia | Storage |
+| `Storage/Devices/` excluding SQLite adapter | StorageDevices | Storage |
+| Domain SQLite files + `Support/Persistence/SQLite/` + construction owner | StorageSQLite | Storage, StorageChat, StorageTasks, StorageMedia, StorageDevices, GRDB.swift |
 | `PlatformKit/` | PlatformKit | None |
 | ModelKit shared capability sources | ModelKit | None |
 | `ModelKit/Support/Management/` (runtime source list) | ModelKitRuntime | ModelKit |
@@ -323,7 +342,7 @@ Current designs use ✅ for implemented behavior, ❗ for confirmed bugs and ❌
 ### Architectural boundaries
 
 - App owns concrete assembly, adaptation and application/session lifetime. Feature workflows expose typed operations and retain no global container access.
-- UI owns presentation values. The compilation target has no project dependencies; App adapts storage records into UI-owned view values. It does not import App, Agents, Gateway, Actions, Tools, ModelKit or PlatformKit.
+- UI owns presentation values. The compilation target has no cross-module dependencies; App adapts storage records into UI-owned view values. It does not import App, Agents, Gateway, Actions, Tools, ModelKit or PlatformKit.
 - AgentCore is independent of concrete Agents, UI, model engines and device adapters.
 - All Agent-driven external inputs and declared execution feedback enter through InputGateway; all Agent messages and executable outputs leave through OutputGateway. Submitted business routes use their owning Agents; immediate host mechanisms retain their explicit scopes.
 - Actions owns business behavior, motion shaping, composition and completion policy. PlatformKit owns native I/O, protocol encoding, hardware limits and device feedback.
@@ -354,7 +373,7 @@ This section is an architectural directory. It describes why each module exists 
 | [CallRuntime](Gateway/Output/Registration/README.md) | Bind and adapt scheduled/native calls. | Depends on FunctionContracts and ExecutionRuntime; no AgentCore. | Calling protocol views. |
 | [ModelKit](ModelKit/README.md) | Expose typed speech, language and vision processing capabilities. | Base SDK knows neither Agent policy nor device I/O; engines live in adapters/backends. | Recognition and generation machinery. |
 | [PlatformKit](PlatformKit/README.md) | Capture/output media, manage links and expose native commands/feedback. | Device SDK only; no gestures, model inference, localization or workflow policy. | Sensory organs and effectors. |
-| [Storage](Storage/README.md) | Provide bounded transient storage and durable local records. | StorageAudio owns PCM handles; StorageChat owns conversation records; no routing or inference. | Short- and long-term retained material. |
+| [Storage](Storage/README.md) | Provide bounded transient storage and durable local records. | Domains own PCM, messages, Tasks, media and device records; Support owns common mechanisms and backend adapters stay separate. No routing or inference. | Short- and long-term retained material. |
 | [Resources](Resources/README.md) | Hold privacy declarations, assets and local model profiles/artifacts. | Packaging input supplied by App; no runtime ownership. | Materials consumed by the organism. |
 
 ### Key internal module groups
@@ -365,7 +384,7 @@ This section is an architectural directory. It describes why each module exists 
 
 **Behavior.** Actions owns protocol-neutral callable functions. ✅ Shared contracts live in Actions/Support/Contracts; ActionMacro and CapabilityModules live directly in Actions/Support. FunctionContracts remains an independent target, while the macro declarations and catalog composition compile in Actions. FunctionContracts defines their inputs/outcomes; Gateway owns independent ExecutionRuntime and CallRuntime. ActionCall follows Channel scheduling; ToolCall executes directly outside Channel/wait. BehaviorAssembly freezes one canonical function store and explicit host bindings without importing AgentCore. [Protocol routing](Gateway/Output/Protocols/README.md) explains registration, Agent transport/parsing and shared execution/feedback.
 
-**Foundations.** ModelKit separates capability contracts, process-wide management, default assembly and engine adapters. PlatformKit separates native I/O from business behavior. Storage separates reusable mechanisms from Chat and Audio domains. ModelKit, PlatformKit and StorageAudio own their separate capability/storage contracts.
+**Foundations.** ModelKit separates capability contracts, process-wide management, default assembly and engine adapters. PlatformKit separates native I/O from business behavior. Storage separates Support mechanisms from Chat, Tasks, Media, Devices and Audio domains; SQLite adapters compile separately. ModelKit, PlatformKit and StorageAudio own their separate capability/storage contracts.
 
 <a id="part-iii--key-techniques"></a>
 
@@ -437,11 +456,11 @@ State, selection and completion are role-owned. Fixed camera/history/settings tr
 
 **Atomic context contract.**
 
-`AgentContext<State>` records version/Agent/scope/revision, bounded work/task state, role state, evidence and consumed batches. Schema validation precedes use. The generic context permits 256 work records, 8192 evidence records and 8192 batches, with individual evidence data at most 512 KiB; role retention may be smaller. New work may evict only the oldest terminal work record; capacity otherwise rejects. Streaming roles retain 256 summaries with eviction counts.
+`AgentContext<State>` records version/Agent/scope/revision, bounded work/task state, role state, evidence and consumed batches. Schema validation precedes use. The generic context permits 256 work records, 8192 evidence records and 8192 batches, with individual evidence data at most 512 KiB and aggregate logical evidence Data at most32MiB; role retention may be smaller. New work may evict only the oldest terminal work record; capacity otherwise rejects. Streaming roles retain 256 summaries with eviction counts.
 
-AgentContextRepository serializes copy-before-commit updates with sixteen commit waiters. Persistent contexts use a 64 MiB LocalDocumentStore. Storage CAS token and logical revision must both match. In-memory state is published only after atomic persistence. No model/native await holds the repository write slot.
+AgentContextRepository serializes copy-before-commit runtime updates with sixteen commit waiters. Storage StateRepository/MemoryStateStore holds one validated snapshot without document encoding or I/O. Live state is published after validation; persistent business commits use the separate repositories at lifecycle boundaries. No model/native await holds the runtime write slot.
 
-Initial load validates identity/schema, marks unfinished work interrupted, advances revision and commits recovery before exposure. It never replays effects. Current histories read the Assistant repository; invalid context state fails explicitly. No separate history-file import is performed.
+Runtime contexts start fresh and validate identity/schema. App marks unfinished SQL identities interrupted before admission and builds Task summaries from normalized source relationships. It never replays effects or loads old Context JSON. Current history combines bounded Assistant memory with indexed SQLite records; invalid state fails explicitly.
 
 **Work and task states.**
 
@@ -665,7 +684,7 @@ Assistant owns one local foreground conversational task. waitingUser retains its
 
 ### Communication and execution contract ownership
 
-- **AgentCore** owns AgentInput/AgentTurn, the generic message container and immutable communication policy; it has no project dependencies.
+- **AgentCore** owns AgentInput/AgentTurn, the generic message container and immutable communication policy; it has no cross-module dependencies.
 - **Agents/Support/Communication** owns domain schemas, identities and expiry rules; each role owns prompts and business interpretation.
 - **App/Adapters** owns native-source conversion and media deadlines; VisionPerception owns sampling. UI owns independent presentation values.
 - **FunctionContracts** owns neutral resource identifiers and bounded report/error values. ExecutionRuntime consumes them; Gateway coordinates resource leases. App defines concrete resources, and NexArm/Bluetooth producers classify their own failures.
@@ -892,7 +911,7 @@ ReACT follows actual outcomes: successful business output and execution failures
 
 ✅ 2026-10-13 clarification implemented: successful reports and lifecycle handles are no longer classified as business output. Explicit values and actual business failures continue. Pure cancellation and Agent-internal failures never request another model round.
 
-✅ Shared Chat implements result-driven reasoning → call → joined result → reasoning. [AgentChatWorker](Agents/Support/Chat/AgentChatWorker.swift) owns requests, context refresh, history and continuation admission. Foundation-only [AgentRoundCoordinator](Agents/Support/Core/Runtime/AgentRoundCoordinator.swift) owns the sealed/all-results barrier; [ToolResult](Agents/Support/Core/Output/ToolResult.swift) derives `requiresReasoning` from actual outcomes. Gateway owns authorization, Channel/wait scheduling, resources and result delivery. ModelKit supplies inference events and provider diagnostics. Registration attributes, role defaults and App policy tables no longer select ReACT.
+✅ Shared Chat implements result-driven reasoning → call → joined result → reasoning. [AgentChatWorker](Agents/Support/Chat/AgentChatWorker.swift) owns requests, context refresh, history and continuation admission. independent runtime framework [AgentRoundCoordinator](Agents/Support/Core/Runtime/AgentRoundCoordinator.swift) owns the sealed/all-results barrier; [ToolResult](Agents/Support/Core/Output/ToolResult.swift) derives `requiresReasoning` from actual outcomes. Gateway owns authorization, Channel/wait scheduling, resources and result delivery. ModelKit supplies inference events and provider diagnostics. Registration attributes, role defaults and App policy tables no longer select ReACT.
 
 Agent-internal errors terminate the input. Otherwise the decision is `roundCoordinator.needsReasoning`, after sealing, execution/delivery join, result verification and durable round evidence. `needsReasoning` requires an uncancelled sealed round with every registered call terminal and at least one failed result or business output. Continuation also requires a live owner, remaining cumulative budget and a valid next request.
 
@@ -940,7 +959,7 @@ Model finish reasons (`stop`, `toolCalls`, `lengthLimit`) record provider termin
 
 #### Context, evidence and Task boundaries
 
-Indexed Task history explicitly separates immutable request-start decisionMetadata from request historyTaskID. The startTask-producing request is assigned to the new Task in the same transaction. Terminal Task status and a conversation-owned compression (stable input/request source IDs, goal, reported summary and real failure) commit together after barriers. Model, UI and query projections replace only those indexed sources at their first historyOrder; current/ordinary/raw execution evidence remains durable. New inputs and same-input Task-boundary continuations share this projection. App checkpoints current.json with independent conversation-ID archives and index.json; previous Assistant contexts are unused without decoding/import/migration. Compression is derived from existing finish/cancel summary plus host terminal facts, without extra inference.
+Indexed Task history explicitly separates immutable request-start decisionMetadata from request historyTaskID. The startTask-producing request is assigned to the new Task in the same transaction. Terminal Task status and a conversation-owned compression (stable input/request source IDs, goal, reported summary and real failure) commit together after barriers. Model, UI and query projections replace only those indexed sources at their first historyOrder; current/ordinary/raw execution evidence remains durable. New inputs and same-input Task-boundary continuations share this projection. App commits completed messages, Task source indexes and recovery metadata in SQLite; previous Assistant contexts are unused without decoding/import/migration. Compression is derived from existing finish/cancel summary plus host terminal facts, without extra inference.
 
 Continuation retains the original input/session, request options, cumulative budget and selected ChatCapability, then rejoins FIFO behind admitted inputs. Resumption rebuilds the effective Skill system prompt/native definitions, refreshes facts/task reports and incorporates eligible intervening completed requests. Facts remain user-role data before the current input or the complete native-call/result group. A request catalog is immutable during its invocation; `loadSkills`/`startTask` can expose new functions only in later requests.
 
@@ -1256,7 +1275,7 @@ flowchart LR
  Render --> Receipt[Capture and presentation outcome]
  Receipt --> Context[Photo ID, MIME and size in exact context]
  Context --> Read[Authorized multimodal read on continuation]
- Render --> Save[Explicit save of displayed UUID]
+ Render --> Save[Explicit save of displayed ID]
  Save --> Photos[Joined add-only Photos import]
  Photos --> Saved[Actual saved state and duplicate fence]
  Saved --> Departure[Joined renderer exit and canonical cue]
@@ -1267,7 +1286,7 @@ flowchart LR
 
 Native capture has one delegate and ten-second terminal bound; photoBusy spans one owned task and clears on every terminal path. Nonempty JPEG is at most 4 MiB, with caller-owned store bounds of 1024 files/2 GiB and a 512 KiB owner index. SDK defaults remain 32 files/128 MiB/16 KiB with reject policy; App explicitly uses evictOldest. Committed new cache records retire oldest JPEGs, and historical retired references return absent. Capture remains durable if later presentation fails. Model/history context stores metadata-only image references, not bytes; selected reads validate the original source/session/input and exact photo identity.
 
-One current photo fades/holds/shrinks into a thumbnail and reports actual animation acknowledgment. Only the positioned thumbnail controls intercept touch. Save validates displayed identity, foreground and original owner, joins one add-only native transaction and sets savedPhotoID only after success. The exact saved UUID remains alreadySaved after component removal, without duplicate import or replayed feedback. Save enlarges the photo to 1.16 before sliding right without shrinking; ignore shrinks/slides beyond the lower-right edge. Both join renderer/cue before removal, and feedbackIssues preserves any nonfatal feedback failures independently from committed save/ignore. Import failure retains the photo. Ignore does not delete album data; private cached evidence remains until the explicit FIFO retention policy retires it. Export requires foreground, not an open camera. Camera/save overlap rejects; neither failure nor continuation automatically repeats the shutter.
+One current photo fades/holds/shrinks into a thumbnail and reports actual animation acknowledgment. Only the positioned thumbnail controls intercept touch. Save validates displayed identity, foreground and original owner, joins one add-only native transaction and sets savedMediaID only after success. The exact saved ID remains alreadySaved after component removal, without duplicate import or replayed feedback. Save enlarges the photo to 1.16 before sliding right without shrinking; ignore shrinks/slides beyond the lower-right edge. Both join renderer/cue before removal, and feedbackIssues preserves any nonfatal feedback failures independently from committed save/ignore. Import failure retains the photo. Ignore does not delete album data; private cached evidence remains until the explicit FIFO retention policy retires it. Export requires foreground, not an open camera. Camera/save overlap rejects; neither failure nor continuation automatically repeats the shutter.
 
 ### Adaptive vision cadence and projection
 
@@ -1281,7 +1300,7 @@ FrameMotionAnalyzer stays within Agents/VisionPerception: one sampled inferred-f
 
 Urgency may reduce the scheduling interval to zero; ordinary inference duration adds no floor. Compute-dominated freshness pressure may temporarily impose a bounded cost floor. Camera close clears skeleton and statistics.
 
-UI/Camera owns PoseOverlay and display statistics. VisionPerception owns its Encodable PoseOverlayPayload; PoseOverlay remains the independently validated callable-function payload. App maps callable outcome values into UI values. UI has zero project dependencies; AgentCore has zero project dependencies.
+UI/Camera owns PoseOverlay and display statistics. VisionPerception owns its Encodable PoseOverlayPayload; PoseOverlay remains the independently validated callable-function payload. App maps callable outcome values into UI values. UI has no cross-module dependencies; AgentCore has no cross-module dependencies.
 
 ### Photographer tracking and control handoff
 
@@ -1370,7 +1389,7 @@ Owner transports survive pages, bind actual Agent incarnations and have 120-seco
 
 ApplicationControl transport admits thirty-two requests and sixty-four output slots. Provider headless operations allow one returning call, presentation-enabled operations two; ordinary resource operations two; source/configureSpeech/error presentation at most three. Photographer camera transport permits one request with output 256 and separately one tracking worker/eight queued calls. Native/discrete controls report overload rather than evict work.
 
-Download completion means admission only, not installation. Actual installation/progress comes from current inventory and settled receipts. Cancellation after admission first joins that admission, preventing a late accepted download from restarting cancelled work. Host-only typed retire(request UUID) releases admitted request bookkeeping after dispatch/feedback failure; it is external host control, not native download cancellation or a model permission.
+Download completion means admission only, not installation. Actual installation/progress comes from current inventory and settled receipts. Cancellation after admission first joins that admission, preventing a late accepted download from restarting cancelled work. Host-only typed retire(request ID) releases admitted request bookkeeping after dispatch/feedback failure; it is external host control, not native download cancellation or a model permission.
 
 Actions owns durable source/cellular/custom-speech schema, installed prerequisites and legacy decoding. Preferences use a 4096-byte revision-checked document with overlap rejection. Source persistence and model binding are separate selected operations. A committed preference survives later binding failure; the frontend cache invalidates and preserves last-confirmed visible flags until explicit reconciliation.
 
@@ -1412,7 +1431,7 @@ HistoryPresentationAdapter validates root session/source, reads actual records a
 
 Existing history records retain actual request Tool declarations, complete native calls and runtime-correlated Gateway outcomes, independently of generation completion. UI displays/exports these values without importing Gateway or ModelKit. Optional input/generated/total usage comes from cloud providers or the local backend. History omits max-token display; normal Assistant requests omit that option.
 
-Each model request stores exact metadata-only request JSON, input, fragments, calls/results, model finish/failure, optional provider usage and adapter timing. Four request rounds, 512 KiB exact-request JSON and 64 KiB current input are separate from whole context limits. Model completion, call outcome and task-owner completion remain separate. Late call outcomes update their original request, including archived records.
+Each model request stores exact metadata-only request JSON, input, completed response, calls/results, model finish/failure, optional provider usage and adapter timing. Four request rounds, 512 KiB exact-request JSON and 64 KiB current input are separate from whole context limits. Model completion, call outcome and task-owner completion remain separate. Late call outcomes update their original request, including archived records.
 
 Model timing samples request start immediately before provider invocation and first nonempty text before yield, using monotonic elapsed time. Consumer persistence, ASR/TTS and UI are excluded. Native-only and unavailable provider timing remains empty; record arrival does not invent TTFT. Generated continuations appear as ReACT without overwriting the original request. Historical native evidence is retained even when current role grants are Action-only.
 
@@ -1420,7 +1439,7 @@ Parser preview uses the exact persisted Assistant request catalog and shared par
 
 History images are authorized metadata references, up to four per context. Reads validate selected producer/input association before accessing CapturedPhotoStore. UI page reads cancel with their owner, permit at most 4 MiB each and prepare 320-pixel thumbnails/2048-pixel full preview. Missing files return absent; wrong ownership/corrupt length fails visibly.
 
-Storage uses atomic, revision-checked documents (64 KiB by default; Agent contexts explicitly use 64 MiB). File storage confines paths, rejects descendant symlinks and validates reservations/free space before non-overwriting publication. Current history uses StorageChat current/individual-archive checkpoints; the Assistant context is memory-only. Cross-process writers, cross-device sync and semantic retrieval remain absent. See [Storage](Storage/README.md) for the underlying mechanisms.
+Storage uses one App-owned GRDB/SQLite database for dialogs, complete messages, Tasks, media metadata and devices. SQL transactions generate business IDs and update only changed records; each completed ReACT message persists independently. The Assistant context is a bounded memory projection. All Agent contexts use process-memory state; generic settings/model documents retain atomic UUID revisions; confined media files publish outside SQL transactions. Cross-process hosts, cross-device sync and semantic retrieval remain absent. See [Storage](Storage/README.md) for the underlying mechanisms.
 
 ### Settings audio detection
 
@@ -1787,7 +1806,7 @@ The implemented `AgentTaskSignal` registry, task bounds and scoped question rout
 | Execution lifecycle | ✅ Owned cancellation/join, causal ActionResult, independent manual-worker failure feedback and bounded result retention | ❌ General long-task progress/activity subscriptions |
 | Model/provider resources | ✅ Agent-routed commands/preferences/inventory/observations/errors and private provider transactions/presentation; ApplicationControl current facts are model-readable | ❌ Model-initiated provider configuration changes with safe session handoff |
 | Decision context | ✅ Bounded root environment facts plus registered current inventory/provider/device reads | ❌ Full resource-state-store plan and push adapters |
-| Foundational independence | ✅ UI, ModelKit, PlatformKit and Storage have no project dependencies | None |
+| Foundational independence | ✅ UI, ModelKit, PlatformKit and Storage have no cross-module dependencies | None |
 | Transport evolution | ✅ Process-local admission and bounded domain content | ❌ Remote authentication/codecs, version migration, durable replay and dynamic subscriptions |
 
 [Cross-module concurrency](#cross-module-concurrency-and-completion) summarizes capacities; [InputGateway](Gateway/Input/README.md) and [communication policy](Agents/Support/Core/Communication/README.md) define admission and the eight-hop limit. AgentMessage encoding is not a wire format for the whole Signal envelope.
@@ -1982,19 +2001,19 @@ flowchart LR
 
 ## Agent records
 
-✅ Implemented: 设置的 Agent 记录入口由各 Agent 注入自己的记录页面，目前只有 Assistant 聊天记录。前台 Task 的摘要、终态与原始请求包含在同一会话文件；任务运行状态与后台委派仍由 Agents/首页执行记录持有。删除重复任务历史页面与聚合接口。其他 Agent 的记录类型尚未实现。
+✅ Implemented: 设置的 Agent 记录入口由各 Agent 注入自己的记录页面，目前只有 Assistant 聊天记录。前台 Task 的摘要、终态与原始请求包含在同一 dialog 的 SQL 记录；任务运行状态与后台委派仍由 Agents/首页执行记录持有。删除重复任务历史页面与聚合接口。其他 Agent 的记录类型尚未实现。
 
 
 ✅ Implemented: UI forwards press begin/end as passive warmup intent. Lifecycle owns one cancellable cue-preparation task and one cached default PCM clip; PlatformKit warms only the bounded output graph, never capture. The canonical Listening Actions remain the sole cue/haptic execution, reusing warm resources at recognized hold. Actual listening consent/admission remains Agent-routed.
 
 
-✅ Implemented (2026-10-13): UI.Notice.showNotice/dismissNotice and UI.Light.updateLight are canonical presentation Actions for trusted business calls, currently registered by no Skill. Neutral Actions values cross RuntimePresentation into root-owned HomeEffectsWorkflow, which retains one replaceable notice expiry and one light expiry, UUID-fenced cleanup, and explicit stop. Notices remain separate from factual ExecutionIssue history; actual upper-layer errors have display priority and Action failures remain panel-only. Decorative light accepts normalized origin, initial opacity/intensity and duration; it never changes consent, microphone or eyes. Native renderer separates light generations from listening eye generations and preserves existing exit fade. RuntimePresentation adapts Action requests into UI-owned values; AppPresentationWorkflow keeps its existing UI/AgentCore/FunctionContracts boundary. No UI project dependencies or new directories.
+✅ Implemented (2026-10-13): UI.Notice.showNotice/dismissNotice and UI.Light.updateLight are canonical presentation Actions for trusted business calls, currently registered by no Skill. Neutral Actions values cross RuntimePresentation into root-owned HomeEffectsWorkflow, which retains one replaceable notice expiry and one light expiry, UUID-fenced cleanup, and explicit stop. Notices remain separate from factual ExecutionIssue history; actual upper-layer errors have display priority and Action failures remain panel-only. Decorative light accepts normalized origin, initial opacity/intensity and duration; it never changes consent, microphone or eyes. Native renderer separates light generations from listening eye generations and preserves existing exit fade. RuntimePresentation adapts Action requests into UI-owned values; AppPresentationWorkflow keeps its existing UI/AgentCore/FunctionContracts boundary. No UI capability/business dependencies or new directories.
 
 
 ✅ Implemented (2026-10-13 Skill scope review): canonical Actions unify trusted business calls and model calls; Skill exposure is optional and must serve an actual procedure. ExpressionInteraction retains two expression functions; Feedback/Notice/Light model exposure is removed while implementations and business bindings remain. ApplicationControl keeps navigation/status/resource/Bluetooth operations, removing duplicate robot functions; RobotInteraction owns them. BasicSkill removes unused send while production background contracts are absent. Affected instructions/revisions and explicit communication-only test catalogs are aligned; all six Skills were audited for prerequisites, result handling and cross-Skill references.
 
 
-✅ Implemented (2026-10-13 caption/error lifecycle): mask bottom ASR and reply/status immediately while a notice is visible, restore retained text after dismissal, and preserve pinned Task/promoted ASR layout. Consent-off clears both captions; root HomeEffectsWorkflow owns one UUID/text-fenced350ms reply fade/removal task, cancelled by new text/turn/off/shutdown, scheduled only after reply-policy/playback/native-resume barriers. Agent errors stay in factual root failure notices, not persistent voiceStatus copies. App root contexts explicitly choose afterFirstUnlock file protection, including their directory; repository persistent factory accepts protection while its SDK default remains whileUnlocked. This mitigates lock-boundary writes, without claiming the screenshot proves that cause or hiding other storage failures.
+✅ Implemented (2026-10-13 caption/error lifecycle): mask bottom ASR and reply/status immediately while a notice is visible, restore retained text after dismissal, and preserve pinned Task/promoted ASR layout. Consent-off clears both captions; root HomeEffectsWorkflow owns one ID/text-fenced350ms reply fade/removal task, cancelled by new text/turn/off/shutdown, scheduled only after reply-policy/playback/native-resume barriers. Agent errors stay in factual root failure notices, not persistent voiceStatus copies. Durable configuration documents retain explicit file protection. Agent runtime state uses memory; business records use SQLite. This does not infer the cause of historical lock-boundary failures.
 
 
 ✅ 长按打断后的旧语音呈现调用可返回正常取消；Gateway 在保留原始输出终态的同时，不将纯取消投影为运行异常。App/UI 继续消费真正失败快照，不新增取消重试、Task 权限或生命周期限制。
@@ -2013,9 +2032,35 @@ flowchart LR
 
 ## Task history indexing and in-place compression
 
-✅ Implemented: Task history v3 uses request-owned historyTaskID, conversation-owned indexed terminal compressions and one chronological projection shared by fresh inputs/Task-boundary continuations. App starts a fresh Assistant memory repository and uses current.json plus per-conversation archives; old contexts are never imported. UI shows inline expandable Task summaries and exact request membership.
+✅ Implemented: Task history v4 uses request-owned historyTaskID, conversation-owned indexed terminal compressions and one chronological projection shared by fresh inputs/Task-boundary continuations. App starts a fresh Assistant memory repository backed by SQLite message records; old contexts are never imported. UI shows inline expandable Task summaries and exact request membership.
 
 
-## 会话存储性能重构 v3
 
-✅ 会话存储 v3：Assistant 的当前会话与恢复快照独立存为 current.json，每个归档为 conversation-<稳定会话ID>.json；小 index.json 仅保存列表元数据。生成及任务状态在内存中更新，用户输入结束与整条 Assistant 决策终态才提交快照；取消收尾保存由根所有者持有。崩溃允许丢失未保存回复，不重放任何设备动作。旧 Assistant context/history 不读取、不导入。
+## Model photo input preparation
+
+✅ Implemented: AssistantContextBuilder owns whether captured evidence becomes model input, chooses AssistantPhotoInputPolicy.analysis (1568-pixel long edge, 1,048,576 pixels, 1 MiB JPEG, quality 0.82), reads the owned original and invokes an injected prepareJPEG capability before constructing ChatImage. App composition supplies raw reads and translates policy fields into PlatformKit NativeImageCompression.Limits; it selects no model-image policy. PlatformKit retains generic Image I/O processing off MainActor. ReACT reuses the prepared attachment; original photo storage/history reads/Photos import stay unchanged. Preparation is cancelled/joined with the decision, and errors or invalid prepared bytes fail explicitly without original-image fallback.
+
+
+
+
+## SQLite records and runtime identity
+
+✅ Implemented: technical identities are opaque UUID strings; committed business entities use dialog/message/task/media/device SQLite IDs. Consumers use Storage repositories while preserving ownership, cancellation and independent foundation boundaries. Complete messages, including each ReACT message, persist at termination; delta fragments do not persist. The custom allocator and replaced file/index implementation are removed. See the [SQLite migration record](../docs/completed/Prefix-Numeric-ID-Plan.md).
+
+✅ SQLite records: one current dialog per Agent, per-message/ReACT commits, ten recent projected context blocks, SQL source indexes and20-item cursor pages. Numeric references belong only to committed dialog/message/task/media/device records. Runtime/framework correlation identities remain opaque UUID strings. GRDB is private to Storage; no custom ID allocator or old-file importer remains. Media names use UTC timestamp plus primary key; models use media_N. See [Storage](Storage/README.md) and [SQLite plan](../docs/completed/Prefix-Numeric-ID-Plan.md).
+
+## Storage repository boundaries
+
+✅ Storage common contracts/memory/file mechanisms are backend-independent. Chat, Audio, Media, Tasks and Devices own their record contracts and policies. A separate StorageSQLite target compiles backend adapters and the shared pool; only App composition creates SQLiteRepositories and injects domain protocols. Agents/Actions/feature workflows do not depend on concrete databases. Preserve existing schemas, complete-message checkpoints, in-place Task projection, bounded previews/caches and failure semantics. No Storage.swift umbrella/global locator; no speculative document-database implementation.
+
+
+✅ Configuration preservation (2026-10-15): SQLite migration is limited to dialogs/messages/tasks/media indexes/devices. App retains Settings/settings.json, Models/download-source.json, Models/transfers.json, the original version1 document envelope, Keychain identifiers and installed models. Media bytes reuse CapturedPhotos. All Agent runtime payloads use Storage process-memory state without loading or writing Context JSON.
+
+
+✅ Record lifecycle: insert dialog/Task and Assistant identity rows before references escape; insert accepted user messages with complete content; hold live Agent state through Storage StateRepository/MemoryStateStore without JSON serialization; flush completed bodies and real terminal states at producer boundaries. GRDB record mapping stays private in StorageSQLite. App configuration and weights retain their original paths/formats.
+
+
+✅ Implemented (2026-10-15): User message admission refinement: ASR partials remain in memory; after VAD closure, final ASR text and Agent acceptance, insert the complete completed user row once and publish its committed ID. Assistant identity reservation remains before generation.
+
+
+✅ Implemented (2026-10-15 current-dialog hardening): Current-dialog consistency: SQL remains authoritative. Rotation commits archive/new-current atomically, then memory publication retains a recovery fence until successful. Read/admission/archive boundaries revalidate current; deltas remain memory-only. Missing current is created by the existing repository transaction. Active/dirty mismatches reject without dropping work.

@@ -4,6 +4,7 @@ import CallRuntime
 import ExecutionRuntime
 import Foundation
 import FunctionContracts
+import Storage
 import Testing
 
 @testable import Agents
@@ -66,7 +67,8 @@ func moveEyesRejectsInvalidTarget(parameters: [String: String]) async throws {
         actionPath: .init(domain: "UI", module: "Gaze", function: "moveEyes"), channel: "Gaze",
         parameters: ["x": "0", "y": "0"])
     let call = ActionCall(actionPath: valid.actionPath, channel: valid.channel, parameters: parameters)
-    let input = AgentInput(sessionID: UUID(), payload: .text("test"))
+    let input = AgentInput(
+        id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("test"))
     let envelope = OutputEnvelope(source: .visionPerception, input: input, output: .actionCall(call))
     await #expect(throws: UIActions.GazeError.invalidTarget) {
         try await UIActions.moveEyes(invocation: uiActionInvocation(ActionInvocation(envelope: envelope))) { _, _ in
@@ -81,7 +83,9 @@ func moveEyesRejectsInvalidTarget(parameters: [String: String]) async throws {
         parameters: ["x": "-1", "y": "1"])
     let envelope = OutputEnvelope(
         source: .visionPerception,
-        input: AgentInput(sessionID: UUID(), payload: .text("test")), output: .actionCall(call))
+        input: AgentInput(
+            id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("test")),
+        output: .actionCall(call))
     let invocation = try ActionInvocation(envelope: envelope)
     try await UIActions.moveEyes(invocation: uiActionInvocation(invocation)) { target, _ in
         #expect(target.x == -1 && target.y == 1)

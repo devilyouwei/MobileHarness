@@ -3,6 +3,7 @@ import AppWorkflows
 import Foundation
 import FunctionContracts
 import ModelKitRuntime
+import Storage
 import UI
 
 enum SettingsModelResourcesAdapter {
@@ -148,12 +149,13 @@ enum SettingsModelResourcesAdapter {
 /// Root-scoped presentation adaptation; every production call is dispatched by OutputGateway.
 @MainActor final class ResourcePresentationAdapter: ResourcePresentationCapability {
     private let state: ModelResourcesState
-    private let sessionID: UUID
+    private let sessionID: String
     private let acknowledge: @MainActor () -> Void
     private let provider: ProviderPresentationAdapter
     private let navigation: NavigationState
     init(
-        state: ModelResourcesState, sessionID: UUID, provider: ProviderPresentationAdapter, navigation: NavigationState,
+        state: ModelResourcesState, sessionID: String, provider: ProviderPresentationAdapter,
+        navigation: NavigationState,
         acknowledge: @escaping @MainActor () -> Void
     ) {
         self.state = state
@@ -173,7 +175,7 @@ enum SettingsModelResourcesAdapter {
         }
         navigation.show(AppDestination(rawValue: destination))
     }
-    func presentProviderResult(requestID: UUID, failureCode: String?, invocation: any FunctionInput) async throws {
+    func presentProviderResult(requestID: String, failureCode: String?, invocation: any FunctionInput) async throws {
         try await provider.present(requestID, failureCode: failureCode, invocation: invocation)
     }
     func presentResources(

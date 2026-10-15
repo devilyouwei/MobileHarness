@@ -6,6 +6,7 @@ import CallRuntime
 import ExecutionRuntime
 import Foundation
 import FunctionContracts
+import Storage
 import Testing
 import UI
 
@@ -35,7 +36,9 @@ private actor ObservationGate {
 }
 
 private func observationCall(_ path: ActionPath, input: AgentInput, channel: String) -> ScheduledAction {
-    ScheduledAction(source: .assistant, input: input, call: ActionCall(actionPath: path, channel: channel))
+    ScheduledAction(
+        source: .assistant, input: input, call: ActionCall(actionPath: path, channel: channel),
+        executionID: UUID().uuidString)
 }
 
 @Test(.actionCatalog, .timeLimit(.minutes(1)))
@@ -59,7 +62,8 @@ func actionObservationTracksParallelChannelsAndQueuedWorkWithoutFeedbackOptIn()
     var iterator = stream.makeAsyncIterator()
     let initial = await iterator.next()
     #expect(initial?.records.isEmpty == true)
-    let input = AgentInput(sessionID: UUID(), payload: .event("observation"))
+    let input = AgentInput(
+        id: UUID().uuidString, sessionID: UUID().uuidString, payload: .event("observation"))
     let armID = try await scheduler.enqueue(invocation: observationCall(armPath, input: input, channel: "Robot"))
     let speechID = try await scheduler.enqueue(invocation: observationCall(speechPath, input: input, channel: "Speech"))
     let queuedID = try await scheduler.enqueue(invocation: observationCall(armPath, input: input, channel: "Robot"))
@@ -92,7 +96,8 @@ func actionObservationTracksParallelChannelsAndQueuedWorkWithoutFeedbackOptIn()
                 await gate.wait()
             }
         ]))
-    let input = AgentInput(sessionID: UUID(), payload: .event("cancel"))
+    let input = AgentInput(
+        id: UUID().uuidString, sessionID: UUID().uuidString, payload: .event("cancel"))
     let activeID = try await scheduler.enqueue(invocation: observationCall(path, input: input, channel: "Robot"))
     await gate.waitForEntry()
     let queuedID = try await scheduler.enqueue(invocation: observationCall(path, input: input, channel: "Robot"))
@@ -115,14 +120,15 @@ func actionObservationTracksParallelChannelsAndQueuedWorkWithoutFeedbackOptIn()
 
 @Test(.actionCatalog) func actionObservationRetainsActiveWorkBoundsHistoryAndIgnoresLateTransitions() {
     var ledger = ActionExecutionLedger(terminalCapacity: 2)
-    let input = AgentInput(sessionID: UUID(), payload: .event("bounds"))
+    let input = AgentInput(
+        id: UUID().uuidString, sessionID: UUID().uuidString, payload: .event("bounds"))
     let path = ActionPath(domain: "Fixture", module: "Control", function: "work")
     let active = observationCall(path, input: input, channel: "Robot")
     let definition = ActionBinding(
         path: path, displayName: "测试动作", kind: .finite, completion: "Fixture completed.", handler: { _ in })
     ledger.admit(active, definition: definition)
     ledger.transition(active.executionID, to: .running)
-    var lastID = UUID()
+    var lastID = UUID().uuidString
     for _ in 0..<20 {
         let job = observationCall(path, input: input, channel: "Speech")
         ledger.admit(job, definition: definition)
@@ -152,7 +158,8 @@ func actionObservationTracksParallelChannelsAndQueuedWorkWithoutFeedbackOptIn()
     var streams: [AsyncStream<ActionExecutionSnapshot>] = []
     for _ in 0..<8 { streams.append(try await scheduler.observeExecutions()) }
     await #expect(throws: ChannelScheduler.ObservationError.self) { try await scheduler.observeExecutions() }
-    let input = AgentInput(sessionID: UUID(), payload: .event("failure"))
+    let input = AgentInput(
+        id: UUID().uuidString, sessionID: UUID().uuidString, payload: .event("failure"))
     try await scheduler.enqueue(invocation: observationCall(path, input: input, channel: "Robot"))
     try await scheduler.finish(inputID: input.id, source: AgentID(rawValue: "assistant"))
     let result = try #require(await scheduler.executionSnapshot().records.first)
@@ -179,7 +186,8 @@ func actionObservationTracksParallelChannelsAndQueuedWorkWithoutFeedbackOptIn()
     let state = ActionActivityState()
     let workflow = ActionActivityWorkflow(state: state)
     workflow.start { try await scheduler.observeExecutions() }
-    let input = AgentInput(sessionID: UUID(), payload: .event("metadata fixture"))
+    let input = AgentInput(
+        id: UUID().uuidString, sessionID: UUID().uuidString, payload: .event("metadata fixture"))
     let id = try await scheduler.enqueue(invocation: observationCall(path, input: input, channel: "CustomLane"))
     try await scheduler.finish(inputID: input.id, source: AgentID(rawValue: "assistant"))
     let snapshot = await scheduler.executionSnapshot()
@@ -228,7 +236,8 @@ func actionObservationTracksParallelChannelsAndQueuedWorkWithoutFeedbackOptIn()
                 path: path, displayName: "Fixture", kind: .finite, completion: "Preserved error",
                 completing: { _ in .report(try await composition.run()) })
         ]))
-    let input = AgentInput(sessionID: UUID(), payload: .event("fixture"))
+    let input = AgentInput(
+        id: UUID().uuidString, sessionID: UUID().uuidString, payload: .event("fixture"))
     _ = try await scheduler.enqueue(invocation: observationCall(path, input: input, channel: "Fixture"))
     try await scheduler.finish(inputID: input.id, source: .assistant)
     let record = try #require(await scheduler.executionSnapshot().records.first)
@@ -254,8 +263,9 @@ func cancelledActionPresentationRetainsOnlyIndependentRealIssues(_ mixed: Bool) 
     )
     .withExecutionFailure(.cancelled, description: "CancellationError()")
     let record = ActionExecutionRecord(
-        id: UUID(), path: .init(domain: "UI", module: "Caption", function: "print"),
-        displayName: "Caption", source: .assistant, sessionID: UUID(), inputID: UUID(), channel: "Display",
+        id: UUID().uuidString, path: .init(domain: "UI", module: "Caption", function: "print"),
+        displayName: "Caption", source: .assistant, sessionID: UUID().uuidString,
+        inputID: UUID().uuidString, channel: "Display",
         semantics: .finite, phase: mixed ? .failed : .cancelled, completion: .report(report))
     let item = ActionActivityItem(execution: record)
     #expect(item.isFailure == mixed)

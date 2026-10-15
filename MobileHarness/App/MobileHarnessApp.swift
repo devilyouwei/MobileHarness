@@ -1,7 +1,9 @@
 import AppWorkflows
+import Foundation
 import ModelKitDefaults
 import ModelKitHub
 import ModelKitRuntime
+import Storage
 import SwiftUI
 import UI
 import UIKit
@@ -203,7 +205,7 @@ struct MobileHarnessApp: App {
 
 @MainActor
 final class ModelDownloadsAppDelegate: NSObject, UIApplicationDelegate {
-    private var completions: [String: (UUID, () -> Void)] = [:]
+    private var completions: [String: (String, () -> Void)] = [:]
     private var preparationTime: UIBackgroundTaskIdentifier = .invalid
     private var preparationTimer: Task<Void, Never>?
     func applicationDidEnterBackground(_ application: UIApplication) {
@@ -235,7 +237,7 @@ final class ModelDownloadsAppDelegate: NSObject, UIApplicationDelegate {
             return
         }
         completions.removeValue(forKey: identifier)?.1()
-        let generation = UUID()
+        let generation = UUID().uuidString
         completions[identifier] = (generation, completionHandler)
         Task {
             do {
@@ -256,7 +258,7 @@ final class ModelDownloadsAppDelegate: NSObject, UIApplicationDelegate {
             Task { @MainActor in self?.finish(identifier, generation: generation) }
         }
     }
-    private func finish(_ identifier: String, generation: UUID) {
+    private func finish(_ identifier: String, generation: String) {
         guard completions[identifier]?.0 == generation else { return }
         completions.removeValue(forKey: identifier)?.1()
     }

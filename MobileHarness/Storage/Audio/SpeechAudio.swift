@@ -11,7 +11,7 @@ extension SpeechAudioError {
         switch error {
         case .capacityExceeded: return SpeechAudioError.capacityExceeded
         case .missing: return SpeechAudioError.missingAudio
-        case .timedOut: return error
+        case .busy, .timedOut: return error
         case .duplicate: return SpeechAudioError.duplicate
         case .closed: return SpeechAudioError.closed
         case .expired: return error
@@ -22,10 +22,10 @@ extension SpeechAudioError {
 
 /// Shared PCM adapter over a bounded, single-reader Storage stream.
 public final class SpeechAudio: Sendable {
-    public let id: UUID
+    public let id: String
     private let stream: BoundedMemoryStream<SpeechPCMFrame>
 
-    public init(id: UUID = UUID(), maximumBytes: Int = 1_048_576) {
+    public init(id: String, maximumBytes: Int = 1_048_576) {
         self.id = id
         stream = BoundedMemoryStream(maximumBytes: maximumBytes, maximumItems: 2048, waitTimeout: nil) {
             $0.data.count

@@ -5,6 +5,7 @@ import ExecutionRuntime
 import Foundation
 import FunctionContracts
 import Gateway
+import Storage
 
 // Test callers explicitly cross the same validated Gateway boundary as production.
 extension ActionInvocation {
@@ -12,11 +13,14 @@ extension ActionInvocation {
         self = try ScheduledAction(envelope: envelope).execution
     }
     init(source: AgentID, input: AgentInput, call: ActionCall, sequence: UInt64 = 0) {
-        self = ScheduledAction(source: source, input: input, call: call, sequence: sequence).execution
+        self =
+            ScheduledAction(
+                source: source, input: input, call: call, sequence: sequence, executionID: UUID().uuidString
+            ).execution
     }
 }
 extension ChannelScheduler {
-    func enqueue(invocation: any FunctionInput) async throws -> UUID {
+    func enqueue(invocation: any FunctionInput) async throws -> String {
         try await enqueue(invocation: ScheduledAction(envelope: invocation.testEnvelope))
     }
 }

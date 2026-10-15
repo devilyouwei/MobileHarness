@@ -25,7 +25,7 @@ flowchart LR
 
 ## Calls, causality and results
 
-ActionCall contains resolved ActionPath, effective Channel and string arguments. ToolCall retains UUID/path/arguments without Channel membership. rejectedCall is non-executable. OutputEnvelope retains source Agent ID, original input metadata, input/session/task/turn, optional round/call IDs and producer sequence. Its input metadata preserves admitted provenance; live executor incarnation and execution owner are validated/bound by runtime transport. `schedulingID` selects round ID, then task ID, then input ID; it is distinct from execution ownership.
+ActionCall contains resolved ActionPath, effective Channel and string arguments. ToolCall retains ID/path/arguments without Channel membership. rejectedCall is non-executable. OutputEnvelope retains source Agent ID, original input metadata, input/session/task/turn, optional round/call IDs and producer sequence. Its input metadata preserves admitted provenance; live executor incarnation and execution owner are validated/bound by runtime transport. `schedulingID` selects round ID, then task ID, then input ID; it is distinct from execution ownership.
 
 ActionResult/ToolResult/RoundResult/CommunicationReceipt are distinct evidence, not duplicate confirmations. Round seal differs from final conversation completion. Only send produces a receipt; publication does not. Completion values are bounded to 64 KiB UTF-8. SignalCausality preserves input/root/parent/hops/turn; runtime feedback advances one hop under a fresh admission lifetime.
 
@@ -60,3 +60,11 @@ ActionExecutionRecord/Snapshot contains payload-free identity/path/Channel/state
 ✅ 2026-10-13 已实现：收窄 hasBusinessOutput 到显式 value；保留 ToolResult.hasFailure 对 report 真实失败、非取消 isError 与 failureCode 的优先判定，旧原生 value 兼容与报告结构保持不变。
 
 ✅ ToolResult and both report contracts distinguish pure cancellation from real failure. cancelled status/code/report remain evidence; hasFailure/requiresReasoning exclude pure cancellation. Mixed real failures take precedence over cancelled leaves and preserve partial effects.
+
+
+
+
+
+## SQLite records and runtime identity
+
+✅ Implemented: technical identities are opaque UUID strings; committed business entities use dialog/message/task/media/device SQLite IDs. Consumers use Storage repositories while preserving ownership, cancellation and independent foundation boundaries. Complete messages, including each ReACT message, persist at termination; delta fragments do not persist. The custom allocator and replaced file/index implementation are removed. See the project SQLite business-record plan.

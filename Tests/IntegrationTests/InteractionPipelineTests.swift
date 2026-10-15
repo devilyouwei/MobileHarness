@@ -5,6 +5,7 @@ import AppWorkflows
 import Foundation
 import FunctionContracts
 import Gateway
+import Storage
 import Testing
 
 private actor InteractionDevice: DeviceControlCapability {
@@ -71,19 +72,21 @@ private actor InteractionPresentation: ResourcePresentationCapability {
 }
 
 @Test(.actionCatalog) func independentManualTerminalResultIsRetainedWithoutSchedulingAnotherAction() async throws {
-    let session = UUID()
+    let session = UUID().uuidString
     let agent = try ApplicationControlAgent(sessionID: session)
     try await agent.start()
-    let owner = ExecutionOwner(agent: agent.descriptor.id, incarnation: UUID(), sessionID: session)
-    let root = UUID()
+    let owner = ExecutionOwner(
+        agent: agent.descriptor.id, incarnation: UUID().uuidString, sessionID: session)
+    let root = UUID().uuidString
     let report = ActionReport.empty.recordingFailure(DeviceControlError.unavailable)
     let result = ActionResult(
-        executionID: UUID(), owner: owner,
+        executionID: UUID().uuidString, owner: owner,
         path: .init(domain: "System", module: "Device", function: "control"),
         causality: .root(id: root), status: .failed, effect: .unknown,
         completion: .report(report.agentValue), failure: .handlerFailed)
     let payload = InputPayload.actionResult(result)
     let feedback = AgentInput(
+        id: UUID().uuidString,
         sessionID: session, payload: payload,
         metadata: InputMetadata(
             payload: payload, source: "runtime", origin: .runtime,
@@ -94,8 +97,10 @@ private actor InteractionPresentation: ResourcePresentationCapability {
     #expect(await agent.status().queuedInputs == 0)
     #expect(try await agent.environmentSnapshot().contains("device.unavailable"))
     let forged = AgentInput(
+        id: UUID().uuidString,
         sessionID: session, payload: payload,
-        metadata: InputMetadata(payload: payload, source: "user", origin: .external))
+        metadata: InputMetadata(
+            payload: payload, source: "user", origin: .external, rootID: UUID().uuidString))
     await #expect(throws: CommunicationError.unauthorized) { try await agent.receive(forged) }
     try await agent.receive(
         AppEnvironmentFact(category: .scene, sequence: 1, value: "active").input(sessionID: session))

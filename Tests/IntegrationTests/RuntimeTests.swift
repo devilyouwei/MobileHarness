@@ -7,11 +7,13 @@ import Foundation
 import FunctionContracts
 import Gateway
 import ModelKit
+import Storage
 import Testing
 
 @Test(.actionCatalog) func lifecycleAndBoundedQueue() async throws {
     let agent = try AssistantAgent(capacity: 1, chat: FixedTextChat())
-    let input = AgentInput(sessionID: UUID(), payload: .text("hello"))
+    let input = AgentInput(
+        id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("hello"))
     await #expect(throws: HarnessError.notRunning) { try await agent.receive(input) }
     _ = try await bindSpeechRequests(agent)
     try await agent.start()
@@ -30,14 +32,18 @@ import Testing
         outputCapacity: 2,
         chat: FixedTextChat(text: "<express emotion=\"happy\"/><express emotion=\"sad\"/><express emotion=\"love\"/>"))
     try await agent.start()
-    try await agent.receive(AgentInput(sessionID: UUID(), payload: .text("overflow")))
+    try await agent.receive(
+        AgentInput(
+            id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("overflow")))
     for _ in 0..<1000 {
         if await agent.status().lifecycle == .failed { break }
         try await Task.sleep(for: .milliseconds(2))
     }
     #expect(await agent.status().lifecycle == .failed)
     await #expect(throws: HarnessError.notRunning) {
-        try await agent.receive(AgentInput(sessionID: UUID(), payload: .text("rejected")))
+        try await agent.receive(
+            AgentInput(
+                id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("rejected")))
     }
     await agent.stop()
 }
@@ -49,7 +55,8 @@ import Testing
     }
     #expect(throws: HarnessError.forbiddenTool) {
         try OutputValidator.validate(
-            .toolCall(ToolCall(toolPath: "Fixture.Control.deletePhotos")), descriptor: descriptor)
+            .toolCall(ToolCall(id: UUID().uuidString, toolPath: "Fixture.Control.deletePhotos")),
+            descriptor: descriptor)
     }
     try OutputValidator.validate(.scheduling(.beginWait), descriptor: descriptor)
     let restricted = AgentDescriptor(id: .assistant, name: "restricted", inputs: [.text], outputs: [.text])
@@ -91,7 +98,8 @@ private func textRoutingConfiguration(_ id: String, subscribes: Bool = true) thr
             textRoutingConfiguration("assistant"), textRoutingConfiguration("missing"),
         ])
     let gateway = InputGateway(manager: manager, policy: policy, allowsExternalSend: true)
-    try await gateway.publish(AgentInput(sessionID: UUID(), payload: .text("hello")))
+    try await gateway.publish(
+        AgentInput(id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("hello")))
     await gateway.flushPublications()
     #expect(await agent.status().processedInputs == 1)
     await manager.stopAll()
@@ -103,7 +111,8 @@ private func textRoutingConfiguration(_ id: String, subscribes: Bool = true) thr
     try await manager.register(agent)
     try await manager.start(.assistant)
     let gateway = InputGateway(manager: manager, allowsExternalSend: true)
-    let input = AgentInput(sessionID: UUID(), payload: .text("hello"))
+    let input = AgentInput(
+        id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("hello"))
     await #expect(throws: CommunicationError.unsupportedContract) { try await gateway.publish(input) }
     #expect(await agent.status().processedInputs == 0)
     let report = try await gateway.send(input, to: .assistant)
@@ -125,14 +134,16 @@ private func textRoutingConfiguration(_ id: String, subscribes: Bool = true) thr
         ],
         configurations: [textRoutingConfiguration("assistant", subscribes: false)])
     let gateway = InputGateway(manager: manager, policy: policy, allowsExternalSend: true)
-    let input = AgentInput(sessionID: UUID(), payload: .text("hello"))
+    let input = AgentInput(
+        id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("hello"))
     try await gateway.publish(input)
     await gateway.flushPublications()
     #expect(await agent.status().processedInputs == 0)
     let report = try await gateway.send(input, to: .assistant)
     #expect(report.delivered == [.assistant])
     #expect(report.rejected.isEmpty)
-    let unsupported = AgentInput(sessionID: input.sessionID, payload: .event("not declared"))
+    let unsupported = AgentInput(
+        id: UUID().uuidString, sessionID: input.sessionID, payload: .event("not declared"))
     let rejected = try await gateway.send(unsupported, to: .assistant)
     #expect(rejected.delivered.isEmpty)
     #expect(rejected.rejected[.assistant] == String(describing: CommunicationError.unsupportedContract))
@@ -187,8 +198,8 @@ private struct StatusRoundTripChat: ChatCapability {
     let responses = OutputGateway(manager: manager, requests: requests, tools: tools, actions: actions) {
         await recorder.record($0)
     }
-    let session = UUID()
-    let input = AgentInput(sessionID: session, payload: .text("query"))
+    let session = UUID().uuidString
+    let input = AgentInput(id: UUID().uuidString, sessionID: session, payload: .text("query"))
     _ = try await requests.send(input, to: .assistant)
     // Tool results now asynchronously admit synthesis before emitting playback.
     var iterator = FixtureGenerationOutputs(agent: agent).makeAsyncIterator()
@@ -222,7 +233,8 @@ private struct StatusRoundTripChat: ChatCapability {
     let requests = InputGateway(manager: manager, allowsExternalSend: true)
     let recorder = Recorder()
     let missing = OutputGateway(manager: manager, requests: requests, tools: ToolRegistry()) { _ in }
-    let input = AgentInput(sessionID: UUID(), payload: .event("test"))
+    let input = AgentInput(
+        id: UUID().uuidString, sessionID: UUID().uuidString, payload: .event("test"))
     let envelope = OutputEnvelope(
         source: .assistant, input: input,
         output: .actionCall(expectedActionCall(name: "express", parameters: ["emotion": "smile"])))
@@ -250,14 +262,15 @@ private struct StatusRoundTripChat: ChatCapability {
 
 @Test(.actionCatalog) func unknownAndFailingToolsReturnCorrelatedErrors() async throws {
     let registry = ToolRegistry()
-    let unknown = ToolCall(toolPath: "Fixture.Control.unknown")
-    let input = AgentInput(sessionID: UUID(), payload: .text("tool"))
+    let unknown = ToolCall(id: UUID().uuidString, toolPath: "Fixture.Control.unknown")
+    let input = AgentInput(
+        id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("tool"))
     let result = try #require(
         try await ToolExecutor(registry: registry).execute(
             unknown, envelope: OutputEnvelope(source: .assistant, input: input, output: .toolCall(unknown))))
     #expect(result.isError && result.callID == unknown.id)
     try await registry.register("Fixture.Control.broken") { _ in throw HarnessError.notRunning }
-    let broken = ToolCall(toolPath: "Fixture.Control.broken")
+    let broken = ToolCall(id: UUID().uuidString, toolPath: "Fixture.Control.broken")
     let failure = try #require(
         try await ToolExecutor(registry: registry).execute(
             broken, envelope: OutputEnvelope(source: .assistant, input: input, output: .toolCall(broken))))
@@ -266,8 +279,9 @@ private struct StatusRoundTripChat: ChatCapability {
 
 @Test(.actionCatalog) func completionToolsReturnFailureOutcomesAndPropagateCancellation() async throws {
     let registry = ToolRegistry()
-    let input = AgentInput(sessionID: UUID(), payload: .text("tool"))
-    let call = ToolCall(toolPath: "UI.Pose.showPose")
+    let input = AgentInput(
+        id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("tool"))
+    let call = ToolCall(id: UUID().uuidString, toolPath: "UI.Pose.showPose")
     let envelope = OutputEnvelope(source: .visionPerception, input: input, output: .toolCall(call))
     try await registry.registerCompletion("UI.Pose.showPose") { invocation in
         let origin = invocation.context
@@ -284,19 +298,19 @@ private struct StatusRoundTripChat: ChatCapability {
     await #expect(throws: ToolRegistryError.duplicateHandler) {
         try await registry.registerCompletion("Fixture.Control.value") { _ in }
     }
-    let value = ToolCall(toolPath: "Fixture.Control.value")
+    let value = ToolCall(id: UUID().uuidString, toolPath: "Fixture.Control.value")
     let result = try #require(try await ToolExecutor(registry: registry).execute(value, envelope: envelope))
     #expect(result.value.isEmpty)  // Empty data is still a result, unlike Void completion.
     try await registry.registerCompletion("Fixture.Control.failure") { _ in throw HarnessError.notRunning }
     let failed = try #require(
         try await ToolExecutor(registry: registry).execute(
-            ToolCall(toolPath: "Fixture.Control.failure"), envelope: envelope))
+            ToolCall(id: UUID().uuidString, toolPath: "Fixture.Control.failure"), envelope: envelope))
     #expect(failed.isError)
     #expect(failed.value.contains("notRunning"))
     try await registry.registerCompletion("Fixture.Control.cancel") { _ in throw CancellationError() }
     let cancelled = try #require(
         try await ToolExecutor(registry: registry).execute(
-            ToolCall(toolPath: "Fixture.Control.cancel"), envelope: envelope))
+            ToolCall(id: UUID().uuidString, toolPath: "Fixture.Control.cancel"), envelope: envelope))
     #expect(cancelled.isError)
     #expect(cancelled.failureCode == .cancelled)
 }
@@ -319,7 +333,8 @@ private struct StatusRoundTripChat: ChatCapability {
         manager: manager, requests: InputGateway(manager: manager, allowsExternalSend: true), tools: ToolRegistry(),
         actions: scheduler
     ) { _ in }
-    let input = AgentInput(sessionID: UUID(), payload: .text("groups"))
+    let input = AgentInput(
+        id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("groups"))
     for _ in 0..<2 {
         try await gateway.dispatch(OutputEnvelope(source: .assistant, input: input, output: .scheduling(.beginWait)))
         try await gateway.dispatch(
@@ -336,7 +351,8 @@ private struct StatusRoundTripChat: ChatCapability {
     }
     try await gateway.dispatch(OutputEnvelope(source: .assistant, input: input, output: .control("agent.finished")))
     #expect(await recorder.actions == 2)
-    let malformed = AgentInput(sessionID: UUID(), payload: .text("malformed"))
+    let malformed = AgentInput(
+        id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("malformed"))
     try await gateway.dispatch(OutputEnvelope(source: .assistant, input: malformed, output: .scheduling(.beginWait)))
     await #expect(throws: ActionSchedulingError.invalidSchedule) {
         try await gateway.dispatch(
@@ -347,7 +363,8 @@ private struct StatusRoundTripChat: ChatCapability {
 
 @Test(.actionCatalog) func messageFailureIsRecordedWithoutFailingProducer() async throws {
     let port = AgentMessaging { _, _, _ in throw CommunicationError.scopeClosed }
-    let input = AgentInput(sessionID: UUID(), payload: .text("fixture"))
+    let input = AgentInput(
+        id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("fixture"))
     let report = try await port.sendResult(.transcript("hello", final: true), parent: input, to: .assistant)
     #expect(report.failure != nil)
     let history = await port.history.snapshot()
@@ -375,7 +392,8 @@ private struct StatusRoundTripChat: ChatCapability {
     let failures = try await gateway.observeFailures()
     var failureIterator = failures.makeAsyncIterator()
     #expect(await failureIterator.next()?.records.isEmpty == true)
-    let input = AgentInput(sessionID: UUID(), payload: .event("fixture"))
+    let input = AgentInput(
+        id: UUID().uuidString, sessionID: UUID().uuidString, payload: .event("fixture"))
     let failedCall = try InternalTool(path: "UI.Caption.print", required: ["text"]).call(["text": "hello"])
     let first = try await gateway.execute(
         OutputEnvelope(source: .assistant, input: input, output: .toolCall(failedCall)))
@@ -397,7 +415,7 @@ private struct StatusRoundTripChat: ChatCapability {
                 OutputEnvelope(
                     source: .assistant, input: input,
                     output: .rejectedCall(
-                        CallRejection(kind: kind, alias: "bad", callID: UUID(), reason: reason))))
+                        CallRejection(kind: kind, alias: "bad", callID: UUID().uuidString, reason: reason))))
             #expect(rejected.isError)
         }
     }
@@ -433,8 +451,9 @@ private struct StatusRoundTripChat: ChatCapability {
             throw error
         }
     }
-    let call = ToolRequest(toolPath: "Fixture.Control.slow")
-    let context = ActionExecutionContext(source: "fixture", sessionID: UUID(), inputID: UUID(), sequence: 1)
+    let call = ToolRequest(id: UUID().uuidString, toolPath: "Fixture.Control.slow")
+    let context = ActionExecutionContext(
+        source: "fixture", sessionID: UUID().uuidString, inputID: UUID().uuidString, sequence: 1)
     let result = try #require(
         try await ToolExecutor(registry: registry).execute(
             call, context: context))
@@ -453,7 +472,8 @@ private struct StatusRoundTripChat: ChatCapability {
     try await manager.register(agent)
     try await manager.start(.assistant)
     try await agent.pause()
-    let input = AgentInput(sessionID: UUID(), payload: .text("occupied"))
+    let input = AgentInput(
+        id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("occupied"))
     try await agent.receive(input)
     let tools = ToolRegistry()
     try await tools.register("UI.Caption.print") { _ in "completed value" }
@@ -463,7 +483,9 @@ private struct StatusRoundTripChat: ChatCapability {
     let result = try await gateway.execute(
         OutputEnvelope(
             source: .assistant, input: input,
-            output: .toolCall(ToolCall(toolPath: "UI.Caption.print", arguments: ["text": "fixture"]))))
+            output: .toolCall(
+                ToolCall(id: UUID().uuidString, toolPath: "UI.Caption.print", arguments: ["text": "fixture"])
+            )))
     #expect(result.isError)
     #expect(result.tool?.value == "completed value")
     #expect(result.tool?.isError == false)
@@ -491,8 +513,10 @@ private struct ToolTimeoutModule: ToolModule {
     let registry = try ToolRegistry(modules: [ToolTimeoutModule(definitions: [definition])])
     let result = try #require(
         try await ToolExecutor(registry: registry).execute(
-            ToolRequest(toolPath: "Fixture.Control.slow"),
-            context: ActionExecutionContext(source: "fixture", sessionID: UUID(), inputID: UUID(), sequence: 1)))
+            ToolRequest(id: UUID().uuidString, toolPath: "Fixture.Control.slow"),
+            context: ActionExecutionContext(
+                source: "fixture", sessionID: UUID().uuidString, inputID: UUID().uuidString,
+                sequence: 1)))
     #expect(result.isError && result.value.contains("timed out"))
     #expect(throws: ToolRegistrationError.invalidDefinition("Fixture.Control.bad")) {
         try ToolRegistry(modules: [
@@ -509,8 +533,10 @@ private struct ToolTimeoutModule: ToolModule {
     try await registry.registerCompletion("Fixture.Control.failure") { _ in throw FixtureFailure() }
     let result = try #require(
         try await ToolExecutor(registry: registry).execute(
-            ToolRequest(toolPath: "Fixture.Control.failure"),
-            context: ActionExecutionContext(source: "Fixture", sessionID: UUID(), inputID: UUID(), sequence: 1)))
+            ToolRequest(id: UUID().uuidString, toolPath: "Fixture.Control.failure"),
+            context: ActionExecutionContext(
+                source: "Fixture", sessionID: UUID().uuidString, inputID: UUID().uuidString,
+                sequence: 1)))
     #expect(result.isError)
     #expect(result.value.count == 512)
     #expect(result.value.hasPrefix("业务资源异常"))
@@ -524,12 +550,13 @@ private struct ToolTimeoutModule: ToolModule {
     try await registry.registerCompletion("Fixture.Control.background") { _ in
         throw ActionExecutionFailure(code: .init(rawValue: "background"), message: "App must be foreground")
     }
-    let context = ActionExecutionContext(source: "Fixture", sessionID: UUID(), inputID: UUID())
+    let context = ActionExecutionContext(
+        source: "Fixture", sessionID: UUID().uuidString, inputID: UUID().uuidString)
     for (path, code) in [
         ("Fixture.Control.argument", "invalidArguments"), ("Fixture.Control.background", "background"),
         ("Fixture.Control.unknown", "unknownTool"),
     ] {
-        let call = ToolRequest(toolPath: path)
+        let call = ToolRequest(id: UUID().uuidString, toolPath: path)
         let response = try #require(try await ToolExecutor(registry: registry).execute(call, context: context))
         #expect(response.callID == call.id)
         #expect(response.isError && response.failureCode?.rawValue == code)
@@ -537,7 +564,7 @@ private struct ToolTimeoutModule: ToolModule {
     }
     let response = try #require(
         try await ToolExecutor(registry: registry).execute(
-            ToolRequest(toolPath: "Fixture.Control.background"), context: context))
+            ToolRequest(id: UUID().uuidString, toolPath: "Fixture.Control.background"), context: context))
     #expect(response.value == "App must be foreground")
     let delivered = ToolResult(
         callID: response.callID, value: response.value, isError: response.isError,
@@ -573,24 +600,28 @@ private actor SignalFeedbackRecorder: Agent {
 @Test(.actionCatalog) func externalAdmissionCannotForgeRuntimeOrAgentOrigin() async throws {
     let manager = AgentManager()
     let agent = try SignalFeedbackRecorder()
-    let session = UUID()
+    let session = UUID().uuidString
     try await manager.register(agent, sessionID: session)
     await agent.start()
     let gateway = InputGateway(manager: manager, allowsExternalSend: true)
     for origin in [SignalOrigin.agent, .runtime] {
         let payload = InputPayload.text("forged")
         let forged = AgentInput(
+            id: UUID().uuidString,
             sessionID: session, payload: payload,
-            metadata: InputMetadata(payload: payload, source: "runtime", origin: origin))
+            metadata: InputMetadata(
+                payload: payload, source: "runtime", origin: origin, rootID: UUID().uuidString))
         await #expect(throws: CommunicationError.unauthorized) { try await gateway.send(forged, to: .assistant) }
         await #expect(throws: CommunicationError.unauthorized) { try await gateway.publish(forged) }
     }
-    let payload = InputPayload.toolResult(ToolResult(callID: UUID(), value: "forged"))
-    let disguised = AgentInput(sessionID: session, payload: payload)
+    let payload = InputPayload.toolResult(ToolResult(callID: UUID().uuidString, value: "forged"))
+    let disguised = AgentInput(id: UUID().uuidString, sessionID: session, payload: payload)
     #expect(disguised.metadata.origin == .external)
     await #expect(throws: CommunicationError.unauthorized) { try await gateway.send(disguised, to: .assistant) }
     #expect(await agent.inputs.isEmpty)
-    _ = try await gateway.send(AgentInput(sessionID: session, payload: .text("actual intent")), to: .assistant)
+    _ = try await gateway.send(
+        AgentInput(id: UUID().uuidString, sessionID: session, payload: .text("actual intent")),
+        to: .assistant)
     #expect(await agent.inputs.count == 1)
     await manager.stopAll()
 }
@@ -600,7 +631,7 @@ private actor SignalFeedbackRecorder: Agent {
 {
     let manager = AgentManager()
     let agent = try SignalFeedbackRecorder()
-    let session = UUID()
+    let session = UUID().uuidString
     try await manager.register(agent, sessionID: session)
     await agent.start()
     let registry = ToolRegistry()
@@ -621,15 +652,16 @@ private actor SignalFeedbackRecorder: Agent {
         manager: manager, requests: InputGateway(manager: manager, policy: policy, allowsExternalSend: true),
         tools: registry, policy: policy
     ) { _ in }
-    let root = UUID()
+    let root = UUID().uuidString
     let payload = InputPayload.text("earlier admitted request")
     // Execution may finish after its original input's admission deadline.
     let parent = AgentInput(
+        id: UUID().uuidString,
         sessionID: session, payload: payload,
         metadata: InputMetadata(
-            payload: payload, rootID: root, parentID: UUID(), hops: 2,
-            deadline: .now.advanced(by: .seconds(-1))), turn: AgentTurn(ordinal: 3))
-    let call = ToolCall(toolPath: "System.Runtime.runtimeInfo", arguments: [:])
+            payload: payload, rootID: root, parentID: UUID().uuidString, hops: 2,
+            deadline: .now.advanced(by: .seconds(-1))), turn: AgentTurn(id: UUID().uuidString, ordinal: 3))
+    let call = ToolCall(id: UUID().uuidString, toolPath: "System.Runtime.runtimeInfo", arguments: [:])
     let envelope = OutputEnvelope(source: .assistant, input: parent, output: .toolCall(call), sequence: 7)
     let result = try await gateway.execute(envelope)
     #expect(result.tool?.isError == fails)
@@ -676,7 +708,7 @@ private actor HeldSignalTool {
 {
     let manager = AgentManager()
     let original = try SignalFeedbackRecorder()
-    let session = UUID()
+    let session = UUID().uuidString
     try await manager.register(original, sessionID: session)
     await original.start()
     let held = HeldSignalTool()
@@ -685,12 +717,14 @@ private actor HeldSignalTool {
     let gateway = OutputGateway(
         manager: manager, requests: InputGateway(manager: manager, allowsExternalSend: true), tools: registry
     ) { _ in }
-    let parent = AgentInput(sessionID: session, payload: .text("intent"))
+    let parent = AgentInput(id: UUID().uuidString, sessionID: session, payload: .text("intent"))
     let operation = Task {
         try await gateway.execute(
             OutputEnvelope(
                 source: .assistant, input: parent,
-                output: .toolCall(ToolCall(toolPath: "System.Runtime.runtimeInfo", arguments: [:]))))
+                output: .toolCall(
+                    ToolCall(id: UUID().uuidString, toolPath: "System.Runtime.runtimeInfo", arguments: [:])))
+        )
     }
     var started = held.started.stream.makeAsyncIterator()
     _ = try #require(await started.next())
@@ -712,7 +746,7 @@ private actor HeldSignalTool {
 @Test(.actionCatalog) func toolFeedbackHopExhaustionPreservesEffectWithoutReplay() async throws {
     let manager = AgentManager()
     let agent = try SignalFeedbackRecorder()
-    let session = UUID()
+    let session = UUID().uuidString
     try await manager.register(agent, sessionID: session)
     await agent.start()
     let registry = ToolRegistry()
@@ -726,11 +760,14 @@ private actor HeldSignalTool {
     ) { _ in }
     let payload = InputPayload.text("intent")
     let parent = AgentInput(
-        sessionID: session, payload: payload, metadata: InputMetadata(payload: payload, hops: 8))
+        id: UUID().uuidString,
+        sessionID: session, payload: payload,
+        metadata: InputMetadata(payload: payload, rootID: UUID().uuidString, hops: 8))
     let result = try await gateway.execute(
         OutputEnvelope(
             source: .assistant, input: parent,
-            output: .toolCall(ToolCall(toolPath: "System.Runtime.runtimeInfo", arguments: [:]))))
+            output: .toolCall(
+                ToolCall(id: UUID().uuidString, toolPath: "System.Runtime.runtimeInfo", arguments: [:]))))
     #expect(result.tool?.value == "Completed once")
     #expect(result.tool?.isError == false)
     #expect(result.tool?.deliveryFailure == String(describing: CommunicationError.hopLimitExceeded))
@@ -774,7 +811,9 @@ func interruptedVoiceStateIsCancelledWithoutHidingRealFailures(mode: String) asy
     let agent = try RuntimeToolFixture(id: .speechPerception, extraTools: [voiceState])
     try await manager.register(agent)
     try await manager.start(.speechPerception)
-    let input = AgentInput(sessionID: UUID(), payload: .text("interrupted recognition"))
+    let input = AgentInput(
+        id: UUID().uuidString, sessionID: UUID().uuidString,
+        payload: .text("interrupted recognition"))
     let registry = ToolRegistry()
     if mode == "delivery" {
         // A cancelled handler plus failed feedback delivery remains a real incident.

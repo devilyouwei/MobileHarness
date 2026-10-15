@@ -7,6 +7,7 @@ import ExecutionRuntime
 import Foundation
 import FunctionContracts
 import Gateway
+import Storage
 import Testing
 
 struct UnusedModelResourceCapability: ModelResourceCapability {
@@ -82,7 +83,8 @@ func resourceRuntime(
     providerSettings: any ProviderSettingsCapability = UnusedProviderSettings(),
     device: any DeviceControlCapability = UnusedDeviceControl(),
     camera: any CameraControlCapability = UnusedCameraControl(),
-    sessionID: UUID = UUID(), manager: AgentManager = AgentManager(), suppliedInput: InputGateway? = nil,
+    sessionID: String = UUID().uuidString, manager: AgentManager = AgentManager(),
+    suppliedInput: InputGateway? = nil,
     suppliedContext: AgentContextRepository<ApplicationControlContextState>? = nil,
     outputSink: @escaping @Sendable (OutputEnvelope) async -> Void = { _ in }
 ) throws -> ApplicationControlIntentRuntime {
@@ -128,10 +130,10 @@ func resourceRuntime(
     await #expect(throws: CommunicationError.scopeClosed) { try await runtime.perform(.cancel("model")) }
 }
 @Test(.actionCatalog) func modelResourceAgentRejectsDuplicateAndOverflowAndRetiresFailedDispatch() async throws {
-    let session = UUID()
+    let session = UUID().uuidString
     let agent = try ApplicationControlAgent(sessionID: session)
     try await agent.start()
-    let first = ModelResourceIntent.cancel("model").input(sessionID: session)
+    let first = try ModelResourceIntent.cancel("model").input(sessionID: session)
     try await agent.receive(first)
     await #expect(throws: CommunicationError.capacityExceeded) { try await agent.receive(first) }
     for _ in 1..<32 { try await agent.receive(ModelResourceIntent.cancel("model").input(sessionID: session)) }
@@ -200,7 +202,7 @@ private actor HeldResourceFixture: ModelResourceCapability {
 }
 
 @Test(.actionCatalog) func pausedApplicationControlRetainsEnvironmentAdmissionWithoutStartingBusiness() async throws {
-    let session = UUID()
+    let session = UUID().uuidString
     let agent = try ApplicationControlAgent(sessionID: session)
     try await agent.start()
     try await agent.pause()
@@ -219,11 +221,11 @@ private actor HeldResourceFixture: ModelResourceCapability {
 }
 
 @Test(.actionCatalog) func resourceIntentRejectsForeignSessionAndMalformedResourceBeforeEffects() async throws {
-    let session = UUID()
+    let session = UUID().uuidString
     let agent = try ApplicationControlAgent(sessionID: session)
     try await agent.start()
     await #expect(throws: CommunicationError.unauthorized) {
-        try await agent.receive(ModelResourceIntent.cancel("model").input(sessionID: UUID()))
+        try await agent.receive(ModelResourceIntent.cancel("model").input(sessionID: UUID().uuidString))
     }
     await #expect(throws: CommunicationError.invalidPayload) {
         try await agent.receive(ModelResourceIntent.remove("../model").input(sessionID: session))
@@ -244,10 +246,10 @@ private actor HeldResourceFixture: ModelResourceCapability {
 @Test(.actionCatalog) func speechBindingOverlapIsRejectedWithoutBlockingOtherResourceIntentsAndRetirementReleasesIt()
     async throws
 {
-    let session = UUID()
+    let session = UUID().uuidString
     let agent = try ApplicationControlAgent(sessionID: session)
     try await agent.start()
-    let request = ModelResourceIntent.configureSpeech(recognition: true, synthesis: false).input(sessionID: session)
+    let request = try ModelResourceIntent.configureSpeech(recognition: true, synthesis: false).input(sessionID: session)
     try await agent.receive(request)
     await #expect(throws: CommunicationError.capacityExceeded) {
         try await agent.receive(
@@ -277,7 +279,8 @@ private actor HeldResourceFixture: ModelResourceCapability {
     let fixture = ResourceFixture()
     let invocation = ActionInvocation(
         source: .applicationControl,
-        input: AgentInput(sessionID: UUID(), payload: .event("fixture")),
+        input: AgentInput(
+            id: UUID().uuidString, sessionID: UUID().uuidString, payload: .event("fixture")),
         call: ActionCall(
             actionPath: ActionPath(domain: "System", module: "ModelResources", function: "configureSpeech"),
             channel: "fixture", parameters: ["recognition": "TRUE", "synthesis": "false"]))
@@ -288,12 +291,12 @@ private actor HeldResourceFixture: ModelResourceCapability {
 }
 
 struct UnusedProviderDiscovery: ProviderDiscoveryCapability {
-    func discoverModels(requestID: UUID, sessionID: UUID) async throws -> [String] { throw CancellationError() }
+    func discoverModels(requestID: String, sessionID: String) async throws -> [String] { throw CancellationError() }
 }
 
 struct UnusedProviderSettings: ProviderSettingsCapability {
-    func restoreSettings(requestID: UUID, sessionID: UUID) async throws { throw CancellationError() }
-    func saveSettings(requestID: UUID, sessionID: UUID) async throws { throw CancellationError() }
+    func restoreSettings(requestID: String, sessionID: String) async throws { throw CancellationError() }
+    func saveSettings(requestID: String, sessionID: String) async throws { throw CancellationError() }
 }
 
 struct UnusedCameraControl: CameraControlCapability {
@@ -309,7 +312,7 @@ struct UnusedCameraControl: CameraControlCapability {
 func environmentPublicationHasNoCompletionWaitAndReceiverErrorsStayIndependent()
     async throws
 {
-    let session = UUID()
+    let session = UUID().uuidString
     let manager = AgentManager()
     let policy = try resourceFixturePolicy()
     let input = InputGateway(manager: manager, policy: policy)

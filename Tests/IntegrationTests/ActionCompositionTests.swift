@@ -6,6 +6,7 @@ import ExecutionRuntime
 import Foundation
 import FunctionContracts
 import Gateway
+import Storage
 import Testing
 
 private actor CompositionCounter {
@@ -55,8 +56,9 @@ private actor CompositionCounter {
 @Test(.actionCatalog) func reportedPartialFailureReleasesWaitAndDeliversAllIssues() async throws {
     let counter = CompositionCounter()
     let path = ActionPath(domain: "Composite", module: "Control", function: "run")
-    let owner = ExecutionOwner(agent: .assistant, incarnation: UUID(), sessionID: UUID())
-    let input = AgentInput(sessionID: owner.sessionID, payload: .event("composition"))
+    let owner = ExecutionOwner(
+        agent: .assistant, incarnation: UUID().uuidString, sessionID: UUID().uuidString)
+    let input = AgentInput(id: UUID().uuidString, sessionID: owner.sessionID, payload: .event("composition"))
     let report = try ActionReport(entries: [
         .init(path: "first", status: .failed, code: .feedbackLost),
         .init(path: "second", status: .succeeded),

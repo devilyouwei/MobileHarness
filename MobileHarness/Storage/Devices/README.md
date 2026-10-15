@@ -1,0 +1,19 @@
+# Device Record Contract
+
+## Responsibility and implementation
+
+✅ DeviceRepository.swift exposes async stable native/business mapping, selected device and reconnect configuration. SQLiteDeviceRepository.swift owns devices schema/indexes/SQL and compiles only in StorageSQLite.
+
+## Direct relationships
+
+StorageDevices depends only on Storage. App Bluetooth consumes the protocol and PlatformKit receives the original native identity; this directory contains no transport or reconnect workflow.
+
+## Lifecycle and failure contracts
+
+Committed device keys remain stable across native-name updates. Selection updates atomically clear the previous selection and reject a missing target; native identifiers retain their original format. Writer failures propagate. No device motion or reconnect success is fabricated from a record.
+
+## Outstanding work
+
+❌ Additional record backends and physical-radio acceptance are separate work.
+
+[Storage](../README.md)

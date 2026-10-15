@@ -1,5 +1,6 @@
 import AgentCore
 import Foundation
+import Storage
 
 /// Application Agent names; the framework only defines the identity value type.
 extension AgentID {
@@ -16,7 +17,7 @@ public enum PerceptionMessage: Codable, Sendable, Equatable {
     case soundSource(SoundSourceObservation)
     case pose(PoseObservation)
     case speechSynthesis(SpeechSynthesisInput)
-    case cancelSpeech(UUID)
+    case cancelSpeech(String)
     public var contract: String {
         switch self {
         case .transcript(_, true): "speech.final"
@@ -55,7 +56,7 @@ extension AgentMessage {
     public static func speechSynthesis(_ request: SpeechSynthesisInput) -> AgentMessage {
         wrap(.speechSynthesis(request))
     }
-    public static func cancelSpeech(_ id: UUID) -> AgentMessage { wrap(.cancelSpeech(id)) }
+    public static func cancelSpeech(_ id: String) -> AgentMessage { wrap(.cancelSpeech(id)) }
     private static func wrap(_ value: PerceptionMessage) -> AgentMessage {
         AgentMessage(
             contract: value.contract, content: value,
@@ -231,19 +232,19 @@ extension InputPayload {
 /// Typed human/history host intent; never embedded in framework business enums.
 public enum MemoryHistoryIntent: Codable, Sendable, Equatable {
     case startNew
-    case summarize(UUID)
+    case summarize(String)
     case refresh
-    case delete(UUID)
-    case cancel(UUID)
+    case delete(String)
+    case cancel(String)
     public static let contract = "history.intent"
-    public func input(sessionID: UUID) -> AgentInput {
-        let requestID: UUID
+    public func input(sessionID: String) throws -> AgentInput {
+        let requestID: String
         let source: String
         if case .cancel(let id) = self {
             requestID = id
             source = "runtime"
         } else {
-            requestID = UUID()
+            requestID = UUID().uuidString
             source = "user"
         }
         let message = AgentMessage(contract: Self.contract, content: self, maximumBytes: 512, validate: { _ in })
@@ -262,8 +263,8 @@ extension AgentMessage {
 public enum AgentSessionControl: Codable, Sendable, Equatable {
     case cancelSession
     public static let contract = "assistant.control"
-    public func input(sessionID: UUID) -> AgentInput {
-        let id = UUID()
+    public func input(sessionID: String) throws -> AgentInput {
+        let id = UUID().uuidString
         let message = AgentMessage(contract: Self.contract, content: self, maximumBytes: 512, validate: { _ in })
         let payload = InputPayload.observation(message)
         return AgentInput(

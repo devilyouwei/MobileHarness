@@ -59,3 +59,11 @@ At most four executed leaves produce one aggregate report with activation/tail/c
 ## Streaming TTS latency
 
 ✅ Owner-scoped playback completes after native drain and lease cleanup. No post-playback timer or replacement task is owned here. App Lifecycle restores listening immediately when policy/session/native barriers permit.
+
+
+
+
+
+## SQLite records and runtime identity
+
+✅ Implemented: technical identities are opaque UUID strings; committed business entities use dialog/message/task/media/device SQLite IDs. Consumers use Storage repositories while preserving ownership, cancellation and independent foundation boundaries. Complete messages, including each ReACT message, persist at termination; delta fragments do not persist. The custom allocator and replaced file/index implementation are removed. See the project SQLite business-record plan.

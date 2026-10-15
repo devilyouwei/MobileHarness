@@ -60,7 +60,7 @@ Camera commands execute for actual Photographer in its root or active task scope
 
 Photo capture freezes foreground/session/revision and owns one task; photoBusy spans that task and clears on every terminal path. JPEG storage is bounded to 32 files/128 MiB; actual capture persists even if presentation fails. Display animation completion is distinct from capture. Camera facts are published from committed native/presentation state, without invoking a model.
 
-Save validates the displayed photo ID and original StorageOwner, reads the original JPEG and joins one Photos transaction. Capture/export overlap fails busy. Confirmed import sets savedPhotoID; the exact saved UUID remains idempotent after departure. Successful save/ignore joins renderer and cue, then clears only the matching current surface; optional receipt feedbackIssues distinguish presentation failure from committed disposition. Permission failure keeps the thumbnail. Ignore hides the current acknowledged thumbnail without deleting album data or private reasoning evidence. Foreground is required; an open camera is not.
+Save validates the displayed photo ID and original StorageOwner, reads the original JPEG and joins one Photos transaction. Capture/export overlap fails busy. Confirmed import sets savedMediaID; the exact saved ID remains idempotent after departure. Successful save/ignore joins renderer and cue, then clears only the matching current surface; optional receipt feedbackIssues distinguish presentation failure from committed disposition. Permission failure keeps the thumbnail. Ignore hides the current acknowledged thumbnail without deleting album data or private reasoning evidence. Foreground is required; an open camera is not.
 
 ## Cleanup and diagnostics
 
@@ -96,7 +96,7 @@ Voice and diagnostics use mutual cleanup barriers. AudioDetectionSession owns al
 ✅ Implemented: cancellation of the parent Listening Action cancels its matching startup worker and invalidates native capture immediately under a startup-ID fence. Cleanup can then join a pending first-frame wait without cancelling a replacement generation.
 
 
-✅ Implemented: CameraCoordinator owns one joined photo command, canonical UIModule cue child using a private photo-native capability, and NativeCuePlayback for overlay cues. Save commits Photos before feedback; ignore commits the selected preview decision. PhotoDispositionWorkflow joins visual/audio effects, retains bounded issues and removes only the original UUID after completion/cancellation. Save failure retains the thumbnail. Explicit duplicate saved UUID returns alreadySaved after departure, without replaying feedback. Foreground shutdown cancels/joins command and stops its cue without resetting voice capture or speech.
+✅ Implemented: CameraCoordinator owns one joined photo command, canonical UIModule cue child using a private photo-native capability, and NativeCuePlayback for overlay cues. Save commits Photos before feedback; ignore commits the selected preview decision. PhotoDispositionWorkflow joins visual/audio effects, retains bounded issues and removes only the original ID after completion/cancellation. Save failure retains the thumbnail. Explicit duplicate saved ID returns alreadySaved after departure, without replaying feedback. Foreground shutdown cancels/joins command and stops its cue without resetting voice capture or speech.
 
 
 ✅ Voice generation publishes the same optional listeningAnimationID as active consent to the UI. Native visual epochs reset every new generation and are independent of microphone/model readiness. Photo archive bound reflects explicit composition policy.
@@ -108,10 +108,10 @@ Voice and diagnostics use mutual cleanup barriers. AudioDetectionSession owns al
 ✅ Implemented: add voicePressChanged to own one coalesced prewarm Task and cached default wake PCM. Begin joins diagnostics/native cleanup before preparing output-only audio; end before recognition cancels/discards warm resources, accepted hold latches pending-activation ownership across intent delivery until the Listening Action arrives, fails or stops, and retains preparation until canonical playCue consumes it. Shutdown/stop cancel preparation and never release another active audio operation. Failures remain explicit. playCue joins pending warmup and avoids generating the same PCM on the trigger path.
 
 
-✅ Implemented (2026-10-13): UI.Notice.showNotice/dismissNotice and UI.Light.updateLight are canonical presentation Actions for trusted business calls, currently registered by no Skill. Neutral Actions values cross RuntimePresentation into root-owned HomeEffectsWorkflow, which retains one replaceable notice expiry and one light expiry, UUID-fenced cleanup, and explicit stop. Notices remain separate from factual ExecutionIssue history; actual upper-layer errors have display priority and Action failures remain panel-only. Decorative light accepts normalized origin, initial opacity/intensity and duration; it never changes consent, microphone or eyes. Native renderer separates light generations from listening eye generations and preserves existing exit fade. RuntimePresentation adapts Action requests into UI-owned values; AppPresentationWorkflow keeps its existing UI/AgentCore/FunctionContracts boundary. No UI project dependencies or new directories.
+✅ Implemented (2026-10-13): UI.Notice.showNotice/dismissNotice and UI.Light.updateLight are canonical presentation Actions for trusted business calls, currently registered by no Skill. Neutral Actions values cross RuntimePresentation into root-owned HomeEffectsWorkflow, which retains one replaceable notice expiry and one light expiry, UUID-fenced cleanup, and explicit stop. Notices remain separate from factual ExecutionIssue history; actual upper-layer errors have display priority and Action failures remain panel-only. Decorative light accepts normalized origin, initial opacity/intensity and duration; it never changes consent, microphone or eyes. Native renderer separates light generations from listening eye generations and preserves existing exit fade. RuntimePresentation adapts Action requests into UI-owned values; AppPresentationWorkflow keeps its existing UI/AgentCore/FunctionContracts boundary. No UI capability/business dependencies or new directories.
 
 
-✅ Implemented (2026-10-13 caption/error lifecycle): mask bottom ASR and reply/status immediately while a notice is visible, restore retained text after dismissal, and preserve pinned Task/promoted ASR layout. Consent-off clears both captions; root HomeEffectsWorkflow owns one UUID/text-fenced350ms reply fade/removal task, cancelled by new text/turn/off/shutdown, scheduled only after reply-policy/playback/native-resume barriers. Agent errors stay in factual root failure notices, not persistent voiceStatus copies. App root contexts explicitly choose afterFirstUnlock file protection, including their directory; repository persistent factory accepts protection while its SDK default remains whileUnlocked. This mitigates lock-boundary writes, without claiming the screenshot proves that cause or hiding other storage failures.
+✅ Implemented (2026-10-13 caption/error lifecycle): mask bottom ASR and reply/status immediately while a notice is visible, restore retained text after dismissal, and preserve pinned Task/promoted ASR layout. Consent-off clears both captions; root HomeEffectsWorkflow owns one ID/text-fenced350ms reply fade/removal task, cancelled by new text/turn/off/shutdown, scheduled only after reply-policy/playback/native-resume barriers. Agent errors stay in factual root failure notices, not persistent voiceStatus copies. Durable configuration documents retain explicit file protection. Agent runtime state uses memory; business records use SQLite. This does not infer the cause of historical lock-boundary failures.
 
 
 
@@ -123,3 +123,19 @@ Voice and diagnostics use mutual cleanup barriers. AudioDetectionSession owns al
 ## Isolated audio-detection communication
 
 ✅ AudioDetectionScope restricts the loaded SpeechPerception declaration to media.audio and sound.source before constructing its single-Agent CommunicationPolicy. Only phone.microphone PCM is subscribed; conversational consent, reply occupancy and speech outputs are excluded. The same projected configuration constructs the Agent. This removes the absent Assistant publication dependency that previously threw CommunicationError.unauthorized during initialization, before microphone permission/capture. Existing cancellation, bounds and joined cleanup remain in force.
+
+
+
+
+
+## SQLite records and runtime identity
+
+✅ Implemented: technical identities are opaque UUID strings; committed business entities use dialog/message/task/media/device SQLite IDs. Consumers use Storage repositories while preserving ownership, cancellation and independent foundation boundaries. Complete messages, including each ReACT message, persist at termination; delta fragments do not persist. The custom allocator and replaced file/index implementation are removed. See the project SQLite business-record plan.
+
+✅ Storage repository refactor: CameraCoordinator consumes Media-owned JPEG store; File/SQLite creation remains in App composition. Preserve capture/save ownership and truthful cancellation outcomes.
+
+
+✅ Isolated AudioDetectionSession uses a fresh process-memory context. It does not load or save diagnostic JSON.
+
+
+✅ Implemented: AudioDetectionSession uses a fresh process-memory SpeechPerception context; it neither loads nor writes diagnostic context JSON.

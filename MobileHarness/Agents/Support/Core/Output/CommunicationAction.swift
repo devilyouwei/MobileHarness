@@ -2,12 +2,12 @@ import Foundation
 
 /// Output representation is encoded once and retains its validated immutable domain message.
 public struct CommunicationAction: Sendable, Equatable {
-    public let id: UUID
+    public let id: String
     public let message: AgentMessage
     public let target: AgentID?
     private let content: Data
-    public init(id: UUID = UUID(), message: AgentMessage, target: AgentID? = nil) throws {
-        self.id = id
+    public init(id: String? = nil, message: AgentMessage, target: AgentID? = nil) throws {
+        self.id = try id ?? UUID().uuidString
         self.message = message
         self.target = target
         content = try message.encodedContent()
@@ -19,11 +19,11 @@ public struct CommunicationAction: Sendable, Equatable {
 }
 
 public struct CommunicationReceipt: Codable, Sendable {
-    public let callID: UUID
+    public let callID: String
     public let report: DeliveryReport
     public let owner: ExecutionOwner
     public let causality: SignalCausality
-    public init(callID: UUID, report: DeliveryReport, owner: ExecutionOwner, causality: SignalCausality) {
+    public init(callID: String, report: DeliveryReport, owner: ExecutionOwner, causality: SignalCausality) {
         self.callID = callID
         self.report = report
         self.owner = owner
@@ -33,12 +33,12 @@ public struct CommunicationReceipt: Codable, Sendable {
 
 /// Agent-owned bounded waiters. Runtime receipts bypass the model inbox.
 public actor CommunicationReceipts {
-    private var waiting: [UUID: CheckedContinuation<DeliveryReport, any Error>] = [:]
-    private var early: [UUID: Result<DeliveryReport, any Error>] = [:]
-    private var registered: Set<UUID> = []
-    private var recording: Set<UUID> = []
+    private var waiting: [String: CheckedContinuation<DeliveryReport, any Error>] = [:]
+    private var early: [String: Result<DeliveryReport, any Error>] = [:]
+    private var registered: Set<String> = []
+    private var recording: Set<String> = []
     public init() {}
-    public func register(_ id: UUID) throws {
+    public func register(_ id: String) throws {
         guard registered.count + early.count < 16, early[id] == nil, registered.insert(id).inserted else {
             throw CommunicationError.capacityExceeded
         }
@@ -68,7 +68,7 @@ public actor CommunicationReceipts {
             early[receipt.callID] = .success(receipt.report)
         }
     }
-    public func wait(_ id: UUID) async throws -> DeliveryReport {
+    public func wait(_ id: String) async throws -> DeliveryReport {
         if let value = early.removeValue(forKey: id) { return try value.get() }
         try Task.checkCancellation()
         guard registered.contains(id), waiting[id] == nil else { throw CommunicationError.scopeClosed }
@@ -78,7 +78,7 @@ public actor CommunicationReceipts {
             Task { await self.cancel(id) }
         }
     }
-    public func cancel(_ id: UUID) {
+    public func cancel(_ id: String) {
         registered.remove(id)
         early[id] = nil
         waiting.removeValue(forKey: id)?.resume(throwing: CancellationError())

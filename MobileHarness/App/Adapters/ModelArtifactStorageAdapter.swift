@@ -13,11 +13,12 @@ actor ModelArtifactStorageAdapter: ModelArtifactStorage {
         let bytes: Int64
     }
     private let files: LocalFileStore
-    private let index: LocalDocumentStore<[ModelArtifactTransferRecord]>
+    private let index: (any DocumentRepository<[ModelArtifactTransferRecord]>)
     init(root: URL) throws {
         files = try LocalFileStore(root: root)
         index = try LocalDocumentStore(
-            url: root.appendingPathComponent("transfers.json"), maximumBytes: 262144, protection: .afterFirstUnlock)
+            url: root.appendingPathComponent("transfers.json"), maximumBytes: 262144,
+            protection: .afterFirstUnlock)
     }
     func restoreTransfers() async throws -> [ModelArtifactTransferRecord] {
         try await index.load()?.value ?? []
@@ -78,17 +79,17 @@ actor ModelArtifactStorageAdapter: ModelArtifactStorage {
         else { return nil }
         return try JSONDecoder().decode(Marker.self, from: data).files.reduce(0) { $0 + $1.bytes }
     }
-    func stage(_ artifact: ModelArtifact, task: UUID) async throws -> URL {
+    func stage(_ artifact: ModelArtifact, task: String) async throws -> URL {
         // A repeated download of the installed bundled revision requires explicit delete first.
         if try await installed(artifact) { throw ModelArtifactError.busy }
         return try await files.directory(
-            "staging/\(task.uuidString)", reserving: artifact.downloadBytes + artifact.installedBytes)
+            "staging/\(task)", reserving: artifact.downloadBytes + artifact.installedBytes)
     }
-    func publish(_ artifact: ModelArtifact, task: UUID) async throws {
-        let stage = try await files.directory("staging/\(task.uuidString)")
+    func publish(_ artifact: ModelArtifact, task: String) async throws {
+        let stage = try await files.directory("staging/\(task)")
         let marker = Marker(id: artifact.id, revision: artifact.revision, files: try inventory(stage))
         try JSONEncoder().encode(marker).write(to: stage.appendingPathComponent(".installation.json"), options: .atomic)
-        try await files.publish(from: "staging/\(task.uuidString)", to: "installed/\(artifact.directory)")
+        try await files.publish(from: "staging/\(task)", to: "installed/\(artifact.directory)")
     }
     private func inventory(_ stage: URL) throws -> [Member] {
         guard
@@ -109,6 +110,6 @@ actor ModelArtifactStorageAdapter: ModelArtifactStorage {
         }
         return members.sorted { $0.path < $1.path }
     }
-    func discard(task: UUID) async throws { try await files.remove("staging/\(task.uuidString)") }
+    func discard(task: String) async throws { try await files.remove("staging/\(task)") }
     func remove(_ artifact: ModelArtifact) async throws { try await files.remove("installed/\(artifact.directory)") }
 }

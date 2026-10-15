@@ -1,5 +1,6 @@
 import Foundation
 import FunctionContracts
+import Storage
 
 /// Host owns permission, capture leases and foreground lifecycle.
 extension CameraActions {
@@ -19,15 +20,15 @@ public struct CameraCommandReceipt: Codable, Sendable, Equatable {
 }
 
 public struct CameraPhotoReceipt: Codable, Sendable, Equatable {
-    public let photoID: UUID
+    public let mediaID: String
     public let width: Int
     public let height: Int
     public let mimeType: String
-    public init(photoID: UUID, width: Int, height: Int, mimeType: String = "image/jpeg") throws {
+    public init(mediaID: String, width: Int, height: Int, mimeType: String = "image/jpeg") throws {
         guard width > 0, height > 0, width <= 4096, height <= 4096, mimeType == "image/jpeg" else {
             throw CameraControlError.unavailable
         }
-        self.photoID = photoID
+        self.mediaID = mediaID
         self.width = width
         self.height = height
         self.mimeType = mimeType
@@ -36,12 +37,12 @@ public struct CameraPhotoReceipt: Codable, Sendable, Equatable {
 
 public struct CameraPhotoCommandReceipt: Codable, Sendable, Equatable {
     public enum State: String, Codable, Sendable { case saved, ignored }
-    public let photoID: UUID
+    public let mediaID: String
     public let state: State
     public let alreadySaved: Bool
     public let feedbackIssues: [String]?
-    public init(photoID: UUID, state: State, alreadySaved: Bool = false, feedbackIssues: [String]? = nil) {
-        self.photoID = photoID
+    public init(mediaID: String, state: State, alreadySaved: Bool = false, feedbackIssues: [String]? = nil) {
+        self.mediaID = mediaID
         self.state = state
         self.alreadySaved = alreadySaved
         self.feedbackIssues = feedbackIssues
@@ -49,10 +50,10 @@ public struct CameraPhotoCommandReceipt: Codable, Sendable, Equatable {
 }
 
 public protocol CameraControlCapability: Sendable {
-    func savePhoto(_ id: UUID?, invocation: any FunctionInput) async throws -> CameraPhotoCommandReceipt
-    func ignorePhoto(_ id: UUID?, invocation: any FunctionInput) async throws -> CameraPhotoCommandReceipt
+    func savePhoto(_ id: String?, invocation: any FunctionInput) async throws -> CameraPhotoCommandReceipt
+    func ignorePhoto(_ id: String?, invocation: any FunctionInput) async throws -> CameraPhotoCommandReceipt
     func takePhoto(invocation: any FunctionInput) async throws -> CameraPhotoReceipt
-    func readPhoto(_ id: UUID, source: String, sessionID: UUID, inputID: UUID) async throws -> Data
+    func readPhoto(_ id: String, source: String, sessionID: String, inputID: String) async throws -> Data
     func setEnabled(_ enabled: Bool, invocation: any FunctionInput) async throws
     func retry(invocation: any FunctionInput) async throws
     func flip(_ facing: CameraActions.Facing, invocation: any FunctionInput) async throws
@@ -119,16 +120,16 @@ public struct CameraModule: CapabilityModule {
 }
 
 extension CameraControlCapability {
-    public func savePhoto(_ id: UUID?, invocation: any FunctionInput) async throws -> CameraPhotoCommandReceipt {
+    public func savePhoto(_ id: String?, invocation: any FunctionInput) async throws -> CameraPhotoCommandReceipt {
         throw CameraControlError.unavailable
     }
-    public func ignorePhoto(_ id: UUID?, invocation: any FunctionInput) async throws -> CameraPhotoCommandReceipt {
+    public func ignorePhoto(_ id: String?, invocation: any FunctionInput) async throws -> CameraPhotoCommandReceipt {
         throw CameraControlError.unavailable
     }
     public func takePhoto(invocation: any FunctionInput) async throws -> CameraPhotoReceipt {
         throw CameraControlError.unavailable
     }
-    public func readPhoto(_ id: UUID, source: String, sessionID: UUID, inputID: UUID) async throws -> Data {
+    public func readPhoto(_ id: String, source: String, sessionID: String, inputID: String) async throws -> Data {
         throw CameraControlError.unavailable
     }
     public func retry(invocation: any FunctionInput) async throws { try await setEnabled(true, invocation: invocation) }

@@ -64,7 +64,7 @@ playCue 默认为 wake、volume=0.85；vibrate 默认为 heavy、intensity=1、c
 
 Notice 的非空文字限 1024 UTF-8 字节，tone 为 info/warning/error（默认 warning），默认期限 8000 毫秒。Light 的 x/y/initialOpacity/intensity 为有限 0…1，默认 0.5/0.4/0.85/1，默认期限 3000 毫秒。两类期限范围为 500…30000 毫秒；本域只提交请求，宿主拥有过期与清理任务。清除请求不表示清除真实错误记录或聆听策略。
 
-资源呈现使用正 UInt64 generation；错误文本限 2048 字节，偏好错误 reason 为 invalidSource/recognitionRequired/synthesisRequired/execution。Provider 呈现使用 UUID requestID，可选失败码最多 64 字节且以 provider. 开头，不传递 URL/密钥。导航目标为 home/settings/language/recognition/synthesis/vision/bluetooth/history。
+资源呈现使用正 UInt64 generation；错误文本限 2048 字节，偏好错误 reason 为 invalidSource/recognitionRequired/synthesisRequired/execution。Provider 呈现使用 ID requestID，可选失败码最多 64 字节且以 provider. 开头，不传递 URL/密钥。导航目标为 home/settings/language/recognition/synthesis/vision/bluetooth/history。
 
 ## 生命周期与约束
 
@@ -73,3 +73,11 @@ Notice 的非空文字限 1024 UTF-8 字节，tone 为 info/warning/error（默�
 函数被编译或绑定不意味着向模型开放。可选反馈/装饰能力缺失时明确 unavailable，不能伪造成功。呈现回执说明状态或效果边界，不代表对应业务操作、照片导入或设备运动已经成功。
 
 [Actions 设计](../README.md) · [值类型与目录](Support/README.md) · [App 呈现适配](../../App/Adapters/README.md)
+
+
+
+
+
+## SQLite records and runtime identity
+
+✅ Implemented: technical identities are opaque UUID strings; committed business entities use dialog/message/task/media/device SQLite IDs. Consumers use Storage repositories while preserving ownership, cancellation and independent foundation boundaries. Complete messages, including each ReACT message, persist at termination; delta fragments do not persist. The custom allocator and replaced file/index implementation are removed. See the project SQLite business-record plan.

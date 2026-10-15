@@ -6,6 +6,7 @@ import ExecutionRuntime
 import Foundation
 import FunctionContracts
 import Gateway
+import Storage
 import Testing
 
 private actor ContractGate {
@@ -30,9 +31,9 @@ private actor ContractGate {
 private actor ContractState {
     var effects = 0
     var animationPending = false
-    var lastExecutionID: UUID?
+    var lastExecutionID: String?
 
-    func commit(id: UUID? = nil) {
+    func commit(id: String? = nil) {
         effects += 1
         lastExecutionID = id
     }
@@ -46,7 +47,9 @@ private let contractPath = ActionPath(domain: "Fixture", module: "Control", func
 
 private func contractInvocation(path: ActionPath = contractPath) -> ActionInvocation {
     ActionInvocation(
-        source: .assistant, input: AgentInput(sessionID: UUID(), payload: .event("contract")),
+        source: .assistant,
+        input: AgentInput(
+            id: UUID().uuidString, sessionID: UUID().uuidString, payload: .event("contract")),
         call: ActionCall(actionPath: path, channel: "Ordered"))
 }
 
@@ -119,7 +122,8 @@ private func contractDefinition(
 }
 
 @Test(.actionCatalog) func invocationRejectsNonActionsAndDerivesCallFromEnvelope() throws {
-    let input = AgentInput(sessionID: UUID(), payload: .event("contract"))
+    let input = AgentInput(
+        id: UUID().uuidString, sessionID: UUID().uuidString, payload: .event("contract"))
     #expect(throws: ActionExecutionError.invalidInvocation) {
         try ActionInvocation(envelope: OutputEnvelope(source: .assistant, input: input, output: .control("finish")))
     }
@@ -162,7 +166,9 @@ private func contractDefinition(
 
 @Test(.actionCatalog) func presentationRejectsUnknownArgumentsBeforeEffects() async throws {
     let invocation = ActionInvocation(
-        source: .assistant, input: AgentInput(sessionID: UUID(), payload: .event("contract")),
+        source: .assistant,
+        input: AgentInput(
+            id: UUID().uuidString, sessionID: UUID().uuidString, payload: .event("contract")),
         call: ActionCall(
             actionPath: .init(domain: "UI", module: "Expression", function: "express"), channel: "Display",
             parameters: ["emotion": "smile", "unexpected": "value"]))
@@ -318,7 +324,8 @@ private enum ContractFailure: Error, Equatable { case failed }
             try await UIActions.setExpression(invocation: invocation) { _, _ in await state.setExpression() }
         }))
     let scheduler = ChannelScheduler(registry: try ActionRegistry(definitions: [definition, setter]))
-    let input = AgentInput(sessionID: UUID(), payload: .event("expression"))
+    let input = AgentInput(
+        id: UUID().uuidString, sessionID: UUID().uuidString, payload: .event("expression"))
     let perform = ActionInvocation(
         source: .assistant, input: input,
         call: ActionCall(
@@ -348,7 +355,8 @@ private enum ContractFailure: Error, Equatable { case failed }
     let state = ContractState()
     let invocation = ActionInvocation(
         source: .assistant,
-        input: AgentInput(sessionID: UUID(), payload: .event("expression")),
+        input: AgentInput(
+            id: UUID().uuidString, sessionID: UUID().uuidString, payload: .event("expression")),
         call: ActionCall(
             actionPath: .init(domain: "UI", module: "Expression", function: "express"), channel: "Display",
             parameters: ["emotion": "smile"]))
@@ -374,7 +382,8 @@ private enum ContractFailure: Error, Equatable { case failed }
 @Test(.actionCatalog) func expressionCleanupFailureRetainsBothErrors() async throws {
     let invocation = ActionInvocation(
         source: .assistant,
-        input: AgentInput(sessionID: UUID(), payload: .event("expression")),
+        input: AgentInput(
+            id: UUID().uuidString, sessionID: UUID().uuidString, payload: .event("expression")),
         call: ActionCall(
             actionPath: .init(domain: "UI", module: "Expression", function: "express"), channel: "Display",
             parameters: ["emotion": "smile"]))
@@ -527,7 +536,8 @@ func actionStoredResultsRetainSubsequentHandlerFailure(_ reported: Bool) async t
 }
 
 @Test(.actionCatalog) func closedEyeExpressionUsesRealFiniteAndPersistentActions() async throws {
-    let input = AgentInput(sessionID: UUID(), payload: .event("close eyes"))
+    let input = AgentInput(
+        id: UUID().uuidString, sessionID: UUID().uuidString, payload: .event("close eyes"))
     func invocation(_ function: String, emotion: String = "closed") -> ActionInvocation {
         .init(
             source: .assistant, input: input,

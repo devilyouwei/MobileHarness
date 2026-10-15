@@ -2,6 +2,7 @@ import Actions
 import Agents
 import Foundation
 import FunctionContracts
+import Storage
 import StorageChat
 import Testing
 
@@ -13,7 +14,7 @@ import Testing
     let function = CameraActions.takePhotoDefinition(handler: { _ in })
     #expect(function.declaration == CameraActions.takePhotoDeclaration)
     try function.validate()
-    #expect(CameraActions.savePhotoDeclaration.parameters.map(\.name) == ["photoID"])
+    #expect(CameraActions.savePhotoDeclaration.parameters.map(\.name) == ["mediaID"])
     let object = try CameraActions.savePhotoDeclaration.actionObject(alias: "save")
     #expect(object["examples"] == nil)
     #expect(object["alias"] as? String == "save")
@@ -47,7 +48,7 @@ import Testing
 
 @Test(.actionCatalog) func skillPromptHistoryAccepts64KiBAndRejectsLargerEvidence() async throws {
     let store = ConversationHistoryStore()
-    let id = UUID()
+    let id = UUID().uuidString
     let prompt = String(repeating: "x", count: 65_536)
     let token = try await store.readCurrent().token
     let record = try await store.begin(
@@ -57,7 +58,8 @@ import Testing
     await #expect(throws: ConversationHistoryError.invalidRecord) {
         let token = try await store.readCurrent().token
         _ = try await store.begin(
-            id: UUID(), user: "task", request: [.init(role: .system, content: prompt + "x")], expecting: token,
+            id: UUID().uuidString, user: "task", request: [.init(role: .system, content: prompt + "x")],
+            expecting: token,
             model: "fixture")
     }
 }

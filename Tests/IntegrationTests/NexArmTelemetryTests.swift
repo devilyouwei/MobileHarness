@@ -7,6 +7,7 @@ import Foundation
 import FunctionContracts
 import Gateway
 import PlatformKit
+import Storage
 import Testing
 
 private func telemetryPacket(_ pose: [Int]) throws -> NexArmPacket {
@@ -63,7 +64,7 @@ private actor ObservableArmFixture: NexArmObservableLink {
     var independentClaw = false
     func offsetClaw() { independentClaw = true }
     var cache = NexArmTelemetryCache()
-    var session: UUID?
+    var session: String?
     var pose = [200, 0, 200, 0, 0, 0]
     var joints = NexArmGesture.referenceHomeJoints
     var skippedWrite: Int?
@@ -82,13 +83,13 @@ private actor ObservableArmFixture: NexArmObservableLink {
     init(_ mode: Mode) { self.mode = mode }
     func configure(_ value: Mode) { mode = value }
     func revoke() { session = nil }
-    func beginObservation() -> UUID {
-        let token = UUID()
+    func beginObservation() -> String {
+        let token = UUID().uuidString
         session = token
         return token
     }
-    func endObservation(_ token: UUID) { if session == token { session = nil } }
-    func sendObserved(_ packet: NexArmPacket, session token: UUID) throws -> Bool {
+    func endObservation(_ token: String) { if session == token { session = nil } }
+    func sendObserved(_ packet: NexArmPacket, session token: String) throws -> Bool {
         guard session == token else { throw CancellationError() }
         if packet.isSynchronousPositionWrite {
             let intent = try ik.intent(packet)
@@ -136,7 +137,7 @@ private actor ObservableArmFixture: NexArmObservableLink {
         try cache.receive(NexArmPacket(command: 11, payload: payload).bytes)
         lastPush = .now
     }
-    func latestObservation(after sequence: UInt64, session token: UUID) throws -> NexArmTelemetry? {
+    func latestObservation(after sequence: UInt64, session token: String) throws -> NexArmTelemetry? {
         guard session == token else { throw CancellationError() }
         if mode == .push, ContinuousClock.now - lastPush >= .milliseconds(100) { try publish() }
         guard let latest = cache.latest, latest.sequence > sequence else { return nil }
@@ -359,7 +360,8 @@ func nexArmEverySegmentRequiresFreshArrivalAfterNominalDuration(_ final: Bool) {
         }
     ])
     let scheduler = ChannelScheduler(registry: registry, resources: try nexArmTestResources())
-    let input = AgentInput(sessionID: UUID(), payload: .text("two gestures"))
+    let input = AgentInput(
+        id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("two gestures"))
     for (function, channel) in [("celebrate", "Robot"), ("dance", "Robot")] {
         try await scheduler.enqueue(
             invocation: ActionInvocation(

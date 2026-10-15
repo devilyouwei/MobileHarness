@@ -37,9 +37,9 @@ public actor ResourceCoordinator {
         case locked(ExecutionOwner?)
     }
     private enum HoldingKind: Equatable {
-        case lease(UUID)
-        case use(UUID)
-        case handoff(UUID)
+        case lease(String)
+        case use(String)
+        case handoff(String)
     }
     private struct Holding {
         let owner: ExecutionOwner?
@@ -54,17 +54,17 @@ public actor ResourceCoordinator {
         let resources: Set<ResourceID>
         let scope: Set<ResourceID>
         let owner: ExecutionOwner?
-        let leaseID: UUID?
+        let leaseID: String?
         let cancel: @Sendable () -> Void
         let join: @Sendable () async -> Void
     }
     private struct Cleanup {
         let resources: Set<ResourceID>
-        let retiredUses: Set<UUID>
+        let retiredUses: Set<String>
         var nextOwner: ExecutionOwner?
         var waiting = true
         var finished = false
-        var observers: [UUID: AsyncStream<CleanupResult>.Continuation] = [:]
+        var observers: [String: AsyncStream<CleanupResult>.Continuation] = [:]
         let task: Task<Void, Never>
     }
     private enum CleanupResult: Sendable {
@@ -74,9 +74,9 @@ public actor ResourceCoordinator {
     private let definitions: [ResourceID: ResourceDefinition]
     // The sole authority for occupancy; leases/uses/cleanups retain lifecycle metadata only.
     private var holdings: [ResourceID: Holding] = [:]
-    private var leases: [UUID: LeaseRecord] = [:]
-    private var uses: [UUID: Use] = [:]
-    private var cleanups: [UUID: Cleanup] = [:]
+    private var leases: [String: LeaseRecord] = [:]
+    private var uses: [String: Use] = [:]
+    private var cleanups: [String: Cleanup] = [:]
     private var expiry: Task<Void, Never>?
     private var closed = false
 
@@ -185,7 +185,8 @@ public actor ResourceCoordinator {
         defer { finishHandoff(token) }
         try Task.checkCancellation()
         guard !closed else { throw ResourceError.shutdown }
-        let lease = ResourceLease(id: UUID(), owner: owner, resources: requested, deadline: .now.advanced(by: duration))
+        let lease = ResourceLease(
+            id: UUID().uuidString, owner: owner, resources: requested, deadline: .now.advanced(by: duration))
         let scope = executionScope(requested)
         finishHandoff(token)
         for id in scope { holdings[id] = Holding(owner: owner, kind: .lease(lease.id)) }
@@ -255,7 +256,7 @@ public actor ResourceCoordinator {
             try Task.checkCancellation()
             try validate(resources: resources, owner: owner, lease: lease)
         }
-        let id = UUID()
+        let id = UUID().uuidString
         let permit = ResourceExecutionPermit { [self] requested in
             try Task.checkCancellation()
             do { try await validateUse(id, resources: requested) } catch {
@@ -291,7 +292,7 @@ public actor ResourceCoordinator {
         }
     }
 
-    private func validateUse(_ id: UUID, resources: Set<ResourceID>) throws {
+    private func validateUse(_ id: String, resources: Set<ResourceID>) throws {
         guard !closed else { throw ResourceError.shutdown }
         guard let use = uses[id], resources.isSubset(of: use.resources),
             use.scope.allSatisfy({ holdings[$0]?.kind == (use.leaseID.map { .lease($0) } ?? .use(id)) })
@@ -301,7 +302,7 @@ public actor ResourceCoordinator {
         }
     }
 
-    private func finishUse(_ id: UUID) {
+    private func finishUse(_ id: String) {
         guard let use = uses.removeValue(forKey: id) else { return }
         for resource in use.scope where holdings[resource]?.kind == .use(id) { holdings[resource] = nil }
     }
@@ -330,7 +331,7 @@ public actor ResourceCoordinator {
         for id in resources { if case .handoff = holdings[id]?.kind { throw ResourceError.busy } }
     }
 
-    public func close(agent: AgentID, incarnation: UUID) async {
+    public func close(agent: AgentID, incarnation: String) async {
         let selected = leases.values.filter {
             $0.lease.owner.agent == agent && $0.lease.owner.incarnation == incarnation
         }
@@ -343,7 +344,7 @@ public actor ResourceCoordinator {
         await stopUses(selectedUses, owned: owned)
     }
 
-    public func close(sessionID: UUID) async {
+    public func close(sessionID: String) async {
         let selected = leases.values.filter { $0.lease.owner.sessionID == sessionID }
         for record in selected { do { try await release(record.lease, owner: record.lease.owner) } catch {} }
         let owned = Set(holdings.compactMap { id, holding in holding.owner?.sessionID == sessionID ? id : nil })
@@ -364,7 +365,7 @@ public actor ResourceCoordinator {
         let scope = cleanupScope(selected.reduce(into: owned) { $0.formUnion($1.scope) })
         guard !scope.isEmpty else { return }
         let existing = Set(
-            scope.compactMap { id -> UUID? in
+            scope.compactMap { id -> String? in
                 if case .handoff(let token) = holdings[id]?.kind { return token }
                 return nil
             })
@@ -413,13 +414,13 @@ public actor ResourceCoordinator {
     private func clean(
         _ resources: Set<ResourceID>, nextOwner: ExecutionOwner?,
         revoke: @escaping @Sendable (Set<ResourceID>) async -> Void
-    ) async throws -> UUID {
+    ) async throws -> String {
         guard cleanups.count < 32 else { throw ResourceError.capacityExceeded }
         try checkNoHandoff(resources)
         let selected = uses.filter { !$0.value.scope.isDisjoint(with: resources) }
         let active = Array(selected.values)
         let stops = resources.compactMap { definitions[$0]?.stop }
-        let id = UUID()
+        let id = UUID().uuidString
         for resource in resources {
             holdings[resource] = Holding(owner: holdings[resource]?.owner ?? nextOwner, kind: .handoff(id))
         }
@@ -473,7 +474,7 @@ public actor ResourceCoordinator {
         }
     }
 
-    private func abandonHandoff(_ id: UUID) {
+    private func abandonHandoff(_ id: String) {
         guard var cleanup = cleanups[id] else { return }
         cleanup.waiting = false
         cleanup.nextOwner = nil
@@ -481,7 +482,7 @@ public actor ResourceCoordinator {
         if cleanup.finished { finishHandoff(id) }
     }
 
-    private func cleanupFinished(_ id: UUID) {
+    private func cleanupFinished(_ id: String) {
         guard var cleanup = cleanups[id] else { return }
         // Native writers have joined even if their run callers have not resumed yet. Retire
         // these exact identities now so lifecycle closure cannot mistake them for a new owner.
@@ -496,10 +497,10 @@ public actor ResourceCoordinator {
         if !cleanup.waiting { finishHandoff(id) }
     }
 
-    private func observeHandoff(_ id: UUID) async throws {
+    private func observeHandoff(_ id: String) async throws {
         guard var cleanup = cleanups[id], !cleanup.finished else { return }
         guard cleanup.observers.count < 8 else { throw ResourceError.capacityExceeded }
-        let observerID = UUID()
+        let observerID = UUID().uuidString
         let pair = AsyncStream<CleanupResult>.makeStream(bufferingPolicy: .bufferingOldest(1))
         cleanup.observers[observerID] = pair.continuation
         cleanups[id] = cleanup
@@ -518,7 +519,7 @@ public actor ResourceCoordinator {
         }
     }
 
-    private func finishHandoff(_ id: UUID) {
+    private func finishHandoff(_ id: String) {
         guard let cleanup = cleanups[id], cleanup.finished else { return }
         for resource in cleanup.resources where holdings[resource]?.kind == .handoff(id) { holdings[resource] = nil }
         cleanups[id] = nil

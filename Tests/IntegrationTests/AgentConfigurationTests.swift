@@ -1,6 +1,7 @@
 import AgentCore
 import Agents
 import Foundation
+import Storage
 import Testing
 
 private func document() -> [String: Any] {
@@ -248,7 +249,9 @@ private func nativeTool() -> [String: Any] {
         try registry.resolveTool("lookup", arguments: ["query": "three"])
     }
     #expect(throws: GenerationError.invalidParameters) { try registry.resolveTool("lookup", arguments: [:]) }
-    #expect(!registry.permits(ToolCall(toolPath: "Memory.Query.lookup", arguments: ["query": "three"])))
+    #expect(
+        !registry.permits(
+            ToolCall(id: UUID().uuidString, toolPath: "Memory.Query.lookup", arguments: ["query": "three"])))
     #expect(!((try CapabilityContextBuilder.build(registry)).contains("lookup")))
 }
 
@@ -288,7 +291,7 @@ func malformedNativeToolsFailExplicitly(_ mutation: String) throws {
     #expect(throws: GenerationError.unknownCapability) {
         try registry.resolveTool("UI.Pose.showPose", arguments: ["payload": "{}"])
     }
-    #expect(!registry.permits(ToolCall(toolPath: "UI.Pose.showPose", arguments: [:])))
+    #expect(!registry.permits(ToolCall(id: UUID().uuidString, toolPath: "UI.Pose.showPose", arguments: [:])))
 }
 
 @Test(.actionCatalog) func codeOwnedTextMappingIsBoundedAndOptional() throws {
@@ -455,10 +458,12 @@ func threeLevelConfigurationRejectsAmbiguousBindings(_ mutation: String) throws 
     #expect(throws: GenerationError.unknownCapability) {
         try catalog.resolveTool("App.openPage", arguments: ["destination": "settings"])
     }
-    let runtime = try ApplicationControlAgent(sessionID: UUID())
+    let runtime = try ApplicationControlAgent(sessionID: UUID().uuidString)
     #expect(
         runtime.descriptor.capabilities.permits(
-            ToolCall(toolPath: "UI.Navigation.open", arguments: ["destination": "settings"])))
+            ToolCall(
+                id: UUID().uuidString, toolPath: "UI.Navigation.open", arguments: ["destination": "settings"]
+            )))
 }
 
 @Test(
@@ -480,7 +485,7 @@ func historyPreviewRecognizesDirectedTaskActions(_ scenario: (String, String, St
     case "Photographer": runtime = try PhotographerAgent.runtimeCapabilities(configuration.capabilities)
     case "Memory": runtime = try MemoryAgent.runtimeCapabilities(configuration.capabilities)
     case "ApplicationControl":
-        runtime = try ApplicationControlAgent(sessionID: UUID()).descriptor.capabilities
+        runtime = try ApplicationControlAgent(sessionID: UUID().uuidString).descriptor.capabilities
     default: runtime = try AssistantAgent.runtimeCapabilities(configuration.capabilities)
     }
     let declared = try AgentSkillLoader.registry(["basic-skill"], fixed: runtime)

@@ -7,6 +7,7 @@ import ExecutionRuntime
 import Foundation
 import FunctionContracts
 import Gateway
+import Storage
 import StorageChat
 import Testing
 
@@ -42,7 +43,7 @@ private actor BehaviorEndpoint: UIPresentationCapability, UIUpdateCapability, Sp
     private(set) var emotion: UIActions.Emotion?
     private(set) var gaze: UIActions.Gaze?
     private(set) var pose: PoseOverlay?
-    func play(audioID: UUID, invocation: any FunctionInput) async throws {}
+    func play(audioID: String, invocation: any FunctionInput) async throws {}
     func present(_ text: String, invocation: any FunctionInput) async throws {}
     func presentTranscript(_ text: String, invocation: any FunctionInput) async throws {}
     func finishTranscript(invocation: any FunctionInput) async throws {}
@@ -56,7 +57,7 @@ private actor BehaviorEndpoint: UIPresentationCapability, UIUpdateCapability, Sp
         self.emotion = emotion
     }
     func present(_ target: UIActions.Gaze, invocation: any FunctionInput) async throws { gaze = target }
-    func present(_ overlay: PoseOverlay, sessionID: UUID) async throws { pose = overlay }
+    func present(_ overlay: PoseOverlay, sessionID: String) async throws { pose = overlay }
 }
 
 private struct FixtureActionModule: ActionModule {
@@ -67,7 +68,9 @@ private struct FixtureToolModule: ToolModule {
 }
 private func behaviorInvocation(_ function: String, parameters: [String: String] = [:]) -> ActionInvocation {
     ActionInvocation(
-        source: .assistant, input: AgentInput(sessionID: UUID(), payload: .event("fixture")),
+        source: .assistant,
+        input: AgentInput(
+            id: UUID().uuidString, sessionID: UUID().uuidString, payload: .event("fixture")),
         call: ActionCall(
             actionPath: ActionPath(domain: "UI", module: "Expression", function: function), channel: "main",
             parameters: parameters))
@@ -96,7 +99,7 @@ private func behaviorInvocation(_ function: String, parameters: [String: String]
             VisionPerceptionAgent.runtimeCapabilities(AgentConfigurations.load(named: "VisionPerception").capabilities),
             PhotographerAgent.runtimeCapabilities(AgentConfigurations.load(named: "Photographer").capabilities),
             AgentConfigurations.load(named: "SpeechSynthesis").capabilities,
-            try ApplicationControlAgent(sessionID: UUID()).descriptor.capabilities,
+            try ApplicationControlAgent(sessionID: UUID().uuidString).descriptor.capabilities,
             MemoryAgent.runtimeCapabilities(
                 AgentConfigurations.load(named: "Memory").capabilities),
         ])
@@ -107,12 +110,13 @@ private func behaviorInvocation(_ function: String, parameters: [String: String]
     #expect(await endpoint.emotion == nil)
     try await executor.execute(behaviorInvocation("express", parameters: ["emotion": "smile"]))
     #expect(await endpoint.emotion == .smile)
-    let tool = ToolCall(toolPath: "System.Runtime.runtimeInfo", arguments: [:])
+    let tool = ToolCall(id: UUID().uuidString, toolPath: "System.Runtime.runtimeInfo", arguments: [:])
     let result = try await ToolExecutor(registry: assembly.tools).execute(
         tool, envelope: behaviorInvocation("express").testEnvelope)
     #expect(result?.callID == tool.id)
     #expect(result?.isError == false)
     let show = ToolCall(
+        id: UUID().uuidString,
         toolPath: "UI.Pose.showPose",
         arguments: ["payload": "{\"sequence\":1,\"timestamp\":0,\"rotation\":0,\"people\":[]}"]
     )
@@ -178,11 +182,14 @@ private func behaviorInvocation(_ function: String, parameters: [String: String]
     #expect(
         await assembly.tools.resources(for: "Fixture.Control.read") == [ActionResource(rawValue: resource.rawValue)])
     let invocation = ActionInvocation(
-        source: .assistant, input: AgentInput(sessionID: UUID(), payload: .event("fixture")),
+        source: .assistant,
+        input: AgentInput(
+            id: UUID().uuidString, sessionID: UUID().uuidString, payload: .event("fixture")),
         call: ActionCall(actionPath: path, channel: "main"))
     try await ActionExecutor(registry: assembly.actions).execute(invocation)
     let result = try await ToolExecutor(registry: assembly.tools).execute(
-        ToolCall(toolPath: "Fixture.Control.read", arguments: [:]), envelope: invocation.testEnvelope)
+        ToolCall(id: UUID().uuidString, toolPath: "Fixture.Control.read", arguments: [:]),
+        envelope: invocation.testEnvelope)
     #expect(result?.value == "smile")
 }
 
@@ -192,32 +199,40 @@ private func behaviorInvocation(_ function: String, parameters: [String: String]
     let envelope = behaviorInvocation("express").testEnvelope
     for name in ["open", "close", "flip"] {
         let result = try await executor.execute(
-            ToolCall(toolPath: "Camera.Capture." + name, arguments: name == "flip" ? ["facing": "front"] : [:]),
+            ToolCall(
+                id: UUID().uuidString, toolPath: "Camera.Capture." + name,
+                arguments: name == "flip" ? ["facing": "front"] : [:]),
             envelope: envelope)
         #expect(result == nil)
     }
     #expect(await endpoint.cameraCalls == ["open", "close", "flip:front"])
     let invalid = try #require(
         try await executor.execute(
-            ToolCall(toolPath: "Camera.Capture.flip", arguments: ["unexpected": "yes"]), envelope: envelope))
+            ToolCall(
+                id: UUID().uuidString, toolPath: "Camera.Capture.flip", arguments: ["unexpected": "yes"]),
+            envelope: envelope))
     #expect(invalid.isError)
     #expect(invalid.value.contains("invalidKeys"))
     for arguments in [[:], ["facing": "rear"], ["facing": ""], ["facing": "Front"]] {
         let rejected = try #require(
             try await executor.execute(
-                ToolCall(toolPath: "Camera.Capture.flip", arguments: arguments), envelope: envelope))
+                ToolCall(id: UUID().uuidString, toolPath: "Camera.Capture.flip", arguments: arguments),
+                envelope: envelope))
         #expect(rejected.isError)
     }
     #expect(await endpoint.cameraCalls == ["open", "close", "flip:front"])
     _ = try await executor.execute(
-        ToolCall(toolPath: "Camera.Capture.flip", arguments: ["facing": "back"]), envelope: envelope)
+        ToolCall(id: UUID().uuidString, toolPath: "Camera.Capture.flip", arguments: ["facing": "back"]),
+        envelope: envelope)
     #expect(await endpoint.cameraCalls.last == "flip:back")
 
     #expect(await endpoint.cameraCalls.count == 4)
     let cancelled = Task {
         try Task.checkCancellation()
         try await Task.sleep(for: .seconds(30))
-        return try await executor.execute(ToolCall(toolPath: "Camera.Capture.open", arguments: [:]), envelope: envelope)
+        return try await executor.execute(
+            ToolCall(id: UUID().uuidString, toolPath: "Camera.Capture.open", arguments: [:]),
+            envelope: envelope)
     }
     cancelled.cancel()
     await #expect(throws: CancellationError.self) { try await cancelled.value }
@@ -238,11 +253,14 @@ private struct UnavailableCameraEndpoint: CameraControlCapability {
         registry: try ToolRegistry(modules: [CameraModule(camera: UnavailableCameraEndpoint())]))
     let envelope = behaviorInvocation("express").testEnvelope
     let open = try #require(
-        try await executor.execute(ToolCall(toolPath: "Camera.Capture.open", arguments: [:]), envelope: envelope))
+        try await executor.execute(
+            ToolCall(id: UUID().uuidString, toolPath: "Camera.Capture.open", arguments: [:]),
+            envelope: envelope))
     #expect(open.isError && open.failureCode == .permissionDenied)
     let flip = try #require(
         try await executor.execute(
-            ToolCall(toolPath: "Camera.Capture.flip", arguments: ["facing": "back"]), envelope: envelope))
+            ToolCall(id: UUID().uuidString, toolPath: "Camera.Capture.flip", arguments: ["facing": "back"]),
+            envelope: envelope))
     #expect(flip.isError && flip.failureCode?.rawValue == "disabled")
 }
 
@@ -256,13 +274,16 @@ private struct UnavailableCameraEndpoint: CameraControlCapability {
         behaviorInvocation("setExpression", parameters: ["emotion": "smile"]))
     let envelope = behaviorInvocation("setExpression").testEnvelope
     let response = try await ToolExecutor(registry: tools).execute(
-        ToolCall(toolPath: "UI.Gaze.moveEyes", arguments: ["x": "0.25", "y": "-0.5"]), envelope: envelope)
+        ToolCall(
+            id: UUID().uuidString, toolPath: "UI.Gaze.moveEyes", arguments: ["x": "0.25", "y": "-0.5"]),
+        envelope: envelope)
     #expect(response == nil)
     #expect(await endpoint.emotion == .smile)
     let accepted = await endpoint.gaze
     #expect(accepted?.x == 0.25 && accepted?.y == -0.5)
     let invalid = try await ToolExecutor(registry: tools).execute(
-        ToolCall(toolPath: "UI.Gaze.moveEyes", arguments: ["x": "1.1", "y": "0"]), envelope: envelope)
+        ToolCall(id: UUID().uuidString, toolPath: "UI.Gaze.moveEyes", arguments: ["x": "1.1", "y": "0"]),
+        envelope: envelope)
     #expect(invalid?.isError == true && invalid?.failureCode == .invalidArguments)
     #expect(await endpoint.gaze == accepted)
 }

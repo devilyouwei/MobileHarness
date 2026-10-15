@@ -89,7 +89,7 @@ private actor AnalyzerWorker {
         let text: String
     }
     private var pieces: [Double: Piece] = [:]
-    private let segment = UUID()
+    private let segment = UUID().uuidString
     private var revision: UInt64 = 0
     init(
         module: SpeechTranscriber, detector: SpeechDetector, format: AVAudioFormat,

@@ -20,3 +20,10 @@ Default registration tests require no downloaded weights and do not initialize a
 
 
 ✅ SpeechSelection uses independent recognition/synthesis choices. Recognition depends only on Nemotron, VAD selects installed available Silero regardless of recognition preference, and synthesis depends only on MOSS. Concrete provider registrations remain separate.
+
+
+✅ Fixtures use UUID/opaque runtime strings and committed database business references; concurrency, restart, invalid-ID and failure behavior remain covered.
+
+## Identity ownership
+
+✅ Runtime and foundation identities use opaque protocol strings or Foundation UUID; no project ID-generator dependency exists. SQLite-backed Storage publishes committed business references and App injects repositories/maps native Bluetooth identities. Tests preserve caller identity, cancellation and failure semantics. See [current storage design](../../MobileHarness/Storage/README.md) for relational allocation and persistence.

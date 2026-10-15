@@ -1,3 +1,5 @@
+import Foundation
+
 #if os(iOS)
     import SwiftUI
     import UIKit
@@ -106,6 +108,12 @@
                             }
                         }
                     }
+                    if state.hasMoreArchives, let cursor = state.archive?.past.last?.id {
+                        HistoryPagingFooter(
+                            cursor: cursor, state: state.archivePaging,
+                            enabled: !state.isRefreshing && (!state.isBusy || state.archivePaging.isLoading)
+                        ) { retry in await controls.loadMoreArchives(retry: retry) }
+                    }
                 } header: {
                     Text("过去的对话")
                 } footer: {
@@ -149,12 +157,62 @@
 
     }
 
+    private struct HistoryPagingTrigger<Cursor: Hashable & Sendable>: Hashable, Sendable {
+        let cursor: Cursor
+        let retryID: UUID
+        let completionID: UUID?
+        let enabled: Bool
+    }
+
+    @MainActor
+    private struct HistoryPagingFooter<Cursor: Hashable & Sendable>: View {
+        let cursor: Cursor
+        let state: HistoryPageLoading<Cursor>
+        var enabled = true
+        let load: @MainActor (Bool) async -> Void
+        @State private var retryID = UUID()
+        @State private var retryRequested = false
+        var body: some View {
+            VStack(spacing: 8) {
+                if let error = state.error {
+                    Text(error).font(.footnote).textSelection(.enabled)
+                    Button("重试") {
+                        retryRequested = true
+                        retryID = UUID()
+                    }
+                    .disabled(!enabled || state.isLoading)
+                } else {
+                    ProgressView().accessibilityLabel("正在加载更多记录")
+                }
+            }
+            .frame(maxWidth: .infinity).padding(.vertical, 8)
+            .foregroundStyle(.secondary)
+            .listRowSeparator(.hidden)
+            .task(
+                id: HistoryPagingTrigger(
+                    cursor: cursor, retryID: retryID, completionID: state.completionID, enabled: enabled)
+            ) {
+                guard enabled, !Task.isCancelled else { return }
+                let retry = retryRequested
+                retryRequested = false
+                await load(retry)
+            }
+        }
+    }
+
     @MainActor
     private struct ConversationHistoryDetail: View {
         private let seed: HistoryConversation
         @State private var loaded: HistoryConversation?
         @State private var loadError: String?
-        @State private var expandedTasks: Set<UUID> = []
+        @State private var isRefreshing = false
+        @State private var expandedTasks: Set<String> = []
+        @State private var taskPages: [String: HistoryConversation] = [:]
+        @State private var loadingRequest = false
+        @State private var pageLoading = HistoryPageLoading<UInt64>()
+        @State private var taskLoading: [String: HistoryPageLoading<UInt64>] = [:]
+        @State private var pageWorker: Task<Void, Never>?
+        @State private var taskWorkers: [String: Task<Void, Never>] = [:]
         @State private var requestNavigation = HistoryRequestNavigation()
         private var items: [HistoryTimelineItem] { ConversationHistoryPresentation.timeline(loaded ?? seed) }
         let title: String
@@ -166,6 +224,12 @@
         }
         var body: some View {
             List {
+                if let loadError {
+                    Section {
+                        Text(loadError).font(.footnote).foregroundStyle(.secondary).textSelection(.enabled)
+                        Button("重试") { Task { await reload() } }.disabled(isRefreshing)
+                    }
+                }
                 Section {
                     ForEach(items) { item in
                         switch item {
@@ -173,30 +237,40 @@
                             requestRow(turn)
                         case .task(let compression, let sources):
                             Group {
-                                taskSummary(compression, sourceCount: sources.count)
+                                taskSummary(compression, sourceCount: compression.sources.count)
                                 if expandedTasks.contains(compression.taskID) {
-                                    ForEach(Array(sources.enumerated()), id: \.element.id) { index, turn in
-                                        requestRow(turn, showsIcon: false, endsTask: index == sources.count - 1)
+                                    let visible =
+                                        taskPages[compression.taskID].map(ConversationHistoryPresentation.turns)
+                                        ?? sources
+                                    ForEach(Array(visible.enumerated()), id: \.element.id) { index, turn in
+                                        requestRow(turn, showsIcon: false, endsTask: index == visible.count - 1)
+                                    }
+                                    if taskPages[compression.taskID] == nil
+                                        || taskPages[compression.taskID]?.nextPosition != nil
+                                    {
+                                        let cursor = taskPages[compression.taskID]?.nextPosition ?? 0
+                                        HistoryPagingFooter(
+                                            cursor: cursor, state: taskLoading[compression.taskID] ?? .init(),
+                                            enabled: !isRefreshing
+                                        ) { retry in await loadTask(compression.taskID, after: cursor, retry: retry) }
+                                        .listRowInsets(EdgeInsets(top: 8, leading: 52, bottom: 8, trailing: 20))
                                     }
                                 }
                             }
                         }
                     }
+                    if let next = loaded?.nextPosition {
+                        HistoryPagingFooter(cursor: next, state: pageLoading, enabled: !isRefreshing) { retry in
+                            await loadPage(after: next, retry: retry)
+                        }
+                    }
                 }
                 .listSectionSeparator(.hidden)
             }
-            .task(id: seed.id) {
-                do {
-                    let conversation = try await controls.loadConversation(seed.id)
-                    try Task.checkCancellation()
-                    loaded = conversation
-                    loadError = nil
-                } catch {
-                    if !Task.isCancelled { loadError = "读取失败：\(error)" }
-                }
-            }
+            .task(id: seed.id) { await reload() }
+            .refreshable { await reload() }
             .overlay {
-                if let loadError { Text(loadError) } else if loaded == nil { ProgressView("加载对话…") }
+                if loaded == nil && loadError == nil { ProgressView("加载对话…") }
             }
             .navigationTitle(String(title.prefix(40)))
             .navigationDestination(isPresented: $requestNavigation.isPresented) {
@@ -204,7 +278,7 @@
             }
             .toolbar {
                 if let loaded {
-                    HistoryJSONShareButton(value: loaded, filename: "conversation-\(loaded.id).json")
+                    HistoryJSONShareButton(value: loaded, filename: "\(loaded.id).json")
                 }
             }
         }
@@ -248,7 +322,14 @@
         }
         private func requestRow(_ turn: HistoryTurn, showsIcon: Bool = true, endsTask: Bool = false) -> some View {
             Button {
-                requestNavigation.open(turn)
+                guard !loadingRequest, !requestNavigation.isPresented else { return }
+                loadingRequest = true
+                Task {
+                    defer { loadingRequest = false }
+                    do { requestNavigation.open(try await controls.loadMessage(turn)) } catch {
+                        loadError = "读取失败：\(error)"
+                    }
+                }
             } label: {
                 HStack(alignment: .top, spacing: 12) {
                     if showsIcon {
@@ -281,6 +362,112 @@
             .foregroundStyle(.primary)
         }
 
+        private func reload() async {
+            guard !isRefreshing, !Task.isCancelled else { return }
+            isRefreshing = true
+            defer { isRefreshing = false }
+            let readers = Array(taskWorkers.values) + [pageWorker].compactMap { $0 }
+            for reader in readers { reader.cancel() }
+            for reader in readers { await reader.value }
+            // Joined readers cannot append into the refreshed generation or exceed its read bound.
+            pageLoading = .init()
+            taskLoading.removeAll()
+            do {
+                try Task.checkCancellation()
+                let conversation = try await controls.loadConversation(seed.id)
+                try Task.checkCancellation()
+                loaded = conversation
+                taskPages.removeAll()
+                loadError = nil
+            } catch {
+                if !Task.isCancelled { loadError = "读取失败：\(error)" }
+            }
+        }
+        private func loadPage(after: UInt64, retry: Bool) async {
+            guard !isRefreshing, !Task.isCancelled, loaded?.nextPosition == after,
+                let ticket = pageLoading.begin(after: after, retry: retry)
+            else {
+                return
+            }
+            let worker = Task {
+                defer { pageWorker = nil }
+                await readPage(after: after, ticket: ticket)
+            }
+            pageWorker = worker
+            await withTaskCancellationHandler {
+                await worker.value
+            } onCancel: {
+                worker.cancel()
+            }
+        }
+        private func readPage(after: UInt64, ticket: UUID) async {
+            do {
+                try Task.checkCancellation()
+                let page = try await controls.loadConversation(seed.id, after: after, taskID: nil)
+                try Task.checkCancellation()
+                guard pageLoading.accepts(ticket) else { return }
+                guard page.nextPosition.map({ $0 > after }) ?? true else { throw HistoryDetailError.unavailable }
+                try loaded?.appendPage(page)
+                pageLoading.finish(ticket)
+            } catch is CancellationError {
+                pageLoading.cancel(ticket)
+            } catch {
+                if Task.isCancelled {
+                    pageLoading.cancel(ticket)
+                } else {
+                    pageLoading.finish(ticket, error: "读取失败：\(error)")
+                }
+            }
+        }
+        private func loadTask(_ id: String, after: UInt64, retry: Bool) async {
+            guard !isRefreshing, !Task.isCancelled, expandedTasks.contains(id) else { return }
+            if let page = taskPages[id] {
+                guard page.nextPosition == after else { return }
+            } else if after != 0 {
+                return
+            }
+            let active = taskLoading.values.filter(\.isLoading).count
+            guard let ticket = taskLoading[id, default: .init()].begin(after: after, retry: retry) else { return }
+            guard active < 16 else {
+                taskLoading[id]?.finish(ticket, error: "同时加载的任务过多，请重试。")
+                return
+            }
+            let worker = Task {
+                defer { taskWorkers[id] = nil }
+                await readTask(id, after: after, ticket: ticket)
+            }
+            taskWorkers[id] = worker
+            await withTaskCancellationHandler {
+                await worker.value
+            } onCancel: {
+                worker.cancel()
+            }
+        }
+        private func readTask(_ id: String, after: UInt64, ticket: UUID) async {
+            do {
+                try Task.checkCancellation()
+                let page = try await controls.loadConversation(seed.id, after: after, taskID: id)
+                try Task.checkCancellation()
+                guard taskLoading[id]?.accepts(ticket) == true else { return }
+                guard page.nextPosition.map({ $0 > after }) ?? true else { throw HistoryDetailError.unavailable }
+                if var existing = taskPages[id] {
+                    try existing.appendPage(page)
+                    taskPages[id] = existing
+                } else {
+                    guard page.id == seed.id else { throw HistoryDetailError.unavailable }
+                    taskPages[id] = page
+                }
+                taskLoading[id]?.finish(ticket)
+            } catch is CancellationError {
+                taskLoading[id]?.cancel(ticket)
+            } catch {
+                if Task.isCancelled {
+                    taskLoading[id]?.cancel(ticket)
+                } else {
+                    taskLoading[id]?.finish(ticket, error: "读取失败：\(error)")
+                }
+            }
+        }
         private func typeBadge(_ title: String, color: Color) -> some View {
             Text(verbatim: title).font(.caption2.bold())
                 .foregroundStyle(color)
@@ -420,7 +607,7 @@
                         ForEach(calls) { call in
                             DisclosureGroup("Tool Call · \(call.name) · \(call.state.rawValue)") {
                                 selectable("Provider Call ID: " + call.providerID)
-                                selectable("Execution Call ID: " + call.id.uuidString)
+                                selectable("Execution Call ID: " + call.id)
                                 Text("Arguments").font(.caption)
                                 selectable(call.argumentsJSON)
                                 Text("Result").font(.caption)
@@ -434,8 +621,8 @@
                 }
                 Section("Generation Meta") {
                     if let error = turn.error { selectable("Generation Error: " + error) }
-                    Text("Request ID: \(turn.id.uuidString)").font(.caption).textSelection(.enabled)
-                    Text("Input ID: \(turn.ownerInputID?.uuidString ?? "")").font(.caption).textSelection(.enabled)
+                    Text("Request ID: \(turn.id)").font(.caption).textSelection(.enabled)
+                    Text("Input ID: \(turn.ownerInputID ?? "")").font(.caption).textSelection(.enabled)
                     Text("Model: \(turn.model)")
                     Text(turn.firstTokenReport)
                     Text("State: \(turn.stateReport); Finish Reason: \(turn.finishReason ?? "")")
@@ -446,7 +633,7 @@
             .navigationTitle("对话详情")
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    HistoryJSONShareButton(value: turn, filename: "request-\(turn.id).json")
+                    HistoryJSONShareButton(value: turn, filename: "\(turn.id).json")
                 }
             }
             .task { interpretation = controls.preview(turn) }
@@ -471,7 +658,7 @@
                                 ? (reference.wasActiveAtRequest ? "Task ID · Active at request" : "Task ID")
                                 : "Active task ID at request"
                         ).font(.caption).foregroundStyle(.secondary)
-                        selectable(reference.id.uuidString)
+                        selectable(reference.id)
                     }
                 }
             }
@@ -608,7 +795,7 @@
     @MainActor
     private struct HistoryImageThumbnail: View {
         let reference: HistoryImageReference
-        let turnID: UUID
+        let turnID: String
         let controls: any ConversationHistoryControlling
         @State private var data: Data?
         @State private var thumbnail: UIImage?
@@ -629,7 +816,7 @@
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("查看发送给模型的图片")
-                    .accessibilityIdentifier("history.image.\(reference.id.uuidString)")
+                    .accessibilityIdentifier("history.image.\(reference.id)")
                 } else if loading {
                     ProgressView().frame(width: 112, height: 84)
                 } else if failed {

@@ -4,6 +4,7 @@ import Agents
 import AppWorkflows
 import Foundation
 import FunctionContracts
+import Storage
 import Testing
 
 private actor HostResourceFixture: ModelResourceCapability {
@@ -76,18 +77,20 @@ private actor HostPresentationFixture: ResourcePresentationCapability {
     await runtime.shutdown()
 }
 @Test(.actionCatalog) func resourceHostFailureSchemaAndScopeAreValidated() async throws {
-    let session = UUID()
+    let session = UUID().uuidString
     let agent = try ApplicationControlAgent(sessionID: session)
     try await agent.start()
     let invalid = ModelResourceHostFailure(
-        requestID: UUID(), phase: .admission, scope: .refresh(generation: 0), message: "error")
+        requestID: UUID().uuidString, phase: .admission, scope: .refresh(generation: 0), message: "error")
     #expect(throws: (any Error).self) { try invalid.validate() }
     let oversized = ModelResourceHostFailure(
-        requestID: UUID(), phase: .dispatch, scope: .operation, message: String(repeating: "界", count: 683))
+        requestID: UUID().uuidString, phase: .dispatch, scope: .operation,
+        message: String(repeating: "界", count: 683))
     #expect(throws: (any Error).self) { try oversized.validate() }
     let fact = ModelResourceHostFailure(
-        requestID: UUID(), phase: .dispatch, scope: .refresh(generation: 7), message: "transport failed")
-    let input = fact.input(sessionID: session)
+        requestID: UUID().uuidString, phase: .dispatch, scope: .refresh(generation: 7),
+        message: "transport failed")
+    let input = try fact.input(sessionID: session)
     #expect(input.metadata.rootID == input.id)
     #expect(input.metadata.parentID == fact.requestID)
     let spoofed = AgentInput(

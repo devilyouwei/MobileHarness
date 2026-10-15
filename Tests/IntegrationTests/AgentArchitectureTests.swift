@@ -15,18 +15,19 @@ import Testing
 private struct TaskFixtureState: AgentContextState {
     var dialogue: [String] = []
     var effects: [String] = []
-    var receipts: [UUID] = []
+    var receipts: [String] = []
     var reports: [AgentTaskSignal.Kind] = []
 }
 
 /// A decoded durable snapshot already at both Core evidence limits; no user data is used.
 func saturatedEvidenceContext<State: AgentContextState>(agent: AgentID, state: State) throws -> AgentContext<State> {
-    let seed = AgentContext(agentID: agent, scopeID: UUID(), state: state)
+    let seed = AgentContext(agentID: agent, scopeID: UUID().uuidString, state: state)
     let records = try (0..<8192).map { _ in
         try AgentContext<State>.Record(kind: "fixture.evidence")
     }
     let batches = try records.enumerated().map { index, record in
-        try SignalBatch(taskID: UUID(), signalIDs: [record.id], admissionSequence: UInt64(index + 1))
+        try SignalBatch(
+            taskID: UUID().uuidString, signalIDs: [record.id], admissionSequence: UInt64(index + 1))
     }
     var wire = try #require(JSONSerialization.jsonObject(with: JSONEncoder().encode(seed)) as? [String: Any])
     wire["records"] = try JSONSerialization.jsonObject(with: JSONEncoder().encode(records))
@@ -47,7 +48,7 @@ func saturatedApplicationControlContextRetainsEvidenceAndKeepsSettingsAvailable(
     let context = AgentContextRepository(
         agent: seed.agentID, scope: seed.scopeID, state: seed.state,
         persistence: .init(load: { seed }, commit: { _, _ in }))
-    let session = UUID()
+    let session = UUID().uuidString
     let agent = try ApplicationControlAgent(sessionID: session, context: context)
     try await agent.start()
     try await agent.receive(
@@ -80,7 +81,7 @@ func saturatedMemoryContextKeepsHistoryRefreshAvailable() async throws {
     let context = AgentContextRepository(
         agent: seed.agentID, scope: seed.scopeID, state: seed.state,
         persistence: .init(load: { seed }, commit: { _, _ in }))
-    let session = UUID()
+    let session = UUID().uuidString
     let agent = try MemoryAgent(sessionID: session, context: context)
     try await agent.start()
     var outputs = agent.outputs.makeAsyncIterator()
@@ -108,10 +109,10 @@ func saturatedPhotographerContextPreservesAdmittedCameraRequest() async throws {
     let context = AgentContextRepository(
         agent: seed.agentID, scope: seed.scopeID, state: seed.state,
         persistence: .init(load: { seed }, commit: { _, _ in }))
-    let session = UUID()
+    let session = UUID().uuidString
     let agent = try PhotographerAgent(sessionID: session, context: context)
     try await agent.start()
-    let intent = PhotographerCameraIntent(.open)
+    let intent = PhotographerCameraIntent(.open, requestID: UUID().uuidString)
     try await agent.receive(intent.input(sessionID: session))
     var outputs = agent.outputs.makeAsyncIterator()
     let output = try #require(await outputs.next())
@@ -200,14 +201,15 @@ private actor TaskFixtureAgent: Agent {
     private var round: AgentRoundCoordinator?
     private var budget: AgentTaskBudget
     private var sequence: UInt64 = 0
-    private var requestCalls: [UUID: UUID] = [:]
+    private var requestCalls: [String: String] = [:]
     init(configuration: AgentConfiguration, model: TaskFixtureChat? = nil) throws {
         descriptor = AgentDescriptor(
             id: configuration.agentID, name: configuration.agentID.rawValue,
             inputs: Set(configuration.communication.inputs.map(\.kind)),
             outputs: [.communication, .actionCall, .control],
             capabilities: configuration.capabilities)
-        context = AgentContextRepository(agent: configuration.agentID, scope: UUID(), state: TaskFixtureState())
+        context = AgentContextRepository(
+            agent: configuration.agentID, scope: UUID().uuidString, state: TaskFixtureState())
         self.model = model
         budget = try AgentTaskBudget()
         let pair = AsyncStream<OutputEnvelope>.makeStream(bufferingPolicy: .bufferingOldest(32))
@@ -230,7 +232,7 @@ private actor TaskFixtureAgent: Agent {
         output.finish()
     }
     func status() -> AgentStatus { .init(lifecycle: lifecycle, queuedInputs: 0, processedInputs: budget.requests) }
-    func emit(_ action: AgentOutput, input: AgentInput, roundID: UUID? = nil, callID: UUID? = nil) throws {
+    func emit(_ action: AgentOutput, input: AgentInput, roundID: String? = nil, callID: String? = nil) throws {
         sequence += 1
         guard
             case .enqueued = output.yield(
@@ -315,7 +317,7 @@ private actor TaskFixtureAgent: Agent {
             let messages =
                 snapshot.state.dialogue.map { ChatMessage(role: .user, content: $0) }
                 + snapshot.state.effects.map { ChatMessage(role: .user, content: "Own observation: " + $0) }
-            let decision = UUID()
+            let decision = UUID().uuidString
             let text = try await AgentChatDriver.collect(
                 ChatRequest(
                     messages: messages,
@@ -334,7 +336,7 @@ private actor TaskFixtureAgent: Agent {
                     data: Data("accepted photo task".utf8))
                 try await send(progress, parent: input)
                 let call = try descriptor.capabilities.resolveAction("fixtureCapture", parameters: [:])
-                let id = UUID()
+                let id = UUID().uuidString
                 round = AgentRoundCoordinator(id: decision, taskID: scope.id)
                 try round?.register(id: id)
                 try round?.seal()
@@ -401,8 +403,10 @@ private func waitForArchitecture(_ condition: @escaping @Sendable () async throw
     let childPump = Task {
         try await IndependentOutputWorkflow.consumeGeneration(child.outputs) { _ = try await gateway.execute($0) }
     }
-    let root = AgentInput(sessionID: UUID(), payload: .text("parent user input"))
+    let root = AgentInput(
+        id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("parent user input"))
     let scope = AgentTaskScope(
+        id: UUID().uuidString,
         parentID: root.id, requester: parent.descriptor.id, executor: child.descriptor.id, sessionID: root.sessionID)
     try await parent.send(
         AgentTaskSignal(
@@ -444,45 +448,32 @@ private func waitForArchitecture(_ condition: @escaping @Sendable () async throw
     _ = await childPump.result
 }
 
-@Test(.actionCatalog) func ownedContextIgnoresSeparateJournalAndRestartsInterruptWithoutReplay() async throws {
-    let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-    defer { try? FileManager.default.removeItem(at: directory) }
-    let scope = UUID()
-    let url = directory.appendingPathComponent("assistant.context.json")
-    let repository = try AgentContextRepository.persistent(
-        agent: .assistant, scope: scope, state: AssistantContextState(), url: url)
-    try await repository.update { _ in }
-    // An obsolete sibling file must never participate in the context load.
-    let source = directory.appendingPathComponent("history.json")
-    let original = Data("invalid obsolete journal".utf8)
-    try original.write(to: source)
+@Test(.actionCatalog) func runtimeContextDiscardsPartialStateOnRestartWithoutReplaying() async throws {
+    let scope = UUID().uuidString
+    let repository = AgentContextRepository(agent: .assistant, scope: scope, state: AssistantContextState())
     let projected = AssistantHistoryContext.store(repository: repository)
-    #expect(try await projected.snapshot().current.turns.isEmpty)
     let read = try await projected.readCurrent()
-    let id = UUID()
+    let id = UUID().uuidString
     _ = try await projected.begin(
-        id: id, user: "retained input", request: [.init(role: .user, content: "retained input")],
+        id: id, user: "live input", request: [.init(role: .user, content: "live input")],
         expecting: read.token, model: "fixture")
-    try await projected.beginModelRequest(.init(id: UUID(), input: "retained input", requestJSON: "[]"), for: id)
+    try await projected.beginModelRequest(
+        .init(id: UUID().uuidString, input: "live input", requestJSON: "[]"), for: id)
     try await projected.append("partial", to: id)
-    #expect(try Data(contentsOf: source) == original)
-    let restarted = try AgentContextRepository.persistent(
-        agent: .assistant, scope: scope, state: AssistantContextState(), url: url)
+    #expect(try await repository.snapshot().state.history.current.turns.first?.raw == "partial")
+    let restarted = AgentContextRepository(agent: .assistant, scope: scope, state: AssistantContextState())
     let recovered = try await restarted.snapshot()
-    #expect(recovered.state.history.current.turns.first?.state == .interrupted)
-    #expect(recovered.state.history.current.turns.first?.modelRequests?.first?.state == .interrupted)
-    #expect(recovered.state.history.current.turns.first?.raw == "partial")
-    let foreign = try AgentContextRepository.persistent(
-        agent: .assistant, scope: UUID(), state: AssistantContextState(), url: url)
-    await #expect(throws: CommunicationError.invalidPayload) { _ = try await foreign.snapshot() }
+    #expect(recovered.state.history.current.turns.isEmpty)
+    #expect(recovered.work.isEmpty && recovered.records.isEmpty)
 }
 
 @Test(.actionCatalog) func signalInboxFusionOwnershipExpiryAndRoundBudgetAreBounded() throws {
-    let session = UUID()
-    let root = UUID()
-    func input(_ text: String, rootID: UUID = UUID()) -> AgentInput {
+    let session = UUID().uuidString
+    let root = UUID().uuidString
+    func input(_ text: String, rootID: String = UUID().uuidString) -> AgentInput {
         let payload = InputPayload.text(text)
         return AgentInput(
+            id: UUID().uuidString,
             sessionID: session, payload: payload, metadata: InputMetadata(payload: payload, rootID: rootID))
     }
     var inbox = try SignalInbox(capacity: 2)
@@ -509,7 +500,7 @@ private func waitForArchitecture(_ condition: @escaping @Sendable () async throw
     try explicit.reserveNativeCall()
     #expect(throws: CommunicationError.capacityExceeded) { try explicit.reserveNativeCall() }
     var round = AgentRoundCoordinator(taskID: root)
-    let call = UUID()
+    let call = UUID().uuidString
     try round.register(id: call)
     try round.seal()
     #expect(!round.complete)
@@ -523,7 +514,7 @@ private func waitForArchitecture(_ condition: @escaping @Sendable () async throw
 }
 
 @Test(.actionCatalog) func rollingContextEvidenceRejectsDuplicatesBeforeEviction() throws {
-    var context = AgentContext(agentID: .assistant, scopeID: UUID(), state: TaskFixtureState())
+    var context = AgentContext(agentID: .assistant, scopeID: UUID().uuidString, state: TaskFixtureState())
     let first = try AgentContext<TaskFixtureState>.Record(kind: "first")
     let second = try AgentContext<TaskFixtureState>.Record(kind: "second")
     try context.append(first, retainingLast: 2)
@@ -533,25 +524,27 @@ private func waitForArchitecture(_ condition: @escaping @Sendable () async throw
     let third = try AgentContext<TaskFixtureState>.Record(kind: "third")
     try context.append(third, retainingLast: 2)
     #expect(context.records == [second, third] && context.evictedRecordCount == 1)
-    let batch = try SignalBatch(taskID: UUID(), signalIDs: [UUID()], admissionSequence: 1)
+    let batch = try SignalBatch(
+        taskID: UUID().uuidString, signalIDs: [UUID().uuidString], admissionSequence: 1)
     try context.consume(batch, retainingLast: 1)
     #expect(throws: CommunicationError.capacityExceeded) { try context.consume(batch, retainingLast: 1) }
     #expect(context.consumedBatches == [batch] && context.evictedBatchCount == nil)
-    let next = try SignalBatch(taskID: UUID(), signalIDs: [UUID()], admissionSequence: 2)
+    let next = try SignalBatch(
+        taskID: UUID().uuidString, signalIDs: [UUID().uuidString], admissionSequence: 2)
     try context.consume(next, retainingLast: 1)
     #expect(context.consumedBatches == [next] && context.evictedBatchCount == 1)
 }
 
 @Test(.actionCatalog) func replyIdentitySurvivesNewRecognitionAndRequiresChildGrant() {
-    let session = UUID()
-    let old = AgentTurn(ordinal: 1)
-    let new = AgentTurn(ordinal: 2)
-    let round = UUID()
-    let childTask = UUID()
+    let session = UUID().uuidString
+    let old = AgentTurn(id: UUID().uuidString, ordinal: 1)
+    let new = AgentTurn(id: UUID().uuidString, ordinal: 2)
+    let round = UUID().uuidString
+    let childTask = UUID().uuidString
     var presentation = ConversationPresentation()
     func context(_ source: String, _ turn: AgentTurn, _ seq: UInt64, task: Bool = false) -> ActionExecutionContext {
         ActionExecutionContext(
-            source: source, sessionID: session, inputID: UUID(), sequence: seq,
+            source: source, sessionID: session, inputID: UUID().uuidString, sequence: seq,
             correlationID: turn.id, ordinal: turn.ordinal, decisionID: round,
             taskID: task ? childTask : nil, taskExecutor: task ? source : nil)
     }
@@ -580,8 +573,10 @@ private func waitForArchitecture(_ condition: @escaping @Sendable () async throw
     let manager = AgentManager()
     try await manager.register(parent)
     try await manager.register(child)
-    let session = UUID()
-    let scope = AgentTaskScope(requester: parent.descriptor.id, executor: child.descriptor.id, sessionID: session)
+    let session = UUID().uuidString
+    let scope = AgentTaskScope(
+        id: UUID().uuidString, requester: parent.descriptor.id, executor: child.descriptor.id,
+        sessionID: session)
     try await manager.grantTask(scope, sender: parent.descriptor.id)
     try await manager.validateTaskInput(scope, agent: child.descriptor.id)
     await #expect(throws: CommunicationError.unauthorized) {
@@ -592,7 +587,7 @@ private func waitForArchitecture(_ condition: @escaping @Sendable () async throw
         try await manager.validateTaskInput(scope, agent: child.descriptor.id)
     }
     await #expect(throws: CommunicationError.scopeClosed) {
-        try await manager.registerExecution(UUID(), scope: scope, agent: child.descriptor.id)
+        try await manager.registerExecution(UUID().uuidString, scope: scope, agent: child.descriptor.id)
     }
     let gateway = OutputGateway(
         manager: manager, requests: InputGateway(manager: manager, allowsExternalSend: true), tools: ToolRegistry(),
@@ -600,7 +595,8 @@ private func waitForArchitecture(_ condition: @escaping @Sendable () async throw
     let consumer = try await gateway.consumer(for: parent)
     let late = OutputEnvelope(
         source: parent.descriptor.id,
-        input: AgentInput(sessionID: session, payload: .text("late")), output: .control("agent.finished"), sequence: 1)
+        input: AgentInput(id: UUID().uuidString, sessionID: session, payload: .text("late")),
+        output: .control("agent.finished"), sequence: 1)
     try await manager.remove(parent.descriptor.id)
     let replacement = try TaskFixtureAgent(configuration: configuration)
     try await manager.register(replacement)
@@ -625,8 +621,10 @@ private func waitForArchitecture(_ condition: @escaping @Sendable () async throw
     let input = InputGateway(manager: manager, policy: policy, allowsExternalSend: true)
     let gateway = OutputGateway(
         manager: manager, requests: input, tools: ToolRegistry(), policy: policy, sink: { _ in })
-    let root = AgentInput(sessionID: UUID(), payload: .text("delegation"))
+    let root = AgentInput(
+        id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("delegation"))
     let scope = AgentTaskScope(
+        id: UUID().uuidString,
         requester: parent.descriptor.id, executor: childConfiguration.agentID, sessionID: root.sessionID)
     try await parent.send(
         AgentTaskSignal(kind: .request, scope: scope, businessContract: "fixture.photo", data: Data()), parent: root)
@@ -644,18 +642,22 @@ private func waitForArchitecture(_ condition: @escaping @Sendable () async throw
 
 @Test(.actionCatalog) func communicationReceiptsAreBoundedDeduplicatedAndFailedWritesDoNotAcknowledge() async throws {
     let receipts = CommunicationReceipts()
-    let ids = (0..<16).map { _ in UUID() }
+    let ids = (0..<16).map { _ in UUID().uuidString }
     for id in ids { try await receipts.register(id) }
-    await #expect(throws: CommunicationError.capacityExceeded) { try await receipts.register(UUID()) }
+    await #expect(throws: CommunicationError.capacityExceeded) {
+        try await receipts.register(UUID().uuidString)
+    }
     let result = CommunicationReceipt(
         callID: ids[0], report: .init(delivered: [.assistant]),
-        owner: ExecutionOwner(agent: .assistant, incarnation: UUID(), sessionID: UUID()), causality: .root())
+        owner: ExecutionOwner(
+            agent: .assistant, incarnation: UUID().uuidString, sessionID: UUID().uuidString),
+        causality: .root())
     await #expect(throws: CommunicationError.invalidPayload) {
         try await receipts.accept(result) { throw CommunicationError.invalidPayload }
     }
     await #expect(throws: CommunicationError.unauthorized) { try await receipts.accept(result) }
     await #expect(throws: CommunicationError.invalidPayload) { _ = try await receipts.wait(ids[0]) }
-    let next = UUID()
+    let next = UUID().uuidString
     try await receipts.register(next)
     let accepted = CommunicationReceipt(
         callID: next, report: .init(delivered: [.assistant]), owner: result.owner, causality: result.causality)
@@ -667,9 +669,11 @@ private func waitForArchitecture(_ condition: @escaping @Sendable () async throw
 
 @Test(.actionCatalog) func contextRejectedCommitAndCorruptStateLeaveNoWritableFallback() async throws {
     let repository = AgentContextRepository(
-        agent: .assistant, scope: UUID(), state: AssistantContextState(),
+        agent: .assistant, scope: UUID().uuidString, state: AssistantContextState(),
         persistence: .init(load: { nil }, commit: { _, _ in throw CommunicationError.invalidPayload }))
-    let input = AgentInput(sessionID: UUID(), payload: .text("Persist before processing"))
+    let input = AgentInput(
+        id: UUID().uuidString, sessionID: UUID().uuidString,
+        payload: .text("Persist before processing"))
     await #expect(throws: CommunicationError.invalidPayload) {
         try await repository.recordSignal(
             input, disposition: .enqueue(priority: 0), admissionSequence: 1, consumed: true
@@ -679,7 +683,7 @@ private func waitForArchitecture(_ condition: @escaping @Sendable () async throw
     #expect(uncommitted.work.isEmpty && uncommitted.records.isEmpty && uncommitted.consumedBatches.isEmpty)
     #expect(uncommitted.revision == 0)
     let agent = AgentID.assistant
-    let scope = UUID()
+    let scope = UUID().uuidString
     let invalid = AgentContext(agentID: agent, scopeID: scope, state: AssistantContextState())
     var object = try #require(JSONSerialization.jsonObject(with: JSONEncoder().encode(invalid)) as? [String: Any])
     object["version"] = 99
@@ -741,8 +745,10 @@ func parentOrChildStopJoinsEffectsAndRecordsDistinctTerminal(_ stopParent: Bool)
     let childPump = Task {
         try await IndependentOutputWorkflow.consumeGeneration(child.outputs) { _ = try await childConsumer.execute($0) }
     }
-    let root = AgentInput(sessionID: UUID(), payload: .text("stop child task"))
+    let root = AgentInput(
+        id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("stop child task"))
     let scope = AgentTaskScope(
+        id: UUID().uuidString,
         parentID: root.id, requester: parent.descriptor.id, executor: child.descriptor.id, sessionID: root.sessionID)
     try await parent.send(
         AgentTaskSignal(kind: .request, scope: scope, businessContract: "fixture.photo", data: Data()), parent: root)
@@ -773,15 +779,16 @@ func parentOrChildStopJoinsEffectsAndRecordsDistinctTerminal(_ stopParent: Bool)
 
 @Test(.actionCatalog) func deletedHistoryErasesItsOwnedSignalEvidenceAndProtectsActiveWork() async throws {
     let store = ConversationHistoryStore()
-    let repository = AgentContextRepository(agent: .assistant, scope: UUID(), state: AssistantContextState())
+    let repository = AgentContextRepository(
+        agent: .assistant, scope: UUID().uuidString, state: AssistantContextState())
     try await AssistantHistoryContext.attach(repository: repository, store: store)
-    let id = UUID()
+    let id = UUID().uuidString
     let token = try await store.readCurrent().token
     _ = try await store.begin(
         id: id, user: "private archived text", request: [.init(role: .user, content: "private archived text")],
         expecting: token, model: "fixture")
     try await repository.update {
-        try $0.beginWork(id, sessionID: UUID())
+        try $0.beginWork(id, sessionID: UUID().uuidString)
         try $0.append(.init(taskID: id, kind: "text", data: Data("private archived text".utf8)))
     }
     await #expect(throws: CommunicationError.scopeClosed) {
@@ -805,8 +812,11 @@ func parentOrChildStopJoinsEffectsAndRecordsDistinctTerminal(_ stopParent: Bool)
     try await manager.register(child)
     await parent.start()
     await child.start()
-    let root = AgentInput(sessionID: UUID(), payload: .text("duplicate admission"))
+    let root = AgentInput(
+        id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("duplicate admission")
+    )
     let scope = AgentTaskScope(
+        id: UUID().uuidString,
         requester: parent.descriptor.id, executor: child.descriptor.id, sessionID: root.sessionID)
     try await manager.grantTask(scope, sender: parent.descriptor.id)
     try await parent.context.update { try $0.tasks.register(scope) }
@@ -847,10 +857,10 @@ private actor HeldAdmissionCommit {
 
 @Test(.actionCatalog, .timeLimit(.minutes(1)))
 func concurrentEnvironmentFactsWaitForStateCommitInsteadOfRejectingAsCapacity() async throws {
-    let session = UUID()
+    let session = UUID().uuidString
     let held = HeldAdmissionCommit()
     let context = AgentContextRepository(
-        agent: .applicationControl, scope: UUID(), state: ApplicationControlContextState(),
+        agent: .applicationControl, scope: UUID().uuidString, state: ApplicationControlContextState(),
         persistence: .init(
             load: { nil },
             commit: { value, _ in
@@ -924,15 +934,18 @@ func concurrentEnvironmentFactsWaitForStateCommitInsteadOfRejectingAsCapacity() 
         try AgentCommunicationAdapter.action(
             path: "Agent.Communication.send",
             arguments: ["kind": "task", "target": "photographer", "content": "关闭摄像头"], sender: .assistant,
-            input: .init(sessionID: UUID(), payload: .text("close")), policy: configuration.communication)
+            input: .init(
+                id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("close")),
+            policy: configuration.communication)
     }
 }
 
 @Test(.actionCatalog) func userSignalsHaveNoImplicitDeadline() throws {
-    let text = InputMetadata(payload: .text("hello"))
+    let text = InputMetadata(payload: .text("hello"), rootID: UUID().uuidString)
     #expect(text.deadline == nil && !text.expired)
-    let audio = InputMetadata(payload: .event("voice-turn"))
+    let audio = InputMetadata(payload: .event("voice-turn"), rootID: UUID().uuidString)
     #expect(audio.deadline == nil && !audio.expired)
-    let explicit = InputMetadata(payload: .event("perception"), deadline: .now.advanced(by: .seconds(-1)))
+    let explicit = InputMetadata(
+        payload: .event("perception"), rootID: UUID().uuidString, deadline: .now.advanced(by: .seconds(-1)))
     #expect(explicit.expired)
 }

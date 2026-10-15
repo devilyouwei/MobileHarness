@@ -44,16 +44,12 @@ private actor PreferenceBindingFixture: ModelResourceCapability {
 }
 
 @Test(.actionCatalog, .timeLimit(.minutes(1)))
-func saturatedControlArchiveRestoresPreferencesAcrossRootGatewayAndPersistsRetention() async throws {
+func saturatedControlMemoryRestoresPreferencesAcrossRootGatewayAndRetainsBoundedEvidence() async throws {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     defer { try? FileManager.default.removeItem(at: root) }
     let seed = try saturatedEvidenceContext(agent: .applicationControl, state: ApplicationControlContextState())
-    let contextURL = root.appendingPathComponent("applicationControl.context.json")
-    let document = try LocalDocumentStore<AgentContext<ApplicationControlContextState>>(
-        url: contextURL, maximumBytes: 64 * 1024 * 1024)
-    try await document.save(seed, expecting: nil)
-    let repository = try AgentContextRepository.persistent(
-        agent: seed.agentID, scope: seed.scopeID, state: seed.state, url: contextURL)
+    let repository = AgentContextRepository(agent: seed.agentID, scope: seed.scopeID, state: seed.state)
+    try await repository.update { $0 = seed }
     let preferences = try LocalDocumentStore<ModelResourcePreferences>(
         url: root.appendingPathComponent("source.json"), maximumBytes: 4096)
     let saved = ModelResourcePreferences(
@@ -72,11 +68,11 @@ func saturatedControlArchiveRestoresPreferencesAcrossRootGatewayAndPersistsReten
     #expect(await binding.calls == [[true, true], [true, true]])
     #expect(await runtime.agent.status().lifecycle == .running)
     await runtime.shutdown()
-    let reopened = try AgentContextRepository.persistent(
-        agent: seed.agentID, scope: seed.scopeID, state: seed.state, url: contextURL)
-    let snapshot = try await reopened.snapshot()
+    let snapshot = try await repository.snapshot()
     #expect(snapshot.records.count == 4096 && snapshot.consumedBatches.count == 4096)
     #expect((snapshot.evictedRecordCount ?? 0) >= 4097 && (snapshot.evictedBatchCount ?? 0) >= 4097)
+    let reopened = AgentContextRepository(agent: seed.agentID, scope: seed.scopeID, state: seed.state)
+    #expect(try await reopened.snapshot().records.isEmpty)
     #expect(try await preferences.refresh()?.value == saved)
 }
 @Test(.actionCatalog) func preferenceLegacyDocumentAndViewDraftRemainWireCompatible() throws {
@@ -150,11 +146,11 @@ func saturatedControlArchiveRestoresPreferencesAcrossRootGatewayAndPersistsReten
 }
 
 @Test(.actionCatalog) func preferenceAgentRejectsMalformedFeedbackAndRetirementReleasesTransaction() async throws {
-    let session = UUID()
+    let session = UUID().uuidString
     let agent = try ApplicationControlAgent(sessionID: session)
     try await agent.start()
     var outputs = agent.outputs.makeAsyncIterator()
-    let request = ModelResourceIntent.restoreSource.input(sessionID: session)
+    let request = try ModelResourceIntent.restoreSource.input(sessionID: session)
     try await agent.receive(request)
     let envelope = try #require(await outputs.next())
     guard case .toolCall(let call) = envelope.output else {
@@ -170,8 +166,10 @@ func saturatedControlArchiveRestoresPreferencesAcrossRootGatewayAndPersistsReten
     await #expect(throws: (any Error).self) {
         try await agent.receive(
             AgentInput(
+                id: UUID().uuidString,
                 sessionID: session, payload: payload,
-                metadata: InputMetadata(payload: payload, source: "runtime", origin: .runtime)))
+                metadata: InputMetadata(
+                    payload: payload, source: "runtime", origin: .runtime, rootID: UUID().uuidString)))
     }
     await #expect(throws: CommunicationError.capacityExceeded) {
         try await agent.receive(ModelResourceIntent.restoreSource.input(sessionID: session))
@@ -377,7 +375,9 @@ private struct SpoofedPreferenceFailure: ModelResourcePreferencesCapability {
                 actionPath: ActionIdentifier(
                     domain: "UI", module: "ResourcePresentation", function: "showResourcePreferenceFailure"),
                 parameters: ["reason": reason, "message": message]),
-            context: ActionExecutionContext(source: "fixture", sessionID: UUID(), inputID: UUID()),
+            context: ActionExecutionContext(
+                source: "fixture", sessionID: UUID().uuidString, inputID: UUID().uuidString),
+            executionID: UUID().uuidString,
             results: ActionReportStore())
     }
     await #expect(throws: ActionArguments.ValidationError.self) {
@@ -395,4 +395,29 @@ private struct SpoofedPreferenceFailure: ModelResourcePreferencesCapability {
         #expect(result == "presented")
     }
     #expect(await presentation.reasons == [.recognitionRequired, .synthesisRequired, .invalidSource, .execution])
+}
+
+@Test(.actionCatalog) func resourcePreferencesRestoresOriginalDocumentWithoutReset() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: root) }
+    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+    let url = root.appendingPathComponent("download-source.json")
+    let original = Data(
+        #"{"version":1,"revision":"00000000-0000-0000-0000-000000000124","value":{"endpoint":"https://hf-mirror.com","allowsCellular":true,"useCustomRecognition":true,"useCustomSynthesis":true}}"#
+            .utf8)
+    try original.write(to: url)
+    let installed = InstalledPreferenceFixture()
+    await installed.set(["nemotron", "moss-tts-nano"])
+    let service = preferencesService(try LocalDocumentStore(url: url), installed: installed)
+    let restored = try await service.restoreSource()
+    #expect(restored.endpoint == "https://hf-mirror.com")
+    #expect(restored.useCustomRecognition && restored.useCustomSynthesis)
+    #expect(try Data(contentsOf: url) == original)
+    var updated = restored
+    updated.endpoint = "https://huggingface.co"
+    _ = try await service.saveSource(updated)
+    let reopened = try LocalDocumentStore<ModelResourcePreferences>(url: url)
+    #expect(try await reopened.load()?.value == updated)
+    let envelope = try #require(JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any])
+    #expect(envelope["version"] as? Int == 1)
 }

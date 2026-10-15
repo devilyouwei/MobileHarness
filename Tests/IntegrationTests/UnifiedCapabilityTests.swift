@@ -6,6 +6,7 @@ import ExecutionRuntime
 import Foundation
 import FunctionContracts
 import Gateway
+import Storage
 import Testing
 
 private struct UnifiedFixtureModule: ActionBindingModule {
@@ -17,9 +18,9 @@ private actor UnifiedFixtureLog {
 }
 
 @Test(.actionCatalog) func oneImplementationReturnsTheSameValueThroughBothProtocols() async throws {
-    let session = UUID()
-    let input = UUID()
-    let correlation = UUID()
+    let session = UUID().uuidString
+    let input = UUID().uuidString
+    let correlation = UUID().uuidString
     let context = ActionExecutionContext(
         source: "fixture", sessionID: session, inputID: input,
         sequence: 4, correlationID: correlation, ordinal: 2)
@@ -42,9 +43,9 @@ private actor UnifiedFixtureLog {
     let toolRegistry = try ToolRegistry(modules: [UnifiedFixtureModule(definitions: [toolBinding]).tools])
     let scheduled = ActionInvocation(
         call: .init(actionPath: path, channel: "main", parameters: ["target": "one"]),
-        context: context)
+        context: context, executionID: UUID().uuidString)
     #expect(try await ActionExecutor(registry: actionRegistry).execute(scheduled) == .value("one"))
-    let call = ToolRequest(toolPath: path.description, arguments: ["target": "one"])
+    let call = ToolRequest(id: UUID().uuidString, toolPath: path.description, arguments: ["target": "one"])
     #expect(try await toolRegistry.resources(for: call) == [ActionResource(rawValue: "fixture.one")])
     #expect(try await toolRegistry.timeout(for: call) == .seconds(2))
     let result = try await ToolExecutor(registry: toolRegistry).execute(
@@ -68,14 +69,16 @@ private actor UnifiedFixtureLog {
     ).exposed(as: [.action, .tool])
     let module = UnifiedFixtureModule(definitions: [definition])
     let scheduler = ChannelScheduler(registry: try ActionRegistry(modules: [module.actions]))
-    let input = AgentInput(sessionID: UUID(), payload: .event("fixture"))
+    let input = AgentInput(
+        id: UUID().uuidString, sessionID: UUID().uuidString, payload: .event("fixture"))
     let call = ActionCall(
         actionPath: .init(domain: "UI", module: "Gaze", function: "moveEyes"),
         channel: "Display", parameters: ["x": "0.2", "y": "0.3"])
     let agent = AgentID(rawValue: "fixture")
     try await scheduler.enqueue(invocation: ActionInvocation(source: agent, input: input, call: call, sequence: 7))
     try await scheduler.finish(inputID: input.id, source: agent)
-    let tool = ToolRequest(toolPath: definition.path.description, arguments: ["x": "0.2", "y": "0.3"])
+    let tool = ToolRequest(
+        id: UUID().uuidString, toolPath: definition.path.description, arguments: ["x": "0.2", "y": "0.3"])
     let result = try await ToolExecutor(registry: ToolRegistry(modules: [module.tools])).execute(
         tool,
         context: .init(source: "fixture", sessionID: input.sessionID, inputID: input.id, sequence: 8))
@@ -96,7 +99,7 @@ private actor UnifiedFixtureLog {
             actions: ActionRegistry(modules: [module.actions]),
             toolPaths: [path.description], capabilities: [permissions])
     }
-    #expect(!permissions.permits(ToolCall(toolPath: path.description)))
+    #expect(!permissions.permits(ToolCall(id: UUID().uuidString, toolPath: path.description)))
 }
 
 private actor UnifiedGate {
@@ -152,7 +155,7 @@ private actor UnifiedReceiptAgent: Agent {
         resources: [.init(rawValue: "fixture.work")],
         completing: { invocation in
             let mode = invocation.call.parameters["mode"] ?? "missing"
-            await log.record(mode + ":" + invocation.context.inputID.uuidString)
+            await log.record(mode + ":" + invocation.context.inputID)
             if mode == "first" {
                 await started.open()
                 await release.wait()
@@ -178,13 +181,13 @@ private actor UnifiedReceiptAgent: Agent {
         ])
     let agent = UnifiedReceiptAgent(capabilities: permissions)
     let manager = AgentManager()
-    let session = UUID()
+    let session = UUID().uuidString
     try await manager.register(agent, sessionID: session)
     try await manager.start(agent.descriptor.id)
     let gateway = OutputGateway(
         manager: manager, requests: InputGateway(manager: manager, allowsExternalSend: true),
         tools: try ToolRegistry(modules: [module.tools]), actions: scheduler, sink: { _ in })
-    let first = AgentInput(sessionID: session, payload: .event("fixture"))
+    let first = AgentInput(id: UUID().uuidString, sessionID: session, payload: .event("fixture"))
     try await gateway.dispatch(
         .init(
             source: agent.descriptor.id, input: first,
@@ -193,32 +196,36 @@ private actor UnifiedReceiptAgent: Agent {
                     actionPath: .init(domain: path.domain, module: path.module, function: path.function),
                     channel: "main", parameters: ["mode": "first"])), sequence: 1))
     await started.wait()
-    let native = AgentInput(sessionID: session, payload: .event("native"))
-    let call = ToolCall(toolPath: path.description, arguments: ["mode": "second"])
+    let native = AgentInput(id: UUID().uuidString, sessionID: session, payload: .event("native"))
+    let call = ToolCall(id: UUID().uuidString, toolPath: path.description, arguments: ["mode": "second"])
     let work = Task {
         try await gateway.execute(
             .init(source: agent.descriptor.id, input: native, output: .toolCall(call), sequence: 2))
     }
     let rejected = try await work.value
     #expect(rejected.isError == true)
-    #expect(await log.values == ["first:" + first.id.uuidString])
+    #expect(await log.values == ["first:" + first.id])
     await release.open()
     try await scheduler.finish(inputID: first.id, source: agent.descriptor.id)
     let result = try await gateway.dispatch(
         .init(
             source: agent.descriptor.id, input: native,
-            output: .toolCall(ToolCall(toolPath: path.description, arguments: call.arguments)), sequence: 2))
+            output: .toolCall(
+                ToolCall(id: UUID().uuidString, toolPath: path.description, arguments: call.arguments)),
+            sequence: 2))
     #expect(result?.completion == .value("second"))
-    #expect(await log.values == ["first:" + first.id.uuidString, "second:" + native.id.uuidString])
+    #expect(await log.values == ["first:" + first.id, "second:" + native.id])
     let receipts = await agent.receipts
     #expect(receipts.count == 1 && receipts.last?.completion == .value("second"))
     try await scheduler.finish(inputID: first.id, source: agent.descriptor.id)
-    let held = AgentInput(sessionID: session, payload: .event("hold"))
+    let held = AgentInput(id: UUID().uuidString, sessionID: session, payload: .event("hold"))
     let cancellation = Task {
         try await gateway.dispatch(
             .init(
                 source: agent.descriptor.id, input: held,
-                output: .toolCall(.init(toolPath: path.description, arguments: ["mode": "hold"])), sequence: 3))
+                output: .toolCall(
+                    .init(id: UUID().uuidString, toolPath: path.description, arguments: ["mode": "hold"])),
+                sequence: 3))
     }
     await nativeStarted.wait()
     cancellation.cancel()
@@ -244,10 +251,10 @@ private actor UnifiedReceiptAgent: Agent {
 }
 
 @Test(.actionCatalog) func normalizedNativeInvocationRetainsReportPrecedenceAndCallIdentity() async throws {
-    let id = UUID()
+    let id = UUID().uuidString
     let context = ActionExecutionContext(
-        source: "fixture", sessionID: UUID(), inputID: UUID(), sequence: 7,
-        correlationID: UUID(), ordinal: 3)
+        source: "fixture", sessionID: UUID().uuidString, inputID: UUID().uuidString, sequence: 7,
+        correlationID: UUID().uuidString, ordinal: 3)
     let report = try ActionReport(entries: [.init(path: "Fixture.Query.read", status: .succeeded)])
     let definition = ActionBinding(
         path: .init(domain: "Fixture", module: "Query", function: "read"),
@@ -298,7 +305,9 @@ private struct PureFunctionFixture: CapabilityModule {
     let path = function.path
     let invocation = ActionInvocation(
         call: .init(actionPath: path, channel: "main", parameters: ["x": "2", "y": "0"]),
-        context: .init(source: "fixture", sessionID: UUID(), inputID: UUID()))
+        context: .init(
+            source: "fixture", sessionID: UUID().uuidString, inputID: UUID().uuidString),
+        executionID: UUID().uuidString)
     let action = try ActionExecutor(registry: ActionRegistry(definitions: [ActionBinding(function: function)]))
     do {
         _ = try await action.execute(invocation)
@@ -309,7 +318,9 @@ private struct PureFunctionFixture: CapabilityModule {
     let binding = ActionBinding(function: function, protocols: [.tool], executionPolicy: .direct)
     let native = try ToolExecutor(registry: ToolRegistry(modules: [UnifiedFixtureModule(definitions: [binding]).tools]))
     let response = try await native.execute(
-        ToolRequest(toolPath: path.description, arguments: invocation.call.parameters), context: invocation.context)
+        ToolRequest(
+            id: UUID().uuidString, toolPath: path.description, arguments: invocation.call.parameters),
+        context: invocation.context)
     #expect(response?.failureCode == .invalidArguments && response?.isError == true)
     #expect(await log.values.isEmpty)
 }
@@ -338,9 +349,11 @@ private struct PureFunctionFixture: CapabilityModule {
     let tools = try ToolRegistry(modules: [UnifiedFixtureModule(definitions: [native]).tools], functions: functions)
     let invocation = ActionInvocation(
         call: .init(actionPath: path, channel: "main"),
-        context: .init(source: "fixture", sessionID: UUID(), inputID: UUID()))
+        context: .init(
+            source: "fixture", sessionID: UUID().uuidString, inputID: UUID().uuidString),
+        executionID: UUID().uuidString)
     #expect(try actions.definition(for: path).resources == function.resources)
-    let call = ToolRequest(toolPath: path.description)
+    let call = ToolRequest(id: UUID().uuidString, toolPath: path.description)
     #expect(try await tools.resources(for: call) == function.resources)
     #expect(try await tools.timeout(for: call) == .seconds(2))
     #expect(try await ActionExecutor(registry: actions).execute(invocation) == .value("canonical"))
@@ -371,7 +384,7 @@ private struct PureFunctionFixture: CapabilityModule {
         tools: [ToolRegistration(alias: "run", path: path.description, requiredParameters: ["mode"])])
     let agent = UnifiedReceiptAgent(capabilities: permissions)
     let manager = AgentManager()
-    let session = UUID()
+    let session = UUID().uuidString
     try await manager.register(agent, sessionID: session)
     try await manager.start(agent.descriptor.id)
     let scheduler = ChannelScheduler(registry: try ActionRegistry(modules: [module.actions]))
@@ -380,8 +393,11 @@ private struct PureFunctionFixture: CapabilityModule {
         tools: try ToolRegistry(modules: [module.tools]), actions: scheduler, sink: { _ in })
     let failed = try await gateway.dispatch(
         .init(
-            source: agent.descriptor.id, input: .init(sessionID: session, payload: .event("failure")),
-            output: .toolCall(.init(toolPath: path.description, arguments: ["mode": "fail"])), sequence: 1))
+            source: agent.descriptor.id,
+            input: .init(id: UUID().uuidString, sessionID: session, payload: .event("failure")),
+            output: .toolCall(
+                .init(id: UUID().uuidString, toolPath: path.description, arguments: ["mode": "fail"])),
+            sequence: 1))
     #expect(failed?.isError == true && failed?.failureCode?.rawValue == "disconnected")
     guard case .report(let returned) = failed?.completion else {
         Issue.record("Structured producer report was lost")
@@ -391,8 +407,11 @@ private struct PureFunctionFixture: CapabilityModule {
     #expect(returned.failureDescription == "Motor feedback disconnected")
     let next = try await gateway.dispatch(
         .init(
-            source: agent.descriptor.id, input: .init(sessionID: session, payload: .event("next")),
-            output: .toolCall(.init(toolPath: path.description, arguments: ["mode": "next"])), sequence: 2))
+            source: agent.descriptor.id,
+            input: .init(id: UUID().uuidString, sessionID: session, payload: .event("next")),
+            output: .toolCall(
+                .init(id: UUID().uuidString, toolPath: path.description, arguments: ["mode": "next"])),
+            sequence: 2))
     #expect(next?.completion == .value("next completed"))
     let receipts = await agent.receipts
     #expect(receipts.count == 2)

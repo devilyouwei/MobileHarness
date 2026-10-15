@@ -8,6 +8,7 @@ import Foundation
 import FunctionContracts
 import Gateway
 import ModelKit
+import Storage
 import StorageChat
 import Testing
 
@@ -46,7 +47,7 @@ private func specialistEventually(_ predicate: @Sendable () async throws -> Bool
 private struct SpecialistTools: ToolModule { let definitions: [ActionBinding] }
 @Test(.actionCatalog, .timeLimit(.minutes(1)))
 func specialistTypedUIBypassesAssistantAndCompletesWithoutModels() async throws {
-    let session = UUID()
+    let session = UUID().uuidString
     let manager = AgentManager()
     let policy = try CommunicationPolicy(
         contracts: AgentContracts.communication,
@@ -69,7 +70,8 @@ func specialistTypedUIBypassesAssistantAndCompletesWithoutModels() async throws 
         manager: manager, requests: input,
         tools: try ToolRegistry(modules: [SpecialistTools(definitions: [definition])]),
         actions: ChannelScheduler(registry: ActionRegistry()), policy: policy, sink: { _ in })
-    let repository = AgentContextRepository(agent: AgentID.assistant, scope: UUID(), state: AssistantContextState())
+    let repository = AgentContextRepository(
+        agent: AgentID.assistant, scope: UUID().uuidString, state: AssistantContextState())
     let parent = try AssistantAgent(context: repository)
     let camera = PhotographerIntentRuntime(
         sessionID: session, manager: manager, input: input, output: gateway,
@@ -140,7 +142,8 @@ private actor SpecialistPendingModel: ChatCapability {
 @Test(.actionCatalog, .timeLimit(.minutes(1))) func specialistPauseJoinsInferenceWhenChildCancellationDeliveryFails()
     async throws
 {
-    let context = AgentContextRepository(agent: .assistant, scope: UUID(), state: AssistantContextState())
+    let context = AgentContextRepository(
+        agent: .assistant, scope: UUID().uuidString, state: AssistantContextState())
     let model = SpecialistPendingModel()
     let failing = try AssistantAgent(chat: model, context: context)
     try await failing.bind(
@@ -148,13 +151,14 @@ private actor SpecialistPendingModel: ChatCapability {
             DeliveryReport(rejected: target.map { [$0: "Target unavailable"] } ?? [:])
         })
     try await failing.start()
-    let session = UUID()
-    let scope = AgentTaskScope(requester: .assistant, executor: .photographer, sessionID: session)
+    let session = UUID().uuidString
+    let scope = AgentTaskScope(
+        id: UUID().uuidString, requester: .assistant, executor: .photographer, sessionID: session)
     try await context.update {
         try $0.tasks.register(scope)
         $0.state.taskViews = [scope.id: AgentTaskView(scope: scope, content: try AgentTaskContent(text: "In progress"))]
     }
-    let input = AgentInput(sessionID: session, payload: .text("pending inference"))
+    let input = AgentInput(id: UUID().uuidString, sessionID: session, payload: .text("pending inference"))
     try await failing.receive(input)
     try await specialistEventually { await model.requests == 1 }
     await #expect(throws: CommunicationError.unavailableTarget) { try await failing.pause() }
@@ -181,7 +185,7 @@ private actor ReplyActivityProbe {
 
 @Test(.actionCatalog, .timeLimit(.minutes(1)))
 func assistantReportsReplyActivityWithoutOwningListening() async throws {
-    let session = UUID()
+    let session = UUID().uuidString
     let root = try AssistantAgent(reportsReplyActivity: true, chat: FixedTextChat(text: ""))
     try await root.start()
     let probe = ReplyActivityProbe()
@@ -191,7 +195,7 @@ func assistantReportsReplyActivityWithoutOwningListening() async throws {
         while try await outputs.next() != nil {}
     }
     await #expect(throws: (any Error).self) { try await root.receive(ListeningIntent().input(sessionID: session)) }
-    try await root.receive(AgentInput(sessionID: session, payload: .text("hello")))
+    try await root.receive(AgentInput(id: UUID().uuidString, sessionID: session, payload: .text("hello")))
     try await specialistEventually {
         let values = await probe.values
         return values.contains { !$0.inputs.isEmpty } && values.last?.inputs.isEmpty == true
@@ -205,7 +209,8 @@ func assistantReportsReplyActivityWithoutOwningListening() async throws {
 }
 
 @Test(.actionCatalog, .timeLimit(.minutes(1))) func assistantExecutesRobotActionWithoutDelegation() async throws {
-    let context = AgentContextRepository(agent: AgentID.assistant, scope: UUID(), state: AssistantContextState())
+    let context = AgentContextRepository(
+        agent: AgentID.assistant, scope: UUID().uuidString, state: AssistantContextState())
     let assistant = try AssistantAgent(chat: FixedTextChat(text: "<dance cycles=\"1\"/>"), context: context)
     let manager = AgentManager()
     let policy = try CommunicationPolicy(
@@ -251,7 +256,8 @@ func assistantReportsReplyActivityWithoutOwningListening() async throws {
         } catch is CancellationError {} catch { await effects.fail(String(describing: error)) }
     }
     do {
-        try await input.publish(.init(sessionID: UUID(), payload: .text("跳舞")))
+        try await input.publish(
+            .init(id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("跳舞")))
         try await specialistEventually { await effects.finished.contains(.assistant) }
         #expect(await effects.owners == ["assistant"])
         #expect(await effects.failures.isEmpty)
@@ -281,7 +287,7 @@ func assistantReportsReplyActivityWithoutOwningListening() async throws {
         manager: manager, requests: input, tools: ToolRegistry(), actions: ChannelScheduler(registry: ActionRegistry()),
         sink: { _ in })
     let parent = try AssistantAgent()
-    let child = try PhotographerAgent(sessionID: UUID())
+    let child = try PhotographerAgent(sessionID: UUID().uuidString)
     let entered = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingOldest(1))
     let release = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingOldest(1))
     let runtime = AgentInteractionRuntime(
@@ -311,7 +317,7 @@ func assistantReportsReplyActivityWithoutOwningListening() async throws {
 }
 
 @Test(.actionCatalog) func photographerCameraFactsArePassiveRevisionedAndScoped() async throws {
-    let session = UUID()
+    let session = UUID().uuidString
     let agent = try PhotographerAgent(sessionID: session)
     try await agent.start()
     let first = CameraStateObservation(
@@ -325,20 +331,26 @@ func assistantReportsReplyActivityWithoutOwningListening() async throws {
         needsSettings: true, facing: .back, failure: "permission denied")
     try await agent.receive(second.input(sessionID: session))
     await #expect(throws: CommunicationError.outOfOrder) { try await agent.receive(first.input(sessionID: session)) }
-    await #expect(throws: CommunicationError.unauthorized) { try await agent.receive(second.input(sessionID: UUID())) }
+    await #expect(throws: CommunicationError.unauthorized) {
+        try await agent.receive(second.input(sessionID: UUID().uuidString))
+    }
     let payload = InputPayload.observation(second.message)
     let forged = AgentInput(
+        id: UUID().uuidString,
         sessionID: session, payload: payload,
-        metadata: InputMetadata(payload: payload, source: "user", sequence: 3))
+        metadata: InputMetadata(payload: payload, source: "user", sequence: 3, rootID: UUID().uuidString))
     await #expect(throws: CommunicationError.unauthorized) { try await agent.receive(forged) }
     let mismatched = AgentInput(
-        sessionID: session, payload: payload,
-        metadata: InputMetadata(payload: payload, source: CameraStateObservation.source, sequence: 4))
-    await #expect(throws: CommunicationError.invalidPayload) { try await agent.receive(mismatched) }
-    let expired = AgentInput(
+        id: UUID().uuidString,
         sessionID: session, payload: payload,
         metadata: InputMetadata(
-            payload: payload, source: CameraStateObservation.source, sequence: 3,
+            payload: payload, source: CameraStateObservation.source, sequence: 4, rootID: UUID().uuidString))
+    await #expect(throws: CommunicationError.invalidPayload) { try await agent.receive(mismatched) }
+    let expired = AgentInput(
+        id: UUID().uuidString,
+        sessionID: session, payload: payload,
+        metadata: InputMetadata(
+            payload: payload, source: CameraStateObservation.source, sequence: 3, rootID: UUID().uuidString,
             deadline: .now.advanced(by: .seconds(-1))))
     await #expect(throws: CommunicationError.expired) { try await agent.receive(expired) }
     let snapshot = try await agent.contextSnapshot()
@@ -364,9 +376,13 @@ func assistantReportsReplyActivityWithoutOwningListening() async throws {
 }
 
 @Test(.actionCatalog) func photographerPhaseProjectsExistingTaskAndArtifactState() throws {
-    let task = AgentTaskScope(requester: .assistant, executor: .photographer, sessionID: UUID())
-    let input = AgentInput(sessionID: task.sessionID, payload: .text("photo"), taskScope: task)
-    var context = AgentContext(agentID: .photographer, scopeID: UUID(), state: PhotographerContextState())
+    let task = AgentTaskScope(
+        id: UUID().uuidString, requester: .assistant, executor: .photographer,
+        sessionID: UUID().uuidString)
+    let input = AgentInput(
+        id: UUID().uuidString, sessionID: task.sessionID, payload: .text("photo"), taskScope: task)
+    var context = AgentContext(
+        agentID: .photographer, scopeID: UUID().uuidString, state: PhotographerContextState())
     try context.tasks.register(task)
     try context.beginWork(input.id, sessionID: input.sessionID)
     #expect(PhotographerContextState.phase(context, input: input) == .preparing)
@@ -374,14 +390,15 @@ func assistantReportsReplyActivityWithoutOwningListening() async throws {
     try context.transitionWork(input.id, to: .awaitingFeedback)
     #expect(PhotographerContextState.phase(context, input: input) == .awaitingFeedback)
     try context.transitionWork(input.id, to: .continuation)
-    let photo = UUID()
+    let photo = UUID().uuidString
     try context.append(.init(taskID: task.id, kind: "user.text", data: JSONEncoder().encode(SignalEvidence(input))))
     context.state.photoOwners = [photo: input.id]
     #expect(PhotographerContextState.phase(context, input: input) == .reviewingPhoto)
     context.state.taskViews = [
         task.id: AgentTaskView(
             scope: task,
-            content: try AgentTaskContent(text: "Save?", stage: .waitingUser, interactionID: UUID(), artifactID: photo))
+            content: try AgentTaskContent(
+                text: "Save?", stage: .waitingUser, interactionID: UUID().uuidString, artifactID: photo))
     ]
     #expect(PhotographerContextState.phase(context, input: input) == .waitingUser)
     let failed = try AgentTaskContent(text: "failure").signal(.result, scope: task, status: .failed)

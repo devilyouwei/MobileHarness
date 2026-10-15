@@ -38,11 +38,10 @@ flowchart LR
 | --- | --- | --- |
 | list | offset 0…64、limit 1…5 | 当前会话优先的会话元数据页 |
 | read | id为list返回的ref或完整UUID、offset 0…1000000、limit 1…2 | 按仓库索引顺序排列的请求/压缩 Task 项目页 |
-| startNew | 无 | archived UUID 或 null |
-| summarize | 已归档会话 id | 标题提交后返回 summarized UUID |
-| delete | 已归档会话 id | 删除提交后返回 deleted UUID |
+| startNew | 无 | archived ID 或 null |
+| summarize | 已归档会话 id | 标题提交后返回 summarized ID |
+| delete | 已归档会话 id | 删除提交后返回 deleted ID |
 
-✅ list adds an optional eight-hex-character ref derived from the stable UUID prefix, only when unique among current/archives. read's id string accepts that ref or an exact full UUID, with a typed HistoryConversationReference passed to the query service. A missing ref returns notFound; an ambiguous ref rejects with invalidArguments and requires the full UUID. Short references remain stable after archiving, not list offsets. No storage schema or UI changes.
 
 ✅ 参数来自字符串传输，未知键被拒绝。list/read 结果最多 1800 UTF-8 字节，超过上限抛 resultTooLarge，不能裁掉 JSON 结构。页包含 items、total，存在更多内容时带 nextOffset；每次调用重新读取快照，不承诺跨调用分页稳定。
 
@@ -59,6 +58,7 @@ list 的 turnCount 是存储的输入块数量；read 的 total 是 indexedHisto
 [Actions 设计](../README.md) · [查询与事务实现](Support/README.md) · [共享会话仓库](../../Storage/Chat/README.md)
 
 
-## 会话存储性能重构 v3
 
-✅ 已实现：History.list 使用会话元数据索引；read/summarize/delete通过会话ID访问单一文档，不读取全部归档。函数授权与1800字节分页结果限制不变。
+## SQLite records and runtime identity
+
+✅ Implemented: technical identities are opaque UUID strings; committed business entities use dialog/message/task/media/device SQLite IDs. Consumers use Storage repositories while preserving ownership, cancellation and independent foundation boundaries. Complete messages, including each ReACT message, persist at termination; delta fragments do not persist. The custom allocator and replaced file/index implementation are removed. See the project SQLite business-record plan.

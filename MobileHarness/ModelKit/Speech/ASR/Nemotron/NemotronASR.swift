@@ -84,7 +84,7 @@ private actor NemotronSessionBridge {
     private var session: LocalNemotronSession?
     private let admission: OperationAdmission
     private let release: @Sendable () async -> Void
-    private let segment = UUID()
+    private let segment = UUID().uuidString
     private var revision: UInt64 = 0
     private var lastText = ""
     init(

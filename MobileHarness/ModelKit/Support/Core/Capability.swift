@@ -37,10 +37,12 @@ public enum CapabilityError: Error, Equatable, Sendable, LocalizedError {
 
 /// Opaque request and owner scope correlation; callers own all business meaning.
 public struct InferenceContext: Equatable, Sendable {
-    public let requestID: UUID
-    public let scopeID: UUID
+    public let requestID: String
+    public let scopeID: String
 
-    public init(requestID: UUID = UUID(), scopeID: UUID = UUID()) {
+    public init(
+        requestID: String = UUID().uuidString, scopeID: String = UUID().uuidString
+    ) {
         self.requestID = requestID
         self.scopeID = scopeID
     }

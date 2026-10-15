@@ -4,6 +4,7 @@ import Agents
 import AppWorkflows
 import Foundation
 import FunctionContracts
+import Storage
 import Testing
 
 @MainActor
@@ -70,7 +71,7 @@ private final class ProviderTransactionFixture: ProviderSettingsPersistence {
 {
     let fixture = ProviderTransactionFixture()
     let requests = ProviderSettingsRequests(service: fixture.service())
-    let session = UUID()
+    let session = UUID().uuidString
     let runtime = try resourceRuntime(UnusedModelResourceCapability(), providerSettings: requests, sessionID: session)
     let restoreID = try requests.stageRestore(sessionID: session)
     try await runtime.configureProvider(.init(operation: .restore, requestID: restoreID))
@@ -113,18 +114,18 @@ private final class ProviderTransactionFixture: ProviderSettingsPersistence {
     #expect(fixture.value?.model == "old")
 }
 @Test(.actionCatalog) func providerSettingsAgentSharesConfigurationGateAndKeepsCallsOpaque() async throws {
-    let session = UUID()
+    let session = UUID().uuidString
     let agent = try ApplicationControlAgent(sessionID: session)
     try await agent.start()
-    let intent = ProviderSettingsIntent(operation: .save, requestID: UUID())
-    let input = intent.input(sessionID: session)
+    let intent = ProviderSettingsIntent(operation: .save, requestID: UUID().uuidString)
+    let input = try intent.input(sessionID: session)
     try await agent.receive(input)
     var iterator = agent.outputs.makeAsyncIterator()
     guard case .toolCall(let call) = await iterator.next()?.output else {
         Issue.record("Missing save call")
         return
     }
-    #expect(call.arguments == ["requestID": intent.requestID.uuidString])
+    #expect(call.arguments == ["requestID": intent.requestID])
     #expect(call.toolPath == "System.Provider.saveSettings")
     await #expect(throws: CommunicationError.self) {
         try await agent.receive(
@@ -148,16 +149,16 @@ private final class ProviderSettingsClock: @unchecked Sendable {
     let fixture = ProviderTransactionFixture()
     let clock = ProviderSettingsClock()
     let requests = ProviderSettingsRequests(service: fixture.service(), clock: { clock.now() })
-    let session = UUID()
+    let session = UUID().uuidString
     let id = try requests.stageRestore(sessionID: session)
     await #expect(throws: ProviderSettingsError.self) {
         try await requests.saveSettings(requestID: id, sessionID: session)
     }
     await #expect(throws: ProviderSettingsError.self) {
-        try await requests.restoreSettings(requestID: id, sessionID: UUID())
+        try await requests.restoreSettings(requestID: id, sessionID: UUID().uuidString)
     }
     try await requests.restoreSettings(requestID: id, sessionID: session)
-    #expect(throws: ProviderSettingsError.self) { try requests.take(id, sessionID: UUID()) }
+    #expect(throws: ProviderSettingsError.self) { try requests.take(id, sessionID: UUID().uuidString) }
     for _ in 0..<31 { _ = try requests.stageRestore(sessionID: session) }
     #expect(throws: ProviderSettingsError.self) { try requests.stageRestore(sessionID: session) }
     clock.advance()
@@ -204,10 +205,12 @@ private final class ProviderCredentialFixture: ProviderCredentialStorage, @unche
     var keyCount: Int { lock.withLock { keys.count } }
 }
 @Test(.actionCatalog) func providerSettingsStoreVerifiesLegacyMigrationAndCleansFailedCredentialCommit() async throws {
-    let url = FileManager.default.temporaryDirectory.appendingPathComponent("provider-settings-\(UUID()).json")
+    let url = FileManager.default.temporaryDirectory.appendingPathComponent(
+        "provider-settings-\(UUID().uuidString).json")
     defer { try? FileManager.default.removeItem(at: url) }
     let credentials = try ProviderCredentialFixture()
-    let store = ProviderSettingsStore(credentials: credentials, documentURL: url)
+    let store = ProviderSettingsStore(
+        credentials: credentials, document: { try LocalDocumentStore<UserSettingsDocument>(url: url) })
     let value = try #require(try await store.load())
     #expect(value.enabled)
     #expect(value.key == "fixture-secret")
@@ -222,11 +225,11 @@ private final class ProviderCredentialFixture: ProviderCredentialStorage, @unche
 
 @MainActor private final class ProviderResultPresentationFixture: ResourcePresentationCapability {
     let requests: ProviderSettingsRequests
-    var ids: [UUID] = []
+    var ids: [String] = []
     var failures: [String?] = []
     var reject = false
     init(_ requests: ProviderSettingsRequests) { self.requests = requests }
-    func presentProviderResult(requestID: UUID, failureCode: String?, invocation: any FunctionInput) async throws {
+    func presentProviderResult(requestID: String, failureCode: String?, invocation: any FunctionInput) async throws {
         ids.append(requestID)
         failures.append(failureCode)
         #expect(invocation.call.parameters.keys.allSatisfy { ["requestID", "failureCode"].contains($0) })
@@ -253,7 +256,7 @@ private final class ProviderCredentialFixture: ProviderCredentialStorage, @unche
     let fixture = ProviderTransactionFixture()
     let requests = ProviderSettingsRequests(service: fixture.service())
     let presenter = ProviderResultPresentationFixture(requests)
-    let session = UUID()
+    let session = UUID().uuidString
     let runtime = try resourceRuntime(
         UnusedModelResourceCapability(), presentation: presenter, providerSettings: requests, sessionID: session)
     let restore = try requests.stageRestore(sessionID: session)
@@ -291,4 +294,41 @@ private final class ProviderCredentialFixture: ProviderCredentialStorage, @unche
     #expect(try ProviderModelList.eligible(values) == ["gpt-4o-mini", "my-deployment"])
     #expect(!ProviderModelList.isLikelyChatModel("GPT-5-Pro-2026"))
     #expect(throws: ProviderDiscoveryError.self) { try ProviderModelList.eligible([""]) }
+}
+
+@Test(.actionCatalog) @MainActor func providerSettingsRestoresOriginalDocumentAndCredentialWithoutReset() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let url = root.appendingPathComponent("Settings/settings.json")
+    try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+    let original = Data(
+        #"{"version":1,"revision":"00000000-0000-0000-0000-000000000123","value":{"version":1,"cloud":{"enabled":true,"url":"https://example.invalid/v1","model":"configured-model","credentialID":"existing-credential"}}}"#
+            .utf8)
+    try original.write(to: url)
+    let credentials = try ProviderCredentialFixture()
+    try credentials.insertKey(Data("fixture-secret".utf8), id: "existing-credential")
+    let store = ProviderSettingsStore(
+        credentials: credentials, document: { try LocalDocumentStore<UserSettingsDocument>(url: url) })
+    var applied: ProviderSettings?
+    let service = ProviderSettingsService(
+        store: store,
+        runtime: .init(
+            initial: .init(enabled: false, url: "https://default.invalid", key: "", model: "default"),
+            prepare: { value in { applied = value } }, beginChange: {}, endChange: {}))
+    let restored = try await service.restore()
+    #expect(restored.enabled && restored.model == "configured-model")
+    #expect(restored.url == "https://example.invalid/v1" && restored.key == "fixture-secret")
+    #expect(applied == restored)
+    #expect(credentials.events == ["insertKey", "readKey"])
+    #expect(try Data(contentsOf: url) == original)
+    let updated = ProviderSettings(
+        enabled: restored.enabled, url: restored.url, key: restored.key, model: "updated-model")
+    _ = try await service.save(updated)
+    let reopened = ProviderSettingsStore(
+        credentials: credentials, document: { try LocalDocumentStore<UserSettingsDocument>(url: url) })
+    #expect(try await reopened.load() == updated)
+    let output = try Data(contentsOf: url)
+    let envelope = try #require(JSONSerialization.jsonObject(with: output) as? [String: Any])
+    #expect(envelope["version"] as? Int == 1)
+    #expect(!String(decoding: output, as: UTF8.self).contains("fixture-secret"))
 }

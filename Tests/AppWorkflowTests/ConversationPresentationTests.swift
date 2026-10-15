@@ -2,18 +2,20 @@ import AgentCore
 import AppWorkflows
 import Foundation
 import FunctionContracts
+import Storage
 import Testing
 import UI
 
 @Test func changingCaptionOwnerDoesNotRevokeParentPlayback() {
-    let session = UUID()
-    let turn = AgentTurn(ordinal: 1)
+    let session = UUID().uuidString
+    let turn = AgentTurn(id: UUID().uuidString, ordinal: 1)
     let parent = ActionExecutionContext(
-        source: "assistant", sessionID: session, inputID: UUID(), sequence: 1,
+        source: "assistant", sessionID: session, inputID: UUID().uuidString, sequence: 1,
         correlationID: turn.id, ordinal: turn.ordinal)
     let child = ActionExecutionContext(
-        source: "photographer", sessionID: session, inputID: UUID(), sequence: 2,
-        correlationID: turn.id, ordinal: turn.ordinal, taskID: UUID(), taskExecutor: "photographer")
+        source: "photographer", sessionID: session, inputID: UUID().uuidString, sequence: 2,
+        correlationID: turn.id, ordinal: turn.ordinal, taskID: UUID().uuidString,
+        taskExecutor: "photographer")
     var presentation = ConversationPresentation()
     let parentAccepted = presentation.accept(parent, update: .beginReply)
     #expect(parentAccepted)
@@ -23,7 +25,7 @@ import UI
     #expect(presentation.acceptsPlayback(parent, activeSessions: [session]))
     #expect(presentation.acceptsPlayback(child, activeSessions: [session]))
     #expect(!presentation.acceptsPlayback(parent, activeSessions: []))
-    #expect(!presentation.acceptsPlayback(child, activeSessions: [UUID()]))
+    #expect(!presentation.acceptsPlayback(child, activeSessions: [UUID().uuidString]))
 }
 
 @Test @MainActor func newRecognitionClearsPriorCaptionsAndStartsBelowBeforeFinalPromotion() {
@@ -34,12 +36,12 @@ import UI
     {
         presentation.accept(context, update: update, state: state)
     }
-    let session = UUID()
-    let first = AgentTurn(ordinal: 1)
-    let second = AgentTurn(ordinal: 2)
+    let session = UUID().uuidString
+    let first = AgentTurn(id: UUID().uuidString, ordinal: 1)
+    let second = AgentTurn(id: UUID().uuidString, ordinal: 2)
     func context(_ turn: AgentTurn, _ sequence: UInt64, source: String = "speechPerception") -> ActionExecutionContext {
         .init(
-            source: source, sessionID: session, inputID: UUID(), sequence: sequence,
+            source: source, sessionID: session, inputID: UUID().uuidString, sequence: sequence,
             correlationID: turn.id, ordinal: turn.ordinal)
     }
     let initial = context(first, 1)
@@ -85,9 +87,10 @@ import UI
     state.liveTranscript = "旧输入"
     state.assistantReply = "旧回复"
     state.finishUserTranscript()
-    let turn = AgentTurn(ordinal: 1)
+    let turn = AgentTurn(id: UUID().uuidString, ordinal: 1)
     let context = ActionExecutionContext(
-        source: "speechPerception", sessionID: UUID(), inputID: UUID(), sequence: 1,
+        source: "speechPerception", sessionID: UUID().uuidString, inputID: UUID().uuidString,
+        sequence: 1,
         correlationID: turn.id, ordinal: turn.ordinal)
     #expect(accept(context, update: .transcript, state: state))
     state.liveTranscript = "新输入"
@@ -97,11 +100,11 @@ import UI
 }
 
 @Test func userOffRejectsLateReplyCaptionAndPlaybackUntilFreshRecognition() {
-    let session = UUID()
-    let turn = AgentTurn(ordinal: 1)
+    let session = UUID().uuidString
+    let turn = AgentTurn(id: UUID().uuidString, ordinal: 1)
     func context(_ turn: AgentTurn, _ sequence: UInt64, source: String = "assistant") -> ActionExecutionContext {
         .init(
-            source: source, sessionID: session, inputID: UUID(), sequence: sequence,
+            source: source, sessionID: session, inputID: UUID().uuidString, sequence: sequence,
             correlationID: turn.id, ordinal: turn.ordinal)
     }
     var presentation = ConversationPresentation()
@@ -117,7 +120,7 @@ import UI
     presentation.beginRecognitionScope()
     #expect(!accept(context(turn, 5), update: .reply))
     #expect(!presentation.acceptsPlayback(context(turn, 6), activeSessions: [session]))
-    let next = AgentTurn(ordinal: 2)
+    let next = AgentTurn(id: UUID().uuidString, ordinal: 2)
     #expect(accept(context(next, 2, source: "speechPerception"), update: .transcript))
     #expect(accept(context(next, 7), update: .beginReply))
     #expect(presentation.acceptsPlayback(context(next, 8), activeSessions: [session]))

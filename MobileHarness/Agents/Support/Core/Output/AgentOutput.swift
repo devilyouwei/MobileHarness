@@ -7,7 +7,7 @@ public enum AgentOutput: Equatable, Sendable {
     case toolCall(ToolCall)
     case control(String)
     case scheduling(SchedulingDirective)
-    case roundFinished(UUID)
+    case roundFinished(String)
     public var kind: OutputKind {
         switch self {
         case .communication: .communication
@@ -23,9 +23,9 @@ public enum AgentOutput: Equatable, Sendable {
 
 /// Runtime acknowledgment after ordered admission, Tool joins and Action tree closure.
 public struct GenerationRoundResult: Codable, Equatable, Sendable {
-    public let roundID: UUID
+    public let roundID: String
     public let failure: String?
-    public init(roundID: UUID, failure: String? = nil) {
+    public init(roundID: String, failure: String? = nil) {
         self.roundID = roundID
         self.failure = failure.map { String($0.prefix(512)) }
     }

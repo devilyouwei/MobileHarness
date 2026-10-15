@@ -248,3 +248,19 @@ ADR0181 regression coverage: CameraInteractionWorkflow emits Photographer typed 
 ✅ Records regressions: canonical conversation metadata/detail regressions verify retention of archived Task sources after live TaskRecord retirement and two Tasks within one input. Required-reader identity rejection protects the selected cache; retain cancellation, archive/title, selected-body/photo association and failure regressions.
 
 ✅ Required conversation reader: selected-conversation reads are a required injected interface; foreign identity fails without replacing the previous selection. Tests inject explicit readers/failures.
+
+
+✅ Fixtures use UUID/opaque runtime strings and committed database business references; concurrency, restart, invalid-ID and failure behavior remain covered.
+
+## Identity ownership
+
+✅ Runtime and foundation identities use opaque protocol strings or Foundation UUID; no project ID-generator dependency exists. SQLite-backed Storage publishes committed business references and App injects repositories/maps native Bluetooth identities. Tests preserve caller identity, cancellation and failure semantics. See [current storage design](../../MobileHarness/Storage/README.md) for relational allocation and persistence.
+
+## SQLite records migration
+
+✅ Runtime fixtures use opaque UUID strings; committed business entities use dialog/message/task/media/device database IDs. Independent repository interfaces preserve ownership/cancellation and foundation boundaries. Completed messages (including each ReACT message) persist individually, without delta fragments or old allocator/file-index compatibility. See the project SQLite business-record plan.
+
+
+✅ Implemented (2026-10-15 automatic history paging): Archive paging tests cover twenty-row initial page, overlapping callbacks, error retention/manual retry, EOF, refresh and a late result after cancellation. Preserve already visible archives and scoped failure evidence.
+
+✅ Implemented: archive refresh regressions hold a page read, verify cancellation/join before refresh, no late append, retained records on refresh failure and released admission.

@@ -1,6 +1,7 @@
 import Foundation
 import FunctionContracts
 import PlatformKit
+import Storage
 
 public enum NexArmCompatibilityPolicy: Sendable {
     case passiveBLE
@@ -344,7 +345,7 @@ public actor NexArmActionController {
         lastFailure = nil
         motionFailure = nil
         let policy = try suppliedPolicy ?? NexArmMotorCompletion()
-        var session: UUID?
+        var session: String?
         var sequence: UInt64 = 0
         var lastFeedback = ContinuousClock.now
         var receivedFeedback = false

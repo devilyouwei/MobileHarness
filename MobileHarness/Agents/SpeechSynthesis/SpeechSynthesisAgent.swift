@@ -1,6 +1,7 @@
 import AgentCore
 import Foundation
 import ModelKit
+import Storage
 import StorageAudio
 
 /// Shared directed synthesis service. One FIFO worker, independent of playback Channels.
@@ -24,7 +25,7 @@ public actor SpeechSynthesisAgent: Agent {
     private var queue: [(SpeechSynthesisInput, AgentInput)] = []
     private var admitting = 0
     private var worker: Task<Void, Never>?
-    private var active: UUID?
+    private var active: String?
     private var processed = 0
 
     // MARK: - Registration
@@ -37,7 +38,8 @@ public actor SpeechSynthesisAgent: Agent {
         self.contextRepository =
             context
             ?? AgentContextRepository(
-                agent: AgentID(rawValue: "speechSynthesis"), scope: UUID(), state: SpeechSynthesisContextState())
+                agent: AgentID(rawValue: "speechSynthesis"), scope: UUID().uuidString,
+                state: SpeechSynthesisContextState())
         guard contextRepository.agentID.rawValue == "speechSynthesis" else {
             throw AgentConfigurationError.identityMismatch
         }
@@ -129,7 +131,7 @@ public actor SpeechSynthesisAgent: Agent {
 
     // MARK: - Decision workers
 
-    private func cancelJob(_ id: UUID) async {
+    private func cancelJob(_ id: String) async {
         queue.removeAll { $0.0.audioID == id }
         if active == id {
             let pending = worker
@@ -265,4 +267,4 @@ public enum SpeechSynthesisError: Error, Equatable, Sendable {
 }
 
 // A producer must not join itself when its failure closes the registered audio handle.
-enum SpeechSynthesisFailureContext { @TaskLocal static var audioID: UUID? }
+enum SpeechSynthesisFailureContext { @TaskLocal static var audioID: String? }

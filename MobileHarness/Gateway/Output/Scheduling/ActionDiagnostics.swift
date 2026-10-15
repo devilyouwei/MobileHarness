@@ -16,11 +16,11 @@ public struct ActionDiagnostics: Sendable {
     }
 
     public struct Record: Sendable {
-        public let executionID: UUID
+        public let executionID: String
         public let path: ActionPath
         public let source: AgentID
-        public let sessionID: UUID
-        public let inputID: UUID
+        public let sessionID: String
+        public let inputID: String
         public let channel: String
         public let kind: ActionBinding.Kind
         public let phase: Phase

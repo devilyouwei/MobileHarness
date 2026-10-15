@@ -1,5 +1,6 @@
 import Foundation
 import FunctionContracts
+import Storage
 
 /// History.Conversation function ownership.
 extension HistoryActions {
@@ -11,7 +12,7 @@ extension HistoryActions {
         try ActionArguments(invocation.call.parameters).validateAllowedKeys([])
         let archived = try await history.startNew()
         try Task.checkCancellation()
-        return "{\"archived\":" + (archived.map { "\"" + $0.uuidString + "\"" } ?? "null") + "}"
+        return "{\"archived\":" + (archived.map { "\"" + $0 + "\"" } ?? "null") + "}"
     }
 
     @Action(
@@ -24,10 +25,12 @@ extension HistoryActions {
         let arguments = ActionArguments(invocation.call.parameters)
         try arguments.validateAllowedKeys(["id"])
         let rawID = try arguments.requiredString("id", maximumUTF8Bytes: 36)
-        guard let id = UUID(uuidString: rawID) else { throw ActionArguments.ValidationError.invalidValue("id") }
-        try await history.summarizeArchived(id)
+        guard let id = BusinessRecordID(rawValue: rawID), id.kind == .dialog else {
+            throw ActionArguments.ValidationError.invalidValue("id")
+        }
+        try await history.summarizeArchived(id.rawValue)
         try Task.checkCancellation()
-        return "{\"summarized\":\"" + id.uuidString + "\"}"
+        return "{\"summarized\":\"" + id.rawValue + "\"}"
     }
 
     @Action(
@@ -39,16 +42,18 @@ extension HistoryActions {
         let arguments = ActionArguments(invocation.call.parameters)
         try arguments.validateAllowedKeys(["id"])
         let rawID = try arguments.requiredString("id", maximumUTF8Bytes: 36)
-        guard let id = UUID(uuidString: rawID) else { throw ActionArguments.ValidationError.invalidValue("id") }
-        try await history.deleteArchived(id)
+        guard let id = BusinessRecordID(rawValue: rawID), id.kind == .dialog else {
+            throw ActionArguments.ValidationError.invalidValue("id")
+        }
+        try await history.deleteArchived(id.rawValue)
         try Task.checkCancellation()
-        return "{\"deleted\":\"" + id.uuidString + "\"}"
+        return "{\"deleted\":\"" + id.rawValue + "\"}"
     }
 
     @Action(
         domain: "History", module: "Conversation", title: "list",
         doc:
-            "List current and archived conversations, current first then newest archives. Returns paged JSON metadata with full IDs, stable short ref when unique, and truncated title/input previews. Prefer the exact returned ref for History.read. Start at offset 0; use nextOffset for more.",
+            "List current and archived conversations, current first then newest archives. Returns paged JSON metadata with canonical dialog_number IDs and and truncated title/input previews. Copy the exact returned id for History.read. Start at offset 0; use nextOffset for more.",
         parameters: [
             .init(
                 "offset", type: .string, required: true,
@@ -74,12 +79,12 @@ extension HistoryActions {
     @Action(
         domain: "History", module: "Conversation", title: "read",
         doc:
-            "Read a conversation using the exact short ref returned by History.list, or the full id when ref is absent. Never invent or repair an identifier. Request blocks and compressed Tasks are oldest first. Returns paged JSON with bounded user/response previews and truncation flags; never replays behavior. Start at offset 0.",
+            "Read a conversation using the exact conversation_number id returned by History.list. Never invent or repair an identifier. Request blocks and compressed Tasks are oldest first. Returns paged JSON with bounded user/response previews and truncation flags; never replays behavior. Start at offset 0.",
         parameters: [
             .init(
                 "id", type: .string, required: true,
                 description:
-                    "Exact eight-hex ref from History.list; use the full conversation UUID only when ref is absent.",
+                    "Exact conversation_number id returned by History.list.",
                 constraints: ""
             ),
             .init(

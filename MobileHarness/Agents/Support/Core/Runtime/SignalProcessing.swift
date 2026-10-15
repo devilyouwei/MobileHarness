@@ -22,15 +22,15 @@ public protocol ContextBuilder: Sendable {
 }
 
 public struct SignalBatch: Codable, Sendable, Equatable {
-    public let id: UUID
-    public let taskID: UUID
-    public let signalIDs: [UUID]
+    public let id: String
+    public let taskID: String
+    public let signalIDs: [String]
     public let admissionSequence: UInt64
-    public init(id: UUID = UUID(), taskID: UUID, signalIDs: [UUID], admissionSequence: UInt64) throws {
+    public init(id: String? = nil, taskID: String, signalIDs: [String], admissionSequence: UInt64) throws {
         guard !signalIDs.isEmpty, signalIDs.count <= 128, Set(signalIDs).count == signalIDs.count,
             admissionSequence > 0
         else { throw CommunicationError.invalidPayload }
-        self.id = id
+        self.id = try id ?? UUID().uuidString
         self.taskID = taskID
         self.signalIDs = signalIDs
         self.admissionSequence = admissionSequence
@@ -52,7 +52,7 @@ public struct SignalInbox: Sendable {
     public var isEmpty: Bool { entries.isEmpty }
     public var inputs: [AgentInput] { entries.map(\.input) }
     public mutating func removeAll() { entries.removeAll() }
-    public mutating func remove(id: UUID) { entries.removeAll { $0.input.id == id } }
+    public mutating func remove(id: String) { entries.removeAll { $0.input.id == id } }
     public mutating func takeBatch() -> [Entry] {
         guard let first = take() else { return [] }
         guard let key = first.key else { return [first] }
@@ -103,7 +103,7 @@ public struct SignalInbox: Sendable {
         else { return nil }
         return entries.remove(at: index)
     }
-    public mutating func remove(sessionID: UUID) -> [AgentInput] {
+    public mutating func remove(sessionID: String) -> [AgentInput] {
         let removed = entries.filter { $0.input.sessionID == sessionID }.map(\.input)
         entries.removeAll { $0.input.sessionID == sessionID }
         return removed
@@ -117,10 +117,10 @@ public final class AgentAdmissionGate: @unchecked Sendable {
     private let capacity: Int
     private var busy = false
     private var closed = false
-    private var waiters: [(UUID, CheckedContinuation<Void, any Error>)] = []
+    private var waiters: [(String, CheckedContinuation<Void, any Error>)] = []
     public init(capacity: Int = 32) { self.capacity = capacity }
     public func acquire() async throws {
-        let id = UUID()
+        let id = UUID().uuidString
         try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, any Error>) in
                 let result: Result<Void, any Error>? = lock.withLock {
@@ -140,7 +140,7 @@ public final class AgentAdmissionGate: @unchecked Sendable {
             self.cancel(id)
         }
     }
-    private func cancel(_ id: UUID) {
+    private func cancel(_ id: String) {
         let waiter = lock.withLock { () -> CheckedContinuation<Void, any Error>? in
             guard let index = waiters.firstIndex(where: { $0.0 == id }) else { return nil }
             return waiters.remove(at: index).1

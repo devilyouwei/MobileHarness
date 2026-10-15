@@ -4,6 +4,7 @@ import AppWorkflows
 import Foundation
 import Gateway
 import ModelKit
+import Storage
 import StorageAudio
 import StorageChat
 
@@ -15,13 +16,13 @@ struct VoiceRuntimeDependencies {
     let output: OutputGateway
     let presentation: RuntimePresentation
     let conversations: ConversationHistoryStore
-    let interactionSessionID: UUID
+    let interactionSessionID: String
     let startInteraction: @MainActor () async throws -> Void
     let cancelReply: @MainActor () async throws -> Void
     let stopInteraction: @MainActor () async -> Void
     let makeSynthesis: (any SpeechSynthesisCapability, SpeechAudioStore) throws -> SpeechSynthesisAgent
     let makePerception:
-        (any SpeechRecognitionCapability, any VoiceActivityCapability, UUID) throws -> SpeechPerceptionAgent
+        (any SpeechRecognitionCapability, any VoiceActivityCapability, String) throws -> SpeechPerceptionAgent
 }
 @MainActor
 struct VisionRuntimeDependencies {

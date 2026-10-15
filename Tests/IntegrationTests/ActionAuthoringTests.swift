@@ -5,16 +5,19 @@ import CallRuntime
 import ExecutionRuntime
 import Foundation
 import FunctionContracts
+import Storage
 import StorageAudio
 import Testing
 
 private actor SpeechEntryProbe {
-    private(set) var ids: [UUID] = []
-    func accept(_ id: UUID) { ids.append(id) }
+    private(set) var ids: [String] = []
+    func accept(_ id: String) { ids.append(id) }
 }
 private func authoringInvocation(_ parameters: [String: String]) -> ActionInvocation {
     ActionInvocation(
-        source: .assistant, input: AgentInput(sessionID: UUID(), payload: .event("test")),
+        source: .assistant,
+        input: AgentInput(
+            id: UUID().uuidString, sessionID: UUID().uuidString, payload: .event("test")),
         call: ActionCall(
             actionPath: ActionPath(domain: "Speech", module: "Playback", function: "speak"), channel: "Voice",
             parameters: parameters))
@@ -22,9 +25,9 @@ private func authoringInvocation(_ parameters: [String: String]) -> ActionInvoca
 
 @Test(.actionCatalog) func speechEntryRejectsInvalidTransportBeforeInvokingPlayback() async throws {
     let probe = SpeechEntryProbe()
-    let id = UUID()
+    let id = UUID().uuidString
     for parameters in [
-        [:], ["audioID": "invalid"], ["audioID": id.uuidString, "text": "hidden synthesis"],
+        [:], ["audioID": "invalid"], ["audioID": id, "text": "hidden synthesis"],
         ["audioID": String(repeating: "a", count: 37)],
     ] {
         await #expect(throws: SpeechActionError.missingAudio) {
@@ -33,7 +36,7 @@ private func authoringInvocation(_ parameters: [String: String]) -> ActionInvoca
         }
     }
     #expect(await probe.ids.isEmpty)
-    try await SpeechActions.speak(invocation: authoringInvocation(["audioID": id.uuidString])) { id, _ in
+    try await SpeechActions.speak(invocation: authoringInvocation(["audioID": id])) { id, _ in
         await probe.accept(id)
     }
     #expect(await probe.ids == [id])
@@ -75,7 +78,8 @@ private enum UnifiedAuthoringFixture {
     )
     let actionRegistry = try ActionRegistry(definitions: [definition])
     let nativeRegistry = try ToolRegistry(modules: [UnifiedAuthoringToolModule(definitions: [definition])])
-    let input = AgentInput(sessionID: UUID(), payload: .event("authoring"))
+    let input = AgentInput(
+        id: UUID().uuidString, sessionID: UUID().uuidString, payload: .event("authoring"))
     let invocation = ActionInvocation(
         source: .assistant, input: input,
         call: ActionCall(
@@ -84,7 +88,9 @@ private enum UnifiedAuthoringFixture {
     let scheduled = try await ActionExecutor(registry: actionRegistry).execute(invocation)
     let native = try #require(
         try await ToolExecutor(registry: nativeRegistry).execute(
-            ToolRequest(toolPath: "Fixture.Control.shared", arguments: ["value": "same outcome"]),
+            ToolRequest(
+                id: UUID().uuidString, toolPath: "Fixture.Control.shared",
+                arguments: ["value": "same outcome"]),
             context: invocation.context))
     #expect(scheduled == .value("same outcome"))
     #expect(native.completion == scheduled && native.value == "same outcome")

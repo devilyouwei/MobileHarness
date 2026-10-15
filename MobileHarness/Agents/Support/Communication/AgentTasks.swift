@@ -1,15 +1,18 @@
 import AgentCore
 import Foundation
 import FunctionContracts
+import Storage
 
 /// Public task content, separate from private inference history and trusted UI commands.
 public struct AgentTaskContent: Codable, Sendable, Equatable {
     public enum Stage: String, Codable, Sendable { case running, waitingUser, completed }
     public let text: String
     public let stage: Stage
-    public let interactionID: UUID?
-    public let artifactID: UUID?
-    public init(text: String, stage: Stage = .running, interactionID: UUID? = nil, artifactID: UUID? = nil) throws {
+    public let interactionID: String?
+    public let artifactID: String?
+    public init(text: String, stage: Stage = .running, interactionID: String? = nil, artifactID: String? = nil)
+        throws
+    {
         guard !text.isEmpty, text.utf8.count <= 4096,
             stage != .waitingUser || interactionID != nil
         else { throw CommunicationError.invalidPayload }
@@ -39,8 +42,8 @@ public struct AgentTaskView: Codable, Sendable {
     public let scope: AgentTaskScope
     public var stage: AgentTaskContent.Stage
     public var text: String
-    public var interactionID: UUID?
-    public var artifactID: UUID?
+    public var interactionID: String?
+    public var artifactID: String?
     public var goal: String?
     public var skills: [String]?
     public var createdAt: Date?
@@ -115,19 +118,19 @@ public enum AgentFixedTaskInput {
 /// Explicit user reply targets an existing question; runtime ownership is not user-supplied.
 public struct AgentTaskInputIntent: Codable, Sendable, Equatable {
     public static let contract = "agent.userInput"
-    public let taskID: UUID
-    public let interactionID: UUID
-    public let artifactID: UUID?
+    public let taskID: String
+    public let interactionID: String
+    public let artifactID: String?
     public let text: String
-    public init(taskID: UUID, interactionID: UUID, artifactID: UUID? = nil, text: String) throws {
+    public init(taskID: String, interactionID: String, artifactID: String? = nil, text: String) throws {
         guard !text.isEmpty, text.utf8.count <= 4096 else { throw CommunicationError.invalidPayload }
         self.taskID = taskID
         self.interactionID = interactionID
         self.artifactID = artifactID
         self.text = text
     }
-    public func input(sessionID: UUID) -> AgentInput {
-        let id = UUID()
+    public func input(sessionID: String) throws -> AgentInput {
+        let id = UUID().uuidString
         let payload = InputPayload.observation(
             AgentMessage(
                 contract: Self.contract, content: self, maximumBytes: 16_384,
@@ -165,11 +168,12 @@ public struct AgentBackgroundTaskRequest: Sendable {
         self.businessContract = contract
         self.data = Data(payload.utf8)
     }
-    public func signal(requester: AgentID, parent: UUID?, session: UUID) throws -> AgentTaskSignal {
+    public func signal(id: String, requester: AgentID, parent: String?, session: String) throws -> AgentTaskSignal {
         guard target != requester else { throw CommunicationError.unauthorized }
         return try AgentTaskSignal(
             kind: .request,
             scope: AgentTaskScope(
+                id: id,
                 parentID: parent, requester: requester, executor: target, sessionID: session, execution: .background),
             businessContract: businessContract, data: data, goal: goal, requestedSkills: skills)
     }

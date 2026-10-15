@@ -3,10 +3,10 @@ import Foundation
 /// Trusted runtime ownership, captured before admission rather than supplied by model parameters.
 public struct ExecutionOwner: Codable, Hashable, Sendable {
     public let agent: AgentID
-    public let incarnation: UUID
-    public let sessionID: UUID
+    public let incarnation: String
+    public let sessionID: String
 
-    public init(agent: AgentID, incarnation: UUID, sessionID: UUID) {
+    public init(agent: AgentID, incarnation: String, sessionID: String) {
         self.agent = agent
         self.incarnation = incarnation
         self.sessionID = sessionID
@@ -19,8 +19,8 @@ public enum AgentActionCompletion: Codable, Equatable, Sendable {
     case completed
     case value(String)
     case report(AgentActionReport)
-    case activityStarted(UUID)
-    case activityStopped(UUID)
+    case activityStarted(String)
+    case activityStopped(String)
 
     /// Business output is distinct from terminal acknowledgment and execution-ledger identity.
     public var hasBusinessOutput: Bool {
@@ -33,14 +33,14 @@ public enum AgentActionCompletion: Codable, Equatable, Sendable {
 
 /// Causal identity only; retaining feedback never retains the initiating media or service lifetime.
 public struct SignalCausality: Codable, Sendable, Equatable {
-    public let inputID: UUID
-    public let rootID: UUID
+    public let inputID: String
+    public let rootID: String
     public let hops: Int
     public let turn: AgentTurn?
     public let sequence: UInt64
     public let taskScope: AgentTaskScope?
     public init(
-        inputID: UUID, rootID: UUID, hops: Int, turn: AgentTurn? = nil, sequence: UInt64 = 0,
+        inputID: String, rootID: String, hops: Int, turn: AgentTurn? = nil, sequence: UInt64 = 0,
         taskScope: AgentTaskScope? = nil
     ) {
         self.inputID = inputID
@@ -57,7 +57,7 @@ public struct SignalCausality: Codable, Sendable, Equatable {
             taskScope: envelope.taskScope)
     }
     /// Explicit host activity root when no Agent input exists.
-    public static func root(id: UUID = UUID()) -> Self {
+    public static func root(id: String = UUID().uuidString) -> Self {
         .init(inputID: id, rootID: id, hops: 0)
     }
 }
@@ -67,12 +67,12 @@ public struct ActionResult: Codable, Sendable, Equatable {
     public enum Effect: String, Codable, Sendable { case notStarted, contractCompleted, unknown }
     public enum Failure: String, Codable, Sendable { case handlerFailed, cancelled, resourceUnavailable }
 
-    public let callID: UUID?
-    public let roundID: UUID?
-    public let executionID: UUID
+    public let callID: String?
+    public let roundID: String?
+    public let executionID: String
     public let owner: ExecutionOwner
     public let causality: SignalCausality
-    public var inputID: UUID { causality.inputID }
+    public var inputID: String { causality.inputID }
     public var turn: AgentTurn? { causality.turn }
     public let path: ActionPath
     public let status: Status
@@ -85,9 +85,9 @@ public struct ActionResult: Codable, Sendable, Equatable {
     }
 
     public init(
-        executionID: UUID, owner: ExecutionOwner, path: ActionPath, causality: SignalCausality,
+        executionID: String, owner: ExecutionOwner, path: ActionPath, causality: SignalCausality,
         status: Status, effect: Effect, completion: AgentActionCompletion? = nil, failure: Failure? = nil,
-        callID: UUID? = nil, roundID: UUID? = nil
+        callID: String? = nil, roundID: String? = nil
     ) {
         self.callID = callID
         self.roundID = roundID
@@ -104,13 +104,13 @@ public struct ActionResult: Codable, Sendable, Equatable {
 
 public struct ActivityEvent: Sendable, Equatable {
     public enum State: String, Codable, Sendable { case started, stopped, failed, revoked }
-    public let activityID: UUID
+    public let activityID: String
     public let causality: SignalCausality
     public let owner: ExecutionOwner
     public let state: State
     public let sequence: UInt64
 
-    public init(activityID: UUID, owner: ExecutionOwner, state: State, sequence: UInt64, causality: SignalCausality) {
+    public init(activityID: String, owner: ExecutionOwner, state: State, sequence: UInt64, causality: SignalCausality) {
         self.causality = causality
         self.activityID = activityID
         self.owner = owner

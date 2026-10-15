@@ -33,9 +33,9 @@ UI 的可信摄影事务直接进入该 Agent；Vision publish 提供最新姿�
 | action / Camera | `flipCamera` | `Camera.Capture.flip` | facing 必填 | Select the requested lens on an enabled camera. Already-selected lens is unchanged; disabled/busy/unavailable fails. Returns lens state. |
 | action / Camera | `closeCamera` | `Camera.Capture.close` | — | Disable camera preview/vision and join cleanup. Returns the resulting camera state. |
 | action / Camera | `openCamera` | `Camera.Capture.open` | — | Enable camera preview/vision; permission is required. Returns capture readiness, not pose-model readiness. |
-| action / Camera | `takePhoto` | `Camera.Capture.takePhoto` | — | Capture once with the ready foreground camera, show preview and return photoID/image evidence. Does not save to Photos. |
-| action / Camera | `savePhoto` | `Camera.Capture.savePhoto` | photoID 必填 | Save the displayed captured photo to Photos; permission denial fails. Returns the save receipt. Repeated saves do not duplicate it. |
-| action / Camera | `ignorePhoto` | `Camera.Capture.ignorePhoto` | photoID 必填 | Discard the displayed preview without exporting or deleting an album photo. Returns the discard receipt; camera remains open. |
+| action / Camera | `takePhoto` | `Camera.Capture.takePhoto` | — | Capture once with the ready foreground camera, show preview and return mediaID/image evidence. Does not save to Photos. |
+| action / Camera | `savePhoto` | `Camera.Capture.savePhoto` | mediaID 必填 | Save the displayed captured photo to Photos; permission denial fails. Returns the save receipt. Repeated saves do not duplicate it. |
+| action / Camera | `ignorePhoto` | `Camera.Capture.ignorePhoto` | mediaID 必填 | Discard the displayed preview without exporting or deleting an album photo. Returns the discard receipt; camera remains open. |
 | action / Camera | `retryCamera` | `Camera.Capture.retry` | — | Retry a failed foreground camera operation on explicit user request. |
 
 ## 固定内部权限
@@ -47,8 +47,8 @@ UI 的可信摄影事务直接进入该 Agent；Vision publish 提供最新姿�
 | InternalTool | `Camera.Capture.close` | — | — | [PhotographerCameraWorkflow.swift](PhotographerCameraWorkflow.swift) |
 | InternalTool | `Camera.Capture.flip` | — | `facing` | [PhotographerCameraWorkflow.swift](PhotographerCameraWorkflow.swift) |
 | InternalTool | `Camera.Capture.retry` | — | — | [PhotographerCameraWorkflow.swift](PhotographerCameraWorkflow.swift) |
-| InternalTool | `Camera.Capture.savePhoto` | — | `photoID?` | [PhotographerCameraWorkflow.swift](PhotographerCameraWorkflow.swift) |
-| InternalTool | `Camera.Capture.ignorePhoto` | — | `photoID?` | [PhotographerCameraWorkflow.swift](PhotographerCameraWorkflow.swift) |
+| InternalTool | `Camera.Capture.savePhoto` | — | `mediaID?` | [PhotographerCameraWorkflow.swift](PhotographerCameraWorkflow.swift) |
+| InternalTool | `Camera.Capture.ignorePhoto` | — | `mediaID?` | [PhotographerCameraWorkflow.swift](PhotographerCameraWorkflow.swift) |
 
 ### Declared input schemas
 
@@ -112,3 +112,11 @@ Directed input schemas and static subscriptions are distinct; admission also val
 角色基础函数目录由资源中的 baseSkills（photography）组合；上表供函数 review 使用，不是 Agent.json 中的另一份注册。函数说明属于实现，流程教学属于 Skill。
 
 ✅ 本次提示词精简同步注册函数说明，保持职责、类型和参数不变；公共执行语义见Actions owning README。
+
+
+
+
+
+## SQLite records and runtime identity
+
+✅ Implemented: technical identities are opaque UUID strings; committed business entities use dialog/message/task/media/device SQLite IDs. Consumers use Storage repositories while preserving ownership, cancellation and independent foundation boundaries. Complete messages, including each ReACT message, persist at termination; delta fragments do not persist. The custom allocator and replaced file/index implementation are removed. See the project SQLite business-record plan.

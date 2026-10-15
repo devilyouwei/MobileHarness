@@ -6,7 +6,7 @@ Public Apple device I/O and bounded NexArm transports. The SDK exposes native va
 
 ## Ownership and boundaries
 
-Foundation capability module with no project dependencies. App owns lifecycle and recovery; Actions owns motion semantics; Agents owns perception and inference policy. No Agent, Gateway, UI or business-function types enter this target.
+Foundation capability module with no cross-module dependencies. App owns lifecycle and recovery; Actions owns motion semantics; Agents owns perception and inference policy. No Agent, Gateway, UI or business-function types enter this target.
 
 ## External relationships and data flow
 
@@ -69,3 +69,7 @@ Device acceptance evidence is recorded in [validation history](../../docs/valida
 
 
 ✅ Implemented: Audio adds generic bounded PCMClipEncoding and one NativeCuePlayback using public AVAudioPlayer. It plays alongside existing audio under the current session, without reconfiguring/deactivating AVAudioSession or touching another player/capture owner. One active clip; overlap fails; callbacks/errors/cancellation complete its wait.
+
+## Native image preparation
+
+✅ Implemented: Vision adds NativeImageCompression, a generic caller-configured JPEG downsampling/encoding capability using public Image I/O. It has no model, Agent or persistence policy. One detached native operation per invocation is cancelled and joined by its caller; no retained queue/cache or UI lifetime. Callers select dimension/pixel/byte limits; malformed input, invalid limits, decoding, encoding and exhausted size budgets fail explicitly.

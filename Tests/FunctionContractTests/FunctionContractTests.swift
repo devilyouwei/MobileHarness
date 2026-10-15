@@ -13,7 +13,8 @@ private actor ContractReportSink: FunctionReporting {
 
 @Test func standardFunctionInputRunsWithoutExecutionOrCallProtocolDependencies() async throws {
     let path = ActionIdentifier(domain: "Fixture", module: "Query", function: "read")
-    let context = ActionExecutionContext(source: "fixture", sessionID: UUID(), inputID: UUID(), sequence: 3)
+    let context = ActionExecutionContext(
+        source: "fixture", sessionID: UUID().uuidString, inputID: UUID().uuidString, sequence: 3)
     let sink = ContractReportSink()
     let report = try ActionReport(entries: [.init(path: path.description, status: .succeeded)])
     let function = ActionFunction(
@@ -26,7 +27,8 @@ private actor ContractReportSink: FunctionReporting {
         })
     try function.validate()
     let input = FunctionInvocation(
-        call: FunctionRequest(actionPath: path, parameters: ["id": "one"]), context: context, results: sink)
+        call: FunctionRequest(actionPath: path, parameters: ["id": "one"]), context: context,
+        executionID: UUID().uuidString, results: sink)
     #expect(try await function.handler(input) == .value("one"))
     #expect(await sink.snapshot() == report)
     #expect(try function.requiredResources(for: input.call) == [.init(rawValue: "fixture.journal")])

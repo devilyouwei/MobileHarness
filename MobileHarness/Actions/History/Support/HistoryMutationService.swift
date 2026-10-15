@@ -1,5 +1,6 @@
 import Foundation
 import FunctionContracts
+import Storage
 import StorageChat
 
 /// Archive-only mutation validation; persistence remains an atomic Storage transaction.
@@ -7,17 +8,20 @@ public struct HistoryMutationService: HistoryMutationCapability {
     private let jobs = HistoryTitleJobs()
     private let archiveChanged: @Sendable (String?) async -> Void
     private let store: ConversationHistoryStore
+    private let titlePositions: @Sendable (Int) -> [Int]
     private let summarizeTitle: @Sendable (StoredConversation) async throws -> String
     public init(
         store: ConversationHistoryStore,
         summarizeTitle: @escaping @Sendable (StoredConversation) async throws -> String,
-        archiveChanged: @escaping @Sendable (String?) async -> Void = { _ in }
+        archiveChanged: @escaping @Sendable (String?) async -> Void = { _ in },
+        titlePositions: @escaping @Sendable (Int) -> [Int] = { Array(0..<min(32, $0)) }
     ) {
         self.archiveChanged = archiveChanged
+        self.titlePositions = titlePositions
         self.store = store
         self.summarizeTitle = summarizeTitle
     }
-    public func startNew() async throws -> UUID? {
+    public func startNew() async throws -> String? {
         try Task.checkCancellation()
         guard let archived = try await store.startNew() else { return nil }
         let accepted = await jobs.start {
@@ -33,7 +37,7 @@ public struct HistoryMutationService: HistoryMutationCapability {
     }
     public func waitForTitles() async { await jobs.wait() }
     public func shutdown() async { await jobs.stop() }
-    public func summarizeArchived(_ id: UUID) async throws {
+    public func summarizeArchived(_ id: String) async throws {
         guard await jobs.beginManual() else { throw ConversationHistoryError.busy }
         do {
             try await generateTitle(id)
@@ -43,12 +47,16 @@ public struct HistoryMutationService: HistoryMutationCapability {
             throw error
         }
     }
-    private func generateTitle(_ id: UUID) async throws {
+    private func generateTitle(_ id: String) async throws {
         try Task.checkCancellation()
         let snapshot = try await store.readCurrent()
         guard snapshot.current.id != id else { throw HistoryQueryError.currentConversation }
         let conversation: StoredConversation
-        do { conversation = try await store.conversation(id) } catch ConversationHistoryError.missingTurn {
+        do {
+            let metadata = try await store.dialogMetadata(id)
+            conversation = try await store.titleExcerpt(
+                id, positions: titlePositions(metadata.turnCount ?? metadata.turns.count))
+        } catch ConversationHistoryError.missingTurn {
             throw HistoryQueryError.missingConversation
         }
         do {
@@ -78,11 +86,11 @@ public struct HistoryMutationService: HistoryMutationCapability {
             throw generationError
         }
     }
-    public func deleteArchived(_ id: UUID) async throws {
+    public func deleteArchived(_ id: String) async throws {
         try Task.checkCancellation()
         let snapshot = try await store.readCurrent()
         guard snapshot.current.id != id else { throw HistoryQueryError.currentConversation }
-        do { _ = try await store.conversation(id) } catch ConversationHistoryError.missingTurn {
+        do { _ = try await store.dialogMetadata(id) } catch ConversationHistoryError.missingTurn {
             throw HistoryQueryError.missingConversation
         }
         try Task.checkCancellation()

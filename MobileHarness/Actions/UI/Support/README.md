@@ -80,3 +80,11 @@ FeedbackTone 的不可变静态 bank 缓存七种原始单声道 Float PCM，采
 本目录没有异步缓存加载、请求队列或后台任务。反馈 PCM 缓存有固定七项边界；未提供端点不产生静默空操作。
 
 [UI 入口与完成](../README.md) · [System 资源类型](../../System/Support/README.md) · [共享契约](../../Support/Contracts/README.md)
+
+
+
+
+
+## SQLite records and runtime identity
+
+✅ Implemented: technical identities are opaque UUID strings; committed business entities use dialog/message/task/media/device SQLite IDs. Consumers use Storage repositories while preserving ownership, cancellation and independent foundation boundaries. Complete messages, including each ReACT message, persist at termination; delta fragments do not persist. The custom allocator and replaced file/index implementation are removed. See the project SQLite business-record plan.

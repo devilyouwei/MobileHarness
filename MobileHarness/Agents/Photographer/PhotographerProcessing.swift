@@ -1,5 +1,6 @@
 import AgentCore
 import Foundation
+import Storage
 
 // MARK: - State
 
@@ -11,12 +12,12 @@ public struct PhotographerContextState: AgentTaskContextState {
         try PhotographerSignalPreprocessor().classify(input, state: state)
     }
 
-    public var taskViews: [UUID: AgentTaskView]?
+    public var taskViews: [String: AgentTaskView]?
 
-    public var photoOwners: [UUID: UUID]?
+    public var photoOwners: [String: String]?
     public var cameraState: CameraStateObservation?
-    public var cameraRequestID: UUID?
-    public var trackingSessionID: UUID?
+    public var cameraRequestID: String?
+    public var trackingSessionID: String?
     public init() {}
     public func validateContextState() throws {
         try validateTaskState()

@@ -17,12 +17,12 @@ public struct SignalTraceRecord: Identifiable, Sendable {
         }
     }
     public let aggregates: Bool
-    public let id: UUID
+    public let id: String
     public let source: String
     public let contract: String
-    public let sessionID: UUID
-    public let rootID: UUID
-    public let parentID: UUID?
+    public let sessionID: String
+    public let rootID: String
+    public let parentID: String?
     public let taskScope: AgentTaskScope?
     public let task: AgentTaskSignal?
     public let summary: String

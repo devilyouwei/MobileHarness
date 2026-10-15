@@ -161,3 +161,11 @@ Publication is one-way and has no recipient acknowledgment. Directed send return
 ## Immediate post-reply listening
 
 ✅ SpeechPerception keeps consent/reply occupancy and emits revisioned Speech.Listening.update when the last reply finishes. App executes physical microphone start/stop and playback/utterance barriers, without a fixed post-playback wait. No Agent timer or physical audio driver is owned here.
+
+
+
+
+
+## SQLite records and runtime identity
+
+✅ Implemented: technical identities are opaque UUID strings; committed business entities use dialog/message/task/media/device SQLite IDs. Consumers use Storage repositories while preserving ownership, cancellation and independent foundation boundaries. Complete messages, including each ReACT message, persist at termination; delta fragments do not persist. The custom allocator and replaced file/index implementation are removed. See the project SQLite business-record plan.

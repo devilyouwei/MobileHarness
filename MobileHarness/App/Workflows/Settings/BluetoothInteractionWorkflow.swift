@@ -1,5 +1,6 @@
 import Agents
 import Foundation
+import Storage
 import UI
 
 /// Root-owned bounded intent adapter. Native recovery and accepted manual workers outlive pages.
@@ -8,14 +9,14 @@ import UI
     private let perform: (AppInteractionIntent) async throws -> Void
     private let pageVisibility: (Bool) -> Void
     private let openSettings: () -> Void
-    private let fenceStop: () -> UUID
-    private var fence: UUID
+    private let fenceStop: () -> String
+    private var fence: String
     private var pending: [[String: String]] = []
     private var motors: [Int: Double] = [:]
     private var worker: Task<Void, Never>?
     private var closed = false
     public init(
-        state: BluetoothSettingsState, initialFence: UUID, fenceStop: @escaping () -> UUID,
+        state: BluetoothSettingsState, initialFence: String, fenceStop: @escaping () -> String,
         pageVisibility: @escaping (Bool) -> Void, openSettings: @escaping () -> Void,
         perform: @escaping (AppInteractionIntent) async throws -> Void
     ) {
@@ -35,7 +36,7 @@ import UI
         task?.cancel()
         await task?.value
     }
-    public func reconnect(_ id: UUID) { submit(["operation": "reconnect", "id": id.uuidString]) }
+    public func reconnect(_ id: String) { submit(["operation": "reconnect", "id": id]) }
     public func refreshDevice() async {
         submit(["operation": "refresh"])
         await worker?.value
@@ -66,7 +67,7 @@ import UI
     }
     public func scan() { submit(["operation": "scan"]) }
     public func stopScan() { submit(["operation": "stopScan"], priority: true) }
-    public func connect(_ id: UUID) { submit(["operation": "connect", "id": id.uuidString]) }
+    public func connect(_ id: String) { submit(["operation": "connect", "id": id]) }
     public func disconnect() {
         replaceMotion()
         submit(["operation": "disconnect"], priority: true)
@@ -87,7 +88,7 @@ import UI
             return
         }
         var request = request
-        request["fence"] = fence.uuidString
+        request["fence"] = fence
         if pending.contains(request) { return }
         guard pending.count < 16 else {
             state.error = "设备操作过多，请稍后重试"
@@ -107,13 +108,13 @@ import UI
                 } else if let id = motors.keys.min(), let value = motors.removeValue(forKey: id) {
                     request = [
                         "operation": "motorVelocity", "id": String(id), "value": String(value),
-                        "fence": fence.uuidString,
+                        "fence": fence,
                     ]
                 } else {
                     break
                 }
                 do { try await perform(.init(kind: .device, parameters: request)) } catch {
-                    if request["fence"] == fence.uuidString { state.error = "设备操作失败：" + error.localizedDescription }
+                    if request["fence"] == fence { state.error = "设备操作失败：" + error.localizedDescription }
                 }
             }
         }

@@ -1,5 +1,6 @@
 import AgentCore
 import Foundation
+import Storage
 import UI
 
 /// Root-owned execution-state subscription. The injected stream carries full snapshots, bounded error descriptions without call arguments.
@@ -63,7 +64,7 @@ public final class ActionActivityWorkflow {
             do {
                 let stream = try await observe()
                 var previousRevision: UInt64?
-                var projected: [UUID: String] = [:]
+                var projected: [String: String] = [:]
                 for await snapshot in stream {
                     guard !Task.isCancelled else { return }
                     guard previousRevision == nil || snapshot.revision > previousRevision! else { continue }

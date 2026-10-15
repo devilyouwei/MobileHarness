@@ -18,15 +18,15 @@ public final class ConversationState {
     public var expression: EyeExpression?
     /// Display transaction identity only; App owns the waiting operation.
     public var expressionEmphasized = false
-    public var expressionTransitionID: UUID?
+    public var expressionTransitionID: String?
     public var expressionRendererAvailable = false
-    @ObservationIgnored public var expressionAnimationCompletion: (@MainActor (UUID, Bool) -> Void)?
+    @ObservationIgnored public var expressionAnimationCompletion: (@MainActor (String, Bool) -> Void)?
     public var playbackSpectrum = [Float](repeating: 0, count: 32)
     public var microphoneSpectrum = [Float](repeating: 0, count: 32)
     public var isReady = false
     public var voiceStatus = "按住双眼，开启聆听"
     public var isVoiceActive = false { didSet { if !isVoiceActive { resetCaptions() } } }
-    public var listeningAnimationID: UUID?
+    public var listeningAnimationID: String?
     /// Normalized content-space origin; latched by the renderer on each new listening generation.
     public var listeningLightOrigin: ListeningLightOrigin?
     public var decorativeLight: DecorativeLight?
@@ -85,11 +85,14 @@ public enum AppDestination: String, Hashable, Sendable {
 
 /// Decoration only: does not own listening consent or expression state.
 public struct DecorativeLight: Sendable, Equatable {
-    public let id: UUID
+    public let id: String
     public let origin: ListeningLightOrigin
     public let initialOpacity: Double
     public let intensity: Double
-    public init(id: UUID = UUID(), origin: ListeningLightOrigin, initialOpacity: Double, intensity: Double) {
+    public init(
+        id: String = UUID().uuidString, origin: ListeningLightOrigin, initialOpacity: Double,
+        intensity: Double
+    ) {
         self.id = id
         self.origin = origin
         self.initialOpacity = initialOpacity

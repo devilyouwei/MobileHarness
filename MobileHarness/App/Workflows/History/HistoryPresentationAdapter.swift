@@ -1,6 +1,7 @@
 import Actions
 import Foundation
 import FunctionContracts
+import Storage
 import StorageChat
 import UI
 
@@ -9,9 +10,9 @@ import UI
 public final class HistoryPresentationAdapter: HistoryPresentationCapability {
     private let state: ConversationHistoryState
     private let store: ConversationHistoryStore
-    private let sessionID: UUID
+    private let sessionID: String
     public init(
-        state: ConversationHistoryState, store: ConversationHistoryStore, sessionID: UUID
+        state: ConversationHistoryState, store: ConversationHistoryStore, sessionID: String
     ) {
         self.state = state
         self.store = store

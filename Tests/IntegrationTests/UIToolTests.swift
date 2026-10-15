@@ -6,11 +6,13 @@ import CallRuntime
 import ExecutionRuntime
 import Foundation
 import FunctionContracts
+import Storage
 import Testing
 
 /// Reuse scheduler fixtures in argument validation tests while constructing a genuine immediate Tool envelope.
 func uiActionInvocation(_ invocation: any FunctionInput) -> ActionInvocation {
     let call = ToolCall(
+        id: UUID().uuidString,
         toolPath: "Fixture.Control.UI." + invocation.call.actionPath.function, arguments: invocation.call.parameters)
     let e = invocation.testEnvelope
     let envelope = OutputEnvelope(
@@ -41,9 +43,13 @@ private actor CaptionEndpoint {
 
 @Test(.actionCatalog) func immediateCaptionToolsPreserveAppendReplacementAndTurnFences() async throws {
     let endpoint = CaptionEndpoint()
-    let input = AgentInput(sessionID: UUID(), payload: .event("fixture"), turn: AgentTurn(ordinal: 1))
+    let input = AgentInput(
+        id: UUID().uuidString, sessionID: UUID().uuidString, payload: .event("fixture"),
+        turn: AgentTurn(id: UUID().uuidString, ordinal: 1))
     func invocation(_ function: String, text: String? = nil, source: AgentID, sequence: UInt64) -> ActionInvocation {
-        let call = ToolCall(toolPath: "Fixture.Control.UI." + function, arguments: text.map { ["text": $0] } ?? [:])
+        let call = ToolCall(
+            id: UUID().uuidString, toolPath: "Fixture.Control.UI." + function,
+            arguments: text.map { ["text": $0] } ?? [:])
         return ActionInvocation(
             call: call,
             envelope: OutputEnvelope(

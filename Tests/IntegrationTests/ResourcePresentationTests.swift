@@ -5,6 +5,7 @@ import AppWorkflows
 import ExecutionRuntime
 import Foundation
 import FunctionContracts
+import Storage
 import Testing
 
 private enum PresentationFixtureError: Error { case queryFailure, snapshotFailure, failurePresentation }
@@ -126,7 +127,9 @@ private actor ResourcePresentationFixture: ResourcePresentationCapability {
             call: FunctionRequest(
                 actionPath: ActionIdentifier(domain: "UI", module: "ResourcePresentation", function: "showResources"),
                 parameters: parameters),
-            context: ActionExecutionContext(source: "fixture", sessionID: UUID(), inputID: UUID()),
+            context: ActionExecutionContext(
+                source: "fixture", sessionID: UUID().uuidString, inputID: UUID().uuidString),
+            executionID: UUID().uuidString,
             results: ActionReportStore())
         await #expect(throws: (any Error).self) {
             _ = try await UIActions.showResources(invocation: invocation, inventory: inventory, using: presentation)
@@ -136,7 +139,9 @@ private actor ResourcePresentationFixture: ResourcePresentationCapability {
         call: FunctionRequest(
             actionPath: ActionIdentifier(domain: "UI", module: "ResourcePresentation", function: "showResourceFailure"),
             parameters: ["generation": "1", "message": String(repeating: "x", count: 2049)]),
-        context: ActionExecutionContext(source: "fixture", sessionID: UUID(), inputID: UUID()),
+        context: ActionExecutionContext(
+            source: "fixture", sessionID: UUID().uuidString, inputID: UUID().uuidString),
+        executionID: UUID().uuidString,
         results: ActionReportStore())
     await #expect(throws: ActionArguments.ValidationError.self) {
         _ = try await UIActions.showResourceFailure(invocation: failure, using: presentation)
@@ -183,10 +188,10 @@ private actor ResourcePresentationFixture: ResourcePresentationCapability {
 @Test(.actionCatalog) func applicationControlAgentBoundsCombiningCharacterFailureBeforeConstructingPresentationCall()
     async throws
 {
-    let session = UUID()
+    let session = UUID().uuidString
     let agent = try ApplicationControlAgent(sessionID: session)
     try await agent.start()
-    let request = ModelResourceIntent.refreshPresentation(generation: 1).input(sessionID: session)
+    let request = try ModelResourceIntent.refreshPresentation(generation: 1).input(sessionID: session)
     try await agent.receive(request)
     var iterator = agent.outputs.makeAsyncIterator()
     let first = try #require(await iterator.next())
@@ -198,8 +203,10 @@ private actor ResourcePresentationFixture: ResourcePresentationCapability {
     let payload = InputPayload.toolResult(ToolResult(callID: call.id, value: raw, isError: true))
     try await agent.receive(
         AgentInput(
+            id: UUID().uuidString,
             sessionID: session, payload: payload,
-            metadata: InputMetadata(payload: payload, source: "runtime", origin: .runtime)))
+            metadata: InputMetadata(
+                payload: payload, source: "runtime", origin: .runtime, rootID: UUID().uuidString)))
     let failure = try #require(await iterator.next())
     guard case .toolCall(let presentation) = failure.output else {
         Issue.record("Expected failure presentation")
@@ -318,7 +325,9 @@ private actor OperationFailurePresentation: ResourcePresentationCapability {
                 actionPath: ActionIdentifier(
                     domain: "UI", module: "ResourcePresentation", function: "showResourceOperationFailure"),
                 parameters: parameters),
-            context: ActionExecutionContext(source: "fixture", sessionID: UUID(), inputID: UUID()),
+            context: ActionExecutionContext(
+                source: "fixture", sessionID: UUID().uuidString, inputID: UUID().uuidString),
+            executionID: UUID().uuidString,
             results: ActionReportStore())
     }
     for arguments in [

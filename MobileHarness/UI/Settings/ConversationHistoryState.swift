@@ -8,8 +8,43 @@ public final class ConversationHistoryState {
     public var archive: HistorySnapshot?
     public var status: String?
     public var isBusy = false
+    public var isRefreshing = false
+    public var hasMoreArchives = false
+    public var archivePaging = HistoryPageLoading<String>()
     public init(title: String = "Assistant 聊天记录") {
         self.title = title
+    }
+}
+
+/// One attempt per cursor unless the user explicitly retries; tickets fence late completions.
+public struct HistoryPageLoading<Cursor: Hashable & Sendable>: Sendable {
+    public private(set) var error: String?
+    public private(set) var completionID: UUID?
+    private var attemptedCursor: Cursor?
+    private var active: UUID?
+    public var isLoading: Bool { active != nil }
+    public init() {}
+    public mutating func begin(after cursor: Cursor, retry: Bool = false) -> UUID? {
+        guard active == nil, retry || attemptedCursor != cursor else { return nil }
+        let ticket = UUID()
+        attemptedCursor = cursor
+        active = ticket
+        error = nil
+        return ticket
+    }
+    public func accepts(_ ticket: UUID) -> Bool { active == ticket }
+    public mutating func finish(_ ticket: UUID, error: String? = nil) {
+        guard accepts(ticket) else { return }
+        active = nil
+        self.error = error.map { String($0.prefix(2048)) }
+        completionID = UUID()
+    }
+    public mutating func cancel(_ ticket: UUID) {
+        guard accepts(ticket) else { return }
+        active = nil
+        attemptedCursor = nil
+        error = nil
+        completionID = UUID()
     }
 }
 
@@ -28,13 +63,16 @@ public struct HistoryRequestNavigation {
 @MainActor
 public protocol ConversationHistoryControlling: AnyObject {
     func load() async
-    func loadConversation(_ id: UUID) async throws -> HistoryConversation
+    func loadConversation(_ id: String) async throws -> HistoryConversation
+    func loadConversation(_ id: String, after: UInt64, taskID: String?) async throws -> HistoryConversation
+    func loadMessage(_ turn: HistoryTurn) async throws -> HistoryTurn
+    func loadMoreArchives(retry: Bool) async
     func startNew()
-    func summarize(_ id: UUID)
-    func delete(_ id: UUID)
+    func summarize(_ id: String)
+    func delete(_ id: String)
     func cancel()
     func preview(_ turn: HistoryTurn) -> String
-    func imageData(_ id: UUID, for turnID: UUID) async throws -> Data?
+    func imageData(_ id: String, for turnID: String) async throws -> Data?
 }
 
 public struct HistoryMessage: Codable, Sendable, Equatable {
@@ -54,10 +92,10 @@ public struct HistoryMessage: Codable, Sendable, Equatable {
 }
 
 public struct HistoryImageReference: Codable, Sendable, Equatable, Identifiable {
-    public let id: UUID
+    public let id: String
     public let mimeType: String
     public let byteCount: Int
-    public init(id: UUID, mimeType: String, byteCount: Int) {
+    public init(id: String, mimeType: String, byteCount: Int) {
         self.id = id
         self.mimeType = mimeType
         self.byteCount = byteCount
@@ -76,7 +114,7 @@ public struct HistoryNativeToolCall: Codable, Sendable, Equatable {
 public struct HistoryDecisionMetadata: Codable, Sendable {
     public var taskGoal: String? = nil
     public var execution: String? = nil
-    public let taskID: UUID?
+    public let taskID: String?
     public let mode: String
     public let skills: [String: Int]
     public let catalogJSON: String
@@ -88,12 +126,14 @@ public struct HistoryDecisionMetadata: Codable, Sendable {
 }
 
 public struct HistoryModelRequest: Codable, Sendable, Identifiable {
+    public var messageID: String? = nil
+    public var isObservation: Bool? = nil
     public var historyOrder: UInt64 = 0
-    public let id: UUID
+    public let id: String
     public let date: Date
     public let input: String
     public let requestJSON: String
-    public var historyTaskID: UUID? = nil
+    public var historyTaskID: String? = nil
     public var decisionMetadata: HistoryDecisionMetadata? = nil
     public let modelRequestStartedAt: Date?
     public let firstTokenLatency: Double?
@@ -119,14 +159,14 @@ public struct HistoryTokenUsage: Codable, Sendable, Equatable {
 
 public struct HistoryToolCall: Codable, Sendable, Identifiable {
     public enum State: String, Codable, Sendable { case received, completed, failed, cancelled }
-    public let id: UUID
+    public let id: String
     public let providerID: String
     public let name: String
     public let argumentsJSON: String
     public var state: State = .received
     public let output: String?
     public let error: String?
-    public init(id: UUID, providerID: String, name: String, argumentsJSON: String) {
+    public init(id: String, providerID: String, name: String, argumentsJSON: String) {
         self.id = id
         self.providerID = providerID
         self.name = name
@@ -137,9 +177,10 @@ public struct HistoryToolCall: Codable, Sendable, Identifiable {
 }
 
 public struct HistoryTurn: Codable, Sendable, Identifiable {
+    public var messageID: String? = nil
     public var historyOrder: UInt64? = nil
     public enum State: String, Codable, Sendable { case generating, completed, failed, cancelled, interrupted }
-    public let id: UUID
+    public let id: String
     public let date: Date
     public let user: String
     public let request: [HistoryMessage]
@@ -149,7 +190,7 @@ public struct HistoryTurn: Codable, Sendable, Identifiable {
     public let modelRequests: [HistoryModelRequest]?
     public let firstTokenAt: Date?
     public let requestJSON: String?
-    public let ownerInputID: UUID?
+    public let ownerInputID: String?
     public let isReACT: Bool?
     public let toolDefinitions: [String]?
     public let toolCalls: [HistoryToolCall]?
@@ -159,7 +200,7 @@ public struct HistoryTurn: Codable, Sendable, Identifiable {
     public let finishReason: String?
     public let error: String?
     public let executionError: String?
-    public var historyTaskID: UUID? = nil
+    public var historyTaskID: String? = nil
     public var decisionMetadata: HistoryDecisionMetadata? = nil
     public var modelRequestStartedAt: Date?
     public var firstTokenLatency: Double?
@@ -167,7 +208,8 @@ public struct HistoryTurn: Codable, Sendable, Identifiable {
 }
 
 public struct HistoryConversation: Codable, Sendable, Identifiable {
-    public let id: UUID
+    public var nextPosition: UInt64? = nil
+    public let id: String
     public let createdAt: Date
     public let archivedAt: Date?
     public let summaryTitle: String?
@@ -177,11 +219,26 @@ public struct HistoryConversation: Codable, Sendable, Identifiable {
     public var turns: [HistoryTurn] = []
     public var taskCompressions: [HistoryTaskCompression] = []
     public init() {
-        id = UUID()
+        id = UUID().uuidString
         createdAt = Date()
         archivedAt = nil
         summaryTitle = nil
         titleError = nil
+    }
+    /// Append a SQL preview/source page without dropping the summaries needed to render Task cards.
+    public mutating func appendPage(_ page: HistoryConversation) throws {
+        guard page.id == id else { throw HistoryDetailError.unavailable }
+        turns.append(contentsOf: page.turns)
+        for compression in page.taskCompressions {
+            if let index = taskCompressions.firstIndex(where: { $0.taskID == compression.taskID }) {
+                taskCompressions[index] = compression
+            } else {
+                taskCompressions.append(compression)
+            }
+        }
+        nextPosition = page.nextPosition
+        turnCount = page.turnCount ?? turnCount
+        latestUser = page.latestUser ?? latestUser
     }
 }
 
@@ -190,20 +247,20 @@ public struct HistorySnapshot: Codable, Sendable {
     public var current: HistoryConversation
     public var past: [HistoryConversation]
     public init() {
-        version = 3
+        version = 4
         current = HistoryConversation()
         past = []
     }
 }
 
-public struct HistorySourceReference: Codable, Sendable, Equatable {
-    public let inputID: UUID
-    public let requestID: UUID
+public struct HistorySourceReference: Codable, Sendable, Hashable {
+    public let inputID: String
+    public let requestID: String
 }
 
 public struct HistoryTaskCompression: Codable, Sendable, Identifiable {
-    public var id: UUID { taskID }
-    public let taskID: UUID
+    public var id: String { taskID }
+    public let taskID: String
     public let goal: String
     public let status: HistoryTurn.State
     public let reportedSummary: String?
@@ -218,7 +275,7 @@ public struct HistoryTaskCompression: Codable, Sendable, Identifiable {
 public enum HistoryTimelineItem: Identifiable, Sendable {
     case request(HistoryTurn)
     case task(HistoryTaskCompression, sources: [HistoryTurn])
-    public var id: UUID {
+    public var id: String {
         switch self {
         case .request(let turn): turn.id
         case .task(let compression, _): compression.taskID

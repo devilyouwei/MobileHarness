@@ -5,15 +5,16 @@ import StorageChat
 
 /// Title-only inference: never parses Action markup, changes context or executes model output.
 public enum ConversationTitleGenerator {
+    public static func samplePositions(count: Int) -> [Int] {
+        let amount = min(32, count)
+        return (0..<amount).map { amount == 1 ? 0 : $0 * (count - 1) / (amount - 1) }
+    }
     public static func summarize(_ conversation: StoredConversation, using chat: any ChatCapability) async throws
         -> String
     {
         guard !conversation.turns.isEmpty else { throw ConversationHistoryError.emptyConversation }
         // Bounded excerpts cover the whole conversation, rather than only its final exchange.
-        let count = min(32, conversation.turns.count)
-        let selected = (0..<count).map { index in
-            conversation.turns[count == 1 ? 0 : index * (conversation.turns.count - 1) / (count - 1)]
-        }
+        let selected = samplePositions(count: conversation.turns.count).map { conversation.turns[$0] }
         let templates = try PromptTemplates(data: AgentConfigurations.titlePromptData())
         let excerpts = try selected.map {
             try templates.render(

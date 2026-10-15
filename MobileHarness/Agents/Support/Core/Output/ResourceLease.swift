@@ -6,12 +6,12 @@ public struct ResourceID: RawRepresentable, Hashable, Sendable {
 }
 
 public struct ResourceLease: Equatable, Sendable {
-    public let id: UUID
+    public let id: String
     public let owner: ExecutionOwner
     public let resources: Set<ResourceID>
     public let deadline: ContinuousClock.Instant
 
-    public init(id: UUID, owner: ExecutionOwner, resources: Set<ResourceID>, deadline: ContinuousClock.Instant) {
+    public init(id: String, owner: ExecutionOwner, resources: Set<ResourceID>, deadline: ContinuousClock.Instant) {
         self.id = id
         self.owner = owner
         self.resources = resources

@@ -2,6 +2,7 @@ import AgentCore
 import Agents
 import AppWorkflows
 import Foundation
+import Storage
 import Testing
 
 private actor OutputRecord {
@@ -13,13 +14,15 @@ private actor OutputRecord {
 private enum TrackingUnavailable: Error { case offline }
 
 @Test func unavailableTrackingDoesNotStopIndependentOutputConsumption() async throws {
-    let input = AgentInput(sessionID: UUID(), payload: .text("fixture"))
+    let input = AgentInput(
+        id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("fixture"))
     let stream = AsyncStream<OutputEnvelope>.makeStream(bufferingPolicy: .bufferingOldest(2))
     for sequence: UInt64 in [1, 2] {
         stream.continuation.yield(
             OutputEnvelope(
                 source: .photographer, input: input,
-                output: .toolCall(ToolCall(toolPath: "NexArm.Tracking.aim")), sequence: sequence))
+                output: .toolCall(ToolCall(id: UUID().uuidString, toolPath: "NexArm.Tracking.aim")),
+                sequence: sequence))
     }
     stream.continuation.finish()
     let record = OutputRecord()
@@ -34,12 +37,13 @@ private enum TrackingUnavailable: Error { case offline }
 }
 
 @Test func trackingCancellationPropagatesWithoutReportingOrdinaryFailure() async throws {
-    let input = AgentInput(sessionID: UUID(), payload: .text("fixture"))
+    let input = AgentInput(
+        id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("fixture"))
     let stream = AsyncStream<OutputEnvelope>.makeStream(bufferingPolicy: .bufferingOldest(1))
     stream.continuation.yield(
         OutputEnvelope(
             source: .photographer, input: input,
-            output: .toolCall(ToolCall(toolPath: "NexArm.Tracking.aim"))))
+            output: .toolCall(ToolCall(id: UUID().uuidString, toolPath: "NexArm.Tracking.aim"))))
     stream.continuation.finish()
     let record = OutputRecord()
     await #expect(throws: CancellationError.self) {
@@ -52,16 +56,17 @@ private enum TrackingUnavailable: Error { case offline }
 }
 
 @Test func failedGenerationJoinsNativeWorkAndAcceptsNextInputAcrossRoundSeals() async throws {
-    let session = UUID()
-    let failedInput = AgentInput(sessionID: session, payload: .text("failed reply"))
-    let nextInput = AgentInput(sessionID: session, payload: .text("retry"))
+    let session = UUID().uuidString
+    let failedInput = AgentInput(id: UUID().uuidString, sessionID: session, payload: .text("failed reply"))
+    let nextInput = AgentInput(id: UUID().uuidString, sessionID: session, payload: .text("retry"))
     let outputs = AsyncStream<OutputEnvelope>.makeStream(bufferingPolicy: .bufferingOldest(8))
     let started = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingOldest(1))
     let record = OutputRecord()
     outputs.continuation.yield(
         OutputEnvelope(
-            source: .assistant, input: failedInput, output: .toolCall(ToolCall(toolPath: "Fixture.read")),
-            sequence: 1, roundID: UUID()))
+            source: .assistant, input: failedInput,
+            output: .toolCall(ToolCall(id: UUID().uuidString, toolPath: "Fixture.read")),
+            sequence: 1, roundID: UUID().uuidString))
     let consumer = Task {
         try await IndependentOutputWorkflow.consumeGeneration(outputs.stream) { envelope in
             if envelope.sequence == 1 {
@@ -84,10 +89,11 @@ private enum TrackingUnavailable: Error { case offline }
         OutputEnvelope(
             source: .assistant, input: failedInput, output: .control("agent.error:fixture"), sequence: 2))
     for (callSequence, sealSequence) in [(UInt64(3), UInt64(4)), (5, 6)] {
-        let round = UUID()
+        let round = UUID().uuidString
         outputs.continuation.yield(
             OutputEnvelope(
-                source: .assistant, input: nextInput, output: .toolCall(ToolCall(toolPath: "Fixture.read")),
+                source: .assistant, input: nextInput,
+                output: .toolCall(ToolCall(id: UUID().uuidString, toolPath: "Fixture.read")),
                 sequence: callSequence, roundID: round))
         outputs.continuation.yield(
             OutputEnvelope(
@@ -140,14 +146,17 @@ private actor ProtocolDispatchGate {
 }
 
 @Test(.timeLimit(.minutes(1))) func saturatedToolsDoNotBlockActionOrWaitAdmission() async throws {
-    let input = AgentInput(sessionID: UUID(), payload: .text("independent protocols"))
-    let round = UUID()
+    let input = AgentInput(
+        id: UUID().uuidString, sessionID: UUID().uuidString,
+        payload: .text("independent protocols"))
+    let round = UUID().uuidString
     let outputs = AsyncStream<OutputEnvelope>.makeStream(bufferingPolicy: .bufferingOldest(16))
     let gate = ProtocolDispatchGate()
     for sequence in UInt64(1)...5 {
         outputs.continuation.yield(
             OutputEnvelope(
-                source: .assistant, input: input, output: .toolCall(ToolCall(toolPath: "Fixture.read")),
+                source: .assistant, input: input,
+                output: .toolCall(ToolCall(id: UUID().uuidString, toolPath: "Fixture.read")),
                 sequence: sequence, roundID: round))
     }
     for (sequence, output) in [
@@ -188,8 +197,10 @@ private actor ProtocolDispatchGate {
 }
 
 @Test(.timeLimit(.minutes(1))) func suspendedActionAdmissionDoesNotBlockToolsAndSealJoinsBoth() async throws {
-    let input = AgentInput(sessionID: UUID(), payload: .text("slow action admission"))
-    let round = UUID()
+    let input = AgentInput(
+        id: UUID().uuidString, sessionID: UUID().uuidString,
+        payload: .text("slow action admission"))
+    let round = UUID().uuidString
     let outputs = AsyncStream<OutputEnvelope>.makeStream(bufferingPolicy: .bufferingOldest(4))
     let gate = ProtocolDispatchGate()
     outputs.continuation.yield(
@@ -202,7 +213,8 @@ private actor ProtocolDispatchGate {
             sequence: 1, roundID: round))
     outputs.continuation.yield(
         OutputEnvelope(
-            source: .assistant, input: input, output: .toolCall(ToolCall(toolPath: "Fixture.read")),
+            source: .assistant, input: input,
+            output: .toolCall(ToolCall(id: UUID().uuidString, toolPath: "Fixture.read")),
             sequence: 2, roundID: round))
     outputs.continuation.yield(
         OutputEnvelope(source: .assistant, input: input, output: .roundFinished(round), sequence: 3, roundID: round))
@@ -225,8 +237,10 @@ private actor ProtocolDispatchGate {
 }
 
 @Test(.timeLimit(.minutes(1))) func independentConsumersCancelAndJoinBothBranches() async throws {
-    let input = AgentInput(sessionID: UUID(), payload: .text("cancel independent branches"))
-    let round = UUID()
+    let input = AgentInput(
+        id: UUID().uuidString, sessionID: UUID().uuidString,
+        payload: .text("cancel independent branches"))
+    let round = UUID().uuidString
     let outputs = AsyncStream<OutputEnvelope>.makeStream(bufferingPolicy: .bufferingOldest(2))
     let gate = ProtocolDispatchGate()
     outputs.continuation.yield(
@@ -239,7 +253,8 @@ private actor ProtocolDispatchGate {
             sequence: 1, roundID: round))
     outputs.continuation.yield(
         OutputEnvelope(
-            source: .assistant, input: input, output: .toolCall(ToolCall(toolPath: "Fixture.read")),
+            source: .assistant, input: input,
+            output: .toolCall(ToolCall(id: UUID().uuidString, toolPath: "Fixture.read")),
             sequence: 2, roundID: round))
     let consumer = Task {
         try await IndependentOutputWorkflow.consumeGeneration(outputs.stream) { envelope in
@@ -256,13 +271,15 @@ private actor ProtocolDispatchGate {
 }
 
 @Test func nativeBurstBeyondSixteenJoinsEveryCallBeforeDispatchingRoundSeal() async throws {
-    let input = AgentInput(sessionID: UUID(), payload: .text("native overflow"))
-    let round = UUID()
+    let input = AgentInput(
+        id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("native overflow"))
+    let round = UUID().uuidString
     let outputs = AsyncStream<OutputEnvelope>.makeStream(bufferingPolicy: .bufferingOldest(18))
     for sequence in UInt64(1)...17 {
         outputs.continuation.yield(
             OutputEnvelope(
-                source: .assistant, input: input, output: .toolCall(ToolCall(toolPath: "Fixture.read")),
+                source: .assistant, input: input,
+                output: .toolCall(ToolCall(id: UUID().uuidString, toolPath: "Fixture.read")),
                 sequence: sequence, roundID: round))
     }
     outputs.continuation.yield(
@@ -281,8 +298,10 @@ private actor ProtocolDispatchGate {
 @Test(.timeLimit(.minutes(1))) func protocolDispatchFailureCancelsSiblingWithoutWaitingForMoreModelOutput()
     async throws
 {
-    let input = AgentInput(sessionID: UUID(), payload: .text("failed protocol dispatch"))
-    let round = UUID()
+    let input = AgentInput(
+        id: UUID().uuidString, sessionID: UUID().uuidString,
+        payload: .text("failed protocol dispatch"))
+    let round = UUID().uuidString
     let outputs = AsyncStream<OutputEnvelope>.makeStream(bufferingPolicy: .bufferingOldest(2))
     let gate = ProtocolDispatchGate()
     outputs.continuation.yield(
@@ -303,7 +322,8 @@ private actor ProtocolDispatchGate {
     _ = await events.next()
     outputs.continuation.yield(
         OutputEnvelope(
-            source: .assistant, input: input, output: .toolCall(ToolCall(toolPath: "Fixture.read")),
+            source: .assistant, input: input,
+            output: .toolCall(ToolCall(id: UUID().uuidString, toolPath: "Fixture.read")),
             sequence: 2, roundID: round))
     // Keep the producer open: the failing consumer must wake the owner on its own.
     await #expect(throws: TrackingUnavailable.offline) { try await consumer.value }
@@ -312,13 +332,14 @@ private actor ProtocolDispatchGate {
 }
 
 @Test(.timeLimit(.minutes(1))) func hostCancellationJoinsHeldProtocolsBeforeNextRound() async throws {
-    let input = AgentInput(sessionID: UUID(), payload: .text("cancel reply"))
-    let next = AgentInput(sessionID: input.sessionID, payload: .text("next reply"))
-    let round = UUID()
+    let input = AgentInput(
+        id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("cancel reply"))
+    let next = AgentInput(id: UUID().uuidString, sessionID: input.sessionID, payload: .text("next reply"))
+    let round = UUID().uuidString
     let outputs = AsyncStream<OutputEnvelope>.makeStream(bufferingPolicy: .bufferingOldest(8))
     let gate = ProtocolDispatchGate()
     for (sequence, output) in [
-        (UInt64(1), AgentOutput.toolCall(ToolCall(toolPath: "Fixture.read"))),
+        (UInt64(1), AgentOutput.toolCall(ToolCall(id: UUID().uuidString, toolPath: "Fixture.read"))),
         (
             2,
             .actionCall(
@@ -343,10 +364,11 @@ private actor ProtocolDispatchGate {
     outputs.continuation.yield(
         OutputEnvelope(
             source: .assistant, input: input, output: .control("agent.cancelled"), sequence: 3, roundID: round))
-    let nextRound = UUID()
+    let nextRound = UUID().uuidString
     outputs.continuation.yield(
         OutputEnvelope(
-            source: .assistant, input: next, output: .toolCall(ToolCall(toolPath: "Fixture.read")),
+            source: .assistant, input: next,
+            output: .toolCall(ToolCall(id: UUID().uuidString, toolPath: "Fixture.read")),
             sequence: 4, roundID: nextRound))
     outputs.continuation.yield(
         OutputEnvelope(

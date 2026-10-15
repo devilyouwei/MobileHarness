@@ -13,13 +13,13 @@ public struct ActionExecutionRecord: Identifiable, Equatable, Sendable {
         public static let operationFailed = Self(rawValue: "operationFailed")
         public static let resourceUnavailable = Self(rawValue: "resourceUnavailable")
     }
-    public let id: UUID
+    public let id: String
     public let path: ActionPath
     /// Copied from the registered definition at admission, not resolved by presentation.
     public let displayName: String
     public let source: AgentID
-    public let sessionID: UUID
-    public let inputID: UUID
+    public let sessionID: String
+    public let inputID: String
     public let channel: String
     public let semantics: Semantics
     public var phase: Phase
@@ -32,7 +32,7 @@ public struct ActionExecutionRecord: Identifiable, Equatable, Sendable {
     public var isTerminal: Bool { phase == .succeeded || phase == .failed || phase == .cancelled }
 
     public init(
-        id: UUID, path: ActionPath, displayName: String, source: AgentID, sessionID: UUID, inputID: UUID,
+        id: String, path: ActionPath, displayName: String, source: AgentID, sessionID: String, inputID: String,
         channel: String,
         semantics: Semantics, phase: Phase = .queued, admittedAt: Date = .now, startedAt: Date? = nil,
         endedAt: Date? = nil, failure: Failure? = nil, completion: AgentActionCompletion? = nil,
@@ -69,16 +69,16 @@ public struct ActionExecutionSnapshot: Sendable {
 
 /// Output failure observation, distinct from scheduled Action execution and Agent-facing results.
 public struct OutputFailureRecord: Identifiable, Sendable, Equatable {
-    public let inputID: UUID?
-    public let id: UUID
+    public let inputID: String?
+    public let id: String
     public let source: AgentID
     public let title: String
     public let message: String
     public let failureCode: String?
     public let time: Date
     public init(
-        id: UUID = UUID(), source: AgentID, title: String, message: String, time: Date = Date(),
-        failureCode: String? = nil, inputID: UUID? = nil
+        id: String = UUID().uuidString, source: AgentID, title: String, message: String, time: Date = Date(),
+        failureCode: String? = nil, inputID: String? = nil
     ) {
         self.inputID = inputID
         self.id = id

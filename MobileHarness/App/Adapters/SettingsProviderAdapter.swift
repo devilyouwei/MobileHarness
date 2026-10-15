@@ -5,6 +5,7 @@ import FunctionContracts
 import ModelKit
 import ModelKitDefaults
 import ModelKitOpenAI
+import Storage
 import UI
 
 @MainActor
@@ -102,25 +103,26 @@ enum SettingsProviderAdapter {
         let operation: Operation
         let revision: UInt64
     }
-    private var entries: [UUID: Entry] = [:]
+    private var entries: [String: Entry] = [:]
     private let state: SettingsState
-    private let sessionID: UUID
+    private let sessionID: String
     private let settings: ProviderSettingsRequests
     private let discovery: ProviderDiscoveryRequests
     init(
-        state: SettingsState, sessionID: UUID, settings: ProviderSettingsRequests, discovery: ProviderDiscoveryRequests
+        state: SettingsState, sessionID: String, settings: ProviderSettingsRequests,
+        discovery: ProviderDiscoveryRequests
     ) {
         self.state = state
         self.sessionID = sessionID
         self.settings = settings
         self.discovery = discovery
     }
-    func register(_ id: UUID, operation: Operation) throws {
+    func register(_ id: String, operation: Operation) throws {
         guard entries.count < 32 else { throw ProviderDiscoveryError.capacityExceeded }
         entries[id] = Entry(operation: operation, revision: state.revision)
     }
-    func discard(_ id: UUID) { entries[id] = nil }
-    func present(_ id: UUID, failureCode: String?, invocation: any FunctionInput) async throws {
+    func discard(_ id: String) { entries[id] = nil }
+    func present(_ id: String, failureCode: String?, invocation: any FunctionInput) async throws {
         guard invocation.context.sessionID == sessionID, let entry = entries[id] else {
             throw ResourcePresentationError.staleGeneration
         }

@@ -6,7 +6,7 @@ import Testing
 
 @Test func listeningEveryGenerationReplaysFromSharedMonotonicEpoch() {
     var motion = ListeningMotion()
-    let first = UUID()
+    let first = UUID().uuidString
     motion.update(active: true, generation: first, reduceMotion: false, at: 10)
     #expect(motion.activatedAt == 10 && motion.elapsed(at: 10) == 0)
     #expect(motion.opacity(at: 10) == 0.85)
@@ -15,11 +15,11 @@ import Testing
     motion.update(active: false, generation: nil, reduceMotion: false, at: 12)
     #expect(motion.opacity(at: 12) == 1 && motion.opacity(at: 12.5) == 0)
     #expect(!motion.needsFrame(at: 12.5))
-    motion.update(active: true, generation: UUID(), reduceMotion: false, at: 13)
+    motion.update(active: true, generation: UUID().uuidString, reduceMotion: false, at: 13)
     #expect(motion.elapsed(at: 13) == 0 && motion.opacity(at: 13) == 0.85)
     #expect(motion.isEntering(at: 13))
     // Coalesced UI off/on still resets when the enabled generation changes.
-    motion.update(active: true, generation: UUID(), reduceMotion: false, at: 14)
+    motion.update(active: true, generation: UUID().uuidString, reduceMotion: false, at: 14)
     #expect(motion.activatedAt == 14 && motion.elapsed(at: 14) == 0)
     motion.update(active: true, generation: motion.generation, reduceMotion: false, at: 14.2)
     #expect(motion.activatedAt == 14)
@@ -27,12 +27,12 @@ import Testing
 
 @Test func listeningRapidReversalPreservesFadeContinuityAndReducedMotionSettles() {
     var motion = ListeningMotion()
-    motion.update(active: true, generation: UUID(), reduceMotion: false, at: 1)
+    motion.update(active: true, generation: UUID().uuidString, reduceMotion: false, at: 1)
     let partial = motion.opacity(at: 1.12)
     motion.update(active: false, generation: nil, reduceMotion: false, at: 1.12)
     #expect(motion.opacity(at: 1.12) == partial)
     let fading = motion.opacity(at: 1.2)
-    motion.update(active: true, generation: UUID(), reduceMotion: true, at: 1.2)
+    motion.update(active: true, generation: UUID().uuidString, reduceMotion: true, at: 1.2)
     #expect(motion.opacity(at: 1.2) == fading)
     #expect(motion.elapsed(at: 1.2) == 2 && !motion.isEntering(at: 1.2))
     #expect(!motion.needsFrame(at: 1.5))
@@ -73,7 +73,7 @@ import Testing
     #expect(ListeningLightOrigin(x: -.infinity, y: .nan) == ListeningLightOrigin(x: 0.5, y: 0.4))
     #expect(ListeningLightOrigin(x: -1, y: 2) == ListeningLightOrigin(x: 0, y: 1))
     var motion = ListeningMotion()
-    let generation = UUID()
+    let generation = UUID().uuidString
     let first = ListeningLightOrigin(x: 0.2, y: 0.3)
     let second = ListeningLightOrigin(x: 0.8, y: 0.6)
     motion.update(active: true, generation: generation, reduceMotion: false, origin: first, at: 1)
@@ -81,15 +81,15 @@ import Testing
     #expect(motion.origin == first && motion.activatedAt == 1)
     motion.update(active: false, generation: nil, reduceMotion: false, origin: second, at: 1.2)
     #expect(motion.origin == first)
-    motion.update(active: true, generation: UUID(), reduceMotion: false, origin: second, at: 1.3)
+    motion.update(active: true, generation: UUID().uuidString, reduceMotion: false, origin: second, at: 1.3)
     #expect(motion.origin == second && motion.elapsed(at: 1.3) == 0)
-    motion.update(active: true, generation: UUID(), reduceMotion: false, at: 1.4)
+    motion.update(active: true, generation: UUID().uuidString, reduceMotion: false, at: 1.4)
     #expect(motion.origin == ListeningLightOrigin(x: 0.5, y: 0.4))
 }
 
 @Test func listeningExitKeepsExistingSmoothFadeAtEverySample() {
     var motion = ListeningMotion()
-    motion.update(active: true, generation: UUID(), reduceMotion: false, at: 0)
+    motion.update(active: true, generation: UUID().uuidString, reduceMotion: false, at: 0)
     #expect(motion.opacity(at: 0) == 0.85)
     motion.update(active: false, generation: nil, reduceMotion: false, at: 2)
     for step in 0...16 {
@@ -97,7 +97,7 @@ import Testing
         let expected = 1 - fraction * fraction * (3 - 2 * fraction)
         #expect(abs(motion.opacity(at: 2 + 0.32 * fraction) - expected) < 0.000001)
     }
-    motion.update(active: true, generation: UUID(), reduceMotion: false, at: 3)
+    motion.update(active: true, generation: UUID().uuidString, reduceMotion: false, at: 3)
     #expect(motion.opacity(at: 3) == 0.85)
 }
 
@@ -105,7 +105,8 @@ import Testing
     var motion = ListeningMotion()
     let origin = ListeningLightOrigin(x: 0.1, y: 0.8)
     motion.update(
-        active: true, generation: UUID(), reduceMotion: false, origin: origin, initialOpacity: 0.95, intensity: 0.6,
+        active: true, generation: UUID().uuidString, reduceMotion: false, origin: origin,
+        initialOpacity: 0.95, intensity: 0.6,
         at: 1)
     #expect(motion.origin == origin && motion.opacity(at: 1) == 0.95 && motion.intensity == 0.6)
     motion.update(active: false, generation: nil, reduceMotion: false, at: 2)
@@ -115,8 +116,9 @@ import Testing
 
 @Test func clearingDecorationRestoresListeningWithoutAnotherWakeFlash() {
     var motion = ListeningMotion()
-    motion.update(active: true, generation: UUID(), reduceMotion: false, at: 1)
-    motion.update(active: true, generation: UUID(), reduceMotion: false, replayEntry: false, at: 2)
+    motion.update(active: true, generation: UUID().uuidString, reduceMotion: false, at: 1)
+    motion.update(
+        active: true, generation: UUID().uuidString, reduceMotion: false, replayEntry: false, at: 2)
     #expect(motion.elapsed(at: 2) == 2 && !motion.isEntering(at: 2))
     #expect(motion.opacity(at: 2) == 1)
 }

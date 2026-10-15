@@ -1,5 +1,6 @@
 import AgentCore
 import Foundation
+import Storage
 
 /// Root-session application operations; shared transaction state with no native or callable implementation imports.
 public actor ApplicationControlAgent: Agent {
@@ -16,23 +17,23 @@ public actor ApplicationControlAgent: Agent {
     private let contextBuilder = ApplicationControlContextBuilder()
 
     private let continuation: AsyncStream<OutputEnvelope>.Continuation
-    private let sessionID: UUID
+    private let sessionID: String
     private var lifecycle = AgentLifecycle.registered
-    private var pending: [UUID: AgentInput] = [:]
-    private var inputs: Set<UUID> = []
-    private var configurationCall: UUID?
-    private var providerSettingsRequest: UUID?
-    private var preferenceRequest: UUID?
-    private var preferenceCalls: Set<UUID> = []
+    private var pending: [String: AgentInput] = [:]
+    private var inputs: Set<String> = []
+    private var configurationCall: String?
+    private var providerSettingsRequest: String?
+    private var preferenceRequest: String?
+    private var preferenceCalls: Set<String> = []
     private struct PresentationStep {
         let generation: UInt64
         let failure: Bool
         var failureTerminatesRequest = true
     }
-    private var presentationCalls: [UUID: PresentationStep] = [:]
-    private var providerPresentationCalls: [UUID: Bool] = [:]
-    private var hostFailureCalls: Set<UUID> = []
-    private var terminalFailureCalls: Set<UUID> = []
+    private var presentationCalls: [String: PresentationStep] = [:]
+    private var providerPresentationCalls: [String: Bool] = [:]
+    private var hostFailureCalls: Set<String> = []
+    private var terminalFailureCalls: Set<String> = []
     private var observationSequence: UInt64 = 0
     private var environment: [AppEnvironmentFact.Category: AppEnvironmentFact] = [:]
     private var sequence: UInt64 = 0
@@ -40,20 +41,20 @@ public actor ApplicationControlAgent: Agent {
     private var deviceResults = ActionResultInbox()
     private let taskCoordinator: AgentFixedTaskCoordinator<ApplicationControlContextState>
     private var taskPump: Task<Void, Never>?
-    private var fixedTaskInputs: [UUID: AgentInput] = [:]
+    private var fixedTaskInputs: [String: AgentInput] = [:]
     private let admission = AgentAdmissionGate(capacity: 32)
     private var stagedOutputs: [OutputEnvelope]?
 
     // MARK: - Registration
 
     public init(
-        sessionID: UUID, configuration: AgentConfiguration? = nil,
+        sessionID: String, configuration: AgentConfiguration? = nil,
         context: AgentContextRepository<ApplicationControlContextState>? = nil
     ) throws {
         self.contextRepository =
             context
             ?? AgentContextRepository(
-                agent: .applicationControl, scope: UUID(), state: ApplicationControlContextState())
+                agent: .applicationControl, scope: UUID().uuidString, state: ApplicationControlContextState())
         guard contextRepository.agentID == .applicationControl else { throw AgentConfigurationError.identityMismatch }
         let configuration = try configuration ?? AgentConfigurations.load(named: "ApplicationControl")
         guard configuration.agentID == .applicationControl else { throw AgentConfigurationError.identityMismatch }
@@ -299,7 +300,7 @@ public actor ApplicationControlAgent: Agent {
                 let tool =
                     settings.operation == .restore
                     ? ApplicationControlFunctions.providerRestoration : ApplicationControlFunctions.providerSaving
-                let call = try tool.call(["requestID": settings.requestID.uuidString])
+                let call = try tool.call(["requestID": settings.requestID])
                 providerSettingsRequest = input.id
                 pending[call.id] = input
                 inputs.insert(input.id)
@@ -318,7 +319,7 @@ public actor ApplicationControlAgent: Agent {
                 guard pending.count < ApplicationControlSignalPreprocessor.inputCapacity, !inputs.contains(input.id)
                 else { throw CommunicationError.capacityExceeded }
                 let call = try ApplicationControlFunctions.providerDiscovery.call([
-                    "requestID": discovery.requestID.uuidString
+                    "requestID": discovery.requestID
                 ])
                 pending[call.id] = input
                 inputs.insert(input.id)
@@ -430,7 +431,7 @@ public actor ApplicationControlAgent: Agent {
                 if settings?.presentation == true || discovery?.presentation == true,
                     let requestID = settings?.requestID ?? discovery?.requestID
                 {
-                    var arguments = ["requestID": requestID.uuidString]
+                    var arguments = ["requestID": requestID]
                     if result.isError { arguments["failureCode"] = result.failureCode ?? "provider.unavailable" }
                     let call = try ApplicationControlFunctions.providerPresentation.call(arguments)
                     pending[call.id] = original
@@ -632,7 +633,7 @@ public actor ApplicationControlAgent: Agent {
         }
     }
 
-    public func completeFixedTask(inputID: UUID, value: String?, failure: String? = nil) async throws {
+    public func completeFixedTask(inputID: String, value: String?, failure: String? = nil) async throws {
         guard let original = fixedTaskInputs.removeValue(forKey: inputID), let scope = original.taskScope else {
             return
         }
@@ -650,7 +651,7 @@ public actor ApplicationControlAgent: Agent {
         var snapshot: [String: Any] = ["facts": facts]
         if let result = deviceResults.results.last {
             var value: [String: Any] = [
-                "executionID": result.executionID.uuidString, "inputID": result.inputID.uuidString,
+                "executionID": result.executionID, "inputID": result.inputID,
                 "status": result.status.rawValue, "effect": result.effect.rawValue, "path": result.path.description,
             ]
             if let report = result.report {

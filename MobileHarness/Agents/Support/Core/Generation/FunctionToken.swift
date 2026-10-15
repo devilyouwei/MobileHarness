@@ -26,10 +26,10 @@ public struct CallRejection: Error, Equatable, Sendable {
     public enum Kind: Equatable, Sendable { case action, tool }
     public let kind: Kind
     public let alias: String
-    public let callID: UUID?
+    public let callID: String?
     public let reason: GenerationError
 
-    public init(kind: Kind, alias: String, callID: UUID? = nil, reason: GenerationError) {
+    public init(kind: Kind, alias: String, callID: String? = nil, reason: GenerationError) {
         self.kind = kind
         self.alias = String(alias.prefix(64))
         self.callID = callID

@@ -17,13 +17,13 @@ public struct GatewayOutputConsumer: Sendable {
 private enum OutputProducerBinding {
     struct Identity: Sendable {
         let agent: AgentID
-        let incarnation: UUID
+        let incarnation: String
     }
     @TaskLocal static var identity: Identity?
 }
 
 private enum OutputDispatchOwnership {
-    @TaskLocal static var current: UUID?
+    @TaskLocal static var current: String?
 }
 
 /// Validates, routes and dispatches output while preserving the existing execution contract.
@@ -32,12 +32,12 @@ public actor OutputGateway {
     private var failures: [OutputFailureRecord] = []
     private var failureRevision: UInt64 = 0
     private var evictedFailures: UInt64 = 0
-    private var failureObservers: [UUID: AsyncStream<OutputFailureSnapshot>.Continuation] = [:]
+    private var failureObservers: [String: AsyncStream<OutputFailureSnapshot>.Continuation] = [:]
     private var closed = false
     public enum ObservationError: Error { case capacityExceeded }
     public func observeFailures() throws -> AsyncStream<OutputFailureSnapshot> {
         guard failureObservers.count < 8 else { throw ObservationError.capacityExceeded }
-        let id = UUID()
+        let id = UUID().uuidString
         let pair = AsyncStream<OutputFailureSnapshot>.makeStream(bufferingPolicy: .bufferingNewest(1))
         pair.continuation.yield(failureSnapshot())
         if closed {
@@ -50,7 +50,7 @@ public actor OutputGateway {
         }
         return pair.stream
     }
-    private func removeFailureObserver(_ id: UUID) { failureObservers.removeValue(forKey: id) }
+    private func removeFailureObserver(_ id: String) { failureObservers.removeValue(forKey: id) }
     private func failureSnapshot() -> OutputFailureSnapshot {
         .init(revision: failureRevision, records: failures, evictedCount: evictedFailures)
     }
@@ -76,8 +76,8 @@ public actor OutputGateway {
     }
     private struct OutputScope: Hashable, Sendable {
         let source: AgentID
-        let session: UUID
-        let input: UUID
+        let session: String
+        let input: String
         init(_ envelope: OutputEnvelope) {
             source = envelope.source
             session = envelope.sessionID
@@ -86,7 +86,7 @@ public actor OutputGateway {
     }
     private struct ProducerSession: Hashable {
         let source: AgentID
-        let session: UUID
+        let session: String
     }
     private struct DirectExecution {
         let scope: OutputScope
@@ -97,7 +97,7 @@ public actor OutputGateway {
     private var outputScopes: Set<OutputScope> = []
     private var cancelledScopes: Set<OutputScope> = []
     private var cancellingProducers: Set<ProducerSession> = []
-    private var directExecutions: [UUID: DirectExecution] = [:]
+    private var directExecutions: [String: DirectExecution] = [:]
     private func isCancelled(_ scope: OutputScope) -> Bool {
         cancelledScopes.contains(scope)
             || cancellingProducers.contains(.init(source: scope.source, session: scope.session))
@@ -121,7 +121,7 @@ public actor OutputGateway {
         switch envelope.output {
         case .toolCall, .communication:
             guard directExecutions.count < 128 else { throw HarnessError.queueFull }
-            let id = UUID()
+            let id = UUID().uuidString
             let task = Task {
                 try await OutputDispatchOwnership.$current.withValue(id) {
                     try await self.dispatch(envelope)
@@ -138,7 +138,7 @@ public actor OutputGateway {
         default: return try await dispatch(envelope)
         }
     }
-    private var roundFailures: [UUID: String] = [:]
+    private var roundFailures: [String: String] = [:]
     private var outputResults: [OutputExecutionResult] = []
     private var evictedOutputs: UInt64 = 0
     private let requests: InputGateway
@@ -153,7 +153,7 @@ public actor OutputGateway {
     private let sink: Sink
     private let resources: ResourceCoordinator?
     private let actionFeedback: ActionFeedback
-    private let lifecycleObserverID = UUID()
+    private let lifecycleObserverID = UUID().uuidString
     private var lifecycleBound = false
 
     public init(
@@ -189,7 +189,7 @@ public actor OutputGateway {
             }
         }
     }
-    private func sourceIdentity(_ envelope: OutputEnvelope) async throws -> UUID {
+    private func sourceIdentity(_ envelope: OutputEnvelope) async throws -> String {
         if let bound = OutputProducerBinding.identity {
             guard bound.agent == envelope.source else { throw CommunicationError.unauthorized }
             try await manager.validate(bound.agent, incarnation: bound.incarnation, sessionID: envelope.sessionID)
@@ -209,7 +209,7 @@ public actor OutputGateway {
     }
     private func emit(
         _ observation: AgentMessage, parent: AgentInput, source: AgentID,
-        incarnation: UUID, target: AgentID?
+        incarnation: String, target: AgentID?
     ) async throws -> DeliveryReport {
         try await emit(
             observation, inputID: parent.id, sessionID: parent.sessionID,
@@ -217,10 +217,10 @@ public actor OutputGateway {
     }
 
     private func emit(
-        _ observation: AgentMessage, inputID: UUID, sessionID: UUID,
-        metadata: InputMetadata, turn: AgentTurn?, source: AgentID, incarnation: UUID, target: AgentID?
+        _ observation: AgentMessage, inputID: String, sessionID: String,
+        metadata: InputMetadata, turn: AgentTurn?, source: AgentID, incarnation: String, target: AgentID?
     ) async throws -> DeliveryReport {
-        var issuedGrant: (UUID, UUID)?
+        var issuedGrant: (String, String)?
         do {
             try Task.checkCancellation()
             guard let policy, let declaration = policy.agents[source] else {
@@ -294,6 +294,7 @@ public actor OutputGateway {
             sequences[source, default: 0] += 1
             let payload = InputPayload.observation(observation)
             let input = AgentInput(
+                id: UUID().uuidString,
                 sessionID: sessionID, payload: payload,
                 metadata: InputMetadata(
                     payload: payload, source: source.rawValue, incarnation: incarnation, origin: .agent,
@@ -321,7 +322,7 @@ public actor OutputGateway {
             }
             let destinations = target.map { [$0] } ?? []
             guard !destinations.isEmpty else { throw CommunicationError.noRecipients }
-            var targets: [(AgentID, UUID)] = []
+            var targets: [(AgentID, String)] = []
             var unavailable: [AgentID: String] = [:]
             for id in destinations {
                 do { targets.append((id, try await manager.identity(id))) } catch {
@@ -391,19 +392,22 @@ public actor OutputGateway {
         cancelledScopes = cancelledScopes.filter { $0.source != agent }
     }
 
-    private var taskCalls: [UUID: [UUID: Task<ToolResponse?, any Error>]] = [:]
-    private var taskTerminationFailures: [UUID: String] = [:]
-    public func terminationFailures() -> [UUID: String] { taskTerminationFailures }
+    private var taskCalls: [String: [String: Task<ToolResponse?, any Error>]] = [:]
+    private var taskTerminationFailures: [String: String] = [:]
+    private var taskTerminationOrder: [String] = []
+    private func retainTaskFailure(_ id: String, message: String) {
+        if taskTerminationFailures[id] == nil {
+            if taskTerminationOrder.count == 32 { taskTerminationFailures[taskTerminationOrder.removeFirst()] = nil }
+            taskTerminationOrder.append(id)
+        }
+        taskTerminationFailures[id] = message
+    }
+    public func terminationFailures() -> [String: String] { taskTerminationFailures }
     private func recordTaskTermination(_ event: AgentTaskTermination, outcome: ActionResultDelivery) {
         if case .accepted = outcome { return }
-        if taskTerminationFailures.count >= 32 { taskTerminationFailures.removeValue(forKey: event.scope.id) }
-        if taskTerminationFailures.count >= 32,
-            let oldest = taskTerminationFailures.keys.sorted(by: { $0.uuidString < $1.uuidString }).first
-        {
-            taskTerminationFailures[oldest] = nil
-        }
-        taskTerminationFailures[event.scope.id] = "Task terminal delivery rejected"
+        retainTaskFailure(event.scope.id, message: "Task terminal delivery rejected")
     }
+
     private func failTaskCompletion(_ scope: AgentTaskScope, owner: ExecutionOwner, reason: String) async {
         do {
             let events = try await manager.failTask(
@@ -421,16 +425,11 @@ public actor OutputGateway {
         } catch CommunicationError.staleIncarnation {
             // The stopped owner's cleanup carries its captured recipient incarnation.
         } catch {
-            if taskTerminationFailures.count == 32,
-                let oldest = taskTerminationFailures.keys.sorted(by: { $0.uuidString < $1.uuidString }).first
-            {
-                taskTerminationFailures[oldest] = nil
-            }
-            taskTerminationFailures[scope.id] =
-                "Task completion cleanup rejected: " + String(String(describing: error).prefix(512))
+            retainTaskFailure(
+                scope.id, message: "Task completion cleanup rejected: " + String(String(describing: error).prefix(512)))
         }
     }
-    private func cancelTaskCalls(_ taskID: UUID) async {
+    private func cancelTaskCalls(_ taskID: String) async {
         let calls = taskCalls.removeValue(forKey: taskID) ?? [:]
         for call in calls.values { call.cancel() }
         for call in calls.values { _ = await call.result }
@@ -453,7 +452,7 @@ public actor OutputGateway {
         return ExecutionOwner(agent: envelope.source, incarnation: identity, sessionID: envelope.sessionID)
     }
 
-    public func resourceControl(for source: AgentID, sessionID: UUID) async throws -> ResourceControl {
+    public func resourceControl(for source: AgentID, sessionID: String) async throws -> ResourceControl {
         try await bindLifecycle()
         guard let resources else { throw ResourceError.unknownResource }
         let owner = ExecutionOwner(agent: source, incarnation: try await manager.identity(source), sessionID: sessionID)
@@ -483,7 +482,7 @@ public actor OutputGateway {
     }
 
     /// Trusted host interruption can preempt a round seal waiting for playback completion.
-    public func cancelCalls(for producer: any Agent, sessionID: UUID) async throws {
+    public func cancelCalls(for producer: any Agent, sessionID: String) async throws {
         guard !closed else { throw CommunicationError.scopeClosed }
         let id = producer.descriptor.id
         let incarnation = try await manager.outputIdentity(for: producer)
@@ -501,7 +500,7 @@ public actor OutputGateway {
         await scheduled
     }
 
-    public func cancel(sessionID: UUID) async {
+    public func cancel(sessionID: String) async {
         cancelledScopes.formUnion(outputScopes.filter { $0.session == sessionID })
         let direct = directExecutions.values.filter { $0.scope.session == sessionID }
         for execution in direct { execution.task.cancel() }
@@ -597,7 +596,7 @@ public actor OutputGateway {
                                 details: ["failureDescription": failure])
                         ])
                         let receipt = ActionResult(
-                            executionID: UUID(), owner: owner, path: call.actionPath,
+                            executionID: UUID().uuidString, owner: owner, path: call.actionPath,
                             causality: SignalCausality(envelope: envelope),
                             status: cancelled ? .cancelled : .failed, effect: .notStarted,
                             completion: .report(report.agentValue), failure: cancelled ? .cancelled : .handlerFailed,
@@ -641,7 +640,7 @@ public actor OutputGateway {
         }
         return result
     }
-    public func executionResults(source: AgentID? = nil, inputID: UUID? = nil) async -> OutputExecutionSnapshot {
+    public func executionResults(source: AgentID? = nil, inputID: String? = nil) async -> OutputExecutionSnapshot {
         let snapshot = await actions.executor.executionSnapshot()
         let matchingOutputs = outputResults.filter {
             (source == nil || $0.source == source) && (inputID == nil || $0.inputID == inputID)
@@ -685,7 +684,7 @@ public actor OutputGateway {
         }
         if case .rejectedCall(let rejection) = envelope.output, rejection.kind == .tool {
             return ToolResponse(
-                callID: rejection.callID ?? UUID(),
+                callID: try rejection.callID ?? UUID().uuidString,
                 value: "\(rejection.reason): \(rejection.alias)", isError: true,
                 failureCode: rejection.reason == .invalidParameters ? .invalidArguments : .unknownTool)
         }
@@ -802,7 +801,7 @@ public actor OutputGateway {
         case .finish:
             do {
                 try await actions.finish(envelope)
-                if let scope = envelope.taskScope { await requests.deliverReplyCompletion(scope) }
+                if let scope = envelope.taskScope { try await requests.deliverReplyCompletion(scope) }
             } catch {
                 await actions.cancel(envelope)
                 throw error

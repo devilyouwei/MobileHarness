@@ -6,29 +6,20 @@ import Foundation
 import FunctionContracts
 import PlatformKit
 import Storage
+import StorageDevices
 import UI
 
 #if os(iOS)
     import UIKit
 #endif
 
-public struct BluetoothDeviceRecord: Codable, Sendable {
-    public let id: UUID?
-    public let name: String?
-    public let automaticallyReconnect: Bool?
-    public init(id: UUID?, name: String?, automaticallyReconnect: Bool? = nil) {
-        self.id = id
-        self.name = name
-        self.automaticallyReconnect = automaticallyReconnect
-    }
-}
 /// Execution provenance belongs to App; never supplied to the Bluetooth SDK.
 public struct NexArmControlOrigin: Sendable, Equatable {
     public let source: String
-    public let sessionID: UUID
-    public let inputID: UUID
-    public let callID: UUID
-    public init(source: String, sessionID: UUID, inputID: UUID, callID: UUID) {
+    public let sessionID: String
+    public let inputID: String
+    public let callID: String
+    public init(source: String, sessionID: String, inputID: String, callID: String) {
         self.source = String(source.prefix(64))
         self.sessionID = sessionID
         self.inputID = inputID
@@ -36,7 +27,7 @@ public struct NexArmControlOrigin: Sendable, Equatable {
     }
 }
 public struct NexArmControlFailure: Sendable {
-    public let workerID: UUID
+    public let workerID: String
     public let origin: NexArmControlOrigin?
     public let code: String
     public let message: String
@@ -49,7 +40,7 @@ public final class BluetoothWorkflow: BluetoothControlling {
     public var manualOrigin: NexArmControlOrigin?
     public var manualFailureReporter: (@Sendable (NexArmControlFailure) async -> Void)?
     private func reportManualFailure(
-        _ error: any Error, workerID: UUID, origin: NexArmControlOrigin?,
+        _ error: any Error, workerID: String, origin: NexArmControlOrigin?,
         reporter: (@Sendable (NexArmControlFailure) async -> Void)?
     ) async {
         let report = (error as? any ActionReportProviding)?.actionReport ?? ActionReport.empty.recordingFailure(error)
@@ -61,10 +52,8 @@ public final class BluetoothWorkflow: BluetoothControlling {
     }
     public let state: BluetoothSettingsState
     private let link: any NexArmBluetoothLink
-    private let makeStore: @Sendable () throws -> LocalDocumentStore<BluetoothDeviceRecord>
-    private var store: LocalDocumentStore<BluetoothDeviceRecord>?
-    private var revision: UUID?
-    private var restoration: Task<Void, any Error>?
+    private let makeDeviceRepository: @Sendable () throws -> any DeviceRepository
+    private var records: (any DeviceRepository)?
     private var controller: NexArmActionController?
     private var operation: Task<Void, Never>?
     private var cleanup: Task<Void, Never>?
@@ -81,8 +70,8 @@ public final class BluetoothWorkflow: BluetoothControlling {
     private var aimGoal: AimGoal?
     private var forearmLeveler = NexArmForearmLeveler()
     private var followingAim = false
-    private var controlRevision = UUID()
-    private var manualRevision = UUID()
+    private var controlRevision = UUID().uuidString
+    private var manualRevision = UUID().uuidString
     private var pendingArmAction: BluetoothArmAction?
     private var settingsWorker: Task<Void, Never>?
     private var settingsPlayback: Task<Void, any Error>?
@@ -95,8 +84,8 @@ public final class BluetoothWorkflow: BluetoothControlling {
             && !state.jogging
             && motion == nil && operation == nil && cleanup == nil
     }
-    private var motionID: UUID?
-    private var generation = UUID()
+    private var motionID: String?
+    private var generation = UUID().uuidString
     private var foreground = true
     private var observing = false
     private var pageVisible = false
@@ -108,7 +97,7 @@ public final class BluetoothWorkflow: BluetoothControlling {
     private var manualDisconnectPending = false
     private var recovery: Task<Void, Never>?
     private var suspension: Task<Void, Never>?
-    private var recoveryID = UUID()
+    private var recoveryID = UUID().uuidString
     private var recoveryPending = false
     private var recoveryNeedsUser = false
     private var recoveryAttempts = 0
@@ -130,11 +119,11 @@ public final class BluetoothWorkflow: BluetoothControlling {
 
     public init(
         state: BluetoothSettingsState, link: any NexArmBluetoothLink,
-        makeStore: @escaping @Sendable () throws -> LocalDocumentStore<BluetoothDeviceRecord>
+        makeDeviceRepository: @escaping @Sendable () throws -> any DeviceRepository
     ) {
         self.state = state
         self.link = link
-        self.makeStore = makeStore
+        self.makeDeviceRepository = makeDeviceRepository
     }
     public func run() async {
         guard !observing else { return }
@@ -144,46 +133,28 @@ public final class BluetoothWorkflow: BluetoothControlling {
         scheduleReconnect()
         for await value in link.updates {
             if Task.isCancelled { break }
-            apply(value)
+            await apply(value)
         }
         disconnect(preserveReconnect: true)
         await waitUntilIdle()
     }
     private func restore() async throws {
-        if store != nil { return }
-        if let restoration {
-            try await restoration.value
-            return
+        if records != nil { return }
+        let records = try makeDeviceRepository()
+        if let record = try await records.selectedDevice() {
+            state.remembered = .init(id: record.id, name: record.name)
+            reconnectEnabled = record.reconnect
         }
-        let task = Task {
-            let document = try makeStore()
-            let saved = try await document.load()
-            if let record = saved?.value {
-                guard (record.id == nil) == (record.name == nil), (record.name?.utf8.count ?? 0) <= 256 else {
-                    throw DocumentStorageError.invalidFile
-                }
-                if let id = record.id, let name = record.name {
-                    state.remembered = .init(id: id, name: name)
-                    reconnectEnabled = record.automaticallyReconnect ?? true
-                }
-            }
-            revision = saved?.revision
-            store = document
-        }
-        restoration = task
-        defer { restoration = nil }
-        try await task.value
+        self.records = records
     }
     private func remember(_ device: BluetoothDeviceRow?) async throws {
         try await restore()
-        guard let store else { throw DocumentStorageError.invalidConfiguration }
-        let saved = try await store.save(
-            .init(id: device?.id, name: device?.name, automaticallyReconnect: device != nil && reconnectEnabled),
-            expecting: revision)
-        revision = saved.revision
+        guard let records else { throw RecordStorageError.missingRecord }
+        try await records.selectDevice(device?.id, reconnect: device != nil && reconnectEnabled)
         state.remembered = device
     }
-    private func apply(_ value: NexArmBluetoothSnapshot) {
+    private func apply(_ value: NexArmBluetoothSnapshot) async {
+        let mappingGeneration = generation
         if value.revision != 0, value.revision <= latestLinkSnapshot.revision { return }
         let previousPower = latestLinkSnapshot.power
         let feedbackChanged =
@@ -205,19 +176,32 @@ public final class BluetoothWorkflow: BluetoothControlling {
             }
         }
         state.scanning = false
-        if discoveryVisible && (state.phase == .idle || state.phase == .failed) {
-            state.scanning = value.scanning
-            state.nearby = value.devices.sorted(by: BluetoothPresentation.discoveryOrder).compactMap {
-                guard let name = BluetoothPresentation.deviceName($0.name) else {
-                    return nil
+        do {
+            if discoveryVisible && (state.phase == .idle || state.phase == .failed) {
+                state.scanning = value.scanning
+                var nearby: [BluetoothDeviceRow] = []
+                for device in value.devices.sorted(by: BluetoothPresentation.discoveryOrder) {
+                    guard let name = BluetoothPresentation.deviceName(device.name) else { continue }
+                    let id = try await makeDeviceRepository().device(nativeID: device.id, name: name)
+                    nearby.append(.init(id: id, name: name))
                 }
-                return .init(id: $0.id, name: name)
+                guard mappingGeneration == generation, latestLinkSnapshot.revision == value.revision else { return }
+                state.nearby = nearby
+            } else {
+                state.nearby = []
             }
-        } else {
+            if let selected = value.selected {
+                let id = try await makeDeviceRepository().device(nativeID: selected.id, name: selected.name)
+                guard mappingGeneration == generation, latestLinkSnapshot.revision == value.revision else { return }
+                if state.selected?.id == id {
+                    state.selected = .init(
+                        id: id, name: BluetoothPresentation.deviceName(selected.name) ?? "未命名设备")
+                }
+            }
+        } catch {
+            guard mappingGeneration == generation else { return }
+            state.error = error.localizedDescription
             state.nearby = []
-        }
-        if let selected = value.selected, state.selected?.id == selected.id {
-            state.selected = .init(id: selected.id, name: BluetoothPresentation.deviceName(selected.name) ?? "未命名设备")
         }
         if discoveryVisible && value.discoveryLimitReached { state.notice = "附近设备较多，请靠近机械臂后重新搜索" }
         if controller != nil, operation == nil, cleanup == nil {
@@ -249,7 +233,7 @@ public final class BluetoothWorkflow: BluetoothControlling {
             guard recovery == nil, cleanup == nil, operation == nil, controller == nil else {
                 throw NexArmExecutionError.busy
             }
-            guard let id = request.id.flatMap(UUID.init(uuidString:)),
+            guard let id = request.id, BusinessRecordID(rawValue: id)?.kind == .device,
                 state.nearby.contains(where: { $0.id == id }) || state.remembered?.id == id || state.selected?.id == id
             else { throw DeviceControlError.unavailable }
         case .preset:
@@ -300,7 +284,7 @@ public final class BluetoothWorkflow: BluetoothControlling {
             }
         }
     }
-    public func connect(_ id: UUID) {
+    public func connect(_ id: String) {
         guard recovery == nil, cleanup == nil else {
             state.error = "正在恢复连接，请等待完成或先断开"
             return
@@ -310,7 +294,7 @@ public final class BluetoothWorkflow: BluetoothControlling {
         state.recoveryStage = .idle
         connect(id, automatically: false)
     }
-    private func connect(_ id: UUID, automatically: Bool) {
+    private func connect(_ id: String, automatically: Bool) {
         guard foreground, operation == nil, cleanup == nil, controller == nil else {
             state.error = "连接操作正在进行，请等待结束"
             return
@@ -325,7 +309,7 @@ public final class BluetoothWorkflow: BluetoothControlling {
         }
         stopScan()
         discoveryVisible = false
-        generation = UUID()
+        generation = UUID().uuidString
         let token = generation
         connectionError = nil
         if !automatically { reconnectEnabled = false }
@@ -347,7 +331,8 @@ public final class BluetoothWorkflow: BluetoothControlling {
                 try await restore()
                 if !automatically { reconnectEnabled = false }
                 try Task.checkCancellation()
-                try await link.connect(id)
+                let nativeID = try await makeDeviceRepository().nativeDevice(id)
+                try await link.connect(nativeID)
                 await link.clearDiscovery()
                 try Task.checkCancellation()
                 guard foreground, token == generation else { throw CancellationError() }
@@ -384,7 +369,7 @@ public final class BluetoothWorkflow: BluetoothControlling {
     public func disconnect() { disconnect(preserveReconnect: false) }
     private func disconnect(preserveReconnect: Bool, cancelRecovery: Bool = true) {
         if cancelRecovery {
-            recoveryID = UUID()
+            recoveryID = UUID().uuidString
             recovery?.cancel()
             recovery = nil
             recoveryPending = preserveReconnect && reconnectEnabled
@@ -398,7 +383,7 @@ public final class BluetoothWorkflow: BluetoothControlling {
         pendingArmAction = nil
         settingsWorker?.cancel()
         liveTask?.cancel()
-        controlRevision = UUID()
+        controlRevision = UUID().uuidString
         if !preserveReconnect {
             recoveryPending = false
             reconnectEnabled = false
@@ -407,7 +392,7 @@ public final class BluetoothWorkflow: BluetoothControlling {
         stopScan()
         discoveryVisible = false
         guard cleanup == nil else { return }
-        generation = UUID()  // Immediately fence in-flight connection setup.
+        generation = UUID().uuidString  // Immediately fence in-flight connection setup.
         controller = nil
         state.joints = []
         jogPlanner = nil
@@ -487,7 +472,7 @@ public final class BluetoothWorkflow: BluetoothControlling {
     private func suspendControl() {
         // A foreground verification waiter is not a failed native connection. Cancel it
         // without tearing down the healthy link when another background event arrives.
-        recoveryID = UUID()
+        recoveryID = UUID().uuidString
         recovery?.cancel()
         recovery = nil
         recoveryPending = false
@@ -497,7 +482,7 @@ public final class BluetoothWorkflow: BluetoothControlling {
         stopMotorControl()
         settingsWorker?.cancel()
         liveTask?.cancel()
-        controlRevision = UUID()
+        controlRevision = UUID().uuidString
         guard suspension == nil else { return }
         let token = generation
         let movement = motion
@@ -561,7 +546,7 @@ public final class BluetoothWorkflow: BluetoothControlling {
         recoveryStarted = nil
         state.recoveryAttempt = 0
     }
-    public func reconnect(_ id: UUID) {
+    public func reconnect(_ id: String) {
         guard foreground, recovery == nil else { return }
         guard
             let device = state.selected.flatMap({ $0.id == id ? $0 : nil })
@@ -588,7 +573,7 @@ public final class BluetoothWorkflow: BluetoothControlling {
         recoveryStarted = recoveryStarted ?? .now
         recoveryCause = cause
         recoveryPending = false
-        recoveryID = UUID()
+        recoveryID = UUID().uuidString
         let identity = recoveryID
         state.recoveryDeviceID = device.id
         state.recoveryStage = .cleaning
@@ -754,7 +739,7 @@ public final class BluetoothWorkflow: BluetoothControlling {
         guard foreground, suspension == nil, state.canControl else {
             return
         }
-        manualRevision = UUID()
+        manualRevision = UUID().uuidString
         motorInputs = Array(repeating: 0, count: 6)
         aimGoal = nil
         liveTask?.cancel()
@@ -854,7 +839,7 @@ public final class BluetoothWorkflow: BluetoothControlling {
         startLiveControl()
     }
     private func cancelTestSequence() {
-        manualRevision = UUID()
+        manualRevision = UUID().uuidString
         pendingArmAction = nil
         settingsPlayback?.cancel()
     }
@@ -865,7 +850,7 @@ public final class BluetoothWorkflow: BluetoothControlling {
     }
     private func startLiveControl() {
         guard liveTask == nil, let controller else { return }
-        controlRevision = UUID()
+        controlRevision = UUID().uuidString
         let revision = controlRevision
         let connectedGeneration = generation
         motion?.cancel()
@@ -875,7 +860,7 @@ public final class BluetoothWorkflow: BluetoothControlling {
         liveTask = Task {
             var failed = false
             let operation: @Sendable () async -> Void = { @MainActor [self] in
-                var session: UUID?
+                var session: String?
                 var nextMotorIndex = 0
                 do {
                     if let playback = settingsPlayback { _ = await playback.result }
@@ -1053,7 +1038,7 @@ public final class BluetoothWorkflow: BluetoothControlling {
             startup.continuation.finish(throwing: NexArmExecutionError.busy)
             return startup.stream
         }
-        controlRevision = UUID()
+        controlRevision = UUID().uuidString
         let revision = controlRevision
         let connectedGeneration = generation
         followingAim = true
@@ -1063,7 +1048,7 @@ public final class BluetoothWorkflow: BluetoothControlling {
             var published = false
             defer { startup.continuation.finish() }
             let operation: @Sendable () async throws -> Void = { @MainActor [self] in
-                var session: UUID?
+                var session: String?
                 var nextAimIndex = 0
                 do {
                     if let movement = motion { _ = await movement.result }
@@ -1221,7 +1206,7 @@ public final class BluetoothWorkflow: BluetoothControlling {
         guard state.controlReady else {
             throw NexArmExecutionError.controlNotReady
         }
-        let token = UUID()
+        let token = UUID().uuidString
         let connectedGeneration = generation
         let revision = controlRevision
         motionID = token

@@ -1,14 +1,15 @@
 import Foundation
+import Storage
 
 /// Bounded one-use staging; active native work belongs to the invoking execution.
 public actor ProviderDiscoveryRequests: ProviderDiscoveryCapability {
     private struct Entry {
         let configuration: ProviderDiscoveryConfiguration
-        let sessionID: UUID
+        let sessionID: String
         let deadline: ContinuousClock.Instant
     }
-    private var entries: [UUID: Entry] = [:]
-    private var completed: [UUID: (UUID, [String])] = [:]
+    private var entries: [String: Entry] = [:]
+    private var completed: [String: (String, [String])] = [:]
     private let clock: @Sendable () -> ContinuousClock.Instant
     private let discover: @Sendable (ProviderDiscoveryConfiguration) async throws -> [String]
     public init(
@@ -18,7 +19,7 @@ public actor ProviderDiscoveryRequests: ProviderDiscoveryCapability {
         self.clock = clock
         self.discover = discover
     }
-    public func stage(_ configuration: ProviderDiscoveryConfiguration, sessionID: UUID) throws -> UUID {
+    public func stage(_ configuration: ProviderDiscoveryConfiguration, sessionID: String) throws -> String {
         try Task.checkCancellation()
         let now = clock()
         entries = entries.filter { $0.value.deadline > now }
@@ -26,23 +27,23 @@ public actor ProviderDiscoveryRequests: ProviderDiscoveryCapability {
         guard configuration.url.utf8.count <= 2048, configuration.key.utf8.count <= 4096 else {
             throw ProviderDiscoveryError.invalidConfiguration
         }
-        let id = UUID()
+        let id = UUID().uuidString
         entries[id] = Entry(
             configuration: configuration, sessionID: sessionID, deadline: now.advanced(by: .seconds(10)))
         return id
     }
-    public func discard(_ requestID: UUID, sessionID: UUID) {
+    public func discard(_ requestID: String, sessionID: String) {
         if completed[requestID]?.0 == sessionID { completed[requestID] = nil }
         guard entries[requestID]?.sessionID == sessionID else { return }
         entries[requestID] = nil
     }
-    public func result(_ requestID: UUID, sessionID: UUID) throws -> [String] {
+    public func result(_ requestID: String, sessionID: String) throws -> [String] {
         guard let value = completed[requestID], value.0 == sessionID else {
             throw ProviderDiscoveryError.invalidRequest
         }
         return value.1
     }
-    public func discoverModels(requestID: UUID, sessionID: UUID) async throws -> [String] {
+    public func discoverModels(requestID: String, sessionID: String) async throws -> [String] {
         try Task.checkCancellation()
         guard let entry = entries[requestID], entry.sessionID == sessionID else {
             throw ProviderDiscoveryError.invalidRequest

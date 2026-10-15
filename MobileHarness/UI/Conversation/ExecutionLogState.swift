@@ -13,11 +13,11 @@ public enum ExecutionLogFilter: String, CaseIterable, Sendable {
     case failed = "异常"
 }
 public struct TaskLogEvent: Identifiable, Equatable, Sendable {
-    public let id: UUID
+    public let id: String
     public let time: Date
     public let title: String
     public let detail: String
-    public init(id: UUID, time: Date, title: String, detail: String) {
+    public init(id: String, time: Date, title: String, detail: String) {
         self.id = id
         self.time = time
         self.title = title
@@ -35,8 +35,8 @@ public struct TaskLogItem: Identifiable, Equatable, Sendable {
         case failed = "失败"
         case cancelled = "已取消"
     }
-    public let id: UUID
-    public let parentID: UUID?
+    public let id: String
+    public let parentID: String?
     public let requester: String
     public let executor: String
     public var title: String
@@ -49,7 +49,7 @@ public struct TaskLogItem: Identifiable, Equatable, Sendable {
     public var evictedEvents: Int
     public var isTerminal: Bool { [.succeeded, .failed, .cancelled].contains(phase) }
     public init(
-        id: UUID, parentID: UUID?, requester: String, executor: String, title: String, phase: Phase,
+        id: String, parentID: String?, requester: String, executor: String, title: String, phase: Phase,
         events: [TaskLogEvent] = [], evictedEvents: Int = 0
     ) {
         self.id = id
@@ -63,12 +63,14 @@ public struct TaskLogItem: Identifiable, Equatable, Sendable {
     }
 }
 public struct AgentRuntimeLogItem: Identifiable, Equatable, Sendable {
-    public let id: UUID
+    public let id: String
     public let source: String
     public let status: String
     public let isFailure: Bool
     public let time: Date
-    public init(id: UUID = UUID(), source: String, status: String, isFailure: Bool, time: Date = .now) {
+    public init(
+        id: String = UUID().uuidString, source: String, status: String, isFailure: Bool, time: Date = .now
+    ) {
         self.id = id
         self.source = source
         self.status = status

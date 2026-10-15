@@ -1,5 +1,6 @@
 import AgentCore
 import Foundation
+import Storage
 
 /// Photographer business service entry point; tracking policy is a co-located component.
 public actor PhotographerAgent: Agent {
@@ -16,8 +17,8 @@ public actor PhotographerAgent: Agent {
     private let contextBuilder = PhotographerContextBuilder()
 
     private let continuation: AsyncStream<OutputEnvelope>.Continuation
-    private let sessionID: UUID
-    private var trackingSessionID: UUID?
+    private let sessionID: String
+    private var trackingSessionID: String?
     private var camera = PhotographerCameraWorkflow()
     private let controlsArm: Bool
     private let controlAvailable: @Sendable () async -> Bool
@@ -33,7 +34,7 @@ public actor PhotographerAgent: Agent {
 
     private let taskCoordinator: AgentFixedTaskCoordinator<PhotographerContextState>
     private var taskPump: Task<Void, Never>?
-    private var fixedTaskInputs: [UUID: AgentInput] = [:]
+    private var fixedTaskInputs: [String: AgentInput] = [:]
     private let admission = AgentAdmissionGate(capacity: 32)
 
     // MARK: - Registration
@@ -43,14 +44,16 @@ public actor PhotographerAgent: Agent {
     }
 
     public init(
-        sessionID: UUID, configuration: AgentConfiguration? = nil, controlsArm: Bool = false,
+        sessionID: String, configuration: AgentConfiguration? = nil, controlsArm: Bool = false,
         outputCapacity: Int = PhotographerSignalPreprocessor.outputCapacity,
         controlAvailable: @escaping @Sendable () async -> Bool = { true },
         context: AgentContextRepository<PhotographerContextState>? = nil
     ) throws {
         guard (1...8192).contains(outputCapacity) else { throw CommunicationError.invalidPayload }
         self.contextRepository =
-            context ?? AgentContextRepository(agent: .photographer, scope: UUID(), state: PhotographerContextState())
+            context
+            ?? AgentContextRepository(
+                agent: .photographer, scope: UUID().uuidString, state: PhotographerContextState())
         guard contextRepository.agentID == .photographer else { throw AgentConfigurationError.identityMismatch }
         let configuration = try configuration ?? AgentConfigurations.load(named: "Photographer")
         guard configuration.agentID == .photographer else { throw AgentConfigurationError.identityMismatch }
@@ -118,7 +121,7 @@ public actor PhotographerAgent: Agent {
     }
 
     /// Trusted host attachment: exactly one vision scope, independent of root camera requests.
-    public func bindTracking(sessionID: UUID) async throws {
+    public func bindTracking(sessionID: String) async throws {
         guard lifecycle == .running else { throw HarnessError.notRunning }
         guard trackingSessionID == nil || trackingSessionID == self.sessionID else {
             throw CommunicationError.capacityExceeded
@@ -131,7 +134,7 @@ public actor PhotographerAgent: Agent {
         lastPoseReceivedAt = nil
         tracking.reset()
     }
-    public func unbindTracking(sessionID: UUID) async throws {
+    public func unbindTracking(sessionID: String) async throws {
         guard trackingSessionID == sessionID else { return }
         try await contextRepository.update { $0.state.trackingSessionID = nil }
         trackingSessionID = nil
@@ -295,7 +298,7 @@ public actor PhotographerAgent: Agent {
         processed += 1
     }
 
-    private func prepareSignal(_ input: AgentInput, cameraRequestID: UUID?) async throws {
+    private func prepareSignal(_ input: AgentInput, cameraRequestID: String?) async throws {
         let snapshot = try await contextRepository.snapshot()
         let disposition = try preprocessor.classify(input, state: snapshot.state)
         if input.payload.kind == .audio || input.payload.kind == .image { return }
@@ -308,7 +311,7 @@ public actor PhotographerAgent: Agent {
         }
     }
 
-    public func completeFixedTask(inputID: UUID, value: String?, failure: String? = nil) async throws {
+    public func completeFixedTask(inputID: String, value: String?, failure: String? = nil) async throws {
         guard let original = fixedTaskInputs.removeValue(forKey: inputID), let scope = original.taskScope else {
             return
         }

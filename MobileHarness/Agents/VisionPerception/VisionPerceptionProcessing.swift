@@ -2,12 +2,13 @@ import AgentCore
 import Foundation
 import ModelKit
 import PlatformKit
+import Storage
 
 // MARK: - State
 
 public struct VisionPerceptionContextState: AgentContextState {
     public var latestFrameSequence: UInt64?
-    public var perceptionSessionID: UUID?
+    public var perceptionSessionID: String?
     public init() {}
     public mutating func recoverInterruptedWork() {
         perceptionSessionID = nil
@@ -45,7 +46,8 @@ public struct VisionPerceptionContextBuilder: ContextBuilder {
                 throw ImageInputError.invalidFrame
             }
             return PoseRequest(
-                image: resolved, context: InferenceContext(requestID: input.id, scopeID: input.sessionID))
+                image: resolved,
+                context: InferenceContext(requestID: input.id, scopeID: input.sessionID))
         }
     }
     public init() {}

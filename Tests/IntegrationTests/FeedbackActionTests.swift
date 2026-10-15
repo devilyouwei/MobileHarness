@@ -3,6 +3,7 @@ import Agents
 import ExecutionRuntime
 import Foundation
 import FunctionContracts
+import Storage
 import Testing
 
 private actor FeedbackProbe {
@@ -14,7 +15,9 @@ private actor FeedbackProbe {
 private func feedbackInput(_ function: String, _ parameters: [String: String] = [:]) -> FunctionInvocation {
     FunctionInvocation(
         call: .init(actionPath: .init(domain: "UI", module: "Feedback", function: function), parameters: parameters),
-        context: .init(source: "assistant", sessionID: UUID(), inputID: UUID()), results: ActionReportStore())
+        context: .init(
+            source: "assistant", sessionID: UUID().uuidString, inputID: UUID().uuidString),
+        executionID: UUID().uuidString, results: ActionReportStore())
 }
 
 @Test func reusableFeedbackActionsForwardDefaultsAndExplicitParameters() async throws {
@@ -88,7 +91,9 @@ func invalidHapticArgumentsNeverInvokeNativeEffect(_ arguments: [String: String]
             "enabled": "true", "paused": "false", "revision": "2", "cue": "soft", "volume": "0.6",
             "hapticStyle": "rigid", "hapticIntensity": "0.9",
         ])
-    let input = FunctionInvocation(call: call, context: feedbackInput("playCue").context, results: ActionReportStore())
+    let input = FunctionInvocation(
+        call: call, context: feedbackInput("playCue").context, executionID: UUID().uuidString,
+        results: ActionReportStore())
     try await SpeechActions.update(invocation: input) { enabled, paused, revision, configuration in
         #expect(enabled && !paused && revision == 2)
         #expect(configuration.cue.cue == .soft && configuration.cue.volume == 0.6)
@@ -112,7 +117,8 @@ func invalidListeningFeedbackDoesNotReachPolicyOrNativeEffects(_ invalid: [Strin
     let input = FunctionInvocation(
         call: .init(
             actionPath: .init(domain: "Speech", module: "Listening", function: "update"), parameters: arguments),
-        context: feedbackInput("playCue").context, results: ActionReportStore())
+        context: feedbackInput("playCue").context, executionID: UUID().uuidString,
+        results: ActionReportStore())
     await #expect(throws: ActionArguments.ValidationError.self) {
         try await SpeechActions.update(invocation: input) { _, _, _, _ in
             Issue.record("Invalid arguments reached listening policy")

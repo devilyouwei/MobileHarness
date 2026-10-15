@@ -55,9 +55,9 @@ private actor ArtifactFixtureStorage: ModelArtifactStorage {
     func restoreTransfers() -> [ModelArtifactTransferRecord] { records }
     func saveTransfers(_ records: [ModelArtifactTransferRecord]) { self.records = records }
     func installed(_ artifact: ModelArtifact) -> Bool { !removed }
-    func stage(_ artifact: ModelArtifact, task: UUID) throws -> URL { throw ModelArtifactError.storage }
-    func publish(_ artifact: ModelArtifact, task: UUID) {}
-    func discard(task: UUID) {}
+    func stage(_ artifact: ModelArtifact, task: String) throws -> URL { throw ModelArtifactError.storage }
+    func publish(_ artifact: ModelArtifact, task: String) {}
+    func discard(task: String) {}
     func remove(_ artifact: ModelArtifact) { removed = true }
 }
 @Test func resourceRemovalPersistsDiskStateWithoutClosingManager() async throws {
@@ -95,14 +95,14 @@ private actor ArtifactInstallFixture: ModelArtifactStorage {
         self.records = records
     }
     func installed(_ artifact: ModelArtifact) -> Bool { published }
-    func stage(_ artifact: ModelArtifact, task: UUID) throws -> URL {
-        let directory = root.appendingPathComponent(task.uuidString)
+    func stage(_ artifact: ModelArtifact, task: String) throws -> URL {
+        let directory = root.appendingPathComponent(task)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         return directory
     }
-    func publish(_ artifact: ModelArtifact, task: UUID) { published = true }
-    func discard(task: UUID) throws {
-        let directory = root.appendingPathComponent(task.uuidString)
+    func publish(_ artifact: ModelArtifact, task: String) { published = true }
+    func discard(task: String) throws {
+        let directory = root.appendingPathComponent(task)
         if FileManager.default.fileExists(atPath: directory.path) { try FileManager.default.removeItem(at: directory) }
     }
     func remove(_ artifact: ModelArtifact) throws {
@@ -228,8 +228,8 @@ private struct SymlinkHubDownloader: ModelArtifactDownloader {
 @Test(.timeLimit(.minutes(1))) func restoredHubRequestPreservesInterruptedStageBeforeReattachment() async throws {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     defer { try? FileManager.default.removeItem(at: root) }
-    let generation = UUID()
-    let interrupted = root.appendingPathComponent(generation.uuidString)
+    let generation = UUID().uuidString
+    let interrupted = root.appendingPathComponent(generation)
     try FileManager.default.createDirectory(at: interrupted, withIntermediateDirectories: true)
     try Data("partial".utf8).write(to: interrupted.appendingPathComponent("stale.partial"))
     let storage = ArtifactInstallFixture(
@@ -252,9 +252,9 @@ private actor UnreadableReceiptStorage: ModelArtifactStorage {
     func restoreTransfers() -> [ModelArtifactTransferRecord] { [] }
     func saveTransfers(_ records: [ModelArtifactTransferRecord]) {}
     func installed(_ artifact: ModelArtifact) throws -> Bool { throw failure }
-    func stage(_ artifact: ModelArtifact, task: UUID) throws -> URL { throw ModelArtifactError.storage }
-    func publish(_ artifact: ModelArtifact, task: UUID) {}
-    func discard(task: UUID) {}
+    func stage(_ artifact: ModelArtifact, task: String) throws -> URL { throw ModelArtifactError.storage }
+    func publish(_ artifact: ModelArtifact, task: String) {}
+    func discard(task: String) {}
     func remove(_ artifact: ModelArtifact) {}
 }
 @Test func malformedReceiptIsAnExplicitPackageFailure() async throws {

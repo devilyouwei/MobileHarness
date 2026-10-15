@@ -43,11 +43,11 @@ Photographer 自己产生的追踪调用仍回 Photographer；Assistant 摄影 A
 | 目录 | 职责 |
 | --- | --- |
 | [../Resources](../Resources/README.md) | v7 Agent 权限、v1 Skills 与显式 catalog；配置/指令无编译代码 |
-| Support/Core | Foundation-only AgentCore，身份、Signal、权限、队列、轮次和 Context 契约 |
+| Support/Core | independent runtime framework AgentCore，身份、Signal、权限、队列、轮次和 Context 契约 |
 | Support | 纯资源加载与不可变 Skill/函数目录组装 |
 | Support/Communication | 业务 Signal 和任务通信 Schema |
 | Support/Chat | 组合式 Chat worker、快照目录、提示词、原生协议、ReACT 与证据 |
-| Support/Context | Task/Skill 结构化状态、固定任务协调与原子持久化 |
+| Support/Context | Task/Skill 结构化状态、固定任务协调与原子内存状态提交 |
 | 七角色目录 | Actor/生命周期、Processing（状态、预处理、Builder）及本角色策略/固定流程 |
 
 ## 开发契约
@@ -58,7 +58,7 @@ Skill 加载验证依赖、canonical 函数、别名、Channel 后整体提交�
 
 ## 历史与可视化
 
-Assistant 运行时 Context 持有内存对话，完整请求与 Task 压缩按会话文件 checkpoint；其他角色保留独立持久化 Context。每请求记录任务目标、执行类型、Skill revision、taskID 和目录 JSON。固定执行者只持久化自身事务/任务状态，重启标记中断且不重放。设置的 Agent 记录当前只展示 Assistant 聊天记录；首页保留有界 Task/Skill 投影和 Action/Task/Agent 执行诊断，未提供其他 Agent 的伪聊天页面。
+所有角色的运行时 Context 都通过 Storage 内存接口持有状态，不读写 Context JSON。Task/Message 先在 SQLite 创建身份记录，运行时仅修改内存，完整消息、终态与证据按各自完成边界提交。每请求记录任务目标、执行类型、Skill revision、taskID 和目录快照。重启从 SQL 标记未完成业务记录中断，不恢复运行状态或重放动作。设置的 Agent 记录当前只展示 Assistant 聊天记录；首页保留有界 Task/Skill 投影和 Action/Task/Agent 执行诊断，未提供其他 Agent 的伪聊天页面。
 
 ✅ 资源、动态授权、Assistant 任务与 ReACT、确定性角色和历史/UI 投影已接入。❌ 真机摄影、语音竞争、模式切换及历史展示仍需验收。详细实现见各目录 README。
 
@@ -140,9 +140,13 @@ flowchart LR
 ✅ Implemented: Agents own request history membership and terminal compression policy; StorageChat supplies neutral records only. Task closure builds an indexed compression from reported finish summary and actual terminal status/failure in the same repository transaction. No additional inference or compatibility migration is added.
 
 
-✅ 确定性角色 ApplicationControl、Memory、Photographer 显式选择最近 4096 条 Signal 证据和消费批次的滚动保留并持久化淘汰计数，避免根服务运行累计记录到 8192 条后终止。业务关联和任务独立保存；策略由角色拥有，Assistant 聊天/Task 历史和 Core 默认溢出拒绝策略不受此策略影响。
+✅ 确定性角色 ApplicationControl、Memory、Photographer 显式选择最近 4096 条 Signal 证据和消费批次的滚动保留并在内存记录淘汰计数，避免根服务运行累计记录到 8192 条后终止。业务关联和任务独立保存；策略由角色拥有，Assistant 聊天/Task 历史和 Core 默认溢出拒绝策略不受此策略影响。
 
 
-## 会话存储性能重构 v3
 
-✅ 已实现：Assistant context 改为纯内存，当前聊天经同一内存 context 事务更新；持久化由会话结束 checkpoint 捕获会话和小型恢复状态，不保留历史 Signal 证据。Skill/任务恢复只标记中断，不重放。移除逐delta持久化屏障。
+## Assistant model-photo ownership
+
+✅ Implemented: Assistant owns model-photo preparation policy and invokes separate injected original-read and JPEG-preparation capabilities before building the observation image. App only wires/bridges capability values; PlatformKit retains generic native codecs. No native image framework dependency or new module is introduced. Policy and lifecycle details belong to [Assistant](Assistant/README.md#model-photo-preparation-policy).
+
+
+✅ Implemented: every production Agent Context uses Storage process-memory state, with no context JSON writer. SQLite is the durable owner of Task/dialog/message facts; crash discards hot state and never replays effects.

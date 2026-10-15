@@ -1,5 +1,6 @@
 import AgentCore
 import Foundation
+import Storage
 
 // MARK: - State
 
@@ -11,9 +12,9 @@ public struct MemoryContextState: AgentTaskContextState {
         try MemorySignalPreprocessor().classify(input, state: state)
     }
 
-    public var taskViews: [UUID: AgentTaskView]?
+    public var taskViews: [String: AgentTaskView]?
 
-    public var pendingRequestIDs: [UUID] = []
+    public var pendingRequestIDs: [String] = []
     public init() {}
     public func validateContextState() throws {
         try validateTaskState()

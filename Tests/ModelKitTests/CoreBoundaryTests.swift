@@ -3,8 +3,8 @@ import Foundation
 import Testing
 
 @Test func inferenceScopeIsOpaqueAndPreservedWithoutConversationPolicy() async throws {
-    let request = UUID()
-    let scope = UUID()
+    let request = UUID().uuidString
+    let scope = UUID().uuidString
     let context = InferenceContext(requestID: request, scopeID: scope)
     let pair = InferenceSession<Int>.make(
         context: context, limits: try StreamLimits(capacity: 1), estimatedBytes: { _ in 8 })

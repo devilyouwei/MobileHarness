@@ -1,5 +1,6 @@
 import AgentCore
 import Foundation
+import Storage
 
 func expectedActionCall(name: String, parameters: [String: String] = [:]) -> ActionCall {
     let module = name == "say" ? "Speech" : "UI"
@@ -9,7 +10,7 @@ func expectedActionCall(name: String, parameters: [String: String] = [:]) -> Act
         channel: name == "say" ? "Speech" : "Display", parameters: parameters)
 }
 
-let fixtureToolID = UUID(uuid: (0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0))
+let fixtureToolID = UUID().uuidString
 func expectedPrint(_ text: String) -> AgentOutput {
     .actionCall(
         ActionCall(

@@ -40,3 +40,10 @@ Update this README when test scope or lifecycle contracts change.
 ✅ Restored HF generations preserve staging before reattachment; failed requests retain resumable records and explicit cancellation removes them. This supersedes the previous discard-before-restart contract.
 
 ✅ RuntimeBoundaryTests cover invalid manager configuration, nondefault limits reaching Core resources, manager state projection, failed admission and unload/shutdown. Isolated contexts specify their gate/waiter limits explicitly; ModelManager initialization propagates configuration errors.
+
+
+✅ Fixtures use UUID/opaque runtime strings and committed database business references; concurrency, restart, invalid-ID and failure behavior remain covered.
+
+## Identity ownership
+
+✅ Runtime and foundation identities use opaque protocol strings or Foundation UUID; no project ID-generator dependency exists. SQLite-backed Storage publishes committed business references and App injects repositories/maps native Bluetooth identities. Tests preserve caller identity, cancellation and failure semantics. See [current storage design](../../MobileHarness/Storage/README.md) for relational allocation and persistence.

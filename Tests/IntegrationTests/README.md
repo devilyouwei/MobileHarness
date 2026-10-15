@@ -1,6 +1,8 @@
 # IntegrationTests
 
-✅ 已实现（2026-10-13）：AgentArchitectureTests 用有效、已达 8192 条上限的持久化 context 覆盖三个确定性角色首次输入收敛、淘汰计数、第二次输入继续服务及设置恢复函数输出；ResourcePreferencesTests 覆盖真实本地文档重开、根 Gateway 设置恢复和原语音配置保留；同时验证未显式选择保留策略时仍拒绝溢出。合成证据不包含用户记录或模型文件。
+✅ Scripted capture-only → later save/ignore/close inputs cover photography release, pre-execution unknown aliases (including discardPhoto), explicit correction feedback, reloading on a subsequent request, canonical alias execution exactly once, and no fabricated Task. Prompt regressions verify current-preview/media_N guidance. These are synthetic runtime checks, not real-model/device acceptance.
+
+✅ 已实现（2026-10-13）：AgentArchitectureTests 用有效、已达 8192 条上限的内存 context 覆盖三个确定性角色首次输入收敛、淘汰计数、第二次输入继续服务及设置恢复函数输出；ResourcePreferencesTests 覆盖真实本地文档重开、根 Gateway 设置恢复和原语音配置保留；同时验证未显式选择保留策略时仍拒绝溢出。合成证据不包含用户记录或模型文件。
 
 Purpose: verify composed Agent, Gateway, Action, Tool, Storage and voice contracts with injected model/device substitutes. Design goals: exercise real boundaries and failure paths without presenting a simulator or test double as physical-device acceptance.
 
@@ -55,7 +57,7 @@ Run one explicitly selected physical test per process with `NEXARM_PORT=/dev/cu.
 
 Update this README when test responsibilities change; dated run results belong in [validation history](../../docs/validation/Validation-History.md).
 
-✅ PromptTemplateTests 直接提取 BasicSkill/Photography 的生产 xml 示例，用当前组合目录与真实 GenerationTrace 解析；验证静默 startTask 无 Speech/Display、副作用按反馈分轮、准备文本只在 wait 中映射一次。检查默认及已加载摄影请求均含最新规则，摄影 revision 快照预期已更新至16。仅验证资源、解析及调用映射，不证明真实模型遵循率或物理相机效果。
+✅ PromptTemplateTests 直接提取 BasicSkill/Photography 的生产 xml 示例，用当前组合目录与真实 GenerationTrace 解析；验证静默 startTask 无 Speech/Display、副作用按反馈分轮、准备文本只在 wait 中映射一次。检查默认及已加载摄影请求均含最新规则，摄影 revision 快照预期已更新至17。仅验证资源、解析及调用映射，不证明真实模型遵循率或物理相机效果。
 
 ✅ Local document tests cover reopen, cached reads, explicit refresh/invalidation, stale and concurrent writers, size bounds and corrupt-file cache preservation. ❌ Keychain migration requires device acceptance.
 
@@ -827,10 +829,10 @@ Camera observation request coverage inspects the complete message list for the o
 ✅ Task 上下文回归覆盖普通对话和 native call/result 在 startTask 续轮、waitingUser 后新输入中保留；仅终态旧 Task 原始过程退出模型投影，摘要保留为新任务背景。同输入替换不恢复旧任务原始调用/图片消息；当前相机事实仍可以提供实际残留预览供操作，启动回执/新目录及历史原文仍完整。
 
 
-✅ Implemented (2026-10-13 caption/error lifecycle): mask bottom ASR and reply/status immediately while a notice is visible, restore retained text after dismissal, and preserve pinned Task/promoted ASR layout. Consent-off clears both captions; root HomeEffectsWorkflow owns one UUID/text-fenced350ms reply fade/removal task, cancelled by new text/turn/off/shutdown, scheduled only after reply-policy/playback/native-resume barriers. Agent errors stay in factual root failure notices, not persistent voiceStatus copies. App root contexts explicitly choose afterFirstUnlock file protection, including their directory; repository persistent factory accepts protection while its SDK default remains whileUnlocked. This mitigates lock-boundary writes, without claiming the screenshot proves that cause or hiding other storage failures.
+✅ Implemented (2026-10-13 caption/error lifecycle): mask bottom ASR and reply/status immediately while a notice is visible, restore retained text after dismissal, and preserve pinned Task/promoted ASR layout. Consent-off clears both captions; root HomeEffectsWorkflow owns one UUID/text-fenced350ms reply fade/removal task, cancelled by new text/turn/off/shutdown, scheduled only after reply-policy/playback/native-resume barriers. Agent errors stay in factual root failure notices, not persistent voiceStatus copies. Agent contexts use Storage memory state; configuration documents retain their explicit file protection. SQL/business failure cases remain separately covered.
 
 
-✅ 用 Assistant/Gateway 合成设备 fixture 验证 loadSkills→openCamera→takePhoto 在无 Task 模式完成，图片结果进入续轮且没有重复拍摄/Task/保存忽略。移除旧 Task 照片鉴权断言，改为验证注册函数可直接调用及相机实际 photoID 投影。
+✅ 用 Assistant/Gateway 合成设备 fixture 验证 loadSkills→openCamera→takePhoto 在无 Task 模式完成，图片结果进入续轮且没有重复拍摄/Task/保存忽略。移除旧 Task 照片鉴权断言，改为验证注册函数可直接调用及相机实际 mediaID 投影。
 
 
 ✅ RuntimeTests 用 speechPerception→UI.VoiceState.setVoiceState 的真实 Gateway/ToolExecutor 路径验证局部取消被保留为取消结果但不进入异常快照、后续正常状态更新可执行；取消合并其他叶子失败及取消后的反馈投递失败仍属于异常。已有调用方取消/清理回归保持。
@@ -860,18 +862,86 @@ Camera observation request coverage inspects the complete message list for the o
 
 ## Task history v2 and in-place compression
 
-✅ Implemented: Regression coverage for history v2: startup/terminal request ownership, stable in-place Task compression, same-input Task replacement, closure/failure/cancellation/recovery, ordinary/native pair preservation, fresh/boundary contexts, rejected persistence and old-schema rejection. No real-model/device acceptance is inferred.
+✅ Regression coverage preserves startup/terminal request ownership, stable in-place Task compression, same-input Task replacement, closure/failure/cancellation/recovery, ordinary/native pairs, context budgets and rejected persistence in the current SQLite repository. Old file-schema/import tests are removed. No real-model/device acceptance is inferred.
 
 
 ## 会话存储性能重构 v3
 
-✅ 已实现：将旧聚合文档/逐delta耐久测试替换为会话文件与结束checkpoint测试，覆盖流式零写入、用户/回复各一次保存、取消/失败保存、崩溃丢未保存尾部、归档事务恢复、缺失current建立与损坏拒绝、索引读取不加载归档正文、原文完整字符串和Task压缩。
+✅ 当前测试覆盖 SQLite 消息边界保存：流式零写入、用户/每条 Assistant 或 ReACT 观察独立提交、取消/失败保存、崩溃丢未保存尾部、原子归档、current 唯一建立、失败传播、列表不读大证据、完整原文与 Task 原位压缩。旧会话文件/索引/轮换测试已移除。
 
 ## Isolated audio-detection startup coverage
 
-✅ History-reference regressions: list/ref/read native routing, ref stability after archiving, retained notFound for a mistyped full UUID, invalid/ambiguous ref rejection, unique-prefix omission on collisions, case normalization and file-backed reopen. Preserve existing pagination/truncation and non-mutating queries.
+✅ History-reference regressions: canonical ID list/read routing, archive/database-backed reopen, explicit missing-ID errors, malformed/foreign-prefix rejection, pagination/truncation and non-mutating reads. The UUID-prefix/ref implementation and its collision tests are removed.
 
 ✅ SoundSourceTests reproduces unauthorized construction with the full SpeechPerception declaration in a single-Agent policy, then uses the production media.audio/sound.source restriction with only phone.microphone allowed. It verifies exact permissions, immutable original configuration, sole PCM recipient, real Gateway direction delivery and running lifecycle without model or presentation calls. This covers policy assembly with synthetic PCM; native microphone/device acceptance remains separate.
 
 
 ✅ Canonical history assertions: HistoryIntent regressions inspect canonical current/archived conversation sources directly. Task cancellation and archive compression must retain full source evidence.
+
+## Native model-photo compression
+
+✅ Implemented: NativeImageCompressionTests.swift uses synthetic native images to verify landscape/portrait and EXIF orientation, no upscale/crop, pixel/byte bounds, retry/exhaustion, malformed input/limits and cancellation. Storage/reopen plus Assistant photo observations verify that the model gets a reduced JPEG under the original photo identity while stored/export-readable bytes remain exactly original. GenerationRoundTests also verifies the compressed photo crosses the actual round/result barrier and is reused across an additional business-result continuation without another photo read. No live provider, user media or physical-camera acceptance.
+
+
+✅ Fixtures distinguish runtime UUID identities from committed database business references; observable behavior and failures remain covered.
+
+
+✅ SQLiteRecordTests replaces the custom allocator contracts with committed-ID concurrency/deletion/rollback and idempotent message storage. Runtime UUID identities are independent of database business keys; see docs/validation/Validation-History.md for exact synthetic/build versus native acceptance.
+
+## Identity ownership
+
+✅ Runtime and foundation identities use opaque protocol strings or Foundation UUID; no project ID-generator dependency exists. SQLite-backed Storage publishes committed business references and App injects repositories/maps native Bluetooth identities. Tests preserve caller identity, cancellation and failure semantics. See [current storage design](../../MobileHarness/Storage/README.md) for relational allocation and persistence.
+
+✅ Database initialization creates the new relational schema; existing settings documents do not influence business allocation. Missing/corrupt database and transaction failures remain explicit; no counter document is opened or imported.
+
+## Assistant photo-policy ownership
+
+✅ Implemented: NativeImageCompressionTests and GenerationRoundTests pass unprocessed original reads plus a separate native preparation closure to the real Assistant photo-observation builder. Verify the builder supplies its own dimension/pixel/byte/quality policy, propagates preparation errors/cancellation, rejects empty/over-budget output, skips read/prepare for unsupported models or irrelevant/failed actions, and preserves photo identity/original storage. Actual round continuations reuse the prepared attachment after one read/preparation. AgentTaskSkillTests retain explicit synthetic preparation doubles for unrelated Skill scenarios.
+
+## SQLite records migration
+
+✅ Runtime fixtures use opaque UUID strings; committed business entities use dialog/message/task/media/device database IDs. Independent repository interfaces preserve ownership/cancellation and foundation boundaries. Completed messages (including each ReACT message) persist individually, without delta fragments or old allocator/file-index compatibility. See the project SQLite business-record plan.
+
+## SQLite validation
+
+✅ SQLiteRecordTests covers independent committed IDs, rollback, per-message ReACT persistence, zero delta writes, media pending/ready and publication rollback, context windows/full Task indexes and exact deduplicated snapshots. The100000-message corpus benchmark runs explicitly with MH_STORAGE_BENCHMARK=1 to avoid changing concurrent freshness/deadline test load. NativeImageCompression coverage remains intact. Required-check results and outstanding native acceptance are recorded separately in docs/validation/Validation-History.md.
+
+✅ The opt-in 100000-message mixed corpus verifies actual dialog/Task/pair indexes, bounded 20-item preview payloads and post-seed pagination peak-memory growth. Committed-row diagnostics verify constant-row new-message writes and idempotent retry. Out-of-order primary keys/tied positions verify explicit history-position enumeration.
+
+✅ Mixed-corpus verification uses100000 user/Assistant messages (50000 display pairs), checks both dialog and Task query plans, and distinguishes pagination peak-memory growth from total test-process peak memory.
+
+✅ After a successful checkpoint message/compression fingerprints are retained only for the captured context window; offloaded records retain SQLite UUID/role idempotency. The long-dialog regression asserts bounded fingerprint count instead of retaining one digest per stored historical message.
+
+✅ Messages store a bounded240-character preview separately from full body. List/pair/title queries read only that column; context selectors project identity fields without body, and metadata reads omit recovery payload. SQLite does not need to materialize a long body to compute a list substring. Full details/context messages retain exact original bodies.
+
+✅ Storage repository refactor: SQLite fixtures use explicit StorageSQLite construction and business repository interfaces; retain current storage/photo/Task/Bluetooth regressions and100000-message benchmark. Shared File/Memory document/binary, namespace, bounded publication/queue and actual cancelled-caller checkpoint regressions are implemented.
+
+
+✅ Configuration-preservation regressions: fixed version1 cloud/preference documents reopen without resetting enabled/model/credential reference; cloud restoration applies the saved configuration, updates retain envelope1 and no plaintext credential. Fixed UUID-generation transfer JSON remains readable as a runtime string and round-trips to the original UUID representation, without downloads.
+
+✅ Test wiring: IntegrationTests declares ModelKitRuntime directly for the File-document/SDK-transfer wire-format regression; production module boundaries do not change.
+
+
+✅ Lifecycle regressions: message identity exists before generation with empty durable body, stable IDs across terminal save/retry, delta zero writes, independent ReACT commits, completed user versus cancelled Assistant, SQL-only crash interruption/compression, and shared memory-state visibility. File Context fixtures are removed; history restart tests use SQLite, and runtime-context restart tests verify fresh memory.
+
+✅ ORM immutability regression: terminal content updates preserve the identity row’s original history position/date, even if a retry DTO supplies different metadata. Startup active-record indexes cover unfinished Tasks and messages.
+
+✅ Empty-identity recovery regression: an uncommitted user body is absent from model context but remains an interrupted timeline identity; an interrupted Task with no source messages does not create an invalid empty compression.
+
+✅ Memory-budget regression: logical evidence bytes reject overflow before publishing a mutated snapshot; the last committed memory state survives.
+
+
+✅ Implemented (2026-10-15): Verify accepted final user text creates one completed row in exactly one committed transaction, returns the durable ID before model admission, and retries without duplicate rows or counts. Preserve Assistant reservation, ReACT and delta-zero-write coverage.
+
+
+✅ Implemented (2026-10-15 current-dialog hardening): Current-dialog regressions cover concurrent ensure-current, missing-current recreation, archive/new-current rollback using a real SQLite INSERT trigger failure, post-commit memory-publication failure with repeated rejection/recovery, stale read tokens and archived-message insertion rejection while existing evidence remains editable. Use SQLite system test APIs only for controlled fault injection, without exposing SQL through production contracts.
+
+SQLiteDialogLifecycleTests.swift owns current-dialog rotation/publication fault injection and archive admission regressions.
+
+
+✅ Verified (2026-10-15): existing ActionLifecycle feedback acceptance, exhausted-hop rejection and replacement-owner fencing after removing the unreachable runtime UUID allocation catch in InputGateway. No new mirrored test is required.
+
+
+✅ Implemented (2026-10-15 Task record visibility): The actual SQLite long-Task test covers HistoryPresentationAdapter and UI timeline projection: committed source records collapse to one Task card, expand all source previews and survive repository reopen/retirement. This distinguishes saved evidence from display failure without a fake storage implementation.
+
+✅ Implemented: verify default20-item timeline/Task/archived-dialog pages, later-page Task folding and complete raw-record reads. Update opt-in100000-message preview-page assertions to20 without reducing corpus size.

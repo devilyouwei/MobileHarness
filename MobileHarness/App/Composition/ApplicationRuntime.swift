@@ -13,6 +13,7 @@ import OSLog
 import PlatformKit
 import Storage
 import StorageChat
+import StorageTasks
 import UI
 
 /// Root-owned communication assembly, available before voice models are ready.
@@ -23,13 +24,12 @@ final class ApplicationRuntime {
     private let providerPresentation: ProviderPresentationAdapter
     private let providerSettings: ProviderSettingsRequests
     private let providerRequests: ProviderDiscoveryRequests
-    private let applicationControlSessionID: UUID
+    private let applicationControlSessionID: String
     let applicationControlIntents: ApplicationControlIntentRuntime
     let photographerIntents: PhotographerIntentRuntime
     let historyIntents: HistoryIntentRuntime
-    private let contextDirectory: URL
     let interaction: AgentInteractionRuntime
-    let interactionSessionID: UUID
+    let interactionSessionID: String
     private var startup: Task<Void, Never>?
     private var skillObservation: Task<Void, Never>?
     private var foregroundUpdate: Task<Void, Never>?
@@ -74,7 +74,8 @@ final class ApplicationRuntime {
         if try await assistantContext.snapshot().state.skillState?.activeTaskID != nil {
             guard let control = presentation.taskControl else { throw CommunicationError.unavailableTarget }
             _ = try await control(
-                "cancelTask", ["reason": "用户开始新对话"], "assistant", interactionSessionID, UUID(), nil)
+                "cancelTask", ["reason": "用户开始新对话"], "assistant", interactionSessionID, UUID().uuidString,
+                nil)
         }
         try await historyIntents.startNew()
     }
@@ -89,7 +90,7 @@ final class ApplicationRuntime {
             sessionID: applicationControlSessionID)
         _ = try await finishProviderSettings(id, operation: .save)
     }
-    private func finishProviderSettings(_ id: UUID, operation: ProviderSettingsIntent.Operation) async throws
+    private func finishProviderSettings(_ id: String, operation: ProviderSettingsIntent.Operation) async throws
         -> CloudSettingsDraft
     {
         defer {
@@ -121,7 +122,9 @@ final class ApplicationRuntime {
     }
 
     init(
-        camera: AppleCamera, cameraControl: any CameraControlCapability, bluetooth: BluetoothWorkflow,
+        chatRecords: any ChatRepository, taskRecords: any TaskRepository, camera: AppleCamera,
+        cameraControl: any CameraControlCapability,
+        bluetooth: BluetoothWorkflow,
         historyState: ConversationHistoryState, resourceState: ModelResourcesState, providerState: SettingsState,
         navigationState: NavigationState, device: DeviceControlAdapter,
         modelResources: any ModelResourceCapability,
@@ -136,30 +139,29 @@ final class ApplicationRuntime {
     ) throws {
         try AgentConfigurations.installDeclarations(CapabilityModules.declarations)
         self.photoCamera = cameraControl
-        let root = try FileManager.default.url(
-            for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
-        var directory = root.appendingPathComponent("MobileHarness/Conversations", isDirectory: true)
-        try FileManager.default.createDirectory(
-            at: directory, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
-        #if os(iOS)
-            try FileManager.default.setAttributes(
-                [.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication], ofItemAtPath: directory.path)
-        #endif
-        var attributes = URLResourceValues()
-        attributes.isExcludedFromBackup = true
-        try directory.setResourceValues(attributes)
-        self.contextDirectory = directory
         let assistantContext = AgentContextRepository(
             agent: .assistant, scope: Self.contextScope, state: AssistantContextState())
         self.assistantContext = assistantContext
-        let historyStore = try AssistantConversationStorage.store(repository: assistantContext, directory: directory)
+        let historyStore = try AssistantConversationStorage.store(
+            repository: assistantContext, chat: chatRecords, tasks: taskRecords)
         conversations = historyStore
         let providerSettings = ProviderSettingsRequests(
             service: ProviderSettingsService(
-                store: ProviderSettingsStore(credentials: SettingsCredentialAdapter()), runtime: providerSettingsRuntime
+                store: ProviderSettingsStore(
+                    credentials: SettingsCredentialAdapter(),
+                    document: {
+                        var directory = URL.applicationSupportDirectory.appendingPathComponent(
+                            "MobileHarness/Settings", isDirectory: true)
+                        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+                        var attributes = URLResourceValues()
+                        attributes.isExcludedFromBackup = true
+                        try directory.setResourceValues(attributes)
+                        return try LocalDocumentStore<UserSettingsDocument>(
+                            url: directory.appendingPathComponent("settings.json"))
+                    }), runtime: providerSettingsRuntime
             ))
         self.providerSettings = providerSettings
-        let applicationControlSessionID = UUID()
+        let applicationControlSessionID = UUID().uuidString
         self.applicationControlSessionID = applicationControlSessionID
         self.interactionSessionID = applicationControlSessionID
         let providerRequests = ProviderDiscoveryRequests(discover: SettingsProviderAdapter.discoverModels)
@@ -168,9 +170,9 @@ final class ApplicationRuntime {
             state: providerState, sessionID: applicationControlSessionID, settings: providerSettings,
             discovery: providerRequests)
         self.providerPresentation = providerPresentation
-        let applicationContext = try Self.context(directory, .applicationControl, ApplicationControlContextState())
-        let photographerContext = try Self.context(directory, .photographer, PhotographerContextState())
-        let memoryContext = try Self.context(directory, .memory, MemoryContextState())
+        let applicationContext = Self.context(.applicationControl, ApplicationControlContextState())
+        let photographerContext = Self.context(.photographer, PhotographerContextState())
+        let memoryContext = Self.context(.memory, MemoryContextState())
         let applicationControlAgent = try ApplicationControlAgent(
             sessionID: applicationControlSessionID,
             context: applicationContext)
@@ -289,7 +291,7 @@ final class ApplicationRuntime {
                         historyState.status = message
                     }
                 } catch { await MainActor.run { historyState.status = "历史刷新失败：\(error)" } }
-            })
+            }, titlePositions: { ConversationTitleGenerator.samplePositions(count: $0) })
         titleMutations = mutations
         let behaviors = try BehaviorAssembly(
             presentation: presentation, playback: presentation, pose: presentation,
@@ -364,16 +366,20 @@ final class ApplicationRuntime {
         historyIntents = history
         let main = try AssistantAgent(
             reportsReplyActivity: true, chatProvider: chatProvider, conversations: conversations, modelName: modelName,
-            observations: { observations, input, chat in
-                try await AssistantContextBuilder.photoObservations(
-                    observations, input: input, chat: chat,
-                    read: { id, input in
-                        try await ChatImage(
-                            id: id,
-                            data: cameraControl.readPhoto(
-                                id, source: "assistant", sessionID: input.sessionID, inputID: input.id))
-                    })
-            }, context: assistantContext)
+            observations: AssistantContextBuilder.photoObservationHandler(
+                read: { id, input in
+                    try await ChatImage(
+                        id: id,
+                        data: cameraControl.readPhoto(
+                            id, source: "assistant", sessionID: input.sessionID, inputID: input.id))
+                },
+                prepareJPEG: { data, policy in
+                    try await NativeImageCompression.jpeg(
+                        from: data,
+                        limits: .init(
+                            maximumDimension: policy.maximumDimension, maximumPixels: policy.maximumPixels,
+                            maximumBytes: policy.maximumBytes, quality: policy.quality))
+                }), context: assistantContext)
         presentation.taskControl = { operation, arguments, source, session, input, decision in
             try await main.controlTask(
                 operation, arguments: arguments, source: source, sessionID: session, inputID: input,
@@ -396,7 +402,7 @@ final class ApplicationRuntime {
             })
         self.interaction = interaction
         skillObservation = Task { [activity] in
-            var previous: [UUID: String] = [:]
+            var previous: [String: String] = [:]
             for await skills in main.skillUpdates {
                 guard !Task.isCancelled else { return }
                 let active = skills.tasks.first { $0.id == skills.activeTaskID }
@@ -420,7 +426,8 @@ final class ApplicationRuntime {
                     default: phase = .running
                     }
                     var item = TaskLogItem(
-                        id: task.id, parentID: nil, requester: "", executor: "assistant", title: task.goal, phase: phase
+                        id: task.id, parentID: nil, requester: "", executor: "assistant", title: task.goal,
+                        phase: phase
                     )
                     item.execution = "foreground"
                     item.mode = task.mode
@@ -429,7 +436,7 @@ final class ApplicationRuntime {
                     activity.state.updateTask(
                         item,
                         event: .init(
-                            id: UUID(), time: task.updatedAt ?? task.date, title: task.status,
+                            id: UUID().uuidString, time: task.updatedAt ?? task.date, title: task.status,
                             detail: "前台任务 · Skills: " + task.skills.joined(separator: ",")))
                 }
                 previous = previous.filter { id, _ in skills.tasks.contains { $0.id == id } }
@@ -444,13 +451,11 @@ final class ApplicationRuntime {
         }
         activity.startFailures { try await gateway.observeFailures() }
     }
-    private static let contextScope = UUID(uuid: (0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1))
-    private static func context<State: AgentContextState>(_ directory: URL, _ agent: AgentID, _ state: State) throws
+    private static let contextScope = "00000000-0000-0000-0000-000000000001"
+    private static func context<State: AgentContextState>(_ agent: AgentID, _ state: State)
         -> AgentContextRepository<State>
     {
-        try AgentContextRepository.persistent(
-            agent: agent, scope: contextScope, state: state,
-            url: directory.appendingPathComponent(agent.rawValue + ".context.json"), protection: .afterFirstUnlock)
+        AgentContextRepository(agent: agent, scope: contextScope, state: state)
     }
     var voiceDependencies: VoiceRuntimeDependencies {
         VoiceRuntimeDependencies(
@@ -461,21 +466,20 @@ final class ApplicationRuntime {
                 try await interaction.cancelConversation(sessionID: interactionSessionID)
             },
             stopInteraction: { [weak self] in await self?.shutdown() },
-            makeSynthesis: { [contextDirectory] in
+            makeSynthesis: {
                 try SpeechSynthesisAgent(
                     synthesis: $0, store: $1,
-                    context: Self.context(
-                        contextDirectory, AgentID(rawValue: "speechSynthesis"), SpeechSynthesisContextState()))
+                    context: Self.context(AgentID(rawValue: "speechSynthesis"), SpeechSynthesisContextState()))
             },
-            makePerception: { [contextDirectory, interactionSessionID] in
+            makePerception: { [interactionSessionID] in
                 try SpeechPerceptionAgent(
                     recognition: $0, vad: $1, sessionID: $2, interactionSessionID: interactionSessionID,
                     residentListening: true,
-                    context: Self.context(contextDirectory, .speechPerception, SpeechPerceptionContextState()))
+                    context: Self.context(.speechPerception, SpeechPerceptionContextState()))
             })
     }
     func visionContext() throws -> AgentContextRepository<VisionPerceptionContextState> {
-        try Self.context(contextDirectory, .visionPerception, VisionPerceptionContextState())
+        Self.context(.visionPerception, VisionPerceptionContextState())
     }
     var visionDependencies: VisionRuntimeDependencies {
         .init(

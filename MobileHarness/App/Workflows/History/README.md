@@ -2,7 +2,7 @@
 
 ## Summary
 
-Reads Assistant conversation files, adapts immutable UI values and transports authorized Assistant-history operations to Memory.
+Reads Assistant SQLite records, adapts immutable UI values and transports authorized Assistant-history operations to Memory.
 
 ## Ownership and boundaries
 
@@ -24,7 +24,7 @@ flowchart LR
 
 ## Interfaces and projection
 
-✅ Implemented: HistoryPresentationAdapter retains presentationSnapshot/listPresentation/conversation/showHistory only. There is no second task-history projection. ConversationHistoryWorkflow is one root-owned Assistant load/mutation slot; no agents array or fake read-only task workflow. Lists read index metadata, selected details load one file, and archive titles never reload all bodies. Current and one selected conversation remain separate UI caches. Save failures remain lastCheckpointError.
+✅ Implemented: HistoryPresentationAdapter retains presentationSnapshot/listPresentation/conversation/showHistory only. There is no second task-history projection. ConversationHistoryWorkflow is one root-owned Assistant load/mutation slot; no agents array or fake read-only task workflow. Lists read SQL metadata/cursor pages; selected messages load their evidence, and archive titles never reload all bodies. Current and one selected conversation remain separate UI caches. Save failures remain lastCheckpointError.
 
 HistoryIntentRuntime admits one Memory operation, consumes bound outputs and awaits correlated business completion with a 120-second watchdog. Cancellation joins dispatch and retirement. Archive/delete/title remain canonical store transactions; starting a new conversation cancels a waiting Task through its existing control route first. Busy generation rejects archiving explicitly.
 
@@ -37,3 +37,20 @@ Image reads validate the selected conversation/request and exact producing input
 [Parent design](../README.md)
 
 ✅ Required conversation reader: selected-conversation reads are required at construction and reject a mismatched returned identity before replacing the selected cache. Tests inject explicit readers/failures; no optional/default read path remains.
+
+
+
+
+
+## SQLite records and runtime identity
+
+✅ Implemented: technical identities are opaque UUID strings; committed business entities use dialog/message/task/media/device SQLite IDs. Consumers use Storage repositories while preserving ownership, cancellation and independent foundation boundaries. Complete messages, including each ReACT message, persist at termination; delta fragments do not persist. The custom allocator and replaced file/index implementation are removed. See the project SQLite business-record plan.
+
+✅ Root-owned controls provide20-item archive/dialog/Task cursor pages and message-ID detail reads. At mostfour detail-image reads and four retained detail values remain in memory. Navigation waits for a complete detail before opening its single destination. Requests/models keep their original UUID correlation separate from message_N references; historical image authorization uses the producing input, not the message primary key.
+
+
+✅ Implemented (2026-10-15 automatic history paging): ConversationHistoryWorkflow owns archive-page state and accepts loadMoreArchives(retry:). Honor EOF, same-cursor deduplication, cancellation and current-cursor fences before publishing results; archive failures stay at the paging footer. Refresh resets paging attempts. UI owns page-task lifetime; existing mutation operation slot/SQL contracts remain.
+
+## Native pull-to-refresh
+
+✅ Implemented: refreshing the archive list cancels and joins its single page-read worker before reloading the first page. Refresh and mutations cannot overlap; a page caller's cancellation joins cleanup. Retain visible archives when reload fails, and reset cursor/error state only on success. Refresh never cancels Agent work or business mutations.

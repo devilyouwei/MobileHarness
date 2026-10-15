@@ -3,12 +3,15 @@ import Agents
 import ExecutionRuntime
 import Foundation
 import FunctionContracts
+import Storage
 import Testing
 
 private func effectInput(_ parameters: [String: String]) -> FunctionInvocation {
     .init(
         call: .init(actionPath: .init(domain: "UI", module: "Light", function: "updateLight"), parameters: parameters),
-        context: .init(source: "assistant", sessionID: UUID(), inputID: UUID()), results: ActionReportStore())
+        context: .init(
+            source: "assistant", sessionID: UUID().uuidString, inputID: UUID().uuidString),
+        executionID: UUID().uuidString, results: ActionReportStore())
 }
 @Test func independentEffectsRemainCanonicalWithoutAnySkillGrant() throws {
     let skills = try AgentConfigurations.skillRegistries()

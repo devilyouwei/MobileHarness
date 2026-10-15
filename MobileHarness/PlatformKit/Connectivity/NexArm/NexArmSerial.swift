@@ -6,19 +6,19 @@
     public actor NexArmSerial: NexArmObservableLink {
         private var fd: Int32
         private var busy = false
-        private var observationID: UUID?
+        private var observationID: String?
         private var telemetry = NexArmTelemetryCache()
-        public func beginObservation() throws -> UUID {
+        public func beginObservation() throws -> String {
             guard fd >= 0 else { throw NexArmError.disconnected }
             guard !busy, observationID == nil else { throw NexArmError.busy }
             guard tcflush(fd, TCIFLUSH) == 0 else { throw NexArmError.io(errno) }
             telemetry = NexArmTelemetryCache()
-            let token = UUID()
+            let token = UUID().uuidString
             observationID = token
             return token
         }
-        public func endObservation(_ session: UUID) { if observationID == session { observationID = nil } }
-        public func sendObserved(_ packet: NexArmPacket, session: UUID) throws -> Bool {
+        public func endObservation(_ session: String) { if observationID == session { observationID = nil } }
+        public func sendObserved(_ packet: NexArmPacket, session: String) throws -> Bool {
             try Task.checkCancellation()
             guard observationID == session else { throw NexArmError.disconnected }
             guard fd >= 0 else { throw NexArmError.disconnected }
@@ -27,7 +27,7 @@
             try send(packet)
             return true
         }
-        public func latestObservation(after sequence: UInt64, session: UUID) throws -> NexArmTelemetry? {
+        public func latestObservation(after sequence: UInt64, session: String) throws -> NexArmTelemetry? {
             try Task.checkCancellation()
             guard observationID == session else { throw NexArmError.disconnected }
             guard fd >= 0 else { throw NexArmError.disconnected }

@@ -26,11 +26,11 @@ public actor ModelResource<Model: Sendable>: ModelResourceLifecycle {
     private let loader: @Sendable () async throws -> Model
     private var model: Model?
     private var loading: Task<Model, Error>?
-    private var loadID: UUID?
+    private var loadID: String?
     private var waiters = 0
     private let maximumLoadWaiters: Int
     private struct ActiveLease {
-        let id: UUID
+        let id: String
         var cancel: (@Sendable () -> Void)?
     }
     private var activeLease: ActiveLease?
@@ -45,12 +45,12 @@ public actor ModelResource<Model: Sendable>: ModelResourceLifecycle {
         self.loader = loader
     }
 
-    public func acquire() async throws -> (id: UUID, model: Model) {
+    public func acquire() async throws -> (id: String, model: Model) {
         try Task.checkCancellation()
         guard !closed else { throw CapabilityError.sessionClosed }
         guard !unloading, !maintenance else { throw CapabilityError.unavailable("Model is under maintenance") }
         guard activeLease == nil else { throw CapabilityError.inputBusy }
-        let id = UUID()
+        let id = UUID().uuidString
         activeLease = ActiveLease(id: id)
         do {
             let model = try await ensureLoaded()
@@ -64,13 +64,13 @@ public actor ModelResource<Model: Sendable>: ModelResourceLifecycle {
     }
 
     /// Install after creating the session/worker; handles shutdown-before-install races.
-    public func setCancellation(_ id: UUID, _ cancel: @escaping @Sendable () -> Void) {
+    public func setCancellation(_ id: String, _ cancel: @escaping @Sendable () -> Void) {
         guard activeLease?.id == id else { return }
         activeLease?.cancel = cancel
         if closed { cancel() }
     }
 
-    public func release(_ id: UUID) {
+    public func release(_ id: String) {
         guard activeLease?.id == id else { return }
         activeLease = nil
         drained?.resume()
@@ -85,7 +85,7 @@ public actor ModelResource<Model: Sendable>: ModelResourceLifecycle {
         waiters += 1
         defer { waiters -= 1 }
         if loading == nil {
-            loadID = UUID()
+            loadID = UUID().uuidString
             loading = Task { try await loader() }
         }
         let id = loadID

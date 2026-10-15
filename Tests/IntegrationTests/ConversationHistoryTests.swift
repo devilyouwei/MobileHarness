@@ -5,6 +5,9 @@ import Foundation
 @_spi(ModelManagement) import ModelKit
 import Storage
 import StorageChat
+import StorageMedia
+import StorageSQLite
+import StorageTasks
 import Testing
 
 @testable import ModelKitOpenAI
@@ -35,7 +38,7 @@ func liveCloudTitleUsesProductionGenerator() async throws {
     let provider = try OpenAIChat(context: context, configuration: configuration)
     let probe = LiveTitleChatProbe(provider: provider)
     let store = ConversationHistoryStore()
-    let id = UUID()
+    let id = UUID().uuidString
     _ = try await store.beginFixture(
         id: id, user: "请介绍如何拍摄室内人像照片，安排补光与人物姿态。", system: "fixture", model: "synthetic")
     try await store.append("可使用窗边柔光，保持背景简洁并调整人物角度。", to: id)
@@ -114,7 +117,7 @@ func liveCloudTitleUsesProductionGenerator() async throws {
 }
 
 private func journal(at url: URL) throws -> ConversationHistoryStore {
-    ConversationHistoryStore(files: try ConversationFileStore(directory: url.deletingLastPathComponent()))
+    ConversationHistoryStore(records: try testConversationRecords(directory: url.deletingLastPathComponent()))
 }
 
 @Test(.actionCatalog) func conversationJournalRestoresRawRequestAndMarksInterruptedGeneration() async throws {
@@ -122,7 +125,7 @@ private func journal(at url: URL) throws -> ConversationHistoryStore {
     defer { try? FileManager.default.removeItem(at: directory) }
     let url = directory.appendingPathComponent("history.json")
     let first = try journal(at: url)
-    let id = UUID()
+    let id = UUID().uuidString
     let original = "  用户原文\n串行执行  "
     let request = try await first.beginFixture(id: id, user: original, system: "system", model: "gpt-4.1")
     #expect(request.request.last?.content == original)
@@ -138,31 +141,32 @@ private func journal(at url: URL) throws -> ConversationHistoryStore {
     #expect(recovered.current.summaryTitle == nil)
 }
 
-@Test(.actionCatalog) func contextUsesTenCompleteRoundsAndNewConversationIsIsolated() async throws {
+@Test(.actionCatalog) func contextUsesTenTerminalRoundsAndNewConversationIsIsolated() async throws {
     let store = ConversationHistoryStore()
     for index in 0..<12 {
-        let id = UUID()
+        let id = UUID().uuidString
         _ = try await store.beginFixture(id: id, user: "question \(index)", system: "system", model: "fixture")
         try await store.beginModelRequest(
-            .init(id: UUID(), input: "question \(index)", requestJSON: "[]"), for: id)
+            .init(id: UUID().uuidString, input: "question \(index)", requestJSON: "[]"), for: id)
         try await store.append("answer \(index)", to: id)
         try await store.finish(id, state: .completed, reason: "stop")
     }
-    let failed = UUID()
+    let failed = UUID().uuidString
     _ = try await store.beginFixture(id: failed, user: "failed question", system: "system", model: "fixture")
     try await store.append("<wait/>", to: failed)
     try await store.finish(failed, state: .failed, error: "bad syntax")
-    let id = UUID()
+    let id = UUID().uuidString
     let request = try await store.beginFixture(id: id, user: "next", system: "new system", model: "fixture")
     try #require(request.request.count == 22)
-    #expect(request.request[1].content == "question 2")
-    #expect(request.request[20].content == "answer 11")
-    #expect(!request.request.contains { $0.content == "<wait/>" })
+    #expect(request.request[1].content == "question 3")
+    #expect(request.request[18].content == "answer 11")
+    #expect(request.request.contains { $0.content == "<wait/>" })
     await #expect(throws: ConversationHistoryError.busy) { try await store.startNew() }
     try await store.finish(id, state: .cancelled)
     let past = try #require(try await store.startNew())
     #expect(past.turns.count == 14 && past.archivedAt != nil)
-    let fresh = try await store.beginFixture(id: UUID(), user: "fresh", system: "system", model: "fixture")
+    let fresh = try await store.beginFixture(
+        id: UUID().uuidString, user: "fresh", system: "system", model: "fixture")
     #expect(fresh.request.count == 2)
     try await store.setTitle("A summarized topic", for: past.id)
     let snapshot = try await store.snapshot()
@@ -174,7 +178,7 @@ private func journal(at url: URL) throws -> ConversationHistoryStore {
 
 @Test(.actionCatalog) func rawOverflowPreservesPrefixAndAdmissionFailureDoesNotOverwriteJournal() async throws {
     let store = ConversationHistoryStore()
-    let id = UUID()
+    let id = UUID().uuidString
     _ = try await store.beginFixture(id: id, user: "original", system: "system", model: "fixture")
     let prefix = String(repeating: "x", count: 262144)
     try await store.append(prefix, to: id)
@@ -183,7 +187,8 @@ private func journal(at url: URL) throws -> ConversationHistoryStore {
     #expect(try await store.snapshot().current.turns.first?.raw == prefix)
     await #expect(throws: ConversationHistoryError.invalidRecord) {
         try await store.beginFixture(
-            id: UUID(), user: String(repeating: "x", count: 4097), system: "system", model: "fixture")
+            id: UUID().uuidString, user: String(repeating: "x", count: 4097), system: "system",
+            model: "fixture")
     }
     #expect(try await store.snapshot().current.turns.count == 1)
 }
@@ -216,7 +221,8 @@ private actor HistoryModel: ChatCapability {
     let model = HistoryModel("<wait/>")
     let agent = try AssistantAgent(chat: model, conversations: store)
     try await agent.start()
-    let input = AgentInput(sessionID: UUID(), payload: .text("请串行"))
+    let input = AgentInput(
+        id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("请串行"))
     try await agent.receive(input)
     var iterator = FixtureGenerationOutputs(agent: agent).makeAsyncIterator()
     let output = try #require(try await iterator.next())
@@ -238,7 +244,9 @@ private actor HistoryModel: ChatCapability {
     let store = ConversationHistoryStore()
     let agent = try AssistantAgent(chat: HistoryModel("partial", leaveOpen: true), conversations: store)
     try await agent.start()
-    try await agent.receive(AgentInput(sessionID: UUID(), payload: .text("original")))
+    try await agent.receive(
+        AgentInput(
+            id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("original")))
     for _ in 0..<10000 {
         if let snapshot = try? await store.snapshot(), snapshot.current.turns.first?.raw == "partial" { break }
         await Task.yield()
@@ -250,7 +258,7 @@ private actor HistoryModel: ChatCapability {
 
 @Test(.actionCatalog) func titleGenerationIsSeparateAndStoredOnlyOnArchivedConversation() async throws {
     let store = ConversationHistoryStore()
-    let id = UUID()
+    let id = UUID().uuidString
     _ = try await store.beginFixture(id: id, user: "Compare channel and wait", system: "system", model: "fixture")
     try await store.append("Some answer", to: id)
     try await store.finish(id, state: .completed)
@@ -271,7 +279,7 @@ private actor HistoryModel: ChatCapability {
 @Test(arguments: ["", "Partial title"])
 func titleGenerationNeverAcceptsIncompleteOutput(text: String) async throws {
     let store = ConversationHistoryStore()
-    let id = UUID()
+    let id = UUID().uuidString
     _ = try await store.beginFixture(id: id, user: "Synthetic title subject", system: "fixture", model: "synthetic")
     try await store.append("Fixture answer", to: id)
     try await store.finish(id, state: .completed)
@@ -281,27 +289,28 @@ func titleGenerationNeverAcceptsIncompleteOutput(text: String) async throws {
     }
 }
 
-@Test(.actionCatalog) func assistantLoadsSavedContextInANewInstanceWithoutReplayingActions() async throws {
+@Test(.actionCatalog) func assistantLoadsSQLiteHistoryWithFreshRuntimeWithoutReplayingActions() async throws {
     let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     defer { try? FileManager.default.removeItem(at: directory) }
-    let url = directory.appendingPathComponent("assistant.context.json")
-    let scope = UUID()
-    let firstRepository = try AgentContextRepository.persistent(
-        agent: .assistant, scope: scope, state: AssistantContextState(), url: url)
-    let firstStore = AssistantHistoryContext.store(repository: firstRepository)
-    let previousID = UUID()
+    let scope = UUID().uuidString
+    let firstRepository = AgentContextRepository(
+        agent: .assistant, scope: scope, state: AssistantContextState())
+    let firstStore = try fixtureAssistantStore(repository: firstRepository, directory: directory)
+    let previousID = UUID().uuidString
     _ = try await firstStore.beginFixture(id: previousID, user: "previous user", system: "old system", model: "fixture")
     try await firstStore.beginModelRequest(
-        .init(id: UUID(), input: "previous user", requestJSON: "[]"), for: previousID)
+        .init(id: UUID().uuidString, input: "previous user", requestJSON: "[]"), for: previousID)
     try await firstStore.append("<express emotion=\"happy\"/>", to: previousID)
     try await firstStore.finish(previousID, state: .completed, reason: "stop")
     let model = HistoryModel("<express emotion=\"smile\"/>")
-    let repository = try AgentContextRepository.persistent(
-        agent: .assistant, scope: scope, state: AssistantContextState(), url: url)
-    let restored = AssistantHistoryContext.store(repository: repository)
+    let repository = AgentContextRepository(
+        agent: .assistant, scope: scope, state: AssistantContextState())
+    let restored = try fixtureAssistantStore(repository: repository, directory: directory)
     let agent = try AssistantAgent(chat: model, conversations: restored, context: repository)
     try await agent.start()
-    try await agent.receive(AgentInput(sessionID: UUID(), payload: .text("continue")))
+    try await agent.receive(
+        AgentInput(
+            id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("continue")))
     var iterator = FixtureGenerationOutputs(agent: agent).makeAsyncIterator()
     let action = try #require(try await iterator.next())
     #expect(action.output == .actionCall(expectedActionCall(name: "express", parameters: ["emotion": "smile"])))
@@ -321,30 +330,10 @@ func titleGenerationNeverAcceptsIncompleteOutput(text: String) async throws {
     #expect(try await restored.snapshot().current.turns.count == 2)
 }
 
-@Test(.actionCatalog) func failedTerminalCheckpointPreservesMemoryAndPriorDurableInput() async throws {
-    let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-    defer { try? FileManager.default.removeItem(at: directory) }
-    let store = ConversationHistoryStore(files: try ConversationFileStore(directory: directory, maximumBytes: 2048))
-    let id = UUID()
-    _ = try await store.beginFixture(id: id, user: "preserve this", system: "system", model: "fixture")
-    try await store.append(String(repeating: "z", count: 3000), to: id)
-    await #expect(throws: DocumentStorageError.capacityExceeded) {
-        try await store.finish(id, state: .failed, error: "checkpoint rejected")
-    }
-    let memory = try await store.readCurrent().current
-    #expect(memory.turns.first?.response.count == 3000 && memory.turns.first?.state == .failed)
-    let restored = try await ConversationHistoryStore(files: ConversationFileStore(directory: directory)).snapshot()
-    #expect(restored.current.turns.first?.response == "" && restored.current.turns.first?.user == "preserve this")
-    #expect(restored.current.turns.first?.state == .interrupted)
-    // Clearing the injected small-file quota lets the retained complete terminal snapshot be saved.
-    try await ConversationFileStore(directory: directory).saveCurrent(.init(conversation: memory))
-    let retried = try await ConversationHistoryStore(files: ConversationFileStore(directory: directory)).snapshot()
-    #expect(retried.current.turns.first?.response.count == 3000 && retried.current.turns.first?.state == .failed)
-}
-
 @Test(.actionCatalog) func conversationTokenBudgetPreservesExplicitValuesAndDefault() async throws {
     let store = ConversationHistoryStore()
-    let record = try await store.beginFixture(id: UUID(), user: "hello", system: "system", model: "fixture")
+    let record = try await store.beginFixture(
+        id: UUID().uuidString, user: "hello", system: "system", model: "fixture")
     #expect(record.maximumOutputTokens == nil)
     let encoded = try JSONEncoder().encode(record)
     #expect(try JSONDecoder().decode(ConversationRecord.self, from: encoded).maximumOutputTokens == nil)
@@ -360,11 +349,11 @@ func titleGenerationNeverAcceptsIncompleteOutput(text: String) async throws {
     defer { try? FileManager.default.removeItem(at: directory) }
     let url = directory.appendingPathComponent("history.json")
     let store = try journal(at: url)
-    let id = UUID()
+    let id = UUID().uuidString
     _ = try await store.beginFixture(id: id, user: "打开摄像头", system: "system", model: "fixture")
     try await store.recordToolDefinitions(["camera declaration"], for: id)
     let call = ConversationToolCall(
-        id: UUID(), providerID: "provider-1", name: "Camera.open", argumentsJSON: "{}")
+        id: UUID().uuidString, providerID: "provider-1", name: "Camera.open", argumentsJSON: "{}")
     try await store.recordToolCall(call, for: id)
     try await store.recordTokenUsage(ConversationTokenUsage(input: 12, generated: 4, total: 16), for: id)
     try await store.finish(id, state: .completed, reason: "toolCalls")
@@ -379,12 +368,14 @@ func titleGenerationNeverAcceptsIncompleteOutput(text: String) async throws {
     try await store.recordToolOutcome(call.id, for: id, state: .failed, output: "permission denied", error: "fixture")
     #expect(try await store.conversation(archivedID).turns.first?.toolCalls?.first?.output == "permission denied")
     // An internal UI Tool or non-journal input does not create a model-call record.
-    try await store.recordToolOutcome(UUID(), for: UUID(), state: .completed)
+    try await store.recordToolOutcome(
+        UUID().uuidString, for: UUID().uuidString, state: .completed)
 }
 
 @Test(.actionCatalog) func admittedConversationRecordHasNoToolOrUsageEvidence() async throws {
     let store = ConversationHistoryStore()
-    let record = try await store.beginFixture(id: UUID(), user: "input", system: "system", model: "fixture")
+    let record = try await store.beginFixture(
+        id: UUID().uuidString, user: "input", system: "system", model: "fixture")
     let restored = try JSONDecoder().decode(ConversationRecord.self, from: JSONEncoder().encode(record))
     #expect(restored.toolCalls == nil && restored.toolDefinitions == nil && restored.tokenUsage == nil)
 }
@@ -416,7 +407,8 @@ private struct NativeRuntimeHistoryChat: ChatCapability {
     let store = ConversationHistoryStore()
     let agent = try FixtureNativeAgent(chat: NativeRuntimeHistoryChat(), conversations: store)
     try await agent.start()
-    let input = AgentInput(sessionID: UUID(), payload: .text("打开摄像头并微笑"))
+    let input = AgentInput(
+        id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("打开摄像头并微笑"))
     try await agent.receive(input)
     var outputs = FixtureGenerationOutputs(agent: agent).makeAsyncIterator()
     var observedAction = false
@@ -437,6 +429,7 @@ private struct NativeRuntimeHistoryChat: ChatCapability {
     let feedbackPayload = InputPayload.toolResult(.init(callID: call.id, value: "completed"))
     try await agent.receive(
         AgentInput(
+            id: UUID().uuidString,
             sessionID: input.sessionID, payload: feedbackPayload,
             metadata: InputMetadata(
                 payload: feedbackPayload, source: "runtime", origin: .runtime, rootID: input.metadata.rootID,
@@ -464,9 +457,10 @@ private struct NativeRuntimeHistoryChat: ChatCapability {
     defer { try? FileManager.default.removeItem(at: directory) }
     let url = directory.appendingPathComponent("history.json")
     let store = try journal(at: url)
-    let id = UUID()
+    let id = UUID().uuidString
     _ = try await store.beginFixture(id: id, user: "concurrent fixture", system: "system", model: "fixture")
-    let call = ConversationToolCall(id: UUID(), providerID: "cloud", name: "Camera.close", argumentsJSON: "{}")
+    let call = ConversationToolCall(
+        id: UUID().uuidString, providerID: "cloud", name: "Camera.close", argumentsJSON: "{}")
     try await store.recordToolCall(call, for: id)
     try await withThrowingTaskGroup(of: Void.self) { group in
         for index in 0..<8 { group.addTask { try await store.append("fragment-\(index)", to: id) } }
@@ -484,7 +478,7 @@ private struct NativeRuntimeHistoryChat: ChatCapability {
 }
 
 extension ConversationHistoryStore {
-    fileprivate func beginFixture(id: UUID, user: String, system: String, model: String) async throws
+    fileprivate func beginFixture(id: String, user: String, system: String, model: String) async throws
         -> ConversationRecord
     {
         let read = try await readCurrent()
@@ -497,22 +491,25 @@ extension ConversationHistoryStore {
     let store = ConversationHistoryStore()
     let read = try await store.readCurrent()
     let request = [ConversationMessage(role: .user, content: "exact caller payload")]
-    let id = UUID()
+    let id = UUID().uuidString
     let record = try await store.begin(id: id, user: "raw", request: request, expecting: read.token, model: "fixture")
     #expect(record.request == request)
     try await store.finish(id, state: .completed)
     await #expect(throws: ConversationHistoryError.conflict) {
-        try await store.begin(id: UUID(), user: "raw", request: request, expecting: read.token, model: "fixture")
+        try await store.begin(
+            id: UUID().uuidString, user: "raw", request: request, expecting: read.token, model: "fixture")
     }
     let beforeArchive = try await store.readCurrent()
     _ = try await store.startNew()
     await #expect(throws: ConversationHistoryError.conflict) {
         try await store.begin(
-            id: UUID(), user: "raw", request: request, expecting: beforeArchive.token, model: "fixture")
+            id: UUID().uuidString, user: "raw", request: request, expecting: beforeArchive.token,
+            model: "fixture")
     }
     let other = try await ConversationHistoryStore().readCurrent()
     await #expect(throws: ConversationHistoryError.conflict) {
-        try await store.begin(id: UUID(), user: "raw", request: request, expecting: other.token, model: "fixture")
+        try await store.begin(
+            id: UUID().uuidString, user: "raw", request: request, expecting: other.token, model: "fixture")
     }
     #expect(try await store.snapshot().current.turns.isEmpty)
 }
@@ -527,10 +524,11 @@ extension ConversationHistoryStore {
             return "fixture"
         })
     try await agent.start()
-    let previous = UUID()
+    let previous = UUID().uuidString
     _ = try await store.beginFixture(id: previous, user: "previous", system: "system", model: "fixture")
     try await store.finish(previous, state: .completed)
-    try await agent.receive(AgentInput(sessionID: UUID(), payload: .text("next")))
+    try await agent.receive(
+        AgentInput(id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("next")))
     var iterator = FixtureGenerationOutputs(agent: agent).makeAsyncIterator()
     guard case .control(let message) = try await iterator.next()?.output else {
         Issue.record("Expected admission error")
@@ -547,7 +545,7 @@ extension ConversationHistoryStore {
 @Test(.actionCatalog) func assistantPersistenceFailureDoesNotCallModel() async throws {
     let store = ConversationHistoryStore()
     let repository = AgentContextRepository(
-        agent: .assistant, scope: UUID(), state: AssistantContextState(),
+        agent: .assistant, scope: UUID().uuidString, state: AssistantContextState(),
         persistence: AgentContextPersistence(
             load: { nil },
             commit: { context, _ in
@@ -557,7 +555,9 @@ extension ConversationHistoryStore {
     let agent = try AssistantAgent(chat: model, conversations: store, context: repository)
     try await agent.start()
     await #expect(throws: DocumentStorageError.capacityExceeded) {
-        try await agent.receive(AgentInput(sessionID: UUID(), payload: .text("next")))
+        try await agent.receive(
+            AgentInput(
+                id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("next")))
     }
     #expect(await model.requests.isEmpty)
     #expect(try await store.snapshot().current.turns.isEmpty)
@@ -567,20 +567,22 @@ extension ConversationHistoryStore {
 
 @Test(.actionCatalog) func modelRequestJournalKeepsFirstTokenUsageAndLateOutcomesWithTheirRequest() async throws {
     let store = ConversationHistoryStore()
-    let id = UUID()
+    let id = UUID().uuidString
     _ = try await store.beginFixture(id: id, user: "question", system: "system", model: "fixture")
-    let first = ConversationModelRequest(id: UUID(), input: "question", requestJSON: "[]")
+    let first = ConversationModelRequest(id: UUID().uuidString, input: "question", requestJSON: "[]")
     try await store.beginModelRequest(first, for: id)
     let arrival = first.date.addingTimeInterval(0.125)
     try await store.recordModelTiming(startedAt: first.date, firstTokenAt: arrival, latency: 0.125, for: id)
     try await store.recordModelTiming(
         startedAt: first.date, firstTokenAt: arrival.addingTimeInterval(1), latency: 1.125, for: id)
     try await store.append("first", to: id)
-    let call = ConversationToolCall(id: UUID(), providerID: "provider", name: "inspect", argumentsJSON: "{}")
+    let call = ConversationToolCall(
+        id: UUID().uuidString, providerID: "provider", name: "inspect", argumentsJSON: "{}")
     try await store.recordToolCall(call, for: id)
     try await store.recordTokenUsage(.init(input: 2, generated: 3, total: 5), for: id)
     try await store.finishModelRequest(id, reason: "toolCalls")
-    try await store.beginModelRequest(.init(id: UUID(), input: "result", requestJSON: "[]"), for: id)
+    try await store.beginModelRequest(
+        .init(id: UUID().uuidString, input: "result", requestJSON: "[]"), for: id)
     try await store.append("second", to: id)
     try await store.recordTokenUsage(.init(input: 6, generated: 7, total: 13), for: id)
     try await store.finishModelRequest(id, reason: "stop")
@@ -595,15 +597,16 @@ extension ConversationHistoryStore {
     #expect(requests[0].tokenUsage?.total == 5 && requests[1].tokenUsage?.total == 13)
 }
 
-@Test(.actionCatalog) func interruptedModelChainLosesUnsavedOutputAndKeepsOneGeneratingRequest() async throws {
+@Test(.actionCatalog) func interruptedModelChainRetainsCompletedMessagesAndLosesUnsavedOutput() async throws {
     let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     defer { try? FileManager.default.removeItem(at: directory) }
     let url = directory.appendingPathComponent("history.json")
     let store = try journal(at: url)
-    let id = UUID()
+    let id = UUID().uuidString
     _ = try await store.beginFixture(id: id, user: "question", system: "system", model: "fixture")
     for index in 0..<8 {
-        try await store.beginModelRequest(.init(id: UUID(), input: "round \(index)", requestJSON: "[]"), for: id)
+        try await store.beginModelRequest(
+            .init(id: UUID().uuidString, input: "round \(index)", requestJSON: "[]"), for: id)
         if index == 7 {
             try await store.append("partial", to: id)
         } else {
@@ -611,10 +614,11 @@ extension ConversationHistoryStore {
         }
     }
     await #expect(throws: ConversationHistoryError.invalidRecord) {
-        try await store.beginModelRequest(.init(id: UUID(), input: "excess", requestJSON: "[]"), for: id)
+        try await store.beginModelRequest(
+            .init(id: UUID().uuidString, input: "excess", requestJSON: "[]"), for: id)
     }
     let record = try #require(try await journal(at: url).snapshot().current.turns.first)
-    #expect(record.state == .interrupted && record.modelRequests == nil && record.response.isEmpty)
+    #expect(record.state == .interrupted && record.modelRequests?.count == 8 && record.response.isEmpty)
     try await store.finish(id, state: .cancelled)
     #expect(try await store.snapshot().current.turns.first?.modelRequests?.last?.state == .cancelled)
 }
@@ -622,9 +626,10 @@ extension ConversationHistoryStore {
 @Test(.actionCatalog) func requestInterfaceTimingIsImmutableAndPersistsSeparatelyFromAdmissionDate() async throws {
     let store = ConversationHistoryStore()
     let read = try await store.readCurrent()
-    let id = UUID()
+    let id = UUID().uuidString
     _ = try await store.begin(id: id, user: "hello", request: [], expecting: read.token, model: "stub")
-    try await store.beginModelRequest(.init(id: UUID(), input: "hello", requestJSON: "[]"), for: id)
+    try await store.beginModelRequest(
+        .init(id: UUID().uuidString, input: "hello", requestJSON: "[]"), for: id)
     let start = Date(timeIntervalSinceReferenceDate: 100)
     let first = start.addingTimeInterval(0.2)
     try await store.recordModelTiming(startedAt: start, firstTokenAt: first, latency: 0.2, for: id)
@@ -642,16 +647,18 @@ extension ConversationHistoryStore {
 
 @Test(.actionCatalog) func failedModelAttemptAllowsNextRequestWithoutCompletingItsTurn() async throws {
     let store = ConversationHistoryStore()
-    let input = UUID()
+    let input = UUID().uuidString
     _ = try await store.beginFixture(id: input, user: "goal", system: "system", model: "fixture")
-    try await store.beginModelRequest(.init(id: UUID(), input: "goal", requestJSON: "[]"), for: input)
+    try await store.beginModelRequest(
+        .init(id: UUID().uuidString, input: "goal", requestJSON: "[]"), for: input)
     try await store.append("partial", to: input)
     try await store.finishModelRequest(input, reason: "error", error: "HTTP 500")
     let failed = try #require(try await store.snapshot().current.turns.first)
     #expect(failed.state == .generating)
     #expect(failed.modelRequests?.first?.state == .failed)
     #expect(failed.modelRequests?.first?.error == "HTTP 500")
-    try await store.beginModelRequest(.init(id: UUID(), input: "HTTP 500", requestJSON: "[]"), for: input)
+    try await store.beginModelRequest(
+        .init(id: UUID().uuidString, input: "HTTP 500", requestJSON: "[]"), for: input)
     try await store.append("recovered", to: input)
     try await store.finishModelRequest(input, reason: "stop")
     try await store.finish(input, state: .completed)
@@ -661,47 +668,24 @@ extension ConversationHistoryStore {
     #expect(completed.modelRequests?.last?.error == nil)
 }
 
-@Test(.actionCatalog) func historyV3RejectsOldSchemaInsteadOfImportingIt() async throws {
-    let current = ConversationArchive()
-    var fields = try #require(JSONSerialization.jsonObject(with: JSONEncoder().encode(current)) as? [String: Any])
-    fields["version"] = 1
-    let old = try JSONDecoder().decode(ConversationArchive.self, from: JSONSerialization.data(withJSONObject: fields))
-    #expect(throws: ConversationHistoryError.invalidRecord) { try old.validate() }
-    var conversation = try #require(fields["current"] as? [String: Any])
-    conversation.removeValue(forKey: "taskCompressions")
-    #expect(throws: DecodingError.self) {
-        _ = try JSONDecoder().decode(
-            StoredConversation.self, from: JSONSerialization.data(withJSONObject: conversation))
-    }
-    let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-    defer { try? FileManager.default.removeItem(at: directory) }
-    var wire = try #require(
-        JSONSerialization.jsonObject(
-            with: JSONEncoder().encode(ConversationFileSnapshot(conversation: StoredConversation()))) as? [String: Any])
-    wire["version"] = 2
-    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-    let envelope: [String: Any] = ["version": 1, "revision": UUID().uuidString, "value": wire]
-    try JSONSerialization.data(withJSONObject: envelope).write(to: directory.appendingPathComponent("current.json"))
-    await #expect(throws: DocumentStorageError.unsupportedVersion) {
-        _ = try await ConversationHistoryStore(files: ConversationFileStore(directory: directory)).snapshot()
-    }
-}
-
 @Test(.actionCatalog) func historyOrderPreservesInterleavedInputContinuations() async throws {
     let store = ConversationHistoryStore()
-    let first = UUID()
-    let second = UUID()
+    let first = UUID().uuidString
+    let second = UUID().uuidString
     let token = try await store.readCurrent().token
     _ = try await store.begin(id: first, user: "A", request: [], expecting: token, model: "stub")
-    try await store.beginModelRequest(.init(id: UUID(), input: "A1", requestJSON: "[]"), for: first)
+    try await store.beginModelRequest(
+        .init(id: UUID().uuidString, input: "A1", requestJSON: "[]"), for: first)
     try await store.append("A1 output", to: first)
     try await store.finishModelRequest(first, reason: "stop")
     let next = try await store.readCurrent().token
     _ = try await store.begin(id: second, user: "B", request: [], expecting: next, model: "stub")
-    try await store.beginModelRequest(.init(id: UUID(), input: "B1", requestJSON: "[]"), for: second)
+    try await store.beginModelRequest(
+        .init(id: UUID().uuidString, input: "B1", requestJSON: "[]"), for: second)
     try await store.append("B1 output", to: second)
     try await store.finish(second, state: .completed)
-    try await store.beginModelRequest(.init(id: UUID(), input: "A2", requestJSON: "[]"), for: first)
+    try await store.beginModelRequest(
+        .init(id: UUID().uuidString, input: "A2", requestJSON: "[]"), for: first)
     try await store.append("A2 output", to: first)
     try await store.finish(first, state: .completed)
     let current = try await store.snapshot().current
@@ -723,105 +707,18 @@ extension ConversationHistoryStore {
     #expect(items.count == 2 && (items[0]["user"] as? [String: Any])?["value"] as? String == "B1")
 }
 
-@Test(.actionCatalog) func conversationCheckpointsOnlyUserAndTerminalResponseWithoutDeltaArrays() async throws {
-    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-    defer { try? FileManager.default.removeItem(at: root) }
-    let files = try ConversationFileStore(directory: root)
-    let store = ConversationHistoryStore(files: files)
-    let id = UUID()
-    _ = try await store.beginFixture(id: id, user: "question", system: "system", model: "fixture")
-    #expect(await files.checkpointCount == 1)
-    let before = try Data(contentsOf: root.appendingPathComponent("current.json"))
-    try await store.beginModelRequest(.init(id: UUID(), input: "question", requestJSON: "[]"), for: id)
-    for _ in 0..<1000 { try await store.append("字", to: id) }
-    #expect(await files.checkpointCount == 1)
-    #expect(try Data(contentsOf: root.appendingPathComponent("current.json")) == before)
-    let crashed = try await ConversationHistoryStore(files: ConversationFileStore(directory: root)).snapshot()
-    #expect(crashed.current.turns.first?.response == "" && crashed.current.turns.first?.state == .interrupted)
-    try await store.finish(id, state: .cancelled)
-    #expect(await files.checkpointCount == 2)
-    let restored = try await ConversationHistoryStore(files: ConversationFileStore(directory: root)).snapshot()
-    #expect(restored.current.turns.first?.response == String(repeating: "字", count: 1000))
-    #expect(restored.current.turns.first?.state == .cancelled)
-    let wire = String(decoding: try Data(contentsOf: root.appendingPathComponent("current.json")), as: UTF8.self)
-    #expect(!wire.contains("\"fragments\"") && wire.contains("\"response\""))
-}
-
-@Test(.actionCatalog) func conversationListUsesIndexAndSelectedArchiveOnly() async throws {
-    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-    defer { try? FileManager.default.removeItem(at: root) }
-    let store = ConversationHistoryStore(files: try ConversationFileStore(directory: root))
-    var ids: [UUID] = []
-    for index in 0..<12 {
-        let id = UUID()
-        _ = try await store.beginFixture(id: id, user: "question \(index)", system: "system", model: "fixture")
-        try await store.append("reply", to: id)
-        try await store.finish(id, state: .completed)
-        let archived = try #require(try await store.startNew())
-        ids.append(archived.id)
-    }
-    let broken = root.appendingPathComponent("conversation-\(ids[0].uuidString).json")
-    try Data("invalid".utf8).write(to: broken)
-    let currentBefore = try Data(contentsOf: root.appendingPathComponent("current.json"))
-    let reopened = ConversationHistoryStore(files: try ConversationFileStore(directory: root))
-    let list = try await reopened.listConversations()
-    #expect(list.count == 13 && list.dropFirst().allSatisfy { $0.turns.isEmpty && $0.turnCount == 1 })
-    #expect(try await reopened.conversation(ids[11]).turns.first?.response == "reply")
-    await #expect(throws: (any Error).self) { _ = try await reopened.conversation(ids[0]) }
-    try await reopened.setTitle("title", for: ids[11])
-    #expect(try Data(contentsOf: root.appendingPathComponent("current.json")) == currentBefore)
-}
-
-@Test(.actionCatalog) func conversationRotationRecoversAfterArchiveDestinationFailure() async throws {
-    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-    defer { try? FileManager.default.removeItem(at: root) }
-    let store = ConversationHistoryStore(files: try ConversationFileStore(directory: root))
-    let id = UUID()
-    _ = try await store.beginFixture(id: id, user: "preserve", system: "system", model: "fixture")
-    try await store.append("reply", to: id)
-    try await store.finish(id, state: .completed)
-    let old = try await store.readCurrent().current.id
-    let destination = root.appendingPathComponent("conversation-\(old.uuidString).json")
-    try Data("obstruction".utf8).write(to: destination)
-    await #expect(throws: (any Error).self) { _ = try await store.startNew() }
-    #expect(FileManager.default.fileExists(atPath: root.appendingPathComponent("rotation.json").path))
-    try FileManager.default.removeItem(at: destination)
-    let reopened = ConversationHistoryStore(files: try ConversationFileStore(directory: root))
-    let list = try await reopened.listConversations()
-    #expect(list.count == 2 && list[0].id != old && list[0].turns.isEmpty)
-    #expect(try await reopened.conversation(old).turns.first?.response == "reply")
-    #expect(!FileManager.default.fileExists(atPath: root.appendingPathComponent("rotation.json").path))
-}
-
-@Test(.actionCatalog) func conversationSharedTextEncodingPreservesExactStrings() async throws {
-    var conversation = StoredConversation()
-    let prompt = String(repeating: "规则中文\n\"xml\"\\", count: 2000)
-    let fixture = ConversationHistoryStore()
-    for _ in 0..<8 {
-        var turn = try await fixture.beginFixture(id: UUID(), user: "user", system: prompt, model: "fixture")
-        turn.modelRequests = [.init(id: UUID(), input: "user", requestJSON: prompt)]
-        conversation.turns.append(turn)
-    }
-    let plain = try JSONEncoder().encode(conversation)
-    let encoded = try JSONEncoder().encode(ConversationFileSnapshot(conversation: conversation))
-    #expect(encoded.count < plain.count / 3)
-    let restored = try JSONDecoder().decode(ConversationFileSnapshot.self, from: encoded)
-    #expect(
-        restored.conversation.turns.allSatisfy {
-            $0.request.first?.content == prompt && $0.modelRequests?.first?.requestJSON == prompt
-        })
-}
-
 @Test(.actionCatalog) func assistantFileCheckpointRestoresBeforeSkillInitializationAndIgnoresOldFiles() async throws {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     defer { try? FileManager.default.removeItem(at: root) }
-    let scope = UUID()
+    let scope = UUID().uuidString
     let first = AgentContextRepository(agent: .assistant, scope: scope, state: AssistantContextState())
-    let firstStore = try AssistantConversationStorage.store(repository: first, directory: root)
+    let firstStore = try fixtureAssistantStore(repository: first, directory: root)
     let agent = try AssistantAgent(
         chat: HistoryModel("<express emotion=\"happy\"/>"), conversations: firstStore, context: first)
     try await agent.start()
-    try await agent.receive(.init(sessionID: UUID(), payload: .text("remember this")))
+    try await agent.receive(
+        .init(
+            id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("remember this")))
     var outputs = FixtureGenerationOutputs(agent: agent).makeAsyncIterator()
     while let output = try await outputs.next() { if output.output == .control("agent.finished") { break } }
     await agent.stop()
@@ -829,7 +726,7 @@ extension ConversationHistoryStore {
     try Data("obsolete invalid data".utf8).write(to: root.appendingPathComponent("assistant.history-v2.context.json"))
     try Data("obsolete invalid data".utf8).write(to: root.appendingPathComponent("assistant.context.json"))
     let second = AgentContextRepository(agent: .assistant, scope: scope, state: AssistantContextState())
-    let secondStore = try AssistantConversationStorage.store(repository: second, directory: root)
+    let secondStore = try fixtureAssistantStore(repository: second, directory: root)
     let restarted = try AssistantAgent(chat: HistoryModel("unused"), conversations: secondStore, context: second)
     try await restarted.start()
     let restored = try await second.snapshot()
@@ -839,60 +736,4 @@ extension ConversationHistoryStore {
     #expect(restored.records.isEmpty && restored.consumedBatches.isEmpty && restored.state.history.past.isEmpty)
     #expect(restored.state.skillState?.loaded.isEmpty == false)
     await restarted.stop()
-}
-
-@Test(.actionCatalog) func unchangedCheckpointRecreatesMissingCurrentAndLostIndexRebuilds() async throws {
-    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-    defer { try? FileManager.default.removeItem(at: root) }
-    let files = try ConversationFileStore(directory: root)
-    let store = ConversationHistoryStore(files: files)
-    let id = UUID()
-    _ = try await store.beginFixture(id: id, user: "preserve", system: "system", model: "fixture")
-    try await store.append("complete", to: id)
-    try await store.finish(id, state: .completed)
-    #expect(await files.checkpointCount == 2)
-    try await store.checkpoint()
-    #expect(await files.checkpointCount == 2)
-    try FileManager.default.removeItem(at: root.appendingPathComponent("current.json"))
-    try await store.checkpoint()
-    #expect(await files.checkpointCount == 3)
-    let archived = try #require(try await store.startNew())
-    try FileManager.default.removeItem(at: root.appendingPathComponent("index.json"))
-    let reopened = ConversationHistoryStore(files: try ConversationFileStore(directory: root))
-    let list = try await reopened.listConversations()
-    #expect(list.count == 2 && list[1].id == archived.id)
-    #expect(try await reopened.conversation(archived.id).turns.first?.response == "complete")
-}
-
-@Test(.actionCatalog) func failedUserCheckpointDoesNotAdmitModelOrLeaveGeneratingHistory() async throws {
-    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-    defer { try? FileManager.default.removeItem(at: root) }
-    let store = ConversationHistoryStore(files: try ConversationFileStore(directory: root, maximumBytes: 2048))
-    let model = HistoryModel("must not run")
-    let agent = try AssistantAgent(chat: model, conversations: store)
-    try await agent.start()
-    await #expect(throws: DocumentStorageError.capacityExceeded) {
-        try await agent.receive(.init(sessionID: UUID(), payload: .text(String(repeating: "x", count: 3000))))
-    }
-    #expect(await model.requests.isEmpty)
-    #expect(try await store.readCurrent().current.turns.first?.state == .failed)
-    #expect(await agent.status().queuedInputs == 0)
-    #expect(await store.lastCheckpointError != nil)
-    await agent.stop()
-}
-
-@Test(.actionCatalog) func recoveredInterruptionRemainsDirtyUntilCheckpoint() async throws {
-    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-    defer { try? FileManager.default.removeItem(at: root) }
-    let first = ConversationHistoryStore(files: try ConversationFileStore(directory: root))
-    _ = try await first.beginFixture(id: UUID(), user: "interrupted", system: "system", model: "fixture")
-    let files = try ConversationFileStore(directory: root)
-    let restarted = ConversationHistoryStore(files: files)
-    #expect(try await restarted.readCurrent().current.turns.first?.state == .interrupted)
-    try await restarted.checkpoint()
-    #expect(await files.checkpointCount == 1)
-    let saved = try await LocalDocumentStore<ConversationFileSnapshot>(
-        url: root.appendingPathComponent("current.json"), maximumBytes: ConversationHistoryStore.maximumBytes
-    ).load()
-    #expect(saved?.value.conversation.turns.first?.state == .interrupted)
 }

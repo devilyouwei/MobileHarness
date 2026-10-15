@@ -1,16 +1,5 @@
 import Foundation
 
-public enum DocumentStorageError: Error, Equatable, Sendable {
-    case invalidConfiguration, capacityExceeded, unsupportedVersion, conflict, invalidFile
-}
-
-public enum DocumentFileProtection: Sendable { case whileUnlocked, afterFirstUnlock }
-
-public struct DocumentSnapshot<Value: Sendable>: Sendable {
-    public let revision: UUID
-    public let value: Value
-}
-
 // Serializes compare-and-replace across store instances within this process.
 private enum DocumentFileAccess {
     private final class Entry: @unchecked Sendable {
@@ -40,7 +29,9 @@ private enum DocumentFileAccess {
 
 /// A bounded, write-through cache for one durable JSON document.
 /// App owns the trusted sandbox URL and payload schema. Cross-process writers are unsupported.
-public actor LocalDocumentStore<Value: Codable & Sendable> {
+public actor LocalDocumentStore<Value: Codable & Sendable>: DocumentRepository {
+    public nonisolated let durability: StorageDurability = .persistent
+
     private struct Envelope: Codable {
         let version: Int
         let revision: UUID

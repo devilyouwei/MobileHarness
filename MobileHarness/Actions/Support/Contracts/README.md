@@ -2,7 +2,7 @@
 
 ## 简介
 
-提供与 Agent、调用协议和调度器无关的业务函数契约。此目录单独编译为 FunctionContracts，仅使用基础 Swift/Foundation 类型，不依赖其他项目目标。
+FunctionContracts uses Foundation and Storage-owned neutral business identity values. It does not import Agent, protocol, scheduler, model, transport or UI implementations.
 
 ## 上下游关系（一级）
 
@@ -77,3 +77,11 @@ ActionFunction 校验 displayName 非空且不超过 256 字节，completion 非
 ActionReport.empty 表示没有叶子记录；其 status 运算为 succeeded，不代表实际效果已被证明。ActionReportedError 通过 throwing 接口保存完整报告。ActionCompletion 的 kind 匹配和 value 的 65536 字节执行上限由 ExecutionRuntime 验证，枚举本身不执行这些检查。
 
 [共享 Support](../README.md) · [Actions 设计](../../README.md) · [执行实现](../../../Gateway/Runtime/README.md)
+
+
+
+
+
+## SQLite records and runtime identity
+
+✅ Implemented: technical identities are opaque UUID strings; committed business entities use dialog/message/task/media/device SQLite IDs. Consumers use Storage repositories while preserving ownership, cancellation and independent foundation boundaries. Complete messages, including each ReACT message, persist at termination; delta fragments do not persist. The custom allocator and replaced file/index implementation are removed. See the project SQLite business-record plan.

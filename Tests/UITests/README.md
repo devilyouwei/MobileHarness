@@ -154,3 +154,18 @@ Root Package.swift compiles this directory as UITests against the UI module. The
 
 
 ✅ Task-history surface removal: conversation/request export replaces obsolete subset/task-only export coverage. Preserve conversation/request JSON round trips, chronological Task expansion, IDs/Skills/catalog metadata and single request navigation regressions.
+
+
+✅ Fixtures use UUID/opaque runtime strings and committed database business references; concurrency, restart, invalid-ID and failure behavior remain covered.
+
+## Identity ownership
+
+✅ Runtime and foundation identities use opaque protocol strings or Foundation UUID; no project ID-generator dependency exists. SQLite-backed Storage publishes committed business references and App injects repositories/maps native Bluetooth identities. Tests preserve caller identity, cancellation and failure semantics. See [current storage design](../../MobileHarness/Storage/README.md) for relational allocation and persistence.
+
+
+✅ Implemented (2026-10-15 Task record visibility): Regression fixtures cover paginated terminal Task subsets, exact input/request source validation, terminal-vs-generating state, subsequent-page Task metadata merge and foreign-dialog page rejection.
+
+
+✅ Implemented (2026-10-15 automatic history paging): Verify paging-state admission, same-cursor suppression, explicit retry, cancellation/re-entry and stale ticket rejection. These are portable state tests; native lazy-footer visibility is separate acceptance.
+
+✅ Implemented: refresh-reset paging-ticket regression rejects completions from the previous list generation and permits the refreshed cursor to load. Native List refresh gestures/spinner and Task expansion remain separate acceptance.

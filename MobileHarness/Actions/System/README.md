@@ -53,9 +53,9 @@ TaskActions 属于 System 目录，但公开地址为 `Agent.Task`，这是显�
 
 资源下载需要 id（最多 64 字节）、endpoint（最多 1024 字节）及严格 true/false 的 allowsCellular。source 保存同时接受 recognition/synthesis 严格布尔字符串；configureSpeech 只改变注入端点绑定，偏好持久化是另一项操作。source 编码上限 2048 字节，资源快照上限 65536 字节。
 
-Provider 的发现、恢复、保存只传 requestID UUID；URL/密钥留在同会话私有暂存中。发现结果最多 2048 个模型 ID、每项最多 512 字节、编码最多 65536 字节；过滤策略在 Support。readSettings 不返回 URL/密钥，不执行联网可用性探测。
+Provider 的发现、恢复、保存只传 requestID ID；URL/密钥留在同会话私有暂存中。发现结果最多 2048 个模型 ID、每项最多 512 字节、编码最多 65536 字节；过滤策略在 Support。readSettings 不返回 URL/密钥，不执行联网可用性探测。
 
-Device.control 的模型声明提供 scan/stopScan/connect/reconnect/disconnect/forget/refresh；实际解析还支持 preset、motorVelocity、stopMotorControl、openPage、closePage、openSystemSettings 等可信操作。connect/reconnect 要求设备 UUID；motorVelocity 要求电机 1…6 和有限 −1…1 的 value；preset 使用封闭动作名。可选 fence 必须为 UUID。其余操作拒绝 id/value/action 混用，未知参数键拒绝。
+Device.control 的模型声明提供 scan/stopScan/connect/reconnect/disconnect/forget/refresh；实际解析还支持 preset、motorVelocity、stopMotorControl、openPage、closePage、openSystemSettings 等可信操作。connect/reconnect 要求设备 ID；motorVelocity 要求电机 1…6 和有限 −1…1 的 value；preset 使用封闭动作名。可选 fence 必须为 ID。其余操作拒绝 id/value/action 混用，未知参数键拒绝。
 
 readStatus/readEnvironment 不接收参数，分别限制 16384/65536 UTF-8 字节，内容由端点提供；入口不追加事实或证明物理完成。runtimeInfo 直接返回固定文字，当前不解析参数，也不是实时健康检查。
 
@@ -68,3 +68,11 @@ Task 声明描述 JSON 数组 Skills、前台/后台 Task 字段和终态控制�
 ❌ runtimeInfo 没有实时诊断实现。声明参数与可信入口解析的开放范围不是同一个集合，不能据函数存在推断模型权限或原生能力可用。
 
 [Actions 设计](../README.md) · [System 服务实现](Support/README.md) · [共享契约](../Support/Contracts/README.md)
+
+
+
+
+
+## SQLite records and runtime identity
+
+✅ Implemented: technical identities are opaque UUID strings; committed business entities use dialog/message/task/media/device SQLite IDs. Consumers use Storage repositories while preserving ownership, cancellation and independent foundation boundaries. Complete messages, including each ReACT message, persist at termination; delta fragments do not persist. The custom allocator and replaced file/index implementation are removed. See the project SQLite business-record plan.

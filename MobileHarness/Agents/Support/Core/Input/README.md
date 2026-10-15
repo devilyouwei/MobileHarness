@@ -2,7 +2,7 @@
 
 ## Summary
 
-Immutable Foundation-only audio and image transport values used by AgentInput and Gateway admission.
+Immutable independent runtime framework audio and image transport values used by AgentInput and Gateway admission.
 
 ## Ownership and boundaries
 

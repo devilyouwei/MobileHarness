@@ -3,6 +3,7 @@ import AppWorkflows
 import ExecutionRuntime
 import Foundation
 import FunctionContracts
+import Storage
 import Testing
 
 enum WakeFixtureFailure: String, Error, Sendable { case haptic, prepare, cue, capture }
@@ -58,7 +59,9 @@ private actor WakeProbe: UIFeedbackCapability {
 private func wakeInput() -> FunctionInvocation {
     FunctionInvocation(
         call: .init(actionPath: .init(domain: "Speech", module: "Listening", function: "update")),
-        context: .init(source: "speechPerception", sessionID: UUID(), inputID: UUID(), sequence: 4),
+        context: .init(
+            source: "speechPerception", sessionID: UUID().uuidString, inputID: UUID().uuidString,
+            sequence: 4), executionID: UUID().uuidString,
         results: ActionReportStore())
 }
 private func wakeConfiguration() throws -> SpeechActions.ListeningFeedback {

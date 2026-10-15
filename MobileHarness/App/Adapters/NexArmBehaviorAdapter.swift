@@ -6,6 +6,7 @@ import ExecutionRuntime
 import Foundation
 import FunctionContracts
 import Gateway
+import Storage
 import UI
 
 /// Host adaptation only; gesture/execution business policy remains in Actions.
@@ -103,7 +104,7 @@ struct NexArmBehaviorAdapter {
 /// Native device adaptation; typed command admission belongs to the canonical Device functions.
 @MainActor final class DeviceControlAdapter: DeviceControlCapability {
     let bluetooth: BluetoothWorkflow
-    private(set) var fence = UUID()
+    private(set) var fence = UUID().uuidString
     var environment: (@Sendable () async throws -> String)?
     var input: InputGateway?
     var activity: ActionActivityWorkflow?
@@ -112,14 +113,14 @@ struct NexArmBehaviorAdapter {
         return try await environment()
     }
     init(bluetooth: BluetoothWorkflow) { self.bluetooth = bluetooth }
-    func stopFence() -> UUID {
-        fence = UUID()
+    func stopFence() -> String {
+        fence = UUID().uuidString
         bluetooth.stopMotorControl()
         return fence
     }
     func control(_ request: DeviceControlRequest, invocation: any FunctionInput) async throws {
         try Task.checkCancellation()
-        if let expected = request.fence, expected != fence.uuidString { throw DeviceControlError.stale }
+        if let expected = request.fence, expected != fence { throw DeviceControlError.stale }
         try bluetooth.validateControlAdmission(request)
         if request.operation == .preset || request.operation == .motorVelocity {
             let origin = NexArmControlOrigin(
@@ -135,7 +136,8 @@ struct NexArmBehaviorAdapter {
                     await activity.recordFailure(
                         title: "手动机械臂操作失败", source: origin.source, message: failure.message, failureCode: failure.code,
                         context: .init(
-                            workerID: failure.workerID, sessionID: origin.sessionID, inputID: origin.inputID,
+                            workerID: failure.workerID, sessionID: origin.sessionID,
+                            inputID: origin.inputID,
                             callID: origin.callID))
                     let result = ActionResult(
                         executionID: executionID, owner: owner,
@@ -160,8 +162,12 @@ struct NexArmBehaviorAdapter {
             bluetooth.scan()
         case .stopScan: bluetooth.stopScan()
         case .connect, .reconnect:
-            guard let id = request.id.flatMap(UUID.init(uuidString:)) else { throw DeviceControlError.invalidRequest }
-            if request.operation == .reconnect { bluetooth.reconnect(id) } else { bluetooth.connect(id) }
+            guard let id = request.id.flatMap(BusinessRecordID.parse) else { throw DeviceControlError.invalidRequest }
+            if request.operation == .reconnect {
+                bluetooth.reconnect(id)
+            } else {
+                bluetooth.connect(id)
+            }
         case .disconnect: bluetooth.disconnect()
         case .forget: bluetooth.forget()
         case .refresh:
@@ -184,7 +190,7 @@ struct NexArmBehaviorAdapter {
     }
     func readStatus() throws -> String {
         let state = bluetooth.state
-        let devices = state.nearby.map { ["id": $0.id.uuidString, "name": $0.name] }
+        let devices = state.nearby.map { ["id": $0.id, "name": $0.name] }
         guard devices.count <= 32 else { throw DeviceControlError.invalidRequest }
         return String(
             decoding: try JSONSerialization.data(

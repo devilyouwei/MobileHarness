@@ -64,3 +64,11 @@ CapabilityContextBuilder renders protocol and capability-description templates f
 ## Isolated communication scopes
 
 ✅ AgentConfiguration.restrictingCommunication(to:contracts:) derives a new immutable configuration by retaining only existing inputs, subscriptions, publications and sends whose contract is explicitly allowed. Revalidate the projected declaration against the injected schema catalog; preserve identity, version and function capabilities. Never add a source, target, grant or cached-resource mutation. Core owns only this neutral restriction; App chooses diagnostic contracts.
+
+
+
+
+
+## SQLite records and runtime identity
+
+✅ Implemented: technical identities are opaque UUID strings; committed business entities use dialog/message/task/media/device SQLite IDs. Consumers use Storage repositories while preserving ownership, cancellation and independent foundation boundaries. Complete messages, including each ReACT message, persist at termination; delta fragments do not persist. The custom allocator and replaced file/index implementation are removed. See the project SQLite business-record plan.

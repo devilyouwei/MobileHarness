@@ -1,10 +1,11 @@
 import Foundation
 import ModelKit
+import Storage
 
 /// Live, VAD-committed PCM -> capability events. Preview never submits an Agent input.
 actor SpeechRecognitionTurn {
     private let recognition: any SpeechRecognitionCapability
-    private let sessionID: UUID
+    private let sessionID: String
     private let preview: @Sendable (String) async throws -> Void
     private var queue: [VoiceStreamEvent] = []
     private var queuedSamples = 0
@@ -17,7 +18,7 @@ actor SpeechRecognitionTurn {
     private var cancelled = false
 
     init(
-        recognition: any SpeechRecognitionCapability, sessionID: UUID,
+        recognition: any SpeechRecognitionCapability, sessionID: String,
         preview: @escaping @Sendable (String) async throws -> Void
     ) {
         self.recognition = recognition
@@ -151,8 +152,8 @@ actor SpeechRecognitionTurn {
 /// Pure revision/order policy for one ASR segment; no runtime or presentation effects.
 struct TranscriptAccumulator {
     let prefix: String
-    private var segments: [UUID: TranscriptionEvent] = [:]
-    private var order: [UUID] = []
+    private var segments: [String: TranscriptionEvent] = [:]
+    private var order: [String] = []
 
     init(prefix: String = "") { self.prefix = prefix }
 

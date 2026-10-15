@@ -8,7 +8,7 @@
             case busy, failed, invalidDuration
             case decoding(String)
         }
-        private var operationID: UUID?
+        private var operationID: String?
         private var player: AVAudioPlayer?
         private var delegate: CueCompletionDelegate?
         private var waiter: CheckedContinuation<Void, any Error>?
@@ -16,7 +16,7 @@
         public func play(_ pcm: PlaybackPCM) async throws {
             try Task.checkCancellation()
             guard operationID == nil else { throw Failure.busy }
-            let id = UUID()
+            let id = UUID().uuidString
             operationID = id
             defer { finish(id: id, result: .failure(CancellationError())) }
             try await withTaskCancellationHandler {
@@ -54,7 +54,7 @@
         public func stop() {
             if let id = operationID { finish(id: id, result: .failure(CancellationError())) }
         }
-        private func finish(id: UUID, result: Result<Void, any Error>) {
+        private func finish(id: String, result: Result<Void, any Error>) {
             guard operationID == id else { return }
             let pending = waiter
             waiter = nil

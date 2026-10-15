@@ -1,7 +1,20 @@
 import AgentCore
 import Foundation
 import ModelKit
+import Storage
 import StorageChat
+import StorageTasks
+
+/// Assistant-owned scene-analysis policy; native implementations only consume these limits.
+public struct AssistantPhotoInputPolicy: Sendable {
+    public let maximumDimension: Int
+    public let maximumPixels: Int
+    public let maximumBytes: Int
+    public let quality: Double
+
+    public static let analysis = Self(
+        maximumDimension: 1568, maximumPixels: 1_048_576, maximumBytes: 1024 * 1024, quality: 0.82)
+}
 
 // MARK: - State
 
@@ -68,7 +81,7 @@ public struct AssistantContextState: AgentChatContextState {
     }
     public var skillState: AgentTaskSkillState?
     public var cameraState: CameraStateObservation?
-    public var taskViews: [UUID: AgentTaskView]?
+    public var taskViews: [String: AgentTaskView]?
     public var history = ConversationArchive()
     public var admissionSequence: UInt64 = 0
     public init() {}
@@ -125,7 +138,7 @@ public struct AssistantContextBuilder: ContextBuilder {
         if let skills = context.state.skillState {
             let task = skills.tasks.first { $0.id == skills.activeTaskID }
             var state: [String: Any] = [
-                "mode": skills.mode, "activeTaskID": skills.activeTaskID?.uuidString ?? "none",
+                "mode": skills.mode, "activeTaskID": skills.activeTaskID ?? "none",
                 "loadedSkills": skills.loaded,
             ]
             if let task {
@@ -145,11 +158,11 @@ public struct AssistantContextBuilder: ContextBuilder {
                 "enabled": camera.enabled, "visible": camera.visible, "busy": camera.busy,
                 "needsSettings": camera.needsSettings, "facing": camera.facing.rawValue,
             ]
-            if let id = camera.displayedPhotoID {
-                value["displayedPhotoID"] = id.uuidString
+            if let id = camera.displayedMediaID {
+                value["displayedMediaID"] = id
             }
-            if let id = camera.savedPhotoID {
-                value["savedPhotoID"] = id.uuidString
+            if let id = camera.savedMediaID {
+                value["savedMediaID"] = id
             }
             if let failure = camera.failure { value["failure"] = failure }
             facts.append(
@@ -162,9 +175,20 @@ public struct AssistantContextBuilder: ContextBuilder {
         }
         return facts
     }
+    public static func photoObservationHandler(
+        read: @escaping @Sendable (String, AgentInput) async throws -> ChatImage,
+        prepareJPEG: @escaping @Sendable (Data, AssistantPhotoInputPolicy) async throws -> Data
+    ) -> @Sendable ([AgentChatObservation], AgentInput, any ChatCapability) async throws -> [ChatMessage] {
+        { observations, input, chat in
+            try await photoObservations(
+                observations, input: input, chat: chat, read: read, prepareJPEG: prepareJPEG)
+        }
+    }
+
     public static func photoObservations(
         _ observations: [AgentChatObservation], input: AgentInput,
-        chat: any ChatCapability, read: @Sendable (UUID, AgentInput) async throws -> ChatImage
+        chat: any ChatCapability, read: @Sendable (String, AgentInput) async throws -> ChatImage,
+        prepareJPEG: @Sendable (Data, AssistantPhotoInputPolicy) async throws -> Data
     ) async throws -> [ChatMessage] {
         var messages: [ChatMessage] = []
         for observation in observations
@@ -172,17 +196,28 @@ public struct AssistantContextBuilder: ContextBuilder {
             guard
                 let receipt = try JSONSerialization.jsonObject(with: Data(observation.result.value.utf8))
                     as? [String: Any],
-                let raw = receipt["photoID"] as? String, let id = UUID(uuidString: raw)
+                let raw = receipt["mediaID"] as? String, let id = BusinessRecordID(rawValue: raw), id.kind == .media
             else { throw CommunicationError.invalidPayload }
-            if await chat.supportsImages {
-                let image = try await read(id, input)
-                guard image.id == id else { throw CommunicationError.invalidPayload }
-                messages.append(.init(role: .user, content: "Captured photo (data): " + id.uuidString, images: [image]))
+            try Task.checkCancellation()
+            let supportsImages = await chat.supportsImages
+            try Task.checkCancellation()
+            if supportsImages {
+                let original = try await read(id.rawValue, input)
+                guard original.id == id.rawValue else { throw CommunicationError.invalidPayload }
+                try Task.checkCancellation()
+                let policy = AssistantPhotoInputPolicy.analysis
+                let prepared = try await prepareJPEG(original.data, policy)
+                try Task.checkCancellation()
+                guard !prepared.isEmpty, prepared.count <= policy.maximumBytes else {
+                    throw CapabilityError.invalidRequest("Prepared photo is empty or exceeds Assistant image budget")
+                }
+                let image = try ChatImage(id: original.id, mimeType: "image/jpeg", data: prepared)
+                messages.append(.init(role: .user, content: "Captured photo (data): " + id.rawValue, images: [image]))
             } else {
                 messages.append(
                     .init(
                         role: .user,
-                        content: "Captured photo ID (data): " + id.uuidString
+                        content: "Captured photo ID (data): " + id.rawValue
                             + "; image analysis is unavailable for this model."))
             }
         }
@@ -211,48 +246,23 @@ public enum ConversationContextBuilder {
     }
 }
 
-private struct AssistantConversationRecovery: Codable, Sendable {
-    let skills: AgentTaskSkillState?
-    let tasks: AgentTaskRegistry
-    let views: [UUID: AgentTaskView]?
-}
-
-/// One live context; disk contains only a conversation and its bounded recovery checkpoint.
+/// Live Agent state stays in memory; normalized SQLite rows are the durable business facts.
 public enum AssistantConversationStorage {
-    public static func store(repository: AgentContextRepository<AssistantContextState>, directory: URL) throws
+    public static func store(
+        repository: AgentContextRepository<AssistantContextState>, chat: any ChatRepository, tasks: any TaskRepository
+    ) throws
         -> ConversationHistoryStore
     {
-        let files = try ConversationFileStore(directory: directory)
+        let records = try ConversationRecordStore(repository: chat, tasks: tasks)
         return ConversationHistoryStore(
-            contextIdentity: repository.scopeID, files: files,
-            capture: {
-                let snapshot = try await repository.snapshot()
-                let encoder = JSONEncoder()
-                encoder.outputFormatting = [.sortedKeys]
-                let data = try encoder.encode(
-                    AssistantConversationRecovery(
-                        skills: snapshot.state.skillState, tasks: snapshot.tasks, views: snapshot.state.taskViews))
-                return ConversationFileSnapshot(
-                    conversation: snapshot.state.history.current, recovery: data,
-                    revision: snapshot.state.history.revision)
-            },
+            contextIdentity: repository.scopeID, records: records,
             canArchive: {
                 guard try await repository.snapshot().state.skillState?.activeTaskID == nil else {
                     throw CommunicationError.scopeClosed
                 }
             },
-            restore: { history, data in
-                let recovery = try data.map { try JSONDecoder().decode(AssistantConversationRecovery.self, from: $0) }
-                try await repository.update { context in
-                    context.state.history = history
-                    if let recovery {
-                        context.state.skillState = recovery.skills
-                        context.state.taskViews = recovery.views
-                        context.tasks = recovery.tasks
-                        context.tasks.recover()
-                        context.state.recoverInterruptedWork()
-                    }
-                }
+            restore: { history, _ in
+                try await repository.update { $0.state.history = history }
             },
             contextLoad: { try await repository.snapshot().state.history },
             contextCommit: { history in try await AgentChatHistoryContext.commit(history, to: repository) })

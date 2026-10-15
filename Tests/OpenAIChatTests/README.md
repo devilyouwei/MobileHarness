@@ -74,3 +74,10 @@ Purpose: independently verify the OpenAI-compatible adapter without network acce
 ## Non-thinking request policy
 
 ✅ Implemented: offline wire assertions cover Alibaba Cloud workspace/dashscope hosts with reasoning.effort=none and top-level enable_thinking=false, canonical OpenAI IDs through native/proxy URLs, unchanged GPT-4/unknown model payloads, explicit mandatory-thinking rejection and title-shaped 64-token requests. Existing tool/image/usage/lifecycle and private-channel regressions remain. The live chat probe records real first-text timing with the same request flags; no secrets, user history or private reasoning text are printed.
+
+
+✅ Fixtures use UUID/opaque runtime strings and committed database business references; concurrency, restart, invalid-ID and failure behavior remain covered.
+
+## Identity ownership
+
+✅ Runtime and foundation identities use opaque protocol strings or Foundation UUID; no project ID-generator dependency exists. SQLite-backed Storage publishes committed business references and App injects repositories/maps native Bluetooth identities. Tests preserve caller identity, cancellation and failure semantics. See [current storage design](../../MobileHarness/Storage/README.md) for relational allocation and persistence.

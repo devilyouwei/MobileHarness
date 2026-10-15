@@ -2,37 +2,28 @@ import AgentCore
 import Foundation
 import Storage
 
-/// Typed state and retention belong to the Agent; this adapter only serializes durable mutations.
+/// Validated runtime transactions over one Storage-owned process-memory snapshot.
 public actor AgentContextRepository<State: AgentContextState> {
-    public nonisolated let scopeID: UUID
+    public nonisolated let scopeID: String
     public nonisolated let agentID: AgentID
-    private var value: AgentContext<State>
+    private let memory: any StateRepository<AgentContext<State>>
+    private var value: AgentContext<State> {
+        get { memory.read() }
+        set { memory.replace(newValue) }
+    }
     private let persistence: AgentContextPersistence<State>?
     private var committedRevision: UInt64?
     private var loaded = false
     private var writing = false
     private var waiters: [CheckedContinuation<Void, Never>] = []
     public init(
-        agent: AgentID, scope: UUID, state: State,
+        agent: AgentID, scope: String, state: State,
         persistence: AgentContextPersistence<State>? = nil
     ) {
         self.scopeID = scope
         self.agentID = agent
-        value = AgentContext(agentID: agent, scopeID: scope, state: state)
+        memory = MemoryStateStore(AgentContext(agentID: agent, scopeID: scope, state: state))
         self.persistence = persistence
-    }
-    public static func persistent(
-        agent: AgentID, scope: UUID, state: State, url: URL, protection: DocumentFileProtection = .whileUnlocked
-    ) throws -> AgentContextRepository<
-        State
-    > {
-        let adapter = ContextDocumentAdapter<State>(
-            document: try LocalDocumentStore(url: url, maximumBytes: 64 * 1024 * 1024, protection: protection))
-        return AgentContextRepository(
-            agent: agent, scope: scope, state: state,
-            persistence: AgentContextPersistence(
-                load: { try await adapter.load() },
-                commit: { try await adapter.commit($0, expecting: $1) }))
     }
     private func acquire() async throws {
         if !writing {
@@ -114,32 +105,12 @@ public actor AgentContextRepository<State: AgentContextState> {
     }
 }
 
-/// Storage owns atomic file replacement; the Agent adapter owns schema/revision interpretation.
-private actor ContextDocumentAdapter<State: AgentContextState> {
-    let document: LocalDocumentStore<AgentContext<State>>
-    private var token: UUID?
-    private var revision: UInt64?
-    init(document: LocalDocumentStore<AgentContext<State>>) { self.document = document }
-    func load() async throws -> AgentContext<State>? {
-        let saved = try await document.load()
-        token = saved?.revision
-        revision = saved?.value.revision
-        return saved?.value
-    }
-    func commit(_ context: AgentContext<State>, expecting expected: UInt64?) async throws {
-        guard expected == revision else { throw DocumentStorageError.conflict }
-        let saved = try await document.save(context, expecting: token)
-        token = saved.revision
-        revision = saved.value.revision
-    }
-}
-
 /// Neutral durable evidence; domain records are encoded by the owning preprocessor.
 public struct SignalEvidence: Codable, Sendable {
-    public let signalID: UUID
-    public let sessionID: UUID
-    public let rootID: UUID
-    public let parentID: UUID?
+    public let signalID: String
+    public let sessionID: String
+    public let rootID: String
+    public let parentID: String?
     public let source: String
     public let origin: SignalOrigin
     public let contract: String

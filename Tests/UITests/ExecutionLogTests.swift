@@ -4,17 +4,20 @@ import UI
 
 @Test @MainActor func executionLogTaskAndRuntimeRetentionIsBounded() {
     let state = ActionActivityState()
-    let taskID = UUID()
+    let taskID = UUID().uuidString
     var value = TaskLogItem(
         id: taskID, parentID: nil, requester: "assistant", executor: "photographer", title: "拍照", phase: .running)
     value.execution = "background"
-    for _ in 0..<40 { state.updateTask(value, event: .init(id: UUID(), time: .now, title: "进度", detail: "")) }
+    for _ in 0..<40 {
+        state.updateTask(value, event: .init(id: UUID().uuidString, time: .now, title: "进度", detail: ""))
+    }
     #expect(state.tasks.first?.events.count == 32 && state.tasks.first?.evictedEvents == 8)
     for _ in 0..<110 {
         state.updateTask(
             .init(
-                id: UUID(), parentID: nil, requester: "assistant", executor: "memory", title: "历史", phase: .succeeded),
-            event: .init(id: UUID(), time: .now, title: "完成", detail: ""))
+                id: UUID().uuidString, parentID: nil, requester: "assistant", executor: "memory",
+                title: "历史", phase: .succeeded),
+            event: .init(id: UUID().uuidString, time: .now, title: "完成", detail: ""))
         state.recordAgentEvent(.init(source: "assistant", status: "running", isFailure: false))
     }
     #expect(state.tasks.count == 100 && state.taskEvictions == 11)
@@ -31,10 +34,10 @@ import UI
 @Test @MainActor func executionLogHasThreeTabsAndPreservesAgentFailuresWithoutSignalRows() {
     #expect(ExecutionLogTab.allCases.map(\.rawValue) == ["Action", "Task", "Agent"])
     let state = ActionActivityState()
-    let id = UUID()
+    let id = UUID().uuidString
     state.recordIssue(.init(title: "Output", source: "assistant", message: "input rejected: queueFull", inputID: id))
     state.recordIssue(.init(title: "Output", source: "assistant", message: "input rejected: queueFull", inputID: id))
-    let other = UUID()
+    let other = UUID().uuidString
     state.recordIssue(.init(title: "Output", source: "assistant", message: "input rejected: queueFull", inputID: other))
     #expect(state.runtimeIssues.count == 2)
     #expect(Set(state.runtimeIssues.compactMap(\.inputID)) == [id, other])
@@ -43,30 +46,33 @@ import UI
 
 @Test @MainActor func taskActionFilteringUsesRetainedTimelineInputIdentity() {
     let state = ActionActivityState()
-    let taskID = UUID()
-    let inputID = UUID()
+    let taskID = UUID().uuidString
+    let inputID = UUID().uuidString
     state.updateTask(
         .init(
             id: taskID, parentID: nil, requester: "assistant", executor: "photographer", title: "拍照", phase: .running),
         event: .init(id: inputID, time: .now, title: "接纳", detail: ""))
     let action = ActionActivityItem(
-        id: UUID(), title: "拍摄", channel: "Camera", status: "运行", issueDescriptions: [], symbol: "camera",
+        id: UUID().uuidString, title: "拍摄", channel: "Camera", status: "运行", issueDescriptions: [],
+        symbol: "camera",
         execution: .init(phase: .running, admittedAt: .now, startedAt: .now, endedAt: nil),
         source: "photographer", inputID: inputID)
     state.replace(revision: 1, records: [action], evictedCount: 0)
     state.selectedTaskID = taskID
     #expect(state.visibleActions.map(\.id) == [action.id])
-    state.selectedTaskID = UUID()
+    state.selectedTaskID = UUID().uuidString
     #expect(state.visibleActions.isEmpty)
 }
 
 @Test @MainActor func taskLogRetainsFailureAndOriginalTimestamp() {
     let state = ActionActivityState()
     let original = Date(timeIntervalSince1970: 100)
-    var task = TaskLogItem(id: UUID(), parentID: nil, requester: "", executor: "assistant", title: "拍照", phase: .failed)
-    state.updateTask(task, event: .init(id: UUID(), time: original, title: "running", detail: ""))
+    var task = TaskLogItem(
+        id: UUID().uuidString, parentID: nil, requester: "", executor: "assistant", title: "拍照",
+        phase: .failed)
+    state.updateTask(task, event: .init(id: UUID().uuidString, time: original, title: "running", detail: ""))
     task.failure = "Capture denied by device"
-    state.updateTask(task, event: .init(id: UUID(), time: original, title: "failed", detail: ""))
+    state.updateTask(task, event: .init(id: UUID().uuidString, time: original, title: "failed", detail: ""))
     #expect(state.tasks.first?.failure == task.failure)
     #expect(state.tasks.first?.events.first?.time == original)
 }
@@ -133,18 +139,19 @@ func homeTaskStaysAboveCaptionThroughPromotion(viewportHeight: CGFloat) {
         title: "Output", source: "assistant", message: "old error", time: Date(timeIntervalSinceNow: -60))
     state.replaceIssues(revision: 1, records: [old], evictedCount: 0)
     #expect(state.errorToast == nil)
-    let input = UUID()
+    let input = UUID().uuidString
     let fresh = ExecutionIssue(
         title: "Output", source: "assistant", message: "agent.error: httpStatus(400)", inputID: input)
     state.replaceIssues(revision: 2, records: [old, fresh], evictedCount: 0)
     #expect(state.errorToast?.message == fresh.message)
-    state.dismissErrorToast(id: UUID())
+    state.dismissErrorToast(id: UUID().uuidString)
     #expect(state.errorToast?.id == fresh.id)
     state.dismissErrorToast(id: fresh.id)
     state.replaceIssues(revision: 3, records: [old, fresh], evictedCount: 0)
     state.recordIssue(.init(title: "Output", source: "assistant", message: fresh.message, inputID: input))
     #expect(state.errorToast == nil && state.outputIssues.count == 2)
-    let other = ExecutionIssue(title: "Output", source: "assistant", message: fresh.message, inputID: UUID())
+    let other = ExecutionIssue(
+        title: "Output", source: "assistant", message: fresh.message, inputID: UUID().uuidString)
     state.recordIssue(other)
     #expect(state.errorToast?.id == other.id)
     state.replaceIssues(revision: 2, records: [], evictedCount: 0)
@@ -153,7 +160,7 @@ func homeTaskStaysAboveCaptionThroughPromotion(viewportHeight: CGFloat) {
 
 @Test @MainActor func homeToastKeepsActionFailuresInThePanelWithoutReplacingAgentNotice() {
     let state = ActionActivityState()
-    let id = UUID()
+    let id = UUID().uuidString
     func item(_ phase: ActionActivityItem.Execution.Phase) -> ActionActivityItem {
         .init(
             id: id, title: "History.Conversation.summarize", channel: "History", status: "failed",
@@ -181,7 +188,7 @@ func homeTaskStaysAboveCaptionThroughPromotion(viewportHeight: CGFloat) {
     #expect(state.errorToast?.id == app.id)
     let action = ExecutionIssue(
         title: "NexArm.Tracking.aim", source: "assistant", message: "device disconnected",
-        context: .init(workerID: UUID(), callID: UUID()))
+        context: .init(workerID: UUID().uuidString, callID: UUID().uuidString))
     state.recordIssue(action)
     #expect(state.errorToast?.id == app.id)
     #expect(state.backgroundIssues.contains(action))

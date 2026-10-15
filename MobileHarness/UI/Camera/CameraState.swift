@@ -11,7 +11,7 @@ public final class CameraState {
     #endif
     public var photoBusy = false
     public var photoMessage: String?
-    public var savedPhotoID: UUID?
+    public var savedMediaID: String?
     public var isEnabled = false
     public var facing: CameraDirection = .front
     public var isVisible = false
@@ -30,6 +30,6 @@ public protocol CameraControlling: AnyObject {
     func toggle()
     func switchCamera()
     func retry()
-    func savePhoto(_ id: UUID)
-    func ignorePhoto(_ id: UUID)
+    func savePhoto(_ id: String)
+    func ignorePhoto(_ id: String)
 }

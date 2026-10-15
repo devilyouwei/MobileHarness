@@ -1,4 +1,5 @@
 import Actions
+import AgentCore
 import Agents
 import AppWorkflows
 import Foundation
@@ -9,11 +10,25 @@ import ModelKitRuntime
 import Observation
 import PlatformKit
 import Storage
+import StorageChat
+import StorageMedia
+import StorageSQLite
+import StorageTasks
 import UI
 
 /// The scene's composition root. Runtime services are lazy but never discovered by consumers.
 @MainActor @Observable
 final class AppAssembly {
+    @ObservationIgnored private let sqliteRepositories: Result<SQLiteRepositories, any Error>
+    init() {
+        sqliteRepositories = Result {
+            let root = URL.applicationSupportDirectory.appendingPathComponent("MobileHarness", isDirectory: true)
+            try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+            let database = try SQLiteRepositories(url: root.appendingPathComponent("records.sqlite"))
+            try database.recoverInFlight()
+            return database
+        }
+    }
     private(set) var container: AppContainer?
     @ObservationIgnored private var runtimeValue: ApplicationRuntime?
     @ObservationIgnored private var environmentSequence: UInt64 = 0
@@ -29,11 +44,18 @@ final class AppAssembly {
             read: { [weak self] in
                 guard let self else { throw CancellationError() }
                 let state = self.camera.state
+                let displayedMediaID = state.capturedPhoto?.id
+                let savedMediaID = state.savedMediaID
+                guard
+                    state.capturedPhoto == nil
+                        || displayedMediaID.flatMap(BusinessRecordID.init(rawValue:))?.kind == .media,
+                    state.savedMediaID == nil || savedMediaID.flatMap(BusinessRecordID.init(rawValue:))?.kind == .media
+                else { throw CommunicationError.invalidPayload }
                 let value = CameraStateObservation(
                     sequence: 1, observedAt: Date(timeIntervalSince1970: 0),
                     enabled: state.isEnabled, visible: state.isVisible, busy: state.isBusy || state.photoBusy,
                     needsSettings: state.needsSettings, facing: state.facing == .front ? .front : .back,
-                    displayedPhotoID: state.capturedPhoto?.id, savedPhotoID: state.savedPhotoID,
+                    displayedMediaID: displayedMediaID, savedMediaID: savedMediaID,
                     failure: state.message.map { String($0.prefix(128)) })
                 self.cameraSample = value
                 let encoder = JSONEncoder()
@@ -49,7 +71,7 @@ final class AppAssembly {
                         CameraStateObservation(
                             sequence: sequence, enabled: value.enabled, visible: value.visible,
                             busy: value.busy, needsSettings: value.needsSettings, facing: value.facing,
-                            displayedPhotoID: value.displayedPhotoID, savedPhotoID: value.savedPhotoID,
+                            displayedMediaID: value.displayedMediaID, savedMediaID: value.savedMediaID,
                             failure: value.failure))
                     return .accepted
                 case .failed(let message): return .retry(message)
@@ -216,9 +238,9 @@ final class AppAssembly {
     private func makeCameraControls() -> CameraInteractionWorkflow {
         CameraInteractionWorkflow(
             state: camera.state,
-            perform: { [weak self] intent, facing, photoID in
+            perform: { [weak self] intent, facing, mediaID in
                 guard let self else { throw CancellationError() }
-                _ = try await self.runtime().photographerIntents.perform(intent, facing: facing, photoID: photoID)
+                _ = try await self.runtime().photographerIntents.perform(intent, facing: facing, mediaID: mediaID)
             })
     }
     let navigation = NavigationState()
@@ -242,18 +264,16 @@ final class AppAssembly {
     }
     @ObservationIgnored lazy var bluetooth = BluetoothWorkflow(
         state: BluetoothSettingsState(), link: NexArmBluetooth(),
-        makeStore: {
-            let root = try FileManager.default.url(
-                for: .applicationSupportDirectory, in: .userDomainMask,
-                appropriateFor: nil, create: true)
-            return try LocalDocumentStore<BluetoothDeviceRecord>(
-                url: root.appendingPathComponent("MobileHarness/Bluetooth/device.json"), maximumBytes: 4096)
-        })
-    @ObservationIgnored private let capturedPhotos = CapturedPhotoStore(
-        root: URL.applicationSupportDirectory.appendingPathComponent("MobileHarness/CapturedPhotos", isDirectory: true),
-        limits: .init(
-            maximumPhotos: 1024, maximumBytes: 2 * 1024 * 1024 * 1024, maximumIndexBytes: 512 * 1024,
-            overflowPolicy: .evictOldest))
+        makeDeviceRepository: { [sqliteRepositories] in try sqliteRepositories.get().devices })
+    @ObservationIgnored private lazy var capturedPhotos = CapturedPhotoStore(
+        repository: sqliteRepositories.map { $0.media as any MediaRepository },
+        files: Result {
+            try LocalFileStore(
+                root: URL.applicationSupportDirectory.appendingPathComponent(
+                    "MobileHarness/CapturedPhotos", isDirectory: true), protection: .afterFirstUnlock)
+                as any BinaryObjectStore
+        },
+        limits: .init(maximumPhotos: 1024, maximumBytes: 2 * 1024 * 1024 * 1024, overflowPolicy: .evictOldest))
     @ObservationIgnored lazy var camera = makeCamera()
     private func makeCamera() -> CameraCoordinator {
         let device = cameraDevice
@@ -306,11 +326,25 @@ final class AppAssembly {
             }, previewOutput: HistoryAgentAdapter.preview,
             readConversation: { [weak self] id in
                 guard let self else { throw CancellationError() }
-                return try HistoryPresentationAdapter.conversation(await self.runtime().conversations.conversation(id))
+                return try HistoryPresentationAdapter.conversation(await self.runtime().conversations.page(id))
             },
             readPhoto: { [weak self] id, inputID in
                 guard let self else { throw CancellationError() }
                 return try await self.capturedPhotos.readForInput(id, source: "assistant", input: inputID)
+            },
+            readMessage: { [weak self] id in
+                guard let self else { throw CancellationError() }
+                return try HistoryPresentationAdapter.conversation(await self.runtime().conversations.message(id))
+            },
+            readPage: { [weak self] id, after, taskID in
+                guard let self else { throw CancellationError() }
+                return try HistoryPresentationAdapter.conversation(
+                    await self.runtime().conversations.page(id, after: after, taskID: taskID))
+            },
+            readArchives: { [weak self] cursor in
+                guard let self else { throw CancellationError() }
+                return try await self.runtime().conversations.archivePage(before: cursor).map(
+                    HistoryPresentationAdapter.conversation)
             })
     }
     #if os(iOS)
@@ -335,6 +369,7 @@ final class AppAssembly {
         return CurrentChatCapability(models: models)
     }
     private func runtime() throws -> ApplicationRuntime {
+        _ = try sqliteRepositories.get()
         if let runtimeValue { return runtimeValue }
         let resourceAdapter = ModelResourceCapabilityAdapter(
             manager: { [weak self] in
@@ -349,6 +384,7 @@ final class AppAssembly {
                 self.container?.lifecycle.endSettingsChange()
             })
         let runtime = try ApplicationRuntime(
+            chatRecords: try sqliteRepositories.get().chat, taskRecords: try sqliteRepositories.get().tasks,
             camera: cameraDevice, cameraControl: camera, bluetooth: bluetooth, historyState: historyState,
             resourceState: modelResources, providerState: settings, navigationState: navigation, device: deviceControl,
             modelResources: resourceAdapter,
@@ -400,6 +436,7 @@ final class AppAssembly {
         runtimeValue?.resourceObservation.setForeground(value)
     }
     func prepare(progress: @MainActor (String) -> Void) async throws {
+        _ = try sqliteRepositories.get()
         guard container == nil else { return }
         _ = try await artifactManager()
         _ = try await modelResourcesWorkflow.restoreSource()

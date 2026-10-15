@@ -55,3 +55,11 @@ Execution failure and later delivery failure remain separate. No adapter retries
 ✅ ActionExecutor/ToolExecutor 共用基础 30 秒默认超时和业务覆盖预算，timeout 触发取消并加入清理，保留实际报告；不存在未声明即可无限等待的执行分支。
 
 ✅ Native Tool failureCode classifies pure cancellation as cancelled and mixed reports by the actual non-cancellation failure. Canonical reports retain every child effect; cancellation cannot request model recovery.
+
+
+
+
+
+## SQLite records and runtime identity
+
+✅ Implemented: technical identities are opaque UUID strings; committed business entities use dialog/message/task/media/device SQLite IDs. Consumers use Storage repositories while preserving ownership, cancellation and independent foundation boundaries. Complete messages, including each ReACT message, persist at termination; delta fragments do not persist. The custom allocator and replaced file/index implementation are removed. See the project SQLite business-record plan.

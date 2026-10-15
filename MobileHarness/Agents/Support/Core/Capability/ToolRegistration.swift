@@ -1,3 +1,5 @@
+import Foundation
+
 /// OpenAI Chat Completions function declaration. The current transport supports string arguments only.
 public struct NativeToolDefinition: Codable, Sendable {
     public let type: String
@@ -54,6 +56,6 @@ public struct InternalTool: Sendable {
 
     public func call(_ arguments: [String: String]) throws -> ToolCall {
         try CapabilityRegistry.validate(arguments, required: requiredParameters, optional: optionalParameters)
-        return ToolCall(toolPath: path, arguments: arguments)
+        return ToolCall(id: UUID().uuidString, toolPath: path, arguments: arguments)
     }
 }

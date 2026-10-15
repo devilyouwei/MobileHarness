@@ -2,6 +2,7 @@ import AgentCore
 import Foundation
 import ModelKit
 import PlatformKit
+import Storage
 
 /// Streaming perception only. Device capture and playback remain composition-owned.
 public actor SpeechPerceptionAgent: Agent {
@@ -28,8 +29,8 @@ public actor SpeechPerceptionAgent: Agent {
     private let recognition: any SpeechRecognitionCapability
     private let vad: any VoiceActivityCapability
     private let resampler: StreamingMonoPCMResampler
-    private var sessionID: UUID
-    private let interactionSessionID: UUID?
+    private var sessionID: String
+    private let interactionSessionID: String?
     private let residentListening: Bool
     private var captureOpen: Bool
     private var listeningPolicy = SpeechListeningPolicy()
@@ -63,7 +64,7 @@ public actor SpeechPerceptionAgent: Agent {
 
     public init(
         recognition: any SpeechRecognitionCapability, vad: any VoiceActivityCapability,
-        sessionID: UUID, interactionSessionID: UUID? = nil, configuration: AgentConfiguration? = nil,
+        sessionID: String, interactionSessionID: String? = nil, configuration: AgentConfiguration? = nil,
         mode: Mode = .speechAndSoundSource, residentListening: Bool = false,
         context: AgentContextRepository<SpeechPerceptionContextState>? = nil
     ) throws {
@@ -73,7 +74,8 @@ public actor SpeechPerceptionAgent: Agent {
         }
         self.contextRepository =
             context
-            ?? AgentContextRepository(agent: .speechPerception, scope: UUID(), state: SpeechPerceptionContextState())
+            ?? AgentContextRepository(
+                agent: .speechPerception, scope: UUID().uuidString, state: SpeechPerceptionContextState())
         guard contextRepository.agentID == .speechPerception else { throw AgentConfigurationError.identityMismatch }
         let configuration = try configuration ?? AgentConfigurations.load(named: "SpeechPerception")
         guard configuration.agentID == .speechPerception else { throw AgentConfigurationError.identityMismatch }
@@ -180,7 +182,7 @@ public actor SpeechPerceptionAgent: Agent {
     }
 
     /// A microphone epoch is independent of the resident policy Agent's lifetime.
-    public func openCapture(sessionID: UUID) async throws {
+    public func openCapture(sessionID: String) async throws {
         guard residentListening, lifecycle == .running, listeningPolicy.enabled else {
             throw HarnessError.notRunning
         }
@@ -249,6 +251,7 @@ public actor SpeechPerceptionAgent: Agent {
         listeningPolicy.revision += 1
         let payload = InputPayload.text("Listening policy")
         let command = AgentInput(
+            id: UUID().uuidString,
             sessionID: interactionSessionID, payload: payload,
             metadata: InputMetadata(
                 payload: payload, source: "speechPerception", origin: .agent,
@@ -487,7 +490,7 @@ public actor SpeechPerceptionAgent: Agent {
                 })
         if beganTurn {
             turnOrdinal += 1
-            currentTurn = AgentTurn(ordinal: turnOrdinal)
+            currentTurn = AgentTurn(id: UUID().uuidString, ordinal: turnOrdinal)
         }
         input = AgentInput(
             id: input.id, sessionID: input.sessionID, payload: input.payload,

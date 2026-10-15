@@ -6,9 +6,11 @@ import Testing
     let store = MemoryLeaseStore<String>(
         capacity: 3, queueTTL: .milliseconds(20), readyTTL: .milliseconds(20), errorTTL: .seconds(1),
         onRemove: { _, _ in })
-    let owner = StorageOwner(namespace: "documents", source: "editor", session: UUID(), input: UUID())
-    let queued = UUID()
-    let ready = UUID()
+    let owner = StorageOwner(
+        namespace: "documents", source: "editor", session: UUID().uuidString,
+        input: UUID().uuidString)
+    let queued = UUID().uuidString
+    let ready = UUID().uuidString
     try await store.register(queued, owner: owner, value: "queued", cancel: {})
     try await store.register(ready, owner: owner, value: "ready", cancel: {})
     _ = try await store.begin(ready)
@@ -37,9 +39,11 @@ import Testing
     let store = MemoryLeaseStore<String>(
         capacity: 1, queueTTL: .seconds(1), readyTTL: .milliseconds(20), errorTTL: .seconds(1),
         onRemove: { _, _ in })
-    let owner = StorageOwner(namespace: "documents", source: "editor", session: UUID(), input: UUID())
+    let owner = StorageOwner(
+        namespace: "documents", source: "editor", session: UUID().uuidString,
+        input: UUID().uuidString)
     let foreign = StorageOwner(namespace: "images", source: "editor", session: owner.session, input: owner.input)
-    let id = UUID()
+    let id = UUID().uuidString
     try await store.register(id, owner: owner, value: "draft", cancel: {})
     #expect(try await store.begin(id) == "draft")
     await store.complete(id)
@@ -118,7 +122,7 @@ import Testing
     try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
     let url = root.appendingPathComponent("settings.json")
     let data = try JSONSerialization.data(withJSONObject: [
-        "version": 2, "revision": UUID().uuidString, "value": "future",
+        "version": 3, "revision": UUID().uuidString, "value": "future",
     ])
     try data.write(to: url)
     let store = try LocalDocumentStore<String>(url: url)

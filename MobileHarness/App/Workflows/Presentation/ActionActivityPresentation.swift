@@ -1,6 +1,7 @@
 import AgentCore
 import Foundation
 import FunctionContracts
+import Storage
 import UI
 
 private struct ActionActivityMapping: Identifiable, Equatable, Sendable {
@@ -77,7 +78,7 @@ private struct ActionActivityMapping: Identifiable, Equatable, Sendable {
             }
         }
     }
-    public var id: UUID { execution.id }
+    public var id: String { execution.id }
     public var channel: String { execution.channel }
     public var isActive: Bool { !execution.isTerminal }
     public var isFailure: Bool { execution.phase == .failed }

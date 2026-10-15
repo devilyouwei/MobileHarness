@@ -2,6 +2,7 @@ import AgentCore
 import Agents
 import Foundation
 import ModelKit
+import Storage
 import Testing
 
 private func generator() throws -> AgentGenerator {
@@ -109,7 +110,7 @@ func functionTokenParserRejectsTruncatedCompletion(_ source: String) throws {
     #expect(
         calls.count == 1 && calls[0].actionCall?.actionPath.domain == "Robot" && calls[0].actionCall?.channel == "robot"
     )
-    let id = UUID()
+    let id = UUID().uuidString
     let tool = try ToolCallParser.parse(
         id: id, alias: "lookup", argumentsJSON: Data(#"{"query":"x"}"#.utf8), capabilities: camera)
     #expect(tool.id == id && tool.toolPath == "Memory.Query.lookup" && tool.arguments == ["query": "x"])
@@ -161,7 +162,8 @@ private struct MarkupChat: ChatCapability {
     let speechRequests = try await bindSpeechRequests(agent)
     try await agent.start()
     var outputs = FixtureGenerationOutputs(agent: agent).makeAsyncIterator()
-    try await agent.receive(AgentInput(sessionID: UUID(), payload: .text("hello")))
+    try await agent.receive(
+        AgentInput(id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("hello")))
     var calls: [ActionCall] = []
     for _ in 0..<6 {
         let output = try #require(try await outputs.next()).output
@@ -175,8 +177,10 @@ private struct MarkupChat: ChatCapability {
     }
     #expect(calls.map(\.channel) == ["Speech", "Display", "Speech", "Speech", "Display"])
     #expect(calls[2].actionPath.function == "express")
-    let result = ToolResult(callID: UUID(), value: "<express emotion='smile'/>")
-    try await agent.receive(AgentInput(sessionID: UUID(), payload: .toolResult(result)))
+    let result = ToolResult(callID: UUID().uuidString, value: "<express emotion='smile'/>")
+    try await agent.receive(
+        AgentInput(
+            id: UUID().uuidString, sessionID: UUID().uuidString, payload: .toolResult(result)))
     let literal = try #require(try await outputs.next()).output
     #expect(
         await speechRequests.restored(literal)
@@ -189,7 +193,8 @@ private struct MarkupChat: ChatCapability {
     let speechRequests = try await bindSpeechRequests(agent)
     try await agent.start()
     var outputs = FixtureGenerationOutputs(agent: agent).makeAsyncIterator()
-    try await agent.receive(AgentInput(sessionID: UUID(), payload: .text("hello")))
+    try await agent.receive(
+        AgentInput(id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("hello")))
     let output = try #require(try await outputs.next()).output
     guard case .control(let state) = output else {
         Issue.record("Expected parse failure")
@@ -198,7 +203,9 @@ private struct MarkupChat: ChatCapability {
     }
     #expect(state.hasPrefix("agent.error:"))
     try await agent.receive(
-        AgentInput(sessionID: UUID(), payload: .toolResult(ToolResult(callID: UUID(), value: "recovered"))))
+        AgentInput(
+            id: UUID().uuidString, sessionID: UUID().uuidString,
+            payload: .toolResult(ToolResult(callID: UUID().uuidString, value: "recovered"))))
     #expect(
         await speechRequests.restored(try #require(try await outputs.next()).output)
             == .actionCall(expectedActionCall(name: "say", parameters: ["text": "recovered"])))
@@ -345,7 +352,8 @@ func invalidWaitSyntaxIsRejected(_ source: String) throws {
     let agent = try AssistantAgent(chat: MarkupChat(markup: "<wait>你好。</wait><wait><express emotion='smile'/></wait>"))
     let probe = try await bindSpeechRequests(agent)
     try await agent.start()
-    try await agent.receive(AgentInput(sessionID: UUID(), payload: .text("test")))
+    try await agent.receive(
+        AgentInput(id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("test")))
     var received: [AgentOutput] = []
     for try await envelope in FixtureGenerationOutputs(agent: agent) {
         received.append(await probe.restored(envelope.output))

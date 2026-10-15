@@ -1,6 +1,7 @@
 import AgentCore
 import Agents
 import Foundation
+import Storage
 import StorageChat
 
 /// Test-only transport bridge: production Agents emit communication Actions exclusively.
@@ -52,14 +53,18 @@ private enum FixtureCommunicationStreams {
                             let receipt = CommunicationReceipt(
                                 callID: action.id, report: report,
                                 owner: ExecutionOwner(
-                                    agent: output.source, incarnation: UUID(), sessionID: output.sessionID),
+                                    agent: output.source, incarnation: UUID().uuidString,
+                                    sessionID: output.sessionID),
                                 causality: SignalCausality(envelope: output))
                             let payload = InputPayload.communicationReceipt(receipt)
                             do {
                                 try await agent.receive(
                                     AgentInput(
+                                        id: UUID().uuidString,
                                         sessionID: output.sessionID, payload: payload,
-                                        metadata: InputMetadata(payload: payload, source: "runtime", origin: .runtime)))
+                                        metadata: InputMetadata(
+                                            payload: payload, source: "runtime", origin: .runtime,
+                                            rootID: UUID().uuidString)))
                             } catch {}
                         }
                     } else {
@@ -119,7 +124,7 @@ struct FixtureNativeChatState: AgentChatContextState {
     }
     var history = ConversationArchive()
     var admissionSequence: UInt64 = 0
-    var taskViews: [UUID: AgentTaskView]?
+    var taskViews: [String: AgentTaskView]?
     init() {}
     func validateContextState() throws { try validateChatState() }
     mutating func recoverInterruptedWork() { recoverChatState() }

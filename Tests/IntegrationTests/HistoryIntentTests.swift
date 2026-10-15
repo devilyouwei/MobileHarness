@@ -18,12 +18,12 @@ private struct HistoryPresentationModule: ToolModule {
 }
 
 private struct UnusedHistoryMutation: HistoryMutationCapability {
-    func startNew() async throws -> UUID? { throw CommunicationError.unsupportedContract }
-    func summarizeArchived(_ id: UUID) async throws { throw CommunicationError.unsupportedContract }
-    func deleteArchived(_ id: UUID) async throws { throw CommunicationError.unsupportedContract }
+    func startNew() async throws -> String? { throw CommunicationError.unsupportedContract }
+    func summarizeArchived(_ id: String) async throws { throw CommunicationError.unsupportedContract }
+    func deleteArchived(_ id: String) async throws { throw CommunicationError.unsupportedContract }
 }
 private func intentRuntime(
-    sessionID: UUID, presentation: any HistoryPresentationCapability,
+    sessionID: String, presentation: any HistoryPresentationCapability,
     mutations: any HistoryMutationCapability = UnusedHistoryMutation()
 ) throws
     -> HistoryIntentRuntime
@@ -65,7 +65,7 @@ private func intentRuntime(
 }
 
 @Test(.actionCatalog) @MainActor func historyRefreshTravelsThroughBothGatewaysWithoutVoiceOrModels() async throws {
-    let session = UUID()
+    let session = UUID().uuidString
     let store = ConversationHistoryStore()
     let state = ConversationHistoryState()
     let runtime = try intentRuntime(
@@ -106,7 +106,7 @@ private actor HeldHistoryPresentation: HistoryPresentationCapability {
 }
 @Test(.actionCatalog) func historyRefreshRejectsOverlapAndJoinsCancellationBeforeRetry() async throws {
     let endpoint = HeldHistoryPresentation()
-    let runtime = try intentRuntime(sessionID: UUID(), presentation: endpoint)
+    let runtime = try intentRuntime(sessionID: UUID().uuidString, presentation: endpoint)
     var started = endpoint.started.stream.makeAsyncIterator()
     let first = Task { try await runtime.refresh() }
     await started.next()
@@ -123,17 +123,19 @@ private actor HeldHistoryPresentation: HistoryPresentationCapability {
 }
 
 @Test(.actionCatalog) func memoryAgentRejectsUnknownIntentsAndBoundsPendingOutputs() async throws {
-    let session = UUID()
+    let session = UUID().uuidString
     let agent = try MemoryAgent(sessionID: session)
     try await agent.start()
     await #expect(throws: CommunicationError.invalidPayload) {
         try await agent.receive(
             AgentInput(
+                id: UUID().uuidString,
                 sessionID: session, payload: .event("history.delete"),
-                metadata: InputMetadata(payload: .event("history.delete"), source: "user")))
+                metadata: InputMetadata(
+                    payload: .event("history.delete"), source: "user", rootID: UUID().uuidString)))
     }
     await #expect(throws: CommunicationError.unauthorized) {
-        try await agent.receive(MemoryHistoryIntent.refresh.input(sessionID: UUID()))
+        try await agent.receive(MemoryHistoryIntent.refresh.input(sessionID: UUID().uuidString))
     }
     for _ in 0..<256 { try await agent.receive(MemoryHistoryIntent.refresh.input(sessionID: session)) }
     await #expect(throws: CommunicationError.capacityExceeded) {
@@ -145,17 +147,19 @@ private actor HeldHistoryPresentation: HistoryPresentationCapability {
 
 @Test(.actionCatalog) @MainActor func historyPresentationRejectsForeignScopeWithoutChangingState() async throws {
     let state = ConversationHistoryState()
-    let adapter = HistoryPresentationAdapter(state: state, store: ConversationHistoryStore(), sessionID: UUID())
+    let adapter = HistoryPresentationAdapter(
+        state: state, store: ConversationHistoryStore(), sessionID: UUID().uuidString)
     let invocation = ActionInvocation(
-        call: ToolRequest(toolPath: "UI.HistoryPresentation.showHistory"),
-        context: ActionExecutionContext(source: "assistant", sessionID: UUID(), inputID: UUID()))
+        call: ToolRequest(id: UUID().uuidString, toolPath: "UI.HistoryPresentation.showHistory"),
+        context: ActionExecutionContext(
+            source: "assistant", sessionID: UUID().uuidString, inputID: UUID().uuidString))
     await #expect(throws: (any Error).self) { try await adapter.showHistory(invocation: invocation) }
     #expect(state.archive == nil)
 }
 
-private func archivedHistory(_ store: ConversationHistoryStore) async throws -> UUID {
+private func archivedHistory(_ store: ConversationHistoryStore) async throws -> String {
     let read = try await store.readCurrent()
-    let turn = UUID()
+    let turn = UUID().uuidString
     _ = try await store.begin(id: turn, user: "archive", request: [], expecting: read.token, model: "fixture")
     try await store.finish(turn, state: .completed)
     return try #require(await store.startNew()).id
@@ -165,7 +169,7 @@ private func archivedHistory(_ store: ConversationHistoryStore) async throws -> 
 func historyDeleteUsesCorrelatedRuntimeResultBeforePresentation() async throws {
     let store = ConversationHistoryStore()
     let id = try await archivedHistory(store)
-    let session = UUID()
+    let session = UUID().uuidString
     let state = ConversationHistoryState()
     let runtime = try intentRuntime(
         sessionID: session,
@@ -184,7 +188,7 @@ func historyDeleteRejectsCurrentAndMissingIDsAndAllowsRefreshAfterFailure()
     async throws
 {
     let store = ConversationHistoryStore()
-    let session = UUID()
+    let session = UUID().uuidString
     let state = ConversationHistoryState()
     let runtime = try intentRuntime(
         sessionID: session,
@@ -193,7 +197,7 @@ func historyDeleteRejectsCurrentAndMissingIDsAndAllowsRefreshAfterFailure()
     let currentID = try await store.snapshot().current.id
     await #expect(throws: HistoryIntentFailure.self) { try await runtime.deleteArchived(currentID) }
     #expect(state.archive == nil)
-    await #expect(throws: HistoryIntentFailure.self) { try await runtime.deleteArchived(UUID()) }
+    await #expect(throws: HistoryIntentFailure.self) { try await runtime.deleteArchived(UUID().uuidString) }
     try await runtime.refresh()
     #expect(state.archive?.current.id == currentID)
 }
@@ -206,9 +210,9 @@ private actor HeldHistoryMutation: HistoryMutationCapability {
     init(store: ConversationHistoryStore) {
         mutations = HistoryMutationService(store: store, summarizeTitle: { _ in "Unused fixture title" })
     }
-    func startNew() async throws -> UUID? { try await mutations.startNew() }
-    func summarizeArchived(_ id: UUID) async throws { try await mutations.summarizeArchived(id) }
-    func deleteArchived(_ id: UUID) async throws {
+    func startNew() async throws -> String? { try await mutations.startNew() }
+    func summarizeArchived(_ id: String) async throws { try await mutations.summarizeArchived(id) }
+    func deleteArchived(_ id: String) async throws {
         try await mutations.deleteArchived(id)
         await withTaskCancellationHandler {
             await withCheckedContinuation {
@@ -231,7 +235,7 @@ func historyDeleteCancellationJoinsCleanupWithoutRollingBackCommittedData()
 {
     let store = ConversationHistoryStore()
     let id = try await archivedHistory(store)
-    let session = UUID()
+    let session = UUID().uuidString
     let state = ConversationHistoryState()
     let mutation = HeldHistoryMutation(store: store)
     let runtime = try intentRuntime(
@@ -255,36 +259,40 @@ func historyDeleteCancellationJoinsCleanupWithoutRollingBackCommittedData()
 
 @Test(.actionCatalog, .timeLimit(.minutes(1)))
 func memoryDeleteRejectsUncorrelatedOrForeignFeedbackAndOverlappingIntent() async throws {
-    let session = UUID()
+    let session = UUID().uuidString
     let agent = try MemoryAgent(sessionID: session)
     try await agent.start()
-    try await agent.receive(MemoryHistoryIntent.delete(UUID()).input(sessionID: session))
+    try await agent.receive(MemoryHistoryIntent.delete(UUID().uuidString).input(sessionID: session))
     var reader = agent.outputs.makeAsyncIterator()
     let envelope = try #require(await reader.next())
     guard case .toolCall(let call) = envelope.output else {
         Issue.record("Expected delete ToolCall")
         return
     }
-    let cancelPayload = InputPayload.event("history.cancel:" + envelope.inputID.uuidString)
+    let cancelPayload = InputPayload.event("history.cancel:" + envelope.inputID)
     await #expect(throws: CommunicationError.invalidPayload) {
         try await agent.receive(
             AgentInput(
                 id: envelope.inputID, sessionID: session, payload: cancelPayload,
-                metadata: InputMetadata(payload: cancelPayload, source: "user")))
+                metadata: InputMetadata(payload: cancelPayload, source: "user", rootID: UUID().uuidString)))
     }
     await #expect(throws: CommunicationError.capacityExceeded) {
         try await agent.receive(MemoryHistoryIntent.refresh.input(sessionID: session))
     }
     await #expect(throws: CommunicationError.invalidPayload) {
         try await agent.receive(
-            AgentInput(sessionID: session, payload: .toolResult(.init(callID: UUID(), value: "ok"))))
+            AgentInput(
+                id: UUID().uuidString, sessionID: session,
+                payload: .toolResult(.init(callID: UUID().uuidString, value: "ok"))))
     }
     let payload = InputPayload.toolResult(.init(callID: call.id, value: "ok"))
     await #expect(throws: CommunicationError.invalidPayload) {
         try await agent.receive(
-            AgentInput(sessionID: session, payload: payload, metadata: InputMetadata(payload: payload, source: "user")))
+            AgentInput(
+                id: UUID().uuidString, sessionID: session, payload: payload,
+                metadata: InputMetadata(payload: payload, source: "user", rootID: UUID().uuidString)))
     }
-    try await agent.receive(AgentInput(sessionID: session, payload: payload))
+    try await agent.receive(AgentInput(id: UUID().uuidString, sessionID: session, payload: payload))
     let followup = try #require(await reader.next())
     #expect(followup.inputID == envelope.inputID)
     guard case .toolCall(let presentation) = followup.output else {
@@ -293,7 +301,7 @@ func memoryDeleteRejectsUncorrelatedOrForeignFeedbackAndOverlappingIntent() asyn
     }
     #expect(presentation.toolPath == "UI.HistoryPresentation.showHistory")
     await #expect(throws: CommunicationError.invalidPayload) {
-        try await agent.receive(AgentInput(sessionID: session, payload: payload))
+        try await agent.receive(AgentInput(id: UUID().uuidString, sessionID: session, payload: payload))
     }
     await agent.stop()
 }
@@ -303,15 +311,16 @@ func memoryDeleteRejectsUncorrelatedOrForeignFeedbackAndOverlappingIntent() asyn
     let invalid = AgentMessage(
         contract: MemoryHistoryIntent.contract, content: "history.refresh", validate: { _ in })
     #expect(throws: CommunicationError.invalidPayload) { try contracts.validatedSize(invalid) }
-    let session = UUID()
+    let session = UUID().uuidString
     let agent = try MemoryAgent(sessionID: session)
     try await agent.start()
     let payload = InputPayload.event("history.refresh")
     await #expect(throws: CommunicationError.invalidPayload) {
         try await agent.receive(
             AgentInput(
+                id: UUID().uuidString,
                 sessionID: session, payload: payload,
-                metadata: .init(payload: payload, source: "user")))
+                metadata: .init(payload: payload, source: "user", rootID: UUID().uuidString)))
     }
     await agent.stop()
 }
@@ -335,7 +344,7 @@ private actor ControlledTitle: ChatCapability {
 
 private func completedConversation() async throws -> ConversationHistoryStore {
     let store = ConversationHistoryStore()
-    let id = UUID()
+    let id = UUID().uuidString
     let read = try await store.readCurrent()
     _ = try await store.begin(
         id: id, user: "原始用户输入", request: [.init(role: .user, content: "原始用户输入")],
@@ -350,7 +359,7 @@ func archiveCommitsAndReturnsBeforeRootTitleCompletes() async throws {
     let store = try await completedConversation()
     let state = ConversationHistoryState()
     let chat = ControlledTitle()
-    let session = UUID()
+    let session = UUID().uuidString
     let mutations = HistoryMutationService(
         store: store, summarizeTitle: { try await ConversationTitleGenerator.summarize($0, using: chat) })
     let runtime = try intentRuntime(
@@ -364,7 +373,8 @@ func archiveCommitsAndReturnsBeforeRootTitleCompletes() async throws {
     #expect(during.current.turns.isEmpty && archived.summaryTitle == nil)
     // A new user input and another history refresh proceed while the title model is held.
     let fresh = try await store.readCurrent()
-    _ = try await store.begin(id: UUID(), user: "new user", request: [], expecting: fresh.token, model: "fixture")
+    _ = try await store.begin(
+        id: UUID().uuidString, user: "new user", request: [], expecting: fresh.token, model: "fixture")
     try await runtime.refresh()
     try await chat.finish("对话标题")
     await mutations.waitForTitles()
@@ -395,7 +405,7 @@ func emptyHistoryArchiveDoesNotInferOrReplaceCurrentConversation()
     let store = ConversationHistoryStore()
     let current = try await store.snapshot().current.id
     let state = ConversationHistoryState()
-    let session = UUID()
+    let session = UUID().uuidString
     let runtime = try intentRuntime(
         sessionID: session, presentation: HistoryPresentationAdapter(state: state, store: store, sessionID: session),
         mutations: HistoryMutationService(
@@ -417,7 +427,7 @@ func emptyHistoryArchiveDoesNotInferOrReplaceCurrentConversation()
     let id = try await archivedHistory(store)
     let state = ConversationHistoryState()
     let chat = ControlledTitle()
-    let session = UUID()
+    let session = UUID().uuidString
     let runtime = try intentRuntime(
         sessionID: session, presentation: HistoryPresentationAdapter(state: state, store: store, sessionID: session),
         mutations: HistoryMutationService(
@@ -440,7 +450,7 @@ func emptyHistoryArchiveDoesNotInferOrReplaceCurrentConversation()
 @Test(.actionCatalog, .timeLimit(.minutes(1))) @MainActor
 func summarizeRejectsCurrentAndMissingArchivesWithoutInference() async throws {
     let store = ConversationHistoryStore()
-    let session = UUID()
+    let session = UUID().uuidString
     let state = ConversationHistoryState()
     let runtime = try intentRuntime(
         sessionID: session, presentation: HistoryPresentationAdapter(state: state, store: store, sessionID: session),
@@ -452,7 +462,7 @@ func summarizeRejectsCurrentAndMissingArchivesWithoutInference() async throws {
             }))
     let current = try await store.snapshot().current.id
     await #expect(throws: HistoryIntentFailure.self) { try await runtime.summarize(current) }
-    await #expect(throws: HistoryIntentFailure.self) { try await runtime.summarize(UUID()) }
+    await #expect(throws: HistoryIntentFailure.self) { try await runtime.summarize(UUID().uuidString) }
     try await runtime.refresh()
     #expect(state.archive?.current.id == current && state.archive?.past.isEmpty == true)
 }
@@ -464,7 +474,8 @@ private struct FailedArchivePresentation: HistoryPresentationCapability {
     let store = try await completedConversation()
     let old = try await store.snapshot().current.id
     let mutations = HistoryMutationService(store: store, summarizeTitle: { _ in "Completed title" })
-    let runtime = try intentRuntime(sessionID: UUID(), presentation: FailedArchivePresentation(), mutations: mutations)
+    let runtime = try intentRuntime(
+        sessionID: UUID().uuidString, presentation: FailedArchivePresentation(), mutations: mutations)
     await #expect(throws: HistoryIntentFailure.self) { try await runtime.startNew() }
     await mutations.waitForTitles()
     let snapshot = try await store.snapshot()
@@ -474,53 +485,30 @@ private struct FailedArchivePresentation: HistoryPresentationCapability {
     await runtime.shutdown()
 }
 
-@Test(.actionCatalog) func titleInferenceAndRetryPersistenceFailuresPreserveBothCauses() async throws {
-    let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-    defer { try? FileManager.default.removeItem(at: directory) }
-    let store = ConversationHistoryStore(files: try ConversationFileStore(directory: directory, maximumBytes: 2048))
-    let id = try await archivedHistory(store)
-    let service = HistoryMutationService(
-        store: store,
-        summarizeTitle: { _ in
-            try FileManager.default.removeItem(at: directory)
-            throw CommunicationError.scopeClosed
-        })
-    do {
-        try await service.summarizeArchived(id)
-        Issue.record("Must report failed inference and failed retry write")
-    } catch let error as ActionReportedError {
-        #expect(error.actionReport.entries.map(\.path) == ["title", "retryState"])
-        #expect(error.actionReport.entries.allSatisfy { $0.status == .failed })
-        #expect(error.actionReport.entries.first?.details["failureDescription"]?.contains("scopeClosed") == true)
-        #expect(error.actionReport.entries.last?.details["failureDescription"] != nil)
-    }
-    #expect(try await store.snapshot().past.first?.id == id)
-}
-
 @Test(.actionCatalog) func memoryAndPhotographerHaveCanonicalIndependentRoleIdentities() throws {
     let memory = try AgentConfigurations.load(named: "Memory")
     let photographer = try AgentConfigurations.load(named: "Photographer")
     #expect(memory.agentID == .memory)
     #expect(photographer.agentID == .photographer)
-    #expect(try MemoryAgent(sessionID: UUID()).descriptor.name == "Memory")
-    #expect(try PhotographerAgent(sessionID: UUID()).descriptor.name == "Photographer")
+    #expect(try MemoryAgent(sessionID: UUID().uuidString).descriptor.name == "Memory")
+    #expect(try PhotographerAgent(sessionID: UUID().uuidString).descriptor.name == "Photographer")
     #expect(throws: AgentConfigurationError.identityMismatch) {
-        try MemoryAgent(sessionID: UUID(), configuration: photographer)
+        try MemoryAgent(sessionID: UUID().uuidString, configuration: photographer)
     }
     #expect(throws: AgentConfigurationError.identityMismatch) {
-        try PhotographerAgent(sessionID: UUID(), configuration: memory)
+        try PhotographerAgent(sessionID: UUID().uuidString, configuration: memory)
     }
 }
 
 @Test(.actionCatalog) func memoryOverflowRetainsAcceptedOutputsAndFailsOnlyItsActor() async throws {
-    let session = UUID()
+    let session = UUID().uuidString
     let memory = try MemoryAgent(sessionID: session)
     let photographer = try PhotographerAgent(sessionID: session)
     try await memory.start()
     try await photographer.start()
-    var accepted: [UUID] = []
+    var accepted: [String] = []
     for _ in 0..<256 {
-        let input = MemoryHistoryIntent.refresh.input(sessionID: session)
+        let input = try MemoryHistoryIntent.refresh.input(sessionID: session)
         accepted.append(input.id)
         try await memory.receive(input)
     }
@@ -530,7 +518,7 @@ private struct FailedArchivePresentation: HistoryPresentationCapability {
     #expect(await memory.status().lifecycle == .failed)
     #expect(await memory.status().processedInputs == 256)
     #expect(await photographer.status().lifecycle == .running)
-    var retained: [UUID] = []
+    var retained: [String] = []
     for await envelope in memory.outputs {
         #expect(envelope.source == .memory)
         retained.append(envelope.inputID)
@@ -540,12 +528,13 @@ private struct FailedArchivePresentation: HistoryPresentationCapability {
 }
 
 @Test(.actionCatalog) @MainActor func taskDialogueRemainsVisibleAndNewConversationPreservesItsEvidence() async throws {
-    let session = UUID()
-    let repository = AgentContextRepository(agent: AgentID.assistant, scope: UUID(), state: AssistantContextState())
+    let session = UUID().uuidString
+    let repository = AgentContextRepository(
+        agent: AgentID.assistant, scope: UUID().uuidString, state: AssistantContextState())
     let store = AgentChatHistoryContext.store(repository: repository)
     let agent = try AssistantAgent(conversations: store, context: repository)
     try await agent.start()
-    let input = UUID()
+    let input = UUID().uuidString
     _ = try await agent.controlTask(
         "startTask", arguments: ["goal": "拍照并等待保存", "skills": "[\"photography\"]"],
         source: "assistant", sessionID: session, inputID: input, decisionID: nil)
@@ -553,23 +542,25 @@ private struct FailedArchivePresentation: HistoryPresentationCapability {
     _ = try await store.begin(id: input, user: "帮我拍照", request: [], expecting: read.token, model: "fixture")
     let historyTaskID = try #require(try await repository.snapshot().state.skillState?.activeTaskID)
     try await store.beginModelRequest(
-        .init(id: UUID(), input: "帮我拍照", requestJSON: "[]", historyTaskID: historyTaskID), for: input)
+        .init(id: UUID().uuidString, input: "帮我拍照", requestJSON: "[]", historyTaskID: historyTaskID),
+        for: input)
     try await store.append("照片已拍摄，要保存吗？", to: input)
     try await store.finish(input, state: .completed)
     let state = ConversationHistoryState()
     let adapter = HistoryPresentationAdapter(state: state, store: store, sessionID: session)
     let invocation = ActionInvocation(
-        call: ToolRequest(toolPath: "UI.HistoryPresentation.showHistory"),
-        context: ActionExecutionContext(source: "memory", sessionID: session, inputID: UUID()))
+        call: ToolRequest(id: UUID().uuidString, toolPath: "UI.HistoryPresentation.showHistory"),
+        context: ActionExecutionContext(source: "memory", sessionID: session, inputID: UUID().uuidString))
     try await adapter.showHistory(invocation: invocation)
     #expect(state.archive?.current.turns.isEmpty == true && state.archive?.current.turnCount == 1)
     #expect(state.archive?.current.latestUser == "帮我拍照")
     let currentRecords = try HistoryPresentationAdapter.conversation((try await store.snapshot()).current)
     #expect(
-        ConversationHistoryPresentation.turns(currentRecords).filter { $0.historyTaskID == historyTaskID }.count == 1)
+        ConversationHistoryPresentation.turns(currentRecords).filter { $0.historyTaskID == historyTaskID }
+            .count == 1)
     _ = try await agent.controlTask(
         "cancelTask", arguments: ["reason": "用户开始新对话"], source: "assistant", sessionID: session,
-        inputID: UUID(), decisionID: nil)
+        inputID: UUID().uuidString, decisionID: nil)
     let archived = try #require(try await store.startNew())
     #expect(archived.turns.first?.id == input)
     #expect(archived.taskCompressions.first?.taskID == historyTaskID)

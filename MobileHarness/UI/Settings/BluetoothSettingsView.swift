@@ -1,3 +1,5 @@
+import Foundation
+
 #if os(iOS)
     import SwiftUI
 
@@ -110,7 +112,7 @@
                 rowLabel(device)
             }
             .disabled(state.rowIntent(for: device.id) == .unavailable)
-            .accessibilityIdentifier("settings.bluetooth.device.\(device.id.uuidString)")
+            .accessibilityIdentifier("settings.bluetooth.device.\(device.id)")
         }
         private func rowLabel(_ device: BluetoothDeviceRow) -> some View {
             HStack(spacing: 12) {

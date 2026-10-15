@@ -1,5 +1,6 @@
 import Foundation
 import FunctionContracts
+import Storage
 
 extension UIActions {
     @Action(
@@ -81,7 +82,8 @@ extension UIActions {
             throw ActionArguments.ValidationError.invalidValue("failureCode")
         }
         try Task.checkCancellation()
-        try await presentation.presentProviderResult(requestID: id, failureCode: code, invocation: invocation)
+        try await presentation.presentProviderResult(
+            requestID: id.uuidString, failureCode: code, invocation: invocation)
         return "presented"
     }
 

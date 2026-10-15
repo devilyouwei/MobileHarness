@@ -1,19 +1,5 @@
 import Foundation
 
-public struct StorageOwner: Sendable, Hashable {
-    public let namespace: String
-    public let source: String
-    public let session: UUID
-    public let input: UUID
-
-    public init(namespace: String, source: String, session: UUID, input: UUID) {
-        self.namespace = namespace
-        self.source = source
-        self.session = session
-        self.input = input
-    }
-}
-
 /// Bounded, single-checkout handles. Nil TTLs leave lifetime to the owning scope.
 public actor MemoryLeaseStore<Value: Sendable> {
     private struct Entry {
@@ -32,8 +18,8 @@ public actor MemoryLeaseStore<Value: Sendable> {
         let expires: ContinuousClock.Instant?
         let createdAt: ContinuousClock.Instant
     }
-    private var entries: [UUID: Entry] = [:]
-    private var terminal: [UUID: Terminal] = [:]
+    private var entries: [String: Entry] = [:]
+    private var terminal: [String: Terminal] = [:]
     private let capacity: Int
     private let queueTTL: Duration?
     private let readyTTL: Duration?
@@ -56,7 +42,7 @@ public actor MemoryLeaseStore<Value: Sendable> {
     }
 
     public func register(
-        _ id: UUID, owner: StorageOwner, value: Value,
+        _ id: String, owner: StorageOwner, value: Value,
         cancel: @escaping @Sendable () async -> Void
     ) throws {
         prune()
@@ -67,7 +53,7 @@ public actor MemoryLeaseStore<Value: Sendable> {
         if let queueTTL { arm(id, after: queueTTL) }
     }
 
-    public func begin(_ id: UUID) async throws -> Value {
+    public func begin(_ id: String) async throws -> Value {
         await expireIfNeeded(id)
         guard var entry = entries[id] else { throw terminal[id]?.error ?? StorageError.missing }
         guard !entry.started else { throw StorageError.duplicate }
@@ -81,17 +67,17 @@ public actor MemoryLeaseStore<Value: Sendable> {
     }
 
     /// Inspect an existing handle for producer completion without changing its lease state.
-    public func valueForCompletion(_ id: UUID) throws -> Value {
+    public func valueForCompletion(_ id: String) throws -> Value {
         guard let entry = entries[id], entry.started else { throw StorageError.missing }
         return entry.value
     }
 
-    public func complete(_ id: UUID) {
+    public func complete(_ id: String) {
         guard let entry = entries[id], !entry.leased else { return }
         if let readyTTL { arm(id, after: readyTTL) }
     }
 
-    public func validate(_ id: UUID, owner: StorageOwner) async throws {
+    public func validate(_ id: String, owner: StorageOwner) async throws {
         await expireIfNeeded(id)
         prune()
         if let result = terminal[id] {
@@ -102,7 +88,7 @@ public actor MemoryLeaseStore<Value: Sendable> {
         guard entry.owner == owner else { throw StorageError.forbidden }
     }
 
-    public func checkout(_ id: UUID, owner: StorageOwner) async throws -> Value {
+    public func checkout(_ id: String, owner: StorageOwner) async throws -> Value {
         try await validate(id, owner: owner)
         guard var entry = entries[id], !entry.leased else { throw StorageError.duplicate }
         entry.leased = true
@@ -116,17 +102,17 @@ public actor MemoryLeaseStore<Value: Sendable> {
         return entry.value
     }
 
-    public func release(_ id: UUID, owner: StorageOwner) async throws {
+    public func release(_ id: String, owner: StorageOwner) async throws {
         try await validate(id, owner: owner)
         await fail(id, error: StorageError.missing)
     }
 
-    public func cancel(_ id: UUID, owner: StorageOwner) async throws {
+    public func cancel(_ id: String, owner: StorageOwner) async throws {
         try await validate(id, owner: owner)
         await fail(id, error: CancellationError())
     }
 
-    public func fail(_ id: UUID, error: any Error) async {
+    public func fail(_ id: String, error: any Error) async {
         guard let entry = entries.removeValue(forKey: id) else { return }
         entry.timer?.cancel()
         prune()
@@ -139,7 +125,7 @@ public actor MemoryLeaseStore<Value: Sendable> {
         await entry.cancel()
     }
 
-    public func cancel(inputID: UUID, source: String, namespace: String) async {
+    public func cancel(inputID: String, source: String, namespace: String) async {
         let ids = entries.filter {
             $0.value.owner.input == inputID && $0.value.owner.source == source
                 && $0.value.owner.namespace == namespace
@@ -147,7 +133,7 @@ public actor MemoryLeaseStore<Value: Sendable> {
         for id in ids { await fail(id, error: CancellationError()) }
     }
 
-    public func cancel(sessionID: UUID, namespace: String) async {
+    public func cancel(sessionID: String, namespace: String) async {
         let ids = entries.filter {
             $0.value.owner.session == sessionID && $0.value.owner.namespace == namespace
         }.map(\.key)
@@ -155,13 +141,13 @@ public actor MemoryLeaseStore<Value: Sendable> {
     }
 
     /// Scope retirement removes error metadata after readers/producers have been cancelled.
-    public func forgetTerminals(inputID: UUID, source: String, namespace: String) {
+    public func forgetTerminals(inputID: String, source: String, namespace: String) {
         terminal = terminal.filter {
             !($0.value.owner.input == inputID && $0.value.owner.source == source
                 && $0.value.owner.namespace == namespace)
         }
     }
-    public func forgetTerminals(sessionID: UUID, namespace: String) {
+    public func forgetTerminals(sessionID: String, namespace: String) {
         terminal = terminal.filter {
             !($0.value.owner.session == sessionID && $0.value.owner.namespace == namespace)
         }
@@ -173,7 +159,7 @@ public actor MemoryLeaseStore<Value: Sendable> {
         terminal.removeAll()
     }
 
-    private func arm(_ id: UUID, after duration: Duration) {
+    private func arm(_ id: String, after duration: Duration) {
         entries[id]?.timer?.cancel()
         let deadline = ContinuousClock.now.advanced(by: duration)
         let token = UUID()
@@ -185,12 +171,12 @@ public actor MemoryLeaseStore<Value: Sendable> {
         }
     }
 
-    private func expire(_ id: UUID, token: UUID) async {
+    private func expire(_ id: String, token: UUID) async {
         guard entries[id]?.timerID == token else { return }
         await expireIfNeeded(id)
     }
 
-    private func expireIfNeeded(_ id: UUID) async {
+    private func expireIfNeeded(_ id: String) async {
         if let expiry = entries[id]?.expiry, expiry <= .now {
             await fail(id, error: StorageError.expired)
         }

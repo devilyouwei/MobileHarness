@@ -7,7 +7,7 @@ public actor ModelManager {
         let registration: ModelRegistration
         var context: ModelContext
         var constructed = false
-        var construction: (id: UUID, task: Task<ProvidedCapabilities, Error>)?
+        var construction: (id: String, task: Task<ProvidedCapabilities, Error>)?
         var waiters = 0
         var unloading = false
         init(_ registration: ModelRegistration, gate: ModelLoadGate, maximumLoadWaiters: Int) throws {
@@ -280,7 +280,7 @@ public actor ModelManager {
             constructing += 1
             let registration = entry.registration
             let context = entry.context
-            let id = UUID()
+            let id = UUID().uuidString
             let task = Task {
                 do {
                     let result = try await registration.factory(context)

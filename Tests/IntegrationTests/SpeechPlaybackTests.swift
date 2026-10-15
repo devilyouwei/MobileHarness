@@ -8,6 +8,7 @@ import Foundation
 import FunctionContracts
 import Gateway
 import ModelKit
+import Storage
 import StorageAudio
 import Testing
 
@@ -38,19 +39,24 @@ private actor PlaybackSynthesisFixture: SpeechSynthesisCapability {
         return pair.session
     }
 }
-private func admit(_ text: String, agent: SpeechSynthesisAgent, source: String = "assistant", session: UUID = UUID())
-    async throws -> (UUID, SpeechAudioStore.Owner, any FunctionInput)
+private func admit(
+    _ text: String, agent: SpeechSynthesisAgent, source: String = "assistant",
+    session: String = UUID().uuidString
+)
+    async throws -> (String, SpeechAudioStore.Owner, any FunctionInput)
 {
-    let parent = AgentInput(sessionID: session, payload: .text(text))
+    let parent = AgentInput(id: UUID().uuidString, sessionID: session, payload: .text(text))
     let request = try SpeechSynthesisInput(text: text)
     let payload = InputPayload.observation(.speechSynthesis(request))
     try await agent.receive(
         AgentInput(
+            id: UUID().uuidString,
             sessionID: session, payload: payload,
-            metadata: InputMetadata(payload: payload, source: source, parentID: parent.id)))
+            metadata: InputMetadata(
+                payload: payload, source: source, rootID: UUID().uuidString, parentID: parent.id)))
     let call = ActionCall(
         actionPath: ActionPath(domain: "Speech", module: "Playback", function: "speak"), channel: "Speech",
-        parameters: ["audioID": request.audioID.uuidString])
+        parameters: ["audioID": request.audioID])
     return (
         request.audioID, .init(source: source, session: session, input: parent.id),
         ActionInvocation(source: AgentID(rawValue: source), input: parent, call: call, sequence: 1)
@@ -100,11 +106,12 @@ private func admit(_ text: String, agent: SpeechSynthesisAgent, source: String =
 }
 @Test(.actionCatalog) func cacheOwnershipCapacityAndExplicitRelease() async throws {
     let store = SpeechAudioStore(capacity: 1)
-    let owner = SpeechAudioStore.Owner(source: "assistant", session: UUID(), input: UUID())
-    let id = UUID()
+    let owner = SpeechAudioStore.Owner(
+        source: "assistant", session: UUID().uuidString, input: UUID().uuidString)
+    let id = UUID().uuidString
     try await store.register(id, owner: owner, cancel: {})
     await #expect(throws: SpeechAudioError.capacityExceeded) {
-        try await store.register(UUID(), owner: owner, cancel: {})
+        try await store.register(UUID().uuidString, owner: owner, cancel: {})
     }
     let audio = try await store.begin(id)
     try await audio.append(storedPCM())
@@ -119,7 +126,7 @@ private func admit(_ text: String, agent: SpeechSynthesisAgent, source: String =
     try await store.release(id, owner: owner)
     await #expect(throws: SpeechAudioError.missingAudio) { _ = try await store.checkout(id, owner: owner) }
     // Releasing one played segment immediately restores capacity for the next segment.
-    let next = UUID()
+    let next = UUID().uuidString
     try await store.register(next, owner: owner, cancel: {})
     await store.cancel(inputID: owner.input, source: owner.source)
     await #expect(throws: SpeechAudioError.missingAudio) { try await store.validate(next, owner: owner) }
@@ -128,9 +135,10 @@ private func admit(_ text: String, agent: SpeechSynthesisAgent, source: String =
 
 @Test(.actionCatalog, .timeLimit(.minutes(2))) func queuedAndCompletedSpeechSurviveOldSixtySecondExpiry() async throws {
     let store = SpeechAudioStore()
-    let owner = SpeechAudioStore.Owner(source: "assistant", session: UUID(), input: UUID())
-    let queued = UUID()
-    let ready = UUID()
+    let owner = SpeechAudioStore.Owner(
+        source: "assistant", session: UUID().uuidString, input: UUID().uuidString)
+    let queued = UUID().uuidString
+    let ready = UUID().uuidString
     try await store.register(queued, owner: owner, cancel: {})
     try await store.register(ready, owner: owner, cancel: {})
     let audio = try await store.begin(ready)
@@ -151,13 +159,14 @@ private func admit(_ text: String, agent: SpeechSynthesisAgent, source: String =
 
 @Test(.actionCatalog) func replyCleanupPreservesOtherRepliesAndSessionInterruptionClearsRemainder() async throws {
     let store = SpeechAudioStore()
-    let session = UUID()
+    let session = UUID().uuidString
     let owners = [
-        SpeechAudioStore.Owner(source: "assistant", session: session, input: UUID()),
-        SpeechAudioStore.Owner(source: "assistant", session: session, input: UUID()),
-        SpeechAudioStore.Owner(source: "assistant", session: UUID(), input: UUID()),
+        SpeechAudioStore.Owner(source: "assistant", session: session, input: UUID().uuidString),
+        SpeechAudioStore.Owner(source: "assistant", session: session, input: UUID().uuidString),
+        SpeechAudioStore.Owner(
+            source: "assistant", session: UUID().uuidString, input: UUID().uuidString),
     ]
-    let ids = [UUID(), UUID(), UUID()]
+    let ids = [UUID().uuidString, UUID().uuidString, UUID().uuidString]
     for (id, owner) in zip(ids, owners) {
         try await store.register(id, owner: owner, cancel: {})
         let audio = try await store.begin(id)
@@ -183,7 +192,7 @@ private struct NeverCompletingSpeech: SpeechSynthesisCapability {
     }
 }
 @Test(.actionCatalog, .timeLimit(.minutes(1))) func audioReadWaitsUntilExplicitCancellation() async throws {
-    let audio = SpeechAudio()
+    let audio = SpeechAudio(id: UUID().uuidString)
     let read = Task { try await audio.next() }
     try await Task.sleep(for: .milliseconds(40))
     read.cancel()
@@ -191,12 +200,12 @@ private struct NeverCompletingSpeech: SpeechSynthesisCapability {
 }
 @Test(.actionCatalog) func cancellationIsScopedToOriginatingAgent() async throws {
     let store = SpeechAudioStore()
-    let session = UUID()
-    let input = UUID()
+    let session = UUID().uuidString
+    let input = UUID().uuidString
     let one = SpeechAudioStore.Owner(source: "assistant", session: session, input: input)
     let two = SpeechAudioStore.Owner(source: "other", session: session, input: input)
-    let a = UUID()
-    let b = UUID()
+    let a = UUID().uuidString
+    let b = UUID().uuidString
     try await store.register(a, owner: one, cancel: {})
     try await store.register(b, owner: two, cancel: {})
     await store.cancel(inputID: input, source: "assistant")
@@ -259,8 +268,10 @@ private func synthesisClientConfiguration(_ name: String, permitted: Bool) throw
         // A segment generated after the originating input's admission TTL is still fresh work.
         let payload = InputPayload.text("test")
         let parent = AgentInput(
-            sessionID: UUID(), payload: payload,
-            metadata: InputMetadata(payload: payload, deadline: .now.advanced(by: .seconds(-1))))
+            id: UUID().uuidString,
+            sessionID: UUID().uuidString, payload: payload,
+            metadata: InputMetadata(
+                payload: payload, rootID: UUID().uuidString, deadline: .now.advanced(by: .seconds(-1))))
         let request = try SpeechSynthesisInput(text: config.agentID.rawValue)
         if config.agentID.rawValue == "denied" {
             await #expect(throws: CommunicationError.unauthorized) {
@@ -303,9 +314,10 @@ private actor ReplyCompletionGate {
 
 @Test(.actionCatalog, .timeLimit(.minutes(1))) func replyFinishJoinsActionsBeforeCleaningRemainingAudio() async throws {
     let store = SpeechAudioStore()
-    let input = AgentInput(sessionID: UUID(), payload: .text("perform then speak"))
+    let input = AgentInput(
+        id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("perform then speak"))
     let owner = SpeechAudioStore.Owner(source: "assistant", session: input.sessionID, input: input.id)
-    let id = UUID()
+    let id = UUID().uuidString
     try await store.register(id, owner: owner, cancel: {})
     let audio = try await store.begin(id)
     try await audio.append(storedPCM())
@@ -419,7 +431,7 @@ func slowSynthesisDoesNotTruncatePlayback(delayBeforeFirstFrame: Bool) async thr
 }
 
 @Test(.actionCatalog, .timeLimit(.minutes(1))) func playbackWithoutReadDeadlineStillCancels() async throws {
-    let audio = SpeechAudio()
+    let audio = SpeechAudio(id: UUID().uuidString)
     let reading = Task { try await audio.next() }
     reading.cancel()
     await #expect(throws: CancellationError.self) { _ = try await reading.value }

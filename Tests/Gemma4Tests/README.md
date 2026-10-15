@@ -10,3 +10,7 @@ Purpose: verify local ChatCapability contracts. Design goals: weight-free regres
 ## Consecutive user message boundaries
 
 ✅ Implemented: The exact prompt regression preserves every consecutive-user turn. Existing alternating-role assertions remain; no real Gemma weights or inference are required.
+
+## Identity ownership
+
+✅ Runtime and foundation identities use opaque protocol strings or Foundation UUID; no project ID-generator dependency exists. SQLite-backed Storage publishes committed business references and App injects repositories/maps native Bluetooth identities. Tests preserve caller identity, cancellation and failure semantics. See [current storage design](../../MobileHarness/Storage/README.md) for relational allocation and persistence.

@@ -1,12 +1,13 @@
 import Foundation
 import FunctionContracts
+import Storage
 import StorageChat
 
 public enum HistoryQueryError: Error, Equatable, Sendable, ActionExecutionFailureProviding {
-    case missingConversation, resultTooLarge, currentConversation, ambiguousConversationReference
+    case missingConversation, resultTooLarge, currentConversation
     public var executionFailureCode: ActionExecutionFailureCode {
         switch self {
-        case .currentConversation, .ambiguousConversationReference: .invalidArguments
+        case .currentConversation: .invalidArguments
         case .missingConversation: .init(rawValue: "notFound")
         case .resultTooLarge: .init(rawValue: "resultTooLarge")
         }
@@ -32,8 +33,7 @@ public struct HistoryQueryService: HistoryQueryCapability {
         }
     }
     private struct Entry: Encodable {
-        let id: UUID
-        let ref: String?
+        let id: String
         let archived: Bool
         let createdAt: Date
         let archivedAt: Date?
@@ -42,11 +42,11 @@ public struct HistoryQueryService: HistoryQueryCapability {
         let turnCount: Int
     }
     private struct Turn: Encodable {
-        let id: UUID
+        let id: String
         let state: ConversationRecord.State
         let kind: String
-        let taskID: UUID?
-        let inputID: UUID?
+        let taskID: String?
+        let inputID: String?
         let user: Text
         let response: Text
     }
@@ -70,11 +70,9 @@ public struct HistoryQueryService: HistoryQueryCapability {
         try Task.checkCancellation()
         let records = try await store.listConversations()
         try Task.checkCancellation()
-        let counts = Dictionary(grouping: records, by: { String($0.id.uuidString.prefix(8)) }).mapValues(\.count)
         let entries = records.dropFirst(offset).prefix(limit).map {
-            let ref = String($0.id.uuidString.prefix(8))
             return Entry(
-                id: $0.id, ref: counts[ref] == 1 ? ref : nil,
+                id: $0.id,
                 archived: $0.archivedAt != nil, createdAt: $0.createdAt, archivedAt: $0.archivedAt,
                 summaryTitle: $0.summaryTitle.map { Text($0, maximumBytes: 40) },
                 latestUser: ($0.latestUser ?? $0.turns.last?.user).map { Text($0, maximumBytes: 40) },
@@ -88,30 +86,22 @@ public struct HistoryQueryService: HistoryQueryCapability {
             throw ActionArguments.ValidationError.invalidValue("pagination")
         }
         try Task.checkCancellation()
-        let id: UUID
-        if let exact = UUID(uuidString: reference.value) {
-            id = exact
-        } else {
-            let matches = try await store.listConversations().filter {
-                String($0.id.uuidString.prefix(8)) == reference.value
-            }
-            guard !matches.isEmpty else { throw HistoryQueryError.missingConversation }
-            guard matches.count == 1 else { throw HistoryQueryError.ambiguousConversationReference }
-            id = matches[0].id
+        guard let id = BusinessRecordID(rawValue: reference.value), id.kind == .dialog else {
+            throw ActionArguments.ValidationError.invalidValue("id")
         }
         try Task.checkCancellation()
-        let record: StoredConversation
-        do { record = try await store.conversation(id) } catch ConversationHistoryError.missingTurn {
-            throw HistoryQueryError.missingConversation
-        }
-        try Task.checkCancellation()
-        let items = try record.indexedHistory()
-        let turns = items.dropFirst(offset).prefix(limit).map { item -> Turn in
+        let page: (items: [ConversationHistoryItem], total: Int)
+        do {
+            page = try await store.timelinePage(id.rawValue, offset: offset, limit: limit)
+        } catch ConversationHistoryError.missingTurn { throw HistoryQueryError.missingConversation }
+        let items = page.items
+        let turns = items.map { item -> Turn in
             switch item {
             case .request(let input, let request):
                 return Turn(
-                    id: request.id, state: request.state, kind: "request", taskID: request.historyTaskID,
-                    inputID: input.id,
+                    id: request.messageID ?? request.id, state: request.state, kind: "request",
+                    taskID: request.historyTaskID,
+                    inputID: input.messageID ?? input.id,
                     user: Text(request.input, maximumBytes: 80),
                     response: Text(request.response, maximumBytes: 160))
             case .task(let compression):
@@ -123,6 +113,6 @@ public struct HistoryQueryService: HistoryQueryCapability {
             }
         }
         let next = offset + turns.count
-        return try encode(Page(items: turns, total: items.count, nextOffset: next < items.count ? next : nil))
+        return try encode(Page(items: turns, total: page.total, nextOffset: next < page.total ? next : nil))
     }
 }

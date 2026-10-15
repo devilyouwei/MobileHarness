@@ -1,4 +1,5 @@
 import Foundation
+import Storage
 import StorageChat
 import UI
 
@@ -8,26 +9,40 @@ public enum HistoryImageLoadingError: Error { case invalidReference, busy, overs
 @MainActor
 public final class ConversationHistoryWorkflow: ConversationHistoryControlling {
     public let state: ConversationHistoryState
-    private let deleteArchive: @MainActor (UUID) async throws -> Void
+    private let deleteArchive: @MainActor (String) async throws -> Void
     private let refresh: @MainActor () async throws -> Void
     private let prepare: @MainActor () async throws -> Void
     private let startNewArchive: @MainActor () async throws -> Void
-    private let summarizeArchive: @MainActor (UUID) async throws -> Void
+    private let summarizeArchive: @MainActor (String) async throws -> Void
     private let previewOutput: @MainActor (HistoryTurn) -> String
-    private let readConversation: @MainActor (UUID) async throws -> HistoryConversation
-    private let readPhoto: @MainActor (UUID, UUID) async throws -> Data?
+    private let readConversation: @MainActor (String) async throws -> HistoryConversation
+    private let readMessage: @MainActor (String) async throws -> HistoryConversation
+    private let readPage: @MainActor (String, UInt64, String?) async throws -> HistoryConversation
+    private let readArchives: @MainActor (Int64) async throws -> [HistoryConversation]
+    private let readPhoto: @MainActor (String, String) async throws -> Data?
     private var photoReads: Set<UUID> = []
+    private var detailTurns: [String: HistoryTurn] = [:]
     private var loaded = false
     private var task: Task<Void, Never>?
+    private var archivePageTask: Task<Void, Never>?
     public init(
         state: ConversationHistoryState, prepare: @escaping @MainActor () async throws -> Void,
         refresh: @escaping @MainActor () async throws -> Void,
-        deleteArchive: @escaping @MainActor (UUID) async throws -> Void,
+        deleteArchive: @escaping @MainActor (String) async throws -> Void,
         startNew: @escaping @MainActor () async throws -> Void,
-        summarize: @escaping @MainActor (UUID) async throws -> Void,
+        summarize: @escaping @MainActor (String) async throws -> Void,
         previewOutput: @escaping @MainActor (HistoryTurn) -> String,
-        readConversation: @escaping @MainActor (UUID) async throws -> HistoryConversation,
-        readPhoto: @escaping @MainActor (UUID, UUID) async throws -> Data?
+        readConversation: @escaping @MainActor (String) async throws -> HistoryConversation,
+        readPhoto: @escaping @MainActor (String, String) async throws -> Data?,
+        readMessage: @escaping @MainActor (String) async throws -> HistoryConversation = { _ in
+            throw HistoryDetailError.unavailable
+        },
+        readPage: @escaping @MainActor (String, UInt64, String?) async throws -> HistoryConversation = { _, _, _ in
+            throw HistoryDetailError.unavailable
+        },
+        readArchives: @escaping @MainActor (Int64) async throws -> [HistoryConversation] = { _ in
+            throw HistoryDetailError.unavailable
+        }
     ) {
         self.deleteArchive = deleteArchive
         self.refresh = refresh
@@ -38,9 +53,19 @@ public final class ConversationHistoryWorkflow: ConversationHistoryControlling {
         self.previewOutput = previewOutput
         self.readPhoto = readPhoto
         self.readConversation = readConversation
+        self.readMessage = readMessage
+        self.readPage = readPage
+        self.readArchives = readArchives
     }
     public func load() async {
-        guard !state.isBusy else { return }
+        guard !state.isRefreshing, !state.isBusy || archivePageTask != nil else { return }
+        state.isRefreshing = true
+        defer { state.isRefreshing = false }
+        if let archivePageTask {
+            archivePageTask.cancel()
+            await archivePageTask.value
+        }
+        guard !Task.isCancelled else { return }
         state.isBusy = true
         defer { state.isBusy = false }
         do {
@@ -48,26 +73,105 @@ public final class ConversationHistoryWorkflow: ConversationHistoryControlling {
             try Task.checkCancellation()
             state.status = nil
             try await refresh()
+            state.hasMoreArchives = state.archive?.past.count == HistoryPaging.pageSize
+            state.archivePaging = .init()
             loaded = true
         } catch { state.status = "历史读取失败：\(error)" }
     }
-    public func loadConversation(_ id: UUID) async throws -> HistoryConversation {
-        let selected = try await readConversation(id)
+    public func loadConversation(_ id: String) async throws -> HistoryConversation {
+        guard let recordID = BusinessRecordID(rawValue: id), recordID.kind == .dialog else {
+            throw HistoryDetailError.unavailable
+        }
+        let selected = try await readConversation(recordID.rawValue)
         guard selected.id == id else { throw HistoryDetailError.unavailable }
         state.selectedConversation = selected
+        detailTurns.removeAll()
         return selected
+    }
+    public func loadConversation(_ id: String, after: UInt64, taskID: String?) async throws -> HistoryConversation {
+        try await readPage(id, after, taskID)
+    }
+    public func loadMessage(_ turn: HistoryTurn) async throws -> HistoryTurn {
+        guard let id = turn.messageID else { return turn }
+        let conversation = try await readMessage(id)
+        guard let result = ConversationHistoryPresentation.turns(conversation).first else {
+            throw HistoryDetailError.unavailable
+        }
+        if detailTurns.count >= 4, let first = detailTurns.keys.sorted().first { detailTurns[first] = nil }
+        detailTurns[result.id] = result
+        return result
+    }
+    public func loadMoreArchives(retry: Bool) async {
+        guard !Task.isCancelled, !state.isRefreshing, !state.isBusy, state.hasMoreArchives,
+            let id = state.archive?.past.last?.id,
+            let cursor = BusinessRecordID(rawValue: id)?.number,
+            let ticket = state.archivePaging.begin(after: id, retry: retry)
+        else { return }
+        state.isBusy = true
+        let worker = Task {
+            defer {
+                state.isBusy = false
+                archivePageTask = nil
+            }
+            await loadArchivePage(after: cursor, id: id, ticket: ticket)
+        }
+        archivePageTask = worker
+        await withTaskCancellationHandler {
+            await worker.value
+        } onCancel: {
+            worker.cancel()
+        }
+    }
+    private func loadArchivePage(after cursor: Int64, id: String, ticket: UUID) async {
+        do {
+            try Task.checkCancellation()
+            let page = try await readArchives(cursor)
+            try Task.checkCancellation()
+            guard state.archivePaging.accepts(ticket) else { return }
+            guard state.archive?.past.last?.id == id else {
+                state.archivePaging.cancel(ticket)
+                return
+            }
+            guard page.count <= HistoryPaging.pageSize,
+                page.allSatisfy({
+                    guard let key = BusinessRecordID(rawValue: $0.id), key.kind == .dialog else { return false }
+                    return key.number < cursor
+                })
+            else { throw HistoryDetailError.unavailable }
+            state.archive?.past.append(contentsOf: page)
+            state.hasMoreArchives = page.count == HistoryPaging.pageSize
+            state.archivePaging.finish(ticket)
+        } catch is CancellationError {
+            state.archivePaging.cancel(ticket)
+        } catch {
+            if Task.isCancelled {
+                state.archivePaging.cancel(ticket)
+            } else {
+                state.archivePaging.finish(ticket, error: "读取失败：\(error)")
+            }
+        }
     }
     public func startNew() {
         perform { try await self.startNewArchive() }
     }
-    public func summarize(_ id: UUID) {
-        perform { try await self.summarizeArchive(id) }
+    public func summarize(_ id: String) {
+        perform {
+            guard let recordID = BusinessRecordID(rawValue: id), recordID.kind == .dialog else {
+                throw HistoryDetailError.unavailable
+            }
+            try await self.summarizeArchive(recordID.rawValue)
+        }
     }
-    public func delete(_ id: UUID) {
-        perform { try await self.deleteArchive(id) }
+    public func delete(_ id: String) {
+        perform {
+            guard let recordID = BusinessRecordID(rawValue: id), recordID.kind == .dialog else {
+                throw HistoryDetailError.unavailable
+            }
+            try await self.deleteArchive(recordID.rawValue)
+        }
     }
     private func perform(_ operation: @escaping @MainActor () async throws -> Void) {
-        guard !state.isBusy, loaded else { return }
+        guard !state.isRefreshing, !state.isBusy, loaded else { return }
         state.isBusy = true
         task = Task {
             defer {
@@ -81,13 +185,15 @@ public final class ConversationHistoryWorkflow: ConversationHistoryControlling {
     }
     public func cancel() { task?.cancel() }
     public func waitUntilIdle() async { await task?.value }
-    public func imageData(_ id: UUID, for turnID: UUID) async throws -> Data? {
+    public func imageData(_ id: String, for turnID: String) async throws -> Data? {
         try Task.checkCancellation()
         guard let archive = state.archive else { throw HistoryImageLoadingError.invalidReference }
         let selected = state.selectedConversation.flatMap { conversation in
             ([archive.current] + archive.past).contains(where: { $0.id == conversation.id }) ? conversation : nil
         }
-        let turn = ([archive.current] + archive.past + [selected].compactMap { $0 }).lazy
+        let turn =
+            detailTurns[turnID]
+            ?? ([archive.current] + archive.past + [selected].compactMap { $0 }).lazy
             .flatMap { ConversationHistoryPresentation.turns($0) }.first { $0.id == turnID }
         guard let turn, turn.attachedImages.contains(where: { $0.id == id }) else {
             throw HistoryImageLoadingError.invalidReference
@@ -96,7 +202,10 @@ public final class ConversationHistoryWorkflow: ConversationHistoryControlling {
         let token = UUID()
         photoReads.insert(token)
         defer { photoReads.remove(token) }
-        let data = try await readPhoto(id, turn.ownerInputID ?? turn.id)
+        guard let mediaID = BusinessRecordID(rawValue: id), mediaID.kind == .media,
+            let inputID = UUID(uuidString: turn.ownerInputID ?? turn.id)
+        else { throw HistoryImageLoadingError.invalidReference }
+        let data = try await readPhoto(mediaID.rawValue, inputID.uuidString)
         try Task.checkCancellation()
         guard data.map({ !$0.isEmpty && $0.count <= 4 * 1024 * 1024 }) ?? true else {
             throw HistoryImageLoadingError.oversizedImage

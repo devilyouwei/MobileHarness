@@ -35,7 +35,7 @@ flowchart LR
 | ModelResourceInteractionWorkflow | 32 pending operations; last-confirmed flags and accepted-snapshot lock reconciliation |
 | SettingsWorkflow / SettingsInteractionWorkflow | 32 restore waiters; one discovery and one save; discovery revision fencing and page-independent save |
 | BluetoothInteractionWorkflow | 16 discrete requests and six latest motor values; stop/reset priority and joined worker |
-| CameraInteractionWorkflow | One command; explicit target facing/photoID; visible overlap failure |
+| CameraInteractionWorkflow | One command; explicit target facing/mediaID; visible overlap failure |
 | ResourceObservationWorkflow | One foreground worker, no sample queue; one acknowledged fingerprint ≤64 KiB or failure ≤2048 bytes |
 
 ## Business transport and facts
@@ -74,3 +74,11 @@ Photographer cancellation joins the function, then asks the Agent to retire the 
 
 
 ✅ Implemented: the output owner recognizes explicit cancelled seal completion while its own task is live, retains its reader, and awaits the following cancellation terminal. Owner-task cancellation still propagates and joins shutdown.
+
+
+
+
+
+## SQLite records and runtime identity
+
+✅ Implemented: technical identities are opaque UUID strings; committed business entities use dialog/message/task/media/device SQLite IDs. Consumers use Storage repositories while preserving ownership, cancellation and independent foundation boundaries. Complete messages, including each ReACT message, persist at termination; delta fragments do not persist. The custom allocator and replaced file/index implementation are removed. See the project SQLite business-record plan.

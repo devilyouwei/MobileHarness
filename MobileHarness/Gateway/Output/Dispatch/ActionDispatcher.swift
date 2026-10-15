@@ -32,6 +32,6 @@ struct ActionDispatcher: Sendable {
         await executor.cancel(inputID: envelope.schedulingID, source: envelope.source)
     }
 
-    func cancel(sessionID: UUID) async { await executor.cancel(sessionID: sessionID) }
+    func cancel(sessionID: String) async { await executor.cancel(sessionID: sessionID) }
     func shutdown() async { await executor.shutdown() }
 }

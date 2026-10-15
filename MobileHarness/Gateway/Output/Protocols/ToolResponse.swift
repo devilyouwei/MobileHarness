@@ -6,13 +6,13 @@ public struct ToolResponse: Equatable, Sendable {
     public typealias FailureCode = ActionExecutionFailureCode
     public let completion: ActionCompletion?
     public let failureCode: FailureCode?
-    public let callID: UUID
+    public let callID: String
     public let value: String
     public let isError: Bool
     /// Feedback transport failure is independent of the handler outcome.
     public let deliveryFailure: String?
     public init(
-        callID: UUID, value: String, isError: Bool = false, deliveryFailure: String? = nil,
+        callID: String, value: String, isError: Bool = false, deliveryFailure: String? = nil,
         failureCode: FailureCode? = nil, completion: ActionCompletion? = nil
     ) {
         self.completion = completion

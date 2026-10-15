@@ -62,13 +62,13 @@ public struct CapabilityRegistry: Sendable {
         return ActionCall(actionPath: action.path, channel: selected, parameters: parameters)
     }
 
-    public func resolveTool(_ alias: String, arguments: [String: String], id: UUID = UUID()) throws -> ToolCall {
+    public func resolveTool(_ alias: String, arguments: [String: String], id: String? = nil) throws -> ToolCall {
         guard let tool = tools.first(where: { $0.alias == alias }) else { throw GenerationError.unknownCapability }
         try Self.validate(arguments, required: tool.requiredParameters, optional: tool.optionalParameters)
         guard Self.permitsValues(arguments, definition: tool.definition) else {
             throw GenerationError.invalidParameters
         }
-        return ToolCall(id: id, toolPath: tool.path, arguments: arguments)
+        return ToolCall(id: try id ?? UUID().uuidString, toolPath: tool.path, arguments: arguments)
     }
 
     public func adding(internalActions: [InternalAction] = [], internalTools: [InternalTool] = []) throws -> Self {

@@ -9,6 +9,7 @@ import FunctionContracts
 import Gateway
 @_spi(ModelManagement) import ModelKit
 import ModelKitOpenAI
+import Storage
 import StorageChat
 import Testing
 
@@ -20,9 +21,10 @@ import Testing
     var state = AgentTaskSkillState()
     try state.initialize(fixed: fixedCapabilities, baseSkills: try AgentConfigurations.baseSkills(named: "Assistant"))
     let old = try state.registry(fixed: fixedCapabilities)
-    let input = UUID()
+    let input = UUID().uuidString
     _ = try state.control(
-        "startTask", arguments: ["skills": "[\"photography\"]", "goal": "拍照"], inputID: input, fixed: fixedCapabilities)
+        "startTask", arguments: ["skills": "[\"photography\"]", "goal": "拍照"], inputID: input, fixed: fixedCapabilities,
+        taskID: try fixtureTaskID())
     #expect(!old.actions.contains { $0.alias == "takePhoto" })
     #expect(try state.registry(fixed: fixedCapabilities).actions.contains { $0.alias == "takePhoto" })
     let encoder = JSONEncoder()
@@ -30,8 +32,9 @@ import Testing
     let encoded = try encoder.encode(state)
     #expect(throws: (any Error).self) {
         try state.control(
-            "startTask", arguments: ["skills": "[\"history-query\"]", "goal": "另一个任务"], inputID: UUID(),
-            fixed: fixedCapabilities)
+            "startTask", arguments: ["skills": "[\"history-query\"]", "goal": "另一个任务"],
+            inputID: UUID().uuidString,
+            fixed: fixedCapabilities, taskID: try fixtureTaskID())
     }
     #expect(try encoder.encode(state) == encoded)
     #expect(throws: (any Error).self) {
@@ -52,16 +55,17 @@ import Testing
     try state.roundCompleted(failed: false, fixed: fixedCapabilities)
     #expect(state.activeTaskID == nil && state.mode == "default" && state.tasks.last?.status == "completed")
     #expect(state.events.contains { $0.operation == "release" && $0.skill == "photography" && $0.taskID == task })
-    #expect(throws: CommunicationError.scopeClosed) { try state.bind(UUID(), task: task) }
+    #expect(throws: CommunicationError.scopeClosed) { try state.bind(UUID().uuidString, task: task) }
 }
 
 @Test(.actionCatalog) func foregroundTasksCanRestartOnlyAfterClosure() throws {
     let fixed = try AssistantAgent.runtimeCapabilities(AgentConfigurations.load(named: "Assistant").capabilities)
     var state = AgentTaskSkillState()
     try state.initialize(fixed: fixed, baseSkills: AgentConfigurations.baseSkills(named: "Assistant"))
-    let input = UUID()
+    let input = UUID().uuidString
     _ = try state.control(
-        "startTask", arguments: ["goal": "旧目标", "skills": "[\"photography\"]"], inputID: input, fixed: fixed)
+        "startTask", arguments: ["goal": "旧目标", "skills": "[\"photography\"]"], inputID: input, fixed: fixed,
+        taskID: try fixtureTaskID())
     let first = try #require(state.activeTaskID)
     try state.roundCompleted(failed: false, fixed: fixed)
     #expect(state.tasks.last?.status == "waitingUser")
@@ -70,20 +74,23 @@ import Testing
     encoder.outputFormatting = .sortedKeys
     let closing = try encoder.encode(state)
     #expect(throws: CommunicationError.invalidPayload) {
-        try state.control("startTask", arguments: ["goal": "新目标"], inputID: input, fixed: fixed)
+        try state.control(
+            "startTask", arguments: ["goal": "新目标"], inputID: input, fixed: fixed, taskID: try fixtureTaskID())
     }
     #expect(try encoder.encode(state) == closing)
     try state.roundCompleted(failed: false, fixed: fixed)
     #expect(state.activeTaskID == nil)
     _ = try state.control(
-        "startTask", arguments: ["goal": "后置镜头拍照", "skills": "[\"photography\"]"], inputID: input, fixed: fixed)
+        "startTask", arguments: ["goal": "后置镜头拍照", "skills": "[\"photography\"]"], inputID: input, fixed: fixed,
+        taskID: try fixtureTaskID())
     let second = try #require(state.activeTaskID)
     #expect(first != second && state.taskID(for: input) == second)
     #expect(state.tasks.first?.summary == "用户改为新目标，旧目标未完成")
     _ = try state.control("finishTask", arguments: ["summary": "已保存"], inputID: input, fixed: fixed)
     try state.roundCompleted(failed: false, fixed: fixed)
     _ = try state.control(
-        "startTask", arguments: ["goal": "再拍一张", "skills": "[\"photography\"]"], inputID: UUID(), fixed: fixed)
+        "startTask", arguments: ["goal": "再拍一张", "skills": "[\"photography\"]"], inputID: UUID().uuidString,
+        fixed: fixed, taskID: try fixtureTaskID())
     #expect(state.tasks.count == 3 && state.activeTaskID != second)
 }
 
@@ -95,8 +102,9 @@ import Testing
         try state.initialize(
             fixed: fixedCapabilities, baseSkills: try AgentConfigurations.baseSkills(named: "Assistant"))
         _ = try state.control(
-            "startTask", arguments: ["skills": "[\"\(skill)\"]", "goal": "fixture"], inputID: UUID(),
-            fixed: fixedCapabilities)
+            "startTask", arguments: ["skills": "[\"\(skill)\"]", "goal": "fixture"],
+            inputID: UUID().uuidString,
+            fixed: fixedCapabilities, taskID: try fixtureTaskID())
         let registry = try state.registry(fixed: fixedCapabilities)
         let paths = registry.actions.map { $0.path.description } + registry.tools.map(\.path)
         #expect(Set(paths).count == paths.count)
@@ -112,7 +120,7 @@ import Testing
     #expect(throws: GenerationError.unknownCapability) { try before.resolveAction("takePhoto", parameters: [:]) }
     _ = try state.control(
         "startTask", arguments: ["skills": "[\"photography\",\"history-query\"]", "goal": "fixture"],
-        inputID: UUID(), fixed: fixed)
+        inputID: UUID().uuidString, fixed: fixed, taskID: try fixtureTaskID())
     let loaded = try state.registry(fixed: fixed)
     #expect(try loaded.resolveAction("takePhoto", parameters: [:]).actionPath.description == "Camera.Capture.takePhoto")
     #expect(loaded.tools.contains { $0.path == "History.Conversation.read" })
@@ -124,30 +132,43 @@ private actor SkillModel: ChatCapability {
     nonisolated let availability: CapabilityAvailability = .available
     nonisolated let supportsImages: Bool
     nonisolated let supportsToolCalls = true
-    let photoID: UUID
+    let mediaID: String
     let rejectFirst: Bool
     let replaceForeground: Bool
     let captureOnly: Bool
+    let followUpAlias: String?
     private(set) var requests: [ChatRequest] = []
     init(
-        photoID: UUID, rejectFirst: Bool = false, replaceForeground: Bool = false, captureOnly: Bool = false,
-        supportsImages: Bool = false
+        mediaID: String, rejectFirst: Bool = false, replaceForeground: Bool = false, captureOnly: Bool = false,
+        supportsImages: Bool = false, followUpAlias: String? = nil
     ) {
         self.supportsImages = supportsImages
-        self.photoID = photoID
+        self.mediaID = mediaID
         self.rejectFirst = rejectFirst
         self.replaceForeground = replaceForeground
         self.captureOnly = captureOnly
+        self.followUpAlias = followUpAlias
     }
     func chat(_ request: ChatRequest) throws -> InferenceSession<ChatEvent> {
         requests.append(request)
         let output: String
         if captureOnly {
-            switch requests.count {
-            case 1: output = "<loadSkills skills='[\"photography\"]'/>"
-            case 2: output = "<openCamera/>"
-            case 3: output = "<takePhoto/>"
-            default: output = "拍好了。"
+            if let followUpAlias, requests.count > 4 {
+                switch requests.count {
+                case 5, 7:
+                    let alias = requests.count == 7 && followUpAlias == "discardPhoto" ? "ignorePhoto" : followUpAlias
+                    let parameters = alias == "closeCamera" ? "" : " mediaID=\"\(mediaID)\""
+                    output = "<\(alias)\(parameters)/>"
+                case 6: output = "<loadSkills skills='[\"photography\"]'/>"
+                default: output = "处理完成。"
+                }
+            } else {
+                switch requests.count {
+                case 1: output = "<loadSkills skills='[\"photography\"]'/>"
+                case 2: output = "<openCamera/>"
+                case 3: output = "<takePhoto/>"
+                default: output = "拍好了。"
+                }
             }
         } else if replaceForeground && requests.count >= 4 {
             switch requests.count {
@@ -162,7 +183,7 @@ private actor SkillModel: ChatCapability {
             case 1: output = "<startTask goal=\"拍照 fixture\" skills='[\"photography\"]'/>"
             case 2: output = "<takePhoto/>"
             case 3: output = "需要保存吗？"
-            case 4: output = "<savePhoto photoID=\"\(photoID)\"/>"
+            case 4: output = "<savePhoto mediaID=\"\(mediaID)\"/>"
             case 5: output = "<finishTask summary=\"照片已保存\"/>"
             case 6: output = "<startTask goal=\"再拍一张 fixture\" skills='[\"photography\"]'/>"
             case 7: output = "<takePhoto/>"
@@ -193,18 +214,18 @@ private actor SkillEffects {
     private(set) var completed = 0
     private(set) var failures: [String] = []
     private(set) var paths: [String] = []
-    private(set) var currentPhoto: UUID?
+    private(set) var currentPhoto: String?
     private var cameraSequence: UInt64 = 1
     func nextCameraSequence() -> UInt64 {
         cameraSequence += 1
         return cameraSequence
     }
-    func newPhoto() -> UUID {
-        let id = UUID()
+    func newPhoto() -> String {
+        let id = "media_\(max(1, paths.filter { $0 == "Camera.Capture.takePhoto" }.count))"
         currentPhoto = id
         return id
     }
-    func resolvePhoto(_ id: UUID?, discard: Bool) throws {
+    func resolvePhoto(_ id: String?, discard: Bool) throws {
         guard id != nil && id == currentPhoto else { throw CommunicationError.invalidPayload }
         if discard { currentPhoto = nil }
     }
@@ -261,15 +282,15 @@ private actor LiveTextChat: ChatCapability {
 
 private func photographyAcceptance(
     live: Bool, cameraFacts: Bool = true, rejectFirst: Bool = false, run: Int = 0, replaceForeground: Bool = false,
-    captureOnly: Bool = false, supportsImages: Bool = false
+    captureOnly: Bool = false, supportsImages: Bool = false, followUpAlias: String? = nil
 )
     async throws
 {
-    let photo = UUID()
-    let session = UUID()
+    let photo = "media_1"
+    let session = UUID().uuidString
     let stub = SkillModel(
-        photoID: photo, rejectFirst: rejectFirst, replaceForeground: replaceForeground, captureOnly: captureOnly,
-        supportsImages: supportsImages)
+        mediaID: photo, rejectFirst: rejectFirst, replaceForeground: replaceForeground, captureOnly: captureOnly,
+        supportsImages: supportsImages, followUpAlias: followUpAlias)
     let model: any ChatCapability
     if live {
         let key = try #require(ProcessInfo.processInfo.environment["OPENAI_API_KEY"])
@@ -277,14 +298,16 @@ private func photographyAcceptance(
     } else {
         model = stub
     }
-    let context = AgentContextRepository(agent: AgentID.assistant, scope: UUID(), state: AssistantContextState())
+    let context = AgentContextRepository(
+        agent: AgentID.assistant, scope: UUID().uuidString, state: AssistantContextState())
     let store = ConversationHistoryStore()
     let agent = try AssistantAgent(
         chat: model, conversations: store,
         observations: { values, input, chat in
             try await AssistantContextBuilder.photoObservations(
                 values, input: input, chat: chat,
-                read: { id, _ in try ChatImage(id: id, data: Data([1])) })
+                read: { id, _ in try ChatImage(id: id, data: Data([1])) },
+                prepareJPEG: { data, _ in data })
         }, context: context)
     _ = try await bindSpeechRequests(agent)
     let manager = AgentManager()
@@ -325,12 +348,12 @@ private func photographyAcceptance(
                                     CameraCommandReceipt(operation: enabled ? "open" : "close", enabled: enabled)),
                                 as: UTF8.self))
                     }
-                    let id: UUID
+                    let id: String
                     let captureCount = await effects.paths.filter { $0 == "Camera.Capture.takePhoto" }.count
                     if path == "Camera.Capture.takePhoto" && (live || captureCount > 1) {
                         id = await effects.newPhoto()
                     } else if live && ["Camera.Capture.savePhoto", "Camera.Capture.ignorePhoto"].contains(path) {
-                        id = try #require(invocation.call.parameters["photoID"].flatMap(UUID.init(uuidString:)))
+                        id = try #require(invocation.call.parameters["mediaID"].flatMap(BusinessRecordID.parse))
                         try await effects.resolvePhoto(id, discard: path == "Camera.Capture.ignorePhoto")
                     } else {
                         id = photo
@@ -340,13 +363,13 @@ private func photographyAcceptance(
                             String(
                                 decoding: try JSONEncoder().encode(
                                     CameraPhotoCommandReceipt(
-                                        photoID: id, state: path == "Camera.Capture.savePhoto" ? .saved : .ignored)),
+                                        mediaID: id, state: path == "Camera.Capture.savePhoto" ? .saved : .ignored)),
                                 as: UTF8.self))
                     }
                     return .value(
                         String(
                             decoding: try JSONEncoder().encode(
-                                CameraPhotoReceipt(photoID: id, width: 640, height: 480)), as: UTF8.self))
+                                CameraPhotoReceipt(mediaID: id, width: 640, height: 480)), as: UTF8.self))
                 }
                 return .completed
             })
@@ -397,6 +420,7 @@ private func photographyAcceptance(
             ).input(sessionID: session))
     }
     let first = AgentInput(
+        id: UUID().uuidString,
         sessionID: session,
         payload: .text(captureOnly ? "可以帮我拍张照吗，但是不需要后续操作" : (live ? "你好，帮我拍张照。" : "拍照 fixture")))
     _ = try await input.send(first, to: .assistant)
@@ -430,8 +454,10 @@ private func photographyAcceptance(
         #expect(snapshot.state.skillState?.activeTaskID == nil && snapshot.state.skillState?.tasks.isEmpty == true)
         #expect(history.state == .completed && history.error == nil)
         #expect(requests.count == 4)
-        #expect(requests.last?.messages.contains { $0.content.contains(photo.uuidString) } == true)
-        #expect(requests.last?.messages.contains { $0.images?.contains { $0.id == photo } == true } == supportsImages)
+        #expect(requests.last?.messages.contains { $0.content.contains(photo) } == true)
+        #expect(
+            requests.last?.messages.contains { $0.images?.contains { $0.id == photo } == true }
+                == supportsImages)
         #expect(history.modelRequests?.allSatisfy { $0.decisionMetadata?.taskID == nil } == true)
         #expect(
             await effects.paths.filter { $0.hasPrefix("Camera.") } == [
@@ -439,6 +465,37 @@ private func photographyAcceptance(
             ])
         #expect(
             !history.raw.contains("startTask") && !history.raw.contains("finishTask") && !history.raw.contains("保存"))
+        if let alias = followUpAlias {
+            // The first decision released photography, while its captured preview can remain visible.
+            #expect(snapshot.state.skillState?.loaded.contains("photography") == false)
+            let followUp = AgentInput(
+                id: UUID().uuidString, sessionID: session, payload: .text("处理当前预览：\(alias)"))
+            _ = try await input.send(followUp, to: .assistant)
+            try await skillEventually { await effects.completed == 2 }
+            let requests = await stub.requests
+            #expect(requests.count == 8)
+            let failure = try #require(requests[5].messages.last { $0.content.contains("unknownCapability") })
+            #expect(failure.content.contains("No function was executed for this rejected call"))
+            #expect(failure.content.contains("unloaded Skill"))
+            #expect(failure.content.contains(alias))
+            #expect(!requests[4].messages[0].content.contains("Action savePhoto:"))
+            #expect(!requests[5].messages[0].content.contains("Action closeCamera:"))
+            #expect(requests[6].messages[0].content.contains("Action savePhoto:"))
+            let path =
+                alias == "discardPhoto"
+                ? "Camera.Capture.ignorePhoto"
+                : (alias == "closeCamera" ? "Camera.Capture.close" : "Camera.Capture.savePhoto")
+            #expect(
+                await effects.paths.filter { $0.hasPrefix("Camera.") } == [
+                    "Camera.Capture.open", "Camera.Capture.takePhoto", path,
+                ])
+            let failures = await effects.failures
+            #expect(failures.count == 1 && failures[0].contains("unknownCapability"))
+            let state = try await context.snapshot().state
+            #expect(state.skillState?.tasks.isEmpty == true)
+            #expect(state.skillState?.loaded.contains("photography") == false)
+            #expect(state.history.current.turns.last?.state == .completed)
+        }
         await agent.stop()
         _ = try await pump.value
         await gateway.shutdown()
@@ -448,7 +505,8 @@ private func photographyAcceptance(
     let active = try #require(try await context.snapshot().state.skillState?.activeTaskID)
     #expect(try await context.snapshot().state.skillState?.tasks.last?.status == "waitingUser")
     if live && run == 2 {
-        _ = try await input.send(AgentInput(sessionID: session, payload: .text("重新拍一张。")), to: .assistant)
+        _ = try await input.send(
+            AgentInput(id: UUID().uuidString, sessionID: session, payload: .text("重新拍一张。")), to: .assistant)
         try await skillEventually {
             let completed = await effects.completed
             let failures = await effects.failures
@@ -460,7 +518,9 @@ private func photographyAcceptance(
         #expect(firstIgnore < secondCapture)
     }
     if replaceForeground {
-        _ = try await input.send(AgentInput(sessionID: session, payload: .text("结束旧任务，再拍一张新照片")), to: .assistant)
+        _ = try await input.send(
+            AgentInput(id: UUID().uuidString, sessionID: session, payload: .text("结束旧任务，再拍一张新照片")),
+            to: .assistant)
         try await skillEventually { await effects.completed == 2 }
         let current = try await context.snapshot().state.skillState
         #expect(current?.activeTaskID != nil && current?.activeTaskID != active)
@@ -474,7 +534,7 @@ private func photographyAcceptance(
             transition.content.contains("\"mode\":\"default\"")
                 && transition.content.contains("\"status\":\"completed\""))
         #expect(!transition.content.contains("\"photography\""))
-        #expect(!requests[5].messages.contains { $0.content.contains(photo.uuidString) })
+        #expect(!requests[5].messages.contains { $0.role != .system && $0.content.contains(photo) })
         await agent.stop()
         _ = try await pump.value
         await gateway.shutdown()
@@ -482,7 +542,7 @@ private func photographyAcceptance(
         return
     }
     let ending = live && run == 1 ? "忽略这张照片，不要保存。" : "保存"
-    let second = AgentInput(sessionID: session, payload: .text(ending))
+    let second = AgentInput(id: UUID().uuidString, sessionID: session, payload: .text(ending))
     _ = try await input.send(second, to: .assistant)
     try await skillEventually {
         let completed = await effects.completed
@@ -506,7 +566,8 @@ private func photographyAcceptance(
     #expect(rounds.first?.resultsJSON.contains("\"protocol\":\"action\"") == true)
     #expect(rounds.contains { $0.resultsJSON.contains("Camera.Capture.takePhoto") })
     if live {
-        let query = AgentInput(sessionID: session, payload: .text("只列出最近的对话标题，不要读取详情，不需要创建任务。"))
+        let query = AgentInput(
+            id: UUID().uuidString, sessionID: session, payload: .text("只列出最近的对话标题，不要读取详情，不需要创建任务。"))
         _ = try await input.send(query, to: .assistant)
         try await skillEventually {
             let completed = await effects.completed
@@ -530,7 +591,9 @@ private func photographyAcceptance(
                             needsSettings: false, facing: .front
                         ).input(sessionID: session))
                 }
-                _ = try await input.send(AgentInput(sessionID: session, payload: .text(command)), to: .assistant)
+                _ = try await input.send(
+                    AgentInput(id: UUID().uuidString, sessionID: session, payload: .text(command)),
+                    to: .assistant)
                 try await skillEventually {
                     let completed = await effects.completed
                     let failures = await effects.failures
@@ -571,7 +634,7 @@ private func photographyAcceptance(
         #expect(requests[0].toolCalls.isEmpty)
         #expect(
             requests[start + 1].decisionMetadata?.taskID == active
-                && requests[start + 1].decisionMetadata?.skills["photography"] == 16)
+                && requests[start + 1].decisionMetadata?.skills["photography"] == 18)
         #expect(archive.current.turns.last?.modelRequests?.count == 2)
         #expect(archive.current.turns.first?.generationRounds?.count == (rejectFirst ? 4 : 3))
         let calls = await stub.requests
@@ -582,7 +645,9 @@ private func photographyAcceptance(
         // A later human input in the still-active Task keeps its entry round too.
         #expect(calls[start + 3].messages.contains { $0.role == .assistant && $0.content.contains("<startTask") })
         if !rejectFirst {
-            _ = try await input.send(AgentInput(sessionID: session, payload: .text("再拍一张")), to: .assistant)
+            _ = try await input.send(
+                AgentInput(id: UUID().uuidString, sessionID: session, payload: .text("再拍一张")), to: .assistant
+            )
             try await skillEventually { await effects.completed == 3 }
             let restarted = try await context.snapshot().state.skillState
             #expect(restarted?.activeTaskID != nil && restarted?.activeTaskID != active)
@@ -592,11 +657,11 @@ private func photographyAcceptance(
             #expect(history.current.turns.count == 3)
             let allRequests = await stub.requests
             #expect(allRequests[5].messages.contains { $0.content.contains("Task history") })
-            #expect(!allRequests[5].messages.contains { $0.content.contains(photo.uuidString) })
-            #expect(!allRequests[6].messages.contains { $0.content.contains(photo.uuidString) })
+            #expect(!allRequests[5].messages.contains { $0.role != .system && $0.content.contains(photo) })
+            #expect(!allRequests[6].messages.contains { $0.role != .system && $0.content.contains(photo) })
             #expect(allRequests[6].messages.contains { $0.content.contains("Task history") })
             #expect(history.current.turns.first?.modelRequests?.count == 3)
-            #expect(history.current.turns.first?.modelRequests?.last?.requestJSON.contains(photo.uuidString) == true)
+            #expect(history.current.turns.first?.modelRequests?.last?.requestJSON.contains(photo) == true)
 
             #expect(history.current.turns.last?.modelRequests?.first?.decisionMetadata?.mode == "default")
             #expect(
@@ -616,30 +681,38 @@ private func photographyAcceptance(
     var skills = AgentTaskSkillState()
     try skills.initialize(fixed: fixedCapabilities, baseSkills: try AgentConfigurations.baseSkills(named: "Assistant"))
     _ = try skills.control(
-        "startTask", arguments: ["skills": "[\"photography\"]", "goal": "original"], inputID: UUID(),
-        fixed: fixedCapabilities)
+        "startTask", arguments: ["skills": "[\"photography\"]", "goal": "original"],
+        inputID: UUID().uuidString,
+        fixed: fixedCapabilities, taskID: try fixtureTaskID())
     initial.skillState = skills
-    let context = AgentContextRepository(agent: AgentID.assistant, scope: UUID(), state: initial)
-    let model = SkillModel(photoID: UUID())
+    let context = AgentContextRepository(agent: AgentID.assistant, scope: UUID().uuidString, state: initial)
+    let model = SkillModel(mediaID: "media_1")
     let agent = try AssistantAgent(chat: model, context: context)
     try await agent.start()
-    let session = UUID()
-    let turn = AgentTurn(ordinal: 1)
-    try await agent.receive(.init(sessionID: session, payload: .observation(.speechPhase(.speaking)), turn: turn))
+    let session = UUID().uuidString
+    let turn = AgentTurn(id: UUID().uuidString, ordinal: 1)
+    try await agent.receive(
+        .init(
+            id: UUID().uuidString, sessionID: session, payload: .observation(.speechPhase(.speaking)),
+            turn: turn))
     try await context.update {
         var state = try #require($0.state.skillState)
         _ = try state.control(
-            "cancelTask", arguments: ["reason": "cancelled"], inputID: UUID(), fixed: fixedCapabilities)
+            "cancelTask", arguments: ["reason": "cancelled"], inputID: UUID().uuidString,
+            fixed: fixedCapabilities)
         try state.roundCompleted(failed: false, fixed: fixedCapabilities)
         _ = try state.control(
-            "startTask", arguments: ["skills": "[\"history-query\"]", "goal": "new task"], inputID: UUID(),
-            fixed: fixedCapabilities)
+            "startTask", arguments: ["skills": "[\"history-query\"]", "goal": "new task"],
+            inputID: UUID().uuidString,
+            fixed: fixedCapabilities, taskID: try fixtureTaskID())
         $0.state.skillState = state
     }
     let current = try await context.snapshot().state.skillState?.activeTaskID
     await #expect(throws: CommunicationError.scopeClosed) {
         try await agent.receive(
-            .init(sessionID: session, payload: .observation(.transcript("保存", final: true)), turn: turn))
+            .init(
+                id: UUID().uuidString, sessionID: session,
+                payload: .observation(.transcript("保存", final: true)), turn: turn))
     }
     #expect(try await context.snapshot().state.skillState?.activeTaskID == current)
     #expect(await model.requests.count == 0)
@@ -655,13 +728,14 @@ private func photographyAcceptance(
     try skills.initialize(fixed: fixedCapabilities, baseSkills: try AgentConfigurations.baseSkills(named: "Assistant"))
     initial.skillState = skills
     let repository = AgentContextRepository(
-        agent: AgentID.assistant, scope: UUID(), state: initial,
+        agent: AgentID.assistant, scope: UUID().uuidString, state: initial,
         persistence: AgentContextPersistence(load: { nil }, commit: { _, _ in throw WriteFailure() }))
     await #expect(throws: WriteFailure.self) {
         try await repository.transaction {
             try $0.state.skillState?.control(
-                "startTask", arguments: ["skills": "[\"photography\"]", "goal": "fixture"], inputID: UUID(),
-                fixed: fixedCapabilities)
+                "startTask", arguments: ["skills": "[\"photography\"]", "goal": "fixture"],
+                inputID: UUID().uuidString,
+                fixed: fixedCapabilities, taskID: try fixtureTaskID())
         }
     }
     let committed = try await repository.snapshot().state.skillState
@@ -670,23 +744,25 @@ private func photographyAcceptance(
 }
 
 @Test(.actionCatalog) func trustedIdleControlsReuseTaskActionsWithoutStartingConversation() async throws {
-    let context = AgentContextRepository(agent: AgentID.assistant, scope: UUID(), state: AssistantContextState())
-    let model = SkillModel(photoID: UUID())
+    let context = AgentContextRepository(
+        agent: AgentID.assistant, scope: UUID().uuidString, state: AssistantContextState())
+    let model = SkillModel(mediaID: "media_1")
     let agent = try AssistantAgent(chat: model, context: context)
     try await agent.start()
-    let session = UUID()
+    let session = UUID().uuidString
     _ = try await agent.controlTask(
         "startTask", arguments: ["skills": "[\"photography\"]", "goal": "fixed fixture"], source: "assistant",
-        sessionID: session, inputID: UUID(), decisionID: nil)
+        sessionID: session, inputID: UUID().uuidString, decisionID: nil)
     #expect(try await context.snapshot().state.skillState?.mode == "task")
     await #expect(throws: CommunicationError.unauthorized) {
         try await agent.controlTask(
-            "cancelTask", arguments: ["reason": "spoofed"], source: "photographer", sessionID: session, inputID: UUID(),
+            "cancelTask", arguments: ["reason": "spoofed"], source: "photographer", sessionID: session,
+            inputID: UUID().uuidString,
             decisionID: nil)
     }
     _ = try await agent.controlTask(
         "cancelTask", arguments: ["reason": "fixed cancelled"], source: "assistant", sessionID: session,
-        inputID: UUID(), decisionID: nil)
+        inputID: UUID().uuidString, decisionID: nil)
     #expect(try await context.snapshot().state.skillState?.tasks.last?.status == "cancelled")
     #expect(try await context.snapshot().state.skillState?.mode == "default")
     #expect(await model.requests.isEmpty)
@@ -698,15 +774,17 @@ private func photographyAcceptance(
         AgentConfigurations.load(named: "Assistant").capabilities)
     var state = AgentTaskSkillState()
     try state.initialize(fixed: fixedCapabilities, baseSkills: try AgentConfigurations.baseSkills(named: "Assistant"))
-    let input = UUID()
+    let input = UUID().uuidString
     _ = try state.control(
         "loadSkills", arguments: ["skills": "[\"history-query\",\"photography\"]"], inputID: input,
         fixed: fixedCapabilities)
     #expect(try state.ownership("photography") == "decision")
     let snapshot = try state.registry(fixed: fixedCapabilities)
-    try state.roundCompleted(failed: false, fixed: fixedCapabilities, inputID: UUID())
+    try state.roundCompleted(failed: false, fixed: fixedCapabilities, inputID: UUID().uuidString)
     #expect(state.loaded.contains("photography"))
-    _ = try state.control("startTask", arguments: ["goal": "拍照并查询历史"], inputID: input, fixed: fixedCapabilities)
+    _ = try state.control(
+        "startTask", arguments: ["goal": "拍照并查询历史"], inputID: input, fixed: fixedCapabilities,
+        taskID: try fixtureTaskID())
     #expect(try state.ownership("photography") == "task")
     #expect(state.temporaryInputID == nil)
     _ = try state.control(
@@ -730,14 +808,18 @@ private func photographyAcceptance(
 
 @Test(.actionCatalog) func genericBackgroundCapacityAndLegacyRecoveryAreExplicit() throws {
     var registry = AgentTaskRegistry()
-    let session = UUID()
+    let session = UUID().uuidString
     for _ in 0..<16 {
         try registry.register(
-            AgentTaskScope(requester: .assistant, executor: .memory, sessionID: session, execution: .background))
+            AgentTaskScope(
+                id: UUID().uuidString, requester: .assistant, executor: .memory, sessionID: session,
+                execution: .background))
     }
     #expect(throws: CommunicationError.capacityExceeded) {
         try registry.register(
-            AgentTaskScope(requester: .assistant, executor: .memory, sessionID: session, execution: .background))
+            AgentTaskScope(
+                id: UUID().uuidString, requester: .assistant, executor: .memory, sessionID: session,
+                execution: .background))
     }
     let cancelling = try #require(registry.records.first?.scope.id)
     try registry.delivered(cancelling, kind: .cancel, accepted: false)
@@ -747,7 +829,9 @@ private func photographyAcceptance(
     registry.recover()
     #expect(registry.records.allSatisfy { $0.state == .interrupted })
     try registry.register(
-        AgentTaskScope(requester: .assistant, executor: .memory, sessionID: session, execution: .background))
+        AgentTaskScope(
+            id: UUID().uuidString, requester: .assistant, executor: .memory, sessionID: session,
+            execution: .background))
     #expect(throws: CommunicationError.unsupportedContract) {
         try AgentConfigurations.backgroundSupport(target: .memory, contract: "demo.background", skills: [])
     }
@@ -760,7 +844,8 @@ private func photographyAcceptance(
     }
     #expect(old.version == 1)
     let legacyScope: [String: Any] = [
-        "id": UUID().uuidString, "requester": "assistant", "executor": "memory", "sessionID": session.uuidString,
+        "id": UUID().uuidString, "requester": "assistant", "executor": "memory",
+        "sessionID": session,
     ]
     let decodedScope = try JSONDecoder().decode(
         AgentTaskScope.self, from: JSONSerialization.data(withJSONObject: legacyScope))
@@ -773,9 +858,10 @@ private func photographyAcceptance(
 @Test(.actionCatalog, .timeLimit(.minutes(1))) func backgroundTaskSendReportsNeverGrabForegroundOrInvokeChat()
     async throws
 {
-    let session = UUID()
-    let context = AgentContextRepository(agent: AgentID.assistant, scope: UUID(), state: AssistantContextState())
-    let model = SkillModel(photoID: UUID())
+    let session = UUID().uuidString
+    let context = AgentContextRepository(
+        agent: AgentID.assistant, scope: UUID().uuidString, state: AssistantContextState())
+    let model = SkillModel(mediaID: "media_1")
     let assistant = try AssistantAgent(
         chat: model, context: context,
         backgroundSupport: { target, contract, skills in
@@ -801,14 +887,14 @@ private func photographyAcceptance(
     await child.start()
     _ = try await assistant.controlTask(
         "startTask", arguments: ["goal": "继续拍摄", "skills": "[\"photography\"]"], source: "assistant",
-        sessionID: session, inputID: UUID(), decisionID: nil)
+        sessionID: session, inputID: UUID().uuidString, decisionID: nil)
     let before = try await context.snapshot().state.skillState
     let receipt = try await assistant.controlTask(
         "startTask",
         arguments: [
             "goal": "后台独立事务", "execution": "background", "target": "memory", "businessContract": "demo.background",
             "payload": "{}",
-        ], source: "assistant", sessionID: session, inputID: UUID(), decisionID: nil)
+        ], source: "assistant", sessionID: session, inputID: UUID().uuidString, decisionID: nil)
     #expect(receipt.contains("not yet complete"))
     let received = try #require(await child.inputs.last)
     guard case .observation(let message) = received.payload else { throw CommunicationError.invalidPayload }
@@ -817,16 +903,19 @@ private func photographyAcceptance(
     let (_, supplemental) = try AgentCommunicationAdapter.action(
         path: "Agent.Communication.send",
         arguments: [
-            "target": "memory", "kind": "input", "content": "补充数据", "taskID": request.scope.id.uuidString,
+            "target": "memory", "kind": "input", "content": "补充数据", "taskID": request.scope.id,
             "businessContract": "demo.background", "payload": "{}",
         ],
-        sender: .assistant, input: AgentInput(sessionID: session, payload: .text("补充")),
+        sender: .assistant,
+        input: AgentInput(id: UUID().uuidString, sessionID: session, payload: .text("补充")),
         policy: try #require(configurations.first { $0.agentID == .assistant }).communication, existing: request.scope)
     #expect(supplemental.scope == request.scope && supplemental.businessContract == "demo.background")
 
     #expect(try await context.snapshot().tasks.task(request.scope.id)?.state == .accepted)
     let port = try await output.messaging(for: .memory)
-    let progress = try AgentTaskContent(text: "后台需要更多信息", stage: .waitingUser, interactionID: UUID()).signal(
+    let progress = try AgentTaskContent(
+        text: "后台需要更多信息", stage: .waitingUser, interactionID: UUID().uuidString
+    ).signal(
         .progress, scope: request.scope)
     _ = try await port.sendResult(progress.message(), parent: received, to: .assistant)
     #expect(try await context.snapshot().state.skillState?.activeTaskID == before?.activeTaskID)
@@ -877,7 +966,9 @@ private struct TaskControlAcknowledgmentFixture: TaskControlCapability {
     for function in module.definitions {
         let invocation = ActionInvocation(
             call: .init(actionPath: function.path, channel: "Control", parameters: [:]),
-            context: .init(source: "assistant", sessionID: UUID(), inputID: UUID(), sequence: 0))
+            context: .init(
+                source: "assistant", sessionID: UUID().uuidString, inputID: UUID().uuidString,
+                sequence: 0), executionID: UUID().uuidString)
         #expect(
             try await FunctionExecutor.perform(invocation, definition: function)
                 == .value(
@@ -886,29 +977,36 @@ private struct TaskControlAcknowledgmentFixture: TaskControlCapability {
 }
 
 @Test(.actionCatalog) func taskReportsExcludeRetainedLegacyHistoryAndUnrelatedSessions() throws {
-    let session = UUID()
+    let session = UUID().uuidString
     var registry = AgentTaskRegistry()
-    var views: [UUID: AgentTaskView] = [:]
+    var views: [String: AgentTaskView] = [:]
     func add(_ scope: AgentTaskScope, terminal: Bool) throws {
         try registry.register(scope)
-        views[scope.id] = AgentTaskView(scope: scope, content: try .init(text: scope.id.uuidString), terminal: terminal)
+        views[scope.id] = AgentTaskView(scope: scope, content: try .init(text: scope.id), terminal: terminal)
     }
-    let legacy = AgentTaskScope(requester: .assistant, executor: .photographer, sessionID: session)
-    let done = AgentTaskScope(requester: .assistant, executor: .memory, sessionID: session, execution: .background)
-    let live = AgentTaskScope(requester: .assistant, executor: .memory, sessionID: session, execution: .background)
-    let other = AgentTaskScope(requester: .assistant, executor: .memory, sessionID: UUID(), execution: .background)
+    let legacy = AgentTaskScope(
+        id: UUID().uuidString, requester: .assistant, executor: .photographer, sessionID: session)
+    let done = AgentTaskScope(
+        id: UUID().uuidString, requester: .assistant, executor: .memory, sessionID: session,
+        execution: .background)
+    let live = AgentTaskScope(
+        id: UUID().uuidString, requester: .assistant, executor: .memory, sessionID: session,
+        execution: .background)
+    let other = AgentTaskScope(
+        id: UUID().uuidString, requester: .assistant, executor: .memory,
+        sessionID: UUID().uuidString, execution: .background)
     try add(legacy, terminal: true)
     try add(done, terminal: true)
     try add(live, terminal: false)
     try add(other, terminal: false)
-    let input = AgentInput(sessionID: session, payload: .text("你好"))
+    let input = AgentInput(id: UUID().uuidString, sessionID: session, payload: .text("你好"))
     let templates = try AgentPrompts.load(named: "Assistant")
     let reports = try AgentChatContextBuilder.taskReports(
         views: views, tasks: registry, input: input, templates: templates)
-    #expect(reports.contains(live.id.uuidString))
-    #expect(!reports.contains(legacy.id.uuidString))
-    #expect(!reports.contains(done.id.uuidString))
-    #expect(!reports.contains(other.id.uuidString))
+    #expect(reports.contains(live.id))
+    #expect(!reports.contains(legacy.id))
+    #expect(!reports.contains(done.id))
+    #expect(!reports.contains(other.id))
     #expect(
         try AgentChatContextBuilder.taskReports(views: [:], tasks: registry, input: input, templates: templates).isEmpty
     )
@@ -954,19 +1052,22 @@ private struct TaskControlAcknowledgmentFixture: TaskControlCapability {
             arguments: [
                 "goal": "拍照", "skills": "[\"photography\"]", "execution": "foreground",
                 "target": "photographer", "businessContract": "photography", "payload": "{}",
-            ], inputID: UUID(), fixed: fixed)
+            ], inputID: UUID().uuidString, fixed: fixed, taskID: try fixtureTaskID())
     }
     #expect(try encoder.encode(state) == before)
     _ = try state.control(
         "startTask", arguments: ["goal": "拍照", "skills": "[\"photography\"]", "execution": "foreground"],
-        inputID: UUID(), fixed: fixed)
+        inputID: UUID().uuidString, fixed: fixed, taskID: try fixtureTaskID())
     #expect(state.activeTaskID != nil && state.loaded.contains("photography"))
 }
 
 @Test(.actionCatalog) func unstartedAssistantRejectsInputWithoutEmittingRuntimeError() async throws {
-    let agent = try AssistantAgent(chat: SkillModel(photoID: UUID()))
+    let agent = try AssistantAgent(chat: SkillModel(mediaID: "media_1"))
     await #expect(throws: HarnessError.notRunning) {
-        try await agent.receive(AgentInput(sessionID: UUID(), payload: .text("startup input")))
+        try await agent.receive(
+            AgentInput(
+                id: UUID().uuidString, sessionID: UUID().uuidString,
+                payload: .text("startup input")))
     }
     await agent.stop()
     for await output in agent.outputs {
@@ -978,9 +1079,10 @@ private struct TaskControlAcknowledgmentFixture: TaskControlCapability {
     let fixed = try AssistantAgent.runtimeCapabilities(AgentConfigurations.load(named: "Assistant").capabilities)
     var state = AgentTaskSkillState()
     try state.initialize(fixed: fixed, baseSkills: try AgentConfigurations.baseSkills(named: "Assistant"))
-    let input = UUID()
+    let input = UUID().uuidString
     _ = try state.control(
-        "startTask", arguments: ["goal": "拍照", "skills": "[\"photography\"]"], inputID: input, fixed: fixed)
+        "startTask", arguments: ["goal": "拍照", "skills": "[\"photography\"]"], inputID: input, fixed: fixed,
+        taskID: try fixtureTaskID())
     let before = Date()
     try state.roundCompleted(failed: true, fixed: fixed, inputID: input, failure: "Capture denied by device")
     let saved = try JSONDecoder().decode(AgentTaskSkillState.self, from: JSONEncoder().encode(state))
@@ -1029,31 +1131,32 @@ private struct TaskControlAcknowledgmentFixture: TaskControlCapability {
     let config = try AgentConfigurations.load(named: "Assistant")
     var skills = AgentTaskSkillState()
     try skills.initialize(fixed: config.capabilities, baseSkills: AgentConfigurations.baseSkills(named: "Assistant"))
-    let input = AgentInput(sessionID: UUID(), payload: .text("拍张照，不要后续操作"))
+    let input = AgentInput(
+        id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("拍张照，不要后续操作"))
     #expect(throws: GenerationError.unknownCapability) {
         try skills.registry(fixed: config.capabilities).resolveAction("takePhoto", parameters: [:])
     }
     _ = try skills.control(
         "loadSkills", arguments: ["skills": "[\"photography\"]"], inputID: input.id, fixed: config.capabilities)
     let registry = try skills.registry(fixed: config.capabilities)
-    let photo = UUID()
+    let photo = "media_1"
     var state = AssistantContextState()
     state.skillState = skills
     state.cameraState = CameraStateObservation(
         sequence: 1, enabled: true, visible: true, busy: false, needsSettings: false, facing: .back,
-        displayedPhotoID: photo, savedPhotoID: photo)
-    let context = AgentContext(agentID: .assistant, scopeID: UUID(), state: state)
+        displayedMediaID: photo, savedMediaID: photo)
+    let context = AgentContext(agentID: .assistant, scopeID: UUID().uuidString, state: state)
     for (alias, parameters) in [
-        ("takePhoto", [:]), ("savePhoto", ["photoID": photo.uuidString]),
-        ("ignorePhoto", ["photoID": photo.uuidString]),
+        ("takePhoto", [:]), ("savePhoto", ["mediaID": photo]),
+        ("ignorePhoto", ["mediaID": photo]),
     ] {
         let call = try registry.resolveAction(alias, parameters: parameters)
         #expect(call.channel == "Camera")
     }
     #expect(skills.activeTaskID == nil)
     let facts = try AssistantContextBuilder.contextFacts(context, input: input)
-    #expect(facts.contains { $0.content.contains("displayedPhotoID") && $0.content.contains(photo.uuidString) })
-    #expect(facts.contains { $0.content.contains("savedPhotoID") && $0.content.contains(photo.uuidString) })
+    #expect(facts.contains { $0.content.contains("displayedMediaID") && $0.content.contains(photo) })
+    #expect(facts.contains { $0.content.contains("savedMediaID") && $0.content.contains(photo) })
 }
 
 @Test(.actionCatalog, .timeLimit(.minutes(1)), arguments: [false, true])
@@ -1069,8 +1172,9 @@ func assistantCapturesWithoutTaskWhenNoFollowUpIsRequested(supportsImages: Bool)
     let fixed = try AssistantAgent.runtimeCapabilities(AgentConfigurations.load(named: "Assistant").capabilities)
     var state = AgentTaskSkillState()
     try state.initialize(fixed: fixed, baseSkills: AgentConfigurations.baseSkills(named: "Assistant"))
-    let input = UUID()
-    _ = try state.control("startTask", arguments: ["goal": "fixture"], inputID: input, fixed: fixed)
+    let input = UUID().uuidString
+    _ = try state.control(
+        "startTask", arguments: ["goal": "fixture"], inputID: input, fixed: fixed, taskID: try fixtureTaskID())
     #expect(throws: CommunicationError.invalidPayload) {
         try state.control(
             "finishTask", arguments: ["summary": "done", "continueDecision": "yes"], inputID: input, fixed: fixed)
@@ -1107,18 +1211,22 @@ func taskEntryRetainsConversationAndNativePairsUntilClosure(replacingWithinInput
     let config = try AgentConfigurations.load(named: "Assistant")
     var skills = AgentTaskSkillState()
     try skills.initialize(fixed: config.capabilities, baseSkills: AgentConfigurations.baseSkills(named: "Assistant"))
-    let ordinaryID = UUID()
-    let oldInputID = UUID()
-    let newInputID = replacingWithinInput ? oldInputID : UUID()
-    _ = try skills.control("startTask", arguments: ["goal": "旧拍照目标"], inputID: oldInputID, fixed: config.capabilities)
+    let ordinaryID = UUID().uuidString
+    let oldInputID = UUID().uuidString
+    let newInputID = replacingWithinInput ? oldInputID : UUID().uuidString
+    _ = try skills.control(
+        "startTask", arguments: ["goal": "旧拍照目标"], inputID: oldInputID, fixed: config.capabilities,
+        taskID: try fixtureTaskID())
     let oldTaskID = try #require(skills.activeTaskID)
     _ = try skills.control(
         "finishTask", arguments: ["summary": "旧照片已保存"], inputID: oldInputID, fixed: config.capabilities)
     try skills.roundCompleted(failed: false, fixed: config.capabilities)
-    _ = try skills.control("startTask", arguments: ["goal": "后置拍照"], inputID: newInputID, fixed: config.capabilities)
+    _ = try skills.control(
+        "startTask", arguments: ["goal": "后置拍照"], inputID: newInputID, fixed: config.capabilities,
+        taskID: try fixtureTaskID())
     let newTaskID = try #require(skills.activeTaskID)
     let store = ConversationHistoryStore()
-    func record(_ inputID: UUID, requests: [(UUID?, String)], nativePair: Bool = false) async throws {
+    func record(_ inputID: String, requests: [(String?, String)], nativePair: Bool = false) async throws {
         let current = try await store.readCurrent()
         _ = try await store.begin(
             id: inputID, user: "fixture input",
@@ -1126,7 +1234,7 @@ func taskEntryRetainsConversationAndNativePairsUntilClosure(replacingWithinInput
             expecting: current.token, model: "stub")
         for (taskID, output) in requests {
             let request = ConversationModelRequest(
-                id: UUID(), input: "fixture input", requestJSON: "[]",
+                id: UUID().uuidString, input: "fixture input", requestJSON: "[]",
                 decisionMetadata: .init(
                     taskID: taskID, mode: taskID == nil ? "default" : "task", skills: [:], catalogJSON: "{}"),
                 historyTaskID: taskID
@@ -1135,7 +1243,8 @@ func taskEntryRetainsConversationAndNativePairsUntilClosure(replacingWithinInput
             try await store.append(output, to: inputID)
             if nativePair {
                 let call = ConversationToolCall(
-                    id: UUID(), providerID: "background-query", name: "History.list", argumentsJSON: "{}")
+                    id: UUID().uuidString, providerID: "background-query", name: "History.list",
+                    argumentsJSON: "{}")
                 try await store.recordToolCall(call, for: inputID)
                 try await store.recordToolOutcome(call.id, for: inputID, state: .completed, output: "用户偏好红帽子")
             }
@@ -1144,8 +1253,8 @@ func taskEntryRetainsConversationAndNativePairsUntilClosure(replacingWithinInput
         try await store.finish(inputID, state: .completed)
     }
     try await record(ordinaryID, requests: [(nil, "普通对话背景")], nativePair: true)
-    let oldRequests: [(UUID?, String)] = [(nil, "OLD_ENTRY"), (oldTaskID, "OLD_PHOTO_RAW")]
-    let newRequests: [(UUID?, String)] = [(nil, "<startTask goal=\"后置拍照\"/>"), (newTaskID, "CURRENT_TASK_RAW")]
+    let oldRequests: [(String?, String)] = [(nil, "OLD_ENTRY"), (oldTaskID, "OLD_PHOTO_RAW")]
+    let newRequests: [(String?, String)] = [(nil, "<startTask goal=\"后置拍照\"/>"), (newTaskID, "CURRENT_TASK_RAW")]
     if replacingWithinInput {
         try await record(oldInputID, requests: oldRequests + newRequests)
     } else {
@@ -1159,9 +1268,10 @@ func taskEntryRetainsConversationAndNativePairsUntilClosure(replacingWithinInput
     let encoder = JSONEncoder()
     encoder.outputFormatting = .sortedKeys
     let originalHistory = try encoder.encode(state.history.current.turns)
-    let input = AgentInput(sessionID: UUID(), payload: .text("保存当前照片"))
+    let input = AgentInput(
+        id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("保存当前照片"))
     func projected(_ value: AssistantContextState) throws -> [ChatMessage] {
-        let snapshot = AgentContext(agentID: .assistant, scopeID: UUID(), state: value)
+        let snapshot = AgentContext(agentID: .assistant, scopeID: UUID().uuidString, state: value)
         let decision = AgentDecisionContext(snapshot: snapshot, input: input)
         return try AgentChatRequestBuilder<AssistantContextState>().build(state: decision, batch: decision.batch())
             .messages(system: "fixture", user: "保存当前照片")
@@ -1189,11 +1299,12 @@ func taskEntryRetainsConversationAndNativePairsUntilClosure(replacingWithinInput
 }
 
 @Test(.actionCatalog) func historyTaskAssignmentRefreshesStoreAndRejectsStaleAdmission() async throws {
-    let context = AgentContextRepository(agent: .assistant, scope: UUID(), state: AssistantContextState())
+    let context = AgentContextRepository(
+        agent: .assistant, scope: UUID().uuidString, state: AssistantContextState())
     let store = AgentChatHistoryContext.store(repository: context)
-    let input = UUID()
-    let request = UUID()
-    let task = UUID()
+    let input = UUID().uuidString
+    let request = UUID().uuidString
+    let task = UUID().uuidString
     let token = try await store.readCurrent().token
     _ = try await store.begin(id: input, user: "start goal", request: [], expecting: token, model: "stub")
     try await store.beginModelRequest(
@@ -1203,7 +1314,8 @@ func taskEntryRetainsConversationAndNativePairsUntilClosure(replacingWithinInput
     let stale = try await store.readCurrent().token
     try await context.update { try $0.state.history.assignHistoryTask(task, inputID: input, requestID: request) }
     await #expect(throws: ConversationHistoryError.conflict) {
-        _ = try await store.begin(id: UUID(), user: "stale", request: [], expecting: stale, model: "stub")
+        _ = try await store.begin(
+            id: UUID().uuidString, user: "stale", request: [], expecting: stale, model: "stub")
     }
     try await store.append("started", to: input)
     try await store.finish(input, state: .completed)
@@ -1218,19 +1330,21 @@ func terminalTaskCompressionKeepsChronologyAndAllSourceEvidence(status: String) 
     let config = try AgentConfigurations.load(named: "Assistant")
     var skills = AgentTaskSkillState()
     try skills.initialize(fixed: config.capabilities, baseSkills: AgentConfigurations.baseSkills(named: "Assistant"))
-    _ = try skills.control("startTask", arguments: ["goal": "目标"], inputID: UUID(), fixed: config.capabilities)
+    _ = try skills.control(
+        "startTask", arguments: ["goal": "目标"], inputID: UUID().uuidString, fixed: config.capabilities,
+        taskID: try fixtureTaskID())
     let task = try #require(skills.activeTaskID)
     skills.tasks[0].status = status
     skills.tasks[0].summary = "用户选择了第一张"
     skills.tasks[0].failure = status == "failed" ? "真实执行失败" : nil
     skills.activeTaskID = nil
     let store = ConversationHistoryStore()
-    func add(_ text: String, taskID: UUID? = nil) async throws -> UUID {
-        let input = UUID()
+    func add(_ text: String, taskID: String? = nil) async throws -> String {
+        let input = UUID().uuidString
         let token = try await store.readCurrent().token
         _ = try await store.begin(id: input, user: text, request: [], expecting: token, model: "stub")
         try await store.beginModelRequest(
-            .init(id: UUID(), input: text, requestJSON: "[]", historyTaskID: taskID), for: input)
+            .init(id: UUID().uuidString, input: text, requestJSON: "[]", historyTaskID: taskID), for: input)
         try await store.append(text + " output", to: input)
         try await store.finish(input, state: .completed)
         return input
@@ -1269,21 +1383,22 @@ func terminalTaskCompressionKeepsChronologyAndAllSourceEvidence(status: String) 
     let fixed = try AgentConfigurations.load(named: "Assistant").capabilities
     var skills = AgentTaskSkillState()
     try skills.initialize(fixed: fixed, baseSkills: AgentConfigurations.baseSkills(named: "Assistant"))
-    let input = UUID()
-    _ = try skills.control("startTask", arguments: ["goal": "goal"], inputID: input, fixed: fixed)
+    let input = UUID().uuidString
+    _ = try skills.control(
+        "startTask", arguments: ["goal": "goal"], inputID: input, fixed: fixed, taskID: try fixtureTaskID())
     let task = try #require(skills.activeTaskID)
     _ = try skills.control("finishTask", arguments: ["summary": "done"], inputID: input, fixed: fixed)
     let store = ConversationHistoryStore()
     _ = try await store.begin(id: input, user: "goal", request: [], expecting: store.readCurrent().token, model: "stub")
     try await store.beginModelRequest(
-        .init(id: UUID(), input: "goal", requestJSON: "[]", historyTaskID: task), for: input)
+        .init(id: UUID().uuidString, input: "goal", requestJSON: "[]", historyTaskID: task), for: input)
     try await store.append("done", to: input)
     try await store.finish(input, state: .completed)
     var state = AssistantContextState()
     state.skillState = skills
     state.history = try await store.snapshot()
     let repository = AgentContextRepository(
-        agent: .assistant, scope: UUID(), state: state,
+        agent: .assistant, scope: UUID().uuidString, state: state,
         persistence: AgentContextPersistence(load: { nil }, commit: { _, _ in throw WriteFailure() }))
     await #expect(throws: WriteFailure.self) {
         try await repository.update {
@@ -1295,4 +1410,9 @@ func terminalTaskCompressionKeepsChronologyAndAllSourceEvidence(status: String) 
     #expect(retained.skillState?.activeTaskID == task && retained.skillState?.tasks.first?.status == "finishing")
     #expect(retained.history.current.taskCompressions.isEmpty)
     #expect(retained.history.current.turns.first?.raw == "done")
+}
+
+@Test(.actionCatalog, .timeLimit(.minutes(1)), arguments: ["savePhoto", "discardPhoto", "closeCamera"])
+func cameraFollowUpReplansRejectedAliasAfterTemporarySkillExpires(alias: String) async throws {
+    try await photographyAcceptance(live: false, captureOnly: true, followUpAlias: alias)
 }

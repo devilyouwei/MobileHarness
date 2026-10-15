@@ -1,20 +1,26 @@
 import AgentCore
 import Foundation
+import Storage
 
 /// Durable business state for a single foreground task; no executable code is loaded from assets.
+public enum RecognitionBinding: Codable, Sendable, Equatable {
+    case conversation
+    case task(String)
+}
+
 public struct AgentTaskSkillState: Codable, Sendable {
     public struct TaskRecord: Codable, Sendable, Identifiable {
-        public let id: UUID
+        public let id: String
         public let mode: String
         public let goal: String
         public let date: Date
         public var status: String
         public var summary: String?
         public var continueDecision: Bool?
-        public var sessionID: UUID? = nil
+        public var sessionID: String? = nil
         public var failure: String? = nil
         public var updatedAt: Date? = nil
-        public var inputIDs: [UUID]
+        public var inputIDs: [String]
         public var skills: [String]
     }
     public struct Event: Codable, Sendable {
@@ -22,24 +28,24 @@ public struct AgentTaskSkillState: Codable, Sendable {
         public let operation: String
         public let skill: String
         public let revision: Int
-        public let taskID: UUID?
+        public let taskID: String?
     }
     public var version = 3
-    public var temporaryInputID: UUID?
+    public var temporaryInputID: String?
     public var baseSkillIDs: [String]?
     public var loaded: [String] = []
     public var mode: String { activeTaskID == nil ? "default" : "task" }
-    public var activeTaskID: UUID?
+    public var activeTaskID: String?
     public var tasks: [TaskRecord] = []
     public var events: [Event] = []
-    public var recognitionBindings: [UUID: UUID] = [:]
-    public var inputBindings: [UUID: UUID] = [:]
+    public var recognitionBindings: [String: RecognitionBinding] = [:]
+    public var inputBindings: [String: String] = [:]
     public init() {}
 
-    public func taskID(for input: UUID) -> UUID? {
+    public func taskID(for input: String) -> String? {
         inputBindings[input] ?? tasks.first(where: { $0.inputIDs.contains(input) })?.id
     }
-    public mutating func bind(_ input: UUID, task: UUID?) throws {
+    public mutating func bind(_ input: String, task: String?) throws {
         guard let task else { return }
         guard
             let index = tasks.firstIndex(where: {
@@ -80,8 +86,9 @@ public struct AgentTaskSkillState: Codable, Sendable {
         return activeTaskID == nil ? "decision" : "task"
     }
     public mutating func control(
-        _ operation: String, arguments: [String: String], inputID: UUID, fixed fixedCapabilities: CapabilityRegistry,
-        sessionID: UUID? = nil
+        _ operation: String, arguments: [String: String], inputID: String,
+        fixed fixedCapabilities: CapabilityRegistry,
+        sessionID: String? = nil, taskID: String? = nil
     ) throws -> String {
         let allowed: Set<String>
         let required: Set<String>
@@ -119,8 +126,12 @@ public struct AgentTaskSkillState: Codable, Sendable {
             next.loaded = try AgentSkillLoader.expand(inherited + requested)
             _ = try AgentSkillLoader.registry(next.loaded, fixed: fixedCapabilities)
             if next.tasks.count == 256 { next.tasks.removeFirst() }
+            guard let taskID, BusinessRecordID(rawValue: taskID)?.kind == .task else {
+                throw CommunicationError.invalidPayload
+            }
             let task = TaskRecord(
-                id: UUID(), mode: "task", goal: goal, date: Date(), status: "running", inputIDs: [], skills: next.loaded
+                id: taskID, mode: "task", goal: goal, date: Date(), status: "running",
+                inputIDs: [], skills: next.loaded
             )
             next.tasks.append(task)
             next.tasks[next.tasks.count - 1].sessionID = sessionID
@@ -162,13 +173,13 @@ public struct AgentTaskSkillState: Codable, Sendable {
         self = next
         let receipt: [String: Any] = [
             "operation": operation, "status": "committed", "mode": mode,
-            "taskID": activeTaskID?.uuidString ?? "none", "skills": loaded,
+            "taskID": activeTaskID ?? "none", "skills": loaded,
         ]
         return String(
             decoding: try JSONSerialization.data(withJSONObject: receipt, options: [.sortedKeys]), as: UTF8.self)
     }
 
-    private mutating func recordChanges(previous: [String], task: UUID?) throws {
+    private mutating func recordChanges(previous: [String], task: String?) throws {
         for id in Set(previous).symmetricDifference(Set(loaded)).sorted() {
             events.append(
                 Event(
@@ -178,7 +189,7 @@ public struct AgentTaskSkillState: Codable, Sendable {
         events = Array(events.suffix(256))
     }
     public mutating func roundCompleted(
-        failed: Bool, fixed fixedCapabilities: CapabilityRegistry, inputID: UUID? = nil, failure: String? = nil,
+        failed: Bool, fixed fixedCapabilities: CapabilityRegistry, inputID: String? = nil, failure: String? = nil,
         cancelled: Bool = false
     )
         throws
@@ -213,7 +224,7 @@ public struct AgentTaskSkillState: Codable, Sendable {
         }
     }
     public mutating func cancelSession(
-        _ session: UUID, inputs: Set<UUID>, fixed: CapabilityRegistry
+        _ session: String, inputs: Set<String>, fixed: CapabilityRegistry
     ) throws {
         if let task = tasks.first(where: { $0.id == activeTaskID }),
             task.sessionID.map({ $0 == session }) ?? !Set(task.inputIDs).isDisjoint(with: inputs)

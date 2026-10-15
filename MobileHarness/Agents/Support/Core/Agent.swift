@@ -11,10 +11,10 @@ public protocol Agent: Actor {
     /// The Agent owns bounded buffering, ordering and any explicitly replaceable state.
     /// Explicit lifecycle/control inputs may join cancellation cleanup.
     func receive(_ input: AgentInput) async throws
-    func effectiveCapabilities(for roundID: UUID) async throws -> CapabilityRegistry?
+    func effectiveCapabilities(for roundID: String) async throws -> CapabilityRegistry?
     func status() async -> AgentStatus
 }
 
 extension Agent {
-    public func effectiveCapabilities(for roundID: UUID) async throws -> CapabilityRegistry? { nil }
+    public func effectiveCapabilities(for roundID: String) async throws -> CapabilityRegistry? { nil }
 }

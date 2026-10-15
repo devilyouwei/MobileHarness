@@ -6,6 +6,7 @@ import ExecutionRuntime
 import Foundation
 import FunctionContracts
 import PlatformKit
+import Storage
 import Testing
 
 private func pose(
@@ -22,11 +23,14 @@ private func pose(
         people: Array(repeating: joints, count: people))
 }
 
-private func observation(_ pose: PoseObservation, session: UUID) -> AgentInput {
+private func observation(_ pose: PoseObservation, session: String) -> AgentInput {
     let payload = InputPayload.observation(.pose(pose))
     return AgentInput(
+        id: UUID().uuidString,
         sessionID: session, payload: payload,
-        metadata: InputMetadata(payload: payload, source: "visionPerception", sequence: pose.sequence))
+        metadata: InputMetadata(
+            payload: payload, source: "visionPerception", sequence: pose.sequence, rootID: UUID().uuidString)
+    )
 }
 
 private func armTargets(in frame: [UInt8]) throws -> [Int] {
@@ -124,12 +128,13 @@ private func armSpeeds(in frame: [UInt8]) throws -> [Int] {
             "app.environment",
         ],
         configurations: AgentConfigurations.all())
-    let input = observation(try pose(noseX: 50, noseY: 50, sequence: 1, timestamp: 0), session: UUID())
+    let input = observation(
+        try pose(noseX: 50, noseY: 50, sequence: 1, timestamp: 0), session: UUID().uuidString)
     #expect(policy.destinations(for: input) == [.photographer])
 }
 
 @Test(.actionCatalog) func photographerOnTheLeftAimsBaseAndHoldsTheOtherJoints() async throws {
-    let session = UUID()
+    let session = UUID().uuidString
     let agent = try PhotographerAgent(sessionID: session, controlsArm: true)
     try await agent.start()
     try await agent.receive(observation(try pose(noseX: 10, noseY: 50, sequence: 1, timestamp: 0), session: session))
@@ -142,7 +147,7 @@ private func armSpeeds(in frame: [UInt8]) throws -> [Int] {
     #expect(call.toolPath == "NexArm.Tracking.aim")
     try await NexArmActions.aim(
         invocation: ActionInvocation(
-            call: ToolRequest(toolPath: call.toolPath, arguments: call.arguments),
+            call: ToolRequest(id: UUID().uuidString, toolPath: call.toolPath, arguments: call.arguments),
             context: ActionExecutionContext(
                 source: aimed.source.rawValue, sessionID: aimed.sessionID, inputID: aimed.inputID))
     ) { base, pitch, _ in
@@ -161,7 +166,7 @@ private func armSpeeds(in frame: [UInt8]) throws -> [Int] {
 }
 
 @Test(.actionCatalog) func photographerFreshnessUsesActualPoseAdmissionAndStopsWithLifecycle() async throws {
-    let session = UUID()
+    let session = UUID().uuidString
     let agent = try PhotographerAgent(sessionID: session, controlsArm: true)
     try await agent.start()
     #expect(await !agent.hasFreshPose())
@@ -184,7 +189,7 @@ private func armSpeeds(in frame: [UInt8]) throws -> [Int] {
 }
 
 @Test(.actionCatalog) func hiddenNoseUsesTheVisibleJointMidpoint() async throws {
-    let session = UUID()
+    let session = UUID().uuidString
     let agent = try PhotographerAgent(sessionID: session, controlsArm: true)
     try await agent.start()
     let body = try pose(noseX: 0, noseY: 0, noseConfidence: 0.1, others: 80, sequence: 1, timestamp: 0)
@@ -206,7 +211,7 @@ private func armSpeeds(in frame: [UInt8]) throws -> [Int] {
 }
 
 @Test(.actionCatalog) func emptyPoseDoesNotAim() async throws {
-    let session = UUID()
+    let session = UUID().uuidString
     let agent = try PhotographerAgent(sessionID: session, controlsArm: true)
     try await agent.start()
     let empty = try PoseObservation(width: 100, height: 100, sequence: 1, timestamp: 0, rotation: 1, people: [])
@@ -217,7 +222,7 @@ private func armSpeeds(in frame: [UInt8]) throws -> [Int] {
 }
 
 @Test(.actionCatalog) func centeredPersonDoesNotAim() async throws {
-    let session = UUID()
+    let session = UUID().uuidString
     let agent = try PhotographerAgent(sessionID: session, controlsArm: true)
     try await agent.start()
     try await agent.receive(observation(try pose(noseX: 50, noseY: 50, sequence: 1, timestamp: 0), session: session))
@@ -227,7 +232,7 @@ private func armSpeeds(in frame: [UInt8]) throws -> [Int] {
 }
 
 @Test(.actionCatalog) func baseKeepsSteppingWhileThePersonStaysOffCenter() async throws {
-    let session = UUID()
+    let session = UUID().uuidString
     let agent = try PhotographerAgent(sessionID: session, controlsArm: true)
     try await agent.start()
     try await agent.receive(observation(try pose(noseX: 10, noseY: 50, sequence: 1, timestamp: 0), session: session))
@@ -248,7 +253,7 @@ private func armSpeeds(in frame: [UInt8]) throws -> [Int] {
 }
 
 @Test(.actionCatalog) func aimWaitsForTimeAndMovement() async throws {
-    let session = UUID()
+    let session = UUID().uuidString
     let agent = try PhotographerAgent(sessionID: session, controlsArm: true)
     try await agent.start()
     try await agent.receive(observation(try pose(noseX: 10, noseY: 50, sequence: 1, timestamp: 0), session: session))
@@ -260,13 +265,15 @@ private func armSpeeds(in frame: [UInt8]) throws -> [Int] {
 }
 
 @Test(.actionCatalog) func aimActionRejectsANonFiniteAngleBeforeSend() async throws {
-    let input = AgentInput(sessionID: UUID(), payload: .text("test"))
-    let call = ToolCall(toolPath: "NexArm.Tracking.aim", arguments: ["base": "nan", "pitch": "0"])
+    let input = AgentInput(
+        id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("test"))
+    let call = ToolCall(
+        id: UUID().uuidString, toolPath: "NexArm.Tracking.aim", arguments: ["base": "nan", "pitch": "0"])
     let envelope = OutputEnvelope(source: .photographer, input: input, output: .toolCall(call))
     await #expect(throws: NexArmActions.AimError.invalidAngle) {
         try await NexArmActions.aim(
             invocation: ActionInvocation(
-                call: ToolRequest(toolPath: call.toolPath, arguments: call.arguments),
+                call: ToolRequest(id: UUID().uuidString, toolPath: call.toolPath, arguments: call.arguments),
                 context: ActionExecutionContext(
                     source: envelope.source.rawValue, sessionID: envelope.sessionID, inputID: envelope.inputID))
         ) { _, _, _ in
@@ -336,7 +343,7 @@ private actor AimLink: NexArmWritableLink {
 }
 
 @Test(.actionCatalog) func photographerOverflowRejectsWithoutStoppingOrReplacingAcceptedAims() async throws {
-    let session = UUID()
+    let session = UUID().uuidString
     let agent = try PhotographerAgent(sessionID: session, controlsArm: true, outputCapacity: 8)
     try await agent.start()
     for index in 0..<8 {
@@ -359,7 +366,7 @@ private actor AimLink: NexArmWritableLink {
 }
 
 @Test(.actionCatalog) func photographerRejectsMalformedDecodedPoseBeforeIndexingJoints() async throws {
-    let session = UUID()
+    let session = UUID().uuidString
     let agent = try PhotographerAgent(sessionID: session, controlsArm: true)
     try await agent.start()
     let pose = try JSONDecoder().decode(
@@ -386,7 +393,7 @@ private actor ArmAvailability {
 }
 
 @Test(.actionCatalog) func photographerSuppressesOfflineCommandsAndResumesFromFreshPose() async throws {
-    let session = UUID()
+    let session = UUID().uuidString
     let availability = ArmAvailability()
     let agent = try PhotographerAgent(
         sessionID: session, controlsArm: true, controlAvailable: { await availability.ready })
@@ -416,7 +423,7 @@ private actor ArmAvailability {
 }
 
 @Test(.actionCatalog) func rejectedTrackingOutputDoesNotAdvanceAccumulatedTarget() async throws {
-    let session = UUID()
+    let session = UUID().uuidString
     let agent = try PhotographerAgent(sessionID: session, controlsArm: true, outputCapacity: 8)
     try await agent.start()
     for sequence in 1...8 {

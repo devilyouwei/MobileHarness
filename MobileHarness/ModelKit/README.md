@@ -4,7 +4,7 @@
 
 ModelKit supplies typed Language/Speech/Vision inference, model execution and model/artifact lifecycle. Core owns neutral values and concurrency mechanisms; capability domains own request/result contracts; concrete providers own algorithms and native integration; Management owns registration, residency, artifacts and default assembly.
 
-The entire SDK depends only on its own targets, approved third-party products and system frameworks. It has no dependency on another project module. Consumers own application tasks, history selection, device actions, capture/playback and presentation. Storage, download and quiescence implementations enter through ModelKit-owned protocols or closures.
+The SDK depends on its own targets, approved third-party products and system frameworks. It has no dependency on another capability or business module. Consumers own application tasks, history selection, device actions, capture/playback and presentation. Storage, download and quiescence implementations enter through ModelKit-owned protocols or closures.
 
 ## External relationships and data flow
 

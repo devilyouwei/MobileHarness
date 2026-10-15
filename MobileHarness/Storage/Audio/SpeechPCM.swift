@@ -1,4 +1,5 @@
 import Foundation
+import Storage
 
 /// Interleaved PCM. Storage PCM is independent of model/device input contracts.
 public struct SpeechPCMFormat: Equatable, Sendable {

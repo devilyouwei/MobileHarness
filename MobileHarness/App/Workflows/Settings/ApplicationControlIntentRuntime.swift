@@ -3,6 +3,7 @@ import Agents
 import AppPresentationWorkflow
 import Foundation
 import Gateway
+import Storage
 
 /// Root-owned transport; Agent chooses business calls, ModelKit owns admitted background transfers.
 public actor ApplicationControlIntentRuntime {
@@ -11,7 +12,7 @@ public actor ApplicationControlIntentRuntime {
     private let input: InputGateway
     private let output: OutputGateway
     private var consumer: GatewayOutputConsumer?
-    private let sessionID: UUID
+    private let sessionID: String
 
     public func prepareForInteraction() async throws { try await ensureStarted() }
     private var started = false
@@ -33,11 +34,11 @@ public actor ApplicationControlIntentRuntime {
         var value: String?
         var failurePresented = false
         var failurePresentationAttempted = false
-        var calls: Set<UUID> = []
+        var calls: Set<String> = []
     }
-    private var requests: [UUID: Request] = [:]
+    private var requests: [String: Request] = [:]
     public init(
-        sessionID: UUID, manager: AgentManager, input: InputGateway, output: OutputGateway,
+        sessionID: String, manager: AgentManager, input: InputGateway, output: OutputGateway,
         agent: ApplicationControlAgent
     ) {
         self.sessionID = sessionID
@@ -50,12 +51,12 @@ public actor ApplicationControlIntentRuntime {
         do {
             let value = try await executeInput(
                 intent.input(sessionID: sessionID), maximumCalls: intent.presentation ? 2 : 1, providerRequest: true)
-            guard value == intent.requestID.uuidString else { throw CommunicationError.invalidPayload }
+            guard value == intent.requestID else { throw CommunicationError.invalidPayload }
         } catch let transport as TransportFailure {
             throw ProviderIntentFailure(message: transport.message, failureCode: nil)
         }
     }
-    public func discoverProvider(requestID: UUID, presentation: Bool = false) async throws -> String {
+    public func discoverProvider(requestID: String, presentation: Bool = false) async throws -> String {
         do {
             guard
                 let value = try await executeInput(
@@ -109,7 +110,7 @@ public actor ApplicationControlIntentRuntime {
         guard let value = try await executeIntent(intent) else { throw CommunicationError.invalidPayload }
         return value
     }
-    public func rejectInput(_ id: UUID, reason: String) async { if requests[id] != nil { await fail(id, reason) } }
+    public func rejectInput(_ id: String, reason: String) async { if requests[id] != nil { await fail(id, reason) } }
     private func boundConsumer() throws -> GatewayOutputConsumer {
         guard let consumer else { throw CommunicationError.scopeClosed }
         return consumer
@@ -360,7 +361,7 @@ public actor ApplicationControlIntentRuntime {
             if let failure = result.failure { throw ApplicationControlIntentFailure.execution(failure) }
         } catch { await fail(envelope.inputID, String(describing: error)) }
     }
-    private func resourceFailure(_ id: UUID) -> any Error {
+    private func resourceFailure(_ id: String) -> any Error {
         let message = requests[id]?.failure ?? "Resource operation failed"
         if requests[id]?.providerRequest == true {
             return ProviderIntentFailure(
@@ -370,7 +371,7 @@ public actor ApplicationControlIntentRuntime {
         return requests[id]?.failurePresented == true
             ? ApplicationControlIntentFailure.presented(message) : ApplicationControlIntentFailure.execution(message)
     }
-    private func fail(_ id: UUID, _ message: String) async {
+    private func fail(_ id: String, _ message: String) async {
         guard requests[id]?.result == nil else { return }
         var failure =
             requests[id]?.failure.map {
@@ -388,7 +389,7 @@ public actor ApplicationControlIntentRuntime {
             await finish(id, .failure(TransportFailure(phase: .dispatch, message: failure)))
         }
     }
-    private func finish(_ id: UUID, _ result: Result<String?, any Error>) async {
+    private func finish(_ id: String, _ result: Result<String?, any Error>) async {
         guard requests[id]?.result == nil else { return }
         var result = result
         if !closed {

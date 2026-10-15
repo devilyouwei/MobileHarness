@@ -103,6 +103,7 @@ Directed input schemas and static subscriptions are distinct; admission also val
 ✅ Implemented: title generation retains the existing two-message request, 64-token budget, 30-second joined deadline and explicit rejection of incomplete/empty titles. The shared [cloud request encoder](../../ModelKit/Language/LLM/OpenAI/README.md#non-thinking-request-policy) disables provider thinking before execution, preventing supported models from spending the title budget on reasoning. Memory does not own vendor-specific fields or retry with a larger budget. Existing archive/title persistence and failure presentation remain unchanged; opt-in synthetic provider evidence is recorded separately from native UI/device acceptance.
 
 
-## 会话存储性能重构 v3
 
-✅ 已实现：新会话归档/创建成功后即可完成新会话请求；标题生成在根持有的单个有界任务中进行，失败不撤销新会话，保存 titleError 并允许重试。
+## SQLite records and runtime identity
+
+✅ Implemented: technical identities are opaque UUID strings; committed business entities use dialog/message/task/media/device SQLite IDs. Consumers use Storage repositories while preserving ownership, cancellation and independent foundation boundaries. Complete messages, including each ReACT message, persist at termination; delta fragments do not persist. The custom allocator and replaced file/index implementation are removed. See the project SQLite business-record plan.

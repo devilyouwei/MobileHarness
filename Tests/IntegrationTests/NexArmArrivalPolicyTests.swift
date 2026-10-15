@@ -7,6 +7,7 @@ import Foundation
 import FunctionContracts
 import Gateway
 import PlatformKit
+import Storage
 import Testing
 
 @Test(.actionCatalog) func arrivalWinsWithoutStabilityAndStaleSamplesCannotComplete() throws {
@@ -117,7 +118,10 @@ private enum MacroFixture {
     #expect(action.displayName == "Generated action")
     #expect(try action.requiredResources(for: call) == [.init(rawValue: "fixture")])
     let invocation = ActionInvocation(
-        source: .assistant, input: .init(sessionID: UUID(), payload: .event("test")), call: call)
+        source: .assistant,
+        input: .init(
+            id: UUID().uuidString, sessionID: UUID().uuidString, payload: .event("test")),
+        call: call)
     let result = try await ActionExecutor(registry: ActionRegistry(definitions: [action])).execute(invocation)
     guard case .report(let report) = result else {
         Issue.record("Missing timeout report")
@@ -180,8 +184,9 @@ private enum MacroFixture {
         .init(id: .init(rawValue: "fixture"), allowedOwners: [.assistant], stop: {})
     ])
     let scheduler = ChannelScheduler(registry: try ActionRegistry(definitions: [action]), resources: resources)
-    let owner = ExecutionOwner(agent: .assistant, incarnation: UUID(), sessionID: UUID())
-    let input = AgentInput(sessionID: owner.sessionID, payload: .event("deadline"))
+    let owner = ExecutionOwner(
+        agent: .assistant, incarnation: UUID().uuidString, sessionID: UUID().uuidString)
+    let input = AgentInput(id: UUID().uuidString, sessionID: owner.sessionID, payload: .event("deadline"))
     for quick in [false, true] {
         let call = ActionCall(
             actionPath: ActionPath(
@@ -242,7 +247,9 @@ private enum MacroFixture {
         completing: { _ in .value("actual child value") })
     let input = FunctionInvocation(
         call: .init(actionPath: child.path),
-        context: .init(source: "fixture", sessionID: UUID(), inputID: UUID()), results: ActionReportStore())
+        context: .init(
+            source: "fixture", sessionID: UUID().uuidString, inputID: UUID().uuidString),
+        executionID: UUID().uuidString, results: ActionReportStore())
     let composition = try ActionComposition(
         .sequence([
             .action(function: child, invocation: input),
@@ -254,7 +261,8 @@ private enum MacroFixture {
         composing: { _ in composition })
     #expect(try function.executionBudget(for: .init(actionPath: function.path)).timeout == .seconds(90))
     let parent = FunctionInvocation(
-        call: .init(actionPath: function.path), context: input.context, results: ActionReportStore())
+        call: .init(actionPath: function.path), context: input.context, executionID: UUID().uuidString,
+        results: ActionReportStore())
     let result = try await FunctionExecutor.perform(parent, definition: function)
     guard case .report(let report) = result else {
         Issue.record("Missing composite result")
@@ -298,9 +306,11 @@ private enum MacroFixture {
                 throw error
             }
         })
-    let context = ActionExecutionContext(source: "fixture", sessionID: UUID(), inputID: UUID())
+    let context = ActionExecutionContext(
+        source: "fixture", sessionID: UUID().uuidString, inputID: UUID().uuidString)
     let invocation = FunctionInvocation(
-        call: .init(actionPath: function.path), context: context, results: ActionReportStore())
+        call: .init(actionPath: function.path), context: context, executionID: UUID().uuidString,
+        results: ActionReportStore())
     async let action = FunctionExecutor.perform(invocation, definition: function)
     let tools = try ToolRegistry(modules: [
         DefaultTimeoutTools(definitions: [
@@ -309,7 +319,7 @@ private enum MacroFixture {
         ])
     ])
     async let tool = ToolExecutor(registry: tools).execute(
-        .init(toolPath: function.path.description), context: context)
+        .init(id: UUID().uuidString, toolPath: function.path.description), context: context)
     let (actionResult, toolResult) = try await (action, tool)
     guard case .report(let report) = actionResult else {
         Issue.record("Missing default timeout")

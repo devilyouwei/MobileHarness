@@ -1,5 +1,6 @@
 import Foundation
 import FunctionContracts
+import Storage
 
 /// Secret-bearing host values deliberately have no Codable conformance.
 public struct ProviderDiscoveryConfiguration: Sendable {
@@ -27,7 +28,7 @@ public enum ProviderDiscoveryError: LocalizedError, Sendable, ActionExecutionFai
     }
 }
 public protocol ProviderDiscoveryCapability: Sendable {
-    func discoverModels(requestID: UUID, sessionID: UUID) async throws -> [String]
+    func discoverModels(requestID: String, sessionID: String) async throws -> [String]
 }
 public enum ProviderModelList {
     // /models has no standard capability field. Exclude known non-chat families while

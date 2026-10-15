@@ -3,13 +3,15 @@ import AppWorkflows
 import ExecutionRuntime
 import Foundation
 import FunctionContracts
+import Storage
 import Testing
 import UI
 
-private func homeEffectInput(session: UUID = UUID()) -> FunctionInvocation {
+private func homeEffectInput(session: String = UUID().uuidString) -> FunctionInvocation {
     .init(
         call: .init(actionPath: .init(domain: "UI", module: "Light", function: "updateLight")),
-        context: .init(source: "assistant", sessionID: session, inputID: UUID()), results: ActionReportStore())
+        context: .init(source: "assistant", sessionID: session, inputID: UUID().uuidString),
+        executionID: UUID().uuidString, results: ActionReportStore())
 }
 
 @Test @MainActor func homeEffectsKeepConsentAndErrorEvidenceIndependent() async throws {

@@ -2,6 +2,138 @@ import Foundation
 import Testing
 import UI
 
+@Test func historyRefreshInvalidatesPreviousPagingTickets() throws {
+    var state = HistoryPageLoading<UInt64>()
+    let first = state.begin(after: 50)
+    let old = try #require(first)
+    state = .init()
+    let second = state.begin(after: 50)
+    let fresh = try #require(second)
+    state.finish(old, error: "stale read")
+    state.cancel(old)
+    #expect(state.accepts(fresh) && state.isLoading && state.error == nil)
+    state.finish(fresh)
+    #expect(!state.isLoading && state.error == nil)
+}
+
+@Test func historyPagingDeduplicatesCursorAndRequiresExplicitFailureRetry() throws {
+    var loading = HistoryPageLoading<UInt64>()
+    let initialAttempt = loading.begin(after: 50)
+    let first = try #require(initialAttempt)
+    let overlap = loading.begin(after: 50)
+    let otherOverlap = loading.begin(after: 100, retry: true)
+    #expect(loading.isLoading && overlap == nil && otherOverlap == nil)
+    loading.finish(first, error: "actual failure")
+    #expect(!loading.isLoading && loading.error == "actual failure")
+    let automaticRetry = loading.begin(after: 50)
+    #expect(automaticRetry == nil)
+    let retryAttempt = loading.begin(after: 50, retry: true)
+    let retry = try #require(retryAttempt)
+    #expect(loading.error == nil && loading.isLoading)
+    loading.finish(retry)
+    let repeatedCursor = loading.begin(after: 50)
+    let nextCursor = loading.begin(after: 100)
+    #expect(repeatedCursor == nil && nextCursor != nil)
+}
+
+@Test func historyPagingCancellationAllowsReentryAndRejectsOldTickets() throws {
+    var loading = HistoryPageLoading<String>()
+    let original = loading.begin(after: "dialog_50")
+    let cancelled = try #require(original)
+    #expect(loading.completionID == nil)
+    loading.cancel(cancelled)
+    let completed = try #require(loading.completionID)
+    let next = loading.begin(after: "dialog_50")
+    let replacement = try #require(next)
+    loading.finish(cancelled, error: "late failure")
+    loading.cancel(cancelled)
+    #expect(loading.accepts(replacement) && loading.error == nil && loading.isLoading)
+    #expect(loading.completionID == completed)
+    loading.finish(replacement)
+    #expect(!loading.isLoading && loading.error == nil && loading.completionID != completed)
+}
+
+private func taskPreviewPage(
+    dialog: String = "dialog_1", request: String = "round_1", input: String = "input_1",
+    sourceInput: String = "input_1", sourceRequest: String = "round_1", task: Bool = true,
+    state: String = "completed", taskState: String = "completed"
+) throws -> HistoryConversation {
+    var invocation: [String: Any] = [
+        "id": request, "historyOrder": request == "round_2" ? 3 : (task ? 2 : 1), "date": 0,
+        "input": "actual input", "requestJSON": "[]",
+        "response": "actual response", "toolCalls": [], "state": state,
+    ]
+    if task { invocation["historyTaskID"] = "task_1" }
+    let value: [String: Any] = [
+        "id": dialog, "createdAt": 0,
+        "turns": [
+            [
+                "id": input, "date": 0, "user": "actual input", "request": [], "model": "fixture", "temperature": 0.7,
+                "modelRequests": [invocation], "response": "", "state": state,
+            ]
+        ],
+        "taskCompressions": task
+            ? [
+                [
+                    "taskID": "task_1", "goal": "actual Task", "status": taskState, "reportedSummary": "done",
+                    "completedAt": 1,
+                    "sources": [
+                        ["inputID": sourceInput, "requestID": sourceRequest],
+                        ["inputID": "input_2", "requestID": "round_2"],
+                    ],
+                ]
+            ] : [],
+    ]
+    return try JSONDecoder().decode(HistoryConversation.self, from: JSONSerialization.data(withJSONObject: value))
+}
+
+@Test func historyFoldsTheLoadedSubsetOfAnEntireTask() throws {
+    let page = try taskPreviewPage()
+    let items = ConversationHistoryPresentation.timeline(page)
+    guard case .task(let task, let visible) = try #require(items.first) else {
+        Issue.record("A single loaded preview must represent the complete expandable Task")
+        return
+    }
+    #expect(items.count == 1 && task.sources.count == 2 && visible.count == 1)
+    #expect(task.reportedSummary == "done" && visible[0].response == "actual response")
+    let exported = try JSONDecoder().decode(
+        HistoryConversation.self, from: ConversationHistoryPresentation.jsonData(page))
+    #expect(exported.taskCompressions[0].sources == task.sources)
+}
+
+@Test(arguments: ["wrong-input", "wrong-request", "generating-request", "generating-task"])
+func historyDoesNotFoldMismatchedOrUnfinishedTaskPreviews(_ invalid: String) throws {
+    let page = try taskPreviewPage(
+        sourceInput: invalid == "wrong-input" ? "other-input" : "input_1",
+        sourceRequest: invalid == "wrong-request" ? "other-request" : "round_1",
+        state: invalid == "generating-request" ? "generating" : "completed",
+        taskState: invalid == "generating-task" ? "generating" : "completed")
+    guard case .request = try #require(ConversationHistoryPresentation.timeline(page).first) else {
+        Issue.record("Invalid membership or unfinished work must remain an ordinary request")
+        return
+    }
+}
+
+@Test func historyAppendsTaskMetadataFromLaterPagesAndRejectsForeignDialogs() throws {
+    var loaded = try taskPreviewPage(request: "ordinary", input: "ordinary-input", task: false)
+    loaded.nextPosition = 50
+    let taskPage = try taskPreviewPage()
+    try loaded.appendPage(taskPage)
+    #expect(loaded.turns.count == 2 && loaded.taskCompressions.count == 1 && loaded.nextPosition == nil)
+    let items = ConversationHistoryPresentation.timeline(loaded)
+    guard case .task(let task, _) = try #require(items.last) else {
+        Issue.record("Task summaries first encountered after page one must render")
+        return
+    }
+    #expect(items.count == 2 && task.sources.count == 2)
+    var expansion = taskPage
+    try expansion.appendPage(try taskPreviewPage(request: "round_2", input: "input_2"))
+    #expect(expansion.taskCompressions.count == 1)
+    #expect(ConversationHistoryPresentation.turns(expansion).map(\.id) == ["round_1", "round_2"])
+    #expect(throws: HistoryDetailError.unavailable) { try loaded.appendPage(taskPreviewPage(dialog: "dialog_2")) }
+    #expect(loaded.turns.count == 2 && loaded.taskCompressions.count == 1)
+}
+
 @Test func historyTitlesUsePresentationFallbacksAndRawInput() throws {
     #expect(ConversationHistoryPresentation.title(try conversation()) == "新对话")
     #expect(ConversationHistoryPresentation.title(try conversation(user: "  original input  ")) == "  original input  ")
@@ -12,19 +144,22 @@ private func conversation(archived: Bool = false, title: String? = nil, user: St
     -> HistoryConversation
 {
     var value: [String: Any] = [
-        "historyOrder": 1, "id": UUID().uuidString, "createdAt": 0, "taskCompressions": [], "turns": [],
+        "historyOrder": 1, "id": UUID().uuidString, "createdAt": 0, "taskCompressions": [],
+        "turns": [],
     ]
     if archived { value["archivedAt"] = 1 }
     if let title { value["summaryTitle"] = title }
     if let user {
         value["turns"] = [
             [
-                "historyOrder": 1, "id": UUID().uuidString, "date": 0, "user": user, "request": [], "model": "fixture",
+                "historyOrder": 1, "id": UUID().uuidString, "date": 0, "user": user, "request": [],
+                "model": "fixture",
                 "temperature": 0.7,
                 "response": "", "state": "completed",
                 "modelRequests": [
                     [
-                        "historyOrder": 1, "id": UUID().uuidString, "date": 0, "input": user, "requestJSON": "[]",
+                        "historyOrder": 1, "id": UUID().uuidString, "date": 0, "input": user,
+                        "requestJSON": "[]",
                         "response": "", "toolCalls": [], "state": "completed",
                     ]
                 ],
@@ -83,7 +218,7 @@ private func conversation(archived: Bool = false, title: String? = nil, user: St
     ]
     let conversation = try historyFixture(extra: ["modelRequests": rounds, "toolDefinitions": ["definition"]])
     let rows = ConversationHistoryPresentation.turns(conversation)
-    #expect(rows.count == 2 && rows.map(\.id.uuidString) == [firstID, secondID])
+    #expect(rows.count == 2 && rows.map(\.id) == [firstID, secondID])
     #expect(rows[0].user == "question" && rows[0].isReACT == false)
     #expect(rows[0].raw.isEmpty && rows[0].outputSummary == "Tool Call：inspect")
     #expect(rows[0].firstTokenReport == "首 token 耗时：")
@@ -127,20 +262,22 @@ private func conversation(archived: Bool = false, title: String? = nil, user: St
 
 private func historyFixture(extra: [String: Any]) throws -> HistoryConversation {
     var turn: [String: Any] = [
-        "historyOrder": 1, "id": UUID().uuidString, "date": 0, "user": "question", "request": [], "model": "fixture",
+        "historyOrder": 1, "id": UUID().uuidString, "date": 0, "user": "question", "request": [],
+        "model": "fixture",
         "temperature": 0.7,
         "response": "", "state": "completed",
     ]
     turn.merge(extra) { _, new in new }
     let value: [String: Any] = [
-        "historyOrder": 1, "id": UUID().uuidString, "createdAt": 0, "taskCompressions": [], "turns": [turn],
+        "historyOrder": 1, "id": UUID().uuidString, "createdAt": 0, "taskCompressions": [],
+        "turns": [turn],
     ]
     return try JSONDecoder().decode(HistoryConversation.self, from: JSONSerialization.data(withJSONObject: value))
 }
 
 @Test func historyImageReferencesUseOnlyStructuredMetadataWithoutEmbeddingBytes() throws {
-    let image = HistoryImageReference(id: UUID(), mimeType: "image/jpeg", byteCount: 8)
-    let marker = "\nImage attachments (bytes omitted): \(image.id.uuidString) image/jpeg 8 bytes"
+    let image = HistoryImageReference(id: UUID().uuidString, mimeType: "image/jpeg", byteCount: 8)
+    let marker = "\nImage attachments (bytes omitted): \(image.id) image/jpeg 8 bytes"
     let textOnly = HistoryMessage(role: .user, content: "photo" + marker)
     #expect(textOnly.attachedImages.isEmpty && textOnly.displayContent == "photo" + marker)
     let structured = HistoryMessage(role: .user, content: "actual input", imageReferences: [image])
@@ -157,12 +294,14 @@ private func historyFixture(extra: [String: Any]) throws -> HistoryConversation 
 }
 
 @Test func historyImageReferencesRejectInvalidMetadataAndBoundTheGallery() {
-    let valid = (0..<6).map { _ in HistoryImageReference(id: UUID(), mimeType: "image/png", byteCount: 1) }
+    let valid = (0..<6).map { _ in
+        HistoryImageReference(id: UUID().uuidString, mimeType: "image/png", byteCount: 1)
+    }
     #expect(HistoryMessage(role: .user, content: "", imageReferences: valid).attachedImages.count == 4)
     let invalid = [
-        HistoryImageReference(id: UUID(), mimeType: "text/plain", byteCount: 1),
-        HistoryImageReference(id: UUID(), mimeType: "image/jpeg", byteCount: 0),
-        HistoryImageReference(id: UUID(), mimeType: "image/png", byteCount: 4 * 1024 * 1024 + 1),
+        HistoryImageReference(id: UUID().uuidString, mimeType: "text/plain", byteCount: 1),
+        HistoryImageReference(id: UUID().uuidString, mimeType: "image/jpeg", byteCount: 0),
+        HistoryImageReference(id: UUID().uuidString, mimeType: "image/png", byteCount: 4 * 1024 * 1024 + 1),
     ]
     #expect(HistoryMessage(role: .user, content: "", imageReferences: invalid).attachedImages.isEmpty)
     #expect(
@@ -227,7 +366,7 @@ private func historyFixture(extra: [String: Any]) throws -> HistoryConversation 
 }
 
 @Test func historyTaskReferencesMergeMatchingIDsWithoutChangingExport() throws {
-    let id = UUID()
+    let id = UUID().uuidString
     let turn = try taskReferenceFixture(owner: id, snapshot: id)
     let references = ConversationHistoryPresentation.taskReferences(for: turn)
     #expect(references.count == 1)
@@ -238,8 +377,8 @@ private func historyFixture(extra: [String: Any]) throws -> HistoryConversation 
 }
 
 @Test func historyTaskReferencesRetainDifferentOwnerAndRequestSnapshot() throws {
-    let owner = UUID()
-    let snapshot = UUID()
+    let owner = UUID().uuidString
+    let snapshot = UUID().uuidString
     let references = ConversationHistoryPresentation.taskReferences(
         for: try taskReferenceFixture(owner: owner, snapshot: snapshot))
     #expect(references.map(\.id) == [owner, snapshot])
@@ -248,7 +387,7 @@ private func historyFixture(extra: [String: Any]) throws -> HistoryConversation 
 }
 
 @Test func historyTaskReferencesDoNotInventMissingOwnershipOrActivity() throws {
-    let id = UUID()
+    let id = UUID().uuidString
     let ownerOnly = ConversationHistoryPresentation.taskReferences(
         for: try taskReferenceFixture(owner: id, snapshot: nil))
     #expect(ownerOnly.count == 1 && ownerOnly.first?.isHistoryOwner == true)
@@ -262,14 +401,14 @@ private func historyFixture(extra: [String: Any]) throws -> HistoryConversation 
     #expect(absent.isEmpty)
 }
 
-private func taskReferenceFixture(owner: UUID?, snapshot: UUID?) throws -> HistoryTurn {
+private func taskReferenceFixture(owner: String?, snapshot: String?) throws -> HistoryTurn {
     var turn = try #require(conversation(user: "fixture").turns.first)
     turn.historyTaskID = owner
     if let snapshot {
         turn.decisionMetadata = try JSONDecoder().decode(
             HistoryDecisionMetadata.self,
             from: JSONSerialization.data(withJSONObject: [
-                "taskID": snapshot.uuidString, "mode": "task", "skills": ["photography": 16], "catalogJSON": "{}",
+                "taskID": snapshot, "mode": "task", "skills": ["photography": 16], "catalogJSON": "{}",
             ]))
     }
     return turn

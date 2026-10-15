@@ -294,3 +294,21 @@ verify-app-agent-resources.py verifies the exact Resources tree, independent Age
 ✅ UI boundary audit permits only public QuartzCore in NativeCompanionSurface.swift and Metal/QuartzCore/Synchronization in MetalHaloRenderer.swift, confined to Components. UI target still has zero project dependencies and service/other-module imports remain rejected.
 
 ✅ Architecture checks validate Actions/Support/Contracts as the independent contract leaf, require its exclusion from Actions compilation, and locate authoring macros in shared Support. Support is infrastructure rather than a seventh callable domain; shared helpers remain subject to business-layer import checks.
+
+
+## Prefix-number identity migration
+
+
+## Identity ownership
+
+✅ Storage owns GRDB-backed relational persistence and BusinessRecordID validation. ModelKit, PlatformKit, UI and Storage have no dependencies on other project modules. Capabilities accept opaque caller IDs; internal tokens and temporary filenames use Foundation UUID. App owns Bluetooth business/native mapping. SQLite tables allocate committed business keys; no counter file or old-record migration exists.
+
+## SQLite records migration
+
+✅ Runtime fixtures use opaque UUID strings; committed business entities use dialog/message/task/media/device database IDs. Independent repository interfaces preserve ownership/cancellation and foundation boundaries. Completed messages (including each ReACT message) persist individually, without delta fragments or old allocator/file-index compatibility. See the project SQLite business-record plan.
+
+✅ Boundary checks now permit only Storage-owned GRDB/CryptoKit integration; AgentCore, FunctionContracts, ExecutionRuntime and CallRuntime no longer depend on Storage for temporary IDs. The required simulator build still encounters the external CoreAIShared/CoreAI SDK limitation; device-target compilation is verified separately.
+
+✅ Storage repository refactor: Boundary checks distinguish Storage contracts from domain and SQLite adapter sources, reject backend imports in Agents/Actions/feature workflows, and ensure common Storage/Audio do not depend on GRDB.
+
+✅ Lifecycle boundary guard rejects production Agent Context document factories/runtime-context JSON paths and require Storage memory-state ownership. Configuration document/file APIs remain valid.

@@ -1,3 +1,5 @@
+import Foundation
+
 #if os(iOS)
     import SwiftUI
 
@@ -5,7 +7,7 @@
     @MainActor
     public struct ActionActivityView: View {
         @Bindable private var state: ActionActivityState
-        @State private var taskPath: [UUID] = []
+        @State private var taskPath: [String] = []
         public init(state: ActionActivityState) {
             self.state = state
         }
@@ -104,14 +106,14 @@
                             state.selectedTab == .action
                         {
                             HStack {
-                                Text("任务：" + String(taskID.uuidString.prefix(8))).font(.caption)
+                                Text("任务：" + taskID).font(.caption)
                                 Spacer()
                                 Button("查看全部") { state.selectedTaskID = nil }
                             }.padding(.horizontal).padding(.bottom, 8)
                         }
                         List { logRows }
                     }
-                    .navigationDestination(for: UUID.self) { taskDetail($0) }
+                    .navigationDestination(for: String.self) { taskDetail($0) }
                     .navigationTitle("执行记录")
                     .navigationBarTitleDisplayMode(.inline)
                     .toolbar {
@@ -137,7 +139,7 @@
                 ForEach(state.visibleTasks.reversed()) { task in
                     NavigationLink(value: task.id) {
                         VStack(alignment: .leading, spacing: 6) {
-                            Text(task.title.isEmpty ? "任务 " + String(task.id.uuidString.prefix(8)) : task.title)
+                            Text(task.title.isEmpty ? "任务 " + task.id : task.title)
                                 .lineLimit(2)
                             Text(
                                 task.execution == nil
@@ -185,7 +187,7 @@
         @ViewBuilder private func retention(_ count: UInt64) -> some View {
             if count > 0 { Text("已移除 \(count) 条较早记录").font(.footnote).foregroundStyle(.secondary) }
         }
-        @ViewBuilder private func taskDetail(_ id: UUID) -> some View {
+        @ViewBuilder private func taskDetail(_ id: String) -> some View {
             if let task = state.tasks.first(where: { $0.id == id }) {
                 List {
                     Section("任务") {
@@ -197,7 +199,7 @@
                         Text(task.phase.rawValue)
                         if !task.skills.isEmpty { Text("Skills: " + task.skills.joined(separator: ", ")) }
                         if let parentID = task.parentID {
-                            Text("父任务 / 输入：" + parentID.uuidString).font(.caption).textSelection(.enabled)
+                            Text("父任务 / 输入：" + parentID).font(.caption).textSelection(.enabled)
                         }
                     }
                     if task.phase == .failed {
@@ -232,7 +234,7 @@
                 Text("该任务记录已超出保留范围")
             }
         }
-        private func selectRelated(_ tab: ExecutionLogTab, task: UUID) {
+        private func selectRelated(_ tab: ExecutionLogTab, task: String) {
             taskPath.removeAll()
             state.selectedTaskID = task
             state.selectedTab = tab
@@ -247,13 +249,13 @@
                 Text(issue.time, style: .time).font(.caption).foregroundStyle(.secondary)
                 if let code = issue.failureCode { Text("错误代码：" + code).font(.caption) }
                 if let input = issue.inputID {
-                    Text("来源输入：" + input.uuidString).font(.caption2).textSelection(.enabled)
+                    Text("来源输入：" + input).font(.caption2).textSelection(.enabled)
                 }
                 if let context = issue.context {
                     DisclosureGroup("关联信息") {
-                        Text("持续任务：" + context.workerID.uuidString)
-                        if let callID = context.callID { Text("来源调用：" + callID.uuidString) }
-                        if let sessionID = context.sessionID { Text("会话：" + sessionID.uuidString) }
+                        Text("持续任务：" + context.workerID)
+                        if let callID = context.callID { Text("来源调用：" + callID) }
+                        if let sessionID = context.sessionID { Text("会话：" + sessionID) }
                     }.font(.caption).textSelection(.enabled)
                 }
             }
@@ -337,7 +339,7 @@
                             revision: 1,
                             records: examples.map { channel, title, phase in
                                 ActionActivityItem(
-                                    id: UUID(), title: title, channel: channel,
+                                    id: UUID().uuidString, title: title, channel: channel,
                                     status: phase == .failed ? "动作参数无效" : "演示状态",
                                     issueDescriptions: [], symbol: "circle",
                                     execution: .init(

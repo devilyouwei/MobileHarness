@@ -2,11 +2,11 @@
 
 ## Summary
 
-Foundation-only contracts and bounded mechanisms for identity, lifecycle, input, permissions, communication, generation and decision evidence.
+independent runtime framework contracts and bounded mechanisms for identity, lifecycle, input, permissions, communication, generation and decision evidence.
 
 ## Ownership and boundaries
 
-AgentCore has no project dependencies, concrete role identities, business schemas, model sessions, Storage adapters or UI/device policy. Agents supplies role processing; Gateway supplies transport/execution; App supplies assembly/lifetime.
+AgentCore imports Storage for neutral business identity values/allocation, but owns no concrete role identities, business schemas, model sessions, persistence adapters or UI/device policy. Agents supplies role processing; Gateway supplies transport/execution; App supplies assembly/lifetime.
 
 ## External relationships and data flow
 
@@ -64,3 +64,11 @@ AgentManager/registry owns live instances/incarnations. Stop revokes authority b
 
 
 ✅ Core decision budget has optional caller-supplied request/native bounds; nil defaults record cumulative usage without an arbitrary business stop.
+
+
+
+
+
+## SQLite records and runtime identity
+
+✅ Implemented: technical identities are opaque UUID strings; committed business entities use dialog/message/task/media/device SQLite IDs. Consumers use Storage repositories while preserving ownership, cancellation and independent foundation boundaries. Complete messages, including each ReACT message, persist at termination; delta fragments do not persist. The custom allocator and replaced file/index implementation are removed. See the project SQLite business-record plan.

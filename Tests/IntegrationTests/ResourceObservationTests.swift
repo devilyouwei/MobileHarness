@@ -4,6 +4,7 @@ import Agents
 import AppWorkflows
 import Foundation
 import FunctionContracts
+import Storage
 import Testing
 
 private actor ObservationInventory: ModelResourceInventoryCapability {
@@ -69,13 +70,15 @@ private func waitForResourceFacts(_ runtime: ApplicationControlIntentRuntime, pr
     try await waitForResourceFacts(runtime, processed: 4)
     #expect(await inventory.reads == 2)
     await runtime.shutdown()
-    let session = UUID()
+    let session = UUID().uuidString
     let agent = try ApplicationControlAgent(sessionID: session)
     try await agent.start()
-    let native = ModelResourceObservation.changed(generation: 1).input(sessionID: session, sequence: 1)
+    let native = try ModelResourceObservation.changed(generation: 1).input(sessionID: session, sequence: 1)
     let forged = AgentInput(
+        id: UUID().uuidString,
         sessionID: session, payload: native.payload,
-        metadata: InputMetadata(payload: native.payload, source: "user", sequence: 1))
+        metadata: InputMetadata(
+            payload: native.payload, source: "user", sequence: 1, rootID: UUID().uuidString))
     await #expect(throws: CommunicationError.self) { try await agent.receive(forged) }
     try await agent.receive(native)
     #expect(await agent.status().queuedInputs == 1)

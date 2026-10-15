@@ -1,16 +1,17 @@
 import AgentCore
 import Foundation
+import Storage
 
 public struct ProviderDiscoveryIntent: Codable, Sendable, Equatable {
     public static let contract = "provider.discovery"
-    public let requestID: UUID
+    public let requestID: String
     public let presentation: Bool
-    public init(requestID: UUID, presentation: Bool = false) {
+    public init(requestID: String, presentation: Bool = false) {
         self.requestID = requestID
         self.presentation = presentation
     }
-    public func input(sessionID: UUID) -> AgentInput {
-        let id = UUID()
+    public func input(sessionID: String) throws -> AgentInput {
+        let id = UUID().uuidString
         let payload = InputPayload.observation(
             AgentMessage(contract: Self.contract, content: self, maximumBytes: 512, validate: { _ in }))
         return AgentInput(
@@ -26,15 +27,15 @@ public struct ProviderSettingsIntent: Codable, Sendable, Equatable {
     public enum Operation: String, Codable, Sendable { case restore, save }
     public static let contract = "provider.settings"
     public let operation: Operation
-    public let requestID: UUID
+    public let requestID: String
     public let presentation: Bool
-    public init(operation: Operation, requestID: UUID, presentation: Bool = false) {
+    public init(operation: Operation, requestID: String, presentation: Bool = false) {
         self.operation = operation
         self.presentation = presentation
         self.requestID = requestID
     }
-    public func input(sessionID: UUID) -> AgentInput {
-        let id = UUID()
+    public func input(sessionID: String) throws -> AgentInput {
+        let id = UUID().uuidString
         let payload = InputPayload.observation(
             AgentMessage(contract: Self.contract, content: self, maximumBytes: 512, validate: { _ in }))
         return AgentInput(

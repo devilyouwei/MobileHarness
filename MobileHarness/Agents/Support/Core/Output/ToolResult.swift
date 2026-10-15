@@ -1,9 +1,9 @@
 import Foundation
 
 public struct ToolResult: Codable, Equatable, Sendable {
-    public let roundID: UUID?
+    public let roundID: String?
     public let completion: AgentActionCompletion?
-    public let callID: UUID
+    public let callID: String
     public let value: String
     public let isError: Bool
     public let failureCode: String?
@@ -25,8 +25,8 @@ public struct ToolResult: Codable, Equatable, Sendable {
         return completion?.hasBusinessOutput ?? true
     }
     public init(
-        callID: UUID, value: String, isError: Bool = false, failureCode: String? = nil,
-        completion: AgentActionCompletion? = nil, roundID: UUID? = nil
+        callID: String, value: String, isError: Bool = false, failureCode: String? = nil,
+        completion: AgentActionCompletion? = nil, roundID: String? = nil
     ) {
         self.roundID = roundID
         self.completion = completion

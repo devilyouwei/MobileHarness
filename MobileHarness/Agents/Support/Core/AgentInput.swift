@@ -34,23 +34,23 @@ public enum InputPayload: Sendable {
 
 /// Session-local interaction identity; the producing workflow assigns its meaning and ordinal.
 public struct AgentTurn: Codable, Sendable, Equatable {
-    public let id: UUID
+    public let id: String
     public let ordinal: UInt64
-    public init(id: UUID = UUID(), ordinal: UInt64) {
+    public init(id: String, ordinal: UInt64) {
         self.id = id
         self.ordinal = ordinal
     }
 }
 
 public struct AgentInput: Sendable {
-    public let id: UUID
-    public let sessionID: UUID
+    public let id: String
+    public let sessionID: String
     public let metadata: InputMetadata
     public let payload: InputPayload
     public let turn: AgentTurn?
     public let taskScope: AgentTaskScope?
     public init(
-        id: UUID = UUID(), sessionID: UUID, payload: InputPayload, metadata: InputMetadata? = nil,
+        id: String, sessionID: String, payload: InputPayload, metadata: InputMetadata? = nil,
         turn: AgentTurn? = nil, taskScope: AgentTaskScope? = nil
     ) {
         self.turn = turn
@@ -68,17 +68,17 @@ public struct InputMetadata: Sendable {
     public let version: Int
     public let topic: String
     public let source: String
-    public let incarnation: UUID?
+    public let incarnation: String?
     public let capturedAt: TimeInterval
     public let sequence: UInt64
-    public let rootID: UUID
-    public let parentID: UUID?
+    public let rootID: String
+    public let parentID: String?
     public let hops: Int
     public let deadline: ContinuousClock.Instant?
     public init(
-        payload: InputPayload, source: String? = nil, incarnation: UUID? = nil, origin: SignalOrigin = .external,
-        capturedAt: TimeInterval? = nil, sequence: UInt64 = 0, rootID: UUID = UUID(),
-        parentID: UUID? = nil, hops: Int = 0, deadline: ContinuousClock.Instant? = nil
+        payload: InputPayload, source: String? = nil, incarnation: String? = nil, origin: SignalOrigin = .external,
+        capturedAt: TimeInterval? = nil, sequence: UInt64 = 0, rootID: String,
+        parentID: String? = nil, hops: Int = 0, deadline: ContinuousClock.Instant? = nil
     ) {
         let contract: String
         var defaultSource = "runtime"

@@ -2,27 +2,186 @@ import AgentCore
 import Agents
 import AppWorkflows
 import Foundation
+import Storage
 import StorageChat
 import Testing
 import UI
 
+private func archivePagingFixture(_ number: Int) throws -> HistoryConversation {
+    try JSONDecoder().decode(
+        HistoryConversation.self,
+        from: JSONSerialization.data(withJSONObject: [
+            "id": "dialog_\(number)", "createdAt": 0, "archivedAt": 1, "turnCount": 1,
+            "turns": [], "taskCompressions": [],
+        ]))
+}
+
+@Test @MainActor func historyArchivePagingRejectsNonProgressingResultsWithoutLooping() async throws {
+    let state = ConversationHistoryState()
+    var snapshot = HistorySnapshot()
+    snapshot.past = try (21...40).reversed().map(archivePagingFixture)
+    var reads = 0
+    let workflow = ConversationHistoryWorkflow(
+        state: state, prepare: {}, refresh: { state.archive = snapshot }, deleteArchive: { _ in }, startNew: {},
+        summarize: { _ in }, previewOutput: { _ in "" },
+        readConversation: { _ in throw HistoryDetailError.unavailable }, readPhoto: { _, _ in nil },
+        readArchives: { _ in
+            reads += 1
+            return [try archivePagingFixture(21)]
+        })
+    await workflow.load()
+    await workflow.loadMoreArchives(retry: false)
+    #expect(state.archive?.past.count == 20 && state.archivePaging.error != nil && state.hasMoreArchives)
+    await workflow.loadMoreArchives(retry: false)
+    #expect(reads == 1 && !state.isBusy)
+}
+
+@Test @MainActor func historyArchivePagingRetainsErrorsUntilRetryAndStopsAtEOF() async throws {
+    let state = ConversationHistoryState()
+    var snapshot = HistorySnapshot()
+    snapshot.past = try (21...40).reversed().map(archivePagingFixture)
+    var attempts = 0
+    var fail = true
+    let workflow = ConversationHistoryWorkflow(
+        state: state, prepare: {}, refresh: { state.archive = snapshot }, deleteArchive: { _ in }, startNew: {},
+        summarize: { _ in }, previewOutput: { _ in "" },
+        readConversation: { _ in throw HistoryDetailError.unavailable }, readPhoto: { _, _ in nil },
+        readArchives: { cursor in
+            #expect(cursor == 21)
+            attempts += 1
+            if fail { throw HistoryPhotoFixtureError.failed }
+            return [try archivePagingFixture(20)]
+        })
+    await workflow.load()
+    #expect(state.hasMoreArchives)
+    await workflow.loadMoreArchives(retry: false)
+    #expect(attempts == 1 && state.archive?.past.count == 20 && state.archivePaging.error != nil)
+    #expect(state.status == nil && !state.isBusy)
+    await workflow.loadMoreArchives(retry: false)
+    #expect(attempts == 1)
+    fail = false
+    await workflow.loadMoreArchives(retry: true)
+    #expect(attempts == 2 && state.archive?.past.count == 21 && state.archivePaging.error == nil)
+    #expect(!state.hasMoreArchives)
+    await workflow.loadMoreArchives(retry: false)
+    #expect(attempts == 2)
+    await workflow.load()
+    #expect(state.hasMoreArchives && state.archive?.past.count == 20)
+    await workflow.loadMoreArchives(retry: false)
+    #expect(attempts == 3 && state.archive?.past.count == 21)
+}
+
+@Test(.timeLimit(.minutes(1)), arguments: [false, true]) @MainActor
+func historyArchivePagingJoinsOverlapAndIgnoresCancelledLatePage(throwsAfterCancellation: Bool) async throws {
+    let state = ConversationHistoryState()
+    var snapshot = HistorySnapshot()
+    snapshot.past = try (21...40).reversed().map(archivePagingFixture)
+    let entered = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingOldest(1))
+    var pending: CheckedContinuation<[HistoryConversation], any Error>?
+    var calls = 0
+    let workflow = ConversationHistoryWorkflow(
+        state: state, prepare: {}, refresh: { state.archive = snapshot }, deleteArchive: { _ in }, startNew: {},
+        summarize: { _ in }, previewOutput: { _ in "" },
+        readConversation: { _ in throw HistoryDetailError.unavailable }, readPhoto: { _, _ in nil },
+        readArchives: { _ in
+            calls += 1
+            if calls > 1 { return [] }
+            entered.continuation.yield(())
+            return try await withCheckedThrowingContinuation { pending = $0 }
+        })
+    await workflow.load()
+    let first = Task { await workflow.loadMoreArchives(retry: false) }
+    var starts = entered.stream.makeAsyncIterator()
+    await starts.next()
+    #expect(state.isBusy && state.archivePaging.isLoading)
+    await workflow.loadMoreArchives(retry: true)
+    #expect(calls == 1)
+    first.cancel()
+    if throwsAfterCancellation {
+        pending?.resume(throwing: HistoryPhotoFixtureError.failed)
+    } else {
+        pending?.resume(returning: [try archivePagingFixture(20)])
+    }
+    await first.value
+    #expect(!state.isBusy && !state.archivePaging.isLoading && state.archivePaging.error == nil)
+    #expect(state.archive?.past.count == 20)
+    await workflow.loadMoreArchives(retry: false)
+    #expect(calls == 2 && !state.hasMoreArchives && state.archive?.past.count == 20)
+}
+
+@Test(.timeLimit(.minutes(1)), arguments: [false, true]) @MainActor
+func historyRefreshJoinsPagingAndRetainsVisibleRecordsOnFailure(failRefresh: Bool) async throws {
+    let state = ConversationHistoryState()
+    var snapshot = HistorySnapshot()
+    snapshot.past = try (21...40).reversed().map(archivePagingFixture)
+    let entered = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingOldest(1))
+    let cancelled = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingOldest(1))
+    var pending: CheckedContinuation<[HistoryConversation], any Error>?
+    var refreshes = 0
+    var reads = 0
+    let workflow = ConversationHistoryWorkflow(
+        state: state, prepare: {},
+        refresh: {
+            refreshes += 1
+            if refreshes > 1 && failRefresh { throw HistoryPhotoFixtureError.failed }
+            state.archive = snapshot
+        },
+        deleteArchive: { _ in Issue.record("Refresh cannot admit a mutation") },
+        startNew: { Issue.record("Refresh cannot admit a mutation") }, summarize: { _ in },
+        previewOutput: { _ in "" }, readConversation: { _ in throw HistoryDetailError.unavailable },
+        readPhoto: { _, _ in nil },
+        readArchives: { _ in
+            reads += 1
+            if reads > 1 { return [] }
+            return try await withTaskCancellationHandler {
+                entered.continuation.yield(())
+                return try await withCheckedThrowingContinuation { pending = $0 }
+            } onCancel: {
+                cancelled.continuation.yield(())
+            }
+        })
+    await workflow.load()
+    let page = Task { await workflow.loadMoreArchives(retry: false) }
+    var starts = entered.stream.makeAsyncIterator()
+    await starts.next()
+    let refresh = Task { await workflow.load() }
+    var cancellations = cancelled.stream.makeAsyncIterator()
+    await cancellations.next()
+    #expect(state.isRefreshing && state.isBusy && refreshes == 1)
+    // The native refresh indicator must remain active until the cancelled read has joined.
+    await workflow.load()
+    await workflow.loadMoreArchives(retry: true)
+    workflow.startNew()
+    #expect(refreshes == 1 && reads == 1)
+    pending?.resume(returning: [try archivePagingFixture(20)])
+    await page.value
+    await refresh.value
+    #expect(refreshes == 2 && state.archive?.past.count == 20)
+    #expect(!state.isBusy && !state.isRefreshing && !state.archivePaging.isLoading)
+    #expect((state.status != nil) == failRefresh && state.archivePaging.error == nil)
+    await workflow.loadMoreArchives(retry: false)
+    #expect(reads == 2 && !state.hasMoreArchives)
+}
+
 @Test @MainActor func canonicalConversationRetainsTaskSourcesAfterLiveStateRetirement() async throws {
     let store = ConversationHistoryStore()
-    let input = UUID()
-    let foreground = UUID()
+    let input = UUID().uuidString
+    let foreground = UUID().uuidString
     let taskData = try JSONSerialization.data(withJSONObject: [
-        "historyOrder": 1, "id": foreground.uuidString, "mode": "task", "goal": "帮我拍照", "date": 0,
-        "status": "completed", "inputIDs": [input.uuidString], "skills": ["photography"],
+        "historyOrder": 1, "id": foreground, "mode": "task", "goal": "帮我拍照", "date": 0,
+        "status": "completed", "inputIDs": [input], "skills": ["photography"],
     ])
     var skills = AgentTaskSkillState()
     skills.tasks = [try JSONDecoder().decode(AgentTaskSkillState.TaskRecord.self, from: taskData)]
-    var context = AgentContext(agentID: .assistant, scopeID: UUID(), state: AssistantContextState())
+    var context = AgentContext(
+        agentID: .assistant, scopeID: UUID().uuidString, state: AssistantContextState())
     context.state.skillState = skills
     let token = try await store.readCurrent().token
     _ = try await store.begin(id: input, user: "帮我拍照", request: [], expecting: token, model: "fixture")
     for text in ["帮我拍照", "拍照结果"] {
         try await store.beginModelRequest(
-            .init(id: UUID(), input: text, requestJSON: "[]", historyTaskID: foreground), for: input)
+            .init(id: UUID().uuidString, input: text, requestJSON: "[]", historyTaskID: foreground),
+            for: input)
         try await store.append("回复", to: input)
         try await store.finishModelRequest(input, reason: "stop")
     }
@@ -68,12 +227,15 @@ import UI
 @Test @MainActor func requiredConversationReaderRejectsForeignIdentityWithoutReplacingSelection() async throws {
     let state = ConversationHistoryState()
     let previous = HistoryConversation()
-    let supplied = HistoryConversation()
+    let supplied = try HistoryPresentationAdapter.conversation(
+        StoredConversation(id: "dialog_1"))
     state.selectedConversation = previous
     let workflow = ConversationHistoryWorkflow(
         state: state, prepare: {}, refresh: {}, deleteArchive: { _ in }, startNew: {}, summarize: { _ in },
         previewOutput: { _ in "" }, readConversation: { _ in supplied }, readPhoto: { _, _ in nil })
-    await #expect(throws: HistoryDetailError.unavailable) { try await workflow.loadConversation(UUID()) }
+    await #expect(throws: HistoryDetailError.unavailable) {
+        try await workflow.loadConversation(UUID().uuidString)
+    }
     #expect(state.selectedConversation?.id == previous.id)
     let selected = try await workflow.loadConversation(supplied.id)
     #expect(selected.id == supplied.id && state.selectedConversation?.id == supplied.id)
@@ -83,8 +245,8 @@ import UI
     let state = ConversationHistoryState()
     let started = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingOldest(1))
     var archives = 0
-    var summaries: [UUID] = []
-    var deletions: [UUID] = []
+    var summaries: [String] = []
+    var deletions: [String] = []
     let workflow = ConversationHistoryWorkflow(
         state: state, prepare: {}, refresh: {}, deleteArchive: { deletions.append($0) },
         startNew: {
@@ -97,7 +259,7 @@ import UI
     var readiness = started.stream.makeAsyncIterator()
     workflow.startNew()
     await readiness.next()
-    let id = UUID()
+    let id = "dialog_1"
     workflow.summarize(id)
     workflow.delete(id)
     workflow.startNew()
@@ -116,12 +278,12 @@ import UI
 @Test @MainActor func historyAdapterRetainsPerRequestEvidenceAcrossCodableBoundary() async throws {
     let store = ConversationHistoryStore()
     let read = try await store.readCurrent()
-    let id = UUID()
+    let id = "dialog_1"
     _ = try await store.begin(
         id: id, user: "question", request: [.init(role: .user, content: "question")], expecting: read.token,
         model: "fixture")
     let request = ConversationModelRequest(
-        id: UUID(), input: "result",
+        id: UUID().uuidString, input: "result",
         requestJSON: "[{\"role\":\"tool\",\"content\":\"result\",\"toolCallID\":\"provider\"}]")
     try await store.beginModelRequest(request, for: id)
     try await store.recordModelTiming(
@@ -140,26 +302,26 @@ import UI
 private enum HistoryPhotoFixtureError: Error { case failed }
 
 @MainActor private func photoHistory(
-    read: @escaping @MainActor (UUID, UUID) async throws -> Data?
-) throws -> (ConversationHistoryWorkflow, UUID, UUID, UUID) {
-    let owner = UUID()
-    let round = UUID()
-    let photo = UUID()
+    read: @escaping @MainActor (String, String) async throws -> Data?
+) throws -> (ConversationHistoryWorkflow, String, String, String) {
+    let owner = UUID().uuidString
+    let round = UUID().uuidString
+    let photo = "media_1"
     let request =
-        "[{\"role\":\"user\",\"content\":\"photo\",\"imageReferences\":[{\"id\":\"\(photo.uuidString)\",\"mimeType\":\"image/jpeg\",\"byteCount\":1}]}]"
+        "[{\"role\":\"user\",\"content\":\"photo\",\"imageReferences\":[{\"id\":\"\(photo)\",\"mimeType\":\"image/jpeg\",\"byteCount\":1}]}]"
     let value: [String: Any] = [
         "version": 2, "past": [],
         "current": [
-            "historyOrder": 1, "id": UUID().uuidString, "createdAt": 0, "taskCompressions": [],
+            "historyOrder": 1, "id": "dialog_1", "createdAt": 0, "taskCompressions": [],
             "turns": [
                 [
-                    "historyOrder": 1, "id": owner.uuidString, "date": 0, "user": "photo", "request": [],
+                    "historyOrder": 1, "id": owner, "date": 0, "user": "photo", "request": [],
                     "model": "fixture",
                     "temperature": 0.7,
                     "response": "", "state": "completed",
                     "modelRequests": [
                         [
-                            "historyOrder": 1, "id": round.uuidString, "date": 0, "input": "photo",
+                            "historyOrder": 1, "id": round, "date": 0, "input": "photo",
                             "requestJSON": request,
                             "response": "", "toolCalls": [], "state": "completed",
                         ]
@@ -174,14 +336,16 @@ private enum HistoryPhotoFixtureError: Error { case failed }
         state: state, prepare: {}, refresh: {}, deleteArchive: { _ in }, startNew: {}, summarize: { _ in },
         previewOutput: { _ in "" },
         readConversation: { id in
-            guard let value = state.archive?.current, value.id == id else { throw HistoryDetailError.unavailable }
+            guard let value = state.archive?.current, value.id == id else {
+                throw HistoryDetailError.unavailable
+            }
             return value
         }, readPhoto: read)
     return (workflow, photo, round, owner)
 }
 
 @Test @MainActor func historyPhotoReaderChecksAttachmentAndOriginalInputBeforeRead() async throws {
-    var requests: [(UUID, UUID)] = []
+    var requests: [(String, String)] = []
     let (workflow, photo, round, owner) = try photoHistory { id, input in
         requests.append((id, input))
         return Data([1])
@@ -189,10 +353,10 @@ private enum HistoryPhotoFixtureError: Error { case failed }
     #expect(try await workflow.imageData(photo, for: round) == Data([1]))
     #expect(requests.count == 1 && requests[0].0 == photo && requests[0].1 == owner)
     await #expect(throws: HistoryImageLoadingError.invalidReference) {
-        try await workflow.imageData(UUID(), for: round)
+        try await workflow.imageData(UUID().uuidString, for: round)
     }
     await #expect(throws: HistoryImageLoadingError.invalidReference) {
-        try await workflow.imageData(photo, for: UUID())
+        try await workflow.imageData(photo, for: UUID().uuidString)
     }
     #expect(requests.count == 1)
 }
@@ -209,8 +373,12 @@ private enum HistoryPhotoFixtureError: Error { case failed }
         }
     }
     #expect(try await workflow.imageData(photo, for: round) == nil)
-    await #expect(throws: HistoryPhotoFixtureError.failed) { try await workflow.imageData(photo, for: round) }
-    await #expect(throws: HistoryImageLoadingError.oversizedImage) { try await workflow.imageData(photo, for: round) }
+    await #expect(throws: HistoryPhotoFixtureError.failed) {
+        try await workflow.imageData(photo, for: round)
+    }
+    await #expect(throws: HistoryImageLoadingError.oversizedImage) {
+        try await workflow.imageData(photo, for: round)
+    }
     #expect(try await workflow.imageData(photo, for: round) == Data([1]))
 }
 
@@ -226,7 +394,9 @@ private enum HistoryPhotoFixtureError: Error { case failed }
     let reads = (0..<4).map { _ in Task { try await workflow.imageData(photo, for: round) } }
     var starts = entered.stream.makeAsyncIterator()
     for _ in 0..<4 { await starts.next() }
-    await #expect(throws: HistoryImageLoadingError.busy) { try await workflow.imageData(photo, for: round) }
+    await #expect(throws: HistoryImageLoadingError.busy) {
+        try await workflow.imageData(photo, for: round)
+    }
     reads[0].cancel()
     pending[0].resume(returning: Data([1]))
     await #expect(throws: CancellationError.self) { try await reads[0].value }
@@ -239,26 +409,27 @@ private enum HistoryPhotoFixtureError: Error { case failed }
 
 @Test @MainActor func canonicalConversationSeparatesTwoTasksWithinOneInput() async throws {
     let store = ConversationHistoryStore()
-    let input = UUID()
-    let taskA = UUID()
-    let taskB = UUID()
+    let input = UUID().uuidString
+    let taskA = UUID().uuidString
+    let taskB = UUID().uuidString
     let token = try await store.readCurrent().token
     _ = try await store.begin(id: input, user: "两个目标", request: [], expecting: token, model: "stub")
     for id in [taskA, taskB] {
         try await store.beginModelRequest(
-            .init(id: UUID(), input: "goal", requestJSON: "[]", historyTaskID: id), for: input)
-        try await store.append(id.uuidString, to: input)
+            .init(id: UUID().uuidString, input: "goal", requestJSON: "[]", historyTaskID: id), for: input)
+        try await store.append(id, to: input)
         try await store.finishModelRequest(input, reason: "stop")
     }
     try await store.finish(input, state: .completed)
-    var context = AgentContext(agentID: .assistant, scopeID: UUID(), state: AssistantContextState())
+    var context = AgentContext(
+        agentID: .assistant, scopeID: UUID().uuidString, state: AssistantContextState())
     context.state.history = try await store.snapshot()
     for id in [taskA, taskB] {
         let request = try #require(
             context.state.history.current.turns[0].modelRequests?.first { $0.historyTaskID == id })
         context.state.history.current.taskCompressions.append(
             .init(
-                taskID: id, goal: id.uuidString, status: .completed, reportedSummary: "done", failure: nil,
+                taskID: id, goal: id, status: .completed, reportedSummary: "done", failure: nil,
                 completedAt: Date(), sources: [.init(inputID: input, requestID: request.id)]))
     }
     let conversation = try HistoryPresentationAdapter.conversation(context.state.history.current)

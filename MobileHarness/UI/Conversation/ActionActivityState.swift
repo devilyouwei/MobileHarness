@@ -17,9 +17,9 @@ public struct ActionActivityItem: Identifiable, Equatable, Sendable {
         }
     }
     public let source: String
-    public let inputID: UUID?
+    public let inputID: String?
     public let isInternal: Bool
-    public let id: UUID
+    public let id: String
     public let title: String
     public let channel: String
     public var channelTitle: String { channel }
@@ -30,8 +30,8 @@ public struct ActionActivityItem: Identifiable, Equatable, Sendable {
     public var isActive: Bool { [.queued, .running, .cancelling].contains(execution.phase) }
     public var isFailure: Bool { execution.phase == .failed }
     public init(
-        id: UUID, title: String, channel: String, status: String, issueDescriptions: [String], symbol: String,
-        execution: Execution, source: String = "", inputID: UUID? = nil, isInternal: Bool = false
+        id: String, title: String, channel: String, status: String, issueDescriptions: [String], symbol: String,
+        execution: Execution, source: String = "", inputID: String? = nil, isInternal: Bool = false
     ) {
         self.source = source
         self.inputID = inputID
@@ -49,29 +49,29 @@ public struct ActionActivityItem: Identifiable, Equatable, Sendable {
 /// Display-only execution issue; no device state or SDK fault classification.
 public struct ExecutionIssue: Identifiable, Sendable, Equatable {
     public struct Context: Sendable, Equatable {
-        public let workerID: UUID
-        public let sessionID: UUID?
-        public let inputID: UUID?
-        public let callID: UUID?
-        public init(workerID: UUID, sessionID: UUID? = nil, inputID: UUID? = nil, callID: UUID? = nil) {
+        public let workerID: String
+        public let sessionID: String?
+        public let inputID: String?
+        public let callID: String?
+        public init(workerID: String, sessionID: String? = nil, inputID: String? = nil, callID: String? = nil) {
             self.workerID = workerID
             self.sessionID = sessionID
             self.inputID = inputID
             self.callID = callID
         }
     }
-    public let inputID: UUID?
+    public let inputID: String?
     public let context: Context?
     public let failureCode: String?
-    public let id: UUID
+    public let id: String
     public let title: String
     public let source: String
     public let message: String
     public let userMessage: String?
     public let time: Date
     public init(
-        id: UUID = UUID(), title: String, source: String, message: String, time: Date = Date(),
-        failureCode: String? = nil, context: Context? = nil, inputID: UUID? = nil, userMessage: String? = nil
+        id: String = UUID().uuidString, title: String, source: String, message: String, time: Date = Date(),
+        failureCode: String? = nil, context: Context? = nil, inputID: String? = nil, userMessage: String? = nil
     ) {
         self.inputID = inputID ?? context?.inputID
         self.id = id
@@ -97,7 +97,7 @@ public struct ActionChannelSummary: Identifiable {
 /// Presentation only. The root-owned workflow consumes snapshots; views never own observation tasks.
 @MainActor @Observable
 public final class ActionActivityState {
-    public var currentTaskID: UUID?
+    public var currentTaskID: String?
     public var skillOwnership: [String: String] = [:]
     public var backgroundTaskCount: Int { tasks.filter { $0.execution == "background" && !$0.isTerminal }.count }
     public var currentTaskTitle = ""
@@ -105,7 +105,7 @@ public final class ActionActivityState {
     public var loadedSkills: [String] = []
     public var showsExecutionHistory = false
     public var selectedTab: ExecutionLogTab = .action
-    public var selectedTaskID: UUID?
+    public var selectedTaskID: String?
     public private(set) var agentEvents: [AgentRuntimeLogItem] = []
     public private(set) var agentEventEvictions: UInt64 = 0
     public var selectedSource = "全部"
@@ -129,11 +129,11 @@ public final class ActionActivityState {
     }
     public private(set) var errorToast: ExecutionIssue?
     private var toastKeys: [String] = []
-    public func dismissErrorToast(id: UUID) { if errorToast?.id == id { errorToast = nil } }
+    public func dismissErrorToast(id: String) { if errorToast?.id == id { errorToast = nil } }
     private func offerToast(_ issue: ExecutionIssue, now: Date = Date()) {
         // Initial/repeated retained snapshots do not replay old failures as new incidents.
         guard issue.context?.callID == nil, now.timeIntervalSince(issue.time) <= 15 else { return }
-        let key = "\(issue.source)|\(issue.inputID?.uuidString ?? issue.id.uuidString)|\(issue.message)"
+        let key = "\(issue.source)|\(issue.inputID ?? issue.id)|\(issue.message)"
         guard !toastKeys.contains(key) else { return }
         toastKeys.append(key)
         toastKeys = Array(toastKeys.suffix(100))
@@ -210,7 +210,7 @@ public final class ActionActivityState {
                         && item.issueDescriptions.contains { !$0.isEmpty && issue.message.contains($0) }
                 }
             return !linked
-                && seen.insert("\(issue.source)|\(issue.inputID?.uuidString ?? issue.id.uuidString)|\(issue.message)")
+                && seen.insert("\(issue.source)|\(issue.inputID ?? issue.id)|\(issue.message)")
                     .inserted
         }
     }
@@ -250,7 +250,7 @@ public final class ActionActivityState {
         }
     }
 
-    private var dismissed: Set<UUID> = []
+    private var dismissed: Set<String> = []
 
     public init() {}
     public func replace(revision: UInt64, records: [ActionActivityItem], evictedCount: UInt64) {
@@ -261,7 +261,7 @@ public final class ActionActivityState {
         dismissed.formIntersection(Set(records.map(\.id)))
         observationUnavailable = false
     }
-    public func dismiss(_ id: UUID) {
+    public func dismiss(_ id: String) {
         guard items.contains(where: { $0.id == id && !$0.isActive }) else { return }
         dismissed.insert(id)
     }
@@ -298,10 +298,10 @@ public final class ActionActivityState {
 /// A display notice is never an ExecutionIssue or a task goal.
 public struct HomeNotice: Sendable, Equatable {
     public enum Tone: String, Sendable { case info, warning, error }
-    public let id: UUID
+    public let id: String
     public let text: String
     public let tone: Tone
-    public init(id: UUID = UUID(), text: String, tone: Tone) {
+    public init(id: String = UUID().uuidString, text: String, tone: Tone) {
         self.id = id
         self.text = text
         self.tone = tone

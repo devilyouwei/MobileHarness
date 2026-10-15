@@ -5,14 +5,17 @@ import CallRuntime
 import ExecutionRuntime
 import Foundation
 import FunctionContracts
+import Storage
 import Testing
 
 @testable import Gateway
 
 @Test(.actionCatalog) func behaviorTranslationPreservesCorrelationWithoutAgentObjectsInExecution() throws {
-    let turn = AgentTurn(ordinal: 9)
-    let input = AgentInput(sessionID: UUID(), payload: .event("boundary"), turn: turn)
-    let owner = ExecutionOwner(agent: .assistant, incarnation: UUID(), sessionID: input.sessionID)
+    let turn = AgentTurn(id: UUID().uuidString, ordinal: 9)
+    let input = AgentInput(
+        id: UUID().uuidString, sessionID: UUID().uuidString, payload: .event("boundary"),
+        turn: turn)
+    let owner = ExecutionOwner(agent: .assistant, incarnation: UUID().uuidString, sessionID: input.sessionID)
     let call = ActionCall(
         actionPath: .init(domain: "Fixture", module: "Control", function: "move"), channel: "Robot",
         parameters: ["target": "2048"])

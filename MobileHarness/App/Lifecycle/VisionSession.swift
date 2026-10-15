@@ -6,21 +6,22 @@ import Foundation
 import Gateway
 import OSLog
 import PlatformKit
+import Storage
 
 /// Owns one vision Agent session: frames enter InputGateway, effects leave through OutputGateway.
 @MainActor
 final class VisionSession {
     private let runtime: VisionRuntimeDependencies
-    private let makeAgent: (UUID, FrameSamplingConfiguration, Bool) throws -> VisionPerceptionAgent
+    private let makeAgent: (String, FrameSamplingConfiguration, Bool) throws -> VisionPerceptionAgent
     init(
         runtime: VisionRuntimeDependencies,
-        makeAgent: @escaping (UUID, FrameSamplingConfiguration, Bool) throws -> VisionPerceptionAgent
+        makeAgent: @escaping (String, FrameSamplingConfiguration, Bool) throws -> VisionPerceptionAgent
     ) {
         self.runtime = runtime
         self.makeAgent = makeAgent
     }
     func run(
-        frames: AsyncThrowingStream<CameraFrame, Error>, sessionID: UUID,
+        frames: AsyncThrowingStream<CameraFrame, Error>, sessionID: String,
         configuration: FrameSamplingConfiguration, mirroredGaze: Bool,
         endpoint: any CameraOutputHandling
     ) async throws {

@@ -6,6 +6,7 @@ import CallRuntime
 import ExecutionRuntime
 import Foundation
 import FunctionContracts
+import Storage
 import UI
 
 @MainActor
@@ -16,7 +17,7 @@ protocol VoiceOutputHandling: AnyObject, Sendable {
         invocation: any FunctionInput) async throws
     func playCue(_ request: UIActions.CueRequest, invocation: any FunctionInput) async throws
     func vibrate(_ request: UIActions.HapticRequest, invocation: any FunctionInput) async throws
-    func play(audioID: UUID, invocation: any FunctionInput) async throws
+    func play(audioID: String, invocation: any FunctionInput) async throws
     func present(_ text: String, invocation: any FunctionInput) throws
     func presentTranscript(_ text: String, invocation: any FunctionInput) throws
     func finishTranscript(invocation: any FunctionInput) throws
@@ -32,8 +33,8 @@ protocol VoiceOutputHandling: AnyObject, Sendable {
 @MainActor
 protocol CameraOutputHandling: AnyObject, Sendable {
     func present(_ target: UIActions.Gaze, invocation: any FunctionInput) throws
-    func present(_ overlay: Actions.PoseOverlay, sessionID: UUID) throws
-    func visionStatus(_ message: String?, sessionID: UUID)
+    func present(_ overlay: Actions.PoseOverlay, sessionID: String) throws
+    func visionStatus(_ message: String?, sessionID: String)
 }
 
 /// A whole role binds atomically. Closures in the handler registry never own session resources.
@@ -42,7 +43,7 @@ final class RuntimePresentation: UIPresentationCapability, UIUpdateCapability, S
     PosePresentationCapability, CameraControlCapability, SpeechListeningCapability, TaskControlCapability,
     UIFeedbackCapability, UIEffectCapability
 {
-    var taskControl: (@Sendable (String, [String: String], String, UUID, UUID, UUID?) async throws -> String)?
+    var taskControl: (@Sendable (String, [String: String], String, String, String, String?) async throws -> String)?
     func controlTask(_ operation: String, arguments: [String: String], invocation: any FunctionInput) async throws
         -> String
     {
@@ -57,9 +58,9 @@ final class RuntimePresentation: UIPresentationCapability, UIUpdateCapability, S
             invocation.context.inputID, invocation.context.decisionID)
     }
     private let cameraControl: any CameraControlCapability
-    private let rootSessionID: UUID
+    private let rootSessionID: String
     let homeEffects: HomeEffectsWorkflow
-    init(cameraControl: any CameraControlCapability, rootSessionID: UUID, activity: ActionActivityState) {
+    init(cameraControl: any CameraControlCapability, rootSessionID: String, activity: ActionActivityState) {
         homeEffects = HomeEffectsWorkflow(activity: activity)
         self.cameraControl = cameraControl
         self.rootSessionID = rootSessionID
@@ -87,7 +88,7 @@ final class RuntimePresentation: UIPresentationCapability, UIUpdateCapability, S
                     intensity: request.intensity) : nil, durationMS: request.durationMS, invocation: invocation)
     }
     private func cameraOperation(
-        _ operation: PhotographerCameraIntent.Operation, facing: CameraActions.Facing? = nil, photoID: UUID? = nil,
+        _ operation: PhotographerCameraIntent.Operation, facing: CameraActions.Facing? = nil, mediaID: String? = nil,
         invocation: any FunctionInput
     )
         async throws -> String?
@@ -106,26 +107,26 @@ final class RuntimePresentation: UIPresentationCapability, UIUpdateCapability, S
             case .retry: try await cameraControl.retry(invocation: invocation)
             case .savePhoto:
                 return String(
-                    decoding: try JSONEncoder().encode(await cameraControl.savePhoto(photoID, invocation: invocation)),
+                    decoding: try JSONEncoder().encode(await cameraControl.savePhoto(mediaID, invocation: invocation)),
                     as: UTF8.self)
             case .ignorePhoto:
                 return String(
                     decoding: try JSONEncoder().encode(
-                        await cameraControl.ignorePhoto(photoID, invocation: invocation)), as: UTF8.self)
+                        await cameraControl.ignorePhoto(mediaID, invocation: invocation)), as: UTF8.self)
             case .cancel: throw CommunicationError.unauthorized
             }
             return nil
         }
         throw CommunicationError.unauthorized
     }
-    func savePhoto(_ id: UUID?, invocation: any FunctionInput) async throws -> CameraPhotoCommandReceipt {
-        guard let result = try await cameraOperation(.savePhoto, photoID: id, invocation: invocation) else {
+    func savePhoto(_ id: String?, invocation: any FunctionInput) async throws -> CameraPhotoCommandReceipt {
+        guard let result = try await cameraOperation(.savePhoto, mediaID: id, invocation: invocation) else {
             throw CommunicationError.invalidPayload
         }
         return try JSONDecoder().decode(CameraPhotoCommandReceipt.self, from: Data(result.utf8))
     }
-    func ignorePhoto(_ id: UUID?, invocation: any FunctionInput) async throws -> CameraPhotoCommandReceipt {
-        guard let result = try await cameraOperation(.ignorePhoto, photoID: id, invocation: invocation) else {
+    func ignorePhoto(_ id: String?, invocation: any FunctionInput) async throws -> CameraPhotoCommandReceipt {
+        guard let result = try await cameraOperation(.ignorePhoto, mediaID: id, invocation: invocation) else {
             throw CommunicationError.invalidPayload
         }
         return try JSONDecoder().decode(CameraPhotoCommandReceipt.self, from: Data(result.utf8))
@@ -140,7 +141,7 @@ final class RuntimePresentation: UIPresentationCapability, UIUpdateCapability, S
         }
         return try await cameraControl.takePhoto(invocation: invocation)
     }
-    func readPhoto(_ id: UUID, source: String, sessionID: UUID, inputID: UUID) async throws -> Data {
+    func readPhoto(_ id: String, source: String, sessionID: String, inputID: String) async throws -> Data {
         try await cameraControl.readPhoto(id, source: source, sessionID: sessionID, inputID: inputID)
     }
     func setEnabled(_ enabled: Bool, invocation: any FunctionInput) async throws {
@@ -189,7 +190,7 @@ final class RuntimePresentation: UIPresentationCapability, UIUpdateCapability, S
         guard let voice else { throw CommunicationError.scopeClosed }
         try await voice.vibrate(request, invocation: invocation)
     }
-    func play(audioID: UUID, invocation: any FunctionInput) async throws {
+    func play(audioID: String, invocation: any FunctionInput) async throws {
         guard let voice else { throw CommunicationError.scopeClosed }
         try await voice.play(audioID: audioID, invocation: invocation)
     }
@@ -229,7 +230,7 @@ final class RuntimePresentation: UIPresentationCapability, UIUpdateCapability, S
         guard let camera else { throw CommunicationError.scopeClosed }
         try camera.present(target, invocation: invocation)
     }
-    func present(_ overlay: Actions.PoseOverlay, sessionID: UUID) async throws {
+    func present(_ overlay: Actions.PoseOverlay, sessionID: String) async throws {
         guard let camera else { throw CommunicationError.scopeClosed }
         try camera.present(overlay, sessionID: sessionID)
     }

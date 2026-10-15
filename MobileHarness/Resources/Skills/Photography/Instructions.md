@@ -7,15 +7,16 @@ Camera effects need foreground, permission and readiness. Use current admitted f
 1. A Task is optional goal/history organization, not camera authorization. Use a matching foreground Task for ordinary photography that needs later save/discard/reshoot; a closed Task does not prevent another. If the user explicitly says no follow-up, load photography temporarily if needed and capture directly without startTask. Explicit replacement of an ongoing goal first closes it under BasicSkill. When starting a Task, its entry remains silent: only startTask.
 2. After committed loading, choose ONE next camera step from facts: unknown/stale readiness or lens → readEnvironment; disabled camera → openCamera; ready camera with a different requested lens → flipCamera; ready camera with the correct lens → takePhoto. Await the actual result of opening or switching on the next request before choosing a dependent step. Same-Channel FIFO or wait orders execution but does not condition capture on success: do not emit open/flip and takePhoto in the same response. If feedback lacks needed readiness/lens facts, readEnvironment. Do not repeatedly query already confirmed facts.
 3. Give a preparation cue only if useful and not already delivered. Put it ONCE inside wait before takePhoto, never repeat it outside or on the next result request. Usually open/flip/recovery responses contain only the next Action; no “请稍等/我来…” for each step. If camera opening itself needs an announcement, put that new cue once inside wait before openCamera. Do not end with preparation alone.
-4. Emit takePhoto once. Its actual result supplies photoID and, when supported, image evidence. If the user requested no follow-up, simply confirm “拍好了。” and end this decision; do not evaluate the image, ask a decision or save/discard automatically. If a Task was already used for that capture-only goal, finish it after success with an honest summary. Otherwise, give one short friendly quality/aesthetic comment based on this image and ask save/discard/reshoot. Prioritize clearly visible blur or poor exposure; otherwise use a supported pose, expression, lighting or clothing detail. No scene inventory or technical monologue. Without image evidence, confirm capture and ask without inventing appearance. Do not repeat the preparation or read raw observations aloud.
+4. Emit takePhoto once. Its actual result supplies mediaID and, when supported, image evidence. If the user requested no follow-up, simply confirm “拍好了。” and end this decision; do not evaluate the image, ask a decision or save/discard automatically. If a Task was already used for that capture-only goal, finish it after success with an honest summary. Otherwise, give one short friendly quality/aesthetic comment based on this image and ask save/discard/reshoot. Prioritize clearly visible blur or poor exposure; otherwise use a supported pose, expression, lighting or clothing detail. No scene inventory or technical monologue. Without image evidence, confirm capture and ask without inventing appearance. Do not repeat the preparation or read raw observations aloud.
 5. When follow-up is requested, the decision question is the waiting-user boundary. Retain the Task/photo; ordinary chat does not resolve it. If waiting continues, do not repeat the question unless the user asks or needs clarification.
-6. Save with savePhoto or discard with ignorePhoto using this Task's real photoID. Await the actual success, then confirm once and finishTask with a factual summary in the same response. Ordinary finishTask ends the decision. Both operations supply application-owned cue/departure; do not add a second feedback operation. Neither captures a new image; discard removes preview, not album media. A committed save remains saved even if feedbackIssues reports animation/audio problems; do not retry import for those issues.
+6. Save with savePhoto or discard with ignorePhoto using the current preview's real mediaID (runtime displayedMediaID or its actual capture result). Await the actual success, then confirm once. If a matching Task exists, finishTask with a factual summary in that response; without a Task, end the decision without finishTask or startTask. Ordinary finishTask ends the decision. Both operations supply application-owned cue/departure; do not add a second feedback operation. Neither captures a new image; discard removes preview, not album media. A committed save remains saved even if feedbackIssues reports animation/audio problems; do not retry import for those issues.
 7. For reshoot, ignorePhoto once, await confirmed ignored, then choose the next camera step and capture within the SAME Task. Do not start another Task or announce the whole workflow again.
+Standalone save/discard may target a preview retained after a capture-only decision. Use current runtime displayedMediaID; if absent/stale, readEnvironment and await facts, or explain that no photo is available. No Task/photo-owner registration is required. The discard alias is ignorePhoto; discardPhoto is not registered. Camera close is closeCamera. If an alias is absent from the effective catalog, follow BasicSkill loading first; neither history nor an open camera makes a Skill loaded.
 ### Tone and failures
-Use concise warm wording, with light humor only when supported; avoid exaggerated praise, insults or pressure to smile. Comment only on this Task's returned image; uncertain quality is not a proven defect.
+Use concise warm wording, with light humor only when supported; avoid exaggerated praise, insults or pressure to smile. Comment only on the actual returned image; uncertain quality is not a proven defect.
 A disabled error permits opening the camera and checking readiness; it does not prove prior capture succeeded. Retry only the failed, known-unperformed step after its prerequisite is confirmed. Permission denial/unavailable hardware needs a short actionable explanation; stop effects and await needed user action. retryCamera is only for explicit user retry. Save failure retains the photo/Task. Uncertain capture/save effects must not be replayed. User cancellation may clean up the preview then cancelTask; cannot undo saving. Do not close the camera implicitly. Follow BasicSkill's state-query rule for void effects.
 ### Examples: hypothetical feedback, exact per-request responses
-These are separate branches, not one output to concatenate. Feedback and IDs below are example data only; runtime uses the actual returned state/photoID. Output only the content inside the relevant xml block, without fences/headings/explanations.
+These are separate branches, not one output to concatenate. Feedback and IDs below are example data only; runtime uses the actual returned state/mediaID. Output only the content inside the relevant xml block, without fences/headings/explanations.
 
 A. New request: “用后置摄像头拍一张照片。” No active Task, including after an earlier Task finished:
 ```xml
@@ -59,9 +60,9 @@ Only after successful opening, continue branch A from confirmed lens/readiness; 
 ```
 Wait for user action; do not repeatedly open/flip/capture or claim a photo exists.
 
-D. Capture feedback in this example supplies photoID 11111111-2222-4333-8444-555555555555; user: “保存。”:
+D. Capture feedback in this example supplies mediaID media_1; user: “保存。”:
 ```xml
-<savePhoto photoID="11111111-2222-4333-8444-555555555555"/>
+<savePhoto mediaID="media_1"/>
 ```
 Next request: actual save is confirmed committed:
 ```xml
@@ -69,9 +70,9 @@ Next request: actual save is confirmed committed:
 ```
 If actual save failed, explain that failure once and retain the photo/Task; never output the success branch.
 
-E. Same example photoID; user: “重拍。”:
+E. Same example mediaID; user: “重拍。”:
 ```xml
-<ignorePhoto photoID="11111111-2222-4333-8444-555555555555"/>
+<ignorePhoto mediaID="media_1"/>
 ```
 Next request: state=ignored, camera/lens still ready; user already knows a reshoot is next:
 ```xml

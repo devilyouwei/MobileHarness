@@ -1,6 +1,7 @@
 import AgentCore
 import Foundation
 import FunctionContracts
+import Storage
 import UI
 
 /// Recognition and replies have independent identities: a queued task may reply after a later utterance.
@@ -12,16 +13,16 @@ public struct ConversationPresentation: Sendable {
     public private(set) var turn: AgentTurn?
     public private(set) var replyTurn: AgentTurn?
     public private(set) var replySource: String?
-    public private(set) var replyDecisionID: UUID?
-    public private(set) var replyTaskID: UUID?
+    public private(set) var replyDecisionID: String?
+    public private(set) var replyTaskID: String?
     public private(set) var transcriptClosed = false
     private var repliesEnabled = true
-    private var cancelledTurns: [UUID] = []
+    private var cancelledTurns: [String] = []
     private var sequences: [Update: UInt64] = [:]
     private var producerSequences: [String: UInt64] = [:]
     public init() {}
     /// Caption ownership is independent of the lifetime of accepted Speech Channel work.
-    public func acceptsPlayback(_ context: ActionExecutionContext, activeSessions: Set<UUID>) -> Bool {
+    public func acceptsPlayback(_ context: ActionExecutionContext, activeSessions: Set<String>) -> Bool {
         repliesEnabled && activeSessions.contains(context.sessionID)
             && !(context.correlationID.map { cancelledTurns.contains($0) } ?? false)
     }
@@ -76,7 +77,7 @@ public struct ConversationPresentation: Sendable {
 
     private mutating func accept(
         source: String, incoming: AgentTurn?, sequence: UInt64,
-        decisionID: UUID?, taskID: UUID?, authorizedTask: Bool, update: Update
+        decisionID: String?, taskID: String?, authorizedTask: Bool, update: Update
     ) -> Bool {
         guard let incoming, incoming.ordinal > 0, sequence > 0 else { return false }
         let recognition = update == .transcript || update == .finishTranscript || update == .voiceState

@@ -3,6 +3,7 @@ import Agents
 import AppPresentationWorkflow
 import Foundation
 import Gateway
+import Storage
 
 /// Root-owned bounded transport. Agents select calls; this host only executes correlated outputs.
 public actor HistoryIntentRuntime {
@@ -11,7 +12,7 @@ public actor HistoryIntentRuntime {
     private let input: InputGateway
     private let output: OutputGateway
     private var consumer: GatewayOutputConsumer?
-    private let sessionID: UUID
+    private let sessionID: String
     private var closed = false
     private var started = false
     private var busy = false
@@ -19,9 +20,9 @@ public actor HistoryIntentRuntime {
     private var pump: Task<Void, Never>?
     private var fixedOutputs: [OutputEnvelope] = []
     private var reader: CheckedContinuation<OutputEnvelope?, Never>?
-    private var currentRequestID: UUID?
+    private var currentRequestID: String?
     private var inputFailure: String?
-    public func rejectInput(_ id: UUID, reason: String) {
+    public func rejectInput(_ id: String, reason: String) {
         guard id == currentRequestID else { return }
         inputFailure = reason
         reader?.resume(returning: nil)
@@ -87,7 +88,7 @@ public actor HistoryIntentRuntime {
         }
     }
     public init(
-        sessionID: UUID, manager: AgentManager, input: InputGateway, output: OutputGateway,
+        sessionID: String, manager: AgentManager, input: InputGateway, output: OutputGateway,
         agent: MemoryAgent
     ) {
         self.sessionID = sessionID
@@ -110,9 +111,9 @@ public actor HistoryIntentRuntime {
         pump = nil
     }
     public func startNew() async throws { try await run(.startNew) }
-    public func summarize(_ id: UUID) async throws { try await run(.summarize(id)) }
+    public func summarize(_ id: String) async throws { try await run(.summarize(id)) }
     public func refresh() async throws { try await run(.refresh) }
-    public func deleteArchived(_ id: UUID) async throws { try await run(.delete(id)) }
+    public func deleteArchived(_ id: String) async throws { try await run(.delete(id)) }
     private func boundConsumer() throws -> GatewayOutputConsumer {
         guard let consumer else { throw CommunicationError.scopeClosed }
         return consumer
@@ -125,7 +126,7 @@ public actor HistoryIntentRuntime {
             currentRequestID = nil
             fixedOutputs.removeAll()
         }
-        let request = intent.input(sessionID: sessionID)
+        let request = try intent.input(sessionID: sessionID)
         currentRequestID = request.id
         inputFailure = nil
         let watchdog = Task {
@@ -205,14 +206,14 @@ public actor HistoryIntentRuntime {
             throw error
         }
     }
-    private func read(_ requestID: UUID) async -> OutputEnvelope? {
+    private func read(_ requestID: String) async -> OutputEnvelope? {
         if !fixedOutputs.isEmpty { return fixedOutputs.removeFirst() }
         guard currentRequestID == requestID, reader == nil, inputFailure == nil else { return nil }
         return await withCheckedContinuation { reader = $0 }
     }
-    private func cancelAndDrain(_ requestID: UUID) async throws {
+    private func cancelAndDrain(_ requestID: String) async throws {
         if inputFailure != nil { return }
-        let cancellation = MemoryHistoryIntent.cancel(requestID).input(sessionID: sessionID)
+        let cancellation = try MemoryHistoryIntent.cancel(requestID).input(sessionID: sessionID)
         try await input.publish(cancellation)
         // One active request, at most eight retained outputs. No device calls are admitted here.
         for _ in 0..<8 {

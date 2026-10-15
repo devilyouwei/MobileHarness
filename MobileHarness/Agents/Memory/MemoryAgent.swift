@@ -1,5 +1,6 @@
 import AgentCore
 import Foundation
+import Storage
 
 /// Memory business service entry point; domain workflows own their processing policy.
 public actor MemoryAgent: Agent {
@@ -16,7 +17,7 @@ public actor MemoryAgent: Agent {
     private let contextBuilder = MemoryContextBuilder()
 
     private let continuation: AsyncStream<OutputEnvelope>.Continuation
-    private let sessionID: UUID
+    private let sessionID: String
     private var lifecycle = AgentLifecycle.registered
     private var processed = 0
     private var sequence: UInt64 = 0
@@ -24,7 +25,7 @@ public actor MemoryAgent: Agent {
 
     private let taskCoordinator: AgentFixedTaskCoordinator<MemoryContextState>
     private var taskPump: Task<Void, Never>?
-    private var fixedTaskInputs: [UUID: AgentInput] = [:]
+    private var fixedTaskInputs: [String: AgentInput] = [:]
     private let admission = AgentAdmissionGate(capacity: 32)
 
     // MARK: - Registration
@@ -34,11 +35,12 @@ public actor MemoryAgent: Agent {
     }
 
     public init(
-        sessionID: UUID, configuration: AgentConfiguration? = nil,
+        sessionID: String, configuration: AgentConfiguration? = nil,
         context: AgentContextRepository<MemoryContextState>? = nil
     ) throws {
         self.contextRepository =
-            context ?? AgentContextRepository(agent: .memory, scope: UUID(), state: MemoryContextState())
+            context
+            ?? AgentContextRepository(agent: .memory, scope: UUID().uuidString, state: MemoryContextState())
         guard contextRepository.agentID == .memory else { throw AgentConfigurationError.identityMismatch }
         let configuration = try configuration ?? AgentConfigurations.load(named: "Memory")
         guard configuration.agentID == .memory else { throw AgentConfigurationError.identityMismatch }
@@ -185,7 +187,7 @@ public actor MemoryAgent: Agent {
 
     // MARK: - Context
 
-    private func prepareSignal(_ input: AgentInput, pending: [UUID]) async throws {
+    private func prepareSignal(_ input: AgentInput, pending: [String]) async throws {
         let snapshot = try await contextRepository.snapshot()
         let disposition = try preprocessor.classify(input, state: snapshot.state)
         if input.payload.kind == .audio || input.payload.kind == .image { return }
@@ -198,7 +200,7 @@ public actor MemoryAgent: Agent {
         }
     }
 
-    public func completeFixedTask(inputID: UUID, value: String?, failure: String? = nil) async throws {
+    public func completeFixedTask(inputID: String, value: String?, failure: String? = nil) async throws {
         guard let original = fixedTaskInputs.removeValue(forKey: inputID), let scope = original.taskScope else {
             return
         }

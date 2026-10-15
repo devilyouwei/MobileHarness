@@ -8,6 +8,7 @@ import Foundation
 import FunctionContracts
 import Gateway
 import PlatformKit
+import Storage
 import Testing
 
 /// Deliberately simple IK fixture; does not model physical kinematics.
@@ -218,7 +219,9 @@ private actor NexArmBaseFixture: NexArmWritableLink {
     ] {
         await #expect(throws: NexArmActions.ShakeError.invalidCycles) {
             let invocation = ActionInvocation(
-                source: .assistant, input: AgentInput(sessionID: UUID(), payload: .event("test")),
+                source: .assistant,
+                input: AgentInput(
+                    id: UUID().uuidString, sessionID: UUID().uuidString, payload: .event("test")),
                 call: ActionCall(
                     actionPath: ActionPath(domain: "NexArm", module: "Motion", function: "shakeBase"), channel: "Robot",
                     parameters: parameters))
@@ -329,7 +332,7 @@ private func runNexArmAssistantMarkup(
     let assistant = try AgentChatWorker<AssistantContextState>(
         chat: FixedTextChat(text: markup), capabilities: AgentConfigurations.registry(defaultBindings))
     let manager = AgentManager()
-    let session = UUID()
+    let session = UUID().uuidString
     try await manager.register(assistant, sessionID: session)
     let policy = try CommunicationPolicy(
         contracts: AgentContracts.communication,
@@ -359,7 +362,8 @@ private func runNexArmAssistantMarkup(
         try await assistant.bind(output.messaging(for: .assistant))
         try await assistant.start()
         let report = try await input.send(
-            AgentInput(sessionID: session, payload: .text("执行请求的机械臂动作")), to: .assistant)
+            AgentInput(id: UUID().uuidString, sessionID: session, payload: .text("执行请求的机械臂动作")),
+            to: .assistant)
         #expect(report.rejected.isEmpty)
         for await envelope in fixtureOutputs(assistant) {
             try await output.dispatch(envelope)
@@ -462,7 +466,7 @@ private actor NexArmFirmwareFixture: NexArmLink {
 
 /// Telemetry simulator only: never opens Bluetooth or serial hardware.
 private actor GestureArmFixture: NexArmObservableLink {
-    private var observation: UUID?
+    private var observation: String?
     private var telemetry = NexArmTelemetryCache()
     private var lastPush = ContinuousClock.now.advanced(by: .seconds(-1))
     private var ik = NexArmTestIK()
@@ -513,18 +517,18 @@ private actor GestureArmFixture: NexArmObservableLink {
         writeRelease?.resume()
         writeRelease = nil
     }
-    func beginObservation() -> UUID {
-        let token = UUID()
+    func beginObservation() -> String {
+        let token = UUID().uuidString
         observation = token
         return token
     }
-    func endObservation(_ session: UUID) { if observation == session { observation = nil } }
-    func sendObserved(_ packet: NexArmPacket, session: UUID) async throws -> Bool {
+    func endObservation(_ session: String) { if observation == session { observation = nil } }
+    func sendObserved(_ packet: NexArmPacket, session: String) async throws -> Bool {
         guard observation == session else { throw CancellationError() }
         try await write(packet)
         return true
     }
-    func latestObservation(after sequence: UInt64, session: UUID) throws -> NexArmTelemetry? {
+    func latestObservation(after sequence: UInt64, session: String) throws -> NexArmTelemetry? {
         guard observation == session else { throw CancellationError() }
         if ContinuousClock.now - lastPush >= .milliseconds(100) {
             try telemetry.receive(
@@ -595,7 +599,9 @@ func nexArmGestureActionsRejectMalformedArgumentsBeforeEffects(_ function: Strin
     ])
     for parameters in invalid {
         let invocation = ActionInvocation(
-            source: .assistant, input: AgentInput(sessionID: UUID(), payload: .event("fixture")),
+            source: .assistant,
+            input: AgentInput(
+                id: UUID().uuidString, sessionID: UUID().uuidString, payload: .event("fixture")),
             call: ActionCall(
                 actionPath: ActionPath(
                     domain: "NexArm",
@@ -829,8 +835,8 @@ func nexArmGestureFailureContinuesAndNextExplicitRequestCanStart(_ disturb: Bool
             }
             return reply
         }
-        func beginObservation() async throws -> UUID { try await serial.beginObservation() }
-        func sendObserved(_ packet: NexArmPacket, session: UUID) async throws -> Bool {
+        func beginObservation() async throws -> String { try await serial.beginObservation() }
+        func sendObserved(_ packet: NexArmPacket, session: String) async throws -> Bool {
             if packet.isSynchronousPositionWrite {
                 leg += 1
                 let values = stride(from: 0, to: packet.payload.count - 1, by: 2).map {
@@ -850,7 +856,7 @@ func nexArmGestureFailureContinuesAndNextExplicitRequestCanStart(_ disturb: Bool
             }
             return try await serial.sendObserved(packet, session: session)
         }
-        func latestObservation(after sequence: UInt64, session: UUID) async throws -> NexArmTelemetry? {
+        func latestObservation(after sequence: UInt64, session: String) async throws -> NexArmTelemetry? {
             let sample = try await serial.latestObservation(after: sequence, session: session)
             if let sample {
                 let values = stride(from: 0, to: 24, by: 2).map {
@@ -862,7 +868,7 @@ func nexArmGestureFailureContinuesAndNextExplicitRequestCanStart(_ disturb: Bool
             }
             return sample
         }
-        func endObservation(_ session: UUID) async { await serial.endObservation(session) }
+        func endObservation(_ session: String) async { await serial.endObservation(session) }
         func close() async { await serial.close() }
     }
 
@@ -1015,7 +1021,9 @@ func nexArmTiltHomesOwnedMotorsBeforeAndAfterItsBody(_ gesture: NexArmGesture) a
         NexArmGestureModule { _, _ in Issue.record("Invalid parameters must not reach the device") }
     ])
     let call = ActionInvocation(
-        source: .assistant, input: AgentInput(sessionID: UUID(), payload: .event("fixture")),
+        source: .assistant,
+        input: AgentInput(
+            id: UUID().uuidString, sessionID: UUID().uuidString, payload: .event("fixture")),
         call: ActionCall(
             actionPath: ActionPath(domain: "NexArm", module: "Gesture", function: "dance"), channel: "Robot",
             parameters: ["cycles": "4"]))

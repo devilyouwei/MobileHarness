@@ -1,5 +1,6 @@
 import Foundation
 import ModelKit
+import Storage
 import Testing
 
 @testable import AgentCore
@@ -34,7 +35,8 @@ private actor StreamingSentenceChat: ChatCapability {
     let agent = try AssistantAgent(chat: model)
     let speechRequests = try await bindSpeechRequests(agent)
     try await agent.start()
-    let input = AgentInput(sessionID: UUID(), payload: .text("stream"))
+    let input = AgentInput(
+        id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("stream"))
     try await agent.receive(input)
     var outputs = FixtureGenerationOutputs(agent: agent).makeAsyncIterator()
     let earlySay = try #require(try await outputs.next())
@@ -60,7 +62,8 @@ private actor StreamingSentenceChat: ChatCapability {
     let agent = try AssistantAgent(chat: model)
     _ = try await bindSpeechRequests(agent)
     try await agent.start()
-    let input = AgentInput(sessionID: UUID(), payload: .text("stream"))
+    let input = AgentInput(
+        id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("stream"))
     try await agent.receive(input)
     var outputs = FixtureGenerationOutputs(agent: agent).makeAsyncIterator()
     _ = try #require(try await outputs.next())
@@ -70,7 +73,8 @@ private actor StreamingSentenceChat: ChatCapability {
     #expect(cancelled.inputID == input.id)
     #expect(cancelled.output == .control("agent.cancelled"))
     #expect(cancelled.roundID != nil)
-    let next = AgentInput(sessionID: UUID(), payload: .text("next"))
+    let next = AgentInput(
+        id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("next"))
     try await agent.receive(next)
     for _ in 0..<3 {
         let envelope = try #require(try await outputs.next())
@@ -113,7 +117,8 @@ private struct ExcessiveSentencesChat: ChatCapability {
     let agent = try AssistantAgent(chat: ExcessiveSentencesChat())
     _ = try await bindSpeechRequests(agent)
     try await agent.start()
-    try await agent.receive(AgentInput(sessionID: UUID(), payload: .text("many")))
+    try await agent.receive(
+        AgentInput(id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("many")))
     var outputs = FixtureGenerationOutputs(agent: agent).makeAsyncIterator()
     var tokens: [AgentOutput] = []
     for _ in 0..<120 {

@@ -18,7 +18,8 @@ import UI
     defer { task.cancel() }
     let request = try await requestedDeparture(departure)
     #expect(request.kind == .save)
-    departure.complete(id: UUID(), success: true)
+    #expect(UUID(uuidString: request.id) != nil)
+    departure.complete(id: UUID().uuidString, success: true)
     #expect(departure.request == request)
     departure.complete(id: request.id, success: true)
     try await task.value

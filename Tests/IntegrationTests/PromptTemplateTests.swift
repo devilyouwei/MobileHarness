@@ -1,6 +1,7 @@
 import AgentCore
 import Agents
 import Foundation
+import Storage
 import Testing
 
 private func promptData(_ templates: [String: String]) throws -> Data {
@@ -139,12 +140,13 @@ func promptRenderingRejectsMalformedExpressions(body: String) throws {
     var state = AssistantContextState()
     var skills = AgentTaskSkillState()
     try skills.initialize(fixed: config.capabilities, baseSkills: AgentConfigurations.baseSkills(named: "Assistant"))
-    let input = AgentInput(sessionID: UUID(), payload: .text("拍照"))
+    let input = AgentInput(
+        id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("拍照"))
     _ = try skills.control(
         "startTask", arguments: ["goal": "拍照并保存", "skills": "[\"photography\"]"], inputID: input.id,
-        fixed: config.capabilities)
+        fixed: config.capabilities, taskID: try fixtureTaskID())
     state.skillState = skills
-    let context = AgentContext(agentID: .assistant, scopeID: UUID(), state: state)
+    let context = AgentContext(agentID: .assistant, scopeID: UUID().uuidString, state: state)
     let facts = try AssistantContextBuilder.contextFacts(context, input: input)
     #expect(facts.count == 1 && facts[0].role == .user)
     #expect(facts[0].content.contains("拍照并保存") && facts[0].content.contains("running"))
@@ -222,18 +224,23 @@ private func skillResponseExamples(_ id: String) throws -> [String] {
         if loaded {
             _ = try state.control(
                 "startTask", arguments: ["goal": "用后置摄像头拍照", "skills": "[\"photography\"]"],
-                inputID: UUID(), fixed: config.capabilities)
+                inputID: UUID().uuidString, fixed: config.capabilities, taskID: try fixtureTaskID())
         }
         let catalog = try state.registry(fixed: config.capabilities)
         let prompt = try AssistantContextState.systemPrompt(catalog, skills: state)
         #expect(prompt.contains(basic) && prompt.contains(identity))
         #expect(prompt.contains("exactly one self-closing startTask tag and nothing else"))
+        #expect(prompt.contains("including saving/discarding an existing preview or closing the camera"))
+        #expect(prompt.contains("A previous temporary load expires at the end of its decision chain"))
         #expect(prompt.contains("including text INSIDE wait"))
         #expect(prompt.contains("Never copy or paraphrase it outside wait"))
         if loaded {
             #expect(prompt.contains(try AgentConfigurations.skillInstructions("photography")))
             #expect(prompt.contains("do not emit open/flip and takePhoto in the same response"))
             #expect(prompt.contains("preparation already delivered"))
+            #expect(prompt.contains("without a Task, end the decision without finishTask or startTask"))
+            #expect(prompt.contains("<savePhoto mediaID=\"media_1\"/>"))
+            #expect(!prompt.contains("11111111-2222-4333-8444-555555555555"))
         }
     }
 }

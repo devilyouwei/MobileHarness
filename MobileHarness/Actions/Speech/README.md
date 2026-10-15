@@ -36,7 +36,7 @@ flowchart LR
 
 | 函数 | 解析与完成 | 静态 timeout |
 | --- | --- | --- |
-| speak | 只接受 audioID，最多 36 字节且可解析为 UUID；调用播放端点并等待它返回 | 300 秒 |
+| speak | 只接受 audioID，最多 36 字节且可解析为 ID；调用播放端点并等待它返回 | 300 秒 |
 | update | enabled/paused 严格为 true/false；revision 为正 UInt64；可选启动反馈参数 | 90 秒 |
 
 speak 将所有参数解析错误映射为 missingAudio，并在播放前后检查取消。端点契约要求播放排空与音频租约释放；入口不把音频存在或写入设备当作已播放完成。函数没有文本合成参数，也没有播放缓存。
@@ -52,3 +52,11 @@ SpeechModule 必须注入播放能力，聆听能力可选；缺少聆听能力�
 聆听恢复、播放屏障、原生捕获和声学时序属于 App/SpeechPerception 的契约，不在本域设定固定恢复等待。端点返回可能表示策略接纳、加入启动完成或实际播放排空，应按对应接口解释；失败不触发这里的隐式语音重试。
 
 [Actions 设计](../README.md) · [能力目录](Support/README.md) · [宿主语音生命周期](../../App/Lifecycle/README.md)
+
+
+
+
+
+## SQLite records and runtime identity
+
+✅ Implemented: technical identities are opaque UUID strings; committed business entities use dialog/message/task/media/device SQLite IDs. Consumers use Storage repositories while preserving ownership, cancellation and independent foundation boundaries. Complete messages, including each ReACT message, persist at termination; delta fragments do not persist. The custom allocator and replaced file/index implementation are removed. See the project SQLite business-record plan.

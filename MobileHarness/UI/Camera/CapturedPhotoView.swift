@@ -1,10 +1,12 @@
+import Foundation
+
 #if os(iOS)
     import SwiftUI
     import UIKit
 
     /// One image and one bounded presentation transaction; no device or storage ownership.
     @MainActor @Observable public final class CapturedPhotoPresentation {
-        public let id: UUID
+        public let id: String
         public let image: UIImage
         public var isThumbnail = false
         public var opacity = 0.0
@@ -12,7 +14,7 @@
         public let departure = PhotoDeparture()
         private let completed: @MainActor (Bool) -> Void
         private var acknowledged = false
-        public init(id: UUID, image: UIImage, completed: @escaping @MainActor (Bool) -> Void) {
+        public init(id: String, image: UIImage, completed: @escaping @MainActor (Bool) -> Void) {
             self.id = id
             self.image = image
             self.completed = completed
@@ -33,7 +35,7 @@
         @Environment(\.scenePhase) private var scenePhase
         @State private var inspecting = false
         @State private var inspectorVisible = false
-        @State private var animatedDepartureID: UUID?
+        @State private var animatedDepartureID: String?
         @State private var departureKind: PhotoDeparture.Kind?
         @State private var departurePhase: PhotoDeparturePhase = .resting
         @State private var departureOpacity = 1.0
@@ -94,7 +96,7 @@
                                 controls.savePhoto(photo.id)
                             } label: {
                                 Label(
-                                    camera.savedPhotoID == photo.id ? "已保存" : "保存", systemImage: "square.and.arrow.down"
+                                    camera.savedMediaID == photo.id ? "已保存" : "保存", systemImage: "square.and.arrow.down"
                                 )
                                 .font(.caption).frame(width: 96, height: 44)
                                 .background(.black.opacity(0.65))
@@ -102,7 +104,7 @@
                             }
                             .accessibilityLabel("保存照片到系统相册")
                             .accessibilityIdentifier("camera.photo.save")
-                            .disabled(camera.photoBusy || camera.savedPhotoID == photo.id)
+                            .disabled(camera.photoBusy || camera.savedMediaID == photo.id)
                         }
                     }
                     .frame(width: 96, height: 128)
@@ -176,7 +178,7 @@
                                 inspecting = false
                                 controls.savePhoto(photo.id)
                             }
-                            .disabled(camera.photoBusy || camera.savedPhotoID == photo.id)
+                            .disabled(camera.photoBusy || camera.savedMediaID == photo.id)
                             Button("忽略") {
                                 inspecting = false
                                 controls.ignorePhoto(photo.id)

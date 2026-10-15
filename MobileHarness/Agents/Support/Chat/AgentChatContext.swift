@@ -1,11 +1,12 @@
 import AgentCore
 import Foundation
 import ModelKit
+import Storage
 import StorageChat
 
 /// Task status retained by deterministic Agents without conversational execution.
 public protocol AgentTaskContextState: AgentContextState {
-    var taskViews: [UUID: AgentTaskView]? { get set }
+    var taskViews: [String: AgentTaskView]? { get set }
 }
 
 /// Role-owned business schema exposes only the fields needed by the shared Chat adapter.
@@ -31,7 +32,7 @@ public protocol AgentChatContextState: AgentTaskContextState {
     var skillState: AgentTaskSkillState? { get set }
     var history: ConversationArchive { get set }
     var admissionSequence: UInt64 { get set }
-    var taskViews: [UUID: AgentTaskView]? { get set }
+    var taskViews: [String: AgentTaskView]? { get set }
 }
 
 struct AgentChatRequestBuilder<State: AgentChatContextState>: ContextBuilder {
@@ -79,8 +80,10 @@ public enum AgentChatHistoryContext {
             let retained = Set(([history.current] + history.past).flatMap { $0.turns.map(\.id) })
             if let skills = $0.state.skillState, let task = skills.tasks.first(where: { $0.id == skills.activeTaskID })
             {
-                guard $0.state.history.current.id == history.current.id,
-                    Set(task.inputIDs).isDisjoint(with: oldIDs.subtracting(retained))
+                guard
+                    $0.state.history.current.id == history.current.id
+                        || ($0.state.history.current.id == "draft" && $0.state.history.current.turns.isEmpty),
+                    history.current.isWindow || Set(task.inputIDs).isDisjoint(with: oldIDs.subtracting(retained))
                 else { throw CommunicationError.scopeClosed }
             }
             try $0.eraseEvidence(for: oldIDs.subtracting(retained))
@@ -92,7 +95,10 @@ public enum AgentChatHistoryContext {
                 skills.tasks.removeAll { ended.contains($0.id) }
                 skills.events.removeAll { $0.taskID.map(ended.contains) == true }
                 skills.inputBindings = skills.inputBindings.filter { !ended.contains($0.value) }
-                skills.recognitionBindings = skills.recognitionBindings.filter { !ended.contains($0.value) }
+                skills.recognitionBindings = skills.recognitionBindings.filter { entry in
+                    if case .task(let id) = entry.value { return !ended.contains(id) }
+                    return true
+                }
                 $0.state.skillState = skills
             }
             $0.state.history = history
@@ -164,8 +170,7 @@ extension AgentTaskContextState {
 extension AgentChatContextState {
     public func validateChatState() throws {
         try validateTaskState()
-        guard history.version == 3, history.current.turns.count <= 256, history.past.count <= 64,
-            history.past.allSatisfy({ $0.turns.count <= 256 })
+        guard history.version == 4
         else { throw CommunicationError.invalidPayload }
     }
     public mutating func recoverChatState() {

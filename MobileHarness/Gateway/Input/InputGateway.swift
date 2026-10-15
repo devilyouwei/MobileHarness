@@ -5,14 +5,14 @@ public actor InputGateway {
     private var signalRecords: [SignalTraceRecord] = []
     private var signalRevision: UInt64 = 0
     private var signalEvictions: UInt64 = 0
-    private var signalObservers: [UUID: AsyncStream<SignalTraceSnapshot>.Continuation] = [:]
+    private var signalObservers: [String: AsyncStream<SignalTraceSnapshot>.Continuation] = [:]
     private var taskRecords: [SignalTraceRecord] = []
     private var taskRevision: UInt64 = 0
     private var taskEvictions: UInt64 = 0
-    private var taskObservers: [UUID: AsyncStream<SignalTraceSnapshot>.Continuation] = [:]
+    private var taskObservers: [String: AsyncStream<SignalTraceSnapshot>.Continuation] = [:]
     private let signalAggregation: @Sendable (AgentInput) -> Bool
     private let signalSummary: @Sendable (AgentInput) -> String
-    private var publications: [UUID: Task<Void, Never>] = [:]
+    private var publications: [String: Task<Void, Never>] = [:]
     private var publicationBranches = 0
     private var publicationBytes = 0
     private var closed = false
@@ -41,7 +41,7 @@ public actor InputGateway {
 
     public func observeSignals() throws -> AsyncStream<SignalTraceSnapshot> {
         guard signalObservers.count + taskObservers.count < 8 else { throw CommunicationError.capacityExceeded }
-        let id = UUID()
+        let id = UUID().uuidString
         let pair = AsyncStream<SignalTraceSnapshot>.makeStream(bufferingPolicy: .bufferingNewest(1))
         pair.continuation.yield(signalSnapshot())
         if closed {
@@ -57,7 +57,7 @@ public actor InputGateway {
     /// Task protocol diagnostics only; ordinary input traffic never wakes these observers.
     public func observeTasks() throws -> AsyncStream<SignalTraceSnapshot> {
         guard signalObservers.count + taskObservers.count < 8 else { throw CommunicationError.capacityExceeded }
-        let id = UUID()
+        let id = UUID().uuidString
         let pair = AsyncStream<SignalTraceSnapshot>.makeStream(bufferingPolicy: .bufferingNewest(1))
         pair.continuation.yield(taskSnapshot())
         if closed {
@@ -70,7 +70,7 @@ public actor InputGateway {
         }
         return pair.stream
     }
-    private func removeTaskObserver(_ id: UUID) { taskObservers[id] = nil }
+    private func removeTaskObserver(_ id: String) { taskObservers[id] = nil }
     private func taskSnapshot() -> SignalTraceSnapshot {
         .init(revision: taskRevision, records: taskRecords, evictedCount: taskEvictions)
     }
@@ -89,7 +89,7 @@ public actor InputGateway {
         let snapshot = taskSnapshot()
         for observer in taskObservers.values { observer.yield(snapshot) }
     }
-    private func removeSignalObserver(_ id: UUID) { signalObservers[id] = nil }
+    private func removeSignalObserver(_ id: String) { signalObservers[id] = nil }
     private func signalSnapshot() -> SignalTraceSnapshot {
         .init(revision: signalRevision, records: signalRecords, evictedCount: signalEvictions)
     }
@@ -98,7 +98,7 @@ public actor InputGateway {
         let snapshot = signalSnapshot()
         for observer in signalObservers.values { observer.yield(snapshot) }
     }
-    private func beginSignal(_ input: AgentInput, mode: SignalTraceRecord.Mode, targets: [AgentID]) -> UUID {
+    private func beginSignal(_ input: AgentInput, mode: SignalTraceRecord.Mode, targets: [AgentID]) -> String {
         if signalRecords.contains(where: { $0.id == input.id }) { return input.id }
         if signalRecords.count == 256 {
             signalRecords.removeFirst()
@@ -113,7 +113,7 @@ public actor InputGateway {
         return input.id
     }
     private func finishSignal(
-        _ id: UUID, phase: SignalTraceRecord.Phase? = nil, reason: String? = nil,
+        _ id: String, phase: SignalTraceRecord.Phase? = nil, reason: String? = nil,
         report: DeliveryReport? = nil
     ) {
         if !signalRecords.contains(where: { $0.id == id }),
@@ -172,7 +172,7 @@ public actor InputGateway {
         return targets
     }
     // Module-internal: only OutputGateway supplies resolved targets and a bound source identity.
-    func sendInternal(_ input: AgentInput, targets: [(AgentID, UUID)]) async throws -> DeliveryReport {
+    func sendInternal(_ input: AgentInput, targets: [(AgentID, String)]) async throws -> DeliveryReport {
         guard input.metadata.origin == .agent, input.metadata.incarnation != nil else {
             throw CommunicationError.unauthorized
         }
@@ -180,7 +180,7 @@ public actor InputGateway {
     }
     private func validatePayload(_ input: AgentInput) throws -> Int {
         guard !input.metadata.expired else { throw CommunicationError.expired }
-        guard input.metadata.contract == InputMetadata(payload: input.payload).contract,
+        guard input.metadata.contract == InputMetadata(payload: input.payload, rootID: input.metadata.rootID).contract,
             input.metadata.version == 1, input.metadata.hops >= 0, input.metadata.hops <= 8,
             input.metadata.capturedAt.isFinite, input.metadata.capturedAt >= 0
         else { throw CommunicationError.invalidPayload }
@@ -234,7 +234,7 @@ public actor InputGateway {
     }
 
     func publishInternal(
-        _ input: AgentInput, targets: [(AgentID, UUID?)],
+        _ input: AgentInput, targets: [(AgentID, String?)],
         observe: (@Sendable (AgentInput) async -> Void)? = nil
     ) async throws {
         let traceID = beginSignal(input, mode: .publish, targets: targets.map(\.0))
@@ -259,7 +259,7 @@ public actor InputGateway {
                 finishSignal(traceID, phase: .dropped, reason: "Publication capacity exceeded")
                 return
             }
-            let id = UUID()
+            let id = UUID().uuidString
             publicationBranches += branches
             publicationBytes += bytes
             publications[id] = Task {
@@ -352,6 +352,7 @@ public actor InputGateway {
         guard (0..<8).contains(context.hops) else { throw CommunicationError.hopLimitExceeded }
         let payload = InputPayload.toolResult(result)
         let input = AgentInput(
+            id: UUID().uuidString,
             sessionID: owner.sessionID, payload: payload,
             metadata: InputMetadata(
                 payload: payload, source: "runtime", origin: .runtime, sequence: envelope.sequence,
@@ -380,6 +381,7 @@ public actor InputGateway {
             let payload = InputPayload.observation(try signal.message())
             return await deliverRuntime(
                 AgentInput(
+                    id: UUID().uuidString,
                     sessionID: event.scope.sessionID, payload: payload,
                     metadata: InputMetadata(
                         payload: payload, source: "runtime", origin: .runtime,
@@ -388,7 +390,8 @@ public actor InputGateway {
         } catch { return .closed }
     }
     /// Runtime completion fact after the child's output/playback barrier; no publisher acknowledgment.
-    func deliverReplyCompletion(_ scope: AgentTaskScope) async {
+    func deliverReplyCompletion(_ scope: AgentTaskScope) async throws {
+        let inputID = UUID().uuidString
         do {
             let signal = try AgentTaskSignal(
                 kind: .progress, scope: scope,
@@ -399,8 +402,10 @@ public actor InputGateway {
                 incarnation: try await manager.identity(scope.requester), sessionID: scope.sessionID)
             _ = await deliverRuntime(
                 AgentInput(
+                    id: inputID,
                     sessionID: scope.sessionID, payload: payload,
-                    metadata: InputMetadata(payload: payload, source: "runtime", origin: .runtime)), owner: owner)
+                    metadata: InputMetadata(payload: payload, source: "runtime", origin: .runtime, rootID: scope.id)),
+                owner: owner)
         } catch {}
     }
 
@@ -425,6 +430,7 @@ public actor InputGateway {
     ) async -> ActionResultDelivery {
         guard (0..<8).contains(causality.hops) else { return .closed }
         let input = AgentInput(
+            id: UUID().uuidString,
             sessionID: owner.sessionID, payload: payload,
             metadata: InputMetadata(
                 payload: payload, source: "runtime", origin: .runtime,
@@ -457,7 +463,7 @@ public actor InputGateway {
     }
 
     private func deliver(
-        _ input: AgentInput, targets: [(AgentID, UUID?)], traceID: UUID? = nil, publication: Bool = false
+        _ input: AgentInput, targets: [(AgentID, String?)], traceID: String? = nil, publication: Bool = false
     ) async throws
         -> DeliveryReport
     {
@@ -472,7 +478,7 @@ public actor InputGateway {
             throw error
         }
     }
-    private func admit(_ input: AgentInput, targets: [(AgentID, UUID?)], publication: Bool = false) async throws
+    private func admit(_ input: AgentInput, targets: [(AgentID, String?)], publication: Bool = false) async throws
         -> DeliveryReport
     {
         try Task.checkCancellation()
@@ -510,7 +516,7 @@ public actor InputGateway {
                         if input.metadata.incarnation != nil, policy == nil {
                             throw CommunicationError.unsupportedContract
                         }
-                        let incarnation: UUID
+                        let incarnation: String
                         if let expectedIncarnation {
                             incarnation = expectedIncarnation
                         } else {

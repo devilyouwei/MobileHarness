@@ -22,6 +22,8 @@ history、skillState（任务/加载事件/输入关联）、cameraState 和后�
 
 ## 函数权限与注册
 
+✅ 已实现：基础 Skill 明确保存/忽略当前预览及关闭相机也必须先检查当前目录；临时 photography 在上一决策链结束后释放时须重新加载。无 Task 的当前预览可使用实时 displayedMediaID 处理，不创建虚假摄影目标；历史标签不提供当前权限。忽略只使用当前 ignorePhoto 别名。
+
 [Agent.json](../../Resources/Agents/Assistant/Agent.json) 声明固定函数；业务模型目录由加载 Skill 决定。实际实现/参数契约以 [owning @Action declarations](../../Actions/README.md) 为准。Internal 固定函数不会自动向模型开放。
 
 下表为可通过 Skill 使用的业务函数及固定控制总览，不代表全部同时开放。Assistant 的当前模型目录由默认能力、已加载 Skill 与控制 Actions 组成；send 由授权通信契约派生且只使用 Action Call。
@@ -45,9 +47,9 @@ history、skillState（任务/加载事件/输入关联）、cameraState 和后�
 | action / Camera | `flipCamera` | `Camera.Capture.flip` | facing 必填 | Select the requested lens on an enabled camera. Already-selected lens is unchanged; disabled/busy/unavailable fails. Returns lens state. |
 | action / Camera | `closeCamera` | `Camera.Capture.close` | — | Disable camera preview/vision and join cleanup. Returns the resulting camera state. |
 | action / Camera | `openCamera` | `Camera.Capture.open` | — | Enable camera preview/vision; permission is required. Returns capture readiness, not pose-model readiness. |
-| action / Camera | `takePhoto` | `Camera.Capture.takePhoto` | — | Capture once with the ready foreground camera, show preview and return photoID/image evidence. Does not save to Photos. |
-| action / Camera | `savePhoto` | `Camera.Capture.savePhoto` | photoID 必填 | Save the displayed captured photo to Photos; permission denial fails. Returns the save receipt. Repeated saves do not duplicate it. |
-| action / Camera | `ignorePhoto` | `Camera.Capture.ignorePhoto` | photoID 必填 | Discard the displayed preview without exporting or deleting an album photo. Returns the discard receipt; camera remains open. |
+| action / Camera | `takePhoto` | `Camera.Capture.takePhoto` | — | Capture once with the ready foreground camera, show preview and return mediaID/image evidence. Does not save to Photos. |
+| action / Camera | `savePhoto` | `Camera.Capture.savePhoto` | mediaID 必填 | Save the displayed captured photo to Photos; permission denial fails. Returns the save receipt. Repeated saves do not duplicate it. |
+| action / Camera | `ignorePhoto` | `Camera.Capture.ignorePhoto` | mediaID 必填 | Discard the displayed preview without exporting or deleting an album photo. Returns the discard receipt; camera remains open. |
 | action / Camera | `retryCamera` | `Camera.Capture.retry` | — | Retry a failed foreground camera operation on explicit user request. |
 | tool / — | `History.list` | `History.Conversation.list` | offset 必填, limit 必填 | List current and archived conversations, current first then newest archives. Returns paged JSON metadata with IDs and explicitly truncated title/input previews. Start at offset 0; use nextOffset for more. |
 | tool / — | `History.read` | `History.Conversation.read` | id 必填, offset 必填, limit 必填 | Read a conversation by an ID returned by History.list. Turns are oldest first. Returns paged JSON with bounded user/response previews and truncation flags, not complete text; never replays behavior. Start at offset 0. |
@@ -177,7 +179,7 @@ Publication is one-way and has no recipient acknowledgment. Directed send return
 
 ✅ 已删除 Assistant 自定义 validateAction、registerPhoto 与 photoOwners；Camera 操作由当前 Skill/函数目录解析执行，无 Task 也能拍摄、接收图片结果、保存或忽略。设备前台/权限/相机就绪由实际函数处理。
 
-照片事实直接来自当前相机快照中的 displayedPhotoID / savedPhotoID；图片证据按拍摄结果实际UUID和产生输入读取，不需要额外 Task 登记。终态摘要从同一持久化Task记录投影，reportedSummary仅为总结说明，实际执行证据仍保留完整历史。新对话不会注入已归档对话的Task摘要。
+照片事实直接来自当前相机快照中的 displayedMediaID / savedMediaID；图片证据按拍摄结果的 media_N 与产生输入读取，不需要额外 Task 登记。终态摘要从同一持久化Task记录投影，reportedSummary仅为总结说明，实际执行证据仍保留完整历史。新对话不会注入已归档对话的Task摘要。
 
 
 
@@ -189,6 +191,20 @@ Publication is one-way and has no recipient acknowledgment. Directed send return
 ✅ Implemented: Assistant validates history schema v2 and projects request-owned task history through conversation compressions. Startup recovery marks unfinished work interrupted and produces terminal history evidence without replay. Camera and media policy remain unchanged.
 
 
-## 会话存储性能重构 v3
 
-✅ 已实现：当前 history 仅含当前会话，历史归档不进入运行 context。恢复快照保存 Skill、任务及任务视图；恢复不保留运行队列/Signal/相机事实，不重放动作。状态校验不再编码完整历史检查容量。
+## Model photo preparation policy
+
+✅ Implemented: AssistantPhotoInputPolicy in AssistantProcessing.swift owns analysis budgets: maximum dimension 1568, maximum pixels 1,048,576, maximum JPEG bytes 1 MiB and initial quality 0.82. photoObservations checks successful takePhoto evidence and model image support, reads the original, validates photo identity, invokes an injected prepareJPEG(Data, policy) capability and constructs the JPEG ChatImage itself. photoObservationHandler builds the worker callback inside Agents from those injected capabilities. Raw read and preparation are separate required capabilities; there is no implicit/no-op production preparation fallback. App only binds capabilities, while PlatformKit retains Image I/O internals. Agent code imports no native codec/framework.
+
+Check cancellation before reading, before preparation and before retaining results. Native preparation failure/cancellation propagates through the current decision; empty/over-budget results reject without uploading the original. The existing worker invokes observations after the round barrier and retains prepared images in ReACT requests, so later business-result continuations do not recompress. Original storage, preview and album import remain independent.
+
+These scene/composition defaults are based on [OpenAI vision sizing](https://developers.openai.com/api/docs/guides/images-vision), [Claude client resizing guidance](https://platform.claude.com/docs/en/build-with-claude/vision) and [Alibaba vision](https://www.alibabacloud.com/help/en/model-studio/vision); 1 MiB is a local transport budget, not a vendor-wide recommendation or an OCR quality guarantee. Native mechanics are described in [PlatformKit/Vision](../../PlatformKit/Vision/README.md#native-image-compression).
+
+## SQLite records and runtime identity
+
+✅ Implemented: technical identities are opaque UUID strings; committed business entities use dialog/message/task/media/device SQLite IDs. Consumers use Storage repositories while preserving ownership, cancellation and independent foundation boundaries. Complete messages, including each ReACT message, persist at termination; delta fragments do not persist. The custom allocator and replaced file/index implementation are removed. See the project SQLite business-record plan.
+
+✅ Storage repository refactor: AssistantConversationStorage receives ChatRepository and TaskRepository, constructs ConversationRecordStore and captures/restores the same Agent-owned state. Concrete backend creation moves entirely to App.
+
+
+✅ Removed AssistantConversationRecovery (duplicated Task/Skill/registry/views). Restore history from SQL only; fresh runtime starts with no active Task, while SQL recovery closes interrupted records and builds source-linked summaries.

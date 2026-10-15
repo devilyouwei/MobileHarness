@@ -1,9 +1,10 @@
 import Foundation
 import FunctionContracts
+import Storage
 
 /// Session-owned playback of an already decoded handle, including checkout, drain and cleanup.
 public protocol SpeechPlaybackCapability: Sendable {
-    func play(audioID: UUID, invocation: any FunctionInput) async throws
+    func play(audioID: String, invocation: any FunctionInput) async throws
 }
 
 public protocol SpeechListeningCapability: Sendable {

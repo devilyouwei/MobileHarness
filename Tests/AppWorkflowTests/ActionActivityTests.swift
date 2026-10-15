@@ -2,18 +2,21 @@ import AgentCore
 import Agents
 import AppWorkflows
 import Foundation
+import Storage
 import Testing
 import UI
 
 private func activityRecord(
-    id: UUID = UUID(), channel: String = "Robot", phase: ActionExecutionRecord.Phase = .running,
+    id: String = UUID().uuidString, channel: String = "Robot",
+    phase: ActionExecutionRecord.Phase = .running,
     semantics: ActionExecutionRecord.Semantics = .finite, at time: Date = .now,
     failure: ActionExecutionRecord.Failure? = nil, completion: AgentActionCompletion? = nil
 ) -> ActionExecutionRecord {
     ActionExecutionRecord(
         id: id, path: ActionPath(domain: "NexArm", module: "Gesture", function: "dance"), displayName: "跳舞",
         source: .assistant,
-        sessionID: UUID(), inputID: UUID(), channel: channel, semantics: semantics, phase: phase,
+        sessionID: UUID().uuidString, inputID: UUID().uuidString, channel: channel,
+        semantics: semantics, phase: phase,
         admittedAt: time, startedAt: phase == .queued ? nil : time,
         endedAt: [.succeeded, .failed, .cancelled].contains(phase) ? time : nil,
         failure: failure, completion: completion)
@@ -63,7 +66,9 @@ private func activityRecord(
     #expect(setting.status == "已设置")
     let start = ActionActivityItem(
         execution:
-            activityRecord(phase: .succeeded, semantics: .activityStart, completion: .activityStarted(UUID())))
+            activityRecord(
+                phase: .succeeded, semantics: .activityStart, completion: .activityStarted(UUID().uuidString)
+            ))
     #expect(start.status == "已启动")
     let cancelled = ActionActivityItem(execution: activityRecord(phase: .cancelled))
     #expect(cancelled.status == "已取消")
@@ -71,7 +76,8 @@ private func activityRecord(
     beforeStart.startedAt = nil
     #expect(ActionActivityItem(execution: beforeStart).status == "执行前已取消")
     let stop = ActionActivityItem(
-        execution: activityRecord(phase: .succeeded, semantics: .activityStop, completion: .activityStopped(UUID())))
+        execution: activityRecord(
+            phase: .succeeded, semantics: .activityStop, completion: .activityStopped(UUID().uuidString)))
     #expect(stop.status == "已结束")
     let failure = ActionActivityItem(
         execution: activityRecord(phase: .failed, failure: .init(rawValue: "feedbackTimeout")))
@@ -97,9 +103,11 @@ private func activityRecord(
 @Test @MainActor func actionActivityShowsEveryScheduledActionRegardlessOfModuleOrSource() async {
     func record(module: String, source: AgentID, channel: String) -> ActionExecutionRecord {
         ActionExecutionRecord(
-            id: UUID(), path: ActionPath(domain: module, module: "Control", function: "fixture"), displayName: "跳舞",
+            id: UUID().uuidString, path: ActionPath(domain: module, module: "Control", function: "fixture"),
+            displayName: "跳舞",
             source: source,
-            sessionID: UUID(), inputID: UUID(), channel: channel, semantics: .finite)
+            sessionID: UUID().uuidString, inputID: UUID().uuidString, channel: channel,
+            semantics: .finite)
     }
     let visible = [
         record(module: "NexArm", source: .assistant, channel: "Robot"),
@@ -159,10 +167,11 @@ extension ActionActivityState {
     ])
     let item = ActionActivityItem(
         execution: ActionExecutionRecord(
-            id: UUID(),
+            id: UUID().uuidString,
             path: ActionPath(domain: "NexArm", module: "Gesture", function: "dance"), displayName: "跳舞",
             source: .assistant,
-            sessionID: UUID(), inputID: UUID(), channel: "Robot", semantics: .finite, phase: .failed,
+            sessionID: UUID().uuidString, inputID: UUID().uuidString, channel: "Robot",
+            semantics: .finite, phase: .failed,
             completion: .report(report)))
     #expect(item.status == "部分完成 · 2项问题")
     #expect(item.issueDescriptions.count == 2)
@@ -174,9 +183,11 @@ extension ActionActivityState {
     let report = try AgentActionReport(entries: [.init(path: "root", status: .failed, code: .handlerFailed)])
     let item = ActionActivityItem(
         execution: ActionExecutionRecord(
-            id: UUID(), path: ActionPath(domain: "Speech", module: "Playback", function: "speak"), displayName: "朗读回复",
+            id: UUID().uuidString, path: ActionPath(domain: "Speech", module: "Playback", function: "speak"),
+            displayName: "朗读回复",
             source: .assistant,
-            sessionID: UUID(), inputID: UUID(), channel: "Speech", semantics: .finite, phase: .failed,
+            sessionID: UUID().uuidString, inputID: UUID().uuidString, channel: "Speech",
+            semantics: .finite, phase: .failed,
             completion: .report(report), failureDescription: "语音合成返回了无效音频"))
     #expect(item.issueDescriptions == ["第1项：语音合成返回了无效音频"])
 }
@@ -215,8 +226,9 @@ extension ActionActivityState {
     func caption(_ phase: ActionExecutionRecord.Phase) -> ActionActivityItem {
         .init(
             execution: .init(
-                id: UUID(), path: .init(domain: "UI", module: "Caption", function: "print"),
-                displayName: "字幕", source: .assistant, sessionID: UUID(), inputID: UUID(), channel: "Display",
+                id: UUID().uuidString, path: .init(domain: "UI", module: "Caption", function: "print"),
+                displayName: "字幕", source: .assistant, sessionID: UUID().uuidString,
+                inputID: UUID().uuidString, channel: "Display",
                 semantics: .finite, phase: phase, admittedAt: .now))
     }
     let state = ActionActivityState()
@@ -238,13 +250,16 @@ extension ActionActivityState {
     let pair = AsyncStream<SignalTraceSnapshot>.makeStream(bufferingPolicy: .bufferingNewest(1))
     workflow.startTasks(
         observe: { pair.stream }, taskContent: { signal in ("task report", signal.kind == .progress) })
-    let scope = AgentTaskScope(requester: .assistant, executor: .photographer, sessionID: UUID())
+    let scope = AgentTaskScope(
+        id: UUID().uuidString, requester: .assistant, executor: .photographer,
+        sessionID: UUID().uuidString)
     func record(
         _ kind: AgentTaskSignal.Kind, status: AgentTaskSignal.Status? = nil, businessContract: String = "fixture"
     ) throws -> SignalTraceRecord {
         let signal = try AgentTaskSignal(
             kind: kind, scope: scope, businessContract: businessContract, data: Data(), status: status)
         let input = AgentInput(
+            id: UUID().uuidString,
             sessionID: scope.sessionID, payload: .observation(try signal.message()), taskScope: scope)
         var value = SignalTraceRecord(input: input, mode: .send, targets: [.photographer], summary: "")
         value.phase = .accepted
@@ -293,7 +308,7 @@ extension ActionActivityState {
     let workflow = ActionActivityWorkflow(state: state)
     let pair = AsyncStream<OutputFailureSnapshot>.makeStream(bufferingPolicy: .bufferingNewest(1))
     workflow.startFailures { pair.stream }
-    let inputID = UUID()
+    let inputID = UUID().uuidString
     let raw = "agent.error: speech perception: Error Domain=SFSpeechErrorDomain Code=1 RecogRejected"
     let issue = OutputFailureRecord(source: .speechPerception, title: "Output", message: raw, inputID: inputID)
     pair.continuation.yield(.init(revision: 1, records: [issue], evictedCount: 0))

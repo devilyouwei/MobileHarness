@@ -1,12 +1,13 @@
 import AgentCore
 import Foundation
 import ModelKit
+import Storage
 
 // MARK: - State
 
 public struct SpeechSynthesisContextState: AgentContextState {
-    public var activeAudioID: UUID?
-    public var pendingAudioIDs: [UUID] = []
+    public var activeAudioID: String?
+    public var pendingAudioIDs: [String] = []
     public init() {}
     public func validateContextState() throws {
         guard pendingAudioIDs.count <= 32 else { throw CommunicationError.invalidPayload }
