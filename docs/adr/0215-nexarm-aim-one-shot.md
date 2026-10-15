@@ -1,6 +1,6 @@
 # ADR0215 — One pan/tilt packet per tracking target
 
-Status: accepted, 2026-10-13. Supersedes the live streaming path in ADR0102 and the production use of `NexArmJogPlanner.approach` described by ADR0135. The planner function remains as a finite-count planning API with its existing tests; production manual jog uses proposal.
+Status: accepted, 2026-10-13. [ADR0216](0216-nexarm-tracking-level-rest.md) supersedes the no-shoulder/elbow-write rule with one admitted calibrated level-rest preparation. Supersedes the live streaming path in ADR0102 and the production use of `NexArmJogPlanner.approach` described by ADR0135. The planner function remains as a finite-count planning API with its existing tests; production manual jog uses proposal.
 
 This decision originated as ADR0142 on feat/main-sh. It is numbered ADR0215 on main to preserve the existing ADR0142 Bluetooth lifecycle decision. Integration retains its FunctionContracts, String native-session identity and root lifetime/resource boundaries. The live worker no longer advances the manual jog planner. Validation is recorded separately.
 

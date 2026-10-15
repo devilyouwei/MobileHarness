@@ -316,4 +316,6 @@ Historical [ADR0155 — Explicit Action serialization identity](0155-explicit-ac
 
 - ✅ [ADR0214 — Result-driven ReACT](0214-result-driven-react.md): actual business output and failures replace registration-selected continuation; automated checks and generic iOS-device build verified, Simulator dependency blocked.
 
-- ✅ [ADR0215 — One pan/tilt packet per tracking target](0215-nexarm-aim-one-shot.md): one synchronous motors 1/4 packet per admitted target, bounded lead/dead zone and native-admission commit; main framework and lifecycle contracts retained. Physical acceptance limits remain in the decision.
+- ✅ [ADR0215 — One pan/tilt packet per tracking target](0215-nexarm-aim-one-shot.md): single-packet pan/tilt tracking, bounded lead/dead zone and native-admission commit; ADR0216 adds shoulder/elbow preparation to the first admitted packet. Main framework and lifecycle contracts are retained. Physical acceptance limits remain in the decision.
+
+- ✅ [ADR0216 — Tracking starts from the calibrated level rest](0216-nexarm-tracking-level-rest.md): first admitted command prepares shoulder/elbow, later commands remain pan/tilt only. Physical arrival remains separate.

@@ -514,6 +514,58 @@ private actor ArmAvailability {
     #expect(restarted.baseGoal == 1947 && restarted.pitchGoal == 2085)
 }
 
+@Test func trackingCommandLevelsTheForearmOnceThenAimsWithMotorsOneAndFour() throws {
+    var command = NexArmAimCommand()
+    let start = ContinuousClock.now
+    try command.seed(base: 2047, pitch: 2045)
+    let levelOnly = try #require(try command.command(base: 2050, pitch: 2045, at: start))
+    let levelTargets = try #require(levelOnly.packet.motorTargets)
+    #expect(levelOnly.levelsForearm)
+    #expect(Set(levelTargets.keys) == Set([2, 3]))
+    #expect(levelTargets[2] == NexArmJointCommand.armHome[1])
+    #expect(levelTargets[3] == NexArmJointCommand.armHome[2])
+    let first = try #require(try command.command(base: 2200, pitch: 2100, at: start))
+    let firstTargets = try #require(first.packet.motorTargets)
+    #expect(first.levelsForearm)
+    #expect(Set(firstTargets.keys) == Set([1, 2, 3, 4]))
+    #expect(firstTargets[2] == 2087 && firstTargets[3] == 1984)
+    #expect(firstTargets[1] == 2200 && firstTargets[4] == 2100)
+    command.accept(first)
+    let later = try #require(
+        try command.command(base: 2300, pitch: 2100, at: start.advanced(by: .milliseconds(200))))
+    let laterTargets = try #require(later.packet.motorTargets)
+    #expect(!later.levelsForearm)
+    #expect(Set(laterTargets.keys) == Set([1, 4]))
+}
+
+@Test func trackingLevelPreparationRetriesUntilAdmissionAndResetsWithControl() throws {
+    var command = NexArmAimCommand()
+    let start = ContinuousClock.now
+    try command.seed(base: 2047, pitch: 2045)
+    let first = try #require(try command.command(base: 2047, pitch: 2045, at: start))
+    let retry = try #require(
+        try command.command(base: 2047, pitch: 2045, at: start.advanced(by: .milliseconds(30))))
+    #expect(retry == first && retry.levelsForearm)
+    #expect(try registeredSpeed(first.packet, motor: 2) == 400)
+    #expect(try registeredSpeed(first.packet, motor: 3) == 400)
+    command.accept(retry)
+    #expect(try command.command(base: 2047, pitch: 2045, at: start.advanced(by: .milliseconds(60))) == nil)
+    let pan = try #require(
+        try command.command(base: 2100, pitch: 2045, at: start.advanced(by: .milliseconds(90))))
+    #expect(!pan.levelsForearm)
+    #expect(Set(try #require(pan.packet.motorTargets).keys) == Set([1, 4]))
+    command.accept(pan)
+    command.reset()
+    #expect(throws: NexArmExecutionError.invalidArguments) {
+        try command.command(base: 2100, pitch: 2045, at: start.advanced(by: .seconds(1)))
+    }
+    try command.seed(base: 2100, pitch: 2045)
+    let restarted = try #require(
+        try command.command(base: 2100, pitch: 2045, at: start.advanced(by: .seconds(1))))
+    #expect(restarted.levelsForearm)
+    #expect(Set(try #require(restarted.packet.motorTargets).keys) == Set([2, 3]))
+}
+
 private func registeredSpeed(_ packet: NexArmPacket, motor: Int) throws -> Int {
     let payload = packet.payload
     let start = try #require(stride(from: 2, to: payload.count, by: 8).first { payload[$0] == UInt8(motor) })

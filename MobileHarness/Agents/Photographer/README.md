@@ -17,7 +17,7 @@
 
 [Agent.json](../../Resources/Agents/Photographer/Agent.json) 定义 camera.state / vision.pose / photography.camera 的来源及 task.progress/result 定向消息，baseSkills=photography。固定函数在 workflow 注册；Skill 的七个 Camera 绑定用于目录复用，不创建 Chat worker。准确参数/完成语义由 [Camera Actions](../../Actions/Camera/README.md) 和 [NexArm Actions](../../Actions/NexArm/README.md) 拥有。
 
-固定摄影状态包括事务、当前相机、产物、调用/任务关联。open/close/flip/retry/save/ignore 按真实反馈推进；调用结果不是物理状态的推测，保存与预览处置使用真实媒体身份。跟踪与相机事务独立，仅在前台、连接和权限条件满足、姿态新鲜时通过内部 NexArm.Tracking.aim 提交目标。跟踪不绕过 native 停机/资源约束。App 跟踪端点将目标提交为一个电机 1/4 同步包，肩/肘不参与实时跟踪；本角色继续拥有姿态策略、固定函数目录及相机事务，包整形见 NexArm Support。
+固定摄影状态包括事务、当前相机、产物、调用/任务关联。open/close/flip/retry/save/ignore 按真实反馈推进；调用结果不是物理状态的推测，保存与预览处置使用真实媒体身份。跟踪与相机事务独立，仅在前台、连接和权限条件满足、姿态新鲜时通过内部 NexArm.Tracking.aim 提交目标。跟踪不绕过 native 停机/资源约束。App 跟踪端点首次准入增加肩/肘水平准备，后续目标只写电机 1/4；本角色继续拥有姿态策略、固定函数目录及相机事务，包整形见 NexArm Support。
 
 ## 状态、容量与生命周期
 

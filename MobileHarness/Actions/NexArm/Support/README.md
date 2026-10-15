@@ -37,7 +37,7 @@ flowchart TB
     Joint --> Native
 ```
 
-JogPlanner 提供手动渐进提案，JointCommand 保留关节几何与诊断控制器路径；ForearmLeveler 保留公开的诊断几何接口及其回归，不参与实时 worker。NexArmAimCommand 接收映射后的 base/pitch count、生成电机 1/4 同步包，以 propose/accept 分离目标提议与实际准入；宿主保留资源与生命周期所有权。
+JogPlanner 提供手动渐进提案，JointCommand 保留关节几何与诊断控制器路径；ForearmLeveler 保留公开的诊断几何接口及其回归，不参与实时 worker。NexArmAimCommand 接收映射后的 base/pitch count，生成首包肩/肘准备及后续电机 1/4 同步包，以 command/accept 分离目标提议与实际准入；宿主保留资源与生命周期所有权。
 
 ## 目录、值与连接所有权
 
@@ -94,9 +94,9 @@ JogPlanner 保存六个位置/速度/加速度/最后已提交 count。周期 30
 
 approach 保留有限 count 渐进规划接口和对应回归，不用于实时跟踪：仅允许电机 1…5，默认上限 200 count/s，aimReachSpeed 为 100。反向且仍有明显速度时先提议保持当前位置并清零速度；最后 1…2 count 只有在 accept 后才视为完成，避免未准入目标被误认为已经提交。
 
-实时跟踪的 NexArmAimCommand 只写电机 1/4，肩、肘、腕滚转和夹爪不寻址。两轴逻辑目标相对上次已准入目标的变化均小于 12 count 时不发送；首包无前视，后续包按 0.2 秒前视但不超过最近一次逻辑步长，目标受硬件范围夹取。寄存器速度为到上次已准入 goal 的距离除以 0.2 秒再乘 2.2，限制为 10…600，加速度 30。Parameters 在 propose 时校验合法范围和有限值。
+NexArmAimCommand.command/accept(Command) 在首次准入时将肩/肘置于跟踪 rest（2087/1984，速度 400、加速度 30）；若 base/pitch 不在死区内则合并进同一个同步包，否则只发送肩/肘。未准入不提交水平位状态，新目标可替换旧包；准入后只写电机 1/4，腕滚转和夹爪始终不寻址。reset 同时清除水平位准入标记，取消、失败或手动接管后的新跟踪周期重新准备；普通空闲退出保留该标记。两轴逻辑目标相对上次已准入目标的变化均小于 12 count 时不发送；首包无前视，后续包按 0.2 秒前视但不超过最近一次逻辑步长，目标受硬件范围夹取。寄存器速度为到上次已准入 goal 的距离除以 0.2 秒再乘 2.2，限制为 10…600，加速度 30。Parameters 在 propose 时校验合法范围和有限值。
 
-状态只保留初始两轴参考、上次准入的逻辑目标/goal、最近提议样本和一个 pending 包。未准入时重复提议同一包；新目标替换 pending，旧提案的 accept 不会提交新状态。reset 清除参考、前视历史和未准入包；宿主在取消/失败、连接清理或手动接管后调用。起点来自最新六轴反馈，否则显式使用跟踪 rest；发出的 goal 是规划估计，不能冒充实测位置。
+状态只保留初始两轴参考、上次准入的逻辑目标/goal、最近提议样本、一个 pending 包和肩/肘是否已准入的布尔标记。未准入时重复提议同一包；新目标替换 pending，携带已被替换云台提案的 Command 不会被 accept 提交。仅含水平位的 Command 由宿主在当前 session 发送准入后接纳；宿主不得向已 reset 的控制周期提交旧 Command。reset 清除参考、前视历史和未准入包；宿主在取消/失败、连接清理或手动接管后调用。起点来自最新六轴反馈，否则显式使用跟踪 rest；发出的 goal 是规划估计，不能冒充实测位置。
 
 JointCommand 将 base/pitch 按 `4096/(2π)` 映射到跟踪 rest。pitch 超过 0.25 弧度开始伸出，至 0.7 达到 shoulder_lift 最小 1150；elbow 用固定肩肘和保持前臂水平。ForearmLeveler 用 40 count lead 与六 count 滞回补偿伸出方向，目标受电机范围夹取。五轴包保留于诊断控制器接口，不用于实时跟踪；速度由相邻目标距离及 200 毫秒名义值选取，上限 700；该名义值不是到位等待。
 
