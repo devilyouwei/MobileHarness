@@ -1,6 +1,8 @@
 # Generic Tasks and Independent Skills: Implementation and Migration
 
-Decision: [ADR0212](adr/0212-assistant-skills-task-modes.md). Current contract: [Agents](../MobileHarness/Agents/README.md). Fixed Task Mode resources and old singular Skill controls are removed. No new directory, module or dependency.
+归档日期：2026-10-15。原需求完成范围：通用 Tasks、独立 Skills 及其调用/历史/UI 迁移。历史验证结果和独立验收限制保留如下；当前实现以源码 README 为准。
+
+Decision: [ADR0212](../adr/0212-assistant-skills-task-modes.md). Current contract: [Agents](../../MobileHarness/Agents/README.md). Fixed Task Mode resources and old singular Skill controls are removed. No new directory, module or dependency.
 
 | Stage | Result |
 | --- | --- |
@@ -19,7 +21,7 @@ Base Skills stay loaded. Default temporary Skills survive ReACT and expire after
 
 History presents only Assistant conversations and foreground/background tasks. Restart interrupts unfinished Tasks/work and never replays effects. Request catalogs are immutable; late ASR cannot enter a different task.
 
-Evidence: [Validation history](Validation-History.md). Synthetic tests/builds are distinct from physical-device and real-model acceptance.
+Evidence: [Validation history](../validation/Validation-History.md). Synthetic tests/builds are distinct from physical-device and real-model acceptance.
 
 ## Resource packaging correction (2026-10-11)
 
@@ -63,7 +65,7 @@ No new module/directory/dependency. Type-only AgentSkillState -> AgentTaskSkillS
 
 ## Camera availability correction (2026-10-13)
 
-✅ Task organizes continuing goals/history; it is not an extra authorization prerequisite for registered camera functions. Assistant no longer validates capture/save/discard against Task/photo owner state or registers captured photos into that state. Capture-only requests can use temporary photography loading and return after confirmed capture. App supplies actual current photo facts and returned image evidence. [Validation evidence](Validation-History.md#2026-10-13--registered-camera-functions-without-task-authorization-and-friendly-recognition-toast) separates fixtures/compilation from device acceptance.
+✅ Task organizes continuing goals/history; it is not an extra authorization prerequisite for registered camera functions. Assistant no longer validates capture/save/discard against Task/photo owner state or registers captured photos into that state. Capture-only requests can use temporary photography loading and return after confirmed capture. App supplies actual current photo facts and returned image evidence. [Validation evidence](../validation/Validation-History.md#2026-10-13--registered-camera-functions-without-task-authorization-and-friendly-recognition-toast) separates fixtures/compilation from device acceptance.
 
 
 ## 2026-10-13 — Task history v2

@@ -3,7 +3,7 @@
 > ADR0134 supersedes the Bluetooth event/history/display decision and types described below: SDK/App/UI retain current native state only; no incident ring, cache, cursor or modal remains. Independent execution results, native recovery and the other execution/admission decisions remain implemented.
 
 
-Status: Implemented. ADR0129 已隔离调度与连接恢复；本次继续隔离异常来源、类型、消息、记录和恢复触发。自动化回归与构建结果见 [Validation-History](../Validation-History.md)；❌ 真机通信与页面验收仍待执行。
+Status: Implemented. ADR0129 已隔离调度与连接恢复；本次继续隔离异常来源、类型、消息、记录和恢复触发。自动化回归与构建结果见 [Validation-History](../validation/Validation-History.md)；❌ 真机通信与页面验收仍待执行。
 
 ## 所有权与边界
 

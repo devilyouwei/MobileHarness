@@ -10,4 +10,4 @@ App CameraCoordinator immediately invalidates old pose/gaze/session identity, fe
 
 Native input switching uses [AVCaptureSession configuration transactions](https://developer.apple.com/documentation/avfoundation/avcapturesession/beginconfiguration()). Sensor reconfiguration and first-frame delivery still have hardware latency; this decision does not promise zero delay. Native acknowledgment duration is logged for later device measurement.
 
-Injected gate-based regressions verify nonblocking replacement, latest-intent coalescing and shutdown rejection/joining. Native touch, repeated inference-time flips and voice coexistence require physical-device acceptance. Build and check results belong to [Validation history](../Validation-History.md).
+Injected gate-based regressions verify nonblocking replacement, latest-intent coalescing and shutdown rejection/joining. Native touch, repeated inference-time flips and voice coexistence require physical-device acceptance. Build and check results belong to [Validation history](../validation/Validation-History.md).

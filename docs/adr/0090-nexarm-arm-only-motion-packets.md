@@ -32,6 +32,6 @@ flowchart TD
 
 ✅ Deterministic coverage rejects injected motor6 entries, whole-device transport commands, invalid IK and missing preparation; checks claw-independent packets, arm-only home, shared Settings/Channel timing, cancellation and completion gates. Opt-in historical six-axis causal variants are disabled for physical dispatch.
 
-✅ USB arm-only home, celebration and dance reached home with claw remaining−6°. Detailed evidence and subsequent acceptance belong in `docs/NexArm_Physical_Acceptance.md`.
+✅ USB arm-only home, celebration and dance reached home with claw remaining−6°. Detailed evidence and subsequent acceptance belong in `docs/validation/NexArm_Physical_Acceptance.md`.
 
 ❌ Device-side emergency-stop/watchdog certification, load-dependent smoothness, and long-duration BLE endurance remain outside this change. Host receipt or command duration is not proof of physical stop or intermediate waypoint arrival.

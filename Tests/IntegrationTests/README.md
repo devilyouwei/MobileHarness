@@ -33,7 +33,7 @@ flowchart LR
 
 ✅ Tests use the real Assistant/Gateway scheduler, domain Action/Tool registration, production App workflow and shared Action recipes. Model text, pose observations and non-device presentation handlers are explicit fixtures; App's private application assembly/behavior adapter and native SwiftUI touches are outside this test seam. Finite Agent success requires terminal execution records and measured movement. Tool acceptance is checked separately from measured tracking. Manual submission, cancellation/replacement, an Agent lease bypass, release hold, invalid arguments and disconnected admission have separate checks. No gripper, torque, firmware or calibration change is part of these trials. Failures stop software owners and close the port without movement replay or automatic return home.
 
-Run one explicitly selected physical test per process with `NEXARM_PORT=/dev/cu.usbserial-110` and its gate: `NEXARM_SERIAL_PREFLIGHT`, `NEXARM_SERIAL_ACCEPTANCE`, `NEXARM_SERIAL_TRACKING_ACCEPTANCE`, or `NEXARM_SERIAL_PRESETS_ACCEPTANCE` set to `1`. Default repository checks leave all gates disabled. Stop phone control and clear the physical workspace first. ❌ Serial results do not certify CoreBluetooth, radio recovery, native UI hit-testing, real model decisions, YOLO perception or sustained tracking under load. Dated observations belong to [physical acceptance](../../docs/NexArm_Physical_Acceptance.md).
+Run one explicitly selected physical test per process with `NEXARM_PORT=/dev/cu.usbserial-110` and its gate: `NEXARM_SERIAL_PREFLIGHT`, `NEXARM_SERIAL_ACCEPTANCE`, `NEXARM_SERIAL_TRACKING_ACCEPTANCE`, or `NEXARM_SERIAL_PRESETS_ACCEPTANCE` set to `1`. Default repository checks leave all gates disabled. Stop phone control and clear the physical workspace first. ❌ Serial results do not certify CoreBluetooth, radio recovery, native UI hit-testing, real model decisions, YOLO perception or sustained tracking under load. Dated observations belong to [physical acceptance](../../docs/validation/NexArm_Physical_Acceptance.md).
 
 ## Current coverage
 
@@ -53,7 +53,7 @@ Run one explicitly selected physical test per process with `NEXARM_PORT=/dev/cu.
 
 - ❌ Real microphone/camera behavior, model accuracy, playback and expression appearance, hardware latency, thermal stability and sustained conversation require physical-device testing. Passing this suite establishes protocol behavior with controlled inputs only.
 
-Update this README when test responsibilities change; dated run results belong in [validation history](../../docs/Validation-History.md).
+Update this README when test responsibilities change; dated run results belong in [validation history](../../docs/validation/Validation-History.md).
 
 ✅ PromptTemplateTests 直接提取 BasicSkill/Photography 的生产 xml 示例，用当前组合目录与真实 GenerationTrace 解析；验证静默 startTask 无 Speech/Display、副作用按反馈分轮、准备文本只在 wait 中映射一次。检查默认及已加载摄影请求均含最新规则，摄影 revision 快照预期已更新至16。仅验证资源、解析及调用映射，不证明真实模型遵循率或物理相机效果。
 
@@ -600,7 +600,7 @@ Verified source organization: existing architecture/context commit-failure, hist
 
 The actual TaskControlModule is exercised through Gateway and Channel execution. Task/default contexts select separate histories; per-request mode/Skill/catalog evidence remains immutable, native call/result pairs and ReACT are preserved. Late ASR rejects closed task association, failed persistence leaves committed mode/catalog unchanged, and idle fixed controls do not invoke Chat. Legacy specialist records remain readonly, not merged or resumed.
 
-App owns stable consumers, actual endpoint authorization and bounded presentation. Microphone capture remains an independent lifetime. Restart interrupts without replay. [Migration plan](../../docs/Agents-Skills-Task-Modes-Plan.md) records remaining real-provider/native/device acceptance.
+App owns stable consumers, actual endpoint authorization and bounded presentation. Microphone capture remains an independent lifetime. Restart interrupts without replay. [Migration plan](../../docs/completed/Agents-Skills-Task-Modes-Plan.md) records remaining real-provider/native/device acceptance.
 
 Bluetooth simulated initial connections wait for the existing restoration/recovery idle barrier after discovery; list appearance alone is not startup completion. Generic communication fixtures preserve explicit parent validity without assigning default transport TTLs.
 
@@ -694,7 +694,7 @@ Camera observation request coverage inspects the complete message list for the o
 
 ## Channel-owned Action ordering
 
-✅ Channel/task concurrency and resource-conflict regressions replace the retired key fixtures. Test/build evidence is recorded in [Validation-History.md](../../docs/Validation-History.md).
+✅ Channel/task concurrency and resource-conflict regressions replace the retired key fixtures. Test/build evidence is recorded in [Validation-History.md](../../docs/validation/Validation-History.md).
 
 ## Task controls through Action Calls
 
@@ -740,7 +740,7 @@ Camera observation request coverage inspects the complete message list for the o
 
 ✅ Bluetooth 恢复期间的受控流模型在执行结果续轮给出确认回复，不再次开启未结束的相同动作流；回归按实际错误/业务输出断言续轮，并验证没有机械臂重放。
 
-✅ 最终完整检查与通用 iOS 真机构建通过；模拟器受外部 CoreAI 依赖阻断。详细范围、日志和未执行的真实模型/设备验收见 [验证记录](../../docs/Validation-History.md#2026-10-12--result-driven-react-without-registration-feedback-flags)。
+✅ 最终完整检查与通用 iOS 真机构建通过；模拟器受外部 CoreAI 依赖阻断。详细范围、日志和未执行的真实模型/设备验收见 [验证记录](../../docs/validation/Validation-History.md#2026-10-12--result-driven-react-without-registration-feedback-flags)。
 
 ✅ 本次回归：任务失败原因持久化及日志真实时间，不把历史恢复时间当作执行时间。
 
@@ -759,7 +759,7 @@ Camera observation request coverage inspects the complete message list for the o
 
 ✅ 提示词精简验收从确定性摄影回归导出当前完整请求证据到/tmp，与真实API usage分别统计，不把合成请求当成模型验收。
 
-❌ 上述真实Responses矩阵尚未全部通过，当前API额度耗尽；按用户选择等待原账户恢复后复测，详见[本轮验收](../../docs/Validation-History.md#2026-10-12--assistant-prompt-compaction)。
+❌ 上述真实Responses矩阵尚未全部通过，当前API额度耗尽；按用户选择等待原账户恢复后复测，详见[本轮验收](../../docs/validation/Validation-History.md#2026-10-12--assistant-prompt-compaction)。
 
 ✅ 回归补充：等待任务主动finish、关闭中的重复start拒绝、同输入关闭后开始新任务、新输入再次开始摄影，以及finish结果续轮。
 
@@ -808,11 +808,11 @@ Camera observation request coverage inspects the complete message list for the o
 
 ✅ 2026-10-13 回归已实现：Action/Tool/混合路径验证非空成功 report 不续轮、失败/部分失败 report 仍续轮，纯取消 report 不续轮，显式空 value 续轮；验证成功 report 日志保留、混合 report/value 的结果屏障/原生配对和活动句柄不续轮。NexArm 蓝牙恢复仍验证错误续轮及无动作重放。
 
-✅ 成功执行证据不续轮的最终全量检查和通用 iOS 真机构建通过；模拟器受外部 CoreAI 依赖阻断。实际日志、测试数量与合成/真机范围见 [验证记录](../../docs/Validation-History.md#2026-10-13--successful-execution-reports-and-activity-handles-do-not-trigger-react)。
+✅ 成功执行证据不续轮的最终全量检查和通用 iOS 真机构建通过；模拟器受外部 CoreAI 依赖阻断。实际日志、测试数量与合成/真机范围见 [验证记录](../../docs/validation/Validation-History.md#2026-10-13--successful-execution-reports-and-activity-handles-do-not-trigger-react)。
 
 ## 历史记录收敛（2026-10-13）
 
-✅ 回归更新：历史 fixture 使用实际 modelRequests 与 Assistant repository，不再依赖导入或 turn 汇总回退；覆盖独立旧文件不参与加载、重启中断、当前原文/请求保留、冲突/失败与固定执行者仅持久化任务状态。构建与完整检查结果见 docs/Validation-History.md。
+✅ 回归更新：历史 fixture 使用实际 modelRequests 与 Assistant repository，不再依赖导入或 turn 汇总回退；覆盖独立旧文件不参与加载、重启中断、当前原文/请求保留、冲突/失败与固定执行者仅持久化任务状态。构建与完整检查结果见 docs/validation/Validation-History.md。
 
 ❌ 历史记录页面板块重新设计及原生 UI/真机验收。
 
@@ -837,7 +837,7 @@ Camera observation request coverage inspects the complete message list for the o
 
 ## Live cloud title generation probe
 
-✅ Implemented: an explicitly opted-in HARNESS_LIVE_CHAT test uses process-supplied URL/key/model with a synthetic archived conversation and the actual ConversationTitleGenerator + OpenAIChat capability. Capture provider timing and title completion/failure; on failure, a separate diagnostic of the exact title request reports only sanitized provider codes, event types, terminal status and usage/reasoning counts. Never load user history/media or print/write credentials. Normal runs remain offline; live evidence and model limits belong in docs/Validation-History.md.
+✅ Implemented: an explicitly opted-in HARNESS_LIVE_CHAT test uses process-supplied URL/key/model with a synthetic archived conversation and the actual ConversationTitleGenerator + OpenAIChat capability. Capture provider timing and title completion/failure; on failure, a separate diagnostic of the exact title request reports only sanitized provider codes, event types, terminal status and usage/reasoning counts. Never load user history/media or print/write credentials. Normal runs remain offline; live evidence and model limits belong in docs/validation/Validation-History.md.
 
 ## Non-thinking title regression
 
@@ -850,7 +850,7 @@ Camera observation request coverage inspects the complete message list for the o
 
 ✅ SentenceFunctionTests covers early first segments, later steady chunks, fragmentation equivalence, English safe words and first-emission state across scope flushes; retain existing sentence-only/explicit-policy checks.
 
-✅ Regression coverage includes Action/Tool/mixed cancellation reports and wrapped throws without ReACT, mixed real failures, presentation without cancellation issues, active/waiting Task cancellation and fresh input, native host cancellation before the round boundary, paused/queued cancellation terminals, and HTTP/parser/observation errors terminating without retry or effect replay. Fixture entry waits use an event barrier; dated check/build evidence is in docs/Validation-History.md.
+✅ Regression coverage includes Action/Tool/mixed cancellation reports and wrapped throws without ReACT, mixed real failures, presentation without cancellation issues, active/waiting Task cancellation and fresh input, native host cancellation before the round boundary, paused/queued cancellation terminals, and HTTP/parser/observation errors terminating without retry or effect replay. Fixture entry waits use an event barrier; dated check/build evidence is in docs/validation/Validation-History.md.
 
 
 ## Immediate post-reply listening

@@ -1,6 +1,6 @@
 # MobileHarness 技术方案
 
-> **历史设计基线（2026-09-23）。** 本文保留当时的需求、技术设想与示例接口，供追溯原始方案；其中的“必须”、目录、API、容量和完成状态不构成当前实现约束。现行技术计划与目录映射见 [MobileHarness/README.md](../MobileHarness/README.md)，模块契约见其中链接的各模块 README，已实施范围见 [公开架构](Architecture.md)。原始 [Word 设计源](Technical_Design.docx) 保持不变。
+> **历史设计基线（2026-09-23）。** 本文保留当时的需求、技术设想与示例接口，供追溯原始方案；其中的“必须”、目录、API、容量和完成状态不构成当前实现约束。现行技术计划与目录映射见 [MobileHarness/README.md](../../MobileHarness/README.md)，模块契约见其中链接的各模块 README，已实施范围见 [公开架构](../Architecture.md)。原始 [Word 设计源](../Technical_Design.docx) 保持不变。
 
 > 文档版本：1.0 · 技术基线：2026-09-23 · 目标平台：iOS / macOS · 实现语言：Swift
 >
@@ -8,7 +8,7 @@
 >
 > 本文中的“必须”为实现约束，“建议”为默认方案，“后续”为非首期范围。容量、时限与阈值是初始工程配置，必须通过目标设备测试调整，不代表已测性能。
 
-> **调度迁移说明（2026-09-28）：** 下文 §6–8 的 Function/lane/barrier、§13 的并发及 §14.5 的有界通道方案属于历史设计。当前协议使用已注册的自闭 Action、Channel 作用域和嵌套 `<wait>...</wait>`；同一任务阶段内同轨串行、异轨允许并行，全进程模块互斥。wait 只汇合父组前序工作及自身子树，不阻塞其他任务；没有特殊 main。当前接纳有界且超限失败，不等待执行或队列空间。详见 [ADR 0059](adr/0059-structured-wait-scheduling.md)、[生成协议](../MobileHarness/Agents/Support/Core/Generation/README.md)与[调度契约](../MobileHarness/Gateway/Output/Scheduling/README.md)。历史正文不作为新版实现规范。
+> **调度迁移说明（2026-09-28）：** 下文 §6–8 的 Function/lane/barrier、§13 的并发及 §14.5 的有界通道方案属于历史设计。当前协议使用已注册的自闭 Action、Channel 作用域和嵌套 `<wait>...</wait>`；同一任务阶段内同轨串行、异轨允许并行，全进程模块互斥。wait 只汇合父组前序工作及自身子树，不阻塞其他任务；没有特殊 main。当前接纳有界且超限失败，不等待执行或队列空间。详见 [ADR 0059](../adr/0059-structured-wait-scheduling.md)、[生成协议](../../MobileHarness/Agents/Support/Core/Generation/README.md)与[调度契约](../../MobileHarness/Gateway/Output/Scheduling/README.md)。历史正文不作为新版实现规范。
 
 ## 1. 目标与架构决策
 

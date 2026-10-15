@@ -1,15 +1,17 @@
 # MOSS-TTS-Nano validation
 
-> Historical evidence scope (updated 2026-10-03): packaging/download statements below describe the revision tested at the time. Current App bundles source metadata/licenses only and installs weights through Settings; HF foreground requests restart after process relaunch. Current synthesis is MOSS. Kokoro is unregistered; its downloader/profile/local weights are removed and its optional real-model test needs HARNESS_KOKORO_MODEL_ROOT. See [current resource contract](../MobileHarness/ModelKit/Support/Management/README.md#local-model-resources--current-contract).
+证据范围：各节的制品、装配、成功与失败只对应所标日期，不定义今天的默认模型或下载行为。当前契约见 [MOSS README](../../MobileHarness/ModelKit/Speech/TTS/MossNano/README.md)；共同的历史报告阅读规则见 [验证索引](README.md)。
 
-Current default: local Core ML MOSS-TTS-Nano beta, sandbox installed/MossTTSNano, zh_1/en_2 voices. The repository Models/MossTTSNano directory is used only by opt-in Mac tests. Kokoro is not registered or packaged. Original design documents and historical Kokoro results are preserved.
+2026-09-28 验收使用的装配：Core ML MOSS-TTS-Nano beta、MossTTSNano 制品与 zh_1/en_2 音色。下文保留当时的 Mac、设备和播放调查结果；模型与 App 的现行选择由当前源码和配置决定。
 
 ## Reproduce
+
+本节保留 2026-09-28 集成时的步骤；执行前核对现有脚本、scheme 和制品。文中的历史容量与超时不作为当前运行契约。
 
 1. Run `python3 scripts/download-moss-tts-nano.py` to provision the pinned artifacts (about 533 MB of compiled graphs plus tokenizer/config/voice codes).
 2. Run `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer HARNESS_TEST_MOSS=1 swift test -c release --filter MossNanoTests` for Mac tokenizer, PCM, real Chinese/English/mixed synthesis and lifecycle tests. No user recordings, downloads at runtime, microphone or speaker access are used by these tests.
 3. In the App, first download MOSS through Settings → 本地模型资源. In Xcode select **MossValidation**, Release, and a physical iPhone. The scheme selects `-moss-benchmark`; tap 合成并试听. It uses the same default managed provider as normal conversation. Optional `-moss-autorun` writes timings to the App's Documents/moss-validation.txt without playing audio.
-4. Test normal conversation with microphone/camera, repeated cancellation, a long reply and English/Chinese switching. Measure initial and warmed first audio, sustained real-time rate, memory and thermal state. Production empty PCM reads now wait for producer progress/failure/cancellation without an independent three-second deadline. The synthesis Agent retains a 60-second execution deadline, excluding queue time; see ADR 0087. Record per-frame arrival gaps and playback failures separately when diagnosing truncation.
+4. Test normal conversation with microphone/camera, repeated cancellation, a long reply and English/Chinese switching. Measure initial and warmed first audio, sustained real-time rate, memory and thermal state. The subsequent ADR 0087 revision removed the independent three-second empty-read deadline and recorded a 60-second synthesis execution deadline excluding queue time. These describe that revision; current timing belongs to the owning Agent/runtime README. Record per-frame arrival gaps and playback failures separately when diagnosing truncation.
 
 ✅ Provisioning and validation entry points implemented. ❌ Audible quality, numbers/dates, Bluetooth, prolonged thermal behavior and crash-free endurance are not established by Mac tests or the short device smoke below.
 

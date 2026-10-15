@@ -52,7 +52,7 @@ Callbacks use serial native queues or short mutex sections, never UI state. App 
 
 ❌ Movie recording and an autonomous hardware safety controller.
 
-Device acceptance evidence is recorded in [validation history](../../docs/Validation-History.md).
+Device acceptance evidence is recorded in [validation history](../../docs/validation/Validation-History.md).
 
 ## Related design
 

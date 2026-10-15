@@ -36,7 +36,7 @@ Auto locale resolves Han text to zh-CN, otherwise en-US; explicit locales preser
 
 ## Outstanding work
 
-❌ Physical-device voice availability and sustained native synthesis/playback coexistence acceptance remains outstanding. [Voice acceptance](../../../../../docs/Voice.md) defines host-level trials.
+❌ Physical-device voice availability and sustained native synthesis/playback coexistence acceptance remains outstanding. [Voice acceptance](../../../../../docs/validation/Voice.md) defines host-level trials.
 
 ## Related design
 

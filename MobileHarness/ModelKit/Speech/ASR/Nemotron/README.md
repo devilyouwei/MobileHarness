@@ -33,7 +33,7 @@ Cancel joins the active SDK call, clears session and releases lease without fina
 
 ## Outstanding work
 
-❌ Physical-device Chinese/English quality, end-to-end latency and sustained thermal/memory acceptance remains outstanding. [Provider evidence](../../../../../docs/Nemotron-Validation.md) is maintained separately.
+❌ Physical-device Chinese/English quality, end-to-end latency and sustained thermal/memory acceptance remains outstanding. [Provider evidence](../../../../../docs/validation/Nemotron-Validation.md) is maintained separately.
 
 ## Related design
 

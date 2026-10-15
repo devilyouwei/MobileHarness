@@ -44,7 +44,7 @@ Purpose: independently verify the OpenAI-compatible adapter without network acce
 
 ✅ Implemented: Replace Chat Completions fixtures with offline Responses SSE and request assertions. Cover terminal status/usage, input and image items, function pairing, refusal/failure/unknown output, fragmented Unicode, cancellation then reuse, one session across sequential operations, unload/replacement cleanup and unchanged TTFT sampling. No live credentials/network calls.
 
-✅ Request regression: Responses historical assistant text must use output_text (annotations=[]), including assistant messages that also declare native calls; system/user text remains input_text. Live acceptance evidence belongs in docs/Validation-History.md, with credentials excluded from test sources and output.
+✅ Request regression: Responses historical assistant text must use output_text (annotations=[]), including assistant messages that also declare native calls; system/user text remains input_text. Live acceptance evidence belongs in docs/validation/Validation-History.md, with credentials excluded from test sources and output.
 
 ## Startup publication and foreground task regression
 
@@ -65,7 +65,7 @@ Purpose: independently verify the OpenAI-compatible adapter without network acce
 
 ## Explicit live-provider request probe
 
-✅ Implemented: opt-in liveProviderPreservesConsecutiveUsers uses HARNESS_LIVE_CHAT_URL/KEY/MODEL supplied by the invoking process, never reading or committing credentials in test sources. It calls the actual OpenAIChat capability with synthetic consecutive-user history, checks encoded user roles/parts, consumes streaming completion and joins model cleanup. On failure, one explicit diagnostic request captures a bounded, key-redacted provider error; normal tests remain offline. Real-provider evidence and compatibility limits belong in docs/Validation-History.md.
+✅ Implemented: opt-in liveProviderPreservesConsecutiveUsers uses HARNESS_LIVE_CHAT_URL/KEY/MODEL supplied by the invoking process, never reading or committing credentials in test sources. It calls the actual OpenAIChat capability with synthetic consecutive-user history, checks encoded user roles/parts, consumes streaming completion and joins model cleanup. On failure, one explicit diagnostic request captures a bounded, key-redacted provider error; normal tests remain offline. Real-provider evidence and compatibility limits belong in docs/validation/Validation-History.md.
 
 ## Responses reasoning compatibility
 

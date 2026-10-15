@@ -18,4 +18,4 @@ One in-flight refresh rejects overlap without backlog. The Agent buffers at most
 
 ## Validation
 
-✅ Six final focused tests, all 484 full-run integration tests and unsigned iOS device build passed. ❌ The existing audio workflow full-run timeout and simulator CoreAI limitation remain; see [dated evidence](../Validation-History.md#2026-10-06--structured-history-refresh-intent).
+✅ Six final focused tests, all 484 full-run integration tests and unsigned iOS device build passed. ❌ The existing audio workflow full-run timeout and simulator CoreAI limitation remain; see [dated evidence](../validation/Validation-History.md#2026-10-06--structured-history-refresh-intent).

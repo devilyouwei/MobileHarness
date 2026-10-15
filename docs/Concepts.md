@@ -1,64 +1,39 @@
 # Technical concepts
 
+本文件定义术语及其区别。当前模块协作见 [Architecture](Architecture.md)，详细接口和运行边界见 [整体技术设计](../MobileHarness/README.md)。生物类比仅用于解释组织方式，不表示复现生物智能。
+
 ## Signal → Cognition → Action
 
-The biological analogy describes functional organization: sensing provides signals, cognitive processes interpret them, and behavior changes what can be sensed next. It is an architectural metaphor rather than a claim to reproduce biological intelligence.
+| 术语 | 含义 |
+| --- | --- |
+| Signal | Agent 接收的不可变意图、观测、通信或执行反馈；运行时携带可信来源和因果关系。 |
+| Agent | 拥有独立角色、输入准入、业务状态和允许输出的处理者。 |
+| Gateway | 输入、通信与执行的验证/协调边界，不解释业务目标。 |
+| Capability | 注入的类型化模型、设备、存储或展示能力。 |
+| Action | 协议中立的业务函数，定义参数、效果、完成和失败语义。 |
+| ActionCall | 使用任务内 Channel/wait 的文本行为调用协议。 |
+| ToolCall | 模型或固定业务流程的原生函数调用；共享函数执行契约，绕过 Channel/wait。 |
+| Function Token | 自然文本/XML 混合行为协议中的结构单元，不是模型 tokenizer 的 token。 |
+| Task | 持续目标及其状态和上下文；可包含多次用户输入。 |
+| Skill | 可复用流程说明和函数绑定，不是另一份 Task 或执行权限凭证。 |
+| Request catalog | 某次模型请求冻结的已加载 Skill/函数视图，用于解释和验证该次输出。 |
 
-| Concept | Meaning | Biological analogy |
-| --- | --- | --- |
-| Signal | Immutable Agent input: intent, observation, Agent message or execution feedback, carried by AgentInput. | Sensory and inter-region signals. |
-| Agent | Stateful processor with a distinct role, input ownership and permitted outputs. | Specialized functional brain region. |
-| Gateway | Validation, communication routing and execution coordination boundary. | Neural pathways coordinating signals and commands. |
-| Capability | Typed model/device/data operation supplied to a consumer. | Processing machinery or sensory/effector capacity. |
-| Action | Protocol-neutral callable business function with shared input, completion and failure rules. | Coordinated behavior. |
-| ActionCall / ToolCall | Scheduled text-call and native function-call protocols over permitted Actions. Native calls may use direct or shared scheduled execution. | Alternative command pathways. |
-| App / UI | Whole-system lifetime/composition and user-facing interaction. | Organism and expressive surface. |
-| Storage / shared values | Retained data and shared value vocabulary. | Retained information and signal representation. |
+## 接纳、执行与完成
 
-## Communication and execution
+publish 选择已声明订阅者，send 选择明确收件人；通信接纳表示消息被接受处理，不代表业务完成。TaskResult 是任务显式报告，Action/Tool 结果表示实际调用结果，通信回执不能代替二者。
 
-Publication selects declared subscribers; directed delivery selects an explicit recipient. Admission means acceptance for processing rather than completed inference or behavior. Agent messages and Tool/Action results return through the input boundary.
+Channel 只组织所属任务内的 Action 顺序，wait 加入声明范围内的工作；原生 Tool 不使用该队列。不同任务可并发，资源冲突按明确契约拒绝或交接，不能从名称推断互斥或授权。
 
-Function Token is a mixed natural-text/XML behavior protocol, not a tokenizer token. Agents interpret it and resolve aliases before execution. A Channel is a task-local Action ordering scope. A wait group joins relevant Action work without making unrelated tasks share a global barrier. Native ToolCall executes directly outside Channel queues; scheduled native bindings reject. Both enforce permission/resource checks. Different Channels/tasks may run concurrently; resource conflicts fail explicitly unless host policy configures takeover.
+模型生成结束、函数处理结束、音频排空、界面渲染完成和物理到位是不同事实。取消请求也不等于立即停止或自动回滚，所有者仍需完成清理。
 
-A capability call is foundational processing, such as inference or data retention. A business effect, such as playback, UI presentation or robot movement, is a registered Action invoked through an authorized call protocol. This distinction keeps model computation separate from effect authorization.
+## 身份、状态与所有权
 
-## Identity, ownership and completion
+Agent 实例、session/input、task、decision/call 和 Signal 因果链各有职责，不能互相替代。运行时身份隔离当前与迟到结果，已提交业务记录 ID 用于持久追溯；具体格式由各拥有者规定。
 
-Session/turn/input identity separates current work from stale output. The owner of an operation retains its resources through cleanup. Model generation completion, Action handler completion, speaker drain and rendered-frame completion are distinct milestones.
+模型驻留与一次推理的所有权不同，取消推理不必等于卸载权重。长期工作由根级服务或业务拥有者持有，页面只持有本地展示状态和明确的页面任务。
 
-Model residency is separate from model operation ownership. A retained capability does not imply active inference, and cancelling an operation does not itself require unloading weights. Shared value types carry data rather than service lifetimes.
+本地导航、草稿、展开和过滤属于 UI 交互；提交业务操作才跨所属业务接口。Agent 请求界面效果仍使用获准的 Action。Signal/Action 描述 Agent 边界，不要求每次触摸都进入 Agent。
 
-## Directions beyond the current implementation
+## 扩展概念
 
-Edge/cloud collaboration means explicitly selecting remote processing where provided; it does not imply automatic compute escalation. Fast/slow cognition describes complementary responsive and deliberative processes; general orchestration remains a planned direction. Embodied intelligence means behavior has observable device/environment effects; it does not establish autonomous robot safety.
-
-[Architecture](Architecture.md) describes current collaboration. The [technical design](../MobileHarness/README.md#part-iii--key-techniques) defines cross-module flows and module READMEs define the algorithms.
-
-The active [Signal contract](../MobileHarness/README.md#unified-signal-contract) defines the shared envelope, payload ownership, admission and feedback rules, with current implementation gaps explicitly marked.
-
-## Agent composition — ADR0187
-
-✅ Agent 自有预处理、版本化结构化 Context 和 Builder 已接入；共享机制在现有 Agents/Core 与 Agents 目录中。业务职责保持当前分界。函数结果按运行时捕获的执行所有者定向返回，通信投递回执只表示接纳；模型续轮不订阅自身广播。
-
-✅ 上下文采用有界原子提交，重启将未完成工作标为中断，不重放设备动作。普通输入、反馈和控制分别接纳；所有容量或持久化失败显式返回。音视频和原生会话保持有界临时状态。
-
-✅ 第二阶段已实现独立摄影 LLM、正式任务委派及任务定向后续输入。❌ 真实模型、原生 UI、真机语音验收仍待完成。
-
-执行所有者（Agent/incarnation/session）、task/parentTask、Signal 因果 root/parent、decision/call 分别关联。ActionResult 按可信运行时所有者路由；TaskResult 是子任务显式报告，communication receipt 是接纳反馈。反馈旁路、普通输入 FIFO/融合/替换由各 Agent 决定。
-
-参见 [ADR0187](adr/0187-agent-composition-and-react.md) 与 [Agents 当前设计](../MobileHarness/Agents/README.md)。
-
-✅ [ADR0190](adr/0190-assistant-listening-and-one-way-publication.md): SpeechPerception owns listening consent and admission policy through fixed Actions; interactive Agents publish reply occupancy and App executes native/playback barriers. External facts publish one-way, internal send retains admission receipts, and recoverable speech errors do not stop recording. Physical recording stops on user-off/native interruption; policy pause suppresses recognition input while preserving capture.
-
-## Frontend and Agent backend
-
-✅ Signal/Action describes the Agent boundary, not every UI event. Like a web frontend, UI owns local navigation, drafts, filtering, selection and rendering. Explicit data/resource/history/camera/device requests publish directly to their owning Agent. Conversation enters Assistant, which may delegate actual tasks. Agent-initiated presentation still uses authorized UI Action functions over the same presentation state; local touch interaction does not create a backend task merely to reuse a UI operation. App owns native lifecycle and immediate cleanup.
-
-## Assistant Skills / Task Modes（2026-10-11）
-
-✅ 当前对话入口收敛为 Assistant，通过纯资源 Skill 加载动态函数和单前台任务上下文；三个专用角色保留确定性流程。旧多 Chat Agent 对话委派说明由 [ADR0212](adr/0212-assistant-skills-task-modes.md) 替代。❌ 真机摄影、语音竞争与模式切换验收待完成；没有远程 Skill、任务栈或新第三方依赖。
-
-## Task 与 Skill 的独立语义
-
-Task 表示任意目标及其状态/上下文；Skill 表示可复用流程和函数绑定。单前台任务与独立后台任务分离；后台通过 send 接纳、显式进度和终态通信。Skill 有基础、决策链、任务三种所有权。Mode 不再是资源配置，任务执行类型按前台/后台记录。
+“快慢认知”描述响应性与审慎处理的分工，“边云协作”描述显式选择的远端能力，“具身”表示可观测的环境效果。这些术语不自动承诺算力升级、后台常驻或物理安全。尚未落实的范围在 [需求索引](requirements/README.md) 单独定义。

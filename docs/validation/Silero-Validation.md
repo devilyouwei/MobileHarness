@@ -1,6 +1,8 @@
 # Silero 验证记录（2026-09-23）
 
-参考实现与当前契约见 [Silero README](../MobileHarness/ModelKit/Speech/VAD/Silero/README.md) 和 [ADR 0008](adr/0008-silero-vad.md)。
+以下为 2026-09-23 的独立模型与组合测试快照。制品打包、平台要求和未验收状态只对应该轮；当前配置与复现规则见 [验证索引](README.md)。
+
+参考实现与当前契约见 [Silero README](../../MobileHarness/ModelKit/Speech/VAD/Silero/README.md) 和 [ADR 0008](../adr/0008-silero-vad.md)。
 
 在完整 Xcode 工具链下，设置 HARNESS_TEST_SILERO=1 与 HARNESS_TEST_NEMOTRON=1 运行 scripts/check.sh：48 项实际测试通过；可选系统中文 TTS 测试本轮未启用。包含真实 Silero 的静音/合成语音、512/137/4000 点分片逐条结果一致、重置、尾部补零、取消和再次使用。额外验证 VAD capability 可独立注册与解析；边界策略使用概率而非输入振幅，长语句有界；16/44.1/48 kHz 连续重采样保持滤波器状态。
 

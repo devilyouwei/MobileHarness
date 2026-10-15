@@ -1,6 +1,6 @@
 # Audio8 验证记录（2026-09-23）
 
-这是 2026-09-23 的历史验证记录。Audio8 adapter 后来从当前源码树移除；当时的取舍见 [ADR 0009](adr/0009-audio8-asr.md)，当前模型选择与验证入口见 [模型资源 README](../MobileHarness/Resources/Models/README.md) 和 [Nemotron 验证记录](Nemotron-Validation.md)。下文关于默认 App 的描述仅反映当时状态。
+这是 2026-09-23 的历史验证记录。Audio8 adapter 后来从当前源码树移除；当时的取舍见 [ADR 0009](../adr/0009-audio8-asr.md)，当前模型选择与验证入口见 [模型资源 README](../../MobileHarness/Resources/Models/README.md) 和 [Nemotron 验证记录](Nemotron-Validation.md)。下文关于默认 App 的描述仅反映当时状态。
 
 ## 已验证
 

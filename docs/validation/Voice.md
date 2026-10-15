@@ -4,16 +4,16 @@ Purpose: record how to verify the current voice experience and what remains unpr
 
 ## Current path and sources of truth
 
-The conversation begins with the microphone → [SpeechPerception](../MobileHarness/Agents/SpeechPerception/README.md) → [Assistant](../MobileHarness/Agents/Assistant/README.md). Speech then follows parallel synthesis and scheduled playback paths linked by an audio ID; the [internal TTS data-flow diagram](../MobileHarness/README.md#synthesis-and-playback-ownership) explains that relationship. [PlatformKit Audio](../MobileHarness/PlatformKit/Audio/README.md) owns capture and hardware playback; [Conversation presentation](../MobileHarness/UI/Conversation/README.md) owns eyes, captions and frequency-based motion. Each module README owns its current queue limits, timeouts, cancellation and error behavior. The [architecture](Architecture.md) explains the cross-module direction, and [ADR 0055](adr/0055-synthesis-agent-audio-handles.md) with [ADR 0056](adr/0056-storage-audio-migration.md) explains the synthesis/cache decisions.
+语音能力、同意/准入与原生播放分别由 [SpeechPerception](../../MobileHarness/Agents/SpeechPerception/README.md)、[Assistant](../../MobileHarness/Agents/Assistant/README.md)、[SpeechSynthesis](../../MobileHarness/Agents/SpeechSynthesis/README.md) 和 [PlatformKit Audio](../../MobileHarness/PlatformKit/Audio/README.md) 的现行契约定义。此处保留验收步骤，不重复生命周期、容量或超时的另一份设计。
 
-The simulator supports UI development but cannot establish ASR, TTS, acoustics or continuous microphone behavior for a physical device. The production path uses local model resources unless the user explicitly selects a configured cloud chat provider. User microphone audio and synthesized PCM are process-local; StorageAudio does not persist them to disk.
+每次验收记录实际选中的 ASR/VAD/chat/TTS 提供者和资源版本，覆盖用户实际配置。模拟器 UI 与受控替身不代替真实推理、麦克风、声学或连续播放证据。瞬时 PCM 的生命周期见 [Storage Audio](../../MobileHarness/Storage/Audio/README.md)。
 
 ## Repeatable repository checks
 
 - Run `./scripts/check.sh` for module boundaries, Swift tests and project metadata. Its speech tests use controlled model/device substitutes, including synthesis admission, audio-ID ownership, reply cleanup, cache overflow and delayed producer progress.
 - Run `./scripts/test-silero.sh` for the opt-in real VAD check; use its documented Nemotron option when the local model artifact is available.
 - Run `./scripts/build-ios.sh` for four unsigned simulator builds. Build success is not evidence of device listening quality or latency.
-- Use the in-app MOSS diagnostic screen and [MOSS validation record](Moss-Validation.md) for model-level listening and timing. Those measurements do not replace the full conversation loop.
+- When validating MOSS, use its in-app diagnostic and [historical report](Moss-Validation.md), recording the actually tested revision and artifacts. Those measurements do not replace the full conversation loop.
 
 
 ## Physical-device acceptance
@@ -29,5 +29,3 @@ Record the device model, iOS version, model resource revisions, audio route and 
 7. VoiceOver, Dynamic Type and Reduce Motion. Confirm eyes remain operable and captions/status remain understandable.
 
 Log first-audio latency, playback gaps, peak memory, thermal state and failures alongside the corresponding model/device versions. Device acceptance remains open until these observations are recorded.
-
-✅ [ADR0190](adr/0190-assistant-listening-and-one-way-publication.md): SpeechPerception owns listening consent and admission policy through fixed Actions; interactive Agents publish reply occupancy and App executes native/playback barriers. External facts publish one-way, internal send retains admission receipts, and recoverable speech errors do not stop recording. Physical recording stops on user-off/native interruption; policy pause suppresses recognition input and stops physical capture after the confirmed utterance, while preserving listening consent.

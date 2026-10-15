@@ -22,7 +22,7 @@ Core remains Foundation-only. Agents/SpeechPerception owns policy; Support/Chat 
 
 ## Validation
 
-See [Validation-History](../Validation-History.md). Tests/build do not establish real-model, true-device acoustic or native UI acceptance.
+See [Validation-History](../validation/Validation-History.md). Tests/build do not establish real-model, true-device acoustic or native UI acceptance.
 
 
 ## 2026-10-10 publication audit correction

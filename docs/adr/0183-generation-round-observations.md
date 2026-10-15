@@ -46,10 +46,10 @@ flowchart TD
     Policy -->|no| Finish[Final completion]
 ```
 
-✅ Final repository check passed (607 integration /51 workflow tests); synthetic regression and repository validation cover the implemented runtime contracts. See [validation history](../Validation-History.md#2026-10-08--registered-actiontool-generation-rounds). ❌ Real provider, native UI and physical-device acceptance remain pending; Simulator compilation is blocked by the existing external CoreAI dependency.
+✅ Final repository check passed (607 integration /51 workflow tests); synthetic regression and repository validation cover the implemented runtime contracts. See [validation history](../validation/Validation-History.md#2026-10-08--registered-actiontool-generation-rounds). ❌ Real provider, native UI and physical-device acceptance remain pending; Simulator compilation is blocked by the existing external CoreAI dependency.
 
 ## Independent protocol consumption refinement — 2026-10-08
 
 ✅ Implemented: replaced shared consuming loops with independent bounded text/Action and native Tool workers inside Assistant and App transport. No new directory, module or dependency. Protocol ordering is local; cross-protocol merge preserves emitted call order. Native saturation cannot block Action admission, and speech preparation cannot block native parsing/emission. Close and join both routes before round acknowledgment and downstream continuation. Overflow is explicit, failed turns cancel/join both routes and preserve the subscription for the next input. Generic Agent request/reply remains pending; this change supplies the existing completed-round continuation boundary.
 
-Independent-consumer refinement validation: focused protocol regressions and unsigned iOS device-target build passed; full checks retain BLE fixture failures, and the required Simulator build remains blocked by CoreAI. See [validation history](../Validation-History.md#2026-10-08--independent-tool-and-action-protocol-consumers). No live-provider/native/device acceptance is inferred.
+Independent-consumer refinement validation: focused protocol regressions and unsigned iOS device-target build passed; full checks retain BLE fixture failures, and the required Simulator build remains blocked by CoreAI. See [validation history](../validation/Validation-History.md#2026-10-08--independent-tool-and-action-protocol-consumers). No live-provider/native/device acceptance is inferred.

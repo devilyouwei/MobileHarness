@@ -64,7 +64,7 @@ Fixed-size saturating traffic counters distinguish actual writes, pacing/system 
 
 ✅ Framing, hardware limits, passive telemetry, shared pacing, session fencing and USB/BLE I/O.
 
-❌ Autonomous safety control and arbitrary register configuration. Physical endurance/calibration evidence belongs in [validation history](../../../../docs/Validation-History.md).
+❌ Autonomous safety control and arbitrary register configuration. Physical endurance/calibration evidence belongs in [validation history](../../../../docs/validation/Validation-History.md).
 
 ## Related design
 

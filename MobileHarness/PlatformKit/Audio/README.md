@@ -43,7 +43,7 @@ One playback stream schedules at most three buffers, each up to 262144 finite mo
 
 ✅ Bounded native capture, pre-admission fallback, streaming conversion, continuous playback and numeric spectrum telemetry.
 
-Physical route, FOA and coexistence evidence belongs in [validation history](../../../docs/Validation-History.md).
+Physical route, FOA and coexistence evidence belongs in [validation history](../../../docs/validation/Validation-History.md).
 
 ## Related design
 

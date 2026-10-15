@@ -1,6 +1,6 @@
 # ADR 0009 Audio8 原生 ASR adapter
 
-> Historical scope: Historical adapter decision. Audio8 was removed from the current source tree; this record does not describe an available provider. See the [validation history](../Audio8-Validation.md).
+> Historical scope: Historical adapter decision. Audio8 was removed from the current source tree; this record does not describe an available provider. See the [validation history](../validation/Audio8-Validation.md).
 
 状态：已实施，独立能力；未切换 App；iPhone 运行待验收。日期：2026-09-23。
 

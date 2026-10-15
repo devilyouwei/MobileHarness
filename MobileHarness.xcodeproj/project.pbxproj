@@ -1648,19 +1648,19 @@
 		"BDD9B31CF5294859E35D68E1" = {
 			"isa" = "PBXFileReference";
 			"lastKnownFileType" = "text";
-			"path" = "docs/Audio8-Validation.md";
+			"path" = "docs/validation/Audio8-Validation.md";
 			"sourceTree" = "SOURCE_ROOT";
 		};
 		"AC6E5427D9343878D1581BB7" = {
 			"isa" = "PBXFileReference";
 			"lastKnownFileType" = "text";
-			"path" = "docs/Bootstrap-Validation.md";
+			"path" = "docs/validation/Bootstrap-Validation.md";
 			"sourceTree" = "SOURCE_ROOT";
 		};
 		"51B597E7B7F2CC25BF6E99B3" = {
 			"isa" = "PBXFileReference";
 			"lastKnownFileType" = "text";
-			"path" = "docs/Nemotron-Validation.md";
+			"path" = "docs/validation/Nemotron-Validation.md";
 			"sourceTree" = "SOURCE_ROOT";
 		};
 		"835ED4A2CC90209A84D23B00" = {
@@ -1678,13 +1678,13 @@
 		"3EB536D9DC8329A706FC789A" = {
 			"isa" = "PBXFileReference";
 			"lastKnownFileType" = "text";
-			"path" = "docs/Silero-Validation.md";
+			"path" = "docs/validation/Silero-Validation.md";
 			"sourceTree" = "SOURCE_ROOT";
 		};
 		"0BA0B71F5F15E41C468A98F4" = {
 			"isa" = "PBXFileReference";
 			"lastKnownFileType" = "text";
-			"path" = "docs/Tech_Design.md";
+			"path" = "docs/history/Tech_Design.md";
 			"sourceTree" = "SOURCE_ROOT";
 		};
 		"3B6F6F4DF78589B6EF624C46" = {
@@ -1696,7 +1696,7 @@
 		"1D497440DACE8EF888B1A530" = {
 			"isa" = "PBXFileReference";
 			"lastKnownFileType" = "text";
-			"path" = "docs/Voice.md";
+			"path" = "docs/validation/Voice.md";
 			"sourceTree" = "SOURCE_ROOT";
 		};
 		"7B9B5109123B9DDEF135DB64" = {
@@ -1810,19 +1810,19 @@
 		"D0C20A9B9E9141A4B214A001" = {
 			"isa" = "PBXFileReference";
 			"lastKnownFileType" = "net.daringfireball.markdown";
-			"path" = "docs/Change-Log.md";
+			"path" = "docs/history/Change-Log.md";
 			"sourceTree" = "SOURCE_ROOT";
 		};
 		"D0C20A9B9E9141A4B214A002" = {
 			"isa" = "PBXFileReference";
 			"lastKnownFileType" = "net.daringfireball.markdown";
-			"path" = "docs/Photographer-Proposal.md";
+			"path" = "docs/requirements/Photographer-Proposal.md";
 			"sourceTree" = "SOURCE_ROOT";
 		};
 		"D0C20A9B9E9141A4B214A003" = {
 			"isa" = "PBXFileReference";
 			"lastKnownFileType" = "net.daringfireball.markdown";
-			"path" = "docs/Validation-History.md";
+			"path" = "docs/validation/Validation-History.md";
 			"sourceTree" = "SOURCE_ROOT";
 		};
 		"F913940C58E8744A2AF1C68B" = {

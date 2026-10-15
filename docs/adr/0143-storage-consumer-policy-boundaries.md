@@ -20,4 +20,4 @@ UI selects display titles and default wording. SpeechSynthesis owns timedOut/inv
 
 ## Validation
 
-✅ Final targeted tests (32), static/format checks and unsigned iOS device build passed. ❌ The full check retained one audio detection timeout (isolated rerun passed); simulator builds remain blocked by external CoreAIShared. See [dated evidence](../Validation-History.md#2026-10-06--agent-driven-app-storage-boundary-stage).
+✅ Final targeted tests (32), static/format checks and unsigned iOS device build passed. ❌ The full check retained one audio detection timeout (isolated rerun passed); simulator builds remain blocked by external CoreAIShared. See [dated evidence](../validation/Validation-History.md#2026-10-06--agent-driven-app-storage-boundary-stage).

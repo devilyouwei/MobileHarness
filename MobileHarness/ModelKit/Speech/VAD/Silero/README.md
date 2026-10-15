@@ -31,7 +31,7 @@ Cancel waits for active graph work before lease release; it cannot interrupt a r
 
 ## Outstanding work
 
-❌ Physical acoustic accuracy and sustained ASR/VAD coexistence acceptance remains outstanding. [Voice acceptance](../../../../../docs/Voice.md) defines host-level trials.
+❌ Physical acoustic accuracy and sustained ASR/VAD coexistence acceptance remains outstanding. [Voice acceptance](../../../../../docs/validation/Voice.md) defines host-level trials.
 
 ## Related design
 

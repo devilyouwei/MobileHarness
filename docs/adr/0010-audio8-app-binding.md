@@ -1,6 +1,6 @@
 # ADR 0010 默认语音切换为 Audio8 + Silero
 
-> Historical scope: Historical default binding. Audio8 is no longer packaged; the [current voice path](../Voice.md) uses other local capabilities.
+> Historical scope: Historical default binding. Audio8 is no longer packaged; the [current voice path](../validation/Voice.md) uses other local capabilities.
 
 状态：已实施。日期：2026-09-23。
 

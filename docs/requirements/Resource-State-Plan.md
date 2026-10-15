@@ -2,6 +2,8 @@
 
 状态：❌ 未来计划，尚未实现。记录日期：2026-10-05。
 
+2026-10-14 衔接：[核心架构技术需求](technical/Core-Architecture-Improvement-Plan.md) 将本计划作为 Storage 通用内存状态机制的首个应用场景。快照存取与通用转换机制共同设计；领域状态与转换规则仍由各业务拥有者定义。本计划继续聚焦当前资源事实，不替代执行状态或资源锁。
+
 ## 目标与范围
 
 以 resource 为单位，快速存储和读取手机 App、UI 与 Platform 设备的当前状态，供 Agent 的后续决策和 LLM 上下文使用。沿用现有模块目录、独立 target、actor 隔离和显式 capability 注入；不新增目录或 target。
@@ -47,7 +49,7 @@ Assistant 每次生成前读取相关资源快照，以数据形式加入上下�
 
 ## Lock 与持久化
 
-lock 可作为 resource 的只读属性，权威来源是 ResourceCoordinator 的 unlocked/locked(owner)（见 [ADR0141](adr/0141-resource-control-ownership.md)）；设备健康与执行异常分别拥有，不推导锁状态。Store 不建立第二套锁控制，本状态缓存计划不重复实现交接、释放或异常处理。
+lock 可作为 resource 的只读属性，权威来源是 ResourceCoordinator 的 unlocked/locked(owner)（见 [ADR0141](../adr/0141-resource-control-ownership.md)）；设备健康与执行异常分别拥有，不推导锁状态。Store 不建立第二套锁控制，本状态缓存计划不重复实现交接、释放或异常处理。
 
 跨页面和会话共享内存状态；进程重启后重新获取事实。未来若需要落盘，复用 Storage 现有机制，物理设备状态不能因读取旧记录而被视为已确认。
 

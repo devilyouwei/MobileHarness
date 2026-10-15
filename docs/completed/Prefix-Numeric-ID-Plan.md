@@ -1,0 +1,19 @@
+# SQLite business records and native runtime identities
+
+归档日期：2026-10-15。原需求完成范围：SQLite 业务记录、稳定 ID 与逐消息持久化迁移。历史验证结果和独立验收限制保留如下；当前实现以源码 README 为准。
+
+✅ Implementation complete; validation evidence is recorded separately. Supersedes the custom prefix allocator; historical test evidence remains in Validation-History.md.
+
+Use GRDB.swift 7.11.1 inside Storage, one App-owned records.sqlite with WAL, foreign keys and synchronous FULL. No new source modules/directories. Business tables dialogs/messages/tasks/media_files/devices use SQLite INTEGER PRIMARY KEY AUTOINCREMENT and dialog_/message_/task_/media_/device_ external references. Runtime IDs, scopes, leases, calls, requests, audio handles, revisions and temporary files use UUID or original protocol strings. Remove IDGenerator/IdentitySource/counter JSON and obsolete chat/current/index/rotation and device/photo index implementations without importing old data. Existing media/model/credential files remain untouched.
+
+Task/message identities are inserted before references escape. User acceptance, each completed Assistant generation and each ReACT observation commit content at their own completion boundary; delta and partial calls remain memory-only. Runtime state uses Storage StateRepository/MemoryStateStore with no Context JSON; private GRDB ORM records map database writes. Terminal failure/cancellation commits the accumulated message. Task creation commits its running row before activation. Sources/compressions retain chronological history order. Record retries are idempotent by runtime UUID. Archive/current rotation is one SQL transaction; titles run asynchronously. Queries paginate 50 records and load evidence only for detail; no archive-count/turn-count file-format limits. Write admission has at most16 waiters. Storage does not own Agent context selection or native execution.
+
+Media references use media_N. Final JPEG filenames are UTC yyyyMMdd_HHmmss_N.jpg, temporary files UUID. Insert pending metadata, publish bytes outside SQL transaction, mark ready and only then return ID. On restart reconcile pending bytes without replay; failures and FIFO retirement preserve unavailable reference records. Existing 4MiB/photo,1024-file/2GiB application limits remain. Generic settings/model documents remain separate. Future memories are not implemented.
+
+Validation: ID concurrency/delete/rollback, message-boundary commits and no delta writes, Task sources/compression, restart/cancellation/no replay, media failure compensation and pending reconciliation, paginated100000-message performance. Run scripts/check.sh and scripts/build-ios.sh; distinguish automated/device builds from native/model/physical acceptance.
+
+Implementation details: Snapshot chunks preserve exact UTF-8 and reference edges prevent orphan cleanup from deleting shared text. Standalone ephemeral repositories allocate process-local identities without opening SQLite; durable App identities come only from committed database rows. Current context is a window over persisted messages; Task source indexes include offloaded inputs. Title positions are injected by Memory. Model history Tools retain their existing offset arguments but use bounded SQL previews; UI uses cursors.
+
+✅ The mixed100000-message benchmark confirms dialog/Task range indexes and exact pair indexes. Generic raw enumeration uses explicit history position plus primary-key tie-breaking; archive previews omit recovery blobs. Dated timings, memory observations and required-check limitations are in [validation history](../validation/Validation-History.md#2026-10-15--sqlite-business-record-migration).
+
+✅ Final memory/read refinements: keep checkpoint fingerprints within the current context window and store bounded preview text separately from full bodies. Metadata queries omit recovery blobs. Large-body details still restore the complete original; the ten-block long-dialog regression verifies bounded cache retention.

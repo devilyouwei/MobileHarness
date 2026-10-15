@@ -46,7 +46,7 @@ The bundle contains source declarations/license notices, not model weights. Cata
 
 ❌ Separate icon appearance variants.
 
-Runtime/server/device acceptance belongs in [validation history](../../docs/Validation-History.md).
+Runtime/server/device acceptance belongs in [validation history](../../docs/validation/Validation-History.md).
 
 ✅ Agents packages Agents/, Skills/ and Catalog.json from this shared source root; Models and app assets remain independently packaged. AgentCore separately packages its generic Function Token prompt resource. The final app resource verifier checks exact source bytes and missing/stale files for both bundles.
 

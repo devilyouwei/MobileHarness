@@ -1,22 +1,25 @@
 # iOS 与机器人能力边界
 
-手机作为推理和感知中心，通过公开 API 控制本 App 获准访问的相机、音频、传感器、照片以及配对设备。普通 App 不能拥有任意系统管理权限，也不能通过通用 API 操作所有第三方 App 的界面。
+本文件描述平台和授权约束，不作为功能已接入清单。当前用户能力见 [Product scope](Product-Scope.md)，模块实现见 [Architecture](Architecture.md) 及其源码入口。
 
-下表描述平台接入方向；照片、位置、系统集成、Network 连接和后台任务并不代表当前 App 已实现的功能。
+## 原生能力与权限
 
-| 能力 | 接入方向 | 实施约束 |
-| --- | --- | --- |
-| 相机 / 音频输入输出（PlatformKit） | AVFoundation / AVFAudio | 按需权限，处理中断、前后台切换与热状态 |
-| 语音数据加工 | 本地 ASR、VAD、TTS 模型 | 按设备与模型核实支持；声明实际使用的数据流 |
-| 照片 / 位置 | Photos / Core Location | 限定授权范围，拒绝后降级 |
-| App 与系统集成 | App Intents / Shortcuts / 已公开 URL 接口 | 只使用系统与目标 App 公开的能力 |
-| 机器人连接 | Core Bluetooth / Network | 配对、授权、协议校验、超时和急停 |
-| 后台任务 | BackgroundTasks 与符合用途的 background modes | 由系统调度，不承诺永久运行 |
+| 领域 | 边界 |
+| --- | --- |
+| 相机与音频 | 使用公开原生接口和用户授权，处理权限拒绝、前后台和路由/设备中断；能力可用不代表已开始采集。 |
+| 系统照片及其他受限数据 | 仅访问实际获准范围，导出、读取与 App 内媒体保存分别确认。 |
+| App 与系统集成 | 只使用系统和目标 App 明确公开的能力；普通 App 不拥有任意系统管理或第三方界面控制权限。 |
+| 模型处理 | 根据实际设备、制品和配置确认能力；本地/云端选择不改变设备权限与业务执行授权。 |
+| 机器人连接 | 原生连接、发送准入、设备反馈和物理到位分别确认；具体协议及失败归属由 PlatformKit/Actions 各自定义。 |
 
-长期存活 actor 是进程内生命周期概念，不代表 App 被系统挂起后仍可无限执行。物理机器人的低层安全控制、运动限幅和 watchdog 必须落在外部控制器；手机失联时外部设备自行停机。手机不承担硬实时安全控制。
+## 生命周期与物理控制
 
-当前生产语音由手机采集麦克风音频，使用本地 Nemotron/Silero 识别语音、MOSS-TTS-Nano 合成回复，再由扬声器播放。旧 Apple ASR 联网调试路径不属于当前默认装配。麦克风在用户开始语音交互时申请权限；相机在正常前台启动时独立申请权限并默认使用前置摄像头。App 协调前后台与设备中断。
+进程内长期 actor 不代表 iOS 挂起后仍能持续执行。后台机会由系统和已配置能力决定，不能把永久运行当成产品保证；根级所有者仍需定义取消、停止和清理。
 
-当前实现把设备输入输出、模型数据处理、Agent 决策和界面呈现分开。摄像头姿态感知与前台 NexArm BLE 控制已接入；Actions 拥有运动业务与完成策略，PlatformKit 拥有连接、协议和设备反馈。自主摄影运镜仍是[未来提案](Photographer-Proposal.md)，骨架显示不等于已实现摄影跟随。内部模块边界见[技术方案](../MobileHarness/README.md)。
+物理机器人的低层保护、限幅和 watchdog 必须由外部控制器承担，手机不能提供硬实时安全保证。BLE 或 USB 实测只支持对应设备、负载、协议和测试环境；发送成功、视觉姿态或 UI 就绪不能代替物理到位事实。
 
-依据（2026-09-22 查阅）：[Apple App Review Guidelines](https://developer.apple.com/app-store/review/guidelines/)，[Background Tasks](https://developer.apple.com/documentation/backgroundtasks)。具体接入时按对应 SDK 文档核实。
+语音提供者、相机初始状态和自动恢复策略会随业务配置演进，本文不重复其默认值。当前契约见 [App 生命周期](../MobileHarness/App/Lifecycle/README.md)、[PlatformKit](../MobileHarness/PlatformKit/README.md) 和 [Actions](../MobileHarness/Actions/README.md)。
+
+## 外部资料
+
+原文在 2026-09-22 引用 [Apple App Review Guidelines](https://developer.apple.com/app-store/review/guidelines/) 与 [Background Tasks](https://developer.apple.com/documentation/backgroundtasks)。具体接入按对应 SDK 的有效接口核实；此处不记录新的政策核验结论。

@@ -41,7 +41,7 @@ One active photo delegate has a ten-second terminal bound. Cancellation checks o
 
 ✅ Foreground camera, native preview/frame transport, healthy input switch, JPEG capture and Photos import.
 
-❌ Movie recording and background capture. Physical camera/permission/latency evidence is tracked in [validation history](../../../docs/Validation-History.md).
+❌ Movie recording and background capture. Physical camera/permission/latency evidence is tracked in [validation history](../../../docs/validation/Validation-History.md).
 
 ## Related design
 

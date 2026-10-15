@@ -79,7 +79,7 @@ Listening pauses during recognition completion and replies, then resumes through
 
 Model downloads use an explicit official Hugging Face, HF-Mirror or custom HTTPS source; YOLO retains its declared ZIP source. Production revisions remain pinned. Background transfer and resume depend on the OS and server; force-quit does not guarantee continued transfer. See [model resources](MobileHarness/Resources/Models/README.md) and the [Hub adapter](MobileHarness/ModelKit/Support/Management/HuggingFace/README.md) for acquisition, compatibility and recovery details.
 
-For offline development and opt-in Mac/model tests, existing `scripts/download-*.py` wrappers provision ignored local artifacts; Hugging Face wrappers accept `--endpoint`. Gemma Mac tests use a separate decoder profile. For voice experiments and acceptance procedures, see [Voice](docs/Voice.md) and [MOSS validation](docs/Moss-Validation.md).
+For offline development and opt-in Mac/model tests, existing `scripts/download-*.py` wrappers provision ignored local artifacts; Hugging Face wrappers accept `--endpoint`. Gemma Mac tests use a separate decoder profile. For voice experiments and acceptance procedures, see [Voice](docs/validation/Voice.md) and [MOSS validation](docs/validation/Moss-Validation.md).
 
 ## Development
 
@@ -97,12 +97,14 @@ For offline development and opt-in Mac/model tests, existing `scripts/download-*
 | Entry                                                                    | Purpose                                                                        |
 | ------------------------------------------------------------------------ | ------------------------------------------------------------------------------ |
 | [Documentation index](docs/README.md)                                     | Document categories and ownership.                                             |
-| [Requirements](docs/Requirements.md) / [Concepts](docs/Concepts.md)        | User goals, biological analogy and architectural vocabulary.                   |
+| [Pending requirements](docs/requirements/README.md)                       | Unimplemented technical, product and combined requirements.                    |
+| [Completed requirements](docs/completed/README.md)                       | Whole requirements archived after their original delivery scope is complete.   |
+| [Product scope](docs/Product-Scope.md) / [Concepts](docs/Concepts.md)       | Delivered product scope, biological analogy and architectural vocabulary.      |
 | [Public architecture](docs/Architecture.md)                               | Public system explanation and retained architecture context.                   |
 | [Technical design](MobileHarness/README.md)                               | Current framework, module boundaries, target map and complete technical flows. |
 | [Module READMEs](MobileHarness/README.md#part-ii--module-responsibilities) | Current local interfaces, algorithms, lifecycle, bounds and failure contracts. |
 | [Roadmap](docs/Roadmap.md)                                                | Pending work and proposed directions.                                          |
-| [Change log](docs/Change-Log.md) / [ADRs](docs/adr/README.md)              | Changes, decisions and supersession.                                           |
+| [Change log](docs/history/Change-Log.md) / [ADRs](docs/adr/README.md)              | Changes, decisions and supersession.                                           |
 | [Validation](docs/README.md#experiments-tests-and-acceptance)             | Recorded experiments, tests, native/device observations and measurements.      |
 
 This root README introduces the project and its concepts. Source READMEs define current implementation; docs holds requirements, plans, decisions, history and validation. The [original Word design](docs/Technical_Design.docx) remains preserved.

@@ -1,10 +1,46 @@
 # Documentation and architecture change history
 
+## 2026-10-15 — 按文档职责整理当前说明与历史证据
+
+- 验证报告及语音验收指南归入 validation，变更、里程碑、旧说明与原始 Markdown 设计归入 history；原始 Word 设计源保持原路径与内容，原始测量继续由 measurements 保留。
+- 精简重写文档索引、架构、路线图、概念和产品范围，移出混杂的旧实施叙述；当前说明不再复制默认值、迁移经过和历史构建结果。历史中保留独有上下文，清除 41 段完全重复叙述。
+- 模型报告改为按各节日期解释，消除历史装配冒充当前默认及未经证据支持的崩溃归因；保留测试数字、设备观察与失败。同步引用和 Xcode 文档导航，不改变业务实现。
+
+## 2026-10-15 — 完整需求完成后统一归档
+
+- 新建 completed 集中归档六份原范围已完成的需求/实施记录：Action 文档与 Skills、Tasks/Skills 迁移、ModelKit Support 重组、ModelKit 解耦审计、SQLite 迁移和 Storage 接口分离。
+- 归档以原定完整范围为单位，部分完成文档仍留 requirements；后续独立 bug 修复或 feature 扩展不阻止原需求归档，也不能将原范围缺项重新命名为扩展以提前归档。历史验证失败与独立验收状态保持真实。
+- 恢复四项核心架构需求的整体状态及已完成子项说明，整份继续保留待办；更新分类规则、归档索引和全仓文档引用，不改变业务代码或原始设计源。
+
+## 2026-10-15 — 未实现需求分类整理
+
+- 新建 requirements/technical 和 requirements/product：核心架构剩余需求归技术类，相册与记忆归产品类；Resource 状态和摄影构图/运镜等交叉需求放在 requirements 根目录。各目录增加分类与维护索引。
+- requirements 仅保留未实现范围。原架构计划第 4 项存储抽象已完成，转入 Storage 实施历史；已完成的 SQLite、Skills 和 ModelKit 计划保留为实施/决策记录，验收事项仍归验证文档。
+- 原 Requirements.md 的当前产品说明改为 Product-Scope.md；更新 Roadmap、文档入口、相对链接和 Xcode 文档引用。保留原始 Technical_Design.docx，不改变业务代码或编译成员。
+
+## 2026-10-15 — 用户相册与日记式记忆需求
+
+- 记录“用户”板块内与“Agent 记录”并列的相册、记忆两个独立页面，均为待实施产品需求。
+- 相册覆盖 Photography Tasks 的图片、视频等产物，区分长期作品与临时缓存；记忆按时间组织，周期性增量更新摘要、关键词、embedding 和原始对话索引。
+- 明确记忆周期和粒度待细化，更新服务独立于页面生命周期；视频、embedding 和日记式记忆仍需补齐。更新 Requirements、Roadmap 和文档索引，本次仅修改需求文档。
+
+## 2026-10-15 — Camera Skill loading and rejected-call feedback
+
+- Teach current-catalog loading before standalone camera save/discard/close, including previews retained after capture-only decisions. No Task requirement is added; ignorePhoto remains the canonical discard alias and model photo examples use media_N.
+- Return explicit pre-execution rejection evidence and catalog/Skill-control correction guidance for XML Actions and native Tools. No alias fallback, automatic loading or device replay is introduced.
+- Synthetic regression and build limitations are recorded in [validation history](../validation/Validation-History.md#2026-10-15--camera-skill-availability-and-rejected-alias-correction).
+
+## 2026-10-14 — 四项核心架构改进计划
+
+- 记录 Storage 通用内存状态机制、错误分类与用户文案/开发日志分层、App 模块管理与桥接、存储抽象接口四项待实施计划，说明职责、实施衔接及验收范围。
+- 明确 Storage 不拥有业务转换规则，用户点击即时反馈/页面跳转直接走 UI 或宿主能力，Agent 发起的 UI 控制保留 Action 路径；抽象存储不得掩盖持久化失败。
+- 关联既有 Resource 当前状态存取和 SQLite 迁移计划，更新 Roadmap 和文档索引；校正 Roadmap 中已过时的 UI → StorageChat 依赖描述。本次仅变更计划文档。
+
 ## 2026-10-14 — Stable short references for model history reads
 
 - Physical history confirms the model copied a listed conversation UUID suffix incorrectly, received notFound, then read the correct UUID successfully. The query backend did not lose the conversation; the historical failure remains real evidence.
 - History.list now exposes an eight-hex ref only when its stable UUID prefix is unique across current/archives. History.read validates a typed short/full reference, resolves only exact unique metadata matches and rejects missing/ambiguous references. No guessed UUID correction, persistent alias table, file-schema change or UI change.
-- HistoryQuery revision6 prefers exact returned refs and permits one fresh-list/corrected-read recovery after notFound. Canonical UUIDs remain available for collision disambiguation and other history operations. Validation is recorded in [validation history](Validation-History.md#2026-10-14--stable-short-history-reference-regression).
+- HistoryQuery revision6 prefers exact returned refs and permits one fresh-list/corrected-read recovery after notFound. Canonical UUIDs remain available for collision disambiguation and other history operations. Validation is recorded in [validation history](../validation/Validation-History.md#2026-10-14--stable-short-history-reference-regression).
 
 ## 2026-10-14 — Function Catalog placement and direct detail contents
 
@@ -33,7 +69,7 @@
 ## 2026-10-14 — History task layout and single request navigation
 
 - Conversation/task rows have distinct icons and task goals use blue. Task metadata and expanded original requests occupy separate native List cells/Sections with spacing and separators; expansion suppresses implicit cell-content animation.
-- Replace multiple nested NavigationLinks inside one compression cell with plain request Buttons and one page-local navigationDestination. Active selection rejects duplicate taps; native dismissal clears the presentation flag and allows reopening while preserving expansion. No persistence/backend contract changes. Validation and remaining native acceptance are recorded in [validation history](Validation-History.md#2026-10-14--history-task-layout-and-single-request-navigation).
+- Replace multiple nested NavigationLinks inside one compression cell with plain request Buttons and one page-local navigationDestination. Active selection rejects duplicate taps; native dismissal clears the presentation flag and allows reopening while preserving expansion. No persistence/backend contract changes. Validation and remaining native acceptance are recorded in [validation history](../validation/Validation-History.md#2026-10-14--history-task-layout-and-single-request-navigation).
 
 ## 2026-10-14 — Isolated audio-detection communication startup
 
@@ -42,43 +78,43 @@
 
 ## 2026-10-13 — Task历史原位压缩与新存储格式
 
-✅ 新历史格式将请求开始时的决策快照与历史Task归属分开；启动请求、任务过程和关闭请求按稳定ID索引，终态压缩独立持久化。上下文和历史查询按请求顺序原位替换，UI可展开原始记录；同一输入中的多个Task分别归属。生产切换到新的Assistant上下文文件，旧数据不导入，移除旧Task状态升级、末尾汇总及已结束Task的整turn过滤。完整检查、设备SDK编译和资源校验通过；模拟器限制及原生验收边界见[验证记录](Validation-History.md#2026-10-13--indexed-task-history-v2-and-inline-compression)。
+✅ 新历史格式将请求开始时的决策快照与历史Task归属分开；启动请求、任务过程和关闭请求按稳定ID索引，终态压缩独立持久化。上下文和历史查询按请求顺序原位替换，UI可展开原始记录；同一输入中的多个Task分别归属。生产切换到新的Assistant上下文文件，旧数据不导入，移除旧Task状态升级、末尾汇总及已结束Task的整turn过滤。完整检查、设备SDK编译和资源校验通过；模拟器限制及原生验收边界见[验证记录](../validation/Validation-History.md#2026-10-13--indexed-task-history-v2-and-inline-compression)。
 
 ## 2026-10-13 — Immediate listening after reply
 
-✅ Removed the 350 ms playback guard and its helper/tests. SpeechPerception retains policy and App retains physical capture ownership; listening restoration joins native playback/lease cleanup as soon as policy permits, with explicit error/cancellation handling. This supersedes the idle-tail portion of the earlier TTS optimization; PCM/segmentation/synthesizer changes remain. Nine focused regressions, 96 App workflow tests and the unsigned iOS device build pass; full-suite sound-source failures and the simulator dependency limitation are recorded in [validation](Validation-History.md#2026-10-13--immediate-listening-after-reply-without-an-acoustic-timer).
+✅ Removed the 350 ms playback guard and its helper/tests. SpeechPerception retains policy and App retains physical capture ownership; listening restoration joins native playback/lease cleanup as soon as policy permits, with explicit error/cancellation handling. This supersedes the idle-tail portion of the earlier TTS optimization; PCM/segmentation/synthesizer changes remain. Nine focused regressions, 96 App workflow tests and the unsigned iOS device build pass; full-suite sound-source failures and the simulator dependency limitation are recorded in [validation](../validation/Validation-History.md#2026-10-13--immediate-listening-after-reply-without-an-acoustic-timer).
 
 ## 2026-10-13 — Streaming TTS latency
 
-✅ Implemented: immediate initial Apple PCM with subsequent bounded coalescing, 20/60 first speech segments followed by 60/120, reusable fenced system synthesizer, and a root-owned replaceable 350 ms acoustic idle tail instead of per-segment blocking. Default voice/rate and bounded failure contracts remain. Focused regressions, opt-in Mac system synthesis and unsigned iOS device builds pass. Whole-suite failures/stall and the CoreAI simulator limitation are recorded in [validation](Validation-History.md#2026-10-13--streaming-apple-tts-latency-and-continuous-playback). Phone acoustic/latency acceptance remains pending.
+✅ Implemented: immediate initial Apple PCM with subsequent bounded coalescing, 20/60 first speech segments followed by 60/120, reusable fenced system synthesizer, and a root-owned replaceable 350 ms acoustic idle tail instead of per-segment blocking. Default voice/rate and bounded failure contracts remain. Focused regressions, opt-in Mac system synthesis and unsigned iOS device builds pass. Whole-suite failures/stall and the CoreAI simulator limitation are recorded in [validation](../validation/Validation-History.md#2026-10-13--streaming-apple-tts-latency-and-continuous-playback). Phone acoustic/latency acceptance remains pending.
 
 ## 2026-10-13 — 关闭云端 thinking 并修复阿里云标题生成
 
 - 真实 qwen3.8-flash 标题请求复现：64 个输出 token 全部用于 reasoning，返回 incomplete/max_output_tokens，Memory 正确拒绝空标题。共享 OpenAIChatConfiguration 请求编码对已识别阿里云地址发送 reasoning.effort=none、enable_thinking=false；普通聊天和标题生成同时生效，保持原来的 64-token 标题预算和原始消息边界。
 - OpenAI 支持关闭推理的规范 GPT-5.x/GPT-6 模型 ID 发送 reasoning.effort=none；旧非推理模型保留原参数，不添加阿里云字段。已知不能关闭 thinking 的 OpenAI 模型明确拒绝，不用低推理强度冒充关闭。未知别名/模型能力仍需单独验证。
-- 保留 reasoning 响应解析、取消/资源清理、原生调用配对和标题失败契约。新增编码、未完成标题及 opt-in 真实标题回归；验证与部署范围见[验证历史](Validation-History.md#2026-10-13--cloud-thinking-off-and-qwen38-title-generation)。
+- 保留 reasoning 响应解析、取消/资源清理、原生调用配对和标题失败契约。新增编码、未完成标题及 opt-in 真实标题回归；验证与部署范围见[验证历史](../validation/Validation-History.md#2026-10-13--cloud-thinking-off-and-qwen38-title-generation)。
 
 ## 2026-10-13 — 撤回连续 user 请求适配
 
 - 按用户要求，撤回 OpenAI Responses 与 Gemma 提示词生成中的连续 user 合并，恢复原始消息边界和文本；删除合并专用回归，改为检查原始连续 user 与图片边界。
-- 保留阿里云 Responses reasoning 兼容修复。使用已授权本地配置，经 OpenAIChat.chat() 直接发送 system/user/user/assistant/user/user，qwen3.5-35b-a3b 成功返回预期答案；这只证明该模型接受此请求，不推广为所有模型都支持连续 user。验证范围见[验证历史](Validation-History.md#2026-10-13--restore-original-user-message-boundaries)。
+- 保留阿里云 Responses reasoning 兼容修复。使用已授权本地配置，经 OpenAIChat.chat() 直接发送 system/user/user/assistant/user/user，qwen3.5-35b-a3b 成功返回预期答案；这只证明该模型接受此请求，不推广为所有模型都支持连续 user。验证范围见[验证历史](../validation/Validation-History.md#2026-10-13--restore-original-user-message-boundaries)。
 
 ## 2026-10-13 — 阿里云 Responses reasoning 兼容
 
 - 使用用户授权的本地阿里云配置，通过真实 OpenAIChat.chat() 复现 HTTP 200 后 unsupportedOutput：阿里云默认输出 reasoning 项及 response.reasoning_text.delta/done。实发六条历史消息已经合并为 system/user/assistant/user，未复现该请求的连续 user 编码错误。
-- ChatEventDecoder 新增 reasoning 项及事件的格式验证与私有通道过滤；仅最终 output_text 进入回复和首 token 采样，保留原生调用的原始 output_index、配对、终态与有界失败契约。新增三个离线回归和显式 opt-in 真实接口测试；本地密钥未写入源码或证据。验证与部署范围见[验证历史](Validation-History.md#2026-10-13--aliyun-responses-reasoning-compatibility)。
+- ChatEventDecoder 新增 reasoning 项及事件的格式验证与私有通道过滤；仅最终 output_text 进入回复和首 token 采样，保留原生调用的原始 output_index、配对、终态与有界失败契约。新增三个离线回归和显式 opt-in 真实接口测试；本地密钥未写入源码或证据。验证与部署范围见[验证历史](../validation/Validation-History.md#2026-10-13--aliyun-responses-reasoning-compatibility)。
 
 ## 2026-10-13 — 请求层合并连续 user 消息
 
 历史阶段：该适配已由同日“撤回连续 user 请求适配”移除；以下保留当时的变更记录。
 
 - OpenAI Responses 编码与 Gemma 本地提示词生成在模型边界合并连续 user 消息；相邻文本以两个换行分隔，图片保持原有文本/图片顺序。system、assistant、原生工具调用及结果保留边界，不自动补造 assistant 消息。
-- 保留 ChatRequest.messages 和调用方聊天记录；原始消息数量、文本、图片和工具配对验证不变，云端插入的分隔符计入 64 KiB 文本上限。新增离线序列化和本地提示词回归；没有新增目录、模块或依赖。验证范围见[验证历史](Validation-History.md#2026-10-13--consecutive-user-request-adaptation)。
+- 保留 ChatRequest.messages 和调用方聊天记录；原始消息数量、文本、图片和工具配对验证不变，云端插入的分隔符计入 64 KiB 文本上限。新增离线序列化和本地提示词回归；没有新增目录、模块或依赖。验证范围见[验证历史](../validation/Validation-History.md#2026-10-13--consecutive-user-request-adaptation)。
 
 ## 2026-10-13 — 平滑眼睛表情轮廓
 
 - 修复笑眼等表情侧边控制点反向弯折，以及不同轮廓锚点在动画插值时产生的异常突出。EyeGeometry 统一为八段三次曲线，共用连接点与切线；笑眼、斜眼和闭眼变形同步调整切线，爱心使用对应的语义锚点。
-- 保留原生 path/shadowPath 插值、动画时长、打断接续与完成回执。增加所有双眼表情组合及中途打断的几何回归；没有新增目录、模块或依赖。检查、预览和构建范围见[验证历史](Validation-History.md#2026-10-13--smooth-eye-contours-through-expression-transitions)。
+- 保留原生 path/shadowPath 插值、动画时长、打断接续与完成回执。增加所有双眼表情组合及中途打断的几何回归；没有新增目录、模块或依赖。检查、预览和构建范围见[验证历史](../validation/Validation-History.md#2026-10-13--smooth-eye-contours-through-expression-transitions)。
 
 
 ## 2026-10-13 — 历史记录收敛
@@ -91,13 +127,13 @@
 ## 2026-10-12 — Centered lamp-arm icon composition
 
 - Recenter the selected first expression-refinement design as one phone/arm/base group, balancing opposing canvas margins while retaining the tilted phone, cyan expression and hidden rear magnetic mount. Preserve the earlier selected source and the new built-in ImageGen edit/prompt in output/icon-concepts.
-- Refresh the opaque 1024×1024 lamp-arm variant and selected AppIcon.png through the unchanged selector; the root README already shares that selected image. Asset/link checks are recorded in [validation history](Validation-History.md#2026-10-12--centered-lamp-arm-icon-composition).
+- Refresh the opaque 1024×1024 lamp-arm variant and selected AppIcon.png through the unchanged selector; the root README already shares that selected image. Asset/link checks are recorded in [validation history](../validation/Validation-History.md#2026-10-12--centered-lamp-arm-icon-composition).
 
 ## 2026-10-12 — Selected lamp-arm app icon
 
 - Select the first image from the latest expression-refinement turn: white lamp-like arm, tilted iPhone face with cyan open/winking eyes, rear magnetic joint hidden behind the phone and no screen halo. Preserve the full-resolution approved source and prior alternatives in output/icon-concepts.
 - Package the approved image as opaque 1024×1024 AppIconVariants/lamp-arm.png. Extend the existing selector with lamp-arm and copy it into the universal AppIcon.png asset without changing asset declarations or runtime behavior.
-- Point the root README logo at the selected AppIcon.png so documentation and app share one selected image; retain old icon sources and existing logo sizing/style. Checks and build limitations are recorded in [validation history](Validation-History.md#2026-10-12--selected-lamp-arm-app-icon).
+- Point the root README logo at the selected AppIcon.png so documentation and app share one selected image; retain old icon sources and existing logo sizing/style. Checks and build limitations are recorded in [validation history](../validation/Validation-History.md#2026-10-12--selected-lamp-arm-app-icon).
 
 ## 2026-10-12 — 回复切换时录音暂停、长按打断与 GPU 光环
 
@@ -105,13 +141,13 @@
 - 用户长按关闭立即停止播放、采集并屏蔽迟到呈现，明确关闭聆听授权。当前 Assistant 的模型取消与按实际 Agent incarnation／session 选择的已接纳 Action 取消并行加入，能打断等待播放的 round seal；不关闭共享 session 的其他 Agent／摄像资源。显式 agent.cancelled 终态保留原 input／round，取消不伪装成成功或普通错误。
 - 空间 PCM 时间不连续／采样率变更使用独立类型与实际证据，64 包真实队列溢出仍显式失败。
 - 光环用 UI 自有 Metal 单次绘制，增加彩色流动光场、移动亮点、侧边启动闪光和 850 ms 内收回的泛光。字幕用两个 Text 段与原生透明度插值；闭眼时暂停重复 Timeline 更新。
-- 自动测试、原生目标编译、视觉预览与物理设备验收分别记录在 [验证历史](Validation-History.md#2026-10-12--reply-capture-interruption-and-gpu-halo)。未增加目录或第三方依赖。
+- 自动测试、原生目标编译、视觉预览与物理设备验收分别记录在 [验证历史](../validation/Validation-History.md#2026-10-12--reply-capture-interruption-and-gpu-halo)。未增加目录或第三方依赖。
 
 ## 2026-10-12 — Project banner and README review
 
 - Place the approved 3:1 laboratory banner below the English italic slogan in the root README. Retain the source artwork and prompt in output; identify diverse robot coordination as the vision and NexArm as the current integration.
 - Describe Assistant-owned conversation, bundled Skills and the single foreground Task. Correct Quick Start to use the half-second eye hold and default-off camera preview; document local Gemma hardware, image and native-Tool limits.
-- Repair the module-design anchor, update Agent/Skill packaging wording and condense download recovery details into owning-document links. Preserve unrelated changes. Documentation verification is recorded in [validation history](Validation-History.md#2026-10-12--project-banner-and-readme-review).
+- Repair the module-design anchor, update Agent/Skill packaging wording and condense download recovery details into owning-document links. Preserve unrelated changes. Documentation verification is recorded in [validation history](../validation/Validation-History.md#2026-10-12--project-banner-and-readme-review).
 
 ## 2026-10-12 — 长按聆听、边缘光环与闭眼表情
 
@@ -119,19 +155,19 @@
 - 开启后显示青蓝/紫粉/橙金流动边缘光环，使用多层柔光与细亮边；关闭时淡出，降低动态效果时使用静态光环。
 - 未开启聆听时双眼呈柔和闭眼弧线，开启时平滑展开。Expression Action 新增 closed，有限演出仍等待进入/恢复的真实动画回执；关闭聆听时不将其他不可见表情报告为成功。
 - App 在启动接纳时触发轻柔振动，在模型/权限准备完成后播放原创 420 ms 启动音；等待原生播放完成和 120 ms 余音间隔后才打开采集。PlatformKit 接收通用有界 PCM，不持有应用配乐/策略；失败、重叠和取消均明确处理。
-- 回归、静态视觉核对、iPhone 编译及 Simulator 限制见 [验证记录](Validation-History.md#2026-10-12--press-and-hold-listening-feedback-and-closed-eyes)。Siri 精确长按时长及原声没有作为公开接口复制，本次采用明确的应用时长和相近风格原创提示音。
+- 回归、静态视觉核对、iPhone 编译及 Simulator 限制见 [验证记录](../validation/Validation-History.md#2026-10-12--press-and-hold-listening-feedback-and-closed-eyes)。Siri 精确长按时长及原声没有作为公开接口复制，本次采用明确的应用时长和相近风格原创提示音。
 
 ## 2026-10-12 — 首页任务与字幕布局优化
 
 - 摄像头初始关闭；开启后 YOLO/FPS 头部保留，性能详情默认收起。
 - 首页移除任务/Skill 卡片、Skill 数量和展开内容。前台任务改为用户 ASR 字幕上方的目标图标与单行 `任务：<goal>`，长目标省略并保留完整无障碍描述；无前台任务隐藏该行。
 - 任务行与 ASR 字幕共享位置及固定间距，一起完成字幕上移动画，并为顶部摄像头控件预留空间。任务历史继续通过已有执行日志查看。
-- 回归覆盖默认关闭状态、首次开启、紧凑/高屏幕字幕位置、任务与字幕间距、日志占位和无任务布局。构建及检查结果见 [验证记录](Validation-History.md#2026-10-12--home-task-and-asr-layout)。
+- 回归覆盖默认关闭状态、首次开启、紧凑/高屏幕字幕位置、任务与字幕间距、日志占位和无任务布局。构建及检查结果见 [验证记录](../validation/Validation-History.md#2026-10-12--home-task-and-asr-layout)。
 
 ## 2026-10-12 — Task context contraction
 
 - Preserve full history while projecting ended Tasks as bounded historical summaries.
-- Rebuild ReACT at Task boundaries and bind photos to producing Tasks; reject unscoped capture/cross-task operations. See [validation](Validation-History.md#2026-10-12--task-context-boundary-and-immutable-photo-ownership).
+- Rebuild ReACT at Task boundaries and bind photos to producing Tasks; reject unscoped capture/cross-task operations. See [validation](../validation/Validation-History.md#2026-10-12--task-context-boundary-and-immutable-photo-ownership).
 
 Purpose: retain dated documentation corrections and architecture changes without turning source-directory READMEs into change logs. For decisions that alter runtime contracts, follow the linked ADR; current behavior remains in the owning module README.
 
@@ -140,14 +176,14 @@ Purpose: retain dated documentation corrections and architecture changes without
 - Consolidate ordinary conversation into Assistant; replace specialist dialogue workers with fixed task coordinators while retaining camera/tracking, history/title and application transactions.
 - Move Agent configuration into approved pure Resources assets; add dynamic Skill catalogs, one local foreground task and immutable per-request mode/Skill/function evidence. Controls reuse real Actions; send/publish semantics remain distinct.
 - Separate Assistant conversations and task history; add bounded home task/Skill state without restoring Signal logs. Retire unused dialogue/voice grants and dependent subscriptions.
-- Preserve canonical Actions and neutral module dependencies; cache immutable assets/configuration to protect short-lived perception inputs under parallel load. See [ADR0212](adr/0212-assistant-skills-task-modes.md) and [migration record](Agents-Skills-Task-Modes-Plan.md).
+- Preserve canonical Actions and neutral module dependencies; cache immutable assets/configuration to protect short-lived perception inputs under parallel load. See [ADR0212](../adr/0212-assistant-skills-task-modes.md) and [migration record](../completed/Agents-Skills-Task-Modes-Plan.md).
 
 ## 2026-10-11 — Role-owned model prompts
 
 - Move role/style and workflow prompts into four role-owned JSON template resources; remove Assistant-specific instructions from shared Worker and move delegation guidance out of the shared task schema source.
 - Keep generic Function Token syntax and wait/Channel semantics in an independent AgentCore protocol resource. Role system templates supply speech/action ordering examples; native Tool definitions retain their separate request transport.
 - Add strict bounded single-pass rendering and immutable role-resource discovery. Missing/malformed templates and variable mismatches fail explicitly. Preserve generation ownership, parsing and execution contracts; generated send examples respect each role's actual grants.
-- Package and verify both role and protocol assets. Validation and Simulator limitations are recorded in [Validation history](Validation-History.md#2026-10-11--role-owned-prompt-templates-and-shared-function-token-guidance).
+- Package and verify both role and protocol assets. Validation and Simulator limitations are recorded in [Validation history](../validation/Validation-History.md#2026-10-11--role-owned-prompt-templates-and-shared-function-token-guidance).
 
 ## 2026-10-09 — Execution log tabs and causal visualization
 
@@ -155,20 +191,20 @@ Purpose: retain dated documentation corrections and architecture changes without
 - Added neutral bounded Signal observations in Core and InputGateway: one row with subscriber branches, explicit publish/send/feedback modes, partial acceptance, rejection, suppression, loss and no-subscriber outcomes. High-frequency media/perception telemetry aggregates matching outcomes within one-second windows, without retaining media payloads or changing communication acknowledgments.
 - Root presentation projects accepted public task reports into bounded parent/child timelines. Admission never completes a task; playback completion cannot replace waiting-user state. Details link related Signals, Actions and existing task-scoped model/ReACT/Tool history.
 - Runtime displays lifecycle changes and infrastructure errors. Originating input IDs allow the same Signal/Action failure to be associated without hiding unrelated errors that share wording. No new directory/module/dependency or writable context was added.
-- See [Validation-History](Validation-History.md) for automated/build evidence and physical/UI acceptance limits.
+- See [Validation-History](../validation/Validation-History.md) for automated/build evidence and physical/UI acceptance limits.
 
 ## 2026-10-09 — Camera-command delegation and concurrent admission
 
 - Corrected task communication declarations: new delegation uses kind=request, authorized task kinds/targets are enumerated, and internal speech/telemetry grants do not expose unsupported model publication. Invalid XML/native communication is associated through the complete model catalog and receives bounded corrective feedback. Successful admission remains distinct from task completion; post-validation persistence/uncertain delivery failures remain terminal without automatic replay.
 - ApplicationControl, Memory and Photographer serialize short fixed-state/context admission through a bounded FIFO gate instead of rejecting overlapping actor entry while a commit is suspended. Cancellation and stop release waiting callers; actual business queue bounds are unchanged.
 - Production composition injects configured model labels into all four interactive histories. Existing phone contexts and historical records are preserved.
-- Regression evidence and physical installation are recorded in [Validation-History](Validation-History.md). Synthetic camera/model tests do not establish physical runtime acceptance.
+- Regression evidence and physical installation are recorded in [Validation-History](../validation/Validation-History.md). Synthetic camera/model tests do not establish physical runtime acceptance.
 
 ## 2026-10-09 - Shared Agent source hierarchy
 
 - Consolidated reusable sources under Agents/Support/Core, Communication, Chat and Context. Core remains the independent Foundation-only AgentCore framework; business role schemas/policies/workflows stay in their role directories. Configuration loading joins Communication; model communication adaptation joins Chat.
 - Relocated64 Swift files without changing their bytes, public declarations, schemas, grants, bounds or runtime behavior. Updated Package paths, exclusions, complete Xcode source groups, current documentation links and static import/path guards. No new target or dependency.
-- See [ADR0189](adr/0189-agent-support-hierarchy.md) and [validation](Validation-History.md); real-model/native-UI/device acceptance is unaffected.
+- See [ADR0189](../adr/0189-agent-support-hierarchy.md) and [validation](../validation/Validation-History.md); real-model/native-UI/device acceptance is unaffected.
 
 ## 2026-10-09 - Default entry and specialist task ownership
 
@@ -176,7 +212,7 @@ Purpose: retain dated documentation corrections and architecture changes without
 - Native/XML sends and fixed UI routing emit existing communication Actions/task Signals. Child execution results return to the actual executor; admission receipts, parent committed evidence and final task reports are separate boundaries. Removed the old function-delegation proxy/TaskLocal and Assistant-private Chat loop.
 - Shared Support composition supplies one-round inference and bounded continuation; each role supplies preprocessing, schema, builder and grants. App owns stable interaction consumers independently of microphone and page lifetime. Task-scoped questions preserve speech-onset/text-admission and exact artifact identity.
 - Explicit schema migration rejects partial/null/unsupported context. Cancellation joins owned work, including failed child cancellation delivery; queue expiry reports failure; restart interrupts without replay. No new directory, target or third-party dependency; Settings/History reuse the existing AppPresentationWorkflow consumer.
-- Final repository checks passed (641 IntegrationTests/65 AppWorkflowTests plus remaining suites); unsigned iOS device build passed. Simulator remains blocked by external CoreAI. See [ADR0188](adr/0188-specialist-task-ownership.md) and [Validation-History](Validation-History.md) for evidence and remaining real-model/native-UI/device acceptance.
+- Final repository checks passed (641 IntegrationTests/65 AppWorkflowTests plus remaining suites); unsigned iOS device build passed. Simulator remains blocked by external CoreAI. See [ADR0188](../adr/0188-specialist-task-ownership.md) and [Validation-History](../validation/Validation-History.md) for evidence and remaining real-model/native-UI/device acceptance.
 
 ## 2026-10-09 - Agent business source audit
 
@@ -192,7 +228,7 @@ Purpose: retain dated documentation corrections and architecture changes without
 - Communication now leaves the Agent output stream as authorized Actions with distinct owner-directed admission receipts. Producer consumers bind actor/incarnation; task grants, parent/child reports, cancellation and runtime-stop cleanup preserve task ownership and causal identity.
 - Assistant executes one model round per worker and queues ready continuation with user inputs. Exact native call/result pairs, independent task history and cumulative budgets survive interleaving. Deletion removes associated closed-task evidence atomically through the authoritative context.
 - Recognition advances independently of reply source/task/decision. Listening follows actual playback with atomic utterance/playback admission and350ms tail cleanup. Current Photographer remains deterministic; photography LLM, active input focus and final role redistribution belong to phase two.
-- No new directory, module or third-party dependency. Tests and build limits are recorded in [Validation-History](Validation-History.md); contract is [ADR0187](adr/0187-agent-composition-and-react.md).
+- No new directory, module or third-party dependency. Tests and build limits are recorded in [Validation-History](../validation/Validation-History.md); contract is [ADR0187](../adr/0187-agent-composition-and-react.md).
 
 ## 2026-10-09 — History image thumbnails
 
@@ -217,7 +253,7 @@ Purpose: retain dated documentation corrections and architecture changes without
 - Reordered details to current input, model text/native Tool Calls, generation evidence including first text-token arrival, actual context, then actual Tools. Removed inline raw sharing and the detail continuation section; retained one upper-right export.
 - Flattened model invocations into peer list items, with ReACT badge, purple text/background and actual fresh execution observations as input. Details/export retain both model-round and owning-input identities and distinguish model completion from owner/execution errors.
 - Added optional nested modelRequests evidence under the original input, preserving existing runtime/context ownership and current schema. Attachment bytes remain excluded.
-- Final full checks and unsigned device-target compilation passed; Simulator remains blocked by the external CoreAI module. See [validation evidence](Validation-History.md#2026-10-08--per-request-conversation-history); native UI/live-provider/physical acceptance remains pending.
+- Final full checks and unsigned device-target compilation passed; Simulator remains blocked by the external CoreAI module. See [validation evidence](../validation/Validation-History.md#2026-10-08--per-request-conversation-history); native UI/live-provider/physical acceptance remains pending.
 
 ## 2026-10-08 — Signal classification documentation
 
@@ -230,14 +266,14 @@ Purpose: retain dated documentation corrections and architecture changes without
 - Assistant exposes Camera.Capture.takePhoto on Camera Channel, registered observation. It directly invokes the camera host, without Photographer delegation, to validate ActionResult plus optional native ToolResult through the existing sealed-round loop.
 - AppleCamera adds bounded joined JPEG capture; CameraCoordinator scopes capture/save/presentation to the originating invocation. Photos persist in a bounded owner-checked Storage store. The UI fades the complete image, shrinks it to the lower-right thumbnail and supports inspection; success waits for animation completion. Native shutter audio remains platform-owned.
 - ChatMessage supports bounded user-role image attachments. Cloud serialization emits text/image_url parts; current provider capability is explicit and Gemma rejects image chat. Assistant resolves only successful owned photo results and attaches bytes to its next request; history retains attachment metadata and omits bytes.
-- Synthetic Gateway/mixed-route, capture/read/provider failure, owned persistent storage, exact image JSON and request transcript regressions passed. See [ADR0184](adr/0184-assistant-photo-observation.md) and [validation history](Validation-History.md#2026-10-08--assistant-photo-observation-loop).
+- Synthetic Gateway/mixed-route, capture/read/provider failure, owned persistent storage, exact image JSON and request transcript regressions passed. See [ADR0184](../adr/0184-assistant-photo-observation.md) and [validation history](../validation/Validation-History.md#2026-10-08--assistant-photo-observation-loop).
 
 ## 2026-10-08 — Registered Action/Tool generation rounds (ADR0183)
 
 - Split text/XML Action dispatch from native Tool execution. Assistant text, captions and reply-turn start use Actions; native Tools bypass Channel/wait and run under a four-worker/sixteen-call input bound. Removed scheduled native projection and reject scheduled native bindings.
 - Host registration explicitly selects recordOnly/observation. Every initializer defaults recordOnly; value/void/error transport does not opt in to continuation. Both result types retain call/round correlation and join a full-round barrier before ordered merge, history evidence and another model request.
 - Added typed round sealing, causal feedback validation, bounded terminal delivery, cancellation/join ownership and execution-versus-delivery failure separation. Existing deterministic Agents retain native presentation routes. No new module, directory or dependency.
-- See [ADR0183](adr/0183-generation-round-observations.md) for ownership, limits, flow diagram and [validation history](Validation-History.md#2026-10-08--registered-actiontool-generation-rounds) for automated and device-target evidence.
+- See [ADR0183](../adr/0183-generation-round-observations.md) for ownership, limits, flow diagram and [validation history](../validation/Validation-History.md#2026-10-08--registered-actiontool-generation-rounds) for automated and device-target evidence.
 
 ## 2026-10-08 — Lower finalized user caption
 
@@ -249,13 +285,13 @@ Purpose: retain dated documentation corrections and architecture changes without
 - Camera.Capture.flip now requires facing=front/back across Assistant native declarations, Photographer intents, shared function validation and typed native capability. Healthy same-facing requests do not restart capture; manual switching resolves the opposite target before admission. Removed obsolete direct coordinator toggle/switch entry points.
 - ASR emits its final bounded caption before sealing it. User text moves above the eyes and remains beside the streaming reply until the next accepted turn; stopping voice retains displayed text. Cyan user and lavender assistant captions have distinct accessibility labels, with reduced-motion support and existing freshness fences.
 - Gaze displacement increases to horizontal14%/vertical9% of face width. Love morphs both stable eye shapes into pink hearts using matching cubic segments and existing animation-completion acknowledgment.
-- Tests cover target/argument validation, delegated target preservation, final-caption ordering, caption retention/reset and manual facing selection. Validation and acceptance limits are recorded in [validation history](Validation-History.md#2026-10-08--camera-target-and-companion-presentation-refinements).
+- Tests cover target/argument validation, delegated target preservation, final-caption ordering, caption retention/reset and manual facing selection. Validation and acceptance limits are recorded in [validation history](../validation/Validation-History.md#2026-10-08--camera-target-and-companion-presentation-refinements).
 
 ## 2026-10-08 — Prefer default Action Channels in model prompts
 
 - CapabilityContextBuilder explicitly prefers bare Action tags on their declared default Channels. Channel scopes are reserved for intentional routing overrides; concurrent work on different defaults needs no scopes or wait groups.
 - Assistant adds a concurrent expression/dance example and discourages duplicate Actions emitted only to demonstrate routing. Parser support and scheduling semantics remain unchanged.
-- Prompt regression checks the guidance and verifies two bare Actions route to Display/Robot without scheduling boundaries. Full checks passed (596 integration /51 workflow tests); simulator build is blocked by external CoreAI. Live-model instruction following remains unverified. See [validation history](Validation-History.md#2026-10-08--default-channel-prompt-guidance).
+- Prompt regression checks the guidance and verifies two bare Actions route to Display/Robot without scheduling boundaries. Full checks passed (596 integration /51 workflow tests); simulator build is blocked by external CoreAI. Live-model instruction following remains unverified. See [validation history](../validation/Validation-History.md#2026-10-08--default-channel-prompt-guidance).
 
 ## 2026-10-08 — ApplicationControl business service (ADR0182)
 
@@ -263,7 +299,7 @@ Purpose: retain dated documentation corrections and architecture changes without
 - Grouped fixed function grants and pure resource-result policy in co-located helpers. Shared transaction exclusion, runtime-result correlation and bounded actor state remain together.
 - Renamed App transport and public transport errors; updated registration, source/session guards, package resources, Xcode navigation and regression fixtures. Terminal control notifications migrate with their consumer.
 - Photographer and Memory retain their domains. Native Actions algorithms, Signal schemas, cancellation/join behavior and error propagation remain unchanged. Generic specialist delegation is still pending.
-- Full repository checks passed (596 integration /51 workflow tests). Unsigned device clean build and seven-config verification passed. Simulator remains blocked by external CoreAI; native UI/live-model/physical acceptance remains pending. See [ADR0182](adr/0182-application-control-service-organization.md).
+- Full repository checks passed (596 integration /51 workflow tests). Unsigned device clean build and seven-config verification passed. Simulator remains blocked by external CoreAI; native UI/live-model/physical acceptance remains pending. See [ADR0182](../adr/0182-application-control-service-organization.md).
 
 ## 2026-10-08 — Photographer camera control (ADR0181)
 
@@ -331,7 +367,7 @@ Purpose: retain dated documentation corrections and architecture changes without
 
 ## 2026-09-28 — Documentation ownership
 
-The internal source/target map is now part of [MobileHarness/README.md's Project Structure](../MobileHarness/README.md#source-structure-and-compilation-map). The unimplemented Photographer concept moved to [Photographer-Proposal.md](Photographer-Proposal.md). [Architecture.md](Architecture.md) now explains the product architecture externally, while source-directory READMEs own current module contracts. Dated UI/build observations moved to [Validation-History.md](Validation-History.md).
+The internal source/target map is now part of [MobileHarness/README.md's Project Structure](../../MobileHarness/README.md#source-structure-and-compilation-map). The unimplemented Photographer concept moved to [Photographer-Proposal.md](../requirements/Photographer-Proposal.md). [Architecture.md](../Architecture.md) now explains the product architecture externally, while source-directory READMEs own current module contracts. Dated UI/build observations moved to [Validation-History.md](../validation/Validation-History.md).
 
 The full `docs/` review classified public architecture, roadmap, proposals, validation records, ADR history, original design sources and license notices. Historical technical designs and superseded ADRs now point to later decisions instead of presenting old models, UI, transport or Agent configuration as current. The original Word source and license texts remain unchanged.
 
@@ -351,7 +387,7 @@ Replaced redundant flat Agent declarations with version/id and Channel-grouped c
 
 Aligned source names with current ownership: ApplicationRuntime, VoiceSessionCoordinator, VisionSession, CameraConversationSurface, CompanionEyes, SpeechDiagnosticState and ChatValidationView. App/Adapters owns the current-chat binding wrapper; App/Workflows owns Debug chat diagnostic execution. Removed duplicate retained assembly values, the one-method AgentBootstrap wrapper, unused imports/errors and the obsolete legacy configuration writer while preserving migration reads and verified deletion.
 
-Fixed the MOSS editor's stale task comparison, which resolved to SwiftUI's task modifier and always disabled editing. Restored the camera toggle's existing accessibility identifier. Module READMEs now describe the actual toolbar placement, state/workflow ownership, selected chat binding, model residency and editable credential scope; earlier historical names in this log and ADRs remain dated evidence. See [ADR 0064](adr/0064-app-ui-boundaries.md).
+Fixed the MOSS editor's stale task comparison, which resolved to SwiftUI's task modifier and always disabled editing. Restored the camera toggle's existing accessibility identifier. Module READMEs now describe the actual toolbar placement, state/workflow ownership, selected chat binding, model residency and editable credential scope; earlier historical names in this log and ADRs remain dated evidence. See [ADR 0064](../adr/0064-app-ui-boundaries.md).
 
 ## 2026-10-02 — Runtime boundaries and documentation ownership
 
@@ -361,7 +397,7 @@ Fixed the MOSS editor's stale task comparison, which resolved to SwiftUI's task 
 - The project README is a product/setup entry point. docs/README.md categorizes requirements, concepts, public architecture, plans, evidence, decisions, history and notices. Requirements.md and Concepts.md summarize current goals and terminology; Architecture.md and Roadmap.md no longer contain accumulated historical implementation notes.
 - Earlier roadmap snapshots are preserved in Milestone-History.md; accumulated entry-page notes are preserved in Documentation-History.md. Original Word/Markdown sources, ADR bodies, validation data and license notices are retained.
 
-Build, test and installation observations are recorded in [Validation-History](Validation-History.md).
+Build, test and installation observations are recorded in [Validation-History](../validation/Validation-History.md).
 
 ## 2026-10-07 — Resource command Agent
 
@@ -433,9 +469,9 @@ Assistant now demultiplexes model protocol fields into bounded text/Action and n
 
 ## 2026-10-08 — Camera lens-switch latency
 
-Healthy front/back switching retains the capture session/output graph and resource lease instead of full teardown/reacquisition. Old perception is fenced immediately and replaced by a bounded root-owned worker after joined cleanup; native command acknowledgment no longer waits for that cleanup. Off/background/model maintenance still join retirement, and native failure is explicit. See [ADR0186](adr/0186-camera-lens-switch-lifetime.md); physical latency acceptance remains pending.
+Healthy front/back switching retains the capture session/output graph and resource lease instead of full teardown/reacquisition. Old perception is fenced immediately and replaced by a bounded root-owned worker after joined cleanup; native command acknowledgment no longer waits for that cleanup. Off/background/model maintenance still join retirement, and native failure is explicit. See [ADR0186](../adr/0186-camera-lens-switch-lifetime.md); physical latency acceptance remains pending.
 
-✅ Phase two specialist ownership implementation: [ADR0188](adr/0188-specialist-task-ownership.md). Implemented; real-model/native-UI/physical-device acceptance pending.
+✅ Phase two specialist ownership implementation: [ADR0188](../adr/0188-specialist-task-ownership.md). Implemented; real-model/native-UI/physical-device acceptance pending.
 
 
 ## 2026-10-09 — Per-Agent conversation history navigation
@@ -447,7 +483,7 @@ History now opens a four-Agent picker, followed by each owner’s current/past c
 - Assistant exclusively owns user consent/reply holds through fixed internal Speech.Listening.update. Child Agents report task state; App executes native capture/playback barriers and SpeechPerception executes admission.
 - External inputs and perception observations publish one-way without recipient acknowledgments. send retains directed admission receipts; Gateway owns bounded fan-out/diagnostics/shutdown.
 - Queue/ASR/VAD errors report through agent.error then reset the damaged utterance and continue. UI result loss/camera cancellation waits are bounded; never replay effects or infer device stop.
-- Documentation and contracts: [ADR0190](adr/0190-assistant-listening-and-one-way-publication.md). Real-device acoustics/native UI remain separate acceptance work.
+- Documentation and contracts: [ADR0190](../adr/0190-assistant-listening-and-one-way-publication.md). Real-device acoustics/native UI remain separate acceptance work.
 
 
 ## 2026-10-09 — SpeechPerception listening authority
@@ -535,7 +571,7 @@ Keep resident RobotInteraction and all function/runtime contracts. Compact Core/
 
 ## 2026-10-12 — ModelKit Support ownership
 
-Shared code moves into Support/Core, Support/Backends, Support/Management and Support/Speech/Apple. Management and Defaults share a directory while retaining explicit independent compilation; HuggingFace remains a separately injected downloader. Concrete Gemma/Nemotron/Kokoro/MOSS/YOLO engines move to their model owners, mixed-model FluidAudio/MossCoreML targets are removed, and inference workers reuse one cancellation controller. Current source/build/test documentation is reconciled; historical model evidence and the original Word design are preserved. Validation successes and limitations are recorded in [the migration record](ModelKit-Support-Plan.md).
+Shared code moves into Support/Core, Support/Backends, Support/Management and Support/Speech/Apple. Management and Defaults share a directory while retaining explicit independent compilation; HuggingFace remains a separately injected downloader. Concrete Gemma/Nemotron/Kokoro/MOSS/YOLO engines move to their model owners, mixed-model FluidAudio/MossCoreML targets are removed, and inference workers reuse one cancellation controller. Current source/build/test documentation is reconciled; historical model evidence and the original Word design are preserved. Validation successes and limitations are recorded in [the migration record](../completed/ModelKit-Support-Plan.md).
 
 ## 2026-10-12 — Intrinsic Action timeouts
 
@@ -543,17 +579,17 @@ Restore a mandatory base-layer execution budget, rename estimatingDuration to dy
 
 ## 2026-10-12 — Neutral ModelKit Core contracts and layer audit
 
-Replaced inference conversation naming with opaque scopeID, separated resource residency from manager registration state, and moved production loader/waiter defaults to Management through explicit validated Core injection. Added independent Core typechecking and complete target dependency/import guards, migrated callers/fixtures, and added six boundary regressions. [The complete audit](ModelKit-Decoupling-Audit.md) records all 66 source owners and distinguishes a unified base SDK from independently compiled implementation targets. Full-suite timing and simulator dependency limitations remain explicit.
+Replaced inference conversation naming with opaque scopeID, separated resource residency from manager registration state, and moved production loader/waiter defaults to Management through explicit validated Core injection. Added independent Core typechecking and complete target dependency/import guards, migrated callers/fixtures, and added six boundary regressions. [The complete audit](../completed/ModelKit-Decoupling-Audit.md) records all 66 source owners and distinguishes a unified base SDK from independently compiled implementation targets. Full-suite timing and simulator dependency limitations remain explicit.
 
 
 ## 2026-10-12 — Complete ModelKit SDK dependency enforcement
 
-Confirmed the entire 15-target ModelKit SDK has no other project-module dependencies. Strengthened the checker with explicit system/third-party import allowlists, third-party product/package ownership, source confinement and SDK target/product transitive closure; eight in-memory invalid cases are rejected. Model algorithms and runtime behavior are unchanged. The shared repository package remains; no standalone publishing package was added. [SDK audit](ModelKit-Decoupling-Audit.md) records ownership and [validation](Validation-History.md#2026-10-12--complete-modelkit-sdk-dependency-enforcement) separates the latest successful full automated run from iOS and runtime acceptance.
+Confirmed the entire 15-target ModelKit SDK has no other project-module dependencies. Strengthened the checker with explicit system/third-party import allowlists, third-party product/package ownership, source confinement and SDK target/product transitive closure; eight in-memory invalid cases are rejected. Model algorithms and runtime behavior are unchanged. The shared repository package remains; no standalone publishing package was added. [SDK audit](../completed/ModelKit-Decoupling-Audit.md) records ownership and [validation](../validation/Validation-History.md#2026-10-12--complete-modelkit-sdk-dependency-enforcement) separates the latest successful full automated run from iOS and runtime acceptance.
 
 
 ## 2026-10-12 — ModelKit current documentation and diagram alignment
 
-Audited all 28 ModelKit directory READMEs, revised 27 and retained the accurate CoreML contract. Reconciled the complete 15-target/23-edge dependency diagram, provider/helper runtime flows, configurable Management limits, CoreAI actor/admission semantics, PCM downmixing and worker/terminal-event cancellation. Integrated current OpenAI protocol contracts and removed migration/regression records, obsolete implementation descriptions and application timer/storage policy from SDK source READMEs. Historical evidence remains under docs; no production code or interface changed. [Documentation history](Documentation-History.md#2026-10-12--modelkit-current-design-documentation-reconciliation) and [validation](Validation-History.md#2026-10-12--modelkit-current-documentation-and-diagram-alignment) record the review.
+Audited all 28 ModelKit directory READMEs, revised 27 and retained the accurate CoreML contract. Reconciled the complete 15-target/23-edge dependency diagram, provider/helper runtime flows, configurable Management limits, CoreAI actor/admission semantics, PCM downmixing and worker/terminal-event cancellation. Integrated current OpenAI protocol contracts and removed migration/regression records, obsolete implementation descriptions and application timer/storage policy from SDK source READMEs. Historical evidence remains under docs; no production code or interface changed. [Documentation history](Documentation-History.md#2026-10-12--modelkit-current-design-documentation-reconciliation) and [validation](../validation/Validation-History.md#2026-10-12--modelkit-current-documentation-and-diagram-alignment) record the review.
 
 
 ## 2026-10-12 — ReACT mechanism and limit design audit
@@ -571,7 +607,7 @@ The default haptic changes from soft/0.8 to heavy/1. Original wake synthesis cha
 
 Waking eyelids now use a fast 180 ms cubic ease-out, retain stable shape identity and start a new blink/breath epoch. Closure remains a softer 460 ms transition. The first 1.2 seconds suppress blinking, and loading no longer scales the eyes. The single-pass GPU rim has stable full-screen bounds, a 320 ms native fade in/out and a softer 1.05 s multicolor activation bloom. Reduce Motion remains static with 200 ms fades. Source-derived previews and actual device acceptance are distinct.
 
-The generic activation helper moved from Presentation to existing Speech workflows; AppSpeechPlayback adds the existing Actions/ExecutionRuntime dependencies. Shared boundary guards reflect that narrow dependency change, and the robot test-only UI fixture registers the new canonical feedback definitions with explicit unavailable native support. No new directory, dependency package, credential or signing-source change was introduced. Validation and installation evidence is recorded in [Validation History](Validation-History.md#2026-10-12--feedback-actions-and-fast-wake-validation).
+The generic activation helper moved from Presentation to existing Speech workflows; AppSpeechPlayback adds the existing Actions/ExecutionRuntime dependencies. Shared boundary guards reflect that narrow dependency change, and the robot test-only UI fixture registers the new canonical feedback definitions with explicit unavailable native support. No new directory, dependency package, credential or signing-source change was introduced. Validation and installation evidence is recorded in [Validation History](../validation/Validation-History.md#2026-10-12--feedback-actions-and-fast-wake-validation).
 
 
 ## 2026-10-12 — VAD and ActionCatalog compiler-warning cleanup
@@ -587,7 +623,7 @@ PhotoDeparture owns one identity-fenced renderer acknowledgment; PhotoDispositio
 
 UI.Feedback.playCue gains save/discard profiles: an original rising save chime and a falling filtered-air/crumpling discard cue. The camera reuses the canonical Action factory and 5-second execution budget through a private scoped native capability. NativeCuePlayback owns one AVAudioPlayer with a UUID-fenced immutable delegate; it does not explicitly reconfigure/deactivate the shared audio session and never resets recording or the speech player. Portable PCM16 encoding validates format and one-second bounds before native playback. All seven cue profiles remain finite, ramped and generated from source; no media asset/dependency package was added.
 
-CameraPhotoCommandReceipt optionally carries bounded feedbackIssues so a feedback problem cannot be reported as a failed album import. ExpressionInteraction revision 8 exposes the expanded cue vocabulary; Photography revision 13 teaches automatic effects, actual-save versus feedback issues and no duplicate cue. Source directories/module dependencies are unchanged. Validation distinguishes portable contracts, source-derived motion preview, native build and physical-device acceptance in [Validation History](Validation-History.md#2026-10-12--photo-disposition-animation-and-cue-validation).
+CameraPhotoCommandReceipt optionally carries bounded feedbackIssues so a feedback problem cannot be reported as a failed album import. ExpressionInteraction revision 8 exposes the expanded cue vocabulary; Photography revision 13 teaches automatic effects, actual-save versus feedback issues and no duplicate cue. Source directories/module dependencies are unchanged. Validation distinguishes portable contracts, source-derived motion preview, native build and physical-device acceptance in [Validation History](../validation/Validation-History.md#2026-10-12--photo-disposition-animation-and-cue-validation).
 
 ## 2026-10-13 — Photo archive capacity and coordinated native home animation
 
@@ -642,12 +678,12 @@ Per user-approved clarification, AgentActionCompletion business-output classific
 
 ## 2026-10-13 — Actions shared Support organization
 
-✅ Grouped the existing neutral contracts under Actions/Support/Contracts and shared macro/catalog utilities under Actions/Support. Preserved six domain owners and the independent FunctionContracts compilation boundary; aligned current design, package paths, Xcode navigation and architecture checks. [Validation](Validation-History.md#2026-10-13--actions-shared-support-organization) records passing full checks and the existing CoreAI Simulator build limitation.
+✅ Grouped the existing neutral contracts under Actions/Support/Contracts and shared macro/catalog utilities under Actions/Support. Preserved six domain owners and the independent FunctionContracts compilation boundary; aligned current design, package paths, Xcode navigation and architecture checks. [Validation](../validation/Validation-History.md#2026-10-13--actions-shared-support-organization) records passing full checks and the existing CoreAI Simulator build limitation.
 
 
 ## 2026-10-13 — Actions current technical documentation
 
-Rewrote all 15 Actions READMEs from current implementations, with direct upstream/downstream and internal relationship graphs, interfaces, key algorithms and completion/failure boundaries. Removed dated modification/acceptance appendices from technical documents and retained the earlier UI audit in Documentation-History.md. [Validation](Validation-History.md#2026-10-13--actions-readme-current-design-audit) records source consistency, link/diagram-structure/diff checks and the documentation-only scope.
+Rewrote all 15 Actions READMEs from current implementations, with direct upstream/downstream and internal relationship graphs, interfaces, key algorithms and completion/failure boundaries. Removed dated modification/acceptance appendices from technical documents and retained the earlier UI audit in Documentation-History.md. [Validation](../validation/Validation-History.md#2026-10-13--actions-readme-current-design-audit) records source consistency, link/diagram-structure/diff checks and the documentation-only scope.
 
 
 ## 2026-10-13 — Deterministic Agent evidence retention and startup failure label
@@ -697,3 +733,84 @@ Replace raw catalog JSON as the default presentation with grouped Actions/Tools 
 Settings now opens Agent 记录, a UI-local destination/view-injection hub with Assistant conversations as the sole implemented entry. Each future Agent can supply its own record type and page. Remove the duplicate Assistant task-history destination and archived-task pages, task aggregation reader/adapter API, task-only UI models/state/constructors/export, input-ID subset filtering, task-to-model-history callback chain and unused log input-ID payload. One root-owned Assistant ConversationHistoryWorkflow replaces the previous dummy root/second task workflow; selected-conversation readers are mandatory and enforce returned identity before caching.
 
 Foreground Task requests, compression summaries and terminal status remain in canonical conversation files and expand in place, including after live TaskRecord retirement. Background/delegated execution state is not claimed as conversation data: real Task registries/Skill state and Home Task/Action/Agent diagnostic projections remain intact. No storage schema, old-format compatibility/import, model function or task execution policy changes. Current module documentation removes duplicated/superseded task-page and v2-file claims; historical evidence remains in the validation/change documents.
+
+## 2026-10-14 — Model-only photo compression
+
+Prepare an Image I/O JPEG only for model observations using App-owned 1568-pixel/1-Mpixel/1-MiB defaults, retaining original photo storage and album import. Reuse the prepared attachment through ReACT instead of recompressing each request; native work remains cancellation-owned and errors are explicit. Offline/native validation is recorded in Validation-History.md; physical quality/latency acceptance remains pending.
+
+
+## 2026-10-14 — Canonical prefix-number identities
+
+Historical intermediate design: the Identity compilation leaf and foundation numeric tokens described below are superseded by the foundation-isolation correction.
+
+Application-generated UUID types and creation/parsing/truncation are replaced across framework, Agents, Gateway, Actions, Storage, ModelKit, PlatformKit, App and UI with RecordID. The independently compiled Identity leaf lives in the existing Storage directory; no new directory or third-party dependency is added. Durable per-prefix numbers reserve atomic batches before publication, remain separate from conversation deletion, reject missing/rolled-back/corrupt counters and propagate failure. Internal onset ownership uses an explicit recognition-binding enum instead of a zero UUID sentinel.
+
+History now returns/accepts only conversation_number, removes short-ref aliases, uses schema v4 and direct ID filenames; LocalDocumentStore envelopes use v2. New NumericRecords/Settings/Photos/Bluetooth locations isolate previous UUID data without decoding/import/migration. App configures its counter source before services. Transient scoped fences and diagnostic IDs use independent numeric prefixes. Native Bluetooth UUID/CBUUID remains solely within the user-approved platform adapter and maps to durable device_number. External provider call strings retain their native association. Existing uncommitted image-compression work is preserved.
+
+Validation outcomes and remaining full-suite/simulator/native limits are recorded in Validation-History.md. No commit or physical installation was requested for this change.
+
+## 2026-10-14 - Business ID and foundation isolation correction
+
+Remove Identity as a package target and compile the business ID value/allocator directly in Storage. ModelKit, PlatformKit, UI and Storage have zero cross-module dependencies. Capability interfaces accept opaque caller strings; native operation, inference lease, speech segment, animation and temporary-file identity uses Foundation UUID. Generic Storage document revisions and reader/expiry tokens also return to UUID. Upper business/framework clients explicitly consume Storage identities.
+
+App owns bidirectional native Bluetooth/device_number mapping with an injectable allocator. Independent per-prefix locks allow concurrent in-memory allocation; only shared durable reservations/associations serialize. Fresh durable initialization establishes the empty counter document before UUID-only records can be written. No old-store migration, new directory, commit or installation is introduced. Final verification evidence and the remaining timing/Simulator limits are recorded separately below in Validation-History.md.
+
+## 2026-10-14 — Assistant-owned model image preparation
+
+Move analysis budgets and preparation invocation from ApplicationRuntime's hidden read side effect to AssistantContextBuilder. App injects raw read and generic native JPEG preparation only; Assistant supplies policy, checks cancellation/identity/output and constructs ChatImage. Retain original photo storage and ReACT attachment reuse; no new directory/module/dependency. Validation is recorded in Validation-History.md.
+
+## 2026-10-14 — SQLite business-record migration
+
+✅ Implemented SQLite/GRDB business-record migration. Complete messages/ReACT observations commit separately; runtime UUIDs replace the broad numeric allocator. Source windows, indexed pages, exact deduplicated snapshots, media pending/ready and device mappings replace JSON record indexes. Historical allocator evidence above is superseded; existing media/models/credentials remain untouched. Validation results are separate.
+
+## 2026-10-15 — Storage repository and backend boundaries
+
+✅ Implemented: domain directories, backend-independent contracts, separate SQLite compilation, interface injection and reusable File/Memory implementations. Preserve current SQLite record/schema and message/media recovery contracts; remove replaced aggregate entry and direct backend dependencies.
+
+
+## 2026-10-15 — Preserve App configuration during SQLite adoption
+
+✅ Restore Settings/settings.json, Models/download-source.json, Models/transfers.json, CapturedPhotos and unchanged File document envelope1. SQLite remains limited to committed business records/indexes. Keychain and installed models are untouched; changed Agent runtime snapshots alone keep isolated filenames. Fixed original-format regression tests pass and build2026101502 is installed/launched; native startup restores the existing cloud configuration. Full-suite timing failures and Simulator CoreAI dependency limits remain separately recorded in [validation history](../validation/Validation-History.md#2026-10-15--restore-app-configuration-paths-and-document-format).
+
+
+## 2026-10-15 — Identity-first ORM records and memory-only runtime
+
+✅ Existing GRDB ORM mappings allocate Task/message/dialog identities before use and update completed content/terminal state. Every production Agent Context now uses Storage process-memory state; Context JSON factories/fixtures and duplicated Task recovery snapshots are removed. Per-message/ReACT commits, zero delta writes, SQL-only interruption recovery, stable metadata and bounded memory remain explicit. Current configuration/media/credential/model paths remain unchanged. Focused tests,100000-message query benchmark and unsigned iOS build pass; full-suite timing/Simulator dependency limits and separate native acceptance are recorded in [validation history](../validation/Validation-History.md#2026-10-15--orm-identity-first-records-and-memory-only-agent-state).
+
+
+## 2026-10-15 — Insert complete user messages once
+
+✅ Final accepted user text inserts directly as completed with its durable ID in one transaction; no empty user identity is reserved. Assistant identity reservation, zero delta writes and independent ReACT commits remain. Failed identity publication retries the same committed row. Focused regressions and unsigned iOS device build pass; full-suite/Simulator limits are recorded in [validation history](../validation/Validation-History.md#2026-10-15--completed-user-message-admission-without-placeholder).
+
+
+## 2026-10-15 — Recoverable current-dialog publication and write preconditions
+
+✅ Atomic archive/new-current rotation now retains a memory-synchronization fence after SQL commit until publication succeeds. Read/admission/rotation boundaries resolve the database current; stale tokens or active/dirty mismatches reject without dropping work. Missing current creates through the existing transaction. SQL rejects new messages/identity reservations on archived dialogs while preserving existing-row late updates. Six dialog fault/concurrency regressions and delta/message/retry coverage pass; validation/build limitations are recorded in [validation history](../validation/Validation-History.md#2026-10-15--current-dialog-publication-recovery-and-write-preconditions).
+
+
+## 2026-10-15 — Remove unreachable feedback catch and install build2026101503
+
+✅ InputGateway.deliverFeedback no longer wraps nonthrowing UUID/envelope construction in an unreachable catch. Existing owner/hop/admission diagnostics remain. Signed build2026101503 is installed and launched on the physical iPhone;18 focused cases pass. Full-suite timing failures and the Simulator CoreAI dependency limit remain separate in [validation history](../validation/Validation-History.md#2026-10-15--feedback-warning-fix-and-physical-installation).
+
+
+## 2026-10-15 — Restore expandable Task records with SQL pagination
+
+✅ Fixed UI Task folding after the SQLite paging migration: a loaded source subset is checked against exact recorded input/request pairs instead of requiring all Task sources on the page. Timeline and expanded Task pagination retain per-page compression metadata. Real SQL regressions distinguish durable source rows from the missing Task card, exercise the second page, read raw details and reopen an archived Task. Existing row styling/navigation remains. Validation evidence and build/native limits are recorded in [validation history](../validation/Validation-History.md#2026-10-15--expandable-task-history-after-sql-pagination).
+
+
+## 2026-10-15 — Automatic history paging with scoped retry
+
+✅ Archive lists, conversation timelines and expanded Task sources load their next50-item page when the lazy-list footer appears. Per-cursor tickets prevent duplicate/overlapping attempts; failed pages retain visible records and expose manual retry. Page-scoped tasks cancel on disappearance/collapse, ignore late responses and re-arm after cancellation completes. Existing Task metadata merging, row styling and navigation remain. Checks and native limits are recorded in [validation history](../validation/Validation-History.md#2026-10-15--automatic-history-paging-with-scoped-retry).
+
+
+## 2026-10-15 — Native history refresh and paging indicators
+
+- Conversation timeline adds native List pull-to-refresh; archive list retains the same system gesture. Automatic archive/timeline/Task paging shares an unlabeled system spinner with an accessibility label and scoped error/retry. No custom refresh/insert transition or visual/navigation redesign.
+- Timeline refresh fences previous page tickets, retains Task expansion and visible records on failure, and clears source caches only after successful first-page reload. Visible expanded Tasks then fetch fresh pages through their existing footers. Archive refresh cancels and joins its bounded page reader before first-page replacement; business mutations are not cancelled or overlapped. No storage/schema/model or Task lifecycle change.
+- State and workflow regressions cover stale-page rejection, cancellation/join ordering, refresh failure retention and resumed paging. Native gesture/animation acceptance and physical installation remain separate.
+
+
+## 2026-10-15 — Twenty-item history pages
+
+- Archive dialogs, conversation timeline and expanded Task sources now default to20 rows through StorageChat.HistoryPaging.pageSize. Archive EOF and response-size validation share the same constant. Raw-message internal enumeration batches and existing query limits remain independent; no stored records/schema change.
+- Regressions use20-row archive boundaries, a32-source Task across20+12 pages, later-page Task folding, complete raw reads, and an unchanged100000-message corpus with20-row preview assertions. Native loading/refresh styles remain unchanged.

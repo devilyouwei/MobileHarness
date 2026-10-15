@@ -77,7 +77,7 @@ Purpose: verify contracts and application integration in separate test targets. 
 
 ✅ Connected Bluetooth feedback-error regression verifies malformed passive packets and explicit refresh failures enter the per-device cache, unchanged packets do not log again on unrelated native snapshots, and clearing records preserves connection/control without reconnecting. These simulated checks do not validate native sheet rendering.
 
-✅ ADR0131 adds independent execution/native diagnostic regression coverage without moving physical hardware. Full verification outcome is recorded in docs/Validation-History.md; ❌ physical endurance remains pending.
+✅ ADR0131 adds independent execution/native diagnostic regression coverage without moving physical hardware. Full verification outcome is recorded in docs/validation/Validation-History.md; ❌ physical endurance remains pending.
 
 ✅ ADR0132: Independent producer codes, timeout root/child causes, App worker provenance and native-only recovery evidence have regression coverage. ❌ Physical acceptance and persistent error history remain pending.
 
@@ -111,7 +111,7 @@ Purpose: verify contracts and application integration in separate test targets. 
 
 ## Channel-owned Action ordering
 
-✅ Channel/task concurrency and resource-conflict regressions replace the retired key fixtures. Test/build evidence is recorded in [Validation-History.md](../docs/Validation-History.md).
+✅ Channel/task concurrency and resource-conflict regressions replace the retired key fixtures. Test/build evidence is recorded in [Validation-History.md](../docs/validation/Validation-History.md).
 
 ## ModelKit Support ownership
 

@@ -34,7 +34,7 @@ SpeechDetector shares analyzer/input/converter with reportResults=false. Normal 
 
 ## Outstanding work
 
-❌ Physical-device locale, cancellation and ASR/TTS coexistence acceptance remains outstanding. [Voice acceptance](../../../../../docs/Voice.md) defines host-level trials.
+❌ Physical-device locale, cancellation and ASR/TTS coexistence acceptance remains outstanding. [Voice acceptance](../../../../../docs/validation/Voice.md) defines host-level trials.
 
 ## Related design
 

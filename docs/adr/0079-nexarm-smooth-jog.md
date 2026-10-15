@@ -14,4 +14,4 @@ Release clears future velocity without returning home; the last admitted finite 
 
 Unit/integration checks cover acceleration/jerk bounds, reversal, duplicate suppression, limits, native packet admission, absent telemetry, backpressure and reset preemption. Opt-in NEXARM_JOG_TEST with explicit NEXARM_PORT tests all six motors through the same production planner and serial transport, verifies motion, arrival and holding after release, then explicitly resets between axes. USB feedback cannot establish Bluetooth cadence or visually prove absence of mechanical vibration.
 
-✅ All six axes passed the shared-planner USB motion/hold run (30.916 s). Motor 3 measured a 19-count (~1.7°) endpoint error; manual acceptance is explicitly 23 counts (~2°), not a precision claim. Full evidence is in [physical acceptance](../NexArm_Physical_Acceptance.md).
+✅ All six axes passed the shared-planner USB motion/hold run (30.916 s). Motor 3 measured a 19-count (~1.7°) endpoint error; manual acceptance is explicitly 23 counts (~2°), not a precision claim. Full evidence is in [physical acceptance](../validation/NexArm_Physical_Acceptance.md).

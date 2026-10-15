@@ -11,6 +11,6 @@ Accepted: 2026-10-08. Design precedes code.
 
 No new directories, dependencies or native business algorithms. Model continuation permits choosing a new function but the runtime never replays prior effects. Physical/live-provider acceptance remains separate.
 
-Failed Tool messages include an explicit error flag/code and the exact native value as data. The final permitted round waits for issued calls before declaring the round bound; it does not start a fifth request. See [validation history](../Validation-History.md).
+Failed Tool messages include an explicit error flag/code and the exact native value as data. The final permitted round waits for issued calls before declaring the round bound; it does not start a fifth request. See [validation history](../validation/Validation-History.md).
 
 Native failure messages also preserve any producer report and its partial-failure status, complete leaf outcomes and execution-level cause, within the existing transcript bounds.

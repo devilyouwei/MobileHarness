@@ -18,4 +18,4 @@ One root request executes at most2 business calls. Failure/cancellation joins ex
 
 ## Validation
 
-✅ Final full check.sh,15 focused tests and unsigned iOS device build passed. ❌ Simulator CoreAI dependency and native confirmation acceptance remain separate; see [dated evidence](../Validation-History.md#2026-10-06--history-deletion-and-deterministic-result-continuation).
+✅ Final full check.sh,15 focused tests and unsigned iOS device build passed. ❌ Simulator CoreAI dependency and native confirmation acceptance remain separate; see [dated evidence](../validation/Validation-History.md#2026-10-06--history-deletion-and-deterministic-result-continuation).

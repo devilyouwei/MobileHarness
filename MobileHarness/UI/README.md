@@ -47,7 +47,7 @@ Finite expressions carry renderer identity and completion acknowledgment; settin
 
 ❌ Multistage character performance and persistent UI audit storage.
 
-Native visual acceptance is recorded in [validation history](../../docs/Validation-History.md).
+Native visual acceptance is recorded in [validation history](../../docs/validation/Validation-History.md).
 
 ## Related design
 

@@ -12,7 +12,7 @@ Validation: dynamic permission/alias/conflict and dependency bounds, snapshot is
 
 Canonical function metadata is packaged in the dependency-free FunctionContracts target, consumed by Agents without importing concrete Actions. App injects actual functions/control endpoints; Gateway validates fixed calls or immutable effective round catalogs. Asset validation uses bounded immutable caches to keep high-concurrency input deadlines from expiring.
 
-Evidence: [validation record](../Validation-History.md#2026-10-11--assistant-skills-and-task-modes). Full check and focused controls passed; generic iPhone build and exact asset packaging passed. Simulator CoreAI dependency and real-device/model acceptance remain limitations.
+Evidence: [validation record](../validation/Validation-History.md#2026-10-11--assistant-skills-and-task-modes). Full check and focused controls passed; generic iPhone build and exact asset packaging passed. Simulator CoreAI dependency and real-device/model acceptance remain limitations.
 
 ## 2026-10-11 修订：泛化目标与 Skill 组合
 
@@ -20,7 +20,7 @@ Evidence: [validation record](../Validation-History.md#2026-10-11--assistant-ski
 
 ❌ 本版仍需真实模型、原生 UI 与真机验收；后台仅公共机制和合成执行者，无新增真实业务。自动检查证据见 Validation-History.md。
 
-Generic Task/Skill validation: [Validation history](../Validation-History.md#2026-10-11---generic-tasks-and-independent-skill-scopes).
+Generic Task/Skill validation: [Validation history](../validation/Validation-History.md#2026-10-11---generic-tasks-and-independent-skill-scopes).
 
 
 ## Shared asset location and Bundle lookup (2026-10-11)

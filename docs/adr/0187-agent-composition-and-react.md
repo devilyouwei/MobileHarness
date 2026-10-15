@@ -32,7 +32,7 @@ Gateway binds producer actor/incarnation before output consumption, keeps32 acti
 
 Assistant one-round workers preserve cumulative budgets and return continuation to the inbox. Native result visibility follows durable history outcome commit so completion cannot outrun its evidence. Recognition/reply identity uses source/task/decision independently of current utterance. Speech playback takes admission atomically after an active utterance finishes, including cancellation-tail cleanup.
 
-No production photography LLM, implicit speech focus, or second-phase role transfer is enabled. Synthetic model-backed child tests exercise the shared mechanism. Validation evidence belongs in [Validation-History](../Validation-History.md), including failed attempts and separate device-build/physical limits.
+No production photography LLM, implicit speech focus, or second-phase role transfer is enabled. Synthetic model-backed child tests exercise the shared mechanism. Validation evidence belongs in [Validation-History](../validation/Validation-History.md), including failed attempts and separate device-build/physical limits.
 
 
 ## 2026-10-09 - Shared component organization follow-up
@@ -44,4 +44,4 @@ No production photography LLM, implicit speech focus, or second-phase role trans
 
 Implemented: apply the Agents business source standard. Keep Core as framework-only, Support as shared business adaptation, Communication as business Signal domains and seven role directories as business owners. Consolidate repeated durable-evidence commits with role-selected arguments; order actor fields/sections consistently; merge single-owner helpers and related domain schemas. Keep independently meaningful perception, camera/tracking and history algorithms. Assistant/ApplicationControl semantic pressure remains phase-two responsibility work. No new directory, target, dependency or role redistribution is introduced.
 
-Audit validation: full repository checks and unsigned iOS device build passed; seven packaged configurations verified. Simulator CoreAI dependency and real-model/native/physical acceptance remain outstanding. Evidence and failed attempts are recorded in [Validation-History](../Validation-History.md#2026-10-09---agent-business-source-audit).
+Audit validation: full repository checks and unsigned iOS device build passed; seven packaged configurations verified. Simulator CoreAI dependency and real-model/native/physical acceptance remain outstanding. Evidence and failed attempts are recorded in [Validation-History](../validation/Validation-History.md#2026-10-09---agent-business-source-audit).

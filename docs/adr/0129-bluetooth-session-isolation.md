@@ -42,4 +42,4 @@ Simulated tests exercise pending Assistant generation, running/queued speech and
 
 Boundary checks reject reintroducing Bluetooth voice cleanup or scheduler hooks. Required check/build results are recorded in Validation-History. Physical BLE/voice coexistence, native UI acceptance and hardware stop remain separate acceptance work.
 
-2026-10-05: thirteen selected integration regressions and the unsigned iOS device build passed. Required full checks still fail in legacy BLE/manual fixtures, aim/vision and intermittent audio retry tests; simulator compilation remains blocked by CoreAI. See [Validation-History](../Validation-History.md#2026-10-05--independent-bluetooth-recovery-and-retained-channel-queues) for scope and unresolved failures.
+2026-10-05: thirteen selected integration regressions and the unsigned iOS device build passed. Required full checks still fail in legacy BLE/manual fixtures, aim/vision and intermittent audio retry tests; simulator compilation remains blocked by CoreAI. See [Validation-History](../validation/Validation-History.md#2026-10-05--independent-bluetooth-recovery-and-retained-channel-queues) for scope and unresolved failures.

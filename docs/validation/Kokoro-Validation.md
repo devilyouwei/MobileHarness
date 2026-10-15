@@ -1,8 +1,8 @@
 # Kokoro 验证记录
 
-> Historical evidence scope (updated 2026-10-03): packaging/download statements below describe the revision tested at the time. Current App bundles source metadata/licenses only and installs weights through Settings; HF foreground requests restart after process relaunch. Current synthesis is MOSS. Kokoro is unregistered; its downloader/profile/local weights are removed and its optional real-model test needs HARNESS_KOKORO_MODEL_ROOT. See [current resource contract](../MobileHarness/ModelKit/Support/Management/README.md#local-model-resources--current-contract).
+证据范围：各节的制品、装配、成功与失败只对应所标日期，不定义今天的默认模型或下载行为。当前契约见 [Kokoro README](../../MobileHarness/ModelKit/Speech/TTS/Kokoro/README.md)；共同的历史报告阅读规则见 [验证索引](README.md)。
 
-历史默认：FluidAudio Core ML 中英双语；已因反复真机闪退由 MOSS 替换，见 ADR 0058 与 Moss-Validation.md。下面 CoreAI / 英语单语数据为历史记录，不能代表当前模型的结果。
+Kokoro 曾有 CoreAI 英语与 FluidAudio Core ML 中英两个验收阶段，随后被替换，决定见 [ADR0058](../adr/0058-moss-tts-nano.md)。后续播放崩溃的实际归因见 [MOSS 调查](Moss-Validation.md#playback-crash-investigation-2026-09-28)，替换本身不证明所有历史崩溃都由 Kokoro 模型造成。下文的“当前”仅指各节记录时的版本。
 
 ## 历史 CoreAI 验证
 
@@ -52,7 +52,7 @@
 - ✅ 当前 Mac 缓存加载 0.160 秒；固定英语句子生成 3.375 秒音频，两次首段 1.339 / 1.072 秒，总耗时 1.339 / 1.072 秒。音频 24 kHz mono，路径仍为 `/tmp/mobileharness-kokoro-0.wav` 和 `/tmp/mobileharness-kokoro-1.wav`。
 - ❌ 本轮未执行 iPhone 安装/试听、持续热状态测量或完整真实 ASR→LLM→TTS 对话测试；英语提示不保证每次模型输出都符合输入范围。
 
-该次英语单语默认切换的绑定和语言策略见 [ADR 0050](adr/0050-default-kokoro-synthesis.md)；随后已由 [ADR 0052](adr/0052-kokoro-coreml-bilingual.md) 的 Core ML 中英双语实现取代。以下一节记录后续验收；两阶段均不自动回退到 Apple TTS。
+该次英语单语默认切换的绑定和语言策略见 [ADR 0050](../adr/0050-default-kokoro-synthesis.md)；随后已由 [ADR 0052](../adr/0052-kokoro-coreml-bilingual.md) 的 Core ML 中英双语实现取代。以下一节记录后续验收；两阶段均不自动回退到 Apple TTS。
 
 ## Core ML 中英双语替换验收（2026-09-28）
 

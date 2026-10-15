@@ -39,7 +39,7 @@ Text/native continuation history remains exact; multimodal records retain attach
 
 ## Validation evidence
 
-✅ Final repository check:611 integration /51 workflow tests and other targets passed. Unsigned device-target compilation passed; final platform/UI hardening also passed incremental device compilation. ❌ Simulator CoreAI dependency remains blocked; live capture, animation, audio and model understanding are unverified. See [validation history](../Validation-History.md#2026-10-08--assistant-photo-observation-loop).
+✅ Final repository check:611 integration /51 workflow tests and other targets passed. Unsigned device-target compilation passed; final platform/UI hardening also passed incremental device compilation. ❌ Simulator CoreAI dependency remains blocked; live capture, animation, audio and model understanding are unverified. See [validation history](../validation/Validation-History.md#2026-10-08--assistant-photo-observation-loop).
 
 ## Photo touch and voice recovery correction
 

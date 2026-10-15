@@ -16,4 +16,4 @@ Calls use required string parameters, matching the native Tool parser. List page
 
 ## Validation
 
-✅ Six final focused tests and unsigned iOS device build passed; all 480 full-run integration tests passed. ❌ Full check.sh retained one audio diagnostic workflow timeout (isolated rerun passed); simulator CoreAI availability remains blocked. See [dated evidence](../Validation-History.md#2026-10-06--shared-read-only-history-tools).
+✅ Six final focused tests and unsigned iOS device build passed; all 480 full-run integration tests passed. ❌ Full check.sh retained one audio diagnostic workflow timeout (isolated rerun passed); simulator CoreAI availability remains blocked. See [dated evidence](../validation/Validation-History.md#2026-10-06--shared-read-only-history-tools).

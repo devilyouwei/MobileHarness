@@ -4,6 +4,8 @@ Purpose: build/sign the iOS application host and maintain physical-device, simul
 
 ## Source ownership
 
+- ✅ 验证与历史文档分别归入 docs/validation 和 docs/history；八个文档导航引用已同步，编译成员与资源构建设置保持原有配置。
+- ✅ 需求文档归入 docs/requirements；Xcode 中 Photographer 提案引用指向新位置，仅调整文档导航路径，编译成员保持原有配置。
 - ✅ MobileHarness and MobileHarnessSimulator compile App/MobileHarnessApp.swift, Composition, Lifecycle and Adapters.
 - ✅ The root HarnessKit product supplies shared runtime modules, the independent UI target and AppWorkflows. Xcode navigates these sources without adding them to either App Sources phase. Model SDK adapters remain separate package targets.
 - ✅ UI owns iOS pages/components and portable presentation state/operation interfaces. AppWorkflows owns history, configuration and explicit speech/chat diagnostics. Native preview/image/value adapters compile with App.

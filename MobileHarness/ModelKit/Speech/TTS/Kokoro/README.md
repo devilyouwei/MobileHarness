@@ -40,7 +40,7 @@ Core InferenceTaskControl handles installation/cancellation races and releases t
 
 ## Outstanding work
 
-Production registration is outside this directory's current scope. Isolated real-model evidence and remaining experiments belong in [Kokoro validation](../../../../../docs/Kokoro-Validation.md).
+Production registration is outside this directory's current scope. Isolated real-model evidence and remaining experiments belong in [Kokoro validation](../../../../../docs/validation/Kokoro-Validation.md).
 
 ## Related design
 

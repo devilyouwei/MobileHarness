@@ -18,4 +18,4 @@ Both UI functions use standard FunctionInput and pure injected endpoints. Host r
 
 ❌ Final check.sh does not pass: its547-test integration run has one unmodified bluetoothPassiveRefreshNeverBlocksManualResetOrIssuesQuery failure (readiness expectation followed by timeout). That test passes independently. Earlier full runs failed different BLE timing tests, which passed in a later545-test full run before the two final failure refinements. This is recorded as outstanding full-suite stability, not proof of a baseline cause or a passing final suite. No Bluetooth production/test source was changed in this stage.
 
-❌ Required simulator build fails in external CoreAIShared because CoreAI cannot be resolved. No phone installation, native UI, live-model or physical acceptance was performed. Detailed evidence is in [validation history](../Validation-History.md).
+❌ Required simulator build fails in external CoreAIShared because CoreAI cannot be resolved. No phone installation, native UI, live-model or physical acceptance was performed. Detailed evidence is in [validation history](../validation/Validation-History.md).

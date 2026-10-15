@@ -1,6 +1,6 @@
 # NexArm supervised USB acceptance
 
-The dated sections retain historical measurements and the APIs/policies used at that time. Current App/Agent serial trials are recorded in the 2026-10-05 section below; current contracts belong to module READMEs and ADRs. Older trial descriptions are not the current implementation specification.
+Each dated section is an independent hardware experiment with its own transport, configuration, observations and limits. This report includes September controller trials and October serial/decoder investigations; no single section defines the current implementation or proves iPhone BLE acceptance. Current contracts belong to module READMEs; raw samples are indexed in [measurements](../measurements/README.md).
 
 ## Historical controller acceptance — 2026-09-30
 
@@ -199,7 +199,7 @@ Installation: signed artifact Info.plist reports `0.1.0 (2026100102)`. The first
 
 ## 2026-10-05 — Settings, Assistant and Photographer over serial before ADR0137
 
-These results precede [ADR0137](adr/0137-nexarm-ordinary-home.md): the recorded reset incorrectly reused the tracking rest (motor3=1984, motor4=2045). Preserve these measurements as evidence for that revision; they do not validate the restored ordinary home (motor3=1198, motor4=1238). The current opt-in trials distinguish ordinary reset from explicit tracking setup.
+These results precede [ADR0137](../adr/0137-nexarm-ordinary-home.md): the recorded reset incorrectly reused the tracking rest (motor3=1984, motor4=2045). Preserve these measurements as evidence for that revision; they do not validate the restored ordinary home (motor3=1198, motor4=1238). The current opt-in trials distinguish ordinary reset from explicit tracking setup.
 
 The user authorized physical serial Action/Tool tests, confirmed phone control was stopped and the workspace was clear, then restarted the arm/reconnected USB after the initial read-only position check failed. The port was `/dev/cu.usbserial-110`, configured by `PlatformKit.NexArmSerial` at 1 Mbps. A valid version reply reported ESP32/AT32 1.0.2. The initial version/position checks were inconsistent: a later version query succeeded, while raw serial showed the firmware receiving CMD11 without a binary position reply. After the user restart, position queries and unsolicited position receipts recovered. No motion was sent before position preflight passed. This observation does not identify the phone's BLE failure cause or prove radio congestion.
 
@@ -301,3 +301,44 @@ The user reported restarting everything and requested another serial test. The l
 The user-reported restart did not restore changing motor5 feedback in this repeat. ❌ The exact missing-servo firmware behavior and physical motor position remain unverified; the unchanged protocol/parser and valid native receipts continue to isolate this symptom from phone UI presentation. Logs (ephemeral): `/tmp/mobileharness-nexarm-restarted-feedback-20261014.log` and `/tmp/mobileharness-nexarm-restarted-small-move-20261014.log`. Documentation diff formatting was checked; no production source changed and no full code check/build was run.
 
 A temporary diagnostic compiled the current production NexArmPacket/NexArmDecoder/NexArmSerial/NexArmMotorCommands files directly; the register-capture probe used equivalent native serial configuration to retain all identifiable frames. It bypassed App/Actions/Gateway and is not full application acceptance. Logs (ephemeral): `/tmp/mobileharness-nexarm-feedback-20261014.log`, `/tmp/mobileharness-nexarm-direct-20261014.log`, `/tmp/mobileharness-nexarm-small-move-20261014.log`. No production-code change was made; full checks/builds were not required or run for this evidence-only update.
+
+## 2026-10-15 — Independent raw reception and decoder audit with motor6 absent
+
+The user relayed technical support's statement that motor6 may be removed without affecting motors1–5, confirmed motor6 was currently disconnected and requested a reception/decoding audit. This statement means the earlier missing-servo/firmware explanations remain hypotheses, not an established product restriction or a confirmed firmware defect. The earlier USB samples establish observed configurations and payload values only.
+
+✅ Captured native serial reads independently of all project Swift reception/decoder/cache/Action/UI code. A bounded Python standard-library probe opened `/dev/cu.usbserial-110` exclusively at1Mbps with8N1, retained all raw bytes and closed the port afterward. Four two-second phases were passive reception, version CMD1, pose CMD11 and documented read-only CMD96. No movement, torque, calibration, mode switch or configuration command was issued.
+
+The captures contained1317 bytes and41 valid full-checksum frames:40 CMD11/ID255/payload24 frames and one ESP32/AT32 1.0.2 version frame. Non-frame bytes were only identifiable device debug text for the requests/version. There were no additional valid short-checksum-only frames or alternative position reply frames. CMD96 produced a debug receipt but no matching position response within its two-second observation window; this does not establish that the installed firmware supports that read interface. The current production CMD11/ID255/payload24 filter did not discard any alternative position frame in this capture.
+
+Every CMD11 frame was exactly:
+
+```text
+FF FF FF 1A 0B C8 00 FF FF C6 00 F9 FF 00 00 00 00
+02 08 26 08 AD 04 DB 04 00 08 00 08 7F
+```
+
+Frame bytes0–1 are the header;2 is ID255;3 is length26 (command +24 payload bytes +checksum);4 is CMD11;5–28 are payload;29 is checksum7F. The sum of bytes2–29 modulo256 is255. Little-endian payload words are pose `[200,-1,198,-7,0,0]` followed by joints `[2050,2086,1197,1243,2048,2048]`. Thus motor5 is payload20–21 (full-frame25–26) and motor6 is payload22–23 (full-frame27–28), both literally `00 08`. This matches the vendor's six-position CMD_GET_CUR_COORDS parsing example (`12 + i*2`), not a shifted four-byte-per-joint layout for another command.
+
+✅ Replayed all four exact raw captures through the current production NexArmDecoder and NexArmTelemetryCache compiled directly from the working tree. Each capture was replayed with every fixed chunk size from1 byte through that capture's full length, totalling1317 fragmentation cases. All decoded packet arrays matched an independent offline full-frame/checksum scan exactly, and every telemetry sample count/latest packet matched. Embedded `FF FF` inside payload and interleaved text did not create a mismatch in these captures.
+
+Source review covered native USB reads, BLE notification forwarding, telemetry filtering/caching, Actions decodePosition, motor result indexing and App snapshot-to-UI updates. No overwrite/default2048 or motor5/motor6 index swap was found in these paths. Whole-frame validation still checks six encoder values, but disconnected motor6's observed2048 is legal and does not reject these frames. This does not certify every possible malformed/noisy input or alternate protocol variant. No speculative decoder or checksum-policy change was made.
+
+❌ The meaning/freshness of motor5=2048 in this installed aggregate-reply interface, the supported independent position-read interface for AT32 1.0.2 and a same-wiring comparison with the official host remain unresolved. Static raw capture does not prove motor5's actual physical angle or movement. Vendor support's general removal claim and the raw aggregate payload observation are not equivalent claims. The specific firmware algorithm and hardware failure remain unestablished.
+
+Primary references: [NexArm motion/feedback example](https://wiki.hiwonder.com/projects/NexArm/en/esp32-version/docs/3_Motion_Control.html), [official CMD96 driver](https://github.com/Hiwonder-official/lerobot-nexarm/blob/main/src/lerobot/motors/nexarm/nexarm.py). A [vendor support response](https://forum.hiwonder.com.cn/t/nexarm-at32f421-1-0-2/476) states that an updated AT communication interface is available through support; it does not specify missing-servo behavior. The user report in that thread about unforwarded raw register reads is separate from the vendor's response and is not a confirmed specification.
+
+Evidence (ephemeral): `/tmp/mobileharness-nexarm-raw-audit-20261015.json` retains raw bytes by capture phase, `/tmp/mobileharness-nexarm-raw-audit-20261015.log` retains the independent decode and `/tmp/mobileharness-nexarm-decoder-replay-20261015.log` records the production replay results. Documentation diff formatting was checked. No production source was edited; full application tests/builds and phone/native UI acceptance were not run for this read-only audit.
+
+## 2026-10-15 — User-observed large motor5 commands with motor6 absent
+
+After the decoder audit, the user explicitly requested larger motor5 movement while watching the arm. The last confirmed wiring had motor6 disconnected. The finite native serial diagnostic addressed motor5 only, at speed300/acceleration30, with bounded raw capture and a two-second valid-feedback-gap failure condition. The recorded allowed motor5 range is908…3128; encoder target units do not prove physical clearance or achieved angle.
+
+✅ A1.2-second preflight and CMD11 query yielded seven samples with joints `[2050,2086,1197,1243,2048,2048]`. One motor5 CMD3 write requested1800 (about22° from reference center2048). Thirty unsolicited samples over six seconds, followed by seven samples during the one-second final-query observation, retained exactly that baseline payload. The user described the movement as not obvious and requested the maximum. This is not confirmation of arrival or of no movement.
+
+✅ At that explicit request, a second independent trial selected the allowed upper target3128 (about95° from reference center), retaining speed300/acceleration30. Seven preflight samples again returned the baseline. The one motion packet was `FF FF 05 0A 03 29 1E 38 0C 00 00 2C 01 35`. Forty valid unsolicited position frames over eight seconds and seven final-query observation frames all retained motor5=2048 and the identical six-axis/pose payload from the preceding audit. No received position frame established arrival at3128. The user was asked to report actual movement; the answer was pending when this record was written.
+
+The native debug stream acknowledged parsing an addressed ID5/CMD3/length10 request. This establishes controller request receipt, not forwarding to a servo or physical execution. The earlier planned2300 endpoint was not issued: the user's maximum-target request superseded it. Across the two actual trials, exactly two motor5 motion writes were made, with no other motor command, automatic return, failed-motion replay, torque change, calibration, firmware or mode switch. Both serial sessions closed after observation.
+
+An initial diagnostic attempt failed in baseline summary formatting (mutable bytearray used as a set key) before any motion write. The temporary diagnostic was corrected to use immutable frame bytes, then preflight was repeated. The failed attempt is not motion evidence. No production source was modified.
+
+❌ Upper-target physical observation, independent servo position, current/torque status and exact cause remain unresolved. These data do not establish a stalled/broken motor, achieved maximum angle, or a firmware defect. Logs/raw captures (ephemeral): `/tmp/mobileharness-nexarm-large-move-20261015-1800.log`, `/tmp/mobileharness-nexarm-large-move-20261015-1800.json`, `/tmp/mobileharness-nexarm-large-move-20261015-3128.log`, `/tmp/mobileharness-nexarm-large-move-20261015-3128.json`; failed preflight log: `/tmp/mobileharness-nexarm-large-move-20261015-1800-preflight-only.log`. Documentation diff formatting was checked; full application tests/builds were not run for this physical diagnostic/evidence update.

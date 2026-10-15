@@ -8,4 +8,4 @@ Presentation-enabled opaque provider intents select business then registered UI 
 
 No new directory, target or dependency. Physical/provider acceptance is separate from compile/fixture validation. Broader completion tracks include bounded model continuation, resource grants/context, typed lifecycle/device/navigation entries and real-device acceptance.
 
-✅ Implemented, including removal of UI installed-model checks before save; transaction preparation validates prerequisites. Automated/native build evidence is recorded in [validation history](../Validation-History.md).
+✅ Implemented, including removal of UI installed-model checks before save; transaction preparation validates prerequisites. Automated/native build evidence is recorded in [validation history](../validation/Validation-History.md).

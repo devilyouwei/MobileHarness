@@ -6,7 +6,7 @@
 
 ## 决策
 
-以 MobileHarness/README.md 为后续设计目标，本轮仅迁移 App、Experience、Gateway。旧 docs/Tech_Design.md 与 Technical_Design.docx 保留，后续模块不因目录迁移而假定已符合新契约。
+以 MobileHarness/README.md 为后续设计目标，本轮仅迁移 App、Experience、Gateway。旧 docs/history/Tech_Design.md 与 Technical_Design.docx 保留，后续模块不因目录迁移而假定已符合新契约。
 
 App 保留 Bootstrap/LifecycleCoordinator 辅助拆分，将 Kokoro provider 创建收口到 AppContainer。Experience 提取 Components 的圆环和字幕，保留 Diagnostics 验证入口。Gateway 从 Request/Response 迁至 Input/Output，入口类型对应改名；EventRouter 改为 SignalRouter 协议。Output 拆成 Validation、Routing、Dispatch，实际调用链使用这些实现。根包仍映射唯一源码，Xcode 更新导航与两个 App target 的组件编译引用。
 

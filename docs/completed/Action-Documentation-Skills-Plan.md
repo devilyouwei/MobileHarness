@@ -1,5 +1,7 @@
 # Action documentation and procedural Skills
 
+归档日期：2026-10-15。原需求完成范围：Action 声明、模块文档投影与流程 Skills 迁移。历史验证结果和独立验收限制保留如下；当前实现以源码 README 为准。
+
 ✅ Implemented: removed FunctionMetadata.json/FunctionMetadata.swift. Extend @Action with doc and structured parameters, generate neutral declarations from module registration, and inject the immutable catalog at composition. Preserve native string argument schemas and enum constraints. Examples move to Skill instructions; old v6 configuration examples remain import-compatible but are not rendered.
 
 Skills cover purpose, use conditions, prerequisites, steps, branches, completion, failure rules and realistic multi-round examples. Photography checks camera state, captures, describes only actual image evidence and keeps the task waiting for save/discard. No invented IDs, automatic action replay or premature task success.

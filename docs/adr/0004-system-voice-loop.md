@@ -1,6 +1,6 @@
 # ADR 0004 系统语音网关闭环
 
-> Historical scope: Historical system-voice stage. Local Nemotron, Silero and bilingual Kokoro replaced the production model choices; see the [current voice path](../Voice.md).
+> Historical scope: Historical system-voice stage. Local Nemotron, Silero and bilingual Kokoro replaced the production model choices; see the [current voice path](../validation/Voice.md).
 
 状态：已实施，真实麦克风/识别效果待真机验收。日期：2026-09-23。
 

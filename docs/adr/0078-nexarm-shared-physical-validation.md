@@ -12,6 +12,6 @@ Intermediate performance tolerance is15mm XYZ /4° pitch /2° roll/claw. Final h
 
 ## Validation
 
-All seven production presets passed in one60.024s USB run using `NexArmController.performGesture`, with physical pose and encoder feedback. The opt-in repository test reproduces the same path and stops on first failure. Default tests cover absolute framing and measured bias without moving hardware. Full evidence and limitations are in [the physical acceptance record](../NexArm_Physical_Acceptance.md).
+All seven production presets passed in one60.024s USB run using `NexArmController.performGesture`, with physical pose and encoder feedback. The opt-in repository test reproduces the same path and stops on first failure. Default tests cover absolute framing and measured bias without moving hardware. Full evidence and limitations are in [the physical acceptance record](../validation/NexArm_Physical_Acceptance.md).
 
 ❌ USB evidence does not establish BLE throughput, subjective smoothness, clearance or emergency-stop guarantees. No firmware, calibration or torque configuration was modified.

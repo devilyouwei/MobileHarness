@@ -1,19 +1,21 @@
 # Historical implementation milestones
 
-This is the historical content of the former Roadmap. Status, model choices, paths and validation results refer to the context of each entry, not current behavior. Current priorities are in [Roadmap](Roadmap.md); [Validation-History](Validation-History.md) and specialist reports index evidence. Current contracts belong to the source README documents.
+This is the historical content of the former Roadmap. Status, model choices, paths and validation results refer to the context of each entry, not current behavior. Current priorities are in [Roadmap](../Roadmap.md); [Validation-History](../validation/Validation-History.md) and specialist reports index evidence. Current contracts belong to the source README documents.
 
-## 当前待验收与后续方向
+<a id="当前待验收与后续方向"></a>
+
+## 早期路线图中的待验收与后续方向
 
 - ❌ 在 iPhone 上完成连续中英语音、当前默认 MOSS-TTS-Nano 试听、音频路由切换、摄像头姿态与眼睛跟随的体验、延迟、内存和热状态验收；自动化测试及模拟器构建不能代替这些结果。
 - ❌ 用真实第三方服务验证已接入的云聊天配置、切换和失败恢复。
 - ❌ 在现有本地设置存储之外，按实际需求扩展持久化媒体与记忆、跨 Agent 请求/回复、更多感知能力及机器人动作；物理运动的限幅、失联停机和确认必须由设备侧承担。
 
-- ✅ 嵌套 wait、任务内阶段/Channel FIFO 与模块互斥已实现；当前契约见[调度 README](../MobileHarness/Gateway/Output/Scheduling/README.md)，历史模块 FIFO 和共享 Channel 描述已由 [ADR 0059](adr/0059-structured-wait-scheduling.md) 取代。
+- ✅ 嵌套 wait、任务内阶段/Channel FIFO 与模块互斥已实现；当前契约见[调度 README](../../MobileHarness/Gateway/Output/Scheduling/README.md)，历史模块 FIFO 和共享 Channel 描述已由 [ADR 0059](../adr/0059-structured-wait-scheduling.md) 取代。
 - ❌ 新版 wait 的真实模型输出质量、嵌套等待/取消和语音字幕真机交互验收仍待完成。
 
 ## Action runtime standard — stage 1 (2026-09-29)
 
-✅ Implemented ActionDefinition registration with kind/completion descriptions and duplicate/metadata limits; App startup validates model-callable and code-owned internal Action coverage using Agent-owned assemblers. Consistent invocation construction removes duplicate call/path inputs and assigns a new ID per admitted execution. UI adopts shared argument readers, and scheduling/presentation errors leave Actions/Runtime. The scheduler retains bounded, payload-free execution diagnostics with explicit eviction and conservative post-cancellation effect status. See [ADR 0065](adr/0065-action-runtime-contracts.md).
+✅ Implemented ActionDefinition registration with kind/completion descriptions and duplicate/metadata limits; App startup validates model-callable and code-owned internal Action coverage using Agent-owned assemblers. Consistent invocation construction removes duplicate call/path inputs and assigns a new ID per admitted execution. UI adopts shared argument readers, and scheduling/presentation errors leave Actions/Runtime. The scheduler retains bounded, payload-free execution diagnostics with explicit eviction and conservative post-cancellation effect status. See [ADR 0065](../adr/0065-action-runtime-contracts.md).
 
 ✅ Added deterministic contract coverage for registration, invocation, decoding, finite versus state completion, diagnostic correlation/overflow and cleanup/cancellation. Existing Channel/wait scheduling and valid business behavior remain intact.
 
@@ -23,7 +25,7 @@ Validation: `scripts/check.sh` passed, including 151 IntegrationTests (9 new con
 
 ## 历史实施计划与里程碑
 
-依据原始技术方案与当前产品优先级，P1 首先接入必备模型与能力封装。模型通过统一能力协议解耦，Runtime 只同步补齐真实调用闭环所需的最小功能。详细目录与职责见 [ModelKit 设计](../MobileHarness/ModelKit/README.md)。本表为实施顺序，不是已完成清单。
+依据原始技术方案与当前产品优先级，P1 首先接入必备模型与能力封装。模型通过统一能力协议解耦，Runtime 只同步补齐真实调用闭环所需的最小功能。详细目录与职责见 [ModelKit 设计](../../MobileHarness/ModelKit/README.md)。本表为实施顺序，不是已完成清单。
 
 | 阶段 | 范围 | 验收条件 |
 | --- | --- | --- |
@@ -39,7 +41,7 @@ Core ML、Core AI、MLX 均属于方案中的候选后端。Core AI 已有 [Appl
 
 P1.1 能力 SDK 与组装边界已实现：ModelKit 不依赖业务层，提供 chat/transcribe/synthesize/judge 接口、可组合依赖、输入校验、单请求取消与有界流；ModelKitRuntime 提供应用组装专用注册/绑定，配套测试替身只位于 Tests。后续 Nemotron 已补齐首个具体模型、制品校验与最小调度，仍不代表 P1 整体完成。
 
-系统语音路径已先行实现：独立 AppleSpeech adapter、RequestGateway ASR、ResponseGateway TTS、PlatformKit 音频与基础 VAD，以及固定回复 UI 闭环。系统中文 TTS 可在本机实际合成，真实麦克风/端侧 ASR 需按 [语音验收说明](Voice.md) 在目标真机完成验证。当前为轮流说话，不支持播放中抢话或后台录音。
+系统语音路径已先行实现：独立 AppleSpeech adapter、RequestGateway ASR、ResponseGateway TTS、PlatformKit 音频与基础 VAD，以及固定回复 UI 闭环。系统中文 TTS 可在本机实际合成，真实麦克风/端侧 ASR 需按 [语音验收说明](../validation/Voice.md) 在目标真机完成验证。当前为轮流说话，不支持播放中抢话或后台录音。
 
 2026-09-23：为模拟器调试，App 经用户授权开启可关闭的 Apple 联网 ASR；后续本地 ASR 仍通过相同能力协议接入。联网模式不能代替真机离线验收，也不保证模拟器的 Apple 识别服务可用。
 
@@ -57,7 +59,7 @@ Silero Core ML VAD 已实现并用于 App 输入分段：标准 VoiceActivityCap
 
 ## 分句行为输出与 Actions（2026-09-24）
 
-Assistant 的回复改为边生成边分句，短句分别输出 say/print FunctionToken，正常结束补发尾句。共享行为实现集中到 `Actions`，AgentDescriptor 只登记简单标签到模块函数路径的映射；Gateway 验证和解析后使用显式 handler 目录执行，不增加 Agent 对具体行为或平台的依赖。上述调整取代整段回复交给 Gateway 做 TTS 的阶段实现，见 [ADR 0015](adr/0015-function-actions.md)。
+Assistant 的回复改为边生成边分句，短句分别输出 say/print FunctionToken，正常结束补发尾句。共享行为实现集中到 `Actions`，AgentDescriptor 只登记简单标签到模块函数路径的映射；Gateway 验证和解析后使用显式 handler 目录执行，不增加 Agent 对具体行为或平台的依赖。上述调整取代整段回复交给 Gateway 做 TTS 的阶段实现，见 [ADR 0015](../adr/0015-function-actions.md)。
 
 动作执行采用每模块有界 FIFO、跨模块并行；Speech.say 等到真实播放完成才接下一句，Display.print 可同时追加字幕。本轮生成结束并等待已接纳动作全部完成后才恢复聆听。停止取消生成、排队动作和播放，保留模型卸载及旧会话清理屏障。
 
@@ -73,7 +75,7 @@ Kokoro 验证结果：5 项测试（含真实 Mac 推理）通过，根检查和
 
 ## 新设计迁移第一阶段：App / Experience / Gateway（2026-09-24）
 
-目标设计切换为 MobileHarness/README.md。本阶段迁移 Gateway/Input、Output，拆分 Validation/Routing/Dispatch；提取 Experience/Components，集中 App 的具体模型装配，并为本阶段所有目录补齐 ✅/❌ README。具体过渡边界见 [ADR 0017](adr/0017-entry-gateway-migration.md)。
+目标设计切换为 MobileHarness/README.md。本阶段迁移 Gateway/Input、Output，拆分 Validation/Routing/Dispatch；提取 Experience/Components，集中 App 的具体模型装配，并为本阶段所有目录补齐 ✅/❌ README。具体过渡边界见 [ADR 0017](../adr/0017-entry-gateway-migration.md)。
 
 AgentCore 的 Signal、Agent 内解析与完整 ActionCall、Output 的 GhostShell/Channel 调度、独立 ActionRuntime 和动作结果回流仍未迁移。本阶段保留现有语音、工具和动作运行行为，不将目录对齐等同于新设计全部实现。
 
@@ -85,7 +87,7 @@ AgentCore 的 Signal、Agent 内解析与完整 ActionCall、Output 的 GhostShe
 
 ✅ 独立 ToolCallParser 完整原生调用解析；System.runtimeInfo 工具回路保留。ChannelScheduler 从 Actions 迁至 Gateway，按有效 Channel FIFO 并保留设备模块互斥、容量、取消与完成屏障。各目录 README 补齐 ✅/❌，解析器、能力目录、运行时和调度器有 Mermaid 设计图。
 
-❌ 模型原生 tool delta 接入、完整 JSON Schema、统一 Signal、通用 AgentRuntime/StateStore/Bus、restart/健康监督、强类型运行通知、ActionResult、优先级/抢占。细节与验证见 [ADR 0018](adr/0018-agent-protocols.md)。
+❌ 模型原生 tool delta 接入、完整 JSON Schema、统一 Signal、通用 AgentRuntime/StateStore/Bus、restart/健康监督、强类型运行通知、ActionResult、优先级/抢占。细节与验证见 [ADR 0018](../adr/0018-agent-protocols.md)。
 
 第二阶段验证：最终核心检查通过，包含 46 项集成测试；五个模拟器构建与真机 Debug 无签名编译通过。解析器/调度器边界与新旧语音回归已覆盖；默认跳过的真实模型测试、真机连续语音及模型 XML 指令遵循质量仍待实测。
 
@@ -99,7 +101,7 @@ AgentCore 的 Signal、Agent 内解析与完整 ActionCall、Output 的 GhostShe
 
 ## 正式 README 目录与命名对齐（2026-09-24）
 
-✅ 权威设计链接更新；Actions/UI、Speech/Speak、ActionPath、AgentLifecycle 对齐；独立 ActionRuntime、Tools/System 与 ToolExecutor；ChannelParser/Channel 职责拆分；Package 和 Xcode 引用同步。当前目录映射见 [MobileHarness/README.md 的项目结构](../MobileHarness/README.md#source-structure-and-compilation-map)；原始决策见 ADR 0020。
+✅ 权威设计链接更新；Actions/UI、Speech/Speak、ActionPath、AgentLifecycle 对齐；独立 ActionRuntime、Tools/System 与 ToolExecutor；ChannelParser/Channel 职责拆分；Package 和 Xcode 引用同步。当前目录映射见 [MobileHarness/README.md 的项目结构](../../MobileHarness/README.md#source-structure-and-compilation-map)；原始决策见 ADR 0020。
 
 ❌ 目标大纲中的未来模块仍按实际需求实现；共享契约及根测试目录例外已说明。运行行为保留现有模型 alias、默认 Channel、FIFO/资源互斥和工具回流。
 
@@ -159,7 +161,7 @@ Unified-expression validation: root checks passed, including 56 integration test
 
 ✅ Added a separate Qwen35Chat adapter and MLX language backend; the physical app selects Qwen3.5-2B 4bit through the existing ChatCapability. Pinned model/dependency versions, local loading and resource/license staging are implemented.
 
-✅ Swift/Python parity passed for ten complete prompts. Local real-model generation and cancellation/unload/reload checks passed. Device experiment artifacts were stored in local, unversioned `output/qwen35-mlx-2026-09-25`; [ADR 0027](adr/0027-qwen35-mlx-chat.md) summarizes the dated limitations without treating that path as a public report.
+✅ Swift/Python parity passed for ten complete prompts. Local real-model generation and cancellation/unload/reload checks passed. Device experiment artifacts were stored in local, unversioned `output/qwen35-mlx-2026-09-25`; [ADR 0027](../adr/0027-qwen35-mlx-chat.md) summarizes the dated limitations without treating that path as a public report.
 
 ❌ Long-running thermal/memory measurements, complete microphone/ASR/TTS coexistence acceptance, reliable constrained XML generation and vision input remain outstanding.
 
@@ -218,7 +220,7 @@ Acceptance requires no blocked reply behind its waiting requester, no unbounded 
 
 ✅ AudioFrame.swift is part of ModelKit/Core. Core is the home for shared audio and future image/video contracts; platform I/O and model-specific processing remain separate. ❌ Image/video types are not implemented until needed.
 
-✅ ModelKitDefaults owns fixed provider registration and default capability bindings. App supplies a resource root and retrieves interfaces with get(.chat) and the other capability keys. ModelKitRuntime remains adapter-independent. See [ADR 0034](adr/0034-modelkit-default-assembly.md).
+✅ ModelKitDefaults owns fixed provider registration and default capability bindings. App supplies a resource root and retrieves interfaces with get(.chat) and the other capability keys. ModelKitRuntime remains adapter-independent. See [ADR 0034](../adr/0034-modelkit-default-assembly.md).
 
 ✅ Default assembly validation passes root checks (including lazy assembly, shared identity and binding conflicts), four simulator schemes and the signed physical App build. ❌ Installation and iPhone runtime acceptance remain outstanding.
 
@@ -314,7 +316,7 @@ Verified (2026-09-27): scripts/check.sh passed, including 92 IntegrationTests; s
 
 ❌ 中文前处理与中文音色、模型输出语言遵循、真实 iPhone 试听及持续运行验收仍待完成。历史系统中文 TTS 记录不代表当前默认行为。
 
-✅ 本轮复验：根检查、四个模拟器 scheme 和五项 Kokoro Release 测试（含真实 Mac 推理）全部通过；3.375 秒固定英语音频合成约 1.07–1.34 秒。具体边界见 [Kokoro 验证](Kokoro-Validation.md)。
+✅ 本轮复验：根检查、四个模拟器 scheme 和五项 Kokoro Release 测试（含真实 Mac 推理）全部通过；3.375 秒固定英语音频合成约 1.07–1.34 秒。具体边界见 [Kokoro 验证](../validation/Kokoro-Validation.md)。
 
 ## Third-party cloud chat (2026-09-28)
 
@@ -344,15 +346,15 @@ Settings validation: root checks and nine cloud tests passed; all four simulator
 
 ✅ 定向文本请求、串行合成、多来源所有权、按 ID 播放及内存缓存过期已接入，取代 Actions 内预合成和 Channel 优先级重排。✅ 仓库完整检查通过（108 项集成测试），四个 iOS 模拟器构建目标通过。❌ 可选真实模型评估未启用，本轮未安装真机，试听、Bluetooth 和持续运行验收待完成。
 
-✅ 已移除旧 Action 准备协议和 Gateway 准备调用；缓存目录归属已由 ADR 0056 解决。❌ 真机验收仍待完成。当前行为细节见 [合成 Agent](../MobileHarness/Agents/SpeechSynthesis/README.md)、[播放 Action](../MobileHarness/Actions/Speech/README.md) 和 [音频缓存](../MobileHarness/Storage/Audio/README.md)。
+✅ 已移除旧 Action 准备协议和 Gateway 准备调用；缓存目录归属已由 ADR 0056 解决。❌ 真机验收仍待完成。当前行为细节见 [合成 Agent](../../MobileHarness/Agents/SpeechSynthesis/README.md)、[播放 Action](../../MobileHarness/Actions/Speech/README.md) 和 [音频缓存](../../MobileHarness/Storage/Audio/README.md)。
 
 ## 共享存储里程碑（ADR 0056）
 
-✅ Storage 与 StorageAudio target 已接入，旧 SpeechRuntime 已移除；迁移后的仓库检查和四个 iOS 模拟器构建目标通过。当前技术契约只在 [Storage](../MobileHarness/Storage/README.md) 与 [StorageAudio](../MobileHarness/Storage/Audio/README.md) 维护。❌ 真机语音验收、可淘汰磁盘缓存、持久化文件与记忆记录仍待完成。
+✅ Storage 与 StorageAudio target 已接入，旧 SpeechRuntime 已移除；迁移后的仓库检查和四个 iOS 模拟器构建目标通过。当前技术契约只在 [Storage](../../MobileHarness/Storage/README.md) 与 [StorageAudio](../../MobileHarness/Storage/Audio/README.md) 维护。❌ 真机语音验收、可淘汰磁盘缓存、持久化文件与记忆记录仍待完成。
 
 ### Local settings persistence and cache synchronization (2026-09-28)
 
-✅ Storage now supports bounded durable documents, read-through/write-through caching, explicit refresh and revision conflicts. App settings migrate from the legacy Keychain record to a sandbox document with device-local credential references. ❌ Cross-device sync, general media persistence and device migration acceptance remain pending. See [ADR 0057](adr/0057-local-settings-storage.md).
+✅ Storage now supports bounded durable documents, read-through/write-through caching, explicit refresh and revision conflicts. App settings migrate from the legacy Keychain record to a sandbox document with device-local credential references. ❌ Cross-device sync, general media persistence and device migration acceptance remain pending. See [ADR 0057](../adr/0057-local-settings-storage.md).
 
 Validation: `scripts/check.sh` passed, including 114 IntegrationTests and four local-document synchronization tests. `scripts/build-ios.sh` passed all four simulator schemes. Device Keychain migration, live cloud requests and phone installation were not exercised in this change.
 
@@ -361,13 +363,13 @@ Validation: `scripts/check.sh` passed, including 114 IntegrationTests and four l
 
 ✅ Default registration, local provisioning, bounded streaming synthesis, Chinese/English preset voices and MOSS diagnostics replace Kokoro after repeated iPhone crashes. No automatic fallback. ❌ Sustained iPhone 17 Pro/iOS 27 stability, cold-start latency across conditions, Chinese number/date pronunciation and continuous speech acceptance remain pending.
 
-✅ MOSS replacement checks: repository checks with real Mac synthesis, all four simulator schemes and signed physical Release build passed. Installed on iPhone 17 Pro; two short mixed-language synthesis runs completed without process termination. Cold prediction latency prompted explicit startup warmup; the final revision also completed a device diagnostic (loading/warmup 0.75 s, first PCM 0.04 s, total 1.85 s for 5.04 s audio, thermal nominal). ❌ Audible quality and sustained full-conversation acceptance remain pending; see [MOSS validation](Moss-Validation.md).
+✅ MOSS replacement checks: repository checks with real Mac synthesis, all four simulator schemes and signed physical Release build passed. Installed on iPhone 17 Pro; two short mixed-language synthesis runs completed without process termination. Cold prediction latency prompted explicit startup warmup; the final revision also completed a device diagnostic (loading/warmup 0.75 s, first PCM 0.04 s, total 1.85 s for 5.04 s audio, thermal nominal). ❌ Audible quality and sustained full-conversation acceptance remain pending; see [MOSS validation](../validation/Moss-Validation.md).
 
 ### Cloud settings input defaults (2026-09-28)
 
 ✅ Optional Key, blank URL fallback to the official OpenAI endpoint, visible default chat model and filtered model discovery are implemented. ❌ Live provider and device UI acceptance remain pending.
 
-✅ MOSS follow-up crash logs identify a MainActor isolation assertion in the AppleAudioIO mixer tap, corrected with an explicitly Sendable callback. Diagnostics now exercise production playback; see [MOSS validation](Moss-Validation.md) for evidence and device acceptance.
+✅ MOSS follow-up crash logs identify a MainActor isolation assertion in the AppleAudioIO mixer tap, corrected with an explicitly Sendable callback. Diagnostics now exercise production playback; see [MOSS validation](../validation/Moss-Validation.md) for evidence and device acceptance.
 
 ✅ Following MOSS playback buffer overflow, the production per-handle PCM cache was increased from 2 MiB to 8 MiB at the user’s request, matching the synthesis output limit. ❌ This does not add backpressure or remove long-reply limits; sustained conversation acceptance remains pending.
 
@@ -375,26 +377,26 @@ Validation: `scripts/check.sh` passed, including 114 IntegrationTests and four l
 
 ✅ 设置新增独立 LLM 测试页：复用已保存模型、Assistant 提示词和 JSON，展示完整接收原文、分片、结束原因、解析错误及解析出的 Action/Channel，可显式导出。解析失败继续收集；取消、传输失败、token 上限和保留上限均明确标记。生产 Agent/Gateway 契约未改变。
 
-❌ 真机交互、真实本地/云模型输出验收以及实际 Channel 执行时序跟踪仍待完成。此页是单轮无副作用测试，不重放已有语音会话；详见 [Diagnostics](../MobileHarness/UI/Diagnostics/README.md)。
+❌ 真机交互、真实本地/云模型输出验收以及实际 Channel 执行时序跟踪仍待完成。此页是单轮无副作用测试，不重放已有语音会话；详见 [Diagnostics](../../MobileHarness/UI/Diagnostics/README.md)。
 
 
 ## Structured wait scheduling (2026-09-28)
 
-✅ Implemented typed wait boundaries, combined lexical scope validation, task-local nested execution groups and global module exclusion. Wait joins parent-prefix work and its own children before parent continuation. Assistant removes the implicit main declaration, preserves wait events through audioID conversion, and uses a 256-event output buffer. Diagnostics displays the ordered wait tree preview. See [ADR 0059](adr/0059-structured-wait-scheduling.md).
+✅ Implemented typed wait boundaries, combined lexical scope validation, task-local nested execution groups and global module exclusion. Wait joins parent-prefix work and its own children before parent continuation. Assistant removes the implicit main declaration, preserves wait events through audioID conversion, and uses a 256-event output buffer. Diagnostics displays the ordered wait tree preview. See [ADR 0059](../adr/0059-structured-wait-scheduling.md).
 
 ❌ Live-model protocol compliance, device scheduling timing, cross-task barriers, preemption, rollback and native Tool grouping remain outside this implementation. Existing speech cache expiration still applies to long blocked plans; no new deployment or device installation is implied.
 
-Validation: final repository checks passed, including 129 IntegrationTests; all four simulator schemes and the signed generic-iOS Debug build passed. Device app signature verification passed. No device installation or live-model acceptance was performed; see [validation history](Validation-History.md).
+Validation: final repository checks passed, including 129 IntegrationTests; all four simulator schemes and the signed generic-iOS Debug build passed. Device app signature verification passed. No device installation or live-model acceptance was performed; see [validation history](../validation/Validation-History.md).
 
 ## 持久化历史记录（2026-09-28）
 
-✅ “历史记录”取代单轮原始输出测试页，接入真实 Assistant 请求，持久化用户原文、模型文本分片、实际上下文和错误。当前会话按最近十轮完整对话构建上下文，停止录音或重启不清空；开始新对话后原子归档，单独生成历史标题，失败可重试。当前标题取最新用户输入。见 [ADR 0060](adr/0060-persistent-conversation-history.md)。
+✅ “历史记录”取代单轮原始输出测试页，接入真实 Assistant 请求，持久化用户原文、模型文本分片、实际上下文和错误。当前会话按最近十轮完整对话构建上下文，停止录音或重启不清空；开始新对话后原子归档，单独生成历史标题，失败可重试。当前标题取最新用户输入。见 [ADR 0060](../adr/0060-persistent-conversation-history.md)。
 
 ❌ GPT-4.1 wait 遵循率、真实标题质量、真机页面交互和持久化写入性能尚待验收。此版本之前未落盘的聊天无法恢复。
 
 ## Agent JSON v5（2026-09-28）
 
-✅ 四个 Agent 统一使用 version/id、按 Channel 分组的 actions、标准 function tools 和 communication。移除旧 channels/textActions/hidden/defaultChannel 配置；固定内部行为与权限由 Agent 代码定义。解析器只能解析模型可调用清单，内部 Action/Tool 仍由 Gateway 校验。此节取代上文历史阶段的 v1–v4 配置描述。见 [ADR 0061](adr/0061-agent-json-v5.md)。
+✅ 四个 Agent 统一使用 version/id、按 Channel 分组的 actions、标准 function tools 和 communication。移除旧 channels/textActions/hidden/defaultChannel 配置；固定内部行为与权限由 Agent 代码定义。解析器只能解析模型可调用清单，内部 Action/Tool 仍由 Gateway 校验。此节取代上文历史阶段的 v1–v4 配置描述。见 [ADR 0061](../adr/0061-agent-json-v5.md)。
 
 ❌ 本次不增加完整 JSON Schema 或原生 Tool 流；模型遵循率与真机交互需要独立验收。
 
@@ -404,13 +406,13 @@ Validation: final repository checks passed, including 129 IntegrationTests; all 
 
 ## 模块目录整合
 
-✅ Actions/Runtime 与行为实现统一编译为 Actions；Tools 同理。AgentCore 移入 Agents/Core，保留独立核心编译边界；本阶段 Experience 移入 App/Views，后续由 ADR 0064 调整为独立 UI 模块。同步 SwiftPM、Xcode、import、边界检查和技术文档，核心链路及功能保持原样。见 [ADR 0063](adr/0063-module-directory-consolidation.md)。❌ 本轮不新增功能，也不代表新的真机交互验收。
+✅ Actions/Runtime 与行为实现统一编译为 Actions；Tools 同理。AgentCore 移入 Agents/Core，保留独立核心编译边界；本阶段 Experience 移入 App/Views，后续由 ADR 0064 调整为独立 UI 模块。同步 SwiftPM、Xcode、import、边界检查和技术文档，核心链路及功能保持原样。见 [ADR 0063](../adr/0063-module-directory-consolidation.md)。❌ 本轮不新增功能，也不代表新的真机交互验收。
 
 目录整合验证：完整仓库检查通过（142 个 IntegrationTests），完整 Xcode 下四个模拟器目标构建通过。194 个 Swift 实现文件除 import/格式外无变化；未新增本地文档断链。本轮未安装真机。
 
 ## App 与 UI 职责拆分（2026-09-29）
 
-✅ App 分为 Composition、Lifecycle、Workflows 和 Adapters；页面迁到独立 UI target。页面状态/操作协议不引用 App 协调器；历史归档与标题、配置事务、诊断设备工作移入可独立测试的 AppWorkflows。ApplicationRuntime 由根装配持有并显式注入；语音和相机各绑定完整的类型化呈现接口。原有双 Gateway、wait 调度、音频完成与取消清理顺序保留。见 [ADR 0064](adr/0064-app-ui-boundaries.md)。
+✅ App 分为 Composition、Lifecycle、Workflows 和 Adapters；页面迁到独立 UI target。页面状态/操作协议不引用 App 协调器；历史归档与标题、配置事务、诊断设备工作移入可独立测试的 AppWorkflows。ApplicationRuntime 由根装配持有并显式注入；语音和相机各绑定完整的类型化呈现接口。原有双 Gateway、wait 调度、音频完成与取消清理顺序保留。见 [ADR 0064](../adr/0064-app-ui-boundaries.md)。
 
 ✅ 页面层目录与编译模块统一命名为 UI，包含页面、状态与交互接口，按功能分组。SwiftPM、Xcode、import、UITests、边界检查、目录说明和依赖图均使用该名称；Actions/UI 与 Tools/UI 继续归属行为模块。
 
@@ -430,7 +432,7 @@ Validation: final repository checks passed, including 129 IntegrationTests; all 
 
 ✅ 开始前已提交第一阶段及当前 App/UI 整理：`b991ba2`。第二阶段新增 typed completion、ActionResult/ActivityEvent、先预留容量再接纳的结果 outbox、消息重试与执行分离、实例/会话隔离及 Agent 有界回执历史。默认仅失败反馈，不自动触发模型。
 
-✅ 新增跨 Action、Tool 和宿主入口的资源仲裁；支持短期执行围栏、持久租约、整组抢占、过期/停止回收，以及清理失败/超时封锁。设备 stop 与旧任务 join 并行启动，确认清理完成后才授予新租约。摄像头采集已接入真实 AppleCamera 生命周期，未新增录像占位功能。见 [ADR 0066](adr/0066-action-results-resource-leases.md)。
+✅ 新增跨 Action、Tool 和宿主入口的资源仲裁；支持短期执行围栏、持久租约、整组抢占、过期/停止回收，以及清理失败/超时封锁。设备 stop 与旧任务 join 并行启动，确认清理完成后才授予新租约。摄像头采集已接入真实 AppleCamera 生命周期，未新增录像占位功能。见 [ADR 0066](../adr/0066-action-results-resource-leases.md)。
 
 ❌ 待完成：通用 activity registry 与事件 outbox、音频/机械臂资源迁移、设备 watchdog、持久化结果与跨重启恢复、逐 Action 执行期限、业务 Action 文件/签名统一及真机验收。当前表情仍以状态接受为完成点，不等待动画结束。
 
@@ -438,7 +440,7 @@ Validation: final repository checks passed, including 129 IntegrationTests; all 
 
 ## Action/Tool 模块装配迁移（2026-09-29）
 
-✅ 域模块拥有定义与函数绑定，Actions/Tools 各有显式内置模块清单。新增独立 BehaviorAssembly target；App 只注入类型化能力，删除逐项注册、prepareTools 异步初始化及适配器中的具体行为调用。启动时同时校验 Action 和 Tool 的模型/内部权限实现覆盖。新增边界检查和装配契约测试。见 [ADR 0067](adr/0067-domain-owned-behavior-assembly.md)。
+✅ 域模块拥有定义与函数绑定，Actions/Tools 各有显式内置模块清单。新增独立 BehaviorAssembly target；App 只注入类型化能力，删除逐项注册、prepareTools 异步初始化及适配器中的具体行为调用。启动时同时校验 Action 和 Tool 的模型/内部权限实现覆盖。新增边界检查和装配契约测试。见 [ADR 0067](../adr/0067-domain-owned-behavior-assembly.md)。
 
 ❌ 新设备能力/生命周期变化仍需适配器与宿主绑定；未顺带迁移全部旧业务文件/函数签名。第二阶段硬件与持久化待办保持不变。
 
@@ -454,7 +456,7 @@ Validation: final repository checks passed, including 129 IntegrationTests; all 
 
 ## Storage core/domain layout
 
-✅ Storage 根目录保留通用内存缓存/租约、文档持久化和本地同步；聊天记录迁入 Chat/，独立 StorageChat target，Audio/ 保持业务目录。同步消费者 import、依赖与工程引用，不改变磁盘路径、格式和业务行为。见 [ADR 0069](adr/0069-storage-core-domain-layout.md)。
+✅ Storage 根目录保留通用内存缓存/租约、文档持久化和本地同步；聊天记录迁入 Chat/，独立 StorageChat target，Audio/ 保持业务目录。同步消费者 import、依赖与工程引用，不改变磁盘路径、格式和业务行为。见 [ADR 0069](../adr/0069-storage-core-domain-layout.md)。
 
 ❌ Image/video/semantic-memory storage and cross-device synchronization remain planned.
 
@@ -522,7 +524,7 @@ Deployment of current Bluetooth UX: signed iPhone build succeeded; the update in
 
 ## NexArm entertainment skills (2026-09-30)
 
-✅ Added five real device-bound NexArm entertainment Actions and Assistant registrations, with fixed base/wrist presets and verified finite-leg completion. ❌ New full gesture sequences require physical iPhone acceptance; unattended operation and device-side stop/watchdog remain outstanding. See [ADR 0072](adr/0072-nexarm-entertainment-skills.md).
+✅ Added five real device-bound NexArm entertainment Actions and Assistant registrations, with fixed base/wrist presets and verified finite-leg completion. ❌ New full gesture sequences require physical iPhone acceptance; unattended operation and device-side stop/watchdog remain outstanding. See [ADR 0072](../adr/0072-nexarm-entertainment-skills.md).
 
 Validation (2026-09-30): `scripts/check.sh` passed, including 212 IntegrationTests; `scripts/build-ios.sh` passed all four simulator schemes. Real-model evaluation remained opt-in/skipped. New gesture sequences used explicit telemetry simulators and have not received fresh physical acceptance.
 
@@ -586,22 +588,22 @@ Verification: required repository checks passed (229 IntegrationTests; opt-in ph
 
 Device delivery: signed build2026093008 installed; CoreDevice inventory confirmed that exact version on the iPhone. USB shared-controller acceptance is complete; BLE timing remains a separate device check.
 
-✅ 2026-09-30: shared NexArm jog planner uses bounded acceleration/jerk, finite look-ahead, 30 ms scheduling and native servo position writes without per-write pose queries. Tests cover smoothing, duplicate suppression, six-axis streaming, congestion and reset preemption. See [ADR 0079](adr/0079-nexarm-smooth-jog.md). ❌ BLE physical cadence/visual smoothness require phone acceptance.
+✅ 2026-09-30: shared NexArm jog planner uses bounded acceleration/jerk, finite look-ahead, 30 ms scheduling and native servo position writes without per-write pose queries. Tests cover smoothing, duplicate suppression, six-axis streaming, congestion and reset preemption. See [ADR 0079](../adr/0079-nexarm-smooth-jog.md). ❌ BLE physical cadence/visual smoothness require phone acceptance.
 
-✅ [ADR 0080](adr/0080-nexarm-independent-motion-results.md): explicit preset admission no longer depends on previous completion/recovery feedback. New actions retain their own completion checks. ❌ Physical failure recovery acceptance remains pending.
+✅ [ADR 0080](../adr/0080-nexarm-independent-motion-results.md): explicit preset admission no longer depends on previous completion/recovery feedback. New actions retain their own completion checks. ❌ Physical failure recovery acceptance remains pending.
 
-✅ Tilt return repair keeps ready height240mm while preserving arm-relative yaw±12°/roll±40° and unchanged arrival thresholds. Both complete USB sequences passed; see [physical acceptance](NexArm_Physical_Acceptance.md). ❌ Phone BLE acceptance remains pending.
+✅ Tilt return repair keeps ready height240mm while preserving arm-relative yaw±12°/roll±40° and unchanged arrival thresholds. Both complete USB sequences passed; see [physical acceptance](../validation/NexArm_Physical_Acceptance.md). ❌ Phone BLE acceptance remains pending.
 
-✅ [ADR0081](adr/0081-settings-immediate-test-control.md) separates immediate preemptible settings tests from unchanged completion-based channel actions. ❌ Settings send status does not assert physical completion.
+✅ [ADR0081](../adr/0081-settings-immediate-test-control.md) separates immediate preemptible settings tests from unchanged completion-based channel actions. ❌ Settings send status does not assert physical completion.
 
-✅ [ADR0082](adr/0082-nexarm-observation-watchdogs.md) adds continuous pose reception, notification-first channel completion, limited query fallback and independent silence/total deadlines. Settings live tests remain unchanged. ❌ Device-side watchdog and action-ID completion require firmware support.
+✅ [ADR0082](../adr/0082-nexarm-observation-watchdogs.md) adds continuous pose reception, notification-first channel completion, limited query fallback and independent silence/total deadlines. Settings live tests remain unchanged. ❌ Device-side watchdog and action-ID completion require firmware support.
 
 ✅ Dance timeout correction: the fixed overall channel deadline sums all per-segment motion and settling budgets, preserving2s feedback silence and per-segment limits. Previously one shared3s margin truncated a healthy multi-frame dance before its ending. Settings playback and pose tolerances are unchanged.
 
 
 ## Unified Action execution presentation — 2026-09-30
 
-✅ Current changes were checkpointed as04b8dca before this implementation. Added a scheduler-owned versioned snapshot stream, bounded terminal history, cancelling state, structured presentation failures and root-owned UI adaptation. Home shows multiple channel summaries, queued counts, transient success and persistent failures, with recent execution details. See [ADR0083](adr/0083-action-execution-presentation.md).
+✅ Current changes were checkpointed as04b8dca before this implementation. Added a scheduler-owned versioned snapshot stream, bounded terminal history, cancelling state, structured presentation failures and root-owned UI adaptation. Home shows multiple channel summaries, queued counts, transient success and persistent failures, with recent execution details. See [ADR0083](../adr/0083-action-execution-presentation.md).
 
 ❌ Device stage progress, durable per-conversation history and physical-phone presentation/accessibility acceptance remain pending. Settings open-loop tests remain separate from verified channel completion.
 
@@ -617,17 +619,17 @@ Deployment: CoreDevice reported successful installation of the signed2026093017 
 
 ### Action / Tool presentation boundary correction
 
-✅ Every scheduled Action is observable; there are no module/source filters. Fixed UI updates are completion-only Tools with explicit append/replacement semantics; model expression remains an Action. Failure descriptions come from the thrown error, bounded in the scheduler snapshot, while machine codes remain metadata. See [ADR0083](adr/0083-action-execution-presentation.md). ❌ Native model Tool output and physical-phone visual acceptance remain separate follow-up work.
+✅ Every scheduled Action is observable; there are no module/source filters. Fixed UI updates are completion-only Tools with explicit append/replacement semantics; model expression remains an Action. Failure descriptions come from the thrown error, bounded in the scheduler snapshot, while machine codes remain metadata. See [ADR0083](../adr/0083-action-execution-presentation.md). ❌ Native model Tool output and physical-phone visual acceptance remain separate follow-up work.
 
 ### Single-motor head gestures
 
-✅ Nod and head shake use a calibrated-home preparation and native motor4/5 trajectories. Channel arrival checks encoders with the same freshness/deadline policy; Settings remains send-only with bounded nominal targets. The shared transport admits only the new bounded motor command. ❌ Physical acceptance of these added gestures remains pending. See [NexArm](../MobileHarness/PlatformKit/Connectivity/NexArm/README.md).
+✅ Nod and head shake use a calibrated-home preparation and native motor4/5 trajectories. Channel arrival checks encoders with the same freshness/deadline policy; Settings remains send-only with bounded nominal targets. The shared transport admits only the new bounded motor command. ❌ Physical acceptance of these added gestures remains pending. See [NexArm](../../MobileHarness/PlatformKit/Connectivity/NexArm/README.md).
 
 ✅ Head gesture preparation corrected to use the existing intermediate-pose arrival contract instead of final-home tolerance. Body encoder verification, watchdogs and strict home ending remain intact. Regression covers both passing preparation and failing final home; physical reproduction remains pending.
 
 ## LLM output buffering (2026-09-30)
 
-✅ Removed the 128-event backlog limit from cloud/local LLM sessions. Other streams remain bounded; finite reply generation, response byte limits, event validation and cancellation are preserved. Added delayed-consumer regression coverage. See [ADR 0084](adr/0084-llm-output-buffering.md).
+✅ Removed the 128-event backlog limit from cloud/local LLM sessions. Other streams remain bounded; finite reply generation, response byte limits, event validation and cancellation are preserved. Added delayed-consumer regression coverage. See [ADR 0084](../adr/0084-llm-output-buffering.md).
 
 ❌ Physical-device all-expression replay and sustained conversation acceptance remain pending.
 
@@ -651,7 +653,7 @@ Validation: `scripts/check.sh` passed with full Xcode selected, including format
 
 ## Reply-owned speech audio (2026-09-30)
 
-✅ Removed queued/ready PCM wall-clock expiry; normal reply termination joins Actions before clearing remaining input-owned audio. Interruption/error cleanup and per-source/input isolation remain explicit. See [ADR 0085](adr/0085-reply-owned-speech-audio.md).
+✅ Removed queued/ready PCM wall-clock expiry; normal reply termination joins Actions before clearing remaining input-owned audio. Interruption/error cleanup and per-source/input isolation remain explicit. See [ADR 0085](../adr/0085-reply-owned-speech-audio.md).
 
 ❌ Physical-device delayed playback and long choreography acceptance remain pending.
 
@@ -691,11 +693,11 @@ Validation: `scripts/check.sh` passed with Xcode Swift 6.4, including the comple
 
 ## TTS playback truncation (2026-09-30)
 
-✅ Removed the default three-second empty-PCM read deadline that could stop playback and discard remaining audio while synthesis was still running. Regression coverage includes delayed first audio and delayed continuation through the real synthesis/cache/Action path. Synthesis execution and hardware completion retain their own deadlines. ❌ iPhone audible continuity and thermal-load acceptance remain pending; slower-than-real-time synthesis may still cause audible pauses. See [ADR 0087](adr/0087-speech-producer-deadline.md).
+✅ Removed the default three-second empty-PCM read deadline that could stop playback and discard remaining audio while synthesis was still running. Regression coverage includes delayed first audio and delayed continuation through the real synthesis/cache/Action path. Synthesis execution and hardware completion retain their own deadlines. ❌ iPhone audible continuity and thermal-load acceptance remain pending; slower-than-real-time synthesis may still cause audible pauses. See [ADR 0087](../adr/0087-speech-producer-deadline.md).
 
 ## Settings-matched Cartesian motion (2026-09-30)
 
-✅ Following user confirmation of smooth repeated Settings celebration/dance, unified their Cartesian frame factory and nominal cadence with Channel playback. Removed Channel-only preparation/ending poses, motion-time queries and intermediate arrival waits. Final fresh stable home still gates Action completion and the next NexArm Action; head gestures retain their calibrated path. See [ADR0088](adr/0088-nexarm-settings-matched-playback.md).
+✅ Following user confirmation of smooth repeated Settings celebration/dance, unified their Cartesian frame factory and nominal cadence with Channel playback. Removed Channel-only preparation/ending poses, motion-time queries and intermediate arrival waits. Final fresh stable home still gates Action completion and the next NexArm Action; head gestures retain their calibrated path. See [ADR0088](../adr/0088-nexarm-settings-matched-playback.md).
 
 ❌ Phone BLE jitter acceptance and intermediate physical-path verification remain pending; final home is not proof of every waypoint.
 
@@ -745,7 +747,7 @@ Deployment: installed the signed Debug build on the connected iPhone17Pro and ve
 
 ## NexArm source boundary correction (2026-10-01)
 
-✅ Moved gesture catalog, names, simple/complex choreography and completion execution from PlatformKit to Actions/NexArm/Support. Renamed native encoder NexArmMotorCommands, added boundary guards, and migrated callers/tests. Motion semantics remain unchanged; validation is recorded after checks. ❌ Physical motion acceptance remains distinct from architectural and simulated tests. See [ADR0093](adr/0093-nexarm-platform-action-boundary.md).
+✅ Moved gesture catalog, names, simple/complex choreography and completion execution from PlatformKit to Actions/NexArm/Support. Renamed native encoder NexArmMotorCommands, added boundary guards, and migrated callers/tests. Motion semantics remain unchanged; validation is recorded after checks. ❌ Physical motion acceptance remains distinct from architectural and simulated tests. See [ADR0093](../adr/0093-nexarm-platform-action-boundary.md).
 
 Validation: `scripts/check.sh` passed with Swift 6.4, including all 286 IntegrationTests; `scripts/build-ios.sh` passed all four simulator schemes. Signed iPhone build2026100106 passed. Hardware motion was not replayed for this source-boundary migration. The congestion fixture was made deterministic after its timed unblock raced a later child; production control behavior was unchanged.
 
@@ -788,7 +790,7 @@ Device: the first installation lost the phone installation-service connection. R
 
 ## Audio storage identity boundary — ADR0097
 
-✅ StorageAudio depends only on Storage and ModelKit; consumers pass opaque source strings instead of AgentID. Source/session/input authorization and cancellation behavior are preserved. See [ADR0097](adr/0097-storage-audio-opaque-owner.md).
+✅ StorageAudio depends only on Storage and ModelKit; consumers pass opaque source strings instead of AgentID. Source/session/input authorization and cancellation behavior are preserved. See [ADR0097](../adr/0097-storage-audio-opaque-owner.md).
 
 ❌ ModelKit PCM type extraction and new physical-device acceptance are not included.
 
@@ -796,7 +798,7 @@ Validation: `scripts/check.sh` passed, including ownership/scoped-cancellation a
 
 ## Independent dependency boundaries — ADR0098 (2026-10-02)
 
-✅ Gateway depends only on AgentCore/ActionRuntime/ToolRuntime; behavior assembly and Agent permission coverage are separate. Six feature workflow targets replace the broad workflow implementation target, with injected provider/title/preview operations. Types is shared by model/device/storage SDKs, and Lifecycle receives role-specific services and Agent factories. Existing business/runtime algorithms are preserved. Current direct dependencies are in MobileHarness/README.md. See [ADR0098](adr/0098-independent-runtime-workflow-audio-boundaries.md).
+✅ Gateway depends only on AgentCore/ActionRuntime/ToolRuntime; behavior assembly and Agent permission coverage are separate. Six feature workflow targets replace the broad workflow implementation target, with injected provider/title/preview operations. Types is shared by model/device/storage SDKs, and Lifecycle receives role-specific services and Agent factories. Existing business/runtime algorithms are preserved. Current direct dependencies are in MobileHarness/README.md. See [ADR0098](../adr/0098-independent-runtime-workflow-audio-boundaries.md).
 
 ❌ Real-provider/device acceptance and multi-window coordination remain separate; no phone installation is part of this refactor.
 
@@ -809,3 +811,245 @@ Validation: `scripts/check.sh` passed, including 297 IntegrationTests and 13 App
 ❌ Shared Image extraction and additional device Tool domains require concrete integration needs; no placeholder implementations or phone installation are included.
 
 Validation: `scripts/check.sh` passed, including 297 IntegrationTests and 13 AppWorkflowTests plus the remaining enabled suites. `scripts/build-ios.sh` passed all four simulator schemes with full Xcode selected through DEVELOPER_DIR. Boundary checks validate the Types compilation owner and recursive category imports. No phone installation or physical-device acceptance was performed.
+
+## 2026-10-15 — 路线图中的旧实施阶段与验收记录
+
+以下内容从整理前的 `docs/Roadmap.md` 迁入，迁移日期不是实现或验收日期。原有“当前”“默认”“待做”对应其原始上下文，可能已被后续记录替代；不作为现行契约或当前待办。完全相同的叙述段落已复用既有记录，原始测试与设备证据仍由验证报告拥有。
+
+- Camera.open/close/flip Tools are registered and declared in Photographer JSON; native/XML task transport is implemented; physical camera/lens/permission acceptance remains pending.
+
+✅ Shared-pose Photographer and five-axis Robot.aim BLE dispatch are implemented. ❌ Physical tracking, wrist recovery and Wi-Fi control acceptance remain pending.
+
+✅ Tracking implementation audit covers Tool resource declarations, composition-owned Agent factories, partial registration cleanup, payload validation, bounded output overflow and latched write failure. ❌ Real-device tracking accuracy and physical stop/arrival acceptance remain pending.
+
+❌ Investigate the reported iPhone NexArm reply timeout after branch merge. Structured query/notification diagnostics are implemented; the physical failure cause is not yet established.
+
+✅ Offline-robot tracking isolation, BLE connected/control-unready presentation and incremental Agent-resource refresh are implemented. ❌ Phone acceptance must verify pose display with an offline arm, query-timeout state and tracking after reconnect.
+
+✅ Implemented: producer messaging failure isolation, completion Tool error results and Photographer control-availability gating. Outstanding: sustained iPhone disconnect/reconnect and voice-service failure acceptance.
+
+✅ Integrated latest feat/main-sh incremental Photographer tracking into main’s current Action/Tool boundaries; retained Agent isolation and Bluetooth control-readiness contracts. ❌ Hardware smoothness and disconnect/reconnect tracking acceptance remain pending.
+
+✅ Finite expression performance and persistent base state are separated; offline tests validate scheduler and cleanup contracts. ❌ iPhone acceptance must cover consecutive same/different expressions, wait ordering, Reduce Motion, hidden/background rendering, next-turn cancellation and base restoration.
+
+### Local model resource management
+
+✅ Declarative source metadata, ModelKitHub SDK adapter, receipt-based installation, Settings source controls and safe removal are implemented. ❌ HF durable background/partial resume, batch acquisition and physical-device acceptance remain. See [Management](../../MobileHarness/ModelKit/Support/Management/README.md#local-model-resources--current-contract) and [ADR0105](../adr/0105-local-model-resource-management.md).
+
+✅ Native Tool call history and input/generated/total token diagnostics are implemented in the existing Settings history flow, with optional provider evidence and actual Gateway execution outcomes. ❌ Physical Camera/provider usage/UI acceptance and partial native-stream diagnostics remain pending.
+
+✅ Local model resource first release: metadata-only packaging, bounded verified download/installation, persistent official/mirror/custom source settings, explicit stop-and-delete and sandbox-only loading. ❌ Full iOS build/device acceptance, partial-file resumeData, batch download, orphan-staging collection and derived compilation-byte accounting remain. See Management current contract for proposal deviations.
+
+Historical validation (2026-10-03; superseded environment status): 35 isolated shared tests passed (32 ModelKitRuntime, 2 Storage, 1 Settings), using the same root sources through temporary symlink target selection to avoid unrelated MLX Metal compilation. ModelKitHub/ModelKitRuntime builds and Defaults/App adapter type checks passed; device/simulator staging fixtures contain only metadata/licenses and remove stale weights. Boundary, provisioning tests, Swift formatting and project plist checks passed. Full check.sh stops at missing `metal`; At that validation, build-ios.sh required full Xcode while only Command Line Tools were selected. iOS UI/delegate runtime and physical inference/background acceptance remain unverified.
+
+✅ Model artifact completion preserves receipt-validated installed state after task-index write failure; atomic transfer snapshots remove split load/save races. ❌ Real iPhone YOLO incident attribution and lock-state/network/UI acceptance remain pending device access.
+
+✅ Real YOLO archive plus production App storage probe reproduces and fixes shifted receipt paths across filesystem aliases; exact known-bug receipts repair without re-downloading valid files. ❌ Physical iPhone confirmation remains pending connectivity.
+
+
+✅ Replaced Nemotron CoreAI exports with the shared multilingual 2240 ms Core ML catalog and bounded FluidAudio adapter. ❌ Complete phone English/Chinese quality, cancellation, sustained thermal/memory and end-to-end latency acceptance for this export.
+
+
+✅ HF model background transport, preserved completed files, system resume-data reuse, bounded retries and three concurrent files/package implemented. ❌ Validate physical-phone lock-screen, system termination, forced quit, signed-URL expiry and large-file resume/speed with actual network traces.
+
+
+✅ Apple ASR burst and four consecutive real system TTS replies passed on Mac. Phone diagnostics identified the production auto locale passed verbatim into AVSpeechSynthesisVoice; Apple TTS now resolves it before voice selection. Real Mac auto-locale consecutive replies passed; phone retest remains pending.
+
+✅ Unknown model Action/Tool calls and invalid invocation parameters now retain failure outcomes without aborting the current reply or cancelling its other Actions. ❌ Live-model acceptance and automatic repair remain pending.
+
+✅ Model acquisition UI is simplified: inline 下载源, automatic endpoint persistence, fixed YOLO source, brief user guidance and all system-permitted networks. ❌ Physical-page interaction acceptance remains pending.
+
+✅ Canonical ActionFunction owns static timeout and request-dependent execution budgets (including NexArm), shared by both call protocols. FunctionExecutor uses the declared budget before its30-second default; invalid explicit declarations fail without fallback. @Action creates protocol-neutral factories; host bindings select protocol/runtime policy. ❌ Deadlines cannot forcibly interrupt uncooperative cleanup.
+
+❌ The iOS simulator SDK lacks CoreAI; the external CoreAILM target cannot build there. build-ios.sh currently stops on this limitation. Independent UI tests run on Mac; a separate simulator assembly remains outstanding.
+
+✅ Latest-capture inference uses pixel-independent capture-time cadence; controlled regression covers latest replacement even with insignificant grayscale change. ❌ Physical camera latency acceptance remains pending.
+
+✅ YOLO per-result timing/FPS/latest-frame replacement statistics and upper-left camera display are implemented. ❌ Adaptive pose/confidence/cost cadence is implemented; physical-phone sustained latency/thermal measurements remain pending.
+
+Validation: 14 explicitly filtered vision/UI tests, module boundary checks and changed-source formatting passed. Unsigned generic iOS device build passed; build-ios.sh remains blocked by the external CoreAIShared target lacking CoreAI in the simulator SDK. No robot motion tests were run. Physical UI/performance acceptance remains pending.
+
+✅ Removed fixed grayscale-percentage detection and camera threshold controls; latest-frame capture-time cadence provides the 100ms measurement baseline. ❌ Adaptive cadence is implemented (ADR0113); physical-phone energy/latency acceptance remains pending.
+
+Cadence baseline validation: 15 filtered vision/UI tests, module/resource boundaries, changed-source formatting, project plist and unsigned generic iOS device build passed. Full check.sh was not run because it includes the robot tests excluded by the user; the simulator CoreAI limitation remains as recorded above.
+
+✅ Adaptive pose cadence: 0...250ms bounds, 100ms initial interval, immediate motion/uncertainty acceleration, delayed stable relaxation, loss recovery and periodic empty-scene search, with measured inference-cost budgeting and optional interval UI statistics. ✅ Image motion and total-latency/freshness budgets are fused into cadence. ❌ Phone tuning, thermal/energy measurements and crowded-scene association acceptance remain pending.
+
+Adaptive validation: 21 filtered vision/UI tests, source formatting, module/resource boundaries and unsigned generic iOS device build passed. Full check.sh remains excluded by the user’s no-robot-test instruction; build-ios.sh has the previously recorded simulator CoreAI limitation. No robot tests or hardware actions were run. Physical camera layout/latency and parameter calibration remain pending.
+
+✅ Fused dynamic detection adds inferred-frame cumulative image motion, padded person-ROI plus global evidence, bounded contrast/brightness compensation, quiet-scene noise adaptation and compute-aware total-latency feedback. Default capture/result age budget is 750ms; stale results update timing only. ❌ Phone saturation/exposure, small-target motion sensitivity, power/thermal acceptance remain pending. Source-stall timeout cleanup is deferred by user decision; camera close already clears presentation.
+
+Fusion validation: 28 explicitly selected vision/UI tests, module/resource boundaries, changed-source formatting, project plist and unsigned generic iOS device build passed. Full check.sh was excluded by the user’s no-robot-test instruction; the known simulator CoreAI limitation remains. No robot tests or hardware actions were run. Physical small-target/exposure sensitivity, sustained latency/thermal behavior and UI acceptance remain pending.
+
+✅ UI/Camera owns PoseOverlay and display statistics. VisionPerception owns its Encodable PoseOverlayPayload; Actions.PoseOverlay remains the independently validated callable-function payload. App maps callable payload values into UI values. UI depends only on StorageChat; AgentCore has zero project dependencies. See ADR0121.
+
+✅ Application domain contracts and identities are consolidated in Agents/Communication/AgentContracts.swift; Core/Gateway contain no speech/vision/phone contract cases. Image transport belongs to AgentCore/Input and presentation values to UI/Camera; Agent-domain speech/pose values belong to Agents/Communication; Assistant prompt policy stays in AssistantAgent.swift. Unknown/spoofed schemas reject admission. ❌ Dynamic registry reload, remote codecs and durable communication remain pending. See [ADR0116](../adr/0116-generic-agent-communication.md).
+
+✅ SpeechPerception file ownership separates boundary policy and transcript accumulation; internal ASR work is named SpeechRecognitionTurn. Agent transition, endpoint, reset and failure paths are centralized without changing reply gating or adding resume broadcasts. ❌ Sustained microphone/real-model acceptance remains pending.
+
+✅ Core residual cleanup (ADR0118): camera resource names moved to App; motor report fields replaced by bounded detail values; device error enums removed from Core; Assistant owns soft text segmentation limits. ❌ Provider-specific detail validation and remote serialization remain outside Core.
+
+SpeechPerception cleanup validation: helper boundary checks, changed Swift formatting and Xcode project plist passed. The targeted speech run passed 20 tests including revision/overflow and variable-window padding. Full check.sh reported two unrelated NexArm follow-motion test failures (four assertions). build-ios.sh remains blocked by CoreAIShared's missing simulator CoreAI module. A final targeted rebuild after empty-state normalization compiled speech sources but was blocked by concurrent ActionActivityTests failure-enum API changes; final whole-suite success is not claimed.
+
+✅ SDK value cohesion: ModelKit/PlatformKit no longer depend on Types; StorageAudio owns PCM storage values. VisionPerception constructs model image input after admission, SpeechPerception selects native-to-16 kHz conversion, and SpeechSynthesis adapts model output to storage. Boundary checks enforce these contracts (ADR0119). ❌ Physical camera/audio acceptance remains pending.
+
+✅ [ADR0121](../adr/0121-remove-shared-types.md): Types is deleted; AgentCore has zero project dependencies, UI depends only on StorageChat, and explicit Agent → Tool → App → UI adaptation preserves the pose wire format. ❌ Physical-device acceptance remains outstanding.
+
+✅ ModelKit diagnostic cleanup: availability/errors provide typed capability outcomes and neutral diagnostic text; consumer layers own localized messages and recovery guidance. Native camera gray64 sampling remains in PlatformKit, with motion/cadence decisions in VisionPerception. ✅ Storage context/title/producer-error separation is implemented in [ADR0143](../adr/0143-storage-consumer-policy-boundaries.md). ❌ Broader Agent-driven app migration remains planned.
+
+Validation update (2026-10-04): Swift 6.4/full Xcode are available. The Types removal boundary checks and targeted media/UI tests passed; the unsigned iOS device build passed. Full check.sh still reports two pre-existing NexArm planner test failures. build-ios.sh stops on simulator CoreAI module availability. Earlier dated CLT/MLX validation entries describe historical conditions. Fresh validation for the diagnostic/documentation cleanup: boundary checks (including localized-diagnostic rejection), six Python checks and Swift formatting passed; unsigned iOS device build passed. Full tests still fail only the same two NexArm planner tests; the simulator build remains blocked by CoreAIShared resolving CoreAI.
+
+Validation (2026-10-04, ADR0122): producer mapping/opaque-code translation and presentation regression tests passed (5 tests); boundary checks, Python checks and Swift formatting passed; unsigned iOS device build passed. Full check.sh retains the same two pre-existing NexArm planner failures. build-ios.sh remains blocked by the simulator CoreAI module dependency.
+
+✅ [ADR0123](../adr/0123-nexarm-ble-shared-pacing.md): shared BLE pacing, bounded transport diagnostics and fair aim iteration. ❌ Measure real BLE single/multi-motor stability, negotiated-MTU packing and bridge/firmware capacity before tuning the initial 30 ms write interval.
+
+Validation (2026-10-04, ADR0123): seven targeted BLE pacing/backpressure/fairness/cancellation tests passed; boundary checks, six Python checks and Swift formatting passed. Full check.sh retains the same two pre-existing aim planner failures (four assertions). build-ios.sh is unavailable under the selected Command Line Tools; full Xcode is not available in this environment. Physical BLE acceptance remains pending.
+
+✅ FOA sound-source perception: spatial-capable native capture, pure dominant-direction estimation independent of VAD, W-only ASR input and optional sound.source/1 broadcast with 500 ms freshness/latest pending replacement are implemented. Mono preserves recognition with unavailable direction. ❌ Physical axes/precision, camera/playback coexistence, room acoustics and Photographer consumption remain pending.
+
+Validation (2026-10-04, ADR0124): 20 targeted speech/sound-source/vision recovery tests passed, including all synthetic direction and publication lifecycle tests. Boundary checks, six Python checks and Swift formatting passed; unsigned generic iOS device build passed. Full check.sh ran 397 integration tests and reported the two existing NexArm planner failures (four assertions) plus one vision recovery timeout (two issues); that vision test passed on the isolated rerun. build-ios.sh remains blocked by CoreAIShared's missing simulator CoreAI module. No physical microphone, coordinate/precision, camera/playback coexistence, route-change or sustained-run acceptance has been performed.
+
+Final verification: changed sound-source Swift files, boundary checks and project/privacy/entitlements plist validation pass. A later whole-repository formatting rerun reports errors in concurrently modified BluetoothWorkflow.swift and BluetoothSettingsState.swift, outside this change; those edits are preserved.
+
+✅ FOA startup regression correction: native microphone configuration and first validated PCM delivery gate now precede listening. Failed spatial startup is joined before mono retry; capture failure/stream completion clears listening and rejects late voice-state Tools. Six readiness concurrency/cancellation tests and existing speech/sound-source/PCM regressions passed (24 targeted tests); unsigned iOS device build passed. See [validation history](../validation/Validation-History.md#2026-10-04--microphone-startup-readiness-correction). ❌ Physical confirmation of restored recording and capture coexistence remains pending.
+
+✅ [ADR0125](../adr/0125-bluetooth-exception-recovery.md): unified Bluetooth exception recovery, cancellation/cleanup fences and per-device diagnostic cache are implemented. ❌ Physical firmware/radio recovery and iOS diagnostic page acceptance remain pending; process-local cache does not survive relaunch.
+
+✅ ADR0126 fixes tracking's overlapping Tool/worker resource fences and returns control-admission failures through Tool results and the independent home execution observer (ADR0131). ❌ Supervised iPhone tracking/endurance acceptance remains pending.
+
+✅ [ADR0127](../adr/0127-settings-manual-robot-takeover.md): Settings presets/reset/jog restore immediate replacement without Gateway resource locks or physical-arrival waiting, sharing Actions recipes/options and native pacing. ❌ Native slider gesture and physical robot takeover/endurance acceptance remain pending.
+
+### Settings audio detection — ADR0128
+
+✅ Recognition settings now has a compact explicit detection section with native permission/input, spatial capability, actual received four-channel/mono mode, startup fallback reason, PCM level and fresh source direction. Diagnostics reuse source-only SpeechPerception and both Gateways without VAD/ASR warmup, conversational consumers or robot effects. One operation and one monitor stop after 10 seconds of captured audio; page departure/background cancel and voice switching joins cleanup.
+
+❌ Device acceptance: permission denial/retry, built-in/headset route, supported versus actual FOA/fallback reason, real front/back/left/right axes, camera coexistence, stop/restart, navigation/background and continuous latency. Synthetic tests do not establish angular precision.
+
+✅ iPhone 17 Pro extraction correction (2026-10-05): native logs confirm 48 kHz/four-channel Float32 ACN/SN3D FOA. The old fixed AudioBufferList size rejected interleaved PCM; PlatformKit now queries the actual size within a four-buffer bound and retains native storage during reading. Four native regressions and full check.sh passed; signed build `2026100505` was installed/launched. The user confirmed fresh direction angles and uncertain/quiet states during Settings detection. ❌ Controlled direction axes/precision, routes/endurance and capture coexistence remain pending. See [the reported diagnostic snapshot and investigation](../validation/Validation-History.md#2026-10-05--open-issue-supported-iphone-foa-capture-falls-back-to-mono).
+
+#### Audio detection validation — 2026-10-05
+
+✅ Settings NexArm presets/reset now advance on fresh segment feedback in a replaceable background task, without fixed 1.5 s waits (ADR0128). ❌ Physical-device rhythm, feedback-loss and immediate preset/jog/reset takeover acceptance remain pending.
+
+✅ [ADR0129](../adr/0129-bluetooth-session-isolation.md): Bluetooth recovery removes global voice cleanup and scheduler coupling. Native session invalidation produces device failures, recorded by existing Action/Tool policies; accepted Channel work is preserved and executes normally. ❌ Physical voice/BLE coexistence acceptance remains pending.
+
+### Passive BLE connection — ADR0130
+
+✅ ADR0129/0130 simulation migration is complete: native recovery preserves accepted work, passive refresh does not query, and feedback silence is diagnostic only. ❌ Whole-suite and physical acceptance remain separate; current failures are recorded in Validation-History.
+
+
+### Independent Bluetooth diagnostics — ADR0131
+
+✅ [ADR0135](../adr/0135-nexarm-aim-final-count.md) implements exact final-count tracking convergence after native admission; scoped supervised USB acceptance is recorded in [physical results](../validation/NexArm_Physical_Acceptance.md). ❌ Real BLE recovery/endurance, native Settings gestures and tracking under phone load remain separate acceptance work.
+
+✅ [ADR0137](../adr/0137-nexarm-ordinary-home.md) restores ordinary reset motor3/4 targets1198/1238 with query-free shared Settings/Agent execution, separately from tracking preparation. ❌ The restored posture has not been revalidated on hardware; earlier tracking-rest reset trials remain revision-scoped evidence.
+
+✅ [ADR0139](../adr/0139-tracking-freshness-and-assistant-preemption.md): Photographer usable-pose freshness expires after one second; camera/session shutdown and stale input release the tracking motor use. Authorized ApplicationControl NexArm actions preempt Photographer through host-configured joined writer takeover, keeping subsequent Channel Actions. ❌ Physical camera-off/source-stall/takeover timing and hardware stop acceptance remain pending.
+
+
+✅ [ADR0141](../adr/0141-resource-control-ownership.md): public unlocked/locked(owner) replaces persistent faulted/recover. One occupancy authority includes transient writers, and revocable execution permits protect App effects. Cleanup timeout fails only its request; retained late cleanup automatically unlocks. Cancellation-independent acknowledgment remains. ❌ Physical camera-close/takeover timing and native uncooperative-I/O isolation acceptance remain pending.
+
+✅ [ADR0145](../adr/0145-history-refresh-agent-intent.md): history load/refresh now uses a deterministic root-owned Memory Agent and both Gateways, with bounded admission and joined cancellation. ✅ Confirmed deletion, archive/title and selected device/navigation intents are implemented; Assistant supports bounded native Tool-result continuation. ❌ Structured memory/semantic recall and model-driven destructive history operations remain pending.
+
+✅ [ADR0146](../adr/0146-model-resource-interaction-ownership.md): model-resource task/admission, source-save and voice-switch policy moved from UI into independent AppSettingsWorkflow. ✅ Resource commands now route through ApplicationControl (ADR0166). ❌ Cloud-form coordination, shared draft values and resource context remain pending; source/preferences/state functions are implemented in ADR0168–0173.
+
+✅ [ADR0147](../adr/0147-history-delete-result-continuation.md): the authoritative Agent-driven contract was revised before implementation; confirmed archive deletion now uses internal History.delete, correlated runtime feedback and success-only UI refresh. ✅ Resource command routes are implemented in ADR0166; ❌ provider/shared-state routes and model continuation remain pending; resource preference/state/failure routes are implemented in ADR0168–0173.
+
+✅ [ADR0148](../adr/0148-unified-signal-contract.md): the active Agent-driven architecture moved into MobileHarness and defines one Signal vocabulary using the existing AgentInput envelope. ❌ Unified lifecycle/capability fact Signals, remaining UI/device routes and versioned remote/durable transport remain pending.
+
+✅ Agent-driven scenario design now documents UI intent, conversation/perception and Agent collaboration with explicit result-to-effect boundaries. ❌ Registered failure presentation, asynchronous discovery contracts and bounded model continuation require staged implementation; diagrams are not feature-completion claims.
+
+✅ Agent-driven scenario coverage now distinguishes six primary categories and external/Agent/runtime origins, with cross-cutting decisions, concurrency, triggers and recovery. ✅ Typed origin admission and Tool owner fencing are implemented in ADR0149. ❌ Unified lifecycle/capability Signals and common long-task feedback/cancellation remain unimplemented.
+
+✅ [ADR0149](../adr/0149-signal-origin-and-tool-feedback.md): Signal origin and owner-fenced Tool feedback are implemented with preserved causal context and explicit delivery failures. ✅ ADR0163 completes Action/activity roots and typed history intent. ❌ Next stages: unified lifecycle/capability facts → Assistant continuation → settings/resources and device entry points. Each stage must reconcile actual code with the authoritative architecture and report remaining work.
+
+### Unified executable capabilities — completed consolidation
+
+✅ ADR0150–0157: shared cooperative execution, one Actions source tree, six domain catalogs and cohesive entry files, explicit serialization keys, three-field paths and v6 native bindings, one canonical definition/outcome/handler, direct/scheduled adapters and retired Tools/ToolRuntime targets. Scheduled native calls preserve resource/serialization admission, original handler context, one typed feedback and joined cancellation.
+
+❌ Next Agent-driven stages: unified lifecycle/capability fact Signals, settings/device entry points and registered failure presentation, then bounded result-driven model continuation. These are feature migration tasks rather than unfinished Action/Tool source consolidation. Physical/native/model acceptance remains separate from fixture and build evidence.
+
+✅ [ADR0163 — Typed history and feedback causality](../adr/0163-typed-history-and-feedback-causality.md): typed history.intent/1 and explicit Action/activity causal feedback. Unified lifecycle/capability fact Signals, resource/device Agent routes and bounded model continuation stay separate stages.
+
+✅ [ADR0164](../adr/0164-typed-assistant-host-control.md): Assistant cancellation now uses typed external assistant.control/1; full/paused admission bypass and session-scoped cleanup are preserved. ❌ Next: settings/device routes, current resource state and bounded model continuation.
+
+✅ [ADR0165](../adr/0165-agent-history-archive-and-title.md): archive/title sequencing crosses Memory and both Gateways; App facade holds no mutation/inference policy. ✅ Settings/model-resource, selected device/navigation routes, registered failure presentation and bounded native model continuation are implemented in ADR0166–0179. ❌ Next memory scope: structured short/long-term records and semantic recall.
+
+
+### Model resource command stage
+
+✅ Route Settings download/cancel/remove through ApplicationControl and both Gateways, preserving native admission/cleanup and page-independent ownership. ❌ Provider selection, model-callable resource exposure and shared-state context remain pending; source/preferences/progress/failure presentation is implemented in ADR0168–0173.
+
+
+### Speech binding stage (2026-10-07)
+
+✅ Speech model binding uses typed ApplicationControl intent and returning feedback (ADR0167). ✅ Source/preference validation and persistence moved into Actions in ADR0168. ❌ Provider selection and host error Signal/presentation remain; root observation and command failures are implemented in ADR0171/0172.
+
+
+### Resource preferences stage (2026-10-07)
+
+✅ Resource source/preference restore, validation and persistence are Actions-owned and Agent-routed (ADR0168). ✅ Installed-group eligibility and registered refresh presentation are implemented in ADR0169/0170. ❌ Provider settings and host error Signal/presentation remain next; Bluetooth/navigation and model continuation follow.
+
+
+### Resource inventory stage (2026-10-07)
+
+✅ Resource inventory queries and installed eligibility now belong to Agent/Actions (ADR0169). ✅ Refresh snapshot/query-failure effects are registered in ADR0170. ❌ Add observation-driven progress, migrate remaining error routes and provider settings, then continue device/navigation and model continuation work.
+
+✅ Resource refresh snapshot/query-failure presentation now crosses OutputGateway (ADR0170). ✅ Root-owned sampled resource invalidations reuse registered presentation (ADR0171). ❌ Next: remaining host/transport Signal/presentation, provider settings, Bluetooth/navigation and bounded model continuation. New LLM grants and physical acceptance remain separate.
+
+❌ Move existing provider model-family eligibility heuristics from the model SDK to Actions while preserving public discovery behavior. The current discovery-route migration leaves native decoding/network behavior unchanged.
+
+### Existing-route completion (2026-10-08)
+
+✅ ADR0177–0179 supersede earlier pending provider-form, registered provider presentation, UI/StorageChat separation, camera/Bluetooth/navigation input and native model-continuation entries. The existing manual resource commands, model-visible download/cancel commands and device/camera/navigation calls share canonical Actions and Gateway execution. Four model rounds,16 native calls and the existing joined deadline bound continuation; actual failures remain model data, with no runtime replay. Root sequenced environment facts and live read capabilities supply current context.
+
+❌ Further product/infrastructure work: system/photo pickers and response correlation; model-initiated provider/source/binding changes and model removal with safe active-session handoff; full Resource-State-Plan storage and effect-point writers; generic activity/progress/request-reply; added sensor adapters; local native Tool support; remote/versioned/durable transport. These are not established by this migration.
+
+❌ Acceptance: real provider/Keychain round trip, native touch/voice/camera, BLE discovery/reconnect/motor stop and physical arrival/failure behavior. Keep device execution supervised; existing simulator CoreAI dependency and intermittent BLE fixture failures must be reported with build/test evidence.
+
+
+### Memory and Photographer service extensions — ADR0180
+
+✅ Canonical Memory naming and co-located history/title components; Photographer keeps its full role, a separately test-covered tracking policy and camera open/close/flip/retry control (ADR0181). No new capabilities are implied by this refactor.
+
+❌ Next: design short/long-term memory schemas, typed CRUD/recall intents, registered storage functions and bounded extraction/consolidation/forgetting policy. Keep Assistant's prompt assembly distinct from memory management.
+
+❌ Next: design Photographer's still capture/video recording/movement planning/shoot-time interaction workflows, declared Signals and registered functions, with independent resource/cancellation/failure ownership and physical acceptance.
+
+✅ ApplicationControl now uses a canonical role directory and identity (ADR0182); no concrete business Agent remains at the Agents root.
+
+
+✅ [ApplicationControl service organization](../adr/0182-application-control-service-organization.md): ADR0182 implements canonical role-directory, identity and host-transport migration; existing business behavior retained. Validation is recorded separately.
+
+✅ [ADR0183](../adr/0183-generation-round-observations.md): implemented Action/Tool split, registered observations and full-round result merge; physical/model acceptance remains pending.
+
+✅ [ADR0184](../adr/0184-assistant-photo-observation.md): Assistant photo Action, screenshot presentation and multimodal observation loop.
+
+✅ [ADR0185](../adr/0185-photo-save-and-ignore.md): Agent-driven current-photo save to system Photos and ignore from UI/dialogue; physical acceptance remains pending.
+
+### Agent composition — ADR0187
+
+✅ 上下文采用有界原子提交，重启将未完成工作标为中断，不重放设备动作。普通输入、反馈和控制分别接纳；所有容量或持久化失败显式返回。音视频和原生会话保持有界临时状态。
+
+✅ 第二阶段已实现独立摄影 LLM、正式任务委派及任务定向后续输入。❌ 真实模型、原生 UI、真机语音验收仍待完成。
+
+✅ 第一阶段包含统一 Signal 预处理、独立持久化 Context、Builder、共享 Chat 驱动、任务契约和输出通信；七个现有 Agent 的业务职责保持现状。
+
+✅ Assistant/Photographer 职责已收敛：摄影对话由 Assistant 的本地任务/Skill 承担，Photographer 保留确定性执行与追踪，不引入专用摄影 Chat worker。
+
+✅ [ADR0189](../adr/0189-agent-support-hierarchy.md): shared Agent sources consolidate under Support/Core, Communication, Chat and Context; Core retains independent Foundation-only compilation. Source-only migration preserves role/runtime behavior.
+
+✅ ADR0190 resident SpeechPerception listening policy, reply-activity snapshots, microphone epoch isolation and one-way Signal publication implemented. ❌ Verify real-device echo behavior, reply/delegation timing, first-frame pause/resume, route changes and immediate post-reply microphone resumption with actual models; automated tests/builds do not establish physical acceptance.
+
+✅ Frontend/backend input separation is implemented: local navigation/page cleanup and direct owner subscriptions replace mandatory UI-to-Assistant task delegation. Agent-driven conversation and callable UI effects remain. ❌ Native touch, dialog routing and actual data/device operations need separate on-device acceptance.
+
+
+### Photographer camera context (2026-10-10)
+
+✅ Passive revisioned camera.state subscription and independent latest Context, selected facts on every model request/continuation, and photography phase projection from existing task/work/artifact state. No automatic model invocation on state changes. ❌ Live-model and physical-device capture/save/ignore/background-race acceptance remain outstanding; sampled facts never replace native readiness checks.
+
+### Assistant Skills / Task Modes（2026-10-11）
+
+✅ 泛化目标、Skill 组合和作用域、后台公共协议/容量、首页目标/Skill/后台投影已实现。❌ 本版没有真实后台业务，摄影/语音/前台切换仍待真机验收。
+
+❌ 历史记录页面板块后续重新设计；当前仅保留 Assistant 聊天记录与任务记录入口。

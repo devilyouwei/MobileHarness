@@ -1,5 +1,7 @@
 # ModelKit Support ownership reorganization
 
+归档日期：2026-10-15。原需求完成范围：ModelKit Support 职责、源码与编译边界重组。历史验证结果和独立验收限制保留如下；当前实现以源码 README 为准。
+
 ## Approved design — 2026-10-12
 
 ✅ Implementation completed. Validation has explicit suite/simulator limitations, recorded below. Support is internal to ModelKit. Shared responsibilities are Core (model-neutral mechanisms), Backends (generic native graph execution), Management (lifecycle, artifacts and default assembly with separate compilation boundaries), and Speech/Apple (ASR/TTS PCM conversion).
@@ -24,4 +26,4 @@ Run source/target ownership checks, cancellation/session/model/resource regressi
 
 ❌ scripts/build-ios.sh fails at the simulator App because coreai-models/CoreAIShared cannot resolve CoreAI in the simulator SDK, matching the pre-existing platform limitation. Independent ModelKitRuntime, ModelKitNemotron and ModelKitSilero simulator schemes all build successfully; details are recorded in Validation-History. No live model inference, native UI interaction, installation or physical-device acceptance is claimed.
 
-[Detailed evidence](Validation-History.md#2026-10-12--modelkit-support-reorganization)
+[Detailed evidence](../validation/Validation-History.md#2026-10-12--modelkit-support-reorganization)

@@ -1,5 +1,7 @@
 # ModelKit Core refinement and decoupling audit
 
+归档日期：2026-10-15。原需求完成范围：中性 Core 契约、SDK 解耦审计及技术文档对齐。历史验证结果和独立验收限制保留如下；当前实现以源码 README 为准。
+
 ## Intended change — 2026-10-12
 
 ✅ Implemented. Validation results are recorded below. Replace conversation-specific inference metadata with opaque scopeID. Separate resource residency (Core ModelResourceState) from manager registration/construction state (Management ModelState). Require Core limits to be explicitly injected and validated; Management owns the existing four-loader/32-waiter defaults, with no new queues or provider policy. ModelManager initialization becomes throwing to expose invalid runtime limits. Isolated providers in tests receive explicitly configured contexts.
@@ -66,7 +68,7 @@ Core and capability-domain contracts remain in the same base ModelKit SDK target
 
 ❌ The earlier Core-refinement scripts/check.sh run passed boundaries, formatting and six provisioning tests but was unsuccessful: the 715-test IntegrationTests target reports three sound-source perception timeouts/six issues. The full run reports 965 declared tests across target summaries, including 28 opt-in skips. All three failing cases pass when run separately, which does not establish a full-suite pass or a resolved timing cause. The unsigned physical-iOS App build and 25 packaged Agent/Skill assets pass verification; the full simulator App still fails because third-party CoreAIShared cannot resolve CoreAI in that SDK.
 
-✅ Final unsigned physical-iOS MobileHarness build passes with Xcode 27, followed by packaged Agent/Skill verification (25 assets). ❌ scripts/build-ios.sh exits 65 at MobileHarnessSimulator with the pre-existing CoreAIShared/CoreAI simulator SDK dependency failure. No installation, live model inference or native physical-device acceptance is claimed. [Detailed validation](Validation-History.md#2026-10-12--modelkit-core-neutral-contracts-and-complete-layer-audit).
+✅ Final unsigned physical-iOS MobileHarness build passes with Xcode 27, followed by packaged Agent/Skill verification (25 assets). ❌ scripts/build-ios.sh exits 65 at MobileHarnessSimulator with the pre-existing CoreAIShared/CoreAI simulator SDK dependency failure. No installation, live model inference or native physical-device acceptance is claimed. [Detailed validation](../validation/Validation-History.md#2026-10-12--modelkit-core-neutral-contracts-and-complete-layer-audit).
 
 
 ## Entire SDK independence — 2026-10-12
@@ -76,16 +78,16 @@ All 15 production targets currently use only ModelKit-owned targets, native fram
 ✅ Implemented: explicit system/third-party import allowlists, product/package identity ownership, source confinement, and production SDK product dependency closure. The current 15 targets pass. Eight in-memory probes reject unknown imports, a newly introduced project module import, partial-declaration imports, an indirect host dependency through Runtime, the wrong third-party package, host source ownership, a host target in an SDK product, and a third-party import in the wrong provider. Keep the shared repository package; publishing a separate SDK package is outside this change. Repository check/build outcomes are recorded separately from runtime acceptance.
 
 
-✅ The subsequent complete-SDK enforcement run passes `./scripts/check.sh` with Xcode 27: all 965 declared Swift tests across 18 run summaries (including 28 opt-in skips), provisioning, strict formatting and metadata. Previous sound-source timeouts did not recur; the cause is not declared resolved. [Latest enforcement evidence](Validation-History.md#2026-10-12--complete-modelkit-sdk-dependency-enforcement) preserves the earlier unsuccessful run separately.
+✅ The subsequent complete-SDK enforcement run passes `./scripts/check.sh` with Xcode 27: all 965 declared Swift tests across 18 run summaries (including 28 opt-in skips), provisioning, strict formatting and metadata. Previous sound-source timeouts did not recur; the cause is not declared resolved. [Latest enforcement evidence](../validation/Validation-History.md#2026-10-12--complete-modelkit-sdk-dependency-enforcement) preserves the earlier unsuccessful run separately.
 
 ❌ The subsequent iOS script still exits 65 because third-party CoreAIShared cannot resolve native CoreAI for the simulator. No runtime/device acceptance is inferred from dependency checks or compilation.
 
 
 ## Current source documentation alignment — 2026-10-12
 
-✅ Completed documentation-only audit: all 28 ModelKit directory READMEs are reconciled with current ownership and contracts; 27 were revised, and CoreML was already accurate. All 26 Mermaid diagrams pass the local Mermaid parser; the complete 15-target/23-edge internal dependency graph exactly matches the manifest. Current source documents separate dependency graphs from runtime calls/events/injection and contain no ADR/change chronology, retired target names or superseded implementation claims. Production sources, dependencies and interfaces are unchanged by this audit. [Detailed verification](Validation-History.md#2026-10-12--modelkit-current-documentation-and-diagram-alignment).
+✅ Completed documentation-only audit: all 28 ModelKit directory READMEs are reconciled with current ownership and contracts; 27 were revised, and CoreML was already accurate. All 26 Mermaid diagrams pass the local Mermaid parser; the complete 15-target/23-edge internal dependency graph exactly matches the manifest. Current source documents separate dependency graphs from runtime calls/events/injection and contain no ADR/change chronology, retired target names or superseded implementation claims. Production sources, dependencies and interfaces are unchanged by this audit. [Detailed verification](../validation/Validation-History.md#2026-10-12--modelkit-current-documentation-and-diagram-alignment).
 
 
 ## Final goal confirmation — 2026-10-12
 
-✅ The agreed directory/source ownership, SDK independence and current English technical-documentation goals are achieved. Final review confirms 66 uniquely owned Swift files, 28 English source READMEs, 15 acyclic SDK targets/23 internal edges, 26 valid current diagrams and 94 exact Xcode navigator entries. ModelKit contains no non-technical record artifacts or ADR/change chronology. [Final review evidence](Validation-History.md#2026-10-12--final-modelkit-structure-and-english-technical-documentation-confirmation) distinguishes completed organization/documentation goals from separate package publication, simulator framework limitations and runtime/device acceptance.
+✅ The agreed directory/source ownership, SDK independence and current English technical-documentation goals are achieved. Final review confirms 66 uniquely owned Swift files, 28 English source READMEs, 15 acyclic SDK targets/23 internal edges, 26 valid current diagrams and 94 exact Xcode navigator entries. ModelKit contains no non-technical record artifacts or ADR/change chronology. [Final review evidence](../validation/Validation-History.md#2026-10-12--final-modelkit-structure-and-english-technical-documentation-confirmation) distinguishes completed organization/documentation goals from separate package publication, simulator framework limitations and runtime/device acceptance.

@@ -18,4 +18,4 @@ Move ModelResourcesOperating, installation requirements and ModelResourceSelecti
 
 ## Validation
 
-✅ Full check.sh,12 final focused tests and unsigned iOS device build passed. ❌ Simulator CoreAI dependency and native interaction/transfer acceptance remain separate; see [dated evidence](../Validation-History.md#2026-10-06--model-resource-interaction-ownership).
+✅ Full check.sh,12 final focused tests and unsigned iOS device build passed. ❌ Simulator CoreAI dependency and native interaction/transfer acceptance remain separate; see [dated evidence](../validation/Validation-History.md#2026-10-06--model-resource-interaction-ownership).

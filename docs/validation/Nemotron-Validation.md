@@ -1,10 +1,10 @@
 # Nemotron 接入验证（2026-09-23）
 
-> Historical evidence scope (updated 2026-10-03): packaging/download statements below describe the revision tested at the time. Current App bundles source metadata/licenses only and installs weights through Settings; HF foreground requests restart after process relaunch. Current synthesis is MOSS. Kokoro is unregistered; its downloader/profile/local weights are removed and its optional real-model test needs HARNESS_KOKORO_MODEL_ROOT. See [current resource contract](../MobileHarness/ModelKit/Support/Management/README.md#local-model-resources--current-contract).
+证据范围：各节的制品、装配、成功与失败只对应所标日期，不定义今天的默认模型或下载行为。当前契约见 [Nemotron README](../../MobileHarness/ModelKit/Speech/ASR/Nemotron/README.md)；共同的历史报告阅读规则见 [验证索引](README.md)。
 
 这是分阶段验证记录：开头的“未注入 App”仅指首次独立能力测试；下方“App 切换后的追加验证”记录了后续接入。当前语音链路见 [Voice.md](Voice.md)。
 
-模型与制品固定版本、接口和资源上限见 [模型 README](../MobileHarness/ModelKit/Speech/ASR/Nemotron/README.md)，架构取舍见 [ADR 0006](adr/0006-nemotron-streaming-asr.md)。本次仅实现独立 capability，未注入 App/Gateway pipeline。
+模型与制品固定版本、接口和资源上限见 [模型 README](../../MobileHarness/ModelKit/Speech/ASR/Nemotron/README.md)，架构取舍见 [ADR 0006](../adr/0006-nemotron-streaming-asr.md)。2026-09-23 首轮仅实现独立 capability，尚未注入 App/Gateway；后文单独记录随后接入和制品替换。
 
 ## 已执行
 
@@ -35,7 +35,7 @@
 尚未安装到 iPhone，麦克风 → Nemotron → 固定回复 → 扬声器的完整实机验收仍未完成。
 
 
-Current model replacement: ADR 0107 selects the multilingual 2240 ms Core ML export. Earlier CoreAI results below are historical and cannot establish acceptance of this model; new real-model results must be recorded separately.
+2026-10-03 的 ADR0107 选择多语言 2240 ms Core ML 导出。前文 CoreAI 结果只支持旧导出；该次替换的实测与限制见下一节。
 
 
 ## 2026-10-03 multilingual Core ML replacement

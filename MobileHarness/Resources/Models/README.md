@@ -39,7 +39,7 @@ Old Qwen receipts are not Gemma installations. Apple ASR/TTS assets are OS-manag
 
 Existing download wrappers use the production catalog except `gemma4-e2b-macos.download.json`, which selects the matching uncompiled Mac decoder. `--endpoint` accepts official/mirror/custom HTTPS sources; `--force` refreshes reused files. Metadata/file bounds, four workers, partial files and atomic replacement avoid replacing a valid local model with a failed download. ZIP extraction validates safe paths/hash/required files.
 
-Ignored Nemotron/Gemma4/Silero/MossTTSNano/YOLOPose directories support opt-in tests, are not build prerequisites and are never committed. Model packages and binary graph subdirectories do not acquire application README contracts. Historical measurements are in [validation history](../../../docs/Validation-History.md).
+Ignored Nemotron/Gemma4/Silero/MossTTSNano/YOLOPose directories support opt-in tests, are not build prerequisites and are never committed. Model packages and binary graph subdirectories do not acquire application README contracts. Historical measurements are in [validation history](../../../docs/validation/Validation-History.md).
 
 ✅ Production declarations and explicit developer provisioning.
 

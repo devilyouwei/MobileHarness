@@ -10,7 +10,7 @@ Purpose: preserve license notices for model artifacts and runtime dependencies. 
 
 ✅ FluidAudio source dependency is pinned at 20d4f0bd46d11d7f50a6eb4f7835cfdbd2b4ba14; Apache-2.0 notice is staged. The model profile also includes ANE/ANE-zh model licenses. Mandarin G2P resources are supplied by the same pinned model repository; tokenizer vocabulary is separately pinned to google-bert/bert-base-chinese.
 
-❌ Audio8 and ONNX Runtime are not current production adapters. Their notices remain here with the historical [Audio8 validation record](../Audio8-Validation.md); retaining a notice does not imply that its model or SDK is packaged in today’s App.
+❌ Audio8 and ONNX Runtime are not current production adapters. Their notices remain here with the historical [Audio8 validation record](../validation/Audio8-Validation.md); retaining a notice does not imply that its model or SDK is packaged in today’s App.
 
 
 ✅ MOSS-TTS-Nano model notices are retained in MOSS-TTS-Nano-Apache-2.0.txt. Narrowly adapted FluidAudio source retains its Apache-2.0 attribution. ❌ No license claim is made for user-supplied voice recordings.

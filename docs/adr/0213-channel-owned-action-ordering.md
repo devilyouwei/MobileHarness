@@ -1,6 +1,6 @@
 # ADR0213 — Channel-owned Action ordering
 
-Status: implemented, 2026-10-11. Targeted scheduling regressions and unsigned iOS-device build passed; full check is blocked by concurrent test edits, and the Simulator build by missing external CoreAI. See [validation evidence](../Validation-History.md#2026-10-11--channel-owned-action-ordering-adr0213). Supersedes ADR0155.
+Status: implemented, 2026-10-11. Targeted scheduling regressions and unsigned iOS-device build passed; full check is blocked by concurrent test edits, and the Simulator build by missing external CoreAI. See [validation evidence](../validation/Validation-History.md#2026-10-11--channel-owned-action-ordering-adr0213). Supersedes ADR0155.
 
 ## Decision
 
