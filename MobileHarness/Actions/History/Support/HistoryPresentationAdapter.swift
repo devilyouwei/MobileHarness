@@ -1,8 +1,8 @@
 import Actions
 import Foundation
 import FunctionContracts
-import Storage
 import StorageChat
+import StorageCore
 import UI
 
 /// Data adaptation only; permission and user intent belong to the gateways/Agent.

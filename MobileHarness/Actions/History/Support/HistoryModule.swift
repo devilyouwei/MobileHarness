@@ -1,6 +1,6 @@
 import Foundation
 import FunctionContracts
-import Storage
+import StorageCore
 
 public struct HistoryConversationReference: Sendable, Equatable {
     public let value: String

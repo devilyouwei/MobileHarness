@@ -12,8 +12,8 @@
     import ModelKit
     import OSLog
     import PlatformKit
-    import Storage
-    import StorageAudio
+    import StorageCore
+    import StorageCache
     import UI
     import UIKit
 
@@ -70,7 +70,7 @@
                 try await self.startMicrophone()
             }, stop: { [weak self] in await self?.stopMicrophone() })
         private var speechTask: Task<Void, Never>?
-        private var speechAudioStore: SpeechAudioStore?
+        private var speechAudioStore: AudioCache?
         private var speech: SpeechPerceptionAgent?
         private var responses: OutputGateway?
         private var interruptionTask: Task<Void, Never>?
@@ -116,7 +116,7 @@
                 state.voiceStatus = "语音呈现接口已被占用"
                 throw CommunicationError.scopeClosed
             }
-            let audioStore = SpeechAudioStore()
+            let audioStore = try await runtime.cache.audioScope(runtime.interactionSessionID)
             speechAudioStore = audioStore
             speechPlayback = SpeechPlayback(store: audioStore)
             self.responses = responses
@@ -177,7 +177,7 @@
             try? await manager.remove(.speechPerception)
             await runtime.stopInteraction()
             try? await manager.remove(AgentID(rawValue: "speechSynthesis"))
-            await speechAudioStore?.shutdown()
+            await runtime.cache.closeAudioScope(runtime.interactionSessionID)
             speechAudioStore = nil
             runtime.presentation.unbindVoice(self)
             speechPlayback = nil
@@ -763,7 +763,7 @@
             }
         }
 
-        private func play(_ stream: SpeechAudio, envelope: ActionExecutionContext) async throws {
+        private func play(_ stream: AudioStream, envelope: ActionExecutionContext) async throws {
             try await nativeEffects.play(
                 stream, context: envelope,
                 validate: { [weak self] in

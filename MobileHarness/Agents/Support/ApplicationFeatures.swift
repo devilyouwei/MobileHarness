@@ -1,3 +1,7 @@
+import StorageCache
+import StorageFiles
+import StorageState
+
 #if os(iOS)
     import ActionBindings
     import StorageDevices
@@ -11,7 +15,7 @@
     import ModelKitRuntime
     import Observation
     import PlatformKit
-    import Storage
+    import StorageCore
     import StorageChat
     import StorageMedia
     import StorageTasks
@@ -21,17 +25,24 @@
     @MainActor @Observable
     @available(iOS 27, *)
     public final class ApplicationFeatures {
-        @ObservationIgnored private let sqliteRepositories: Result<ApplicationRepositories, any Error>
+        @ObservationIgnored private let repositories: @Sendable () throws -> ApplicationRepositories
         @ObservationIgnored private let capturedPhotos: CapturedPhotoStore
         @ObservationIgnored private let cameraDevice: AppleCamera
         @ObservationIgnored private let artifacts: ArtifactServices
         @ObservationIgnored private let resources: URL
+        private let stateStorage: StateContainer
+        private let cacheStorage: CacheContainer
+        private let filesStorage: FilesContainer
         let bluetooth: BluetoothWorkflow
         public init(
-            repositories: Result<ApplicationRepositories, any Error>, photos: CapturedPhotoStore,
+            repositories: @escaping @Sendable () throws -> ApplicationRepositories, state: StateContainer,
+            cache: CacheContainer, files: FilesContainer, photos: CapturedPhotoStore,
             camera: AppleCamera, bluetooth: BluetoothWorkflow, artifacts: ArtifactServices, resources: URL
         ) {
-            sqliteRepositories = repositories
+            self.stateStorage = state
+            self.cacheStorage = cache
+            self.filesStorage = files
+            self.repositories = repositories
             capturedPhotos = photos
             cameraDevice = camera
             self.bluetooth = bluetooth
@@ -365,7 +376,7 @@
             return CurrentChatCapability(models: models)
         }
         private func runtime() throws -> AgentServices {
-            _ = try sqliteRepositories.get()
+            _ = try repositories()
             if let runtimeValue { return runtimeValue }
             let resourceAdapter = ModelResourceCapabilityAdapter(
                 manager: { [weak self] in
@@ -380,7 +391,8 @@
                     self.container?.lifecycle.endSettingsChange()
                 })
             let runtime = try AgentServices(
-                chatRecords: try sqliteRepositories.get().chat, taskRecords: try sqliteRepositories.get().tasks,
+                state: stateStorage, cache: cacheStorage, files: filesStorage,
+                chatRecords: try repositories().chat, taskRecords: try repositories().tasks,
                 camera: cameraDevice,
                 readHistoryPhoto: { [capturedPhotos] id, inputID in
                     try await capturedPhotos.readForInput(id, source: "assistant", input: inputID)
@@ -394,9 +406,9 @@
                     endChange: { [weak self] in self?.container?.lifecycle.endSettingsChange() }),
                 resourcePreferences: ModelResourcePreferencesService(
                     store: {
-                        try LocalDocumentStore<ModelResourcePreferences>(
-                            url: URL.applicationSupportDirectory.appendingPathComponent(
-                                "MobileHarness/Models/download-source.json"), maximumBytes: 4096)
+                        try self.filesStorage.document(
+                            ModelResourcePreferences.self, in: self.filesStorage.models, name: "download-source.json",
+                            maximumBytes: 4096)
                     },
                     validate: { try await SettingsModelResourcesAdapter.validatePreferences($0) },
                     installed: { [weak self] in
@@ -524,7 +536,7 @@
             await runtimeValue?.shutdown()
         }
         private func prepareServices(progress: @MainActor (String) -> Void) async throws {
-            _ = try sqliteRepositories.get()
+            _ = try repositories()
             guard container == nil else { return }
             _ = try await artifactManager()
             try await runtime().start()

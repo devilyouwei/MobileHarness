@@ -37,7 +37,7 @@ NexArmAimCommand 的导航引用指向 Actions/Support；文件由现有 Actions
 
 ## Storage domain organization
 
-✅ Storage/Chat now owns the ConversationHistory.swift reference and README. SwiftPM compiles StorageChat separately; no duplicate App Sources membership is introduced.
+✅ Storage/Database/Chat now owns the ConversationHistory.swift reference and README. SwiftPM compiles StorageChat separately; no duplicate App Sources membership is introduced.
 
 ✅ Photographer, Robot.aim and the NexArm frame sources are navigator references. SwiftPM compiles them; they are not added to App Sources.
 
@@ -136,3 +136,5 @@ Implemented: business IDs are allocated by Storage; Foundation libraries use nat
 ✅ StorageSQLite compiles GRDB.swift 7.11.1 privately through a separate adapter target; common Storage/domain consumers have no GRDB dependency. The lockfile pins it and App owns records.sqlite initialization. New internal Storage directories/targets implement approved ownership boundaries; signing is unchanged. Required simulator/device build outcomes are recorded separately in docs/validation/Validation-History.md.
 
 ✅ Storage repository refactor: HarnessKit/App composition links the explicit StorageSQLite adapter product and existing domain targets; no new first-level application module or signing change.
+
+Storage 四类容器通过本地 HarnessKit 产品暴露，AppStorage 单独编译注册源码；App Sources 不重复包含 ApplicationContainer。FactoryKit 3.4.1 由 SwiftPM 固定解析，存储目录引用与新路径一致。

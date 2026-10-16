@@ -9,8 +9,8 @@ import Foundation
 import FunctionContracts
 import Gateway
 import PlatformKit
-import Storage
 import StorageChat
+import StorageCore
 import Testing
 
 private func historyRequest(_ path: String, _ arguments: [String: String]) -> ActionInvocation {

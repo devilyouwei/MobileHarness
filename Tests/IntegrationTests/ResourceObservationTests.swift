@@ -7,7 +7,8 @@ import Foundation
 import FunctionContracts
 import Gateway
 import PlatformKit
-import Storage
+import StorageCore
+import StorageState
 import Testing
 
 private actor ObservationInventory: ModelResourceInventoryCapability {
@@ -74,7 +75,12 @@ private func waitForResourceFacts(_ runtime: ApplicationControlIntentRuntime, pr
     #expect(await inventory.reads == 2)
     await runtime.shutdown()
     let session = UUID().uuidString
-    let agent = try ApplicationControlAgent(sessionID: session)
+    let agent = try ApplicationControlAgent(
+        sessionID: session,
+        context: try AgentContextRepository(
+            agent: AgentID(rawValue: "applicationControl"), scope: UUID().uuidString,
+            state: ApplicationControlContextState(), stateScope: StateContainer().makeScope())
+    )
     try await agent.start()
     let native = try ModelResourceObservation.changed(generation: 1).input(sessionID: session, sequence: 1)
     let forged = AgentInput(

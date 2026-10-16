@@ -6,7 +6,7 @@ import Foundation
 import FunctionContracts
 import Gateway
 import PlatformKit
-import Storage
+import StorageCore
 import Testing
 
 enum WakeFixtureFailure: String, Error, Sendable { case haptic, prepare, cue, capture }

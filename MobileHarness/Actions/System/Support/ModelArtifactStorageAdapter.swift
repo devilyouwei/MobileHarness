@@ -1,6 +1,7 @@
 import Foundation
 import ModelKitRuntime
-import Storage
+import StorageCore
+import StorageFiles
 
 actor ModelArtifactStorageAdapter: ModelArtifactStorage {
     private struct Marker: Codable {
@@ -12,13 +13,11 @@ actor ModelArtifactStorageAdapter: ModelArtifactStorage {
         let path: String
         let bytes: Int64
     }
-    private let files: LocalFileStore
-    private let index: (any DocumentRepository<[ModelArtifactTransferRecord]>)
-    public init(root: URL) throws {
-        files = try LocalFileStore(root: root)
-        index = try LocalDocumentStore(
-            url: root.appendingPathComponent("transfers.json"), maximumBytes: 262144,
-            protection: .afterFirstUnlock)
+    private let files: DiskFileStore
+    private let index: (any DocumentStore<[ModelArtifactTransferRecord]>)
+    public init(files: DiskFileStore, index: any DocumentStore<[ModelArtifactTransferRecord]>) {
+        self.files = files
+        self.index = index
     }
     public func restoreTransfers() async throws -> [ModelArtifactTransferRecord] {
         try await index.load()?.value ?? []
@@ -101,7 +100,7 @@ actor ModelArtifactStorageAdapter: ModelArtifactStorage {
             let values = try url.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey, .fileSizeKey])
             guard values.isSymbolicLink != true else { throw ModelArtifactError.integrity }
             if values.isRegularFile == true {
-                let path = try LocalFileStore.relativePath(of: url, within: stage)
+                let path = try DiskFileStore.relativePath(of: url, within: stage)
                 guard ModelArtifactCatalog.validInstalledPath(path), members.count < 16384 else {
                     throw ModelArtifactError.integrity
                 }

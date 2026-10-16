@@ -1,7 +1,7 @@
 import AgentCore
 import Foundation
 import ModelKit
-import Storage
+import StorageCore
 
 // MARK: - State
 

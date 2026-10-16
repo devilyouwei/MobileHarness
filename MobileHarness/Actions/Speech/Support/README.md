@@ -54,3 +54,7 @@ ActionBindings 编译 SpeechPlayback、ListeningActivationFeedback 和 VoiceNati
 - 暂无本目录独立的实现待办；跨模块及实际模型/设备验收见所属模块说明。
 
 ✅ VoiceNativeEffects 的播放电平子任务在播放结束、失败或取消后取消并加入，展示值经 UI 的公开方法提交。
+
+## Storage 依赖
+
+✅ 存储访问使用独立的 State、Cache、Database 和 Files 接口；App 注册根实例，消费者通过构造器获得所需能力。存储容器不接管本目录的业务验证、执行和完成语义。

@@ -1,6 +1,6 @@
 import AgentCore
 import Foundation
-import Storage
+import StorageCore
 
 /// One camera operation, correlated completion and no native I/O.
 struct PhotographerCameraWorkflow {

@@ -1,6 +1,6 @@
 import AgentCore
 import Foundation
-import Storage
+import StorageCore
 
 public struct AppEnvironmentFact: Codable, Sendable, Equatable {
     public enum Category: String, Codable, Sendable { case scene, devices, navigation, capabilities }

@@ -1,7 +1,7 @@
 import AgentCore
 import Foundation
 import FunctionContracts
-import Storage
+import StorageCore
 
 /// Public task content, separate from private inference history and trusted UI commands.
 public struct AgentTaskContent: Codable, Sendable, Equatable {

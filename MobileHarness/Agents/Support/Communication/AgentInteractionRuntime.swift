@@ -4,7 +4,7 @@ import Agents
 import Foundation
 import Gateway
 import PlatformKit
-import Storage
+import StorageCore
 
 /// Application-owned entry transport. Admission never waits for reasoning or child completion.
 public actor AgentInteractionRuntime {

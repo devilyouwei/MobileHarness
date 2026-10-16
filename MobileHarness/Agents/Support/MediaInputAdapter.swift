@@ -3,7 +3,7 @@ import AgentCore
 import Agents
 import Foundation
 import PlatformKit
-import Storage
+import StorageCore
 
 /// The host owns device source names and media admission deadlines.
 enum MediaInputAdapter {

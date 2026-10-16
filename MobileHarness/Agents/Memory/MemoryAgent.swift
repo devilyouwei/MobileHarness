@@ -1,6 +1,6 @@
 import AgentCore
 import Foundation
-import Storage
+import StorageCore
 
 /// Memory business service entry point; domain workflows own their processing policy.
 public actor MemoryAgent: Agent {
@@ -38,11 +38,9 @@ public actor MemoryAgent: Agent {
     public init(
         sessionID: String, configuration: AgentConfiguration? = nil,
         historyReads: MemoryHistoryReadRequests? = nil,
-        context: AgentContextRepository<MemoryContextState>? = nil
+        context: AgentContextRepository<MemoryContextState>
     ) throws {
-        self.contextRepository =
-            context
-            ?? AgentContextRepository(agent: .memory, scope: UUID().uuidString, state: MemoryContextState())
+        self.contextRepository = context
         guard contextRepository.agentID == .memory else { throw AgentConfigurationError.identityMismatch }
         let configuration = try configuration ?? AgentConfigurations.load(named: "Memory")
         guard configuration.agentID == .memory else { throw AgentConfigurationError.identityMismatch }

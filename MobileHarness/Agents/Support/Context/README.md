@@ -4,11 +4,11 @@
 
 ## Responsibility and direct relationships
 
-AgentContextRepository compiles in Agents and adapts AgentCore state to Storage StateRepository/MemoryStateStore. AgentTaskSkillState owns Skill/task transitions; AgentFixedTaskCoordinator joins fixed-task results. Roles own schemas, admission, classification and retention. SQLite writes belong to injected Chat/Task repositories, not this directory.
+AgentContextRepository compiles in Agents and registers AgentCore state through an explicitly injected StorageState StateScope. AgentTaskSkillState owns Skill/task transitions; AgentFixedTaskCoordinator joins fixed-task results. Roles own schemas, admission, classification and retention. SQLite writes belong to injected Chat/Task repositories, not this directory.
 
 ## Runtime state ownership
 
-Every production role has one root-owned repository backed by a single typed MemoryStateStore snapshot. The store uses a Mutex and no Codable encoding, file, database or hidden flush. Returned values are snapshots; stable business IDs express references across owners. Actor transactions serialize at most16 FIFO waiters; overflow rejects. Copy, mutate, advance revision and validate before publishing the new value. No suspended model/device operation holds the slot.
+Every production role has one root-owned repository backed by a single registered StateWriter snapshot. The store uses a Mutex and no Codable encoding, file, database or hidden flush. Returned values are snapshots; stable business IDs express references across owners. Actor transactions serialize at most16 FIFO waiters; overflow rejects. Copy, mutate, advance revision and validate before CAS publication through StateWriter. Task/Skill remain fields of the same authoritative value; there is no writable mirror. No suspended model/device operation holds the slot.
 
 recordSignal encodes bounded neutral evidence into Data retained in memory, not a JSON file. Caller-selected rolling retention is4096 for deterministic role evidence/batches; unconfigured Core limits remain8192 with explicit rejection. Logical evidence Data totals at most32MiB; overflow rejects before publication without encoding the whole snapshot. Media bytes and credentials are excluded. Signal/delta updates never cause whole-context serialization or I/O.
 
@@ -76,4 +76,8 @@ Runtime shared state, bounded admission, independent terminal persistence and st
 
 ## 待实现
 
-- Durable live-worker resumption, cross-process runtime sharing and general state subscriptions are not implemented.
+- Durable live-worker resumption, cross-process runtime sharing and Skill-driven context subscriptions are not implemented; generic bounded observation is provided by StorageState.
+
+## Storage 依赖
+
+✅ 存储访问使用独立的 State、Cache、Database 和 Files 接口；App 注册根实例，消费者通过构造器获得所需能力。存储容器不接管本目录的业务验证、执行和完成语义。

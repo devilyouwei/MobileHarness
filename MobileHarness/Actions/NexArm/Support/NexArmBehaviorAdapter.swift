@@ -4,7 +4,7 @@ import CallRuntime
 import ExecutionRuntime
 import Foundation
 import FunctionContracts
-import Storage
+import StorageCore
 import UI
 
 /// Host adaptation only; gesture/execution business policy remains in Actions.

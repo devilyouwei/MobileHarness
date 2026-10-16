@@ -46,7 +46,7 @@ ModelResourceInventory 是 version=1 的 Codable 值。read 从 capability 获�
 
 快照最多 64 个唯一 ID、编码最多 65536 字节；ID/name/revision/license/failure 分别限 64/256/512/512/1024 UTF-8 字节，字节计数非负。active 对应 queued/downloading/verifying/deleting，progress 对总量做有界计算。decode 校验版本、条目和大小；installedGroups 的一致性推导发生于构造读取路径，validate 不重新计算已解码集合。
 
-ModelResourcePreferencesService 是 actor，惰性获取注入的 DocumentRepository，通过 changing 标志拒绝重叠 restore/save。restore 校验存储值并依据已安装资源关闭不可用自定义语音选项；只有联网/语音开关变化时才回写，单独 endpoint 规范化不触发写入。save 先校验源与已安装前提，再以预期 revision 保存。偏好结果编码上限 2048 字节；文档存储容量由注入 store 配置。
+ModelResourcePreferencesService 是 actor，惰性获取注入的 DocumentStore，通过 changing 标志拒绝重叠 restore/save。restore 校验存储值并依据已安装资源关闭不可用自定义语音选项；只有联网/语音开关变化时才回写，单独 endpoint 规范化不触发写入。save 先校验源与已安装前提，再以预期 revision 保存。偏好结果编码上限 2048 字节；文档存储容量由注入 store 配置。
 
 偏好解码支持 preferDownloadedSpeech 字段映射到两个独立开关；新编码只写当前字段。持久化不负责模型绑定，已提交偏好不会因另一项绑定失败自动撤销。
 
@@ -74,7 +74,7 @@ ProviderSettingsStore 是 actor，以 busy 排斥重叠读写，保存 version=1
 
 ## SQLite records and runtime identity
 
-Settings/model-preference services consume DocumentRepository protocols; concrete settings-file construction stays in module integration/test factories. Preserve revision conflicts and producer-owned rollback policy.
+Settings/model-preference services consume DocumentStore protocols; concrete settings-file construction stays in module integration/test factories. Preserve revision conflicts and producer-owned rollback policy.
 
 ## 配置与制品的真实能力绑定
 
@@ -88,3 +88,7 @@ SpeechDiagnosticWorkflow 的 stopAndWait 加入真实播放、操作和卸载；
 ## 待实现
 
 - 发现中的请求已经移出 entries，未占用容量槽，所以此条件不是待领取/执行中/完成的总量硬上限；并发总量控制仍需宿主约束。
+
+## Storage 依赖
+
+✅ 存储访问使用独立的 State、Cache、Database 和 Files 接口；App 注册根实例，消费者通过构造器获得所需能力。存储容器不接管本目录的业务验证、执行和完成语义。

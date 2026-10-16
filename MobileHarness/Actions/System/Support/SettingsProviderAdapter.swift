@@ -4,7 +4,7 @@ import FunctionContracts
 import ModelKit
 import ModelKitDefaults
 import ModelKitOpenAI
-import Storage
+import StorageCore
 import UI
 
 @MainActor

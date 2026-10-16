@@ -10,8 +10,9 @@ import FunctionContracts
 import Gateway
 import ModelKit
 import PlatformKit
-import Storage
 import StorageChat
+import StorageCore
+import StorageState
 import Testing
 
 private struct TaskFixtureState: AgentContextState {
@@ -47,9 +48,10 @@ func saturatedApplicationControlContextRetainsEvidenceAndKeepsSettingsAvailable(
     #expect(throws: CommunicationError.capacityExceeded) {
         try defaultPolicy.append(.init(kind: "fixture.overflow"))
     }
-    let context = AgentContextRepository(
+    let context = try AgentContextRepository(
         agent: seed.agentID, scope: seed.scopeID, state: seed.state,
-        persistence: .init(load: { seed }, commit: { _, _ in }))
+        persistence: .init(load: { seed }, commit: { _, _ in }), stateScope: StateContainer().makeScope()
+    )
     let session = UUID().uuidString
     let agent = try ApplicationControlAgent(sessionID: session, context: context)
     try await agent.start()
@@ -80,9 +82,10 @@ func saturatedApplicationControlContextRetainsEvidenceAndKeepsSettingsAvailable(
 @Test(.actionCatalog, .timeLimit(.minutes(1)))
 func saturatedMemoryContextKeepsHistoryRefreshAvailable() async throws {
     let seed = try saturatedEvidenceContext(agent: .memory, state: MemoryContextState())
-    let context = AgentContextRepository(
+    let context = try AgentContextRepository(
         agent: seed.agentID, scope: seed.scopeID, state: seed.state,
-        persistence: .init(load: { seed }, commit: { _, _ in }))
+        persistence: .init(load: { seed }, commit: { _, _ in }), stateScope: StateContainer().makeScope()
+    )
     let session = UUID().uuidString
     let agent = try MemoryAgent(sessionID: session, context: context)
     try await agent.start()
@@ -108,9 +111,10 @@ func saturatedMemoryContextKeepsHistoryRefreshAvailable() async throws {
 @Test(.actionCatalog, .timeLimit(.minutes(1)))
 func saturatedPhotographerContextPreservesAdmittedCameraRequest() async throws {
     let seed = try saturatedEvidenceContext(agent: .photographer, state: PhotographerContextState())
-    let context = AgentContextRepository(
+    let context = try AgentContextRepository(
         agent: seed.agentID, scope: seed.scopeID, state: seed.state,
-        persistence: .init(load: { seed }, commit: { _, _ in }))
+        persistence: .init(load: { seed }, commit: { _, _ in }), stateScope: StateContainer().makeScope()
+    )
     let session = UUID().uuidString
     let agent = try PhotographerAgent(sessionID: session, context: context)
     try await agent.start()
@@ -210,8 +214,10 @@ private actor TaskFixtureAgent: Agent {
             inputs: Set(configuration.communication.inputs.map(\.kind)),
             outputs: [.communication, .actionCall, .control],
             capabilities: configuration.capabilities)
-        context = AgentContextRepository(
-            agent: configuration.agentID, scope: UUID().uuidString, state: TaskFixtureState())
+        context = try AgentContextRepository(
+            agent: configuration.agentID, scope: UUID().uuidString, state: TaskFixtureState(),
+            stateScope: StateContainer().makeScope()
+        )
         self.model = model
         budget = try AgentTaskBudget()
         let pair = AsyncStream<OutputEnvelope>.makeStream(bufferingPolicy: .bufferingOldest(32))
@@ -452,7 +458,9 @@ private func waitForArchitecture(_ condition: @escaping @Sendable () async throw
 
 @Test(.actionCatalog) func runtimeContextDiscardsPartialStateOnRestartWithoutReplaying() async throws {
     let scope = UUID().uuidString
-    let repository = AgentContextRepository(agent: .assistant, scope: scope, state: AssistantContextState())
+    let repository = try AgentContextRepository(
+        agent: .assistant, scope: scope, state: AssistantContextState(), stateScope: StateContainer().makeScope()
+    )
     let projected = AssistantHistoryContext.store(repository: repository)
     let read = try await projected.readCurrent()
     let id = UUID().uuidString
@@ -463,7 +471,9 @@ private func waitForArchitecture(_ condition: @escaping @Sendable () async throw
         .init(id: UUID().uuidString, input: "live input", requestJSON: "[]"), for: id)
     try await projected.append("partial", to: id)
     #expect(try await repository.snapshot().state.history.current.turns.first?.raw == "partial")
-    let restarted = AgentContextRepository(agent: .assistant, scope: scope, state: AssistantContextState())
+    let restarted = try AgentContextRepository(
+        agent: .assistant, scope: scope, state: AssistantContextState(), stateScope: StateContainer().makeScope()
+    )
     let recovered = try await restarted.snapshot()
     #expect(recovered.state.history.current.turns.isEmpty)
     #expect(recovered.work.isEmpty && recovered.records.isEmpty)
@@ -670,9 +680,11 @@ private func waitForArchitecture(_ condition: @escaping @Sendable () async throw
 }
 
 @Test(.actionCatalog) func contextRejectedCommitAndCorruptStateLeaveNoWritableFallback() async throws {
-    let repository = AgentContextRepository(
+    let repository = try AgentContextRepository(
         agent: .assistant, scope: UUID().uuidString, state: AssistantContextState(),
-        persistence: .init(load: { nil }, commit: { _, _ in throw CommunicationError.invalidPayload }))
+        persistence: .init(load: { nil }, commit: { _, _ in throw CommunicationError.invalidPayload }),
+        stateScope: StateContainer().makeScope()
+    )
     let input = AgentInput(
         id: UUID().uuidString, sessionID: UUID().uuidString,
         payload: .text("Persist before processing"))
@@ -691,9 +703,11 @@ private func waitForArchitecture(_ condition: @escaping @Sendable () async throw
     object["version"] = 99
     let saved = try JSONDecoder().decode(
         AgentContext<AssistantContextState>.self, from: JSONSerialization.data(withJSONObject: object))
-    let corrupt = AgentContextRepository(
+    let corrupt = try AgentContextRepository(
         agent: agent, scope: scope, state: AssistantContextState(),
-        persistence: .init(load: { saved }, commit: { _, _ in Issue.record("Corrupt state must never commit") }))
+        persistence: .init(load: { saved }, commit: { _, _ in Issue.record("Corrupt state must never commit") }),
+        stateScope: StateContainer().makeScope()
+    )
     await #expect(throws: CommunicationError.invalidPayload) { _ = try await corrupt.snapshot() }
     await #expect(throws: CommunicationError.invalidPayload) { try await corrupt.update { _ in } }
 }
@@ -781,8 +795,10 @@ func parentOrChildStopJoinsEffectsAndRecordsDistinctTerminal(_ stopParent: Bool)
 
 @Test(.actionCatalog) func deletedHistoryErasesItsOwnedSignalEvidenceAndProtectsActiveWork() async throws {
     let store = ConversationHistoryStore()
-    let repository = AgentContextRepository(
-        agent: .assistant, scope: UUID().uuidString, state: AssistantContextState())
+    let repository = try AgentContextRepository(
+        agent: .assistant, scope: UUID().uuidString, state: AssistantContextState(),
+        stateScope: StateContainer().makeScope()
+    )
     try await AssistantHistoryContext.attach(repository: repository, store: store)
     let id = UUID().uuidString
     let token = try await store.readCurrent().token
@@ -861,13 +877,14 @@ private actor HeldAdmissionCommit {
 func concurrentEnvironmentFactsWaitForStateCommitInsteadOfRejectingAsCapacity() async throws {
     let session = UUID().uuidString
     let held = HeldAdmissionCommit()
-    let context = AgentContextRepository(
+    let context = try AgentContextRepository(
         agent: .applicationControl, scope: UUID().uuidString, state: ApplicationControlContextState(),
         persistence: .init(
             load: { nil },
             commit: { value, _ in
                 if value.records.contains(where: { $0.kind == AppEnvironmentFact.contract }) { await held.hold() }
-            }))
+            }), stateScope: StateContainer().makeScope()
+    )
     let agent = try ApplicationControlAgent(sessionID: session, context: context)
     try await agent.start()
     let first = Task {

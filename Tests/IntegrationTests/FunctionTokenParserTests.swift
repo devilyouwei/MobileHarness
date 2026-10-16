@@ -2,7 +2,8 @@ import AgentCore
 import Agents
 import Foundation
 import ModelKit
-import Storage
+import StorageCore
+import StorageState
 import Testing
 
 private func generator() throws -> AgentGenerator {
@@ -158,7 +159,11 @@ private struct MarkupChat: ChatCapability {
 
 @Test(.actionCatalog) func assistantEmitsResolvedMarkupAndLiteralToolResultsCannotExecuteTags() async throws {
     let agent = try AssistantAgent(
-        chat: MarkupChat(markup: "<channel.Speech>你好<express emotion='smile'/></channel.Speech>尾巴"))
+        chat: MarkupChat(markup: "<channel.Speech>你好<express emotion='smile'/></channel.Speech>尾巴"),
+        context: try AgentContextRepository(
+            agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState(),
+            stateScope: StateContainer().makeScope())
+    )
     let speechRequests = try await bindSpeechRequests(agent)
     try await agent.start()
     var outputs = FixtureGenerationOutputs(agent: agent).makeAsyncIterator()
@@ -189,7 +194,12 @@ private struct MarkupChat: ChatCapability {
 }
 
 @Test(.actionCatalog) func incompleteModelMarkupFailsTurnAndFreshTurnGetsFreshParser() async throws {
-    let agent = try AssistantAgent(chat: MarkupChat(markup: "<channel.Speech>未结束"))
+    let agent = try AssistantAgent(
+        chat: MarkupChat(markup: "<channel.Speech>未结束"),
+        context: try AgentContextRepository(
+            agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState(),
+            stateScope: StateContainer().makeScope())
+    )
     let speechRequests = try await bindSpeechRequests(agent)
     try await agent.start()
     var outputs = FixtureGenerationOutputs(agent: agent).makeAsyncIterator()
@@ -349,7 +359,12 @@ func invalidWaitSyntaxIsRejected(_ source: String) throws {
 }
 
 @Test(.actionCatalog) func assistantPreservesWaitEventsAroundSpeechHandleConversion() async throws {
-    let agent = try AssistantAgent(chat: MarkupChat(markup: "<wait>你好。</wait><wait><express emotion='smile'/></wait>"))
+    let agent = try AssistantAgent(
+        chat: MarkupChat(markup: "<wait>你好。</wait><wait><express emotion='smile'/></wait>"),
+        context: try AgentContextRepository(
+            agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState(),
+            stateScope: StateContainer().makeScope())
+    )
     let probe = try await bindSpeechRequests(agent)
     try await agent.start()
     try await agent.receive(

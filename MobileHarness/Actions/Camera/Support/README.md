@@ -56,7 +56,12 @@ ActionBindings 编译 CameraCoordinator、CameraRuntimePorts、CameraPreviewAdap
 
 CameraStorageFactory 选择最多 1024 张、2 GiB、evictOldest 的应用存储策略，组合根只注入仓库和根路径。PhotoDispositionWorkflow 是 Actions 核心的提交/反馈组合，不负责 Agent 决策。通用最新感知替换属于 PlatformKit/Vision。shutdown 加入命令和捕获清理，并要求确认 native camera 已停止，否则向根生命周期传播失败。
 
+✅ CameraStorageFactory 接收延迟 MediaRepository 提供器并传入 CapturedPhotoStore，组合时不解析未启动仓库；容量/FIFO 和文件保护规则不变，不依赖 StorageSQLite。
 
 ## 待实现
 
 - 暂无本目录独立的实现待办；跨模块及实际模型/设备验收见所属模块说明。
+
+## Storage 依赖
+
+✅ 存储访问使用独立的 State、Cache、Database 和 Files 接口；App 注册根实例，消费者通过构造器获得所需能力。存储容器不接管本目录的业务验证、执行和完成语义。

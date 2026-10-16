@@ -1,5 +1,6 @@
 import Foundation
-import Storage
+import StorageCore
+import StorageFiles
 import Testing
 
 @Test(.actionCatalog) func memoryHandleExpiryRemainsOptInForOtherDomains() async throws {
@@ -60,8 +61,8 @@ import Testing
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     defer { try? FileManager.default.removeItem(at: root) }
     let url = root.appendingPathComponent("settings.json")
-    let first = try LocalDocumentStore<String>(url: url)
-    let second = try LocalDocumentStore<String>(url: url)
+    let first = try FileDocumentStore<String>(url: url)
+    let second = try FileDocumentStore<String>(url: url)
     #expect(try await first.load() == nil)
     let initial = try await first.save("first", expecting: nil)
     #expect(try await second.load()?.value == "first")
@@ -73,7 +74,7 @@ import Testing
     #expect(try await second.refresh()?.revision == changed.revision)
     await first.invalidate()
     #expect(try await first.load()?.value == "second")
-    let reopened = try LocalDocumentStore<String>(url: url)
+    let reopened = try FileDocumentStore<String>(url: url)
     #expect(try await reopened.load()?.value == "second")
 }
 
@@ -81,7 +82,7 @@ import Testing
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     defer { try? FileManager.default.removeItem(at: root) }
     let url = root.appendingPathComponent("settings.json")
-    let store = try LocalDocumentStore<String>(url: url, maximumBytes: 128)
+    let store = try FileDocumentStore<String>(url: url, maximumBytes: 128)
     let saved = try await store.save("valid", expecting: nil)
     await #expect(throws: DocumentStorageError.capacityExceeded) {
         try await store.save(String(repeating: "x", count: 129), expecting: saved.revision)
@@ -98,8 +99,8 @@ import Testing
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     defer { try? FileManager.default.removeItem(at: root) }
     let url = root.appendingPathComponent("settings.json")
-    let first = try LocalDocumentStore<Int>(url: url)
-    let second = try LocalDocumentStore<Int>(url: url)
+    let first = try FileDocumentStore<Int>(url: url)
+    let second = try FileDocumentStore<Int>(url: url)
     let successes = await withTaskGroup(of: Bool.self, returning: Int.self) { group in
         for store in [first, second] {
             group.addTask {
@@ -125,7 +126,7 @@ import Testing
         "version": 3, "revision": UUID().uuidString, "value": "future",
     ])
     try data.write(to: url)
-    let store = try LocalDocumentStore<String>(url: url)
+    let store = try FileDocumentStore<String>(url: url)
     await #expect(throws: DocumentStorageError.unsupportedVersion) { try await store.load() }
     try FileManager.default.removeItem(at: url)
     try FileManager.default.createDirectory(at: url, withIntermediateDirectories: false)
@@ -136,8 +137,8 @@ import Testing
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     defer { try? FileManager.default.removeItem(at: root) }
     let url = root.appendingPathComponent("document.json")
-    let first = try LocalDocumentStore<Int>(url: url, maximumBytes: 128, protection: .afterFirstUnlock)
-    let second = try LocalDocumentStore<Int>(url: url, maximumBytes: 128)
+    let first = try FileDocumentStore<Int>(url: url, maximumBytes: 128, protection: .afterFirstUnlock)
+    let second = try FileDocumentStore<Int>(url: url, maximumBytes: 128)
     try await withThrowingTaskGroup(of: Void.self) { group in
         for value in 0..<20 {
             group.addTask { _ = try await (value.isMultiple(of: 2) ? first : second).replace(value) }
@@ -149,7 +150,7 @@ import Testing
     #expect(try await second.refresh()?.revision == saved.revision)
     await #expect(throws: DocumentStorageError.conflict) { try await first.save(100, expecting: nil) }
     await #expect(throws: DocumentStorageError.capacityExceeded) {
-        let bounded = try LocalDocumentStore<String>(
+        let bounded = try FileDocumentStore<String>(
             url: root.appendingPathComponent("bounded.json"), maximumBytes: 128)
         try await bounded.replace(String(repeating: "x", count: 200))
     }

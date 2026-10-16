@@ -2,7 +2,7 @@ import ActionBindings
 import Agents
 import Foundation
 import PlatformKit
-import Storage
+import StorageCore
 import UI
 
 /// Root-owned single camera-command slot; native capture lifetime remains independent of UI pages.

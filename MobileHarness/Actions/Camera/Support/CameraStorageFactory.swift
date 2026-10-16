@@ -1,12 +1,18 @@
 import Foundation
-import Storage
+import StorageCore
+import StorageFiles
 import StorageMedia
 
 public enum CameraStorageFactory {
-    public static func make(repository: Result<any MediaRepository, any Error>, root: URL) -> CapturedPhotoStore {
+    public static func make(
+        repository: @escaping @Sendable () throws -> any MediaRepository,
+        files: @escaping @Sendable () throws -> any FileStore
+    )
+        -> CapturedPhotoStore
+    {
         CapturedPhotoStore(
             repository: repository,
-            files: Result { try LocalFileStore(root: root, protection: .afterFirstUnlock) as any BinaryObjectStore },
+            files: files,
             limits: .init(maximumPhotos: 1024, maximumBytes: 2 * 1024 * 1024 * 1024, overflowPolicy: .evictOldest))
     }
 }

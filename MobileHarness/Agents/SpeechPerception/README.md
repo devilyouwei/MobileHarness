@@ -91,3 +91,7 @@ Input/request identity is retained in ModelKit requests; scopeID is opaque to th
 - `reportError` ignores the output stream's yield result. When its 32-slot buffer is full or closed, an `agent.error` diagnostic can be lost. Normal output emission checks yield failure; reliable diagnostic delivery is not guaranteed by this implementation.
 
 [Agents](../README.md) · [Communication](../Support/Communication/README.md)
+
+## Storage 依赖
+
+✅ 存储访问使用独立的 State、Cache、Database 和 Files 接口；App 注册根实例，消费者通过构造器获得所需能力。存储容器不接管本目录的业务验证、执行和完成语义。

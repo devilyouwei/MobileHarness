@@ -1,7 +1,7 @@
 import Foundation
 import FunctionContracts
 import PlatformKit
-import Storage
+import StorageCore
 
 public enum NexArmCompatibilityPolicy: Sendable {
     case passiveBLE

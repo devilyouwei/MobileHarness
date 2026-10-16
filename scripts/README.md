@@ -45,6 +45,7 @@ model_download.py 从生产 model-catalog.json 选择源，通过分页 Hub 元�
 
 check-modelkit-boundaries.py 读取 SwiftPM 的显式源清单，区分 Agents/Actions 核心与同目录内的集成目标，验证每个生产源只有一个目标拥有者；App executable 只编译宿主文件，AppLifecycle 只依赖 Foundation。它禁止基础模块反向依赖集成、ActionBindings 导入 Agents/Gateway 实现、核心 Agents 导入 UI/执行实现，以及 App 中的领域意图/JSON/呈现转换。旧 AppWorkflows/功能目标和业务目录不能回归。
 
+✅ 边界检查拒绝 App 直接构造 SQLiteRepositories、恢复记录或打开/关闭数据库；确认注册 SQLiteDatabaseStorage.start/stop 与 storage → agents 依赖。Agents/Actions 仍禁止导入具体后端。
 
 ## 待实现
 
@@ -52,3 +53,7 @@ check-modelkit-boundaries.py 读取 SwiftPM 的显式源清单，区分 Agents/A
 - 麦克风/相机/原生 UI、模型准确率、温度/性能和持续真机验收。
 
 边界检查同时限制执行呈现适配器必须调用 UI 公开方法，拒绝恢复跨目标直接写 UI 字段。
+
+Storage 四类容器边界检查覆盖 StorageCore/State/Cache/Files/Database/SQLite 与 AppStorage；源码必须唯一归属，业务不得构造具体文件后端或查询 IoC。
+
+✅ 工具链选择：FactoryKit 的 SwiftUI 宏需要完整 Xcode；检查脚本在未显式设置 DEVELOPER_DIR 且系统选中 CLT 时，优先使用标准位置已安装的完整 Xcode，不修改全局 xcode-select。

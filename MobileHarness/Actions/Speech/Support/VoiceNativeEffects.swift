@@ -3,7 +3,7 @@
     import Foundation
     import FunctionContracts
     import PlatformKit
-    import StorageAudio
+    import StorageCache
     import UI
 
     /// Native feedback/player resources and decoding, independent of Agent implementation.
@@ -69,7 +69,7 @@
         }
 
         public func play(
-            _ stream: SpeechAudio, context: ActionExecutionContext,
+            _ stream: AudioStream, context: ActionExecutionContext,
             validate: @escaping @MainActor () throws -> Void,
             currentSession: @escaping @MainActor () -> Bool,
             activeChanged: @escaping @MainActor (Bool) -> Void

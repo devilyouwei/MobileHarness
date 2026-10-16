@@ -12,7 +12,7 @@ ADR 0055 introduced `SpeechRuntime` as a shared cache so synthesis Agents and sc
 
 - Replace `SpeechRuntime` with two SwiftPM targets under one `MobileHarness/Storage/` directory. `Storage` depends only on Foundation and provides `BoundedMemoryStream<Element>` and `MemoryLeaseStore<Value>`. `StorageAudio` depends on Storage, AgentCore and ModelKit and adapts PCM frames, Agent ownership and speech errors.
 - Keep `SpeechAudioStore` and `SpeechAudio` as the audio-facing APIs. App injects one store into `SpeechSynthesisAgent` and `SpeechPlayback`; `Speech.speak(audioID)`, Channel scheduling and Gateway behavior remain unchanged.
-- Preserve ADR 0055's owner, capacity, expiry, single-checkout and empty-read failure behavior. The current exact values and API contract live in [StorageAudio README](../../MobileHarness/Storage/Audio/README.md).
+- Preserve ADR 0055's owner, capacity, expiry, single-checkout and empty-read failure behavior. The current exact values and API contract live in [StorageAudio README](../../MobileHarness/Storage/Cache/Audio/README.md).
 - Do not add a third-party dependency for process-local memory. Introduce disk/cache/database backends only with concrete persistence requirements and retention rules.
 
 ## Consequences

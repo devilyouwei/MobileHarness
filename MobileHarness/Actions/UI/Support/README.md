@@ -91,3 +91,7 @@ HomeEffectsWorkflow 的 timer、文本/UUID 围栏和状态在 UI/Conversation�
 ## 待实现
 
 - showPose 当前只读取 payload，没有统一拒绝其它参数键；调用规范应只发送 payload。
+
+## Storage 依赖
+
+✅ 存储访问使用独立的 State、Cache、Database 和 Files 接口；App 注册根实例，消费者通过构造器获得所需能力。存储容器不接管本目录的业务验证、执行和完成语义。

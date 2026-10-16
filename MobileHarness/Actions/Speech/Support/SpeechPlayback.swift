@@ -1,19 +1,19 @@
 import Foundation
 import FunctionContracts
-import Storage
-import StorageAudio
+import StorageCache
+import StorageCore
 import Synchronization
 
 /// Typed audio checkout, playback and cleanup only. Synthesis belongs to SpeechSynthesisAgent.
 public actor SpeechPlayback {
-    private let store: SpeechAudioStore
-    public init(store: SpeechAudioStore) { self.store = store }
+    private let store: AudioCache
+    public init(store: AudioCache) { self.store = store }
     public func play(
         audioID id: String, invocation: any FunctionInput,
-        using playback: @escaping @Sendable (SpeechAudio, any FunctionInput) async throws -> Void
+        using playback: @escaping @Sendable (AudioStream, any FunctionInput) async throws -> Void
     ) async throws {
         try Task.checkCancellation()
-        let owner = SpeechAudioStore.Owner(
+        let owner = AudioCache.Owner(
             source: invocation.context.source, session: invocation.context.sessionID,
             input: invocation.context.inputID)
         let audio = try await store.checkout(id, owner: owner)

@@ -1,6 +1,6 @@
 import AgentCore
 import Foundation
-import Storage
+import StorageCore
 
 /// Runtime Task/Skill state; executable code is never loaded from assets.
 public enum RecognitionBinding: Codable, Sendable, Equatable {

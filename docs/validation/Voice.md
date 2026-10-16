@@ -6,7 +6,7 @@ Purpose: record how to verify the current voice experience and what remains unpr
 
 语音能力、同意/准入与原生播放分别由 [SpeechPerception](../../MobileHarness/Agents/SpeechPerception/README.md)、[Assistant](../../MobileHarness/Agents/Assistant/README.md)、[SpeechSynthesis](../../MobileHarness/Agents/SpeechSynthesis/README.md) 和 [PlatformKit Audio](../../MobileHarness/PlatformKit/Audio/README.md) 的现行契约定义。此处保留验收步骤，不重复生命周期、容量或超时的另一份设计。
 
-每次验收记录实际选中的 ASR/VAD/chat/TTS 提供者和资源版本，覆盖用户实际配置。模拟器 UI 与受控替身不代替真实推理、麦克风、声学或连续播放证据。瞬时 PCM 的生命周期见 [Storage Audio](../../MobileHarness/Storage/Audio/README.md)。
+每次验收记录实际选中的 ASR/VAD/chat/TTS 提供者和资源版本，覆盖用户实际配置。模拟器 UI 与受控替身不代替真实推理、麦克风、声学或连续播放证据。瞬时 PCM 的生命周期见 [Storage Audio](../../MobileHarness/Storage/Cache/Audio/README.md)。
 
 ## Repeatable repository checks
 

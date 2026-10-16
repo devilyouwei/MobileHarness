@@ -3,7 +3,7 @@ import Agents
 import ExecutionRuntime
 import Foundation
 import FunctionContracts
-import Storage
+import StorageCore
 import Testing
 
 private actor FeedbackProbe {

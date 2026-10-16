@@ -41,3 +41,5 @@ RuntimeBoundaryTests cover invalid manager configuration, nondefault limits reac
 ## 待实现
 
 - iPhone 网络/后台生命周期、文件保护、安装回执与实际设备资源发布验收。
+
+✅ 制品存储作用域重绑回归：释放旧 Files 绑定后，同一模型管理器应使用新存储；关闭制品服务拒绝新请求并加入已接纳工作。

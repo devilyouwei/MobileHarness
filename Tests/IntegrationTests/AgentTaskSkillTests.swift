@@ -10,8 +10,9 @@ import Gateway
 @_spi(ModelManagement) import ModelKit
 import ModelKitOpenAI
 import PlatformKit
-import Storage
 import StorageChat
+import StorageCore
+import StorageState
 import Testing
 
 @testable import Agents
@@ -310,8 +311,10 @@ private func photographyAcceptance(
     } else {
         model = stub
     }
-    let context = AgentContextRepository(
-        agent: AgentID.assistant, scope: UUID().uuidString, state: AssistantContextState())
+    let context = try AgentContextRepository(
+        agent: AgentID.assistant, scope: UUID().uuidString, state: AssistantContextState(),
+        stateScope: StateContainer().makeScope()
+    )
     let store = ConversationHistoryStore()
     let agent = try AssistantAgent(
         chat: model, conversations: store,
@@ -712,7 +715,9 @@ private func photographyAcceptance(
         inputID: UUID().uuidString,
         fixed: fixedCapabilities, taskID: try fixtureTaskID())
     initial.skillState = skills
-    let context = AgentContextRepository(agent: AgentID.assistant, scope: UUID().uuidString, state: initial)
+    let context = try AgentContextRepository(
+        agent: AgentID.assistant, scope: UUID().uuidString, state: initial, stateScope: StateContainer().makeScope()
+    )
     let model = SkillModel(mediaID: "media_1")
     let agent = try AssistantAgent(chat: model, context: context)
     try await agent.start()
@@ -754,9 +759,11 @@ private func photographyAcceptance(
     var skills = AgentTaskSkillState()
     try skills.initialize(fixed: fixedCapabilities, baseSkills: try AgentConfigurations.baseSkills(named: "Assistant"))
     initial.skillState = skills
-    let repository = AgentContextRepository(
+    let repository = try AgentContextRepository(
         agent: AgentID.assistant, scope: UUID().uuidString, state: initial,
-        persistence: AgentContextPersistence(load: { nil }, commit: { _, _ in throw WriteFailure() }))
+        persistence: AgentContextPersistence(load: { nil }, commit: { _, _ in throw WriteFailure() }),
+        stateScope: StateContainer().makeScope()
+    )
     await #expect(throws: WriteFailure.self) {
         try await repository.transaction {
             try $0.state.skillState?.control(
@@ -771,8 +778,10 @@ private func photographyAcceptance(
 }
 
 @Test(.actionCatalog) func trustedIdleControlsReuseTaskActionsWithoutStartingConversation() async throws {
-    let context = AgentContextRepository(
-        agent: AgentID.assistant, scope: UUID().uuidString, state: AssistantContextState())
+    let context = try AgentContextRepository(
+        agent: AgentID.assistant, scope: UUID().uuidString, state: AssistantContextState(),
+        stateScope: StateContainer().makeScope()
+    )
     let model = SkillModel(mediaID: "media_1")
     let agent = try AssistantAgent(chat: model, context: context)
     try await agent.start()
@@ -874,8 +883,10 @@ private func photographyAcceptance(
     async throws
 {
     let session = UUID().uuidString
-    let context = AgentContextRepository(
-        agent: AgentID.assistant, scope: UUID().uuidString, state: AssistantContextState())
+    let context = try AgentContextRepository(
+        agent: AgentID.assistant, scope: UUID().uuidString, state: AssistantContextState(),
+        stateScope: StateContainer().makeScope()
+    )
     let model = SkillModel(mediaID: "media_1")
     let assistant = try AssistantAgent(
         chat: model, context: context,
@@ -1077,7 +1088,12 @@ private struct TaskControlAcknowledgmentFixture: TaskControlCapability {
 }
 
 @Test(.actionCatalog) func unstartedAssistantRejectsInputWithoutEmittingRuntimeError() async throws {
-    let agent = try AssistantAgent(chat: SkillModel(mediaID: "media_1"))
+    let agent = try AssistantAgent(
+        chat: SkillModel(mediaID: "media_1"),
+        context: try AgentContextRepository(
+            agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState(),
+            stateScope: StateContainer().makeScope())
+    )
     await #expect(throws: HarnessError.notRunning) {
         try await agent.receive(
             AgentInput(
@@ -1314,8 +1330,10 @@ func taskEntryRetainsConversationAndNativePairsUntilClosure(replacingWithinInput
 }
 
 @Test(.actionCatalog) func historyTaskAssignmentRefreshesStoreAndRejectsStaleAdmission() async throws {
-    let context = AgentContextRepository(
-        agent: .assistant, scope: UUID().uuidString, state: AssistantContextState())
+    let context = try AgentContextRepository(
+        agent: .assistant, scope: UUID().uuidString, state: AssistantContextState(),
+        stateScope: StateContainer().makeScope()
+    )
     let store = AgentChatHistoryContext.store(repository: context)
     let input = UUID().uuidString
     let request = UUID().uuidString
@@ -1412,9 +1430,11 @@ func terminalTaskCompressionKeepsChronologyAndAllSourceEvidence(status: String) 
     var state = AssistantContextState()
     state.skillState = skills
     state.history = try await store.snapshot()
-    let repository = AgentContextRepository(
+    let repository = try AgentContextRepository(
         agent: .assistant, scope: UUID().uuidString, state: state,
-        persistence: AgentContextPersistence(load: { nil }, commit: { _, _ in throw WriteFailure() }))
+        persistence: AgentContextPersistence(load: { nil }, commit: { _, _ in throw WriteFailure() }),
+        stateScope: StateContainer().makeScope()
+    )
     await #expect(throws: WriteFailure.self) {
         try await repository.update {
             try $0.state.skillState?.decisionCompleted(failed: false, fixed: fixed)
@@ -1603,7 +1623,9 @@ func nativeSkillAdmissionRenewsButParameterRejectionDoesNot(executionFails: Bool
     }
     var initial = AssistantContextState()
     initial.skillState = skills
-    let context = AgentContextRepository(agent: .assistant, scope: UUID().uuidString, state: initial)
+    let context = try AgentContextRepository(
+        agent: .assistant, scope: UUID().uuidString, state: initial, stateScope: StateContainer().makeScope()
+    )
     let agent = try AssistantAgent(chat: NativeRetentionModel(), context: context)
     _ = try await bindSpeechRequests(agent)
     try await agent.start()
@@ -1637,7 +1659,10 @@ func nativeSkillAdmissionRenewsButParameterRejectionDoesNot(executionFails: Bool
 }
 
 @Test(.actionCatalog) func newConversationDropsRecentSkillsThroughHistoryCommit() async throws {
-    let context = AgentContextRepository(agent: .assistant, scope: UUID().uuidString, state: AssistantContextState())
+    let context = try AgentContextRepository(
+        agent: .assistant, scope: UUID().uuidString, state: AssistantContextState(),
+        stateScope: StateContainer().makeScope()
+    )
     let store = AgentChatHistoryContext.store(repository: context)
     let input = UUID().uuidString
     _ = try await store.begin(
@@ -1672,7 +1697,9 @@ func nativeSkillAdmissionRenewsButParameterRejectionDoesNot(executionFails: Bool
     try retainedLoad("photography", state: &skills, fixed: fixed)
     var initial = AssistantContextState()
     initial.skillState = skills
-    let context = AgentContextRepository(agent: .assistant, scope: UUID().uuidString, state: initial)
+    let context = try AgentContextRepository(
+        agent: .assistant, scope: UUID().uuidString, state: initial, stateScope: StateContainer().makeScope()
+    )
     let agent = try AssistantAgent(
         chatProvider: { throw CapabilityError.unavailable("Synthetic provider failure") }, context: context)
     try await agent.start()
@@ -2070,9 +2097,11 @@ func failedLifecycleCommitCanRetryWithoutDoubleReleaseOrCountdown(operation: Str
     var initial = AssistantContextState()
     initial.skillState = skills
     let failure = FailOnce()
-    let repository = AgentContextRepository(
+    let repository = try AgentContextRepository(
         agent: .assistant, scope: UUID().uuidString, state: initial,
-        persistence: AgentContextPersistence(load: { nil }, commit: { _, _ in try failure.commit() }))
+        persistence: AgentContextPersistence(load: { nil }, commit: { _, _ in try failure.commit() }),
+        stateScope: StateContainer().makeScope()
+    )
     let original = try lifecycleSnapshot(skills)
     let mutate: @Sendable (inout AgentContext<AssistantContextState>) throws -> Void = { [fixed] context in
         if operation == "release" {
@@ -2103,7 +2132,9 @@ func failedLifecycleCommitCanRetryWithoutDoubleReleaseOrCountdown(operation: Str
     if waiting { try skills.decisionCompleted(failed: false, fixed: fixed, inputID: input) }
     var initial = AssistantContextState()
     initial.skillState = skills
-    let context = AgentContextRepository(agent: .assistant, scope: UUID().uuidString, state: initial)
+    let context = try AgentContextRepository(
+        agent: .assistant, scope: UUID().uuidString, state: initial, stateScope: StateContainer().makeScope()
+    )
     let store = AgentChatHistoryContext.store(repository: context)
     _ = try await store.begin(id: input, user: "保持任务", request: [], expecting: store.readCurrent().token, model: "stub")
     try await store.finish(input, state: .completed)
@@ -2168,7 +2199,9 @@ func assistantIdleExpiryChangesNextRequestCatalogButKeepsEarlierConversationEvid
     try retainedLoad("photography", state: &skills, fixed: fixed)
     var initial = AssistantContextState()
     initial.skillState = skills
-    let context = AgentContextRepository(agent: .assistant, scope: UUID().uuidString, state: initial)
+    let context = try AgentContextRepository(
+        agent: .assistant, scope: UUID().uuidString, state: initial, stateScope: StateContainer().makeScope()
+    )
     let model = SkillLifecycleModel()
     let agent = try AssistantAgent(chat: model, context: context)
     _ = try await bindSpeechRequests(agent)
@@ -2201,7 +2234,9 @@ func assistantIdleExpiryChangesNextRequestCatalogButKeepsEarlierConversationEvid
     try retainedLoad("history-query", state: &skills, fixed: fixed)
     var initial = AssistantContextState()
     initial.skillState = skills
-    let context = AgentContextRepository(agent: .assistant, scope: UUID().uuidString, state: initial)
+    let context = try AgentContextRepository(
+        agent: .assistant, scope: UUID().uuidString, state: initial, stateScope: StateContainer().makeScope()
+    )
     let model = SkillLifecycleModel(nativeRounds: 8)
     let agent = try AssistantAgent(chat: model, context: context)
     _ = try await bindSpeechRequests(agent)

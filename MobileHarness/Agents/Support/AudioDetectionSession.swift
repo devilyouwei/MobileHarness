@@ -1,3 +1,5 @@
+import StorageState
+
 #if os(iOS)
     import ActionBindings
     import AVFAudio
@@ -10,26 +12,30 @@
     import Gateway
     import ModelKit
     import PlatformKit
-    import Storage
+    import StorageCore
     import UI
 
     /// Isolated capture/perception endpoint. No conversation, camera or robot consumer is registered.
     @MainActor final class AudioDetectionSession: AudioDetectionRunning {
+        private let stateStorage: StateContainer
         private let recognition: any SpeechRecognitionCapability
         private let vad: any VoiceActivityCapability
         private let beforeStart: @MainActor () async -> Void
         private var active: AudioDetectionScope?
         init(
-            recognition: any SpeechRecognitionCapability, vad: any VoiceActivityCapability,
+            stateStorage: StateContainer, recognition: any SpeechRecognitionCapability,
+            vad: any VoiceActivityCapability,
             beforeStart: @escaping @MainActor () async -> Void
         ) {
+            self.stateStorage = stateStorage
             self.recognition = recognition
             self.vad = vad
             self.beforeStart = beforeStart
         }
         func run(update: @escaping @MainActor @Sendable (AudioDetectionSnapshot) -> Void) async throws {
             guard active == nil else { throw CapabilityError.inputBusy }
-            let scope = try AudioDetectionScope(recognition: recognition, vad: vad, update: update)
+            let scope = try AudioDetectionScope(
+                stateStorage: stateStorage, recognition: recognition, vad: vad, update: update)
             active = scope
             var failure: (any Error)?
             do {
@@ -114,7 +120,8 @@
             observeEvent: { [weak self] in await self?.observe($0) }, sink: { _ in })
 
         init(
-            recognition: any SpeechRecognitionCapability, vad: any VoiceActivityCapability,
+            stateStorage: StateContainer, recognition: any SpeechRecognitionCapability,
+            vad: any VoiceActivityCapability,
             update: @escaping @MainActor @Sendable (AudioDetectionSnapshot) -> Void
         ) throws {
             let configuration = try AgentConfigurations.load(named: "SpeechPerception").restrictingCommunication(
@@ -123,9 +130,10 @@
                 contracts: AgentContracts.communication, externalSources: MediaInputAdapter.externalSources,
                 configurations: [configuration])
             input = InputGateway(manager: manager, policy: policy)
-            let context = AgentContextRepository(
+            let context = try AgentContextRepository(
                 agent: .speechPerception,
-                scope: "00000000-0000-0000-0000-000000000002", state: SpeechPerceptionContextState())
+                scope: "00000000-0000-0000-0000-000000000002", state: SpeechPerceptionContextState(),
+                stateScope: stateStorage.makeScope())
             speech = try SpeechPerceptionAgent(
                 recognition: recognition, vad: vad, sessionID: id, configuration: configuration, mode: .soundSourceOnly,
                 context: context)

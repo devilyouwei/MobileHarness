@@ -5,6 +5,7 @@
     /// Native callbacks are forwarded to the registered domain handler without interpreting payloads.
     @MainActor final class ApplicationSystemDelegate: NSObject, UIApplicationDelegate {
         private let handler = ModelDownloadBackgroundService()
+        func connect(prepare: @escaping @MainActor () async throws -> Void) { handler.connect(prepare: prepare) }
         func applicationDidEnterBackground(_ application: UIApplication) {
             handler.applicationDidEnterBackground(application)
         }

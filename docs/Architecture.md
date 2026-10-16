@@ -59,3 +59,9 @@ Assistant 决定照片如何进入模型上下文，PlatformKit 提供通用图�
 ## 状态与证据入口
 
 当前未完成需求见 [requirements](requirements/README.md)，完整交付归档见 [completed](completed/README.md)，独立验收见 [Roadmap](Roadmap.md#acceptance-work)。历史架构叙述见 [旧说明记录](history/Documentation-History.md)，测试与设备观察见 [验证索引](validation/README.md)。这些历史资料不替代源码 README 的现行契约。
+
+## Storage 生命周期边界收敛
+
+✅ AppStorage 使用实例级 FactoryKit 注册 StorageContainer，组合 State、Cache、Database、Files；AppLifecycle 按 storage → agents → native 启停。数据库实现负责迁移、恢复、接纳和关闭；会话音频使用 Cache 子作用域，配置/照片/模型文件复用 Files。模型制品工作在 Files 释放前加入清理并解除旧绑定。见 [实施计划](requirements/technical/Storage-Containers-Plan.md)。
+
+Storage 四类容器与通用 State 已实施，参见 [计划及验证范围](requirements/technical/Storage-Containers-Plan.md)；Skill 自动状态上下文仍待后续。

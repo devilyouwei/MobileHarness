@@ -60,3 +60,8 @@ lock 可作为 resource 的只读属性，权威来源是 ResourceCoordinator �
 3. ❌ Assistant 状态上下文：按需选择、限定大小，验证状态仅作为数据，不被重新解析执行。
 
 实施时更新所有被修改目录的 README（含 Mermaid 设计说明）、边界检查、MobileHarness/README.md、架构决策和 Roadmap。测试放在根 Tests/ 的现有目录。运行 scripts/check.sh 和完整 Xcode 可用时的 scripts/build-ios.sh，明确报告不可用或失败的检查。保留 docs/Technical_Design.docx 原始设计源。
+
+
+## 通用 State 实施衔接
+
+✅ StorageState 已提供 StateContainer/StateScope、受限 Reader/Writer、版本、纯转换、一致快照和有界观察，现有 AgentContext 已迁入。❌ 本文列出的设备/UI 事实接入和 Skill 上下文投影尚未迁移，不能把基础机制完成等同本需求全部交付。旧 ResourceStateStore 命名与 App 适配器描述后续按实际业务接入替换，当前通用接口以 Storage/State README 为准。

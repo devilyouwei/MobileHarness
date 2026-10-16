@@ -1,6 +1,6 @@
 import Foundation
 import FunctionContracts
-import Storage
+import StorageCore
 
 /// Host owns permission, capture leases and foreground lifecycle.
 extension CameraActions {

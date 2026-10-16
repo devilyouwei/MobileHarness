@@ -111,3 +111,7 @@ CurrentChatCapability 独立属于 ModelKitRuntime，按每个请求取得 Model
 - Timed eviction, global inference scheduling, general orphan-stage collection and batch acquisition are not implemented.
 
 - Active-inference provider fallback, automatic variant/quantization selection and judgment provider are not implemented.
+
+## Storage 文件作用域接入
+
+✅ 模型制品适配器由 App 注入 Files；后台回调复用同一制品服务。制品绑定停止时关闭接纳、取消并加入下载并保留清理错误，释放配置后允许在新 Files 作用域重新绑定，不停止无关模型实例。App 只转交接口与调度启停。

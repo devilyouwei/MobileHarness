@@ -1,6 +1,6 @@
 import Foundation
 import FunctionContracts
-import Storage
+import StorageCore
 
 extension SystemActions {
     @Action(domain: "System", module: "Provider", title: "discoverModels", timeout: .seconds(60))

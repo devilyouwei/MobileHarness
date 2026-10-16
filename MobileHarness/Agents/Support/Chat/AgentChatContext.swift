@@ -1,8 +1,8 @@
 import AgentCore
 import Foundation
 import ModelKit
-import Storage
 import StorageChat
+import StorageCore
 
 /// Task status retained by deterministic Agents without conversational execution.
 public protocol AgentTaskContextState: AgentContextState {

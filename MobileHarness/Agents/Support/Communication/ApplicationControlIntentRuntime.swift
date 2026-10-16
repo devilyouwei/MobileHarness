@@ -4,7 +4,7 @@ import Agents
 import Foundation
 import Gateway
 import PlatformKit
-import Storage
+import StorageCore
 import UI
 
 /// Root-owned transport; Agent chooses business calls, ModelKit owns admitted background transfers.

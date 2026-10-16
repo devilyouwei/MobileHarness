@@ -1,6 +1,6 @@
 import AgentCore
 import Foundation
-import Storage
+import StorageCore
 
 public struct ProviderDiscoveryIntent: Codable, Sendable, Equatable {
     public static let contract = "provider.discovery"

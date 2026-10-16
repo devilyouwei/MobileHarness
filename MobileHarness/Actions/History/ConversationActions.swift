@@ -1,6 +1,6 @@
 import Foundation
 import FunctionContracts
-import Storage
+import StorageCore
 
 /// History.Conversation function ownership.
 extension HistoryActions {

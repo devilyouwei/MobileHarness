@@ -1,5 +1,5 @@
 import Foundation
-import Storage
+import StorageCore
 
 /// Bounded one-use staging; active native work belongs to the invoking execution.
 public actor ProviderDiscoveryRequests: ProviderDiscoveryCapability {

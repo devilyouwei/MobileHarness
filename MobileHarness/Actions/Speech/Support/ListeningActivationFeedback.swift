@@ -2,7 +2,7 @@ import Actions
 import ExecutionRuntime
 import Foundation
 import FunctionContracts
-import Storage
+import StorageCore
 
 /// Bounded staged child composition. Only a successful stage permits the next native effect.
 public enum ListeningActivationFeedback {

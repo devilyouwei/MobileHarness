@@ -7,7 +7,7 @@ import ExecutionRuntime
 import FunctionContracts
 import Gateway
 import PlatformKit
-import StorageAudio
+import StorageCache
 
 /// Explicit implementation metadata for generic scheduler fixtures, not production registration.
 func testActionRegistry(handlers: [ActionPath: ActionHandler]) throws -> ActionRegistry {
@@ -23,7 +23,7 @@ func testActionRegistry(handlers: [ActionPath: ActionHandler]) throws -> ActionR
 extension SpeechPlayback {
     func play(
         _ invocation: any FunctionInput,
-        using playback: @escaping @Sendable (SpeechAudio, any FunctionInput) async throws -> Void
+        using playback: @escaping @Sendable (AudioStream, any FunctionInput) async throws -> Void
     ) async throws {
         try await SpeechActions.speak(invocation: invocation) { id, invocation in
             try await self.play(audioID: id, invocation: invocation, using: playback)

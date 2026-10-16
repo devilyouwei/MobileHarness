@@ -1,25 +1,13 @@
-# Backend-independent Contracts
+# Shared Storage Values
 
-## Responsibility and implementation
+✅ StorageCore 编译本目录，无项目/第三方依赖。StorageOwner 表达命名空间和 source/session/input 身份；StorageDurability 区分内存成功与持久化成功。StorageError、RecordStorageError、DocumentStorageError 提供共享机制错误；BusinessRecordID 与 ContentFingerprint 只格式化/验证及计算指纹，不分配全局身份。
 
-DocumentRepository supplies typed Codable snapshots, UUID revisions, optimistic save and replacement. BinaryObjectStore supplies bounded reads/info, non-overwriting put, remove and bounded best-effort listing. StorageDurability explicitly distinguishes memory and persistent success. RecordStorageError, BusinessRecordID and ContentFingerprint are shared values/validation, never allocation services.
+RecordStorageError.notReady 表示数据库端口尚未发布，closed 表示作用域关闭；conflict 表示仓库前置条件被并发变化破坏。错误不包含展示文案，原始失败由生产者保留。
 
-## Direct relationships
+状态注册契约归 [State](../../State/README.md)，文档、字节、文件保护与发布契约归 [Files](../../Files/README.md)。各领域返回拥有的数据，禁止跨目标暴露 SQL 对象或共享可写值。
 
-Compiled in Storage; Foundation/CryptoKit only. Domain/App consumers use protocols and immutable values. Concrete File/Memory/SQLite mechanisms implement their own applicable contracts.
+[Support](../README.md)
 
-## Lifecycle and failure contracts
+## 待完成
 
-Keys are confined relative names; listing cursors are opaque and at most128 items/steps. Cancel/close, conflict, capacity, ownership and publication errors are explicit; BinaryPublicationError retains original and cleanup failures. Native filesystem directory materialization is a separate capability, not simulated by every binary backend.
-
-[Parent](../README.md)
-
-Binary object contract: BinaryObjectStore describes byte objects only, with no file-protection or regular-file flags in its interface. File protection is configured when App constructs LocalFileStore; directory/non-blob keys are absent from object info. Preserve Media pending recovery through that neutral contract.
-
-StateRepository: synchronous typed read/replace for a single process-local owned snapshot; no codec/database APIs or hidden durability. Owner validates bounds and serializes transactions.
-
-RecordStorageError.conflict explicitly reports a repository precondition invalidated by a concurrent/current-dialog change; it is distinct from invalid content, missing records and busy admission.
-
-## 待实现
-
-- 暂无本目录独立实现待办；领域仓库接口由对应领域拥有。
+暂无本目录独立待办。

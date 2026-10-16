@@ -2,6 +2,27 @@
 
 本文件是按日期追加的跨模块验证日志。每节中的版本、数字、失败与未执行范围只对应该轮，不作为当前设计；专项模型和硬件样本在 [验证索引](README.md) 所列报告中拥有正文。相同运行的摘要与专项报告不能算作两次独立验收。
 
+## 2026-10-16 — Physical-device installation succeeded after signing renewal
+
+- After the user restored Xcode account access, the requested retry built and signed the current working tree as MobileHarness Debug 0.1.0/build 2026101604 with existing local signing configuration and a command-line version override. Xcode 27.0 build passed; log `/tmp/mobileharness-install-2026101604-build-signed.log`. The renewed profile includes the paired iPhone and expires at 2026-10-23 13:42:31 UTC. No source signing/version settings changed.
+- PASS: deep/strict signature verification, bundle identity/version, valid target-device provisioning, and packaging verification of all 25 Agent/Skill assets plus Core protocol/function declarations. All 491 captured production/configuration/resource inputs match before compilation, before installation and after installation; snapshot `/tmp/mobileharness-install-2026101604-inputs-retry.json`.
+- PASS: CoreDevice installed `dev.mobileharness.app` in place on physical Youwei’s iPhone 17 Pro; independent installed-app readback confirms 0.1.0/build 2026101604. Receipt `/tmp/mobileharness-install-2026101604-receipt.json`; readback `/tmp/mobileharness-install-2026101604-readback.json`. No uninstall or data reset occurred. The app was not launched by this deployment; native UI, microphone/camera, real-model and physical-action acceptance remain separate. This installation-only retry did not rerun automated tests or alter earlier recorded check failures.
+
+## 2026-10-16 — Requested physical-device installation blocked by expired signing
+
+- User requested installation of the current working tree on the paired physical iPhone 17 Pro. Attempted MobileHarness Debug build 0.1.0/2026101604 with existing local signing and a command-line version override, using Xcode 27.0. The first build failed because no matching development profile was available; retry with `-allowProvisioningUpdates` failed with `No Accounts` and no matching profile. Logs: `/tmp/mobileharness-install-2026101604-build.log`, `/tmp/mobileharness-install-2026101604-build-retry.log`.
+- Existing cached profile for `dev.mobileharness.app` includes the target device but expired at 2026-10-16 06:11:30 UTC (14:11:30 Asia/Shanghai); no valid replacement was found in existing local provisioning caches or build artifacts. Developer-account sign-in/profile renewal is required before installation can proceed.
+- Device inventory before the attempt confirms installed version 0.1.0/build 2026101603; evidence `/tmp/mobileharness-install-2026101604-before.json`. No new app was installed or launched, no data reset occurred, and no source signing/version settings were changed. All 491 captured tracked/untracked production/configuration/resource inputs remained unchanged; snapshot `/tmp/mobileharness-install-2026101604-inputs.json`. No automated tests, model/native UI or physical-action acceptance was performed for this installation-only request.
+
+## 2026-10-16 — Storage runtime and App lifecycle boundary
+
+- Work is on `codex/storage-lifecycle-boundary`, based on `c1d1f47d`. StorageSQLite owns inert runtime construction, background database opening/migration/recovery, deferred domain ports, failed/cancelled-scope fencing, joined read/write drain and explicit pool close. App registers `storage → agents → native`; no database lifecycle details remain in App. No new directory/target or persistence migration was introduced.
+- PASS: 12 new StorageRuntimeTests (including a two-case read/write test), covering inert construction, one scope across concurrent startup, repeat stop, recovery once, off-main initialization, original/cleanup failures, cancellation with initialization join, escaped repositories after close, a real SQLite close failure from an unfinalized statement, deferred media access, consumer rollback ordering, stop-before-start, corruption without fallback and scene suspension during startup. Log `/tmp/mobileharness-storage-tests.log`.
+- PASS: focused SQLite/Storage contracts and representative full-run failure rechecks, 42 tests. The selected `atomicStableOffTargetEndsBeforeOverallDeadlineAndKeepsError`, `visionResolvesOpaqueInputWithoutCopyingMediaIntoObservation` and `soundSourceOnlyDiagnosticCrossesGatewaysWithoutModelsOrPresentationGrants` all pass in this run. Log `/tmp/mobileharness-storage-regressions.log`. This does not erase full-run failures.
+- Required `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer ./scripts/check.sh` ran under Xcode 27.0 / Swift 6.4: dependency/source/README boundaries, strict Swift format, six Python tests, UI 64 and AppWorkflow 117 pass; StorageRuntimeTests also pass inside the full run. FAIL: IntegrationTests runs 880 tests with 22 issues in 10 tests: eight SoundSource cases plus the atomic motion deadline and opaque native vision tests. Failures include timed waits, missing observations and 60-second limits. No full-suite pass is claimed. Log `/tmp/mobileharness-storage-check.log`. The plist checks skipped by the script's failure were run independently and pass.
+- Required `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer ./scripts/build-ios.sh` fails at MobileHarnessSimulator because external coreai-models/CoreAIShared cannot resolve `CoreAI`; later ModelKit schemes are not reached. Log `/tmp/mobileharness-storage-ios.log`.
+- PASS: separate unsigned generic iOS MobileHarness Debug build with the same Xcode, `CODE_SIGNING_ALLOWED=NO`, log `/tmp/mobileharness-storage-device.log`. The final bundle passes all 25 Agent/Skill assets plus Core protocol and compiled function declaration checks. This verifies iOS-only App/AgentBindings integration compiles; no installation, signing change, real model, native UI or physical device acceptance was performed.
+
 ## 2026-10-16 — Requested reinstallation of build 2026101603
 
 - User requested installation again. The current 694 production/configuration/resource input hashes exactly match the signed 0.1.0/2026101603 build, so that matching bundle was reused. Deep/strict signature, target-device provisioning and all 25 Agent/Skill assets/Core protocol/function declaration checks pass; no source or signing/version settings changed.
@@ -1760,8 +1781,8 @@ Every row passed the shared structure, graph, link, navigation and current-desig
 | 93 | [MobileHarness/PlatformKit/Vision/README.md](../../MobileHarness/PlatformKit/Vision/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
 | 94 | [MobileHarness/PlatformKit/Connectivity/NexArm/README.md](../../MobileHarness/PlatformKit/Connectivity/NexArm/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
 | 95 | [MobileHarness/Storage/README.md](../../MobileHarness/Storage/README.md) | 0 / 0 | 2 | ✅ Current technical design reconciled |
-| 96 | [MobileHarness/Storage/Audio/README.md](../../MobileHarness/Storage/Audio/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
-| 97 | [MobileHarness/Storage/Chat/README.md](../../MobileHarness/Storage/Chat/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
+| 96 | [MobileHarness/Storage/Audio/README.md](../../MobileHarness/Storage/Cache/Audio/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
+| 97 | [MobileHarness/Storage/Chat/README.md](../../MobileHarness/Storage/Database/Chat/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
 | 98 | [MobileHarness/UI/README.md](../../MobileHarness/UI/README.md) | 0 / 0 | 2 | ✅ Current technical design reconciled |
 | 99 | [MobileHarness/UI/Camera/README.md](../../MobileHarness/UI/Camera/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
 | 100 | [MobileHarness/UI/Components/README.md](../../MobileHarness/UI/Components/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
@@ -3037,3 +3058,34 @@ Final static verification: module boundaries pass (/tmp/mh-v3-boundaries-final.l
 - Required scripts/check.sh passes boundary/dependency guards, six offline Python tests, strict formatting and compilation. Its859-test Integration run fails19 issues in ten existing cases: seven SoundSource wait/state cases, nexArmPlaybackCongestionRejectsWithoutReplayingMotion, atomicStableOffTargetEndsBeforeOverallDeadlineAndKeepsError and visionResolvesOpaqueInputWithoutCopyingMediaIntoObservation. Other targets pass, including100 workflow cases (/tmp/mobileharness-level-rest-merge-check.log). The new preparation cases pass in that run. Similar concurrency/timing failures are recorded in prior validation; no definitive cause or full-suite pass is claimed.
 - Serial focused validation passes146 Integration tests and eight workflow tests (/tmp/mobileharness-level-rest-merge-focused.log), covering Bluetooth/aim/Photographer, new preparation behavior, takeover/recovery/cleanup, every SoundSource case and both failing NexArm cases. The remaining vision case passes separately in0.017s (/tmp/mobileharness-level-rest-merge-vision.log). Total155 selected tests pass, including every full-run failure. Injected model/device values remain fixtures; these runs do not move hardware or establish real-model behavior.
 - Required scripts/build-ios.sh fails at the first Simulator scheme because external CoreAIShared cannot resolve CoreAI; later schemes are not reached (/tmp/mobileharness-level-rest-merge-simulator.log). Unsigned generic iOS-device Debug build succeeds (/tmp/mobileharness-level-rest-merge-device.log). All25 packaged Agent/Skill assets, project/privacy/entitlement plist validation, affected local documentation paths, conflict-marker scan and diff formatting pass. This merge does not install an app or perform native UI, physical level-arrival, phone-mounted tracking or sustained physical acceptance.
+## 2026-10-17 — Storage 四类容器、IoC 与 State 基础
+
+分支 `codex/storage-lifecycle-boundary`，承接上轮未提交修改；本轮未提交、未合并、未安装真机。FactoryKit 固定 3.4.1。系统仍选中 CLT；CLT 缺 SwiftUI 宏插件，脚本在未显式指定 DEVELOPER_DIR 时选择标准路径完整 Xcode，不修改全局设置。实际检查使用 Apple Swift 6.4、macOS 27 SDK。
+
+| 检查 | 实际结果及边界 |
+| --- | --- |
+| 静态边界 | ✅ 依赖、源码唯一归属、目录 README、FactoryKit 仅在 AppStorage、业务无具体文件后端构造；最终音频文件改名后复查通过。 |
+| 格式与 Python | ✅ strict 全仓格式检查，Python 6 项通过。 |
+| Storage 专项 | ✅ 最终全量中 24 项、4 个 suite 通过，覆盖 State、Cache、根生命周期及 SQLite 生命周期；包括共享缓冲区地址/身份、租约计费、同步关闭接纳、失败清理及正常取消不包装为启动失败。 |
+| 模型制品作用域 | ✅ ModelKitRuntime 42 项通过，包含新增文件绑定释放/重绑及关闭接纳 2 项；受控 fixture 不是真实模型验收。 |
+| 首次全量 check | ❌ IntegrationTests 891 项中 9 项失败、17 个 issue：声源 7 项、机械臂截止时间 1 项、原生视觉统计 1 项。该次运行在最后一项关闭接纳测试加入前。 |
+| 最终 ./scripts/check.sh | ❌ IntegrationTests 892 项中声源 6 项失败、11 个 issue。UI 64 项、AppWorkflow 117 项及其他目标通过；真实模型显式 gate 仍跳过，不能视为全量通过。 |
+| 失败隔离复查 | ✅ 最终失败的 6 项声源用例分别使用 `swift test --skip-build --filter` 运行，全部通过；不据此改判全量结果，也不宣称已修复原有并发/时序问题。 |
+| ./scripts/build-ios.sh | ❌ 首个 MobileHarnessSimulator scheme 在外部 coreai-models/CoreAIShared 缺少 CoreAI 模块处失败，与既有限制一致；后续独立 scheme 未执行。 |
+| iOS 设备目标 | ✅ 完整 Xcode 下，MobileHarness、Debug、generic/platform=iOS、CODE_SIGNING_ALLOWED=NO，最终源码构建成功。 |
+| 打包与配置 | ✅ 最终设备产物 Agent/Skill 资源 25 项；project.pbxproj、PrivacyInfo、entitlements 的 plutil 校验；当前源码 README 链接及 Xcode Storage 引用无缺失；git diff --check 通过。 |
+
+最终全量失败用例：soundSourceMonoIsUnavailableAndRejectedPublicationDoesNotStopRecognition、soundSourceBroadcastCrossesGatewaysWithBoundIdentityAndCaptureDeadline、soundSourceStopCancelsAndJoinsAnInFlightPublisher、soundSourceReplyGateClearsDirectionAndResumeStartsANewWindow、soundSourceOnlyDiagnosticCrossesGatewaysWithoutModelsOrPresentationGrants、soundSourceSlowSubscriberDoesNotBlockFollowingDirections。
+
+设备构建命令：`DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild -project MobileHarness.xcodeproj -scheme MobileHarness -configuration Debug -destination 'generic/platform=iOS' -derivedDataPath build/DerivedData CODE_SIGNING_ALLOWED=NO build`。
+
+输出保留于当前主机 `/tmp/storage-check-final.log`、`/tmp/storage-rechecks.json` 及对应 recheck 日志、`/tmp/storage-ios.log`、`/tmp/storage-native-final.log`、`/tmp/storage-boundary-final.log`、`/tmp/storage-format-final.log`。临时路径不是长期归档附件，本节保存核心证据。
+
+❌ 未进行真实模型推理、原生界面操作、照片/音频/蓝牙物理设备验收。原生播放 Data 到 Float 数组仍有转换复制；Skill 动态状态声明与提示词自动注入、资源事实全面迁入 State 不在本轮。
+
+## 2026-10-17 — Storage containers build installed on physical iPhone
+
+- User requested installation of the current codex/storage-lifecycle-boundary working tree. Built and signed MobileHarness Debug 0.1.0/build 2026101701 with existing ignored local signing configuration and a command-line CURRENT_PROJECT_VERSION override. Source signing/version configuration unchanged. Build log: /tmp/mobileharness-install-2026101701-build.log.
+- PASS: deep/strict signature, target-device inclusion and provisioning expiration, bundle identity/version, and all 25 Agent/Skill assets/Core protocol/function declarations. All 499 captured production/configuration/resource inputs match before build, before installation and after installation; snapshot /tmp/mobileharness-install-2026101701-inputs.json.
+- PASS: in-place CoreDevice installation on Youwei’s iPhone 17 Pro. Independent installed-app readback confirms dev.mobileharness.app 0.1.0/build 2026101701, replacing 2026101604. Receipt /tmp/mobileharness-install-2026101701-receipt.json; readbacks /tmp/mobileharness-install-2026101701-before.json and /tmp/mobileharness-install-2026101701-after.json. No uninstall or data reset.
+- Installation did not launch the app or perform model, microphone/camera, native UI or physical-action acceptance. Automated checks were not rerun for this installation-only request; earlier full-suite failures and Simulator dependency limitations remain recorded above. No commit or merge.

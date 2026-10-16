@@ -5,7 +5,7 @@ import ExecutionRuntime
 import Foundation
 import FunctionContracts
 import PlatformKit
-import Storage
+import StorageCore
 import StorageDevices
 
 /// Execution provenance belongs to App; never supplied to the Bluetooth SDK.

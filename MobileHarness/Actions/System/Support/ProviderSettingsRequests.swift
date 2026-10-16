@@ -1,6 +1,6 @@
 import Foundation
 import FunctionContracts
-import Storage
+import StorageCore
 
 public protocol ProviderSettingsCapability: Sendable {
     func readSettings() async throws -> String

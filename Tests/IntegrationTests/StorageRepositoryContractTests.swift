@@ -2,9 +2,11 @@ import AgentCore
 import Agents
 import Foundation
 import ModelKitRuntime
-import Storage
 import StorageChat
+import StorageCore
+import StorageFiles
 import StorageSQLite
+import StorageState
 import StorageTasks
 import Testing
 
@@ -15,10 +17,10 @@ private struct ContractDocument: Codable, Sendable, Equatable { let text: String
 @Test func documentRepositoriesShareRevisionAndFailureContract() async throws {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     defer { try? FileManager.default.removeItem(at: root) }
-    let file = try LocalDocumentStore<ContractDocument>(
+    let file = try FileDocumentStore<ContractDocument>(
         url: root.appendingPathComponent("document.json"), maximumBytes: 4096)
     let memory = try MemoryDocumentStore<ContractDocument>(maximumBytes: 4096)
-    let repositories: [any DocumentRepository<ContractDocument>] = [file, memory]
+    let repositories: [any DocumentStore<ContractDocument>] = [file, memory]
     for repository in repositories {
         #expect(try await repository.load() == nil)
         let first = try await repository.save(.init(text: "original"), expecting: nil)
@@ -35,7 +37,7 @@ private struct ContractDocument: Codable, Sendable, Equatable { let text: String
         let second = try await repository.save(.init(text: "replacement"), expecting: first.revision)
         #expect(second.revision != first.revision)
     }
-    let reopened: any DocumentRepository<ContractDocument> = try LocalDocumentStore(
+    let reopened: any DocumentStore<ContractDocument> = try FileDocumentStore(
         url: root.appendingPathComponent("document.json"))
     #expect(try await reopened.load()?.value.text == "replacement")
     #expect(file.durability == .persistent && memory.durability == .memory)
@@ -44,9 +46,9 @@ private struct ContractDocument: Codable, Sendable, Equatable { let text: String
 @Test func binaryRepositoriesSharePublicationConfinementAndPaginationContract() async throws {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     defer { try? FileManager.default.removeItem(at: root) }
-    let file = try LocalFileStore(root: root)
-    let memory = try MemoryBinaryObjectStore()
-    let repositories: [any BinaryObjectStore] = [file, memory]
+    let file = try DiskFileStore(root: root)
+    let memory = try MemoryFileStore()
+    let repositories: [any FileStore] = [file, memory]
     for repository in repositories {
         try await repository.putIfAbsent(Data([1, 2, 3]), key: "original.bin")
         await #expect(throws: (any Error).self) { try await repository.putIfAbsent(Data([9]), key: "original.bin") }
@@ -77,13 +79,13 @@ private struct ContractDocument: Codable, Sendable, Equatable { let text: String
     _ = try ConversationRecordStore(repository: first.chat, tasks: first.tasks)
 }
 
-private actor PausedBinaryStore: BinaryObjectStore {
+private actor PausedBinaryStore: FileStore {
     nonisolated let durability: StorageDurability = .memory
-    let base: any BinaryObjectStore
+    let base: any FileStore
     private var released = false
     private var continuation: CheckedContinuation<Void, Never>?
     var publishing: Bool { continuation != nil }
-    init(base: any BinaryObjectStore) { self.base = base }
+    init(base: any FileStore) { self.base = base }
     func putIfAbsent(_ data: Data, key: String) async throws {
         if !released { await withCheckedContinuation { continuation = $0 } }
         try await base.putIfAbsent(data, key: key)
@@ -106,7 +108,7 @@ private actor PausedBinaryStore: BinaryObjectStore {
 
 @Test func mediaAsyncPublicationSerializesReadsAndRejectsQueueOverflow() async throws {
     let records = try SQLiteRepositories.temporary()
-    let files = PausedBinaryStore(base: try MemoryBinaryObjectStore())
+    let files = PausedBinaryStore(base: try MemoryFileStore())
     let store = CapturedPhotoStore(repository: records.media, files: files)
     let owner = StorageOwner(
         namespace: "photos", source: "fixture", session: UUID().uuidString, input: UUID().uuidString)
@@ -171,7 +173,7 @@ private actor PausedBinaryStore: BinaryObjectStore {
         #"{"version":1,"revision":"00000000-0000-0000-0000-000000000125","value":[{"id":"gemma4-e2b","generation":"00000000-0000-0000-0000-000000000126","source":{"endpoint":"https://hf-mirror.com","allowsCellular":true}}]}"#
             .utf8)
     try original.write(to: url)
-    let store = try LocalDocumentStore<[ModelArtifactTransferRecord]>(url: url)
+    let store = try FileDocumentStore<[ModelArtifactTransferRecord]>(url: url)
     let snapshot = try #require(try await store.load())
     let transfer = try #require(snapshot.value.first)
     #expect(transfer.id == "gemma4-e2b")
@@ -190,22 +192,27 @@ private actor PausedBinaryStore: BinaryObjectStore {
     #expect(emitted.version == 1 && emitted.value.first?.generation.uuidString == transfer.generation)
 }
 
-@Test func memoryStateStoreSharesOneTypedSnapshotWithoutEncoding() {
+@Test func registeredStateSharesOneTypedSnapshotWithoutEncoding() throws {
     struct RuntimeState: Sendable { var active: String? }
-    let concrete = MemoryStateStore(RuntimeState(active: nil))
-    let first: any StateRepository<RuntimeState> = concrete
-    let second: any StateRepository<RuntimeState> = concrete
-    var snapshot = first.read()
+    let scope = try StateContainer().makeScope()
+    let writer = try scope.register(StateKey<RuntimeState>("runtime"), initial: RuntimeState(active: nil))
+    let first = writer.reader
+    let second = writer.reader
+    let prior = try first.get()
+    var snapshot = prior.value
     snapshot.active = "task_1"
-    #expect(second.read().active == nil)
-    first.replace(snapshot)
-    #expect(second.read().active == "task_1")
-    second.replace(.init(active: nil))
-    #expect(first.read().active == nil)
+    #expect(try second.get().value.active == nil)
+    try writer.set(snapshot, expecting: prior.revision)
+    #expect(try second.get().value.active == "task_1")
+    try writer.set(.init(active: nil), expecting: second.get().revision)
+    #expect(try first.get().value.active == nil)
 }
 
 @Test func runtimeMemoryEvidenceBudgetRejectsWithoutPublishingPartialMutation() async throws {
-    let repository = AgentContextRepository(agent: .assistant, scope: UUID().uuidString, state: AssistantContextState())
+    let repository = try AgentContextRepository(
+        agent: .assistant, scope: UUID().uuidString, state: AssistantContextState(),
+        stateScope: StateContainer().makeScope()
+    )
     let payload = Data(repeating: 1, count: 524_288)
     try await repository.update { context in
         for _ in 0..<64 { try context.append(.init(kind: "fixture", data: payload)) }

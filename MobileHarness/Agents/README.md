@@ -90,3 +90,7 @@ Root UI bootstrap 只调用注入的生命周期启动端口；根服务开始�
 - 通用生产后台业务契约与对应独立执行者能力。
 - 运行中 Task 跨场景挂起的目标保留与统一终态 checkpoint；详见 [Chat](Support/Chat/README.md#待实现)。
 - 真实模型的流程遵循、原生交互、摄影/Photos、语音竞争及持续设备验收。
+
+## Storage 依赖
+
+✅ 存储访问使用独立的 State、Cache、Database 和 Files 接口；App 注册根实例，消费者通过构造器获得所需能力。存储容器不接管本目录的业务验证、执行和完成语义。

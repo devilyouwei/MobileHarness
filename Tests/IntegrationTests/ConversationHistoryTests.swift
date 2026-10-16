@@ -3,10 +3,12 @@ import AgentCore
 import Agents
 import Foundation
 @_spi(ModelManagement) import ModelKit
-import Storage
 import StorageChat
+import StorageCore
+import StorageFiles
 import StorageMedia
 import StorageSQLite
+import StorageState
 import StorageTasks
 import Testing
 
@@ -219,7 +221,12 @@ private actor HistoryModel: ChatCapability {
 @Test(.actionCatalog) func assistantRecordsMalformedOutputBeforeParsingAndContextSurvivesNewInstance() async throws {
     let store = ConversationHistoryStore()
     let model = HistoryModel("<wait/>")
-    let agent = try AssistantAgent(chat: model, conversations: store)
+    let agent = try AssistantAgent(
+        chat: model, conversations: store,
+        context: try AgentContextRepository(
+            agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState(),
+            stateScope: StateContainer().makeScope())
+    )
     try await agent.start()
     let input = AgentInput(
         id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("请串行"))
@@ -242,7 +249,12 @@ private actor HistoryModel: ChatCapability {
 
 @Test(.actionCatalog) func cancellationPersistsReceivedTextBeforeStoppingProducer() async throws {
     let store = ConversationHistoryStore()
-    let agent = try AssistantAgent(chat: HistoryModel("partial", leaveOpen: true), conversations: store)
+    let agent = try AssistantAgent(
+        chat: HistoryModel("partial", leaveOpen: true), conversations: store,
+        context: try AgentContextRepository(
+            agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState(),
+            stateScope: StateContainer().makeScope())
+    )
     try await agent.start()
     try await agent.receive(
         AgentInput(
@@ -293,8 +305,9 @@ func titleGenerationNeverAcceptsIncompleteOutput(text: String) async throws {
     let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     defer { try? FileManager.default.removeItem(at: directory) }
     let scope = UUID().uuidString
-    let firstRepository = AgentContextRepository(
-        agent: .assistant, scope: scope, state: AssistantContextState())
+    let firstRepository = try AgentContextRepository(
+        agent: .assistant, scope: scope, state: AssistantContextState(), stateScope: StateContainer().makeScope()
+    )
     let firstStore = try fixtureAssistantStore(repository: firstRepository, directory: directory)
     let previousID = UUID().uuidString
     _ = try await firstStore.beginFixture(id: previousID, user: "previous user", system: "old system", model: "fixture")
@@ -303,8 +316,9 @@ func titleGenerationNeverAcceptsIncompleteOutput(text: String) async throws {
     try await firstStore.append("<express emotion=\"happy\"/>", to: previousID)
     try await firstStore.finish(previousID, state: .completed, reason: "stop")
     let model = HistoryModel("<express emotion=\"smile\"/>")
-    let repository = AgentContextRepository(
-        agent: .assistant, scope: scope, state: AssistantContextState())
+    let repository = try AgentContextRepository(
+        agent: .assistant, scope: scope, state: AssistantContextState(), stateScope: StateContainer().makeScope()
+    )
     let restored = try fixtureAssistantStore(repository: repository, directory: directory)
     let agent = try AssistantAgent(chat: model, conversations: restored, context: repository)
     try await agent.start()
@@ -405,7 +419,12 @@ private struct NativeRuntimeHistoryChat: ChatCapability {
 
 @Test(.actionCatalog) func assistantJournalsMixedActionNativeToolAndUsageWithRuntimeCorrelation() async throws {
     let store = ConversationHistoryStore()
-    let agent = try FixtureNativeAgent(chat: NativeRuntimeHistoryChat(), conversations: store)
+    let agent = try FixtureNativeAgent(
+        chat: NativeRuntimeHistoryChat(), conversations: store,
+        context: try AgentContextRepository(
+            agent: FixtureNativeChatState.agentID, scope: UUID().uuidString, state: FixtureNativeChatState(),
+            stateScope: StateContainer().makeScope())
+    )
     try await agent.start()
     let input = AgentInput(
         id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("打开摄像头并微笑"))
@@ -522,7 +541,11 @@ extension ConversationHistoryStore {
         modelName: {
             _ = try await store.startNew()
             return "fixture"
-        })
+        },
+        context: try AgentContextRepository(
+            agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState(),
+            stateScope: StateContainer().makeScope())
+    )
     try await agent.start()
     let previous = UUID().uuidString
     _ = try await store.beginFixture(id: previous, user: "previous", system: "system", model: "fixture")
@@ -544,13 +567,14 @@ extension ConversationHistoryStore {
 
 @Test(.actionCatalog) func assistantPersistenceFailureDoesNotCallModel() async throws {
     let store = ConversationHistoryStore()
-    let repository = AgentContextRepository(
+    let repository = try AgentContextRepository(
         agent: .assistant, scope: UUID().uuidString, state: AssistantContextState(),
         persistence: AgentContextPersistence(
             load: { nil },
             commit: { context, _ in
                 if !context.records.isEmpty { throw DocumentStorageError.capacityExceeded }
-            }))
+            }), stateScope: StateContainer().makeScope()
+    )
     let model = HistoryModel("should not run")
     let agent = try AssistantAgent(chat: model, conversations: store, context: repository)
     try await agent.start()
@@ -711,7 +735,9 @@ extension ConversationHistoryStore {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     defer { try? FileManager.default.removeItem(at: root) }
     let scope = UUID().uuidString
-    let first = AgentContextRepository(agent: .assistant, scope: scope, state: AssistantContextState())
+    let first = try AgentContextRepository(
+        agent: .assistant, scope: scope, state: AssistantContextState(), stateScope: StateContainer().makeScope()
+    )
     let firstStore = try fixtureAssistantStore(repository: first, directory: root)
     let agent = try AssistantAgent(
         chat: HistoryModel("<express emotion=\"happy\"/>"), conversations: firstStore, context: first)
@@ -725,7 +751,9 @@ extension ConversationHistoryStore {
     // Deliberately corrupt obsolete files: the new path must not read them.
     try Data("obsolete invalid data".utf8).write(to: root.appendingPathComponent("assistant.history-v2.context.json"))
     try Data("obsolete invalid data".utf8).write(to: root.appendingPathComponent("assistant.context.json"))
-    let second = AgentContextRepository(agent: .assistant, scope: scope, state: AssistantContextState())
+    let second = try AgentContextRepository(
+        agent: .assistant, scope: scope, state: AssistantContextState(), stateScope: StateContainer().makeScope()
+    )
     let secondStore = try fixtureAssistantStore(repository: second, directory: root)
     let restarted = try AssistantAgent(chat: HistoryModel("unused"), conversations: secondStore, context: second)
     try await restarted.start()

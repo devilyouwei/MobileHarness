@@ -9,8 +9,8 @@ import StorageTasks
 import Testing
 import UI
 
-@testable import Storage
 @testable import StorageChat
+@testable import StorageCore
 @testable import StorageSQLite
 
 #if os(macOS)

@@ -1,19 +1,11 @@
 # Common Storage Mechanisms
 
-## Responsibility and implementation
+✅ StorageCore 编译 Contracts 与 Memory，无其他项目或第三方依赖。Contracts 提供身份、持久化标识、通用错误和指纹；Memory 提供有界流、owner 租约与接纳门。State、Cache、Files、数据库领域和后端使用这些机制。
 
-Contracts owns backend-neutral interfaces/values; Memory owns bounded process-local stores/streams/leases/admission; Persistence owns concrete File and SQLite mechanisms. Domain schemas/queries remain in Chat/Tasks/Media/Devices.
+文件与文档契约归 Files；注册状态归 State；音频归 Cache/Audio；SQL 机制与领域 SQL 实现归 Database/SQLite。公共机制不解释业务状态、模型、设备、UI 或 SQL schema，不提供全局查找与后端回退。
 
-## Direct relationships
+[契约](Contracts/README.md) · [内存机制](Memory/README.md) · [Storage](../README.md)
 
-The Storage target compiles Contracts/Memory/File only and depends on no project/third-party target. SQLite support compiles separately in StorageSQLite. Domains use the common contracts; App chooses implementations and owns roots/lifetime.
+## 待完成
 
-## Lifecycle and failure contracts
-
-No global discovery, universal SQL/query DSL, business state transitions or backend fallback. Protocol completion/error/durability contracts are explicit. Individual source files expose public APIs through Swift modules; no umbrella Storage.swift is needed.
-
-[Storage](../README.md)
-
-## 待实现
-
-- General state-transition/subscription feature and new persistent backends are not implemented.
+❌ 新机制须由实际消费者需要驱动；不增加空适配后端。

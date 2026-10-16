@@ -1,5 +1,5 @@
 {
-  "originHash" : "d8c0adb33d04791bbe88b1cb69680d71e89077f6fa0ac664984509dec349a740",
+  "originHash" : "67cac1615b0c4b97e441051e3a36b88103d090648a6b8d9ed4f2662b5b711ad2",
   "pins" : [
     {
       "identity" : "coreai-models",
@@ -17,6 +17,15 @@
       "state" : {
         "revision" : "86b5096ac59ab46e66bd1f6377c604bc1dab0bc2",
         "version" : "1.5.1"
+      }
+    },
+    {
+      "identity" : "factory",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/hmlongco/Factory",
+      "state" : {
+        "revision" : "39d340fbfc4eb79a8981e9166083cda011a6b3f8",
+        "version" : "3.4.1"
       }
     },
     {

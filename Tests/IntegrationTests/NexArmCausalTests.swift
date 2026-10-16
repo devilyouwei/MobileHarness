@@ -4,7 +4,7 @@ import ExecutionRuntime
 import Foundation
 import FunctionContracts
 import PlatformKit
-import Storage
+import StorageCore
 import Testing
 
 #if os(macOS)

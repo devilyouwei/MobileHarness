@@ -83,6 +83,7 @@
             let audioDetection = AudioDetectionWorkflow(
                 state: AudioDetectionState(),
                 endpoint: AudioDetectionSession(
+                    stateStorage: runtime.stateStorage,
                     recognition: recognition, vad: vad,
                     beforeStart: { [weak lifecycle] in await lifecycle?.stopVoiceAndWait() }))
             self.audioDetection = audioDetection

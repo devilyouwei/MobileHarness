@@ -1,7 +1,8 @@
 import AgentCore
 import Agents
 import Foundation
-import Storage
+import StorageCore
+import StorageState
 import Testing
 
 private func document() -> [String: Any] {
@@ -126,7 +127,12 @@ func agentConfigurationRejectsInvalidDocuments(_ mutation: String) throws {
     #expect(!active.actions.contains { $0.path.domain == "Camera" })
     #expect(active.actions.contains { $0.alias == "startTask" })
     #expect(active.actions.filter { $0.path.domain == "Agent" && $0.path.module == "Task" }.count == 5)
-    let agent = try AssistantAgent(chat: FixedTextChat())
+    let agent = try AssistantAgent(
+        chat: FixedTextChat(),
+        context: try AgentContextRepository(
+            agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState(),
+            stateScope: StateContainer().makeScope())
+    )
     let registry = agent.descriptor.capabilities
     #expect(registry.internalActions.count == 3 && registry.internalTools.isEmpty)
     #expect(!registry.internalActions.contains { $0.path.description == "Speech.Listening.update" })
@@ -171,7 +177,12 @@ func agentConfigurationRejectsInvalidDocuments(_ mutation: String) throws {
     root["id"] = "other"
     let other = try decode(root)
     #expect(throws: AgentConfigurationError.identityMismatch) {
-        try AssistantAgent(chat: FixedTextChat(), configuration: other)
+        try AssistantAgent(
+            chat: FixedTextChat(), configuration: other,
+            context: try AgentContextRepository(
+                agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState(),
+                stateScope: StateContainer().makeScope())
+        )
     }
     root["version"] = 4
     #expect(throws: AgentConfigurationError.unsupportedVersion(4)) { try decode(root) }
@@ -458,7 +469,12 @@ func threeLevelConfigurationRejectsAmbiguousBindings(_ mutation: String) throws 
     #expect(throws: GenerationError.unknownCapability) {
         try catalog.resolveTool("App.openPage", arguments: ["destination": "settings"])
     }
-    let runtime = try ApplicationControlAgent(sessionID: UUID().uuidString)
+    let runtime = try ApplicationControlAgent(
+        sessionID: UUID().uuidString,
+        context: try AgentContextRepository(
+            agent: AgentID(rawValue: "applicationControl"), scope: UUID().uuidString,
+            state: ApplicationControlContextState(), stateScope: StateContainer().makeScope())
+    )
     #expect(
         runtime.descriptor.capabilities.permits(
             ToolCall(
@@ -485,7 +501,12 @@ func historyPreviewRecognizesDirectedTaskActions(_ scenario: (String, String, St
     case "Photographer": runtime = try PhotographerAgent.runtimeCapabilities(configuration.capabilities)
     case "Memory": runtime = try MemoryAgent.runtimeCapabilities(configuration.capabilities)
     case "ApplicationControl":
-        runtime = try ApplicationControlAgent(sessionID: UUID().uuidString).descriptor.capabilities
+        runtime = try ApplicationControlAgent(
+            sessionID: UUID().uuidString,
+            context: try AgentContextRepository(
+                agent: AgentID(rawValue: "applicationControl"), scope: UUID().uuidString,
+                state: ApplicationControlContextState(), stateScope: StateContainer().makeScope())
+        ).descriptor.capabilities
     default: runtime = try AssistantAgent.runtimeCapabilities(configuration.capabilities)
     }
     let declared = try AgentSkillLoader.registry(["basic-skill"], fixed: runtime)

@@ -4,7 +4,7 @@ import Agents
 import Foundation
 import Gateway
 import PlatformKit
-import Storage
+import StorageCore
 
 /// Root-owned bounded transport. Agents select calls; this host only executes correlated outputs.
 public actor HistoryIntentRuntime {

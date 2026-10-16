@@ -8,7 +8,9 @@ import Foundation
 import FunctionContracts
 import Gateway
 import PlatformKit
-import Storage
+import StorageCore
+import StorageFiles
+import StorageState
 import Testing
 import UI
 
@@ -17,7 +19,7 @@ private actor InstalledPreferenceFixture {
     func set(_ ids: Set<String>) { self.ids = ids }
 }
 private func preferencesService(
-    _ store: LocalDocumentStore<ModelResourcePreferences>, installed: InstalledPreferenceFixture
+    _ store: FileDocumentStore<ModelResourcePreferences>, installed: InstalledPreferenceFixture
 )
     -> ModelResourcePreferencesService
 {
@@ -51,9 +53,11 @@ func saturatedControlMemoryRestoresPreferencesAcrossRootGatewayAndRetainsBounded
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     defer { try? FileManager.default.removeItem(at: root) }
     let seed = try saturatedEvidenceContext(agent: .applicationControl, state: ApplicationControlContextState())
-    let repository = AgentContextRepository(agent: seed.agentID, scope: seed.scopeID, state: seed.state)
+    let repository = try AgentContextRepository(
+        agent: seed.agentID, scope: seed.scopeID, state: seed.state, stateScope: StateContainer().makeScope()
+    )
     try await repository.update { $0 = seed }
-    let preferences = try LocalDocumentStore<ModelResourcePreferences>(
+    let preferences = try FileDocumentStore<ModelResourcePreferences>(
         url: root.appendingPathComponent("source.json"), maximumBytes: 4096)
     let saved = ModelResourcePreferences(
         endpoint: "https://hf-mirror.com", useCustomRecognition: true, useCustomSynthesis: true)
@@ -74,7 +78,9 @@ func saturatedControlMemoryRestoresPreferencesAcrossRootGatewayAndRetainsBounded
     let snapshot = try await repository.snapshot()
     #expect(snapshot.records.count == 4096 && snapshot.consumedBatches.count == 4096)
     #expect((snapshot.evictedRecordCount ?? 0) >= 4097 && (snapshot.evictedBatchCount ?? 0) >= 4097)
-    let reopened = AgentContextRepository(agent: seed.agentID, scope: seed.scopeID, state: seed.state)
+    let reopened = try AgentContextRepository(
+        agent: seed.agentID, scope: seed.scopeID, state: seed.state, stateScope: StateContainer().makeScope()
+    )
     #expect(try await reopened.snapshot().records.isEmpty)
     #expect(try await preferences.refresh()?.value == saved)
 }
@@ -88,7 +94,7 @@ func saturatedControlMemoryRestoresPreferencesAcrossRootGatewayAndRetainsBounded
 @Test(.actionCatalog) func preferenceServiceValidatesBeforeCommitAndRestoreMigratesMissingModels() async throws {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     defer { try? FileManager.default.removeItem(at: root) }
-    let store = try LocalDocumentStore<ModelResourcePreferences>(
+    let store = try FileDocumentStore<ModelResourcePreferences>(
         url: root.appendingPathComponent("source.json"), maximumBytes: 4096)
     let installed = InstalledPreferenceFixture()
     let service = preferencesService(store, installed: installed)
@@ -112,7 +118,7 @@ func saturatedControlMemoryRestoresPreferencesAcrossRootGatewayAndRetainsBounded
 @Test(.actionCatalog) func preferencePipelineKeepsCommitOnBindingFailureAndExplicitRestoreRetries() async throws {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     defer { try? FileManager.default.removeItem(at: root) }
-    let store = try LocalDocumentStore<ModelResourcePreferences>(
+    let store = try FileDocumentStore<ModelResourcePreferences>(
         url: root.appendingPathComponent("source.json"), maximumBytes: 4096)
     let installed = InstalledPreferenceFixture()
     await installed.set(["nemotron"])
@@ -134,7 +140,7 @@ func saturatedControlMemoryRestoresPreferencesAcrossRootGatewayAndRetainsBounded
 @Test(.actionCatalog) func preferenceRestoreMigratesNetworkAndFlagsBeforeReturningBinding() async throws {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     defer { try? FileManager.default.removeItem(at: root) }
-    let store = try LocalDocumentStore<ModelResourcePreferences>(
+    let store = try FileDocumentStore<ModelResourcePreferences>(
         url: root.appendingPathComponent("source.json"), maximumBytes: 4096)
     try await store.save(
         .init(allowsCellular: false, useCustomRecognition: true, useCustomSynthesis: true), expecting: nil)
@@ -150,7 +156,12 @@ func saturatedControlMemoryRestoresPreferencesAcrossRootGatewayAndRetainsBounded
 
 @Test(.actionCatalog) func preferenceAgentRejectsMalformedFeedbackAndRetirementReleasesTransaction() async throws {
     let session = UUID().uuidString
-    let agent = try ApplicationControlAgent(sessionID: session)
+    let agent = try ApplicationControlAgent(
+        sessionID: session,
+        context: try AgentContextRepository(
+            agent: AgentID(rawValue: "applicationControl"), scope: UUID().uuidString,
+            state: ApplicationControlContextState(), stateScope: StateContainer().makeScope())
+    )
     try await agent.start()
     var outputs = agent.outputs.makeAsyncIterator()
     let request = try ModelResourceIntent.restoreSource.input(sessionID: session)
@@ -231,7 +242,7 @@ private actor PreferencePresentationFixture: ResourcePresentationCapability {
 @Test(.actionCatalog) func preferenceFailureCodesSelectRegisteredNoticeReasonsWithoutBindingOrCommit() async throws {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     defer { try? FileManager.default.removeItem(at: root) }
-    let store = try LocalDocumentStore<ModelResourcePreferences>(
+    let store = try FileDocumentStore<ModelResourcePreferences>(
         url: root.appendingPathComponent("source.json"), maximumBytes: 4096)
     let installed = InstalledPreferenceFixture()
     let binding = PreferenceBindingFixture()
@@ -255,7 +266,7 @@ private actor PreferencePresentationFixture: ResourcePresentationCapability {
 @Test(.actionCatalog) func bindingFailureUsesThirdPresentationCallAndPreservesDurablePreference() async throws {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     defer { try? FileManager.default.removeItem(at: root) }
-    let store = try LocalDocumentStore<ModelResourcePreferences>(
+    let store = try FileDocumentStore<ModelResourcePreferences>(
         url: root.appendingPathComponent("source.json"), maximumBytes: 4096)
     let installed = InstalledPreferenceFixture()
     await installed.set(["nemotron"])
@@ -287,7 +298,7 @@ func preferenceGateStaysHeldUntilFailurePresentationCompletes(
 ) async throws {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     defer { try? FileManager.default.removeItem(at: root) }
-    let store = try LocalDocumentStore<ModelResourcePreferences>(
+    let store = try FileDocumentStore<ModelResourcePreferences>(
         url: root.appendingPathComponent("source.json"), maximumBytes: 4096)
     let installed = InstalledPreferenceFixture()
     let binding = PreferenceBindingFixture()
@@ -326,7 +337,7 @@ func preferenceGateStaysHeldUntilFailurePresentationCompletes(
     for missing in [false, true] {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: root) }
-        let store = try LocalDocumentStore<ModelResourcePreferences>(
+        let store = try FileDocumentStore<ModelResourcePreferences>(
             url: root.appendingPathComponent("source.json"), maximumBytes: 4096)
         let installed = InstalledPreferenceFixture()
         let binding = PreferenceBindingFixture()
@@ -411,7 +422,7 @@ private struct SpoofedPreferenceFailure: ModelResourcePreferencesCapability {
     try original.write(to: url)
     let installed = InstalledPreferenceFixture()
     await installed.set(["nemotron", "moss-tts-nano"])
-    let service = preferencesService(try LocalDocumentStore(url: url), installed: installed)
+    let service = preferencesService(try FileDocumentStore(url: url), installed: installed)
     let restored = try await service.restoreSource()
     #expect(restored.endpoint == "https://hf-mirror.com")
     #expect(restored.useCustomRecognition && restored.useCustomSynthesis)
@@ -419,7 +430,7 @@ private struct SpoofedPreferenceFailure: ModelResourcePreferencesCapability {
     var updated = restored
     updated.endpoint = "https://huggingface.co"
     _ = try await service.saveSource(updated)
-    let reopened = try LocalDocumentStore<ModelResourcePreferences>(url: url)
+    let reopened = try FileDocumentStore<ModelResourcePreferences>(url: url)
     #expect(try await reopened.load()?.value == updated)
     let envelope = try #require(JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any])
     #expect(envelope["version"] as? Int == 1)

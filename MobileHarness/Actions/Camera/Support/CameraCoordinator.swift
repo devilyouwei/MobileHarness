@@ -8,7 +8,7 @@
     import FunctionContracts
     import OSLog
     import PlatformKit
-    import Storage
+    import StorageCore
     import StorageMedia
     import UI
     import UIKit

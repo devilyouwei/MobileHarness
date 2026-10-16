@@ -1,8 +1,8 @@
 import AgentCore
 import Foundation
 import ModelKit
-import Storage
 import StorageChat
+import StorageCore
 
 /// Preserve provider call/result blocks when interleaving independent task rounds.
 public enum AgentChatContextBuilder {

@@ -1,79 +1,57 @@
-# Storage — Contracts, Domain Repositories and Backends
+# Storage — State / Cache / Database / Files
 
-## Ownership and boundaries
+## 职责与边界
 
-Storage owns record persistence and bounded process memory, without Agent decisions, model selection, device execution or UI orchestration. ModelKit, PlatformKit and UI remain independent. App chooses backends, paths and lifecycle, then injects domain protocols; consumers do not discover stores globally.
+Storage 提供进程内状态、临时字节、结构化持久化和文件能力。App 选择位置与数据库实现，通过独立 ApplicationContainer 注册根实例并调度生命周期；业务模块获得所需子接口，不访问全局容器。Storage 不依赖 Agents、Actions、Gateway、UI、PlatformKit 或 ModelKit，也不解释业务状态、配置类型和模型选择。
 
-Directory ownership differs from compilation ownership: each business directory contains its contracts/policy and its SQLite adapter, but backend files compile only in StorageSQLite. The common Storage target compiles Support excluding SQLite and has no project or third-party target dependency. StorageSQLite alone links GRDB.swift7.11.1; its SQL/GRDB values are internal. There is no Storage.swift umbrella or Storage.shared locator.
+## 上下游与数据流
 
 ```mermaid
-flowchart LR
- App -->|Construct| SQL[SQLiteRepositories]
- SQL --> ChatSQL[SQLiteChatRepository]
- SQL --> TaskSQL[SQLiteTaskRepository]
- SQL --> MediaSQL[SQLiteMediaRepository]
- SQL --> DeviceSQL[SQLiteDeviceRepository]
- Consumer[Agents / Actions / feature workflows] -->|Injected protocol| Contracts[Chat / Task / Media / Device repositories]
- ChatSQL -.-> Contracts
- TaskSQL -.-> Contracts
- MediaSQL -.-> Contracts
- DeviceSQL -.-> Contracts
- Media[CapturedPhotoStore] --> Contracts
- Media --> Binary[BinaryObjectStore]
- File[LocalFileStore] -.-> Binary
- Memory[MemoryBinaryObjectStore] -.-> Binary
+flowchart TB
+ App[App / AppStorage] -.->|创建、注入、启停| Root[StorageContainer]
+ Root --> State[StateContainer]
+ Root --> Cache[CacheContainer]
+ Root --> DB[DatabaseStorage]
+ Root --> Files[FilesContainer]
+ State --> Ports[StateScope / Reader / Writer]
+ Cache --> Audio[会话 AudioCache]
+ Cache --> Buffers[BufferCache / images / 自定义命名空间]
+ DB --> Repos[chat / tasks / media / devices]
+ Repos --> SQLite[SQLiteDatabaseStorage]
+ Files --> Names[settings / photos / models]
+ Consumer[Agents / Actions 集成] -->|注入的受限接口| Ports
+ Consumer --> Audio
+ Consumer --> Repos
+ Consumer --> Names
 ```
 
-## Direct relationships and internal components
+## 内部结构与编译
 
-| Directory / target | Owns | Direct relationships |
+| 目录 | 编译目标 | 责任与依赖 |
 | --- | --- | --- |
-| Support / Storage | Document/binary contracts, ownership/errors/identity/fingerprints; File/Memory mechanisms | Foundation, Synchronization, CryptoKit; used by all domains and injected App document consumers |
-| Chat / StorageChat | Dialog/message values, ChatRepository, ConversationRecordStore, memory history/checkpoints/windows | Storage and StorageTasks; Agents/Actions/App consume it |
-| Tasks / StorageTasks | TaskRepository and explicit ephemeral MemoryTaskRepository | Storage; Agents/Chat consume it |
-| Audio / StorageAudio | Single-use PCM handles and producer/player ownership | Storage; synthesis/playback owners consume it |
-| Media / StorageMedia | MediaRepository and JPEG delivery/recovery/FIFO policy | Storage; ActionBindings camera / AgentBindings history readers consume it |
-| Devices / StorageDevices | DeviceRepository mapping/selection/reconnect contract | Storage; ActionBindings Bluetooth service consumes it |
-| SQLite files / StorageSQLite | Domain schemas/queries, shared connection pool, explicit construction owner | Storage plus Chat/Tasks/Media/Devices contracts and GRDB; only App construction and backend tests use it |
+| 根 StorageContainer.swift | Storage | 四类容器组合、启动回滚与加入停止；依赖自身子目标，不依赖 GRDB |
+| Support | StorageCore | 公共身份、错误、容量门、有界流和租约；无项目/第三方依赖 |
+| State | StorageState | 类型化注册与进程内一致快照；只依赖 StorageCore |
+| Cache（含 Audio） | StorageCache | 不可变字节、租约、音频作用域；只依赖 StorageCore |
+| Files | StorageFiles | 文档、字节和受控目录；只依赖 StorageCore |
+| Database 根 | StorageDatabase | 数据库生命周期协议与四个领域端口 |
+| Database/Chat、Tasks、Media、Devices | 独立领域目标 | 记录契约；Chat 使用 Tasks，Media 组合 Files |
+| Database/SQLite | StorageSQLite | 共享连接池、领域 SQL 适配、迁移、恢复与关闭；独占 GRDB |
 
-Individual products expose common/domain libraries without requiring the aggregate application product. New backends implement the same domain/capability interfaces; there are no empty MongoDB/document-database adapters or additional ORM dependency.
+每份源码只有一个编译拥有者。没有统一业务查询 DSL，没有自动内存回退或跨文件/SQL 事务。
 
-## Contracts and consistency
+## 生命周期与一致性
 
-DocumentRepository<Value> supplies load/refresh/invalidate, UUID-revision compare-and-replace and explicit replacement. LocalDocumentStore and MemoryDocumentStore share that contract; durability is persistent or memory, respectively. BinaryObjectStore supplies bounded reads/info, non-overwriting publication, deletion and bounded object listing; LocalFileStore and MemoryBinaryObjectStore implement it. Success in memory never promises survival after restart. Native model-artifact directory materialization remains a File capability chosen in ActionBindings' adapter, rather than a fabricated memory filesystem URL.
+✅ 构造根容器不打开数据库或创建目录。start 准备 Files 并启动数据库；失败关闭内存/文件能力、清理数据库并保留原始与清理错误；清理成功的正常取消保持 CancellationError。重复启动共享准备任务，失败/停止作用域不复用。stop 同步关闭 State/Cache/Files 接纳，取消并加入启动，关闭 Cache/Files、加入数据库停止；重复停止共享结果。应用消费者先停止，再释放存储；重试只在原作用域清理成功后创建新根。
 
-Domain protocols are async and return owned values, never SQL predicates, table handles or GRDB rows. ChatRepository checkpoint commits messages and Task compression/source facts atomically. Its paired TaskRepository must have the same opaque runtime storageScope; mismatched namespaces reject construction even if their task_N strings coincide. App uses one SQLiteRepositories family. There is no file/database combined transaction or transaction across model/device awaits.
+✅ DatabaseStorage 的 chat/tasks/media/devices 在准备前、关闭后抛错。SQLite 以 WAL、FULL、外键、四读者和一个写者运行；最多 64 个接纳操作，写入一个执行者加 16 等待者。旧仓库引用也受关闭屏障约束。恢复仅修复未完成事实，不重放设备动作。
 
-StorageOperationGate provides FIFO admission across async backend calls: one active operation and at most16 waiters; overflow busy. Ordinary cancelled queued callers release admission without executing their body; captured checkpoints run a joined store-owned operation so cancellation terminal data still persists. Chat checkpoint/rotation cache updates and Media publication/recovery reuse it. Caller lifecycle remains responsible for joining accepted work; no page owns database lifetime.
+✅ State 保存无 Codable 的类型化值；Cache 保存不可变缓冲区。数据库和文件写入成功才承诺对应持久化，不把内存成功解释为重启可恢复。Task/Skill 业务状态仍由 Agents 维护；照片发布仍由 CapturedPhotoStore 组合数据库元数据和文件。
 
-## SQLite records and performance
+数据库 schema、ID、配置 envelope version 1、文件路径、照片恢复和 FIFO 契约保持。Models 的文件目录能力是真实路径，不用内存实现伪造文件 URL。业务错误保留在生产者；Storage 不生成用户文案。
 
-One App-owned records.sqlite uses WAL, foreign keys, synchronous FULL, four readers and one writer plus16 waiters. Generic SQLiteDatabase executes caller-supplied migrations/transactions; business schemas and queries stay in owning domain files. The records-v1 tables are retained; record-lifecycle-v2 adds an unfinished-message index. Named migrations come from domain assembly; no legacy JSON import exists.
+## 子目录与待完成
 
-Business tables allocate independently committed AUTOINCREMENT keys and format dialog_/message_/task_/media_/device_ references. Deleted committed keys do not repeat and gaps are allowed. BusinessRecordID validates/formats references only. Technical scopes/calls/requests/audio/revisions/temp files use UUID or original protocol strings; there is no application-wide ID generator/counter file. Standalone memory conversation/Task consumers allocate ephemeral business records locally and open no SQLite connection.
+[State](State/README.md) · [Cache](Cache/README.md) · [Database](Database/README.md) · [Files](Files/README.md) · [公共机制](Support/README.md)
 
-Message identities commit before references escape. Complete user/Assistant/ReACT observation content commits separately; delta stays in memory. A completed user message stays completed even if its Assistant response is cancelled. Dirty-input hashes and window-bounded fingerprints skip unchanged messages. List/pair/title reads use stored240-character previews and omit large body/evidence/recovery data. Details restore exact text; UTF-8 chunks deduplicate shared request/catalog content. Position plus primary-key tie-breaking preserves history order; UI/Task pages have20 items and context retains ten projected blocks. Full Task source indexes survive memory offloading. Startup recovery repairs unfinished facts without replaying actions.
-
-## Media lifecycle
-
-App injects MediaRepository and BinaryObjectStore independently. CapturedPhotoStore currently produces JPEG: at most4MiB each, application1024 files/2GiB and FIFO eviction; default32 files/128MiB. Pending metadata reserves a committed key/path, binary bytes publish outside SQL, then ready commits before media_N is returned. Formal names are UTC yyyyMMdd_HHmmss_primaryKey.jpg; File backend temp names use UUID. Failure preserves prior destinations and records truthful failed/unavailable states. Startup checks pending regular-file size; bounded128-object cleanup resumes by cursor and ignores unrelated old/user filenames. Historical references remain after FIFO removal; deleting a dialog does not delete other media files.
-
-## Completion and outstanding work
-
-Agent 热状态使用进程内存；配置/偏好文档使用 File 后端，业务记录使用领域仓库注入的 SQLite 后端。仓库、提交、并发与损坏错误显式传播，不自动切换后端。
-
-[Chat](Chat/README.md) · [Tasks](Tasks/README.md) · [Media](Media/README.md) · [Devices](Devices/README.md) · [Audio](Audio/README.md) · [Support](Support/README.md)
-
-[Repository refactor decision](../../docs/completed/Storage-Repository-Plan.md)
-
-File 文档 envelope version 为 1，以 UUID revision 和 value 保存配置。媒体原件位于 CapturedPhotos；SQLite 索引业务媒体记录，不自动导入或删除未被索引的用户文件。
-
-Lifecycle and ORM: StateRepository<Value: Sendable> and single-snapshot MemoryStateStore own hot runtime state without Codable or per-update encoding. ChatRepository.beginMessage reserves an idempotent empty Assistant/observation identity row; message completion/checkpoint saves content by that identity. Accepted user messages insert completed content directly. SQL row mappings use GRDB FetchableRecord/MutablePersistableRecord; specialized indexed reads remain SQL. No GRDB object or shared mutable reference crosses modules. Task start rows/terminal updates and atomic dialog rotation remain.
-
-User acceptance inserts the complete completed message in one transaction, with no empty user placeholder. Checkpoints return backend-neutral committed message identities; Chat memory publishes the returned ID before inference. Assistant identities are reserved before inference.
-
-Current-dialog synchronization: one current per Agent remains constrained by the existing partial unique index. Failed post-rotation memory publication fences subsequent operations until authoritative current reload succeeds. New message rows and identity reservations require a current dialog in the same write transaction; existing archived-message evidence may still update.
-
-## 待实现
-
-- Additional chat/document-database backends, semantic memory extraction/query, durable PCM and video/audio/document producers remain separate work. Current controlled tests/builds do not establish physical camera/Bluetooth/UI or live-model acceptance. See [validation history](../../docs/validation/Validation-History.md).
+❌ Skill 动态状态需求与自动提示词上下文、持久化音视频、额外数据库后端、原生播放转换零拷贝不在本轮。自动化、构建、真实模型/UI/设备结果分别见 [验证记录](../../docs/validation/Validation-History.md)。

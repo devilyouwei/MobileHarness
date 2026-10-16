@@ -6,7 +6,7 @@ import ExecutionRuntime
 import Foundation
 import FunctionContracts
 import Gateway
-import Storage
+import StorageCore
 import Testing
 
 func communicationConfiguration(_ id: String, subscribes: Bool = false, publishes: Bool = false) throws

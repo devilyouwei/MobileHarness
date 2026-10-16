@@ -9,8 +9,9 @@ import Foundation
 import FunctionContracts
 import Gateway
 import PlatformKit
-import Storage
 import StorageChat
+import StorageCore
+import StorageState
 import Testing
 
 private actor BehaviorEndpoint: UIPresentationCapability, UIUpdateCapability, SpeechPlaybackCapability,
@@ -101,7 +102,12 @@ private func behaviorInvocation(_ function: String, parameters: [String: String]
             VisionPerceptionAgent.runtimeCapabilities(AgentConfigurations.load(named: "VisionPerception").capabilities),
             PhotographerAgent.runtimeCapabilities(AgentConfigurations.load(named: "Photographer").capabilities),
             AgentConfigurations.load(named: "SpeechSynthesis").capabilities,
-            try ApplicationControlAgent(sessionID: UUID().uuidString).descriptor.capabilities,
+            try ApplicationControlAgent(
+                sessionID: UUID().uuidString,
+                context: try AgentContextRepository(
+                    agent: AgentID(rawValue: "applicationControl"), scope: UUID().uuidString,
+                    state: ApplicationControlContextState(), stateScope: StateContainer().makeScope())
+            ).descriptor.capabilities,
             MemoryAgent.runtimeCapabilities(
                 AgentConfigurations.load(named: "Memory").capabilities),
         ])

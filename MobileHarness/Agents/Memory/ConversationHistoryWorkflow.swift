@@ -1,8 +1,8 @@
 import ActionBindings
 import Foundation
 import PlatformKit
-import Storage
 import StorageChat
+import StorageCore
 import UI
 
 public enum HistoryImageLoadingError: Error { case invalidReference, busy, oversizedImage }

@@ -2,7 +2,7 @@ import ActionBindings
 import AgentCore
 import Foundation
 import PlatformKit
-import Storage
+import StorageCore
 import UI
 
 /// Root-owned execution-state subscription. The injected stream carries full snapshots, bounded error descriptions without call arguments.

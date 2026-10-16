@@ -1,6 +1,6 @@
 import AgentCore
 import Foundation
-import Storage
+import StorageCore
 
 public enum ModelResourceIntent: Codable, Sendable, Equatable {
     case refreshResources

@@ -1,6 +1,6 @@
 import Foundation
 import FunctionContracts
-import Storage
+import StorageCore
 
 /// Secret-bearing host values deliberately have no Codable conformance.
 public struct ProviderDiscoveryConfiguration: Sendable {

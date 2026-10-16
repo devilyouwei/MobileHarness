@@ -346,11 +346,11 @@ Settings validation: root checks and nine cloud tests passed; all four simulator
 
 ✅ 定向文本请求、串行合成、多来源所有权、按 ID 播放及内存缓存过期已接入，取代 Actions 内预合成和 Channel 优先级重排。✅ 仓库完整检查通过（108 项集成测试），四个 iOS 模拟器构建目标通过。❌ 可选真实模型评估未启用，本轮未安装真机，试听、Bluetooth 和持续运行验收待完成。
 
-✅ 已移除旧 Action 准备协议和 Gateway 准备调用；缓存目录归属已由 ADR 0056 解决。❌ 真机验收仍待完成。当前行为细节见 [合成 Agent](../../MobileHarness/Agents/SpeechSynthesis/README.md)、[播放 Action](../../MobileHarness/Actions/Speech/README.md) 和 [音频缓存](../../MobileHarness/Storage/Audio/README.md)。
+✅ 已移除旧 Action 准备协议和 Gateway 准备调用；缓存目录归属已由 ADR 0056 解决。❌ 真机验收仍待完成。当前行为细节见 [合成 Agent](../../MobileHarness/Agents/SpeechSynthesis/README.md)、[播放 Action](../../MobileHarness/Actions/Speech/README.md) 和 [音频缓存](../../MobileHarness/Storage/Cache/Audio/README.md)。
 
 ## 共享存储里程碑（ADR 0056）
 
-✅ Storage 与 StorageAudio target 已接入，旧 SpeechRuntime 已移除；迁移后的仓库检查和四个 iOS 模拟器构建目标通过。当前技术契约只在 [Storage](../../MobileHarness/Storage/README.md) 与 [StorageAudio](../../MobileHarness/Storage/Audio/README.md) 维护。❌ 真机语音验收、可淘汰磁盘缓存、持久化文件与记忆记录仍待完成。
+✅ Storage 与 StorageAudio target 已接入，旧 SpeechRuntime 已移除；迁移后的仓库检查和四个 iOS 模拟器构建目标通过。当前技术契约只在 [Storage](../../MobileHarness/Storage/README.md) 与 [StorageAudio](../../MobileHarness/Storage/Cache/Audio/README.md) 维护。❌ 真机语音验收、可淘汰磁盘缓存、持久化文件与记忆记录仍待完成。
 
 ### Local settings persistence and cache synchronization (2026-09-28)
 

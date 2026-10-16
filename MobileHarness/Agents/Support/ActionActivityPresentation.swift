@@ -3,7 +3,7 @@ import AgentCore
 import Foundation
 import FunctionContracts
 import PlatformKit
-import Storage
+import StorageCore
 import UI
 
 private struct ActionActivityMapping: Identifiable, Equatable, Sendable {

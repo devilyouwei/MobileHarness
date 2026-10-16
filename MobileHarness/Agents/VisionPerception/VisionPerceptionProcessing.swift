@@ -2,7 +2,7 @@ import AgentCore
 import Foundation
 import ModelKit
 import PlatformKit
-import Storage
+import StorageCore
 
 // MARK: - State
 

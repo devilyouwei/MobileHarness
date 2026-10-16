@@ -12,15 +12,16 @@ let package = Package(
             targets: [
                 "AgentCore", "Gateway", "Agents", "Actions", "FunctionContracts", "ExecutionRuntime", "CallRuntime",
                 "ModelKit",
-                "Storage", "StorageChat", "StorageAudio", "StorageTasks", "StorageMedia", "StorageDevices",
+                "Storage", "AppStorage", "StorageState", "StorageFiles", "StorageDatabase", "StorageCore",
+                "StorageChat", "StorageCache", "StorageTasks", "StorageMedia", "StorageDevices",
                 "StorageSQLite", "UI", "AgentBindings", "ActionBindings", "AppLifecycle",
                 "ModelKitAppleSpeech", "ModelKitRuntime", "ModelKitDefaults", "ModelKitHub",
                 "ModelKitSilero", "ModelKitNemotron", "ModelKitMossNano",
                 "PlatformKit",
             ]),
-        .library(name: "Storage", targets: ["Storage"]),
+        .library(name: "StorageCore", targets: ["StorageCore"]),
         .library(name: "StorageChat", targets: ["StorageChat"]),
-        .library(name: "StorageAudio", targets: ["StorageAudio"]),
+        .library(name: "StorageCache", targets: ["StorageCache"]),
         .library(name: "StorageTasks", targets: ["StorageTasks"]),
         .library(name: "StorageMedia", targets: ["StorageMedia"]),
         .library(name: "StorageDevices", targets: ["StorageDevices"]),
@@ -34,9 +35,15 @@ let package = Package(
         .library(name: "ModelKitGemma4", targets: ["ModelKitGemma4"]),
         .library(name: "ModelKitRuntime", targets: ["ModelKitRuntime"]),
         .library(name: "ModelKitAppleSpeech", targets: ["ModelKitAppleSpeech"]),
+        .library(name: "Storage", targets: ["Storage"]),
+        .library(name: "StorageState", targets: ["StorageState"]),
+        .library(name: "StorageFiles", targets: ["StorageFiles"]),
+        .library(name: "StorageDatabase", targets: ["StorageDatabase"]),
+        .library(name: "AppStorage", targets: ["AppStorage"]),
     ],
     dependencies: [
         .package(url: "https://github.com/groue/GRDB.swift.git", exact: "7.11.1"),
+        .package(url: "https://github.com/hmlongco/Factory", exact: "3.4.1"),
         .package(url: "https://github.com/huggingface/swift-huggingface", exact: "0.9.0"),
         .package(url: "https://github.com/swiftlang/swift-syntax.git", exact: "603.0.2"),
         .package(
@@ -67,6 +74,7 @@ let package = Package(
         .target(
             name: "ActionBindings",
             dependencies: [
+                "StorageFiles",
                 "Actions",
                 "AgentCore",
                 "CallRuntime",
@@ -78,8 +86,8 @@ let package = Package(
                 "ModelKitOpenAI",
                 "ModelKitRuntime",
                 "PlatformKit",
-                "Storage",
-                "StorageAudio",
+                "StorageCore",
+                "StorageCache",
                 "StorageChat",
                 "StorageDevices",
                 "StorageMedia",
@@ -227,6 +235,7 @@ let package = Package(
         .target(
             name: "AgentBindings",
             dependencies: [
+                "StorageFiles", "StorageState",
                 "ActionBindings",
                 "Actions",
                 "AgentCore",
@@ -240,8 +249,8 @@ let package = Package(
                 "ModelKitHub",
                 "ModelKitRuntime",
                 "PlatformKit",
-                "Storage",
-                "StorageAudio",
+                "StorageCore",
+                "StorageCache",
                 "StorageChat",
                 "StorageDevices",
                 "StorageMedia",
@@ -408,7 +417,8 @@ let package = Package(
         .testTarget(
             name: "AppWorkflowTests",
             dependencies: [
-                "Storage",
+                "StorageFiles", "StorageState",
+                "StorageCore",
                 "ActionBindings", "AgentBindings", "AppLifecycle", "Gateway", "Actions", "FunctionContracts",
                 "ExecutionRuntime", "PlatformKit", "UI", "StorageChat", "ModelKit", "Agents",
             ],
@@ -446,7 +456,9 @@ let package = Package(
             ]),
         .target(
             name: "Actions",
-            dependencies: ["Storage", "FunctionContracts", "PlatformKit", "BehaviorDefinitions", "StorageChat"],
+            dependencies: [
+                "StorageFiles", "StorageCore", "FunctionContracts", "PlatformKit", "BehaviorDefinitions", "StorageChat",
+            ],
             path: "MobileHarness/Actions",
             exclude: [
                 "Camera/README.md",
@@ -498,7 +510,9 @@ let package = Package(
         .target(
             name: "Agents",
             dependencies: [
-                "Storage", "AgentCore", "FunctionContracts", "ModelKit", "PlatformKit", "StorageChat", "StorageAudio",
+                "StorageState",
+                "StorageCore", "AgentCore", "FunctionContracts", "ModelKit", "PlatformKit", "StorageChat",
+                "StorageCache",
                 "StorageTasks",
             ],
             path: "MobileHarness",
@@ -559,46 +573,55 @@ let package = Package(
             sources: ["Agents"],
             resources: [.copy("Resources/Agents"), .copy("Resources/Skills"), .copy("Resources/Catalog.json")]),
         .target(
-            name: "Storage", dependencies: [], path: "MobileHarness/Storage/Support",
-            exclude: [
-                "README.md", "Contracts/README.md", "Memory/README.md", "Persistence/README.md",
-                "Persistence/File/README.md", "Persistence/SQLite",
-            ]),
+            name: "StorageCore", dependencies: [], path: "MobileHarness/Storage/Support",
+            exclude: ["README.md", "Contracts/README.md", "Memory/README.md"]),
         .target(
-            name: "StorageTasks", dependencies: ["Storage"], path: "MobileHarness/Storage/Tasks",
-            exclude: ["README.md", "SQLiteTaskRepository.swift"]),
+            name: "StorageState", dependencies: ["StorageCore"], path: "MobileHarness/Storage/State",
+            exclude: ["README.md"]),
         .target(
-            name: "StorageChat", dependencies: ["Storage", "StorageTasks"], path: "MobileHarness/Storage/Chat",
-            exclude: ["README.md", "SQLiteChatRepository.swift"]),
+            name: "StorageCache", dependencies: ["StorageCore"], path: "MobileHarness/Storage/Cache",
+            exclude: ["README.md", "Audio/README.md"]),
         .target(
-            name: "StorageAudio", dependencies: ["Storage"], path: "MobileHarness/Storage/Audio", exclude: ["README.md"]
-        ),
+            name: "StorageFiles", dependencies: ["StorageCore"], path: "MobileHarness/Storage/Files",
+            exclude: ["README.md"]),
         .target(
-            name: "StorageMedia", dependencies: ["Storage"], path: "MobileHarness/Storage/Media",
-            exclude: ["README.md", "SQLiteMediaRepository.swift"]),
+            name: "StorageTasks", dependencies: ["StorageCore"], path: "MobileHarness/Storage/Database/Tasks",
+            exclude: ["README.md"]),
         .target(
-            name: "StorageDevices", dependencies: ["Storage"], path: "MobileHarness/Storage/Devices",
-            exclude: ["README.md", "SQLiteDeviceRepository.swift"]),
+            name: "StorageChat", dependencies: ["StorageCore", "StorageTasks"],
+            path: "MobileHarness/Storage/Database/Chat", exclude: ["README.md"]),
+        .target(
+            name: "StorageMedia", dependencies: ["StorageCore", "StorageFiles"],
+            path: "MobileHarness/Storage/Database/Media", exclude: ["README.md"]),
+        .target(
+            name: "StorageDevices", dependencies: ["StorageCore"], path: "MobileHarness/Storage/Database/Devices",
+            exclude: ["README.md"]),
+        .target(
+            name: "StorageDatabase",
+            dependencies: ["StorageCore", "StorageChat", "StorageTasks", "StorageMedia", "StorageDevices"],
+            path: "MobileHarness/Storage/Database",
+            exclude: ["README.md", "Chat", "Tasks", "Media", "Devices", "SQLite"], sources: ["DatabaseStorage.swift"]),
         .target(
             name: "StorageSQLite",
             dependencies: [
-                "Storage", "StorageChat", "StorageTasks", "StorageMedia", "StorageDevices",
+                "StorageCore", "StorageDatabase", "StorageChat", "StorageTasks", "StorageMedia", "StorageDevices",
                 .product(name: "GRDB", package: "GRDB.swift"),
             ],
-            path: "MobileHarness/Storage",
-            exclude: [
-                "README.md", "Audio", "Chat/README.md", "Chat/ConversationHistory.swift",
-                "Chat/ConversationRecordStore.swift", "Chat/ChatRepository.swift", "Tasks/README.md",
-                "Tasks/TaskRepository.swift", "Tasks/MemoryTaskRepository.swift", "Media/README.md",
-                "Media/CapturedPhotoStore.swift", "Media/MediaRepository.swift", "Devices/README.md",
-                "Devices/DeviceRepository.swift", "Support/README.md", "Support/Contracts", "Support/Memory",
-                "Support/Persistence/README.md", "Support/Persistence/File", "Support/Persistence/SQLite/README.md",
+            path: "MobileHarness/Storage/Database/SQLite", exclude: ["README.md"]),
+        .target(
+            name: "Storage",
+            dependencies: ["StorageCore", "StorageState", "StorageCache", "StorageFiles", "StorageDatabase"],
+            path: "MobileHarness/Storage", exclude: ["README.md", "State", "Cache", "Files", "Database", "Support"],
+            sources: ["StorageContainer.swift"]),
+        .target(
+            name: "AppStorage",
+            dependencies: [
+                "Storage", "StorageCore", "StorageState", "StorageCache", "StorageFiles", "StorageDatabase",
+                "StorageSQLite", .product(name: "FactoryKit", package: "Factory"),
             ],
-            sources: [
-                "SQLiteRepositories.swift", "Chat/SQLiteChatRepository.swift", "Tasks/SQLiteTaskRepository.swift",
-                "Media/SQLiteMediaRepository.swift", "Devices/SQLiteDeviceRepository.swift",
-                "Support/Persistence/SQLite",
-            ]),
+            path: "MobileHarness/App/Composition",
+            exclude: ["README.md", "AppComposition.swift", "ModuleRegistration.swift", "ServiceFactories.swift"],
+            sources: ["ApplicationContainer.swift"]),
         .target(
             name: "ModelKit", dependencies: [], path: "MobileHarness/ModelKit",
             exclude: [
@@ -712,11 +735,12 @@ let package = Package(
         .testTarget(
             name: "IntegrationTests",
             dependencies: [
-                "Storage",
+                "StorageFiles", "StorageState", "Storage", "StorageDatabase", "AppStorage",
+                "StorageCore",
                 "ActionBindings", "AgentBindings", "AppLifecycle", "UI",
                 "AgentCore", "Gateway", "Agents", "Actions", "FunctionContracts", "ExecutionRuntime", "CallRuntime",
                 "ModelKit", "ModelKitOpenAI", "ModelKitRuntime",
-                "StorageChat", "StorageAudio", "StorageTasks", "StorageMedia", "StorageDevices", "StorageSQLite",
+                "StorageChat", "StorageCache", "StorageTasks", "StorageMedia", "StorageDevices", "StorageSQLite",
                 "PlatformKit",
             ],
             exclude: ["README.md"]),
@@ -728,11 +752,11 @@ let package = Package(
             ],
             path: "MobileHarness/ModelKit/Language/LLM/Gemma4", exclude: ["README.md"]),
         .testTarget(
-            name: "Gemma4Tests", dependencies: ["Storage", "ModelKit", "ModelKitGemma4"],
+            name: "Gemma4Tests", dependencies: ["StorageCore", "ModelKit", "ModelKitGemma4"],
             exclude: ["README.md"]),
         .testTarget(
             name: "AgentModelEvaluationTests",
-            dependencies: ["Storage", "AgentCore", "Agents", "ModelKit", "ModelKitGemma4"],
+            dependencies: ["StorageCore", "AgentCore", "Agents", "ModelKit", "ModelKitGemma4"],
             exclude: ["README.md"], resources: [.copy("Scenarios")]),
         .testTarget(
             name: "ModelKitDefaultsTests",

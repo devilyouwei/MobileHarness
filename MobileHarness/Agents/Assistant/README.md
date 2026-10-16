@@ -106,3 +106,7 @@ These scene/composition defaults are based on [OpenAI vision sizing](https://dev
 - 真实模型对无 Task 完成、目标转移询问、主动释放及多轮摄影教学的遵循验收。
 - 场景挂起期间保留前台目标及最终 checkpoint 的完整落盘；公共限制见 [Chat](../Support/Chat/README.md#待实现)。
 - 相机/Photos、图像质量、原生历史交互、语音竞争及持续真机验收。
+
+## Storage 依赖
+
+✅ 存储访问使用独立的 State、Cache、Database 和 Files 接口；App 注册根实例，消费者通过构造器获得所需能力。存储容器不接管本目录的业务验证、执行和完成语义。

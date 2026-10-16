@@ -5,8 +5,8 @@ import CallRuntime
 import ExecutionRuntime
 import Foundation
 import FunctionContracts
-import Storage
-import StorageAudio
+import StorageCache
+import StorageCore
 import Testing
 
 private actor SpeechEntryProbe {

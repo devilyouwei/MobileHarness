@@ -1,6 +1,6 @@
 import AgentCore
 import Foundation
-import Storage
+import StorageCore
 
 /// Root-session application operations; shared transaction state with no native or callable implementation imports.
 public actor ApplicationControlAgent: Agent {
@@ -49,12 +49,9 @@ public actor ApplicationControlAgent: Agent {
 
     public init(
         sessionID: String, configuration: AgentConfiguration? = nil,
-        context: AgentContextRepository<ApplicationControlContextState>? = nil
+        context: AgentContextRepository<ApplicationControlContextState>
     ) throws {
-        self.contextRepository =
-            context
-            ?? AgentContextRepository(
-                agent: .applicationControl, scope: UUID().uuidString, state: ApplicationControlContextState())
+        self.contextRepository = context
         guard contextRepository.agentID == .applicationControl else { throw AgentConfigurationError.identityMismatch }
         let configuration = try configuration ?? AgentConfigurations.load(named: "ApplicationControl")
         guard configuration.agentID == .applicationControl else { throw AgentConfigurationError.identityMismatch }

@@ -22,6 +22,10 @@ public actor ModelArtifactStore {
     private var liveTransports: [String: ArtifactDownloadTransport] = [:]
     private var progress: [String: Int64] = [:]
     private var failures: [String: String] = [:]
+    private var closing = false
+    private var closeTask: Task<Void, any Error>?
+    private var admitted = 0
+    private var idle: CheckedContinuation<Void, Never>?
     private var restored = false
     private var restoring: Task<[ModelArtifactTransferRecord], Error>?
     private var mutation = false
@@ -83,6 +87,8 @@ public actor ModelArtifactStore {
         try await storage.saveTransfers(records)
     }
     public func snapshots() async throws -> [ModelArtifactSnapshot] {
+        try admit()
+        defer { releaseAdmission() }
         try await restore()
         var result: [ModelArtifactSnapshot] = []
         for artifact in catalog.packages {
@@ -117,6 +123,8 @@ public actor ModelArtifactStore {
         return result
     }
     public func download(_ id: String, source: ModelDownloadSource) async throws {
+        try admit()
+        defer { releaseAdmission() }
         try await restore()
         guard !mutation else { throw ModelArtifactError.busy }
         mutation = true
@@ -145,6 +153,7 @@ public actor ModelArtifactStore {
         startNext()
     }
     private func startNext() {
+        guard !closing else { return }
         while transfers.values.filter({ $0.task != nil }).count < 2, !queue.isEmpty {
             let id = queue.removeFirst()
             guard let transfer = transfers[id] else { continue }
@@ -288,6 +297,11 @@ public actor ModelArtifactStore {
     }
 
     public func cancel(_ id: String) async throws {
+        try admit()
+        defer { releaseAdmission() }
+        try await cancelOwned(id)
+    }
+    private func cancelOwned(_ id: String) async throws {
         try await restore()
         _ = try package(id)
         guard transfers[id] != nil else { return }
@@ -305,16 +319,47 @@ public actor ModelArtifactStore {
         try await persist()
     }
 
+    /// Joined teardown before releasing the injected file scope.
+    public func close() async throws {
+        if let closeTask { return try await closeTask.value }
+        closing = true
+        queue.removeAll()
+        let task = Task { [self] in try await finishClose() }
+        closeTask = task
+        try await task.value
+    }
+    private func finishClose() async throws {
+        if admitted > 0 { await withCheckedContinuation { idle = $0 } }
+        var failures: [any Error] = []
+        for id in Array(transfers.keys) {
+            do { try await cancelOwned(id) } catch { failures.append(error) }
+        }
+        if !failures.isEmpty { throw ModelArtifactCleanupFailure(errors: failures) }
+    }
+    private func admit() throws {
+        guard !closing, admitted < 64 else { throw ModelArtifactError.busy }
+        admitted += 1
+    }
+    private func releaseAdmission() {
+        admitted -= 1
+        if admitted == 0 {
+            let waiter = idle
+            idle = nil
+            waiter?.resume()
+        }
+    }
     public func cancelAll() async {
         queue.removeAll()
         let ids = Array(transfers.keys)
-        for id in ids { try? await cancel(id) }
+        for id in ids { try? await cancelOwned(id) }
     }
     public func remove(_ id: String) async throws {
+        try admit()
+        defer { releaseAdmission() }
         let artifact = try package(id)
         guard deleting.insert(id).inserted else { throw ModelArtifactError.busy }
         defer { deleting.remove(id) }
-        try await cancel(id)
+        try await cancelOwned(id)
         phases[id] = .deleting
         do {
             try await storage.remove(artifact)
@@ -413,3 +458,5 @@ public actor ModelArtifactStore {
         guard Set(artifact.requiredFiles).isSubset(of: seen) else { throw ModelArtifactError.integrity }
     }
 }
+
+public struct ModelArtifactCleanupFailure: Error, Sendable { public let errors: [any Error] }

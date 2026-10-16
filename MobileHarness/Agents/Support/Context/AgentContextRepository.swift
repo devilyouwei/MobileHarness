@@ -1,16 +1,14 @@
 import AgentCore
 import Foundation
-import Storage
+import StorageCore
+import StorageState
 
 /// Validated runtime transactions over one Storage-owned process-memory snapshot.
 public actor AgentContextRepository<State: AgentContextState> {
     public nonisolated let scopeID: String
     public nonisolated let agentID: AgentID
-    private let memory: any StateRepository<AgentContext<State>>
-    private var value: AgentContext<State> {
-        get { memory.read() }
-        set { memory.replace(newValue) }
-    }
+    private let stateScope: StateScope
+    private let memory: StateWriter<AgentContext<State>>
     private let persistence: AgentContextPersistence<State>?
     private var committedRevision: UInt64?
     private var loaded = false
@@ -18,13 +16,20 @@ public actor AgentContextRepository<State: AgentContextState> {
     private var waiters: [CheckedContinuation<Void, Never>] = []
     public init(
         agent: AgentID, scope: String, state: State,
-        persistence: AgentContextPersistence<State>? = nil
-    ) {
+        persistence: AgentContextPersistence<State>? = nil, stateScope: StateScope
+    ) throws {
+        self.stateScope = stateScope
         self.scopeID = scope
         self.agentID = agent
-        memory = MemoryStateStore(AgentContext(agentID: agent, scopeID: scope, state: state))
+        memory = try stateScope.register(
+            StateKey<AgentContext<State>>(agent.rawValue + "." + scope),
+            initial: AgentContext(agentID: agent, scopeID: scope, state: state)
+        ) {
+            try $0.validate(agent: agent, scope: scope)
+        }
         self.persistence = persistence
     }
+    deinit { memory.unregister() }
     private func acquire() async throws {
         if !writing {
             writing = true
@@ -40,24 +45,25 @@ public actor AgentContextRepository<State: AgentContextState> {
     private func load() async throws {
         guard !loaded else { return }
         if var saved = try await persistence?.load() {
-            try saved.validate(agent: value.agentID, scope: value.scopeID)
+            try saved.validate(agent: agentID, scope: scopeID)
             let priorRevision = saved.revision
             saved.state.recoverInterruptedWork()
             saved.tasks.recover()
             saved.recoverWork()
             try saved.advanceRevision()
             try await persistence?.commit(saved, priorRevision)
-            value = saved
+            let current = try memory.get()
+            try memory.set(saved, expecting: current.revision)
             committedRevision = saved.revision
         }
-        try value.validate(agent: agentID, scope: scopeID)
+        try memory.get().value.validate(agent: agentID, scope: scopeID)
         loaded = true
     }
     public func snapshot() async throws -> AgentContext<State> {
         try await acquire()
         defer { release() }
         try await load()
-        return value
+        return try memory.get().value
     }
     public func exists() async throws -> Bool {
         try await acquire()
@@ -75,12 +81,13 @@ public actor AgentContextRepository<State: AgentContextState> {
         try await acquire()
         defer { release() }
         try await load()
-        var next = value
+        let current = try memory.get()
+        var next = current.value
         let result = try mutation(&next)
         try next.advanceRevision()
-        try next.validate(agent: value.agentID, scope: value.scopeID)
+        try next.validate(agent: agentID, scope: scopeID)
         try await persistence?.commit(next, committedRevision)
-        value = next
+        try memory.set(next, expecting: current.revision)
         committedRevision = next.revision
         return result
     }

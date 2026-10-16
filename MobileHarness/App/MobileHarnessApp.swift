@@ -7,6 +7,10 @@ struct MobileHarnessApp: App {
     @UIApplicationDelegateAdaptor(ApplicationSystemDelegate.self) private var delegate
     @State private var composition = AppComposition()
     @Environment(\.scenePhase) private var phase
+    init() {
+        let composition = self.composition
+        delegate.connect { try await composition.prepareBackgroundArtifacts() }
+    }
     var body: some Scene {
         WindowGroup {
             ApplicationRootView(services: composition.features)

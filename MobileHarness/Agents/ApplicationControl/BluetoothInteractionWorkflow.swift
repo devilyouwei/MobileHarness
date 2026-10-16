@@ -2,7 +2,7 @@ import ActionBindings
 import Agents
 import Foundation
 import PlatformKit
-import Storage
+import StorageCore
 import UI
 
 /// Root-owned bounded intent adapter. Native recovery and accepted manual workers outlive pages.

@@ -5,7 +5,7 @@ import CallRuntime
 import ExecutionRuntime
 import Foundation
 import FunctionContracts
-import Storage
+import StorageCore
 import Testing
 
 @testable import Gateway

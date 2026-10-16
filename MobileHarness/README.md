@@ -257,25 +257,30 @@ Directory nesting expresses ownership; `Package.swift` defines the actual compil
 
 | Source path | Target | Direct dependencies |
 | --- | --- | --- |
-| `App/` excluding ApplicationLifecycle.swift | Xcode App targets | AgentBindings, ActionBindings, AppLifecycle, UI, PlatformKit and Storage backend construction |
+| `App/` excluding ApplicationLifecycle.swift and ApplicationContainer.swift | Xcode App targets | AgentBindings, ActionBindings, AppLifecycle, UI, PlatformKit and Storage backend construction |
 | `App/Lifecycle/ApplicationLifecycle.swift` | AppLifecycle | None |
 | Explicit source list within `Agents/` | AgentBindings | Agents, AgentCore, Gateway, Actions, ActionBindings, FunctionContracts, ExecutionRuntime, CallRuntime, UI, PlatformKit, ModelKit, ModelKitRuntime/Defaults/Hub, Storage and domain repositories |
 | Explicit source list within `Actions/` | ActionBindings | Actions, AgentCore, FunctionContracts, ExecutionRuntime, CallRuntime, UI, PlatformKit, ModelKit SDK targets, Storage and domain repositories; no Agents/Gateway implementation |
 | `UI/` | UI | None |
 | `Agents/Support/Core/` | AgentCore | None |
-| `Agents/` excluding Core and AgentBindings source list | Agents | AgentCore, ModelKit, PlatformKit, Storage, StorageChat, StorageAudio, StorageTasks, FunctionContracts |
+| `Agents/` excluding Core and AgentBindings source list | Agents | AgentCore, ModelKit, PlatformKit, StorageCore, StorageState, StorageChat, StorageCache, StorageTasks, FunctionContracts |
 | `Gateway/` excluding Runtime/Registration/Protocols | Gateway | AgentCore, FunctionContracts, ExecutionRuntime, CallRuntime |
 | `Actions/Support/Contracts/` | FunctionContracts | None |
 | `Gateway/Runtime/` | ExecutionRuntime | FunctionContracts |
 | `Gateway/Output/Registration/` and `Protocols/` | CallRuntime | FunctionContracts, ExecutionRuntime |
-| `Actions/` excluding Contracts and ActionBindings source list | Actions | FunctionContracts, PlatformKit, BehaviorDefinitions, StorageChat, Storage |
-| `Storage/Support/` excluding SQLite | Storage | None |
-| `Storage/Chat/` excluding SQLite adapter | StorageChat | Storage, StorageTasks |
-| `Storage/Audio/` | StorageAudio | Storage |
-| `Storage/Tasks/` excluding SQLite adapter | StorageTasks | Storage |
-| `Storage/Media/` excluding SQLite adapter | StorageMedia | Storage |
-| `Storage/Devices/` excluding SQLite adapter | StorageDevices | Storage |
-| Domain SQLite files + `Support/Persistence/SQLite/` + construction owner | StorageSQLite | Storage, StorageChat, StorageTasks, StorageMedia, StorageDevices, GRDB.swift |
+| `Actions/` excluding Contracts and ActionBindings source list | Actions | FunctionContracts, PlatformKit, BehaviorDefinitions, StorageChat, StorageCore, StorageFiles |
+| `Storage/StorageContainer.swift` | Storage | StorageCore, StorageState, StorageCache, StorageFiles, StorageDatabase |
+| `Storage/Support/` | StorageCore | None |
+| `Storage/State/` | StorageState | StorageCore |
+| `Storage/Cache/` including Audio | StorageCache | StorageCore |
+| `Storage/Files/` | StorageFiles | StorageCore |
+| `Storage/Database/DatabaseStorage.swift` | StorageDatabase | StorageCore, StorageChat, StorageTasks, StorageMedia, StorageDevices |
+| `Storage/Database/Chat/` | StorageChat | StorageCore, StorageTasks |
+| `Storage/Database/Tasks/` | StorageTasks | StorageCore |
+| `Storage/Database/Media/` | StorageMedia | StorageCore, StorageFiles |
+| `Storage/Database/Devices/` | StorageDevices | StorageCore |
+| `Storage/Database/SQLite/` | StorageSQLite | StorageCore, StorageDatabase, domain repositories, GRDB.swift |
+| `App/Composition/ApplicationContainer.swift` | AppStorage | Storage root/capabilities, StorageSQLite, FactoryKit |
 | `PlatformKit/` | PlatformKit | None |
 | ModelKit shared capability sources | ModelKit | None |
 | `ModelKit/Support/Management/` (runtime source list) | ModelKitRuntime | ModelKit |
@@ -345,7 +350,7 @@ This section is an architectural directory. It describes why each module exists 
 
 **Behavior.** Actions owns protocol-neutral callable functions. ✅ Shared contracts live in Actions/Support/Contracts; ActionMacro and CapabilityModules live directly in Actions/Support. FunctionContracts remains an independent target, while the macro declarations and catalog composition compile in Actions. FunctionContracts defines their inputs/outcomes; Gateway owns independent ExecutionRuntime and CallRuntime. ActionCall follows Channel scheduling; ToolCall executes directly outside Channel/wait. BehaviorAssembly freezes one canonical function store and explicit host bindings without importing AgentCore. [Protocol routing](Gateway/Output/Protocols/README.md) explains registration, Agent transport/parsing and shared execution/feedback.
 
-**Foundations.** ModelKit separates capability contracts, process-wide management, default assembly and engine adapters. PlatformKit separates native I/O from business behavior. Storage separates Support mechanisms from Chat, Tasks, Media, Devices and Audio domains; SQLite adapters compile separately. ModelKit, PlatformKit and StorageAudio own their separate capability/storage contracts.
+**Foundations.** ModelKit separates capability contracts, process-wide management, default assembly and engine adapters. PlatformKit separates native I/O from business behavior. Storage separates Support mechanisms from Chat, Tasks, Media, Devices and Audio domains; SQLite adapters compile separately. ModelKit, PlatformKit and StorageCache own their separate capability/storage contracts.
 
 <a id="part-iii--key-techniques"></a>
 
@@ -378,17 +383,15 @@ flowchart TD
     Platform --> Workflows
 ```
 
-App composes model capabilities, Storage repositories, native endpoints, canonical functions, Gateways and Agent instances before producers start. Invalid configuration, missing implementations or failed startup recovery blocks admission explicitly. UI pages consume root-owned services; navigation does not own their lifetime. AgentBindings owns the domain service factory and resource declarations; App invokes its public interfaces and installs the static repositories → agents → native lifecycle graph.
+App composes model capabilities, Storage repositories, native endpoints, canonical functions, Gateways and Agent instances before producers start. Invalid configuration, missing implementations or failed startup recovery blocks admission explicitly. UI pages consume root-owned services; navigation does not own their lifetime. AgentBindings owns the domain service factory and resource declarations; App invokes its public interfaces and installs the static storage → agents → native lifecycle graph.
 
-All Agents start with validated process-memory contexts. App constructs the SQLite business repositories, marks unfinished identities interrupted and injects their interfaces before admitting new work. Agents commit business evidence before dependent outputs; runtime-state mutation and durable record transactions have separate owners. Restart reconciles records without replaying effects.
+### Storage container lifecycle
 
-✅ Initial startup waits for active; a system-inactivity startup cancellation with fully successful cleanup is suspended, not a preparation failure. The next active event stops/replaces that graph without replaying operations. Business and cleanup failures remain explicit.
+✅ AppStorage 用 FactoryKit 3.4.1 在每个 App 根作用域注册 StorageContainer，组合 State、Cache、Database、Files。Factory 只构造；AppLifecycle 按 storage → agents → native 启停。StorageCore 保持无项目依赖；SQLite 独占 GRDB；业务模块只接收所需端口。详见 [Storage](Storage/README.md)。
 
-Voice, camera and diagnostics have independent module-owned scopes. Shutdown closes admission, cancels and joins owned producers, processing, dispatch and native cleanup before releasing resources. Session/incarnation/turn identities fence late feedback and presentation; changing display focus never transfers execution authority.
+AgentContext 使用注册后的 StateWriter 保存同一份 Task/Skill 权威状态；同步 CAS/转换与一致快照属于 State，业务规则仍属于 Agents。Cache 音频由会话申请/关闭，缓冲区交接共享内存。配置、照片、模型文件通过 Files 注入，数据库保留既有记录格式和恢复语义。文件和数据库没有跨后端事务；重启不重放业务动作。Skill 状态上下文自动注入尚未实现。
 
-Assembly and generic lifecycle: [Composition](App/Composition/README.md), [Lifecycle](App/Lifecycle/README.md). Role processing: [Agents](Agents/README.md). Generic work-state transitions: [AgentCore Runtime](Agents/Support/Core/Runtime/README.md#processing-work-state). Atomic state: [Context](Agents/Support/Context/README.md).
-
-<a id="canonical-functions-and-protocol-bindings"></a>
+模型制品服务在释放 Files 前取消并加入下载、解除 ModelKit 制品存储绑定；后台下载回调复用注入服务。构建与测试不等于设备验收。
 
 ### Unified Signal Contract
 
@@ -664,7 +667,7 @@ The complete outcome matrix and model-observation projection are owned by [Chat]
 
 Agents owns hot Task/Skill state and request selection; Storage domain repositories own committed messages and Task sources; App injects those repositories. Terminal Task summaries project over indexed sources while original evidence remains queryable. ReACT retains exact native pairing and the current input; Skill changes only affect later requests. Task closure waits for execution/reply cleanup before admitting remaining goals in the same input.
 
-Details: [Chat history](Agents/Support/Chat/README.md#多轮历史与持久化), [Task/Skill lifecycle](Agents/Support/Context/README.md#task-and-skill-lifecycle), [Storage Chat](Storage/Chat/README.md).
+Details: [Chat history](Agents/Support/Chat/README.md#多轮历史与持久化), [Task/Skill lifecycle](Agents/Support/Context/README.md#task-and-skill-lifecycle), [Storage Chat](Storage/Database/Chat/README.md).
 
 #### ReACT limits and time ownership
 
@@ -786,7 +789,7 @@ sequenceDiagram
     participant Producers as Capture / perception
     participant Input as InputGateway
     participant Assistant
-    participant Audio as StorageAudio
+    participant Audio as StorageCache
     participant Output as OutputGateway
     participant Actions as Scheduled Actions
     App->>UI: invalidate session and clear presentation
@@ -813,7 +816,7 @@ Function completion/restore semantics: [UI Actions](Actions/UI/README.md#接口�
 
 ### Synthesis and playback ownership
 
-Assistant sends directed synthesis input through Gateway to SpeechSynthesis and separately schedules Speech.Playback for the same owned audio identity. ModelKit produces PCM; StorageAudio carries a single-checkout stream; ActionBindings/PlatformKit plays and drains it. Synthesis admission, producer completion and player completion are distinct.
+Assistant sends directed synthesis input through Gateway to SpeechSynthesis and separately schedules Speech.Playback for the same owned audio identity. ModelKit produces PCM; StorageCache carries a single-checkout stream; ActionBindings/PlatformKit plays and drains it. Synthesis admission, producer completion and player completion are distinct.
 
 ```mermaid
 sequenceDiagram
@@ -821,7 +824,7 @@ sequenceDiagram
     participant G as Output/Input Gateway
     participant S as SpeechSynthesisAgent
     participant M as ModelKit TTS
-    participant C as StorageAudio
+    participant C as StorageCache
     participant Q as ChannelScheduler
     participant R as Speech Action
     participant P as ActionBindings / PlatformKit
@@ -847,7 +850,7 @@ sequenceDiagram
 
 The original reply owner scopes both production and playback. Cleanup retires unused handles, joins synthesis/player work and preserves actual failures. Successful playback means native drain and lease release; AgentBindings then joins listening restoration when consent/session/policy permit. Restoration cannot invent playback success or withdraw a committed audible effect.
 
-Text segmentation: [Chat](Agents/Support/Chat/README.md#reply-text-segmentation). Synthesis validation/queue: [SpeechSynthesis](Agents/SpeechSynthesis/README.md). PCM handle/buffer contract: [StorageAudio](Storage/Audio/README.md). Native buffers: [Platform Audio](PlatformKit/Audio/README.md#playback-and-completion). Resume ownership: [Voice integration](Agents/Support/README.md).
+Text segmentation: [Chat](Agents/Support/Chat/README.md#reply-text-segmentation). Synthesis validation/queue: [SpeechSynthesis](Agents/SpeechSynthesis/README.md). PCM handle/buffer contract: [StorageCache](Storage/Cache/Audio/README.md). Native buffers: [Platform Audio](PlatformKit/Audio/README.md#playback-and-completion). Resume ownership: [Voice integration](Agents/Support/README.md).
 
 ### Camera perception and UI projection
 
@@ -910,7 +913,7 @@ flowchart LR
 
 Capture stores the original before model preparation or later presentation. Save joins add-only Photos import before declaring saved; ignore disposes of the matching preview without deleting album data. Later feedback/presentation failure retains the committed disposition and original evidence. Model context uses authorized references/prepared attachments; no error automatically repeats capture.
 
-Native capture/export and renderer coordination: [Camera integration](Actions/Camera/Support/README.md). Native graph: [Platform Vision](PlatformKit/Vision/README.md). Retention: [StorageMedia](Storage/Media/README.md). Composition policy: [App Composition](App/Composition/README.md). Model-image policy: [Assistant](Agents/Assistant/README.md#model-photo-preparation-policy).
+Native capture/export and renderer coordination: [Camera integration](Actions/Camera/Support/README.md). Native graph: [Platform Vision](PlatformKit/Vision/README.md). Retention: [StorageMedia](Storage/Database/Media/README.md). Composition policy: [App Composition](App/Composition/README.md). Model-image policy: [Assistant](Agents/Assistant/README.md#model-photo-preparation-policy).
 
 ### Adaptive vision cadence and projection
 
@@ -1003,7 +1006,7 @@ UI confirmation becomes history.intent through AgentBindings/InputGateway. Memor
 
 Archival/deletion commits before dependent presentation. A committed mutation survives cancellation or later display/title failure; no automatic deletion retry occurs. AgentBindings transports correlated requests/results and ActionBindings presents immutable history to UI without selecting the next business function. Returning-handler failure permits Agent follow-up; completion-only presentation failure remains a distinct terminal transport outcome.
 
-Transaction/call/cancellation algorithms: [Memory](Agents/Memory/README.md), [History Actions Support](Actions/History/Support/README.md), [History transport](Agents/Memory/README.md). Durable schema: [StorageChat](Storage/Chat/README.md).
+Transaction/call/cancellation algorithms: [Memory](Agents/Memory/README.md), [History Actions Support](Actions/History/Support/README.md), [History transport](Agents/Memory/README.md). Durable schema: [StorageChat](Storage/Database/Chat/README.md).
 
 <a id="391-platformkit-versus-modelkit"></a>
 
@@ -1013,7 +1016,7 @@ Agents records exact requests, provider completion, resolved calls and actual ru
 
 Provider timing originates at the model interface and remains absent when unavailable; record arrival, ASR, playback and UI timing cannot invent TTFT. Parser previews use the recorded catalog without executing anything. Historical image reads validate the original producing input and selected record before loading retained bytes; missing media remains absent.
 
-History projection and limits: [Chat](Agents/Support/Chat/README.md). Image/page reads and preview: [Memory integration](Agents/Memory/README.md). UI layout/export: [Settings UI](UI/Settings/README.md). Stored records: [StorageChat](Storage/Chat/README.md).
+History projection and limits: [Chat](Agents/Support/Chat/README.md). Image/page reads and preview: [Memory integration](Agents/Memory/README.md). UI layout/export: [Settings UI](UI/Settings/README.md). Stored records: [StorageChat](Storage/Database/Chat/README.md).
 
 ### Settings audio detection
 
@@ -1113,8 +1116,8 @@ Every owner bounds its own queue/active work and declares reject, suspend or lat
 | Resource leases and takeover | [Resources](Gateway/Output/Resources/README.md) |
 | Terminal result reservation/redelivery | [Results](Gateway/Output/Results/README.md) |
 | Hot state transactions | [Context](Agents/Support/Context/README.md) |
-| Synthesis / PCM / native playback | [SpeechSynthesis](Agents/SpeechSynthesis/README.md), [StorageAudio](Storage/Audio/README.md), [Platform Audio](PlatformKit/Audio/README.md) |
-| Camera/media / resource/model lifecycle | [Lifecycle](App/Lifecycle/README.md), [StorageMedia](Storage/Media/README.md), [Management](ModelKit/Support/Management/README.md) |
+| Synthesis / PCM / native playback | [SpeechSynthesis](Agents/SpeechSynthesis/README.md), [StorageCache](Storage/Cache/Audio/README.md), [Platform Audio](PlatformKit/Audio/README.md) |
+| Camera/media / resource/model lifecycle | [Lifecycle](App/Lifecycle/README.md), [StorageMedia](Storage/Database/Media/README.md), [Management](ModelKit/Support/Management/README.md) |
 | Feature requests / manual control | [Settings](Agents/ApplicationControl/README.md), [Bluetooth](Actions/NexArm/Support/README.md) |
 
 AgentBindings samples bounded execution/lifecycle snapshots into UI-owned logs. Display filters, dismissal and counted eviction do not cancel execution, acknowledge results or prove physical arrival. Record-retention and display limits belong to [Presentation](Actions/UI/Support/README.md), [Conversation UI](UI/Conversation/README.md) and [Settings UI](UI/Settings/README.md).
@@ -1439,7 +1442,7 @@ App alone constructs concrete record backends and injects domain repository inte
 
 Complete messages and real terminal facts commit at declared boundaries; delta fragments, Skill counters and runtime queues remain memory-only. Media bytes publish outside SQL transactions; configuration documents and Keychain retain separate contracts. Current-dialog rotation commits durable archive/new-current state before memory publication, and a failure fence prevents silent loss or unsafe admission.
 
-Backend/schema/CAS/page details: [Storage](Storage/README.md), [Chat records](Storage/Chat/README.md), [App composition](App/Composition/README.md). Task source selection and compression: [Chat](Agents/Support/Chat/README.md#多轮历史与持久化).
+Backend/schema/CAS/page details: [Storage](Storage/README.md), [Chat records](Storage/Database/Chat/README.md), [App composition](App/Composition/README.md). Task source selection and compression: [Chat](Agents/Support/Chat/README.md#多轮历史与持久化).
 
 ### Model photo and presentation boundaries
 
@@ -1453,3 +1456,7 @@ SpeechPerception owns consent/occupancy, SpeechSynthesis produces PCM, the modul
 - Unified foreground Task preservation/final checkpoint across scene suspension, and generic business background contracts.
 - Push-based shared resource-state integration and the remaining absent routes identified in [implementation coverage](#implementation-coverage).
 - Real-model instruction following, microphone/camera/Photos, native navigation/accessibility, sustained load and physical device acceptance.
+
+## Storage 依赖
+
+✅ 存储访问使用独立的 State、Cache、Database 和 Files 接口；App 注册根实例，消费者通过构造器获得所需能力。存储容器不接管本目录的业务验证、执行和完成语义。

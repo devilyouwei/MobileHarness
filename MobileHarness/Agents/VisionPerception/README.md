@@ -98,3 +98,7 @@ OutputMailbox has 18 total slots shared by discrete output and the `overlay`/`ga
 - Person identity tracking, separate face/depth models and thermal feedback are not implemented.
 
 [Agents](../README.md) · [Communication](../Support/Communication/README.md)
+
+## Storage 依赖
+
+✅ 存储访问使用独立的 State、Cache、Database 和 Files 接口；App 注册根实例，消费者通过构造器获得所需能力。存储容器不接管本目录的业务验证、执行和完成语义。

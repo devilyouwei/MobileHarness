@@ -1,7 +1,7 @@
 import AgentCore
 import Agents
 import Foundation
-import Storage
+import StorageCore
 
 /// Tests inspect the text-to-handle boundary without running a model or device.
 actor SpeechRequestProbe {

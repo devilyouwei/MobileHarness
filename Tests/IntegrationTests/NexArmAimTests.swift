@@ -6,7 +6,8 @@ import ExecutionRuntime
 import Foundation
 import FunctionContracts
 import PlatformKit
-import Storage
+import StorageCore
+import StorageState
 import Testing
 
 private func pose(
@@ -135,7 +136,12 @@ private func armSpeeds(in frame: [UInt8]) throws -> [Int] {
 
 @Test(.actionCatalog) func photographerOnTheLeftAimsBaseAndHoldsTheOtherJoints() async throws {
     let session = UUID().uuidString
-    let agent = try PhotographerAgent(sessionID: session, controlsArm: true)
+    let agent = try PhotographerAgent(
+        sessionID: session, controlsArm: true,
+        context: try AgentContextRepository(
+            agent: AgentID(rawValue: "photographer"), scope: UUID().uuidString, state: PhotographerContextState(),
+            stateScope: StateContainer().makeScope())
+    )
     try await agent.start()
     try await agent.receive(observation(try pose(noseX: 10, noseY: 50, sequence: 1, timestamp: 0), session: session))
     var stream = agent.outputs.makeAsyncIterator()
@@ -167,7 +173,12 @@ private func armSpeeds(in frame: [UInt8]) throws -> [Int] {
 
 @Test(.actionCatalog) func photographerFreshnessUsesActualPoseAdmissionAndStopsWithLifecycle() async throws {
     let session = UUID().uuidString
-    let agent = try PhotographerAgent(sessionID: session, controlsArm: true)
+    let agent = try PhotographerAgent(
+        sessionID: session, controlsArm: true,
+        context: try AgentContextRepository(
+            agent: AgentID(rawValue: "photographer"), scope: UUID().uuidString, state: PhotographerContextState(),
+            stateScope: StateContainer().makeScope())
+    )
     try await agent.start()
     #expect(await !agent.hasFreshPose())
     // A future sensor timestamp cannot prolong physical input freshness.
@@ -190,7 +201,12 @@ private func armSpeeds(in frame: [UInt8]) throws -> [Int] {
 
 @Test(.actionCatalog) func hiddenNoseUsesTheVisibleJointMidpoint() async throws {
     let session = UUID().uuidString
-    let agent = try PhotographerAgent(sessionID: session, controlsArm: true)
+    let agent = try PhotographerAgent(
+        sessionID: session, controlsArm: true,
+        context: try AgentContextRepository(
+            agent: AgentID(rawValue: "photographer"), scope: UUID().uuidString, state: PhotographerContextState(),
+            stateScope: StateContainer().makeScope())
+    )
     try await agent.start()
     let body = try pose(noseX: 0, noseY: 0, noseConfidence: 0.1, others: 80, sequence: 1, timestamp: 0)
     try await agent.receive(observation(body, session: session))
@@ -212,7 +228,12 @@ private func armSpeeds(in frame: [UInt8]) throws -> [Int] {
 
 @Test(.actionCatalog) func emptyPoseDoesNotAim() async throws {
     let session = UUID().uuidString
-    let agent = try PhotographerAgent(sessionID: session, controlsArm: true)
+    let agent = try PhotographerAgent(
+        sessionID: session, controlsArm: true,
+        context: try AgentContextRepository(
+            agent: AgentID(rawValue: "photographer"), scope: UUID().uuidString, state: PhotographerContextState(),
+            stateScope: StateContainer().makeScope())
+    )
     try await agent.start()
     let empty = try PoseObservation(width: 100, height: 100, sequence: 1, timestamp: 0, rotation: 1, people: [])
     try await agent.receive(observation(empty, session: session))
@@ -223,7 +244,12 @@ private func armSpeeds(in frame: [UInt8]) throws -> [Int] {
 
 @Test(.actionCatalog) func centeredPersonDoesNotAim() async throws {
     let session = UUID().uuidString
-    let agent = try PhotographerAgent(sessionID: session, controlsArm: true)
+    let agent = try PhotographerAgent(
+        sessionID: session, controlsArm: true,
+        context: try AgentContextRepository(
+            agent: AgentID(rawValue: "photographer"), scope: UUID().uuidString, state: PhotographerContextState(),
+            stateScope: StateContainer().makeScope())
+    )
     try await agent.start()
     try await agent.receive(observation(try pose(noseX: 50, noseY: 50, sequence: 1, timestamp: 0), session: session))
     var stream = agent.outputs.makeAsyncIterator()
@@ -233,7 +259,12 @@ private func armSpeeds(in frame: [UInt8]) throws -> [Int] {
 
 @Test(.actionCatalog) func baseKeepsSteppingWhileThePersonStaysOffCenter() async throws {
     let session = UUID().uuidString
-    let agent = try PhotographerAgent(sessionID: session, controlsArm: true)
+    let agent = try PhotographerAgent(
+        sessionID: session, controlsArm: true,
+        context: try AgentContextRepository(
+            agent: AgentID(rawValue: "photographer"), scope: UUID().uuidString, state: PhotographerContextState(),
+            stateScope: StateContainer().makeScope())
+    )
     try await agent.start()
     try await agent.receive(observation(try pose(noseX: 10, noseY: 50, sequence: 1, timestamp: 0), session: session))
     try await agent.receive(observation(try pose(noseX: 10, noseY: 50, sequence: 2, timestamp: 0.25), session: session))
@@ -254,7 +285,12 @@ private func armSpeeds(in frame: [UInt8]) throws -> [Int] {
 
 @Test(.actionCatalog) func aimWaitsForTimeAndMovement() async throws {
     let session = UUID().uuidString
-    let agent = try PhotographerAgent(sessionID: session, controlsArm: true)
+    let agent = try PhotographerAgent(
+        sessionID: session, controlsArm: true,
+        context: try AgentContextRepository(
+            agent: AgentID(rawValue: "photographer"), scope: UUID().uuidString, state: PhotographerContextState(),
+            stateScope: StateContainer().makeScope())
+    )
     try await agent.start()
     try await agent.receive(observation(try pose(noseX: 10, noseY: 50, sequence: 1, timestamp: 0), session: session))
     try await agent.receive(observation(try pose(noseX: 10, noseY: 50, sequence: 2, timestamp: 0.1), session: session))
@@ -344,7 +380,12 @@ private actor AimLink: NexArmWritableLink {
 
 @Test(.actionCatalog) func photographerOverflowRejectsWithoutStoppingOrReplacingAcceptedAims() async throws {
     let session = UUID().uuidString
-    let agent = try PhotographerAgent(sessionID: session, controlsArm: true, outputCapacity: 8)
+    let agent = try PhotographerAgent(
+        sessionID: session, controlsArm: true, outputCapacity: 8,
+        context: try AgentContextRepository(
+            agent: AgentID(rawValue: "photographer"), scope: UUID().uuidString, state: PhotographerContextState(),
+            stateScope: StateContainer().makeScope())
+    )
     try await agent.start()
     for index in 0..<8 {
         try await agent.receive(
@@ -367,7 +408,12 @@ private actor AimLink: NexArmWritableLink {
 
 @Test(.actionCatalog) func photographerRejectsMalformedDecodedPoseBeforeIndexingJoints() async throws {
     let session = UUID().uuidString
-    let agent = try PhotographerAgent(sessionID: session, controlsArm: true)
+    let agent = try PhotographerAgent(
+        sessionID: session, controlsArm: true,
+        context: try AgentContextRepository(
+            agent: AgentID(rawValue: "photographer"), scope: UUID().uuidString, state: PhotographerContextState(),
+            stateScope: StateContainer().makeScope())
+    )
     try await agent.start()
     let pose = try JSONDecoder().decode(
         PoseObservation.self,
@@ -396,7 +442,11 @@ private actor ArmAvailability {
     let session = UUID().uuidString
     let availability = ArmAvailability()
     let agent = try PhotographerAgent(
-        sessionID: session, controlsArm: true, controlAvailable: { await availability.ready })
+        sessionID: session, controlsArm: true, controlAvailable: { await availability.ready },
+        context: try AgentContextRepository(
+            agent: AgentID(rawValue: "photographer"), scope: UUID().uuidString, state: PhotographerContextState(),
+            stateScope: StateContainer().makeScope())
+    )
     try await agent.start()
     try await agent.receive(observation(try pose(noseX: 10, noseY: 50, sequence: 1, timestamp: 0), session: session))
     await availability.enable()
@@ -424,7 +474,12 @@ private actor ArmAvailability {
 
 @Test(.actionCatalog) func rejectedTrackingOutputDoesNotAdvanceAccumulatedTarget() async throws {
     let session = UUID().uuidString
-    let agent = try PhotographerAgent(sessionID: session, controlsArm: true, outputCapacity: 8)
+    let agent = try PhotographerAgent(
+        sessionID: session, controlsArm: true, outputCapacity: 8,
+        context: try AgentContextRepository(
+            agent: AgentID(rawValue: "photographer"), scope: UUID().uuidString, state: PhotographerContextState(),
+            stateScope: StateContainer().makeScope())
+    )
     try await agent.start()
     for sequence in 1...8 {
         try await agent.receive(

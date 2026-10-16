@@ -1,7 +1,7 @@
 import AgentCore
 import Agents
 import Foundation
-import Storage
+import StorageCore
 import Testing
 
 private func promptData(_ templates: [String: String]) throws -> Data {

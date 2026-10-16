@@ -2,7 +2,7 @@ import AgentCore
 import Foundation
 import ModelKit
 import PlatformKit
-import Storage
+import StorageCore
 
 /// Shared visual perception: one model operation and one newest pending frame, publishes shared observations, skeleton visualization and face-driven gaze Tools.
 public actor VisionPerceptionAgent: Agent {
@@ -53,12 +53,9 @@ public actor VisionPerceptionAgent: Agent {
     public init(
         pose: any PoseCapability, sessionID: String, configuration: AgentConfiguration? = nil,
         sampling: FrameSamplingConfiguration? = nil, mirroredGaze: Bool = false,
-        context: AgentContextRepository<VisionPerceptionContextState>? = nil
+        context: AgentContextRepository<VisionPerceptionContextState>
     ) throws {
-        self.contextRepository =
-            context
-            ?? AgentContextRepository(
-                agent: .visionPerception, scope: UUID().uuidString, state: VisionPerceptionContextState())
+        self.contextRepository = context
         guard contextRepository.agentID == .visionPerception else { throw AgentConfigurationError.identityMismatch }
         let configuration = try configuration ?? AgentConfigurations.load(named: "VisionPerception")
         guard configuration.agentID == .visionPerception else { throw AgentConfigurationError.identityMismatch }

@@ -1,5 +1,5 @@
 import Foundation
-import Storage
+import StorageCore
 
 public enum SpeechValidationError: Error, Equatable, Sendable { case invalidRequest }
 

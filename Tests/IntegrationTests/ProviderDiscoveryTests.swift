@@ -8,7 +8,8 @@ import Foundation
 import FunctionContracts
 import Gateway
 import PlatformKit
-import Storage
+import StorageCore
+import StorageState
 import Testing
 
 private actor DiscoveryRecorder {
@@ -150,7 +151,12 @@ private func providerDiscoveryRejectsMalformedModelLists(value: InvalidProviderM
 
 @Test(.actionCatalog) func providerDiscoveryAgentEmitsOnlyOpaqueRequestArgument() async throws {
     let session = UUID().uuidString
-    let agent = try ApplicationControlAgent(sessionID: session)
+    let agent = try ApplicationControlAgent(
+        sessionID: session,
+        context: try AgentContextRepository(
+            agent: AgentID(rawValue: "applicationControl"), scope: UUID().uuidString,
+            state: ApplicationControlContextState(), stateScope: StateContainer().makeScope())
+    )
     try await agent.start()
     let intent = ProviderDiscoveryIntent(requestID: UUID().uuidString)
     try await agent.receive(intent.input(sessionID: session))

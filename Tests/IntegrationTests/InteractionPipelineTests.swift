@@ -7,7 +7,8 @@ import Foundation
 import FunctionContracts
 import Gateway
 import PlatformKit
-import Storage
+import StorageCore
+import StorageState
 import Testing
 
 private actor InteractionDevice: DeviceControlCapability {
@@ -75,7 +76,12 @@ private actor InteractionPresentation: ResourcePresentationCapability {
 
 @Test(.actionCatalog) func independentManualTerminalResultIsRetainedWithoutSchedulingAnotherAction() async throws {
     let session = UUID().uuidString
-    let agent = try ApplicationControlAgent(sessionID: session)
+    let agent = try ApplicationControlAgent(
+        sessionID: session,
+        context: try AgentContextRepository(
+            agent: AgentID(rawValue: "applicationControl"), scope: UUID().uuidString,
+            state: ApplicationControlContextState(), stateScope: StateContainer().makeScope())
+    )
     try await agent.start()
     let owner = ExecutionOwner(
         agent: agent.descriptor.id, incarnation: UUID().uuidString, sessionID: session)

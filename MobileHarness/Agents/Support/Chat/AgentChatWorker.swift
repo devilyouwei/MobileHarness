@@ -1,8 +1,8 @@
 import AgentCore
 import Foundation
 import ModelKit
-import Storage
 import StorageChat
+import StorageCore
 import StorageTasks
 
 /// Model-backed assistant; concrete model selection belongs exclusively to the composition root.
@@ -133,7 +133,7 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
         observations:
             @escaping @Sendable ([AgentChatObservation], AgentInput, any ChatCapability) async throws -> [ChatMessage] =
             { _, _, _ in [] },
-        context: AgentContextRepository<State>? = nil,
+        context: AgentContextRepository<State>,
         capabilities: CapabilityRegistry? = nil,
         prompt: (@Sendable (CapabilityRegistry) throws -> String)? = nil,
         backgroundSupport: @escaping @Sendable (AgentID, String, [String]) throws -> Void = {
@@ -149,8 +149,7 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
         self.backgroundSupport = backgroundSupport
         self.reportsReplyActivity = reportsReplyActivity
         queue = try SignalInbox(capacity: capacity + 1)
-        self.contextRepository =
-            context ?? AgentContextRepository(agent: State.agentID, scope: UUID().uuidString, state: State())
+        self.contextRepository = context
         guard contextRepository.agentID == State.agentID else { throw AgentConfigurationError.identityMismatch }
         let configuration = try configuration ?? AgentConfigurations.load(named: State.configurationName)
         guard configuration.agentID == State.agentID else { throw AgentConfigurationError.identityMismatch }

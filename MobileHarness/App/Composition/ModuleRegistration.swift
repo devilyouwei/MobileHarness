@@ -3,9 +3,14 @@ import AppLifecycle
 @MainActor enum ModuleRegistration {
     static func lifecycle(_ services: ServiceFactories.Services) throws -> ApplicationLifecycle {
         try ApplicationLifecycle(services: [
-            ManagedService(id: "repositories", start: { _ = try services.repositories.get() }, stop: {}),
             ManagedService(
-                id: "agents", dependencies: ["repositories"],
+                id: "storage", start: { try await services.storage.start() },
+                stop: {
+                    try await services.artifacts.stop()
+                    try await services.storage.stop()
+                }),
+            ManagedService(
+                id: "agents", dependencies: ["storage"],
                 start: services.agents.startAgents,
                 foreground: services.agents.setAgentForeground,
                 stop: services.agents.stopAgents),

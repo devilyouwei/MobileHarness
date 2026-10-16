@@ -1,6 +1,6 @@
 import Foundation
 import FunctionContracts
-import Storage
+import StorageCore
 
 /// Finite transition/restore acknowledgments and independent persistent-state commitment.
 public protocol UIPresentationCapability: Sendable {

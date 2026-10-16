@@ -1,5 +1,9 @@
 #!/bin/bash
 set -euo pipefail
+# SwiftUI macros used by FactoryKit are provided by the full Xcode toolchain.
+if [[ -z "${DEVELOPER_DIR:-}" && "$(xcode-select -p)" == */CommandLineTools && -x /Applications/Xcode.app/Contents/Developer/usr/bin/xcodebuild ]]; then
+    export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
+fi
 cd "$(dirname "$0")/.."
 if ! xcodebuild -version >/dev/null 2>&1; then
     echo "Install Xcode 27+, launch it once, and select it with xcode-select before building." >&2

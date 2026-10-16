@@ -1,6 +1,7 @@
 import Foundation
 import ModelKit
-import Storage
+import StorageCore
+import StorageState
 import Testing
 
 @testable import AgentCore
@@ -32,7 +33,12 @@ private actor StreamingSentenceChat: ChatCapability {
 
 @Test(.actionCatalog) func sentenceTokensArriveBeforeModelCompletionAndFlushFinalTail() async throws {
     let model = StreamingSentenceChat()
-    let agent = try AssistantAgent(chat: model)
+    let agent = try AssistantAgent(
+        chat: model,
+        context: try AgentContextRepository(
+            agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState(),
+            stateScope: StateContainer().makeScope())
+    )
     let speechRequests = try await bindSpeechRequests(agent)
     try await agent.start()
     let input = AgentInput(
@@ -59,7 +65,12 @@ private actor StreamingSentenceChat: ChatCapability {
 
 @Test(.actionCatalog) func cancellationDiscardsUnfinishedSentenceAndTurnCompletion() async throws {
     let model = StreamingSentenceChat()
-    let agent = try AssistantAgent(chat: model)
+    let agent = try AssistantAgent(
+        chat: model,
+        context: try AgentContextRepository(
+            agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState(),
+            stateScope: StateContainer().makeScope())
+    )
     _ = try await bindSpeechRequests(agent)
     try await agent.start()
     let input = AgentInput(
@@ -114,7 +125,12 @@ private struct ExcessiveSentencesChat: ChatCapability {
 }
 
 @Test(.actionCatalog) func assistantSentenceBudgetFailsExplicitlyAfterSixtyPairs() async throws {
-    let agent = try AssistantAgent(chat: ExcessiveSentencesChat())
+    let agent = try AssistantAgent(
+        chat: ExcessiveSentencesChat(),
+        context: try AgentContextRepository(
+            agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState(),
+            stateScope: StateContainer().makeScope())
+    )
     _ = try await bindSpeechRequests(agent)
     try await agent.start()
     try await agent.receive(

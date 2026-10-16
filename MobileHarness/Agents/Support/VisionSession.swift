@@ -7,7 +7,7 @@
     import Gateway
     import OSLog
     import PlatformKit
-    import Storage
+    import StorageCore
 
     /// Owns one vision Agent session: frames enter InputGateway, effects leave through OutputGateway.
     @MainActor

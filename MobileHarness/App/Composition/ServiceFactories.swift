@@ -1,39 +1,47 @@
 import ActionBindings
 import AgentBindings
+import AppStorage
 import Foundation
 import PlatformKit
 import Storage
+import StorageCache
+import StorageCore
 import StorageMedia
 import StorageSQLite
+import StorageState
 import UI
 
 @MainActor enum ServiceFactories {
     struct Services {
-        let repositories: Result<SQLiteRepositories, any Error>
+        let registry: ApplicationContainer
+        let storage: StorageContainer
+        let artifacts: ArtifactServices
         let agents: ApplicationFeatures
         let ui: AgentApplicationUI
     }
     static func make() -> Services {
         let root = URL.applicationSupportDirectory.appendingPathComponent("MobileHarness", isDirectory: true)
-        let repositories = Result {
-            try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
-            let value = try SQLiteRepositories(url: root.appendingPathComponent("records.sqlite"))
-            try value.recoverInFlight()
-            return value
-        }
+        let registry = ApplicationContainer(root: root)
+        let storage = registry.storage()
+        let files = storage.files
         let camera = AppleCamera()
         let bluetooth = BluetoothWorkflow(
             state: BluetoothSettingsState(), link: NexArmBluetooth(),
-            makeDeviceRepository: { try repositories.get().devices })
+            makeDeviceRepository: { try storage.database.devices })
         let photos = CameraStorageFactory.make(
-            repository: repositories.map { $0.media as any MediaRepository },
-            root: root.appendingPathComponent("CapturedPhotos", isDirectory: true))
+            repository: { try storage.database.media },
+            files: { try files.file(files.photos) })
         let resources = root.appendingPathComponent("Models/installed", isDirectory: true)
-        let artifacts = ArtifactServices(resources: resources)
+        let artifacts = ArtifactServices(resources: resources, files: files)
         let agents = ApplicationFeatures(
-            repositories: repositories.map {
-                ApplicationRepositories(chat: $0.chat, tasks: $0.tasks, media: $0.media, devices: $0.devices)
-            }, photos: photos, camera: camera, bluetooth: bluetooth, artifacts: artifacts, resources: resources)
-        return Services(repositories: repositories, agents: agents, ui: AgentApplicationUI(features: agents))
+            repositories: {
+                return try ApplicationRepositories(
+                    chat: storage.database.chat, tasks: storage.database.tasks, media: storage.database.media,
+                    devices: storage.database.devices)
+            }, state: storage.state, cache: storage.cache, files: files, photos: photos, camera: camera,
+            bluetooth: bluetooth, artifacts: artifacts, resources: resources)
+        return Services(
+            registry: registry, storage: storage, artifacts: artifacts, agents: agents,
+            ui: AgentApplicationUI(features: agents))
     }
 }

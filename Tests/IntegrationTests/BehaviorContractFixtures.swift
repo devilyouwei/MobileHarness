@@ -5,7 +5,7 @@ import ExecutionRuntime
 import Foundation
 import FunctionContracts
 import Gateway
-import Storage
+import StorageCore
 
 // Test callers explicitly cross the same validated Gateway boundary as production.
 extension ActionInvocation {

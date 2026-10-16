@@ -3,7 +3,7 @@ import SQLite3
 import StorageChat
 import Testing
 
-@testable import Storage
+@testable import StorageCore
 @testable import StorageSQLite
 
 private func dialogFixtureSQL(_ url: URL, _ sql: String) throws {

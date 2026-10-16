@@ -2,7 +2,7 @@ import Actions
 import Foundation
 import FunctionContracts
 import ModelKitRuntime
-import Storage
+import StorageCore
 import UI
 
 public enum SettingsModelResourcesAdapter {

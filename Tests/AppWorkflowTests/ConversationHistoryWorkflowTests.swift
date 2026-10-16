@@ -6,8 +6,8 @@ import Agents
 import Foundation
 import Gateway
 import PlatformKit
-import Storage
 import StorageChat
+import StorageCore
 import Testing
 import UI
 

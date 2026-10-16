@@ -18,6 +18,7 @@ public actor ModelManager {
     private let loadGate: ModelLoadGate
     private let maximumLoadWaiters: Int
     private var artifacts: ModelArtifactStore?
+    private var artifactRelease: Task<Void, any Error>?
     private var artifactConfiguration: [String: String]?
     private var artifactIDs: Set<String>?
     private var entries: [ModelID: Entry] = [:]
@@ -38,6 +39,7 @@ public actor ModelManager {
         downloader: (any ModelArtifactDownloader)? = nil
     ) throws {
         guard !closed else { throw CapabilityError.sessionClosed }
+        guard artifactRelease == nil else { throw ModelArtifactError.busy }
         let configuration = Dictionary(
             uniqueKeysWithValues: catalog.packages.map { ($0.id, $0.revision + "/" + $0.directory) })
         if let artifactConfiguration {
@@ -51,6 +53,20 @@ public actor ModelManager {
         artifactConfiguration = configuration
         artifactIDs = ids
         artifacts = ModelArtifactStore(catalog: catalog, storage: storage, downloader: downloader)
+    }
+    /// Detaches file-backed artifact work while preserving unrelated model instances.
+    public func releaseArtifacts() async throws {
+        if let artifactRelease { return try await artifactRelease.value }
+        guard let artifacts else { return }
+        let task = Task { [self] in
+            try await artifacts.close()
+            self.artifacts = nil
+            artifactConfiguration = nil
+            artifactIDs = nil
+            artifactRelease = nil
+        }
+        artifactRelease = task
+        try await task.value
     }
     public func artifactSnapshots() async throws -> [ModelArtifactSnapshot] {
         guard !closed, let artifacts else { throw ModelArtifactError.missingArtifact }

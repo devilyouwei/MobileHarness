@@ -9,9 +9,10 @@ import Foundation
 import FunctionContracts
 import Gateway
 import ModelKit
-import Storage
+import StorageCore
 import StorageMedia
 import StorageSQLite
+import StorageState
 import StorageTasks
 import Testing
 import UI
@@ -236,7 +237,12 @@ import UI
     private func serialAssistant(
         _ markup: String, workflow: BluetoothWorkflow, expected: ActionExecutionRecord.Phase
     ) async throws {
-        let assistant = try AgentChatWorker<AssistantContextState>(chat: FixedTextChat(text: markup))
+        let assistant = try AgentChatWorker<AssistantContextState>(
+            chat: FixedTextChat(text: markup),
+            context: try AgentContextRepository(
+                agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState(),
+                stateScope: StateContainer().makeScope())
+        )
         let manager = AgentManager()
         let session = UUID().uuidString
         try await manager.register(assistant, sessionID: session)
@@ -356,7 +362,11 @@ import UI
         let manager = AgentManager()
         let session = UUID().uuidString
         let photographer = try PhotographerAgent(
-            sessionID: session, controlsArm: true, controlAvailable: { await workflow.trackingAvailable })
+            sessionID: session, controlsArm: true, controlAvailable: { await workflow.trackingAvailable },
+            context: try AgentContextRepository(
+                agent: AgentID(rawValue: "photographer"), scope: UUID().uuidString, state: PhotographerContextState(),
+                stateScope: StateContainer().makeScope())
+        )
         try await manager.register(photographer, sessionID: session)
         let policy = try CommunicationPolicy(
             contracts: AgentContracts.communication,

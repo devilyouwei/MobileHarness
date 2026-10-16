@@ -8,7 +8,8 @@ import Foundation
 import FunctionContracts
 import Gateway
 import PlatformKit
-import Storage
+import StorageCore
+import StorageState
 import Testing
 
 private enum PresentationFixtureError: Error { case queryFailure, snapshotFailure, failurePresentation }
@@ -192,7 +193,12 @@ private actor ResourcePresentationFixture: ResourcePresentationCapability {
     async throws
 {
     let session = UUID().uuidString
-    let agent = try ApplicationControlAgent(sessionID: session)
+    let agent = try ApplicationControlAgent(
+        sessionID: session,
+        context: try AgentContextRepository(
+            agent: AgentID(rawValue: "applicationControl"), scope: UUID().uuidString,
+            state: ApplicationControlContextState(), stateScope: StateContainer().makeScope())
+    )
     try await agent.start()
     let request = try ModelResourceIntent.refreshPresentation(generation: 1).input(sessionID: session)
     try await agent.receive(request)

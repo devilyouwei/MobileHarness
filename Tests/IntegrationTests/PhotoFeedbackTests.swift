@@ -1,7 +1,7 @@
 import Actions
 import Foundation
 import PlatformKit
-import Storage
+import StorageCore
 import Testing
 
 @Test func photoFeedbackReceiptsDecodeOlderDataAndKeepActualSaveSeparateFromIssues() throws {

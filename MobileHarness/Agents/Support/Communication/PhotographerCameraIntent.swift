@@ -1,6 +1,6 @@
 import AgentCore
 import Foundation
-import Storage
+import StorageCore
 
 /// Camera work owned by Photographer; request identity is opaque, never an executable path.
 public struct PhotographerCameraIntent: Codable, Sendable, Equatable {

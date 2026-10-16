@@ -9,6 +9,7 @@ import Observation
     private var foreground = false
     private var replacement: Task<Void, Never>?
     private(set) var scopeID = UUID()
+    func prepareBackgroundArtifacts() async throws { try await services.artifacts.prepareBackground() }
     var features: AgentApplicationUI { services.ui }
 
     init() {

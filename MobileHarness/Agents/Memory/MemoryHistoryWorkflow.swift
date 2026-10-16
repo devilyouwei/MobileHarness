@@ -1,6 +1,6 @@
 import AgentCore
 import Foundation
-import Storage
+import StorageCore
 
 /// Memory-owned history sequencing; no I/O, model execution or runtime scheduling.
 struct MemoryHistoryWorkflow {

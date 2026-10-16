@@ -8,9 +8,10 @@ import Foundation
 import FunctionContracts
 import Gateway
 import ModelKit
-import Storage
+import StorageCore
 import StorageMedia
 import StorageSQLite
+import StorageState
 import StorageTasks
 import Testing
 import UI
@@ -2277,7 +2278,12 @@ func bluetoothTrackingInputExpiryJoinsWriterAndReleasesMotorResources() async th
     let resources = try nexArmTestResources()
     workflow.withMotorResources = bluetoothResourceGuard(resources)
     let session = UUID().uuidString
-    let photographer = try PhotographerAgent(sessionID: session, controlsArm: true)
+    let photographer = try PhotographerAgent(
+        sessionID: session, controlsArm: true,
+        context: try AgentContextRepository(
+            agent: AgentID(rawValue: "photographer"), scope: UUID().uuidString, state: PhotographerContextState(),
+            stateScope: StateContainer().makeScope())
+    )
     try await photographer.start()
     let pose = try PoseObservation(
         width: 100, height: 100, sequence: 1, timestamp: 1e12, rotation: 1,
@@ -2333,7 +2339,12 @@ func bluetoothGatewayAimUpdatesUseOneWorkerAndKeepActualMotorExclusion() async t
     workflow.connect(try link.businessID)
     await workflow.waitUntilIdle()
     let session = UUID().uuidString
-    let photographer = try PhotographerAgent(sessionID: session, controlsArm: true)
+    let photographer = try PhotographerAgent(
+        sessionID: session, controlsArm: true,
+        context: try AgentContextRepository(
+            agent: AgentID(rawValue: "photographer"), scope: UUID().uuidString, state: PhotographerContextState(),
+            stateScope: StateContainer().makeScope())
+    )
     let manager = AgentManager()
     try await manager.register(photographer, sessionID: session)
     try await photographer.start()
@@ -2592,13 +2603,23 @@ private func bluetoothRecoveryPreservesAssistantGenerationSpeechAndOtherActions(
     let link = BluetoothArmFixture()
     let workflow = bluetoothTestWorkflow(link, file: file)
     let chat = BluetoothRecoveryChat()
-    let assistant = try AgentChatWorker<AssistantContextState>(chat: chat)
+    let assistant = try AgentChatWorker<AssistantContextState>(
+        chat: chat,
+        context: try AgentContextRepository(
+            agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState(),
+            stateScope: StateContainer().makeScope())
+    )
     let speech = try await bindSpeechRequests(assistant)
     let manager = AgentManager()
     let session = UUID().uuidString
     try await manager.register(assistant, sessionID: session)
     try await assistant.start()
-    let photographer = try PhotographerAgent(sessionID: session, controlsArm: true)
+    let photographer = try PhotographerAgent(
+        sessionID: session, controlsArm: true,
+        context: try AgentContextRepository(
+            agent: AgentID(rawValue: "photographer"), scope: UUID().uuidString, state: PhotographerContextState(),
+            stateScope: StateContainer().makeScope())
+    )
     try await manager.register(photographer, sessionID: session)
     try await photographer.start()
     let input = InputGateway(manager: manager, allowsExternalSend: true)
@@ -2874,7 +2895,12 @@ func bluetoothRecoveryLeavesQueuedActionsForNormalChannelExecution() async throw
     defer { try? FileManager.default.removeItem(at: file) }
     let link = BluetoothArmFixture()
     let workflow = bluetoothTestWorkflow(link, file: file)
-    let assistant = try AgentChatWorker<AssistantContextState>(chat: BluetoothRecoveryChat())
+    let assistant = try AgentChatWorker<AssistantContextState>(
+        chat: BluetoothRecoveryChat(),
+        context: try AgentContextRepository(
+            agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState(),
+            stateScope: StateContainer().makeScope())
+    )
     let manager = AgentManager()
     let session = UUID().uuidString
     try await manager.register(assistant, sessionID: session)

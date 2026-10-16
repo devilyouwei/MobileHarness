@@ -1,7 +1,7 @@
 import AgentCore
 import Foundation
 import FunctionContracts
-import Storage
+import StorageCore
 import UI
 
 /// Recognition and replies have independent identities: a queued task may reply after a later utterance.
