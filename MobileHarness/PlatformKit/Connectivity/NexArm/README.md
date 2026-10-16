@@ -22,7 +22,7 @@ flowchart LR
 
 ## Protocol
 
-`NexArmLink`, `NexArmWritableLink` and `NexArmObservableLink` expose exchange, writes and session-scoped passive observation. CMD3 encodes one motor; CMD131 packs 1…6 distinct addressed motors. Options require speed 1…1400 and acceleration 1…254. Position limits for motors 1…6 are respectively 210…3826, 200…3800, 968…3200, 728…3218, 908…3128 and 1118…2828. These are encoder bounds, not obstacle detection.
+`NexArmLink`, `NexArmWritableLink` and `NexArmObservableLink` expose exchange, writes and session-scoped passive observation. CMD3 encodes one motor; CMD131 packs 1…6 distinct addressed motors for a position block, or exactly motors 1 and 4 for a two-byte speed block at register 46. Live control also admits register 40 torque and register 33 mode values 0 or 1, and only for motors 1 and 4. Mode 2 and any other register write stay rejected. Options require speed 1…1400 and acceleration 1…254. Position limits for motors 1…6 are respectively 210…3826, 200…3800, 968…3200, 728…3218, 908…3128 and 1118…2828. These are encoder bounds, not obstacle detection.
 
 `NexArmDecoder` limits buffered bytes to 4096 and validates frame/header/checksum. Replies/consumed serial bytes are bounded to 16384. Unsolicited CMD11 telemetry validates six motor positions and carries sequence/receipt time. Feedback health uses a two-second window; silence alone neither disables control nor reconnects.
 

@@ -177,6 +177,8 @@ public protocol NexArmBluetoothLink: NexArmObservableLink {
     func stopScan() async
     func beginLiveControl() async throws -> String
     func sendLive(_ packet: NexArmPacket, session: String) async throws -> Bool
+    /// Speed-mode exit. The tracking task may already be cancelled; this send still attempts delivery.
+    func restoreLive(_ packet: NexArmPacket, session: String) async throws -> Bool
     func endLiveControl(_ session: String) async
     func clearDiscovery() async
     func forgetDevice() async throws
@@ -207,6 +209,9 @@ public actor NexArmBluetooth: NexArmBluetoothLink, NexArmObservableLink {
     public func beginLiveControl() async throws -> String { try await driver.value.beginLiveControl() }
     public func sendLive(_ packet: NexArmPacket, session: String) async throws -> Bool {
         try await driver.value.sendLive(packet, session: session)
+    }
+    public func restoreLive(_ packet: NexArmPacket, session: String) async throws -> Bool {
+        try await driver.value.restoreLive(packet, session: session)
     }
     public func endLiveControl(_ session: String) async { await driver.value.endLiveControl(session) }
     public func clearDiscovery() async { await driver.value.clearDiscovery() }
@@ -528,6 +533,12 @@ private final class NexArmBLEDriver: NSObject, @preconcurrency CBCentralManagerD
     }
     func sendLive(_ packet: NexArmPacket, session: String) throws -> Bool {
         try Task.checkCancellation()
+        try deliverLive(packet, session: session)
+    }
+    func restoreLive(_ packet: NexArmPacket, session: String) throws -> Bool {
+        try deliverLive(packet, session: session)
+    }
+    private func deliverLive(_ packet: NexArmPacket, session: String) throws -> Bool {
         guard liveControlID == session else { throw NexArmError.disconnected }
         guard snapshot.phase == .connected, let peripheral, let tx else { throw NexArmError.disconnected }
         guard packet.isLiveControl else { throw NexArmError.invalidPacket }

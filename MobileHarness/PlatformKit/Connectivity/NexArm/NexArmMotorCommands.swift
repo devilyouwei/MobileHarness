@@ -36,4 +36,36 @@ public enum NexArmMotorCommands {
             id: 254, command: 131,
             payload: [41, 7] + atoms.flatMap { [$0.id] + $0.payload.dropFirst() })
     }
+
+    /// Torque enable for a tracking axis. Only motors 1 and 4 may change torque from live control.
+    public static func trackingTorque(motor: Int, enabled: Bool) throws -> NexArmPacket {
+        guard motor == 1 || motor == 4 else { throw NexArmError.invalidMotion }
+        return try NexArmPacket(id: UInt8(motor), command: 3, payload: [40, enabled ? 1 : 0])
+    }
+
+    /// Closed-loop speed mode is 1. Position mode is 0. PWM mode is not representable here.
+    public static func trackingMode(motor: Int, closedLoopSpeed: Bool) throws -> NexArmPacket {
+        guard motor == 1 || motor == 4 else { throw NexArmError.invalidMotion }
+        return try NexArmPacket(id: UInt8(motor), command: 3, payload: [33, closedLoopSpeed ? 1 : 0])
+    }
+
+    /// One speed write for motors 1 and 4. Each value uses bits 0...14 as magnitude and bit 15 as reverse.
+    /// Magnitude 0 clears the direction bit. A positive magnitude with bit 15 clear decreases the encoder.
+    public static func trackingSpeeds(base: Int, pitch: Int) throws -> NexArmPacket {
+        try NexArmPacket(
+            id: 254, command: 131,
+            payload: [46, 2, 1] + speedBytes(base) + [4] + speedBytes(pitch))
+    }
+
+    public static func trackingSpeed(motor: Int, speed: Int) throws -> NexArmPacket {
+        guard motor == 1 || motor == 4 else { throw NexArmError.invalidMotion }
+        return try NexArmPacket(id: UInt8(motor), command: 3, payload: [46] + speedBytes(speed))
+    }
+
+    private static func speedBytes(_ speed: Int) throws -> [UInt8] {
+        let magnitude = speed & 0x7FFF
+        guard (0...1400).contains(magnitude) else { throw NexArmError.invalidMotion }
+        let encoded = magnitude == 0 ? 0 : speed
+        return [UInt8(encoded & 255), UInt8((encoded >> 8) & 255)]
+    }
 }

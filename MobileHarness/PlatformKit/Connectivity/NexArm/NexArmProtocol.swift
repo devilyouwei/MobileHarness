@@ -20,6 +20,33 @@ public struct NexArmPacket: Equatable, Sendable {
     /// Observation sessions admit supported addressed position writes and read-only telemetry requests.
     public var isObservedControl: Bool {
         (id == 255 && command == 11 && payload.isEmpty) || isSynchronousPositionWrite || isSinglePositionWrite
+            || isTrackingSpeedControl
+    }
+    /// Live tracking may switch motors 1 and 4 between position mode and closed-loop speed, and may write their speeds.
+    public var isTrackingSpeedControl: Bool {
+        isTrackingRegisterWrite || isTrackingSpeedSync
+    }
+    private var isTrackingRegisterWrite: Bool {
+        guard (id == 1 || id == 4), command == 3 else { return false }
+        switch payload.count {
+        case 2:
+            return (payload[0] == 40 || payload[0] == 33) && (payload[1] == 0 || payload[1] == 1)
+        case 3:
+            return payload[0] == 46 && Self.legalSpeed(Array(payload.dropFirst()))
+        default:
+            return false
+        }
+    }
+    private var isTrackingSpeedSync: Bool {
+        guard id == 254, command == 131, payload.count == 8, payload[0] == 46, payload[1] == 2,
+            payload[2] == 1, payload[5] == 4
+        else { return false }
+        return Self.legalSpeed(Array(payload[3..<5])) && Self.legalSpeed(Array(payload[6..<8]))
+    }
+    private static func legalSpeed(_ bytes: [UInt8]) -> Bool {
+        guard bytes.count >= 2 else { return false }
+        let magnitude = (Int(bytes[0]) | Int(bytes[1]) << 8) & 0x7FFF
+        return (0...1400).contains(magnitude)
     }
     public var isSynchronousPositionWrite: Bool {
         guard id == 254, command == 131, (10...50).contains(payload.count), (payload.count - 2) % 8 == 0,
@@ -59,7 +86,9 @@ public struct NexArmPacket: Equatable, Sendable {
         if isSinglePositionWrite { return [Int(id): Int(payload[2]) | Int(payload[3]) << 8] }
         return nil
     }
-    public var isLiveControl: Bool { isSinglePositionWrite || isSynchronousPositionWrite }
+    public var isLiveControl: Bool {
+        isSinglePositionWrite || isSynchronousPositionWrite || isTrackingSpeedControl
+    }
     public var bytes: [UInt8] {
         let body = [id, UInt8(payload.count + 2), command] + payload
         return [0xFF, 0xFF] + body + [~body.reduce(0, &+)]

@@ -993,7 +993,7 @@ public final class NexArmControlService {
             try await $0.performGesture(gesture, repetitions: repetitions, speed: speed, acceleration: acceleration)
         }
     }
-    /// Keeps only the latest aim. One motors 1 and 4 packet is sent per admitted target; this returns without waiting.
+    /// Keeps only the latest aim. Tracking enters speed mode on motors 1 and 4 and does not wait for arrival.
     public func aim(
         base: Double, pitch: Double, origin: NexArmControlOrigin? = nil,
         failed: @escaping @Sendable (NexArmControlFailure) async -> Void = { _ in }
@@ -1024,9 +1024,10 @@ public final class NexArmControlService {
             worker?.cancel()
         }
     }
-    /// Polls the latest pan/tilt target. The first admitted write also places motors 2 and 3 on the calibrated
-    /// level rest. Later writes move only motors 1 and 4. Motor 5 stays uncommanded.
-    /// A newer aim replaces an unsent target. The 30 ms pause only checks freshness and admission.
+    /// Polls the latest pan/tilt target. The first admitted write places motors 2 and 3 on the calibrated
+    /// level rest. Motors 1 and 4 then enter closed-loop speed mode. Later writes send one combined speed.
+    /// Motor 5 stays uncommanded. A newer aim replaces an unsent speed. The 30 ms pause only checks freshness
+    /// and admission. Exit returns motors 1 and 4 to position mode before live control ends.
     private func startAimFollow(
         _ controller: NexArmActionController, origin: NexArmControlOrigin?,
         failed reportFailure: @escaping @Sendable (NexArmControlFailure) async -> Void
@@ -1070,6 +1071,7 @@ public final class NexArmControlService {
                     startup.continuation.finish()
                     published = true
                     var idleSince: ContinuousClock.Instant?
+                    var polled: AimGoal?
                     while true {
                         let tickStart = ContinuousClock.now
                         try Task.checkCancellation()
@@ -1079,6 +1081,10 @@ public final class NexArmControlService {
                             throw CancellationError()
                         }
                         guard let goal = aimGoal else { break }
+                        if goal != polled {
+                            idleSince = nil
+                            polled = goal
+                        }
                         if let command = try aimCommand.command(
                             base: goal.base, pitch: goal.pitch, at: tickStart)
                         {
@@ -1098,7 +1104,6 @@ public final class NexArmControlService {
                     }
                 } catch {
                     failed = true
-                    aimCommand.reset()
                     startup.continuation.finish(throwing: error)
                     if revision == controlRevision { followingAim = false }
                     if published, !(error is CancellationError) {
@@ -1108,7 +1113,11 @@ public final class NexArmControlService {
                                 code: ActionReport.code(for: error).rawValue, message: Self.message(error)))
                     }
                 }
-                if let session { await link.endLiveControl(session) }
+                if let session {
+                    await releaseTracking(session: session)
+                    await link.endLiveControl(session)
+                }
+                aimCommand.reset()
             }
             do {
                 if let withMotorResources {
@@ -1144,6 +1153,20 @@ public final class NexArmControlService {
         }
         return startup.stream
     }
+    /// Returns motors 1 and 4 to position mode even when the tracking task is already cancelled.
+    private func releaseTracking(session: String) async {
+        let packets = aimCommand.releasePackets(
+            base: aimGoal?.base ?? lastBaseFallback, pitch: aimGoal?.pitch ?? lastPitchFallback)
+        guard !packets.isEmpty else { return }
+        for packet in packets {
+            for _ in 0..<8 {
+                if (try? await link.restoreLive(packet, session: session)) == true { break }
+                await Task.detached { try? await Task.sleep(for: .milliseconds(40)) }.value
+            }
+        }
+    }
+    private var lastBaseFallback: Int { NexArmJointCommand.armHome[0] }
+    private var lastPitchFallback: Int { NexArmJointCommand.armHome[3] }
     private func validateAgentWriter(_ resources: Set<ResourceID>) async throws {
         guard let permit = ResourceExecutionContext.permit else { return }
         do { try await permit.validate(resources) } catch {

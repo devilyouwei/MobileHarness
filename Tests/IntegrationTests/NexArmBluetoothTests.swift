@@ -190,6 +190,9 @@ private actor BluetoothArmFixture: NexArmBluetoothLink {
         pendingLiveFailure?.resume()
         pendingLiveFailure = nil
     }
+    func restoreLive(_ packet: NexArmPacket, session: String) async throws -> Bool {
+        try await sendLive(packet, session: session)
+    }
     func sendLive(_ packet: NexArmPacket, session: String) async throws -> Bool {
         guard liveSession == session, snapshot.phase == .connected else { throw NexArmError.disconnected }
         if failNextLiveValidation {
@@ -1349,7 +1352,9 @@ func aimFinalCountRemainsPendingUntilNativeAdmission(motor: Int, delta: Int) thr
     let stopped = planner.targets
     planner.stop(id: 1)
     #expect(planner.targets == stopped && planner.velocities[0] == 0)
-    #expect(try !NexArmPacket(id: 1, command: 3, payload: [40, 0]).isLiveControl)
+    #expect(try NexArmPacket(id: 1, command: 3, payload: [40, 0]).isLiveControl)
+    #expect(try !NexArmPacket(id: 2, command: 3, payload: [40, 0]).isLiveControl)
+    #expect(try !NexArmPacket(id: 1, command: 3, payload: [33, 2]).isLiveControl)
     #expect(try !NexArmPacket(command: 51, payload: [1, 0, 8, 20, 0]).isLiveControl)
 }
 
