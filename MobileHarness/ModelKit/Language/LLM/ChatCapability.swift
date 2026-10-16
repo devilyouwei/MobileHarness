@@ -86,6 +86,14 @@ public final class ChatTiming: Sendable {
     }
     public func recordText(_ text: String) {
         guard !text.isEmpty else { return }
+        recordFirstOutput()
+    }
+    /// Called by the provider after validating a streamed native argument delta's identity.
+    public func recordToolArguments(_ delta: String) {
+        guard !delta.isEmpty else { return }
+        recordFirstOutput()
+    }
+    private func recordFirstOutput() {
         state.withLock {
             guard let start = $0.started, $0.firstTokenAt == nil else { return }
             let elapsed = start.duration(to: .now).components

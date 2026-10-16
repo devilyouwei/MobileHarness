@@ -58,7 +58,8 @@ public actor OpenAIChat: ChatCapability {
                 guard response.mimeType?.lowercased() == "text/event-stream" else {
                     throw OpenAIChatError.invalidResponse
                 }
-                var decoder = ChatEventDecoder(toolNames: OpenAIChatConfiguration.toolNames(request.tools))
+                var decoder = ChatEventDecoder(
+                    toolNames: OpenAIChatConfiguration.toolNames(request.tools), timing: request.timing)
                 var finish: ChatEvent?
                 for try await byte in bytes {
                     try Task.checkCancellation()

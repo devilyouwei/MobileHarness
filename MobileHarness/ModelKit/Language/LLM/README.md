@@ -27,7 +27,7 @@ ChatRequest retains InferenceContext, caller messages, optional output token bud
 
 ChatToolDefinition is a neutral function-envelope declaration; Responses flattens it. ChatToolCall identity/name/arguments is data, never execution authority. Native transcripts require complete original call/result pairing; unsupported local requests reject rather than pretending to execute/see images.
 
-ChatTiming is one mutex-protected caller sampler per request. Providers report monotonic start and first nonempty text before emission; consumers persist supplied evidence. Native-only/unsupported timing remains absent. There is no automatic provider retry or application task loop in these values.
+ChatTiming is one mutex-protected caller sampler per request. ✅ Providers sample monotonic request start and the first nonempty public text or validated native argument delta, whichever arrives first; consumers persist supplied evidence. Private reasoning, item creation and tool execution/completion are not first-token samples. Unsupported providers or streams without either delta retain absent timing. There is no automatic provider retry or application task loop in these values.
 
 Typed chat/image/native-call contracts and optional timing are implemented.
 

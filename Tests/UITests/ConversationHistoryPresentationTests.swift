@@ -254,6 +254,9 @@ private func conversation(archived: Bool = false, title: String? = nil, user: St
     #expect(rows.count == 2 && rows.map(\.id) == [firstID, secondID])
     #expect(rows[0].user == "question" && rows[0].isReACT == false)
     #expect(rows[0].raw.isEmpty && rows[0].outputSummary == "Tool Call：inspect")
+    #expect(
+        rows[0].toolCalls?.first?.responseReport
+            == "Tool Call · inspect · completed\n\nArguments:\n{}\n\nResult:\nactual-result")
     #expect(rows[0].firstTokenReport == "首 token 耗时：")
     #expect(rows[1].user == "[tool]\nactual-result" && rows[1].isReACT == true)
     #expect(rows[1].raw == "observed" && rows[1].toolCalls?.isEmpty == true)
@@ -268,6 +271,43 @@ private func conversation(archived: Bool = false, title: String? = nil, user: St
     let firstExport = try JSONDecoder().decode(
         HistoryTurn.self, from: ConversationHistoryPresentation.jsonData(rows[0]))
     #expect(firstExport.toolCalls?.first?.output == "actual-result")
+}
+
+@Test func historyToolResponsesKeepMixedTextMultipleCallsAndFailures() throws {
+    let calls: [[String: Any]] = [
+        [
+            "id": "first", "providerID": "provider-1", "name": "History.list", "argumentsJSON": "{}",
+            "state": "completed", "output": "",
+        ],
+        [
+            "id": "second", "providerID": "provider-2", "name": "History.read",
+            "argumentsJSON": #"{"id":"dialog_1"}"#, "state": "failed", "error": "missingConversation",
+        ],
+        [
+            "id": "third", "providerID": "provider-3", "name": "History.list", "argumentsJSON": "{}",
+            "state": "received",
+        ],
+    ]
+    let page = try historyFixture(extra: [
+        "modelRequests": [
+            [
+                "historyOrder": 1, "id": "mixed", "date": 0, "input": "read", "requestJSON": "[]",
+                "response": "checking",
+                "toolCalls": calls, "state": "completed",
+                "modelRequestStartedAt": 10, "firstTokenAt": 10.125, "firstTokenLatency": 0.125,
+            ]
+        ]
+    ])
+    let turn = try #require(ConversationHistoryPresentation.turns(page).first)
+    let reports = try #require(turn.toolCalls).map(\.responseReport)
+    #expect(turn.raw == "checking" && reports.count == 3)
+    #expect(reports[0].hasSuffix("Result:\n"))
+    #expect(reports[1].contains(#"{"id":"dialog_1"}"#))
+    #expect(reports[1].hasSuffix("Error:\nmissingConversation") && !reports[1].contains("Result:"))
+    #expect(!reports[2].contains("Result:") && !reports[2].contains("Error:"))
+    #expect(turn.firstTokenReport == "首 token 耗时：0.125 秒")
+    let exported = try JSONDecoder().decode(HistoryTurn.self, from: ConversationHistoryPresentation.jsonData(turn))
+    #expect(exported.response == "checking" && exported.toolCalls?.count == 3)
 }
 
 @Test func historyKeepsSentDefinitionsEvenWithoutCallsAndMalformedRequestIsVisible() throws {

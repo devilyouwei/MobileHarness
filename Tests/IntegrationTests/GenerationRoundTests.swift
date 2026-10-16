@@ -171,6 +171,7 @@ private actor RoundModel: ChatCapability {
                 for _ in 0..<actionCount { try text("<wait><express emotion=\"happy\"/></wait>") }
             }
             for index in 0..<toolCount {
+                request.timing?.recordToolArguments("{}")
                 try pair.emitter.yield(
                     .toolCall(
                         .init(
@@ -356,8 +357,8 @@ func generationRoundActualOutputControlsContinuationForAllThreeRoutes(_ route: S
     }
     #expect(modelRequests.first?.input == "test")
     #expect(modelRequests.first?.toolCalls.count == (route == "action" ? 0 : 1))
-    #expect(modelRequests.first?.firstTokenAt != nil || route == "tool")
-    if route == "tool" { #expect(modelRequests.first?.firstTokenAt == nil) }
+    #expect(modelRequests.first?.firstTokenAt != nil)
+    #expect(modelRequests.first?.firstTokenLatency != nil)
     if route != "action" {
         #expect(modelRequests.first?.toolCalls.first?.output == (hasValue ? "actual-result" : "completed"))
     }

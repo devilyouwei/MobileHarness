@@ -14,7 +14,7 @@
 | 流与背压 | 字节级 Unicode、CRLF/多行 SSE、慢消费和暂停、终态 usage、取消/卸载/关闭后复用与拒绝 |
 | 失败 | HTTP 安全分类、credit_balance_exhausted、缺失/错误/重复 usage、拒绝/截断/未知或超限输出、无效配置 |
 | reasoning | Alibaba reasoning item/delta/done 的结构验证与私有文本过滤、native 输出 index 与配对保持、非思考请求选项及强制思考模型拒绝 |
-| 计时与清理 | 首个有效文本时间、幂等 start、实际清理屏障、并发请求拒绝、共享句柄替换与卸载 |
+| 计时与清理 | 首个有效文本时间、幂等 start、实际清理屏障、并发请求拒绝、共享句柄替换与卸载；native 参数增量首样本、空增量/私有推理忽略、文本/native 先到者及终态前不发布调用 |
 
 ## 显式在线探针
 

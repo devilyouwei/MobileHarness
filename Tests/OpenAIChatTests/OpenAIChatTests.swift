@@ -769,6 +769,111 @@ private final class UsageProtocol: URLProtocol, @unchecked Sendable {
     #expect(timing.snapshot == first)
 }
 
+@Test(arguments: [false, true])
+func nativeArgumentTimingPreservesFirstTextOrToolSample(textFirst: Bool) throws {
+    let timing = ChatTiming()
+    timing.recordToolArguments("before start")
+    #expect(timing.snapshot == nil)
+    timing.start()
+    let start = try #require(timing.snapshot)
+    timing.recordToolArguments("")
+    #expect(timing.snapshot == start)
+    if textFirst { timing.recordText("first text") }
+    let textSample = timing.snapshot
+    var decoder = ChatEventDecoder(toolNames: ["Read_State_0": "Read.State"], timing: timing)
+    let added: [String: Any] = [
+        "type": "function_call", "id": "item-1", "call_id": "call-1", "name": "Read_State_0",
+    ]
+    for byte in try
+        (reasoningWire()
+        + eventWire(["type": "response.output_item.added", "output_index": 0, "item": added])
+        + eventWire([
+            "type": "response.function_call_arguments.delta", "output_index": 0, "item_id": "item-1", "delta": "",
+        ])).utf8
+    {
+        #expect(try decoder.consume(byte).isEmpty)
+    }
+    #expect(timing.snapshot == textSample)
+    for byte in try eventWire([
+        "type": "response.function_call_arguments.delta", "output_index": 0, "item_id": "item-1", "delta": "{",
+    ]).utf8 {
+        #expect(try decoder.consume(byte).isEmpty)
+    }
+    let first = try #require(timing.snapshot)
+    #expect(first.firstTokenAt != nil && first.firstTokenLatency.map { $0 >= 0 } == true)
+    if textFirst { #expect(first == textSample) }
+    timing.recordText("later text")
+    timing.recordToolArguments("later args")
+    #expect(timing.snapshot == first && !decoder.finished)
+
+    let invalidTiming = ChatTiming()
+    invalidTiming.start()
+    var invalid = ChatEventDecoder(toolNames: ["Read_State_0": "Read.State"], timing: invalidTiming)
+    for byte in try eventWire(["type": "response.output_item.added", "output_index": 0, "item": added]).utf8 {
+        _ = try invalid.consume(byte)
+    }
+    #expect(throws: OpenAIChatError.invalidResponse) {
+        for byte in try eventWire([
+            "type": "response.function_call_arguments.delta", "output_index": 0, "item_id": "forged", "delta": "{",
+        ]).utf8 { _ = try invalid.consume(byte) }
+    }
+    #expect(invalidTiming.snapshot?.firstTokenAt == nil)
+}
+
+private final class NativeTimingProtocol: URLProtocol, @unchecked Sendable {
+    override class func canInit(with request: URLRequest) -> Bool { true }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+    override func startLoading() {
+        do {
+            let url = try #require(request.url)
+            let response = try #require(
+                HTTPURLResponse(
+                    url: url, statusCode: 200, httpVersion: nil,
+                    headerFields: ["Content-Type": "text/event-stream"]))
+            let item: [String: Any] = [
+                "type": "function_call", "id": "item-1", "call_id": "call-1", "name": "Read_State_0", "arguments": "{}",
+            ]
+            let wire =
+                try eventWire(["type": "response.output_item.added", "output_index": 0, "item": item])
+                + eventWire([
+                    "type": "response.function_call_arguments.delta", "output_index": 0, "item_id": "item-1",
+                    "delta": "{}",
+                ]) + eventWire(["type": "response.output_item.done", "output_index": 0, "item": item])
+                + eventWire([
+                    "type": "response.completed", "response": ["status": "completed", "output": [item]],
+                ])
+            client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+            client?.urlProtocol(self, didLoad: Data(wire.utf8))
+            client?.urlProtocolDidFinishLoading(self)
+        } catch { client?.urlProtocol(self, didFailWithError: error) }
+    }
+    override func stopLoading() {}
+}
+
+@Test func nativeOnlyCapabilityReportsTimingWithoutPublicText() async throws {
+    let capability = try OpenAIChat(
+        context: ModelContext(loadGate: ModelLoadGate(maximumConcurrentLoads: 4), maximumLoadWaiters: 32),
+        configuration: config(),
+        sessionConfiguration: {
+            let settings = URLSessionConfiguration.ephemeral
+            settings.protocolClasses = [NativeTimingProtocol.self]
+            return settings
+        })
+    let tool = try ChatToolDefinition(
+        declaration: Data(
+            #"{"type":"function","function":{"name":"Read.State","parameters":{"type":"object","properties":{},"required":[]}}}"#
+                .utf8))
+    var request = try ChatRequest(messages: [.init(role: .user, content: "read state")], tools: [tool])
+    let timing = ChatTiming()
+    request.timing = timing
+    let session = try await capability.chat(request)
+    var events: [ChatEvent] = []
+    for try await event in session.events { events.append(event) }
+    #expect(events == [.toolCall(.init(id: "call-1", name: "Read.State", argumentsJSON: "{}")), .finished(.toolCalls)])
+    let snapshot = try #require(timing.snapshot)
+    #expect(snapshot.firstTokenAt != nil && snapshot.firstTokenLatency.map { $0 >= 0 } == true)
+}
+
 private func eventWire(_ object: [String: Any]) throws -> String {
     "data: " + String(decoding: try JSONSerialization.data(withJSONObject: object), as: UTF8.self) + "\n\n"
 }

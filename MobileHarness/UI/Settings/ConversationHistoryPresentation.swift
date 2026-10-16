@@ -160,6 +160,15 @@ extension HistoryMessage {
 
 }
 
+extension HistoryToolCall {
+    public var responseReport: String {
+        var sections = ["Tool Call · \(name) · \(state.rawValue)", "Arguments:\n\(argumentsJSON)"]
+        if let output { sections.append("Result:\n\(output)") }
+        if let error { sections.append("Error:\n\(error)") }
+        return sections.joined(separator: "\n\n")
+    }
+}
+
 extension HistoryTurn {
     public var displayInput: String { user }
     public var attachedImages: [HistoryImageReference] {

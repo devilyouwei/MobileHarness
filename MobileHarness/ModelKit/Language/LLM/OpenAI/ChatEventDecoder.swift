@@ -5,7 +5,11 @@ import ModelKit
 /// Incremental SSE framing, bounded before UTF-8 decoding (including unterminated lines).
 struct ChatEventDecoder {
     let toolNames: [String: String]
-    init(toolNames: [String: String] = [:]) { self.toolNames = toolNames }
+    private let timing: ChatTiming?
+    init(toolNames: [String: String] = [:], timing: ChatTiming? = nil) {
+        self.toolNames = toolNames
+        self.timing = timing
+    }
     private struct Pending {
         let itemID: String
         let callID: String
@@ -95,6 +99,7 @@ struct ChatEventDecoder {
             call.arguments += delta
             guard call.arguments.utf8.count <= 4096 else { throw OpenAIChatError.responseTooLarge }
             calls[index] = call
+            timing?.recordToolArguments(delta)
             return []
         case "response.output_item.done":
             let (index, item) = try outputItem(object)

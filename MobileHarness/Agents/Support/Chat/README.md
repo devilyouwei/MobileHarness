@@ -81,7 +81,7 @@ The driver's secondary queues use synchronous checked yields. They do not suspen
 
 worker 独立于 UI 页面；结果必须匹配 call/round/task/session/incarnation 与封闭屏障。Pause/stop 取消并加入拥有的工作，输出传输失败也必须清理。Reply occupancy 是有界完整 revision 快照，证据提交先于占用移交；终态事实释放占用，不使用租约定时器，也不授予麦克风权。
 
-ChatTiming 由支持的 provider 在请求发出/首个非空文本时取单调样本；native-only/不支持的 provider 不产生 TTFT。消费、ASR、TTS 与 UI 耗时不是模型首 token 时延。网络传输自身超时和实时感知 freshness 不作为整个决策时限。
+✅ ChatTiming 由支持的 provider 在请求发出及首个非空文本或已校验身份的原生工具参数增量时取单调样本；取先到者，排除私有推理和工具执行时间。不支持计时或没有有效增量时不产生 TTFT；driver 沿用同一快照持久化链路。消费、ASR、TTS 与 UI 耗时不是模型首 token 时延。网络传输自身超时和实时感知 freshness 不作为整个决策时限。
 
 错误保留原生产者语义：provider HTTP/transport/response 错误、GenerationError、CapabilityError 与提交错误分别传播；不伪造空值成功或不确定副作用的重试。执行者超时通过真实 ActionResult 返回。
 
