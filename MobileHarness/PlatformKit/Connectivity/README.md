@@ -14,7 +14,7 @@ Runtime arrows show data or capability calls; dashed arrows show injection.
 
 ```mermaid
 flowchart LR
- Callers[App and Actions] <--> NexArm[NexArm SDK]
+ Callers[ActionBindings] <--> NexArm[NexArm SDK]
  NexArm <--> Device[USB or BLE firmware]
 ```
 

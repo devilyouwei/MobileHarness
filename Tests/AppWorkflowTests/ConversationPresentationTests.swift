@@ -1,7 +1,11 @@
+import ActionBindings
+import Actions
+import AgentBindings
 import AgentCore
-import AppWorkflows
 import Foundation
 import FunctionContracts
+import Gateway
+import PlatformKit
 import Storage
 import Testing
 import UI
@@ -124,4 +128,70 @@ import UI
     #expect(accept(context(next, 2, source: "speechPerception"), update: .transcript))
     #expect(accept(context(next, 7), update: .beginReply))
     #expect(presentation.acceptsPlayback(context(next, 8), activeSessions: [session]))
+}
+
+@Test(.timeLimit(.minutes(1))) @MainActor
+func uiExpressionWaitsForRendererAndRejectsLateCompletionAfterReplacement() async throws {
+    let state = ConversationState()
+    state.isVoiceActive = true
+    state.expressionRendererAvailable = true
+    let renderer = ConversationExpressionPresentation(state: state)
+    renderer.setBase(.smile)
+    var completed = false
+    let first = Task {
+        try await renderer.perform(.happy, owner: "first")
+        completed = true
+    }
+    while state.expressionTransitionID == nil { await Task.yield() }
+    let firstID = try #require(state.expressionTransitionID)
+    let late = try #require(state.expressionAnimationCompletion)
+    #expect(!completed && state.expression == .happy)
+    late(firstID, true)
+    try await first.value
+    #expect(completed)
+    let restore = Task { try await renderer.restore(owner: "first", accepts: true) }
+    while state.expressionTransitionID == nil { await Task.yield() }
+    let restoreID = try #require(state.expressionTransitionID)
+    late(firstID, true)
+    #expect(state.expressionTransitionID == restoreID)
+    state.expressionAnimationCompletion?(restoreID, true)
+    try await restore.value
+    #expect(state.expression == .smile && !state.expressionEmphasized)
+    #expect(state.expressionTransitionID == nil)
+}
+
+@Test(.timeLimit(.minutes(1))) @MainActor
+func uiExpressionCancellationJoinsWaitAndPreservesRendererFailure() async throws {
+    let state = ConversationState()
+    state.isVoiceActive = true
+    let renderer = ConversationExpressionPresentation(state: state)
+    await #expect(throws: ConversationExpressionError.rendererUnavailable) {
+        try await renderer.perform(.happy, owner: "unavailable")
+    }
+    renderer.resetExpression()
+    state.expressionRendererAvailable = true
+    let operation = Task { try await renderer.perform(.happy, owner: "cancelled") }
+    while state.expressionTransitionID == nil { await Task.yield() }
+    let staleID = try #require(state.expressionTransitionID)
+    let late = try #require(state.expressionAnimationCompletion)
+    operation.cancel()
+    await #expect(throws: CancellationError.self) { try await operation.value }
+    #expect(state.expressionTransitionID == nil)
+    renderer.resetExpression()
+    late(staleID, true)
+    #expect(state.expression == nil && state.expressionTransitionID == nil)
+}
+
+@Test @MainActor func uiSettingsRejectsProjectionFromReplacedDraft() {
+    let state = SettingsState(initial: CloudSettingsDraft(enabled: true, url: "https://old", key: "old", model: "old"))
+    let previous = state.revision
+    state.url = "https://new"
+    #expect(!state.presentModels(["stale"], notice: "stale", revision: previous))
+    #expect(!state.presentFailure("stale", revision: previous))
+    #expect(
+        !state.presentRestored(
+            CloudSettingsDraft(enabled: false, url: "https://old", key: "old", model: "old"), revision: previous))
+    #expect(state.url == "https://new" && state.models.isEmpty && state.error == nil)
+    #expect(state.presentModels(["new"], notice: "current", revision: state.revision))
+    #expect(state.models == ["new"] && state.notice == "current")
 }

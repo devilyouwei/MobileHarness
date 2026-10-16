@@ -6,7 +6,7 @@ Independent SwiftUI views, display values and injected interaction interfaces.
 
 ## Ownership and boundaries
 
-Foundational module with no cross-module dependencies. App adapts Agent/device/storage values and implements injected controls; views own drafts/navigation/rendering. Long-lived models, devices and task cleanup stay with their host owners.
+Foundational module with no cross-module dependencies. Owner-specific AgentBindings/ActionBindings adapt business/native values and implement injected controls; views own drafts/navigation/rendering. Long-lived models, devices and task cleanup stay with their host owners.
 
 ## External relationships and data flow
 
@@ -14,11 +14,11 @@ Runtime arrows show data or capability calls; dashed arrows show injection.
 
 ```mermaid
 flowchart LR
- App -->|UI-owned values and injected controls| UI
+ Bindings[AgentBindings / ActionBindings] -->|UI-owned values and controls| UI
  User -->|local navigation and intent| UI
- UI -->|submitted data/device intent| App
+ UI -->|submitted business intent| Bindings[AgentBindings]
  UI -->|rendered state| Screen[Native screen]
- UI -->|renderer identity and completion| App
+ UI -->|renderer identity and completion| Bindings
 ```
 
 ## Internal structure
@@ -37,9 +37,9 @@ Home refinement: camera intent initially off, YOLO details initially collapsed, 
 
 ## Interaction and acceptance
 
-Page navigation, disclosure, dialogs and drafts are local presentation. Submitted operations invoke host controls, which route directly to their actual owner. Agent-driven presentation invokes a registered function and scoped App endpoint before state changes. A later ActionResult reports the function's completion boundary; it is not the trigger for that same UI mutation.
+Page navigation, disclosure, dialogs and drafts are local presentation. Submitted operations invoke host controls, which route directly to their actual owner. Agent-driven presentation invokes a registered function and scoped UI endpoint before state changes. A later ActionResult reports the function's completion boundary; it is not the trigger for that same UI mutation.
 
-App rejects stale session/turn/request/frame updates before converting them to UI values. UI never imports Agent, Action, model, transport or persistence types. Independent display schemas include camera/pose, settings/resources/history and Action/Task/Agent logs.
+The owning integration and UI endpoints reject stale session/turn/request/frame updates before converting them to UI values. UI never imports Agent, Action, model, transport or persistence types. Independent display schemas include camera/pose, settings/resources/history and Action/Task/Agent logs.
 
 Finite expressions carry renderer identity and completion acknowledgment; setting a persistent base expression only commits state. Passive pose/gaze/spectrum updates have no long-lived UI queue. View disappearance cancels page-scoped reads/diagnostics and renderer availability, not root-owned execution.
 
@@ -82,6 +82,15 @@ UI exposes passive indexed history compressions and a chronological timeline. Ta
 History must fold a terminal Task when the loaded paginated source subset matches its exact input/request references. Complete source evidence remains independently pageable. Subsequent timeline pages must merge Task compression metadata as well as request rows, without changing row styling/navigation.
 
 History pagination becomes appearance-driven for archive lists, dialog timelines and expanded Task sources. UI-local cursor/ticket state prevents overlapping/duplicate attempts; page-owned tasks cancel on disappearance, while long-lived business operations remain root-owned.
+
+## 公开端口与应用根界面
+
+ApplicationRootPorts 定义 UI 自己的根请求/会话能力，不包含业务模块类型；ApplicationRootView 拥有首页、导航树、设置/历史目的地及诊断展示。AgentApplicationUI 在 AgentBindings 实现这些请求端口；bootstrap/retry 是注入的生命周期接口，页面不拥有根服务。
+
+SettingsProviderOperations、ModelResourcesOperating 与展示错误值属于 UI 的公开请求契约；调用实现和业务判断在上层。BluetoothViewSnapshot 由 UI.apply 接纳，连接/控制事实仍由 NexArmControlService 拥有。HomeEffectsWorkflow 只依赖 Foundation 和 UI 自身类型，持有有界期限状态；业务 invocation 到 PresentationOwner 的转换在 ActionBindings。
+
+UI、ModelKit、PlatformKit、Storage 仍无项目依赖；Actions/Agents 的外层集成可以依赖 UI，UI 不反向依赖它们。实际 Action 直接调用模块公开呈现端口，本地点击/导航不经过 Agent。
+
 
 ## 待实现
 

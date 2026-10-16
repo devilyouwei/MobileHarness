@@ -6,7 +6,7 @@ Local settings drafts/navigation, resource/device snapshots, audio detection and
 
 ## Ownership and boundaries
 
-Injected controls submit operations to App owners. UI owns localization, selection, presentation fallback and independent record schemas; it does not import Storage, Agents, Actions or device SDKs.
+Injected controls submit operations to the owning AgentBindings request ports. UI owns localization, selection, presentation fallback and independent record schemas; it does not import Storage, Agents, Actions or device SDKs.
 
 ## External relationships and data flow
 
@@ -14,10 +14,11 @@ Runtime arrows show data or capability calls; dashed arrows show injection.
 
 ```mermaid
 flowchart LR
- App -->|drafts, snapshots and control protocols| Settings[Settings state and views]
+ Bindings[Module integrations]
+ Bindings -->|drafts, snapshots and control protocols| Settings[Settings state and views]
  User -->|edit and navigate locally| Settings
- Settings -->|save, discover, acquire, device or history operation| App
- App -->|actual outcomes and revision-fenced values| Settings
+ Settings -->|save, discover, acquire, device or history operation| Bindings
+ Bindings -->|actual outcomes and revision-fenced values| Settings
 ```
 
 ## Forms and resources
@@ -113,6 +114,8 @@ archive and conversation Lists use native refreshable indicators; paging uses th
 ## Preserve history while returning from detail
 
 separate per-page initial appearance from explicit refresh. A view-local HistoryInitialLoad gate admits the first successful read once and permits retry after failure/cancellation. Dialog-list and message-list .task callbacks must not replace loaded pages when a child destination is popped. Keep List identity/row IDs, expanded Task pages and cursor state intact; native List retains its offset without a forced scrollTo. Explicit pull-to-refresh/retry still reloads the first page. A newly created page gets a fresh initial-load gate; conversation destination identity is keyed by the stable dialog ID so a different dialog never reuses another dialog’s page cache.
+
+✅ SettingsState 提供修订围栏下的发现、恢复、成功/失败呈现方法；ConversationHistoryState 提供快照提交；ModelResourcesState 提供安装提示/操作失败呈现。转换错误及领域结果留在 ActionBindings。
 
 ## 待实现
 

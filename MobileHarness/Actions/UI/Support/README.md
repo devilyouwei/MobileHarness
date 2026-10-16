@@ -2,14 +2,14 @@
 
 ## 简介
 
-定义与 UI 框架无关的能力协议、请求值、姿态载荷、反馈 PCM，以及三个呈现目录的依赖绑定。该目录编译于 Actions，不持有页面或原生渲染对象。
+定义与 UI 框架无关的能力协议、请求值、姿态载荷、反馈 PCM，以及三个呈现目录的依赖绑定。核心值/函数源编译于 Actions；RuntimePresentation 等外层集成源由互斥清单编译于 ActionBindings，通过 UI 公开接口呈现。
 
 ## 上下游关系（一级）
 
 ```mermaid
 flowchart LR
     Entries[UI 函数入口] -->|值与能力协议| S[UI/Support]
-    Host[App 呈现端点] -.->|接口实现| S
+    Host[ActionBindings 呈现端点] -.->|接口实现| S
     Catalog[Actions 共用目录组合] -->|构造目录| S
     S -->|已绑定定义| Catalog
     Speech[Actions/Speech] -->|复用反馈请求| S
@@ -75,9 +75,18 @@ FeedbackTone 的不可变静态 bank 缓存七种原始单声道 Float PCM，采
 
 所有请求都是中立 Sendable 值。能力调用以真实 FunctionInput 或明确 sessionID 为关联；原生设备准入、期限取消、状态过滤与动画恢复属于宿主。Emotion/VoiceState 是封闭词汇，Gaze/姿态/呈现参数错误提供 invalidArguments 分类，表情恢复可保留双重失败。
 
-本目录没有异步缓存加载、请求队列或后台任务。反馈 PCM 缓存有固定七项边界；未提供端点不产生静默空操作。
+核心值/目录没有异步缓存加载、请求队列或后台任务；呈现集成的事务及实际渲染等待由 UI 拥有。反馈 PCM 缓存有固定七项边界；未提供端点不产生静默空操作。
 
 [UI 入口与完成](../README.md) · [System 资源类型](../../System/Support/README.md) · [共享契约](../../Support/Contracts/README.md)
+
+## 直接 UI 绑定
+
+RuntimePresentation、EyeExpression、ConversationPresentation、ConversationPresentationController 和 HomeEffectsBindings 独立编译为 ActionBindings。它们实现标准 Actions 呈现能力，把 FunctionInput/中立业务值转换为 UI 自己的公开值和能力；实际调用不经过 App。
+
+HomeEffectsWorkflow 的 timer、文本/UUID 围栏和状态在 UI/Conversation，只接受 UI.PresentationOwner；HomeEffectsBindings 转换 invocation 身份，不把 FunctionContracts 依赖带入 UI。会话/角色/执行权限分别由 Gateway、领域端点及呈现接纳负责；表情有限动画等待保留真实 renderer completion，持续表情只确认状态接纳。
+
+
+✅ ConversationPresentationController 委托 UI 表情呈现对象等待实际动画完成；只保留执行身份接纳和领域值转换，不直接修改页面字段。
 
 ## 待实现
 

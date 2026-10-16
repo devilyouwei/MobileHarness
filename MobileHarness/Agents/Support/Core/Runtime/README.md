@@ -14,7 +14,7 @@ Runtime arrows show data or capability calls; dashed arrows show injection.
 
 ```mermaid
 flowchart LR
- Host[App lifecycle] --> Manager[AgentManager]
+ Host[AgentBindings role lifecycle] --> Manager[AgentManager]
  Manager --> Registry[AgentRegistry]
  Registry --> Role[Agent instance]
  Role --> Gate[AgentAdmissionGate and SignalInbox]

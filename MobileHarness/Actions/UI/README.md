@@ -10,14 +10,14 @@
 flowchart LR
     Gateway -->|FunctionInput| U[Actions/UI]
     U -->|完成或异常| Gateway
-    Host[App 呈现能力端点] -.->|接口实现| U
+    Host[ActionBindings 呈现端点] -.->|接口实现| U
     U -->|类型化呈现与反馈请求| Host
     System[Actions/System] -->|资源快照与读取接口| U
     U -->|反馈请求类型提供| Speech[Actions/Speech]
     Contracts[FunctionContracts] -.->|输入与定义| U
 ```
 
-App 端点负责执行关联检查、UI 状态适配、动画/设备服务及期限任务。本域不负责页面布局、权限选择或设备寿命。
+呈现/执行绑定端点负责执行关联检查、UI 状态适配、动画/设备服务及期限任务。本域不负责页面布局、权限选择或设备寿命。
 
 ## 内部模块关系
 
@@ -72,7 +72,7 @@ Notice 的非空文字限 1024 UTF-8 字节，tone 为 info/warning/error（默�
 
 函数被编译或绑定不意味着向模型开放。可选反馈/装饰能力缺失时明确 unavailable，不能伪造成功。呈现回执说明状态或效果边界，不代表对应业务操作、照片导入或设备运动已经成功。
 
-[Actions 设计](../README.md) · [值类型与目录](Support/README.md) · [App 呈现适配](../../App/Adapters/README.md)
+[Actions 设计](../README.md) · [值类型与目录](Support/README.md) · [呈现集成](Support/README.md)
 
 ## 待实现
 

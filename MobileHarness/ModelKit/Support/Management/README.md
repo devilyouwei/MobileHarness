@@ -101,6 +101,11 @@ Lazy process assembly, independent speech switches and explicit current-binding 
 
 [Parent design](../README.md)
 
+## 当前绑定代理
+
+CurrentChatCapability 独立属于 ModelKitRuntime，按每个请求取得 ModelManager 当前 chat binding，并转交工具/图片支持和推理会话。它不认识 App、UI、设置 schema 或业务仓库；失败的 availability 返回不可用诊断，实际 chat 错误继续抛出。SDK 仍只依赖自身目标和批准的第三方 SDK。
+
+
 ## 待实现
 
 - Timed eviction, global inference scheduling, general orphan-stage collection and batch acquisition are not implemented.

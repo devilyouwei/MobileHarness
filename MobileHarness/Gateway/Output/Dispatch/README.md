@@ -48,6 +48,11 @@ Separate scheduled/direct dispatch, inherited authority and retained execution/d
 
 Native calls are joined cancellable dispatches owned by OutputGateway for both ordinary model inputs and task scopes. Host interruption directly cancels and joins the owned native handler, independently of ordered terminal arrival.
 
+## 独立输出消费
+
+IndependentOutputWorkflow 属于 Gateway，复用同一实际注册 incarnation 的 dispatch 能力。Tool 队列 128、Action 队列 256、通信队列 16；Tool 并发四，边界 seal/drain 后才完成。溢出拒绝且不淘汰已接纳工作，终态失败和取消只加入对应输入。它不导入 UI、Agents 实现或 Storage，也不承担展示投影。
+
+
 ## 待实现
 
 - Durable result transport is not implemented.

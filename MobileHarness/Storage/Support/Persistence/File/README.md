@@ -2,7 +2,7 @@
 
 ## Responsibility and implementation
 
-LocalDocumentStore implements DocumentRepository with a bounded cached JSON envelope/version1, UUID revisions, process-local per-file CAS locks and atomic replacement. LocalFileStore implements BinaryObjectStore plus explicitly native directory/reservation/materialization methods used by App model-artifact adapters.
+LocalDocumentStore implements DocumentRepository with a bounded cached JSON envelope/version1, UUID revisions, process-local per-file CAS locks and atomic replacement. LocalFileStore implements BinaryObjectStore plus explicitly native directory/reservation/materialization methods used by ActionBindings model-artifact adapters.
 
 ## Direct relationships
 

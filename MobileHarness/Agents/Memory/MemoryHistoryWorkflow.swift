@@ -76,6 +76,7 @@ struct MemoryHistoryWorkflow {
             throw CommunicationError.invalidPayload
         }
         switch intent {
+        case .query: throw CommunicationError.invalidPayload
         case .cancel(let id):
             guard input.metadata.source == "runtime", id == input.id, pending == nil || pending?.input.id == id
             else {

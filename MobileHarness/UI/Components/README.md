@@ -16,7 +16,7 @@ Runtime arrows show data or capability calls; dashed arrows show injection.
 flowchart LR
  Pages[Conversation and camera] -->|expression, gaze, phase, numeric bands| Eyes[CompanionEyes and VoiceBars]
  Pages -->|full caption text and color| Caption[FadingCaption]
- Eyes -->|request-scoped completion and availability| Host[Injected App callback]
+ Eyes -->|request-scoped completion and availability| Host[Injected presentation callback]
 ```
 
 ## Eyes and completion
@@ -29,7 +29,7 @@ Normal expression changes use a 0.65-second eased layer transition. Waking from 
 
 `VoiceBars` draws 32 supplied bands, without FFT or audio generation. Production metering and synthetic preview values remain distinct. Geometry uses public safe-area values, without modifying system island UI. Decorative drawing ignores touch and VoiceOver.
 
-`FadingCaption` retains a stable character prefix, shows the latest 320 characters, renders a stable prefix and revised suffix as two Text spans, interpolates revised-suffix opacity over 250 ms and auto-scrolls. Eighteen-point vertical padding/edge fades keep boundary text readable. Accessibility receives the full caption. Reduced motion retains readable state.
+✅ FadingCaption 将完整当前值同步交给原生 caption surface，不保存异步 SwiftUI 文本副本。CaptionPresentation 保留最多 320 个完整 Characters，输出稳定前缀的 UTF-16 边界；定稿/Reduce Motion 直接显示全值。两个 UILabel 使用相同完整字符串、字体、段落和排版，仅颜色范围不同；新增范围通过 CABasicAnimation.opacity 在 250 ms 内淡入。模型层透明度始终为 1，取消、替换、离窗或移动不会使文字停在低透明度。UIScrollView 仅在内容/布局变化时定位尾部，不随每段文字启动另一条滚动动画；没有逐字 timer、逐帧 SwiftUI body 或后台任务。18 pt 边缘留白/渐变和完整文本辅助功能保留。真实设备帧率需要测量，不由 API 选择推断。采用 Apple [Core Animation 图层动画](https://developer.apple.com/library/archive/documentation/Cocoa/Conceptual/CoreAnimation_guide/CreatingBasicAnimations/CreatingBasicAnimations.html)；模型层保存可读终值，呈现层仅负责过渡。
 
 Parameterized expressions, request-scoped animation completion, numeric bars and bounded caption rendering.
 
@@ -55,7 +55,7 @@ The host-facing origin value is `ListeningLightOrigin(x:y:)`, with coordinates i
 
 normal entry visibility starts at at least 0.85. A native discrete z-position animation places the existing Metal flash above eyes only during the 0.9 s activation pulse, then restores the original settled/exit stacking. Reduce Motion retains its static field. Exit opacity duration/easing remain unchanged.
 
-UI.Notice.showNotice/dismissNotice and UI.Light.updateLight are canonical presentation Actions for trusted business calls, currently registered by no Skill. Neutral Actions values cross RuntimePresentation into root-owned HomeEffectsWorkflow, which retains one replaceable notice expiry and one light expiry, UUID-fenced cleanup, and explicit stop. Notices remain separate from factual ExecutionIssue history; actual upper-layer errors have display priority and Action failures remain panel-only. Decorative light accepts normalized origin, initial opacity/intensity and duration; it never changes consent, microphone or eyes. Native renderer separates light generations from listening eye generations and preserves existing exit fade. RuntimePresentation converts neutral Action requests into UI-owned values; AppPresentationWorkflow retains existing dependencies. UI remains a presentation-only consumer of injected values.
+UI.Notice.showNotice/dismissNotice and UI.Light.updateLight are canonical presentation Actions for trusted business calls, currently registered by no Skill. Neutral Actions values cross RuntimePresentation into root-owned HomeEffectsWorkflow, which retains one replaceable notice expiry and one light expiry, UUID-fenced cleanup, and explicit stop. Notices remain separate from factual ExecutionIssue history; actual upper-layer errors have display priority and Action failures remain panel-only. Decorative light accepts normalized origin, initial opacity/intensity and duration; it never changes consent, microphone or eyes. Native renderer separates light generations from listening eye generations and preserves existing exit fade. RuntimePresentation converts neutral Action requests into UI-owned values; HomeEffectsWorkflow now belongs to UI with no project dependencies. UI remains a presentation-only consumer of injected values.
 
 UIModule.effectDefinitions exposes the same canonical factories for isolated hosts, with nil capability explicitly unavailable. Isolated effect tests provide explicit capabilities. Clearing a decorative override restores an already-active listening rim without replaying its wake burst; its new generation still replays normally.
 

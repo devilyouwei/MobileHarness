@@ -8,11 +8,12 @@
 
 ```mermaid
 flowchart LR
+ Bindings[Module integrations]
     Gateway -->|FunctionInput| H[History 函数]
     H -->|JSON 结果或异常| Gateway
-    App -.->|共享仓库与标题计算注入| H
+    Bindings -.->|共享仓库与标题计算注入| H
     H -->|快照和原子修改| StorageChat
-    H -->|标题计算请求| App
+    H -->|标题计算请求| Bindings
     Contracts[FunctionContracts] -.->|输入与报告类型| H
 ```
 

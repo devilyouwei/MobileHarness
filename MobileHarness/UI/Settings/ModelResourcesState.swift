@@ -147,6 +147,12 @@ public enum ModelResourceOperation: Sendable { case download, remove, cancel }
         return true
     }
     public init() {}
+    public func presentInstallationNotice(_ message: String) {
+        installationNotice = message
+        error = nil
+    }
+    public func presentOperationFailure(_ message: String) { error = message }
+
     public func isDownloading(_ item: ModelResourceItem) -> Bool {
         pending[item.id] == .download || admitted.contains(item.id) || (item.active && item.activity != .deleting)
     }

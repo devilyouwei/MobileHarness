@@ -9,7 +9,7 @@ HistoryModule 定义查询/修改能力端口及五项函数绑定；HistoryQuer
 ```mermaid
 flowchart LR
     Entries[ConversationActions] -->|查询和修改能力| S[History/Support]
-    Host[App 组合层] -.->|仓库与标题计算闭包| S
+    Host[AgentBindings 集成] -.->|仓库与标题计算闭包| S
     S -->|快照与提交| Store[StorageChat 仓库]
     S -->|标题计算| Host
     Catalog[Actions 共用目录组合] -->|构造 HistoryModule| S
@@ -46,6 +46,8 @@ summarizeArchived 读取并验证归档会话，执行注入的异步标题计�
 服务持有共享 actor 仓库和一个根所有者可取消/加入的标题 worker。自动标题与显式重试共用单个准入槽，溢出明确记录可重试失败；不创建第二个历史仓库或自动重试。取消不能撤销已经完成的持久化；并发与仓库一致性规则由 StorageChat 负责。查询和目录本身不授予历史访问或删除确认。
 
 [History 参数与完成](../README.md) · [StorageChat 设计](../../../Storage/Chat/README.md) · [共享契约](../../Support/Contracts/README.md)
+
+✅ HistoryPresentationAdapter 编译到 ActionBindings，将共享仓库事实转换为 UI 自有值并通过公开呈现接口提交，保留会话/版本围栏。UI 的只读分页由 AgentBindings 经 Gateway/Memory 返回关联结果；纯查询不主动呈现第二次。
 
 ## 待实现
 

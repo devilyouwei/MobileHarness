@@ -1,6 +1,9 @@
+import ActionBindings
 import Actions
-import AppWorkflows
+import AgentBindings
 import Foundation
+import Gateway
+import PlatformKit
 import Testing
 
 private actor InventoryFixture: ModelResourceInventoryCapability {

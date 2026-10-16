@@ -111,8 +111,11 @@ import Foundation
                         }
                         Group {
                             if !state.liveTranscript.isEmpty {
-                                FadingCaption(text: state.liveTranscript, reduceMotion: reduceMotion, color: .cyan)
-                                    .accessibilityLabel("用户输入：" + state.liveTranscript)
+                                FadingCaption(
+                                    text: state.liveTranscript, reduceMotion: reduceMotion, color: .cyan,
+                                    finalized: state.transcriptFinalized
+                                )
+                                .accessibilityLabel("用户输入：" + state.liveTranscript)
                             } else {
                                 Color.clear.allowsHitTesting(false)
                             }

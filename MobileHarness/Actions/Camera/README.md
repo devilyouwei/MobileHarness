@@ -2,16 +2,17 @@
 
 ## 简介
 
-通过 CameraControlCapability 执行相机启闭、镜头选择、重试、拍摄及照片处置。入口负责参数与结果编码，App 端点负责原生相机、权限、媒体所有权和呈现生命周期。
+通过 CameraControlCapability 执行相机启闭、镜头选择、重试、拍摄及照片处置。入口负责参数与结果编码，ActionBindings 端点负责原生相机、权限、媒体所有权和呈现生命周期。
 
 ## 上下游关系（一级）
 
 ```mermaid
 flowchart LR
+ Bindings[Module integrations]
     Gateway -->|FunctionInput| Camera[Camera 函数]
     Camera -->|完成值或异常| Gateway
-    App -.->|注入 CameraControlCapability| Camera
-    Camera -->|相机和照片请求| App
+    Bindings -.->|注入 CameraControlCapability| Camera
+    Camera -->|相机和照片请求| Bindings
     Contracts[FunctionContracts] -.->|请求与定义类型| Camera
 ```
 
@@ -52,7 +53,7 @@ flowchart LR
 
 本域没有请求队列、缓存或常驻捕获任务。权限拒绝、忙、未启用、后台或照片不可用通过类型化错误传播；是否已经发生部分效果以端点的实际状态和回执为准。
 
-[Actions 设计](../README.md) · [能力与回执](Support/README.md) · [宿主相机生命周期](../../App/Lifecycle/README.md)
+[Actions 设计](../README.md) · [能力与回执](Support/README.md) · [相机执行生命周期](Support/README.md)
 
 ## 待实现
 

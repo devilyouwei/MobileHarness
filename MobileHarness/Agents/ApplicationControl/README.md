@@ -2,7 +2,7 @@
 
 ## 职责与直接关系
 
-拥有设置、模型资源、Provider、设备、导航及环境事实的确定性事务，不承担普通对话。UI/App 提交类型化意图，Gateway 校验和投递，本角色发出固定函数调用，Actions 使用注入能力完成读写或呈现。Assistant 可以通过 application-control Skill 调用相同函数，不需要创建本角色的对话。
+拥有设置、模型资源、Provider、设备、导航及环境事实的确定性事务，不承担普通对话。UI/AgentBindings 提交类型化意图，Gateway 校验和投递，本角色发出固定函数调用，Actions 使用注入能力完成读写或呈现。Assistant 可以通过 application-control Skill 调用相同函数，不需要创建本角色的对话。
 
 ## 内部结构
 

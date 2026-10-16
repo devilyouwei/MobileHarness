@@ -9,7 +9,7 @@
 ```mermaid
 flowchart LR
     Entries[System 函数入口] -->|目录与业务服务| S[System/Support]
-    Host[App 组合与原生能力] -.->|校验绑定凭据和设备端点| S
+    Host[ActionBindings 原生能力] -.->|校验绑定凭据和设备端点| S
     S -->|原生效果与状态请求| Host
     S -->|文档读写| Storage
     UI[Actions/UI] -->|资源事实和呈现分类| S
@@ -74,7 +74,16 @@ ProviderSettingsStore 是 actor，以 busy 排斥重叠读写，保存 version=1
 
 ## SQLite records and runtime identity
 
-Settings/model-preference services consume DocumentRepository protocols; concrete file construction stays in App/test composition factories. Preserve revision conflicts and producer-owned rollback policy.
+Settings/model-preference services consume DocumentRepository protocols; concrete settings-file construction stays in module integration/test factories. Preserve revision conflicts and producer-owned rollback policy.
+
+## 配置与制品的真实能力绑定
+
+ActionBindings 编译 SettingsCredentialAdapter、SettingsProviderAdapter、SettingsModelResourcesAdapter、ModelArtifactStorageAdapter、ArtifactServices、ModelDownloadBackgroundService 及显式模型/语音诊断执行。Provider 事务和资源策略仍由 Actions 核心服务拥有；绑定只调用 SDK/Keychain/文件能力并适配展示值。SettingsCredentialAdapter 提供公开的无参数构造和凭据协议实现；SettingsProviderAdapter.discoverModels 提供公开异步发现端口，供 AgentBindings 注入领域请求服务。
+
+ArtifactServices 根持有一个准备任务；模型权重仍按需加载。后台回调最多保留 10 个 session completion，重复 identifier 替换时先完成旧回调，溢出明确保留 lastFailure 并结束该次交接。真实制品读取错误保留，不伪造恢复成功。单份 OS 准备额度由 PlatformKit.NativeBackgroundAllowance 提供，不承担设备安全。
+
+SpeechDiagnosticWorkflow 的 stopAndWait 加入真实播放、操作和卸载；卸载/音频会话清理错误保留并向根服务传播，成功报告只在真实完成后设置。App 委托仅转交 OS 参数。
+
 
 ## 待实现
 

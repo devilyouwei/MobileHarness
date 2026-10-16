@@ -1,116 +1,60 @@
-# App — Composition and Native Lifecycle
+# App — 应用入口与组合根
 
-## Summary
+## 职责与边界
 
-Application host, explicit service assembly, native lifecycle ownership and adaptation between independent modules.
+App 只负责入口、创建、注册、组合、连接及应用级生命周期。业务流程、数据转换、领域状态、用户错误文案、页面树和功能工作者由所属模块拥有；注入闭包只连接公开接口。
 
-## Ownership and boundaries
-
-App owns registration, operation lifetimes, permissions, safety fences and UI/native adapters. Agents own business decisions; UI owns local presentation. ModelKitDefaults owns model assembly. Root services outlive page navigation.
-
-## External relationships and data flow
-
-Runtime arrows show data or capability calls; dashed arrows show injection.
+## 直接上下游
 
 ```mermaid
-flowchart LR
- UI -->|Submitted intent| App
- PlatformKit -->|Media and native facts| App
- App -->|External Signals and execution transport| Gateway
- App -.->|Construct and register| Agents
- App -.->|Capabilities and catalog| Actions
- Actions -->|Injected native or presentation endpoint| App
- App -->|State and view content| UI
- App -->|Capture, playback and connectivity| PlatformKit
- App -->|Capability acquisition| ModelKit
- App -->|Stores and resource roots| Storage
- Resources -->|Packaged metadata| App
+flowchart TB
+ OS[iOS / Scene / 系统回调] --> App
+ Configuration[资源位置和模块声明] --> App
+ App -.->|创建、注入、启停| AgentBindings
+ App -.->|创建与注册| ActionBindings
+ App -.->|服务图管理| AppLifecycle
+ App -.->|后端与原生实例| Foundations[UI / PlatformKit / Storage]
+ UI -->|注入的业务请求接口| AgentBindings
+ AgentBindings --> Gateway
+ Gateway --> Agents
+ Agents -->|函数请求| Gateway
+ Gateway --> ActionBindings
+ ActionBindings -->|公开呈现及能力接口| Foundations
 ```
 
-## Internal structure
+App 不位于运行期业务请求、数据转换或 UI 呈现链路中。Agents 核心拥有决策；Gateway 拥有传输和执行；ActionBindings/AgentBindings 是各自模块内的外层集成目标，不是新增一级模块。
+
+## 内部结构与数据流
 
 ```mermaid
-flowchart TD
- Entry[MobileHarnessApp] --> Composition
- Composition --> Lifecycle
- Composition --> Workflows
- Composition --> Behaviors[Composition/Behaviors]
- Composition --> Adapters
- Lifecycle -->|Native scopes| Adapters
- Workflows -->|Injected operations| Adapters
- Behaviors -->|Function bindings| Adapters
+flowchart TB
+ Entry[MobileHarnessApp] --> Composition[AppComposition]
+ Composition --> Factories[ServiceFactories]
+ Composition --> Registration[ModuleRegistration]
+ Composition --> Connections[connect: 公开端口接线]
+ Factories --> Services[Services: 实例与根作用域]
+ Registration --> Lifecycle[ApplicationLifecycle]
+ Entry -->|系统生命周期| Lifecycle
+ Services --> Lifecycle
+ Lifecycle -->|启停、失效及完成| Ports[模块公开生命周期接口]
 ```
 
-## Interfaces and routing
+- MobileHarnessApp 挂载 UI.ApplicationRootView，转交 Scene 活动状态；导航、设置/历史目的地及诊断页面由 UI 实现。
+- [Composition](Composition/README.md) 创建实例并安装静态服务图；重试先加入旧图停止，再创建新作用域。消费者不查询 App 容器。
+- [Lifecycle](Lifecycle/README.md) 管理通用顺序、启动回滚、前台状态与停止加入，并转交 OS URL-session 回调。
 
-| Operation | Owner and route | Completion |
-| --- | --- | --- |
-| Navigation, dialogs, drafts and selection | UI-local injected methods | State accepted |
-| Page visibility, system settings and immediate stop | App lifecycle endpoint | Native cleanup according to endpoint |
-| Camera, history, provider, resource and device requests | External publish to the exact business Agent; registered function execution | Correlated business result |
-| Text and final ASR | Assistant; explicit specialist delegation where selected | Reply or task result |
-| Agent-selected presentation | Gateway → Actions → authorized App endpoint | Current scope accepted |
+## 接口与失败
 
-Publication has no subscriber receipt. UI request waiters observe business completion independently, with owned 120-second watchdogs. Every output consumer is bound to the actual registered Agent incarnation.
+根图为 repositories → agents → native。具体服务内部的 Agent 注册、配置事务、采集/播放、相机处置、蓝牙恢复和展示由模块实现。App 只调用公开方法，错误原样交给 UI 请求适配器的启动失败端口。
 
-## Lifecycle and failure semantics
+AppLifecycle 验证有限静态依赖图，保留原始启动错误及全部服务清理错误。后台先同步失效，再等待异步暂停/清理；取消和物理停止分别确认。停止失败阻止新图替换。模块根任务独立于页面；物理安全不依赖后台任务额度。
 
-Close admission, stop producers, cancel and join owned work, then release matching bindings and resources. A cancellation request is not physical stop. Native background fences run immediately; inference never supplies device safety. Captions, microphone capture, business tasks and playback have separate lifetimes.
+✅ 前台启动：初始 inactive 只等待 active；启动中失活引起的取消在成功回滚后由下一次 active 重建作用域。业务与清理错误不被隐藏。
 
-Healthy camera flips retain the native session/lease and acknowledge input replacement before independently joined vision replacement. Full close/background joins all owners. Bluetooth recovery does not cancel unrelated Agent queues. Download scheduling is independent of voice/device work.
+## 当前实现
 
-Stable interaction runtime, resident SpeechPerception, independent feature targets, typed owner subscriptions and frozen function registration are implemented.
-
-## Related design
-
-[Parent design](../README.md) · [Adapters](Adapters/README.md) · [Composition](Composition/README.md) · [Lifecycle](Lifecycle/README.md) · [Workflows](Workflows/README.md)
-
-## Skill/task-mode contract
-
-App binds real Agent.Task control functions to Assistant and projects current task/Skill state. Photography model results return to Assistant. Assistant conversations include all persisted inputs; task history additionally groups foreground/background tasks from Assistant state. UI navigation remains local; conversation-requested UI changes remain Actions.
-
-home hold intents remain routed to resident SpeechPerception. Lifecycle owns a bounded toggle publication and native capture before activation feedback; Speech owns canonical feedback composition; Actions/UI owns bounded original PCM synthesis, and PlatformKit owns generic clip playback and native impact requests.
-
-Lifecycle owns native half-duplex capture and immediate interruption; Composition injects trusted current-conversation cancellation. Presentation owns a single native-transition worker and bounded stale-turn fencing. Native I/O owns stopPlayback and distinct PCM continuity failure facts.
-
-App forwards reusable feedback capabilities to its root voice owner. ✅ Listening activation validates capabilities/permissions, starts native capture, then joins canonical cue/native-start-gated haptic. The first PCM enables the active animation. SpeechPerception buffers PCM while lazy VAD/ASR loading completes; model weights and TTS preparation do not gate recording. Lifecycle owns the context-fenced waiter and an independent NativeCuePlayback, which leaves capture running. No acoustic tail or cue mute window discards overlapping user speech.
-
-Camera save/ignore shares the same native disposition path from UI and Agents. Successful import gates feedback; one root-owned task joins animation/cue and removes the matching photo. Feedback issues never fabricate a failed album transaction.
-
-Host keeps archive policy and physical voice ownership; wake presentation receives the actual generation. Graphics lifecycle remains independent of native input/model preparation.
-
-Implemented validation aid: the DEBUG-only `-companion-cycle-preview` launch argument opens the isolated visual surface and automatically exercises six 1.3-second wakes / 0.8-second sleeps. It creates no camera, microphone or model runtime; physical Animation Hitches evidence must be labeled synthetic UI acceptance.
-
-Home failure contract: failures remain in root execution snapshots; only Agent/App/system failures project a fresh toast independent of voicePhase. Action failures remain panel-only. Photo storage selects FIFO cache retention; decision continuation has no four-round/16-native host limit.
-
-## Agent records
-
-设置的 Agent 记录入口由各 Agent 注入自己的记录页面，目前只有 Assistant 聊天记录。前台 Task 的摘要、终态与原始请求包含在同一 dialog 的 SQL 记录；任务运行状态与后台委派仍由 Agents/首页执行记录持有。其他 Agent 的记录类型尚未实现。
-
-VoiceSessionCoordinator prepares bounded default cue PCM and the haptic generator on touch-down through an injected UI callback. Aborted/background preparation is cancelled and joined. It does not prewarm an output graph or load model weights; canonical activation reuses the prepared PCM.
-
-根持有的 HomeEffectsWorkflow 管理 notice/light 的有界状态、UUID 隔离到期与 stop；RuntimePresentation 适配中立 Action 请求。详见 [Presentation](Workflows/Presentation/README.md)。
-
-ActionActivityWorkflow 在日志→展示边界为 speechPerception 的 recognition 错误设置用户文案“我没听清”；原始消息、来源、输入关联仍原样保存在日志。recordFailure 和 startFailures 快照使用同一映射，其他错误不改文案。
-
-## Streaming TTS latency
-
-VoiceSessionCoordinator joins playback/lease cleanup and immediate policy-permitted listening restoration. There is no post-playback timer; failures remain explicit and user-off/session fences prevent reopening capture.
-
-## Task history v2 and in-place compression
-
-App adapts canonical SQLite dialog/message projections into passive UI. Historical Task membership uses historyTaskID rather than all requests under inputIDs.
-
-## Model-only photo preparation
-
-ApplicationRuntime injects two distinct capabilities into Assistant photo observations: read returns the owned original ChatImage; prepareJPEG translates the Agent-supplied policy into native codec limits. App holds no compression thresholds, decides no analysis precision and never performs preparation as a hidden side effect of reading. Assistant constructs the prepared ChatImage and retains it through ReACT; camera/photo storage and album import continue with the original.
-
-## SQLite records and runtime identity
-
-Configuration preservation: retain Settings/settings.json, Models/download-source.json, Models/transfers.json and CapturedPhotos. Runtime contexts use Storage process-memory state; only business record metadata belongs in records.sqlite.
-
-App 为所有角色和隔离诊断注入进程内存 Context，业务数据注入 SQLite 仓库；设置、模型和媒体文件由相应原生适配器管理。
+✅ 代码已迁移至上述边界，静态边界、专项回归及未签名 iOS 设备目标编译通过。❌ 全量回归和 Simulator 构建仍有单独记录的失败/限制，不作为通过。实现与验收记录见 [实施计划](../../docs/requirements/technical/App-Host-Boundaries-Plan.md) 和 [验证记录](../../docs/validation/Validation-History.md)。
 
 ## 待实现
 
-- Independent multi-window execution namespaces and forced interruption of non-cooperative native handlers are not implemented.
+- 多窗口独立运行命名空间、非合作原生 handler 的强制中断，以及独立的真实模型/原生 UI/物理设备验收。

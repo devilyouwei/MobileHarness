@@ -2,7 +2,7 @@
 
 ## 职责与直接接口
 
-处理历史读取、归档、删除、展示与独立标题生成事务，不生成普通对话。UI/App 的 history.intent 经 Gateway 进入；Memory 发出固定调用，Actions 通过注入的 StorageChat/呈现端口执行，结果回原事务。Assistant 的 history-query 原生查询直接使用同一批函数，不需要把用户对话转发到 Memory。
+处理历史读取、归档、删除、展示与独立标题生成事务，不生成普通对话。UI/AgentBindings 的 history.intent 经 Gateway 进入；Memory 发出固定调用，Actions 通过注入的 StorageChat/呈现端口执行，结果回原事务。Assistant 的 history-query 原生查询直接使用同一批函数，不需要把用户对话转发到 Memory。
 
 ## 内部结构
 
@@ -31,3 +31,8 @@ Cloud 非思考参数由 [OpenAI 请求编码器](../../ModelKit/Language/LLM/Op
 
 - 超出记录事务与标题生成范围的语义记忆能力。
 - 历史原生交互、真实模型标题与端到端取消/恢复验收。
+
+
+## 历史只读请求接入
+
+✅ UI 的记录分页、消息、归档及授权图片读取也经 MemoryHistoryIntent.query 的实际 Gateway/Memory 接入；不再由 UI 请求适配器直接读仓库。MemoryHistoryReadRequests 为根持有的类型化只读请求暂存，最多四个请求，每个请求一个结果等待者；Signal 只携带随机 ID，结果保留规范仓库返回值。请求/结果有界，120 秒未返回明确超时，取消/停止加入实际读取，迟到结果不更新 UI；不新增模型函数或重放副作用。

@@ -1,8 +1,12 @@
+import ActionBindings
+import Actions
 import Foundation
+import Gateway
+import PlatformKit
 import Testing
 import UI
 
-@testable import AppSettingsWorkflow
+@testable import AgentBindings
 
 @MainActor
 private final class SettingsFacadeFixture {

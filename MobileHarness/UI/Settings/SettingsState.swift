@@ -52,6 +52,37 @@ public final class SettingsState {
     }
     public var canLoad: Bool { !isLoading && !isSaving }
     public var canSave: Bool { !isLoading && !isSaving && (!isEnabled || !selectedModel.isEmpty) }
+    @discardableResult public func presentFailure(_ message: String, revision: UInt64) -> Bool {
+        guard revision == self.revision else { return false }
+        error = message
+        isLoading = false
+        return true
+    }
+    @discardableResult public func presentModels(_ values: [String], notice: String, revision: UInt64) -> Bool {
+        guard revision == self.revision else { return false }
+        models = values
+        if !values.isEmpty && !values.contains(selectedModel) { selectedModel = "" }
+        self.notice = notice
+        isLoading = false
+        error = nil
+        return true
+    }
+    @discardableResult public func presentRestored(_ value: CloudSettingsDraft, revision: UInt64) -> Bool {
+        guard revision == self.revision else { return false }
+        isEnabled = value.enabled
+        url = value.url
+        key = value.key
+        selectedModel = value.model
+        models = value.model.isEmpty ? [] : [value.model]
+        error = nil
+        return true
+    }
+    @discardableResult public func presentNotice(_ message: String, revision: UInt64) -> Bool {
+        guard revision == self.revision else { return false }
+        notice = message
+        error = nil
+        return true
+    }
     public func invalidateRevision() { revision += 1 }
 }
 

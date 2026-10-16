@@ -9,7 +9,7 @@
 ```mermaid
 flowchart LR
     Entries[Speech 函数入口] -->|能力与反馈类型| S[Speech/Support]
-    Host[App 播放及捕获端点] -.->|协议实现| S
+    Host[ActionBindings 原生端点] -.->|协议实现| S
     Catalog[Actions 共用目录组合] -->|构造目录| S
     S -->|两项函数定义| Catalog
     UIValues[Actions/UI] -->|CueRequest 与 HapticRequest| S
@@ -42,6 +42,15 @@ ListeningFeedback 在 `ListeningFeedback.swift` 中组合已校验的 UI 提示�
 
 [Speech 入口设计](../README.md) · [UI 反馈接口](../../UI/Support/README.md) · [共享契约](../../Support/Contracts/README.md)
 
+## 原生执行集成
+
+ActionBindings 编译 SpeechPlayback、ListeningActivationFeedback 和 VoiceNativeEffects。它们持有 PCM checkout、canonical 子调用反馈组合、一个激活 gate、单份 cue cache、原生提示音/触觉和真实播放器。VoiceNativeEffects 通过注入的当前 scope 校验和状态回调执行，不导入 Agents/Gateway。
+
+输入同意、半双工策略、角色登记与输入发布属于 AgentBindings 的 VoiceSessionCoordinator。通用麦克风启停屏障属于 PlatformKit/Audio。生产者 SpeechSynthesisError 的用户文案属于 AgentBindings 的 SpeechFailurePresentation，原始错误保留。
+
+
 ## 待实现
 
 - 暂无本目录独立的实现待办；跨模块及实际模型/设备验收见所属模块说明。
+
+✅ VoiceNativeEffects 的播放电平子任务在播放结束、失败或取消后取消并加入，展示值经 UI 的公开方法提交。

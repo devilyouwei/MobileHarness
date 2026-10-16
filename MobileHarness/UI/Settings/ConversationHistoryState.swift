@@ -11,6 +11,10 @@ public final class ConversationHistoryState {
     public var isRefreshing = false
     public var hasMoreArchives = false
     public var archivePaging = HistoryPageLoading<String>()
+    public func present(_ snapshot: HistorySnapshot, status: String?) {
+        archive = snapshot
+        self.status = status
+    }
     public init(title: String = "Assistant 聊天记录") {
         self.title = title
     }

@@ -18,6 +18,8 @@
 
 测试操作使用注入结果及明确完成信号；执行结果到 UI 值的映射属于 AppWorkflowTests。历史页的返回保留检查验证 gate/缓存状态，不声称已验证 native List 的真实滚动位置。
 
+CaptionPresentationTests 覆盖部分文本→最终修订、定稿与移动不丢字符、连续替换、320 Character 上限、emoji/组合字符的 UTF-16 范围及 Reduce Motion。不以值测试代替原生 UILabel/动画帧率验收。
+
 ## 待实现
 
 - 原生 List 分页/下拉刷新/返回手势和滚动位置保持。

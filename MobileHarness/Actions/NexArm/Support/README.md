@@ -8,10 +8,11 @@
 
 ```mermaid
 flowchart LR
+ Bindings[Module integrations]
     Entries[NexArm 函数入口] -->|请求与元数据| S[NexArm/Support]
-    App -->|计划执行和渐进提案| S
-    App -.->|注入连接内链路| S
-    S -->|结果及失败状态| App
+    Bindings -->|计划执行和渐进提案| S
+    Bindings -.->|注入连接内链路| S
+    S -->|结果及失败状态| Bindings
     S -->|编码和观察接口| PlatformKit
     PlatformKit -->|新鲜测量与发送准入| S
     Catalog[Actions 共用目录组合] -->|构造目录| S
@@ -100,9 +101,16 @@ NexArmAimCommand.command/accept(Command) 在首次准入时将肩/肘置于跟�
 
 JointCommand 将 base/pitch 按 `4096/(2π)` 映射到跟踪 rest。pitch 超过 0.25 弧度开始伸出，至 0.7 达到 shoulder_lift 最小 1150；elbow 用固定肩肘和保持前臂水平。ForearmLeveler 用 40 count lead 与六 count 滞回补偿伸出方向，目标受电机范围夹取。五轴包保留于诊断控制器接口，不用于实时跟踪；速度由相邻目标距离及 200 毫秒名义值选取，上限 700；该名义值不是到位等待。
 
-这些组件只提供有限计划、提案与接纳状态。长期跟踪 worker、资源接管、写入公平性、连接恢复及手动替换/加入清理由 App 负责，不能用 planner 完成替代真实到位。
+这些组件只提供有限计划、提案与接纳状态。长期跟踪 worker、资源接管、写入公平性、连接恢复及手动替换/加入清理由领域执行服务负责，不能用 planner 完成替代真实到位。
 
 [入口、资源与完成](../README.md) · [原生链路接口](../../../PlatformKit/Connectivity/NexArm/README.md) · [共享契约](../../Support/Contracts/README.md)
+
+## 连接、执行与 UI 适配的分离
+
+ActionBindings 编译 NexArmControlService、NexArmConnectionState、BluetoothRecovery/Presentation、BluetoothWorkflow 和 NexArmBehaviorAdapter。NexArmControlService 的状态不含 UI 类型，拥有连接内执行器、恢复策略及有界手动/跟踪工作；NexArmConnectionState 是唯一连接/控制事实来源。BluetoothWorkflow 实现 UI 控制接口，只转换完整 BluetoothViewSnapshot，UI 草稿/错误字段不能授权原生动作。
+
+独立持续执行失败先保留 invocation 私有报告，再通过注入的结果投递能力回到真实 Gateway；报告转换在 AgentBindings 完成，不反向导入 Gateway。资源验证保留 inherited permit；连接恢复不取消其他 Agent 队列，不自动重放动作。shutdown 加入已有清理并核对真实 link.status 的 disconnected；未确认则明确失败，不宣称物理电机已经到位或停止。
+
 
 ## 待实现
 

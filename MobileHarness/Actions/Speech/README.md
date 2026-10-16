@@ -10,13 +10,13 @@
 flowchart LR
     Gateway -->|FunctionInput| S[Speech 函数]
     S -->|完成或异常| Gateway
-    Host[App 播放与聆听端点] -.->|能力注入| S
+    Host[ActionBindings 播放与聆听端点] -.->|能力注入| S
     S -->|音频句柄与策略配置| Host
     Contracts[FunctionContracts] -.->|输入与预算类型| S
     UIValues[Actions/UI 反馈类型] -.->|提示音与触觉请求| S
 ```
 
-SpeechPerception 的策略选择和音频生成在调用上游；本域只通过已注册函数接收请求。原生播放、捕获与会话寿命属于注入的 App 能力。
+SpeechPerception 的策略选择和音频生成在调用上游；本域只通过已注册函数接收请求。原生播放、捕获与会话寿命属于注入的 ActionBindings 能力。
 
 ## 内部模块关系
 
@@ -49,9 +49,9 @@ update 的固定使用者是 SpeechPerception；实际 source/session/revision �
 
 SpeechModule 必须注入播放能力，聆听能力可选；缺少聆听能力时 update 抛 listeningUnavailable。入口没有排队、后台 worker 或自动恢复循环，取消传递与清理由端点及执行层共同实现。
 
-聆听恢复、播放屏障、原生捕获和声学时序属于 App/SpeechPerception 的契约，不在本域设定固定恢复等待。端点返回可能表示策略接纳、加入启动完成或实际播放排空，应按对应接口解释；失败不触发这里的隐式语音重试。
+聆听恢复、播放屏障、原生捕获和声学时序属于 AgentBindings/ActionBindings/SpeechPerception 的契约，不在本域设定固定恢复等待。端点返回可能表示策略接纳、加入启动完成或实际播放排空，应按对应接口解释；失败不触发这里的隐式语音重试。
 
-[Actions 设计](../README.md) · [能力目录](Support/README.md) · [宿主语音生命周期](../../App/Lifecycle/README.md)
+[Actions 设计](../README.md) · [能力目录](Support/README.md) · [语音集成生命周期](../../Agents/Support/README.md)
 
 ## 待实现
 

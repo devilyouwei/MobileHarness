@@ -10,7 +10,7 @@
 flowchart LR
     Gateway -->|FunctionInput| S[System 函数]
     S -->|实际结果与失败| Gateway
-    Host[App 能力端点] -.->|资源设备与 Task 能力| S
+    Host[ActionBindings 能力端点] -.->|资源设备与 Task 能力| S
     S -->|原生操作和控制请求| Host
     S -->|配置文档持久化| Storage
     Contracts[FunctionContracts] -.->|输入与 TaskControlCapability| S

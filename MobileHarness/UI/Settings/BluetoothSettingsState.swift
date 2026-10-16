@@ -71,7 +71,7 @@ public enum BluetoothRecoveryStage: Sendable {
     }
 }
 
-/// Presentation values only; AppWorkflows owns discovery, connections, persistence and motion.
+/// Presentation values only; NexArmControlService owns discovery, connections, persistence and motion.
 @MainActor @Observable
 public final class BluetoothSettingsState {
     public var availability: BluetoothAvailability = .unknown
@@ -83,7 +83,7 @@ public final class BluetoothSettingsState {
     public var recoveryStage: BluetoothRecoveryStage = .idle
     public var recoveryDeviceID: String?
     public var recoveryAttempt = 0
-    /// Latest native communication issue, independently adapted by App.
+    /// Latest native communication issue, adapted by ActionBindings.
     public var transportIssue: String?
     /// Connected or remembered devices belong to My Devices; a new pending selection stays nearby.
     public var myDevice: BluetoothDeviceRow? {
@@ -151,5 +151,46 @@ public final class BluetoothSettingsState {
             case .idle, .suspended: "未连接"
             }
         }
+    }
+}
+
+public struct BluetoothViewSnapshot: Sendable {
+    public var availability: BluetoothAvailability = .unknown
+    public var phase: BluetoothConnectionPhase = .idle
+    public var scanning = false
+    public var remembered: BluetoothDeviceRow?
+    public var nearby: [BluetoothDeviceRow] = []
+    public var selected: BluetoothDeviceRow?
+    public var recoveryStage: BluetoothRecoveryStage = .idle
+    public var recoveryDeviceID: String?
+    public var recoveryAttempt = 0
+    public var transportIssue: String?
+    public var error: String?
+    public var notice: String?
+    public var jogging = false
+    public var joints: [Int] = []
+    public var pose: [Int] = []
+    public var sampledAt: Date?
+    public init() {}
+}
+
+extension BluetoothSettingsState {
+    public func apply(_ snapshot: BluetoothViewSnapshot) {
+        availability = snapshot.availability
+        phase = snapshot.phase
+        scanning = snapshot.scanning
+        remembered = snapshot.remembered
+        nearby = snapshot.nearby
+        selected = snapshot.selected
+        recoveryStage = snapshot.recoveryStage
+        recoveryDeviceID = snapshot.recoveryDeviceID
+        recoveryAttempt = snapshot.recoveryAttempt
+        transportIssue = snapshot.transportIssue
+        error = snapshot.error
+        notice = snapshot.notice
+        jogging = snapshot.jogging
+        joints = snapshot.joints
+        pose = snapshot.pose
+        sampledAt = snapshot.sampledAt
     }
 }

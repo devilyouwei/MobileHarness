@@ -9,7 +9,7 @@
 ```mermaid
 flowchart LR
     Domains[六个业务域] -->|使用宏与契约| S[Actions/Support]
-    Host[App 组合层] -->|能力绑定| S
+    Host[ActionBindings 注册] -->|能力绑定| S
     S -->|声明与已绑定目录| Host
     Plugin[BehaviorDefinitions] -.->|宏展开实现| S
     Runtime[Gateway 执行与协议适配] -->|消费公共契约| S
@@ -51,6 +51,11 @@ Actions 目标排除 `Support/Contracts`，通过导入 FunctionContracts 使用
 本目录的宏声明和目录组合不持有异步任务、队列或设备会话。生成的工厂闭包捕获注入能力；其使用寿命由已构造目录和宿主负责。重复地址、无效定义与目录容量由 CapabilityCatalog 校验，不由声明汇总函数自动处理。
 
 [Actions 设计](../README.md) · [编译目标地图](../../README.md#target-map) · [宏插件设计](../../../Macros/BehaviorDefinitions/README.md)
+
+## 独立 ActionBindings 目标
+
+BehaviorAssembly.swift、BehaviorProtocolBindings.swift 和 NativeCleanupFailure.swift 属于外层 ActionBindings，不编译进 Actions 核心。前两者冻结并校验真实函数/协议注册；后者保留多个原生清理错误，不把部分停止改写为成功。域内集成源同样由显式清单选择，不能因同目录而获得核心目标依赖。
+
 
 ## 待实现
 

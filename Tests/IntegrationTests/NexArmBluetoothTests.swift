@@ -1,7 +1,7 @@
 import Actions
+import AgentBindings
 import AgentCore
 import Agents
-import AppWorkflows
 import CallRuntime
 import ExecutionRuntime
 import Foundation
@@ -15,7 +15,7 @@ import StorageTasks
 import Testing
 import UI
 
-@testable import AppBluetoothWorkflow
+@testable import ActionBindings
 @testable import PlatformKit
 
 /// Explicit simulation. Default tests never create a CoreBluetooth manager or move physical hardware.
@@ -3392,4 +3392,21 @@ func bluetoothManualSimpleCommandsRemainUsableWithoutIKOrResourceAdmission() asy
     try workflow.validateControlAdmission(.init(operation: .scan))
     workflow.disconnect()
     await workflow.waitUntilIdle()
+}
+
+@Test(.actionCatalog) @MainActor func bluetoothPresentationCannotAuthorizeNativeExecution() async throws {
+    let file = bluetoothTestFile()
+    defer { try? FileManager.default.removeItem(at: file) }
+    let link = BluetoothArmFixture()
+    let workflow = bluetoothTestWorkflow(link, file: file)
+    workflow.state.phase = .connected
+    workflow.state.availability = .available
+    #expect(workflow.state.canControl)
+    #expect(workflow.service.state.phase == .idle)
+    #expect(throws: NexArmExecutionError.controlNotReady) {
+        try workflow.validateControlAdmission(.init(operation: .preset, action: "nod"))
+    }
+    #expect(await link.observedCommands.isEmpty)
+    try await workflow.shutdown()
+    #expect(workflow.state.phase == .idle)
 }

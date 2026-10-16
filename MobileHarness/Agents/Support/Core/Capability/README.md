@@ -59,7 +59,7 @@ CapabilityDocumentation 只保留 doc/parameters，目录不渲染函数 example
 
 ## Isolated communication scopes
 
-AgentConfiguration.restrictingCommunication(to:contracts:) derives a new immutable configuration by retaining only existing inputs, subscriptions, publications and sends whose contract is explicitly allowed. Revalidate the projected declaration against the injected schema catalog; preserve identity, version and function capabilities. Never add a source, target, grant or cached-resource mutation. Core owns only this neutral restriction; App chooses diagnostic contracts.
+AgentConfiguration.restrictingCommunication(to:contracts:) derives a new immutable configuration by retaining only existing inputs, subscriptions, publications and sends whose contract is explicitly allowed. Revalidate the projected declaration against the injected schema catalog; preserve identity, version and function capabilities. Never add a source, target, grant or cached-resource mutation. Core owns only this neutral restriction; AgentBindings chooses diagnostic contracts.
 
 ## 待实现
 

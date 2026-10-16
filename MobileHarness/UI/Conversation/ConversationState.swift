@@ -7,7 +7,7 @@ public enum EyeExpression: String, CaseIterable, Sendable {
     case clear, closed, smile, happy, laugh, thinking, surprised, sad, love, angry, scared, playful
 }
 
-/// MainActor presentation only. App applies accepted updates and owns the running session.
+/// MainActor presentation values and public rendering ports; module services own business sessions.
 @MainActor @Observable
 public final class ConversationState {
     public var voicePhase: VoicePhase = .loading
@@ -16,7 +16,7 @@ public final class ConversationState {
     public var assistantReply = ""
     public var assistantReplyOpacity = 1.0
     public var expression: EyeExpression?
-    /// Display transaction identity only; App owns the waiting operation.
+    /// Display transaction identity only; UI owns the renderer acknowledgment.
     public var expressionEmphasized = false
     public var expressionTransitionID: String?
     public var expressionRendererAvailable = false
@@ -36,6 +36,14 @@ public final class ConversationState {
     /// Sleep is a presentation gate, independent of processing/speaking pauses in an enabled session.
     public var displayedExpression: EyeExpression { isVoiceActive ? (expression ?? .clear) : .closed }
     public init() {}
+    public func presentPlaybackSpectrum(_ values: [Float]) { playbackSpectrum = values }
+    public func presentTranscript(_ text: String) { liveTranscript = text }
+    public func beginReply() { assistantReply = "" }
+    public func appendReply(_ text: String) { assistantReply += text }
+    public func presentVoiceStatus(_ status: String, clearMicrophone: Bool = false) {
+        if clearMicrophone { microphoneSpectrum = [Float](repeating: 0, count: 32) }
+        voiceStatus = status
+    }
     public func resetCaptions() {
         liveTranscript = ""
         transcriptFinalized = false
@@ -106,4 +114,86 @@ public enum ConversationCaptionVisibility {
         isListening && (finalized || !hasNotice)
     }
     public static func reply(hasNotice: Bool) -> Bool { !hasNotice }
+}
+
+public enum ConversationExpressionError: Error, Equatable { case rendererUnavailable, busy }
+
+/// UI-owned transaction and renderer acknowledgment; IDs fence replacement and late callbacks.
+@MainActor public final class ConversationExpressionPresentation {
+    private let state: ConversationState
+    private var baseExpression: EyeExpression?
+    private var expressionOwner: String?
+    private var expressionWaiter: CheckedContinuation<Void, Error>?
+    private var expressionWaitID: String?
+    public init(state: ConversationState) { self.state = state }
+    public func setBase(_ expression: EyeExpression?) {
+        baseExpression = expression
+        if expressionOwner == nil { state.expression = expression }
+    }
+    public func perform(_ expression: EyeExpression, owner: String) async throws {
+        guard state.isVoiceActive || expression == .closed else {
+            throw ConversationExpressionError.rendererUnavailable
+        }
+        guard expressionOwner == nil else { throw ConversationExpressionError.busy }
+        expressionOwner = owner
+        try await transitionExpression(to: expression, emphasized: true)
+    }
+    public func restore(owner: String, accepts: Bool) async throws {
+        guard expressionOwner == owner else { return }
+        if Task.isCancelled || !state.expressionRendererAvailable || !accepts {
+            finishExpressionTransition(id: expressionWaitID, completed: false)
+            expressionOwner = nil
+            state.expressionEmphasized = false
+            state.expression = baseExpression
+            return
+        }
+        defer {
+            if expressionOwner == owner {
+                expressionOwner = nil
+                state.expressionEmphasized = false
+                state.expression = baseExpression
+            }
+        }
+        try await transitionExpression(to: baseExpression)
+    }
+    private func transitionExpression(to target: EyeExpression?, emphasized: Bool = false) async throws {
+        try Task.checkCancellation()
+        guard state.expressionRendererAvailable else { throw ConversationExpressionError.rendererUnavailable }
+        guard expressionWaiter == nil else { throw ConversationExpressionError.busy }
+        let id = UUID().uuidString
+        try await withTaskCancellationHandler {
+            try Task.checkCancellation()
+            try await withCheckedThrowingContinuation { continuation in
+                expressionWaitID = id
+                expressionWaiter = continuation
+                state.expressionAnimationCompletion = { [weak self] id, completed in
+                    self?.finishExpressionTransition(id: id, completed: completed)
+                }
+                state.expressionTransitionID = id
+                state.expressionEmphasized = emphasized
+                state.expression = target
+            }
+        } onCancel: {
+            Task { @MainActor [weak self] in self?.finishExpressionTransition(id: id, completed: false) }
+        }
+    }
+
+    private func finishExpressionTransition(id: String?, completed: Bool) {
+        guard let id, expressionWaitID == id else { return }
+        let waiter = expressionWaiter
+        expressionWaiter = nil
+        expressionWaitID = nil
+        state.expressionTransitionID = nil
+        state.expressionAnimationCompletion = nil
+        if completed { waiter?.resume() } else { waiter?.resume(throwing: CancellationError()) }
+    }
+
+    public func resetExpression() {
+        finishExpressionTransition(id: expressionWaitID, completed: false)
+        expressionOwner = nil
+        baseExpression = nil
+        state.expressionEmphasized = false
+        state.expression = nil
+    }
+
 }

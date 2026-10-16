@@ -41,7 +41,14 @@ model_download.py 从生产 model-catalog.json 选择源，通过分页 Hub 元�
 
 下载器与 App 安装路径分离；App 运行时资源获取由 ModelKit Management/Hub 及 Settings 工作流拥有。各 gate/模型根路径见 [Tests](../Tests/README.md) 与对应适配器 README，不在普通检查中隐式下载或执行真实模型。
 
+## App 组合根边界
+
+check-modelkit-boundaries.py 读取 SwiftPM 的显式源清单，区分 Agents/Actions 核心与同目录内的集成目标，验证每个生产源只有一个目标拥有者；App executable 只编译宿主文件，AppLifecycle 只依赖 Foundation。它禁止基础模块反向依赖集成、ActionBindings 导入 Agents/Gateway 实现、核心 Agents 导入 UI/执行实现，以及 App 中的领域意图/JSON/呈现转换。旧 AppWorkflows/功能目标和业务目录不能回归。
+
+
 ## 待实现
 
 - CoreAI 的 Simulator SDK 可用性取决于外部工具链；相应构建限制必须单独报告。
 - 麦克风/相机/原生 UI、模型准确率、温度/性能和持续真机验收。
+
+边界检查同时限制执行呈现适配器必须调用 UI 公开方法，拒绝恢复跨目标直接写 UI 字段。

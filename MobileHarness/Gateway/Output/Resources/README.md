@@ -6,7 +6,7 @@ Actor-owned arbitration for declared function and host resources, with live perm
 
 ## Ownership and boundaries
 
-App injects concrete owner/preemption/stop policy. holdings is the sole occupancy authority; device health, physical stop and Channel ordering are separate. ResourceCoordinator owns leases/uses/cleanup, not business retry or native isolation.
+module registration injects concrete owner/preemption/stop policy. holdings is the sole occupancy authority; device health, physical stop and Channel ordering are separate. ResourceCoordinator owns leases/uses/cleanup, not business retry or native isolation.
 
 ## External relationships and data flow
 

@@ -14,9 +14,10 @@ Runtime arrows show data or capability calls; dashed arrows show injection.
 
 ```mermaid
 flowchart LR
+ Bindings[Module integrations]
  Hardware[Microphone and speaker] <--> IO[AppleAudioIO]
- IO -->|native frames and capture context| App
- App -->|PCM and drain wait| IO
+ IO -->|native frames and capture context| Bindings
+ Bindings -->|PCM and drain wait| IO
  Caller[Perception caller] --> Converter[StreamingMonoPCMResampler]
  Converter -->|converted frames or error| Caller
 ```
@@ -62,6 +63,8 @@ PCMClipEncoding.wav16(samples:sampleRate:) is portable and rejects invalid input
 playClip/playStream accept an optional MainActor onStarted callback, fired once after the first buffer is successfully scheduled and the player started. No callback on setup failure or empty streams; it acknowledges native admission rather than audible hardware time. Existing bounded buffering, drain, cancellation and cleanup remain unchanged.
 
 AppleAudioIO.prepareClip validates bounded PCM, connects/prepares/starts only its output graph and retains one prepared sample-rate marker. Successful warm playback skips repeated category/session activation; playStream reuses a running graph. discardPreparedClip affects only an unconsumed warm marker with no capture/playback owner. Stop/cleanup clear the marker; failed preparation rolls back and propagates cleanup errors. No recording/buffer scheduling/sound occurs during prewarm.
+
+✅ ListeningCaptureWorkflow 持有一个原生切换 worker 和最新 enabled 意图；invalidate 同步取消正在启动的捕获，stop 加入 worker。迟到 start 在退出前停止，失败保留生产者错误，不决定语音同意、半双工或模型策略。
 
 ## 待实现
 

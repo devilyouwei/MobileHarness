@@ -6,7 +6,7 @@ Processes the newest fresh camera frame, publishes validated pose facts and proj
 
 ## Ownership and boundaries
 
-This role owns detection cadence, image-motion evidence, pose association and gaze policy. PlatformKit captures/gray-samples; ModelKit owns YOLO preprocessing/inference. Photographer owns tracking/device decisions. Pose values belong to Support/Communication; display values belong to UI/Actions with App adaptation.
+This role owns detection cadence, image-motion evidence, pose association and gaze policy. PlatformKit captures/gray-samples; ModelKit owns YOLO preprocessing/inference. Photographer owns tracking/device decisions. Pose values belong to Support/Communication; display values belong to UI/Actions with ActionBindings adaptation.
 
 ## External relationships and data flow
 

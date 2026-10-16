@@ -17,13 +17,13 @@
 
 [Agent.json](../../Resources/Agents/Photographer/Agent.json) 定义 camera.state / vision.pose / photography.camera 的来源及 task.progress/result 定向消息，baseSkills=photography。固定函数在 workflow 注册；Skill 的七个 Camera 绑定用于目录复用，不创建 Chat worker。准确参数/完成语义由 [Camera Actions](../../Actions/Camera/README.md) 和 [NexArm Actions](../../Actions/NexArm/README.md) 拥有。
 
-固定摄影状态包括事务、当前相机、产物、调用/任务关联。open/close/flip/retry/save/ignore 按真实反馈推进；调用结果不是物理状态的推测，保存与预览处置使用真实媒体身份。跟踪与相机事务独立，仅在前台、连接和权限条件满足、姿态新鲜时通过内部 NexArm.Tracking.aim 提交目标。跟踪不绕过 native 停机/资源约束。App 跟踪端点首次准入增加肩/肘水平准备，后续目标只写电机 1/4；本角色继续拥有姿态策略、固定函数目录及相机事务，包整形见 NexArm Support。
+固定摄影状态包括事务、当前相机、产物、调用/任务关联。open/close/flip/retry/save/ignore 按真实反馈推进；调用结果不是物理状态的推测，保存与预览处置使用真实媒体身份。跟踪与相机事务独立，仅在前台、连接和权限条件满足、姿态新鲜时通过内部 NexArm.Tracking.aim 提交目标。跟踪不绕过 native 停机/资源约束。ActionBindings 跟踪端点首次准入增加肩/肘水平准备，后续目标只写电机 1/4；本角色继续拥有姿态策略、固定函数目录及相机事务，包整形见 NexArm Support。
 
 ## 状态、容量与生命周期
 
 根服务拥有事务/输出消费，不依赖页面。最近 4096 条 Signal 证据和消费批次滚动保留并累计淘汰；相机状态、目标、调用和任务独立保存，淘汰证据不删除待执行工作。输出容量 256，状态与通信等待有界，超限拒绝。
 
-仓库原子提交先于依赖步骤；反馈必须匹配会话/调用。取消加入拥有的动作与追踪清理；热状态使用内存，未完成持久化业务记录在重启后标记中断，不重放设备效果。基础机制见 [Context](../Support/Context/README.md)，实际采集和设备停机由 App/PlatformKit 保证。
+仓库原子提交先于依赖步骤；反馈必须匹配会话/调用。取消加入拥有的动作与追踪清理；热状态使用内存，未完成持久化业务记录在重启后标记中断，不重放设备效果。基础机制见 [Context](../Support/Context/README.md)，实际采集和设备停机由所属集成服务及 PlatformKit 实现。
 
 ## 待实现
 

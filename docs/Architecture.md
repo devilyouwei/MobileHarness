@@ -6,13 +6,13 @@ MobileHarness 以 iPhone 为宿主，将感知、Agent 决策和受控执行连�
 
 ```mermaid
 flowchart LR
-    Input[用户意图 / 原生感知事实] --> Host[App 适配与生命周期]
+    Input[用户意图 / 原生感知事实] --> Host[AgentBindings 输入适配]
     Host --> In[InputGateway]
     In --> Agents[业务与感知 Agents]
     Agents --> Models[注入的 ModelKit 能力]
     Agents --> Out[OutputGateway]
     Out --> Functions[Actions 业务函数]
-    Functions --> Effects[注入的 UI / 原生能力]
+    Functions --> Effects[ActionBindings 绑定的 UI / 原生能力]
     Out -->|执行结果和声明的通信| In
     Agents --> Data[注入的 Storage 接口]
     Local[本地导航 / 草稿 / 选择] --> UI[UI 展示状态]
@@ -25,10 +25,10 @@ flowchart LR
 
 | 拥有者 | 责任与边界 |
 | --- | --- |
-| [App](../MobileHarness/App/README.md) | 创建和注册服务、注入能力、适配接口，持有应用/会话生命周期及原生停止和清理。 |
-| [Agents](../MobileHarness/Agents/README.md) | 解释输入、拥有业务状态与策略，通过获准的函数表达行为。Assistant 是普通对话入口；Memory、Photographer、ApplicationControl 拥有各自确定性事务。 |
+| [App](../MobileHarness/App/README.md) | 应用入口、创建、注册、组合、连接及应用级生命周期；通过模块公开接口启停，不承担业务流程或数据转换。 |
+| [Agents](../MobileHarness/Agents/README.md) | 解释输入、拥有业务状态与策略，通过获准的函数表达行为；AgentBindings 负责请求/结果适配及角色运行接入。Assistant 是普通对话入口；Memory、Photographer、ApplicationControl 拥有各自确定性事务。 |
 | [Gateway](../MobileHarness/Gateway/README.md) | 校验身份与权限、通信和执行准入，协调排序、结果、资源与取消；不选择业务策略。 |
-| [Actions](../MobileHarness/Actions/README.md) | 定义协议中立的业务函数、参数、效果和完成/失败契约。 |
+| [Actions](../MobileHarness/Actions/README.md) | 定义协议中立的业务函数、参数、效果和完成/失败契约；ActionBindings 实现原生执行与直接 UI 绑定。 |
 | [UI](../MobileHarness/UI/README.md) | 拥有独立展示值、页面导航和本地交互；通过注入接口提交业务操作。 |
 | [ModelKit](../MobileHarness/ModelKit/README.md) | 提供独立推理 SDK、模型生命周期及制品管理，不拥有应用决策或设备效果。 |
 | [PlatformKit](../MobileHarness/PlatformKit/README.md) | 提供原生音视频、连接、设备协议和真实反馈。 |
@@ -40,7 +40,7 @@ SpeechPerception 拥有聆听同意和输入准入策略，VisionPerception 提�
 
 Skill 组织可复用流程及函数绑定，Task 组织持续目标与上下文。实际调用权限由当前作用域与冻结的请求目录验证。Task 是业务组织方式，不是已注册相机函数的额外调用前提。当前角色、固定事务及后台能力边界见 [Agents](../MobileHarness/Agents/README.md)。
 
-本地跳转、展开、草稿和选择直接由 UI/宿主处理。用户提交业务意图交给实际拥有者；Agent 发起的界面控制通过获准的 Action 和 App 注入的同一展示能力执行。
+本地跳转、展开、草稿和选择直接由 UI/宿主处理。用户提交业务意图交给实际拥有者；Agent 发起的界面控制通过获准的 Action、ActionBindings 和 UI 公开呈现接口执行。
 
 ## 执行与反馈
 
@@ -54,7 +54,7 @@ App 选择存储后端和路径，消费者使用注入契约。SQLite 保存已
 
 Assistant 决定照片如何进入模型上下文，PlatformKit 提供通用图像处理；保留的原图与模型分析附件分别处理。媒体存在不代表已经导出到系统照片库，临时照片缓存也不等于计划中的用户相册。
 
-长期任务属于根级服务与明确的业务所有者，页面关闭不承担全局停止。App 处理权限、前后台和原生中断；物理设备安全不依赖后台持续执行。模型和语音提供者由实际配置及已注册能力决定，本文件不固定某个历史默认。
+长期任务属于根级服务与明确的业务所有者，页面关闭不承担全局停止。App 转交应用生命周期；模块处理具体权限、原生中断和停止清理；物理设备安全不依赖后台持续执行。模型和语音提供者由实际配置及已注册能力决定，本文件不固定某个历史默认。
 
 ## 状态与证据入口
 

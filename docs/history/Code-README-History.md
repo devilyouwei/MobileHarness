@@ -1324,7 +1324,7 @@ Model exposure comes from [../../Resources/Agents/VisionPerception/Agent.json](.
 
 ## MobileHarness/App/Adapters/README.md
 
-[现行 README](../../MobileHarness/App/Adapters/README.md)
+[现行 README](../../MobileHarness/App/README.md)
 
 ````markdown
 ## Skill/task-mode contract
@@ -1354,7 +1354,7 @@ Model exposure comes from [../../Resources/Agents/VisionPerception/Agent.json](.
 
 ## MobileHarness/App/Composition/Behaviors/README.md
 
-[现行 README](../../MobileHarness/App/Composition/Behaviors/README.md)
+[现行 README](../../MobileHarness/Actions/Support/README.md)
 
 ````markdown
 ## Validation and failure
@@ -1450,7 +1450,7 @@ Model exposure comes from [../../Resources/Agents/VisionPerception/Agent.json](.
 
 ## MobileHarness/App/Workflows/Bluetooth/README.md
 
-[现行 README](../../MobileHarness/App/Workflows/Bluetooth/README.md)
+[现行 README](../../MobileHarness/Actions/NexArm/Support/README.md)
 
 ````markdown
 ## Foreground and manual ownership
@@ -1466,7 +1466,7 @@ Model exposure comes from [../../Resources/Agents/VisionPerception/Agent.json](.
 
 ## MobileHarness/App/Workflows/History/README.md
 
-[现行 README](../../MobileHarness/App/Workflows/History/README.md)
+[现行 README](../../MobileHarness/Agents/Memory/README.md)
 
 ````markdown
 ## SQLite records and runtime identity
@@ -1476,7 +1476,7 @@ Model exposure comes from [../../Resources/Agents/VisionPerception/Agent.json](.
 
 ## MobileHarness/App/Workflows/Presentation/README.md
 
-[现行 README](../../MobileHarness/App/Workflows/Presentation/README.md)
+[现行 README](../../MobileHarness/Actions/UI/Support/README.md)
 
 ````markdown
 ## Vision replacement
@@ -1490,7 +1490,7 @@ Model exposure comes from [../../Resources/Agents/VisionPerception/Agent.json](.
 
 ## MobileHarness/App/Workflows/README.md
 
-[现行 README](../../MobileHarness/App/Workflows/README.md)
+[现行 README](../../MobileHarness/App/README.md)
 
 ````markdown
 ## Streaming TTS latency

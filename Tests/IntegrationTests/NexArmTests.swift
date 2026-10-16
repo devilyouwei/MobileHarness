@@ -1,7 +1,8 @@
+import ActionBindings
 import Actions
+import AgentBindings
 import AgentCore
 import Agents
-import BehaviorAssembly
 import CallRuntime
 import ExecutionRuntime
 import Foundation

@@ -20,7 +20,7 @@ flowchart LR
  Communication[CommunicationAction] --> Envelope
  Envelope --> Gateway
  Gateway -->|Owner-directed result or receipt| Feedback[Agent feedback contracts]
- Gateway -->|Passive snapshots| Observer[App observation]
+ Gateway -->|Passive snapshots| Observer[AgentBindings observation]
 ```
 
 ## Calls, causality and results

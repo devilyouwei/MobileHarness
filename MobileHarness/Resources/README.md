@@ -72,7 +72,7 @@ Agent resources declare baseSkills and backgroundTasks; production backgroundTas
 
 ## Skill 函数目录
 
-Agent.json 声明基础 Skill，不直接声明函数或函数权限上限。模型函数由已加载 Skill 组合，校验 canonical 元数据、重复/冲突、容量、通信授权、真实执行身份和 Task 范围。Gateway 使用调用所属轮次快照；固定调用使用 Agent 固定目录。App 检查所有 Skill 目录的真实实现覆盖；后台 Skill 还须匹配目标支持的业务契约。历史目录快照不可变。
+Agent.json 声明基础 Skill，不直接声明函数或函数权限上限。模型函数由已加载 Skill 组合，校验 canonical 元数据、重复/冲突、容量、通信授权、真实执行身份和 Task 范围。Gateway 使用调用所属轮次快照；固定调用使用 Agent 固定目录。AgentBindings 检查所有 Skill 目录的真实实现覆盖；后台 Skill 还须匹配目标支持的业务契约。历史目录快照不可变。
 
 RobotInteraction instructions teach Channel/wait ordering and explicit resource conflicts; the arm writer group remains authoritative.
 

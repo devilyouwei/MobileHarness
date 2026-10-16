@@ -71,3 +71,8 @@ Run one explicitly selected physical test per process with `NEXARM_PORT=/dev/cu.
 - 可注入 Skill 依赖图及跨进程/持久活跃 worker 的独立验证环境。
 
 执行方法与结果归 [validation](../../docs/validation/README.md)，不在本文件追加运行/安装记录。
+
+
+## 历史只读请求接入
+
+✅ UI 的记录分页、消息、归档及授权图片读取也经 MemoryHistoryIntent.query 的实际 Gateway/Memory 接入；不再由 UI 请求适配器直接读仓库。MemoryHistoryReadRequests 为根持有的类型化只读请求暂存，最多四个请求，每个请求一个结果等待者；Signal 只携带随机 ID，结果保留规范仓库返回值。请求/结果有界，120 秒未返回明确超时，取消/停止加入实际读取，迟到结果不更新 UI；不新增模型函数或重放副作用。

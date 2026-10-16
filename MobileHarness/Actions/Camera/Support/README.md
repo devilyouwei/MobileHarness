@@ -9,7 +9,7 @@
 ```mermaid
 flowchart LR
     Entries[Camera 函数入口] -->|能力调用与值类型| S[Camera/Support]
-    Host[App 相机端点] -.->|实现能力协议| S
+    Host[ActionBindings 相机端点] -.->|实现能力协议| S
     Catalog[Actions 共用目录组合] -->|构造 CameraModule| S
     S -->|ActionFunction 集合| Catalog
     Contracts[FunctionContracts] -.->|目录与执行类型| S
@@ -49,6 +49,13 @@ CameraControlError 区分 notForeground、busy、disabled、permissionDenied、u
 目录没有自动替代相机、失败重试循环或请求队列；异步完成及清理由能力实现者负责。
 
 [Camera 设计与参数](../README.md) · [共享契约](../../Support/Contracts/README.md)
+
+## 相机执行集成
+
+ActionBindings 编译 CameraCoordinator、CameraRuntimePorts、CameraPreviewAdapter 和 CameraStorageFactory。CameraCoordinator 拥有拍摄、照片存储/处置、前台原生捕获和真实完成；CameraResourceAccess 注入租约仲裁，CameraVisionRunning 注入感知运行，两者都不带 Gateway/Agents 实现依赖。
+
+CameraStorageFactory 选择最多 1024 张、2 GiB、evictOldest 的应用存储策略，组合根只注入仓库和根路径。PhotoDispositionWorkflow 是 Actions 核心的提交/反馈组合，不负责 Agent 决策。通用最新感知替换属于 PlatformKit/Vision。shutdown 加入命令和捕获清理，并要求确认 native camera 已停止，否则向根生命周期传播失败。
+
 
 ## 待实现
 

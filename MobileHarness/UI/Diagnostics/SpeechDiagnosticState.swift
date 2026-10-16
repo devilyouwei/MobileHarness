@@ -8,6 +8,11 @@ public final class SpeechDiagnosticState {
     public var isRunning = false
     public var isStopping = false
     public init() {}
+    public func presentRunning(_ value: Bool) { isRunning = value }
+    public func presentStopping(_ value: Bool) { isStopping = value }
+    public func presentReport(_ value: String) { report = value }
+    public func appendReport(_ value: String) { report += value }
+
 }
 
 @MainActor

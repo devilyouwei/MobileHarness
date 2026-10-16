@@ -102,6 +102,19 @@ Skill概述明确标记 id/description，不把Skill ID呈现为函数；提示�
 
 Chat owns rolling request projection and unlimited default cumulative decisions; Core retains optional caller budgets and usage validation only.
 
+## AgentBindings 运行接入
+
+本目录同时容纳核心声明/配置辅助与明确隔离的 AgentBindings 源文件，二者通过静态互斥清单编译，不能依据物理目录放宽核心 imports。Support/Communication 中的角色 IntentRuntime 同样只属于 AgentBindings；普通通信 schema 仍属于 Agents 核心。
+
+AgentServices 拥有角色接入、输出消费者、资源注册、Provider 私有请求接线及根观察。ApplicationFeatures 通过领域仓库接口组合 UI 请求服务；AgentApplicationUI 把现成服务适配成 UI.ApplicationRootProviding。RuntimeDependencies 只向会话拥有者暴露必要能力，不提供整个 App。
+
+VoiceSessionCoordinator 只保留语音输入、同意/占用屏障、角色及输出接入；ConversationPresentationController 和 VoiceNativeEffects 分别属于 ActionBindings。VisionSession 实现 CameraVisionRunning；GatewayCameraResources 实现 CameraResourceAccess，保留真实租约与旧所有者隔离。两端都不反向依赖 App。
+
+启动和停止由公开方法显式完成。前后台异步切换由通用 AppLifecycle 单 worker 调度，不再累积逐次 scene task 链；原生失效接口同步执行。根观察、准备、设备输入和业务操作都由模块持有，不由页面拥有。
+
+
+✅ 根 UI 对生命周期自身的正常暂停取消不记录启动失败；真正业务/清理错误继续保留。App 只调度公开生命周期接口，UI 模块仍不依赖 AppLifecycle。
+
 ## 待实现
 
 - 暂无本目录独立的实现待办；跨模块及实际模型/设备验收见所属模块说明。

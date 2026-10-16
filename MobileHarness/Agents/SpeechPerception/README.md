@@ -6,7 +6,7 @@ Resident listening policy, streaming VAD/ASR and native sound-source observation
 
 ## Ownership and boundaries
 
-User consent and revisioned reply occupancy are interpreted here. App executes physical capture, confirmed-utterance/playback barriers. ModelKit supplies VAD/ASR; PlatformKit supplies generic PCM conversion. The diagnostic soundSourceOnly mode has no recognition/presentation grants.
+User consent and revisioned reply occupancy are interpreted here. AgentBindings/ActionBindings execute physical capture and confirmed-utterance/playback barriers. ModelKit supplies VAD/ASR; PlatformKit supplies generic PCM conversion. The diagnostic soundSourceOnly mode has no recognition/presentation grants.
 
 ## External relationships and data flow
 
@@ -71,7 +71,7 @@ Publication is one-way. A subscriber rejection cannot stop inference; output pro
 
 speech.listening controls session-only consent. Up to four source/incarnation/revision-fenced interaction.replyActivity snapshots and one pending final root suppress new utterance admission. Final ASR closes admission before publication; matching Assistant acknowledgment transfers the hold to occupancy. Occupancy ends on explicit terminal/activity or lifecycle facts; there is no lease timer. Generic busy is not reply occupancy.
 
-Native speech.captureEnded clears consent only for the current revision. User-off stops physical capture; policy pause closes recognition admission and App stops native capture after confirmed utterance completion while retaining logical consent. App additionally joins confirmed utterance completion and playback drain/audio cleanup; capture resumes immediately when policy and these barriers permit. Policy is not restored after process restart. openCapture/closeCapture cancel/join a capture epoch without stopping the resident Agent; full stop also joins recovery/publisher and closes output.
+Native speech.captureEnded clears consent only for the current revision. User-off stops physical capture; policy pause closes recognition admission and the voice integration stops native capture after confirmed utterance completion while retaining logical consent. the voice integration additionally joins confirmed utterance completion and playback drain/audio cleanup; capture resumes immediately when policy and these barriers permit. Policy is not restored after process restart. openCapture/closeCapture cancel/join a capture epoch without stopping the resident Agent; full stop also joins recovery/publisher and closes output.
 
 ## Sound-source algorithm
 
@@ -81,7 +81,7 @@ Mono publishes unavailable once per format/listening epoch and still supports AS
 
 ## Registration and authority
 
-[Agent.json](../../Resources/Agents/SpeechPerception/Agent.json) admits native audio, user listening consent, Assistant reply occupancy and matching capture-ended facts. Only Assistant currently publishes authorized reply occupancy. Internal caption/voice-state Tools and Speech.Listening.update are code-bound; there are no model-callable functions. App owns physical microphone/playback and confirmed-utterance barriers; the Agent owns consent/occupancy and revisioned listening policy. Consent is explicit/idempotent when enabled is supplied; otherwise the input toggles consent. Reply termination never restores revoked consent.
+[Agent.json](../../Resources/Agents/SpeechPerception/Agent.json) admits native audio, user listening consent, Assistant reply occupancy and matching capture-ended facts. Only Assistant currently publishes authorized reply occupancy. Internal caption/voice-state Tools and Speech.Listening.update are code-bound; there are no model-callable functions. AgentBindings/ActionBindings own physical microphone/playback and confirmed-utterance barriers; the Agent owns consent/occupancy and revisioned listening policy. Consent is explicit/idempotent when enabled is supplied; otherwise the input toggles consent. Reply termination never restores revoked consent.
 
 Input/request identity is retained in ModelKit requests; scopeID is opaque to the SDK. Final-ASR admission rejection or recognition/publication failure releases this input's pending-final hold and publishes current policy; it does not forge another Agent's terminal fact. No fixed post-reply wait, occupancy lease timer or whole-utterance watchdog is used.
 

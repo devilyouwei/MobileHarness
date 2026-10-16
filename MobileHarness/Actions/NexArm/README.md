@@ -2,17 +2,18 @@
 
 ## 简介
 
-提供单电机移动/归位、整臂归位、有限表演动作和相机跟踪目标发布。业务域负责参数、资源、预算、动作规划及反馈完成；App 负责连接、前台准入、共享资源策略和常驻跟踪 worker。
+提供单电机移动/归位、整臂归位、有限表演动作和相机跟踪目标发布。业务域负责参数、资源、预算、动作规划及反馈完成；NexArmControlService 负责连接、前台准入和常驻跟踪 worker，模块绑定注入共享资源接口。
 
 ## 上下游关系（一级）
 
 ```mermaid
 flowchart LR
+ Bindings[Module integrations]
     Gateway -->|标准输入与已授予执行| N[NexArm 函数]
     N -->|完成和报告| Gateway
-    App -.->|动作与跟踪端点注入| N
-    N -->|类型化运动请求| App
-    App -->|手动复用计划与控制器| N
+    Bindings -.->|动作与跟踪端点注入| N
+    N -->|类型化运动请求| Bindings
+    Bindings -->|手动复用计划与控制器| N
     N -->|编码范围及链路接口| PlatformKit
     PlatformKit -->|原生反馈与准入事实| N
     Contracts[FunctionContracts] -.->|资源预算与结果类型| N

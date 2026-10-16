@@ -6,9 +6,9 @@ Actions 定义应用的业务操作与查询：参数校验、函数说明、资
 
 ## 职责与边界
 
-六个业务域和共享 Support 构成当前实现。业务域入口使用 `FunctionInput`，不读取 Channel、Agent 权限或调用协议。Gateway 负责授权、调度、资源仲裁与结果传递；App 负责注入能力、原生服务及其生命周期。
+六个业务域和共享 Support 构成当前实现。业务域入口使用 `FunctionInput`，不读取 Channel、Agent 权限或调用协议。Gateway 负责授权、调度、资源仲裁与结果传递；App 只创建和连接模块；ActionBindings/领域服务负责真实原生执行与呈现，App 通过公开生命周期接口管理根作用域。
 
-`Package.swift` 将 `Support/Contracts` 单独编译为无项目依赖的 FunctionContracts；其余 Swift 源码编译为 Actions。Actions 的项目依赖为 FunctionContracts、PlatformKit、BehaviorDefinitions、Storage、StorageChat。PlatformKit 导入限于 NexArm/Support，StorageChat 导入限于 History，Storage 导入限于 System 的持久化服务。Actions 不导入 Agents、Gateway、UI 或 App 的实现。
+`Package.swift` 将 `Support/Contracts` 单独编译为无项目依赖的 FunctionContracts；其余核心 Swift 源码编译为 Actions；外层集成源由互斥清单独立编译为 ActionBindings。Actions 的项目依赖为 FunctionContracts、PlatformKit、BehaviorDefinitions、Storage、StorageChat。PlatformKit 导入限于 NexArm/Support，StorageChat 导入限于 History，Storage 导入限于 System 的持久化服务。Actions 不导入 Agents、Gateway、UI 或 App 的实现。
 
 ## 上下游关系（一级）
 
@@ -16,7 +16,7 @@ Actions 定义应用的业务操作与查询：参数校验、函数说明、资
 
 ```mermaid
 flowchart LR
-    Host[App 组合与能力端点] -.->|注入实现能力| A[Actions]
+    Host[ActionBindings 执行与呈现端点] -.->|注入实现能力| A[Actions]
     A -->|类型化效果请求| Host
     Gateway -->|标准函数输入| A
     A -->|完成值和报告| Gateway
@@ -82,6 +82,15 @@ flowchart TB
 直接调用函数体不自动获得 Gateway 的权限、Channel 排序、资源租约或超时机制。需要这些机制的调用方必须通过对应执行接口；端点仍独立验证其运行所有权。
 
 [整体技术设计](../README.md) · [函数协议](Support/Contracts/README.md) · [Gateway 执行](../Gateway/Runtime/README.md)
+
+## ActionBindings 执行与呈现集成
+
+Actions 核心的依赖和协议中立函数保持独立。ActionBindings 通过互斥源清单编译外层真实绑定，可依赖 UI、PlatformKit、ModelKit SDK、领域仓库、FunctionContracts、ExecutionRuntime、CallRuntime，以及 AgentCore 的中立执行身份/结果契约；不导入 Agents 或 Gateway 实现。
+
+BehaviorAssembly/BehaviorProtocolBindings 属于 ActionBindings，完整函数目录由业务模块组装后提供给组合根。RuntimePresentation 实现 Action 能力端口并调用 UI 公开能力；实际业务资格与会话围栏留在领域端点，UI 自己持有展示状态。相机执行通过注入的 CameraResourceAccess 使用租约，不导入 ResourceCoordinator；感知接入通过 CameraVisionRunning 注入。
+
+NexArmControlService 持有不含 UI 类型的连接/执行状态，BluetoothWorkflow 只把完整事实投影为 UI.BluetoothViewSnapshot，并转交 UI 控制。VoiceNativeEffects 持有原生提示音/触觉/播放，ConversationPresentationController 持有呈现接纳；UI 持有真实动画回调。Provider、制品存储和背景传输接入属于 System；照片提交/可选反馈属于 Camera。App 不再转换这些数据或实现这些流程。
+
 
 ## 待实现
 

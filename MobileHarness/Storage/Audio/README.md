@@ -15,8 +15,8 @@ Runtime arrows show data or capability calls; dashed arrows show injection.
 ```mermaid
 flowchart LR
  Producer[Speech synthesis owner] -->|register, begin, append, complete| Store[SpeechAudioStore]
- Player[App playback owner] -->|checkout, next, release| Store
- Scope[App input/session cleanup] -->|cancel or shutdown| Store
+ Player[ActionBindings playback owner] -->|checkout, next, release| Store
+ Scope[AgentBindings session cleanup] -->|cancel or shutdown| Store
  Store --> Stream[BoundedMemoryStream]
  Store --> Lease[MemoryLeaseStore]
 ```

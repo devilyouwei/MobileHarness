@@ -8,7 +8,7 @@ Render conversation phases/captions/eyes and bounded Action, Task and Agent log 
 
 ## Ownership and boundaries
 
-App owns input/output lifetimes and supplies validated values. Views forward listening/retry/navigation intents and own only local presentation selection. Device connection policy is confined to Settings.
+AgentBindings/ActionBindings own input/output lifetimes and supply validated values. Views forward listening/retry/navigation intents and own only local presentation selection. Device connection policy is confined to Settings.
 
 ## External relationships and data flow
 
@@ -16,9 +16,10 @@ Runtime arrows show data or capability calls; dashed arrows show injection.
 
 ```mermaid
 flowchart LR
- App -->|phase, captions, spectrum and execution snapshots| State[ConversationState and ActionActivityState]
+ Bindings[Module integrations]
+ Bindings -->|phase, captions, spectrum and execution snapshots| State[ConversationState and ActionActivityState]
  State --> View[ConversationView and ActionActivityView]
- View -->|injected toggle, retry and history intent| App
+ View -->|injected toggle, retry and history intent| Bindings
  View --> Components[Shared rendering]
 ```
 
@@ -26,11 +27,11 @@ flowchart LR
 
 Startup is noninteractive while preparation runs and exposes progress/error/retry. Listening starts only from explicit interaction. User transcription and Assistant reply occupy separate slots: final user text moves above the eyes, while reply remains below; the next accepted recognition turn resets both. Actual audio telemetry drives playback phase/spectrum independently of caption timing.
 
-`ConversationState` separates phase, base/finite expression, renderer request identity and gaze. App invalidates transient completion on session/turn reset. Components provide full-text accessibility, stable caption identity and reduced motion. Camera background is injected.
+`ConversationState` separates phase, base/finite expression, renderer request identity and gaze. UI invalidates transient completion on session/turn reset. Components provide full-text accessibility, stable caption identity and reduced motion. Camera background is injected.
 
 ## Logs and issues
 
-`ActionActivityItem`, `ExecutionIssue`, `TaskLogItem` and `AgentRuntimeLogItem` are UI-owned projections. App supplies bounded snapshots/revisions/eviction counts; UI does not execute or persist them. The sheet has Action / Task / Agent tabs, source/status filters and an internal-Action toggle. There is no Signal collection/subscription in this UI.
+`ActionActivityItem`, `ExecutionIssue`, `TaskLogItem` and `AgentRuntimeLogItem` are UI-owned projections. AgentBindings supplies bounded snapshots/revisions/eviction counts; UI does not execute or persist them. The sheet has Action / Task / Agent tabs, source/status filters and an internal-Action toggle. There is no Signal collection/subscription in this UI.
 
 Home summaries show up to three exact Channel names, concurrent/queued counts and recent nonfailure terminal state for three seconds. Failures are shown in the scheduling issue list. Dismissal affects retained display identities only, never execution/cancellation. Internal maintenance success is hidden by default while failures remain visible. Direct Tools have no synthetic scheduled rows.
 
@@ -38,7 +39,7 @@ Task details use retained task/call identities for related Action filtering; can
 
 ## Preview boundary
 
-Debug conversation/Action previews explicitly use synthetic state and bypass model/camera/audio/Bluetooth startup. Release ignores their launch flags. Page-owned refresh only drives display hiding; observers and long-lived work belong to App.
+Debug conversation/Action previews explicitly use synthetic state and bypass model/camera/audio/Bluetooth startup. Release ignores their launch flags. Page-owned refresh only drives display hiding; observers and long-lived work belong to module services.
 
 Independent conversation/log values, request-scoped expression callbacks and read-only task execution navigation and independent Agent records.
 
@@ -76,13 +77,15 @@ Toast 输入只来自新鲜 Agent 输出或 App/runtime/system issue；带 call 
 
 add optional injected voicePressChanged callback. Zero-distance drag reports touch-down (root coalesces repeats), touch-end/page disappearance report release. Hold recognition still submits one toggle at 0.5 s; callback owns no native work and cannot enable capture.
 
-会话层合并 notice 和 factual ExecutionIssue 的展示优先级，并向组件传递装饰光值；状态拥有者与到期在 App，原生渲染见 [Components](../Components/README.md)。
+会话层合并 notice 和 factual ExecutionIssue 的展示优先级，并向组件传递装饰光值；展示状态拥有者与到期在 UI，原生渲染见 [Components](../Components/README.md)。
 
-mask bottom ASR and reply/status immediately while a notice is visible, restore retained text after dismissal, and preserve pinned Task/promoted ASR layout. Consent-off clears both captions; root HomeEffectsWorkflow owns one ID/text-fenced350ms reply fade/removal task, cancelled by new text/turn/off/shutdown, scheduled only after reply-policy/playback/native-resume barriers. Agent errors stay in factual root failure notices, not persistent voiceStatus copies. App root contexts explicitly choose afterFirstUnlock file protection, including their directory; repository persistent factory accepts protection while its SDK default remains whileUnlocked. This mitigates lock-boundary writes, without claiming the screenshot proves that cause or hiding other storage failures.
+mask bottom ASR and reply/status immediately while a notice is visible, restore retained text after dismissal, and preserve pinned Task/promoted ASR layout. Consent-off clears both captions; root HomeEffectsWorkflow owns one ID/text-fenced350ms reply fade/removal task, cancelled by new text/turn/off/shutdown, scheduled only after reply-policy/playback/native-resume barriers. Agent errors stay in factual root failure notices, not persistent voiceStatus copies. AgentBindings root contexts explicitly choose afterFirstUnlock file protection, including their directory; repository persistent factory accepts protection while its SDK default remains whileUnlocked. This mitigates lock-boundary writes, without claiming the screenshot proves that cause or hiding other storage failures.
 
 ExecutionIssue 已增加可选 userMessage 展示值，日志 message 不变；首页 visibleNotice 优先使用宿主提供的 userMessage，错误 toast 的身份、去重、到期和日志面板保持现有行为。UI 不解析语音 SDK 错误。
 
 Execution-history navigation: ConversationView/ActionActivityView have no task-history view factory; TaskLogItem carries only execution display fields. Task details retain requester/executor/mode/Skills/parent/state/failure/event timeline and related Action filtering. Background task evidence remains execution diagnostics and is not described as conversation history.
+
+✅ 识别字幕把 transcriptFinalized 传给 FadingCaption。上移时立即提交当前完整定稿文本，位置动画不负责文字完成；历史记录仍保存原识别值。字幕只在显示边界截取最新 320 Characters。
 
 ## Caption state transitions
 
@@ -96,6 +99,8 @@ Execution-history navigation: ConversationView/ActionActivityView have no task-h
 | Stop, background or failure | Retain displayed text and invalidate session updates | Retain displayed text and invalidate session updates |
 
 以上表格描述已接纳的 UI 值，不让 View 推断 ASR、播放或 Task 完成。会话/turn 身份先由宿主呈现适配器验证；consent-off 明确清除字幕，普通生命周期暂停保留显示值并使旧 scope 更新失效。样式和几何由本目录与 Components 拥有。
+
+✅ 收口呈现接口：ConversationState 提供字幕/回复/阶段值方法；ConversationExpressionPresentation 由 UI 拥有动画等待、事务 ID、取消和基础表情恢复。ActionBindings 只转换领域值并调用接口，保留领域授权。
 
 ## 待实现
 

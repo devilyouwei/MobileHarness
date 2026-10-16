@@ -32,15 +32,15 @@ flowchart LR
 | Chat / StorageChat | Dialog/message values, ChatRepository, ConversationRecordStore, memory history/checkpoints/windows | Storage and StorageTasks; Agents/Actions/App consume it |
 | Tasks / StorageTasks | TaskRepository and explicit ephemeral MemoryTaskRepository | Storage; Agents/Chat consume it |
 | Audio / StorageAudio | Single-use PCM handles and producer/player ownership | Storage; synthesis/playback owners consume it |
-| Media / StorageMedia | MediaRepository and JPEG delivery/recovery/FIFO policy | Storage; App camera/history readers consume it |
-| Devices / StorageDevices | DeviceRepository mapping/selection/reconnect contract | Storage; App Bluetooth workflow consumes it |
+| Media / StorageMedia | MediaRepository and JPEG delivery/recovery/FIFO policy | Storage; ActionBindings camera / AgentBindings history readers consume it |
+| Devices / StorageDevices | DeviceRepository mapping/selection/reconnect contract | Storage; ActionBindings Bluetooth service consumes it |
 | SQLite files / StorageSQLite | Domain schemas/queries, shared connection pool, explicit construction owner | Storage plus Chat/Tasks/Media/Devices contracts and GRDB; only App construction and backend tests use it |
 
 Individual products expose common/domain libraries without requiring the aggregate application product. New backends implement the same domain/capability interfaces; there are no empty MongoDB/document-database adapters or additional ORM dependency.
 
 ## Contracts and consistency
 
-DocumentRepository<Value> supplies load/refresh/invalidate, UUID-revision compare-and-replace and explicit replacement. LocalDocumentStore and MemoryDocumentStore share that contract; durability is persistent or memory, respectively. BinaryObjectStore supplies bounded reads/info, non-overwriting publication, deletion and bounded object listing; LocalFileStore and MemoryBinaryObjectStore implement it. Success in memory never promises survival after restart. Native model-artifact directory materialization remains a File capability chosen in App's adapter, rather than a fabricated memory filesystem URL.
+DocumentRepository<Value> supplies load/refresh/invalidate, UUID-revision compare-and-replace and explicit replacement. LocalDocumentStore and MemoryDocumentStore share that contract; durability is persistent or memory, respectively. BinaryObjectStore supplies bounded reads/info, non-overwriting publication, deletion and bounded object listing; LocalFileStore and MemoryBinaryObjectStore implement it. Success in memory never promises survival after restart. Native model-artifact directory materialization remains a File capability chosen in ActionBindings' adapter, rather than a fabricated memory filesystem URL.
 
 Domain protocols are async and return owned values, never SQL predicates, table handles or GRDB rows. ChatRepository checkpoint commits messages and Task compression/source facts atomically. Its paired TaskRepository must have the same opaque runtime storageScope; mismatched namespaces reject construction even if their task_N strings coincide. App uses one SQLiteRepositories family. There is no file/database combined transaction or transaction across model/device awaits.
 

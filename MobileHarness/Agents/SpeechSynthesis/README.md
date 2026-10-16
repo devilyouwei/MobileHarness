@@ -6,7 +6,7 @@ Converts authorized directed text requests into owner-scoped bounded PCM streams
 
 ## Ownership and boundaries
 
-This role owns synthesis, validation and producer failures. StorageAudio owns audio handles/PCM; App SpeechPlayback consumes them; ModelKit supplies TTS. There are no subscriptions, business output envelopes, publications or outgoing sends.
+This role owns synthesis, validation and producer failures. StorageAudio owns audio handles/PCM; ActionBindings SpeechPlayback consumes them; ModelKit supplies TTS. There are no subscriptions, business output envelopes, publications or outgoing sends.
 
 ## External relationships and data flow
 
@@ -18,7 +18,7 @@ flowchart LR
  Synthesis -->|SpeechSynthesisRequest| ModelKit
  ModelKit -->|Validated audio frames| Synthesis
  Synthesis -->|PCM or terminal error| Storage[StorageAudio]
- Storage -->|Checkout and stream read| Playback[App SpeechPlayback]
+ Storage -->|Checkout and stream read| Playback[ActionBindings SpeechPlayback]
 ```
 
 ## Internal components
@@ -31,7 +31,7 @@ flowchart LR
  Builder --> Producer[Single owned TTS producer]
  Producer -->|Validated PCM or terminal failure| Store
  Cancel[Scoped cancellation or producer failure] --> Producer
- Store -->|Checkout and read| Playback[App SpeechPlayback]
+ Store -->|Checkout and read| Playback[ActionBindings SpeechPlayback]
 ```
 
 This role uses typed media requests and deterministic policy, with no Chat system prompt or role prompt asset.
@@ -61,3 +61,8 @@ Directed admission, serial bounded production and explicit audio failure propaga
 - Real-provider synthesis, native playback competition and sustained-device acceptance.
 
 [Agents](../README.md) · [Communication](../Support/Communication/README.md)
+
+
+## 输出错误呈现接入（待实施）
+
+❌ AgentBindings 拥有 SpeechFailurePresentation，识别本角色的 invalidOutput，保留原始原因并生成用户文案；ActionBindings 不依赖 Agents 实现。

@@ -1,9 +1,12 @@
+import ActionBindings
 import Actions
+import AgentBindings
 import AgentCore
-import AppWorkflows
 import CallRuntime
 import ExecutionRuntime
 import FunctionContracts
+import Gateway
+import PlatformKit
 import StorageAudio
 
 /// Explicit implementation metadata for generic scheduler fixtures, not production registration.

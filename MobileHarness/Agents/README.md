@@ -56,7 +56,7 @@ ReACT 在本轮调用及回复屏障后由显式业务 value（包括空值）�
 
 每个异步生产者、队列、缓存与活动都必须有 owner、容量及溢出/取消/完成策略；页面退出不终止根服务拥有的业务工作。事务先提交状态，再执行依赖步骤；配置、执行与持久化失败显式传播。确定性事务角色保留最近 4096 条 Signal 证据，核心未指定滚动策略时上限 8192 且拒绝溢出；业务关联独立保存。
 
-模型调用、私有固定调用、通信权和实际设备授权分别验证。Speech/vision 的 freshness 不等于任务超时；App 的物理停机及权限保护不等待模型。
+模型调用、私有固定调用、通信权和实际设备授权分别验证。Speech/vision 的 freshness 不等于任务超时；模块的物理停机及权限保护不等待模型；App 只调用公开接口。
 
 ## Role processing pipeline
 
@@ -75,6 +75,15 @@ flowchart LR
 ```
 
 角色预处理、批次选择和状态转换由角色拥有。Context 仓库先验证并提交热状态，再提供不可变快照；固定事务直接选择已注册调用，Assistant 的模型分支还记录精确请求与实际结果。业务持久化通过注入仓库完成，不将流式证据或整个热状态反复编码落盘。状态机与存储机制分别见 [Core Runtime](Support/Core/Runtime/README.md#processing-work-state) 和 [Context](Support/Context/README.md)。
+
+## 核心与集成编译边界
+
+Agents 核心仍只依赖独立契约、模型/原生能力和领域仓库；不导入 UI、Actions、Gateway 实现或 App。AgentBindings 使用互斥源清单编译外层请求与运行接入，可依赖 Gateway、ActionBindings、公开 UI/基础能力。
+
+UI 提交的设置、资源、历史、相机及蓝牙请求由 AgentBindings 编码并关联实际角色结果；发布成功不等于业务完成。AgentServices 构造角色内部运行图并显式 start，启动错误传播至应用服务图。ApplicationFeatures 持有根级操作和观察，AgentApplicationUI 实现 UI 自己的端口；不读取具体 SQLite 后端。语音输入/角色策略、VisionSession 和隔离诊断属于本目标；原生播放和 UI 动画不在这些角色接入器内实现。
+
+Root UI bootstrap 只调用注入的生命周期启动端口；根服务开始后页面才等待呈现准备。根观察独立于 SwiftUI 页面，退出/重试加入观察、业务消费和模块清理。App 只创建、连接和启停模块。
+
 
 ## 待实现
 

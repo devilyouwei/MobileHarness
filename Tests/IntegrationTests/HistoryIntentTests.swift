@@ -1,13 +1,15 @@
+import ActionBindings
 import Actions
+import AgentBindings
 import AgentCore
 import Agents
-import AppWorkflows
 import CallRuntime
 import ExecutionRuntime
 import Foundation
 import FunctionContracts
 import Gateway
 import ModelKit
+import PlatformKit
 import Storage
 import StorageChat
 import Testing
@@ -24,7 +26,8 @@ private struct UnusedHistoryMutation: HistoryMutationCapability {
 }
 private func intentRuntime(
     sessionID: String, presentation: any HistoryPresentationCapability,
-    mutations: any HistoryMutationCapability = UnusedHistoryMutation()
+    mutations: any HistoryMutationCapability = UnusedHistoryMutation(),
+    reads: MemoryHistoryReadRequests? = nil
 ) throws
     -> HistoryIntentRuntime
 {
@@ -61,7 +64,7 @@ private func intentRuntime(
         actions: ChannelScheduler(registry: ActionRegistry()), policy: policy, sink: { _ in })
     return try HistoryIntentRuntime(
         sessionID: sessionID, manager: manager, input: input, output: gateway,
-        agent: MemoryAgent(sessionID: sessionID))
+        agent: MemoryAgent(sessionID: sessionID, historyReads: reads))
 }
 
 @Test(.actionCatalog) @MainActor func historyRefreshTravelsThroughBothGatewaysWithoutVoiceOrModels() async throws {
@@ -579,4 +582,95 @@ private struct FailedArchivePresentation: HistoryPresentationCapability {
     #expect(state.archive?.past.first?.turns.isEmpty == true)
     #expect(try await store.conversation(archived.id).turns.first?.raw == "照片已拍摄，要保存吗？")
     await agent.stop()
+}
+
+@Test(.actionCatalog) @MainActor func historyReadQueryIsAdmittedByMemoryWithoutPresentationOrModel() async throws {
+    let store = ConversationHistoryStore()
+    let current = try await store.readCurrent()
+    let reads = MemoryHistoryReadRequests { query in
+        guard case .conversation(let id) = query else { throw CommunicationError.invalidPayload }
+        return .conversation(try await store.page(id))
+    }
+    let state = ConversationHistoryState()
+    let session = UUID().uuidString
+    let runtime = try intentRuntime(
+        sessionID: session,
+        presentation: HistoryPresentationAdapter(state: state, store: store, sessionID: session), reads: reads)
+    let result = try await runtime.query(.conversation(current.current.id))
+    guard case .conversation(let value) = result else {
+        Issue.record("Expected conversation")
+        return
+    }
+    #expect(value.id == current.current.id)
+    #expect(state.archive == nil)
+    #expect(await runtime.agent.status().processedInputs == 1)
+    await runtime.shutdown()
+}
+
+@Test(.actionCatalog) func historyReadStagingRejectsOverflowAndWrongSessionWithoutReading() async throws {
+    let reads = MemoryHistoryReadRequests { _ in .photo(nil) }
+    let session = UUID().uuidString
+    var ids: [String] = []
+    for _ in 0..<4 { ids.append(try await reads.stage(.photo(id: "media_1", inputID: "input"), sessionID: session)) }
+    await #expect(throws: CommunicationError.capacityExceeded) {
+        try await reads.stage(.archives(before: 10), sessionID: session)
+    }
+    await #expect(throws: CommunicationError.scopeClosed) {
+        try await reads.execute(ids[0], sessionID: UUID().uuidString)
+    }
+    for id in ids { await reads.discard(id) }
+    let id = try await reads.stage(.archives(before: 10), sessionID: session)
+    await reads.discard(id)
+    await reads.shutdown()
+    await #expect(throws: CommunicationError.scopeClosed) {
+        try await reads.stage(.archives(before: 10), sessionID: session)
+    }
+}
+
+@Test(.actionCatalog) @MainActor func historyReadCancellationJoinsActualReaderAndReleasesAdmission() async throws {
+    let entered = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingOldest(1))
+    let cancelled = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingOldest(1))
+    let release = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingOldest(1))
+    let reads = MemoryHistoryReadRequests { _ in
+        try await withTaskCancellationHandler {
+            entered.continuation.yield(())
+            for await _ in release.stream { break }
+            try Task.checkCancellation()
+            return .photo(nil)
+        } onCancel: {
+            cancelled.continuation.yield(())
+        }
+    }
+    let store = ConversationHistoryStore()
+    let session = UUID().uuidString
+    let runtime = try intentRuntime(
+        sessionID: session,
+        presentation: HistoryPresentationAdapter(state: ConversationHistoryState(), store: store, sessionID: session),
+        reads: reads)
+    let operation = Task { try await runtime.query(.photo(id: "media_1", inputID: "input")) }
+    for await _ in entered.stream { break }
+    operation.cancel()
+    for await _ in cancelled.stream { break }
+    release.continuation.yield(())
+    await #expect(throws: CancellationError.self) { try await operation.value }
+    let next = try await reads.stage(.archives(before: 10), sessionID: session)
+    await reads.discard(next)
+    await runtime.shutdown()
+}
+
+private enum HistoryReadFixtureFailure: Error, Equatable { case unavailable }
+
+@Test(.actionCatalog) @MainActor func historyReadFailurePreservesProducerAndDoesNotPresent() async throws {
+    let reads = MemoryHistoryReadRequests { _ in throw HistoryReadFixtureFailure.unavailable }
+    let state = ConversationHistoryState()
+    let session = UUID().uuidString
+    let runtime = try intentRuntime(
+        sessionID: session,
+        presentation: HistoryPresentationAdapter(state: state, store: ConversationHistoryStore(), sessionID: session),
+        reads: reads)
+    await #expect(throws: HistoryReadFixtureFailure.unavailable) { try await runtime.query(.archives(before: 10)) }
+    #expect(state.archive == nil)
+    let next = try await reads.stage(.archives(before: 10), sessionID: session)
+    await reads.discard(next)
+    await runtime.shutdown()
 }

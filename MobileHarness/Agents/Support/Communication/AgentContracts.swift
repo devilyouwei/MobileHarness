@@ -231,6 +231,7 @@ extension InputPayload {
 
 /// Typed human/history host intent; never embedded in framework business enums.
 public enum MemoryHistoryIntent: Codable, Sendable, Equatable {
+    case query(String)
     case startNew
     case summarize(String)
     case refresh
@@ -240,7 +241,10 @@ public enum MemoryHistoryIntent: Codable, Sendable, Equatable {
     public func input(sessionID: String) throws -> AgentInput {
         let requestID: String
         let source: String
-        if case .cancel(let id) = self {
+        if case .query(let id) = self {
+            requestID = id
+            source = "user"
+        } else if case .cancel(let id) = self {
             requestID = id
             source = "runtime"
         } else {

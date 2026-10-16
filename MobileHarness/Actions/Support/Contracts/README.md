@@ -13,7 +13,7 @@ flowchart LR
     CallRuntime -->|调用协议适配| C
     ExecutionRuntime -->|预算执行与结果校验| C
     Gateway -->|执行关联与资源协调| C
-    Host[App 能力端点] -->|输入与结果实现| C
+    Host[ActionBindings 能力端点] -->|输入与结果实现| C
 ```
 
 这些模块是契约的直接消费者；契约不回调它们的具体实现。

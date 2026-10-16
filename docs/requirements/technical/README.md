@@ -4,7 +4,8 @@
 
 | 需求文档 | 待实现范围 |
 | --- | --- |
-| [四项核心架构改进](Core-Architecture-Improvement-Plan.md) | Storage 通用内存状态转换；错误分类及用户文案/开发日志分层；App 的模块管理和业务解耦。存储抽象接口子项已完成，整份需求仍未完成。 |
+| [四项核心架构改进](Core-Architecture-Improvement-Plan.md) | Storage 通用内存状态转换；错误分类及用户文案/开发日志分层；App 独立端到端/设备验收。App 结构迁移和存储抽象接口子项已完成，整份需求仍未完成。 |
+| [App 宿主职责与目录调整方案](App-Host-Boundaries-Plan.md) | 核心架构第 3 项的纯组合根重构已实现；保留全量感知回归、Simulator 依赖与真实模型/原生 UI/物理设备验收。 |
 
 已有内存状态容器不等于通用业务状态转换已实现。已完成的存储接口与后端分离记录在 [Storage 实施历史](../../completed/Storage-Repository-Plan.md)，不再列为未实现需求。
 

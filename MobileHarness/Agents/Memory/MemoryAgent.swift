@@ -17,6 +17,7 @@ public actor MemoryAgent: Agent {
     private let contextBuilder = MemoryContextBuilder()
 
     private let continuation: AsyncStream<OutputEnvelope>.Continuation
+    public nonisolated let historyReads: MemoryHistoryReadRequests?
     private let sessionID: String
     private var lifecycle = AgentLifecycle.registered
     private var processed = 0
@@ -36,6 +37,7 @@ public actor MemoryAgent: Agent {
 
     public init(
         sessionID: String, configuration: AgentConfiguration? = nil,
+        historyReads: MemoryHistoryReadRequests? = nil,
         context: AgentContextRepository<MemoryContextState>? = nil
     ) throws {
         self.contextRepository =
@@ -50,6 +52,7 @@ public actor MemoryAgent: Agent {
             capabilities: try Self.runtimeCapabilities(configuration.capabilities))
         taskCoordinator = AgentFixedTaskCoordinator(context: self.contextRepository)
         self.sessionID = sessionID
+        self.historyReads = historyReads
         let stream = AsyncStream<OutputEnvelope>.makeStream(
             bufferingPolicy: .bufferingOldest(MemorySignalPreprocessor.outputCapacity))
         outputs = stream.stream
@@ -90,6 +93,7 @@ public actor MemoryAgent: Agent {
         admission.close()
         lifecycle = .stopped
         history.reset()
+        await historyReads?.shutdown()
         fixedTaskInputs.removeAll()
         await taskCoordinator.stop()
         taskPump?.cancel()
@@ -136,7 +140,22 @@ public actor MemoryAgent: Agent {
 
         try await admission.acquire()
         defer { admission.release() }
-        try Task.checkCancellation()
+        if case .observation(let message) = input.payload, case .query(let id)? = message.historyIntent {
+            guard let historyReads else { throw CommunicationError.unavailableTarget }
+            do {
+                try Task.checkCancellation()
+                guard lifecycle == .running else { throw HarnessError.notRunning }
+                guard input.sessionID == sessionID, input.metadata.source == "user", input.id == id,
+                    !input.metadata.expired, input.taskScope == nil
+                else { throw CommunicationError.unauthorized }
+                try await historyReads.execute(id, sessionID: input.sessionID)
+                processed += 1
+            } catch {
+                await historyReads.reject(id, sessionID: input.sessionID, error: error)
+                throw error
+            }
+            return
+        }
         try Task.checkCancellation()
         guard lifecycle == .running else { throw HarnessError.invalidTransition }
         guard input.sessionID == sessionID || input.taskScope?.executor == .memory else {

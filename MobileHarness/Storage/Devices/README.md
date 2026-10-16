@@ -6,7 +6,7 @@ DeviceRepository.swift exposes async stable native/business mapping, selected de
 
 ## Direct relationships
 
-StorageDevices depends only on Storage. App Bluetooth consumes the protocol and PlatformKit receives the original native identity; this directory contains no transport or reconnect workflow.
+StorageDevices depends only on Storage. ActionBindings consumes the protocol and PlatformKit receives the original native identity; this directory contains no transport or reconnect workflow.
 
 ## Lifecycle and failure contracts
 
