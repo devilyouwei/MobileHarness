@@ -113,7 +113,15 @@ public actor AgentInteractionRuntime {
         try await input.publish(signal)
     }
 
-    /// Trusted host interruption; retain the resident Agent and unrelated session work.
+    /// Stop accepted execution without ending the conversation or its public State scope.
+    public func interruptConversation(sessionID: String) async throws {
+        guard started, !closed else { return }
+        async let calls: Void = output.cancelCalls(for: agent, sessionID: sessionID)
+        async let model: Void = agent.receive(AgentSessionControl.interruptSession.input(sessionID: sessionID))
+        _ = try await (model, calls)
+    }
+
+    /// Explicit session closure; release its Task/Skill ownership and public State scope.
     public func cancelConversation(sessionID: String) async throws {
         guard started, !closed else { return }
         async let calls: Void = output.cancelCalls(for: agent, sessionID: sessionID)

@@ -40,3 +40,9 @@
 ## Storage 依赖
 
 ✅ 存储访问使用独立的 State、Cache、Database 和 Files 接口；App 注册根实例，消费者通过构造器获得所需能力。存储容器不接管本目录的业务验证、执行和完成语义。
+
+## 公开 State 边界
+
+✅ State 回归覆盖公开编码、作用域隔离、代际/容量/失败、Task 投影与每轮请求。Assistant fixture 显式注入隔离的公开事实源；测试替身和自动化结果不等于真实模型或物理设备验收。
+
+[公开 State 契约](../MobileHarness/Storage/State/README.md)

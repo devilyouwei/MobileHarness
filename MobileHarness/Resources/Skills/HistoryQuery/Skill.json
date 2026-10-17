@@ -1,7 +1,7 @@
 {
-  "version": 1,
+  "version": 2,
   "id": "history-query",
-  "revision": 9,
+  "revision": 10,
   "description": "Read-only paged conversation search and recall with native history Tools; no history mutation.",
   "dependencies": [],
   "functions": [
@@ -16,9 +16,5 @@
       "alias": "History.read"
     }
   ],
-  "contextFields": [
-    "runtimeFacts",
-    "taskState",
-    "actionResults"
-  ]
+  "useState": []
 }

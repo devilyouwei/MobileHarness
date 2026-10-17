@@ -6,7 +6,7 @@
 
 App 用 FactoryKit 3.4.1 的独立 ApplicationContainer 注册 StorageContainer。根组合 state/cache/database/files；FactoryKit 不进入业务或 Storage 目标。StorageCore 保留公共机制；StorageState、StorageCache、StorageFiles、StorageDatabase 保持独立；StorageSQLite 独占 GRDB。AppStorage 复用 App/Composition 中的注册源码。
 
-State 提供类型化注册、Reader/Writer、代际、CAS、同步纯转换、一致快照、有界观察。默认 256 项、64 作用域、64 观察者；通知保留最新一项。AgentContext 迁移到唯一权威内存状态，业务事务和 Task/Skill 规则不变；Skill 动态状态上下文后续实现。
+State 提供类型化注册、Reader/Writer、代际、CAS、同步纯转换、一致快照、有界观察。默认 256 项、64 作用域、64 观察者；通知保留最新一项。AgentContext 当前由 Agent actor 私有持有，业务事务和 Task/Skill 规则不变；State 只保存有限公开事实，Skill useState 每轮取新快照。
 
 Cache 提供不可变共享缓冲区、命名空间与租约，默认字节缓存 256 对象/64 MiB；音频保留 32 句柄、8 MiB/2048 帧、单消费者和 owner 校验。会话显式申请/关闭音频子作用域。零拷贝保证限于 Cache 存取与交接，原生播放格式转换保留。
 
@@ -28,9 +28,12 @@ Database 保留 chat/tasks/media/devices、共享 SQLite 池和既有恢复/关�
 
 - ✅ 四类目录、独立编译目标、StorageCore 与根 StorageContainer；移除 StorageAudio、MemoryStateStore 和具体文件后端分散构造。
 - ✅ AppStorage 使用 FactoryKit 3.4.1 实例缓存，业务通过构造器注入端口，保持 storage → agents → native 生命周期。
-- ✅ State 注册、读写能力、代际、CAS/纯转换、一致快照、有界通知和旧端口失效；AgentContext 迁移且不复制 Task/Skill 权威状态。
+- ✅ State 注册、读写能力、代际、CAS/纯转换、一致快照、有界通知和旧端口失效；AgentContext 私有内存与有限公开投影分离，不复制 Task/Skill 权威对象。
 - ✅ Cache 共享缓冲区、租约计费、会话音频；Files 文档/字节/目录统一并保留原格式与路径；Database 保留恢复和关闭契约。
 - ✅ 模型后台下载复用注入服务；Files 释放前加入制品工作并解除旧绑定，避免新根引用已关闭后端。
 - ✅ 新旧实现清理、路径引用、文档与源码归属对账；❌ 全量感知回归和 Simulator 外部依赖限制不能判为通过。
 
 详细结果见 [验证记录](../../validation/Validation-History.md)。真实模型/UI/物理设备未验收；本轮交付不等同整个资源 State/Skill 上下文需求完成。
+
+
+✅ State 边界已修订：AgentContext 使用私有 actor 内存，公开寄存器只承载有限事实；以 [公开 State 计划](../Resource-State-Plan.md) 为现行范围；历史记录保留此前实现与验收限制。

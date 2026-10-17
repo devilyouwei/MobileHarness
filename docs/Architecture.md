@@ -64,4 +64,9 @@ Assistant 决定照片如何进入模型上下文，PlatformKit 提供通用图�
 
 ✅ AppStorage 使用实例级 FactoryKit 注册 StorageContainer，组合 State、Cache、Database、Files；AppLifecycle 按 storage → agents → native 启停。数据库实现负责迁移、恢复、接纳和关闭；会话音频使用 Cache 子作用域，配置/照片/模型文件复用 Files。模型制品工作在 Files 释放前加入清理并解除旧绑定。见 [实施计划](requirements/technical/Storage-Containers-Plan.md)。
 
-Storage 四类容器与通用 State 已实施，参见 [计划及验证范围](requirements/technical/Storage-Containers-Plan.md)；Skill 自动状态上下文仍待后续。
+Storage 四类容器与通用 State 已实施，参见 [计划及验证范围](requirements/technical/Storage-Containers-Plan.md)；Skill useState 每轮公开状态上下文已接通，真实模型/设备验收独立记录。
+
+
+✅ State 边界已修订：AgentContext 使用私有 actor 内存，公开寄存器只承载有限事实；以 [公开 State 计划](requirements/Resource-State-Plan.md) 为现行范围；历史记录保留此前实现与验收限制。
+
+✅ 页面导航、原生执行中断、对话结束分离。设置页不关闭根服务；后台保留 Assistant 内存及当前目标/Skill，只取消并加入在途执行及安全停止设备；恢复等待新输入，显式结束会话才回收作用域。

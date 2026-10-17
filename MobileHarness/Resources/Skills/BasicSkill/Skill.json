@@ -1,7 +1,7 @@
 {
-  "version": 1,
+  "version": 2,
   "id": "basic-skill",
-  "revision": 21,
+  "revision": 22,
   "description": "Task and Skill orchestration, grounded environment reading and a single continuing foreground goal.",
   "dependencies": [],
   "functions": [
@@ -42,9 +42,7 @@
       "channel": "System"
     }
   ],
-  "contextFields": [
-    "runtimeFacts",
-    "taskState",
-    "actionResults"
+  "useState": [
+    "task"
   ]
 }

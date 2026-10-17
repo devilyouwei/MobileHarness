@@ -139,8 +139,7 @@ private func armSpeeds(in frame: [UInt8]) throws -> [Int] {
     let agent = try PhotographerAgent(
         sessionID: session, controlsArm: true,
         context: try AgentContextRepository(
-            agent: AgentID(rawValue: "photographer"), scope: UUID().uuidString, state: PhotographerContextState(),
-            stateScope: StateContainer().makeScope())
+            agent: AgentID(rawValue: "photographer"), scope: UUID().uuidString, state: PhotographerContextState())
     )
     try await agent.start()
     try await agent.receive(observation(try pose(noseX: 10, noseY: 50, sequence: 1, timestamp: 0), session: session))
@@ -176,8 +175,7 @@ private func armSpeeds(in frame: [UInt8]) throws -> [Int] {
     let agent = try PhotographerAgent(
         sessionID: session, controlsArm: true,
         context: try AgentContextRepository(
-            agent: AgentID(rawValue: "photographer"), scope: UUID().uuidString, state: PhotographerContextState(),
-            stateScope: StateContainer().makeScope())
+            agent: AgentID(rawValue: "photographer"), scope: UUID().uuidString, state: PhotographerContextState())
     )
     try await agent.start()
     #expect(await !agent.hasFreshPose())
@@ -204,8 +202,7 @@ private func armSpeeds(in frame: [UInt8]) throws -> [Int] {
     let agent = try PhotographerAgent(
         sessionID: session, controlsArm: true,
         context: try AgentContextRepository(
-            agent: AgentID(rawValue: "photographer"), scope: UUID().uuidString, state: PhotographerContextState(),
-            stateScope: StateContainer().makeScope())
+            agent: AgentID(rawValue: "photographer"), scope: UUID().uuidString, state: PhotographerContextState())
     )
     try await agent.start()
     let body = try pose(noseX: 0, noseY: 0, noseConfidence: 0.1, others: 80, sequence: 1, timestamp: 0)
@@ -231,8 +228,7 @@ private func armSpeeds(in frame: [UInt8]) throws -> [Int] {
     let agent = try PhotographerAgent(
         sessionID: session, controlsArm: true,
         context: try AgentContextRepository(
-            agent: AgentID(rawValue: "photographer"), scope: UUID().uuidString, state: PhotographerContextState(),
-            stateScope: StateContainer().makeScope())
+            agent: AgentID(rawValue: "photographer"), scope: UUID().uuidString, state: PhotographerContextState())
     )
     try await agent.start()
     let empty = try PoseObservation(width: 100, height: 100, sequence: 1, timestamp: 0, rotation: 1, people: [])
@@ -247,8 +243,7 @@ private func armSpeeds(in frame: [UInt8]) throws -> [Int] {
     let agent = try PhotographerAgent(
         sessionID: session, controlsArm: true,
         context: try AgentContextRepository(
-            agent: AgentID(rawValue: "photographer"), scope: UUID().uuidString, state: PhotographerContextState(),
-            stateScope: StateContainer().makeScope())
+            agent: AgentID(rawValue: "photographer"), scope: UUID().uuidString, state: PhotographerContextState())
     )
     try await agent.start()
     try await agent.receive(observation(try pose(noseX: 50, noseY: 50, sequence: 1, timestamp: 0), session: session))
@@ -262,8 +257,7 @@ private func armSpeeds(in frame: [UInt8]) throws -> [Int] {
     let agent = try PhotographerAgent(
         sessionID: session, controlsArm: true,
         context: try AgentContextRepository(
-            agent: AgentID(rawValue: "photographer"), scope: UUID().uuidString, state: PhotographerContextState(),
-            stateScope: StateContainer().makeScope())
+            agent: AgentID(rawValue: "photographer"), scope: UUID().uuidString, state: PhotographerContextState())
     )
     try await agent.start()
     try await agent.receive(observation(try pose(noseX: 10, noseY: 50, sequence: 1, timestamp: 0), session: session))
@@ -288,8 +282,7 @@ private func armSpeeds(in frame: [UInt8]) throws -> [Int] {
     let agent = try PhotographerAgent(
         sessionID: session, controlsArm: true,
         context: try AgentContextRepository(
-            agent: AgentID(rawValue: "photographer"), scope: UUID().uuidString, state: PhotographerContextState(),
-            stateScope: StateContainer().makeScope())
+            agent: AgentID(rawValue: "photographer"), scope: UUID().uuidString, state: PhotographerContextState())
     )
     try await agent.start()
     try await agent.receive(observation(try pose(noseX: 10, noseY: 50, sequence: 1, timestamp: 0), session: session))
@@ -383,8 +376,7 @@ private actor AimLink: NexArmWritableLink {
     let agent = try PhotographerAgent(
         sessionID: session, controlsArm: true, outputCapacity: 8,
         context: try AgentContextRepository(
-            agent: AgentID(rawValue: "photographer"), scope: UUID().uuidString, state: PhotographerContextState(),
-            stateScope: StateContainer().makeScope())
+            agent: AgentID(rawValue: "photographer"), scope: UUID().uuidString, state: PhotographerContextState())
     )
     try await agent.start()
     for index in 0..<8 {
@@ -411,8 +403,7 @@ private actor AimLink: NexArmWritableLink {
     let agent = try PhotographerAgent(
         sessionID: session, controlsArm: true,
         context: try AgentContextRepository(
-            agent: AgentID(rawValue: "photographer"), scope: UUID().uuidString, state: PhotographerContextState(),
-            stateScope: StateContainer().makeScope())
+            agent: AgentID(rawValue: "photographer"), scope: UUID().uuidString, state: PhotographerContextState())
     )
     try await agent.start()
     let pose = try JSONDecoder().decode(
@@ -444,8 +435,7 @@ private actor ArmAvailability {
     let agent = try PhotographerAgent(
         sessionID: session, controlsArm: true, controlAvailable: { await availability.ready },
         context: try AgentContextRepository(
-            agent: AgentID(rawValue: "photographer"), scope: UUID().uuidString, state: PhotographerContextState(),
-            stateScope: StateContainer().makeScope())
+            agent: AgentID(rawValue: "photographer"), scope: UUID().uuidString, state: PhotographerContextState())
     )
     try await agent.start()
     try await agent.receive(observation(try pose(noseX: 10, noseY: 50, sequence: 1, timestamp: 0), session: session))
@@ -477,8 +467,7 @@ private actor ArmAvailability {
     let agent = try PhotographerAgent(
         sessionID: session, controlsArm: true, outputCapacity: 8,
         context: try AgentContextRepository(
-            agent: AgentID(rawValue: "photographer"), scope: UUID().uuidString, state: PhotographerContextState(),
-            stateScope: StateContainer().makeScope())
+            agent: AgentID(rawValue: "photographer"), scope: UUID().uuidString, state: PhotographerContextState())
     )
     try await agent.start()
     for sequence in 1...8 {

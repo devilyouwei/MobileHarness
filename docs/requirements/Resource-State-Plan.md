@@ -1,67 +1,24 @@
-# Resource 当前状态存取计划
+# State 公开寄存器与 useState 实施
 
-状态：❌ 未来计划，尚未实现。记录日期：2026-10-05。
+状态：✅ 本轮代码与专项自动化已实施；❌ 真实模型、原生 UI 与物理设备验收待执行。替换旧资源快照计划与完整 AgentContext 托管方案；历史证据保留在 validation/history。
 
-2026-10-14 衔接：[核心架构技术需求](technical/Core-Architecture-Improvement-Plan.md) 将本计划作为 Storage 通用内存状态机制的首个应用场景。快照存取与通用转换机制共同设计；领域状态与转换规则仍由各业务拥有者定义。本计划继续聚焦当前资源事实，不替代执行状态或资源锁。
+State 仅发布 LLM 所需的有限公开事实，不集中保存程序执行状态。保留版本、代际、类型化端口、一致快照、容量和观察；增加名称/应用或 Agent 会话作用域及编码投影。AgentContextRepository 持有私有内存，保留事务、验证与提交测试钩子。
 
-## 目标与范围
+首批 camera：enabled/running/selectedFacing/busy/needsSettings/displayedMediaID/savedMediaID；robot：connected/controlAvailable；task：goal/status（running/waitingUser），无任务为 null，内部收尾保留最近公开状态。Task 业务权威仍在 Agent，按会话发布，结束关闭。未知/不可用明确表达；发布失败失效并报告。
 
-以 resource 为单位，快速存储和读取手机 App、UI 与 Platform 设备的当前状态，供 Agent 的后续决策和 LLM 上下文使用。沿用现有模块目录、独立 target、actor 隔离和显式 capability 注入；不新增目录或 target。
+Skill schema v2 的 useState 必填，替代 contextFields；BasicSkill=[task]、Photography=[camera]、RobotInteraction=[robot]、其余=[]。展开依赖合并去重，验证声明；每次请求与 ReACT 重新读取绑定作用域的快照，生成唯一 CURRENT STATE 系统数据块，历史保存实际请求。移除旧相机及 Task/Skill 管理信息 user 消息，保留真实输入、动作反馈与 native 配对。
 
-本计划不记录 Action 排队、准备、执行阶段，不替代现有执行诊断。首版采用内存快照，不要求磁盘持久化或完整状态机框架。
+公开名称按声明解析，禁止跨作用域回退。同地址唯一；默认 256 项/64 Scope/64 观察者，每值 8 KiB、每 Skill 16 名称、每请求 32 名称、状态块 16 KiB。失败显式传播，取消/关闭失效旧端口。事实生命周期独立于 Skill/页面。
 
-首批属性：UI 基础/当前表情、视线、字幕；相机开关/镜头、音频播放状态；设备连接、控制可用性、已接受目标角度与实际反馈角度。领域内采用类型化属性，不以调用名称或任意字符串推断状态。
+本轮不新增目录/目标/第三方依赖（ActionBindings 显式使用既有 StorageState 目标），不实现 Trigger、逐转换日志、完整写入源治理或全量 Signal 重构，不改变 SQL/文件格式，不自动提交合并。
 
-## 模块归属
-
-| 现有位置 | 计划职责 |
-| --- | --- |
-| Storage/ | 通用 ResourceStateStore actor、状态记录/快照结构、版本和有界内存存取；不认识具体设备或 UI 业务字段。 |
-| Actions 的现有领域目录及 Support | 定义领域属性和类型化状态写入契约；向实现注入写入能力，在实际效果发生时报告变化。 |
-| App/Adapters | 绑定状态写入能力，将 UI 接受结果、Platform 原生反馈转换成状态更新；避免同一事实重复写入。 |
-| App/Lifecycle、App/Workflows 的现有领域目录 | 接入手动操作、资源关闭/释放、断连和恢复等变化，保持当前状态完整。 |
-| App/Composition | 创建唯一共享 Store，显式注入生产者写入端和消费者只读端；生命周期不依赖页面。 |
-| Agents/Communication、Agents/Assistant | 定义 Agent 消费的状态视图，按需读取快照并组织 LLM 上下文。 |
-
-Store 不放在 AgentCore。Storage 保持 Foundation-only；Actions 不必依赖具体 Store，App 适配双方契约。Gateway 的 ExecutionRuntime/CallRuntime 不解释领域状态。PlatformKit 继续提供原生设备事实，UI 继续接收展示值；仅在缺少必要事实或确认接口时补充对应领域接口。
-
-## 更新与读取
-
-```mermaid
-flowchart LR
-    Calls[Callable Actions] --> Effects[App 绑定的 UI / Platform 效果]
-    Effects --> Updates[类型化状态更新]
-    Other[手动操作 / 生命周期 / 设备反馈] --> Updates
-    Updates --> Store[Storage ResourceStateStore]
-    Store --> View[App 适配的只读快照]
-    View --> Agent[Agent / LLM 上下文]
-```
-
-- 在实际状态变化处更新，不能仅凭 Action/Tool 成功或失败推导状态。查询类 Tool 无需制造状态变化。
-- UI 接受更新后记录；有限表情分别记录进入与恢复。调用失败或取消时保留已发生的效果，不自动回滚。
-- 设备目标与实际反馈分开保存。目标被接受不代表物理到达；断连或反馈过期标记不可用/未知，不猜测实际位置。
-- 记录必要的资源标识、版本、更新时间、有效性及来源/session/序号，拒绝旧回调覆盖新状态。具体转换规则由领域拥有。
-- 读取返回一致的不可变快照，按资源直接访问，不扫描调用历史、不访问磁盘。actor 管理共享存取，UI 保持 MainActor 隔离。
-- 首版仅保存当前值。实现前确定资源数、属性数、载荷大小和订阅者上限；超限显式失败，不静默丢失更新。若增加通知流，以容量一的完整最新快照合并旧通知，不承担动作队列。
-- Store 是当前事实的记录视图；效果与记录之间不宣称跨设备事务原子性。更新失败需显式暴露，相关视图失效，不能继续呈现旧值为已确认事实。
-
-Assistant 每次生成前读取相关资源快照，以数据形式加入上下文。异步状态输入若进入 Agent，仍经过 InputGateway；Agent 后续动作仍经过 OutputGateway，并在执行时重新验证权限、资源和设备可用性。首版不自动触发模型续轮或动作重试。
-
-## Lock 与持久化
-
-lock 可作为 resource 的只读属性，权威来源是 ResourceCoordinator 的 unlocked/locked(owner)（见 [ADR0141](../adr/0141-resource-control-ownership.md)）；设备健康与执行异常分别拥有，不推导锁状态。Store 不建立第二套锁控制，本状态缓存计划不重复实现交接、释放或异常处理。
-
-跨页面和会话共享内存状态；进程重启后重新获取事实。未来若需要落盘，复用 Storage 现有机制，物理设备状态不能因读取旧记录而被视为已确认。
-
-## 实施阶段与验收
-
-1. ❌ Storage 基础契约与 UI 状态接入：表情、视线、字幕；验证一致快照、顺序和恢复。
-2. ❌ App/设备状态接入：相机、播放、BLE、目标/反馈；验证部分失败、取消、手动操作、断连及过期。
-3. ❌ Assistant 状态上下文：按需选择、限定大小，验证状态仅作为数据，不被重新解析执行。
-
-实施时更新所有被修改目录的 README（含 Mermaid 设计说明）、边界检查、MobileHarness/README.md、架构决策和 Roadmap。测试放在根 Tests/ 的现有目录。运行 scripts/check.sh 和完整 Xcode 可用时的 scripts/build-ios.sh，明确报告不可用或失败的检查。保留 docs/Technical_Design.docx 原始设计源。
+验收覆盖私有状态移出、注册/版本/编码/容量、作用域隔离、每轮刷新、Task 生命周期与发布失败、Skill 依赖/释放、设备真实事实与部分失败、watch 不触发执行。运行 scripts/check.sh、scripts/build-ios.sh，区分全量失败、CoreAI Simulator 限制、设备构建及真实验收。
 
 
-## 通用 State 实施衔接
+## 实施对账
 
-✅ StorageState 已提供 StateContainer/StateScope、受限 Reader/Writer、版本、纯转换、一致快照和有界观察，现有 AgentContext 已迁入。❌ 本文列出的设备/UI 事实接入和 Skill 上下文投影尚未迁移，不能把基础机制完成等同本需求全部交付。旧 ResourceStateStore 命名与 App 适配器描述后续按实际业务接入替换，当前通用接口以 Storage/State README 为准。
+- ✅ AgentContext 私有 actor 内存；公开名称、作用域、编码投影及绑定读取；camera/robot/task 首批事实发布。
+- ✅ Skill v2/useState、每轮新快照与唯一系统块、请求证据及旧 user 状态入口清理。
+- ✅ observe 保留初始/最新通知，不触发模型；发布失败保留业务提交并失效公开读取。
+- ✅ 设备目标构建和资源打包通过；❌ 全量集成时序失败、Simulator CoreAI 限制及真实验收缺口见 [验证记录](../validation/Validation-History.md#2026-10-17--state-public-register-and-usestate)，不以专项通过替代全量结论。
+- ❌ Trigger、完整写入源治理和更多事实属于后续范围。

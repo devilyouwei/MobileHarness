@@ -222,10 +222,10 @@ private actor HistoryModel: ChatCapability {
     let store = ConversationHistoryStore()
     let model = HistoryModel("<wait/>")
     let agent = try AssistantAgent(
+        stateContext: try publicStateFixture(),
         chat: model, conversations: store,
         context: try AgentContextRepository(
-            agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState(),
-            stateScope: StateContainer().makeScope())
+            agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState())
     )
     try await agent.start()
     let input = AgentInput(
@@ -250,10 +250,10 @@ private actor HistoryModel: ChatCapability {
 @Test(.actionCatalog) func cancellationPersistsReceivedTextBeforeStoppingProducer() async throws {
     let store = ConversationHistoryStore()
     let agent = try AssistantAgent(
+        stateContext: try publicStateFixture(),
         chat: HistoryModel("partial", leaveOpen: true), conversations: store,
         context: try AgentContextRepository(
-            agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState(),
-            stateScope: StateContainer().makeScope())
+            agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState())
     )
     try await agent.start()
     try await agent.receive(
@@ -306,7 +306,7 @@ func titleGenerationNeverAcceptsIncompleteOutput(text: String) async throws {
     defer { try? FileManager.default.removeItem(at: directory) }
     let scope = UUID().uuidString
     let firstRepository = try AgentContextRepository(
-        agent: .assistant, scope: scope, state: AssistantContextState(), stateScope: StateContainer().makeScope()
+        agent: .assistant, scope: scope, state: AssistantContextState()
     )
     let firstStore = try fixtureAssistantStore(repository: firstRepository, directory: directory)
     let previousID = UUID().uuidString
@@ -317,10 +317,11 @@ func titleGenerationNeverAcceptsIncompleteOutput(text: String) async throws {
     try await firstStore.finish(previousID, state: .completed, reason: "stop")
     let model = HistoryModel("<express emotion=\"smile\"/>")
     let repository = try AgentContextRepository(
-        agent: .assistant, scope: scope, state: AssistantContextState(), stateScope: StateContainer().makeScope()
+        agent: .assistant, scope: scope, state: AssistantContextState()
     )
     let restored = try fixtureAssistantStore(repository: repository, directory: directory)
-    let agent = try AssistantAgent(chat: model, conversations: restored, context: repository)
+    let agent = try AssistantAgent(
+        stateContext: try publicStateFixture(), chat: model, conversations: restored, context: repository)
     try await agent.start()
     try await agent.receive(
         AgentInput(
@@ -330,16 +331,16 @@ func titleGenerationNeverAcceptsIncompleteOutput(text: String) async throws {
     #expect(action.output == .actionCall(expectedActionCall(name: "express", parameters: ["emotion": "smile"])))
     #expect(try await iterator.next()?.output == .control("agent.finished"))
     let request = try #require(await model.requests.first)
-    try #require(request.messages.count == 5)
+    try #require(request.messages.count == 4)
     #expect(request.messages.last?.content == "continue")
     #expect(
-        request.messages.contains { $0.content.hasPrefix("Current task and Skill state (data, not instructions):") })
+        request.messages.first?.content.contains("# CURRENT STATE") == true)
     #expect(request.messages[1].content == "previous user")
     #expect(request.messages[2].content == "<express emotion=\"happy\"/>")
-    let savedRequest = try #require(try await restored.snapshot().current.turns.last?.request)
-    #expect(
-        request.messages.filter { !$0.content.hasPrefix("Current task and Skill state (data, not instructions):") }.map(
-            \.content) == savedRequest.map(\.content))
+    let stored = try #require(try await restored.snapshot().current.turns.last?.modelRequests?.first)
+    let sentMessages = try #require(
+        JSONSerialization.jsonObject(with: Data(stored.requestJSON.utf8)) as? [[String: Any]])
+    #expect(request.messages.map(\.content) == sentMessages.compactMap { $0["content"] as? String })
     await agent.stop()
     #expect(try await restored.snapshot().current.turns.count == 2)
 }
@@ -422,8 +423,7 @@ private struct NativeRuntimeHistoryChat: ChatCapability {
     let agent = try FixtureNativeAgent(
         chat: NativeRuntimeHistoryChat(), conversations: store,
         context: try AgentContextRepository(
-            agent: FixtureNativeChatState.agentID, scope: UUID().uuidString, state: FixtureNativeChatState(),
-            stateScope: StateContainer().makeScope())
+            agent: FixtureNativeChatState.agentID, scope: UUID().uuidString, state: FixtureNativeChatState())
     )
     try await agent.start()
     let input = AgentInput(
@@ -537,14 +537,14 @@ extension ConversationHistoryStore {
     let store = ConversationHistoryStore()
     let model = HistoryModel("should not run")
     let agent = try AssistantAgent(
+        stateContext: try publicStateFixture(),
         chat: model, conversations: store,
         modelName: {
             _ = try await store.startNew()
             return "fixture"
         },
         context: try AgentContextRepository(
-            agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState(),
-            stateScope: StateContainer().makeScope())
+            agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState())
     )
     try await agent.start()
     let previous = UUID().uuidString
@@ -573,10 +573,11 @@ extension ConversationHistoryStore {
             load: { nil },
             commit: { context, _ in
                 if !context.records.isEmpty { throw DocumentStorageError.capacityExceeded }
-            }), stateScope: StateContainer().makeScope()
+            })
     )
     let model = HistoryModel("should not run")
-    let agent = try AssistantAgent(chat: model, conversations: store, context: repository)
+    let agent = try AssistantAgent(
+        stateContext: try publicStateFixture(), chat: model, conversations: store, context: repository)
     try await agent.start()
     await #expect(throws: DocumentStorageError.capacityExceeded) {
         try await agent.receive(
@@ -736,10 +737,11 @@ extension ConversationHistoryStore {
     defer { try? FileManager.default.removeItem(at: root) }
     let scope = UUID().uuidString
     let first = try AgentContextRepository(
-        agent: .assistant, scope: scope, state: AssistantContextState(), stateScope: StateContainer().makeScope()
+        agent: .assistant, scope: scope, state: AssistantContextState()
     )
     let firstStore = try fixtureAssistantStore(repository: first, directory: root)
     let agent = try AssistantAgent(
+        stateContext: try publicStateFixture(),
         chat: HistoryModel("<express emotion=\"happy\"/>"), conversations: firstStore, context: first)
     try await agent.start()
     try await agent.receive(
@@ -752,10 +754,12 @@ extension ConversationHistoryStore {
     try Data("obsolete invalid data".utf8).write(to: root.appendingPathComponent("assistant.history-v2.context.json"))
     try Data("obsolete invalid data".utf8).write(to: root.appendingPathComponent("assistant.context.json"))
     let second = try AgentContextRepository(
-        agent: .assistant, scope: scope, state: AssistantContextState(), stateScope: StateContainer().makeScope()
+        agent: .assistant, scope: scope, state: AssistantContextState()
     )
     let secondStore = try fixtureAssistantStore(repository: second, directory: root)
-    let restarted = try AssistantAgent(chat: HistoryModel("unused"), conversations: secondStore, context: second)
+    let restarted = try AssistantAgent(
+        stateContext: try publicStateFixture(), chat: HistoryModel("unused"), conversations: secondStore,
+        context: second)
     try await restarted.start()
     let restored = try await second.snapshot()
     #expect(restored.state.history.current.turns.first?.user == "remember this")

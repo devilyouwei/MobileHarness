@@ -88,3 +88,11 @@ Storage 生命周期回归同时覆盖停止先于启动、损坏数据库无后
 ✅ 存储访问使用独立的 State、Cache、Database 和 Files 接口；App 注册根实例，消费者通过构造器获得所需能力。存储容器不接管本目录的业务验证、执行和完成语义。
 
 GenerationRoundTests 的 native-only 模型夹具报告合成参数首样本，验证 driver 到历史仓库保留原始计时，不把工具完成时间作为首 token。
+
+## 公开 State 边界
+
+✅ State 回归覆盖公开编码、作用域隔离、代际/容量/失败、Task 投影与每轮请求。Assistant fixture 显式注入隔离的公开事实源；测试替身和自动化结果不等于真实模型或物理设备验收。
+
+[公开 State 契约](../../MobileHarness/Storage/State/README.md)
+
+✅ 补充会话 interrupt/pause 与真实 close 的区别回归，覆盖近期 Skill 续期保留、运行/等待 Task、公开 task 作用域及恢复后新输入；中断不重放、不累计 idle，关闭仍拒绝旧代际。

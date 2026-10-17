@@ -1,8 +1,9 @@
 import AgentCore
-import Agents
 import Foundation
 import StorageCore
 import Testing
+
+@testable import Agents
 
 private func promptData(_ templates: [String: String]) throws -> Data {
     try JSONSerialization.data(withJSONObject: ["version": 1, "templates": templates])
@@ -137,7 +138,6 @@ func promptRenderingRejectsMalformedExpressions(body: String) throws {
 
 @Test(.actionCatalog) func taskFactsProjectCurrentGoalWithoutStorageBookkeeping() throws {
     let config = try AgentConfigurations.load(named: "Assistant")
-    var state = AssistantContextState()
     var skills = AgentTaskSkillState()
     try skills.initialize(fixed: config.capabilities, baseSkills: AgentConfigurations.baseSkills(named: "Assistant"))
     let input = AgentInput(
@@ -145,13 +145,14 @@ func promptRenderingRejectsMalformedExpressions(body: String) throws {
     _ = try skills.control(
         "startTask", arguments: ["goal": "拍照并保存", "skills": "[\"photography\"]"], inputID: input.id,
         fixed: config.capabilities, taskID: try fixtureTaskID())
-    state.skillState = skills
-    let context = AgentContext(agentID: .assistant, scopeID: UUID().uuidString, state: state)
-    let facts = try AssistantContextBuilder.contextFacts(context, input: input)
-    #expect(facts.count == 1 && facts[0].role == .user)
-    #expect(facts[0].content.contains("拍照并保存") && facts[0].content.contains("running"))
-    #expect(!facts[0].content.contains("inputIDs") && !facts[0].content.contains("updatedAt"))
-    #expect(!facts[0].content.contains("Local task state"))
+    let publicState = try publicStateFixture()
+    try publicState.open(session: input.sessionID)
+    // Bind the owner's Task to the same admitted session.
+    skills.tasks[0].sessionID = input.sessionID
+    try publicState.publish(skills)
+    let facts = try publicState.snapshot(session: input.sessionID, names: ["task"]).json
+    #expect(facts.contains("拍照并保存") && facts.contains("running"))
+    #expect(!facts.contains("inputIDs") && !facts.contains("updatedAt") && !facts.contains("loadedSkills"))
 }
 
 @Test(.actionCatalog) func communicationTeachingIncludesOnlyPermittedKinds() throws {
@@ -232,7 +233,7 @@ private func skillResponseExamples(_ id: String) throws -> [String] {
         #expect(prompt.contains("exactly one self-closing startTask tag and nothing else"))
         #expect(prompt.contains("including saving/discarding an existing preview or closing the camera"))
         #expect(prompt.contains("Five unrelated user decisions or capacity eviction can remove it"))
-        #expect(prompt.contains("If activeTaskID is \"none\" or absent, never emit finishTask or cancelTask"))
+        #expect(prompt.contains("If it is null, never emit finishTask or cancelTask"))
         #expect(prompt.contains("An unrelated operation must not finish the current Task"))
         #expect(prompt.contains("Keep the Task and its Skills while awaiting the answer"))
         #expect(prompt.contains("do not ask again"))

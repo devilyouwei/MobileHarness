@@ -501,7 +501,7 @@
             stopVoice()
         }
 
-        /// One joined barrier for every logical listening close; native pause never uses this path.
+        /// Join accepted reply/capture interruption without closing the resident conversation.
         private func requestReplyCancellation() {
             guard replyCancellationTask == nil else { return }
             replyCancellationTask = Task { [weak self] in

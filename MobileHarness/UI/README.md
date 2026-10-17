@@ -97,3 +97,11 @@ UI、ModelKit、PlatformKit、Storage 仍无项目依赖；Actions/Agents 的外
 - Multistage character performance and persistent UI audit storage.
 
 - 历史记录页面板块重新设计及原生 UI/真机验收。
+
+## 公开 State 边界
+
+✅ UI 继续只提供展示值与公开呈现/交互接口。相机呈现变更通知由 CameraState 提供，集成拥有者据此更新公开事实；UI 不持有共享 State 写端口或 Agent 业务上下文。
+
+[公开 State 契约](../Storage/State/README.md)
+
+✅ ApplicationRootView 的设置入口仅本地导航；移除 stopVoice 和 setHomeVisible 生命周期控制。设置/历史导航不停止根级 Assistant、语音或相机，页面独有读取/诊断仍按离开清理。

@@ -99,3 +99,9 @@ NexArmControlService 持有不含 UI 类型的连接/执行状态，BluetoothWor
 ## Storage 依赖
 
 ✅ 存储访问使用独立的 State、Cache、Database 和 Files 接口；App 注册根实例，消费者通过构造器获得所需能力。存储容器不接管本目录的业务验证、执行和完成语义。
+
+## 公开 State 边界
+
+✅ StorageState 仅承载公开事实；边界检查禁止完整 AgentContext 注册，校验 Skill schema v2/useState。沿用现有源码归属及目标，ActionBindings 显式依赖 StorageState。
+
+[公开 State 契约](../Storage/State/README.md)

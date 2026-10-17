@@ -304,7 +304,7 @@ for source in (ROOT / 'MobileHarness/Gateway').rglob('*.swift'):
     if re.search(r'\b(?:UIActions|SpeechPlayback|UITools|SystemTools|CameraTools)\b', source.read_text()):
         errors.append(f'Gateway directly uses a concrete behavior: {source.relative_to(ROOT)}')
 # Agents may compute with the base ModelKit SDK, never invoke business/UI/device modules.
-agent_allowed = {'FunctionContracts', 'AgentCore', 'ModelKit', 'StorageCore', 'StorageState', 'StorageChat', 'StorageCache', 'StorageTasks', 'PlatformKit', 'Foundation'}
+agent_allowed = {'FunctionContracts', 'AgentCore', 'ModelKit', 'StorageCore', 'StorageState', 'StorageChat', 'StorageCache', 'StorageTasks', 'PlatformKit', 'Foundation', 'Synchronization'}
 for source in (ROOT / 'MobileHarness/Agents').rglob('*.swift'):
     if source.resolve() in integration_sources or 'Core' in source.relative_to(ROOT / 'MobileHarness/Agents').parts:
         continue
@@ -549,7 +549,7 @@ for source in list((ROOT / 'MobileHarness').rglob('*.swift')) + list((ROOT / 'Te
 expected_bindings = {
     'ActionBindings': {'Actions', 'AgentCore', 'FunctionContracts', 'ExecutionRuntime', 'CallRuntime', 'UI',
                        'PlatformKit', 'ModelKit', 'ModelKitRuntime', 'ModelKitDefaults', 'ModelKitOpenAI',
-                       'ModelKitHub', 'StorageCore', 'StorageFiles', 'StorageChat', 'StorageMedia', 'StorageCache', 'StorageDevices'},
+                       'ModelKitHub', 'StorageCore', 'StorageState', 'StorageFiles', 'StorageChat', 'StorageMedia', 'StorageCache', 'StorageDevices'},
     'AgentBindings': {'Agents', 'AgentCore', 'Gateway', 'Actions', 'ActionBindings', 'FunctionContracts',
                       'ExecutionRuntime', 'CallRuntime', 'UI', 'PlatformKit', 'ModelKit', 'ModelKitRuntime',
                       'ModelKitDefaults', 'ModelKitHub', 'StorageCore', 'StorageState', 'StorageFiles', 'StorageChat', 'StorageMedia', 'StorageCache',
@@ -799,8 +799,8 @@ for source in (support / 'Communication').glob('*.swift'):
 for layer, allowed in {
     'Core': {'Foundation', 'StorageCore'},
     'Communication': {'Foundation', 'AgentCore', 'FunctionContracts', 'StorageCore'},
-    'Context': {'Foundation', 'AgentCore', 'StorageCore', 'StorageState'},
-    'Chat': {'Foundation', 'AgentCore', 'ModelKit', 'StorageChat', 'StorageTasks', 'StorageCore'},
+    'Context': {'Foundation', 'AgentCore', 'StorageCore'},
+    'Chat': {'Foundation', 'AgentCore', 'ModelKit', 'StorageChat', 'StorageTasks', 'StorageCore', 'StorageState', 'Synchronization'},
 }.items():
     for source in (ROOT / 'MobileHarness/Agents/Support' / layer).rglob('*.swift'):
         if source.resolve() in integration_sources:
@@ -902,7 +902,7 @@ if targets['Agents'].get('path') != 'MobileHarness' or targets['Agents'].get('so
     errors.append('Agents must compile only Agents sources while packaging shared assets')
 asset_root = ROOT / 'MobileHarness/Resources'
 asset_catalog = json.loads((asset_root / 'Catalog.json').read_text())
-for group, version in [('agents', 7), ('skills', 1)]:
+for group, version in [('agents', 7), ('skills', 2)]:
     for name, relative in asset_catalog[group].items():
         source = asset_root / relative
         parts = Path(relative).parts
@@ -925,7 +925,12 @@ for group, version in [('agents', 7), ('skills', 1)]:
             if not isinstance(base, list) or any(skill not in asset_catalog['skills'] for skill in base):
                 errors.append(f'Unknown Agent base Skill: {relative}')
             functions = []
-        elif group == 'skills': functions = configuration['functions']
+        elif group == 'skills':
+            functions = configuration['functions']
+            states = configuration.get('useState')
+            if (not isinstance(states, list) or len(states) > 16 or len(set(states)) != len(states)
+                    or not set(states).issubset({'camera', 'robot', 'task'}) or 'contextFields' in configuration):
+                errors.append(f'Invalid useState declaration: {relative}')
         else: continue
         paths = [f['path'] for f in functions]
         aliases = [f['alias'] for f in functions]
@@ -1122,9 +1127,16 @@ for owner in ('App', 'Agents'):
         text = source.read_text()
         if 'FileDocumentStore<AgentContext' in text or '.runtime-context.json' in text:
             raise SystemExit(f'{source}: Agent runtime state must not use JSON files.')
+for source in (ROOT / 'MobileHarness').rglob('*.swift'):
+    if re.search(r'\b(?:StateKey|StateWriter)\s*<\s*AgentContext\b', source.read_text()):
+        raise SystemExit(f'{source}: Private AgentContext cannot be a public State value.')
 context_repository = (ROOT / 'MobileHarness/Agents/Support/Context/AgentContextRepository.swift').read_text()
-if 'StateWriter<AgentContext<State>>' not in context_repository or 'stateScope.register' not in context_repository:
-    raise SystemExit('Agent runtime state must use the Storage memory-state contract.')
+if 'StorageState' in context_repository or 'stateScope.register' in context_repository:
+    raise SystemExit('Private AgentContext must not be registered in public State.')
+for relative in ('Agents/Assistant/AssistantProcessing.swift', 'Agents/Support/Chat/AgentChatWorker.swift'):
+    text = (ROOT / 'MobileHarness' / relative).read_text()
+    if any(label in text for label in ('Task transition result (data)', 'Runtime camera facts (data', 'Current task and Skill state (data')):
+        raise SystemExit(f'{relative}: Retired synthetic state-user injection must not return.')
 if 'ContextDocumentAdapter' in context_repository or 'AssistantConversationRecovery' in (ROOT / 'MobileHarness/Agents/Assistant/AssistantProcessing.swift').read_text():
     raise SystemExit('Retired Context JSON adapters and duplicate Task recovery blobs must stay removed.')
 print('Runtime memory-state and database record lifecycle boundaries pass.')

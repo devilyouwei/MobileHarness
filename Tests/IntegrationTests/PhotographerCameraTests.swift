@@ -161,7 +161,7 @@ private struct CameraFixture {
                 sessionID: root,
                 context: try AgentContextRepository(
                     agent: AgentID(rawValue: "photographer"), scope: UUID().uuidString,
-                    state: PhotographerContextState(), stateScope: StateContainer().makeScope())
+                    state: PhotographerContextState())
             ))
     }
 }
@@ -256,8 +256,7 @@ func photographerCameraUsesSharedFunctionsAndRetainsFailuresBeforeRecovering()
     let agent = try PhotographerAgent(
         sessionID: root,
         context: try AgentContextRepository(
-            agent: AgentID(rawValue: "photographer"), scope: UUID().uuidString, state: PhotographerContextState(),
-            stateScope: StateContainer().makeScope())
+            agent: AgentID(rawValue: "photographer"), scope: UUID().uuidString, state: PhotographerContextState())
     )
     try await agent.start()
     await #expect(throws: CommunicationError.unauthorized) {

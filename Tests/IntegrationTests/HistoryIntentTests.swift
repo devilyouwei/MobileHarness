@@ -68,8 +68,7 @@ private func intentRuntime(
         agent: MemoryAgent(
             sessionID: sessionID, historyReads: reads,
             context: try AgentContextRepository(
-                agent: AgentID(rawValue: "memory"), scope: UUID().uuidString, state: MemoryContextState(),
-                stateScope: StateContainer().makeScope())
+                agent: AgentID(rawValue: "memory"), scope: UUID().uuidString, state: MemoryContextState())
         ))
 }
 
@@ -136,8 +135,7 @@ private actor HeldHistoryPresentation: HistoryPresentationCapability {
     let agent = try MemoryAgent(
         sessionID: session,
         context: try AgentContextRepository(
-            agent: AgentID(rawValue: "memory"), scope: UUID().uuidString, state: MemoryContextState(),
-            stateScope: StateContainer().makeScope())
+            agent: AgentID(rawValue: "memory"), scope: UUID().uuidString, state: MemoryContextState())
     )
     try await agent.start()
     await #expect(throws: CommunicationError.invalidPayload) {
@@ -277,8 +275,7 @@ func memoryDeleteRejectsUncorrelatedOrForeignFeedbackAndOverlappingIntent() asyn
     let agent = try MemoryAgent(
         sessionID: session,
         context: try AgentContextRepository(
-            agent: AgentID(rawValue: "memory"), scope: UUID().uuidString, state: MemoryContextState(),
-            stateScope: StateContainer().makeScope())
+            agent: AgentID(rawValue: "memory"), scope: UUID().uuidString, state: MemoryContextState())
     )
     try await agent.start()
     try await agent.receive(MemoryHistoryIntent.delete(UUID().uuidString).input(sessionID: session))
@@ -334,8 +331,7 @@ func memoryDeleteRejectsUncorrelatedOrForeignFeedbackAndOverlappingIntent() asyn
     let agent = try MemoryAgent(
         sessionID: session,
         context: try AgentContextRepository(
-            agent: AgentID(rawValue: "memory"), scope: UUID().uuidString, state: MemoryContextState(),
-            stateScope: StateContainer().makeScope())
+            agent: AgentID(rawValue: "memory"), scope: UUID().uuidString, state: MemoryContextState())
     )
     try await agent.start()
     let payload = InputPayload.event("history.refresh")
@@ -518,30 +514,26 @@ private struct FailedArchivePresentation: HistoryPresentationCapability {
         try MemoryAgent(
             sessionID: UUID().uuidString,
             context: try AgentContextRepository(
-                agent: AgentID(rawValue: "memory"), scope: UUID().uuidString, state: MemoryContextState(),
-                stateScope: StateContainer().makeScope())
+                agent: AgentID(rawValue: "memory"), scope: UUID().uuidString, state: MemoryContextState())
         ).descriptor.name == "Memory")
     #expect(
         try PhotographerAgent(
             sessionID: UUID().uuidString,
             context: try AgentContextRepository(
-                agent: AgentID(rawValue: "photographer"), scope: UUID().uuidString, state: PhotographerContextState(),
-                stateScope: StateContainer().makeScope())
+                agent: AgentID(rawValue: "photographer"), scope: UUID().uuidString, state: PhotographerContextState())
         ).descriptor.name == "Photographer")
     #expect(throws: AgentConfigurationError.identityMismatch) {
         try MemoryAgent(
             sessionID: UUID().uuidString, configuration: photographer,
             context: try AgentContextRepository(
-                agent: AgentID(rawValue: "memory"), scope: UUID().uuidString, state: MemoryContextState(),
-                stateScope: StateContainer().makeScope())
+                agent: AgentID(rawValue: "memory"), scope: UUID().uuidString, state: MemoryContextState())
         )
     }
     #expect(throws: AgentConfigurationError.identityMismatch) {
         try PhotographerAgent(
             sessionID: UUID().uuidString, configuration: memory,
             context: try AgentContextRepository(
-                agent: AgentID(rawValue: "photographer"), scope: UUID().uuidString, state: PhotographerContextState(),
-                stateScope: StateContainer().makeScope())
+                agent: AgentID(rawValue: "photographer"), scope: UUID().uuidString, state: PhotographerContextState())
         )
     }
 }
@@ -551,14 +543,12 @@ private struct FailedArchivePresentation: HistoryPresentationCapability {
     let memory = try MemoryAgent(
         sessionID: session,
         context: try AgentContextRepository(
-            agent: AgentID(rawValue: "memory"), scope: UUID().uuidString, state: MemoryContextState(),
-            stateScope: StateContainer().makeScope())
+            agent: AgentID(rawValue: "memory"), scope: UUID().uuidString, state: MemoryContextState())
     )
     let photographer = try PhotographerAgent(
         sessionID: session,
         context: try AgentContextRepository(
-            agent: AgentID(rawValue: "photographer"), scope: UUID().uuidString, state: PhotographerContextState(),
-            stateScope: StateContainer().makeScope())
+            agent: AgentID(rawValue: "photographer"), scope: UUID().uuidString, state: PhotographerContextState())
     )
     try await memory.start()
     try await photographer.start()
@@ -586,11 +576,10 @@ private struct FailedArchivePresentation: HistoryPresentationCapability {
 @Test(.actionCatalog) @MainActor func taskDialogueRemainsVisibleAndNewConversationPreservesItsEvidence() async throws {
     let session = UUID().uuidString
     let repository = try AgentContextRepository(
-        agent: AgentID.assistant, scope: UUID().uuidString, state: AssistantContextState(),
-        stateScope: StateContainer().makeScope()
+        agent: AgentID.assistant, scope: UUID().uuidString, state: AssistantContextState()
     )
     let store = AgentChatHistoryContext.store(repository: repository)
-    let agent = try AssistantAgent(conversations: store, context: repository)
+    let agent = try AssistantAgent(stateContext: try publicStateFixture(), conversations: store, context: repository)
     try await agent.start()
     let input = UUID().uuidString
     _ = try await agent.controlTask(

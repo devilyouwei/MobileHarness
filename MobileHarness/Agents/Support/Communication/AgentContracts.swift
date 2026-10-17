@@ -265,6 +265,7 @@ extension AgentMessage {
 
 /// Host lifecycle controls are domain messages, not model-callable functions or runtime feedback.
 public enum AgentSessionControl: Codable, Sendable, Equatable {
+    case interruptSession
     case cancelSession
     public static let contract = "assistant.control"
     public func input(sessionID: String) throws -> AgentInput {

@@ -73,3 +73,5 @@ ListeningIntent accepts optional explicit enabled consent; absence retains the e
 ## Storage 依赖
 
 ✅ 存储访问使用独立的 State、Cache、Database 和 Files 接口；App 注册根实例，消费者通过构造器获得所需能力。存储容器不接管本目录的业务验证、执行和完成语义。
+
+✅ AgentSessionControl 增加仅可信宿主可用的 interruptSession，取消会话在途工作但保留 Task/Skill/公开端口；cancelSession 表示真正关闭。两者不向模型注册，沿用当前身份校验与有界消息。

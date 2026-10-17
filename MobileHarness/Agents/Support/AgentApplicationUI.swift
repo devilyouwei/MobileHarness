@@ -33,7 +33,6 @@
                     facing: features.camera.state.facing == .front ? .front : .back,
                     skeleton: features.camera.state.skeleton))
         }
-        public func setHomeVisible(_ visible: Bool) { features.setHomeVisible(visible) }
         public func navigationChanged() {
             features.reportEnvironment(
                 .navigation, value: features.navigation.path.map(\.rawValue).joined(separator: "/"))
@@ -51,7 +50,6 @@
     extension InteractionServices: ApplicationSessionProviding {
         var audioDetectionState: AudioDetectionState { audioDetection.state }
         var audioDetectionControls: any AudioDetectionControlling { audioDetection }
-        func stopVoice() { lifecycle.stopVoice() }
         func toggleVoice() { lifecycle.toggleVoice() }
         func voicePressChanged(_ pressing: Bool) { lifecycle.voicePressChanged(pressing) }
         func speechValidationContent() -> AnyView { AnyView(makeMossValidationView()) }

@@ -1,5 +1,3 @@
-import StorageState
-
 #if os(iOS)
     import ActionBindings
     import AVFAudio
@@ -17,17 +15,15 @@ import StorageState
 
     /// Isolated capture/perception endpoint. No conversation, camera or robot consumer is registered.
     @MainActor final class AudioDetectionSession: AudioDetectionRunning {
-        private let stateStorage: StateContainer
         private let recognition: any SpeechRecognitionCapability
         private let vad: any VoiceActivityCapability
         private let beforeStart: @MainActor () async -> Void
         private var active: AudioDetectionScope?
         init(
-            stateStorage: StateContainer, recognition: any SpeechRecognitionCapability,
+            recognition: any SpeechRecognitionCapability,
             vad: any VoiceActivityCapability,
             beforeStart: @escaping @MainActor () async -> Void
         ) {
-            self.stateStorage = stateStorage
             self.recognition = recognition
             self.vad = vad
             self.beforeStart = beforeStart
@@ -35,7 +31,7 @@ import StorageState
         func run(update: @escaping @MainActor @Sendable (AudioDetectionSnapshot) -> Void) async throws {
             guard active == nil else { throw CapabilityError.inputBusy }
             let scope = try AudioDetectionScope(
-                stateStorage: stateStorage, recognition: recognition, vad: vad, update: update)
+                recognition: recognition, vad: vad, update: update)
             active = scope
             var failure: (any Error)?
             do {
@@ -120,7 +116,7 @@ import StorageState
             observeEvent: { [weak self] in await self?.observe($0) }, sink: { _ in })
 
         init(
-            stateStorage: StateContainer, recognition: any SpeechRecognitionCapability,
+            recognition: any SpeechRecognitionCapability,
             vad: any VoiceActivityCapability,
             update: @escaping @MainActor @Sendable (AudioDetectionSnapshot) -> Void
         ) throws {
@@ -132,8 +128,7 @@ import StorageState
             input = InputGateway(manager: manager, policy: policy)
             let context = try AgentContextRepository(
                 agent: .speechPerception,
-                scope: "00000000-0000-0000-0000-000000000002", state: SpeechPerceptionContextState(),
-                stateScope: stateStorage.makeScope())
+                scope: "00000000-0000-0000-0000-000000000002", state: SpeechPerceptionContextState())
             speech = try SpeechPerceptionAgent(
                 recognition: recognition, vad: vad, sessionID: id, configuration: configuration, mode: .soundSourceOnly,
                 context: context)

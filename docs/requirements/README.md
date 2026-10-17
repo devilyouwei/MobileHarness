@@ -22,7 +22,7 @@
 
 | 需求 | 未实现范围 |
 | --- | --- |
-| [Resource 当前状态存取](Resource-State-Plan.md) | 类型化资源状态、实际效果/设备事实接入及 Agent 状态上下文；产品决策可见性与存储/适配机制共同定义。 |
+| [State 公开寄存器与 useState](Resource-State-Plan.md) | 首批 camera/robot/task、作用域与每轮上下文已实施；真实模型/UI/物理验收及后续 Trigger/写入源治理另行跟进。 |
 | [摄影构图与运镜](Photographer-Proposal.md) | 摄影任务的构图和跟随体验，以及相应感知契约、运动策略与完成/安全边界。 |
 
 ## 其他待细化方向

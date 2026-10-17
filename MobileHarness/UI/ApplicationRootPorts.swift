@@ -7,7 +7,6 @@
         var actionActivity: ActionActivityState { get }
         var audioDetectionState: AudioDetectionState { get }
         var audioDetectionControls: any AudioDetectionControlling { get }
-        func stopVoice()
         func toggleVoice()
         func voicePressChanged(_ pressing: Bool)
         func speechValidationContent() -> AnyView
@@ -30,7 +29,6 @@
         var recordDestinations: [AgentRecordDestination] { get }
         func navigate(_ destination: AppDestination?)
         func cameraPreview() -> AnyView
-        func setHomeVisible(_ visible: Bool)
         func navigationChanged()
         func prepare(progress: @MainActor (String) -> Void) async throws
     }

@@ -130,33 +130,6 @@ public enum AgentChatContextBuilder {
             + message.toolCalls.reduce(0) { $0 + $1.id.utf8.count + $1.name.utf8.count + $1.argumentsJSON.utf8.count }
     }
 
-    /// Runtime facts are scoped data; retained task history is not an instruction catalog.
-    static func taskReports(
-        views: [String: AgentTaskView], tasks: AgentTaskRegistry, input: AgentInput, templates: PromptTemplates
-    ) throws -> String {
-        let selected = views.values.filter { view in
-            guard view.scope.sessionID == input.sessionID else { return false }
-            if view.scope.id == input.taskScope?.id { return true }
-            guard view.scope.execution == .background, !view.terminal,
-                let record = tasks.task(view.scope.id)
-            else { return false }
-            return ![.succeeded, .failed, .cancelled, .interrupted].contains(record.state)
-        }.sorted { ($0.createdAt ?? .distantPast, $0.scope.id) < ($1.createdAt ?? .distantPast, $1.scope.id) }.prefix(
-            17)
-        guard !selected.isEmpty else { return "" }
-        let reports = try selected.map { view in
-            try templates.render(
-                "taskReport",
-                variables: [
-                    "taskID": view.scope.id, "executor": view.scope.executor.rawValue,
-                    "status": tasks.task(view.scope.id)?.state.rawValue ?? "unknown", "stage": view.stage.rawValue,
-                    "interaction": view.interactionID ?? "none",
-                    "artifact": view.artifactID ?? "none", "report": String(view.text.prefix(128)),
-                ])
-        }.joined(separator: "\n")
-        return try templates.render("taskReports", variables: ["reports": reports])
-    }
-
     public static func historyProjection(
         system: String, user: String, conversation: StoredConversation, templates: PromptTemplates
     ) throws -> [ConversationMessage] {

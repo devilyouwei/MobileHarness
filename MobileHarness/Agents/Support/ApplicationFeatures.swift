@@ -30,6 +30,14 @@ import StorageState
         @ObservationIgnored private let cameraDevice: AppleCamera
         @ObservationIgnored private let artifacts: ArtifactServices
         @ObservationIgnored private let resources: URL
+        @ObservationIgnored private var publicStateScope: StateScope?
+        private func installPublicState() throws {
+            guard publicStateScope == nil else { return }
+            let scope = try stateStorage.makeScope()
+            try camera.connectPublicState(scope: scope)
+            try bluetooth.service.connectPublicState(scope: scope)
+            publicStateScope = scope
+        }
         private let stateStorage: StateContainer
         private let cacheStorage: CacheContainer
         private let filesStorage: FilesContainer
@@ -390,6 +398,7 @@ import StorageState
                     await ModelKitDefaults.configureSpeech(recognition: recognition, synthesis: synthesis)
                     self.container?.lifecycle.endSettingsChange()
                 })
+            try installPublicState()
             let runtime = try AgentServices(
                 state: stateStorage, cache: cacheStorage, files: filesStorage,
                 chatRecords: try repositories().chat, taskRecords: try repositories().tasks,
@@ -453,7 +462,6 @@ import StorageState
         @ObservationIgnored private var bluetoothObservation: Task<Void, Never>?
         @ObservationIgnored private var cameraEvents: Task<Void, Never>?
         private var foreground = true
-        private var homeVisible = true
         var isolatedPresentation: Bool {
             let arguments = ProcessInfo.processInfo.arguments
             return [
@@ -499,15 +507,11 @@ import StorageState
         public func setForeground(_ value: Bool) {
             foreground = value
             guard !isolatedPresentation else { return }
-            camera.setForeground(value && homeVisible)
+            camera.setForeground(value)
             bluetooth.setForeground(value)
             setResourceObservationForeground(value)
             reportEnvironment(.scene, value: value ? "active" : "background")
             if !value { invalidateNative() }
-        }
-        func setHomeVisible(_ visible: Bool) {
-            homeVisible = visible
-            camera.setForeground(foreground && visible)
         }
         public func stopNativeServices() async throws {
             invalidateNative()
@@ -534,6 +538,8 @@ import StorageState
             await environmentObservation.shutdown()
             await runtimeValue?.resourceObservation.shutdown()
             await runtimeValue?.shutdown()
+            publicStateScope?.close()
+            publicStateScope = nil
         }
         private func prepareServices(progress: @MainActor (String) -> Void) async throws {
             _ = try repositories()

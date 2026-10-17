@@ -16,7 +16,7 @@ Document values default64KiB and failed/stale writes preserve the snapshot. Bina
 
 Cancellation completion: ordinary gate callers reject cancellation before their body; captured Chat checkpoints instead run a joined, store-owned operation independent of the cancelled caller, so cancelled/failed messages still commit. An actual cancelled-Task terminal checkpoint regression verifies received text and both terminal message states.
 
-Registered state now belongs to [State](../../State/README.md); StateWriter retains the authoritative in-memory value without JSON encoding. Agent owners enforce value limits and domain transactions.
+Registered state now belongs to [State](../../State/README.md); StateWriter atomically retains a typed public fact and its bounded encoded projection. Private AgentContext memory remains inside Agents.
 
 ## 待实现
 

@@ -40,9 +40,9 @@ flowchart LR
 
 Worker 在选择 provider 前登记原始 Decision，内部 ReACT 复用该输入/使用集合。每次从角色仓库选择快照，按加载 Skill 组合不可变目录与 system；加载/释放仅影响下一请求。具体 system 章节由 [Assistant](../../Assistant/README.md#system-提示词结构与来源) 拥有，公共层不解释相机业务事实。
 
-AgentPrompts 通过显式资源 Catalog 读取模板，要求 activeTask/taskReports/taskReport/executionObservations/historicalExecution/toolFailure。标题模板由 Memory 独立读取。渲染规则见 [Generation](../Core/Generation/README.md#prompt-resources-and-rendering)：单次替换、精确变量、缺失/超限明确失败，无资源热更新。
+AgentPrompts 通过显式资源 Catalog 读取模板，要求 executionObservations/historicalExecution/toolFailure。标题模板由 Memory 独立读取。渲染规则见 [Generation](../Core/Generation/README.md#prompt-resources-and-rendering)：单次替换、精确变量、缺失/超限明确失败，无资源热更新。
 
-角色的 decisionContextMessages 注入当前事实，任务报告只包含同会话活跃后台任务或当前定向任务。事实放在本次用户输入或完整 native 调用/结果组之前，不拆开配对，不让状态数据冒充用户请求。Native Tool 定义位于 ChatRequest.tools。
+每次实际模型请求按已加载 Skill 的 useState 读取同一公开快照，重建系统消息内唯一 CURRENT STATE 事实数据块；不再通过 user 消息注入私有 Task/Skill 管理状态。真实 Action 观察与 native 调用/结果保持配对。Native Tool 定义位于 ChatRequest.tools。
 
 ## Task/Skill 控制与执行边界
 
@@ -123,7 +123,7 @@ AgentChatWorker 默认 TextSegmentationPolicy 为首段 Han/其他字符 20/60�
 
 ## 待实现
 
-- 场景后台化时 pause 与语音 cancelSession 的目标保留和统一最终 checkpoint；当前会取消等待中的前台 Task，终态投影与 per-input 提交尚无统一最终 flush。
+- 暂停/中断的 Task 状态投影与 per-input 提交仍无统一最终 flush；现有提交边界分别保留错误，不伪造统一 checkpoint。
 - 活跃 worker 的持久化恢复、跨进程传输与真实模型/原生交互验收。
 
 [Support](../README.md) · [Context](../Context/README.md) · [Generation](../Core/Generation/README.md) · [Capability](../Core/Capability/README.md)
@@ -131,3 +131,13 @@ AgentChatWorker 默认 TextSegmentationPolicy 为首段 Han/其他字符 20/60�
 ## Storage 依赖
 
 ✅ 存储访问使用独立的 State、Cache、Database 和 Files 接口；App 注册根实例，消费者通过构造器获得所需能力。存储容器不接管本目录的业务验证、执行和完成语义。
+
+## 公开 State 边界
+
+✅ AgentStateContext 拥有按 Agent/会话隔离的 task 注册代际和只读快照能力。每轮 executeRound 固定 Skill/目录/useState 集合，文本 Action 与 native Tool 解析共用该次冻结目录，读取最新公开快照并重建唯一 CURRENT STATE 系统数据块；预算包含该块，历史保存实际请求。中断加入后保留会话；显式 cancelSession 才关闭会话，stop 关闭全部注册。observe 不触发模型。标题请求不经过此 Skill 链路。
+
+[公开 State 契约](../../../Storage/State/README.md)
+
+Task 关闭后的历史重建复用真实 Action executionObservations，不再额外生成 mode/activeTaskID/skills 等 Task 转换状态摘要；当前任务事实只从 CURRENT STATE 读取。
+
+✅ pause 与可信 interruptSession 复用当前取消/join 屏障，但保留 Task/Skill 和 AgentStateContext 作用域；被中断 Decision 不结算闲置次数，运行目标回到 waitingUser。cancelSession 才关闭公开端口并释放会话 Skill。处理中的显式 finish/cancel 仍按真实屏障结算终态。

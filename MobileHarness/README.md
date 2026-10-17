@@ -389,7 +389,7 @@ App composes model capabilities, Storage repositories, native endpoints, canonic
 
 ✅ AppStorage 用 FactoryKit 3.4.1 在每个 App 根作用域注册 StorageContainer，组合 State、Cache、Database、Files。Factory 只构造；AppLifecycle 按 storage → agents → native 启停。StorageCore 保持无项目依赖；SQLite 独占 GRDB；业务模块只接收所需端口。详见 [Storage](Storage/README.md)。
 
-AgentContext 使用注册后的 StateWriter 保存同一份 Task/Skill 权威状态；同步 CAS/转换与一致快照属于 State，业务规则仍属于 Agents。Cache 音频由会话申请/关闭，缓冲区交接共享内存。配置、照片、模型文件通过 Files 注入，数据库保留既有记录格式和恢复语义。文件和数据库没有跨后端事务；重启不重放业务动作。Skill 状态上下文自动注入尚未实现。
+AgentContext 由 Agent actor 私有持有；State 只保存业务拥有者发布的有限 LLM 事实，类型化值与编码投影原子提交。Cache 音频由会话申请/关闭，缓冲区交接共享内存。配置、照片、模型文件通过 Files 注入，数据库保留既有记录格式和恢复语义。文件和数据库没有跨后端事务；重启不重放业务动作。Skill 通过 useState 声明读取需求，每轮推理取最新一致快照，在唯一 CURRENT STATE 系统块注入。
 
 模型制品服务在释放 Files 前取消并加入下载、解除 ModelKit 制品存储绑定；后台下载回调复用注入服务。构建与测试不等于设备验收。
 
@@ -459,7 +459,7 @@ Agents own interpretation and inbox policy. Gateway owns bounded transport admis
 | `user` | External | `speech.listening/1` | Resident SpeechPerception listening-consent input |
 | `phone.microphone` | External | `speech.captureEnded/1` | SpeechPerception current-revision capture-termination fact |
 | `phone.camera` | External | `media.image` | VisionPerception subscription |
-| `phone.camera` | External | `camera.state/1` | Assistant and Photographer passive camera/native state |
+| `phone.camera` | External | `camera.state/1` | Photographer deterministic internal feedback; Assistant reads public camera State |
 | `user` | External | `user.text` | Assistant subscription; the current production UI has no text-entry field |
 | `user` | External | `agent.userInput/1` | Assistant scoped answer/confirmation input; forwarded as task input where applicable |
 | `speechPerception` | Agent | `speech.final`, `speech.phase` | Assistant subscription |
@@ -1454,9 +1454,31 @@ SpeechPerception owns consent/occupancy, SpeechSynthesis produces PCM, the modul
 
 - Generic remote authentication/codecs, durable active-worker resumption and activity/progress-driven Chat continuation.
 - Unified foreground Task preservation/final checkpoint across scene suspension, and generic business background contracts.
-- Push-based shared resource-state integration and the remaining absent routes identified in [implementation coverage](#implementation-coverage).
+- Additional public facts, writer governance/Trigger and the remaining absent routes identified in [implementation coverage](#implementation-coverage).
 - Real-model instruction following, microphone/camera/Photos, native navigation/accessibility, sustained load and physical device acceptance.
 
 ## Storage 依赖
 
 ✅ 存储访问使用独立的 State、Cache、Database 和 Files 接口；App 注册根实例，消费者通过构造器获得所需能力。存储容器不接管本目录的业务验证、执行和完成语义。
+
+## 公开 State 边界
+
+✅ App 持有 Storage 根生命周期，AgentBindings 安装应用事实发布者与会话端口，ActionBindings 发布 camera/robot，Agents 发布 task 的有限视图。Skill useState 在每轮模型请求前选取最新一致公开快照；唯一 CURRENT STATE 系统数据块与实际请求证据一起保存。AgentContext、Task/Skill 管理和执行机制保持私有，Skill 释放不关闭事实或设备。
+
+[公开 State 契约](Storage/State/README.md)
+
+```mermaid
+flowchart LR
+ App -.->|创建/连接/生命周期| Storage
+ Devices[PlatformKit 设备] --> Owners[ActionBindings 拥有者]
+ Owners -->|camera / robot 公开事实| State[StorageState]
+ AgentPrivate[Agent 私有 Task] -->|goal / status 投影| State
+ Skills[Skill useState] --> Request[每轮请求构造]
+ State -->|绑定作用域的一致快照| Request
+ Request -->|CURRENT STATE 系统数据块| LLM
+ LLM --> Gateway --> Actions
+ Actions --> Devices
+ Actions --> UI
+```
+
+✅ 页面导航只改变展示，不关闭根级 Assistant/语音会话或停用相机。应用失去前台及停止语音仅中断并加入当前执行，保留同一 Agent、对话、Task 目标、Skill 和公开 task 注册；恢复不重放操作。显式会话关闭和根服务停止仍结束作用域。原生设备的后台安全失效保持独立。

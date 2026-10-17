@@ -26,7 +26,6 @@
                             CameraConversationSurface(
                                 camera: assembly.cameraState, controls: assembly.cameraControls,
                                 openSettings: {
-                                    container?.stopVoice()
                                     assembly.navigate(.settings)
                                 }
                             ) {
@@ -40,9 +39,6 @@
                     .toolbar(.hidden, for: .navigationBar)
                     .navigationDestination(for: AppDestination.self) { destination in destinationView(destination) }
 
-                }
-                .onChange(of: showingSettings) { _, showing in
-                    if !isVisualPreview && !isDiagnostic { assembly.setHomeVisible(!showing) }
                 }
                 .onChange(of: assembly.navigation.path) { _, path in
                     assembly.navigationChanged()

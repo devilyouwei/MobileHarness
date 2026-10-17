@@ -192,8 +192,8 @@ private actor PausedBinaryStore: FileStore {
     #expect(emitted.version == 1 && emitted.value.first?.generation.uuidString == transfer.generation)
 }
 
-@Test func registeredStateSharesOneTypedSnapshotWithoutEncoding() throws {
-    struct RuntimeState: Sendable { var active: String? }
+@Test func registeredPublicStateSharesTypedValueAndEncodedProjection() throws {
+    struct RuntimeState: Codable, Sendable { var active: String? }
     let scope = try StateContainer().makeScope()
     let writer = try scope.register(StateKey<RuntimeState>("runtime"), initial: RuntimeState(active: nil))
     let first = writer.reader
@@ -210,8 +210,7 @@ private actor PausedBinaryStore: FileStore {
 
 @Test func runtimeMemoryEvidenceBudgetRejectsWithoutPublishingPartialMutation() async throws {
     let repository = try AgentContextRepository(
-        agent: .assistant, scope: UUID().uuidString, state: AssistantContextState(),
-        stateScope: StateContainer().makeScope()
+        agent: .assistant, scope: UUID().uuidString, state: AssistantContextState()
     )
     let payload = Data(repeating: 1, count: 524_288)
     try await repository.update { context in

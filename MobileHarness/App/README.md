@@ -68,3 +68,9 @@ AppLifecycle 验证有限静态依赖图，保留原始启动错误及全部服�
 ✅ 存储访问使用独立的 State、Cache、Database 和 Files 接口；App 注册根实例，消费者通过构造器获得所需能力。存储容器不接管本目录的业务验证、执行和完成语义。
 
 AppStorage 目标只编译 Composition/ApplicationContainer.swift，使用 FactoryKit 实例内缓存；业务目标不导入 IoC。Services 持有注册容器和 StorageContainer，连接所需子接口。模型后台事件只转交 ArtifactServices；存储停止前先加入其制品清理。
+
+## 公开 State 边界
+
+✅ App 只创建并注入 Storage 根及子能力、调度生命周期。公开 State 声明、事实转换与会话投影由业务模块/集成拥有者安装；App 不维护 Camera/Robot/Task 业务字段。
+
+[公开 State 契约](../Storage/State/README.md)

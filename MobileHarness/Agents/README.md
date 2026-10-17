@@ -12,7 +12,7 @@ flowchart LR
  Gateway -->|Signal 与原执行者定向反馈| Agents
  Agents -->|ActionCall / ToolCall / 通信 / 轮次屏障| Gateway
  Agents -->|推理与感知请求| ModelKit
- Agents -->|运行时内存及业务记录接口| Storage
+ Agents -->|公开事实及业务记录接口| Storage
 ```
 
 语义解释和业务协调由角色拥有；Gateway 不推断用户目标，基础模块不持有 Agent 业务策略。执行接纳、任务完成和物理效果完成是不同事实。
@@ -50,7 +50,7 @@ Skill 所有权分 base、recent、task。基础项常驻；无 Task 加载/合�
 
 ReACT 在本轮调用及回复屏障后由显式业务 value（包括空值）或真实调用失败驱动；成功报告、活动句柄及投递接纳是完成证据。单轮生成/反馈有界，完整决策不以累计轮数或计时器结束。Provider、流、解析、观察构造等 Agent 异常结束当前决策，不自动重试或重放副作用；调用拒绝保留未执行证据，可由模型重新选择合法步骤。
 
-每个角色使用根拥有的 Storage 内存状态仓库。SQLite 是 dialog/message/task/media/device 业务事实的持久化来源；完整模型消息与真实终态在各自边界提交，delta 与运行时队列留内存。Task 原始过程仅在终态投影成有界摘要，来源可查询。重启标记未完成业务记录 interrupted，不恢复热状态或重放效果。详细历史契约由 [Chat](Support/Chat/README.md) 与 [Storage](../Storage/README.md) 拥有。
+每个角色使用根拥有的 actor 私有内存仓库，有限公开事实另行发布到共享 State。SQLite 是 dialog/message/task/media/device 业务事实的持久化来源；完整模型消息与真实终态在各自边界提交，delta 与运行时队列留内存。Task 原始过程仅在终态投影成有界摘要，来源可查询。重启标记未完成业务记录 interrupted，不恢复热状态或重放效果。详细历史契约由 [Chat](Support/Chat/README.md) 与 [Storage](../Storage/README.md) 拥有。
 
 ## 生命周期与开发约束
 
@@ -94,3 +94,11 @@ Root UI bootstrap 只调用注入的生命周期启动端口；根服务开始�
 ## Storage 依赖
 
 ✅ 存储访问使用独立的 State、Cache、Database 和 Files 接口；App 注册根实例，消费者通过构造器获得所需能力。存储容器不接管本目录的业务验证、执行和完成语义。
+
+## 公开 State 边界
+
+✅ 角色运行内存由 AgentContextRepository actor 私有持有。AgentBindings 安装设备公开事实并创建会话端口；Agents 只发布 task 的有限业务视图。Skill schema v2 的 useState 决定每轮公开读取集合；确定性 Photographer 的内部反馈继续独立保留。
+
+[公开 State 契约](../Storage/State/README.md)
+
+✅ 区分会话中断与会话关闭。后台暂停、语音停止只结束在途 Decision（不扣闲置次数），运行 Task 在屏障后回到 waitingUser，保留近期计数、Task 持有 Skill 和公开会话端口；显式关闭继续清理，前台恢复不自动重放。

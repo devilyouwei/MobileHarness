@@ -24,7 +24,6 @@ import StorageState
     @MainActor
     @available(iOS 27, *)
     final class AgentServices {
-        let stateStorage: StateContainer
         private let cacheStorage: CacheContainer
         private let bluetooth: BluetoothWorkflow
         let resourceObservation: ResourceObservationWorkflow
@@ -136,13 +135,11 @@ import StorageState
             modelName: @escaping @Sendable () async throws -> String = { "Unspecified model" },
             chatProvider: @escaping @Sendable () async throws -> any ChatCapability
         ) throws {
-            self.stateStorage = state
             self.cacheStorage = cache
             try AgentConfigurations.installDeclarations(CapabilityModules.declarations)
             self.photoCamera = cameraControl
             let assistantContext = try AgentContextRepository(
-                agent: .assistant, scope: Self.contextScope, state: AssistantContextState(),
-                stateScope: state.makeScope())
+                agent: .assistant, scope: Self.contextScope, state: AssistantContextState())
             self.assistantContext = assistantContext
             let historyStore = try AssistantConversationStorage.store(
                 repository: assistantContext, chat: chatRecords, tasks: taskRecords)
@@ -166,9 +163,9 @@ import StorageState
                 discovery: providerRequests)
             self.providerPresentation = providerPresentation
             let applicationContext = try Self.context(
-                .applicationControl, ApplicationControlContextState(), storage: state)
-            let photographerContext = try Self.context(.photographer, PhotographerContextState(), storage: state)
-            let memoryContext = try Self.context(.memory, MemoryContextState(), storage: state)
+                .applicationControl, ApplicationControlContextState())
+            let photographerContext = try Self.context(.photographer, PhotographerContextState())
+            let memoryContext = try Self.context(.memory, MemoryContextState())
             let applicationControlAgent = try ApplicationControlAgent(
                 sessionID: applicationControlSessionID,
                 context: applicationContext)
@@ -384,6 +381,7 @@ import StorageState
                 sessionID: historySessionID, manager: manager, input: input, output: gateway, agent: historyAgent)
             historyIntents = history
             let main = try AssistantAgent(
+                stateContext: AgentStateContext(storage: state, agent: .assistant),
                 reportsReplyActivity: true, chatProvider: chatProvider, conversations: conversations,
                 modelName: modelName,
                 observations: AssistantContextBuilder.photoObservationHandler(
@@ -466,10 +464,10 @@ import StorageState
             activity.startFailures { try await gateway.observeFailures() }
         }
         private static let contextScope = "00000000-0000-0000-0000-000000000001"
-        private static func context<State: AgentContextState>(_ agent: AgentID, _ state: State, storage: StateContainer)
+        private static func context<State: AgentContextState>(_ agent: AgentID, _ state: State)
             throws -> AgentContextRepository<State>
         {
-            try AgentContextRepository(agent: agent, scope: contextScope, state: state, stateScope: storage.makeScope())
+            try AgentContextRepository(agent: agent, scope: contextScope, state: state)
         }
         var voiceDependencies: VoiceRuntimeDependencies {
             VoiceRuntimeDependencies(
@@ -478,25 +476,25 @@ import StorageState
                 interactionSessionID: interactionSessionID,
                 startInteraction: { [interaction] in try await interaction.start() },
                 cancelReply: { [interaction, interactionSessionID] in
-                    try await interaction.cancelConversation(sessionID: interactionSessionID)
+                    try await interaction.interruptConversation(sessionID: interactionSessionID)
                 },
                 stopInteraction: { [weak self] in await self?.shutdown() },
-                makeSynthesis: { [stateStorage] in
+                makeSynthesis: {
                     try SpeechSynthesisAgent(
                         synthesis: $0, store: $1,
                         context: try Self.context(
-                            AgentID(rawValue: "speechSynthesis"), SpeechSynthesisContextState(), storage: stateStorage))
+                            AgentID(rawValue: "speechSynthesis"), SpeechSynthesisContextState()))
                 },
-                makePerception: { [interactionSessionID, stateStorage] in
+                makePerception: { [interactionSessionID] in
                     try SpeechPerceptionAgent(
                         recognition: $0, vad: $1, sessionID: $2, interactionSessionID: interactionSessionID,
                         residentListening: true,
                         context: try Self.context(
-                            .speechPerception, SpeechPerceptionContextState(), storage: stateStorage))
+                            .speechPerception, SpeechPerceptionContextState()))
                 })
         }
         func visionContext() throws -> AgentContextRepository<VisionPerceptionContextState> {
-            try Self.context(.visionPerception, VisionPerceptionContextState(), storage: stateStorage)
+            try Self.context(.visionPerception, VisionPerceptionContextState())
         }
         var visionDependencies: VisionRuntimeDependencies {
             .init(

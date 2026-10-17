@@ -74,6 +74,7 @@ let package = Package(
         .target(
             name: "ActionBindings",
             dependencies: [
+                "StorageState",
                 "StorageFiles",
                 "Actions",
                 "AgentCore",

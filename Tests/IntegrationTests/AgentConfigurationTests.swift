@@ -128,10 +128,10 @@ func agentConfigurationRejectsInvalidDocuments(_ mutation: String) throws {
     #expect(active.actions.contains { $0.alias == "startTask" })
     #expect(active.actions.filter { $0.path.domain == "Agent" && $0.path.module == "Task" }.count == 5)
     let agent = try AssistantAgent(
+        stateContext: try publicStateFixture(),
         chat: FixedTextChat(),
         context: try AgentContextRepository(
-            agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState(),
-            stateScope: StateContainer().makeScope())
+            agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState())
     )
     let registry = agent.descriptor.capabilities
     #expect(registry.internalActions.count == 3 && registry.internalTools.isEmpty)
@@ -178,10 +178,10 @@ func agentConfigurationRejectsInvalidDocuments(_ mutation: String) throws {
     let other = try decode(root)
     #expect(throws: AgentConfigurationError.identityMismatch) {
         try AssistantAgent(
+            stateContext: try publicStateFixture(),
             chat: FixedTextChat(), configuration: other,
             context: try AgentContextRepository(
-                agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState(),
-                stateScope: StateContainer().makeScope())
+                agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState())
         )
     }
     root["version"] = 4
@@ -473,7 +473,7 @@ func threeLevelConfigurationRejectsAmbiguousBindings(_ mutation: String) throws 
         sessionID: UUID().uuidString,
         context: try AgentContextRepository(
             agent: AgentID(rawValue: "applicationControl"), scope: UUID().uuidString,
-            state: ApplicationControlContextState(), stateScope: StateContainer().makeScope())
+            state: ApplicationControlContextState())
     )
     #expect(
         runtime.descriptor.capabilities.permits(
@@ -505,7 +505,7 @@ func historyPreviewRecognizesDirectedTaskActions(_ scenario: (String, String, St
             sessionID: UUID().uuidString,
             context: try AgentContextRepository(
                 agent: AgentID(rawValue: "applicationControl"), scope: UUID().uuidString,
-                state: ApplicationControlContextState(), stateScope: StateContainer().makeScope())
+                state: ApplicationControlContextState())
         ).descriptor.capabilities
     default: runtime = try AssistantAgent.runtimeCapabilities(configuration.capabilities)
     }
@@ -536,4 +536,23 @@ func historyPreviewRecognizesDirectedTaskActions(_ scenario: (String, String, St
         invalid.events.contains {
             $0 == .rejected(CallRejection(kind: .action, alias: "unknown", reason: .unknownCapability))
         })
+}
+
+@Test(
+    .actionCatalog, arguments: ["missing", "old", "duplicate", "unknown", "wildcard", "fieldPath", "tooMany", "schema"])
+func skillUseStateRejectsInvalidDeclarations(_ mutation: String) throws {
+    let skill = try AgentConfigurations.skill("basic-skill")
+    var json = try #require(JSONSerialization.jsonObject(with: JSONEncoder().encode(skill)) as? [String: Any])
+    switch mutation {
+    case "missing": json.removeValue(forKey: "useState")
+    case "old": json["contextFields"] = ["runtimeFacts"]
+    case "duplicate": json["useState"] = ["camera", "camera"]
+    case "unknown": json["useState"] = ["privateContext"]
+    case "wildcard": json["useState"] = ["*"]
+    case "fieldPath": json["useState"] = ["camera.running"]
+    case "tooMany": json["useState"] = Array(repeating: "camera", count: 17)
+    default: json["version"] = 1
+    }
+    let data = try JSONSerialization.data(withJSONObject: json)
+    #expect(throws: (any Error).self) { try JSONDecoder().decode(AgentConfigurations.Skill.self, from: data) }
 }

@@ -1,14 +1,18 @@
 import AgentCore
 import Foundation
 import StorageCore
-import StorageState
 
-/// Validated runtime transactions over one Storage-owned process-memory snapshot.
+public struct AgentPublicProjectionFailure: Error, Sendable {
+    public let committedRevision: UInt64
+    public let underlying: any Error
+}
+
+/// Private actor-owned memory. Only an explicit owner projection may publish public facts.
 public actor AgentContextRepository<State: AgentContextState> {
     public nonisolated let scopeID: String
     public nonisolated let agentID: AgentID
-    private let stateScope: StateScope
-    private let memory: StateWriter<AgentContext<State>>
+    private var memory: AgentContext<State>
+    private var publish: (@Sendable (AgentContext<State>) throws -> Void)?
     private let persistence: AgentContextPersistence<State>?
     private var committedRevision: UInt64?
     private var loaded = false
@@ -16,20 +20,24 @@ public actor AgentContextRepository<State: AgentContextState> {
     private var waiters: [CheckedContinuation<Void, Never>] = []
     public init(
         agent: AgentID, scope: String, state: State,
-        persistence: AgentContextPersistence<State>? = nil, stateScope: StateScope
+        persistence: AgentContextPersistence<State>? = nil
     ) throws {
-        self.stateScope = stateScope
         self.scopeID = scope
         self.agentID = agent
-        memory = try stateScope.register(
-            StateKey<AgentContext<State>>(agent.rawValue + "." + scope),
-            initial: AgentContext(agentID: agent, scopeID: scope, state: state)
-        ) {
-            try $0.validate(agent: agent, scope: scope)
-        }
+        memory = AgentContext(agentID: agent, scopeID: scope, state: state)
+        try memory.validate(agent: agent, scope: scope)
         self.persistence = persistence
     }
-    deinit { memory.unregister() }
+    public func installPublicProjection(_ publish: @escaping @Sendable (AgentContext<State>) throws -> Void)
+        async throws
+    {
+        try await acquire()
+        defer { release() }
+        try await load()
+        guard self.publish == nil else { throw CommunicationError.invalidPayload }
+        try publish(memory)
+        self.publish = publish
+    }
     private func acquire() async throws {
         if !writing {
             writing = true
@@ -52,18 +60,17 @@ public actor AgentContextRepository<State: AgentContextState> {
             saved.recoverWork()
             try saved.advanceRevision()
             try await persistence?.commit(saved, priorRevision)
-            let current = try memory.get()
-            try memory.set(saved, expecting: current.revision)
+            memory = saved
             committedRevision = saved.revision
         }
-        try memory.get().value.validate(agent: agentID, scope: scopeID)
+        try memory.validate(agent: agentID, scope: scopeID)
         loaded = true
     }
     public func snapshot() async throws -> AgentContext<State> {
         try await acquire()
         defer { release() }
         try await load()
-        return try memory.get().value
+        return memory
     }
     public func exists() async throws -> Bool {
         try await acquire()
@@ -81,14 +88,17 @@ public actor AgentContextRepository<State: AgentContextState> {
         try await acquire()
         defer { release() }
         try await load()
-        let current = try memory.get()
-        var next = current.value
+        var next = memory
         let result = try mutation(&next)
         try next.advanceRevision()
         try next.validate(agent: agentID, scope: scopeID)
         try await persistence?.commit(next, committedRevision)
-        try memory.set(next, expecting: current.revision)
+        memory = next
         committedRevision = next.revision
+        // A failed public projection cannot undo a durable/private business commit.
+        do { try publish?(next) } catch {
+            throw AgentPublicProjectionFailure(committedRevision: next.revision, underlying: error)
+        }
         return result
     }
 

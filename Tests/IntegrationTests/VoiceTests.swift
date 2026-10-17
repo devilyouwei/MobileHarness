@@ -81,8 +81,7 @@ private func preparedSpeech(
     let agent = try SpeechSynthesisAgent(
         synthesis: SynthesisFixture(probe: probe, producesAudio: producesAudio), store: store,
         context: try AgentContextRepository(
-            agent: AgentID(rawValue: "speechSynthesis"), scope: UUID().uuidString, state: SpeechSynthesisContextState(),
-            stateScope: StateContainer().makeScope())
+            agent: AgentID(rawValue: "speechSynthesis"), scope: UUID().uuidString, state: SpeechSynthesisContextState())
     )
     try await agent.start()
     let request = try SpeechSynthesisInput(text: text)
@@ -105,10 +104,10 @@ private func preparedSpeech(
 @Test(.actionCatalog) func voiceGatewaysRoundTripThroughSayAndPrint() async throws {
     let manager = AgentManager()
     let agent = try AssistantAgent(
+        stateContext: try publicStateFixture(),
         chat: FixedTextChat(text: "固定回复"),
         context: try AgentContextRepository(
-            agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState(),
-            stateScope: StateContainer().makeScope())
+            agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState())
     )
     try await manager.register(agent)
 
@@ -117,8 +116,7 @@ private func preparedSpeech(
     let synth = try SpeechSynthesisAgent(
         synthesis: SynthesisFixture(probe: probe), store: store,
         context: try AgentContextRepository(
-            agent: AgentID(rawValue: "speechSynthesis"), scope: UUID().uuidString, state: SpeechSynthesisContextState(),
-            stateScope: StateContainer().makeScope())
+            agent: AgentID(rawValue: "speechSynthesis"), scope: UUID().uuidString, state: SpeechSynthesisContextState())
     )
     try await manager.register(synth)
     try await synth.start()
@@ -181,10 +179,10 @@ private func preparedSpeech(
 @Test(.actionCatalog) func partialRecognitionNeverSubmitsAgentInput() async throws {
     let manager = AgentManager()
     let agent = try AssistantAgent(
+        stateContext: try publicStateFixture(),
         chat: FixedTextChat(),
         context: try AgentContextRepository(
-            agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState(),
-            stateScope: StateContainer().makeScope())
+            agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState())
     )
     try await manager.register(agent)
     try await agent.start()
@@ -216,10 +214,10 @@ private func preparedSpeech(
     let manager = AgentManager()
     try await manager.register(
         AssistantAgent(
+            stateContext: try publicStateFixture(),
             chat: FixedTextChat(),
             context: try AgentContextRepository(
-                agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState(),
-                stateScope: StateContainer().makeScope())
+                agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState())
         ))
     let probe = VoiceProbe()
     let input = AgentInput(
@@ -256,10 +254,10 @@ private func preparedSpeech(
 @Test(.actionCatalog) func longVoiceTurnRecognizesChunksButSubmitsOnlyOnce() async throws {
     let manager = AgentManager()
     let agent = try AssistantAgent(
+        stateContext: try publicStateFixture(),
         chat: FixedTextChat(),
         context: try AgentContextRepository(
-            agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState(),
-            stateScope: StateContainer().makeScope())
+            agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState())
     )
     try await manager.register(agent)
     try await agent.start()
@@ -343,10 +341,10 @@ private struct LiveRecognitionFixture: SpeechRecognitionCapability {
 @Test(.actionCatalog) func livePreviewArrivesBeforeEndpointAndDoesNotTriggerAgent() async throws {
     let manager = AgentManager()
     let agent = try AssistantAgent(
+        stateContext: try publicStateFixture(),
         chat: FixedTextChat(),
         context: try AgentContextRepository(
-            agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState(),
-            stateScope: StateContainer().makeScope())
+            agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState())
     )
     try await manager.register(agent)
     try await agent.start()
@@ -497,7 +495,7 @@ private actor EndpointVADSession: VoiceActivitySession {
         recognition: RecognitionFixture(text: "你好", includeFinal: true), vad: EndpointVAD(), sessionID: session,
         context: try AgentContextRepository(
             agent: AgentID(rawValue: "speechPerception"), scope: UUID().uuidString,
-            state: SpeechPerceptionContextState(), stateScope: StateContainer().makeScope())
+            state: SpeechPerceptionContextState())
     )
     try await manager.register(assistant, sessionID: session)
     await assistant.start()
@@ -592,7 +590,7 @@ private actor EndpointVADSession: VoiceActivitySession {
         recognition: RecognitionFixture(text: "hello", includeFinal: true), vad: EndpointVAD(), sessionID: session,
         context: try AgentContextRepository(
             agent: AgentID(rawValue: "speechPerception"), scope: UUID().uuidString,
-            state: SpeechPerceptionContextState(), stateScope: StateContainer().makeScope())
+            state: SpeechPerceptionContextState())
     )
     try await speech.bind(AgentMessaging { _, _, _ in DeliveryReport(delivered: [.assistant]) })
     try await speech.start()
@@ -652,10 +650,10 @@ private actor EndpointVADSession: VoiceActivitySession {
     let session = UUID().uuidString
     let manager = AgentManager()
     let assistant = try AssistantAgent(
+        stateContext: try publicStateFixture(),
         chat: FixedTextChat(text: "must not generate"),
         context: try AgentContextRepository(
-            agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState(),
-            stateScope: StateContainer().makeScope())
+            agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState())
     )
     let source = ObservationRecorder(id: "speechPerception")
     try await manager.register(assistant, sessionID: session)
@@ -895,7 +893,7 @@ private actor NativeRateVADProbe: VoiceActivityCapability, VoiceActivitySession 
         recognition: RecognitionFixture(text: "", includeFinal: false), vad: probe, sessionID: session,
         context: try AgentContextRepository(
             agent: AgentID(rawValue: "speechPerception"), scope: UUID().uuidString,
-            state: SpeechPerceptionContextState(), stateScope: StateContainer().makeScope())
+            state: SpeechPerceptionContextState())
     )
     try await agent.bind(AgentMessaging { _, _, _ in DeliveryReport() })
     try await agent.start()
@@ -933,7 +931,7 @@ private actor FailOnceRecognition: SpeechRecognitionCapability {
         recognition: FailOnceRecognition(), vad: EndpointVAD(), sessionID: session,
         context: try AgentContextRepository(
             agent: AgentID(rawValue: "speechPerception"), scope: UUID().uuidString,
-            state: SpeechPerceptionContextState(), stateScope: StateContainer().makeScope())
+            state: SpeechPerceptionContextState())
     )
     let events = AsyncStream<String>.makeStream(bufferingPolicy: .bufferingOldest(16))
     try await agent.bind(
@@ -983,7 +981,7 @@ private actor FailOnceRecognition: SpeechRecognitionCapability {
         vad: NativeRateVADProbe(), sessionID: session,
         context: try AgentContextRepository(
             agent: AgentID(rawValue: "speechPerception"), scope: UUID().uuidString,
-            state: SpeechPerceptionContextState(), stateScope: StateContainer().makeScope())
+            state: SpeechPerceptionContextState())
     )
     try await agent.start()
     try await agent.pauseAudioAdmission()
@@ -1048,7 +1046,7 @@ func speechPerceptionOwnsConsentAcrossCaptureEpochsAndRejectsStaleActivity() asy
         sessionID: session, interactionSessionID: session, residentListening: true,
         context: try AgentContextRepository(
             agent: AgentID(rawValue: "speechPerception"), scope: UUID().uuidString,
-            state: SpeechPerceptionContextState(), stateScope: StateContainer().makeScope())
+            state: SpeechPerceptionContextState())
     )
     try await agent.start()
     let probe = PerceptionListeningProbe()
@@ -1132,7 +1130,7 @@ func replyTerminalImmediatelyEmitsListeningResumeWithoutDisablingConsent() async
         sessionID: session, interactionSessionID: session, residentListening: true,
         context: try AgentContextRepository(
             agent: AgentID(rawValue: "speechPerception"), scope: UUID().uuidString,
-            state: SpeechPerceptionContextState(), stateScope: StateContainer().makeScope())
+            state: SpeechPerceptionContextState())
     )
     try await agent.start()
     var outputs = agent.outputs.makeAsyncIterator()
@@ -1180,7 +1178,7 @@ func replyTerminalImmediatelyEmitsListeningResumeWithoutDisablingConsent() async
         sessionID: session, interactionSessionID: session, residentListening: true,
         context: try AgentContextRepository(
             agent: AgentID(rawValue: "speechPerception"), scope: UUID().uuidString,
-            state: SpeechPerceptionContextState(), stateScope: StateContainer().makeScope())
+            state: SpeechPerceptionContextState())
     )
     try await agent.start()
     await #expect(throws: CommunicationError.scopeClosed) {
@@ -1208,13 +1206,13 @@ func listeningIntentAndReplyFactsCrossGatewaysWithPerceptionExecutionOwner() asy
         sessionID: session, interactionSessionID: session, residentListening: true,
         context: try AgentContextRepository(
             agent: AgentID(rawValue: "speechPerception"), scope: UUID().uuidString,
-            state: SpeechPerceptionContextState(), stateScope: StateContainer().makeScope())
+            state: SpeechPerceptionContextState())
     )
     let assistant = try AssistantAgent(
+        stateContext: try publicStateFixture(),
         reportsReplyActivity: true, chat: FixedTextChat(text: ""),
         context: try AgentContextRepository(
-            agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState(),
-            stateScope: StateContainer().makeScope())
+            agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState())
     )
     try await manager.register(speech)
     try await manager.register(assistant, sessionID: session)
@@ -1277,7 +1275,7 @@ func listeningIntentAndReplyFactsCrossGatewaysWithPerceptionExecutionOwner() asy
         sessionID: session, interactionSessionID: session, residentListening: true,
         context: try AgentContextRepository(
             agent: AgentID(rawValue: "speechPerception"), scope: UUID().uuidString,
-            state: SpeechPerceptionContextState(), stateScope: StateContainer().makeScope())
+            state: SpeechPerceptionContextState())
     )
     try await speech.start()
     let probe = PerceptionListeningProbe()
@@ -1305,7 +1303,7 @@ func finalASRGatesNextUtteranceBeforePublicationUntilReplyCompletes() async thro
         sessionID: session, interactionSessionID: session, residentListening: true,
         context: try AgentContextRepository(
             agent: AgentID(rawValue: "speechPerception"), scope: UUID().uuidString,
-            state: SpeechPerceptionContextState(), stateScope: StateContainer().makeScope())
+            state: SpeechPerceptionContextState())
     )
     try await speech.start()
     let probe = PerceptionListeningProbe()
@@ -1353,7 +1351,7 @@ func finalASRGatesNextUtteranceBeforePublicationUntilReplyCompletes() async thro
         sessionID: session, interactionSessionID: session, residentListening: true,
         context: try AgentContextRepository(
             agent: AgentID(rawValue: "speechPerception"), scope: UUID().uuidString,
-            state: SpeechPerceptionContextState(), stateScope: StateContainer().makeScope())
+            state: SpeechPerceptionContextState())
     )
     try await agent.start()
     let probe = PerceptionListeningProbe()
@@ -1439,7 +1437,7 @@ func coldVADAndASRPreserveRecordedPrefixAndJoinLiveAudioInOrder() async throws {
         recognition: recognition, vad: vad, sessionID: root, interactionSessionID: root, residentListening: true,
         context: try AgentContextRepository(
             agent: AgentID(rawValue: "speechPerception"), scope: UUID().uuidString,
-            state: SpeechPerceptionContextState(), stateScope: StateContainer().makeScope())
+            state: SpeechPerceptionContextState())
     )
     let final = AsyncStream<String>.makeStream(bufferingPolicy: .bufferingOldest(1))
     try await speech.start()
@@ -1552,7 +1550,7 @@ func speechRawAudioQueueEnforcesPacketAndMemoryBounds(memoryBound: Bool) async t
         recognition: RecognitionFixture(text: "", includeFinal: false), vad: EndpointVAD(), sessionID: root,
         context: try AgentContextRepository(
             agent: AgentID(rawValue: "speechPerception"), scope: UUID().uuidString,
-            state: SpeechPerceptionContextState(), stateScope: StateContainer().makeScope())
+            state: SpeechPerceptionContextState())
     )
     try await speech.start()
     try await speech.pause()

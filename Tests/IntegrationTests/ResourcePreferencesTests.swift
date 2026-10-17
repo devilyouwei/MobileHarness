@@ -54,7 +54,7 @@ func saturatedControlMemoryRestoresPreferencesAcrossRootGatewayAndRetainsBounded
     defer { try? FileManager.default.removeItem(at: root) }
     let seed = try saturatedEvidenceContext(agent: .applicationControl, state: ApplicationControlContextState())
     let repository = try AgentContextRepository(
-        agent: seed.agentID, scope: seed.scopeID, state: seed.state, stateScope: StateContainer().makeScope()
+        agent: seed.agentID, scope: seed.scopeID, state: seed.state
     )
     try await repository.update { $0 = seed }
     let preferences = try FileDocumentStore<ModelResourcePreferences>(
@@ -79,7 +79,7 @@ func saturatedControlMemoryRestoresPreferencesAcrossRootGatewayAndRetainsBounded
     #expect(snapshot.records.count == 4096 && snapshot.consumedBatches.count == 4096)
     #expect((snapshot.evictedRecordCount ?? 0) >= 4097 && (snapshot.evictedBatchCount ?? 0) >= 4097)
     let reopened = try AgentContextRepository(
-        agent: seed.agentID, scope: seed.scopeID, state: seed.state, stateScope: StateContainer().makeScope()
+        agent: seed.agentID, scope: seed.scopeID, state: seed.state
     )
     #expect(try await reopened.snapshot().records.isEmpty)
     #expect(try await preferences.refresh()?.value == saved)
@@ -160,7 +160,7 @@ func saturatedControlMemoryRestoresPreferencesAcrossRootGatewayAndRetainsBounded
         sessionID: session,
         context: try AgentContextRepository(
             agent: AgentID(rawValue: "applicationControl"), scope: UUID().uuidString,
-            state: ApplicationControlContextState(), stateScope: StateContainer().makeScope())
+            state: ApplicationControlContextState())
     )
     try await agent.start()
     var outputs = agent.outputs.makeAsyncIterator()

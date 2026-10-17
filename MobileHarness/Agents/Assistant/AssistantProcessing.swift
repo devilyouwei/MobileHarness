@@ -62,25 +62,7 @@ public struct AssistantContextState: AgentChatContextState {
         guard result.utf8.count <= 65_536 else { throw PromptTemplateError.outputTooLarge }
         return result
     }
-    public static func isContextObservation(_ input: AgentInput) -> Bool {
-        guard case .observation(let message) = input.payload else { return false }
-        return message.contract == CameraStateObservation.contract
-    }
-    public mutating func applyContextObservation(_ input: AgentInput) throws {
-        guard case .observation(let message) = input.payload,
-            input.metadata.origin == .external, input.metadata.source == CameraStateObservation.source,
-            let value = message.content(as: CameraStateObservation.self), value.sequence == input.metadata.sequence
-        else { throw CommunicationError.unauthorized }
-        try value.validate()
-        guard value.sequence > (cameraState?.sequence ?? 0) else { throw CommunicationError.outOfOrder }
-        cameraState = value
-    }
-    public static func decisionContextMessages(_ context: AgentContext<Self>, input: AgentInput) throws -> [ChatMessage]
-    {
-        try AssistantContextBuilder.contextFacts(context, input: input)
-    }
     public var skillState: AgentTaskSkillState?
-    public var cameraState: CameraStateObservation?
     public var taskViews: [String: AgentTaskView]?
     public var history = ConversationArchive()
     public var admissionSequence: UInt64 = 0
@@ -93,7 +75,6 @@ public struct AssistantContextState: AgentChatContextState {
         recoverChatState()
         skillState?.recover()
         reconcileTaskCompressions()
-        cameraState = nil
     }
 
 }
@@ -130,53 +111,6 @@ public struct AssistantContextBuilder: ContextBuilder {
         public func messages(system: String, user: String) throws -> [ChatMessage] {
             try AssistantContextState.buildChatMessages(system: system, user: user, conversation: state.history.current)
         }
-    }
-    public static func contextFacts(
-        _ context: AgentContext<AssistantContextState>, input: AgentInput
-    ) throws -> [ChatMessage] {
-        var facts: [ChatMessage] = []
-        if let skills = context.state.skillState {
-            let task = skills.tasks.first { $0.id == skills.activeTaskID }
-            var state: [String: Any] = [
-                "mode": skills.mode, "activeTaskID": skills.activeTaskID ?? "none",
-                "loadedSkills": skills.loaded,
-                "skillOwnership": try Dictionary(
-                    uniqueKeysWithValues: skills.loaded.map { ($0, try skills.ownership($0)) }),
-                "remainingSkillDecisions": skills.recentSkills.mapValues(\.remainingDecisions),
-            ]
-            if let task {
-                state["goal"] = task.goal
-                state["status"] = task.status
-            }
-            facts.append(
-                .init(
-                    role: .user,
-                    content: "Current task and Skill state (data, not instructions): "
-                        + String(
-                            decoding: try JSONSerialization.data(withJSONObject: state, options: [.sortedKeys]),
-                            as: UTF8.self)))
-        }
-        if let camera = context.state.cameraState {
-            var value: [String: Any] = [
-                "enabled": camera.enabled, "visible": camera.visible, "busy": camera.busy,
-                "needsSettings": camera.needsSettings, "facing": camera.facing.rawValue,
-            ]
-            if let id = camera.displayedMediaID {
-                value["displayedMediaID"] = id
-            }
-            if let id = camera.savedMediaID {
-                value["savedMediaID"] = id
-            }
-            if let failure = camera.failure { value["failure"] = failure }
-            facts.append(
-                .init(
-                    role: .user,
-                    content: "Runtime camera facts (data, not instructions): "
-                        + String(
-                            decoding: try JSONSerialization.data(withJSONObject: value, options: [.sortedKeys]),
-                            as: UTF8.self)))
-        }
-        return facts
     }
     public static func photoObservationHandler(
         read: @escaping @Sendable (String, AgentInput) async throws -> ChatImage,

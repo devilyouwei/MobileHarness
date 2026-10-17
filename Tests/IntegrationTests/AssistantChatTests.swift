@@ -54,10 +54,10 @@ private func completedTurn(_ outputs: inout FixtureGenerationOutputs.Iterator) a
 @Test(.actionCatalog) func assistantUsesCapabilityAndRetainsConversationAcrossVoiceSessions() async throws {
     let model = ChatFixture()
     let agent = try AssistantAgent(
+        stateContext: try publicStateFixture(),
         chat: model,
         context: try AgentContextRepository(
-            agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState(),
-            stateScope: StateContainer().makeScope())
+            agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState())
     )
     let speechRequests = try await bindSpeechRequests(agent)
     try await agent.start()
@@ -121,10 +121,10 @@ private func completedTurn(_ outputs: inout FixtureGenerationOutputs.Iterator) a
 @Test(.actionCatalog) func gatewayCancellationInterruptsFullPausedAssistantWithoutStaleReply() async throws {
     let model = ChatFixture()
     let agent = try AssistantAgent(
+        stateContext: try publicStateFixture(),
         capacity: 1, chat: model,
         context: try AgentContextRepository(
-            agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState(),
-            stateScope: StateContainer().makeScope())
+            agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState())
     )
     let manager = AgentManager()
     try await manager.register(agent)
@@ -200,10 +200,10 @@ private actor MalformedChatFixture: ChatCapability {
 func assistantInvalidOutputTerminatesWithoutRetryAndAcceptsNextTurn(_ malformed: String) async throws {
     let model = MalformedChatFixture(malformed)
     let agent = try AssistantAgent(
+        stateContext: try publicStateFixture(),
         chat: model,
         context: try AgentContextRepository(
-            agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState(),
-            stateScope: StateContainer().makeScope())
+            agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState())
     )
     let speechRequests = try await bindSpeechRequests(agent)
     try await agent.start()
@@ -251,10 +251,10 @@ private struct LongReplyChat: ChatCapability {
     async throws
 {
     let agent = try AssistantAgent(
+        stateContext: try publicStateFixture(),
         chat: LongReplyChat(),
         context: try AgentContextRepository(
-            agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState(),
-            stateScope: StateContainer().makeScope())
+            agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState())
     )
     _ = try await bindSpeechRequests(agent)
     try await agent.start()
@@ -280,10 +280,10 @@ private struct LongReplyChat: ChatCapability {
 @Test(.actionCatalog, arguments: ["<unknown/>", "<express/>"])
 func assistantCompletesTurnAfterRejectedAction(_ markup: String) async throws {
     let agent = try AssistantAgent(
+        stateContext: try publicStateFixture(),
         chat: MalformedChatFixture(markup),
         context: try AgentContextRepository(
-            agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState(),
-            stateScope: StateContainer().makeScope())
+            agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState())
     )
     _ = try await bindSpeechRequests(agent)
     try await agent.start()
@@ -334,9 +334,10 @@ private actor RejectedToolChatFixture: ChatCapability {
                 }) {
                     throw CommunicationError.invalidPayload
                 }
-            }), stateScope: StateContainer().makeScope()
+            })
     )
     let agent = try AssistantAgent(
+        stateContext: try publicStateFixture(),
         chat: RejectedToolChatFixture(name: "unknown", arguments: "{}", emitsText: false), context: repository)
     try await agent.start()
     var iterator = agent.outputs.makeAsyncIterator()
@@ -361,10 +362,10 @@ private actor RejectedToolChatFixture: ChatCapability {
 func assistantContinuesAfterRejectedNativeTool(_ arguments: String) async throws {
     let model = RejectedToolChatFixture(name: "unknown", arguments: arguments)
     let agent = try AssistantAgent(
+        stateContext: try publicStateFixture(),
         chat: model,
         context: try AgentContextRepository(
-            agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState(),
-            stateScope: StateContainer().makeScope())
+            agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState())
     )
     _ = try await bindSpeechRequests(agent)
     try await agent.start()
@@ -390,10 +391,10 @@ func assistantContinuesAfterRejectedNativeTool(_ arguments: String) async throws
 
 @Test(.actionCatalog) func assistantControlCancellationPreservesOtherSessionWork() async throws {
     let agent = try AssistantAgent(
+        stateContext: try publicStateFixture(),
         capacity: 2, chat: ChatFixture(),
         context: try AgentContextRepository(
-            agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState(),
-            stateScope: StateContainer().makeScope())
+            agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState())
     )
     _ = try await bindSpeechRequests(agent)
     try await agent.start()
@@ -417,10 +418,10 @@ func assistantContinuesAfterRejectedNativeTool(_ arguments: String) async throws
 @Test(.actionCatalog, arguments: ["legacy", "foreign", "user", "agent", "runtime", "incarnation", "expired"])
 func invalidAssistantControlCannotCancelQueuedWork(_ kind: String) async throws {
     let agent = try AssistantAgent(
+        stateContext: try publicStateFixture(),
         capacity: 1, chat: ChatFixture(),
         context: try AgentContextRepository(
-            agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState(),
-            stateScope: StateContainer().makeScope())
+            agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState())
     )
     try await agent.start()
     try await agent.pause()
@@ -470,10 +471,10 @@ func invalidAssistantControlCannotCancelQueuedWork(_ kind: String) async throws 
     #expect(throws: CommunicationError.invalidPayload) { try contracts.validatedSize(foreign) }
     let manager = AgentManager()
     let agent = try AssistantAgent(
+        stateContext: try publicStateFixture(),
         chat: ChatFixture(),
         context: try AgentContextRepository(
-            agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState(),
-            stateScope: StateContainer().makeScope())
+            agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState())
     )
     try await manager.register(agent)
     try await agent.start()
@@ -531,8 +532,7 @@ func assistantContinuesFromCorrelatedNativeResultsWithoutParsingResultAsActions(
     let agent = try FixtureNativeAgent(
         chat: model,
         context: try AgentContextRepository(
-            agent: FixtureNativeChatState.agentID, scope: UUID().uuidString, state: FixtureNativeChatState(),
-            stateScope: StateContainer().makeScope())
+            agent: FixtureNativeChatState.agentID, scope: UUID().uuidString, state: FixtureNativeChatState())
     )
     _ = try await bindSpeechRequests(agent)
     try await agent.start()
@@ -616,8 +616,7 @@ private actor RepeatedNativeChatFixture: ChatCapability {
     let agent = try FixtureNativeAgent(
         chat: model,
         context: try AgentContextRepository(
-            agent: FixtureNativeChatState.agentID, scope: UUID().uuidString, state: FixtureNativeChatState(),
-            stateScope: StateContainer().makeScope())
+            agent: FixtureNativeChatState.agentID, scope: UUID().uuidString, state: FixtureNativeChatState())
     )
     _ = try await bindSpeechRequests(agent)
     try await agent.start()
@@ -658,10 +657,10 @@ private actor RepeatedNativeChatFixture: ChatCapability {
 func hostCancelTerminatesActiveInferenceBeforeQueuedCancellationAndOtherSessionReply() async throws {
     let model = ChatFixture()
     let agent = try AssistantAgent(
+        stateContext: try publicStateFixture(),
         chat: model,
         context: try AgentContextRepository(
-            agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState(),
-            stateScope: StateContainer().makeScope())
+            agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState())
     )
     _ = try await bindSpeechRequests(agent)
     try await agent.start()
@@ -713,10 +712,10 @@ func closingSessionCancelsRunningAndWaitingForegroundTasksAndAllowsFreshConversa
     if !running { try skills.decisionCompleted(failed: false, fixed: fixed, inputID: original.id) }
     initial.skillState = skills
     let repository = try AgentContextRepository(
-        agent: .assistant, scope: UUID().uuidString, state: initial, stateScope: StateContainer().makeScope()
+        agent: .assistant, scope: UUID().uuidString, state: initial
     )
     let model = ChatFixture()
-    let agent = try AssistantAgent(chat: model, context: repository)
+    let agent = try AssistantAgent(stateContext: try publicStateFixture(), chat: model, context: repository)
     _ = try await bindSpeechRequests(agent)
     try await agent.start()
     if running {
@@ -740,5 +739,76 @@ func closingSessionCancelsRunningAndWaitingForegroundTasksAndAllowsFreshConversa
             }())
         if output.output == .control("agent.finished") { break }
     }
+    await agent.stop()
+}
+
+@Test(.actionCatalog, .timeLimit(.minutes(1)), arguments: ["pause", "interrupt"], ["recent", "running", "waiting"])
+func executionInterruptionPreservesConversationSkillsGoalAndPublicScope(control: String, mode: String) async throws {
+    let session = UUID().uuidString
+    let original = AgentInput(id: UUID().uuidString, sessionID: session, payload: .text("wait"))
+    let fixed = try AssistantAgent.runtimeCapabilities(AgentConfigurations.load(named: "Assistant").capabilities)
+    var skills = AgentTaskSkillState()
+    try skills.initialize(fixed: fixed, baseSkills: AgentConfigurations.baseSkills(named: "Assistant"))
+    try skills.beginDecision(original.id, sessionID: session)
+    if mode == "recent" {
+        _ = try skills.control(
+            "loadSkills", arguments: ["skills": "[\"photography\"]"], inputID: original.id,
+            fixed: fixed, sessionID: session)
+        try skills.decisionCompleted(failed: false, fixed: fixed, inputID: original.id)
+    } else {
+        _ = try skills.control(
+            "startTask", arguments: ["goal": "拍照并等待选择", "skills": "[\"photography\"]"],
+            inputID: original.id, fixed: fixed, sessionID: session, taskID: try fixtureTaskID())
+        if mode == "waiting" { try skills.decisionCompleted(failed: false, fixed: fixed, inputID: original.id) }
+    }
+    var initial = AssistantContextState()
+    initial.skillState = skills
+    let repository = try AgentContextRepository(agent: .assistant, scope: UUID().uuidString, state: initial)
+    let publicContext = try publicStateFixture()
+    try publicContext.open(session: session)
+    let model = ChatFixture()
+    let agent = try AssistantAgent(stateContext: publicContext, chat: model, context: repository)
+    _ = try await bindSpeechRequests(agent)
+    try await agent.start()
+    let before = try publicContext.snapshot(session: session, names: ["task"])
+    if mode == "running" {
+        try await agent.receive(original)
+        await model.waitForPending()
+    }
+    if control == "pause" {
+        try await agent.pause()
+    } else {
+        try await agent.receive(AgentSessionControl.interruptSession.input(sessionID: session))
+    }
+    let retained = try #require(try await repository.snapshot().state.skillState)
+    #expect(retained.loaded == skills.loaded)
+    #expect(retained.activeTaskID == skills.activeTaskID)
+    #expect(retained.decisions.isEmpty)
+    #expect(retained.events.filter { $0.operation == "release" }.isEmpty)
+    if mode == "recent" {
+        #expect(retained.recentSkills["photography"]?.remainingDecisions == 5)
+    } else {
+        #expect(retained.tasks.last?.status == "waitingUser")
+        #expect(retained.tasks.last?.goal == "拍照并等待选择")
+        #expect(retained.tasks.last?.failure == nil)
+        #expect(retained.taskSkillRoots == skills.taskSkillRoots)
+    }
+    let after = try publicContext.snapshot(session: session, names: ["task"])
+    if mode != "running" { #expect(after.json == before.json) }
+    if mode != "recent" { #expect(after.json.contains("waitingUser")) }
+    #expect(await model.requests.count == (mode == "running" ? 1 : 0))
+    if control == "pause" { try await agent.resume() }
+    // New input, never automatic replay of the cancelled capture/model request.
+    try await agent.receive(.init(id: UUID().uuidString, sessionID: session, payload: .text("继续")))
+    var outputs = FixtureGenerationOutputs(agent: agent).makeAsyncIterator()
+    let reply = try await completedTurn(&outputs)
+    #expect(reply.last?.output == .control("agent.finished"))
+    let request = try #require(await model.requests.last)
+    #expect(request.messages[0].content.contains("Action closeCamera:"))
+    let continued = try #require(try await repository.snapshot().state.skillState)
+    #expect(continued.recentSkills["photography"]?.remainingDecisions == (mode == "recent" ? 4 : nil))
+    try await agent.receive(AgentSessionControl.cancelSession.input(sessionID: session))
+    #expect(try await repository.snapshot().state.skillState?.loaded.contains("photography") == false)
+    #expect(throws: StateError.closed) { try publicContext.snapshot(session: session, names: ["task"]) }
     await agent.stop()
 }

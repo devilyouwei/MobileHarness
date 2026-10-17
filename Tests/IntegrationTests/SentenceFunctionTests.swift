@@ -34,10 +34,10 @@ private actor StreamingSentenceChat: ChatCapability {
 @Test(.actionCatalog) func sentenceTokensArriveBeforeModelCompletionAndFlushFinalTail() async throws {
     let model = StreamingSentenceChat()
     let agent = try AssistantAgent(
+        stateContext: try publicStateFixture(),
         chat: model,
         context: try AgentContextRepository(
-            agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState(),
-            stateScope: StateContainer().makeScope())
+            agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState())
     )
     let speechRequests = try await bindSpeechRequests(agent)
     try await agent.start()
@@ -66,10 +66,10 @@ private actor StreamingSentenceChat: ChatCapability {
 @Test(.actionCatalog) func cancellationDiscardsUnfinishedSentenceAndTurnCompletion() async throws {
     let model = StreamingSentenceChat()
     let agent = try AssistantAgent(
+        stateContext: try publicStateFixture(),
         chat: model,
         context: try AgentContextRepository(
-            agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState(),
-            stateScope: StateContainer().makeScope())
+            agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState())
     )
     _ = try await bindSpeechRequests(agent)
     try await agent.start()
@@ -126,10 +126,10 @@ private struct ExcessiveSentencesChat: ChatCapability {
 
 @Test(.actionCatalog) func assistantSentenceBudgetFailsExplicitlyAfterSixtyPairs() async throws {
     let agent = try AssistantAgent(
+        stateContext: try publicStateFixture(),
         chat: ExcessiveSentencesChat(),
         context: try AgentContextRepository(
-            agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState(),
-            stateScope: StateContainer().makeScope())
+            agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState())
     )
     _ = try await bindSpeechRequests(agent)
     try await agent.start()

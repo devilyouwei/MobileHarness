@@ -74,8 +74,7 @@ private func admit(
     let agent = try SpeechSynthesisAgent(
         synthesis: model, store: store,
         context: try AgentContextRepository(
-            agent: AgentID(rawValue: "speechSynthesis"), scope: UUID().uuidString, state: SpeechSynthesisContextState(),
-            stateScope: StateContainer().makeScope())
+            agent: AgentID(rawValue: "speechSynthesis"), scope: UUID().uuidString, state: SpeechSynthesisContextState())
     )
     try await agent.start()
     let one = try await admit("one", agent: agent)
@@ -104,8 +103,7 @@ private func admit(
     let agent = try SpeechSynthesisAgent(
         synthesis: model, store: store,
         context: try AgentContextRepository(
-            agent: AgentID(rawValue: "speechSynthesis"), scope: UUID().uuidString, state: SpeechSynthesisContextState(),
-            stateScope: StateContainer().makeScope())
+            agent: AgentID(rawValue: "speechSynthesis"), scope: UUID().uuidString, state: SpeechSynthesisContextState())
     )
     try await agent.start()
     let one = try await admit("one", agent: agent)
@@ -270,8 +268,7 @@ private func synthesisClientConfiguration(_ name: String, permitted: Bool) throw
     let synthesizer = try SpeechSynthesisAgent(
         synthesis: model, store: store,
         context: try AgentContextRepository(
-            agent: AgentID(rawValue: "speechSynthesis"), scope: UUID().uuidString, state: SpeechSynthesisContextState(),
-            stateScope: StateContainer().makeScope())
+            agent: AgentID(rawValue: "speechSynthesis"), scope: UUID().uuidString, state: SpeechSynthesisContextState())
     )
     try await manager.register(synthesizer)
     try await synthesizer.start()
@@ -357,8 +354,7 @@ private actor ReplyCompletionGate {
         FixtureNativeAgent(
             chat: UnusedPlaybackChat(),
             context: try AgentContextRepository(
-                agent: FixtureNativeChatState.agentID, scope: UUID().uuidString, state: FixtureNativeChatState(),
-                stateScope: StateContainer().makeScope())
+                agent: FixtureNativeChatState.agentID, scope: UUID().uuidString, state: FixtureNativeChatState())
         ))
     try await manager.start(.assistant)
     let gateway = OutputGateway(
@@ -387,8 +383,7 @@ private actor ReplyCompletionGate {
     let synth = try SpeechSynthesisAgent(
         synthesis: PlaybackSynthesisFixture(), store: store,
         context: try AgentContextRepository(
-            agent: AgentID(rawValue: "speechSynthesis"), scope: UUID().uuidString, state: SpeechSynthesisContextState(),
-            stateScope: StateContainer().makeScope())
+            agent: AgentID(rawValue: "speechSynthesis"), scope: UUID().uuidString, state: SpeechSynthesisContextState())
     )
     try await synth.start()
     let job = try await admit("rejected", agent: synth)
@@ -397,8 +392,7 @@ private actor ReplyCompletionGate {
         FixtureNativeAgent(
             chat: UnusedPlaybackChat(),
             context: try AgentContextRepository(
-                agent: FixtureNativeChatState.agentID, scope: UUID().uuidString, state: FixtureNativeChatState(),
-                stateScope: StateContainer().makeScope())
+                agent: FixtureNativeChatState.agentID, scope: UUID().uuidString, state: FixtureNativeChatState())
         ))
     let gateway = OutputGateway(
         manager: manager, requests: InputGateway(manager: manager, allowsExternalSend: true), tools: ToolRegistry(),
@@ -419,8 +413,7 @@ private actor ReplyCompletionGate {
     let agent = try SpeechSynthesisAgent(
         synthesis: NeverCompletingSpeech(), store: store,
         context: try AgentContextRepository(
-            agent: AgentID(rawValue: "speechSynthesis"), scope: UUID().uuidString, state: SpeechSynthesisContextState(),
-            stateScope: StateContainer().makeScope())
+            agent: AgentID(rawValue: "speechSynthesis"), scope: UUID().uuidString, state: SpeechSynthesisContextState())
     )
     try await agent.start()
     let job = try await admit("wait", agent: agent)
@@ -459,8 +452,7 @@ func slowSynthesisDoesNotTruncatePlayback(delayBeforeFirstFrame: Bool) async thr
     let agent = try SpeechSynthesisAgent(
         synthesis: SlowPlaybackSynthesis(delayBeforeFirstFrame: delayBeforeFirstFrame), store: store,
         context: try AgentContextRepository(
-            agent: AgentID(rawValue: "speechSynthesis"), scope: UUID().uuidString, state: SpeechSynthesisContextState(),
-            stateScope: StateContainer().makeScope())
+            agent: AgentID(rawValue: "speechSynthesis"), scope: UUID().uuidString, state: SpeechSynthesisContextState())
     )
     try await agent.start()
     let job = try await admit("complete speech", agent: agent)

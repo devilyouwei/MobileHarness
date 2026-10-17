@@ -1,7 +1,7 @@
 {
-  "version": 1,
+  "version": 2,
   "id": "application-control",
-  "revision": 6,
+  "revision": 7,
   "description": "Conversational page navigation, resource/provider/Bluetooth status and explicit supported device/resource operations.",
   "dependencies": [],
   "functions": [
@@ -45,9 +45,5 @@
       "channel": "System"
     }
   ],
-  "contextFields": [
-    "runtimeFacts",
-    "taskState",
-    "actionResults"
-  ]
+  "useState": []
 }

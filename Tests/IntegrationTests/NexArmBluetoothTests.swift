@@ -2281,8 +2281,7 @@ func bluetoothTrackingInputExpiryJoinsWriterAndReleasesMotorResources() async th
     let photographer = try PhotographerAgent(
         sessionID: session, controlsArm: true,
         context: try AgentContextRepository(
-            agent: AgentID(rawValue: "photographer"), scope: UUID().uuidString, state: PhotographerContextState(),
-            stateScope: StateContainer().makeScope())
+            agent: AgentID(rawValue: "photographer"), scope: UUID().uuidString, state: PhotographerContextState())
     )
     try await photographer.start()
     let pose = try PoseObservation(
@@ -2342,8 +2341,7 @@ func bluetoothGatewayAimUpdatesUseOneWorkerAndKeepActualMotorExclusion() async t
     let photographer = try PhotographerAgent(
         sessionID: session, controlsArm: true,
         context: try AgentContextRepository(
-            agent: AgentID(rawValue: "photographer"), scope: UUID().uuidString, state: PhotographerContextState(),
-            stateScope: StateContainer().makeScope())
+            agent: AgentID(rawValue: "photographer"), scope: UUID().uuidString, state: PhotographerContextState())
     )
     let manager = AgentManager()
     try await manager.register(photographer, sessionID: session)
@@ -2604,10 +2602,10 @@ private func bluetoothRecoveryPreservesAssistantGenerationSpeechAndOtherActions(
     let workflow = bluetoothTestWorkflow(link, file: file)
     let chat = BluetoothRecoveryChat()
     let assistant = try AgentChatWorker<AssistantContextState>(
+        stateContext: try publicStateFixture(),
         chat: chat,
         context: try AgentContextRepository(
-            agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState(),
-            stateScope: StateContainer().makeScope())
+            agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState())
     )
     let speech = try await bindSpeechRequests(assistant)
     let manager = AgentManager()
@@ -2617,8 +2615,7 @@ private func bluetoothRecoveryPreservesAssistantGenerationSpeechAndOtherActions(
     let photographer = try PhotographerAgent(
         sessionID: session, controlsArm: true,
         context: try AgentContextRepository(
-            agent: AgentID(rawValue: "photographer"), scope: UUID().uuidString, state: PhotographerContextState(),
-            stateScope: StateContainer().makeScope())
+            agent: AgentID(rawValue: "photographer"), scope: UUID().uuidString, state: PhotographerContextState())
     )
     try await manager.register(photographer, sessionID: session)
     try await photographer.start()
@@ -2896,10 +2893,10 @@ func bluetoothRecoveryLeavesQueuedActionsForNormalChannelExecution() async throw
     let link = BluetoothArmFixture()
     let workflow = bluetoothTestWorkflow(link, file: file)
     let assistant = try AgentChatWorker<AssistantContextState>(
+        stateContext: try publicStateFixture(),
         chat: BluetoothRecoveryChat(),
         context: try AgentContextRepository(
-            agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState(),
-            stateScope: StateContainer().makeScope())
+            agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState())
     )
     let manager = AgentManager()
     let session = UUID().uuidString
@@ -3435,4 +3432,33 @@ func bluetoothManualSimpleCommandsRemainUsableWithoutIKOrResourceAdmission() asy
     #expect(await link.observedCommands.isEmpty)
     try await workflow.shutdown()
     #expect(workflow.state.phase == .idle)
+}
+
+@Test(.actionCatalog) @MainActor func robotPublicFactsFollowNativeConnectionAndImmediateSafetyInvalidation()
+    async throws
+{
+    let file = bluetoothTestFile()
+    defer { try? FileManager.default.removeItem(at: file) }
+    let link = BluetoothArmFixture()
+    let workflow = bluetoothTestWorkflow(link, file: file)
+    let storage = StateContainer()
+    let scope = try storage.makeScope()
+    try workflow.service.connectPublicState(scope: scope)
+    let reader = try storage.contextReader(scope: scope)
+    #expect(try reader.snapshot(names: ["robot"]).json.contains("unknown"))
+    let observer = Task { await workflow.run() }
+    workflow.openPage()
+    try await until { !workflow.state.nearby.isEmpty }
+    workflow.connect(try link.businessID)
+    try await until { workflow.trackingAvailable }
+    let connected = try reader.snapshot(names: ["robot"]).json
+    #expect(connected.contains("\"connected\":true") && connected.contains("\"controlAvailable\":true"))
+    workflow.setForeground(false)
+    #expect(try reader.snapshot(names: ["robot"]).json.contains("\"controlAvailable\":false"))
+    try await workflow.shutdown()
+    #expect(try reader.snapshot(names: ["robot"]).json.contains("\"connected\":false"))
+    observer.cancel()
+    await observer.value
+    scope.close()
+    #expect(throws: StateError.closed) { try reader.snapshot(names: ["robot"]) }
 }

@@ -57,3 +57,9 @@ check-modelkit-boundaries.py 读取 SwiftPM 的显式源清单，区分 Agents/A
 Storage 四类容器边界检查覆盖 StorageCore/State/Cache/Files/Database/SQLite 与 AppStorage；源码必须唯一归属，业务不得构造具体文件后端或查询 IoC。
 
 ✅ 工具链选择：FactoryKit 的 SwiftUI 宏需要完整 Xcode；检查脚本在未显式设置 DEVELOPER_DIR 且系统选中 CLT 时，优先使用标准位置已安装的完整 Xcode，不修改全局 xcode-select。
+
+## 公开 State 边界
+
+✅ StorageState 仅承载公开事实；边界检查禁止完整 AgentContext 注册，校验 Skill schema v2/useState。沿用现有源码归属及目标，ActionBindings 显式依赖 StorageState。
+
+[公开 State 契约](../MobileHarness/Storage/State/README.md)

@@ -124,7 +124,7 @@ private final class ProviderTransactionFixture: ProviderSettingsPersistence {
         sessionID: session,
         context: try AgentContextRepository(
             agent: AgentID(rawValue: "applicationControl"), scope: UUID().uuidString,
-            state: ApplicationControlContextState(), stateScope: StateContainer().makeScope())
+            state: ApplicationControlContextState())
     )
     try await agent.start()
     let intent = ProviderSettingsIntent(operation: .save, requestID: UUID().uuidString)

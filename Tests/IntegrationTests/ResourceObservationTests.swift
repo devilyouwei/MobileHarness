@@ -79,7 +79,7 @@ private func waitForResourceFacts(_ runtime: ApplicationControlIntentRuntime, pr
         sessionID: session,
         context: try AgentContextRepository(
             agent: AgentID(rawValue: "applicationControl"), scope: UUID().uuidString,
-            state: ApplicationControlContextState(), stateScope: StateContainer().makeScope())
+            state: ApplicationControlContextState())
     )
     try await agent.start()
     let native = try ModelResourceObservation.changed(generation: 1).input(sessionID: session, sequence: 1)

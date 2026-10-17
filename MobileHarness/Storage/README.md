@@ -46,7 +46,7 @@ flowchart TB
 
 ✅ DatabaseStorage 的 chat/tasks/media/devices 在准备前、关闭后抛错。SQLite 以 WAL、FULL、外键、四读者和一个写者运行；最多 64 个接纳操作，写入一个执行者加 16 等待者。旧仓库引用也受关闭屏障约束。恢复仅修复未完成事实，不重放设备动作。
 
-✅ State 保存无 Codable 的类型化值；Cache 保存不可变缓冲区。数据库和文件写入成功才承诺对应持久化，不把内存成功解释为重启可恢复。Task/Skill 业务状态仍由 Agents 维护；照片发布仍由 CapturedPhotoStore 组合数据库元数据和文件。
+✅ State 保存可编码的有限公开事实及只读投影；Cache 保存不可变缓冲区。数据库和文件写入成功才承诺对应持久化，不把内存成功解释为重启可恢复。Task/Skill 业务状态仍由 Agents 维护；照片发布仍由 CapturedPhotoStore 组合数据库元数据和文件。
 
 数据库 schema、ID、配置 envelope version 1、文件路径、照片恢复和 FIFO 契约保持。Models 的文件目录能力是真实路径，不用内存实现伪造文件 URL。业务错误保留在生产者；Storage 不生成用户文案。
 
@@ -55,3 +55,9 @@ flowchart TB
 [State](State/README.md) · [Cache](Cache/README.md) · [Database](Database/README.md) · [Files](Files/README.md) · [公共机制](Support/README.md)
 
 ❌ Skill 动态状态需求与自动提示词上下文、持久化音视频、额外数据库后端、原生播放转换零拷贝不在本轮。自动化、构建、真实模型/UI/设备结果分别见 [验证记录](../../docs/validation/Validation-History.md)。
+
+## 公开 State 边界
+
+✅ State 是公开事实寄存器：原子发布类型化值与编码投影，公开读取绑定作用域；不托管完整 AgentContext 或业务状态机。Storage 不定义 Camera/Robot/Task 类型。
+
+[公开 State 契约](State/README.md)

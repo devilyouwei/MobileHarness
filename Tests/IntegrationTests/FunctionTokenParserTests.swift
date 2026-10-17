@@ -159,10 +159,10 @@ private struct MarkupChat: ChatCapability {
 
 @Test(.actionCatalog) func assistantEmitsResolvedMarkupAndLiteralToolResultsCannotExecuteTags() async throws {
     let agent = try AssistantAgent(
+        stateContext: try publicStateFixture(),
         chat: MarkupChat(markup: "<channel.Speech>你好<express emotion='smile'/></channel.Speech>尾巴"),
         context: try AgentContextRepository(
-            agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState(),
-            stateScope: StateContainer().makeScope())
+            agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState())
     )
     let speechRequests = try await bindSpeechRequests(agent)
     try await agent.start()
@@ -195,10 +195,10 @@ private struct MarkupChat: ChatCapability {
 
 @Test(.actionCatalog) func incompleteModelMarkupFailsTurnAndFreshTurnGetsFreshParser() async throws {
     let agent = try AssistantAgent(
+        stateContext: try publicStateFixture(),
         chat: MarkupChat(markup: "<channel.Speech>未结束"),
         context: try AgentContextRepository(
-            agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState(),
-            stateScope: StateContainer().makeScope())
+            agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState())
     )
     let speechRequests = try await bindSpeechRequests(agent)
     try await agent.start()
@@ -360,10 +360,10 @@ func invalidWaitSyntaxIsRejected(_ source: String) throws {
 
 @Test(.actionCatalog) func assistantPreservesWaitEventsAroundSpeechHandleConversion() async throws {
     let agent = try AssistantAgent(
+        stateContext: try publicStateFixture(),
         chat: MarkupChat(markup: "<wait>你好。</wait><wait><express emotion='smile'/></wait>"),
         context: try AgentContextRepository(
-            agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState(),
-            stateScope: StateContainer().makeScope())
+            agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState())
     )
     let probe = try await bindSpeechRequests(agent)
     try await agent.start()

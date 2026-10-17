@@ -106,7 +106,7 @@ private func behaviorInvocation(_ function: String, parameters: [String: String]
                 sessionID: UUID().uuidString,
                 context: try AgentContextRepository(
                     agent: AgentID(rawValue: "applicationControl"), scope: UUID().uuidString,
-                    state: ApplicationControlContextState(), stateScope: StateContainer().makeScope())
+                    state: ApplicationControlContextState())
             ).descriptor.capabilities,
             MemoryAgent.runtimeCapabilities(
                 AgentConfigurations.load(named: "Memory").capabilities),

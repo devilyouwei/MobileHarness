@@ -74,17 +74,15 @@ func specialistTypedUIBypassesAssistantAndCompletesWithoutModels() async throws 
         tools: try ToolRegistry(modules: [SpecialistTools(definitions: [definition])]),
         actions: ChannelScheduler(registry: ActionRegistry()), policy: policy, sink: { _ in })
     let repository = try AgentContextRepository(
-        agent: AgentID.assistant, scope: UUID().uuidString, state: AssistantContextState(),
-        stateScope: StateContainer().makeScope()
+        agent: AgentID.assistant, scope: UUID().uuidString, state: AssistantContextState()
     )
-    let parent = try AssistantAgent(context: repository)
+    let parent = try AssistantAgent(stateContext: try publicStateFixture(), context: repository)
     let camera = PhotographerIntentRuntime(
         sessionID: session, manager: manager, input: input, output: gateway,
         agent: try PhotographerAgent(
             sessionID: session,
             context: try AgentContextRepository(
-                agent: AgentID(rawValue: "photographer"), scope: UUID().uuidString, state: PhotographerContextState(),
-                stateScope: StateContainer().makeScope())
+                agent: AgentID(rawValue: "photographer"), scope: UUID().uuidString, state: PhotographerContextState())
         ), report: { await effects.fail($0) })
     let root = AgentInteractionRuntime(
         agent: parent, manager: manager, input: input, output: gateway,
@@ -153,11 +151,10 @@ private actor SpecialistPendingModel: ChatCapability {
     async throws
 {
     let context = try AgentContextRepository(
-        agent: .assistant, scope: UUID().uuidString, state: AssistantContextState(),
-        stateScope: StateContainer().makeScope()
+        agent: .assistant, scope: UUID().uuidString, state: AssistantContextState()
     )
     let model = SpecialistPendingModel()
-    let failing = try AssistantAgent(chat: model, context: context)
+    let failing = try AssistantAgent(stateContext: try publicStateFixture(), chat: model, context: context)
     try await failing.bind(
         AgentMessaging { _, _, target in
             DeliveryReport(rejected: target.map { [$0: "Target unavailable"] } ?? [:])
@@ -199,10 +196,10 @@ private actor ReplyActivityProbe {
 func assistantReportsReplyActivityWithoutOwningListening() async throws {
     let session = UUID().uuidString
     let root = try AssistantAgent(
+        stateContext: try publicStateFixture(),
         reportsReplyActivity: true, chat: FixedTextChat(text: ""),
         context: try AgentContextRepository(
-            agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState(),
-            stateScope: StateContainer().makeScope())
+            agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState())
     )
     try await root.start()
     let probe = ReplyActivityProbe()
@@ -227,10 +224,10 @@ func assistantReportsReplyActivityWithoutOwningListening() async throws {
 
 @Test(.actionCatalog, .timeLimit(.minutes(1))) func assistantExecutesRobotActionWithoutDelegation() async throws {
     let context = try AgentContextRepository(
-        agent: AgentID.assistant, scope: UUID().uuidString, state: AssistantContextState(),
-        stateScope: StateContainer().makeScope()
+        agent: AgentID.assistant, scope: UUID().uuidString, state: AssistantContextState()
     )
-    let assistant = try AssistantAgent(chat: FixedTextChat(text: "<dance cycles=\"1\"/>"), context: context)
+    let assistant = try AssistantAgent(
+        stateContext: try publicStateFixture(), chat: FixedTextChat(text: "<dance cycles=\"1\"/>"), context: context)
     let manager = AgentManager()
     let policy = try CommunicationPolicy(
         contracts: AgentContracts.communication,
@@ -306,15 +303,14 @@ func assistantReportsReplyActivityWithoutOwningListening() async throws {
         manager: manager, requests: input, tools: ToolRegistry(), actions: ChannelScheduler(registry: ActionRegistry()),
         sink: { _ in })
     let parent = try AssistantAgent(
+        stateContext: try publicStateFixture(),
         context: try AgentContextRepository(
-            agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState(),
-            stateScope: StateContainer().makeScope())
+            agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState())
     )
     let child = try PhotographerAgent(
         sessionID: UUID().uuidString,
         context: try AgentContextRepository(
-            agent: AgentID(rawValue: "photographer"), scope: UUID().uuidString, state: PhotographerContextState(),
-            stateScope: StateContainer().makeScope())
+            agent: AgentID(rawValue: "photographer"), scope: UUID().uuidString, state: PhotographerContextState())
     )
     let entered = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingOldest(1))
     let release = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingOldest(1))
@@ -349,8 +345,7 @@ func assistantReportsReplyActivityWithoutOwningListening() async throws {
     let agent = try PhotographerAgent(
         sessionID: session,
         context: try AgentContextRepository(
-            agent: AgentID(rawValue: "photographer"), scope: UUID().uuidString, state: PhotographerContextState(),
-            stateScope: StateContainer().makeScope())
+            agent: AgentID(rawValue: "photographer"), scope: UUID().uuidString, state: PhotographerContextState())
     )
     try await agent.start()
     let first = CameraStateObservation(

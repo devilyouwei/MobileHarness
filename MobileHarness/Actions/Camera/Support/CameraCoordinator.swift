@@ -8,6 +8,7 @@
     import FunctionContracts
     import OSLog
     import PlatformKit
+    import StorageState
     import StorageCore
     import StorageMedia
     import UI
@@ -67,6 +68,66 @@
             self.camera = camera
             self.photos = photos
             preview = camera.preview
+        }
+
+        public struct PublicFacts: Encodable, Sendable, Equatable {
+            public let enabled: Bool
+            public let running: Bool
+            public let selectedFacing: String
+            public let busy: Bool
+            public let needsSettings: Bool
+            public let displayedMediaID: String?
+            public let savedMediaID: String?
+            private enum CodingKeys: String, CodingKey {
+                case enabled, running, selectedFacing, busy, needsSettings, displayedMediaID, savedMediaID
+            }
+            public func encode(to encoder: any Encoder) throws {
+                var fields = encoder.container(keyedBy: CodingKeys.self)
+                try fields.encode(enabled, forKey: .enabled)
+                try fields.encode(running, forKey: .running)
+                try fields.encode(selectedFacing, forKey: .selectedFacing)
+                try fields.encode(busy, forKey: .busy)
+                try fields.encode(needsSettings, forKey: .needsSettings)
+                try fields.encode(displayedMediaID, forKey: .displayedMediaID)
+                try fields.encode(savedMediaID, forKey: .savedMediaID)
+            }
+        }
+        private var confirmedRunning = false { didSet { publishPublicFacts() } }
+        private var publicFacts: StateWriter<PublishedState<PublicFacts>>?
+        private var lastPublicFacts: PublicFacts?
+        public private(set) var publicStateFailure: (any Error)?
+        public func connectPublicState(scope: StateScope) throws {
+            guard publicFacts == nil else { throw StateError.duplicate }
+            publicFacts = try scope.register(
+                StateKey("camera"), initial: PublishedState<PublicFacts>(availability: .unknown))
+            state.connectFactsObserver { [weak self] in self?.publishPublicFacts() }
+            publishPublicFacts()
+            if let publicStateFailure { throw publicStateFailure }
+        }
+        private func publishPublicFacts() {
+            guard let publicFacts else { return }
+            let fact = PublicFacts(
+                enabled: state.isEnabled, running: confirmedRunning,
+                selectedFacing: state.facing == .front ? "front" : "back",
+                busy: state.isBusy || state.photoBusy, needsSettings: state.needsSettings,
+                displayedMediaID: state.capturedPhoto?.didReachThumbnail == true ? state.capturedPhoto?.id : nil,
+                savedMediaID: state.savedMediaID)
+            let availability: StateAvailability =
+                state.needsSettings
+                    || (state.message != nil && state.isEnabled && !state.isVisible && !state.isBusy)
+                ? .unavailable : .available
+            do {
+                let old = try publicFacts.get()
+                guard fact != lastPublicFacts || old.value.availability != availability || publicStateFailure != nil
+                else { return }
+                try publicFacts.set(PublishedState(fact, availability: availability), expecting: old.revision)
+                lastPublicFacts = fact
+                publicStateFailure = nil
+            } catch {
+                publicFacts.invalidate()
+                publicStateFailure = error
+                log.error("Camera public State publication failed: \(String(describing: error), privacy: .public)")
+            }
         }
 
         public func readPhoto(_ id: String, source: String, sessionID: String, inputID: String) async throws -> Data {
@@ -238,6 +299,7 @@
                     .capturedPhoto(
                         CapturedPhotoPresentation(id: id, image: image) { [weak self] success in
                             guard let self, self.state.capturedPhoto?.id == id else { return }
+                            self.publishPublicFacts()
                             self.presentationFinished = (id, success)
                         }))
                 let deadline = ContinuousClock.now.advanced(by: .seconds(3))
@@ -325,7 +387,10 @@
             try Task.checkCancellation()
             guard revision == expectedRevision else { throw CancellationError() }
             guard foreground else { throw CameraControlError.notForeground }
+            if let publicStateFailure { throw publicStateFailure }
             let running = await camera.isRunning()
+            confirmedRunning = running
+            if let publicStateFailure { throw publicStateFailure }
             try Task.checkCancellation()
             guard revision == expectedRevision else { throw CancellationError() }
             if state.needsSettings { throw CameraControlError.permissionDenied }
@@ -364,6 +429,7 @@
         public func observe() async {
             for await event in camera.events {
                 if Task.isCancelled { break }
+                confirmedRunning = await camera.isRunning()
                 guard state.isEnabled, foreground else { continue }
                 switch event {
                 case .interrupted:
@@ -492,6 +558,7 @@
                     guard await camera.isRunning() else { throw CameraError.unavailable }
                     return frames
                 }
+                confirmedRunning = await camera.isRunning()
                 recordCapture(.started, id: lease.id)
                 leaseRenewal = Task { [weak self] in
                     while !Task.isCancelled {
@@ -525,18 +592,24 @@
             _ = try? await photoCommand?.value
             leaseRenewal?.cancel()
             leaseRenewal = nil
-            guard let lease = captureLease, let runtime = resourceRuntime else { return true }
+            guard let lease = captureLease, let runtime = resourceRuntime else {
+                confirmedRunning = await camera.isRunning()
+                return true
+            }
             captureLease = nil
             do {
                 try await runtime.resources.release(lease, owner: captureOwner)
+                confirmedRunning = await camera.isRunning()
                 recordCapture(.stopped, id: lease.id)
                 return true
             } catch CameraResourceFailure.staleLease {
                 if await runtime.resources.isReleased(CameraCoordinator.captureResource) {
+                    confirmedRunning = await camera.isRunning()
                     recordCapture(.revoked, id: lease.id)
                     return true
                 }
             } catch {}
+            confirmedRunning = await camera.isRunning()
             recordCapture(.failed, id: lease.id)
             failed = true
             state.present(.isVisible(false))
@@ -562,6 +635,7 @@
                         ) { [camera] in try await camera.switchCamera(facing: facing) }
                         guard current == revision else { continue }
                         let running = await camera.isRunning()
+                        confirmedRunning = running
                         guard current == revision else { continue }
                         guard running else { throw CameraError.startFailed }
                         let elapsed = switchingStarted.duration(to: .now).components
@@ -596,6 +670,7 @@
                         do {
                             let frames = try await startCapture(facing: state.facing == .front ? .front : .back)
                             let running = await camera.isRunning()
+                            confirmedRunning = running
                             if current == revision {
                                 state.present(.isVisible(running))
                                 state.present(.message(running ? nil : "相机暂时不可用，请重试"))

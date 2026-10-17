@@ -238,10 +238,10 @@ import UI
         _ markup: String, workflow: BluetoothWorkflow, expected: ActionExecutionRecord.Phase
     ) async throws {
         let assistant = try AgentChatWorker<AssistantContextState>(
+            stateContext: try publicStateFixture(),
             chat: FixedTextChat(text: markup),
             context: try AgentContextRepository(
-                agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState(),
-                stateScope: StateContainer().makeScope())
+                agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState())
         )
         let manager = AgentManager()
         let session = UUID().uuidString
@@ -364,8 +364,7 @@ import UI
         let photographer = try PhotographerAgent(
             sessionID: session, controlsArm: true, controlAvailable: { await workflow.trackingAvailable },
             context: try AgentContextRepository(
-                agent: AgentID(rawValue: "photographer"), scope: UUID().uuidString, state: PhotographerContextState(),
-                stateScope: StateContainer().makeScope())
+                agent: AgentID(rawValue: "photographer"), scope: UUID().uuidString, state: PhotographerContextState())
         )
         try await manager.register(photographer, sessionID: session)
         let policy = try CommunicationPolicy(

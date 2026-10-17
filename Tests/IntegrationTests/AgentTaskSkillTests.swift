@@ -312,11 +312,15 @@ private func photographyAcceptance(
         model = stub
     }
     let context = try AgentContextRepository(
-        agent: AgentID.assistant, scope: UUID().uuidString, state: AssistantContextState(),
-        stateScope: StateContainer().makeScope()
+        agent: AgentID.assistant, scope: UUID().uuidString, state: AssistantContextState()
     )
     let store = ConversationHistoryStore()
+    let publicStorage = StateContainer()
+    let publicOwner = try PublicStateFixtureOwner(publicStorage, ready: cameraFacts)
+    let publicContext = try AgentStateContext(
+        storage: publicStorage, agent: .assistant, retainingPublishers: publicOwner)
     let agent = try AssistantAgent(
+        stateContext: publicContext,
         chat: model, conversations: store,
         observations: { values, input, chat in
             try await AssistantContextBuilder.photoObservations(
@@ -350,12 +354,8 @@ private func photographyAcceptance(
                     await effects.capture(invocation.context.source)
                     if path == "Camera.Capture.close" || path == "Camera.Capture.open" {
                         let enabled = path == "Camera.Capture.open"
-                        if live {
-                            try await agent.receive(
-                                CameraStateObservation(
-                                    sequence: await effects.nextCameraSequence(), enabled: enabled, visible: enabled,
-                                    busy: false, needsSettings: false, facing: .front
-                                ).input(sessionID: session))
+                        try publicOwner.camera.transition(expecting: publicOwner.camera.get().revision) {
+                            $0 = PublishedState(FixtureCameraFact(enabled: enabled, running: enabled))
                         }
                         return .value(
                             String(
@@ -372,6 +372,16 @@ private func photographyAcceptance(
                         try await effects.resolvePhoto(id, discard: path == "Camera.Capture.ignorePhoto")
                     } else {
                         id = photo
+                    }
+                    try publicOwner.camera.transition(expecting: publicOwner.camera.get().revision) { state in
+                        var fact = state.value ?? FixtureCameraFact()
+                        if path == "Camera.Capture.takePhoto" { fact.displayedMediaID = id }
+                        if path == "Camera.Capture.savePhoto" {
+                            fact.savedMediaID = id
+                            fact.displayedMediaID = nil
+                        }
+                        if path == "Camera.Capture.ignorePhoto" { fact.displayedMediaID = nil }
+                        state = PublishedState(fact)
                     }
                     if live && ["Camera.Capture.savePhoto", "Camera.Capture.ignorePhoto"].contains(path) {
                         return .value(
@@ -427,12 +437,6 @@ private func photographyAcceptance(
                 if text.hasPrefix("agent.error:") { await effects.fail(text) }
             }
         }
-    }
-    if live && cameraFacts {
-        try await agent.receive(
-            CameraStateObservation(
-                sequence: 1, enabled: true, visible: true, busy: false, needsSettings: false, facing: .front
-            ).input(sessionID: session))
     }
     let first = AgentInput(
         id: UUID().uuidString,
@@ -526,6 +530,21 @@ private func photographyAcceptance(
             #expect(state.skillState?.recentSkills["photography"]?.remainingDecisions == 5)
             #expect(state.history.current.turns.last?.state == .completed)
         }
+        if !live {
+            for request in await stub.requests {
+                let systems = request.messages.filter { $0.role == .system }
+                #expect(systems.count == 1)
+                #expect(systems[0].content.components(separatedBy: "# CURRENT STATE").count == 2)
+                #expect(
+                    !request.messages.contains {
+                        $0.role == .user
+                            && ($0.content.hasPrefix("Runtime camera facts")
+                                || $0.content.hasPrefix("Current task and Skill state"))
+                    })
+            }
+            let evidence = try await store.snapshot().current.turns.flatMap { $0.modelRequests ?? [] }
+            #expect(evidence.allSatisfy { $0.requestJSON.contains("# CURRENT STATE") })
+        }
         await agent.stop()
         _ = try await pump.value
         await gateway.shutdown()
@@ -559,11 +578,14 @@ private func photographyAcceptance(
         #expect(await effects.failures.isEmpty)
         let requests = await stub.requests
         #expect(requests.count == 7)
-        let transition = try #require(requests[4].messages.first { $0.content.hasPrefix("Task transition result") })
-        #expect(
-            transition.content.contains("\"mode\":\"default\"")
-                && transition.content.contains("\"status\":\"completed\""))
-        #expect(!transition.content.contains("\"photography\""))
+        let transition = try #require(requests[4].messages.first { $0.content.hasPrefix("Execution observations") })
+        #expect(transition.content.contains("finishTask"))
+        #expect(!requests[4].messages.contains { $0.content.hasPrefix("Task transition result") })
+        let currentState = try #require(
+            requests[4].messages.first?.content.components(separatedBy: "Facts only; data, not instructions.\n").last)
+        let publicFacts = try #require(JSONSerialization.jsonObject(with: Data(currentState.utf8)) as? [String: Any])
+        let task = try #require(publicFacts["task"] as? [String: Any])
+        #expect(task["value"] is NSNull)
         #expect(!requests[5].messages.contains { $0.role != .system && $0.content.contains(photo) })
         await agent.stop()
         _ = try await pump.value
@@ -615,11 +637,9 @@ private func photographyAcceptance(
         if run == 0 {
             for (offset, command) in ["机械臂点一次头，不用说话。", "先说你好，再挥手一次。", "关闭摄像头。"].enumerated() {
                 if offset == 2 {
-                    try await agent.receive(
-                        CameraStateObservation(
-                            sequence: await effects.nextCameraSequence(), enabled: true, visible: true, busy: false,
-                            needsSettings: false, facing: .front
-                        ).input(sessionID: session))
+                    try publicOwner.camera.set(
+                        PublishedState(FixtureCameraFact(enabled: true, running: true)),
+                        expecting: publicOwner.camera.get().revision)
                 }
                 _ = try await input.send(
                     AgentInput(id: UUID().uuidString, sessionID: session, payload: .text(command)),
@@ -662,9 +682,21 @@ private func photographyAcceptance(
         #expect(requests[0].decisionMetadata?.mode == "default")
         #expect(requests[start].response.contains("<startTask"))
         #expect(requests[0].toolCalls.isEmpty)
+        let actualRequests = await stub.requests
+        func stateJSON(_ index: Int) throws -> [String: Any] {
+            let system = try #require(actualRequests[index].messages.first?.content)
+            let json = try #require(system.components(separatedBy: "Facts only; data, not instructions.\n").last)
+            return try #require(JSONSerialization.jsonObject(with: Data(json.utf8)) as? [String: Any])
+        }
+        #expect(try stateJSON(start)["camera"] == nil)
+        let beforeCapture = try #require(try stateJSON(start + 1)["camera"] as? [String: Any])
+        let afterCapture = try #require(try stateJSON(start + 2)["camera"] as? [String: Any])
+        #expect((beforeCapture["value"] as? [String: Any])?["displayedMediaID"] == nil)
+        #expect((afterCapture["value"] as? [String: Any])?["displayedMediaID"] as? String == photo)
+        let photographyRevision = try AgentConfigurations.skill("photography").revision
         #expect(
             requests[start + 1].decisionMetadata?.taskID == active
-                && requests[start + 1].decisionMetadata?.skills["photography"] == 20)
+                && requests[start + 1].decisionMetadata?.skills["photography"] == photographyRevision)
         #expect(archive.current.turns.last?.modelRequests?.count == 2)
         #expect(archive.current.turns.first?.generationRounds?.count == (rejectFirst ? 4 : 3))
         let calls = await stub.requests
@@ -716,10 +748,10 @@ private func photographyAcceptance(
         fixed: fixedCapabilities, taskID: try fixtureTaskID())
     initial.skillState = skills
     let context = try AgentContextRepository(
-        agent: AgentID.assistant, scope: UUID().uuidString, state: initial, stateScope: StateContainer().makeScope()
+        agent: AgentID.assistant, scope: UUID().uuidString, state: initial
     )
     let model = SkillModel(mediaID: "media_1")
-    let agent = try AssistantAgent(chat: model, context: context)
+    let agent = try AssistantAgent(stateContext: try publicStateFixture(), chat: model, context: context)
     try await agent.start()
     let session = UUID().uuidString
     let turn = AgentTurn(id: UUID().uuidString, ordinal: 1)
@@ -761,8 +793,7 @@ private func photographyAcceptance(
     initial.skillState = skills
     let repository = try AgentContextRepository(
         agent: AgentID.assistant, scope: UUID().uuidString, state: initial,
-        persistence: AgentContextPersistence(load: { nil }, commit: { _, _ in throw WriteFailure() }),
-        stateScope: StateContainer().makeScope()
+        persistence: AgentContextPersistence(load: { nil }, commit: { _, _ in throw WriteFailure() })
     )
     await #expect(throws: WriteFailure.self) {
         try await repository.transaction {
@@ -779,11 +810,10 @@ private func photographyAcceptance(
 
 @Test(.actionCatalog) func trustedIdleControlsReuseTaskActionsWithoutStartingConversation() async throws {
     let context = try AgentContextRepository(
-        agent: AgentID.assistant, scope: UUID().uuidString, state: AssistantContextState(),
-        stateScope: StateContainer().makeScope()
+        agent: AgentID.assistant, scope: UUID().uuidString, state: AssistantContextState()
     )
     let model = SkillModel(mediaID: "media_1")
-    let agent = try AssistantAgent(chat: model, context: context)
+    let agent = try AssistantAgent(stateContext: try publicStateFixture(), chat: model, context: context)
     try await agent.start()
     let session = UUID().uuidString
     _ = try await agent.controlTask(
@@ -884,11 +914,11 @@ private func photographyAcceptance(
 {
     let session = UUID().uuidString
     let context = try AgentContextRepository(
-        agent: AgentID.assistant, scope: UUID().uuidString, state: AssistantContextState(),
-        stateScope: StateContainer().makeScope()
+        agent: AgentID.assistant, scope: UUID().uuidString, state: AssistantContextState()
     )
     let model = SkillModel(mediaID: "media_1")
     let assistant = try AssistantAgent(
+        stateContext: try publicStateFixture(),
         chat: model, context: context,
         backgroundSupport: { target, contract, skills in
             guard target == .memory, contract == "demo.background", skills.isEmpty else {
@@ -1002,40 +1032,15 @@ private struct TaskControlAcknowledgmentFixture: TaskControlCapability {
     }
 }
 
-@Test(.actionCatalog) func taskReportsExcludeRetainedLegacyHistoryAndUnrelatedSessions() throws {
-    let session = UUID().uuidString
-    var registry = AgentTaskRegistry()
-    var views: [String: AgentTaskView] = [:]
-    func add(_ scope: AgentTaskScope, terminal: Bool) throws {
-        try registry.register(scope)
-        views[scope.id] = AgentTaskView(scope: scope, content: try .init(text: scope.id), terminal: terminal)
-    }
-    let legacy = AgentTaskScope(
-        id: UUID().uuidString, requester: .assistant, executor: .photographer, sessionID: session)
-    let done = AgentTaskScope(
-        id: UUID().uuidString, requester: .assistant, executor: .memory, sessionID: session,
-        execution: .background)
-    let live = AgentTaskScope(
-        id: UUID().uuidString, requester: .assistant, executor: .memory, sessionID: session,
-        execution: .background)
-    let other = AgentTaskScope(
-        id: UUID().uuidString, requester: .assistant, executor: .memory,
-        sessionID: UUID().uuidString, execution: .background)
-    try add(legacy, terminal: true)
-    try add(done, terminal: true)
-    try add(live, terminal: false)
-    try add(other, terminal: false)
-    let input = AgentInput(id: UUID().uuidString, sessionID: session, payload: .text("你好"))
-    let templates = try AgentPrompts.load(named: "Assistant")
-    let reports = try AgentChatContextBuilder.taskReports(
-        views: views, tasks: registry, input: input, templates: templates)
-    #expect(reports.contains(live.id))
-    #expect(!reports.contains(legacy.id))
-    #expect(!reports.contains(done.id))
-    #expect(!reports.contains(other.id))
+@Test(.actionCatalog) func publicTaskDoesNotExposePrivateTaskRegistry() throws {
+    let context = try publicStateFixture()
+    try context.open(session: "one")
+    let snapshot = try context.snapshot(session: "one", names: ["task"])
+    #expect(snapshot.json.contains("\"value\":null"))
     #expect(
-        try AgentChatContextBuilder.taskReports(views: [:], tasks: registry, input: input, templates: templates).isEmpty
-    )
+        !snapshot.json.contains("executor") && !snapshot.json.contains("interaction")
+            && !snapshot.json.contains("skills"))
+    #expect(throws: StateError.closed) { try context.snapshot(session: "other", names: ["task"]) }
 }
 
 @Test(.actionCatalog) func baseSkillsAreTheOnlyRoleModelFunctionSource() throws {
@@ -1089,10 +1094,10 @@ private struct TaskControlAcknowledgmentFixture: TaskControlCapability {
 
 @Test(.actionCatalog) func unstartedAssistantRejectsInputWithoutEmittingRuntimeError() async throws {
     let agent = try AssistantAgent(
+        stateContext: try publicStateFixture(),
         chat: SkillModel(mediaID: "media_1"),
         context: try AgentContextRepository(
-            agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState(),
-            stateScope: StateContainer().makeScope())
+            agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState())
     )
     await #expect(throws: HarnessError.notRunning) {
         try await agent.receive(
@@ -1171,12 +1176,6 @@ private struct TaskControlAcknowledgmentFixture: TaskControlCapability {
         "loadSkills", arguments: ["skills": "[\"photography\"]"], inputID: input.id, fixed: config.capabilities)
     let registry = try skills.registry(fixed: config.capabilities)
     let photo = "media_1"
-    var state = AssistantContextState()
-    state.skillState = skills
-    state.cameraState = CameraStateObservation(
-        sequence: 1, enabled: true, visible: true, busy: false, needsSettings: false, facing: .back,
-        displayedMediaID: photo, savedMediaID: photo)
-    let context = AgentContext(agentID: .assistant, scopeID: UUID().uuidString, state: state)
     for (alias, parameters) in [
         ("takePhoto", [:]), ("savePhoto", ["mediaID": photo]),
         ("ignorePhoto", ["mediaID": photo]),
@@ -1185,9 +1184,8 @@ private struct TaskControlAcknowledgmentFixture: TaskControlCapability {
         #expect(call.channel == "Camera")
     }
     #expect(skills.activeTaskID == nil)
-    let facts = try AssistantContextBuilder.contextFacts(context, input: input)
-    #expect(facts.contains { $0.content.contains("displayedMediaID") && $0.content.contains(photo) })
-    #expect(facts.contains { $0.content.contains("savedMediaID") && $0.content.contains(photo) })
+    #expect(try AgentSkillLoader.useState(skills.loaded).contains("camera"))
+    #expect(try AgentSkillLoader.useState(skills.loaded).contains("task"))
 }
 
 @Test(.actionCatalog, .timeLimit(.minutes(1)), arguments: [false, true])
@@ -1331,8 +1329,7 @@ func taskEntryRetainsConversationAndNativePairsUntilClosure(replacingWithinInput
 
 @Test(.actionCatalog) func historyTaskAssignmentRefreshesStoreAndRejectsStaleAdmission() async throws {
     let context = try AgentContextRepository(
-        agent: .assistant, scope: UUID().uuidString, state: AssistantContextState(),
-        stateScope: StateContainer().makeScope()
+        agent: .assistant, scope: UUID().uuidString, state: AssistantContextState()
     )
     let store = AgentChatHistoryContext.store(repository: context)
     let input = UUID().uuidString
@@ -1432,8 +1429,7 @@ func terminalTaskCompressionKeepsChronologyAndAllSourceEvidence(status: String) 
     state.history = try await store.snapshot()
     let repository = try AgentContextRepository(
         agent: .assistant, scope: UUID().uuidString, state: state,
-        persistence: AgentContextPersistence(load: { nil }, commit: { _, _ in throw WriteFailure() }),
-        stateScope: StateContainer().makeScope()
+        persistence: AgentContextPersistence(load: { nil }, commit: { _, _ in throw WriteFailure() })
     )
     await #expect(throws: WriteFailure.self) {
         try await repository.update {
@@ -1624,9 +1620,10 @@ func nativeSkillAdmissionRenewsButParameterRejectionDoesNot(executionFails: Bool
     var initial = AssistantContextState()
     initial.skillState = skills
     let context = try AgentContextRepository(
-        agent: .assistant, scope: UUID().uuidString, state: initial, stateScope: StateContainer().makeScope()
+        agent: .assistant, scope: UUID().uuidString, state: initial
     )
-    let agent = try AssistantAgent(chat: NativeRetentionModel(), context: context)
+    let agent = try AssistantAgent(
+        stateContext: try publicStateFixture(), chat: NativeRetentionModel(), context: context)
     _ = try await bindSpeechRequests(agent)
     try await agent.start()
     var outputs = FixtureGenerationOutputs(agent: agent).makeAsyncIterator()
@@ -1660,8 +1657,7 @@ func nativeSkillAdmissionRenewsButParameterRejectionDoesNot(executionFails: Bool
 
 @Test(.actionCatalog) func newConversationDropsRecentSkillsThroughHistoryCommit() async throws {
     let context = try AgentContextRepository(
-        agent: .assistant, scope: UUID().uuidString, state: AssistantContextState(),
-        stateScope: StateContainer().makeScope()
+        agent: .assistant, scope: UUID().uuidString, state: AssistantContextState()
     )
     let store = AgentChatHistoryContext.store(repository: context)
     let input = UUID().uuidString
@@ -1698,9 +1694,10 @@ func nativeSkillAdmissionRenewsButParameterRejectionDoesNot(executionFails: Bool
     var initial = AssistantContextState()
     initial.skillState = skills
     let context = try AgentContextRepository(
-        agent: .assistant, scope: UUID().uuidString, state: initial, stateScope: StateContainer().makeScope()
+        agent: .assistant, scope: UUID().uuidString, state: initial
     )
     let agent = try AssistantAgent(
+        stateContext: try publicStateFixture(),
         chatProvider: { throw CapabilityError.unavailable("Synthetic provider failure") }, context: context)
     try await agent.start()
     try await agent.receive(.init(id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("hello")))
@@ -2099,8 +2096,7 @@ func failedLifecycleCommitCanRetryWithoutDoubleReleaseOrCountdown(operation: Str
     let failure = FailOnce()
     let repository = try AgentContextRepository(
         agent: .assistant, scope: UUID().uuidString, state: initial,
-        persistence: AgentContextPersistence(load: { nil }, commit: { _, _ in try failure.commit() }),
-        stateScope: StateContainer().makeScope()
+        persistence: AgentContextPersistence(load: { nil }, commit: { _, _ in try failure.commit() })
     )
     let original = try lifecycleSnapshot(skills)
     let mutate: @Sendable (inout AgentContext<AssistantContextState>) throws -> Void = { [fixed] context in
@@ -2133,7 +2129,7 @@ func failedLifecycleCommitCanRetryWithoutDoubleReleaseOrCountdown(operation: Str
     var initial = AssistantContextState()
     initial.skillState = skills
     let context = try AgentContextRepository(
-        agent: .assistant, scope: UUID().uuidString, state: initial, stateScope: StateContainer().makeScope()
+        agent: .assistant, scope: UUID().uuidString, state: initial
     )
     let store = AgentChatHistoryContext.store(repository: context)
     _ = try await store.begin(id: input, user: "保持任务", request: [], expecting: store.readCurrent().token, model: "stub")
@@ -2200,10 +2196,10 @@ func assistantIdleExpiryChangesNextRequestCatalogButKeepsEarlierConversationEvid
     var initial = AssistantContextState()
     initial.skillState = skills
     let context = try AgentContextRepository(
-        agent: .assistant, scope: UUID().uuidString, state: initial, stateScope: StateContainer().makeScope()
+        agent: .assistant, scope: UUID().uuidString, state: initial
     )
     let model = SkillLifecycleModel()
-    let agent = try AssistantAgent(chat: model, context: context)
+    let agent = try AssistantAgent(stateContext: try publicStateFixture(), chat: model, context: context)
     _ = try await bindSpeechRequests(agent)
     try await agent.start()
     var outputs = FixtureGenerationOutputs(agent: agent).makeAsyncIterator()
@@ -2235,10 +2231,10 @@ func assistantIdleExpiryChangesNextRequestCatalogButKeepsEarlierConversationEvid
     var initial = AssistantContextState()
     initial.skillState = skills
     let context = try AgentContextRepository(
-        agent: .assistant, scope: UUID().uuidString, state: initial, stateScope: StateContainer().makeScope()
+        agent: .assistant, scope: UUID().uuidString, state: initial
     )
     let model = SkillLifecycleModel(nativeRounds: 8)
-    let agent = try AssistantAgent(chat: model, context: context)
+    let agent = try AssistantAgent(stateContext: try publicStateFixture(), chat: model, context: context)
     _ = try await bindSpeechRequests(agent)
     try await agent.start()
     var outputs = FixtureGenerationOutputs(agent: agent).makeAsyncIterator()
@@ -2256,4 +2252,93 @@ func assistantIdleExpiryChangesNextRequestCatalogButKeepsEarlierConversationEvid
     #expect(history.turns.count == 2 && history.turns.first?.modelRequests?.count == 9)
     #expect(history.turns.first?.toolCalls?.count == 8)
     await agent.stop()
+}
+
+@Test(.actionCatalog) func taskRegisterPublishesBusinessStatusAndKeepsSessionsIsolated() async throws {
+    let storage = StateContainer()
+    let port = try AgentStateContext(storage: storage, agent: .assistant)
+    try port.open(session: "one")
+    try port.open(session: "two")
+    let fixed = try AssistantAgent.runtimeCapabilities(AgentConfigurations.load(named: "Assistant").capabilities)
+    let repository = try AgentContextRepository(
+        agent: .assistant, scope: UUID().uuidString, state: AssistantContextState())
+    try await repository.installPublicProjection { try port.publish($0.state.skillState) }
+    try await repository.update {
+        var skills = AgentTaskSkillState()
+        try skills.initialize(fixed: fixed, baseSkills: ["basic-skill"])
+        $0.state.skillState = skills
+    }
+    #expect(try port.snapshot(session: "one", names: ["task"]).json.contains("\"value\":null"))
+    let taskID = try fixtureTaskID()
+    try await repository.update {
+        _ = try $0.state.skillState?.control(
+            "startTask", arguments: ["goal": "保存或忽略照片"], inputID: "input", fixed: fixed, sessionID: "one",
+            taskID: taskID)
+    }
+    #expect(try port.snapshot(session: "one", names: ["task"]).json.contains("running"))
+    #expect(try port.snapshot(session: "two", names: ["task"]).json.contains("\"value\":null"))
+    try await repository.update { try $0.state.skillState?.settleTask(failed: false, fixed: fixed) }
+    let waiting = try port.snapshot(session: "one", names: ["task"]).json
+    #expect(waiting.contains("waitingUser") && !waiting.contains("waitingFor") && !waiting.contains(taskID))
+    try await repository.update { try $0.state.skillState?.bind("nextInput", task: taskID) }
+    #expect(try port.snapshot(session: "one", names: ["task"]).json.contains("running"))
+    try await repository.update { try $0.state.skillState?.settleTask(failed: false, fixed: fixed) }
+    try await repository.update {
+        _ = try $0.state.skillState?.control(
+            "finishTask", arguments: ["summary": "已处理"], inputID: "input", fixed: fixed)
+    }
+    #expect(try port.snapshot(session: "one", names: ["task"]).json == waiting)
+    try await repository.update { try $0.state.skillState?.settleTask(failed: false, fixed: fixed) }
+    #expect(try port.snapshot(session: "one", names: ["task"]).json.contains("\"value\":null"))
+    port.close(session: "one")
+    #expect(throws: StateError.closed) { try port.snapshot(session: "one", names: ["task"]) }
+    try port.open(session: "one")
+    #expect(try port.snapshot(session: "one", names: ["task"]).json.contains("\"value\":null"))
+}
+
+@Test(.actionCatalog) func taskPublicationFailureRetainsPrivateCommitAndInvalidatesPublicView() async throws {
+    let storage = StateContainer()
+    let port = try AgentStateContext(storage: storage, agent: .assistant)
+    try port.open(session: "session")
+    let fixed = try AssistantAgent.runtimeCapabilities(AgentConfigurations.load(named: "Assistant").capabilities)
+    let repository = try AgentContextRepository(
+        agent: .assistant, scope: UUID().uuidString, state: AssistantContextState())
+    try await repository.installPublicProjection { try port.publish($0.state.skillState) }
+    let taskID = try fixtureTaskID()
+    await #expect(throws: AgentPublicProjectionFailure.self) {
+        try await repository.update {
+            var skills = AgentTaskSkillState()
+            try skills.initialize(fixed: fixed, baseSkills: ["basic-skill"])
+            _ = try skills.control(
+                "startTask", arguments: ["goal": String(repeating: "\u{1}", count: 2000)], inputID: "input",
+                fixed: fixed, sessionID: "session", taskID: taskID)
+            $0.state.skillState = skills
+        }
+    }
+    #expect(try await repository.snapshot().state.skillState?.activeTaskID == taskID)
+    #expect(throws: StateError.invalidPublication) { try port.snapshot(session: "session", names: ["task"]) }
+}
+
+@Test(.actionCatalog) func useStateTracksLoadedDependenciesWithoutOwningFactLifetime() throws {
+    let storage = StateContainer()
+    let owner = try PublicStateFixtureOwner(storage)
+    let context = try AgentStateContext(storage: storage, agent: .assistant, retainingPublishers: owner)
+    try context.open(session: "session")
+    let fixed = try AssistantAgent.runtimeCapabilities(AgentConfigurations.load(named: "Assistant").capabilities)
+    var skills = AgentTaskSkillState()
+    try skills.initialize(fixed: fixed, baseSkills: ["basic-skill"])
+    #expect(try AgentSkillLoader.useState(skills.loaded) == ["task"])
+    _ = try skills.control("loadSkills", arguments: ["skills": "[\"photography\"]"], inputID: "input", fixed: fixed)
+    let names = try AgentSkillLoader.useState(skills.loaded)
+    #expect(names == ["camera", "task"])
+    let sent = try context.snapshot(session: "session", names: names)
+    try owner.camera.set(
+        PublishedState(FixtureCameraFact(enabled: true, running: true)), expecting: owner.camera.get().revision)
+    let next = try context.snapshot(session: "session", names: names)
+    #expect(sent.json.contains("\"running\":false") && next.json.contains("\"running\":true"))
+    _ = try skills.control("releaseSkills", arguments: ["skills": "[\"photography\"]"], inputID: "input", fixed: fixed)
+    #expect(try AgentSkillLoader.useState(skills.loaded) == ["task"])
+    #expect(try owner.camera.get().value.value?.running == true)
+    _ = try skills.control("loadSkills", arguments: ["skills": "[\"photography\"]"], inputID: "nextInput", fixed: fixed)
+    #expect(try context.snapshot(session: "session", names: AgentSkillLoader.useState(skills.loaded)).json == next.json)
 }

@@ -332,10 +332,10 @@ private func runNexArmAssistantMarkup(
         try AgentConfigurations.skill("expression-interaction").functions
         + AgentConfigurations.skill("robot-interaction").functions
     let assistant = try AgentChatWorker<AssistantContextState>(
+        stateContext: try publicStateFixture(),
         chat: FixedTextChat(text: markup),
         context: try AgentContextRepository(
-            agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState(),
-            stateScope: StateContainer().makeScope()),
+            agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState()),
         capabilities: AgentConfigurations.registry(defaultBindings)
     )
     let manager = AgentManager()

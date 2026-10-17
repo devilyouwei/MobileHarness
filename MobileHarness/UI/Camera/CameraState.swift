@@ -21,9 +21,17 @@ public final class CameraState {
     public var skeleton: PoseOverlay?
     public var gaze: CGSize = .zero
     public var visionMessage: String?
+    @ObservationIgnored private var onFactsChanged: (@MainActor () -> Void)?
     public init() {}
+    public func connectFactsObserver(_ observer: @escaping @MainActor () -> Void) { onFactsChanged = observer }
     /// Public presentation submission; this never grants native capture or motion authority.
     public func present(_ update: CameraPresentationUpdate) {
+        defer {
+            switch update {
+            case .skeleton, .gaze, .visionMessage, .photoMessage: break
+            default: onFactsChanged?()
+            }
+        }
         switch update {
         case .photoBusy(let value): photoBusy = value
         case .photoMessage(let value): photoMessage = value

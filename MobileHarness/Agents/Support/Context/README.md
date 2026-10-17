@@ -4,11 +4,11 @@
 
 ## Responsibility and direct relationships
 
-AgentContextRepository compiles in Agents and registers AgentCore state through an explicitly injected StorageState StateScope. AgentTaskSkillState owns Skill/task transitions; AgentFixedTaskCoordinator joins fixed-task results. Roles own schemas, admission, classification and retention. SQLite writes belong to injected Chat/Task repositories, not this directory.
+AgentContextRepository compiles in Agents and owns its sole AgentCore context value inside the repository actor. AgentTaskSkillState owns Skill/task transitions; AgentFixedTaskCoordinator joins fixed-task results. Roles own schemas, admission, classification and retention. SQLite writes belong to injected Chat/Task repositories, not this directory.
 
 ## Runtime state ownership
 
-Every production role has one root-owned repository backed by a single registered StateWriter snapshot. The store uses a Mutex and no Codable encoding, file, database or hidden flush. Returned values are snapshots; stable business IDs express references across owners. Actor transactions serialize at most16 FIFO waiters; overflow rejects. Copy, mutate, advance revision and validate before CAS publication through StateWriter. Task/Skill remain fields of the same authoritative value; there is no writable mirror. No suspended model/device operation holds the slot.
+Every production role has one root-owned repository with a private value. It performs no whole-context encoding, file/database I/O or hidden flush in production. Returned values are snapshots; stable business IDs express references across owners. Actor transactions serialize at most16 FIFO waiters; overflow rejects. Copy, mutate, advance revision, validate and run any explicit persistence test hook before replacing the private value. Task/Skill remain fields of the same authoritative value; there is no writable mirror. No suspended model/device operation holds the slot.
 
 recordSignal encodes bounded neutral evidence into Data retained in memory, not a JSON file. Caller-selected rolling retention is4096 for deterministic role evidence/batches; unconfigured Core limits remain8192 with explicit rejection. Logical evidence Data totals at most32MiB; overflow rejects before publication without encoding the whole snapshot. Media bytes and credentials are excluded. Signal/delta updates never cause whole-context serialization or I/O.
 
@@ -70,7 +70,7 @@ Task entry preserves ordinary background context and complete current-task evide
 
 Restart discards hot state; App closes unfinished SQL identities as interrupted and never replays actions. Task compression comes from SQL source relationships, not a serialized Skill/registry snapshot. Cancellation cleanup is joined by the owner; failed persistence retains the terminal checkpoint and blocks subsequent model admission. Repository waiters release their granted slot even after cancellation. Snapshot/state/capacity/commit failures propagate without fallback.
 
-Runtime shared state, bounded admission, independent terminal persistence and structured Task/Skill control are implemented.
+Private runtime state, bounded admission, independent terminal persistence and structured Task/Skill control are implemented.
 
 [Agents](../../README.md) · [Chat](../Chat/README.md) · [Storage](../../../Storage/README.md)
 
@@ -81,3 +81,11 @@ Runtime shared state, bounded admission, independent terminal persistence and st
 ## Storage 依赖
 
 ✅ 存储访问使用独立的 State、Cache、Database 和 Files 接口；App 注册根实例，消费者通过构造器获得所需能力。存储容器不接管本目录的业务验证、执行和完成语义。
+
+## 公开 State 边界
+
+✅ 私有事务提交成功后才调用拥有者提供的同步公开投影钩子；钩子失败抛 AgentPublicProjectionFailure，保留已提交的值/修订和原始错误。Task 的公开视图由 Chat 层拥有，不把注册表、Skill 所有权或执行阶段放入共享 State。
+
+[公开 State 契约](../../../Storage/State/README.md)
+
+✅ 新增中断结算接口，移除指定 Decision 使用集合而不扣数；在途 Task 保留目标及 Skill 并进入 waitingUser，近期 Skill 的剩余次数不变。全局 pause 不再调用 resetSession；显式会话关闭/新对话/根关闭保留原清理规则。

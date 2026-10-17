@@ -86,7 +86,7 @@ private actor HostPresentationFixture: ResourcePresentationCapability {
         sessionID: session,
         context: try AgentContextRepository(
             agent: AgentID(rawValue: "applicationControl"), scope: UUID().uuidString,
-            state: ApplicationControlContextState(), stateScope: StateContainer().makeScope())
+            state: ApplicationControlContextState())
     )
     try await agent.start()
     let invalid = ModelResourceHostFailure(

@@ -268,22 +268,21 @@ private func roundHarness(
                     })
             },
             context: try AgentContextRepository(
-                agent: FixtureNativeChatState.agentID, scope: UUID().uuidString, state: FixtureNativeChatState(),
-                stateScope: StateContainer().makeScope()), capabilities: capabilities
+                agent: FixtureNativeChatState.agentID, scope: UUID().uuidString, state: FixtureNativeChatState()),
+            capabilities: capabilities
         )
     } else if toolCount > 0 {
         agent = try FixtureNativeAgent(
             chat: model, conversations: store,
             context: try AgentContextRepository(
-                agent: FixtureNativeChatState.agentID, scope: UUID().uuidString, state: FixtureNativeChatState(),
-                stateScope: StateContainer().makeScope())
+                agent: FixtureNativeChatState.agentID, scope: UUID().uuidString, state: FixtureNativeChatState())
         )
     } else {
         agent = try AssistantAgent(
+            stateContext: try publicStateFixture(),
             chat: model, conversations: store,
             context: try AgentContextRepository(
-                agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState(),
-                stateScope: StateContainer().makeScope())
+                agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState())
         )
     }
     _ = try await bindSpeechRequests(agent)
@@ -787,8 +786,7 @@ private struct IndependentProtocolModel: ChatCapability {
     let agent = try FixtureNativeAgent(
         chat: IndependentProtocolModel(),
         context: try AgentContextRepository(
-            agent: FixtureNativeChatState.agentID, scope: UUID().uuidString, state: FixtureNativeChatState(),
-            stateScope: StateContainer().makeScope())
+            agent: FixtureNativeChatState.agentID, scope: UUID().uuidString, state: FixtureNativeChatState())
     )
     let entered = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingOldest(1))
     let release = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingOldest(1))
@@ -867,10 +865,10 @@ func actionParserFailureCancelsOpenModelStreamWithoutWaitingForAnotherEvent()
 {
     let termination = AsyncStream<SessionTermination>.makeStream(bufferingPolicy: .bufferingOldest(1))
     let agent = try AssistantAgent(
+        stateContext: try publicStateFixture(),
         chat: OpenMalformedProtocolModel(termination: termination.continuation),
         context: try AgentContextRepository(
-            agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState(),
-            stateScope: StateContainer().makeScope())
+            agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState())
     )
     try await agent.start()
     try await agent.receive(
@@ -1034,10 +1032,10 @@ private struct UnfinishedGenerationModel: ChatCapability {
 func modelGenerationWaitsPastThirtySecondsUntilUserCancellation() async throws {
     let store = ConversationHistoryStore()
     let agent = try AssistantAgent(
+        stateContext: try publicStateFixture(),
         chat: UnfinishedGenerationModel(), conversations: store,
         context: try AgentContextRepository(
-            agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState(),
-            stateScope: StateContainer().makeScope())
+            agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState())
     )
     _ = try await bindSpeechRequests(agent)
     try await agent.start()
@@ -1140,7 +1138,7 @@ private func agentRequestFailuresTerminateWithoutRetryOrEffectReplay(_ failure: 
             "startTask", arguments: ["goal": "保留跨轮目标"], inputID: input.id, fixed: fixed, taskID: try fixtureTaskID())
         initial.skillState = skills
         context = try AgentContextRepository(
-            agent: .assistant, scope: UUID().uuidString, state: initial, stateScope: StateContainer().makeScope()
+            agent: .assistant, scope: UUID().uuidString, state: initial
         )
     } else {
         context = nil
@@ -1150,15 +1148,14 @@ private func agentRequestFailuresTerminateWithoutRetryOrEffectReplay(_ failure: 
         ? try FixtureNativeAgent(
             chat: model, conversations: store,
             context: try AgentContextRepository(
-                agent: FixtureNativeChatState.agentID, scope: UUID().uuidString, state: FixtureNativeChatState(),
-                stateScope: StateContainer().makeScope())
+                agent: FixtureNativeChatState.agentID, scope: UUID().uuidString, state: FixtureNativeChatState())
         )
         : try AssistantAgent(
+            stateContext: try publicStateFixture(),
             chat: model, conversations: store,
             context: context
                 ?? AgentContextRepository(
-                    agent: .assistant, scope: UUID().uuidString, state: AssistantContextState(),
-                    stateScope: StateContainer().makeScope()))
+                    agent: .assistant, scope: UUID().uuidString, state: AssistantContextState()))
     _ = try await bindSpeechRequests(agent)
     let manager = AgentManager()
     try await manager.register(agent)

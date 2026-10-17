@@ -138,3 +138,9 @@ Implemented: business IDs are allocated by Storage; Foundation libraries use nat
 ✅ Storage repository refactor: HarnessKit/App composition links the explicit StorageSQLite adapter product and existing domain targets; no new first-level application module or signing change.
 
 Storage 四类容器通过本地 HarnessKit 产品暴露，AppStorage 单独编译注册源码；App Sources 不重复包含 ApplicationContainer。FactoryKit 3.4.1 由 SwiftPM 固定解析，存储目录引用与新路径一致。
+
+## 公开 State 边界
+
+✅ StorageState 仅承载公开事实；边界检查禁止完整 AgentContext 注册，校验 Skill schema v2/useState。沿用现有源码归属及目标，ActionBindings 显式依赖 StorageState。
+
+[公开 State 契约](../MobileHarness/Storage/State/README.md)

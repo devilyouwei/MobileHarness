@@ -65,3 +65,9 @@ CameraStorageFactory 选择最多 1024 张、2 GiB、evictOldest 的应用存储
 ## Storage 依赖
 
 ✅ 存储访问使用独立的 State、Cache、Database 和 Files 接口；App 注册根实例，消费者通过构造器获得所需能力。存储容器不接管本目录的业务验证、执行和完成语义。
+
+## 公开 State 边界
+
+✅ CameraCoordinator 通过应用作用域的唯一写端口发布 camera 的有限公开事实；running 来自原生会话确认，不使用预览隐藏表示物理停机。CameraState.present 的同步回调只用于触发拥有者投影，照片预览引用仅在可操作时公开。发布失败记录原始错误并失效公开视图；资源、权限和执行围栏仍独立校验。
+
+[公开 State 契约](../../../Storage/State/README.md)

@@ -289,3 +289,79 @@ extension SharedCacheTests {
         await cache.close()
     }
 }
+
+@Suite struct PublicStateRegisterTests {
+    @Test func scopedNamesNeverFallBackAndOldReadersStayClosed() throws {
+        let storage = StateContainer()
+        try storage.declare([.init("camera", scope: .application), .init("task", scope: .conversation)])
+        let app = try storage.makeScope()
+        let camera = try app.register(
+            StateKey("camera"), initial: PublishedState<Bool>(false, availability: .unavailable))
+        let domain = StateDomain.conversation(agent: "assistant", session: "one")
+        let first = try storage.makeScope(domain: domain)
+        let other = try storage.makeScope(domain: .conversation(agent: "assistant", session: "two"))
+        let agent = try storage.makeScope(domain: .conversation(agent: "other", session: "one"))
+        _ = try first.register(StateKey("task"), initial: PublishedState("first"))
+        _ = try other.register(StateKey("task"), initial: PublishedState("second"))
+        _ = try agent.register(StateKey("task"), initial: PublishedState("differentAgent"))
+        let reader = try storage.contextReader(domain: domain, scope: first)
+        let snapshot = try reader.snapshot(names: ["camera", "task"])
+        #expect(
+            snapshot.json.contains("first") && !snapshot.json.contains("second")
+                && !snapshot.json.contains("differentAgent"))
+        #expect(snapshot.json.contains("unavailable"))
+        #expect(throws: StateError.missing) { try reader.snapshot(names: ["unknown"]) }
+        #expect(throws: StateError.typeMismatch) { try storage.declare([.init("task", scope: .application)]) }
+        #expect(throws: StateError.missing) { try storage.contextReader(domain: domain) }
+        let duplicate = try storage.makeScope(domain: domain)
+        #expect(throws: StateError.duplicate) {
+            try duplicate.register(StateKey("task"), initial: PublishedState("duplicate"))
+        }
+        first.close()
+        let replacement = try storage.makeScope(domain: domain)
+        _ = try replacement.register(StateKey("task"), initial: PublishedState("replacement"))
+        #expect(throws: StateError.closed) { try reader.snapshot(names: ["task"]) }
+        #expect(try camera.get().value.availability == .unavailable)
+    }
+    @Test func encodingFailureAndInvalidationAreExplicitAndAtomic() async throws {
+        struct Fact: Encodable, Sendable {
+            let valid: Bool
+            func encode(to encoder: any Encoder) throws {
+                if !valid { throw ContainerFixtureError.invalid }
+                var value = encoder.singleValueContainer()
+                try value.encode("confirmed")
+            }
+        }
+        let storage = StateContainer()
+        let scope = try storage.makeScope()
+        let writer = try scope.register(StateKey("fact"), initial: Fact(valid: true))
+        let reader = try storage.contextReader(scope: scope)
+        let old = try reader.snapshot(names: ["fact"])
+        #expect(throws: ContainerFixtureError.invalid) {
+            try writer.set(Fact(valid: false), expecting: writer.get().revision)
+        }
+        #expect(try reader.snapshot(names: ["fact"]).json == old.json)
+        #expect(try reader.snapshot(names: ["fact"]).revision == old.revision)
+        var watch = try writer.reader.observe().makeAsyncIterator()
+        #expect(try await watch.next()?.revision == old.revision)
+        writer.invalidate()
+        #expect(try await watch.next()!.revision > old.revision)
+        #expect(throws: StateError.invalidPublication) { try reader.snapshot(names: ["fact"]) }
+        try writer.set(Fact(valid: true), expecting: writer.get().revision)
+        #expect(try reader.snapshot(names: ["fact"]).json == old.json)
+    }
+    @Test func publicBudgetsRejectInsteadOfTruncating() throws {
+        let storage = StateContainer()
+        let scope = try storage.makeScope()
+        #expect(throws: StateError.capacityExceeded) {
+            try scope.register(StateKey("large"), initial: String(repeating: "x", count: 8192))
+        }
+        for key in ["one", "two", "three"] {
+            _ = try scope.register(StateKey(key), initial: String(repeating: "x", count: 6000))
+        }
+        let reader = try storage.contextReader(scope: scope)
+        #expect(throws: StateError.capacityExceeded) { try reader.snapshot(names: ["one", "two", "three"]) }
+        #expect(throws: StateError.capacityExceeded) { try reader.snapshot(names: (0..<33).map { "name\($0)" }) }
+        #expect(try reader.snapshot(names: ["one", "two"]).json.utf8.count < 16 * 1024)
+    }
+}

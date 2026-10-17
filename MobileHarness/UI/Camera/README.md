@@ -51,3 +51,9 @@ PhotoDeparture.swift owns one renderer request/continuation with identity, avail
 ## 待实现
 
 - Video UI and exact preview-crop mapping of eye gaze.
+
+## 公开 State 边界
+
+✅ CameraState.connectFactsObserver 安装同步呈现变更通知，present 完成值更新后回调。回调不查询设备或 Storage；公开事实的编码、可操作资格及原生运行确认由 Camera 的集成拥有者负责。UI 不依赖 StorageState。
+
+[公开 State 契约](../../Storage/State/README.md)

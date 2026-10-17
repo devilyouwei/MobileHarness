@@ -102,3 +102,9 @@ Actions 为可信业务调用和模型调用提供统一实现与元数据。Ski
 - Separate icon appearance variants.
 
 - 远程下载、热更新与任务栈不在首版范围内。
+
+## 公开 State 边界
+
+✅ Skill 资源采用 schema v2/useState；教学使用 CURRENT STATE 公开事实，不依赖 activeTaskID、Skill 持有关系等私有字段。资源打包仍保留原目录和历史证据。
+
+[公开 State 契约](../Storage/State/README.md)

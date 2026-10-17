@@ -119,8 +119,7 @@ func resourceRuntime(
             sessionID: session,
             context: suppliedContext
                 ?? AgentContextRepository(
-                    agent: .applicationControl, scope: UUID().uuidString, state: ApplicationControlContextState(),
-                    stateScope: StateContainer().makeScope())))
+                    agent: .applicationControl, scope: UUID().uuidString, state: ApplicationControlContextState())))
 }
 @Test(.actionCatalog) func modelResourceCommandsCrossGatewaysAndRecoverAfterNativeFailure() async throws {
     let fixture = ResourceFixture()
@@ -143,7 +142,7 @@ func resourceRuntime(
         sessionID: session,
         context: try AgentContextRepository(
             agent: AgentID(rawValue: "applicationControl"), scope: UUID().uuidString,
-            state: ApplicationControlContextState(), stateScope: StateContainer().makeScope())
+            state: ApplicationControlContextState())
     )
     try await agent.start()
     let first = try ModelResourceIntent.cancel("model").input(sessionID: session)
@@ -220,7 +219,7 @@ private actor HeldResourceFixture: ModelResourceCapability {
         sessionID: session,
         context: try AgentContextRepository(
             agent: AgentID(rawValue: "applicationControl"), scope: UUID().uuidString,
-            state: ApplicationControlContextState(), stateScope: StateContainer().makeScope())
+            state: ApplicationControlContextState())
     )
     try await agent.start()
     try await agent.pause()
@@ -244,7 +243,7 @@ private actor HeldResourceFixture: ModelResourceCapability {
         sessionID: session,
         context: try AgentContextRepository(
             agent: AgentID(rawValue: "applicationControl"), scope: UUID().uuidString,
-            state: ApplicationControlContextState(), stateScope: StateContainer().makeScope())
+            state: ApplicationControlContextState())
     )
     try await agent.start()
     await #expect(throws: CommunicationError.unauthorized) {
@@ -274,7 +273,7 @@ private actor HeldResourceFixture: ModelResourceCapability {
         sessionID: session,
         context: try AgentContextRepository(
             agent: AgentID(rawValue: "applicationControl"), scope: UUID().uuidString,
-            state: ApplicationControlContextState(), stateScope: StateContainer().makeScope())
+            state: ApplicationControlContextState())
     )
     try await agent.start()
     let request = try ModelResourceIntent.configureSpeech(recognition: true, synthesis: false).input(sessionID: session)

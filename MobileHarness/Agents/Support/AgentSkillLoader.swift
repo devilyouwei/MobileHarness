@@ -18,6 +18,9 @@ public enum AgentSkillLoader {
         for id in ids { try visit(id, path: []) }
         return result
     }
+    public static func useState(_ loaded: [String]) throws -> [String] {
+        try Set(loaded.flatMap { try AgentConfigurations.skill($0).useState }).sorted()
+    }
     static func bindings(_ loaded: [String]) throws -> [AgentConfigurations.Binding] {
         var bindings: [AgentConfigurations.Binding] = []
         for id in loaded {
