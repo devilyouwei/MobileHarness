@@ -203,7 +203,6 @@ let package = Package(
             ],
             sources: [
                 "Camera/Support/CameraCoordinator.swift",
-                "Camera/Support/CameraPreviewAdapter.swift",
                 "Camera/Support/CameraRuntimePorts.swift",
                 "Camera/Support/CameraStorageFactory.swift",
                 "History/Support/HistoryPresentationAdapter.swift",
@@ -401,9 +400,7 @@ let package = Package(
                 "Support/GatewayCameraResources.swift",
                 "Support/HistoryAgentAdapter.swift",
                 "Support/InteractionServices.swift",
-                "Support/MediaInputAdapter.swift",
                 "Support/RuntimeDependencies.swift",
-                "Support/VisionSession.swift",
                 "Support/VoiceSessionCoordinator.swift",
             ]),
         .target(
@@ -447,7 +444,7 @@ let package = Package(
             ], sources: ["Registration", "Protocols"]),
         .target(
             name: "Gateway",
-            dependencies: ["AgentCore", "FunctionContracts", "ExecutionRuntime", "CallRuntime"],
+            dependencies: ["AgentCore", "FunctionContracts", "ExecutionRuntime", "CallRuntime", "PlatformKit"],
             path: "MobileHarness/Gateway",
             exclude: [
                 "Runtime", "Output/Registration", "Output/Protocols",
@@ -464,7 +461,6 @@ let package = Package(
             exclude: [
                 "Camera/README.md",
                 "Camera/Support/CameraCoordinator.swift",
-                "Camera/Support/CameraPreviewAdapter.swift",
                 "Camera/Support/CameraRuntimePorts.swift",
                 "Camera/Support/CameraStorageFactory.swift",
                 "Camera/Support/README.md",
@@ -552,10 +548,8 @@ let package = Package(
                 "Agents/Support/GatewayCameraResources.swift",
                 "Agents/Support/HistoryAgentAdapter.swift",
                 "Agents/Support/InteractionServices.swift",
-                "Agents/Support/MediaInputAdapter.swift",
                 "Agents/Support/README.md",
                 "Agents/Support/RuntimeDependencies.swift",
-                "Agents/Support/VisionSession.swift",
                 "Agents/Support/VoiceSessionCoordinator.swift",
                 "Agents/VisionPerception/README.md",
                 "App",
@@ -618,7 +612,7 @@ let package = Package(
             name: "AppStorage",
             dependencies: [
                 "Storage", "StorageCore", "StorageState", "StorageCache", "StorageFiles", "StorageDatabase",
-                "StorageSQLite", .product(name: "FactoryKit", package: "Factory"),
+                "StorageSQLite", "PlatformKit", "UI", .product(name: "FactoryKit", package: "Factory"),
             ],
             path: "MobileHarness/App/Composition",
             exclude: ["README.md", "AppComposition.swift", "ModuleRegistration.swift", "ServiceFactories.swift"],

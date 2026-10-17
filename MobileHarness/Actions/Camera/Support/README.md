@@ -52,7 +52,7 @@ CameraControlError 区分 notForeground、busy、disabled、permissionDenied、u
 
 ## 相机执行集成
 
-ActionBindings 编译 CameraCoordinator、CameraRuntimePorts、CameraPreviewAdapter 和 CameraStorageFactory。CameraCoordinator 拥有拍摄、照片存储/处置、前台原生捕获和真实完成；CameraResourceAccess 注入租约仲裁，CameraVisionRunning 注入感知运行，两者都不带 Gateway/Agents 实现依赖。
+ActionBindings 编译 CameraCoordinator、CameraRuntimePorts 和 CameraStorageFactory。CameraCoordinator 拥有拍摄、照片存储/处置、前台原生捕获和真实完成；CameraResourceAccess 注入租约仲裁，帧连接回调注入感知接入，两者都不带 Gateway/Agents 实现依赖。
 
 CameraStorageFactory 选择最多 1024 张、2 GiB、evictOldest 的应用存储策略，组合根只注入仓库和根路径。PhotoDispositionWorkflow 是 Actions 核心的提交/反馈组合，不负责 Agent 决策。通用最新感知替换属于 PlatformKit/Vision。shutdown 加入命令和捕获清理，并要求确认 native camera 已停止，否则向根生命周期传播失败。
 
@@ -71,3 +71,17 @@ CameraStorageFactory 选择最多 1024 张、2 GiB、evictOldest 的应用存储
 ✅ CameraCoordinator 通过应用作用域的唯一写端口发布 camera 的有限公开事实；running 来自原生会话确认，不使用预览隐藏表示物理停机。CameraState.present 的同步回调只用于触发拥有者投影，照片预览引用仅在可操作时公开。发布失败记录原始错误并失效公开视图；资源、权限和执行围栏仍独立校验。
 
 [公开 State 契约](../../../Storage/State/README.md)
+
+## Platform 根、设备接入与独立影像/姿态呈现
+
+✅ CameraCoordinator 只接收 App 供应的相机、照片导入、提示音和帧连接回调。Frame 连接回调不创建原生设备，所属 Agents 根管理感知角色；CameraResourceAccess 仍隔离资源租约。相机不绑定原生预览层，不依赖感知角色实现。
+
+✅ 呈现端点核对 Vision 会话、前台与单调序号，将 Tool 的同帧附件用于验证 Pose，再更新 UI 自有骨架；没有有效附件明确失败，不影响独立影像订阅。原生事件通过注入端口交给 Gateway，同时保留即时设备失效和业务错误呈现。
+
+## 相机与姿态独立输出修复
+
+✅ CameraCoordinator 在受生命周期管理的任务中独立订阅容量为一的最新原生帧，直接提交 UI 自有图像值；YOLO 继续通过 Gateway 与 Pose Tool 更新骨架。模型启动、失败、空检测和超时不清除实时影像。图像与骨架分别按捕获时间在 750 ms 后失效；停机、换镜头和后台取消并加入两个任务，清除旧会话。骨架使用最新有效结果，沿用相同几何/镜像变换，不再要求与当前预览帧序号相同；仍验证 Tool 自带的原始帧、会话及单调序号。真实进程崩溃不在此故障隔离范围。
+
+## UI 容器与相机能力注入
+
+✅ CameraCoordinator 接收 CameraCapturing、CameraPresenting；帧/姿态到 UI 值的转换仍在本目录，无额外帧适配层。CameraIntegrationBindings 提供 Agent 资源/事件/视觉回调，App 工厂仅连接它们，保留惰性创建且无默认状态构造。

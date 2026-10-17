@@ -24,10 +24,19 @@ public final class ActionActivityWorkflow: ExecutionFailureReporting {
         title: String, source: String, message: String, failureCode: String? = nil,
         context: ExecutionIssue.Context? = nil
     ) {
+        recordFailure(
+            title: title, source: source, message: message, failureCode: failureCode,
+            context: context, diagnostic: nil)
+    }
+    public func recordFailure(
+        title: String, source: String, message: String, failureCode: String? = nil,
+        context: ExecutionIssue.Context? = nil, diagnostic: AgentFailureDiagnostic?
+    ) {
         state.recordIssue(
             .init(
                 title: title, source: source, message: message, failureCode: failureCode, context: context,
-                userMessage: Self.userMessage(source: source, message: message, code: failureCode)))
+                userMessage: Self.userMessage(source: source, message: message, code: failureCode),
+                category: diagnostic.map { Self.categoryTitle($0.category) }))
     }
     private static func userMessage(source: String, message: String, code: String? = nil) -> String? {
         switch code {
@@ -40,6 +49,12 @@ public final class ActionActivityWorkflow: ExecutionFailureReporting {
         case "agent.model.httpStatus", "agent.model.provider": return "模型服务请求失败，本次回复已中止"
         case let code? where code.hasPrefix("agent.model."): return "模型响应格式异常，本次回复已中止"
         case let code? where code.hasPrefix("agent.generation."): return "模型输出的指令格式异常，本次回复已中止"
+        case "vision.pose.failed", "vision.pipeline.failed", "vision.input.failed":
+            return "姿态识别已停止，请查看日志后重试"
+        case "vision.presentation.failed": return "姿态绘制失败，请查看日志"
+        case "vision.pose.stalled": return "姿态推理长时间未返回，实时影像仍可用"
+        case "vision.pose.stale": return "姿态结果持续超时，请查看日志"
+        case "vision.input.stalled": return "姿态识别未收到相机帧，请查看日志"
         case "agent.runtime.failed": return "对话处理失败，请查看日志"
         case "agent.context.publication": return "对话上下文更新失败，本次回复已中止"
         default:

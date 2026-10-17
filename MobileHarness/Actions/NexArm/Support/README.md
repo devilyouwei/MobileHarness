@@ -125,3 +125,5 @@ ActionBindings 编译 NexArmControlService、NexArmConnectionState、BluetoothRe
 ✅ NexArmControlService 通过唯一写端口同步发布 robot.connected/controlAvailable。连接来自最新原生链路快照，可控制性还检查前台、恢复、接管和在途工作。状态及服务字段变化触发去重发布，失败记录原始错误并失效公开视图；不公开设备标识、连接句柄或队列。
 
 [公开 State 契约](../../../Storage/State/README.md)
+
+✅ 原生连接快照通过注入的 nativeObservation 端口提交 Gateway；业务状态转换和重连仍归本目录，投递失败保留为明确接入错误，不重放控制。

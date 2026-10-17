@@ -58,3 +58,7 @@ ActionBindings 编译 SpeechPlayback、ListeningActivationFeedback 和 VoiceNati
 ## Storage 依赖
 
 ✅ 存储访问使用独立的 State、Cache、Database 和 Files 接口；App 注册根实例，消费者通过构造器获得所需能力。存储容器不接管本目录的业务验证、执行和完成语义。
+
+## Platform 根、设备接入与同帧呈现
+
+✅ VoiceNativeEffects 的 IO、提示音和触觉由 AudioContainer 注入，不自行创建原生实例。提示音/触觉保留模块拥有的可取消任务；根停止加入这些任务，生产语音/诊断/检测的会话冲突由 AudioContainer 拒绝。

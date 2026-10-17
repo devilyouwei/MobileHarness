@@ -47,7 +47,7 @@ flowchart TB
 
 ## 接口与失败
 
-根图为 storage → agents → native。具体服务内部的 Agent 注册、配置事务、采集/播放、相机处置、蓝牙恢复和展示由模块实现。App 只调用公开方法，错误原样交给 UI 请求适配器的启动失败端口。
+根图为 storage / platform / ui → agents → native。具体服务内部的 Agent 注册、配置事务、采集/播放、相机处置、蓝牙恢复和展示由模块实现。App 只调用公开方法，错误原样交给 UI 请求适配器的启动失败端口。
 
 AppLifecycle 验证有限静态依赖图，保留原始启动错误及全部服务清理错误。后台先同步失效，再等待异步暂停/清理；取消和物理停止分别确认。停止失败阻止新图替换。模块根任务独立于页面；物理安全不依赖后台任务额度。
 
@@ -59,7 +59,7 @@ AppLifecycle 验证有限静态依赖图，保留原始启动错误及全部服�
 
 ## Storage 生命周期收敛
 
-✅ ServiceFactories 只调用 ApplicationContainer 创建未启动的 StorageContainer，注入延迟领域仓库接口。ModuleRegistration 注册 storage → agents → native，绑定 start/stop；不再创建数据库目录、执行恢复或注册空停止。重试等待旧 Storage 关闭成功，业务终态写入先于存储停止。Scene 非活跃不关闭存储。
+✅ ServiceFactories 只调用 ApplicationContainer 创建未启动的 StorageContainer，注入延迟领域仓库接口。ModuleRegistration 注册 storage / platform / ui → agents → native，绑定 start/stop；不再创建数据库目录、执行恢复或注册空停止。重试等待旧 Storage 关闭成功，业务终态写入先于存储停止。Scene 非活跃不关闭存储。
 
 ## 待实现
 
@@ -69,10 +69,18 @@ AppLifecycle 验证有限静态依赖图，保留原始启动错误及全部服�
 
 ✅ 存储访问使用独立的 State、Cache、Database 和 Files 接口；App 注册根实例，消费者通过构造器获得所需能力。存储容器不接管本目录的业务验证、执行和完成语义。
 
-AppStorage 目标只编译 Composition/ApplicationContainer.swift，使用 FactoryKit 实例内缓存；业务目标不导入 IoC。Services 持有注册容器和 StorageContainer，连接所需子接口。模型后台事件只转交 ArtifactServices；存储停止前先加入其制品清理。
+AppStorage 目标只编译 Composition/ApplicationContainer.swift，使用 FactoryKit 实例内缓存；业务目标不导入 IoC。Services 持有注册容器、StorageContainer、PlatformContainer 和 UIContainer，连接所需子接口。模型后台事件只转交 ArtifactServices；存储停止前先加入其制品清理。
 
 ## 公开 State 边界
 
 ✅ App 只创建并注入 Storage 根及子能力、调度生命周期。公开 State 声明、事实转换与会话投影由业务模块/集成拥有者安装；App 不维护 Camera/Robot/Task 业务字段。
 
 [公开 State 契约](../Storage/State/README.md)
+
+## Platform 根、设备接入与同帧呈现
+
+✅ Services 持有实例级 PlatformContainer，向集成层注入 Audio/Vision 子能力和原生设备端口。AppLifecycle 管理 platform 的 start/invalidate/foreground/stop；业务接入依赖 storage 与 platform，先结束消费与业务作用域，再释放根。App 不转换帧、PCM 或 Pose。
+
+## UI 容器与相机能力注入
+
+✅ App 注册 UI 根及相机子能力，提供唯一 CameraCoordinator 工厂，注入相机与 UI 呈现接口及延迟 Agent 接入回调。App 不转换帧或 Pose；生命周期图为 storage/platform/ui → agents → native。

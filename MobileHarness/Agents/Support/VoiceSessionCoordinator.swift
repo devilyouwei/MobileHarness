@@ -1,6 +1,5 @@
 #if os(iOS)
     import ActionBindings
-    import AVFAudio
     import Actions
     import AgentCore
     import Agents
@@ -43,7 +42,7 @@
         private var startupTask: Task<Void, Error>?
         private var startupID: String?
         private var listeningIntentTask: Task<Void, Never>?
-        private lazy var nativeEffects = VoiceNativeEffects(audio: audio, state: state)
+        private lazy var nativeEffects = VoiceNativeEffects(audio: audio, state: state, cue: cue, haptic: haptic)
         private var voiceGeneration: String? {
             didSet {
                 if voiceGeneration == nil {
@@ -53,6 +52,8 @@
                 }
             }
         }
+        private let cue: NativeCuePlayback
+        private let haptic: NativeHapticFeedback
         private let audio: AppleAudioIO
         private let voiceActivity: any VoiceActivityCapability
         private let recognition: any SpeechRecognitionCapability
@@ -73,7 +74,6 @@
         private var speechAudioStore: AudioCache?
         private var speech: SpeechPerceptionAgent?
         private var responses: OutputGateway?
-        private var interruptionTask: Task<Void, Never>?
         private var routeTask: Task<Void, Never>?
         private var cleanupTask: Task<Void, Never>?
         private var listeningRevision: UInt64 = 0
@@ -91,13 +91,16 @@
 
         init(
             runtime: VoiceRuntimeDependencies, state: ConversationState,
-            audio: AppleAudioIO, recognition: any SpeechRecognitionCapability,
+            audio: AppleAudioIO, cue: NativeCuePlayback, haptic: NativeHapticFeedback,
+            recognition: any SpeechRecognitionCapability,
             synthesis: any SpeechSynthesisCapability,
             voiceActivity: any VoiceActivityCapability
         ) {
             self.runtime = runtime
             self.state = state
             runtime.presentation.homeEffects.bind(state)
+            self.cue = cue
+            self.haptic = haptic
             self.audio = audio
             self.recognition = recognition
             self.synthesis = synthesis
@@ -222,28 +225,21 @@
                     presentationPhase = handlingTurn ? .processing : .listening
                     state.voiceStatus = handlingTurn ? "正在回复 · 聆听已暂停" : "正在聆听 · 停顿后自动识别"
                 }
-                interruptionTask = Task { [weak self] in
-                    for await _ in NotificationCenter.default.notifications(
-                        named: AVAudioSession.interruptionNotification)
-                    {
-                        guard !Task.isCancelled, let self, self.voiceGeneration == generation else { return }
-                        self.stopVoice(message: "音频被系统中断，请按住双眼重新开始")
-                        return
-                    }
-                }
+                let events = try audio.subscribeEvents()
                 routeTask = Task { [weak self] in
-                    for await notification in NotificationCenter.default.notifications(
-                        named: AVAudioSession.routeChangeNotification)
-                    {
-                        guard !Task.isCancelled, let self, self.voiceGeneration == generation else { return }
-                        // Ignore the category update made by our own startCapture setup.
-                        if let raw = notification.userInfo?[AVAudioSessionRouteChangeReasonKey] as? UInt,
-                            AVAudioSession.RouteChangeReason(rawValue: raw) == .categoryChange
-                        {
-                            continue
+                    do {
+                        for try await event in events {
+                            guard !Task.isCancelled, let self, self.voiceGeneration == generation else { return }
+                            try await self.runtime.input.publish(
+                                DeviceInputAdapter.audioEvent(event, sessionID: generation))
+                            self.stopVoice(
+                                message: event == .interrupted
+                                    ? "音频被系统中断，请按住双眼重新开始" : "音频设备已变化，请按住双眼重新开始")
+                            return
                         }
-                        self.stopVoice(message: "音频设备已变化，请按住双眼重新开始")
-                        return
+                    } catch {
+                        guard let self, self.voiceGeneration == generation else { return }
+                        self.stopVoice(message: "音频事件接入失败：\(error)")
                     }
                 }
             } catch {
@@ -356,14 +352,11 @@
                             self.state.microphoneSpectrum = AudioSpectrum.silence
                             continue
                         }
-                        let audioInput = try AudioInput(
-                            samples: frame.samples.withUnsafeBytes { Data($0) }, sampleRate: frame.sampleRate,
-                            sequence: self.captureSequence, timestamp: frame.timestamp,
-                            layout: frame.layout == .mono ? .mono : .firstOrderAmbisonicsACNSN3D,
-                            capturedAt: frame.capturedAt)
+                        let audioInput = try DeviceInputAdapter.audio(
+                            frame, sessionID: generation, sequence: self.captureSequence)
                         self.captureSequence += 1
                         do {
-                            try await requests.publish(MediaInputAdapter.audio(audioInput, sessionID: generation))
+                            try await requests.publish(audioInput)
                         } catch is CancellationError { throw CancellationError() } catch {
                             // Local publication validation failure is diagnostic; the microphone stays active.
                             self.state.voiceStatus = "音频输入异常：\(error)"
@@ -644,10 +637,14 @@
             let previousCleanup = cleanupTask
             let previousSpeech = speech
             let previousPause = listeningPause
+            let previousEvents = routeTask
+            routeTask = nil
+            previousEvents?.cancel()
             listeningPause = nil
             previousPause?.cancel()
             cleanupTask = Task {
                 await previousCleanup?.value
+                await previousEvents?.value
                 await microphone.stop()
                 _ = try? await previousStartup?.value
                 await previousSpeech?.closeCapture()
@@ -661,8 +658,6 @@
                 }
             }
             captureTask?.cancel()
-            interruptionTask?.cancel()
-            interruptionTask = nil
             routeTask?.cancel()
             routeTask = nil
             state.microphoneSpectrum = AudioSpectrum.silence

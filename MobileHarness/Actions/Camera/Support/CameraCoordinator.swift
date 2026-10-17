@@ -26,10 +26,13 @@
         private var leaseRenewal: Task<Void, Never>?
         private var eventSequence: UInt64 = 0
         private(set) var captureEvent: ActivityEvent?
-        public let preview: CameraPreviewSource
-        public let state: CameraState
+        private let presentation: any CameraPresenting
+        private var state: CameraPresentationSnapshot { presentation.snapshot }
         private var gazeSequence: UInt64?
-        private let makeSession: () async throws -> any CameraVisionRunning
+        private let connectFrames:
+            @MainActor (
+                AsyncThrowingStream<CameraFrame, Error>, String, Bool, any CameraOutputHandling
+            ) async throws -> Void
         private struct VisionIntent: Sendable {
             let frames: AsyncThrowingStream<CameraFrame, Error>
             let revision: Int
@@ -41,7 +44,7 @@
         private var hotSwitchRevision: Int?
         private var visionSession: String?
         private let log = Logger(subsystem: "dev.mobileharness", category: "CameraPipeline")
-        private let camera: AppleCamera
+        private let camera: any CameraCapturing
         private var foreground = false
         private var failed = false
         private var revision = 0
@@ -51,23 +54,33 @@
         private var photoOwner: (id: String, owner: StorageOwner)?
         private let photos: CapturedPhotoStore
         private var presentationFinished: (id: String, success: Bool)?
-        private let photoCues = NativeCuePlayback()
+        private let saveJPEG: @Sendable (Data) async throws -> Void
+        private let nativeEvent: @Sendable (CameraEvent) async throws -> Void
+        private let photoCues: NativeCuePlayback
         private var photoFeedbackContext: ActionExecutionContext?
 
         public init(
-            camera: AppleCamera, state: CameraState, photos: CapturedPhotoStore,
+            camera: any CameraCapturing, presentation: any CameraPresenting, photos: CapturedPhotoStore,
+            photoCues: NativeCuePlayback,
+            saveJPEG: @escaping @Sendable (Data) async throws -> Void,
+            nativeEvent: @escaping @Sendable (CameraEvent) async throws -> Void,
             makeRuntime: @escaping () throws -> CameraRuntimeDependencies,
-            makeSession: @escaping () async throws -> any CameraVisionRunning
+            connectFrames:
+                @escaping @MainActor (
+                    AsyncThrowingStream<CameraFrame, Error>, String, Bool, any CameraOutputHandling
+                ) async throws -> Void
         ) {
+            self.saveJPEG = saveJPEG
+            self.nativeEvent = nativeEvent
+            self.photoCues = photoCues
             self.captureOwner = ExecutionOwner(
                 agent: Self.resourceOwnerID, incarnation: UUID().uuidString,
                 sessionID: UUID().uuidString)
             self.makeRuntime = makeRuntime
-            self.state = state
-            self.makeSession = makeSession
+            self.presentation = presentation
+            self.connectFrames = connectFrames
             self.camera = camera
             self.photos = photos
-            preview = camera.preview
         }
 
         public struct PublicFacts: Encodable, Sendable, Equatable {
@@ -100,7 +113,7 @@
             guard publicFacts == nil else { throw StateError.duplicate }
             publicFacts = try scope.register(
                 StateKey("camera"), initial: PublishedState<PublicFacts>(availability: .unknown))
-            state.connectFactsObserver { [weak self] in self?.publishPublicFacts() }
+            presentation.connectFactsObserver { [weak self] in self?.publishPublicFacts() }
             publishPublicFacts()
             if let publicStateFailure { throw publicStateFailure }
         }
@@ -156,10 +169,10 @@
                     mediaID: selected.id, state: .ignored, feedbackIssues: issues.isEmpty ? nil : issues)
             }
             photoCommand = task
-            state.present(.photoBusy(true))
+            presentation.present(.photoBusy(true))
             defer {
                 photoCommand = nil
-                state.present(.photoBusy(false))
+                presentation.present(.photoBusy(false))
             }
             return try await withTaskCancellationHandler {
                 try await task.value
@@ -177,21 +190,21 @@
             }
             let selected = try selectedPhoto(id)
             guard let photo = state.capturedPhoto else { throw CameraControlError.photoUnavailable }
-            state.present(.photoBusy(true))
-            state.present(.photoMessage("正在保存到相册…"))
+            presentation.present(.photoBusy(true))
+            presentation.present(.photoMessage("正在保存到相册…"))
             let task = Task<CameraPhotoCommandReceipt, Error> {
                 let issues = try await departPhoto(photo, kind: .save, invocation: invocation) { [self] in
                     let data = try await photos.read(selected.id, owner: selected.owner)
                     try Task.checkCancellation()
                     guard foreground, state.capturedPhoto?.id == selected.id else { throw CancellationError() }
-                    do { try await ApplePhotoLibrary.saveJPEG(data) } catch ApplePhotoLibrary.Failure.permissionDenied {
+                    do { try await saveJPEG(data) } catch ApplePhotoLibrary.Failure.permissionDenied {
                         throw CameraControlError.permissionDenied
                     } catch ApplePhotoLibrary.Failure.invalidImage {
                         throw CameraControlError.photoUnavailable
                     }
                     // An actual import remains committed if feedback subsequently fails or is cancelled.
-                    state.present(.savedMediaID(selected.id))
-                    state.present(.photoMessage("已保存到相册"))
+                    presentation.present(.savedMediaID(selected.id))
+                    presentation.present(.photoMessage("已保存到相册"))
                 }
                 return CameraPhotoCommandReceipt(
                     mediaID: selected.id, state: .saved, feedbackIssues: issues.isEmpty ? nil : issues)
@@ -199,7 +212,7 @@
             photoCommand = task
             defer {
                 photoCommand = nil
-                state.present(.photoBusy(false))
+                presentation.present(.photoBusy(false))
             }
             do {
                 return try await withTaskCancellationHandler {
@@ -208,7 +221,7 @@
                     task.cancel()
                 }
             } catch {
-                state.present(
+                presentation.present(
                     .photoMessage(
                         state.savedMediaID == selected.id
                             ? "已保存到相册，退场反馈已中断" : "保存失败：" + error.localizedDescription))
@@ -244,9 +257,9 @@
                 },
                 remove: { [self] in
                     guard state.capturedPhoto?.id == photo.id else { return }
-                    state.present(.capturedPhoto(nil))
+                    presentation.present(.capturedPhoto(nil))
                     photoOwner = nil
-                    state.present(.photoMessage(nil))
+                    presentation.present(.photoMessage(nil))
                 })
             if !issues.isEmpty { log.error("照片已处理，退场反馈异常：\(issues.joined(separator: "; "), privacy: .public)") }
             return issues
@@ -275,7 +288,8 @@
             guard state.isVisible, captureLease != nil else { throw CameraControlError.unavailable }
             let expectedRevision = revision
             let task = Task<CameraPhotoReceipt, Error> {
-                let data = try await camera.capturePhoto(rotation: preview.captureRotation)
+                let rotation = await camera.captureRotation
+                let data = try await camera.capturePhoto(rotation: rotation)
                 try Task.checkCancellation()
                 guard foreground, state.isVisible, revision == expectedRevision else { throw CancellationError() }
                 guard let image = UIImage(data: data), image.size.width > 0, image.size.height > 0 else {
@@ -293,9 +307,9 @@
                 guard foreground, revision == expectedRevision else { throw CancellationError() }
                 presentationFinished = nil
                 photoOwner = (id, owner)
-                state.present(.savedMediaID(nil))
-                state.present(.photoMessage(nil))
-                state.present(
+                presentation.present(.savedMediaID(nil))
+                presentation.present(.photoMessage(nil))
+                presentation.present(
                     .capturedPhoto(
                         CapturedPhotoPresentation(id: id, image: image) { [weak self] success in
                             guard let self, self.state.capturedPhoto?.id == id else { return }
@@ -314,17 +328,17 @@
                     return receipt
                 } catch {
                     if state.capturedPhoto?.id == id {
-                        state.present(.capturedPhoto(nil))
+                        presentation.present(.capturedPhoto(nil))
                         photoOwner = nil
                     }
                     throw error
                 }
             }
             photoTask = task
-            state.present(.photoBusy(true))
+            presentation.present(.photoBusy(true))
             defer {
                 photoTask = nil
-                state.present(.photoBusy(false))
+                presentation.present(.photoBusy(false))
             }
             return try await withTaskCancellationHandler {
                 let result = try await task.value
@@ -338,8 +352,8 @@
         public func pauseVisionForModelMaintenance() async {
             visionSession = nil
             await visionRestart.stop()
-            state.present(.skeleton(nil))
-            state.present(.visionMessage("姿态模型已停用，可在设置中重新下载"))
+            presentation.clearPose()
+            presentation.present(.visionMessage("姿态模型已停用，可在设置中重新下载"))
         }
 
         /// Tool calls reject overlap rather than replacing another command's intent.
@@ -355,10 +369,10 @@
                     return
                 }
             }
-            state.present(.isEnabled(enabled))
+            presentation.present(.isEnabled(enabled))
             failed = false
-            state.present(.message(nil))
-            state.present(.needsSettings(false))
+            presentation.present(.message(nil))
+            presentation.present(.needsSettings(false))
             reconcile()
             try await finishCameraControl(enabled: enabled)
         }
@@ -373,10 +387,10 @@
                 try await finishCameraControl(enabled: true)
                 return
             }
-            state.present(.facing(target))
+            presentation.present(.facing(target))
             failed = false
-            state.present(.message(nil))
-            state.present(.needsSettings(false))
+            presentation.present(.message(nil))
+            presentation.present(.needsSettings(false))
             reconcile(hotSwitch: state.isVisible && captureLease != nil)
             try await finishCameraControl(enabled: true)
         }
@@ -405,7 +419,7 @@
         }
         public func retry() {
             failed = false
-            state.present(.message(nil))
+            presentation.present(.message(nil))
             reconcile()
         }
 
@@ -429,22 +443,23 @@
         public func observe() async {
             for await event in camera.events {
                 if Task.isCancelled { break }
+                do { try await nativeEvent(event) } catch { presentation.present(.visionMessage("相机事件接入失败：\(error)")) }
                 confirmedRunning = await camera.isRunning()
                 guard state.isEnabled, foreground else { continue }
                 switch event {
                 case .interrupted:
                     visionSession = nil
-                    state.present(.skeleton(nil))
-                    state.present(.gaze(.zero))
+                    presentation.clearPose()
+                    presentation.present(.gaze(.zero))
                     gazeSequence = nil
                     visionRestart.invalidate()
-                    state.present(.isVisible(false))
-                    state.present(.message("相机暂时被占用"))
+                    presentation.present(.isVisible(false))
+                    presentation.present(.message("相机暂时被占用"))
                 case .interruptionEnded:
                     reconcile()
                 case .failed:
                     failed = true
-                    state.present(.message("相机暂时不可用，请重试"))
+                    presentation.present(.message("相机暂时不可用，请重试"))
                     reconcile()
                 }
             }
@@ -460,15 +475,15 @@
             hotSwitchRevision = hotSwitch ? revision : nil
             photoTask?.cancel()
             photoCommand?.cancel()
-            state.present(.isVisible(false))
-            state.present(.skeleton(nil))
-            state.present(.gaze(.zero))
+            presentation.present(.isVisible(false))
+            presentation.clearPose()
+            presentation.present(.gaze(.zero))
             gazeSequence = nil
-            state.present(.visionMessage(nil))
+            presentation.present(.visionMessage(nil))
             visionSession = nil
             visionRestart.invalidate()
             guard worker == nil else { return }
-            state.present(.isBusy(true))
+            presentation.present(.isBusy(true))
             worker = Task { await applyLatestIntent() }
         }
 
@@ -476,29 +491,65 @@
             guard foreground, state.isEnabled, state.isVisible, revision == intent.revision else { return nil }
             let id = UUID().uuidString
             visionSession = id
+            presentation.present(.visionMessage("姿态识别准备中"))
             let mirrored = intent.mirrored
             return Task { [weak self] in
+                guard let self else { return }
                 do {
-                    let session = try await self?.makeSession()
+                    let preview = try await self.camera.subscribeFrames()
                     try Task.checkCancellation()
-                    guard let self, let session else { throw CancellationError() }
-                    try await session.run(
-                        frames: intent.frames, sessionID: id,
-                        mirroredGaze: mirrored, endpoint: self)
+                    async let cameraOutput: Void = self.runPreview(preview, sessionID: id)
+                    async let poseOutput: Void = self.runPose(intent, sessionID: id, mirrored: mirrored)
+                    // Model completion does not cancel the independent camera subscription.
+                    _ = await (cameraOutput, poseOutput)
                 } catch is CancellationError {} catch {
-                    guard let self, self.visionSession == id else { return }
-                    self.state.present(.skeleton(nil))
-                    self.state.present(.gaze(.zero))
-                    self.gazeSequence = nil
-                    self.state.present(.visionMessage("姿态识别暂不可用，请重试"))
-                    self.log.error("Pose pipeline failed: \(String(describing: error), privacy: .private)")
+                    guard self.visionSession == id else { return }
+                    self.presentation.present(.message("相机画面订阅失败，请重试"))
                 }
+            }
+        }
+        private func runPreview(_ frames: AsyncThrowingStream<CameraFrame, Error>, sessionID: String) async {
+            do {
+                for try await frame in frames {
+                    try Task.checkCancellation()
+                    guard visionSession == sessionID, foreground, state.isEnabled, state.isVisible else { return }
+                    do { try presentation.presentVideo(Self.displayFrame(frame)) } catch CameraFramePresentationError
+                        .stale
+                    {
+                        continue
+                    }
+                }
+            } catch is CancellationError {} catch {
+                guard visionSession == sessionID else { return }
+                presentation.clearFrame()
+                presentation.present(.message("相机画面暂不可用，请重试"))
+                log.error("Camera preview failed: \(String(describing: error), privacy: .private)")
+            }
+        }
+        private func runPose(_ intent: VisionIntent, sessionID: String, mirrored: Bool) async {
+            do {
+                try Task.checkCancellation()
+                try await connectFrames(intent.frames, sessionID, mirrored, self)
+            } catch is CancellationError {} catch {
+                guard visionSession == sessionID else { return }
+                presentation.clearPose()
+                presentation.present(.gaze(.zero))
+                gazeSequence = nil
+                presentation.present(.visionMessage("姿态识别暂不可用，请重试"))
+                log.error("Pose pipeline failed: \(String(describing: error), privacy: .private)")
+            }
+        }
+        private static func displayFrame(_ frame: CameraFrame) -> UI.CameraVideoFrame {
+            frame.withPixelBuffer {
+                UI.CameraVideoFrame(
+                    pixels: $0, width: frame.width, height: frame.height,
+                    rotation: frame.rotation, sequence: frame.sequence, capturedAt: frame.capturedAt)
             }
         }
         public func visionStatus(_ message: String?, sessionID: String) {
             guard visionSession == sessionID, foreground, state.isEnabled else { return }
-            state.present(.visionMessage(message))
-            if message != nil { state.present(.skeleton(nil)) }
+            presentation.present(.visionMessage(message))
+            if message != nil { presentation.clearPose() }
         }
         public func present(_ target: UIActions.Gaze, invocation: any FunctionInput) throws {
             try Task.checkCancellation()
@@ -507,10 +558,10 @@
             }
             guard gazeSequence.map({ invocation.context.sequence > $0 }) ?? true else { return }
             gazeSequence = invocation.context.sequence
-            state.present(.gaze(CGSize(width: target.x, height: target.y)))
+            presentation.present(.gaze(CGSize(width: target.x, height: target.y)))
         }
 
-        public func present(_ overlay: Actions.PoseOverlay, sessionID: String) throws {
+        public func present(_ overlay: Actions.PoseOverlay, frame: CameraFrame?, sessionID: String) throws {
             try Task.checkCancellation()
             guard visionSession == sessionID, foreground, state.isEnabled, state.isVisible else {
                 throw CancellationError()
@@ -518,22 +569,26 @@
             guard state.skeleton.map({ overlay.sequence > $0.sequence }) ?? true else {
                 throw CommunicationError.outOfOrder
             }
-            state.present(
-                .skeleton(
-                    UI.PoseOverlay(
-                        sequence: overlay.sequence, timestamp: overlay.timestamp, rotation: overlay.rotation,
-                        people: overlay.people.map {
-                            $0.map { UI.PoseOverlay.Joint(x: $0.x, y: $0.y, confidence: $0.confidence) }
-                        },
-                        statistics: overlay.statistics.map {
-                            UI.PoseOverlay.Statistics(
-                                queueMilliseconds: $0.queueMilliseconds,
-                                inferenceMilliseconds: $0.inferenceMilliseconds,
-                                totalMilliseconds: $0.totalMilliseconds, framesPerSecond: $0.framesPerSecond,
-                                replacements: $0.replacements,
-                                detectionIntervalMilliseconds: $0.detectionIntervalMilliseconds,
-                                imageMotion: $0.imageMotion)
-                        })))
+            guard let frame, frame.sequence == overlay.sequence, frame.rotation == overlay.rotation else {
+                throw CameraFramePresentationError.stale
+            }
+            try presentation.present(
+                frame: Self.displayFrame(frame),
+                pose: UI.PoseOverlay(
+                    sequence: overlay.sequence, timestamp: overlay.timestamp, rotation: overlay.rotation,
+                    people: overlay.people.map {
+                        $0.map { UI.PoseOverlay.Joint(x: $0.x, y: $0.y, confidence: $0.confidence) }
+                    },
+                    statistics: overlay.statistics.map {
+                        UI.PoseOverlay.Statistics(
+                            queueMilliseconds: $0.queueMilliseconds,
+                            inferenceMilliseconds: $0.inferenceMilliseconds,
+                            totalMilliseconds: $0.totalMilliseconds, framesPerSecond: $0.framesPerSecond,
+                            replacements: $0.replacements,
+                            detectionIntervalMilliseconds: $0.detectionIntervalMilliseconds,
+                            imageMotion: $0.imageMotion)
+                    }))
+            presentation.present(.visionMessage(nil))
         }
 
         private func recordCapture(_ state: ActivityEvent.State, id: String) {
@@ -570,7 +625,7 @@
                         } catch {
                             self.recordCapture(.revoked, id: lease.id)
                             self.failed = true
-                            self.state.present(.message("相机控制已结束，请重试"))
+                            self.presentation.present(.message("相机控制已结束，请重试"))
                             self.reconcile()
                             return
                         }
@@ -612,15 +667,15 @@
             confirmedRunning = await camera.isRunning()
             recordCapture(.failed, id: lease.id)
             failed = true
-            state.present(.isVisible(false))
-            state.present(.message("相机尚未确认停止，请重试"))
+            presentation.present(.isVisible(false))
+            presentation.present(.message("相机尚未确认停止，请重试"))
             return false
         }
 
         private func applyLatestIntent() async {
             defer {
                 worker = nil
-                state.present(.isBusy(false))
+                presentation.present(.isBusy(false))
             }
             while true {
                 let current = revision
@@ -641,9 +696,9 @@
                         let elapsed = switchingStarted.duration(to: .now).components
                         let milliseconds = Double(elapsed.seconds) * 1_000 + Double(elapsed.attoseconds) / 1e15
                         log.debug("Native lens switch acknowledged in \(milliseconds, privacy: .public) ms")
-                        state.present(.isVisible(true))
-                        state.present(.message(nil))
-                        state.present(.needsSettings(false))
+                        presentation.present(.isVisible(true))
+                        presentation.present(.message(nil))
+                        presentation.present(.needsSettings(false))
                         visionRestart.replace(
                             with: VisionIntent(frames: frames, revision: current, mirrored: facing == .front))
                         return
@@ -653,7 +708,7 @@
                         _ = await stopCapture()
                         await visionRestart.stop()
                         guard current == revision else { continue }
-                        state.present(.message("无法切换镜头，请重试"))
+                        presentation.present(.message("无法切换镜头，请重试"))
                         return
                     }
                 }
@@ -663,7 +718,7 @@
                 if !state.isEnabled || !foreground || failed {
                     _ = await stopCapture()
                 } else {
-                    let authorized = await AppleCamera.requestPermission()
+                    let authorized = await camera.requestPermission()
                     // Permission prompts may suspend/deactivate the scene or outlive a user stop.
                     guard current == revision else { continue }
                     if authorized {
@@ -672,9 +727,9 @@
                             let running = await camera.isRunning()
                             confirmedRunning = running
                             if current == revision {
-                                state.present(.isVisible(running))
-                                state.present(.message(running ? nil : "相机暂时不可用，请重试"))
-                                state.present(.needsSettings(false))
+                                presentation.present(.isVisible(running))
+                                presentation.present(.message(running ? nil : "相机暂时不可用，请重试"))
+                                presentation.present(.needsSettings(false))
                                 if running {
                                     visionRestart.replace(
                                         with: VisionIntent(
@@ -684,7 +739,7 @@
                         } catch {
                             _ = await stopCapture()
                             if current == revision {
-                                state.present(
+                                presentation.present(
                                     .message(
                                         (error as? CameraError) == .unavailable
                                             ? "此设备没有可用的摄像头" : "无法开启相机，请重试"))
@@ -693,8 +748,8 @@
                     } else {
                         _ = await stopCapture()
                         if current == revision {
-                            state.present(.message("请在设置中允许相机访问"))
-                            state.present(.needsSettings(true))
+                            presentation.present(.message("请在设置中允许相机访问"))
+                            presentation.present(.needsSettings(true))
                         }
                     }
                 }

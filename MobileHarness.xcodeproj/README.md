@@ -144,3 +144,9 @@ Storage 四类容器通过本地 HarnessKit 产品暴露，AppStorage 单独编�
 ✅ StorageState 仅承载公开事实；边界检查禁止完整 AgentContext 注册，校验 Skill schema v2/useState。沿用现有源码归属及目标，ActionBindings 显式依赖 StorageState。
 
 [公开 State 契约](../MobileHarness/Storage/State/README.md)
+
+✅ Platform 容器、设备输入和同帧渲染文件更新导航引用；移除已删除的媒体适配、VisionSession 与原生预览引用，SwiftPM 仍唯一编译这些源码。
+
+## UI 容器与相机能力注入
+
+✅ 导航加入 UIContainer、UICameraContainer 和 CameraCapturing，均只由现有 SwiftPM 目标编译；不新增目录、目标或本地签名配置。

@@ -87,7 +87,7 @@ flowchart TB
 
 Actions 核心的依赖和协议中立函数保持独立。ActionBindings 通过互斥源清单编译外层真实绑定，可依赖 UI、PlatformKit、ModelKit SDK、领域仓库、FunctionContracts、ExecutionRuntime、CallRuntime，以及 AgentCore 的中立执行身份/结果契约；不导入 Agents 或 Gateway 实现。
 
-BehaviorAssembly/BehaviorProtocolBindings 属于 ActionBindings，完整函数目录由业务模块组装后提供给组合根。RuntimePresentation 实现 Action 能力端口并调用 UI 公开能力；实际业务资格与会话围栏留在领域端点，UI 自己持有展示状态。相机执行通过注入的 CameraResourceAccess 使用租约，不导入 ResourceCoordinator；感知接入通过 CameraVisionRunning 注入。
+BehaviorAssembly/BehaviorProtocolBindings 属于 ActionBindings，完整函数目录由业务模块组装后提供给组合根。RuntimePresentation 实现 Action 能力端口并调用 UI 公开能力；实际业务资格与会话围栏留在领域端点，UI 自己持有展示状态。相机执行通过注入的 CameraResourceAccess 使用租约，不导入 ResourceCoordinator；感知接入通过帧连接回调注入。CameraCoordinator 独立订阅最新原生帧用于背景呈现，Pose Tool 只更新骨架；两路共享关闭/切换/后台清理边界，姿态失败不清除实时影像。
 
 NexArmControlService 持有不含 UI 类型的连接/执行状态，BluetoothWorkflow 只把完整事实投影为 UI.BluetoothViewSnapshot，并转交 UI 控制。VoiceNativeEffects 持有原生提示音/触觉/播放，ConversationPresentationController 持有呈现接纳；UI 持有真实动画回调。Provider、制品存储和背景传输接入属于 System；照片提交/可选反馈属于 Camera。App 不再转换这些数据或实现这些流程。
 
@@ -107,3 +107,11 @@ NexArmControlService 持有不含 UI 类型的连接/执行状态，BluetoothWor
 [公开 State 契约](../Storage/State/README.md)
 
 ✅ Implemented: ActionBindings adds the Action projection of five Skill query functions while retaining their direct Tool projections for fixed/isolated callers. Business handlers, return values, budgets and resources stay protocol-neutral.
+
+## Platform 根、设备接入与同帧呈现
+
+✅ 相机与语音执行端点使用 App 注入的原生能力，不在业务模块创建原生所有者。Pose 内部 Tool 可携带 Gateway 已验证的只读同帧附件，业务函数仍只访问 FunctionInput 和注入端口。
+
+## UI 容器与相机能力注入
+
+✅ CameraCoordinator 留在现有 ActionBindings 目标，构造改由 App 的唯一工厂提供；注入 CameraCapturing 与 CameraPresenting，以快照读展示事实，经呈现接口更新 UI，不查找 IoC、不持有具体 CameraState/AppleCamera。

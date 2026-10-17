@@ -63,3 +63,9 @@ ToolResult and both report contracts distinguish pure cancellation from real fai
 ## 分类异常诊断
 
 ✅ OutputEnvelope 增加可选 AgentFailureDiagnostic（类别、稳定代码、有界详情），OutputFailureRecord 保留同一诊断及 sessionID/roundID。中立契约不认识 ModelKit/Provider；非失败输出不得携带诊断。诊断详情最多2048字符，不改变执行路由。
+
+## Platform 根、设备接入与同帧呈现
+
+✅ OutputEnvelope 可按需持有 ImageInput 媒体附件，与原输入因果身份同行；不改变模型参数或序列化协议。仅需要同帧呈现的输出保留附件，邮箱替换/关闭和执行结束释放引用。
+
+✅ 邮箱关闭时释放有 replacement key 的状态快照；已接纳离散输出仍按原终态/排空语义保留。

@@ -33,3 +33,7 @@ NexArm transports and protocol values.
 ## 待实现
 
 - 暂无本目录独立的实现待办；跨模块及实际模型/设备验收见所属模块说明。
+
+## Platform 根、设备接入与同帧呈现
+
+✅ ConnectivityContainer 持有惰性驱动的 BLE 句柄，并在 macOS 提供最多一个显式打开的串口。构造/根 start/关闭未使用句柄均不初始化 CoreBluetooth。admission 关闭后拒绝新连接和写入；stop 关闭链路并检查断开确认，失败交回根。业务重连、运动语义和 UI 仍归 Actions 集成。

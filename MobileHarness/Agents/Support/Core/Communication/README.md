@@ -19,7 +19,7 @@ flowchart LR
  Gateway -->|Directed admission| Receiver[Target Agent]
  Receiver -->|Admission only| Receipt[CommunicationReceipt]
  Receipt --> Agent
- Gateway -->|One-way publication| Subscribers[Exact static subscribers]
+ Gateway -->|One-way publication| Subscribers[Exact static / host dynamic subscribers]
 ```
 
 ## Policy and provenance
@@ -52,4 +52,8 @@ Signal 默认没有过期时间；通信授权不附加隐式 TTL。实时感知
 
 ## 待实现
 
-- Dynamic subscriptions, remote serialization and durable delivery are not implemented.
+- Remote serialization and durable delivery are not implemented.
+
+## 动态订阅边界
+
+✅ Gateway 在不可变 CommunicationPolicy 的 schema/来源权限之上增加宿主控制的有界动态订阅；Core 不拥有运行时订阅表，动态关系不得扩展目标输入或发布者权限。

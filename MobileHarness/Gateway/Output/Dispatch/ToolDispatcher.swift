@@ -15,7 +15,8 @@ struct ToolDispatcher: Sendable {
         let execute: @Sendable () async throws -> ToolResponse? = {
             try await ResourceExecutionContext.$owner.withValue(owner) {
                 try await ToolExecutor(registry: registry).execute(
-                    call.executionRequest, context: envelope.executionContext, returning: envelope.roundID != nil)
+                    call.executionRequest, context: envelope.executionContext, returning: envelope.roundID != nil,
+                    attachment: try DeviceInputAdapter.executionAttachment(envelope.media, sequence: envelope.sequence))
             }
         }
         let result: ToolResponse?

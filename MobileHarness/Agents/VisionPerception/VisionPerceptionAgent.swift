@@ -4,6 +4,13 @@ import ModelKit
 import PlatformKit
 import StorageCore
 
+/// A bounded diagnostic snapshot; inspecting it never waits for native inference.
+public struct VisionPerceptionHealth: Sendable {
+    public let diagnostic: AgentFailureDiagnostic?
+    public let inputID: String?
+    public let sequence: UInt64?
+}
+
 /// Shared visual perception: one model operation and one newest pending frame, publishes shared observations, skeleton visualization and face-driven gaze Tools.
 public actor VisionPerceptionAgent: Agent {
 
@@ -27,6 +34,9 @@ public actor VisionPerceptionAgent: Agent {
     public private(set) var gazeReplacements = 0
     public private(set) var replacements = 0
     public private(set) var expiredInputs = 0
+    public private(set) var modelFailures = 0
+    public private(set) var consecutiveModelFailures = 0
+    public private(set) var lastModelError: String?
     private let pose: any PoseCapability
     private let sessionID: String
     private var lifecycle: AgentLifecycle = .registered
@@ -43,6 +53,14 @@ public actor VisionPerceptionAgent: Agent {
     public private(set) var overlayReplacements = 0
     private var lastSequence: UInt64?
     private var lastTimestamp: TimeInterval?
+    private var startedAt: ContinuousClock.Instant?
+    private var lastInputAt: ContinuousClock.Instant?
+    private var lastFreshResultAt: ContinuousClock.Instant?
+    private var modelStartedAt: ContinuousClock.Instant?
+    private var modelInFlight = false
+    private var lastInputID: String?
+    private var lastInputMetadata: InputMetadata?
+    private var presentationError: String?
     private var processed = 0
     private var fpsWindow: ContinuousClock.Instant?
     private var fpsCompletions = 0
@@ -83,6 +101,7 @@ public actor VisionPerceptionAgent: Agent {
         _ = try await contextRepository.snapshot()
         let id = sessionID
         try await contextRepository.update { $0.state.perceptionSessionID = id }
+        startedAt = .now
         lifecycle = .running
     }
     public func pause() throws {
@@ -127,12 +146,14 @@ public actor VisionPerceptionAgent: Agent {
             resultInbox.accept(result)
             return
         }
-        let state = try await contextRepository.snapshot().state
-        _ = try preprocessor.classify(input, state: state)
+        // Image admission is state-independent; do not queue capture behind a persistence commit.
         guard case .image(let image) = input.payload else { throw HarnessError.unsupportedInput }
         guard lastSequence.map({ image.sequence > $0 }) ?? true,
             lastTimestamp.map({ image.timestamp >= $0 }) ?? true
         else { throw CommunicationError.outOfOrder }
+        lastInputAt = .now
+        lastInputID = input.id
+        lastInputMetadata = input.metadata
         lastSequence = image.sequence
         lastTimestamp = image.timestamp
         if pending != nil { replacements += 1 }
@@ -176,7 +197,31 @@ public actor VisionPerceptionAgent: Agent {
             let context = inference.context
             let startedAt = ContinuousClock.now
             if fpsWindow == nil { fpsWindow = startedAt }
-            let result = try await pose.estimatePose(inference)
+            modelStartedAt = startedAt
+            modelInFlight = true
+            let result: PoseResult
+            do {
+                defer { modelInFlight = false }
+                result = try await pose.estimatePose(inference)
+                consecutiveModelFailures = 0
+            } catch is CancellationError {
+                throw CancellationError()
+            } catch {
+                try Task.checkCancellation()
+                modelFailures += 1
+                consecutiveModelFailures += 1
+                lastModelError = String(String(describing: error).prefix(512))
+                if let capability = error as? CapabilityError {
+                    switch capability {
+                    case .invalidRequest, .sessionClosed, .multipleConsumers, .inputFinished: throw error
+                    default: break
+                    }
+                }
+                guard consecutiveModelFailures < 3 else { throw error }
+                // Keep the single worker slot while incoming frames replace only the pending slot.
+                try await Task.sleep(for: .milliseconds(250))
+                return
+            }
             let finishedAt = ContinuousClock.now
             try Task.checkCancellation()
             guard lifecycle == .running || lifecycle == .paused else { return }
@@ -225,9 +270,10 @@ public actor VisionPerceptionAgent: Agent {
             if pendingPublication != nil { publicationReplacements += 1 }
             pendingPublication = Publication(observation: observation, parent: input)
             drainPublication()
+            lastFreshResultAt = .now
             processed += 1
         } catch is CancellationError {} catch {
-            fail(input)
+            fail(input, error: error)
         }
     }
     private func drainPublication() {
@@ -249,12 +295,12 @@ public actor VisionPerceptionAgent: Agent {
             } catch is CancellationError {
                 return
             } catch {
-                fail(publication.parent)
+                fail(publication.parent, error: error)
                 return
             }
         }
     }
-    private func fail(_ input: AgentInput) {
+    private func fail(_ input: AgentInput, error: any Error, code: String = "vision.pose.failed") {
         guard lifecycle != .stopped, lifecycle != .failed else { return }
         lifecycle = .failed
         pending = nil
@@ -264,7 +310,44 @@ public actor VisionPerceptionAgent: Agent {
         mailbox.close(
             terminal: OutputEnvelope(
                 source: descriptor.id, input: input,
-                output: .control("agent.error: pose processing failed")))
+                output: .control("agent.error: pose processing failed"),
+                failure: AgentFailureDiagnostic(
+                    category: .runtime, code: code, detail: String(describing: error))))
+    }
+    /// The source owner closes input explicitly; the output consumer must still drain this terminal.
+    public func failInput(_ error: any Error) {
+        guard lifecycle == .running || lifecycle == .paused else { return }
+        let input = AgentInput(
+            id: lastInputID ?? UUID().uuidString, sessionID: sessionID,
+            payload: .event("vision.input.failed"), metadata: lastInputMetadata)
+        fail(input, error: error, code: "vision.input.failed")
+    }
+    public func presentationFinished(failure: String?) {
+        presentationError = failure.map { String($0.prefix(512)) }
+    }
+    public func health(at now: ContinuousClock.Instant = .now) -> VisionPerceptionHealth {
+        var code: String?
+        var reason = ""
+        if lifecycle == .running, let startedAt {
+            if modelInFlight, let modelStartedAt, modelStartedAt.duration(to: now) >= .seconds(3) {
+                code = "vision.pose.stalled"
+                reason = "Native pose inference has not returned for at least 3 seconds"
+            } else if let presentationError {
+                code = "vision.presentation.failed"
+                reason = "Pose Tool presentation failed: \(presentationError)"
+            } else if (lastInputAt ?? startedAt).duration(to: now) >= .seconds(3) {
+                code = "vision.input.stalled"
+                reason = "No camera input admitted for at least 3 seconds"
+            } else if (lastFreshResultAt ?? startedAt).duration(to: now) >= .seconds(3) {
+                code = "vision.pose.stale"
+                reason = "No fresh pose output for at least 3 seconds"
+            }
+        }
+        let detail =
+            "\(reason); sequence=\(lastSequence.map(String.init) ?? "none"), processed=\(processed), expired=\(expiredInputs), modelFailures=\(modelFailures), lastModelError=\(lastModelError ?? "none")"
+        return VisionPerceptionHealth(
+            diagnostic: code.map { AgentFailureDiagnostic(category: .runtime, code: $0, detail: detail) },
+            inputID: lastInputID, sequence: lastSequence)
     }
     private static func milliseconds(_ duration: Duration) -> Double {
         let components = duration.components
@@ -302,28 +385,42 @@ public actor VisionPerceptionAgent: Agent {
         try emit(.toolCall(call), input: input)
     }
 
+    /// The producer owns latest-state semantics; transport does not interpret business addresses.
+    public nonisolated static func outputReplacementKey(_ output: AgentOutput) -> String? {
+        switch output {
+        case .toolCall(let call):
+            switch call.toolPath {
+            case "UI.Pose.showPose": return "overlay"
+            case "UI.Gaze.moveEyes": return "gaze"
+            default: return nil
+            }
+        case .communication(let action) where action.target == nil && action.message.contract == "vision.pose":
+            return "pose"
+        default: return nil
+        }
+    }
     private func emit(_ output: AgentOutput, input: AgentInput) throws {
         guard case .image(let image) = input.payload else { throw HarnessError.unsupportedInput }
-        let key: String?
-        if case .toolCall(let call) = output {
-            switch call.toolPath {
-            case "UI.Pose.showPose": key = "overlay"
-            case "UI.Gaze.moveEyes": key = "gaze"
-            default: key = nil
-            }
-        } else {
-            key = nil
-        }
+        let key = Self.outputReplacementKey(output)
         let replaced = try mailbox.admit(
-            OutputEnvelope(source: descriptor.id, input: input, output: output, sequence: image.sequence),
+            OutputEnvelope(
+                source: descriptor.id, input: input, output: output, sequence: image.sequence,
+                media: key == "overlay" && Self.hasNativeImage(image) ? image : nil),
             replacing: key)
         if let replaced {
             if case .toolCall(let call) = replaced.output, call.toolPath == "UI.Pose.showPose" {
                 overlayReplacements += 1
+            } else if case .communication = replaced.output {
+                publicationReplacements += 1
             } else {
                 gazeReplacements += 1
             }
         }
+    }
+
+    private static func hasNativeImage(_ image: ImageInput) -> Bool {
+        guard case .attachment(let value) = image.content else { return false }
+        return value is ImageValueAttachment<CameraFrame>
     }
 
     // MARK: - Communication output
@@ -367,10 +464,4 @@ public actor VisionPerceptionAgent: Agent {
         try await contextRepository.snapshot()
     }
     public func actionResults() -> [ActionResult] { resultInbox.results }
-}
-
-/// Agent transport retains the unconverted device output; only the inference worker constructs ModelKit input.
-public struct CameraImageAttachment: ImageAttachment {
-    public let frame: CameraFrame
-    public init(frame: CameraFrame) { self.frame = frame }
 }

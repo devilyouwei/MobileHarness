@@ -27,13 +27,4 @@
         let makePerception:
             (any SpeechRecognitionCapability, any VoiceActivityCapability, String) throws -> SpeechPerceptionAgent
     }
-    @MainActor
-    struct VisionRuntimeDependencies {
-        let photographer: PhotographerIntentRuntime
-        let manager: AgentManager
-        let input: InputGateway
-        let output: OutputGateway
-        let actions: ChannelScheduler
-        let presentation: RuntimePresentation
-    }
 #endif

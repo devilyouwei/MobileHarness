@@ -105,10 +105,8 @@ public actor AgentInteractionRuntime {
         if case .text = signal.payload, signal.turn == nil {
             guard textOrdinal < UInt64.max else { throw CommunicationError.capacityExceeded }
             textOrdinal += 1
-            signal = AgentInput(
-                id: signal.id, sessionID: signal.sessionID, payload: signal.payload,
-                metadata: signal.metadata, turn: AgentTurn(id: UUID().uuidString, ordinal: textOrdinal),
-                taskScope: signal.taskScope)
+            signal = try ExternalInputAdapter.assigningTurn(
+                AgentTurn(id: UUID().uuidString, ordinal: textOrdinal), to: signal)
         }
         try await input.publish(signal)
     }
@@ -117,7 +115,7 @@ public actor AgentInteractionRuntime {
     public func interruptConversation(sessionID: String) async throws {
         guard started, !closed else { return }
         async let calls: Void = output.cancelCalls(for: agent, sessionID: sessionID)
-        async let model: Void = agent.receive(AgentSessionControl.interruptSession.input(sessionID: sessionID))
+        async let model: Void = sendControl(.interruptSession, sessionID: sessionID)
         _ = try await (model, calls)
     }
 
@@ -125,8 +123,15 @@ public actor AgentInteractionRuntime {
     public func cancelConversation(sessionID: String) async throws {
         guard started, !closed else { return }
         async let calls: Void = output.cancelCalls(for: agent, sessionID: sessionID)
-        async let model: Void = agent.receive(AgentSessionControl.cancelSession.input(sessionID: sessionID))
+        async let model: Void = sendControl(.cancelSession, sessionID: sessionID)
         _ = try await (model, calls)
+    }
+
+    private func sendControl(_ control: AgentSessionControl, sessionID: String) async throws {
+        let report = try await input.send(control.input(sessionID: sessionID))
+        guard report.rejected.isEmpty, report.delivered.contains(.assistant) else {
+            throw InputAdmissionFailure(report: report)
+        }
     }
 
     public func shutdown() async {

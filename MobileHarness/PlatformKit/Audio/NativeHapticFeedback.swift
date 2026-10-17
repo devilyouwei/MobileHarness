@@ -9,12 +9,34 @@
         public enum Failure: Error, Sendable { case unavailable, busy, invalidRequest }
         private var generators: [Style: UIImpactFeedbackGenerator] = [:]
         private var busy = false
-        public init() {}
+        private let admission: PlatformAdmission?
+        private var operation: Task<Void, any Error>?
+        public init(admission: PlatformAdmission? = nil) { self.admission = admission }
+        public func stop() async {
+            let operation = operation
+            operation?.cancel()
+            _ = await operation?.result
+        }
         public func prepare(_ style: Style = .heavy) {
+            guard admission?.isOpen != false else { return }
             guard CHHapticEngine.capabilitiesForHardware().supportsHaptics else { return }
             generator(style).prepare()
         }
         public func impact(style: Style, intensity: Double, count: Int, intervalMS: Int) async throws {
+            try admission?.check()
+            guard operation == nil else { throw Failure.busy }
+            let task = Task {
+                try await self.perform(style: style, intensity: intensity, count: count, intervalMS: intervalMS)
+            }
+            operation = task
+            defer { operation = nil }
+            try await withTaskCancellationHandler {
+                try await task.value
+            } onCancel: {
+                task.cancel()
+            }
+        }
+        private func perform(style: Style, intensity: Double, count: Int, intervalMS: Int) async throws {
             try Task.checkCancellation()
             guard intensity.isFinite, (0...1).contains(intensity), (1...3).contains(count),
                 (40...250).contains(intervalMS)
@@ -28,6 +50,7 @@
             for pulse in 0..<count {
                 if pulse > 0 { try await Task.sleep(for: .milliseconds(intervalMS)) }
                 try Task.checkCancellation()
+                try admission?.check()
                 native.impactOccurred(intensity: CGFloat(intensity))
             }
             try Task.checkCancellation()

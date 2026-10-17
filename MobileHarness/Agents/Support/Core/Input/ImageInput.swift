@@ -4,6 +4,12 @@ import Foundation
 /// Upright, unmirrored RGB8 with monotonic sequence/time within one capture session.
 public protocol ImageAttachment: Sendable {}
 
+/// Opaque retained native value. No platform or image-analysis dependency enters this target.
+public struct ImageValueAttachment<Value: Sendable>: ImageAttachment {
+    public let value: Value
+    public init(_ value: Value) { self.value = value }
+}
+
 public struct ImageInput: Sendable {
     public enum Content: Sendable {
         case rgb(Data)

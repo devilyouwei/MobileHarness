@@ -8,9 +8,10 @@
 
 | 文件 | 职责 |
 | --- | --- |
+| ApplicationContainer.swift | AppStorage 内的 Storage/Platform 根与子能力注册 |
 | AppComposition.swift | 持有当前 Services 和生命周期图，连接 UI bootstrap/retry/failure 端口；显式重试替换整个根作用域 |
 | ServiceFactories.swift | 选择 Storage 运行工厂和数据库位置，创建原生实例、照片工厂、模型制品服务及 Agent 集成入口；注入延迟领域仓库接口 |
-| ModuleRegistration.swift | 注册 storage → agents → native 的静态依赖与公开启停/失效接口 |
+| ModuleRegistration.swift | 注册 storage / platform / ui → agents → native 的静态依赖与公开启停/失效接口 |
 
 配置中的资源路径属于组合输入。照片容量/FIFO、Provider 事务、模型选择、页面控制、意图编码和结果转换属于模块；App 不在绑定闭包中复制这些逻辑。
 
@@ -25,7 +26,7 @@ StorageContainer 在自己的后台启动任务中完成后端打开、迁移和
 
 [App](../README.md) · [生命周期](../Lifecycle/README.md) · [Agent 集成](../../Agents/Support/README.md) · [Action 集成](../../Actions/Support/README.md)
 
-✅ Services 持有 storage: StorageContainer；工厂持有独立 ApplicationContainer 并选择根 URL，注入领域仓库提供器。注册实际 storage.start/stop 与 storage → agents → native 依赖；不调用 SQLiteRepositories、FileManager 或恢复。
+✅ Services 持有 storage: StorageContainer；工厂持有独立 ApplicationContainer 并选择根 URL，注入领域仓库提供器。注册实际 storage.start/stop 与 storage / platform / ui → agents → native 依赖；不调用 SQLiteRepositories、FileManager 或恢复。
 
 ## 待实现
 
@@ -35,4 +36,12 @@ StorageContainer 在自己的后台启动任务中完成后端打开、迁移和
 
 ✅ 存储访问使用独立的 State、Cache、Database 和 Files 接口；App 注册根实例，消费者通过构造器获得所需能力。存储容器不接管本目录的业务验证、执行和完成语义。
 
-AppStorage 目标只编译 Composition/ApplicationContainer.swift，使用 FactoryKit 实例内缓存；业务目标不导入 IoC。Services 持有注册容器和 StorageContainer，连接所需子接口。模型后台事件只转交 ArtifactServices；存储停止前先加入其制品清理。
+AppStorage 目标只编译 Composition/ApplicationContainer.swift，使用 FactoryKit 实例内缓存；业务目标不导入 IoC。Services 持有注册容器、StorageContainer、PlatformContainer 和 UIContainer，连接所需子接口。模型后台事件只转交 ArtifactServices；存储停止前先加入其制品清理。
+
+## Platform 根、设备接入与同帧呈现
+
+✅ ApplicationContainer 注册 Storage、Platform 与 UI 根及子能力，FactoryKit 只在现有 AppStorage 目标中使用。ServiceFactories 解析根并提供 Coordinator 构造工厂，不创建 AppleAudioIO/AppleCamera/BLE，也不转发帧。ModuleRegistration 将 platform 注册为独立服务，Agents 依赖 storage/platform/ui，native 只保留业务接入和观察。
+
+## UI 容器与相机能力注入
+
+✅ ApplicationContainer 缓存 UI 根及相机子能力，AppStorage 显式依赖 UI。Services 持有 UIContainer；ServiceFactories 定义唯一 Coordinator 工厂，ApplicationFeatures 只在原有惰性时机调用它。ModuleRegistration 注册 ui 生命周期，Agents 依赖 storage/platform/ui。

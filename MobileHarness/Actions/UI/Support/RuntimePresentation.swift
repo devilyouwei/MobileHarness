@@ -4,6 +4,7 @@ import CallRuntime
 import ExecutionRuntime
 import Foundation
 import FunctionContracts
+import PlatformKit
 import StorageCore
 import UI
 
@@ -31,7 +32,7 @@ public protocol VoiceOutputHandling: AnyObject, Sendable {
 @MainActor
 public protocol CameraOutputHandling: AnyObject, Sendable {
     func present(_ target: UIActions.Gaze, invocation: any FunctionInput) throws
-    func present(_ overlay: Actions.PoseOverlay, sessionID: String) throws
+    func present(_ overlay: Actions.PoseOverlay, frame: CameraFrame?, sessionID: String) throws
     func visionStatus(_ message: String?, sessionID: String)
 }
 
@@ -233,8 +234,14 @@ public final class RuntimePresentation: UIPresentationCapability, UIUpdateCapabi
     }
     public func present(_ overlay: Actions.PoseOverlay, sessionID: String) async throws {
         guard let camera else { throw CommunicationError.scopeClosed }
-        try camera.present(overlay, sessionID: sessionID)
+        try camera.present(overlay, frame: nil, sessionID: sessionID)
     }
+    public func present(_ overlay: Actions.PoseOverlay, invocation: any FunctionInput) async throws {
+        guard let camera else { throw CommunicationError.scopeClosed }
+        try camera.present(
+            overlay, frame: invocation.attachment as? CameraFrame, sessionID: invocation.context.sessionID)
+    }
+
     public func observe(_ input: AgentInput) async throws {
         guard let voice else { throw CommunicationError.scopeClosed }
         voice.observeSpeech(input)

@@ -116,3 +116,17 @@ UI、ModelKit、PlatformKit、Storage 仍无项目依赖；Actions/Agents 的外
 ## 分类异常诊断
 
 ✅ ExecutionIssue 增加可选分类与轮次展示值；宿主提供短 userMessage 和有界详细日志，UI 只展示并保留原 toast 生命周期。见 [Conversation](Conversation/README.md)。
+
+## Platform 根、设备接入与独立影像/姿态呈现
+
+✅ CameraVideoFrame/CameraState 与 CameraFrameView 属于 UI 自有数据和原生渲染，不导入项目模块。影像与姿态独立接纳、过期；设备启停、权限、推理和原生帧适配仍在上层/基础能力拥有者。
+
+✅ CameraState 分别接纳独立摄像头最新帧和带原始帧验证的姿态结果，独立过期；模型状态提示不清除影像。CameraFrameView 使用共享几何在同一 Metal pass 合成最新画面和有效骨架，详见 [Camera](Camera/README.md)。
+
+✅ 相机 Metal 渲染位于专用线程，由 CAMetalDisplayLink 合并最新展示状态；主线程仅提交状态与布局。双 GPU 槽位复用骨架 buffer，姿态和几何未变化时复用顶点；离窗停止显示链并等待真实 GPU 完成，失败仍通过原有代际接口报告。
+
+## UI 容器与相机能力注入
+
+✅ 新增 UIContainer 与相机子能力；只迁移相机展示状态，其他应用级 UI 状态保持现有归属。UI 无项目依赖或 FactoryKit；App 管理根生命周期，视图继续管理 Metal/GPU 生命周期。
+
+❌ 会话、设置、导航、日志等其他应用级 UI 状态尚未迁入 UIContainer；本轮仅相机展示。

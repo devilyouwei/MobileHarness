@@ -35,6 +35,7 @@ public struct NexArmControlFailure: Sendable {
 public final class NexArmControlService {
     public private(set) var lastManualFailure: NexArmControlFailure?
     public var manualOrigin: NexArmControlOrigin?
+    public var nativeObservation: (@Sendable (NexArmBluetoothSnapshot) async throws -> Void)?
     public var manualFailureReporter: (@Sendable (NexArmControlFailure) async -> Void)?
     private func reportManualFailure(
         _ error: any Error, workerID: String, origin: NexArmControlOrigin?,
@@ -199,6 +200,7 @@ public final class NexArmControlService {
         state.remembered = device
     }
     private func apply(_ value: NexArmBluetoothSnapshot) async {
+        do { try await nativeObservation?(value) } catch { state.error = "设备事件接入失败：\(error)" }
         let mappingGeneration = generation
         if value.revision != 0, value.revision <= latestLinkSnapshot.revision { return }
         let previousPower = latestLinkSnapshot.power

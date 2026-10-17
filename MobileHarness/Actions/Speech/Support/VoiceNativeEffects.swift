@@ -8,13 +8,16 @@
 
     /// Native feedback/player resources and decoding, independent of Agent implementation.
     @MainActor public final class VoiceNativeEffects {
-        public let haptic = NativeHapticFeedback()
-        public let cue = NativeCuePlayback()
+        public let haptic: NativeHapticFeedback
+        public let cue: NativeCuePlayback
         public var preparedCue: (request: UIActions.CueRequest, pcm: PlaybackPCM)?
         public var feedbackStart: (context: ActionExecutionContext, gate: ListeningFeedbackStart)?
         private let audio: AppleAudioIO
         private let state: ConversationState
-        public init(audio: AppleAudioIO, state: ConversationState) {
+        public init(audio: AppleAudioIO, state: ConversationState, cue: NativeCuePlayback, haptic: NativeHapticFeedback)
+        {
+            self.cue = cue
+            self.haptic = haptic
             self.audio = audio
             self.state = state
         }

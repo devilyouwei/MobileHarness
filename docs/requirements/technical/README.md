@@ -13,3 +13,5 @@
 部分完成时保留整份需求并更新状态；原范围全部完成后整份迁入 completed，更新当前设计和验证记录。分类及维护规则见 [需求总索引](../README.md)。
 
 [Storage 四类容器与 State](Storage-Containers-Plan.md)：代码与专项验证已完成；全量声源回归和 Simulator 限制保留；公开事实/useState 的当前实现与后续验收见 [公开 State 计划](../Resource-State-Plan.md)。
+
+- [PlatformKit 容器与 Gateway 设备接入](PlatformKit-Containers-Plan.md)：代码已实现，保留全量回归、Simulator 与设备验收缺口。

@@ -59,4 +59,20 @@ deliverFeedback 创建运行时 UUID，并校验 hops、执行 owner、实时 Ag
 
 ## 待实现
 
-- Remote inputs, dynamic subscriptions and durable feedback delivery are not implemented.
+- Remote inputs and durable feedback delivery are not implemented.
+
+## Platform 根、设备接入与同帧呈现
+
+✅ DeviceInputAdapter 将原生 CameraFrame/MicrophoneFrame 转换为 ImageInput/AudioInput，再统一生成外部来源、会话和因果根。图像保留原生值附件；PCM 保留原布局/采样率/捕获时间，允许调用者提供会话内连续序号。camera/microphone/BLE 技术状态使用 runtime.event 载荷，不冒充业务完成或 ActionResult；没有订阅者时保留既有单向发布语义。
+
+✅ DeviceInputConnection 持有一个相机输入 pump，逐项等待 publish 接纳，不等待推理。wait 的取消会取消源任务；stop 取消并加入空闲或活跃源。根级拥有者在设备代际结束后关闭连接，不重用旧流。原生订阅容量和溢出由 PlatformKit 拥有，本层仍受既有发布容量约束。
+
+## 统一接入契约
+
+✅ ExternalInputAdapter 将 ExternalInputDraft 转为 AgentInput；ExternalInputProviding.input 通用扩展属于 Gateway。领域提供内容/来源/因果描述；Gateway 生成外部 origin、身份、root/parent/hops/sequence/deadline/turn，禁止伪造反馈或任务授权。新增传感器由宿主注册类型化 observation/schema/source，不新增硬件驱动。
+
+✅ subscribe(owner:contract:source:) 返回显式 token，unsubscribe 取消。仅可信宿主使用，不向模型暴露；目标须声明 input/version/kind，来源须在 externalSources 或声明 publication。每目标静态及动态关系合计最多16，全局动态256，合并话题64，每个 contract/source 最多16目标。重复拒绝，超限抛错。动态关系绑定会话/incarnation，不被新实例继承。取消只阻止后续发布，已接纳发布可完成；shutdown 清空订阅并取消/加入发布。拥有者须结束时取消，不增加订阅队列或任务。
+
+✅ 新实例注册动态关系时，清除同 Agent ID 的旧 incarnation 关系；旧 token 取消不能撤销新 token。
+
+普通外部事实使用 publish；宿主会话中断/关闭使用不接收任意目标参数的 send，目标仍由订阅解析，返回实际接纳报告。AgentBindings 等待该报告及原有执行取消屏障，分支拒绝以 InputAdmissionFailure 保留，不改成成功。草稿可提供已有业务请求身份；未提供的 Signal ID 和 root 由 Gateway 生成。源权限始终由注入策略验证。

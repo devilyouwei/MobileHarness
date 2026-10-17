@@ -16,7 +16,7 @@ public struct ToolRequest: Equatable, Sendable {
 /// Native wire adapter; business handlers receive only the normalized invocation.
 
 extension FunctionInvocation {
-    public init(tool: ToolRequest, context: ActionExecutionContext) {
+    public init(tool: ToolRequest, context: ActionExecutionContext, attachment: (any Sendable)? = nil) {
         let parts = tool.toolPath.split(separator: ".", omittingEmptySubsequences: false).map(String.init)
         let address =
             parts.count == 3
@@ -25,7 +25,7 @@ extension FunctionInvocation {
         self.init(
             call: .init(actionPath: address, parameters: tool.arguments),
             context: context,
-            executionID: tool.id, results: ActionReportStore())
+            executionID: tool.id, results: ActionReportStore(), attachment: attachment)
     }
 }
 

@@ -96,3 +96,19 @@ Direct Tool/communication dispatch has an owned cancellable Task, with at most12
 ## 分类异常诊断
 
 ✅ Gateway 从 Agent 终止输出复制异常分类/代码/详情与会话/轮次到失败快照，仍有界100条。不解析底层错误、不提供文案、不重试。
+
+## Platform 根、设备接入与同帧呈现
+
+✅ 只有显式媒体输出保留 ImageInput 附件；Tool 分发验证原生帧一致性与新鲜度，CallRuntime 通过中立附件字段传递。流式媒体使用独立最新态通道，不占用离散函数 FIFO 的像素保留空间。
+
+## 视觉停顿恢复修复
+
+✅ 最新态媒体过期按单个输出处理，不关闭后续 Signal；离散操作与通信错误契约不变。
+
+## 视觉过期呈现可观测性
+
+✅ consumeSignals 增加可选 onMediaExpired 回调，在队列前或派发中过期时记录并通知调用拥有者。该通知不重放帧、不改变其他错误传播；视觉拥有者将持续呈现过期纳入健康告警，后续成功呈现恢复。
+
+## 视觉 queueFull 修复
+
+✅ 最新状态 Tool 与广播各用容量 16 的独立替换邮箱，每个邮箱一个串行消费者；媒体容量 1；离散函数 FIFO 256、离散通信 FIFO 16 保持原策略。

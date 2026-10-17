@@ -71,6 +71,8 @@ Read top to bottom: App Host → business modules → foundational capabilities.
 
 Gateway contains InputGateway, OutputGateway and shared execution. ActionCall and ToolCall are call protocols over the same Actions functions, not separate top-level modules. UI captures intent and presents state; ModelKit, PlatformKit and Storage supply processing, native I/O and persistence.
 
+✅ AgentCore's XML alias resolution discards undeclared Action attributes before emitting resolved calls to Gateway. Raw bounds, required arguments, registered permissions and handler value validation remain enforced; operation-specific device argument handling belongs to Actions/System. See [Capability resolution](Agents/Support/Core/Capability/README.md) and [System functions](Actions/System/README.md).
+
 ### Coordination ownership
 
 | Owner | Governing question | Responsibility |
@@ -158,6 +160,7 @@ flowchart TB
  Agents --> ModelKit
  Agents --> PlatformKit
  Agents --> Stores
+ Gateway --> PlatformKit
  Gateway --> AgentCore
  Gateway --> FunctionContracts
  Gateway --> ExecutionRuntime
@@ -178,7 +181,7 @@ flowchart TB
 ```
 
 
-AgentBindings and ActionBindings are explicit outer integration targets within the existing owning modules, with disjoint source lists. AppLifecycle has no project dependencies. UI requests and Action presentation do not pass through App. `FunctionContracts`, `Storage` and `AgentCore` have no cross-module dependencies. FunctionContracts is the independent function-contract leaf; ExecutionRuntime owns shared execution, and CallRuntime owns registration and call adapters. Gateway depends on execution contracts, never concrete Actions or Tools. Base ModelKit and PlatformKit have no cross-module dependencies and own their input/output types. Agents adapts across their boundaries. The complete ModelKit SDK, including Runtime, Defaults, download adapters and concrete providers, may depend only on its own targets, approved third-party SDKs and system frameworks. Its direct and transitive target dependencies must never reach another project module; host adapters implement ModelKit-owned protocols.
+AgentBindings and ActionBindings are explicit outer integration targets within the existing owning modules, with disjoint source lists. AppLifecycle has no project dependencies. UI requests and Action presentation do not pass through App. `FunctionContracts`, `Storage` and `AgentCore` have no cross-module dependencies. FunctionContracts is the independent function-contract leaf; ExecutionRuntime owns shared execution, and CallRuntime owns registration and call adapters. Gateway depends on execution contracts, never concrete Actions or Tools. Base ModelKit and PlatformKit have no cross-module dependencies and own their input/output types. Gateway adapts native input transport; Agents adapts admitted values into model requests. The complete ModelKit SDK, including Runtime, Defaults, download adapters and concrete providers, may depend only on its own targets, approved third-party SDKs and system frameworks. Its direct and transitive target dependencies must never reach another project module; host adapters implement ModelKit-owned protocols.
 
 <a id="37-project-structure"></a>
 <a id="project-structure"></a>
@@ -284,7 +287,7 @@ Directory nesting expresses ownership; `Package.swift` defines the actual compil
 | `Storage/Database/Media/` | StorageMedia | StorageCore, StorageFiles |
 | `Storage/Database/Devices/` | StorageDevices | StorageCore |
 | `Storage/Database/SQLite/` | StorageSQLite | StorageCore, StorageDatabase, domain repositories, GRDB.swift |
-| `App/Composition/ApplicationContainer.swift` | AppStorage | Storage root/capabilities, StorageSQLite, FactoryKit |
+| `App/Composition/ApplicationContainer.swift` | AppStorage | Storage/Platform roots and capabilities, StorageSQLite, FactoryKit |
 | `PlatformKit/` | PlatformKit | None |
 | ModelKit shared capability sources | ModelKit | None |
 | `ModelKit/Support/Management/` (runtime source list) | ModelKitRuntime | ModelKit |
@@ -387,11 +390,11 @@ flowchart TD
     Platform --> Workflows
 ```
 
-App composes model capabilities, Storage repositories, native endpoints, canonical functions, Gateways and Agent instances before producers start. Invalid configuration, missing implementations or failed startup recovery blocks admission explicitly. UI pages consume root-owned services; navigation does not own their lifetime. AgentBindings owns the domain service factory and resource declarations; App invokes its public interfaces and installs the static storage → agents → native lifecycle graph.
+App composes model capabilities, Storage repositories, native endpoints, canonical functions, Gateways and Agent instances before producers start. Invalid configuration, missing implementations or failed startup recovery blocks admission explicitly. UI pages consume root-owned services; navigation does not own their lifetime. App supplies the camera Coordinator factory; AgentBindings owns Agent integration and resource declarations; App invokes its public interfaces and installs the static storage / platform / ui → agents → native lifecycle graph.
 
 ### Storage container lifecycle
 
-✅ AppStorage 用 FactoryKit 3.4.1 在每个 App 根作用域注册 StorageContainer，组合 State、Cache、Database、Files。Factory 只构造；AppLifecycle 按 storage → agents → native 启停。StorageCore 保持无项目依赖；SQLite 独占 GRDB；业务模块只接收所需端口。详见 [Storage](Storage/README.md)。
+✅ AppStorage 用 FactoryKit 3.4.1 在每个 App 根作用域注册 StorageContainer，组合 State、Cache、Database、Files。Factory 只构造；AppLifecycle 按 storage / platform / ui → agents → native 启停。StorageCore 保持无项目依赖；SQLite 独占 GRDB；业务模块只接收所需端口。详见 [Storage](Storage/README.md)。
 
 AgentContext 由 Agent actor 私有持有；State 只保存业务拥有者发布的有限 LLM 事实，类型化值与编码投影原子提交。Cache 音频由会话申请/关闭，缓冲区交接共享内存。配置、照片、模型文件通过 Files 注入，数据库保留既有记录格式和恢复语义。文件和数据库没有跨后端事务；重启不重放业务动作。Skill 通过 useState 声明读取需求，每轮推理取最新一致快照，在唯一 CURRENT STATE 系统块注入。
 
@@ -1346,7 +1349,7 @@ The Task transport path is defined under [Input and Agent communication](#input-
 | Model/provider resources | ✅ Agent-routed commands/preferences/inventory/observations/errors and private provider transactions/presentation; ApplicationControl current facts are model-readable | ❌ Model-initiated provider configuration changes with safe session handoff |
 | Decision context | ✅ Bounded root environment facts plus registered current inventory/provider/device reads | ❌ Full resource-state-store plan and push adapters |
 | Foundational independence | ✅ UI, ModelKit, PlatformKit and Storage have no cross-module dependencies | None |
-| Transport evolution | ✅ Process-local admission and bounded domain content | ❌ Remote authentication/codecs, version migration, durable replay and dynamic subscriptions |
+| Transport evolution | ✅ Process-local admission, bounded domain content and host-controlled exact dynamic subscriptions | ❌ Remote authentication/codecs, version migration and durable replay |
 
 [Cross-module concurrency](#cross-module-concurrency-and-completion) links each capacity owner; [InputGateway](Gateway/Input/README.md) and [communication policy](Agents/Support/Core/Communication/README.md) define admission and the eight-hop limit. AgentMessage encoding is not a wire format for the whole Signal envelope.
 
@@ -1497,3 +1500,35 @@ flowchart LR
 ## Skill invocation protocol
 
 ✅ Implemented: bundled Skills expose all business functions as Function Token Actions. Queries use a dedicated Query Channel and return explicit business values. Generic native Tool parsing, dispatch, internal fixed callers and historical native pairing remain supported; no duplicate model exposure or error-driven protocol fallback.
+
+## Platform 根、设备接入与独立影像/姿态呈现
+
+✅ AppStorage 在实例级 FactoryKit 注册 Storage 与 Platform 根；Platform 组合 Audio、Vision、Connectivity，不依赖其他项目模块。AppLifecycle 先准备 Storage/Platform，随后启动 Agents 和业务接入；逆序关闭接入/Agents 后释放根。后台同步关闭 Platform admission，并并行加入各原生所有者停止。
+
+✅ Gateway/Input 单向使用 PlatformKit，将原生图像、PCM 和技术设备事件包装为外部 Signal。Agents 拥有感知/聆听/追踪策略；根级业务接入连接设备流与 Gateway，不将业务规则迁入基础库。相机最新帧经 ActionBindings 独立转换为 UI 图像值；内部 Pose Tool 的只读附件用于验证骨架来源。UI 在同一 Metal render pass 合成独立更新的图像与最新有效骨架。详见 [Platform](PlatformKit/README.md)、[输入](Gateway/Input/README.md)、[相机呈现](UI/Camera/README.md)。
+
+✅ 业务意图与原生输入统一经 Gateway 封装；提供有界、精确且受权限约束的宿主动态订阅。❌ 额外硬件驱动、远程传输及完整物理设备验收仍待后续工作。
+
+## 相机与姿态独立输出修复
+
+✅ CameraCoordinator 在受生命周期管理的任务中独立订阅容量为一的最新原生帧，直接提交 UI 自有图像值；YOLO 继续通过 Gateway 与 Pose Tool 更新骨架。模型启动、失败、空检测和超时不清除实时影像。图像与骨架分别按捕获时间在 750 ms 后失效；停机、换镜头和后台取消并加入两个任务，清除旧会话。骨架使用最新有效结果，沿用相同几何/镜像变换，不再要求与当前预览帧序号相同；仍验证 Tool 自带的原始帧、会话及单调序号。真实进程崩溃不在此故障隔离范围。
+
+## 视觉停顿恢复修复
+
+✅ VisionPerception 对单次原生模型运行错误采用有界恢复，永久配置错误保持终止；Gateway 对已经过期的最新态媒体输出单独拒绝并记录，不终止后续感知。
+
+## 视觉静默停止与诊断补齐
+
+✅ 视觉会话输入结束/失败先请求角色发布终态，输出分支排空后才取消输入和健康监视。连续 3 秒无进展产生可见诊断而非伪造原生停机。
+
+## 视觉 queueFull 修复
+
+✅ 视觉输出的 latest 替换策略从角色延续到 Gateway，骨架、视线和姿态广播均有界保留最新值；离散操作保持 FIFO。
+
+## UI 容器与相机能力注入
+
+✅ UI 根及相机能力容器化：App 注册唯一 UIContainer/UICameraContainer 并提供 CameraCoordinator 构造工厂；Actions 注入 PlatformKit.CameraCapturing 与 UI.CameraPresenting，保留订阅、会话和业务协调。视频直达呈现接口，Pose 仍经 Gateway Tool；四大基础库不相互依赖。
+
+## 统一外部 Signal 接入
+
+✅ 业务只提供 ExternalInputDraft 内容/因果描述，Gateway 统一构造和验证 Signal；设备复用相同入口。提供宿主控制的精确动态订阅及类型化传感器扩展；保留权限、容量、会话/incarnation 和单向发布约束。相机逐帧呈现继续直接调用 UI。

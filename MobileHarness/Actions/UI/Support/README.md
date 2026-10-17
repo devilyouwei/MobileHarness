@@ -95,3 +95,7 @@ HomeEffectsWorkflow 的 timer、文本/UUID 围栏和状态在 UI/Conversation�
 ## Storage 依赖
 
 ✅ 存储访问使用独立的 State、Cache、Database 和 Files 接口；App 注册根实例，消费者通过构造器获得所需能力。存储容器不接管本目录的业务验证、执行和完成语义。
+
+## Platform 根、设备接入与同帧呈现
+
+✅ PosePresentationCapability 增加携带 FunctionInput 的提交入口；通用独立宿主可使用原有无像素端口，生产 RuntimePresentation 则从受控 attachment 取得同帧 CameraFrame 并交给相机呈现端点。缺失/错帧/过期在生产端明确失败，不回退到单独骨架或原生视频。

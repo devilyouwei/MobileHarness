@@ -6,7 +6,7 @@ Validates Signal transport and resolved output, coordinates execution and return
 
 ## Ownership and boundaries
 
-Gateway owns authority/admission/routing/execution coordination; Agents owns business meaning and alias resolution. Gateway imports AgentCore, FunctionContracts, ExecutionRuntime and CallRuntime, never concrete Actions, UI, ModelKit, PlatformKit or App. Foundation calls inside an Agent do not pass through Gateway.
+Gateway owns authority/admission/routing/execution coordination; Agents owns business meaning and alias resolution. Gateway imports AgentCore, FunctionContracts, ExecutionRuntime and CallRuntime; its native input adapters additionally use PlatformKit. It never imports concrete Actions, UI, ModelKit or App. Foundation calls inside an Agent do not pass through Gateway.
 
 ## External relationships and data flow
 
@@ -42,7 +42,7 @@ flowchart LR
 
 ## Public interfaces and protocol policy
 
-InputGateway validates external/Agent/runtime provenance, source/session/schema/deadline and bounds. External production input uses publish and exact static subscriptions. OutputGateway validates the bound actor/incarnation and permissions before calling functions, communicating or scheduling. Source authority cannot come from payloads.
+InputGateway validates external/Agent/runtime provenance, source/session/schema/deadline and bounds. External production facts use publish with exact static or host-controlled dynamic subscriptions. Explicit host controls may use subscribed send and await admission; arbitrary external targets remain disabled by default. OutputGateway validates the bound actor/incarnation and permissions before calling functions, communicating or scheduling. Source authority cannot come from payloads.
 
 | Protocol | Execution | Feedback |
 | --- | --- | --- |
@@ -101,3 +101,25 @@ Producer/session cancellation joins scheduled and direct native execution, prese
 ## 分类异常诊断
 
 ✅ Agent 失败诊断随原终止控制进入有界失败快照，保留分类、代码和输入/会话/轮次；Gateway 不重新归因、提供业务文案或发起重试。
+
+## Platform 根、设备接入与同帧呈现
+
+✅ Gateway/Input 拥有 DeviceInputAdapter 和 DeviceInputConnection，单向依赖 PlatformKit；原生输入适配与通用分发分开，Gateway 不依赖具体 Agents、Actions 或 UI。适配器固定 external 来源与无 incarnation 的信封，InputGateway 继续拒绝外部伪造运行结果。业务消息语义仍由所属模块解释。
+
+✅ 输出信封可携带按需保留的通用图像附件；Gateway 校验帧一致性、新鲜度和已绑定生产者后，将只读原生值绑定到单次 Tool 执行。附件不进入 JSON、诊断、历史或 State。
+
+## 视觉停顿恢复修复
+
+✅ consumeSignals 的最新态媒体输出因捕获时间达到 750 ms 或父输入过期而被拒绝时，记录序号和拒绝原因后继续消费；其他权限/结构/执行错误保持失败。
+
+## 视觉过期呈现可观测性
+
+✅ consumeSignals 增加可选 onMediaExpired 回调，在队列前或派发中过期时记录并通知调用拥有者。该通知不重放帧、不改变其他错误传播；视觉拥有者将持续呈现过期纳入健康告警，后续成功呈现恢复。
+
+## 视觉 queueFull 修复
+
+✅ consumeSignals 支持拥有者显式声明 latest 替换键；普通离散 FIFO 溢出仍拒绝，报告具体队列、容量、来源和序号。
+
+## 统一外部输入与动态订阅
+
+✅ ExternalInputAdapter 统一封装业务、文字、设备和扩展传感器输入，不引用具体业务模块。InputGateway 提供宿主订阅，校验注册 schema、目标输入和来源权限。静态/动态关系合并去重，外部与 Agent 广播共享分发；订阅不能获得执行或反馈权限。

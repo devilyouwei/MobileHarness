@@ -27,16 +27,16 @@ flowchart TB
 
 ## 内部结构与编译
 
-| 目录 | 编译目标 | 责任与依赖 |
-| --- | --- | --- |
-| 根 StorageContainer.swift | Storage | 四类容器组合、启动回滚与加入停止；依赖自身子目标，不依赖 GRDB |
-| Support | StorageCore | 公共身份、错误、容量门、有界流和租约；无项目/第三方依赖 |
-| State | StorageState | 类型化注册与进程内一致快照；只依赖 StorageCore |
-| Cache（含 Audio） | StorageCache | 不可变字节、租约、音频作用域；只依赖 StorageCore |
-| Files | StorageFiles | 文档、字节和受控目录；只依赖 StorageCore |
-| Database 根 | StorageDatabase | 数据库生命周期协议与四个领域端口 |
-| Database/Chat、Tasks、Media、Devices | 独立领域目标 | 记录契约；Chat 使用 Tasks，Media 组合 Files |
-| Database/SQLite | StorageSQLite | 共享连接池、领域 SQL 适配、迁移、恢复与关闭；独占 GRDB |
+| 目录                                 | 编译目标        | 责任与依赖                                                    |
+| ------------------------------------ | --------------- | ------------------------------------------------------------- |
+| 根 StorageContainer.swift            | Storage         | 四类容器组合、启动回滚与加入停止；依赖自身子目标，不依赖 GRDB |
+| Support                              | StorageCore     | 公共身份、错误、容量门、有界流和租约；无项目/第三方依赖       |
+| State                                | StorageState    | 类型化注册与进程内一致快照；只依赖 StorageCore                |
+| Cache（含 Audio）                    | StorageCache    | 不可变字节、租约、音频作用域；只依赖 StorageCore              |
+| Files                                | StorageFiles    | 文档、字节和受控目录；只依赖 StorageCore                      |
+| Database 根                          | StorageDatabase | 数据库生命周期协议与四个领域端口                              |
+| Database/Chat、Tasks、Media、Devices | 独立领域目标    | 记录契约；Chat 使用 Tasks，Media 组合 Files                   |
+| Database/SQLite                      | StorageSQLite   | 共享连接池、领域 SQL 适配、迁移、恢复与关闭；独占 GRDB        |
 
 每份源码只有一个编译拥有者。没有统一业务查询 DSL，没有自动内存回退或跨文件/SQL 事务。
 

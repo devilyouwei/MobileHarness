@@ -24,7 +24,7 @@ flowchart LR
 
 ## Graph and preview
 
-The graph has one front/back wide-angle input, up to 720p video and one JPEG output. It has no microphone/movie output and disables application audio-session auto-configuration. `CameraPreviewSource` exposes attachment to a native preview layer, without session mutation. ActionBindings selects aspect-fill, mirroring and display rotation.
+The graph has one front/back wide-angle input, up to 720p video and one JPEG output. It has no microphone/movie output and disables application audio-session auto-configuration. CameraCaptureOrientation supplies capture rotation independently of UI. UI owns image/pose crop and mirroring in the same render pass.
 
 A healthy `switchCamera(facing:)` replaces only the input inside begin/commit configuration, restores the old input on admission failure, drains/renews the frame stream and reapplies unmirrored sensor settings. It does not restart the session. Permission, running state and no photo in flight are required. Stop closes frames; interruption/error notifications use newest-one status storage.
 
@@ -59,3 +59,13 @@ Input is one JPEG/PNG, at most 4 MiB, with bounded valid dimensions. Upright JPE
 ## 待实现
 
 - Movie recording and background capture. Physical camera/permission/latency evidence is tracked in [validation history](../../../docs/validation/Validation-History.md).
+
+## Platform 根、设备接入与同帧呈现
+
+✅ VisionContainer 惰性持有唯一相机和最多一个相册导入任务，根 stop 取消并加入照片回调/导入。CameraCaptureOrientation 由设备 RotationCoordinator 更新，不再依赖预览层；原生帧保持未镜像传输。
+
+✅ AppleCamera.start 返回主帧流，subscribeFrames 提供最多 16 个独立的最新帧观察流；订阅本身不启动设备，停止/换镜头结束旧观察。CameraFrame 只读保留像素，Gateway 包装传输，Agents 才执行模型预处理。原生设备事件和业务呈现分开，照片提交后不因取消伪造回滚。
+
+## UI 容器与相机能力注入
+
+✅ 新增跨平台可替身的 CameraCapturing 原生接口与相机枚举/错误；AppleCamera 实现权限、帧订阅、启停、切换、照片、状态、事件和拍照方向能力。接口无 UI/业务依赖，静态权限方法保留原有原生入口，Coordinator 使用实例接口。

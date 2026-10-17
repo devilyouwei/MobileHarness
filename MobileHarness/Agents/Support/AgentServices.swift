@@ -53,6 +53,7 @@ import StorageState
             await titleMutations?.shutdown()
             await applicationControlIntents.shutdown()
             await manager.stopAll()
+            bluetooth.service.nativeObservation = nil
             await output.shutdown()
         }
         private let assistantContext: AgentContextRepository<AssistantContextState>
@@ -119,7 +120,7 @@ import StorageState
 
         init(
             state: StateContainer, cache: CacheContainer, files: FilesContainer,
-            chatRecords: any ChatRepository, taskRecords: any TaskRepository, camera: AppleCamera,
+            chatRecords: any ChatRepository, taskRecords: any TaskRepository, camera: any CameraCapturing,
             readHistoryPhoto: @escaping @Sendable (String, String) async throws -> Data?,
             cameraControl: any CameraControlCapability,
             bluetooth: BluetoothWorkflow,
@@ -194,7 +195,11 @@ import StorageState
             let historyPresentation = HistoryPresentationAdapter(
                 state: historyState, store: conversations, sessionID: historySessionID)
             let policy = try CommunicationPolicy(
-                contracts: AgentContracts.communication, externalSources: MediaInputAdapter.externalSources,
+                contracts: AgentContracts.communication,
+                externalSources: DeviceInputAdapter.sources.union([
+                    "user", "runtime", ModelResourceObservation.source, ModelResourceHostFailure.source,
+                    AppEnvironmentFact.source,
+                ]),
                 configurations: [
                     "Assistant", "SpeechPerception", "VisionPerception", "Photographer", "SpeechSynthesis",
                     "Memory", "ApplicationControl",
@@ -249,6 +254,9 @@ import StorageState
             let presentation = RuntimePresentation(
                 cameraControl: cameraControl, rootSessionID: photographerSessionID, activity: activity.state)
             self.bluetooth = bluetooth
+            bluetooth.service.nativeObservation = { value in
+                try await input.publish(DeviceInputAdapter.bluetooth(value))
+            }
             let resources = try ResourceCoordinator(
                 definitions: [
                     ResourceDefinition(
@@ -495,11 +503,6 @@ import StorageState
         }
         func visionContext() throws -> AgentContextRepository<VisionPerceptionContextState> {
             try Self.context(.visionPerception, VisionPerceptionContextState())
-        }
-        var visionDependencies: VisionRuntimeDependencies {
-            .init(
-                photographer: photographerIntents,
-                manager: manager, input: input, output: output, actions: actions, presentation: presentation)
         }
         var cameraDependencies: CameraRuntimeDependencies {
             .init(resources: GatewayCameraResources(resources: resources, actions: actions))

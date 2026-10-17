@@ -4,11 +4,13 @@
 
     /// One exclusively opened serial device; no write retries, no pending request queue.
     public actor NexArmSerial: NexArmObservableLink {
+        private let admission: PlatformAdmission?
         private var fd: Int32
         private var busy = false
         private var observationID: String?
         private var telemetry = NexArmTelemetryCache()
         public func beginObservation() throws -> String {
+            try admission?.check()
             guard fd >= 0 else { throw NexArmError.disconnected }
             guard !busy, observationID == nil else { throw NexArmError.busy }
             guard tcflush(fd, TCIFLUSH) == 0 else { throw NexArmError.io(errno) }
@@ -49,7 +51,8 @@
             return latest
         }
 
-        public init(path: String) throws {
+        public init(path: String, admission: PlatformAdmission? = nil) throws {
+            self.admission = admission
             guard path.hasPrefix("/dev/cu.usbserial-") || path.hasPrefix("/dev/tty.usbserial-") else {
                 throw NexArmError.disconnected
             }
@@ -85,6 +88,7 @@
 
         /// Serial admission only, matching BLE write semantics; physical completion is queried separately.
         public func write(_ packet: NexArmPacket) throws {
+            try admission?.check()
             try Task.checkCancellation()
             guard !busy, observationID == nil else { throw NexArmError.busy }
             guard fd >= 0 else { throw NexArmError.disconnected }
@@ -92,6 +96,7 @@
         }
 
         private func send(_ packet: NexArmPacket) throws {
+            try admission?.check()
             let bytes = packet.bytes
             let written = bytes.withUnsafeBytes { Darwin.write(fd, $0.baseAddress, $0.count) }
             guard written == bytes.count else { throw NexArmError.io(written < 0 ? errno : EIO) }

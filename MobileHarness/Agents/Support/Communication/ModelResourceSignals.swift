@@ -2,7 +2,7 @@ import AgentCore
 import Foundation
 import StorageCore
 
-public enum ModelResourceIntent: Codable, Sendable, Equatable {
+public enum ModelResourceIntent: ExternalInputProviding, Codable, Sendable, Equatable {
     case refreshResources
     case refreshPresentation(generation: UInt64)
     case restoreSource
@@ -34,22 +34,21 @@ public enum ModelResourceIntent: Codable, Sendable, Equatable {
             })
         else { throw CommunicationError.invalidPayload }
     }
-    public func input(sessionID: String) throws -> AgentInput {
-        let id: String
+    public func externalInput(sessionID: String, sequence: UInt64) throws -> ExternalInputDraft {
+        let id: String?
         let source: String
         if case .retire(let requestID) = self {
             id = requestID
             source = "runtime"
         } else {
-            id = UUID().uuidString
+            id = nil
             source = "user"
         }
         let message = AgentMessage(
             contract: Self.contract, content: self, maximumBytes: 2048, validate: { try $0.validate() })
         let payload = InputPayload.observation(message)
-        return AgentInput(
-            id: id, sessionID: sessionID, payload: payload,
-            metadata: InputMetadata(payload: payload, source: source, origin: .external, rootID: id))
+        return ExternalInputDraft(
+            id: id, sessionID: sessionID, payload: payload, source: source, rootID: id)
     }
 }
 extension AgentMessage {
@@ -57,7 +56,7 @@ extension AgentMessage {
 }
 
 /// Native sampled state invalidation; it carries no concrete model/UI values.
-public enum ModelResourceObservation: Codable, Sendable, Equatable {
+public enum ModelResourceObservation: ExternalInputProviding, Codable, Sendable, Equatable {
     case changed(generation: UInt64)
     case failed(generation: UInt64, message: String)
     public static let contract = "model.resource.state"
@@ -79,15 +78,12 @@ public enum ModelResourceObservation: Codable, Sendable, Equatable {
             }
         }
     }
-    public func input(sessionID: String, sequence: UInt64) throws -> AgentInput {
-        let id = UUID().uuidString
+    public func externalInput(sessionID: String, sequence: UInt64) throws -> ExternalInputDraft {
         let message = AgentMessage(
             contract: Self.contract, content: self, maximumBytes: 16_384, validate: { try $0.validate() })
         let payload = InputPayload.observation(message)
-        return AgentInput(
-            id: id, sessionID: sessionID, payload: payload,
-            metadata: InputMetadata(
-                payload: payload, source: Self.source, origin: .external, sequence: sequence, rootID: id))
+        return ExternalInputDraft(
+            sessionID: sessionID, payload: payload, source: Self.source, sequence: sequence)
     }
 }
 extension AgentMessage {
@@ -95,7 +91,7 @@ extension AgentMessage {
 }
 
 /// A host transport fact, separate from native function feedback and human intent.
-public struct ModelResourceHostFailure: Codable, Sendable, Equatable {
+public struct ModelResourceHostFailure: ExternalInputProviding, Codable, Sendable, Equatable {
     public enum Phase: String, Codable, Sendable { case admission, dispatch }
     public enum Scope: Codable, Sendable, Equatable {
         case operation, preference
@@ -119,14 +115,12 @@ public struct ModelResourceHostFailure: Codable, Sendable, Equatable {
         }
         if case .refresh(let generation) = scope, generation == 0 { throw CommunicationError.invalidPayload }
     }
-    public func input(sessionID: String) throws -> AgentInput {
-        let id = UUID().uuidString
+    public func externalInput(sessionID: String, sequence: UInt64) throws -> ExternalInputDraft {
         let payload = InputPayload.observation(
             AgentMessage(contract: Self.contract, content: self, maximumBytes: 16_384, validate: { try $0.validate() }))
-        return AgentInput(
-            id: id, sessionID: sessionID, payload: payload,
-            metadata: InputMetadata(
-                payload: payload, source: Self.source, rootID: id, parentID: requestID, hops: 1))
+        return ExternalInputDraft(
+            sessionID: sessionID, payload: payload, source: Self.source, parentID: requestID,
+            hops: 1)
     }
 }
 extension AgentMessage {

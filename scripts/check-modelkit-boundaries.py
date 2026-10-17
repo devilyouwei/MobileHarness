@@ -237,8 +237,8 @@ for target_name, path, dependencies in (
                 errors.append(f'Forbidden isolated execution import: {source.relative_to(ROOT)}')
 if {next(iter(d.values()))[0] for d in targets['FunctionContractTests'].get('dependencies', [])} != {'FunctionContracts'}:
     errors.append('FunctionContractTests must prove contracts without execution/call dependencies')
-if {next(iter(d.values()))[0] for d in targets['Gateway'].get('dependencies', [])} != {'AgentCore', 'FunctionContracts', 'ExecutionRuntime', 'CallRuntime'}:
-    errors.append('Gateway must depend only on AgentCore and the three isolated execution SDKs')
+if {next(iter(d.values()))[0] for d in targets['Gateway'].get('dependencies', [])} != {'AgentCore', 'FunctionContracts', 'ExecutionRuntime', 'CallRuntime', 'PlatformKit'}:
+    errors.append('Gateway may additionally depend on PlatformKit for native input adapters')
 if 'Support/Contracts' not in targets['Actions'].get('exclude', []):
     errors.append('Actions must exclude its independent FunctionContracts source target')
 if {next(iter(d.values()))[0] for d in targets['Actions'].get('dependencies', [])} != {'FunctionContracts', 'PlatformKit', 'BehaviorDefinitions', 'StorageChat', 'StorageCore', 'StorageFiles'}:
@@ -269,7 +269,7 @@ if not (ROOT / 'MobileHarness/Gateway/Runtime/README.md').is_file():
 # Gateway is transport-only; AgentCore remains independent of models/platform/business.
 for module, forbidden in {
     'PlatformKit': {'StorageTasks', 'StorageMedia', 'StorageDevices', 'StorageSQLite', 'Types', 'StorageCore', 'StorageChat', 'StorageCache', 'Actions', 'Tools', 'Agents', 'AgentCore', 'Gateway', 'UI', 'AppWorkflows', 'BehaviorAssembly'},
-    'Gateway': {'ModelKit', 'ModelKitRuntime', 'ModelKitDefaults', 'Agents', 'PlatformKit', 'Actions', 'Tools'},
+    'Gateway': {'ModelKit', 'ModelKitRuntime', 'ModelKitDefaults', 'Agents', 'Actions', 'Tools'},
     'AgentCore': {'ModelKit', 'ModelKitRuntime', 'ModelKitDefaults', 'Gateway', 'Agents', 'PlatformKit', 'SwiftUI', 'UIKit', 'CoreVideo'},
 }.items():
     source_root = ROOT / 'MobileHarness' / ('Agents/Support/Core' if module == 'AgentCore' else module)
@@ -279,6 +279,8 @@ for module, forbidden in {
         for imported in re.findall(r'\bimport\s+(\w+)', source.read_text()):
             if imported in forbidden or imported.startswith('ModelKit'):
                 errors.append(f'Forbidden {module} import {imported}: {source.relative_to(ROOT)}')
+        if module == 'Gateway' and 'PlatformKit' in imported_modules(source.read_text()) and source.name != 'DeviceInputAdapter.swift':
+            errors.append(f'Native SDK import outside Gateway input adapter: {source.relative_to(ROOT)}')
     target = next(t for t in package['targets'] if t['name'] == module)
     for dependency in target.get('dependencies', []):
         name = next(iter(dependency.values()))[0]
@@ -397,8 +399,10 @@ ui_dependencies = [next(iter(d.values()))[0] for d in ui.get('dependencies', [])
 if ui_dependencies:
     errors.append('UI must have no project dependencies')
 allowed_ui = {'Foundation', 'CoreGraphics', 'Observation', 'SwiftUI', 'UIKit'}
-# Public rendering frameworks are confined to the native companion implementation.
+# Public rendering frameworks are confined to the native rendering implementations.
 native_ui_imports = {
+    'Camera/CameraVideoFrame.swift': {'CoreVideo'},
+    'Camera/CameraFrameView.swift': {'CoreVideo', 'Metal', 'QuartzCore', 'Synchronization'},
     'Components/NativeCompanionSurface.swift': {'QuartzCore'},
     'Components/MetalHaloRenderer.swift': {'Metal', 'QuartzCore', 'Synchronization'},
 }
@@ -711,6 +715,23 @@ if 'trackingInputAvailable' not in runtime or '[weak photographerAgent]' not in 
     errors.append('Tracking freshness must be bound to the current Photographer without retaining its lifetime')
 assembly = (ROOT / 'MobileHarness/Agents/Support/ApplicationFeatures.swift').read_text()
 bluetooth_binding = (ROOT / 'MobileHarness/App/Composition/ServiceFactories.swift').read_text()
+# Composition supplies concrete camera/UI instances; consumers only use injected ports.
+for source in binding_sources['AgentBindings']:
+    if re.search(r'\b(?:CameraState|CameraCoordinator)\s*\(', source.read_text()):
+        errors.append(f'AgentBindings must not construct camera display state or Coordinator: {source.relative_to(ROOT)}')
+if not all(marker in camera_ownership for marker in ('any CameraCapturing', 'any CameraPresenting')):
+    errors.append('Camera execution must receive native and presentation interfaces')
+if re.search(r'\b(?:AppleCamera|CameraCaptureOrientation|CameraState)\b', camera_ownership):
+    errors.append('Camera execution acquired a concrete device or UI state dependency')
+if 'CameraCoordinator(' not in bluetooth_binding or 'makeCamera:' not in bluetooth_binding:
+    errors.append('App must supply the sole camera Coordinator factory')
+ui_registration = (ROOT / 'MobileHarness/App/Composition/ApplicationContainer.swift').read_text()
+if not all(marker in ui_registration for marker in ('Factory<UIContainer>', 'Factory<UICameraContainer>')):
+    errors.append('App must register the UI root and its camera capability')
+for source in (ROOT / 'MobileHarness/UI').rglob('*.swift'):
+    if imported_modules(source.read_text()) & {'PlatformKit', 'Gateway', 'Agents', 'Actions', 'FactoryKit'}:
+        errors.append(f'UI acquired a foundation/business dependency: {source.relative_to(ROOT)}')
+
 if 'stopVoice' in bluetooth_binding or 'beginSettingsChange' in bluetooth_binding:
     errors.append('Bluetooth construction cannot bind whole voice/session cleanup')
 for source in (ROOT / 'MobileHarness/App').rglob('*.swift'):
@@ -718,7 +739,7 @@ for source in (ROOT / 'MobileHarness/App').rglob('*.swift'):
         errors.append(f'App must call Storage runtime ports, not backend lifecycle details: {source.relative_to(ROOT)}')
 storage_registration = (ROOT / 'MobileHarness/App/Composition/ModuleRegistration.swift').read_text()
 if not all(value in storage_registration for value in (
-    'id: "storage"', 'dependencies: ["storage"]', 'services.storage.start()', 'services.storage.stop()',
+    'id: "storage"', 'id: "platform"', 'id: "ui"', 'services.uiContainer.start()', 'services.uiContainer.invalidate', 'services.uiContainer.setForeground($0)', 'services.uiContainer.stop()', 'dependencies: ["storage", "platform", "ui"]', 'services.storage.start()', 'services.storage.stop()',
 )):
     errors.append('App must register the actual Storage runtime before its consumers')
 for source in (ROOT / 'MobileHarness/App/Lifecycle').glob('*.swift'):
@@ -828,9 +849,26 @@ for source in (ROOT / 'MobileHarness/Agents/Support/Core').rglob('*.swift'):
         errors.append('Agent communication domain values belong to Agents/Support/Communication')
 
 # Generic communication infrastructure must not regain application domain schemas or camera samples.
+external_schema_files = (
+    'ApplicationSignals.swift', 'ProviderIntents.swift', 'PhotographerCameraIntent.swift',
+    'ModelResourceSignals.swift', 'AgentContracts.swift',
+)
+for name in external_schema_files:
+    source = ROOT / 'MobileHarness/Agents/Support/Communication' / name
+    if re.search(r'\b(?:AgentInput|InputMetadata)\s*\(', source.read_text()):
+        errors.append(f'External domain input must leave Signal encoding to Gateway: {name}')
+task_values = (ROOT / 'MobileHarness/Agents/Support/Communication/AgentTasks.swift').read_text()
+external_task_values = task_values.split('public struct AgentTaskInputIntent:', 1)[-1]
+if re.search(r'\b(?:AgentInput|InputMetadata)\s*\(', external_task_values):
+    errors.append('External task input must leave Signal encoding to Gateway')
+host_interaction = (ROOT / 'MobileHarness/Agents/Support/Communication/AgentInteractionRuntime.swift').read_text()
+if re.search(r'\b(?:AgentInput|InputMetadata)\s*\(|agent\.receive\(', host_interaction):
+    errors.append('Host interaction must use Gateway encoding and admission')
 for directory in ('MobileHarness/Agents/Support/Core', 'MobileHarness/Gateway'):
     for source in (ROOT / directory).rglob('*.swift'):
         content = source.read_text()
+        if source.name == 'DeviceInputAdapter.swift' and directory.endswith('Gateway'):
+            continue
         if any(marker in content for marker in ('"speech.', '"vision.', '"sound.', '"phone.', 'gray64', 'PerceptionMessage')):
             errors.append(f'Domain communication policy in generic infrastructure: {source.relative_to(ROOT)}')
 if (ROOT / 'MobileHarness/Agents/Support/Core/Communication/PerceptionInput.swift').exists() or (ROOT / 'MobileHarness/Agents/Support/Core/ImageInput.swift').exists():
@@ -983,7 +1021,7 @@ for directory in ('ModelKit', 'PlatformKit'):
             raise SystemExit(f'SDK exports application values: {source.relative_to(ROOT)}')
 if (ROOT / 'MobileHarness/Types/Audio/MicrophoneFrame.swift').exists():
     raise SystemExit('MicrophoneFrame must be owned by PlatformKit')
-for source in list(binding_sources['AgentBindings']) + [ROOT / 'MobileHarness/Agents/Support/MediaInputAdapter.swift']:
+for source in binding_sources['AgentBindings']:
     if re.search(r'\bImageFrame\s*\(|\bStreamingMonoPCMResampler\s*\(', source.read_text()):
         raise SystemExit(f'Model input preparation belongs to the calling Agent: {source.relative_to(ROOT)}')
 if 'resolveImage:' in (ROOT / 'MobileHarness/Agents/Support/ApplicationFeatures.swift').read_text():

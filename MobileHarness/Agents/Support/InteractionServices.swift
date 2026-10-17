@@ -48,7 +48,8 @@
         }
 
         init(
-            resources: URL, runtime: AgentServices, modelName: @escaping @Sendable () async throws -> String,
+            resources: URL, audio: AudioContainer, runtime: AgentServices,
+            modelName: @escaping @Sendable () async throws -> String,
             progress: @MainActor (String) -> Void
         ) async throws {
             actionActivity = runtime.actionActivity.state
@@ -61,7 +62,7 @@
             let validationModel = synthesis
             let diagnosticState = SpeechDiagnosticState()
             diagnostic = SpeechDiagnosticWorkflow(
-                state: diagnosticState, player: AppleAudioIO(), provider: validationModel,
+                state: diagnosticState, player: audio.io(.diagnostic), provider: validationModel,
                 load: { try await models.warmup(.synthesis) },
                 unload: { try await ModelKitDefaults.unloadSpeechSynthesis(resources: resources) })
             #if DEBUG
@@ -78,12 +79,13 @@
             let state = ConversationState()
             let lifecycle = VoiceSessionCoordinator(
                 runtime: runtime.voiceDependencies, state: state,
-                audio: AppleAudioIO(), recognition: recognition, synthesis: synthesis, voiceActivity: vad)
+                audio: audio.io(.voice), cue: audio.cue(.voice), haptic: audio.haptic(.voice), recognition: recognition,
+                synthesis: synthesis, voiceActivity: vad)
             self.lifecycle = lifecycle
             let audioDetection = AudioDetectionWorkflow(
                 state: AudioDetectionState(),
                 endpoint: AudioDetectionSession(
-                    recognition: recognition, vad: vad,
+                    recognition: recognition, vad: vad, audio: audio.io(.detection),
                     beforeStart: { [weak lifecycle] in await lifecycle?.stopVoiceAndWait() }))
             self.audioDetection = audioDetection
             lifecycle.beforeVoiceStart = { [weak audioDetection] in await audioDetection?.stopAndWait() }

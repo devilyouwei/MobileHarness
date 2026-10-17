@@ -62,7 +62,7 @@ Assistant 决定照片如何进入模型上下文，PlatformKit 提供通用图�
 
 ## Storage 生命周期边界收敛
 
-✅ AppStorage 使用实例级 FactoryKit 注册 StorageContainer，组合 State、Cache、Database、Files；AppLifecycle 按 storage → agents → native 启停。数据库实现负责迁移、恢复、接纳和关闭；会话音频使用 Cache 子作用域，配置/照片/模型文件复用 Files。模型制品工作在 Files 释放前加入清理并解除旧绑定。见 [实施计划](requirements/technical/Storage-Containers-Plan.md)。
+✅ AppStorage 使用实例级 FactoryKit 注册 StorageContainer，组合 State、Cache、Database、Files；AppLifecycle 按 storage / platform / ui → agents → native 启停。数据库实现负责迁移、恢复、接纳和关闭；会话音频使用 Cache 子作用域，配置/照片/模型文件复用 Files。模型制品工作在 Files 释放前加入清理并解除旧绑定。见 [实施计划](requirements/technical/Storage-Containers-Plan.md)。
 
 Storage 四类容器与通用 State 已实施，参见 [计划及验证范围](requirements/technical/Storage-Containers-Plan.md)；Skill useState 每轮公开状态上下文已接通，真实模型/设备验收独立记录。
 
@@ -79,3 +79,33 @@ Storage 四类容器与通用 State 已实施，参见 [计划及验证范围](r
 ## Skill call protocol migration
 
 ✅ Implemented: all bundled Skill functions use Action Call; historical/provider-native Tool infrastructure remains available for explicit non-Skill callers. Read-only queries use Query Channel and real value feedback before dependent decisions.
+
+## Platform 根与设备输入
+
+✅ App 以实例级 FactoryKit 注册 PlatformContainer（Audio、Vision、Connectivity），并管理启停/前后台失效。四大基础模块不依赖应用模块；Gateway 的原生输入适配允许单向使用 PlatformKit，统一包装帧、PCM 和设备技术事件。感知、聆听同意和业务完成归 Agents/Actions。
+
+✅ 内部 Pose Tool 携带进程内只读同帧附件；相机最新帧独立提交 UI；Pose Tool 只更新可独立过期的骨架，两者共享 Metal 几何变换。姿态加载、失败或超时不清除实时影像。详见 [实施计划](requirements/technical/PlatformKit-Containers-Plan.md) 与 [验证记录](validation/PlatformKit-Containers.md)。
+
+✅ 录音主输入直接消费原生容量 64 的有序流；可选 PCM 观察在原生回调阶段通过单代围栏独立广播。Gateway 对已过期的媒体呈现单独拒绝并记录；VisionPerception 对模型运行错误仅处理后续最新帧，250 ms 退避、连续三次失败终止，永久契约错误立即终止。取消加入真实原生工作，不以超时抛弃同步 Core ML 调用。
+
+✅ 视觉输入的关闭/异常先产生角色终态，输出分支排空后再清理，避免终态错误被并发取消。根级每秒监视输入、原生推理和新鲜输出进展，连续 3 秒无进展或媒体呈现失败进入 Agent 分类诊断及短 toast；同一故障只报告一次，恢复后解除提示。原生推理不返回时仍等待真实清理，不重复启动模型。图像接纳不等待无关的上下文持久化写锁，推理前仍读取已提交快照。
+
+✅ 视觉订阅保留最新态投递语义：VisionPerception 声明骨架、视线与 vision.pose 广播的替换键，Gateway 复用同一声明。生产视觉会话每路一个在途和一个最新待处理状态，不补发历史观测；离散命令保持独立 FIFO。Gateway 不硬编码视觉业务函数地址，所有缓冲有界，错误附具体队列信息并及时传播。
+
+## UI 根与相机能力装配
+
+✅ App 通过实例级 FactoryKit 注册 UIContainer 及唯一相机子能力，并提供 CameraCoordinator 构造工厂。Actions 的协调器注入 CameraCapturing 与 CameraPresenting，保留业务规则和帧到 UI 值转换；App 不转发帧，不增加运行时适配层。AgentBindings 只提供弱引用、延迟访问运行时的接入回调。页面与 Coordinator 共用容器内的相机状态。
+
+```mermaid
+flowchart LR
+ App[App IoC 装配] -.->|注入相机接口| Action[Actions CameraCoordinator]
+ App -.->|注入呈现接口| Action
+ Platform[PlatformKit CameraCapturing] -->|最新原生帧| Action
+ Action -->|最新画面与骨架| UI[UIContainer.camera CameraPresenting]
+```
+
+UI 根的失活关闭媒体接纳并清屏，停止加入展示到期任务；Metal/GPU 仍由原生视图按真实完成清理。其他 UI 状态尚未迁移。接口和生命周期细节见 [相机呈现](../MobileHarness/UI/Camera/README.md)。
+
+## 统一外部 Signal 边界
+
+现有用户意图、App 事实、模型资源和设备输入均由 Gateway.ExternalInputAdapter 生成外部 Signal；领域仅提供 ExternalInputDraft 内容及因果提示，基础库不依赖 Signal。Gateway 依照注入 schema/来源策略进行验证及分发；静态订阅与宿主动态订阅共享接纳，动态关系绑定会话/incarnation，不扩展目标能力或发布权限。显式宿主会话控制可等待订阅目标接纳并保留分支失败；普通 publish 保持单向语义。原生相机帧仍由 Actions 协调 UI 直接呈现。

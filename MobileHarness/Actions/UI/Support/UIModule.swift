@@ -87,8 +87,8 @@ public struct UIModule: CapabilityModule {
                 }),
             UIActions.showPoseDefinition(
                 handler: { [pose] invocation in
-                    try await UIActions.showPose(invocation: invocation) {
-                        try await pose.present($0, sessionID: $1.sessionID)
+                    try await UIActions.showPose(invocation: invocation) { overlay, _ in
+                        try await pose.present(overlay, invocation: invocation)
                     }
                 }),
         ]

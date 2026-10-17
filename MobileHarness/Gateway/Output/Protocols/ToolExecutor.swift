@@ -6,7 +6,9 @@ import FunctionContracts
 public struct ToolExecutor: Sendable {
     private let registry: ToolRegistry
     public init(registry: ToolRegistry) { self.registry = registry }
-    public func execute(_ call: ToolRequest, context: ActionExecutionContext, returning: Bool = false) async throws
+    public func execute(
+        _ call: ToolRequest, context: ActionExecutionContext, returning: Bool = false, attachment: (any Sendable)? = nil
+    ) async throws
         -> ToolResponse?
     {
         try Task.checkCancellation()
@@ -17,7 +19,7 @@ public struct ToolExecutor: Sendable {
         }
         do {
             let completion = try await FunctionExecutor.perform(
-                FunctionInvocation(tool: call, context: context),
+                FunctionInvocation(tool: call, context: context, attachment: attachment),
                 definition: definition.function)
             try Task.checkCancellation()
             return try Self.response(

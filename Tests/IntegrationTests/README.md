@@ -119,3 +119,35 @@ GenerationRoundTests 的 native-only 模型夹具报告合成参数首样本，�
 ✅ Implemented: bundled Skill regressions assert Action-only queries, Query Channel, value feedback, retention and Task adoption. Generic native/mixed protocol tests remain. Qwen full-suite assertions require all Skill calls to be Actions and every actual request to have no native declarations; original 53-case business expectations remain unchanged.
 
 ✅ Implemented: FixtureGenerationOutputs accepts explicit synthetic Action completion/failure outcomes, so query-retention fixtures feed exactly one correlated value result instead of a completion followed by duplicate feedback. Generic native fixtures stay independent of bundled Skill registration.
+
+## Platform 根、设备接入与同帧呈现
+
+PlatformContainerTests 验证注册隔离、根失效/恢复、重复停止和保留断开失败；DeviceInputTests 验证原生媒体适配、独立订阅、FIFO 溢出和输入取消加入；NativeAttachmentTests 验证字符串参数不能伪造附件；MediaTransportTests 验证慢媒体呈现只保留最新包且不阻塞离散输出。构建与运行证据见 [专项验证](../../docs/validation/PlatformKit-Containers.md)。
+
+## 视觉停顿恢复修复
+
+✅ 新增媒体过期后继续输出/新鲜媒体拒绝仍失败、模型忙后恢复/连续三次停止/永久错误立即停止/恢复等待可取消的回归。
+
+✅ 验证原生回调单代围栏在关闭后拒绝迟到包，慢观察者溢出不影响另一个消费者，广播错误保留。
+
+## 视觉静默停止与诊断补齐
+
+✅ 新增视觉会话输入结束/错误等待终态排空、输出失败取消加入输入、用户取消不报故障、卡住/过期健康快照和视觉异常 Agent 分类与 toast 的行为回归。
+
+✅ 图像接纳只做会话、新鲜度、单调序号及类型验证，原子替换 latest 槽；移除接纳前未使用的上下文快照读取，避免帧接纳等待上下文持久化写锁。真正开始推理时仍读取已提交快照。回归使用被阻塞的真实仓库 commit 验证接纳能独立返回。
+
+✅ 真实 VisionPerception 终态经绑定 Gateway consumer、失败快照订阅映射到 Agent 异常与 toast，验证原始错误、会话和输入关联保留。
+
+## 视觉 queueFull 修复
+
+✅ 增加慢视线/姿态广播消费下数百次更新只交付首个和最新值、离散输出不受阻、原始派发错误不被 queueFull 覆盖、FIFO 真溢出携带队列详情、不允许 Action/定向通信误标 latest 的回归。
+
+✅ 最新状态替换键在不同会话间隔离；超过 16 个不同键明确拒绝，验证不会通过最新态策略引入无界缓存。
+
+## UI 容器与相机能力注入
+
+✅ 补充 AppStorage 的 UI 根/子能力缓存一致性、跨根隔离及 CameraCapturing 替身接口回归；不将 iOS-only Coordinator 的编译或主机替身当作真机功能验收。
+
+## 统一输入专项
+
+✅ DeviceInputTests 覆盖统一草稿/信封、业务身份与因果、内容/反馈伪造拒绝、合成传感器 schema、静态/动态合并、容量/取消/关闭与会话/incarnation 隔离。既有业务意图回归验证兼容；替身不证明硬件采集。

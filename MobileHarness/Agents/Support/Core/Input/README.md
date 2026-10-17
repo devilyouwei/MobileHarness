@@ -35,3 +35,7 @@ Validated rate/layout/geometry and opaque media attachments are implemented.
 ## 待实现
 
 - 暂无本目录独立的实现待办；跨模块及实际模型/设备验收见所属模块说明。
+
+## Platform 根、设备接入与同帧呈现
+
+✅ ImageValueAttachment<Value: Sendable> 是通用只读值包装，不依赖平台像素或感知采样类型。Gateway 可包装原生值，感知消费者按其公开能力解包；框架自身不转换 RGB 或分析图像。

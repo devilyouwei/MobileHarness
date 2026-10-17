@@ -37,7 +37,7 @@ Assistant delegation guidance belongs to Resources/Agents/Assistant/Prompts.json
 
 ## Validation and causality
 
-Factories preserve session, source, root/parent and turn; payloads cannot supply runtime authority. Unknown types, malformed identities, forbidden fields and oversized encoded values reject. TaskRequest/Input/Progress/Result/Cancel are directed scoped values; TaskInput user text is ≤4096 bytes. Fixed UI confirmation requires trusted provenance.
+Domain drafts describe content and causal identities; Gateway encodes session/source/root/parent/turn and external provenance. Payloads cannot supply runtime authority. Unknown types, malformed identities, forbidden fields and oversized encoded values reject. TaskRequest/Input/Progress/Result/Cancel are directed scoped values; TaskInput user text is ≤4096 bytes. Fixed UI confirmation requires trusted provenance.
 
 Sound freshness is 500 ms, pose one second and partial transcript two seconds. Camera/history/provider intents retain declared 512-byte schema limits; application interaction and model-resource intents permit 2048 bytes. Camera-state snapshots permit 2048 bytes. ReplyActivity carries up to 128 input and task IDs each, source-local revision and causal acknowledgment. camera.state carries monotonic sequence/sample time, native permission/busy/lens state, displayed/saved photo IDs and bounded errors; root session stays in the envelope. Passive facts create neither task nor receipt.
 
@@ -75,3 +75,11 @@ ListeningIntent accepts optional explicit enabled consent; absence retains the e
 ✅ 存储访问使用独立的 State、Cache、Database 和 Files 接口；App 注册根实例，消费者通过构造器获得所需能力。存储容器不接管本目录的业务验证、执行和完成语义。
 
 ✅ AgentSessionControl 增加仅可信宿主可用的 interruptSession，取消会话在途工作但保留 Task/Skill/公开端口；cancelSession 表示真正关闭。两者不向模型注册，沿用当前身份校验与有界消息。
+
+## Platform 根、设备接入与同帧呈现
+
+✅ 本目录使用 App 注入的原生能力与 Gateway 设备输入接入；设备根由 AppLifecycle 启停，业务规则保持所属模块。当前框架边界及同帧呈现见 所属上级设计与 PlatformKit/Gateway 的模块说明。
+
+## 外部输入草稿
+
+✅ ApplicationSignals、ProviderIntents、PhotographerCameraIntent、ModelResourceSignals、AgentContracts、AgentTasks 的宿主输入实现 ExternalInputProviding，提供草稿，不创建 AgentInput/InputMetadata。Gateway 通用 input 扩展保留调用方式、请求身份及因果；AgentFixedTaskInput 可信解包不作为外部输入重封装。

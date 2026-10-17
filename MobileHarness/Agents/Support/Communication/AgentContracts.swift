@@ -230,7 +230,7 @@ extension InputPayload {
 }
 
 /// Typed human/history host intent; never embedded in framework business enums.
-public enum MemoryHistoryIntent: Codable, Sendable, Equatable {
+public enum MemoryHistoryIntent: ExternalInputProviding, Codable, Sendable, Equatable {
     case query(String)
     case startNew
     case summarize(String)
@@ -238,8 +238,8 @@ public enum MemoryHistoryIntent: Codable, Sendable, Equatable {
     case delete(String)
     case cancel(String)
     public static let contract = "history.intent"
-    public func input(sessionID: String) throws -> AgentInput {
-        let requestID: String
+    public func externalInput(sessionID: String, sequence: UInt64) throws -> ExternalInputDraft {
+        let requestID: String?
         let source: String
         if case .query(let id) = self {
             requestID = id
@@ -248,14 +248,13 @@ public enum MemoryHistoryIntent: Codable, Sendable, Equatable {
             requestID = id
             source = "runtime"
         } else {
-            requestID = UUID().uuidString
+            requestID = nil
             source = "user"
         }
         let message = AgentMessage(contract: Self.contract, content: self, maximumBytes: 512, validate: { _ in })
         let payload = InputPayload.observation(message)
-        return AgentInput(
-            id: requestID, sessionID: sessionID, payload: payload,
-            metadata: InputMetadata(payload: payload, source: source, rootID: requestID))
+        return ExternalInputDraft(
+            id: requestID, sessionID: sessionID, payload: payload, source: source, rootID: requestID)
     }
 }
 
@@ -264,17 +263,15 @@ extension AgentMessage {
 }
 
 /// Host lifecycle controls are domain messages, not model-callable functions or runtime feedback.
-public enum AgentSessionControl: Codable, Sendable, Equatable {
+public enum AgentSessionControl: ExternalInputProviding, Codable, Sendable, Equatable {
     case interruptSession
     case cancelSession
     public static let contract = "assistant.control"
-    public func input(sessionID: String) throws -> AgentInput {
-        let id = UUID().uuidString
+    public func externalInput(sessionID: String, sequence: UInt64) throws -> ExternalInputDraft {
         let message = AgentMessage(contract: Self.contract, content: self, maximumBytes: 512, validate: { _ in })
         let payload = InputPayload.observation(message)
-        return AgentInput(
-            id: id, sessionID: sessionID, payload: payload,
-            metadata: InputMetadata(payload: payload, source: "runtime", origin: .external, rootID: id))
+        return ExternalInputDraft(
+            sessionID: sessionID, payload: payload, source: "runtime")
     }
 }
 

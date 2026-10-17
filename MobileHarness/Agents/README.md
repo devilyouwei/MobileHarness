@@ -80,7 +80,7 @@ flowchart LR
 
 Agents 核心仍只依赖独立契约、模型/原生能力和领域仓库；不导入 UI、Actions、Gateway 实现或 App。AgentBindings 使用互斥源清单编译外层请求与运行接入，可依赖 Gateway、ActionBindings、公开 UI/基础能力。
 
-UI 提交的设置、资源、历史、相机及蓝牙请求由 AgentBindings 编码并关联实际角色结果；发布成功不等于业务完成。AgentServices 构造角色内部运行图并显式 start，启动错误传播至应用服务图。ApplicationFeatures 持有根级操作和观察，AgentApplicationUI 实现 UI 自己的端口；不读取具体 SQLite 后端。语音输入/角色策略、VisionSession 和隔离诊断属于本目标；原生播放和 UI 动画不在这些角色接入器内实现。
+UI 提交的设置、资源、历史、相机及蓝牙请求由 AgentBindings 编码并关联实际角色结果；发布成功不等于业务完成。AgentServices 构造角色内部运行图并显式 start，启动错误传播至应用服务图。ApplicationFeatures 持有根级操作和观察，AgentApplicationUI 实现 UI 自己的端口；不读取具体 SQLite 后端。语音输入/角色策略、感知角色会话和隔离诊断属于本目标；原生播放和 UI 动画不在这些角色接入器内实现。
 
 Root UI bootstrap 只调用注入的生命周期启动端口；根服务开始后页面才等待呈现准备。根观察独立于 SwiftUI 页面，退出/重试加入观察、业务消费和模块清理。App 只创建、连接和启停模块。
 
@@ -113,3 +113,27 @@ Root UI bootstrap 只调用注入的生命周期启动端口；根服务开始�
 ✅ AgentChatWorker 将模型中立诊断归为 Agent 异常，生成稳定 agent.model.* 代码，并分类生成/运行错误。现有 agent.error 控制继续结束决策；附加结构化诊断，不靠解析错误描述分类。模型请求和对话错误证据保留详细原因，无自动重试。
 
 ✅ Implemented: bundled Skill business invocations are Action-only, including read queries; generic Tool execution and historical pairing remain supported. Request catalog alone determines applicable protocol teaching.
+
+## Platform 根、设备接入与同帧呈现
+
+✅ Gateway 负责设备输入适配；Agents 保留 Vision 角色/追踪生命周期、语音同意及半双工规则。根集成使用注入的 Audio/Vision 子能力，不构造原生设备。帧通过 Gateway 进入角色，同帧展示通过内部 Tool 返回；角色不直接修改 UI 或管理 GPU。
+
+## 视觉停顿恢复修复
+
+✅ 视觉恢复策略只属于 VisionPerception，不影响对话/Action 的不自动重放契约。
+
+## 视觉静默停止与诊断补齐
+
+✅ VisionPerception 暴露有界健康快照及原始终态诊断；根级业务接入负责监视、日志及 toast，不让 UI 或 PlatformKit 负责感知恢复。
+
+## 视觉 queueFull 修复
+
+✅ VisionPerception 通过公开纯函数声明输出替换键，根级接入传递给 Gateway，不由 Gateway 识别业务函数地址。
+
+## UI 容器与相机能力注入
+
+✅ ApplicationFeatures 接收共享相机 UI state 与 App 提供的 Coordinator 工厂；只生成弱引用的 CameraIntegrationBindings，保留 Agent/Gateway/模型逻辑，不构造相机 UI 状态或 Coordinator。
+
+## 外部输入封装边界
+
+✅ 业务输入工厂实现 ExternalInputProviding，返回中立草稿；Gateway 负责信封，Agents 不导入 Gateway。可信固定任务解包保留原身份与授权。AgentBindings 的宿主控制和文字轮次也使用 Gateway 接入。

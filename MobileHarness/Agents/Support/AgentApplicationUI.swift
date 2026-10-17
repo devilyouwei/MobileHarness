@@ -16,7 +16,7 @@
         public init(features: ApplicationFeatures) { self.features = features }
         public var session: (any ApplicationSessionProviding)? { features.container }
         public var navigation: NavigationState { features.navigation }
-        public var cameraState: CameraState { features.camera.state }
+        public var cameraState: CameraState { features.cameraState }
         public var cameraControls: any CameraControlling { features.cameraControls }
         public var bluetoothState: BluetoothSettingsState { features.bluetooth.state }
         public var bluetoothControls: any BluetoothControlling { features.bluetoothControls }
@@ -27,11 +27,7 @@
         public var recordDestinations: [AgentRecordDestination] { features.recordDestinations }
         public func navigate(_ destination: AppDestination?) { features.navigate(destination) }
         public func cameraPreview() -> AnyView {
-            AnyView(
-                CameraPreviewAdapter(
-                    source: features.camera.preview,
-                    facing: features.camera.state.facing == .front ? .front : .back,
-                    skeleton: features.camera.state.skeleton))
+            AnyView(CameraFrameView(state: features.cameraState).id(features.cameraState.videoGeneration))
         }
         public func navigationChanged() {
             features.reportEnvironment(

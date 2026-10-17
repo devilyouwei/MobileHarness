@@ -94,3 +94,11 @@ InputKind 的 video/binary 尚无 InputPayload 分支或 codec。输入支持、
 - Generic factory/automatic restart, remote transport and durable execution delivery are not implemented.
 
 ✅ Generation 资源说明两种输出协议及原生名称来源；不将具体 Agent、Task 或设备策略加入 Core。解析器与权限契约保持不变。
+
+## Platform 根、设备接入与同帧呈现
+
+✅ ImageValueAttachment 只包装 Sendable 值，OutputEnvelope 按需保留通用 ImageInput。框架契约仍无项目依赖；不引入 CoreVideo、PlatformKit、具体消息契约或设备策略。邮箱停止释放可替换状态，离散消息继续遵循既有排空规则。
+
+## 外部输入描述
+
+✅ AgentInput.swift 定义 Foundation-only ExternalInputDraft/ExternalInputProviding；只携带内容、来源、因果和轮次，没有 origin/incarnation/taskScope 权限。实际 Signal 构造在 Gateway。

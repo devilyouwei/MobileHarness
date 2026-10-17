@@ -1,5 +1,6 @@
 import AgentCore
 import Foundation
+import PlatformKit
 
 /// Cheap image evidence; holds one inference reference and one union mask, each 64x64.
 /// YOLO cadence's fixed sample is a business attachment, not a framework image variant.
@@ -104,6 +105,7 @@ struct FrameMotionAnalyzer: Sendable {
     static func sample(_ frame: ImageInput) throws -> [UInt8] {
         switch frame.content {
         case .attachment(let attachment):
+            if let native = attachment as? ImageValueAttachment<CameraFrame> { return Array(native.value.gray64) }
             guard let value = attachment as? SampledImageAttachment else { throw ImageInputError.invalidFrame }
             return Array(value.gray64)
         case .rgb(let rgb):

@@ -76,3 +76,17 @@ Storage 四类容器边界检查覆盖 StorageCore/State/Cache/Files/Database/SQ
 ✅ compare-qwen-protocols.py 是隔离的阿里 Responses 协议探针，只允许 flash/max。相同函数语义/输入分别使用 xml-only、native-only、mixed、mixed-exclusive；独立场景与重复采样，含同一响应必须双调用的实验。只记录合成调用并返回替身反馈，不改变生产注册或执行设备，不把 HTTP 探针当生产 Agent/Gateway 验收。原始请求/公开输出、配对结果、协议及流程判定分别保留；限时/容量/调用次数有界，不自动重试，不保留凭据或私有 reasoning。
 
 ✅ Implemented: resource boundary checks require bundled Skill functions to be Actions with explicit Channel; generic schemas and Tool infrastructure remain supported. No cloud call is added to normal checks.
+
+## Platform 根、设备接入与同帧呈现
+
+check-modelkit-boundaries.py 保持四大基础模块无应用依赖、FactoryKit 仅在 AppStorage；Gateway 仅 DeviceInputAdapter.swift 可导入 PlatformKit 并声明设备来源。相机 UI 的 CoreVideo/Metal/QuartzCore 仅开放给帧值/渲染文件。check.sh 与 build-ios.sh 的失败和外部 SDK 限制见 [专项验证](../docs/validation/PlatformKit-Containers.md)。
+
+✅ 相机渲染的系统 Synchronization 导入仅限 Camera/CameraFrameView.swift，用于原生渲染线程的最新状态/槽位互斥；UI 的应用模块依赖和其他文件许可保持原有边界。
+
+## UI 容器与相机能力注入
+
+✅ 边界检查新增 App-only Coordinator 工厂、AgentBindings 禁止构造 CameraState/Coordinator、四大基础库相互隔离和 UI 生命周期注册约束；同步新增源码的唯一归属。
+
+## 外部输入边界
+
+✅ 边界检查限制业务外部工厂重建信封；Gateway 不引用业务 schema，基础库不引入框架依赖。

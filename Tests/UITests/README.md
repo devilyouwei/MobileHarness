@@ -35,3 +35,17 @@ CaptionPresentationTests 覆盖部分文本→最终修订、定稿与移动不�
 ## 分类异常诊断
 
 ✅ 验证诊断详情的有界保留及短 userMessage 展示，不将错误详情直接塞入 toast。
+
+## Platform 根、设备接入与同帧呈现
+
+✅ CameraFramePresentationTests 验证图像独立提交、姿态失败不清图、姿态独立过期、重复/错帧拒绝和渲染故障的代际围栏。测试使用合成像素，不代表 Metal 上屏或真实摄像头验收；证据见 [专项验证](../../docs/validation/PlatformKit-Containers.md)。
+
+✅ CameraFramePresentationTests 另覆盖相机渲染最新槽的合并、排空后的再接纳、停止拒绝，以及骨架网格的缓存、容量、镜像和方向约束；不以状态/几何测试替代原生显示链与 GPU 线程的设备验收。
+
+✅ macOS 上直接运行生产 CameraMetalRenderer，合成 Metal 兼容像素并验证真实 display-link/GPU 完成、无帧停止及反复启停/同图层接管。测试不使用真实相机或 YOLO，不代表 iPhone 上屏性能验收。
+
+✅ 相机到期回归按可观察状态作有界等待，替代固定 90 ms 睡眠，允许原生窗口与主线程调度在不同机器上有合理抖动；仍断言姿态过期时新鲜影像保留。
+
+## UI 容器与相机能力注入
+
+✅ 新增 UI 根/相机容器隔离、生命周期围栏、清屏、到期任务加入与停止后拒绝媒体回归，并保留相机独立输出和原生 Metal 回归。

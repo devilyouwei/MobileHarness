@@ -33,7 +33,7 @@ flowchart TB
  Vision --> Camera[Camera graph and preview]
  Vision --> Photo[JPEG and native Photos import]
  Connectivity --> NexArm[Protocol and USB/BLE]
- Core[Core: no implementation]
+ Core[Core: native lifecycle and bounded subscriptions]
 ```
 
 ## Capability contracts
@@ -43,7 +43,7 @@ flowchart TB
 | Audio | `AppleAudioIO`: first validated PCM before capture admission; playback completion after native buffer drain |
 | Vision | `AppleCamera`: actor-owned graph, native preview and newest frame; one bounded JPEG capture |
 | Connectivity | NexArm link protocols, native command encoding, passive telemetry and session-fenced transports |
-| Core | Documentation-only boundary; no compiled shared implementation |
+| Core | Generic native lifecycle and bounded subscription mechanisms |
 
 Capture layout is fixed for an admitted audio stream. Spatial-to-mono fallback is allowed only before admission and after spatial shutdown. Discrete PCM overflow fails; replaceable camera/status values explicitly use newest-one buffers. Native write completion does not prove physical arrival.
 
@@ -79,3 +79,19 @@ Audio/ListeningCaptureWorkflow 串行加入原生 start/stop，Vision/CameraVisi
 ## 待实现
 
 - Movie recording and an autonomous hardware safety controller.
+
+## Platform 根、设备接入与同帧呈现
+
+✅ PlatformContainer 是 MainActor 根，组合 AudioContainer、VisionContainer、ConnectivityContainer。构造/start 不请求权限、打开设备或扫描；根 start 开放 admission。invalidate 同步关门，并行请求原生停止；setForeground(false)/stop 加入停止；重复停止共享结果，错误保留，已停止根不能重用。App 持有根，消费者只获得子能力或端口。
+
+Audio 管理有限命名原生作用域与会话互斥；Vision 管理相机/照片导入；Connectivity 管理 BLE 和一个显式打开的 macOS serial。原生值与失败通过公开接口暴露给 Gateway；SDK 不知道 Signal、Agent、UI 或 FactoryKit。业务策略与设备完成仍是独立边界。
+
+✅ 根构造允许以共享 admission 注入 Connectivity 工厂；子容器使用 NexArmBluetoothLink 公共端口，测试可验证真实断开失败被根保留、重复停止不重试，不创建原生驱动。
+
+## 录音容器化回归修复
+
+✅ 移除主录音路径新增的 MainActor PCM 转发任务与第二级订阅 FIFO，startCapture 直接返回原生容量 64 的有序源流。可选订阅改为在原生回调交付阶段独立广播，不经主线程中转；保持每订阅 64、慢观察者局部 overflow、容量上限 16，不丢弃或扩大主录音队列来掩盖堵塞。原生停机前关闭观察代次并加入原生回调，旧回调不能污染新录音；原生错误结束对应观察流。
+
+## UI 容器与相机能力注入
+
+✅ Vision 提供 CameraCapturing 原生相机能力接口，由 AppleCamera 实现；接口不导入 UI/Actions，App 注入该能力，权限请求与拍照方向读取也经过接口。

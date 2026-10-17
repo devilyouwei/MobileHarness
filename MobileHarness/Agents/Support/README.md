@@ -108,7 +108,7 @@ Chat owns rolling request projection and unlimited default cumulative decisions;
 
 AgentServices 拥有角色接入、输出消费者、资源注册、Provider 私有请求接线及根观察。ApplicationFeatures 通过领域仓库接口组合 UI 请求服务；AgentApplicationUI 把现成服务适配成 UI.ApplicationRootProviding。RuntimeDependencies 只向会话拥有者暴露必要能力，不提供整个 App。
 
-VoiceSessionCoordinator 只保留语音输入、同意/占用屏障、角色及输出接入；ConversationPresentationController 和 VoiceNativeEffects 分别属于 ActionBindings。VisionSession 实现 CameraVisionRunning；GatewayCameraResources 实现 CameraResourceAccess，保留真实租约与旧所有者隔离。两端都不反向依赖 App。
+VoiceSessionCoordinator 只保留语音输入、同意/占用屏障、角色及输出接入；ConversationPresentationController 和 VoiceNativeEffects 分别属于 ActionBindings。ApplicationFeatures 拥有感知角色会话；GatewayCameraResources 实现 CameraResourceAccess，保留真实租约与旧所有者隔离。两端都不反向依赖 App。
 
 启动和停止由公开方法显式完成。前后台异步切换由通用 AppLifecycle 单 worker 调度，不再累积逐次 scene task 链；原生失效接口同步执行。根观察、准备、设备输入和业务操作都由模块持有，不由页面拥有。
 
@@ -141,3 +141,31 @@ VoiceSessionCoordinator 只保留语音输入、同意/占用屏障、角色及�
 模型响应侧协议拒绝发生在原生调用发布前，日志归 Agent 异常；已解析调用的 unknownCapability/参数拒绝及真实 Action/Tool 执行失败继续使用既有结果/完成契约，不因新增诊断而统一终止或重试。
 
 ✅ Implemented: Skill-only production catalogs contain Actions; no native declarations are synthesized for migrated queries. Retention/Task ownership follows admitted Action calls; private state and lifecycle semantics stay intact.
+
+## Platform 根、设备接入与同帧呈现
+
+✅ 原生音视频转 Signal 由 Gateway 的 DeviceInputAdapter 统一完成。ApplicationFeatures 只拥有 Vision 角色登记/移除和 Photographer 追踪关系，DeviceInputConnection 负责逐帧接纳。语音协调器保留同意、半双工和确认语句/播放屏障，原生通知由 AppleAudioIO 提供。
+
+✅ 运行服务使用注入的 Audio/Vision 能力，不构造 AppleAudioIO、BLE 或提示音/触觉实例。其他领域 IntentRuntime 的业务完成协议及 UI 适配仍保留。
+
+## 录音容器化回归修复
+
+✅ 移除主录音路径新增的 MainActor PCM 转发任务与第二级订阅 FIFO，startCapture 直接返回原生容量 64 的有序源流。可选订阅改为在原生回调交付阶段独立广播，不经主线程中转；保持每订阅 64、慢观察者局部 overflow、容量上限 16，不丢弃或扩大主录音队列来掩盖堵塞。原生停机前关闭观察代次并加入原生回调，旧回调不能污染新录音；原生错误结束对应观察流。
+
+## 视觉静默停止与诊断补齐
+
+✅ ApplicationFeatures 内的跨平台 VisionPipelineWorkflow 管理输入、输出和可选健康任务；输入正常结束或失败转换为角色终态，等待输出排空；输出失败或显式取消加入所有任务。根级监视每秒读取健康快照，3 秒无有效进展每次故障只记录一次，恢复后解除提示。ActionActivityWorkflow 将视觉诊断映射到 Agent 异常分类及短 toast；接入/加载/派发失败也记录完整关联信息，不只设置相机文案。
+
+✅ 根级消费检查媒体 Tool 的实际执行结果，将非取消的呈现失败纳入健康快照；一秒监视将其显示为 Agent 分类诊断和 toast，同一连续故障只报告一次，后续成功呈现清除该健康故障。
+
+## 视觉 queueFull 修复
+
+✅ 视觉根在 consumeSignals 注入角色的 outputReplacementKey，保留跨 Gateway 的状态替换语义；不增加模型并发或扩大录音/视觉 FIFO。
+
+## UI 容器与相机能力注入
+
+✅ ApplicationFeatures 的相机惰性属性调用 App 工厂，传递类型明确、弱引用且延迟访问 runtime 的 CameraIntegrationBindings；页面投影/观察使用注入的同一 CameraState。移除具体相机类依赖和原有状态/Coordinator 构造。
+
+## 统一外部输入
+
+✅ Communication 业务输入只生成草稿，Gateway 负责信封；AgentInteractionRuntime 不再自行改写文字信封。宿主控制先经过 Gateway 验证再等待既有中断/停止完成屏障，保持取消与私有请求身份。

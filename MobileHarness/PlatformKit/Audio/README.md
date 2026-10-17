@@ -69,3 +69,13 @@ AppleAudioIO.prepareClip validates bounded PCM, connects/prepares/starts only it
 ## 待实现
 
 - 暂无本目录独立的实现待办；跨模块及实际模型/设备验收见所属模块说明。
+
+## Platform 根、设备接入与同帧呈现
+
+✅ AudioContainer 提供 voice/diagnostic/detection/camera 四个有限命名作用域；只有原生 IO 需要独占会话，冲突明确 busy。各 IO/提示音/触觉惰性创建并复用根 admission；失效后拒绝新工作。停止取消并加入提示音、触觉和原生通知任务并关闭原生采集，关闭 IO；会话释放错误保留给 Platform 根。
+
+✅ AppleAudioIO 直接返回原生 64 包有序 FIFO；最多 16 个可选 PCM 观察订阅在原生回调阶段各自接收，每订阅保留 64 包，无 MainActor PCM 转发任务或主路径第二级队列。慢订阅保留已接受包后以 overflow 结束，不消费其他订阅的数据。subscribeCapture 不启动设备；结束捕获关闭当前订阅。路由/中断由两个模块拥有的通知 worker 产生 NativeAudioEvent，调用者可独立订阅最新事件。
+
+## 录音容器化回归修复
+
+✅ 移除主录音路径新增的 MainActor PCM 转发任务与第二级订阅 FIFO，startCapture 直接返回原生容量 64 的有序源流。可选订阅改为在原生回调交付阶段独立广播，不经主线程中转；保持每订阅 64、慢观察者局部 overflow、容量上限 16，不丢弃或扩大主录音队列来掩盖堵塞。原生停机前关闭观察代次并加入原生回调，旧回调不能污染新录音；原生错误结束对应观察流。
