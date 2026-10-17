@@ -55,7 +55,9 @@ TaskActions 属于 System 目录，但公开地址为 `Agent.Task`，这是显�
 
 Provider 的发现、恢复、保存只传 requestID ID；URL/密钥留在同会话私有暂存中。发现结果最多 2048 个模型 ID、每项最多 512 字节、编码最多 65536 字节；过滤策略在 Support。readSettings 不返回 URL/密钥，不执行联网可用性探测。
 
-Device.control 的模型声明提供 scan/stopScan/connect/reconnect/disconnect/forget/refresh；实际解析还支持 preset、motorVelocity、stopMotorControl、openPage、closePage、openSystemSettings 等可信操作。connect/reconnect 要求设备 ID；motorVelocity 要求电机 1…6 和有限 −1…1 的 value；preset 使用封闭动作名。可选 fence 必须为 ID。其余操作拒绝 id/value/action 混用，未知参数键拒绝。
+Device.control 的模型声明提供 scan/stopScan/connect/reconnect/disconnect/forget/refresh；实际解析还支持 preset、motorVelocity、stopMotorControl、openPage、closePage、openSystemSettings 等可信操作。
+
+✅ DeviceActions.control 按 operation 提取适用字段，忽略其他操作专用的 id/value/action，不传到设备端口。connect/reconnect 仍要求设备 ID；motorVelocity 仍要求电机 1…6 和有限 −1…1 的 value；preset 仍使用封闭动作名。可选 fence 始终校验 UUID。XML 额外未声明参数在 AgentCore 解析别名时过滤；可信直接入口仍拒绝未知键。disconnect 不需要设备 ID，即使附带 id 或其他操作字段也只提交断开请求。
 
 readStatus/readEnvironment 不接收参数，分别限制 16384/65536 UTF-8 字节，内容由端点提供；入口不追加事实或证明物理完成。runtimeInfo 直接返回固定文字，当前不解析参数，也不是实时健康检查。
 

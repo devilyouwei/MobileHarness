@@ -23,26 +23,23 @@ extension SystemActions {
             let operation = DeviceControlRequest.Operation(
                 rawValue: try args.requiredString("operation", maximumUTF8Bytes: 32))
         else { throw DeviceControlError.invalidRequest }
-        let id = invocation.call.parameters["id"]
-        let value = invocation.call.parameters["value"].flatMap(Double.init)
-        let action = invocation.call.parameters["action"]
-        guard invocation.call.parameters["value"] == nil || value != nil else {
-            throw DeviceControlError.invalidRequest
-        }
+        let id = [.connect, .reconnect, .motorVelocity].contains(operation) ? invocation.call.parameters["id"] : nil
+        let value = operation == .motorVelocity ? invocation.call.parameters["value"].flatMap(Double.init) : nil
+        let action = operation == .preset ? invocation.call.parameters["action"] : nil
         switch operation {
         case .connect, .reconnect:
-            guard id.flatMap(BusinessRecordID.parse) != nil, value == nil, action == nil else {
+            guard id.flatMap(BusinessRecordID.parse) != nil else {
                 throw DeviceControlError.invalidRequest
             }
         case .motorVelocity:
             guard id.flatMap(Int.init).map({ (1...6).contains($0) }) == true, let value, value.isFinite,
-                (-1...1).contains(value), action == nil
+                (-1...1).contains(value)
             else { throw DeviceControlError.invalidRequest }
         case .preset:
-            guard let action, DeviceControlRequest.actions.contains(action), id == nil, value == nil else {
+            guard let action, DeviceControlRequest.actions.contains(action) else {
                 throw DeviceControlError.invalidRequest
             }
-        default: guard id == nil, value == nil, action == nil else { throw DeviceControlError.invalidRequest }
+        default: break
         }
         if let fence = invocation.call.parameters["fence"], UUID(uuidString: fence) == nil {
             throw DeviceControlError.invalidRequest
