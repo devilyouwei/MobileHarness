@@ -42,7 +42,7 @@ Worker 在选择 provider 前登记原始 Decision，内部 ReACT 复用该输�
 
 AgentPrompts 通过显式资源 Catalog 读取模板，要求 executionObservations/historicalExecution/toolFailure。标题模板由 Memory 独立读取。渲染规则见 [Generation](../Core/Generation/README.md#prompt-resources-and-rendering)：单次替换、精确变量、缺失/超限明确失败，无资源热更新。
 
-每次实际模型请求按已加载 Skill 的 useState 读取同一公开快照，重建系统消息内唯一 CURRENT STATE 事实数据块；不再通过 user 消息注入私有 Task/Skill 管理状态。真实 Action 观察与 native 调用/结果保持配对。Native Tool 定义位于 ChatRequest.tools。
+每次实际模型请求按已加载 Skill 的 useState 读取同一公开快照；首条 system 保留稳定指令/目录，独立 system 消息承载唯一 CURRENT STATE，放在历史后、最新 user 输入/观察前；末尾为 native Tool 结果时追加在完整结果组之后。旧 State 不带入续轮，不通过 user 消息注入私有 Task/Skill 管理状态。Native Tool 定义位于 ChatRequest.tools。缓存命中由 provider 决定，本层不假定服务端边界或价格。
 
 ## Task/Skill 控制与执行边界
 
@@ -141,3 +141,10 @@ AgentChatWorker 默认 TextSegmentationPolicy 为首段 Han/其他字符 20/60�
 Task 关闭后的历史重建复用真实 Action executionObservations，不再额外生成 mode/activeTaskID/skills 等 Task 转换状态摘要；当前任务事实只从 CURRENT STATE 读取。
 
 ✅ pause 与可信 interruptSession 复用当前取消/join 屏障，但保留 Task/Skill 和 AgentStateContext 作用域；被中断 Decision 不结算闲置次数，运行目标回到 waitingUser。cancelSession 才关闭公开端口并释放会话 Skill。处理中的显式 finish/cancel 仍按真实屏障结算终态。
+
+✅ State 单独系统消息按每请求刷新，放在最新 user 消息之前或完整 native 结果组之后；历史选择保留 system 与配对，预算包含 State。缓存用量透传到真实请求证据。
+
+
+## 分类异常诊断
+
+✅ 模型失败使用类型化诊断生成 AgentFailureDiagnostic；分类代码、可读细节随现有 agent.error 输出。清理附带错误继续保留，原始模型失败不被降为普通运行错误；取消继续使用 agent.cancelled，不产生错误 toast。

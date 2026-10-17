@@ -11,3 +11,5 @@ The exact prompt regression preserves every consecutive-user turn. Existing alte
 ## 待实现
 
 - Real inference, cancellation and unload/reload require HARNESS_TEST_GEMMA4=1 and HARNESS_GEMMA4_ROOT pointing at the paired CoreAI b2 decoder/QAT table tree. No test weights are committed.
+
+✅ 无权重回归验证后置 system 被显式前置合并，保留用户消息边界和原本地限制。

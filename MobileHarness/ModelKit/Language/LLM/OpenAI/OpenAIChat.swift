@@ -51,12 +51,14 @@ public actor OpenAIChat: ChatCapability {
                 request.timing?.start()
                 let (bytes, response) = try await network.bytes(for: http)
                 control.installHTTP(bytes.task)
-                guard let response = response as? HTTPURLResponse else { throw OpenAIChatError.invalidResponse }
+                guard let response = response as? HTTPURLResponse else {
+                    throw OpenAIChatError.responseFailure(.init(.invalidHTTPResponse, stage: .http))
+                }
                 guard (200..<300).contains(response.statusCode) else {
                     throw OpenAIChatError.httpStatus(response.statusCode)
                 }
                 guard response.mimeType?.lowercased() == "text/event-stream" else {
-                    throw OpenAIChatError.invalidResponse
+                    throw OpenAIChatError.responseFailure(.init(.unexpectedContentType, stage: .http))
                 }
                 var decoder = ChatEventDecoder(
                     toolNames: OpenAIChatConfiguration.toolNames(request.tools), timing: request.timing)

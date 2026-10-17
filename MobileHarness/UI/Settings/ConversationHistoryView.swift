@@ -906,7 +906,7 @@ import Foundation
                 }
                 loading = false
             }
-            .fullScreenCover(isPresented: $inspecting) {
+            .retainedFullScreenCover(isPresented: $inspecting) {
                 ZStack(alignment: .topTrailing) {
                     Color.black.ignoresSafeArea()
                     if let data { HistoryImagePreview(data: data) }

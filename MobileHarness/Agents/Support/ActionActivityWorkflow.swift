@@ -27,10 +27,33 @@ public final class ActionActivityWorkflow: ExecutionFailureReporting {
         state.recordIssue(
             .init(
                 title: title, source: source, message: message, failureCode: failureCode, context: context,
-                userMessage: Self.userMessage(source: source, message: message)))
+                userMessage: Self.userMessage(source: source, message: message, code: failureCode)))
     }
-    private static func userMessage(source: String, message: String) -> String? {
-        source == "speechPerception" && message.hasPrefix("agent.error: speech perception:") ? "我没听清" : nil
+    private static func userMessage(source: String, message: String, code: String? = nil) -> String? {
+        switch code {
+        case "agent.model.tool.undeclaredName": return "模型调用了未声明的工具，本次回复已中止"
+        case "agent.model.tool.invalidArguments": return "模型返回的工具参数格式错误，本次回复已中止"
+        case "agent.model.tool.argumentsMismatch": return "模型返回的工具参数前后不一致，本次回复已中止"
+        case "agent.model.tool.invalidIdentity", "agent.model.tool.sequenceMismatch":
+            return "模型返回的工具调用信息不一致，本次回复已中止"
+        case "agent.model.transport": return "模型连接失败，请检查网络后重试"
+        case "agent.model.httpStatus", "agent.model.provider": return "模型服务请求失败，本次回复已中止"
+        case let code? where code.hasPrefix("agent.model."): return "模型响应格式异常，本次回复已中止"
+        case let code? where code.hasPrefix("agent.generation."): return "模型输出的指令格式异常，本次回复已中止"
+        case "agent.runtime.failed": return "对话处理失败，请查看日志"
+        case "agent.context.publication": return "对话上下文更新失败，本次回复已中止"
+        default:
+            return source == "speechPerception" && message.hasPrefix("agent.error: speech perception:") ? "我没听清" : nil
+        }
+    }
+    private static func categoryTitle(_ category: AgentFailureDiagnostic.Category) -> String {
+        switch category {
+        case .modelResponse: "模型响应异常"
+        case .modelTransport: "模型连接异常"
+        case .generation: "指令生成异常"
+        case .context: "上下文异常"
+        case .runtime: "Agent 运行异常"
+        }
     }
 
     public func startFailures(observe: @escaping @Sendable () async throws -> AsyncStream<OutputFailureSnapshot>) {
@@ -46,8 +69,14 @@ public final class ActionActivityWorkflow: ExecutionFailureReporting {
                         records: snapshot.records.map {
                             .init(
                                 id: $0.id, title: $0.title, source: $0.source.rawValue, message: $0.message,
-                                time: $0.time, failureCode: $0.failureCode, inputID: $0.inputID,
-                                userMessage: Self.userMessage(source: $0.source.rawValue, message: $0.message))
+                                time: $0.time, failureCode: $0.failureCode,
+                                context: .init(
+                                    workerID: $0.source.rawValue, sessionID: $0.sessionID,
+                                    inputID: $0.inputID, roundID: $0.roundID),
+                                inputID: $0.inputID,
+                                userMessage: Self.userMessage(
+                                    source: $0.source.rawValue, message: $0.message, code: $0.failureCode),
+                                category: $0.diagnostic.map { Self.categoryTitle($0.category) })
                         }, evictedCount: snapshot.evictedCount)
                 }
             } catch {

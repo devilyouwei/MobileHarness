@@ -1,5 +1,7 @@
 # Camera Presentation
 
+✅ 照片检查器使用共享 retainedFullScreenCover，保留原有全屏黑底和保存/忽略/返回按钮，同时让首页仍挂载；onDismiss 仍以真实关闭完成为退出动画起点，不提前确认效果。
+
 ## Summary
 
 Camera controls, injected preview content, pose statistics and one current-photo surface.

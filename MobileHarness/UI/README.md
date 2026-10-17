@@ -1,5 +1,7 @@
 # UI — Presentation and Human Interaction
 
+✅ 相机与历史照片大图使用共享 RetainedFullScreenCover，以 UIKit overFullScreen 保留下层窗口树；只在真实关闭完成后发送 onDismiss，快速开关合并为一个最新期望值，源销毁关闭并加入实际 dismissal。
+
 ## Summary
 
 Independent SwiftUI views, display values and injected interaction interfaces.
@@ -85,6 +87,8 @@ History pagination becomes appearance-driven for archive lists, dialog timelines
 
 ## 公开端口与应用根界面
 
+✅ ApplicationRootView 使用 PersistentHomeNavigation，将首页及相机/表情渲染树常驻在 NavigationStack 外；独立透明根导航层承载设置、历史及更深详情。任意层级覆盖只切换命中和辅助功能，保留首页身份、窗口挂载、状态更新与动画真实回执。前台所有页面保持屏幕唤醒；Scene 非 active 仍由 App 同步失效并取消根业务，返回前台不自动恢复旧操作。导航返回不重新创建首页。原生离窗/销毁仍如实失败，不伪造动画成功。
+
 ApplicationRootPorts 定义 UI 自己的根请求/会话能力，不包含业务模块类型；ApplicationRootView 拥有首页、导航树、设置/历史目的地及诊断展示。AgentApplicationUI 在 AgentBindings 实现这些请求端口；bootstrap/retry 是注入的生命周期接口，页面不拥有根服务。
 
 SettingsProviderOperations、ModelResourcesOperating 与展示错误值属于 UI 的公开请求契约；调用实现和业务判断在上层。BluetoothViewSnapshot 由 UI.apply 接纳，连接/控制事实仍由 NexArmControlService 拥有。HomeEffectsWorkflow 只依赖 Foundation 和 UI 自身类型，持有有界期限状态；业务 invocation 到 PresentationOwner 的转换在 ActionBindings。
@@ -105,3 +109,10 @@ UI、ModelKit、PlatformKit、Storage 仍无项目依赖；Actions/Agents 的外
 [公开 State 契约](../Storage/State/README.md)
 
 ✅ ApplicationRootView 的设置入口仅本地导航；移除 stopVoice 和 setHomeVisible 生命周期控制。设置/历史导航不停止根级 Assistant、语音或相机，页面独有读取/诊断仍按离开清理。
+
+✅ 历史用量展示可选缓存读/写计数，不推算缺失值或费用；Prompts 沿用实际消息列表显示独立 system 事实。
+
+
+## 分类异常诊断
+
+✅ ExecutionIssue 增加可选分类与轮次展示值；宿主提供短 userMessage 和有界详细日志，UI 只展示并保留原 toast 生命周期。见 [Conversation](Conversation/README.md)。

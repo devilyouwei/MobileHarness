@@ -54,3 +54,5 @@ HistoryPaging.pageSize supplies the shared20-item default for archived dialogs a
 ## Storage 容器关系
 
 ✅ 本目录的领域端口由 DatabaseStorage 发布；SQL 适配器统一归 Database/SQLite 编译，业务调用方不导入 SQLite 后端。
+
+✅ ConversationTokenUsage 透传可选 cachedInput/cacheWriteInput；原始请求保存稳定 system 与当前 State 分开的消息。旧 Codable 数据缺失字段可读。

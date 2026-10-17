@@ -516,3 +516,19 @@ private func taskReferenceFixture(owner: String?, snapshot: String?) throws -> H
 func historyFunctionCatalogRejectsCorruptSnapshotsRatherThanInventingEmptyGroups(_ json: String) {
     #expect(throws: DecodingError.self) { try ConversationHistoryPresentation.functionCatalog(json) }
 }
+
+@Test func historyCacheUsageDistinguishesZeroFromMissingAndPreservesExport() throws {
+    let legacy = try JSONDecoder().decode(
+        HistoryTokenUsage.self, from: Data(#"{"input":12,"generated":2,"total":14}"#.utf8))
+    #expect(legacy.cachedInput == nil && legacy.cacheWriteInput == nil)
+    let snapshot = try historyFixture(extra: [
+        "tokenUsage": ["input": 12, "generated": 2, "total": 14, "cachedInput": 0, "cacheWriteInput": 4]
+    ])
+    let turn = try #require(snapshot.turns.first)
+    #expect(turn.tokenReport.contains("缓存读取：0 tokens"))
+    #expect(turn.tokenReport.contains("缓存写入：4 tokens"))
+    let exported = try JSONDecoder().decode(HistoryTurn.self, from: ConversationHistoryPresentation.jsonData(turn))
+    #expect(exported.tokenUsage?.cachedInput == 0 && exported.tokenUsage?.cacheWriteInput == 4)
+    let older = try historyFixture(extra: ["tokenUsage": ["input": 12, "generated": 2, "total": 14]])
+    #expect(older.turns.first?.tokenReport.contains("缓存") == false)
+}

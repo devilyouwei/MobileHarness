@@ -60,3 +60,5 @@ BehaviorAssembly.swift、BehaviorProtocolBindings.swift 和 NativeCleanupFailure
 ## 待实现
 
 - 暂无本目录独立的实现待办；跨模块及实际模型/设备验收见所属模块说明。
+
+✅ Implemented: BehaviorProtocolBindings explicitly supports Action+Tool for History list/read, Provider readSettings, resource snapshot and Device readStatus. Action callers use their Skill Channel; the Tool projection remains direct. Other functions are unchanged.

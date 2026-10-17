@@ -174,7 +174,45 @@ private enum LifecycleTestFailure: Error { case start, cleanup }
     #expect(invalidations == 1)
     release.continuation.yield(())
     try await lifecycle.waitForForeground()
-    #expect(values == [true, true])
+    #expect(values == [true, false, true])
+    try await lifecycle.stop()
+}
+
+@Test(.timeLimit(.minutes(1))) @MainActor
+func rapidReactivationJoinsEverySuspensionBeforeResumingAnyService() async throws {
+    let entered = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingOldest(1))
+    let release = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingOldest(1))
+    var events: [String] = []
+    var cancellationFinished = false
+    let lifecycle = try ApplicationLifecycle(services: [
+        .init(
+            id: "agents", start: {},
+            foreground: { active in
+                events.append("agents \(active)")
+                if !active { cancellationFinished = true }
+                if active, events.count > 2 { #expect(cancellationFinished) }
+            }, stop: {}),
+        .init(
+            id: "native", dependencies: ["agents"], start: {},
+            foreground: { active in
+                events.append("native \(active)")
+                if !active {
+                    entered.continuation.yield(())
+                    for await _ in release.stream { break }
+                }
+            }, stop: {}),
+    ])
+    try await lifecycle.start()
+    try await lifecycle.waitForForeground()
+    events.removeAll()
+    lifecycle.setForeground(false)
+    for await _ in entered.stream { break }
+    lifecycle.setForeground(true)
+    #expect(events == ["native false"] && !cancellationFinished)
+    release.continuation.yield(())
+    try await lifecycle.waitForForeground()
+    #expect(events == ["native false", "agents false", "agents true", "native true"])
+    #expect(cancellationFinished)
     try await lifecycle.stop()
 }
 

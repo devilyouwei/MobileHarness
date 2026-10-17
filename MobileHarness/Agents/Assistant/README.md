@@ -69,7 +69,7 @@ block-beta
 
 资源由 [AgentConfigurations](../Support/AgentConfigurations.swift) 按打包 Bundle 中的 [Catalog.json](../../Resources/Catalog.json) 显式映射读取并缓存，不扫描目录或热更新。协议与短检查来自 [FunctionTokenPrompts.json](../Support/Core/Generation/FunctionTokenPrompts.json)，角色来自 [Instructions.md](../../Resources/Agents/Assistant/Instructions.md)，独立 Agent 职责来自 [Prompts.json](../../Resources/Agents/Assistant/Prompts.json) 的 delegation。Skill 概览读取各 Skill.json 的 id/description，按 ID 排序，总预算 4 KiB，必要时截短描述并保留 ID。
 
-基础列表来自 [Agent.json](../../Resources/Agents/Assistant/Agent.json) 的 baseSkills；[AgentSkillLoader](../Support/AgentSkillLoader.swift) 展开当前激活项的依赖并合并函数绑定，⑤拼接对应 Instructions.md，⑥通过 [CapabilityContextBuilder](../Support/Core/Capability/CapabilityContextBuilder.swift) 渲染当前 Action 目录。别名/Channel 来自 Skill 绑定，描述、参数与约束来自真实 @Action 声明；⑦由同一目录渲染器追加；实际请求随后添加 CURRENT STATE 公开事实块。
+基础列表来自 [Agent.json](../../Resources/Agents/Assistant/Agent.json) 的 baseSkills；[AgentSkillLoader](../Support/AgentSkillLoader.swift) 展开当前激活项的依赖并合并函数绑定，⑤拼接对应 Instructions.md，⑥通过 [CapabilityContextBuilder](../Support/Core/Capability/CapabilityContextBuilder.swift) 渲染当前 Action 目录。别名/Channel 来自 Skill 绑定，描述、参数与约束来自真实 @Action 声明；⑦由同一目录渲染器追加。实际请求把唯一 CURRENT STATE 作为独立 system 数据消息放在完整历史之后、最新 user 输入/观察之前；末尾为 native Tool 结果时，State 位于完整调用/结果组之后。
 
 [共享 Chat Worker](../Support/Chat/README.md) 在每次新输入及 ReACT 请求中按当前 Skill 快照重新组装 system/工具定义；已发出的请求与历史证据不重写。system 正文最多 64 KiB，超限明确失败。Task/相机/机械臂公开事实进入 CURRENT STATE 系统数据块，Skill 归属/剩余次数保持私有；历史与真实 ReACT 执行观察通过原有消息保留；原生 Tool 定义放在 request.tools，仅模型支持 Tool Calls 时提供，均不属于上图的 system 正文。
 
@@ -116,3 +116,7 @@ These scene/composition defaults are based on [OpenAI vision sizing](https://dev
 ✅ Assistant 不接收 camera.state 或持有可写相机镜像。按已加载 Skill 的 useState 读取 camera/robot/task；task 仅 goal 与 running/waitingUser，无任务为 null，收尾保留最近业务状态，不新增 waitingFor。真实输入、Action 结果、Tool 配对和历史证据继续保留。
 
 [公开 State 契约](../../Storage/State/README.md)
+
+✅ 教学去重、保留关键示例；固定 system 不含当前 State，公开事实以独立 system 消息放在完整历史之后、最新用户或 Action 观察之前；native Tool 结果组完整保留，事实不伪装用户输入。
+
+✅ 请求教学明确“先产生合法调用，收到确认后再报告效果”，控制独占响应及替换后的新请求边界由 BasicSkill 负责；业务 Skill 单独解释照片终态和设备阻断。保留 Task/Skill 状态机、每轮 State 注入、Native Tool 编解码和运行期执行契约。

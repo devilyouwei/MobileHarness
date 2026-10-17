@@ -58,6 +58,7 @@ public struct ApplicationLifecycleFailure: Error {
     private var sceneFailure: ApplicationLifecycleFailure?
     private var sceneRevision: UInt64 = 0
     private var desiredForeground = true
+    private var suspensionPending = false
     private var closed = false
     private var startingServices = false
     private var startupSuspended = false
@@ -167,6 +168,7 @@ public struct ApplicationLifecycleFailure: Error {
         sceneRevision &+= 1
         if foreground { resumeStartupForeground() }
         if !foreground {
+            if state == .running { suspensionPending = true }
             // Runs synchronously even while a native/model start is suspended.
             for service in services.reversed() { service.invalidate() }
             if state == .starting, startingServices {
@@ -179,10 +181,12 @@ public struct ApplicationLifecycleFailure: Error {
             defer { sceneWorker = nil }
             while !Task.isCancelled, !closed {
                 let selected = sceneRevision
-                let value = desiredForeground
+                let value = suspensionPending ? false : desiredForeground
+                if !value { suspensionPending = false }
                 for service in value ? started : Array(started.reversed()) {
                     guard !closed, !Task.isCancelled else { return }
-                    if sceneRevision != selected { break }
+                    // A suspension must reach every service before any resumed admission.
+                    if value, sceneRevision != selected { break }
                     do { try await service.foreground(value) } catch {
                         let result = ApplicationLifecycleFailure(service: service.id, primary: error, cleanup: [])
                         sceneFailure = result
@@ -190,7 +194,7 @@ public struct ApplicationLifecycleFailure: Error {
                         onFailure?(result)
                     }
                 }
-                if selected == sceneRevision { return }
+                if !suspensionPending, value == desiredForeground, selected == sceneRevision { return }
             }
         }
     }

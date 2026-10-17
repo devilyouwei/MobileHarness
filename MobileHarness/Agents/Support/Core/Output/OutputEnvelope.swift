@@ -13,10 +13,17 @@ public struct OutputEnvelope: Sendable {
     public let callID: String?
     public var schedulingID: String { roundID ?? taskScope?.id ?? inputID }
     public let output: AgentOutput
+    public let failure: AgentFailureDiagnostic?
     public init(
         source: AgentID, input: AgentInput, output: AgentOutput, sequence: UInt64 = 0, roundID: String? = nil,
-        callID: String? = nil
+        callID: String? = nil, failure: AgentFailureDiagnostic? = nil
     ) {
+        if failure != nil {
+            guard case .control(let value) = output, value.hasPrefix("agent.error:") else {
+                preconditionFailure("Failure diagnostics require an Agent error control")
+            }
+        }
+        self.failure = failure
         self.roundID = roundID
         self.callID = callID
         self.inputMetadata = input.metadata

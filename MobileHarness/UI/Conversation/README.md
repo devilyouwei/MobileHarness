@@ -105,3 +105,8 @@ Execution-history navigation: ConversationView/ActionActivityView have no task-h
 ## 待实现
 
 - Durable execution audit and device-specific stage progress.
+
+
+## 分类异常诊断
+
+✅ ExecutionIssue 支持宿主注入的类别/轮次关联和最多2048字符诊断详情，Agent 日志显示类别、代码、详情及关联信息；toast 继续优先使用 userMessage，保留去重、过期及新输入撤销。UI 不分类 Provider 错误。

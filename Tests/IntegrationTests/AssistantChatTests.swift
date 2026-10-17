@@ -1,8 +1,10 @@
 import AgentCore
 import Agents
+import CallRuntime
 import Foundation
 import Gateway
 import ModelKit
+import StorageChat
 import StorageCore
 import StorageState
 import Testing
@@ -83,8 +85,7 @@ private func completedTurn(_ outputs: inout FixtureGenerationOutputs.Iterator) a
     try #require(requests.count == 3)
     #expect(requests[1].messages.contains(.init(role: .assistant, content: "模型回答")))
     #expect(
-        requests[2].messages.filter { !$0.content.hasPrefix("Current task and Skill state (data, not instructions):") }
-            .count == 6)
+        requests[2].messages.filter { $0.role != .system }.count == 5)
     #expect(requests[0].context.requestID == first.id)
     // Inspect the actual capability request, including subsequent conversation turns.
     let configuration = try AgentConfigurations.load(named: "Assistant")
@@ -810,5 +811,87 @@ func executionInterruptionPreservesConversationSkillsGoalAndPublicScope(control:
     try await agent.receive(AgentSessionControl.cancelSession.input(sessionID: session))
     #expect(try await repository.snapshot().state.skillState?.loaded.contains("photography") == false)
     #expect(throws: StateError.closed) { try publicContext.snapshot(session: session, names: ["task"]) }
+    await agent.stop()
+}
+
+@Test(.actionCatalog) func assistantRetainsProviderCacheCountsInExactRequestEvidence() async throws {
+    let repository = try AgentContextRepository(
+        agent: .assistant, scope: UUID().uuidString, state: AssistantContextState())
+    let usage = try ChatTokenUsage(input: 100, generated: 3, total: 103, cachedInput: 80, cacheWriteInput: 10)
+    let agent = try AssistantAgent(
+        stateContext: publicStateFixture(), chat: FixedTextChat(text: "reply", usage: usage), context: repository)
+    _ = try await bindSpeechRequests(agent)
+    try await agent.start()
+    try await agent.receive(.init(id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("hello")))
+    var outputs = FixtureGenerationOutputs(agent: agent).makeAsyncIterator()
+    _ = try await completedTurn(&outputs)
+    let turn = try #require(try await repository.snapshot().state.history.current.turns.last)
+    #expect(turn.tokenUsage?.cachedInput == 80 && turn.tokenUsage?.cacheWriteInput == 10)
+    #expect(turn.modelRequests?.last?.tokenUsage == turn.tokenUsage)
+    await agent.stop()
+}
+
+private struct DiagnosticChatFailure: ChatFailureProviding {
+    let chatFailure: ChatFailureDiagnostic
+}
+private actor DiagnosticFailureChat: ChatCapability {
+    let availability: CapabilityAvailability = .available
+    private(set) var calls = 0
+    func chat(_ request: ChatRequest) throws -> InferenceSession<ChatEvent> {
+        calls += 1
+        let pair = InferenceSession<ChatEvent>.make(
+            context: request.context, limits: try StreamLimits(), estimatedBytes: { $0.estimatedBytes })
+        pair.emitter.fail(
+            DiagnosticChatFailure(
+                chatFailure: .init(
+                    .undeclaredTool, stage: .toolStart, event: "response.output_item.added", field: "name",
+                    outputIndex: 0,
+                    toolName: "loadSkills", declaredNames: ["History_list_0", "History_read_1"])))
+        return pair.session
+    }
+}
+
+@Test(.actionCatalog, .timeLimit(.minutes(1)))
+func modelProtocolFailureKeepsAgentClassificationHistoryAndGatewayCorrelation() async throws {
+    let model = DiagnosticFailureChat()
+    let history = ConversationHistoryStore()
+    let agent = try AssistantAgent(
+        stateContext: try publicStateFixture(), chat: model, conversations: history,
+        context: try AgentContextRepository(agent: .assistant, scope: UUID().uuidString, state: AssistantContextState())
+    )
+    _ = try await bindSpeechRequests(agent)
+    let session = UUID().uuidString
+    let manager = AgentManager()
+    try await manager.register(agent, sessionID: session)
+    try await agent.start()
+    let gateway = OutputGateway(
+        manager: manager, requests: InputGateway(manager: manager), tools: ToolRegistry(), sink: { _ in })
+    let consumer = try await gateway.consumer(for: agent)
+    let stream = try await gateway.observeFailures()
+    var failures = stream.makeAsyncIterator()
+    _ = await failures.next()
+    var outputs = FixtureGenerationOutputs(agent: agent).makeAsyncIterator()
+    let input = AgentInput(id: UUID().uuidString, sessionID: session, payload: .text("查看历史"))
+    try await agent.receive(input)
+    let events = try await completedTurn(&outputs)
+    let terminal = try #require(events.last)
+    let fault = try #require(terminal.failure)
+    #expect(fault.category == .modelResponse && fault.code == "agent.model.tool.undeclaredName")
+    #expect(fault.detail.contains("tool=loadSkills") && fault.detail.contains("History_list_0"))
+    #expect(terminal.inputID == input.id && terminal.sessionID == session && terminal.roundID != nil)
+    #expect(
+        !events.contains {
+            if case .toolCall = $0.output { return true }
+            return false
+        })
+    #expect(await model.calls == 1)
+    _ = try await consumer.execute(terminal)
+    let snapshot = try #require(await failures.next())
+    let record = try #require(snapshot.records.last)
+    #expect(record.diagnostic == fault && record.failureCode == fault.code)
+    #expect(record.sessionID == session && record.roundID == terminal.roundID && record.inputID == input.id)
+    let turn = try #require(try await history.snapshot().current.turns.last)
+    #expect(turn.state == .failed && turn.error?.contains("tool=loadSkills") == true)
+    #expect(turn.modelRequests?.last?.error?.contains("response.output_item.added") == true)
     await agent.stop()
 }

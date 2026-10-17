@@ -25,7 +25,7 @@
 | Storage 用例 | domain 仓库、配置文档、提交身份、完整消息 checkpoint、容量/损坏/并发与缓存 |
 | NexArm/Bluetooth 用例 | 包与几何、反馈/归位、断连与恢复、资源接管、机械臂状态和协议隔离；首次肩/肘水平准备、未准入重试、死区内独立准备和 reset 后重新准备；包括电机 1/4 单包、死区、准入重试/替换、保持无重发、显式新目标触发的迟到发送异常及清理后新目标 |
 
-Task/Skill 的边界矩阵包括四种预加载接管方式（指定、加载、Action、Tool）和完成/失败/取消终态；最后一次闲置时使用/重载、零后重载、独立计数、错误快照、32 个在途 Decision、精确字节/数量预算、批量失败回滚、跨会话取消权及失败提交重试。通过实际 Assistant 请求检查后续目录到期、历史证据保留与内部 ReACT 单次结算。用例数量从源码/测试运行报告获取，不在 README 保存某次执行的计数或通过结论。
+Task/Skill 的边界矩阵包括四种预加载接管方式（指定、加载、操作 Action、查询 Action）和完成/失败/取消终态；最后一次闲置时使用/重载、零后重载、独立计数、错误快照、32 个在途 Decision、精确字节/数量预算、批量失败回滚、跨会话取消权及失败提交重试。通过实际 Assistant 请求检查后续目录到期、历史证据保留与内部 ReACT 单次结算。用例数量从源码/测试运行报告获取，不在 README 保存某次执行的计数或通过结论。
 
 ## 资源和历史约束
 
@@ -96,3 +96,26 @@ GenerationRoundTests 的 native-only 模型夹具报告合成参数首样本，�
 [公开 State 契约](../../MobileHarness/Storage/State/README.md)
 
 ✅ 补充会话 interrupt/pause 与真实 close 的区别回归，覆盖近期 Skill 续期保留、运行/等待 Task、公开 task 作用域及恢复后新输入；中断不重放、不累计 idle，关闭仍拒绝旧代际。
+
+✅ 验证静态 system 稳定、每轮唯一最新 State、历史/工具配对不被拆分、上下文预算，以及精简教学后的 Task/Skill/相机既有契约；缓存计数保留并兼容旧证据。
+
+## 千问 Action / Tool 回归
+
+✅ 显式 `MH_QWEN_EVAL=1` gate 使用生产 Assistant、公开 State、Task/Skill 控制及 Gateway，注入真实阿里 Responses 模型和合成设备/仓库执行者。共用场景位于 AgentModelEvaluationTests/Scenarios/qwen-workflows.json；每场景独立会话，按用户轮次断言调用协议、参数、顺序、Task/Skill 及禁止效果。普通检查不访问网络。每场景最多32模型请求、每用户输入最多10请求、每输入180秒；超限失败，取消并加入工作，不自动重试。证据仅含合成输入、实际请求/响应/调用和用量，不含凭据；通过不等于真实设备验收。
+
+相机替身同步发布事实，busy/权限/未开启/照片不可操作使用现有 CameraControlError；拍照不能在 busy 时被替身伪造成功。查询旁支保留 Task，替换确认单独测试；强制 Tool 查询需请求 State 未公开的电源/发现列表，避免把合理的 State 直接回答判错。
+
+✅ 针对 Qwen 实测失败补充调用教学守卫、普通忽略与重拍分支的可解析示例，以及无模板变量/无伪 native 函数示例检查；在有界静态正文预算内允许必要教学。同套53场景保留业务判定；全 Action 迁移另外断言调用协议及实际请求无 native 声明。历史三模型结果保留，当前迁移回归只选择 flash/max。
+
+静态 system 正文预算分别为基础 Skill 22,000 UTF-8 bytes、含摄影29,000 bytes（不含 State/历史），用于约束新增教学的规模；完整请求继续执行现有64KiB总预算。示例由生产解析器验证，不把声明名称保护当作真实模型遵循证明。
+
+定向模板/示例检查已通过；完整云回归及全量自动化失败分别见[优化验证报告](../../docs/validation/Qwen-Prompt-Optimization.md)，不以定向通过替代全量验收。
+
+
+## 分类异常诊断
+
+✅ 注入确定性模型协议失败，验证 Agent 终止控制、类别/代码/轮次、请求证据和无执行/无重试；保留原取消及部分效果行为。
+
+✅ Implemented: bundled Skill regressions assert Action-only queries, Query Channel, value feedback, retention and Task adoption. Generic native/mixed protocol tests remain. Qwen full-suite assertions require all Skill calls to be Actions and every actual request to have no native declarations; original 53-case business expectations remain unchanged.
+
+✅ Implemented: FixtureGenerationOutputs accepts explicit synthetic Action completion/failure outcomes, so query-retention fixtures feed exactly one correlated value result instead of a completion followed by duplicate feedback. Generic native fixtures stay independent of bundled Skill registration.

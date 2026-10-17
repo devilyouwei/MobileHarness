@@ -91,3 +91,8 @@ Direct Tool/communication dispatch has an owned cancellable Task, with at most12
 ## 待实现
 
 - Durable outcome transport and automatic effect replay are not implemented.
+
+
+## 分类异常诊断
+
+✅ Gateway 从 Agent 终止输出复制异常分类/代码/详情与会话/轮次到失败快照，仍有界100条。不解析底层错误、不提供文案、不重试。

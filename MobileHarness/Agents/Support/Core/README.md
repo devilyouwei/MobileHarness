@@ -92,3 +92,5 @@ InputKind 的 video/binary 尚无 InputPayload 分支或 codec。输入支持、
 ## 待实现
 
 - Generic factory/automatic restart, remote transport and durable execution delivery are not implemented.
+
+✅ Generation 资源说明两种输出协议及原生名称来源；不将具体 Agent、Task 或设备策略加入 Core。解析器与权限契约保持不变。

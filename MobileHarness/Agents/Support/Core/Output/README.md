@@ -58,3 +58,8 @@ ToolResult and both report contracts distinguish pure cancellation from real fai
 ## 待实现
 
 - Durable execution delivery and full typed replacement of legacy control strings are not implemented.
+
+
+## 分类异常诊断
+
+✅ OutputEnvelope 增加可选 AgentFailureDiagnostic（类别、稳定代码、有界详情），OutputFailureRecord 保留同一诊断及 sessionID/roundID。中立契约不认识 ModelKit/Provider；非失败输出不得携带诊断。诊断详情最多2048字符，不改变执行路由。

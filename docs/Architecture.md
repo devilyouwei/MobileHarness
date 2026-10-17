@@ -70,3 +70,12 @@ Storage 四类容器与通用 State 已实施，参见 [计划及验证范围](r
 ✅ State 边界已修订：AgentContext 使用私有 actor 内存，公开寄存器只承载有限事实；以 [公开 State 计划](requirements/Resource-State-Plan.md) 为现行范围；历史记录保留此前实现与验收限制。
 
 ✅ 页面导航、原生执行中断、对话结束分离。设置页不关闭根服务；后台保留 Assistant 内存及当前目标/Skill，只取消并加入在途执行及安全停止设备；恢复等待新输入，显式结束会话才回收作用域。
+
+✅ 提示词固定规则与本轮事实分离，State 后置且非 user 消息；缓存观察指标透传，不承诺缓存命中或价格，真实 provider 验收独立。
+
+
+模型响应诊断沿已有错误链传递：ModelKit 在协议边界产生中立类型化原因 → Agent 归类并发布带诊断的终止控制 → Gateway 保留有界失败快照及输入/会话/轮次 → AgentBindings 映射短用户消息与详细日志 → UI 被动显示。错误不触发重试或已执行效果重放；原生调用仍须通过完整终态校验才发布。具体代码与容量见 [LLM](../MobileHarness/ModelKit/Language/LLM/README.md) 和 [Agent 输出](../MobileHarness/Agents/Support/Core/Output/README.md)。
+
+## Skill call protocol migration
+
+✅ Implemented: all bundled Skill functions use Action Call; historical/provider-native Tool infrastructure remains available for explicit non-Skill callers. Read-only queries use Query Channel and real value feedback before dependent decisions.

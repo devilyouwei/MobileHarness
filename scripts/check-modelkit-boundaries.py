@@ -939,6 +939,8 @@ for group, version in [('agents', 7), ('skills', 2)]:
         for function in functions:
             if len(function['path'].split('.')) != 3 or function['callType'] not in ('action', 'tool'):
                 errors.append(f'Invalid function binding: {relative}')
+            if function['callType'] != 'action' or not function.get('channel'):
+                errors.append(f'Bundled Skills require Action calls with an explicit Channel: {relative}')
             if function['path'] == 'Agent.Communication.send' and function['callType'] != 'action':
                 errors.append(f'send must be Action: {relative}')
 if any(p for group in ('Agents', 'Skills') for p in (asset_root / group).rglob('*.swift')):

@@ -83,3 +83,17 @@ struct Gemma4ProviderTests {
         try await context.unload()
     }
 }
+
+@Test func lateSystemFactsRetainPriorityWithoutBecomingUserText() throws {
+    guard #available(iOS 27, macOS 27, *) else { return }
+    let request = try ChatRequest(messages: [
+        .init(role: .system, content: "stable rules"),
+        .init(role: .user, content: "earlier"), .init(role: .assistant, content: "reply"),
+        .init(role: .system, content: "CURRENT STATE: facts"), .init(role: .user, content: "now"),
+    ])
+    try Gemma4Chat.validate(request)
+    let rendered = Gemma4Chat.renderedMessages(request)
+    #expect(rendered.first == .init(role: .system, content: "stable rules\n\nCURRENT STATE: facts"))
+    #expect(Array(rendered.dropFirst()) == request.messages.filter { $0.role != .system })
+    #expect(request.messages[3].role == .system)
+}

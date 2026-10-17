@@ -2,7 +2,7 @@
 
 ## 职责与直接接口
 
-处理历史读取、归档、删除、展示与独立标题生成事务，不生成普通对话。UI/AgentBindings 的 history.intent 经 Gateway 进入；Memory 发出固定调用，Actions 通过注入的 StorageChat/呈现端口执行，结果回原事务。Assistant 的 history-query 原生查询直接使用同一批函数，不需要把用户对话转发到 Memory。
+处理历史读取、归档、删除、展示与独立标题生成事务，不生成普通对话。UI/AgentBindings 的 history.intent 经 Gateway 进入；Memory 发出固定调用，Actions 通过注入的 StorageChat/呈现端口执行，结果回原事务。Assistant 的 history-query 查询 Actions直接使用同一批函数，不需要把用户对话转发到 Memory。
 
 ## 内部结构
 

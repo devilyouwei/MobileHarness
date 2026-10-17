@@ -23,7 +23,7 @@ flowchart LR
 
 ## Request and output bounds
 
-At most 64 nonempty messages/64 KiB ending in user, with optional initial system instruction. Prompt plus generation fits 4096 tokens. Native Tool declarations/transcripts and image attachments reject before tokenization; no local vision or native-call fallback exists.
+At most 64 nonempty source messages/64 KiB ending in user. Before rendering, system messages are joined in source order into one leading system turn; non-system turns retain their order and boundaries. Prompt plus generation fits 4096 tokens. Native Tool declarations/transcripts and image attachments reject before tokenization; no local vision or native-call fallback exists.
 
 Each request resets backend cache. Event stream currently retains 4096 events of ≤4096 estimated bytes; overflow fails explicitly. Usage includes consumed stop tokens. Thought-channel text never reaches public ChatEvent text. The resource owns supported iOS h18p AOT/macOS matching b2 graph selection.
 
@@ -58,3 +58,5 @@ GemmaLanguageEngine.render emits one prompt turn for each caller message, includ
 - Local native calls and image inference are not implemented.
 
 - The third-party CoreAIShared runtime imports CoreAI unconditionally and cannot currently compile against the simulator SDK. ModelKitDefaults' simulator source branch does not eliminate that package dependency. Build and live-model acceptance evidence belongs in docs.
+
+✅ 验证原请求边界后，将所有 system 正文按源顺序合并至首个 system，再渲染其他消息；本地缓存仍逐次重建，保留末尾 user、文本/原生能力和 4096 token 限制。

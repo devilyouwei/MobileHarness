@@ -1,5 +1,7 @@
 # Generic Application Lifecycle
 
+✅ ApplicationLifecycle 持有一个有界 suspensionPending 锁存位。running 中每次失活先同步 invalidate，并要求 worker 在最新 active 前执行完整逆序 foreground(false)；false 遍历不被版本变化截断，只有过期的 true 遍历可抢占。最新前台状态继续合并，无事件队列；初始 inactive 等待和 startup 回滚规则不变。
+
 ## 职责与编译边界
 
 ApplicationLifecycle.swift 独立编译为 AppLifecycle，只依赖 Foundation。它管理服务图，不实现语音、相机、蓝牙、配置或展示。ApplicationSystemDelegate.swift 仅由 App executable 编译，把 OS 回调原样转交 ActionBindings 的 ModelDownloadBackgroundService。
@@ -12,7 +14,7 @@ ManagedService 声明 id、dependencies、start、同步 invalidate、异步 for
 
 最多 64 个静态服务；超限、重复 ID、缺少依赖或循环在任何启动效果之前拒绝。拓扑排序对相同输入稳定。根图不动态增加服务。
 
-一个 startup、一个 shutdown、一个前后台状态 worker；无事件队列。前后台只保留最新完整期望状态；重复停止加入同一结果。已停止/启动失败的图不重新启动，显式重试由组合根创建新图。
+一个 startup、一个 shutdown、一个前后台状态 worker；无事件队列。前后台保留最新期望状态及一个必须完成的非前台清理锁存位；快速 active 不丢失或截断暂停。重复停止加入同一结果。已停止/启动失败的图不重新启动，显式重试由组合根创建新图。
 
 ## 前台启动与暂停
 

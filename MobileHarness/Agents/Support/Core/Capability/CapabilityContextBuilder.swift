@@ -6,8 +6,10 @@ public enum CapabilityContextBuilder {
         return result
     }
     public static func protocolRules(_ registry: CapabilityRegistry) throws -> String {
-        try FunctionTokenPrompts.load().render(
-            "protocol", variables: ["channels": registry.channels.sorted().joined(separator: ", ")])
+        let templates = try FunctionTokenPrompts.load()
+        return try templates.render(registry.tools.isEmpty ? "actionProtocol" : "protocol") + "\n"
+            + templates.render(
+                "scheduling", variables: ["channels": registry.channels.sorted().joined(separator: ", ")])
     }
     public static func catalog(_ registry: CapabilityRegistry) throws -> String {
         let templates = try FunctionTokenPrompts.load()
@@ -35,7 +37,7 @@ public enum CapabilityContextBuilder {
                 }
             }
         }
-        lines.append(try templates.render("catalogBoundary"))
+        lines.append(try templates.render(registry.tools.isEmpty ? "actionCatalogBoundary" : "catalogBoundary"))
         let result = lines.joined(separator: "\n")
         guard result.utf8.count <= 65_536 else { throw PromptTemplateError.outputTooLarge }
         return result

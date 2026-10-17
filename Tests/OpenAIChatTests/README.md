@@ -23,3 +23,14 @@ liveProviderPreservesConsecutiveUsers 从调用进程获取 HARNESS_LIVE_CHAT_UR
 ## 待实现
 
 - 真实第三方 Provider 兼容性、认证与 iPhone 网络生命周期验收，需要显式提供端点/凭据。
+
+✅ 离线 SSE fixtures 覆盖缓存读取/写入缺失、零、有效值和非法类型/范围，不访问真实 API。
+
+✅ 离线编码验证固定 system、完整 native 调用/结果组和后置 system 事实的顺序保持，不混入用户正文。
+
+✅ 将千问实测的无后缀/未声明 native 名称归一为合成身份 fixture，验证当前解码器在 output_item.added 明确拒绝并不输出调用；这描述当前失败边界，不将其记为名称兼容已修复。
+
+
+## 分类异常诊断
+
+✅ 离线 SSE 回归精确断言未声明/缺失名称、身份、顺序、参数格式及增量不一致、终态、用量和脱敏有界诊断；不放宽错误为接受，不运行云请求。

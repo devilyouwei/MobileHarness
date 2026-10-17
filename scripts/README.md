@@ -63,3 +63,16 @@ Storage 四类容器边界检查覆盖 StorageCore/State/Cache/Files/Database/SQ
 ✅ StorageState 仅承载公开事实；边界检查禁止完整 AgentContext 注册，校验 Skill schema v2/useState。沿用现有源码归属及目标，ActionBindings 显式依赖 StorageState。
 
 [公开 State 契约](../MobileHarness/Storage/State/README.md)
+
+## 千问提示词回归
+
+✅ evaluate-qwen.py 读取指定 ENV（默认 .env.local）的 ALIYUN_API_URL / ALIYUN_API_KEY，先编译离线用例检查，再对显式模型列表执行同套 opt-in IntegrationTests。凭据仅经子进程环境传递，禁止输出或写入报告；不读取/使用 OpenAI Key。模型并行上限3，不自动换模型或重试；每模型独立报告，失败不阻止其他模型。报告位置显式指定，普通 check 不触发真实调用。
+
+需要完整 Xcode：编译后通过 swift build --show-bin-path 定位 IntegrationTests bundle，使用所选 Xcode 的 Swift Testing helper 和测试库路径执行独立进程，避免多个 SwiftPM 命令持有同一构建锁。缺少 helper/bundle 明确失败。输出前缀不能覆盖已有原始结果；summary 保留源输入 hash、实际 State/响应/调用和请求 hash，完整请求留在原始报告。复现及实测限制见 [千问工作流报告](../docs/validation/Qwen-Workflow-Regression.md)。
+
+✅ 输入 hash 显式包含 Agents Core 的 FunctionTokenPrompts.json，完整覆盖 Resources 外的共享协议教学；旧报告缺少此键的历史范围保持原样。
+
+
+✅ compare-qwen-protocols.py 是隔离的阿里 Responses 协议探针，只允许 flash/max。相同函数语义/输入分别使用 xml-only、native-only、mixed、mixed-exclusive；独立场景与重复采样，含同一响应必须双调用的实验。只记录合成调用并返回替身反馈，不改变生产注册或执行设备，不把 HTTP 探针当生产 Agent/Gateway 验收。原始请求/公开输出、配对结果、协议及流程判定分别保留；限时/容量/调用次数有界，不自动重试，不保留凭据或私有 reasoning。
+
+✅ Implemented: resource boundary checks require bundled Skill functions to be Actions with explicit Channel; generic schemas and Tool infrastructure remain supported. No cloud call is added to normal checks.

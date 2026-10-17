@@ -43,7 +43,7 @@ public actor Gemma4Chat: ChatCapability {
         let lease = try await resource.acquire()
         do {
             let tokens = await lease.model.tokenize(
-                request.messages.map {
+                Self.renderedMessages(request).map {
                     GemmaLanguageTurn(role: $0.role.rawValue, content: $0.content)
                 })
             let maximumTokens = request.maximumOutputTokens ?? (contextLimit - tokens.count)
@@ -116,8 +116,13 @@ public actor Gemma4Chat: ChatCapability {
                 "Gemma4 requires 1–64 nonempty messages ending in user, at most 64 KiB, and an output budget fitting the local context window"
             )
         }
-        guard !request.messages.dropFirst().contains(where: { $0.role == .system }) else {
-            throw CapabilityError.invalidRequest("System instructions must be the first message")
-        }
+    }
+
+    /// The local template accepts one leading system turn; retain every system value in source order.
+    static func renderedMessages(_ request: ChatRequest) -> [ChatMessage] {
+        let systems = request.messages.filter { $0.role == .system }
+        let conversation = request.messages.filter { $0.role != .system }
+        guard !systems.isEmpty else { return conversation }
+        return [.init(role: .system, content: systems.map(\.content).joined(separator: "\n\n"))] + conversation
     }
 }

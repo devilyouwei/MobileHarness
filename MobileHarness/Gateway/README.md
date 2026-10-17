@@ -96,3 +96,8 @@ Producer/session cancellation joins scheduled and direct native execution, prese
 ## 待实现
 
 - Durable transport/results, global fairness scheduling and hardware stop acknowledgment are not implemented.
+
+
+## 分类异常诊断
+
+✅ Agent 失败诊断随原终止控制进入有界失败快照，保留分类、代码和输入/会话/轮次；Gateway 不重新归因、提供业务文案或发起重试。

@@ -146,7 +146,10 @@ extension HistoryTurn {
     }
     public var tokenReport: String {
         guard let usage = tokenUsage else { return "Token 用量：" }
-        return "输入：\(usage.input) tokens · 生成：\(usage.generated) tokens · 总计：\(usage.total) tokens"
+        var report = "输入：\(usage.input) tokens · 生成：\(usage.generated) tokens · 总计：\(usage.total) tokens"
+        if let cached = usage.cachedInput { report += " · 缓存读取：\(cached) tokens" }
+        if let written = usage.cacheWriteInput { report += " · 缓存写入：\(written) tokens" }
+        return report
     }
 
 }

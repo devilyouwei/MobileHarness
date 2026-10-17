@@ -9,12 +9,11 @@
         public init(services: any ApplicationRootProviding) { assembly = services }
         private var container: (any ApplicationSessionProviding)? { assembly.session }
         @Environment(\.scenePhase) private var scenePhase
-        private var showingSettings: Bool { !assembly.navigation.path.isEmpty }
         @State private var startupError: String?
         @State private var startupStatus = "正在准备…"
         public var body: some View {
             Group {
-                NavigationStack(
+                PersistentHomeNavigation(
                     path: Binding(get: { assembly.navigation.path }, set: { assembly.navigation.path = $0 })
                 ) {
                     Group {
@@ -35,10 +34,8 @@
                             }
                         }
                     }
-                    .navigationTitle("首页")
-                    .toolbar(.hidden, for: .navigationBar)
-                    .navigationDestination(for: AppDestination.self) { destination in destinationView(destination) }
-
+                } destination: { destination in
+                    destinationView(destination)
                 }
                 .onChange(of: assembly.navigation.path) { _, path in
                     assembly.navigationChanged()
@@ -79,7 +76,7 @@
         }
 
         private var keepsHomeScreenAwake: Bool {
-            scenePhase == .active && !showingSettings && !isDiagnostic && !isVisualPreview
+            scenePhase == .active && !isDiagnostic && !isVisualPreview
         }
 
         @ViewBuilder

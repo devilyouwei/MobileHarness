@@ -102,3 +102,14 @@ Root UI bootstrap 只调用注入的生命周期启动端口；根服务开始�
 [公开 State 契约](../Storage/State/README.md)
 
 ✅ 区分会话中断与会话关闭。后台暂停、语音停止只结束在途 Decision（不扣闲置次数），运行 Task 在屏障后回到 waitingUser，保留近期计数、Task 持有 Skill 和公开会话端口；显式关闭继续清理，前台恢复不自动重放。
+
+✅ 每轮固定 system、Skill/目录后在历史尾部注入唯一 CURRENT STATE 系统数据；ReACT 不携带旧 State。Skill 基础选择/Task/说话规则只归 BasicSkill，摄影仅保留摄影流程。
+
+✅ Core 通用输出教学区分 XML Actions 与接口提供的原生 Tools，原生 name 以当前接口声明为准，业务 Skill 不另写一套可调用名称。补强先执行后依据真实反馈确认效果的通用规则；保持现有解析、名称映射和调度执行不变。
+
+
+## 分类异常诊断
+
+✅ AgentChatWorker 将模型中立诊断归为 Agent 异常，生成稳定 agent.model.* 代码，并分类生成/运行错误。现有 agent.error 控制继续结束决策；附加结构化诊断，不靠解析错误描述分类。模型请求和对话错误证据保留详细原因，无自动重试。
+
+✅ Implemented: bundled Skill business invocations are Action-only, including read queries; generic Tool execution and historical pairing remain supported. Request catalog alone determines applicable protocol teaching.

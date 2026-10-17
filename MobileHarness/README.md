@@ -1,5 +1,7 @@
 # MobileHarness Technical Design
 
+✅ Scene coalescing retains one required nonforeground interruption even when active immediately follows it. Every started service receives the joined suspension before foreground admission resumes; navigation never participates in that signal.
+
 This document defines the current framework architecture, module responsibilities, cross-module flows and key technical contracts.
 
 This technical document has three parts:
@@ -15,6 +17,8 @@ This technical document has three parts:
 Agents own input interpretation, business decisions and task coordination. Human intent, physical observations, system events, Agent messages and declared execution feedback enter as Signals through InputGateway. AgentBindings adapts external inputs; Agent communication and execution feedback use identity-bound Gateway paths.
 
 Direct interaction and model decisions share Agent-owned business flows and registered functions. An Agent handles typed intent deterministically or uses a model, emits calls through OutputGateway, and uses declared feedback to continue, complete or cancel work.
+
+✅ UI mounts the home surface outside the navigation stack as a persistent sibling. Settings/history/detail pushes cover that surface without detaching its native renderer or cancelling home work; Scene inactive/background remains the application interruption boundary.
 
 App assembles the system and manages application lifetime through public module interfaces. The owning modules implement immediate native safety and joined cleanup. UI, ModelKit, PlatformKit and Storage provide independent presentation, inference, native I/O and persistence capabilities. Submitted history, settings, resource, provider, device and camera requests reach their owning Agents; local UI state stays in UI. [Implementation coverage](#implementation-coverage) distinguishes current routes from absent integration.
 
@@ -1482,3 +1486,14 @@ flowchart LR
 ```
 
 ✅ 页面导航只改变展示，不关闭根级 Assistant/语音会话或停用相机。应用失去前台及停止语音仅中断并加入当前执行，保留同一 Agent、对话、Task 目标、Skill 和公开 task 注册；恢复不重放操作。显式会话关闭和根服务停止仍结束作用域。原生设备的后台安全失效保持独立。
+
+✅ Assistant 精简常驻/摄影教学并保持原业务契约；稳定 system 与每轮公开 State 系统消息分离，State 位于完整历史之后且不拆 Tool 配对。Provider 用量保留可选缓存读取/写入 token，历史与 UI 展示缺失与零的区别。
+
+
+## 分类异常诊断
+
+✅ 模型适配器提供中立、类型化且有界的响应诊断；Agent 归类为模型响应/连接、生成或运行失败，通过现有终止控制携带诊断代码。Gateway 只保留和转交，AgentBindings 转换简短用户提示，UI 显示完整诊断与输入/会话/轮次关联。保持取消、清理、拒绝执行及无自动重试契约。
+
+## Skill invocation protocol
+
+✅ Implemented: bundled Skills expose all business functions as Function Token Actions. Queries use a dedicated Query Channel and return explicit business values. Generic native Tool parsing, dispatch, internal fixed callers and historical native pairing remain supported; no duplicate model exposure or error-driven protocol fallback.

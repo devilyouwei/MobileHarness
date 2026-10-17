@@ -64,3 +64,5 @@ AgentConfiguration.restrictingCommunication(to:contracts:) derives a new immutab
 ## 待实现
 
 - Full JSON Schema and configuration hot reload are not implemented.
+
+✅ Implemented: CapabilityContextBuilder selects Action-only teaching/boundary when the visible Tool catalog is empty; mixed catalogs retain generic dual-protocol teaching. No native runtime grants are removed or exposed as aliases.

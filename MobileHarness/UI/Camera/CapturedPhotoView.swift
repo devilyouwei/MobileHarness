@@ -163,7 +163,7 @@ import Foundation
             .onChange(of: camera.capturedPhoto?.id) { _, id in
                 if id != photo.id { inspecting = false }
             }
-            .fullScreenCover(
+            .retainedFullScreenCover(
                 isPresented: $inspecting,
                 onDismiss: {
                     inspectorVisible = false

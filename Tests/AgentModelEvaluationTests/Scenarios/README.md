@@ -6,6 +6,12 @@ Design goals: explicit ownership, capability boundaries and no duplicate product
 
 - cases.json contains evaluation scenarios; it does not define SDK behavior or production Actions.
 
+✅ qwen-workflows.json 是 flash/plus/max 共用的有版本合成流程集，包含场景初始公开事实/Skill/Task、用户输入及调用断言。允许与禁止行为由用例定义，不在请求里提示答案；设备结果通过 IntegrationTests 的执行替身返回。真实模型与执行替身的结果分别记录。
+
+用例需要区分查询旁支与替换目标：未声明放弃原任务的查询可保留原 Task 并执行；明确考虑替换、又未决定结束旧任务时才要求先澄清。修改判定必须保留原始运行，单独记录修订后的复查，不能覆盖原失败。
+
 ## 待实现
 
 - Representative user-study coverage and semantic acceptance scoring.
+
+全 Action 迁移保留 qwen-workflows.json 的全部业务输入/断言与稳定 ID；部分 ID/category 含 tool/native 是既有场景身份，不声明当前调用协议。协议由真实生产目录和额外 Action-only/no-native 校验确定。

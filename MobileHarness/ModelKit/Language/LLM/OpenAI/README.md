@@ -73,3 +73,10 @@ All consumers, including Memory title requests (64 output tokens), pass through 
 ## 待实现
 
 - Cloud ASR/TTS/video and automatic retry policies are not implemented.
+
+✅ 纯 SSE usage 解码保留 input_tokens_details.cached_tokens/cache_write_tokens，未知字段兼容，非法数值明确失败。不调用真实 API，不改网络或凭据配置。Responses 原有逐条序列化保留多 system 边界；本轮不注入特定模型的显式断点参数。
+
+
+## 分类异常诊断
+
+✅ ChatEventDecoder 在校验失败点记录明确 reason、stage、event、field、outputIndex、实际及允许的 Tool 名称（最多8项并保留总数）；不改变接纳条件、终态前不发布调用及流清理。OpenAIChatError 通过 ModelKit 中立诊断接口向 Agent 保留原因；旧通用错误仅兼容模型发现等未细分入口。

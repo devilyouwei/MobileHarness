@@ -1,5 +1,7 @@
 # Reusable UI Components
 
+✅ RetainedFullScreenCover.swift 提供保持下层视图挂载的全屏覆盖接口。UIViewControllerRepresentable 锚点只持有一个 UIHostingController，采用公开 [UIKit overFullScreen](https://developer.apple.com/documentation/uikit/uimodalpresentationstyle/overfullscreen) 保留下层视图树；一个 transition 标记与最新 binding 合并开关，呈现/关闭完成后再协调，无队列。源销毁不重新呈现，等待实际关闭后回调一次；内容更新不重建已呈现控制器。它只拥有页面呈现，不拥有业务/设备生命周期。
+
 ## Summary
 
 State-driven eye geometry, numeric spectrum bars and streaming captions.

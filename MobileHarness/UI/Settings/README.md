@@ -1,5 +1,7 @@
 # Settings and History Presentation
 
+✅ 历史图片检查器使用共享 retainedFullScreenCover，保留全屏查看/关闭行为而不让下层首页离窗；历史分页与解码仍是页面任务，离开时照常取消。
+
 ## Summary
 
 Local settings drafts/navigation, resource/device snapshots, audio detection and read-only model history rendering.
@@ -130,3 +132,5 @@ separate per-page initial appearance from explicit refresh. A view-local History
 - Native receiving-app file acceptance remains separate from Codable regressions, simulator layout and Transferable/device compilation.
 
 - Native scroll-offset retention and interactive Back after multiple pages still require device acceptance; lifecycle-state tests and iOS compilation are distinct evidence.
+
+✅ HistoryTokenUsage 可选缓存读取/写入输入计数；Generation Meta 只显示已报告值，零不当作缺失，旧记录照常读取。

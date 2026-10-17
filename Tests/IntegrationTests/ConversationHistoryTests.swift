@@ -331,10 +331,10 @@ func titleGenerationNeverAcceptsIncompleteOutput(text: String) async throws {
     #expect(action.output == .actionCall(expectedActionCall(name: "express", parameters: ["emotion": "smile"])))
     #expect(try await iterator.next()?.output == .control("agent.finished"))
     let request = try #require(await model.requests.first)
-    try #require(request.messages.count == 4)
+    try #require(request.messages.count == 5)
     #expect(request.messages.last?.content == "continue")
     #expect(
-        request.messages.first?.content.contains("# CURRENT STATE") == true)
+        request.messages.dropLast().last?.content.contains("# CURRENT STATE") == true)
     #expect(request.messages[1].content == "previous user")
     #expect(request.messages[2].content == "<express emotion=\"happy\"/>")
     let stored = try #require(try await restored.snapshot().current.turns.last?.modelRequests?.first)
@@ -370,13 +370,16 @@ func titleGenerationNeverAcceptsIncompleteOutput(text: String) async throws {
     let call = ConversationToolCall(
         id: UUID().uuidString, providerID: "provider-1", name: "Camera.open", argumentsJSON: "{}")
     try await store.recordToolCall(call, for: id)
-    try await store.recordTokenUsage(ConversationTokenUsage(input: 12, generated: 4, total: 16), for: id)
+    try await store.recordTokenUsage(
+        ConversationTokenUsage(input: 12, generated: 4, total: 16, cachedInput: 8, cacheWriteInput: 2), for: id)
     try await store.finish(id, state: .completed, reason: "toolCalls")
     let archivedID = try #require(try await store.startNew()).id
     try await store.recordToolOutcome(call.id, for: id, state: .completed)
     let restored = try #require(try await journal(at: url).conversation(archivedID).turns.first)
     #expect(restored.toolDefinitions == ["camera declaration"])
-    #expect(restored.tokenUsage == ConversationTokenUsage(input: 12, generated: 4, total: 16))
+    #expect(
+        restored.tokenUsage
+            == ConversationTokenUsage(input: 12, generated: 4, total: 16, cachedInput: 8, cacheWriteInput: 2))
     let result = try #require(restored.toolCalls?.first)
     #expect(result.providerID == "provider-1" && result.argumentsJSON == "{}" && result.state == .completed)
     #expect(result.output == nil)
@@ -768,4 +771,20 @@ extension ConversationHistoryStore {
     #expect(restored.records.isEmpty && restored.consumedBatches.isEmpty && restored.state.history.past.isEmpty)
     #expect(restored.state.skillState?.loaded.isEmpty == false)
     await restarted.stop()
+}
+
+@Test(.actionCatalog) func historyRejectsInvalidCacheUsageWithoutChangingEvidence() async throws {
+    let store = ConversationHistoryStore()
+    let id = UUID().uuidString
+    _ = try await store.beginFixture(id: id, user: "usage", system: "system", model: "fixture")
+    let usage = ConversationTokenUsage(input: 12, generated: 2, total: 14, cachedInput: 8, cacheWriteInput: 2)
+    try await store.recordTokenUsage(usage, for: id)
+    await #expect(throws: ConversationHistoryError.invalidRecord) {
+        try await store.recordTokenUsage(
+            .init(input: 12, generated: 2, total: 14, cachedInput: 11, cacheWriteInput: 2), for: id)
+    }
+    #expect(try await store.snapshot().current.turns.first?.tokenUsage == usage)
+    let legacy = try JSONDecoder().decode(
+        ConversationTokenUsage.self, from: Data(#"{"input":12,"generated":2,"total":14}"#.utf8))
+    #expect(legacy.cachedInput == nil && legacy.cacheWriteInput == nil)
 }

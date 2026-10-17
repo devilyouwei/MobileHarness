@@ -114,7 +114,7 @@ import Testing
         state.recover()
         #expect(state.activeTaskID == nil && state.mode == "default" && state.tasks.last?.status == "interrupted")
     }
-    // No static business grant: loading the Skill is sufficient for Actions and native Tools.
+    // Loading a bundled Skill grants its declared Actions, including query Actions.
     let fixed = try CapabilityRegistry()
     var state = AgentTaskSkillState()
     try state.initialize(fixed: fixed, baseSkills: [])
@@ -125,7 +125,8 @@ import Testing
         inputID: UUID().uuidString, fixed: fixed, taskID: try fixtureTaskID())
     let loaded = try state.registry(fixed: fixed)
     #expect(try loaded.resolveAction("takePhoto", parameters: [:]).actionPath.description == "Camera.Capture.takePhoto")
-    #expect(loaded.tools.contains { $0.path == "History.Conversation.read" })
+    #expect(loaded.actions.contains { $0.path.description == "History.Conversation.read" })
+    #expect(loaded.tools.isEmpty)
     #expect(!before.actions.contains { $0.alias == "takePhoto" })
 
 }
@@ -407,18 +408,19 @@ private func photographyAcceptance(
         #expect(control.protocols == [.action])
         #expect(await controlAssembly.tools.handler(for: control.path.description) == nil)
     }
-    let scheduler = ChannelScheduler(
-        registry: try ActionRegistry(modules: [
-            Module(definitions: definitions + controlBindings)
-        ])
-    ) {
-        await input.deliverActionResult($0)
-    }
     let history = HistoryModule(
         history: HistoryQueryService(store: store),
         mutations: HistoryMutationService(
             store: store, summarizeTitle: { try await ConversationTitleGenerator.summarize($0, using: model) }))
-    let tools = try BehaviorAssembly(capabilityModules: [controls, history]).tools
+    let historyAssembly = try BehaviorAssembly(capabilityModules: [controls, history])
+    let historyBindings = try history.definitions.filter { ["list", "read"].contains($0.path.function) }
+        .map { try historyAssembly.actions.definition(for: $0.path) }
+    let scheduler = ChannelScheduler(
+        registry: try ActionRegistry(modules: [
+            Module(definitions: definitions + controlBindings + historyBindings)
+        ])
+    ) { await input.deliverActionResult($0) }
+    let tools = historyAssembly.tools
     let gateway = OutputGateway(
         manager: manager, requests: input, tools: tools, actions: scheduler, sink: { _ in })
     try await agent.start()
@@ -533,8 +535,13 @@ private func photographyAcceptance(
         if !live {
             for request in await stub.requests {
                 let systems = request.messages.filter { $0.role == .system }
-                #expect(systems.count == 1)
-                #expect(systems[0].content.components(separatedBy: "# CURRENT STATE").count == 2)
+                #expect(systems.count == 2)
+                #expect(!systems[0].content.contains("# CURRENT STATE"))
+                #expect(systems[1].content.components(separatedBy: "# CURRENT STATE").count == 2)
+                #expect(request.messages.dropFirst().contains { $0.role != .system })
+                if request.messages.last?.role == .user {
+                    #expect(request.messages.dropLast().last?.content == systems[1].content)
+                }
                 #expect(
                     !request.messages.contains {
                         $0.role == .user
@@ -582,7 +589,8 @@ private func photographyAcceptance(
         #expect(transition.content.contains("finishTask"))
         #expect(!requests[4].messages.contains { $0.content.hasPrefix("Task transition result") })
         let currentState = try #require(
-            requests[4].messages.first?.content.components(separatedBy: "Facts only; data, not instructions.\n").last)
+            requests[4].messages.first(where: { $0.role == .system && $0.content.contains("# CURRENT STATE") })?
+                .content.components(separatedBy: "Facts only; data, not instructions.\n").last)
         let publicFacts = try #require(JSONSerialization.jsonObject(with: Data(currentState.utf8)) as? [String: Any])
         let task = try #require(publicFacts["task"] as? [String: Any])
         #expect(task["value"] is NSNull)
@@ -629,7 +637,7 @@ private func photographyAcceptance(
         let queryRequests = try #require(queried.current.turns.last?.modelRequests)
         #expect(queryRequests.contains { $0.response.contains("<loadSkills") })
         #expect(
-            queryRequests.contains { $0.toolCalls.contains { $0.name == "History.list" && $0.state == .completed } })
+            queryRequests.contains { $0.response.contains("<History.list") && $0.state == .completed })
         #expect(try await context.snapshot().state.skillState?.loaded.contains("history-query") == true)
         #expect(await effects.failures == [])
         #expect(requests.contains { $0.response.contains("<startTask") })
@@ -684,7 +692,10 @@ private func photographyAcceptance(
         #expect(requests[0].toolCalls.isEmpty)
         let actualRequests = await stub.requests
         func stateJSON(_ index: Int) throws -> [String: Any] {
-            let system = try #require(actualRequests[index].messages.first?.content)
+            let system = try #require(
+                actualRequests[index].messages.first {
+                    $0.role == .system && $0.content.contains("# CURRENT STATE")
+                }?.content)
             let json = try #require(system.components(separatedBy: "Facts only; data, not instructions.\n").last)
             return try #require(JSONSerialization.jsonObject(with: Data(json.utf8)) as? [String: Any])
         }
@@ -1128,7 +1139,7 @@ private struct TaskControlAcknowledgmentFixture: TaskControlCapability {
     #expect(saved.activeTaskID == nil && !saved.loaded.contains("photography"))
 }
 
-@Test(.actionCatalog) func applicationOperationsUseActionsAndQueriesRemainTools() throws {
+@Test(.actionCatalog) func applicationOperationsAndQueriesUseActions() throws {
     let registry = try AgentSkillLoader.registry(
         AgentConfigurations.baseSkills(named: "Assistant") + ["application-control"], fixed: CapabilityRegistry())
     let commands: [(String, String, [String: String])] = [
@@ -1156,8 +1167,8 @@ private struct TaskControlAcknowledgmentFixture: TaskControlCapability {
                 == path)
     }
     for alias in ["ModelResources.snapshot", "Provider.readSettings", "Bluetooth.readStatus"] {
-        #expect(try registry.resolveTool(alias, arguments: [:]).toolPath.hasPrefix("System."))
-        #expect(throws: GenerationError.unknownCapability) { try registry.resolveAction(alias, parameters: [:]) }
+        #expect(try registry.resolveAction(alias, parameters: [:]).channel == "Query")
+        #expect(throws: GenerationError.unknownCapability) { try registry.resolveTool(alias, arguments: [:]) }
     }
     #expect(registry.actions.filter { $0.path.domain == "NexArm" }.count == 11)
     #expect(Set(registry.actions.map(\.path)).count == registry.actions.count)
@@ -1490,11 +1501,12 @@ private func retainedLoad(_ skill: String, state: inout AgentTaskSkillState, fix
     #expect(try frozen.resolveAction("closeCamera", parameters: [:]).actionPath.description == "Camera.Capture.close")
 }
 
-@Test(.actionCatalog, arguments: ["action", "tool"])
-func admittedSkillCallsRenewRetentionIncludingExecutionFailure(callType: String) throws {
+@Test(.actionCatalog, arguments: ["effect", "query"])
+func admittedSkillCallsRenewRetentionIncludingExecutionFailure(kind: String) throws {
     var (state, fixed) = try retentionFixture()
-    let skill = callType == "tool" ? "history-query" : "photography"
-    let path = callType == "tool" ? "History.Conversation.list" : "Camera.Capture.close"
+    let callType = "action"
+    let skill = kind == "query" ? "history-query" : "photography"
+    let path = kind == "query" ? "History.Conversation.list" : "Camera.Capture.close"
     try retainedLoad(skill, state: &state, fixed: fixed)
     for _ in 0..<3 {
         let id = UUID().uuidString
@@ -1522,7 +1534,8 @@ func admittedSkillCallsRenewRetentionIncludingExecutionFailure(callType: String)
     try retainedLoad("photography", state: &state, fixed: fixed)
     let use = UUID().uuidString
     try state.beginDecision(use)
-    try state.recordUse(path: "History.Conversation.list", callType: "tool", inputID: use, snapshotSkills: state.loaded)
+    try state.recordUse(
+        path: "History.Conversation.list", callType: "action", inputID: use, snapshotSkills: state.loaded)
     try state.decisionCompleted(failed: false, fixed: fixed, inputID: use)
     try retainedLoad("application-control", state: &state, fixed: fixed)
     #expect(!state.loaded.contains("photography") && state.loaded.contains("history-query"))
@@ -1530,9 +1543,10 @@ func admittedSkillCallsRenewRetentionIncludingExecutionFailure(callType: String)
     encoder.outputFormatting = .sortedKeys
     let id = UUID().uuidString
     try state.beginDecision(id)
-    try state.recordUse(path: "History.Conversation.list", callType: "tool", inputID: id, snapshotSkills: state.loaded)
     try state.recordUse(
-        path: "System.Provider.readSettings", callType: "tool", inputID: id, snapshotSkills: state.loaded)
+        path: "History.Conversation.list", callType: "action", inputID: id, snapshotSkills: state.loaded)
+    try state.recordUse(
+        path: "System.Provider.readSettings", callType: "action", inputID: id, snapshotSkills: state.loaded)
     let before = try encoder.encode(state)
     #expect(throws: CommunicationError.capacityExceeded) {
         try state.control("loadSkills", arguments: ["skills": "[\"photography\"]"], inputID: id, fixed: fixed)
@@ -1586,7 +1600,7 @@ func admittedSkillCallsRenewRetentionIncludingExecutionFailure(callType: String)
     #expect(!state.loaded.contains("photography") && state.recentSkills.isEmpty)
 }
 
-private actor NativeRetentionModel: ChatCapability {
+private actor QueryRetentionModel: ChatCapability {
     let availability: CapabilityAvailability = .available
     let supportsToolCalls = true
     private var count = 0
@@ -1595,10 +1609,7 @@ private actor NativeRetentionModel: ChatCapability {
         let pair = InferenceSession<ChatEvent>.make(limits: try StreamLimits(), estimatedBytes: { $0.estimatedBytes })
         if count == 1 || count == 3 {
             try pair.emitter.yield(
-                .toolCall(
-                    .init(
-                        id: "retention-\(count)", name: "History.list",
-                        argumentsJSON: count == 1 ? #"{"offset":"0","limit":"1"}"# : "{}")))
+                .text(count == 1 ? #"<History.list offset="0" limit="1"/>"# : "<History.list/>"))
         } else {
             try pair.emitter.yield(.text("已处理真实结果。"))
         }
@@ -1609,7 +1620,7 @@ private actor NativeRetentionModel: ChatCapability {
 }
 
 @Test(.actionCatalog, .timeLimit(.minutes(1)), arguments: [false, true])
-func nativeSkillAdmissionRenewsButParameterRejectionDoesNot(executionFails: Bool) async throws {
+func queryActionAdmissionRenewsButParameterRejectionDoesNot(executionFails: Bool) async throws {
     var (skills, fixed) = try retentionFixture()
     try retainedLoad("history-query", state: &skills, fixed: fixed)
     for _ in 0..<3 {
@@ -1623,26 +1634,21 @@ func nativeSkillAdmissionRenewsButParameterRejectionDoesNot(executionFails: Bool
         agent: .assistant, scope: UUID().uuidString, state: initial
     )
     let agent = try AssistantAgent(
-        stateContext: try publicStateFixture(), chat: NativeRetentionModel(), context: context)
+        stateContext: try publicStateFixture(), chat: QueryRetentionModel(), context: context)
     _ = try await bindSpeechRequests(agent)
     try await agent.start()
-    var outputs = FixtureGenerationOutputs(agent: agent).makeAsyncIterator()
+    var outputs = FixtureGenerationOutputs(
+        agent: agent,
+        actionCompletion: { call in
+            call.actionPath.description == "History.Conversation.list"
+                ? (.value(executionFails ? "Synthetic execution failure" : "[]"), executionFails ? .handlerFailed : nil)
+                : (.completed, nil)
+        }
+    ).makeAsyncIterator()
     let session = UUID().uuidString
     for index in 0..<2 {
         try await agent.receive(.init(id: UUID().uuidString, sessionID: session, payload: .text("读取历史")))
         while let output = try await outputs.next() {
-            if case .toolCall(let call) = output.output {
-                let payload = InputPayload.toolResult(
-                    .init(
-                        callID: call.id, value: executionFails ? "Synthetic execution failure" : "[]",
-                        isError: executionFails, completion: .value(executionFails ? "failed" : "[]")))
-                try await agent.receive(
-                    .init(
-                        id: UUID().uuidString, sessionID: session, payload: payload,
-                        metadata: InputMetadata(
-                            payload: payload, source: "runtime", origin: .runtime,
-                            rootID: output.inputMetadata.rootID, parentID: output.inputID)))
-            }
             if case .control(let value) = output.output {
                 try #require(value == "agent.finished", Comment(rawValue: value))
                 break
@@ -1721,12 +1727,12 @@ private func idleSkillDecision(_ state: inout AgentTaskSkillState, fixed: Capabi
 }
 
 @Test(
-    .actionCatalog, arguments: ["specified", "loaded", "action", "tool"],
+    .actionCatalog, arguments: ["specified", "loaded", "action", "queryAction"],
     ["completed", "failed", "cancelled"])
 func preloadedSkillAdoptionReleasesOnlyTaskOwnedSkills(adoption: String, terminal: String) throws {
     var (state, fixed) = try retentionFixture()
-    let owned = adoption == "tool" ? "history-query" : "photography"
-    let unrelated = adoption == "tool" ? "photography" : "history-query"
+    let owned = adoption == "queryAction" ? "history-query" : "photography"
+    let unrelated = adoption == "queryAction" ? "photography" : "history-query"
     try retainedLoad(owned, state: &state, fixed: fixed)
     try retainedLoad(unrelated, state: &state, fixed: fixed)
     let frozen = try state.registry(fixed: fixed)
@@ -1738,11 +1744,11 @@ func preloadedSkillAdoptionReleasesOnlyTaskOwnedSkills(adoption: String, termina
     _ = try state.control("startTask", arguments: arguments, inputID: input, fixed: fixed, taskID: fixtureTaskID())
     if adoption == "loaded" {
         _ = try state.control("loadSkills", arguments: ["skills": "[\"\(owned)\"]"], inputID: input, fixed: fixed)
-    } else if adoption == "action" || adoption == "tool" {
+    } else if adoption == "action" || adoption == "queryAction" {
         #expect(try state.ownership(owned) == "recent")
         try state.recordUse(
-            path: adoption == "tool" ? "History.Conversation.list" : "Camera.Capture.close",
-            callType: adoption, inputID: input, snapshotSkills: state.loaded)
+            path: adoption == "queryAction" ? "History.Conversation.list" : "Camera.Capture.close",
+            callType: "action", inputID: input, snapshotSkills: state.loaded)
     }
     let task = try #require(state.activeTaskID)
     #expect(try state.ownership(owned) == "task")
@@ -1771,7 +1777,7 @@ func preloadedSkillAdoptionReleasesOnlyTaskOwnedSkills(adoption: String, termina
     try state.decisionCompleted(failed: false, fixed: fixed, inputID: finish)
     #expect(try lifecycleSnapshot(state) == settled)
     #expect(frozen.actions.contains { $0.alias == "closeCamera" })
-    #expect(frozen.tools.contains { $0.path == "History.Conversation.list" })
+    #expect(frozen.actions.contains { $0.path.description == "History.Conversation.list" })
     try state.validate()
 }
 
@@ -2142,18 +2148,14 @@ func failedLifecycleCommitCanRetryWithoutDoubleReleaseOrCountdown(operation: Str
 private actor SkillLifecycleModel: ChatCapability {
     let availability: CapabilityAvailability = .available
     let supportsToolCalls = true
-    let nativeRounds: Int
+    let queryRounds: Int
     private(set) var requests: [ChatRequest] = []
-    init(nativeRounds: Int = 0) { self.nativeRounds = nativeRounds }
+    init(queryRounds: Int = 0) { self.queryRounds = queryRounds }
     func chat(_ request: ChatRequest) throws -> InferenceSession<ChatEvent> {
         requests.append(request)
         let pair = InferenceSession<ChatEvent>.make(limits: try StreamLimits(), estimatedBytes: { $0.estimatedBytes })
-        if requests.count <= nativeRounds {
-            try pair.emitter.yield(
-                .toolCall(
-                    .init(
-                        id: "lifecycle-\(requests.count)", name: "History.list",
-                        argumentsJSON: #"{"offset":"0","limit":"1"}"#)))
+        if requests.count <= queryRounds {
+            try pair.emitter.yield(.text(#"<History.list offset="0" limit="1"/>"#))
         } else {
             try pair.emitter.yield(.text("已完成第 \(requests.count) 次请求。"))
         }
@@ -2168,22 +2170,14 @@ private func completeLifecycleDecision(
 ) async throws -> Int {
     let input = UUID().uuidString
     try await agent.receive(.init(id: input, sessionID: session, payload: .text("继续对话 \(input)")))
-    var nativeCalls = 0
+    var queryCalls = 0
     while let output = try await outputs.next() {
-        if case .toolCall(let call) = output.output {
-            nativeCalls += 1
-            let payload = InputPayload.toolResult(
-                .init(callID: call.id, value: "[]", isError: false, completion: .value("[]")))
-            try await agent.receive(
-                .init(
-                    id: UUID().uuidString, sessionID: session, payload: payload,
-                    metadata: InputMetadata(
-                        payload: payload, source: "runtime", origin: .runtime, rootID: output.inputMetadata.rootID,
-                        parentID: output.inputID)))
+        if case .actionCall(let call) = output.output, call.actionPath.description == "History.Conversation.list" {
+            queryCalls += 1
         }
         if case .control(let value) = output.output {
             try #require(!value.hasPrefix("agent.error:"), Comment(rawValue: value))
-            if value == "agent.finished" { return nativeCalls }
+            if value == "agent.finished" { return queryCalls }
         }
     }
     throw CapabilityError.unavailable("Synthetic lifecycle stream ended before decision completion")
@@ -2233,11 +2227,16 @@ func assistantIdleExpiryChangesNextRequestCatalogButKeepsEarlierConversationEvid
     let context = try AgentContextRepository(
         agent: .assistant, scope: UUID().uuidString, state: initial
     )
-    let model = SkillLifecycleModel(nativeRounds: 8)
+    let model = SkillLifecycleModel(queryRounds: 8)
     let agent = try AssistantAgent(stateContext: try publicStateFixture(), chat: model, context: context)
     _ = try await bindSpeechRequests(agent)
     try await agent.start()
-    var outputs = FixtureGenerationOutputs(agent: agent).makeAsyncIterator()
+    var outputs = FixtureGenerationOutputs(
+        agent: agent,
+        actionCompletion: { call in
+            (call.actionPath.description == "History.Conversation.list" ? .value("[]") : .completed, nil)
+        }
+    ).makeAsyncIterator()
     let session = UUID().uuidString
     #expect(try await completeLifecycleDecision(agent: agent, outputs: &outputs, session: session) == 8)
     let first = try #require(try await context.snapshot().state.skillState)
@@ -2250,7 +2249,10 @@ func assistantIdleExpiryChangesNextRequestCatalogButKeepsEarlierConversationEvid
     #expect(second.recentSkills["history-query"]?.remainingDecisions == 4)
     let history = try await context.snapshot().state.history.current
     #expect(history.turns.count == 2 && history.turns.first?.modelRequests?.count == 9)
-    #expect(history.turns.first?.toolCalls?.count == 8)
+    #expect(history.turns.first?.toolCalls?.isEmpty != false)
+    #expect(
+        history.turns.first?.generationRounds?.filter { $0.resultsJSON.contains("History.Conversation.list") }.count
+            == 8)
     await agent.stop()
 }
 
@@ -2341,4 +2343,32 @@ func assistantIdleExpiryChangesNextRequestCatalogButKeepsEarlierConversationEvid
     #expect(try owner.camera.get().value.value?.running == true)
     _ = try skills.control("loadSkills", arguments: ["skills": "[\"photography\"]"], inputID: "nextInput", fixed: fixed)
     #expect(try context.snapshot(session: "session", names: AgentSkillLoader.useState(skills.loaded)).json == next.json)
+}
+
+@Test(.actionCatalog) func migratedSkillQueriesHaveExecutableActionBindingsAndRetainedToolViews() async throws {
+    let catalog = try AgentSkillLoader.registry(
+        ["application-control", "history-query"], fixed: CapabilityRegistry())
+    let queries = catalog.actions.filter { $0.defaultChannel == "Query" }
+    try #require(queries.count == 5 && catalog.tools.isEmpty)
+    struct Module: CapabilityModule { let definitions: [ActionFunction] }
+    let definitions = try queries.map { query in
+        let declaration = try #require(
+            CapabilityModules.declarations.first { $0.path.description == query.path.description })
+        return ActionFunction(
+            path: declaration.path, declaration: declaration, displayName: query.alias, kind: .finite,
+            completion: "Return synthetic query evidence.", completing: { _ in .value(query.alias) })
+    }
+    let assembly = try BehaviorAssembly(capabilityModules: [Module(definitions: definitions)])
+    for query in queries {
+        #expect(await assembly.tools.handler(for: query.path.description) != nil)
+        let parameters: [String: String] =
+            query.alias == "History.list"
+            ? ["offset": "0", "limit": "1"]
+            : (query.alias == "History.read" ? ["id": "dialog_17", "offset": "0", "limit": "1"] : [:])
+        let input = AgentInput(id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("query fixture"))
+        let call = try catalog.resolveAction(query.alias, parameters: parameters)
+        let invocation = try ActionInvocation(
+            envelope: OutputEnvelope(source: .assistant, input: input, output: .actionCall(call)))
+        #expect(try await ActionExecutor(registry: assembly.actions).execute(invocation) == .value(query.alias))
+    }
 }

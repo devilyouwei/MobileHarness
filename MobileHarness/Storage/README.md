@@ -61,3 +61,5 @@ flowchart TB
 ✅ State 是公开事实寄存器：原子发布类型化值与编码投影，公开读取绑定作用域；不托管完整 AgentContext 或业务状态机。Storage 不定义 Camera/Robot/Task 类型。
 
 [公开 State 契约](State/README.md)
+
+✅ 对话用量增加可选缓存读/写输入计数，兼容旧证据无字段；不更改数据库表或迁移版本。

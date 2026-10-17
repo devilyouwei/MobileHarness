@@ -1,5 +1,7 @@
 # App Workflow Tests
 
+✅ 快速前后台回归要求即使前台 worker 尚在等待，也按 true → false → true 交付；native 暂停中快速 active 的 gate 用例，确认 Agent 暂停/取消完成先于任何恢复。
+
 ## 职责与边界
 
 测试 App 的根生命周期、Feature workflow、独立输出消费及注入端点的呈现/原生适配。状态、取消和完成以显式 gate 同步，不把合成回执作为模型或设备验收。业务函数的参数/执行器和真实记录仓库跨 Gateway 的验证属于 IntegrationTests。
@@ -44,3 +46,8 @@ UI 呈现边界回归覆盖设置修订拒绝过期更新、实际表情动画�
 ## Storage 依赖
 
 ✅ 存储访问使用独立的 State、Cache、Database 和 Files 接口；App 注册根实例，消费者通过构造器获得所需能力。存储容器不接管本目录的业务验证、执行和完成语义。
+
+
+## 分类异常诊断
+
+✅ 验证异常分类从 Gateway 快照到 AgentBindings/UI 的短 toast 与完整日志双通道，保留关联信息及取消/去重/过期契约。

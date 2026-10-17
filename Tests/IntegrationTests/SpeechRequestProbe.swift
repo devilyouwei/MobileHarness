@@ -37,17 +37,27 @@ struct FixtureGenerationOutputs: AsyncSequence {
     typealias Element = OutputEnvelope
     let agent: any Agent
     let observer: @Sendable (OutputEnvelope) async -> Void
-    init(agent: any Agent, observer: @escaping @Sendable (OutputEnvelope) async -> Void = { _ in }) {
+    let actionCompletion: @Sendable (ActionCall) -> (AgentActionCompletion, ActionResult.Failure?)
+    init(
+        agent: any Agent, observer: @escaping @Sendable (OutputEnvelope) async -> Void = { _ in },
+        actionCompletion: @escaping @Sendable (ActionCall) -> (AgentActionCompletion, ActionResult.Failure?) = {
+            _ in (.completed, nil)
+        }
+    ) {
         self.agent = agent
         self.observer = observer
+        self.actionCompletion = actionCompletion
     }
     func makeAsyncIterator() -> Iterator {
-        Iterator(base: fixtureOutputs(agent).makeAsyncIterator(), agent: agent, observer: observer)
+        Iterator(
+            base: fixtureOutputs(agent).makeAsyncIterator(), agent: agent, observer: observer,
+            actionCompletion: actionCompletion)
     }
     struct Iterator: AsyncIteratorProtocol {
         var base: AsyncStream<OutputEnvelope>.Iterator
         let agent: any Agent
         let observer: @Sendable (OutputEnvelope) async -> Void
+        let actionCompletion: @Sendable (ActionCall) -> (AgentActionCompletion, ActionResult.Failure?)
         mutating func next() async throws -> OutputEnvelope? {
             while let envelope = await base.next() {
                 await observer(envelope)
@@ -74,15 +84,18 @@ struct FixtureGenerationOutputs: AsyncSequence {
                     let payload: InputPayload?
                     switch envelope.output {
                     case .actionCall(let call):
+                        let (completion, failure) = actionCompletion(call)
                         let owner = ExecutionOwner(
                             agent: envelope.source, incarnation: UUID().uuidString,
                             sessionID: envelope.sessionID)
                         payload = .actionResult(
                             .init(
                                 executionID: UUID().uuidString, owner: owner, path: call.actionPath,
-                                causality: SignalCausality(envelope: envelope), status: .succeeded,
-                                effect: .contractCompleted,
-                                completion: .completed, callID: envelope.callID, roundID: roundID))
+                                causality: SignalCausality(envelope: envelope),
+                                status: failure == nil ? .succeeded : .failed,
+                                effect: failure == nil ? .contractCompleted : .unknown,
+                                completion: completion, failure: failure,
+                                callID: envelope.callID, roundID: roundID))
                     case .roundFinished:
                         payload = .roundResult(.init(roundID: roundID))
                     default: payload = nil

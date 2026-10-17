@@ -173,10 +173,16 @@ public struct HistoryTokenUsage: Codable, Sendable, Equatable {
     public let input: Int
     public let generated: Int
     public let total: Int
-    public init(input: Int, generated: Int, total: Int) {
+    public let cachedInput: Int?
+    public let cacheWriteInput: Int?
+    public init(
+        input: Int, generated: Int, total: Int, cachedInput: Int? = nil, cacheWriteInput: Int? = nil
+    ) {
         self.input = input
         self.generated = generated
         self.total = total
+        self.cachedInput = cachedInput
+        self.cacheWriteInput = cacheWriteInput
     }
 }
 

@@ -1,7 +1,7 @@
 {
   "version": 2,
   "id": "application-control",
-  "revision": 7,
+  "revision": 9,
   "description": "Conversational page navigation, resource/provider/Bluetooth status and explicit supported device/resource operations.",
   "dependencies": [],
   "functions": [
@@ -13,18 +13,21 @@
     },
     {
       "path": "System.ModelResources.snapshotResources",
-      "callType": "tool",
-      "alias": "ModelResources.snapshot"
+      "callType": "action",
+      "alias": "ModelResources.snapshot",
+      "channel": "Query"
     },
     {
       "path": "System.Provider.readSettings",
-      "callType": "tool",
-      "alias": "Provider.readSettings"
+      "callType": "action",
+      "alias": "Provider.readSettings",
+      "channel": "Query"
     },
     {
       "path": "System.Device.readStatus",
-      "callType": "tool",
-      "alias": "Bluetooth.readStatus"
+      "callType": "action",
+      "alias": "Bluetooth.readStatus",
+      "channel": "Query"
     },
     {
       "path": "System.Device.control",

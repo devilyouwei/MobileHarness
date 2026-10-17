@@ -36,3 +36,5 @@ Conversation and judgment contracts are implemented.
 ## 待实现
 
 - A concrete judgment provider is not implemented.
+
+✅ 中立用量保留缓存读取/写入的可选输入 token 数；消息可包含多条 system，具体 provider 保留语义并适配模板。

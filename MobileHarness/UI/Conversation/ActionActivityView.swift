@@ -245,6 +245,7 @@ import Foundation
             VStack(alignment: .leading, spacing: 5) {
                 Text(issue.title).font(.body.weight(.medium))
                 Text(issue.source).font(.caption).foregroundStyle(.secondary)
+                if let category = issue.category { Text("类别：" + category).font(.caption) }
                 Text(issue.message).font(.subheadline).textSelection(.enabled)
                 Text(issue.time, style: .time).font(.caption).foregroundStyle(.secondary)
                 if let code = issue.failureCode { Text("错误代码：" + code).font(.caption) }
@@ -253,9 +254,10 @@ import Foundation
                 }
                 if let context = issue.context {
                     DisclosureGroup("关联信息") {
-                        Text("持续任务：" + context.workerID)
+                        Text("所属运行：" + context.workerID)
                         if let callID = context.callID { Text("来源调用：" + callID) }
                         if let sessionID = context.sessionID { Text("会话：" + sessionID) }
+                        if let roundID = context.roundID { Text("模型请求/轮次：" + roundID) }
                     }.font(.caption).textSelection(.enabled)
                 }
             }

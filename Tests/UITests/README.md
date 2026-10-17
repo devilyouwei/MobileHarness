@@ -2,7 +2,9 @@
 
 ## 职责与边界
 
-根 Package.swift 的 UITests target 只依赖 UI，测试 UI-owned 状态和值，不引用 App、Agent、数据库、模型或设备实现。这里是 Swift 状态单元测试，原生触摸/渲染验收另行进行。
+根 Package.swift 的 UITests target 只依赖 UI，测试 UI-owned 状态和值，不引用 App、Agent、数据库、模型或设备实现。以 Swift 状态测试为主；常驻导航使用原生 macOS 挂载回归，iOS 触摸/渲染验收另行进行。
+
+✅ PersistentHomeNavigationTests 在 macOS 原生 SwiftUI/AppKit 窗口中挂载与生产相同的常驻导航容器，验证多层 push/pop、覆盖时首页原生视图身份/窗口挂载、持续状态更新与 page task 不取消，以及根销毁时清理。该回归不替代 iPhone 的 Core Animation、语音和物理动作验收。
 
 ## 当前用例
 
@@ -26,3 +28,10 @@ CaptionPresentationTests 覆盖部分文本→最终修订、定稿与移动不�
 - 真实图片/长历史/错误展示、布局、动画与辅助功能验收。
 
 运行结果与设备证据记录到 [validation](../../docs/validation/README.md)。
+
+✅ 历史 token 展示覆盖缓存读取/写入、零值、缺失与旧 JSON 兼容；不从总输入反推缓存命中或费用。
+
+
+## 分类异常诊断
+
+✅ 验证诊断详情的有界保留及短 userMessage 展示，不将错误详情直接塞入 toast。

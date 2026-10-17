@@ -102,3 +102,11 @@ SentenceFunctionBuffer accepts optional first-segment length limits, retains the
 ## 待实现
 
 - Automatic syntax repair and timer-based flushing are not implemented.
+
+✅ 当目录显式含 Tool 时，FunctionTokenPrompts.protocol 说明 XML Actions 和接口原生 Tools 为两个独立输出通道；只从各自声明选择，复制原生 name 的全部字符，不从业务 prose 推导名称。catalogBoundary 提醒依赖实际反馈及当前公开阻断事实；不加入具体 Task/Skill/Camera/Robot 名称，不修改 token 解析或 native 名称映射。
+
+catalogBoundary 同时重申：上层要求独占调用时，整个响应只包含该调用，不添加过程旁白或第二个调用。具体哪些业务步骤独占仍由上层 Skill 声明。
+
+✅ 通用双协议教学仅用于含 Tool 的目录；内置 Skill 目录使用 actionProtocol/actionCatalogBoundary。两种教学共用 scheduling 模板中的 Channel/wait/语法约束。
+
+✅ Implemented: FunctionTokenPrompts adds Action-only protocol/boundary templates sharing the existing Channel/wait/syntax section with generic mixed guidance. Native Tool parsing remains supported.

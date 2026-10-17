@@ -6,7 +6,7 @@ State 仅发布 LLM 所需的有限公开事实，不集中保存程序执行状
 
 首批 camera：enabled/running/selectedFacing/busy/needsSettings/displayedMediaID/savedMediaID；robot：connected/controlAvailable；task：goal/status（running/waitingUser），无任务为 null，内部收尾保留最近公开状态。Task 业务权威仍在 Agent，按会话发布，结束关闭。未知/不可用明确表达；发布失败失效并报告。
 
-Skill schema v2 的 useState 必填，替代 contextFields；BasicSkill=[task]、Photography=[camera]、RobotInteraction=[robot]、其余=[]。展开依赖合并去重，验证声明；每次请求与 ReACT 重新读取绑定作用域的快照，生成唯一 CURRENT STATE 系统数据块，历史保存实际请求。移除旧相机及 Task/Skill 管理信息 user 消息，保留真实输入、动作反馈与 native 配对。
+Skill schema v2 的 useState 必填，替代 contextFields；BasicSkill=[task]、Photography=[camera]、RobotInteraction=[robot]、其余=[]。展开依赖合并去重，验证声明；每次请求与 ReACT 重新读取绑定作用域的快照，生成唯一 CURRENT STATE 独立 system 数据消息，放在完整历史之后、当前输入/观察之前；若末尾为 native Tool 结果，放在完整结果组之后。稳定规则/目录位于首条 system，历史保存实际请求。移除旧相机及 Task/Skill 管理信息 user 消息，保留真实输入、动作反馈与 native 配对。
 
 公开名称按声明解析，禁止跨作用域回退。同地址唯一；默认 256 项/64 Scope/64 观察者，每值 8 KiB、每 Skill 16 名称、每请求 32 名称、状态块 16 KiB。失败显式传播，取消/关闭失效旧端口。事实生命周期独立于 Skill/页面。
 

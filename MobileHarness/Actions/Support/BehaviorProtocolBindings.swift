@@ -6,6 +6,19 @@ import FunctionContracts
 public struct BehaviorProtocolBindings {
     enum Error: Swift.Error { case unknownModule(ActionIdentifier) }
     public static func bind(_ function: ActionFunction) throws -> ActionBinding {
+        if (function.path.domain == "History" && function.path.module == "Conversation"
+            && ["list", "read"].contains(function.path.function))
+            || (function.path.domain == "System" && function.path.module == "Provider"
+                && function.path.function == "readSettings")
+            || (function.path.domain == "System" && function.path.module == "ModelResources"
+                && function.path.function == "snapshotResources")
+            || (function.path.domain == "System" && function.path.module == "Device"
+                && function.path.function == "readStatus")
+        {
+            return ActionBinding(
+                function: function, protocols: [.action, .tool], executionPolicy: .direct,
+                directResultPolicy: .returning)
+        }
         if (function.path.domain == "Camera" && function.path.module == "Capture")
             || (function.path.domain == "UI" && function.path.module == "Navigation")
             || (function.path.domain == "System" && function.path.module == "Device"

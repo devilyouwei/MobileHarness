@@ -20,10 +20,16 @@ public struct ConversationTokenUsage: Codable, Sendable, Equatable {
     public let input: Int
     public let generated: Int
     public let total: Int
-    public init(input: Int, generated: Int, total: Int) {
+    public let cachedInput: Int?
+    public let cacheWriteInput: Int?
+    public init(
+        input: Int, generated: Int, total: Int, cachedInput: Int? = nil, cacheWriteInput: Int? = nil
+    ) {
         self.input = input
         self.generated = generated
         self.total = total
+        self.cachedInput = cachedInput
+        self.cacheWriteInput = cacheWriteInput
     }
 }
 
@@ -742,7 +748,11 @@ public actor ConversationHistoryStore {
     }
 
     public func recordTokenUsage(_ usage: ConversationTokenUsage, for id: String) async throws {
-        guard usage.input >= 0, usage.generated >= 0, usage.total >= 0 else {
+        guard usage.input >= 0, usage.generated >= 0, usage.total >= 0,
+            usage.cachedInput.map({ (0...usage.input).contains($0) }) ?? true,
+            usage.cacheWriteInput.map({ (0...usage.input).contains($0) }) ?? true,
+            (usage.cachedInput ?? 0) <= usage.input - (usage.cacheWriteInput ?? 0)
+        else {
             throw ConversationHistoryError.invalidRecord
         }
         try await updateTurn(id) {

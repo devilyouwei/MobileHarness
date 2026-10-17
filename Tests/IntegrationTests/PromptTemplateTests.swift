@@ -65,7 +65,7 @@ func promptRenderingRejectsMalformedExpressions(body: String) throws {
     #expect(system.contains("<wait>你好。</wait><express emotion=\"happy\"/>"))
     #expect(!system.contains("Action takePhoto:"))
     #expect(system.contains("AVAILABLE SKILLS") && system.contains("photography"))
-    #expect(system.contains("### Loading and task flow"))
+    #expect(system.contains(try AgentConfigurations.skillInstructions("basic-skill")))
     #expect(!system.contains("{{functionToken}}"))
     #expect(system.contains("Channels with the same name in different tasks are independent."))
     #expect(system.contains("a resource conflict fails unless host policy permits takeover after cleanup"))
@@ -230,21 +230,21 @@ private func skillResponseExamples(_ id: String) throws -> [String] {
         let catalog = try state.registry(fixed: config.capabilities)
         let prompt = try AssistantContextState.systemPrompt(catalog, skills: state)
         #expect(prompt.contains(basic) && prompt.contains(identity))
-        #expect(prompt.contains("exactly one self-closing startTask tag and nothing else"))
-        #expect(prompt.contains("including saving/discarding an existing preview or closing the camera"))
-        #expect(prompt.contains("Five unrelated user decisions or capacity eviction can remove it"))
-        #expect(prompt.contains("If it is null, never emit finishTask or cancelTask"))
-        #expect(prompt.contains("An unrelated operation must not finish the current Task"))
-        #expect(prompt.contains("Keep the Task and its Skills while awaiting the answer"))
-        #expect(prompt.contains("do not ask again"))
-        #expect(prompt.contains("SAME user input after Task closure"))
-        #expect(prompt.contains("including text INSIDE wait"))
-        #expect(prompt.contains("Never copy or paraphrase it outside wait"))
+        #expect(prompt.contains("startTask must be the ENTIRE response"))
+        #expect(prompt.contains("including close/save/ignore"))
+        #expect(prompt.contains("Capacity may evict unprotected recent Skills"))
+        #expect(prompt.contains("task=null means neither is valid"))
+        #expect(prompt.contains("Completing one operation need not complete the goal"))
+        #expect(prompt.contains("retain the Task and perform no replacement effects while waiting"))
+        #expect(prompt.contains("Explicit replacement already authorizes closing the old goal"))
+        #expect(prompt.contains("SAME input"))
+        #expect(prompt.contains("including text inside wait"))
+        #expect(prompt.contains("Say useful new information once"))
         if loaded {
             #expect(prompt.contains(try AgentConfigurations.skillInstructions("photography")))
-            #expect(prompt.contains("do not emit open/flip and takePhoto in the same response"))
-            #expect(prompt.contains("preparation already delivered"))
-            #expect(prompt.contains("without a Task, end the decision without finishTask or startTask"))
+            #expect(prompt.contains("emit these in separate requests"))
+            #expect(prompt.contains("preparation was already spoken"))
+            #expect(prompt.contains("Standalone save/ignore/close/lens operations need no new Task"))
             #expect(prompt.contains("<savePhoto mediaID=\"media_1\"/>"))
             #expect(!prompt.contains("11111111-2222-4333-8444-555555555555"))
         }
@@ -266,12 +266,12 @@ private func skillResponseExamples(_ id: String) throws -> [String] {
         #expect(!trace.calls.contains { $0.actionPath.domain == "Agent" })
     }
     let question = try #require(basic.first { $0.hasPrefix("还要继续") })
-    #expect(question.contains("拍照并选择保存、忽略或重拍"))
+    #expect(question.contains("实际任务目标"))
     var clarification = GenerationTrace(capabilities: catalog, textMapping: AssistantAgent.mapText)
     try clarification.append(question)
     clarification.finish()
     #expect(clarification.parserError == nil && !clarification.calls.contains { $0.actionPath.domain == "Agent" })
-    let replacement = try #require(basic.first { $0.contains("照片尚未保存或忽略") })
+    let replacement = try #require(basic.first { $0.contains("旧任务未完成") })
     var closure = GenerationTrace(capabilities: catalog, textMapping: AssistantAgent.mapText)
     try closure.append(replacement)
     closure.finish()
@@ -284,12 +284,73 @@ private func skillResponseExamples(_ id: String) throws -> [String] {
 func businessSkillTeachingCannotFinishAnAbsentOrUnrelatedTask(skill: String) throws {
     let text = try AgentConfigurations.skillInstructions(skill)
     if skill == "photography" {
-        #expect(text.contains("current facts still show an active matching capture-only Task"))
-        #expect(text.contains("No finishTask or cancelTask"))
-        #expect(text.contains("unclear replacement asks whether to continue the actual goal"))
+        #expect(text.contains("matching Task was actually created"))
+        #expect(text.contains("BasicSkill owns Task selection/closure"))
+        #expect(text.contains("use its current Task facts"))
     } else {
         #expect(text.contains("current facts show an active matching query Task"))
         #expect(text.contains("With no Task, answer and end without finishTask or cancelTask"))
         #expect(text.contains("An unrelated query must not close another goal"))
     }
+}
+
+@Test(.actionCatalog) func assistantInstructionBudgetsKeepCatalogAndSafetyRules() throws {
+    let configuration = try AgentConfigurations.load(named: "Assistant")
+    let fixed = try AssistantAgent.runtimeCapabilities(configuration.capabilities)
+    var skills = AgentTaskSkillState()
+    try skills.initialize(fixed: fixed, baseSkills: AgentConfigurations.baseSkills(named: "Assistant"))
+    let base = try AssistantContextState.systemPrompt(skills.registry(fixed: fixed), skills: skills)
+    #expect(base.utf8.count < 22_000)
+    _ = try skills.control("loadSkills", arguments: ["skills": "[\"photography\"]"], inputID: "budget", fixed: fixed)
+    let photography = try AssistantContextState.systemPrompt(skills.registry(fixed: fixed), skills: skills)
+    #expect(photography.utf8.count < 29_000)
+    #expect(photography.contains("Action closeCamera:"))
+    #expect(photography.contains("Task is not device authorization"))
+    #expect(!photography.contains("skillOwnership/loadedSkills"))
+    print("Prompt UTF8 budgets: base=\(base.utf8.count), photography=\(photography.utf8.count)")
+}
+
+@Test(.actionCatalog) func bundledQueryTeachingUsesOnlyRegisteredXMLActions() throws {
+    let config = try AgentConfigurations.load(named: "Assistant")
+    let catalog = try AgentSkillLoader.registry(
+        AgentConfigurations.baseSkills(named: "Assistant") + ["application-control", "history-query"],
+        fixed: config.capabilities)
+    let protocolText = try CapabilityContextBuilder.protocolRules(catalog)
+    #expect(protocolText.contains("All callable functions in this request use Function Token XML Actions"))
+    #expect(!protocolText.contains("two distinct call protocols"))
+    #expect(catalog.tools.isEmpty)
+    for id in ["application-control", "history-query"] {
+        let text = try AgentConfigurations.skillInstructions(id)
+        #expect(!text.contains("{{") && !text.contains("native"))
+    }
+    for (alias, arguments) in [
+        ("Bluetooth.readStatus", [:]), ("Provider.readSettings", [:]), ("ModelResources.snapshot", [:]),
+        ("History.list", ["offset": "0", "limit": "5"]),
+        ("History.read", ["id": "dialog_17", "offset": "0", "limit": "2"]),
+    ] {
+        #expect(try catalog.resolveAction(alias, parameters: arguments).channel == "Query")
+        #expect(throws: GenerationError.unknownCapability) { try catalog.resolveTool(alias, arguments: arguments) }
+    }
+    // Generic Tool teaching remains available when a host explicitly declares a Tool.
+    let binding = try JSONDecoder().decode(
+        AgentConfigurations.Binding.self,
+        from: Data(#"{"path":"History.Conversation.list","callType":"tool","alias":"History.list"}"#.utf8))
+    let native = try AgentConfigurations.registry([binding])
+    #expect(try CapabilityContextBuilder.protocolRules(native).contains("two distinct call protocols"))
+    #expect(try CapabilityContextBuilder.catalog(native).contains("exact API-native Tool"))
+}
+
+@Test(.actionCatalog) func ignoredPhotoTerminalExampleParsesWithoutStartingOrRepeatingEffects() throws {
+    let config = try AgentConfigurations.load(named: "Assistant")
+    let catalog = try AgentSkillLoader.registry(
+        AgentConfigurations.baseSkills(named: "Assistant") + ["photography"], fixed: config.capabilities)
+    let examples = try skillResponseExamples("photography")
+    let terminal = try #require(examples.first { $0.contains("照片已忽略。<finishTask") })
+    var trace = GenerationTrace(capabilities: catalog, textMapping: AssistantAgent.mapText)
+    try trace.append(terminal)
+    trace.finish()
+    #expect(trace.parserError == nil)
+    let business = trace.calls.filter { $0.actionPath.domain != "Speech" && $0.actionPath.domain != "UI" }
+    #expect(business.count == 1 && business.first?.actionPath.description == "Agent.Task.finishTask")
+    #expect(business.first?.parameters["continueDecision"] == nil)
 }

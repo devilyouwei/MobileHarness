@@ -11,7 +11,7 @@ Skill 是可复用的流程与能力集合，Task 是运行时目标、状态和
 | 文件 | 作用与要求 |
 | --- | --- |
 | `../Catalog.json` | `version: 1`，`skills` 显式映射 Skill ID 到 `Skills/<SkillName>/Skill.json`。运行时按 ID 加载，不扫描文件夹。 |
-| `<SkillName>/Skill.json` | 必需。v1 资源配置，引用 canonical 函数绑定，不复制参数或文档。 |
+| `<SkillName>/Skill.json` | 必需。v2 资源配置，引用 canonical 函数绑定，不复制参数或文档。 |
 | `<SkillName>/Instructions.md` | 必需。UTF-8 静态运行时指令，与 Skill.json 同目录；加载后进入模型上下文。开发 README 不能替代它。 |
 
 目录用 UpperCamelCase，如 `Photography`；ID 用稳定的 kebab-case，如 `photography`、`history-query`。ID 必须与 Catalog 键完全一致。文件名固定为 Skill.json 和 Instructions.md；路径相对 Resources，不允许绝对路径、反斜杠和 `.` / `..` 段。Skill 引用其他 Skill 使用 ID，不使用文件路径。
@@ -35,11 +35,11 @@ Skill 是可复用的流程与能力集合，Task 是运行时目标、状态和
 | 字段 | 作用与规范 |
 | --- | --- |
 | `path` | `Domain.Module.function` 三段 canonical 路径，必须有所属实现维护的中立声明和真实执行路由；通信函数声明由 Agents/Support/Communication 维护。 |
-| `callType` | `action` 或 `tool`。对话中设备操作、展示和通信使用 Action；Task/Skill 控制使用 Action；明确的原生查询或事务使用 Tool。 |
-| `alias` | 模型调用名，组合目录内唯一，不使用保留名 wait 或 channel. 前缀。 |
-| `channel` | Action 必需，声明该函数的调度 Channel；Tool 不填写，不能靠 channel 将 Tool 变成调度 Action。 |
+| `callType` | 所有内置 Skill 固定为 `action`，包括查询、设备操作、展示和 Task/Skill 控制。通用配置库保留 `tool` 支持，不作为生产 Skill 的第二入口。 |
+| `alias` | 项目内可读调用标识，组合目录内唯一；内置 Skill 使用该 XML 别名。底层 Tool 兼容接口的传输 name 仍由适配器负责。不使用保留名 wait 或 channel. 前缀。 |
+| `channel` | 每个内置函数必需，声明调度 Channel；五个历史/资源/Provider/蓝牙查询使用独立 `Query` Channel。底层 Tool 配置仍不填写。 |
 
-加载了 Skill 即可使用其全部合法 Action/Tool，不再维护 Agent 权限上限或重复登记函数。不同 Skill 引用同一 path 时，绑定完全相同才合并；类型、别名或 Channel 冲突时整个加载失败。不同 path 也不能共享 alias；同一函数不能同时作为 Action 和 Tool。send 只能是 Action，不能作为原生 Tool。Task 控制 Actions 由 BasicSkill 注册，通过 baseSkills 常驻；组合器没有固定 Task 函数注入特例。
+加载了 Skill 即可使用其全部合法 Action，不再维护 Agent 权限上限或重复登记函数。不同 Skill 引用同一 path 时，绑定完全相同才合并；类型、别名或 Channel 冲突时整个加载失败。不同 path 也不能共享 alias；同一函数不能同时作为 Action 和 Tool。send 只能是 Action，不能作为原生 Tool。Task 控制 Actions 由 BasicSkill 注册，通过 baseSkills 常驻；组合器没有固定 Task 函数注入特例。
 
 `doc`、参数 Schema、必填项、约束和完成语义来自函数自己的 `@Action`，不放在 Skill.json。函数不注册 examples；全部业务示例放在 Instructions.md，并遵循真实函数参数与当前 Skill 别名。
 
@@ -121,7 +121,7 @@ BasicSkill Instructions.md明确单步相机控制/只读查询使用 loadSkills
 | expression-interaction / ExpressionInteraction | 表情互动，仅注册双眼表情 Actions。 |
 | robot-interaction / RobotInteraction | 默认机械臂交互动作。 |
 | photography / Photography | Assistant 内的摄影任务流程和相机 Actions。 |
-| history-query / HistoryQuery | 历史查询的原生 Tools。 |
+| history-query / HistoryQuery | 历史只读查询 Actions。 |
 | application-control / ApplicationControl | 应用配置、资源、设备及 UI 能力。 |
 
 资源仅随 App 打包，无远程下载或热更新。
@@ -138,10 +138,22 @@ BasicSkill 要求以 CURRENT STATE task.value 和匹配目标判断关闭：无 
 
 - Trigger、完整写入源治理及更多公开事实。
 - 声明并实现生产后台业务流程；多前台任务栈尚不提供。
-- 真实模型对完成/等待/目标转移、恢复及主动释放教学的遵循验收。
+- 扩展真实模型多次采样及物理设备验收；当前固定合成场景的云回归已有通过及失败证据，详见[验证报告](../../../docs/validation/Qwen-Prompt-Optimization.md)。
 
 ## 公开 State 边界
 
 ✅ 全部内置 Skill 使用 schema v2，useState 必填并递增 revision；每轮模型请求读取当前加载及依赖 Skill 声明的集合，卸载只改变后续读取集合。旧 contextFields 加载和独立状态 user 注入已移除。
 
 [公开 State 契约](../../Storage/State/README.md)
+
+✅ BasicSkill 统一承载 Skill 选择/Task/表达/失败规则，Photography 专注就绪/镜头/捕获/照片处理；少量示例验证主要分支，不重述通用协议。公开 State 位于独立的每轮系统数据消息。
+
+✅ BasicSkill 教学明确五种控制都是 XML、加载/替换关闭的独占响应与后续请求边界，查询旁支保留 Task，最近 Skill 不因短暂旁支而主动释放。Photography 明确 busy/needsSettings 门、真实 preview ID、已保存事实与未执行保存的区别；普通忽略成功结束匹配 Task，明确重拍则保留。RobotInteraction 以 connected/controlAvailable 同时为 true 作为动作前提，不以环境查询覆盖明确阻断。ApplicationControl/HistoryQuery 使用 Query Channel 的精确 XML 查询别名与跨请求结果示例。教学保持简洁，增加有针对性的正向分支示例，不扩展新能力。
+
+✅ 当前 Action 目录中的查询可直接使用，不重复加载 Skill；摄影示例区分“用户请求但尚未拍摄”和“收到成功反馈”，缺失 displayedMediaID 字段也不能传空 ID。沿用相同能力、用例和执行错误，不通过放宽校验兼容错误输出。
+
+模型以当前声明判断 Skill 可用，不要求模型计算私有闲置倒计时。倒计时/容量/所有权仍由运行时实现，教学只保留跨轮使用、终态释放和不可由释放代替设备清理的边界。
+
+## Action-only bundled Skill policy
+
+✅ Implemented: every bundled function has callType=action and an explicit Channel. History.list/read, ModelResources.snapshot, Provider.readSettings and Bluetooth.readStatus use Query. Instructions use exact XML aliases; query values enter existing round feedback. The generic loader still supports Tool declarations for isolated hosts/tests; production resources must not declare Tools. BasicSkill, ApplicationControl and HistoryQuery revisions identify the new instructions/registration.

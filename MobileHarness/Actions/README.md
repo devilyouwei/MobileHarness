@@ -105,3 +105,5 @@ NexArmControlService 持有不含 UI 类型的连接/执行状态，BluetoothWor
 ✅ StorageState 仅承载公开事实；边界检查禁止完整 AgentContext 注册，校验 Skill schema v2/useState。沿用现有源码归属及目标，ActionBindings 显式依赖 StorageState。
 
 [公开 State 契约](../Storage/State/README.md)
+
+✅ Implemented: ActionBindings adds the Action projection of five Skill query functions while retaining their direct Tool projections for fixed/isolated callers. Business handlers, return values, budgets and resources stay protocol-neutral.

@@ -132,3 +132,12 @@ VoiceSessionCoordinator 只保留语音输入、同意/占用屏障、角色及�
 [公开 State 契约](../../Storage/State/README.md)
 
 ✅ VoiceSessionCoordinator 的取消回复绑定到保留会话的 interruptSession；设置导航不调用 stopVoice，页面可见性不控制根相机。原生后台仍立即停止采集/播放并加入清理，Assistant 内存由根持有。
+
+
+## 分类异常诊断
+
+✅ ActionActivityWorkflow 依据 Agent 稳定分类码选择短 toast 文案，将完整有界诊断、代码及关联标识映射为 UI 值；UI 不依赖 ModelKit/AgentCore，不从日志文本推测类别。
+
+模型响应侧协议拒绝发生在原生调用发布前，日志归 Agent 异常；已解析调用的 unknownCapability/参数拒绝及真实 Action/Tool 执行失败继续使用既有结果/完成契约，不因新增诊断而统一终止或重试。
+
+✅ Implemented: Skill-only production catalogs contain Actions; no native declarations are synthesized for migrated queries. Retention/Task ownership follows admitted Action calls; private state and lifecycle semantics stay intact.

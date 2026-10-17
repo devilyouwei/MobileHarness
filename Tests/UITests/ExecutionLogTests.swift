@@ -200,3 +200,14 @@ func homeTaskStaysAboveCaptionThroughPromotion(viewportHeight: CGFloat) {
     #expect(state.errorToast?.id == system.id)
     #expect(state.outputIssues.contains(action))
 }
+
+@Test @MainActor func classifiedAgentIssueBoundsDetailsWithoutLeakingThemIntoToast() {
+    let state = ActionActivityState()
+    let issue = ExecutionIssue(
+        title: "modelResponse", source: "assistant", message: String(repeating: "x", count: 3000),
+        failureCode: "agent.model.tool.invalidArguments", userMessage: "工具参数格式错误", category: "模型响应异常")
+    state.recordIssue(issue)
+    #expect(issue.message.count == 2048)
+    #expect(state.visibleNotice?.text == "工具参数格式错误")
+    #expect(state.runtimeIssues.first?.failureCode == "agent.model.tool.invalidArguments")
+}

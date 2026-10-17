@@ -135,3 +135,10 @@ Apple TTS retains one native synthesizer per capability, fence request cleanup, 
 ## Storage 文件作用域接入
 
 ✅ 模型制品适配器由 App 注入 Files；后台回调复用同一制品服务。制品绑定停止时关闭接纳、取消并加入下载并保留清理错误，释放配置后允许在新 Files 作用域重新绑定，不停止无关模型实例。App 只转交接口与调度启停。
+
+✅ ChatTokenUsage 提供可选 cachedInput/cacheWriteInput；具体 provider 解码，消费者透传。Gemma4 显式合并多条 system 到首部以适配本地模板，不将系统数据降级为 user。
+
+
+## 分类异常诊断
+
+✅ LLM 中立失败诊断向消费者提供原因/协议阶段及安全标识；具体 Provider 在校验点记录，ModelKit 不决定 Agent 的恢复或用户提示。见 [Chat](Language/LLM/README.md)。
