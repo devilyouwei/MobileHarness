@@ -533,10 +533,10 @@ private final class NexArmBLEDriver: NSObject, @preconcurrency CBCentralManagerD
     }
     func sendLive(_ packet: NexArmPacket, session: String) throws -> Bool {
         try Task.checkCancellation()
-        try deliverLive(packet, session: session)
+        return try deliverLive(packet, session: session)
     }
     func restoreLive(_ packet: NexArmPacket, session: String) throws -> Bool {
-        try deliverLive(packet, session: session)
+        return try deliverLive(packet, session: session)
     }
     private func deliverLive(_ packet: NexArmPacket, session: String) throws -> Bool {
         guard liveControlID == session else { throw NexArmError.disconnected }

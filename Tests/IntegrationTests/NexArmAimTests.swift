@@ -525,7 +525,8 @@ private actor ArmAvailability {
     #expect(!later.levelsForearm)
     #expect(later.packet.isTrackingSpeedControl)
     let speeds = try speedPair(later.packet)
-    #expect(speeds.base != 0 && speeds.pitch != 0)
+    // Higher base count sets bit 15. Higher pitch count looks down and leaves bit 15 clear.
+    #expect(speeds.base == (600 | 0x8000) && speeds.pitch == 600)
 }
 
 @Test func trackingLevelPreparationRetriesUntilAdmissionAndResetsWithControl() throws {

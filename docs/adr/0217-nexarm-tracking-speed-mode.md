@@ -17,4 +17,4 @@ Position commands on this arm accelerate, cruise, and brake at the goal. Trackin
 
 ## Consequences
 
-Motor 4's positive direction is copied from motor 2 and has not been filmed. A reversed pitch is a one-value change. Photographer can raise its publication rate without a new aim contract. Bluetooth still keeps only the latest unsent speed.
+A 2026-10-18 Bluetooth observation showed motor 4's positive speed pitches the wrist down, opposite the look-up needed when the target is above center. Pitch therefore uses the reverse direction bit from motor 1. Motor 1 is unchanged: bit 15 clear turns the arm left. Photographer can raise its publication rate without a new aim contract. Bluetooth still keeps only the latest unsent speed.

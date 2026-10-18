@@ -11,7 +11,7 @@ public struct NexArmAimCommand: Sendable {
         fileprivate let time: ContinuousClock.Instant
     }
 
-    private enum Step: Equatable, Sendable {
+    fileprivate enum Step: Equatable, Sendable {
         case level
         case engage(Int)
         case speed(baseSpeed: Int, pitchSpeed: Int, base: Int, pitch: Int)
@@ -132,16 +132,18 @@ public struct NexArmAimCommand: Sendable {
     private func registerSpeeds(base: Int, pitch: Int, at time: ContinuousClock.Instant) -> (base: Int, pitch: Int) {
         let elapsed = admittedTime.map { min(0.5, max(0.02, Self.seconds(time - $0))) } ?? 0.2
         return (
-            Self.encode(delta: base - lastBase, elapsed: elapsed),
-            Self.encode(delta: pitch - lastPitch, elapsed: elapsed))
+            Self.encode(delta: base - lastBase, elapsed: elapsed, pitch: false),
+            Self.encode(delta: pitch - lastPitch, elapsed: elapsed, pitch: true))
     }
 
-    /// Positive speed magnitude with bit 15 clear decreases the encoder count.
-    private static func encode(delta: Int, elapsed: Double) -> Int {
+    /// Motor 1: bit 15 clear decreases the encoder and turns the arm left.
+    /// Motor 4: the same register sign pitches the wrist down, so its direction bit is reversed.
+    private static func encode(delta: Int, elapsed: Double, pitch: Bool) -> Int {
         guard elapsed > 0 else { return 0 }
         let magnitude = min(600, Int((abs(Double(delta) / elapsed) * 2.2).rounded()))
         guard magnitude > 0 else { return 0 }
-        return delta > 0 ? magnitude | 0x8000 : magnitude
+        let reverse = pitch ? delta < 0 : delta > 0
+        return reverse ? magnitude | 0x8000 : magnitude
     }
 
     private static func forearmLevel() throws -> NexArmPacket {
