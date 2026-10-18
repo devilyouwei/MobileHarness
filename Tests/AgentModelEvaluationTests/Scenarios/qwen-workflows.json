@@ -1492,6 +1492,240 @@
           ]
         }
       ]
+    },
+    {
+      "id": "expression-serial-four",
+      "category": "expression-sequence",
+      "turns": [
+        {
+          "user": "按顺序做开心、思考、惊讶、微笑这四个表情，一个做完再做下一个，全程不要说话。",
+          "required": [
+            "express"
+          ],
+          "forbidden": [
+            "setExpression",
+            "startTask",
+            "loadSkills",
+            "releaseSkills",
+            "finishTask",
+            "cancelTask"
+          ],
+          "counts": {
+            "express": 4
+          },
+          "task": false,
+          "expressionSequence": [
+            "happy",
+            "thinking",
+            "surprised",
+            "smile"
+          ],
+          "expressionSpeech": false,
+          "unorderedExpressions": false
+        }
+      ]
+    },
+    {
+      "id": "expression-serial-all",
+      "category": "expression-sequence",
+      "turns": [
+        {
+          "user": "把所有能演出的表情挨个做一遍，每个完成再开始下一个，不用说话。",
+          "required": [
+            "express"
+          ],
+          "forbidden": [
+            "setExpression",
+            "startTask",
+            "loadSkills",
+            "releaseSkills",
+            "finishTask",
+            "cancelTask"
+          ],
+          "counts": {
+            "express": 11
+          },
+          "task": false,
+          "expressionSequence": [
+            "closed",
+            "smile",
+            "happy",
+            "laugh",
+            "thinking",
+            "surprised",
+            "sad",
+            "love",
+            "angry",
+            "scared",
+            "playful"
+          ],
+          "expressionSpeech": false,
+          "unorderedExpressions": true
+        }
+      ]
+    },
+    {
+      "id": "expression-paired-three",
+      "category": "expression-sequence",
+      "turns": [
+        {
+          "user": "依次做开心、思考、惊讶。每做一个表情时同时说出这个表情的名称，等这项说完也做完，再做下一项。",
+          "required": [
+            "express"
+          ],
+          "forbidden": [
+            "setExpression",
+            "startTask",
+            "loadSkills",
+            "releaseSkills",
+            "finishTask",
+            "cancelTask"
+          ],
+          "counts": {
+            "express": 3
+          },
+          "task": false,
+          "expressionSequence": [
+            "happy",
+            "thinking",
+            "surprised"
+          ],
+          "expressionSpeech": true,
+          "unorderedExpressions": false
+        }
+      ]
+    },
+    {
+      "id": "expression-paired-all",
+      "category": "expression-sequence",
+      "turns": [
+        {
+          "user": "把所有表情都做一遍，挨个做，一边做表情一边说这个表情是什么，一个一个表情挨个做下去。",
+          "required": [
+            "express"
+          ],
+          "forbidden": [
+            "setExpression",
+            "startTask",
+            "loadSkills",
+            "releaseSkills",
+            "finishTask",
+            "cancelTask"
+          ],
+          "counts": {
+            "express": 11
+          },
+          "task": false,
+          "expressionSequence": [
+            "closed",
+            "smile",
+            "happy",
+            "laugh",
+            "thinking",
+            "surprised",
+            "sad",
+            "love",
+            "angry",
+            "scared",
+            "playful"
+          ],
+          "expressionSpeech": true,
+          "unorderedExpressions": true
+        }
+      ]
+    },
+    {
+      "id": "expression-paired-reordered",
+      "category": "expression-sequence",
+      "turns": [
+        {
+          "user": "依次展示调皮、害怕、生气、微笑，每项都边做边说出名称，两者都完成后再进入下一项。",
+          "required": [
+            "express"
+          ],
+          "forbidden": [
+            "setExpression",
+            "startTask",
+            "loadSkills",
+            "releaseSkills",
+            "finishTask",
+            "cancelTask"
+          ],
+          "counts": {
+            "express": 4
+          },
+          "task": false,
+          "expressionSequence": [
+            "playful",
+            "scared",
+            "angry",
+            "smile"
+          ],
+          "expressionSpeech": true,
+          "unorderedExpressions": false
+        },
+        {
+          "user": "现在反过来，微笑、生气、害怕、调皮，这一轮不要说话，只挨个做表情。",
+          "required": [
+            "express"
+          ],
+          "forbidden": [
+            "setExpression",
+            "startTask",
+            "loadSkills",
+            "releaseSkills",
+            "finishTask",
+            "cancelTask"
+          ],
+          "counts": {
+            "express": 4
+          },
+          "task": false,
+          "expressionSequence": [
+            "smile",
+            "angry",
+            "scared",
+            "playful"
+          ],
+          "expressionSpeech": false,
+          "unorderedExpressions": false
+        }
+      ]
+    },
+    {
+      "id": "expression-paired-keeps-task",
+      "category": "expression-sequence",
+      "turns": [
+        {
+          "user": "先不处理照片，临时给我依次做难过、喜爱、大笑，每项边做边报名称；做完我们继续原来的照片任务。",
+          "required": [
+            "express"
+          ],
+          "forbidden": [
+            "setExpression",
+            "startTask",
+            "loadSkills",
+            "releaseSkills",
+            "finishTask",
+            "cancelTask"
+          ],
+          "counts": {
+            "express": 3
+          },
+          "task": true,
+          "expressionSequence": [
+            "sad",
+            "love",
+            "laugh"
+          ],
+          "expressionSpeech": true,
+          "unorderedExpressions": false
+        }
+      ],
+      "skills": [
+        "photography"
+      ],
+      "taskGoal": "拍照并等待用户决定保存或忽略"
     }
   ]
 }

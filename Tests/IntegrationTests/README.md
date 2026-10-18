@@ -6,6 +6,8 @@
 
 ## 当前覆盖
 
+✅ PromptTemplateTests 通过生产目录和增量解析器读取 ExpressionInteraction 的子集串行/全量语音并行示例，核对每个 wait 的表情、默认 Channel、语音对应关系及全量示例对所有合法 express 值的覆盖，并检查默认请求包含教学。现有调度器 wait 回归验证组内跨 Channel 并行和组间完成屏障；合成测试不代表 Flash 真实模型遵循验收。
+
 | 文件/用例组 | 主要边界 |
 | --- | --- |
 | AgentTaskSkillTests | 基础/近期/Task Skill 所有权、五次完整 Decision 闲置回收、使用续期、Task 接管及终态、等待/替换、依赖预算、在途保护、LRU、会话/重启与原子提交 |
@@ -103,13 +105,15 @@ GenerationRoundTests 的 native-only 模型夹具报告合成参数首样本，�
 
 ## 千问 Action / Tool 回归
 
+✅ 连续表情专项在真实 Flash/Max 调用中验证指定顺序、全量覆盖、静默串行与逐项语音/表情并行。QwenWorkflowEvaluationTests 保存每个已解析调用的 round 内 wait 路径及合成语音请求的原文映射；专项断言介绍版每项唯一独立 wait、同项语音/表情同组、默认 Channel 和同轮完整输出；纯静默版同 Display Channel 已保证串行，不强制多余 wait。全量无指定顺序时允许枚举重排，语音名称接受中英文常用同义词；执行端继续使用合成设备，不宣称原生动画/音频验收。新增结构判定另用离线反例覆盖遗漏、错组和错名称。执行方法与证据见[连续动作专项](../../docs/validation/Action-Sequence-Prompts.md)。
+
 ✅ 显式 `MH_QWEN_EVAL=1` gate 使用生产 Assistant、公开 State、Task/Skill 控制及 Gateway，注入真实阿里 Responses 模型和合成设备/仓库执行者。共用场景位于 AgentModelEvaluationTests/Scenarios/qwen-workflows.json；每场景独立会话，按用户轮次断言调用协议、参数、顺序、Task/Skill 及禁止效果。普通检查不访问网络。每场景最多32模型请求、每用户输入最多10请求、每输入180秒；超限失败，取消并加入工作，不自动重试。证据仅含合成输入、实际请求/响应/调用和用量，不含凭据；通过不等于真实设备验收。
 
 相机替身同步发布事实，busy/权限/未开启/照片不可操作使用现有 CameraControlError；拍照不能在 busy 时被替身伪造成功。查询旁支保留 Task，替换确认单独测试；强制 Tool 查询需请求 State 未公开的电源/发现列表，避免把合理的 State 直接回答判错。
 
-✅ 针对 Qwen 实测失败补充调用教学守卫、普通忽略与重拍分支的可解析示例，以及无模板变量/无伪 native 函数示例检查；在有界静态正文预算内允许必要教学。同套53场景保留业务判定；全 Action 迁移另外断言调用协议及实际请求无 native 声明。历史三模型结果保留，当前迁移回归只选择 flash/max。
+✅ 针对 Qwen 实测失败补充调用教学守卫、普通忽略与重拍分支的可解析示例，以及无模板变量/无伪 native 函数示例检查；在有界静态正文预算内允许必要教学。既有53场景保留业务判定，另有6个连续表情专项；全 Action 迁移另外断言调用协议及实际请求无 native 声明。历史三模型结果保留，当前迁移回归只选择 flash/max。
 
-静态 system 正文预算分别为基础 Skill 22,000 UTF-8 bytes、含摄影29,000 bytes（不含 State/历史），用于约束新增教学的规模；完整请求继续执行现有64KiB总预算。示例由生产解析器验证，不把声明名称保护当作真实模型遵循证明。
+静态 system 正文预算分别为基础 Skill 23,500 UTF-8 bytes、含摄影30,500 bytes（不含 State/历史），包含常驻连续表情的完整示例及通用串行教学；完整请求继续执行现有64KiB总预算。示例由生产解析器验证，不把声明名称保护当作真实模型遵循证明。
 
 定向模板/示例检查已通过；完整云回归及全量自动化失败分别见[优化验证报告](../../docs/validation/Qwen-Prompt-Optimization.md)，不以定向通过替代全量验收。
 

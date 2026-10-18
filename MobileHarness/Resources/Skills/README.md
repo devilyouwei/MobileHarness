@@ -43,6 +43,8 @@ Skill 是可复用的流程与能力集合，Task 是运行时目标、状态和
 
 `doc`、参数 Schema、必填项、约束和完成语义来自函数自己的 `@Action`，不放在 Skill.json。函数不注册 examples；全部业务示例放在 Instructions.md，并遵循真实函数参数与当前 Skill 别名。
 
+✅ ExpressionInteraction 教学连续表情演出，提供指定子集的纯串行及“每项语音与表情并行、各项串行”的全量 XML 示例；“所有表情”按当前 express 参数枚举逐项展开，不包括仅用于清除状态的 clear。演出使用完成时等待过渡与恢复的 express，保持默认 Speech/Display Channel；不为有限演出创建需后续用户决策的 Task。资源 revision 随教学递增，通用编排规则由 Core scheduling 模板拥有。
+
 ### useState 与当前事实
 
 BasicSkill 读取 task，Photography 读取 camera，RobotInteraction 读取 robot；其余内置 Skill 声明空数组。加载与依赖合并后去重排序，每次实际模型请求（包括 ReACT）读取最新一致快照。当前系统消息包含唯一 CURRENT STATE JSON 数据块，值以 availability 和 value 表达；它是数据，不是指令。无任务为 available/null，未知事实与设备不可用分别表达。

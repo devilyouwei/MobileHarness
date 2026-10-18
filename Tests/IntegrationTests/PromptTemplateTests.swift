@@ -1,3 +1,4 @@
+import Actions
 import AgentCore
 import Foundation
 import StorageCore
@@ -171,6 +172,68 @@ private func skillResponseExamples(_ id: String) throws -> [String] {
     }
 }
 
+@Test(.actionCatalog) func expressionSequenceTeachingUsesSerialGroupsAndParallelSpeech() throws {
+    let config = try AgentConfigurations.load(named: "Assistant")
+    var skills = AgentTaskSkillState()
+    try skills.initialize(fixed: config.capabilities, baseSkills: AgentConfigurations.baseSkills(named: "Assistant"))
+    let catalog = try skills.registry(fixed: config.capabilities)
+    let prompt = try AssistantContextState.systemPrompt(catalog, skills: skills)
+    #expect(prompt.contains(try AgentConfigurations.skillInstructions("expression-interaction")))
+    #expect(prompt.contains("emit ALL requested steps in ONE response"))
+    let examples = try skillResponseExamples("expression-interaction")
+    #expect(examples.count == 2)
+    let emotions = UIActions.Emotion.allCases.filter { $0 != .clear }.map(\.rawValue)
+    let labels = ["闭眼", "微笑", "开心", "大笑", "思考", "惊讶", "难过", "喜爱", "生气", "害怕", "调皮"]
+    for (index, example) in examples.enumerated() {
+        var trace = GenerationTrace(
+            capabilities: catalog, textMapping: AssistantAgent.mapText,
+            segmentation: try AssistantAgent.textSegmentation)
+        for character in example { try trace.append(String(character)) }
+        trace.finish()
+        #expect(trace.parserError == nil)
+        var groups: [[ActionCall]] = []
+        var current: [ActionCall] = []
+        var inGroup = false
+        for event in trace.events {
+            switch event {
+            case .scheduling(.beginWait):
+                #expect(!inGroup)
+                inGroup = true
+                current = []
+            case .scheduling(.endWait):
+                #expect(inGroup)
+                groups.append(current)
+                inGroup = false
+            case .action(let call):
+                #expect(inGroup)
+                current.append(call)
+            default:
+                Issue.record("Unexpected event in expression sequence: \(event)")
+            }
+        }
+        let expectedEmotions = index == 0 ? ["smile", "thinking", "happy"] : emotions
+        #expect(!inGroup && groups.count == expectedEmotions.count)
+        #expect(
+            groups.flatMap { $0 }.filter { $0.actionPath.description == "UI.Expression.express" }
+                .compactMap { $0.parameters["emotion"] } == expectedEmotions)
+        for (step, group) in groups.enumerated() {
+            let expression = group.filter { $0.actionPath.description == "UI.Expression.express" }
+            #expect(expression.count == 1 && expression.first?.channel == "Display")
+            let speech = group.filter { $0.channel == "Speech" }
+            let captions = group.filter {
+                $0.channel == "Display" && $0.actionPath.description != "UI.Expression.express"
+            }
+            if index == 0 {
+                #expect(group.count == 1 && speech.isEmpty && captions.isEmpty)
+            } else {
+                #expect(group.count == 3 && speech.count == 1 && captions.count == 1)
+                #expect(speech.first?.parameters["text"] == "这是\(labels[step])。")
+                #expect(captions.first?.parameters["text"] == speech.first?.parameters["text"])
+            }
+        }
+    }
+}
+
 @Test(.actionCatalog) func bundledTaskExamplesEmitSilentEntryAndSingleOrderedSpeech() throws {
     let config = try AgentConfigurations.load(named: "Assistant")
     let base = try AgentConfigurations.baseSkills(named: "Assistant")
@@ -300,10 +363,10 @@ func businessSkillTeachingCannotFinishAnAbsentOrUnrelatedTask(skill: String) thr
     var skills = AgentTaskSkillState()
     try skills.initialize(fixed: fixed, baseSkills: AgentConfigurations.baseSkills(named: "Assistant"))
     let base = try AssistantContextState.systemPrompt(skills.registry(fixed: fixed), skills: skills)
-    #expect(base.utf8.count < 22_000)
+    #expect(base.utf8.count < 23_500)
     _ = try skills.control("loadSkills", arguments: ["skills": "[\"photography\"]"], inputID: "budget", fixed: fixed)
     let photography = try AssistantContextState.systemPrompt(skills.registry(fixed: fixed), skills: skills)
-    #expect(photography.utf8.count < 29_000)
+    #expect(photography.utf8.count < 30_500)
     #expect(photography.contains("Action closeCamera:"))
     #expect(photography.contains("Task is not device authorization"))
     #expect(!photography.contains("skillOwnership/loadedSkills"))

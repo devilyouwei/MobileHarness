@@ -89,6 +89,8 @@ FunctionTokenPrompts.json 是 Core Bundle 中的 Function Token 模板资源，�
 
 Core 提供语法、Channel/wait 与通信协议教学。具体函数与业务示例放在已加载 Skill 的 Instructions.md。
 
+✅ scheduling 模板明确教学一次响应连续输出已确定的多步动作：每步一个 wait 实现跨 Channel 串行；每步内部不同 Channel 可并行，连续 wait 串行连接这些组。依赖结果才能选择的后续步骤仍须等待实际反馈，不因批量输出跳过前置条件。
+
 shared FunctionTokenPrompts guidance describes task-local Channel/wait ordering, independent same-name Channels across tasks and explicit resource conflict/takeover outcomes. Canonical addresses do not create queues; prompt text grants no execution authority.
 
 FunctionTokenPrompts 分别提供 protocol、catalog 标题与末尾 catalogBoundary；Channel/wait 语义由 protocol 定义。

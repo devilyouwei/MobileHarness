@@ -45,6 +45,9 @@ private struct QwenTurn: Codable, Sendable {
     var status: String?
     var loaded: [String]?
     var unloaded: [String]?
+    var expressionSequence: [String]?
+    var expressionSpeech: Bool?
+    var unorderedExpressions: Bool?
 }
 private func qwenCases() throws -> [QwenCase] {
     let url = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
@@ -62,6 +65,7 @@ private struct QwenCall: Codable, Sendable {
     let channel: String?
     let round: String?
     let input: String
+    let waitPath: [Int]
 }
 private struct QwenTurnResult: Codable, Sendable {
     let input: String
@@ -154,23 +158,39 @@ private actor QwenEffects {
     var terminals: Set<String> = []
     var calls: [QwenCall] = []
     var failures: [String] = []
+    private var recordingRound: String?
+    private var waitPath: [Int] = []
+    private var nextWait = 0
     init(scenario: QwenCase, facts: QwenFacts) {
         self.scenario = scenario
         self.facts = facts
     }
-    func record(_ output: OutputEnvelope, aliases: [String: String]) {
+    func record(_ output: OutputEnvelope, aliases: [String: String], speechText: String? = nil) {
+        if recordingRound != output.roundID {
+            recordingRound = output.roundID
+            waitPath = []
+            nextWait = 0
+        }
         switch output.output {
+        case .scheduling(.beginWait):
+            nextWait += 1
+            waitPath.append(nextWait)
+        case .scheduling(.endWait):
+            if !waitPath.isEmpty { waitPath.removeLast() }
         case .actionCall(let call):
             let path = call.actionPath.description
+            var parameters = call.parameters
+            if let speechText { parameters["text"] = speechText }
             calls.append(
                 .init(
-                    alias: aliases[path] ?? path, path: path, kind: "action", parameters: call.parameters,
-                    channel: call.channel, round: output.roundID, input: output.inputID))
+                    alias: aliases[path] ?? path, path: path, kind: "action", parameters: parameters,
+                    channel: call.channel, round: output.roundID, input: output.inputID, waitPath: waitPath))
         case .toolCall(let call):
             calls.append(
                 .init(
                     alias: aliases[call.toolPath] ?? call.toolPath, path: call.toolPath, kind: "tool",
-                    parameters: call.arguments, channel: nil, round: output.roundID, input: output.inputID))
+                    parameters: call.arguments, channel: nil, round: output.roundID, input: output.inputID,
+                    waitPath: waitPath))
         case .rejectedCall(let rejection): failures.append(String(describing: rejection))
         case .control(let text):
             if text == "agent.finished" || text == "agent.cancelled" || text.hasPrefix("agent.error:") {
@@ -289,8 +309,51 @@ private actor QwenEffects {
     }
 }
 
-private func qwenIssues(_ expected: QwenTurn, calls: [QwenCall], skills: AgentTaskSkillState) -> [String] {
+private func qwenExpressionIssues(_ expected: QwenTurn, calls: [QwenCall]) -> [String] {
+    guard let sequence = expected.expressionSequence else { return [] }
     var issues: [String] = []
+    let expressions = calls.filter { $0.path == "UI.Expression.express" }
+    let actual = expressions.compactMap { $0.parameters["emotion"] }
+    if expected.unorderedExpressions == true ? actual.sorted() != sequence.sorted() : actual != sequence {
+        issues.append("expressionSequence:\(actual)")
+    }
+    if Set(expressions.compactMap(\.round)).count != 1 { issues.append("expressionSequenceMustUseOneRound") }
+    if expressions.contains(where: { $0.channel != "Display" }) { issues.append("expressionChannel") }
+    let speech = calls.filter { $0.path == "Speech.Playback.speak" }
+    guard expected.expressionSpeech == true else {
+        if !speech.isEmpty { issues.append("unexpectedSequenceSpeech") }
+        return issues
+    }
+    let labels = [
+        "closed": ["闭眼", "闭上眼", "闭合", "closed"], "smile": ["微笑", "smile"],
+        "happy": ["开心", "高兴", "快乐", "happy"], "laugh": ["大笑", "开怀", "laugh"],
+        "thinking": ["思考", "思索", "thinking"], "surprised": ["惊讶", "吃惊", "惊喜", "surprised"],
+        "sad": ["难过", "伤心", "悲伤", "sad"], "love": ["喜爱", "爱心", "喜欢", "爱意", "love"],
+        "angry": ["生气", "愤怒", "angry"], "scared": ["害怕", "恐惧", "惊恐", "scared"],
+        "playful": ["调皮", "俏皮", "顽皮", "playful"],
+    ]
+    if speech.count != sequence.count { issues.append("expressionSpeechCount:\(speech.count)") }
+    if expressions.contains(where: { $0.waitPath.isEmpty })
+        || Set(expressions.map(\.waitPath)).count != expressions.count
+    {
+        issues.append("expressionNeedsSeparateWaitGroups")
+    }
+    for expression in expressions {
+        let paired = speech.filter { $0.round == expression.round && $0.waitPath == expression.waitPath }
+        if paired.count != 1 || paired.first?.channel != "Speech" {
+            issues.append("expressionSpeechGroup:\(expression.parameters["emotion"] ?? "missing")")
+            continue
+        }
+        let text = (paired[0].parameters["text"] ?? "").lowercased()
+        if !(labels[expression.parameters["emotion"] ?? ""] ?? []).contains(where: text.contains) {
+            issues.append("expressionSpeechLabel:\(expression.parameters["emotion"] ?? "missing")")
+        }
+    }
+    return issues
+}
+
+private func qwenIssues(_ expected: QwenTurn, calls: [QwenCall], skills: AgentTaskSkillState) -> [String] {
+    var issues = qwenExpressionIssues(expected, calls: calls)
     for call in calls where call.kind != "action" { issues.append("nonActionSkillCall:\(call.alias)") }
     for alias in expected.required ?? [] where !calls.contains(where: { $0.alias == alias }) {
         issues.append("missing:\(alias)")
@@ -371,7 +434,7 @@ private func qwenRun(_ scenario: QwenCase, provider: OpenAIChat) async throws ->
     let repository = try AgentContextRepository(agent: .assistant, scope: UUID().uuidString, state: initial)
     let model = QwenBoundedChat(provider)
     let agent = try AssistantAgent(stateContext: state, chat: model, conversations: history, context: repository)
-    _ = try await bindSpeechRequests(agent)
+    let speechRequests = try await bindSpeechRequests(agent)
     let manager = AgentManager()
     try await manager.register(agent)
     let inputGateway = InputGateway(manager: manager, allowsExternalSend: true)
@@ -425,7 +488,14 @@ private func qwenRun(_ scenario: QwenCase, provider: OpenAIChat) async throws ->
     let pump = Task {
         do {
             try await IndependentOutputWorkflow.consumeGeneration(fixtureOutputs(agent)) { output in
-                await effects.record(output, aliases: frozenAliases)
+                let restored = await speechRequests.restored(output.output)
+                let speechText: String?
+                if case .actionCall(let call) = restored, call.actionPath.description == "Speech.Playback.speak" {
+                    speechText = call.parameters["text"]
+                } else {
+                    speechText = nil
+                }
+                await effects.record(output, aliases: frozenAliases, speechText: speechText)
                 _ = try await consumer.execute(output)
             }
         } catch is CancellationError {
@@ -486,7 +556,62 @@ private func qwenRun(_ scenario: QwenCase, provider: OpenAIChat) async throws ->
             #expect(!turn.user.isEmpty && turn.user.utf8.count < 2048)
             #expect(Set((turn.required ?? []) + (turn.forbidden ?? [])).isSubset(of: aliases))
             #expect(Set(turn.required ?? []).isDisjoint(with: turn.forbidden ?? []))
+            if let sequence = turn.expressionSequence {
+                #expect(!sequence.isEmpty && sequence.count <= 16)
+                #expect(
+                    Set(sequence).isSubset(of: Set(UIActions.Emotion.allCases.filter { $0 != .clear }.map(\.rawValue))))
+                #expect(turn.expressionSpeech != nil)
+            }
         }
+    }
+}
+
+@Test(.actionCatalog, arguments: ["valid", "nested", "shared", "label", "missing", "root", "order", "silent"])
+func qwenExpressionSequenceScoringRejectsBrokenGroups(variant: String) async throws {
+    let first = "<express emotion=\"happy\"/>这是开心。"
+    let second = "<express emotion=\"thinking\"/>这是思考。"
+    let valid = "<wait>\(first)</wait><wait>\(second)</wait>"
+    let samples: [String: (String, String?)] = [
+        "valid": (valid, nil), "nested": ("<wait>\(valid)</wait>", nil),
+        "shared": ("<wait>\(first)\(second)</wait>", "expressionNeedsSeparateWaitGroups"),
+        "label": (valid.replacingOccurrences(of: "这是思考", with: "这是开心"), "expressionSpeechLabel:thinking"),
+        "missing": ("<wait>\(first)</wait>", "expressionSequence:"),
+        "root": ("\(first)\(second)", "expressionNeedsSeparateWaitGroups"),
+        "order": ("<wait>\(second)</wait><wait>\(first)</wait>", "expressionSequence:"),
+        "silent": ("<express emotion=\"happy\"/><express emotion=\"thinking\"/>", nil),
+    ]
+    let sample = try #require(samples[variant])
+    let expected = QwenTurn(
+        user: "Synthetic offline fixture", expressionSequence: ["happy", "thinking"],
+        expressionSpeech: variant != "silent")
+    let scenario = QwenCase(id: "offline", category: "expression-sequence", turns: [expected])
+    let storage = StateContainer()
+    let effects = QwenEffects(scenario: scenario, facts: try QwenFacts(storage: storage, scenario: scenario))
+    let config = try AgentConfigurations.load(named: "Assistant")
+    let catalog = try AgentSkillLoader.registry(
+        AgentConfigurations.baseSkills(named: "Assistant"), fixed: config.capabilities)
+    var trace = GenerationTrace(capabilities: catalog, textMapping: AssistantAgent.mapText)
+    try trace.append(sample.0)
+    trace.finish()
+    try #require(trace.parserError == nil)
+    let input = AgentInput(id: "offline", sessionID: "offline", payload: .text(expected.user))
+    for event in trace.events {
+        let output: AgentOutput
+        switch event {
+        case .action(let call): output = .actionCall(call)
+        case .scheduling(let directive): output = .scheduling(directive)
+        default:
+            Issue.record("Unexpected fixture event")
+            continue
+        }
+        await effects.record(
+            OutputEnvelope(source: .assistant, input: input, output: output, roundID: "offline"), aliases: [:])
+    }
+    let issues = qwenExpressionIssues(expected, calls: await effects.calls)
+    if let issue = sample.1 {
+        #expect(issues.contains { $0.hasPrefix(issue) })
+    } else {
+        #expect(issues.isEmpty)
     }
 }
 

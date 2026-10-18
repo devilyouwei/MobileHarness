@@ -9,6 +9,7 @@
 | [项目验证日志](Validation-History.md) | 按日期记录仓库检查、构建、部署、问题调查与验证结果；专项报告有详细数据时使用链接。 |
 | [千问工作流回归](Qwen-Workflow-Regression.md) | 同套合成场景下真实 flash/plus/max 的 Action/Tool、Task/Skill 调用与边界；不等于物理设备验收。 |
 | [千问提示词修订回归](Qwen-Prompt-Optimization.md) | 基于原始失败修订教学后的同用例对照，保留 pilot、完整运行及残留失败；不改执行权限。 |
+| [连续动作提示词验证](Action-Sequence-Prompts.md) | 串行动作、组内语音/表情并行的生产示例与预算回归；包含 Flash/Max 三轮专项及完整原始数据，保留完整检查、构建与原生效果验收限制。 |
 | [语音验收指南](Voice.md) | 当前可重复的语音体验检查步骤及记录要求，不固定某次模型默认或宣称已经通过。 |
 | [NexArm 物理试验](NexArm_Physical_Acceptance.md) | 带日期的真实硬件调查和测量，限定 USB/BLE、设备、负载和观察范围。 |
 | [原始测量数据](../measurements/README.md) | 保留原始 CSV 与字段解释；测量值和失败样本不因文档整理改变。 |
