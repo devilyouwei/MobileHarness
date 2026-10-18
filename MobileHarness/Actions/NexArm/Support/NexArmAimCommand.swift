@@ -165,11 +165,9 @@ public struct NexArmAimCommand: Sendable {
         let elapsed = referenceTime.map { min(0.5, max(0.02, Self.seconds(time - $0))) } ?? 0.2
         return (
             Self.encode(
-                rate: Self.rate(target: base, reference: referenceBase, estimate: estimatedBase, dt: elapsed),
-                pitch: false),
+                rate: Self.rate(target: base, reference: referenceBase, estimate: estimatedBase, dt: elapsed)),
             Self.encode(
-                rate: Self.rate(target: pitch, reference: referencePitch, estimate: estimatedPitch, dt: elapsed),
-                pitch: true))
+                rate: Self.rate(target: pitch, reference: referencePitch, estimate: estimatedPitch, dt: elapsed)))
     }
 
     private mutating func integrate(to time: ContinuousClock.Instant) {
@@ -179,8 +177,8 @@ public struct NexArmAimCommand: Sendable {
         }
         let elapsed = Self.seconds(time - from)
         guard elapsed > 0 else { return }
-        estimatedBase += Self.countsPerSecond(heldBaseSpeed, pitch: false) * elapsed
-        estimatedPitch += Self.countsPerSecond(heldPitchSpeed, pitch: true) * elapsed
+        estimatedBase += Self.countsPerSecond(heldBaseSpeed) * elapsed
+        estimatedPitch += Self.countsPerSecond(heldPitchSpeed) * elapsed
         integratedAt = time
     }
 
@@ -193,21 +191,19 @@ public struct NexArmAimCommand: Sendable {
         return min(maxRate, max(-maxRate, feedforward + correction))
     }
 
-    /// Motor 1: bit 15 clear decreases the encoder and turns the arm left.
-    /// Motor 4: the same register sign pitches the wrist down, so its direction bit is reversed.
-    private static func encode(rate: Double, pitch: Bool) -> Int {
+    /// Bit 15 clear decreases the encoder on motors 1 and 4. On motor 1 that turns the arm left.
+    /// A positive rate increases the count and sets bit 15.
+    private static func encode(rate: Double) -> Int {
         let magnitude = min(maxMagnitude, Int((abs(rate) * scale).rounded()))
         guard magnitude > 0 else { return 0 }
-        let reverse = pitch ? rate < 0 : rate > 0
-        return reverse ? magnitude | 0x8000 : magnitude
+        return rate > 0 ? magnitude | 0x8000 : magnitude
     }
 
     /// Inverse of `encode`. The estimate is the integral of admitted speeds, not a measured joint.
-    private static func countsPerSecond(_ register: Int, pitch: Bool) -> Double {
+    private static func countsPerSecond(_ register: Int) -> Double {
         let magnitude = Double(register & 0x7FFF)
         let reverse = register & 0x8000 != 0
         let rate = magnitude / scale
-        if pitch { return reverse ? -rate : rate }
         return reverse ? rate : -rate
     }
 
