@@ -10,7 +10,7 @@
 | --- | --- |
 | NativeCompanionSurface.swift | 眼睛、视线、眨眼、呼吸及光环挂载，启动眼睛包装 |
 | EyeGeometry.swift | 可跨平台验证的连续眼睛曲线 |
-| ListeningMotion.swift | 归一化光源和单调时间运动状态 |
+| ListeningMotion.swift | 归一化光源、单调时间运动状态及光环接纳／去重 |
 | MetalHaloRenderer.swift / ListeningHalo.metal | 光环管线、显示线程和像素光效 |
 | VoiceBars.swift | 顶部／底部频谱原生图层及固定拓扑几何 |
 | FadingCaption.swift | 常驻双 UILabel 字幕及增量透明度动画 |
@@ -55,3 +55,5 @@ RetainedFullScreenCover 通过 UIKit overFullScreen 保留首页及相机挂载�
 ❌ 频谱缓存的实际收益、全屏光效功耗、原生交互和持续帧率仍须分别测量／验收，不以技术选型代替结论。
 
 [UI 根](../README.md) · [验证记录](../../../docs/validation/PlatformKit-Containers.md)
+
+✅ 光环故障对当前实例锁存并停止接纳，仅报告首次故障；相同运动／尺寸／可见性不唤醒线程，刷新率仅变化时提交。失败只停止光环，眼睛仍独立回执；新渲染实例重新接纳。保持GPU完成回收与现有帧率。

@@ -718,6 +718,7 @@ public enum VisionPipelineWorkflow {
             await bluetoothObservation?.value
             cameraEvents = nil
             bluetoothObservation = nil
+            await modelResourceControls.stopAndWait()
             var cleanupErrors: [any Error] = []
             do { try await camera.shutdown() } catch { cleanupErrors.append(error) }
             do { try await bluetooth.shutdown() } catch { cleanupErrors.append(error) }

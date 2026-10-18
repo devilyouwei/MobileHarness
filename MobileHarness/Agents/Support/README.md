@@ -208,3 +208,5 @@ ActionActivityWorkflow.shutdown 显式取消并加入执行、任务、角色及
 ✅ 会话和音频检测注入 any AudioInputOutput，保留会话／轮次校验及停止加入；模型和设备决策仍在业务层，不持有原生音频驱动。
 
 ✅ 聆听协调的 cue/haptic 注入 CuePlaying／HapticFeedbackProviding，保留原生预备、取消、加入和反馈屏障，不通过具体驱动查找设备。
+
+✅ 应用停止原生服务前先关闭并加入模型资源交互的恢复／自动保存任务，再关闭执行依赖。

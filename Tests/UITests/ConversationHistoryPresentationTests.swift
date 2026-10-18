@@ -533,3 +533,75 @@ func historyFunctionCatalogRejectsCorruptSnapshotsRatherThanInventingEmptyGroups
     let older = try historyFixture(extra: ["tokenUsage": ["input": 12, "generated": 2, "total": 14]])
     #expect(older.turns.first?.tokenReport.contains("缓存") == false)
 }
+
+@MainActor private func awaitHistoryRead(_ ready: () -> Bool) async throws {
+    let deadline = ContinuousClock.now + .seconds(2)
+    while !ready(), ContinuousClock.now < deadline { try await Task.sleep(for: .milliseconds(2)) }
+    try #require(ready())
+}
+
+@Test @MainActor func historyMessageReadCancellationRejectsLateNavigationAndErrors() async throws {
+    let loader = HistoryMessageLoader()
+    let turn = try #require(conversation(user: "read").turns.first)
+    var pending: CheckedContinuation<HistoryTurn, Error>?
+    var shown: HistoryTurn?
+    loader.open(read: { try await withCheckedThrowingContinuation { pending = $0 } }, show: { shown = $0 })
+    try await awaitHistoryRead { pending != nil }
+    loader.cancel()
+    pending?.resume(returning: turn)
+    await loader.stopAndWait()
+    #expect(shown == nil && loader.error == nil && !loader.isLoading)
+    loader.open(read: { throw CancellationError() }, show: { shown = $0 })
+    try await awaitHistoryRead { !loader.isLoading }
+    #expect(loader.error == nil && shown == nil)
+    await loader.stopAndWait()
+}
+
+@Test @MainActor func historyMessageReadsRejectDuplicatesAndJoinBeforeReplacement() async throws {
+    let loader = HistoryMessageLoader()
+    let turn = try #require(conversation(user: "read").turns.first)
+    var pending: CheckedContinuation<HistoryTurn, Error>?
+    var reads = 0
+    var shows = 0
+    loader.open(
+        read: {
+            reads += 1
+            return try await withCheckedThrowingContinuation { pending = $0 }
+        }, show: { _ in shows += 1 })
+    loader.open(
+        read: {
+            reads += 1
+            return turn
+        }, show: { _ in shows += 1 })
+    try await awaitHistoryRead { pending != nil }
+    #expect(reads == 1)
+    loader.cancel()
+    loader.open(
+        read: {
+            reads += 1
+            return turn
+        }, show: { _ in shows += 1 })
+    for _ in 0..<5 { await Task.yield() }
+    #expect(reads == 1)
+    pending?.resume(returning: turn)
+    try await awaitHistoryRead { shows == 1 }
+    #expect(reads == 2 && loader.error == nil && !loader.isLoading)
+    await loader.stopAndWait()
+}
+
+@Test func historyAsyncProjectionPreservesTimelineAndCancelledCatalogDoesNotComplete() async throws {
+    let page = try taskPreviewPage()
+    let projected = try await ConversationHistoryPresentation.timelineOffMain(page)
+    #expect(projected.map(\.id) == ConversationHistoryPresentation.timeline(page).map(\.id))
+    let catalog = try await ConversationHistoryPresentation.functionCatalogOffMain(#"{"actions":[],"tools":[]}"#)
+    #expect(catalog.actions.isEmpty && catalog.tools.isEmpty)
+    let cancelled = Task {
+        while !Task.isCancelled { await Task.yield() }
+        return try await ConversationHistoryPresentation.functionCatalogOffMain(#"{"actions":[],"tools":[]}"#)
+    }
+    cancelled.cancel()
+    do {
+        _ = try await cancelled.value
+        Issue.record("Cancelled catalog parsing must reject its result")
+    } catch is CancellationError {}
+}

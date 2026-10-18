@@ -16,31 +16,103 @@ import UI
     private var confirmedSource: ModelResourceSourceDraft?
     private var preferenceFailed = false
     private let operations: any ModelResourcesOperating
-    public init(state: any ModelResourcesPresenting, operations: any ModelResourcesOperating) {
+    private let autosaveDelay: Duration
+    private var restoration: Task<Void, Never>?
+    private var autosave: Task<Void, Never>?
+    private var pendingEndpoint: String?
+    private var autosaveDeadline: ContinuousClock.Instant?
+    private var stopped = false
+    public init(
+        state: any ModelResourcesPresenting, operations: any ModelResourcesOperating,
+        autosaveDelay: Duration = .milliseconds(600)
+    ) {
         self.state = state
         self.operations = operations
+        self.autosaveDelay = max(.zero, autosaveDelay)
+    }
+    deinit {
+        restoration?.cancel()
+        autosave?.cancel()
+    }
+    public func editDownloadSource(_ endpoint: String) {
+        guard !stopped, state.source.endpoint != endpoint, state.present(.sourceEndpoint(endpoint)) else { return }
+        pendingEndpoint = endpoint
+        autosaveDeadline = .now.advanced(by: autosaveDelay)
+        scheduleAutosave()
+    }
+    private func scheduleAutosave() {
+        guard !stopped, state.hasRestored, pendingEndpoint != nil, autosave == nil else { return }
+        autosave = Task { [weak self] in
+            defer { self?.autosave = nil }
+            while let deadline = self?.autosaveDeadline {
+                do { try await Task.sleep(until: deadline, clock: .continuous) } catch { return }
+                guard !Task.isCancelled, let self, !self.stopped else { return }
+                if let current = self.autosaveDeadline, current > .now { continue }
+                // A saving completion schedules the retained latest edit; never poll the UI.
+                guard !self.state.saving else { return }
+                self.pendingEndpoint = nil
+                self.autosaveDeadline = nil
+                _ = await self.saveDownloadSource()
+            }
+        }
+    }
+    private func finishSaving() {
+        if let pendingEndpoint { state.present(.sourceEndpoint(pendingEndpoint)) }
+        state.present(.saving(false))
+        scheduleAutosave()
+    }
+    public func stopAndWait() async {
+        stopped = true
+        pendingEndpoint = nil
+        autosaveDeadline = nil
+        restoration?.cancel()
+        autosave?.cancel()
+        await restoration?.value
+        await autosave?.value
+        restoration = nil
+        autosave = nil
     }
     private func restoreConfirmedSource() async throws -> ModelResourceSourceDraft {
         let value = try await operations.restoreSource()
+        try Task.checkCancellation()
+        guard !stopped else { throw CancellationError() }
         confirmedSource = value
         preferenceFailed = false
         return value
     }
     public func restore() async {
-        do {
-            state.present(.source(try await restoreConfirmedSource()))
-            state.present(.hasRestored(true))
+        guard !stopped else { return }
+        if let restoration { return await restoration.value }
+        if state.hasRestored, !preferenceFailed {
             await refresh()
-        } catch {
-            preferenceFailed = true
-            recordCommandFailure(error)
+            return
         }
+        let worker = Task {
+            defer {
+                restoration = nil
+                scheduleAutosave()
+            }
+            do {
+                let saved = try await restoreConfirmedSource()
+                state.present(.source(saved))
+                if let pendingEndpoint { state.present(.sourceEndpoint(pendingEndpoint)) }
+                state.present(.hasRestored(true))
+                await refresh()
+            } catch {
+                guard !Task.isCancelled, !stopped else { return }
+                preferenceFailed = true
+                recordCommandFailure(error)
+            }
+        }
+        restoration = worker
+        await worker.value
     }
     public func refresh() async {
+        guard !stopped, !Task.isCancelled else { return }
         let generation = state.beginRefresh()
         do {
             _ = try await operations.refresh(generation: generation)
-            guard generation == state.refreshGeneration else { return }
+            guard !stopped, !Task.isCancelled, generation == state.refreshGeneration else { return }
             if !state.saving, !preferenceFailed {
                 let saved = try await restoreConfirmedSource()
                 state.present(.sourceUseCustomRecognition(saved.useCustomRecognition))
@@ -48,7 +120,7 @@ import UI
             }
 
         } catch {
-            guard generation == state.refreshGeneration else { return }
+            guard !stopped, !Task.isCancelled, generation == state.refreshGeneration else { return }
             preferenceFailed = true
             if case ApplicationControlIntentFailure.presented = error { return }
             state.present(.error(error.localizedDescription))
@@ -56,9 +128,9 @@ import UI
     }
     public func acceptPresentedSnapshot() { admitted.subtract(state.items.map(\.id)) }
     public func saveSource() async {
-        guard !state.saving else { return }
+        guard !stopped, !state.saving else { return }
         state.present(.saving(true))
-        defer { state.present(.saving(false)) }
+        defer { finishSaving() }
         do {
             try await operations.saveSource(state.source)
             state.present(.source(try await restoreConfirmedSource()))
@@ -67,10 +139,14 @@ import UI
     }
     /// Persist only the download endpoint; voice switches retain their durable values.
     @discardableResult public func saveDownloadSource() async -> Bool {
-        guard state.hasRestored, !state.saving else { return false }
+        guard !stopped, state.hasRestored, !state.saving else { return false }
         state.present(.saving(true))
-        defer { state.present(.saving(false)) }
+        defer { finishSaving() }
         let endpoint = state.source.endpoint
+        if pendingEndpoint == endpoint {
+            pendingEndpoint = nil
+            autosaveDeadline = nil
+        }
         do {
             var draft = try await restoreConfirmedSource()
             if draft.endpoint == endpoint && draft.allowsCellular {
@@ -92,6 +168,7 @@ import UI
         }
     }
     private func handleSaveFailure(_ failure: any Error) async {
+        guard !stopped, !Task.isCancelled else { return }
         preferenceFailed = true
         recordCommandFailure(failure)
         if failure is ModelResourceSelectionError {
@@ -104,9 +181,9 @@ import UI
         }
     }
     public func setCustomModel(_ group: ModelResourceGroup, enabled: Bool) async {
-        guard !state.saving, group == .recognition || group == .synthesis else { return }
+        guard !stopped, !state.saving, group == .recognition || group == .synthesis else { return }
         state.present(.saving(true))
-        defer { state.present(.saving(false)) }
+        defer { finishSaving() }
         do {
             // A voice switch must not save or validate an unfinished download-domain edit.
             var draft = try await restoreConfirmedSource()
@@ -125,6 +202,7 @@ import UI
         } catch { await handleSaveFailure(error) }
     }
     private func recordCommandFailure(_ error: any Error) {
+        guard !stopped, !Task.isCancelled else { return }
         if case ApplicationControlIntentFailure.presented = error { return }
         state.present(.error(error.localizedDescription))
     }

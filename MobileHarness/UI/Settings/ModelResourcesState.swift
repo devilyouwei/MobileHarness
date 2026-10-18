@@ -109,6 +109,7 @@ public enum ModelResourceOperation: Sendable { case download, remove, cancel }
 @MainActor
 public protocol ModelResourcesControlling: AnyObject {
     func restore() async
+    func editDownloadSource(_ endpoint: String)
     func refresh() async
     func saveSource() async
     func saveDownloadSource() async -> Bool

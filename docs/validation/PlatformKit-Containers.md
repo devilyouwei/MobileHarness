@@ -334,3 +334,25 @@
 ### UI并发修复版安装与提交基线（2026-10-18）
 
 用户要求先安装测试、提交当前修改，再进行UI并发审查列出的优化。已将签名构建安装到iPhone17Pro并启动，安装序号3972；日志`/tmp/mobileharness-ui-concurrency-install.log`和`/tmp/mobileharness-ui-concurrency-launch.log`。此安装补充此前设备不可连接的限制，不覆盖之前自动化失败，也不代表用户手工、功耗或模型稳定性验收通过。后续优化另行记录，不混入这次已安装版本。
+
+### UI并发审查后续优化（2026-10-18）
+
+从已安装3972的提交b846d32开始修改，手机基线不变。待验证：光环失败锁存／去重、历史读取生命周期／异步目录／时间线缓存、资源恢复与防抖保存归属。计划运行针对回归、完整检查、Simulator和签名构建；字幕／图片、日志和实际功耗等待独立测量，后续修改不自动提交。
+
+真机基线3972用户反馈：展示没有报错和明显异常。此为当前操作范围内的手工反馈，不延伸为长时间YOLO稳定性、实测内存／功耗或后续未安装修改的验收。
+
+本批实现与最终验证：
+
+- ✅ 光环使用生产HaloRenderState锁存失败，只报告首次真实失败，拒绝后续输入；相同快照不唤醒、刷新率只在阶段／配置变化时提交。保持两个显示线程和GPU槽位真实回收，不改变帧率。
+- ✅ 历史消息读取由页面拥有，一个实际读取＋一个最新候选，取消清空候选并撤销回执；旧读取退出后才开始候选，避免取消任务链积累。目录按JSON身份保留结果，在通用执行器解析；时间线仅随会话／分页变化异步重建并预分组，不由body反复投影。
+- ✅ 下载源编辑通过控制接口更新；ModelResourceInteractionWorkflow合并初始恢复并拥有一个可续期防抖任务，忙碌完成驱动续存，不轮询、不重放失败保存。已恢复页面不覆盖端点草稿；偏好失败仍允许显式restore重试。ApplicationFeatures停止执行依赖前取消并加入恢复／防抖任务。
+- ✅ 定向9项通过（4项UI、5项应用工作流，其中含既有偏好重试回归）：`/tmp/mobileharness-ui-review-regression-latest.log`。此前`/tmp/mobileharness-ui-review-targeted.log`暴露显式偏好恢复重试被跳过，已保留该语义修复；`/tmp/mobileharness-ui-review-regression.log`曾因Testing宏内直接调用mutating方法编译失败，已将调用结果分离后重测。
+- ✅ 最终完整检查中UI91项及AppWorkflow120项通过，含相机原生Metal启停／交接；源码归属、依赖边界、严格Swift格式与Python6项通过。证据`/tmp/mobileharness-ui-review-check-final.log`。先前Metal回归曾超时，单次通过不代表已证明长期稳定。
+- ❌ 完整检查整体未通过：Integration999项中9项失败、17个问题，为atomicStableOffTargetEndsBeforeOverallDeadlineAndKeepsError、七项soundSource及visionRejectsMismatchedCaptureBeforeCallingModel；不归因为全部环境问题。较早一轮结果保留在`/tmp/mobileharness-ui-review-check.log`，不覆盖最终结果。
+- ✅ 最终签名真机构建通过：`/tmp/mobileharness-ui-review-device-final.log`。早期构建也通过，见`/tmp/mobileharness-ui-review-device.log`，最终结果包含历史读取容量限制的最后修订。
+- ❌ Simulator仍被CoreAIShared无法解析CoreAI依赖阻断，后续scheme未执行：`/tmp/mobileharness-ui-review-simulator.log`。
+- 本批未安装、未提交；手机保留用户已反馈正常的3972／b846d32基线。新增GPU故障行为仅由生产接纳状态测试覆盖，未进行真实GPU故障注入或本批原生iOS动画、模型稳定性、功耗／内存／帧率验收。字幕／图片准备／空闲日志刷新未调整，等待采样证据。
+
+### UI并发优化版真机安装（2026-10-18）
+
+按用户要求将当前未提交优化版安装并启动于iPhone17Pro，安装序号3980。使用最终签名构建，确认改动中的构建输入均不晚于可执行文件；安装日志`/tmp/mobileharness-ui-review-install.log`，启动日志`/tmp/mobileharness-ui-review-launch.log`。已替换此前3972基线；包含光环失败锁存／去重、历史读取与投影缓存、资源恢复／防抖保存优化，字幕合并与排版尚未调整。安装和启动成功不代表本版手工、模型或性能验收通过，源码仍未提交。

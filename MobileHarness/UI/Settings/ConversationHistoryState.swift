@@ -106,6 +106,74 @@ public struct HistoryRequestNavigation {
     }
 }
 
+/// Page-owned read: one active read and one latest candidate, never a chain of waiting tasks.
+@MainActor
+@Observable
+final class HistoryMessageLoader {
+    private struct Request {
+        let id: UUID
+        let read: @MainActor () async throws -> HistoryTurn
+        let show: @MainActor (HistoryTurn) -> Void
+    }
+    private(set) var isLoading = false
+    private(set) var error: String?
+    @ObservationIgnored private var worker: Task<Void, Never>?
+    @ObservationIgnored private var readTask: Task<HistoryTurn, Error>?
+    @ObservationIgnored private var pending: Request?
+    private var requestID: UUID?
+
+    func open(
+        read: @escaping @MainActor () async throws -> HistoryTurn, show: @escaping @MainActor (HistoryTurn) -> Void
+    ) {
+        guard !isLoading else { return }
+        let id = UUID()
+        requestID = id
+        isLoading = true
+        error = nil
+        pending = Request(id: id, read: read, show: show)
+        guard worker == nil else { return }
+        worker = Task { [weak self] in
+            while let request = self?.takePending() {
+                let task = Task {
+                    try Task.checkCancellation()
+                    return try await request.read()
+                }
+                self?.readTask = task
+                let result = await task.result
+                self?.readTask = nil
+                self?.complete(request, result: result)
+            }
+            self?.worker = nil
+        }
+    }
+    private func takePending() -> Request? {
+        defer { pending = nil }
+        return pending
+    }
+    private func complete(_ request: Request, result: Result<HistoryTurn, Error>) {
+        guard requestID == request.id else { return }
+        requestID = nil
+        isLoading = false
+        switch result {
+        case .success(let turn): request.show(turn)
+        case .failure(let failure):
+            if !(failure is CancellationError) { error = "读取失败：\(failure)" }
+        }
+    }
+    func cancel() {
+        requestID = nil
+        pending = nil
+        isLoading = false
+        error = nil
+        readTask?.cancel()
+    }
+    func stopAndWait() async {
+        cancel()
+        await worker?.value
+    }
+    deinit { readTask?.cancel() }
+}
+
 @MainActor
 public protocol ConversationHistoryControlling: AnyObject {
     func load() async

@@ -25,6 +25,21 @@ public enum ConversationHistoryPresentation {
         try JSONDecoder().decode(HistoryFunctionCatalog.self, from: Data(json.utf8))
     }
 
+    @concurrent public static func functionCatalogOffMain(_ json: String) async throws -> HistoryFunctionCatalog {
+        try Task.checkCancellation()
+        let result = try functionCatalog(json)
+        try Task.checkCancellation()
+        return result
+    }
+    @concurrent public static func timelineOffMain(_ conversation: HistoryConversation) async throws
+        -> [HistoryTimelineItem]
+    {
+        try Task.checkCancellation()
+        let result = timeline(conversation)
+        try Task.checkCancellation()
+        return result
+    }
+
     public static func taskReferences(for turn: HistoryTurn) -> [HistoryTaskReference] {
         var references: [HistoryTaskReference] = []
         if let id = turn.historyTaskID {
@@ -92,9 +107,12 @@ public enum ConversationHistoryPresentation {
 
     public static func timeline(_ conversation: HistoryConversation) -> [HistoryTimelineItem] {
         let requests = turns(conversation)
+        let grouped = requests.reduce(into: [String: [HistoryTurn]]()) { groups, turn in
+            if let id = turn.historyTaskID { groups[id, default: []].append(turn) }
+        }
         var replacements: [String: HistoryTaskCompression] = [:]
         for compression in conversation.taskCompressions {
-            let owned = requests.filter { $0.historyTaskID == compression.taskID }
+            let owned = grouped[compression.taskID] ?? []
             let references = Set(compression.sources)
             if !owned.isEmpty, compression.status != .generating,
                 owned.allSatisfy({
@@ -109,7 +127,7 @@ public enum ConversationHistoryPresentation {
         return requests.compactMap { turn in
             if let taskID = turn.historyTaskID, let compression = replacements[taskID] {
                 return emitted.insert(taskID).inserted
-                    ? .task(compression, sources: requests.filter { $0.historyTaskID == taskID }) : nil
+                    ? .task(compression, sources: grouped[taskID] ?? []) : nil
             }
             return .request(turn)
         }

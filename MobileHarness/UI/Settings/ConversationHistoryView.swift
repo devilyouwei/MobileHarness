@@ -219,13 +219,14 @@ import Foundation
         @State private var isRefreshing = false
         @State private var expandedTasks: Set<String> = []
         @State private var taskPages: [String: HistoryConversation] = [:]
-        @State private var loadingRequest = false
+        @Environment(\.scenePhase) private var scenePhase
+        @State private var messageLoader = HistoryMessageLoader()
+        @State private var items: [HistoryTimelineItem] = []
         @State private var pageLoading = HistoryPageLoading<UInt64>()
         @State private var taskLoading: [String: HistoryPageLoading<UInt64>] = [:]
         @State private var pageWorker: Task<Void, Never>?
         @State private var taskWorkers: [String: Task<Void, Never>] = [:]
         @State private var requestNavigation = HistoryRequestNavigation()
-        private var items: [HistoryTimelineItem] { ConversationHistoryPresentation.timeline(loaded ?? seed) }
         let title: String
         let controls: any ConversationHistoryControlling
         init(conversation: HistoryConversation, controls: any ConversationHistoryControlling) {
@@ -235,9 +236,9 @@ import Foundation
         }
         var body: some View {
             List {
-                if let loadError {
+                if let error = loadError ?? messageLoader.error {
                     Section {
-                        Text(loadError).font(.footnote).foregroundStyle(.secondary).textSelection(.enabled)
+                        Text(error).font(.footnote).foregroundStyle(.secondary).textSelection(.enabled)
                         Button("重试") { Task { await reload() } }.disabled(isRefreshing)
                     }
                 }
@@ -280,6 +281,10 @@ import Foundation
             }
             .task(id: seed.id) {
                 guard loaded == nil, initialLoad.begin() else { return }
+                do { items = try await ConversationHistoryPresentation.timelineOffMain(seed) } catch {
+                    initialLoad.finish(succeeded: false)
+                    return
+                }
                 await reload()
                 initialLoad.finish(succeeded: !Task.isCancelled && loaded != nil)
             }
@@ -287,6 +292,8 @@ import Foundation
             .overlay {
                 if loaded == nil && loadError == nil { ProgressView("加载对话…") }
             }
+            .onDisappear { messageLoader.cancel() }
+            .onChange(of: scenePhase) { _, phase in if phase != .active { messageLoader.cancel() } }
             .navigationTitle(String(title.prefix(40)))
             .navigationDestination(isPresented: $requestNavigation.isPresented) {
                 if let turn = requestNavigation.turn { ConversationTurnDetail(turn: turn, controls: controls) }
@@ -337,14 +344,8 @@ import Foundation
         }
         private func requestRow(_ turn: HistoryTurn, showsIcon: Bool = true, endsTask: Bool = false) -> some View {
             Button {
-                guard !loadingRequest, !requestNavigation.isPresented else { return }
-                loadingRequest = true
-                Task {
-                    defer { loadingRequest = false }
-                    do { requestNavigation.open(try await controls.loadMessage(turn)) } catch {
-                        loadError = "读取失败：\(error)"
-                    }
-                }
+                guard !requestNavigation.isPresented else { return }
+                messageLoader.open(read: { try await controls.loadMessage(turn) }) { requestNavigation.open($0) }
             } label: {
                 HStack(alignment: .top, spacing: 12) {
                     if showsIcon {
@@ -380,6 +381,7 @@ import Foundation
         private func reload() async {
             guard !isRefreshing, !Task.isCancelled else { return }
             isRefreshing = true
+            messageLoader.cancel()
             defer { isRefreshing = false }
             let readers = Array(taskWorkers.values) + [pageWorker].compactMap { $0 }
             for reader in readers { reader.cancel() }
@@ -390,8 +392,10 @@ import Foundation
             do {
                 try Task.checkCancellation()
                 let conversation = try await controls.loadConversation(seed.id)
+                let timeline = try await ConversationHistoryPresentation.timelineOffMain(conversation)
                 try Task.checkCancellation()
                 loaded = conversation
+                items = timeline
                 taskPages.removeAll()
                 loadError = nil
                 initialLoad.finish(succeeded: true)
@@ -423,7 +427,13 @@ import Foundation
                 try Task.checkCancellation()
                 guard pageLoading.accepts(ticket) else { return }
                 guard page.nextPosition.map({ $0 > after }) ?? true else { throw HistoryDetailError.unavailable }
-                try loaded?.appendPage(page)
+                guard var conversation = loaded else { throw HistoryDetailError.unavailable }
+                try conversation.appendPage(page)
+                let timeline = try await ConversationHistoryPresentation.timelineOffMain(conversation)
+                try Task.checkCancellation()
+                guard pageLoading.accepts(ticket) else { return }
+                loaded = conversation
+                items = timeline
                 pageLoading.finish(ticket)
             } catch is CancellationError {
                 pageLoading.cancel(ticket)
@@ -532,8 +542,9 @@ import Foundation
     private struct ConversationTurnDetail: View {
         let turn: HistoryTurn
         let controls: any ConversationHistoryControlling
-        private let catalog: HistoryFunctionCatalog?
-        private let catalogError: String?
+        @State private var catalog: HistoryFunctionCatalog?
+        @State private var catalogError: String?
+        @State private var catalogSource: String?
         @State private var interpretation = ""
         @State private var catalogExpanded = false
         @State private var catalogRawExpanded = false
@@ -541,18 +552,6 @@ import Foundation
         init(turn: HistoryTurn, controls: any ConversationHistoryControlling) {
             self.turn = turn
             self.controls = controls
-            if let metadata = turn.decisionMetadata {
-                do {
-                    catalog = try ConversationHistoryPresentation.functionCatalog(metadata.catalogJSON)
-                    catalogError = nil
-                } catch {
-                    catalog = nil
-                    catalogError = error.localizedDescription
-                }
-            } else {
-                catalog = nil
-                catalogError = nil
-            }
         }
 
         var body: some View {
@@ -658,6 +657,21 @@ import Foundation
                 }
             }
             .task { interpretation = controls.preview(turn) }
+            .task(id: turn.decisionMetadata?.catalogJSON) {
+                guard let source = turn.decisionMetadata?.catalogJSON, source != catalogSource else { return }
+                catalog = nil
+                catalogError = nil
+                do {
+                    let result = try await ConversationHistoryPresentation.functionCatalogOffMain(source)
+                    try Task.checkCancellation()
+                    catalog = result
+                    catalogSource = source
+                } catch {
+                    guard !Task.isCancelled else { return }
+                    catalogError = error.localizedDescription
+                    catalogSource = source
+                }
+            }
         }
 
         private var taskInformation: some View {
