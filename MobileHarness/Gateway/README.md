@@ -123,3 +123,11 @@ Producer/session cancellation joins scheduled and direct native execution, prese
 ## 统一外部输入与动态订阅
 
 ✅ ExternalInputAdapter 统一封装业务、文字、设备和扩展传感器输入，不引用具体业务模块。InputGateway 提供宿主订阅，校验注册 schema、目标输入和来源权限。静态/动态关系合并去重，外部与 Agent 广播共享分发；订阅不能获得执行或反馈权限。
+
+## 统一容器异常通道
+
+✅ 新增容器异常通道，保持不依赖 Storage/UI/具体 Agents。注入回调转换中立错误，记录与投递分离；按来源根/组件/操作/代码/有界描述合并故障。Agent 不可用时保留事件和未送达状态，通道自身投递失败只更新状态，不能递归产生异常。
+
+## ApplicationControl 异常展示
+
+✅ 已实现：异常展示链路调整为：Gateway Signal → ApplicationControl 确定性策略 → 内部 UI.RuntimeDiagnostics.recordFailure → UI 运行异常/Toast。移除绑定层直接监听容器异常生成展示的旧链路；Assistant 保留可选被动诊断，App 保留启动失败兜底。容器原始抛错及模块组合装配本轮不变。

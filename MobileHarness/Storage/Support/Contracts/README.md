@@ -11,3 +11,9 @@ RecordStorageError.notReady 表示数据库端口尚未发布，closed 表示作
 ## 待完成
 
 暂无本目录独立待办。
+
+## 统一容器异常通道
+
+✅ StorageError.swift 新增 StorageFailureReporter，以组件/操作/原错误回调向宿主报告；Storage 子能力共享注入实例，不依赖框架模块。调用者必须提供有界非阻塞接收，不在存储锁内等待。
+
+✅ StorageError.swift 集中声明通用、文档和记录三类错误及注入报告器，值错误统一 Error/Equatable/Sendable；StorageDurability 单独表达持久化事实。各错误名称和 case 保持独立，不用一类泛化错误抹平语义。

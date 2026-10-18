@@ -1,9 +1,11 @@
 import AppLifecycle
 import AppStorage
 import Foundation
+import Gateway
 import PlatformKit
 import Testing
-import UI
+
+@testable import UI
 
 @Test @MainActor func platformRegistrationIsRootLocal() async throws {
     let registry = ApplicationContainer(root: URL.temporaryDirectory)
@@ -69,7 +71,10 @@ private actor UnconfirmedPlatformLink: NexArmBluetoothLink {
 
 @Test @MainActor func platformRetainsCleanupFailureAndDoesNotReopenOrRepeatDisconnect() async throws {
     let link = UnconfirmedPlatformLink()
-    let root = PlatformContainer { ConnectivityContainer(admission: $0, bluetooth: link) }
+    let channel = ContainerFailureChannel()
+    let root = PlatformContainer(
+        makeConnectivity: { ConnectivityContainer(admission: $0, bluetooth: link) },
+        onFailure: channel.sink(module: "platform"))
     try root.start()
     root.invalidate()
     await #expect(throws: PlatformCleanupFailure.self) { try await root.setForeground(false) }
@@ -78,6 +83,9 @@ private actor UnconfirmedPlatformLink: NexArmBluetoothLink {
     await #expect(throws: PlatformCleanupFailure.self) { try await root.stop() }
     #expect(!root.isAvailable)
     #expect(await link.disconnects == 1)
+    #expect(
+        channel.snapshot().records.contains { $0.event.component == "connectivity" && $0.event.module == "platform" })
+    await channel.stop()
 }
 
 @Test @MainActor func uiRegistrationSharesCameraWithItsRootAndIsolatesScopes() async throws {

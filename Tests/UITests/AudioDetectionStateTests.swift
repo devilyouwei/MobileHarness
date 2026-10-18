@@ -1,6 +1,7 @@
 import Foundation
 import Testing
-import UI
+
+@testable import UI
 
 @Test @MainActor func audioDetectionExpiresDirectionAndDetectsMissingPCMIndependently() {
     let state = AudioDetectionState()

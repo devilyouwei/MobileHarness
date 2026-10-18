@@ -27,6 +27,9 @@ import Observation
         if case .success(let lifecycle) = owner {
             lifecycle.onFailure = features.reportStartupFailure
             lifecycle.setForeground(foreground)
+        } else if case .failure(let error) = owner {
+            services.containerFailures.report(
+                module: "app", component: "lifecycle", operation: "assemble", phase: .startup, error: error)
         }
         features.onRetry = { [weak self] in self?.retry() }
     }

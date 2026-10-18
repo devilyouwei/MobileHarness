@@ -22,27 +22,34 @@ internal final class SQLiteDatabase: Sendable {
     var committedWriteCount: Int { writeTransactions.withLock { $0 } }
     var lastWriteChanges: Int { committedChanges.withLock { $0 } }
     func write<Value>(_ body: (Database) throws -> Value) throws -> Value {
-        try admit()
-        defer { release() }
-        let admitted = admittedWrites.withLock { count in
-            guard count < 17 else { return false }
-            count += 1
-            return true
+        do {
+            try admit()
+            defer { release() }
+            let admitted = admittedWrites.withLock { count in
+                guard count < 17 else { return false }
+                count += 1
+                return true
+            }
+            guard admitted else { throw RecordStorageError.busy }
+            defer { admittedWrites.withLock { $0 -= 1 } }
+            writer.lock()
+            defer { writer.unlock() }
+            let result = try pool.write { db in
+                let before = db.totalChangesCount
+                let result = try body(db)
+                return (result, db.totalChangesCount - before)
+            }
+            committedChanges.withLock { $0 = result.1 }
+            writeTransactions.withLock { $0 += 1 }
+            return result.0
+        } catch {
+            failures.report("database.sqlite", "write", error)
+            throw error
         }
-        guard admitted else { throw RecordStorageError.busy }
-        defer { admittedWrites.withLock { $0 -= 1 } }
-        writer.lock()
-        defer { writer.unlock() }
-        let result = try pool.write { db in
-            let before = db.totalChangesCount
-            let result = try body(db)
-            return (result, db.totalChangesCount - before)
-        }
-        committedChanges.withLock { $0 = result.1 }
-        writeTransactions.withLock { $0 += 1 }
-        return result.0
     }
-    public init(url: URL, removeOnClose: Bool = false) throws {
+    private let failures: StorageFailureReporter
+    public init(url: URL, removeOnClose: Bool = false, failures: StorageFailureReporter = .init()) throws {
+        self.failures = failures
         temporaryURL = removeOnClose ? url : nil
         guard url.isFileURL else { throw RecordStorageError.invalidRecord }
         var configuration = Configuration()
@@ -55,13 +62,18 @@ internal final class SQLiteDatabase: Sendable {
         pool = try DatabasePool(path: url.path, configuration: configuration)
     }
     func migrate(_ changes: [(name: String, statements: [String])]) throws {
-        var migrations = DatabaseMigrator()
-        for change in changes {
-            migrations.registerMigration(change.name) { db in
-                for sql in change.statements { try db.execute(sql: sql) }
+        do {
+            var migrations = DatabaseMigrator()
+            for change in changes {
+                migrations.registerMigration(change.name) { db in
+                    for sql in change.statements { try db.execute(sql: sql) }
+                }
             }
+            try migrations.migrate(pool)
+        } catch {
+            failures.report("database.sqlite", "migrate", error)
+            throw error
         }
-        try migrations.migrate(pool)
     }
     private func admit() throws {
         try lifetime.withLock { state in
@@ -93,25 +105,35 @@ internal final class SQLiteDatabase: Sendable {
         }
     }
     func shutdown() async throws {
-        let task = lifetime.withLock { state in
-            if let shutdown = state.shutdown { return shutdown }
-            state.accepting = false
-            let task = Task.detached { [self] in
-                await waitForDrain()
-                try closeUnpublished()
+        do {
+            let task = lifetime.withLock { state in
+                if let shutdown = state.shutdown { return shutdown }
+                state.accepting = false
+                let task = Task.detached { [self] in
+                    await waitForDrain()
+                    try closeUnpublished()
+                }
+                state.shutdown = task
+                return task
             }
-            state.shutdown = task
-            return task
+            try await task.value
+        } catch {
+            failures.report("database.sqlite", "shutdown", error)
+            throw error
         }
-        try await task.value
     }
     // Only used before publication, or after all admitted operations have drained.
     func closeUnpublished() throws {
-        beginClosing()
-        guard !lifetime.withLock({ $0.poolClosed }) else { return }
-        try pool.close()
-        lifetime.withLock { $0.poolClosed = true }
-        removeTemporaryFiles()
+        do {
+            beginClosing()
+            guard !lifetime.withLock({ $0.poolClosed }) else { return }
+            try pool.close()
+            lifetime.withLock { $0.poolClosed = true }
+            removeTemporaryFiles()
+        } catch {
+            failures.report("database.sqlite", "closeUnpublished", error)
+            throw error
+        }
     }
     private func removeTemporaryFiles() {
         guard let temporaryURL else { return }
@@ -133,9 +155,14 @@ internal final class SQLiteDatabase: Sendable {
         }
     }
     func read<Value>(_ body: (Database) throws -> Value) throws -> Value {
-        try admit()
-        defer { release() }
-        return try pool.read(body)
+        do {
+            try admit()
+            defer { release() }
+            return try pool.read(body)
+        } catch {
+            failures.report("database.sqlite", "read", error)
+            throw error
+        }
     }
 }
 

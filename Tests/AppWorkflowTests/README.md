@@ -51,3 +51,13 @@ UI 呈现边界回归覆盖设置修订拒绝过期更新、实际表情动画�
 ## 分类异常诊断
 
 ✅ 验证异常分类从 Gateway 快照到 AgentBindings/UI 的短 toast 与完整日志双通道，保留关联信息及取消/去重/过期契约。
+
+## ApplicationControl 异常展示
+
+✅ 已实现：原异常提示策略回归迁到 IntegrationTests/ContainerFailureTests.swift，经过真实 Gateway/ApplicationControl/内部函数验证；本目标保留纯展示和 workflow 投影测试，不再假定 recordFailure 同步直接更新 UI。
+
+## UI 全量容器化
+
+✅ 应用级 UI 状态由八个子容器统一创建，消费者注入所需 Presenting 接口并提交 UI 自有值，不直接写字段。App 注册并管理同一 UI 根；原业务身份/版本校验、原生完成和基础库依赖边界保持。跨模块连接迁移仍是独立待办。
+
+✅ 相机点击回归覆盖同步忙碌、重叠拒绝、成功/失败后的忙碌与控制提示清理，且不覆盖原生设备错误。

@@ -1,6 +1,7 @@
 import ActionBindings
 import AgentCore
 import Foundation
+import Gateway
 import PlatformKit
 import StorageCore
 import UI
@@ -8,17 +9,64 @@ import UI
 /// Root-owned execution-state subscription. The injected stream carries full snapshots, bounded error descriptions without call arguments.
 @MainActor
 public final class ActionActivityWorkflow: ExecutionFailureReporting {
-    public let state: ActionActivityState
+    public let state: any ActivityPresenting
     private var taskObservation: Task<Void, Never>?
     private var agentObservation: Task<Void, Never>?
     private var observation: Task<Void, Never>?
     private var failureObservation: Task<Void, Never>?
-    public init(state: ActionActivityState) { self.state = state }
+    private let failureEvents = AsyncStream<RuntimeFailureEvent>.makeStream(bufferingPolicy: .bufferingOldest(100))
+    private var failureSignalObservation: Task<Void, Never>?
+    public private(set) var rejectedFailureSignals: UInt64 = 0
+    public private(set) var lastFailureSignalError: String?
+    public init(state: any ActivityPresenting) { self.state = state }
     deinit {
         taskObservation?.cancel()
         agentObservation?.cancel()
         observation?.cancel()
         failureObservation?.cancel()
+        failureEvents.continuation.finish()
+        failureSignalObservation?.cancel()
+    }
+    public func connectFailureSignals(input: InputGateway, sessionID: String) {
+        guard failureSignalObservation == nil else { return }
+        let stream = failureEvents.stream
+        failureSignalObservation = Task { [weak self] in
+            for await event in stream {
+                guard !Task.isCancelled else { return }
+                do { try await input.publishRuntimeFailure(event, sessionID: sessionID) } catch {
+                    guard !Task.isCancelled else { return }
+                    self?.lastFailureSignalError = String(String(describing: error).prefix(512))
+                    self?.state.present(.observationUnavailable(true))
+                }
+            }
+        }
+    }
+    public func stopFailureSignals() async {
+        failureEvents.continuation.finish()
+        failureObservation?.cancel()
+        failureSignalObservation?.cancel()
+        await failureObservation?.value
+        await failureSignalObservation?.value
+    }
+    public func shutdown() async {
+        await stopFailureSignals()
+        let tasks = [taskObservation, agentObservation, observation]
+        for task in tasks { task?.cancel() }
+        for task in tasks { await task?.value }
+        taskObservation = nil
+        agentObservation = nil
+        observation = nil
+    }
+    private func forwardFailure(_ event: RuntimeFailureEvent) {
+        switch failureEvents.continuation.yield(event) {
+        case .enqueued: break
+        case .dropped, .terminated:
+            rejectedFailureSignals &+= 1
+            lastFailureSignalError = "Runtime failure Signal forwarding unavailable or full"
+            state.present(.observationUnavailable(true))
+        @unknown default:
+            state.present(.observationUnavailable(true))
+        }
     }
     public func recordFailure(
         title: String, source: String, message: String, failureCode: String? = nil,
@@ -32,70 +80,39 @@ public final class ActionActivityWorkflow: ExecutionFailureReporting {
         title: String, source: String, message: String, failureCode: String? = nil,
         context: ExecutionIssue.Context? = nil, diagnostic: AgentFailureDiagnostic?
     ) {
-        state.recordIssue(
+        forwardFailure(
             .init(
-                title: title, source: source, message: message, failureCode: failureCode, context: context,
-                userMessage: Self.userMessage(source: source, message: message, code: failureCode),
-                category: diagnostic.map { Self.categoryTitle($0.category) }))
-    }
-    private static func userMessage(source: String, message: String, code: String? = nil) -> String? {
-        switch code {
-        case "agent.model.tool.undeclaredName": return "模型调用了未声明的工具，本次回复已中止"
-        case "agent.model.tool.invalidArguments": return "模型返回的工具参数格式错误，本次回复已中止"
-        case "agent.model.tool.argumentsMismatch": return "模型返回的工具参数前后不一致，本次回复已中止"
-        case "agent.model.tool.invalidIdentity", "agent.model.tool.sequenceMismatch":
-            return "模型返回的工具调用信息不一致，本次回复已中止"
-        case "agent.model.transport": return "模型连接失败，请检查网络后重试"
-        case "agent.model.httpStatus", "agent.model.provider": return "模型服务请求失败，本次回复已中止"
-        case let code? where code.hasPrefix("agent.model."): return "模型响应格式异常，本次回复已中止"
-        case let code? where code.hasPrefix("agent.generation."): return "模型输出的指令格式异常，本次回复已中止"
-        case "vision.pose.failed", "vision.pipeline.failed", "vision.input.failed":
-            return "姿态识别已停止，请查看日志后重试"
-        case "vision.presentation.failed": return "姿态绘制失败，请查看日志"
-        case "vision.pose.stalled": return "姿态推理长时间未返回，实时影像仍可用"
-        case "vision.pose.stale": return "姿态结果持续超时，请查看日志"
-        case "vision.input.stalled": return "姿态识别未收到相机帧，请查看日志"
-        case "agent.runtime.failed": return "对话处理失败，请查看日志"
-        case "agent.context.publication": return "对话上下文更新失败，本次回复已中止"
-        default:
-            return source == "speechPerception" && message.hasPrefix("agent.error: speech perception:") ? "我没听清" : nil
-        }
-    }
-    private static func categoryTitle(_ category: AgentFailureDiagnostic.Category) -> String {
-        switch category {
-        case .modelResponse: "模型响应异常"
-        case .modelTransport: "模型连接异常"
-        case .generation: "指令生成异常"
-        case .context: "上下文异常"
-        case .runtime: "Agent 运行异常"
-        }
+                source: source, title: title, message: message, failureCode: failureCode,
+                sessionID: context?.sessionID, inputID: context?.inputID, roundID: context?.roundID,
+                category: diagnostic?.category.rawValue, workerID: context?.workerID, callID: context?.callID))
     }
 
     public func startFailures(observe: @escaping @Sendable () async throws -> AsyncStream<OutputFailureSnapshot>) {
         guard failureObservation == nil else { return }
         let state = state
-        failureObservation = Task {
+        failureObservation = Task { [weak self] in
             do {
                 let stream = try await observe()
+                var seen: Set<String> = []
+                var revision: UInt64?
                 for await snapshot in stream {
                     guard !Task.isCancelled else { return }
-                    state.replaceIssues(
-                        revision: snapshot.revision,
-                        records: snapshot.records.map {
-                            .init(
-                                id: $0.id, title: $0.title, source: $0.source.rawValue, message: $0.message,
-                                time: $0.time, failureCode: $0.failureCode,
-                                context: .init(
-                                    workerID: $0.source.rawValue, sessionID: $0.sessionID,
-                                    inputID: $0.inputID, roundID: $0.roundID),
-                                inputID: $0.inputID,
-                                userMessage: Self.userMessage(
-                                    source: $0.source.rawValue, message: $0.message, code: $0.failureCode),
-                                category: $0.diagnostic.map { Self.categoryTitle($0.category) })
-                        }, evictedCount: snapshot.evictedCount)
+                    guard revision == nil || snapshot.revision > revision! else { continue }
+                    revision = snapshot.revision
+                    let retained = Set(snapshot.records.map(\.id))
+                    seen = seen.intersection(retained)
+                    for record in snapshot.records where !seen.contains(record.id) {
+                        seen.insert(record.id)
+                        // A failed diagnostic presentation is already evidence; never recursively present it.
+                        guard
+                            !(record.source == .applicationControl
+                                && record.title == "UI.RuntimeDiagnostics.recordFailure")
+                        else { continue }
+                        self?.forwardFailure(RuntimeFailureEvent(record))
+                    }
                 }
             } catch {
-                if !Task.isCancelled { state.observationUnavailable = true }
+                if !Task.isCancelled { state.present(.observationUnavailable(true)) }
             }
         }
     }
@@ -106,7 +123,7 @@ public final class ActionActivityWorkflow: ExecutionFailureReporting {
     ) {
         guard taskObservation == nil else { return }
         let state = state
-        taskObservation = Task {
+        taskObservation = Task { [weak self] in
             do {
                 let stream = try await observe()
                 var previousRevision: UInt64?
@@ -163,8 +180,7 @@ public final class ActionActivityWorkflow: ExecutionFailureReporting {
                 }
             } catch {
                 if !Task.isCancelled {
-                    state.recordIssue(
-                        .init(title: "Task 记录不可用", source: "runtime", message: String(describing: error)))
+                    self?.recordFailure(title: "Task 记录不可用", source: "runtime", message: String(describing: error))
                 }
             }
         }
@@ -203,7 +219,7 @@ public final class ActionActivityWorkflow: ExecutionFailureReporting {
                         evictedCount: snapshot.evictedCount)
                 }
             } catch {
-                if !Task.isCancelled { state.observationUnavailable = true }
+                if !Task.isCancelled { state.present(.observationUnavailable(true)) }
             }
         }
     }

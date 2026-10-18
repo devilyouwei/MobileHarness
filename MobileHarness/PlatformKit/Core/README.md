@@ -23,3 +23,7 @@ AgentBindings 注入原生事实读取与 Gateway 发布接口；ActionBindings 
 ✅ NativeInputBroadcast 只提供原生值分发，最多 16 个订阅者；latest 每订阅者保留一项并计数替换，ordered 每订阅者 64 项、溢出只终止该订阅并保留明确错误。finish 关闭当前全部订阅；不启停设备、不提供 Signal 或业务重放。
 
 ✅ NativeInputSession 为回调广播提供可同步关闭的单代围栏，无转发任务/额外队列；finish 与 send 串行，关闭后迟到回调不能向复用广播发送数据。
+
+## 统一容器异常通道
+
+✅ PlatformAdmission 增加原生故障回调入口；只同步调用注入的有界报告器，不开设备、不创建转发任务或依赖其他模块。

@@ -1,112 +1,50 @@
-# Conversation and Execution Presentation
+# Conversation — 首页与运行记录呈现
 
-ConversationView 的根启动失败提示改为“应用准备失败”，因为准备过程包括 Agent 服务和配置恢复；继续显示实际错误，不将 scopeClosed 一概归为模型文件失败。
+## 职责与接口
 
-## Summary
+UIHomeContainer 唯一创建 ConversationState、ActionActivityState、HomeEffectsWorkflow 和 ConversationExpressionPresentation，向业务分别暴露 ConversationPresenting、ActivityPresenting、HomeEffectsPresenting、ExpressionPresenting。
 
-Render conversation phases/captions/eyes and bounded Action, Task and Agent log values.
+上游业务集成提交经会话／轮次验证的 UI 值；本目录消费 Components 的原生呈现，向上游转发聆听／重试意图及表情回执。没有 Signal 订阅、模型调用、设备控制或持久化。
 
-## Ownership and boundaries
+## 文件与内部关系
 
-AgentBindings/ActionBindings own input/output lifetimes and supply validated values. Views forward listening/retry/navigation intents and own only local presentation selection. Device connection policy is confined to Settings.
+| 文件 | 职责 |
+| --- | --- |
+| UIHomeContainer.swift | 子容器装配、共享根接纳及失活／停止 |
+| ConversationState.swift | 会话值、字幕几何、呈现协议与表情事务 |
+| ConversationView.swift | 首页和启动界面，隔离频谱、表情与字幕观察 |
+| ActionActivityState.swift | Action／Task／Agent 日志值、异常、过滤及有界展示状态 |
+| ActionActivityView.swift | 运行摘要、日志面板和详情 |
+| HomeEffectsWorkflow.swift | Notice／装饰光／回复清理及其到期任务 |
 
-## External relationships and data flow
+✅ 日志值及异常呈现接口归 ActionActivityState，效果／表情协议与实现同文件；导航由 UI 根提供。首页消费真实状态，不包含另行构造的模拟记录或视觉演示页面。
 
-Runtime arrows show data or capability calls; dashed arrows show injection.
+## 字幕、表情与交互
 
-```mermaid
-flowchart LR
- Bindings[Module integrations]
- Bindings -->|phase, captions, spectrum and execution snapshots| State[ConversationState and ActionActivityState]
- State --> View[ConversationView and ActionActivityView]
- View -->|injected toggle, retry and history intent| Bindings
- View --> Components[Shared rendering]
-```
+✅ 半秒长按提交一次聆听切换；零距离拖动只提供按压和归一化光源位置，不直接打开设备。辅助功能激活使用相同控制端口。停止意图可打断回复；实际聆听和播放状态由外部执行者投影。
 
-## Conversation
+识别与回复分别占位：新的已接纳识别轮次清除前轮两段字幕，定稿的用户文本移到眼睛上方，回复保留在下方直到新一轮或明确清理。consent-off 清除字幕；普通生命周期暂停使旧 scope 失效。视图不推断 ASR 或播放完成。
 
-Startup is noninteractive while preparation runs and exposes progress/error/retry. Listening starts only from explicit interaction. User transcription and Assistant reply occupy separate slots: final user text moves above the eyes, while reply remains below; the next accepted recognition turn resets both. Actual audio telemetry drives playback phase/spectrum independently of caption timing.
+ConversationCaptionLayout 分别计算固定任务行与移动字幕；仅活动的前台任务展示一行目标，定稿字幕与任务保留间距。用户字幕的位置只随定稿边界动画，任务出现不使用会造成重叠的间距补间。Components 在显示边界保留最新320个完整 Characters。
 
-`ConversationState` separates phase, base/finite expression, renderer request identity and gaze. UI invalidates transient completion on session/turn reset. Components provide full-text accessibility, stable caption identity and reduced motion. Camera background is injected.
+表情基态只提交状态；有限表演拥有独立身份和等待者，替换、失活、离窗或取消不能伪造成功。默认关闭眼睛跟随会话关闭；显式表情动作仍保留资格与真实完成校验。
 
-## Logs and issues
+## 日志、异常和装饰
 
-`ActionActivityItem`, `ExecutionIssue`, `TaskLogItem` and `AgentRuntimeLogItem` are UI-owned projections. AgentBindings supplies bounded snapshots/revisions/eviction counts; UI does not execute or persist them. The sheet has Action / Task / Agent tabs, source/status filters and an internal-Action toggle. There is no Signal collection/subscription in this UI.
+✅ 首页最多展示三个 Channel 摘要，日志分 Action／Task／Agent 页签。显示值保留真实执行身份、状态、来源、排队／并发计数及淘汰数量；内部维护成功默认隐藏，失败可见。关闭摘要不取消执行，Tool 不虚构调度记录。
 
-Home summaries show up to three exact Channel names, concurrent/queued counts and recent nonfailure terminal state for three seconds. Failures are shown in the scheduling issue list. Dismissal affects retained display identities only, never execution/cancellation. Internal maintenance success is hidden by default while failures remain visible. Direct Tools have no synthetic scheduled rows.
+Task 详情按实际 task/call 身份关联 Action；独立的 Agent 聊天记录由设置历史页面呈现。缺失证据保持缺失，不推断物理回滚或执行成功。日志时间仅以半秒节奏刷新显示值。
 
-Task details use retained task/call identities for related Action filtering; canonical Agent request records are available separately in Settings. Missing/evicted evidence remains explicit. Outcome strings distinguish accepting state, native completion, cancellation before/after execution and retained child failures; they do not imply physical rollback.
+ExecutionIssue 保留分类、短提示、最多2048字符详情及轮次关联。调用者决定 showsToast；UI 执行去重、身份替换、八秒到期及新输入撤销，保留日志。后台只记录不弹出，不在前台重放。replaceIssues 是独立宿主的纯值快照接口，当前应用使用 recordIssue。
 
-## Preview boundary
+Toast 为最多三行的黄色图标／文字，不拦截触摸，出现时让出回复／状态区。事实异常优先于装饰 Notice；装饰光不改变聆听同意或设备状态。
 
-Debug conversation/Action previews explicitly use synthetic state and bypass model/camera/audio/Bluetooth startup. Release ignores their launch flags. Page-owned refresh only drives display hiding; observers and long-lived work belong to module services.
+HomeEffectsWorkflow 拥有独立、可替换、按身份围栏的 Notice／光效到期任务和350ms回复清理任务。回复清理由外部完成策略触发；新文本、新轮次、停止可取消，stopAndWait 加入任务。Toast 到期由根拥有，不依赖页面存活。
 
-Independent conversation/log values, request-scoped expression callbacks and read-only task execution navigation and independent Agent records.
+## 生命周期与约束
 
-## Related design
+共享根接纳及实时 token 拒绝后台、迟到和旧根更新；会话／轮次和日志 revision 校验仍由各自接口保留。失活解除表情等待并清理实时状态，停止加入期限任务。业务异常策略不在 UI 内决定。
 
-[Parent design](../README.md)
+❌ 持久化审计、设备实际阶段及完整真机动画／前后台验收仍独立跟进。
 
-## Home task and caption contract
-
-`ConversationView` removes the task/Skill disclosure and its local expansion state. Only an active foreground Task renders a small target icon and one truncated line `任务：<goal>`, with full-goal accessibility; no box, Skill count/list or background-task shortcut. Task/Agent history remains available through the existing execution sheet. Root-owned bounded projections update on task/Skill changes rather than model tokens; the 100-row Task projection preferentially retires terminal rows to retain active work.
-
-`ConversationCaptionLayout` exposes independent `taskCenterY` and `captionCenterY`. The task row stays fixed for viewport/face geometry regardless of transcript finalization, empty text or activity. The moving ASR view owns its own position animation; its promoted area starts below the 18-point goal with an 8-point gap. The task clears top controls by at least 72 points. Regression covers compact/tall screens and both transcript slots.
-
-Task details independently show failure reasons; missing history evidence is not interpreted as startTask failure.
-
-ConversationView replaces the eye tap with a 0.5 s/24 pt long press, one toggle per recognized hold, and an accessibility activation. The hint/status say 按住; release preserves continuous listening. A press subtly compresses the face. ConversationState.displayedExpression returns closed when the voice session is off and the requested/default expression while on. Explicit closed Actions can close active eyes; nonclosed finite performances reject while off rather than fabricate visual success. NativeCompanionSurface covers the screen edges without intercepting touch; halo follows isVoiceActive across processing/reply pauses, fades on off/failure and pauses when inactive.
-
-listeningControlMessage surfaces rejected overlapping toggle intents in the bottom caption area and clears on the next accepted interaction.
-
-the hold-off path interrupts active replies as well as capture; a passive isReplyActive value supplies accurate control wording after capture failure. Halo is still active through automatic reply pauses. No model/player work is owned by the view.
-
-ConversationCaptionLayout exposes independent taskCenterY and captionCenterY. Task center is fixed for viewport/face geometry, unaffected by transcript finalization/empty/activity; promoted caption begins below the 18-point task with 8-point gap. NativeCompanionSurface replaces separate eyes/halo instances and receives generation ID/phase/expression/gaze/hold state in one update. Preview can cycle native effects without recording/models.
-
-Implemented validation aid: the DEBUG-only `-companion-cycle-preview` launch argument opens the isolated visual surface and automatically exercises six 1.3-second wakes / 0.8-second sleeps. It creates no camera, microphone or model runtime; physical Animation Hitches evidence must be labeled synthetic UI acceptance.
-
-ActionActivityState projects one latest fresh failure toast from Agent output and App/runtime/system issues, with bounded deduplication and no historical replay. Action snapshots and call-scoped issues stay log/panel-only. Eight-second page-owned expiry does not remove execution evidence.
-
-Implemented layout: toast is centered yellow text with an inline warning icon (up to three lines), with no card/header/scroll/close control. It temporarily replaces the lower assistant/status slot; a new live ASR turn dismisses the notice while retaining error history.
-
-Implemented clearance: ASR position animates only on transcript finalization changes. Task appearance/removal commits the reserved gap immediately, so its pinned row cannot overlap an already-promoted caption during a spacing tween.
-
-ConversationState exposes optional listeningLightOrigin (normalized home content coordinates). A simultaneous zero-distance drag captures the initial contact inside the existing half-second hold region without changing its recognition/cancellation policy; accessibility activation clears the touch origin and uses the eye-center default. Preview exercises different origins on each wake. Origin changes while active do not move an in-flight wave.
-
-Toast 输入只来自新鲜 Agent 输出或 App/runtime/system issue；带 call scope 的 issue 只入日志。投影执行有界去重、stale fencing 和 UUID 隔离的八秒到期。ConversationView 在底部 caption 区域显示黄色文本与警告图标，最多三行且不拦截触摸；显示期间让出 reply/hint，ASR 和 Task 几何独立。
-
-add optional injected voicePressChanged callback. Zero-distance drag reports touch-down (root coalesces repeats), touch-end/page disappearance report release. Hold recognition still submits one toggle at 0.5 s; callback owns no native work and cannot enable capture.
-
-会话层合并 notice 和 factual ExecutionIssue 的展示优先级，并向组件传递装饰光值；展示状态拥有者与到期在 UI，原生渲染见 [Components](../Components/README.md)。
-
-mask bottom ASR and reply/status immediately while a notice is visible, restore retained text after dismissal, and preserve pinned Task/promoted ASR layout. Consent-off clears both captions; root HomeEffectsWorkflow owns one ID/text-fenced350ms reply fade/removal task, cancelled by new text/turn/off/shutdown, scheduled only after reply-policy/playback/native-resume barriers. Agent errors stay in factual root failure notices, not persistent voiceStatus copies. AgentBindings root contexts explicitly choose afterFirstUnlock file protection, including their directory; repository persistent factory accepts protection while its SDK default remains whileUnlocked. This mitigates lock-boundary writes, without claiming the screenshot proves that cause or hiding other storage failures.
-
-ExecutionIssue 已增加可选 userMessage 展示值，日志 message 不变；首页 visibleNotice 优先使用宿主提供的 userMessage，错误 toast 的身份、去重、到期和日志面板保持现有行为。UI 不解析语音 SDK 错误。
-
-Execution-history navigation: ConversationView/ActionActivityView have no task-history view factory; TaskLogItem carries only execution display fields. Task details retain requester/executor/mode/Skills/parent/state/failure/event timeline and related Action filtering. Background task evidence remains execution diagnostics and is not described as conversation history.
-
-✅ 识别字幕把 transcriptFinalized 传给 FadingCaption。上移时立即提交当前完整定稿文本，位置动画不负责文字完成；历史记录仍保存原识别值。字幕只在显示边界截取最新 320 Characters。
-
-## Caption state transitions
-
-| Boundary | Recognition caption | Reply / expression |
-| --- | --- | --- |
-| Confirmed new utterance | Clear the preceding user caption on an accepted newer turn, then display partials below eyes | Clear preceding reply on the same accepted newer turn; beginReplyTurn starts this reply once |
-| Endpoint reached, ASR pending | Preserve the preview | Await the reply |
-| Final or empty recognition | Final setTranscript replaces text; finishTranscript seals it. Nonempty text moves above eyes; empty text clears | Produce a reply below eyes or return to listening |
-| Response and playback | Retain sealed user text above eyes in cyan | Append lavender reply below eyes; speaking follows actual playback |
-| Reply completed | Retain until next utterance | Retain until next utterance |
-| Stop, background or failure | Retain displayed text and invalidate session updates | Retain displayed text and invalidate session updates |
-
-以上表格描述已接纳的 UI 值，不让 View 推断 ASR、播放或 Task 完成。会话/turn 身份先由宿主呈现适配器验证；consent-off 明确清除字幕，普通生命周期暂停保留显示值并使旧 scope 更新失效。样式和几何由本目录与 Components 拥有。
-
-✅ 收口呈现接口：ConversationState 提供字幕/回复/阶段值方法；ConversationExpressionPresentation 由 UI 拥有动画等待、事务 ID、取消和基础表情恢复。ActionBindings 只转换领域值并调用接口，保留领域授权。
-
-## 待实现
-
-- Durable execution audit and device-specific stage progress.
-
-
-## 分类异常诊断
-
-✅ ExecutionIssue 支持宿主注入的类别/轮次关联和最多2048字符诊断详情，Agent 日志显示类别、代码、详情及关联信息；toast 继续优先使用 userMessage，保留去重、过期及新输入撤销。UI 不分类 Provider 错误。
+[UI 根](../README.md) · [原生组件](../Components/README.md)

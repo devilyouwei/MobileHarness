@@ -2,7 +2,8 @@
     import Foundation
     import SwiftUI
 
-    @MainActor public protocol ApplicationSessionProviding: AnyObject {
+    @MainActor
+    public protocol ApplicationSessionProviding: AnyObject {
         var conversation: ConversationState { get }
         var actionActivity: ActionActivityState { get }
         var audioDetectionState: AudioDetectionState { get }
@@ -13,7 +14,8 @@
         func chatValidationContent() -> AnyView
     }
 
-    @MainActor public protocol ApplicationRootProviding: AnyObject {
+    @MainActor
+    public protocol ApplicationRootProviding: AnyObject {
         var startupIssue: String? { get }
         func retry()
         var session: (any ApplicationSessionProviding)? { get }

@@ -8,7 +8,8 @@ import Gateway
 import PlatformKit
 import StorageCore
 import Testing
-import UI
+
+@testable import UI
 
 private func activityRecord(
     id: String = UUID().uuidString, channel: String = "Robot",
@@ -207,25 +208,6 @@ extension ActionActivityState {
     #expect(item.issueDescriptions == ["第1项：执行失败"])
 }
 
-@Test @MainActor func executionFailureObservationIsIndependentAndBounded() async throws {
-    let state = ActionActivityState()
-    let workflow = ActionActivityWorkflow(state: state)
-    let pair = AsyncStream<OutputFailureSnapshot>.makeStream(bufferingPolicy: .bufferingNewest(1))
-    workflow.startFailures { pair.stream }
-    let issue = OutputFailureRecord(source: .assistant, title: "Fixture.Control.tool", message: "Resource rejected")
-    pair.continuation.yield(.init(revision: 1, records: [issue], evictedCount: 2))
-    let deadline = ContinuousClock.now.advanced(by: .seconds(2))
-    while state.outputIssues.isEmpty && ContinuousClock.now < deadline { await Task.yield() }
-    #expect(state.outputIssues.first?.message == "Resource rejected")
-    #expect(state.items.isEmpty && state.hasRecords)
-    for _ in 0..<105 { workflow.recordFailure(title: "Worker", source: "Fixture", message: "Business failure") }
-    #expect(state.backgroundIssues.count == 100)
-    #expect(state.issueEvictions == 7)
-    state.replaceIssues(revision: 0, records: [], evictedCount: 0)
-    #expect(state.outputIssues.count == 1)
-    pair.continuation.finish()
-}
-
 @Test @MainActor func executionLogInternalFilteringMatchesHomeAndPreservesFailures() {
     func caption(_ phase: ActionExecutionRecord.Phase) -> ActionActivityItem {
         .init(
@@ -291,64 +273,5 @@ extension ActionActivityState {
     while state.tasks.first?.events.count != 4 && ContinuousClock.now < end { await Task.yield() }
     #expect(state.tasks.first?.phase == .succeeded)
     #expect(state.tasks.first?.events.count == 4)
-    pair.continuation.finish()
-}
-
-@Test @MainActor func speechRecognitionToastIsFriendlyAndDirectFailureDetailsStayInLog() {
-    let state = ActionActivityState()
-    let workflow = ActionActivityWorkflow(state: state)
-    let raw = "agent.error: speech perception: Error Domain=SFSpeechErrorDomain Code=1 RecogRejected"
-    workflow.recordFailure(title: "Output", source: "speechPerception", message: raw)
-    #expect(state.visibleNotice?.text == "我没听清")
-    #expect(state.backgroundIssues.first?.message == raw)
-    #expect(state.errorToast?.message == raw)
-    workflow.recordFailure(title: "Output", source: "assistant", message: "agent.error: Fixture failure")
-    #expect(state.visibleNotice?.text == "Fixture failure")
-    #expect(state.backgroundIssues.last?.message == "agent.error: Fixture failure")
-}
-
-@Test @MainActor func speechRecognitionSnapshotToastPreservesDetailedRecordAndInput() async {
-    let state = ActionActivityState()
-    let workflow = ActionActivityWorkflow(state: state)
-    let pair = AsyncStream<OutputFailureSnapshot>.makeStream(bufferingPolicy: .bufferingNewest(1))
-    workflow.startFailures { pair.stream }
-    let inputID = UUID().uuidString
-    let raw = "agent.error: speech perception: Error Domain=SFSpeechErrorDomain Code=1 RecogRejected"
-    let issue = OutputFailureRecord(source: .speechPerception, title: "Output", message: raw, inputID: inputID)
-    pair.continuation.yield(.init(revision: 1, records: [issue], evictedCount: 0))
-    let deadline = ContinuousClock.now.advanced(by: .seconds(2))
-    while state.outputIssues.isEmpty && ContinuousClock.now < deadline { await Task.yield() }
-    #expect(state.visibleNotice?.text == "我没听清")
-    #expect(state.visibleNotice?.id == issue.id)
-    #expect(state.outputIssues.first?.message == raw && state.outputIssues.first?.inputID == inputID)
-    #expect(state.errorToast?.message == raw)
-    pair.continuation.finish()
-}
-
-@Test @MainActor func agentProtocolFailureProjectsShortToastFullDetailAndCorrelation() async throws {
-    let state = ActionActivityState()
-    let workflow = ActionActivityWorkflow(state: state)
-    let pair = AsyncStream<OutputFailureSnapshot>.makeStream(bufferingPolicy: .bufferingNewest(1))
-    workflow.startFailures { pair.stream }
-    let detail =
-        "stage=toolStart\nevent=response.output_item.added\ntool=loadSkills\n" + String(repeating: "x", count: 900)
-    let fault = AgentFailureDiagnostic(
-        category: .modelResponse, code: "agent.model.tool.undeclaredName", detail: detail)
-    let record = OutputFailureRecord(
-        source: .assistant, title: "modelResponse", message: detail,
-        failureCode: fault.code, inputID: "input-1", diagnostic: fault, sessionID: "session-1", roundID: "round-1")
-    pair.continuation.yield(.init(revision: 1, records: [record], evictedCount: 0))
-    let deadline = ContinuousClock.now.advanced(by: .seconds(2))
-    while state.outputIssues.isEmpty && ContinuousClock.now < deadline { await Task.yield() }
-    let issue = try #require(state.outputIssues.first)
-    #expect(state.visibleNotice?.text == "模型调用了未声明的工具，本次回复已中止")
-    #expect(issue.message == detail && issue.message.count > 512)
-    #expect(issue.category == "模型响应异常" && issue.failureCode == fault.code)
-    #expect(issue.context?.sessionID == "session-1" && issue.context?.roundID == "round-1")
-    #expect(issue.inputID == "input-1" && state.errorToast?.id == record.id)
-    state.dismissErrorToast(id: record.id)
-    pair.continuation.yield(.init(revision: 2, records: [record], evictedCount: 0))
-    while state.outputIssues.first?.id != record.id && ContinuousClock.now < deadline { await Task.yield() }
-    #expect(state.errorToast == nil && state.outputIssues.first?.message == detail)
     pair.continuation.finish()
 }

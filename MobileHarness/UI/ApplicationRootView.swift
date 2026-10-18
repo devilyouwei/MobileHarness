@@ -17,9 +17,7 @@
                     path: Binding(get: { assembly.navigation.path }, set: { assembly.navigation.path = $0 })
                 ) {
                     Group {
-                        if isVisualPreview {
-                            visualPreview
-                        } else if isDiagnostic {
+                        if isDiagnostic {
                             startupContent
                         } else {
                             CameraConversationSurface(
@@ -44,7 +42,7 @@
                     UIApplication.shared.isIdleTimerDisabled = keepsAwake
                 }
                 .task {
-                    if !isVisualPreview { await prepare() }
+                    await prepare()
                 }
             }
         }
@@ -76,30 +74,7 @@
         }
 
         private var keepsHomeScreenAwake: Bool {
-            scenePhase == .active && !isDiagnostic && !isVisualPreview
-        }
-
-        @ViewBuilder
-        private var visualPreview: some View {
-            #if DEBUG
-                if ProcessInfo.processInfo.arguments.contains("-actions-preview") {
-                    ActionActivityVisualPreview()
-                } else {
-                    ConversationVisualPreview()
-                }
-            #else
-                EmptyView()
-            #endif
-        }
-
-        private var isVisualPreview: Bool {
-            #if DEBUG
-                (ProcessInfo.processInfo.arguments.contains("-conversation-preview")
-                    || ProcessInfo.processInfo.arguments.contains("-companion-cycle-preview"))
-                    || ProcessInfo.processInfo.arguments.contains("-actions-preview")
-            #else
-                false
-            #endif
+            scenePhase == .active && !isDiagnostic
         }
 
         private var isDiagnostic: Bool {

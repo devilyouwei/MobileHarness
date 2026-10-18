@@ -62,7 +62,7 @@ Assistant 决定照片如何进入模型上下文，PlatformKit 提供通用图�
 
 ## Storage 生命周期边界收敛
 
-✅ AppStorage 使用实例级 FactoryKit 注册 StorageContainer，组合 State、Cache、Database、Files；AppLifecycle 按 storage / platform / ui → agents → native 启停。数据库实现负责迁移、恢复、接纳和关闭；会话音频使用 Cache 子作用域，配置/照片/模型文件复用 Files。模型制品工作在 Files 释放前加入清理并解除旧绑定。见 [实施计划](requirements/technical/Storage-Containers-Plan.md)。
+✅ AppStorage 使用实例级 FactoryKit 注册 StorageContainer，组合 State、Cache、Database、Files；AppLifecycle 按 diagnostics → storage / platform / ui → agents → native 启停。数据库实现负责迁移、恢复、接纳和关闭；会话音频使用 Cache 子作用域，配置/照片/模型文件复用 Files。模型制品工作在 Files 释放前加入清理并解除旧绑定。见 [实施计划](requirements/technical/Storage-Containers-Plan.md)。
 
 Storage 四类容器与通用 State 已实施，参见 [计划及验证范围](requirements/technical/Storage-Containers-Plan.md)；Skill useState 每轮公开状态上下文已接通，真实模型/设备验收独立记录。
 
@@ -109,3 +109,17 @@ UI 根的失活关闭媒体接纳并清屏，停止加入展示到期任务；Me
 ## 统一外部 Signal 边界
 
 现有用户意图、App 事实、模型资源和设备输入均由 Gateway.ExternalInputAdapter 生成外部 Signal；领域仅提供 ExternalInputDraft 内容及因果提示，基础库不依赖 Signal。Gateway 依照注入 schema/来源策略进行验证及分发；静态订阅与宿主动态订阅共享接纳，动态关系绑定会话/incarnation，不扩展目标能力或发布权限。显式宿主会话控制可等待订阅目标接纳并保留分支失败；普通 publish 保持单向语义。原生相机帧仍由 Actions 协调 UI 直接呈现。
+
+## 容器故障传播
+
+Storage/Platform/UI 通过基础库自己的中立回调报告，App 把报告器接到同一根作用域的 Gateway.ContainerFailureChannel；Gateway 统一产生 container.failure observation。ApplicationControl 显式订阅并决定异常展示，通过内部函数调用提交到 UI；Assistant 可在有界内存中被动接纳，AgentBindings 不直接从容器快照生成异常展示。接收诊断不写入可能故障的 Storage，也不启动模型。原始调用失败与真实清理仍按原接口返回。
+
+通道先于基础库启动、最后停止。Agent 未启动或已停止时，故障保留在有界日志中，不伪造处理回执；根替换不继承旧根待投递队列。普通 publish 提交与 Agent 接纳/处理是不同边界，日志投递状态不能证明副作用完成。
+
+## ApplicationControl 异常展示组织
+
+✅ 已实现：容器异常及现有执行诊断经 Gateway 的 container.failure/runtime.failure Signal 进入 ApplicationControl，以确定性有界策略生成内部呈现调用，Actions 验证根会话并更新 UI。Bindings 仅连接/转发，不决定异常提示；App 启动失败保留独立兜底。模块装配归属另行讨论，本轮不迁移。
+
+## UI 全量容器化
+
+✅ App 单一缓存 UI 根下设八个子能力，业务通过注入呈现接口提交 UI 自有值，页面观察同根状态。首页表情、装饰、Toast 到期由 UI 管理；实时流与保留事实区别接纳，旧根和失活代际拒绝迟到输出；原生设备和业务策略继续由原拥有者管理。现有 Bindings 目标及跨模块连接暂不迁移。

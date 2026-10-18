@@ -17,6 +17,7 @@ public actor ApplicationControlIntentRuntime {
     private let sessionID: String
 
     public func prepareForInteraction() async throws { try await ensureStarted() }
+    public private(set) var lastDiagnosticDeliveryFailure: String?
     private var started = false
     private var ownsRegistration = false
     private var closed = false
@@ -270,7 +271,13 @@ public actor ApplicationControlIntentRuntime {
             } else {
                 receiverError = false
             }
-            if resourceFact || receiverError {
+            let diagnosticFact = [ContainerFailureEvent.contract, RuntimeFailureEvent.contract].contains(
+                envelope.inputMetadata.contract)
+            if diagnosticFact {
+                do { _ = try await boundConsumer().execute(envelope) } catch {
+                    lastDiagnosticDeliveryFailure = String(String(describing: error).prefix(512))
+                }
+            } else if resourceFact || receiverError {
                 do { _ = try await boundConsumer().execute(envelope) } catch { await streamEnded() }
             }
             return

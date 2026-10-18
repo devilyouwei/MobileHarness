@@ -15,3 +15,7 @@ SQLiteDatabaseStorage 在后台任务完成目录、打开、迁移和恢复后�
 ❌ 新数据库后端、跨进程运行态和跨文件/SQL 原子事务不在本轮。
 
 [Storage](../README.md)
+
+## 统一容器异常通道
+
+✅ SQLiteDatabaseFactory 接收 StorageFailureReporter，根及后端读/写/迁移/关闭错误进入相同宿主回调；DatabaseStorage 不导入框架事件。后端选择仍属于 App。

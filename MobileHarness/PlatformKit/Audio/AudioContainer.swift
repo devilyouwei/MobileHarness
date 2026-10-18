@@ -1,7 +1,8 @@
 import Foundation
 
 /// Finite named native scopes. The session fence rejects conflicting owners rather than replacing them.
-@MainActor public final class AudioContainer {
+@MainActor
+public final class AudioContainer {
     public enum Scope: CaseIterable, Sendable { case voice, diagnostic, detection, camera }
     private let admission: PlatformAdmission
     #if os(iOS)
@@ -9,9 +10,10 @@ import Foundation
         private var cues: [Scope: NativeCuePlayback] = [:]
         private var haptics: [Scope: NativeHapticFeedback] = [:]
         private var owner: Scope?
-        public func io(_ scope: Scope) -> AppleAudioIO {
+        public func io(_ scope: Scope) -> any AudioInputOutput {
             if let existing = instances[scope] { return existing }
             let value = AppleAudioIO(
+                platformAdmission: admission,
                 admitAvailability: { [admission] in try admission.check() },
                 admit: { [weak self] in
                     guard let self else { throw PlatformError.stopped }
@@ -25,13 +27,13 @@ import Foundation
             instances[scope] = value
             return value
         }
-        public func cue(_ scope: Scope) -> NativeCuePlayback {
+        public func cue(_ scope: Scope) -> any CuePlaying {
             if let value = cues[scope] { return value }
             let value = NativeCuePlayback(admission: admission)
             cues[scope] = value
             return value
         }
-        public func haptic(_ scope: Scope) -> NativeHapticFeedback {
+        public func haptic(_ scope: Scope) -> any HapticFeedbackProviding {
             if let value = haptics[scope] { return value }
             let value = NativeHapticFeedback(admission: admission)
             haptics[scope] = value

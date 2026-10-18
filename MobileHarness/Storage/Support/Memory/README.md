@@ -21,3 +21,6 @@ Registered state now belongs to [State](../../State/README.md); StateWriter atom
 ## 待实现
 
 - Registered transitions/subscriptions are implemented in StorageState; durable streams remain outstanding.
+
+
+✅ MemoryLeaseStore 的移除回调使用明确 released/failure 原因。正常 release 仍留下 missing tombstone、关闭旧值并加入生产者取消；真实 fail/过期保留原错误，二者不再依靠同一个 Error 推断。

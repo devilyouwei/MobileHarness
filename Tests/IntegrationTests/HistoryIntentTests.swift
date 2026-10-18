@@ -14,7 +14,8 @@ import StorageChat
 import StorageCore
 import StorageState
 import Testing
-import UI
+
+@testable import UI
 
 private struct HistoryPresentationModule: ToolModule {
     let definitions: [ActionBinding]

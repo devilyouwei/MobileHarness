@@ -31,10 +31,15 @@ public final class CacheLease: Sendable {
     public func withUnsafeBytes<Result: Sendable>(_ body: @Sendable (UnsafeRawBufferPointer) throws -> Result) throws
         -> Result
     {
-        try state.withLock { state in
-            try access.check()
-            guard let buffer = state.buffer else { throw StorageError.closed }
-            return try buffer.withUnsafeBytes(body)
+        do {
+            return try state.withLock { state in
+                try access.check()
+                guard let buffer = state.buffer else { throw StorageError.closed }
+                return try buffer.withUnsafeBytes(body)
+            }
+        } catch {
+            access.failures.report("cache.lease", "withUnsafeBytes", error)
+            throw error
         }
     }
     public func release() {
@@ -48,6 +53,8 @@ public final class CacheLease: Sendable {
     deinit { release() }
 }
 final class CacheAccess: Sendable {
+    let failures: StorageFailureReporter
+    init(failures: StorageFailureReporter = .init()) { self.failures = failures }
     private let closed = Mutex(false)
     func check() throws { try closed.withLock { if $0 { throw StorageError.closed } } }
     func close() { closed.withLock { $0 = true } }
@@ -70,57 +77,76 @@ public final class BufferCache: Sendable {
         var closed = false
     }
     private let state = Mutex(State())
-    private let access = CacheAccess()
+    private let access: CacheAccess
     private let capacity: Int
     private let maximumBytes: Int
-    public init(capacity: Int = 256, maximumBytes: Int = 64 * 1024 * 1024) {
+    private let failures: StorageFailureReporter
+    public init(capacity: Int = 256, maximumBytes: Int = 64 * 1024 * 1024, failures: StorageFailureReporter = .init()) {
+        self.failures = failures
+        access = CacheAccess(failures: failures)
         self.capacity = capacity
         self.maximumBytes = maximumBytes
     }
     public func put(_ buffer: CacheBuffer, key: String, namespace: String = "images") throws {
-        guard !key.isEmpty, key.utf8.count <= 256, !namespace.isEmpty, namespace.utf8.count <= 256 else {
-            throw StorageError.forbidden
-        }
-        try state.withLock { state in
-            guard !state.closed else { throw StorageError.closed }
-            let key = Key(namespace: namespace, name: key)
-            guard state.values[key] == nil else { throw StorageError.duplicate }
-            guard state.values.count < capacity else { throw StorageError.capacityExceeded }
-            if var retained = state.retained[buffer.id] {
-                retained.keys += 1
-                state.retained[buffer.id] = retained
-            } else {
-                guard state.retained.count < capacity, buffer.count <= maximumBytes - state.bytes else {
-                    throw StorageError.capacityExceeded
-                }
-                state.retained[buffer.id] = Retained(buffer: buffer, keys: 1, leases: 0)
-                state.bytes += buffer.count
+        do {
+            guard !key.isEmpty, key.utf8.count <= 256, !namespace.isEmpty, namespace.utf8.count <= 256 else {
+                throw StorageError.forbidden
             }
-            state.values[key] = buffer.id
+            try state.withLock { state in
+                guard !state.closed else { throw StorageError.closed }
+                let key = Key(namespace: namespace, name: key)
+                guard state.values[key] == nil else { throw StorageError.duplicate }
+                guard state.values.count < capacity else { throw StorageError.capacityExceeded }
+                if var retained = state.retained[buffer.id] {
+                    retained.keys += 1
+                    state.retained[buffer.id] = retained
+                } else {
+                    guard state.retained.count < capacity, buffer.count <= maximumBytes - state.bytes else {
+                        throw StorageError.capacityExceeded
+                    }
+                    state.retained[buffer.id] = Retained(buffer: buffer, keys: 1, leases: 0)
+                    state.bytes += buffer.count
+                }
+                state.values[key] = buffer.id
+            }
+        } catch {
+            failures.report("cache.buffers", "put", error)
+            throw error
         }
     }
     public func get(_ key: String, namespace: String = "images") throws -> CacheLease {
-        try state.withLock { state in
-            guard !state.closed else { throw StorageError.closed }
-            guard let id = state.values[Key(namespace: namespace, name: key)], var retained = state.retained[id] else {
-                throw StorageError.missing
+        do {
+            return try state.withLock { state in
+                guard !state.closed else { throw StorageError.closed }
+                guard let id = state.values[Key(namespace: namespace, name: key)], var retained = state.retained[id]
+                else {
+                    throw StorageError.missing
+                }
+                guard retained.leases < 256 else { throw StorageError.capacityExceeded }
+                retained.leases += 1
+                state.retained[id] = retained
+                return CacheLease(retained.buffer, access: access) { [weak self] in self?.release(id) }
             }
-            guard retained.leases < 256 else { throw StorageError.capacityExceeded }
-            retained.leases += 1
-            state.retained[id] = retained
-            return CacheLease(retained.buffer, access: access) { [weak self] in self?.release(id) }
+        } catch {
+            failures.report("cache.buffers", "get", error)
+            throw error
         }
     }
     public func remove(_ key: String, namespace: String = "images") throws {
-        try state.withLock { state in
-            guard !state.closed else { throw StorageError.closed }
-            if let id = state.values.removeValue(forKey: Key(namespace: namespace, name: key)),
-                var retained = state.retained[id]
-            {
-                retained.keys -= 1
-                state.retained[id] = retained
-                reap(id, state: &state)
+        do {
+            try state.withLock { state in
+                guard !state.closed else { throw StorageError.closed }
+                if let id = state.values.removeValue(forKey: Key(namespace: namespace, name: key)),
+                    var retained = state.retained[id]
+                {
+                    retained.keys -= 1
+                    state.retained[id] = retained
+                    reap(id, state: &state)
+                }
             }
+        } catch {
+            failures.report("cache.buffers", "remove", error)
+            throw error
         }
     }
     private func release(_ id: UUID) {
@@ -170,15 +196,24 @@ public actor CacheContainer {
     private var audio: [String: AudioCache] = [:]
     private var shutdown: Task<Void, Never>?
     private var closing: [String: Task<Void, Never>] = [:]
-    public init() { buffers = BufferCache() }
+    private let failures: StorageFailureReporter
+    public init(failures: StorageFailureReporter = .init()) {
+        self.failures = failures
+        buffers = BufferCache(failures: failures)
+    }
     public func audioScope(_ id: String) throws -> AudioCache {
-        try admission.check()
-        guard shutdown == nil, closing[id] == nil else { throw StorageError.closed }
-        if let existing = audio[id] { return existing }
-        guard !id.isEmpty, id.utf8.count <= 256, audio.count < 64 else { throw StorageError.capacityExceeded }
-        let cache = AudioCache(rootAccess: admission)
-        audio[id] = cache
-        return cache
+        do {
+            try admission.check()
+            guard shutdown == nil, closing[id] == nil else { throw StorageError.closed }
+            if let existing = audio[id] { return existing }
+            guard !id.isEmpty, id.utf8.count <= 256, audio.count < 64 else { throw StorageError.capacityExceeded }
+            let cache = AudioCache(rootAccess: admission, failures: failures)
+            audio[id] = cache
+            return cache
+        } catch {
+            failures.report("cache", "audioScope", error)
+            throw error
+        }
     }
     public func closeAudioScope(_ id: String) async {
         if let existing = closing[id] {

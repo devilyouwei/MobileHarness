@@ -10,9 +10,9 @@ import FunctionContracts
 import PlatformKit
 import StorageCore
 import Testing
-import UI
 
 @testable import Gateway
+@testable import UI
 
 private actor ObservationGate {
     private var entered = false
@@ -385,20 +385,28 @@ private actor VisionSessionRecorder {
     #expect(await recorder.inputJoined)
 }
 
-@Test @MainActor func visionDiagnosticsAppearInAgentLogAndToast() {
+@Test @MainActor func visionDiagnosticsAppearInAgentLogAndToast() async throws {
     for code in [
         "vision.pose.failed", "vision.pipeline.failed", "vision.input.failed", "vision.pose.stalled",
         "vision.pose.stale", "vision.input.stalled", "vision.presentation.failed",
     ] {
         let state = ActionActivityState()
         let workflow = ActionActivityWorkflow(state: state)
+        let fixture = try RuntimeFailurePresentationFixture(activity: workflow)
+        try await fixture.start(activity: workflow)
         let diagnostic = AgentFailureDiagnostic(category: .runtime, code: code, detail: "fixture native cause")
         workflow.recordFailure(
             title: "视觉异常", source: "visionPerception", message: diagnostic.detail, failureCode: code,
             context: .init(workerID: "visionPerception", sessionID: "fixture"), diagnostic: diagnostic)
+        let deadline = ContinuousClock.now + .seconds(4)
+        while state.backgroundIssues.isEmpty {
+            guard ContinuousClock.now < deadline else { throw CommunicationError.expired }
+            try await Task.sleep(for: .milliseconds(5))
+        }
         #expect(state.backgroundIssues.last?.category == "Agent 运行异常")
         #expect(state.backgroundIssues.last?.message == "fixture native cause")
         #expect(state.errorToast?.userMessage != nil)
         #expect(state.visibleNotice?.tone == .error)
+        await fixture.stop(activity: workflow)
     }
 }

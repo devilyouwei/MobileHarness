@@ -81,3 +81,13 @@ Notice 的非空文字限 1024 UTF-8 字节，tone 为 info/warning/error（默�
 ## Storage 依赖
 
 ✅ 存储访问使用独立的 State、Cache、Database 和 Files 接口；App 注册根实例，消费者通过构造器获得所需能力。存储容器不接管本目录的业务验证、执行和完成语义。
+
+## ApplicationControl 异常展示
+
+✅ 已实现：新增内部 UI.RuntimeDiagnostics.recordFailure：校验有界展示参数，调用注入的 RuntimeFailurePresentationCapability；完成仅表示异常记录/提示状态提交，不代表故障恢复。仅 ApplicationControl 根会话可调用，不向模型 Skill 暴露。
+
+✅ 已实现：RuntimeDiagnosticsActions.swift 独立拥有 UI.RuntimeDiagnostics 函数地址，沿用既有 UI 目录，不新建目录或编译目标。
+
+## UI 全量容器化
+
+✅ 应用级 UI 状态由八个子容器统一创建，消费者注入所需 Presenting 接口并提交 UI 自有值，不直接写字段。App 注册并管理同一 UI 根；原业务身份/版本校验、原生完成和基础库依赖边界保持。跨模块连接迁移仍是独立待办。

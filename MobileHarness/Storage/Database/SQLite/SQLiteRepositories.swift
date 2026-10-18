@@ -13,8 +13,8 @@ public final class SQLiteRepositories: Sendable {
     public let devices: SQLiteDeviceRepository
     var lastWriteChanges: Int { database.lastWriteChanges }
     var committedWriteCount: Int { database.committedWriteCount }
-    public init(url: URL, removeOnClose: Bool = false) throws {
-        let database = try SQLiteDatabase(url: url, removeOnClose: removeOnClose)
+    public init(url: URL, removeOnClose: Bool = false, failures: StorageFailureReporter = .init()) throws {
+        let database = try SQLiteDatabase(url: url, removeOnClose: removeOnClose, failures: failures)
         do {
             try database.migrate([
                 (

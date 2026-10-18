@@ -18,7 +18,7 @@
         public var navigation: NavigationState { features.navigation }
         public var cameraState: CameraState { features.cameraState }
         public var cameraControls: any CameraControlling { features.cameraControls }
-        public var bluetoothState: BluetoothSettingsState { features.bluetooth.state }
+        public var bluetoothState: BluetoothSettingsState { features.devicesUI.state }
         public var bluetoothControls: any BluetoothControlling { features.bluetoothControls }
         public var settings: SettingsState { features.settings }
         public var settingsControls: any SettingsControlling { features.settingsControls }

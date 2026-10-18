@@ -72,6 +72,11 @@
         "contract": "agent.userInput",
         "version": 1,
         "kind": "observation"
+      },
+      {
+        "contract": "container.failure",
+        "version": 1,
+        "kind": "observation"
       }
     ],
     "subscriptions": [
@@ -99,6 +104,11 @@
         "contract": "assistant.control",
         "source": "runtime",
         "topic": "assistant.control"
+      },
+      {
+        "contract": "container.failure",
+        "source": "runtime",
+        "topic": "container.failure"
       }
     ],
     "publications": [

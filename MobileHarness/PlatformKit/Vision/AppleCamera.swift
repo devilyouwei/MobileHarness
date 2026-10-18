@@ -1,7 +1,7 @@
 #if os(iOS)
     import AVFoundation
-    import Synchronization
     import Foundation
+    import Synchronization
 
     /// Callback-owned state; only terminal capture resumes the caller once.
     private final class PhotoReceiver: NSObject, AVCapturePhotoCaptureDelegate, @unchecked Sendable {
@@ -110,25 +110,101 @@
 
         /// No suspension inside graph mutation/start/stop; all operations are actor serialized.
         public func subscribeFrames() throws -> AsyncThrowingStream<CameraFrame, Error> {
-            try admission?.check()
-            return try receiver.subscribe()
+            do {
+                try admission?.check()
+                return try receiver.subscribe()
+            } catch {
+                admission?.report("vision.camera", "subscribeFrames", error)
+                throw error
+            }
         }
         public func start(facing: CameraFacing) throws -> AsyncThrowingStream<CameraFrame, Error> {
-            try admission?.check()
-            guard AVCaptureDevice.authorizationStatus(for: .video) == .authorized else {
-                throw CameraError.permissionDenied
+            do {
+                try admission?.check()
+                guard AVCaptureDevice.authorizationStatus(for: .video) == .authorized else {
+                    throw CameraError.permissionDenied
+                }
+                guard photoTask == nil else { throw CameraError.photoBusy }
+                stop()
+                frameQueue.sync {}  // Drain old-lens callbacks before opening another capture stream.
+                installObservers()
+                let position: AVCaptureDevice.Position = facing == .front ? .front : .back
+                if input?.device.position != position {
+                    guard let device = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: position)
+                    else { throw CameraError.unavailable }
+                    let replacement = try AVCaptureDeviceInput(device: device)
+                    session.beginConfiguration()
+                    if session.canSetSessionPreset(.hd1280x720) { session.sessionPreset = .hd1280x720 }
+                    let previous = input
+                    if let previous { session.removeInput(previous) }
+                    guard session.canAddInput(replacement) else {
+                        if let previous, session.canAddInput(previous) { session.addInput(previous) }
+                        session.commitConfiguration()
+                        throw CameraError.configurationFailed
+                    }
+                    session.addInput(replacement)
+                    input = replacement
+                    session.commitConfiguration()
+                }
+                if !outputInstalled {
+                    session.beginConfiguration()
+                    videoOutput.videoSettings = [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA]
+                    videoOutput.alwaysDiscardsLateVideoFrames = true
+                    guard session.canAddOutput(videoOutput) else {
+                        session.commitConfiguration()
+                        throw CameraError.configurationFailed
+                    }
+                    session.addOutput(videoOutput)
+                    videoOutput.setSampleBufferDelegate(receiver, queue: frameQueue)
+                    session.commitConfiguration()
+                    outputInstalled = true
+                }
+                if !photoOutputInstalled {
+                    session.beginConfiguration()
+                    guard session.canAddOutput(photoOutput) else {
+                        session.commitConfiguration()
+                        throw CameraError.configurationFailed
+                    }
+                    session.addOutput(photoOutput)
+                    session.commitConfiguration()
+                    photoOutputInstalled = true
+                }
+                frameQueue.sync {}
+                configureFrameConnection()
+                let frames = receiver.begin()
+                if !session.isRunning { session.startRunning() }
+                guard session.isRunning, !session.isInterrupted else {
+                    receiver.finish()
+                    throw CameraError.startFailed
+                }
+                return frames
+            } catch {
+                admission?.report("vision.camera", "start", error)
+                throw error
             }
-            guard photoTask == nil else { throw CameraError.photoBusy }
-            stop()
-            frameQueue.sync {}  // Drain old-lens callbacks before opening another capture stream.
-            installObservers()
-            let position: AVCaptureDevice.Position = facing == .front ? .front : .back
-            if input?.device.position != position {
+        }
+
+        /// Keep a healthy session/output graph running; only replace its video input.
+        public func switchCamera(facing: CameraFacing) throws -> AsyncThrowingStream<CameraFrame, Error> {
+            do {
+                try admission?.check()
+                try Task.checkCancellation()
+                guard AVCaptureDevice.authorizationStatus(for: .video) == .authorized else {
+                    throw CameraError.permissionDenied
+                }
+                guard photoTask == nil else { throw CameraError.photoBusy }
+                guard session.isRunning, !session.isInterrupted, outputInstalled, photoOutputInstalled else {
+                    throw CameraError.unavailable
+                }
+                let position: AVCaptureDevice.Position = facing == .front ? .front : .back
                 guard let device = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: position)
-                else { throw CameraError.unavailable }
+                else {
+                    throw CameraError.unavailable
+                }
                 let replacement = try AVCaptureDeviceInput(device: device)
+                receiver.finish()
+                frameQueue.sync {}
                 session.beginConfiguration()
-                if session.canSetSessionPreset(.hd1280x720) { session.sessionPreset = .hd1280x720 }
                 let previous = input
                 if let previous { session.removeInput(previous) }
                 guard session.canAddInput(replacement) else {
@@ -139,74 +215,14 @@
                 session.addInput(replacement)
                 input = replacement
                 session.commitConfiguration()
+                configureFrameConnection()
+                frameQueue.sync {}
+                guard session.isRunning, !session.isInterrupted else { throw CameraError.startFailed }
+                return receiver.begin()
+            } catch {
+                admission?.report("vision.camera", "switchCamera", error)
+                throw error
             }
-            if !outputInstalled {
-                session.beginConfiguration()
-                videoOutput.videoSettings = [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA]
-                videoOutput.alwaysDiscardsLateVideoFrames = true
-                guard session.canAddOutput(videoOutput) else {
-                    session.commitConfiguration()
-                    throw CameraError.configurationFailed
-                }
-                session.addOutput(videoOutput)
-                videoOutput.setSampleBufferDelegate(receiver, queue: frameQueue)
-                session.commitConfiguration()
-                outputInstalled = true
-            }
-            if !photoOutputInstalled {
-                session.beginConfiguration()
-                guard session.canAddOutput(photoOutput) else {
-                    session.commitConfiguration()
-                    throw CameraError.configurationFailed
-                }
-                session.addOutput(photoOutput)
-                session.commitConfiguration()
-                photoOutputInstalled = true
-            }
-            frameQueue.sync {}
-            configureFrameConnection()
-            let frames = receiver.begin()
-            if !session.isRunning { session.startRunning() }
-            guard session.isRunning, !session.isInterrupted else {
-                receiver.finish()
-                throw CameraError.startFailed
-            }
-            return frames
-        }
-
-        /// Keep a healthy session/output graph running; only replace its video input.
-        public func switchCamera(facing: CameraFacing) throws -> AsyncThrowingStream<CameraFrame, Error> {
-            try admission?.check()
-            try Task.checkCancellation()
-            guard AVCaptureDevice.authorizationStatus(for: .video) == .authorized else {
-                throw CameraError.permissionDenied
-            }
-            guard photoTask == nil else { throw CameraError.photoBusy }
-            guard session.isRunning, !session.isInterrupted, outputInstalled, photoOutputInstalled else {
-                throw CameraError.unavailable
-            }
-            let position: AVCaptureDevice.Position = facing == .front ? .front : .back
-            guard let device = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: position) else {
-                throw CameraError.unavailable
-            }
-            let replacement = try AVCaptureDeviceInput(device: device)
-            receiver.finish()
-            frameQueue.sync {}
-            session.beginConfiguration()
-            let previous = input
-            if let previous { session.removeInput(previous) }
-            guard session.canAddInput(replacement) else {
-                if let previous, session.canAddInput(previous) { session.addInput(previous) }
-                session.commitConfiguration()
-                throw CameraError.configurationFailed
-            }
-            session.addInput(replacement)
-            input = replacement
-            session.commitConfiguration()
-            configureFrameConnection()
-            frameQueue.sync {}
-            guard session.isRunning, !session.isInterrupted else { throw CameraError.startFailed }
-            return receiver.begin()
         }
 
         private func configureFrameConnection() {
@@ -233,55 +249,62 @@
 
         /// One joined native capture; cancellation/timeout stop the graph and retain the delegate until terminal callback.
         public func capturePhoto(rotation: CGFloat) async throws -> Data {
-            try admission?.check()
-            try Task.checkCancellation()
-            guard photoTask == nil else { throw CameraError.photoBusy }
-            guard photoOutputInstalled, session.isRunning, !session.isInterrupted else { throw CameraError.unavailable }
-            let id = UUID().uuidString
-            mediaID = id
-            photoTimedOut = false
-            if let connection = photoOutput.connection(with: .video) {
-                if connection.isVideoRotationAngleSupported(rotation) { connection.videoRotationAngle = rotation }
-                if connection.isVideoMirroringSupported {
-                    connection.automaticallyAdjustsVideoMirroring = false
-                    connection.isVideoMirrored = input?.device.position == .front
-                }
-            }
-            let settings = AVCapturePhotoSettings(format: [AVVideoCodecKey: AVVideoCodecType.jpeg])
-            settings.flashMode = .off
-            let receiver = PhotoReceiver()
-            let task = Task<Data, Error> {
+            do {
+                try admission?.check()
                 try Task.checkCancellation()
-                guard session.isRunning, !session.isInterrupted else { throw CameraError.unavailable }
-                defer { withExtendedLifetime(receiver) {} }
-                return try await withCheckedThrowingContinuation { continuation in
-                    receiver.begin(continuation)
-                    self.photoOutput.capturePhoto(with: settings, delegate: receiver)
+                guard photoTask == nil else { throw CameraError.photoBusy }
+                guard photoOutputInstalled, session.isRunning, !session.isInterrupted else {
+                    throw CameraError.unavailable
                 }
-            }
-            photoTask = task
-            let deadline = Task {
-                do {
-                    try await Task.sleep(for: .seconds(10))
-                    guard mediaID == id else { return }
-                    photoTimedOut = true
-                    stop()
-                } catch {}
-            }
-            defer {
-                deadline.cancel()
-                photoTask = nil
-                mediaID = nil
-            }
-            return try await withTaskCancellationHandler {
-                let data = try await task.value
-                try Task.checkCancellation()
-                guard !photoTimedOut else { throw CameraError.photoTimedOut }
-                guard !data.isEmpty, data.count <= 4 * 1024 * 1024 else { throw CameraError.photoFailed }
-                return data
-            } onCancel: {
-                task.cancel()
-                Task { await self.cancelPhoto(id) }
+                let id = UUID().uuidString
+                mediaID = id
+                photoTimedOut = false
+                if let connection = photoOutput.connection(with: .video) {
+                    if connection.isVideoRotationAngleSupported(rotation) { connection.videoRotationAngle = rotation }
+                    if connection.isVideoMirroringSupported {
+                        connection.automaticallyAdjustsVideoMirroring = false
+                        connection.isVideoMirrored = input?.device.position == .front
+                    }
+                }
+                let settings = AVCapturePhotoSettings(format: [AVVideoCodecKey: AVVideoCodecType.jpeg])
+                settings.flashMode = .off
+                let receiver = PhotoReceiver()
+                let task = Task<Data, Error> {
+                    try Task.checkCancellation()
+                    guard session.isRunning, !session.isInterrupted else { throw CameraError.unavailable }
+                    defer { withExtendedLifetime(receiver) {} }
+                    return try await withCheckedThrowingContinuation { continuation in
+                        receiver.begin(continuation)
+                        self.photoOutput.capturePhoto(with: settings, delegate: receiver)
+                    }
+                }
+                photoTask = task
+                let deadline = Task {
+                    do {
+                        try await Task.sleep(for: .seconds(10))
+                        guard mediaID == id else { return }
+                        photoTimedOut = true
+                        stop()
+                    } catch {}
+                }
+                defer {
+                    deadline.cancel()
+                    photoTask = nil
+                    mediaID = nil
+                }
+                return try await withTaskCancellationHandler {
+                    let data = try await task.value
+                    try Task.checkCancellation()
+                    guard !photoTimedOut else { throw CameraError.photoTimedOut }
+                    guard !data.isEmpty, data.count <= 4 * 1024 * 1024 else { throw CameraError.photoFailed }
+                    return data
+                } onCancel: {
+                    task.cancel()
+                    Task { await self.cancelPhoto(id) }
+                }
+            } catch {
+                admission?.report("vision.camera", "capturePhoto", error)
+                throw error
             }
         }
         private func cancelPhoto(_ id: String) {
@@ -309,6 +332,7 @@
         private func installObservers() {
             guard observers.isEmpty else { return }
             let continuation = continuation
+            let admission = admission
             for (name, event) in [
                 (AVCaptureSession.wasInterruptedNotification, CameraEvent.interrupted),
                 (AVCaptureSession.interruptionEndedNotification, CameraEvent.interruptionEnded),
@@ -316,7 +340,18 @@
             ] {
                 observers.append(
                     CameraObservation(
-                        NotificationCenter.default.addObserver(forName: name, object: session, queue: nil) { _ in
+                        NotificationCenter.default.addObserver(forName: name, object: session, queue: nil) { value in
+                            if event == .failed {
+                                let error: any Error
+                                if let native = value.userInfo?[AVCaptureSessionErrorKey] as? NSError {
+                                    error = native
+                                } else {
+                                    error = CameraError.runtimeFailed
+                                }
+                                admission?.report("vision.camera", "nativeEvent", error)
+                            } else if event == .interrupted, admission?.isOpen ?? true {
+                                admission?.report("vision.camera", "nativeEvent", CameraError.interrupted)
+                            }
                             continuation.yield(event)
                         }))
             }

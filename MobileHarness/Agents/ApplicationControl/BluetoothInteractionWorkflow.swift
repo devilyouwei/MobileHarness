@@ -7,7 +7,7 @@ import UI
 
 /// Root-owned bounded intent adapter. Native recovery and accepted manual workers outlive pages.
 @MainActor public final class BluetoothInteractionWorkflow: BluetoothControlling {
-    private let state: BluetoothSettingsState
+    private let state: any DeviceSettingsPresenting
     private let perform: (AppInteractionIntent) async throws -> Void
     private let pageVisibility: (Bool) -> Void
     private let openSettings: () -> Void
@@ -18,7 +18,7 @@ import UI
     private var worker: Task<Void, Never>?
     private var closed = false
     public init(
-        state: BluetoothSettingsState, initialFence: String, fenceStop: @escaping () -> String,
+        state: any DeviceSettingsPresenting, initialFence: String, fenceStop: @escaping () -> String,
         pageVisibility: @escaping (Bool) -> Void, openSettings: @escaping () -> Void,
         perform: @escaping (AppInteractionIntent) async throws -> Void
     ) {
@@ -49,11 +49,11 @@ import UI
     }
     public func setMotorVelocity(id: Int, value: Double) {
         guard !closed else {
-            state.error = "设备交互已关闭"
+            state.present(.error("设备交互已关闭"))
             return
         }
         guard (1...6).contains(id), value.isFinite, (-1...1).contains(value) else {
-            state.error = "电机操作参数无效"
+            state.present(.error("电机操作参数无效"))
             return
         }
         motors[id] = value
@@ -86,14 +86,14 @@ import UI
     }
     private func submit(_ request: [String: String], priority: Bool = false) {
         guard !closed else {
-            state.error = "设备交互已关闭"
+            state.present(.error("设备交互已关闭"))
             return
         }
         var request = request
         request["fence"] = fence
         if pending.contains(request) { return }
         guard pending.count < 16 else {
-            state.error = "设备操作过多，请稍后重试"
+            state.present(.error("设备操作过多，请稍后重试"))
             return
         }
         if priority { pending.insert(request, at: 0) } else { pending.append(request) }
@@ -116,7 +116,7 @@ import UI
                     break
                 }
                 do { try await perform(.init(kind: .device, parameters: request)) } catch {
-                    if request["fence"] == fence { state.error = "设备操作失败：" + error.localizedDescription }
+                    if request["fence"] == fence { state.present(.error("设备操作失败：" + error.localizedDescription)) }
                 }
             }
         }

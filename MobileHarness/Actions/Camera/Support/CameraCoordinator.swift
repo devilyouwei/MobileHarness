@@ -19,6 +19,7 @@
     public final class CameraCoordinator: CameraOutputHandling, CameraControlCapability, UIFeedbackCapability {
         public static let captureResource = ResourceID(rawValue: "camera.capture")
         public static let resourceOwnerID = AgentID(rawValue: "runtime.camera")
+
         private let captureOwner: ExecutionOwner
         private let makeRuntime: () throws -> CameraRuntimeDependencies
         private var resourceRuntime: CameraRuntimeDependencies?
@@ -56,12 +57,12 @@
         private var presentationFinished: (id: String, success: Bool)?
         private let saveJPEG: @Sendable (Data) async throws -> Void
         private let nativeEvent: @Sendable (CameraEvent) async throws -> Void
-        private let photoCues: NativeCuePlayback
+        private let photoCues: any CuePlaying
         private var photoFeedbackContext: ActionExecutionContext?
 
         public init(
             camera: any CameraCapturing, presentation: any CameraPresenting, photos: CapturedPhotoStore,
-            photoCues: NativeCuePlayback,
+            photoCues: any CuePlaying,
             saveJPEG: @escaping @Sendable (Data) async throws -> Void,
             nativeEvent: @escaping @Sendable (CameraEvent) async throws -> Void,
             makeRuntime: @escaping () throws -> CameraRuntimeDependencies,
@@ -238,7 +239,7 @@
             defer { photoFeedbackContext = nil }
             let issues = try await PhotoDispositionWorkflow.run(
                 commit: commit,
-                animation: { try await photo.departure.perform(kind) },
+                animation: { [presentation] in try await presentation.departPhoto(id: photo.id, kind: kind) },
                 sound: { [self] in
                     guard
                         let definition = UIModule.feedbackDefinitions(feedback: self).first(where: {
@@ -309,13 +310,11 @@
                 photoOwner = (id, owner)
                 presentation.present(.savedMediaID(nil))
                 presentation.present(.photoMessage(nil))
-                presentation.present(
-                    .capturedPhoto(
-                        CapturedPhotoPresentation(id: id, image: image) { [weak self] success in
-                            guard let self, self.state.capturedPhoto?.id == id else { return }
-                            self.publishPublicFacts()
-                            self.presentationFinished = (id, success)
-                        }))
+                try presentation.presentPhoto(id: id, image: image) { [weak self] success in
+                    guard let self, self.state.capturedPhoto?.id == id else { return }
+                    self.publishPublicFacts()
+                    self.presentationFinished = (id, success)
+                }
                 let deadline = ContinuousClock.now.advanced(by: .seconds(3))
                 do {
                     while presentationFinished?.id != id {
@@ -487,18 +486,21 @@
             worker = Task { await applyLatestIntent() }
         }
 
+        private var visionDisplayToken: UIPresentationToken?
         private func startVision(_ intent: VisionIntent) -> Task<Void, Never>? {
             guard foreground, state.isEnabled, state.isVisible, revision == intent.revision else { return nil }
             let id = UUID().uuidString
             visionSession = id
+            visionDisplayToken = presentation.token
             presentation.present(.visionMessage("姿态识别准备中"))
             let mirrored = intent.mirrored
+            let displayToken = presentation.token
             return Task { [weak self] in
                 guard let self else { return }
                 do {
                     let preview = try await self.camera.subscribeFrames()
                     try Task.checkCancellation()
-                    async let cameraOutput: Void = self.runPreview(preview, sessionID: id)
+                    async let cameraOutput: Void = self.runPreview(preview, sessionID: id, token: displayToken)
                     async let poseOutput: Void = self.runPose(intent, sessionID: id, mirrored: mirrored)
                     // Model completion does not cancel the independent camera subscription.
                     _ = await (cameraOutput, poseOutput)
@@ -508,18 +510,27 @@
                 }
             }
         }
-        private func runPreview(_ frames: AsyncThrowingStream<CameraFrame, Error>, sessionID: String) async {
+        private func runPreview(
+            _ frames: AsyncThrowingStream<CameraFrame, Error>, sessionID: String,
+            token displayToken: UIPresentationToken
+        ) async {
             do {
                 for try await frame in frames {
+
                     try Task.checkCancellation()
                     guard visionSession == sessionID, foreground, state.isEnabled, state.isVisible else { return }
-                    do { try presentation.presentVideo(Self.displayFrame(frame)) } catch CameraFramePresentationError
+                    do {
+                        try presentation.presentVideo(Self.displayFrame(frame), token: displayToken)
+                    } catch CameraFramePresentationError
                         .stale
                     {
                         continue
                     }
                 }
-            } catch is CancellationError {} catch {
+            } catch is CancellationError {} catch is UIContainerError {
+                // Lifecycle closure is expected and must not create another camera fault.
+                return
+            } catch {
                 guard visionSession == sessionID else { return }
                 presentation.clearFrame()
                 presentation.present(.message("相机画面暂不可用，请重试"))
@@ -572,6 +583,7 @@
             guard let frame, frame.sequence == overlay.sequence, frame.rotation == overlay.rotation else {
                 throw CameraFramePresentationError.stale
             }
+            guard let displayToken = visionDisplayToken else { throw UIContainerError.stale }
             try presentation.present(
                 frame: Self.displayFrame(frame),
                 pose: UI.PoseOverlay(
@@ -587,7 +599,7 @@
                             replacements: $0.replacements,
                             detectionIntervalMilliseconds: $0.detectionIntervalMilliseconds,
                             imageMotion: $0.imageMotion)
-                    }))
+                    }), token: displayToken)
             presentation.present(.visionMessage(nil))
         }
 

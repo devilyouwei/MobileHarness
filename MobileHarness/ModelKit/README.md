@@ -142,3 +142,7 @@ Apple TTS retains one native synthesizer per capability, fence request cleanup, 
 ## 分类异常诊断
 
 ✅ LLM 中立失败诊断向消费者提供原因/协议阶段及安全标识；具体 Provider 在校验点记录，ModelKit 不决定 Agent 的恢复或用户提示。见 [Chat](Language/LLM/README.md)。
+
+## 基础能力审查
+
+✅ 制品下载一次读取／解码恢复计划，按 ID/revision/endpoint 选择复用；旧暂存迁移和完整文件复用保留。CurrentChatCapability 由 ModelKitRuntime 唯一编译，按当前 binding 转发 ChatCapability，不包含 App 源码或其他项目模块依赖。❌ ModelKitDefaults 仍是进程级管理器，尚无 App 缓存根容器。

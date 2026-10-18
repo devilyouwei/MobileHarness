@@ -1,5 +1,11 @@
 import Foundation
 
+/// Cleanup reason is distinct from the error returned by a later lookup of a retired handle.
+public enum MemoryLeaseRemoval: Sendable {
+    case released
+    case failure(any Error)
+}
+
 /// Bounded, single-checkout handles. Nil TTLs leave lifetime to the owning scope.
 public actor MemoryLeaseStore<Value: Sendable> {
     private struct Entry {
@@ -24,12 +30,12 @@ public actor MemoryLeaseStore<Value: Sendable> {
     private let queueTTL: Duration?
     private let readyTTL: Duration?
     private let errorTTL: Duration?
-    private let onRemove: @Sendable (Value, any Error) async -> Void
+    private let onRemove: @Sendable (Value, MemoryLeaseRemoval) async -> Void
     private var closed = false
 
     public init(
         capacity: Int, queueTTL: Duration?, readyTTL: Duration?, errorTTL: Duration?,
-        onRemove: @escaping @Sendable (Value, any Error) async -> Void
+        onRemove: @escaping @Sendable (Value, MemoryLeaseRemoval) async -> Void
     ) {
         precondition(capacity > 0 && (errorTTL.map { $0 > .zero } ?? true))
         precondition(queueTTL.map { $0 > .zero } ?? true)
@@ -104,7 +110,7 @@ public actor MemoryLeaseStore<Value: Sendable> {
 
     public func release(_ id: String, owner: StorageOwner) async throws {
         try await validate(id, owner: owner)
-        await fail(id, error: StorageError.missing)
+        await remove(id, error: StorageError.missing, reason: .released)
     }
 
     public func cancel(_ id: String, owner: StorageOwner) async throws {
@@ -113,6 +119,10 @@ public actor MemoryLeaseStore<Value: Sendable> {
     }
 
     public func fail(_ id: String, error: any Error) async {
+        await remove(id, error: error, reason: .failure(error))
+    }
+
+    private func remove(_ id: String, error: any Error, reason: MemoryLeaseRemoval) async {
         guard let entry = entries.removeValue(forKey: id) else { return }
         entry.timer?.cancel()
         prune()
@@ -121,7 +131,7 @@ public actor MemoryLeaseStore<Value: Sendable> {
         }
         terminal[id] = Terminal(
             owner: entry.owner, error: error, expires: errorTTL.map { .now.advanced(by: $0) }, createdAt: .now)
-        await onRemove(entry.value, error)
+        await onRemove(entry.value, reason)
         await entry.cancel()
     }
 

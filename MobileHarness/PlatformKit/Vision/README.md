@@ -69,3 +69,9 @@ Input is one JPEG/PNG, at most 4 MiB, with bounded valid dimensions. Upright JPE
 ## UI 容器与相机能力注入
 
 ✅ 新增跨平台可替身的 CameraCapturing 原生接口与相机枚举/错误；AppleCamera 实现权限、帧订阅、启停、切换、照片、状态、事件和拍照方向能力。接口无 UI/业务依赖，静态权限方法保留原有原生入口，Coordinator 使用实例接口。
+
+## 统一容器异常通道
+
+✅ VisionContainer/AppleCamera 报告操作及相机原生错误/中断，照片导入保留原失败；正常镜头切换/停止不产生故障。报告不消费原有相机 events 单消费流，不改变帧路径。
+
+✅ VisionContainer.camera 返回 CameraCapturing，容器内部唯一持有原生驱动。CameraEvent 为 String/Sendable 事实；中断／运行失败使用 CameraError，存在系统原错误时保留原错误。Signal 适配由 Gateway 执行，相机生命周期与图像路径保持。

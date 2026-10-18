@@ -41,10 +41,22 @@ import StorageState
             try await interaction.setForeground(foreground)
         }
 
-        func start() async throws { try await interaction.start() }
+        private let containerFailures: ContainerFailureChannel
+        private var containerFailuresConnected = false
+        func start() async throws {
+            try await applicationControlIntents.prepareForInteraction()
+            try await interaction.start()
+            actionActivity.connectFailureSignals(input: input, sessionID: interactionSessionID)
+            guard !containerFailuresConnected else { return }
+            containerFailuresConnected = true
+            containerFailures.connect(input: input, sessionID: interactionSessionID)
+        }
 
         private var titleMutations: HistoryMutationService?
         func shutdown() async {
+            containerFailures.disconnect()
+            containerFailuresConnected = false
+            await actionActivity.shutdown()
             skillObservation?.cancel()
             await skillObservation?.value
             await interaction.shutdown()
@@ -119,13 +131,15 @@ import StorageState
         }
 
         init(
+            containerFailures: ContainerFailureChannel, home: UIHomeContainer,
             state: StateContainer, cache: CacheContainer, files: FilesContainer,
             chatRecords: any ChatRepository, taskRecords: any TaskRepository, camera: any CameraCapturing,
             readHistoryPhoto: @escaping @Sendable (String, String) async throws -> Data?,
             cameraControl: any CameraControlCapability,
             bluetooth: BluetoothWorkflow,
-            historyState: ConversationHistoryState, resourceState: ModelResourcesState, providerState: SettingsState,
-            navigationState: NavigationState, device: DeviceControlAdapter,
+            historyState: any HistoryPresenting, resourceState: any ModelResourcesPresenting,
+            providerState: any SettingsPresenting,
+            navigationState: any NavigationPresenting, device: DeviceControlAdapter,
             modelResources: any ModelResourceCapability,
             providerSettingsRuntime: ProviderSettingsRuntime,
             resourcePreferences: any ModelResourcePreferencesCapability,
@@ -136,6 +150,7 @@ import StorageState
             modelName: @escaping @Sendable () async throws -> String = { "Unspecified model" },
             chatProvider: @escaping @Sendable () async throws -> any ChatCapability
         ) throws {
+            self.containerFailures = containerFailures
             self.cacheStorage = cache
             try AgentConfigurations.installDeclarations(CapabilityModules.declarations)
             self.photoCamera = cameraControl
@@ -208,7 +223,7 @@ import StorageState
                     try AgentConfigurations.load(named: $0)
                 })
             let manager = AgentManager()
-            let activity = ActionActivityWorkflow(state: ActionActivityState())
+            let activity = ActionActivityWorkflow(state: home.activityPresentation)
             let input = InputGateway(
                 manager: manager, policy: policy,
                 signalSummary: { input in
@@ -252,7 +267,8 @@ import StorageState
                 return values
             }
             let presentation = RuntimePresentation(
-                cameraControl: cameraControl, rootSessionID: photographerSessionID, activity: activity.state)
+                cameraControl: cameraControl, rootSessionID: photographerSessionID, activity: activity.state,
+                effects: home.effects, expressions: home.expressions)
             self.bluetooth = bluetooth
             bluetooth.service.nativeObservation = { value in
                 try await input.publish(DeviceInputAdapter.bluetooth(value))
@@ -310,10 +326,10 @@ import StorageState
                     do {
                         let presentation = try await HistoryPresentationAdapter.listPresentation(historyStore)
                         await MainActor.run {
-                            historyState.archive = presentation
-                            historyState.status = message
+                            historyState.present(.archive(presentation))
+                            historyState.present(.status(message))
                         }
-                    } catch { await MainActor.run { historyState.status = "历史刷新失败：\(error)" } }
+                    } catch { await MainActor.run { historyState.present(.status("历史刷新失败：\(error)")) } }
                 }, titlePositions: { ConversationTitleGenerator.samplePositions(count: $0) })
             titleMutations = mutations
             let behaviors = try BehaviorAssembly(
@@ -384,7 +400,7 @@ import StorageState
                     return .accepted
                 },
                 invalidate: { resourceState.beginRefresh() },
-                report: { _ in resourceState.error = "资源状态更新失败，请稍后重试。" })
+                report: { _ in resourceState.present(.error("资源状态更新失败，请稍后重试。")) })
             let history = HistoryIntentRuntime(
                 sessionID: historySessionID, manager: manager, input: input, output: gateway, agent: historyAgent)
             historyIntents = history
@@ -432,12 +448,16 @@ import StorageState
                 for await skills in main.skillUpdates {
                     guard !Task.isCancelled else { return }
                     let active = skills.tasks.first { $0.id == skills.activeTaskID }
-                    activity.state.currentTaskID = active?.id
-                    activity.state.skillOwnership = Dictionary(
-                        uniqueKeysWithValues: skills.loaded.map { ($0, (try? skills.ownership($0)) ?? "unknown") })
-                    activity.state.currentTaskTitle = active?.goal ?? ""
-                    activity.state.currentTaskStatus = active?.status ?? ""
-                    activity.state.loadedSkills = skills.loaded
+                    activity.state.present(.currentTaskID(active?.id))
+                    activity.state.present(
+                        .skillOwnership(
+                            Dictionary(
+                                uniqueKeysWithValues: skills.loaded.map {
+                                    ($0, (try? skills.ownership($0)) ?? "unknown")
+                                })))
+                    activity.state.present(.currentTaskTitle(active?.goal ?? ""))
+                    activity.state.present(.currentTaskStatus(active?.status ?? ""))
+                    activity.state.present(.loadedSkills(skills.loaded))
                     for task in skills.tasks {
                         let marker = task.status + task.skills.joined(separator: ",") + (task.failure ?? "")
                         guard previous[task.id] != marker else { continue }

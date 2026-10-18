@@ -1,9 +1,10 @@
 import Foundation
 
 public enum CameraFacing: Sendable, Equatable { case front, back }
-public enum CameraEvent: Sendable { case interrupted, interruptionEnded, failed }
-public enum CameraError: Error, Equatable {
+public enum CameraEvent: String, Sendable { case interrupted, interruptionEnded, failed }
+public enum CameraError: Error, Equatable, Sendable {
     case permissionDenied, unavailable, configurationFailed, startFailed, photoBusy, photoFailed, photoTimedOut
+    case interrupted, runtimeFailed
 }
 
 /// Native capability only. Permission requests and capture require an explicit caller operation.

@@ -63,3 +63,13 @@ flowchart TB
 [公开 State 契约](State/README.md)
 
 ✅ 对话用量增加可选缓存读/写输入计数，兼容旧证据无字段；不更改数据库表或迁移版本。
+
+## 统一容器异常通道
+
+✅ StorageCore 的原生 StorageFailureReporter 使用注入的 Sendable 回调，不认识 Signal。Storage 根及 State/Cache/Files/SQLite 的操作、后台失败与清理保留原错误并同步报告，由 App 连接 Gateway；报告不改变返回值或完成边界。无观察者的 SDK 使用保留原抛错语义。
+
+报告器由 App 同时传给 Files、SQLite 后端和 Storage 根；根把它传给自身创建的 State/Cache。外部自建后端由构造者明确注入，不通过全局通知或隐式查找补绑定。
+
+## 契约与重复报告整理
+
+✅ StorageError/DocumentStorageError/RecordStorageError 集中在共享契约文件，值错误统一 Error/Equatable/Sendable。AudioCache 私有接纳检查只翻译／抛错，公开操作报告该接纳错误一次；原始失败、释放／取消及数据库 schema 保持，Storage 不生成 Signal。

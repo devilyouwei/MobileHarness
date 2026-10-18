@@ -43,3 +43,45 @@ UI 根容器、接口注入和 App 构造工厂已落地；其余 UI 状态明�
 ## 统一所有现有外部输入
 
 ✅ 业务意图/宿主事实与设备统一由 Gateway 生成 Signal；领域保留 schema，Gateway 不依赖业务模块。补齐绑定会话/incarnation 的宿主动态订阅和类型化传感器扩展。新增硬件驱动、远程传输、持久投递不属于本项。验证身份兼容、权限/容量/取消/代际、分发并分别记录完整检查及构建结果。
+
+## Container failure channel
+
+Implemented: foundation-owned injected callbacks, App-scoped Gateway journal and bounded publisher, passive Agent subscriptions and existing issue/toast projection. Preserve original throws, cancellation and real cleanup. No new directory/module; no implicit device restart or model inference. Validate source/scope, pre-start/shutdown, capacity/coalescing, root isolation and end-to-end delivery; retain failures honestly.
+
+### ApplicationControl 统一异常展示
+
+✅ 容器/执行异常通过 Signal 交给 ApplicationControl，策略不调用模型或 Storage；移除快照直达首页的容器异常支路。覆盖重复、过期、未运行、暂停、错误来源、展示失败防递归以及停止清理；保留 App 启动失败兜底。
+
+### UI 全量容器化
+
+✅ 八个 UI 子容器统一创建应用级展示状态，App 管理生命周期；删除消费者重复状态和直接写入，保留 revision/generation/会话围栏。后台只冻结实时输出，导航/草稿/历史保留，资源设备及异常可更新；停止取消并加入展示期限和动画等待。覆盖实例同一性、无效果初始化、失活/停止迟到拒绝、前后台、旧根隔离、既有呈现和 Metal 回归，运行完整检查与构建，安装真机并区分自动化/物理验收。本轮不提交。
+
+❌ UI 全量容器化的完整自动化、iOS 构建与真机手工验收以最新验证记录为准，尚未以旧证据判定通过。
+
+
+### 真机反馈修复
+
+✅ 已实现独立交互提示/忙碌状态、字幕与原生效果观察隔离、图层尺寸变更判断和离主线程 FFT。正常音频释放与真实失败原因分开，真实缺失仍抛错并上报；路由事实不直接报告容器失败，用户已确认无误报。相关历史失败及中间安装结果保留在专项验证，不作为最新版本验收。
+
+✅ 逐段时序定位回复开始时约700ms音频输出启动阻塞主线程；原生输出图移交 PlatformKit 私有 actor，停止/token/真实完成及缓冲上限保留。频谱改为常驻原生图层和 Core Animation 插值，UI 无 Canvas；八个子容器原本已在根构造时全部创建，不在 UI boot 激活设备。
+
+❌ 最新采样证明音频启动等待时相机仍连续交付，但另有一次原生捕获同步暂停待关联操作；新版完整手工验收、Metal 自动化失败及全量集成失败仍未关闭。最新签名构建及设备安装通过，Simulator 的 CoreAI 阻断仍未解决。详见 [验证记录](../../validation/PlatformKit-Containers.md)。本轮保持不提交。
+
+
+### UI 代码与文档整理
+
+✅ 已清除视觉演示、模拟记录、临时性能对比和已替代的坐标转换；同类状态／端口归并，导航归根、检测归诊断、眼睛与频谱职责分离。全部 UI README、工程导航、源码守卫及格式已对齐，保留真实诊断和原有能力／回执，不增加目录／target／依赖、不自动提交。12项定向回归和签名真机构建通过，工作区既有修改保持。
+
+❌ 完整检查的 Metal 挂载、集成超时及 Simulator CoreAI 阻断仍单独记录；本轮未重新安装／执行真机交互验收，清理不代替性能或物理验收。详见 [验证记录](../../validation/PlatformKit-Containers.md)。
+
+### 其他基础模块边界与冗余审查
+
+✅ PlatformKit 相机、PCM音频、提示音、触觉及串口通过协议端口提供，具体驱动由模块内创建和缓存；删除未使用的音频预热／游标，原生设备事实与实际错误分离。Storage 共享错误集中、私有接纳只抛错并由公开操作报告；ModelKit 复用一次恢复计划读取，保留有效的旧暂存迁移。文档、消费者及源码守卫已对齐，Signal 转换仍在 Gateway，无新目录／target／依赖，未提交。
+
+❌ ModelKit App 根容器化仍独立待完成；完整检查的Metal／集成超时、Simulator CoreAI阻断和实际设备／模型验收仍未关闭。定向运行119项中117通过、2项外部资源验收跳过，签名真机构建通过，详见[验证记录](../../validation/PlatformKit-Containers.md)。
+
+### UI 并发开销与渲染清理
+
+✅ 已实现光环停止归还 GPU 槽位、锁保护线程与完成屏障；相机视频／骨架各复用一个可续期任务，保留独立750ms到期、更早期限及停止加入；频谱缓存固定配置。保持显示线程数量和帧率。
+
+❌ 自动化、Simulator和签名构建的最新执行结果见验证记录；实际功耗／内存／真机流畅度仍需采集，不将构建当作通过。

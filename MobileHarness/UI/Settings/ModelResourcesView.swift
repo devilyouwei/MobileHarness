@@ -1,7 +1,8 @@
 #if os(iOS)
     import SwiftUI
 
-    @MainActor public struct ModelResourcesView: View {
+    @MainActor
+    public struct ModelResourcesView: View {
         @Bindable private var state: ModelResourcesState
         private let controls: any ModelResourcesControlling
         private let group: ModelResourceGroup
@@ -59,7 +60,8 @@
         }
     }
 
-    @MainActor struct ModelResourceSections: View {
+    @MainActor
+    struct ModelResourceSections: View {
         @Bindable var state: ModelResourcesState
         let controls: any ModelResourcesControlling
         let group: ModelResourceGroup

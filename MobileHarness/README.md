@@ -287,7 +287,7 @@ Directory nesting expresses ownership; `Package.swift` defines the actual compil
 | `Storage/Database/Media/` | StorageMedia | StorageCore, StorageFiles |
 | `Storage/Database/Devices/` | StorageDevices | StorageCore |
 | `Storage/Database/SQLite/` | StorageSQLite | StorageCore, StorageDatabase, domain repositories, GRDB.swift |
-| `App/Composition/ApplicationContainer.swift` | AppStorage | Storage/Platform roots and capabilities, StorageSQLite, FactoryKit |
+| `App/Composition/ApplicationContainer.swift` | AppStorage | Storage/Platform/UI roots and diagnostics, StorageSQLite, Gateway, FactoryKit |
 | `PlatformKit/` | PlatformKit | None |
 | ModelKit shared capability sources | ModelKit | None |
 | `ModelKit/Support/Management/` (runtime source list) | ModelKitRuntime | ModelKit |
@@ -390,11 +390,11 @@ flowchart TD
     Platform --> Workflows
 ```
 
-App composes model capabilities, Storage repositories, native endpoints, canonical functions, Gateways and Agent instances before producers start. Invalid configuration, missing implementations or failed startup recovery blocks admission explicitly. UI pages consume root-owned services; navigation does not own their lifetime. App supplies the camera Coordinator factory; AgentBindings owns Agent integration and resource declarations; App invokes its public interfaces and installs the static storage / platform / ui → agents → native lifecycle graph.
+App composes model capabilities, Storage repositories, native endpoints, canonical functions, Gateways and Agent instances before producers start. Invalid configuration, missing implementations or failed startup recovery blocks admission explicitly. UI pages consume root-owned services; navigation does not own their lifetime. App supplies the camera Coordinator factory; AgentBindings owns Agent integration and resource declarations; App invokes its public interfaces and installs the static diagnostics → storage / platform / ui → agents → native lifecycle graph.
 
 ### Storage container lifecycle
 
-✅ AppStorage 用 FactoryKit 3.4.1 在每个 App 根作用域注册 StorageContainer，组合 State、Cache、Database、Files。Factory 只构造；AppLifecycle 按 storage / platform / ui → agents → native 启停。StorageCore 保持无项目依赖；SQLite 独占 GRDB；业务模块只接收所需端口。详见 [Storage](Storage/README.md)。
+✅ AppStorage 用 FactoryKit 3.4.1 在每个 App 根作用域注册 StorageContainer，组合 State、Cache、Database、Files。Factory 只构造；AppLifecycle 按 diagnostics → storage / platform / ui → agents → native 启停。StorageCore 保持无项目依赖；SQLite 独占 GRDB；业务模块只接收所需端口。详见 [Storage](Storage/README.md)。
 
 AgentContext 由 Agent actor 私有持有；State 只保存业务拥有者发布的有限 LLM 事实，类型化值与编码投影原子提交。Cache 音频由会话申请/关闭，缓冲区交接共享内存。配置、照片、模型文件通过 Files 注入，数据库保留既有记录格式和恢复语义。文件和数据库没有跨后端事务；重启不重放业务动作。Skill 通过 useState 声明读取需求，每轮推理取最新一致快照，在唯一 CURRENT STATE 系统块注入。
 
@@ -1532,3 +1532,26 @@ flowchart LR
 ## 统一外部 Signal 接入
 
 ✅ 业务只提供 ExternalInputDraft 内容/因果描述，Gateway 统一构造和验证 Signal；设备复用相同入口。提供宿主控制的精确动态订阅及类型化传感器扩展；保留权限、容量、会话/incarnation 和单向发布约束。相机逐帧呈现继续直接调用 UI。
+
+## 统一容器异常通道
+
+✅ 基础库通过注入的原生错误回调上报，App 将同一根作用域的 Storage/Platform/UI 及生命周期错误接入 Gateway.ContainerFailureChannel；Gateway 编码 container.failure 并向已声明的 Agent 广播，ApplicationControl 以固定策略组织异常记录/Toast，Assistant 可被动接收，不自动推理或重放设备动作。构造和订阅不打开设备。普通取消及预期媒体过期不升级为故障。
+
+## ApplicationControl 异常展示
+
+✅ 已实现：异常展示链路调整为：Gateway Signal → ApplicationControl 确定性策略 → 内部 UI.RuntimeDiagnostics.recordFailure → UI 运行异常/Toast。移除绑定层直接监听容器异常生成展示的旧链路；Assistant 保留可选被动诊断，App 保留启动失败兜底。容器原始抛错及模块组合装配本轮不变。
+
+## UI 全量容器化
+
+✅ 应用级 UI 状态由八个子容器统一创建，消费者注入所需 Presenting 接口并提交 UI 自有值，不直接写字段。App 注册并管理同一 UI 根；原业务身份/版本校验、原生完成和基础库依赖边界保持。跨模块连接迁移仍是独立待办。
+
+✅ 正常音频路由通知不作为 container.failure；只有实际操作/流失败进入故障通道，设备事实仍走原生事件/Signal 接入。
+
+
+## UI 源码归属整理
+
+✅ UI 按首页、相机、设置／资源／设备／历史、诊断及原生组件归类，子容器与所属状态／接口集中，导航归 UI 根。应用根提供实际页面及注入的真实诊断，不承载模拟展示或比较程序。八子容器、App 装配、基础库独立及数据链路见 [UI](UI/README.md)。
+
+## 基础能力边界复核
+
+✅ PlatformKit 原生能力通过协议提供，原生设备事件与执行 Error 分离；Storage 私有接纳检查抛错，公开操作报告；ModelKit 制品恢复使用同一已验证计划快照。基础模块不依赖其他基础／业务模块，Signal 编码在 Gateway。❌ ModelKit 的 App 根容器化仍未完成。

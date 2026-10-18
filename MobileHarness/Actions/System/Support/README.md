@@ -92,3 +92,9 @@ SpeechDiagnosticWorkflow 的 stopAndWait 加入真实播放、操作和卸载；
 ## Storage 依赖
 
 ✅ 存储访问使用独立的 State、Cache、Database 和 Files 接口；App 注册根实例，消费者通过构造器获得所需能力。存储容器不接管本目录的业务验证、执行和完成语义。
+
+## UI 全量容器化
+
+✅ 应用级 UI 状态由八个子容器统一创建，消费者注入所需 Presenting 接口并提交 UI 自有值，不直接写字段。App 注册并管理同一 UI 根；原业务身份/版本校验、原生完成和基础库依赖边界保持。跨模块连接迁移仍是独立待办。
+
+✅ SpeechDiagnosticWorkflow 注入 AudioInputOutput 执行真实播放，报告使用原生播放能力描述；诊断和资源策略仍归业务所有者。

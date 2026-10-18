@@ -116,3 +116,9 @@ Actions 为可信业务调用和模型调用提供统一实现与元数据。Ski
 真实云回归使用固定合成场景，修订收益、回退和未解决的原生协议错误见[提示词优化验证](../../docs/validation/Qwen-Prompt-Optimization.md)；不等于真机执行验收。
 
 ✅ Implemented: bundled Skill registrations become Action-only; ApplicationControl/HistoryQuery revisions and BasicSkill instructions change together. Native Tool base schemas and Agent internal grants remain intact.
+
+Assistant 的技术诊断输入声明属于 Agents 资源契约；container.failure 是被动框架 observation，不新增模型函数或 Skill 暴露。
+
+## ApplicationControl 异常展示
+
+✅ ApplicationControl 配置声明 container.failure/runtime.failure 的 runtime 来源订阅；Assistant 保留被动容器诊断。内部呈现函数由代码授权，不加入模型 Skill 或改变资源 schema 版本。

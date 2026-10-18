@@ -148,3 +148,7 @@ Task 关闭后的历史重建复用真实 Action executionObservations，不再�
 ## 分类异常诊断
 
 ✅ 模型失败使用类型化诊断生成 AgentFailureDiagnostic；分类代码、可读细节随现有 agent.error 输出。清理附带错误继续保留，原始模型失败不被降为普通运行错误；取消继续使用 agent.cancelled，不产生错误 toast。
+
+## 统一容器异常通道
+
+✅ AgentChatWorker 在普通决策前接收已授权的 container.failure，维护最多128条被动诊断，按事件 ID 更新次数，超限计数淘汰。仅内存，不写可能故障的 Storage、不启动模型/Task/自动重试；拒绝错误来源、伪造授权和失效会话。

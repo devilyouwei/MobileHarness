@@ -9,3 +9,7 @@
 ## 待完成
 
 ❌ 新机制须由实际消费者需要驱动；不增加空适配后端。
+
+## 统一容器异常通道
+
+✅ StorageFailureReporter 属于 StorageCore，仅 Foundation；统一非阻塞错误回调，普通 CancellationError 不升级。它不存储历史、不执行 UI/Agent 或重试。

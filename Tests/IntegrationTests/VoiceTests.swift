@@ -1578,3 +1578,17 @@ func speechRawAudioQueueEnforcesPacketAndMemoryBounds(memoryBound: Bool) async t
     await speech.stop()
     #expect(await speech.status().queuedInputs == 0)
 }
+
+@Test @MainActor func spectrumOffMainMatchesSynchronousAndRejectsCancelledWork() async throws {
+    let samples = (0..<AudioSpectrum.sampleCount).map { index in
+        Float(sin(Double(index) * 2 * .pi * 440 / 16000))
+    }
+    let expected = AudioSpectrum.measure(samples, sampleRate: 16000)
+    let actual = try await AudioSpectrum.measureOffMain(samples, sampleRate: 16000)
+    #expect(actual == expected)
+    let cancelled = Task { @MainActor in
+        try await AudioSpectrum.measureOffMain(samples, sampleRate: 16000)
+    }
+    cancelled.cancel()
+    await #expect(throws: CancellationError.self) { try await cancelled.value }
+}

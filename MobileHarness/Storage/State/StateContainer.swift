@@ -158,175 +158,226 @@ public final class StateContainer: Sendable {
     }
     private let state = Mutex(State())
     private let limits: Limits
-    public init(limits: Limits = Limits()) { self.limits = limits }
+    private let failures: StorageFailureReporter
+    public init(limits: Limits = Limits(), failures: StorageFailureReporter = .init()) {
+        self.limits = limits
+        self.failures = failures
+    }
     public func makeScope(domain: StateDomain = .application) throws -> StateScope {
-        if case .conversation(let agent, let session) = domain {
-            guard !agent.isEmpty, !session.isEmpty, agent.utf8.count <= 256, session.utf8.count <= 256 else {
-                throw StateError.invalidKey
+        do {
+            if case .conversation(let agent, let session) = domain {
+                guard !agent.isEmpty, !session.isEmpty, agent.utf8.count <= 256, session.utf8.count <= 256 else {
+                    throw StateError.invalidKey
+                }
             }
-        }
-        return try state.withLock { state in
-            guard !state.closed else { throw StateError.closed }
-            guard state.scopes.count < limits.scopes else { throw StateError.capacityExceeded }
-            let id = UUID()
-            state.scopes[id] = domain
-            return StateScope(id: id, container: self)
+            return try state.withLock { state in
+                guard !state.closed else { throw StateError.closed }
+                guard state.scopes.count < limits.scopes else { throw StateError.capacityExceeded }
+                let id = UUID()
+                state.scopes[id] = domain
+                return StateScope(id: id, container: self)
+            }
+        } catch {
+            failures.report("state", "makeScope", error)
+            throw error
         }
     }
     fileprivate func register<Value: Encodable>(
         scope: UUID, key: StateKey<Value>, initial: Value,
         validate: @escaping @Sendable (Value) throws -> Void
     ) throws -> StateWriter<Value> {
-        guard !key.name.isEmpty, key.name.utf8.count <= 256 else { throw StateError.invalidKey }
-        try validate(initial)
-        let encoder: @Sendable (any Sendable) throws -> Data = { raw in
-            guard let value = raw as? Value else { throw StateError.typeMismatch }
-            let encoder = JSONEncoder()
-            encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
-            let data = try encoder.encode(value)
-            guard data.count <= 8192 else { throw StateError.capacityExceeded }
-            return data
-        }
-        let encoded = try encoder(initial)
-        return try state.withLock { state in
-            guard !state.closed, state.scopes[scope] != nil else { throw StateError.closed }
-            guard let domain = state.scopes[scope] else { throw StateError.closed }
-            if let declared = state.declarations[key.name], declared != domain.kind { throw StateError.typeMismatch }
-            if let existing = state.entries.first(where: {
-                state.scopes[$0.key.scope] == domain && $0.key.name == key.name
-            }) {
-                throw existing.value.type == ObjectIdentifier(Value.self)
-                    ? StateError.duplicate : StateError.typeMismatch
+        do {
+            guard !key.name.isEmpty, key.name.utf8.count <= 256 else { throw StateError.invalidKey }
+            try validate(initial)
+            let encoder: @Sendable (any Sendable) throws -> Data = { raw in
+                guard let value = raw as? Value else { throw StateError.typeMismatch }
+                let encoder = JSONEncoder()
+                encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+                let data = try encoder.encode(value)
+                guard data.count <= 8192 else { throw StateError.capacityExceeded }
+                return data
             }
-            guard state.entries.count < limits.registrations, state.revision < UInt64.max else {
-                throw StateError.capacityExceeded
+            let encoded = try encoder(initial)
+            return try state.withLock { state in
+                guard !state.closed, state.scopes[scope] != nil else { throw StateError.closed }
+                guard let domain = state.scopes[scope] else { throw StateError.closed }
+                if let declared = state.declarations[key.name], declared != domain.kind {
+                    throw StateError.typeMismatch
+                }
+                if let existing = state.entries.first(where: {
+                    state.scopes[$0.key.scope] == domain && $0.key.name == key.name
+                }) {
+                    throw existing.value.type == ObjectIdentifier(Value.self)
+                        ? StateError.duplicate : StateError.typeMismatch
+                }
+                guard state.entries.count < limits.registrations, state.revision < UInt64.max else {
+                    throw StateError.capacityExceeded
+                }
+                guard state.declarations[key.name] != nil || state.declarations.count < limits.registrations else {
+                    throw StateError.capacityExceeded
+                }
+                state.declarations[key.name] = domain.kind
+                state.revision += 1
+                let token = StateToken(scope: scope, name: key.name, generation: UUID())
+                state.entries[token] = StateEntry(
+                    value: initial, revision: state.revision, type: ObjectIdentifier(Value.self),
+                    validate: { raw in
+                        guard let value = raw as? Value else { throw StateError.typeMismatch }
+                        try validate(value)
+                    }, encode: encoder, encoded: encoded)
+                return StateWriter(reader: StateReader(container: self, token: token))
             }
-            guard state.declarations[key.name] != nil || state.declarations.count < limits.registrations else {
-                throw StateError.capacityExceeded
-            }
-            state.declarations[key.name] = domain.kind
-            state.revision += 1
-            let token = StateToken(scope: scope, name: key.name, generation: UUID())
-            state.entries[token] = StateEntry(
-                value: initial, revision: state.revision, type: ObjectIdentifier(Value.self),
-                validate: { raw in
-                    guard let value = raw as? Value else { throw StateError.typeMismatch }
-                    try validate(value)
-                }, encode: encoder, encoded: encoded)
-            return StateWriter(reader: StateReader(container: self, token: token))
+        } catch {
+            failures.report("state", "register", error)
+            throw error
         }
     }
     fileprivate func get<Value>(_ token: StateToken) throws -> StateValue<Value> {
-        try state.withLock { state in
-            guard !state.closed, state.scopes[token.scope] != nil else { throw StateError.closed }
-            guard let entry = state.entries[token] else { throw StateError.missing }
-            guard let value = entry.value as? Value else { throw StateError.typeMismatch }
-            return StateValue(value: value, revision: entry.revision, generation: token.generation)
+        do {
+            return try state.withLock { state in
+                guard !state.closed, state.scopes[token.scope] != nil else { throw StateError.closed }
+                guard let entry = state.entries[token] else { throw StateError.missing }
+                guard let value = entry.value as? Value else { throw StateError.typeMismatch }
+                return StateValue(value: value, revision: entry.revision, generation: token.generation)
+            }
+        } catch {
+            failures.report("state", "get", error)
+            throw error
         }
     }
     fileprivate func transition<Value, Result>(
         _ token: StateToken, expecting revision: UInt64, _ mutation: @Sendable (inout Value) throws -> Result
     ) throws -> Result where Value: Sendable, Result: Sendable {
-        try state.withLock { state in
-            guard !state.closed, state.scopes[token.scope] != nil else { throw StateError.closed }
-            guard var entry = state.entries[token] else { throw StateError.missing }
-            guard entry.revision == revision else { throw StateError.conflict }
-            guard var value = entry.value as? Value else { throw StateError.typeMismatch }
-            let result = try mutation(&value)
-            try entry.validate(value)
-            let encoded = try entry.encode(value)
-            guard state.revision < UInt64.max else { throw StateError.capacityExceeded }
-            state.revision += 1
-            entry.value = value
-            entry.encoded = encoded
-            entry.valid = true
-            entry.revision = state.revision
-            state.entries[token] = entry
-            for observer in state.observers.values where observer.tokens.contains(token) {
-                observer.continuation.yield(StateChange(revision: state.revision))
+        do {
+            return try state.withLock { state in
+                guard !state.closed, state.scopes[token.scope] != nil else { throw StateError.closed }
+                guard var entry = state.entries[token] else { throw StateError.missing }
+                guard entry.revision == revision else { throw StateError.conflict }
+                guard var value = entry.value as? Value else { throw StateError.typeMismatch }
+                let result = try mutation(&value)
+                try entry.validate(value)
+                let encoded = try entry.encode(value)
+                guard state.revision < UInt64.max else { throw StateError.capacityExceeded }
+                state.revision += 1
+                entry.value = value
+                entry.encoded = encoded
+                entry.valid = true
+                entry.revision = state.revision
+                state.entries[token] = entry
+                for observer in state.observers.values where observer.tokens.contains(token) {
+                    observer.continuation.yield(StateChange(revision: state.revision))
+                }
+                return result
             }
-            return result
+        } catch {
+            failures.report("state", "transition", error)
+            throw error
         }
     }
     public func snapshot(_ selections: [StateSelection]) throws -> StateSnapshot {
-        try state.withLock { state in
-            guard !state.closed else { throw StateError.closed }
-            var values: [StateToken: StateEntry] = [:]
-            for selected in selections {
-                guard selected.container === self, let entry = state.entries[selected.token] else {
-                    throw StateError.missing
+        do {
+            return try state.withLock { state in
+                guard !state.closed else { throw StateError.closed }
+                var values: [StateToken: StateEntry] = [:]
+                for selected in selections {
+                    guard selected.container === self, let entry = state.entries[selected.token] else {
+                        throw StateError.missing
+                    }
+                    values[selected.token] = entry
                 }
-                values[selected.token] = entry
+                return StateSnapshot(revision: state.revision, values: values)
             }
-            return StateSnapshot(revision: state.revision, values: values)
+        } catch {
+            failures.report("state", "snapshot", error)
+            throw error
         }
     }
     public func observe(_ selections: [StateSelection]) throws -> AsyncThrowingStream<StateChange, any Error> {
-        let id = UUID()
-        let stream = AsyncThrowingStream<StateChange, any Error>.makeStream(bufferingPolicy: .bufferingNewest(1))
-        stream.continuation.onTermination = { [weak self] _ in
-            Task { self?.removeObserver(id) }
+        do {
+            let id = UUID()
+            let stream = AsyncThrowingStream<StateChange, any Error>.makeStream(bufferingPolicy: .bufferingNewest(1))
+            stream.continuation.onTermination = { [weak self] _ in
+                Task { self?.removeObserver(id) }
+            }
+            try state.withLock { state in
+                guard !state.closed else { throw StateError.closed }
+                guard !selections.isEmpty,
+                    selections.allSatisfy({ $0.container === self && state.entries[$0.token] != nil })
+                else { throw StateError.missing }
+                guard state.observers.count < limits.observers else { throw StateError.capacityExceeded }
+                state.observers[id] = Observer(tokens: Set(selections.map(\.token)), continuation: stream.continuation)
+                stream.continuation.yield(StateChange(revision: state.revision))
+            }
+            return stream.stream
+        } catch {
+            failures.report("state", "observe", error)
+            throw error
         }
-        try state.withLock { state in
-            guard !state.closed else { throw StateError.closed }
-            guard !selections.isEmpty,
-                selections.allSatisfy({ $0.container === self && state.entries[$0.token] != nil })
-            else { throw StateError.missing }
-            guard state.observers.count < limits.observers else { throw StateError.capacityExceeded }
-            state.observers[id] = Observer(tokens: Set(selections.map(\.token)), continuation: stream.continuation)
-            stream.continuation.yield(StateChange(revision: state.revision))
-        }
-        return stream.stream
     }
     public func declare(_ declarations: [StateDeclaration]) throws {
-        try state.withLock { state in
-            guard !state.closed else { throw StateError.closed }
-            var next = state.declarations
-            for item in declarations {
-                guard !item.name.isEmpty, item.name.utf8.count <= 256 else { throw StateError.invalidKey }
-                if let existing = next[item.name], existing != item.scope { throw StateError.typeMismatch }
-                next[item.name] = item.scope
+        do {
+            try state.withLock { state in
+                guard !state.closed else { throw StateError.closed }
+                var next = state.declarations
+                for item in declarations {
+                    guard !item.name.isEmpty, item.name.utf8.count <= 256 else { throw StateError.invalidKey }
+                    if let existing = next[item.name], existing != item.scope { throw StateError.typeMismatch }
+                    next[item.name] = item.scope
+                }
+                guard next.count <= limits.registrations else { throw StateError.capacityExceeded }
+                state.declarations = next
             }
-            guard next.count <= limits.registrations else { throw StateError.capacityExceeded }
-            state.declarations = next
+        } catch {
+            failures.report("state", "declare", error)
+            throw error
         }
     }
     public func contextReader(domain: StateDomain = .application, scope: StateScope? = nil) throws
         -> any StateContextReading
     {
-        try state.withLock { state in
-            guard !state.closed else { throw StateError.closed }
-            if domain.kind == .conversation, scope == nil { throw StateError.missing }
-            if let scope {
-                guard scope.container === self, state.scopes[scope.id] == domain else { throw StateError.closed }
+        do {
+            try state.withLock { state in
+                guard !state.closed else { throw StateError.closed }
+                if domain.kind == .conversation, scope == nil { throw StateError.missing }
+                if let scope {
+                    guard scope.container === self, state.scopes[scope.id] == domain else { throw StateError.closed }
+                }
             }
+            return BoundStateContext(container: self, domain: domain, scopeID: scope?.id)
+        } catch {
+            failures.report("state", "contextReader", error)
+            throw error
         }
-        return BoundStateContext(container: self, domain: domain, scopeID: scope?.id)
     }
     fileprivate func contextSnapshot(names: [String], domain: StateDomain, scopeID: UUID?) throws
         -> StateContextSnapshot
     {
-        guard names.count <= 32, Set(names).count == names.count else { throw StateError.capacityExceeded }
-        return try state.withLock { state in
-            guard !state.closed else { throw StateError.closed }
-            if let scopeID { guard state.scopes[scopeID] == domain else { throw StateError.closed } }
-            var fields: [String: Any] = [:]
-            for name in names {
-                guard let kind = state.declarations[name] else { throw StateError.missing }
-                let selected: StateDomain = kind == .application ? .application : domain
-                guard selected.kind == kind else { throw StateError.missing }
-                guard
-                    let entry = state.entries.first(where: {
-                        $0.key.name == name && state.scopes[$0.key.scope] == selected
-                    })?.value
-                else { throw StateError.missing }
-                guard entry.valid else { throw StateError.invalidPublication }
-                fields[name] = try JSONSerialization.jsonObject(with: entry.encoded, options: [.fragmentsAllowed])
+        do {
+            guard names.count <= 32, Set(names).count == names.count else { throw StateError.capacityExceeded }
+            return try state.withLock { state in
+                guard !state.closed else { throw StateError.closed }
+                if let scopeID { guard state.scopes[scopeID] == domain else { throw StateError.closed } }
+                var fields: [String: Any] = [:]
+                for name in names {
+                    guard let kind = state.declarations[name] else { throw StateError.missing }
+                    let selected: StateDomain = kind == .application ? .application : domain
+                    guard selected.kind == kind else { throw StateError.missing }
+                    guard
+                        let entry = state.entries.first(where: {
+                            $0.key.name == name && state.scopes[$0.key.scope] == selected
+                        })?.value
+                    else { throw StateError.missing }
+                    guard entry.valid else { throw StateError.invalidPublication }
+                    fields[name] = try JSONSerialization.jsonObject(with: entry.encoded, options: [.fragmentsAllowed])
+                }
+                let data = try JSONSerialization.data(
+                    withJSONObject: fields, options: [.sortedKeys, .withoutEscapingSlashes])
+                guard data.count <= 16 * 1024 else { throw StateError.capacityExceeded }
+                return StateContextSnapshot(revision: state.revision, json: String(decoding: data, as: UTF8.self))
             }
-            let data = try JSONSerialization.data(
-                withJSONObject: fields, options: [.sortedKeys, .withoutEscapingSlashes])
-            guard data.count <= 16 * 1024 else { throw StateError.capacityExceeded }
-            return StateContextSnapshot(revision: state.revision, json: String(decoding: data, as: UTF8.self))
+        } catch {
+            failures.report("state", "contextSnapshot", error)
+            throw error
         }
     }
     fileprivate func invalidate(_ token: StateToken) {

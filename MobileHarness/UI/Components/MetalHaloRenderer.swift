@@ -31,12 +31,15 @@
         static func prewarm() { DispatchQueue.global(qos: .userInteractive).async { _ = prepared } }
     }
 
-    private struct HaloControl: Sendable {
+    // Thread is only published/read under the control mutex; perform(on:) is a cross-thread wake.
+    private struct HaloControl: @unchecked Sendable {
         var motion = ListeningMotion()
         var size = SIMD2<Float>(1, 1)
         var visible = false
         var wakeQueued = false
         var stopping = false
+        var finished = false
+        var thread: Thread?
         var maximumFPS: Float = 60
     }
     private struct HaloUniforms {
@@ -56,7 +59,7 @@
         private let control = Mutex(HaloControl())
         private let slots = DispatchSemaphore(value: 3)
         private let failure: @Sendable (String) -> Void
-        private var renderThread: Thread!
+        let completion = DispatchGroup()
         // Render-thread-only fields.
         private var displayLink: CAMetalDisplayLink?
         private var stopped = false
@@ -66,10 +69,12 @@
             self.context = context
             self.failure = failure
             super.init()
-            renderThread = Thread { [self] in run() }
-            renderThread.name = "MobileHarness.CompanionMetal"
-            renderThread.qualityOfService = .userInteractive
-            renderThread.start()
+            completion.enter()
+            let thread = Thread { [self] in run() }
+            thread.name = "MobileHarness.CompanionMetal"
+            thread.qualityOfService = .userInteractive
+            control.withLock { $0.thread = thread }
+            thread.start()
         }
         func update(motion: ListeningMotion, size: CGSize, visible: Bool, maximumFPS: Int) {
             let accepted = control.withLock { state in
@@ -93,14 +98,15 @@
             scheduleRefresh()
         }
         private func scheduleRefresh() {
-            let wake = control.withLock { state in
-                guard !state.wakeQueued else { return false }
+            let thread = control.withLock { state -> Thread? in
+                guard !state.finished, !state.wakeQueued else { return nil }
                 state.wakeQueued = true
-                return true
+                return state.thread
             }
-            if wake { perform(#selector(refresh), on: renderThread, with: nil, waitUntilDone: false) }
+            if let thread { perform(#selector(refresh), on: thread, with: nil, waitUntilDone: false) }
         }
         private func run() {
+            defer { completion.leave() }
             let port = Port()
             RunLoop.current.add(port, forMode: .default)
             let link = CAMetalDisplayLink(metalLayer: metalLayer)
@@ -110,9 +116,12 @@
             displayLink = link
             link.add(to: .current, forMode: .default)
             refresh()
-            while !stopped { RunLoop.current.run(until: Date(timeIntervalSinceNow: 60)) }
+            while !stopped { CFRunLoopRun() }
             port.invalidate()
-            renderThread = nil
+            control.withLock {
+                $0.finished = true
+                $0.thread = nil
+            }
         }
         @objc private func refresh() {
             guard !stopped else { return }
@@ -125,6 +134,8 @@
                 displayLink = nil
                 // GPU completion callbacks run off this thread. Never block the UI during teardown.
                 for _ in 0..<3 { slots.wait() }
+                // Joining borrows all permits; restore them before semaphore destruction.
+                for _ in 0..<3 { slots.signal() }
                 stopped = true
                 CFRunLoopStop(CFRunLoopGetCurrent())
             } else {
@@ -149,7 +160,8 @@
             link.preferredFrameRateRange = CAFrameRateRange(
                 minimum: min(30, maximumFPS), maximum: fast ? maximumFPS : min(60, maximumFPS),
                 preferred: fast ? maximumFPS : min(60, maximumFPS))
-            guard slots.wait(timeout: .now()) == .success else { return }  // Drop this frame; never queue it.
+            guard slots.wait(timeout: .now()) == .success else { return }
+            // Drop this frame; never queue it.
             guard let command = context.queue.makeCommandBuffer() else {
                 slots.signal()
                 failure("无法创建光环渲染帧")

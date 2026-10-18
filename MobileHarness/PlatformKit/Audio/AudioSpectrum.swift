@@ -9,6 +9,16 @@ public enum AudioSpectrum {
         0.5 - 0.5 * cos(2 * Double.pi * Double(index) / Double(sampleCount - 1))
     }
 
+    /// One bounded calculation on the concurrent executor; the caller owns cancellation and joining.
+    @concurrent public static func measureOffMain(_ samples: [Float], sampleRate: Int) async throws(CancellationError)
+        -> [Float]
+    {
+        if Task.isCancelled { throw CancellationError() }
+        let result = measure(samples, sampleRate: sampleRate)
+        if Task.isCancelled { throw CancellationError() }
+        return result
+    }
+
     /// Hann-windowed radix-2 FFT; at most 2048 samples, no retained audio or asynchronous queue.
     public static func measure<C: Collection>(_ samples: C, sampleRate: Int) -> [Float] where C.Element == Float {
         guard sampleRate >= 8000, !samples.isEmpty else { return silence }

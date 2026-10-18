@@ -14,14 +14,14 @@
 
     /// Isolated capture/perception endpoint. No conversation, camera or robot consumer is registered.
     @MainActor final class AudioDetectionSession: AudioDetectionRunning {
-        private let audio: AppleAudioIO
+        private let audio: any AudioInputOutput
         private let recognition: any SpeechRecognitionCapability
         private let vad: any VoiceActivityCapability
         private let beforeStart: @MainActor () async -> Void
         private var active: AudioDetectionScope?
         init(
             recognition: any SpeechRecognitionCapability,
-            vad: any VoiceActivityCapability, audio: AppleAudioIO,
+            vad: any VoiceActivityCapability, audio: any AudioInputOutput,
             beforeStart: @escaping @MainActor () async -> Void
         ) {
             self.audio = audio
@@ -69,6 +69,7 @@
             case .invalidFormat: return AudioDetectionError.invalidFormat
             case .overflow: return AudioDetectionError.overflow
             case .busy: return AudioDetectionError.busy
+            case .interrupted: return AudioDetectionError.interrupted
             }
         }
         return error
@@ -92,7 +93,7 @@
 
     @MainActor private final class AudioDetectionScope {
         let id = UUID().uuidString
-        let audio: AppleAudioIO
+        let audio: any AudioInputOutput
         let manager = AgentManager()
         let policy: CommunicationPolicy
         let input: InputGateway
@@ -112,7 +113,7 @@
 
         init(
             recognition: any SpeechRecognitionCapability,
-            vad: any VoiceActivityCapability, audio: AppleAudioIO,
+            vad: any VoiceActivityCapability, audio: any AudioInputOutput,
             update: @escaping @MainActor @Sendable (AudioDetectionSnapshot) -> Void
         ) throws {
             self.audio = audio

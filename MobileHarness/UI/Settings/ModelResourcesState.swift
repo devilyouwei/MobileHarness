@@ -106,7 +106,8 @@ public struct ModelResourceViewSnapshot: Sendable {
 }
 public enum ModelResourceOperation: Sendable { case download, remove, cancel }
 
-@MainActor public protocol ModelResourcesControlling: AnyObject {
+@MainActor
+public protocol ModelResourcesControlling: AnyObject {
     func restore() async
     func refresh() async
     func saveSource() async
@@ -115,25 +116,33 @@ public enum ModelResourceOperation: Sendable { case download, remove, cancel }
     func perform(_ id: String, operation: ModelResourceOperation) async
 }
 
-@MainActor @Observable public final class ModelResourcesState {
-    public var source = ModelResourceSourceDraft()
-    public var items: [ModelResourceItem] = []
-    public var installedGroups: Set<ModelResourceGroup> = []
-    public var error: String? { didSet { refreshErrorGeneration = nil } }
+@MainActor
+@Observable
+public final class ModelResourcesState {
+    @ObservationIgnored var presentationAdmission: UIPresentationAdmission?
+    public var isPresentationAvailable: Bool { presentationAdmission.map { $0.started && !$0.stopped } ?? true }
+
+    public internal(set) var source = ModelResourceSourceDraft()
+    public internal(set) var items: [ModelResourceItem] = []
+    public internal(set) var installedGroups: Set<ModelResourceGroup> = []
+    public internal(set) var error: String? { didSet { refreshErrorGeneration = nil } }
     private var refreshErrorGeneration: UInt64?
-    public var saving = false
-    public var installationNotice: String?
-    public var hasRestored = false
-    public var pending: [String: ModelResourceOperation] = [:]
-    public var admitted: Set<String> = []
-    public var cancelling: Set<String> = []
+    public internal(set) var saving = false
+    public internal(set) var installationNotice: String?
+    public internal(set) var hasRestored = false
+    public internal(set) var pending: [String: ModelResourceOperation] = [:]
+    public internal(set) var admitted: Set<String> = []
+    public internal(set) var cancelling: Set<String> = []
     public private(set) var refreshGeneration: UInt64 = 0
-    @discardableResult public func beginRefresh() -> UInt64 {
+    @discardableResult
+    public func beginRefresh() -> UInt64 {
+        guard presentationAdmission?.acceptsRetained() ?? true else { return 0 }
         refreshGeneration &+= 1
         if refreshGeneration == 0 { refreshGeneration = 1 }
         return refreshGeneration
     }
     public func applySnapshot(_ snapshot: ModelResourceViewSnapshot, generation: UInt64) -> Bool {
+        guard presentationAdmission?.acceptsRetained() ?? true else { return false }
         guard generation == refreshGeneration, generation > 0 else { return false }
         items = snapshot.items
         installedGroups = snapshot.installedGroups
@@ -141,6 +150,7 @@ public enum ModelResourceOperation: Sendable { case download, remove, cancel }
         return true
     }
     public func applyRefreshFailure(_ message: String, generation: UInt64) -> Bool {
+        guard presentationAdmission?.acceptsRetained() ?? true else { return false }
         guard generation == refreshGeneration, generation > 0 else { return false }
         error = message
         refreshErrorGeneration = generation
@@ -148,10 +158,14 @@ public enum ModelResourceOperation: Sendable { case download, remove, cancel }
     }
     public init() {}
     public func presentInstallationNotice(_ message: String) {
+        guard presentationAdmission?.acceptsRetained() ?? true else { return }
         installationNotice = message
         error = nil
     }
-    public func presentOperationFailure(_ message: String) { error = message }
+    public func presentOperationFailure(_ message: String) {
+        guard presentationAdmission?.acceptsRetained() ?? true else { return }
+        error = message
+    }
 
     public func isDownloading(_ item: ModelResourceItem) -> Bool {
         pending[item.id] == .download || admitted.contains(item.id) || (item.active && item.activity != .deleting)
@@ -168,4 +182,96 @@ public enum ModelResourceOperation: Sendable { case download, remove, cancel }
         return item.status
     }
 
+    @discardableResult
+    public func present(_ update: ModelResourcesUpdate) -> Bool {
+        guard presentationAdmission?.acceptsRetained() ?? true else { return false }
+        apply(update)
+        return true
+    }
+    func apply(_ update: ModelResourcesUpdate) {
+        switch update {
+        case .sourceEndpoint(let value): source.endpoint = value
+        case .sourceAllowsCellular(let value): source.allowsCellular = value
+        case .sourceUseCustomRecognition(let value): source.useCustomRecognition = value
+        case .sourceUseCustomSynthesis(let value): source.useCustomSynthesis = value
+        case .source(let value): source = value
+        case .items(let value): items = value
+        case .installedGroups(let value): installedGroups = value
+        case .error(let value): error = value
+        case .saving(let value): saving = value
+        case .installationNotice(let value): installationNotice = value
+        case .hasRestored(let value): hasRestored = value
+        case .pending(let value): pending = value
+        case .admitted(let value): admitted = value
+        case .cancelling(let value): cancelling = value
+        }
+    }
+}
+
+public enum ModelResourcesUpdate {
+    case sourceEndpoint(String)
+    case sourceAllowsCellular(Bool)
+    case sourceUseCustomRecognition(Bool)
+    case sourceUseCustomSynthesis(Bool)
+    case source(ModelResourceSourceDraft)
+    case items([ModelResourceItem])
+    case installedGroups(Set<ModelResourceGroup>)
+    case error(String?)
+    case saving(Bool)
+    case installationNotice(String?)
+    case hasRestored(Bool)
+    case pending([String: ModelResourceOperation])
+    case admitted(Set<String>)
+    case cancelling(Set<String>)
+}
+
+@MainActor
+public protocol ModelResourcesPresenting: UIPresentationAccess {
+    var source: ModelResourceSourceDraft { get }
+    var items: [ModelResourceItem] { get }
+    var installedGroups: Set<ModelResourceGroup> { get }
+    var error: String? { get }
+    var saving: Bool { get }
+    var installationNotice: String? { get }
+    var hasRestored: Bool { get }
+    var pending: [String: ModelResourceOperation] { get }
+    var admitted: Set<String> { get }
+    var cancelling: Set<String> { get }
+    var refreshGeneration: UInt64 { get }
+    @discardableResult
+    func present(_ update: ModelResourcesUpdate) -> Bool
+    func beginRefresh() -> UInt64
+    func applySnapshot(_ snapshot: ModelResourceViewSnapshot, generation: UInt64) -> Bool
+    func applyRefreshFailure(_ message: String, generation: UInt64) -> Bool
+    func presentInstallationNotice(_ message: String)
+    func presentOperationFailure(_ message: String)
+    func isDownloading(_ item: ModelResourceItem) -> Bool
+    func isBusy(_ item: ModelResourceItem) -> Bool
+    func isCancelling(_ id: String) -> Bool
+    func status(_ item: ModelResourceItem) -> String
+}
+
+extension ModelResourcesState: ModelResourcesPresenting {}
+
+@MainActor
+public protocol ModelResourcesOperating: AnyObject {
+    func refresh(generation: UInt64?) async throws -> ModelResourceViewSnapshot
+    func restoreSource() async throws -> ModelResourceSourceDraft
+    func saveSource(_ source: ModelResourceSourceDraft) async throws
+    func download(_ id: String) async throws
+    func cancel(_ id: String) async throws
+    func remove(_ id: String) async throws
+}
+
+public struct ModelResourceSelectionError: LocalizedError, Sendable {
+    public let group: ModelResourceGroup
+    public init(group: ModelResourceGroup) { self.group = group }
+    public var errorDescription: String? { group.installationMessage }
+}
+
+@MainActor
+public final class UIModelResourcesContainer {
+    public let state = ModelResourcesState()
+    public var presentation: any ModelResourcesPresenting { state }
+    init(admission: UIPresentationAdmission) { state.presentationAdmission = admission }
 }

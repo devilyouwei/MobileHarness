@@ -1,6 +1,7 @@
 import Foundation
 import Testing
-import UI
+
+@testable import UI
 
 @Test func finalTranscriptPromotesTheCompleteRecognitionEvenDuringSuffixFade() {
     let recognized = "把摄像头关了。"

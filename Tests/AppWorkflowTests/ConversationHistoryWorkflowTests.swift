@@ -9,7 +9,8 @@ import PlatformKit
 import StorageChat
 import StorageCore
 import Testing
-import UI
+
+@testable import UI
 
 private func archivePagingFixture(_ number: Int) throws -> HistoryConversation {
     try JSONDecoder().decode(

@@ -57,3 +57,11 @@ Signal 默认没有过期时间；通信授权不附加隐式 TTL。实时感知
 ## 动态订阅边界
 
 ✅ Gateway 在不可变 CommunicationPolicy 的 schema/来源权限之上增加宿主控制的有界动态订阅；Core 不拥有运行时订阅表，动态关系不得扩展目标输入或发布者权限。
+
+## 统一容器异常通道
+
+✅ container.failure 是中立标准 observation，来源 runtime，严格验证事件身份/组件/操作/代码/内容/次数。它是外部技术事实，不获得 runtime feedback、Task 或执行授权。
+
+## ApplicationControl 异常展示
+
+✅ 标准注册表包含 runtime.failure（16 KiB）与 container.failure（8 KiB）的 observation 类型验证。发布者身份由外部接纳验证；这些事实不代表 ActionResult，不启动新业务执行作用域。

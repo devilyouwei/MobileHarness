@@ -34,6 +34,9 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
     private var resultInbox = ActionResultInbox()
     private let continuation: AsyncStream<OutputEnvelope>.Continuation
     private let communicationReceipts = CommunicationReceipts()
+    private var containerFailures: [ContainerFailureEvent] = []
+    public private(set) var containerFailureEvictions: UInt64 = 0
+    public func receivedContainerFailures() -> [ContainerFailureEvent] { containerFailures }
     private var lifecycle: AgentLifecycle = .registered
     private var queue: SignalInbox
     private var admitting = 0
@@ -362,6 +365,28 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
     }
 
     private func receiveSignal(_ input: AgentInput) async throws {
+        if case .observation(let message) = input.payload, message.contract == ContainerFailureEvent.contract {
+            guard lifecycle == .running || lifecycle == .paused else { throw HarnessError.notRunning }
+            guard input.metadata.origin == .external, input.metadata.incarnation == nil, input.taskScope == nil,
+                input.metadata.source == ContainerFailureEvent.source,
+                communicationPolicy.inputs.contains(where: { $0.contract == ContainerFailureEvent.contract }),
+                let failure = message.content(as: ContainerFailureEvent.self)
+            else { throw CommunicationError.unauthorized }
+            try failure.validate()
+            guard !input.metadata.expired else { throw CommunicationError.expired }
+            if let index = containerFailures.firstIndex(where: { $0.id == failure.id && $0.scopeID == failure.scopeID })
+            {
+                if failure.occurrences >= containerFailures[index].occurrences { containerFailures[index] = failure }
+            } else {
+                if containerFailures.count == 128 {
+                    containerFailures.removeFirst()
+                    containerFailureEvictions &+= 1
+                }
+                containerFailures.append(failure)
+            }
+            // Diagnostics must remain available when persistence or the model itself has failed.
+            return
+        }
         if case .communicationReceipt(let receipt) = input.payload {
             guard input.metadata.origin == .runtime, receipt.owner.agent == descriptor.id,
                 receipt.owner.sessionID == input.sessionID

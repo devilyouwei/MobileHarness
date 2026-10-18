@@ -192,13 +192,18 @@ public actor NexArmBluetooth: NexArmBluetoothLink, NexArmObservableLink {
     private let admission: PlatformAdmission?
     private let initialSnapshot = NexArmBluetoothSnapshot()
     private func native() throws -> Task<NexArmBLEDriver, Never> {
-        try admission?.check()
-        if let driver { return driver }
-        let continuation = continuation
-        let admission = admission
-        let value = Task { @MainActor in NexArmBLEDriver(updates: continuation, admission: admission) }
-        driver = value
-        return value
+        do {
+            try admission?.check()
+            if let driver { return driver }
+            let continuation = continuation
+            let admission = admission
+            let value = Task { @MainActor in NexArmBLEDriver(updates: continuation, admission: admission) }
+            driver = value
+            return value
+        } catch {
+            admission?.report("connectivity.bluetooth", "native", error)
+            throw error
+        }
     }
     public init(admission: PlatformAdmission? = nil) {
         self.admission = admission
@@ -206,12 +211,29 @@ public actor NexArmBluetooth: NexArmBluetoothLink, NexArmObservableLink {
         updates = pair.stream
         continuation = pair.continuation
     }
-    public func beginObservation() async throws -> String { try await native().value.beginObservation() }
+    public func beginObservation() async throws -> String {
+        do {
+            return try await native().value.beginObservation()
+        } catch {
+            admission?.report("connectivity.bluetooth", "beginObservation", error)
+            throw error
+        }
+    }
     public func sendObserved(_ packet: NexArmPacket, session: String) async throws -> Bool {
-        try await native().value.sendObserved(packet, session: session)
+        do {
+            return try await native().value.sendObserved(packet, session: session)
+        } catch {
+            admission?.report("connectivity.bluetooth", "sendObserved", error)
+            throw error
+        }
     }
     public func latestObservation(after sequence: UInt64, session: String) async throws -> NexArmTelemetry? {
-        try await native().value.latestObservation(after: sequence, session: session)
+        do {
+            return try await native().value.latestObservation(after: sequence, session: session)
+        } catch {
+            admission?.report("connectivity.bluetooth", "latestObservation", error)
+            throw error
+        }
     }
     public func endObservation(_ session: String) async { await driver?.value.endObservation(session) }
     public func status() async -> NexArmBluetoothSnapshot {
@@ -221,23 +243,69 @@ public actor NexArmBluetooth: NexArmBluetoothLink, NexArmObservableLink {
     public func currentStatus() async -> NexArmBluetoothSnapshot {
         await driver?.value.status() ?? initialSnapshot
     }
-    public func scan() async throws { try await native().value.scan() }
+    public func scan() async throws {
+        do {
+            try await native().value.scan()
+        } catch {
+            admission?.report("connectivity.bluetooth", "scan", error)
+            throw error
+        }
+    }
     public func stopScan() async { await driver?.value.stopScan() }
-    public func beginLiveControl() async throws -> String { try await native().value.beginLiveControl() }
+    public func beginLiveControl() async throws -> String {
+        do {
+            return try await native().value.beginLiveControl()
+        } catch {
+            admission?.report("connectivity.bluetooth", "beginLiveControl", error)
+            throw error
+        }
+    }
     public func sendLive(_ packet: NexArmPacket, session: String) async throws -> Bool {
-        try await native().value.sendLive(packet, session: session)
+        do {
+            return try await native().value.sendLive(packet, session: session)
+        } catch {
+            admission?.report("connectivity.bluetooth", "sendLive", error)
+            throw error
+        }
     }
     public func endLiveControl(_ session: String) async { await driver?.value.endLiveControl(session) }
     public func clearDiscovery() async { await driver?.value.clearDiscovery() }
-    public func forgetDevice() async throws { try await native().value.forgetDevice() }
-    public func connect(_ id: String) async throws { try await native().value.connect(id) }
+    public func forgetDevice() async throws {
+        do {
+            try await native().value.forgetDevice()
+        } catch {
+            admission?.report("connectivity.bluetooth", "forgetDevice", error)
+            throw error
+        }
+    }
+    public func connect(_ id: String) async throws {
+        do {
+            try await native().value.connect(id)
+        } catch {
+            admission?.report("connectivity.bluetooth", "connect", error)
+            throw error
+        }
+    }
     public func disconnect() async { await driver?.value.disconnect() }
     public func close() async { await disconnect() }
-    public func write(_ packet: NexArmPacket) async throws { try await native().value.write(packet) }
+    public func write(_ packet: NexArmPacket) async throws {
+        do {
+            try await native().value.write(packet)
+        } catch {
+            admission?.report("connectivity.bluetooth", "write", error)
+            throw error
+        }
+    }
     public func exchange(_ packet: NexArmPacket, replyID: UInt8, replyCommand: UInt8, replyCount: Int) async throws
         -> NexArmPacket
     {
-        try await native().value.exchange(packet, replyID: replyID, replyCommand: replyCommand, replyCount: replyCount)
+        do {
+            return try await native().value.exchange(
+                packet, replyID: replyID, replyCommand: replyCommand, replyCount: replyCount)
+        } catch {
+            admission?.report("connectivity.bluetooth", "exchange", error)
+            throw error
+        }
     }
 }
 
@@ -245,7 +313,7 @@ public actor NexArmBluetooth: NexArmBluetoothLink, NexArmObservableLink {
 public enum NexArmBluetoothStep: String, Sendable, Equatable {
     case connecting, services, characteristics, notifications, writing, response
 }
-public enum NexArmBluetoothFailure: Sendable, Equatable {
+public enum NexArmBluetoothFailure: Error, Sendable, Equatable {
     public enum ProtocolViolation: Sendable, Equatable { case invalidPacket, receiveOverflow }
     case protocolViolation(ProtocolViolation)
     case timeout(NexArmBluetoothStep)
@@ -375,7 +443,12 @@ private final class NexArmBLEDriver: NSObject, @preconcurrency CBCentralManagerD
         publish()
     }
     // Replace only presentation snapshots, never commands/results.
+    private var reportedFailure: NexArmBluetoothFailure?
     private func publish() {
+        if let failure = snapshot.failure, failure != reportedFailure {
+            admission?.report("connectivity.bluetooth", "nativeEvent", failure)
+        }
+        reportedFailure = snapshot.failure
         snapshot.revision &+= 1
         snapshot.queriesQuarantined = queryTimeoutLatched
         snapshot.traffic = trafficBudget.diagnostics()

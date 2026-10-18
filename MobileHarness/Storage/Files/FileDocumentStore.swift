@@ -62,18 +62,28 @@ public actor FileDocumentStore<Value: Codable & Sendable>: DocumentStore {
     func close() { access.close() }
 
     public func load() throws -> DocumentSnapshot<Value>? {
-        try access.check()
-        if loaded { return cached }
-        return try refresh()
+        do {
+            try access.check()
+            if loaded { return cached }
+            return try refresh()
+        } catch {
+            access.failures.report("files.document", "load", error)
+            throw error
+        }
     }
 
     /// Disk wins on explicit refresh; a failed read never replaces the last valid cache.
     public func refresh() throws -> DocumentSnapshot<Value>? {
-        try access.check()
-        let result = try DocumentFileAccess.withLock(for: url) { try readDisk() }
-        cached = result
-        loaded = true
-        return result
+        do {
+            try access.check()
+            let result = try DocumentFileAccess.withLock(for: url) { try readDisk() }
+            cached = result
+            loaded = true
+            return result
+        } catch {
+            access.failures.report("files.document", "refresh", error)
+            throw error
+        }
     }
 
     public func invalidate() {
@@ -84,61 +94,81 @@ public actor FileDocumentStore<Value: Codable & Sendable>: DocumentStore {
     /// nil expects an absent file. Stale revisions fail instead of overwriting another writer.
     @discardableResult
     public func save(_ value: Value, expecting revision: UUID?) throws -> DocumentSnapshot<Value> {
-        try access.check()
-        let next = DocumentSnapshot(revision: UUID(), value: value)
-        let data = try JSONEncoder().encode(Envelope(version: 1, revision: next.revision, value: value))
-        guard data.count <= maximumBytes else { throw DocumentStorageError.capacityExceeded }
-        try DocumentFileAccess.withLock(for: url) {
-            guard try readDisk()?.revision == revision else { throw DocumentStorageError.conflict }
-            try writeDisk(data)
+        do {
+            try access.check()
+            let next = DocumentSnapshot(revision: UUID(), value: value)
+            let data = try JSONEncoder().encode(Envelope(version: 1, revision: next.revision, value: value))
+            guard data.count <= maximumBytes else { throw DocumentStorageError.capacityExceeded }
+            try DocumentFileAccess.withLock(for: url) {
+                guard try readDisk()?.revision == revision else { throw DocumentStorageError.conflict }
+                try writeDisk(data)
+            }
+            cached = next
+            loaded = true
+            return next
+        } catch {
+            access.failures.report("files.document", "save", error)
+            throw error
         }
-        cached = next
-        loaded = true
-        return next
     }
 
     /// Explicit last-writer-wins replacement for an authoritative single-owner snapshot.
     /// Read/modify/write consumers must continue to use save(_:expecting:).
     @discardableResult
     public func replace(_ value: Value) throws -> DocumentSnapshot<Value> {
-        try access.check()
-        let next = DocumentSnapshot(revision: UUID(), value: value)
-        let data = try JSONEncoder().encode(Envelope(version: 1, revision: next.revision, value: value))
-        guard data.count <= maximumBytes else { throw DocumentStorageError.capacityExceeded }
-        try DocumentFileAccess.withLock(for: url) { try writeDisk(data) }
-        cached = next
-        loaded = true
-        return next
+        do {
+            try access.check()
+            let next = DocumentSnapshot(revision: UUID(), value: value)
+            let data = try JSONEncoder().encode(Envelope(version: 1, revision: next.revision, value: value))
+            guard data.count <= maximumBytes else { throw DocumentStorageError.capacityExceeded }
+            try DocumentFileAccess.withLock(for: url) { try writeDisk(data) }
+            cached = next
+            loaded = true
+            return next
+        } catch {
+            access.failures.report("files.document", "replace", error)
+            throw error
+        }
     }
     private func writeDisk(_ data: Data) throws {
-        try FileManager.default.createDirectory(
-            at: url.deletingLastPathComponent(), withIntermediateDirectories: true,
-            attributes: [.posixPermissions: 0o700])
-        #if os(iOS)
-            let protectionOption: Data.WritingOptions =
-                protection == .afterFirstUnlock
-                ? .completeFileProtectionUntilFirstUserAuthentication : .completeFileProtection
-            try data.write(to: url, options: [.atomic, protectionOption])
-        #else
-            try data.write(to: url, options: .atomic)
-        #endif
+        do {
+            try FileManager.default.createDirectory(
+                at: url.deletingLastPathComponent(), withIntermediateDirectories: true,
+                attributes: [.posixPermissions: 0o700])
+            #if os(iOS)
+                let protectionOption: Data.WritingOptions =
+                    protection == .afterFirstUnlock
+                    ? .completeFileProtectionUntilFirstUserAuthentication : .completeFileProtection
+                try data.write(to: url, options: [.atomic, protectionOption])
+            #else
+                try data.write(to: url, options: .atomic)
+            #endif
+        } catch {
+            access.failures.report("files.document", "writeDisk", error)
+            throw error
+        }
     }
 
     private func readDisk() throws -> DocumentSnapshot<Value>? {
         do {
-            let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
-            guard attributes[.type] as? FileAttributeType == .typeRegular else {
-                throw DocumentStorageError.invalidFile
+            do {
+                let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
+                guard attributes[.type] as? FileAttributeType == .typeRegular else {
+                    throw DocumentStorageError.invalidFile
+                }
+                let file = try FileHandle(forReadingFrom: url)
+                defer { try? file.close() }
+                let data = try file.read(upToCount: maximumBytes + 1) ?? Data()
+                guard data.count <= maximumBytes else { throw DocumentStorageError.capacityExceeded }
+                let envelope = try JSONDecoder().decode(Envelope.self, from: data)
+                guard envelope.version == 1 else { throw DocumentStorageError.unsupportedVersion }
+                return DocumentSnapshot(revision: envelope.revision, value: envelope.value)
+            } catch let error as CocoaError where error.code == .fileReadNoSuchFile || error.code == .fileNoSuchFile {
+                return nil
             }
-            let file = try FileHandle(forReadingFrom: url)
-            defer { try? file.close() }
-            let data = try file.read(upToCount: maximumBytes + 1) ?? Data()
-            guard data.count <= maximumBytes else { throw DocumentStorageError.capacityExceeded }
-            let envelope = try JSONDecoder().decode(Envelope.self, from: data)
-            guard envelope.version == 1 else { throw DocumentStorageError.unsupportedVersion }
-            return DocumentSnapshot(revision: envelope.revision, value: envelope.value)
-        } catch let error as CocoaError where error.code == .fileReadNoSuchFile || error.code == .fileNoSuchFile {
-            return nil
+        } catch {
+            access.failures.report("files.document", "readDisk", error)
+            throw error
         }
     }
 }

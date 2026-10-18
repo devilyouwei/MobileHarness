@@ -137,3 +137,15 @@ Root UI bootstrap 只调用注入的生命周期启动端口；根服务开始�
 ## 外部输入封装边界
 
 ✅ 业务输入工厂实现 ExternalInputProviding，返回中立草稿；Gateway 负责信封，Agents 不导入 Gateway。可信固定任务解包保留原身份与授权。AgentBindings 的宿主控制和文字轮次也使用 Gateway 接入。
+
+## 统一容器异常通道
+
+✅ Assistant 声明 container.failure/runtime 输入与订阅，保持基础错误为被动诊断；不触发模型、自动重试或硬件操作。ApplicationControl 订阅相同通道并组织既有运行异常/toast，Agent 暂未运行时由 Gateway 有界保留；已有 ActionResult/模型诊断保持自己的完成语义。
+
+## ApplicationControl 异常展示
+
+✅ 已实现：异常展示链路调整为：Gateway Signal → ApplicationControl 确定性策略 → 内部 UI.RuntimeDiagnostics.recordFailure → UI 运行异常/Toast。移除绑定层直接监听容器异常生成展示的旧链路；Assistant 保留可选被动诊断，App 保留启动失败兜底。容器原始抛错及模块组合装配本轮不变。
+
+## UI 全量容器化
+
+✅ 应用级 UI 状态由八个子容器统一创建，消费者注入所需 Presenting 接口并提交 UI 自有值，不直接写字段。App 注册并管理同一 UI 根；原业务身份/版本校验、原生完成和基础库依赖边界保持。跨模块连接迁移仍是独立待办。

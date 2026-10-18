@@ -2,6 +2,51 @@
 
 Each dated section is an independent hardware experiment with its own transport, configuration, observations and limits. This report includes September controller trials and October serial/decoder investigations; no single section defines the current implementation or proves iPhone BLE acceptance. Current contracts belong to module READMEs; raw samples are indexed in [measurements](../measurements/README.md).
 
+## 2026-10-18 — Replacement joint 3 responds to joint 1 commands
+
+The user reported that the replacement servo installed at joint 3 responds to joint 1 commands. The replacement model and whether the original ID1 servo remains connected were not confirmed during this read-only investigation.
+
+✅ Source review found direct addressing in `NexArmMotorCommands.move` (`id: UInt8(motor)`) and synchronous commands retaining each atom's ID. The arm joint planner uses sequential motor IDs; no joint 1/3 remapping was found in these paths. No application source or hardware configuration was changed.
+
+✅ Opened `/dev/cu.usbserial-110` exclusively at 1 Mbps/8N1. Captured two seconds passively, sent one system CMD1 version request with a 1.5-second capture, then one system CMD11 pose request with a two-second capture. The 975 received bytes contained 29 checksum-valid frames: 28 CMD11/ID255/24-byte telemetry frames and one version frame reporting ESP32 1.0.2 / AT32 1.0.2. Every telemetry frame reported joint values `[2048,1024,3072,2048,2048,2048]`. The serial descriptor closed after the bounded trial. No movement, torque, mode, calibration, ID or other configuration write was sent.
+
+The leading hypothesis is a replacement servo retaining ID1, based on the user's observed command response and the [manufacturer's HX-65HM specification](https://www.hiwonder.com/products/hx-65hm), which states a default ID of 1. The [NexArm protocol](https://wiki.hiwonder.com/projects/NexArm/en/esp32-version/docs/3_Motion_Control.html) addresses individual servos by IDs 1–6. The replacement model remains unconfirmed, so its specific register/configuration procedure must be checked before writing.
+
+❌ Aggregate feedback does not establish the replacement's individual ID, prove all six servos are present or exclude duplicate IDs. No independent ID read, isolated-servo configuration, persistence check, mechanical alignment or physical movement acceptance was performed. Before changing a suspected duplicate ID1 to ID3, power down, support the arm and isolate the replacement on the bus so the original ID1 cannot receive the same configuration write. After an isolated ID change, verify readback/persistence and installation alignment before supervised motion; an application ID remap would not resolve duplicate hardware addresses.
+
+Ephemeral raw evidence: `/tmp/mobileharness-nexarm-replacement-audit-20261018.json` contains each phase's transmitted read request, raw received bytes, checksum-valid frames and decoded joints. Full application tests/builds and native UI acceptance were not run for this read-only diagnostic.
+
+### Follow-up — authorized shared ID change attempt
+
+The user subsequently identified the replacement as HX-30HM and explicitly requested changing both currently addressed ID1 servos to ID3 as the first stage of a recovery sequence. The proposed later stages are to power down and disconnect the replacement completely, restore the remaining original servo from ID3 to ID1, then reconnect the replacement while powered down. This supersedes the earlier isolation-only recommendation for this user-authorized sequence; it does not establish that either servo has changed ID. No motion is appropriate during the temporary duplicate-ID state.
+
+The official [HX-30HM protocol](https://github.com/Hiwonder-official/hiwonder-servo-sdk/blob/main/docs/protocol_en.md) and [register table](https://github.com/Hiwonder-official/hiwonder-servo-sdk/blob/main/docs/register_table_en.md) were consulted: ID is register 0x05; NVS writes require unlocking 0x37 and relocking afterward. These references describe servo firmware 2.43; the connected servos' own firmware and the controller's configuration forwarding/readback remain unverified. At execution preflight, `/dev/cu.usbserial-110` no longer existed and no USB callout or USB tty device was present; only debug-console and Bluetooth-Incoming-Port callout devices were listed. No serial device was opened and no unlock, ID write, relock or motion packet was transmitted. Reconnection is required before further hardware work.
+
+✅ Following the user's reconnection confirmation, `/dev/cu.usbserial-110` was opened exclusively at 1 Mbps/8N1 for a bounded approximately ten-second session. CMD1 verified ESP32/AT32 1.0.2 again. Read-only ID-register queries to IDs 1 and 3 returned controller debug receipts and aggregate telemetry, but no direct servo response. The authorized first-stage configuration sent exactly these four writes, once each:
+
+| Purpose | Exact packet |
+| --- | --- |
+| Unlock ID1 NVS (0x37 = 0) | `FF FF 01 04 03 37 00 C0` |
+| Change addressed ID1 to ID3 (0x05 = 3) | `FF FF 01 04 03 05 03 EF` |
+| Restore lock at possible new ID3 (0x37 = 1) | `FF FF 03 04 03 37 01 BD` |
+| Restore lock at possible unchanged ID1 (0x37 = 1) | `FF FF 01 04 03 37 01 BF` |
+
+All four native writes completed in full and controller debug text acknowledged parsing the addressed CMD3/length4 requests. Post-write ID-register queries to IDs 3 and 1 again produced no direct servo response. Aggregate telemetry remained `[2048,1024,3072,2048,2048,2048]` throughout, including the final CMD11 query; it does not verify configuration or identify either physical servo. No movement, torque, mode, calibration, broadcast configuration, automatic ID-change retry or second-stage ID3-to-ID1 write was sent. Serial closed normally.
+
+❌ Individual servo forwarding, successful ID changes on either/both servos, successful relocking and persistence remain unverified. Controller parsing is not a servo configuration acknowledgment; absent readback does not establish success or failure. The next user-supervised stage requires power off/USB disconnection and complete bus isolation of the replacement before any attempt to restore the original servo to ID1. No motion should be issued while duplicate IDs or partial configuration remain possible.
+
+Ephemeral raw evidence: `/tmp/mobileharness-nexarm-id1-to-id3-20261018-053304.json` records every transmitted packet, phase capture, decoded frame, native write length and verification limit. Only this validation document changed; documentation diff formatting passed. Application tests/builds, physical movement and persistence acceptance were not run.
+
+### Follow-up — restore the original servo after replacement isolation
+
+The user reported testing and observing that both physical servos now respond as ID3, then explicitly confirmed disconnecting the replacement and restarting the arm. This is user-observed evidence of the first-stage ID change, separate from the serial trial's unavailable independent ID readback. The user's test method and individual persistence measurements were not recorded.
+
+✅ With the replacement disconnected as confirmed by the user, an exclusive approximately ten-second serial session at `/dev/cu.usbserial-110`, 1 Mbps/8N1, verified ESP32/AT32 1.0.2. Exactly four configuration packets were sent, once each: unlock ID3 `FF FF 03 04 03 37 00 BE`, ID3-to-ID1 `FF FF 03 04 03 05 01 EF`, relock possible new ID1 `FF FF 01 04 03 37 01 BF`, and relock possible unchanged ID3 `FF FF 03 04 03 37 01 BD`. Every native write completed in full; controller debug text confirmed parsing each addressed CMD3/length4 request. No movement, torque, broadcast configuration, calibration or repeated ID-change write was sent. Serial closed normally.
+
+❌ Before/after ID-register reads to IDs 1 and 3 produced no independent servo responses. Aggregate telemetry stayed `[2048,1024,3072,2048,2048,2048]`; this does not verify the original servo's restored ID, NVS lock or persistence. Final user verification after powered-down reconnection of the replacement remains pending. No further hardware writes or wiring changes were performed automatically.
+
+Ephemeral evidence: `/tmp/mobileharness-nexarm-id3-to-id1-20261018-053619.json` contains phase-by-phase raw captures, exact packets and full native write lengths. Documentation diff formatting passed; application tests/builds and final physical acceptance were not run for this hardware configuration stage.
+
 ## Historical controller acceptance — 2026-09-30
 
 This is real hardware evidence, not a simulator result. Port `/dev/cu.usbserial-110`, serial1Mbps, strict firmware compatibility verified by the shared controller. The user explicitly authorized Mac serial action debugging. USB and iPhone BLE run the same `NexArmController.performGesture` code with different `NexArmWritableLink` implementations.

@@ -4,6 +4,10 @@ import Testing
 
 @testable import UI
 
+#if os(iOS)
+    import QuartzCore
+#endif
+
 @MainActor private func frame(_ sequence: UInt64, age: Duration = .zero) throws -> CameraVideoFrame {
     var buffer: CVPixelBuffer?
     #expect(CVPixelBufferCreate(nil, 8, 8, kCVPixelFormatType_32BGRA, nil, &buffer) == kCVReturnSuccess)
@@ -327,3 +331,82 @@ import Testing
     #expect(throws: UIContainerError.unavailable) { try presentation.presentVideo(video) }
     await root.stop()
 }
+
+@Test @MainActor func cameraRenewedFrameSurvivesThePreviousDeadline() async throws {
+    let state = CameraState()
+    try state.presentVideo(frame(1, age: .milliseconds(650)))
+    // Allow the first sleep to begin before extending it with a fresh frame.
+    await Task.yield()
+    try state.presentVideo(frame(2))
+    try await Task.sleep(for: .milliseconds(180))
+    #expect(state.videoFrame?.sequence == 2)
+    // The replacement still expires from its own capture time, not from the old wake.
+    let deadline = ContinuousClock.now + .seconds(1)
+    while state.videoFrame != nil, ContinuousClock.now < deadline { try await Task.sleep(for: .milliseconds(10)) }
+    #expect(state.videoFrame == nil)
+    await state.stopPresentation()
+}
+
+@Test @MainActor func cameraEarlierCaptureDeadlineReplacesThePendingSleep() async throws {
+    let state = CameraState()
+    try state.presentVideo(frame(1))
+    await Task.yield()
+    // Sequence admission is independent of capture timestamp ordering.
+    try state.presentVideo(frame(2, age: .milliseconds(700)))
+    try await awaitCameraState { state.videoFrame == nil }
+    await state.stopPresentation()
+}
+
+@Test @MainActor func cameraClearedDeadlineCannotExpireAReplacementSession() async throws {
+    let state = CameraState()
+    try state.presentVideo(frame(1, age: .milliseconds(650)))
+    await Task.yield()
+    state.present(.isVisible(false))
+    try state.presentVideo(frame(1))
+    try state.present(frame: frame(1), pose: PoseOverlay(sequence: 1, timestamp: 0, rotation: 0, people: []))
+    try await Task.sleep(for: .milliseconds(180))
+    #expect(state.videoFrame?.sequence == 1)
+    #expect(state.skeleton?.sequence == 1)
+    await state.stopPresentation()
+    await state.stopPresentation()
+    #expect(state.videoFrame == nil)
+    #expect(state.skeleton == nil)
+}
+
+@Test @MainActor func cameraDeadlineDoesNotRetainItsPresentationOwner() throws {
+    weak var released: CameraState?
+    do {
+        let state = CameraState()
+        released = state
+        try state.presentVideo(frame(1))
+        try state.present(frame: frame(1), pose: PoseOverlay(sequence: 1, timestamp: 0, rotation: 0, people: []))
+    }
+    #expect(released == nil)
+}
+
+#if os(iOS)
+    @Test @MainActor func haloStopJoinsWithoutFramesAndReleasesTheRenderer() async throws {
+        let context = try await Task.detached { try HaloPipeline.prepared.get() }.value
+        for _ in 0..<3 {
+            let layer = CAMetalLayer()
+            layer.device = context.device
+            weak var released: MetalHaloRenderer?
+            let completion: DispatchGroup
+            do {
+                let renderer = MetalHaloRenderer(layer: layer, context: context, failure: { _ in })
+                released = renderer
+                completion = renderer.completion
+                renderer.stop()
+                renderer.stop()
+            }
+            let deadline = ContinuousClock.now + .seconds(3)
+            while completion.wait(timeout: .now()) != .success, ContinuousClock.now < deadline {
+                try await Task.sleep(for: .milliseconds(10))
+            }
+            #expect(completion.wait(timeout: .now()) == .success)
+            // Completion leaves immediately before the thread releases its last owner.
+            while released != nil, ContinuousClock.now < deadline { try await Task.sleep(for: .milliseconds(10)) }
+            #expect(released == nil)
+        }
+    }
+#endif

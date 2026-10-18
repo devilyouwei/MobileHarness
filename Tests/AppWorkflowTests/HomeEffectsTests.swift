@@ -8,7 +8,8 @@ import Gateway
 import PlatformKit
 import StorageCore
 import Testing
-import UI
+
+@testable import UI
 
 private func homeEffectInput(session: String = UUID().uuidString) -> FunctionInvocation {
     .init(

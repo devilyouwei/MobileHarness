@@ -29,3 +29,7 @@ observe 返回 AsyncThrowingStream，初始通知和后续通知使用 buffering
 ❌ 完整写入源治理、Trigger 与更多事实注册由后续需求处理。本模块不增加业务状态机或设备锁。
 
 [Storage](../README.md) · [Skill 读取规范](../../Resources/Skills/README.md)
+
+## 统一容器异常通道
+
+✅ StateContainer 的失败端口与公开操作一起注入；验证、状态注册、读写及快照错误在离开锁后原样抛出并报告。StateScope/Reader/Writer 仍经同一拥有者，错误不会触发再次 State 写入。

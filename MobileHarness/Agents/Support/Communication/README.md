@@ -83,3 +83,7 @@ ListeningIntent accepts optional explicit enabled consent; absence retains the e
 ## 外部输入草稿
 
 ✅ ApplicationSignals、ProviderIntents、PhotographerCameraIntent、ModelResourceSignals、AgentContracts、AgentTasks 的宿主输入实现 ExternalInputProviding，提供草稿，不创建 AgentInput/InputMetadata。Gateway 通用 input 扩展保留调用方式、请求身份及因果；AgentFixedTaskInput 可信解包不作为外部输入重封装。
+
+## ApplicationControl 异常展示
+
+✅ 已实现：ApplicationControlIntentRuntime 根启动时接通角色及输出消费者，允许无请求等待者的 container.failure/runtime.failure 内部呈现；呈现传输失败保留有界详情，不终止无关业务或递归提示。

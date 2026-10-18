@@ -8,6 +8,8 @@
 
     /// Audio-only hardware backend. Session graph and shutdown are actor serialized.
     actor SpatialAudioCapture {
+        private let admission: PlatformAdmission?
+        init(admission: PlatformAdmission? = nil) { self.admission = admission }
         private let session = AVCaptureSession()
         private let callbackQueue = DispatchQueue(label: "dev.mobileharness.audio.spatial")
         private var receiver: SpatialAudioReceiver?
@@ -39,11 +41,12 @@
             let pair = AsyncThrowingStream<MicrophoneFrame, Error>.makeStream(bufferingPolicy: .bufferingOldest(64))
             let readiness = AudioCaptureReadiness()
             let receiver = SpatialAudioReceiver(
-                continuation: pair.continuation, readiness: readiness, observation: observation)
+                continuation: pair.continuation, readiness: readiness, observation: observation, admission: admission)
             self.receiver = receiver
             output.setSampleBufferDelegate(receiver, queue: callbackQueue)
             self.observation = SpatialAudioObservation(
-                session: session, continuation: pair.continuation, readiness: readiness, observation: observation)
+                session: session, continuation: pair.continuation, readiness: readiness, observation: observation,
+                admission: admission)
             session.commitConfiguration()
             session.startRunning()
             guard session.isRunning, !session.isInterrupted else {
@@ -77,7 +80,8 @@
         private static let log = Logger(subsystem: "dev.mobileharness", category: "AudioCapture")
         init(
             session: AVCaptureSession, continuation: AsyncThrowingStream<MicrophoneFrame, Error>.Continuation,
-            readiness: AudioCaptureReadiness, observation: NativeInputSession<MicrophoneFrame>
+            readiness: AudioCaptureReadiness, observation: NativeInputSession<MicrophoneFrame>,
+            admission: PlatformAdmission?
         ) {
             tokens = [
                 NotificationCenter.default.addObserver(
@@ -87,6 +91,7 @@
                     Self.log.error(
                         "Spatial capture runtime error: domain=\(error?.domain ?? "unknown", privacy: .public), code=\(error?.code ?? 0, privacy: .public)"
                     )
+                    admission?.report("audio.spatial", "nativeEvent", AudioIOError.invalidFormat)
                     readiness.resolve(.failure(AudioIOError.invalidFormat))
                     observation.finish(throwing: AudioIOError.invalidFormat)
                     continuation.finish(throwing: AudioIOError.invalidFormat)
@@ -96,6 +101,7 @@
                 ) { notification in
                     let reason = notification.userInfo?[AVCaptureSessionInterruptionReasonKey] as? NSNumber
                     Self.log.error("Spatial capture interrupted: reason=\(reason?.intValue ?? 0, privacy: .public)")
+                    admission?.report("audio.spatial", "nativeEvent", AudioIOError.invalidFormat)
                     readiness.resolve(.failure(AudioIOError.invalidFormat))
                     observation.finish(throwing: AudioIOError.invalidFormat)
                     continuation.finish(throwing: AudioIOError.invalidFormat)
@@ -110,21 +116,25 @@
         let continuation: AsyncThrowingStream<MicrophoneFrame, Error>.Continuation
         let readiness: AudioCaptureReadiness
         private let observation: NativeInputSession<MicrophoneFrame>
+        private let admission: PlatformAdmission?
         private let sequence = Mutex<UInt64>(0)
         private let timeline = Mutex(AudioPCMContinuity())
         private let reported = Mutex((format: false, failure: false))
         private let log = Logger(subsystem: "dev.mobileharness", category: "AudioCapture")
         init(
             continuation: AsyncThrowingStream<MicrophoneFrame, Error>.Continuation,
-            readiness: AudioCaptureReadiness, observation: NativeInputSession<MicrophoneFrame>
+            readiness: AudioCaptureReadiness, observation: NativeInputSession<MicrophoneFrame>,
+            admission: PlatformAdmission?
         ) {
             self.continuation = continuation
             self.readiness = readiness
             self.observation = observation
+            self.admission = admission
         }
         func captureOutput(
             _ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection
         ) {
+            guard observation.isActive else { return }
             var stage = "format description"
             do {
                 if reported.withLock({ value in
@@ -240,6 +250,7 @@
                     )
                 }
                 readiness.resolve(.failure(error))
+                admission?.report("audio.spatial", "callback", error)
                 observation.finish(throwing: error)
                 continuation.finish(throwing: error)
             }

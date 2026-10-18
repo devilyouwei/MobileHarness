@@ -1,5 +1,6 @@
 import Testing
-import UI
+
+@testable import UI
 
 @Test @MainActor func providerFormEditsAdvanceRevisionWithoutExecutingOperations() {
     let state = SettingsState(initial: .init(enabled: false, url: "", key: "", model: "default"))

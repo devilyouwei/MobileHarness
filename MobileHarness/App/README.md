@@ -47,7 +47,7 @@ flowchart TB
 
 ## 接口与失败
 
-根图为 storage / platform / ui → agents → native。具体服务内部的 Agent 注册、配置事务、采集/播放、相机处置、蓝牙恢复和展示由模块实现。App 只调用公开方法，错误原样交给 UI 请求适配器的启动失败端口。
+根图为 diagnostics → storage / platform / ui → agents → native。具体服务内部的 Agent 注册、配置事务、采集/播放、相机处置、蓝牙恢复和展示由模块实现。App 只调用公开方法，错误原样交给 UI 请求适配器的启动失败端口。
 
 AppLifecycle 验证有限静态依赖图，保留原始启动错误及全部服务清理错误。后台先同步失效，再等待异步暂停/清理；取消和物理停止分别确认。停止失败阻止新图替换。模块根任务独立于页面；物理安全不依赖后台任务额度。
 
@@ -59,7 +59,7 @@ AppLifecycle 验证有限静态依赖图，保留原始启动错误及全部服�
 
 ## Storage 生命周期收敛
 
-✅ ServiceFactories 只调用 ApplicationContainer 创建未启动的 StorageContainer，注入延迟领域仓库接口。ModuleRegistration 注册 storage / platform / ui → agents → native，绑定 start/stop；不再创建数据库目录、执行恢复或注册空停止。重试等待旧 Storage 关闭成功，业务终态写入先于存储停止。Scene 非活跃不关闭存储。
+✅ ServiceFactories 只调用 ApplicationContainer 创建未启动的 StorageContainer，注入延迟领域仓库接口。ModuleRegistration 注册 diagnostics → storage / platform / ui → agents → native，绑定 start/stop；不再创建数据库目录、执行恢复或注册空停止。重试等待旧 Storage 关闭成功，业务终态写入先于存储停止。Scene 非活跃不关闭存储。
 
 ## 待实现
 
@@ -84,3 +84,11 @@ AppStorage 目标只编译 Composition/ApplicationContainer.swift，使用 Facto
 ## UI 容器与相机能力注入
 
 ✅ App 注册 UI 根及相机子能力，提供唯一 CameraCoordinator 工厂，注入相机与 UI 呈现接口及延迟 Agent 接入回调。App 不转换帧或 Pose；生命周期图为 storage/platform/ui → agents → native。
+
+## 统一容器异常通道
+
+✅ App 注册同一实例的 ContainerFailureChannel 与各库回调；诊断服务先于 Storage/Platform/UI/Agents 启动、最后停止。生命周期包装报告阶段及清理错误，保留 onFailure/启动界面和原错误返回。Agent 不可用仍记录，不为上报而启动设备或提前打开仓库。
+
+## UI 全量容器化
+
+✅ 应用级 UI 状态由八个子容器统一创建，消费者注入所需 Presenting 接口并提交 UI 自有值，不直接写字段。App 注册并管理同一 UI 根；原业务身份/版本校验、原生完成和基础库依赖边界保持。跨模块连接迁移仍是独立待办。

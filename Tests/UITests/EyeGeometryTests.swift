@@ -116,3 +116,46 @@ func eyeExpressionTransitionsKeepSmoothSides(from: EyeExpression) {
         }
     }
 }
+
+@Test func nativeSpectrumBoundsInvalidInputAndPreservesInterpolationTopology() {
+    let size = CGSize(width: 166, height: 62)
+    for reply in [false, true] {
+        let path = VoiceSpectrumGeometry.bars(
+            size: size, bands: [.nan, .infinity, -1, 2] + Array(repeating: 1, count: 100),
+            reply: reply, active: true, reduceMotion: false)
+        var kinds: [CGPathElementType] = []
+        var points: [CGPoint] = []
+        path.applyWithBlock { element in
+            kinds.append(element.pointee.type)
+            points.append(element.pointee.points[0])
+        }
+        #expect(kinds.count == 64)
+        #expect(
+            kinds.enumerated().allSatisfy {
+                $0.element == ($0.offset.isMultiple(of: 2) ? .moveToPoint : .addLineToPoint)
+            })
+        #expect(points.allSatisfy { $0.x.isFinite && $0.y.isFinite })
+        #expect(
+            VoiceSpectrumGeometry.bars(
+                size: size, bands: [], reply: reply, active: true, reduceMotion: false
+            ).boundingBox.isInfinite == false)
+    }
+    #expect(
+        VoiceSpectrumGeometry.bars(
+            size: CGSize(width: CGFloat.infinity, height: 62), bands: [1], reply: true, active: true,
+            reduceMotion: false
+        ).isEmpty)
+}
+
+@Test func nativeSpectrumIdleAndReducedMotionIgnoreChangingMeterValues() {
+    let size = CGSize(width: 166, height: 62)
+    for reply in [false, true] {
+        for mode in [(false, false), (true, true)] {
+            let quiet = VoiceSpectrumGeometry.bars(
+                size: size, bands: [], reply: reply, active: mode.0, reduceMotion: mode.1)
+            let loud = VoiceSpectrumGeometry.bars(
+                size: size, bands: Array(repeating: 1, count: 32), reply: reply, active: mode.0, reduceMotion: mode.1)
+            #expect(quiet == loud)
+        }
+    }
+}

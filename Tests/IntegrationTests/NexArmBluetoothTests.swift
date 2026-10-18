@@ -14,10 +14,10 @@ import StorageSQLite
 import StorageState
 import StorageTasks
 import Testing
-import UI
 
 @testable import ActionBindings
 @testable import PlatformKit
+@testable import UI
 
 /// Explicit simulation. Default tests never create a CoreBluetooth manager or move physical hardware.
 private actor BluetoothArmFixture: NexArmBluetoothLink {
@@ -1101,7 +1101,7 @@ func bluetoothConnectAndForgetClearDiscoveryAndSavedState() async throws {
     #expect(workflow.state.controlReady)
     let connected = await link.status()
     #expect(!connected.scanning && connected.devices.isEmpty)
-    workflow.state.error = "旧错误"
+    workflow.state.present(.error("旧错误"))
     workflow.forget()
     await workflow.waitUntilIdle()
     #expect(workflow.state.remembered == nil && workflow.state.selected == nil)
@@ -3086,6 +3086,8 @@ func bluetoothLateAimExecutionFailureIsIndependentOfDeviceRecordsAndCompletedToo
     let link = BluetoothArmFixture()
     let workflow = bluetoothTestWorkflow(link, file: file)
     let activity = ActionActivityWorkflow(state: ActionActivityState())
+    let diagnosticFixture = try RuntimeFailurePresentationFixture(activity: activity)
+    try await diagnosticFixture.start(activity: activity)
     let observer = Task { await workflow.run() }
     workflow.openPage()
     try await until { !workflow.state.nearby.isEmpty }
@@ -3110,6 +3112,7 @@ func bluetoothLateAimExecutionFailureIsIndependentOfDeviceRecordsAndCompletedToo
     await workflow.waitUntilIdle()
     observer.cancel()
     await observer.value
+    await diagnosticFixture.stop(activity: activity)
 }
 
 /// A rejected concurrent call cannot clear or borrow the running invocation's report.
@@ -3187,6 +3190,8 @@ func bluetoothLateNativeAimErrorIsReportedAfterRecoveryFencesTheConnection() asy
     let link = BluetoothArmFixture()
     let workflow = bluetoothTestWorkflow(link, file: file)
     let activity = ActionActivityWorkflow(state: ActionActivityState())
+    let diagnosticFixture = try RuntimeFailurePresentationFixture(activity: activity)
+    try await diagnosticFixture.start(activity: activity)
     let observer = Task { await workflow.run() }
     workflow.openPage()
     try await until { !workflow.state.nearby.isEmpty }
@@ -3224,6 +3229,7 @@ func bluetoothLateNativeAimErrorIsReportedAfterRecoveryFencesTheConnection() asy
     await workflow.waitUntilIdle()
     observer.cancel()
     await observer.value
+    await diagnosticFixture.stop(activity: activity)
 }
 
 @Test(.actionCatalog) func bluetoothFeedbackReadFailureDoesNotChangeNativeStateOrBecomeSendFailure() async throws {
@@ -3422,8 +3428,8 @@ func bluetoothManualSimpleCommandsRemainUsableWithoutIKOrResourceAdmission() asy
     defer { try? FileManager.default.removeItem(at: file) }
     let link = BluetoothArmFixture()
     let workflow = bluetoothTestWorkflow(link, file: file)
-    workflow.state.phase = .connected
-    workflow.state.availability = .available
+    workflow.state.present(.phase(.connected))
+    workflow.state.present(.availability(.available))
     #expect(workflow.state.canControl)
     #expect(workflow.service.state.phase == .idle)
     #expect(throws: NexArmExecutionError.controlNotReady) {

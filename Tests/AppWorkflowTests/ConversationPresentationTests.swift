@@ -8,7 +8,8 @@ import Gateway
 import PlatformKit
 import StorageCore
 import Testing
-import UI
+
+@testable import UI
 
 @Test func changingCaptionOwnerDoesNotRevokeParentPlayback() {
     let session = UUID().uuidString

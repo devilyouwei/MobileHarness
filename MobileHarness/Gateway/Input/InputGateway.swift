@@ -16,6 +16,18 @@ public struct InputAdmissionFailure: Error, Sendable {
 }
 
 public actor InputGateway {
+    /// Host diagnostic ingress; creates an external fact, never runtime execution authority.
+    public func publishRuntimeFailure(_ event: RuntimeFailureEvent, sessionID: String) async throws {
+        try event.validate()
+        let message = AgentMessage(
+            contract: RuntimeFailureEvent.contract, content: event, maximumBytes: 16_384,
+            validate: { try $0.validate() })
+        try await publish(
+            ExternalInputDraft(
+                sessionID: sessionID, payload: .observation(message), source: RuntimeFailureEvent.source,
+                rootID: event.id))
+    }
+
     private var subscriptions: [String: SignalSubscription] = [:]
     private var signalRecords: [SignalTraceRecord] = []
     private var signalRevision: UInt64 = 0

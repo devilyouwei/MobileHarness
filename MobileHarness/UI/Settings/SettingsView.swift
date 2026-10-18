@@ -2,7 +2,8 @@
     import SwiftUI
 
     /// Native feature list. Route selection crosses the injected Agent intent interface.
-    @MainActor public struct SettingsView: View {
+    @MainActor
+    public struct SettingsView: View {
         let bluetooth: BluetoothSettingsState
         let navigate: (AppDestination) -> Void
         public init(bluetooth: BluetoothSettingsState, navigate: @escaping (AppDestination) -> Void) {

@@ -12,7 +12,8 @@ import StorageCore
 import StorageFiles
 import StorageState
 import Testing
-import UI
+
+@testable import UI
 
 private actor InstalledPreferenceFixture {
     var ids: Set<String> = []

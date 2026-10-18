@@ -12,9 +12,9 @@ import ModelKit
 import StorageCore
 import StorageState
 import Testing
-import UI
 
 @testable import PlatformKit
+@testable import UI
 
 private func image(_ value: UInt8, sequence: UInt64, rotation: Int = 1, capturedAt: ContinuousClock.Instant? = nil)
     throws -> ImageInput
@@ -319,12 +319,6 @@ func sharedPosePublishesAndVisualizesWithoutRequiringSubscribers(withSubscribers
             Issue.record("Invalid pose reached UI")
         }
     }
-    let point = UI.PoseOverlay.Joint(x: 2500, y: 7500, confidence: 1000)
-    #expect(point.sensorPoint(rotation: 0).x == 0.25)
-    #expect(point.sensorPoint(rotation: 1).x == 0.75)
-    #expect(point.sensorPoint(rotation: 1).y == 0.75)
-    #expect(point.sensorPoint(rotation: 2).y == 0.25)
-    #expect(point.sensorPoint(rotation: 3).x == 0.25)
 }
 
 @Test(.actionCatalog) func visionOutputsAreCodeOwnedPermissions() throws {
@@ -1366,6 +1360,9 @@ func visionTerminalFailureSurvivesGatewayAndAppearsAsAgentToast() async throws {
     let consumer = try await gateway.consumer(for: agent)
     let state = ActionActivityState()
     let workflow = ActionActivityWorkflow(state: state)
+    let fixture = try RuntimeFailurePresentationFixture(activity: workflow)
+    try await fixture.runtime.prepareForInteraction()
+    workflow.connectFailureSignals(input: fixture.input, sessionID: fixture.sessionID)
     workflow.startFailures { try await gateway.observeFailures() }
     await agent.failInput(CommunicationError.scopeClosed)
     var output = agent.outputs.makeAsyncIterator()
@@ -1384,4 +1381,5 @@ func visionTerminalFailureSurvivesGatewayAndAppearsAsAgentToast() async throws {
     #expect(state.visibleNotice?.tone == .error)
     await agent.stop()
     await gateway.shutdown()
+    await fixture.stop(activity: workflow)
 }

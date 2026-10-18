@@ -42,6 +42,7 @@ public struct CameraFrame: @unchecked Sendable {
             var timestamp: Double = -1
             var rotation = 1
         }
+
         private let state = Mutex(State())
         private let observations = NativeInputBroadcast<CameraFrame>()
         func subscribe() throws -> AsyncThrowingStream<CameraFrame, Error> { try observations.subscribe(.latest) }
@@ -107,6 +108,7 @@ public struct CameraFrame: @unchecked Sendable {
                 return (value.output, value.sequence, value.rotation, value.generation)
             }
             guard let (continuation, sequence, rotation, generation) = snapshot else { return }
+
             guard let pixels = CMSampleBufferGetImageBuffer(sampleBuffer),
                 CVPixelBufferGetPixelFormatType(pixels) == kCVPixelFormatType_32BGRA,
                 CVPixelBufferLockBaseAddress(pixels, .readOnly) == kCVReturnSuccess

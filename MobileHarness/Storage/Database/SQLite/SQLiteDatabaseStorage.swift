@@ -14,12 +14,12 @@ public struct StoragePreparationFailure: Error {
 
 public enum SQLiteDatabaseFactory {
     /// Construction is inert. Filesystem and database work belongs to start().
-    public static func make(databaseURL: URL) -> SQLiteDatabaseStorage {
-        SQLiteDatabaseStorage {
+    public static func make(databaseURL: URL, failures: StorageFailureReporter = .init()) -> SQLiteDatabaseStorage {
+        SQLiteDatabaseStorage(failures: failures) {
             guard databaseURL.isFileURL else { throw RecordStorageError.invalidRecord }
             try FileManager.default.createDirectory(
                 at: databaseURL.deletingLastPathComponent(), withIntermediateDirectories: true)
-            return try SQLiteRepositories(url: databaseURL)
+            return try SQLiteRepositories(url: databaseURL, failures: failures)
         }
     }
 }
@@ -38,59 +38,80 @@ public actor SQLiteDatabaseStorage: DatabaseStorage {
     private var closed = false
     private var failure: (any Error)?
 
-    init(open: @escaping @Sendable () throws -> SQLiteRepositories) { self.open = open }
+    private let failures: StorageFailureReporter
+    init(failures: StorageFailureReporter = .init(), open: @escaping @Sendable () throws -> SQLiteRepositories) {
+        self.failures = failures
+        self.open = open
+    }
 
-    public nonisolated func repositories() throws -> DatabaseRepositories { try access.repositories() }
+    public nonisolated func repositories() throws -> DatabaseRepositories {
+        do {
+            return try access.repositories()
+        } catch {
+            failures.report("database", "repositories", error)
+            throw error
+        }
+    }
 
     public func start() async throws {
-        guard !closed else { throw RecordStorageError.closed }
-        if let failure { throw failure }
-        let task: Task<Void, any Error>
-        if let startup {
-            task = startup
-        } else {
-            let created = Task.detached { [open, access] in
-                try Task.checkCancellation()
-                let repositories = try open()
-                access.install(repositories)
-                try Task.checkCancellation()
-                try repositories.recoverInFlight()
-                try Task.checkCancellation()
-                try access.publish()
-            }
-            startup = created
-            task = created
-        }
         do {
-            try await withTaskCancellationHandler {
-                try await task.value
-                try Task.checkCancellation()
-            } onCancel: {
-                task.cancel()
-            }
-            if let failure { throw failure }
             guard !closed else { throw RecordStorageError.closed }
+            if let failure { throw failure }
+            let task: Task<Void, any Error>
+            if let startup {
+                task = startup
+            } else {
+                let created = Task.detached { [open, access] in
+                    try Task.checkCancellation()
+                    let repositories = try open()
+                    access.install(repositories)
+                    try Task.checkCancellation()
+                    try repositories.recoverInFlight()
+                    try Task.checkCancellation()
+                    try access.publish()
+                }
+                startup = created
+                task = created
+            }
+            do {
+                try await withTaskCancellationHandler {
+                    try await task.value
+                    try Task.checkCancellation()
+                } onCancel: {
+                    task.cancel()
+                }
+                if let failure { throw failure }
+                guard !closed else { throw RecordStorageError.closed }
+            } catch {
+                if failure == nil { failure = error }
+                access.closeAdmission()
+                throw error
+            }
         } catch {
-            if failure == nil { failure = error }
-            access.closeAdmission()
+            failures.report("database", "start", error)
             throw error
         }
     }
 
     public func stop() async throws {
-        if let shutdown { return try await shutdown.value }
-        closed = true
-        access.closeAdmission()
-        startup?.cancel()
-        let task = Task.detached { [startup, access] in
-            let result = await startup?.result
-            try await access.closeBackend()
-            // A constructor can fail before it can publish an owner for later cleanup.
-            // Its unconfirmed cleanup must still block replacement of this scope.
-            if case .failure(let failure as StoragePreparationFailure) = result { throw failure.cleanup }
+        do {
+            if let shutdown { return try await shutdown.value }
+            closed = true
+            access.closeAdmission()
+            startup?.cancel()
+            let task = Task.detached { [startup, access] in
+                let result = await startup?.result
+                try await access.closeBackend()
+                // A constructor can fail before it can publish an owner for later cleanup.
+                // Its unconfirmed cleanup must still block replacement of this scope.
+                if case .failure(let failure as StoragePreparationFailure) = result { throw failure.cleanup }
+            }
+            shutdown = task
+            try await task.value
+        } catch {
+            failures.report("database", "stop", error)
+            throw error
         }
-        shutdown = task
-        try await task.value
     }
 }
 

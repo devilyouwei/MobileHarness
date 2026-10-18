@@ -5,7 +5,8 @@ import Foundation
 import Gateway
 import PlatformKit
 import Testing
-import UI
+
+@testable import UI
 
 private actor ObservationCadence {
     nonisolated let entered = AsyncStream<Int>.makeStream(bufferingPolicy: .bufferingOldest(16))

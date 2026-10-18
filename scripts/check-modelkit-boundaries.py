@@ -403,9 +403,12 @@ allowed_ui = {'Foundation', 'CoreGraphics', 'Observation', 'SwiftUI', 'UIKit'}
 native_ui_imports = {
     'Camera/CameraVideoFrame.swift': {'CoreVideo'},
     'Camera/CameraFrameView.swift': {'CoreVideo', 'Metal', 'QuartzCore', 'Synchronization'},
+    'Components/VoiceBars.swift': {'QuartzCore'},
     'Components/NativeCompanionSurface.swift': {'QuartzCore'},
     'Components/MetalHaloRenderer.swift': {'Metal', 'QuartzCore', 'Synchronization'},
 }
+if 'Canvas {' in (ROOT / 'MobileHarness/UI/Components/VoiceBars.swift').read_text():
+    errors.append('Voice spectrum must use native retained layers, not Canvas')
 for source in (ROOT / 'MobileHarness/UI').rglob('*.swift'):
     content = source.read_text()
     for imported in re.findall(r'\bimport\s+(\w+)', content):
@@ -666,10 +669,14 @@ if 'SignalCausality(envelope: invocation.envelope)' not in result_ledger:
     errors.append('Scheduled feedback must retain original envelope causality')
 # Resource UI state must remain passive; asynchronous effects belong to the feature.
 resource_state = (ROOT / 'MobileHarness/UI/Settings/ModelResourcesState.swift').read_text()
-resource_implementation = resource_state.split('public final class ModelResourcesState', 1)[1]
+# Exclude only neutral declarations co-located with the state; keep checking all implementations/extensions.
+resource_implementation = re.sub(
+    r'(?ms)^@MainActor\s+public protocol ModelResources(?:Operating|Controlling)\b.*?^}\n?', '', resource_state)
+resource_implementation = re.sub(
+    r'(?ms)^public struct ModelResourceSelectionError\b.*?^}\n?', '', resource_implementation)
 if re.search(r'\bTask\b|\basync\b|\bModelResourcesOperating\b', resource_implementation):
     errors.append('ModelResourcesState owns resource operation effects')
-if 'ModelResourceSelectionError' in resource_state or 'func isInstalled(in:' in resource_state:
+if 'ModelResourceSelectionError' in resource_implementation or 'func isInstalled(in:' in resource_implementation:
     errors.append('Resource installation policy belongs to AppSettingsWorkflow')
 if (ROOT / 'Tests/UITests/ModelResourcesStateTests.swift').exists():
     errors.append('Resource operation tests belong to AppWorkflowTests')
@@ -849,6 +856,17 @@ for source in (ROOT / 'MobileHarness/Agents/Support/Core').rglob('*.swift'):
         errors.append('Agent communication domain values belong to Agents/Support/Communication')
 
 # Generic communication infrastructure must not regain application domain schemas or camera samples.
+failure_channel = (ROOT / 'MobileHarness/Gateway/Input/ContainerFailureChannel.swift').read_text()
+if imported_modules(failure_channel) & {'UI', 'Storage', 'Agents', 'AppStorage'}:
+    errors.append('Container failure transport must remain independent of capability and role implementations')
+failure_registry = (ROOT / 'MobileHarness/App/Composition/ApplicationContainer.swift').read_text()
+for marker in ('Factory<ContainerFailureChannel>', 'sink(module: "storage")', 'sink(module: "platform")', 'sink(module: "ui")'):
+    if marker not in failure_registry:
+        errors.append(f'App must install same-scope container failure reporting: {marker}')
+failure_lifecycle = (ROOT / 'MobileHarness/App/Composition/ModuleRegistration.swift').read_text()
+for marker in ('id: "diagnostics"', 'dependencies: ["diagnostics"]', 'phase: .startup', 'phase: .foreground', 'phase: .shutdown'):
+    if marker not in failure_lifecycle:
+        errors.append(f'Container failure lifecycle ownership missing: {marker}')
 external_schema_files = (
     'ApplicationSignals.swift', 'ProviderIntents.swift', 'PhotographerCameraIntent.swift',
     'ModelResourceSignals.swift', 'AgentContracts.swift',
@@ -1180,3 +1198,114 @@ for relative in ('Agents/Assistant/AssistantProcessing.swift', 'Agents/Support/C
 if 'ContextDocumentAdapter' in context_repository or 'AssistantConversationRecovery' in (ROOT / 'MobileHarness/Agents/Assistant/AssistantProcessing.swift').read_text():
     raise SystemExit('Retired Context JSON adapters and duplicate Task recovery blobs must stay removed.')
 print('Runtime memory-state and database record lifecycle boundaries pass.')
+
+# ApplicationControl owns runtime failure presentation policy; bindings only forward evidence.
+activity_source = (ROOT / 'MobileHarness/Agents/Support/ActionActivityWorkflow.swift').read_text()
+if any(marker in activity_source for marker in ('startContainerFailures', 'state.recordIssue(', 'state.replaceIssues(', 'func userMessage(')):
+    raise SystemExit('AgentBindings must not bypass ApplicationControl to present runtime failures.')
+application_control_config = json.loads((ROOT / 'MobileHarness/Resources/Agents/ApplicationControl/Agent.json').read_text())
+for contract in ('container.failure', 'runtime.failure'):
+    if not any(value['contract'] == contract and value.get('source') == 'runtime' for value in application_control_config['communication']['subscriptions']):
+        raise SystemExit(f'ApplicationControl must subscribe to {contract} from runtime.')
+runtime_presentation = (ROOT / 'MobileHarness/Actions/UI/Support/RuntimePresentation.swift').read_text()
+if 'invocation.context.source == "applicationControl"' not in runtime_presentation or 'showsToast: issue.userMessage != nil' not in runtime_presentation:
+    raise SystemExit('Runtime failure presentation requires ApplicationControl identity and explicit toast policy.')
+print('ApplicationControl owns diagnostic presentation policy; bindings remain transport projections.')
+
+# UI presentation models are owned by the UI root; consumers receive read-only capability protocols.
+ui_model_names = ('ConversationState', 'ActionActivityState', 'SettingsState', 'ModelResourcesState', 'NavigationState', 'ConversationHistoryState', 'BluetoothSettingsState', 'SpeechDiagnosticState', 'AudioDetectionState', 'ConversationExpressionPresentation', 'HomeEffectsWorkflow', 'CapturedPhotoPresentation')
+for source in (ROOT / 'MobileHarness').rglob('*.swift'):
+    if ROOT / 'MobileHarness/UI' in source.parents:
+        continue
+    if re.search(r'\b(?:' + '|'.join(ui_model_names) + r')\s*\(', source.read_text()):
+        raise SystemExit(f'UI root must own presentation construction: {source.relative_to(ROOT)}')
+ui_root_source = (ROOT / 'MobileHarness/UI/UIContainer.swift').read_text()
+ui_registry_source = (ROOT / 'MobileHarness/App/Composition/ApplicationContainer.swift').read_text()
+for property_name in ('home', 'camera', 'settings', 'modelResources', 'navigation', 'history', 'devices', 'diagnostics'):
+    if f'public let {property_name}:' not in ui_root_source or f'self.ui().{property_name}' not in ui_registry_source:
+        raise SystemExit(f'UI root and App must share the {property_name} capability.')
+conversation_view_source = (ROOT / 'MobileHarness/UI/Conversation/ConversationView.swift').read_text()
+if '.task(id: issue.id)' in conversation_view_source:
+    raise SystemExit('Toast expiry belongs to the UI root, never the page.')
+for source in (ROOT / 'MobileHarness/Agents').rglob('*.swift'):
+    if source.name in ('AgentApplicationUI.swift', 'ApplicationFeatures.swift', 'InteractionServices.swift'):
+        continue  # Read-only view-provider fields, not business mutation handles.
+    if re.search(r':\s*(?:' + '|'.join(ui_model_names[:9]) + r')\b', source.read_text()):
+        raise SystemExit(f'Agent business consumers require narrow presentation interfaces: {source.relative_to(ROOT)}')
+print('UI root owns eight capabilities and presentation construction; App shares them through explicit registration.')
+
+native_audio_source = (ROOT / 'MobileHarness/PlatformKit/Audio/AppleAudioIO.swift').read_text()
+if re.search(r'\.report\(\s*"audio"\s*,\s*"routeChanged"', native_audio_source):
+    raise SystemExit('Audio route facts must not be reported as container execution failures.')
+if re.search(r'NativeAudioEvent\s*:[^{]*\bError\b', audio_context.read_text()):
+    raise SystemExit('NativeAudioEvent must remain a device fact rather than an Error type.')
+print('Audio route facts are separate from container execution failures.')
+
+# Native output graph mutation must remain outside the MainActor controller.
+audio_io = (ROOT / 'MobileHarness/PlatformKit/Audio/AppleAudioIO.swift').read_text()
+audio_controller = audio_io.split('public final class AppleAudioIO', 1)[1]
+if 'private actor NativePlaybackGraph' not in audio_io or 'AVAudioPlayerNode()' in audio_controller:
+    raise SystemExit('Native playback graph must have its own actor owner')
+
+# UI organization: keep one owner per feature and retire comparison-only paths.
+ui_root = ROOT / 'MobileHarness/UI'
+retired_ui_files = (
+    'Components/CompanionEyes.swift', 'Camera/PoseOverlayProjection.swift',
+    'Conversation/ExecutionLogState.swift', 'Conversation/PresentationPorts.swift',
+    'Settings/SettingsProviderOperations.swift', 'Settings/ModelResourceRequests.swift',
+    'Settings/UISettingsContainers.swift', 'Settings/AudioDetectionState.swift',
+    'Settings/AudioDetectionSection.swift',
+)
+for relative in retired_ui_files:
+    if (ui_root / relative).exists():
+        raise SystemExit(f'Retired UI implementation must not return: {relative}')
+ui_sources = '\n'.join(source.read_text() for source in ui_root.rglob('*.swift'))
+if re.search(r'\b(?:ConversationVisualPreview|ActionActivityVisualPreview|OSSignposter|sensorPoint)\b', ui_sources):
+    raise SystemExit('UI must not retain synthetic preview routes, comparison probes or legacy projection')
+for relative, declarations in {
+    'UIContainer.swift': ('class UINavigationContainer', 'class NavigationState'),
+    'Settings/SettingsState.swift': ('class UISettingsContainer', 'struct SettingsProviderOperations'),
+    'Settings/ModelResourcesState.swift': ('class UIModelResourcesContainer', 'protocol ModelResourcesOperating'),
+    'Settings/ConversationHistoryState.swift': ('class UIHistoryContainer',),
+    'Settings/BluetoothSettingsState.swift': ('class UIDeviceSettingsContainer',),
+    'Diagnostics/AudioDetectionWorkflow.swift': ('class AudioDetectionState', 'struct AudioDetectionSection'),
+    'Components/NativeCompanionSurface.swift': ('struct CompanionEyes',),
+}.items():
+    content = (ui_root / relative).read_text()
+    if any(declaration not in content for declaration in declarations):
+        raise SystemExit(f'UI feature ownership drift: {relative}')
+print('UI feature ownership and retired comparison-code checks pass.')
+
+# Foundational modules expose native contracts only; Signal adaptation stays in Gateway.
+for module in ('PlatformKit', 'Storage', 'ModelKit'):
+    for source in (ROOT / 'MobileHarness' / module).rglob('*.swift'):
+        code = re.sub(r'//[^\n]*|/\*.*?\*/', '', source.read_text(), flags=re.S)
+        if re.search(r'\b(?:AgentInput|ActionInvocation|InputGateway|OutputGateway|SignalCausality|SignalMetadata)\b', code):
+            raise SystemExit(f'Communication/business contract in foundational SDK: {source.relative_to(ROOT)}')
+vision_container = (ROOT / 'MobileHarness/PlatformKit/Vision/VisionContainer.swift').read_text()
+audio_container = (ROOT / 'MobileHarness/PlatformKit/Audio/AudioContainer.swift').read_text()
+if not re.search(r'var camera:\s*any CameraCapturing', vision_container):
+    raise SystemExit('Vision root must expose its camera protocol')
+if not re.search(r'func io\([^)]*\)\s*->\s*any AudioInputOutput', audio_container):
+    raise SystemExit('Audio root must expose its I/O protocol')
+camera_contract = (ROOT / 'MobileHarness/PlatformKit/Vision/CameraCapturing.swift').read_text()
+if re.search(r'CameraEvent\s*:[^{]*\bError\b', camera_contract):
+    raise SystemExit('CameraEvent is a device fact, not an execution Error')
+if re.search(r'\b(?:prepareClip|discardPreparedClip|playbackSampleOffset|preparedClipRate)\b', audio_io):
+    raise SystemExit('Unused native output warmup/cursor API must remain retired')
+for folder in ('Agents', 'Actions'):
+    for source in (ROOT / 'MobileHarness' / folder).rglob('*.swift'):
+        if re.search(r':\s*AppleAudioIO\b', source.read_text()):
+            raise SystemExit(f'Business consumers require AudioInputOutput: {source.relative_to(ROOT)}')
+for retired in ('DocumentStorageError.swift', 'RecordStorageError.swift'):
+    if (ROOT / 'MobileHarness/Storage/Support/Contracts' / retired).exists():
+        raise SystemExit('Shared storage errors must have one source owner')
+print('Foundation capability ports, native facts and Gateway conversion boundaries pass.')
+
+for method, port in (('cue', 'CuePlaying'), ('haptic', 'HapticFeedbackProviding')):
+    if not re.search(r'func ' + method + r'\([^)]*\)\s*->\s*any ' + port, audio_container):
+        raise SystemExit(f'Audio root must expose {port}')
+for folder in ('Agents', 'Actions'):
+    for source in (ROOT / 'MobileHarness' / folder).rglob('*.swift'):
+        if re.search(r':\s*(?:NativeCuePlayback|NativeHapticFeedback)\s*[,\n)]', source.read_text()):
+            raise SystemExit(f'Business feedback consumers require protocol ports: {source.relative_to(ROOT)}')

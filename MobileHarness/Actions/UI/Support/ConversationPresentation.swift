@@ -67,7 +67,7 @@ public struct ConversationPresentation: Sendable {
     }
     /// Clear the previous visual round only after accepting a new recognition identity.
     @MainActor public mutating func accept(
-        _ context: ActionExecutionContext, update: Update, state: ConversationState
+        _ context: ActionExecutionContext, update: Update, state: any ConversationPresenting
     ) -> Bool {
         let previous = turn
         guard accept(context, update: update) else { return false }

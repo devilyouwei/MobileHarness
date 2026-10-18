@@ -8,34 +8,41 @@
     @MainActor public final class ConversationPresentationController {
         public var conversationPresentation = ConversationPresentation()
         private let phaseChanged: @MainActor (VoicePhase) -> Void
-        private let state: ConversationState
-        private let effects: HomeEffectsWorkflow
+        private let state: any ConversationPresenting
+        private var token: UIPresentationToken?
+        private let effects: any HomeEffectsPresenting
         private let acceptsSession: @MainActor (String) -> Bool
         private let captureAvailable: @MainActor () -> Bool
         private let handlingTurn: @MainActor () -> Bool
-        private let expressions: ConversationExpressionPresentation
+        private let expressions: any ExpressionPresenting
         public init(
-            state: ConversationState, effects: HomeEffectsWorkflow,
+            state: any ConversationPresenting, effects: any HomeEffectsPresenting,
+            expressions: any ExpressionPresenting,
             acceptsSession: @escaping @MainActor (String) -> Bool,
             captureAvailable: @escaping @MainActor () -> Bool,
             handlingTurn: @escaping @MainActor () -> Bool, phaseChanged: @escaping @MainActor (VoicePhase) -> Void
         ) {
             self.state = state
-            expressions = ConversationExpressionPresentation(state: state)
+            token = state.token
+            self.expressions = expressions
             self.effects = effects
             self.acceptsSession = acceptsSession
             self.captureAvailable = captureAvailable
             self.handlingTurn = handlingTurn
             self.phaseChanged = phaseChanged
         }
+        public func beginPresentationSession() { token = state.token }
         private func acceptPresentation(_ context: ActionExecutionContext, update: ConversationPresentation.Update)
             -> Bool
         {
-            conversationPresentation.accept(context, update: update, state: state)
+            guard state.accepts(token) else { return false }
+            return conversationPresentation.accept(context, update: update, state: state)
         }
 
         public func presentTranscript(_ text: String, invocation: any FunctionInput) throws {
             try Task.checkCancellation()
+            try state.requirePresentation()
+            guard state.accepts(token) else { throw CancellationError() }
             guard state.isVoiceActive, acceptsSession(invocation.context.sessionID) else { throw CancellationError() }
             guard acceptPresentation(invocation.context, update: .transcript) else { return }
             state.presentTranscript(text)
@@ -43,6 +50,8 @@
 
         public func finishTranscript(invocation: any FunctionInput) throws {
             try Task.checkCancellation()
+            try state.requirePresentation()
+            guard state.accepts(token) else { throw CancellationError() }
             guard acceptsSession(invocation.context.sessionID) else { throw CancellationError() }
             guard acceptPresentation(invocation.context, update: .finishTranscript) else { return }
             state.finishUserTranscript()
@@ -50,6 +59,8 @@
 
         public func beginReplyTurn(invocation: any FunctionInput) throws {
             try Task.checkCancellation()
+            try state.requirePresentation()
+            guard state.accepts(token) else { throw CancellationError() }
             guard state.isVoiceActive, acceptsSession(invocation.context.sessionID) else { throw CancellationError() }
             guard acceptPresentation(invocation.context, update: .beginReply) else { return }
             effects.replyDidBegin()
@@ -59,6 +70,8 @@
 
         public func presentVoiceState(_ voiceState: UIActions.VoiceState, invocation: any FunctionInput) throws {
             try Task.checkCancellation()
+            try state.requirePresentation()
+            guard state.accepts(token) else { throw CancellationError() }
             guard acceptsSession(invocation.context.sessionID) else { throw CancellationError() }
             // In-flight perception Tools cannot restore listening after capture admission has closed.
             guard captureAvailable() else { throw CancellationError() }
@@ -86,6 +99,8 @@
 
         public func setExpression(_ emotion: UIActions.Emotion, invocation: any FunctionInput) throws {
             try Task.checkCancellation()
+            try state.requirePresentation()
+            guard state.accepts(token) else { throw CancellationError() }
             guard acceptsSession(invocation.context.sessionID) else { throw CancellationError() }
             guard acceptPresentation(invocation.context, update: .expression) else {
                 throw CancellationError()
@@ -94,6 +109,8 @@
         }
         public func presentExpression(_ emotion: UIActions.Emotion, invocation: any FunctionInput) async throws {
             try Task.checkCancellation()
+            try state.requirePresentation()
+            guard state.accepts(token) else { throw CancellationError() }
             guard acceptsSession(invocation.context.sessionID),
                 acceptPresentation(invocation.context, update: .expression)
             else { throw CancellationError() }
@@ -121,6 +138,8 @@
 
         public func present(_ text: String, invocation: any FunctionInput) throws {
             try Task.checkCancellation()
+            try state.requirePresentation()
+            guard state.accepts(token) else { throw CancellationError() }
             guard state.isVoiceActive, acceptsSession(invocation.context.sessionID) else { throw CancellationError() }
             guard acceptPresentation(invocation.context, update: .reply) else { return }
             effects.replyDidBegin()

@@ -1,9 +1,39 @@
 import Foundation
 
 #if os(iOS)
+    import QuartzCore
     import SwiftUI
     import UIKit
-    import QuartzCore
+
+    extension EnvironmentValues {
+        @Entry var eyeGaze: CGSize = .zero
+    }
+
+    /// Startup/standalone eyes use the same native layer renderer as the conversation.
+    @MainActor
+    struct CompanionEyes: View {
+        let phase: VoicePhase
+        let reduceMotion: Bool
+        var expression: EyeExpression? = nil
+        var expressionEmphasized = false
+        var expressionTransitionID: String? = nil
+        var expressionCompletion: (@MainActor (String, Bool) -> Void)? = nil
+        var expressionAvailability: (@MainActor (Bool) -> Void)? = nil
+        var gaze: CGSize = .zero
+        var faceWidth: CGFloat = 390
+        var body: some View {
+            GeometryReader { geometry in
+                NativeCompanionSurface(
+                    phase: phase, reduceMotion: reduceMotion, expression: expression ?? .clear,
+                    emphasized: expressionEmphasized, transitionID: expressionTransitionID,
+                    gaze: gaze, faceWidth: faceWidth,
+                    eyeCenter: CGPoint(x: geometry.size.width / 2, y: geometry.size.height / 2),
+                    haloEnabled: false, active: false, generation: nil,
+                    completion: expressionCompletion, availability: expressionAvailability)
+            }
+            .accessibilityHidden(true)
+        }
+    }
 
     @MainActor
     struct NativeCompanionSurface: UIViewRepresentable {
@@ -130,12 +160,13 @@ import Foundation
             CATransaction.begin()
             CATransaction.setDisableActions(true)
             if let window {
-                haloLayer.frame = convert(window.bounds, from: window)
-                haloLayer.contentsScale = window.screen.scale
-                haloLayer.drawableSize = CGSize(
-                    width: haloLayer.bounds.width * window.screen.scale,
-                    height: haloLayer.bounds.height * window.screen.scale)
-            } else {
+                let frame = convert(window.bounds, from: window)
+                let scale = window.screen.scale
+                let pixels = CGSize(width: frame.width * scale, height: frame.height * scale)
+                if haloLayer.frame != frame { haloLayer.frame = frame }
+                if haloLayer.contentsScale != scale { haloLayer.contentsScale = scale }
+                if haloLayer.drawableSize != pixels { haloLayer.drawableSize = pixels }
+            } else if haloLayer.frame != bounds {
                 haloLayer.frame = bounds
             }
             face.position = input.eyeCenter

@@ -3,8 +3,20 @@
     import Foundation
     import UIKit
 
+    /// Native feedback values only; preparation never promises a physical impact.
+    @MainActor
+    public protocol HapticFeedbackProviding: AnyObject, Sendable {
+        func prepare(_ style: NativeHapticFeedback.Style)
+        func impact(style: NativeHapticFeedback.Style, intensity: Double, count: Int, intervalMS: Int) async throws
+        func stop() async
+    }
+    extension HapticFeedbackProviding {
+        public func prepare() { prepare(.heavy) }
+    }
+
     /// Generic native impact requests, independent of application policy and presentation state.
-    @MainActor public final class NativeHapticFeedback {
+    @MainActor
+    public final class NativeHapticFeedback: HapticFeedbackProviding {
         public enum Style: String, CaseIterable, Sendable { case light, medium, heavy, rigid, soft }
         public enum Failure: Error, Sendable { case unavailable, busy, invalidRequest }
         private var generators: [Style: UIImpactFeedbackGenerator] = [:]
@@ -23,17 +35,22 @@
             generator(style).prepare()
         }
         public func impact(style: Style, intensity: Double, count: Int, intervalMS: Int) async throws {
-            try admission?.check()
-            guard operation == nil else { throw Failure.busy }
-            let task = Task {
-                try await self.perform(style: style, intensity: intensity, count: count, intervalMS: intervalMS)
-            }
-            operation = task
-            defer { operation = nil }
-            try await withTaskCancellationHandler {
-                try await task.value
-            } onCancel: {
-                task.cancel()
+            do {
+                try admission?.check()
+                guard operation == nil else { throw Failure.busy }
+                let task = Task {
+                    try await self.perform(style: style, intensity: intensity, count: count, intervalMS: intervalMS)
+                }
+                operation = task
+                defer { operation = nil }
+                try await withTaskCancellationHandler {
+                    try await task.value
+                } onCancel: {
+                    task.cancel()
+                }
+            } catch {
+                admission?.report("audio.haptic", "impact", error)
+                throw error
             }
         }
         private func perform(style: Style, intensity: Double, count: Int, intervalMS: Int) async throws {

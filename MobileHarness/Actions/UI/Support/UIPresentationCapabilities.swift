@@ -54,3 +54,8 @@ extension ResourcePresentationCapability {
         throw ResourcePresentationError.unavailable
     }
 }
+
+/// Commits diagnostic presentation; classification and toast selection remain with the caller.
+public protocol RuntimeFailurePresentationCapability: Sendable {
+    func recordRuntimeFailure(_ issue: RuntimeIssue, invocation: any FunctionInput) async throws
+}

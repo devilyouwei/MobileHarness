@@ -5,7 +5,8 @@ import Foundation
 import Gateway
 import PlatformKit
 import Testing
-import UI
+
+@testable import UI
 
 @MainActor private final class DetectionEndpoint: AudioDetectionRunning {
     var calls = 0

@@ -28,11 +28,12 @@
         let conversation: ConversationState
         let actionActivity: ActionActivityState
         private let diagnostic: SpeechDiagnosticWorkflow
+        private let diagnosticState: SpeechDiagnosticState
         let audioDetection: AudioDetectionWorkflow
 
         func makeMossValidationView() -> MossValidationView {
             MossValidationView(
-                state: diagnostic.state, controls: diagnostic,
+                state: diagnosticState, controls: diagnostic,
                 autorun: ProcessInfo.processInfo.arguments.contains("-moss-autorun"))
         }
 
@@ -48,11 +49,12 @@
         }
 
         init(
+            home: UIHomeContainer, diagnostics: UIDiagnosticsContainer,
             resources: URL, audio: AudioContainer, runtime: AgentServices,
             modelName: @escaping @Sendable () async throws -> String,
             progress: @MainActor (String) -> Void
         ) async throws {
-            actionActivity = runtime.actionActivity.state
+            actionActivity = home.activity
             let models = try await ModelKitDefaults.manager(resources: resources)
             // Resolve stable capability handles before preparing the conversation models.
             let recognition = try await models.get(.recognition, load: false)
@@ -60,7 +62,8 @@
             let vad = try await models.get(.voiceActivity, load: false)
             let synthesis = try await models.get(.synthesis, load: false)
             let validationModel = synthesis
-            let diagnosticState = SpeechDiagnosticState()
+            let diagnosticState = diagnostics.speech
+            self.diagnosticState = diagnosticState
             diagnostic = SpeechDiagnosticWorkflow(
                 state: diagnosticState, player: audio.io(.diagnostic), provider: validationModel,
                 load: { try await models.warmup(.synthesis) },
@@ -76,14 +79,14 @@
             // Preparation is deferred to explicit voice admission; missing downloads do not block Settings/history.
             progress("本地模型可在设置中下载")
             try Task.checkCancellation()
-            let state = ConversationState()
+            let state = home.conversation
             let lifecycle = VoiceSessionCoordinator(
                 runtime: runtime.voiceDependencies, state: state,
                 audio: audio.io(.voice), cue: audio.cue(.voice), haptic: audio.haptic(.voice), recognition: recognition,
                 synthesis: synthesis, voiceActivity: vad)
             self.lifecycle = lifecycle
             let audioDetection = AudioDetectionWorkflow(
-                state: AudioDetectionState(),
+                state: diagnostics.audioDetection,
                 endpoint: AudioDetectionSession(
                     recognition: recognition, vad: vad, audio: audio.io(.detection),
                     beforeStart: { [weak lifecycle] in await lifecycle?.stopVoiceAndWait() }))

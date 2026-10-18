@@ -62,3 +62,13 @@ ActionBindings 编译 SpeechPlayback、ListeningActivationFeedback 和 VoiceNati
 ## Platform 根、设备接入与同帧呈现
 
 ✅ VoiceNativeEffects 的 IO、提示音和触觉由 AudioContainer 注入，不自行创建原生实例。提示音/触觉保留模块拥有的可取消任务；根停止加入这些任务，生产语音/诊断/检测的会话冲突由 AudioContainer 拒绝。
+
+## UI 全量容器化
+
+✅ 应用级 UI 状态由八个子容器统一创建，消费者注入所需 Presenting 接口并提交 UI 自有值，不直接写字段。App 注册并管理同一 UI 根；原业务身份/版本校验、原生完成和基础库依赖边界保持。跨模块连接迁移仍是独立待办。
+
+✅ 播放电平任务 await 原生离主线程频谱入口，返回后重新检查任务取消/当前会话再提交；nil 结束旧采样消费者。停止仍取消并加入同一任务，不重新创建后台观察链。
+
+✅ VoiceNativeEffects 接收 AudioInputOutput，实际 PCM／播放回执及 UI 呈现协议保持；Actions 不负责 Signal 编码。
+
+✅ 提示音和触觉分别注入 CuePlaying／HapticFeedbackProviding，便利重载只转发显式参数，实际原生实现决定失败和完成。

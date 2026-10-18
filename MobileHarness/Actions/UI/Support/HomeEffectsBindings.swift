@@ -2,7 +2,7 @@ import Foundation
 import FunctionContracts
 import UI
 
-extension HomeEffectsWorkflow {
+extension HomeEffectsPresenting {
     public func showNotice(_ notice: HomeNotice, durationMS: Int = 8000, invocation: any FunctionInput) async throws {
         try await showNotice(
             notice, durationMS: durationMS,

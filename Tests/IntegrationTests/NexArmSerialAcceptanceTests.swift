@@ -15,9 +15,9 @@ import StorageSQLite
 import StorageState
 import StorageTasks
 import Testing
-import UI
 
 @testable import PlatformKit
+@testable import UI
 
 #if os(macOS)
     private actor SerialControlFailureProbe {

@@ -15,7 +15,8 @@ public final class NativeInputBroadcast<Value: Sendable>: Sendable {
         var replacements: UInt64 = 0
     }
     private let state = Mutex(State())
-    public init() {}
+    private let onFailure: @Sendable (any Error) -> Void
+    public init(onFailure: @escaping @Sendable (any Error) -> Void = { _ in }) { self.onFailure = onFailure }
     deinit { finish() }
     public var replacements: UInt64 { state.withLock { $0.replacements } }
     public func subscribe(_ policy: Policy) throws -> AsyncThrowingStream<Value, any Error> {
@@ -38,6 +39,7 @@ public final class NativeInputBroadcast<Value: Sendable>: Sendable {
                 if entry.policy == .ordered {
                     state.withLock { $0.entries[id] = nil }
                     entry.continuation.finish(throwing: NativeSubscriptionError.overflow)
+                    onFailure(NativeSubscriptionError.overflow)
                 } else {
                     state.withLock { if $0.replacements < UInt64.max { $0.replacements += 1 } }
                 }
@@ -59,6 +61,7 @@ public final class NativeInputSession<Value: Sendable>: Sendable {
     private let active = Mutex(true)
     private let broadcast: NativeInputBroadcast<Value>
     public init(broadcast: NativeInputBroadcast<Value>) { self.broadcast = broadcast }
+    public var isActive: Bool { active.withLock { $0 } }
     public func send(_ value: Value) {
         active.withLock { if $0 { broadcast.send(value) } }
     }

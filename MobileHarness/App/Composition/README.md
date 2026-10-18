@@ -8,10 +8,10 @@
 
 | 文件 | 职责 |
 | --- | --- |
-| ApplicationContainer.swift | AppStorage 内的 Storage/Platform 根与子能力注册 |
+| ApplicationContainer.swift | AppStorage 内的 Storage/Platform/UI 根、子能力及容器故障通道注册 |
 | AppComposition.swift | 持有当前 Services 和生命周期图，连接 UI bootstrap/retry/failure 端口；显式重试替换整个根作用域 |
-| ServiceFactories.swift | 选择 Storage 运行工厂和数据库位置，创建原生实例、照片工厂、模型制品服务及 Agent 集成入口；注入延迟领域仓库接口 |
-| ModuleRegistration.swift | 注册 storage / platform / ui → agents → native 的静态依赖与公开启停/失效接口 |
+| ServiceFactories.swift | 选择 Storage 运行工厂和数据库位置，获取原生能力、创建照片工厂、模型制品服务及 Agent 集成入口；注入延迟领域仓库接口 |
+| ModuleRegistration.swift | 注册 diagnostics → storage / platform / ui → agents → native 的静态依赖与公开启停/失效接口 |
 
 配置中的资源路径属于组合输入。照片容量/FIFO、Provider 事务、模型选择、页面控制、意图编码和结果转换属于模块；App 不在绑定闭包中复制这些逻辑。
 
@@ -26,7 +26,7 @@ StorageContainer 在自己的后台启动任务中完成后端打开、迁移和
 
 [App](../README.md) · [生命周期](../Lifecycle/README.md) · [Agent 集成](../../Agents/Support/README.md) · [Action 集成](../../Actions/Support/README.md)
 
-✅ Services 持有 storage: StorageContainer；工厂持有独立 ApplicationContainer 并选择根 URL，注入领域仓库提供器。注册实际 storage.start/stop 与 storage / platform / ui → agents → native 依赖；不调用 SQLiteRepositories、FileManager 或恢复。
+✅ Services 持有 storage: StorageContainer；工厂持有独立 ApplicationContainer 并选择根 URL，注入领域仓库提供器。注册实际 storage.start/stop 与 diagnostics → storage / platform / ui → agents → native 依赖；不调用 SQLiteRepositories、FileManager 或恢复。
 
 ## 待实现
 
@@ -45,3 +45,15 @@ AppStorage 目标只编译 Composition/ApplicationContainer.swift，使用 Facto
 ## UI 容器与相机能力注入
 
 ✅ ApplicationContainer 缓存 UI 根及相机子能力，AppStorage 显式依赖 UI。Services 持有 UIContainer；ServiceFactories 定义唯一 Coordinator 工厂，ApplicationFeatures 只在原有惰性时机调用它。ModuleRegistration 注册 ui 生命周期，Agents 依赖 storage/platform/ui。
+
+## 统一容器异常通道
+
+✅ ApplicationContainer 注册根作用域故障通道，并注入 Storage/Platform/UI 原生报告器。Services 持有同一通道，ModuleRegistration 包装服务生命周期错误及清理阶段；diagnostics 依赖在基础库之前启动，最后取消/加入。AppComposition 的 onFailure 连接保留启动错误展示，不重复广播同一故障。根替换不继承旧通道队列。
+
+生命周期包装区分调用方已请求的取消与服务自行抛出的意外取消：前者不升级，后者仍报告故障。published 仅表示提交到 Gateway 发布入口，不冒充 Agent 已处理；实际接纳结果仍看 Signal 诊断。
+
+## UI 全量容器化
+
+✅ ApplicationContainer 缓存唯一 UIContainer，并将八个子能力注册为根属性的别名，不单独缓存备用实例。ServiceFactories 显式传入设置初值，再注入界面状态和所需呈现能力；不在 App 创建状态或逐帧转发。生命周期继续使用 diagnostics → storage/platform/ui → agents → native，业务消费者先停再停 UI，重试创建新根。
+
+✅ ApplicationFeatures 注入同根相机呈现端口供点击请求忙碌/提示投影，仍共用页面 CameraState，不创建备用根。

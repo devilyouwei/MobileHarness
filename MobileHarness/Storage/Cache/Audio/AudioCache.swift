@@ -19,6 +19,7 @@ public final class AudioCache: Sendable {
         }
     }
 
+    private let failures: StorageFailureReporter
     private let rootAccess: CacheAccess?
     private let admission = CacheAccess()
     private let stopping = Mutex<Task<Void, Never>?>(nil)
@@ -28,13 +29,22 @@ public final class AudioCache: Sendable {
     public convenience init(capacity: Int = 32, audioBytes: Int = 8_388_608) {
         self.init(capacity: capacity, audioBytes: audioBytes, rootAccess: nil)
     }
-    init(capacity: Int = 32, audioBytes: Int = 8_388_608, rootAccess: CacheAccess?) {
+    init(
+        capacity: Int = 32, audioBytes: Int = 8_388_608, rootAccess: CacheAccess?,
+        failures: StorageFailureReporter = .init()
+    ) {
+        self.failures = failures
         self.rootAccess = rootAccess
         precondition(audioBytes > 0)
         self.audioBytes = audioBytes
         handles = MemoryLeaseStore(
             capacity: capacity, queueTTL: nil, readyTTL: nil, errorTTL: nil
-        ) { audio, error in await audio.fail(error) }
+        ) { audio, reason in
+            switch reason {
+            case .released: await audio.retire()
+            case .failure(let error): await audio.fail(error)
+            }
+        }
     }
 
     private func checkAdmission() throws {
@@ -44,16 +54,26 @@ public final class AudioCache: Sendable {
         } catch { throw AudioCacheError.translating(error) }
     }
     public func register(_ id: String, owner: Owner, cancel: @escaping @Sendable () async -> Void) async throws {
-        try checkAdmission()
-        let audio = AudioStream(id: id, maximumBytes: audioBytes)
-        do { try await handles.register(id, owner: owner.storage, value: audio, cancel: cancel) } catch {
-            throw AudioCacheError.translating(error)
+        do {
+            try checkAdmission()
+            let audio = AudioStream(id: id, maximumBytes: audioBytes, failures: failures)
+            do { try await handles.register(id, owner: owner.storage, value: audio, cancel: cancel) } catch {
+                throw AudioCacheError.translating(error)
+            }
+        } catch {
+            failures.report("cache.audio", "register", error)
+            throw error
         }
     }
 
     public func begin(_ id: String) async throws -> AudioStream {
-        try checkAdmission()
-        do { return try await handles.begin(id) } catch { throw AudioCacheError.translating(error) }
+        do {
+            try checkAdmission()
+            do { return try await handles.begin(id) } catch { throw AudioCacheError.translating(error) }
+        } catch {
+            failures.report("cache.audio", "begin", error)
+            throw error
+        }
     }
 
     public func complete(_ id: String) async {
@@ -63,26 +83,53 @@ public final class AudioCache: Sendable {
     }
 
     public func validate(_ id: String, owner: Owner) async throws {
-        try checkAdmission()
-        do { try await handles.validate(id, owner: owner.storage) } catch { throw AudioCacheError.translating(error) }
+        do {
+            try checkAdmission()
+            do { try await handles.validate(id, owner: owner.storage) } catch {
+                throw AudioCacheError.translating(error)
+            }
+        } catch {
+            failures.report("cache.audio", "validate", error)
+            throw error
+        }
     }
 
     public func checkout(_ id: String, owner: Owner) async throws -> AudioStream {
-        try checkAdmission()
-        do { return try await handles.checkout(id, owner: owner.storage) } catch {
-            throw AudioCacheError.translating(error)
+        do {
+            try checkAdmission()
+            do { return try await handles.checkout(id, owner: owner.storage) } catch {
+                throw AudioCacheError.translating(error)
+            }
+        } catch {
+            failures.report("cache.audio", "checkout", error)
+            throw error
         }
     }
 
     public func release(_ id: String, owner: Owner) async throws {
-        do { try await handles.release(id, owner: owner.storage) } catch { throw AudioCacheError.translating(error) }
+        do {
+            do { try await handles.release(id, owner: owner.storage) } catch {
+                throw AudioCacheError.translating(error)
+            }
+        } catch {
+            failures.report("cache.audio", "release", error)
+            throw error
+        }
     }
 
     public func cancel(_ id: String, owner: Owner) async throws {
-        do { try await handles.cancel(id, owner: owner.storage) } catch { throw AudioCacheError.translating(error) }
+        do {
+            do { try await handles.cancel(id, owner: owner.storage) } catch { throw AudioCacheError.translating(error) }
+        } catch {
+            failures.report("cache.audio", "cancel", error)
+            throw error
+        }
     }
 
-    public func fail(_ id: String, error: any Error) async { await handles.fail(id, error: error) }
+    public func fail(_ id: String, error: any Error) async {
+        failures.report("cache.audio", "fail", error)
+        await handles.fail(id, error: error)
+    }
     public func cancel(inputID: String, source: String) async {
         await handles.cancel(inputID: inputID, source: source, namespace: "speech.pcm")
         await handles.forgetTerminals(inputID: inputID, source: source, namespace: "speech.pcm")

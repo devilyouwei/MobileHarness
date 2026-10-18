@@ -10,3 +10,5 @@ Persisted complete-file plans resume without network access; unsafe/reserved/ove
 ## 待实现
 
 - iPhone 下载进度呈现、后台生命周期和大文件续传验收。
+
+✅ 完整文件／持久计划的离线恢复及元数据边界回归覆盖本地复用；网络下载和 iPhone 后台验收独立进行，不由离线测试替代。

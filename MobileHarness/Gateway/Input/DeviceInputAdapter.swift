@@ -101,21 +101,13 @@ public enum DeviceInputAdapter {
             .event(String(decoding: data, as: UTF8.self)), source: "phone.bluetooth",
             sessionID: snapshot.connectionID, lifetime: .seconds(1))
     }
-    #if os(iOS)
-        public static func audioEvent(_ event: NativeAudioEvent, sessionID: String) throws -> AgentInput {
-            try envelope(
-                .event(event.rawValue), source: "phone.microphone", sessionID: sessionID, lifetime: .seconds(1))
-        }
-        public static func cameraEvent(_ event: CameraEvent, sessionID: String) throws -> AgentInput {
-            let value: String
-            switch event {
-            case .interrupted: value = "interrupted"
-            case .interruptionEnded: value = "interruptionEnded"
-            case .failed: value = "failed"
-            }
-            return try envelope(.event(value), source: "phone.camera", sessionID: sessionID, lifetime: .seconds(1))
-        }
-    #endif
+    public static func audioEvent(_ event: NativeAudioEvent, sessionID: String) throws -> AgentInput {
+        try envelope(
+            .event(event.rawValue), source: "phone.microphone", sessionID: sessionID, lifetime: .seconds(1))
+    }
+    public static func cameraEvent(_ event: CameraEvent, sessionID: String) throws -> AgentInput {
+        try envelope(.event(event.rawValue), source: "phone.camera", sessionID: sessionID, lifetime: .seconds(1))
+    }
     private static func envelope(
         _ payload: InputPayload, source: String, sessionID: String, lifetime: Duration
     ) throws -> AgentInput {

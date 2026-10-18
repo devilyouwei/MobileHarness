@@ -41,7 +41,8 @@
             coordinator.reconcile()
         }
 
-        @MainActor final class Coordinator: NSObject, UIAdaptivePresentationControllerDelegate {
+        @MainActor
+        final class Coordinator: NSObject, UIAdaptivePresentationControllerDelegate {
             weak var anchor: CoverAnchor?
             var desired: Binding<Bool>?
             var onDismiss: (() -> Void)?
@@ -88,7 +89,8 @@
         }
     }
 
-    @MainActor private final class CoverAnchor: UIViewController {
+    @MainActor
+    private final class CoverAnchor: UIViewController {
         var appeared: (() -> Void)?
         override func loadView() {
             let view = UIView()

@@ -3,7 +3,8 @@
     import UIKit
 
     /// Camera image and latest valid pose update independently with shared geometry.
-    @MainActor public struct CameraFrameView: UIViewRepresentable {
+    @MainActor
+    public struct CameraFrameView: UIViewRepresentable {
         @Bindable private var state: CameraState
         public init(state: CameraState) { self.state = state }
         public func makeUIView(context: Context) -> CameraFrameSurface { CameraFrameSurface() }
@@ -18,7 +19,8 @@
     }
 
     /// The main thread only owns UIKit, layout, and the latest immutable submission.
-    @MainActor public final class CameraFrameSurface: UIView {
+    @MainActor
+    public final class CameraFrameSurface: UIView {
         public override class var layerClass: AnyClass { CAMetalLayer.self }
         private var metalLayer: CAMetalLayer { layer as! CAMetalLayer }
         private var renderer: CameraMetalRenderer?
@@ -55,9 +57,15 @@
         }
         public override func layoutSubviews() {
             super.layoutSubviews()
-            metalLayer.contentsScale = window?.screen.scale ?? contentScaleFactor
-            metalLayer.drawableSize = CGSize(
-                width: bounds.width * metalLayer.contentsScale, height: bounds.height * metalLayer.contentsScale)
+            let scale = window?.screen.scale ?? contentScaleFactor
+            let pixels = CGSize(width: bounds.width * scale, height: bounds.height * scale)
+            // Caption layout can revisit this view without changing the camera surface.
+            // Avoid touching the drawable pool or animating native layer geometry in that case.
+            CATransaction.begin()
+            CATransaction.setDisableActions(true)
+            if metalLayer.contentsScale != scale { metalLayer.contentsScale = scale }
+            if metalLayer.drawableSize != pixels { metalLayer.drawableSize = pixels }
+            CATransaction.commit()
             submit()
         }
         public override func didMoveToWindow() {
@@ -172,6 +180,7 @@
 
     /// One owner thread, one latest state, two GPU slots. No per-submission tasks.
     final class CameraMetalRenderer: NSObject, CAMetalDisplayLinkDelegate, @unchecked Sendable {
+
         private let layer: CAMetalLayer
         private let failure: @Sendable (String) -> Void
         let completion = DispatchGroup()
@@ -205,6 +214,7 @@
         }
         func submit(_ snapshot: CameraRenderSnapshot) {
             guard control.withLock({ $0.mailbox.submit(snapshot) }) else { return }
+
             scheduleRefresh()
         }
         func stop() {
@@ -371,6 +381,7 @@
                 if completion.status == .error { fail(completion.error?.localizedDescription ?? "Camera GPU failure") }
             }
             command.present(drawable)
+
             command.commit()
             committed = true
             // A racing update owns a coalesced refresh; never pause over its pending value.

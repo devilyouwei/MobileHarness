@@ -115,3 +115,10 @@ NexArmControlService 持有不含 UI 类型的连接/执行状态，BluetoothWor
 ## UI 容器与相机能力注入
 
 ✅ CameraCoordinator 留在现有 ActionBindings 目标，构造改由 App 的唯一工厂提供；注入 CameraCapturing 与 CameraPresenting，以快照读展示事实，经呈现接口更新 UI，不查找 IoC、不持有具体 CameraState/AppleCamera。
+
+## ApplicationControl 异常展示
+
+✅ UI.RuntimeDiagnostics.recordFailure 作为代码授权的内部 Tool，接收已分类的中立展示值。ActionBindings 校验 ApplicationControl 根身份后更新注入 UI 状态；Actions 核心不导入 Agents、Gateway 或 UI，函数完成不代表原故障恢复。
+## UI 全量容器化
+
+✅ 应用级 UI 状态由八个子容器统一创建，消费者注入所需 Presenting 接口并提交 UI 自有值，不直接写字段。App 注册并管理同一 UI 根；原业务身份/版本校验、原生完成和基础库依赖边界保持。跨模块连接迁移仍是独立待办。

@@ -184,6 +184,7 @@ let package = Package(
                 "UI/LightActions.swift",
                 "UI/NavigationActions.swift",
                 "UI/NoticeActions.swift",
+                "UI/RuntimeDiagnosticsActions.swift",
                 "UI/PoseActions.swift",
                 "UI/README.md",
                 "UI/ResourcePresentationActions.swift",
@@ -612,7 +613,7 @@ let package = Package(
             name: "AppStorage",
             dependencies: [
                 "Storage", "StorageCore", "StorageState", "StorageCache", "StorageFiles", "StorageDatabase",
-                "StorageSQLite", "PlatformKit", "UI", .product(name: "FactoryKit", package: "Factory"),
+                "StorageSQLite", "PlatformKit", "UI", "Gateway", .product(name: "FactoryKit", package: "Factory"),
             ],
             path: "MobileHarness/App/Composition",
             exclude: ["README.md", "AppComposition.swift", "ModuleRegistration.swift", "ServiceFactories.swift"],

@@ -1,7 +1,7 @@
 import Foundation
 import StorageCore
 
-public enum FileStorageError: Error, Sendable { case invalidPath, invalidFile, capacityExceeded, busy }
+public enum FileStorageError: Error, Equatable, Sendable { case invalidPath, invalidFile, capacityExceeded, busy }
 public struct BinaryObjectInfo: Sendable {
     public let bytes: Int
     public init(bytes: Int) { self.bytes = bytes }

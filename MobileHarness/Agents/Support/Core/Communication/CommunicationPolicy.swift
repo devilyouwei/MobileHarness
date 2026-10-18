@@ -28,6 +28,22 @@ public struct CommunicationContract: Sendable {
 public struct CommunicationContracts: Sendable {
     private let entries: [String: CommunicationContract]
     public static let standard = CommunicationContracts(standard: [
+        CommunicationContract(
+            name: RuntimeFailureEvent.contract, kind: .observation, maximumBytes: 16_384,
+            validateMessage: { message in
+                guard let event = message.content(as: RuntimeFailureEvent.self) else {
+                    throw CommunicationError.invalidPayload
+                }
+                try event.validate()
+            }),
+        CommunicationContract(
+            name: ContainerFailureEvent.contract, kind: .observation, maximumBytes: 8192,
+            validateMessage: { message in
+                guard let event = message.content(as: ContainerFailureEvent.self) else {
+                    throw CommunicationError.invalidPayload
+                }
+                try event.validate()
+            }),
         CommunicationContract(name: "communication.receipt", kind: .communicationReceipt),
         CommunicationContract(name: "user.text", kind: .text, maximumBytes: 4096),
         CommunicationContract(name: "runtime.event", kind: .event),

@@ -1,0 +1,746 @@
+import ActionBindings
+import Actions
+import AgentBindings
+import AgentCore
+import Agents
+import AppLifecycle
+import AppStorage
+import CallRuntime
+import ExecutionRuntime
+import Foundation
+import FunctionContracts
+import Gateway
+import ModelKit
+import PlatformKit
+import Storage
+import StorageCache
+import StorageChat
+import StorageCore
+import StorageDatabase
+import StorageDevices
+import StorageFiles
+import StorageMedia
+import StorageSQLite
+import StorageState
+import StorageTasks
+import Synchronization
+import Testing
+
+@testable import UI
+
+private struct DiagnosticTools: ToolModule { let definitions: [ActionBinding] }
+
+private enum InjectedContainerFailure: Error, Equatable {
+    case operation(Int)
+    case startup, cleanup, transport
+}
+
+@MainActor private func containerEventually(_ predicate: () async throws -> Bool) async throws {
+    let deadline = ContinuousClock.now + .seconds(4)
+    while !(try await predicate()) {
+        guard ContinuousClock.now < deadline else { throw CommunicationError.expired }
+        try await Task.sleep(for: .milliseconds(5))
+    }
+}
+private actor DiagnosticChat: ChatCapability {
+    let availability: CapabilityAvailability = .available
+    private(set) var calls = 0
+    func chat(_ request: ChatRequest) throws -> InferenceSession<ChatEvent> {
+        calls += 1
+        throw InjectedContainerFailure.operation(0)
+    }
+}
+private actor DiagnosticPublicationGate {
+    private var continuation: CheckedContinuation<Void, Never>?
+    private var opened = false
+    let entered = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingNewest(1))
+    func wait() async {
+        entered.continuation.yield(())
+        guard !opened else { return }
+        await withCheckedContinuation { continuation = $0 }
+    }
+    func release() {
+        opened = true
+        continuation?.resume()
+        continuation = nil
+    }
+}
+private actor FailedDiagnosticDatabase: DatabaseStorage {
+    nonisolated var chat: any ChatRepository { get throws { throw RecordStorageError.notReady } }
+    nonisolated var tasks: any TaskRepository { get throws { throw RecordStorageError.notReady } }
+    nonisolated var media: any MediaRepository { get throws { throw RecordStorageError.notReady } }
+    nonisolated var devices: any DeviceRepository { get throws { throw RecordStorageError.notReady } }
+    func start() throws { throw InjectedContainerFailure.startup }
+    func stop() throws { throw InjectedContainerFailure.cleanup }
+}
+
+@MainActor struct RuntimeFailurePresentationFixture {
+    let ui = UIContainer()
+    let manager: AgentManager
+    let input: InputGateway
+    let output: OutputGateway
+    let runtime: ApplicationControlIntentRuntime
+    let context: AgentContextRepository<ApplicationControlContextState>
+    let sessionID: String
+    init(activity: ActionActivityWorkflow, rejectPresentation: Bool = false) throws {
+        sessionID = UUID().uuidString
+        manager = AgentManager()
+        let configurations = try [
+            "Assistant", "SpeechPerception", "SpeechSynthesis", "VisionPerception", "Photographer", "Memory",
+            "ApplicationControl",
+        ].map { try AgentConfigurations.load(named: $0) }
+        let policy = try CommunicationPolicy(
+            contracts: AgentContracts.communication,
+            externalSources: [
+                "user", "runtime", "phone.camera", "phone.microphone", "phone.bluetooth", "app.environment",
+                "app.resources", "model.resources",
+            ], configurations: configurations)
+        input = InputGateway(manager: manager, policy: policy)
+        context = try AgentContextRepository(
+            agent: .applicationControl, scope: sessionID, state: ApplicationControlContextState())
+        let agent = try ApplicationControlAgent(sessionID: sessionID, context: context)
+        let presentation = RuntimePresentation(
+            cameraControl: UnusedCameraControl(), rootSessionID: sessionID, activity: activity.state,
+            effects: ui.home.effects, expressions: ui.home.expressions)
+        let function = UIActions.recordFailureDefinition(completing: { invocation in
+            if rejectPresentation { throw InjectedContainerFailure.operation(99) }
+            return .value(try await UIActions.recordFailure(invocation: invocation, using: presentation))
+        })
+        output = OutputGateway(
+            manager: manager, requests: input,
+            tools: try ToolRegistry(modules: [
+                DiagnosticTools(definitions: [try BehaviorProtocolBindings.bind(function)])
+            ]),
+            policy: policy, sink: { _ in })
+        runtime = ApplicationControlIntentRuntime(
+            sessionID: sessionID, manager: manager, input: input, output: output, agent: agent)
+    }
+    func start(activity: ActionActivityWorkflow) async throws {
+        try ui.start()
+        try await runtime.prepareForInteraction()
+        activity.startFailures { try await output.observeFailures() }
+        activity.connectFailureSignals(input: input, sessionID: sessionID)
+    }
+    func stop(activity: ActionActivityWorkflow) async {
+        await activity.stopFailureSignals()
+        await runtime.shutdown()
+        await output.shutdown()
+        await input.shutdown()
+        await ui.stop()
+    }
+}
+
+@Test @MainActor func containerFailureRegistrySharesNativeReportersAndIsolatesRoots() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    let registry = ApplicationContainer(root: root)
+    let other = ApplicationContainer(root: root.appendingPathComponent("other"))
+    let channel = registry.containerFailures()
+    #expect(channel === registry.containerFailures())
+    #expect(channel !== other.containerFailures())
+    let storage = registry.storage()
+    #expect(!FileManager.default.fileExists(atPath: root.path))
+    let scope = try storage.state.makeScope()
+    #expect(throws: StateError.invalidKey) { try scope.register(StateKey<Int>(""), initial: 0) }
+    #expect(throws: StorageError.missing) { try storage.cache.buffers.get("missing") }
+    #expect(throws: StorageError.forbidden) { try storage.files.file(other.storage().files.photos) }
+    #expect(throws: RecordStorageError.notReady) { try storage.database.chat }
+    let display = registry.ui()
+    display.camera.state.presentRendererFailure(
+        "synthetic renderer failure", generation: display.camera.state.videoGeneration)
+    let snapshot = channel.snapshot()
+    #expect(
+        Set(snapshot.records.map { $0.event.component }).isSuperset(of: [
+            "state", "cache.buffers", "files", "database", "camera.renderer",
+        ]))
+    #expect(snapshot.records.allSatisfy { $0.event.scopeID == channel.scopeID })
+    #expect(other.containerFailures().snapshot().records.isEmpty)
+    #expect(!FileManager.default.fileExists(atPath: root.path))
+    scope.close()
+    await display.stop()
+    await channel.stop()
+    await other.containerFailures().stop()
+}
+
+@Test(.actionCatalog) @MainActor func containerFailureBroadcastReachesAssistantAndToastWithoutInferenceOrPersistence()
+    async throws
+{
+    let manager = AgentManager()
+    let configurations = try [
+        "Assistant", "SpeechPerception", "SpeechSynthesis", "VisionPerception", "Photographer", "Memory",
+        "ApplicationControl",
+    ].map {
+        try AgentConfigurations.load(named: $0)
+    }
+    let policy = try CommunicationPolicy(
+        contracts: AgentContracts.communication,
+        externalSources: [
+            "user", "runtime", "phone.camera", "phone.microphone", "phone.bluetooth", "app.environment",
+            "app.resources", "model.resources",
+        ],
+        configurations: configurations)
+    let input = InputGateway(manager: manager, policy: policy)
+    let context = try AgentContextRepository(
+        agent: .assistant, scope: "diagnostic-root", state: AssistantContextState())
+    let chat = DiagnosticChat()
+    let agent = try AssistantAgent(stateContext: try publicStateFixture(), chat: chat, context: context)
+    try await manager.register(agent, sessionID: "diagnostic-session")
+    try await agent.start()
+    let channel = ContainerFailureChannel()
+    let activity = ActionActivityWorkflow(state: ActionActivityState())
+    let controlContext = try AgentContextRepository(
+        agent: .applicationControl, scope: "diagnostic-root", state: ApplicationControlContextState())
+    let control = try ApplicationControlAgent(sessionID: "diagnostic-session", context: controlContext)
+    let display = UIContainer()
+    try display.start()
+    let presentation = RuntimePresentation(
+        cameraControl: UnusedCameraControl(), rootSessionID: "diagnostic-session", activity: activity.state,
+        effects: display.home.effects, expressions: display.home.expressions)
+    let function = UIActions.recordFailureDefinition(completing: { invocation in
+        .value(try await UIActions.recordFailure(invocation: invocation, using: presentation))
+    })
+    let output = OutputGateway(
+        manager: manager, requests: input,
+        tools: try ToolRegistry(modules: [DiagnosticTools(definitions: [try BehaviorProtocolBindings.bind(function)])]),
+        policy: policy, sink: { _ in })
+    let runtime = ApplicationControlIntentRuntime(
+        sessionID: "diagnostic-session", manager: manager, input: input, output: output, agent: control)
+    try await runtime.prepareForInteraction()
+    channel.report(
+        module: "storage", component: "database", operation: "read", error: InjectedContainerFailure.operation(1))
+    #expect(channel.snapshot().records.first?.delivery == .pending)
+    channel.start()
+    channel.connect(input: input, sessionID: "diagnostic-session")
+    try await containerEventually {
+        await agent.receivedContainerFailures().count == 1 && activity.state.backgroundIssues.count == 1
+    }
+    let first = try #require(await agent.receivedContainerFailures().first)
+    #expect(first.scopeID == channel.scopeID)
+    #expect(first.component == "database")
+    #expect(activity.state.errorToast?.failureCode == "container.failure")
+    let toastID = try #require(activity.state.errorToast?.id)
+    activity.state.dismissErrorToast(id: toastID)
+    for _ in 0..<100 {
+        channel.report(
+            module: "storage", component: "database", operation: "read", error: InjectedContainerFailure.operation(1))
+    }
+    try await containerEventually { await agent.receivedContainerFailures().first?.occurrences == 101 }
+    try await containerEventually {
+        guard let presented = activity.state.backgroundIssues.first?.time,
+            let reported = channel.snapshot().records.first?.event.lastOccurred
+        else { return false }
+        return abs(presented.timeIntervalSince(reported)) < 0.001
+    }
+    #expect(activity.state.backgroundIssues.count == 1)
+    #expect(activity.state.errorToast == nil)
+    #expect(await chat.calls == 0)
+    #expect(try await context.snapshot().state.history.current.turns.isEmpty)
+    #expect(try await context.snapshot().state.admissionSequence == 0)
+    #expect(try await controlContext.snapshot().revision == 0)
+    #expect(await control.failurePresentationErrors().isEmpty)
+    var traces = try await input.observeSignals().makeAsyncIterator()
+    let records = try #require(await traces.next()).records
+    #expect(
+        records.contains {
+            $0.contract == ContainerFailureEvent.contract && $0.source == "runtime" && $0.phase == .accepted
+        })
+    channel.disconnect()
+    await runtime.shutdown()
+    await output.shutdown()
+    await channel.stop()
+    await input.shutdown()
+    await manager.stopAll()
+    await display.stop()
+}
+
+@Test @MainActor func containerFailureJournalBoundsCoalescesAndRetainsShutdownEvidence() async throws {
+    let channel = ContainerFailureChannel()
+    for index in 0..<130 {
+        channel.report(
+            module: "platform", component: "audio", operation: "capture",
+            error: InjectedContainerFailure.operation(index))
+    }
+    let snapshot = channel.snapshot()
+    #expect(snapshot.records.count == 128)
+    #expect(snapshot.evictedRecords == 2)
+    #expect(snapshot.droppedPending == 66)
+    #expect(snapshot.records.filter { $0.delivery == .pending }.count == 64)
+    var observers: [AsyncStream<ContainerFailureSnapshot>] = []
+    for _ in 0..<8 { observers.append(try channel.observe()) }
+    #expect(throws: CommunicationError.capacityExceeded) { try channel.observe() }
+    #expect(!channel.report(module: "ui", component: "camera", operation: "stop", error: CancellationError()))
+    #expect(channel.snapshot().records.count == 128)
+    await channel.stop()
+    #expect(
+        !channel.report(
+            module: "ui", component: "camera", operation: "late", error: InjectedContainerFailure.operation(999)))
+    #expect(channel.snapshot().rejectedAfterStop == 1)
+    #expect(channel.snapshot().records.count == 128)
+    var retained = observers[0].makeAsyncIterator()
+    #expect(await retained.next()?.records.count == 128)
+    #expect(await retained.next() == nil)
+}
+
+@Test @MainActor func containerFailureTransportFailureDoesNotRecurseAndCanReconnect() async throws {
+    let channel = ContainerFailureChannel()
+    channel.start()
+    channel.connect { _ in throw InjectedContainerFailure.transport }
+    channel.report(module: "ui", component: "camera", operation: "render", error: InjectedContainerFailure.operation(1))
+    try await containerEventually { channel.snapshot().records.first?.delivery == .failed }
+    #expect(channel.snapshot().records.count == 1)
+    #expect(channel.snapshot().records.first?.deliveryFailure?.contains("transport") == true)
+    let count = Mutex(0)
+    channel.connect { _ in count.withLock { $0 += 1 } }
+    try await containerEventually { channel.snapshot().records.first?.delivery == .published }
+    #expect(count.withLock { $0 } == 1)
+    #expect(channel.snapshot().records.first?.event.occurrences == 1)
+    channel.disconnect()
+    channel.report(module: "ui", component: "camera", operation: "render", error: InjectedContainerFailure.operation(1))
+    #expect(channel.snapshot().records.first?.delivery == .pending)
+    #expect(count.withLock { $0 } == 1)
+    await channel.stop()
+}
+
+@Test @MainActor func containerFailureStopJoinsNonCooperativePublisherAndCoalescesPendingRepeats() async throws {
+    let channel = ContainerFailureChannel()
+    let gate = DiagnosticPublicationGate()
+    let sent = Mutex<[UInt64]>([])
+    channel.connect { event in
+        sent.withLock { $0.append(event.occurrences) }
+        await gate.wait()
+    }
+    channel.start()
+    channel.report(
+        module: "platform", component: "camera", operation: "capture", error: InjectedContainerFailure.operation(1))
+    var entered = await gate.entered.stream.makeAsyncIterator()
+    _ = await entered.next()
+    for _ in 0..<100 {
+        channel.report(
+            module: "platform", component: "camera", operation: "capture", error: InjectedContainerFailure.operation(1))
+    }
+    #expect(channel.snapshot().records.count == 1)
+    #expect(channel.snapshot().records.first?.event.occurrences == 101)
+    let finished = Mutex(false)
+    let stopping = Task {
+        await channel.stop()
+        finished.withLock { $0 = true }
+    }
+    try await Task.sleep(for: .milliseconds(20))
+    #expect(!finished.withLock { $0 })
+    await gate.release()
+    await stopping.value
+    #expect(finished.withLock { $0 })
+    #expect(sent.withLock { $0 } == [1])
+}
+
+@Test @MainActor func containerFailureStorageRollbackPreservesPrimaryAndCleanupBeforeAgentStartup() async throws {
+    let channel = ContainerFailureChannel()
+    let reporter = StorageFailureReporter(receive: channel.sink(module: "storage"))
+    let path = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: path) }
+    let files = FilesContainer(settings: path, photos: path, models: path, failures: reporter)
+    let storage = StorageContainer(database: FailedDiagnosticDatabase(), files: files, failures: reporter)
+    let startedAgent = Mutex(false)
+    let lifecycle = try ApplicationLifecycle(services: [
+        ManagedService(id: "diagnostics", start: { channel.start() }, stop: { await channel.stop() }),
+        ManagedService(
+            id: "storage", dependencies: ["diagnostics"], start: { try await storage.start() },
+            stop: { try await storage.stop() }),
+        ManagedService(
+            id: "agent", dependencies: ["storage"], start: { startedAgent.withLock { $0 = true } }, stop: {}),
+    ])
+    do {
+        try await lifecycle.start()
+        Issue.record("Expected startup failure")
+    } catch let failure as ApplicationLifecycleFailure {
+        let storage = try #require(failure.primary as? StorageLifecycleFailure)
+        #expect(storage.primary as? InjectedContainerFailure == .startup)
+        #expect(storage.cleanup.first as? InjectedContainerFailure == .cleanup)
+    }
+    #expect(!startedAgent.withLock { $0 })
+    #expect(!channel.snapshot().records.isEmpty)
+    #expect(channel.snapshot().records.allSatisfy { $0.delivery != .published })
+    #expect(channel.snapshot().records.contains { $0.event.message.contains("startup") })
+    #expect(channel.snapshot().records.contains { $0.event.message.contains("cleanup") })
+}
+
+@Test(.actionCatalog) @MainActor func containerFailureAssistantRejectsForgedSourceAndMalformedEvents() async throws {
+    let agent = try AssistantAgent(
+        stateContext: try publicStateFixture(),
+        context: AgentContextRepository(agent: .assistant, scope: "fault-auth", state: AssistantContextState()))
+    try await agent.start()
+    let channel = ContainerFailureChannel()
+    channel.report(module: "ui", component: "camera", operation: "render", error: InjectedContainerFailure.operation(1))
+    let event = try #require(channel.snapshot().records.first?.event)
+    let payload = InputPayload.observation(
+        AgentMessage(contract: ContainerFailureEvent.contract, content: event, validate: { try $0.validate() }))
+    await #expect(throws: CommunicationError.unauthorized) {
+        try await agent.receive(
+            AgentInput(
+                id: "forged", sessionID: "s", payload: payload,
+                metadata: InputMetadata(payload: payload, source: "user", rootID: "forged")))
+    }
+    await #expect(throws: CommunicationError.unauthorized) {
+        try await agent.receive(
+            AgentInput(
+                id: "forged-agent", sessionID: "s", payload: payload,
+                metadata: InputMetadata(
+                    payload: payload, source: "runtime", incarnation: "fake", origin: .agent, rootID: "forged-agent")))
+    }
+    var invalid = event
+    invalid.occurrences = 0
+    #expect(throws: CommunicationError.invalidPayload) { try invalid.validate() }
+    #expect(await agent.receivedContainerFailures().isEmpty)
+    await channel.stop()
+    await agent.stop()
+}
+
+@Test func containerFailureNativeSubscriberOverflowIsReportedWithoutStoppingOtherInputs() async throws {
+    let channel = ContainerFailureChannel()
+    let admission = PlatformAdmission(onFailure: channel.sink(module: "platform"))
+    let broadcast = NativeInputBroadcast<Int> { error in admission.report("audio.capture", "subscriber", error) }
+    let slow = try broadcast.subscribe(.ordered)
+    let latest = try broadcast.subscribe(.latest)
+    for value in 0..<65 { broadcast.send(value) }
+    var slowValues = slow.makeAsyncIterator()
+    for value in 0..<64 { #expect(try await slowValues.next() == value) }
+    await #expect(throws: NativeSubscriptionError.self) { try await slowValues.next() }
+    var current = latest.makeAsyncIterator()
+    #expect(try await current.next() == 64)
+    let record = try #require(channel.snapshot().records.first)
+    #expect(record.event.module == "platform")
+    #expect(record.event.component == "audio.capture")
+    #expect(record.event.message.contains("overflow"))
+    broadcast.finish()
+    await channel.stop()
+}
+
+@Test @MainActor func containerFailureStorageLeafOperationsRetainThrownErrorsAndReportAtTheirOwner() async throws {
+    let channel = ContainerFailureChannel()
+    let reporter = StorageFailureReporter(receive: channel.sink(module: "storage"))
+    let path = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: path) }
+    let files = FilesContainer(settings: path, photos: path, models: path, failures: reporter)
+    try files.start()
+    let document = try files.document(String.self, in: files.settings, name: "limited.json", maximumBytes: 16)
+    await #expect(throws: DocumentStorageError.capacityExceeded) {
+        try await document.replace(String(repeating: "x", count: 100))
+    }
+    let bytes = try files.file(files.photos)
+    await #expect(throws: FileStorageError.invalidPath) { try await bytes.read("../outside", maximumBytes: 64) }
+    let cache = CacheContainer(failures: reporter)
+    let audio = try await cache.audioScope("session")
+    let owner = AudioCache.Owner(source: "synthetic", session: "session", input: "input")
+    try await audio.register("stream", owner: owner, cancel: {})
+    let stream = try await audio.begin("stream")
+    await stream.fail(InjectedContainerFailure.operation(3))
+    await #expect(throws: InjectedContainerFailure.operation(3)) { try await stream.next() }
+    let components = Set(channel.snapshot().records.map { $0.event.component })
+    #expect(components.isSuperset(of: ["files.document", "files.bytes", "cache.audio.stream"]))
+    await cache.close()
+    await files.close()
+    await channel.stop()
+}
+
+@Test func containerFailureExplicitLifecycleCancellationIsKeptButNormalCancellationIsIgnored() async {
+    let channel = ContainerFailureChannel()
+    #expect(!channel.report(module: "storage", component: "lifecycle", operation: "start", error: CancellationError()))
+    #expect(channel.snapshot().records.isEmpty)
+    #expect(
+        channel.report(
+            module: "storage", component: "lifecycle", operation: "start", phase: .startup, error: CancellationError(),
+            includeCancellation: true))
+    #expect(channel.snapshot().records.count == 1)
+    #expect(channel.snapshot().records.first?.event.phase == .startup)
+    await channel.stop()
+}
+
+@Test(.actionCatalog) @MainActor func applicationControlOwnsRuntimeFailurePolicyAndKeepsCorrelation() async throws {
+    let activity = ActionActivityWorkflow(state: ActionActivityState())
+    let fixture = try RuntimeFailurePresentationFixture(activity: activity)
+    activity.recordFailure(
+        title: "Model", source: "assistant", message: "native transport cause", failureCode: "agent.model.transport",
+        context: .init(workerID: "worker", sessionID: "business", inputID: "input", roundID: "round"),
+        diagnostic: .init(category: .modelTransport, code: "agent.model.transport", detail: "native transport cause"))
+    #expect(activity.state.backgroundIssues.isEmpty && activity.state.errorToast == nil)
+    try await fixture.start(activity: activity)
+    try await containerEventually { activity.state.backgroundIssues.count == 1 }
+    let issue = try #require(activity.state.backgroundIssues.first)
+    #expect(issue.category == "模型连接异常")
+    #expect(issue.userMessage == "模型连接失败，请检查网络后重试")
+    #expect(issue.context?.sessionID == "business" && issue.context?.inputID == "input")
+    #expect(issue.context?.workerID == "worker" && issue.context?.roundID == "round")
+    #expect(try await fixture.context.snapshot().revision == 0)
+    await fixture.stop(activity: activity)
+}
+
+@Test(.actionCatalog) @MainActor func applicationControlRecordsStaleEvidenceWhilePausedWithoutToast() async throws {
+    let activity = ActionActivityWorkflow(state: ActionActivityState())
+    let fixture = try RuntimeFailurePresentationFixture(activity: activity)
+    try await fixture.start(activity: activity)
+    try await fixture.runtime.agent.pause()
+    let event = RuntimeFailureEvent(
+        id: "stale", source: "visionPerception", title: "Vision", message: "old native failure",
+        time: Date().addingTimeInterval(-60), failureCode: "vision.pose.failed", category: "runtime")
+    try await fixture.input.publishRuntimeFailure(event, sessionID: fixture.sessionID)
+    try await containerEventually { activity.state.backgroundIssues.count == 1 }
+    #expect(activity.state.errorToast == nil)
+    #expect(activity.state.backgroundIssues.first?.category == "Agent 运行异常")
+    let processed = await fixture.runtime.agent.status().processedInputs
+    try await fixture.input.publishRuntimeFailure(event, sessionID: fixture.sessionID)
+    // Joining publication shutdown below also joins the duplicate delivery.
+    await fixture.input.shutdown()
+    #expect(await fixture.runtime.agent.status().processedInputs == processed)
+    #expect(activity.state.backgroundIssues.count == 1)
+    await fixture.stop(activity: activity)
+}
+
+@Test(.actionCatalog) @MainActor func applicationControlPresentationFailureDoesNotFeedBackOrStopBusiness() async throws
+{
+    let activity = ActionActivityWorkflow(state: ActionActivityState())
+    let fixture = try RuntimeFailurePresentationFixture(activity: activity, rejectPresentation: true)
+    try await fixture.start(activity: activity)
+    activity.recordFailure(
+        title: "Vision", source: "visionPerception", message: "inference failed", failureCode: "vision.pose.failed")
+    try await containerEventually { await fixture.runtime.agent.failurePresentationErrors().count == 1 }
+    #expect(activity.state.backgroundIssues.isEmpty && activity.state.errorToast == nil)
+    #expect(await fixture.runtime.agent.status().lifecycle == .running)
+    #expect(await fixture.runtime.agent.status().processedInputs == 1)
+    // Barrier: observe and forward the failed presentation snapshot, then close the forwarding owner.
+    var snapshots = try await fixture.output.observeFailures().makeAsyncIterator()
+    #expect(await snapshots.next()?.records.count == 1)
+    await activity.stopFailureSignals()
+    #expect(await fixture.runtime.agent.status().processedInputs == 1)
+    #expect(try await fixture.context.snapshot().revision == 0)
+    await fixture.stop(activity: activity)
+}
+
+@Test @MainActor func runtimeFailureForwardingIsBoundedAndRejectsAfterStop() async {
+    let activity = ActionActivityWorkflow(state: ActionActivityState())
+    for index in 0..<101 {
+        activity.recordFailure(title: "runtime", source: "runtime", message: "failure \(index)")
+    }
+    #expect(activity.rejectedFailureSignals == 1)
+    #expect(activity.state.observationUnavailable)
+    #expect(activity.state.backgroundIssues.isEmpty)
+    await activity.stopFailureSignals()
+    activity.recordFailure(title: "runtime", source: "runtime", message: "late")
+    #expect(activity.rejectedFailureSignals == 2)
+}
+
+private func diagnosticInput(
+    _ event: RuntimeFailureEvent, session: String, source: String = "runtime",
+    deadline: ContinuousClock.Instant? = nil
+) -> AgentInput {
+    let payload = InputPayload.observation(
+        AgentMessage(
+            contract: RuntimeFailureEvent.contract, content: event, maximumBytes: 16_384,
+            validate: { try $0.validate() }))
+    let id = UUID().uuidString
+    return AgentInput(
+        id: id, sessionID: session, payload: payload,
+        metadata: .init(payload: payload, source: source, rootID: id, deadline: deadline))
+}
+
+@Test(.actionCatalog) func applicationControlRejectsForgedExpiredAndStoppedDiagnostics() async throws {
+    let session = UUID().uuidString
+    let agent = try ApplicationControlAgent(
+        sessionID: session,
+        context: AgentContextRepository(
+            agent: .applicationControl, scope: session, state: ApplicationControlContextState()))
+    try await agent.start()
+    let event = RuntimeFailureEvent(source: "assistant", title: "Model", message: "failed")
+    await #expect(throws: CommunicationError.unauthorized) {
+        try await agent.receive(diagnosticInput(event, session: session, source: "user"))
+    }
+    await #expect(throws: CommunicationError.unauthorized) {
+        try await agent.receive(diagnosticInput(event, session: "other"))
+    }
+    await #expect(throws: CommunicationError.expired) {
+        try await agent.receive(diagnosticInput(event, session: session, deadline: .now - .seconds(1)))
+    }
+    #expect(await agent.status().processedInputs == 0)
+    await agent.stop()
+    await #expect(throws: HarnessError.notRunning) {
+        try await agent.receive(diagnosticInput(event, session: session))
+    }
+}
+
+@Test(.actionCatalog) func applicationControlBoundsPendingDiagnosticPresentationCalls() async throws {
+    let session = UUID().uuidString
+    let agent = try ApplicationControlAgent(
+        sessionID: session,
+        context: AgentContextRepository(
+            agent: .applicationControl, scope: session, state: ApplicationControlContextState()))
+    try await agent.start()
+    for index in 0..<128 {
+        let event = RuntimeFailureEvent(id: "error-\(index)", source: "assistant", title: "Model", message: "failed")
+        try await agent.receive(diagnosticInput(event, session: session))
+    }
+    await #expect(throws: CommunicationError.capacityExceeded) {
+        try await agent.receive(
+            diagnosticInput(
+                RuntimeFailureEvent(source: "assistant", title: "Model", message: "overflow"), session: session))
+    }
+    #expect(await agent.status().processedInputs == 128)
+    await agent.stop()
+}
+
+@Test(.actionCatalog) @MainActor func executionFailureObservationIsIndependentAndBounded() async throws {
+    let state = ActionActivityState()
+    let workflow = ActionActivityWorkflow(state: state)
+    let fixture = try RuntimeFailurePresentationFixture(activity: workflow)
+    try await fixture.runtime.prepareForInteraction()
+    workflow.connectFailureSignals(input: fixture.input, sessionID: fixture.sessionID)
+    let pair = AsyncStream<OutputFailureSnapshot>.makeStream(bufferingPolicy: .bufferingNewest(1))
+    workflow.startFailures { pair.stream }
+    let issue = OutputFailureRecord(source: .assistant, title: "Fixture.Control.tool", message: "Resource rejected")
+    pair.continuation.yield(.init(revision: 1, records: [issue], evictedCount: 2))
+    let deadline = ContinuousClock.now.advanced(by: .seconds(2))
+    while state.backgroundIssues.isEmpty && ContinuousClock.now < deadline { await Task.yield() }
+    #expect(state.backgroundIssues.first?.message == "Resource rejected")
+    #expect(state.items.isEmpty && state.hasRecords)
+    for index in 0..<105 {
+        workflow.recordFailure(title: "Worker", source: "Fixture", message: "Business failure \(index)")
+        try await containerEventually { await fixture.runtime.agent.status().processedInputs >= index + 2 }
+    }
+    try await containerEventually { state.backgroundIssues.last?.message == "Business failure 104" }
+    #expect(state.backgroundIssues.count == 100)
+    #expect(state.issueEvictions == 6)
+    pair.continuation.yield(.init(revision: 0, records: [], evictedCount: 0))
+    pair.continuation.finish()
+    await fixture.stop(activity: workflow)
+}
+
+@Test(.actionCatalog) @MainActor func speechRecognitionToastIsFriendlyAndDirectFailureDetailsStayInLog() async throws {
+    let state = ActionActivityState()
+    let workflow = ActionActivityWorkflow(state: state)
+    let fixture = try RuntimeFailurePresentationFixture(activity: workflow)
+    try await fixture.start(activity: workflow)
+    let raw = "agent.error: speech perception: Error Domain=SFSpeechErrorDomain Code=1 RecogRejected"
+    workflow.recordFailure(title: "Output", source: "speechPerception", message: raw)
+    try await containerEventually { state.backgroundIssues.count == 1 }
+    #expect(state.visibleNotice?.text == "我没听清")
+    #expect(state.backgroundIssues.first?.message == raw)
+    #expect(state.errorToast?.message == raw)
+    workflow.recordFailure(title: "Output", source: "assistant", message: "agent.error: Fixture failure")
+    try await containerEventually { state.backgroundIssues.count == 2 }
+    #expect(state.visibleNotice?.text == "Fixture failure")
+    #expect(state.backgroundIssues.last?.message == "agent.error: Fixture failure")
+    await fixture.stop(activity: workflow)
+}
+
+@Test(.actionCatalog) @MainActor func speechRecognitionSnapshotToastPreservesDetailedRecordAndInput() async throws {
+    let state = ActionActivityState()
+    let workflow = ActionActivityWorkflow(state: state)
+    let fixture = try RuntimeFailurePresentationFixture(activity: workflow)
+    try await fixture.runtime.prepareForInteraction()
+    workflow.connectFailureSignals(input: fixture.input, sessionID: fixture.sessionID)
+    let pair = AsyncStream<OutputFailureSnapshot>.makeStream(bufferingPolicy: .bufferingNewest(1))
+    workflow.startFailures { pair.stream }
+    let inputID = UUID().uuidString
+    let raw = "agent.error: speech perception: Error Domain=SFSpeechErrorDomain Code=1 RecogRejected"
+    let issue = OutputFailureRecord(source: .speechPerception, title: "Output", message: raw, inputID: inputID)
+    pair.continuation.yield(.init(revision: 1, records: [issue], evictedCount: 0))
+    let deadline = ContinuousClock.now.advanced(by: .seconds(2))
+    while state.backgroundIssues.isEmpty && ContinuousClock.now < deadline { await Task.yield() }
+    #expect(state.visibleNotice?.text == "我没听清")
+    #expect(state.visibleNotice?.id == "runtime:" + issue.id)
+    #expect(state.backgroundIssues.first?.message == raw && state.backgroundIssues.first?.inputID == inputID)
+    #expect(state.errorToast?.message == raw)
+    pair.continuation.finish()
+    await fixture.stop(activity: workflow)
+}
+
+@Test(.actionCatalog) @MainActor func agentProtocolFailureProjectsShortToastFullDetailAndCorrelation() async throws {
+    let state = ActionActivityState()
+    let workflow = ActionActivityWorkflow(state: state)
+    let fixture = try RuntimeFailurePresentationFixture(activity: workflow)
+    try await fixture.runtime.prepareForInteraction()
+    workflow.connectFailureSignals(input: fixture.input, sessionID: fixture.sessionID)
+    let pair = AsyncStream<OutputFailureSnapshot>.makeStream(bufferingPolicy: .bufferingNewest(1))
+    workflow.startFailures { pair.stream }
+    let detail =
+        "stage=toolStart\nevent=response.output_item.added\ntool=loadSkills\n" + String(repeating: "x", count: 900)
+    let fault = AgentFailureDiagnostic(
+        category: .modelResponse, code: "agent.model.tool.undeclaredName", detail: detail)
+    let record = OutputFailureRecord(
+        source: .assistant, title: "modelResponse", message: detail,
+        failureCode: fault.code, inputID: "input-1", diagnostic: fault, sessionID: "session-1", roundID: "round-1")
+    pair.continuation.yield(.init(revision: 1, records: [record], evictedCount: 0))
+    let deadline = ContinuousClock.now.advanced(by: .seconds(2))
+    while state.backgroundIssues.isEmpty && ContinuousClock.now < deadline { await Task.yield() }
+    let issue = try #require(state.backgroundIssues.first)
+    #expect(state.visibleNotice?.text == "模型调用了未声明的工具，本次回复已中止")
+    #expect(issue.message == detail && issue.message.count > 512)
+    #expect(issue.category == "模型响应异常" && issue.failureCode == fault.code)
+    #expect(issue.context?.sessionID == "session-1" && issue.context?.roundID == "round-1")
+    #expect(issue.inputID == "input-1" && state.errorToast?.id == "runtime:" + record.id)
+    state.dismissErrorToast(id: "runtime:" + record.id)
+    pair.continuation.yield(.init(revision: 2, records: [record], evictedCount: 0))
+    while state.backgroundIssues.first?.id != "runtime:" + record.id && ContinuousClock.now < deadline {
+        await Task.yield()
+    }
+    #expect(state.errorToast == nil && state.backgroundIssues.first?.message == detail)
+    pair.continuation.finish()
+    await fixture.stop(activity: workflow)
+}
+
+@Test @MainActor func normalAudioReleaseDoesNotReportFailureButRealMissingStillDoes() async throws {
+    let channel = ContainerFailureChannel()
+    let cache = CacheContainer(failures: StorageFailureReporter(receive: channel.sink(module: "storage")))
+    let audio = try await cache.audioScope("playback")
+    let owner = AudioCache.Owner(source: "synthesis", session: "playback", input: "reply")
+    let cancellations = Mutex(0)
+    try await audio.register("finished", owner: owner) {
+        await Task.yield()
+        cancellations.withLock { $0 += 1 }
+    }
+    let produced = try await audio.begin("finished")
+    let frame = try StorageCache.AudioFrame(
+        data: Data(repeating: 0, count: 16),
+        format: .init(sampleRate: 16000, channels: 1, encoding: .signedInt16), sequence: 0, timestamp: 0)
+    try await produced.append(frame)
+    await audio.complete("finished")
+    let playback = try await audio.checkout("finished", owner: owner)
+    #expect(try await playback.next() == frame)
+    #expect(try await playback.next() == nil)
+    try await audio.release("finished", owner: owner)
+    #expect(cancellations.withLock { $0 } == 1)
+    #expect(channel.snapshot().records.isEmpty)
+
+    // A genuinely invalid access must still fail and report; do not globally filter missing.
+    await #expect(throws: AudioCacheError.missingAudio) { try await audio.validate("finished", owner: owner) }
+    #expect(channel.snapshot().records.contains { $0.event.operation == "validate" })
+    try await audio.register("failed", owner: owner, cancel: {})
+    let failed = try await audio.begin("failed")
+    await failed.fail(StorageError.missing)
+    await #expect(throws: AudioCacheError.missingAudio) { try await failed.next() }
+    #expect(
+        channel.snapshot().records.contains {
+            $0.event.component == "cache.audio.stream" && $0.event.operation == "fail"
+        })
+    await cache.close()
+    await channel.stop()
+}
+
+@Test func audioCacheAdmissionFailureReportsOnlyItsPublicOperation() async throws {
+    let reports = Mutex<[(String, String)]>([])
+    let cache = CacheContainer(
+        failures: StorageFailureReporter { component, operation, _ in
+            reports.withLock { $0.append((component, operation)) }
+        })
+    let audio = try await cache.audioScope("closed-scope")
+    await cache.close()
+    await #expect(throws: AudioCacheError.closed) { _ = try await audio.begin("late") }
+    let cancelled = Mutex(false)
+    await #expect(throws: AudioCacheError.closed) {
+        try await audio.register("late", owner: .init(source: "test", session: "s", input: "i")) {
+            cancelled.withLock { $0 = true }
+        }
+    }
+    let recorded = reports.withLock { $0 }
+    #expect(recorded.count == 2)
+    #expect(recorded.map(\.0) == ["cache.audio", "cache.audio"])
+    #expect(recorded.map(\.1) == ["begin", "register"])
+    #expect(!cancelled.withLock { $0 })
+}

@@ -25,3 +25,7 @@ accept named domain-supplied migrations, including partial unfinished-message an
 ## Storage 容器关系
 
 ✅ 本目录的领域端口由 DatabaseStorage 发布；SQL 适配器统一归 Database/SQLite 编译，业务调用方不导入 SQLite 后端。
+
+## 统一容器异常通道
+
+✅ SQLiteDatabaseFactory/Storage/Repositories 把报告器传到 SQLiteDatabase；中央读写、迁移、准备、关闭异常原样保留并报告。不得将 SQL/参数当作事件额外字段，诊断不写回数据库、不重试事务。

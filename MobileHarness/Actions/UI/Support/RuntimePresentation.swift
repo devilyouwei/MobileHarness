@@ -40,7 +40,7 @@ public protocol CameraOutputHandling: AnyObject, Sendable {
 @MainActor
 public final class RuntimePresentation: UIPresentationCapability, UIUpdateCapability, SpeechPlaybackCapability,
     PosePresentationCapability, CameraControlCapability, SpeechListeningCapability, TaskControlCapability,
-    UIFeedbackCapability, UIEffectCapability
+    UIFeedbackCapability, UIEffectCapability, RuntimeFailurePresentationCapability
 {
     public var taskControl:
         (@Sendable (String, [String: String], String, String, String, String?) async throws -> String)?
@@ -60,9 +60,32 @@ public final class RuntimePresentation: UIPresentationCapability, UIUpdateCapabi
     }
     private let cameraControl: any CameraControlCapability
     private let rootSessionID: String
-    public let homeEffects: HomeEffectsWorkflow
-    public init(cameraControl: any CameraControlCapability, rootSessionID: String, activity: ActionActivityState) {
-        homeEffects = HomeEffectsWorkflow(activity: activity)
+    private let activity: any ActivityPresenting
+    public func recordRuntimeFailure(_ issue: RuntimeIssue, invocation: any FunctionInput) async throws {
+        try Task.checkCancellation()
+        guard invocation.context.source == "applicationControl", invocation.context.sessionID == rootSessionID,
+            invocation.context.taskID == nil
+        else { throw CommunicationError.unauthorized }
+        try activity.requirePresentation()
+        activity.recordIssue(
+            .init(
+                id: issue.id, title: issue.title, source: issue.source, message: issue.message, time: issue.time,
+                failureCode: issue.failureCode,
+                context: .init(
+                    workerID: issue.workerID, sessionID: issue.sessionID, inputID: issue.inputID, callID: issue.callID,
+                    roundID: issue.roundID
+                ),
+                userMessage: issue.userMessage, category: issue.category), showsToast: issue.userMessage != nil)
+    }
+    public let homeEffects: any HomeEffectsPresenting
+    public let expressions: any ExpressionPresenting
+    public init(
+        cameraControl: any CameraControlCapability, rootSessionID: String, activity: any ActivityPresenting,
+        effects: any HomeEffectsPresenting, expressions: any ExpressionPresenting
+    ) {
+        self.activity = activity
+        homeEffects = effects
+        self.expressions = expressions
         self.cameraControl = cameraControl
         self.rootSessionID = rootSessionID
     }

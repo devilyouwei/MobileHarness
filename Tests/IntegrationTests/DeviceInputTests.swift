@@ -604,3 +604,31 @@ private func sensorConfiguration(
     await runtime.shutdown()
     await output.shutdown()
 }
+
+@Test func nativeDeviceEventsRemainFactsAndGatewayOwnsSignalEncoding() throws {
+    for event in [CameraEvent.interrupted, .interruptionEnded, .failed] {
+        let fact: any Sendable = event
+        #expect(!(fact is any Error))
+        let input = try DeviceInputAdapter.cameraEvent(event, sessionID: "camera-scope")
+        #expect(input.sessionID == "camera-scope")
+        #expect(input.metadata.origin == .external)
+        #expect(input.metadata.source == "phone.camera")
+        guard case .event(let value) = input.payload else {
+            Issue.record("Expected a camera event payload")
+            continue
+        }
+        #expect(value == event.rawValue)
+    }
+    for event in [NativeAudioEvent.interrupted, .routeChanged] {
+        let fact: any Sendable = event
+        #expect(!(fact is any Error))
+        let input = try DeviceInputAdapter.audioEvent(event, sessionID: "audio-scope")
+        #expect(input.sessionID == "audio-scope")
+        #expect(input.metadata.source == "phone.microphone")
+        guard case .event(let value) = input.payload else {
+            Issue.record("Expected an audio event payload")
+            continue
+        }
+        #expect(value == event.rawValue)
+    }
+}

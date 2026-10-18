@@ -17,3 +17,10 @@ CacheBuffer 持有不可变 Data，Cache 存取只转交相同实例。CacheLeas
 ## 待完成
 
 ❌ 原生音频 Data 到播放 Float 数组的转换仍有复制；图片处理业务、多消费者音频及持久化音频不在本轮。
+
+## 统一容器异常通道
+
+✅ CacheContainer/BufferCache/AudioCache 共享 StorageFailureReporter，缓存拒绝与流失败报告后仍保持原失败/释放语义；没有新增缓存或逐帧诊断队列。
+
+
+✅ AudioCache 区分句柄正常释放与失败；正常回收不进入统一异常通道，真正的缓存访问失败仍保留原错误与上报。

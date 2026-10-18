@@ -4,36 +4,41 @@ import Observation
 
 public enum CameraDirection: Sendable { case front, back }
 
-@MainActor @Observable
+@MainActor
+@Observable
 public final class CameraState {
+    @ObservationIgnored var presentationAdmission: UIPresentationAdmission?
+    public var isPresentationAvailable: Bool { presentationAdmission.map { $0.started && !$0.stopped } ?? true }
     #if os(iOS)
-        public var capturedPhoto: CapturedPhotoPresentation?
+        public internal(set) var capturedPhoto: CapturedPhotoPresentation?
     #endif
-    public var photoBusy = false
-    public var photoMessage: String?
-    public var savedMediaID: String?
-    public var isEnabled = false
-    public var facing: CameraDirection = .front
-    public var isVisible = false
-    public var isBusy = false
-    public var message: String?
-    public var needsSettings = false
+    public internal(set) var photoBusy = false
+    public internal(set) var photoMessage: String?
+    public internal(set) var savedMediaID: String?
+    public internal(set) var isEnabled = false
+    public internal(set) var facing: CameraDirection = .front
+    public internal(set) var isVisible = false
+    public internal(set) var isBusy = false
+    public internal(set) var controlBusy = false
+    public internal(set) var controlMessage: String?
+    public internal(set) var message: String?
+    public internal(set) var needsSettings = false
     public private(set) var rendererFailure: String?
     public private(set) var videoGeneration: UInt64 = 0
     public private(set) var videoFrame: CameraVideoFrame?
-    @ObservationIgnored private var frameExpiry: Task<Void, Never>?
-    @ObservationIgnored private var poseExpiry: Task<Void, Never>?
-    private var poseRevision: UInt64 = 0
+    @ObservationIgnored private let frameExpiry = CameraMediaExpiry()
+    @ObservationIgnored private let poseExpiry = CameraMediaExpiry()
     private var lastPoseSequence: UInt64?
-    private var frameRevision: UInt64 = 0
     private var lastFrameSequence: UInt64?
     public func presentRendererFailure(_ message: String, generation: UInt64) {
-        guard generation == videoGeneration else { return }
+        guard presentationAdmission?.stopped != true, generation == videoGeneration else { return }
+        onFailure("camera.renderer", "render", CameraRendererFailure(message: message))
         rendererFailure = message
         clearFrame()
         visionMessage = message
     }
     public func presentVideo(_ frame: CameraVideoFrame) throws {
+        try presentationAdmission?.requireLive()
         guard rendererFailure == nil else { throw CameraFramePresentationError.unavailable }
         try validate(frame)
         if let previous = lastFrameSequence, frame.sequence <= previous { throw CameraFramePresentationError.stale }
@@ -42,19 +47,10 @@ public final class CameraState {
         {
             clearPose()
         }
-        frameRevision &+= 1
-        let revision = frameRevision
-        let previousExpiry = frameExpiry
-        previousExpiry?.cancel()
         lastFrameSequence = frame.sequence
         videoFrame = frame
-        frameExpiry = Task { [weak self] in
-            await previousExpiry?.value
-            do {
-                try await Task.sleep(until: frame.capturedAt.advanced(by: .milliseconds(750)), clock: .continuous)
-            } catch { return }
-            guard let self, self.frameRevision == revision else { return }
-            self.clearFrame()
+        frameExpiry.update(frame.capturedAt.advanced(by: .milliseconds(750))) { [weak self] in
+            self?.clearFrame()
         }
     }
     private func validate(_ frame: CameraVideoFrame) throws {
@@ -66,6 +62,7 @@ public final class CameraState {
     }
     /// Pose admission never replaces or clears the independent camera image.
     public func present(frame: CameraVideoFrame, pose: PoseOverlay) throws {
+        try presentationAdmission?.requireLive()
         try validate(frame)
         guard frame.sequence == pose.sequence, frame.rotation == pose.rotation,
             lastPoseSequence.map({ pose.sequence > $0 }) ?? true
@@ -75,53 +72,39 @@ public final class CameraState {
                 frame.height == videoFrame.height
             else { throw CameraFramePresentationError.stale }
         }
-        poseRevision &+= 1
-        let revision = poseRevision
-        let previousExpiry = poseExpiry
-        previousExpiry?.cancel()
         lastPoseSequence = pose.sequence
         skeleton = pose
-        poseExpiry = Task { [weak self] in
-            await previousExpiry?.value
-            do {
-                try await Task.sleep(until: frame.capturedAt.advanced(by: .milliseconds(750)), clock: .continuous)
-            } catch { return }
-            guard let self, self.poseRevision == revision else { return }
-            self.clearPose()
+        poseExpiry.update(frame.capturedAt.advanced(by: .milliseconds(750))) { [weak self] in
+            self?.clearPose()
         }
     }
     func clearPose() {
-        poseRevision &+= 1
-        poseExpiry?.cancel()
+        poseExpiry.cancel()
         skeleton = nil
     }
     public func clearFrame() {
-        frameRevision &+= 1
-        frameExpiry?.cancel()
+        frameExpiry.cancel()
         videoFrame = nil
         clearPose()
     }
     public private(set) var skeleton: PoseOverlay?
     /// Cancels and joins display timers; this does not acknowledge GPU completion.
     func stopPresentation() async {
-        let frame = frameExpiry
-        let pose = poseExpiry
         present(.isVisible(false))
-        await frame?.value
-        await pose?.value
-        frameExpiry = nil
-        poseExpiry = nil
+        await frameExpiry.stop()
+        await poseExpiry.stop()
     }
-    public var gaze: CGSize = .zero
-    public var visionMessage: String?
+    public internal(set) var gaze: CGSize = .zero
+    public internal(set) var visionMessage: String?
     @ObservationIgnored private var onFactsChanged: (@MainActor () -> Void)?
-    public init() {}
+    private let onFailure: UIFailureReporting
+    public init(onFailure: @escaping UIFailureReporting = { _, _, _ in }) { self.onFailure = onFailure }
     public func connectFactsObserver(_ observer: @escaping @MainActor () -> Void) { onFactsChanged = observer }
     /// Public presentation submission; this never grants native capture or motion authority.
     public func present(_ update: CameraPresentationUpdate) {
         defer {
             switch update {
-            case .gaze, .visionMessage, .photoMessage: break
+            case .gaze, .visionMessage, .photoMessage, .controlBusy, .controlMessage: break
             default: onFactsChanged?()
             }
         }
@@ -141,6 +124,8 @@ public final class CameraState {
                 clearFrame()
             }
         case .isBusy(let value): isBusy = value
+        case .controlBusy(let value): controlBusy = value
+        case .controlMessage(let value): controlMessage = value
         case .message(let value): message = value
         case .needsSettings(let value): needsSettings = value
         case .gaze(let value): gaze = value
@@ -173,6 +158,8 @@ public enum CameraPresentationUpdate {
     case facing(CameraDirection)
     case isVisible(Bool)
     case isBusy(Bool)
+    case controlBusy(Bool)
+    case controlMessage(String?)
     case message(String?)
     case needsSettings(Bool)
     case gaze(CGSize)
@@ -183,3 +170,61 @@ public enum CameraPresentationUpdate {
 }
 
 public enum CameraFramePresentationError: Error { case stale, unavailable }
+
+private struct CameraRendererFailure: Error, Sendable { let message: String }
+
+/// One sleeping worker per media stream. Extending freshness only updates the deadline.
+@MainActor
+private final class CameraMediaExpiry {
+    private var deadline: ContinuousClock.Instant?
+    private var wake: ContinuousClock.Instant?
+    private var revision: UInt64 = 0
+    private var task: Task<Void, Never>?
+
+    func update(_ deadline: ContinuousClock.Instant, expired: @escaping @MainActor () -> Void) {
+        self.deadline = deadline
+        if let wake, wake <= deadline { return }
+        let previous = task
+        previous?.cancel()
+        revision &+= 1
+        let revision = revision
+        wake = deadline
+        task = Task { [weak self] in
+            await previous?.value
+            while let next = self?.nextDeadline(revision: revision) {
+                do { try await Task.sleep(until: next, clock: .continuous) } catch { return }
+                guard !Task.isCancelled else { return }
+                if self?.takeExpiry(revision: revision) == true {
+                    expired()
+                    return
+                }
+            }
+        }
+    }
+    private func nextDeadline(revision: UInt64) -> ContinuousClock.Instant? {
+        guard self.revision == revision else { return nil }
+        wake = deadline
+        return deadline
+    }
+    private func takeExpiry(revision: UInt64) -> Bool {
+        guard self.revision == revision, let deadline, deadline <= .now else { return false }
+        self.deadline = nil
+        wake = nil
+        return true
+    }
+    func cancel() {
+        revision &+= 1
+        deadline = nil
+        wake = nil
+        task?.cancel()
+    }
+    func stop() async {
+        cancel()
+        let previous = task
+        let revision = revision
+        await previous?.value
+        // A replacement admitted while suspended must keep its join handle.
+        if self.revision == revision { task = nil }
+    }
+    deinit { task?.cancel() }
+}

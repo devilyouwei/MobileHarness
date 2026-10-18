@@ -6,7 +6,8 @@ import Gateway
 import PlatformKit
 import StorageCore
 import Testing
-import UI
+
+@testable import UI
 
 @MainActor private final class PreferenceFacadeFixture {
     var value = ModelResourceSourceDraft()

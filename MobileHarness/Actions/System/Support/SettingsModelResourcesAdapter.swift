@@ -148,14 +148,14 @@ public enum SettingsModelResourcesAdapter {
 
 /// Root-scoped presentation adaptation; every production call is dispatched by OutputGateway.
 @MainActor public final class ResourcePresentationAdapter: ResourcePresentationCapability {
-    private let state: ModelResourcesState
+    private let state: any ModelResourcesPresenting
     private let sessionID: String
     private let acknowledge: @MainActor () -> Void
     private let provider: ProviderPresentationAdapter
-    private let navigation: NavigationState
+    private let navigation: any NavigationPresenting
     public init(
-        state: ModelResourcesState, sessionID: String, provider: ProviderPresentationAdapter,
-        navigation: NavigationState,
+        state: any ModelResourcesPresenting, sessionID: String, provider: ProviderPresentationAdapter,
+        navigation: any NavigationPresenting,
         acknowledge: @escaping @MainActor () -> Void
     ) {
         self.state = state
@@ -173,6 +173,7 @@ public enum SettingsModelResourcesAdapter {
         guard destination == "home" || AppDestination(rawValue: destination) != nil else {
             throw ResourcePresentationError.invalidGeneration
         }
+        try navigation.requirePresentation()
         navigation.show(AppDestination(rawValue: destination))
     }
     public func presentProviderResult(requestID: String, failureCode: String?, invocation: any FunctionInput)
@@ -184,6 +185,7 @@ public enum SettingsModelResourcesAdapter {
         _ inventory: ModelResourceInventory, generation: UInt64, invocation: any FunctionInput
     ) async throws {
         try Task.checkCancellation()
+        try state.requirePresentation()
         guard invocation.context.sessionID == sessionID, generation == state.refreshGeneration else {
             throw ResourcePresentationError.staleGeneration
         }
@@ -197,6 +199,7 @@ public enum SettingsModelResourcesAdapter {
         _ reason: ResourcePreferenceFailureReason, message: String, invocation: any FunctionInput
     ) async throws {
         try Task.checkCancellation()
+        try state.requirePresentation()
         guard invocation.context.sessionID == sessionID else { throw ResourcePresentationError.staleGeneration }
         switch reason {
         case .recognitionRequired, .synthesisRequired:
@@ -208,6 +211,7 @@ public enum SettingsModelResourcesAdapter {
     }
     public func presentResourceOperationFailure(_ message: String, invocation: any FunctionInput) async throws {
         try Task.checkCancellation()
+        try state.requirePresentation()
         guard invocation.context.sessionID == sessionID else { throw ResourcePresentationError.staleGeneration }
         state.presentOperationFailure(message)
     }
@@ -215,6 +219,7 @@ public enum SettingsModelResourcesAdapter {
         async throws
     {
         try Task.checkCancellation()
+        try state.requirePresentation()
         guard invocation.context.sessionID == sessionID, state.applyRefreshFailure(message, generation: generation)
         else {
             throw ResourcePresentationError.staleGeneration

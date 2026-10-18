@@ -1,6 +1,7 @@
 import Foundation
 import Testing
-import UI
+
+@testable import UI
 
 @Test func historyReturningFromChildKeepsInitialLoadClosedUntilPageIsRecreated() {
     var lifecycle = HistoryInitialLoad()

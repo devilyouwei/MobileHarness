@@ -1,5 +1,99 @@
 import Foundation
 
+/// Passive technical failure evidence, never an execution result or a request to recover hardware.
+public struct ContainerFailureEvent: Codable, Sendable, Equatable, Identifiable {
+    public enum Phase: String, Codable, Sendable { case operation, startup, foreground, shutdown, cleanup, runtime }
+    public static let contract = "container.failure"
+    public static let source = "runtime"
+    public let id: String
+    public let scopeID: String
+    public let module: String
+    public let component: String
+    public let operation: String
+    public let phase: Phase
+    public let code: String
+    public let message: String
+    public var occurrences: UInt64
+    public var lastOccurred: Date
+    public init(
+        id: String = UUID().uuidString, scopeID: String, module: String, component: String, operation: String,
+        phase: Phase, code: String, message: String, occurrences: UInt64 = 1, lastOccurred: Date = Date()
+    ) {
+        self.id = id
+        self.scopeID = scopeID
+        self.module = module
+        self.component = component
+        self.operation = operation
+        self.phase = phase
+        self.code = code
+        self.message = message
+        self.occurrences = occurrences
+        self.lastOccurred = lastOccurred
+    }
+    public func validate() throws {
+        guard [id, scopeID].allSatisfy({ !$0.isEmpty && $0.utf8.count <= 128 }),
+            !module.isEmpty, module.utf8.count <= 64,
+            [component, operation].allSatisfy({ !$0.isEmpty && $0.utf8.count <= 256 }),
+            !code.isEmpty, code.utf8.count <= 128, !message.isEmpty, message.utf8.count <= 2048,
+            occurrences > 0, lastOccurred.timeIntervalSince1970.isFinite
+        else { throw CommunicationError.invalidPayload }
+    }
+}
+
+/// Technical runtime evidence; presentation policy belongs to ApplicationControl, not this value.
+public struct RuntimeFailureEvent: Codable, Sendable, Equatable, Identifiable {
+    public static let contract = "runtime.failure"
+    public static let source = "runtime"
+    public let id: String
+    public let sourceAgent: String
+    public let title: String
+    public let message: String
+    public let time: Date
+    public let failureCode: String?
+    public let sessionID: String?
+    public let inputID: String?
+    public let roundID: String?
+    public let category: String?
+    public let workerID: String?
+    public let callID: String?
+    public init(
+        id: String = UUID().uuidString, source: String, title: String, message: String, time: Date = Date(),
+        failureCode: String? = nil, sessionID: String? = nil, inputID: String? = nil, roundID: String? = nil,
+        category: String? = nil, workerID: String? = nil, callID: String? = nil
+    ) {
+        self.id = id
+        sourceAgent = source
+        self.title = String(title.prefix(128))
+        self.message = String(message.prefix(2048))
+        self.time = time
+        self.failureCode = failureCode
+        self.sessionID = sessionID
+        self.inputID = inputID
+        self.roundID = roundID
+        self.category = category
+        self.workerID = workerID
+        self.callID = callID
+    }
+    public init(_ record: OutputFailureRecord) {
+        self.init(
+            id: record.id, source: record.source.rawValue, title: record.title, message: record.message,
+            time: record.time, failureCode: record.failureCode, sessionID: record.sessionID,
+            inputID: record.inputID, roundID: record.roundID, category: record.diagnostic?.category.rawValue)
+    }
+    public func validate() throws {
+        guard !id.isEmpty, id.utf8.count <= 128, !sourceAgent.isEmpty, sourceAgent.utf8.count <= 64,
+            !title.isEmpty, title.utf8.count <= 512, !message.isEmpty, message.utf8.count <= 8192,
+            time.timeIntervalSince1970.isFinite,
+            failureCode.map({ !$0.isEmpty && $0.utf8.count <= 64 }) ?? true,
+            [sessionID, inputID, roundID, workerID, callID].allSatisfy({
+                $0.map { !$0.isEmpty && $0.utf8.count <= 128 } ?? true
+            }),
+            category.map({ ["modelResponse", "modelTransport", "generation", "context", "runtime"].contains($0) })
+                ?? true
+        else { throw CommunicationError.invalidPayload }
+    }
+}
+
 /// Untrusted host content and causal hints. Only Gateway turns this into a Signal envelope.
 public struct ExternalInputDraft: Sendable {
     public let id: String?

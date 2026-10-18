@@ -32,17 +32,21 @@ public protocol SettingsControlling: AnyObject {
 }
 
 /// Editable form values only. Execution and lifetime are supplied through SettingsControlling.
-@MainActor @Observable
+@MainActor
+@Observable
 public final class SettingsState {
-    public var isEnabled: Bool
-    public var url: String { didSet { if oldValue != url { revision += 1 } } }
-    public var key: String { didSet { if oldValue != key { revision += 1 } } }
-    public var selectedModel: String
-    public var models: [String] = []
-    public var isLoading = false
-    public var isSaving = false
-    public var error: String?
-    public var notice: String?
+    @ObservationIgnored var presentationAdmission: UIPresentationAdmission?
+    public var isPresentationAvailable: Bool { presentationAdmission.map { $0.started && !$0.stopped } ?? true }
+
+    public internal(set) var isEnabled: Bool
+    public internal(set) var url: String { didSet { if oldValue != url { revision += 1 } } }
+    public internal(set) var key: String { didSet { if oldValue != key { revision += 1 } } }
+    public internal(set) var selectedModel: String
+    public internal(set) var models: [String] = []
+    public internal(set) var isLoading = false
+    public internal(set) var isSaving = false
+    public internal(set) var error: String?
+    public internal(set) var notice: String?
     public private(set) var revision: UInt64 = 0
     public init(initial: CloudSettingsDraft) {
         isEnabled = initial.enabled
@@ -52,13 +56,17 @@ public final class SettingsState {
     }
     public var canLoad: Bool { !isLoading && !isSaving }
     public var canSave: Bool { !isLoading && !isSaving && (!isEnabled || !selectedModel.isEmpty) }
-    @discardableResult public func presentFailure(_ message: String, revision: UInt64) -> Bool {
+    @discardableResult
+    public func presentFailure(_ message: String, revision: UInt64) -> Bool {
+        guard presentationAdmission?.acceptsRetained() ?? true else { return false }
         guard revision == self.revision else { return false }
         error = message
         isLoading = false
         return true
     }
-    @discardableResult public func presentModels(_ values: [String], notice: String, revision: UInt64) -> Bool {
+    @discardableResult
+    public func presentModels(_ values: [String], notice: String, revision: UInt64) -> Bool {
+        guard presentationAdmission?.acceptsRetained() ?? true else { return false }
         guard revision == self.revision else { return false }
         models = values
         if !values.isEmpty && !values.contains(selectedModel) { selectedModel = "" }
@@ -67,7 +75,9 @@ public final class SettingsState {
         error = nil
         return true
     }
-    @discardableResult public func presentRestored(_ value: CloudSettingsDraft, revision: UInt64) -> Bool {
+    @discardableResult
+    public func presentRestored(_ value: CloudSettingsDraft, revision: UInt64) -> Bool {
+        guard presentationAdmission?.acceptsRetained() ?? true else { return false }
         guard revision == self.revision else { return false }
         isEnabled = value.enabled
         url = value.url
@@ -77,14 +87,120 @@ public final class SettingsState {
         error = nil
         return true
     }
-    @discardableResult public func presentNotice(_ message: String, revision: UInt64) -> Bool {
+    @discardableResult
+    public func presentNotice(_ message: String, revision: UInt64) -> Bool {
+        guard presentationAdmission?.acceptsRetained() ?? true else { return false }
         guard revision == self.revision else { return false }
         notice = message
         error = nil
         return true
     }
-    public func invalidateRevision() { revision += 1 }
+    public func invalidateRevision() {
+        guard presentationAdmission?.acceptsRetained() ?? true else { return }
+        revision += 1
+    }
+
+    @discardableResult
+    public func present(_ update: SettingsUpdate) -> Bool {
+        guard presentationAdmission?.acceptsRetained() ?? true else { return false }
+        apply(update)
+        return true
+    }
+    func apply(_ update: SettingsUpdate) {
+        switch update {
+        case .isEnabled(let value): isEnabled = value
+        case .url(let value): url = value
+        case .key(let value): key = value
+        case .selectedModel(let value): selectedModel = value
+        case .models(let value): models = value
+        case .isLoading(let value): isLoading = value
+        case .isSaving(let value): isSaving = value
+        case .error(let value): error = value
+        case .notice(let value): notice = value
+        }
+    }
 }
 
 extension SettingsOperating { public var presentsResults: Bool { false } }
 public protocol SettingsFailurePresenting: Error { var wasPresented: Bool { get } }
+
+public enum SettingsUpdate {
+    case isEnabled(Bool)
+    case url(String)
+    case key(String)
+    case selectedModel(String)
+    case models([String])
+    case isLoading(Bool)
+    case isSaving(Bool)
+    case error(String?)
+    case notice(String?)
+}
+
+@MainActor
+public protocol SettingsPresenting: UIPresentationAccess {
+    var isEnabled: Bool { get }
+    var url: String { get }
+    var key: String { get }
+    var selectedModel: String { get }
+    var models: [String] { get }
+    var isLoading: Bool { get }
+    var isSaving: Bool { get }
+    var error: String? { get }
+    var notice: String? { get }
+    var revision: UInt64 { get }
+    var canLoad: Bool { get }
+    var canSave: Bool { get }
+    @discardableResult
+    func present(_ update: SettingsUpdate) -> Bool
+    func presentFailure(_ message: String, revision: UInt64) -> Bool
+    func presentModels(_ values: [String], notice: String, revision: UInt64) -> Bool
+    func presentRestored(_ value: CloudSettingsDraft, revision: UInt64) -> Bool
+    func presentNotice(_ message: String, revision: UInt64) -> Bool
+    func invalidateRevision()
+}
+
+extension SettingsState: SettingsPresenting {}
+
+/// Form-facing operations are injected transports, never storage or provider application.
+@MainActor
+public struct SettingsProviderOperations {
+    public let initial: CloudSettingsDraft
+    public let restore: () async throws -> CloudSettingsDraft
+    public let discover: (CloudSettingsDraft) async throws -> [String]
+    public let save: (CloudSettingsDraft) async throws -> Void
+    public let errorMessage: (any Error) -> String?
+    public init(
+        initial: CloudSettingsDraft,
+        restore: @escaping () async throws -> CloudSettingsDraft,
+        discover: @escaping (CloudSettingsDraft) async throws -> [String],
+        save: @escaping (CloudSettingsDraft) async throws -> Void,
+        errorMessage: @escaping (any Error) -> String?
+    ) {
+        self.initial = initial
+        self.restore = restore
+        self.discover = discover
+        self.save = save
+        self.errorMessage = errorMessage
+    }
+}
+
+public protocol ProviderRequestFailure: Error {
+    var failureCode: String? { get }
+}
+
+@MainActor
+public final class UISettingsContainer {
+    public let state: SettingsState
+    public var presentation: any SettingsPresenting { state }
+    init(initial: CloudSettingsDraft, admission: UIPresentationAdmission) {
+        state = SettingsState(initial: initial)
+        state.presentationAdmission = admission
+    }
+    func clearSensitiveDraft() {
+        state.key = ""
+        state.models = []
+        state.isLoading = false
+        state.isSaving = false
+        state.invalidateRevision()
+    }
+}

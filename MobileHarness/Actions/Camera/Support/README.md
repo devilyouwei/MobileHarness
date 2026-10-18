@@ -85,3 +85,9 @@ CameraStorageFactory 选择最多 1024 张、2 GiB、evictOldest 的应用存储
 ## UI 容器与相机能力注入
 
 ✅ CameraCoordinator 接收 CameraCapturing、CameraPresenting；帧/姿态到 UI 值的转换仍在本目录，无额外帧适配层。CameraIntegrationBindings 提供 Agent 资源/事件/视觉回调，App 工厂仅连接它们，保留惰性创建且无默认状态构造。
+
+## UI 全量容器化
+
+✅ 应用级 UI 状态由八个子容器统一创建，消费者注入所需 Presenting 接口并提交 UI 自有值，不直接写字段。App 注册并管理同一 UI 根；原业务身份/版本校验、原生完成和基础库依赖边界保持。跨模块连接迁移仍是独立待办。
+
+✅ 拍照提示音注入 CuePlaying，业务时序、文件／相册与真实播放回执仍由各自拥有者负责。

@@ -22,7 +22,14 @@ public struct UIModule: CapabilityModule {
         self.effects = effects
     }
     public var definitions: [ActionFunction] {
-        expressionFunctions + presentationFunctions + feedbackFunctions + effectFunctions
+        expressionFunctions + presentationFunctions + feedbackFunctions + effectFunctions + [
+            UIActions.recordFailureDefinition(completing: { [updates] invocation in
+                guard let presentation = updates as? any RuntimeFailurePresentationCapability else {
+                    throw UIActions.PresentationError.invalidCall
+                }
+                return .value(try await UIActions.recordFailure(invocation: invocation, using: presentation))
+            })
+        ]
     }
     private var expressionFunctions: [ActionFunction] {
         [

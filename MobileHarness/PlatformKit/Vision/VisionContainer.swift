@@ -1,10 +1,11 @@
 import Foundation
 
-@MainActor public final class VisionContainer {
+@MainActor
+public final class VisionContainer {
     private let admission: PlatformAdmission
     #if os(iOS)
         private var nativeCamera: AppleCamera?
-        public var camera: AppleCamera {
+        public var camera: any CameraCapturing {
             if let nativeCamera { return nativeCamera }
             let value = AppleCamera(admission: admission)
             nativeCamera = value
@@ -12,19 +13,24 @@ import Foundation
         }
         private var photoImport: Task<Void, any Error>?
         public func saveJPEG(_ data: Data) async throws {
-            try admission.check()
-            guard photoImport == nil else { throw PlatformError.busy }
-            let admission = admission
-            let task = Task {
+            do {
                 try admission.check()
-                try await ApplePhotoLibrary.saveJPEG(data)
-            }
-            photoImport = task
-            defer { photoImport = nil }
-            try await withTaskCancellationHandler {
-                try await task.value
-            } onCancel: {
-                task.cancel()
+                guard photoImport == nil else { throw PlatformError.busy }
+                let admission = admission
+                let task = Task {
+                    try admission.check()
+                    try await ApplePhotoLibrary.saveJPEG(data)
+                }
+                photoImport = task
+                defer { photoImport = nil }
+                try await withTaskCancellationHandler {
+                    try await task.value
+                } onCancel: {
+                    task.cancel()
+                }
+            } catch {
+                admission.report("vision", "saveJPEG", error)
+                throw error
             }
         }
         func stop() async {

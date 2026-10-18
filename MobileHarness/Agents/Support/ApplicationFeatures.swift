@@ -79,11 +79,13 @@ public enum VisionPipelineWorkflow {
     @MainActor @Observable
     @available(iOS 27, *)
     public final class ApplicationFeatures {
+        @ObservationIgnored private let containerFailures: ContainerFailureChannel
         @ObservationIgnored private let repositories: @Sendable () throws -> ApplicationRepositories
         @ObservationIgnored private let capturedPhotos: CapturedPhotoStore
         @ObservationIgnored private let audio: AudioContainer
         @ObservationIgnored private let cameraDevice: any CameraCapturing
         let cameraState: CameraState
+        @ObservationIgnored private let cameraPresentation: any CameraPresenting
         @ObservationIgnored private let cameraFactory: @MainActor (CameraIntegrationBindings) -> CameraCoordinator
         @ObservationIgnored private let artifacts: ArtifactServices
         @ObservationIgnored private let resources: URL
@@ -95,19 +97,38 @@ public enum VisionPipelineWorkflow {
             try bluetooth.service.connectPublicState(scope: scope)
             publicStateScope = scope
         }
+        private let homeUI: UIHomeContainer
+        private let settingsUI: UISettingsContainer
+        private let resourcesUI: UIModelResourcesContainer
+        private let navigationUI: UINavigationContainer
+        private let historyUI: UIHistoryContainer
+        let devicesUI: UIDeviceSettingsContainer
+        private let diagnosticsUI: UIDiagnosticsContainer
         private let stateStorage: StateContainer
         private let cacheStorage: CacheContainer
         private let filesStorage: FilesContainer
         let bluetooth: BluetoothWorkflow
         public init(
+            containerFailures: ContainerFailureChannel,
+            home: UIHomeContainer, settings: UISettingsContainer, modelResources: UIModelResourcesContainer,
+            navigation: UINavigationContainer, history: UIHistoryContainer, devices: UIDeviceSettingsContainer,
+            diagnostics: UIDiagnosticsContainer,
             repositories: @escaping @Sendable () throws -> ApplicationRepositories, state: StateContainer,
             cache: CacheContainer, files: FilesContainer, photos: CapturedPhotoStore,
-            camera: any CameraCapturing, cameraState: CameraState,
+            camera: any CameraCapturing, cameraState: CameraState, cameraPresentation: any CameraPresenting,
             makeCamera: @escaping @MainActor (CameraIntegrationBindings) -> CameraCoordinator,
             bluetooth: BluetoothWorkflow, audio: AudioContainer,
             artifacts: ArtifactServices,
             resources: URL
         ) {
+            self.containerFailures = containerFailures
+            homeUI = home
+            settingsUI = settings
+            resourcesUI = modelResources
+            navigationUI = navigation
+            historyUI = history
+            devicesUI = devices
+            diagnosticsUI = diagnostics
             self.audio = audio
             self.stateStorage = state
             self.cacheStorage = cache
@@ -116,6 +137,7 @@ public enum VisionPipelineWorkflow {
             capturedPhotos = photos
             cameraDevice = camera
             self.cameraState = cameraState
+            self.cameraPresentation = cameraPresentation
             cameraFactory = makeCamera
             self.bluetooth = bluetooth
             self.resources = resources
@@ -282,9 +304,9 @@ public enum VisionPipelineWorkflow {
                 throw SettingsModelResourcesAdapter.preferenceFailure(message)
             }
         }
-        let modelResources = ModelResourcesState()
+        var modelResources: ModelResourcesState { resourcesUI.state }
         @ObservationIgnored lazy var modelResourceControls = ModelResourceInteractionWorkflow(
-            state: modelResources, operations: modelResourcesWorkflow)
+            state: resourcesUI.presentation, operations: modelResourcesWorkflow)
         private func quiesceForModelRemoval(_ id: String) async {
             if id == "yolo26n-pose" {
                 await camera.pauseVisionForModelMaintenance()
@@ -307,24 +329,25 @@ public enum VisionPipelineWorkflow {
                     guard let self else { throw CancellationError() }
                     try await self.runtime().saveProvider(draft)
                 }), presentsResults: true)
-        @ObservationIgnored lazy var settings = SettingsState(initial: SettingsProviderAdapter.initial)
+        var settings: SettingsState { settingsUI.state }
         @ObservationIgnored lazy var settingsControls = SettingsInteractionWorkflow(
-            state: settings, operations: settingsWorkflow, defaultModel: SettingsProviderAdapter.initial.model)
+            state: settingsUI.presentation, operations: settingsWorkflow,
+            defaultModel: SettingsProviderAdapter.initial.model)
         @ObservationIgnored lazy var cameraControls = makeCameraControls()
         private func makeCameraControls() -> CameraInteractionWorkflow {
             CameraInteractionWorkflow(
-                state: cameraState,
+                presentation: cameraPresentation,
                 perform: { [weak self] intent, facing, mediaID in
                     guard let self else { throw CancellationError() }
                     _ = try await self.runtime().photographerIntents.perform(intent, facing: facing, mediaID: mediaID)
                 })
         }
-        let navigation = NavigationState()
+        var navigation: NavigationState { navigationUI.state }
         @ObservationIgnored lazy var deviceControl = DeviceControlAdapter(bluetooth: bluetooth)
         @ObservationIgnored lazy var bluetoothControls = makeBluetoothControls()
         private func makeBluetoothControls() -> BluetoothInteractionWorkflow {
             BluetoothInteractionWorkflow(
-                state: bluetooth.state,
+                state: devicesUI.presentation,
                 initialFence: deviceControl.fence, fenceStop: { [deviceControl] in deviceControl.stopFence() },
                 pageVisibility: { [bluetooth] visible in
                     if visible { bluetooth.openPage() } else { bluetooth.closePage() }
@@ -336,7 +359,7 @@ public enum VisionPipelineWorkflow {
         }
 
         func navigate(_ destination: AppDestination?) {
-            navigation.show(destination)
+            navigationUI.presentation.show(destination)
         }
         @ObservationIgnored lazy var camera = makeCamera()
         private func makeCamera() -> CameraCoordinator {
@@ -467,11 +490,11 @@ public enum VisionPipelineWorkflow {
             }
         }
 
-        private let historyState = ConversationHistoryState(title: "Assistant")
+        private var historyState: ConversationHistoryState { historyUI.state }
         @ObservationIgnored lazy var history = makeHistory()
         private func makeHistory() -> ConversationHistoryWorkflow {
             return ConversationHistoryWorkflow(
-                state: historyState,
+                state: historyUI.presentation,
                 prepare: { [weak self] in
                     guard let self else { throw CancellationError() }
                     await self.container?.lifecycle.beginSettingsChange()
@@ -571,13 +594,14 @@ public enum VisionPipelineWorkflow {
                 })
             try installPublicState()
             let runtime = try AgentServices(
+                containerFailures: containerFailures, home: homeUI,
                 state: stateStorage, cache: cacheStorage, files: filesStorage,
                 chatRecords: try repositories().chat, taskRecords: try repositories().tasks,
                 camera: cameraDevice,
                 readHistoryPhoto: { [capturedPhotos] id, inputID in
                     try await capturedPhotos.readForInput(id, source: "assistant", input: inputID)
                 }, cameraControl: camera, bluetooth: bluetooth, historyState: historyState,
-                resourceState: modelResources, providerState: settings, navigationState: navigation,
+                resourceState: modelResources, providerState: settings, navigationState: navigationUI.presentation,
                 device: deviceControl,
                 modelResources: resourceAdapter,
                 providerSettingsRuntime: SettingsProviderAdapter.runtime(
@@ -636,7 +660,7 @@ public enum VisionPipelineWorkflow {
         var isolatedPresentation: Bool {
             let arguments = ProcessInfo.processInfo.arguments
             return [
-                "-conversation-preview", "-companion-cycle-preview", "-actions-preview", "-gemma4-validation",
+                "-gemma4-validation",
                 "-moss-benchmark",
             ].contains { arguments.contains($0) }
         }
@@ -721,7 +745,8 @@ public enum VisionPipelineWorkflow {
             try await settingsControls.restore()
             let workflow = settingsWorkflow
             let prepared = try await InteractionServices(
-                resources: resources, audio: audio, runtime: runtime(), modelName: { await workflow.modelName },
+                home: homeUI, diagnostics: diagnosticsUI, resources: resources, audio: audio, runtime: runtime(),
+                modelName: { await workflow.modelName },
                 progress: progress)
             try Task.checkCancellation()
             container = prepared

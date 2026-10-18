@@ -136,7 +136,7 @@ VoiceSessionCoordinator 只保留语音输入、同意/占用屏障、角色及�
 
 ## 分类异常诊断
 
-✅ ActionActivityWorkflow 依据 Agent 稳定分类码选择短 toast 文案，将完整有界诊断、代码及关联标识映射为 UI 值；UI 不依赖 ModelKit/AgentCore，不从日志文本推测类别。
+✅ ApplicationControl 依据 Agent 稳定分类码选择短 toast 文案，Actions 将完整有界诊断、代码及关联标识映射为 UI 值；UI 不依赖 ModelKit/AgentCore，不从日志文本推测类别。
 
 模型响应侧协议拒绝发生在原生调用发布前，日志归 Agent 异常；已解析调用的 unknownCapability/参数拒绝及真实 Action/Tool 执行失败继续使用既有结果/完成契约，不因新增诊断而统一终止或重试。
 
@@ -154,7 +154,7 @@ VoiceSessionCoordinator 只保留语音输入、同意/占用屏障、角色及�
 
 ## 视觉静默停止与诊断补齐
 
-✅ ApplicationFeatures 内的跨平台 VisionPipelineWorkflow 管理输入、输出和可选健康任务；输入正常结束或失败转换为角色终态，等待输出排空；输出失败或显式取消加入所有任务。根级监视每秒读取健康快照，3 秒无有效进展每次故障只记录一次，恢复后解除提示。ActionActivityWorkflow 将视觉诊断映射到 Agent 异常分类及短 toast；接入/加载/派发失败也记录完整关联信息，不只设置相机文案。
+✅ ApplicationFeatures 内的跨平台 VisionPipelineWorkflow 管理输入、输出和可选健康任务；输入正常结束或失败转换为角色终态，等待输出排空；输出失败或显式取消加入所有任务。根级监视每秒读取健康快照，3 秒无有效进展每次故障只记录一次，恢复后解除提示。ActionActivityWorkflow 将视觉诊断转发为 runtime.failure，由 ApplicationControl 决定异常分类及短 toast；接入/加载/派发失败也记录完整关联信息，不只设置相机文案。
 
 ✅ 根级消费检查媒体 Tool 的实际执行结果，将非取消的呈现失败纳入健康快照；一秒监视将其显示为 Agent 分类诊断和 toast，同一连续故障只报告一次，后续成功呈现清除该健康故障。
 
@@ -169,3 +169,42 @@ VoiceSessionCoordinator 只保留语音输入、同意/占用屏障、角色及�
 ## 统一外部输入
 
 ✅ Communication 业务输入只生成草稿，Gateway 负责信封；AgentInteractionRuntime 不再自行改写文字信封。宿主控制先经过 Gateway 验证再等待既有中断/停止完成屏障，保持取消与私有请求身份。
+
+## 统一容器异常通道
+
+✅ ApplicationFeatures 注入 App 持有的容器故障通道；AgentServices 在实际 Agent 启动后连接分发，停止前解除连接；ApplicationControl 订阅故障 Signal 并发出内部呈现调用，ActionActivityWorkflow 不再观察容器快照生成 UI 异常，不向故障通道反向写入。预启动与清理期间仍有通道记录及启动失败接口，不伪造 Agent 已接收。
+
+## ApplicationControl 异常展示
+
+✅ 已实现：ActionActivityWorkflow 移除容器快照直达 UI 的监听及异常提示策略。既有执行异常快照/本地诊断仅由有界、根拥有的转发任务提交 runtime.failure；策略归 ApplicationControl，Actions 执行呈现。转发停止取消并加入任务，拒绝/投递失败显式记录不可用状态。现有跨模块装配归属本轮不调整。
+
+转发队列最多 100 条，拒绝新项时累计 rejectedFailureSignals 并标记观察不可用；投递失败保留 lastFailureSignalError，不以新诊断递归上报。不承诺 Agent 接纳回执或持久送达。停止取消并加入转发与执行异常观察任务；已停止的流不复用，重建根时创建新 workflow。
+
+## UI 全量容器化
+
+✅ ApplicationFeatures/AgentServices/InteractionServices 使用 App 注入的 UI 子能力，不再创建应用级 UI 状态。请求工作流和投影通过只读呈现协议提交值；视图 façade 仅暴露同根观察对象。原会话、角色、模型和设备接入归属保持，跨模块装配尚未迁出 Bindings。
+
+ActionActivityWorkflow.shutdown 显式取消并加入执行、任务、角色及异常观察；AgentServices 停止时先结束这些消费者。UI 到期/动画等待由 UI 根加入，不冒充业务或 GPU 完成。
+
+✅ ActionActivityWorkflow 的显式 shutdown 同时取消并加入运行、任务、角色和异常观察；Agent 服务停止时调用，避免 UI 根关闭后仍由旧轮询持有状态。
+
+
+✅ ApplicationFeatures 为相机点击工作流注入同根 CameraPresenting，避免消费者持有可变 CameraState；其页面状态仍来自 UI 根。
+
+
+✅ 麦克风频谱计算 await PlatformKit 的离主线程入口；每个捕获消费者最多一个在途计算，返回后重新校验 voice generation、capture epoch、处理轮次及 UI 凭证。取消仍由 captureTask 拥有并加入，不增加 PCM 队列。
+
+
+✅ 音频检测将实际 AudioIOError.interrupted 映射为已有系统中断提示；路由设备事实不冒充 Error。
+
+
+## 播放启动隔离
+
+✅ 将输出 AVAudioEngine/AVAudioPlayerNode 的连接、启动、PCM 提交和停止移至 PlatformKit 私有串行 actor；AppleAudioIO 保留主线程业务接纳和真实完成等待，以 token 围栏防止旧取消停止新播放。最多三个已调度缓冲、一个串行提交；停止同步关闭接纳并在拥有的清理任务中加入原生停止，根 stop 和下一次播放加入清理。不在 UI boot 激活音频设备。
+
+
+✅ isolatedPresentation 仅为真实聊天及语音诊断选择隔离展示；普通运行继续按同一 UI 根装配，不提供视觉模拟启动分支。
+
+✅ 会话和音频检测注入 any AudioInputOutput，保留会话／轮次校验及停止加入；模型和设备决策仍在业务层，不持有原生音频驱动。
+
+✅ 聆听协调的 cue/haptic 注入 CuePlaying／HapticFeedbackProviding，保留原生预备、取消、加入和反馈屏障，不通过具体驱动查找设备。

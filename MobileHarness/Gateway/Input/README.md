@@ -76,3 +76,17 @@ deliverFeedback 创建运行时 UUID，并校验 hops、执行 owner、实时 Ag
 ✅ 新实例注册动态关系时，清除同 Agent ID 的旧 incarnation 关系；旧 token 取消不能撤销新 token。
 
 普通外部事实使用 publish；宿主会话中断/关闭使用不接收任意目标参数的 send，目标仍由订阅解析，返回实际接纳报告。AgentBindings 等待该报告及原有执行取消屏障，分支拒绝以 InputAdmissionFailure 保留，不改成成功。草稿可提供已有业务请求身份；未提供的 Signal ID 和 root 由 Gateway 生成。源权限始终由注入策略验证。
+
+## 统一容器异常通道
+
+✅ ContainerFailureChannel 每根实例独立，128 条故障日志、64 个待投递故障、8 个 newest-one 快照观察者；满日志/待投递均淘汰最旧并计数。一个拥有的 worker 与 newest-one 唤醒，原生回调只同步记入有界槽，不 await 或逐事件创建 Task。连接 Agent 的 InputGateway 后转为 container.failure 广播，重复故障合并并计数。调用方正常取消/正常关闭不制造故障；停止取消并加入 worker，记录仍可读取，迟到上报拒绝计数。投递失败不自报，不重放副作用。
+
+生命周期包装区分调用方已请求的取消与服务自行抛出的意外取消：前者不升级，后者仍报告故障。published 仅表示提交到 Gateway 发布入口，不冒充 Agent 已处理；实际接纳结果仍看 Signal 诊断。
+
+合并键在同一根内由 module/component/operation/phase/code/message 组成；次数指该故障记录的上报观察次数，不承诺跨层唯一异常计数。普通 SDK 客户端仍可只处理原始 throw，App 工厂则为现有所有根安装同一报告通道。
+
+## ApplicationControl 异常展示
+
+✅ publishRuntimeFailure 接受 RuntimeFailureEvent 与根会话，验证并编码为 runtime.failure/runtime observation，再使用同一 publish 入口分发。它不选择 Toast 文案、不授予 runtime 反馈身份；提交成功不等于角色已接纳或已展示。
+
+✅ 音频／相机事件编码只依赖跨平台原生值，由 Gateway 构造 Signal 元数据和载荷。原生 rawValue 只是事件事实，不携带应用身份或传输协议；基础库不导入通信类型。
