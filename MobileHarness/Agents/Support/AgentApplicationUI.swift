@@ -30,6 +30,7 @@
             AnyView(CameraFrameView(state: features.cameraState).id(features.cameraState.videoGeneration))
         }
         public func navigationChanged() {
+            features.updateCameraAvailability()
             features.reportEnvironment(
                 .navigation, value: features.navigation.path.map(\.rawValue).joined(separator: "/"))
         }

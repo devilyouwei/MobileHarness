@@ -20,7 +20,7 @@
 
 测试操作使用注入结果及明确完成信号；执行结果到 UI 值的映射属于 AppWorkflowTests。历史页的返回保留检查验证 gate/缓存状态，不声称已验证 native List 的真实滚动位置。
 
-CaptionPresentationTests 覆盖部分文本→最终修订、定稿与移动不丢字符、连续替换、320 Character 上限、emoji/组合字符的 UTF-16 范围及 Reduce Motion。不以值测试代替原生 UILabel/动画帧率验收。
+CaptionPresentationTests 覆盖部分文本→最终修订、定稿与移动不丢字符、连续替换、320 Character 上限、emoji/组合字符的 UTF-16 范围及 Reduce Motion。不以值测试代替原生TextRenderer/动画帧率验收。
 
 ## 待实现
 
@@ -62,3 +62,5 @@ CaptionPresentationTests 覆盖部分文本→最终修订、定稿与移动不�
 ✅ 已补充连续帧延后到期、更早捕获期限、清屏后重新接纳及重复停止／释放回归；光环重复停止、无帧退出与所有者释放测试仅在 iOS 编译／执行，不将 macOS 状态测试视为该原生测试通过。带在途 GPU 帧的光环退出及真机功耗仍待验收。
 
 ✅ 覆盖历史消息读取取消／迟到／重复点击与替换前加入、异步目录取消与时间线结果等价；光环失败只报告一次及重复状态不唤醒使用生产接纳逻辑验证，不代替原生GPU故障注入与功耗验收。
+
+✅ 覆盖TextRenderer字幕的连续追加进度、中文／emoji修订、滚动320字符窗口、清空与定稿／Reduce Motion／失活；原生离屏渲染验证新增run透明度与最终可读性，不以离屏测试代替真机流畅度。

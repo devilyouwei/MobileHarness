@@ -48,3 +48,5 @@ HomeEffectsWorkflow 拥有独立、可替换、按身份围栏的 Notice／光�
 ❌ 持久化审计、设备实际阶段及完整真机动画／前后台验收仍独立跟进。
 
 [UI 根](../README.md) · [原生组件](../Components/README.md)
+
+✅ 首页两处字幕继续消费同一UI值，向TextRenderer字幕传递根代际；根失活或新根后不得继续旧淡入。字幕仍是页面局部呈现，不改变业务会话、音频及相机链路。

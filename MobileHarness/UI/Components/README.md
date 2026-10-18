@@ -13,7 +13,7 @@
 | ListeningMotion.swift | 归一化光源、单调时间运动状态及光环接纳／去重 |
 | MetalHaloRenderer.swift / ListeningHalo.metal | 光环管线、显示线程和像素光效 |
 | VoiceBars.swift | 顶部／底部频谱原生图层及固定拓扑几何 |
-| FadingCaption.swift | 常驻双 UILabel 字幕及增量透明度动画 |
+| FadingCaption.swift | 单Text字幕、run出生时间与TextRenderer透明度绘制 |
 | RetainedFullScreenCover.swift | 保留下层挂载的原生全屏覆盖 |
 
 ✅ 启动眼睛包装与原生眼睛同属 NativeCompanionSurface，频谱及其可测试几何归 VoiceBars。组件保留真实动画／GPU 回执，运行路径不含临时性能对比程序。
@@ -44,9 +44,11 @@ ListeningLightOrigin 接受有限归一化坐标并逐轴回退／截断；Liste
 
 ## 字幕
 
-✅ 同步提交最新完整文字，保留最新320个完整 Characters，并以 UTF-16 边界区分稳定／新增范围。两个 UILabel 使用同一完整字符串及排版，新增范围以250ms opacity 动画淡入；模型层透明度始终为1。定稿／Reduce Motion 直接显示，取消或替换不留下低透明度文本。
+✅ 保留最新320个完整Characters，CaptionPresentation维护可测试的稳定／修订边界，CaptionRenderState只保存有界字素与单调出生时间。流式追加延续旧文字淡入，滚动窗口保留仍在显示的文字进度；修订只重置变化后缀，组合字符不会拆开。
 
-UIScrollView 仅在文字／尺寸变化时定位尾部，保留18pt边缘渐变及完整辅助功能值。不创建逐字 timer 或异步文字副本，离窗移除动画。文字测量和图层提交仍受主线程预算约束。
+一个SwiftUI Text布局，按相邻出生时间合并run并附加TextAttribute；TextRenderer绘制时只改变对应run透明度，新增部分从0.15到1，250ms后完全可见。定稿／Reduce Motion立即不透明；清空、根代际变化、离窗或失活撤销旧动画。无双标签、NSAttributedString覆盖或UIKit字幕备用路径。
+
+Text在TimelineView闭包外由最新输入构造；仅挂载且前台的淡入期间请求不快于60Hz的动画节奏，结束后暂停，不创建线程、逐字Task或定时器。ScrollView在文字提交及实际布局尺寸变化后定位尾部，保留18pt边缘渐变与完整辅助功能值。字号随Dynamic Type更新，文字布局和动画的实际开销仍需采样，不保证比旧实现更快。
 
 ## 全屏覆盖
 

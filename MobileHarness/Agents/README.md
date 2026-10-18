@@ -1,5 +1,7 @@
 # Agents — 业务决策与运行上下文
 
+✅ 已实现：导航只收窄相机运行准入，不停止聆听；Assistant 历史只读准备不进入设置变更的语音停机屏障。
+
 ## 职责与边界
 
 Agents 解释 Signal、维护业务目标与上下文，并选择下一步动作。Assistant 是唯一普通对话执行者；Photographer、Memory、ApplicationControl、SpeechPerception、SpeechSynthesis、VisionPerception 按各自确定性流程处理输入。App 提供能力及生命周期，Gateway 校验和传输，Actions 实现被调用函数。角色之间不共享可写聊天历史。

@@ -1,5 +1,7 @@
 # Shared Agent Components
 
+✅ 已实现：ApplicationFeatures 以 foreground && navigation.path.isEmpty 更新相机准入，AgentApplicationUI 在路径变化时同步；不改相机开启意图，不把导航当场景后台。历史 prepare 只检查取消并取得运行时，不调用 beginSettingsChange/endSettingsChange，真正设置变更保留现有屏障。
+
 AgentSkillLoader 计算激活预算并组合不可变目录；Context 管理根 Skill/依赖、Task 持有、Decision 使用及会话倒计数；Chat 记录合法接纳的模型 Action/Tool 使用，在完整用户 Decision 结束时结算。资源定义缓存与模型激活状态独立。
 
 ## Summary

@@ -254,7 +254,7 @@ import UI
         case .cancel: return
         }
         pending[id] = command
-        state.beginRefresh()
+        _ = state.beginRefresh()
         state.present(.error(nil))
         let request = Task { @MainActor in
             switch command {

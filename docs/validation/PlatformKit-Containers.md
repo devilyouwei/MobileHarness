@@ -367,6 +367,35 @@
 - ❌ 取消清理竞态及重复报告尚未修复。建议在已取得所有权的播放租约上提供可加入、幂等的终止，并使作用域清理加入消费者取消后再回收终态；保持未知句柄、越权、实际读写和生产失败的明确错误，不全局过滤 missingAudio。
 - 未运行完整检查或iOS构建：本轮没有运行代码变更，仅补充调查证据；未完成修复后的真机关闭聆听验收，亦未由本次调查推断相机卡顿或模型稳定性结论。
 
+### 原生TextRenderer字幕试用（2026-10-18）
+
+从9426eb47干净工作区开始，待实施：单Text／TextRenderer替换双UILabel，按单调出生时间处理新增淡入并保留滚动、Unicode、定稿、Reduce Motion和失活语义。计划状态／离屏原生测试、完整检查、Simulator和签名构建；真机视觉／性能独立记录，不预设比旧实现快。
+
+本轮实际结果：
+
+- ✅ 一个SwiftUI Text＋TextRenderer替换双UILabel／NSMutableAttributedString；按相邻单调出生时间合并run，文字在TimelineView tick闭包外构造。最多保存320个字素；相同追加字符、窗口移位和组合字符延长均保留正确边界与旧淡入进度。定稿／Reduce Motion／失活结束动画，不创建逐字Task、线程或应用定时器；动画节奏不快于60Hz，视频／光环刷新策略未变。
+- ✅ 定向18项通过：UI12项、1项字幕Tool集成、5项应用会话回归，日志`/tmp/mobileharness-text-renderer-regression.log`。新增5项测试覆盖进度、窗口与相同字符、组合字符修订、结束／清空，以及生产TextRenderer的原生离屏像素；实际验证已有A字形区域不变、新增B透明度随时间增加、强制可见等于最终结果。离屏ImageRenderer不是原生滚动／上屏帧率验收。
+- ✅ 完整检查中UI96项（含原生字幕像素及相机Metal启停／交接）、AppWorkflow120项通过；源码边界、README归属、严格格式及Python6项通过：`/tmp/mobileharness-text-renderer-check.log`。
+- ❌ 完整检查整体未通过：Integration999项中12项失败、21个问题，为uiFullHomeOwnsToastExpiryWithoutAViewAndStopJoinsEffects、atomicStableOffTargetEndsBeforeOverallDeadlineAndKeepsError、原七项soundSource、mediaTransportSurvivesExpiryDuringDispatchAndDisplaysNextFrame、visionDiscardsOverBudgetResultsWithoutPublishingAndRecovers及soundSourceContextWriteFailureReportsWithoutStoppingOrSelfJoin。不将其全部归为环境因素，也不覆盖历史失败。
+- ❌ Simulator仍被CoreAIShared无法解析CoreAI依赖阻断，后续scheme未执行：`/tmp/mobileharness-text-renderer-simulator.log`。
+- ✅ 签名真机构建成功：`/tmp/mobileharness-text-renderer-device.log`。已安装并启动iPhone17Pro，安装序号3988：`/tmp/mobileharness-text-renderer-install.log`、`/tmp/mobileharness-text-renderer-launch.log`。已请求用户验证相机并行回复时的淡入、长文本换行／滚底和前后台。
+- ✅ git diff --check通过；源码中已无NativeCaptionSurface、CaptionSurface、UILabel或NSMutableAttributedString字幕路径。无新目录／编译目标／第三方依赖，未提交。
+- ✅ 真机手工反馈：用户按上述3988版检查请求回复“没有，挺正常的”，本次测试未报告缺字、闪烁、滚动异常或视频卡顿。仅作为该次操作范围内的视觉／交互反馈，不扩展为长期模型稳定性结论。
+- ❌ 尚无完整Instruments对照、内存／功耗／P95排版耗时或持续模型帧率结果，不认定性能已经优于3980双标签版。
+
+
+## 2026-10-18 首页相机与深层历史聆听修复
+
+已实现：导航覆盖首页时暂停相机捕获／姿态，保留开启意图，返回按原意图恢复；App 前后台变化也重新校验首页路径。Assistant 历史 prepare 移除误用的 beginSettingsChange/endSettingsChange（前者会调用 stopVoice），只检查取消并获取运行时；真实设置变更与 App 后台语音停机保持。
+
+- 源码回归：检查历史绑定不得停止语音，导航不得全局失活，并要求场景／导航均更新相机准入；严格格式、边界及 Python 6 项通过。
+- `./scripts/check.sh` 全量失败：UI 96、AppWorkflow 120 通过；Integration 999 项中有 11 项失败、20 issues，包含声源感知、机械臂截止时间、媒体过期和视觉统计，不能记为全量通过。日志 `/tmp/mobileharness-home-navigation-check.log`。
+- 单独回归 5 项通过：原生常驻首页深层导航／根销毁，以及历史分页、刷新、取消与迟到返回；这是 macOS 原生视图和替身工作流证据，不证明 iOS 摄像／收音连续性。日志 `/tmp/mobileharness-home-navigation-regression.log`。
+- `./scripts/build-ios.sh` 失败于 Simulator CoreAIShared 无法解析 CoreAI，后续 scheme 未执行。日志 `/tmp/mobileharness-home-navigation-simulator.log`。
+- 签名真机构建通过，已安装到连接的 iPhone 17 Pro（安装序号4020）并成功启动。日志 `/tmp/mobileharness-home-navigation-device.log`、`/tmp/mobileharness-home-navigation-install.log`。
+- ✅ 用户在安装序号4020的真机上按上述导航路径复测，反馈“是的，没问题”：深层导航期间聆听保持，相机离开首页暂停、返回恢复，原本关闭的相机不会自动开启。此结论为用户交互验收，不代表持续性能或真实模型稳定性已量化。
+- ❌ 非首页切 App 后台再返回、快速进出及启停期间导航的组合场景尚未单独确认；不扩大本次用户反馈的验收范围。
+
 ### 关闭聆听的音频清理顺序修复（2026-10-18）
 
 用户明确要求最后清理音频，至少等待取消播放。已先更新总体、Agents／Support 和 IntegrationTests README，再修改实现；保留工作区既有字幕／导航改动，不新增目录、目标或依赖。
@@ -378,3 +407,11 @@
 - ✅ 完整检查中的模块边界／源码归属／README、严格Swift格式、Python6项及AppWorkflow120项通过，新增顺序回归的三种参数均通过；另行 git diff --check、修改文件严格格式与工程／隐私／权限plutil通过。
 - ❌ 完整检查整体未通过：UI96项中cameraPoseExpiresWithoutRemovingLiveVideo失败；Integration1000项中10项失败、22个问题，为atomicStableOffTargetEndsBeforeOverallDeadlineAndKeepsError、七项soundSource、visionDiscardsOverBudgetResultsWithoutPublishingAndRecovers、visionResolvesOpaqueInputWithoutCopyingMediaIntoObservation。日志 `/tmp/mobileharness-audio-stop-order-check.log`；未证明这些失败都是环境问题，不将定向通过替代全量通过。
 - ❌ 修复后的真机关闭聆听、快速启停及前后台验收仍待执行，不将本机替身测试或编译视为真机通过。字幕／导航等既有改动不纳入本次音频修复提交。
+
+### 资源操作未使用刷新代次返回值（2026-10-18）
+
+先更新 ApplicationControl README，再将 ModelResourceInteractionWorkflow.perform 中仅用于失效旧刷新的调用改为 `_ = state.beginRefresh()`；不改变返回值接口、刷新代次或业务行为，不新增测试、目录或依赖。
+
+- ✅ 完整检查重新编译后未再出现 beginRefresh 未使用返回值警告；模块边界、README、严格格式、Python6项、UI96项及AppWorkflow120项通过。另行修改文件格式、git diff --check及工程／隐私／权限plutil通过。
+- ❌ 完整检查仍未通过：Integration1000项中12项失败、22个问题，涉及atomic稳定离靶、七项soundSource、媒体到期传输、Vision预算恢复、soundSourceContextWriteFailureReportsWithoutStoppingOrSelfJoin及Vision不复制媒体。日志 `/tmp/mobileharness-unused-refresh-check.log`；不将这些失败全部归因于环境。
+- ❌ `./scripts/build-ios.sh` 仍在首个Simulator scheme的CoreAIShared无法解析CoreAI处失败，后续scheme未执行：`/tmp/mobileharness-unused-refresh-simulator.log`。本轮未另行签名构建、安装或操作真机，未提交。

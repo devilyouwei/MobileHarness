@@ -137,7 +137,7 @@ import Foundation
                         }
                         FadingCaption(
                             text: state.liveTranscript, reduceMotion: reduceMotion, color: .cyan,
-                            finalized: state.transcriptFinalized
+                            finalized: state.transcriptFinalized, generation: state.token
                         )
                         .accessibilityLabel("用户输入：" + state.liveTranscript)
                         .allowsHitTesting(!state.liveTranscript.isEmpty)
@@ -167,10 +167,10 @@ import Foundation
                             state.voicePhase != .failed && state.listeningControlMessage == nil
                             && state.isVoiceActive && !state.assistantReply.isEmpty
                         ZStack {
-                            // Stable identity: native text surfaces mount before the first recognition/reply.
+                            // Stable identity: text renderer surfaces mount before the first recognition/reply.
                             FadingCaption(
                                 text: state.assistantReply, reduceMotion: reduceMotion,
-                                color: Color(red: 0.83, green: 0.74, blue: 1)
+                                color: Color(red: 0.83, green: 0.74, blue: 1), generation: state.token
                             )
                             .accessibilityLabel("assistant 回复：" + state.assistantReply)
                             .opacity(showsReply ? state.assistantReplyOpacity : 0)

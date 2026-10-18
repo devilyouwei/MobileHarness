@@ -721,6 +721,19 @@ if 'preempts: [.assistant: [.photographer], .applicationControl: [.photographer]
 if 'trackingInputAvailable' not in runtime or '[weak photographerAgent]' not in runtime or 'hasFreshPose()' not in runtime:
     errors.append('Tracking freshness must be bound to the current Photographer without retaining its lifetime')
 assembly = (ROOT / 'MobileHarness/Agents/Support/ApplicationFeatures.swift').read_text()
+history_binding = assembly.split('private func makeHistory()', 1)[1].split('private func historyConversation', 1)[0]
+if re.search(r'\b(?:stopVoice|beginSettingsChange|endSettingsChange)\b', history_binding):
+    errors.append('Read-only Assistant history preparation must not stop the root listening session')
+camera_admission = assembly.split('func updateCameraAvailability()', 1)[1].split('var isolatedPresentation', 1)[0]
+if 'camera.setForeground(foreground && navigation.path.isEmpty)' not in camera_admission:
+    errors.append('Camera admission must require both foreground and the uncovered home route')
+scene_admission = assembly.split('public func setForeground(_ value: Bool)', 1)[1].split('public func stopNativeServices()', 1)[0]
+navigation_binding = (ROOT / 'MobileHarness/Agents/Support/AgentApplicationUI.swift').read_text()
+navigation_admission = navigation_binding.split('public func navigationChanged()', 1)[1].split('public func prepare(', 1)[0]
+if 'updateCameraAvailability()' not in scene_admission or 'features.updateCameraAvailability()' not in navigation_admission:
+    errors.append('Scene and navigation changes must both reconcile camera admission')
+if re.search(r'\b(?:stopVoice|beginSettingsChange|invalidateNative|setForeground)\b', navigation_admission):
+    errors.append('Navigation changes must not suspend the whole native service or listening session')
 bluetooth_binding = (ROOT / 'MobileHarness/App/Composition/ServiceFactories.swift').read_text()
 # Composition supplies concrete camera/UI instances; consumers only use injected ports.
 for source in binding_sources['AgentBindings']:

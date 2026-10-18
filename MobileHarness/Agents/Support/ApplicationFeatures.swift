@@ -497,8 +497,6 @@ public enum VisionPipelineWorkflow {
                 state: historyUI.presentation,
                 prepare: { [weak self] in
                     guard let self else { throw CancellationError() }
-                    await self.container?.lifecycle.beginSettingsChange()
-                    defer { self.container?.lifecycle.endSettingsChange() }
                     try Task.checkCancellation()
                     _ = try self.runtime()
                 },
@@ -657,6 +655,9 @@ public enum VisionPipelineWorkflow {
         @ObservationIgnored private var bluetoothObservation: Task<Void, Never>?
         @ObservationIgnored private var cameraEvents: Task<Void, Never>?
         private var foreground = true
+        func updateCameraAvailability() {
+            camera.setForeground(foreground && navigation.path.isEmpty)
+        }
         var isolatedPresentation: Bool {
             let arguments = ProcessInfo.processInfo.arguments
             return [
@@ -702,7 +703,7 @@ public enum VisionPipelineWorkflow {
         public func setForeground(_ value: Bool) {
             foreground = value
             guard !isolatedPresentation else { return }
-            camera.setForeground(value)
+            updateCameraAvailability()
             bluetooth.setForeground(value)
             setResourceObservationForeground(value)
             reportEnvironment(.scene, value: value ? "active" : "background")
