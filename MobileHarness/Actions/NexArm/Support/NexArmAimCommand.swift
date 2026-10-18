@@ -3,6 +3,7 @@ import PlatformKit
 
 /// Tracking command for motors 1 and 4. Shoulder and elbow stay on one position-mode preparation.
 /// After that preparation, motors 1 and 4 use closed-loop speed. A sent packet is not physical arrival.
+/// An admitted speed is held until the target changes, or the target has stayed unchanged for 0.3 seconds.
 public struct NexArmAimCommand: Sendable {
     public struct Command: Sendable, Equatable {
         public let packet: NexArmPacket
@@ -17,17 +18,24 @@ public struct NexArmAimCommand: Sendable {
         case speed(baseSpeed: Int, pitchSpeed: Int, base: Int, pitch: Int)
     }
 
+    private static let scale = 2.2
+    private static let maxMagnitude = 600
+    private static let correctionHorizon = 0.35
+    private static let correctionLimit = 80.0
+    private static let deadman = 0.30
+
     private var seeded = false
-    private var originBase = 0
-    private var originPitch = 0
-    private var lastBase = 0
-    private var lastPitch = 0
+    private var referenceBase = 0
+    private var referencePitch = 0
+    private var estimatedBase = 0.0
+    private var estimatedPitch = 0.0
+    private var integratedAt: ContinuousClock.Instant?
     private var forearmAdmitted = false
     private var engageIndex = 0
     private var speedAdmitted = false
-    private var admittedTime: ContinuousClock.Instant?
-    private var lastSpeedBase = 0
-    private var lastSpeedPitch = 0
+    private var referenceTime: ContinuousClock.Instant?
+    private var heldBaseSpeed = 0
+    private var heldPitchSpeed = 0
     private var pending: Command?
     private var modeOpen = false
 
@@ -39,10 +47,10 @@ public struct NexArmAimCommand: Sendable {
         guard Self.legal(base, motor: 1), Self.legal(pitch, motor: 4) else {
             throw NexArmExecutionError.invalidArguments
         }
-        originBase = base
-        originPitch = pitch
-        lastBase = base
-        lastPitch = pitch
+        referenceBase = base
+        referencePitch = pitch
+        estimatedBase = Double(base)
+        estimatedPitch = Double(pitch)
         seeded = true
     }
 
@@ -50,7 +58,7 @@ public struct NexArmAimCommand: Sendable {
         self = NexArmAimCommand()
     }
 
-    /// The next packet. Nil means the admitted speed already matches this target.
+    /// The next packet. Nil means the admitted speed already matches this target, or speed mode is idle at zero.
     /// The same command is returned until `accept`; a newer target replaces an unadmitted speed.
     public mutating func command(base: Int, pitch: Int, at time: ContinuousClock.Instant) throws -> Command? {
         guard seeded, Self.legal(base, motor: 1), Self.legal(pitch, motor: 4) else {
@@ -69,15 +77,23 @@ public struct NexArmAimCommand: Sendable {
             pending = command
             return command
         }
-        let speeds = registerSpeeds(base: base, pitch: pitch, at: time)
-        if let pending, case .speed(let heldBase, let heldPitch, _, _) = pending.step,
-            heldBase == speeds.base, heldPitch == speeds.pitch
+        guard let speeds = desiredSpeeds(base: base, pitch: pitch, at: time) else { return nil }
+        if speedAdmitted, speeds.base == heldBaseSpeed, speeds.pitch == heldPitchSpeed {
+            if base != referenceBase || pitch != referencePitch {
+                referenceBase = base
+                referencePitch = pitch
+                referenceTime = time
+            }
+            pending = nil
+            return nil
+        }
+        if let pending, case .speed(let baseSpeed, let pitchSpeed, let pendingBase, let pendingPitch) = pending.step,
+            baseSpeed == speeds.base, pitchSpeed == speeds.pitch, pendingBase == base, pendingPitch == pitch
         {
             return pending
         }
         pending = nil
         if speeds.base == 0, speeds.pitch == 0, !speedAdmitted { return nil }
-        guard !speedAdmitted || speeds.base != lastSpeedBase || speeds.pitch != lastSpeedPitch else { return nil }
         let command = Command(
             packet: try NexArmMotorCommands.trackingSpeeds(base: speeds.base, pitch: speeds.pitch),
             levelsForearm: false,
@@ -97,11 +113,12 @@ public struct NexArmAimCommand: Sendable {
             engageIndex += 1
             if engageIndex == Self.engage.count { modeOpen = true }
         case .speed(let baseSpeed, let pitchSpeed, let base, let pitch):
-            lastSpeedBase = baseSpeed
-            lastSpeedPitch = pitchSpeed
-            lastBase = base
-            lastPitch = pitch
-            admittedTime = command.time
+            integrate(to: command.time)
+            heldBaseSpeed = baseSpeed
+            heldPitchSpeed = pitchSpeed
+            referenceBase = base
+            referencePitch = pitch
+            referenceTime = command.time
             speedAdmitted = true
         }
         pending = nil
@@ -113,8 +130,10 @@ public struct NexArmAimCommand: Sendable {
         modeOpen = false
         engageIndex = Self.engage.count
         speedAdmitted = false
-        let holdBase = Self.legal(base, motor: 1) ? base : lastBase
-        let holdPitch = Self.legal(pitch, motor: 4) ? pitch : lastPitch
+        heldBaseSpeed = 0
+        heldPitchSpeed = 0
+        let holdBase = Self.legal(base, motor: 1) ? base : referenceBase
+        let holdPitch = Self.legal(pitch, motor: 4) ? pitch : referencePitch
         let hold: [NexArmPacket]
         if let packet = try? NexArmMotorCommands.simultaneous([
             try NexArmMotorCommands.move(
@@ -129,21 +148,67 @@ public struct NexArmAimCommand: Sendable {
         return [Self.stopped] + Self.disengage + hold
     }
 
-    private func registerSpeeds(base: Int, pitch: Int, at time: ContinuousClock.Instant) -> (base: Int, pitch: Int) {
-        let elapsed = admittedTime.map { min(0.5, max(0.02, Self.seconds(time - $0))) } ?? 0.2
+    /// Nil before any speed write when the target is still the seed. Otherwise the speed to hold or send.
+    private mutating func desiredSpeeds(base: Int, pitch: Int, at time: ContinuousClock.Instant) -> (
+        base: Int, pitch: Int
+    )? {
+        integrate(to: time)
+        let changed = base != referenceBase || pitch != referencePitch
+        if !changed {
+            let idle = referenceTime.map { Self.seconds(time - $0) } ?? 0
+            if speedAdmitted, idle >= Self.deadman, (heldBaseSpeed != 0 || heldPitchSpeed != 0) {
+                return (0, 0)
+            }
+            if !speedAdmitted { return nil }
+            return (heldBaseSpeed, heldPitchSpeed)
+        }
+        let elapsed = referenceTime.map { min(0.5, max(0.02, Self.seconds(time - $0))) } ?? 0.2
         return (
-            Self.encode(delta: base - lastBase, elapsed: elapsed, pitch: false),
-            Self.encode(delta: pitch - lastPitch, elapsed: elapsed, pitch: true))
+            Self.encode(
+                rate: Self.rate(target: base, reference: referenceBase, estimate: estimatedBase, dt: elapsed),
+                pitch: false),
+            Self.encode(
+                rate: Self.rate(target: pitch, reference: referencePitch, estimate: estimatedPitch, dt: elapsed),
+                pitch: true))
+    }
+
+    private mutating func integrate(to time: ContinuousClock.Instant) {
+        guard let from = integratedAt else {
+            integratedAt = time
+            return
+        }
+        let elapsed = Self.seconds(time - from)
+        guard elapsed > 0 else { return }
+        estimatedBase += Self.countsPerSecond(heldBaseSpeed, pitch: false) * elapsed
+        estimatedPitch += Self.countsPerSecond(heldPitchSpeed, pitch: true) * elapsed
+        integratedAt = time
+    }
+
+    /// Feedforward covers the new step. Correction covers only the miss against the previous target.
+    private static func rate(target: Int, reference: Int, estimate: Double, dt: Double) -> Double {
+        let feedforward = Double(target - reference) / dt
+        let lag = Double(reference) - estimate
+        let correction = min(correctionLimit, max(-correctionLimit, lag / correctionHorizon))
+        let maxRate = Double(maxMagnitude) / scale
+        return min(maxRate, max(-maxRate, feedforward + correction))
     }
 
     /// Motor 1: bit 15 clear decreases the encoder and turns the arm left.
     /// Motor 4: the same register sign pitches the wrist down, so its direction bit is reversed.
-    private static func encode(delta: Int, elapsed: Double, pitch: Bool) -> Int {
-        guard elapsed > 0 else { return 0 }
-        let magnitude = min(600, Int((abs(Double(delta) / elapsed) * 2.2).rounded()))
+    private static func encode(rate: Double, pitch: Bool) -> Int {
+        let magnitude = min(maxMagnitude, Int((abs(rate) * scale).rounded()))
         guard magnitude > 0 else { return 0 }
-        let reverse = pitch ? delta < 0 : delta > 0
+        let reverse = pitch ? rate < 0 : rate > 0
         return reverse ? magnitude | 0x8000 : magnitude
+    }
+
+    /// Inverse of `encode`. The estimate is the integral of admitted speeds, not a measured joint.
+    private static func countsPerSecond(_ register: Int, pitch: Bool) -> Double {
+        let magnitude = Double(register & 0x7FFF)
+        let reverse = register & 0x8000 != 0
+        let rate = magnitude / scale
+        if pitch { return reverse ? -rate : rate }
+        return reverse ? rate : -rate
     }
 
     private static func forearmLevel() throws -> NexArmPacket {

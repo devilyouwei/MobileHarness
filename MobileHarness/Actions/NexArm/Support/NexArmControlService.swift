@@ -1025,9 +1025,11 @@ public final class NexArmControlService {
         }
     }
     /// Polls the latest pan/tilt target. The first admitted write places motors 2 and 3 on the calibrated
-    /// level rest. Motors 1 and 4 then enter closed-loop speed mode. Later writes send one combined speed.
-    /// Motor 5 stays uncommanded. A newer aim replaces an unsent speed. The 30 ms pause only checks freshness
-    /// and admission. Exit returns motors 1 and 4 to position mode before live control ends.
+    /// level rest. Motors 1 and 4 then enter closed-loop speed mode. A changed target updates their combined
+    /// speed; an unchanged target keeps that speed. Speed 0 is written once after the target stays unchanged
+    /// for 0.3 seconds. Motor 5 stays uncommanded. A newer aim replaces an unsent speed. The 30 ms pause only
+    /// checks freshness and admission. A further quiet period ends live control and returns motors 1 and 4
+    /// to position mode.
     private func startAimFollow(
         _ controller: NexArmActionController, origin: NexArmControlOrigin?,
         failed reportFailure: @escaping @Sendable (NexArmControlFailure) async -> Void

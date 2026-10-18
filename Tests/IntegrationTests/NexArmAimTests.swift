@@ -486,6 +486,48 @@ private actor ArmAvailability {
     command.accept(faster)
 }
 
+@Test func aimCommandHoldsSpeedUntilTheTargetChangesOrGoesQuiet() throws {
+    var command = NexArmAimCommand()
+    let start = ContinuousClock.now
+    try command.seed(base: 2047, pitch: 2045)
+    try admitPreparation(&command, at: start)
+    let moving = try #require(try command.command(base: 2067, pitch: 2045, at: start))
+    #expect(try speedPair(moving.packet).base == (220 | 0x8000))
+    command.accept(moving)
+    for offset in [30, 60, 120, 200] {
+        #expect(
+            try command.command(base: 2067, pitch: 2045, at: start.advanced(by: .milliseconds(offset))) == nil)
+    }
+    let stopped = try #require(
+        try command.command(base: 2067, pitch: 2045, at: start.advanced(by: .milliseconds(350))))
+    let stoppedSpeeds = try speedPair(stopped.packet)
+    #expect(stoppedSpeeds.base == 0 && stoppedSpeeds.pitch == 0)
+    command.accept(stopped)
+    #expect(try command.command(base: 2067, pitch: 2045, at: start.advanced(by: .milliseconds(400))) == nil)
+    let resumed = try #require(
+        try command.command(base: 2087, pitch: 2045, at: start.advanced(by: .milliseconds(500))))
+    let speeds = try speedPair(resumed.packet)
+    #expect(speeds.base & 0x8000 != 0)
+    #expect((speeds.base & 0x7FFF) > 0)
+    #expect(speeds.pitch == 0)
+}
+
+@Test func aimCommandAddsCatchUpWhenTheHeldSpeedUndershoots() throws {
+    var command = NexArmAimCommand()
+    let start = ContinuousClock.now
+    try command.seed(base: 2047, pitch: 2045)
+    try admitPreparation(&command, at: start)
+    let clamped = try #require(try command.command(base: 2187, pitch: 2045, at: start))
+    #expect(try speedPair(clamped.packet).base == (600 | 0x8000))
+    command.accept(clamped)
+    let corrected = try #require(
+        try command.command(base: 2197, pitch: 2045, at: start.advanced(by: .milliseconds(200))))
+    // 140 counts clamp to 272.7 count/s and cover 54.5 counts. The 85.5 count lag corrects at the 80 count/s cap.
+    // The next 10 counts over 0.2 seconds add 50. Combined 130 count/s encodes as 286 with the reverse bit.
+    let correctedSpeeds = try speedPair(corrected.packet)
+    #expect(correctedSpeeds.base == (286 | 0x8000) && correctedSpeeds.pitch == 0)
+}
+
 @Test func aimCommandReplacesUnadmittedTargetAndResetDropsOldGoals() throws {
     var command = NexArmAimCommand()
     let start = ContinuousClock.now

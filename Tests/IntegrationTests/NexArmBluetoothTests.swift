@@ -1644,7 +1644,7 @@ func bluetoothPassiveConnectionDoesNotQueryAndActualQueryTimeoutRecovers() async
 }
 
 @Test(.actionCatalog, .timeLimit(.minutes(1))) @MainActor
-func bluetoothAimSendsOnePanTiltPacketAndStopsWhenTheTargetHolds() async throws {
+func bluetoothAimHoldsSpeedWhileTheTargetStaysPut() async throws {
     let file = bluetoothTestFile()
     defer { try? FileManager.default.removeItem(at: file) }
     let link = BluetoothArmFixture()
@@ -1657,24 +1657,29 @@ func bluetoothAimSendsOnePanTiltPacketAndStopsWhenTheTargetHolds() async throws 
     await workflow.waitUntilIdle()
     await link.throttleLive()
     try await workflow.aim(base: 0.6, pitch: 0.5)
-    try await until { await link.liveCommands.count >= 1 }
-    // Hold the target through the worker's idle window before explicit cancellation.
-    try await Task.sleep(for: .milliseconds(400))
+    try await until {
+        await link.liveCommands.contains { packet in
+            guard packet.id == 254, packet.command == 131, packet.payload.count == 8 else { return false }
+            let base = Int(packet.payload[3]) | Int(packet.payload[4]) << 8
+            let pitch = Int(packet.payload[6]) | Int(packet.payload[7]) << 8
+            return base != 0 || pitch != 0
+        }
+    }
     let commands = await link.liveCommands
-    let packet = try #require(commands.first)
-    let expected = try NexArmJointCommand.positions(base: 0.6, pitch: 0.5)
-    #expect(commands.count == 1)
-    #expect(packet.isSynchronousPositionWrite && packet.isLiveControl)
-    let addressed = try #require(packet.motorTargets)
-    #expect(addressed[1] == expected[0] && addressed[4] == expected[3])
+    let level = try #require(commands.first)
+    let addressed = try #require(level.motorTargets)
+    #expect(Set(addressed.keys) == Set([2, 3]))
     #expect(addressed[2] == NexArmJointCommand.armHome[1])
     #expect(addressed[3] == NexArmJointCommand.armHome[2])
-    #expect(Set(addressed.keys) == Set([1, 2, 3, 4]))
+    let admitted = commands.count
+    // Inside the 0.30 second hold window the admitted speed stays on the servo and is not rewritten.
+    try await Task.sleep(for: .milliseconds(150))
+    #expect(await link.liveCommands.count == admitted)
     await workflow.stopActions()
     #expect(workflow.state.controlReady)
-    let count = commands.count
+    let stopped = await link.liveCommands.count
     try await Task.sleep(for: .milliseconds(100))
-    #expect(await link.liveCommands.count == count)
+    #expect(await link.liveCommands.count == stopped)
     workflow.disconnect()
     await workflow.waitUntilIdle()
     observer.cancel()
