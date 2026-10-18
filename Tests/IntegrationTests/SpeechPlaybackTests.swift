@@ -13,6 +13,7 @@ import PlatformKit
 import StorageCache
 import StorageCore
 import StorageState
+import Synchronization
 import Testing
 
 private func pcm(_ sequence: UInt64 = 0) throws -> ModelKit.AudioFrame {
@@ -326,6 +327,84 @@ private actor ReplyCompletionGate {
         waiter?.resume()
         waiter = nil
     }
+}
+
+private enum ReplyInterruptionFailure: Error, Equatable { case unavailable }
+
+@Test(.actionCatalog, .timeLimit(.minutes(1)), arguments: ["completed", "failed", "cancelled"])
+@MainActor func voiceReplyCancellationJoinsPlaybackBeforeRetiringSessionAudio(outcome: String) async throws {
+    let failures = Mutex<[String]>([])
+    let cache = CacheContainer(
+        failures: StorageFailureReporter { component, operation, error in
+            failures.withLock { $0.append("\(component).\(operation): \(error)") }
+        })
+    let session = UUID().uuidString
+    let store = try await cache.audioScope(session)
+    let input = AgentInput(id: UUID().uuidString, sessionID: session, payload: .text("speak"))
+    let owner = AudioCache.Owner(source: "assistant", session: session, input: input.id)
+    let id = UUID().uuidString
+    let queued = UUID().uuidString
+    try await store.register(id, owner: owner, cancel: {})
+    try await store.register(queued, owner: owner, cancel: {})
+    let audio = try await store.begin(id)
+    try await audio.append(storedPCM())
+    await store.complete(id)
+    let invocation = ActionInvocation(
+        source: .assistant, input: input,
+        call: ActionCall(
+            actionPath: .init(domain: "Speech", module: "Playback", function: "speak"), channel: "Speech",
+            parameters: ["audioID": id]), sequence: 1)
+    let playbackEntered = ReplyCompletionGate()
+    let playbackCancelled = ReplyCompletionGate()
+    let releasePlayback = ReplyCompletionGate()
+    let nativeStopEntered = ReplyCompletionGate()
+    let releaseNativeStop = ReplyCompletionGate()
+    let player = SpeechPlayback(store: store)
+    let playback = Task {
+        try await player.play(audioID: id, invocation: invocation) { stream, _ in
+            #expect(try await stream.next() != nil)
+            await playbackEntered.open()
+            do { try await Task.sleep(for: .seconds(60)) } catch {
+                // Model a player that still owns its PCM while joining cancellation cleanup.
+                await playbackCancelled.open()
+                await releasePlayback.wait()
+                throw error
+            }
+        }
+    }
+    await playbackEntered.wait()
+    let interruption = Task {
+        try await VoiceReplyCancellation.run(
+            cancelReply: {
+                playback.cancel()
+                await #expect(throws: CancellationError.self) { try await playback.value }
+                if outcome == "failed" { throw ReplyInterruptionFailure.unavailable }
+                if outcome == "cancelled" { throw CancellationError() }
+            },
+            waitForPlaybackStop: {
+                await nativeStopEntered.open()
+                await releaseNativeStop.wait()
+            },
+            cleanupAudio: { await store.cancel(sessionID: session) })
+    }
+    await playbackCancelled.wait()
+    // Session cleanup cannot retire unplayed audio while a playback task is still exiting.
+    try await store.validate(queued, owner: owner)
+    await releasePlayback.open()
+    await nativeStopEntered.wait()
+    // Joining the Swift action alone is insufficient: the native graph must also have stopped.
+    try await store.validate(queued, owner: owner)
+    await releaseNativeStop.open()
+    if outcome == "failed" {
+        await #expect(throws: ReplyInterruptionFailure.unavailable) { try await interruption.value }
+    } else if outcome == "cancelled" {
+        await #expect(throws: CancellationError.self) { try await interruption.value }
+    } else {
+        try await interruption.value
+    }
+    #expect(failures.withLock { $0 }.isEmpty)
+    await #expect(throws: AudioCacheError.missingAudio) { try await store.validate(queued, owner: owner) }
+    await cache.close()
 }
 
 @Test(.actionCatalog, .timeLimit(.minutes(1))) func replyFinishJoinsActionsBeforeCleaningRemainingAudio() async throws {

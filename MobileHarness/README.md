@@ -2,6 +2,8 @@
 
 ✅ Scene coalescing retains one required nonforeground interruption even when active immediately follows it. Every started service receives the joined suspension before foreground admission resumes; navigation never participates in that signal.
 
+✅ 停止聆听的回复中断依次加入已接纳执行／播放取消、原生播放器停止，最后回收会话音频及取消终态。即时原生停声保持同步，取消或失败仍完成后续清理并保留原错误。具体流程见 [语音接入](Agents/Support/README.md)。
+
 This document defines the current framework architecture, module responsibilities, cross-module flows and key technical contracts.
 
 This technical document has three parts:

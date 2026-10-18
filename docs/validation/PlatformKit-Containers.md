@@ -356,3 +356,25 @@
 ### UI并发优化版真机安装（2026-10-18）
 
 按用户要求将当前未提交优化版安装并启动于iPhone17Pro，安装序号3980。使用最终签名构建，确认改动中的构建输入均不晚于可执行文件；安装日志`/tmp/mobileharness-ui-review-install.log`，启动日志`/tmp/mobileharness-ui-review-launch.log`。已替换此前3972基线；包含光环失败锁存／去重、历史读取与投影缓存、资源恢复／防抖保存优化，字幕合并与排版尚未调整。安装和启动成功不代表本版手工、模型或性能验收通过，源码仍未提交。
+
+### 关闭聆听时 missingAudio 调查（2026-10-18）
+
+用户截图在17:39显示同一会话的 `storage.cache.audio` / `cancel: missingAudio` 和 `fail: missingAudio`，补充操作“关闭聆听好像”。本轮仅分析，未修改运行代码、重新安装或重启应用。
+
+- ✅ 只读访问连接的 iPhone17Pro，确认安装的应用为 `dev.mobileharness.app`。复制应用 records.sqlite 与 WAL 至本机临时文件，副本 quick_check 为 ok；17:39:47 创建的最后一轮 assistant 消息为 cancelled，原因为 `CancellationError()`。数据库没有截图会话ID或这两条容器异常，故只作为同时间取消的旁证，不能宣称从持久化数据恢复了截图的完整事件顺序。副本未纳入仓库，也未读取配置凭据或下载用户媒体。
+- ✅ 当前源码（调查基线 `9426eb47`）明确存在竞态：VoiceSessionCoordinator.cancelReplyWork 并行执行会话音频清理与 runtime.cancelReply；前者删除句柄并忘记取消终态。SpeechPlayback 的 onCancel 随后按ID取消已清理句柄，AudioCache 报 cancel/missingAudio；catch 再调用 fail，同一错误又报告一次。AudioCache.fail 在检查句柄是否存在之前报告，因此第二条不代表发生第二次音频生产故障。
+- ✅ 使用未修改的 StorageCore、StorageCache、FunctionContracts 及 SpeechPlayback 生产源码单独编译本机诊断程序。正常读完成功且零报告；先取消播放返回 CancellationError 且零报告；先清理会话或输入、再取消播放，均返回 CancellationError 并且恰好报告 `cache.audio cancel: missingAudio`、`cache.audio fail: missingAudio`。程序 `/tmp/mobileharness-missing-audio-repro.swift`，输出 `/tmp/mobileharness-missing-audio-repro.log`。这是受控任务顺序与合成PCM验证，未执行真实TTS或原生播放器。
+- ❌ 取消清理竞态及重复报告尚未修复。建议在已取得所有权的播放租约上提供可加入、幂等的终止，并使作用域清理加入消费者取消后再回收终态；保持未知句柄、越权、实际读写和生产失败的明确错误，不全局过滤 missingAudio。
+- 未运行完整检查或iOS构建：本轮没有运行代码变更，仅补充调查证据；未完成修复后的真机关闭聆听验收，亦未由本次调查推断相机卡顿或模型稳定性结论。
+
+### 关闭聆听的音频清理顺序修复（2026-10-18）
+
+用户明确要求最后清理音频，至少等待取消播放。已先更新总体、Agents／Support 和 IntegrationTests README，再修改实现；保留工作区既有字幕／导航改动，不新增目录、目标或依赖。
+
+- ✅ VoiceSessionCoordinator.cancelReplyWork 移除并行 cancelSpeechAudio 分支，使用同文件的 VoiceReplyCancellation 依次加入 runtime.cancelReply（已接纳执行／播放取消）、audio.waitForPlaybackStop、会话音频清理。stopVoice 的即时原生停声保持；顺序器不创建额外任务／队列。中断失败或取消也执行后两阶段，随后向原提示路径传播原错误；没有过滤 missingAudio 或修改 Storage 的失败语义。
+- ✅ 最终定向6项测试通过，新增参数化回归含正常返回／失败／取消三种情况。使用真实 AudioCache／SpeechPlayback、合成PCM及显式退出 gate，验证播放任务退出前、原生停止加入前均保留排队音频，最后清理无容器故障，且错误身份保留；同时验证正常释放、真正缺失仍上报、所有权／容量、按来源取消、公开接纳失败报告及回复结束加入。日志 `/tmp/mobileharness-audio-stop-order-related.log`。原生停止与PCM来源为替身，不代表真实模型或iOS播放器验收。
+- ✅ 签名真机构建通过：`/tmp/mobileharness-audio-stop-order-device.log`；本轮未安装、重启或操作真机。
+- ❌ `./scripts/build-ios.sh` 在首个 Simulator scheme 的 CoreAIShared 无法解析 CoreAI 处失败，后续scheme未执行：`/tmp/mobileharness-audio-stop-order-simulator.log`。
+- ✅ 完整检查中的模块边界／源码归属／README、严格Swift格式、Python6项及AppWorkflow120项通过，新增顺序回归的三种参数均通过；另行 git diff --check、修改文件严格格式与工程／隐私／权限plutil通过。
+- ❌ 完整检查整体未通过：UI96项中cameraPoseExpiresWithoutRemovingLiveVideo失败；Integration1000项中10项失败、22个问题，为atomicStableOffTargetEndsBeforeOverallDeadlineAndKeepsError、七项soundSource、visionDiscardsOverBudgetResultsWithoutPublishingAndRecovers、visionResolvesOpaqueInputWithoutCopyingMediaIntoObservation。日志 `/tmp/mobileharness-audio-stop-order-check.log`；未证明这些失败都是环境问题，不将定向通过替代全量通过。
+- ❌ 修复后的真机关闭聆听、快速启停及前后台验收仍待执行，不将本机替身测试或编译视为真机通过。字幕／导航等既有改动不纳入本次音频修复提交。

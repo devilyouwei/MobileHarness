@@ -103,6 +103,8 @@ Root UI bootstrap 只调用注入的生命周期启动端口；根服务开始�
 
 ✅ 区分会话中断与会话关闭。后台暂停、语音停止只结束在途 Decision（不扣闲置次数），运行 Task 在屏障后回到 waitingUser，保留近期计数、Task 持有 Skill 和公开会话端口；显式关闭继续清理，前台恢复不自动重放。
 
+✅ AgentBindings 停止聆听先加入回复执行与播放取消，再加入原生停止，最后清理会话 PCM；取消任务由会话拥有，错误继续向既有提示传播。顺序与回收契约见 [语音接入](Support/README.md)。
+
 ✅ 每轮固定 system、Skill/目录后在历史尾部注入唯一 CURRENT STATE 系统数据；ReACT 不携带旧 State。Skill 基础选择/Task/说话规则只归 BasicSkill，摄影仅保留摄影流程。
 
 ✅ Core 通用输出教学区分 XML Actions 与接口提供的原生 Tools，原生 name 以当前接口声明为准，业务 Skill 不另写一套可调用名称。补强先执行后依据真实反馈确认效果的通用规则；保持现有解析、名称映射和调度执行不变。

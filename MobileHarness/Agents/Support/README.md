@@ -133,6 +133,8 @@ VoiceSessionCoordinator 只保留语音输入、同意/占用屏障、角色及�
 
 ✅ VoiceSessionCoordinator 的取消回复绑定到保留会话的 interruptSession；设置导航不调用 stopVoice，页面可见性不控制根相机。原生后台仍立即停止采集/播放并加入清理，Assistant 内存由根持有。
 
+✅ VoiceSessionCoordinator.swift 中的跨平台 VoiceReplyCancellation 顺序加入 cancelReply、waitForPlaybackStop、cleanupAudio；协调器持有唯一 replyCancellationTask 并在重启／关闭前加入。cancelReply 必须加入已接纳的执行取消，即使返回错误也继续等待原生停止并回收音频，最后传播原错误。stopVoice 同步使原生播放失效，不等待模型停声；会话句柄与取消终态只在播放清理完成后回收。此顺序器不创建任务或队列，不过滤 Storage 的真实错误。
+
 
 ## 分类异常诊断
 

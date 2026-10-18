@@ -1,3 +1,25 @@
+/// The session owner joins execution and native playback before retiring shared audio handles.
+/// cancelReply must join accepted calls even on failure; cleanup completes before that error is rethrown.
+@MainActor
+public enum VoiceReplyCancellation {
+    public static func run(
+        cancelReply: () async throws -> Void,
+        waitForPlaybackStop: () async -> Void,
+        cleanupAudio: () async -> Void
+    ) async throws {
+        let failure: (any Error)?
+        do {
+            try await cancelReply()
+            failure = nil
+        } catch {
+            failure = error
+        }
+        await waitForPlaybackStop()
+        await cleanupAudio()
+        if let failure { throw failure }
+    }
+}
+
 #if os(iOS)
     import ActionBindings
     import Actions
@@ -522,15 +544,17 @@
             }
         }
         private func cancelReplyWork() async {
-            async let audio: Void = cancelSpeechAudio()
-            do { try await runtime.cancelReply() } catch is CancellationError {} catch {
+            do {
+                try await VoiceReplyCancellation.run(
+                    cancelReply: runtime.cancelReply,
+                    waitForPlaybackStop: { await self.audio.waitForPlaybackStop() },
+                    cleanupAudio: {
+                        await self.speechAudioStore?.cancel(sessionID: self.runtime.interactionSessionID)
+                    })
+            } catch is CancellationError {} catch {
                 state.present(.listeningControlMessage("回复停止失败：\(error)"))
                 record(state.listeningControlMessage ?? "回复停止失败")
             }
-            await audio
-        }
-        private func cancelSpeechAudio() async {
-            await speechAudioStore?.cancel(sessionID: runtime.interactionSessionID)
         }
 
         func updateListening(
