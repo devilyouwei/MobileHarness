@@ -7,6 +7,7 @@ struct PhotographerTrackingPolicy {
     private var filteredPitch = 0.0
     private var commandedBase = 0.0
     private var commandedPitch = 0.0
+    private var resume = false
 
     /// Advance the commanded target only after the actor admits its output.
     mutating func commit(base: Double, pitch: Double, timestamp: TimeInterval) {
@@ -21,22 +22,54 @@ struct PhotographerTrackingPolicy {
         filteredPitch = 0
         commandedBase = 0
         commandedPitch = 0
+        resume = false
     }
+
+    /// Keep the last command after the person leaves. The next pose only re-anchors time.
+    mutating func holdForResume() {
+        filteredBase = 0
+        filteredPitch = 0
+        guard lastAim != nil else { return }
+        resume = true
+    }
+
+    private static let minimumInterval = 0.02
+    private static let maximumInterval = 0.4
+    private static let nominalInterval = 0.2
 
     /// First published person. Nose at confidence ≥ 0.3 inside the image, otherwise the midpoint of such joints.
     /// `base` turns the base; `pitch` tips the wrist. Both advance in limited steps from the last command.
+    /// Each pose with an aim point can publish. `dt` is that pose's timestamp interval, clamped to
+    /// 0.02...0.4 seconds, so the step uses the same interval as the publication. The first aim uses 0.2 seconds.
+    /// After the person leaves, the next pose re-anchors the clock and does not add a catch-up step.
     mutating func nextAim(_ pose: PoseObservation) -> (base: Double, pitch: Double)? {
-        guard let person = pose.people.first else { return nil }
-        guard let point = Self.aimPoint(person, width: pose.width, height: pose.height) else { return nil }
+        guard let person = pose.people.first else {
+            holdForResume()
+            return nil
+        }
+        guard let point = Self.aimPoint(person, width: pose.width, height: pose.height) else {
+            holdForResume()
+            return nil
+        }
         let errorX = point.x / Double(pose.width) - 0.5
         let errorY = point.y / Double(pose.height) - 0.5
         let baseError = Self.track(&filteredBase, error: errorX)
         let pitchError = Self.track(&filteredPitch, error: errorY)
-        if let lastAim, pose.timestamp - lastAim.time < 0.2 { return nil }
-        let dt = lastAim.map { min(0.4, max(0.05, pose.timestamp - $0.time)) } ?? 0.2
+        if resume {
+            resume = false
+            lastAim = (commandedBase, commandedPitch, pose.timestamp)
+            return nil
+        }
+        let dt: TimeInterval
+        if let lastAim {
+            let elapsed = pose.timestamp - lastAim.time
+            if elapsed < Self.minimumInterval { return nil }
+            dt = min(Self.maximumInterval, elapsed)
+        } else {
+            dt = Self.nominalInterval
+        }
         let baseStep = rateStep(baseError, gain: 1.15, limit: 0.55, dt: dt)
         let pitchStep = rateStep(pitchError, gain: 0.85, limit: 0.40, dt: dt)
-        guard abs(baseStep) >= 0.004 || abs(pitchStep) >= 0.004 else { return nil }
         let base = min(1, max(-1, commandedBase + baseStep))
         let pitch = min(0.7, max(-0.7, commandedPitch + pitchStep))
         guard base != commandedBase || pitch != commandedPitch else { return nil }

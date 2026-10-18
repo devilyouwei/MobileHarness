@@ -17,7 +17,7 @@
 
 [Agent.json](../../Resources/Agents/Photographer/Agent.json) 定义 camera.state / vision.pose / photography.camera 的来源及 task.progress/result 定向消息，baseSkills=photography。固定函数在 workflow 注册；Skill 的七个 Camera 绑定用于目录复用，不创建 Chat worker。准确参数/完成语义由 [Camera Actions](../../Actions/Camera/README.md) 和 [NexArm Actions](../../Actions/NexArm/README.md) 拥有。
 
-固定摄影状态包括事务、当前相机、产物、调用/任务关联。open/close/flip/retry/save/ignore 按真实反馈推进；调用结果不是物理状态的推测，保存与预览处置使用真实媒体身份。跟踪与相机事务独立，仅在前台、连接和权限条件满足、姿态新鲜时通过内部 NexArm.Tracking.aim 提交目标。跟踪不绕过 native 停机/资源约束。本角色提交的仍是 base/pitch 位置。执行层首次准入用位置指令准备肩/肘，再把电机 1/4 切到速度模式；目标不变时保持已发速度。包整形见 NexArm Support。输出间隔仍至少 0.2 秒。
+固定摄影状态包括事务、当前相机、产物、调用/任务关联。open/close/flip/retry/save/ignore 按真实反馈推进；调用结果不是物理状态的推测，保存与预览处置使用真实媒体身份。跟踪与相机事务独立，仅在前台、连接和权限条件满足、姿态新鲜时通过内部 NexArm.Tracking.aim 提交目标。跟踪不绕过 native 停机/资源约束。本角色提交的仍是 base/pitch 位置。执行层首次准入用位置指令准备肩/肘，再把电机 1/4 切到速度模式；目标不变时保持已发速度。包整形见 NexArm Support。每个带瞄准点的姿态都可以发布目标。步长使用该姿态时间戳与上次发布的间隔，并限制在 0.02…0.4 秒；第一次发布用 0.2 秒。这个间隔就是执行层相邻目标之间应看到的间隔。短于 0.02 秒的重复姿态不发布。人离开画面，或距离上一次有瞄准点的姿态已超过 1 秒时，下一次有瞄准点的姿态只重新锚定时钟，不改变已发布角度。4% 软死区仍在误差上，不再另设 0.004 弧度的步长门槛。
 
 ## 状态、容量与生命周期
 

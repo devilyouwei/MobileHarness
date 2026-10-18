@@ -220,7 +220,7 @@ public actor PhotographerAgent: Agent {
         else { throw CommunicationError.outOfOrder }
         guard !input.metadata.expired else { throw CommunicationError.expired }
         if let lastPoseReceivedAt, ContinuousClock.now - lastPoseReceivedAt >= .seconds(1) {
-            tracking.reset()
+            tracking.holdForResume()
         }
         if let person = pose.people.first,
             PhotographerTrackingPolicy.aimPoint(person, width: pose.width, height: pose.height) != nil

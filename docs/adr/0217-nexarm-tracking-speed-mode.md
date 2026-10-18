@@ -6,7 +6,7 @@ Status: accepted, 2026-10-16. Supersedes the one position packet per target in [
 
 Position commands on this arm accelerate, cruise, and brake at the goal. Tracking was publishing a new goal about every 0.2 seconds, so each segment braked. Camera checks on 2026-10-16, with only motors 1 and 2 connected, showed closed-loop speed mode: speed 0 holds, a positive speed turns motor 1 toward the arm's left and motor 2 downward, and bit 15 reverses it. Returning to position mode and sending a position goal stops at that goal. CMD11 did not change during these trials, so completion was the camera, not telemetry.
 
-`NexArm.Tracking.aim` still publishes base and pitch positions. The 0.2 second publication gate remains in Photographer.
+`NexArm.Tracking.aim` still publishes base and pitch positions. Photographer can publish one aim for each pose that has an aim point. The step uses the pose-timestamp interval, clamped to 0.02…0.4 seconds, which is the interval the execution layer should see between those targets. The first aim uses 0.2 seconds. After the person leaves, or after one second without an aim point, the next pose re-anchors the clock and does not add a catch-up step. There is no separate 0.004 radian step gate.
 
 ## Decision
 

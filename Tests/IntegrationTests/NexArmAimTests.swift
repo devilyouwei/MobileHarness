@@ -252,14 +252,35 @@ private func armSpeeds(in frame: [UInt8]) throws -> [Int] {
     await agent.stop()
 }
 
-@Test(.actionCatalog) func aimWaitsForTimeAndMovement() async throws {
+@Test(.actionCatalog) func aimPublishesEachPoseAndDoesNotCatchUpAfterAGap() async throws {
     let session = UUID().uuidString
     let agent = try PhotographerAgent(sessionID: session, controlsArm: true)
     try await agent.start()
     try await agent.receive(observation(try pose(noseX: 10, noseY: 50, sequence: 1, timestamp: 0), session: session))
-    try await agent.receive(observation(try pose(noseX: 10, noseY: 50, sequence: 2, timestamp: 0.1), session: session))
+    try await agent.receive(observation(try pose(noseX: 10, noseY: 50, sequence: 2, timestamp: 0.01), session: session))
+    try await agent.receive(
+        observation(try pose(noseX: 10, noseY: 50, sequence: 3, timestamp: 0.033), session: session))
+    let empty = try PoseObservation(width: 100, height: 100, sequence: 4, timestamp: 0.066, rotation: 1, people: [])
+    try await agent.receive(observation(empty, session: session))
+    try await agent.receive(observation(try pose(noseX: 10, noseY: 50, sequence: 5, timestamp: 0.1), session: session))
+    try await agent.receive(
+        observation(try pose(noseX: 10, noseY: 50, sequence: 6, timestamp: 0.133), session: session))
     var stream = agent.outputs.makeAsyncIterator()
-    _ = try #require(await stream.next())
+    let first = try #require(await stream.next())
+    let second = try #require(await stream.next())
+    let third = try #require(await stream.next())
+    guard case .toolCall(let firstCall) = first.output, case .toolCall(let secondCall) = second.output,
+        case .toolCall(let thirdCall) = third.output
+    else {
+        Issue.record("Missing aim")
+        return
+    }
+    let firstBase = try #require(Double(firstCall.arguments["base"] ?? ""))
+    let secondBase = try #require(Double(secondCall.arguments["base"] ?? ""))
+    let thirdBase = try #require(Double(thirdCall.arguments["base"] ?? ""))
+    #expect(secondBase < firstBase)
+    #expect(thirdBase < secondBase)
+    #expect(abs(thirdBase - secondBase) < 0.03)
     await agent.stop()
     #expect(await stream.next() == nil)
 }
