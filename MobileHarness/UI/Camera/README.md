@@ -60,3 +60,6 @@ flowchart LR
 [UI 根](../README.md) · [原生组件](../Components/README.md) · [验证记录](../../../docs/validation/PlatformKit-Containers.md)
 
 ✅ 已实现：宿主准备门禁禁止新开相机／切镜头，已开启相机仍可关闭，设置入口不受门禁影响；保留原相机忙碌及权限围栏。
+
+
+✅ CameraState将渲染故障包装为UIFailure后同步交宿主，保留原技术描述和包装源码位置。CameraPresenting的帧新鲜度／方向／代际拒绝保持原领域错误及独立画面／骨架行为，不逐帧升级为全局Toast。

@@ -99,10 +99,11 @@ public final class UIContainer {
     }
     public var isAvailable: Bool { admission.active }
     public var rejectedUpdates: UInt64 { admission.rejected }
-    public func start() throws {
+    public func start() throws(UIFailure) {
         guard !admission.stopped else {
-            onFailure("root", "start", UIContainerError.stopped)
-            throw UIContainerError.stopped
+            let failure = UIFailure(component: "root", operation: "start", underlying: UIContainerError.stopped)
+            onFailure(failure.component, failure.operation, failure)
+            throw failure
         }
         guard !admission.started else { return }
         admission.start()
@@ -114,14 +115,17 @@ public final class UIContainer {
         home.invalidate()
         camera.setAvailable(false)
     }
-    public func setForeground(_ active: Bool) throws {
+    public func setForeground(_ active: Bool) throws(UIFailure) {
         guard !admission.stopped else {
-            onFailure("root", "setForeground", UIContainerError.stopped)
-            throw UIContainerError.stopped
+            let failure = UIFailure(component: "root", operation: "setForeground", underlying: UIContainerError.stopped)
+            onFailure(failure.component, failure.operation, failure)
+            throw failure
         }
         guard admission.started else {
-            onFailure("root", "setForeground", UIContainerError.unavailable)
-            throw UIContainerError.unavailable
+            let failure = UIFailure(
+                component: "root", operation: "setForeground", underlying: UIContainerError.unavailable)
+            onFailure(failure.component, failure.operation, failure)
+            throw failure
         }
         if !active {
             invalidate()

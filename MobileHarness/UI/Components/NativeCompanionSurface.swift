@@ -75,6 +75,8 @@ import Foundation
         private let gazeLayer = CALayer()
         private let breath = CALayer()
         private let blink = CALayer()
+        private let leftSize = CALayer()
+        private let rightSize = CALayer()
         private let left = CAShapeLayer()
         private let right = CAShapeLayer()
         private var renderer: MetalHaloRenderer?
@@ -104,8 +106,10 @@ import Foundation
             face.addSublayer(gazeLayer)
             gazeLayer.addSublayer(breath)
             breath.addSublayer(blink)
-            blink.addSublayer(left)
-            blink.addSublayer(right)
+            blink.addSublayer(leftSize)
+            blink.addSublayer(rightSize)
+            leftSize.addSublayer(left)
+            rightSize.addSublayer(right)
             for eye in [left, right] {
                 eye.fillColor = UIColor(red: 0.08, green: 0.62, blue: 1, alpha: 1).cgColor
                 eye.shadowColor = UIColor.systemBlue.cgColor
@@ -173,7 +177,8 @@ import Foundation
             let eyeSize = CGSize(width: input.faceWidth * 0.21, height: input.faceWidth * 0.25)
             for (index, eye) in [left, right].enumerated() {
                 eye.bounds = CGRect(origin: .zero, size: eyeSize)
-                eye.position = CGPoint(x: (index == 0 ? -1 : 1) * input.faceWidth * 0.20, y: 0)
+                let sizeLayer = index == 0 ? leftSize : rightSize
+                sizeLayer.position = CGPoint(x: (index == 0 ? -1 : 1) * input.faceWidth * 0.20, y: 0)
                 eye.contentsScale = window?.screen.scale ?? traitCollection.displayScale
             }
             let changedSize = lastSize != bounds.size
@@ -320,6 +325,33 @@ import Foundation
             layer.add(animation, forKey: key)
         }
         private func updateAmbient(_ input: NativeCompanionSurface, visible: Bool, at time: Double) {
+            CATransaction.begin()
+            CATransaction.setDisableActions(true)
+            defer { CATransaction.commit() }
+            let loading = visible && input.expression == .loading
+            for (index, sizeLayer) in [leftSize, rightSize].enumerated() {
+                let scales = index == 0 ? [1.12, 0.68, 1.12] : [0.68, 1.12, 0.68]
+                let scale = loading ? scales[0] : 1
+                sizeLayer.transform = CATransform3DMakeScale(scale, scale, 1)
+                if loading, !input.reduceMotion {
+                    guard sizeLayer.animation(forKey: "loading") == nil else { continue }
+                    let animation = CAKeyframeAnimation(keyPath: "transform.scale")
+                    animation.values = scales
+                    animation.keyTimes = [0, 0.5, 1]
+                    animation.duration = 1.2
+                    animation.timingFunctions = Array(repeating: CAMediaTimingFunction(name: .easeInEaseOut), count: 2)
+                    animation.repeatCount = .infinity
+                    animation.beginTime = sizeLayer.convertTime(time, from: nil)
+                    sizeLayer.add(animation, forKey: "loading")
+                } else {
+                    sizeLayer.removeAnimation(forKey: "loading")
+                }
+            }
+            if input.expression == .loading {
+                blink.removeAllAnimations()
+                breath.removeAllAnimations()
+                return
+            }
             guard visible, !input.reduceMotion, input.expression != .closed else {
                 blink.removeAllAnimations()
                 breath.removeAllAnimations()
@@ -352,6 +384,10 @@ import Foundation
             renderer?.stop()
             renderer = nil
             face.removeAllAnimations()
+            leftSize.removeAllAnimations()
+            rightSize.removeAllAnimations()
+            leftSize.transform = CATransform3DIdentity
+            rightSize.transform = CATransform3DIdentity
             latest = nil
             committed = nil
         }

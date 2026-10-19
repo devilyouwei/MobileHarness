@@ -1,5 +1,9 @@
 # IntegrationTests
 
+✅ 覆盖 Worker 等待标记在首个有效输出及失败／取消的结束边界，继续保留真实模型和物理设备独立验收。
+
+✅ 宿主准备验证失败通过真实 ContainerFailureChannel／Gateway／ApplicationControl／呈现函数记录异常并显示 Toast，保留原始 ValidationError，不由 UI 或 App 决定 Toast。
+
 ## 职责与构造边界
 
 通过真实 Agent/Gateway/Action/Tool/Storage 接口和注入模型、设备及呈现端点验证跨模块契约。ActionCatalogFixture 在每个作用域安装相同不可变生产声明；并发、失败与完成使用显式 gate/反馈同步。常规用例不推理真实模型、不控制硬件；真实 provider 和串口验收必须单独启用。
@@ -192,3 +196,25 @@ PlatformContainerTests 验证注册隔离、根失效/恢复、重复停止和�
 ✅ 已实现：回归Gateway稳定连接条件代码、Agent无Toast状态降级、事实→两个呈现Action、重连／连接／断开变更、旧revision与伪造来源拒绝；严重传输故障保留原异常。
 
 ✅ 自动化覆盖：完整原始错误及长文本保留、同前缀错误不合并、正常取消／生命周期拒绝保留但不广播，四根统一错误回调与原始抛错。
+
+
+✅ FoundationFailureTests通过同一测试协议检查四种封装的字段语义、稳定代码集合、NSError身份、来源保留、多项清理错误和取消分类；同时回归Gateway稳定投影、包装后的蓝牙条件及单项清理错误不降级。根容器原有测试改为验证结构化错误与underlying。
+
+
+✅ modelPreparationLoadingEyesCrossGatewayAgentAndExpressionAction覆盖App环境事实经Gateway／ApplicationControl／独立Expression Tool到UI，未聆听显示及回前台重复loading事实重新开启，ready退出且不产生Toast。
+
+✅ setLoading为state函数，必须使用Void handler产生completed，禁止value完成；回归通过FunctionExecutor校验完成类型和Tool返回成功，不能只检查UI副作用。
+
+✅ 已实现：实际模型 preparing 使用独立加载 Action，checking 不启动加载表情。
+
+✅ 已实现：回归原始及 PlatformFailure 包装的 connect 超时保留证据、无 Toast，并验证同样 timeout 在 write 及清理失败时仍为故障。
+
+✅ 已实现：通过真实 setLoading ToolExecutor 验证检查／ready 后迟到加载和乱序版本正常完成且不改变 UI，错误身份、无效版本及冲突仍拒绝。
+
+✅ ModelKit reportLoading 的真实冷加载／暖模型／无资源／失败区间回归归 [ModelKitRuntimeTests](../ModelKitRuntimeTests/README.md)；本目录继续验证呈现 Action 链路。
+
+✅ 已实现：app.environment 按类别保留最新版本；来源、会话、信封和内容先校验。晚到旧版本及相同版本相同内容不重复呈现、不产生 outOfOrder；同版本不同内容明确拒绝。仅适用于环境快照，不改变 PCM、业务动作和结果的顺序契约。回归覆盖逆序、重复、冲突及 loading 不被旧事实重新打开。
+
+✅ 旧机械臂宿主的窄 UI fixture 补全新增内部等待函数声明，验证完整生产授权目录，不扩大生产模块依赖。
+
+✅ 已实现：FeedbackActionTests提供iOS原生触觉重复请求回归，以HAPTIC_DEVICE_ACCEPTANCE=1显式启用；同一NativeHapticFeedback实例在每次模拟录音重配关闭触觉开关后仍须恢复允许，含stop后重用。测试还原共享会话原值并保留清理失败，需支持触觉的真机；macOS不执行此原生用例，API接纳不等于已实测震感。

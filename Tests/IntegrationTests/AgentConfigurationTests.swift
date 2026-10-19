@@ -134,7 +134,9 @@ func agentConfigurationRejectsInvalidDocuments(_ mutation: String) throws {
             agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState())
     )
     let registry = agent.descriptor.capabilities
-    #expect(registry.internalActions.count == 3 && registry.internalTools.isEmpty)
+    #expect(registry.internalActions.count == 4 && registry.internalTools.isEmpty)
+    #expect(registry.internalActions.contains { $0.path.description == "UI.Expression.setReplyWaiting" })
+    #expect(!registry.actions.contains { $0.path.description == "UI.Expression.setReplyWaiting" })
     #expect(!registry.internalActions.contains { $0.path.description == "Speech.Listening.update" })
     #expect(
         registry.permits(

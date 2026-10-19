@@ -122,7 +122,7 @@ public actor ModelResource<Model: Sendable>: ModelResourceLifecycle {
         drained = nil
     }
 
-    private func ensureLoaded() async throws -> Model {
+    private func ensureLoaded(reportLoading: @Sendable (Bool) async -> Void = { _ in }) async throws -> Model {
         let generation = try admission.check()
         guard !closed else { throw CapabilityError.sessionClosed }
         guard !unloading, !maintenance else { throw CapabilityError.unavailable("Model is under maintenance") }
@@ -136,6 +136,7 @@ public actor ModelResource<Model: Sendable>: ModelResourceLifecycle {
         }
         let id = loadID
         let task = loading!
+        await reportLoading(true)
         do {
             let value = try await task.value
             // Never let an old waiter resurrect a resource after unload or a later retry.
@@ -147,12 +148,14 @@ public actor ModelResource<Model: Sendable>: ModelResourceLifecycle {
             try Task.checkCancellation()
             try admission.validate(generation)
             guard !closed, !unloading, !maintenance, let model else { throw CancellationError() }
+            await reportLoading(false)
             return model
         } catch {
             if loadID == id {
                 loading = nil
                 loadID = nil
             }
+            await reportLoading(false)
             throw error
         }
     }
@@ -171,6 +174,9 @@ public actor ModelResource<Model: Sendable>: ModelResourceLifecycle {
     }
 
     fileprivate func load() async throws { _ = try await ensureLoaded() }
+    fileprivate func load(reportLoading: @Sendable (Bool) async -> Void) async throws {
+        _ = try await ensureLoaded(reportLoading: reportLoading)
+    }
 
     fileprivate func unload() async throws {
         guard !closed else { throw CapabilityError.sessionClosed }
@@ -225,6 +231,7 @@ public actor ModelResource<Model: Sendable>: ModelResourceLifecycle {
 private protocol ModelResourceLifecycle: Sendable {
     var state: ModelResourceState { get async }
     func load() async throws
+    func load(reportLoading: @Sendable (Bool) async -> Void) async throws
     func unload() async throws
     func shutdown() async
     func suspend() async
@@ -280,6 +287,9 @@ public final class ModelContext: Sendable {
     }
     @_spi(ModelManagement) public func seal() { state.withLock { $0.sealed = true } }
     @_spi(ModelManagement) public func load() async throws { try await state.withLock { $0.resource }?.load() }
+    @_spi(ModelManagement) public func load(reportLoading: @Sendable (Bool) async -> Void) async throws {
+        try await state.withLock { $0.resource }?.load(reportLoading: reportLoading)
+    }
     @_spi(ModelManagement) public func unload() async throws { try await state.withLock { $0.resource }?.unload() }
     @_spi(ModelManagement) public func unloadIfIdle() async -> Bool {
         await state.withLock { $0.resource }?.unloadIfIdle() ?? false

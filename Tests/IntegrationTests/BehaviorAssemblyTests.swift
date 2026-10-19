@@ -51,6 +51,7 @@ private actor BehaviorEndpoint: UIPresentationCapability, UIUpdateCapability, Sp
     func presentTranscript(_ text: String, invocation: any FunctionInput) async throws {}
     func finishTranscript(invocation: any FunctionInput) async throws {}
     func beginReplyTurn(invocation: any FunctionInput) async throws {}
+    func setReplyWaiting(_ enabled: Bool, requestID: String, invocation: any FunctionInput) async throws {}
     func presentVoiceState(_ state: UIActions.VoiceState, invocation: any FunctionInput) async throws {}
     func presentExpression(_ emotion: UIActions.Emotion, invocation: any FunctionInput) async throws {
         self.emotion = emotion

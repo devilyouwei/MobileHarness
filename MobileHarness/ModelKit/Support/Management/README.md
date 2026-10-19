@@ -1,6 +1,8 @@
 # Model Management and Default Assembly
 
-✅ ModelContainer.swift 拥有根、四子能力及私有默认装配；ModelScope 合并一个准备任务，最多32个等待者，配置替换拒绝重叠。ModelManager 仍是私有注册与资源机制，消费者通过公开子能力协议访问。
+✅ ModelContainer.swift 移至 ../../ModelContainer.swift；本目录保留默认注册／选择辅助及运行机制，仍使用显式、互斥源码清单。
+
+✅ 模块根目录 [ModelContainer.swift](../../ModelContainer.swift) 拥有根、四子能力及私有默认装配；ModelScope 合并一个准备任务，最多32个等待者，配置替换拒绝重叠。ModelManager 仍是私有注册与资源机制，消费者通过公开子能力协议访问。
 
 ## Summary
 
@@ -13,10 +15,10 @@ ModelKitRuntime depends only on ModelKit. Management owns ModelState (including 
 | Target | Explicit root source ownership |
 | --- | --- |
 | ModelKitRuntime | ModelManager.swift, ModelRegistration.swift, ModelArtifactContracts.swift, ModelArtifactStore.swift, ArtifactDownloadTransport.swift |
-| ModelKitDefaults | ModelContainer.swift, ChatDefaults.swift, SpeechDefaults.swift, VisionDefaults.swift, SpeechProviderSelection.swift |
+| ModelKitDefaults | 模块根 ModelContainer.swift；本目录 ChatDefaults.swift, SpeechDefaults.swift, VisionDefaults.swift, SpeechProviderSelection.swift |
 | ModelKitHub | HuggingFace/ source files |
 
-The two root targets use explicit disjoint sources/excludes. Registration and artifact contracts are separated by file; native archive transfer remains Runtime-owned. Each ModelContainer owns its manager/configuration; Chat, Speech and Vision register their own providers. SpeechProviderSelection chooses once before admission; it never retries failed active inference on another provider.
+The two targets use explicit disjoint sources/excludes; Defaults is rooted at ModelKit to include the public entry file, while Runtime remains rooted in this directory. Registration and artifact contracts are separated by file; native archive transfer remains Runtime-owned. Each ModelContainer owns its manager/configuration; Chat, Speech and Vision register their own providers. SpeechProviderSelection chooses once before admission; it never retries failed active inference on another provider.
 
 ## External relationships and data flow
 
@@ -120,12 +122,17 @@ ModelLanguageContainer 属于默认装配目标，按每个请求解析当前 ch
 
 ✅ 默认装配根实例独立，制品协议及托管加载／卸载不依赖应用模块；消费者不获得管理器。
 
-✅ ModelContainer.swift 统一模型根／子能力及实例私有默认装配；旧进程入口与 CurrentChatCapability 已移除。App 同根缓存、流式错误一次观察、停止和权重保留由自动化覆盖，真实模型／硬件证据独立记录。
+✅ 模块根目录的 ModelContainer.swift 统一模型根／子能力及实例私有默认装配；旧进程入口与 CurrentChatCapability 已移除。App 同根缓存、流式错误一次观察、停止和权重保留由自动化覆盖，真实模型／硬件证据独立记录。
 
 ✅ 语言／视觉使用同一 ModelResourceControlling 协议提供 load、warmup、unload、status；语音按 recognition／synthesis／voiceActivity 选择同样操作，卸载覆盖该类别的本地和系统后端，状态反映选中的实际后端。移除合成专用卸载命名，保持接口一致。
 
 ✅ 已实现：路径字符白名单缓存为不可变CharacterSet，避免资源轮询对每个路径字符重复构造集合；路径规则、安全边界及磁盘校验不变。
 
-✅ 已实现：根生命周期、配置前置校验接入统一原生错误报告，取消与 admission 错误亦保留；原始 throw 类型不包装丢失，复合清理错误继续包含全部底层错误。
+✅ 已实现：根生命周期、配置前置校验接入统一原生错误报告，取消与 admission 错误亦保留；原始 throw 类型由 underlying 保留，复合清理错误继续包含全部底层错误。
 
 根启动／停止传播准备失败和全部清理错误；停止主动取消未完成装配时，原始 CancellationError 留在诊断，正常清理仍可完成。availability/support 的非抛错能力查询继续返回中立不可用值，原始失败同步走报告端口，不解释业务提示。
+
+
+✅ ModelScope为全部原生异常报告包装ModelFailure，根生命周期使用throws(ModelFailure)。装配／制品释放的主错误和清理错误统一分开保留，不再声明专用清理聚合类型；availability／推理流仍遵循各自领域协议，不以根容器迁移冒充所有SDK抛错已替换。
+
+✅ 已实现：warmup 提供模块自有 reportLoading(Bool) 回调；先构造后端，再由真实资源 load 区间报告开始／结束；ready／unmanaged 不报告，语音按当前选中后端统一准备。回调不包含 UI／Signal，失败结束后原样上抛。

@@ -2,6 +2,16 @@ import AgentCore
 import Foundation
 import Synchronization
 
+/// Technical projection supplied by the host, never a presentation policy.
+public struct ContainerFailureDetails: Sendable {
+    public let code: String
+    public let isCancellation: Bool
+    public init(code: String, isCancellation: Bool) {
+        self.code = code
+        self.isCancellation = isCancellation
+    }
+}
+
 public struct ContainerFailureRecord: Sendable {
     public enum Delivery: String, Sendable { case pending, published, failed, dropped, suppressed }
     public var event: ContainerFailureEvent
@@ -45,27 +55,30 @@ public final class ContainerFailureChannel: Sendable {
         state.withLock { $0.worker?.cancel() }
     }
     public func sink(
-        module: String, shouldPublish: @escaping @Sendable (any Error) -> Bool = { _ in true }
+        module: String, shouldPublish: @escaping @Sendable (any Error) -> Bool = { _ in true },
+        details: @escaping @Sendable (any Error) -> ContainerFailureDetails? = { _ in nil }
     ) -> @Sendable (String, String, any Error) -> Void {
         { [self] component, operation, error in
             report(
-                module: module, component: component, operation: operation, error: error, publish: shouldPublish(error))
+                module: module, component: component, operation: operation, error: error, publish: shouldPublish(error),
+                details: details(error))
         }
     }
     @discardableResult public func report(
         module: String, component: String, operation: String,
         phase: ContainerFailureEvent.Phase = .operation, error: any Error, includeCancellation: Bool = false,
-        publish: Bool = true
+        publish: Bool = true, details: ContainerFailureDetails? = nil
     ) -> Bool {
         let fullMessage = String(describing: error)
         let shouldPublish =
-            publish && (!(error is CancellationError) || includeCancellation)
+            publish && (!(details?.isCancellation ?? (error is CancellationError)) || includeCancellation)
             && !DeviceInputAdapter.isLifecycleControl(module: module, error: error)
         let event = ContainerFailureEvent(
             scopeID: scopeID, module: String(module.prefix(16)), component: String(component.prefix(64)),
             operation: String(operation.prefix(64)), phase: phase,
-            code: DeviceInputAdapter.bluetoothFailureCode(module: module, component: component, error: error)
-                ?? String(String(reflecting: type(of: error)).prefix(32)),
+            code: DeviceInputAdapter.bluetoothFailureCode(
+                module: module, component: component, operation: operation, error: error)
+                ?? details?.code ?? String(String(reflecting: type(of: error)).prefix(32)),
             message: String(fullMessage.prefix(512)))
         let accepted = state.withLock { value in
             guard !value.closed else {

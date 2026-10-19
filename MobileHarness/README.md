@@ -1,5 +1,18 @@
 # MobileHarness Technical Design
 
+✅ Assistant 的前台大模型请求通过 Gateway→Actions 提交带请求身份的等待表情；首个非空输出、工具输出、完成、失败或取消结束等待，复用 UI 原生大小眼动画，与真实模型加载独立。
+
+✅ 首页实际加载模型时只显示双眼左右大小交替的等待表情，无加载文字或手动取消；失败才显示重试按钮，异常经 Gateway → ApplicationControl → Actions 呈现 Toast。检查／已就绪不显示等待表情，场景失活／根停止仍保留真实取消与加入。
+
+✅ 四基础模块根目录统一放置 XxxContainer.swift 与 XxxFailure.swift。ModelKit 入口／错误、Storage 错误迁至根目录；物理目录不改变编译归属、依赖方向或 Signal 转换所有权。
+
+| 基础模块 | 根容器入口 | 根异常定义 |
+| --- | --- | --- |
+| ModelKit | [ModelContainer.swift](ModelKit/ModelContainer.swift) | [ModelFailure.swift](ModelKit/ModelFailure.swift) |
+| PlatformKit | [PlatformContainer.swift](PlatformKit/PlatformContainer.swift) | [PlatformFailure.swift](PlatformKit/PlatformFailure.swift) |
+| Storage | [StorageContainer.swift](Storage/StorageContainer.swift) | [StorageFailure.swift](Storage/StorageFailure.swift) |
+| UI | [UIContainer.swift](UI/UIContainer.swift) | [UIFailure.swift](UI/UIFailure.swift) |
+
 ✅ App 持有实例级 ModelContainer 并注入 language／speech／vision／artifacts；依赖顺序为 Storage → Model → Agents。后台关闭推理并加入取消、保留权重与既有后台制品传输；模型中立错误回调接入 Gateway，Signal 适配不进入基础库。
 
 This document defines the current framework architecture, module responsibilities, cross-module flows and key technical contracts.
@@ -17,6 +30,8 @@ This technical document has three parts:
 Agents own input interpretation, business decisions and task coordination. Human intent, physical observations, system events, Agent messages and declared execution feedback enter as Signals through InputGateway. AgentBindings adapts external inputs; Agent communication and execution feedback use identity-bound Gateway paths.
 
 Direct interaction and model decisions share Agent-owned business flows and registered functions. An Agent handles typed intent deterministically or uses a model, emits calls through OutputGateway, and uses declared feedback to continue, complete or cancel work.
+
+✅ The iOS navigation container is transparent while destination pages own their opaque backgrounds, allowing native return transitions to reveal the retained home throughout the gesture. Navigation still pauses camera admission independently of the resident listening session.
 
 UI mounts the home surface outside the navigation stack as a persistent sibling. Settings/history/detail pushes retain its native renderer and root voice session. Camera admission requires both foreground state and the home route; navigation pauses capture and pose processing while preserving the camera-enabled intent. Returning home resumes according to that intent. Scene inactive/background interrupts the root voice session independently of navigation.
 
@@ -282,7 +297,7 @@ Directory nesting expresses ownership; `Package.swift` defines the actual compil
 | `Gateway/Output/Registration/` and `Protocols/` | CallRuntime | FunctionContracts, ExecutionRuntime |
 | `Actions/` excluding Contracts and ActionBindings source list | Actions | FunctionContracts, PlatformKit, BehaviorDefinitions, StorageChat, StorageCore, StorageFiles |
 | `Storage/StorageContainer.swift` | Storage | StorageCore, StorageState, StorageCache, StorageFiles, StorageDatabase |
-| `Storage/Support/` | StorageCore | None |
+| `Storage/StorageFailure.swift`, `Storage/Support/` | StorageCore | None |
 | `Storage/State/` | StorageState | StorageCore |
 | `Storage/Cache/` including Audio | StorageCache | StorageCore |
 | `Storage/Files/` | StorageFiles | StorageCore |
@@ -296,7 +311,7 @@ Directory nesting expresses ownership; `Package.swift` defines the actual compil
 | `PlatformKit/` | PlatformKit | None |
 | ModelKit shared capability sources | ModelKit | None |
 | `ModelKit/Support/Management/` (runtime source list) | ModelKitRuntime | ModelKit |
-| `ModelKit/Support/Management/` (assembly source list) | ModelKitDefaults | ModelKit, ModelKitRuntime, registered adapters |
+| `ModelKit/ModelContainer.swift`, `ModelKit/Support/Management/` (assembly source list) | ModelKitDefaults | ModelKit, ModelKitRuntime, registered adapters |
 | `ModelKit/Speech/VAD/Energy/` | ModelKitEnergy | ModelKit |
 | `ModelKit/Support/Management/HuggingFace/` | ModelKitHub | ModelKitRuntime, HuggingFace product |
 | `Macros/BehaviorDefinitions/` | BehaviorDefinitions | SwiftCompilerPlugin, SwiftSyntax, SwiftSyntaxBuilder, SwiftSyntaxMacros products |
@@ -782,6 +797,8 @@ flowchart LR
 ```
 
 PlatformKit captures PCM; the voice input/execution services own native admission and scope; Gateway delivers it to SpeechPerception; ModelKit supplies VAD/ASR; Assistant interprets final text and emits resolved outputs. ActionBindings adapts permitted presentation calls into UI values. Recognition, model completion, captions and actual playback remain separate facts.
+
+✅ Press preparation only prepares cue/haptics; device exclusion and cleanup joins belong to actual listening admission. Native startup, first-PCM readiness and feedback completion remain distinct.
 
 Listening admission validates capabilities/permission and starts native capture before loading model weights. First PCM enables the listening animation and canonical cue/haptic. SpeechPerception buffers ordered PCM while its VAD/ASR resource acquisition loads the selected models; the voice service does not prewarm recognition, VAD or synthesis before recording. Queue limits and overflow belong to [SpeechPerception](Agents/SpeechPerception/README.md#input-and-processing); native cue and capture capabilities retain their own admission and completion contracts.
 
@@ -1495,8 +1512,16 @@ Assistant selects and authorizes model photos; App injects original-read/prepara
 
 SpeechPerception owns consent/occupancy, SpeechSynthesis produces PCM, the module-owned voice input/execution services join native microphone/playback barriers and UI renders supplied captions/eyes/light. Cue/haptic/notice functions reuse canonical Actions; Skill exposure and physical completion remain separate. Rendering details belong to [UI Components](UI/Components/README.md); root presentation ownership to [Action presentation](Actions/UI/Support/README.md).
 
-✅ 已实现：首页可见且前台时，由App持有一个可取消并加入的准备协调器，通过ModelKit窄接口检查当前模型，冷能力串行准备；已就绪直接放行。UI.home只呈现独立准备状态，阻止新聆听和新相机操作，保留设置／重试／取消及已有会话停止。导航不终止已有聆听，后台仍按原生命周期停止。
+✅ 已实现：首页可见且前台时，由App持有一个可取消并加入的准备协调器，通过ModelKit窄接口检查当前模型，冷能力串行准备；已就绪直接放行。UI.home只呈现独立准备状态，阻止新聆听和新相机操作，保留设置、失败重试及已有会话停止，不提供手动取消加载。导航不终止已有聆听，后台仍按原生命周期停止。
 
 ✅ 已实现：蓝牙连接不可用／连接建立失败保留Platform错误与Gateway原始记录，Gateway提供稳定连接条件代码，ApplicationControl将其降为状态而非故障Toast；实际设备事实经既有app.environment更新Agent连接状态，再分别调用首页／设置呈现Action。控制与传输严重错误不降级。
 
 ✅ 已实现：四大基础根使用统一的原生错误报告签名，完整原始 Error 保留在根级诊断记录，Signal 仅携带有界摘要；基础库不决定提示方式，正常取消／生命周期拒绝只保留本地记录。
+
+
+✅ 四基础根分别以 StorageFailure／PlatformFailure／ModelFailure／UIFailure 类型化抛错，原生报告统一采用同形模块自有结构；App投影技术分类及取消标记，Gateway生成Signal，Agent决定展示。底层领域协议继续保留原始类型化throw，原始对象和全部清理错误通过underlying／cleanupErrors保存。
+
+
+✅ 首页模型准备由App拥有；准备事实经Gateway→ApplicationControl→独立UI.Expression.setLoading状态Tool→UI.home.expressions→原生Core Animation。UI交互门和准备终态清理仍同步生效，加载表情不改变麦克风或会话状态。
+
+✅ 已实现：首页加载呈现由 ModelKit 实际资源加载区间报告驱动，App 转为准备状态与 Gateway 环境事实；检查／后端对象构造不触发加载，UI 显示与交互门分开。

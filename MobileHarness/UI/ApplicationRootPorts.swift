@@ -18,7 +18,6 @@
     public protocol ApplicationRootProviding: AnyObject {
         var homePreparation: HomeModelPreparation { get }
         func retryHomePreparation()
-        func cancelHomePreparation()
         func interactionActivityChanged()
         func modelRequirementsChanged()
         var startupIssue: String? { get }

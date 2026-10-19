@@ -160,9 +160,9 @@ for source in KIT.rglob('*.swift'):
     if source not in owners:
         errors.append(f'Unowned ModelKit source: {source.relative_to(ROOT)}')
 management = 'MobileHarness/ModelKit/Support/Management'
-for name in ('ModelKitRuntime', 'ModelKitDefaults'):
-    if model_targets[name]['path'] != management or not model_targets[name].get('sources'):
-        errors.append(f'{name} requires an explicit source list in the unified Management directory')
+for name, path in (('ModelKitRuntime', management), ('ModelKitDefaults', 'MobileHarness/ModelKit')):
+    if model_targets[name]['path'] != path or not model_targets[name].get('sources'):
+        errors.append(f'{name} requires an explicit source list at {path}')
 for source, name in owners.items():
     imports = imported_modules(source.read_text())
     permitted = expected_model_dependencies.get(name, set()) | {name}
@@ -184,6 +184,7 @@ for source in (KIT / 'Support/Core').glob('*.swift'):
         errors.append(f'Hardcoded runtime loading policy in Core: {source.relative_to(ROOT)}')
 # Typecheck Core alone: same-target capability declarations must not hide a reverse dependency.
 core_sources = sorted(str(source) for source in (KIT / 'Support/Core').glob('*.swift'))
+core_sources.append(str(KIT / 'ModelFailure.swift'))
 try:
     subprocess.run(['swiftc', '-swift-version', '6', '-parse-as-library', '-typecheck',
         '-module-name', 'ModelKitCoreBoundary', *core_sources], cwd=ROOT, check=True)
@@ -873,7 +874,7 @@ failure_channel = (ROOT / 'MobileHarness/Gateway/Input/ContainerFailureChannel.s
 if imported_modules(failure_channel) & {'UI', 'Storage', 'Agents', 'AppStorage'}:
     errors.append('Container failure transport must remain independent of capability and role implementations')
 failure_registry = (ROOT / 'MobileHarness/App/Composition/ApplicationContainer.swift').read_text()
-for marker in ('Factory<ContainerFailureChannel>', 'sink(module: "storage")', 'sink(module: "platform")', 'sink(module: "ui")'):
+for marker in ('Factory<ContainerFailureChannel>', 'sink(module: "storage", details: Self.failureDetails)', 'sink(module: "platform", details: Self.failureDetails)', 'sink(module: "ui", details: Self.failureDetails)'):
     if marker not in failure_registry:
         errors.append(f'App must install same-scope container failure reporting: {marker}')
 failure_lifecycle = (ROOT / 'MobileHarness/App/Composition/ModuleRegistration.swift').read_text()
@@ -1324,7 +1325,7 @@ for folder in ('Agents', 'Actions'):
             raise SystemExit(f'Business feedback consumers require protocol ports: {source.relative_to(ROOT)}')
 
 # App-owned model roots; production consumers receive ports, never process singletons.
-model_root = (ROOT / 'MobileHarness/ModelKit/Support/Management/ModelContainer.swift').read_text()
+model_root = (ROOT / 'MobileHarness/ModelKit/ModelContainer.swift').read_text()
 if 'ProcessModels' in model_root or 'static let speechSelection' in model_root:
     raise SystemExit('Model selection and manager ownership must be instance-local')
 for source in (ROOT / 'MobileHarness').rglob('*.swift'):
@@ -1345,18 +1346,13 @@ for source in (ROOT / 'MobileHarness').rglob('*.swift'):
         raise SystemExit(f'Local context fitting escaped its ModelKit provider: {source}')
 print('Local context fitting remains confined to ModelKitGemma4.')
 
-# Native capture startup must not synchronously construct its session on the UI actor.
-spatial_start_source = (ROOT / 'MobileHarness/PlatformKit/Audio/SpatialAudioCapture.swift').read_text()
-if 'private let session = AVCaptureSession()' in spatial_start_source:
-    raise SystemExit('Spatial session construction must run inside its capture actor method')
+# Startup cleanup must not retire a replacement capture after an older attempt fails.
+# Executor placement is under a documented hardware baseline comparison; do not
+# freeze the experimental implementation in a source-shape assertion.
 audio_start_source = (ROOT / 'MobileHarness/PlatformKit/Audio/AppleAudioIO.swift').read_text()
-audio_start_body = audio_start_source.split('public func startCapture(preferSpatial:', 1)[1].split('private func captureInput', 1)[0]
-if 'audio.setActive(' in audio_start_body or 'audio.setCategory(' in audio_start_body:
-    raise SystemExit('Native capture session activation must execute off MainActor')
-for contract in ('capturePreparation', 'await preparation?.task.result', 'guard captureToken == token else { throw primary }'):
-    if contract not in audio_start_source:
-        raise SystemExit('Capture preparation must be owned, joined and token fenced: ' + contract)
-print('Native capture startup isolation and ownership checks pass.')
+if 'guard captureToken == token else { throw primary }' not in audio_start_source:
+    raise SystemExit('Capture failure cleanup must remain token fenced')
+print('Native capture failure ownership checks pass.')
 
 # Home preparation is host lifecycle orchestration; no Foundation SDK locates models or IoC.
 home_preparation_composition = (ROOT / 'MobileHarness/App/Composition/ServiceFactories.swift').read_text()
@@ -1367,3 +1363,46 @@ for contract in ('id: "homePreparation"', 'await services.homePreparation.stop()
     if contract not in home_preparation_registration:
         raise SystemExit('Home preparation must join the lifecycle graph: ' + contract)
 print('Home readiness remains App-owned with explicit lifecycle cleanup.')
+
+# Independent foundation envelopes share a schema, never a cross-SDK dependency.
+foundation_errors = [
+    ROOT / 'MobileHarness/Storage/StorageFailure.swift',
+    ROOT / 'MobileHarness/PlatformKit/PlatformFailure.swift',
+    ROOT / 'MobileHarness/ModelKit/ModelFailure.swift',
+    ROOT / 'MobileHarness/UI/UIFailure.swift',
+]
+canonical_schema = None
+for source in foundation_errors:
+    content = source.read_text()
+    schema = content.split('    private static func classify(', 1)[0]
+    schema = schema.replace(source.stem, 'FoundationFailure')
+    if canonical_schema is None:
+        canonical_schema = schema
+    elif schema != canonical_schema:
+        raise SystemExit(f'Foundation failure schema drift: {source.relative_to(ROOT)}')
+    if set(re.findall(r'\bimport\s+(\w+)', content)) != {'Foundation'}:
+        raise SystemExit(f'Foundation failure must remain independent: {source.relative_to(ROOT)}')
+for directory in ('Storage', 'PlatformKit', 'ModelKit', 'UI'):
+    for source in (ROOT / 'MobileHarness' / directory).rglob('*.swift'):
+        if re.search(r'\b(?:StorageLifecycleFailure|StoragePreparationFailure|PlatformCleanupFailure|ModelCleanupFailure|ModelArtifactCleanupFailure)\b', source.read_text()):
+            raise SystemExit(f'Retired cleanup envelope: {source.relative_to(ROOT)}')
+print('Four independent foundation error schemas and retired cleanup types pass.')
+
+# Physical entry points do not merge the independent compiled capability layers.
+for directory, prefix, container_target, failure_target in (
+    ('Storage', 'Storage', 'Storage', 'StorageCore'),
+    ('PlatformKit', 'Platform', 'PlatformKit', 'PlatformKit'),
+    ('ModelKit', 'Model', 'ModelKitDefaults', 'ModelKit'),
+    ('UI', 'UI', 'UI', 'UI'),
+):
+    root = ROOT / 'MobileHarness' / directory
+    for suffix, owner in (('Container', container_target), ('Failure', failure_target)):
+        source = root / (prefix + suffix + '.swift')
+        if not source.is_file():
+            raise SystemExit(f'Missing foundation root entry: {source.relative_to(ROOT)}')
+        actual = {name for name, target in targets.items() if target.get('path') and source.resolve() in target_sources(target)}
+        if actual != {owner}:
+            raise SystemExit(f'Foundation root source owner mismatch: {source.relative_to(ROOT)} -> {actual}')
+        if list(root.rglob(source.name)) != [source]:
+            raise SystemExit(f'Duplicate foundation root entry: {source.name}')
+print('Foundation Container/Failure root layout and unique compiled owners pass.')

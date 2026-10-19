@@ -559,3 +559,277 @@
 - `/tmp/mobileharness-foundation-errors-simulator.log`：build-ios脚本退出65，CoreAIShared的Simulator编译失败，其余scheme未执行。
 - `/tmp/mobileharness-foundation-errors-device.log`：签名iOS真机构建成功；应用25项Skill资源与声明检查通过。未安装／未进行本轮物理验收。
 - 提交是当前全部工作区的检查点，包含前序模型容器化、Gemma无system诊断版、音频启动隔离、首页准备和蓝牙状态改动；真实模型指令行为、首token时延、硬件及全量失败仍各自待验证，不因提交而关闭。
+
+## 四基础模块异常结构统一（2026-10-19）
+
+- 实施前工作区干净，基线为`61d1c72a`，没有重复创建空提交；仍在`codex/storage-lifecycle-boundary`，未改`main-sh`。本轮实现修改未自动提交。
+- 四个独立SDK分别声明StorageFailure／PlatformFailure／ModelFailure／UIFailure，均为Error／Sendable／CustomStringConvertible；同形Code、component、operation、message、underlying、cleanupErrors、Source(fileID/function/line)。根生命周期使用类型化throws；容器原生报告出口交付同形封装。底层领域能力协议仍可抛原始错误，不能宣称全SDK每个throw都已替换。
+- 保留原始NSError身份／userInfo及全部清理错误；重复同模块包装保留首次来源。Source是包装／报告位置，不是原始throw堆栈。无清理失败的取消通过明确标记抑制广播；单项或多项清理失败均不得被降为取消、生命周期拒绝或蓝牙连接状态。
+- App仅投影技术code／取消标记并维持宿主取消语义；Gateway独占Signal编码及有界摘要。基础SDK不生成业务提示、重试或状态机策略。原有根／制品／数据库准备的五种专用复合清理错误已删除，其他领域原生错误保留。
+- 结构漂移／独立依赖静态检查通过；新增同一测试协议校验四结构语义。最终定向`/tmp/mobileharness-error-schema-final-regression.log`：61项、5 suites全部通过，覆盖根生命周期／回滚／主与清理错误／取消／同根注册／蓝牙状态与UI根完整回归。较早定向47项通过后，增加单项清理不降级用例及完整UI根回归。
+- `/tmp/mobileharness-error-schema-check.log`为首次全量运行，包含三处旧UI根错误类型断言失败；已按新的类型化根契约修正，后续定向已通过。最终全量结果记录在本节后续，不把定向结果替代完整检查。
+- `/tmp/mobileharness-error-schema-simulator.log`：Simulator构建退出65，第三方CoreAIShared在arm64／x86_64编译失败；后续scheme未执行。
+- `/tmp/mobileharness-error-schema-device.log`：签名iOS真机构建成功，最终应用25项Skill资源／函数声明检查通过；工程、隐私清单及entitlements lint通过。本轮未安装／未做硬件、原生UI或真实模型验收。
+
+最终全量检查：`/tmp/mobileharness-error-schema-final-check.log`，退出1。源码依赖／结构漂移、Python6项、Swift格式检查通过；AppWorkflow126项通过。UI99项中1个命名测试失败（cameraNativeMetalDrawStopAndLayerHandoff）；Integration1012项中10个命名测试失败、20个issue：voiceReplyCancellationJoinsPlaybackBeforeRetiringSessionAudio（3参数用例）、atomicStableOffTargetEndsBeforeOverallDeadlineAndKeepsError、soundSource的BroadcastCrossesGatewaysWithBoundIdentityAndCaptureDeadline／StopCancelsAndJoinsAnInFlightPublisher／MonoIsUnavailableAndRejectedPublicationDoesNotStopRecognition／NonSpeechBroadcastDoesNotRequireSubscribersOrOpenASR／ReplyGateClearsDirectionAndResumeStartsANewWindow／OnlyDiagnosticCrossesGatewaysWithoutModelsOrPresentationGrants／SlowSubscriberDoesNotBlockFollowingDirections，以及visionResolvesOpaqueInputWithoutCopyingMediaIntoObservation（60秒超时）。合计11个命名失败测试；三处旧UI根断言已不再失败，定向61项通过，不宣称全量失败均与本轮无关。最终工程／隐私清单lint及diff格式通过；物理设备、模型与完整集成失败仍待单独验收。
+
+设备重新连接后：`/tmp/mobileharness-error-schema-install.log`确认安装成功（databaseSequenceNumber 4196）；`/tmp/mobileharness-error-schema-launch.log`确认启动dev.mobileharness.app成功。安装的是包含首页模型准备与本轮异常结构统一的最新签名构建；用户功能验收结果尚待反馈，不将安装／启动成功视为硬件或模型验收通过。
+
+## 独立加载表情Action与真机复测（2026-10-19）
+
+- 根因：旧方案只改变VoicePhase.loading，但displayedExpression在未聆听时仍强制closed，原生表面也无独立加载循环。
+- App拥有模型准备，只报告modelPreparation环境事实；Gateway→ApplicationControl→代码私有UI.Expression.setLoading（direct/returning状态Tool）→UI.home.expressions。传入enabled/revision，完成表示状态接纳，非模型完成／GPU回执。未增加模型Skill、线程、Canvas或逐帧Task。
+- loading为独立眼睛形状，Core Animation 1.2秒双眼交替透明度／位移、相位差0.6秒。关闭聆听也能显示，减少动态效果静态呈现。终态／失活同步清理；旧revision和后台开启被拒。每个新事实版本均提交，处理快速前后台造成idle被事实合并的情况。有限表情被接管时取消真实等待者，加载期间不伪造其他表情完成；启动占位在Agent不可用时共用loading形状。
+- `/tmp/mobileharness-loading-expression-receipts-tests.log`：最终定向12项通过（UI5、Gateway/Agent/Action端到端1、App准备生命周期6），包含前后台重新开启、根和版本拒绝、无聆听呈现、取消旧回执与busy拒绝。全量运行后追加的回执保护以此定向和最终签名构建验证，未因此宣称全量通过。
+- `/tmp/mobileharness-loading-expression-check.log`：完整检查退出1；源码边界／结构检查、Python6项及Swift格式通过；UI102项、AppWorkflow126项通过。Integration1013项中14个命名测试失败、27个issue：nexArmIntermediateTimeoutAdvancesAndReportsMissingSegmentAfterEnding、nexArmPlaybackCongestionRejectsWithoutReplayingMotion、voiceReplyCancellationJoinsPlaybackBeforeRetiringSessionAudio（3参数）、atomicStableOffTargetEndsBeforeOverallDeadlineAndKeepsError、soundSource的MonoIsUnavailableAndRejectedPublicationDoesNotStopRecognition／BroadcastCrossesGatewaysWithBoundIdentityAndCaptureDeadline／StopCancelsAndJoinsAnInFlightPublisher／NonSpeechBroadcastDoesNotRequireSubscribersOrOpenASR／ReplyGateClearsDirectionAndResumeStartsANewWindow／OnlyDiagnosticCrossesGatewaysWithoutModelsOrPresentationGrants／SlowSubscriberDoesNotBlockFollowingDirections，及visionDiscardsOverBudgetResultsWithoutPublishingAndRecovers／visionStatisticsMeasureCaptureToResultThroughPoseTool／visionRejectsMismatchedCaptureBeforeCallingModel。不声明均与本轮无关。
+- `/tmp/mobileharness-loading-expression-simulator.log`：Simulator退出65，CoreAIShared arm64/x86_64编译失败，后续scheme未运行。
+- `/tmp/mobileharness-loading-expression-final-device.log`：最终签名真机构建成功；最终应用25项Skill资源与声明检查、工程／隐私清单lint及diff检查通过。
+- `/tmp/mobileharness-loading-expression-final-install.log`确认安装成功（databaseSequenceNumber 4212）；`/tmp/mobileharness-loading-expression-launch.log`确认启动dev.mobileharness.app成功。双眼实际观感、加载时长和硬件行为仍待用户反馈，安装不等于验收。保留之前异常结构统一工作区修改，本轮未提交。
+
+用户真机反馈（2026-10-19，安装序号4212）：关闭聆听情况下触发模型准备，双眼加载动画及退出恢复均正常。该反馈确认本轮加载表情呈现与退出行为，不扩展为模型稳定性、全部硬件流程或全量测试通过；上述自动化失败和Simulator阻断仍保留。
+
+## setLoading完成回执修复（2026-10-19）
+
+- 用户确认动画及退出正常后报告setLoading/invalidCompletion。根因是state函数注册返回value("presented")；真实FunctionExecutor只允许state→completed，所以UI副作用已发生，随后完成校验才报错。此前只检查UI状态的端到端测试未发现失败回执，不能把之前的测试作为完成契约已验证的证据。
+- ExpressionActions.setLoading改为Void，UIModule及集成fixture均使用handler注册自动生成completed；未放宽Gateway校验，也未改为finite掩盖契约错误。
+- 新增loadingExpressionStateCompletionPassesRealExecutorAndReturningTool，从生产UIModule取得定义，经过真实ToolExecutor／FunctionExecutor，分别检查开启／关闭均isError=false、failureCode=nil、completion=.completed及value="completed"。
+- `/tmp/mobileharness-loading-completion-final-tests.log`：4项定向通过（UI2、Integration2），包括真实完成回执、Gateway→Agent→Expression及加载与有限表情回执隔离。
+- 完整检查、Simulator、最终签名及安装结果见本节后续；动画效果前轮真机反馈仍保留，本轮新增完成回执需要独立确认。
+
+最终验证：`/tmp/mobileharness-loading-completion-check.log`完整检查退出1，源码边界／结构、Python6项、格式通过，UI103项及AppWorkflow126项通过；Integration1014项中13个命名测试失败／24个issue：voiceReplyCancellationJoinsPlaybackBeforeRetiringSessionAudio（3参数）、atomicStableOffTargetEndsBeforeOverallDeadlineAndKeepsError、publicationOverflowDoesNotWaitForDiagnosticCallbacks，soundSource的MonoIsUnavailableAndRejectedPublicationDoesNotStopRecognition／StopCancelsAndJoinsAnInFlightPublisher／BroadcastCrossesGatewaysWithBoundIdentityAndCaptureDeadline／NonSpeechBroadcastDoesNotRequireSubscribersOrOpenASR／ReplyGateClearsDirectionAndResumeStartsANewWindow／OnlyDiagnosticCrossesGatewaysWithoutModelsOrPresentationGrants／SlowSubscriberDoesNotBlockFollowingDirections／ContextWriteFailureReportsWithoutStoppingOrSelfJoin，以及visionRejectsMismatchedCaptureBeforeCallingModel、mediaTransportSurvivesExpiryDuringDispatchAndDisplaysNextFrame。不声明全量通过或失败均无关。
+
+`/tmp/mobileharness-loading-completion-simulator.log`退出65，CoreAIShared编译阻断，后续scheme未运行。`/tmp/mobileharness-loading-completion-device.log`签名构建成功，最终App资源25项检查通过。`/tmp/mobileharness-loading-completion-install.log`确认安装成功（序号4220）；启动结果见`/tmp/mobileharness-loading-completion-launch.log`，本轮回执修复真机验收待反馈。修改未提交。
+
+启动失败补充：CoreDevice 10002／FBS Security preflight拒绝；随后`/tmp/mobileharness-loading-completion-lock.log`确认passcodeRequired=true，需用户解锁后再启动。不能将安装成功记为已启动或真机回执验收通过。
+
+## 首页检查与加载表情分离
+
+用户确认 setLoading / invalidCompletion Toast 已解决；返回首页暖模型检查仍短暂播放加载眼睛。本轮将 checking 与 preparing 分开，加载后复查回到 checking，启动占位保持闭眼。
+
+- 定向自动化：13 项通过（UI 4、集成 2、App 生命周期 7）；覆盖 checking 拒绝迟到开启、加载后退出、真实加载 Action 完成及暖模型反复进入首页。证据 `/tmp/mobileharness-loading-separation-tests.log`。
+- Simulator：退出 65，CoreAIShared 的 arm64／x86_64 编译失败，后续 scheme 未运行。证据 `/tmp/mobileharness-loading-separation-simulator.log`。
+- 完整检查：退出 1；UI 103 项、AppWorkflow 127 项通过。集成 1014 项运行产生 20 个问题，涉及音频取消清理、运控截止及 SoundSource（包括 60 秒超时）；不记为全量通过。证据 `/tmp/mobileharness-loading-separation-check.log`。
+- 签名真机构建成功，25 项 App 资源检查通过，已安装并启动连接的 iPhone。证据 `/tmp/mobileharness-loading-separation-device.log`、`/tmp/mobileharness-loading-separation-install.log`、`/tmp/mobileharness-loading-separation-launch.log`。
+- 新行为真机验收待用户复测：暖模型返回首页不显示加载眼睛；切换到需要真实加载的模型后返回首页才显示，完成即退出。构建及自动化不代替真实模型验收。
+
+## 蓝牙连接超时状态呈现
+
+用户报告机械臂连接超时仍弹基础能力异常。原生快照上报 timeout(connecting)，connect 返回 NexArmError.timeout，后者缺少连接阶段分类。Gateway 已按 connect 操作补齐原始 timeout 分类，ApplicationControl 继续仅调用状态呈现 Action，保留完整原始错误。
+
+- 定向蓝牙自动化 8 项通过，覆盖原始／封装连接超时、原错误保留、无 Toast、写入及响应超时边界和清理错误不可降级。证据 `/tmp/mobileharness-bluetooth-timeout-tests.log`。
+- Simulator 构建退出 65：CoreAIShared 无法解析 CoreAI 模块依赖，后续 scheme 未运行。证据 `/tmp/mobileharness-bluetooth-timeout-simulator.log`。
+- 完整检查退出 1：UI 103 项、AppWorkflow 127 项通过；集成 1015 项运行产生 21 个问题，涉及 Toast 到期时序、音频取消清理、运控截止、SoundSource 和视觉结果超时，不记为全量通过。证据 `/tmp/mobileharness-bluetooth-timeout-check.log`。
+- 签名真机构建成功，25 项 App 资源检查通过。证据 `/tmp/mobileharness-bluetooth-timeout-device.log`。
+- 已安装并启动连接的 iPhone；证据 `/tmp/mobileharness-bluetooth-timeout-install.log`、`/tmp/mobileharness-bluetooth-timeout-launch.log`。机械臂真实连接超时不弹 Toast、顶部状态正确及重新连接的硬件场景仍待用户验收；自动化不代替真实设备。
+
+## setLoading 正常取代与拒绝分离
+
+用户报告 setLoading stale。当前 Bool 把旧版本、准备完成后的迟到加载、后台接纳和真正非法提交一并变为 stale。已使用 UI 自有 applied／superseded／rejected 结果分类；被跳过的版本仍记录水位，禁止旧开启重放，同版本冲突仍拒绝。Action 将正常被取代视为状态投影完成，不冒充动画完成。
+
+- 定向自动化 4 项通过（UI 2、集成 2），真实 ToolExecutor 表驱动覆盖正常开关、checking／ready 迟到、乱序、同版本重放、冲突、零版本及错误来源。证据 `/tmp/mobileharness-loading-stale-tests.log`。
+- Simulator 构建退出 65：CoreAIShared 无法解析 CoreAI 模块，后续 scheme 未运行。证据 `/tmp/mobileharness-loading-stale-simulator.log`。
+- 完整检查退出 1：UI 103 项、AppWorkflow 127 项通过；集成 1015 项产生 28 个问题，涉及运控拥塞／截止、Toast 到期、音频取消清理、SoundSource 与视觉时序／超时，不记为全量通过。新增会话接管回归也随完整 UI 套件通过。证据 `/tmp/mobileharness-loading-stale-check.log`。
+- 签名真机构建成功，25 项 App 资源检查通过，证据 `/tmp/mobileharness-loading-stale-device.log`。已安装并启动连接的 iPhone，安装／启动证据 `/tmp/mobileharness-loading-stale-install.log`、`/tmp/mobileharness-loading-stale-launch.log`；切页返回、快速完成和前后台下无新增 setLoading stale 的真实模型场景待用户验收。
+
+## 首页加载提示真实边界
+
+用户报告仍有瞬时 setLoading。检查文字层仍由 blocksNewActions 控制，且 registered 的无资源后端构造会被 prepare 入口误报为加载。已将加载报告移至 ModelResource actor 内真实无缓存加载分支；缓存命中和 unmanaged 不发加载。App 不再在 prepare 入口投影 preparing，UI 以独立 showsStatus 控制文字／按钮；不使用人为延时隐藏真实加载。
+
+- 定向 15 项通过：UI 4、ModelKitRuntime 1、集成 2、AppWorkflow 8。覆盖真实加载／失败成对回调、暖模型及 unmanaged 无回调、对象装配不显示、代际围栏及 Action 完成。证据 `/tmp/mobileharness-real-loading-final-tests.log`。
+- ModelKit 语音 warmup 与 load／status 一致使用当前选中的后端。
+- 完整检查、签名构建、提示音原生隔离与真机结果另行记录。
+
+## 按住唤醒整屏短暂停顿采样
+
+用户明确为整个界面短暂无响应后恢复，并在 45 秒采样中复现。`/tmp/mobileharness-wake-system-20261019.trace` 的 potential-hangs 记录主线程约 739.98 ms、1114.42 ms 两次停顿。Time Profiler 只在停顿结束附近采到少量运行栈，不能将整段阻塞时长都归因同一函数；UUID 匹配的应用二进制符号解析确认其中栈落在 NativeCuePlayback.swift:81 的 prepareToPlay／play，另有 UI 更新及麦克风采样转换。待将提示音启动迁至私有音频 actor；尚不宣称所有卡顿根因已经排除。单进程 attach 两次未找到目标，改用设备全进程采样成功。
+
+### 本轮最终构建与检查
+
+- 签名真机构建成功，25 项打包资源检查通过，安装及启动成功：`/tmp/mobileharness-real-loading-device.log`、`/tmp/mobileharness-real-loading-install.log`、`/tmp/mobileharness-real-loading-launch.log`。原生提示音图的 iOS 代码由该构建验证，不以 macOS 测试冒充原生音频验收。
+- 最新源码的 Simulator 脚本退出 65，CoreAIShared 无法解析 CoreAI 模块（arm64／x86_64），后续 scheme 未运行：`/tmp/mobileharness-real-loading-final-simulator.log`。
+- 完整检查退出 1：UI 103 项有 1 项相机到期时序失败，AppWorkflow 128 项通过；集成多项失败／超时，超时报告后仍挂住超过三分钟，终止本次测试子进程让后续目标继续，集成套件未完整完成，不记为通过：`/tmp/mobileharness-real-loading-final-check.log`。
+- 第二次 45 秒设备采样 `/tmp/mobileharness-wake-fixed-20261019.trace` 的 potential-hangs 表为空，未发现阈值 250 ms 以上的停顿。尚待用户确认该窗口确实完成唤醒动作及提示音正常，不据此宣称硬件体验已验收。
+
+- 构建结束后单独复核 16 项均通过（UI 5，含相机到期；ModelKitRuntime 1；集成 2；AppWorkflow 8）：`/tmp/mobileharness-real-loading-final-regression.log`。该结果不覆盖或抹去完整套件的失败／中断。源码边界及 diff 格式检查通过。
+
+## 唤醒卡顿持续复现
+
+用户确认提示音迁移后整屏短暂无响应仍存在，前次 potential-hangs 为空不能视为验收。重新启用 Time Profiler 的 recordWaitingThreads／contextSwitchSampling，90 秒设备全进程采集，用户确认重复唤醒已复现。待分析等待栈，再确定修改范围。
+
+90 秒等待采样已确认两次主线程停顿（790.13 ms、1070.73 ms）；采样栈明确包含 `AppleAudioIO.performStop → AVAudioSession privateSetActive → NSXPCConnection synchronous reply → mach_msg`。提示音隔离未覆盖共享会话停用，是本轮实际修复点。记录保存时出现系统动态库地址重叠符号警告，导出成功，应用及系统等待栈均可解析。待修复会话释放边界。
+
+### 会话停用隔离实现及验证
+
+- `NativePlaybackGraph.deactivateSession` 在既有音频 actor 执行停用；AppleAudioIO 的短音频释放和全量 stop 共用一个 MainActor 拥有的释放任务并等待真实返回。任务结束前拒绝新 claim，任务内统一释放所有权并清除接纳围栏；错误完整保留，不新增专用线程或操作队列。
+- 源码归属守卫和 diff 格式通过，禁止 AppleAudioIO owner 直接调用任何 setActive。
+- 完整检查退出 1：UI 103 项、AppWorkflow 128 项通过，集成 1015 项完成并有 18 个问题（音频取消清理、运控截止、SoundSource），不记全量通过：`/tmp/mobileharness-session-release-check.log`。
+- 签名真机构建成功，25 项 App 资源校验通过：`/tmp/mobileharness-session-release-device.log`。已安装并启动真机：`/tmp/mobileharness-session-release-install.log`、`/tmp/mobileharness-session-release-launch.log`。Simulator 脚本退出 65，CoreAIShared 无法解析 CoreAI 模块（arm64／x86_64），后续 scheme 未运行，证据 `/tmp/mobileharness-session-release-simulator.log`；硬件复测尚未验收，不能把源码隔离或编译结果等同体验修好。
+
+## 用户澄清：长按开启聆听延迟
+
+用户进一步明确：始终不是整屏冻结，实际问题是长按后开启录音和动画等待过久。此前对用户体验的“整屏冻结”描述应视为误解；系统 potential-hangs 和同步等待栈仅作为技术证据，不能等同用户症状。验收改为长按接纳到真实首 PCM／动画的延迟、提示音及正常收音。
+
+代码确认 stopCapture 只结束采集，保留同一输入作用域拥有的共享会话；下次 startCapture 却无条件 full stop，产生已采到的停用 XPC 等待，再重新激活。已在同作用域空闲重启分支跳过多余 full stop，加入采集／播放清理并检查新占用；有活动／正在停止或释放时仍走完整停止。真实首 PCM 才接纳录音和聆听动画，不提前伪造就绪。
+
+签名真机构建成功，25 项 App 资源检查通过：`/tmp/mobileharness-wake-latency-device.log`。完整检查退出 1：UI 103 项、AppWorkflow 128 项通过，集成 1015 项有 19 个问题，不记全量通过，证据 `/tmp/mobileharness-wake-latency-check.log`。Simulator 退出 65，CoreAIShared 无法解析 CoreAI，后续 scheme 未运行，证据 `/tmp/mobileharness-wake-latency-simulator.log`。安装并启动成功：`/tmp/mobileharness-wake-latency-install.log`、`/tmp/mobileharness-wake-latency-launch.log`。用户补充每次开启约 2～3 秒，本轮同作用域重启的实际耗时改善待真机复测；不以无系统 hang 代替录音开启延迟验收。
+
+## 音频实验回归撤回
+
+用户提供新证据：Listening 动作约 10.64 秒后 Action execution timed out；随后同一作用域出现 audio.spatial.start 与 callback 的 invalidFormat。具体卡住阶段尚未确认，不能仅凭截图归因提示音、捕获或声道。先撤回本轮三个原生文件的实验修改（NativeCuePlayback、AppleAudioIO、PCMClipEncoding），恢复本轮改动前已使用的播放器与完整启停路径；保留其余工作区修改及完整错误上报，不增加超时、不隐藏错误。录音开启2～3秒延迟仍开放；待重新验证真实启动、收音、提示音与反复开关后，再做单一有证据的优化。
+
+恢复版三个原生文件已与 HEAD 对应文件逐字一致，撤回实现的源码形状守卫已删除，未触及工作区其他功能改动。UI 103 项通过；签名真机构建成功、25 项打包资源校验通过，证据 `/tmp/mobileharness-audio-restore-check.log`、`/tmp/mobileharness-audio-restore-device.log`。完整检查退出 1：AppWorkflow 128 项通过；集成 1015 项产生 38 个问题，未通过，不将回归撤回等同全量通过。恢复版安装成功，自动启动因手机锁屏被系统拒绝，证据 `/tmp/mobileharness-audio-restore-install.log`、`/tmp/mobileharness-audio-restore-launch.log`。Simulator 退出 65：CoreAIShared 无法解析 CoreAI 模块（arm64／x86_64），后续 scheme 未运行，证据 `/tmp/mobileharness-audio-restore-simulator.log`。真实收音复测仍待结果，不能宣称新增错误已被设备验收解决。
+
+## 恢复版仍有正在唤醒后延迟
+
+用户明确延迟位于显示“正在唤醒”之后，约 2～3 秒。改为在恢复后的原音频链路增加阶段区间，采样原生停止、配置、启动、首帧及反馈完成，不改变行为；先获得分段耗时再选优化点。正常收音是否完全恢复仍不能从这条延迟反馈自动推断。
+
+## 模型准备新增环境事实的逆序回归
+
+用户截图显示 applicationControl input rejected: outOfOrder。Gateway 单向广播不保证并发到达顺序，而接收方原先将旧环境快照作为故障；新增 modelPreparation loading/idle 事实使该路径更易触发。待将环境快照改为按类别版本归约，保留来源与内容校验、同版本冲突拒绝。唤醒延迟仍独立开放，不以消除该错误代表录音启动性能已解决。
+
+环境快照归约已实现。针对性 3 项通过，覆盖逆序／重复不重复发出 loading 呈现、同版本冲突／非法值／错误会话拒绝、类别版本独立，以及既有 Gateway→Agent→Expression Action 回归：`/tmp/mobileharness-environment-revision-tests.log`。前次耗时采样完整检查发生集成超时后挂起，终止测试子进程以继续其余目标；该次 UI 与集成失败，不记全量通过，证据 `/tmp/mobileharness-wake-timing-check.log`。新增音频／唤醒区间只用于分段测量，当前尚无带这些区间的真机采样，不宣称延迟已修复。
+
+本次签名构建及 25 项 App 资源校验通过；安装、启动成功：`/tmp/mobileharness-environment-revision-device.log`、`/tmp/mobileharness-environment-revision-install.log`、`/tmp/mobileharness-environment-revision-launch.log`。完整检查退出 1：UI 103 项、AppWorkflow 128 项通过，集成 1016 项完成但有 42 个问题（包括声源、运控、相机时序），不记全量通过：`/tmp/mobileharness-environment-revision-check.log`。Simulator 构建退出 65：CoreAIShared 无法解析 CoreAI 模块，后续 scheme 未运行：`/tmp/mobileharness-environment-revision-simulator.log`。分段采样已保存 `/tmp/mobileharness-wake-stages-20261019.trace`，复现确认及区间分析仍待完成。
+
+用户确认仍可复现等待。首次 55 秒采样未读到新增阶段标记，不能据此推算分段耗时，也不能确认复现动作落在记录窗口内。扩大下一次采样到 90 秒并显式加入 os_signpost 与等待线程记录；不再修改音频行为。
+
+### 唤醒分段采样结果（用户确认复现）
+
+90 秒记录 `/tmp/mobileharness-wake-stages-full-20261019.trace` 显式加入 os_signpost 并记录等待线程；保存及导出过程有系统 dylib overlap 警告，但导出成功。原始区间 `/tmp/mobileharness-wake-stages-full-signposts.xml`，相同时间和 ID 的重复事件去重后，得到四次原生启动：
+
+| 区间 | 实测耗时 |
+| --- | --- |
+| ASR 可用性 | 2.37～4.16 ms（完整三次） |
+| TTS 可用性 | 53.81～80.06 ms（完整三次） |
+| VAD 可用性 | 22.70～23.08 ms（完整三次） |
+| 权限／感知接纳 | 各低于 0.1 ms |
+| Capture.Reset | 847.42～1021.80 ms |
+| Capture.SessionConfiguration | 33.05～38.79 ms |
+| Spatial.StartRunning | 75.17～78.70 ms |
+| Spatial.FirstPCM | 2188.70～2196.35 ms |
+| Wake.NativeCapture | 3156.94～3328.37 ms |
+| Wake.NativeCue | 1222.10～1287.81 ms |
+| Wake.Activation | 4667.70～4688.23 ms（完整三次） |
+
+首次部分区间开始早于采样可用事件，不能把缺失起点计为零。主要等待在完整音频重置和 FOA 首帧，能力检查约 0.1 秒；没有证据将几秒延迟归因于本次可用性检查或模型加载。区间证明延迟仍存在，尚未修复，不代表系统 FOA 首帧耗时不可优化。没有关闭空间能力、提前伪造录音就绪或延长超时。普通聆听是否允许只用单声道会改变声源定位能力，已向用户确认该业务要求；未擅自改变。
+
+## 继续追溯此前已验收基线
+
+用户指出此前四声道没有延迟，拒绝以降级单声道代替回归定位。git diff 6431d36f..61d1c72a 确认模型容器化提交同时迁移了音频会话配置执行位置／准备 Task，以及空间捕获 session 的构造和释放时机。当前恢复到 HEAD 仍包含这两处变化，不能视为回到此前已验收基线。待只恢复这两处调用顺序作对照，保留当前错误上报、token、首帧校验及阶段计时；不改变四声道能力。
+
+对照实现已构建、安装并启动，25 项资源验证通过：`/tmp/mobileharness-capture-baseline-device.log`、`/tmp/mobileharness-capture-baseline-install.log`、`/tmp/mobileharness-capture-baseline-launch.log`。完整检查退出 1：UI 103 项、AppWorkflow 128 项通过，集成 1016 项有 21 个问题，不记全量通过：`/tmp/mobileharness-capture-baseline-check.log`。本次对照不是全仓回滚：仅恢复会话配置与空间 session 构造顺序，保留 token 取消隔离、错误链路和分段计时。用户未授权降级，继续保留四声道；已启动 90 秒对照采样，延迟改善尚待确认。
+
+对照版 Simulator 脚本仍退出 65，CoreAIShared 无法解析 CoreAI，后续 scheme 未运行：`/tmp/mobileharness-capture-baseline-simulator.log`。本次未提交任何修改。
+
+用户回复对照版“已复现”。对照 trace 已保存 `/tmp/mobileharness-wake-baseline-20261019.trace`，但导出 `/tmp/mobileharness-wake-baseline-signposts.xml` 未包含任何 Wake／Spatial／Capture 区间；不能确认复现动作落在采样窗口内，不能从此记录得出性能前后差值。用户反馈仍作为延迟未解决的证据；未宣称两处恢复已修好。已撤销“普通聆听改用单声道”的方向假设，保持声源定位能力。尚待隔离首页模型预准备的间接影响；该功能当前仍保留，未继续叠加未验证音频改动。
+
+## 当前工作区全部暂存并安装供复测
+
+按用户要求，当前 89 个文件全部暂存（含新增文件），未提交；没有为此新增功能修改。签名构建成功，25 项 App 资源检查通过，安装并启动成功：`/tmp/mobileharness-staged-device.log`、`/tmp/mobileharness-staged-install.log`、`/tmp/mobileharness-staged-launch.log`。沿用上一轮完整检查失败记录，不将本次签名构建视为全量测试通过。
+
+只读核对蓝牙与唤醒连接：CBCentralManager 回调使用 main queue；connect 通过 continuation 等待原生完成，12 秒超时使用 Task.sleep，不是同步睡眠。VoiceRuntimeDependencies 不注入蓝牙，beforeVoiceStart 只加入音频检测停止，prepareVoice／admitVoice 不等待机械臂连接；已启动的 AgentInteractionRuntime.start 直接返回。未发现唤醒串行等待 BLE connect 的路径；共享主线程回调的间接竞争未通过这次代码阅读排除，仍以用户复测及必要的同条件对照为准。
+
+## 忽略机械臂后仍延迟：提交基线对照
+
+用户确认忽略机械臂蓝牙后仍有唤醒等待。计划用最后提交 61d1c72a（已有模型容器化、尚未加入首页自动模型准备）构建一个粗粒度基线对照。当前全部修改先保留为 Git 暂存树，临时恢复工作区为该提交供构建，构建结束无论成功失败都恢复暂存树对应源码。只在真机安装基线，不丢弃或提交当前修改，不新增诊断功能开关，不以此对照宣称已锁定单一文件根因。该版尚无后加的首页模型预加载；原生首帧和模型使用时的实际验证仍由该提交原实现负责。
+
+基线签名构建成功，25 项资源校验通过；安装、启动成功：`/tmp/mobileharness-committed-baseline-device.log`、`/tmp/mobileharness-committed-baseline-install.log`、`/tmp/mobileharness-committed-baseline-launch.log`。构建期间工作区与 61d1c72a 一致，暂存树 5708862771765cc2c6127f668bbe0d7c487933bb 保留全部修改；构建后从该树完整恢复，工作区与暂存区无差异。真机当前运行的是提交基线，并非恢复后的源码；未把基线构建标为当前修改已修复。本次仅做提交基线编译／安装，没有重新执行完整测试和 Simulator 构建；当前修改的前次失败记录保持。已请求用户区分首次与重复开启聆听的延迟，硬件结论待复测。
+
+## 更正：61d1c72a 不是无首页预加载基线
+
+用户在对照版仍看到 loading 闪现。重新直接读取提交源码，确认 61d1c72a 的 ServiceFactories 已有 ForegroundPreparation 和 warmup；此前“该提交没有首页自动模型准备”的结论错误，相关记录只能作为当时误判的历史，不能用于性能归因。用户要求保存全部当前修改并回到前一个提交；将使用 git stash（含新增文件）完整保存，保留原分支提交，再 detached 切到 6431d36f 进行干净构建和安装。该提交早于模型容器化及首页准备。当前全部修改不会自动恢复或提交；后续恢复需使用对应 stash，并保留暂存状态。
+
+## 旧基线重启后仍有唤醒等待：展示阶段边界
+
+用户确认 6431d36f 重启 iPhone 后，显示“正在唤醒”约 2～3 秒才进入聆听。保持原 stash 76137e968f194f0d5e86208b22265ce18a182ae3 不动，从此基线创建修复分支。只读核对发现 startMicrophone 接纳首 PCM 后提交 isVoiceActive 和 listeningAnimationID，却未结束 loading 展示；startVoice 直到捕获及 cue/haptic 整体完成才结束该阶段。此前采样提示音区间约 1.22～1.29 秒，该展示等待不能用于解释首帧之前的约 2.19 秒。待将展示阶段切换移动到真实收音就绪边界，保持反馈动作完整等待及失败语义；不缩短超时、关闭空间能力或伪造录音成功。ConversationView 的“正在加载模型”是辅助功能标签，非页面下方可见文字，需同步纠正。
+
+本次仅修改业务呈现时机及辅助功能标签，原生格式／启停／就绪与反馈完成契约保持。签名构建及 25 项 App 资源校验通过，安装、启动成功，手机独立查询确认 bundleVersion=643137：`/tmp/mobileharness-listening-state-device.log`、`/tmp/mobileharness-listening-state-install.log`、`/tmp/mobileharness-listening-state-launch.log`、`/tmp/mobileharness-listening-state-installed.json`。原 stash 保留。已请求用户复测唤醒展示、提示音与收音；未将构建等同启动延迟已修复。
+
+用户反馈 643137 未缩短等待，展示时机补丁不构成性能修复。完整检查退出 1：UI 96 项、AppWorkflow 120 项通过；集成 1000 项有 29 个问题，不记全量通过，日志 `/tmp/mobileharness-listening-state-check.log`。Simulator 退出 65：CoreAIShared 无法解析 CoreAI，后续 scheme 未运行，日志 `/tmp/mobileharness-listening-state-simulator.log`。将本轮四处业务／UI 源码与 README 恢复到 6431d36f，保留本验证记录；撤出的补丁保存在 `/tmp/mobileharness-listening-display-only.patch`，不混入后续修复。原 89 文件 stash 仍保留。手机仍为已安装 643137，未再安装其他版本。
+
+### 10 月 18 日唤醒历史逐项对比（只读）
+
+对比 2494f4ea（10:19）、b846d323（17:04）、9426eb47（17:35）、39a48417（19:03）、6431d36f（19:18）。五个提交的 AppleSpeechRecognition.swift SHA256 均为 ee1182e74e73bb5c3cdd96cb4f7975a6a63e04594129faff80acc6680752a4b3；prepareVoice 均依次检查 recognition/synthesis/voiceActivity availability，再请求音频权限，没有调用识别 warmup。结构化证据 `/tmp/mobileharness-wake-yesterday-comparison.json`。
+
+- 8305a380（10 月 16 日 01:05）的真实时序变化：删除 prepareRecognition 及其 warmup 调用、删除按压时 audio.prepareClip 原生预备调用；activation 阶段原为 prepare／cue／haptic 并行，随后 120 ms tail 再 capture，改为 preparation → capture → feedback。isVoiceActive／listeningAnimationID 从代际创建立即设置改为首 PCM 接纳后设置。昨天所有对照提交已含该变化；它解释反馈为何晚于录音启动，不证明录音物理首帧因此变慢。
+- b846d323（10 月 18 日 17:04）将输出 AVAudioEngine 迁往 NativePlaybackGraph actor，加入 playbackCleanup／stopOperation 取消清理加入；首帧、四声道及录音配置策略没有因 UI 协议化改变。
+- 39a48417（10 月 18 日 19:03）将回复取消从并行改为 cancelReply → waitForPlaybackStop → cache cleanup。startVoice 在显示“正在唤醒”之前已经加入这些任务；不能直接将显示之后的 2～3 秒归因于这处变更。
+- 实际线程边界：AppleAudioIO 的 setCategory/setActive 及完整 stop 中 setActive(false) 仍在 MainActor 同步执行；此前停用区间测得 0.85～1.02 秒，有系统同步等待栈。SpatialAudioCapture.startRunning 在捕获 actor 执行，约 75～79 ms；readiness.wait 约 2.19 秒是挂起等待首个有效 PCM，不等于主线程同步阻塞。
+- AppleSpeechRecognition.warmup 只 acquire/release Locale 资源（语言支持和安装资产），不是 SpeechAnalyzer.prepareToAnalyze；后者只在实际 transcribe 的 AnalyzerWorker.start 执行。SpeechRecognitionTurn 只在收到有效音频事件时 open/transcribe，所以不能凭“正在唤醒”文字推断正在等待 Apple ASR 分析器。
+
+没有从这些对比得到“唯一根因已验证”的结论，不再要求重启或连续安装无明确假设的版本。
+
+## 用户指定体验 8305a380
+
+按用户明确指定，计划保存当前排查记录后 detached 检出 8305a380，执行签名干净构建并安装真机。此提交本身已经包含 preparation → capture → feedback 的时序变更；不自动改为其父提交。原 89 文件 stash 76137e968f194f0d5e86208b22265ce18a182ae3 保留，原分支不移动。通过独立构建号 8305380 核对构建产物和手机安装版本；此次只做历史版本体验，不新增功能代码。
+
+## 恢复最新工作区继续排查
+
+用户反馈 8305a380 仍慢，要求结束历史版本切换并恢复最新代码。已切回 codex/storage-lifecycle-boundary（HEAD 61d1c72a），以 --index 应用 stash 76137e968f194f0d5e86208b22265ce18a182ae3，核对恢复的工作区和暂存树与保存快照一致；恢复原 89 文件修改及暂存状态。后续只读审计记录从 stash 987a4cc813e887c2a346258ad6f90fd6b4b0f512 追加恢复；无效的 643137 展示补丁未带回。两份 stash 均保留，未新增提交。本次只做源码与记录恢复，未重新构建或安装；手机仍为之前安装的 8305a380（构建 8305380）。
+
+## 最新工作区重新安装真机
+
+按用户要求，基于已恢复的 codex/storage-lifecycle-boundary（HEAD 61d1c72a 加原 89 文件修改）执行签名干净构建，独立构建号 10192001。构建成功，25 项 App 资源校验通过；安装与启动成功，手机端独立查询 bundleVersion=10192001。日志：`/tmp/mobileharness-restored-latest-device.log`、`/tmp/mobileharness-restored-latest-install.log`、`/tmp/mobileharness-restored-latest-launch.log`、`/tmp/mobileharness-restored-latest-installed.json`。本次仅重新部署，没有新增功能修复、提交或更改原暂存状态；未重跑完整检查与 Simulator，既有失败记录保留。聆听延迟仍待后续定位，安装成功不代表性能问题已修复。
+
+## 首页返回转场空白
+
+用户截图显示设置页交互返回时，下方首页区域为空白，直到页面退出才显示。当前 PersistentHomeNavigation 将首页常驻在 NavigationStack 外，导航根只有 Color.clear，未显式声明导航容器透明；iOS 路径驱动的整体 opacity 也参与显示。待通过公开 containerBackground(.clear, for: .navigation) 清除根与目的页面的导航容器背景，目的页面使用自己的不透明背景，移除 iOS 导航层整体 opacity。保留首页身份、聆听与呈现状态、相机导航准入及辅助功能／命中隔离；不修改录音或模型流程。检查、构建与原生手势验收分别记录。
+
+上述导航背景调整已实现，仅修改 PersistentHomeNavigation 的 UI 呈现。公开 API 说明：https://developer.apple.com/documentation/swiftui/containerbackgroundplacement/navigation 。`./scripts/check.sh` 退出 1：UI 103 项（含常驻首页多层导航原生挂载回归）、AppWorkflow 128 项通过，集成 1016 项有 34 个问题，不能记全量通过；日志 `/tmp/mobileharness-home-return-check.log`。既有挂载测试不验证 iOS 返回中间帧的可见像素，本轮不将它当作交互返回验收。`./scripts/build-ios.sh` 退出 65，CoreAIShared 无法解析 Simulator 的 CoreAI，后续 scheme 未执行：`/tmp/mobileharness-home-return-simulator.log`。
+
+签名真机构建、25 项资源校验、安装及启动成功；手机独立查询确认构建号 10192002：`/tmp/mobileharness-home-return-device.log`、`/tmp/mobileharness-home-return-install.log`、`/tmp/mobileharness-home-return-launch.log`、`/tmp/mobileharness-home-return-installed.json`。原生验收待用户检查设置页返回手势拉至中间、取消返回、完成返回及深层返回时首页持续显示、聆听保持、相机离开暂停／返回恢复。无新增提交，原暂存修改保持。
+
+用户确认构建 10192002 的返回手势问题“可以了”，作为本次返回场景的真机反馈；不扩大为全场景验收。
+
+## 一轮结束恢复聆听时清理用户字幕
+
+用户反馈只清除了 assistant 回复，已定稿用户字幕仍留在顶部。已核对 VoiceSessionCoordinator 在恢复收音确认后调用 homeEffects.replyDidFinish；现有 UI 实现只清理回复。待在同一业务完成边界清除已定稿用户文本及标记，保留未定稿新输入和既有回复淡出／替换／停止围栏，不在页面根据 voicePhase 推测轮次完成。
+
+已在 HomeEffectsWorkflow 实现清理：有效前台聆听会话收到完成通知后，同步清除已定稿用户字幕；无回复文本也执行，未定稿新输入保留。新增两项测试（其中一项含有／无回复文本两个参数用例），定向回归通过：`/tmp/mobileharness-caption-restoration-tests.log`。完整检查退出 1：UI 103 项、AppWorkflow 130 项通过；集成 1016 项有 23 个问题，不记全量通过：`/tmp/mobileharness-caption-restoration-check.log`。Simulator 退出 65，CoreAIShared 无法解析 CoreAI，后续 scheme 未执行：`/tmp/mobileharness-caption-restoration-simulator.log`。签名真机构建和 25 项资源检查通过：`/tmp/mobileharness-caption-restoration-device.log`。真实回复结束／聆听恢复的字幕效果仍待真机验收，本轮未提交。
+
+真机安装与启动成功，独立查询确认 bundleVersion=10192003：`/tmp/mobileharness-caption-restoration-install.log`、`/tmp/mobileharness-caption-restoration-launch.log`、`/tmp/mobileharness-caption-restoration-installed.json`。原暂存状态保持，原工作区修改保留。
+
+## 四基础模块容器入口与异常定义归根
+
+按用户要求统一文件布局：ModelContainer.swift、ModelFailure.swift、StorageFailure.swift 移至各自模块根；PlatformKit 现有根布局保留，并将 PlatformError 声明归入 PlatformFailure.swift。UI 已满足布局。保持编译目标、公开类型、运行时和 Signal 转换边界；更新 SwiftPM 源码清单、Xcode 导航、边界检查及当前 README，历史测量输入路径保持原始证据。验证待执行，不新增目录／目标／依赖，不自动提交或改变既有暂存。
+
+布局调整已完成。三个移动文件 SHA256 与移动前一致，记录 `/tmp/mobileharness-foundation-layout-move-hashes.json`；PlatformError 仅移动声明位置，公开类型／case 保持。边界检查通过，包括四模块 Container／Failure 必须在物理根、文件唯一编译归属、错误结构一致及模型 Core 独立类型检查：`/tmp/mobileharness-foundation-layout-boundaries.log`。Xcode project plist 及 diff 格式检查通过；原暂存 89 文件未修改。
+
+完整 `./scripts/check.sh` 退出 1：UI 103 项有 1 个问题（cameraNativeMetalDrawStopAndLayerHandoff 超时），集成 1016 项有 21 个问题，AppWorkflow 130 项通过：`/tmp/mobileharness-foundation-layout-check.log`。定向复跑的四模块异常结构 6 项通过，但原生 Metal 用例仍失败：`/tmp/mobileharness-foundation-layout-focused.log`；不记全量通过，也不将原生失败归因于目录移动或宣布其已解决。
+
+`./scripts/build-ios.sh` 退出 65，CoreAIShared 无法解析 Simulator 的 CoreAI，后续 scheme 未执行：`/tmp/mobileharness-foundation-layout-simulator.log`。签名真机构建与 25 项资源校验通过：`/tmp/mobileharness-foundation-layout-device.log`。此次未安装或做硬件验收，手机仍为此前字幕修复构建 10192003；未自动提交。
+
+## 首页加载仅大小眼、失败重试与异常 Toast
+
+用户要求删除加载文字／取消按钮，加载不提供手动取消，只以左右大小交替的双眼表达等待；失败提供重试及业务异常 Toast。待移除手动取消端口／用户状态、简化首页恢复提示，保留实际加载事实 → ApplicationControl → Expression Action，修改 Core Animation 缩放并清理退出状态。ModelKit 已上报的加载失败沿现有 Gateway 异常链路；仅补齐宿主验证未就绪的原始错误上报，避免重复 Toast。生命周期失活／配置替换／根停止仍取消并加入，不承诺原生加载可即时中断。验证待执行，本轮不提交。
+
+已完成：加载／检查无状态文字和按钮，failed 才有重试按钮；手动 cancel 端口／接线／cancelled 用户状态已移除。加载眼睛使用两个独立父图层的 Core Animation 缩放，1.2 秒内左右在 1.12／0.68 之间交换，移除原明暗／上下浮动；减少动态效果时静态大小眼，退出／失活恢复缩放。模型错误沿原通道，新增 ForegroundPreparation.ValidationError.notReady 的 onValidationFailure 报告，经同根 Gateway → ApplicationControl → 呈现函数显示 Toast，UI／App 不直接决定 Toast。
+
+定向测试退出 0：UI 5 项（含表情几何参数用例）、集成 2 项、AppWorkflow 8 项通过；包含实际准备验证错误经过真实 Gateway／ApplicationControl 成为 Toast，原错误对象仍保留：`/tmp/mobileharness-loading-eyes-focused.log`。完整 `./scripts/check.sh` 退出 1：UI 103 项有 1 个原生 Metal 问题，集成 1017 项有 26 个问题，AppWorkflow 130 项通过：`/tmp/mobileharness-loading-eyes-check.log`。不记全量通过。
+
+`./scripts/build-ios.sh` 退出 65，CoreAIShared 无法解析 Simulator 的 CoreAI，后续 scheme 未执行：`/tmp/mobileharness-loading-eyes-simulator.log`。签名真机构建、25 项资源校验、安装及启动通过；手机查询确认构建号 10192005：`/tmp/mobileharness-loading-eyes-device.log`、`/tmp/mobileharness-loading-eyes-install.log`、`/tmp/mobileharness-loading-eyes-launch.log`、`/tmp/mobileharness-loading-eyes-installed.json`。实际大小眼观感、真实模型失败／重试和前后台验收待用户确认；未提交，原 89 文件暂存保持。
+
+
+## 2026-10-19 大模型请求等待眼睛
+
+实现：Assistant 前台回复 Worker 在实际 chat 调用前经 Gateway 提交内部 UI.Expression.setReplyWaiting，按请求 ID 结束覆盖。首个非空文本、原生工具输出、无输出完成、流失败及建流失败均收尾；取消不向已关闭 round 注册新 Action，通过现有回复占用清空／根生命周期清理。复用原生大小眼，不修改音频、相机或预热，不增加线程。模型准备 checking／ready 与请求等待独立；有限表情有真实回执，不被等待装饰报 busy。
+
+- 专项最终运行 `/tmp/mobileharness-reply-waiting-focused-final.log`：UI 5 项、集成 6 项（请求结束测试含 text／native／finish／failure／openFailure／cancel 六种参数）、AppWorkflow 1 项通过；包括单次流式回复只发一对等待标记、身份围栏、生命周期、模型准备独立及有限表情回执。使用注入模型，不代表真实模型表现。
+- 首轮 `./scripts/check.sh` 未通过：UI 106 项有 3 个问题，集成 1019 项有 57 个问题。暴露旧机械臂 UI fixture 未提供新增内部函数、授权数量断言及测试把回复占用事实的 finished 误当请求终态；已修复相关测试宿主／关联校验，最终专项及后续全量对应测试通过。原始日志 `/tmp/mobileharness-reply-waiting-check.log` 保留失败证据。
+- 最终 `./scripts/check.sh` 退出 1：源码边界、6 项 Python 检查及格式检查通过；UI 106 项仍有 1 个 Metal draw/stop/handoff 问题，集成 1019 项仍有 22 个问题（含环境逆序断言、播放清理、声源／视觉超时等），AppWorkflow 131 项通过。新增等待、配置目录与真实装配覆盖测试通过；全量失败不记为通过。日志 `/tmp/mobileharness-reply-waiting-check-final.log`。
+- `./scripts/build-ios.sh` 退出 65：MobileHarnessSimulator 在 CoreAIShared 无法解析 CoreAI；后续三个 scheme 未执行。日志 `/tmp/mobileharness-reply-waiting-simulator.log`。
+- 签名真机构建成功，最终应用 25 项 Agent/Skill 资源校验通过；构建日志 `/tmp/mobileharness-reply-waiting-device.log`。
+- 已安装 iPhone 17 Pro，并通过设备应用清单独立核实 bundleVersion **10192006**（`/tmp/mobileharness-reply-waiting-installed.json`）。自动启动当时被系统 Locked 拒绝。随后用户解锁测试并反馈“有，正常”，确认大模型等待首个输出时出现大小眼动画，开始输出后正常恢复。该实机确认不扩展为失败／取消、全部模型或性能验收。
+- 本轮未提交，原 89 个已暂存文件保持原索引，所有本轮变更留在工作区。
+
+
+## 2026-10-19 聆听路径冗余清理
+
+实现：按压预备仅准备触觉和提示音，不调用诊断停机或加入设备清理；真实 startVoice 保留一次互斥准备，移除同一区间重复等待。VoiceNativeEffects 以 prepareCue 唯一生成并持有一份私有 PCM 缓存，播放复用该入口，取消前后校验保留。AppleAudioIO 共用同步会话配置，各调用者仍按原隔离执行。计时只保留 Wake.Activation／Spatial.Start 总区间；撤下细分 wrapper，不引入新任务、线程、延时或预热。
+
+- 专项运行 `/tmp/mobileharness-listening-cleanup-focused.log`：UI 12、集成 63、AppWorkflow 19 项通过，包含聆听阶段失败／取消、反馈并行、首 PCM readiness 和反馈参数／PCM。复用既有回归；iOS 原生按压、缓存及会话配置路径不能由 macOS 替身运行代替。
+- `./scripts/check.sh` 退出 1：源码／依赖边界、6 项 Python 检查、严格格式通过；UI 106 项、AppWorkflow 131 项通过；集成 1019 项仍有 30 个问题，涉及机械臂时序、Toast 状态、环境逆序断言、播放清理、声源及视觉超时等。全量失败不记为通过。日志 `/tmp/mobileharness-listening-cleanup-check.log`。
+- `./scripts/build-ios.sh` 退出 65：MobileHarnessSimulator 在 CoreAIShared 的 arm64／x86_64 编译无法解析 CoreAI，后续三个 scheme 未执行。日志 `/tmp/mobileharness-listening-cleanup-simulator.log`。
+- 签名真机构建成功，最终 Bundle 的 25 项 Agent/Skill 资源校验通过。日志 `/tmp/mobileharness-listening-cleanup-device.log`。
+- 已安装并启动 iPhone 17 Pro，设备应用清单独立确认 bundleVersion **10192007**（`/tmp/mobileharness-listening-cleanup-installed.json`）；启动日志 `/tmp/mobileharness-listening-cleanup-launch.log`。连续启停、实际提示音／收音及按压预备的设备互斥行为待用户确认，不据此声明已解决系统音频延迟。
+- SpeechTypes 错误定义文档已纠正，Audio README 移除重复的历史对照描述，历史失败证据仍保留在本验证日志；本轮不提交，原 89 个已暂存文件的索引保持。

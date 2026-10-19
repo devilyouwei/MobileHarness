@@ -166,6 +166,9 @@ public actor ModelManager {
 
     public func load(_ capability: ProvidedCapability) async throws { try await load(defaultID(for: capability)) }
     public func warmup(_ capability: ProvidedCapability) async throws { try await warmup(defaultID(for: capability)) }
+    public func warmup(_ capability: ProvidedCapability, reportLoading: @Sendable (Bool) async -> Void) async throws {
+        try await warmup(defaultID(for: capability), reportLoading: reportLoading)
+    }
     public func unload(_ capability: ProvidedCapability) async throws { try await unload(defaultID(for: capability)) }
     public func status(_ capability: ProvidedCapability) async throws -> ModelState {
         try await status(defaultID(for: capability))
@@ -244,9 +247,12 @@ public actor ModelManager {
     }
 
     public func warmup(_ id: ModelID) async throws {
+        try await warmup(id, reportLoading: { _ in })
+    }
+    public func warmup(_ id: ModelID, reportLoading: @Sendable (Bool) async -> Void) async throws {
         let entry = try entry(id)
         let provider = try await construct(entry)
-        try await entry.context.load()
+        try await entry.context.load(reportLoading: reportLoading)
         try Task.checkCancellation()
         guard !closed, !entry.unloading else { throw CapabilityError.sessionClosed }
         try await provider.warmup?()

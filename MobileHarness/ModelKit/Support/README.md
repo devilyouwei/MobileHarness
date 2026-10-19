@@ -1,6 +1,8 @@
 # ModelKit Shared Support
 
-✅ Management 的 ModelContainer 组合实例级默认装配与四个子能力；Core 提供同步 InferenceAdmission、可恢复资源暂停和流式错误观察。Provider 和资源机制保持隔离。
+✅ 容器入口与统一异常定义移到 ModelKit 根目录；Support 只保留内部机制。ModelContainer 的编译拥有者仍为 ModelKitDefaults，ModelFailure 仍属于基础 ModelKit。
+
+✅ 模块根目录的 ModelContainer 组合实例级默认装配与四个子能力，Management 提供注册／选择辅助；Core 提供同步 InferenceAdmission、可恢复资源暂停和流式错误观察。Provider 和资源机制保持隔离。
 
 ## Purpose and boundaries
 

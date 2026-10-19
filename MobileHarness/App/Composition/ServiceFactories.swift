@@ -78,7 +78,7 @@ import UI
                             case .ready, .unmanaged: true
                             default: false
                             }
-                        }, prepare: { try await model.language.warmup() })
+                        }, prepare: { report in try await model.language.warmup(reportLoading: { await report($0) }) })
                 ]
                 for (id, capability) in [
                     ("recognition", ProvidedCapability.recognition), ("synthesis", .synthesis),
@@ -92,7 +92,10 @@ import UI
                                 case .ready, .unmanaged: true
                                 default: false
                                 }
-                            }, prepare: { try await model.speech.warmup(capability) }))
+                            },
+                            prepare: { report in
+                                try await model.speech.warmup(capability, reportLoading: { await report($0) })
+                            }))
                 }
                 if uiContainer.camera.state.isEnabled {
                     steps.append(
@@ -103,7 +106,8 @@ import UI
                                 case .ready, .unmanaged: true
                                 default: false
                                 }
-                            }, prepare: { try await model.vision.load() }))
+                            }, prepare: { report in try await model.vision.warmup(reportLoading: { await report($0) }) }
+                        ))
                 }
                 return steps
             }, canPrepare: { !home.conversation.hasActiveInteraction },
@@ -115,10 +119,14 @@ import UI
                 case .preparing(let component): value = .preparing(component)
                 case .ready: value = .ready
                 case .deferred: value = .deferred
-                case .cancelled: value = .cancelled
                 case .failed(let component, let message): value = .failed(component: component, message: message)
                 }
                 home?.presentModelPreparation(value)
+                agents.reportModelPreparation(loading: value.isLoading)
+            },
+            onValidationFailure: { component, error in
+                containerFailures.report(
+                    module: "app", component: "homePreparation", operation: "verify." + component, error: error)
             })
         return Services(
             registry: registry, containerFailures: containerFailures,

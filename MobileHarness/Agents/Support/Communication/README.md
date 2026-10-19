@@ -89,3 +89,6 @@ ListeningIntent accepts optional explicit enabled consent; absence retains the e
 ✅ 已实现：ApplicationControlIntentRuntime 根启动时接通角色及输出消费者，允许无请求等待者的 container.failure/runtime.failure 内部呈现；呈现传输失败保留有界详情，不终止无关业务或递归提示。
 
 ✅ 已实现：无request waiter的app.environment蓝牙状态呈现与诊断事实一样执行受Gateway约束的内部Tool；执行失败记录lastDiagnosticDeliveryFailure，不递归Toast或停止无关会话。
+
+
+✅ AppEnvironmentFact新增modelPreparation类别，loading／idle值由ApplicationControl校验；仍使用app.environment来源、sequence及原Gateway外部接入。

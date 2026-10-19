@@ -1,4 +1,6 @@
 import AppLifecycle
+import AppStorage
+import Foundation
 import Gateway
 
 @MainActor enum ModuleRegistration {
@@ -52,7 +54,11 @@ import Gateway
                         do { try await service.start() } catch {
                             services.containerFailures.report(
                                 module: service.id, component: "lifecycle", operation: "start", phase: .startup,
-                                error: error, includeCancellation: !Task.isCancelled)
+                                error: error, includeCancellation: !Task.isCancelled,
+                                details: ApplicationContainer.failureDetails(error))
+                            if ApplicationContainer.failureDetails(error)?.isCancellation == true {
+                                throw CancellationError()
+                            }
                             throw error
                         }
                     }, invalidate: service.invalidate,
@@ -60,7 +66,11 @@ import Gateway
                         do { try await service.foreground(active) } catch {
                             services.containerFailures.report(
                                 module: service.id, component: "lifecycle", operation: active ? "resume" : "suspend",
-                                phase: .foreground, error: error, includeCancellation: !Task.isCancelled)
+                                phase: .foreground, error: error, includeCancellation: !Task.isCancelled,
+                                details: ApplicationContainer.failureDetails(error))
+                            if ApplicationContainer.failureDetails(error)?.isCancellation == true {
+                                throw CancellationError()
+                            }
                             throw error
                         }
                     },
@@ -68,7 +78,11 @@ import Gateway
                         do { try await service.stop() } catch {
                             services.containerFailures.report(
                                 module: service.id, component: "lifecycle", operation: "stop", phase: .shutdown,
-                                error: error, includeCancellation: !Task.isCancelled)
+                                error: error, includeCancellation: !Task.isCancelled,
+                                details: ApplicationContainer.failureDetails(error))
+                            if ApplicationContainer.failureDetails(error)?.isCancellation == true {
+                                throw CancellationError()
+                            }
                             throw error
                         }
                     })

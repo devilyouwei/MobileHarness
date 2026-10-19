@@ -113,6 +113,9 @@ private actor FailedDiagnosticDatabase: DatabaseStorage {
                 DiagnosticTools(
                     definitions: try [
                         function,
+                        UIActions.setLoadingDefinition(handler: { invocation in
+                            try await UIActions.setLoading(invocation: invocation, using: presentation)
+                        }),
                         UIActions.showBluetoothHomeDefinition(completing: { invocation in
                             .value(try await UIActions.showBluetoothHome(invocation: invocation, using: presentation))
                         }),
@@ -139,6 +142,36 @@ private actor FailedDiagnosticDatabase: DatabaseStorage {
         await input.shutdown()
         await ui.stop()
     }
+}
+
+@Test(.actionCatalog) @MainActor func homePreparationValidationFailureReachesBusinessToastWithOriginalError()
+    async throws
+{
+    let state = ActionActivityState()
+    let activity = ActionActivityWorkflow(state: state)
+    let fixture = try RuntimeFailurePresentationFixture(activity: activity)
+    try await fixture.start(activity: activity)
+    let channel = ContainerFailureChannel()
+    channel.start()
+    channel.connect(input: fixture.input, sessionID: fixture.sessionID)
+    let preparation = ForegroundPreparation(
+        steps: { [.init(id: "language", isReady: { false }, prepare: { _ in })] },
+        canPrepare: { true }, project: { _ in },
+        onValidationFailure: { component, error in
+            channel.report(module: "app", component: "homePreparation", operation: "verify." + component, error: error)
+        })
+
+    preparation.setActive(true)
+    try await containerEventually { state.errorToast != nil }
+    #expect(state.backgroundIssues.count == 1)
+    #expect(state.visibleNotice?.text == "基础能力发生异常，请查看运行异常")
+    #expect(state.backgroundIssues.first?.message.contains("notReady") == true)
+    #expect(channel.snapshot().records.first?.error as? ForegroundPreparation.ValidationError == .notReady)
+    #expect(channel.snapshot().records.count == 1)
+
+    await preparation.stop()
+    await channel.stop()
+    await fixture.stop(activity: activity)
 }
 
 @Test @MainActor func containerFailureRegistrySharesNativeReportersAndIsolatesRoots() async throws {
@@ -346,7 +379,8 @@ private actor FailedDiagnosticDatabase: DatabaseStorage {
 
 @Test @MainActor func containerFailureStorageRollbackPreservesPrimaryAndCleanupBeforeAgentStartup() async throws {
     let channel = ContainerFailureChannel()
-    let reporter = StorageFailureReporter(receive: channel.sink(module: "storage"))
+    let reporter = StorageFailureReporter(
+        receive: channel.sink(module: "storage", details: ApplicationContainer.failureDetails))
     let path = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     defer { try? FileManager.default.removeItem(at: path) }
     let files = FilesContainer(settings: path, photos: path, models: path, failures: reporter)
@@ -364,9 +398,9 @@ private actor FailedDiagnosticDatabase: DatabaseStorage {
         try await lifecycle.start()
         Issue.record("Expected startup failure")
     } catch let failure as ApplicationLifecycleFailure {
-        let storage = try #require(failure.primary as? StorageLifecycleFailure)
-        #expect(storage.primary as? InjectedContainerFailure == .startup)
-        #expect(storage.cleanup.first as? InjectedContainerFailure == .cleanup)
+        let storage = try #require(failure.primary as? StorageFailure)
+        #expect(storage.underlying as? InjectedContainerFailure == .startup)
+        #expect(storage.cleanupErrors.first as? InjectedContainerFailure == .cleanup)
     }
     #expect(!startedAgent.withLock { $0 })
     #expect(!channel.snapshot().records.isEmpty)
@@ -428,7 +462,8 @@ private actor FailedDiagnosticDatabase: DatabaseStorage {
 
 @Test @MainActor func containerFailureStorageLeafOperationsRetainThrownErrorsAndReportAtTheirOwner() async throws {
     let channel = ContainerFailureChannel()
-    let reporter = StorageFailureReporter(receive: channel.sink(module: "storage"))
+    let reporter = StorageFailureReporter(
+        receive: channel.sink(module: "storage", details: ApplicationContainer.failureDetails))
     let path = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     defer { try? FileManager.default.removeItem(at: path) }
     let files = FilesContainer(settings: path, photos: path, models: path, failures: reporter)
@@ -701,7 +736,9 @@ private func diagnosticInput(
 
 @Test @MainActor func normalAudioReleaseDoesNotReportFailureButRealMissingStillDoes() async throws {
     let channel = ContainerFailureChannel()
-    let cache = CacheContainer(failures: StorageFailureReporter(receive: channel.sink(module: "storage")))
+    let cache = CacheContainer(
+        failures: StorageFailureReporter(
+            receive: channel.sink(module: "storage", details: ApplicationContainer.failureDetails)))
     let audio = try await cache.audioScope("playback")
     let owner = AudioCache.Owner(source: "synthesis", session: "playback", input: "reply")
     let cancellations = Mutex(0)
@@ -778,6 +815,29 @@ private func diagnosticInput(
     await channel.stop()
 }
 
+@Test func bluetoothRawConnectionTimeoutKeepsEvidenceWithoutMaskingOtherTimeouts() async throws {
+    let channel = ContainerFailureChannel()
+    let wrapped = PlatformFailure(
+        component: "connectivity.bluetooth", operation: "connect", underlying: NexArmError.timeout)
+    let cleanup = PlatformFailure(
+        component: "connectivity.bluetooth", operation: "connect", underlying: NexArmError.timeout,
+        cleanupErrors: [NexArmBluetoothFailure.disconnectUnconfirmed])
+    for (operation, error) in [
+        ("connect", NexArmError.timeout as any Error), ("connect", wrapped), ("write", NexArmError.timeout),
+        ("exchange", NexArmError.timeout), ("connect", cleanup),
+    ] {
+        channel.report(module: "platform", component: "connectivity.bluetooth", operation: operation, error: error)
+    }
+    let records = channel.snapshot().records
+    #expect(records.count == 5)
+    #expect(records.prefix(2).allSatisfy { $0.event.code == "bluetooth.connectionUnavailable" })
+    #expect(records.dropFirst(2).allSatisfy { $0.event.code != "bluetooth.connectionUnavailable" })
+    #expect(records[0].error as? NexArmError == .timeout)
+    #expect((records[1].error as? PlatformFailure)?.underlying as? NexArmError == .timeout)
+    #expect((records[4].error as? PlatformFailure)?.cleanupErrors.count == 1)
+    await channel.stop()
+}
+
 private func bluetoothEnvironment(
     connection: String, availability: String = "available", recovery: String = "idle", sequence: UInt64
 ) throws -> AppEnvironmentFact {
@@ -828,9 +888,18 @@ private func bluetoothEnvironment(
             && fixture.ui.devices.state.connectionPresentation == .disconnected
     }
     #expect(activity.state.errorToast == nil && activity.state.backgroundIssues.isEmpty)
+    let processedBeforeTimeout = await fixture.runtime.agent.status().processedInputs
+    channel.report(
+        module: "platform", component: "connectivity.bluetooth", operation: "connect",
+        error: PlatformFailure(
+            component: "connectivity.bluetooth", operation: "connect", underlying: NexArmError.timeout))
+    try await containerEventually { await fixture.runtime.agent.status().processedInputs > processedBeforeTimeout }
+    #expect(fixture.ui.home.conversation.bluetoothStatus == .disconnected)
+    #expect(activity.state.errorToast == nil && activity.state.backgroundIssues.isEmpty)
+    #expect(channel.snapshot().records.contains { $0.event.code == "bluetooth.connectionUnavailable" })
     channel.report(
         module: "platform", component: "connectivity.bluetooth", operation: "write",
-        error: NexArmBluetoothFailure.sendBlocked)
+        error: NexArmError.timeout)
     try await containerEventually { activity.state.errorToast != nil }
     #expect(channel.snapshot().records.contains { $0.event.code == "bluetooth.unavailable" })
     await channel.stop()
@@ -906,17 +975,95 @@ private struct DetailedContainerError: Error, CustomStringConvertible {
     channel.connect { _ in publications.withLock { $0 += 1 } }
     channel.start()
     let platform = registry.platform()
-    await #expect(throws: PlatformError.stopped) { try await platform.setForeground(true) }
+    await #expect(throws: PlatformFailure.self) { try await platform.setForeground(true) }
     let model = registry.model()
-    await #expect(throws: InferenceAdmissionError.stopped) { try await model.setForeground(true) }
-    let reporter = StorageFailureReporter(receive: channel.sink(module: "storage"))
+    await #expect(throws: ModelFailure.self) { try await model.setForeground(true) }
+    let reporter = StorageFailureReporter(
+        receive: channel.sink(module: "storage", details: ApplicationContainer.failureDetails))
     reporter.report("root", "stop", CancellationError())
     let records = channel.snapshot().records
     #expect(records.count == 3)
     #expect(records.allSatisfy { $0.delivery == .suppressed })
-    #expect(records.contains { $0.error is PlatformError })
-    #expect(records.contains { $0.error is InferenceAdmissionError })
-    #expect(records.contains { $0.error is CancellationError })
+    #expect(records.contains { ($0.error as? PlatformFailure)?.underlying is PlatformError })
+    #expect(records.contains { ($0.error as? ModelFailure)?.underlying is InferenceAdmissionError })
+    #expect(records.contains { ($0.error as? StorageFailure)?.underlying is CancellationError })
     await channel.stop()
     #expect(publications.withLock { $0 } == 0)
+}
+
+@Test(.actionCatalog) @MainActor func modelPreparationLoadingEyesCrossGatewayAgentAndExpressionAction() async throws {
+    let ui = UIContainer()
+    let activity = ActionActivityWorkflow(state: ui.home.activity)
+    let fixture = try RuntimeFailurePresentationFixture(activity: activity)
+    try await fixture.start(activity: activity)
+    fixture.ui.home.presentModelPreparation(.preparing("language"))
+    #expect(!fixture.ui.home.conversation.isVoiceActive)
+    try await fixture.runtime.observeEnvironment(.init(category: .modelPreparation, sequence: 1, value: "loading"))
+    try await containerEventually { fixture.ui.home.conversation.displayedExpression == .loading }
+    #expect(fixture.ui.home.activity.errorToast == nil)
+    fixture.ui.invalidate()
+    try fixture.ui.setForeground(true)
+    fixture.ui.home.presentModelPreparation(.preparing("language"))
+    try await fixture.runtime.observeEnvironment(.init(category: .modelPreparation, sequence: 2, value: "loading"))
+    try await containerEventually { fixture.ui.home.conversation.displayedExpression == .loading }
+    fixture.ui.home.presentModelPreparation(.ready)
+    try await fixture.runtime.observeEnvironment(.init(category: .modelPreparation, sequence: 3, value: "idle"))
+    try await containerEventually { !fixture.ui.home.conversation.loadingExpression }
+    #expect(fixture.ui.home.conversation.displayedExpression == .closed)
+    #expect(!fixture.ui.home.conversation.isVoiceActive)
+    await fixture.stop(activity: activity)
+}
+
+private struct UnusedLoadingHistory: HistoryPresentationCapability {
+    func showHistory(invocation: any FunctionInput) async throws { throw InjectedContainerFailure.operation(404) }
+}
+
+@Test(.actionCatalog) @MainActor func loadingExpressionStateCompletionPassesRealExecutorAndReturningTool() async throws
+{
+    let root = UIContainer()
+    try root.start()
+    root.home.presentModelPreparation(.preparing("language"))
+    let presentation = RuntimePresentation(
+        cameraControl: UnusedCameraControl(), rootSessionID: "loading-root", activity: root.home.activity,
+        effects: root.home.effects, expressions: root.home.expressions,
+        homeBluetooth: root.home.conversation, deviceBluetooth: root.devices.state)
+    let module = UIModule(
+        expression: presentation, pose: presentation, updates: presentation, history: UnusedLoadingHistory())
+    let definition = try #require(module.definitions.first { $0.path.description == "UI.Expression.setLoading" })
+    let binding = try BehaviorProtocolBindings.bind(definition)
+    let registry = try ToolRegistry(modules: [DiagnosticTools(definitions: [binding])])
+    let cases: [(HomeModelPreparation, String, String, String, Bool, Bool)] = [
+        (.preparing("language"), "true", "1", "applicationControl", false, true),
+        (.preparing("language"), "false", "2", "applicationControl", false, false),
+        (.checking, "true", "3", "applicationControl", false, false),
+        (.preparing("language"), "true", "3", "applicationControl", false, false),
+        (.preparing("language"), "true", "4", "applicationControl", false, true),
+        (.ready, "true", "5", "applicationControl", false, false),
+        (.preparing("language"), "false", "6", "applicationControl", false, false),
+        (.preparing("language"), "true", "4", "applicationControl", false, false),
+        (.preparing("language"), "true", "7", "applicationControl", false, true),
+        (.preparing("language"), "false", "7", "applicationControl", true, true),
+        (.preparing("language"), "false", "0", "applicationControl", true, true),
+        (.preparing("language"), "false", "8", "assistant", true, true),
+    ]
+    for (preparation, enabled, revision, source, rejected, showing) in cases {
+        root.home.presentModelPreparation(preparation)
+        let call = ToolRequest(
+            id: UUID().uuidString, toolPath: "UI.Expression.setLoading",
+            arguments: ["enabled": enabled, "revision": revision])
+        let response = try #require(
+            try await ToolExecutor(registry: registry).execute(
+                call,
+                context: ActionExecutionContext(
+                    source: source, sessionID: "loading-root", inputID: UUID().uuidString),
+                returning: true))
+        #expect(response.isError == rejected)
+        if !rejected {
+            #expect(response.failureCode == nil)
+            #expect(response.value == "completed")
+            #expect(response.completion == .completed)
+        }
+        #expect(root.home.conversation.loadingExpression == showing)
+    }
+    await root.stop()
 }

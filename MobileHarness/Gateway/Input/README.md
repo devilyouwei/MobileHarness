@@ -96,3 +96,8 @@ deliverFeedback 创建运行时 UUID，并校验 hops、执行 owner、实时 Ag
 ✅ 已实现：ContainerFailureRecord 同时保留原始 Error、完整描述和有界 Signal 摘要；取消／生命周期控制保留为 suppressed 记录，不广播、不触发 Toast。去重比较完整描述，避免长错误同前缀合并；保持 128 记录和显式淘汰计数，非无限永久审计。
 
 原始 Error（包含关联值、NSError/userInfo 和复合清理错误）只保留在内存诊断记录，不自动序列化到 Signal、磁盘或 Toast。完整描述不截断；Signal 仍受摘要大小限制。原生报告接口统一为 component／operation／any Error；不以一个跨基础库 Error 枚举替代各 SDK 的类型化错误。返回 false 表示未进入广播（含正常控制结果），不等于本地未留证据。128 条记录上限意味着有界保留，不承诺永久保存全部历史。
+
+
+✅ ContainerFailureDetails是宿主注入的技术投影（稳定code／isCancellation），Gateway不为此新增UI／Storage／ModelKit依赖。DeviceInputAdapter检查PlatformFailure.underlying以保留蓝牙条件与生命周期围栏语义；cleanup.failed不得降级。原始结构留在记录中，Signal摘要及业务展示规则仍独立。
+
+✅ 已实现：蓝牙连接调用原始 NexArmError.timeout 按 operation=connect 转为连接不可用条件；原始错误完整保留，写入／响应超时及清理失败不降级。

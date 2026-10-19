@@ -1,6 +1,7 @@
 import Compression
 import CryptoKit
 import Foundation
+import ModelKit
 import Synchronization
 
 /// Two active packages, eight pending; explicit user retries. Complete snapshots preserve outcomes.
@@ -334,7 +335,11 @@ public actor ModelArtifactStore {
         for id in Array(transfers.keys) {
             do { try await cancelOwned(id) } catch { failures.append(error) }
         }
-        if !failures.isEmpty { throw ModelArtifactCleanupFailure(errors: failures) }
+        if let primary = failures.first {
+            throw ModelFailure(
+                component: "artifacts", operation: "close", underlying: primary,
+                cleanupErrors: Array(failures.dropFirst()), code: .cleanupFailed)
+        }
     }
     private func admit() throws {
         guard !closing, admitted < 64 else { throw ModelArtifactError.busy }
@@ -458,5 +463,3 @@ public actor ModelArtifactStore {
         guard Set(artifact.requiredFiles).isSubset(of: seen) else { throw ModelArtifactError.integrity }
     }
 }
-
-public struct ModelArtifactCleanupFailure: Error, Sendable { public let errors: [any Error] }

@@ -1,5 +1,9 @@
 # PlatformKit — 原生设备能力
 
+✅ Audio 内统一重复会话配置，执行隔离、设备生命周期及错误传播不变；调试时序收敛到持久总区间。
+
+✅ 根目录 PlatformContainer.swift 保留容器与接纳机制，PlatformFailure.swift 集中统一异常封装和 PlatformError 生命周期错误；不改变类型或传播行为。
+
 ## 职责与边界
 
 PlatformKit 是不依赖其他项目模块的基础 SDK，只使用系统框架。提供原生设备能力、有限缓冲的输入、运行事实和执行错误；不认识 Signal、Agent、Action、UI 或 FactoryKit。
@@ -60,4 +64,7 @@ NativeAudioEvent／CameraEvent 是 String/Sendable 原生事实，不采用 Erro
 
 [总体设计](../README.md) · [Audio](Audio/README.md) · [Vision](Vision/README.md) · [Connectivity](Connectivity/README.md) · [Core](Core/README.md)
 
-✅ 已实现：PlatformAdmission 不再过滤取消／关闭错误，原始 Error 完整交给宿主统一报告端口；生命周期控制事件的广播抑制由宿主／Gateway 完成，不改变类型化 throw。
+✅ 已实现：PlatformAdmission 不再过滤取消／关闭错误，原始 Error 完整交给宿主统一报告端口；生命周期控制事件的广播抑制由宿主／Gateway 完成，底层协议保留类型化 throw，根生命周期使用 PlatformFailure。
+
+
+✅ PlatformFailure属于独立SDK；根start／setForeground／stop类型化抛错，PlatformAdmission为原生回调包装同一结构并保留首次来源。Audio与根的清理失败使用underlying＋cleanupErrors；上层通过原始类型识别蓝牙连接条件，清理失败不能降为连接状态。

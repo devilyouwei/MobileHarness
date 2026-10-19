@@ -168,7 +168,7 @@ private func containerRoot() -> URL { FileManager.default.temporaryDirectory.app
         _ = try await (one, two)
         await #expect(throws: StorageError.closed) { try await store.load() }
         await #expect(throws: RecordStorageError.closed) { try await chat.current(agent: "late") }
-        await #expect(throws: StorageError.closed) { try await first.start() }
+        await #expect(throws: StorageFailure.self) { try await first.start() }
         try await second.stop()
     }
     @Test func fileNamespacesAreScopedAndCompatibleOnDisk() async throws {
@@ -226,19 +226,19 @@ extension StorageContainerTests {
         do {
             try await storage.start()
             Issue.record("Expected database preparation failure")
-        } catch let error as StorageLifecycleFailure {
-            #expect(error.primary as? ContainerFixtureError == .start)
-            #expect(error.cleanup.count == 1)
-            #expect(error.cleanup.first as? ContainerFixtureError == .cleanup)
+        } catch let error as StorageFailure {
+            #expect(error.underlying as? ContainerFixtureError == .start)
+            #expect(error.cleanupErrors.count == 1)
+            #expect(error.cleanupErrors.first as? ContainerFixtureError == .cleanup)
         }
         #expect(throws: StateError.closed) { try writer.get() }
         #expect(throws: StorageError.closed) { try files.file(files.photos) }
         #expect(throws: StorageError.closed) { try storage.cache.images.put(CacheBuffer(Data([1])), key: "late") }
-        await #expect(throws: StorageLifecycleFailure.self) { try await storage.start() }
+        await #expect(throws: StorageFailure.self) { try await storage.start() }
         #expect(await database.counts().0 == 1)
-        await #expect(throws: StorageLifecycleFailure.self) { try await storage.stop() }
+        await #expect(throws: StorageFailure.self) { try await storage.stop() }
         let stopped = await database.counts().1
-        await #expect(throws: StorageLifecycleFailure.self) { try await storage.stop() }
+        await #expect(throws: StorageFailure.self) { try await storage.stop() }
         #expect(await database.counts().1 == stopped)
     }
 }
@@ -270,7 +270,14 @@ extension StorageContainerTests {
         let work = Task { try await storage.start() }
         while !(await database.isStarting()) { await Task.yield() }
         work.cancel()
-        await #expect(throws: CancellationError.self) { try await work.value }
+        do {
+            try await work.value
+            Issue.record("Expected structured cancellation")
+        } catch let failure as StorageFailure {
+            #expect(failure.isCancellation)
+            #expect(failure.underlying is CancellationError)
+            #expect(failure.cleanupErrors.isEmpty)
+        }
         #expect(await database.isStopped())
         #expect(throws: StorageError.closed) { try files.file(files.photos) }
         try await storage.stop()

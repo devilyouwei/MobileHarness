@@ -45,10 +45,6 @@ import Observation
             guard let self, selected == self.scopeID else { return }
             self.services.homePreparation.refresh()
         }
-        features.onPreparationCancelled = { [weak self] in
-            guard let self, selected == self.scopeID else { return }
-            self.services.homePreparation.cancel()
-        }
         features.onInteractionActivityChanged = { [weak self] in
             guard let self, selected == self.scopeID,
                 self.services.homePreparation.state == .deferred,

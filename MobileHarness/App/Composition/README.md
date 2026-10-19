@@ -1,5 +1,7 @@
 # Application Composition
 
+✅ 组合根移除准备手动取消接线；准备复查未就绪通过同根异常通道上报原始验证错误，ModelKit 已报告的加载／查询错误继续走既有通道，不重复生成 Toast。
+
 ✅ ApplicationContainer 缓存 ModelContainer 并返回同根 language／speech／vision／artifacts。模型服务依赖 storage／diagnostics；Agents 依赖 model，消费者停止后再关闭模型和存储。
 
 ## 职责与接口
@@ -65,3 +67,13 @@ AppStorage 目标只编译 Composition/ApplicationContainer.swift，使用 Facto
 ✅ 已实现：Services持有唯一ForegroundPreparation协调器；App在生命周期前台屏障完成后、首页可见时激活。绑定导航／配置应用／交互结束的刷新回调；切页或失活立即取消接纳，根替换先加入协调器再停止模型。步骤串行、重复请求合并，准备检查已就绪状态；云端不发探测生成请求，相机开启时才准备视觉。
 
 ✅ 已实现：四根注入同一原生错误签名；App 仅标识模型生命周期拒绝为不广播的控制结果，Gateway保留原始 Error。
+
+
+✅ ApplicationContainer.failureDetails只投影四种模块自有Failure的稳定code及isCancellation，交给同根Gateway报告通道；模型生命周期拒绝保留不广播，真实清理失败例外。ModuleRegistration在保留结构化诊断后，将无清理失败的取消转换为通用宿主CancellationError以保持生命周期语义，不决定业务展示。
+
+
+✅ 准备状态投影同时更新UI交互门并向AgentBindings报告loading／idle事实，App不直接设置表情；已有会话延后冷准备，终态／失活立即清理展示。
+
+✅ 已实现：模型准备事实仅在 preparing 投影 loading，checking 投影 idle，返回首页仅检查已加载能力时不触发加载表情。
+
+✅ 已实现：首页步骤从 ModelKit 接收实际权重加载开始／结束，不再把调用 prepare 本身当作加载；检查、已就绪、无需挂载不投影 loading。

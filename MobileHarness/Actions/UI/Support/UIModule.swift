@@ -55,6 +55,17 @@ public struct UIModule: CapabilityModule {
                         try await expression.restoreExpression(invocation: $0)
                     })
             }),
+            UIActions.setReplyWaitingDefinition(handler: { [updates] invocation in
+                try await UIActions.setReplyWaiting(invocation: invocation) {
+                    try await updates.setReplyWaiting($0, requestID: $1, invocation: $2)
+                }
+            }),
+            UIActions.setLoadingDefinition(handler: { [updates] invocation in
+                guard let presentation = updates as? any LoadingExpressionPresentationCapability else {
+                    throw UIActions.PresentationError.invalidCall
+                }
+                try await UIActions.setLoading(invocation: invocation, using: presentation)
+            }),
             UIActions.setExpressionDefinition(handler: { [expression] invocation in
                 try await UIActions.setExpression(invocation: invocation) {
                     try await expression.setExpression($0, invocation: $1)

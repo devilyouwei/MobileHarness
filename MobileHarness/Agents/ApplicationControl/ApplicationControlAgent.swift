@@ -72,7 +72,7 @@ public actor ApplicationControlAgent: Agent {
             outputs: [.communication, .actionCall, .toolCall, .control, .scheduling],
             capabilities: try configuration.capabilities.adding(internalTools: [
                 ApplicationControlFunctions.runtimeFailure, ApplicationControlFunctions.bluetoothHome,
-                ApplicationControlFunctions.bluetoothSettings,
+                ApplicationControlFunctions.bluetoothSettings, ApplicationControlFunctions.loadingExpression,
                 ApplicationControlFunctions.download, ApplicationControlFunctions.cancellation,
                 ApplicationControlFunctions.removal, ApplicationControlFunctions.speechBinding,
                 ApplicationControlFunctions.restoration, ApplicationControlFunctions.saving,
@@ -352,6 +352,20 @@ public actor ApplicationControlAgent: Agent {
         processed += 1
     }
 
+    private func presentLoading(_ fact: AppEnvironmentFact, input: AgentInput) throws {
+        let enabled = fact.value == "loading"
+        guard diagnosticCalls.count < 128 else { throw CommunicationError.capacityExceeded }
+        let call = try ApplicationControlFunctions.loadingExpression.call([
+            "enabled": enabled ? "true" : "false", "revision": String(fact.sequence),
+        ])
+        sequence &+= 1
+        guard
+            case .enqueued = continuation.yield(
+                OutputEnvelope(source: descriptor.id, input: input, output: .toolCall(call), sequence: sequence))
+        else { throw CommunicationError.capacityExceeded }
+        diagnosticCalls.insert(call.id)
+    }
+
     private func presentBluetooth(_ state: ApplicationControlBluetoothState, input: AgentInput) throws {
         guard state != bluetoothPresented else { return }
         guard diagnosticCalls.count <= 126, bluetoothRevision < UInt64.max else {
@@ -405,11 +419,22 @@ public actor ApplicationControlAgent: Agent {
                 else { throw CommunicationError.invalidPayload }
                 try fact.validate()
                 _ = try message.validatedSize()
-                guard fact.sequence > (environment[fact.category]?.sequence ?? 0) else {
-                    throw CommunicationError.outOfOrder
+                if fact.category == .modelPreparation {
+                    guard fact.value == "loading" || fact.value == "idle" else {
+                        throw CommunicationError.invalidPayload
+                    }
                 }
                 let bluetooth =
                     fact.category == .devices ? try ApplicationControlBluetoothState.environment(fact.value) : nil
+                if let current = environment[fact.category], fact.sequence <= current.sequence {
+                    // Environment facts are complete snapshots; Gateway publication is not FIFO.
+                    guard fact.sequence < current.sequence || fact == current else {
+                        throw CommunicationError.invalidPayload
+                    }
+                    processed += 1
+                    return
+                }
+                if fact.category == .modelPreparation { try presentLoading(fact, input: input) }
                 if let bluetooth {
                     bluetoothState = bluetooth
                     try presentBluetooth(bluetooth, input: input)

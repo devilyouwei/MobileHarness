@@ -47,3 +47,5 @@ RuntimeBoundaryTests cover invalid manager configuration, nondefault limits reac
 ✅ 制品存储作用域重绑回归：释放旧 Files 绑定后，同一模型管理器应使用新存储；关闭制品服务拒绝新请求并加入已接纳工作。
 
 ✅ 已实现：回归缓存路径字符集合后的Unicode合法路径、标点及危险路径拒绝；优化不放宽规则。
+
+✅ 已实现：验证报告区间对应真实冷加载，暖模型／unmanaged 无事件，失败成对结束且保留原错。

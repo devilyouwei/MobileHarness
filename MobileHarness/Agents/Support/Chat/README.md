@@ -1,5 +1,7 @@
 # Shared Chat Decision Worker
 
+✅ 仅报告前台回复活动的 Worker 在 collect 前提交请求等待，首个非空文本／原生工具或终态清除；请求 ID 围栏与现有轮次授权共同拒绝迟到清理。不将装饰呈现计为模型有效回复，不改变模型、音频和分段策略。
+
 ## 职责与边界
 
 把注入的 ChatCapability 适配为有界决策、执行反馈和观察续轮。Assistant 使用动态 Skill；确定性角色使用固定任务协调器，不拥有普通 Chat worker。角色拥有身份、预处理、业务状态和请求选择；本目录拥有请求组装、协议消费、屏障、取消与历史投影。Gateway 执行调用，ModelKit 管 provider 传输。
@@ -152,3 +154,5 @@ Task 关闭后的历史重建复用真实 Action executionObservations，不再�
 ## 统一容器异常通道
 
 ✅ AgentChatWorker 在普通决策前接收已授权的 container.failure，维护最多128条被动诊断，按事件 ID 更新次数，超限计数淘汰。仅内存，不写可能故障的 Storage、不启动模型/Task/自动重试；拒绝错误来源、伪造授权和失效会话。
+
+✅ 取消已封闭的 round 不再注册清理 Action；退出由既有回复占用清空／UI 生命周期完成，请求身份在 Worker 内同步释放。

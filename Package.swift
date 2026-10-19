@@ -176,6 +176,7 @@ let package = Package(
                 "System/Support/TaskControlModule.swift",
                 "System/SystemActions.swift",
                 "System/TaskActions.swift",
+                "UI/BluetoothStatusActions.swift",
                 "UI/CaptionActions.swift",
                 "UI/ExpressionActions.swift",
                 "UI/FeedbackActions.swift",
@@ -569,8 +570,11 @@ let package = Package(
             sources: ["Agents"],
             resources: [.copy("Resources/Agents"), .copy("Resources/Skills"), .copy("Resources/Catalog.json")]),
         .target(
-            name: "StorageCore", dependencies: [], path: "MobileHarness/Storage/Support",
-            exclude: ["README.md", "Contracts/README.md", "Memory/README.md"]),
+            name: "StorageCore", dependencies: [], path: "MobileHarness/Storage",
+            exclude: [
+                "README.md", "StorageContainer.swift", "State", "Cache", "Files", "Database",
+                "Support/README.md", "Support/Contracts/README.md", "Support/Memory/README.md",
+            ], sources: ["StorageFailure.swift", "Support/Contracts", "Support/Memory"]),
         .target(
             name: "StorageState", dependencies: ["StorageCore"], path: "MobileHarness/Storage/State",
             exclude: ["README.md"]),
@@ -607,7 +611,8 @@ let package = Package(
         .target(
             name: "Storage",
             dependencies: ["StorageCore", "StorageState", "StorageCache", "StorageFiles", "StorageDatabase"],
-            path: "MobileHarness/Storage", exclude: ["README.md", "State", "Cache", "Files", "Database", "Support"],
+            path: "MobileHarness/Storage",
+            exclude: ["README.md", "StorageFailure.swift", "State", "Cache", "Files", "Database", "Support"],
             sources: ["StorageContainer.swift"]),
         .target(
             name: "AppStorage",
@@ -622,7 +627,7 @@ let package = Package(
         .target(
             name: "ModelKit", dependencies: [], path: "MobileHarness/ModelKit",
             exclude: [
-                "README.md", "Language/README.md", "Language/JEV/README.md",
+                "README.md", "ModelContainer.swift", "Language/README.md", "Language/JEV/README.md",
                 "Speech/README.md", "Speech/ASR/README.md", "Speech/TTS/README.md", "Speech/VAD/README.md",
                 "Language/LLM/Gemma4", "Language/LLM/OpenAI", "Language/LLM/README.md", "Support/Backends",
                 "Support/README.md", "Support/Speech",
@@ -644,20 +649,25 @@ let package = Package(
                 "ModelKitMossNano", "ModelKitGemma4", "ModelKitYOLOPose", "ModelKitOpenAI", "ModelKitAppleSpeech",
                 "ModelKitEnergy",
             ],
-            path: "MobileHarness/ModelKit/Support/Management",
+            path: "MobileHarness/ModelKit",
             exclude: [
-                "README.md", "HuggingFace", "ModelManager.swift", "ModelRegistration.swift",
-                "ModelArtifactContracts.swift", "ModelArtifactStore.swift", "ArtifactDownloadTransport.swift",
+                "README.md", "ModelFailure.swift", "Language", "Speech", "Vision",
+                "Support/README.md", "Support/Core", "Support/Backends", "Support/Speech",
+                "Support/Management/README.md", "Support/Management/HuggingFace",
+                "Support/Management/ModelManager.swift", "Support/Management/ModelRegistration.swift",
+                "Support/Management/ModelArtifactContracts.swift", "Support/Management/ModelArtifactStore.swift",
+                "Support/Management/ArtifactDownloadTransport.swift",
             ],
             sources: [
-                "ModelContainer.swift", "ChatDefaults.swift", "SpeechDefaults.swift", "VisionDefaults.swift",
-                "SpeechProviderSelection.swift",
+                "ModelContainer.swift", "Support/Management/ChatDefaults.swift",
+                "Support/Management/SpeechDefaults.swift",
+                "Support/Management/VisionDefaults.swift", "Support/Management/SpeechProviderSelection.swift",
             ]),
         .target(
             name: "ModelKitRuntime", dependencies: ["ModelKit"],
             path: "MobileHarness/ModelKit/Support/Management",
             exclude: [
-                "README.md", "HuggingFace", "ModelContainer.swift", "ChatDefaults.swift", "SpeechDefaults.swift",
+                "README.md", "HuggingFace", "ChatDefaults.swift", "SpeechDefaults.swift",
                 "VisionDefaults.swift", "SpeechProviderSelection.swift",
             ],
             sources: [
@@ -671,7 +681,8 @@ let package = Package(
         .target(
             name: "ModelKitAppleSpeech", dependencies: ["ModelKit"], path: "MobileHarness/ModelKit",
             exclude: [
-                "README.md", "Language", "Vision", "Support/README.md", "Support/Core", "Support/Backends",
+                "README.md", "ModelContainer.swift", "ModelFailure.swift", "Language", "Vision", "Support/README.md",
+                "Support/Core", "Support/Backends",
                 "Support/Management", "Support/Speech/README.md", "Support/Speech/Apple/README.md", "Speech/README.md",
                 "Speech/ASR/README.md", "Speech/TTS/README.md", "Speech/ASR/Apple/README.md",
                 "Speech/TTS/Apple/README.md", "Speech/ASR/SpeechRecognitionCapability.swift",

@@ -1,5 +1,11 @@
 # Shared Agent Components
 
+✅ 按压预备只计算提示音并准备触觉，不停止诊断设备；真实 startVoice 独占执行 beforeVoiceStart，并只加入一次已有清理／回复取消任务。保留跨异步边界的会话校验、首 PCM 和反馈完成语义。唤醒诊断仅保留 Wake.Activation 总区间。
+
+✅ VoiceSessionCoordinator 只转发已授权的大模型请求等待呈现，业务等待由 Chat Worker 拥有，不由页面或录音阶段推断。
+
+✅ AgentApplicationUI 移除模型准备手动取消接线，重试端口只在 failed 接纳；导航／配置刷新和业务生命周期保持。
+
 ✅ ApplicationFeatures／InteractionServices 注入模型的语言、语音、视觉、制品窄接口及内存压力回调，不再创建或获取进程管理器。语音配置错误仍执行 endSettingsChange，根模型暂停／关闭由 App 生命周期负责。
 
 ✅ 已实现：ApplicationFeatures 以 foreground && navigation.path.isEmpty 更新相机准入，AgentApplicationUI 在路径变化时同步；不改相机开启意图，不把导航当场景后台。历史 prepare 只检查取消并取得运行时，不调用 beginSettingsChange/endSettingsChange，真正设置变更保留现有屏障。
@@ -116,7 +122,6 @@ VoiceSessionCoordinator 只保留语音输入、同意/占用屏障、角色及�
 
 启动和停止由公开方法显式完成。前后台异步切换由通用 AppLifecycle 单 worker 调度，不再累积逐次 scene task 链；原生失效接口同步执行。根观察、准备、设备输入和业务操作都由模块持有，不由页面拥有。
 
-
 ✅ 根 UI 对生命周期自身的正常暂停取消不记录启动失败；真正业务/清理错误继续保留。App 只调度公开生命周期接口，UI 模块仍不依赖 AppLifecycle。
 
 ✅ ApplicationFeatures 持有 Sendable 的 repositories 领域仓库提供器。运行时获取仓库，未启动/关闭错误原样传播；不依赖具体后端，不接管存储生命周期。
@@ -138,7 +143,6 @@ VoiceSessionCoordinator 只保留语音输入、同意/占用屏障、角色及�
 ✅ VoiceSessionCoordinator 的取消回复绑定到保留会话的 interruptSession；设置导航不调用 stopVoice，页面可见性不控制根相机。原生后台仍立即停止采集/播放并加入清理，Assistant 内存由根持有。
 
 ✅ VoiceSessionCoordinator.swift 中的跨平台 VoiceReplyCancellation 顺序加入 cancelReply、waitForPlaybackStop、cleanupAudio；协调器持有唯一 replyCancellationTask 并在重启／关闭前加入。cancelReply 必须加入已接纳的执行取消，即使返回错误也继续等待原生停止并回收音频，最后传播原错误。stopVoice 同步使原生播放失效，不等待模型停声；会话句柄与取消终态只在播放清理完成后回收。此顺序器不创建任务或队列，不过滤 Storage 的真实错误。
-
 
 ## 分类异常诊断
 
@@ -194,20 +198,15 @@ ActionActivityWorkflow.shutdown 显式取消并加入执行、任务、角色及
 
 ✅ ActionActivityWorkflow 的显式 shutdown 同时取消并加入运行、任务、角色和异常观察；Agent 服务停止时调用，避免 UI 根关闭后仍由旧轮询持有状态。
 
-
 ✅ ApplicationFeatures 为相机点击工作流注入同根 CameraPresenting，避免消费者持有可变 CameraState；其页面状态仍来自 UI 根。
-
 
 ✅ 麦克风频谱计算 await PlatformKit 的离主线程入口；每个捕获消费者最多一个在途计算，返回后重新校验 voice generation、capture epoch、处理轮次及 UI 凭证。取消仍由 captureTask 拥有并加入，不增加 PCM 队列。
 
-
 ✅ 音频检测将实际 AudioIOError.interrupted 映射为已有系统中断提示；路由设备事实不冒充 Error。
-
 
 ## 播放启动隔离
 
 ✅ 将输出 AVAudioEngine/AVAudioPlayerNode 的连接、启动、PCM 提交和停止移至 PlatformKit 私有串行 actor；AppleAudioIO 保留主线程业务接纳和真实完成等待，以 token 围栏防止旧取消停止新播放。最多三个已调度缓冲、一个串行提交；停止同步关闭接纳并在拥有的清理任务中加入原生停止，根 stop 和下一次播放加入清理。不在 UI boot 激活音频设备。
-
 
 ✅ isolatedPresentation 仅为真实聊天及语音诊断选择隔离展示；普通运行继续按同一 UI 根装配，不提供视觉模拟启动分支。
 
@@ -220,3 +219,7 @@ ActionActivityWorkflow.shutdown 显式取消并加入执行、任务、角色及
 ✅ 已实现：AgentApplicationUI只转交App的准备控制／导航可见性／活动变更通知，状态来自注入同根home；模型配置应用后通知宿主重检，不在Bindings持有准备worker。UI触发聆听增加准备状态校验，不影响已运行会话的停止。
 
 ✅ 已实现：RuntimePresentation注入同根home／devices蓝牙呈现端口；既有环境事实源继续经Gateway发布，不另建连接所有者或Toast策略。
+
+✅ ApplicationFeatures.reportModelPreparation通过已有根级环境事实pump报告模型准备状态；不创建页面任务、不直接呈现眼睛。
+
+✅ 等待表情 Action 标记为内部呈现，默认不显示成功执行摘要，失败仍保留。

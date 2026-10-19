@@ -429,3 +429,49 @@ private struct UnavailableChat: ChatCapability {
     _ = try await manager.get(id, as: .chat)
     await manager.shutdown()
 }
+
+private actor LoadingReportLog {
+    var values: [Bool] = []
+    func append(_ value: Bool) { values.append(value) }
+}
+private struct NoResourcePreparationChat: ChatCapability {
+    let availability: CapabilityAvailability = .available
+    func chat(_ request: ChatRequest) async throws -> InferenceSession<ChatEvent> {
+        throw CapabilityError.unavailable("Not used by preparation tests")
+    }
+}
+private enum PreparationLoadError: Error { case failed }
+
+@Test func modelLoadingReportsOnlyColdResourceWorkAndAlwaysEndsOnFailure() async throws {
+    let counter = LoadCounter()
+    let manager = try await registeredManager(counter)
+    let reports = LoadingReportLog()
+    let id = ModelID("model")
+    try await manager.warmup(id, reportLoading: { await reports.append($0) })
+    #expect(await reports.values == [true, false])
+    try await manager.warmup(id, reportLoading: { await reports.append($0) })
+    #expect(await reports.values == [true, false])
+    #expect(await counter.loads == 1)
+    let unmanaged = ModelID("unmanaged")
+    try await manager.register(
+        ModelRegistration(id: unmanaged, capabilities: [.chat]) { _ in
+            ProvidedCapabilities(chat: NoResourcePreparationChat())
+        })
+    try await manager.warmup(unmanaged, reportLoading: { await reports.append($0) })
+    #expect(try await manager.status(unmanaged) == .unmanaged)
+    #expect(await reports.values == [true, false])
+    let failed = ModelID("failed")
+    try await manager.register(
+        ModelRegistration(id: failed, capabilities: [.chat]) { context in
+            ProvidedCapabilities(
+                chat: ManagedChat(
+                    try context.resource { () async throws -> Int in
+                        throw PreparationLoadError.failed
+                    }))
+        })
+    await #expect(throws: PreparationLoadError.failed) {
+        try await manager.warmup(failed, reportLoading: { await reports.append($0) })
+    }
+    #expect(await reports.values == [true, false, true, false])
+    await manager.shutdown()
+}

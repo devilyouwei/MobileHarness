@@ -1,5 +1,7 @@
 # Generic Application Lifecycle
 
+✅ ForegroundPreparation 移除手动 cancel／cancelled 状态，保留失活／配置替换／stop 的取消与加入；内部 notReady 验证失败通过注入的 onValidationFailure 上报原始值，具体模型错误仍由模型能力拥有者报告。
+
 ✅ ApplicationLifecycle 持有一个有界 suspensionPending 锁存位。running 中每次失活先同步 invalidate，并要求 worker 在最新 active 前执行完整逆序 foreground(false)；false 遍历不被版本变化截断，只有过期的 true 遍历可抢占。最新前台状态继续合并，无事件队列；初始 inactive 等待和 startup 回滚规则不变。
 
 ## 职责与编译边界
@@ -38,8 +40,12 @@ ManagedService 声明 id、dependencies、start、同步 invalidate、异步 for
 
 ✅ 模型制品适配器由 App 注入 Files；后台回调复用同一制品服务。制品绑定停止时关闭接纳、取消并加入下载并保留清理错误，释放配置后允许在新 Files 作用域重新绑定，不停止无关模型实例。App 只转交接口与调度启停。
 
-✅ 已实现：同文件ForegroundPreparation是Foundation独立的宿主准备任务所有者，注入readiness步骤、允许准备条件及状态投影。一个worker和一个待重检锁存位，无队列；代际围栏拒绝迟到结果，取消／失活后必须等旧worker退出才允许替代，stop幂等加入并释放回调。运行中会话只检查，不发出竞争预热，交互结束刷新。
+✅ 已实现：同文件ForegroundPreparation是Foundation独立的宿主准备任务所有者，注入readiness步骤、允许准备条件及状态投影。一个worker和一个待重检锁存位，无队列；代际围栏拒绝迟到结果，失活／配置替换后必须等旧worker退出才允许替代，stop幂等加入并释放回调。运行中会话只检查，不发出竞争预热，交互结束刷新。
 
 ✅ 已实现：所有准备步骤完成后再统一复查一次状态；若加载后续模型导致前面能力被回收，明确失败而非自动反复加载或错误放行。
 
-取消首先关闭本次结果接纳，不承诺系统原生加载立即停止；旧worker必须实际退出后才启动替代。界面可进入设置或提交一次重试，stop仍等待真实完成，不伪造停机。
+取消首先关闭本次结果接纳，不承诺系统原生加载立即停止；旧worker必须实际退出后才启动替代。界面保留设置入口，仅失败后可提交一次重试，stop仍等待真实完成，不伪造停机。
+
+✅ 已实现：实际 prepare 返回后先投影 checking 再复查，就绪检查不再属于模型加载展示区间。
+
+✅ 已实现：Step.prepare 接受加载事实回调，worker 只在当前代际回调 true 时投影 preparing，false 立即 checking；普通检查和准备调用入口不发布加载。

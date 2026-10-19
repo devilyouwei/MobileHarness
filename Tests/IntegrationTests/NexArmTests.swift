@@ -273,7 +273,7 @@ private actor NexArmBaseFixture: NexArmWritableLink {
 
 struct NexArmAssistantUIModule: ActionModule {
     var definitions: [ActionBinding] {
-        ["express", "setExpression", "beginReplyTurn", "print"].map {
+        ["express", "setExpression", "setReplyWaiting", "beginReplyTurn", "print"].map {
             ActionBinding(
                 path: ActionPath(
                     domain: "UI", module: ["beginReplyTurn", "print"].contains($0) ? "Caption" : "Expression",

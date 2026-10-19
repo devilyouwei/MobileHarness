@@ -1,5 +1,7 @@
 # Speech Support — 播放、聆听能力与目录绑定
 
+✅ VoiceNativeEffects.prepareCue 唯一负责 PCM 生成及单份私有缓存，播放和按压预备共用；取消后不写入缓存。保留播放前后 scope 校验、原生播放完成和触觉 gate。SpeechTypes.swift 定义 SpeechActionError。
+
 ## 简介
 
 定义两个异步能力端口、聆听反馈值和 SpeechModule 的函数目录。接口保留真实 invocation，以便宿主核对音频/会话所有权并记录实际子结果。
@@ -32,7 +34,7 @@ flowchart LR
 
 SpeechPlaybackCapability 的 `play(audioID:invocation:)` 接受 ID 与标准输入，端点负责音频取出、原生排空和清理。SpeechListeningCapability 的 `updateListening` 接受 enabled、paused、revision、ListeningFeedback 和 invocation；策略的接纳条件、取消与启动流程由实现者负责。
 
-ListeningFeedback 在 `ListeningFeedback.swift` 中组合已校验的 UI 提示音与触觉请求，不含设备句柄。`SpeechModule.swift` 保存 capability 并绑定 speak/update；前者必需，后者可选。`SpeechTypes.swift` 当前只有 Foundation 导入，没有独立值类型。
+ListeningFeedback 在 `ListeningFeedback.swift` 中组合已校验的 UI 提示音与触觉请求，不含设备句柄。`SpeechModule.swift` 保存 capability 并绑定 speak/update；前者必需，后者可选。`SpeechTypes.swift` 定义 SpeechActionError，区分缺少音频句柄和聆听能力不可用。
 
 两项定义通过 Void handler 返回 completed。如果子工作已向 invocation.results 记录报告，报告由执行层保存；目录本身不把报告重编码成字符串。
 

@@ -35,6 +35,15 @@ public struct BehaviorProtocolBindings {
                 function: function, protocols: [.action], executionPolicy: .direct,
                 directResultPolicy: .returning)
         }
+        if function.path.domain == "UI", function.path.module == "Expression", function.path.function == "setLoading" {
+            return ActionBinding(
+                function: function, protocols: [.tool], executionPolicy: .direct, directResultPolicy: .returning)
+        }
+        if function.path.domain == "UI", function.path.module == "Expression",
+            function.path.function == "setReplyWaiting"
+        {
+            return ActionBinding(function: function, protocols: [.action, .tool], executionPolicy: .direct)
+        }
         let group = function.path.domain + "." + function.path.module
         if group == "UI.Caption", ["print", "beginReplyTurn"].contains(function.path.function) {
             return ActionBinding(function: function, protocols: [.action, .tool], executionPolicy: .direct)

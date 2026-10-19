@@ -1,5 +1,9 @@
 # UI — 呈现与人机交互
 
+✅ home 接纳带身份的大模型等待值，与模型准备独立，二者复用 loading 大小眼；请求等待不阻止停止聆听、不增加文字或取消按钮。
+
+✅ 移除首页准备状态文字和取消端口；准备失败只提供重试按钮。真实加载仅通过独立 expression Action 呈现左右大小眼等待动画，UI 不决定失败 Toast。
+
 ✅ 已实现：常驻首页保留挂载，但应用导航覆盖时由注入的导航通知暂停相机；返回首页按原开启意图恢复。导航保持根聆听，深层 Assistant 历史加载不得停止会话；真正场景失活仍遵循 App 策略。
 
 ## 职责与边界
@@ -49,6 +53,8 @@ flowchart LR
 
 ## 应用根与导航
 
+✅ PersistentHomeNavigation 显式清除 iOS 导航容器背景，目的页面自己绘制不透明背景并随原生转场移动；返回手势揭示下方常驻首页，不再通过路径驱动整个 iOS 导航层透明度。命中与辅助功能仍由路径控制，导航不重建首页或停止聆听，相机继续按首页准入暂停／恢复。
+
 ApplicationRootPorts 定义 UI 自有请求契约。ApplicationRootView 使用 PersistentHomeNavigation，将首页和原生相机／表情树常驻在 NavigationStack 外；导航和图片覆盖保留首页身份及窗口挂载。覆盖只调整命中与辅助功能，离窗仍如实撤销回执。前台页面保持亮屏；场景失活由 App 关闭业务接纳。
 
 设置／历史导航保持根聆听；相机仅在首页且 App 前台时运行，覆盖期间暂停，返回按原开启意图恢复。bootstrap/retry 由注入的生命周期接口执行。保留真实聊天／语音诊断入口，诊断结果不作为生产或硬件验收。
@@ -65,8 +71,16 @@ ApplicationRootPorts 定义 UI 自有请求契约。ApplicationRootView 使用 P
 
 ✅ 字幕已改为单个SwiftUI Text＋TextRenderer，移除双UILabel／富文本覆盖路径；只在有限250ms淡入期间启用本地显示节奏，保留完整文字、320 Character边界、滚动、无障碍与生命周期取消。仅使用原生API，实际性能另测。
 
-✅ 已实现：home提供独立模型准备呈现值及加载眼睛；UI不导入ModelKit或App。根页面连接重试／取消与活动变化通知，设置和已有停止入口可用，不阻塞主线程。
+✅ 已实现：home提供独立模型准备呈现值及加载眼睛；UI不导入ModelKit或App。根页面连接失败重试与活动变化通知，设置和已有停止入口可用，不阻塞主线程。
 
 ✅ 已实现：home／devices各持有UI自有BluetoothConnectionStatus及版本围栏；接纳保留事实更新，后台无需重放Toast。基础库不引入Signal／Actions。
 
 ✅ UI 使用 UIContainerError 及原始渲染错误报告，过期提交以显式 Bool／拒绝计数表达；错误展示值由上层提交，UI 根不决定 Toast／语音／状态机策略。
+
+
+✅ UIFailure与其他基础根采用同形结构，根start／setForeground类型化抛错，渲染失败使用同一报告。逐帧过期／方向校验保留既有领域异常及Bool接纳协议，不自动产生逐帧故障广播；UI不选择错误的业务呈现方式。
+
+
+✅ home.expressions拥有独立加载状态与revision；模型准备中可显示两个加载眼睛，即使聆听关闭。UI不接触模型或Signal；终态／失活／停止同步清理，Action只是提交呈现。
+
+✅ 已实现：首页检查仍保留交互门，但不挂载加载文字层；真实准备仅显示等待眼睛，失败只显示重试按钮。

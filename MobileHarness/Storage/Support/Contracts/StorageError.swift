@@ -6,8 +6,15 @@ public struct StorageFailureReporter: Sendable {
     public init(receive: @escaping @Sendable (String, String, any Error) -> Void = { _, _, _ in }) {
         self.receive = receive
     }
-    public func report(_ component: String, _ operation: String, _ error: any Error) {
-        receive(component, operation, error)
+    @discardableResult public func report(
+        _ component: String, _ operation: String, _ error: any Error,
+        fileID: String = #fileID, function: String = #function, line: UInt = #line
+    ) -> StorageFailure {
+        let failure = StorageFailure(
+            component: component, operation: operation, underlying: error,
+            fileID: fileID, function: function, line: line)
+        receive(failure.component, failure.operation, failure)
+        return failure
     }
 }
 

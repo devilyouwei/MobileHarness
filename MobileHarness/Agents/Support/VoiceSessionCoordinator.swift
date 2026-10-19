@@ -110,6 +110,7 @@ public enum VoiceReplyCancellation {
         private var listeningPause: Task<Void, Never>?
         private var handlingTurn = false
         private let log = Logger(subsystem: "dev.mobileharness", category: "AppLifecycle")
+        private let wakeTiming = OSSignposter(subsystem: "dev.mobileharness", category: .pointsOfInterest)
 
         init(
             runtime: VoiceRuntimeDependencies, state: any ConversationPresenting,
@@ -228,10 +229,9 @@ public enum VoiceReplyCancellation {
             conversationPresentation.beginRecognitionScope()
             presentationPhase = .loading
             state.present(.voiceStatus("正在唤醒…"))
+            let wakeInterval = wakeTiming.beginInterval("Wake.Activation", id: wakeTiming.makeSignpostID())
+            defer { wakeTiming.endInterval("Wake.Activation", wakeInterval) }
             do {
-                await cleanupTask?.value
-                await replyCancellationTask?.value
-                guard voiceGeneration == generation else { throw CancellationError() }
                 let feedbackStart = ListeningFeedbackStart()
                 nativeEffects.feedbackStart = (invocation.context, feedbackStart)
                 defer {
@@ -306,7 +306,9 @@ public enum VoiceReplyCancellation {
             guard voiceGeneration == generation else { throw CancellationError() }
             captureSequence = 0
             handlingTurn = listeningPaused || hasPlaybackBarrier
-            if !handlingTurn { try await microphone.setEnabled(true) }
+            if !handlingTurn {
+                try await microphone.setEnabled(true)
+            }
         }
 
         private func validateFeedback(_ invocation: any FunctionInput) throws {
@@ -467,15 +469,10 @@ public enum VoiceReplyCancellation {
                     }
                 }
                 do {
-                    await beforeVoiceStart()
-                    await cleanupTask?.value
                     try Task.checkCancellation()
                     guard voiceGeneration == nil else { return }
                     let request = try UIActions.CueRequest(cue: .wake, volume: 0.85)
-                    let pcm = try await nativeEffects.prepareCue(request)
-                    try Task.checkCancellation()
-                    guard voiceGeneration == nil else { return }
-                    nativeEffects.preparedCue = (request, pcm)
+                    try await nativeEffects.prepareCue(request)
                 } catch is CancellationError {} catch {
                     state.present(.listeningControlMessage("提示音准备失败：\(error)"))
                     record(state.listeningControlMessage ?? "提示音准备失败")
@@ -819,6 +816,9 @@ public enum VoiceReplyCancellation {
         }
         func finishTranscript(invocation: any FunctionInput) throws {
             try projection.finishTranscript(invocation: invocation)
+        }
+        func setReplyWaiting(_ enabled: Bool, requestID: String, invocation: any FunctionInput) throws {
+            try projection.setReplyWaiting(enabled, requestID: requestID, invocation: invocation)
         }
         func beginReplyTurn(invocation: any FunctionInput) throws {
             try projection.beginReplyTurn(invocation: invocation)

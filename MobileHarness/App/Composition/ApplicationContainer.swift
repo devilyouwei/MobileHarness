@@ -29,11 +29,27 @@ public final class ApplicationContainer: ManagedContainer, @unchecked Sendable {
         self.uiConfiguration = uiConfiguration
         self.modelArtifacts = modelArtifacts
     }
+    /// Structural projection only. Each independent SDK retains its own Failure definition.
+    public nonisolated static func failureDetails(_ error: any Error) -> ContainerFailureDetails? {
+        switch error {
+        case let failure as StorageFailure:
+            return ContainerFailureDetails(code: failure.code.rawValue, isCancellation: failure.isCancellation)
+        case let failure as PlatformFailure:
+            return ContainerFailureDetails(code: failure.code.rawValue, isCancellation: failure.isCancellation)
+        case let failure as ModelFailure:
+            return ContainerFailureDetails(code: failure.code.rawValue, isCancellation: failure.isCancellation)
+        case let failure as UIFailure:
+            return ContainerFailureDetails(code: failure.code.rawValue, isCancellation: failure.isCancellation)
+        default: return nil
+        }
+    }
     public var containerFailures: Factory<ContainerFailureChannel> { self { ContainerFailureChannel() }.cached }
     @MainActor public var ui: Factory<UIContainer> {
         self {
             MainActor.assumeIsolated {
-                UIContainer(configuration: self.uiConfiguration, onFailure: self.containerFailures().sink(module: "ui"))
+                UIContainer(
+                    configuration: self.uiConfiguration,
+                    onFailure: self.containerFailures().sink(module: "ui", details: Self.failureDetails))
             }
         }.cached
     }
@@ -70,7 +86,12 @@ public final class ApplicationContainer: ManagedContainer, @unchecked Sendable {
                         try await configure(files)
                     },
                     onFailure: self.containerFailures().sink(
-                        module: "model", shouldPublish: { !($0 is InferenceAdmissionError) }))
+                        module: "model",
+                        shouldPublish: {
+                            guard let failure = $0 as? ModelFailure else { return !($0 is InferenceAdmissionError) }
+                            return failure.code == .cleanupFailed || !failure.cleanupErrors.isEmpty
+                                || !(failure.underlying is InferenceAdmissionError)
+                        }, details: Self.failureDetails))
             }
         }.cached
     }
@@ -88,7 +109,10 @@ public final class ApplicationContainer: ManagedContainer, @unchecked Sendable {
     }
     @MainActor public var platform: Factory<PlatformContainer> {
         self {
-            MainActor.assumeIsolated { PlatformContainer(onFailure: self.containerFailures().sink(module: "platform")) }
+            MainActor.assumeIsolated {
+                PlatformContainer(
+                    onFailure: self.containerFailures().sink(module: "platform", details: Self.failureDetails))
+            }
         }.cached
     }
     @MainActor public var audio: Factory<AudioContainer> { self { MainActor.assumeIsolated { self.platform().audio } } }
@@ -100,7 +124,8 @@ public final class ApplicationContainer: ManagedContainer, @unchecked Sendable {
     }
     public var storage: Factory<StorageContainer> {
         self {
-            let failures = StorageFailureReporter(receive: self.containerFailures().sink(module: "storage"))
+            let failures = StorageFailureReporter(
+                receive: self.containerFailures().sink(module: "storage", details: Self.failureDetails))
             let files = FilesContainer(
                 settings: self.root.appendingPathComponent("Settings", isDirectory: true),
                 photos: self.root.appendingPathComponent("CapturedPhotos", isDirectory: true),

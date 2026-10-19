@@ -361,10 +361,11 @@ func homePreparationSkipsReadyAndSeriallyPreparesColdSteps() async {
                     isReady: {
                         events.append("check.warm")
                         return true
-                    }, prepare: { Issue.record("Already ready") }),
+                    }, prepare: { _ in Issue.record("Already ready") }),
                 .init(
                     id: "cold", isReady: { loaded },
-                    prepare: {
+                    prepare: { loading in
+                        loading(true)
                         events.append("prepare.cold")
                         loaded = true
                     }),
@@ -373,7 +374,7 @@ func homePreparationSkipsReadyAndSeriallyPreparesColdSteps() async {
                     isReady: {
                         events.append("check.last")
                         return true
-                    }, prepare: { Issue.record("Already ready") }),
+                    }, prepare: { _ in Issue.record("Already ready") }),
             ]
         }, canPrepare: { true }, project: { if $0 == .ready { ready.continuation.yield(()) } })
     workflow.setActive(true)
@@ -386,7 +387,7 @@ func homePreparationSkipsReadyAndSeriallyPreparesColdSteps() async {
 }
 
 @Test(.timeLimit(.minutes(1))) @MainActor
-func homePreparationCancellationFencesLateSuccessAndJoinsBeforeReplacement() async {
+func homePreparationDeactivationFencesLateSuccessAndJoinsBeforeReplacement() async {
     let entered = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingOldest(1))
     let release = PreparationTestLatch()
     let ready = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingOldest(1))
@@ -398,7 +399,8 @@ func homePreparationCancellationFencesLateSuccessAndJoinsBeforeReplacement() asy
             [
                 .init(
                     id: "cold", isReady: { loaded },
-                    prepare: {
+                    prepare: { loading in
+                        loading(true)
                         attempts += 1
                         entered.continuation.yield(())
                         await release.wait()
@@ -414,9 +416,8 @@ func homePreparationCancellationFencesLateSuccessAndJoinsBeforeReplacement() asy
         })
     workflow.setActive(true)
     for await _ in entered.stream { break }
-    workflow.cancel()
-    #expect(workflow.state == .cancelled)
     workflow.setActive(false)
+    #expect(workflow.state == .inactive)
     workflow.setActive(true)
     #expect(attempts == 1 && readyCount == 0)
     release.open()
@@ -441,13 +442,15 @@ func homePreparationDefersColdWorkDuringAnActiveSessionAndRetriesFailure() async
             [
                 .init(
                     id: "cold", isReady: { loaded },
-                    prepare: {
+                    prepare: { loading in
+                        loading(true)
                         attempts += 1
                         if fail { throw LifecycleTestFailure.start }
                         loaded = true
                     })
             ]
-        }, canPrepare: { !busy }, project: { updates.continuation.yield($0) })
+        }, canPrepare: { !busy }, project: { updates.continuation.yield($0) },
+        onValidationFailure: { _, _ in Issue.record("Provider errors must retain their owning failure channel") })
     workflow.setActive(true)
     for await state in updates.stream { if state == .deferred { break } }
     #expect(attempts == 0)
@@ -478,7 +481,8 @@ func homePreparationStopWaitsForNonCancellableNativePreparation() async {
             [
                 .init(
                     id: "native", isReady: { false },
-                    prepare: {
+                    prepare: { loading in
+                        loading(true)
                         entered.continuation.yield(())
                         await release.wait()
                     })
@@ -504,13 +508,20 @@ func homePreparationDoesNotClaimReadyWhenALaterLoadEvictsEarlierResources() asyn
     var secondLoaded = false
     let failed = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingOldest(1))
     var ready = false
+    var failures: [(String, ForegroundPreparation.ValidationError)] = []
     let workflow = ForegroundPreparation(
         steps: {
             [
-                .init(id: "first", isReady: { firstLoaded }, prepare: { firstLoaded = true }),
+                .init(
+                    id: "first", isReady: { firstLoaded },
+                    prepare: { loading in
+                        loading(true)
+                        firstLoaded = true
+                    }),
                 .init(
                     id: "second", isReady: { secondLoaded },
-                    prepare: {
+                    prepare: { loading in
+                        loading(true)
                         secondLoaded = true
                         firstLoaded = false
                     }),
@@ -522,10 +533,11 @@ func homePreparationDoesNotClaimReadyWhenALaterLoadEvictsEarlierResources() asyn
                 #expect(component == "first")
                 failed.continuation.yield(())
             }
-        })
+        }, onValidationFailure: { component, error in failures.append((component, error)) })
     workflow.setActive(true)
     for await _ in failed.stream { break }
     #expect(!ready && !firstLoaded && secondLoaded)
+    #expect(failures.count == 1 && failures.first?.0 == "first" && failures.first?.1 == .notReady)
     await workflow.stop()
 }
 
@@ -543,7 +555,8 @@ func homePreparationConfigurationChangesCoalesceAndCannotPublishAnOldReadyResult
             [
                 .init(
                     id: "selected", isReady: { loadedSelection == selection },
-                    prepare: {
+                    prepare: { loading in
+                        loading(true)
                         let selected = selection
                         attempts += 1
                         entered.continuation.yield(())
@@ -566,5 +579,74 @@ func homePreparationConfigurationChangesCoalesceAndCannotPublishAnOldReadyResult
     release.open()
     for await _ in finished.stream { break }
     #expect(attempts == 2 && readyCount == 1 && loadedSelection == 1)
+    await workflow.stop()
+}
+
+@Test(.timeLimit(.minutes(1))) @MainActor
+func homePreparationSeparatesLoadingFromChecksAndWarmReentry() async {
+    var loaded = false
+    var states: [ForegroundPreparation.State] = []
+    let ready = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingOldest(1))
+    let workflow = ForegroundPreparation(
+        steps: {
+            [
+                .init(
+                    id: "language",
+                    isReady: {
+                        #expect(states.last == .checking)
+                        return loaded
+                    },
+                    prepare: { loading in
+                        loading(true)
+                        #expect(states.last == .preparing("language"))
+                        loaded = true
+                    })
+            ]
+        }, canPrepare: { true },
+        project: {
+            states.append($0)
+            if $0 == .ready { ready.continuation.yield(()) }
+        })
+    workflow.setActive(true)
+    for await _ in ready.stream { break }
+    #expect(states.contains(.preparing("language")))
+    for _ in 0..<2 {
+        workflow.setActive(false)
+        states.removeAll()
+        workflow.setActive(true)
+        for await _ in ready.stream { break }
+        #expect(states == [.checking, .ready])
+    }
+    await workflow.stop()
+}
+
+@Test(.timeLimit(.minutes(1))) @MainActor
+func homePreparationDoesNotShowLoadingForObjectAssemblyAndFencesLateReports() async {
+    var loaded = false
+    var states: [ForegroundPreparation.State] = []
+    var lateReport: ForegroundPreparation.LoadingReport?
+    let ready = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingOldest(1))
+    let workflow = ForegroundPreparation(
+        steps: {
+            [
+                .init(
+                    id: "unmanaged", isReady: { loaded },
+                    prepare: { report in
+                        #expect(states.last == .checking)
+                        lateReport = report
+                        loaded = true
+                    })
+            ]
+        }, canPrepare: { true },
+        project: {
+            states.append($0)
+            if $0 == .ready { ready.continuation.yield(()) }
+        })
+    workflow.setActive(true)
+    for await _ in ready.stream { break }
+    #expect(!states.contains(.preparing("unmanaged")))
+    workflow.setActive(false)
+    lateReport?(true)
+    #expect(workflow.state == .inactive)
     await workflow.stop()
 }

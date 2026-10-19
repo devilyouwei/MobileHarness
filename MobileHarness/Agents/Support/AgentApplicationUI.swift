@@ -12,12 +12,13 @@
         private let home: UIHomeContainer
         public var onHomeVisibilityChanged: (@MainActor (Bool) -> Void)?
         public var onPreparationRequested: (@MainActor () -> Void)?
-        public var onPreparationCancelled: (@MainActor () -> Void)?
         public var onInteractionActivityChanged: (@MainActor () -> Void)?
         public var preparesHomeModels: Bool { !features.isolatedPresentation }
         public var homePreparation: HomeModelPreparation { home.conversation.modelPreparation }
-        public func retryHomePreparation() { onPreparationRequested?() }
-        public func cancelHomePreparation() { onPreparationCancelled?() }
+        public func retryHomePreparation() {
+            guard homePreparation.showsRetry else { return }
+            onPreparationRequested?()
+        }
         public func interactionActivityChanged() { onInteractionActivityChanged?() }
         public func modelRequirementsChanged() { onPreparationRequested?() }
         public var bootstrap: (@MainActor () async throws -> Void)?

@@ -69,6 +69,7 @@ public struct ApplicationControlContextBuilder: ContextBuilder {
 
 /// Code-owned permissions, independent of model-callable JSON catalogs.
 enum ApplicationControlFunctions {
+    static let loadingExpression = InternalTool(path: "UI.Expression.setLoading", required: ["enabled", "revision"])
     static let bluetoothHome = InternalTool(
         path: "UI.BluetoothStatus.showBluetoothHome", required: ["phase", "revision"])
     static let bluetoothSettings = InternalTool(

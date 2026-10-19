@@ -25,7 +25,6 @@ import Foundation
         private let gradient = CAGradientLayer()
         private let barMask = CAShapeLayer()
         private let glow = CAShapeLayer()
-        private let rim = CAShapeLayer()
         private var reply = false
         private var bands: [Float] = []
         private var active = false
@@ -40,11 +39,10 @@ import Foundation
             backgroundColor = .clear
             layer.addSublayer(glow)
             layer.addSublayer(gradient)
-            layer.addSublayer(rim)
             gradient.mask = barMask
             gradient.startPoint = CGPoint(x: 0, y: 0)
             gradient.endPoint = CGPoint(x: 0, y: 1)
-            for shape in [barMask, glow, rim] {
+            for shape in [barMask, glow] {
                 shape.fillColor = nil
                 shape.lineCap = .round
             }
@@ -54,11 +52,7 @@ import Foundation
             glow.shadowOpacity = 0.45
             glow.lineWidth = 4
             glow.opacity = 0.45
-            rim.shadowOffset = .zero
-            rim.shadowRadius = 2
-            rim.shadowOpacity = 0.22
-            rim.lineWidth = 2
-            rim.opacity = 0.22
+
         }
         required init?(coder: NSCoder) { nil }
         func update(reply: Bool, bands: [Float], active: Bool, reduceMotion: Bool) {
@@ -79,7 +73,10 @@ import Foundation
         }
         override func didMoveToWindow() {
             super.didMoveToWindow()
-            if window == nil { for shape in [barMask, glow, rim] { shape.removeAllAnimations() } }
+            if window == nil { stopAnimations() }
+        }
+        func stopAnimations() {
+            for shape in [barMask, glow] { shape.removeAllAnimations() }
         }
         private func drawBars(animated: Bool) {
             guard bounds.width > 0, bounds.height > 0 else { return }
@@ -91,7 +88,7 @@ import Foundation
             let path = VoiceSpectrumGeometry.bars(
                 size: bounds.size, bands: bands, reply: reply, active: active, reduceMotion: reduceMotion)
             let shadow = path.copy(strokingWithWidth: 4, lineCap: .round, lineJoin: .round, miterLimit: 0)
-            let moving = animated && !reduceMotion && window != nil
+            let moving = animated && active && !reduceMotion && window != nil
             let previousMask = barMask.presentation()?.path ?? barMask.path
             let previousGlow = glow.presentation()?.path ?? glow.path
             let previousShadow = glow.presentation()?.shadowPath ?? glow.shadowPath
@@ -101,7 +98,6 @@ import Foundation
                 gradient.frame = bounds
                 barMask.frame = bounds
                 glow.frame = bounds
-                rim.frame = bounds
             }
             if styleChanged {
                 gradient.colors =
@@ -115,16 +111,12 @@ import Foundation
                 glow.strokeColor = color.cgColor
                 glow.shadowColor = color.cgColor
                 barMask.lineWidth = reply ? 2 : 3
-                rim.strokeColor = color.cgColor
-                rim.shadowColor = color.cgColor
+                barMask.lineCap = reply ? .butt : .round
+                glow.lineCap = reply ? .butt : .round
             }
             barMask.path = path
             glow.path = path
             glow.shadowPath = shadow
-            if sizeChanged || styleChanged {
-                rim.path = reply ? VoiceSpectrumGeometry.rim(size: bounds.size) : nil
-                rim.shadowPath = rim.path?.copy(strokingWithWidth: 2, lineCap: .round, lineJoin: .round, miterLimit: 0)
-            }
             if renderedActive != active {
                 layer.opacity = active ? 0.95 : 0.15
                 renderedActive = active
@@ -153,34 +145,6 @@ import Foundation
 
 /// Fixed path topology permits native interpolation without a display timer.
 struct VoiceSpectrumGeometry {
-    static func bowl(_ fraction: CGFloat, size: CGSize) -> (CGPoint, CGVector) {
-        let radius: CGFloat = 19
-        let halfStraight: CGFloat = 44
-        let angle: CGFloat = .pi * 0.38
-        let arc = radius * angle
-        let distance = fraction * (2 * arc + 2 * halfStraight)
-        let theta: CGFloat
-        let x: CGFloat
-        if distance < arc {
-            theta = .pi / 2 + angle - distance / radius
-            x = size.width / 2 - halfStraight
-        } else if distance > arc + 2 * halfStraight {
-            theta = .pi / 2 - (distance - arc - 2 * halfStraight) / radius
-            x = size.width / 2 + halfStraight
-        } else {
-            return (CGPoint(x: size.width / 2 - halfStraight + distance - arc, y: 24), CGVector(dx: 0, dy: 1))
-        }
-        let normal = CGVector(dx: cos(theta), dy: sin(theta))
-        return (CGPoint(x: x + radius * normal.dx, y: 5 + radius * normal.dy), normal)
-    }
-    static func rim(size: CGSize) -> CGPath {
-        let path = CGMutablePath()
-        for index in 0...64 {
-            let point = bowl(CGFloat(index) / 64, size: size).0
-            if index == 0 { path.move(to: point) } else { path.addLine(to: point) }
-        }
-        return path
-    }
     static func bars(size: CGSize, bands: [Float], reply: Bool, active: Bool, reduceMotion: Bool) -> CGPath {
         let path = CGMutablePath()
         guard size.width.isFinite, size.height.isFinite, size.width > 0, size.height > 0 else { return path }
@@ -189,11 +153,11 @@ struct VoiceSpectrumGeometry {
             let energy = active ? (reduceMotion ? 0.08 : min(1, max(0, measured))) : 0
             let fraction = (CGFloat(index) + 0.5) / 32
             if reply {
-                let (root, normal) = bowl(fraction, size: size)
-                let taper = 0.55 + 0.45 * min(1, min(fraction, 1 - fraction) / 0.18)
-                let length = (2 + energy * 30) * taper
-                path.move(to: CGPoint(x: root.x - normal.dx, y: root.y - normal.dy))
-                path.addLine(to: CGPoint(x: root.x + normal.dx * length, y: root.y + normal.dy * length))
+                // Include both edges with 2pt-wide strokes; every root lies on the same bottom edge.
+                let x = 1 + CGFloat(index) / 31 * max(0, size.width - 2)
+                let length = min(size.height, 2 + energy * min(30, max(0, size.height - 2)))
+                path.move(to: CGPoint(x: x, y: 0))
+                path.addLine(to: CGPoint(x: x, y: length))
             } else {
                 let x = fraction * size.width
                 let height = 2 + energy * max(0, size.height - 4)

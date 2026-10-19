@@ -1,5 +1,7 @@
 # Speech — 播放与聆听策略函数
 
+✅ 原生提示音预备与播放共用 ActionBindings 的单份私有 PCM 缓存；Speech 函数继续只转发配置和真实 invocation，不接管设备或聆听策略。
+
 ## 简介
 
 提供 `Speech.Playback.speak` 与 `Speech.Listening.update`。前者播放已有音频句柄，后者传递可信聆听策略和启动反馈配置；本域不生成语音、不持有音频流，也不选择聆听策略。

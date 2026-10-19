@@ -5,10 +5,6 @@ import StorageDatabase
 import StorageFiles
 import StorageState
 
-public struct StorageLifecycleFailure: Error, Sendable {
-    public let primary: any Error
-    public let cleanup: [any Error]
-}
 /// Owns the storage graph. Backend selection and application ordering remain in App.
 public actor StorageContainer {
     public nonisolated let state: StateContainer
@@ -26,7 +22,7 @@ public actor StorageContainer {
         state = StateContainer(failures: failures)
         cache = CacheContainer(failures: failures)
     }
-    public func start() async throws {
+    public func start() async throws(StorageFailure) {
         do {
             guard !closed else { throw StorageError.closed }
             let task: Task<Void, any Error>
@@ -47,7 +43,8 @@ public actor StorageContainer {
                         var cleanup: [any Error] = []
                         do { try await database.stop() } catch { cleanup.append(error) }
                         if cleanup.isEmpty { throw primary }
-                        throw StorageLifecycleFailure(primary: primary, cleanup: cleanup)
+                        throw StorageFailure(
+                            component: "root", operation: "start", underlying: primary, cleanupErrors: cleanup)
                     }
                 }
                 startup = task
@@ -61,17 +58,17 @@ public actor StorageContainer {
                 }
             } catch is CancellationError {
                 do { try await stop() } catch {
-                    throw StorageLifecycleFailure(primary: CancellationError(), cleanup: [error])
+                    throw StorageFailure(
+                        component: "root", operation: "start", underlying: CancellationError(), cleanupErrors: [error])
                 }
                 throw CancellationError()
             }
         } catch {
-            failures.report("root", "start", error)
-            throw error
+            throw failures.report("root", "start", error)
         }
     }
 
-    public func stop() async throws {
+    public func stop() async throws(StorageFailure) {
         do {
             if let shutdown { return try await shutdown.value }
             closed = true
@@ -87,18 +84,19 @@ public actor StorageContainer {
                 _ = await (closingCache, closingFiles)
                 var errors: [any Error] = []
                 do { try await closingDatabase.value } catch { errors.append(error) }
-                if case .failure(let failure as StorageLifecycleFailure) = result {
-                    errors.append(contentsOf: failure.cleanup)
+                if case .failure(let failure as StorageFailure) = result {
+                    errors.append(contentsOf: failure.cleanupErrors)
                 }
                 if let primary = errors.first {
-                    throw StorageLifecycleFailure(primary: primary, cleanup: Array(errors.dropFirst()))
+                    throw StorageFailure(
+                        component: "root", operation: "stop", underlying: primary,
+                        cleanupErrors: Array(errors.dropFirst()))
                 }
             }
             shutdown = task
             try await task.value
         } catch {
-            failures.report("root", "stop", error)
-            throw error
+            throw failures.report("root", "stop", error)
         }
     }
 }

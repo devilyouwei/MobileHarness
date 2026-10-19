@@ -60,11 +60,11 @@ private actor WakeProbe: UIFeedbackCapability {
         events.append("recording")
     }
 }
-private func wakeInput() -> FunctionInvocation {
+private func wakeInput(sessionID: String = UUID().uuidString) -> FunctionInvocation {
     FunctionInvocation(
         call: .init(actionPath: .init(domain: "Speech", module: "Listening", function: "update")),
         context: .init(
-            source: "speechPerception", sessionID: UUID().uuidString, inputID: UUID().uuidString,
+            source: "speechPerception", sessionID: sessionID, inputID: UUID().uuidString,
             sequence: 4), executionID: UUID().uuidString,
         results: ActionReportStore())
 }
@@ -188,4 +188,25 @@ func failedListeningStageBlocksLaterEffectsAndRetainsActualChildren(_ failure: W
     _ = await entered.next()
     pending.cancel()
     await #expect(throws: CancellationError.self) { try await pending.value }
+}
+
+@Test func listeningReactivationRequestsCueAndHapticEveryTimeInTheSameSession() async throws {
+    let probe = WakeProbe()
+    let sessionID = UUID().uuidString
+    for activation in 1...5 {
+        let input = wakeInput(sessionID: sessionID)
+        try await ListeningActivationFeedback.run(
+            invocation: input, configuration: wakeConfiguration(), feedback: probe,
+            prepare: { try await probe.prepare() }, capture: { try await probe.capture() })
+        let events = await probe.events
+        #expect(events.filter { $0 == "recording" }.count == activation)
+        #expect(events.filter { $0 == "haptic" }.count == activation)
+        #expect(events.filter { $0 == "drained" }.count == activation)
+        let current = await probe.children.filter { $0.1 == input.context }
+        #expect(current.count == 2)
+        #expect(Set(current.map { $0.0.actionPath.function }) == ["vibrate", "playCue"])
+        let report = try #require(await input.results.snapshot())
+        #expect(!report.hasFailures && !report.isCancelled)
+        #expect(report.entries.contains { $0.path.contains("vibrate") && $0.status == .succeeded })
+    }
 }

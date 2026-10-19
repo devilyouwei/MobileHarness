@@ -15,9 +15,7 @@ import Foundation
         let held: Bool
         var body: some View {
             NativeCompanionSurface(
-                phase: state.showsModelPreparation
-                    ? (state.modelPreparation.isLoading || state.modelPreparation == .inactive ? .loading : .failed)
-                    : state.voicePhase, reduceMotion: reduceMotion,
+                phase: state.showsLoadingExpression ? .loading : state.voicePhase, reduceMotion: reduceMotion,
                 expression: state.displayedExpression, emphasized: state.expressionEmphasized,
                 transitionID: state.expressionTransitionID, gaze: gaze,
                 faceWidth: faceWidth, eyeCenter: eyeCenter,
@@ -47,6 +45,19 @@ import Foundation
                 bands: placement == .bottom ? state.microphoneSpectrum : state.playbackSpectrum,
                 active: state.voicePhase == (placement == .bottom ? .listening : .speaking),
                 reduceMotion: reduceMotion)
+        }
+    }
+
+    @MainActor
+    private struct ConversationIslandHeader: View {
+        let state: ConversationState
+        let activity: ActionActivityState
+        let layout: HomeBluetoothLayout
+        var body: some View {
+            HomeBluetoothIndicator(
+                status: state.bluetoothStatus, layout: layout,
+                playbackBands: layout.attachesToIsland ? state.playbackSpectrum : [],
+                speaking: state.voicePhase == .speaking, hasTask: activity.hasOngoingTask)
         }
     }
 
@@ -228,22 +239,22 @@ import Foundation
 
                     }
 
-                    let islandLayout = geometry.safeAreaInsets.top >= 59 && geometry.size.width < 600
-                    HomeBluetoothIndicator(status: state.bluetoothStatus)
-                        .frame(width: 16, height: 24)
-                        .position(x: islandLayout ? geometry.size.width / 2 - 92 : 24, y: islandLayout ? -24 : 16)
+                    let bluetoothLayout = HomeBluetoothLayout(
+                        viewportWidth: geometry.size.width, safeAreaTop: geometry.safeAreaInsets.top)
+                    ConversationIslandHeader(state: state, activity: activity, layout: bluetoothLayout)
+                        .frame(width: bluetoothLayout.size.width, height: bluetoothLayout.size.height)
+                        .position(bluetoothLayout.center)
                     ConversationVoiceBars(state: state, placement: .bottom, reduceMotion: reduceMotion)
                         .frame(width: geometry.size.width, height: 100 + geometry.safeAreaInsets.bottom)
                         .position(
                             x: geometry.size.width / 2,
                             y: geometry.size.height + geometry.safeAreaInsets.bottom / 2 - 50)
-                    ConversationVoiceBars(state: state, placement: .reply, reduceMotion: reduceMotion)
-                        .frame(width: 166, height: 62)
-                        .position(
-                            x: geometry.size.width / 2,
-                            y: replySpectrumY(in: geometry)
-                        )
-                        .opacity(state.voicePhase == .speaking ? 1 : 0)
+                    if !bluetoothLayout.attachesToIsland {
+                        ConversationVoiceBars(state: state, placement: .reply, reduceMotion: reduceMotion)
+                            .frame(width: 174, height: 34)
+                            .position(x: geometry.size.width / 2, y: 17)
+                            .opacity(state.voicePhase == .speaking ? 1 : 0)
+                    }
                     VStack {
                         Spacer(minLength: 0)
                         if activity.hasRecords || activity.observationUnavailable {
@@ -305,7 +316,8 @@ import Foundation
                 ZStack {
                     ConversationAtmosphere()
                     CompanionEyes(
-                        phase: error == nil ? .loading : .failed, reduceMotion: reduceMotion, expression: .closed,
+                        phase: error == nil ? .idle : .failed, reduceMotion: reduceMotion,
+                        expression: .closed,
                         gaze: eyeGaze,
                         faceWidth: min(geometry.size.width, 600)
                     )
@@ -351,114 +363,20 @@ import Foundation
         }
     }
 
-    /// Public safe-area estimate: typical island lower edge is about 12 pt above its safe-area bottom.
-    /// The 62 pt surface reserves 24 pt above its lower-edge baseline for the bowl corners.
-    /// Bars overlap the estimated edge by one point. Non-island layouts stay inside the safe area.
     @MainActor
-    private func replySpectrumY(in geometry: GeometryProxy) -> CGFloat {
-        let islandLayout = geometry.safeAreaInsets.top >= 59 && geometry.size.width < 600
-        return islandLayout ? 31 - 24 - 13 : 31
-    }
-
-    @MainActor
-    struct HomeModelPreparationOverlay: View {
-        let state: HomeModelPreparation
+    struct HomeModelPreparationRetry: View {
         let retry: () -> Void
-        let cancel: () -> Void
         var body: some View {
             GeometryReader { geometry in
-                VStack(spacing: 16) {
-                    Text(state.message)
-                        .font(.callout).foregroundStyle(.white.opacity(0.8))
-                        .multilineTextAlignment(.center).lineLimit(4)
-                        .accessibilityIdentifier("home.models.status")
-                    HStack(spacing: 28) {
-                        if state.isLoading {
-                            Button("取消", action: cancel).accessibilityIdentifier("home.models.cancel")
-                        } else {
-                            Button("重试", action: retry).accessibilityIdentifier("home.models.retry")
-                        }
-                    }.buttonStyle(.bordered)
+                Button(action: retry) {
+                    Label("重试", systemImage: "arrow.clockwise")
                 }
-                .frame(width: min(geometry.size.width - 48, 420))
+                .buttonStyle(.bordered)
+                .accessibilityLabel("重新加载模型")
+                .accessibilityIdentifier("home.models.retry")
                 .position(x: geometry.size.width / 2, y: geometry.size.height * 0.64)
             }
         }
-    }
-
-    @MainActor
-    private struct HomeBluetoothIndicator: View {
-        let status: BluetoothConnectionStatus
-        @Environment(\.accessibilityReduceMotion) private var reduceMotion
-        @Environment(\.scenePhase) private var scenePhase
-        var body: some View {
-            BluetoothStatusGlyph(
-                status: status, flashing: status.isConnecting && !reduceMotion && scenePhase == .active
-            )
-            .accessibilityElement(children: .ignore)
-            .accessibilityLabel("机械臂蓝牙，" + status.title)
-            .accessibilityIdentifier("home.bluetooth.status")
-            .allowsHitTesting(false)
-        }
-    }
-    @MainActor
-    private struct BluetoothStatusGlyph: UIViewRepresentable {
-        let status: BluetoothConnectionStatus
-        let flashing: Bool
-        final class GlyphView: UIView {
-            let glyph = CAShapeLayer()
-            override init(frame: CGRect) {
-                super.init(frame: frame)
-                isUserInteractionEnabled = false
-                glyph.fillColor = nil
-                glyph.lineWidth = 1.7
-                glyph.lineCap = .round
-                glyph.lineJoin = .round
-                layer.addSublayer(glyph)
-            }
-            required init?(coder: NSCoder) { nil }
-            override func layoutSubviews() {
-                super.layoutSubviews()
-                CATransaction.begin()
-                CATransaction.setDisableActions(true)
-                glyph.frame = bounds
-                let path = UIBezierPath()
-                let x = bounds.midX
-                let top = bounds.minY + 2
-                let bottom = bounds.maxY - 2
-                path.move(to: CGPoint(x: x, y: top))
-                path.addLine(to: CGPoint(x: x + 5, y: top + 5))
-                path.addLine(to: CGPoint(x: x - 5, y: bottom - 5))
-                path.move(to: CGPoint(x: x, y: bottom))
-                path.addLine(to: CGPoint(x: x + 5, y: bottom - 5))
-                path.addLine(to: CGPoint(x: x - 5, y: top + 5))
-                path.move(to: CGPoint(x: x, y: top))
-                path.addLine(to: CGPoint(x: x, y: bottom))
-                glyph.path = path.cgPath
-                CATransaction.commit()
-            }
-        }
-        func makeUIView(context: Context) -> GlyphView { GlyphView() }
-        func updateUIView(_ view: GlyphView, context: Context) {
-            CATransaction.begin()
-            CATransaction.setDisableActions(true)
-            view.glyph.strokeColor = (status == .disconnected ? UIColor.systemGray : UIColor.systemBlue).cgColor
-            CATransaction.commit()
-            if flashing {
-                if view.glyph.animation(forKey: "bluetooth.connecting") == nil {
-                    let animation = CABasicAnimation(keyPath: "opacity")
-                    animation.fromValue = 0.25
-                    animation.toValue = 1
-                    animation.duration = 0.65
-                    animation.autoreverses = true
-                    animation.repeatCount = .infinity
-                    view.glyph.add(animation, forKey: "bluetooth.connecting")
-                }
-            } else {
-                view.glyph.removeAnimation(forKey: "bluetooth.connecting")
-            }
-        }
-        static func dismantleUIView(_ view: GlyphView, coordinator: ()) { view.glyph.removeAllAnimations() }
     }
 
 #endif

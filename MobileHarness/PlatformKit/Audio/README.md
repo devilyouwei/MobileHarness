@@ -1,5 +1,7 @@
 # Audio — 原生音频、反馈与数值能力
 
+✅ 录音与播放共用文件私有的同步 AVAudioSession 配置函数，各调用者继续在自身隔离域执行，不增加调度；移除临时细分计时，只保留空间启动总区间。保留完整停止、原生错误、四声道及首 PCM 就绪。
+
 ## 职责与公开协议
 
 AudioContainer 按有限命名作用域缓存原生实现，对外返回 AudioInputOutput、CuePlaying、HapticFeedbackProviding。AppleAudioIO／NativeCuePlayback／NativeHapticFeedback 实现这些端口；业务只注入需要的协议，SDK 不依赖其他项目模块。
@@ -50,6 +52,8 @@ CuePlaying使用一个AVAudioPlayer／delegate，重叠明确busy，取消停止
 
 HapticFeedbackProviding使用公开支持检查、缓存生成器和一个有主人的operation；最多三次触觉、间隔40…250ms，取消和停止加入，UIKit只确认请求发出。触觉预备不承诺实际产生反馈。
 
+✅ 已实现：NativeHapticFeedback.perform在每次实际impact前重新设置共享AVAudioSession允许录音时触觉，再prepare并发出impact；不能把录音启动前的设置或生成器预备视为持续有效。只修改该触觉开关，不重配category／mode／route、不停录音；取消／根接纳检查先于设置，设置失败原样抛出并沿既有Platform报告链传播。缓存生成器与可重复operation保留，单次及多次请求均按每个pulse处理。
+
 ## 原生事件、错误与约束
 
 NativeAudioEvent 是事实而非Error。路由按前后输入／输出portType+UID比较，categoryChange/override及同设备重配不打断流；实际设备变化、不可用路由和缺少旧快照保守投递routeChanged，不直接上报容器故障。
@@ -60,4 +64,6 @@ NativeAudioEvent 是事实而非Error。路由按前后输入／输出portType+U
 
 [PlatformKit](../README.md) · [Core](../Core/README.md)
 
-✅ 已实现：空间后端AVCaptureSession改为actor内惰性创建；录音共享会话配置在既有原生音频actor执行，主线程只拥有单个启动准备Task及token。停止先关闭token、取消并加入准备后再关闭原生后端；旧启动失败不能停止替代会话。保持首PCM就绪和空间失败加入后mono回退，不增加线程或PCM队列。
+✅ AudioContainer停止聚合使用PlatformFailure：首个失败为underlying，其余按顺序保留在cleanupErrors，分类为cleanup.failed；不以取消／设备不可用掩盖未完成清理。
+
+录音会话同步配置，空间 AVCaptureSession 仅在请求录音时随后端实例创建，start/stopRunning 在后端 actor 执行。首 PCM 确认前不报告收音成功；空间启动失败必须加入清理，再按原支持条件回退 mono，token 围栏防止旧失败影响新捕获。容器 boot 不打开设备，不保留异步会话配置 preparation Task。

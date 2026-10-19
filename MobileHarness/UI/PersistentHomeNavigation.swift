@@ -25,9 +25,20 @@
                     .accessibilityHidden(covered)
                 NavigationStack(path: $path) {
                     navigationRoot
-                        .navigationDestination(for: Destination.self, destination: destination)
+                        .navigationDestination(for: Destination.self) { page in
+                            #if os(iOS)
+                                destination(page)
+                                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                                    .background(.background)
+                                    .containerBackground(.clear, for: .navigation)
+                            #else
+                                destination(page)
+                            #endif
+                        }
                 }
-                .opacity(covered ? 1 : 0)
+                #if !os(iOS)
+                    .opacity(covered ? 1 : 0)
+                #endif
                 .allowsHitTesting(covered)
                 .accessibilityHidden(!covered)
             }
@@ -35,7 +46,9 @@
 
         private var navigationRoot: some View {
             #if os(iOS)
-                Color.clear.navigationTitle("首页").toolbar(.hidden, for: .navigationBar)
+                Color.clear
+                    .containerBackground(.clear, for: .navigation)
+                    .navigationTitle("首页").toolbar(.hidden, for: .navigationBar)
             #else
                 Color.clear
             #endif

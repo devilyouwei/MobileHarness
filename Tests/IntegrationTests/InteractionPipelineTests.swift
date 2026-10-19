@@ -131,6 +131,45 @@ private actor InteractionPresentation: ResourcePresentationCapability {
     await runtime.shutdown()
 }
 
+@Test(.actionCatalog) func environmentSnapshotsSupersedeLateDeliveryWithoutReplayingLoading() async throws {
+    let session = UUID().uuidString
+    let agent = try ApplicationControlAgent(
+        sessionID: session,
+        context: try AgentContextRepository(
+            agent: .applicationControl, scope: UUID().uuidString, state: ApplicationControlContextState()))
+    try await agent.start()
+    let loading = AppEnvironmentFact(category: .modelPreparation, sequence: 2, value: "loading")
+    let idle = AppEnvironmentFact(category: .modelPreparation, sequence: 4, value: "idle")
+    try await agent.receive(loading.input(sessionID: session))
+    try await agent.receive(idle.input(sessionID: session))
+    try await agent.receive(loading.input(sessionID: session))
+    try await agent.receive(idle.input(sessionID: session))
+    // Versions are per category, so an independent category may have a lower number.
+    try await agent.receive(
+        AppEnvironmentFact(category: .scene, sequence: 1, value: "active").input(sessionID: session))
+    await #expect(throws: CommunicationError.invalidPayload) {
+        try await agent.receive(
+            AppEnvironmentFact(category: .modelPreparation, sequence: 4, value: "loading").input(sessionID: session))
+    }
+    // Supersession never bypasses payload or session validation.
+    await #expect(throws: CommunicationError.invalidPayload) {
+        try await agent.receive(
+            AppEnvironmentFact(category: .modelPreparation, sequence: 1, value: "invalid").input(sessionID: session))
+    }
+    await #expect(throws: CommunicationError.unauthorized) {
+        try await agent.receive(loading.input(sessionID: UUID().uuidString))
+    }
+    let snapshot = try await agent.environmentSnapshot()
+    #expect(snapshot.contains("idle") && snapshot.contains("active"))
+    #expect(!snapshot.contains("loading"))
+    await agent.stop()
+    var emitted = 0
+    for await envelope in agent.outputs {
+        if case .toolCall = envelope.output { emitted += 1 }
+    }
+    #expect(emitted == 2)
+}
+
 @Test(.actionCatalog) func independentManualTerminalResultIsRetainedWithoutSchedulingAnotherAction() async throws {
     let session = UUID().uuidString
     let agent = try ApplicationControlAgent(

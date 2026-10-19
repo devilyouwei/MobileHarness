@@ -3,7 +3,7 @@ import Foundation
 import StorageCore
 
 public struct AppEnvironmentFact: ExternalInputProviding, Codable, Sendable, Equatable {
-    public enum Category: String, Codable, Sendable { case scene, devices, navigation, capabilities }
+    public enum Category: String, Codable, Sendable { case scene, devices, navigation, capabilities, modelPreparation }
     public static let contract = "app.environment"
     public static let source = "app.environment"
     public let category: Category

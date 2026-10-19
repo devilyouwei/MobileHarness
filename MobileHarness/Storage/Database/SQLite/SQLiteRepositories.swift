@@ -35,7 +35,8 @@ public final class SQLiteRepositories: Sendable {
         } catch {
             let primary = error
             do { try database.closeUnpublished() } catch {
-                throw StoragePreparationFailure(primary: primary, cleanup: error)
+                throw StorageFailure(
+                    component: "database", operation: "prepare", underlying: primary, cleanupErrors: [error])
             }
             throw primary
         }

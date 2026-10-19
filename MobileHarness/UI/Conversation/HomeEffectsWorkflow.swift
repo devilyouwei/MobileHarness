@@ -26,9 +26,14 @@ public final class HomeEffectsWorkflow: HomeEffectsPresenting {
         conversation?.assistantReplyOpacity = 1
     }
     public func replyDidFinish() {
-        guard replyFadeID == nil, presentationAdmission?.acceptsLive() ?? true, let conversation,
-            conversation.isVoiceActive, !conversation.assistantReply.isEmpty
+        guard presentationAdmission?.acceptsLive() ?? true, let conversation, conversation.isVoiceActive
         else { return }
+        conversation.replyWaitingRequest = nil
+        if conversation.transcriptFinalized {
+            conversation.liveTranscript = ""
+            conversation.transcriptFinalized = false
+        }
+        guard replyFadeID == nil, !conversation.assistantReply.isEmpty else { return }
         let id = UUID().uuidString
         let text = conversation.assistantReply
         replyFadeID = id

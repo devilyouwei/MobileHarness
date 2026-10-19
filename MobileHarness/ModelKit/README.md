@@ -1,5 +1,7 @@
 # ModelKit — Independent Inference SDK
 
+✅ 根目录 ModelContainer.swift 为容器入口（仍编译于 ModelKitDefaults），ModelFailure.swift 为独立错误定义（仍编译于基础 ModelKit）。Support/Management 保留注册／制品／默认工厂，Support/Core 保留资源与并发机制；不新增目标，不改变公开类型。
+
 ✅ 已实现：本地Gemma当前排查版本移除推理副本中的所有system，以实际tokenizer拟合最近最多5条对话消息和生成预算。使用后端有效窗口，当前iOS上限1024；当前输入不改写，无法容纳时明确拒绝。云端、Agent原请求及持久历史不变。
 
 ✅ ModelContainer 是 App 管理的实例根，提供四个同根子能力。构造不产生模型／设备副作用；start 只注册工厂并准备制品元数据，setForeground 开放推理。实例私有配置与 manager 不跨根共享。
@@ -28,6 +30,7 @@ flowchart LR
 
 | Directory | Responsibilities and compilation |
 | --- | --- |
+| ModelContainer.swift / ModelFailure.swift | Root entry in ModelKitDefaults / independent error contract in ModelKit |
 | Support/Core | Neutral media, opaque requestID/scopeID, streams, resource leases, admission and worker cancellation; part of ModelKit |
 | Language, Speech, Vision contracts | Typed capability requests/results; part of ModelKit |
 | Support/Backends/CoreAI | Generic stateless graph/tensor runtime; ModelKitCoreAI |
@@ -169,3 +172,8 @@ Apple TTS retains one native synthesizer per capability, fence request cleanup, 
 ✅ 已实现：Gemma使用Apple系统OSLog signpost提供不含消息正文的本地性能事件，源码边界检查允许该系统模块；不引入项目依赖或第三方包。
 
 ✅ 已实现：模型根生命周期和配置拒绝完整报告原始 Error；生命周期拒绝和取消由宿主区分记录／广播，不丢弃底层错误信息。
+
+
+✅ 根目录 ModelFailure.swift 由基础 ModelKit 目标拥有；根start／setForeground／stop类型化抛错，ModelScope报告统一结构。模型推理／流的既有领域错误契约保留，完整底层对象放在报告的underlying；制品及装配清理均使用同一复合结构。
+
+✅ 已实现：语言／语音／视觉 warmup 统一提供 reportLoading 回调，只报告实际资源加载等待，不承载 UI／Signal 或业务展示。

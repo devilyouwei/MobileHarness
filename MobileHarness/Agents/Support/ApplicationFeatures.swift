@@ -237,6 +237,10 @@ public enum VisionPipelineWorkflow {
                 }, invalidate: {}, report: { [weak self] message in self?.recordEnvironmentFailure(message) })
         }
 
+        public func reportModelPreparation(loading: Bool) {
+            reportEnvironment(.modelPreparation, value: loading ? "loading" : "idle")
+        }
+
         func reportEnvironment(_ category: AppEnvironmentFact.Category, value: String) {
             guard value.utf8.count <= 16_384 else {
                 recordEnvironmentFailure("Environment fact exceeds bound")

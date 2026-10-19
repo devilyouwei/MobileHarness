@@ -31,6 +31,7 @@ public final class UIHomeContainer {
     public func presentModelPreparation(_ value: HomeModelPreparation) {
         guard admission.acceptsRetained(), value == .inactive || admission.acceptsLive() else { return }
         conversation.modelPreparation = value
+        if !value.isLoading { conversation.loadingExpression = false }
     }
     func invalidate() {
         conversation.modelPreparation = .inactive

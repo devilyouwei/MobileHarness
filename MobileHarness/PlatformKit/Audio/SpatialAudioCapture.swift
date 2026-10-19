@@ -10,23 +10,24 @@
     actor SpatialAudioCapture {
         private let admission: PlatformAdmission?
         init(admission: PlatformAdmission? = nil) { self.admission = admission }
-        private var session: AVCaptureSession?
+        private let session = AVCaptureSession()
         private let callbackQueue = DispatchQueue(label: "dev.mobileharness.audio.spatial")
         private var receiver: SpatialAudioReceiver?
         private var observation: SpatialAudioObservation?
         private(set) var supportsSpatialCapture: Bool?
         private let log = Logger(subsystem: "dev.mobileharness", category: "AudioCapture")
+        private let captureTiming = OSSignposter(subsystem: "dev.mobileharness", category: .pointsOfInterest)
 
         /// Nil means the built-in route cannot supply FOA, before any hardware is started.
         func start(observation: NativeInputSession<MicrophoneFrame>) async throws -> AsyncThrowingStream<
             MicrophoneFrame, Error
         >? {
+            let configuration = captureTiming.beginInterval("Spatial.Start", id: captureTiming.makeSignpostID())
+            defer { captureTiming.endInterval("Spatial.Start", configuration) }
             guard let device = AVCaptureDevice.default(for: .audio) else { return nil }
             let input = try AVCaptureDeviceInput(device: device)
             supportsSpatialCapture = input.isMultichannelAudioModeSupported(.firstOrderAmbisonics)
             guard supportsSpatialCapture == true else { return nil }
-            let session = AVCaptureSession()
-            self.session = session
             // FOA needs capture-specific microphone configuration, unlike the mono engine backend.
             session.automaticallyConfiguresApplicationAudioSession = true
             session.beginConfiguration()
@@ -53,7 +54,7 @@
             session.startRunning()
             guard session.isRunning, !session.isInterrupted else {
                 log.error(
-                    "Spatial capture startup: running=\(session.isRunning, privacy: .public), interrupted=\(session.isInterrupted, privacy: .public)"
+                    "Spatial capture startup: running=\(self.session.isRunning, privacy: .public), interrupted=\(self.session.isInterrupted, privacy: .public)"
                 )
                 pair.continuation.finish(throwing: AudioIOError.invalidFormat)
                 stop()
@@ -68,13 +69,12 @@
             return pair.stream
         }
         func stop() {
-            session?.stopRunning()
+            session.stopRunning()
             callbackQueue.sync {}  // Join callbacks before allowing a replacement capture backend.
             receiver?.readiness.resolve(.failure(CancellationError()))
             receiver?.continuation.finish()
             receiver = nil
             observation = nil
-            session = nil
         }
     }
 

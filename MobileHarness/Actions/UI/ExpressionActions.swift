@@ -3,6 +3,25 @@ import FunctionContracts
 
 /// UI.Expression function ownership; current invocation paths remain compatible.
 extension UIActions {
+    /// Trusted request progress; not a model-selected expression or animation receipt.
+    @Action(
+        domain: "UI", module: "Expression", title: "请求等待", kind: .state,
+        completion: "Request waiting state is accepted; the animation loop is not joined.", timeout: .seconds(5))
+    public static func setReplyWaiting(
+        invocation: any FunctionInput,
+        using present: @escaping @Sendable (Bool, String, any FunctionInput) async throws -> Void
+    ) async throws {
+        try Task.checkCancellation()
+        let arguments = ActionArguments(invocation.call.parameters)
+        try arguments.validateAllowedKeys(["enabled", "requestID"])
+        guard let enabled = invocation.call.parameters["enabled"], ["true", "false"].contains(enabled) else {
+            throw PresentationError.invalidCall
+        }
+        let requestID = try arguments.requiredString("requestID", maximumUTF8Bytes: 128, allowBlank: false)
+        try await present(enabled == "true", requestID, invocation)
+        try Task.checkCancellation()
+    }
+
     @Action(
         domain: "UI", module: "Expression", title: "表情演出",
         doc:
@@ -63,6 +82,23 @@ extension UIActions {
         let emotion = try decode(invocation)
         try await apply(emotion, invocation)
         try Task.checkCancellation()
+    }
+
+    @Action(
+        domain: "UI", module: "Expression", title: "加载眼睛", kind: .state,
+        completion: "Loading expression state is accepted; does not wait for model preparation or animation loops.",
+        timeout: .seconds(5))
+    public static func setLoading(
+        invocation: any FunctionInput, using presentation: any LoadingExpressionPresentationCapability
+    ) async throws {
+        try Task.checkCancellation()
+        let arguments = ActionArguments(invocation.call.parameters)
+        try arguments.validateAllowedKeys(["enabled", "revision"])
+        guard let raw = invocation.call.parameters["enabled"], ["true", "false"].contains(raw),
+            let revisionValue = invocation.call.parameters["revision"], let revision = UInt64(revisionValue),
+            revision > 0
+        else { throw PresentationError.invalidCall }
+        try await presentation.setLoadingExpression(raw == "true", revision: revision, invocation: invocation)
     }
 
     private static func decode(_ invocation: any FunctionInput) throws -> Emotion {

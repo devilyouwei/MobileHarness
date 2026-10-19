@@ -196,3 +196,27 @@ func uiExpressionCancellationJoinsWaitAndPreservesRendererFailure() async throws
     #expect(state.presentModels(["new"], notice: "current", revision: state.revision))
     #expect(state.models == ["new"] && state.notice == "current")
 }
+
+@Test func replyWaitingKeepsIndependentSequenceAndRejectsOldDecision() {
+    let session = UUID().uuidString
+    let turn = AgentTurn(id: UUID().uuidString, ordinal: 1)
+    func context(_ sequence: UInt64, decision: String = "first") -> ActionExecutionContext {
+        .init(
+            source: "assistant", sessionID: session, inputID: "input", sequence: sequence,
+            correlationID: turn.id, ordinal: turn.ordinal, decisionID: decision)
+    }
+    var presentation = ConversationPresentation()
+    func accept(_ context: ActionExecutionContext, update: ConversationPresentation.Update) -> Bool {
+        presentation.accept(context, update: update)
+    }
+    #expect(accept(context(1), update: .beginReply))
+    #expect(accept(context(2), update: .replyWaiting))
+    #expect(accept(context(3), update: .reply))
+    #expect(accept(context(4), update: .replyWaiting))
+    #expect(!accept(context(2), update: .replyWaiting))
+    #expect(accept(context(5, decision: "second"), update: .beginReply))
+    #expect(!accept(context(6), update: .replyWaiting))
+    #expect(accept(context(7, decision: "second"), update: .replyWaiting))
+    presentation.suspendReplies()
+    #expect(!accept(context(8, decision: "second"), update: .replyWaiting))
+}

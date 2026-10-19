@@ -32,7 +32,7 @@ import Testing
     try await first.stop()
     try await first.stop()
     await #expect(throws: InferenceAdmissionError.self) { try await oldLanguage.warmup() }
-    await #expect(throws: InferenceAdmissionError.self) { try await first.start() }
+    await #expect(throws: ModelFailure.self) { try await first.start() }
     // Another root with the same resource path is independent and remains usable.
     try await second.speech.configure(recognition: false, synthesis: false)
     try await second.stop()
@@ -44,7 +44,7 @@ import Testing
     let port = root.artifacts
     try await root.stop()
     await #expect(throws: InferenceAdmissionError.self) { try await port.prepare() }
-    await #expect(throws: InferenceAdmissionError.self) { try await root.setForeground(true) }
+    await #expect(throws: ModelFailure.self) { try await root.setForeground(true) }
 }
 
 @Test @MainActor func modelChatConfigurationIsRootLocalAndUpdatesRetainedPort() async throws {

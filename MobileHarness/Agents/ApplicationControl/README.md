@@ -54,3 +54,10 @@
 ✅ 已实现：确定性Bluetooth连接状态处理使用devices事实（availability／connection／recovery），同根revision去重；已知连接条件不调用异常呈现，而更新状态（有实际事实时不以迟到错误覆盖）。分别发出首页和设置两个内部呈现Tool；有界沿用128在途调用，身份校验、迟到和失败仍显式处理。
 
 ✅ 已实现：BluetoothStatusActions.swift单独拥有UI.BluetoothStatus.showBluetoothHome／showBluetoothSettings；连接状态不归RuntimeDiagnostics异常函数组。使用现有Actions/UI目录和编译目标。
+
+
+✅ modelPreparation事实驱动代码私有UI.Expression.setLoading工具，传入enabled及事实sequence作为revision；每个新版本均提交，避免前后台idle被最新事实合并后漏掉重新开启。沿用128在途诊断调用和回执错误保留，不调用模型或等待动画循环。
+
+✅ 已实现：连接超时的原生事件和 connect 返回错误均通过稳定连接条件进入现有蓝牙状态呈现，不弹 Toast；连接事实仍优先，基础库继续完整上报。
+
+✅ 已实现：app.environment 按类别保留最新版本；来源、会话、信封和内容先校验。晚到旧版本及相同版本相同内容不重复呈现、不产生 outOfOrder；同版本不同内容明确拒绝。仅适用于环境快照，不改变 PCM、业务动作和结果的顺序契约。回归覆盖逆序、重复、冲突及 loading 不被旧事实重新打开。

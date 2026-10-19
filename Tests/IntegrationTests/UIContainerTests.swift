@@ -121,7 +121,7 @@ import Testing
     diagnostic.presentReport("late report")
     #expect(root.diagnostics.speech.report != "late report")
     #expect(!root.home.present(.assistantReply("late reply"), token: oldToken))
-    #expect(throws: UIContainerError.stopped) { try root.start() }
+    #expect(throws: UIFailure.self) { try root.start() }
     let replacement = UIContainer()
     try replacement.start()
     #expect(!replacement.home.present(.assistantReply("foreign epoch"), token: oldToken))

@@ -3,11 +3,10 @@ import ModelKit
 import ModelKitOpenAI
 @_spi(ModelAssembly) import ModelKitRuntime
 
-public struct ModelCleanupFailure: Error { public let errors: [any Error] }
-
 public protocol ModelResourceControlling: Sendable {
     func load() async throws
     func warmup() async throws
+    func warmup(reportLoading: @escaping @Sendable (Bool) async -> Void) async throws
     func unload() async throws
     func status() async throws -> ModelState
 }
@@ -21,6 +20,7 @@ public protocol ModelSpeechProviding: Sendable {
     func configure(recognition: Bool, synthesis: Bool) async throws
     func load(_ capability: ProvidedCapability) async throws
     func warmup(_ capability: ProvidedCapability) async throws
+    func warmup(_ capability: ProvidedCapability, reportLoading: @escaping @Sendable (Bool) async -> Void) async throws
     func unload(_ capability: ProvidedCapability) async throws
     func status(_ capability: ProvidedCapability) async throws -> ModelState
 }
@@ -73,7 +73,7 @@ public struct ModelArtifactConfiguration: Sendable {
         vision = ModelVisionContainer(scope: scope)
         artifacts = ModelArtifactsContainer(scope: scope)
     }
-    public func start() async throws {
+    public func start() async throws(ModelFailure) {
         do {
             guard !stopped else { throw InferenceAdmissionError.stopped }
             if started { return }
@@ -82,8 +82,7 @@ public struct ModelArtifactConfiguration: Sendable {
             started = true
             // Foreground is granted by the lifecycle graph, after all required starts succeed.
         } catch {
-            scope.report("root", "start", error)
-            throw error
+            throw scope.report("root", "start", error)
         }
     }
     public func invalidate() {
@@ -91,7 +90,7 @@ public struct ModelArtifactConfiguration: Sendable {
         guard suspension == nil else { return }
         suspension = Task { [scope] in await scope.suspend() }
     }
-    public func setForeground(_ active: Bool) async throws {
+    public func setForeground(_ active: Bool) async throws(ModelFailure) {
         do {
             if !active { invalidate() }
             await suspension?.value
@@ -101,12 +100,11 @@ public struct ModelArtifactConfiguration: Sendable {
                 try admission.resume()
             }
         } catch {
-            scope.report("root", "setForeground", error)
-            throw error
+            throw scope.report("root", "setForeground", error)
         }
     }
     public func handleMemoryPressure() async { await scope.memoryPressure() }
-    public func stop() async throws {
+    public func stop() async throws(ModelFailure) {
         do {
             if let shutdown { return try await shutdown.value }
             stopped = true
@@ -119,8 +117,7 @@ public struct ModelArtifactConfiguration: Sendable {
             shutdown = task
             try await task.value
         } catch {
-            scope.report("root", "stop", error)
-            throw error
+            throw scope.report("root", "stop", error)
         }
     }
 }
@@ -172,7 +169,8 @@ private actor ModelScope {
                     let primary = error
                     do { try await manager.releaseArtifacts() } catch {
                         await manager.shutdown()
-                        throw ModelCleanupFailure(errors: [primary, error])
+                        throw ModelFailure(
+                            component: "root", operation: "prepare", underlying: primary, cleanupErrors: [error])
                     }
                     await manager.shutdown()
                     throw primary
@@ -185,8 +183,15 @@ private actor ModelScope {
         guard !closed else { throw InferenceAdmissionError.stopped }
         return manager
     }
-    nonisolated func report(_ component: String, _ operation: String, _ error: any Error) {
-        failure(component, operation, error)
+    @discardableResult nonisolated func report(
+        _ component: String, _ operation: String, _ error: any Error,
+        fileID: String = #fileID, function: String = #function, line: UInt = #line
+    ) -> ModelFailure {
+        let value = ModelFailure(
+            component: component, operation: operation, underlying: error,
+            fileID: fileID, function: function, line: line)
+        failure(value.component, value.operation, value)
+        return value
     }
     func perform<T: Sendable>(
         _ component: String, _ operation: String, inference: Bool = true,
@@ -307,7 +312,10 @@ public final class ModelLanguageContainer: ModelLanguageProviding, Sendable {
     public func configure(_ configuration: OpenAIChatConfiguration?) async throws {
         try await scope.configureChat(configuration)
     }
-    public func warmup() async throws { try await scope.perform("language", "warmup") { try await $0.warmup(.chat) } }
+    public func warmup() async throws { try await warmup(reportLoading: { _ in }) }
+    public func warmup(reportLoading: @escaping @Sendable (Bool) async -> Void) async throws {
+        try await scope.perform("language", "warmup") { try await $0.warmup(.chat, reportLoading: reportLoading) }
+    }
     public func load() async throws { try await scope.perform("language", "load") { try await $0.load(.chat) } }
     public func unload() async throws {
         try await scope.perform("language", "unload", inference: false) { try await $0.unload(.chat) }
@@ -339,10 +347,17 @@ public final class ModelSpeechContainer: ModelSpeechProviding, Sendable {
         try await scope.configureSpeech(recognition: recognition, synthesis: synthesis)
     }
     public func warmup(_ capability: ProvidedCapability) async throws {
+        try await warmup(capability, reportLoading: { _ in })
+    }
+    public func warmup(_ capability: ProvidedCapability, reportLoading: @escaping @Sendable (Bool) async -> Void)
+        async throws
+    {
         guard [.recognition, .synthesis, .voiceActivity].contains(capability) else {
             throw CapabilityError.invalidRequest("Not a speech capability")
         }
-        try await scope.perform("speech", "warmup") { try await $0.warmup(capability) }
+        try await scope.perform("speech", "warmup") { [scope] manager in
+            try await manager.warmup(scope.selectedSpeech(capability, manager: manager), reportLoading: reportLoading)
+        }
     }
     public func load(_ capability: ProvidedCapability) async throws {
         try await scope.perform("speech", "load") { [scope] manager in
@@ -460,7 +475,10 @@ public final class ModelVisionContainer: ModelVisionProviding, Sendable {
         }
     }
     public func load() async throws { try await scope.perform("vision", "load") { try await $0.load(.pose) } }
-    public func warmup() async throws { try await scope.perform("vision", "warmup") { try await $0.warmup(.pose) } }
+    public func warmup() async throws { try await warmup(reportLoading: { _ in }) }
+    public func warmup(reportLoading: @escaping @Sendable (Bool) async -> Void) async throws {
+        try await scope.perform("vision", "warmup") { try await $0.warmup(.pose, reportLoading: reportLoading) }
+    }
     public func unload() async throws {
         try await scope.perform("vision", "unload", inference: false) { try await $0.unload(.pose) }
     }

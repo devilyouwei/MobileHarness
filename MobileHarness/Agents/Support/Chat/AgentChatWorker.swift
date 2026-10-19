@@ -125,6 +125,12 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
         InternalAction(
             domain: "UI", module: "Caption", function: "beginReplyTurn", channel: "Display")
     }
+    private var replyWaitingRequest: String?
+    private static var replyWaiting: InternalAction {
+        InternalAction(
+            domain: "UI", module: "Expression", function: "setReplyWaiting", channel: "Display",
+            required: ["enabled", "requestID"])
+    }
     private static var playback: InternalAction {
         InternalAction(
             domain: "Speech", module: "Playback", function: "speak", channel: "Speech", required: ["audioID"])
@@ -207,7 +213,7 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
 
     public nonisolated static func runtimeCapabilities(_ model: CapabilityRegistry) throws -> CapabilityRegistry {
         try model.adding(
-            internalActions: [playback, beginReply, caption]
+            internalActions: [playback, beginReply, caption, replyWaiting]
                 .filter { grant in
                     !model.internalActions.contains { $0.path == grant.path }
                 })
@@ -1310,23 +1316,61 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
             throw error
         }
     }
+    /// Presentation calls participate in the round, but never count as a model-generated answer.
+    private func finishReplyWaiting(_ requestID: String, input: AgentInput) throws {
+        guard replyWaitingRequest == requestID else { return }
+        replyWaitingRequest = nil
+        // Cancellation closes the round; reply occupancy/lifecycle clears its UI projection.
+        guard !Task.isCancelled else { return }
+        guard
+            try emitAction(
+                Self.replyWaiting.call(["enabled": "false", "requestID": requestID]), for: input)
+        else { throw HarnessError.queueFull }
+    }
     private func collect(_ request: ChatRequest, input: AgentInput, using chat: any ChatCapability) async throws
         -> String
     {
+        try Task.checkCancellation()
+        let requestID = UUID().uuidString
+        if reportsReplyActivity, input.turn != nil {
+            guard
+                try emitAction(
+                    Self.replyWaiting.call(["enabled": "true", "requestID": requestID]), for: input)
+            else { throw HarnessError.queueFull }
+            replyWaitingRequest = requestID
+        }
         let startCalls = generationCalls
-        let answer = try await AgentChatDriver.collect(
-            request, using: chat,
-            consumers: .init(
-                text: { try await self.consumeActionText($0, input: input) },
-                native: { _ = try await self.consumeNativeTools($0, input: input) },
-                evidence: { try await self.modelEvidence($0, input: input) },
-                timing: { timing in
-                    try await self.recordGenerationEvidence {
-                        try await self.conversations.recordModelTiming(
-                            startedAt: timing.startedAt, firstTokenAt: timing.firstTokenAt,
-                            latency: timing.firstTokenLatency, for: input.id)
-                    }
-                }))
+        let result: Result<String, any Error>
+        do {
+            result = .success(
+                try await AgentChatDriver.collect(
+                    request, using: chat,
+                    consumers: .init(
+                        text: { try await self.consumeActionText($0, input: input) },
+                        native: { _ = try await self.consumeNativeTools($0, input: input) },
+                        evidence: { event in
+                            switch event {
+                            case .text(let text) where !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty:
+                                try await self.finishReplyWaiting(requestID, input: input)
+                            case .toolCall, .finished:
+                                try await self.finishReplyWaiting(requestID, input: input)
+                            default: break
+                            }
+                            try await self.modelEvidence(event, input: input)
+                        },
+                        timing: { timing in
+                            try await self.recordGenerationEvidence {
+                                try await self.conversations.recordModelTiming(
+                                    startedAt: timing.startedAt, firstTokenAt: timing.firstTokenAt,
+                                    latency: timing.firstTokenLatency, for: input.id)
+                            }
+                        })))
+        } catch {
+            result = .failure(error)
+        }
+        // Runs for errors before a stream exists as well as cancellation of a live stream.
+        try finishReplyWaiting(requestID, input: input)
+        let answer = try result.get()
         guard generationCalls > startCalls else {
             throw CapabilityError.unavailable("LLM returned no speakable answer")
         }

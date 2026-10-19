@@ -7,11 +7,6 @@ import StorageMedia
 import StorageTasks
 import Synchronization
 
-public struct StoragePreparationFailure: Error {
-    public let primary: any Error
-    public let cleanup: any Error
-}
-
 public enum SQLiteDatabaseFactory {
     /// Construction is inert. Filesystem and database work belongs to start().
     public static func make(databaseURL: URL, failures: StorageFailureReporter = .init()) -> SQLiteDatabaseStorage {
@@ -104,7 +99,11 @@ public actor SQLiteDatabaseStorage: DatabaseStorage {
                 try await access.closeBackend()
                 // A constructor can fail before it can publish an owner for later cleanup.
                 // Its unconfirmed cleanup must still block replacement of this scope.
-                if case .failure(let failure as StoragePreparationFailure) = result { throw failure.cleanup }
+                if case .failure(let failure as StorageFailure) = result, let primary = failure.cleanupErrors.first {
+                    throw StorageFailure(
+                        component: "database", operation: "stop", underlying: primary,
+                        cleanupErrors: Array(failure.cleanupErrors.dropFirst()), code: .cleanupFailed)
+                }
             }
             shutdown = task
             try await task.value

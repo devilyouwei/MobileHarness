@@ -173,8 +173,11 @@ import Testing
     let state = root.home.conversation
     state.isReady = true
     state.voicePhase = .idle
+    root.home.presentModelPreparation(.checking)
+    #expect(!state.showsModelPreparation && !state.allowsHomeInteraction)
     root.home.presentModelPreparation(.preparing("language"))
     #expect(state.showsModelPreparation && !state.allowsHomeInteraction)
+    #expect(!state.showsModelRetry)
     #expect(state.voicePhase == .idle)
     state.isVoiceActive = true
     state.voicePhase = .listening
@@ -183,6 +186,7 @@ import Testing
     #expect(state.allowsHomeInteraction && state.voicePhase == .listening)
     state.isVoiceActive = false
     #expect(!state.allowsHomeInteraction)
+    #expect(state.showsModelRetry)
     root.home.presentModelPreparation(.ready)
     #expect(state.allowsHomeInteraction && !state.showsModelPreparation)
     await root.stop()
@@ -205,7 +209,140 @@ import Testing
     try next.start()
     try next.setForeground(true)
     next.home.presentModelPreparation(.ready)
-    root.home.presentModelPreparation(.cancelled)
+    root.home.presentModelPreparation(.failed(component: "language", message: "late"))
     #expect(next.home.conversation.modelPreparation == .ready)
     await next.stop()
+}
+
+@Test @MainActor func loadingExpressionIsIndependentOfListeningAndFencedByRevisionAndRoot() async throws {
+    let root = UIContainer()
+    try root.start()
+    let port = root.home.expressions
+    root.home.presentModelPreparation(.checking)
+    #expect(port.setLoading(true, revision: 1) == .superseded)
+    #expect(root.home.conversation.displayedExpression == .closed)
+    #expect(!HomeModelPreparation.checking.isLoading && !HomeModelPreparation.checking.showsRetry)
+    root.home.presentModelPreparation(.preparing("language"))
+    #expect(port.setLoading(true, revision: 1) == .superseded)
+    #expect(port.setLoading(true, revision: 0) == .rejected)
+    #expect(port.setLoading(true, revision: 2) == .applied)
+    #expect(root.home.conversation.displayedExpression == .loading)
+    #expect(!root.home.conversation.isVoiceActive)
+    #expect(port.setLoading(false, revision: 2) == .rejected)
+    root.home.presentModelPreparation(.checking)
+    #expect(!root.home.conversation.loadingExpression)
+    #expect(port.setLoading(true, revision: 2) == .superseded)
+    #expect(root.home.conversation.displayedExpression == .closed)
+    root.home.presentModelPreparation(.ready)
+    #expect(port.setLoading(false, revision: 3) == .applied)
+    root.home.presentModelPreparation(.preparing("language"))
+    #expect(port.setLoading(true, revision: 4) == .applied)
+    #expect(port.setLoading(false, revision: 3) == .superseded)
+    #expect(root.home.conversation.displayedExpression == .loading)
+    root.invalidate()
+    #expect(root.home.conversation.displayedExpression == .closed)
+    #expect(port.setLoading(true, revision: 5) == .superseded)
+    #expect(port.setLoading(false, revision: 6) == .applied)
+    try root.setForeground(true)
+    root.home.presentModelPreparation(.preparing("language"))
+    #expect(port.setLoading(true, revision: 5) == .superseded)
+    #expect(root.home.conversation.displayedExpression == .closed)
+    #expect(port.setLoading(true, revision: 7) == .applied)
+    root.home.presentModelPreparation(.checking)
+    #expect(root.home.conversation.present(.isVoiceActive(true)))
+    root.home.presentModelPreparation(.preparing("language"))
+    #expect(port.setLoading(true, revision: 8) == .superseded)
+    #expect(!root.home.conversation.showsLoadingExpression)
+    #expect(root.home.conversation.present(.isVoiceActive(false)))
+    #expect(port.setLoading(true, revision: 8) == .superseded)
+    await root.stop()
+    #expect(port.setLoading(true, revision: 9) == .rejected)
+    #expect(root.home.conversation.displayedExpression == .closed)
+}
+
+@Test @MainActor func loadingExpressionCancelsFiniteReceiptWithoutFabricatingCompletion() async throws {
+    let root = UIContainer()
+    try root.start()
+    let port = root.home.expressions
+    root.home.conversation.expressionRendererAvailable = true
+    let closing = Task { try await port.perform(.closed, owner: "old") }
+    while root.home.conversation.expressionTransitionID == nil { await Task.yield() }
+    root.home.presentModelPreparation(.preparing("language"))
+    #expect(port.setLoading(true, revision: 1) == .applied)
+    await #expect(throws: CancellationError.self) { try await closing.value }
+    #expect(root.home.conversation.expressionTransitionID == nil)
+    await #expect(throws: ConversationExpressionError.busy) { try await port.perform(.closed, owner: "new") }
+    #expect(root.home.conversation.displayedExpression == .loading)
+    await root.stop()
+}
+
+@Test @MainActor func replyWaitingUsesLoadingEyesWithoutModelPreparationOrInteractionGate() async throws {
+    let root = UIContainer()
+    try root.start()
+    try root.setForeground(true)
+    let state = root.home.conversation
+    state.isReady = true
+    state.isVoiceActive = true
+    state.expression = .smile
+    state.presentReplyWaiting(true, requestID: "first")
+    #expect(state.displayedExpression == .loading && state.allowsHomeInteraction)
+    #expect(!state.showsModelPreparation && !state.showsModelRetry)
+    for preparation in [HomeModelPreparation.checking, .ready, .preparing("language")] {
+        root.home.presentModelPreparation(preparation)
+        #expect(state.displayedExpression == .loading)
+    }
+    state.presentReplyWaiting(true, requestID: "second")
+    state.presentReplyWaiting(false, requestID: "first")
+    #expect(state.replyWaitingRequest == "second" && state.displayedExpression == .loading)
+    state.presentReplyWaiting(false, requestID: "second")
+    #expect(state.displayedExpression == .smile)
+    state.presentReplyWaiting(true, requestID: "third")
+    state.appendReply("回答")
+    #expect(!state.showsLoadingExpression && state.assistantReply == "回答")
+    await root.stop()
+}
+
+@Test @MainActor func replyWaitingClearsOnReplyEndConsentOffAndRootInvalidation() async throws {
+    let root = UIContainer()
+    try root.start()
+    try root.setForeground(true)
+    let state = root.home.conversation
+    state.isVoiceActive = true
+    state.isReplyActive = true
+    state.presentReplyWaiting(true, requestID: "first")
+    state.isReplyActive = false
+    #expect(state.replyWaitingRequest == nil)
+    state.presentReplyWaiting(true, requestID: "second")
+    root.home.effects.replyDidFinish()
+    #expect(state.replyWaitingRequest == nil)
+    state.presentReplyWaiting(true, requestID: "third")
+    state.isVoiceActive = false
+    #expect(state.replyWaitingRequest == nil && state.displayedExpression == .closed)
+    state.presentReplyWaiting(true, requestID: "closed")
+    #expect(state.replyWaitingRequest == nil)
+    state.isVoiceActive = true
+    state.presentReplyWaiting(true, requestID: "last")
+    root.invalidate()
+    state.presentReplyWaiting(true, requestID: "late")
+    #expect(state.replyWaitingRequest == nil)
+    await root.stop()
+}
+
+@Test @MainActor func replyWaitingDoesNotRejectFiniteExpressionOrForgeItsCompletion() async throws {
+    let root = UIContainer()
+    try root.start()
+    try root.setForeground(true)
+    let state = root.home.conversation
+    state.isVoiceActive = true
+    state.expressionRendererAvailable = true
+    state.presentReplyWaiting(true, requestID: "request")
+    let performance = Task { try await root.home.expressions.perform(.happy, owner: "performance") }
+    for _ in 0..<100 where state.expressionTransitionID == nil { await Task.yield() }
+    let transition = try #require(state.expressionTransitionID)
+    #expect(state.displayedExpression == .happy && !state.showsLoadingExpression)
+    state.expressionAnimationCompletion?(transition, true)
+    try await performance.value
+    state.presentReplyWaiting(false, requestID: "request")
+    #expect(!state.showsLoadingExpression)
+    await root.stop()
 }

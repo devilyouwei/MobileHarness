@@ -32,7 +32,9 @@ public final class CameraState {
     private var lastFrameSequence: UInt64?
     public func presentRendererFailure(_ message: String, generation: UInt64) {
         guard presentationAdmission?.stopped != true, generation == videoGeneration else { return }
-        onFailure("camera.renderer", "render", CameraRendererFailure(message: message))
+        let failure = UIFailure(
+            component: "camera.renderer", operation: "render", underlying: CameraRendererFailure(message: message))
+        onFailure(failure.component, failure.operation, failure)
         rendererFailure = message
         clearFrame()
         visionMessage = message

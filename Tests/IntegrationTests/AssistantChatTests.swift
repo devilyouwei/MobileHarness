@@ -895,3 +895,123 @@ func modelProtocolFailureKeepsAgentClassificationHistoryAndGatewayCorrelation() 
     #expect(turn.modelRequests?.last?.error?.contains("response.output_item.added") == true)
     await agent.stop()
 }
+
+private actor ReplyWaitingChat: ChatCapability {
+    let availability: CapabilityAvailability = .available
+    let failsOpening: Bool
+    private var emitter: InferenceEmitter<ChatEvent>?
+    private let entered = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingOldest(1))
+    init(failsOpening: Bool) { self.failsOpening = failsOpening }
+    func chat(_ request: ChatRequest) throws -> InferenceSession<ChatEvent> {
+        if failsOpening { throw CapabilityError.unavailable("request failed before stream") }
+        let pair = InferenceSession<ChatEvent>.make(limits: try StreamLimits(), estimatedBytes: { $0.estimatedBytes })
+        emitter = pair.emitter
+        try pair.emitter.yield(.text(""))
+        entered.continuation.yield(())
+        return pair.session
+    }
+    func waitUntilEntered() async {
+        var iterator = entered.stream.makeAsyncIterator()
+        _ = await iterator.next()
+    }
+    func release(_ outcome: String) throws {
+        let emitter = try #require(emitter)
+        switch outcome {
+        case "text":
+            try emitter.yield(.text("首个输出"))
+            try emitter.yield(.finished(.stop))
+            emitter.finish()
+        case "native":
+            try emitter.yield(.toolCall(.init(id: "call", name: "fixture", argumentsJSON: "{}")))
+        case "finish":
+            try emitter.yield(.finished(.stop))
+            emitter.finish()
+        default: emitter.fail(CapabilityError.unavailable("stream failed"))
+        }
+    }
+}
+
+@Test(
+    .actionCatalog, .timeLimit(.minutes(1)),
+    arguments: ["text", "native", "finish", "failure", "openFailure", "cancel"])
+func assistantReplyWaitingEndsOnFirstOutputAndAllRequestTerminations(outcome: String) async throws {
+    let model = ReplyWaitingChat(failsOpening: outcome == "openFailure")
+    let agent = try AssistantAgent(
+        stateContext: try publicStateFixture(), reportsReplyActivity: true, chat: model,
+        context: try AgentContextRepository(
+            agent: .assistant, scope: UUID().uuidString, state: AssistantContextState()))
+    try await agent.start()
+    var outputs = agent.outputs.makeAsyncIterator()
+    try await agent.receive(
+        AgentInput(
+            id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("hello"),
+            turn: .init(id: UUID().uuidString, ordinal: 1)))
+    var started: String?
+    while let envelope = await outputs.next() {
+        if case .actionCall(let call) = envelope.output,
+            call.actionPath.description == "UI.Expression.setReplyWaiting"
+        {
+            #expect(call.parameters["enabled"] == "true")
+            started = call.parameters["requestID"]
+            break
+        }
+    }
+    let requestID = try #require(started)
+    if outcome != "openFailure" {
+        await model.waitUntilEntered()
+        if outcome == "cancel" { await agent.stop() } else { try await model.release(outcome) }
+    }
+    var ended = false
+    while let envelope = await outputs.next() {
+        if outcome == "cancel", case .communication(let message) = envelope.output,
+            let activity = message.message.content(as: ReplyActivity.self), activity.inputs.isEmpty
+        {
+            ended = true
+        }
+        if case .actionCall(let call) = envelope.output,
+            call.actionPath.description == "UI.Expression.setReplyWaiting"
+        {
+            #expect(call.parameters == ["enabled": "false", "requestID": requestID])
+            ended = true
+            break
+        }
+    }
+    #expect(ended)
+    await agent.stop()
+}
+
+@Test(.actionCatalog, .timeLimit(.minutes(1))) func assistantReplyWaitingEmitsOneExitForAStreamingAnswer() async throws
+{
+    let agent = try AssistantAgent(
+        stateContext: try publicStateFixture(), reportsReplyActivity: true, chat: ChatFixture(),
+        context: try AgentContextRepository(
+            agent: .assistant, scope: UUID().uuidString, state: AssistantContextState()))
+    _ = try await bindSpeechRequests(agent)
+    try await agent.start()
+    var outputs = FixtureGenerationOutputs(agent: agent).makeAsyncIterator()
+    let input = AgentInput(
+        id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("hello"),
+        turn: .init(id: UUID().uuidString, ordinal: 1))
+    try await agent.receive(input)
+    var answer: [OutputEnvelope] = []
+    while let envelope = try await outputs.next() {
+        // Reply occupancy facts have their own finished control; they are not this request's terminal.
+        guard envelope.inputID == input.id else { continue }
+        answer.append(envelope)
+        if case .control(let value) = envelope.output,
+            value == "agent.finished" || value.hasPrefix("agent.error:")
+        {
+            break
+        }
+    }
+    let markers = answer.compactMap { envelope -> ActionCall? in
+        guard case .actionCall(let call) = envelope.output,
+            call.actionPath.description == "UI.Expression.setReplyWaiting"
+        else { return nil }
+        return call
+    }
+    #expect(markers.map { $0.parameters["enabled"] } == ["true", "false"], "Outputs: \(answer.map(\.output))")
+    #expect(Set(markers.compactMap { $0.parameters["requestID"] }).count == 1)
+    #expect(answer.contains { $0.output == .control("agent.finished") })
+    await agent.stop()
+}

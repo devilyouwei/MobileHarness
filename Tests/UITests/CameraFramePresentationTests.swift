@@ -297,8 +297,8 @@ import Testing
     #expect(root.camera.state.videoFrame == nil)
     #expect(presentation.snapshot.skeleton == nil)
     #expect(root.camera.state.videoGeneration > generation)
-    #expect(throws: UIContainerError.stopped) { try root.start() }
-    #expect(throws: UIContainerError.stopped) { try root.setForeground(true) }
+    #expect(throws: UIFailure.self) { try root.start() }
+    #expect(throws: UIFailure.self) { try root.setForeground(true) }
     #expect(throws: UIContainerError.stopped) { try presentation.presentVideo(video) }
     let replacement = UIContainer()
     try replacement.start()

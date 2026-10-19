@@ -57,6 +57,16 @@
             state.finishUserTranscript()
         }
 
+        public func setReplyWaiting(_ enabled: Bool, requestID: String, invocation: any FunctionInput) throws {
+            try Task.checkCancellation()
+            try state.requirePresentation()
+            guard state.accepts(token), state.isVoiceActive, acceptsSession(invocation.context.sessionID) else {
+                throw CancellationError()
+            }
+            guard acceptPresentation(invocation.context, update: .replyWaiting) else { return }
+            state.presentReplyWaiting(enabled, requestID: requestID)
+        }
+
         public func beginReplyTurn(invocation: any FunctionInput) throws {
             try Task.checkCancellation()
             try state.requirePresentation()

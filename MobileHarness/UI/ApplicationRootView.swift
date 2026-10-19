@@ -32,12 +32,8 @@
                                 startupContent
                             }
                             .overlay {
-                                if let session = container, !session.conversation.hasActiveInteraction,
-                                    assembly.homePreparation.blocksNewActions
-                                {
-                                    HomeModelPreparationOverlay(
-                                        state: assembly.homePreparation, retry: assembly.retryHomePreparation,
-                                        cancel: assembly.cancelHomePreparation)
+                                if let session = container, session.conversation.showsModelRetry {
+                                    HomeModelPreparationRetry(retry: assembly.retryHomePreparation)
                                 }
                             }
                         }

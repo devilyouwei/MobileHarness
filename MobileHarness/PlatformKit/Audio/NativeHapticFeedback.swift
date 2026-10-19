@@ -1,4 +1,5 @@
 #if os(iOS)
+    import AVFAudio
     import CoreHaptics
     import Foundation
     import UIKit
@@ -63,11 +64,14 @@
             busy = true
             defer { busy = false }
             let native = generator(style)
-            native.prepare()
             for pulse in 0..<count {
                 if pulse > 0 { try await Task.sleep(for: .milliseconds(intervalMS)) }
                 try Task.checkCancellation()
                 try admission?.check()
+                // A recording backend may reconfigure the shared session after its initial setup.
+                // Restore only haptic access at the point of use, without interrupting capture.
+                try AVAudioSession.sharedInstance().setAllowHapticsAndSystemSoundsDuringRecording(true)
+                native.prepare()
                 native.impactOccurred(intensity: CGFloat(intensity))
             }
             try Task.checkCancellation()

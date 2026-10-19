@@ -249,16 +249,17 @@ public final class ForegroundPreparation {
     public enum State: Equatable, Sendable {
         case inactive, checking
         case preparing(String)
-        case ready, deferred, cancelled
+        case ready, deferred
         case failed(component: String, message: String)
     }
+    public typealias LoadingReport = @MainActor @Sendable (Bool) -> Void
     public struct Step {
         public let id: String
         public let isReady: @MainActor () async throws -> Bool
-        public let prepare: @MainActor () async throws -> Void
+        public let prepare: @MainActor (@escaping LoadingReport) async throws -> Void
         public init(
             id: String, isReady: @escaping @MainActor () async throws -> Bool,
-            prepare: @escaping @MainActor () async throws -> Void
+            prepare: @escaping @MainActor (@escaping LoadingReport) async throws -> Void
         ) {
             self.id = id
             self.isReady = isReady
@@ -267,6 +268,7 @@ public final class ForegroundPreparation {
     }
     public private(set) var state: State = .inactive
     private var steps: (@MainActor () -> [Step])?
+    private var onValidationFailure: (@MainActor (String, ValidationError) -> Void)?
     private var canPrepare: (@MainActor () -> Bool)?
     private var project: (@MainActor (State) -> Void)?
     private var worker: Task<Void, Never>?
@@ -276,11 +278,13 @@ public final class ForegroundPreparation {
     private var revision: UInt64 = 0
     public init(
         steps: @escaping @MainActor () -> [Step], canPrepare: @escaping @MainActor () -> Bool,
-        project: @escaping @MainActor (State) -> Void
+        project: @escaping @MainActor (State) -> Void,
+        onValidationFailure: @escaping @MainActor (String, ValidationError) -> Void = { _, _ in }
     ) {
         self.steps = steps
         self.canPrepare = canPrepare
         self.project = project
+        self.onValidationFailure = onValidationFailure
     }
     deinit { worker?.cancel() }
     private func publish(_ value: State) {
@@ -305,13 +309,6 @@ public final class ForegroundPreparation {
         publish(.checking)
         startIfIdle()
     }
-    public func cancel() {
-        guard active, !closed else { return }
-        revision &+= 1
-        pending = false
-        worker?.cancel()
-        publish(.cancelled)
-    }
     private func startIfIdle() {
         guard active, !closed, pending, worker == nil else { return }
         pending = false
@@ -335,25 +332,30 @@ public final class ForegroundPreparation {
                     publish(.deferred)
                     return
                 }
-                publish(.preparing(step.id))
-                try await step.prepare()
+                let componentID = step.id
+                try await step.prepare { [weak self] loading in
+                    guard let self, self.active, !self.closed, selected == self.revision else { return }
+                    self.publish(loading ? .preparing(componentID) : .checking)
+                }
                 try check(selected)
-                guard try await step.isReady() else { throw PreparationError.notReady }
+                publish(.checking)
+                guard try await step.isReady() else { throw ValidationError.notReady }
                 try check(selected)
             }
             for step in selectedSteps {
                 component = step.id
                 try check(selected)
-                guard try await step.isReady() else { throw PreparationError.notReady }
+                guard try await step.isReady() else { throw ValidationError.notReady }
                 try check(selected)
             }
             publish(.ready)
         } catch {
             guard active, !closed, selected == revision, !Task.isCancelled else { return }
             publish(.failed(component: component, message: String(String(describing: error).prefix(2048))))
+            if let failure = error as? ValidationError { onValidationFailure?(component, failure) }
         }
     }
-    private enum PreparationError: Error { case notReady }
+    public enum ValidationError: Error, Sendable, Equatable { case notReady }
     private func check(_ selected: UInt64) throws {
         try Task.checkCancellation()
         guard active, !closed, selected == revision else { throw CancellationError() }
@@ -373,5 +375,6 @@ public final class ForegroundPreparation {
         steps = nil
         canPrepare = nil
         project = nil
+        onValidationFailure = nil
     }
 }

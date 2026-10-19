@@ -21,6 +21,7 @@ public protocol VoiceOutputHandling: AnyObject, Sendable {
     func presentTranscript(_ text: String, invocation: any FunctionInput) throws
     func finishTranscript(invocation: any FunctionInput) throws
     func beginReplyTurn(invocation: any FunctionInput) throws
+    func setReplyWaiting(_ enabled: Bool, requestID: String, invocation: any FunctionInput) throws
     func presentVoiceState(_ state: UIActions.VoiceState, invocation: any FunctionInput) throws
     func presentExpression(_ emotion: UIActions.Emotion, invocation: any FunctionInput) async throws
     func restoreExpression(invocation: any FunctionInput) async throws
@@ -41,7 +42,7 @@ public protocol CameraOutputHandling: AnyObject, Sendable {
 public final class RuntimePresentation: UIPresentationCapability, UIUpdateCapability, SpeechPlaybackCapability,
     PosePresentationCapability, CameraControlCapability, SpeechListeningCapability, TaskControlCapability,
     UIFeedbackCapability, UIEffectCapability, RuntimeFailurePresentationCapability,
-    BluetoothStatusPresentationCapability
+    BluetoothStatusPresentationCapability, LoadingExpressionPresentationCapability
 {
     public var taskControl:
         (@Sendable (String, [String: String], String, String, String, String?) async throws -> String)?
@@ -66,7 +67,7 @@ public final class RuntimePresentation: UIPresentationCapability, UIUpdateCapabi
     public func presentBluetoothHome(
         _ phase: BluetoothPresentationPhase, revision: UInt64, invocation: any FunctionInput
     ) async throws {
-        try validateBluetooth(invocation)
+        try validateApplicationControl(invocation)
         guard let status = BluetoothConnectionStatus(rawValue: phase.rawValue),
             homeBluetooth.presentBluetoothConnection(status, revision: revision)
         else { throw UIContainerError.stale }
@@ -74,16 +75,23 @@ public final class RuntimePresentation: UIPresentationCapability, UIUpdateCapabi
     public func presentBluetoothSettings(
         _ phase: BluetoothPresentationPhase, revision: UInt64, invocation: any FunctionInput
     ) async throws {
-        try validateBluetooth(invocation)
+        try validateApplicationControl(invocation)
         guard let status = BluetoothConnectionStatus(rawValue: phase.rawValue),
             deviceBluetooth.presentBluetoothConnection(status, revision: revision)
         else { throw UIContainerError.stale }
     }
-    private func validateBluetooth(_ invocation: any FunctionInput) throws {
+    private func validateApplicationControl(_ invocation: any FunctionInput) throws {
         try Task.checkCancellation()
         guard invocation.context.source == "applicationControl", invocation.context.sessionID == rootSessionID,
             invocation.context.taskID == nil
         else { throw CommunicationError.unauthorized }
+    }
+    public func setLoadingExpression(_ enabled: Bool, revision: UInt64, invocation: any FunctionInput) async throws {
+        try validateApplicationControl(invocation)
+        switch expressions.setLoading(enabled, revision: revision) {
+        case .applied, .superseded: return
+        case .rejected: throw UIContainerError.stale
+        }
     }
     private let activity: any ActivityPresenting
     public func recordRuntimeFailure(_ issue: RuntimeIssue, invocation: any FunctionInput) async throws {
@@ -258,6 +266,10 @@ public final class RuntimePresentation: UIPresentationCapability, UIUpdateCapabi
     public func finishTranscript(invocation: any FunctionInput) async throws {
         guard let voice else { throw CommunicationError.scopeClosed }
         try voice.finishTranscript(invocation: invocation)
+    }
+    public func setReplyWaiting(_ enabled: Bool, requestID: String, invocation: any FunctionInput) async throws {
+        guard let voice else { throw CommunicationError.scopeClosed }
+        try voice.setReplyWaiting(enabled, requestID: requestID, invocation: invocation)
     }
     public func beginReplyTurn(invocation: any FunctionInput) async throws {
         guard let voice else { throw CommunicationError.scopeClosed }

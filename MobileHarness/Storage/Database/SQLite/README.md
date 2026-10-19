@@ -29,3 +29,6 @@ accept named domain-supplied migrations, including partial unfinished-message an
 ## 统一容器异常通道
 
 ✅ SQLiteDatabaseFactory/Storage/Repositories 把报告器传到 SQLiteDatabase；中央读写、迁移、准备、关闭异常原样保留并报告。不得将 SQL/参数当作事件额外字段，诊断不写回数据库、不重试事务。
+
+
+✅ 初始化与清理复合失败统一使用StorageCore.StorageFailure，不再使用独立准备失败类型；underlying保留初始化主错误，cleanupErrors保留附加错误。未确认清理继续阻止旧作用域被复用，stop不丢弃多项清理错误。

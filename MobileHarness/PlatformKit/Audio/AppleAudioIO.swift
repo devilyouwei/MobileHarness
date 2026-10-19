@@ -24,6 +24,14 @@
         }
     }
 
+    /// Synchronous configuration shared by native callers, on each caller's existing executor.
+    private func configureNativeAudioSession() throws {
+        let session = AVAudioSession.sharedInstance()
+        try session.setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker, .allowBluetoothHFP])
+        try session.setAllowHapticsAndSystemSoundsDuringRecording(true)
+        try session.setActive(true)
+    }
+
     /// All output graph mutation is serialized away from MainActor. Native calls do not suspend.
     private actor NativePlaybackGraph {
         private lazy var engine = AVAudioEngine()
@@ -45,16 +53,10 @@
             }
             installed = true
         }
-        func configureSession() throws {
-            let session = AVAudioSession.sharedInstance()
-            try session.setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker, .allowBluetoothHFP])
-            try session.setAllowHapticsAndSystemSoundsDuringRecording(true)
-            try session.setActive(true)
-        }
         func begin(_ id: String, configureSession: Bool) throws {
             guard token == nil else { throw AudioIOError.busy }
             token = id
-            if configureSession && !engine.isRunning { try self.configureSession() }
+            if configureSession && !engine.isRunning { try configureNativeAudioSession() }
         }
         private func connect(_ sampleRate: Int) throws -> AVAudioFormat {
             install()
@@ -207,7 +209,6 @@
         private var captureToken: String?
         public private(set) var captureContext = AudioCaptureContext()
         private var captureReadiness: AudioCaptureReadiness?
-        private var capturePreparation: (id: String, task: Task<Void, Error>)?
         private var spatialCapture: SpatialAudioCapture?
         private let log = Logger(subsystem: "dev.mobileharness", category: "AudioCapture")
         private var capture: AsyncThrowingStream<MicrophoneFrame, Error>.Continuation?
@@ -282,7 +283,7 @@
                 captureToken = token
                 do {
                     try Task.checkCancellation()
-                    try await prepareCaptureSession(token: token)
+                    try prepareCaptureSession(token: token)
                     let audio = AVAudioSession.sharedInstance()
                     let input = captureInput(audio)
                     var spatialSupport: AudioCaptureContext.SpatialSupport = .unknown
@@ -321,7 +322,7 @@
                         guard captureToken == token, !Task.isCancelled else { throw CancellationError() }
                         spatialCapture = nil
                         // Release the failed spatial graph before reconfiguring and starting the mono engine.
-                        try await prepareCaptureSession(token: token)
+                        try prepareCaptureSession(token: token)
                     } else if preferSpatial {
                         spatialSupport = .inputUnavailable
                         fallback = .inputUnavailable
@@ -408,19 +409,10 @@
                 throw error
             }
         }
-        private func prepareCaptureSession(token: String) async throws {
-            let id = UUID().uuidString
-            let playback = playback
-            let task = Task { try await playback.configureSession() }
-            capturePreparation = (id, task)
-            defer { if capturePreparation?.id == id { capturePreparation = nil } }
-            try await withTaskCancellationHandler {
-                try await task.value
-                try Task.checkCancellation()
-                guard captureToken == token else { throw CancellationError() }
-            } onCancel: {
-                task.cancel()
-            }
+        private func prepareCaptureSession(token: String) throws {
+            try Task.checkCancellation()
+            guard captureToken == token else { throw CancellationError() }
+            try configureNativeAudioSession()
         }
         private func captureInput(_ audio: AVAudioSession) -> AudioCaptureContext.Input {
             guard let input = audio.currentRoute.inputs.first else { return .unknown }
@@ -613,10 +605,6 @@
             if hadCapture { observations.finish() }
             captureReadiness?.resolve(.failure(CancellationError()))
             captureReadiness = nil
-            let preparation = capturePreparation
-            preparation?.task.cancel()
-            _ = await preparation?.task.result
-            if capturePreparation?.id == preparation?.id { capturePreparation = nil }
             let backend = spatialCapture
             spatialCapture = nil
             await backend?.stop()

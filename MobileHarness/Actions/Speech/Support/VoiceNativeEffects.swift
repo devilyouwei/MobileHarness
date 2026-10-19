@@ -10,7 +10,7 @@
     @MainActor public final class VoiceNativeEffects {
         public let haptic: any HapticFeedbackProviding
         public let cue: any CuePlaying
-        public var preparedCue: (request: UIActions.CueRequest, pcm: PlaybackPCM)?
+        private var preparedCue: (request: UIActions.CueRequest, pcm: PlaybackPCM)?
         public var feedbackStart: (context: ActionExecutionContext, gate: ListeningFeedbackStart)?
         private let audio: any AudioInputOutput
         private let state: any ConversationPresenting
@@ -23,12 +23,16 @@
             self.audio = audio
             self.state = state
         }
+        @discardableResult
         public func prepareCue(_ request: UIActions.CueRequest) async throws -> PlaybackPCM {
+            try Task.checkCancellation()
             if let cached = preparedCue, cached.request == request { return cached.pcm }
             let samples = try await Task.detached(priority: .userInitiated) { try FeedbackTone.samples(for: request) }
                 .value
             try Task.checkCancellation()
-            return PlaybackPCM(samples: samples, sampleRate: FeedbackTone.sampleRate)
+            let pcm = PlaybackPCM(samples: samples, sampleRate: FeedbackTone.sampleRate)
+            preparedCue = (request, pcm)
+            return pcm
         }
         public func playCue(
             _ request: UIActions.CueRequest, invocation: any FunctionInput, validate: @MainActor () throws -> Void
@@ -36,15 +40,7 @@
             let started = feedbackStart?.context == invocation.context ? feedbackStart?.gate : nil
             do {
                 try validate()
-                let pcm: PlaybackPCM
-                if let cached = preparedCue, cached.request == request {
-                    pcm = cached.pcm
-                } else {
-                    let samples = try await Task.detached(priority: .userInitiated) {
-                        try FeedbackTone.samples(for: request)
-                    }.value
-                    pcm = PlaybackPCM(samples: samples, sampleRate: FeedbackTone.sampleRate)
-                }
+                let pcm = try await prepareCue(request)
                 try validate()
                 if let started {
                     try await cue.play(pcm) { started.resolve(.success(())) }

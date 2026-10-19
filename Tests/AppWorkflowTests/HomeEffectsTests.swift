@@ -105,3 +105,39 @@ private func homeEffectInput(session: String = UUID().uuidString) -> FunctionInv
     #expect(state.assistantReply.isEmpty && state.liveTranscript.isEmpty)
     effects.stop()
 }
+
+@Test(arguments: ["", "本轮回复"]) @MainActor
+func listeningRestorationClearsFinalUserCaptionEvenWithoutReplyText(reply: String) async {
+    let state = ConversationState()
+    state.isVoiceActive = true
+    state.presentTranscript("本轮用户输入")
+    state.finishUserTranscript()
+    state.appendReply(reply)
+    let effects = HomeEffectsWorkflow(activity: ActionActivityState())
+    effects.bind(state)
+
+    effects.replyDidFinish()
+
+    #expect(state.liveTranscript.isEmpty && !state.transcriptFinalized)
+    #expect(state.isVoiceActive && state.assistantReply == reply)
+    await effects.stopAndWait()
+}
+
+@Test @MainActor func listeningRestorationPreservesNextPartialTranscriptThroughReplyExpiry() async throws {
+    let state = ConversationState()
+    state.isVoiceActive = true
+    state.presentTranscript("下一轮正在说话")
+    state.appendReply("上一轮回复")
+    let effects = HomeEffectsWorkflow(activity: ActionActivityState())
+    effects.bind(state)
+
+    effects.replyDidFinish()
+    #expect(state.liveTranscript == "下一轮正在说话" && !state.transcriptFinalized)
+    let deadline = ContinuousClock.now + .seconds(3)
+    while !state.assistantReply.isEmpty, ContinuousClock.now < deadline {
+        try await Task.sleep(for: .milliseconds(10))
+    }
+    #expect(state.assistantReply.isEmpty)
+    #expect(state.liveTranscript == "下一轮正在说话" && !state.transcriptFinalized)
+    await effects.stopAndWait()
+}

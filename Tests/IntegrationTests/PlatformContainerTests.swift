@@ -35,8 +35,8 @@ import Testing
     try await root.stop()
     try await root.stop()
     #expect(!root.isAvailable)
-    #expect(throws: PlatformError.self) { try root.start() }
-    await #expect(throws: PlatformError.self) { try await root.setForeground(true) }
+    #expect(throws: PlatformFailure.self) { try root.start() }
+    await #expect(throws: PlatformFailure.self) { try await root.setForeground(true) }
 }
 
 private actor UnconfirmedPlatformLink: NexArmBluetoothLink {
@@ -78,10 +78,10 @@ private actor UnconfirmedPlatformLink: NexArmBluetoothLink {
         onFailure: channel.sink(module: "platform"))
     try root.start()
     root.invalidate()
-    await #expect(throws: PlatformCleanupFailure.self) { try await root.setForeground(false) }
-    await #expect(throws: PlatformCleanupFailure.self) { try await root.setForeground(true) }
-    await #expect(throws: PlatformCleanupFailure.self) { try await root.stop() }
-    await #expect(throws: PlatformCleanupFailure.self) { try await root.stop() }
+    await #expect(throws: PlatformFailure.self) { try await root.setForeground(false) }
+    await #expect(throws: PlatformFailure.self) { try await root.setForeground(true) }
+    await #expect(throws: PlatformFailure.self) { try await root.stop() }
+    await #expect(throws: PlatformFailure.self) { try await root.stop() }
     #expect(!root.isAvailable)
     #expect(await link.disconnects == 1)
     #expect(
@@ -143,7 +143,7 @@ private actor UnconfirmedPlatformLink: NexArmBluetoothLink {
     try await lifecycle.stop()
     #expect(trace.events == ["ui.start", "consumer.start", "consumer.stop", "ui.stop"])
     #expect(!root.isAvailable)
-    #expect(throws: UI.UIContainerError.stopped) { try root.start() }
+    #expect(throws: UI.UIFailure.self) { try root.start() }
 }
 
 private enum UIConsumerFailure: Error, Equatable { case start }
@@ -163,7 +163,7 @@ private enum UIConsumerFailure: Error, Equatable { case start }
         #expect(failure.cleanup.isEmpty)
     }
     #expect(!root.isAvailable)
-    #expect(throws: UI.UIContainerError.stopped) { try root.start() }
+    #expect(throws: UI.UIFailure.self) { try root.start() }
 }
 
 @Test @MainActor func modelRegistrationSharesFourPortsAndIsolatesRoots() async throws {

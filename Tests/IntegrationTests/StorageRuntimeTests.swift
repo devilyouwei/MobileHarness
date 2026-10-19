@@ -120,18 +120,19 @@ private func waitForStorageClosed(_ storage: SQLiteDatabaseStorage) async throws
 
     @Test func initializationCleanupFailureRemainsAStopFailure() async throws {
         let storage = SQLiteDatabaseStorage {
-            throw StoragePreparationFailure(
-                primary: StorageRuntimeFixtureError.open, cleanup: StorageRuntimeFixtureError.cleanup)
+            throw StorageFailure(
+                component: "database", operation: "prepare", underlying: StorageRuntimeFixtureError.open,
+                cleanupErrors: [StorageRuntimeFixtureError.cleanup])
         }
         do {
             try await storage.start()
             Issue.record("Expected preparation failure")
-        } catch let error as StoragePreparationFailure {
-            #expect(error.primary as? StorageRuntimeFixtureError == .open)
-            #expect(error.cleanup as? StorageRuntimeFixtureError == .cleanup)
+        } catch let error as StorageFailure {
+            #expect(error.underlying as? StorageRuntimeFixtureError == .open)
+            #expect(error.cleanupErrors.first as? StorageRuntimeFixtureError == .cleanup)
         }
         for _ in 0..<2 {
-            await #expect(throws: StorageRuntimeFixtureError.cleanup) { try await storage.stop() }
+            await #expect(throws: StorageFailure.self) { try await storage.stop() }
         }
     }
 

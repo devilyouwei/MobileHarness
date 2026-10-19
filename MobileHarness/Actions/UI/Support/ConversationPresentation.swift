@@ -8,7 +8,7 @@ import UI
 /// Session, active task and registered function permissions are checked by the calling host/Gateway.
 public struct ConversationPresentation: Sendable {
     public enum Update: Hashable, Sendable {
-        case transcript, finishTranscript, voiceState, beginReply, reply, expression
+        case transcript, finishTranscript, voiceState, beginReply, reply, expression, replyWaiting
     }
     public private(set) var turn: AgentTurn?
     public private(set) var replyTurn: AgentTurn?
@@ -106,7 +106,7 @@ public struct ConversationPresentation: Sendable {
                 replySource = source
                 replyDecisionID = decisionID
                 replyTaskID = taskID
-                for key in [Update.beginReply, .reply, .expression] { sequences[key] = nil }
+                for key in [Update.beginReply, .reply, .expression, .replyWaiting] { sequences[key] = nil }
             } else {
                 guard incoming == replyTurn, source == replySource, decisionID == replyDecisionID,
                     taskID == replyTaskID,

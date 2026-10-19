@@ -45,7 +45,11 @@ public final class AudioContainer {
             for io in instances.values { await io.stop() }
             owner = nil
             let failures = instances.values.compactMap(\.cleanupFailure)
-            if !failures.isEmpty { throw PlatformCleanupFailure(errors: failures) }
+            if let primary = failures.first {
+                throw PlatformFailure(
+                    component: "audio", operation: "stop", underlying: primary,
+                    cleanupErrors: Array(failures.dropFirst()), code: .cleanupFailed)
+            }
         }
     #endif
     public init(admission: PlatformAdmission) { self.admission = admission }

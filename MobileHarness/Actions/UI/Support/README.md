@@ -1,5 +1,7 @@
 # UI Support — 中立呈现接口、载荷与反馈生成
 
+✅ UIUpdateCapability 与 VoiceOutputHandling 转发请求等待；ConversationPresentation 按会话／轮次／任务／序号校验，再提交 UI 自有请求 ID，不能修改模型准备状态。
+
 ## 简介
 
 定义与 UI 框架无关的能力协议、请求值、姿态载荷、反馈 PCM，以及三个呈现目录的依赖绑定。核心值/函数源编译于 Actions；RuntimePresentation 等外层集成源由互斥清单编译于 ActionBindings，通过 UI 公开接口呈现。
@@ -110,3 +112,10 @@ HomeEffectsWorkflow 的 timer、文本/UUID 围栏和状态在 UI/Conversation�
 ✅ 已实现：BluetoothStatusPresentationCapability与RuntimePresentation提供两个窄呈现端点，校验ApplicationControl来源／根会话／无task及递增revision，注入同根home和devices，不创建备用UI状态。
 
 ✅ 已实现：BluetoothStatusActions.swift单独拥有UI.BluetoothStatus.showBluetoothHome／showBluetoothSettings；连接状态不归RuntimeDiagnostics异常函数组。使用现有Actions/UI目录和编译目标。
+
+
+✅ UIModule注册setLoading，RuntimePresentation校验applicationControl来源、根会话、无Task及取消，再提交UI自有ExpressionPresenting.setLoading；不借用聆听开关或有限表情回执。
+
+✅ setLoading为state函数，必须使用Void handler产生completed，禁止value完成；回归通过FunctionExecutor校验完成类型和Tool返回成功，不能只检查UI副作用。
+
+✅ 已实现：setLoading 区分正常被更新取代的呈现与非法提交；applied／superseded 为状态投影完成，rejected 仍抛错，身份校验和取消保持。

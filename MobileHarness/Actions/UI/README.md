@@ -1,5 +1,7 @@
 # UI Actions — 呈现、反馈与装饰效果函数
 
+✅ Expression.setReplyWaiting 接纳 enabled／requestID，完成表示呈现端口接纳，不等待持续动画；仅可信内部目录使用，不暴露为模型工具。
+
 ## 简介
 
 此业务域将表情、文字、视线、姿态、资源呈现、导航以及短反馈转换为类型化能力调用。它与独立 UI 模块分属不同编译目标：Actions/UI 不导入 SwiftUI、UIKit 或 UI 项目实现。
@@ -40,7 +42,7 @@ flowchart TB
 
 | 模块 | 函数与参数 | 完成边界 |
 | --- | --- | --- |
-| Expression | express/setExpression：emotion | express 加入呈现与恢复；setExpression 接纳持续基础状态 |
+| Expression | express/setExpression：emotion；内部 setReplyWaiting：enabled/requestID | express 加入呈现与恢复；setExpression 接纳持续基础状态 |
 | Caption | beginReplyTurn/finishTranscript 无参数；print/setTranscript：text | 端点接纳本轮或文字更新 |
 | VoiceState | setVoiceState：listening/hearing/processing | 显示状态接纳，不产生麦克风效果 |
 | Gaze | moveEyes：有限 x/y，均为 −1…1 | 视线目标接纳 |
@@ -94,3 +96,12 @@ Notice 的非空文字限 1024 UTF-8 字节，tone 为 info/warning/error（默�
 ✅ 已实现：新增两个内部Bluetooth呈现Action（首页／设置），参数为连接phase和revision，使用独立能力协议；只更新呈现，不能连接、发送、恢复设备或调用模型。
 
 ✅ 已实现：BluetoothStatusActions.swift单独拥有UI.BluetoothStatus.showBluetoothHome／showBluetoothSettings；连接状态不归RuntimeDiagnostics异常函数组。使用现有Actions/UI目录和编译目标。
+
+✅ 蓝牙呈现 Action 源码由 Actions 独占，ActionBindings 的排除表同步列出，避免 SwiftPM 未归属警告。
+
+
+✅ ExpressionActions.setLoading是独立状态函数，参数enabled／revision，完成表示呈现状态接纳。它不属于模型表情Skill，不等待模型加载或循环动画结束；Gateway按内部Tool调用。
+
+✅ setLoading为state函数，必须使用Void handler产生completed，禁止value完成；回归通过FunctionExecutor校验完成类型和Tool返回成功，不能只检查UI副作用。
+
+✅ 请求等待归 ExpressionActions，与模型准备 setLoading 同属表情域；请求身份与会话准入独立处理，不放入字幕函数。
