@@ -1,5 +1,7 @@
 # System Support — 资源值、私有暂存与配置事务
 
+✅ ArtifactServices 只生成 ModelKit 自有制品配置并组合 Files／下载适配，不持有模型管理器或停止任务。Provider 配置与库存／制品操作使用注入的模型子能力，后台事件复用同根 artifacts。
+
 ## 简介
 
 提供 System 的五个目录、资源事实与偏好、Provider 私有请求暂存/事务/凭据文档，以及设备控制值。业务规则属于本目录，文件一致性和原生服务由 Storage 与注入端点负责。
@@ -80,7 +82,7 @@ Settings/model-preference services consume DocumentStore protocols; concrete set
 
 ActionBindings 编译 SettingsCredentialAdapter、SettingsProviderAdapter、SettingsModelResourcesAdapter、ModelArtifactStorageAdapter、ArtifactServices、ModelDownloadBackgroundService 及显式模型/语音诊断执行。Provider 事务和资源策略仍由 Actions 核心服务拥有；绑定只调用 SDK/Keychain/文件能力并适配展示值。SettingsCredentialAdapter 提供公开的无参数构造和凭据协议实现；SettingsProviderAdapter.discoverModels 提供公开异步发现端口，供 AgentBindings 注入领域请求服务。
 
-ArtifactServices 根持有一个准备任务；模型权重仍按需加载。后台回调最多保留 10 个 session completion，重复 identifier 替换时先完成旧回调，溢出明确保留 lastFailure 并结束该次交接。真实制品读取错误保留，不伪造恢复成功。单份 OS 准备额度由 PlatformKit.NativeBackgroundAllowance 提供，不承担设备安全。
+模型根持有唯一准备任务；ArtifactServices 仅适配配置，权重仍按需加载。后台回调最多保留 10 个 session completion，重复 identifier 替换时先完成旧回调，溢出明确保留 lastFailure 并结束该次交接。真实制品读取错误保留，不伪造恢复成功。单份 OS 准备额度由 PlatformKit.NativeBackgroundAllowance 提供，不承担设备安全。
 
 SpeechDiagnosticWorkflow 的 stopAndWait 加入真实播放、操作和卸载；卸载/音频会话清理错误保留并向根服务传播，成功报告只在真实完成后设置。App 委托仅转交 OS 参数。
 

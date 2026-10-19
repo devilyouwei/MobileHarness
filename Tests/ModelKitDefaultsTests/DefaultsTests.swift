@@ -4,46 +4,67 @@ import ModelKitDefaults
 import ModelKitRuntime
 import Testing
 
-@Test func defaultAssemblyIsLazyAndSpeechHasManagedSystemFallback() async throws {
+@Test @MainActor func modelRootsAreIsolatedLazyAndTerminal() async throws {
     guard #available(macOS 27, iOS 27, *) else { return }
-    let missing = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-    let managers = try await withThrowingTaskGroup(of: ModelManager.self) { group in
-        for _ in 0..<16 { group.addTask { try await ModelKitDefaults.manager(resources: missing) } }
-        var results: [ModelManager] = []
-        for try await result in group { results.append(result) }
-        return results
-    }
-    let manager = try #require(managers.first)
-    #expect(managers.allSatisfy { $0 === manager })
-    await #expect(throws: ModelKitConfigurationError.resourceDirectoryConflict) {
-        _ = try await ModelKitDefaults.manager(resources: missing.appendingPathComponent("other"))
-    }
-    for capability in [ProvidedCapability.chat, .recognition, .synthesis, .voiceActivity, .pose] {
-        #expect(try await manager.status(capability) == .registered)
-    }
-    let pose = try await manager.get(.pose, load: false)
-    let samePose = try await manager.get(.pose, load: false)
-    let samePoseInstance = (pose as AnyObject) === (samePose as AnyObject)
-    #expect(samePoseInstance)
-    #expect(try await manager.status(.pose) == .unloaded)
-    let synthesis = try await manager.get(.synthesis, load: false)
-    let again = try await manager.get(.synthesis, load: false)
-    let sameInstance = (synthesis as AnyObject) === (again as AnyObject)
-    #expect(sameInstance)
-    let mossNano = try await manager.get(ModelKitDefaults.mossNano, as: .synthesis, load: false)
-    let sameMossNanoInstance = (synthesis as AnyObject) === (mossNano as AnyObject)
-    #expect(!sameMossNanoInstance)
-    // Facade loading does not load missing custom weights; warmup selects system speech.
-    try await manager.load(.synthesis)
-    #expect(try await manager.status(.synthesis) == .unmanaged)
-    #expect(try await manager.status(ModelKitDefaults.mossNano) == .unloaded)
-    #expect(try await manager.status(.chat) == .registered)
-    await #expect(throws: ModelRegistrationError.missingDefault(.judge)) { _ = try await manager.get(.judge) }
-    await manager.shutdown()
-    let closed = try await ModelKitDefaults.manager(resources: missing)
-    let sameManager = closed === manager
-    #expect(sameManager)
-    await #expect(throws: CapabilityError.sessionClosed) { _ = try await closed.get(.synthesis) }
+    let resources = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    let first = ModelContainer(resources: resources)
+    let second = ModelContainer(resources: resources)
+    #expect(first.language !== second.language)
+    #expect(first.speech !== second.speech)
+    #expect(first.vision !== second.vision)
+    #expect(first.artifacts !== second.artifacts)
+    await #expect(throws: InferenceAdmissionError.self) { try await first.language.warmup() }
+    try await first.start()
+    try await second.start()
+    #expect(try await first.language.status() == .registered)
+    #expect(try await first.vision.status() == .registered)
+    #expect(try await first.speech.status(.recognition) == .registered)
+    try await first.speech.unload(.synthesis)
+    try await first.setForeground(true)
+    try await second.setForeground(true)
+    // Registering defaults does not require any model artifact directory or device permission.
+    #expect(!FileManager.default.fileExists(atPath: resources.path))
+    first.invalidate()
+    await #expect(throws: InferenceAdmissionError.self) { try await first.speech.warmup(.synthesis) }
+    try await first.setForeground(false)
+    try await first.setForeground(true)
+    let oldLanguage = first.language
+    try await first.stop()
+    try await first.stop()
+    await #expect(throws: InferenceAdmissionError.self) { try await oldLanguage.warmup() }
+    await #expect(throws: InferenceAdmissionError.self) { try await first.start() }
+    // Another root with the same resource path is independent and remains usable.
+    try await second.speech.configure(recognition: false, synthesis: false)
+    try await second.stop()
 }
 
-private final class TestBundleAnchor: NSObject {}
+@Test @MainActor func stoppedModelRootCannotPrepareArtifactsOrReopenPorts() async throws {
+    guard #available(macOS 27, iOS 27, *) else { return }
+    let root = ModelContainer(resources: URL(fileURLWithPath: "/missing/models"))
+    let port = root.artifacts
+    try await root.stop()
+    await #expect(throws: InferenceAdmissionError.self) { try await port.prepare() }
+    await #expect(throws: InferenceAdmissionError.self) { try await root.setForeground(true) }
+}
+
+@Test @MainActor func modelChatConfigurationIsRootLocalAndUpdatesRetainedPort() async throws {
+    guard #available(macOS 27, iOS 27, *) else { return }
+    let path = URL.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    let first = ModelContainer(resources: path)
+    let second = ModelContainer(resources: path)
+    try await first.start()
+    try await second.start()
+    try await first.setForeground(true)
+    try await second.setForeground(true)
+    let port = first.language
+    #expect(await !port.supportsToolCalls)
+    try await port.configure(
+        .init(baseURL: URL(string: "https://models.example.invalid/v1")!, apiKey: "", model: "fixture"))
+    #expect(await port.supportsToolCalls)
+    #expect(await !second.language.supportsToolCalls)
+    try await port.configure(nil)
+    #expect(await !port.supportsToolCalls)
+    #expect(!FileManager.default.fileExists(atPath: path.path))
+    try await first.stop()
+    try await second.stop()
+}

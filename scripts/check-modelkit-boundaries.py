@@ -11,7 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 KIT = ROOT / 'MobileHarness/ModelKit'
 FORBIDDEN = {'Storage', 'StorageState', 'StorageFiles', 'StorageCore', 'StorageDatabase', 'AppStorage', 'FactoryKit', 'StorageTasks', 'StorageMedia', 'StorageDevices', 'StorageSQLite', 'AgentCore', 'Agents', 'Gateway', 'StorageCore', 'StorageChat', 'StorageCache', 'Actions', 'Tools', 'PlatformKit', 'SwiftUI', 'UIKit', 'HarnessKit', 'UI', 'AppWorkflows', 'BehaviorAssembly', 'Types'}
 SYSTEM_MODULES = {
-    'Foundation', 'Synchronization', 'CoreFoundation', 'Darwin', 'os',
+    'Foundation', 'Synchronization', 'CoreFoundation', 'Darwin', 'os', 'OSLog',
     'AVFAudio', 'Speech', 'CoreVideo', 'CoreML', 'CoreAI', 'Metal',
     'Accelerate', 'Vision', 'ImageIO', 'Compression', 'CryptoKit',
 }
@@ -759,7 +759,7 @@ for source in (ROOT / 'MobileHarness/App').rglob('*.swift'):
         errors.append(f'App must call Storage runtime ports, not backend lifecycle details: {source.relative_to(ROOT)}')
 storage_registration = (ROOT / 'MobileHarness/App/Composition/ModuleRegistration.swift').read_text()
 if not all(value in storage_registration for value in (
-    'id: "storage"', 'id: "platform"', 'id: "ui"', 'services.uiContainer.start()', 'services.uiContainer.invalidate', 'services.uiContainer.setForeground($0)', 'services.uiContainer.stop()', 'dependencies: ["storage", "platform", "ui"]', 'services.storage.start()', 'services.storage.stop()',
+    'id: "storage"', 'id: "platform"', 'id: "ui"', 'services.uiContainer.start()', 'services.uiContainer.invalidate', 'services.uiContainer.setForeground($0)', 'services.uiContainer.stop()', 'dependencies: ["storage", "platform", "ui", "model"]', 'services.storage.start()', 'services.storage.stop()',
 )):
     errors.append('App must register the actual Storage runtime before its consumers')
 for source in (ROOT / 'MobileHarness/App/Lifecycle').glob('*.swift'):
@@ -1322,3 +1322,48 @@ for folder in ('Agents', 'Actions'):
     for source in (ROOT / 'MobileHarness' / folder).rglob('*.swift'):
         if re.search(r':\s*(?:NativeCuePlayback|NativeHapticFeedback)\s*[,\n)]', source.read_text()):
             raise SystemExit(f'Business feedback consumers require protocol ports: {source.relative_to(ROOT)}')
+
+# App-owned model roots; production consumers receive ports, never process singletons.
+model_root = (ROOT / 'MobileHarness/ModelKit/Support/Management/ModelContainer.swift').read_text()
+if 'ProcessModels' in model_root or 'static let speechSelection' in model_root:
+    raise SystemExit('Model selection and manager ownership must be instance-local')
+for source in (ROOT / 'MobileHarness').rglob('*.swift'):
+    if 'ModelKit' in source.parts:
+        continue
+    if re.search(r'\bModelKitDefaults\s*\.', source.read_text()) or re.search(r'\bModelManager\s*\(', source.read_text()):
+        raise SystemExit(f'Production consumer bypasses injected model ports: {source}')
+for marker in ('Factory<ModelContainer>', 'Factory<ModelLanguageContainer>', 'Factory<ModelSpeechContainer>', 'Factory<ModelVisionContainer>', 'Factory<ModelArtifactsContainer>'):
+    if marker not in ui_registration:
+        raise SystemExit(f'Missing App model registration: {marker}')
+for marker in ('id: "model"', 'services.model.start()', 'services.model.invalidate', 'services.model.setForeground($0)', 'services.model.stop()'):
+    if marker not in storage_registration:
+        raise SystemExit(f'Missing model lifecycle connection: {marker}')
+print('Instance-local model root, injected ports and lifecycle ownership checks pass.')
+
+for source in (ROOT / 'MobileHarness').rglob('*.swift'):
+    if 'GemmaContextBudget' in source.read_text() and 'Gemma4' not in source.parts:
+        raise SystemExit(f'Local context fitting escaped its ModelKit provider: {source}')
+print('Local context fitting remains confined to ModelKitGemma4.')
+
+# Native capture startup must not synchronously construct its session on the UI actor.
+spatial_start_source = (ROOT / 'MobileHarness/PlatformKit/Audio/SpatialAudioCapture.swift').read_text()
+if 'private let session = AVCaptureSession()' in spatial_start_source:
+    raise SystemExit('Spatial session construction must run inside its capture actor method')
+audio_start_source = (ROOT / 'MobileHarness/PlatformKit/Audio/AppleAudioIO.swift').read_text()
+audio_start_body = audio_start_source.split('public func startCapture(preferSpatial:', 1)[1].split('private func captureInput', 1)[0]
+if 'audio.setActive(' in audio_start_body or 'audio.setCategory(' in audio_start_body:
+    raise SystemExit('Native capture session activation must execute off MainActor')
+for contract in ('capturePreparation', 'await preparation?.task.result', 'guard captureToken == token else { throw primary }'):
+    if contract not in audio_start_source:
+        raise SystemExit('Capture preparation must be owned, joined and token fenced: ' + contract)
+print('Native capture startup isolation and ownership checks pass.')
+
+# Home preparation is host lifecycle orchestration; no Foundation SDK locates models or IoC.
+home_preparation_composition = (ROOT / 'MobileHarness/App/Composition/ServiceFactories.swift').read_text()
+if 'ForegroundPreparation(' not in home_preparation_composition:
+    raise SystemExit('App must own the home readiness coordinator')
+home_preparation_registration = (ROOT / 'MobileHarness/App/Composition/ModuleRegistration.swift').read_text()
+for contract in ('id: "homePreparation"', 'await services.homePreparation.stop()'):
+    if contract not in home_preparation_registration:
+        raise SystemExit('Home preparation must join the lifecycle graph: ' + contract)
+print('Home readiness remains App-owned with explicit lifecycle cleanup.')

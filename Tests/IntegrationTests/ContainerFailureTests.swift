@@ -101,7 +101,8 @@ private actor FailedDiagnosticDatabase: DatabaseStorage {
         let agent = try ApplicationControlAgent(sessionID: sessionID, context: context)
         let presentation = RuntimePresentation(
             cameraControl: UnusedCameraControl(), rootSessionID: sessionID, activity: activity.state,
-            effects: ui.home.effects, expressions: ui.home.expressions)
+            effects: ui.home.effects, expressions: ui.home.expressions,
+            homeBluetooth: ui.home.conversation, deviceBluetooth: ui.devices.state)
         let function = UIActions.recordFailureDefinition(completing: { invocation in
             if rejectPresentation { throw InjectedContainerFailure.operation(99) }
             return .value(try await UIActions.recordFailure(invocation: invocation, using: presentation))
@@ -109,7 +110,17 @@ private actor FailedDiagnosticDatabase: DatabaseStorage {
         output = OutputGateway(
             manager: manager, requests: input,
             tools: try ToolRegistry(modules: [
-                DiagnosticTools(definitions: [try BehaviorProtocolBindings.bind(function)])
+                DiagnosticTools(
+                    definitions: try [
+                        function,
+                        UIActions.showBluetoothHomeDefinition(completing: { invocation in
+                            .value(try await UIActions.showBluetoothHome(invocation: invocation, using: presentation))
+                        }),
+                        UIActions.showBluetoothSettingsDefinition(completing: { invocation in
+                            .value(
+                                try await UIActions.showBluetoothSettings(invocation: invocation, using: presentation))
+                        }),
+                    ].map(BehaviorProtocolBindings.bind))
             ]),
             policy: policy, sink: { _ in })
         runtime = ApplicationControlIntentRuntime(
@@ -194,7 +205,8 @@ private actor FailedDiagnosticDatabase: DatabaseStorage {
     try display.start()
     let presentation = RuntimePresentation(
         cameraControl: UnusedCameraControl(), rootSessionID: "diagnostic-session", activity: activity.state,
-        effects: display.home.effects, expressions: display.home.expressions)
+        effects: display.home.effects, expressions: display.home.expressions,
+        homeBluetooth: display.home.conversation, deviceBluetooth: display.devices.state)
     let function = UIActions.recordFailureDefinition(completing: { invocation in
         .value(try await UIActions.recordFailure(invocation: invocation, using: presentation))
     })
@@ -441,16 +453,18 @@ private actor FailedDiagnosticDatabase: DatabaseStorage {
     await channel.stop()
 }
 
-@Test func containerFailureExplicitLifecycleCancellationIsKeptButNormalCancellationIsIgnored() async {
+@Test func containerFailureExplicitLifecycleCancellationIsBroadcastButNormalCancellationIsRetained() async {
     let channel = ContainerFailureChannel()
     #expect(!channel.report(module: "storage", component: "lifecycle", operation: "start", error: CancellationError()))
-    #expect(channel.snapshot().records.isEmpty)
+    #expect(channel.snapshot().records.count == 1)
+    #expect(channel.snapshot().records.first?.delivery == .suppressed)
+    #expect(channel.snapshot().records.first?.error is CancellationError)
     #expect(
         channel.report(
             module: "storage", component: "lifecycle", operation: "start", phase: .startup, error: CancellationError(),
             includeCancellation: true))
-    #expect(channel.snapshot().records.count == 1)
-    #expect(channel.snapshot().records.first?.event.phase == .startup)
+    #expect(channel.snapshot().records.count == 2)
+    #expect(channel.snapshot().records.last?.event.phase == .startup)
     await channel.stop()
 }
 
@@ -743,4 +757,166 @@ private func diagnosticInput(
     #expect(recorded.map(\.0) == ["cache.audio", "cache.audio"])
     #expect(recorded.map(\.1) == ["begin", "register"])
     #expect(!cancelled.withLock { $0 })
+}
+
+@Test func bluetoothConnectionConditionsKeepNativeEvidenceAndDoNotMaskTransportFaults() async {
+    let channel = ContainerFailureChannel()
+    channel.report(
+        module: "platform", component: "connectivity.bluetooth", operation: "scan",
+        error: NexArmBluetoothError.unavailable)
+    channel.report(
+        module: "platform", component: "connectivity.bluetooth", operation: "connect",
+        error: NexArmBluetoothFailure.timeout(.connecting))
+    channel.report(
+        module: "platform", component: "connectivity.bluetooth", operation: "write",
+        error: NexArmBluetoothFailure.sendBlocked)
+    let records = channel.snapshot().records
+    #expect(records[0].event.code == "bluetooth.unavailable")
+    #expect(records[0].event.message == "unavailable")
+    #expect(records[1].event.code == "bluetooth.connectionUnavailable")
+    #expect(records[2].event.code != "bluetooth.connectionUnavailable")
+    await channel.stop()
+}
+
+private func bluetoothEnvironment(
+    connection: String, availability: String = "available", recovery: String = "idle", sequence: UInt64
+) throws -> AppEnvironmentFact {
+    let facts = try JSONSerialization.data(withJSONObject: [
+        "connection": connection, "availability": availability, "recovery": recovery,
+    ])
+    let value = try JSONSerialization.data(withJSONObject: ["bluetooth": String(decoding: facts, as: UTF8.self)])
+    return .init(category: .devices, sequence: sequence, value: String(decoding: value, as: UTF8.self))
+}
+
+@Test(.actionCatalog) @MainActor func bluetoothUnavailabilityIsPresentedAsStateWithoutFailureToast() async throws {
+    let activity = ActionActivityWorkflow(state: ActionActivityState())
+    let fixture = try RuntimeFailurePresentationFixture(activity: activity)
+    try await fixture.start(activity: activity)
+    let channel = ContainerFailureChannel()
+    channel.start()
+    channel.connect(input: fixture.input, sessionID: fixture.sessionID)
+    channel.report(
+        module: "platform", component: "connectivity.bluetooth", operation: "scan",
+        error: NexArmBluetoothError.unavailable)
+    try await containerEventually { await fixture.runtime.agent.status().processedInputs >= 1 }
+    try await fixture.runtime.observeEnvironment(bluetoothEnvironment(connection: "connecting", sequence: 1))
+    try await containerEventually {
+        fixture.ui.home.conversation.bluetoothStatus == .connecting
+            && fixture.ui.devices.state.connectionPresentation == .connecting
+    }
+    #expect(activity.state.errorToast == nil && activity.state.backgroundIssues.isEmpty)
+    try await fixture.runtime.observeEnvironment(bluetoothEnvironment(connection: "connected", sequence: 2))
+    try await containerEventually {
+        fixture.ui.home.conversation.bluetoothStatus == .connected
+            && fixture.ui.devices.state.connectionPresentation == .connected
+    }
+    let processedBeforeLateCondition = await fixture.runtime.agent.status().processedInputs
+    channel.report(
+        module: "platform", component: "connectivity.bluetooth", operation: "scan",
+        error: NexArmBluetoothError.unavailable)
+    try await containerEventually {
+        await fixture.runtime.agent.status().processedInputs > processedBeforeLateCondition
+    }
+    #expect(fixture.ui.home.conversation.bluetoothStatus == .connected)
+    try await fixture.runtime.observeEnvironment(
+        bluetoothEnvironment(connection: "idle", recovery: "waiting", sequence: 3))
+    try await containerEventually { fixture.ui.home.conversation.bluetoothStatus == .connecting }
+    try await fixture.runtime.observeEnvironment(
+        bluetoothEnvironment(connection: "idle", availability: "poweredOff", sequence: 4))
+    try await containerEventually {
+        fixture.ui.home.conversation.bluetoothStatus == .disconnected
+            && fixture.ui.devices.state.connectionPresentation == .disconnected
+    }
+    #expect(activity.state.errorToast == nil && activity.state.backgroundIssues.isEmpty)
+    channel.report(
+        module: "platform", component: "connectivity.bluetooth", operation: "write",
+        error: NexArmBluetoothFailure.sendBlocked)
+    try await containerEventually { activity.state.errorToast != nil }
+    #expect(channel.snapshot().records.contains { $0.event.code == "bluetooth.unavailable" })
+    await channel.stop()
+    await fixture.stop(activity: activity)
+}
+
+@Test(.actionCatalog) @MainActor func bluetoothPresentationActionsRejectForeignOwnersAndStaleRevisions() async throws {
+    let root = UIContainer()
+    try root.start()
+    let presentation = RuntimePresentation(
+        cameraControl: UnusedCameraControl(), rootSessionID: "bluetooth-root", activity: root.home.activity,
+        effects: root.home.effects, expressions: root.home.expressions,
+        homeBluetooth: root.home.conversation, deviceBluetooth: root.devices.state)
+    func invocation(
+        source: String = "applicationControl", session: String = "bluetooth-root", revision: String = "2",
+        extra: Bool = false
+    ) -> FunctionInvocation {
+        var parameters = ["phase": "connected", "revision": revision]
+        if extra { parameters["unknown"] = "value" }
+        return FunctionInvocation(
+            call: FunctionRequest(
+                actionPath: ActionIdentifier(domain: "UI", module: "BluetoothStatus", function: "showBluetoothHome"),
+                parameters: parameters),
+            context: ActionExecutionContext(source: source, sessionID: session, inputID: UUID().uuidString),
+            executionID: UUID().uuidString, results: ActionReportStore())
+    }
+    for value in [invocation(source: "assistant"), invocation(session: "retired-root"), invocation(extra: true)] {
+        await #expect(throws: (any Error).self) {
+            _ = try await UIActions.showBluetoothHome(invocation: value, using: presentation)
+        }
+    }
+    _ = try await UIActions.showBluetoothHome(invocation: invocation(), using: presentation)
+    #expect(root.home.conversation.bluetoothStatus == .connected)
+    await #expect(throws: UIContainerError.stale) {
+        _ = try await UIActions.showBluetoothHome(invocation: invocation(revision: "1"), using: presentation)
+    }
+    #expect(!root.devices.state.controlReady)
+    await root.stop()
+    await #expect(throws: UIContainerError.stale) {
+        _ = try await UIActions.showBluetoothHome(invocation: invocation(revision: "3"), using: presentation)
+    }
+}
+
+private struct DetailedContainerError: Error, CustomStringConvertible {
+    let detail: String
+    let underlying: NSError
+    var description: String { detail }
+}
+
+@Test func containerFailureRetainsOriginalErrorAndDistinguishesLongSharedPrefixes() async {
+    let channel = ContainerFailureChannel()
+    let prefix = String(repeating: "x", count: 700)
+    let native = NSError(domain: "native.test", code: 42, userInfo: ["detail": "original"])
+    for suffix in ["first", "second"] {
+        channel.report(
+            module: "storage", component: "files", operation: "read",
+            error: DetailedContainerError(detail: prefix + suffix, underlying: native))
+    }
+    let records = channel.snapshot().records
+    #expect(records.count == 2)
+    #expect(records[0].event.message == records[1].event.message)
+    #expect(records[0].fullMessage == prefix + "first")
+    #expect(records[1].fullMessage == prefix + "second")
+    #expect((records[0].error as? DetailedContainerError)?.underlying === native)
+    await channel.stop()
+}
+
+@Test @MainActor func foundationalLifecycleErrorsRetainEvidenceWithoutBusinessPublication() async throws {
+    let registry = ApplicationContainer(
+        root: FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString))
+    let channel = registry.containerFailures()
+    let publications = Mutex(0)
+    channel.connect { _ in publications.withLock { $0 += 1 } }
+    channel.start()
+    let platform = registry.platform()
+    await #expect(throws: PlatformError.stopped) { try await platform.setForeground(true) }
+    let model = registry.model()
+    await #expect(throws: InferenceAdmissionError.stopped) { try await model.setForeground(true) }
+    let reporter = StorageFailureReporter(receive: channel.sink(module: "storage"))
+    reporter.report("root", "stop", CancellationError())
+    let records = channel.snapshot().records
+    #expect(records.count == 3)
+    #expect(records.allSatisfy { $0.delivery == .suppressed })
+    #expect(records.contains { $0.error is PlatformError })
+    #expect(records.contains { $0.error is InferenceAdmissionError })
+    #expect(records.contains { $0.error is CancellationError })
+    await channel.stop()
+    #expect(publications.withLock { $0 } == 0)
 }

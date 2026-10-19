@@ -3,7 +3,7 @@ import ModelKit
 @_spi(ModelAssembly) import ModelKitRuntime
 import ModelKitYOLOPose
 
-extension ModelKitDefaults {
+extension DefaultModelAssembly {
     static func registerVision(manager: ModelManager, resources: URL) async throws {
         try await manager.register(
             ModelRegistration(

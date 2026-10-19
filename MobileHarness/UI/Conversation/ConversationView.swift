@@ -2,6 +2,7 @@ import Foundation
 
 #if os(iOS)
     import SwiftUI
+    import UIKit
 
     /// Keep caption observation outside the native effects surface's update inputs.
     @MainActor
@@ -14,7 +15,9 @@ import Foundation
         let held: Bool
         var body: some View {
             NativeCompanionSurface(
-                phase: state.voicePhase, reduceMotion: reduceMotion,
+                phase: state.showsModelPreparation
+                    ? (state.modelPreparation.isLoading || state.modelPreparation == .inactive ? .loading : .failed)
+                    : state.voicePhase, reduceMotion: reduceMotion,
                 expression: state.displayedExpression, emphasized: state.expressionEmphasized,
                 transitionID: state.expressionTransitionID, gaze: gaze,
                 faceWidth: faceWidth, eyeCenter: eyeCenter,
@@ -81,12 +84,12 @@ import Foundation
                         .gesture(
                             LongPressGesture(minimumDuration: 0.5, maximumDistance: 24)
                                 .updating($holdingVoice) { pressing, held, _ in held = pressing }
-                                .onEnded { _ in if state.isReady { toggleVoice() } }
+                                .onEnded { _ in if state.allowsHomeInteraction { toggleVoice() } }
                         )
                         .simultaneousGesture(
                             DragGesture(minimumDistance: 0)
                                 .onChanged { touch in
-                                    guard state.isReady else { return }
+                                    guard state.allowsHomeInteraction else { return }
                                     voicePressChanged?(true)
                                     let origin = ListeningLightOrigin(
                                         x: (touch.startLocation.x + (geometry.size.width - diameter) / 2)
@@ -97,11 +100,11 @@ import Foundation
                                 }
                                 .onEnded { _ in voicePressChanged?(false) }
                         )
-                        .allowsHitTesting(state.isReady)
+                        .allowsHitTesting(state.allowsHomeInteraction)
                         .accessibilityElement(children: .ignore)
                         .accessibilityAddTraits(.isButton)
                         .accessibilityAction {
-                            if state.isReady {
+                            if state.allowsHomeInteraction {
                                 state.listeningLightOrigin = nil
                                 toggleVoice()
                             }
@@ -178,11 +181,15 @@ import Foundation
                             .allowsHitTesting(showsReply)
                             .animation(
                                 reduceMotion ? nil : .easeOut(duration: 0.35), value: state.assistantReplyOpacity)
-                            if state.voicePhase == .failed || state.listeningControlMessage != nil {
+                            if !state.showsModelPreparation
+                                && (state.voicePhase == .failed || state.listeningControlMessage != nil)
+                            {
                                 Text(state.listeningControlMessage ?? state.voiceStatus)
                                     .font(.callout).foregroundStyle(.white.opacity(0.72))
                                     .multilineTextAlignment(.center)
-                            } else if !showsReply && (state.liveTranscript.isEmpty || state.transcriptFinalized) {
+                            } else if !state.showsModelPreparation && !showsReply
+                                && (state.liveTranscript.isEmpty || state.transcriptFinalized)
+                            {
                                 Text(hint)
                                     .font(.subheadline).tracking(1)
                                     .foregroundStyle(.white.opacity(0.45))
@@ -221,6 +228,10 @@ import Foundation
 
                     }
 
+                    let islandLayout = geometry.safeAreaInsets.top >= 59 && geometry.size.width < 600
+                    HomeBluetoothIndicator(status: state.bluetoothStatus)
+                        .frame(width: 16, height: 24)
+                        .position(x: islandLayout ? geometry.size.width / 2 - 92 : 24, y: islandLayout ? -24 : 16)
                     ConversationVoiceBars(state: state, placement: .bottom, reduceMotion: reduceMotion)
                         .frame(width: geometry.size.width, height: 100 + geometry.safeAreaInsets.bottom)
                         .position(
@@ -347,6 +358,107 @@ import Foundation
     private func replySpectrumY(in geometry: GeometryProxy) -> CGFloat {
         let islandLayout = geometry.safeAreaInsets.top >= 59 && geometry.size.width < 600
         return islandLayout ? 31 - 24 - 13 : 31
+    }
+
+    @MainActor
+    struct HomeModelPreparationOverlay: View {
+        let state: HomeModelPreparation
+        let retry: () -> Void
+        let cancel: () -> Void
+        var body: some View {
+            GeometryReader { geometry in
+                VStack(spacing: 16) {
+                    Text(state.message)
+                        .font(.callout).foregroundStyle(.white.opacity(0.8))
+                        .multilineTextAlignment(.center).lineLimit(4)
+                        .accessibilityIdentifier("home.models.status")
+                    HStack(spacing: 28) {
+                        if state.isLoading {
+                            Button("取消", action: cancel).accessibilityIdentifier("home.models.cancel")
+                        } else {
+                            Button("重试", action: retry).accessibilityIdentifier("home.models.retry")
+                        }
+                    }.buttonStyle(.bordered)
+                }
+                .frame(width: min(geometry.size.width - 48, 420))
+                .position(x: geometry.size.width / 2, y: geometry.size.height * 0.64)
+            }
+        }
+    }
+
+    @MainActor
+    private struct HomeBluetoothIndicator: View {
+        let status: BluetoothConnectionStatus
+        @Environment(\.accessibilityReduceMotion) private var reduceMotion
+        @Environment(\.scenePhase) private var scenePhase
+        var body: some View {
+            BluetoothStatusGlyph(
+                status: status, flashing: status.isConnecting && !reduceMotion && scenePhase == .active
+            )
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("机械臂蓝牙，" + status.title)
+            .accessibilityIdentifier("home.bluetooth.status")
+            .allowsHitTesting(false)
+        }
+    }
+    @MainActor
+    private struct BluetoothStatusGlyph: UIViewRepresentable {
+        let status: BluetoothConnectionStatus
+        let flashing: Bool
+        final class GlyphView: UIView {
+            let glyph = CAShapeLayer()
+            override init(frame: CGRect) {
+                super.init(frame: frame)
+                isUserInteractionEnabled = false
+                glyph.fillColor = nil
+                glyph.lineWidth = 1.7
+                glyph.lineCap = .round
+                glyph.lineJoin = .round
+                layer.addSublayer(glyph)
+            }
+            required init?(coder: NSCoder) { nil }
+            override func layoutSubviews() {
+                super.layoutSubviews()
+                CATransaction.begin()
+                CATransaction.setDisableActions(true)
+                glyph.frame = bounds
+                let path = UIBezierPath()
+                let x = bounds.midX
+                let top = bounds.minY + 2
+                let bottom = bounds.maxY - 2
+                path.move(to: CGPoint(x: x, y: top))
+                path.addLine(to: CGPoint(x: x + 5, y: top + 5))
+                path.addLine(to: CGPoint(x: x - 5, y: bottom - 5))
+                path.move(to: CGPoint(x: x, y: bottom))
+                path.addLine(to: CGPoint(x: x + 5, y: bottom - 5))
+                path.addLine(to: CGPoint(x: x - 5, y: top + 5))
+                path.move(to: CGPoint(x: x, y: top))
+                path.addLine(to: CGPoint(x: x, y: bottom))
+                glyph.path = path.cgPath
+                CATransaction.commit()
+            }
+        }
+        func makeUIView(context: Context) -> GlyphView { GlyphView() }
+        func updateUIView(_ view: GlyphView, context: Context) {
+            CATransaction.begin()
+            CATransaction.setDisableActions(true)
+            view.glyph.strokeColor = (status == .disconnected ? UIColor.systemGray : UIColor.systemBlue).cgColor
+            CATransaction.commit()
+            if flashing {
+                if view.glyph.animation(forKey: "bluetooth.connecting") == nil {
+                    let animation = CABasicAnimation(keyPath: "opacity")
+                    animation.fromValue = 0.25
+                    animation.toValue = 1
+                    animation.duration = 0.65
+                    animation.autoreverses = true
+                    animation.repeatCount = .infinity
+                    view.glyph.add(animation, forKey: "bluetooth.connecting")
+                }
+            } else {
+                view.glyph.removeAnimation(forKey: "bluetooth.connecting")
+            }
+        }
+        static func dismantleUIView(_ view: GlyphView, coordinator: ()) { view.glyph.removeAllAnimations() }
     }
 
 #endif

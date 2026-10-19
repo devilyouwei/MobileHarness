@@ -28,7 +28,12 @@ public final class UIHomeContainer {
         conversation.apply(update)
         return true
     }
+    public func presentModelPreparation(_ value: HomeModelPreparation) {
+        guard admission.acceptsRetained(), value == .inactive || admission.acceptsLive() else { return }
+        conversation.modelPreparation = value
+    }
     func invalidate() {
+        conversation.modelPreparation = .inactive
         effectOwner.stop()
         expressionOwner.resetExpression()
         conversation.isVoiceActive = false
@@ -41,6 +46,7 @@ public final class UIHomeContainer {
     func stop() async {
         await effectOwner.stopAndWait()
         await activity.stopPresentation()
+        conversation.modelPreparation = .inactive
         conversation.isReady = false
         expressionOwner.resetExpression()
     }

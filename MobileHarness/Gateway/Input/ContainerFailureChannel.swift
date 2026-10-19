@@ -3,8 +3,10 @@ import Foundation
 import Synchronization
 
 public struct ContainerFailureRecord: Sendable {
-    public enum Delivery: String, Sendable { case pending, published, failed, dropped }
+    public enum Delivery: String, Sendable { case pending, published, failed, dropped, suppressed }
     public var event: ContainerFailureEvent
+    public let error: any Error
+    public let fullMessage: String
     public var delivery: Delivery = .pending
     public var deliveryFailure: String?
 }
@@ -42,21 +44,29 @@ public final class ContainerFailureChannel: Sendable {
         wake.continuation.finish()
         state.withLock { $0.worker?.cancel() }
     }
-    public func sink(module: String) -> @Sendable (String, String, any Error) -> Void {
+    public func sink(
+        module: String, shouldPublish: @escaping @Sendable (any Error) -> Bool = { _ in true }
+    ) -> @Sendable (String, String, any Error) -> Void {
         { [self] component, operation, error in
-            report(module: module, component: component, operation: operation, error: error)
+            report(
+                module: module, component: component, operation: operation, error: error, publish: shouldPublish(error))
         }
     }
     @discardableResult public func report(
         module: String, component: String, operation: String,
-        phase: ContainerFailureEvent.Phase = .operation, error: any Error, includeCancellation: Bool = false
+        phase: ContainerFailureEvent.Phase = .operation, error: any Error, includeCancellation: Bool = false,
+        publish: Bool = true
     ) -> Bool {
-        guard !(error is CancellationError) || includeCancellation else { return false }
+        let fullMessage = String(describing: error)
+        let shouldPublish =
+            publish && (!(error is CancellationError) || includeCancellation)
+            && !DeviceInputAdapter.isLifecycleControl(module: module, error: error)
         let event = ContainerFailureEvent(
             scopeID: scopeID, module: String(module.prefix(16)), component: String(component.prefix(64)),
             operation: String(operation.prefix(64)), phase: phase,
-            code: String(String(reflecting: type(of: error)).prefix(32)),
-            message: String(String(describing: error).prefix(512)))
+            code: DeviceInputAdapter.bluetoothFailureCode(module: module, component: component, error: error)
+                ?? String(String(reflecting: type(of: error)).prefix(32)),
+            message: String(fullMessage.prefix(512)))
         let accepted = state.withLock { value in
             guard !value.closed else {
                 value.rejectedAfterStop &+= 1
@@ -67,12 +77,13 @@ public final class ContainerFailureChannel: Sendable {
             if let index = value.records.firstIndex(where: {
                 $0.event.module == event.module && $0.event.component == event.component
                     && $0.event.operation == event.operation && $0.event.phase == event.phase
-                    && $0.event.code == event.code && $0.event.message == event.message
+                    && $0.event.code == event.code && $0.fullMessage == fullMessage
+                    && ($0.delivery == .suppressed) == !shouldPublish
             }) {
                 id = value.records[index].event.id
                 if value.records[index].event.occurrences < UInt64.max { value.records[index].event.occurrences += 1 }
                 value.records[index].event.lastOccurred = event.lastOccurred
-                value.records[index].delivery = .pending
+                value.records[index].delivery = shouldPublish ? .pending : .suppressed
                 value.records[index].deliveryFailure = nil
             } else {
                 if value.records.count == 128 {
@@ -82,17 +93,20 @@ public final class ContainerFailureChannel: Sendable {
                     value.evictedRecords &+= 1
                 }
                 id = event.id
-                value.records.append(ContainerFailureRecord(event: event))
+                value.records.append(
+                    ContainerFailureRecord(
+                        event: event, error: error, fullMessage: fullMessage,
+                        delivery: shouldPublish ? .pending : .suppressed))
             }
-            Self.enqueue(id, state: &value)
+            if shouldPublish { Self.enqueue(id, state: &value) }
             value.revision &+= 1
             return true
         }
         if accepted {
             notify()
-            wake.continuation.yield(())
+            if shouldPublish { wake.continuation.yield(()) }
         }
-        return accepted
+        return accepted && shouldPublish
     }
     private static func enqueue(_ id: String, state: inout State) {
         guard !state.pending.contains(id) else { return }

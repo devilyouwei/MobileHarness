@@ -1,5 +1,7 @@
 # ModelKit Shared Support
 
+✅ Management 的 ModelContainer 组合实例级默认装配与四个子能力；Core 提供同步 InferenceAdmission、可恢复资源暂停和流式错误观察。Provider 和资源机制保持隔离。
+
 ## Purpose and boundaries
 
 Support groups shared SDK code while preserving independent compilation and ownership. Core owns neutral data/concurrency mechanisms; Backends owns reusable native graph/tensor execution; Management owns lifecycle/artifacts and default assembly in separate targets; Speech owns helpers shared within its capability domain. Concrete providers remain in Language, Speech and Vision.

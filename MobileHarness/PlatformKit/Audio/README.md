@@ -59,3 +59,5 @@ NativeAudioEvent 是事实而非Error。路由按前后输入／输出portType+U
 ❌ 原生路由、实际声音／触觉、持续模型负载及硬件连续性仍需真机验收。
 
 [PlatformKit](../README.md) · [Core](../Core/README.md)
+
+✅ 已实现：空间后端AVCaptureSession改为actor内惰性创建；录音共享会话配置在既有原生音频actor执行，主线程只拥有单个启动准备Task及token。停止先关闭token、取消并加入准备后再关闭原生后端；旧启动失败不能停止替代会话。保持首PCM就绪和空间失败加入后mono回退，不增加线程或PCM队列。

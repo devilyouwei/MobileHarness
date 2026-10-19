@@ -165,3 +165,47 @@ import Testing
         #expect(stableEarly > 0 && stableEarly == stableFull)
     }
 #endif
+
+@Test @MainActor func homePreparationGatePreservesActiveStopAndVoicePresentation() async throws {
+    let root = UIContainer()
+    try root.start()
+    try root.setForeground(true)
+    let state = root.home.conversation
+    state.isReady = true
+    state.voicePhase = .idle
+    root.home.presentModelPreparation(.preparing("language"))
+    #expect(state.showsModelPreparation && !state.allowsHomeInteraction)
+    #expect(state.voicePhase == .idle)
+    state.isVoiceActive = true
+    state.voicePhase = .listening
+    #expect(!state.showsModelPreparation && state.allowsHomeInteraction)
+    root.home.presentModelPreparation(.failed(component: "language", message: "fixture"))
+    #expect(state.allowsHomeInteraction && state.voicePhase == .listening)
+    state.isVoiceActive = false
+    #expect(!state.allowsHomeInteraction)
+    root.home.presentModelPreparation(.ready)
+    #expect(state.allowsHomeInteraction && !state.showsModelPreparation)
+    await root.stop()
+}
+
+@Test @MainActor func homePreparationPresentationRejectsInactiveAndStoppedRoots() async throws {
+    let root = UIContainer()
+    root.home.presentModelPreparation(.ready)
+    #expect(root.home.conversation.modelPreparation == .inactive)
+    try root.start()
+    try root.setForeground(true)
+    root.home.presentModelPreparation(.ready)
+    root.invalidate()
+    root.home.presentModelPreparation(.ready)
+    #expect(root.home.conversation.modelPreparation == .inactive)
+    await root.stop()
+    root.home.presentModelPreparation(.preparing("language"))
+    #expect(root.home.conversation.modelPreparation == .inactive)
+    let next = UIContainer()
+    try next.start()
+    try next.setForeground(true)
+    next.home.presentModelPreparation(.ready)
+    root.home.presentModelPreparation(.cancelled)
+    #expect(next.home.conversation.modelPreparation == .ready)
+    await next.stop()
+}

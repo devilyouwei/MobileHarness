@@ -1,5 +1,7 @@
 # Chat Requests and Provider Events
 
+✅ 已实现：仅 Gemma 的推理副本按不超过4096的后端有效总预算适配，当前排查版本移除全部system，最近5条消息按实际token计数筛减，保留当前输入；调用方请求与云端序列化不变。
+
 ## Summary
 
 Provider-neutral caller-owned conversation, image/native-call data and optional model-interface timing.
@@ -37,7 +39,7 @@ Typed chat/image/native-call contracts and optional timing are implemented.
 
 ## Consecutive user message boundaries
 
-Provider serialization preserves every original caller message boundary. Each caller user message keeps its original boundary and content; ChatRequest.messages remains authoritative. Providers retain their existing wire/token representation, input bounds and explicit unsupported-input failures. Responses reasoning parsing remains implemented. Role-order compatibility remains provider/model-specific.
+Cloud serialization preserves every original message boundary. Gemma fits an inference-only subset to its local window, preserving selected message boundaries and the complete current input; ChatRequest.messages remains unchanged. Providers retain their existing wire/token representation, input bounds and explicit unsupported-input failures. Responses reasoning parsing remains implemented. Role-order compatibility remains provider/model-specific.
 
 ## Request validation bounds
 
@@ -55,7 +57,7 @@ Provider serialization preserves every original caller message boundary. Each ca
 
 - No additional implementation work is declared for the documented contract values. Provider-specific limitations are listed in the provider designs below.
 
-✅ ChatTokenUsage 可选 cachedInput/cacheWriteInput，校验非负及不超过输入；缺失保持 nil。系统事实可单独置于上下文尾部，Gemma4 的首部规范化由其适配器负责。
+✅ ChatTokenUsage 可选 cachedInput/cacheWriteInput，校验非负及不超过输入；缺失保持 nil。系统事实可单独置于上下文尾部，Gemma4当前排查版本由适配器从推理副本移除全部system。
 
 
 ## 分类异常诊断
@@ -80,3 +82,7 @@ Provider serialization preserves every original caller message boundary. Each ca
 | `transport / httpStatus / provider` | 连接失败、HTTP 状态或经过格式校验的服务端错误代码。 |
 
 Stage 标识 http/framing/event/toolStart/toolArguments/toolEnd/completion/usage/reasoning；event、field、outputIndex 只在校验点可确定时出现。标识只接纳有界 ASCII 字母、数字及 `_.-`；非法/过长值用占位符表示，参数正文、用户消息、URL、Header 和凭据不进入诊断。
+
+✅ 本地Gemma在ModelKit内按后端有效窗口适配，当前iOS缓存安全限制比4096更小；接口及算法见 [Gemma4](Gemma4/README.md)。
+
+✅ 按用户要求，本地Gemma排查版本移除所有system，仅保留有界对话输入；云端及通用请求不变，详见Gemma4目录契约。

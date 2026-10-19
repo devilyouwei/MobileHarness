@@ -50,3 +50,7 @@ HomeEffectsWorkflow 拥有独立、可替换、按身份围栏的 Notice／光�
 [UI 根](../README.md) · [原生组件](../Components/README.md)
 
 ✅ 首页两处字幕继续消费同一UI值，向TextRenderer字幕传递根代际；根失活或新根后不得继续旧淡入。字幕仍是页面局部呈现，不改变业务会话、音频及相机链路。
+
+✅ 已实现：ConversationState增加与voicePhase独立的HomeModelPreparation；UIHomeContainer写入有生命周期接纳，inactive／stop清理。非就绪时禁新交互，但已活动会话仍可停止；加载眼睛复用原生Companion，不新增Canvas。页面提供进度、失败、取消及重试，正文不与原字幕重叠。
+
+✅ 已实现：首页灵动岛左侧增加蓝牙图标：未连接灰色、连接中蓝色闪烁、已连接蓝色；原生CAShapeLayer绘制标准蓝牙轮廓，CABasicAnimation闪烁，减少动态效果／后台停止闪烁，无Canvas或计时worker。非灵动岛布局放在安全区左上。

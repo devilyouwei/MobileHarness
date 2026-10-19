@@ -66,3 +66,7 @@ BehaviorAssembly.swift、BehaviorProtocolBindings.swift 和 NativeCleanupFailure
 ## ApplicationControl 异常展示
 
 ✅ 已实现：BehaviorProtocolBindings 将 UI.RuntimeDiagnostics 注册为直接、返回结果的内部 Tool；不添加模型 Action 授权，沿用实际调用身份与失败回执。
+
+✅ 已实现：独立UI.BluetoothStatus直接Tool组承载首页与设置两个蓝牙状态呈现函数；不暴露为模型Action别名。
+
+✅ 已实现：BluetoothStatusActions.swift单独拥有UI.BluetoothStatus.showBluetoothHome／showBluetoothSettings；连接状态不归RuntimeDiagnostics异常函数组。使用现有Actions/UI目录和编译目标。

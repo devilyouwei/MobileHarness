@@ -1,6 +1,8 @@
 import FactoryKit
 import Foundation
 import Gateway
+import ModelKit
+import ModelKitDefaults
 import PlatformKit
 import Storage
 import StorageCache
@@ -16,9 +18,16 @@ public final class ApplicationContainer: ManagedContainer, @unchecked Sendable {
     public let manager = ContainerManager()
     private let root: URL
     private let uiConfiguration: UIConfiguration
-    public init(root: URL, uiConfiguration: UIConfiguration = .init()) {
+    private let modelArtifacts: @Sendable (FilesContainer) async throws -> ModelArtifactConfiguration
+    public init(
+        root: URL, uiConfiguration: UIConfiguration = .init(),
+        modelArtifacts: @escaping @Sendable (FilesContainer) async throws -> ModelArtifactConfiguration = { _ in
+            throw CocoaError(.fileReadNoSuchFile)
+        }
+    ) {
         self.root = root
         self.uiConfiguration = uiConfiguration
+        self.modelArtifacts = modelArtifacts
     }
     public var containerFailures: Factory<ContainerFailureChannel> { self { ContainerFailureChannel() }.cached }
     @MainActor public var ui: Factory<UIContainer> {
@@ -51,6 +60,31 @@ public final class ApplicationContainer: ManagedContainer, @unchecked Sendable {
     }
     @MainActor public var cameraPresentation: Factory<UICameraContainer> {
         self { MainActor.assumeIsolated { self.ui().camera } }
+    }
+    @MainActor public var model: Factory<ModelContainer> {
+        self {
+            MainActor.assumeIsolated {
+                ModelContainer(
+                    resources: self.root.appendingPathComponent("Models/installed", isDirectory: true),
+                    prepareArtifacts: { [files = self.files(), configure = self.modelArtifacts] in
+                        try await configure(files)
+                    },
+                    onFailure: self.containerFailures().sink(
+                        module: "model", shouldPublish: { !($0 is InferenceAdmissionError) }))
+            }
+        }.cached
+    }
+    @MainActor public var languageModels: Factory<ModelLanguageContainer> {
+        self { MainActor.assumeIsolated { self.model().language } }
+    }
+    @MainActor public var speechModels: Factory<ModelSpeechContainer> {
+        self { MainActor.assumeIsolated { self.model().speech } }
+    }
+    @MainActor public var visionModels: Factory<ModelVisionContainer> {
+        self { MainActor.assumeIsolated { self.model().vision } }
+    }
+    @MainActor public var modelArtifactsCapability: Factory<ModelArtifactsContainer> {
+        self { MainActor.assumeIsolated { self.model().artifacts } }
     }
     @MainActor public var platform: Factory<PlatformContainer> {
         self {

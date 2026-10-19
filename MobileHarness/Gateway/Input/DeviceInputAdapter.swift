@@ -62,6 +62,33 @@ extension ExternalInputProviding {
 
 /// Native ingress codecs. The foundation SDK never constructs transport identities.
 public enum DeviceInputAdapter {
+    static func isLifecycleControl(module: String, error: any Error) -> Bool {
+        guard module == "platform", let error = error as? PlatformError else { return false }
+        return error == .unavailable || error == .stopped
+    }
+
+    static func bluetoothFailureCode(module: String, component: String, error: any Error) -> String? {
+        guard module == "platform", component == "connectivity.bluetooth" else { return nil }
+        if let error = error as? NexArmBluetoothError {
+            switch error {
+            case .unavailable: return "bluetooth.unavailable"
+            case .unknownDevice: return "bluetooth.deviceUnavailable"
+            case .incompatibleService: return "bluetooth.connectionUnavailable"
+            case .packetTooLarge: return nil
+            }
+        }
+        let step: NexArmBluetoothStep
+        switch error as? NexArmBluetoothFailure {
+        case .timeout(let value), .incompatibleService(let value): step = value
+        case .native(let value, _, _): step = value
+        default: return nil
+        }
+        switch step {
+        case .connecting, .services, .characteristics, .notifications: return "bluetooth.connectionUnavailable"
+        case .writing, .response: return nil
+        }
+    }
+
     public static let sources: Set<String> = ["phone.camera", "phone.microphone", "phone.bluetooth"]
     public static func audio(_ frame: MicrophoneFrame, sessionID: String, sequence: UInt64? = nil) throws -> AgentInput
     {

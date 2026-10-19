@@ -50,29 +50,28 @@
 
         init(
             home: UIHomeContainer, diagnostics: UIDiagnosticsContainer,
-            resources: URL, audio: AudioContainer, runtime: AgentServices,
+            language: any ModelLanguageProviding, speech: any ModelSpeechProviding,
+            memoryPressure: @escaping @Sendable () async -> Void, audio: AudioContainer, runtime: AgentServices,
             modelName: @escaping @Sendable () async throws -> String,
             progress: @MainActor (String) -> Void
         ) async throws {
             actionActivity = home.activity
-            let models = try await ModelKitDefaults.manager(resources: resources)
-            // Resolve stable capability handles before preparing the conversation models.
-            let recognition = try await models.get(.recognition, load: false)
-            let chat = CurrentChatCapability(models: models)
-            let vad = try await models.get(.voiceActivity, load: false)
-            let synthesis = try await models.get(.synthesis, load: false)
+            let recognition = speech.recognition
+            let chat = language
+            let vad = speech.voiceActivity
+            let synthesis = speech.synthesis
             let validationModel = synthesis
             let diagnosticState = diagnostics.speech
             self.diagnosticState = diagnosticState
             diagnostic = SpeechDiagnosticWorkflow(
                 state: diagnosticState, player: audio.io(.diagnostic), provider: validationModel,
-                load: { try await models.warmup(.synthesis) },
-                unload: { try await ModelKitDefaults.unloadSpeechSynthesis(resources: resources) })
+                load: { try await speech.warmup(.synthesis) },
+                unload: { try await speech.unload(.synthesis) })
             #if DEBUG
                 validateVoiceModels = {
                     try await ChatDiagnosticWorkflow.validate(chat: chat) {
-                        try await models.warmup(.recognition)
-                        try await models.warmup(.chat)
+                        try await speech.warmup(.recognition)
+                        try await language.warmup()
                     }
                 }
             #endif
@@ -97,7 +96,7 @@
             memoryWarnings = Task {
                 for await _ in warnings {
                     guard !Task.isCancelled else { break }
-                    await models.handleMemoryPressure()
+                    await memoryPressure()
                 }
             }
         }

@@ -1,5 +1,9 @@
 # ModelKit — Independent Inference SDK
 
+✅ 已实现：本地Gemma当前排查版本移除推理副本中的所有system，以实际tokenizer拟合最近最多5条对话消息和生成预算。使用后端有效窗口，当前iOS上限1024；当前输入不改写，无法容纳时明确拒绝。云端、Agent原请求及持久历史不变。
+
+✅ ModelContainer 是 App 管理的实例根，提供四个同根子能力。构造不产生模型／设备副作用；start 只注册工厂并准备制品元数据，setForeground 开放推理。实例私有配置与 manager 不跨根共享。
+
 ## Purpose and boundaries
 
 ModelKit supplies typed Language/Speech/Vision inference, model execution and model/artifact lifecycle. Core owns neutral values and concurrency mechanisms; capability domains own request/result contracts; concrete providers own algorithms and native integration; Management owns registration, residency, artifacts and default assembly.
@@ -106,7 +110,7 @@ Custom ASR/TTS switches default off and are independent. Kokoro is an explicitly
 
 ## Lifecycle, streams and failures
 
-Defaults owns one process manager. Consumers acquire stable typed handles; acquisition, resource residency and capability availability are distinct. Management owns registration/construction state and injects validated loading limits; Core owns resource residency and lease mechanics. One active inference per resource rejects overlap. Loading coalesces bounded waiters; unload drains active leases, shutdown cancels/joins and is terminal. Memory-pressure releaseWhenIdle evicts eligible idle resources.
+App owns one ModelContainer with four stable child ports. Each root owns an independent manager and speech selection. Consumers acquire stable typed handles; acquisition, resource residency and capability availability are distinct. Management owns registration/construction state and injects validated loading limits; Core owns resource residency and lease mechanics. One active inference per resource rejects overlap. Loading coalesces bounded waiters; unload drains active leases, shutdown cancels/joins and is terminal. Memory-pressure releaseWhenIdle evicts eligible idle resources.
 
 InferenceSession has one consumer and explicit event-count/byte limits. Core's default is 64 events/4096 estimated bytes per event; each provider declares its own bounds. Gemma uses 4096 events/4096 bytes; OpenAI uses 128 events/65,568 bytes with producer backpressure. Normal completion drains accepted events; failure/cancellation suppresses buffered delivery. InferenceTaskControl owns one worker's cancellation state; providers join cleanup and release leases after native work exits. OpenAI separately owns HTTP cancellation.
 
@@ -136,7 +140,7 @@ Apple TTS retains one native synthesizer per capability, fence request cleanup, 
 
 ✅ 模型制品适配器由 App 注入 Files；后台回调复用同一制品服务。制品绑定停止时关闭接纳、取消并加入下载并保留清理错误，释放配置后允许在新 Files 作用域重新绑定，不停止无关模型实例。App 只转交接口与调度启停。
 
-✅ ChatTokenUsage 提供可选 cachedInput/cacheWriteInput；具体 provider 解码，消费者透传。Gemma4 显式合并多条 system 到首部以适配本地模板，不将系统数据降级为 user。
+✅ ChatTokenUsage 提供可选 cachedInput/cacheWriteInput；具体 provider 解码，消费者透传。Gemma4 当前排查版本在推理副本中移除全部system，不改写原请求，不将系统数据降级为user。
 
 
 ## 分类异常诊断
@@ -145,4 +149,23 @@ Apple TTS retains one native synthesizer per capability, fence request cleanup, 
 
 ## 基础能力审查
 
-✅ 制品下载一次读取／解码恢复计划，按 ID/revision/endpoint 选择复用；旧暂存迁移和完整文件复用保留。CurrentChatCapability 由 ModelKitRuntime 唯一编译，按当前 binding 转发 ChatCapability，不包含 App 源码或其他项目模块依赖。❌ ModelKitDefaults 仍是进程级管理器，尚无 App 缓存根容器。
+✅ 制品下载一次读取／解码恢复计划，按 ID/revision/endpoint 选择复用；旧暂存迁移和完整文件复用保留。ModelLanguageContainer 每次操作解析当前绑定；不存在进程级 manager 或共享语音配置。ModelKitRuntime 不包含 App 源码或其他项目模块依赖。
+
+## Root and child ports
+
+| 子能力 | 对外协议／内容 |
+| --- | --- |
+| language | ModelLanguageProviding：聊天、当前绑定配置及统一资源控制 |
+| speech | ModelSpeechProviding：识别／合成／VAD，选择配置及按语音类别的资源控制 |
+| vision | ModelVisionProviding：单帧姿态、可用性及统一资源控制 |
+| artifacts | ModelArtifactsManaging：准备、库存、下载、取消及带宿主静默屏障的删除 |
+
+语言／视觉共享 ModelResourceControlling 的 load、warmup、unload、status；语音按类别提供同名操作，状态对应所选后端、卸载覆盖同类本地与系统后端。子能力不暴露注册、manager 或根关闭权限；首次准备和后台恢复共用一个实例级准备任务。查询元信息不加载权重。关闭推理不终止后台制品传输；根 stop 先加入推理，再关闭制品，最后终止 manager，Storage 随后关闭。取消与生命周期拒绝不升级为故障；真实调用失败及流失败由所属子能力上报中立回调，Gateway 负责广播。
+
+✅ 本地Gemma在ModelKit内按后端有效窗口适配，当前iOS缓存安全限制比4096更小；接口及算法见 [Gemma4](Language/LLM/Gemma4/README.md)。
+
+✅ 按用户要求，本地Gemma排查版本移除所有system，仅保留有界对话输入；云端及通用请求不变，详见Gemma4目录契约。
+
+✅ 已实现：Gemma使用Apple系统OSLog signpost提供不含消息正文的本地性能事件，源码边界检查允许该系统模块；不引入项目依赖或第三方包。
+
+✅ 已实现：模型根生命周期和配置拒绝完整报告原始 Error；生命周期拒绝和取消由宿主区分记录／广播，不丢弃底层错误信息。

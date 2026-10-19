@@ -79,14 +79,20 @@ deliverFeedback 创建运行时 UUID，并校验 hops、执行 owner、实时 Ag
 
 ## 统一容器异常通道
 
-✅ ContainerFailureChannel 每根实例独立，128 条故障日志、64 个待投递故障、8 个 newest-one 快照观察者；满日志/待投递均淘汰最旧并计数。一个拥有的 worker 与 newest-one 唤醒，原生回调只同步记入有界槽，不 await 或逐事件创建 Task。连接 Agent 的 InputGateway 后转为 container.failure 广播，重复故障合并并计数。调用方正常取消/正常关闭不制造故障；停止取消并加入 worker，记录仍可读取，迟到上报拒绝计数。投递失败不自报，不重放副作用。
+✅ ContainerFailureChannel 每根实例独立，128 条故障日志、64 个待投递故障、8 个 newest-one 快照观察者；满日志/待投递均淘汰最旧并计数。一个拥有的 worker 与 newest-one 唤醒，原生回调只同步记入有界槽，不 await 或逐事件创建 Task。连接 Agent 的 InputGateway 后转为 container.failure 广播，重复故障合并并计数。调用方正常取消/正常关闭保留 suppressed 原始记录，不制造业务故障；停止取消并加入 worker，记录仍可读取，迟到上报拒绝计数。投递失败不自报，不重放副作用。
 
 生命周期包装区分调用方已请求的取消与服务自行抛出的意外取消：前者不升级，后者仍报告故障。published 仅表示提交到 Gateway 发布入口，不冒充 Agent 已处理；实际接纳结果仍看 Signal 诊断。
 
-合并键在同一根内由 module/component/operation/phase/code/message 组成；次数指该故障记录的上报观察次数，不承诺跨层唯一异常计数。普通 SDK 客户端仍可只处理原始 throw，App 工厂则为现有所有根安装同一报告通道。
+合并键在同一根内由 module/component/operation/phase/code/完整描述/是否抑制广播 组成；次数指该故障记录的上报观察次数，不承诺跨层唯一异常计数。普通 SDK 客户端仍可只处理原始 throw，App 工厂则为现有所有根安装同一报告通道。
 
 ## ApplicationControl 异常展示
 
 ✅ publishRuntimeFailure 接受 RuntimeFailureEvent 与根会话，验证并编码为 runtime.failure/runtime observation，再使用同一 publish 入口分发。它不选择 Toast 文案、不授予 runtime 反馈身份；提交成功不等于角色已接纳或已展示。
 
 ✅ 音频／相机事件编码只依赖跨平台原生值，由 Gateway 构造 Signal 元数据和载荷。原生 rawValue 只是事件事实，不携带应用身份或传输协议；基础库不导入通信类型。
+
+✅ 已实现：DeviceInputAdapter识别platform.connectivity.bluetooth的类型化不可用／连接建立失败输出稳定bluetooth.*条件代码，ContainerFailureChannel保留原错误详情与记录，不决定Toast或UI；协议／写入／断开未确认仍原故障。
+
+✅ 已实现：ContainerFailureRecord 同时保留原始 Error、完整描述和有界 Signal 摘要；取消／生命周期控制保留为 suppressed 记录，不广播、不触发 Toast。去重比较完整描述，避免长错误同前缀合并；保持 128 记录和显式淘汰计数，非无限永久审计。
+
+原始 Error（包含关联值、NSError/userInfo 和复合清理错误）只保留在内存诊断记录，不自动序列化到 Signal、磁盘或 Toast。完整描述不截断；Signal 仍受摘要大小限制。原生报告接口统一为 component／operation／any Error；不以一个跨基础库 Error 枚举替代各 SDK 的类型化错误。返回 false 表示未进入广播（含正常控制结果），不等于本地未留证据。128 条记录上限意味着有界保留，不承诺永久保存全部历史。

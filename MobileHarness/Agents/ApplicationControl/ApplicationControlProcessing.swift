@@ -69,6 +69,10 @@ public struct ApplicationControlContextBuilder: ContextBuilder {
 
 /// Code-owned permissions, independent of model-callable JSON catalogs.
 enum ApplicationControlFunctions {
+    static let bluetoothHome = InternalTool(
+        path: "UI.BluetoothStatus.showBluetoothHome", required: ["phase", "revision"])
+    static let bluetoothSettings = InternalTool(
+        path: "UI.BluetoothStatus.showBluetoothSettings", required: ["phase", "revision"])
     static let runtimeFailure = InternalTool(
         path: "UI.RuntimeDiagnostics.recordFailure",
         required: ["id", "title", "source", "message", "time", "workerID"],
@@ -183,4 +187,33 @@ enum ApplicationControlFailurePolicy {
         }
     }
 
+}
+
+/// Application state classification, independent of native drivers and UI types.
+enum ApplicationControlBluetoothState: String, Sendable {
+    case disconnected, connecting, connected
+    static func isConnectionCondition(_ event: ContainerFailureEvent) -> Bool {
+        event.module == "platform" && event.component == "connectivity.bluetooth"
+            && ["bluetooth.unavailable", "bluetooth.deviceUnavailable", "bluetooth.connectionUnavailable"].contains(
+                event.code)
+    }
+    static func environment(_ value: String) throws -> Self? {
+        guard let outer = try? JSONSerialization.jsonObject(with: Data(value.utf8)) as? [String: Any],
+            let raw = outer["bluetooth"]
+        else { return nil }
+        guard let text = raw as? String,
+            let facts = try? JSONSerialization.jsonObject(with: Data(text.utf8)) as? [String: Any],
+            let connection = facts["connection"] as? String,
+            let availability = facts["availability"] as? String,
+            ["idle", "connecting", "connected", "disconnecting", "failed"].contains(connection),
+            ["unknown", "available", "poweredOff", "denied", "unsupported"].contains(availability)
+        else { throw CommunicationError.invalidPayload }
+        guard availability == "available" else { return .disconnected }
+        if connection == "connected" { return .connected }
+        let recovery = facts["recovery"] as? String ?? "idle"
+        if connection == "connecting" || ["cleaning", "waiting", "connecting"].contains(recovery) {
+            return .connecting
+        }
+        return .disconnected
+    }
 }

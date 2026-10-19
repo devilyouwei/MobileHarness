@@ -371,3 +371,61 @@ private struct UnavailableChat: ChatCapability {
     await context.shutdown()
     #expect(await context.status == .closed)
 }
+
+@Test(.timeLimit(.minutes(1))) func modelSuspensionCancelsJoinsAndKeepsLoadedWeights() async throws {
+    let admission = InferenceAdmission()
+    let manager = try ModelManager(admission: admission)
+    let counter = LoadCounter()
+    let id = ModelID("suspend")
+    try await manager.register(
+        ModelRegistration(id: id, capabilities: [.chat]) { context in
+            ProvidedCapabilities(chat: ManagedChat(try context.resource { await counter.load() }))
+        })
+    let handle = try await manager.get(id, as: .chat)
+    let session = try await handle.chat(ChatRequest(messages: [.init(role: .user, content: "hold")]))
+    admission.close()
+    await manager.suspend()
+    #expect(await counter.loads == 1)
+    #expect(try await manager.status(id) == .ready)
+    await #expect(throws: CancellationError.self) {
+        for try await _ in session.events {}
+    }
+    await #expect(throws: InferenceAdmissionError.self) {
+        _ = try await handle.chat(ChatRequest(messages: [.init(role: .user, content: "late")]))
+    }
+    try admission.resume()
+    let next = try await handle.chat(ChatRequest(messages: [.init(role: .user, content: "again")]))
+    for try await _ in next.events {}
+    #expect(await counter.loads == 1)
+    admission.close(terminal: true)
+    await manager.shutdown()
+    #expect(try await manager.status(id) == .closed)
+    #expect(throws: InferenceAdmissionError.self) { try admission.resume() }
+}
+
+@Test(.timeLimit(.minutes(1))) func modelPauseJoinsUncooperativeLoadingAndRejectsItsLateWaiter() async throws {
+    let admission = InferenceAdmission()
+    let manager = try ModelManager(admission: admission)
+    let latch = LoadLatch()
+    let id = ModelID("paused-load")
+    try await manager.register(
+        ModelRegistration(id: id, capabilities: [.chat]) { context in
+            ProvidedCapabilities(
+                chat: ManagedChat(
+                    try context.resource {
+                        await latch.wait()
+                        return 1
+                    }))
+        })
+    let loading = Task { try await manager.get(id, as: .chat) }
+    while await latch.entered == 0 { await Task.yield() }
+    admission.close()
+    let pausing = Task { await manager.suspend() }
+    // Native loading can ignore cancellation; pause must join it rather than fabricate completion.
+    await latch.release()
+    await pausing.value
+    await #expect(throws: (any Error).self) { _ = try await loading.value }
+    try admission.resume()
+    _ = try await manager.get(id, as: .chat)
+    await manager.shutdown()
+}

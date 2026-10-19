@@ -46,6 +46,7 @@ import Foundation
         @ViewBuilder private var availabilitySection: some View {
             Section {
                 LabeledContent("蓝牙", value: availabilityText)
+                LabeledContent("机械臂连接", value: state.connectionPresentation.title)
                 if state.availability == .denied {
                     Button("前往系统设置允许蓝牙", action: controls.openSystemSettings)
                         .accessibilityIdentifier("settings.bluetooth.permission")

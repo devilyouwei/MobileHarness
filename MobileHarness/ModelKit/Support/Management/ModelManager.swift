@@ -1,7 +1,7 @@
 import Foundation
 @_spi(ModelManagement) import ModelKit
 
-/// Process-owned IoC container in production; isolated construction is assembly/test SPI. Owns registration, provider identity and weight lifecycle.
+/// Instance-owned model registry; isolated construction is assembly/test SPI. Owns registration, provider identity and weight lifecycle.
 public actor ModelManager {
     private final class Entry {
         let registration: ModelRegistration
@@ -10,13 +10,17 @@ public actor ModelManager {
         var construction: (id: String, task: Task<ProvidedCapabilities, Error>)?
         var waiters = 0
         var unloading = false
-        init(_ registration: ModelRegistration, gate: ModelLoadGate, maximumLoadWaiters: Int) throws {
+        init(
+            _ registration: ModelRegistration, gate: ModelLoadGate, maximumLoadWaiters: Int,
+            admission: InferenceAdmission
+        ) throws {
             self.registration = registration
-            context = try ModelContext(loadGate: gate, maximumLoadWaiters: maximumLoadWaiters)
+            context = try ModelContext(loadGate: gate, maximumLoadWaiters: maximumLoadWaiters, admission: admission)
         }
     }
     private let loadGate: ModelLoadGate
     private let maximumLoadWaiters: Int
+    private let admission: InferenceAdmission
     private var artifacts: ModelArtifactStore?
     private var artifactRelease: Task<Void, any Error>?
     private var artifactConfiguration: [String: String]?
@@ -28,10 +32,13 @@ public actor ModelManager {
     private var closed = false
     private var shutdownTask: Task<Void, Never>?
     /// Runtime policy lives here; Core requires explicit validated admission limits.
-    @_spi(ModelAssembly) public init(maximumConcurrentLoads: Int = 4, maximumLoadWaiters: Int = 32) throws {
+    @_spi(ModelAssembly) public init(
+        maximumConcurrentLoads: Int = 4, maximumLoadWaiters: Int = 32, admission: InferenceAdmission = .init()
+    ) throws {
         guard maximumLoadWaiters > 0 else { throw CapabilityError.invalidRequest("Invalid load waiter limit") }
         loadGate = try ModelLoadGate(maximumConcurrentLoads: maximumConcurrentLoads)
         self.maximumLoadWaiters = maximumLoadWaiters
+        self.admission = admission
     }
 
     @_spi(ModelAssembly) public func configureArtifacts(
@@ -118,7 +125,8 @@ public actor ModelManager {
         for capability in selected where defaults[capability] != nil {
             throw ModelRegistrationError.duplicateDefault(capability)
         }
-        entries[registration.id] = try Entry(registration, gate: loadGate, maximumLoadWaiters: maximumLoadWaiters)
+        entries[registration.id] = try Entry(
+            registration, gate: loadGate, maximumLoadWaiters: maximumLoadWaiters, admission: admission)
         for capability in selected { defaults[capability] = registration.id }
     }
 
@@ -135,7 +143,8 @@ public actor ModelManager {
         }
         old.unloading = true
         defer { old.unloading = false }
-        let candidate = try Entry(registration, gate: loadGate, maximumLoadWaiters: maximumLoadWaiters)
+        let candidate = try Entry(
+            registration, gate: loadGate, maximumLoadWaiters: maximumLoadWaiters, admission: admission)
         replacements[registration.id] = candidate
         defer { replacements[registration.id] = nil }
         do {
@@ -255,6 +264,16 @@ public actor ModelManager {
         try await entry.context.unload()
     }
 
+    /// Nonterminal pause: join admitted inference without evicting loaded weights.
+    public func suspend() async {
+        admission.close()
+        let work = Array(entries.values) + Array(replacements.values)
+        for entry in work {
+            if let construction = entry.construction?.task { _ = await construction.result }
+            await entry.context.suspend()
+        }
+    }
+
     /// Terminal: close admission, cancel active sessions and join backend cleanup.
     public func shutdown() async {
         if let shutdownTask {
@@ -277,6 +296,9 @@ public actor ModelManager {
         }
         shutdownTask = task
         await task.value
+        entries.removeAll()
+        defaults.removeAll()
+        replacements.removeAll()
     }
 
     private func entry(_ id: ModelID) throws -> Entry {
@@ -313,7 +335,8 @@ public actor ModelManager {
                     if entry.construction?.id == id {
                         entry.construction = nil
                         entry.context = try ModelContext(
-                            loadGate: self.loadGate, maximumLoadWaiters: self.maximumLoadWaiters)
+                            loadGate: self.loadGate, maximumLoadWaiters: self.maximumLoadWaiters,
+                            admission: self.admission)
                     }
                     throw error
                 }

@@ -58,3 +58,5 @@ flowchart LR
 ❌ 原生 Metal 挂载／重启回归超时、取帧暂停、相机裁剪与视线映射及完整真机前后台验收仍需跟进。
 
 [UI 根](../README.md) · [原生组件](../Components/README.md) · [验证记录](../../../docs/validation/PlatformKit-Containers.md)
+
+✅ 已实现：宿主准备门禁禁止新开相机／切镜头，已开启相机仍可关闭，设置入口不受门禁影响；保留原相机忙碌及权限围栏。

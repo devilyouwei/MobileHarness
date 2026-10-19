@@ -1,5 +1,7 @@
 # Model Management and Default Assembly
 
+✅ ModelContainer.swift 拥有根、四子能力及私有默认装配；ModelScope 合并一个准备任务，最多32个等待者，配置替换拒绝重叠。ModelManager 仍是私有注册与资源机制，消费者通过公开子能力协议访问。
+
 ## Summary
 
 Shared directory for independent lifecycle, artifact acquisition and default-provider assembly targets.
@@ -11,10 +13,10 @@ ModelKitRuntime depends only on ModelKit. Management owns ModelState (including 
 | Target | Explicit root source ownership |
 | --- | --- |
 | ModelKitRuntime | ModelManager.swift, ModelRegistration.swift, ModelArtifactContracts.swift, ModelArtifactStore.swift, ArtifactDownloadTransport.swift |
-| ModelKitDefaults | ModelKitDefaults.swift, ChatDefaults.swift, SpeechDefaults.swift, VisionDefaults.swift, SpeechProviderSelection.swift |
+| ModelKitDefaults | ModelContainer.swift, ChatDefaults.swift, SpeechDefaults.swift, VisionDefaults.swift, SpeechProviderSelection.swift |
 | ModelKitHub | HuggingFace/ source files |
 
-The two root targets use explicit disjoint sources/excludes. Registration and artifact contracts are separated by file; native archive transfer remains Runtime-owned. Default assembly owns the process manager/configuration; Chat, Speech and Vision register their own providers. SpeechProviderSelection chooses once before admission; it never retries failed active inference on another provider.
+The two root targets use explicit disjoint sources/excludes. Registration and artifact contracts are separated by file; native archive transfer remains Runtime-owned. Each ModelContainer owns its manager/configuration; Chat, Speech and Vision register their own providers. SpeechProviderSelection chooses once before admission; it never retries failed active inference on another provider.
 
 ## External relationships and data flow
 
@@ -83,9 +85,9 @@ Shared providers, bounded lifecycle/replace and receipt-based artifact managemen
 
 Stable speech facades select before an operation; active inference failure does not switch provider. Custom recognition/synthesis default off. Local adapters never auto-download. Kokoro is not registered. Apple recognition combines transcriber/detector; ordinary silence timing uses external Silero/Energy rather than assumed native activity callbacks.
 
-## Singleton and replacement
+## Instance assembly and replacement
 
-The first manager call fixes canonical root/initial configuration and stores one assembly task before suspension. At most 32 callers join; different roots or explicit conflicting initial cloud configuration fail. Caller cancellation does not cancel assembly. Failure is retained without an alternate manager; shutdown stays terminal.
+Each ModelContainer owns one assembly task and its resource root/configuration. At most 32 callers join that instance; distinct roots never share a manager. Caller cancellation does not cancel shared assembly. Failure is retained without an alternate manager; shutdown stays terminal.
 
 configureChat constructs/replaces only the chat binding through existing manager SPI; nil restores Gemma. Other resources/defaults remain. Consumers resolve current binding each request; configured does not mean network reachable/authenticated. configureArtifacts validates matching identities/revisions/directories and injects protocols without importing Storage. JSON defines files, never executable factories.
 
@@ -95,7 +97,7 @@ Registration is lazy. Explicit voice admission/diagnostics prepares selected cap
 
 Large local Gemma/Nemotron/MOSS and pose releaseWhenIdle opt into memory-pressure policy; Silero/system speech retain. Local Gemma requires supported OS/hardware/artifacts; explicit cloud works without Gemma artifacts. Native simulator CoreAI support is a separate backend constraint.
 
-Lazy process assembly, independent speech switches and explicit current-binding replacement are implemented.
+Instance-local lazy assembly, independent speech switches and explicit current-binding replacement are implemented.
 
 [HuggingFace transfer](HuggingFace/README.md) · [Core lifecycle mechanisms](../Core/README.md)
 
@@ -103,7 +105,7 @@ Lazy process assembly, independent speech switches and explicit current-binding 
 
 ## 当前绑定代理
 
-CurrentChatCapability 独立属于 ModelKitRuntime，按每个请求取得 ModelManager 当前 chat binding，并转交工具/图片支持和推理会话。它不认识 App、UI、设置 schema 或业务仓库；失败的 availability 返回不可用诊断，实际 chat 错误继续抛出。SDK 仍只依赖自身目标和批准的第三方 SDK。
+ModelLanguageContainer 属于默认装配目标，按每个请求解析当前 chat binding，并转交工具/图片支持和推理会话。它不认识 App、UI、设置 schema 或业务仓库；失败的 availability 返回不可用诊断，实际 chat 错误继续抛出。SDK 仍只依赖自身目标和批准的第三方 SDK。
 
 
 ## 待实现
@@ -116,4 +118,14 @@ CurrentChatCapability 独立属于 ModelKitRuntime，按每个请求取得 Model
 
 ✅ 模型制品适配器由 App 注入 Files；后台回调复用同一制品服务。制品绑定停止时关闭接纳、取消并加入下载并保留清理错误，释放配置后允许在新 Files 作用域重新绑定，不停止无关模型实例。App 只转交接口与调度启停。
 
-✅ CurrentChatCapability 由 Runtime 唯一编译，制品协议及托管加载／卸载不依赖应用模块。❌ Defaults 当前仍是进程级管理器，App 根容器化尚未完成。
+✅ 默认装配根实例独立，制品协议及托管加载／卸载不依赖应用模块；消费者不获得管理器。
+
+✅ ModelContainer.swift 统一模型根／子能力及实例私有默认装配；旧进程入口与 CurrentChatCapability 已移除。App 同根缓存、流式错误一次观察、停止和权重保留由自动化覆盖，真实模型／硬件证据独立记录。
+
+✅ 语言／视觉使用同一 ModelResourceControlling 协议提供 load、warmup、unload、status；语音按 recognition／synthesis／voiceActivity 选择同样操作，卸载覆盖该类别的本地和系统后端，状态反映选中的实际后端。移除合成专用卸载命名，保持接口一致。
+
+✅ 已实现：路径字符白名单缓存为不可变CharacterSet，避免资源轮询对每个路径字符重复构造集合；路径规则、安全边界及磁盘校验不变。
+
+✅ 已实现：根生命周期、配置前置校验接入统一原生错误报告，取消与 admission 错误亦保留；原始 throw 类型不包装丢失，复合清理错误继续包含全部底层错误。
+
+根启动／停止传播准备失败和全部清理错误；停止主动取消未完成装配时，原始 CancellationError 留在诊断，正常清理仍可完成。availability/support 的非抛错能力查询继续返回中立不可用值，原始失败同步走报告端口，不解释业务提示。

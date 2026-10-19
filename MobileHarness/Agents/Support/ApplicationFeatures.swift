@@ -87,8 +87,11 @@ public enum VisionPipelineWorkflow {
         let cameraState: CameraState
         @ObservationIgnored private let cameraPresentation: any CameraPresenting
         @ObservationIgnored private let cameraFactory: @MainActor (CameraIntegrationBindings) -> CameraCoordinator
-        @ObservationIgnored private let artifacts: ArtifactServices
-        @ObservationIgnored private let resources: URL
+        @ObservationIgnored private let languageModels: any ModelLanguageProviding
+        @ObservationIgnored private let speechModels: any ModelSpeechProviding
+        @ObservationIgnored private let visionModels: any ModelVisionProviding
+        @ObservationIgnored private let modelArtifacts: any ModelArtifactsManaging
+        @ObservationIgnored private let memoryPressure: @Sendable () async -> Void
         @ObservationIgnored private var publicStateScope: StateScope?
         private func installPublicState() throws {
             guard publicStateScope == nil else { return }
@@ -97,6 +100,7 @@ public enum VisionPipelineWorkflow {
             try bluetooth.service.connectPublicState(scope: scope)
             publicStateScope = scope
         }
+        public var onModelConfigurationChanged: (@MainActor () -> Void)?
         private let homeUI: UIHomeContainer
         private let settingsUI: UISettingsContainer
         private let resourcesUI: UIModelResourcesContainer
@@ -118,8 +122,9 @@ public enum VisionPipelineWorkflow {
             camera: any CameraCapturing, cameraState: CameraState, cameraPresentation: any CameraPresenting,
             makeCamera: @escaping @MainActor (CameraIntegrationBindings) -> CameraCoordinator,
             bluetooth: BluetoothWorkflow, audio: AudioContainer,
-            artifacts: ArtifactServices,
-            resources: URL
+            languageModels: any ModelLanguageProviding, speechModels: any ModelSpeechProviding,
+            visionModels: any ModelVisionProviding, modelArtifacts: any ModelArtifactsManaging,
+            memoryPressure: @escaping @Sendable () async -> Void
         ) {
             self.containerFailures = containerFailures
             homeUI = home
@@ -140,8 +145,11 @@ public enum VisionPipelineWorkflow {
             self.cameraPresentation = cameraPresentation
             cameraFactory = makeCamera
             self.bluetooth = bluetooth
-            self.resources = resources
-            self.artifacts = artifacts
+            self.languageModels = languageModels
+            self.speechModels = speechModels
+            self.visionModels = visionModels
+            self.modelArtifacts = modelArtifacts
+            self.memoryPressure = memoryPressure
         }
         private(set) var container: InteractionServices?
         @ObservationIgnored private var runtimeValue: AgentServices?
@@ -255,7 +263,10 @@ public enum VisionPipelineWorkflow {
                 failureCode: "environment.delivery")
         }
         @ObservationIgnored private var resourceObservationForeground = false
-        private func artifactManager() async throws -> ModelManager { try await artifacts.manager() }
+        private func artifactManager() async throws -> any ModelArtifactsManaging {
+            try await modelArtifacts.prepare()
+            return modelArtifacts
+        }
         @ObservationIgnored private lazy var modelResourcesWorkflow = makeModelResourcesWorkflow()
         private func makeModelResourcesWorkflow() -> ModelResourcesWorkflow {
             ModelResourcesWorkflow(
@@ -401,8 +412,7 @@ public enum VisionPipelineWorkflow {
             endpoint: any CameraOutputHandling
         ) async throws {
             let runtime = try runtime()
-            let models = try await ModelKitDefaults.manager(resources: resources)
-            let pose = try await models.get(.pose, load: false)
+            let pose = visionModels
             let vision = try VisionPerceptionAgent(
                 pose: pose, sessionID: sessionID, mirroredGaze: mirrored, context: runtime.visionContext())
             try runtime.presentation.bindCamera(endpoint)
@@ -572,14 +582,13 @@ public enum VisionPipelineWorkflow {
             await container?.lifecycle.beginSettingsChange()
             defer { container?.lifecycle.endSettingsChange() }
             try Task.checkCancellation()
-            let models = try await ModelKitDefaults.manager(resources: resources)
-            return CurrentChatCapability(models: models)
+            return languageModels
         }
         private func runtime() throws -> AgentServices {
             _ = try repositories()
             if let runtimeValue { return runtimeValue }
             let resourceAdapter = ModelResourceCapabilityAdapter(
-                manager: { [weak self] in
+                artifacts: { [weak self] in
                     guard let self else { throw CancellationError() }
                     return try await self.artifactManager()
                 },
@@ -587,8 +596,11 @@ public enum VisionPipelineWorkflow {
                 bindSpeech: { [weak self] recognition, synthesis in
                     guard let self else { throw CancellationError() }
                     await self.container?.lifecycle.beginSettingsChange()
-                    await ModelKitDefaults.configureSpeech(recognition: recognition, synthesis: synthesis)
-                    self.container?.lifecycle.endSettingsChange()
+                    defer {
+                        self.container?.lifecycle.endSettingsChange()
+                        self.onModelConfigurationChanged?()
+                    }
+                    try await self.speechModels.configure(recognition: recognition, synthesis: synthesis)
                 })
             try installPublicState()
             let runtime = try AgentServices(
@@ -603,9 +615,12 @@ public enum VisionPipelineWorkflow {
                 device: deviceControl,
                 modelResources: resourceAdapter,
                 providerSettingsRuntime: SettingsProviderAdapter.runtime(
-                    resources: resources,
+                    language: languageModels,
                     beginChange: { [weak self] in await self?.container?.lifecycle.beginSettingsChange() },
-                    endChange: { [weak self] in self?.container?.lifecycle.endSettingsChange() }),
+                    endChange: { [weak self] in
+                        self?.container?.lifecycle.endSettingsChange()
+                        self?.onModelConfigurationChanged?()
+                    }),
                 resourcePreferences: ModelResourcePreferencesService(
                     store: {
                         try self.filesStorage.document(
@@ -634,10 +649,7 @@ public enum VisionPipelineWorkflow {
                     guard let self else { throw CancellationError() }
                     return await self.settingsWorkflow.modelName
                 },
-                chatProvider: { [resources] in
-                    let models = try await ModelKitDefaults.manager(resources: resources)
-                    return try await models.get(.chat)
-                })
+                chatProvider: { [languageModels] in languageModels })
             runtimeValue = runtime
             return runtime
         }
@@ -747,7 +759,8 @@ public enum VisionPipelineWorkflow {
             try await settingsControls.restore()
             let workflow = settingsWorkflow
             let prepared = try await InteractionServices(
-                home: homeUI, diagnostics: diagnosticsUI, resources: resources, audio: audio, runtime: runtime(),
+                home: homeUI, diagnostics: diagnosticsUI, language: languageModels, speech: speechModels,
+                memoryPressure: memoryPressure, audio: audio, runtime: runtime(),
                 modelName: { await workflow.modelName },
                 progress: progress)
             try Task.checkCancellation()

@@ -131,3 +131,4 @@ ActionBindings 编译 NexArmControlService、NexArmConnectionState、BluetoothRe
 ## UI 全量容器化
 
 ✅ 应用级 UI 状态由八个子容器统一创建，消费者注入所需 Presenting 接口并提交 UI 自有值，不直接写字段。App 注册并管理同一 UI 根；原业务身份/版本校验、原生完成和基础库依赖边界保持。跨模块连接迁移仍是独立待办。
+✅ 已实现：DeviceControlAdapter.readStatus补充真实recovery阶段供Agent判定重连；业务连接／运动状态与详细设置投影仍由现有能力拥有。

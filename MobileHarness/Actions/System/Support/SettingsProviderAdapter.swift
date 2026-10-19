@@ -27,7 +27,7 @@ public enum SettingsProviderAdapter {
             model: OpenAIChatConfiguration.defaultModel)
     }
     public static func runtime(
-        resources: URL,
+        language: any ModelLanguageProviding,
         beginChange: @escaping @MainActor () async -> Void, endChange: @escaping @MainActor () -> Void
     ) -> ProviderSettingsRuntime {
         let value = initial
@@ -48,7 +48,7 @@ public enum SettingsProviderAdapter {
                 return {
                     do {
                         if #available(iOS 27, macOS 27, *) {
-                            try await ModelKitDefaults.configureChat(resources: resources, configuration: configuration)
+                            try await language.configure(configuration)
                         } else {
                             throw ProviderSettingsError.application
                         }

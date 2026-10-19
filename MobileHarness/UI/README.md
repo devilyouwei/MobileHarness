@@ -64,3 +64,9 @@ ApplicationRootPorts 定义 UI 自有请求契约。ApplicationRootView 使用 P
 ✅ 光环失败锁存与状态去重；历史详情读取随页面取消、目录异步解析、时间线按数据变更缓存；资源编辑只发意图，由唯一业务拥有者合并恢复与自动保存。图片及空闲日志刷新保留现状，等待实测。
 
 ✅ 字幕已改为单个SwiftUI Text＋TextRenderer，移除双UILabel／富文本覆盖路径；只在有限250ms淡入期间启用本地显示节奏，保留完整文字、320 Character边界、滚动、无障碍与生命周期取消。仅使用原生API，实际性能另测。
+
+✅ 已实现：home提供独立模型准备呈现值及加载眼睛；UI不导入ModelKit或App。根页面连接重试／取消与活动变化通知，设置和已有停止入口可用，不阻塞主线程。
+
+✅ 已实现：home／devices各持有UI自有BluetoothConnectionStatus及版本围栏；接纳保留事实更新，后台无需重放Toast。基础库不引入Signal／Actions。
+
+✅ UI 使用 UIContainerError 及原始渲染错误报告，过期提交以显式 Bool／拒绝计数表达；错误展示值由上层提交，UI 根不决定 Toast／语音／状态机策略。

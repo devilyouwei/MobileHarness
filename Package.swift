@@ -613,7 +613,8 @@ let package = Package(
             name: "AppStorage",
             dependencies: [
                 "Storage", "StorageCore", "StorageState", "StorageCache", "StorageFiles", "StorageDatabase",
-                "StorageSQLite", "PlatformKit", "UI", "Gateway", .product(name: "FactoryKit", package: "Factory"),
+                "StorageSQLite", "PlatformKit", "UI", "Gateway", "ModelKit", "ModelKitDefaults",
+                .product(name: "FactoryKit", package: "Factory"),
             ],
             path: "MobileHarness/App/Composition",
             exclude: ["README.md", "AppComposition.swift", "ModuleRegistration.swift", "ServiceFactories.swift"],
@@ -645,23 +646,21 @@ let package = Package(
             ],
             path: "MobileHarness/ModelKit/Support/Management",
             exclude: [
-                "CurrentChatCapability.swift",
                 "README.md", "HuggingFace", "ModelManager.swift", "ModelRegistration.swift",
                 "ModelArtifactContracts.swift", "ModelArtifactStore.swift", "ArtifactDownloadTransport.swift",
             ],
             sources: [
-                "ModelKitDefaults.swift", "ChatDefaults.swift", "SpeechDefaults.swift", "VisionDefaults.swift",
+                "ModelContainer.swift", "ChatDefaults.swift", "SpeechDefaults.swift", "VisionDefaults.swift",
                 "SpeechProviderSelection.swift",
             ]),
         .target(
             name: "ModelKitRuntime", dependencies: ["ModelKit"],
             path: "MobileHarness/ModelKit/Support/Management",
             exclude: [
-                "README.md", "HuggingFace", "ModelKitDefaults.swift", "ChatDefaults.swift", "SpeechDefaults.swift",
+                "README.md", "HuggingFace", "ModelContainer.swift", "ChatDefaults.swift", "SpeechDefaults.swift",
                 "VisionDefaults.swift", "SpeechProviderSelection.swift",
             ],
             sources: [
-                "CurrentChatCapability.swift",
                 "ModelManager.swift", "ModelRegistration.swift", "ModelArtifactContracts.swift",
                 "ModelArtifactStore.swift", "ArtifactDownloadTransport.swift",
             ]),

@@ -40,7 +40,8 @@ public protocol CameraOutputHandling: AnyObject, Sendable {
 @MainActor
 public final class RuntimePresentation: UIPresentationCapability, UIUpdateCapability, SpeechPlaybackCapability,
     PosePresentationCapability, CameraControlCapability, SpeechListeningCapability, TaskControlCapability,
-    UIFeedbackCapability, UIEffectCapability, RuntimeFailurePresentationCapability
+    UIFeedbackCapability, UIEffectCapability, RuntimeFailurePresentationCapability,
+    BluetoothStatusPresentationCapability
 {
     public var taskControl:
         (@Sendable (String, [String: String], String, String, String, String?) async throws -> String)?
@@ -60,6 +61,30 @@ public final class RuntimePresentation: UIPresentationCapability, UIUpdateCapabi
     }
     private let cameraControl: any CameraControlCapability
     private let rootSessionID: String
+    private let homeBluetooth: any BluetoothConnectionPresenting
+    private let deviceBluetooth: any BluetoothConnectionPresenting
+    public func presentBluetoothHome(
+        _ phase: BluetoothPresentationPhase, revision: UInt64, invocation: any FunctionInput
+    ) async throws {
+        try validateBluetooth(invocation)
+        guard let status = BluetoothConnectionStatus(rawValue: phase.rawValue),
+            homeBluetooth.presentBluetoothConnection(status, revision: revision)
+        else { throw UIContainerError.stale }
+    }
+    public func presentBluetoothSettings(
+        _ phase: BluetoothPresentationPhase, revision: UInt64, invocation: any FunctionInput
+    ) async throws {
+        try validateBluetooth(invocation)
+        guard let status = BluetoothConnectionStatus(rawValue: phase.rawValue),
+            deviceBluetooth.presentBluetoothConnection(status, revision: revision)
+        else { throw UIContainerError.stale }
+    }
+    private func validateBluetooth(_ invocation: any FunctionInput) throws {
+        try Task.checkCancellation()
+        guard invocation.context.source == "applicationControl", invocation.context.sessionID == rootSessionID,
+            invocation.context.taskID == nil
+        else { throw CommunicationError.unauthorized }
+    }
     private let activity: any ActivityPresenting
     public func recordRuntimeFailure(_ issue: RuntimeIssue, invocation: any FunctionInput) async throws {
         try Task.checkCancellation()
@@ -81,8 +106,11 @@ public final class RuntimePresentation: UIPresentationCapability, UIUpdateCapabi
     public let expressions: any ExpressionPresenting
     public init(
         cameraControl: any CameraControlCapability, rootSessionID: String, activity: any ActivityPresenting,
-        effects: any HomeEffectsPresenting, expressions: any ExpressionPresenting
+        effects: any HomeEffectsPresenting, expressions: any ExpressionPresenting,
+        homeBluetooth: any BluetoothConnectionPresenting, deviceBluetooth: any BluetoothConnectionPresenting
     ) {
+        self.homeBluetooth = homeBluetooth
+        self.deviceBluetooth = deviceBluetooth
         self.activity = activity
         homeEffects = effects
         self.expressions = expressions

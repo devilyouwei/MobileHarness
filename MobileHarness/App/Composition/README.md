@@ -1,5 +1,7 @@
 # Application Composition
 
+✅ ApplicationContainer 缓存 ModelContainer 并返回同根 language／speech／vision／artifacts。模型服务依赖 storage／diagnostics；Agents 依赖 model，消费者停止后再关闭模型和存储。
+
 ## 职责与接口
 
 只创建、持有和连接模块实例，安装模块公开声明及生命周期描述。不接收业务请求、不转换业务数据，也不决定模型/相机/语音/设备业务规则。
@@ -8,10 +10,10 @@
 
 | 文件 | 职责 |
 | --- | --- |
-| ApplicationContainer.swift | AppStorage 内的 Storage/Platform/UI 根、子能力及容器故障通道注册 |
+| ApplicationContainer.swift | AppStorage 内的 Storage/Platform/UI/Model 根、子能力及容器故障通道注册 |
 | AppComposition.swift | 持有当前 Services 和生命周期图，连接 UI bootstrap/retry/failure 端口；显式重试替换整个根作用域 |
 | ServiceFactories.swift | 选择 Storage 运行工厂和数据库位置，获取原生能力、创建照片工厂、模型制品服务及 Agent 集成入口；注入延迟领域仓库接口 |
-| ModuleRegistration.swift | 注册 diagnostics → storage / platform / ui → agents → native 的静态依赖与公开启停/失效接口 |
+| ModuleRegistration.swift | 注册 diagnostics → storage → model；platform / ui / model → agents → native 的静态依赖与公开启停/失效接口 |
 
 配置中的资源路径属于组合输入。照片容量/FIFO、Provider 事务、模型选择、页面控制、意图编码和结果转换属于模块；App 不在绑定闭包中复制这些逻辑。
 
@@ -26,7 +28,7 @@ StorageContainer 在自己的后台启动任务中完成后端打开、迁移和
 
 [App](../README.md) · [生命周期](../Lifecycle/README.md) · [Agent 集成](../../Agents/Support/README.md) · [Action 集成](../../Actions/Support/README.md)
 
-✅ Services 持有 storage: StorageContainer；工厂持有独立 ApplicationContainer 并选择根 URL，注入领域仓库提供器。注册实际 storage.start/stop 与 diagnostics → storage / platform / ui → agents → native 依赖；不调用 SQLiteRepositories、FileManager 或恢复。
+✅ Services 持有 storage: StorageContainer；工厂持有独立 ApplicationContainer 并选择根 URL，注入领域仓库提供器。注册实际 storage.start/stop 与 diagnostics → storage → model；platform / ui / model → agents → native 依赖；不调用 SQLiteRepositories、FileManager 或恢复。
 
 ## 待实现
 
@@ -36,15 +38,15 @@ StorageContainer 在自己的后台启动任务中完成后端打开、迁移和
 
 ✅ 存储访问使用独立的 State、Cache、Database 和 Files 接口；App 注册根实例，消费者通过构造器获得所需能力。存储容器不接管本目录的业务验证、执行和完成语义。
 
-AppStorage 目标只编译 Composition/ApplicationContainer.swift，使用 FactoryKit 实例内缓存；业务目标不导入 IoC。Services 持有注册容器、StorageContainer、PlatformContainer 和 UIContainer，连接所需子接口。模型后台事件只转交 ArtifactServices；存储停止前先加入其制品清理。
+AppStorage 目标只编译 Composition/ApplicationContainer.swift，使用 FactoryKit 实例内缓存；业务目标不导入 IoC。Services 持有注册容器、StorageContainer、PlatformContainer、UIContainer 和 ModelContainer，连接所需子接口。模型后台事件只转交 model.artifacts；模型根停止加入制品后再停止存储。
 
 ## Platform 根、设备接入与同帧呈现
 
-✅ ApplicationContainer 注册 Storage、Platform 与 UI 根及子能力，FactoryKit 只在现有 AppStorage 目标中使用。ServiceFactories 解析根并提供 Coordinator 构造工厂，不创建 AppleAudioIO/AppleCamera/BLE，也不转发帧。ModuleRegistration 将 platform 注册为独立服务，Agents 依赖 storage/platform/ui，native 只保留业务接入和观察。
+✅ ApplicationContainer 注册 Storage、Platform、UI 与 Model 根及子能力，FactoryKit 只在现有 AppStorage 目标中使用。ServiceFactories 解析根并提供 Coordinator 构造工厂，不创建 AppleAudioIO/AppleCamera/BLE，也不转发帧。ModuleRegistration 将 platform 注册为独立服务，Agents 依赖 storage/platform/ui/model，native 只保留业务接入和观察。
 
 ## UI 容器与相机能力注入
 
-✅ ApplicationContainer 缓存 UI 根及相机子能力，AppStorage 显式依赖 UI。Services 持有 UIContainer；ServiceFactories 定义唯一 Coordinator 工厂，ApplicationFeatures 只在原有惰性时机调用它。ModuleRegistration 注册 ui 生命周期，Agents 依赖 storage/platform/ui。
+✅ ApplicationContainer 缓存 UI 根及相机子能力，AppStorage 显式依赖 UI。Services 持有 UIContainer；ServiceFactories 定义唯一 Coordinator 工厂，ApplicationFeatures 只在原有惰性时机调用它。ModuleRegistration 注册 ui 生命周期，Agents 依赖 storage/platform/ui/model。
 
 ## 统一容器异常通道
 
@@ -57,3 +59,9 @@ AppStorage 目标只编译 Composition/ApplicationContainer.swift，使用 Facto
 ✅ ApplicationContainer 缓存唯一 UIContainer，并将八个子能力注册为根属性的别名，不单独缓存备用实例。ServiceFactories 显式传入设置初值，再注入界面状态和所需呈现能力；不在 App 创建状态或逐帧转发。生命周期继续使用 diagnostics → storage/platform/ui → agents → native，业务消费者先停再停 UI，重试创建新根。
 
 ✅ ApplicationFeatures 注入同根相机呈现端口供点击请求忙碌/提示投影，仍共用页面 CameraState，不创建备用根。
+
+✅ 后台 URLSession 可以在前台生命周期启动前准备同根制品；组合根记录该作用域已被使用，重建时在生命周期停止后显式加入幂等 model.stop/storage.stop，避免未加入 started 列表的后台所有者泄漏。后台准备不启动相机、音频、UI 或推理。
+
+✅ 已实现：Services持有唯一ForegroundPreparation协调器；App在生命周期前台屏障完成后、首页可见时激活。绑定导航／配置应用／交互结束的刷新回调；切页或失活立即取消接纳，根替换先加入协调器再停止模型。步骤串行、重复请求合并，准备检查已就绪状态；云端不发探测生成请求，相机开启时才准备视觉。
+
+✅ 已实现：四根注入同一原生错误签名；App 仅标识模型生命周期拒绝为不广播的控制结果，Gateway保留原始 Error。

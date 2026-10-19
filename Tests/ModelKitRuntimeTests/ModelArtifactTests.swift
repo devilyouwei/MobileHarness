@@ -409,3 +409,15 @@ private actor ResumableHubFixture: ModelArtifactDownloader {
         try await store.download("fixture", source: ModelDownloadSource(endpoint: ModelDownloadSource.official))
     }
 }
+
+@Test func installedPathCharacterPolicyRetainsUnicodeAndRejectsUnsafeComponents() {
+    for path in ["model/config.json", "Gemma_4-e2b/weights.bin", "模型/权重.bin", "version.1/config.json"] {
+        #expect(ModelArtifactCatalog.validInstalledPath(path))
+    }
+    for path in [
+        "", ".", "..", "a/../b", "a//b", "a b/file", "a:b/file", "a/\\b", "a/\nfile",
+        String(repeating: "a", count: 201),
+    ] {
+        #expect(!ModelArtifactCatalog.validInstalledPath(path))
+    }
+}

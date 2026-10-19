@@ -28,7 +28,19 @@ public struct UIModule: CapabilityModule {
                     throw UIActions.PresentationError.invalidCall
                 }
                 return .value(try await UIActions.recordFailure(invocation: invocation, using: presentation))
-            })
+            }),
+            UIActions.showBluetoothHomeDefinition(completing: { [updates] invocation in
+                guard let presentation = updates as? any BluetoothStatusPresentationCapability else {
+                    throw UIActions.PresentationError.invalidCall
+                }
+                return .value(try await UIActions.showBluetoothHome(invocation: invocation, using: presentation))
+            }),
+            UIActions.showBluetoothSettingsDefinition(completing: { [updates] invocation in
+                guard let presentation = updates as? any BluetoothStatusPresentationCapability else {
+                    throw UIActions.PresentationError.invalidCall
+                }
+                return .value(try await UIActions.showBluetoothSettings(invocation: invocation, using: presentation))
+            }),
         ]
     }
     private var expressionFunctions: [ActionFunction] {

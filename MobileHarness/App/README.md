@@ -1,5 +1,7 @@
 # App — 应用入口与组合根
 
+✅ App 注册并持有唯一 ModelContainer，注入四子能力并通过现有生命周期图管理启动、失活、恢复和停止；业务不查询注册容器。
+
 ✅ 快速 inactive → active 也保留一次必须执行的非前台清理，已启动服务全部完成暂停后再恢复前台接纳；页面覆盖不发送 Scene 生命周期。
 
 ## 职责与边界
@@ -24,7 +26,7 @@ flowchart TB
  ActionBindings -->|公开呈现及能力接口| Foundations
 ```
 
-App 不位于运行期业务请求、数据转换或 UI 呈现链路中。Agents 核心拥有决策；Gateway 拥有传输和执行；ActionBindings/AgentBindings 是各自模块内的外层集成目标，不是新增一级模块。
+App 不转发运行期业务请求、媒体帧或Signal；首页模型准备属于宿主生命周期编排，App仅提交这一准备状态给UI。Agents 核心拥有决策；Gateway 拥有传输和执行；ActionBindings/AgentBindings 是各自模块内的外层集成目标，不是新增一级模块。
 
 ## 内部结构与数据流
 
@@ -92,3 +94,7 @@ AppStorage 目标只编译 Composition/ApplicationContainer.swift，使用 Facto
 ## UI 全量容器化
 
 ✅ 应用级 UI 状态由八个子容器统一创建，消费者注入所需 Presenting 接口并提交 UI 自有值，不直接写字段。App 注册并管理同一 UI 根；原业务身份/版本校验、原生完成和基础库依赖边界保持。跨模块连接迁移仍是独立待办。
+
+✅ 已实现：App新增首页模型准备的宿主生命周期编排例外，通过公开状态／warmup／load接口组合当前能力；不推理业务请求、不下载制品或转换Signal。
+
+✅ Xcode 源码导航恢复 ModelKit Management 组，移除已删除 CurrentChatCapability 的组引用；编译源码仍由 SwiftPM 目标拥有。

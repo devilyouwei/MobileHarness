@@ -5,6 +5,45 @@ public enum ModelResourceState: Sendable, Equatable {
     case unmanaged, unloaded, loading, ready, unloading, closed
 }
 
+/// Synchronous root fence; retained resources cannot bypass a suspended or retired owner.
+public enum InferenceAdmissionError: Error, Sendable { case inactive, stopped }
+
+public final class InferenceAdmission: Sendable {
+    private struct State {
+        var open: Bool
+        var stopped = false
+        var generation: UInt64 = 0
+    }
+    private let state: Mutex<State>
+    public init(open: Bool = true) { state = Mutex(State(open: open)) }
+    public func check() throws -> UInt64 {
+        try state.withLock {
+            guard !$0.stopped else { throw InferenceAdmissionError.stopped }
+            guard $0.open else { throw InferenceAdmissionError.inactive }
+            return $0.generation
+        }
+    }
+    public func checkAlive() throws {
+        try state.withLock { if $0.stopped { throw InferenceAdmissionError.stopped } }
+    }
+    public func validate(_ generation: UInt64) throws {
+        guard try check() == generation else { throw CancellationError() }
+    }
+    public func close(terminal: Bool = false) {
+        state.withLock {
+            if $0.open { $0.generation &+= 1 }
+            $0.open = false
+            $0.stopped = $0.stopped || terminal
+        }
+    }
+    public func resume() throws {
+        try state.withLock {
+            guard !$0.stopped else { throw InferenceAdmissionError.stopped }
+            $0.open = true
+        }
+    }
+}
+
 /// A manager shares one gate across its contexts. Capacity exhaustion never queues work.
 @_spi(ModelManagement) public actor ModelLoadGate {
     private var active = 0
@@ -29,6 +68,7 @@ public actor ModelResource<Model: Sendable>: ModelResourceLifecycle {
     private var loadID: String?
     private var waiters = 0
     private let maximumLoadWaiters: Int
+    private let admission: InferenceAdmission
     private struct ActiveLease {
         let id: String
         var cancel: (@Sendable () -> Void)?
@@ -40,13 +80,17 @@ public actor ModelResource<Model: Sendable>: ModelResourceLifecycle {
     private var unloadFinished: CheckedContinuation<Void, Never>?
     private var drained: CheckedContinuation<Void, Never>?
 
-    fileprivate init(maximumLoadWaiters: Int, loader: @escaping @Sendable () async throws -> Model) {
+    fileprivate init(
+        maximumLoadWaiters: Int, admission: InferenceAdmission, loader: @escaping @Sendable () async throws -> Model
+    ) {
         self.maximumLoadWaiters = maximumLoadWaiters
+        self.admission = admission
         self.loader = loader
     }
 
     public func acquire() async throws -> (id: String, model: Model) {
         try Task.checkCancellation()
+        let generation = try admission.check()
         guard !closed else { throw CapabilityError.sessionClosed }
         guard !unloading, !maintenance else { throw CapabilityError.unavailable("Model is under maintenance") }
         guard activeLease == nil else { throw CapabilityError.inputBusy }
@@ -54,6 +98,7 @@ public actor ModelResource<Model: Sendable>: ModelResourceLifecycle {
         activeLease = ActiveLease(id: id)
         do {
             let model = try await ensureLoaded()
+            try admission.validate(generation)
             try Task.checkCancellation()
             guard !closed, !unloading, !maintenance else { throw CancellationError() }
             return (id, model)
@@ -67,7 +112,7 @@ public actor ModelResource<Model: Sendable>: ModelResourceLifecycle {
     public func setCancellation(_ id: String, _ cancel: @escaping @Sendable () -> Void) {
         guard activeLease?.id == id else { return }
         activeLease?.cancel = cancel
-        if closed { cancel() }
+        if closed || (try? admission.check()) == nil { cancel() }
     }
 
     public func release(_ id: String) {
@@ -78,6 +123,7 @@ public actor ModelResource<Model: Sendable>: ModelResourceLifecycle {
     }
 
     private func ensureLoaded() async throws -> Model {
+        let generation = try admission.check()
         guard !closed else { throw CapabilityError.sessionClosed }
         guard !unloading, !maintenance else { throw CapabilityError.unavailable("Model is under maintenance") }
         if let model { return model }
@@ -99,6 +145,7 @@ public actor ModelResource<Model: Sendable>: ModelResourceLifecycle {
                 loadID = nil
             }
             try Task.checkCancellation()
+            try admission.validate(generation)
             guard !closed, !unloading, !maintenance, let model else { throw CancellationError() }
             return model
         } catch {
@@ -137,6 +184,17 @@ public actor ModelResource<Model: Sendable>: ModelResourceLifecycle {
         await drain(cancel: false)
     }
 
+    fileprivate func suspend() async {
+        loading?.cancel()
+        activeLease?.cancel?()
+        if unloading {
+            await withCheckedContinuation { unloadFinished = $0 }
+            return
+        }
+        if let loading { _ = await loading.result }
+        if activeLease != nil { await withCheckedContinuation { drained = $0 } }
+    }
+
     fileprivate func shutdown() async {
         closed = true
         loading?.cancel()
@@ -169,6 +227,7 @@ private protocol ModelResourceLifecycle: Sendable {
     func load() async throws
     func unload() async throws
     func shutdown() async
+    func suspend() async
     func unloadIfIdle() async -> Bool
     func beginMaintenance() async throws
     func endMaintenance() async
@@ -184,9 +243,13 @@ public final class ModelContext: Sendable {
     private let state = Mutex(State())
     private let loadGate: ModelLoadGate
     private let maximumLoadWaiters: Int
-    @_spi(ModelManagement) public init(loadGate: ModelLoadGate, maximumLoadWaiters: Int) throws {
+    private let admission: InferenceAdmission
+    @_spi(ModelManagement) public init(
+        loadGate: ModelLoadGate, maximumLoadWaiters: Int, admission: InferenceAdmission = .init()
+    ) throws {
         guard maximumLoadWaiters > 0 else { throw CapabilityError.invalidRequest("Invalid load waiter limit") }
         self.loadGate = loadGate
+        self.admission = admission
         self.maximumLoadWaiters = maximumLoadWaiters
     }
 
@@ -198,7 +261,9 @@ public final class ModelContext: Sendable {
                 throw CapabilityError.invalidRequest("One resource per context; context is sealed")
             }
             let gate = loadGate
-            let resource = ModelResource(maximumLoadWaiters: maximumLoadWaiters) { try await gate.run(loader) }
+            let resource = ModelResource(maximumLoadWaiters: maximumLoadWaiters, admission: admission) {
+                try await gate.run(loader)
+            }
             $0.resource = resource
             return resource
         }
@@ -219,5 +284,6 @@ public final class ModelContext: Sendable {
     @_spi(ModelManagement) public func unloadIfIdle() async -> Bool {
         await state.withLock { $0.resource }?.unloadIfIdle() ?? false
     }
+    @_spi(ModelManagement) public func suspend() async { await state.withLock { $0.resource }?.suspend() }
     @_spi(ModelManagement) public func shutdown() async { await state.withLock { $0.resource }?.shutdown() }
 }

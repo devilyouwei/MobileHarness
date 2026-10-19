@@ -35,6 +35,9 @@ public actor ApplicationControlAgent: Agent {
     private var hostFailureCalls: Set<String> = []
     private var terminalFailureCalls: Set<String> = []
     private var observationSequence: UInt64 = 0
+    private var bluetoothState: ApplicationControlBluetoothState?
+    private var bluetoothPresented: ApplicationControlBluetoothState?
+    private var bluetoothRevision: UInt64 = 0
     private var environment: [AppEnvironmentFact.Category: AppEnvironmentFact] = [:]
     private var sequence: UInt64 = 0
     private var processed = 0
@@ -68,7 +71,8 @@ public actor ApplicationControlAgent: Agent {
             inputs: Set(configuration.communication.inputs.map(\.kind)),
             outputs: [.communication, .actionCall, .toolCall, .control, .scheduling],
             capabilities: try configuration.capabilities.adding(internalTools: [
-                ApplicationControlFunctions.runtimeFailure,
+                ApplicationControlFunctions.runtimeFailure, ApplicationControlFunctions.bluetoothHome,
+                ApplicationControlFunctions.bluetoothSettings,
                 ApplicationControlFunctions.download, ApplicationControlFunctions.cancellation,
                 ApplicationControlFunctions.removal, ApplicationControlFunctions.speechBinding,
                 ApplicationControlFunctions.restoration, ApplicationControlFunctions.saving,
@@ -123,6 +127,9 @@ public actor ApplicationControlAgent: Agent {
         diagnosticOrder.removeAll()
         pending.removeAll()
         environment.removeAll()
+        bluetoothState = nil
+        bluetoothPresented = nil
+        bluetoothRevision = 0
         inputs.removeAll()
         configurationCall = nil
         providerSettingsRequest = nil
@@ -279,6 +286,13 @@ public actor ApplicationControlAgent: Agent {
                 throw CommunicationError.invalidPayload
             }
             try event.validate()
+            if ApplicationControlBluetoothState.isConnectionCondition(event) {
+                let state = bluetoothState ?? .disconnected
+                bluetoothState = state
+                try presentBluetooth(state, input: input)
+                processed += 1
+                return
+            }
             key = "container:" + event.scopeID + ":" + event.id
             count = event.occurrences
             time = event.lastOccurred
@@ -338,6 +352,27 @@ public actor ApplicationControlAgent: Agent {
         processed += 1
     }
 
+    private func presentBluetooth(_ state: ApplicationControlBluetoothState, input: AgentInput) throws {
+        guard state != bluetoothPresented else { return }
+        guard diagnosticCalls.count <= 126, bluetoothRevision < UInt64.max else {
+            throw CommunicationError.capacityExceeded
+        }
+        bluetoothRevision += 1
+        let parameters = ["phase": state.rawValue, "revision": String(bluetoothRevision)]
+        let calls = try [ApplicationControlFunctions.bluetoothHome, ApplicationControlFunctions.bluetoothSettings].map {
+            try $0.call(parameters)
+        }
+        for call in calls {
+            sequence &+= 1
+            guard
+                case .enqueued = continuation.yield(
+                    OutputEnvelope(source: descriptor.id, input: input, output: .toolCall(call), sequence: sequence))
+            else { throw CommunicationError.capacityExceeded }
+            diagnosticCalls.insert(call.id)
+        }
+        bluetoothPresented = state
+    }
+
     private func acceptsPassive(_ input: AgentInput) -> Bool {
         switch input.payload {
         case .actionResult, .toolResult, .roundResult, .communicationReceipt: return true
@@ -372,6 +407,12 @@ public actor ApplicationControlAgent: Agent {
                 _ = try message.validatedSize()
                 guard fact.sequence > (environment[fact.category]?.sequence ?? 0) else {
                     throw CommunicationError.outOfOrder
+                }
+                let bluetooth =
+                    fact.category == .devices ? try ApplicationControlBluetoothState.environment(fact.value) : nil
+                if let bluetooth {
+                    bluetoothState = bluetooth
+                    try presentBluetooth(bluetooth, input: input)
                 }
                 environment[fact.category] = fact
                 processed += 1

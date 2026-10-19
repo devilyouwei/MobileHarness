@@ -156,3 +156,23 @@ private final class EndCounter: Sendable {
     pair.session.cancel()
     await #expect(throws: (any Error).self) { try await producer.value }
 }
+
+@Test func ownerStreamFailureObserverDeliversOnceBeforeOrAfterTermination() async throws {
+    enum Failure: Error { case injected }
+    let first = InferenceSession<Int>.make(limits: try StreamLimits(), estimatedBytes: { _ in 1 })
+    let early = EndCounter()
+    first.session.observeFailure { _ in early.increment() }
+    first.emitter.fail(Failure.injected)
+    first.emitter.fail(Failure.injected)
+    first.session.observeFailure { _ in early.increment() }
+    #expect(early.count == 1)
+    let second = InferenceSession<Int>.make(limits: try StreamLimits(), estimatedBytes: { _ in 1 })
+    let late = EndCounter()
+    second.emitter.fail(Failure.injected)
+    second.session.observeFailure { _ in late.increment() }
+    #expect(late.count == 1)
+    let cancelled = InferenceSession<Int>.make(limits: try StreamLimits(), estimatedBytes: { _ in 1 })
+    cancelled.session.observeFailure { _ in late.increment() }
+    cancelled.session.cancel()
+    #expect(late.count == 1)
+}

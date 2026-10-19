@@ -22,6 +22,7 @@
                         } else {
                             CameraConversationSurface(
                                 camera: assembly.cameraState, controls: assembly.cameraControls,
+                                blocksNewActions: assembly.homePreparation.blocksNewActions,
                                 openSettings: {
                                     assembly.navigate(.settings)
                                 }
@@ -30,6 +31,15 @@
                             } content: {
                                 startupContent
                             }
+                            .overlay {
+                                if let session = container, !session.conversation.hasActiveInteraction,
+                                    assembly.homePreparation.blocksNewActions
+                                {
+                                    HomeModelPreparationOverlay(
+                                        state: assembly.homePreparation, retry: assembly.retryHomePreparation,
+                                        cancel: assembly.cancelHomePreparation)
+                                }
+                            }
                         }
                     }
                 } destination: { destination in
@@ -37,6 +47,12 @@
                 }
                 .onChange(of: assembly.navigation.path) { _, path in
                     assembly.navigationChanged()
+                }
+                .onChange(of: container?.conversation.hasActiveInteraction) { _, _ in
+                    assembly.interactionActivityChanged()
+                }
+                .onChange(of: assembly.cameraState.isEnabled) { _, _ in
+                    assembly.modelRequirementsChanged()
                 }
                 .onChange(of: keepsHomeScreenAwake, initial: true) { _, keepsAwake in
                     UIApplication.shared.isIdleTimerDisabled = keepsAwake

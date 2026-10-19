@@ -59,3 +59,5 @@ NativeAudioEvent／CameraEvent 是 String/Sendable 原生事实，不采用 Erro
 ❌ 视频录制、自主硬件安全控制器及完整原生／物理验收仍待完成。协议化、编译和替身测试不等于真实设备验收。
 
 [总体设计](../README.md) · [Audio](Audio/README.md) · [Vision](Vision/README.md) · [Connectivity](Connectivity/README.md) · [Core](Core/README.md)
+
+✅ 已实现：PlatformAdmission 不再过滤取消／关闭错误，原始 Error 完整交给宿主统一报告端口；生命周期控制事件的广播抑制由宿主／Gateway 完成，不改变类型化 throw。

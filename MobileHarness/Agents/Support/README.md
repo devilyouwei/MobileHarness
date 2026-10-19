@@ -1,5 +1,7 @@
 # Shared Agent Components
 
+✅ ApplicationFeatures／InteractionServices 注入模型的语言、语音、视觉、制品窄接口及内存压力回调，不再创建或获取进程管理器。语音配置错误仍执行 endSettingsChange，根模型暂停／关闭由 App 生命周期负责。
+
 ✅ 已实现：ApplicationFeatures 以 foreground && navigation.path.isEmpty 更新相机准入，AgentApplicationUI 在路径变化时同步；不改相机开启意图，不把导航当场景后台。历史 prepare 只检查取消并取得运行时，不调用 beginSettingsChange/endSettingsChange，真正设置变更保留现有屏障。
 
 AgentSkillLoader 计算激活预算并组合不可变目录；Context 管理根 Skill/依赖、Task 持有、Decision 使用及会话倒计数；Chat 记录合法接纳的模型 Action/Tool 使用，在完整用户 Decision 结束时结算。资源定义缓存与模型激活状态独立。
@@ -214,3 +216,7 @@ ActionActivityWorkflow.shutdown 显式取消并加入执行、任务、角色及
 ✅ 聆听协调的 cue/haptic 注入 CuePlaying／HapticFeedbackProviding，保留原生预备、取消、加入和反馈屏障，不通过具体驱动查找设备。
 
 ✅ 应用停止原生服务前先关闭并加入模型资源交互的恢复／自动保存任务，再关闭执行依赖。
+
+✅ 已实现：AgentApplicationUI只转交App的准备控制／导航可见性／活动变更通知，状态来自注入同根home；模型配置应用后通知宿主重检，不在Bindings持有准备worker。UI触发聆听增加准备状态校验，不影响已运行会话的停止。
+
+✅ 已实现：RuntimePresentation注入同根home／devices蓝牙呈现端口；既有环境事实源继续经Gateway发布，不另建连接所有者或Toast策略。

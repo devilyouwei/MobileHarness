@@ -9,11 +9,26 @@
     @available(iOS 27, *)
     @MainActor @Observable public final class AgentApplicationUI: ApplicationRootProviding {
         private let features: ApplicationFeatures
+        private let home: UIHomeContainer
+        public var onHomeVisibilityChanged: (@MainActor (Bool) -> Void)?
+        public var onPreparationRequested: (@MainActor () -> Void)?
+        public var onPreparationCancelled: (@MainActor () -> Void)?
+        public var onInteractionActivityChanged: (@MainActor () -> Void)?
+        public var preparesHomeModels: Bool { !features.isolatedPresentation }
+        public var homePreparation: HomeModelPreparation { home.conversation.modelPreparation }
+        public func retryHomePreparation() { onPreparationRequested?() }
+        public func cancelHomePreparation() { onPreparationCancelled?() }
+        public func interactionActivityChanged() { onInteractionActivityChanged?() }
+        public func modelRequirementsChanged() { onPreparationRequested?() }
         public var bootstrap: (@MainActor () async throws -> Void)?
         public var onRetry: (() -> Void)?
         private var startupFailure: (any Error)?
         public var startupIssue: String? { startupFailure.map { String(describing: $0) } }
-        public init(features: ApplicationFeatures) { self.features = features }
+        public init(features: ApplicationFeatures, home: UIHomeContainer) {
+            self.features = features
+            self.home = home
+            features.onModelConfigurationChanged = { [weak self] in self?.onPreparationRequested?() }
+        }
         public var session: (any ApplicationSessionProviding)? { features.container }
         public var navigation: NavigationState { features.navigation }
         public var cameraState: CameraState { features.cameraState }
@@ -30,6 +45,7 @@
             AnyView(CameraFrameView(state: features.cameraState).id(features.cameraState.videoGeneration))
         }
         public func navigationChanged() {
+            onHomeVisibilityChanged?(features.navigation.path.isEmpty)
             features.updateCameraAvailability()
             features.reportEnvironment(
                 .navigation, value: features.navigation.path.map(\.rawValue).joined(separator: "/"))
@@ -47,8 +63,10 @@
     extension InteractionServices: ApplicationSessionProviding {
         var audioDetectionState: AudioDetectionState { audioDetection.state }
         var audioDetectionControls: any AudioDetectionControlling { audioDetection }
-        func toggleVoice() { lifecycle.toggleVoice() }
-        func voicePressChanged(_ pressing: Bool) { lifecycle.voicePressChanged(pressing) }
+        func toggleVoice() { if conversation.allowsHomeInteraction { lifecycle.toggleVoice() } }
+        func voicePressChanged(_ pressing: Bool) {
+            if !pressing || conversation.allowsHomeInteraction { lifecycle.voicePressChanged(pressing) }
+        }
         func speechValidationContent() -> AnyView { AnyView(makeMossValidationView()) }
         func chatValidationContent() -> AnyView {
             #if DEBUG

@@ -268,7 +268,8 @@ import StorageState
             }
             let presentation = RuntimePresentation(
                 cameraControl: cameraControl, rootSessionID: photographerSessionID, activity: activity.state,
-                effects: home.effects, expressions: home.expressions)
+                effects: home.effects, expressions: home.expressions,
+                homeBluetooth: home.conversation, deviceBluetooth: bluetooth.state)
             self.bluetooth = bluetooth
             bluetooth.service.nativeObservation = { value in
                 try await input.publish(DeviceInputAdapter.bluetooth(value))

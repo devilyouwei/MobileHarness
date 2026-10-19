@@ -91,3 +91,6 @@ Notice 的非空文字限 1024 UTF-8 字节，tone 为 info/warning/error（默�
 ## UI 全量容器化
 
 ✅ 应用级 UI 状态由八个子容器统一创建，消费者注入所需 Presenting 接口并提交 UI 自有值，不直接写字段。App 注册并管理同一 UI 根；原业务身份/版本校验、原生完成和基础库依赖边界保持。跨模块连接迁移仍是独立待办。
+✅ 已实现：新增两个内部Bluetooth呈现Action（首页／设置），参数为连接phase和revision，使用独立能力协议；只更新呈现，不能连接、发送、恢复设备或调用模型。
+
+✅ 已实现：BluetoothStatusActions.swift单独拥有UI.BluetoothStatus.showBluetoothHome／showBluetoothSettings；连接状态不归RuntimeDiagnostics异常函数组。使用现有Actions/UI目录和编译目标。

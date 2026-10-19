@@ -10,7 +10,7 @@
     actor SpatialAudioCapture {
         private let admission: PlatformAdmission?
         init(admission: PlatformAdmission? = nil) { self.admission = admission }
-        private let session = AVCaptureSession()
+        private var session: AVCaptureSession?
         private let callbackQueue = DispatchQueue(label: "dev.mobileharness.audio.spatial")
         private var receiver: SpatialAudioReceiver?
         private var observation: SpatialAudioObservation?
@@ -25,6 +25,8 @@
             let input = try AVCaptureDeviceInput(device: device)
             supportsSpatialCapture = input.isMultichannelAudioModeSupported(.firstOrderAmbisonics)
             guard supportsSpatialCapture == true else { return nil }
+            let session = AVCaptureSession()
+            self.session = session
             // FOA needs capture-specific microphone configuration, unlike the mono engine backend.
             session.automaticallyConfiguresApplicationAudioSession = true
             session.beginConfiguration()
@@ -51,7 +53,7 @@
             session.startRunning()
             guard session.isRunning, !session.isInterrupted else {
                 log.error(
-                    "Spatial capture startup: running=\(self.session.isRunning, privacy: .public), interrupted=\(self.session.isInterrupted, privacy: .public)"
+                    "Spatial capture startup: running=\(session.isRunning, privacy: .public), interrupted=\(session.isInterrupted, privacy: .public)"
                 )
                 pair.continuation.finish(throwing: AudioIOError.invalidFormat)
                 stop()
@@ -66,12 +68,13 @@
             return pair.stream
         }
         func stop() {
-            session.stopRunning()
+            session?.stopRunning()
             callbackQueue.sync {}  // Join callbacks before allowing a replacement capture backend.
             receiver?.readiness.resolve(.failure(CancellationError()))
             receiver?.continuation.finish()
             receiver = nil
             observation = nil
+            session = nil
         }
     }
 

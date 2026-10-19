@@ -7,7 +7,6 @@ public struct StorageFailureReporter: Sendable {
         self.receive = receive
     }
     public func report(_ component: String, _ operation: String, _ error: any Error) {
-        guard !(error is CancellationError) else { return }
         receive(component, operation, error)
     }
 }

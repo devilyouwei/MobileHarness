@@ -14,6 +14,21 @@ public struct BluetoothDeviceRow: Identifiable, Sendable, Hashable {
         self.name = name
     }
 }
+public enum BluetoothConnectionStatus: String, Equatable, Sendable {
+    case disconnected, connecting, connected
+    public var isConnecting: Bool { self == .connecting }
+    public var title: String {
+        switch self {
+        case .disconnected: "未连接"
+        case .connecting: "正在连接…"
+        case .connected: "已连接"
+        }
+    }
+}
+@MainActor public protocol BluetoothConnectionPresenting: AnyObject, Sendable {
+    @discardableResult func presentBluetoothConnection(_ value: BluetoothConnectionStatus, revision: UInt64) -> Bool
+}
+
 @MainActor
 public protocol BluetoothControlling: AnyObject {
     func reconnect(_ id: String)
@@ -126,6 +141,19 @@ public final class BluetoothSettingsState {
     /// Manual controls remain available for takeover while a previous operation is active.
     public var canControl: Bool { phase == .connected && !recoveryStage.busy }
 
+    public internal(set) var connectionPresentation: BluetoothConnectionStatus = .disconnected
+    private var connectionRevision: UInt64 = 0
+    @discardableResult public func presentBluetoothConnection(_ value: BluetoothConnectionStatus, revision: UInt64)
+        -> Bool
+    {
+        guard presentationAdmission?.acceptsRetained() ?? true, revision > 0, revision >= connectionRevision else {
+            return false
+        }
+        guard revision != connectionRevision || value == connectionPresentation else { return false }
+        connectionRevision = revision
+        connectionPresentation = value
+        return true
+    }
     public init() {}
     public var controlReady: Bool { phase == .connected && !recoveryStage.busy }
     public var connectionBusy: Bool {
@@ -252,7 +280,7 @@ public enum DeviceSettingsUpdate {
 }
 
 @MainActor
-public protocol DeviceSettingsPresenting: UIPresentationAccess {
+public protocol DeviceSettingsPresenting: UIPresentationAccess, BluetoothConnectionPresenting {
     var availability: BluetoothAvailability { get }
     var phase: BluetoothConnectionPhase { get }
     var scanning: Bool { get }

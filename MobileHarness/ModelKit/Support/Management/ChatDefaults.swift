@@ -7,7 +7,7 @@ import ModelKitOpenAI
     import ModelKitGemma4
 #endif
 
-extension ModelKitDefaults {
+extension DefaultModelAssembly {
     @available(iOS 27, macOS 27, *)
     static func chatRegistration(resources: URL, configuration: OpenAIChatConfiguration?) throws
         -> ModelRegistration

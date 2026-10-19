@@ -50,3 +50,7 @@
 ✅ ModelResourceInteractionWorkflow唯一拥有下载源防抖任务和共享初始恢复任务；已恢复页面刷新库存与声音偏好，不覆盖端点草稿，明确失败后的restore允许重试。编辑意图更新草稿、合并最新端点，忙碌完成事件驱动续存而非轮询；停止关闭接纳、取消并加入自有任务，不重放失败保存。
 
 ✅ 资源操作接纳时调用 beginRefresh 使旧库存刷新失效；该处不发起按代次读取，显式丢弃返回的 generation，实际刷新路径继续校验代次。
+
+✅ 已实现：确定性Bluetooth连接状态处理使用devices事实（availability／connection／recovery），同根revision去重；已知连接条件不调用异常呈现，而更新状态（有实际事实时不以迟到错误覆盖）。分别发出首页和设置两个内部呈现Tool；有界沿用128在途调用，身份校验、迟到和失败仍显式处理。
+
+✅ 已实现：BluetoothStatusActions.swift单独拥有UI.BluetoothStatus.showBluetoothHome／showBluetoothSettings；连接状态不归RuntimeDiagnostics异常函数组。使用现有Actions/UI目录和编译目标。

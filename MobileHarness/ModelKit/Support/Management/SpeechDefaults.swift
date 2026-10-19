@@ -7,7 +7,7 @@ import ModelKitNemotron
 @_spi(ModelAssembly) import ModelKitRuntime
 import ModelKitSilero
 
-extension ModelKitDefaults {
+extension DefaultModelAssembly {
     @available(iOS 27, macOS 27, *)
     static func registerSpeechModels(manager: ModelManager, resources: URL) async throws {
         try await manager.register(
@@ -50,10 +50,10 @@ extension ModelKitDefaults {
             })
     }
     @available(iOS 27, macOS 27, *)
-    static func registerSpeechDefaults(manager: ModelManager) async throws {
-        let recognition = SelectedRecognition(manager: manager, selection: speechSelection)
-        let synthesis = SelectedSynthesis(manager: manager, selection: speechSelection)
-        let vad = SelectedVoiceActivity(manager: manager, selection: speechSelection)
+    static func registerSpeechDefaults(manager: ModelManager, selection: SpeechSelection) async throws {
+        let recognition = SelectedRecognition(manager: manager, selection: selection)
+        let synthesis = SelectedSynthesis(manager: manager, selection: selection)
+        let vad = SelectedVoiceActivity(manager: manager, selection: selection)
         try await manager.register(
             ModelRegistration(id: ModelID("recognition"), capabilities: [.recognition]) { _ in
                 ProvidedCapabilities(warmup: { try await recognition.warmup() }, recognition: recognition)

@@ -107,3 +107,6 @@ HomeEffectsWorkflow 的 timer、文本/UUID 围栏和状态在 UI/Conversation�
 ## UI 全量容器化
 
 ✅ 应用级 UI 状态由八个子容器统一创建，消费者注入所需 Presenting 接口并提交 UI 自有值，不直接写字段。App 注册并管理同一 UI 根；原业务身份/版本校验、原生完成和基础库依赖边界保持。跨模块连接迁移仍是独立待办。
+✅ 已实现：BluetoothStatusPresentationCapability与RuntimePresentation提供两个窄呈现端点，校验ApplicationControl来源／根会话／无task及递增revision，注入同根home和devices，不创建备用UI状态。
+
+✅ 已实现：BluetoothStatusActions.swift单独拥有UI.BluetoothStatus.showBluetoothHome／showBluetoothSettings；连接状态不归RuntimeDiagnostics异常函数组。使用现有Actions/UI目录和编译目标。

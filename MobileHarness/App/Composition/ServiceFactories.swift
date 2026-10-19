@@ -1,8 +1,11 @@
 import ActionBindings
 import AgentBindings
+import AppLifecycle
 import AppStorage
 import Foundation
 import Gateway
+import ModelKitDefaults
+import ModelKitRuntime
 import PlatformKit
 import Storage
 import StorageCache
@@ -19,14 +22,16 @@ import UI
         let uiContainer: UIContainer
         let platform: PlatformContainer
         let storage: StorageContainer
-        let artifacts: ArtifactServices
+        let model: ModelContainer
         let agents: ApplicationFeatures
         let ui: AgentApplicationUI
+        let homePreparation: ForegroundPreparation
     }
     static func make() -> Services {
         let root = URL.applicationSupportDirectory.appendingPathComponent("MobileHarness", isDirectory: true)
         let registry = ApplicationContainer(
-            root: root, uiConfiguration: .init(settings: SettingsProviderAdapter.initial))
+            root: root, uiConfiguration: .init(settings: SettingsProviderAdapter.initial),
+            modelArtifacts: { try ArtifactServices.configuration(files: $0) })
         let containerFailures = registry.containerFailures()
         let storage = registry.storage()
         let files = storage.files
@@ -40,8 +45,7 @@ import UI
         let photos = CameraStorageFactory.make(
             repository: { try storage.database.media },
             files: { try files.file(files.photos) })
-        let resources = root.appendingPathComponent("Models/installed", isDirectory: true)
-        let artifacts = ArtifactServices(resources: resources, files: files)
+        let model = registry.model()
         let agents = ApplicationFeatures(
             containerFailures: containerFailures,
             home: uiContainer.home, settings: uiContainer.settings, modelResources: uiContainer.modelResources,
@@ -60,12 +64,66 @@ import UI
                     nativeEvent: bindings.nativeEvent, makeRuntime: bindings.makeRuntime,
                     connectFrames: bindings.connectFrames)
             },
-            bluetooth: bluetooth, audio: platform.audio, artifacts: artifacts,
-            resources: resources)
+            bluetooth: bluetooth, audio: platform.audio,
+            languageModels: model.language, speechModels: model.speech, visionModels: model.vision,
+            modelArtifacts: model.artifacts, memoryPressure: { await model.handleMemoryPressure() })
+        let home = uiContainer.home
+        let homePreparation = ForegroundPreparation(
+            steps: {
+                var steps: [ForegroundPreparation.Step] = [
+                    .init(
+                        id: "language",
+                        isReady: {
+                            switch try await model.language.status() {
+                            case .ready, .unmanaged: true
+                            default: false
+                            }
+                        }, prepare: { try await model.language.warmup() })
+                ]
+                for (id, capability) in [
+                    ("recognition", ProvidedCapability.recognition), ("synthesis", .synthesis),
+                    ("voiceActivity", .voiceActivity),
+                ] {
+                    steps.append(
+                        .init(
+                            id: id,
+                            isReady: {
+                                switch try await model.speech.status(capability) {
+                                case .ready, .unmanaged: true
+                                default: false
+                                }
+                            }, prepare: { try await model.speech.warmup(capability) }))
+                }
+                if uiContainer.camera.state.isEnabled {
+                    steps.append(
+                        .init(
+                            id: "vision",
+                            isReady: {
+                                switch try await model.vision.status() {
+                                case .ready, .unmanaged: true
+                                default: false
+                                }
+                            }, prepare: { try await model.vision.load() }))
+                }
+                return steps
+            }, canPrepare: { !home.conversation.hasActiveInteraction },
+            project: { [weak home] state in
+                let value: HomeModelPreparation
+                switch state {
+                case .inactive: value = .inactive
+                case .checking: value = .checking
+                case .preparing(let component): value = .preparing(component)
+                case .ready: value = .ready
+                case .deferred: value = .deferred
+                case .cancelled: value = .cancelled
+                case .failed(let component, let message): value = .failed(component: component, message: message)
+                }
+                home?.presentModelPreparation(value)
+            })
         return Services(
             registry: registry, containerFailures: containerFailures,
-            uiContainer: uiContainer, platform: platform, storage: storage, artifacts: artifacts,
+            uiContainer: uiContainer, platform: platform, storage: storage, model: model,
             agents: agents,
-            ui: AgentApplicationUI(features: agents))
+            ui: AgentApplicationUI(features: agents, home: home), homePreparation: homePreparation)
     }
 }

@@ -2,6 +2,7 @@ import AppLifecycle
 import AppStorage
 import Foundation
 import Gateway
+import ModelKitDefaults
 import PlatformKit
 import Testing
 
@@ -163,4 +164,19 @@ private enum UIConsumerFailure: Error, Equatable { case start }
     }
     #expect(!root.isAvailable)
     #expect(throws: UI.UIContainerError.stopped) { try root.start() }
+}
+
+@Test @MainActor func modelRegistrationSharesFourPortsAndIsolatesRoots() async throws {
+    let registry = ApplicationContainer(root: URL.temporaryDirectory)
+    let root = registry.model()
+    #expect(root === registry.model())
+    #expect(root.language === registry.languageModels())
+    #expect(root.speech === registry.speechModels())
+    #expect(root.vision === registry.visionModels())
+    #expect(root.artifacts === registry.modelArtifactsCapability())
+    let other = ApplicationContainer(root: URL.temporaryDirectory).model()
+    #expect(root !== other)
+    #expect(root.language !== other.language)
+    try await root.stop()
+    try await other.stop()
 }

@@ -271,7 +271,9 @@ public actor ApplicationControlIntentRuntime {
             } else {
                 receiverError = false
             }
-            let diagnosticFact = [ContainerFailureEvent.contract, RuntimeFailureEvent.contract].contains(
+            let diagnosticFact = [
+                ContainerFailureEvent.contract, RuntimeFailureEvent.contract, AppEnvironmentFact.contract,
+            ].contains(
                 envelope.inputMetadata.contract)
             if diagnosticFact {
                 do { _ = try await boundConsumer().execute(envelope) } catch {

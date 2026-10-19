@@ -73,3 +73,5 @@ flowchart TB
 ## 契约与重复报告整理
 
 ✅ StorageError/DocumentStorageError/RecordStorageError 集中在共享契约文件，值错误统一 Error/Equatable/Sendable。AudioCache 私有接纳检查只翻译／抛错，公开操作报告该接纳错误一次；原始失败、释放／取消及数据库 schema 保持，Storage 不生成 Signal。
+
+✅ 已实现：StorageFailureReporter 保留取消在内的原始错误回调，调用方仍接收原始 throw；宿主保留诊断，正常取消不广播业务故障。

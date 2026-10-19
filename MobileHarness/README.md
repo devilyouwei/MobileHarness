@@ -1,5 +1,7 @@
 # MobileHarness Technical Design
 
+✅ App 持有实例级 ModelContainer 并注入 language／speech／vision／artifacts；依赖顺序为 Storage → Model → Agents。后台关闭推理并加入取消、保留权重与既有后台制品传输；模型中立错误回调接入 Gateway，Signal 适配不进入基础库。
+
 This document defines the current framework architecture, module responsibilities, cross-module flows and key technical contracts.
 
 This technical document has three parts:
@@ -290,7 +292,7 @@ Directory nesting expresses ownership; `Package.swift` defines the actual compil
 | `Storage/Database/Media/` | StorageMedia | StorageCore, StorageFiles |
 | `Storage/Database/Devices/` | StorageDevices | StorageCore |
 | `Storage/Database/SQLite/` | StorageSQLite | StorageCore, StorageDatabase, domain repositories, GRDB.swift |
-| `App/Composition/ApplicationContainer.swift` | AppStorage | Storage/Platform/UI roots and diagnostics, StorageSQLite, Gateway, FactoryKit |
+| `App/Composition/ApplicationContainer.swift` | AppStorage | Storage/Platform/UI/Model roots and diagnostics, StorageSQLite, ModelKitDefaults, Gateway, FactoryKit |
 | `PlatformKit/` | PlatformKit | None |
 | ModelKit shared capability sources | ModelKit | None |
 | `ModelKit/Support/Management/` (runtime source list) | ModelKitRuntime | ModelKit |
@@ -317,7 +319,7 @@ Directory nesting expresses ownership; `Package.swift` defines the actual compil
 - All Agent-driven external inputs and declared execution feedback enter through InputGateway; all Agent messages and executable outputs leave through OutputGateway. Submitted business routes use their owning Agents; immediate host mechanisms retain their explicit scopes.
 - Actions owns business behavior, motion shaping, composition and completion policy. PlatformKit owns native I/O, protocol encoding, hardware limits and device feedback.
 - FunctionContracts owns standard callable input/output and ActionFunction metadata only. Gateway/Runtime (ExecutionRuntime) owns shared function registration/execution; Gateway/Output registration/protocol adapters (CallRuntime) own ActionBinding and calling policies. Gateway orchestration owns scheduling, admission, feedback and shared resource coordination.
-- ModelKit is a capability SDK. Provider registration/default selection belongs to ModelKitDefaults; process-wide model ownership belongs to ModelKitRuntime.
+- ModelKit is a capability SDK. Provider registration/default selection belongs to ModelKitDefaults; App-owned instance lifetime belongs to ModelContainer; ModelKitRuntime owns the private registry.
 - AgentCore/Input owns generic input transport; UI owns presentation values. Storage owns lifetime and retention, not inference or business policy.
 
 AgentCore, FunctionContracts, base ModelKit, PlatformKit and Storage are independent targets. Execution, call adaptation and feature workflows have the compilation boundaries shown above.
@@ -352,7 +354,7 @@ This section is an architectural directory. It describes why each module exists 
 
 **Behavior.** Actions owns protocol-neutral callable functions. Shared contracts live in Actions/Support/Contracts; ActionMacro and CapabilityModules live directly in Actions/Support. FunctionContracts remains an independent target, while the macro declarations and catalog composition compile in Actions. FunctionContracts defines their inputs/outcomes; Gateway owns independent ExecutionRuntime and CallRuntime. ActionCall follows Channel scheduling; ToolCall executes directly outside Channel/wait. BehaviorAssembly freezes one canonical function store and explicit host bindings without importing AgentCore. [Protocol routing](Gateway/Output/Protocols/README.md) explains registration, Agent transport/parsing and shared execution/feedback.
 
-**Foundations.** UI owns presentation containers and native rendering. ModelKit separates capability contracts, process-wide management, default assembly and engine adapters. PlatformKit groups Audio, Vision and Connectivity capabilities behind native protocols. Storage combines State, Cache, Database and Files; domain repositories and SQLite adapters compile separately. Each foundational module owns its interfaces and values without depending on another foundational or business module.
+**Foundations.** UI owns presentation containers and native rendering. ModelKit separates capability contracts, instance-local management, default assembly and engine adapters. PlatformKit groups Audio, Vision and Connectivity capabilities behind native protocols. Storage combines State, Cache, Database and Files; domain repositories and SQLite adapters compile separately. Each foundational module owns its interfaces and values without depending on another foundational or business module.
 
 <a id="part-iii--key-techniques"></a>
 
@@ -369,7 +371,8 @@ This part owns interactions between modules: data and call paths, injected inter
 ```mermaid
 flowchart TD
     Resources[App resource root] --> Defaults[ModelKitDefaults]
-    Defaults --> Manager[Process-wide ModelManager]
+    Defaults --> Root[App-owned ModelContainer]
+    Root --> Manager[Instance-local ModelManager]
     App[AppComposition] --> Manager
     App --> Stores[Storage services]
     App --> Platform[PlatformKit capabilities]
@@ -1491,3 +1494,9 @@ Backend/schema/CAS/page details: [Storage](Storage/README.md), [Chat records](St
 Assistant selects and authorizes model photos; App injects original-read/preparation capabilities; PlatformKit owns codecs; Storage retains originals. ReACT reuses prepared attachments without changing original Photos/media data. Policy and failure handling: [Assistant](Agents/Assistant/README.md#model-photo-preparation-policy), [Platform Vision](PlatformKit/Vision/README.md#native-image-compression).
 
 SpeechPerception owns consent/occupancy, SpeechSynthesis produces PCM, the module-owned voice input/execution services join native microphone/playback barriers and UI renders supplied captions/eyes/light. Cue/haptic/notice functions reuse canonical Actions; Skill exposure and physical completion remain separate. Rendering details belong to [UI Components](UI/Components/README.md); root presentation ownership to [Action presentation](Actions/UI/Support/README.md).
+
+✅ 已实现：首页可见且前台时，由App持有一个可取消并加入的准备协调器，通过ModelKit窄接口检查当前模型，冷能力串行准备；已就绪直接放行。UI.home只呈现独立准备状态，阻止新聆听和新相机操作，保留设置／重试／取消及已有会话停止。导航不终止已有聆听，后台仍按原生命周期停止。
+
+✅ 已实现：蓝牙连接不可用／连接建立失败保留Platform错误与Gateway原始记录，Gateway提供稳定连接条件代码，ApplicationControl将其降为状态而非故障Toast；实际设备事实经既有app.environment更新Agent连接状态，再分别调用首页／设置呈现Action。控制与传输严重错误不降级。
+
+✅ 已实现：四大基础根使用统一的原生错误报告签名，完整原始 Error 保留在根级诊断记录，Signal 仅携带有界摘要；基础库不决定提示方式，正常取消／生命周期拒绝只保留本地记录。

@@ -1,6 +1,7 @@
 import Actions
 import Foundation
 import FunctionContracts
+import ModelKitDefaults
 import ModelKitRuntime
 import StorageCore
 import UI
@@ -87,21 +88,21 @@ public enum SettingsModelResourcesAdapter {
 /// Native SDK adaptation only; Agent/functions select commands and source inputs.
 @MainActor public final class ModelResourceCapabilityAdapter: ModelResourceCapability, ModelResourceInventoryCapability
 {
-    private let manager: @MainActor () async throws -> ModelManager
+    private let artifacts: @MainActor () async throws -> any ModelArtifactsManaging
     private var speechPreference: [Bool]?
     private let bindSpeech: @MainActor (Bool, Bool) async throws -> Void
     private let quiesce: @MainActor (String) async -> Void
     public init(
-        manager: @escaping @MainActor () async throws -> ModelManager,
+        artifacts: @escaping @MainActor () async throws -> any ModelArtifactsManaging,
         quiesce: @escaping @MainActor (String) async -> Void,
         bindSpeech: @escaping @MainActor (Bool, Bool) async throws -> Void
     ) {
-        self.manager = manager
+        self.artifacts = artifacts
         self.quiesce = quiesce
         self.bindSpeech = bindSpeech
     }
     public func snapshotResources() async throws -> [ModelResourceFact] {
-        let manager = try await manager()
+        let manager = try await artifacts()
         let snapshots = try await manager.artifactSnapshots()
         guard snapshots.count <= 64 else { throw ResourceInventoryError.capacityExceeded }
         return try snapshots.map { snapshot in
@@ -132,16 +133,16 @@ public enum SettingsModelResourcesAdapter {
         speechPreference = preference
     }
     public func download(_ id: String, endpoint: String, allowsCellular: Bool) async throws {
-        let manager = try await manager()
+        let manager = try await artifacts()
         try await manager.downloadArtifact(
             id, source: ModelDownloadSource(endpoint: endpoint, allowsCellular: allowsCellular))
     }
     public func cancel(_ id: String) async throws {
-        let manager = try await manager()
+        let manager = try await artifacts()
         try await manager.cancelArtifact(id)
     }
     public func remove(_ id: String) async throws {
-        let manager = try await manager()
+        let manager = try await artifacts()
         try await manager.removeArtifact(id) { [quiesce] in await quiesce(id) }
     }
 }

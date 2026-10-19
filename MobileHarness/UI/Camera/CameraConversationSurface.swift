@@ -7,14 +7,17 @@
     public struct CameraConversationSurface<Content: View, Preview: View>: View {
         let camera: CameraState
         let controls: any CameraControlling
+        let blocksNewActions: Bool
         let preview: () -> Preview
         let openSettings: () -> Void
         @ViewBuilder let content: () -> Content
 
         public init(
-            camera: CameraState, controls: any CameraControlling, openSettings: @escaping () -> Void,
+            camera: CameraState, controls: any CameraControlling, blocksNewActions: Bool = false,
+            openSettings: @escaping () -> Void,
             @ViewBuilder preview: @escaping () -> Preview, @ViewBuilder content: @escaping () -> Content
         ) {
+            self.blocksNewActions = blocksNewActions
             self.camera = camera
             self.controls = controls
             self.openSettings = openSettings
@@ -30,7 +33,8 @@
                 CameraGazeContent(camera: camera, content: content)
             }
             .overlay(alignment: .topTrailing) {
-                CameraControlsOverlay(camera: camera, controls: controls, openSettings: openSettings)
+                CameraControlsOverlay(
+                    camera: camera, controls: controls, blocksNewActions: blocksNewActions, openSettings: openSettings)
             }
             .overlay(alignment: .topLeading) { CameraStatisticsOverlay(camera: camera) }
             .overlay { CameraPhotoOverlay(camera: camera, controls: controls) }
@@ -57,6 +61,7 @@
     private struct CameraControlsOverlay: View {
         let camera: CameraState
         let controls: any CameraControlling
+        let blocksNewActions: Bool
         let openSettings: () -> Void
         @Environment(\.openURL) private var openURL
         @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -70,14 +75,14 @@
                     .accessibilityLabel(camera.isEnabled ? "关闭摄像头" : "开启摄像头")
                     .accessibilityValue(camera.isVisible ? "已开启" : (camera.isEnabled ? "等待相机" : "已关闭"))
                     .accessibilityIdentifier("camera.toggle")
-                    .disabled(camera.isBusy || camera.controlBusy)
+                    .disabled(camera.isBusy || camera.controlBusy || (blocksNewActions && !camera.isEnabled))
                     if camera.isEnabled {
                         HStack(spacing: 12) {
                             Button(action: controls.switchCamera) {
                                 Image(systemName: "arrow.triangle.2.circlepath.camera")
                                     .frame(width: 48, height: 48)
                             }
-                            .disabled(!camera.isEnabled || camera.isBusy || camera.controlBusy)
+                            .disabled(blocksNewActions || !camera.isEnabled || camera.isBusy || camera.controlBusy)
                             .accessibilityLabel(camera.facing == .front ? "切换到后置摄像头" : "切换到前置摄像头")
                             .accessibilityIdentifier("camera.switch")
 
@@ -104,7 +109,8 @@
                                 if let url = URL(string: UIApplication.openSettingsURLString) { openURL(url) }
                             }
                         } else {
-                            Button("重试", action: controls.retry).disabled(camera.isBusy || camera.controlBusy)
+                            Button("重试", action: controls.retry).disabled(
+                                blocksNewActions || camera.isBusy || camera.controlBusy)
                         }
                     }
                     .font(.footnote.weight(.medium))

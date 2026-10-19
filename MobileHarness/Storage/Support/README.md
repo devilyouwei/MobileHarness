@@ -13,3 +13,5 @@
 ## 统一容器异常通道
 
 ✅ StorageFailureReporter 属于 StorageCore，仅 Foundation；统一非阻塞错误回调，普通 CancellationError 不升级。它不存储历史、不执行 UI/Agent 或重试。
+
+✅ 已实现：统一报告端口完整转交原始 Error，不在基础库删除取消证据；不选择业务呈现。

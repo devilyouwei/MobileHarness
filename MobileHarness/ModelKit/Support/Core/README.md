@@ -1,5 +1,7 @@
 # Inference Data, Sessions and Resource Admission
 
+✅ InferenceAdmission 同步关闭接纳并更新代际，旧加载等待与迟到结果不能越过暂停；ModelResource.suspend 取消并加入活动租约／加载、保留已加载权重。终止关闭不可恢复。InferenceSession 允许唯一故障观察者，迟安装仍收到一次真实失败；不增加消费任务或事件队列。
+
 ## Summary
 
 Model-neutral media/request identity, single-consumer streams and adapter-facing managed resource handles.

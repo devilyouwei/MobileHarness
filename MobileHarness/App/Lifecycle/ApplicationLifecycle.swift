@@ -242,3 +242,136 @@ public struct ApplicationLifecycleFailure: Error {
         return failures
     }
 }
+
+/// A host-owned, single-worker readiness barrier, independent of page task lifetime.
+@MainActor
+public final class ForegroundPreparation {
+    public enum State: Equatable, Sendable {
+        case inactive, checking
+        case preparing(String)
+        case ready, deferred, cancelled
+        case failed(component: String, message: String)
+    }
+    public struct Step {
+        public let id: String
+        public let isReady: @MainActor () async throws -> Bool
+        public let prepare: @MainActor () async throws -> Void
+        public init(
+            id: String, isReady: @escaping @MainActor () async throws -> Bool,
+            prepare: @escaping @MainActor () async throws -> Void
+        ) {
+            self.id = id
+            self.isReady = isReady
+            self.prepare = prepare
+        }
+    }
+    public private(set) var state: State = .inactive
+    private var steps: (@MainActor () -> [Step])?
+    private var canPrepare: (@MainActor () -> Bool)?
+    private var project: (@MainActor (State) -> Void)?
+    private var worker: Task<Void, Never>?
+    private var active = false
+    private var closed = false
+    private var pending = false
+    private var revision: UInt64 = 0
+    public init(
+        steps: @escaping @MainActor () -> [Step], canPrepare: @escaping @MainActor () -> Bool,
+        project: @escaping @MainActor (State) -> Void
+    ) {
+        self.steps = steps
+        self.canPrepare = canPrepare
+        self.project = project
+    }
+    deinit { worker?.cancel() }
+    private func publish(_ value: State) {
+        state = value
+        project?(value)
+    }
+    public func setActive(_ value: Bool) {
+        guard !closed, value != active else { return }
+        active = value
+        revision &+= 1
+        pending = value
+        worker?.cancel()
+        publish(value ? .checking : .inactive)
+        startIfIdle()
+    }
+    /// Configuration changes fence the old result and retain only one replacement request.
+    public func refresh() {
+        guard active, !closed else { return }
+        revision &+= 1
+        pending = true
+        worker?.cancel()
+        publish(.checking)
+        startIfIdle()
+    }
+    public func cancel() {
+        guard active, !closed else { return }
+        revision &+= 1
+        pending = false
+        worker?.cancel()
+        publish(.cancelled)
+    }
+    private func startIfIdle() {
+        guard active, !closed, pending, worker == nil else { return }
+        pending = false
+        let selected = revision
+        worker = Task { [weak self] in
+            await self?.run(selected)
+            self?.finished()
+        }
+    }
+    private func run(_ selected: UInt64) async {
+        var component = "configuration"
+        do {
+            let selectedSteps = steps?() ?? []
+            for step in selectedSteps {
+                component = step.id
+                try check(selected)
+                let ready = try await step.isReady()
+                try check(selected)
+                if ready { continue }
+                guard canPrepare?() == true else {
+                    publish(.deferred)
+                    return
+                }
+                publish(.preparing(step.id))
+                try await step.prepare()
+                try check(selected)
+                guard try await step.isReady() else { throw PreparationError.notReady }
+                try check(selected)
+            }
+            for step in selectedSteps {
+                component = step.id
+                try check(selected)
+                guard try await step.isReady() else { throw PreparationError.notReady }
+                try check(selected)
+            }
+            publish(.ready)
+        } catch {
+            guard active, !closed, selected == revision, !Task.isCancelled else { return }
+            publish(.failed(component: component, message: String(String(describing: error).prefix(2048))))
+        }
+    }
+    private enum PreparationError: Error { case notReady }
+    private func check(_ selected: UInt64) throws {
+        try Task.checkCancellation()
+        guard active, !closed, selected == revision else { throw CancellationError() }
+    }
+    private func finished() {
+        worker = nil
+        startIfIdle()
+    }
+    public func stop() async {
+        closed = true
+        active = false
+        pending = false
+        revision &+= 1
+        worker?.cancel()
+        await worker?.value
+        publish(.inactive)
+        steps = nil
+        canPrepare = nil
+        project = nil
+    }
+}

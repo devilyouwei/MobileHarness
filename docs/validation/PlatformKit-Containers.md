@@ -415,3 +415,147 @@
 - ✅ 完整检查重新编译后未再出现 beginRefresh 未使用返回值警告；模块边界、README、严格格式、Python6项、UI96项及AppWorkflow120项通过。另行修改文件格式、git diff --check及工程／隐私／权限plutil通过。
 - ❌ 完整检查仍未通过：Integration1000项中12项失败、22个问题，涉及atomic稳定离靶、七项soundSource、媒体到期传输、Vision预算恢复、soundSourceContextWriteFailureReportsWithoutStoppingOrSelfJoin及Vision不复制媒体。日志 `/tmp/mobileharness-unused-refresh-check.log`；不将这些失败全部归因于环境。
 - ❌ `./scripts/build-ios.sh` 仍在首个Simulator scheme的CoreAIShared无法解析CoreAI处失败，后续scheme未执行：`/tmp/mobileharness-unused-refresh-simulator.log`。本轮未另行签名构建、安装或操作真机，未提交。
+
+## 2026-10-19 ModelKit 容器化
+
+已实现于 codex/storage-lifecycle-boundary，基线6431d36f；main-sh仍为377b5470，未合并或修改。ModelContainer 持有 language／speech／vision／artifacts，同根注册、实例私有 manager／选择配置，业务消费者注入窄端口。后台关闭接纳、取消加入并保留已加载权重；根停止先加入推理、关闭制品，再释放 manager 注册／配置。生产静态 Defaults 和旧 CurrentChatCapability 已移除。后台回调复用同根制品准备，冷启动准备在作用域替换时也有明确清理。
+
+- ✅ 首轮模型与注册定向回归5项通过，包括流失败早／晚观察一次、暂停取消加入与权重保留、默认根隔离／关闭、App四子能力共享。第二轮增加聊天配置隔离／保留端口更新及不合作加载的迟到等待者，相关结果见最新日志；测试不申请权限、不运行真实权重或联网。
+- ✅ 第一轮签名构建通过：`/tmp/mobileharness-model-container-device.log`。后续清理曾出现局部变量 assembly 遮蔽导致编译失败，已改为 self.assembly；最终结果另记，不以第一轮替代最终构建。
+- ❌ Simulator 首个scheme仍被CoreAIShared无法解析CoreAI阻断，后续scheme未执行：`/tmp/mobileharness-model-container-simulator.log`。
+- ❌ 第一轮完整检查未通过：UI和Integration存在超时／状态失败（Integration1001项、41 issues），模型新增回归均通过，不能归为全部环境问题。日志 `/tmp/mobileharness-model-container-check.log`；最终检查另记。
+- ✅ 最终模型相关定向93项通过（SDK模型／资源／制品、根与配置、流故障观察及App注册）：`/tmp/mobileharness-model-container-api-regression.log`。语言／视觉控制统一为 load/warmup/unload/status；语音按类别控制，状态读取选择后的实际后端，卸载覆盖同类本地和系统提供者。默认根测试另断言元数据查询不加载权重。
+- ✅ 最终签名构建通过：`/tmp/mobileharness-model-container-delivery-device.log`。工程／隐私／权限plutil、git diff --check、最终25项Skill资源与函数声明打包检查通过：`/tmp/mobileharness-model-container-resources.log`。
+- ❌ 最终完整检查整体未通过：UI96项中cameraNativeMetalDrawStopAndLayerHandoff失败；Integration1001项中10项失败、21 issues，为uiFullHomeOwnsToastExpiryWithoutAViewAndStopJoinsEffects、atomicStableOffTargetEndsBeforeOverallDeadlineAndKeepsError、七项soundSource及visionResolvesOpaqueInputWithoutCopyingMediaIntoObservation。AppWorkflow120项、模型相关及新增回归、源码边界、严格格式和Python6项通过。日志 `/tmp/mobileharness-model-container-delivery-check.log`；未证明这些失败全部属于环境，不把定向通过替代全量通过。
+- ✅ 真机最初不可连接，安装尝试被CoreDevice4016拒绝；连接恢复后，最终版本已安装到iPhone17Pro，安装序号4124：`/tmp/mobileharness-model-container-install-final.log`。启动被锁屏拒绝（Locked），未确认应用已运行：`/tmp/mobileharness-model-container-launch.log`。
+- ❌ 实际聊天／连续聆听与合成、姿态、模型配置／资源、前后台权重复用、旧任务不重放及后台下载恢复的真机验收待用户反馈；不以替身、元数据或编译证明模型稳定性。本轮未提交。
+
+- ✅ 2026-10-19 按用户要求重新安装同一签名产物（确认无更新的Swift源码），iPhone17Pro安装序号4132，成功启动。日志 `/tmp/mobileharness-model-container-reinstall.log`、`/tmp/mobileharness-model-container-relaunch.log`。仅确认安装／启动，真实模型及交互验收仍待反馈。
+
+## 2026-10-19 模型真机反馈与本地窗口兼容
+
+✅ 用户确认已测试语音识别／合成的Apple原生和开源模型，以及云端大模型，均无问题。仅记录这些场景，不扩展为持续功耗／后台下载／本地LLM通过。
+
+❌ 本地LLM真实推理尚未通过验收；已实现ModelKit内的4096总窗口适配，最新5条消息含当前输入，裁剪system并为生成留空间。定向、完整检查、Simulator、签名构建与真机结果分别记录。
+
+已实现 GemmaContextBudget：最新5条非system消息包含当前输入，必要时裁剪system及最旧历史；实际完整模板token与生成上限合计不超过4096，Engine入口再次检查。默认先预留1024，拟合后未指定输出上限的请求仍按原规则使用剩余窗口。
+
+定向13项通过（输出预算另含6组参数），1项真实权重用例按未启用标记跳过；覆盖Unicode、原请求不变、模板／输出预算、非单调计数、取消，以及旧历史不支持的输入仍拒绝。计数器为替身，不代表真实本地模型效果。日志 `/tmp/mobileharness-gemma-window-final.log`。
+
+- ✅ 定向最终13项通过、1项真实权重测试跳过；完整检查中Gemma同组结果一致，UI96和AppWorkflow120项通过，源码归属／模块独立、严格格式、Python6项通过。
+- ❌ `./scripts/check.sh` 整体失败：Integration1001项中10项失败、18 issues，为atomicStableOffTargetEndsBeforeOverallDeadlineAndKeepsError、bluetoothLateNativeAimErrorIsReportedAfterRecoveryFencesTheConnection、七项soundSource及visionDiscardsOverBudgetResultsWithoutPublishingAndRecovers。日志 `/tmp/mobileharness-gemma-window-check.log`，不将失败全部归因于环境。
+- ❌ `./scripts/build-ios.sh` 首个Simulator scheme被CoreAIShared无法解析CoreAI阻断，后续scheme未执行：`/tmp/mobileharness-gemma-window-simulator.log`。
+- ✅ 签名真机构建成功：`/tmp/mobileharness-gemma-window-device.log`；工程／隐私／权限plutil、最终Skill／函数资源验证及git diff --check通过，资源日志 `/tmp/mobileharness-gemma-window-resources.log`。
+- ✅ 修复版已安装iPhone17Pro（安装序号4140）；首次启动遇到CoreDevice远程连接错误，重试后成功启动。日志 `/tmp/mobileharness-gemma-window-install.log`、`/tmp/mobileharness-gemma-window-launch-retry.log`。
+- ❌ 本地Gemma真实tokenizer／CoreAI连续回复、实际业务长system及20轮历史验收待用户反馈；权重无关计数器回归不代替真实模型效果。不修改Agent、云端请求或持久历史，保留既有模型容器改造及全部工作区修改，未提交。
+
+### 本地 Gemma 原始消息校验修复（2026-10-19）
+
+用户真机反馈旧的笼统 invalidRequest，真实模型尚未通过验收。源码确认历史请求可产出空assistant，旧Gemma全量非空校验会拒绝。计划仅在ModelKit规范化推理副本：移除空历史、归并system，保留当前输入身份与4096预算，补充针对性回归；具体真机触发分支尚未由日志确认。
+
+已实现上述ModelKit内规范化，并将旧笼统报错拆为源请求大小、末尾非system角色、空当前输入三个原因；错误不含消息正文。定向测试 `/tmp/mobileharness-gemma-validation-test.log`：16项通过，真实权重测试1项跳过（框架汇总17项）。真实Gemma仍待用户复测。
+
+验证与交付：
+
+- `/tmp/mobileharness-gemma-validation-check.log`：静态依赖检查、格式、Python 6项、UI 96项、AppWorkflow 120项通过；Gemma 16项通过、真实权重1项跳过。完整检查退出1：Integration 1001项中9项失败、16个issue（首页Toast到期、7项soundSource、mediaTransport到期派发）。这些失败未作为通过或已排除回归记录。
+- `/tmp/mobileharness-gemma-validation-simulator.log`：模拟器构建退出65，CoreAIShared无法解析CoreAI；后续scheme未执行。
+- `/tmp/mobileharness-gemma-validation-device.log`：签名真机构建成功；25项最终应用资源检查、project/privacy/entitlements及diff格式检查通过。
+- `/tmp/mobileharness-gemma-validation-install.log`、`/tmp/mobileharness-gemma-validation-launch.log`：已安装到iPhone 17 Pro（安装序列4148）并启动。原生Gemma生成、长历史与4096边界验收尚待用户复测，自动化计数器不能代替真实模型验收。
+- 本轮未自动提交；工作仍在codex/storage-lifecycle-boundary，未修改main-sh。
+
+### CoreAI iOS有效窗口修复（2026-10-19）
+
+用户反馈contextLengthExceeded(0, 1024)。已定位固定依赖CoreAIPipelinedEngine.runCompletion的iOS GrowingKVCache 1024保护（源码引用apple/coreai-models#124），不是4096总预算校验失效；ModelKit未纳入实际更小后端限制。计划统一引擎配置与推理预算使用有效窗口，保留上游安全限制，不修改依赖和Agent，补充小窗口回归。真实模型仍未通过。
+
+已实现统一后端有效限额：iOS取min(1024, 模型声明)，macOS取min(4096, 模型声明)，引擎配置、实际token拟合及生成防御校验同源；默认预留min(1024, 窗口/4)，最终输出不超过剩余窗口。未绕过依赖保护、未修改Agent或三方源码。该更小上下文可能减少可保留历史及system内容；真实回复质量和长度待测。
+
+- `/tmp/mobileharness-gemma-backend-window-test.log`：20项定向测试通过、真实权重1项跳过（框架汇总21项）；新增有效容量解析、1024下长system／20轮历史／显式输出上限、当前输入超限与非法容量回归。
+- `/tmp/mobileharness-gemma-backend-window-check.log`：静态、格式、Python 6项、UI 96项、AppWorkflow 120项通过；完整检查退出1，Integration 1001项中10项失败、19个issue（bluetoothLateNativeAim、8项soundSource、visionDiscardsOverBudget）。未证明这些失败与本次无关，不记为全量通过。
+- `/tmp/mobileharness-gemma-backend-window-simulator.log`：退出65，CoreAIShared无法解析CoreAI，后续scheme未执行。
+- `/tmp/mobileharness-gemma-backend-window-device.log`：签名真机构建成功；25项最终资源、project/privacy/entitlements及diff格式检查通过。
+- `/tmp/mobileharness-gemma-backend-window-install.log`、`/tmp/mobileharness-gemma-backend-window-launch.log`：iPhone 17 Pro安装序列4156，启动成功。真实Gemma输出、长历史与实际窗口稳定性待用户复测。未自动提交，未修改main-sh。
+
+### Gemma无system排查版本（2026-10-19）
+
+用户要求先移除全部system再测，尚未确认1024版本的具体失败或输出表现。计划删除本地推理副本system及不再使用的拟合实现，保留对话和窗口防御；原请求和云端不变。此版本不代表system指令或完整Agent业务验收。
+
+已实现：本地Gemma从推理副本移除全部system，删除不再使用的system截短／二分拟合算法；最多5条非空对话消息包含完整当前输入，继续以实际token计数遵守iOS 1024上限。原请求、持久历史与云端未改变；失去system指令属于本次用户指定的排查行为，不代表完整Agent业务验收。
+
+- `/tmp/mobileharness-gemma-no-system-test.log`：19项定向测试通过、真实权重1项跳过（框架汇总20项）。验证首部／中间／末尾／Unicode超长system不进入任何tokenize调用；保留原请求和当前输入、输出上限及取消回归。移除已删除二分算法的非单调计数测试。
+- `/tmp/mobileharness-gemma-no-system-check.log`：静态、格式、Python 6项、UI 96项、AppWorkflow 120项通过；完整检查退出1，Integration 1001项中11项失败、22个issue：首页Toast到期、atomicStableOffTarget、7项soundSource、mediaTransport到期派发及visionOpaqueInput。未将失败记为通过，未证明与本次无关。
+- `/tmp/mobileharness-gemma-no-system-simulator.log`：退出65，CoreAIShared无法解析CoreAI；后续scheme未执行。
+- `/tmp/mobileharness-gemma-no-system-device.log`：签名真机构建成功；最终25项资源检查、project/privacy/entitlements及diff格式通过。
+- `/tmp/mobileharness-gemma-no-system-install.log`、`/tmp/mobileharness-gemma-no-system-launch.log`：iPhone 17 Pro安装序列4164，启动成功。真实生成及原会话连续对话待用户复测；未自动提交，main-sh未修改。
+
+### 无system版真机反馈与性能排查（2026-10-19）
+
+用户确认本地Gemma可以生成，但可见首token需等待几十秒，且按住开启聆听会卡顿。此反馈只确认基础生成可用，不代表性能或完整Agent行为通过。
+
+源码检查：GemmaLanguageEngine与Gemma4Chat为actor；S=1图要求COREAI_CHUNK_THRESHOLD=1，每轮显式重置缓存；thought内容生成后被过滤。ModelResource.release仅释放租约，releaseWhenIdle只在内存压力回收路径生效，不能据此断言每轮都卸载权重。聆听按住路径在MainActor准备触觉、异步准备提示音，尚无调用栈证据说明卡顿来自主线程、GPU竞争或内存压力。未据猜测新增线程或改写缓存策略。
+
+尝试Time Profiler附加进程未成功（找不到进程）；重启应用成功后，全进程采集 `/tmp/mobileharness-gemma-listening-20261019d.trace` 在1.851秒因Device disconnected中止，未采到用户复现，不能作为性能结论。日志 `/tmp/mobileharness-gemma-listening-profile.log`；目录 `/tmp/mobileharness-gemma-listening-profile-toc.xml`。已请求用户连接数据线、保持解锁并打开应用，等待重新采样。此阶段未修改代码，未运行构建或测试，未提交。
+
+### Gemma／聆听性能复采与修复计划（2026-10-19）
+
+用户确认复现，Time Profiler成功采集55.841秒：`/tmp/mobileharness-gemma-listening-retry-20261019.trace`（日志／TOC／samples／hangs／analysis同前缀）。导出时工具警告localspeechrecognition镜像地址重叠，结果仍可读，保留符号化限制。主线程potential-hangs记录40.443秒开始的980.715ms卡顿；附近采样含AVAudioSession.privateSetActive和SpatialAudioCapture.init→AVCaptureSession.init→同步XPC。Gemma引擎加载采样始于49.14秒，持续到54.39秒，采集末端未覆盖可见输出，无法据此量化完整TTFT或断言模型导致此卡顿。
+
+资源清单轮询installed相关包容采样约4487ms（不是墙钟延迟），路径校验约1892ms，其中逐字符CharacterSet.union反复分配明显。计划缓存字符集；本次不缓存磁盘安装结论，不改变完整性校验。录音启动会话配置移至已有原生actor并加入单一准备任务，空间会话惰性创建；模型补充加载／首原生token／首可见文字signpost以继续采样。
+
+实施及自动化结果：
+
+- SpatialAudioCapture只在actor的start且确认FOA支持后构造AVCaptureSession，stop不再为未启动后端创建会话。AppleAudioIO通过既有NativePlaybackGraph配置共享会话；单个capturePreparation Task由token拥有，父取消转发，stopCapture先关闭接纳再取消并加入准备；迟到启动失败不关闭新token会话。单声道引擎其余启动及会话deactivate路径未在本轮迁移，不能声称所有音频同步调用都已移出主线程。
+- ModelArtifactCatalog静态缓存不可变CharacterSet，保留Unicode／标点／路径拒绝规则；未缓存安装事实，清单双重磁盘检查仍保留。
+- Gemma signpost：EngineLoad、Generation及FirstNativeToken／FirstVisibleText，只有token数量元数据，不含正文。尚未用新版本量化冷加载／预填充／隐藏thought的占比，不宣称首token改善。
+- `/tmp/mobileharness-gemma-listening-fix-tests.log`：22项定向测试通过（2项目录规则、6项录音就绪、14项窗口回归），不包含真实模型测试。录音原生配置任务的iOS行为仅构建和静态归属检查，仍需硬件复验。
+- `/tmp/mobileharness-gemma-listening-fix-check.log`：系统OSLog白名单初次检查未通过，补充明确系统依赖文档及白名单后重跑；静态／格式／Python 6项、UI 96项、AppWorkflow 120项通过。最终完整检查退出1：Integration 1001项中12项失败、21个issue（Toast到期、atomicStableOffTarget、8项soundSource、mediaTransport到期及visionDiscardsOverBudget）。不记为全量通过，未证明失败与本次无关。
+- `/tmp/mobileharness-gemma-listening-fix-simulator.log`：CoreAIShared解析CoreAI失败，退出65；后续scheme未执行。`/tmp/mobileharness-gemma-listening-fix-device.log`：签名真机构建通过；25项应用资源、project/privacy/entitlements和diff检查通过。
+- `/tmp/mobileharness-gemma-listening-fix-install.log`：iPhone 17 Pro安装序列4188成功；`/tmp/mobileharness-gemma-listening-fix-launch.log`：锁屏拒绝启动。已请求解锁，再开始长时间性能采样；修复效果及真实模型性能尚待复验。未提交，未修改main-sh。
+
+### 首页模型准备门禁（2026-10-19）
+
+用户要求按已讨论设计实施。计划App持有串行可取消准备，UI独立呈现，当前模型按状态跳过／准备，云端不自动生成探测，保留设置与已有停止。不改制品下载策略、不自动提交。
+
+实施结果：
+
+- App的Services持有唯一ForegroundPreparation，并以homePreparation服务加入native之后的生命周期；模型／UI已开放前台接纳后才激活，失活同步取消本次结果接纳，停止先加入准备worker再关闭模型。任务不由页面task拥有，一个worker＋一个待重检位，旧配置／页面代际结果不可放行；原生不合作工作仍须真实退出，不承诺取消立即停机。
+- 首页初次进入、导航返回、Scene恢复、Provider／语音配置应用、相机启用状态变化触发检查。当前language／recognition／synthesis／VAD依次按状态跳过或warmup，相机启用时vision按需load；不加载其他已安装模型，不新增云端探测请求。全部结束后再复查，避免后续加载回收了前面的模型仍错误放行。云端只表示本地客户端配置／资源就绪，不保证远端凭据、网络或服务可用。
+- UI.home持有独立HomeModelPreparation，保留voicePhase和原会话；加载眼睛复用NativeCompanionSurface，不新增Canvas或线程。新聆听／新开相机／切镜头受门禁，设置、取消／重试及已有会话／相机关闭入口保留。活动会话存在且能力尚冷时延后预热，活动结束重检；导航不关闭既有聆听。
+- `/tmp/mobileharness-home-preparation-tests-delivery.log`：新增8项定向测试通过（6项任务编排、2项UI状态接纳），覆盖已就绪跳过、顺序、快速失活恢复、取消加入、失败重试、活动延后、100次配置刷新合并／旧选择围栏、加载后被回收的最终复查，以及旧UI根隔离。最后配置合并用例在全量检查编译后增加，已独立执行通过。
+- `/tmp/mobileharness-home-preparation-check.log`：首轮UI98、AppWorkflow124通过；Integration1001中10项失败／19issues，退出1。`/tmp/mobileharness-home-preparation-check-final.log`：静态／格式／Python6、UI98、AppWorkflow125通过；Integration1001中17项失败／33issues，退出1。最终全量失败：nexArmPlaybackCongestion、homeToastExpiry、visionHealth、atomicStableOffTarget、8项soundSource、mediaTransportExpiry以及4项vision预算／统计／输入身份／opaque输入；不是全量通过，未证明与本次无关。
+- `/tmp/mobileharness-home-preparation-simulator.log`：CoreAIShared无法解析CoreAI，退出65，后续scheme未执行。
+- `/tmp/mobileharness-home-preparation-device.log`：首次签名构建失败，ProvidedCapability归属ModelKitRuntime，已修正App显式import。retry及最终 `/tmp/mobileharness-home-preparation-device-final.log` 签名构建通过；最终25项应用资源、project/privacy/entitlements及diff检查通过。
+- `/tmp/mobileharness-home-preparation-install.log`：设备不可用，CoreDevice4016，安装失败，未启动本版；已请求重新连接和解锁。真实冷加载耗时、加载眼睛、云端客户端准备、取消／设置修复、深层聆听保持、相机及前后台／根重建验收均尚待真机。此前音频启动隔离和Gemma时序标记改动随构建保留，但性能改善仍未验收。
+- 工作保持codex/storage-lifecycle-boundary；未修改main-sh，未自动提交，也未移除工作区既有改动。无新目录、编译目标或第三方依赖。
+
+### 蓝牙连接条件与页面呈现（2026-10-19）
+
+用户报告未连接机械臂触发基础模块Toast；计划保留Platform错误，仅在Agent归类为连接状态，经两个Action呈现。稳定条件代码归Gateway，原始记录保留，真实协议／发送／停止故障不隐藏。
+
+实施结果：
+
+- Platform抛错保持原样。Gateway.DeviceInputAdapter将connectivity.bluetooth的unavailable／unknownDevice／incompatibleService，以及连接／服务／特征／通知建立步骤的timeout/native失败编码为稳定bluetooth.*连接条件；ContainerFailureChannel保留原始错误详情和投递记录。发送阻塞、发送／响应步骤错误、协议损坏、断开未确认等继续为故障。
+- ApplicationControl接纳连接条件为私有连接状态，不提交RuntimeDiagnostics异常列表／Toast。devices事实按availability／connection／recovery决策灰／闪蓝／蓝，迟到错误不覆盖已接收的实际设备状态；与模型无关。变更通过UI.BluetoothStatus.showBluetoothHome和showBluetoothSettings两项内部Tool呈现，沿用128在途上限和根身份／版本校验，呈现失败可观察且不递归Toast。
+- ActionBindings.RuntimePresentation注入同根home和devices的UI自有BluetoothConnectionPresenting，UI保留独立revision且拒绝旧／停止端口；显示已连接不授予控制权限。蓝牙设置保留详细原生状态及运动策略，新增连接摘要。首页CAShapeLayer绘制图标，CABasicAnimation控制连接中闪烁，非连接中／减少动态／后台／视图移除时不保留闪烁；无新线程或逐帧Task。图标在灵动岛左侧，无灵动岛布局落安全区左上。
+- 新增BluetoothStatusActions.swift位于既有Actions/UI目录，由原Actions目标自动编译；无新目录、编译目标或第三方依赖。状态函数独立于RuntimeDiagnostics故障组，不新增模型别名。
+- 初次编译发现UI.BluetoothRecoveryStage没有rawValue，已按既有状态接口以String(describing:)提供事实。移动函数组后首次端到端测试因内部Tool路径使用展示title而非Swift函数名导致过期；已修正为完整生成路径，未扩大等待超时。静态检查拒绝在ContainerFailureChannel导入原生SDK，已把类型识别移入唯一原生适配文件DeviceInputAdapter，保留原依赖边界。
+- `/tmp/mobileharness-bluetooth-status-regression.log`：7项定向回归通过，包含Gateway条件与严重故障区分、真实Gateway→Agent→两个Action→UI且不Toast／不记异常列表、迟到条件与重连／断开、冒充来源／旧根／未知参数／旧revision／停止根拒绝、显示不授权控制，以及全部角色目录完整性和既有异常策略／伪造诊断回归。原生颜色／位置／闪烁与物理机械臂仍未验收。
+- `/tmp/mobileharness-bluetooth-status-check-delivery.log`：静态／格式／Python6通过，AppWorkflow126通过；UI99中1失败（cameraNativeMetalDrawStopAndLayerHandoff），Integration1004中10失败／17issues（publicationOverflow、atomicStableOffTarget、7项soundSource及mediaTransportExpiry），总11失败，退出1；不记为全量通过，未证明失败与本次无关。早期全量旧路径失败保留于check-final日志，不覆盖为通过。
+- `/tmp/mobileharness-bluetooth-status-simulator.log`：CoreAIShared解析CoreAI失败，退出65，后续scheme未执行。`/tmp/mobileharness-bluetooth-status-device.log`：签名真机构建通过；最终25项应用资源、project/privacy/entitlements及diff检查通过。
+- `/tmp/mobileharness-bluetooth-status-install.log`：设备连接不可用，CoreDevice4016，安装失败。当前真机尚未运行本版（包含此前首页模型准备改动）；需重连解锁后安装并验证。本轮未自动提交，工作仍在codex/storage-lifecycle-boundary，未修改main-sh，保留既有改动。
+
+## 四基础根与完整异常保留（2026-10-19）
+
+- 核对 StorageContainer（state/cache/database/files）、PlatformContainer（audio/vision/connectivity）、ModelContainer（language/speech/vision/artifacts）、UIContainer（八子能力）均由 App 的独立 ApplicationContainer 缓存并纳入生命周期；基础模块无相互项目依赖。
+- 原生错误报告统一采用 component/operation/any Error；保留各 SDK 类型化 throw，不创建跨基础库错误依赖。根级记录增加原始 Error 与完整描述，Signal 保持有界摘要。取消／生命周期控制改为 suppressed 本地记录；蓝牙连接条件由 ApplicationControl 选择状态 Action，严重错误策略不变。
+- 完整异常指当前有界记录保留原始对象和关联信息，非无限永久审计；128条以外明确淘汰计数。UI 过期提交仍是 Bool/拒绝计数协议，不伪造成执行故障。
+- 模型根启动、前后台、停止及配置前置拒绝完整上报；装配停止不再吞掉非取消错误。恢复 Xcode Management 源码组并清理过时单例说明。
+- 首次定向验证：`/tmp/mobileharness-foundation-errors-targeted.log`，12项通过；覆盖完整原生错误／长文本区分、四根注册与生命周期错误、回滚主错误及清理错误、正常取消留存但不广播、既有容器通道。源码边界检查、工程及隐私清单lint通过。
+- 完整检查、最终定向回归与签名构建结果见本节后续记录。设备验证未执行；本轮按用户要求提交全部工作区修改，不包含模型权重、媒体或本地签名配置。
+
+最终验证：
+
+- `/tmp/mobileharness-foundation-errors-final-regression.log`：最终源码定向12项通过。
+- `/tmp/mobileharness-foundation-errors-check.log`：完整脚本退出1；源码边界、Python6项、Swift格式检查通过，AppWorkflow126项通过；UI99项中1个测试失败（cameraNativeMetalDrawStopAndLayerHandoff）；Integration1006项中9个命名测试失败、19个issue：voiceReplyCancellationJoinsPlaybackBeforeRetiringSessionAudio（3参数用例），soundSource的StopCancelsAndJoinsAnInFlightPublisher、MonoIsUnavailableAndRejectedPublicationDoesNotStopRecognition、BroadcastCrossesGatewaysWithBoundIdentityAndCaptureDeadline、NonSpeechBroadcastDoesNotRequireSubscribersOrOpenASR、ReplyGateClearsDirectionAndResumeStartsANewWindow、OnlyDiagnosticCrossesGatewaysWithoutModelsOrPresentationGrants、SlowSubscriberDoesNotBlockFollowingDirections、ContextWriteFailureReportsWithoutStoppingOrSelfJoin。合计10个命名失败测试，不宣称与本轮无关或全量通过。
+- `/tmp/mobileharness-foundation-errors-simulator.log`：build-ios脚本退出65，CoreAIShared的Simulator编译失败，其余scheme未执行。
+- `/tmp/mobileharness-foundation-errors-device.log`：签名iOS真机构建成功；应用25项Skill资源与声明检查通过。未安装／未进行本轮物理验收。
+- 提交是当前全部工作区的检查点，包含前序模型容器化、Gemma无system诊断版、音频启动隔离、首页准备和蓝牙状态改动；真实模型指令行为、首token时延、硬件及全量失败仍各自待验证，不因提交而关闭。

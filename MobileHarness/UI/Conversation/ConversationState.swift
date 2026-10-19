@@ -1,6 +1,42 @@
 import Foundation
 import Observation
 
+public enum HomeModelPreparation: Equatable, Sendable {
+    case inactive, checking
+    case preparing(String)
+    case ready, deferred, cancelled
+    case failed(component: String, message: String)
+    public var blocksNewActions: Bool { self != .ready }
+    public var isLoading: Bool {
+        switch self {
+        case .checking, .preparing: true
+        default: false
+        }
+    }
+    public var message: String {
+        switch self {
+        case .inactive: "等待进入前台"
+        case .checking: "正在检查模型…"
+        case .preparing(let component): "正在准备：" + Self.name(component)
+        case .ready: "模型已就绪"
+        case .deferred: "当前会话结束后继续准备"
+        case .cancelled: "已取消等待，可重试或进入设置"
+        case .failed(let component, let message):
+            Self.name(component) + "：" + (message == "notReady" ? "准备后仍未就绪，请重试或到设置检查" : message)
+        }
+    }
+    private static func name(_ component: String) -> String {
+        switch component {
+        case "language": "语言模型"
+        case "recognition": "语音识别"
+        case "synthesis": "语音合成"
+        case "voiceActivity": "语音活动检测"
+        case "vision": "姿态模型"
+        default: "模型配置"
+        }
+    }
+}
+
 public enum VoicePhase: Sendable, Equatable { case idle, loading, listening, processing, speaking, failed }
 
 public enum EyeExpression: String, CaseIterable, Sendable {
@@ -27,6 +63,23 @@ public final class ConversationState {
     @ObservationIgnored public internal(set) var expressionAnimationCompletion: (@MainActor (String, Bool) -> Void)?
     public internal(set) var playbackSpectrum = [Float](repeating: 0, count: 32)
     public internal(set) var microphoneSpectrum = [Float](repeating: 0, count: 32)
+    public internal(set) var bluetoothStatus: BluetoothConnectionStatus = .disconnected
+    private var bluetoothRevision: UInt64 = 0
+    @discardableResult public func presentBluetoothConnection(_ value: BluetoothConnectionStatus, revision: UInt64)
+        -> Bool
+    {
+        guard presentationAdmission?.acceptsRetained() ?? true, revision > 0, revision >= bluetoothRevision else {
+            return false
+        }
+        guard revision != bluetoothRevision || value == bluetoothStatus else { return false }
+        bluetoothRevision = revision
+        bluetoothStatus = value
+        return true
+    }
+    public internal(set) var modelPreparation: HomeModelPreparation = .inactive
+    public var hasActiveInteraction: Bool { isVoiceActive || isReplyActive }
+    public var allowsHomeInteraction: Bool { isReady && (hasActiveInteraction || !modelPreparation.blocksNewActions) }
+    public var showsModelPreparation: Bool { !hasActiveInteraction && modelPreparation.blocksNewActions }
     public internal(set) var isReady = false
     public internal(set) var voiceStatus = "按住双眼，开启聆听"
     public internal(set) var isVoiceActive = false { didSet { if !isVoiceActive { resetCaptions() } } }
@@ -319,3 +372,5 @@ public protocol ExpressionPresenting: AnyObject, Sendable {
     func restore(owner: String, accepts: Bool) async throws
     func resetExpression()
 }
+
+extension ConversationState: BluetoothConnectionPresenting {}

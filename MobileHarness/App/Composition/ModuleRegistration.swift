@@ -1,8 +1,6 @@
 import AppLifecycle
 import Gateway
 
-private struct ServiceStopFailure: Error { let errors: [any Error] }
-
 @MainActor enum ModuleRegistration {
     static func lifecycle(_ services: ServiceFactories.Services) throws -> ApplicationLifecycle {
         let descriptions = [
@@ -11,12 +9,12 @@ private struct ServiceStopFailure: Error { let errors: [any Error] }
                 stop: { await services.containerFailures.stop() }),
             ManagedService(
                 id: "storage", dependencies: ["diagnostics"], start: { try await services.storage.start() },
-                stop: {
-                    var errors: [any Error] = []
-                    do { try await services.artifacts.stop() } catch { errors.append(error) }
-                    do { try await services.storage.stop() } catch { errors.append(error) }
-                    if !errors.isEmpty { throw ServiceStopFailure(errors: errors) }
-                }),
+                stop: { try await services.storage.stop() }),
+            ManagedService(
+                id: "model", dependencies: ["storage", "diagnostics"],
+                start: { try await services.model.start() }, invalidate: services.model.invalidate,
+                foreground: { try await services.model.setForeground($0) },
+                stop: { try await services.model.stop() }),
             ManagedService(
                 id: "platform", dependencies: ["diagnostics"], start: { try services.platform.start() },
                 invalidate: services.platform.invalidate,
@@ -28,7 +26,7 @@ private struct ServiceStopFailure: Error { let errors: [any Error] }
                 foreground: { try services.uiContainer.setForeground($0) },
                 stop: { await services.uiContainer.stop() }),
             ManagedService(
-                id: "agents", dependencies: ["storage", "platform", "ui"],
+                id: "agents", dependencies: ["storage", "platform", "ui", "model"],
                 start: services.agents.startAgents,
                 foreground: services.agents.setAgentForeground,
                 stop: services.agents.stopAgents),
@@ -38,6 +36,13 @@ private struct ServiceStopFailure: Error { let errors: [any Error] }
                 invalidate: services.agents.invalidateNative,
                 foreground: { services.agents.setForeground($0) },
                 stop: services.agents.stopNativeServices),
+            ManagedService(
+                id: "homePreparation", dependencies: ["native"], start: {},
+                invalidate: { services.homePreparation.setActive(false) },
+                foreground: { active in
+                    services.homePreparation.setActive(
+                        active && services.ui.preparesHomeModels && services.ui.navigation.path.isEmpty)
+                }, stop: { await services.homePreparation.stop() }),
         ]
         return try ApplicationLifecycle(
             services: descriptions.map { service in
@@ -64,13 +69,6 @@ private struct ServiceStopFailure: Error { let errors: [any Error] }
                             services.containerFailures.report(
                                 module: service.id, component: "lifecycle", operation: "stop", phase: .shutdown,
                                 error: error, includeCancellation: !Task.isCancelled)
-                            if let failure = error as? ServiceStopFailure {
-                                for (index, cause) in failure.errors.enumerated() {
-                                    services.containerFailures.report(
-                                        module: service.id, component: "cleanup", operation: "stop.\(index)",
-                                        phase: .cleanup, error: cause)
-                                }
-                            }
                             throw error
                         }
                     })

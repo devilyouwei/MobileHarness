@@ -44,7 +44,7 @@ public struct BehaviorProtocolBindings {
             "NexArm.Motion", "NexArm.Gesture":
             return ActionBinding(function: function)
         case "History.Conversation", "System.Runtime", "System.ModelResources", "System.Provider",
-            "UI.ResourcePresentation", "UI.RuntimeDiagnostics", "System.Device":
+            "UI.ResourcePresentation", "UI.RuntimeDiagnostics", "UI.BluetoothStatus", "System.Device":
             return ActionBinding(
                 function: function, protocols: [.tool], executionPolicy: .direct, directResultPolicy: .returning)
         case "UI.Gaze", "UI.Caption", "UI.VoiceState", "UI.Pose", "UI.HistoryPresentation",

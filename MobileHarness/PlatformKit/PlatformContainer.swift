@@ -13,9 +13,6 @@ public final class PlatformAdmission: Sendable {
         failure = onFailure
     }
     public func report(_ component: String, _ operation: String, _ error: any Error) {
-        guard !(error is CancellationError) else { return }
-        // A deliberately closed admission fence is normal lifecycle control, not device failure.
-        if let error = error as? PlatformError, error == .unavailable || error == .stopped { return }
         failure(component, operation, error)
     }
     public var isOpen: Bool { open.withLock { $0 } }
