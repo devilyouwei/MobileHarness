@@ -1,18 +1,18 @@
 import Actions
 import Foundation
 import FunctionContracts
-import Storage
 import StorageChat
+import StorageCore
 import UI
 
 /// Data adaptation only; permission and user intent belong to the gateways/Agent.
 @MainActor
 public final class HistoryPresentationAdapter: HistoryPresentationCapability {
-    private let state: ConversationHistoryState
+    private let state: any HistoryPresenting
     private let store: ConversationHistoryStore
     private let sessionID: String
     public init(
-        state: ConversationHistoryState, store: ConversationHistoryStore, sessionID: String
+        state: any HistoryPresenting, store: ConversationHistoryStore, sessionID: String
     ) {
         self.state = state
         self.store = store
@@ -51,7 +51,9 @@ public final class HistoryPresentationAdapter: HistoryPresentationCapability {
         try Task.checkCancellation()
         let presentation = try await Self.listPresentation(store)
         try Task.checkCancellation()
-        state.present(presentation, status: await store.lastCheckpointError.map { "当前会话尚未保存：" + $0 })
+        let status = await store.lastCheckpointError.map { "当前会话尚未保存：" + $0 }
+        try state.requirePresentation()
+        state.present(presentation, status: status)
     }
 }
 

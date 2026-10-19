@@ -6,6 +6,19 @@ import FunctionContracts
 public struct BehaviorProtocolBindings {
     enum Error: Swift.Error { case unknownModule(ActionIdentifier) }
     public static func bind(_ function: ActionFunction) throws -> ActionBinding {
+        if (function.path.domain == "History" && function.path.module == "Conversation"
+            && ["list", "read"].contains(function.path.function))
+            || (function.path.domain == "System" && function.path.module == "Provider"
+                && function.path.function == "readSettings")
+            || (function.path.domain == "System" && function.path.module == "ModelResources"
+                && function.path.function == "snapshotResources")
+            || (function.path.domain == "System" && function.path.module == "Device"
+                && function.path.function == "readStatus")
+        {
+            return ActionBinding(
+                function: function, protocols: [.action, .tool], executionPolicy: .direct,
+                directResultPolicy: .returning)
+        }
         if (function.path.domain == "Camera" && function.path.module == "Capture")
             || (function.path.domain == "UI" && function.path.module == "Navigation")
             || (function.path.domain == "System" && function.path.module == "Device"
@@ -22,6 +35,15 @@ public struct BehaviorProtocolBindings {
                 function: function, protocols: [.action], executionPolicy: .direct,
                 directResultPolicy: .returning)
         }
+        if function.path.domain == "UI", function.path.module == "Expression", function.path.function == "setLoading" {
+            return ActionBinding(
+                function: function, protocols: [.tool], executionPolicy: .direct, directResultPolicy: .returning)
+        }
+        if function.path.domain == "UI", function.path.module == "Expression",
+            function.path.function == "setReplyWaiting"
+        {
+            return ActionBinding(function: function, protocols: [.action, .tool], executionPolicy: .direct)
+        }
         let group = function.path.domain + "." + function.path.module
         if group == "UI.Caption", ["print", "beginReplyTurn"].contains(function.path.function) {
             return ActionBinding(function: function, protocols: [.action, .tool], executionPolicy: .direct)
@@ -31,7 +53,7 @@ public struct BehaviorProtocolBindings {
             "NexArm.Motion", "NexArm.Gesture":
             return ActionBinding(function: function)
         case "History.Conversation", "System.Runtime", "System.ModelResources", "System.Provider",
-            "UI.ResourcePresentation", "System.Device":
+            "UI.ResourcePresentation", "UI.RuntimeDiagnostics", "UI.BluetoothStatus", "System.Device":
             return ActionBinding(
                 function: function, protocols: [.tool], executionPolicy: .direct, directResultPolicy: .returning)
         case "UI.Gaze", "UI.Caption", "UI.VoiceState", "UI.Pose", "UI.HistoryPresentation",

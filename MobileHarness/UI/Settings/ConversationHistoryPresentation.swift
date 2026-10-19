@@ -25,6 +25,21 @@ public enum ConversationHistoryPresentation {
         try JSONDecoder().decode(HistoryFunctionCatalog.self, from: Data(json.utf8))
     }
 
+    @concurrent public static func functionCatalogOffMain(_ json: String) async throws -> HistoryFunctionCatalog {
+        try Task.checkCancellation()
+        let result = try functionCatalog(json)
+        try Task.checkCancellation()
+        return result
+    }
+    @concurrent public static func timelineOffMain(_ conversation: HistoryConversation) async throws
+        -> [HistoryTimelineItem]
+    {
+        try Task.checkCancellation()
+        let result = timeline(conversation)
+        try Task.checkCancellation()
+        return result
+    }
+
     public static func taskReferences(for turn: HistoryTurn) -> [HistoryTaskReference] {
         var references: [HistoryTaskReference] = []
         if let id = turn.historyTaskID {
@@ -92,9 +107,12 @@ public enum ConversationHistoryPresentation {
 
     public static func timeline(_ conversation: HistoryConversation) -> [HistoryTimelineItem] {
         let requests = turns(conversation)
+        let grouped = requests.reduce(into: [String: [HistoryTurn]]()) { groups, turn in
+            if let id = turn.historyTaskID { groups[id, default: []].append(turn) }
+        }
         var replacements: [String: HistoryTaskCompression] = [:]
         for compression in conversation.taskCompressions {
-            let owned = requests.filter { $0.historyTaskID == compression.taskID }
+            let owned = grouped[compression.taskID] ?? []
             let references = Set(compression.sources)
             if !owned.isEmpty, compression.status != .generating,
                 owned.allSatisfy({
@@ -109,7 +127,7 @@ public enum ConversationHistoryPresentation {
         return requests.compactMap { turn in
             if let taskID = turn.historyTaskID, let compression = replacements[taskID] {
                 return emitted.insert(taskID).inserted
-                    ? .task(compression, sources: requests.filter { $0.historyTaskID == taskID }) : nil
+                    ? .task(compression, sources: grouped[taskID] ?? []) : nil
             }
             return .request(turn)
         }
@@ -146,7 +164,10 @@ extension HistoryTurn {
     }
     public var tokenReport: String {
         guard let usage = tokenUsage else { return "Token 用量：" }
-        return "输入：\(usage.input) tokens · 生成：\(usage.generated) tokens · 总计：\(usage.total) tokens"
+        var report = "输入：\(usage.input) tokens · 生成：\(usage.generated) tokens · 总计：\(usage.total) tokens"
+        if let cached = usage.cachedInput { report += " · 缓存读取：\(cached) tokens" }
+        if let written = usage.cacheWriteInput { report += " · 缓存写入：\(written) tokens" }
+        return report
     }
 
 }
@@ -158,6 +179,15 @@ extension HistoryMessage {
     }
     public var displayContent: String { content }
 
+}
+
+extension HistoryToolCall {
+    public var responseReport: String {
+        var sections = ["Tool Call · \(name) · \(state.rawValue)", "Arguments:\n\(argumentsJSON)"]
+        if let output { sections.append("Result:\n\(output)") }
+        if let error { sections.append("Error:\n\(error)") }
+        return sections.joined(separator: "\n\n")
+    }
 }
 
 extension HistoryTurn {

@@ -1,8 +1,8 @@
 import AgentCore
 import Foundation
 import ModelKit
-import Storage
-import StorageAudio
+import StorageCache
+import StorageCore
 
 /// Shared directed synthesis service. One FIFO worker, independent of playback Channels.
 public actor SpeechSynthesisAgent: Agent {
@@ -20,7 +20,7 @@ public actor SpeechSynthesisAgent: Agent {
 
     private let continuation: AsyncStream<OutputEnvelope>.Continuation
     private let synthesis: any SpeechSynthesisCapability
-    private let store: SpeechAudioStore
+    private let store: AudioCache
     private var lifecycle: AgentLifecycle = .registered
     private var queue: [(SpeechSynthesisInput, AgentInput)] = []
     private var admitting = 0
@@ -31,15 +31,11 @@ public actor SpeechSynthesisAgent: Agent {
     // MARK: - Registration
 
     public init(
-        synthesis: any SpeechSynthesisCapability, store: SpeechAudioStore,
+        synthesis: any SpeechSynthesisCapability, store: AudioCache,
         configuration: AgentConfiguration? = nil,
-        context: AgentContextRepository<SpeechSynthesisContextState>? = nil
+        context: AgentContextRepository<SpeechSynthesisContextState>
     ) throws {
-        self.contextRepository =
-            context
-            ?? AgentContextRepository(
-                agent: AgentID(rawValue: "speechSynthesis"), scope: UUID().uuidString,
-                state: SpeechSynthesisContextState())
+        self.contextRepository = context
         guard contextRepository.agentID.rawValue == "speechSynthesis" else {
             throw AgentConfigurationError.identityMismatch
         }
@@ -88,7 +84,7 @@ public actor SpeechSynthesisAgent: Agent {
     public func receive(_ input: AgentInput) async throws {
         guard lifecycle == .running || lifecycle == .paused else { throw HarnessError.notRunning }
         guard !input.metadata.expired else { throw CommunicationError.expired }
-        let owner = SpeechAudioStore.Owner(
+        let owner = AudioCache.Owner(
             source: input.metadata.source,
             session: input.sessionID, input: input.metadata.parentID ?? input.id)
         if case .cancelSpeech(let id)? = input.payload.perception {
@@ -168,7 +164,7 @@ public actor SpeechSynthesisAgent: Agent {
             guard session.context == context else { throw SpeechSynthesisError.invalidOutput }
             var finished = false
             var bytes = 0
-            var format: AudioFormat?
+            var format: ModelKit.AudioFormat?
             var sequence: UInt64?
             try await withTaskCancellationHandler {
                 for try await event in session.events {
@@ -184,11 +180,11 @@ public actor SpeechSynthesisAgent: Agent {
                         format = frame.format
                         sequence = frame.sequence
                         bytes += frame.data.count
-                        let storedFormat = try SpeechPCMFormat(
+                        let storedFormat = try StorageCache.AudioFormat(
                             sampleRate: frame.format.sampleRate, channels: frame.format.channels,
                             encoding: frame.format.encoding == .float32 ? .float32 : .signedInt16)
                         try await audio.append(
-                            SpeechPCMFrame(
+                            StorageCache.AudioFrame(
                                 data: frame.data, format: storedFormat, sequence: frame.sequence,
                                 timestamp: frame.timestamp))
                     case .finished: finished = true

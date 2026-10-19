@@ -4,7 +4,7 @@ import FunctionContracts
 import ModelKit
 import ModelKitDefaults
 import ModelKitOpenAI
-import Storage
+import StorageCore
 import UI
 
 @MainActor
@@ -27,7 +27,7 @@ public enum SettingsProviderAdapter {
             model: OpenAIChatConfiguration.defaultModel)
     }
     public static func runtime(
-        resources: URL,
+        language: any ModelLanguageProviding,
         beginChange: @escaping @MainActor () async -> Void, endChange: @escaping @MainActor () -> Void
     ) -> ProviderSettingsRuntime {
         let value = initial
@@ -48,7 +48,7 @@ public enum SettingsProviderAdapter {
                 return {
                     do {
                         if #available(iOS 27, macOS 27, *) {
-                            try await ModelKitDefaults.configureChat(resources: resources, configuration: configuration)
+                            try await language.configure(configuration)
                         } else {
                             throw ProviderSettingsError.application
                         }
@@ -109,12 +109,12 @@ public enum SettingsProviderAdapter {
         let revision: UInt64
     }
     private var entries: [String: Entry] = [:]
-    private let state: SettingsState
+    private let state: any SettingsPresenting
     private let sessionID: String
     private let settings: ProviderSettingsRequests
     private let discovery: ProviderDiscoveryRequests
     public init(
-        state: SettingsState, sessionID: String, settings: ProviderSettingsRequests,
+        state: any SettingsPresenting, sessionID: String, settings: ProviderSettingsRequests,
         discovery: ProviderDiscoveryRequests
     ) {
         self.state = state
@@ -128,6 +128,7 @@ public enum SettingsProviderAdapter {
     }
     public func discard(_ id: String) { entries[id] = nil }
     public func present(_ id: String, failureCode: String?, invocation: any FunctionInput) async throws {
+        try state.requirePresentation()
         guard invocation.context.sessionID == sessionID, let entry = entries[id] else {
             throw ResourcePresentationError.staleGeneration
         }
@@ -143,12 +144,14 @@ public enum SettingsProviderAdapter {
         switch entry.operation {
         case .discovery:
             let models = try await discovery.result(id, sessionID: sessionID)
+            try state.requirePresentation()
             state.presentModels(
                 models,
                 notice: models.isEmpty ? "此服务没有返回可识别的聊天模型" : "请选择用于对话的模型",
                 revision: entry.revision)
         case .restore:
             let value = try settings.result(id, sessionID: sessionID)
+            try state.requirePresentation()
             state.presentRestored(
                 CloudSettingsDraft(
                     enabled: value.enabled, url: value.url, key: value.key,
@@ -156,6 +159,7 @@ public enum SettingsProviderAdapter {
                 revision: entry.revision)
         case .save:
             let value = try settings.result(id, sessionID: sessionID)
+            try state.requirePresentation()
             state.presentNotice(value.enabled ? "已保存，云端模型立即生效" : "已切换为本地模型", revision: entry.revision)
         }
     }

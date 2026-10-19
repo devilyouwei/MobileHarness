@@ -74,9 +74,6 @@ Assistant 当前模板契约：
 | 模板 | 用途 | 变量 |
 | --- | --- | --- |
 | `delegation` | 独立 Agent 的职责概述 | 无 |
-| `activeTask` | 定向任务身份说明 | `taskID`、`requester`、`executor` |
-| `taskReports` | 有界、相关的任务报告数据 | `reports` |
-| `taskReport` | 单条任务报告格式 | `taskID`、`executor`、`status`、`stage`、`interaction`、`artifact`、`report` |
 | `executionObservations` | 当前执行观察数据 | `data` |
 | `historicalExecution` | 历史动作证据 | `name`、`state`、`arguments`、`result`、`error` |
 | `toolFailure` | 真实执行错误及输出 | `error`、`output` |
@@ -135,3 +132,13 @@ Assistant 的 Agent/Provider 异常终止当前 Decision 并保留历史/效果�
 ## 待实现
 
 - 生产后台任务契约仍为空；远程资源更新和多前台任务栈未实现。
+
+✅ 每轮状态数据由 CURRENT STATE 统一注入，删除独立 activeTask/taskReports/taskReport 模板；保留执行观察、历史证据及 Tool 失败模板。
+
+## 统一容器异常通道
+
+✅ Assistant 配置显式声明 container.failure 标准输入及 runtime 来源订阅；不添加模型函数或 Skill 暴露。其他 Agent 可按能力声明订阅，不强制向不支持的角色投递。
+
+## ApplicationControl 异常展示
+
+✅ ApplicationControl 的配置声明 container.failure/runtime.failure observation 输入和 runtime 来源订阅。Assistant 保留容器异常的被动订阅；异常呈现使用角色代码中的内部权限，不向模型扩展函数目录。

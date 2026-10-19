@@ -1,5 +1,7 @@
 # Shared Chat Decision Worker
 
+✅ 仅报告前台回复活动的 Worker 在 collect 前提交请求等待，首个非空文本／原生工具或终态清除；请求 ID 围栏与现有轮次授权共同拒绝迟到清理。不将装饰呈现计为模型有效回复，不改变模型、音频和分段策略。
+
 ## 职责与边界
 
 把注入的 ChatCapability 适配为有界决策、执行反馈和观察续轮。Assistant 使用动态 Skill；确定性角色使用固定任务协调器，不拥有普通 Chat worker。角色拥有身份、预处理、业务状态和请求选择；本目录拥有请求组装、协议消费、屏障、取消与历史投影。Gateway 执行调用，ModelKit 管 provider 传输。
@@ -40,9 +42,9 @@ flowchart LR
 
 Worker 在选择 provider 前登记原始 Decision，内部 ReACT 复用该输入/使用集合。每次从角色仓库选择快照，按加载 Skill 组合不可变目录与 system；加载/释放仅影响下一请求。具体 system 章节由 [Assistant](../../Assistant/README.md#system-提示词结构与来源) 拥有，公共层不解释相机业务事实。
 
-AgentPrompts 通过显式资源 Catalog 读取模板，要求 activeTask/taskReports/taskReport/executionObservations/historicalExecution/toolFailure。标题模板由 Memory 独立读取。渲染规则见 [Generation](../Core/Generation/README.md#prompt-resources-and-rendering)：单次替换、精确变量、缺失/超限明确失败，无资源热更新。
+AgentPrompts 通过显式资源 Catalog 读取模板，要求 executionObservations/historicalExecution/toolFailure。标题模板由 Memory 独立读取。渲染规则见 [Generation](../Core/Generation/README.md#prompt-resources-and-rendering)：单次替换、精确变量、缺失/超限明确失败，无资源热更新。
 
-角色的 decisionContextMessages 注入当前事实，任务报告只包含同会话活跃后台任务或当前定向任务。事实放在本次用户输入或完整 native 调用/结果组之前，不拆开配对，不让状态数据冒充用户请求。Native Tool 定义位于 ChatRequest.tools。
+每次实际模型请求按已加载 Skill 的 useState 读取同一公开快照；首条 system 保留稳定指令/目录，独立 system 消息承载唯一 CURRENT STATE，放在历史后、最新 user 输入/观察前；末尾为 native Tool 结果时追加在完整结果组之后。旧 State 不带入续轮，不通过 user 消息注入私有 Task/Skill 管理状态。Native Tool 定义位于 ChatRequest.tools。缓存命中由 provider 决定，本层不假定服务端边界或价格。
 
 ## Task/Skill 控制与执行边界
 
@@ -81,7 +83,7 @@ The driver's secondary queues use synchronous checked yields. They do not suspen
 
 worker 独立于 UI 页面；结果必须匹配 call/round/task/session/incarnation 与封闭屏障。Pause/stop 取消并加入拥有的工作，输出传输失败也必须清理。Reply occupancy 是有界完整 revision 快照，证据提交先于占用移交；终态事实释放占用，不使用租约定时器，也不授予麦克风权。
 
-ChatTiming 由支持的 provider 在请求发出/首个非空文本时取单调样本；native-only/不支持的 provider 不产生 TTFT。消费、ASR、TTS 与 UI 耗时不是模型首 token 时延。网络传输自身超时和实时感知 freshness 不作为整个决策时限。
+✅ ChatTiming 由支持的 provider 在请求发出及首个非空文本或已校验身份的原生工具参数增量时取单调样本；取先到者，排除私有推理和工具执行时间。不支持计时或没有有效增量时不产生 TTFT；driver 沿用同一快照持久化链路。消费、ASR、TTS 与 UI 耗时不是模型首 token 时延。网络传输自身超时和实时感知 freshness 不作为整个决策时限。
 
 错误保留原生产者语义：provider HTTP/transport/response 错误、GenerationError、CapabilityError 与提交错误分别传播；不伪造空值成功或不确定副作用的重试。执行者超时通过真实 ActionResult 返回。
 
@@ -123,7 +125,34 @@ AgentChatWorker 默认 TextSegmentationPolicy 为首段 Han/其他字符 20/60�
 
 ## 待实现
 
-- 场景后台化时 pause 与语音 cancelSession 的目标保留和统一最终 checkpoint；当前会取消等待中的前台 Task，终态投影与 per-input 提交尚无统一最终 flush。
+- 暂停/中断的 Task 状态投影与 per-input 提交仍无统一最终 flush；现有提交边界分别保留错误，不伪造统一 checkpoint。
 - 活跃 worker 的持久化恢复、跨进程传输与真实模型/原生交互验收。
 
 [Support](../README.md) · [Context](../Context/README.md) · [Generation](../Core/Generation/README.md) · [Capability](../Core/Capability/README.md)
+
+## Storage 依赖
+
+✅ 存储访问使用独立的 State、Cache、Database 和 Files 接口；App 注册根实例，消费者通过构造器获得所需能力。存储容器不接管本目录的业务验证、执行和完成语义。
+
+## 公开 State 边界
+
+✅ AgentStateContext 拥有按 Agent/会话隔离的 task 注册代际和只读快照能力。每轮 executeRound 固定 Skill/目录/useState 集合，文本 Action 与 native Tool 解析共用该次冻结目录，读取最新公开快照并重建唯一 CURRENT STATE 系统数据块；预算包含该块，历史保存实际请求。中断加入后保留会话；显式 cancelSession 才关闭会话，stop 关闭全部注册。observe 不触发模型。标题请求不经过此 Skill 链路。
+
+[公开 State 契约](../../../Storage/State/README.md)
+
+Task 关闭后的历史重建复用真实 Action executionObservations，不再额外生成 mode/activeTaskID/skills 等 Task 转换状态摘要；当前任务事实只从 CURRENT STATE 读取。
+
+✅ pause 与可信 interruptSession 复用当前取消/join 屏障，但保留 Task/Skill 和 AgentStateContext 作用域；被中断 Decision 不结算闲置次数，运行目标回到 waitingUser。cancelSession 才关闭公开端口并释放会话 Skill。处理中的显式 finish/cancel 仍按真实屏障结算终态。
+
+✅ State 单独系统消息按每请求刷新，放在最新 user 消息之前或完整 native 结果组之后；历史选择保留 system 与配对，预算包含 State。缓存用量透传到真实请求证据。
+
+
+## 分类异常诊断
+
+✅ 模型失败使用类型化诊断生成 AgentFailureDiagnostic；分类代码、可读细节随现有 agent.error 输出。清理附带错误继续保留，原始模型失败不被降为普通运行错误；取消继续使用 agent.cancelled，不产生错误 toast。
+
+## 统一容器异常通道
+
+✅ AgentChatWorker 在普通决策前接收已授权的 container.failure，维护最多128条被动诊断，按事件 ID 更新次数，超限计数淘汰。仅内存，不写可能故障的 Storage、不启动模型/Task/自动重试；拒绝错误来源、伪造授权和失效会话。
+
+✅ 取消已封闭的 round 不再注册清理 Action；退出由既有回复占用清空／UI 生命周期完成，请求身份在 Worker 内同步释放。

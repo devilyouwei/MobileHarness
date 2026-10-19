@@ -60,3 +60,8 @@ OutputExecutionResult.isError excludes pure cancellation while preserving raw ca
 ## 待实现
 
 - Durable result delivery, crash recovery and generic activity outbox are not implemented.
+
+
+## 分类异常诊断
+
+✅ 失败快照透传 AgentFailureDiagnostic 与原输入/会话/轮次，诊断详情上限2048字符，普通消息仍512；取消过滤及 Action 完成语义保持。

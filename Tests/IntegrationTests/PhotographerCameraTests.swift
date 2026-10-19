@@ -9,7 +9,8 @@ import Foundation
 import FunctionContracts
 import Gateway
 import PlatformKit
-import Storage
+import StorageCore
+import StorageState
 import Testing
 
 private actor CameraProbe {
@@ -156,7 +157,12 @@ private struct CameraFixture {
             actions: ChannelScheduler(registry: actions), policy: policy, sink: { _ in })
         runtime = PhotographerIntentRuntime(
             sessionID: root, manager: manager, input: input, output: gateway,
-            agent: try PhotographerAgent(sessionID: root))
+            agent: try PhotographerAgent(
+                sessionID: root,
+                context: try AgentContextRepository(
+                    agent: AgentID(rawValue: "photographer"), scope: UUID().uuidString,
+                    state: PhotographerContextState())
+            ))
     }
 }
 @Test(.actionCatalog, .timeLimit(.minutes(1)))
@@ -247,7 +253,11 @@ func photographerCameraUsesSharedFunctionsAndRetainsFailuresBeforeRecovering()
 
 @Test(.actionCatalog) func photographerCameraRejectsForeignScopeAndFeedbackWithoutLosingPendingWork() async throws {
     let root = UUID().uuidString
-    let agent = try PhotographerAgent(sessionID: root)
+    let agent = try PhotographerAgent(
+        sessionID: root,
+        context: try AgentContextRepository(
+            agent: AgentID(rawValue: "photographer"), scope: UUID().uuidString, state: PhotographerContextState())
+    )
     try await agent.start()
     await #expect(throws: CommunicationError.unauthorized) {
         try await agent.receive(

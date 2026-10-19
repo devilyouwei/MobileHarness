@@ -8,8 +8,8 @@
     /// Explicit diagnostic application workflow, separate from the authorized Agent Action path.
     @MainActor
     public final class SpeechDiagnosticWorkflow: SpeechDiagnosticControlling {
-        public let state: SpeechDiagnosticState
-        private let player: AppleAudioIO
+        public let state: any SpeechDiagnosticPresenting
+        private let player: any AudioInputOutput
         private let provider: any SpeechSynthesisCapability
         private let load: @Sendable () async throws -> Void
         private let unload: @Sendable () async throws -> Void
@@ -19,7 +19,8 @@
         private var task: Task<Void, Never>?
         private var session: InferenceSession<SynthesisEvent>?
         public init(
-            state: SpeechDiagnosticState, player: AppleAudioIO, provider: any SpeechSynthesisCapability,
+            state: any SpeechDiagnosticPresenting, player: any AudioInputOutput,
+            provider: any SpeechSynthesisCapability,
             load: @escaping @Sendable () async throws -> Void, unload: @escaping @Sendable () async throws -> Void
         ) {
             self.state = state
@@ -85,7 +86,7 @@
                         let automatic = ProcessInfo.processInfo.arguments.contains("-moss-autorun")
                         if !automatic || ProcessInfo.processInfo.arguments.contains("-moss-playback") {
                             try await play(samples)
-                            state.appendReport("\n扬声器播放完成（AppleAudioIO）")
+                            state.appendReport("\n扬声器播放完成（原生音频接口）")
                         }
                         saveAutomaticReport(state.report)
                     #endif

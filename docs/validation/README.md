@@ -7,6 +7,9 @@
 | 文档 | 职责 |
 | --- | --- |
 | [项目验证日志](Validation-History.md) | 按日期记录仓库检查、构建、部署、问题调查与验证结果；专项报告有详细数据时使用链接。 |
+| [千问工作流回归](Qwen-Workflow-Regression.md) | 同套合成场景下真实 flash/plus/max 的 Action/Tool、Task/Skill 调用与边界；不等于物理设备验收。 |
+| [千问提示词修订回归](Qwen-Prompt-Optimization.md) | 基于原始失败修订教学后的同用例对照，保留 pilot、完整运行及残留失败；不改执行权限。 |
+| [连续动作提示词验证](Action-Sequence-Prompts.md) | 串行动作、组内语音/表情并行的生产示例与预算回归；包含 Flash/Max 三轮专项及完整原始数据，保留完整检查、构建与原生效果验收限制。 |
 | [语音验收指南](Voice.md) | 当前可重复的语音体验检查步骤及记录要求，不固定某次模型默认或宣称已经通过。 |
 | [NexArm 物理试验](NexArm_Physical_Acceptance.md) | 带日期的真实硬件调查和测量，限定 USB/BLE、设备、负载和观察范围。 |
 | [原始测量数据](../measurements/README.md) | 保留原始 CSV 与字段解释；测量值和失败样本不因文档整理改变。 |
@@ -30,3 +33,14 @@
 项目日志记录跨模块检查的经过，专项报告保留模型/设备实验的详细样本和测量。相同实验通过链接复用，不能把多个报告中的相同运行合计为更多次验证。历史失败不删除，新的成功也不追溯改写旧结果。
 
 [当前验收方向](../Roadmap.md#acceptance-work) · [文档总索引](../README.md) · [历史资料](../history/README.md)
+
+[分类异常复现分析](Qwen-Diagnostics-Reproduction.md) 使用新增类型化诊断复跑同套场景，区分协议原因、流程判定和执行替身，不改变原判定。
+
+
+[调用协议对照](Qwen-Protocol-Comparison.md) 区分请求同时提供两类能力、同一响应混用和跨轮分开使用，覆盖 flash/max 与隔离语法对照。
+
+[基础 Skill 常驻时的协议对照](Skill-Protocol-Focused-Comparison.md)比较同 Skill 混合、分 Skill 混合与全 Action；千问 flash/max 小范围实验完成，GPT‑4.1 首次请求返回401，未得到模型输出。不改生产注册。
+
+[内置 Skill 全 Action 迁移](Skill-Action-Migration.md)记录生产注册、Query Channel、原生 Tool 基础能力保留，以及完整 Flash/Max 工作流的实际结果、残留失败和构建边界。早期隔离实验不作为本次生产迁移的验收替代。
+
+- [PlatformKit 容器与设备接入验证](PlatformKit-Containers.md)

@@ -1,7 +1,8 @@
 import Foundation
 
 /// One native transition worker and one latest desired state, independent of page lifetime.
-@MainActor public final class ListeningCaptureWorkflow {
+@MainActor
+public final class ListeningCaptureWorkflow {
     private let start: @MainActor () async throws -> Void
     private let stopNative: @MainActor () async -> Void
     private var worker: Task<Void, Never>?

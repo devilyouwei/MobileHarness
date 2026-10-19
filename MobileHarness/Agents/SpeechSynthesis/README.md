@@ -6,7 +6,7 @@ Converts authorized directed text requests into owner-scoped bounded PCM streams
 
 ## Ownership and boundaries
 
-This role owns synthesis, validation and producer failures. StorageAudio owns audio handles/PCM; ActionBindings SpeechPlayback consumes them; ModelKit supplies TTS. There are no subscriptions, business output envelopes, publications or outgoing sends.
+This role owns synthesis, validation and producer failures. StorageCache owns audio handles/PCM; ActionBindings SpeechPlayback consumes them; ModelKit supplies TTS. There are no subscriptions, business output envelopes, publications or outgoing sends.
 
 ## External relationships and data flow
 
@@ -17,7 +17,7 @@ flowchart LR
  Gateway -->|Directed synthesize or cancel| Synthesis[SpeechSynthesis]
  Synthesis -->|SpeechSynthesisRequest| ModelKit
  ModelKit -->|Validated audio frames| Synthesis
- Synthesis -->|PCM or terminal error| Storage[StorageAudio]
+ Synthesis -->|PCM or terminal error| Storage[StorageCache]
  Storage -->|Checkout and stream read| Playback[ActionBindings SpeechPlayback]
 ```
 
@@ -26,7 +26,7 @@ flowchart LR
 ```mermaid
 flowchart LR
  Agent[SpeechSynthesisAgent] --> Queue[Bounded directed request FIFO]
- Agent -->|Reserve handle at admission| Store[SpeechAudioStore]
+ Agent -->|Reserve handle at admission| Store[AudioCache]
  Queue --> Builder[SpeechSynthesisContextBuilder]
  Builder --> Producer[Single owned TTS producer]
  Producer -->|Validated PCM or terminal failure| Store
@@ -44,7 +44,7 @@ One serial synthesis worker has at most 32 queued/in-flight admissions in additi
 
 ## Production and failure propagation
 
-Build the request from role context and validate request identity, mono Float32, stable format, increasing sequence, explicit finished event, nonempty audio and ≤8 MiB total output. Convert ModelKit.AudioFrame into StorageAudio.SpeechPCMFrame without a dependency from Storage to ModelKit. Producer errors are SpeechSynthesisError; storage errors remain SpeechAudioError.
+Build the request from role context and validate request identity, mono Float32, stable format, increasing sequence, explicit finished event, nonempty audio and ≤8 MiB total output. Convert ModelKit.AudioFrame into StorageCache.AudioFrame without a dependency from Storage to ModelKit. Producer errors are SpeechSynthesisError; storage errors remain AudioCacheError.
 
 Synthesis waits for provider completion, failure or owner cancellation without an Agent timer. Cancellation fails the audio handle, wakes readers and joins the producer. Failed handles retain the original error until scope cleanup or bounded metadata eviction; no audio/cache TTL or reader timeout exists. Already audible samples cannot be retracted.
 
@@ -66,3 +66,7 @@ Directed admission, serial bounded production and explicit audio failure propaga
 ## 输出错误呈现接入（待实施）
 
 ❌ AgentBindings 拥有 SpeechFailurePresentation，识别本角色的 invalidOutput，保留原始原因并生成用户文案；ActionBindings 不依赖 Agents 实现。
+
+## Storage 依赖
+
+✅ 存储访问使用独立的 State、Cache、Database 和 Files 接口；App 注册根实例，消费者通过构造器获得所需能力。存储容器不接管本目录的业务验证、执行和完成语义。

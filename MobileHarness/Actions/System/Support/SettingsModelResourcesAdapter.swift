@@ -1,8 +1,9 @@
 import Actions
 import Foundation
 import FunctionContracts
+import ModelKitDefaults
 import ModelKitRuntime
-import Storage
+import StorageCore
 import UI
 
 public enum SettingsModelResourcesAdapter {
@@ -87,21 +88,21 @@ public enum SettingsModelResourcesAdapter {
 /// Native SDK adaptation only; Agent/functions select commands and source inputs.
 @MainActor public final class ModelResourceCapabilityAdapter: ModelResourceCapability, ModelResourceInventoryCapability
 {
-    private let manager: @MainActor () async throws -> ModelManager
+    private let artifacts: @MainActor () async throws -> any ModelArtifactsManaging
     private var speechPreference: [Bool]?
     private let bindSpeech: @MainActor (Bool, Bool) async throws -> Void
     private let quiesce: @MainActor (String) async -> Void
     public init(
-        manager: @escaping @MainActor () async throws -> ModelManager,
+        artifacts: @escaping @MainActor () async throws -> any ModelArtifactsManaging,
         quiesce: @escaping @MainActor (String) async -> Void,
         bindSpeech: @escaping @MainActor (Bool, Bool) async throws -> Void
     ) {
-        self.manager = manager
+        self.artifacts = artifacts
         self.quiesce = quiesce
         self.bindSpeech = bindSpeech
     }
     public func snapshotResources() async throws -> [ModelResourceFact] {
-        let manager = try await manager()
+        let manager = try await artifacts()
         let snapshots = try await manager.artifactSnapshots()
         guard snapshots.count <= 64 else { throw ResourceInventoryError.capacityExceeded }
         return try snapshots.map { snapshot in
@@ -132,30 +133,30 @@ public enum SettingsModelResourcesAdapter {
         speechPreference = preference
     }
     public func download(_ id: String, endpoint: String, allowsCellular: Bool) async throws {
-        let manager = try await manager()
+        let manager = try await artifacts()
         try await manager.downloadArtifact(
             id, source: ModelDownloadSource(endpoint: endpoint, allowsCellular: allowsCellular))
     }
     public func cancel(_ id: String) async throws {
-        let manager = try await manager()
+        let manager = try await artifacts()
         try await manager.cancelArtifact(id)
     }
     public func remove(_ id: String) async throws {
-        let manager = try await manager()
+        let manager = try await artifacts()
         try await manager.removeArtifact(id) { [quiesce] in await quiesce(id) }
     }
 }
 
 /// Root-scoped presentation adaptation; every production call is dispatched by OutputGateway.
 @MainActor public final class ResourcePresentationAdapter: ResourcePresentationCapability {
-    private let state: ModelResourcesState
+    private let state: any ModelResourcesPresenting
     private let sessionID: String
     private let acknowledge: @MainActor () -> Void
     private let provider: ProviderPresentationAdapter
-    private let navigation: NavigationState
+    private let navigation: any NavigationPresenting
     public init(
-        state: ModelResourcesState, sessionID: String, provider: ProviderPresentationAdapter,
-        navigation: NavigationState,
+        state: any ModelResourcesPresenting, sessionID: String, provider: ProviderPresentationAdapter,
+        navigation: any NavigationPresenting,
         acknowledge: @escaping @MainActor () -> Void
     ) {
         self.state = state
@@ -173,6 +174,7 @@ public enum SettingsModelResourcesAdapter {
         guard destination == "home" || AppDestination(rawValue: destination) != nil else {
             throw ResourcePresentationError.invalidGeneration
         }
+        try navigation.requirePresentation()
         navigation.show(AppDestination(rawValue: destination))
     }
     public func presentProviderResult(requestID: String, failureCode: String?, invocation: any FunctionInput)
@@ -184,6 +186,7 @@ public enum SettingsModelResourcesAdapter {
         _ inventory: ModelResourceInventory, generation: UInt64, invocation: any FunctionInput
     ) async throws {
         try Task.checkCancellation()
+        try state.requirePresentation()
         guard invocation.context.sessionID == sessionID, generation == state.refreshGeneration else {
             throw ResourcePresentationError.staleGeneration
         }
@@ -197,6 +200,7 @@ public enum SettingsModelResourcesAdapter {
         _ reason: ResourcePreferenceFailureReason, message: String, invocation: any FunctionInput
     ) async throws {
         try Task.checkCancellation()
+        try state.requirePresentation()
         guard invocation.context.sessionID == sessionID else { throw ResourcePresentationError.staleGeneration }
         switch reason {
         case .recognitionRequired, .synthesisRequired:
@@ -208,6 +212,7 @@ public enum SettingsModelResourcesAdapter {
     }
     public func presentResourceOperationFailure(_ message: String, invocation: any FunctionInput) async throws {
         try Task.checkCancellation()
+        try state.requirePresentation()
         guard invocation.context.sessionID == sessionID else { throw ResourcePresentationError.staleGeneration }
         state.presentOperationFailure(message)
     }
@@ -215,6 +220,7 @@ public enum SettingsModelResourcesAdapter {
         async throws
     {
         try Task.checkCancellation()
+        try state.requirePresentation()
         guard invocation.context.sessionID == sessionID, state.applyRefreshFailure(message, generation: generation)
         else {
             throw ResourcePresentationError.staleGeneration

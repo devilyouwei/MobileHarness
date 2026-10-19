@@ -9,7 +9,8 @@ import FunctionContracts
 import Gateway
 import ModelKit
 import PlatformKit
-import Storage
+import StorageCore
+import StorageState
 import Testing
 
 @testable import Agents
@@ -205,7 +206,11 @@ private func waitForSound(_ predicate: () async -> Bool) async throws {
     let values = SoundPublications()
     let speech = try SpeechPerceptionAgent(
         recognition: NoSoundASR(), vad: ForbiddenSoundVAD(), sessionID: session,
-        configuration: configuration, mode: .soundSourceOnly)
+        configuration: configuration, mode: .soundSourceOnly,
+        context: try AgentContextRepository(
+            agent: AgentID(rawValue: "speechPerception"), scope: UUID().uuidString,
+            state: SpeechPerceptionContextState())
+    )
     #expect(speech.descriptor.capabilities.internalTools.isEmpty)
     #expect(speech.descriptor.capabilities.internalActions.isEmpty)
     try await manager.register(speech, sessionID: session)
@@ -251,7 +256,12 @@ private func waitForSound(_ predicate: () async -> Bool) async throws {
     let session = UUID().uuidString
     let vad = SoundVADSession()
     let values = SoundPublications()
-    let agent = try SpeechPerceptionAgent(recognition: NoSoundASR(), vad: SoundVAD(session: vad), sessionID: session)
+    let agent = try SpeechPerceptionAgent(
+        recognition: NoSoundASR(), vad: SoundVAD(session: vad), sessionID: session,
+        context: try AgentContextRepository(
+            agent: AgentID(rawValue: "speechPerception"), scope: UUID().uuidString,
+            state: SpeechPerceptionContextState())
+    )
     try await agent.bind(
         AgentMessaging { message, _, _ in
             if case .soundSource(let value)? = message.perception { await values.append(value) }
@@ -285,7 +295,7 @@ private func waitForSound(_ predicate: () async -> Bool) async throws {
     async throws
 {
     let session = UUID().uuidString
-    let context = AgentContextRepository(
+    let context = try AgentContextRepository(
         agent: .speechPerception, scope: UUID().uuidString, state: SpeechPerceptionContextState(),
         persistence: .init(
             load: { nil },
@@ -293,7 +303,8 @@ private func waitForSound(_ predicate: () async -> Bool) async throws {
                 if value.records.contains(where: { $0.kind == "communication.output" }) {
                     throw CommunicationError.invalidPayload
                 }
-            }))
+            })
+    )
     let agent = try SpeechPerceptionAgent(
         recognition: NoSoundASR(), vad: ForbiddenSoundVAD(), sessionID: session,
         mode: .soundSourceOnly, context: context)
@@ -316,7 +327,11 @@ private func waitForSound(_ predicate: () async -> Bool) async throws {
     let session = UUID().uuidString
     let values = SoundPublications()
     let agent = try SpeechPerceptionAgent(
-        recognition: NoSoundASR(), vad: SoundVAD(session: SoundVADSession()), sessionID: session)
+        recognition: NoSoundASR(), vad: SoundVAD(session: SoundVADSession()), sessionID: session,
+        context: try AgentContextRepository(
+            agent: AgentID(rawValue: "speechPerception"), scope: UUID().uuidString,
+            state: SpeechPerceptionContextState())
+    )
     try await agent.bind(
         AgentMessaging { message, _, _ in
             if case .soundSource(let value)? = message.perception { await values.append(value) }
@@ -356,7 +371,11 @@ private func waitForSound(_ predicate: () async -> Bool) async throws {
     let manager = AgentManager()
     let session = UUID().uuidString
     let speech = try SpeechPerceptionAgent(
-        recognition: NoSoundASR(), vad: SoundVAD(session: SoundVADSession()), sessionID: session)
+        recognition: NoSoundASR(), vad: SoundVAD(session: SoundVADSession()), sessionID: session,
+        context: try AgentContextRepository(
+            agent: AgentID(rawValue: "speechPerception"), scope: UUID().uuidString,
+            state: SpeechPerceptionContextState())
+    )
     let recorder = ObservationRecorder(id: "soundListener")
     try await manager.register(speech, sessionID: session)
     try await manager.register(recorder, sessionID: session)
@@ -401,7 +420,12 @@ private actor SoundPublicationGate {
     let values = SoundPublications()
     let gate = SoundPublicationGate()
     let vad = SoundVADSession()
-    let agent = try SpeechPerceptionAgent(recognition: NoSoundASR(), vad: SoundVAD(session: vad), sessionID: session)
+    let agent = try SpeechPerceptionAgent(
+        recognition: NoSoundASR(), vad: SoundVAD(session: vad), sessionID: session,
+        context: try AgentContextRepository(
+            agent: AgentID(rawValue: "speechPerception"), scope: UUID().uuidString,
+            state: SpeechPerceptionContextState())
+    )
     try await agent.bind(
         AgentMessaging { message, _, _ in
             if case .soundSource(let value)? = message.perception {
@@ -431,7 +455,11 @@ private actor SoundPublicationGate {
     let session = UUID().uuidString
     let values = SoundPublications()
     let agent = try SpeechPerceptionAgent(
-        recognition: NoSoundASR(), vad: SoundVAD(session: SoundVADSession()), sessionID: session)
+        recognition: NoSoundASR(), vad: SoundVAD(session: SoundVADSession()), sessionID: session,
+        context: try AgentContextRepository(
+            agent: AgentID(rawValue: "speechPerception"), scope: UUID().uuidString,
+            state: SpeechPerceptionContextState())
+    )
     try await agent.bind(
         AgentMessaging { message, _, _ in
             if case .soundSource(let value)? = message.perception { await values.append(value) }
@@ -451,7 +479,11 @@ private actor SoundPublicationGate {
     let manager = AgentManager()
     let session = UUID().uuidString
     let speech = try SpeechPerceptionAgent(
-        recognition: NoSoundASR(), vad: SoundVAD(session: SoundVADSession()), sessionID: session)
+        recognition: NoSoundASR(), vad: SoundVAD(session: SoundVADSession()), sessionID: session,
+        context: try AgentContextRepository(
+            agent: AgentID(rawValue: "speechPerception"), scope: UUID().uuidString,
+            state: SpeechPerceptionContextState())
+    )
     let policy = try CommunicationPolicy(
         contracts: AgentContracts.communication,
         externalSources: [
@@ -512,7 +544,12 @@ private struct SoundEndpoint: VoiceActivityCapability {
     let session = UUID().uuidString
     let values = SoundPublications()
     let finals = SoundPublications()
-    let speech = try SpeechPerceptionAgent(recognition: SoundRecognition(), vad: SoundEndpoint(), sessionID: session)
+    let speech = try SpeechPerceptionAgent(
+        recognition: SoundRecognition(), vad: SoundEndpoint(), sessionID: session,
+        context: try AgentContextRepository(
+            agent: AgentID(rawValue: "speechPerception"), scope: UUID().uuidString,
+            state: SpeechPerceptionContextState())
+    )
     try await speech.bind(
         AgentMessaging { message, _, _ in
             if case .soundSource(let value)? = message.perception { await values.append(value) }
@@ -561,7 +598,11 @@ private struct SoundEndpoint: VoiceActivityCapability {
     let values = SoundPublications()
     let gate = SoundPublicationGate()
     let speech = try SpeechPerceptionAgent(
-        recognition: NoSoundASR(), vad: SoundVAD(session: SoundVADSession()), sessionID: session)
+        recognition: NoSoundASR(), vad: SoundVAD(session: SoundVADSession()), sessionID: session,
+        context: try AgentContextRepository(
+            agent: AgentID(rawValue: "speechPerception"), scope: UUID().uuidString,
+            state: SpeechPerceptionContextState())
+    )
     try await speech.bind(
         AgentMessaging { message, _, _ in
             if case .soundSource(let value)? = message.perception {

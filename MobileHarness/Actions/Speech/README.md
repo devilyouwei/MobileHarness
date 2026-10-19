@@ -1,5 +1,7 @@
 # Speech — 播放与聆听策略函数
 
+✅ 原生提示音预备与播放共用 ActionBindings 的单份私有 PCM 缓存；Speech 函数继续只转发配置和真实 invocation，不接管设备或聆听策略。
+
 ## 简介
 
 提供 `Speech.Playback.speak` 与 `Speech.Listening.update`。前者播放已有音频句柄，后者传递可信聆听策略和启动反馈配置；本域不生成语音、不持有音频流，也不选择聆听策略。
@@ -56,3 +58,7 @@ SpeechModule 必须注入播放能力，聆听能力可选；缺少聆听能力�
 ## 待实现
 
 - 暂无本目录独立的实现待办；跨模块及实际模型/设备验收见所属模块说明。
+
+## Storage 依赖
+
+✅ 存储访问使用独立的 State、Cache、Database 和 Files 接口；App 注册根实例，消费者通过构造器获得所需能力。存储容器不接管本目录的业务验证、执行和完成语义。

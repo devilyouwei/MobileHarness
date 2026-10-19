@@ -5,7 +5,8 @@ import Foundation
 import Gateway
 import PlatformKit
 import Testing
-import UI
+
+@testable import UI
 
 @MainActor private final class ResourceOperationsFixture: ModelResourcesOperating {
     let state: ModelResourcesState
@@ -45,15 +46,31 @@ import UI
         return snapshot
     }
     var restoreCalls = 0
-    func restoreSource() throws -> ModelResourceSourceDraft {
+    var blockRestore = false
+    var restoreGate: CheckedContinuation<Void, Error>?
+    var saveCalls = 0
+    var blockSave = false
+    var saveGate: CheckedContinuation<Void, Error>?
+    func restoreSource() async throws -> ModelResourceSourceDraft {
         restoreCalls += 1
+        if blockRestore {
+            blockRestore = false
+            try await withCheckedThrowingContinuation { restoreGate = $0 }
+        }
+        try Task.checkCancellation()
         if restoreFailurePresented {
             state.error = "accepted restore failure"
             throw ApplicationControlIntentFailure.presented("restore chain details")
         }
         return storedSource
     }
-    func saveSource(_ source: ModelResourceSourceDraft) throws {
+    func saveSource(_ source: ModelResourceSourceDraft) async throws {
+        saveCalls += 1
+        if blockSave {
+            blockSave = false
+            try await withCheckedThrowingContinuation { saveGate = $0 }
+        }
+        try Task.checkCancellation()
         if let missingGroup {
             if preferenceFailurePresented {
                 state.installationNotice = missingGroup.installationMessage
@@ -415,4 +432,97 @@ import UI
     #expect(!(await workflow.saveDownloadSource()))
     #expect(state.error == "accepted preference failure" && !state.saving)
     #expect(state.source.endpoint == "https://new.example")
+}
+
+@MainActor private func awaitResourceEdit(_ ready: () -> Bool) async throws {
+    let deadline = ContinuousClock.now + .seconds(2)
+    while !ready(), ContinuousClock.now < deadline { try await Task.sleep(for: .milliseconds(2)) }
+    try #require(ready())
+}
+
+@Test @MainActor func resourceInitialRestoreIsSharedAndReturningPagesKeepTheDraft() async throws {
+    let state = ModelResourcesState()
+    let operations = ResourceOperationsFixture(state: state)
+    operations.blockRestore = true
+    let workflow = ModelResourceInteractionWorkflow(state: state, operations: operations)
+    let first = Task { await workflow.restore() }
+    try await awaitResourceEdit { operations.restoreGate != nil }
+    let second = Task { await workflow.restore() }
+    for _ in 0..<5 { await Task.yield() }
+    #expect(operations.restoreCalls == 1)
+    operations.restoreGate?.resume()
+    operations.restoreGate = nil
+    await first.value
+    await second.value
+    workflow.editDownloadSource("https://draft.example")
+    await workflow.restore()
+    #expect(state.hasRestored && state.source.endpoint == "https://draft.example")
+    await workflow.stopAndWait()
+}
+
+@Test @MainActor func resourceAutosaveCoalescesEditsAndDoesNotReplayFailure() async throws {
+    let state = ModelResourcesState()
+    let operations = ResourceOperationsFixture(state: state)
+    let workflow = ModelResourceInteractionWorkflow(
+        state: state, operations: operations, autosaveDelay: .milliseconds(10))
+    await workflow.restore()
+    workflow.editDownloadSource("https://one.example")
+    workflow.editDownloadSource("https://two.example")
+    workflow.editDownloadSource("https://latest.example")
+    try await awaitResourceEdit { operations.saveCalls == 1 && !state.saving }
+    #expect(operations.storedSource.endpoint == "https://latest.example")
+    operations.failSave = true
+    workflow.editDownloadSource("https://failure.example")
+    try await awaitResourceEdit { operations.saveCalls == 2 && state.error != nil }
+    try await Task.sleep(for: .milliseconds(40))
+    #expect(operations.saveCalls == 2)
+    workflow.editDownloadSource("https://stopped.example")
+    await workflow.stopAndWait()
+    workflow.editDownloadSource("https://late.example")
+    try await Task.sleep(for: .milliseconds(20))
+    #expect(operations.saveCalls == 2 && state.source.endpoint == "https://stopped.example")
+}
+
+@Test @MainActor func resourceBusySaveCompletionPersistsTheLatestEndpointWithoutPolling() async throws {
+    let state = ModelResourcesState()
+    let operations = ResourceOperationsFixture(state: state)
+    let workflow = ModelResourceInteractionWorkflow(
+        state: state, operations: operations, autosaveDelay: .milliseconds(10))
+    await workflow.restore()
+    operations.blockSave = true
+    let switching = Task { await workflow.setCustomModel(.recognition, enabled: true) }
+    try await awaitResourceEdit { operations.saveGate != nil }
+    workflow.editDownloadSource("https://pending.example")
+    try await Task.sleep(for: .milliseconds(30))
+    #expect(operations.saveCalls == 1)
+    operations.saveGate?.resume()
+    operations.saveGate = nil
+    await switching.value
+    try await awaitResourceEdit { operations.saveCalls == 2 && !state.saving }
+    #expect(operations.storedSource.endpoint == "https://pending.example")
+    #expect(operations.storedSource.useCustomRecognition)
+    await workflow.stopAndWait()
+}
+
+@Test @MainActor func resourceStopJoinsAnAdmittedAutosaveAndRejectsLateResults() async throws {
+    let state = ModelResourcesState()
+    let operations = ResourceOperationsFixture(state: state)
+    let workflow = ModelResourceInteractionWorkflow(
+        state: state, operations: operations, autosaveDelay: .milliseconds(10))
+    await workflow.restore()
+    operations.blockSave = true
+    workflow.editDownloadSource("https://pending.example")
+    try await awaitResourceEdit { operations.saveGate != nil }
+    var finished = false
+    let stopping = Task {
+        await workflow.stopAndWait()
+        finished = true
+    }
+    for _ in 0..<5 { await Task.yield() }
+    #expect(!finished)
+    operations.saveGate?.resume()
+    operations.saveGate = nil
+    await stopping.value
+    #expect(finished && !state.saving && state.error == nil)
+    #expect(operations.storedSource.endpoint != "https://pending.example")
 }

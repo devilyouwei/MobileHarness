@@ -1,71 +1,69 @@
-# Platform Audio I/O
+# Audio — 原生音频、反馈与数值能力
 
-## Summary
+✅ 录音与播放共用文件私有的同步 AVAudioSession 配置函数，各调用者继续在自身隔离域执行，不增加调度；移除临时细分计时，只保留空间启动总区间。保留完整停止、原生错误、四声道及首 PCM 就绪。
 
-Capture native PCM, convert mono streams, play continuous PCM and measure spectra with public Apple APIs.
+## 职责与公开协议
 
-## Ownership and boundaries
+AudioContainer 按有限命名作用域缓存原生实现，对外返回 AudioInputOutput、CuePlaying、HapticFeedbackProviding。AppleAudioIO／NativeCuePlayback／NativeHapticFeedback 实现这些端口；业务只注入需要的协议，SDK 不依赖其他项目模块。
 
-`AppleAudioIO` owns device/session I/O. Model selection, VAD, speech-turn policy and presentation belong to callers. `MicrophoneFrame` owns native layout/rate/sequence/media time and monotonic capture time.
+协议覆盖权限、原生PCM／事件订阅、播放／频谱、运行事实及停止／加入；便利重载只转发明确参数，不替代驱动、不伪造成功。样式、PCM、错误和设备事实均为 SDK 自有值，Signal 转换在 Gateway。
 
-## External relationships and data flow
+## 源码与所有者
 
-Runtime arrows show data or capability calls; dashed arrows show injection.
+| 文件／类型 | 职责 |
+| --- | --- |
+| AudioContainer | 有限作用域、实例缓存、原生会话互斥和根停止 |
+| AppleAudioIO / AudioInputOutput | 捕获／播放接纳，原生完成及清理 |
+| SpatialAudioCapture / AudioSampleBufferReader | 空间采集、格式／连续性及原生buffer读取 |
+| MicrophoneFrame / AudioCaptureContext | 原生PCM、布局、输入／支持／回退事实 |
+| AudioCaptureReadiness | 首个有效帧的可取消就绪门 |
+| AudioSpectrum / StreamingMonoPCMResampler | 有界频谱计算、持续单声道转换 |
+| NativeCuePlayback / CuePlaying | 单次原生PCM反馈播放 |
+| NativeHapticFeedback / HapticFeedbackProviding | 有界触觉、预备生成器和取消 |
+| ListeningCaptureWorkflow | 单worker、最新原生启停意图的取消加入 |
 
-```mermaid
-flowchart LR
- Bindings[Module integrations]
- Hardware[Microphone and speaker] <--> IO[AppleAudioIO]
- IO -->|native frames and capture context| Bindings
- Bindings -->|PCM and drain wait| IO
- Caller[Perception caller] --> Converter[StreamingMonoPCMResampler]
- Converter -->|converted frames or error| Caller
-```
+## 录音与输入
 
-## Capture and startup
+✅ startCapture 在支持的内置路由优先尝试FOA，否则选择mono。空间启动失败必须停止并加入后再尝试mono；仅允许接纳前回退。已接纳流不改变布局，格式／中断／连续性失败明确终止。
 
-`startCapture(preferSpatial:)` selects audio-only FOA capture on a supported built-in route, otherwise mono AVAudioEngine. Each backend waits for one validated, enqueued frame through a cancellable readiness gate; silence is valid. Native callbacks, errors and cancellation complete this gate, without a fabricated first-frame timeout fallback. A caller may declare its own finite Action budget. Spatial startup failure closes/joins that backend before trying mono. Once admitted, invalid format, interruption or continuity failure terminates the stream; it never changes layout in place. `AudioCaptureContext` distinguishes native input, capability support and pre-admission fallback reason from actual received layout.
+两后端都在首个有效入队PCM后返回就绪，静音也有效，不伪造首帧超时回退。mono请求1024样本，回调验证1…8192帧；FOA为四声道ACN/SN3D，时间连续误差不超过两样本，每传输包最多4000帧／16000标量。
 
-Both streams hold 64 packets with `bufferingOldest`; a dropped yield fails with `overflow`. Mono requests 1024 samples and validates callbacks of 1…8192 samples. Spatial validates four-channel ACN/SN3D PCM, media PTS continuity within two samples, and native callbacks up to 8192 frames; transport packets contain at most 4000 frames/16000 scalar samples. Metering uses W. `AudioSampleBufferReader` queries the exact native buffer-list size, limits it to four buffers, preserves OSStatus and holds CMBlockBuffer through synchronous extraction.
+主录音直接返回原生64包有序源流，不经过MainActor逐包中转。最多16个可选观察订阅，各自64包，慢订阅局部overflow并明确结束。NativeInputSession 关闭围栏后迟到回调不能污染新流。stopCapture 关闭接纳并加入空间后端／原生回调。
 
-`stopCapture` fences startup and joins spatial shutdown/callback ownership. Sendable callbacks use mutex-protected state, without MainActor captures. Startup logs contain graph/layout/error metadata only.
+AudioCaptureContext 区分输入、空间支持和接纳前回退；原生读buffer受声道／格式边界约束，保留OSStatus及CMBlockBuffer至同步提取完成。
 
-## Conversion
+## 播放与完成
 
-`StreamingMonoPCMResampler` is an actor with continuous AVAudioConverter state. Input must be mono, with finite samples and supported 8…192 kHz rates; the caller selects output rate. Format changes recreate conversion state; `reset` clears converter/rate/sequence. Multichannel callers must extract mono first. Conversion failure propagates instead of fabricating PCM.
+✅ NativePlaybackGraph 私有actor拥有输出引擎、播放器、格式、mixer tap及原生连接／启动／PCM提交／停止，避免这些同步原生调用阻塞MainActor。AppleAudioIO只持有主线程接纳、token和完成等待。
 
-## Playback and completion
+最多三个已调度PCM buffer、一个串行提交；单包非空、最多262144样本、有限数值、8…192kHz、mono。消费端保持同一次流的采样率，真实dataPlayedBack回调释放容量并确认排空。onStarted仅在首块提交且player启动成功后回调，不代表声音已到达用户。
 
-One playback stream schedules at most three buffers, each up to 262144 finite mono samples. Producers suspend for capacity. Final success awaits every `dataPlayedBack` callback; cancellation/token fencing stops old work and wakes capacity/drain waiters. Scheduled buffers wait for dataPlayedBack/error or cancellation without a watchdog. Same-format packets do not restart the player; format changes wait for drain. Render completion does not measure acoustic arrival at a remote speaker.
+stopPlayback同步失效token并唤醒等待，单个清理任务加入原生停止；waitForPlaybackStop、根stop及下一次播放加入清理。旧取消不能停止新播放，未完成原生调用返回前不伪造停机。
 
-## Spectrum
+playClip拒绝捕获／播放冲突，复用同一播放端口；主因和清理错误分别保留，释放不触碰替代会话。引擎内部可复用健康连接，不提供无人使用的独立预热／播放游标API。
 
-`AudioSpectrum` uses the latest 2048 samples, removes DC, applies Hann/FFT and aggregates 32 logarithmic bands from 80 Hz to min(8 kHz, Nyquist). Invalid samples become zero; fixed −66…−6 dB mapping preserves level differences. Attack/release factors are 0.78/0.32. The mixer tap retains at most 2048 samples; callers sample telemetry rather than retaining audio.
+## 频谱、转换与反馈
 
-Bounded native capture, pre-admission fallback, streaming conversion, continuous playback and numeric spectrum telemetry.
+AudioSpectrum 每次最多2048样本，measureOffMain 在通用执行器运行、前后可取消；同步计算保留供明确调用。播放频谱只在MainActor取tap快照和token，计算后复核同一播放；取消／替换返回nil，无播放返回静音。
 
-Physical route, FOA and coexistence evidence belongs in [validation history](../../../docs/validation/Validation-History.md).
+StreamingMonoPCMResampler 持有连续AVAudioConverter，输入为有限mono、8…192kHz；格式变化重建转换器，reset清状态。多声道提取和VAD／ASR策略属于调用者，不在转换失败后伪造PCM。
 
-## Related design
+CuePlaying使用一个AVAudioPlayer／delegate，重叠明确busy，取消停止并加入自己的播放器，不主动重配共享AVAudioSession。PCMClipEncoding只编码有界、最多1秒／192000样本的PCM16 WAV。
 
-[Parent design](../README.md)
+HapticFeedbackProviding使用公开支持检查、缓存生成器和一个有主人的operation；最多三次触觉、间隔40…250ms，取消和停止加入，UIKit只确认请求发出。触觉预备不承诺实际产生反馈。
 
-音频完成等待使用原生回调、实际错误及作用域取消，不设置 ASR/TTS 收尾、PCM 首帧或播放 buffer 兜底计时器；完成依赖真实回调，失败保留实际来源。
+✅ 已实现：NativeHapticFeedback.perform在每次实际impact前重新设置共享AVAudioSession允许录音时触觉，再prepare并发出impact；不能把录音启动前的设置或生成器预备视为持续有效。只修改该触觉开关，不重配category／mode／route、不停录音；取消／根接纳检查先于设置，设置失败原样抛出并沿既有Platform报告链传播。缓存生成器与可重复operation保留，单次及多次请求均按每个pulse处理。
 
-playClip(PlaybackPCM) rejects capture/playback overlap with busy, validates a single bounded finite PCM clip before session changes, configures public playAndRecord speaker/HFP routing, and awaits native dataPlayedBack using playStream. All exit paths stop/reset the clip graph and deactivate its unused session, without touching a replacement capture/playback owner; cancellation retains token fencing. Primary and cleanup errors remain separately retained. It has no queue, synthesized sound or capture admission policy.
+## 原生事件、错误与约束
 
-PCM continuity validation reports a typed timestamp/rate discontinuity with measured gap instead of overflow. Existing 64-packet queue overflow remains fatal/explicit. A portable continuity state in MicrophoneFrame.swift is tested for contiguous callbacks, gaps, rate changes and reset. AppleAudioIO.stopPlayback stops the player graph and wakes native playback waits independently of capture; the caller owns async handler join; playStream configures speaker/HFP output when no capture is running.
+NativeAudioEvent 是事实而非Error。路由按前后输入／输出portType+UID比较，categoryChange/override及同设备重配不打断流；实际设备变化、不可用路由和缺少旧快照保守投递routeChanged，不直接上报容器故障。
 
-NativeHapticFeedback.swift accepts five generic impact styles, finite intensity, up to three pulses and bounded intervals; rejects concurrent calls and unsupported hardware, honors cancellation between pulses and has no pending queue. UIKit only confirms request issuance. Audio session setup allows haptics during recording; PCM/startup ownership stays unchanged.
+中断仅在began且实例有活动采集／播放时报告AudioIOError.interrupted；ended不重复终止。格式、连续性、overflow、执行和清理失败保留原throw及注入报告。事件两个worker由原生所有者取消并加入，不由页面持有。
 
-PCMClipEncoding.wav16(samples:sampleRate:) is portable and rejects invalid inputs with its own invalidFormat failure. It validates mono finite samples, 8…192 kHz, <=192000 samples and <=1 s; emits bounded PCM16 WAV. NativeCuePlayback owns one AVAudioPlayer/delegate wait with a per-operation ID captured by a retained immutable delegate, so late callbacks cannot complete a replacement clip. It rejects overlap, joins cancellation by stopping only its own player, propagates decode/start/completion failure, and does not explicitly reconfigure or deactivate AVAudioSession. ✅ play accepts an optional MainActor onStarted callback, fired once only after native prepare/play succeeds; failure or cancellation does not fabricate admission. Native completion does not prove perceived volume.
+❌ 原生路由、实际声音／触觉、持续模型负载及硬件连续性仍需真机验收。
 
-playClip/playStream accept an optional MainActor onStarted callback, fired once after the first buffer is successfully scheduled and the player started. No callback on setup failure or empty streams; it acknowledges native admission rather than audible hardware time. Existing bounded buffering, drain, cancellation and cleanup remain unchanged.
+[PlatformKit](../README.md) · [Core](../Core/README.md)
 
-AppleAudioIO.prepareClip validates bounded PCM, connects/prepares/starts only its output graph and retains one prepared sample-rate marker. Successful warm playback skips repeated category/session activation; playStream reuses a running graph. discardPreparedClip affects only an unconsumed warm marker with no capture/playback owner. Stop/cleanup clear the marker; failed preparation rolls back and propagates cleanup errors. No recording/buffer scheduling/sound occurs during prewarm.
+✅ AudioContainer停止聚合使用PlatformFailure：首个失败为underlying，其余按顺序保留在cleanupErrors，分类为cleanup.failed；不以取消／设备不可用掩盖未完成清理。
 
-✅ ListeningCaptureWorkflow 持有一个原生切换 worker 和最新 enabled 意图；invalidate 同步取消正在启动的捕获，stop 加入 worker。迟到 start 在退出前停止，失败保留生产者错误，不决定语音同意、半双工或模型策略。
-
-## 待实现
-
-- 暂无本目录独立的实现待办；跨模块及实际模型/设备验收见所属模块说明。
+录音会话同步配置，空间 AVCaptureSession 仅在请求录音时随后端实例创建，start/stopRunning 在后端 actor 执行。首 PCM 确认前不报告收音成功；空间启动失败必须加入清理，再按原支持条件回退 mono，token 围栏防止旧失败影响新捕获。容器 boot 不打开设备，不保留异步会话配置 preparation Task。

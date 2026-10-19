@@ -380,3 +380,44 @@ private actor ResumableHubFixture: ModelArtifactDownloader {
     #expect(await Set(downloader.roots.map(\.path)).count == 1)
     #expect(await storage.records.isEmpty)
 }
+
+@Test func artifactStorageCanRebindAfterItsFileScopeEnds() async throws {
+    let first = ArtifactFixtureStorage()
+    let second = ArtifactFixtureStorage()
+    let catalog = try fixtureCatalog()
+    await second.remove(catalog.packages[0])
+    let manager = try ModelManager()
+    try await manager.configureArtifacts(catalog: catalog, storage: first)
+    #expect(try await manager.artifactSnapshots().first?.phase == .installed)
+    async let firstRelease: Void = manager.releaseArtifacts()
+    async let secondRelease: Void = manager.releaseArtifacts()
+    _ = try await (firstRelease, secondRelease)
+    await #expect(throws: ModelArtifactError.missingArtifact) { try await manager.artifactSnapshots() }
+    try await manager.configureArtifacts(catalog: catalog, storage: second)
+    #expect(try await manager.artifactSnapshots().first?.phase == .notInstalled)
+    await manager.shutdown()
+}
+
+@Test func closedArtifactStoreRejectsNewWork() async throws {
+    let store = ModelArtifactStore(catalog: try fixtureCatalog(), storage: ArtifactFixtureStorage())
+    _ = try await store.snapshots()
+    async let first: Void = store.close()
+    async let second: Void = store.close()
+    _ = try await (first, second)
+    await #expect(throws: ModelArtifactError.busy) { try await store.snapshots() }
+    await #expect(throws: ModelArtifactError.busy) {
+        try await store.download("fixture", source: ModelDownloadSource(endpoint: ModelDownloadSource.official))
+    }
+}
+
+@Test func installedPathCharacterPolicyRetainsUnicodeAndRejectsUnsafeComponents() {
+    for path in ["model/config.json", "Gemma_4-e2b/weights.bin", "模型/权重.bin", "version.1/config.json"] {
+        #expect(ModelArtifactCatalog.validInstalledPath(path))
+    }
+    for path in [
+        "", ".", "..", "a/../b", "a//b", "a b/file", "a:b/file", "a/\\b", "a/\nfile",
+        String(repeating: "a", count: 201),
+    ] {
+        #expect(!ModelArtifactCatalog.validInstalledPath(path))
+    }
+}

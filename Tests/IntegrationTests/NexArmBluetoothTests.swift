@@ -8,15 +8,16 @@ import Foundation
 import FunctionContracts
 import Gateway
 import ModelKit
-import Storage
+import StorageCore
 import StorageMedia
 import StorageSQLite
+import StorageState
 import StorageTasks
 import Testing
-import UI
 
 @testable import ActionBindings
 @testable import PlatformKit
+@testable import UI
 
 /// Explicit simulation. Default tests never create a CoreBluetooth manager or move physical hardware.
 private actor BluetoothArmFixture: NexArmBluetoothLink {
@@ -167,6 +168,7 @@ private actor BluetoothArmFixture: NexArmBluetoothLink {
     }
     var waitingForPose: Bool { pendingPose != nil }
     private(set) var liveCommands: [NexArmPacket] = []
+    private(set) var restoredCommandIndices: Set<Int> = []
     private(set) var poseReads = 0
     func blockLive(_ value: Bool) {
         liveBlocked = value
@@ -191,9 +193,12 @@ private actor BluetoothArmFixture: NexArmBluetoothLink {
         pendingLiveFailure = nil
     }
     func restoreLive(_ packet: NexArmPacket, session: String) async throws -> Bool {
-        try await sendLive(packet, session: session)
+        try await deliverLive(packet, session: session, restoring: true)
     }
     func sendLive(_ packet: NexArmPacket, session: String) async throws -> Bool {
+        try await deliverLive(packet, session: session, restoring: false)
+    }
+    private func deliverLive(_ packet: NexArmPacket, session: String, restoring: Bool) async throws -> Bool {
         guard liveSession == session, snapshot.phase == .connected else { throw NexArmError.disconnected }
         if failNextLiveValidation {
             failNextLiveValidation = false
@@ -210,6 +215,7 @@ private actor BluetoothArmFixture: NexArmBluetoothLink {
         guard try admitFixtureWrite() else { return false }
         if limitLiveRate, let lastLiveWrite, ContinuousClock.now - lastLiveWrite < .milliseconds(50) { return false }
         lastLiveWrite = .now
+        if restoring { restoredCommandIndices.insert(liveCommands.count) }
         liveCommands.append(packet)
         // Unacknowledged command admission is recorded separately; no fake feedback completion.
         if let targets = packet.motorTargets {
@@ -1103,7 +1109,7 @@ func bluetoothConnectAndForgetClearDiscoveryAndSavedState() async throws {
     #expect(workflow.state.controlReady)
     let connected = await link.status()
     #expect(!connected.scanning && connected.devices.isEmpty)
-    workflow.state.error = "旧错误"
+    workflow.state.present(.error("旧错误"))
     workflow.forget()
     await workflow.waitUntilIdle()
     #expect(workflow.state.remembered == nil && workflow.state.selected == nil)
@@ -2287,7 +2293,11 @@ func bluetoothTrackingInputExpiryJoinsWriterAndReleasesMotorResources() async th
     let resources = try nexArmTestResources()
     workflow.withMotorResources = bluetoothResourceGuard(resources)
     let session = UUID().uuidString
-    let photographer = try PhotographerAgent(sessionID: session, controlsArm: true)
+    let photographer = try PhotographerAgent(
+        sessionID: session, controlsArm: true,
+        context: try AgentContextRepository(
+            agent: AgentID(rawValue: "photographer"), scope: UUID().uuidString, state: PhotographerContextState())
+    )
     try await photographer.start()
     let pose = try PoseObservation(
         width: 100, height: 100, sequence: 1, timestamp: 1e12, rotation: 1,
@@ -2343,7 +2353,11 @@ func bluetoothGatewayAimUpdatesUseOneWorkerAndKeepActualMotorExclusion() async t
     workflow.connect(try link.businessID)
     await workflow.waitUntilIdle()
     let session = UUID().uuidString
-    let photographer = try PhotographerAgent(sessionID: session, controlsArm: true)
+    let photographer = try PhotographerAgent(
+        sessionID: session, controlsArm: true,
+        context: try AgentContextRepository(
+            agent: AgentID(rawValue: "photographer"), scope: UUID().uuidString, state: PhotographerContextState())
+    )
     let manager = AgentManager()
     try await manager.register(photographer, sessionID: session)
     try await photographer.start()
@@ -2554,7 +2568,12 @@ func bluetoothLatestSliderSupersedesPresetWhileOldAimCleanupIsJoining() async th
     try await until { await link.liveCommands.dropFirst(before).contains { $0.id == 6 } }
     workflow.stopMotorControl()
     await workflow.waitUntilIdle()
-    #expect(await link.liveCommands.dropFirst(before).allSatisfy { !$0.isSynchronousPositionWrite })
+    let commands = await link.liveCommands
+    let restored = await link.restoredCommandIndices
+    let later = commands.indices.filter { $0 >= before }
+    #expect(later.allSatisfy { restored.contains($0) || !commands[$0].isSynchronousPositionWrite })
+    let firstSlider = try #require(later.first { commands[$0].id == 6 })
+    #expect(restored.filter { $0 >= before }.allSatisfy { $0 < firstSlider })
     #expect(workflow.state.error == nil && workflow.state.canControl)
     workflow.disconnect()
     await workflow.waitUntilIdle()
@@ -2602,13 +2621,22 @@ private func bluetoothRecoveryPreservesAssistantGenerationSpeechAndOtherActions(
     let link = BluetoothArmFixture()
     let workflow = bluetoothTestWorkflow(link, file: file)
     let chat = BluetoothRecoveryChat()
-    let assistant = try AgentChatWorker<AssistantContextState>(chat: chat)
+    let assistant = try AgentChatWorker<AssistantContextState>(
+        stateContext: try publicStateFixture(),
+        chat: chat,
+        context: try AgentContextRepository(
+            agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState())
+    )
     let speech = try await bindSpeechRequests(assistant)
     let manager = AgentManager()
     let session = UUID().uuidString
     try await manager.register(assistant, sessionID: session)
     try await assistant.start()
-    let photographer = try PhotographerAgent(sessionID: session, controlsArm: true)
+    let photographer = try PhotographerAgent(
+        sessionID: session, controlsArm: true,
+        context: try AgentContextRepository(
+            agent: AgentID(rawValue: "photographer"), scope: UUID().uuidString, state: PhotographerContextState())
+    )
     try await manager.register(photographer, sessionID: session)
     try await photographer.start()
     let input = InputGateway(manager: manager, allowsExternalSend: true)
@@ -2884,7 +2912,12 @@ func bluetoothRecoveryLeavesQueuedActionsForNormalChannelExecution() async throw
     defer { try? FileManager.default.removeItem(at: file) }
     let link = BluetoothArmFixture()
     let workflow = bluetoothTestWorkflow(link, file: file)
-    let assistant = try AgentChatWorker<AssistantContextState>(chat: BluetoothRecoveryChat())
+    let assistant = try AgentChatWorker<AssistantContextState>(
+        stateContext: try publicStateFixture(),
+        chat: BluetoothRecoveryChat(),
+        context: try AgentContextRepository(
+            agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState())
+    )
     let manager = AgentManager()
     let session = UUID().uuidString
     try await manager.register(assistant, sessionID: session)
@@ -3073,6 +3106,8 @@ func bluetoothLateAimExecutionFailureIsIndependentOfDeviceRecordsAndCompletedToo
     let link = BluetoothArmFixture()
     let workflow = bluetoothTestWorkflow(link, file: file)
     let activity = ActionActivityWorkflow(state: ActionActivityState())
+    let diagnosticFixture = try RuntimeFailurePresentationFixture(activity: activity)
+    try await diagnosticFixture.start(activity: activity)
     let observer = Task { await workflow.run() }
     workflow.openPage()
     try await until { !workflow.state.nearby.isEmpty }
@@ -3097,6 +3132,7 @@ func bluetoothLateAimExecutionFailureIsIndependentOfDeviceRecordsAndCompletedToo
     await workflow.waitUntilIdle()
     observer.cancel()
     await observer.value
+    await diagnosticFixture.stop(activity: activity)
 }
 
 /// A rejected concurrent call cannot clear or borrow the running invocation's report.
@@ -3174,6 +3210,8 @@ func bluetoothLateNativeAimErrorIsReportedAfterRecoveryFencesTheConnection() asy
     let link = BluetoothArmFixture()
     let workflow = bluetoothTestWorkflow(link, file: file)
     let activity = ActionActivityWorkflow(state: ActionActivityState())
+    let diagnosticFixture = try RuntimeFailurePresentationFixture(activity: activity)
+    try await diagnosticFixture.start(activity: activity)
     let observer = Task { await workflow.run() }
     workflow.openPage()
     try await until { !workflow.state.nearby.isEmpty }
@@ -3211,6 +3249,7 @@ func bluetoothLateNativeAimErrorIsReportedAfterRecoveryFencesTheConnection() asy
     await workflow.waitUntilIdle()
     observer.cancel()
     await observer.value
+    await diagnosticFixture.stop(activity: activity)
 }
 
 @Test(.actionCatalog) func bluetoothFeedbackReadFailureDoesNotChangeNativeStateOrBecomeSendFailure() async throws {
@@ -3409,8 +3448,8 @@ func bluetoothManualSimpleCommandsRemainUsableWithoutIKOrResourceAdmission() asy
     defer { try? FileManager.default.removeItem(at: file) }
     let link = BluetoothArmFixture()
     let workflow = bluetoothTestWorkflow(link, file: file)
-    workflow.state.phase = .connected
-    workflow.state.availability = .available
+    workflow.state.present(.phase(.connected))
+    workflow.state.present(.availability(.available))
     #expect(workflow.state.canControl)
     #expect(workflow.service.state.phase == .idle)
     #expect(throws: NexArmExecutionError.controlNotReady) {
@@ -3419,4 +3458,33 @@ func bluetoothManualSimpleCommandsRemainUsableWithoutIKOrResourceAdmission() asy
     #expect(await link.observedCommands.isEmpty)
     try await workflow.shutdown()
     #expect(workflow.state.phase == .idle)
+}
+
+@Test(.actionCatalog) @MainActor func robotPublicFactsFollowNativeConnectionAndImmediateSafetyInvalidation()
+    async throws
+{
+    let file = bluetoothTestFile()
+    defer { try? FileManager.default.removeItem(at: file) }
+    let link = BluetoothArmFixture()
+    let workflow = bluetoothTestWorkflow(link, file: file)
+    let storage = StateContainer()
+    let scope = try storage.makeScope()
+    try workflow.service.connectPublicState(scope: scope)
+    let reader = try storage.contextReader(scope: scope)
+    #expect(try reader.snapshot(names: ["robot"]).json.contains("unknown"))
+    let observer = Task { await workflow.run() }
+    workflow.openPage()
+    try await until { !workflow.state.nearby.isEmpty }
+    workflow.connect(try link.businessID)
+    try await until { workflow.trackingAvailable }
+    let connected = try reader.snapshot(names: ["robot"]).json
+    #expect(connected.contains("\"connected\":true") && connected.contains("\"controlAvailable\":true"))
+    workflow.setForeground(false)
+    #expect(try reader.snapshot(names: ["robot"]).json.contains("\"controlAvailable\":false"))
+    try await workflow.shutdown()
+    #expect(try reader.snapshot(names: ["robot"]).json.contains("\"connected\":false"))
+    observer.cancel()
+    await observer.value
+    scope.close()
+    #expect(throws: StateError.closed) { try reader.snapshot(names: ["robot"]) }
 }

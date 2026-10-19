@@ -28,11 +28,10 @@ public struct HuggingFaceArtifactDownloader: ModelArtifactDownloader {
         } else if let savedPlan, savedPlan.endpoint != source.endpoint {
             try? FileManager.default.removeItem(at: directory.appendingPathComponent(".hub-resume"))
         }
-        if let data = try? Data(contentsOf: manifest), data.count <= 8 * 1024 * 1024,
-            let saved = try? JSONDecoder().decode(HubBackgroundTransfer.Plan.self, from: data),
-            saved.id == artifact.id, saved.revision == artifact.revision, saved.endpoint == source.endpoint
+        if let savedPlan, savedPlan.id == artifact.id, savedPlan.revision == artifact.revision,
+            savedPlan.endpoint == source.endpoint
         {
-            plan = saved
+            plan = savedPlan
         } else {
             let configuration = URLSessionConfiguration.default
             configuration.allowsCellularAccess = source.allowsCellular

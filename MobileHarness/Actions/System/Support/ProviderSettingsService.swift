@@ -1,6 +1,7 @@
 import Foundation
 import FunctionContracts
-import Storage
+import StorageCore
+import StorageFiles
 
 /// Private configuration value; decoding exists only for the legacy credential record.
 public struct ProviderSettings: Decodable, Equatable, Sendable {

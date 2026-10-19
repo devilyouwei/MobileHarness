@@ -3,7 +3,7 @@ import AgentCore
 import Foundation
 import FunctionContracts
 import PlatformKit
-import Storage
+import StorageCore
 import UI
 
 private struct ActionActivityMapping: Identifiable, Equatable, Sendable {
@@ -109,7 +109,10 @@ extension ActionActivityItem {
                 phase: execution.phase.presentationPhase, admittedAt: execution.admittedAt,
                 startedAt: execution.startedAt, endedAt: execution.endedAt),
             source: execution.source.rawValue, inputID: execution.inputID,
-            isInternal: ["UI.Caption.print", "UI.Caption.beginReplyTurn", "Speech.Listening.update"].contains(
+            isInternal: [
+                "UI.Caption.print", "UI.Caption.beginReplyTurn", "UI.Expression.setReplyWaiting",
+                "Speech.Listening.update",
+            ].contains(
                 execution.path.description))
     }
 }

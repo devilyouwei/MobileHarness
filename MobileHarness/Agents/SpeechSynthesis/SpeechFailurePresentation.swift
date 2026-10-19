@@ -1,6 +1,6 @@
 import Agents
 import Foundation
-import StorageAudio
+import StorageCache
 
 /// Applied only at the host playback boundary, after audio cleanup.
 public enum SpeechFailurePresentation {
@@ -16,7 +16,7 @@ public enum SpeechFailurePresentation {
             switch producer {
             case .invalidOutput: message = "语音合成返回了无效音频"
             }
-        } else if let storage = error as? SpeechAudioError {
+        } else if let storage = error as? AudioCacheError {
             switch storage {
             case .capacityExceeded: message = "语音缓冲已满，请重试"
             case .missingAudio: message = "语音任务已失效"

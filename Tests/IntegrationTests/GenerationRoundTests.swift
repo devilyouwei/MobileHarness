@@ -9,10 +9,12 @@ import FunctionContracts
 import Gateway
 import ModelKit
 import PlatformKit
-import Storage
 import StorageChat
+import StorageCore
+import StorageFiles
 import StorageMedia
 import StorageSQLite
+import StorageState
 import StorageTasks
 import Testing
 
@@ -169,6 +171,7 @@ private actor RoundModel: ChatCapability {
                 for _ in 0..<actionCount { try text("<wait><express emotion=\"happy\"/></wait>") }
             }
             for index in 0..<toolCount {
+                request.timing?.recordToolArguments("{}")
                 try pair.emitter.yield(
                     .toolCall(
                         .init(
@@ -263,11 +266,24 @@ private func roundHarness(
                                 maximumDimension: policy.maximumDimension, maximumPixels: policy.maximumPixels,
                                 maximumBytes: policy.maximumBytes, quality: policy.quality))
                     })
-            }, capabilities: capabilities)
+            },
+            context: try AgentContextRepository(
+                agent: FixtureNativeChatState.agentID, scope: UUID().uuidString, state: FixtureNativeChatState()),
+            capabilities: capabilities
+        )
     } else if toolCount > 0 {
-        agent = try FixtureNativeAgent(chat: model, conversations: store)
+        agent = try FixtureNativeAgent(
+            chat: model, conversations: store,
+            context: try AgentContextRepository(
+                agent: FixtureNativeChatState.agentID, scope: UUID().uuidString, state: FixtureNativeChatState())
+        )
     } else {
-        agent = try AssistantAgent(chat: model, conversations: store)
+        agent = try AssistantAgent(
+            stateContext: try publicStateFixture(),
+            chat: model, conversations: store,
+            context: try AgentContextRepository(
+                agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState())
+        )
     }
     _ = try await bindSpeechRequests(agent)
     let manager = AgentManager()
@@ -340,8 +356,8 @@ func generationRoundActualOutputControlsContinuationForAllThreeRoutes(_ route: S
     }
     #expect(modelRequests.first?.input == "test")
     #expect(modelRequests.first?.toolCalls.count == (route == "action" ? 0 : 1))
-    #expect(modelRequests.first?.firstTokenAt != nil || route == "tool")
-    if route == "tool" { #expect(modelRequests.first?.firstTokenAt == nil) }
+    #expect(modelRequests.first?.firstTokenAt != nil)
+    #expect(modelRequests.first?.firstTokenLatency != nil)
     if route != "action" {
         #expect(modelRequests.first?.toolCalls.first?.output == (hasValue ? "actual-result" : "completed"))
     }
@@ -767,7 +783,11 @@ private struct IndependentProtocolModel: ChatCapability {
 
 @Test(.actionCatalog, .timeLimit(.minutes(1))) func nativeParsingAndEmissionDoNotWaitForSpeechPreparation() async throws
 {
-    let agent = try FixtureNativeAgent(chat: IndependentProtocolModel())
+    let agent = try FixtureNativeAgent(
+        chat: IndependentProtocolModel(),
+        context: try AgentContextRepository(
+            agent: FixtureNativeChatState.agentID, scope: UUID().uuidString, state: FixtureNativeChatState())
+    )
     let entered = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingOldest(1))
     let release = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingOldest(1))
     let observed = AsyncStream<AgentOutput>.makeStream(bufferingPolicy: .bufferingOldest(16))
@@ -844,7 +864,12 @@ func actionParserFailureCancelsOpenModelStreamWithoutWaitingForAnotherEvent()
     async throws
 {
     let termination = AsyncStream<SessionTermination>.makeStream(bufferingPolicy: .bufferingOldest(1))
-    let agent = try AssistantAgent(chat: OpenMalformedProtocolModel(termination: termination.continuation))
+    let agent = try AssistantAgent(
+        stateContext: try publicStateFixture(),
+        chat: OpenMalformedProtocolModel(termination: termination.continuation),
+        context: try AgentContextRepository(
+            agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState())
+    )
     try await agent.start()
     try await agent.receive(
         .init(
@@ -1006,7 +1031,12 @@ private struct UnfinishedGenerationModel: ChatCapability {
 @Test(.actionCatalog, .timeLimit(.minutes(1)))
 func modelGenerationWaitsPastThirtySecondsUntilUserCancellation() async throws {
     let store = ConversationHistoryStore()
-    let agent = try AssistantAgent(chat: UnfinishedGenerationModel(), conversations: store)
+    let agent = try AssistantAgent(
+        stateContext: try publicStateFixture(),
+        chat: UnfinishedGenerationModel(), conversations: store,
+        context: try AgentContextRepository(
+            agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState())
+    )
     _ = try await bindSpeechRequests(agent)
     try await agent.start()
     try await agent.receive(
@@ -1107,14 +1137,25 @@ private func agentRequestFailuresTerminateWithoutRetryOrEffectReplay(_ failure: 
         _ = try skills.control(
             "startTask", arguments: ["goal": "保留跨轮目标"], inputID: input.id, fixed: fixed, taskID: try fixtureTaskID())
         initial.skillState = skills
-        context = AgentContextRepository(agent: .assistant, scope: UUID().uuidString, state: initial)
+        context = try AgentContextRepository(
+            agent: .assistant, scope: UUID().uuidString, state: initial
+        )
     } else {
         context = nil
     }
     let agent: any Agent =
         failure == .native || failure == .nativeAtLimit
-        ? try FixtureNativeAgent(chat: model, conversations: store)
-        : try AssistantAgent(chat: model, conversations: store, context: context)
+        ? try FixtureNativeAgent(
+            chat: model, conversations: store,
+            context: try AgentContextRepository(
+                agent: FixtureNativeChatState.agentID, scope: UUID().uuidString, state: FixtureNativeChatState())
+        )
+        : try AssistantAgent(
+            stateContext: try publicStateFixture(),
+            chat: model, conversations: store,
+            context: context
+                ?? AgentContextRepository(
+                    agent: .assistant, scope: UUID().uuidString, state: AssistantContextState()))
     _ = try await bindSpeechRequests(agent)
     let manager = AgentManager()
     try await manager.register(agent)

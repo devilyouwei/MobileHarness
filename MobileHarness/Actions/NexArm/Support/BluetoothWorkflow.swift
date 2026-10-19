@@ -13,11 +13,11 @@ import UI
 
 /// UI control/presentation adapter. Connection and motion state belong to NexArmControlService.
 @MainActor public final class BluetoothWorkflow: BluetoothControlling {
-    public let state: BluetoothSettingsState
+    public let state: any DeviceSettingsPresenting
     public let service: NexArmControlService
     private var projectionTask: Task<Void, Never>?
     public init(
-        state: BluetoothSettingsState, link: any NexArmBluetoothLink,
+        state: any DeviceSettingsPresenting, link: any NexArmBluetoothLink,
         makeDeviceRepository: @escaping @Sendable () throws -> any DeviceRepository
     ) {
         self.state = state

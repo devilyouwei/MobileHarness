@@ -9,8 +9,9 @@ import Foundation
 import FunctionContracts
 import Gateway
 import PlatformKit
-import Storage
 import StorageChat
+import StorageCore
+import StorageState
 import Testing
 
 private actor BehaviorEndpoint: UIPresentationCapability, UIUpdateCapability, SpeechPlaybackCapability,
@@ -50,6 +51,7 @@ private actor BehaviorEndpoint: UIPresentationCapability, UIUpdateCapability, Sp
     func presentTranscript(_ text: String, invocation: any FunctionInput) async throws {}
     func finishTranscript(invocation: any FunctionInput) async throws {}
     func beginReplyTurn(invocation: any FunctionInput) async throws {}
+    func setReplyWaiting(_ enabled: Bool, requestID: String, invocation: any FunctionInput) async throws {}
     func presentVoiceState(_ state: UIActions.VoiceState, invocation: any FunctionInput) async throws {}
     func presentExpression(_ emotion: UIActions.Emotion, invocation: any FunctionInput) async throws {
         self.emotion = emotion
@@ -101,7 +103,12 @@ private func behaviorInvocation(_ function: String, parameters: [String: String]
             VisionPerceptionAgent.runtimeCapabilities(AgentConfigurations.load(named: "VisionPerception").capabilities),
             PhotographerAgent.runtimeCapabilities(AgentConfigurations.load(named: "Photographer").capabilities),
             AgentConfigurations.load(named: "SpeechSynthesis").capabilities,
-            try ApplicationControlAgent(sessionID: UUID().uuidString).descriptor.capabilities,
+            try ApplicationControlAgent(
+                sessionID: UUID().uuidString,
+                context: try AgentContextRepository(
+                    agent: AgentID(rawValue: "applicationControl"), scope: UUID().uuidString,
+                    state: ApplicationControlContextState())
+            ).descriptor.capabilities,
             MemoryAgent.runtimeCapabilities(
                 AgentConfigurations.load(named: "Memory").capabilities),
         ])

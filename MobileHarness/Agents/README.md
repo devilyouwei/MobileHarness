@@ -1,5 +1,7 @@
 # Agents — 业务决策与运行上下文
 
+✅ 已实现：导航只收窄相机运行准入，不停止聆听；Assistant 历史只读准备不进入设置变更的语音停机屏障。
+
 ## 职责与边界
 
 Agents 解释 Signal、维护业务目标与上下文，并选择下一步动作。Assistant 是唯一普通对话执行者；Photographer、Memory、ApplicationControl、SpeechPerception、SpeechSynthesis、VisionPerception 按各自确定性流程处理输入。App 提供能力及生命周期，Gateway 校验和传输，Actions 实现被调用函数。角色之间不共享可写聊天历史。
@@ -12,7 +14,7 @@ flowchart LR
  Gateway -->|Signal 与原执行者定向反馈| Agents
  Agents -->|ActionCall / ToolCall / 通信 / 轮次屏障| Gateway
  Agents -->|推理与感知请求| ModelKit
- Agents -->|运行时内存及业务记录接口| Storage
+ Agents -->|公开事实及业务记录接口| Storage
 ```
 
 语义解释和业务协调由角色拥有；Gateway 不推断用户目标，基础模块不持有 Agent 业务策略。执行接纳、任务完成和物理效果完成是不同事实。
@@ -50,7 +52,7 @@ Skill 所有权分 base、recent、task。基础项常驻；无 Task 加载/合�
 
 ReACT 在本轮调用及回复屏障后由显式业务 value（包括空值）或真实调用失败驱动；成功报告、活动句柄及投递接纳是完成证据。单轮生成/反馈有界，完整决策不以累计轮数或计时器结束。Provider、流、解析、观察构造等 Agent 异常结束当前决策，不自动重试或重放副作用；调用拒绝保留未执行证据，可由模型重新选择合法步骤。
 
-每个角色使用根拥有的 Storage 内存状态仓库。SQLite 是 dialog/message/task/media/device 业务事实的持久化来源；完整模型消息与真实终态在各自边界提交，delta 与运行时队列留内存。Task 原始过程仅在终态投影成有界摘要，来源可查询。重启标记未完成业务记录 interrupted，不恢复热状态或重放效果。详细历史契约由 [Chat](Support/Chat/README.md) 与 [Storage](../Storage/README.md) 拥有。
+每个角色使用根拥有的 actor 私有内存仓库，有限公开事实另行发布到共享 State。SQLite 是 dialog/message/task/media/device 业务事实的持久化来源；完整模型消息与真实终态在各自边界提交，delta 与运行时队列留内存。Task 原始过程仅在终态投影成有界摘要，来源可查询。重启标记未完成业务记录 interrupted，不恢复热状态或重放效果。详细历史契约由 [Chat](Support/Chat/README.md) 与 [Storage](../Storage/README.md) 拥有。
 
 ## 生命周期与开发约束
 
@@ -80,7 +82,7 @@ flowchart LR
 
 Agents 核心仍只依赖独立契约、模型/原生能力和领域仓库；不导入 UI、Actions、Gateway 实现或 App。AgentBindings 使用互斥源清单编译外层请求与运行接入，可依赖 Gateway、ActionBindings、公开 UI/基础能力。
 
-UI 提交的设置、资源、历史、相机及蓝牙请求由 AgentBindings 编码并关联实际角色结果；发布成功不等于业务完成。AgentServices 构造角色内部运行图并显式 start，启动错误传播至应用服务图。ApplicationFeatures 持有根级操作和观察，AgentApplicationUI 实现 UI 自己的端口；不读取具体 SQLite 后端。语音输入/角色策略、VisionSession 和隔离诊断属于本目标；原生播放和 UI 动画不在这些角色接入器内实现。
+UI 提交的设置、资源、历史、相机及蓝牙请求由 AgentBindings 编码并关联实际角色结果；发布成功不等于业务完成。AgentServices 构造角色内部运行图并显式 start，启动错误传播至应用服务图。ApplicationFeatures 持有根级操作和观察，AgentApplicationUI 实现 UI 自己的端口；不读取具体 SQLite 后端。语音输入/角色策略、感知角色会话和隔离诊断属于本目标；原生播放和 UI 动画不在这些角色接入器内实现。
 
 Root UI bootstrap 只调用注入的生命周期启动端口；根服务开始后页面才等待呈现准备。根观察独立于 SwiftUI 页面，退出/重试加入观察、业务消费和模块清理。App 只创建、连接和启停模块。
 
@@ -90,3 +92,64 @@ Root UI bootstrap 只调用注入的生命周期启动端口；根服务开始�
 - 通用生产后台业务契约与对应独立执行者能力。
 - 运行中 Task 跨场景挂起的目标保留与统一终态 checkpoint；详见 [Chat](Support/Chat/README.md#待实现)。
 - 真实模型的流程遵循、原生交互、摄影/Photos、语音竞争及持续设备验收。
+
+## Storage 依赖
+
+✅ 存储访问使用独立的 State、Cache、Database 和 Files 接口；App 注册根实例，消费者通过构造器获得所需能力。存储容器不接管本目录的业务验证、执行和完成语义。
+
+## 公开 State 边界
+
+✅ 角色运行内存由 AgentContextRepository actor 私有持有。AgentBindings 安装设备公开事实并创建会话端口；Agents 只发布 task 的有限业务视图。Skill schema v2 的 useState 决定每轮公开读取集合；确定性 Photographer 的内部反馈继续独立保留。
+
+[公开 State 契约](../Storage/State/README.md)
+
+✅ 区分会话中断与会话关闭。后台暂停、语音停止只结束在途 Decision（不扣闲置次数），运行 Task 在屏障后回到 waitingUser，保留近期计数、Task 持有 Skill 和公开会话端口；显式关闭继续清理，前台恢复不自动重放。
+
+✅ AgentBindings 停止聆听先加入回复执行与播放取消，再加入原生停止，最后清理会话 PCM；取消任务由会话拥有，错误继续向既有提示传播。顺序与回收契约见 [语音接入](Support/README.md)。
+
+✅ 每轮固定 system、Skill/目录后在历史尾部注入唯一 CURRENT STATE 系统数据；ReACT 不携带旧 State。Skill 基础选择/Task/说话规则只归 BasicSkill，摄影仅保留摄影流程。
+
+✅ Core 通用输出教学区分 XML Actions 与接口提供的原生 Tools，原生 name 以当前接口声明为准，业务 Skill 不另写一套可调用名称。补强先执行后依据真实反馈确认效果的通用规则；保持现有解析、名称映射和调度执行不变。
+
+
+## 分类异常诊断
+
+✅ AgentChatWorker 将模型中立诊断归为 Agent 异常，生成稳定 agent.model.* 代码，并分类生成/运行错误。现有 agent.error 控制继续结束决策；附加结构化诊断，不靠解析错误描述分类。模型请求和对话错误证据保留详细原因，无自动重试。
+
+✅ Implemented: bundled Skill business invocations are Action-only, including read queries; generic Tool execution and historical pairing remain supported. Request catalog alone determines applicable protocol teaching.
+
+## Platform 根、设备接入与同帧呈现
+
+✅ Gateway 负责设备输入适配；Agents 保留 Vision 角色/追踪生命周期、语音同意及半双工规则。根集成使用注入的 Audio/Vision 子能力，不构造原生设备。帧通过 Gateway 进入角色，同帧展示通过内部 Tool 返回；角色不直接修改 UI 或管理 GPU。
+
+## 视觉停顿恢复修复
+
+✅ 视觉恢复策略只属于 VisionPerception，不影响对话/Action 的不自动重放契约。
+
+## 视觉静默停止与诊断补齐
+
+✅ VisionPerception 暴露有界健康快照及原始终态诊断；根级业务接入负责监视、日志及 toast，不让 UI 或 PlatformKit 负责感知恢复。
+
+## 视觉 queueFull 修复
+
+✅ VisionPerception 通过公开纯函数声明输出替换键，根级接入传递给 Gateway，不由 Gateway 识别业务函数地址。
+
+## UI 容器与相机能力注入
+
+✅ ApplicationFeatures 接收共享相机 UI state 与 App 提供的 Coordinator 工厂；只生成弱引用的 CameraIntegrationBindings，保留 Agent/Gateway/模型逻辑，不构造相机 UI 状态或 Coordinator。
+
+## 外部输入封装边界
+
+✅ 业务输入工厂实现 ExternalInputProviding，返回中立草稿；Gateway 负责信封，Agents 不导入 Gateway。可信固定任务解包保留原身份与授权。AgentBindings 的宿主控制和文字轮次也使用 Gateway 接入。
+
+## 统一容器异常通道
+
+✅ Assistant 声明 container.failure/runtime 输入与订阅，保持基础错误为被动诊断；不触发模型、自动重试或硬件操作。ApplicationControl 订阅相同通道并组织既有运行异常/toast，Agent 暂未运行时由 Gateway 有界保留；已有 ActionResult/模型诊断保持自己的完成语义。
+
+## ApplicationControl 异常展示
+
+✅ 已实现：异常展示链路调整为：Gateway Signal → ApplicationControl 确定性策略 → 内部 UI.RuntimeDiagnostics.recordFailure → UI 运行异常/Toast。移除绑定层直接监听容器异常生成展示的旧链路；Assistant 保留可选被动诊断，App 保留启动失败兜底。容器原始抛错及模块组合装配本轮不变。
+
+## UI 全量容器化
+
+✅ 应用级 UI 状态由八个子容器统一创建，消费者注入所需 Presenting 接口并提交 UI 自有值，不直接写字段。App 注册并管理同一 UI 根；原业务身份/版本校验、原生完成和基础库依赖边界保持。跨模块连接迁移仍是独立待办。

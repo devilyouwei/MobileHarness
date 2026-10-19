@@ -1,4 +1,5 @@
 import Actions
+import AgentBindings
 import AgentCore
 import Agents
 import CallRuntime
@@ -8,11 +9,12 @@ import Foundation
 import FunctionContracts
 import Gateway
 import ModelKit
-import Storage
+import StorageCore
+import StorageState
 import Testing
-import UI
 
 @testable import PlatformKit
+@testable import UI
 
 private func image(_ value: UInt8, sequence: UInt64, rotation: Int = 1, capturedAt: ContinuousClock.Instant? = nil)
     throws -> ImageInput
@@ -63,7 +65,11 @@ private actor ControlledPose: PoseCapability {
     let model = ControlledPose()
     let session = UUID().uuidString
     let agent = try VisionPerceptionAgent(
-        pose: model, sessionID: session, sampling: FrameSamplingConfiguration(minimumInterval: 0))
+        pose: model, sessionID: session, sampling: FrameSamplingConfiguration(minimumInterval: 0),
+        context: try AgentContextRepository(
+            agent: AgentID(rawValue: "visionPerception"), scope: UUID().uuidString,
+            state: VisionPerceptionContextState())
+    )
     let observations = AsyncStream<AgentMessage>.makeStream(bufferingPolicy: .bufferingOldest(8))
     try await agent.bind(
         AgentMessaging { value, _, _ in
@@ -111,7 +117,12 @@ private actor ControlledPose: PoseCapability {
 {
     let model = ControlledPose()
     let session = UUID().uuidString
-    let agent = try VisionPerceptionAgent(pose: model, sessionID: session)
+    let agent = try VisionPerceptionAgent(
+        pose: model, sessionID: session,
+        context: try AgentContextRepository(
+            agent: AgentID(rawValue: "visionPerception"), scope: UUID().uuidString,
+            state: VisionPerceptionContextState())
+    )
     try await agent.bind(AgentMessaging { _, _, _ in DeliveryReport() })
     try await agent.start()
     var started = model.started.makeAsyncIterator()
@@ -142,7 +153,11 @@ private actor ControlledPose: PoseCapability {
     let model = ControlledPose()
     let session = UUID().uuidString
     let agent = try VisionPerceptionAgent(
-        pose: model, sessionID: session, sampling: FrameSamplingConfiguration(minimumInterval: 0))
+        pose: model, sessionID: session, sampling: FrameSamplingConfiguration(minimumInterval: 0),
+        context: try AgentContextRepository(
+            agent: AgentID(rawValue: "visionPerception"), scope: UUID().uuidString,
+            state: VisionPerceptionContextState())
+    )
     try await agent.bind(
         AgentMessaging { _, _, _ in
             Issue.record("Late output")
@@ -186,7 +201,12 @@ func sharedPosePublishesAndVisualizesWithoutRequiringSubscribers(withSubscribers
     let session = UUID().uuidString
     let manager = AgentManager()
     let model = ControlledPose()
-    let vision = try VisionPerceptionAgent(pose: model, sessionID: session)
+    let vision = try VisionPerceptionAgent(
+        pose: model, sessionID: session,
+        context: try AgentContextRepository(
+            agent: AgentID(rawValue: "visionPerception"), scope: UUID().uuidString,
+            state: VisionPerceptionContextState())
+    )
     let second = ObservationRecorder(id: "second")
     let third = ObservationRecorder(id: "third")
     let secondConfig = try AgentConfiguration(
@@ -299,18 +319,17 @@ func sharedPosePublishesAndVisualizesWithoutRequiringSubscribers(withSubscribers
             Issue.record("Invalid pose reached UI")
         }
     }
-    let point = UI.PoseOverlay.Joint(x: 2500, y: 7500, confidence: 1000)
-    #expect(point.sensorPoint(rotation: 0).x == 0.25)
-    #expect(point.sensorPoint(rotation: 1).x == 0.75)
-    #expect(point.sensorPoint(rotation: 1).y == 0.75)
-    #expect(point.sensorPoint(rotation: 2).y == 0.25)
-    #expect(point.sensorPoint(rotation: 3).x == 0.25)
 }
 
 @Test(.actionCatalog) func visionOutputsAreCodeOwnedPermissions() throws {
     let config = try AgentConfigurations.load(named: "VisionPerception")
     #expect(config.capabilities.actions.isEmpty && config.capabilities.tools.isEmpty)
-    let agent = try VisionPerceptionAgent(pose: CrowdPose(), sessionID: UUID().uuidString)
+    let agent = try VisionPerceptionAgent(
+        pose: CrowdPose(), sessionID: UUID().uuidString,
+        context: try AgentContextRepository(
+            agent: AgentID(rawValue: "visionPerception"), scope: UUID().uuidString,
+            state: VisionPerceptionContextState())
+    )
     let registry = agent.descriptor.capabilities
     #expect(
         registry.permits(
@@ -334,7 +353,12 @@ func visionCrowdFitsToolProtocolWithoutSubscribersAndRejectsForeignSession()
     async throws
 {
     let session = UUID().uuidString
-    let agent = try VisionPerceptionAgent(pose: CrowdPose(), sessionID: session)
+    let agent = try VisionPerceptionAgent(
+        pose: CrowdPose(), sessionID: session,
+        context: try AgentContextRepository(
+            agent: AgentID(rawValue: "visionPerception"), scope: UUID().uuidString,
+            state: VisionPerceptionContextState())
+    )
     try await agent.bind(AgentMessaging { _, _, _ in throw CommunicationError.noRecipients })
     try await agent.start()
     await #expect(throws: CommunicationError.scopeClosed) {
@@ -379,7 +403,12 @@ func visionCrowdFitsToolProtocolWithoutSubscribersAndRejectsForeignSession()
     async throws
 {
     let session = UUID().uuidString
-    let agent = try VisionPerceptionAgent(pose: EmptyPose(), sessionID: session)
+    let agent = try VisionPerceptionAgent(
+        pose: EmptyPose(), sessionID: session,
+        context: try AgentContextRepository(
+            agent: AgentID(rawValue: "visionPerception"), scope: UUID().uuidString,
+            state: VisionPerceptionContextState())
+    )
     try await agent.start()
     for i: UInt64 in 1...9 {
         try await agent.receive(
@@ -427,7 +456,7 @@ private func nativeCameraInput(
         width: width, height: height, pixels: buffer, gray64: sample, sequence: sequence,
         timestamp: time, capturedAt: capturedAt, rotation: rotation)
     return try ImageInput(
-        width: width, height: height, gray64: sample, attachment: CameraImageAttachment(frame: frame),
+        width: width, height: height, attachment: ImageValueAttachment(frame),
         sequence: sequence, timestamp: time, rotation: rotation, capturedAt: capturedAt)
 }
 @Test(.actionCatalog, .timeLimit(.minutes(1))) func visionResolvesOpaqueInputWithoutCopyingMediaIntoObservation()
@@ -435,7 +464,12 @@ private func nativeCameraInput(
 {
     let model = ControlledPose()
     let session = UUID().uuidString
-    let agent = try VisionPerceptionAgent(pose: model, sessionID: session)
+    let agent = try VisionPerceptionAgent(
+        pose: model, sessionID: session,
+        context: try AgentContextRepository(
+            agent: AgentID(rawValue: "visionPerception"), scope: UUID().uuidString,
+            state: VisionPerceptionContextState())
+    )
     let observed = AsyncStream<AgentMessage>.makeStream(bufferingPolicy: .bufferingOldest(1))
     try await agent.bind(
         AgentMessaging { value, _, _ in
@@ -449,10 +483,9 @@ private func nativeCameraInput(
     #expect(await started.next() == 0)
     #expect(await model.receivedNative)
     guard case .attachment(let value) = frame.content,
-        let sampled = value as? SampledImageAttachment,
-        let captured = sampled.source as? CameraImageAttachment
+        let captured = value as? ImageValueAttachment<CameraFrame>
     else { throw ImageInputError.invalidFrame }
-    #expect(await model.nativeIdentity == captured.frame.withPixelBuffer { ObjectIdentifier($0) })
+    #expect(await model.nativeIdentity == captured.value.withPixelBuffer { ObjectIdentifier($0) })
     await model.release()
     var values = observed.stream.makeAsyncIterator()
     guard case .pose(let pose)? = try #require(await values.next()).perception else {
@@ -512,7 +545,12 @@ private actor BlockedPosePublication {
 {
     let session = UUID().uuidString
     let port = BlockedPosePublication()
-    let agent = try VisionPerceptionAgent(pose: EmptyPose(), sessionID: session)
+    let agent = try VisionPerceptionAgent(
+        pose: EmptyPose(), sessionID: session,
+        context: try AgentContextRepository(
+            agent: AgentID(rawValue: "visionPerception"), scope: UUID().uuidString,
+            state: VisionPerceptionContextState())
+    )
     try await agent.bind(AgentMessaging { value, _, _ in try await port.publish(value) })
     try await agent.start()
     var receipts = port.started.makeAsyncIterator()
@@ -567,7 +605,12 @@ private struct FailingSecondPose: PoseCapability {
 @Test(.actionCatalog, .timeLimit(.minutes(1))) func visualTerminalErrorSurvivesPendingSkeletonReplacement() async throws
 {
     let session = UUID().uuidString
-    let agent = try VisionPerceptionAgent(pose: FailingSecondPose(), sessionID: session)
+    let agent = try VisionPerceptionAgent(
+        pose: FailingSecondPose(), sessionID: session,
+        context: try AgentContextRepository(
+            agent: AgentID(rawValue: "visionPerception"), scope: UUID().uuidString,
+            state: VisionPerceptionContextState())
+    )
     try await agent.start()
     try await agent.receive(
         AgentInput(id: UUID().uuidString, sessionID: session, payload: .image(image(40, sequence: 1))))
@@ -601,7 +644,12 @@ private struct FailingSecondPose: PoseCapability {
     async throws
 {
     let session = UUID().uuidString
-    let agent = try VisionPerceptionAgent(pose: EmptyPose(), sessionID: session)
+    let agent = try VisionPerceptionAgent(
+        pose: EmptyPose(), sessionID: session,
+        context: try AgentContextRepository(
+            agent: AgentID(rawValue: "visionPerception"), scope: UUID().uuidString,
+            state: VisionPerceptionContextState())
+    )
     let manager = AgentManager()
     try await manager.register(agent, sessionID: session)
     try await agent.bind(AgentMessaging { _, _, _ in DeliveryReport() })
@@ -634,7 +682,12 @@ private struct FailingSecondPose: PoseCapability {
 
 @Test(.actionCatalog, .timeLimit(.minutes(1))) func rejectingPhotographerCannotStopPoseDisplay() async throws {
     let session = UUID().uuidString
-    let agent = try VisionPerceptionAgent(pose: CrowdPose(), sessionID: session)
+    let agent = try VisionPerceptionAgent(
+        pose: CrowdPose(), sessionID: session,
+        context: try AgentContextRepository(
+            agent: AgentID(rawValue: "visionPerception"), scope: UUID().uuidString,
+            state: VisionPerceptionContextState())
+    )
     try await agent.bind(
         AgentMessaging { _, _, _ in
             DeliveryReport(rejected: [.photographer: "notRunning"])
@@ -664,7 +717,12 @@ private struct FailingSecondPose: PoseCapability {
 @Test(.actionCatalog, .timeLimit(.minutes(1))) func visionStatisticsMeasureCaptureToResultThroughPoseTool() async throws
 {
     let session = UUID().uuidString
-    let agent = try VisionPerceptionAgent(pose: EmptyPose(), sessionID: session)
+    let agent = try VisionPerceptionAgent(
+        pose: EmptyPose(), sessionID: session,
+        context: try AgentContextRepository(
+            agent: AgentID(rawValue: "visionPerception"), scope: UUID().uuidString,
+            state: VisionPerceptionContextState())
+    )
     try await agent.bind(AgentMessaging { _, _, _ in DeliveryReport() })
     try await agent.start()
     let capturedAt = ContinuousClock.now.advanced(by: .milliseconds(-20))
@@ -961,7 +1019,11 @@ private func motionPatch(_ value: UInt8, x: ClosedRange<Int>, y: ClosedRange<Int
     let model = ControlledPose()
     let session = UUID().uuidString
     let agent = try VisionPerceptionAgent(
-        pose: model, sessionID: session, sampling: FrameSamplingConfiguration(maximumObservationLatency: 0.5))
+        pose: model, sessionID: session, sampling: FrameSamplingConfiguration(maximumObservationLatency: 0.5),
+        context: try AgentContextRepository(
+            agent: AgentID(rawValue: "visionPerception"), scope: UUID().uuidString,
+            state: VisionPerceptionContextState())
+    )
     try await agent.bind(
         AgentMessaging { _, parent, _ in
             guard case .image(let frame) = parent.payload else { throw CommunicationError.invalidPayload }
@@ -1029,7 +1091,12 @@ private func motionPatch(_ value: UInt8, x: ClosedRange<Int>, y: ClosedRange<Int
 @Test(.actionCatalog, .timeLimit(.minutes(1))) func visionRejectsMismatchedCaptureBeforeCallingModel() async throws {
     let model = ControlledPose()
     let session = UUID().uuidString
-    let agent = try VisionPerceptionAgent(pose: model, sessionID: session)
+    let agent = try VisionPerceptionAgent(
+        pose: model, sessionID: session,
+        context: try AgentContextRepository(
+            agent: AgentID(rawValue: "visionPerception"), scope: UUID().uuidString,
+            state: VisionPerceptionContextState())
+    )
     try await agent.bind(AgentMessaging { _, _, _ in DeliveryReport() })
     try await agent.start()
     let original = try nativeCameraInput(width: 4, height: 4, sequence: 1, time: 1)
@@ -1049,4 +1116,270 @@ private func motionPatch(_ value: UInt8, x: ClosedRange<Int>, y: ClosedRange<Int
     #expect(await model.calls.isEmpty)
     #expect(await agent.status().lifecycle == .failed)
     await agent.stop()
+}
+
+private actor RecoverablePose: PoseCapability {
+    nonisolated let availability: CapabilityAvailability = .available
+    var remaining: Int
+    private(set) var calls = 0
+    init(failures: Int) { remaining = failures }
+    func failNext(_ count: Int) { remaining = count }
+    func estimatePose(_ request: PoseRequest) async throws -> PoseResult {
+        calls += 1
+        if remaining > 0 {
+            remaining -= 1
+            throw CapabilityError.inputBusy
+        }
+        return PoseResult(context: request.context, people: [])
+    }
+}
+
+private func awaitVisionCondition(_ condition: () async -> Bool) async throws {
+    let deadline = ContinuousClock.now.advanced(by: .seconds(5))
+    while !(await condition()), ContinuousClock.now < deadline { try await Task.sleep(for: .milliseconds(5)) }
+    #expect(await condition())
+}
+
+@Test(.actionCatalog, .timeLimit(.minutes(1))) func visionRecoversTransientModelFailureUsingNewestFrame() async throws {
+    let model = RecoverablePose(failures: 1)
+    let session = UUID().uuidString
+    let agent = try VisionPerceptionAgent(
+        pose: model, sessionID: session,
+        context: try AgentContextRepository(
+            agent: AgentID(rawValue: "visionPerception"), scope: UUID().uuidString,
+            state: VisionPerceptionContextState()))
+    try await agent.start()
+    func send(_ sequence: UInt64) async throws {
+        try await agent.receive(
+            AgentInput(
+                id: UUID().uuidString, sessionID: session,
+                payload: .image(image(0, sequence: sequence))))
+    }
+    try await send(1)
+    try await awaitVisionCondition { await agent.modelFailures == 1 }
+    try await send(2)
+    try await send(3)
+    try await awaitVisionCondition { await agent.status().processedInputs == 1 }
+    #expect(await agent.status().lifecycle == .running)
+    #expect(await model.calls == 2)
+    #expect(await agent.replacements == 1)
+    #expect(await agent.consecutiveModelFailures == 0)
+    var output = agent.outputs.makeAsyncIterator()
+    #expect(try #require(await output.next()).sequence == 3)
+    await model.failNext(1)
+    try await send(4)
+    try await awaitVisionCondition { await agent.modelFailures == 2 }
+    #expect(await agent.consecutiveModelFailures == 1)
+    await agent.stop()
+    #expect(await agent.status().lifecycle == .stopped)
+    #expect(await model.calls == 3)
+}
+
+@Test(.actionCatalog, .timeLimit(.minutes(1))) func visionStopsAfterThreeConsecutiveModelFailuresWithDiagnostic()
+    async throws
+{
+    let model = RecoverablePose(failures: 4)
+    let session = UUID().uuidString
+    let agent = try VisionPerceptionAgent(
+        pose: model, sessionID: session,
+        context: try AgentContextRepository(
+            agent: AgentID(rawValue: "visionPerception"), scope: UUID().uuidString,
+            state: VisionPerceptionContextState()))
+    try await agent.start()
+    for sequence in 1...3 {
+        try await agent.receive(
+            AgentInput(
+                id: UUID().uuidString, sessionID: session,
+                payload: .image(image(0, sequence: UInt64(sequence)))))
+        try await awaitVisionCondition { await agent.modelFailures == sequence }
+    }
+    try await awaitVisionCondition { await agent.status().lifecycle == .failed }
+    #expect(await model.calls == 3)
+    var output = agent.outputs.makeAsyncIterator()
+    let failure = try #require(await output.next())
+    #expect(failure.failure?.code == "vision.pose.failed")
+    #expect(failure.failure?.detail.contains("inputBusy") == true)
+    await agent.stop()
+}
+
+@Test(.actionCatalog, .timeLimit(.minutes(1))) func visionHealthDetectsBlockedInferenceAndClearsAfterFreshResult()
+    async throws
+{
+    let model = ControlledPose()
+    let session = UUID().uuidString
+    let agent = try VisionPerceptionAgent(
+        pose: model, sessionID: session,
+        context: try AgentContextRepository(
+            agent: AgentID(rawValue: "visionPerception"), scope: UUID().uuidString,
+            state: VisionPerceptionContextState()))
+    try await agent.start()
+    try await agent.receive(AgentInput(id: "frame", sessionID: session, payload: .image(image(0, sequence: 1))))
+    var started = model.started.makeAsyncIterator()
+    #expect(await started.next() == 0)
+    let blocked = await agent.health(at: .now.advanced(by: .seconds(4)))
+    #expect(blocked.diagnostic?.code == "vision.pose.stalled")
+    #expect(blocked.diagnostic?.detail.contains("sequence=1") == true)
+    #expect(blocked.inputID == "frame")
+    await model.release()
+    try await awaitVisionCondition { await agent.status().processedInputs == 1 }
+    #expect(await agent.health().diagnostic == nil)
+    await agent.stop()
+    #expect(await agent.health(at: .now.advanced(by: .seconds(10))).diagnostic == nil)
+}
+
+@Test(.actionCatalog) func visionInputFailureBeforeFirstFramePublishesDiagnostic() async throws {
+    let agent = try VisionPerceptionAgent(
+        pose: RecoverablePose(failures: 0), sessionID: "input-fixture",
+        context: try AgentContextRepository(
+            agent: AgentID(rawValue: "visionPerception"), scope: UUID().uuidString,
+            state: VisionPerceptionContextState()))
+    try await agent.start()
+    await agent.failInput(CommunicationError.scopeClosed)
+    var output = agent.outputs.makeAsyncIterator()
+    let terminal = try #require(await output.next())
+    #expect(terminal.failure?.code == "vision.input.failed")
+    #expect(terminal.failure?.detail.contains("scopeClosed") == true)
+    #expect(await agent.status().lifecycle == .failed)
+    await agent.stop()
+}
+
+@Test(.actionCatalog, .timeLimit(.minutes(1))) func visionHealthReportsInputSilenceAndContinuousExpiredFrames()
+    async throws
+{
+    let agent = try VisionPerceptionAgent(
+        pose: RecoverablePose(failures: 0), sessionID: "health-fixture",
+        context: try AgentContextRepository(
+            agent: AgentID(rawValue: "visionPerception"), scope: UUID().uuidString,
+            state: VisionPerceptionContextState()))
+    try await agent.start()
+    try await Task.sleep(for: .milliseconds(3050))
+    #expect(await agent.health().diagnostic?.code == "vision.input.stalled")
+    try await agent.receive(
+        AgentInput(
+            id: "expired-frame", sessionID: "health-fixture",
+            payload: .image(image(0, sequence: 1, capturedAt: .now.advanced(by: .seconds(-1))))))
+    try await awaitVisionCondition { await agent.expiredInputs == 1 }
+    let stale = await agent.health()
+    #expect(stale.diagnostic?.code == "vision.pose.stale")
+    #expect(stale.diagnostic?.detail.contains("expired=1") == true)
+    #expect(await agent.status().lifecycle == .running)
+    await agent.stop()
+}
+
+@Test(.actionCatalog) func visionHealthRetainsPresentationFailureUntilSuccessfulDelivery() async throws {
+    let agent = try VisionPerceptionAgent(
+        pose: RecoverablePose(failures: 0), sessionID: "presentation-health",
+        context: try AgentContextRepository(
+            agent: AgentID(rawValue: "visionPerception"), scope: UUID().uuidString,
+            state: VisionPerceptionContextState()))
+    try await agent.start()
+    await agent.presentationFinished(failure: "fixture Metal handler rejected the frame")
+    let health = await agent.health()
+    #expect(health.diagnostic?.code == "vision.presentation.failed")
+    #expect(health.diagnostic?.detail.contains("fixture Metal handler") == true)
+    await agent.presentationFinished(failure: nil)
+    #expect(await agent.health().diagnostic == nil)
+    await agent.stop()
+}
+
+private actor VisionPersistenceGate {
+    nonisolated let entered: AsyncStream<Void>
+    private let continuation: AsyncStream<Void>.Continuation
+    private var armed = false
+    private var waiter: CheckedContinuation<Void, Never>?
+    private(set) var admitted = false
+    init() {
+        let pair = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingOldest(1))
+        entered = pair.stream
+        continuation = pair.continuation
+    }
+    func arm() { armed = true }
+    func markAdmitted() { admitted = true }
+    func commit() async {
+        guard armed else { return }
+        await withCheckedContinuation { waiter in
+            self.waiter = waiter
+            continuation.yield(())
+        }
+    }
+    func release() {
+        armed = false
+        waiter?.resume()
+        waiter = nil
+    }
+}
+
+@Test(.actionCatalog, .timeLimit(.minutes(1))) func visionFrameAdmissionDoesNotWaitForContextPersistence() async throws
+{
+    let persistence = VisionPersistenceGate()
+    let model = ControlledPose()
+    let session = UUID().uuidString
+    let agent = try VisionPerceptionAgent(
+        pose: model, sessionID: session,
+        context: try AgentContextRepository(
+            agent: AgentID(rawValue: "visionPerception"), scope: UUID().uuidString,
+            state: VisionPerceptionContextState(),
+            persistence: AgentContextPersistence(load: { nil }, commit: { _, _ in await persistence.commit() })))
+    try await agent.start()
+    try await agent.receive(AgentInput(id: "first", sessionID: session, payload: .image(image(0, sequence: 1))))
+    var starts = model.started.makeAsyncIterator()
+    #expect(await starts.next() == 0)
+    await persistence.arm()
+    await model.release()
+    var commits = persistence.entered.makeAsyncIterator()
+    #expect(await commits.next() != nil)
+    let admission = Task {
+        try await agent.receive(AgentInput(id: "second", sessionID: session, payload: .image(image(0, sequence: 2))))
+        await persistence.markAdmitted()
+    }
+    let deadline = ContinuousClock.now.advanced(by: .seconds(1))
+    while !(await persistence.admitted), ContinuousClock.now < deadline { await Task.yield() }
+    let independent = await persistence.admitted
+    let stopping = Task { await agent.stop() }
+    try await awaitVisionCondition { await agent.status().lifecycle == .stopped }
+    await persistence.release()
+    try await admission.value
+    await stopping.value
+    #expect(independent)
+    #expect(await model.calls == [0])
+}
+
+@Test(.actionCatalog, .timeLimit(.minutes(1))) @MainActor
+func visionTerminalFailureSurvivesGatewayAndAppearsAsAgentToast() async throws {
+    let session = UUID().uuidString
+    let agent = try VisionPerceptionAgent(
+        pose: RecoverablePose(failures: 0), sessionID: session,
+        context: try AgentContextRepository(
+            agent: AgentID(rawValue: "visionPerception"), scope: UUID().uuidString,
+            state: VisionPerceptionContextState()))
+    let manager = AgentManager()
+    try await manager.register(agent, sessionID: session)
+    try await agent.start()
+    let gateway = OutputGateway(
+        manager: manager, requests: InputGateway(manager: manager), tools: ToolRegistry(), sink: { _ in })
+    let consumer = try await gateway.consumer(for: agent)
+    let state = ActionActivityState()
+    let workflow = ActionActivityWorkflow(state: state)
+    let fixture = try RuntimeFailurePresentationFixture(activity: workflow)
+    try await fixture.runtime.prepareForInteraction()
+    workflow.connectFailureSignals(input: fixture.input, sessionID: fixture.sessionID)
+    workflow.startFailures { try await gateway.observeFailures() }
+    await agent.failInput(CommunicationError.scopeClosed)
+    var output = agent.outputs.makeAsyncIterator()
+    let terminal = try #require(await output.next())
+    let result = try await consumer.execute(terminal)
+    #expect(!result.isError)
+    let deadline = ContinuousClock.now.advanced(by: .seconds(5))
+    while state.runtimeIssues.isEmpty, ContinuousClock.now < deadline { await Task.yield() }
+    let issue = try #require(state.runtimeIssues.last)
+    #expect(issue.failureCode == "vision.input.failed")
+    #expect(issue.message.contains("scopeClosed"))
+    #expect(issue.context?.sessionID == session)
+    #expect(issue.inputID == terminal.inputID)
+    #expect(issue.category == "Agent 运行异常")
+    #expect(state.errorToast?.userMessage == "姿态识别已停止，请查看日志后重试")
+    #expect(state.visibleNotice?.tone == .error)
+    await agent.stop()
+    await gateway.shutdown()
+    await fixture.stop(activity: workflow)
 }

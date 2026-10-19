@@ -87,7 +87,7 @@ flowchart TB
 
 Actions 核心的依赖和协议中立函数保持独立。ActionBindings 通过互斥源清单编译外层真实绑定，可依赖 UI、PlatformKit、ModelKit SDK、领域仓库、FunctionContracts、ExecutionRuntime、CallRuntime，以及 AgentCore 的中立执行身份/结果契约；不导入 Agents 或 Gateway 实现。
 
-BehaviorAssembly/BehaviorProtocolBindings 属于 ActionBindings，完整函数目录由业务模块组装后提供给组合根。RuntimePresentation 实现 Action 能力端口并调用 UI 公开能力；实际业务资格与会话围栏留在领域端点，UI 自己持有展示状态。相机执行通过注入的 CameraResourceAccess 使用租约，不导入 ResourceCoordinator；感知接入通过 CameraVisionRunning 注入。
+BehaviorAssembly/BehaviorProtocolBindings 属于 ActionBindings，完整函数目录由业务模块组装后提供给组合根。RuntimePresentation 实现 Action 能力端口并调用 UI 公开能力；实际业务资格与会话围栏留在领域端点，UI 自己持有展示状态。相机执行通过注入的 CameraResourceAccess 使用租约，不导入 ResourceCoordinator；感知接入通过帧连接回调注入。CameraCoordinator 独立订阅最新原生帧用于背景呈现，Pose Tool 只更新骨架；两路共享关闭/切换/后台清理边界，姿态失败不清除实时影像。
 
 NexArmControlService 持有不含 UI 类型的连接/执行状态，BluetoothWorkflow 只把完整事实投影为 UI.BluetoothViewSnapshot，并转交 UI 控制。VoiceNativeEffects 持有原生提示音/触觉/播放，ConversationPresentationController 持有呈现接纳；UI 持有真实动画回调。Provider、制品存储和背景传输接入属于 System；照片提交/可选反馈属于 Camera。App 不再转换这些数据或实现这些流程。
 
@@ -95,3 +95,30 @@ NexArmControlService 持有不含 UI 类型的连接/执行状态，BluetoothWor
 ## 待实现
 
 - 暂无本目录独立的实现待办；跨模块及实际模型/设备验收见所属模块说明。
+
+## Storage 依赖
+
+✅ 存储访问使用独立的 State、Cache、Database 和 Files 接口；App 注册根实例，消费者通过构造器获得所需能力。存储容器不接管本目录的业务验证、执行和完成语义。
+
+## 公开 State 边界
+
+✅ StorageState 仅承载公开事实；边界检查禁止完整 AgentContext 注册，校验 Skill schema v2/useState。沿用现有源码归属及目标，ActionBindings 显式依赖 StorageState。
+
+[公开 State 契约](../Storage/State/README.md)
+
+✅ Implemented: ActionBindings adds the Action projection of five Skill query functions while retaining their direct Tool projections for fixed/isolated callers. Business handlers, return values, budgets and resources stay protocol-neutral.
+
+## Platform 根、设备接入与同帧呈现
+
+✅ 相机与语音执行端点使用 App 注入的原生能力，不在业务模块创建原生所有者。Pose 内部 Tool 可携带 Gateway 已验证的只读同帧附件，业务函数仍只访问 FunctionInput 和注入端口。
+
+## UI 容器与相机能力注入
+
+✅ CameraCoordinator 留在现有 ActionBindings 目标，构造改由 App 的唯一工厂提供；注入 CameraCapturing 与 CameraPresenting，以快照读展示事实，经呈现接口更新 UI，不查找 IoC、不持有具体 CameraState/AppleCamera。
+
+## ApplicationControl 异常展示
+
+✅ UI.RuntimeDiagnostics.recordFailure 作为代码授权的内部 Tool，接收已分类的中立展示值。ActionBindings 校验 ApplicationControl 根身份后更新注入 UI 状态；Actions 核心不导入 Agents、Gateway 或 UI，函数完成不代表原故障恢复。
+## UI 全量容器化
+
+✅ 应用级 UI 状态由八个子容器统一创建，消费者注入所需 Presenting 接口并提交 UI 自有值，不直接写字段。App 注册并管理同一 UI 根；原业务身份/版本校验、原生完成和基础库依赖边界保持。跨模块连接迁移仍是独立待办。

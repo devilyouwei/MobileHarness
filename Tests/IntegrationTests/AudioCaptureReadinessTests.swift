@@ -104,3 +104,33 @@ private enum CaptureReadinessFixtureError: Error, Equatable { case invalidPCM }
     }
     try timeline.accept(timestamp: 1000, frameCount: 480, sampleRate: 48000)
 }
+
+@Test func audioRouteConfigurationKeepsSameDevicesButDetectsRealRouteLoss() {
+    let builtIn = AudioRouteIdentity(inputs: ["mic:builtin"], outputs: ["speaker:builtin"])
+    #expect(
+        AudioSessionEventPolicy.routeChange(
+            applicationChange: true, unavailable: false, previous: nil, current: builtIn) == nil)
+    #expect(
+        AudioSessionEventPolicy.routeChange(
+            applicationChange: false, unavailable: false, previous: builtIn, current: builtIn) == nil)
+    let reordered = AudioRouteIdentity(inputs: ["a", "b"], outputs: ["speaker:builtin"])
+    #expect(
+        AudioSessionEventPolicy.routeChange(
+            applicationChange: false, unavailable: false,
+            previous: .init(inputs: ["b", "a"], outputs: ["speaker:builtin"]), current: reordered) == nil)
+    for changed in [
+        AudioRouteIdentity(inputs: ["mic:headset"], outputs: ["speaker:builtin"]),
+        AudioRouteIdentity(inputs: ["mic:builtin"], outputs: ["speaker:headset"]),
+        AudioRouteIdentity(inputs: [], outputs: []),
+    ] {
+        #expect(
+            AudioSessionEventPolicy.routeChange(
+                applicationChange: false, unavailable: false, previous: builtIn, current: changed) == .routeChanged)
+    }
+    #expect(
+        AudioSessionEventPolicy.routeChange(
+            applicationChange: false, unavailable: false, previous: nil, current: builtIn) == .routeChanged)
+    #expect(
+        AudioSessionEventPolicy.routeChange(
+            applicationChange: false, unavailable: true, previous: builtIn, current: builtIn) == .routeChanged)
+}

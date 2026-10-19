@@ -156,7 +156,7 @@ public struct NexArmAimCommand: Sendable {
         let changed = base != referenceBase || pitch != referencePitch
         if !changed {
             let idle = referenceTime.map { Self.seconds(time - $0) } ?? 0
-            if speedAdmitted, idle >= Self.deadman, (heldBaseSpeed != 0 || heldPitchSpeed != 0) {
+            if speedAdmitted, idle >= Self.deadman, heldBaseSpeed != 0 || heldPitchSpeed != 0 {
                 return (0, 0)
             }
             if !speedAdmitted { return nil }
@@ -169,7 +169,8 @@ public struct NexArmAimCommand: Sendable {
                 pitch: false),
             Self.encode(
                 rate: Self.rate(target: pitch, reference: referencePitch, estimate: estimatedPitch, dt: elapsed),
-                pitch: true))
+                pitch: true)
+        )
     }
 
     private mutating func integrate(to time: ContinuousClock.Instant) {

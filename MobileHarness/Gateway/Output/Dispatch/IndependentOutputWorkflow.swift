@@ -1,5 +1,6 @@
 import AgentCore
 import Foundation
+import OSLog
 
 /// Consume an optional subscriber independently; failures are reported, never silently discarded.
 public enum IndependentOutputWorkflow {
@@ -121,15 +122,77 @@ public enum IndependentOutputWorkflow {
         }
     }
 
-    /// Streaming/deterministic producers have independent communication delivery and ordered function output.
+    public struct QueueFailure: Error, Sendable, CustomStringConvertible {
+        public let queue: String
+        public let capacity: Int
+        public let source: String
+        public let sessionID: String
+        public let sequence: UInt64
+        public let output: String
+        public let reason: String
+        init(queue: String, capacity: Int, envelope: OutputEnvelope, reason: String) {
+            self.queue = queue
+            self.capacity = capacity
+            source = envelope.source.rawValue
+            sessionID = envelope.sessionID
+            sequence = envelope.sequence
+            self.reason = reason
+            switch envelope.output {
+            case .toolCall(let call): output = call.toolPath
+            case .communication(let action): output = action.message.contract
+            case .actionCall(let action): output = action.actionPath.description
+            default: output = "control"
+            }
+        }
+        public var description: String {
+            "queueFull(queue=\(queue), capacity=\(capacity), source=\(source), session=\(sessionID), sequence=\(sequence), output=\(output), reason=\(reason))"
+        }
+    }
+
+    /// Latest-state policy comes from the producer; discrete commands retain FIFO admission.
     public static func consumeSignals(
         _ outputs: AsyncStream<OutputEnvelope>,
+        replacementKey: @escaping @Sendable (OutputEnvelope) -> String? = { _ in nil },
+        onMediaExpired: @escaping @Sendable (OutputEnvelope) async -> Void = { _ in },
         dispatch: @escaping @Sendable (OutputEnvelope) async throws -> Void
     ) async throws {
+        let media = AgentOutputMailbox(capacity: 1)
+        let latestTools = AgentOutputMailbox(capacity: 16)
+        let latestCommunications = AgentOutputMailbox(capacity: 16)
         let actions = AsyncStream<OutputEnvelope>.makeStream(bufferingPolicy: .bufferingOldest(256))
         let communications = AsyncStream<OutputEnvelope>.makeStream(bufferingPolicy: .bufferingOldest(16))
         try await withThrowingTaskGroup(of: Void.self) { group in
             group.addTask { try await consumeTools(communications.stream, dispatch: dispatch) }
+            group.addTask {
+                for await envelope in latestCommunications.stream {
+                    try Task.checkCancellation()
+                    if envelope.inputMetadata.expired { continue }
+                    try await dispatch(envelope)
+                }
+            }
+            group.addTask {
+                for await envelope in latestTools.stream {
+                    try Task.checkCancellation()
+                    if envelope.inputMetadata.expired { continue }
+                    try await dispatch(envelope)
+                }
+            }
+            group.addTask {
+                for await envelope in media.stream {
+                    try Task.checkCancellation()
+                    if expiredMedia(envelope) {
+                        recordExpiredMedia(envelope)
+                        await onMediaExpired(envelope)
+                        continue
+                    }
+                    do {
+                        try await dispatch(envelope)
+                    } catch CommunicationError.expired where expiredMedia(envelope) {
+                        recordExpiredMedia(envelope)
+                        await onMediaExpired(envelope)
+                    }
+                }
+            }
             group.addTask {
                 for await envelope in actions.stream {
                     try Task.checkCancellation()
@@ -139,25 +202,89 @@ public enum IndependentOutputWorkflow {
             group.addTask {
                 for await envelope in outputs {
                     try Task.checkCancellation()
-                    let destination: AsyncStream<OutputEnvelope>.Continuation
-                    if case .communication = envelope.output {
-                        destination = communications.continuation
+                    let key = try scopedStateKey(replacementKey(envelope), envelope: envelope)
+                    if envelope.media != nil {
+                        try admitState(envelope, key: "media", mailbox: media, queue: "media", capacity: 1)
+                    } else if let key {
+                        if case .communication = envelope.output {
+                            try admitState(
+                                envelope, key: key, mailbox: latestCommunications,
+                                queue: "latestCommunications", capacity: 16)
+                        } else {
+                            try admitState(envelope, key: key, mailbox: latestTools, queue: "latestTools", capacity: 16)
+                        }
                     } else {
-                        destination = actions.continuation
+                        let communication: Bool
+                        if case .communication = envelope.output { communication = true } else { communication = false }
+                        let destination = communication ? communications.continuation : actions.continuation
+                        switch destination.yield(envelope) {
+                        case .enqueued: break
+                        case .dropped:
+                            throw QueueFailure(
+                                queue: communication ? "communications" : "actions",
+                                capacity: communication ? 16 : 256, envelope: envelope, reason: "full")
+                        case .terminated:
+                            try Task.checkCancellation()
+                            throw QueueFailure(
+                                queue: communication ? "communications" : "actions",
+                                capacity: communication ? 16 : 256, envelope: envelope, reason: "closed")
+                        @unknown default: throw HarnessError.queueFull
+                        }
                     }
-                    guard case .enqueued = destination.yield(envelope) else { throw HarnessError.queueFull }
                 }
+                media.close(discardingState: false)
+                latestTools.close(discardingState: false)
+                latestCommunications.close(discardingState: false)
                 communications.continuation.finish()
                 actions.continuation.finish()
             }
             defer {
                 group.cancelAll()
+                media.close()
+                latestTools.close()
+                latestCommunications.close()
                 communications.continuation.finish()
                 actions.continuation.finish()
             }
-            try await group.waitForAll()
+            // React to the first failing branch, then join cancellation in the scope cleanup.
+            while (try await group.next()) != nil {}
             try Task.checkCancellation()
         }
+    }
+
+    private static func scopedStateKey(_ key: String?, envelope: OutputEnvelope) throws -> String? {
+        guard let key else { return nil }
+        guard !key.isEmpty, key.utf8.count <= 64, envelope.roundID == nil else {
+            throw CommunicationError.invalidPayload
+        }
+        switch envelope.output {
+        case .toolCall: break
+        case .communication(let action) where action.target == nil: break
+        default: throw CommunicationError.invalidPayload
+        }
+        return "\(envelope.source.rawValue)|\(envelope.sessionID)|\(envelope.taskScope?.id ?? "")|\(key)"
+    }
+    private static func admitState(
+        _ envelope: OutputEnvelope, key: String, mailbox: AgentOutputMailbox,
+        queue: String, capacity: Int
+    ) throws {
+        do { try mailbox.admit(envelope, replacing: key) } catch {
+            try Task.checkCancellation()
+            throw QueueFailure(
+                queue: queue, capacity: capacity, envelope: envelope,
+                reason: error as? CommunicationError == .capacityExceeded ? "full" : "closed")
+        }
+    }
+
+    private static func expiredMedia(_ envelope: OutputEnvelope) -> Bool {
+        guard let image = envelope.media else { return false }
+        if envelope.inputMetadata.expired { return true }
+        guard let capturedAt = image.capturedAt else { return false }
+        return capturedAt.duration(to: .now) >= .milliseconds(750)
+    }
+    private static func recordExpiredMedia(_ envelope: OutputEnvelope) {
+        Logger(subsystem: "dev.mobileharness", category: "SignalMedia")
+            .notice("Rejected expired media output; sequence=\(envelope.sequence, privacy: .public)")
     }
 
     public static func consume(

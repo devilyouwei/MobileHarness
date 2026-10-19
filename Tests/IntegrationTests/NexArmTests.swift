@@ -9,7 +9,8 @@ import Foundation
 import FunctionContracts
 import Gateway
 import PlatformKit
-import Storage
+import StorageCore
+import StorageState
 import Testing
 
 /// Deliberately simple IK fixture; does not model physical kinematics.
@@ -272,7 +273,7 @@ private actor NexArmBaseFixture: NexArmWritableLink {
 
 struct NexArmAssistantUIModule: ActionModule {
     var definitions: [ActionBinding] {
-        ["express", "setExpression", "beginReplyTurn", "print"].map {
+        ["express", "setExpression", "setReplyWaiting", "beginReplyTurn", "print"].map {
             ActionBinding(
                 path: ActionPath(
                     domain: "UI", module: ["beginReplyTurn", "print"].contains($0) ? "Caption" : "Expression",
@@ -331,7 +332,12 @@ private func runNexArmAssistantMarkup(
         try AgentConfigurations.skill("expression-interaction").functions
         + AgentConfigurations.skill("robot-interaction").functions
     let assistant = try AgentChatWorker<AssistantContextState>(
-        chat: FixedTextChat(text: markup), capabilities: AgentConfigurations.registry(defaultBindings))
+        stateContext: try publicStateFixture(),
+        chat: FixedTextChat(text: markup),
+        context: try AgentContextRepository(
+            agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState()),
+        capabilities: AgentConfigurations.registry(defaultBindings)
+    )
     let manager = AgentManager()
     let session = UUID().uuidString
     try await manager.register(assistant, sessionID: session)

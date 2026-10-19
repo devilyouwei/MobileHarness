@@ -1,0 +1,147 @@
+{
+  "version": 1,
+  "date": "2026-10-17",
+  "scope": "Additional synthetic diagnostic requests; no device effects",
+  "fullPromptReplay": {
+    "model": "qwen3.8-flash",
+    "origin": "run1/provider-query-native/first request",
+    "requestSHA256": "c79399b916eca396a87d3259d065c13a46e6638fa5bf2fa4fba5e3baba7422ef",
+    "responseSHA256": "dc1791ff82af8278172bf9fcff4908fc5e71e8c4e438fa3f1d27683d521a3b77",
+    "declaredNames": [
+      "ModelResources_snapshot_0",
+      "Provider_readSettings_1",
+      "Bluetooth_readStatus_2"
+    ],
+    "returnedCalls": [
+      {
+        "name": "Provider_readSettings",
+        "arguments": "{}",
+        "status": "completed"
+      },
+      {
+        "name": "loadSkills",
+        "arguments": "{\"skills\": \"[\\\"application-control\\\"]\"}",
+        "status": "completed"
+      }
+    ],
+    "usage": {
+      "input_tokens": 17305,
+      "input_tokens_details": {
+        "cached_tokens": 16128
+      },
+      "output_tokens": 83,
+      "output_tokens_details": {
+        "reasoning_tokens": 0
+      },
+      "total_tokens": 17388,
+      "x_details": [
+        {
+          "input_tokens": 17305,
+          "output_tokens": 83,
+          "total_tokens": 17388,
+          "prompt_tokens_details": {
+            "cached_tokens": 16128
+          },
+          "x_billing_type": "response_api"
+        }
+      ]
+    },
+    "productionDecoderBoundary": "response.output_item.added checks toolNames[name] != nil; first Provider_readSettings is undeclared and raises invalidResponse",
+    "limit": "Equivalent request replay reconstructed from saved synthetic request and definitions; not original run1 wire capture. Does not prove the cause of every invalidResponse."
+  },
+  "minimalNativeControls": [
+    {
+      "model": "qwen3.8-flash",
+      "declaredNames": [
+        "Provider_readSettings_1"
+      ],
+      "returnedNames": [
+        "Provider_readSettings_1"
+      ],
+      "usage": {
+        "input_tokens": 319,
+        "input_tokens_details": {
+          "cached_tokens": 0
+        },
+        "output_tokens": 17,
+        "output_tokens_details": {
+          "reasoning_tokens": 0
+        },
+        "total_tokens": 336,
+        "x_details": [
+          {
+            "input_tokens": 319,
+            "output_tokens": 17,
+            "total_tokens": 336,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "x_billing_type": "response_api"
+          }
+        ]
+      }
+    },
+    {
+      "model": "qwen3.7-plus",
+      "declaredNames": [
+        "Provider_readSettings_1"
+      ],
+      "returnedNames": [
+        "Provider_readSettings_1"
+      ],
+      "usage": {
+        "input_tokens": 319,
+        "input_tokens_details": {
+          "cached_tokens": 0
+        },
+        "output_tokens": 17,
+        "output_tokens_details": {
+          "reasoning_tokens": 0
+        },
+        "total_tokens": 336,
+        "x_details": [
+          {
+            "input_tokens": 319,
+            "output_tokens": 17,
+            "total_tokens": 336,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "x_billing_type": "response_api"
+          }
+        ]
+      }
+    },
+    {
+      "model": "qwen3.8-max",
+      "declaredNames": [
+        "Provider_readSettings_1"
+      ],
+      "returnedNames": [
+        "Provider_readSettings_1"
+      ],
+      "usage": {
+        "input_tokens": 319,
+        "input_tokens_details": {
+          "cached_tokens": 0
+        },
+        "output_tokens": 17,
+        "output_tokens_details": {
+          "reasoning_tokens": 0
+        },
+        "total_tokens": 336,
+        "x_details": [
+          {
+            "input_tokens": 319,
+            "output_tokens": 17,
+            "total_tokens": 336,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "x_billing_type": "response_api"
+          }
+        ]
+      }
+    }
+  ]
+}

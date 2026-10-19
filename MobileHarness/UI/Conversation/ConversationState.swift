@@ -1,56 +1,177 @@
 import Foundation
 import Observation
 
+public enum HomeModelPreparation: Equatable, Sendable {
+    case inactive, checking
+    case preparing(String)
+    case ready, deferred
+    case failed(component: String, message: String)
+    public var blocksNewActions: Bool { self != .ready }
+    public var isLoading: Bool {
+        if case .preparing = self { return true }
+        return false
+    }
+    public var showsRetry: Bool {
+        if case .failed = self { return true }
+        return false
+    }
+}
+
 public enum VoicePhase: Sendable, Equatable { case idle, loading, listening, processing, speaking, failed }
 
 public enum EyeExpression: String, CaseIterable, Sendable {
-    case clear, closed, smile, happy, laugh, thinking, surprised, sad, love, angry, scared, playful
+    case clear, closed, loading, smile, happy, laugh, thinking, surprised, sad, love, angry, scared, playful
 }
 
 /// MainActor presentation values and public rendering ports; module services own business sessions.
-@MainActor @Observable
+@MainActor
+@Observable
 public final class ConversationState {
-    public var voicePhase: VoicePhase = .loading
-    public var liveTranscript = ""
-    public var transcriptFinalized = false
-    public var assistantReply = ""
-    public var assistantReplyOpacity = 1.0
-    public var expression: EyeExpression?
+    @ObservationIgnored var presentationAdmission: UIPresentationAdmission?
+    public var isPresentationAvailable: Bool { presentationAdmission.map { $0.started && !$0.stopped } ?? true }
+
+    public internal(set) var voicePhase: VoicePhase = .loading
+    public internal(set) var liveTranscript = ""
+    public internal(set) var transcriptFinalized = false
+    public internal(set) var assistantReply = ""
+    public internal(set) var assistantReplyOpacity = 1.0
+    public internal(set) var expression: EyeExpression?
     /// Display transaction identity only; UI owns the renderer acknowledgment.
-    public var expressionEmphasized = false
-    public var expressionTransitionID: String?
-    public var expressionRendererAvailable = false
-    @ObservationIgnored public var expressionAnimationCompletion: (@MainActor (String, Bool) -> Void)?
-    public var playbackSpectrum = [Float](repeating: 0, count: 32)
-    public var microphoneSpectrum = [Float](repeating: 0, count: 32)
-    public var isReady = false
-    public var voiceStatus = "按住双眼，开启聆听"
-    public var isVoiceActive = false { didSet { if !isVoiceActive { resetCaptions() } } }
-    public var listeningAnimationID: String?
+    public internal(set) var expressionEmphasized = false
+    public internal(set) var expressionTransitionID: String?
+    public internal(set) var expressionRendererAvailable = false
+    @ObservationIgnored public internal(set) var expressionAnimationCompletion: (@MainActor (String, Bool) -> Void)?
+    public internal(set) var playbackSpectrum = [Float](repeating: 0, count: 32)
+    public internal(set) var microphoneSpectrum = [Float](repeating: 0, count: 32)
+    public internal(set) var bluetoothStatus: BluetoothConnectionStatus = .disconnected
+    private var bluetoothRevision: UInt64 = 0
+    @discardableResult public func presentBluetoothConnection(_ value: BluetoothConnectionStatus, revision: UInt64)
+        -> Bool
+    {
+        guard presentationAdmission?.acceptsRetained() ?? true, revision > 0, revision >= bluetoothRevision else {
+            return false
+        }
+        guard revision != bluetoothRevision || value == bluetoothStatus else { return false }
+        bluetoothRevision = revision
+        bluetoothStatus = value
+        return true
+    }
+    public internal(set) var modelPreparation: HomeModelPreparation = .inactive
+    public var hasActiveInteraction: Bool { isVoiceActive || isReplyActive }
+    public var allowsHomeInteraction: Bool { isReady && (hasActiveInteraction || !modelPreparation.blocksNewActions) }
+    public var showsModelPreparation: Bool {
+        !hasActiveInteraction && (modelPreparation.isLoading || modelPreparation.showsRetry)
+    }
+    public var showsModelRetry: Bool { !hasActiveInteraction && modelPreparation.showsRetry }
+    public internal(set) var isReady = false
+    public internal(set) var voiceStatus = "按住双眼，开启聆听"
+    public internal(set) var isVoiceActive = false { didSet { if !isVoiceActive { resetCaptions() } } }
+    public internal(set) var listeningAnimationID: String?
     /// Normalized content-space origin; latched by the renderer on each new listening generation.
-    public var listeningLightOrigin: ListeningLightOrigin?
-    public var decorativeLight: DecorativeLight?
-    public var graphicsMessage: String?
-    public var isReplyActive = false
-    public var listeningControlMessage: String?
+    public internal(set) var listeningLightOrigin: ListeningLightOrigin?
+    public internal(set) var decorativeLight: DecorativeLight?
+    public internal(set) var graphicsMessage: String?
+    public internal(set) var isReplyActive = false {
+        didSet { if !isReplyActive { replyWaitingRequest = nil } }
+    }
+    public internal(set) var replyWaitingRequest: String?
+    public internal(set) var listeningControlMessage: String?
     /// Sleep is a presentation gate, independent of processing/speaking pauses in an enabled session.
-    public var displayedExpression: EyeExpression { isVoiceActive ? (expression ?? .clear) : .closed }
+    public internal(set) var loadingExpression = false
+    public var showsLoadingExpression: Bool {
+        (loadingExpression && modelPreparation.isLoading && !hasActiveInteraction)
+            || (replyWaitingRequest != nil && isVoiceActive && !expressionEmphasized)
+    }
+    public var displayedExpression: EyeExpression {
+        showsLoadingExpression ? .loading : (isVoiceActive ? (expression ?? .clear) : .closed)
+    }
     public init() {}
-    public func presentPlaybackSpectrum(_ values: [Float]) { playbackSpectrum = values }
-    public func presentTranscript(_ text: String) { liveTranscript = text }
-    public func beginReply() { assistantReply = "" }
-    public func appendReply(_ text: String) { assistantReply += text }
+    public func presentPlaybackSpectrum(_ values: [Float]) {
+        guard presentationAdmission?.acceptsLive() ?? true else { return }
+        playbackSpectrum = values
+    }
+    public func presentTranscript(_ text: String) {
+        guard presentationAdmission?.acceptsLive() ?? true else { return }
+        liveTranscript = text
+    }
+    public func beginReply() {
+        guard presentationAdmission?.acceptsLive() ?? true else { return }
+        assistantReply = ""
+        replyWaitingRequest = nil
+    }
+    public func presentReplyWaiting(_ enabled: Bool, requestID: String) {
+        if enabled {
+            guard presentationAdmission?.acceptsLive() ?? true, isVoiceActive else { return }
+            replyWaitingRequest = requestID
+        } else if replyWaitingRequest == requestID {
+            replyWaitingRequest = nil
+        }
+    }
+    public func appendReply(_ text: String) {
+        guard presentationAdmission?.acceptsLive() ?? true else { return }
+        if !text.isEmpty { replyWaitingRequest = nil }
+        assistantReply += text
+    }
     public func presentVoiceStatus(_ status: String, clearMicrophone: Bool = false) {
+        guard presentationAdmission?.acceptsRetained() ?? true else { return }
         if clearMicrophone { microphoneSpectrum = [Float](repeating: 0, count: 32) }
         voiceStatus = status
     }
     public func resetCaptions() {
+        guard presentationAdmission?.acceptsRetained() ?? true else { return }
+        replyWaitingRequest = nil
         liveTranscript = ""
         transcriptFinalized = false
         assistantReply = ""
         assistantReplyOpacity = 1
     }
-    public func finishUserTranscript() { transcriptFinalized = true }
+    public func finishUserTranscript() {
+        guard presentationAdmission?.acceptsLive() ?? true else { return }
+        transcriptFinalized = true
+    }
+
+    public var token: UIPresentationToken? { presentationAdmission?.token }
+    public func accepts(_ token: UIPresentationToken?) -> Bool { presentationAdmission?.acceptsLive(token) ?? true }
+    @discardableResult
+    public func present(_ update: ConversationUpdate, token: UIPresentationToken?) -> Bool {
+        guard accepts(token) else { return false }
+        apply(update)
+        return true
+    }
+    @discardableResult
+    public func present(_ update: ConversationUpdate) -> Bool {
+        let retained: Bool
+        switch update {
+        case .isReady, .voiceStatus, .graphicsMessage, .listeningControlMessage, .isVoiceActive(false),
+            .isReplyActive(false):
+            retained = true
+        default: retained = false
+        }
+        guard
+            retained
+                ? (presentationAdmission?.acceptsRetained() ?? true) : (presentationAdmission?.acceptsLive() ?? true)
+        else { return false }
+        apply(update)
+        return true
+    }
+    func apply(_ update: ConversationUpdate) {
+        switch update {
+        case .voicePhase(let value): voicePhase = value
+        case .liveTranscript(let value): liveTranscript = value
+        case .transcriptFinalized(let value): transcriptFinalized = value
+        case .assistantReply(let value): assistantReply = value
+        case .playbackSpectrum(let value): playbackSpectrum = value
+        case .microphoneSpectrum(let value): microphoneSpectrum = value
+        case .isReady(let value): isReady = value
+        case .voiceStatus(let value): voiceStatus = value
+        case .isVoiceActive(let value): isVoiceActive = value
+        case .listeningAnimationID(let value): listeningAnimationID = value
+        case .listeningLightOrigin(let value): listeningLightOrigin = value
+        case .graphicsMessage(let value): graphicsMessage = value
+        case .isReplyActive(let value): isReplyActive = value
+        case .listeningControlMessage(let value): listeningControlMessage = value
+        }
+    }
 }
 
 /// The pinned goal and movable ASR are independent, with reserved promoted-caption space.
@@ -73,21 +194,6 @@ public struct ConversationCaptionLayout: Sendable {
             captionCenter = viewportHeight - (hasActivity ? 240 : 120)
         }
         captionCenterY = captionCenter
-    }
-}
-
-public enum AppDestination: String, Hashable, Sendable {
-    case settings, language, recognition, synthesis, vision, bluetooth, history
-}
-@MainActor @Observable public final class NavigationState {
-    public var path: [AppDestination] = []
-    public init() {}
-    public func show(_ destination: AppDestination?) {
-        guard let destination else {
-            path = []
-            return
-        }
-        path = destination == .settings ? [.settings] : [.settings, destination]
     }
 }
 
@@ -118,19 +224,54 @@ public enum ConversationCaptionVisibility {
 
 public enum ConversationExpressionError: Error, Equatable { case rendererUnavailable, busy }
 
+/// Outcome of a versioned desired-state projection, not an animation receipt.
+public enum LoadingExpressionUpdate: Sendable, Equatable { case applied, superseded, rejected }
+
 /// UI-owned transaction and renderer acknowledgment; IDs fence replacement and late callbacks.
-@MainActor public final class ConversationExpressionPresentation {
+@MainActor
+public final class ConversationExpressionPresentation: ExpressionPresenting {
+    var presentationAdmission: UIPresentationAdmission?
     private let state: ConversationState
+    private var loadingRevision: UInt64 = 0
+    private var loadingRequest: Bool?
+    @discardableResult public func setLoading(_ enabled: Bool, revision: UInt64) -> LoadingExpressionUpdate {
+        guard presentationAdmission?.acceptsRetained() ?? true, revision > 0 else { return .rejected }
+        if revision < loadingRevision { return .superseded }
+        if revision == loadingRevision {
+            guard loadingRequest == enabled else { return .rejected }
+            return state.loadingExpression == enabled ? .applied : .superseded
+        }
+        loadingRevision = revision
+        loadingRequest = enabled
+        guard
+            !enabled
+                || ((presentationAdmission?.acceptsLive() ?? true) && state.modelPreparation.isLoading
+                    && !state.hasActiveInteraction)
+        else { return .superseded }
+        if enabled, expressionOwner != nil {
+            finishExpressionTransition(id: expressionWaitID, completed: false)
+            expressionOwner = nil
+            state.expressionEmphasized = false
+            state.expression = baseExpression
+        }
+        state.loadingExpression = enabled
+        return .applied
+    }
     private var baseExpression: EyeExpression?
     private var expressionOwner: String?
     private var expressionWaiter: CheckedContinuation<Void, Error>?
     private var expressionWaitID: String?
     public init(state: ConversationState) { self.state = state }
     public func setBase(_ expression: EyeExpression?) {
+        guard presentationAdmission?.acceptsLive() ?? true else { return }
         baseExpression = expression
         if expressionOwner == nil { state.expression = expression }
     }
     public func perform(_ expression: EyeExpression, owner: String) async throws {
+        try presentationAdmission?.requireLive()
+        guard !(state.loadingExpression && state.modelPreparation.isLoading && !state.hasActiveInteraction) else {
+            throw ConversationExpressionError.busy
+        }
         guard state.isVoiceActive || expression == .closed else {
             throw ConversationExpressionError.rendererUnavailable
         }
@@ -189,6 +330,8 @@ public enum ConversationExpressionError: Error, Equatable { case rendererUnavail
     }
 
     public func resetExpression() {
+        state.loadingExpression = false
+        state.replyWaitingRequest = nil
         finishExpressionTransition(id: expressionWaitID, completed: false)
         expressionOwner = nil
         baseExpression = nil
@@ -197,3 +340,76 @@ public enum ConversationExpressionError: Error, Equatable { case rendererUnavail
     }
 
 }
+
+public enum ConversationUpdate {
+    case voicePhase(VoicePhase)
+    case liveTranscript(String)
+    case transcriptFinalized(Bool)
+    case assistantReply(String)
+    case playbackSpectrum([Float])
+    case microphoneSpectrum([Float])
+    case isReady(Bool)
+    case voiceStatus(String)
+    case isVoiceActive(Bool)
+    case listeningAnimationID(String?)
+    case listeningLightOrigin(ListeningLightOrigin?)
+    case graphicsMessage(String?)
+    case isReplyActive(Bool)
+    case listeningControlMessage(String?)
+}
+
+@MainActor
+public protocol ConversationPresenting: UIPresentationAccess {
+    var token: UIPresentationToken? { get }
+    func accepts(_ token: UIPresentationToken?) -> Bool
+    @discardableResult
+    func present(_ update: ConversationUpdate, token: UIPresentationToken?) -> Bool
+    var voicePhase: VoicePhase { get }
+    var liveTranscript: String { get }
+    var transcriptFinalized: Bool { get }
+    var assistantReply: String { get }
+    var assistantReplyOpacity: Double { get }
+    var expression: EyeExpression? { get }
+    var expressionEmphasized: Bool { get }
+    var expressionTransitionID: String? { get }
+    var expressionRendererAvailable: Bool { get }
+    var playbackSpectrum: [Float] { get }
+    var microphoneSpectrum: [Float] { get }
+    var isReady: Bool { get }
+    var voiceStatus: String { get }
+    var isVoiceActive: Bool { get }
+    var listeningAnimationID: String? { get }
+    var listeningLightOrigin: ListeningLightOrigin? { get }
+    var decorativeLight: DecorativeLight? { get }
+    var graphicsMessage: String? { get }
+    var isReplyActive: Bool { get }
+    var listeningControlMessage: String? { get }
+    var displayedExpression: EyeExpression { get }
+    @discardableResult
+    func present(_ update: ConversationUpdate) -> Bool
+    func presentPlaybackSpectrum(_ values: [Float])
+    func presentTranscript(_ text: String)
+    func beginReply()
+    func presentReplyWaiting(_ enabled: Bool, requestID: String)
+    func appendReply(_ text: String)
+    func presentVoiceStatus(_ status: String, clearMicrophone: Bool)
+    func resetCaptions()
+    func finishUserTranscript()
+}
+
+extension ConversationState: ConversationPresenting {}
+
+extension ConversationPresenting {
+    public func presentVoiceStatus(_ status: String) { presentVoiceStatus(status, clearMicrophone: false) }
+}
+
+@MainActor
+public protocol ExpressionPresenting: AnyObject, Sendable {
+    @discardableResult func setLoading(_ enabled: Bool, revision: UInt64) -> LoadingExpressionUpdate
+    func setBase(_ expression: EyeExpression?)
+    func perform(_ expression: EyeExpression, owner: String) async throws
+    func restore(owner: String, accepts: Bool) async throws
+    func resetExpression()
+}
+
+extension ConversationState: BluetoothConnectionPresenting {}

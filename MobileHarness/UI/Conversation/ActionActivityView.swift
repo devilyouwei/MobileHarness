@@ -245,6 +245,7 @@ import Foundation
             VStack(alignment: .leading, spacing: 5) {
                 Text(issue.title).font(.body.weight(.medium))
                 Text(issue.source).font(.caption).foregroundStyle(.secondary)
+                if let category = issue.category { Text("类别：" + category).font(.caption) }
                 Text(issue.message).font(.subheadline).textSelection(.enabled)
                 Text(issue.time, style: .time).font(.caption).foregroundStyle(.secondary)
                 if let code = issue.failureCode { Text("错误代码：" + code).font(.caption) }
@@ -253,9 +254,10 @@ import Foundation
                 }
                 if let context = issue.context {
                     DisclosureGroup("关联信息") {
-                        Text("持续任务：" + context.workerID)
+                        Text("所属运行：" + context.workerID)
                         if let callID = context.callID { Text("来源调用：" + callID) }
                         if let sessionID = context.sessionID { Text("会话：" + sessionID) }
+                        if let roundID = context.roundID { Text("模型请求/轮次：" + roundID) }
                     }.font(.caption).textSelection(.enabled)
                 }
             }
@@ -305,50 +307,8 @@ import Foundation
     private struct ActionPanelGlass: ViewModifier {
         @ViewBuilder
         func body(content: Content) -> some View {
-            if #available(iOS 26.0, *) {
-                content.glassEffect(.regular.interactive(), in: RoundedRectangle(cornerRadius: 20))
-            } else {
-                content.background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 20))
-            }
+            content.glassEffect(.regular.interactive(), in: RoundedRectangle(cornerRadius: 20))
         }
     }
 
-    #if DEBUG
-        /// Explicitly synthetic layout fixture: never starts models, audio, camera or device control.
-        @MainActor
-        public struct ActionActivityVisualPreview: View {
-            @State private var state = ActionActivityState()
-            @State private var conversation = ConversationState()
-            public init() {}
-            public var body: some View {
-                ConversationView(state: conversation, activity: state, toggleVoice: {})
-                    .overlay(alignment: .top) {
-                        Text("演示数据 · 不连接设备").font(.caption).padding(12)
-                    }
-                    .task {
-                        conversation.isReady = true
-                        conversation.voicePhase = .idle
-                        conversation.assistantReply = "好的，我会先跳舞，再向你挥手。"
-                        let examples: [(String, String, ActionActivityItem.Execution.Phase)] = [
-                            ("Robot", "跳舞", .running),
-                            ("Robot", "挥手", .queued),
-                            ("Speech", "朗读回复", .cancelling),
-                            ("Robot", "庆祝", .failed),
-                        ]
-                        state.replace(
-                            revision: 1,
-                            records: examples.map { channel, title, phase in
-                                ActionActivityItem(
-                                    id: UUID().uuidString, title: title, channel: channel,
-                                    status: phase == .failed ? "动作参数无效" : "演示状态",
-                                    issueDescriptions: [], symbol: "circle",
-                                    execution: .init(
-                                        phase: phase, admittedAt: .now,
-                                        startedAt: nil, endedAt: phase == .failed ? .now : nil))
-
-                            }, evictedCount: 0)
-                    }
-            }
-        }
-    #endif
 #endif

@@ -7,7 +7,9 @@ import Foundation
 import FunctionContracts
 import Gateway
 import PlatformKit
-import Storage
+import StorageCore
+import StorageFiles
+import StorageState
 import Testing
 
 @MainActor
@@ -118,7 +120,12 @@ private final class ProviderTransactionFixture: ProviderSettingsPersistence {
 }
 @Test(.actionCatalog) func providerSettingsAgentSharesConfigurationGateAndKeepsCallsOpaque() async throws {
     let session = UUID().uuidString
-    let agent = try ApplicationControlAgent(sessionID: session)
+    let agent = try ApplicationControlAgent(
+        sessionID: session,
+        context: try AgentContextRepository(
+            agent: AgentID(rawValue: "applicationControl"), scope: UUID().uuidString,
+            state: ApplicationControlContextState())
+    )
     try await agent.start()
     let intent = ProviderSettingsIntent(operation: .save, requestID: UUID().uuidString)
     let input = try intent.input(sessionID: session)
@@ -213,7 +220,7 @@ private final class ProviderCredentialFixture: ProviderCredentialStorage, @unche
     defer { try? FileManager.default.removeItem(at: url) }
     let credentials = try ProviderCredentialFixture()
     let store = ProviderSettingsStore(
-        credentials: credentials, document: { try LocalDocumentStore<UserSettingsDocument>(url: url) })
+        credentials: credentials, document: { try FileDocumentStore<UserSettingsDocument>(url: url) })
     let value = try #require(try await store.load())
     #expect(value.enabled)
     #expect(value.key == "fixture-secret")
@@ -311,7 +318,7 @@ private final class ProviderCredentialFixture: ProviderCredentialStorage, @unche
     let credentials = try ProviderCredentialFixture()
     try credentials.insertKey(Data("fixture-secret".utf8), id: "existing-credential")
     let store = ProviderSettingsStore(
-        credentials: credentials, document: { try LocalDocumentStore<UserSettingsDocument>(url: url) })
+        credentials: credentials, document: { try FileDocumentStore<UserSettingsDocument>(url: url) })
     var applied: ProviderSettings?
     let service = ProviderSettingsService(
         store: store,
@@ -328,7 +335,7 @@ private final class ProviderCredentialFixture: ProviderCredentialStorage, @unche
         enabled: restored.enabled, url: restored.url, key: restored.key, model: "updated-model")
     _ = try await service.save(updated)
     let reopened = ProviderSettingsStore(
-        credentials: credentials, document: { try LocalDocumentStore<UserSettingsDocument>(url: url) })
+        credentials: credentials, document: { try FileDocumentStore<UserSettingsDocument>(url: url) })
     #expect(try await reopened.load() == updated)
     let output = try Data(contentsOf: url)
     let envelope = try #require(JSONSerialization.jsonObject(with: output) as? [String: Any])

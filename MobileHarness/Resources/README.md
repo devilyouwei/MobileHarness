@@ -52,7 +52,7 @@ Agents packages Agents/, Skills/ and Catalog.json from this shared source root; 
 
 ## 职责与组织
 
-纯随 App 打包的配置与文本，由 Catalog.json 显式索引。Agents 保存 v7 身份、角色指令、通信契约、baseSkills、backgroundTasks 支持声明；Skills 保存 v1 配置、revision、流程说明和函数引用。Task 目标仅作为运行时数据。
+纯随 App 打包的配置与文本，由 Catalog.json 显式索引。Agents 保存 v7 身份、角色指令、通信契约、baseSkills、backgroundTasks 支持声明；Skills 保存 v2 配置、revision、流程说明和函数引用。Task 目标仅作为运行时数据。
 
 这里不包含 Swift、脚本、函数实现、凭据或用户媒体。Actions 独立提供实现，FunctionContracts 提供中立元数据。Catalog 是唯一资源索引。
 
@@ -102,3 +102,23 @@ Actions 为可信业务调用和模型调用提供统一实现与元数据。Ski
 - Separate icon appearance variants.
 
 - 远程下载、热更新与任务栈不在首版范围内。
+
+## 公开 State 边界
+
+✅ Skill 资源采用 schema v2/useState；教学使用 CURRENT STATE 公开事实，不依赖 activeTaskID、Skill 持有关系等私有字段。资源打包仍保留原目录和历史证据。
+
+[公开 State 契约](../Storage/State/README.md)
+
+✅ 精简 BasicSkill/Photography 和交叉规则，递增变更 Skill revision；保留别名、能力、错误与业务完成契约，Robot 常驻列表不变。
+
+✅ 依据真实 Qwen 调用回归重写 Core/Skill 教学边界。内置 Skill 所有函数使用 Function Token XML Actions，包括 Query Channel 的只读查询；通用原生 Tool 基础能力保留。明确设备阻断、照片终态、先执行后确认以及跨请求控制边界，递增变更 Skill revision。Skill 声明与执行协议投影保持一致，业务实现与底层原生传输能力独立。
+
+真实云回归使用固定合成场景，修订收益、回退和未解决的原生协议错误见[提示词优化验证](../../docs/validation/Qwen-Prompt-Optimization.md)；不等于真机执行验收。
+
+✅ Implemented: bundled Skill registrations become Action-only; ApplicationControl/HistoryQuery revisions and BasicSkill instructions change together. Native Tool base schemas and Agent internal grants remain intact.
+
+Assistant 的技术诊断输入声明属于 Agents 资源契约；container.failure 是被动框架 observation，不新增模型函数或 Skill 暴露。
+
+## ApplicationControl 异常展示
+
+✅ ApplicationControl 配置声明 container.failure/runtime.failure 的 runtime 来源订阅；Assistant 保留被动容器诊断。内部呈现函数由代码授权，不加入模型 Skill 或改变资源 schema 版本。

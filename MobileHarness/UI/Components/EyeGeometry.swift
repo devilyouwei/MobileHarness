@@ -15,6 +15,7 @@ struct EyePose: Equatable, Sendable {
     static func pair(for emotion: EyeExpression) -> (Self, Self) {
         switch emotion {
         case .clear: return (Self(), Self())
+        case .loading: return (Self(), Self())
         case .closed:
             let eye = Self(closure: 1, width: 1.02)
             return (eye, eye)

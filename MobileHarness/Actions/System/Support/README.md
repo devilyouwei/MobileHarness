@@ -1,5 +1,7 @@
 # System Support — 资源值、私有暂存与配置事务
 
+✅ ArtifactServices 只生成 ModelKit 自有制品配置并组合 Files／下载适配，不持有模型管理器或停止任务。Provider 配置与库存／制品操作使用注入的模型子能力，后台事件复用同根 artifacts。
+
 ## 简介
 
 提供 System 的五个目录、资源事实与偏好、Provider 私有请求暂存/事务/凭据文档，以及设备控制值。业务规则属于本目录，文件一致性和原生服务由 Storage 与注入端点负责。
@@ -46,7 +48,7 @@ ModelResourceInventory 是 version=1 的 Codable 值。read 从 capability 获�
 
 快照最多 64 个唯一 ID、编码最多 65536 字节；ID/name/revision/license/failure 分别限 64/256/512/512/1024 UTF-8 字节，字节计数非负。active 对应 queued/downloading/verifying/deleting，progress 对总量做有界计算。decode 校验版本、条目和大小；installedGroups 的一致性推导发生于构造读取路径，validate 不重新计算已解码集合。
 
-ModelResourcePreferencesService 是 actor，惰性获取注入的 DocumentRepository，通过 changing 标志拒绝重叠 restore/save。restore 校验存储值并依据已安装资源关闭不可用自定义语音选项；只有联网/语音开关变化时才回写，单独 endpoint 规范化不触发写入。save 先校验源与已安装前提，再以预期 revision 保存。偏好结果编码上限 2048 字节；文档存储容量由注入 store 配置。
+ModelResourcePreferencesService 是 actor，惰性获取注入的 DocumentStore，通过 changing 标志拒绝重叠 restore/save。restore 校验存储值并依据已安装资源关闭不可用自定义语音选项；只有联网/语音开关变化时才回写，单独 endpoint 规范化不触发写入。save 先校验源与已安装前提，再以预期 revision 保存。偏好结果编码上限 2048 字节；文档存储容量由注入 store 配置。
 
 偏好解码支持 preferDownloadedSpeech 字段映射到两个独立开关；新编码只写当前字段。持久化不负责模型绑定，已提交偏好不会因另一项绑定失败自动撤销。
 
@@ -74,13 +76,13 @@ ProviderSettingsStore 是 actor，以 busy 排斥重叠读写，保存 version=1
 
 ## SQLite records and runtime identity
 
-Settings/model-preference services consume DocumentRepository protocols; concrete settings-file construction stays in module integration/test factories. Preserve revision conflicts and producer-owned rollback policy.
+Settings/model-preference services consume DocumentStore protocols; concrete settings-file construction stays in module integration/test factories. Preserve revision conflicts and producer-owned rollback policy.
 
 ## 配置与制品的真实能力绑定
 
 ActionBindings 编译 SettingsCredentialAdapter、SettingsProviderAdapter、SettingsModelResourcesAdapter、ModelArtifactStorageAdapter、ArtifactServices、ModelDownloadBackgroundService 及显式模型/语音诊断执行。Provider 事务和资源策略仍由 Actions 核心服务拥有；绑定只调用 SDK/Keychain/文件能力并适配展示值。SettingsCredentialAdapter 提供公开的无参数构造和凭据协议实现；SettingsProviderAdapter.discoverModels 提供公开异步发现端口，供 AgentBindings 注入领域请求服务。
 
-ArtifactServices 根持有一个准备任务；模型权重仍按需加载。后台回调最多保留 10 个 session completion，重复 identifier 替换时先完成旧回调，溢出明确保留 lastFailure 并结束该次交接。真实制品读取错误保留，不伪造恢复成功。单份 OS 准备额度由 PlatformKit.NativeBackgroundAllowance 提供，不承担设备安全。
+模型根持有唯一准备任务；ArtifactServices 仅适配配置，权重仍按需加载。后台回调最多保留 10 个 session completion，重复 identifier 替换时先完成旧回调，溢出明确保留 lastFailure 并结束该次交接。真实制品读取错误保留，不伪造恢复成功。单份 OS 准备额度由 PlatformKit.NativeBackgroundAllowance 提供，不承担设备安全。
 
 SpeechDiagnosticWorkflow 的 stopAndWait 加入真实播放、操作和卸载；卸载/音频会话清理错误保留并向根服务传播，成功报告只在真实完成后设置。App 委托仅转交 OS 参数。
 
@@ -88,3 +90,13 @@ SpeechDiagnosticWorkflow 的 stopAndWait 加入真实播放、操作和卸载；
 ## 待实现
 
 - 发现中的请求已经移出 entries，未占用容量槽，所以此条件不是待领取/执行中/完成的总量硬上限；并发总量控制仍需宿主约束。
+
+## Storage 依赖
+
+✅ 存储访问使用独立的 State、Cache、Database 和 Files 接口；App 注册根实例，消费者通过构造器获得所需能力。存储容器不接管本目录的业务验证、执行和完成语义。
+
+## UI 全量容器化
+
+✅ 应用级 UI 状态由八个子容器统一创建，消费者注入所需 Presenting 接口并提交 UI 自有值，不直接写字段。App 注册并管理同一 UI 根；原业务身份/版本校验、原生完成和基础库依赖边界保持。跨模块连接迁移仍是独立待办。
+
+✅ SpeechDiagnosticWorkflow 注入 AudioInputOutput 执行真实播放，报告使用原生播放能力描述；诊断和资源策略仍归业务所有者。

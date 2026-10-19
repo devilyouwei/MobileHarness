@@ -4,6 +4,16 @@
   "communication": {
     "inputs": [
       {
+        "contract": "runtime.failure",
+        "version": 1,
+        "kind": "observation"
+      },
+      {
+        "contract": "container.failure",
+        "version": 1,
+        "kind": "observation"
+      },
+      {
         "contract": "app.environment",
         "version": 1,
         "kind": "observation"
@@ -75,6 +85,16 @@
       }
     ],
     "subscriptions": [
+      {
+        "contract": "runtime.failure",
+        "source": "runtime",
+        "topic": "runtime.failure"
+      },
+      {
+        "contract": "container.failure",
+        "source": "runtime",
+        "topic": "container.failure"
+      },
       {
         "contract": "model.resource.intent",
         "source": "runtime",

@@ -7,7 +7,7 @@ import Foundation
 import FunctionContracts
 import Gateway
 import PlatformKit
-import Storage
+import StorageCore
 import Testing
 
 private func telemetryPacket(_ pose: [Int]) throws -> NexArmPacket {

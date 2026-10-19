@@ -2,7 +2,7 @@
 
 ## 职责与边界
 
-PlatformKit Core 只依赖 Foundation/UIKit，不识别 Agent、Gateway、Action、UI 展示或应用业务。业务所有者注入读取、发布及错误报告回调；工具不选择领域反应。
+PlatformKit Core 只依赖 Foundation/Synchronization/UIKit，不识别 Agent、Gateway、Action、UI 展示或应用业务。业务所有者注入读取、发布及错误报告回调；工具不选择领域反应。
 
 ## 接口与运行契约
 
@@ -19,3 +19,11 @@ AgentBindings 注入原生事实读取与 Gateway 发布接口；ActionBindings 
 ## 待实现
 
 ❌ 非合作原生操作的强制中断和物理设备停止确认不由这些工具实现。
+
+✅ NativeInputBroadcast 只提供原生值分发，最多 16 个订阅者；latest 每订阅者保留一项并计数替换，ordered 每订阅者 64 项、溢出只终止该订阅并保留明确错误。finish 关闭当前全部订阅；不启停设备、不提供 Signal 或业务重放。
+
+✅ NativeInputSession 为回调广播提供可同步关闭的单代围栏，无转发任务/额外队列；finish 与 send 串行，关闭后迟到回调不能向复用广播发送数据。
+
+## 统一容器异常通道
+
+✅ PlatformAdmission 增加原生故障回调入口；只同步调用注入的有界报告器，不开设备、不创建转发任务或依赖其他模块。

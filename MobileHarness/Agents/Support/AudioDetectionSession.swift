@@ -1,6 +1,5 @@
 #if os(iOS)
     import ActionBindings
-    import AVFAudio
     import AgentCore
     import Agents
     import CallRuntime
@@ -10,26 +9,30 @@
     import Gateway
     import ModelKit
     import PlatformKit
-    import Storage
+    import StorageCore
     import UI
 
     /// Isolated capture/perception endpoint. No conversation, camera or robot consumer is registered.
     @MainActor final class AudioDetectionSession: AudioDetectionRunning {
+        private let audio: any AudioInputOutput
         private let recognition: any SpeechRecognitionCapability
         private let vad: any VoiceActivityCapability
         private let beforeStart: @MainActor () async -> Void
         private var active: AudioDetectionScope?
         init(
-            recognition: any SpeechRecognitionCapability, vad: any VoiceActivityCapability,
+            recognition: any SpeechRecognitionCapability,
+            vad: any VoiceActivityCapability, audio: any AudioInputOutput,
             beforeStart: @escaping @MainActor () async -> Void
         ) {
+            self.audio = audio
             self.recognition = recognition
             self.vad = vad
             self.beforeStart = beforeStart
         }
         func run(update: @escaping @MainActor @Sendable (AudioDetectionSnapshot) -> Void) async throws {
             guard active == nil else { throw CapabilityError.inputBusy }
-            let scope = try AudioDetectionScope(recognition: recognition, vad: vad, update: update)
+            let scope = try AudioDetectionScope(
+                recognition: recognition, vad: vad, audio: audio, update: update)
             active = scope
             var failure: (any Error)?
             do {
@@ -44,12 +47,7 @@
                     try Task.checkCancellation()
                     if let failure = scope.failure { throw failure }
                     scope.receive(frame)
-                    let audio = try AudioInput(
-                        samples: frame.samples.withUnsafeBytes { Data($0) }, sampleRate: frame.sampleRate,
-                        sequence: frame.sequence, timestamp: frame.timestamp,
-                        layout: frame.layout == .mono ? .mono : .firstOrderAmbisonicsACNSN3D,
-                        capturedAt: frame.capturedAt)
-                    try await scope.input.publish(MediaInputAdapter.audio(audio, sessionID: scope.id))
+                    try await scope.input.publish(DeviceInputAdapter.audio(frame, sessionID: scope.id))
                 }
                 try Task.checkCancellation()
                 throw scope.failure ?? AudioDetectionError.captureEnded
@@ -71,6 +69,7 @@
             case .invalidFormat: return AudioDetectionError.invalidFormat
             case .overflow: return AudioDetectionError.overflow
             case .busy: return AudioDetectionError.busy
+            case .interrupted: return AudioDetectionError.interrupted
             }
         }
         return error
@@ -94,7 +93,7 @@
 
     @MainActor private final class AudioDetectionScope {
         let id = UUID().uuidString
-        let audio = AppleAudioIO()
+        let audio: any AudioInputOutput
         let manager = AgentManager()
         let policy: CommunicationPolicy
         let input: InputGateway
@@ -104,7 +103,6 @@
         private let update: @MainActor @Sendable (AudioDetectionSnapshot) -> Void
         private var outputTask: Task<Void, Never>?
         private var routeTask: Task<Void, Never>?
-        private var interruptionTask: Task<Void, Never>?
         private var shutdownTask: Task<Void, Never>?
         private var closing = false
         private var lastDisplay: ContinuousClock.Instant?
@@ -114,16 +112,19 @@
             observeEvent: { [weak self] in await self?.observe($0) }, sink: { _ in })
 
         init(
-            recognition: any SpeechRecognitionCapability, vad: any VoiceActivityCapability,
+            recognition: any SpeechRecognitionCapability,
+            vad: any VoiceActivityCapability, audio: any AudioInputOutput,
             update: @escaping @MainActor @Sendable (AudioDetectionSnapshot) -> Void
         ) throws {
+            self.audio = audio
             let configuration = try AgentConfigurations.load(named: "SpeechPerception").restrictingCommunication(
                 to: ["media.audio", "sound.source"], contracts: AgentContracts.communication)
             policy = try CommunicationPolicy(
-                contracts: AgentContracts.communication, externalSources: MediaInputAdapter.externalSources,
+                contracts: AgentContracts.communication,
+                externalSources: DeviceInputAdapter.sources.union(["user", "runtime"]),
                 configurations: [configuration])
             input = InputGateway(manager: manager, policy: policy)
-            let context = AgentContextRepository(
+            let context = try AgentContextRepository(
                 agent: .speechPerception,
                 scope: "00000000-0000-0000-0000-000000000002", state: SpeechPerceptionContextState())
             speech = try SpeechPerceptionAgent(
@@ -178,28 +179,21 @@
             update(snapshot)
         }
         func watchAudioChanges() {
-            routeTask = Task {
-                for await notification in NotificationCenter.default.notifications(
-                    named: AVAudioSession.routeChangeNotification)
-                {
-                    guard !Task.isCancelled else { return }
-                    if let raw = notification.userInfo?[AVAudioSessionRouteChangeReasonKey] as? UInt,
-                        AVAudioSession.RouteChangeReason(rawValue: raw) == .categoryChange
-                    {
-                        continue
-                    }
-                    await fail(AudioDetectionError.routeChanged)
-                    return
+            do {
+                let events = try audio.subscribeEvents()
+                routeTask = Task {
+                    do {
+                        for try await event in events {
+                            guard !Task.isCancelled else { return }
+                            try await input.publish(DeviceInputAdapter.audioEvent(event, sessionID: id))
+                            await fail(
+                                event == .interrupted
+                                    ? AudioDetectionError.interrupted : AudioDetectionError.routeChanged)
+                            return
+                        }
+                    } catch { await fail(error) }
                 }
-            }
-            interruptionTask = Task {
-                for await _ in NotificationCenter.default.notifications(named: AVAudioSession.interruptionNotification)
-                {
-                    guard !Task.isCancelled else { return }
-                    await fail(AudioDetectionError.interrupted)
-                    return
-                }
-            }
+            } catch { failure = error }
         }
         func receive(_ frame: MicrophoneFrame) {
             snapshot.capture = frame.layout == .mono ? .mono : .spatial
@@ -240,13 +234,11 @@
                 closing = true
                 outputTask?.cancel()
                 routeTask?.cancel()
-                interruptionTask?.cancel()
                 shutdownTask = Task {
                     await audio.stop()
                     await speech.stop()
                     await outputTask?.value
                     await routeTask?.value
-                    await interruptionTask?.value
                     try? await manager.remove(.speechPerception)
                     await output.shutdown()
                 }

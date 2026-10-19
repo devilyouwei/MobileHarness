@@ -114,10 +114,11 @@ public struct ModelArtifactCatalog: Codable, Sendable {
         }
         return value
     }
+    private static let componentCharacters = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "-_."))
     static func validComponent(_ text: String) -> Bool {
         !text.isEmpty && text.count <= 200 && text != "." && text != ".."
             && text.unicodeScalars.allSatisfy {
-                CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "-_.")).contains($0)
+                componentCharacters.contains($0)
             }
     }
     public static func validInstalledPath(_ text: String) -> Bool { validPath(text) }

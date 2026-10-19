@@ -2,7 +2,8 @@ import AgentCore
 import Agents
 import Foundation
 import ModelKit
-import Storage
+import StorageCore
+import StorageState
 import Testing
 
 private func generator() throws -> AgentGenerator {
@@ -11,6 +12,61 @@ private func generator() throws -> AgentGenerator {
             ["expression-interaction", "robot-interaction", "photography"],
             fixed: AgentConfigurations.load(named: "Assistant").capabilities), textMapping: AssistantAgent.mapText,
         segmentation: try AssistantAgent.textSegmentation)
+}
+
+@Test(.actionCatalog) func xmlActionsDiscardUndeclaredParametersBeforeAuthorization() throws {
+    let capabilities = try AgentSkillLoader.registry(
+        ["application-control"], fixed: AgentConfigurations.load(named: "Assistant").capabilities)
+    var parser = AgentGenerator(capabilities: capabilities)
+    let events =
+        try parser.append(
+            "<Bluetooth.control operation='disconnect' id='irrelevant' unexpected='extra' fence='untrusted'/>"
+                + "<Bluetooth.readStatus id='irrelevant' unexpected='extra'/>") + parser.finish()
+    let calls = events.compactMap(\.actionCall)
+    #expect(calls.count == 2)
+    #expect(calls.first?.parameters == ["operation": "disconnect", "id": "irrelevant"])
+    #expect(calls.last?.parameters == [:])
+    #expect(calls.allSatisfy { capabilities.permits($0) })
+
+    // Directly constructed calls do not receive XML normalization or expanded permissions.
+    let direct = ActionCall(
+        actionPath: .init(domain: "System", module: "Device", function: "control"), channel: "System",
+        parameters: ["operation": "disconnect", "unexpected": "extra"])
+    #expect(!capabilities.permits(direct))
+    let tools = try CapabilityRegistry(
+        tools: [ToolRegistration(alias: "lookup", path: "Memory.Query.lookup", requiredParameters: ["query"])])
+    #expect(throws: GenerationError.invalidParameters) {
+        try tools.resolveTool("lookup", arguments: ["query": "x", "unexpected": "extra"])
+    }
+}
+
+@Test(.actionCatalog) func xmlParameterTolerancePreservesRequiredKeysAndRawBounds() throws {
+    let capabilities = try CapabilityRegistry(actions: [
+        ActionRegistration(
+            alias: "perform", path: .init(domain: "Fixture", module: "Control", function: "perform"),
+            defaultChannel: "System", requiredParameters: ["operation"], optionalParameters: ["id"])
+    ])
+    var missing = AgentGenerator(capabilities: capabilities)
+    #expect(
+        try missing.append("<perform operaton='disconnect' extra='ignored'/>") == [
+            .rejected(CallRejection(kind: .action, alias: "perform", reason: .invalidParameters))
+        ])
+    #expect(throws: GenerationError.invalidParameters) {
+        try capabilities.resolveAction(
+            "perform", parameters: ["operation": "disconnect", "extra": String(repeating: "x", count: 4097)])
+    }
+    var excessive = ["operation": "disconnect"]
+    for index in 0..<32 { excessive["extra\(index)"] = "ignored" }
+    #expect(throws: GenerationError.invalidParameters) {
+        try capabilities.resolveAction("perform", parameters: excessive)
+    }
+    #expect(throws: GenerationError.invalidParameters) {
+        try capabilities.resolveAction("perform", parameters: ["operation": "disconnect", "bad key": "ignored"])
+    }
+    var oversized = AgentGenerator(capabilities: capabilities)
+    #expect(throws: GenerationError.limitExceeded) {
+        try oversized.append("<perform operation='disconnect' extra='" + String(repeating: "x", count: 4096) + "'/>")
+    }
 }
 
 @Test(.actionCatalog) func functionTokenParserEveryByteSplitPreservesActionsTextAndNestedChannels() throws {
@@ -158,7 +214,11 @@ private struct MarkupChat: ChatCapability {
 
 @Test(.actionCatalog) func assistantEmitsResolvedMarkupAndLiteralToolResultsCannotExecuteTags() async throws {
     let agent = try AssistantAgent(
-        chat: MarkupChat(markup: "<channel.Speech>你好<express emotion='smile'/></channel.Speech>尾巴"))
+        stateContext: try publicStateFixture(),
+        chat: MarkupChat(markup: "<channel.Speech>你好<express emotion='smile'/></channel.Speech>尾巴"),
+        context: try AgentContextRepository(
+            agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState())
+    )
     let speechRequests = try await bindSpeechRequests(agent)
     try await agent.start()
     var outputs = FixtureGenerationOutputs(agent: agent).makeAsyncIterator()
@@ -189,7 +249,12 @@ private struct MarkupChat: ChatCapability {
 }
 
 @Test(.actionCatalog) func incompleteModelMarkupFailsTurnAndFreshTurnGetsFreshParser() async throws {
-    let agent = try AssistantAgent(chat: MarkupChat(markup: "<channel.Speech>未结束"))
+    let agent = try AssistantAgent(
+        stateContext: try publicStateFixture(),
+        chat: MarkupChat(markup: "<channel.Speech>未结束"),
+        context: try AgentContextRepository(
+            agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState())
+    )
     let speechRequests = try await bindSpeechRequests(agent)
     try await agent.start()
     var outputs = FixtureGenerationOutputs(agent: agent).makeAsyncIterator()
@@ -349,7 +414,12 @@ func invalidWaitSyntaxIsRejected(_ source: String) throws {
 }
 
 @Test(.actionCatalog) func assistantPreservesWaitEventsAroundSpeechHandleConversion() async throws {
-    let agent = try AssistantAgent(chat: MarkupChat(markup: "<wait>你好。</wait><wait><express emotion='smile'/></wait>"))
+    let agent = try AssistantAgent(
+        stateContext: try publicStateFixture(),
+        chat: MarkupChat(markup: "<wait>你好。</wait><wait><express emotion='smile'/></wait>"),
+        context: try AgentContextRepository(
+            agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState())
+    )
     let probe = try await bindSpeechRequests(agent)
     try await agent.start()
     try await agent.receive(

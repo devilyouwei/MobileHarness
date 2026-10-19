@@ -1,130 +1,62 @@
-# Settings and History Presentation
+# Settings — 设置、资源、设备与历史
 
-## Summary
+## 职责与接口
 
-Local settings drafts/navigation, resource/device snapshots, audio detection and read-only model history rendering.
+本目录只拥有 UI 草稿、事实快照、历史展示及注入的请求接口，不依赖 Storage、Agents、Actions 或设备 SDK。业务集成执行保存、模型资源操作、连接及历史读取，并回传版本围栏下的 UI 值；导航和编辑本身不提交业务。
 
-## Ownership and boundaries
+## 按功能归类
 
-Injected controls submit operations to the owning AgentBindings request ports. UI owns localization, selection, presentation fallback and independent record schemas; it does not import Storage, Agents, Actions or device SDKs.
+| 功能 | 状态／子容器与接口 | 页面 |
+| --- | --- | --- |
+| Provider 设置 | SettingsState、UISettingsContainer、SettingsProviderOperations | SettingsView |
+| 模型资源 | ModelResourcesState、UIModelResourcesContainer、ModelResourcesOperating | ModelResourcesView |
+| 蓝牙展示 | BluetoothSettingsState、UIDeviceSettingsContainer | BluetoothSettingsView |
+| 历史记录 | ConversationHistoryState、UIHistoryContainer、ConversationHistoryPresentation | ConversationHistoryView |
 
-## External relationships and data flow
+✅ 各子容器、呈现协议及请求接口与所属状态同文件；导航由 UI 根提供。音频检测属于 Diagnostics，本目录仅嵌入其公开 Section，不复制状态或控制实现。
 
-Runtime arrows show data or capability calls; dashed arrows show injection.
+## 表单与资源
 
-```mermaid
-flowchart LR
- Bindings[Module integrations]
- Bindings -->|drafts, snapshots and control protocols| Settings[Settings state and views]
- User -->|edit and navigate locally| Settings
- Settings -->|save, discover, acquire, device or history operation| Bindings
- Bindings -->|actual outcomes and revision-fenced values| Settings
-```
+✅ Provider 草稿包含地址、模型和密钥，不写入模型历史／用户日志。发现、恢复、保存保留草稿 revision，迟到结果不覆盖新输入；页面离开取消发现任务。根停止清除敏感草稿。
 
-## Forms and resources
+资源界面按目录 ID 展示识别、合成、语言和视觉，接受宿主提供的安装／下载／删除／取消及偏好事实；刷新保留 generation。下载不自动开启自定义语音，资源资格由宿主判定。
 
-`CloudSettingsDraft` contains editable endpoint/model/key fields; credentials never enter model history or user logs. `SettingsControlling` handles restore/save/discovery and cancellation of page-scoped discovery. Draft revisions fence late results; navigation does not submit forms.
+## 设备展示
 
-`ModelResourceGroup` presents recognition, synthesis, language and vision while preserving catalog IDs. Recognition activation requires Nemotron, synthesis requires MOSS; Silero availability is independent. Download never automatically enables custom speech. `ModelResourcesState` applies only the current refresh generation and displays queued/downloading/installing/deleting/cancelling facts supplied by the host.
+BluetoothSettingsState 分开呈现可用性、发现、连接、传输问题、控制资格及恢复阶段。点击未连接设备提交连接意图，已连接设备打开本地详情；滑杆释放／停止提交实际停止意图。连接事实不代表物理动作验证。
 
-## Device and audio detection
+设备子容器在 UI start 前只暂存一个最新快照，start 应用 UI 值但不查询设备；停止清除待应用值。真正连接、恢复、控制 worker 和清理属于外部能力拥有者。
 
-`BluetoothSettingsState` separates availability, discovery, connection phase, transport issue, control capability and recovery stage. Tapping a disconnected row submits connect; tapping a connected row opens local detail. Native recovery/manual workers are host-owned. Slider release/stop submits actual stop intent; connected does not mean physically verified.
+## 历史值、分页与导航
 
-`AudioDetectionSnapshot` distinguishes native input/support, actual spatial/mono layout, fallback, PCM freshness and direction evidence. More than one second without a frame becomes no-audio. Controls delegate one whole detection endpoint; no direction algorithm or microphone owner lives in UI.
+AgentRecordsView 是注入的记录页面入口，当前 Assistant 提供实际会话记录。ConversationHistoryView 不构造业务总结或持久化结果；只有原始 modelRequests 投影为请求行，不伪造续轮／任务。
 
-## History
+Task 压缩行以实际 historyTaskID、input/request 来源对及 historyOrder 校验，在原请求位置展示；展开源记录独立分页。不同 Task 的 source、request-time task 快照和 live execution 状态保持区别。缺失证据不补造。
 
-Settings Agent 记录 is a generic view-injection hub; currently only Assistant has a record destination. Each future Agent provides its own record schema/view. Assistant renders canonical current/archive conversations, with Task sources in the conversation timeline. Conversation titles use canonical metadata; Task association stays bound to indexed request identities. UI does not invent dates, usage, timing or outcomes.
+页面保留20项游标分页、ticket／generation、首次成功加载门和显式重试。最多16个 Task 页读取，超额显式拒绝。取消只释放匹配 ticket；完成 revision 唤醒被取消的可见 footer，不由开始读取自行取消任务。
 
-`History*` values are presentation-owned. Actual request order, ReACT (orange type markers), native calls/results, usage and optional adapter-recorded request-start/first-token latency are retained. Generation metadata renders directly under Generation Meta. Timing is never inferred from record arrival. Unavailable provider values remain blank. Exports preserve supplied evidence and real failures, without fabricated fields or diagnostic commentary.
+下拉刷新取消并加入时间线与 Task 读取后重置分页，刷新失败保留已有内容；从详情返回不重载成功页或重建列表，保留展开和滚动位置。不同会话以稳定 ID 隔离。请求详情使用一个选择值和一个 navigationDestination，重复点击不累加导航。
 
-Up to four image references are deduplicated from actual context. Page-cancellable reads allow at most 4 MiB per image; asynchronous UIKit preparation bounds thumbnails to 320 pixels and preview to 2048 while preserving aspect ratio. Actual failures offer retry; absent photos remain blank. Only structured imageReferences supply image identity; displayed text stays literal.
+## 历史展示与导出
 
-Local drafts/navigation, independent resource/device/history values and bounded image presentation.
+Task／ReACT 标签、状态、来源数量及分层缩进分别表达真实证据；详情保留原始输入、模型请求、执行、元数据和 Functions/Skills。结构化 Function Catalog 只解析记录时的 schema，一次解析并保留错误与原 JSON，不回退为当前注册表或虚构空结果。
 
-## Related design
+Function Catalog 为独立平铺 Form 行，展开状态为页面局部值，避免嵌套交互行接管点击。Token 用量只显示已报告的值，包括可选缓存读写；零与缺失不同。
 
-[Parent design](../README.md)
+JSON 分享延迟编码实际展示的 Codable 值，保留原始 requestJSON；prettyPrinted/sortedKeys、默认日期编码，最大32MiB。取消／编码错误显式传播，不创建临时仓库数据或空导出。
 
-## Skill/task-mode contract
+历史图片仅解析结构化引用，按身份去重并限制展示数量。全屏检查器使用共享 RetainedFullScreenCover 保留下层首页；页面图片解码／读取仍随离开取消。
 
-“Agent 记录” contains Assistant 聊天记录 only. Request details show immutable task/Skill/function evidence separately from generation information; only stored modelRequests become request rows.
+## 接纳、失败与待验收
 
-## 泛化 Task 与独立 Skill
+✅ 子容器统一创建状态，业务只读协议＋类型化提交；根停止后拒绝更新，后台允许保留事实。设置 revision、资源 generation、分页 ticket 独立于根接纳。
 
-Conversation Task summaries display recorded goal/terminal status/result and source count; request details show immutable taskGoal/execution/Skill revisions separately from generation information. Task executor/parent/progress belongs to the separate execution diagnostics. Unavailable evidence remains absent.
+❌ 更多 Agent 记录 schema、历史页面重设计、交互返回／滚动保持、目录点按、分享接收端及蓝牙物理行为仍需单独验收，自动化状态测试不代替真机。
 
-音频完成等待使用原生回调、实际错误及作用域取消，不设置 ASR/TTS 收尾、PCM 首帧或播放 buffer 兜底计时器；完成依赖真实回调，失败保留实际来源。
+[UI 根](../README.md) · [音频检测](../Diagnostics/README.md)
 
-## 历史记录接口
+✅ 历史消息读取有页面所有者、取消／身份校验与加入；目录在通用执行器解析，按原JSON身份缓存，时间线仅随加载／分页重建并预分组。资源下载源编辑提交窄控制接口，页面不轮询自动保存；外部唯一工作流合并初始恢复并拥有防抖、停止与错误上报。
 
-SettingsView opens AgentRecordsView under “Agent 记录”; ConversationHistoryView is the Assistant conversation page only. ConversationHistoryPresentation 仅展开 modelRequests、只解析结构化图片引用；删除旧续轮合成、虚构身份、缺失元数据标签与 Mode 回退。未关联输入不合成为虚构任务。
+历史详情读取的容量约束：一个实际读取与一个最新候选，取消清除候选并取消实际读取；候选替换不创建等待任务链，实际读取完成后才接纳下一项。
 
-## Task history indexing and in-place compression
-
-Conversation history v2 shows Task summary cards at their original request position, with goal/status/reported summary/failure and expandable raw request evidence. Task details use exact historyTaskID membership. Current/archived conversations and exports retain source diagnostics; no old history decoder is provided.
-
-Ordering: each admitted model request receives a monotonic historyOrder from the archive revision. Order the flattened timeline and compression sources by this value, not parent turn order or wall-clock timestamps; a continuation can interleave with later user inputs. History facade refreshes authoritative revisions and rejects stale commits.
-
-## 历史列表布局与单级详情导航
-
-Task-row disclosure: ConversationHistoryView renders Task metadata as one plain Button that toggles the existing expandedTasks state with animations disabled. Status and source count read completed · N 轮对话; the trailing chevron uses request-row style/position, right when collapsed and down when expanded. Request/source cells stay independent in the contiguous timeline; source rows keep icon-free indentation and ReACT styling.
-
-ReACT visual hierarchy: top-level ReACT requests use an orange arrow.clockwise single-arrow cycle symbol instead of the ordinary text bubble. ReACT input text retains its original orange color; ordinary input uses primary color and all responses use secondary color. ReACT icons/badges remain orange. Task summaries place a blue Task capsule after the status/count, sharing the caption2/bold, horizontal6/vertical2 and 15%-tint styling of ReACT badges through one private view helper. Expanded source rows retain their icon-free layout. No data/navigation/storage contracts change.
-
-ConversationHistoryState defines a UI-local HistoryRequestNavigation value with one selected request and one presentation flag; repeated taps during an active destination do not replace or append it. ConversationHistoryDetail registers exactly one navigationDestination outside List rows, uses plain Buttons to select requests, and retains expansion state after Back/interactive dismissal. Async detail loading checks cancellation before applying results. No storage, backend or module interfaces change.
-
-Hierarchical separators: keep timeline outer/top edges hidden and first-level boundaries full width. The Task summary's bottom separator is inset to the 52-point primary text column while expanded with sources, and full width while collapsed. Expanded source text/lines align to that text column; the last source closes the task with a full-width boundary. There is no expansion-control cell. Updated native simulator screenshots of production page code with synthetic records verify collapsed/expanded static geometry; model/storage and gesture acceptance remain separate.
-
-## Detail headings and JSON sharing
-
-ConversationTurnDetail retains the six English section titles. decisionMetadata.catalogJSON's Function Catalog disclosure belongs to Tasks and Skills; Prompts retains actual context messages and sent declarations. 解析输出与元数据直接显示在 Action Execution 和 Generation Meta。 Parsed interpretation still comes from controls.preview and is not execution evidence; no data/share/navigation contract changes.
-
-Conversation/request values are Codable; the presentation JSON encoder uses pretty printed/sorted keys, default Codable dates and a 32 MiB output limit. A native Transferable JSON document uses the unmodified UI-owned conversation/request value, including original requestJSON strings and evidence. Encoding happens only when the share provider requests data, with cancellation checks and thrown failures; no file writes, view-body serialization, diagnostic report, fabricated empty export or storage API change. Conversation timelines share loaded full conversation JSON, request details share the displayed request JSON. Metadata is not substituted for a conversation that is still loading.
-
-## Request Task and Skills panel
-
-ConversationHistoryPresentation.taskReferences(for:) projects immutable record ownership and request-time task snapshots into unique ID references with explicit role flags. Equal historyTaskID/decisionMetadata.taskID merges both roles; distinct IDs remain separate, in record-owner then snapshot order. Active at request describes recorded request state only, never live task status. No storage/backend or Codable schema changes.
-
-ConversationTurnDetail keeps one Tasks and Skills section. ViewThatFits renders Task/Skills subpanels side-by-side only when their minimum readable widths fit, otherwise vertically with an internal divider. Task goal, request execution mode and selectable unique IDs are grouped together. Sorted Skill ID/revision labels use a private wrapping Layout and tinted capsules rather than separate Form rows. Function Catalog remains a separate disclosure row within the same section; the panel native separator aligns with its internal divider at the content leading edge. Layout recomputes from available width and measured subviews; no async work/state/cache owner is added.
-
-## Structured Function Catalog
-
-HistoryFunctionCatalog/HistoryFunctionRegistration are UI-local Decodable projections of the current request snapshot schema. ConversationHistoryPresentation.functionCatalog(_:) strictly requires Actions/Tools and recorded registration fields; no old format import. ConversationTurnDetail decodes once on construction and retains the explicit failure message for malformed snapshots. Function Catalog stays in Tasks and Skills with grouped Actions/Tools counts, sorted alias/path rows and per-function Channel/required/optional/definition disclosure. Empty groups show actual zero counts; corrupted snapshots show the error and original JSON rather than fabricated empty success. Raw JSON sharing remains unchanged and catalog origin is the recorded request, never the live registry.
-
-AgentRecordDestination carries stable identity, display text and a MainActor view factory. AgentRecordsView renders those independently injected record pages; it has no conversation state or load/mutation workflow. ConversationHistoryView renders only canonical Assistant conversations, with no task-only state, subset page or separate export. Real Task compression/source schemas remain intact.
-
-Required conversation reader: selected-conversation reads are a required injected interface, with no optional/default unavailable implementation. Tests inject explicit readers/failures.
-
-## SQLite records and runtime identity
-
-History controls expose explicit page/detail reads; UI remains independent of Storage/GRDB. The existing icons/colors/separators/navigation are preserved, with automatic paging footers for20-item pages and explicit retry after failure. Task source counts come from complete source indexes; expanded sources paginate independently. Sharing uses the corresponding displayed Codable values. Raw detail evidence loads only on row selection.
-
-ConversationHistoryPresentation.timeline validates each loaded Task source pair against recorded sources instead of requiring all source input IDs to be loaded. HistoryConversation has a page-append operation that checks dialog identity and merges compression metadata/cursor with message previews; ConversationHistoryView uses it for list and expanded Task pages. Keep blue Task rows, source count, right/down chevrons and raw-request expansion.
-
-An automatic paging footer starts when the lazy List reaches its row. Render loading and scoped error/manual retry without hiding existing rows. HistoryPageLoading provides cursor/ticket state in ConversationHistoryState.swift, use independent timeline/Task state, retain sixteen active Task-page reads and reject overflow explicitly. Cancellation releases only the matching attempt; stale responses cannot mutate replacement state. Archive controls accept an explicit retry flag. Keep20-item SQL cursor pages, source metadata merging, existing cell styling and navigation.
-
-a completion-only paging revision re-arms a visible footer when a cancelled previous read finally releases its slot (rapid collapse/re-expand or navigation return); starting a read never changes that revision, so it cannot cancel itself.
-
-## Native history refresh
-
-archive and conversation Lists use native refreshable indicators; paging uses the system ProgressView without custom movement/insert animations. Pulling the timeline reloads its first page and preserves Task expansion/navigation. It cancels and joins its one timeline reader and at most sixteen Task readers before resetting paging tickets, so rapid refresh cannot overlap old/new read generations. Expanded source caches are discarded only after a successful refresh and reload through their visible paging footers; failed refresh retains visible records with an inline retryable error. Disable paging during refresh so late cancelled reads cannot append.
-
-## Preserve history while returning from detail
-
-separate per-page initial appearance from explicit refresh. A view-local HistoryInitialLoad gate admits the first successful read once and permits retry after failure/cancellation. Dialog-list and message-list .task callbacks must not replace loaded pages when a child destination is popped. Keep List identity/row IDs, expanded Task pages and cursor state intact; native List retains its offset without a forced scrollTo. Explicit pull-to-refresh/retry still reloads the first page. A newly created page gets a fresh initial-load gate; conversation destination identity is keyed by the stable dialog ID so a different dialog never reuses another dialog’s page cache.
-
-✅ SettingsState 提供修订围栏下的发现、恢复、成功/失败呈现方法；ConversationHistoryState 提供快照提交；ModelResourcesState 提供安装提示/操作失败呈现。转换错误及领域结果留在 ActionBindings。
-
-## 待实现
-
-- Other Agent record schemas and native navigation/physical acceptance remain separate.
-
-- 历史记录页面板块重新设计及原生 UI/真机验收。
-
-- Native expansion layout, interactive Back and repeated navigation acceptance remain separate from state regressions and iOS compilation.
-
-- Native receiving-app file acceptance remains separate from Codable regressions, simulator layout and Transferable/device compilation.
-
-- Native scroll-offset retention and interactive Back after multiple pages still require device acceptance; lifecycle-state tests and iOS compilation are distinct evidence.
+✅ 已实现：devices呈现Action维护独立连接摘要，设置页展示该状态；详细设备／机械臂控制资格仍消费原真实状态，不由显示摘要解锁设备。

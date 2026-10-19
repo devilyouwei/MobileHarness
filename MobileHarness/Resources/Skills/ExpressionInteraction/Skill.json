@@ -1,7 +1,7 @@
 {
-  "version": 1,
+  "version": 2,
   "id": "expression-interaction",
-  "revision": 10,
+  "revision": 12,
   "description": "双眼表情互动：按对话需要或用户要求展示短暂表情、设置持续表情。",
   "dependencies": [],
   "functions": [
@@ -18,9 +18,5 @@
       "channel": "Display"
     }
   ],
-  "contextFields": [
-    "runtimeFacts",
-    "taskState",
-    "actionResults"
-  ]
+  "useState": []
 }

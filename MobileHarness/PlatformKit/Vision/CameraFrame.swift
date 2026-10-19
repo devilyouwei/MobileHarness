@@ -35,16 +35,21 @@ public struct CameraFrame: @unchecked Sendable {
 
     final class CameraFrameReceiver: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate, Sendable {
         private struct State {
+            var active = false
             var output: AsyncThrowingStream<CameraFrame, Error>.Continuation?
             var generation = UUID().uuidString
             var sequence: UInt64 = 0
             var timestamp: Double = -1
             var rotation = 1
         }
+
         private let state = Mutex(State())
+        private let observations = NativeInputBroadcast<CameraFrame>()
+        func subscribe() throws -> AsyncThrowingStream<CameraFrame, Error> { try observations.subscribe(.latest) }
 
         func setRotation(_ rotation: Int) { state.withLock { $0.rotation = rotation } }
         func begin() -> AsyncThrowingStream<CameraFrame, Error> {
+            if state.withLock({ $0.active }) { observations.finish() }
             let stream = AsyncThrowingStream<CameraFrame, Error>.makeStream(bufferingPolicy: .bufferingNewest(1))
             let generation = UUID().uuidString
             stream.continuation.onTermination = { [weak self] _ in
@@ -54,6 +59,7 @@ public struct CameraFrame: @unchecked Sendable {
             }
             let previous = state.withLock { value in
                 let previous = value.output
+                value.active = true
                 value.output = stream.continuation
                 value.generation = generation
                 value.sequence = 0
@@ -67,9 +73,25 @@ public struct CameraFrame: @unchecked Sendable {
             let output = state.withLock { value in
                 let output = value.output
                 value.output = nil
+                value.active = false
+                value.generation = UUID().uuidString
                 return output
             }
+            observations.finish()
             output?.finish()
+        }
+        private func fail(_ error: any Error, generation: String) {
+            let result = state.withLock { value -> (Bool, AsyncThrowingStream<CameraFrame, Error>.Continuation?) in
+                guard value.active, value.generation == generation else { return (false, nil) }
+                value.active = false
+                let output = value.output
+                value.output = nil
+                return (true, output)
+            }
+            if result.0 {
+                result.1?.finish(throwing: error)
+                observations.finish(throwing: error)
+            }
         }
         func captureOutput(
             _ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection
@@ -77,33 +99,34 @@ public struct CameraFrame: @unchecked Sendable {
             let capturedAt = ContinuousClock.now
             let timestamp = CMSampleBufferGetPresentationTimeStamp(sampleBuffer).seconds
             let snapshot = state.withLock {
-                value -> (AsyncThrowingStream<CameraFrame, Error>.Continuation, UInt64, Int)? in
-                guard let output = value.output, timestamp.isFinite, timestamp >= 0,
+                value -> (AsyncThrowingStream<CameraFrame, Error>.Continuation?, UInt64, Int, String)? in
+                guard value.active, timestamp.isFinite, timestamp >= 0,
                     timestamp > value.timestamp, value.sequence < UInt64.max
                 else { return nil }
                 value.timestamp = timestamp
                 value.sequence += 1
-                return (output, value.sequence, value.rotation)
+                return (value.output, value.sequence, value.rotation, value.generation)
             }
-            guard let (continuation, sequence, rotation) = snapshot else { return }
+            guard let (continuation, sequence, rotation, generation) = snapshot else { return }
+
             guard let pixels = CMSampleBufferGetImageBuffer(sampleBuffer),
                 CVPixelBufferGetPixelFormatType(pixels) == kCVPixelFormatType_32BGRA,
                 CVPixelBufferLockBaseAddress(pixels, .readOnly) == kCVReturnSuccess
             else {
-                continuation.finish(throwing: CameraError.configurationFailed)
+                fail(CameraError.configurationFailed, generation: generation)
                 return
             }
             defer { CVPixelBufferUnlockBaseAddress(pixels, .readOnly) }
             let sourceWidth = CVPixelBufferGetWidth(pixels)
             let sourceHeight = CVPixelBufferGetHeight(pixels)
             guard sourceWidth > 0, sourceHeight > 0, let base = CVPixelBufferGetBaseAddress(pixels) else {
-                continuation.finish(throwing: CameraError.configurationFailed)
+                fail(CameraError.configurationFailed, generation: generation)
                 return
             }
             let width = rotation % 2 == 0 ? sourceWidth : sourceHeight
             let height = rotation % 2 == 0 ? sourceHeight : sourceWidth
             guard width <= 4096, height <= 4096, width * height <= 4_194_304 else {
-                continuation.finish(throwing: CameraError.configurationFailed)
+                fail(CameraError.configurationFailed, generation: generation)
                 return
             }
             let gray: Data
@@ -112,14 +135,19 @@ public struct CameraFrame: @unchecked Sendable {
                     base: base, sourceWidth: sourceWidth, sourceHeight: sourceHeight,
                     stride: CVPixelBufferGetBytesPerRow(pixels), rotation: rotation)
             } catch {
-                continuation.finish(throwing: error)
+                fail(error, generation: generation)
                 return
             }
-            // Retain the immutable capture buffer; AVFoundation cannot recycle it until all owners release it.
-            continuation.yield(
-                CameraFrame(
-                    width: width, height: height, pixels: pixels, gray64: gray,
-                    sequence: sequence, timestamp: timestamp, capturedAt: capturedAt, rotation: rotation))
+            // Retain immutable native storage, shared by all independent subscriptions.
+            let frame = CameraFrame(
+                width: width, height: height, pixels: pixels, gray64: gray,
+                sequence: sequence, timestamp: timestamp, capturedAt: capturedAt, rotation: rotation)
+            let accepted = state.withLock { value in
+                guard value.active, value.generation == generation else { return false }
+                observations.send(frame)
+                return true
+            }
+            if accepted { continuation?.yield(frame) }
         }
     }
 #endif

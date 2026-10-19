@@ -1,23 +1,10 @@
 # Default assembly tests
 
-Purpose: verify ModelKit-owned registration without requiring weights or device permissions. Design goals: explicit defaults, deferred loading and shared conversation/diagnostic Core ML synthesis.
+## Ownership and coverage
 
-Default registration tests require no downloaded weights and do not initialize a GPU engine.
+默认装配测试验证 App 管理的 ModelContainer，不取得进程单例或直接注册生产模型。覆盖根／四子能力隔离、缺失资源目录时无副作用启动、暂停与恢复、重复停止、旧端口拒绝，以及保留的聊天端口随配置变化切换且不影响另一根。
 
-- Default capability registrations remain lightweight with an absent resource directory.
-- Repeated synthesis retrieval shares one instance; default synthesis and explicit MOSS-TTS-Nano retrieval share one instance. Missing resources fail without system speech fallback.
-- Missing judgment is explicit. Mapping conflicts and lifecycle routing are covered by ModelKitRuntimeTests.
+模型工厂只建立轻量对象；测试不运行真实推理、不初始化 GPU 权重、不请求设备权限、不发送网络请求。资源取消加入／权重保留与不合作加载在 ModelKitRuntimeTests 覆盖；App 缓存一致性在 IntegrationTests 覆盖。构建与真机验收独立记录。
 
-Production assembly tests cover concurrent first access, shared manager identity, conflicting roots and terminal shutdown. Runtime tests use ModelAssembly SPI for isolated containers; production has no public manager constructor.
 
-Pose default registration remains lazy and typed acquisition does not load absent weights.
-
-Repeated .pose acquisition returns the identical provider; camera pipeline incarnations share its model lifecycle.
-
-SpeechSelectionTests uses isolated registration/storage fixtures to verify installed local selection, unavailable/missing artifact fallback and forced system preference. Default assembly tests verify stable facades and separate explicit MOSS identity.
-
-SpeechSelection uses independent recognition/synthesis choices. Recognition depends only on Nemotron, VAD selects installed available Silero regardless of recognition preference, and synthesis depends only on MOSS. Concrete provider registrations remain separate.
-
-## 待实现
-
-- These tests do not establish real inference or physical-device acceptance.
+✅ 模型根停止后start／setForeground的错误断言使用ModelFailure；底层能力端口仍验证原始InferenceAdmissionError，明确根与领域接口边界。

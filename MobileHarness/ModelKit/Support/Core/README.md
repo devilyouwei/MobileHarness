@@ -1,5 +1,9 @@
 # Inference Data, Sessions and Resource Admission
 
+✅ 统一异常封装 ModelFailure.swift 移到 ../../ModelFailure.swift，基础 ModelKit 编译归属保持；本目录不保留重复定义。
+
+✅ InferenceAdmission 同步关闭接纳并更新代际，旧加载等待与迟到结果不能越过暂停；ModelResource.suspend 取消并加入活动租约／加载、保留已加载权重。终止关闭不可恢复。InferenceSession 允许唯一故障观察者，迟安装仍收到一次真实失败；不增加消费任务或事件队列。
+
 ## Summary
 
 Model-neutral media/request identity, single-consumer streams and adapter-facing managed resource handles.
@@ -51,7 +55,7 @@ InferenceTaskControl provides install/cancel/finish for one worker per request a
 
 ## Initialization and layer isolation
 
-ModelLoadGate requires an explicit positive maximumConcurrentLoads. ModelContext requires an injected gate and positive maximumLoadWaiters; invalid configuration throws CapabilityError.invalidRequest. Context creation and resource acquisition do not choose production defaults. Owning runtimes share a gate when cross-resource admission is needed. Core's seven files typecheck together independently of the Language/Speech/Vision contract sources, Management and provider implementations.
+ModelLoadGate requires an explicit positive maximumConcurrentLoads. ModelContext requires an injected gate and positive maximumLoadWaiters; invalid configuration throws CapabilityError.invalidRequest. Context creation and resource acquisition do not choose production defaults. Owning runtimes share a gate when cross-resource admission is needed. Core sources typecheck together independently of the Language/Speech/Vision contract sources, Management and provider implementations.
 
 ## Related design
 
@@ -60,3 +64,8 @@ ModelLoadGate requires an explicit positive maximumConcurrentLoads. ModelContext
 ## 待实现
 
 - Durable event replay, inference waiting queues and forced native interruption are not implemented.
+
+
+✅ 模块根目录 [ModelFailure](../../ModelFailure.swift) 为只依赖Foundation的中立错误封装，仍编译于基础 ModelKit，结构同其他基础根；Source只记录包装处源码位置，不承诺异步调用堆栈。InferenceAdmissionError分类为unavailable／stopped，未知提供者错误为execution.failed并完整保留underlying，不在Core依赖领域能力或业务模块。
+
+✅ 已实现：ModelResource 在 actor 内通过实际无缓存资源加载分支报告 loading；已有缓存直接返回，不发送事件；共享任务的等待方按真实等待结束报告退出，错误仍传播，不新增线程或订阅队列。

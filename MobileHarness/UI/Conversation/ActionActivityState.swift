@@ -53,11 +53,16 @@ public struct ExecutionIssue: Identifiable, Sendable, Equatable {
         public let sessionID: String?
         public let inputID: String?
         public let callID: String?
-        public init(workerID: String, sessionID: String? = nil, inputID: String? = nil, callID: String? = nil) {
+        public let roundID: String?
+        public init(
+            workerID: String, sessionID: String? = nil, inputID: String? = nil, callID: String? = nil,
+            roundID: String? = nil
+        ) {
             self.workerID = workerID
             self.sessionID = sessionID
             self.inputID = inputID
             self.callID = callID
+            self.roundID = roundID
         }
     }
     public let inputID: String?
@@ -68,16 +73,19 @@ public struct ExecutionIssue: Identifiable, Sendable, Equatable {
     public let source: String
     public let message: String
     public let userMessage: String?
+    public let category: String?
     public let time: Date
     public init(
         id: String = UUID().uuidString, title: String, source: String, message: String, time: Date = Date(),
-        failureCode: String? = nil, context: Context? = nil, inputID: String? = nil, userMessage: String? = nil
+        failureCode: String? = nil, context: Context? = nil, inputID: String? = nil, userMessage: String? = nil,
+        category: String? = nil
     ) {
         self.inputID = inputID ?? context?.inputID
         self.id = id
         self.title = String(title.prefix(128))
         self.source = String(source.prefix(64))
-        self.message = String(message.prefix(512))
+        self.category = category.map { String($0.prefix(64)) }
+        self.message = String(message.prefix(category == nil ? 512 : 2048))
         self.userMessage = userMessage.map { String($0.prefix(512)) }
         precondition(failureCode.map { !$0.isEmpty && $0.utf8.count <= 64 } ?? true)
         self.failureCode = failureCode
@@ -95,29 +103,34 @@ public struct ActionChannelSummary: Identifiable {
 }
 
 /// Presentation only. The root-owned workflow consumes snapshots; views never own observation tasks.
-@MainActor @Observable
+@MainActor
+@Observable
 public final class ActionActivityState {
-    public var currentTaskID: String?
-    public var skillOwnership: [String: String] = [:]
+    @ObservationIgnored var presentationAdmission: UIPresentationAdmission?
+    public var isPresentationAvailable: Bool { presentationAdmission.map { $0.started && !$0.stopped } ?? true }
+
+    var hasOngoingTask: Bool { currentTaskID != nil || tasks.contains { !$0.isTerminal } }
+    public internal(set) var currentTaskID: String?
+    public internal(set) var skillOwnership: [String: String] = [:]
     public var backgroundTaskCount: Int { tasks.filter { $0.execution == "background" && !$0.isTerminal }.count }
-    public var currentTaskTitle = ""
-    public var currentTaskStatus = ""
-    public var loadedSkills: [String] = []
-    public var showsExecutionHistory = false
-    public var selectedTab: ExecutionLogTab = .action
-    public var selectedTaskID: String?
+    public internal(set) var currentTaskTitle = ""
+    public internal(set) var currentTaskStatus = ""
+    public internal(set) var loadedSkills: [String] = []
+    public internal(set) var showsExecutionHistory = false
+    public internal(set) var selectedTab: ExecutionLogTab = .action
+    public internal(set) var selectedTaskID: String?
     public private(set) var agentEvents: [AgentRuntimeLogItem] = []
     public private(set) var agentEventEvictions: UInt64 = 0
-    public var selectedSource = "全部"
-    public var selectedFilter: ExecutionLogFilter = .all
-    public var showsInternalActions = false
+    public internal(set) var selectedSource = "全部"
+    public internal(set) var selectedFilter: ExecutionLogFilter = .all
+    public internal(set) var showsInternalActions = false
     public private(set) var tasks: [TaskLogItem] = []
     public private(set) var taskEvictions: UInt64 = 0
     public private(set) var items: [ActionActivityItem] = []
     public private(set) var revision: UInt64?
     public private(set) var evictedCount: UInt64 = 0
-    public var observationUnavailable = false
-    public var notice: HomeNotice?
+    public internal(set) var observationUnavailable = false
+    public internal(set) var notice: HomeNotice?
     public var visibleNotice: HomeNotice? {
         if let errorToast {
             return HomeNotice(
@@ -128,16 +141,35 @@ public final class ActionActivityState {
         return notice
     }
     public private(set) var errorToast: ExecutionIssue?
+    @ObservationIgnored var toastDuration = Duration.seconds(8)
+    @ObservationIgnored private var toastExpiry: Task<Void, Never>?
     private var toastKeys: [String] = []
     public func dismissErrorToast(id: String) { if errorToast?.id == id { errorToast = nil } }
     private func offerToast(_ issue: ExecutionIssue, now: Date = Date()) {
         // Initial/repeated retained snapshots do not replay old failures as new incidents.
-        guard issue.context?.callID == nil, now.timeIntervalSince(issue.time) <= 15 else { return }
+        guard presentationAdmission?.active ?? true, issue.context?.callID == nil,
+            now.timeIntervalSince(issue.time) <= 15
+        else { return }
         let key = "\(issue.source)|\(issue.inputID ?? issue.id)|\(issue.message)"
         guard !toastKeys.contains(key) else { return }
         toastKeys.append(key)
         toastKeys = Array(toastKeys.suffix(100))
         errorToast = issue
+        let previous = toastExpiry
+        previous?.cancel()
+        toastExpiry = Task { [weak self] in
+            await previous?.value
+            do { try await Task.sleep(for: self?.toastDuration ?? .seconds(8)) } catch { return }
+            self?.dismissErrorToast(id: issue.id)
+        }
+    }
+    deinit { toastExpiry?.cancel() }
+    func stopPresentation() async {
+        toastExpiry?.cancel()
+        await toastExpiry?.value
+        toastExpiry = nil
+        errorToast = nil
+        notice = nil
     }
     public private(set) var outputIssues: [ExecutionIssue] = []
     public private(set) var backgroundIssues: [ExecutionIssue] = []
@@ -146,6 +178,7 @@ public final class ActionActivityState {
     public var issueEvictions: UInt64 { outputEvictions + backgroundEvictions }
     private var issueRevision: UInt64?
     public func replaceIssues(revision: UInt64, records: [ExecutionIssue], evictedCount: UInt64) {
+        guard presentationAdmission?.acceptsRetained() ?? true else { return }
         guard issueRevision == nil || revision > issueRevision! else { return }
         issueRevision = revision
         let previous = Set(outputIssues.map(\.id))
@@ -157,8 +190,13 @@ public final class ActionActivityState {
         outputIssues = Array(records.suffix(100))
         outputEvictions = evictedCount
     }
-    public func recordIssue(_ issue: ExecutionIssue) {
-        offerToast(issue)
+    public func recordIssue(_ issue: ExecutionIssue, showsToast: Bool = true) {
+        guard presentationAdmission?.acceptsRetained() ?? true else { return }
+        if showsToast { offerToast(issue) }
+        if let index = backgroundIssues.firstIndex(where: { $0.id == issue.id }) {
+            backgroundIssues[index] = issue
+            return
+        }
         if backgroundIssues.count == 100 {
             backgroundIssues.removeFirst()
             backgroundEvictions &+= 1
@@ -215,6 +253,7 @@ public final class ActionActivityState {
         }
     }
     public func recordAgentEvent(_ event: AgentRuntimeLogItem) {
+        guard presentationAdmission?.acceptsRetained() ?? true else { return }
         if agentEvents.count == 100 {
             agentEvents.removeFirst()
             agentEventEvictions &+= 1
@@ -222,6 +261,7 @@ public final class ActionActivityState {
         agentEvents.append(event)
     }
     public func updateTask(_ incoming: TaskLogItem, event: TaskLogEvent) {
+        guard presentationAdmission?.acceptsRetained() ?? true else { return }
         if let index = tasks.firstIndex(where: { $0.id == incoming.id }) {
             if let existing = tasks[index].events.firstIndex(where: { $0.id == event.id }) {
                 tasks[index].events[existing] = event
@@ -254,6 +294,7 @@ public final class ActionActivityState {
 
     public init() {}
     public func replace(revision: UInt64, records: [ActionActivityItem], evictedCount: UInt64) {
+        guard presentationAdmission?.acceptsRetained() ?? true else { return }
         guard self.revision == nil || revision > self.revision! else { return }
         self.revision = revision
         self.items = records
@@ -293,6 +334,29 @@ public final class ActionActivityState {
             return $0.item.execution.admittedAt < $1.item.execution.admittedAt
         }
     }
+
+    @discardableResult
+    public func present(_ update: ActivityUpdate) -> Bool {
+        guard presentationAdmission?.acceptsRetained() ?? true else { return false }
+        apply(update)
+        return true
+    }
+    func apply(_ update: ActivityUpdate) {
+        switch update {
+        case .currentTaskID(let value): currentTaskID = value
+        case .skillOwnership(let value): skillOwnership = value
+        case .currentTaskTitle(let value): currentTaskTitle = value
+        case .currentTaskStatus(let value): currentTaskStatus = value
+        case .loadedSkills(let value): loadedSkills = value
+        case .showsExecutionHistory(let value): showsExecutionHistory = value
+        case .selectedTab(let value): selectedTab = value
+        case .selectedTaskID(let value): selectedTaskID = value
+        case .selectedSource(let value): selectedSource = value
+        case .selectedFilter(let value): selectedFilter = value
+        case .showsInternalActions(let value): showsInternalActions = value
+        case .observationUnavailable(let value): observationUnavailable = value
+        }
+    }
 }
 
 /// A display notice is never an ExecutionIssue or a task goal.
@@ -306,4 +370,144 @@ public struct HomeNotice: Sendable, Equatable {
         self.text = text
         self.tone = tone
     }
+}
+
+public enum ActivityUpdate {
+    case currentTaskID(String?)
+    case skillOwnership([String: String])
+    case currentTaskTitle(String)
+    case currentTaskStatus(String)
+    case loadedSkills([String])
+    case showsExecutionHistory(Bool)
+    case selectedTab(ExecutionLogTab)
+    case selectedTaskID(String?)
+    case selectedSource(String)
+    case selectedFilter(ExecutionLogFilter)
+    case showsInternalActions(Bool)
+    case observationUnavailable(Bool)
+}
+
+@MainActor
+public protocol ActivityPresenting: UIPresentationAccess {
+    var currentTaskID: String? { get }
+    var skillOwnership: [String: String] { get }
+    var currentTaskTitle: String { get }
+    var currentTaskStatus: String { get }
+    var loadedSkills: [String] { get }
+    var showsExecutionHistory: Bool { get }
+    var selectedTab: ExecutionLogTab { get }
+    var selectedTaskID: String? { get }
+    var selectedSource: String { get }
+    var selectedFilter: ExecutionLogFilter { get }
+    var showsInternalActions: Bool { get }
+    var observationUnavailable: Bool { get }
+    var notice: HomeNotice? { get }
+    var errorToast: ExecutionIssue? { get }
+    var backgroundIssues: [ExecutionIssue] { get }
+    var runtimeIssues: [ExecutionIssue] { get }
+    var items: [ActionActivityItem] { get }
+    var tasks: [TaskLogItem] { get }
+    var agentEvents: [AgentRuntimeLogItem] { get }
+    var issueEvictions: UInt64 { get }
+    var hasRecords: Bool { get }
+    var backgroundTaskCount: Int { get }
+    @discardableResult
+    func present(_ update: ActivityUpdate) -> Bool
+    func recordIssue(_ issue: ExecutionIssue, showsToast: Bool)
+    func dismissErrorToast(id: String)
+    func replaceIssues(revision: UInt64, records: [ExecutionIssue], evictedCount: UInt64)
+    func recordAgentEvent(_ event: AgentRuntimeLogItem)
+    func updateTask(_ incoming: TaskLogItem, event: TaskLogEvent)
+    func replace(revision: UInt64, records: [ActionActivityItem], evictedCount: UInt64)
+}
+
+extension ActionActivityState: ActivityPresenting {}
+
+extension ActivityPresenting {
+    public func recordIssue(_ issue: ExecutionIssue) { recordIssue(issue, showsToast: true) }
+}
+
+/// Passive log projections. Neither observation nor filtering drives Agent execution.
+public enum ExecutionLogTab: String, CaseIterable, Sendable {
+    case action = "Action"
+    case task = "Task"
+    case agent = "Agent"
+}
+public enum ExecutionLogFilter: String, CaseIterable, Sendable {
+    case all = "全部"
+    case active = "进行中"
+    case succeeded = "成功"
+    case failed = "异常"
+}
+public struct TaskLogEvent: Identifiable, Equatable, Sendable {
+    public let id: String
+    public let time: Date
+    public let title: String
+    public let detail: String
+    public init(id: String, time: Date, title: String, detail: String) {
+        self.id = id
+        self.time = time
+        self.title = title
+        self.detail = String(detail.prefix(256))
+    }
+}
+public struct TaskLogItem: Identifiable, Equatable, Sendable {
+    public enum Phase: String, Sendable {
+        case requested = "委派中"
+        case accepted = "已接纳"
+        case running = "进行中"
+        case waitingUser = "等待用户"
+        case cancelling = "取消请求已接纳"
+        case succeeded = "已完成"
+        case failed = "失败"
+        case cancelled = "已取消"
+    }
+    public let id: String
+    public let parentID: String?
+    public let requester: String
+    public let executor: String
+    public var title: String
+    public var phase: Phase
+    public var execution: String?
+    public var mode: String?
+    public var skills: [String] = []
+    public var failure: String?
+    public var events: [TaskLogEvent]
+    public var evictedEvents: Int
+    public var isTerminal: Bool { [.succeeded, .failed, .cancelled].contains(phase) }
+    public init(
+        id: String, parentID: String?, requester: String, executor: String, title: String, phase: Phase,
+        events: [TaskLogEvent] = [], evictedEvents: Int = 0
+    ) {
+        self.id = id
+        self.parentID = parentID
+        self.requester = requester
+        self.executor = executor
+        self.title = String(title.prefix(256))
+        self.phase = phase
+        self.events = events
+        self.evictedEvents = evictedEvents
+    }
+}
+public struct AgentRuntimeLogItem: Identifiable, Equatable, Sendable {
+    public let id: String
+    public let source: String
+    public let status: String
+    public let isFailure: Bool
+    public let time: Date
+    public init(
+        id: String = UUID().uuidString, source: String, status: String, isFailure: Bool, time: Date = .now
+    ) {
+        self.id = id
+        self.source = source
+        self.status = status
+        self.isFailure = isFailure
+        self.time = time
+    }
+}
+
+@MainActor
+public protocol ExecutionFailureReporting: AnyObject, Sendable {
+    func recordFailure(
+        title: String, source: String, message: String, failureCode: String?, context: ExecutionIssue.Context?)
 }

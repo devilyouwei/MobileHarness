@@ -2,6 +2,7 @@ import CoreAILanguageModels
 import Darwin
 import Foundation
 import Metal
+import OSLog
 import Tokenizers
 
 public struct GemmaLanguageTurn: Sendable {
@@ -26,17 +27,22 @@ public enum GemmaLanguageError: Error, Sendable {
     case busy
     case nonMonotonicText
     case outputTooLarge
+    case contextLimit
 }
 
 /// Gemma's decode-only CoreAI graph with immutable, checkpoint-matched PLE buffers.
 @available(iOS 27, macOS 27, *)
 public actor GemmaLanguageEngine {
+    private static let signposter = OSSignposter(subsystem: "dev.mobileharness", category: "GemmaPerformance")
+    nonisolated let contextLimit: Int
     private let engine: any InferenceEngine
     private let tokenizer: any Tokenizer
     private let tables: [String: StaticInputBuffer]
     private var active = false
 
     public init(directory: URL) async throws {
+        let interval = Self.signposter.beginInterval("EngineLoad")
+        defer { Self.signposter.endInterval("EngineLoad", interval) }
         #if os(iOS)
             var system = utsname()
             uname(&system)
@@ -67,9 +73,16 @@ public actor GemmaLanguageEngine {
         tables = buffers
         let bundle = try LanguageBundle(
             at: directory.appendingPathComponent("gpu-pipelined-b2/" + bundleName))
+        #if os(iOS)
+            let isIOS = true
+        #else
+            let isIOS = false
+        #endif
+        contextLimit = GemmaContextBudget.effectiveContextLimit(modelLimit: bundle.maxContextLength, isIOS: isIOS)
+        guard contextLimit >= 2 else { throw GemmaLanguageError.contextLimit }
         let config = ModelConfig(
             name: bundle.name, tokenizer: bundle.tokenizer, vocabSize: bundle.vocabSize,
-            maxContextLength: min(4096, bundle.maxContextLength), serializedModel: [bundle.modelAssetPath],
+            maxContextLength: contextLimit, serializedModel: [bundle.modelAssetPath],
             function: "main")
         engine = try await EngineFactory.createEngine(
             config: JSONEncoder().encode(config), modelURL: bundle.requireModelURL(for: "main"),
@@ -95,8 +108,15 @@ public actor GemmaLanguageEngine {
         onText: @Sendable (String) throws -> Void
     ) async throws -> GemmaLanguageGeneration {
         guard !active else { throw GemmaLanguageError.busy }
+        guard !tokens.isEmpty, maximumTokens > 0, maximumTokens <= contextLimit,
+            tokens.count <= contextLimit - maximumTokens
+        else { throw GemmaLanguageError.contextLimit }
         active = true
         defer { active = false }
+        let signpostID = Self.signposter.makeSignpostID()
+        let interval = Self.signposter.beginInterval(
+            "Generation", id: signpostID, "input=\(tokens.count) outputBudget=\(maximumTokens)")
+        defer { Self.signposter.endInterval("Generation", interval) }
         do {
             try Task.checkCancellation()
             try await engine.reset()
@@ -112,6 +132,7 @@ public actor GemmaLanguageEngine {
             for try await output in stream {
                 try Task.checkCancellation()
                 count += 1
+                if count == 1 { Self.signposter.emitEvent("FirstNativeToken", id: signpostID) }
                 let token = Int(output.tokenId)
                 if stopIDs.contains(token) {
                     stopped = true
@@ -125,7 +146,12 @@ public actor GemmaLanguageEngine {
                 while visible.last == "\u{FFFD}" { visible.removeLast() }
                 guard visible.hasPrefix(emitted) else { throw GemmaLanguageError.nonMonotonicText }
                 let delta = String(visible.dropFirst(emitted.count))
-                if !delta.isEmpty { try onText(delta) }
+                if !delta.isEmpty {
+                    if emitted.isEmpty {
+                        Self.signposter.emitEvent("FirstVisibleText", id: signpostID, "generated=\(count)")
+                    }
+                    try onText(delta)
+                }
                 emitted = visible
             }
             // Pipelined decode owns a worker; cancel joins it even on early EOS.

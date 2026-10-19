@@ -8,11 +8,11 @@ import ExecutionRuntime
 import Foundation
 import FunctionContracts
 import PlatformKit
-import Storage
+import StorageCore
 import Testing
-import UI
 
 @testable import Gateway
+@testable import UI
 
 private actor ObservationGate {
     private var entered = false
@@ -273,4 +273,140 @@ func cancelledActionPresentationRetainsOnlyIndependentRealIssues(_ mixed: Bool) 
     #expect(item.isFailure == mixed)
     #expect(item.issueDescriptions.count == (mixed ? 1 : 0))
     #expect(!item.issueDescriptions.contains { $0.contains("CancellationError") })
+}
+
+private actor VisionSessionRecorder {
+    var failures = 0
+    var delivered = false
+    var returned = false
+    var inputJoined = false
+    func failed() { failures += 1 }
+    func deliver() { delivered = true }
+    func finish() { returned = true }
+    func joinInput() { inputJoined = true }
+}
+
+@Test(.timeLimit(.minutes(1))) func visionSessionDrainsTerminalAfterInputFailure() async throws {
+    let reported = ObservationGate()
+    let output = ObservationGate()
+    let recorder = VisionSessionRecorder()
+    let task = Task {
+        try await VisionPipelineWorkflow.run(
+            input: { throw VisionPipelineWorkflow.Failure.inputEnded },
+            inputFailed: { _ in
+                await recorder.failed()
+                await reported.release()
+            },
+            output: {
+                await reported.wait()
+                await output.wait()
+                try Task.checkCancellation()
+                await recorder.deliver()
+            }, stopInput: {})
+        await recorder.finish()
+    }
+    await output.waitForEntry()
+    #expect(await recorder.failures == 1)
+    #expect(await recorder.returned == false)
+    await output.release()
+    try await task.value
+    #expect(await recorder.delivered)
+    #expect(await recorder.returned)
+}
+
+@Test(.timeLimit(.minutes(1))) func visionSessionReportsUnexpectedSourceEnd() async throws {
+    let sourceEnded = ObservationGate()
+    let recorder = VisionSessionRecorder()
+    try await VisionPipelineWorkflow.run(
+        input: {},
+        inputFailed: { error in
+            #expect(error is VisionPipelineWorkflow.Failure)
+            await recorder.failed()
+            await sourceEnded.release()
+        },
+        output: {
+            await sourceEnded.wait()
+            await recorder.deliver()
+        }, stopInput: {})
+    #expect(await recorder.failures == 1)
+    #expect(await recorder.delivered)
+}
+
+@Test(.timeLimit(.minutes(1))) func visionSessionOutputFailureCancelsAndJoinsInput() async throws {
+    let entered = ObservationGate()
+    let recorder = VisionSessionRecorder()
+    let stream = AsyncStream<Int>.makeStream(bufferingPolicy: .bufferingOldest(1))
+    await #expect(throws: CommunicationError.unauthorized) {
+        try await VisionPipelineWorkflow.run(
+            input: {
+                await entered.release()
+                for await _ in stream.stream {}
+                try Task.checkCancellation()
+            }, inputFailed: { _ in await recorder.failed() },
+            output: {
+                await entered.wait()
+                throw CommunicationError.unauthorized
+            },
+            stopInput: {
+                stream.continuation.finish()
+                await recorder.joinInput()
+            })
+    }
+    #expect(await recorder.failures == 0)
+    #expect(await recorder.inputJoined)
+}
+
+@Test(.timeLimit(.minutes(1))) func visionSessionUserCancellationDoesNotReportInputFailure() async throws {
+    let entered = ObservationGate()
+    let recorder = VisionSessionRecorder()
+    let input = AsyncStream<Int>.makeStream(bufferingPolicy: .bufferingOldest(1))
+    let output = AsyncStream<Int>.makeStream(bufferingPolicy: .bufferingOldest(1))
+    let task = Task {
+        try await VisionPipelineWorkflow.run(
+            input: {
+                await entered.release()
+                for await _ in input.stream {}
+                try Task.checkCancellation()
+            },
+            inputFailed: { _ in await recorder.failed() },
+            output: {
+                for await _ in output.stream {}
+                try Task.checkCancellation()
+            },
+            stopInput: {
+                input.continuation.finish()
+                await recorder.joinInput()
+            })
+    }
+    await entered.wait()
+    task.cancel()
+    await #expect(throws: CancellationError.self) { try await task.value }
+    #expect(await recorder.failures == 0)
+    #expect(await recorder.inputJoined)
+}
+
+@Test @MainActor func visionDiagnosticsAppearInAgentLogAndToast() async throws {
+    for code in [
+        "vision.pose.failed", "vision.pipeline.failed", "vision.input.failed", "vision.pose.stalled",
+        "vision.pose.stale", "vision.input.stalled", "vision.presentation.failed",
+    ] {
+        let state = ActionActivityState()
+        let workflow = ActionActivityWorkflow(state: state)
+        let fixture = try RuntimeFailurePresentationFixture(activity: workflow)
+        try await fixture.start(activity: workflow)
+        let diagnostic = AgentFailureDiagnostic(category: .runtime, code: code, detail: "fixture native cause")
+        workflow.recordFailure(
+            title: "视觉异常", source: "visionPerception", message: diagnostic.detail, failureCode: code,
+            context: .init(workerID: "visionPerception", sessionID: "fixture"), diagnostic: diagnostic)
+        let deadline = ContinuousClock.now + .seconds(4)
+        while state.backgroundIssues.isEmpty {
+            guard ContinuousClock.now < deadline else { throw CommunicationError.expired }
+            try await Task.sleep(for: .milliseconds(5))
+        }
+        #expect(state.backgroundIssues.last?.category == "Agent 运行异常")
+        #expect(state.backgroundIssues.last?.message == "fixture native cause")
+        #expect(state.errorToast?.userMessage != nil)
+        #expect(state.visibleNotice?.tone == .error)
+        await fixture.stop(activity: workflow)
+    }
 }

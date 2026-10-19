@@ -28,11 +28,12 @@
         let conversation: ConversationState
         let actionActivity: ActionActivityState
         private let diagnostic: SpeechDiagnosticWorkflow
+        private let diagnosticState: SpeechDiagnosticState
         let audioDetection: AudioDetectionWorkflow
 
         func makeMossValidationView() -> MossValidationView {
             MossValidationView(
-                state: diagnostic.state, controls: diagnostic,
+                state: diagnosticState, controls: diagnostic,
                 autorun: ProcessInfo.processInfo.arguments.contains("-moss-autorun"))
         }
 
@@ -48,42 +49,45 @@
         }
 
         init(
-            resources: URL, runtime: AgentServices, modelName: @escaping @Sendable () async throws -> String,
+            home: UIHomeContainer, diagnostics: UIDiagnosticsContainer,
+            language: any ModelLanguageProviding, speech: any ModelSpeechProviding,
+            memoryPressure: @escaping @Sendable () async -> Void, audio: AudioContainer, runtime: AgentServices,
+            modelName: @escaping @Sendable () async throws -> String,
             progress: @MainActor (String) -> Void
         ) async throws {
-            actionActivity = runtime.actionActivity.state
-            let models = try await ModelKitDefaults.manager(resources: resources)
-            // Resolve stable capability handles before preparing the conversation models.
-            let recognition = try await models.get(.recognition, load: false)
-            let chat = CurrentChatCapability(models: models)
-            let vad = try await models.get(.voiceActivity, load: false)
-            let synthesis = try await models.get(.synthesis, load: false)
+            actionActivity = home.activity
+            let recognition = speech.recognition
+            let chat = language
+            let vad = speech.voiceActivity
+            let synthesis = speech.synthesis
             let validationModel = synthesis
-            let diagnosticState = SpeechDiagnosticState()
+            let diagnosticState = diagnostics.speech
+            self.diagnosticState = diagnosticState
             diagnostic = SpeechDiagnosticWorkflow(
-                state: diagnosticState, player: AppleAudioIO(), provider: validationModel,
-                load: { try await models.warmup(.synthesis) },
-                unload: { try await ModelKitDefaults.unloadSpeechSynthesis(resources: resources) })
+                state: diagnosticState, player: audio.io(.diagnostic), provider: validationModel,
+                load: { try await speech.warmup(.synthesis) },
+                unload: { try await speech.unload(.synthesis) })
             #if DEBUG
                 validateVoiceModels = {
                     try await ChatDiagnosticWorkflow.validate(chat: chat) {
-                        try await models.warmup(.recognition)
-                        try await models.warmup(.chat)
+                        try await speech.warmup(.recognition)
+                        try await language.warmup()
                     }
                 }
             #endif
             // Preparation is deferred to explicit voice admission; missing downloads do not block Settings/history.
             progress("本地模型可在设置中下载")
             try Task.checkCancellation()
-            let state = ConversationState()
+            let state = home.conversation
             let lifecycle = VoiceSessionCoordinator(
                 runtime: runtime.voiceDependencies, state: state,
-                audio: AppleAudioIO(), recognition: recognition, synthesis: synthesis, voiceActivity: vad)
+                audio: audio.io(.voice), cue: audio.cue(.voice), haptic: audio.haptic(.voice), recognition: recognition,
+                synthesis: synthesis, voiceActivity: vad)
             self.lifecycle = lifecycle
             let audioDetection = AudioDetectionWorkflow(
-                state: AudioDetectionState(),
+                state: diagnostics.audioDetection,
                 endpoint: AudioDetectionSession(
-                    recognition: recognition, vad: vad,
+                    recognition: recognition, vad: vad, audio: audio.io(.detection),
                     beforeStart: { [weak lifecycle] in await lifecycle?.stopVoiceAndWait() }))
             self.audioDetection = audioDetection
             lifecycle.beforeVoiceStart = { [weak audioDetection] in await audioDetection?.stopAndWait() }
@@ -92,7 +96,7 @@
             memoryWarnings = Task {
                 for await _ in warnings {
                     guard !Task.isCancelled else { break }
-                    await models.handleMemoryPressure()
+                    await memoryPressure()
                 }
             }
         }

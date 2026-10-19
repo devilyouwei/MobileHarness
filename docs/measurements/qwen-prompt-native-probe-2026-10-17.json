@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "model": "qwen3.8-max",
+  "phase": "between-full1-and-full2",
+  "scope": "One additional equivalent replay of history-list-native first request; not original failed HTTP wire capture, not explanation of all invalidResponse errors. No credentials recorded.",
+  "declaredNames": [
+    "History_list_0",
+    "History_read_1"
+  ],
+  "actualOutput": [
+    {
+      "arguments": "{\"skills\": \"[\\\"history-query\\\"]\"}",
+      "call_id": "call_3122129acfe449c8a7c604d7",
+      "name": "loadSkills",
+      "type": "function_call",
+      "id": "msg_3bbb5a19-725d-472f-b0b7-728ec5d59389",
+      "status": "completed"
+    },
+    {
+      "arguments": "{\"offset\": \"0\", \"limit\": \"5\"}",
+      "call_id": "call_27ee72d3929b45fea01f8518",
+      "name": "History_list_0",
+      "type": "function_call",
+      "id": "msg_9caf1932-4125-409f-ba91-091fc7f28e00",
+      "status": "completed"
+    }
+  ],
+  "requestFile": "/tmp/qwen-prompt-history-probe-request.json",
+  "responseFile": "/tmp/qwen-prompt-history-probe.sse",
+  "requestSHA256": "63545e142e0171eebc30edcc7c48c7de5c7692f689ec667d68ed0d2affc00991",
+  "responseSHA256": "4a2818c6e564b88bd318904b43b6bef8de11ebba41e593f6edbc267f2641af64",
+  "interpretation": "Model emitted undeclared native loadSkills in addition to declared History_list_0. Unchanged decoder rejects undeclared native functions; final teaching clarifies already-declared Tool availability."
+}

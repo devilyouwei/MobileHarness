@@ -5,9 +5,10 @@ import Agents
 import Foundation
 import Gateway
 import PlatformKit
-import Storage
+import StorageCore
 import Testing
-import UI
+
+@testable import UI
 
 @MainActor private final class HeldInteraction {
     var calls: [AppInteractionIntent] = []
@@ -81,10 +82,12 @@ import UI
 }
 @Test @MainActor func cameraCommandRejectsOverlapAndRecoversAfterFailure() async throws {
     let host = HeldInteraction()
-    let state = CameraState()
+    let ui = UIContainer()
+    try ui.start()
+    let state = ui.camera.state
     #expect(!state.isEnabled)
     let controls = CameraInteractionWorkflow(
-        state: state,
+        presentation: ui.camera,
         perform: { operation, facing, mediaID in
             try await host.performCamera(operation, facing: facing, mediaID: mediaID)
         })
@@ -93,9 +96,13 @@ import UI
     await started.next()
     controls.switchCamera()
     #expect(host.cameraCalls.count == 1)
-    #expect(state.message != nil)
+    #expect(state.controlMessage != nil)
+    #expect(state.message == nil)
+    #expect(state.controlBusy)
     host.finish(throwing: CancellationError())
     await controls.waitUntilIdle()
+    #expect(!state.controlBusy)
+    #expect(state.controlMessage == nil)
     controls.retry()
     await controls.waitUntilIdle()
     #expect(host.cameraCalls == [.open, .retry])
@@ -110,9 +117,11 @@ import UI
 
 @Test @MainActor func photoUIControlsPreserveSelectedIDAndAllowRetryAfterFailure() async throws {
     let host = HeldInteraction()
-    let state = CameraState()
+    let ui = UIContainer()
+    try ui.start()
+    let state = ui.camera.state
     let controls = CameraInteractionWorkflow(
-        state: state,
+        presentation: ui.camera,
         perform: { operation, facing, id in try await host.performCamera(operation, facing: facing, mediaID: id) })
     let original = "media_1"
     let replacement = "media_2"
@@ -133,11 +142,13 @@ import UI
 }
 
 @Test @MainActor func committedPhotoSaveIsVisibleWhenLaterRequestCompletionFails() async throws {
-    let state = CameraState()
+    let ui = UIContainer()
+    try ui.start()
+    let state = ui.camera.state
     let id = "media_1"
     var calls = 0
     let controls = CameraInteractionWorkflow(
-        state: state,
+        presentation: ui.camera,
         perform: { _, _, selected in
             calls += 1
             state.savedMediaID = selected
@@ -148,4 +159,33 @@ import UI
     #expect(calls == 1)
     #expect(state.savedMediaID == id)
     #expect(state.photoMessage?.hasPrefix("已保存到相册") == true)
+}
+
+@Test @MainActor func cameraOverlapHintClearsOnCompletionWithoutReplacingDeviceFailure() async throws {
+    let ui = UIContainer()
+    try ui.start()
+    let state = ui.camera.state
+    let host = HeldInteraction()
+    let controls = CameraInteractionWorkflow(
+        presentation: ui.camera,
+        perform: { operation, facing, id in try await host.performCamera(operation, facing: facing, mediaID: id) })
+    var started = host.started.stream.makeAsyncIterator()
+    controls.toggle()
+    // Busy is visible synchronously, before the asynchronous dispatch starts.
+    #expect(state.controlBusy)
+    await started.next()
+    state.present(.message("设备中断"))
+    controls.retry()
+    #expect(state.controlMessage != nil)
+    #expect(state.message == "设备中断")
+    #expect(host.cameraCalls == [.open])
+    host.finish()
+    await controls.waitUntilIdle()
+    #expect(!state.controlBusy)
+    #expect(state.controlMessage == nil)
+    #expect(state.message == "设备中断")
+    controls.retry()
+    await controls.waitUntilIdle()
+    #expect(host.cameraCalls == [.open, .retry])
+    await ui.stop()
 }

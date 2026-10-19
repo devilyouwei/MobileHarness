@@ -1,7 +1,8 @@
 import Foundation
 
 /// Root-owned latest-intent replacement. Native camera switching never waits on perception cleanup.
-@MainActor public final class CameraVisionRestartWorkflow<Intent: Sendable> {
+@MainActor
+public final class CameraVisionRestartWorkflow<Intent: Sendable> {
     private let start: (Intent) -> Task<Void, Never>?
     private var active: Task<Void, Never>?
     private var worker: Task<Void, Never>?

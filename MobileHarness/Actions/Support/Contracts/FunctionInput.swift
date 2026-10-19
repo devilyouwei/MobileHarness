@@ -6,7 +6,10 @@ public protocol FunctionInput: Sendable {
     var executionID: String { get }
     var context: ActionExecutionContext { get }
     var call: FunctionRequest { get }
+    var attachment: (any Sendable)? { get }
 }
+extension FunctionInput { public var attachment: (any Sendable)? { nil } }
+
 public protocol FunctionReporting: Sendable {
     func record(_ report: ActionReport) async throws
     func snapshot() async -> ActionReport?
@@ -16,10 +19,12 @@ public struct FunctionInvocation: FunctionInput {
     public let executionID: String
     public let context: ActionExecutionContext
     public let call: FunctionRequest
+    public let attachment: (any Sendable)?
     public init(
         call: FunctionRequest, context: ActionExecutionContext, executionID: String,
-        results: any FunctionReporting
+        results: any FunctionReporting, attachment: (any Sendable)? = nil
     ) {
+        self.attachment = attachment
         self.call = call
         self.context = context
         self.executionID = executionID

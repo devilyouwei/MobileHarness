@@ -1,99 +1,86 @@
-# UI — Presentation and Human Interaction
+# UI — 呈现与人机交互
 
-## Summary
+✅ home 接纳带身份的大模型等待值，与模型准备独立，二者复用 loading 大小眼；请求等待不阻止停止聆听、不增加文字或取消按钮。
 
-Independent SwiftUI views, display values and injected interaction interfaces.
+✅ 移除首页准备状态文字和取消端口；准备失败只提供重试按钮。真实加载仅通过独立 expression Action 呈现左右大小眼等待动画，UI 不决定失败 Toast。
 
-## Ownership and boundaries
+✅ 已实现：常驻首页保留挂载，但应用导航覆盖时由注入的导航通知暂停相机；返回首页按原开启意图恢复。导航保持根聆听，深层 Assistant 历史加载不得停止会话；真正场景失活仍遵循 App 策略。
 
-Foundational module with no cross-module dependencies. Owner-specific AgentBindings/ActionBindings adapt business/native values and implement injected controls; views own drafts/navigation/rendering. Long-lived models, devices and task cleanup stay with their host owners.
+## 职责与边界
 
-## External relationships and data flow
+UI 是零项目依赖的基础模块，不导入 FactoryKit、PlatformKit、Storage、Actions 或 Agents。只接收 UI 自有值和注入的操作接口，拥有展示状态、原生渲染及交互回执；不拥有设备、模型、仓库或业务策略。
 
-Runtime arrows show data or capability calls; dashed arrows show injection.
+App 缓存唯一 UIContainer 并管理生命周期；AgentBindings / ActionBindings 将业务值转换后提交呈现端口，页面将用户意图交给注入的控制端口。ApplicationControl 决定异常是否提示，UI 只负责呈现、去重和期限。
+
+## 模块关系与数据流
 
 ```mermaid
 flowchart LR
- Bindings[AgentBindings / ActionBindings] -->|UI-owned values and controls| UI
- User -->|local navigation and intent| UI
- UI -->|submitted business intent| Bindings[AgentBindings]
- UI -->|rendered state| Screen[Native screen]
- UI -->|renderer identity and completion| Bindings
+ App["App 装配与生命周期"] -.-> Root["UIContainer"]
+ Bindings["业务集成"] -->|"UI 自有值／呈现接口"| Root
+ Root --> State["八个子容器的展示状态"]
+ State --> Views["页面与原生渲染"]
+ Views -->|"用户意图／真实动画回执"| Bindings
 ```
 
-## Internal structure
+外部只描述直接相邻关系；业务和原生设备的完整链路见[总体设计](../README.md)。
 
-```mermaid
-flowchart TB
- Conversation --> Components[Shared eyes, spectrum and captions]
- Camera --> Components
- Settings --> History[History presentation in Settings]
- Diagnostics --> Forms[Injected debug controls]
- Camera --> Values[UI-owned camera and pose values]
- Conversation --> Logs[Action, Task and Agent values]
-```
+## 子容器与源码归属
 
-Home refinement: camera intent initially off, YOLO details initially collapsed, and a single unboxed foreground goal above the user caption; Conversation owns separate pinned-goal and moving-caption geometry.
+✅ 根构造时一次创建八个子容器，不在首次回复或页面切换时补建；构造与 start 不请求权限、不读取仓库、不启动设备或模型。
 
-## Interaction and acceptance
+| 子容器 | 拥有的展示状态 | 源码 |
+| --- | --- | --- |
+| home | 会话、表情回执、字幕、频谱、运行日志、Toast、Notice、装饰光 | [Conversation](Conversation/README.md) |
+| camera | 视频、骨架、照片及离场呈现 | [Camera](Camera/README.md) |
+| settings | Provider 草稿、发现／保存状态及 revision | [Settings](Settings/README.md) |
+| modelResources | 资源列表、偏好、安装状态及 generation | [Settings](Settings/README.md) |
+| navigation | 应用路径与导航呈现 | UIContainer.swift |
+| history | 历史列表、详情及分页展示 | [Settings](Settings/README.md) |
+| devices | 蓝牙展示快照 | [Settings](Settings/README.md) |
+| diagnostics | 语音合成与音频检测展示 | [Diagnostics](Diagnostics/README.md) |
 
-Page navigation, disclosure, dialogs and drafts are local presentation. Submitted operations invoke host controls, which route directly to their actual owner. Agent-driven presentation invokes a registered function and scoped UI endpoint before state changes. A later ActionResult reports the function's completion boundary; it is not the trigger for that same UI mutation.
+[Components](Components/README.md) 提供无业务依赖的眼睛、光环、频谱、字幕及常驻全屏覆盖组件。页面局部展开、焦点、图片检查器及页面请求任务仍由视图拥有。
 
-The owning integration and UI endpoints reject stale session/turn/request/frame updates before converting them to UI values. UI never imports Agent, Action, model, transport or persistence types. Independent display schemas include camera/pose, settings/resources/history and Action/Task/Agent logs.
+## 接纳、生命周期与完成
 
-Finite expressions carry renderer identity and completion acknowledgment; setting a persistent base expression only commits state. Passive pose/gaze/spectrum updates have no long-lived UI queue. View disappearance cancels page-scoped reads/diagnostics and renderer availability, not root-owned execution.
+- ✅ 业务通过只读 Presenting 协议及类型化更新提交；应用级状态由子容器唯一创建，字段写权限留在 UI。App 注册的子能力均来自同一根。
+- ✅ start 开启接纳；invalidate 同步使实时代际凭证失效，关闭视频／骨架／实时会话及动画接纳，解除动画等待。
+- ✅ 后台保留导航、草稿、历史、资源／设备事实和异常记录；后台不弹 Toast，回前台不重放旧异常或自动恢复旧会话。
+- ✅ stop 幂等关闭全部接纳，取消并加入 UI 自有期限任务，清理敏感草稿及展示回调；旧根不可重启，旧端口不能修改新根。
+- ✅ 会话／轮次、设置 revision、资源 generation、分页 ticket、相机序号／方向等业务围栏独立保留，根代际不替代它们。
+- ✅ 状态接纳不代表 GPU 上屏、动画结束或设备停机。原生视图拥有 Metal 生命周期和真实 GPU 完成，照片及表情通过身份匹配返回真实回执。
 
-State-driven conversation/camera/settings/history/log/diagnostic surfaces, native local navigation, accessibility and Reduce Motion paths.
+## 应用根与导航
 
-Native visual acceptance is recorded in [validation history](../../docs/validation/Validation-History.md).
+✅ PersistentHomeNavigation 显式清除 iOS 导航容器背景，目的页面自己绘制不透明背景并随原生转场移动；返回手势揭示下方常驻首页，不再通过路径驱动整个 iOS 导航层透明度。命中与辅助功能仍由路径控制，导航不重建首页或停止聆听，相机继续按首页准入暂停／恢复。
 
-## Related design
+ApplicationRootPorts 定义 UI 自有请求契约。ApplicationRootView 使用 PersistentHomeNavigation，将首页和原生相机／表情树常驻在 NavigationStack 外；导航和图片覆盖保留首页身份及窗口挂载。覆盖只调整命中与辅助功能，离窗仍如实撤销回执。前台页面保持亮屏；场景失活由 App 关闭业务接纳。
 
-[Parent design](../README.md) · [Camera](Camera/README.md) · [Components](Components/README.md) · [Conversation](Conversation/README.md) · [Diagnostics](Diagnostics/README.md) · [Settings](Settings/README.md)
+设置／历史导航保持根聆听；相机仅在首页且 App 前台时运行，覆盖期间暂停，返回按原开启意图恢复。bootstrap/retry 由注入的生命周期接口执行。保留真实聊天／语音诊断入口，诊断结果不作为生产或硬件验收。
 
-Listening presentation: long-press interaction/accessibility remain local; UI displays active-session halo and resting open/closed eyes from passive state, without native audio/haptic ownership.
+## 约束与待完成项
 
-UI packages a native Metal vertex/fragment edge-light resource with no cross-module dependencies. Conversation submits long-hold stop during replies; halo follows consent while native capture pauses. A GPU edge field and two-span caption fade replace full-screen layered blur and per-character 30 Hz reconstruction.
+✅ 子容器和所属状态、接口同文件归类；导航归 UI 根，音频检测归 Diagnostics，眼睛和频谱分别拥有原生实现。应用根只提供实际页面与真实诊断入口，不承载模拟状态或性能对比程序。导入顺序、声明属性和格式由统一规则维护。
 
-waking eye transition is rapid and separate from slow closure; first blink is delayed after a fresh wake epoch, and loading does not scale the eyes. Halo keeps one stable native layer and generation-scoped GPU opacity envelope with no App/Action dependencies.
+❌ Metal 持续挂载／重启稳定性、全量集成失败、原生取帧暂停及完整真机验收仍待关闭。渲染方式选择不等于性能已最优，详见[验证记录](../../docs/validation/PlatformKit-Containers.md)。
 
-Camera adds an identity-fenced PhotoDeparture acknowledgment and pure numeric departure layout. Saving enlarges to 1.16 then translates wholly right without shrinking; ignoring shrinks toward the lower-right outside screen bounds. UI owns no audio or album transactions.
+✅ 光环渲染线程退出与 GPU 槽位回收已有明确完成屏障；相机媒体复用到期任务，频谱缓存固定属性。保持两个显示线程和现有帧率，实际内存、功耗与流畅度仍须真机测量。
 
-Conversation separates pinned goal and moving ASR. Components use an atomic native Core Animation/Metal companion surface; UI still has no cross-module dependencies. UIKit owns state-to-layer commits, immutable Metal snapshots cross one isolated rendering thread; no 60 Hz SwiftUI body loop for eyes/rim.
+✅ 光环失败锁存与状态去重；历史详情读取随页面取消、目录异步解析、时间线按数据变更缓存；资源编辑只发意图，由唯一业务拥有者合并恢复与自动保存。图片及空闲日志刷新保留现状，等待实测。
 
-Conversation provides passive error-toast presentation, driven by root-owned failure projections. No Agent/provider dependency is added.
+✅ 字幕已改为单个SwiftUI Text＋TextRenderer，移除双UILabel／富文本覆盖路径；只在有限250ms淡入期间启用本地显示节奏，保留完整文字、320 Character边界、滚动、无障碍与生命周期取消。仅使用原生API，实际性能另测。
 
-## 历史记录接口
+✅ 已实现：home提供独立模型准备呈现值及加载眼睛；UI不导入ModelKit或App。根页面连接失败重试与活动变化通知，设置和已有停止入口可用，不阻塞主线程。
 
-设置入口改为 Agent 记录，仅提供真实 Assistant 聊天记录；前台 Task 按持久化身份在对话内展开，不再提供重复任务页面。
+✅ 已实现：home／devices各持有UI自有BluetoothConnectionStatus及版本围栏；接纳保留事实更新，后台无需重放Toast。基础库不引入Signal／Actions。
 
-listening light origin is a UI-owned normalized presentation parameter, captured from the actual hold and latched per activation. No new device/Action lifetime or module dependency is introduced.
-
-home notices are restricted to upper-layer Agent/App/system failures; Action failure color/status stays in the current Action panel. Notice is plain centered yellow icon/text, with no card or close control.
-
-UI 消费宿主注入的 notice/light 值；实际错误优先于装饰提示，装饰光与聆听 generation 独立。原生渲染见 [Components](Components/README.md)，会话投影见 [Conversation](Conversation/README.md)。
-
-ExecutionIssue 已增加可选 userMessage 展示值，日志 message 不变；首页 visibleNotice 优先使用宿主提供的 userMessage，错误 toast 的身份、去重、到期和日志面板保持现有行为。UI 不解析语音 SDK 错误。
-
-## Task history v2 and in-place compression
-
-UI exposes passive indexed history compressions and a chronological timeline. Task summaries expand to original model request details; UI never chooses persistence or constructs business summaries.
-
-History must fold a terminal Task when the loaded paginated source subset matches its exact input/request references. Complete source evidence remains independently pageable. Subsequent timeline pages must merge Task compression metadata as well as request rows, without changing row styling/navigation.
-
-History pagination becomes appearance-driven for archive lists, dialog timelines and expanded Task sources. UI-local cursor/ticket state prevents overlapping/duplicate attempts; page-owned tasks cancel on disappearance, while long-lived business operations remain root-owned.
-
-## 公开端口与应用根界面
-
-ApplicationRootPorts 定义 UI 自己的根请求/会话能力，不包含业务模块类型；ApplicationRootView 拥有首页、导航树、设置/历史目的地及诊断展示。AgentApplicationUI 在 AgentBindings 实现这些请求端口；bootstrap/retry 是注入的生命周期接口，页面不拥有根服务。
-
-SettingsProviderOperations、ModelResourcesOperating 与展示错误值属于 UI 的公开请求契约；调用实现和业务判断在上层。BluetoothViewSnapshot 由 UI.apply 接纳，连接/控制事实仍由 NexArmControlService 拥有。HomeEffectsWorkflow 只依赖 Foundation 和 UI 自身类型，持有有界期限状态；业务 invocation 到 PresentationOwner 的转换在 ActionBindings。
-
-UI、ModelKit、PlatformKit、Storage 仍无项目依赖；Actions/Agents 的外层集成可以依赖 UI，UI 不反向依赖它们。实际 Action 直接调用模块公开呈现端口，本地点击/导航不经过 Agent。
+✅ UI 使用 UIContainerError 及原始渲染错误报告，过期提交以显式 Bool／拒绝计数表达；错误展示值由上层提交，UI 根不决定 Toast／语音／状态机策略。
 
 
-## 待实现
+✅ UIFailure与其他基础根采用同形结构，根start／setForeground类型化抛错，渲染失败使用同一报告。逐帧过期／方向校验保留既有领域异常及Bool接纳协议，不自动产生逐帧故障广播；UI不选择错误的业务呈现方式。
 
-- Multistage character performance and persistent UI audit storage.
 
-- 历史记录页面板块重新设计及原生 UI/真机验收。
+✅ home.expressions拥有独立加载状态与revision；模型准备中可显示两个加载眼睛，即使聆听关闭。UI不接触模型或Signal；终态／失活／停止同步清理，Action只是提交呈现。
+
+✅ 已实现：首页检查仍保留交互门，但不挂载加载文字层；真实准备仅显示等待眼睛，失败只显示重试按钮。

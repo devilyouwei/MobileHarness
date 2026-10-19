@@ -1,8 +1,9 @@
 import Foundation
 
-/// Complete display text is independent of animation completion; offsets use UILabel's UTF-16 indices.
+/// Latest bounded text and grapheme-safe stable/revised boundaries.
 public struct CaptionPresentation: Equatable, Sendable {
     public let text: String
+    public let stableCharacterCount: Int
     public let stableUTF16Count: Int
     public let animatesSuffix: Bool
     public var revisedRange: NSRange {
@@ -12,14 +13,129 @@ public struct CaptionPresentation: Equatable, Sendable {
         let next = Array(text.suffix(320))
         self.text = String(next)
         let count = zip(previous.suffix(320), next).prefix { $0 == $1 }.count
-        stableUTF16Count = finalized || reduceMotion ? self.text.utf16.count : String(next.prefix(count)).utf16.count
-        animatesSuffix = !finalized && !reduceMotion && stableUTF16Count < self.text.utf16.count
+        stableCharacterCount = finalized || reduceMotion ? next.count : count
+        stableUTF16Count = String(next.prefix(stableCharacterCount)).utf16.count
+        animatesSuffix = !finalized && !reduceMotion && stableCharacterCount < next.count
     }
 }
 
-#if os(iOS)
+struct CaptionRenderRun: Equatable, Sendable {
+    var text: String
+    let appearedAt: ContinuousClock.Instant?
+    static let duration = Duration.milliseconds(250)
+    static func opacity(appearedAt: ContinuousClock.Instant?, at time: ContinuousClock.Instant) -> Double {
+        guard let appearedAt else { return 1 }
+        let elapsed = appearedAt.duration(to: time).components
+        let seconds = Double(elapsed.seconds) + Double(elapsed.attoseconds) / 1e18
+        let progress = min(1, max(0, seconds / 0.25))
+        return 0.15 + 0.85 * (1 - pow(1 - progress, 3))
+    }
+}
+
+/// Bounded glyph history preserves ongoing fades across appends, corrections and window shifts.
+struct CaptionRenderState: Equatable, Sendable {
+    private struct Glyph: Equatable, Sendable {
+        let character: Character
+        var appearedAt: ContinuousClock.Instant?
+    }
+    private var glyphs: [Glyph] = []
+    private var inputByteCount = 0
+    private(set) var text = ""
+    var runs: [CaptionRenderRun] {
+        glyphs.reduce(into: []) { runs, glyph in
+            if let last = runs.last, last.appearedAt == glyph.appearedAt {
+                runs[runs.count - 1].text.append(glyph.character)
+            } else {
+                runs.append(CaptionRenderRun(text: String(glyph.character), appearedAt: glyph.appearedAt))
+            }
+        }
+    }
+    mutating func update(
+        _ input: String, finalized: Bool = false, animated: Bool = true,
+        at time: ContinuousClock.Instant = .now
+    ) {
+        let value = CaptionPresentation(previous: text, text: input, finalized: finalized, reduceMotion: !animated)
+        let next = Array(value.text)
+        let bytes = input.utf8
+        let added = bytes.count - inputByteCount
+        var retained = value.stableCharacterCount
+        var characters = next
+        // Verify the old visible suffix at its old byte position before treating a window shift as an append.
+        if animated, !finalized, glyphs.count == 320, added > 0,
+            bytes.dropLast(added).suffix(text.utf8.count).elementsEqual(text.utf8)
+        {
+            if added >= input.suffix(321).utf8.count {
+                retained = 0
+            } else {
+                characters = Array(text + String(decoding: bytes.suffix(added), as: UTF8.self))
+                retained = zip(glyphs, characters).prefix { $0.character == $1 }.count
+            }
+        }
+        let old = glyphs
+        glyphs = characters.enumerated().map { index, character in
+            if !animated || finalized { return Glyph(character: character, appearedAt: nil) }
+            if index < retained, index < old.count {
+                let appeared = old[index].appearedAt
+                return Glyph(
+                    character: character,
+                    appearedAt: appeared.map { $0.advanced(by: CaptionRenderRun.duration) > time } == true
+                        ? appeared : nil)
+            }
+            return Glyph(character: character, appearedAt: time)
+        }
+        glyphs = Array(glyphs.suffix(320))
+        text = value.text
+        inputByteCount = bytes.count
+    }
+    func isAnimating(at time: ContinuousClock.Instant) -> Bool {
+        glyphs.contains { $0.appearedAt.map { $0.advanced(by: CaptionRenderRun.duration) > time } == true }
+    }
+    mutating func settle() {
+        for index in glyphs.indices { glyphs[index].appearedAt = nil }
+    }
+}
+
+#if os(iOS) || os(macOS)
     import SwiftUI
-    import UIKit
+
+    private struct CaptionFadeAttribute: TextAttribute {
+        let appearedAt: ContinuousClock.Instant
+    }
+
+    struct CaptionTextRenderer: TextRenderer {
+        let time: ContinuousClock.Instant
+        var forceVisible = false
+        func draw(layout: Text.Layout, in context: inout GraphicsContext) {
+            for line in layout {
+                for run in line {
+                    if !forceVisible, let fade = run[CaptionFadeAttribute.self] {
+                        var copy = context
+                        copy.opacity *= CaptionRenderRun.opacity(appearedAt: fade.appearedAt, at: time)
+                        copy.draw(run)
+                    } else {
+                        context.draw(run)
+                    }
+                }
+            }
+        }
+    }
+
+    func captionText(_ runs: [CaptionRenderRun]) -> Text {
+        runs.reduce(Text(verbatim: "")) { result, run in
+            var part = Text(verbatim: run.text)
+            if let appearedAt = run.appearedAt {
+                part = part.customAttribute(CaptionFadeAttribute(appearedAt: appearedAt))
+            }
+            return Text("\(result)\(part)")
+        }
+    }
+
+    private struct CaptionInput: Equatable {
+        let text: String
+        let finalized: Bool
+        let reduceMotion: Bool
+        let generation: UIPresentationToken?
+    }
 
     @MainActor
     struct FadingCaption: View {
@@ -27,142 +143,86 @@ public struct CaptionPresentation: Equatable, Sendable {
         let reduceMotion: Bool
         var color: Color = .white
         var finalized = false
+        var generation: UIPresentationToken?
+        @Environment(\.scenePhase) private var scenePhase
+        @State private var state = CaptionRenderState()
+        @State private var renderedGeneration: UIPresentationToken?
+        @State private var mounted = false
+        @State private var ticking = false
+        @State private var position = ScrollPosition(edge: .top)
+
         var body: some View {
-            CaptionSurface(text: text, reduceMotion: reduceMotion, color: color, finalized: finalized)
-                .accessibilityElement(children: .ignore)
-                .accessibilityLabel(text)
-        }
-    }
-
-    @MainActor
-    private struct CaptionSurface: UIViewRepresentable {
-        let text: String
-        let reduceMotion: Bool
-        let color: Color
-        let finalized: Bool
-        func makeUIView(context: Context) -> NativeCaptionSurface { NativeCaptionSurface() }
-        func updateUIView(_ view: NativeCaptionSurface, context: Context) {
-            _ = context.environment.dynamicTypeSize
-            view.apply(text: text, finalized: finalized, reduceMotion: reduceMotion, color: UIColor(color))
-        }
-    }
-
-    /// Two identical layouts, differing only in color ranges. Only layer opacity animates.
-    @MainActor
-    private final class NativeCaptionSurface: UIView {
-        private let scroll = UIScrollView()
-        private let stable = UILabel()
-        private let incoming = UILabel()
-        private let edgeFade = CAGradientLayer()
-        private var presentation: CaptionPresentation?
-        private var finalized = false
-        private var reduceMotion = false
-        private var color: UIColor?
-        private var font: UIFont?
-        private var textLayoutNeeded = true
-        private var previousSize: CGSize = .zero
-
-        init() {
-            super.init(frame: .zero)
-            backgroundColor = .clear
-            isOpaque = false
-            scroll.showsVerticalScrollIndicator = false
-            scroll.showsHorizontalScrollIndicator = false
-            scroll.contentInsetAdjustmentBehavior = .never
-            scroll.bounces = false
-            scroll.clipsToBounds = true
-            addSubview(scroll)
-            for label in [stable, incoming] {
-                label.backgroundColor = .clear
-                label.isOpaque = false
-                label.numberOfLines = 0
-                label.textAlignment = .center
-                label.lineBreakMode = .byWordWrapping
-                label.isAccessibilityElement = false
-                scroll.addSubview(label)
+            let input = CaptionInput(
+                text: text, finalized: finalized, reduceMotion: reduceMotion, generation: generation)
+            // Construct runs only on input/state changes, outside the animation timeline's tick closure.
+            let content = captionText(state.runs)
+            TimelineView(.animation(minimumInterval: 1.0 / 60, paused: !ticking || !mounted || scenePhase != .active)) {
+                context in
+                let _ = context.date
+                let now = ContinuousClock.now
+                ScrollView(.vertical) {
+                    content
+                        .font(.system(.title3, weight: .medium))
+                        .foregroundStyle(color)
+                        .multilineTextAlignment(.center)
+                        .lineSpacing(7)
+                        .textRenderer(CaptionTextRenderer(time: now, forceVisible: reduceMotion || finalized))
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 18)
+                        .onGeometryChange(for: CGSize.self) {
+                            $0.size
+                        } action: { _ in
+                            position.scrollTo(edge: .bottom)
+                        }
+                }
+                .scrollIndicators(.hidden)
+                .scrollBounceBehavior(.basedOnSize)
+                .scrollPosition($position)
+                .defaultScrollAnchor(.bottom, for: .sizeChanges)
+                .mask {
+                    GeometryReader { geometry in
+                        let fade = min(18 / max(geometry.size.height, 1), 0.25)
+                        LinearGradient(
+                            stops: [
+                                .init(color: .clear, location: 0), .init(color: .black, location: fade),
+                                .init(color: .black, location: 1 - fade), .init(color: .clear, location: 1),
+                            ], startPoint: .top, endPoint: .bottom)
+                    }
+                }
+                .onChange(of: state.isAnimating(at: now), initial: true) { _, animating in
+                    if !animating, ticking {
+                        state.settle()
+                        ticking = false
+                    }
+                }
             }
-            edgeFade.colors = [
-                UIColor.clear.cgColor, UIColor.black.cgColor, UIColor.black.cgColor, UIColor.clear.cgColor,
-            ]
-            edgeFade.startPoint = CGPoint(x: 0.5, y: 0)
-            edgeFade.endPoint = CGPoint(x: 0.5, y: 1)
-            layer.mask = edgeFade
-        }
-        required init?(coder: NSCoder) { nil }
-
-        func apply(text: String, finalized: Bool, reduceMotion: Bool, color: UIColor) {
-            let preferred = UIFont.preferredFont(forTextStyle: .title3)
-            let font = UIFont.systemFont(ofSize: preferred.pointSize, weight: .medium)
-            guard
-                presentation == nil || presentation?.text != String(text.suffix(320)) || self.finalized != finalized
-                    || self.reduceMotion != reduceMotion || self.color != color || self.font != font
-            else { return }
-            let value = CaptionPresentation(
-                previous: presentation?.text ?? "", text: text, finalized: finalized,
-                reduceMotion: reduceMotion)
-            presentation = value
-            self.finalized = finalized
-            self.reduceMotion = reduceMotion
-            self.color = color
-            self.font = font
-            let paragraph = NSMutableParagraphStyle()
-            paragraph.alignment = .center
-            paragraph.lineSpacing = 7
-            paragraph.lineBreakMode = .byWordWrapping
-            let attributes: [NSAttributedString.Key: Any] = [
-                .font: font, .foregroundColor: color, .paragraphStyle: paragraph,
-            ]
-            let base = NSMutableAttributedString(string: value.text, attributes: attributes)
-            let addition = NSMutableAttributedString(string: value.text, attributes: attributes)
-            base.addAttribute(.foregroundColor, value: UIColor.clear, range: value.revisedRange)
-            addition.addAttribute(
-                .foregroundColor, value: UIColor.clear, range: NSRange(location: 0, length: value.stableUTF16Count))
-            CATransaction.begin()
-            CATransaction.setDisableActions(true)
-            incoming.layer.removeAnimation(forKey: "captionSuffix")
-            // The target is always readable, including when the animation is interrupted or removed.
-            incoming.layer.opacity = 1
-            stable.attributedText = base
-            incoming.attributedText = addition
-            CATransaction.commit()
-            if value.animatesSuffix, let screen = window?.screen {
-                let fade = CABasicAnimation(keyPath: "opacity")
-                fade.fromValue = 0.15
-                fade.toValue = 1
-                fade.duration = 0.25
-                fade.timingFunction = CAMediaTimingFunction(name: .easeOut)
-                let rate = Float(screen.maximumFramesPerSecond)
-                fade.preferredFrameRateRange = CAFrameRateRange(minimum: min(60, rate), maximum: rate, preferred: rate)
-                incoming.layer.add(fade, forKey: "captionSuffix")
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(text)
+            .onChange(of: input, initial: true) { _, value in submit(value, animated: mounted && scenePhase == .active)
             }
-            textLayoutNeeded = true
-            setNeedsLayout()
+            .onAppear {
+                mounted = true
+                submit(input, animated: false)
+            }
+            .onDisappear {
+                mounted = false
+                ticking = false
+                state.settle()
+            }
+            .onChange(of: scenePhase) { _, _ in
+                ticking = false
+                state.settle()
+            }
         }
-
-        override func layoutSubviews() {
-            super.layoutSubviews()
-            guard bounds.size != previousSize || textLayoutNeeded else { return }
-            previousSize = bounds.size
-            textLayoutNeeded = false
-            CATransaction.begin()
-            CATransaction.setDisableActions(true)
-            scroll.frame = bounds
-            let height = ceil(
-                stable.sizeThatFits(CGSize(width: max(1, bounds.width), height: .greatestFiniteMagnitude)).height)
-            let frame = CGRect(x: 0, y: 18, width: bounds.width, height: height)
-            stable.frame = frame
-            incoming.frame = frame
-            scroll.contentSize = CGSize(width: bounds.width, height: max(bounds.height, height + 36))
-            scroll.setContentOffset(
-                CGPoint(x: 0, y: max(0, scroll.contentSize.height - bounds.height)), animated: false)
-            edgeFade.frame = bounds
-            let fade = min(18 / max(bounds.height, 1), 0.25)
-            edgeFade.locations = [0, NSNumber(value: Double(fade)), NSNumber(value: Double(1 - fade)), 1]
-            CATransaction.commit()
-        }
-        override func didMoveToWindow() {
-            super.didMoveToWindow()
-            if window == nil { incoming.layer.removeAnimation(forKey: "captionSuffix") }
+        private func submit(_ input: CaptionInput, animated: Bool) {
+            if input.generation != renderedGeneration {
+                state = CaptionRenderState()
+                renderedGeneration = input.generation
+            }
+            state.update(input.text, finalized: input.finalized, animated: animated && !input.reduceMotion)
+            ticking = state.isAnimating(at: .now)
+            position.scrollTo(edge: .bottom)
         }
     }
 #endif

@@ -1,6 +1,7 @@
 import Foundation
 import FunctionContracts
-import Storage
+import StorageCore
+import StorageFiles
 
 /// Durable business data, independent of UI drafts and calling conventions.
 public struct ModelResourcePreferences: Codable, Sendable, Equatable {
@@ -57,13 +58,13 @@ public protocol ModelResourcePreferencesCapability: Sendable {
     func saveSource(_ preferences: ModelResourcePreferences) async throws -> ModelResourcePreferences
 }
 public actor ModelResourcePreferencesService: ModelResourcePreferencesCapability {
-    private let makeStore: @Sendable () throws -> any DocumentRepository<ModelResourcePreferences>
+    private let makeStore: @Sendable () throws -> any DocumentStore<ModelResourcePreferences>
     private let validate: @Sendable (ModelResourcePreferences) async throws -> ModelResourcePreferences
     private let installed: @Sendable () async throws -> Set<String>
-    private var store: (any DocumentRepository<ModelResourcePreferences>)?
+    private var store: (any DocumentStore<ModelResourcePreferences>)?
     private var changing = false
     public init(
-        store: @escaping @Sendable () throws -> any DocumentRepository<ModelResourcePreferences>,
+        store: @escaping @Sendable () throws -> any DocumentStore<ModelResourcePreferences>,
         validate: @escaping @Sendable (ModelResourcePreferences) async throws -> ModelResourcePreferences,
         installed: @escaping @Sendable () async throws -> Set<String>
     ) {
@@ -71,7 +72,7 @@ public actor ModelResourcePreferencesService: ModelResourcePreferencesCapability
         self.validate = validate
         self.installed = installed
     }
-    private func persistence() throws -> any DocumentRepository<ModelResourcePreferences> {
+    private func persistence() throws -> any DocumentStore<ModelResourcePreferences> {
         if let store { return store }
         let value = try makeStore()
         store = value

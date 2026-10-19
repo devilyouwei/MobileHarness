@@ -4,7 +4,8 @@ import CallRuntime
 import ExecutionRuntime
 import Foundation
 import FunctionContracts
-import Storage
+import PlatformKit
+import StorageCore
 import UI
 
 @MainActor
@@ -20,6 +21,7 @@ public protocol VoiceOutputHandling: AnyObject, Sendable {
     func presentTranscript(_ text: String, invocation: any FunctionInput) throws
     func finishTranscript(invocation: any FunctionInput) throws
     func beginReplyTurn(invocation: any FunctionInput) throws
+    func setReplyWaiting(_ enabled: Bool, requestID: String, invocation: any FunctionInput) throws
     func presentVoiceState(_ state: UIActions.VoiceState, invocation: any FunctionInput) throws
     func presentExpression(_ emotion: UIActions.Emotion, invocation: any FunctionInput) async throws
     func restoreExpression(invocation: any FunctionInput) async throws
@@ -31,7 +33,7 @@ public protocol VoiceOutputHandling: AnyObject, Sendable {
 @MainActor
 public protocol CameraOutputHandling: AnyObject, Sendable {
     func present(_ target: UIActions.Gaze, invocation: any FunctionInput) throws
-    func present(_ overlay: Actions.PoseOverlay, sessionID: String) throws
+    func present(_ overlay: Actions.PoseOverlay, frame: CameraFrame?, sessionID: String) throws
     func visionStatus(_ message: String?, sessionID: String)
 }
 
@@ -39,7 +41,8 @@ public protocol CameraOutputHandling: AnyObject, Sendable {
 @MainActor
 public final class RuntimePresentation: UIPresentationCapability, UIUpdateCapability, SpeechPlaybackCapability,
     PosePresentationCapability, CameraControlCapability, SpeechListeningCapability, TaskControlCapability,
-    UIFeedbackCapability, UIEffectCapability
+    UIFeedbackCapability, UIEffectCapability, RuntimeFailurePresentationCapability,
+    BluetoothStatusPresentationCapability, LoadingExpressionPresentationCapability
 {
     public var taskControl:
         (@Sendable (String, [String: String], String, String, String, String?) async throws -> String)?
@@ -59,9 +62,66 @@ public final class RuntimePresentation: UIPresentationCapability, UIUpdateCapabi
     }
     private let cameraControl: any CameraControlCapability
     private let rootSessionID: String
-    public let homeEffects: HomeEffectsWorkflow
-    public init(cameraControl: any CameraControlCapability, rootSessionID: String, activity: ActionActivityState) {
-        homeEffects = HomeEffectsWorkflow(activity: activity)
+    private let homeBluetooth: any BluetoothConnectionPresenting
+    private let deviceBluetooth: any BluetoothConnectionPresenting
+    public func presentBluetoothHome(
+        _ phase: BluetoothPresentationPhase, revision: UInt64, invocation: any FunctionInput
+    ) async throws {
+        try validateApplicationControl(invocation)
+        guard let status = BluetoothConnectionStatus(rawValue: phase.rawValue),
+            homeBluetooth.presentBluetoothConnection(status, revision: revision)
+        else { throw UIContainerError.stale }
+    }
+    public func presentBluetoothSettings(
+        _ phase: BluetoothPresentationPhase, revision: UInt64, invocation: any FunctionInput
+    ) async throws {
+        try validateApplicationControl(invocation)
+        guard let status = BluetoothConnectionStatus(rawValue: phase.rawValue),
+            deviceBluetooth.presentBluetoothConnection(status, revision: revision)
+        else { throw UIContainerError.stale }
+    }
+    private func validateApplicationControl(_ invocation: any FunctionInput) throws {
+        try Task.checkCancellation()
+        guard invocation.context.source == "applicationControl", invocation.context.sessionID == rootSessionID,
+            invocation.context.taskID == nil
+        else { throw CommunicationError.unauthorized }
+    }
+    public func setLoadingExpression(_ enabled: Bool, revision: UInt64, invocation: any FunctionInput) async throws {
+        try validateApplicationControl(invocation)
+        switch expressions.setLoading(enabled, revision: revision) {
+        case .applied, .superseded: return
+        case .rejected: throw UIContainerError.stale
+        }
+    }
+    private let activity: any ActivityPresenting
+    public func recordRuntimeFailure(_ issue: RuntimeIssue, invocation: any FunctionInput) async throws {
+        try Task.checkCancellation()
+        guard invocation.context.source == "applicationControl", invocation.context.sessionID == rootSessionID,
+            invocation.context.taskID == nil
+        else { throw CommunicationError.unauthorized }
+        try activity.requirePresentation()
+        activity.recordIssue(
+            .init(
+                id: issue.id, title: issue.title, source: issue.source, message: issue.message, time: issue.time,
+                failureCode: issue.failureCode,
+                context: .init(
+                    workerID: issue.workerID, sessionID: issue.sessionID, inputID: issue.inputID, callID: issue.callID,
+                    roundID: issue.roundID
+                ),
+                userMessage: issue.userMessage, category: issue.category), showsToast: issue.userMessage != nil)
+    }
+    public let homeEffects: any HomeEffectsPresenting
+    public let expressions: any ExpressionPresenting
+    public init(
+        cameraControl: any CameraControlCapability, rootSessionID: String, activity: any ActivityPresenting,
+        effects: any HomeEffectsPresenting, expressions: any ExpressionPresenting,
+        homeBluetooth: any BluetoothConnectionPresenting, deviceBluetooth: any BluetoothConnectionPresenting
+    ) {
+        self.homeBluetooth = homeBluetooth
+        self.deviceBluetooth = deviceBluetooth
+        self.activity = activity
+        homeEffects = effects
+        self.expressions = expressions
         self.cameraControl = cameraControl
         self.rootSessionID = rootSessionID
     }
@@ -207,6 +267,10 @@ public final class RuntimePresentation: UIPresentationCapability, UIUpdateCapabi
         guard let voice else { throw CommunicationError.scopeClosed }
         try voice.finishTranscript(invocation: invocation)
     }
+    public func setReplyWaiting(_ enabled: Bool, requestID: String, invocation: any FunctionInput) async throws {
+        guard let voice else { throw CommunicationError.scopeClosed }
+        try voice.setReplyWaiting(enabled, requestID: requestID, invocation: invocation)
+    }
     public func beginReplyTurn(invocation: any FunctionInput) async throws {
         guard let voice else { throw CommunicationError.scopeClosed }
         try voice.beginReplyTurn(invocation: invocation)
@@ -233,8 +297,14 @@ public final class RuntimePresentation: UIPresentationCapability, UIUpdateCapabi
     }
     public func present(_ overlay: Actions.PoseOverlay, sessionID: String) async throws {
         guard let camera else { throw CommunicationError.scopeClosed }
-        try camera.present(overlay, sessionID: sessionID)
+        try camera.present(overlay, frame: nil, sessionID: sessionID)
     }
+    public func present(_ overlay: Actions.PoseOverlay, invocation: any FunctionInput) async throws {
+        guard let camera else { throw CommunicationError.scopeClosed }
+        try camera.present(
+            overlay, frame: invocation.attachment as? CameraFrame, sessionID: invocation.context.sessionID)
+    }
+
     public func observe(_ input: AgentInput) async throws {
         guard let voice else { throw CommunicationError.scopeClosed }
         voice.observeSpeech(input)

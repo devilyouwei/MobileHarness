@@ -1,7 +1,8 @@
 #if os(iOS)
     import SwiftUI
 
-    @MainActor public struct ModelResourcesView: View {
+    @MainActor
+    public struct ModelResourcesView: View {
         @Bindable private var state: ModelResourcesState
         private let controls: any ModelResourcesControlling
         private let group: ModelResourceGroup
@@ -59,7 +60,8 @@
         }
     }
 
-    @MainActor struct ModelResourceSections: View {
+    @MainActor
+    struct ModelResourceSections: View {
         @Bindable var state: ModelResourcesState
         let controls: any ModelResourcesControlling
         let group: ModelResourceGroup
@@ -79,15 +81,18 @@
                     .pickerStyle(.menu)
                     .disabled(state.saving || !state.hasRestored)
                     .onChange(of: selectedSource) { _, value in
-                        if value == "official" { state.source.endpoint = "https://huggingface.co" }
-                        if value == "mirror" { state.source.endpoint = "https://hf-mirror.com" }
+                        if value == "official" { controls.editDownloadSource("https://huggingface.co") }
+                        if value == "mirror" { controls.editDownloadSource("https://hf-mirror.com") }
                     }
                     if selectedSource == "custom" {
                         HStack {
-                            TextField("https://your-domain.example", text: $state.source.endpoint)
-                                .keyboardType(.URL).textInputAutocapitalization(.never).autocorrectionDisabled()
+                            TextField(
+                                "https://your-domain.example",
+                                text: Binding(get: { state.source.endpoint }, set: controls.editDownloadSource)
+                            )
+                            .keyboardType(.URL).textInputAutocapitalization(.never).autocorrectionDisabled()
                             PasteButton(payloadType: String.self) { values in
-                                if let value = values.first { state.source.endpoint = value }
+                                if let value = values.first { controls.editDownloadSource(value) }
                             }.labelStyle(.iconOnly).accessibilityLabel("粘贴下载域名")
                         }
                         .disabled(state.saving || !state.hasRestored)
@@ -176,21 +181,9 @@
                                 ? "删除后需要使用云端大模型，或重新下载 Gemma 4 E2B 才能进行本地对话。"
                                 : "删除后需要重新下载 YOLO 才能使用本地姿态识别。")
             }
-            .task(id: state.source.endpoint) {
-                guard group != .vision else { return }
-                do {
-                    try await Task.sleep(for: .milliseconds(600))
-                    while state.saving || !state.hasRestored {
-                        try await Task.sleep(for: .milliseconds(100))
-                    }
-                    try Task.checkCancellation()
-                    await controls.saveDownloadSource()
-                } catch {
-                    // Editing or leaving the page cancels pending autosave.
-                }
-            }
             .task {
                 await controls.restore()
+                guard !Task.isCancelled else { return }
                 selectedSource =
                     state.source.endpoint == "https://huggingface.co"
                     ? "official" : (state.source.endpoint == "https://hf-mirror.com" ? "mirror" : "custom")

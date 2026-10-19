@@ -1,3 +1,26 @@
+/// Device events are facts, not automatic container execution failures.
+public enum NativeAudioEvent: String, Sendable { case interrupted, routeChanged }
+
+struct AudioRouteIdentity: Equatable, Sendable {
+    let inputs: [String]
+    let outputs: [String]
+    init(inputs: [String], outputs: [String]) {
+        self.inputs = inputs.sorted()
+        self.outputs = outputs.sorted()
+    }
+}
+
+enum AudioSessionEventPolicy {
+    static func routeChange(
+        applicationChange: Bool, unavailable: Bool, previous: AudioRouteIdentity?, current: AudioRouteIdentity
+    ) -> NativeAudioEvent? {
+        if unavailable { return .routeChanged }
+        guard !applicationChange else { return nil }
+        guard let previous else { return .routeChanged }
+        return previous == current ? nil : .routeChanged
+    }
+}
+
 /// Native capture selection facts. Presentation/localization belongs to the caller.
 public struct AudioCaptureContext: Sendable, Equatable {
     public enum Input: Sendable { case builtInMicrophone, headset, external, unknown }

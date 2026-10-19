@@ -6,7 +6,7 @@ import ExecutionRuntime
 import Foundation
 import FunctionContracts
 import Gateway
-import Storage
+import StorageCore
 import Testing
 
 private actor ContractGate {

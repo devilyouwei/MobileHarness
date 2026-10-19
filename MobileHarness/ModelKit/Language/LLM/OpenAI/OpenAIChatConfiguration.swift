@@ -200,7 +200,7 @@ public struct OpenAIChatConfiguration: Sendable, Equatable, CustomStringConverti
 }
 
 /// Deliberately excludes response bodies, URLs and credentials from surfaced failures.
-public enum OpenAIChatError: Error, Equatable, Sendable {
+public enum OpenAIChatError: Error, Equatable, Sendable, ChatFailureProviding, CustomStringConvertible {
     case httpStatus(Int)
     case invalidResponse
     case providerCode(String)
@@ -208,4 +208,19 @@ public enum OpenAIChatError: Error, Equatable, Sendable {
     case truncatedStream
     case responseTooLarge
     case transport
+    case responseFailure(ChatFailureDiagnostic)
+
+    public var chatFailure: ChatFailureDiagnostic {
+        switch self {
+        case .responseFailure(let failure): failure
+        case .httpStatus(let status): .init(.httpStatus, stage: .http, statusCode: status)
+        case .invalidResponse: .init(.malformedEvent, stage: .event)
+        case .providerCode(let code): .init(.providerFailure, stage: .event, providerCode: code)
+        case .unsupportedOutput: .init(.unsupportedOutput, stage: .event)
+        case .truncatedStream: .init(.truncatedStream, stage: .framing)
+        case .responseTooLarge: .init(.responseTooLarge, stage: .framing)
+        case .transport: .init(.transport, stage: .http)
+        }
+    }
+    public var description: String { chatFailure.description }
 }

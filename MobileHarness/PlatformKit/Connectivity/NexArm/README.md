@@ -71,3 +71,13 @@ Framing, hardware limits, passive telemetry, shared pacing, session fencing and 
 ## 待实现
 
 - Autonomous safety control and arbitrary register configuration. Physical endurance/calibration evidence belongs in [validation history](../../../../docs/validation/Validation-History.md).
+
+✅ 原生 BLE driver 按首次能力使用创建，关闭未创建的链路不初始化 CoreBluetooth；根 admission 关闭后拒绝新的设备写入和连接。
+
+显式 disconnect 先取消并最终加入扫描、连接/请求/控制 deadline、发送与反馈 worker，再确认原生断开；原生断开未确认继续保留围栏和 failure，不把取消当成物理停机。
+
+## 统一容器异常通道
+
+✅ BLE 原生快照从无故障到故障或故障变化时直接报告；串口公开失败保留并报告。通知不依赖 UI/BluetoothWorkflow 是否消费流，不把断开请求当作物理完成。
+
+✅ restoreLive保留跟踪任务已取消时仍尝试速度模式退出的接口；通过惰性native入口接纳并按同一错误通道报告，根admission关闭仍拒绝写入。取消任务不等于关闭根或连接；不绕过原生session、liveControlID、包合法性、写入节奏及MTU检查。

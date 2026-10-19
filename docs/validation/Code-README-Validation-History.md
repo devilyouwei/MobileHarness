@@ -210,7 +210,7 @@ Agent-internal errors terminate the input. Otherwise the decision is `roundCoord
 
 ## MobileHarness/Storage/Chat/README.md
 
-[现行 README](../../MobileHarness/Storage/Chat/README.md)
+[现行 README](../../MobileHarness/Storage/Database/Chat/README.md)
 
 ````markdown
 ## Task, queries and archives

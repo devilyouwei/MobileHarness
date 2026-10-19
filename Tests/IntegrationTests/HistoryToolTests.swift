@@ -9,8 +9,8 @@ import Foundation
 import FunctionContracts
 import Gateway
 import PlatformKit
-import Storage
 import StorageChat
+import StorageCore
 import Testing
 
 private func historyRequest(_ path: String, _ arguments: [String: String]) -> ActionInvocation {
@@ -123,11 +123,15 @@ private actor HistoryQueryProbe: HistoryQueryCapability {
 }
 
 @Test(.actionCatalog) func historyDeclarationsResolveNativeStringArgumentsAndReturnCorrelatedResults() async throws {
-    let configuration = try AgentConfigurations.load(named: "Memory")
+    // Explicit non-Skill native registration preserves the generic Tool protocol.
+    let binding = try JSONDecoder().decode(
+        AgentConfigurations.Binding.self,
+        from: Data(#"{"path":"History.Conversation.list","callType":"tool","alias":"History.list"}"#.utf8))
+    let capabilities = try AgentConfigurations.registry([binding])
     let id = UUID().uuidString
     let call = try ToolCallParser.parse(
         id: id, alias: "History.list", argumentsJSON: Data("{\"offset\":\"0\",\"limit\":\"1\"}".utf8),
-        capabilities: configuration.capabilities)
+        capabilities: capabilities)
     #expect(call.toolPath == "History.Conversation.list" && call.id == id)
     let registry = try BehaviorAssembly(capabilityModules: [
         HistoryModule(

@@ -9,6 +9,11 @@ import Observation
     private var foreground = false
     private var replacement: Task<Void, Never>?
     private(set) var scopeID = UUID()
+    private var backgroundArtifactsPrepared = false
+    func prepareBackgroundArtifacts() async throws {
+        backgroundArtifactsPrepared = true
+        try await services.model.artifacts.prepare()
+    }
     var features: AgentApplicationUI { services.ui }
 
     init() {
@@ -26,6 +31,26 @@ import Observation
         if case .success(let lifecycle) = owner {
             lifecycle.onFailure = features.reportStartupFailure
             lifecycle.setForeground(foreground)
+        } else if case .failure(let error) = owner {
+            services.containerFailures.report(
+                module: "app", component: "lifecycle", operation: "assemble", phase: .startup, error: error)
+        }
+        features.onHomeVisibilityChanged = { [weak self] visible in
+            guard let self, selected == self.scopeID else { return }
+            let running = (try? self.owner.get().state) == .running
+            self.services.homePreparation.setActive(
+                visible && self.foreground && running && self.features.preparesHomeModels)
+        }
+        features.onPreparationRequested = { [weak self] in
+            guard let self, selected == self.scopeID else { return }
+            self.services.homePreparation.refresh()
+        }
+        features.onInteractionActivityChanged = { [weak self] in
+            guard let self, selected == self.scopeID,
+                self.services.homePreparation.state == .deferred,
+                !self.services.uiContainer.home.conversation.hasActiveInteraction
+            else { return }
+            self.services.homePreparation.refresh()
         }
         features.onRetry = { [weak self] in self?.retry() }
     }
@@ -63,6 +88,12 @@ import Observation
             }
             do {
                 if case .success(let lifecycle) = owner { try await lifecycle.stop() }
+                await services.homePreparation.stop()
+                if backgroundArtifactsPrepared {
+                    try await services.model.stop()
+                    try await services.storage.stop()
+                }
+                backgroundArtifactsPrepared = false
                 services = ServiceFactories.make()
                 owner = Result { try ModuleRegistration.lifecycle(services) }
                 scopeID = UUID()

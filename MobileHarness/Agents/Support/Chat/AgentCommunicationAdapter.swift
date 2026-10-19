@@ -1,6 +1,6 @@
 import AgentCore
 import Foundation
-import Storage
+import StorageCore
 
 /// Model-only declarations. These paths are intercepted before function execution or validation.
 public enum AgentCommunicationAdapter {

@@ -206,8 +206,8 @@ private func decode(_ text: String) throws -> [ChatEvent] {
 
 @Test func rejectsMalformedUnsupportedAndOversizeStreams() throws {
     #expect(throws: OpenAIChatError.truncatedStream) { try decode("data: [DONE]\n\n") }
-    #expect(throws: OpenAIChatError.invalidResponse) { try decode("data: {broken}\n\n") }
-    #expect(throws: OpenAIChatError.unsupportedOutput) {
+    expectResponseFailure(.malformedEvent) { try decode("data: {broken}\n\n") }
+    expectResponseFailure(.unsupportedOutput) {
         try decode(
             "data: {\"type\":\"response.output_item.added\",\"output_index\":0,\"item\":{\"type\":\"unsupported\"}}\n\n"
         )
@@ -574,9 +574,9 @@ private final class AnonymousModelListProtocol: URLProtocol, @unchecked Sendable
         try decode(usage + "data: [DONE]\n\n") == [
             .usage(try ChatTokenUsage(input: 1, generated: 2, total: 3)), .finished(.stop),
         ])
-    #expect(throws: OpenAIChatError.invalidResponse) { try decode(usage + usage) }
+    expectResponseFailure(.invalidCompletion) { try decode(usage + usage) }
     for invalid in ["true", "-2"] {
-        #expect(throws: OpenAIChatError.invalidResponse) {
+        expectResponseFailure(.invalidUsage) {
             try decode(usage.replacingOccurrences(of: "\"input_tokens\":1", with: "\"input_tokens\":" + invalid))
         }
     }
@@ -769,6 +769,111 @@ private final class UsageProtocol: URLProtocol, @unchecked Sendable {
     #expect(timing.snapshot == first)
 }
 
+@Test(arguments: [false, true])
+func nativeArgumentTimingPreservesFirstTextOrToolSample(textFirst: Bool) throws {
+    let timing = ChatTiming()
+    timing.recordToolArguments("before start")
+    #expect(timing.snapshot == nil)
+    timing.start()
+    let start = try #require(timing.snapshot)
+    timing.recordToolArguments("")
+    #expect(timing.snapshot == start)
+    if textFirst { timing.recordText("first text") }
+    let textSample = timing.snapshot
+    var decoder = ChatEventDecoder(toolNames: ["Read_State_0": "Read.State"], timing: timing)
+    let added: [String: Any] = [
+        "type": "function_call", "id": "item-1", "call_id": "call-1", "name": "Read_State_0",
+    ]
+    for byte in try
+        (reasoningWire()
+        + eventWire(["type": "response.output_item.added", "output_index": 0, "item": added])
+        + eventWire([
+            "type": "response.function_call_arguments.delta", "output_index": 0, "item_id": "item-1", "delta": "",
+        ])).utf8
+    {
+        #expect(try decoder.consume(byte).isEmpty)
+    }
+    #expect(timing.snapshot == textSample)
+    for byte in try eventWire([
+        "type": "response.function_call_arguments.delta", "output_index": 0, "item_id": "item-1", "delta": "{",
+    ]).utf8 {
+        #expect(try decoder.consume(byte).isEmpty)
+    }
+    let first = try #require(timing.snapshot)
+    #expect(first.firstTokenAt != nil && first.firstTokenLatency.map { $0 >= 0 } == true)
+    if textFirst { #expect(first == textSample) }
+    timing.recordText("later text")
+    timing.recordToolArguments("later args")
+    #expect(timing.snapshot == first && !decoder.finished)
+
+    let invalidTiming = ChatTiming()
+    invalidTiming.start()
+    var invalid = ChatEventDecoder(toolNames: ["Read_State_0": "Read.State"], timing: invalidTiming)
+    for byte in try eventWire(["type": "response.output_item.added", "output_index": 0, "item": added]).utf8 {
+        _ = try invalid.consume(byte)
+    }
+    expectResponseFailure(.invalidToolIdentity) {
+        for byte in try eventWire([
+            "type": "response.function_call_arguments.delta", "output_index": 0, "item_id": "forged", "delta": "{",
+        ]).utf8 { _ = try invalid.consume(byte) }
+    }
+    #expect(invalidTiming.snapshot?.firstTokenAt == nil)
+}
+
+private final class NativeTimingProtocol: URLProtocol, @unchecked Sendable {
+    override class func canInit(with request: URLRequest) -> Bool { true }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+    override func startLoading() {
+        do {
+            let url = try #require(request.url)
+            let response = try #require(
+                HTTPURLResponse(
+                    url: url, statusCode: 200, httpVersion: nil,
+                    headerFields: ["Content-Type": "text/event-stream"]))
+            let item: [String: Any] = [
+                "type": "function_call", "id": "item-1", "call_id": "call-1", "name": "Read_State_0", "arguments": "{}",
+            ]
+            let wire =
+                try eventWire(["type": "response.output_item.added", "output_index": 0, "item": item])
+                + eventWire([
+                    "type": "response.function_call_arguments.delta", "output_index": 0, "item_id": "item-1",
+                    "delta": "{}",
+                ]) + eventWire(["type": "response.output_item.done", "output_index": 0, "item": item])
+                + eventWire([
+                    "type": "response.completed", "response": ["status": "completed", "output": [item]],
+                ])
+            client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+            client?.urlProtocol(self, didLoad: Data(wire.utf8))
+            client?.urlProtocolDidFinishLoading(self)
+        } catch { client?.urlProtocol(self, didFailWithError: error) }
+    }
+    override func stopLoading() {}
+}
+
+@Test func nativeOnlyCapabilityReportsTimingWithoutPublicText() async throws {
+    let capability = try OpenAIChat(
+        context: ModelContext(loadGate: ModelLoadGate(maximumConcurrentLoads: 4), maximumLoadWaiters: 32),
+        configuration: config(),
+        sessionConfiguration: {
+            let settings = URLSessionConfiguration.ephemeral
+            settings.protocolClasses = [NativeTimingProtocol.self]
+            return settings
+        })
+    let tool = try ChatToolDefinition(
+        declaration: Data(
+            #"{"type":"function","function":{"name":"Read.State","parameters":{"type":"object","properties":{},"required":[]}}}"#
+                .utf8))
+    var request = try ChatRequest(messages: [.init(role: .user, content: "read state")], tools: [tool])
+    let timing = ChatTiming()
+    request.timing = timing
+    let session = try await capability.chat(request)
+    var events: [ChatEvent] = []
+    for try await event in session.events { events.append(event) }
+    #expect(events == [.toolCall(.init(id: "call-1", name: "Read.State", argumentsJSON: "{}")), .finished(.toolCalls)])
+    let snapshot = try #require(timing.snapshot)
+    #expect(snapshot.firstTokenAt != nil && snapshot.firstTokenLatency.map { $0 >= 0 } == true)
+}
+
 private func eventWire(_ object: [String: Any]) throws -> String {
     "data: " + String(decoding: try JSONSerialization.data(withJSONObject: object), as: UTF8.self) + "\n\n"
 }
@@ -847,6 +952,25 @@ private func reasoningWire() throws -> String {
     #expect(events == [.toolCall(.init(id: "call-1", name: "Read.State", argumentsJSON: "{}")), .finished(.toolCalls)])
 }
 
+@Test(arguments: ["Provider_readSettings", "loadSkills", "Bluetooth_readStatus"])
+func qwenUndeclaredNativeNamesFailBeforePublishingCalls(_ name: String) throws {
+    let names = [
+        "ModelResources_snapshot_0": "ModelResources.snapshot",
+        "Provider_readSettings_1": "Provider.readSettings",
+        "Bluetooth_readStatus_2": "Bluetooth.readStatus",
+    ]
+    let wire = try eventWire([
+        "type": "response.output_item.added", "output_index": 0,
+        "item": ["type": "function_call", "id": "synthetic-item", "call_id": "synthetic-call", "name": name],
+    ])
+    var decoder = ChatEventDecoder(toolNames: names)
+    var delivered: [ChatEvent] = []
+    expectResponseFailure(.undeclaredTool) {
+        for byte in wire.utf8 { delivered += try decoder.consume(byte) }
+    }
+    #expect(delivered.isEmpty && !decoder.finished)
+}
+
 @Test func malformedReasoningMetadataIsRejected() throws {
     for item: [String: Any] in [
         ["type": "reasoning", "id": "", "summary": []],
@@ -855,17 +979,17 @@ private func reasoningWire() throws -> String {
         ["type": "reasoning", "id": "reason-1"],
     ] {
         for type in ["response.output_item.added", "response.output_item.done"] {
-            #expect(throws: OpenAIChatError.invalidResponse) {
+            expectResponseFailure(.invalidReasoning) {
                 try decode(try eventWire(["type": type, "output_index": 0, "item": item]))
             }
         }
-        #expect(throws: OpenAIChatError.invalidResponse) {
+        expectResponseFailure(.invalidReasoning) {
             try decode(
                 try eventWire(["type": "response.completed", "response": ["status": "completed", "output": [item]]]))
         }
     }
     for type in ["response.reasoning_text.delta", "response.reasoning_text.done"] {
-        #expect(throws: OpenAIChatError.invalidResponse) {
+        expectResponseFailure(.invalidReasoning) {
             try decode(try eventWire(["type": type, "output_index": 0, "item_id": "reason-1", "delta": 1, "text": 1]))
         }
     }
@@ -898,14 +1022,14 @@ private func reasoningWire() throws -> String {
         try parse(prefix + itemDone + terminal) == [
             .toolCall(.init(id: "call-1", name: "Read.State", argumentsJSON: "{}")), .finished(.toolCalls),
         ])
-    #expect(throws: OpenAIChatError.invalidResponse) { try parse(prefix + terminal) }
-    #expect(throws: OpenAIChatError.invalidResponse) {
+    expectResponseFailure(.toolSequence) { try parse(prefix + terminal) }
+    expectResponseFailure(.invalidToolIdentity) {
         try parse(prefix + itemDone.replacingOccurrences(of: "call-1", with: "forged"))
     }
-    #expect(throws: OpenAIChatError.invalidResponse) {
+    expectResponseFailure(.providerFailure) {
         try parse(prefix + itemDone + eventWire(["type": "response.failed", "response": ["status": "failed"]]))
     }
-    #expect(throws: OpenAIChatError.unsupportedOutput) {
+    expectResponseFailure(.unsupportedOutput) {
         try decode(try eventWire(["type": "response.refusal.delta", "delta": "refusal"]))
     }
     #expect(throws: OpenAIChatError.truncatedStream) {
@@ -1038,4 +1162,110 @@ private final class ReusableProtocol: URLProtocol, @unchecked Sendable {
             for byte in wire.utf8 { _ = try decoder.consume(byte) }
         }
     }
+}
+
+@Test(
+    arguments: [nil, "null", "{}", "{\"cached_tokens\":0}", "{\"cached_tokens\":6,\"cache_write_tokens\":2}"]
+        as [String?])
+func terminalUsagePreservesOptionalCacheCounts(details: String?) throws {
+    let field = details.map { ",\"input_tokens_details\":\($0)" } ?? ""
+    let stream =
+        "data: {\"type\":\"response.completed\",\"response\":{\"status\":\"completed\",\"output\":[],\"usage\":{\"input_tokens\":10,\"output_tokens\":2,\"total_tokens\":12\(field)}}}\n\n"
+    let events = try decode(stream)
+    guard case .usage(let usage) = events.first else {
+        Issue.record("Missing usage")
+        return
+    }
+    #expect(
+        usage.cachedInput
+            == (details?.contains("cached_tokens") == true ? (details?.contains(":6") == true ? 6 : 0) : nil))
+    #expect(usage.cacheWriteInput == (details?.contains("cache_write_tokens") == true ? 2 : nil))
+}
+
+@Test(arguments: ["true", "-1", "11", "1.5", "\"2\""])
+func terminalUsageRejectsInvalidCacheCounts(value: String) throws {
+    for key in ["cached_tokens", "cache_write_tokens"] {
+        let stream =
+            "data: {\"type\":\"response.completed\",\"response\":{\"status\":\"completed\",\"output\":[],\"usage\":{\"input_tokens\":10,\"output_tokens\":2,\"total_tokens\":12,\"input_tokens_details\":{\"\(key)\":\(value)}}}}\n\n"
+        expectResponseFailure(.invalidUsage) { try decode(stream) }
+    }
+}
+
+@Test func responsesPreserveLateSystemFactsAfterCompleteNativePair() throws {
+    let messages: [ChatMessage] = [
+        .init(role: .system, content: "stable rules"), .init(role: .user, content: "query"),
+        .init(role: .assistant, content: "", toolCalls: [.init(id: "call-1", name: "inspect", argumentsJSON: "{}")]),
+        .init(role: .tool, content: "actual result", toolCallID: "call-1"),
+        .init(role: .system, content: "CURRENT STATE: current facts"),
+    ]
+    let request = try config().request(ChatRequest(messages: messages))
+    let data = try #require(request.httpBody)
+    let body = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
+    let input = try #require(body["input"] as? [[String: Any]])
+    #expect(input.count == 5)
+    #expect(input[0]["role"] as? String == "system")
+    #expect(input[2]["type"] as? String == "function_call")
+    #expect(input[3]["type"] as? String == "function_call_output")
+    #expect(input[4]["role"] as? String == "system")
+    let content = try #require(input[4]["content"] as? [[String: Any]])
+    #expect(content.first?["text"] as? String == "CURRENT STATE: current facts")
+}
+
+private func expectResponseFailure<Result>(_ reason: ChatFailureDiagnostic.Reason, _ body: () throws -> Result) {
+    do {
+        _ = try body()
+        Issue.record("Expected typed response failure: \(reason.rawValue)")
+    } catch OpenAIChatError.responseFailure(let diagnostic) {
+        #expect(diagnostic.reason == reason)
+    } catch {
+        Issue.record("Expected response failure \(reason.rawValue), received \(error)")
+    }
+}
+
+@Test func undeclaredToolDiagnosticRetainsBoundedNamesAndNeverArguments() throws {
+    let names = Dictionary(uniqueKeysWithValues: (0..<12).map { ("Tool_\($0)", "Tool.\($0)") })
+    let wire = try eventWire([
+        "type": "response.output_item.added", "output_index": 0,
+        "item": [
+            "type": "function_call", "id": "item-1", "call_id": "call-1", "name": "loadSkills",
+            "arguments": "PRIVATE_ARGUMENT_BODY",
+        ],
+    ])
+    var decoder = ChatEventDecoder(toolNames: names)
+    do {
+        for byte in wire.utf8 { _ = try decoder.consume(byte) }
+        Issue.record("Undeclared Tool was accepted")
+    } catch OpenAIChatError.responseFailure(let diagnostic) {
+        #expect(diagnostic.reason == .undeclaredTool && diagnostic.stage == .toolStart)
+        #expect(diagnostic.event == "response.output_item.added" && diagnostic.field == "name")
+        #expect(diagnostic.outputIndex == 0 && diagnostic.toolName == "loadSkills")
+        #expect(diagnostic.declaredNames.count == 8 && diagnostic.declaredCount == 12)
+        #expect(diagnostic.description.contains("declaredToolsTruncated=true"))
+        #expect(!diagnostic.description.contains("PRIVATE_ARGUMENT_BODY"))
+        #expect(!decoder.finished)
+    }
+    let malicious = ChatFailureDiagnostic(
+        .undeclaredTool, stage: .toolStart,
+        event: "response.output_item.added\nPRIVATE", toolName: "private prompt body with spaces")
+    #expect(!malicious.description.contains("PRIVATE") && !malicious.description.contains("private prompt"))
+    #expect(malicious.toolName == "<invalid-identifier>")
+}
+
+@Test(arguments: ["{broken", "{\"limit\":5}", "[]", "null"])
+func nativeArgumentShapeAndIncrementMismatchHaveDifferentDiagnostics(arguments: String) throws {
+    let added: [String: Any] = ["type": "function_call", "id": "item-1", "call_id": "call-1", "name": "Read_0"]
+    var item = added
+    item["arguments"] = arguments
+    let prefix = try eventWire(["type": "response.output_item.added", "output_index": 0, "item": added])
+    let delta = try eventWire([
+        "type": "response.function_call_arguments.delta", "output_index": 0,
+        "item_id": "item-1", "delta": arguments,
+    ])
+    let end = try eventWire(["type": "response.output_item.done", "output_index": 0, "item": item])
+    func parse(_ wire: String) throws {
+        var decoder = ChatEventDecoder(toolNames: ["Read_0": "Read"])
+        for byte in wire.utf8 { _ = try decoder.consume(byte) }
+    }
+    expectResponseFailure(.invalidToolArguments) { try parse(prefix + delta + end) }
+    expectResponseFailure(.toolArgumentsMismatch) { try parse(prefix + end) }
 }

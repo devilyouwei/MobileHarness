@@ -371,3 +371,107 @@ private struct UnavailableChat: ChatCapability {
     await context.shutdown()
     #expect(await context.status == .closed)
 }
+
+@Test(.timeLimit(.minutes(1))) func modelSuspensionCancelsJoinsAndKeepsLoadedWeights() async throws {
+    let admission = InferenceAdmission()
+    let manager = try ModelManager(admission: admission)
+    let counter = LoadCounter()
+    let id = ModelID("suspend")
+    try await manager.register(
+        ModelRegistration(id: id, capabilities: [.chat]) { context in
+            ProvidedCapabilities(chat: ManagedChat(try context.resource { await counter.load() }))
+        })
+    let handle = try await manager.get(id, as: .chat)
+    let session = try await handle.chat(ChatRequest(messages: [.init(role: .user, content: "hold")]))
+    admission.close()
+    await manager.suspend()
+    #expect(await counter.loads == 1)
+    #expect(try await manager.status(id) == .ready)
+    await #expect(throws: CancellationError.self) {
+        for try await _ in session.events {}
+    }
+    await #expect(throws: InferenceAdmissionError.self) {
+        _ = try await handle.chat(ChatRequest(messages: [.init(role: .user, content: "late")]))
+    }
+    try admission.resume()
+    let next = try await handle.chat(ChatRequest(messages: [.init(role: .user, content: "again")]))
+    for try await _ in next.events {}
+    #expect(await counter.loads == 1)
+    admission.close(terminal: true)
+    await manager.shutdown()
+    #expect(try await manager.status(id) == .closed)
+    #expect(throws: InferenceAdmissionError.self) { try admission.resume() }
+}
+
+@Test(.timeLimit(.minutes(1))) func modelPauseJoinsUncooperativeLoadingAndRejectsItsLateWaiter() async throws {
+    let admission = InferenceAdmission()
+    let manager = try ModelManager(admission: admission)
+    let latch = LoadLatch()
+    let id = ModelID("paused-load")
+    try await manager.register(
+        ModelRegistration(id: id, capabilities: [.chat]) { context in
+            ProvidedCapabilities(
+                chat: ManagedChat(
+                    try context.resource {
+                        await latch.wait()
+                        return 1
+                    }))
+        })
+    let loading = Task { try await manager.get(id, as: .chat) }
+    while await latch.entered == 0 { await Task.yield() }
+    admission.close()
+    let pausing = Task { await manager.suspend() }
+    // Native loading can ignore cancellation; pause must join it rather than fabricate completion.
+    await latch.release()
+    await pausing.value
+    await #expect(throws: (any Error).self) { _ = try await loading.value }
+    try admission.resume()
+    _ = try await manager.get(id, as: .chat)
+    await manager.shutdown()
+}
+
+private actor LoadingReportLog {
+    var values: [Bool] = []
+    func append(_ value: Bool) { values.append(value) }
+}
+private struct NoResourcePreparationChat: ChatCapability {
+    let availability: CapabilityAvailability = .available
+    func chat(_ request: ChatRequest) async throws -> InferenceSession<ChatEvent> {
+        throw CapabilityError.unavailable("Not used by preparation tests")
+    }
+}
+private enum PreparationLoadError: Error { case failed }
+
+@Test func modelLoadingReportsOnlyColdResourceWorkAndAlwaysEndsOnFailure() async throws {
+    let counter = LoadCounter()
+    let manager = try await registeredManager(counter)
+    let reports = LoadingReportLog()
+    let id = ModelID("model")
+    try await manager.warmup(id, reportLoading: { await reports.append($0) })
+    #expect(await reports.values == [true, false])
+    try await manager.warmup(id, reportLoading: { await reports.append($0) })
+    #expect(await reports.values == [true, false])
+    #expect(await counter.loads == 1)
+    let unmanaged = ModelID("unmanaged")
+    try await manager.register(
+        ModelRegistration(id: unmanaged, capabilities: [.chat]) { _ in
+            ProvidedCapabilities(chat: NoResourcePreparationChat())
+        })
+    try await manager.warmup(unmanaged, reportLoading: { await reports.append($0) })
+    #expect(try await manager.status(unmanaged) == .unmanaged)
+    #expect(await reports.values == [true, false])
+    let failed = ModelID("failed")
+    try await manager.register(
+        ModelRegistration(id: failed, capabilities: [.chat]) { context in
+            ProvidedCapabilities(
+                chat: ManagedChat(
+                    try context.resource { () async throws -> Int in
+                        throw PreparationLoadError.failed
+                    }))
+        })
+    await #expect(throws: PreparationLoadError.failed) {
+        try await manager.warmup(failed, reportLoading: { await reports.append($0) })
+    }
+    #expect(await reports.values == [true, false, true, false])
+    await manager.shutdown()
+}

@@ -2,7 +2,7 @@ import AgentCore
 import Foundation
 import ModelKit
 import PlatformKit
-import Storage
+import StorageCore
 
 /// Streaming perception only. Device capture and playback remain composition-owned.
 public actor SpeechPerceptionAgent: Agent {
@@ -67,16 +67,13 @@ public actor SpeechPerceptionAgent: Agent {
         recognition: any SpeechRecognitionCapability, vad: any VoiceActivityCapability,
         sessionID: String, interactionSessionID: String? = nil, configuration: AgentConfiguration? = nil,
         mode: Mode = .speechAndSoundSource, residentListening: Bool = false,
-        context: AgentContextRepository<SpeechPerceptionContextState>? = nil
+        context: AgentContextRepository<SpeechPerceptionContextState>
     ) throws {
         if residentListening {
             guard interactionSessionID != nil else { throw CommunicationError.scopeClosed }
             if case .soundSourceOnly = mode { throw CommunicationError.invalidPayload }
         }
-        self.contextRepository =
-            context
-            ?? AgentContextRepository(
-                agent: .speechPerception, scope: UUID().uuidString, state: SpeechPerceptionContextState())
+        self.contextRepository = context
         guard contextRepository.agentID == .speechPerception else { throw AgentConfigurationError.identityMismatch }
         let configuration = try configuration ?? AgentConfigurations.load(named: "SpeechPerception")
         guard configuration.agentID == .speechPerception else { throw AgentConfigurationError.identityMismatch }

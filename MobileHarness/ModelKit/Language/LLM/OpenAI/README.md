@@ -42,7 +42,7 @@ Emit text on response.output_text.delta. Validate bounded argument deltas agains
 
 At most 64 messages/64 KiB text, 128 declarations/64 KiB declarations, 32,768 requested output tokens, 64 KiB SSE line/event and eight MiB total stream. Native output indices ≤128; item/call IDs ≤512 bytes, safe names ≤64 and string-object arguments ≤4096. Images separately retain four/16 MiB transcript and four MiB each. CR/LF/CRLF, bytewise UTF-8, comments and multiline SSE fields are supported.
 
-The session uses `StreamLimits(capacity: 128, maximumEventBytes: 65568)` and serialized `yieldSuspending` for every event, including the terminal event. A full queue pauses event production without dropping fragments or failing with bufferOverflow. The request retains its operation lease while waiting; normal completion drains accepted events, and cancellation/failure wakes the producer and suppresses buffered delivery. Callers must consume or cancel a session before awaiting ordinary unload, which drains active work without cancellation. Queue limits cover decoded events, not URLSession or decoder memory. Optional timing starts immediately before URLSession.bytes and first nonempty decoded text before yield; validation/loading/consumer/voice/UI are excluded. Native-only has no TTFT.
+The session uses `StreamLimits(capacity: 128, maximumEventBytes: 65568)` and serialized `yieldSuspending` for every event, including the terminal event. A full queue pauses event production without dropping fragments or failing with bufferOverflow. The request retains its operation lease while waiting; normal completion drains accepted events, and cancellation/failure wakes the producer and suppresses buffered delivery. Callers must consume or cancel a session before awaiting ordinary unload, which drains active work without cancellation. Queue limits cover decoded events, not URLSession or decoder memory. ✅ Optional timing starts immediately before URLSession.bytes and samples the first nonempty decoded text or identity-validated function argument delta before consumer delivery. Native-only timing therefore measures streamed model arguments rather than tool execution or terminal validation. Private reasoning and empty deltas do not count; missing samples remain absent. Validation/loading/consumer/voice/UI are excluded.
 
 ## Model discovery
 
@@ -73,3 +73,10 @@ All consumers, including Memory title requests (64 output tokens), pass through 
 ## 待实现
 
 - Cloud ASR/TTS/video and automatic retry policies are not implemented.
+
+✅ 纯 SSE usage 解码保留 input_tokens_details.cached_tokens/cache_write_tokens，未知字段兼容，非法数值明确失败。不调用真实 API，不改网络或凭据配置。Responses 原有逐条序列化保留多 system 边界；本轮不注入特定模型的显式断点参数。
+
+
+## 分类异常诊断
+
+✅ ChatEventDecoder 在校验失败点记录明确 reason、stage、event、field、outputIndex、实际及允许的 Tool 名称（最多8项并保留总数）；不改变接纳条件、终态前不发布调用及流清理。OpenAIChatError 通过 ModelKit 中立诊断接口向 Agent 保留原因；旧通用错误仅兼容模型发现等未细分入口。

@@ -1,14 +1,14 @@
 import AgentCore
 import Foundation
 import FunctionContracts
-import Storage
+import StorageCore
 import UI
 
 /// Recognition and replies have independent identities: a queued task may reply after a later utterance.
 /// Session, active task and registered function permissions are checked by the calling host/Gateway.
 public struct ConversationPresentation: Sendable {
     public enum Update: Hashable, Sendable {
-        case transcript, finishTranscript, voiceState, beginReply, reply, expression
+        case transcript, finishTranscript, voiceState, beginReply, reply, expression, replyWaiting
     }
     public private(set) var turn: AgentTurn?
     public private(set) var replyTurn: AgentTurn?
@@ -67,7 +67,7 @@ public struct ConversationPresentation: Sendable {
     }
     /// Clear the previous visual round only after accepting a new recognition identity.
     @MainActor public mutating func accept(
-        _ context: ActionExecutionContext, update: Update, state: ConversationState
+        _ context: ActionExecutionContext, update: Update, state: any ConversationPresenting
     ) -> Bool {
         let previous = turn
         guard accept(context, update: update) else { return false }
@@ -106,7 +106,7 @@ public struct ConversationPresentation: Sendable {
                 replySource = source
                 replyDecisionID = decisionID
                 replyTaskID = taskID
-                for key in [Update.beginReply, .reply, .expression] { sequences[key] = nil }
+                for key in [Update.beginReply, .reply, .expression, .replyWaiting] { sequences[key] = nil }
             } else {
                 guard incoming == replyTurn, source == replySource, decisionID == replyDecisionID,
                     taskID == replyTaskID,

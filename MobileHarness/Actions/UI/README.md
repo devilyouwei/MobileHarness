@@ -1,5 +1,7 @@
 # UI Actions — 呈现、反馈与装饰效果函数
 
+✅ Expression.setReplyWaiting 接纳 enabled／requestID，完成表示呈现端口接纳，不等待持续动画；仅可信内部目录使用，不暴露为模型工具。
+
 ## 简介
 
 此业务域将表情、文字、视线、姿态、资源呈现、导航以及短反馈转换为类型化能力调用。它与独立 UI 模块分属不同编译目标：Actions/UI 不导入 SwiftUI、UIKit 或 UI 项目实现。
@@ -40,7 +42,7 @@ flowchart TB
 
 | 模块 | 函数与参数 | 完成边界 |
 | --- | --- | --- |
-| Expression | express/setExpression：emotion | express 加入呈现与恢复；setExpression 接纳持续基础状态 |
+| Expression | express/setExpression：emotion；内部 setReplyWaiting：enabled/requestID | express 加入呈现与恢复；setExpression 接纳持续基础状态 |
 | Caption | beginReplyTurn/finishTranscript 无参数；print/setTranscript：text | 端点接纳本轮或文字更新 |
 | VoiceState | setVoiceState：listening/hearing/processing | 显示状态接纳，不产生麦克风效果 |
 | Gaze | moveEyes：有限 x/y，均为 −1…1 | 视线目标接纳 |
@@ -77,3 +79,29 @@ Notice 的非空文字限 1024 UTF-8 字节，tone 为 info/warning/error（默�
 ## 待实现
 
 - 暂无本目录独立的实现待办；跨模块及实际模型/设备验收见所属模块说明。
+
+## Storage 依赖
+
+✅ 存储访问使用独立的 State、Cache、Database 和 Files 接口；App 注册根实例，消费者通过构造器获得所需能力。存储容器不接管本目录的业务验证、执行和完成语义。
+
+## ApplicationControl 异常展示
+
+✅ 已实现：新增内部 UI.RuntimeDiagnostics.recordFailure：校验有界展示参数，调用注入的 RuntimeFailurePresentationCapability；完成仅表示异常记录/提示状态提交，不代表故障恢复。仅 ApplicationControl 根会话可调用，不向模型 Skill 暴露。
+
+✅ 已实现：RuntimeDiagnosticsActions.swift 独立拥有 UI.RuntimeDiagnostics 函数地址，沿用既有 UI 目录，不新建目录或编译目标。
+
+## UI 全量容器化
+
+✅ 应用级 UI 状态由八个子容器统一创建，消费者注入所需 Presenting 接口并提交 UI 自有值，不直接写字段。App 注册并管理同一 UI 根；原业务身份/版本校验、原生完成和基础库依赖边界保持。跨模块连接迁移仍是独立待办。
+✅ 已实现：新增两个内部Bluetooth呈现Action（首页／设置），参数为连接phase和revision，使用独立能力协议；只更新呈现，不能连接、发送、恢复设备或调用模型。
+
+✅ 已实现：BluetoothStatusActions.swift单独拥有UI.BluetoothStatus.showBluetoothHome／showBluetoothSettings；连接状态不归RuntimeDiagnostics异常函数组。使用现有Actions/UI目录和编译目标。
+
+✅ 蓝牙呈现 Action 源码由 Actions 独占，ActionBindings 的排除表同步列出，避免 SwiftPM 未归属警告。
+
+
+✅ ExpressionActions.setLoading是独立状态函数，参数enabled／revision，完成表示呈现状态接纳。它不属于模型表情Skill，不等待模型加载或循环动画结束；Gateway按内部Tool调用。
+
+✅ setLoading为state函数，必须使用Void handler产生completed，禁止value完成；回归通过FunctionExecutor校验完成类型和Tool返回成功，不能只检查UI副作用。
+
+✅ 请求等待归 ExpressionActions，与模型准备 setLoading 同属表情域；请求身份与会话准入独立处理，不放入字幕函数。

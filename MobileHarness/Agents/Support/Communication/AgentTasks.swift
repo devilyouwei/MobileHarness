@@ -1,7 +1,7 @@
 import AgentCore
 import Foundation
 import FunctionContracts
-import Storage
+import StorageCore
 
 /// Public task content, separate from private inference history and trusted UI commands.
 public struct AgentTaskContent: Codable, Sendable, Equatable {
@@ -116,7 +116,7 @@ public enum AgentFixedTaskInput {
 }
 
 /// Explicit user reply targets an existing question; runtime ownership is not user-supplied.
-public struct AgentTaskInputIntent: Codable, Sendable, Equatable {
+public struct AgentTaskInputIntent: ExternalInputProviding, Codable, Sendable, Equatable {
     public static let contract = "agent.userInput"
     public let taskID: String
     public let interactionID: String
@@ -129,8 +129,7 @@ public struct AgentTaskInputIntent: Codable, Sendable, Equatable {
         self.artifactID = artifactID
         self.text = text
     }
-    public func input(sessionID: String) throws -> AgentInput {
-        let id = UUID().uuidString
+    public func externalInput(sessionID: String, sequence: UInt64) throws -> ExternalInputDraft {
         let payload = InputPayload.observation(
             AgentMessage(
                 contract: Self.contract, content: self, maximumBytes: 16_384,
@@ -139,9 +138,8 @@ public struct AgentTaskInputIntent: Codable, Sendable, Equatable {
                         taskID: value.taskID, interactionID: value.interactionID, artifactID: value.artifactID,
                         text: value.text)
                 }))
-        return AgentInput(
-            id: id, sessionID: sessionID, payload: payload,
-            metadata: InputMetadata(payload: payload, source: "user", rootID: id))
+        return ExternalInputDraft(
+            sessionID: sessionID, payload: payload, source: "user")
     }
 }
 

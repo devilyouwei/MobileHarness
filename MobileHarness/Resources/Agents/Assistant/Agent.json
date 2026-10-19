@@ -74,7 +74,7 @@
         "kind": "observation"
       },
       {
-        "contract": "camera.state",
+        "contract": "container.failure",
         "version": 1,
         "kind": "observation"
       }
@@ -106,9 +106,9 @@
         "topic": "assistant.control"
       },
       {
-        "contract": "camera.state",
-        "source": "phone.camera",
-        "topic": "camera.state"
+        "contract": "container.failure",
+        "source": "runtime",
+        "topic": "container.failure"
       }
     ],
     "publications": [

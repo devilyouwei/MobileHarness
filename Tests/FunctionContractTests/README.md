@@ -15,3 +15,7 @@ Runtime fixtures use opaque UUID strings; committed business entities use dialog
 ## 待实现
 
 - 暂无本目录独立实现待办；Agent 授权与物理/模型验收由上层负责。
+
+## Platform 根、设备接入与同帧呈现
+
+FunctionInput 的可选 Sendable 附件缺省为空，原生 Tool 附件与字符串参数的隔离由 IntegrationTests/NativeAttachmentTests 覆盖。此目标仍只依赖独立函数契约。

@@ -1,81 +1,70 @@
-# PlatformKit — Native Device Capabilities
+# PlatformKit — 原生设备能力
 
-## Summary
+✅ Audio 内统一重复会话配置，执行隔离、设备生命周期及错误传播不变；调试时序收敛到持久总区间。
 
-Public Apple device I/O and bounded NexArm transports. The SDK exposes native values, readiness and failures to its callers.
+✅ 根目录 PlatformContainer.swift 保留容器与接纳机制，PlatformFailure.swift 集中统一异常封装和 PlatformError 生命周期错误；不改变类型或传播行为。
 
-## Ownership and boundaries
+## 职责与边界
 
-Foundation capability module with no cross-module dependencies. App manages root lifetime; module-owned services implement recovery; Actions owns motion semantics; Agents owns perception and inference policy. No Agent, Gateway, UI or business-function types enter this target.
+PlatformKit 是不依赖其他项目模块的基础 SDK，只使用系统框架。提供原生设备能力、有限缓冲的输入、运行事实和执行错误；不认识 Signal、Agent、Action、UI 或 FactoryKit。
 
-## External relationships and data flow
+App 创建根并管理生命周期，业务拥有同意、资源租约、动作含义和感知策略。模块内部只创建／持有原生驱动，对外按能力协议接入。
 
-Runtime arrows show data or capability calls; dashed arrows show injection.
+## 上下游与内部结构
 
 ```mermaid
 flowchart LR
- Bindings[Module integrations]
- Bindings -->|capture, preview, playback, connection| PlatformKit
- Actions -->|motor commands and feedback| PlatformKit
- Agents -->|PCM conversion and native frame access| PlatformKit
- PlatformKit -->|frames, readiness, errors| Bindings
- PlatformKit -->|telemetry and I/O outcomes| Actions
- PlatformKit <--> Hardware[Apple hardware and arm firmware]
+ App["App 装配与启停"] -.-> Root["PlatformContainer"]
+ Root --> Audio["AudioContainer"]
+ Root --> Vision["VisionContainer"]
+ Root --> Connectivity["ConnectivityContainer"]
+ Consumer["注入的业务消费者"] -->|"原生能力协议"| Audio
+ Consumer -->|"相机协议"| Vision
+ Consumer -->|"链路协议"| Connectivity
+ Audio <--> Hardware["系统与硬件"]
+ Vision <--> Hardware
+ Connectivity <--> Hardware
+ Audio -->|"原生事实／数据"| Gateway["Gateway 适配器"]
+ Vision -->|"原生事实／数据"| Gateway
+ Connectivity -->|"原生事实／数据"| Gateway
 ```
 
-## Internal structure
+箭头到 Gateway 表示消费数据，不构成 SDK 编译依赖；Signal 的载荷、来源、会话和传输适配均在 Gateway。
 
-```mermaid
-flowchart TB
- Audio --> Capture[Capture and readiness]
- Audio --> PCM[Conversion and spectrum]
- Audio --> Playback[Continuous playback]
- Vision --> Camera[Camera graph and preview]
- Vision --> Photo[JPEG and native Photos import]
- Connectivity --> NexArm[Protocol and USB/BLE]
- Core[Core: no implementation]
-```
+## 子能力接口
 
-## Capability contracts
+| 子能力 | 对外接口 | 完成与所有权 |
+| --- | --- | --- |
+| Audio | AudioInputOutput、CuePlaying、HapticFeedbackProviding | 首个有效PCM后就绪；播放等待真实dataPlayedBack；停止可加入 |
+| Vision | CameraCapturing，受控JPEG相册导入 | 相机actor管理图；独立最新帧；单次照片回调加入 |
+| Connectivity | NexArmBluetoothLink、NexArmObservableLink | 原生读写及观察；写入成功不代表物理到达 |
+| Core | 有界广播、单代输入围栏、采样与OS清理额度 | 不选择业务反应，不授予设备后台执行资格 |
 
-| Domain | Interface and completion boundary |
-| --- | --- |
-| Audio | `AppleAudioIO`: first validated PCM before capture admission; playback completion after native buffer drain |
-| Vision | `AppleCamera`: actor-owned graph, native preview and newest frame; one bounded JPEG capture |
-| Connectivity | NexArm link protocols, native command encoding, passive telemetry and session-fenced transports |
-| Core | Documentation-only boundary; no compiled shared implementation |
+Audio 的 voice/diagnostic/detection/camera 是有限原生作用域，作用域内实例缓存一致，共享会话互斥。原生实现的构造／配置留在子容器；协议参数只包含 SDK／系统值。
 
-Capture layout is fixed for an admitted audio stream. Spatial-to-mono fallback is allowed only before admission and after spatial shutdown. Discrete PCM overflow fails; replaceable camera/status values explicitly use newest-one buffers. Native write completion does not prove physical arrival.
+## 根生命周期
 
-Callbacks use serial native queues or short mutex sections, never UI state. module-owned services implement foreground fences and join teardown; physical safety cannot rely on background scheduling. SDK diagnostics retain bounded format/traffic/error facts, not media or business context.
+✅ 构造和 start 不请求权限、不打开设备、不扫描；start 开放同步 admission。invalidate 同步关门并请求原生停止，setForeground(false)/stop 加入实际停止；重复停止共享结果。失败保留，已停止根不可重用；消费者先停止，再释放根。
 
-Audio capture/playback/conversion, camera/photo/library capabilities and USB/BLE transports.
+Audio/Vision/Connectivity 独立管理自己的取消、原生回调和清理。恢复／重建由拥有者明确决定，不自动重放设备动作；物理安全不依赖后台调度。
 
-Device acceptance evidence is recorded in [validation history](../../docs/validation/Validation-History.md).
+## 数据、事件与失败
 
-## Related design
+原生PCM保持有序、满载明确失败；相机／状态使用最新值替换。缓冲上限、单消费者／独立观察者及清理规则见各能力 README。
 
-[Parent design](../README.md) · [Audio](Audio/README.md) · [Connectivity](Connectivity/README.md) · [Core](Core/README.md) · [Vision](Vision/README.md)
+NativeAudioEvent／CameraEvent 是 String/Sendable 原生事实，不采用 Error。实际设备失败使用 SDK 错误或原系统错误，事件编码留给 Gateway。PlatformAdmission 同步调用注入的非阻塞错误报告回调，保留原 throw／真实清理结果；正常取消和有意关闭不升级为设备故障。
 
-AppleAudioIO exposes generic playClip for bounded PCM before capture, reusing the existing native drain/cancellation implementation. No app chime/music or presentation policy enters PlatformKit.
+公开错误和值属于本 SDK，不生成业务提示或应用身份。SDK日志仅保留有界原生格式／交通／错误事实，不记录媒体或业务上下文。
 
-native PCM continuity evidence is distinguished from bounded queue overflow; stopPlayback cancels/wakes the owned native playback operation without stopping capture. Upper-layer consent/reply policy belongs to Agents and its integration.
+## 源码风格与待完成
 
-Audio owns generic NativeHapticFeedback with public UIKit/CoreHaptics support checks, one bounded operation, cached prepared generators and explicit busy/unavailable/invalid-request failures. It owns no listening policy or cue selection. AppleAudioIO enables supported haptics during recording through the public AVAudioSession API.
+✅ 根及相关 Audio/Vision 能力使用统一声明／导入格式；能力协议与实现同目录，具体驱动不进入业务成员类型。无调用的PCM预热／游标接口不属于当前公开端口，实际播放actor隔离和停止加入保持。
 
-Audio adds generic bounded PCMClipEncoding and one NativeCuePlayback using public AVAudioPlayer. It plays alongside existing audio under the current session, without reconfiguring/deactivating AVAudioSession or touching another player/capture owner. One active clip; overlap fails; callbacks/errors/cancellation complete its wait.
+❌ 视频录制、自主硬件安全控制器及完整原生／物理验收仍待完成。协议化、编译和替身测试不等于真实设备验收。
 
-## Native image preparation
+[总体设计](../README.md) · [Audio](Audio/README.md) · [Vision](Vision/README.md) · [Connectivity](Connectivity/README.md) · [Core](Core/README.md)
 
-Vision adds NativeImageCompression, a generic caller-configured JPEG downsampling/encoding capability using public Image I/O. It has no model, Agent or persistence policy. One detached native operation per invocation is cancelled and joined by its caller; no retained queue/cache or UI lifetime. Callers select dimension/pixel/byte limits; malformed input, invalid limits, decoding, encoding and exhausted size budgets fail explicitly.
-
-## 通用根级运行机制
-
-Core/ResourceObservationWorkflow 提供注入的 read/deliver/invalidate 单 worker 采样，不知道资源、模型、Agent 或 UI；消息/指纹容量和取消语义保持不变。Core/NativeBackgroundAllowance 提供一个可替换、可结束的 OS 准备额度，期限由调用方指定，不授权设备后台执行。
-
-Audio/ListeningCaptureWorkflow 串行加入原生 start/stop，Vision/CameraVisionRestartWorkflow 加入旧管线后启动最新意图。它们只接收闭包/中立泛型数据，业务同意、感知选择和 UI 状态属于上层；没有新增项目依赖。
+✅ 已实现：PlatformAdmission 不再过滤取消／关闭错误，原始 Error 完整交给宿主统一报告端口；生命周期控制事件的广播抑制由宿主／Gateway 完成，底层协议保留类型化 throw，根生命周期使用 PlatformFailure。
 
 
-## 待实现
-
-- Movie recording and an autonomous hardware safety controller.
+✅ PlatformFailure属于独立SDK；根start／setForeground／stop类型化抛错，PlatformAdmission为原生回调包装同一结构并保留首次来源。Audio与根的清理失败使用underlying＋cleanupErrors；上层通过原始类型识别蓝牙连接条件，清理失败不能降为连接状态。

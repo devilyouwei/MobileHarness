@@ -1,8 +1,9 @@
 import AgentCore
 import Agents
 import Foundation
-import Storage
 import StorageChat
+import StorageCore
+import StorageFiles
 import StorageMedia
 import StorageSQLite
 import StorageTasks
@@ -26,7 +27,7 @@ func fixtureMediaStore(root: URL, repositories: SQLiteRepositories? = nil, limit
 {
     let records = try repositories ?? testSQLiteRepositories(root)
     return CapturedPhotoStore(
-        repository: records.media, files: try LocalFileStore(root: root, protection: .afterFirstUnlock), limits: limits)
+        repository: records.media, files: try DiskFileStore(root: root, protection: .afterFirstUnlock), limits: limits)
 }
 func fixtureAssistantStore(repository: AgentContextRepository<AssistantContextState>, directory: URL) throws
     -> ConversationHistoryStore

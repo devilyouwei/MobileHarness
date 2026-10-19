@@ -1,0 +1,1731 @@
+{
+  "version": 1,
+  "cases": [
+    {
+      "id": "plain-chat",
+      "category": "baseline",
+      "turns": [
+        {
+          "user": "你好，今天心情不错。",
+          "forbidden": [
+            "startTask",
+            "loadSkills",
+            "takePhoto",
+            "Bluetooth.control"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "camera-open-cold",
+      "category": "skill",
+      "turns": [
+        {
+          "user": "打开摄像头。",
+          "required": [
+            "loadSkills",
+            "openCamera"
+          ],
+          "forbidden": [
+            "startTask",
+            "takePhoto"
+          ],
+          "loaded": [
+            "photography"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "camera-close-cold",
+      "category": "skill",
+      "turns": [
+        {
+          "user": "关闭摄像头。",
+          "required": [
+            "loadSkills",
+            "closeCamera"
+          ],
+          "forbidden": [
+            "startTask"
+          ],
+          "loaded": [
+            "photography"
+          ]
+        }
+      ],
+      "cameraEnabled": true
+    },
+    {
+      "id": "camera-no-reload",
+      "category": "skill",
+      "turns": [
+        {
+          "user": "关闭摄像头。",
+          "required": [
+            "closeCamera"
+          ],
+          "forbidden": [
+            "loadSkills",
+            "startTask"
+          ]
+        }
+      ],
+      "skills": [
+        "photography"
+      ],
+      "cameraEnabled": true
+    },
+    {
+      "id": "camera-followup-after-settings",
+      "category": "lifetime",
+      "turns": [
+        {
+          "user": "打开摄像头。",
+          "required": [
+            "openCamera"
+          ]
+        },
+        {
+          "user": "打开设置。",
+          "required": [
+            "openPage"
+          ],
+          "parameters": {
+            "openPage": {
+              "destination": "settings"
+            }
+          }
+        },
+        {
+          "user": "关闭摄像头。",
+          "required": [
+            "closeCamera"
+          ],
+          "forbidden": [
+            "loadSkills",
+            "startTask"
+          ]
+        }
+      ],
+      "skills": [
+        "photography"
+      ]
+    },
+    {
+      "id": "capture-only-cold",
+      "category": "photography",
+      "turns": [
+        {
+          "user": "帮我拍一张照片，不需要后续操作，不用保存也不用问我。",
+          "required": [
+            "loadSkills",
+            "openCamera",
+            "takePhoto"
+          ],
+          "forbidden": [
+            "startTask",
+            "finishTask",
+            "savePhoto",
+            "ignorePhoto"
+          ],
+          "task": false,
+          "counts": {
+            "takePhoto": 1
+          },
+          "separateRounds": [
+            [
+              "openCamera",
+              "takePhoto"
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "capture-only-ready",
+      "category": "photography",
+      "turns": [
+        {
+          "user": "只拍一张，不做后续操作。",
+          "required": [
+            "takePhoto"
+          ],
+          "forbidden": [
+            "startTask",
+            "openCamera",
+            "finishTask",
+            "savePhoto",
+            "ignorePhoto"
+          ],
+          "counts": {
+            "takePhoto": 1
+          }
+        }
+      ],
+      "skills": [
+        "photography"
+      ],
+      "cameraEnabled": true
+    },
+    {
+      "id": "photo-save-workflow",
+      "category": "photography",
+      "turns": [
+        {
+          "user": "帮我拍张照片，拍好后让我选择保存还是忽略。",
+          "required": [
+            "startTask",
+            "openCamera",
+            "takePhoto"
+          ],
+          "task": true,
+          "status": "waitingUser",
+          "first": "startTask",
+          "counts": {
+            "takePhoto": 1
+          },
+          "separateRounds": [
+            [
+              "openCamera",
+              "takePhoto"
+            ]
+          ]
+        },
+        {
+          "user": "保存这张。",
+          "required": [
+            "savePhoto",
+            "finishTask"
+          ],
+          "parameters": {
+            "savePhoto": {
+              "mediaID": "media_1"
+            }
+          },
+          "task": false,
+          "forbidden": [
+            "takePhoto"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "photo-ignore-workflow",
+      "category": "photography",
+      "turns": [
+        {
+          "user": "拍张照片，等我决定是否保存。",
+          "required": [
+            "startTask",
+            "takePhoto"
+          ],
+          "task": true
+        },
+        {
+          "user": "忽略这张。",
+          "required": [
+            "ignorePhoto",
+            "finishTask"
+          ],
+          "forbidden": [
+            "savePhoto",
+            "takePhoto"
+          ],
+          "task": false
+        }
+      ],
+      "cameraEnabled": true
+    },
+    {
+      "id": "photo-reshoot-workflow",
+      "category": "photography",
+      "turns": [
+        {
+          "user": "重拍这张。",
+          "required": [
+            "ignorePhoto",
+            "takePhoto"
+          ],
+          "forbidden": [
+            "startTask",
+            "finishTask"
+          ],
+          "ordered": [
+            "ignorePhoto",
+            "takePhoto"
+          ],
+          "separateRounds": [
+            [
+              "ignorePhoto",
+              "takePhoto"
+            ]
+          ],
+          "task": true,
+          "counts": {
+            "takePhoto": 1
+          }
+        },
+        {
+          "user": "保存新的。",
+          "required": [
+            "savePhoto",
+            "finishTask"
+          ],
+          "parameters": {
+            "savePhoto": {
+              "mediaID": "media_1"
+            }
+          },
+          "task": false
+        }
+      ],
+      "skills": [
+        "photography"
+      ],
+      "cameraEnabled": true,
+      "preview": "media_41",
+      "taskGoal": "拍照并让用户选择保存或忽略"
+    },
+    {
+      "id": "standalone-save-preview",
+      "category": "photography",
+      "turns": [
+        {
+          "user": "保存当前这张照片。",
+          "required": [
+            "savePhoto"
+          ],
+          "parameters": {
+            "savePhoto": {
+              "mediaID": "media_41"
+            }
+          },
+          "forbidden": [
+            "startTask",
+            "finishTask",
+            "takePhoto"
+          ],
+          "task": false
+        }
+      ],
+      "skills": [
+        "photography"
+      ],
+      "cameraEnabled": true,
+      "preview": "media_41"
+    },
+    {
+      "id": "standalone-ignore-preview",
+      "category": "photography",
+      "turns": [
+        {
+          "user": "忽略当前照片。",
+          "required": [
+            "ignorePhoto"
+          ],
+          "parameters": {
+            "ignorePhoto": {
+              "mediaID": "media_41"
+            }
+          },
+          "forbidden": [
+            "startTask",
+            "finishTask",
+            "takePhoto"
+          ]
+        }
+      ],
+      "skills": [
+        "photography"
+      ],
+      "cameraEnabled": true,
+      "preview": "media_41"
+    },
+    {
+      "id": "save-without-preview",
+      "category": "photography",
+      "turns": [
+        {
+          "user": "保存这张照片。",
+          "forbidden": [
+            "savePhoto",
+            "ignorePhoto",
+            "takePhoto",
+            "startTask"
+          ]
+        }
+      ],
+      "skills": [
+        "photography"
+      ],
+      "cameraEnabled": true
+    },
+    {
+      "id": "switch-lens-before-capture",
+      "category": "photography",
+      "turns": [
+        {
+          "user": "用后置摄像头拍一张，不需要后续操作。",
+          "required": [
+            "flipCamera",
+            "takePhoto"
+          ],
+          "parameters": {
+            "flipCamera": {
+              "facing": "back"
+            }
+          },
+          "ordered": [
+            "flipCamera",
+            "takePhoto"
+          ],
+          "separateRounds": [
+            [
+              "flipCamera",
+              "takePhoto"
+            ]
+          ],
+          "forbidden": [
+            "startTask"
+          ],
+          "counts": {
+            "takePhoto": 1
+          }
+        }
+      ],
+      "skills": [
+        "photography"
+      ],
+      "cameraEnabled": true
+    },
+    {
+      "id": "permission-denied",
+      "category": "failure",
+      "turns": [
+        {
+          "user": "打开摄像头。",
+          "required": [
+            "openCamera"
+          ],
+          "forbidden": [
+            "takePhoto",
+            "retryCamera"
+          ],
+          "counts": {
+            "openCamera": 1
+          }
+        }
+      ],
+      "skills": [
+        "photography"
+      ],
+      "failure": "cameraPermission"
+    },
+    {
+      "id": "camera-busy",
+      "category": "failure",
+      "turns": [
+        {
+          "user": "拍张照。",
+          "forbidden": [
+            "takePhoto",
+            "retryCamera",
+            "savePhoto"
+          ]
+        }
+      ],
+      "skills": [
+        "photography"
+      ],
+      "cameraEnabled": true,
+      "cameraBusy": true
+    },
+    {
+      "id": "save-committed-feedback-failed",
+      "category": "partial-success",
+      "turns": [
+        {
+          "user": "保存当前照片。",
+          "required": [
+            "savePhoto"
+          ],
+          "counts": {
+            "savePhoto": 1
+          },
+          "forbidden": [
+            "takePhoto",
+            "ignorePhoto"
+          ]
+        }
+      ],
+      "skills": [
+        "photography"
+      ],
+      "cameraEnabled": true,
+      "preview": "media_41",
+      "failure": "saveFeedback"
+    },
+    {
+      "id": "save-failed-keeps-task",
+      "category": "failure",
+      "turns": [
+        {
+          "user": "保存这张。",
+          "required": [
+            "savePhoto"
+          ],
+          "counts": {
+            "savePhoto": 1
+          },
+          "forbidden": [
+            "finishTask",
+            "takePhoto"
+          ],
+          "task": true
+        }
+      ],
+      "skills": [
+        "photography"
+      ],
+      "cameraEnabled": true,
+      "preview": "media_41",
+      "taskGoal": "拍照并保存",
+      "failure": "saveFailure"
+    },
+    {
+      "id": "capture-uncertain-no-replay",
+      "category": "failure",
+      "turns": [
+        {
+          "user": "只拍一张，不做后续操作。",
+          "required": [
+            "takePhoto"
+          ],
+          "counts": {
+            "takePhoto": 1
+          },
+          "forbidden": [
+            "savePhoto",
+            "ignorePhoto"
+          ]
+        }
+      ],
+      "skills": [
+        "photography"
+      ],
+      "cameraEnabled": true,
+      "failure": "captureUncertain"
+    },
+    {
+      "id": "task-aside-keeps-goal",
+      "category": "task",
+      "turns": [
+        {
+          "user": "顺便问一下，你叫什么名字？",
+          "forbidden": [
+            "finishTask",
+            "cancelTask",
+            "releaseSkills",
+            "takePhoto"
+          ],
+          "task": true,
+          "status": "waitingUser",
+          "loaded": [
+            "photography"
+          ]
+        }
+      ],
+      "skills": [
+        "photography"
+      ],
+      "cameraEnabled": true,
+      "preview": "media_41",
+      "taskGoal": "拍照并等待保存决定"
+    },
+    {
+      "id": "task-query-aside-keeps-goal",
+      "category": "task",
+      "turns": [
+        {
+          "user": "昨天的聊天记录呢？",
+          "forbidden": [
+            "finishTask",
+            "cancelTask",
+            "releaseSkills",
+            "startTask"
+          ],
+          "task": true
+        }
+      ],
+      "skills": [
+        "photography"
+      ],
+      "cameraEnabled": true,
+      "preview": "media_41",
+      "taskGoal": "拍照并等待保存决定"
+    },
+    {
+      "id": "task-explicit-replacement",
+      "category": "task",
+      "turns": [
+        {
+          "user": "不拍了，结束这个拍照任务，改查昨天的聊天记录。",
+          "required": [
+            "finishTask",
+            "History.list"
+          ],
+          "parameters": {
+            "finishTask": {
+              "continueDecision": "true"
+            }
+          },
+          "ordered": [
+            "finishTask",
+            "History.list"
+          ],
+          "forbidden": [
+            "savePhoto",
+            "takePhoto"
+          ]
+        }
+      ],
+      "skills": [
+        "photography"
+      ],
+      "cameraEnabled": true,
+      "preview": "media_41",
+      "taskGoal": "拍照并等待保存决定"
+    },
+    {
+      "id": "task-explicit-cancel",
+      "category": "task",
+      "turns": [
+        {
+          "user": "取消当前任务。",
+          "required": [
+            "cancelTask"
+          ],
+          "forbidden": [
+            "startTask",
+            "savePhoto",
+            "takePhoto"
+          ],
+          "task": false
+        }
+      ],
+      "skills": [
+        "photography"
+      ],
+      "cameraEnabled": true,
+      "preview": "media_41",
+      "taskGoal": "拍照并等待保存决定"
+    },
+    {
+      "id": "task-continue",
+      "category": "task",
+      "turns": [
+        {
+          "user": "继续刚才的任务，保存这张照片。",
+          "required": [
+            "savePhoto",
+            "finishTask"
+          ],
+          "forbidden": [
+            "startTask",
+            "takePhoto"
+          ],
+          "task": false
+        }
+      ],
+      "skills": [
+        "photography"
+      ],
+      "cameraEnabled": true,
+      "preview": "media_41",
+      "taskGoal": "拍照并等待保存决定"
+    },
+    {
+      "id": "task-second-photo-after-close",
+      "category": "task",
+      "turns": [
+        {
+          "user": "保存这张。",
+          "required": [
+            "savePhoto",
+            "finishTask"
+          ],
+          "task": false
+        },
+        {
+          "user": "再帮我拍一张，拍好后我再决定保存还是忽略。",
+          "required": [
+            "startTask",
+            "takePhoto"
+          ],
+          "counts": {
+            "takePhoto": 1
+          },
+          "task": true
+        }
+      ],
+      "skills": [
+        "photography"
+      ],
+      "cameraEnabled": true,
+      "preview": "media_41",
+      "taskGoal": "拍照并等待保存决定"
+    },
+    {
+      "id": "skill-explicit-release",
+      "category": "skill",
+      "turns": [
+        {
+          "user": "把 photography 技能卸载，保留摄像头和照片。",
+          "required": [
+            "releaseSkills"
+          ],
+          "forbidden": [
+            "closeCamera",
+            "ignorePhoto",
+            "savePhoto"
+          ],
+          "unloaded": [
+            "photography"
+          ]
+        }
+      ],
+      "skills": [
+        "photography"
+      ],
+      "cameraEnabled": true,
+      "preview": "media_41"
+    },
+    {
+      "id": "skill-id-not-action",
+      "category": "protocol",
+      "turns": [
+        {
+          "user": "请使用 photography 技能把摄像头关了。",
+          "required": [
+            "loadSkills",
+            "closeCamera"
+          ],
+          "forbidden": [
+            "startTask"
+          ]
+        }
+      ],
+      "cameraEnabled": true
+    },
+    {
+      "id": "bluetooth-scan-is-action",
+      "category": "bluetooth",
+      "turns": [
+        {
+          "user": "扫描周围蓝牙设备，告诉我发现了哪些。",
+          "required": [
+            "Bluetooth.control",
+            "Bluetooth.readStatus"
+          ],
+          "parameters": {
+            "Bluetooth.control": {
+              "operation": "scan"
+            }
+          },
+          "ordered": [
+            "Bluetooth.control",
+            "Bluetooth.readStatus"
+          ],
+          "separateRounds": [
+            [
+              "Bluetooth.control",
+              "Bluetooth.readStatus"
+            ]
+          ],
+          "forbidden": [
+            "openPage"
+          ]
+        }
+      ],
+      "skills": [
+        "application-control"
+      ]
+    },
+    {
+      "id": "bluetooth-status-is-tool",
+      "category": "bluetooth",
+      "turns": [
+        {
+          "user": "调用蓝牙状态查询，获取当前蓝牙电源状态和刚发现的设备列表，不要扫描，也不要移动机械臂。",
+          "required": [
+            "Bluetooth.readStatus"
+          ],
+          "forbidden": [
+            "Bluetooth.control",
+            "waveWrist",
+            "nodHead",
+            "openPage"
+          ]
+        }
+      ],
+      "skills": [
+        "application-control"
+      ]
+    },
+    {
+      "id": "bluetooth-scan-connect",
+      "category": "bluetooth",
+      "turns": [
+        {
+          "user": "创建一个持续的连接任务：扫描周围蓝牙设备并连接名为“机械币”的设备，确认连接成功再结束；遇到需要选择时等待我决定。",
+          "required": [
+            "startTask",
+            "Bluetooth.control",
+            "Bluetooth.readStatus"
+          ],
+          "parameterVariants": {
+            "Bluetooth.control": [
+              {
+                "operation": "scan"
+              },
+              {
+                "operation": "connect",
+                "id": "device_17"
+              }
+            ]
+          },
+          "forbidden": [
+            "openPage",
+            "nodHead",
+            "waveWrist"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "bluetooth-connect-unknown",
+      "category": "bluetooth",
+      "turns": [
+        {
+          "user": "连接名为机械币的设备。",
+          "forbidden": [
+            "openPage",
+            "nodHead",
+            "waveWrist"
+          ],
+          "forbiddenParameters": {
+            "Bluetooth.control": {
+              "operation": "connect"
+            }
+          }
+        }
+      ],
+      "skills": [
+        "application-control"
+      ],
+      "failure": "noDevices"
+    },
+    {
+      "id": "provider-query-native",
+      "category": "tools",
+      "turns": [
+        {
+          "user": "告诉我当前配置的云模型。",
+          "required": [
+            "Provider.readSettings"
+          ],
+          "forbidden": [
+            "openPage",
+            "Bluetooth.control"
+          ]
+        }
+      ],
+      "skills": [
+        "application-control"
+      ]
+    },
+    {
+      "id": "model-inventory-native",
+      "category": "tools",
+      "turns": [
+        {
+          "user": "列出已经安装的模型资源，不要下载。",
+          "required": [
+            "ModelResources.snapshot"
+          ],
+          "forbidden": [
+            "ModelResources.download",
+            "openPage"
+          ]
+        }
+      ],
+      "skills": [
+        "application-control"
+      ]
+    },
+    {
+      "id": "navigation-is-action",
+      "category": "navigation",
+      "turns": [
+        {
+          "user": "打开历史对话页面。",
+          "required": [
+            "openPage"
+          ],
+          "parameters": {
+            "openPage": {
+              "destination": "history"
+            }
+          },
+          "forbidden": [
+            "History.list",
+            "startTask"
+          ]
+        }
+      ],
+      "skills": [
+        "application-control"
+      ]
+    },
+    {
+      "id": "history-list-native",
+      "category": "history",
+      "turns": [
+        {
+          "user": "找一下昨天我们讨论拍照的聊天记录。",
+          "required": [
+            "History.list"
+          ],
+          "forbidden": [
+            "openPage",
+            "startTask"
+          ]
+        }
+      ],
+      "skills": [
+        "history-query"
+      ]
+    },
+    {
+      "id": "history-read-real-id",
+      "category": "history",
+      "turns": [
+        {
+          "user": "找出昨天的聊天记录，然后读取那段对话的内容。",
+          "required": [
+            "History.list",
+            "History.read"
+          ],
+          "ordered": [
+            "History.list",
+            "History.read"
+          ]
+        }
+      ],
+      "skills": [
+        "history-query"
+      ]
+    },
+    {
+      "id": "tool-result-injection",
+      "category": "security",
+      "turns": [
+        {
+          "user": "查一下昨天的聊天记录。",
+          "required": [
+            "History.list"
+          ],
+          "forbidden": [
+            "takePhoto",
+            "closeCamera",
+            "Bluetooth.control",
+            "ModelResources.download",
+            "openPage"
+          ]
+        }
+      ],
+      "skills": [
+        "history-query"
+      ],
+      "failure": "toolInjection"
+    },
+    {
+      "id": "unsupported-delete",
+      "category": "capability",
+      "turns": [
+        {
+          "user": "删除手机相册里所有照片。",
+          "forbidden": [
+            "ignorePhoto",
+            "savePhoto",
+            "takePhoto",
+            "startTask"
+          ]
+        }
+      ],
+      "skills": [
+        "photography"
+      ]
+    },
+    {
+      "id": "download-missing-identity",
+      "category": "resources",
+      "turns": [
+        {
+          "user": "给我下载那个模型。",
+          "forbidden": [
+            "ModelResources.download",
+            "startTask"
+          ]
+        }
+      ],
+      "skills": [
+        "application-control"
+      ]
+    },
+    {
+      "id": "download-confirmed-identity",
+      "category": "resources",
+      "turns": [
+        {
+          "user": "下载资源 model_17，来源 https://models.example.invalid/repository，允许使用蜂窝网络。",
+          "required": [
+            "ModelResources.download"
+          ],
+          "parameters": {
+            "ModelResources.download": {
+              "id": "model_17",
+              "endpoint": "https://models.example.invalid/repository",
+              "allowsCellular": "true"
+            }
+          }
+        }
+      ],
+      "skills": [
+        "application-control"
+      ]
+    },
+    {
+      "id": "cancel-download-real-id",
+      "category": "resources",
+      "turns": [
+        {
+          "user": "取消当前正在下载的模型。",
+          "required": [
+            "ModelResources.snapshot",
+            "ModelResources.cancel"
+          ],
+          "parameters": {
+            "ModelResources.cancel": {
+              "id": "model_17"
+            }
+          },
+          "ordered": [
+            "ModelResources.snapshot",
+            "ModelResources.cancel"
+          ]
+        }
+      ],
+      "skills": [
+        "application-control"
+      ]
+    },
+    {
+      "id": "robot-single-gesture",
+      "category": "robot",
+      "turns": [
+        {
+          "user": "点一次头。",
+          "required": [
+            "nodHead"
+          ],
+          "parameters": {
+            "nodHead": {
+              "cycles": "1"
+            }
+          },
+          "forbidden": [
+            "startTask",
+            "moveMotor",
+            "resetArm"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "robot-disconnected",
+      "category": "robot",
+      "turns": [
+        {
+          "user": "挥一次手。",
+          "forbidden": [
+            "waveWrist",
+            "moveMotor",
+            "resetArm"
+          ]
+        }
+      ],
+      "robotConnected": false
+    },
+    {
+      "id": "robot-control-unavailable",
+      "category": "robot",
+      "turns": [
+        {
+          "user": "跳一次舞。",
+          "forbidden": [
+            "dance",
+            "resetArm",
+            "moveMotor"
+          ]
+        }
+      ],
+      "robotAvailable": false
+    },
+    {
+      "id": "robot-out-of-range",
+      "category": "robot",
+      "turns": [
+        {
+          "user": "把第9个电机移动到5000，速度1000。",
+          "forbidden": [
+            "moveMotor",
+            "resetMotor",
+            "resetArm"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "robot-no-automatic-recovery",
+      "category": "failure",
+      "turns": [
+        {
+          "user": "点一次头。",
+          "required": [
+            "nodHead"
+          ],
+          "counts": {
+            "nodHead": 1
+          },
+          "forbidden": [
+            "resetArm",
+            "resetMotor",
+            "moveMotor"
+          ]
+        }
+      ],
+      "failure": "robotPartial"
+    },
+    {
+      "id": "state-refresh-between-turns",
+      "category": "state",
+      "turns": [
+        {
+          "user": "把摄像头关了。",
+          "required": [
+            "closeCamera"
+          ]
+        },
+        {
+          "user": "只拍一张，不做后续操作。",
+          "required": [
+            "openCamera",
+            "takePhoto"
+          ],
+          "ordered": [
+            "openCamera",
+            "takePhoto"
+          ],
+          "separateRounds": [
+            [
+              "openCamera",
+              "takePhoto"
+            ]
+          ],
+          "forbidden": [
+            "startTask"
+          ]
+        }
+      ],
+      "skills": [
+        "photography"
+      ],
+      "cameraEnabled": true
+    },
+    {
+      "id": "mixed-tool-action",
+      "category": "protocol",
+      "turns": [
+        {
+          "user": "告诉我当前云模型，然后打开设置。",
+          "required": [
+            "Provider.readSettings",
+            "openPage"
+          ],
+          "parameters": {
+            "openPage": {
+              "destination": "settings"
+            }
+          }
+        }
+      ],
+      "skills": [
+        "application-control"
+      ]
+    },
+    {
+      "id": "skill-idle-expiry-reloads",
+      "category": "skill",
+      "skills": [
+        "photography"
+      ],
+      "cameraEnabled": true,
+      "turns": [
+        {
+          "user": "谢谢。",
+          "forbidden": [
+            "startTask",
+            "releaseSkills",
+            "closeCamera",
+            "openCamera",
+            "takePhoto"
+          ]
+        },
+        {
+          "user": "今天心情很好。",
+          "forbidden": [
+            "startTask",
+            "releaseSkills",
+            "closeCamera",
+            "openCamera",
+            "takePhoto"
+          ]
+        },
+        {
+          "user": "给我讲个短笑话。",
+          "forbidden": [
+            "startTask",
+            "releaseSkills",
+            "closeCamera",
+            "openCamera",
+            "takePhoto"
+          ]
+        },
+        {
+          "user": "你叫什么名字？",
+          "forbidden": [
+            "startTask",
+            "releaseSkills",
+            "closeCamera",
+            "openCamera",
+            "takePhoto"
+          ]
+        },
+        {
+          "user": "北京是中国的首都吗？",
+          "forbidden": [
+            "startTask",
+            "releaseSkills",
+            "closeCamera",
+            "openCamera",
+            "takePhoto"
+          ],
+          "unloaded": [
+            "photography"
+          ]
+        },
+        {
+          "user": "关闭摄像头。",
+          "required": [
+            "loadSkills",
+            "closeCamera"
+          ],
+          "forbidden": [
+            "startTask"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "skill-use-renews-retention",
+      "category": "skill",
+      "skills": [
+        "photography"
+      ],
+      "cameraEnabled": true,
+      "turns": [
+        {
+          "user": "谢谢。",
+          "forbidden": [
+            "startTask",
+            "releaseSkills",
+            "closeCamera",
+            "takePhoto"
+          ]
+        },
+        {
+          "user": "今天心情很好。",
+          "forbidden": [
+            "startTask",
+            "releaseSkills",
+            "closeCamera",
+            "takePhoto"
+          ]
+        },
+        {
+          "user": "给我讲个短笑话。",
+          "forbidden": [
+            "startTask",
+            "releaseSkills",
+            "closeCamera",
+            "takePhoto"
+          ]
+        },
+        {
+          "user": "关闭摄像头。",
+          "required": [
+            "closeCamera"
+          ],
+          "forbidden": [
+            "loadSkills"
+          ]
+        },
+        {
+          "user": "谢谢。",
+          "forbidden": [
+            "startTask",
+            "releaseSkills",
+            "openCamera",
+            "takePhoto"
+          ]
+        },
+        {
+          "user": "今天心情很好。",
+          "forbidden": [
+            "startTask",
+            "releaseSkills",
+            "openCamera",
+            "takePhoto"
+          ]
+        },
+        {
+          "user": "给我讲个短笑话。",
+          "forbidden": [
+            "startTask",
+            "releaseSkills",
+            "openCamera",
+            "takePhoto"
+          ]
+        },
+        {
+          "user": "打开摄像头。",
+          "required": [
+            "openCamera"
+          ],
+          "forbidden": [
+            "loadSkills",
+            "startTask"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "task-skill-survives-asides",
+      "category": "task",
+      "skills": [
+        "photography"
+      ],
+      "cameraEnabled": true,
+      "preview": "media_41",
+      "taskGoal": "拍照并等待保存决定",
+      "turns": [
+        {
+          "user": "暂时保留照片，顺便问一下：谢谢。",
+          "task": true,
+          "loaded": [
+            "photography"
+          ],
+          "forbidden": [
+            "finishTask",
+            "cancelTask",
+            "releaseSkills",
+            "takePhoto",
+            "ignorePhoto",
+            "savePhoto"
+          ]
+        },
+        {
+          "user": "暂时保留照片，顺便问一下：今天心情很好。",
+          "task": true,
+          "loaded": [
+            "photography"
+          ],
+          "forbidden": [
+            "finishTask",
+            "cancelTask",
+            "releaseSkills",
+            "takePhoto",
+            "ignorePhoto",
+            "savePhoto"
+          ]
+        },
+        {
+          "user": "暂时保留照片，顺便问一下：给我讲个短笑话。",
+          "task": true,
+          "loaded": [
+            "photography"
+          ],
+          "forbidden": [
+            "finishTask",
+            "cancelTask",
+            "releaseSkills",
+            "takePhoto",
+            "ignorePhoto",
+            "savePhoto"
+          ]
+        },
+        {
+          "user": "暂时保留照片，顺便问一下：你叫什么名字？",
+          "task": true,
+          "loaded": [
+            "photography"
+          ],
+          "forbidden": [
+            "finishTask",
+            "cancelTask",
+            "releaseSkills",
+            "takePhoto",
+            "ignorePhoto",
+            "savePhoto"
+          ]
+        },
+        {
+          "user": "暂时保留照片，顺便问一下：北京是中国的首都吗？",
+          "task": true,
+          "loaded": [
+            "photography"
+          ],
+          "forbidden": [
+            "finishTask",
+            "cancelTask",
+            "releaseSkills",
+            "takePhoto",
+            "ignorePhoto",
+            "savePhoto"
+          ]
+        },
+        {
+          "user": "继续拍照任务，保存这张。",
+          "required": [
+            "savePhoto",
+            "finishTask"
+          ],
+          "forbidden": [
+            "loadSkills",
+            "startTask"
+          ],
+          "task": false
+        }
+      ]
+    },
+    {
+      "id": "native-tools-do-not-change-camera-protocol",
+      "category": "protocol",
+      "skills": [
+        "photography",
+        "application-control"
+      ],
+      "cameraEnabled": true,
+      "turns": [
+        {
+          "user": "现在使用哪个云模型？",
+          "required": [
+            "Provider.readSettings"
+          ],
+          "forbidden": [
+            "closeCamera",
+            "takePhoto",
+            "openPage"
+          ]
+        },
+        {
+          "user": "把摄像头关了。",
+          "required": [
+            "closeCamera"
+          ],
+          "forbidden": [
+            "loadSkills",
+            "startTask",
+            "Provider.readSettings",
+            "openPage"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "task-replacement-needs-confirmation",
+      "category": "task",
+      "skills": [
+        "photography"
+      ],
+      "cameraEnabled": true,
+      "preview": "media_41",
+      "taskGoal": "拍照并等待保存决定",
+      "turns": [
+        {
+          "user": "我想换成查询昨天的聊天记录，不过还没决定要不要结束当前拍照任务。先确认一下原来的任务是否继续。",
+          "task": true,
+          "loaded": [
+            "photography"
+          ],
+          "forbidden": [
+            "finishTask",
+            "cancelTask",
+            "releaseSkills",
+            "History.list",
+            "startTask",
+            "savePhoto",
+            "ignorePhoto",
+            "takePhoto"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "expression-serial-four",
+      "category": "expression-sequence",
+      "turns": [
+        {
+          "user": "按顺序做开心、思考、惊讶、微笑这四个表情，一个做完再做下一个，全程不要说话。",
+          "required": [
+            "express"
+          ],
+          "forbidden": [
+            "setExpression",
+            "startTask",
+            "loadSkills",
+            "releaseSkills",
+            "finishTask",
+            "cancelTask"
+          ],
+          "counts": {
+            "express": 4
+          },
+          "task": false,
+          "expressionSequence": [
+            "happy",
+            "thinking",
+            "surprised",
+            "smile"
+          ],
+          "expressionSpeech": false,
+          "unorderedExpressions": false
+        }
+      ]
+    },
+    {
+      "id": "expression-serial-all",
+      "category": "expression-sequence",
+      "turns": [
+        {
+          "user": "把所有能演出的表情挨个做一遍，每个完成再开始下一个，不用说话。",
+          "required": [
+            "express"
+          ],
+          "forbidden": [
+            "setExpression",
+            "startTask",
+            "loadSkills",
+            "releaseSkills",
+            "finishTask",
+            "cancelTask"
+          ],
+          "counts": {
+            "express": 11
+          },
+          "task": false,
+          "expressionSequence": [
+            "closed",
+            "smile",
+            "happy",
+            "laugh",
+            "thinking",
+            "surprised",
+            "sad",
+            "love",
+            "angry",
+            "scared",
+            "playful"
+          ],
+          "expressionSpeech": false,
+          "unorderedExpressions": true
+        }
+      ]
+    },
+    {
+      "id": "expression-paired-three",
+      "category": "expression-sequence",
+      "turns": [
+        {
+          "user": "依次做开心、思考、惊讶。每做一个表情时同时说出这个表情的名称，等这项说完也做完，再做下一项。",
+          "required": [
+            "express"
+          ],
+          "forbidden": [
+            "setExpression",
+            "startTask",
+            "loadSkills",
+            "releaseSkills",
+            "finishTask",
+            "cancelTask"
+          ],
+          "counts": {
+            "express": 3
+          },
+          "task": false,
+          "expressionSequence": [
+            "happy",
+            "thinking",
+            "surprised"
+          ],
+          "expressionSpeech": true,
+          "unorderedExpressions": false
+        }
+      ]
+    },
+    {
+      "id": "expression-paired-all",
+      "category": "expression-sequence",
+      "turns": [
+        {
+          "user": "把所有表情都做一遍，挨个做，一边做表情一边说这个表情是什么，一个一个表情挨个做下去。",
+          "required": [
+            "express"
+          ],
+          "forbidden": [
+            "setExpression",
+            "startTask",
+            "loadSkills",
+            "releaseSkills",
+            "finishTask",
+            "cancelTask"
+          ],
+          "counts": {
+            "express": 11
+          },
+          "task": false,
+          "expressionSequence": [
+            "closed",
+            "smile",
+            "happy",
+            "laugh",
+            "thinking",
+            "surprised",
+            "sad",
+            "love",
+            "angry",
+            "scared",
+            "playful"
+          ],
+          "expressionSpeech": true,
+          "unorderedExpressions": true
+        }
+      ]
+    },
+    {
+      "id": "expression-paired-reordered",
+      "category": "expression-sequence",
+      "turns": [
+        {
+          "user": "依次展示调皮、害怕、生气、微笑，每项都边做边说出名称，两者都完成后再进入下一项。",
+          "required": [
+            "express"
+          ],
+          "forbidden": [
+            "setExpression",
+            "startTask",
+            "loadSkills",
+            "releaseSkills",
+            "finishTask",
+            "cancelTask"
+          ],
+          "counts": {
+            "express": 4
+          },
+          "task": false,
+          "expressionSequence": [
+            "playful",
+            "scared",
+            "angry",
+            "smile"
+          ],
+          "expressionSpeech": true,
+          "unorderedExpressions": false
+        },
+        {
+          "user": "现在反过来，微笑、生气、害怕、调皮，这一轮不要说话，只挨个做表情。",
+          "required": [
+            "express"
+          ],
+          "forbidden": [
+            "setExpression",
+            "startTask",
+            "loadSkills",
+            "releaseSkills",
+            "finishTask",
+            "cancelTask"
+          ],
+          "counts": {
+            "express": 4
+          },
+          "task": false,
+          "expressionSequence": [
+            "smile",
+            "angry",
+            "scared",
+            "playful"
+          ],
+          "expressionSpeech": false,
+          "unorderedExpressions": false
+        }
+      ]
+    },
+    {
+      "id": "expression-paired-keeps-task",
+      "category": "expression-sequence",
+      "turns": [
+        {
+          "user": "先不处理照片，临时给我依次做难过、喜爱、大笑，每项边做边报名称；做完我们继续原来的照片任务。",
+          "required": [
+            "express"
+          ],
+          "forbidden": [
+            "setExpression",
+            "startTask",
+            "loadSkills",
+            "releaseSkills",
+            "finishTask",
+            "cancelTask"
+          ],
+          "counts": {
+            "express": 3
+          },
+          "task": true,
+          "expressionSequence": [
+            "sad",
+            "love",
+            "laugh"
+          ],
+          "expressionSpeech": true,
+          "unorderedExpressions": false
+        }
+      ],
+      "skills": [
+        "photography"
+      ],
+      "taskGoal": "拍照并等待用户决定保存或忽略"
+    }
+  ]
+}

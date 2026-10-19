@@ -36,3 +36,20 @@
 
 - 各模型及设备 README 列出的真实准确率、持续运行、声学/图像质量和资源压力验收。
 - 原生 UI 导航、手势、辅助功能及长历史交互验收。
+
+## Storage 依赖
+
+✅ 存储访问使用独立的 State、Cache、Database 和 Files 接口；App 注册根实例，消费者通过构造器获得所需能力。存储容器不接管本目录的业务验证、执行和完成语义。
+
+## 公开 State 边界
+
+✅ State 回归覆盖公开编码、作用域隔离、代际/容量/失败、Task 投影与每轮请求。Assistant fixture 显式注入隔离的公开事实源；测试替身和自动化结果不等于真实模型或物理设备验收。
+
+[公开 State 契约](../MobileHarness/Storage/State/README.md)
+
+✅ test_evaluate_qwen.py 离线验证 ENV 仅选择阿里字段、不执行 shell 内容，以及数组/对象请求证据的压缩兼容性；通过单独 unittest 命令运行，不访问网络。
+
+场景选择为空或包含未知 ID 必须在网络前失败；子进程清除继承的 live gate/filter，只接纳 CLI 的显式测试范围。
+
+
+✅ test_compare_qwen_protocols.py 离线验证受控协议组的声明与评分、合法混合响应、错误通道/名称/参数及依赖先后；测试不访问云。生产框架混合调用能力继续由 GenerationRoundTests 的既有混合轮次/屏障用例验证。

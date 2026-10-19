@@ -2,7 +2,7 @@ import AgentCore
 import Foundation
 import ModelKit
 import PlatformKit
-import Storage
+import StorageCore
 
 // MARK: - State
 
@@ -59,14 +59,21 @@ public struct VisionPerceptionContextBuilder: ContextBuilder {
         switch input.content {
         case .rgb(let rgb): return try ImageFrame(width: input.width, height: input.height, rgb: rgb)
         case .attachment(let attachment):
-            guard let sample = attachment as? SampledImageAttachment,
-                let camera = sample.source as? CameraImageAttachment,
-                camera.frame.width == input.width, camera.frame.height == input.height,
-                camera.frame.rotation == input.rotation,
-                camera.frame.sequence == input.sequence, camera.frame.timestamp == input.timestamp,
-                camera.frame.capturedAt == input.capturedAt, camera.frame.gray64 == sample.gray64
+            let camera: CameraFrame
+            if let native = attachment as? ImageValueAttachment<CameraFrame> {
+                camera = native.value
+            } else if let sampled = attachment as? SampledImageAttachment,
+                let native = sampled.source as? ImageValueAttachment<CameraFrame>, native.value.gray64 == sampled.gray64
+            {
+                camera = native.value
+            } else {
+                throw ImageInputError.invalidFrame
+            }
+            guard camera.width == input.width, camera.height == input.height, camera.rotation == input.rotation,
+                camera.sequence == input.sequence, camera.timestamp == input.timestamp,
+                camera.capturedAt == input.capturedAt
             else { throw ImageInputError.invalidFrame }
-            return try camera.frame.withPixelBuffer { try ImageFrame(pixelBuffer: $0, rotation: input.rotation) }
+            return try camera.withPixelBuffer { try ImageFrame(pixelBuffer: $0, rotation: input.rotation) }
         }
     }
 }

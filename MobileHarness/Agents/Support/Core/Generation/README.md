@@ -56,7 +56,7 @@ Examples illustrate syntax; aliases/parameters must be declared by the caller. S
 
 UTF-8 decoding handles arbitrary byte boundaries. Text segmentation uses sentence/safe-word boundaries and explicit soft limits of 1–2000 Characters; no timer flush exists. Text mapping returns at most eight ordered events per chunk; generation permits 120 calls. Wait count is 32 and combined lexical depth eight. Native Tool parsing is separate and creates no XML aliases or Channel/wait membership.
 
-Unknown aliases/parameter resolution produce ordered non-executable CallRejection and continue, counting toward the call bound. Malformed XML, forbidden Channels, resource limits and cancellation terminate parsing. Finish flushes only normal completion; failed/cancelled models do not finish partial syntax or replay emitted effects.
+✅ XML Action resolution discards undeclared attributes after raw input bounds validation; syntax parsing retains its existing limits and duplicate-attribute rejection. Unknown aliases and invalid/missing required parameters produce ordered non-executable CallRejection and continue, counting toward the call bound. Malformed XML, forbidden Channels, resource limits and cancellation terminate parsing. Finish flushes only normal completion; failed/cancelled models do not finish partial syntax or replay emitted effects.
 
 GenerationTrace retains exact raw fragments up to 256 KiB/8192 fragments, including empties, without eviction. It retains the first parse error/location, stops interpretation and continues bounded raw collection. append throwing does not partially recover events. Trace retains ordered action/rejection/wait events and owns no worker, persistence or dispatch.
 
@@ -89,6 +89,8 @@ FunctionTokenPrompts.json 是 Core Bundle 中的 Function Token 模板资源，�
 
 Core 提供语法、Channel/wait 与通信协议教学。具体函数与业务示例放在已加载 Skill 的 Instructions.md。
 
+✅ scheduling 模板明确教学一次响应连续输出已确定的多步动作：每步一个 wait 实现跨 Channel 串行；每步内部不同 Channel 可并行，连续 wait 串行连接这些组。依赖结果才能选择的后续步骤仍须等待实际反馈，不因批量输出跳过前置条件。
+
 shared FunctionTokenPrompts guidance describes task-local Channel/wait ordering, independent same-name Channels across tasks and explicit resource conflict/takeover outcomes. Canonical addresses do not create queues; prompt text grants no execution authority.
 
 FunctionTokenPrompts 分别提供 protocol、catalog 标题与末尾 catalogBoundary；Channel/wait 语义由 protocol 定义。
@@ -102,3 +104,11 @@ SentenceFunctionBuffer accepts optional first-segment length limits, retains the
 ## 待实现
 
 - Automatic syntax repair and timer-based flushing are not implemented.
+
+✅ 当目录显式含 Tool 时，FunctionTokenPrompts.protocol 说明 XML Actions 和接口原生 Tools 为两个独立输出通道；只从各自声明选择，复制原生 name 的全部字符，不从业务 prose 推导名称。catalogBoundary 提醒依赖实际反馈及当前公开阻断事实；不加入具体 Task/Skill/Camera/Robot 名称，不修改 token 解析或 native 名称映射。
+
+catalogBoundary 同时重申：上层要求独占调用时，整个响应只包含该调用，不添加过程旁白或第二个调用。具体哪些业务步骤独占仍由上层 Skill 声明。
+
+✅ 通用双协议教学仅用于含 Tool 的目录；内置 Skill 目录使用 actionProtocol/actionCatalogBoundary。两种教学共用 scheduling 模板中的 Channel/wait/语法约束。
+
+✅ Implemented: FunctionTokenPrompts adds Action-only protocol/boundary templates sharing the existing Channel/wait/syntax section with generic mixed guidance. Native Tool parsing remains supported.

@@ -4,7 +4,7 @@ import Agents
 import Foundation
 import Gateway
 import PlatformKit
-import Storage
+import StorageCore
 
 /// One root-owned output consumer; camera and tracking workers cannot block each other's admission.
 public actor PhotographerIntentRuntime {

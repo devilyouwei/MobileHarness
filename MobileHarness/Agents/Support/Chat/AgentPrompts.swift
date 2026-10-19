@@ -6,7 +6,7 @@ public enum AgentPrompts {
     public static func load(named role: String) throws -> PromptTemplates {
         let templates = try PromptTemplates(data: AgentConfigurations.promptData(named: role))
         let required: Set<String> = [
-            "activeTask", "taskReports", "taskReport", "executionObservations", "historicalExecution",
+            "executionObservations", "historicalExecution",
             "toolFailure",
         ]
         guard required.isSubset(of: templates.names) else { throw PromptTemplateError.invalidDocument }

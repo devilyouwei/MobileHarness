@@ -9,7 +9,8 @@ import Foundation
 import FunctionContracts
 import Gateway
 import PlatformKit
-import Storage
+import StorageCore
+import StorageState
 import Testing
 
 struct UnusedModelResourceCapability: ModelResourceCapability {
@@ -114,7 +115,11 @@ func resourceRuntime(
         actions: ChannelScheduler(registry: ActionRegistry()), policy: policy, sink: outputSink)
     return ApplicationControlIntentRuntime(
         sessionID: session, manager: manager, input: input, output: output,
-        agent: try ApplicationControlAgent(sessionID: session, context: suppliedContext))
+        agent: try ApplicationControlAgent(
+            sessionID: session,
+            context: suppliedContext
+                ?? AgentContextRepository(
+                    agent: .applicationControl, scope: UUID().uuidString, state: ApplicationControlContextState())))
 }
 @Test(.actionCatalog) func modelResourceCommandsCrossGatewaysAndRecoverAfterNativeFailure() async throws {
     let fixture = ResourceFixture()
@@ -133,7 +138,12 @@ func resourceRuntime(
 }
 @Test(.actionCatalog) func modelResourceAgentRejectsDuplicateAndOverflowAndRetiresFailedDispatch() async throws {
     let session = UUID().uuidString
-    let agent = try ApplicationControlAgent(sessionID: session)
+    let agent = try ApplicationControlAgent(
+        sessionID: session,
+        context: try AgentContextRepository(
+            agent: AgentID(rawValue: "applicationControl"), scope: UUID().uuidString,
+            state: ApplicationControlContextState())
+    )
     try await agent.start()
     let first = try ModelResourceIntent.cancel("model").input(sessionID: session)
     try await agent.receive(first)
@@ -205,7 +215,12 @@ private actor HeldResourceFixture: ModelResourceCapability {
 
 @Test(.actionCatalog) func pausedApplicationControlRetainsEnvironmentAdmissionWithoutStartingBusiness() async throws {
     let session = UUID().uuidString
-    let agent = try ApplicationControlAgent(sessionID: session)
+    let agent = try ApplicationControlAgent(
+        sessionID: session,
+        context: try AgentContextRepository(
+            agent: AgentID(rawValue: "applicationControl"), scope: UUID().uuidString,
+            state: ApplicationControlContextState())
+    )
     try await agent.start()
     try await agent.pause()
     let fact = AppEnvironmentFact(category: .devices, sequence: 1, value: "camera: available")
@@ -224,7 +239,12 @@ private actor HeldResourceFixture: ModelResourceCapability {
 
 @Test(.actionCatalog) func resourceIntentRejectsForeignSessionAndMalformedResourceBeforeEffects() async throws {
     let session = UUID().uuidString
-    let agent = try ApplicationControlAgent(sessionID: session)
+    let agent = try ApplicationControlAgent(
+        sessionID: session,
+        context: try AgentContextRepository(
+            agent: AgentID(rawValue: "applicationControl"), scope: UUID().uuidString,
+            state: ApplicationControlContextState())
+    )
     try await agent.start()
     await #expect(throws: CommunicationError.unauthorized) {
         try await agent.receive(ModelResourceIntent.cancel("model").input(sessionID: UUID().uuidString))
@@ -249,7 +269,12 @@ private actor HeldResourceFixture: ModelResourceCapability {
     async throws
 {
     let session = UUID().uuidString
-    let agent = try ApplicationControlAgent(sessionID: session)
+    let agent = try ApplicationControlAgent(
+        sessionID: session,
+        context: try AgentContextRepository(
+            agent: AgentID(rawValue: "applicationControl"), scope: UUID().uuidString,
+            state: ApplicationControlContextState())
+    )
     try await agent.start()
     let request = try ModelResourceIntent.configureSpeech(recognition: true, synthesis: false).input(sessionID: session)
     try await agent.receive(request)

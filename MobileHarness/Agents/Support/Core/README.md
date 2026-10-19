@@ -92,3 +92,21 @@ InputKind 的 video/binary 尚无 InputPayload 分支或 codec。输入支持、
 ## 待实现
 
 - Generic factory/automatic restart, remote transport and durable execution delivery are not implemented.
+
+✅ Generation 资源说明两种输出协议及原生名称来源；不将具体 Agent、Task 或设备策略加入 Core。解析器与权限契约保持不变。
+
+## Platform 根、设备接入与同帧呈现
+
+✅ ImageValueAttachment 只包装 Sendable 值，OutputEnvelope 按需保留通用 ImageInput。框架契约仍无项目依赖；不引入 CoreVideo、PlatformKit、具体消息契约或设备策略。邮箱停止释放可替换状态，离散消息继续遵循既有排空规则。
+
+## 外部输入描述
+
+✅ AgentInput.swift 定义 Foundation-only ExternalInputDraft/ExternalInputProviding；只携带内容、来源、因果和轮次，没有 origin/incarnation/taskScope 权限。实际 Signal 构造在 Gateway。
+
+## 统一容器异常通道
+
+✅ AgentInput.swift 定义中立 Codable ContainerFailureEvent 及分类/身份/有界内容验证；CommunicationContracts.standard 注册 container.failure。只定义值与 schema，不拥有硬件、容器或上报 worker。
+
+## ApplicationControl 异常展示
+
+✅ RuntimeFailureEvent 保存有界执行诊断及原有 session/input/round/call/worker 关联；ContainerFailureEvent 保存容器原生故障。两者是 observation 事实，不授予执行权限，不含 UI 或模型依赖。展示策略由角色实现。

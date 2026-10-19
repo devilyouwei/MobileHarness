@@ -1,6 +1,6 @@
 import AgentCore
 import Foundation
-import Storage
+import StorageCore
 
 /// Runtime Task/Skill state; executable code is never loaded from assets.
 public enum RecognitionBinding: Codable, Sendable, Equatable {
@@ -358,6 +358,24 @@ public struct AgentTaskSkillState: Codable, Sendable {
         decisions = [:]
         try refreshLoaded()
         try recordChanges(previous: previous, task: nil, releaseReason: "conversationClosed")
+    }
+
+    /// Execution interruption keeps the conversation, counters and unfinished business goal.
+    public mutating func interruptSession(
+        _ session: String? = nil, inputs: Set<String> = [], fixed: CapabilityRegistry
+    ) throws {
+        var next = self
+        if let task = next.tasks.first(where: { $0.id == next.activeTaskID }),
+            session == nil || task.sessionID == session || !Set(task.inputIDs).isDisjoint(with: inputs)
+        {
+            // Explicit closure already in progress must still join cancellation, not fabricate completion.
+            try next.settleTask(
+                failed: false, fixed: fixed, cancelled: ["finishing", "cancelling"].contains(task.status))
+        }
+        next.decisions = next.decisions.filter {
+            session != nil && $0.value.sessionID != session && !inputs.contains($0.key)
+        }
+        self = next
     }
 
     public mutating func resetSession(fixed: CapabilityRegistry) throws {

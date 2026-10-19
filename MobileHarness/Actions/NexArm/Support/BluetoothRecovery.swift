@@ -1,6 +1,7 @@
 import Foundation
 import PlatformKit
-import Storage
+import StorageCore
+import StorageFiles
 
 /// App policy, independent of page lifetime and native transport implementation.
 public struct BluetoothRecoveryPolicy {

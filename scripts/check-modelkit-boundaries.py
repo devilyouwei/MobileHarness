@@ -9,9 +9,9 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
 KIT = ROOT / 'MobileHarness/ModelKit'
-FORBIDDEN = {'StorageTasks', 'StorageMedia', 'StorageDevices', 'StorageSQLite', 'AgentCore', 'Agents', 'Gateway', 'Storage', 'StorageChat', 'StorageAudio', 'Actions', 'Tools', 'PlatformKit', 'SwiftUI', 'UIKit', 'HarnessKit', 'UI', 'AppWorkflows', 'BehaviorAssembly', 'Types'}
+FORBIDDEN = {'Storage', 'StorageState', 'StorageFiles', 'StorageCore', 'StorageDatabase', 'AppStorage', 'FactoryKit', 'StorageTasks', 'StorageMedia', 'StorageDevices', 'StorageSQLite', 'AgentCore', 'Agents', 'Gateway', 'StorageCore', 'StorageChat', 'StorageCache', 'Actions', 'Tools', 'PlatformKit', 'SwiftUI', 'UIKit', 'HarnessKit', 'UI', 'AppWorkflows', 'BehaviorAssembly', 'Types'}
 SYSTEM_MODULES = {
-    'Foundation', 'Synchronization', 'CoreFoundation', 'Darwin', 'os',
+    'Foundation', 'Synchronization', 'CoreFoundation', 'Darwin', 'os', 'OSLog',
     'AVFAudio', 'Speech', 'CoreVideo', 'CoreML', 'CoreAI', 'Metal',
     'Accelerate', 'Vision', 'ImageIO', 'Compression', 'CryptoKit',
 }
@@ -160,9 +160,9 @@ for source in KIT.rglob('*.swift'):
     if source not in owners:
         errors.append(f'Unowned ModelKit source: {source.relative_to(ROOT)}')
 management = 'MobileHarness/ModelKit/Support/Management'
-for name in ('ModelKitRuntime', 'ModelKitDefaults'):
-    if model_targets[name]['path'] != management or not model_targets[name].get('sources'):
-        errors.append(f'{name} requires an explicit source list in the unified Management directory')
+for name, path in (('ModelKitRuntime', management), ('ModelKitDefaults', 'MobileHarness/ModelKit')):
+    if model_targets[name]['path'] != path or not model_targets[name].get('sources'):
+        errors.append(f'{name} requires an explicit source list at {path}')
 for source, name in owners.items():
     imports = imported_modules(source.read_text())
     permitted = expected_model_dependencies.get(name, set()) | {name}
@@ -184,6 +184,7 @@ for source in (KIT / 'Support/Core').glob('*.swift'):
         errors.append(f'Hardcoded runtime loading policy in Core: {source.relative_to(ROOT)}')
 # Typecheck Core alone: same-target capability declarations must not hide a reverse dependency.
 core_sources = sorted(str(source) for source in (KIT / 'Support/Core').glob('*.swift'))
+core_sources.append(str(KIT / 'ModelFailure.swift'))
 try:
     subprocess.run(['swiftc', '-swift-version', '6', '-parse-as-library', '-typecheck',
         '-module-name', 'ModelKitCoreBoundary', *core_sources], cwd=ROOT, check=True)
@@ -237,11 +238,11 @@ for target_name, path, dependencies in (
                 errors.append(f'Forbidden isolated execution import: {source.relative_to(ROOT)}')
 if {next(iter(d.values()))[0] for d in targets['FunctionContractTests'].get('dependencies', [])} != {'FunctionContracts'}:
     errors.append('FunctionContractTests must prove contracts without execution/call dependencies')
-if {next(iter(d.values()))[0] for d in targets['Gateway'].get('dependencies', [])} != {'AgentCore', 'FunctionContracts', 'ExecutionRuntime', 'CallRuntime'}:
-    errors.append('Gateway must depend only on AgentCore and the three isolated execution SDKs')
+if {next(iter(d.values()))[0] for d in targets['Gateway'].get('dependencies', [])} != {'AgentCore', 'FunctionContracts', 'ExecutionRuntime', 'CallRuntime', 'PlatformKit'}:
+    errors.append('Gateway may additionally depend on PlatformKit for native input adapters')
 if 'Support/Contracts' not in targets['Actions'].get('exclude', []):
     errors.append('Actions must exclude its independent FunctionContracts source target')
-if {next(iter(d.values()))[0] for d in targets['Actions'].get('dependencies', [])} != {'FunctionContracts', 'PlatformKit', 'BehaviorDefinitions', 'StorageChat', 'Storage'}:
+if {next(iter(d.values()))[0] for d in targets['Actions'].get('dependencies', [])} != {'FunctionContracts', 'PlatformKit', 'BehaviorDefinitions', 'StorageChat', 'StorageCore', 'StorageFiles'}:
     errors.append('Actions must not depend on Gateway, execution or call protocol targets')
 if 'Runtime' not in targets['Gateway'].get('exclude', []) or 'Output/Registration' not in targets['Gateway'].get('exclude', []) or 'Output/Protocols' not in targets['Gateway'].get('exclude', []):
     errors.append('Gateway must exclude separately compiled execution and protocol sources')
@@ -268,8 +269,8 @@ if not (ROOT / 'MobileHarness/Gateway/Runtime/README.md').is_file():
     errors.append('Missing consolidated execution Runtime')
 # Gateway is transport-only; AgentCore remains independent of models/platform/business.
 for module, forbidden in {
-    'PlatformKit': {'StorageTasks', 'StorageMedia', 'StorageDevices', 'StorageSQLite', 'Types', 'Storage', 'StorageChat', 'StorageAudio', 'Actions', 'Tools', 'Agents', 'AgentCore', 'Gateway', 'UI', 'AppWorkflows', 'BehaviorAssembly'},
-    'Gateway': {'ModelKit', 'ModelKitRuntime', 'ModelKitDefaults', 'Agents', 'PlatformKit', 'Actions', 'Tools'},
+    'PlatformKit': {'StorageTasks', 'StorageMedia', 'StorageDevices', 'StorageSQLite', 'Types', 'StorageCore', 'StorageChat', 'StorageCache', 'Actions', 'Tools', 'Agents', 'AgentCore', 'Gateway', 'UI', 'AppWorkflows', 'BehaviorAssembly'},
+    'Gateway': {'ModelKit', 'ModelKitRuntime', 'ModelKitDefaults', 'Agents', 'Actions', 'Tools'},
     'AgentCore': {'ModelKit', 'ModelKitRuntime', 'ModelKitDefaults', 'Gateway', 'Agents', 'PlatformKit', 'SwiftUI', 'UIKit', 'CoreVideo'},
 }.items():
     source_root = ROOT / 'MobileHarness' / ('Agents/Support/Core' if module == 'AgentCore' else module)
@@ -279,6 +280,8 @@ for module, forbidden in {
         for imported in re.findall(r'\bimport\s+(\w+)', source.read_text()):
             if imported in forbidden or imported.startswith('ModelKit'):
                 errors.append(f'Forbidden {module} import {imported}: {source.relative_to(ROOT)}')
+        if module == 'Gateway' and 'PlatformKit' in imported_modules(source.read_text()) and source.name != 'DeviceInputAdapter.swift':
+            errors.append(f'Native SDK import outside Gateway input adapter: {source.relative_to(ROOT)}')
     target = next(t for t in package['targets'] if t['name'] == module)
     for dependency in target.get('dependencies', []):
         name = next(iter(dependency.values()))[0]
@@ -304,7 +307,7 @@ for source in (ROOT / 'MobileHarness/Gateway').rglob('*.swift'):
     if re.search(r'\b(?:UIActions|SpeechPlayback|UITools|SystemTools|CameraTools)\b', source.read_text()):
         errors.append(f'Gateway directly uses a concrete behavior: {source.relative_to(ROOT)}')
 # Agents may compute with the base ModelKit SDK, never invoke business/UI/device modules.
-agent_allowed = {'FunctionContracts', 'AgentCore', 'ModelKit', 'Storage', 'StorageChat', 'StorageAudio', 'StorageTasks', 'PlatformKit', 'Foundation'}
+agent_allowed = {'FunctionContracts', 'AgentCore', 'ModelKit', 'StorageCore', 'StorageState', 'StorageChat', 'StorageCache', 'StorageTasks', 'PlatformKit', 'Foundation', 'Synchronization'}
 for source in (ROOT / 'MobileHarness/Agents').rglob('*.swift'):
     if source.resolve() in integration_sources or 'Core' in source.relative_to(ROOT / 'MobileHarness/Agents').parts:
         continue
@@ -314,70 +317,75 @@ for source in (ROOT / 'MobileHarness/Agents').rglob('*.swift'):
 agent_target = next(t for t in package['targets'] if t['name'] == 'Agents')
 for dependency in agent_target.get('dependencies', []):
     name = next(iter(dependency.values()))[0]
-    if name not in {'FunctionContracts', 'AgentCore', 'ModelKit', 'Storage', 'StorageChat', 'StorageAudio', 'StorageTasks', 'PlatformKit'}:
+    if name not in {'FunctionContracts', 'AgentCore', 'ModelKit', 'StorageCore', 'StorageState', 'StorageChat', 'StorageCache', 'StorageTasks', 'PlatformKit'}:
         errors.append(f'Forbidden Agents dependency: {name}')
-# Common storage contracts/implementations are independent of record domains and GRDB.
-storage_target = targets['Storage']
-if storage_target.get('dependencies') or storage_target.get('path') != 'MobileHarness/Storage/Support':
-    errors.append('Storage must compile backend-independent Support with no target dependencies')
-if 'Persistence/SQLite' not in storage_target.get('exclude', []):
-    errors.append('Storage common core must exclude the SQLite backend')
-record_domains = {'Chat', 'Audio', 'Media', 'Tasks', 'Devices'}
-for domain in record_domains:
-    name = 'Storage' + domain
+# Storage graph: independent mechanisms, narrow domain ports and one concrete SQL target.
+expected_storage = {
+    'StorageCore': set(),
+    'StorageState': {'StorageCore'},
+    'StorageCache': {'StorageCore'},
+    'StorageFiles': {'StorageCore'},
+    'StorageTasks': {'StorageCore'},
+    'StorageChat': {'StorageCore', 'StorageTasks'},
+    'StorageMedia': {'StorageCore', 'StorageFiles'},
+    'StorageDevices': {'StorageCore'},
+    'StorageDatabase': {'StorageCore', 'StorageChat', 'StorageTasks', 'StorageMedia', 'StorageDevices'},
+    'StorageSQLite': {'StorageCore', 'StorageDatabase', 'StorageChat', 'StorageTasks', 'StorageMedia', 'StorageDevices', 'GRDB'},
+    'Storage': {'StorageCore', 'StorageState', 'StorageCache', 'StorageFiles', 'StorageDatabase'},
+}
+for name, expected in expected_storage.items():
     target = targets.get(name, {})
-    expected = ['Storage', 'StorageTasks'] if domain == 'Chat' else ['Storage']
-    actual = [next(iter(d.values()))[0] for d in target.get('dependencies', [])]
-    if target.get('path') != 'MobileHarness/Storage/' + domain or actual != expected:
-        errors.append(f'Unexpected {name} compilation/dependencies: {actual}')
-    for source in (ROOT / 'MobileHarness/Storage' / domain).glob('*.swift'):
-        imports = set(re.findall(r'\bimport\s+(\w+)', source.read_text()))
-        if source.name.startswith('SQLite'):
-            if source.name not in target.get('exclude', []):
-                errors.append(f'Domain contract target includes backend: {source.relative_to(ROOT)}')
-            allowed = {'Foundation', 'Storage', name, 'GRDB', 'CryptoKit'}
-        else:
-            allowed = {'Foundation', 'Storage', 'Synchronization'} | ({'StorageTasks'} if domain == 'Chat' else set())
-        if imports - allowed:
-            errors.append(f'Unexpected storage domain imports {imports - allowed}: {source.relative_to(ROOT)}')
-common_root = ROOT / 'MobileHarness/Storage/Support'
-for source in common_root.rglob('*.swift'):
-    imports = set(re.findall(r'\bimport\s+(\w+)', source.read_text()))
-    if 'SQLite' in source.relative_to(common_root).parts:
-        allowed = {'Foundation', 'Synchronization', 'GRDB', 'Storage'}
-        if re.search(r'CREATE TABLE|dialog_id|media_files|task_messages|devices\(', source.read_text()):
-            errors.append(f'Generic SQLite support contains domain schema: {source.relative_to(ROOT)}')
-    else:
-        allowed = {'Foundation', 'Synchronization', 'CryptoKit'}
-    if imports - allowed:
-        errors.append(f'Unexpected common storage imports {imports - allowed}: {source.relative_to(ROOT)}')
-backend = targets.get('StorageSQLite', {})
-backend_dependencies = {next(iter(d.values()))[0] for d in backend.get('dependencies', [])}
-if backend_dependencies != {'Storage', 'StorageChat', 'StorageTasks', 'StorageMedia', 'StorageDevices', 'GRDB'}:
-    errors.append('StorageSQLite alone must own the GRDB dependency and domain adapters')
+    deps = {next(iter(d.values()))[0] for d in target.get('dependencies', [])}
+    if deps != expected:
+        errors.append(f'Unexpected {name} dependencies: {deps}')
+    allowed = expected | {'Foundation', 'Synchronization', 'CryptoKit'}
+    for source in target_sources(target):
+        imported = imported_modules(source.read_text())
+        if imported - allowed:
+            errors.append(f'Unexpected {name} imports {imported - allowed}: {source.relative_to(ROOT)}')
+        if name == 'StorageCore' and re.search(r'CREATE TABLE|dialog_id|media_files|task_messages', source.read_text()):
+            errors.append(f'Generic storage contains domain schema: {source.relative_to(ROOT)}')
 for target in package['targets']:
-    dependencies = {next(iter(d.values()))[0] for d in target.get('dependencies', [])}
-    if target.get('name') not in {'StorageSQLite', 'IntegrationTests'} and 'GRDB' in dependencies:
-        errors.append(f'GRDB leaked into {target.get("name")}')
-    if target.get('name') != 'IntegrationTests' and 'StorageSQLite' in dependencies:
-        errors.append(f'Backend dependency outside application construction: {target.get("name")}')
+    deps = {next(iter(d.values()))[0] for d in target.get('dependencies', [])}
+    name = target.get('name')
+    if name not in {'StorageSQLite', 'IntegrationTests'} and 'GRDB' in deps:
+        errors.append(f'GRDB leaked into {name}')
+    if name not in {'AppStorage', 'IntegrationTests'} and 'StorageSQLite' in deps:
+        errors.append(f'Backend dependency outside application construction: {name}')
+    if name != 'AppStorage' and 'FactoryKit' in deps:
+        errors.append(f'FactoryKit leaked outside App registration: {name}')
 for parent in ['Agents', 'Actions']:
     for source in (ROOT / 'MobileHarness' / parent).rglob('*.swift'):
-        if re.search(r'\bimport\s+(?:GRDB|StorageSQLite)\b|\b(?:RecordDatabase|SQLiteRepositories|SQLiteChatRepository|SQLiteTaskRepository|SQLiteMediaRepository|SQLiteDeviceRepository)\b', source.read_text()):
-            errors.append(f'Concrete record backend leaked to consumer: {source.relative_to(ROOT)}')
+        text = source.read_text()
+        if re.search(r'\bimport\s+(?:GRDB|StorageSQLite|AppStorage|FactoryKit|Storage)\b|\b(?:SQLiteRepositories|SQLiteChatRepository|SQLiteTaskRepository|SQLiteMediaRepository|SQLiteDeviceRepository)\b', text):
+            errors.append(f'Concrete backend or root container leaked to consumer: {source.relative_to(ROOT)}')
+        if re.search(r'\b(?:DiskFileStore|FileDocumentStore)\s*(?:<[^>]+>)?\(', text):
+            errors.append(f'Consumer constructs file backend: {source.relative_to(ROOT)}')
 for path, directories, files in os.walk(ROOT / 'MobileHarness/Storage'):
     if 'README.md' not in files:
         errors.append(f'Missing Storage directory README: {Path(path).relative_to(ROOT)}')
-# Storage retains data; business context, producer policy and wording belong to consumers.
 for source in (ROOT / 'MobileHarness/Storage').rglob('*.swift'):
     text = source.read_text()
     if re.search(r'\b(?:LocalizedError|errorDescription|synthesisTimedOut)\b', text):
         errors.append(f'Storage contains presentation or synthesis policy: {source.relative_to(ROOT)}')
     if any(word in text for word in ('新对话', '待生成标题')):
         errors.append(f'Storage contains localized title fallback: {source.relative_to(ROOT)}')
-chat_source = (ROOT / 'MobileHarness/Storage/Chat/ConversationHistory.swift').read_text()
+chat_source = (ROOT / 'MobileHarness/Storage/Database/Chat/ConversationHistory.swift').read_text()
 if re.search(r'\.suffix\(10\)|public var title:', chat_source):
     errors.append('StorageChat must not select model context or presentation titles')
+# Verify every storage source has one and only one compiler owner.
+owners = {}
+for name in expected_storage:
+    for source in target_sources(targets[name]):
+        owners.setdefault(source, []).append(name)
+for source in (ROOT / 'MobileHarness/Storage').rglob('*.swift'):
+    if len(owners.get(source, [])) != 1:
+        errors.append(f'Storage source must have exactly one owner: {source}: {owners.get(source)}')
+if 'StorageAudio' in targets:
+    errors.append('Retired StorageAudio target returned')
+for source in (ROOT / 'MobileHarness').rglob('*.swift'):
+    if re.search(r'\bimport\s+FactoryKit\b', source.read_text()) and source not in target_sources(targets['AppStorage']):
+        errors.append(f'IoC import outside AppStorage: {source}')
 # Speech signal observation is runtime admission/logging, never a UI-command side channel.
 coordinator = (ROOT / 'MobileHarness/Agents/Support/VoiceSessionCoordinator.swift').read_text()
 observer = coordinator.split('func observeSpeech(', 1)[1].split('private func resumeListening(', 1)[0]
@@ -392,17 +400,22 @@ ui_dependencies = [next(iter(d.values()))[0] for d in ui.get('dependencies', [])
 if ui_dependencies:
     errors.append('UI must have no project dependencies')
 allowed_ui = {'Foundation', 'CoreGraphics', 'Observation', 'SwiftUI', 'UIKit'}
-# Public rendering frameworks are confined to the native companion implementation.
+# Public rendering frameworks are confined to the native rendering implementations.
 native_ui_imports = {
+    'Camera/CameraVideoFrame.swift': {'CoreVideo'},
+    'Camera/CameraFrameView.swift': {'CoreVideo', 'Metal', 'QuartzCore', 'Synchronization'},
+    'Components/VoiceBars.swift': {'QuartzCore'},
     'Components/NativeCompanionSurface.swift': {'QuartzCore'},
     'Components/MetalHaloRenderer.swift': {'Metal', 'QuartzCore', 'Synchronization'},
 }
+if 'Canvas {' in (ROOT / 'MobileHarness/UI/Components/VoiceBars.swift').read_text():
+    errors.append('Voice spectrum must use native retained layers, not Canvas')
 for source in (ROOT / 'MobileHarness/UI').rglob('*.swift'):
     content = source.read_text()
     for imported in re.findall(r'\bimport\s+(\w+)', content):
         if imported not in allowed_ui | native_ui_imports.get(str(source.relative_to(ROOT / 'MobileHarness/UI')), set()):
             errors.append(f'Forbidden UI import {imported}: {source.relative_to(ROOT)}')
-    if re.search(r'\b(?:VoiceSessionCoordinator|CameraCoordinator|ApplicationRuntime|AppContainer|AppAssembly|ConversationHistoryStore|LocalDocumentStore|MemoryLeaseStore)\b', content):
+    if re.search(r'\b(?:VoiceSessionCoordinator|CameraCoordinator|ApplicationRuntime|AppContainer|AppAssembly|ConversationHistoryStore|FileDocumentStore|MemoryLeaseStore)\b', content):
         errors.append(f'UI uses a runtime/service implementation: {source.relative_to(ROOT)}')
 for folder in ('App', 'UI'):
     for path, directories, files in os.walk(ROOT / 'MobileHarness' / folder):
@@ -415,7 +428,7 @@ for source in (ROOT / 'MobileHarness/App').rglob('*.swift'):
 for source in target_sources(targets['Actions']):
     if 'Support/Contracts' in str(source):
         continue
-    allowed = {'Foundation', 'Synchronization', 'PlatformKit', 'FunctionContracts', 'Storage'}
+    allowed = {'Foundation', 'Synchronization', 'PlatformKit', 'FunctionContracts', 'StorageCore', 'StorageFiles'}
     if source.is_relative_to(ROOT / 'MobileHarness/Actions/History'):
         allowed.add('StorageChat')
     for imported in imported_modules(source.read_text()):
@@ -530,7 +543,7 @@ elif any(next(iter(d.values()))[0] not in {'SwiftCompilerPlugin', 'SwiftSyntax',
 
 for module in ('Actions',):
     dependency_names = {next(iter(d.values()))[0] for d in targets[module].get('dependencies', [])}
-    forbidden = {'AgentCore', 'Agents', 'Gateway', 'UI', 'AppWorkflows', 'BehaviorAssembly', 'StorageAudio', 'Tools' if module == 'Actions' else 'Actions'}
+    forbidden = {'AgentCore', 'Agents', 'Gateway', 'UI', 'AppWorkflows', 'BehaviorAssembly', 'StorageCache', 'Tools' if module == 'Actions' else 'Actions'}
     if dependency_names & forbidden:
         errors.append(f'{module} has reverse execution dependencies: {dependency_names & forbidden}')
 
@@ -544,10 +557,10 @@ for source in list((ROOT / 'MobileHarness').rglob('*.swift')) + list((ROOT / 'Te
 expected_bindings = {
     'ActionBindings': {'Actions', 'AgentCore', 'FunctionContracts', 'ExecutionRuntime', 'CallRuntime', 'UI',
                        'PlatformKit', 'ModelKit', 'ModelKitRuntime', 'ModelKitDefaults', 'ModelKitOpenAI',
-                       'ModelKitHub', 'Storage', 'StorageChat', 'StorageMedia', 'StorageAudio', 'StorageDevices'},
+                       'ModelKitHub', 'StorageCore', 'StorageState', 'StorageFiles', 'StorageChat', 'StorageMedia', 'StorageCache', 'StorageDevices'},
     'AgentBindings': {'Agents', 'AgentCore', 'Gateway', 'Actions', 'ActionBindings', 'FunctionContracts',
                       'ExecutionRuntime', 'CallRuntime', 'UI', 'PlatformKit', 'ModelKit', 'ModelKitRuntime',
-                      'ModelKitDefaults', 'ModelKitHub', 'Storage', 'StorageChat', 'StorageMedia', 'StorageAudio',
+                      'ModelKitDefaults', 'ModelKitHub', 'StorageCore', 'StorageState', 'StorageFiles', 'StorageChat', 'StorageMedia', 'StorageCache',
                       'StorageTasks', 'StorageDevices'},
 }
 system_imports = {'Foundation', 'Observation', 'Synchronization', 'Security', 'UIKit', 'SwiftUI',
@@ -603,7 +616,7 @@ for name, target in targets.items():
         source_owners.setdefault(source, []).append(name)
 for source in (ROOT / 'MobileHarness').rglob('*.swift'):
     owners = source_owners.get(source.resolve(), [])
-    host_source = source.is_relative_to(ROOT / 'MobileHarness/App') and source.name != 'ApplicationLifecycle.swift'
+    host_source = source.is_relative_to(ROOT / 'MobileHarness/App') and source.name not in {'ApplicationLifecycle.swift', 'ApplicationContainer.swift'}
     if len(owners) != (0 if host_source else 1):
         errors.append(f'Unexpected source owners {owners}: {source.relative_to(ROOT)}')
 for root in ('UI', 'PlatformKit', 'ModelKit', 'Storage'):
@@ -620,9 +633,9 @@ preferences_facade = (ROOT / 'MobileHarness/Agents/ApplicationControl/ModelResou
 provider_facade = (ROOT / 'MobileHarness/Agents/ApplicationControl/SettingsWorkflow.swift').read_text()
 if (ROOT / 'MobileHarness/App/Workflows/Settings/CloudSettingsStore.swift').exists():
     errors.append('Provider settings persistence belongs to Actions, not App workflows')
-if re.search(r'provider\.prepare|store\.(?:load|save)\(|LocalDocumentStore', provider_facade):
+if re.search(r'provider\.prepare|store\.(?:load|save)\(|FileDocumentStore', provider_facade):
     errors.append('Provider settings facade cannot own preparation or persistence transactions')
-if re.search(r'LocalDocumentStore|\.(?:save|load)\(|\bnormalized\b', preferences_facade):
+if re.search(r'FileDocumentStore|\.(?:save|load)\(|\bnormalized\b', preferences_facade):
     errors.append('Settings preference facade cannot own persistence/normalization')
 if 'intents.inventory()' not in resource_assembly or 'intents.presentInventory(generation: generation)' not in resource_assembly:
     errors.append('Resource refresh must cross ApplicationControl')
@@ -635,14 +648,14 @@ if re.search(r'state\.(?:items|installedGroups)\s*=', resource_interaction):
 resource_agent = '\n'.join(source.read_text() for source in (ROOT / 'MobileHarness/Agents/ApplicationControl').glob('*.swift') if source.resolve() not in integration_sources)
 if 'Camera.Capture.' in resource_agent:
     errors.append('Camera decisions/grants belong to Photographer, not ApplicationControl')
-if set(re.findall(r'\bimport\s+(\w+)', resource_agent)) - {'AgentCore', 'Foundation', 'ModelKit', 'StorageChat', 'Storage'}:
+if set(re.findall(r'\bimport\s+(\w+)', resource_agent)) - {'AgentCore', 'Foundation', 'ModelKit', 'StorageChat', 'StorageCore'}:
     errors.append('ApplicationControl actor must remain independent of implementations')
 # History transport is a narrow staged exception, not blanket feature policy access.
 for source in (ROOT / 'MobileHarness/Agents/Memory').glob('*.swift'):
     if source.resolve() in integration_sources:
         continue
     imports = set(re.findall(r'\bimport\s+(\w+)', source.read_text()))
-    allowed = {'Foundation', 'AgentCore', 'ModelKit', 'StorageChat', 'Storage'} if source.name == 'ConversationTitleGenerator.swift' else {'Foundation', 'AgentCore', 'ModelKit', 'StorageChat', 'Storage'}
+    allowed = {'Foundation', 'AgentCore', 'ModelKit', 'StorageChat', 'StorageCore'} if source.name == 'ConversationTitleGenerator.swift' else {'Foundation', 'AgentCore', 'ModelKit', 'StorageChat', 'StorageCore'}
     if imports - allowed:
         errors.append(f'Unexpected memory computation/coordination imports: {source.relative_to(ROOT)}')
     if source.name == 'ConversationTitleGenerator.swift' and re.search(r'\.(?:setTitle|startNew|deleteArchived)\(|\b(?:Gateway|ActionCall|ToolCall)\b', source.read_text()):
@@ -657,10 +670,14 @@ if 'SignalCausality(envelope: invocation.envelope)' not in result_ledger:
     errors.append('Scheduled feedback must retain original envelope causality')
 # Resource UI state must remain passive; asynchronous effects belong to the feature.
 resource_state = (ROOT / 'MobileHarness/UI/Settings/ModelResourcesState.swift').read_text()
-resource_implementation = resource_state.split('public final class ModelResourcesState', 1)[1]
+# Exclude only neutral declarations co-located with the state; keep checking all implementations/extensions.
+resource_implementation = re.sub(
+    r'(?ms)^@MainActor\s+public protocol ModelResources(?:Operating|Controlling)\b.*?^}\n?', '', resource_state)
+resource_implementation = re.sub(
+    r'(?ms)^public struct ModelResourceSelectionError\b.*?^}\n?', '', resource_implementation)
 if re.search(r'\bTask\b|\basync\b|\bModelResourcesOperating\b', resource_implementation):
     errors.append('ModelResourcesState owns resource operation effects')
-if 'ModelResourceSelectionError' in resource_state or 'func isInstalled(in:' in resource_state:
+if 'ModelResourceSelectionError' in resource_implementation or 'func isInstalled(in:' in resource_implementation:
     errors.append('Resource installation policy belongs to AppSettingsWorkflow')
 if (ROOT / 'Tests/UITests/ModelResourcesStateTests.swift').exists():
     errors.append('Resource operation tests belong to AppWorkflowTests')
@@ -705,9 +722,47 @@ if 'preempts: [.assistant: [.photographer], .applicationControl: [.photographer]
 if 'trackingInputAvailable' not in runtime or '[weak photographerAgent]' not in runtime or 'hasFreshPose()' not in runtime:
     errors.append('Tracking freshness must be bound to the current Photographer without retaining its lifetime')
 assembly = (ROOT / 'MobileHarness/Agents/Support/ApplicationFeatures.swift').read_text()
+history_binding = assembly.split('private func makeHistory()', 1)[1].split('private func historyConversation', 1)[0]
+if re.search(r'\b(?:stopVoice|beginSettingsChange|endSettingsChange)\b', history_binding):
+    errors.append('Read-only Assistant history preparation must not stop the root listening session')
+camera_admission = assembly.split('func updateCameraAvailability()', 1)[1].split('var isolatedPresentation', 1)[0]
+if 'camera.setForeground(foreground && navigation.path.isEmpty)' not in camera_admission:
+    errors.append('Camera admission must require both foreground and the uncovered home route')
+scene_admission = assembly.split('public func setForeground(_ value: Bool)', 1)[1].split('public func stopNativeServices()', 1)[0]
+navigation_binding = (ROOT / 'MobileHarness/Agents/Support/AgentApplicationUI.swift').read_text()
+navigation_admission = navigation_binding.split('public func navigationChanged()', 1)[1].split('public func prepare(', 1)[0]
+if 'updateCameraAvailability()' not in scene_admission or 'features.updateCameraAvailability()' not in navigation_admission:
+    errors.append('Scene and navigation changes must both reconcile camera admission')
+if re.search(r'\b(?:stopVoice|beginSettingsChange|invalidateNative|setForeground)\b', navigation_admission):
+    errors.append('Navigation changes must not suspend the whole native service or listening session')
 bluetooth_binding = (ROOT / 'MobileHarness/App/Composition/ServiceFactories.swift').read_text()
+# Composition supplies concrete camera/UI instances; consumers only use injected ports.
+for source in binding_sources['AgentBindings']:
+    if re.search(r'\b(?:CameraState|CameraCoordinator)\s*\(', source.read_text()):
+        errors.append(f'AgentBindings must not construct camera display state or Coordinator: {source.relative_to(ROOT)}')
+if not all(marker in camera_ownership for marker in ('any CameraCapturing', 'any CameraPresenting')):
+    errors.append('Camera execution must receive native and presentation interfaces')
+if re.search(r'\b(?:AppleCamera|CameraCaptureOrientation|CameraState)\b', camera_ownership):
+    errors.append('Camera execution acquired a concrete device or UI state dependency')
+if 'CameraCoordinator(' not in bluetooth_binding or 'makeCamera:' not in bluetooth_binding:
+    errors.append('App must supply the sole camera Coordinator factory')
+ui_registration = (ROOT / 'MobileHarness/App/Composition/ApplicationContainer.swift').read_text()
+if not all(marker in ui_registration for marker in ('Factory<UIContainer>', 'Factory<UICameraContainer>')):
+    errors.append('App must register the UI root and its camera capability')
+for source in (ROOT / 'MobileHarness/UI').rglob('*.swift'):
+    if imported_modules(source.read_text()) & {'PlatformKit', 'Gateway', 'Agents', 'Actions', 'FactoryKit'}:
+        errors.append(f'UI acquired a foundation/business dependency: {source.relative_to(ROOT)}')
+
 if 'stopVoice' in bluetooth_binding or 'beginSettingsChange' in bluetooth_binding:
     errors.append('Bluetooth construction cannot bind whole voice/session cleanup')
+for source in (ROOT / 'MobileHarness/App').rglob('*.swift'):
+    if re.search(r'\b(?:SQLiteRepositories|SQLiteDatabase|recoverInFlight|DatabasePool)\b|\bimport\s+GRDB\b', source.read_text()):
+        errors.append(f'App must call Storage runtime ports, not backend lifecycle details: {source.relative_to(ROOT)}')
+storage_registration = (ROOT / 'MobileHarness/App/Composition/ModuleRegistration.swift').read_text()
+if not all(value in storage_registration for value in (
+    'id: "storage"', 'id: "platform"', 'id: "ui"', 'services.uiContainer.start()', 'services.uiContainer.invalidate', 'services.uiContainer.setForeground($0)', 'services.uiContainer.stop()', 'dependencies: ["storage", "platform", "ui", "model"]', 'services.storage.start()', 'services.storage.stop()',
+)):
+    errors.append('App must register the actual Storage runtime before its consumers')
 for source in (ROOT / 'MobileHarness/App/Lifecycle').glob('*.swift'):
     if 'ApplicationRuntime' in source.read_text():
         errors.append(f'Lifecycle depends on whole application runtime: {source.relative_to(ROOT)}')
@@ -744,7 +799,7 @@ for source in (ROOT / 'MobileHarness/Actions/History').rglob('*.swift'):
     if source.resolve() in integration_sources:
         continue
     imports = set(re.findall(r'\bimport\s+(\w+)', source.read_text()))
-    if imports - {'Foundation', 'FunctionContracts', 'StorageChat', 'Storage'}:
+    if imports - {'Foundation', 'FunctionContracts', 'StorageChat', 'StorageCore'}:
         errors.append(f'History Tools have non-foundational imports: {source.relative_to(ROOT)}')
 # Feature-specific presentation contracts must not return to Agent infrastructure.
 if (ROOT / "MobileHarness/Agents/Support/Core/Output/PoseOverlay.swift").exists():
@@ -784,10 +839,10 @@ for source in (support / 'Communication').glob('*.swift'):
 
 # Physical consolidation preserves distinct framework/contracts/capability/persistence layers.
 for layer, allowed in {
-    'Core': {'Foundation', 'Storage'},
-    'Communication': {'Foundation', 'AgentCore', 'FunctionContracts', 'Storage'},
-    'Context': {'Foundation', 'AgentCore', 'Storage'},
-    'Chat': {'Foundation', 'AgentCore', 'ModelKit', 'StorageChat', 'StorageTasks', 'Storage'},
+    'Core': {'Foundation', 'StorageCore'},
+    'Communication': {'Foundation', 'AgentCore', 'FunctionContracts', 'StorageCore'},
+    'Context': {'Foundation', 'AgentCore', 'StorageCore'},
+    'Chat': {'Foundation', 'AgentCore', 'ModelKit', 'StorageChat', 'StorageTasks', 'StorageCore', 'StorageState', 'Synchronization'},
 }.items():
     for source in (ROOT / 'MobileHarness/Agents/Support' / layer).rglob('*.swift'):
         if source.resolve() in integration_sources:
@@ -815,9 +870,37 @@ for source in (ROOT / 'MobileHarness/Agents/Support/Core').rglob('*.swift'):
         errors.append('Agent communication domain values belong to Agents/Support/Communication')
 
 # Generic communication infrastructure must not regain application domain schemas or camera samples.
+failure_channel = (ROOT / 'MobileHarness/Gateway/Input/ContainerFailureChannel.swift').read_text()
+if imported_modules(failure_channel) & {'UI', 'Storage', 'Agents', 'AppStorage'}:
+    errors.append('Container failure transport must remain independent of capability and role implementations')
+failure_registry = (ROOT / 'MobileHarness/App/Composition/ApplicationContainer.swift').read_text()
+for marker in ('Factory<ContainerFailureChannel>', 'sink(module: "storage", details: Self.failureDetails)', 'sink(module: "platform", details: Self.failureDetails)', 'sink(module: "ui", details: Self.failureDetails)'):
+    if marker not in failure_registry:
+        errors.append(f'App must install same-scope container failure reporting: {marker}')
+failure_lifecycle = (ROOT / 'MobileHarness/App/Composition/ModuleRegistration.swift').read_text()
+for marker in ('id: "diagnostics"', 'dependencies: ["diagnostics"]', 'phase: .startup', 'phase: .foreground', 'phase: .shutdown'):
+    if marker not in failure_lifecycle:
+        errors.append(f'Container failure lifecycle ownership missing: {marker}')
+external_schema_files = (
+    'ApplicationSignals.swift', 'ProviderIntents.swift', 'PhotographerCameraIntent.swift',
+    'ModelResourceSignals.swift', 'AgentContracts.swift',
+)
+for name in external_schema_files:
+    source = ROOT / 'MobileHarness/Agents/Support/Communication' / name
+    if re.search(r'\b(?:AgentInput|InputMetadata)\s*\(', source.read_text()):
+        errors.append(f'External domain input must leave Signal encoding to Gateway: {name}')
+task_values = (ROOT / 'MobileHarness/Agents/Support/Communication/AgentTasks.swift').read_text()
+external_task_values = task_values.split('public struct AgentTaskInputIntent:', 1)[-1]
+if re.search(r'\b(?:AgentInput|InputMetadata)\s*\(', external_task_values):
+    errors.append('External task input must leave Signal encoding to Gateway')
+host_interaction = (ROOT / 'MobileHarness/Agents/Support/Communication/AgentInteractionRuntime.swift').read_text()
+if re.search(r'\b(?:AgentInput|InputMetadata)\s*\(|agent\.receive\(', host_interaction):
+    errors.append('Host interaction must use Gateway encoding and admission')
 for directory in ('MobileHarness/Agents/Support/Core', 'MobileHarness/Gateway'):
     for source in (ROOT / directory).rglob('*.swift'):
         content = source.read_text()
+        if source.name == 'DeviceInputAdapter.swift' and directory.endswith('Gateway'):
+            continue
         if any(marker in content for marker in ('"speech.', '"vision.', '"sound.', '"phone.', 'gray64', 'PerceptionMessage')):
             errors.append(f'Domain communication policy in generic infrastructure: {source.relative_to(ROOT)}')
 if (ROOT / 'MobileHarness/Agents/Support/Core/Communication/PerceptionInput.swift').exists() or (ROOT / 'MobileHarness/Agents/Support/Core/ImageInput.swift').exists():
@@ -850,7 +933,7 @@ for name, filename in (
     if not re.search(rf'\b(?:struct|actor|class|enum)\s+{name}\b', content):
         errors.append(f'Missing speech helper declaration: {name}')
     imports = re.findall(r'^import (\w+)', content, re.MULTILINE)
-    if set(imports) - {'Foundation', 'ModelKit', 'Storage'}:
+    if set(imports) - {'Foundation', 'ModelKit', 'StorageCore'}:
         errors.append(f'{name} must not import transport, UI or device modules')
 if (speech_root / 'LiveSpeechInput.swift').exists():
     errors.append('Obsolete LiveSpeechInput must not duplicate SpeechRecognitionTurn')
@@ -889,7 +972,7 @@ if targets['Agents'].get('path') != 'MobileHarness' or targets['Agents'].get('so
     errors.append('Agents must compile only Agents sources while packaging shared assets')
 asset_root = ROOT / 'MobileHarness/Resources'
 asset_catalog = json.loads((asset_root / 'Catalog.json').read_text())
-for group, version in [('agents', 7), ('skills', 1)]:
+for group, version in [('agents', 7), ('skills', 2)]:
     for name, relative in asset_catalog[group].items():
         source = asset_root / relative
         parts = Path(relative).parts
@@ -912,7 +995,12 @@ for group, version in [('agents', 7), ('skills', 1)]:
             if not isinstance(base, list) or any(skill not in asset_catalog['skills'] for skill in base):
                 errors.append(f'Unknown Agent base Skill: {relative}')
             functions = []
-        elif group == 'skills': functions = configuration['functions']
+        elif group == 'skills':
+            functions = configuration['functions']
+            states = configuration.get('useState')
+            if (not isinstance(states, list) or len(states) > 16 or len(set(states)) != len(states)
+                    or not set(states).issubset({'camera', 'robot', 'task'}) or 'contextFields' in configuration):
+                errors.append(f'Invalid useState declaration: {relative}')
         else: continue
         paths = [f['path'] for f in functions]
         aliases = [f['alias'] for f in functions]
@@ -921,6 +1009,8 @@ for group, version in [('agents', 7), ('skills', 1)]:
         for function in functions:
             if len(function['path'].split('.')) != 3 or function['callType'] not in ('action', 'tool'):
                 errors.append(f'Invalid function binding: {relative}')
+            if function['callType'] != 'action' or not function.get('channel'):
+                errors.append(f'Bundled Skills require Action calls with an explicit Channel: {relative}')
             if function['path'] == 'Agent.Communication.send' and function['callType'] != 'action':
                 errors.append(f'send must be Action: {relative}')
 if any(p for group in ('Agents', 'Skills') for p in (asset_root / group).rglob('*.swift')):
@@ -963,7 +1053,7 @@ for directory in ('ModelKit', 'PlatformKit'):
             raise SystemExit(f'SDK exports application values: {source.relative_to(ROOT)}')
 if (ROOT / 'MobileHarness/Types/Audio/MicrophoneFrame.swift').exists():
     raise SystemExit('MicrophoneFrame must be owned by PlatformKit')
-for source in list(binding_sources['AgentBindings']) + [ROOT / 'MobileHarness/Agents/Support/MediaInputAdapter.swift']:
+for source in binding_sources['AgentBindings']:
     if re.search(r'\bImageFrame\s*\(|\bStreamingMonoPCMResampler\s*\(', source.read_text()):
         raise SystemExit(f'Model input preparation belongs to the calling Agent: {source.relative_to(ROOT)}')
 if 'resolveImage:' in (ROOT / 'MobileHarness/Agents/Support/ApplicationFeatures.swift').read_text():
@@ -1107,11 +1197,212 @@ if set(re.findall(r'\bimport\s+(\w+)', observer_source)) - {'Foundation'}:
 for owner in ('App', 'Agents'):
     for source in (ROOT / 'MobileHarness' / owner).rglob('*.swift'):
         text = source.read_text()
-        if 'LocalDocumentStore<AgentContext' in text or '.runtime-context.json' in text:
+        if 'FileDocumentStore<AgentContext' in text or '.runtime-context.json' in text:
             raise SystemExit(f'{source}: Agent runtime state must not use JSON files.')
+for source in (ROOT / 'MobileHarness').rglob('*.swift'):
+    if re.search(r'\b(?:StateKey|StateWriter)\s*<\s*AgentContext\b', source.read_text()):
+        raise SystemExit(f'{source}: Private AgentContext cannot be a public State value.')
 context_repository = (ROOT / 'MobileHarness/Agents/Support/Context/AgentContextRepository.swift').read_text()
-if 'MemoryStateStore' not in context_repository or 'StateRepository<AgentContext<State>>' not in context_repository:
-    raise SystemExit('Agent runtime state must use the Storage memory-state contract.')
+if 'StorageState' in context_repository or 'stateScope.register' in context_repository:
+    raise SystemExit('Private AgentContext must not be registered in public State.')
+for relative in ('Agents/Assistant/AssistantProcessing.swift', 'Agents/Support/Chat/AgentChatWorker.swift'):
+    text = (ROOT / 'MobileHarness' / relative).read_text()
+    if any(label in text for label in ('Task transition result (data)', 'Runtime camera facts (data', 'Current task and Skill state (data')):
+        raise SystemExit(f'{relative}: Retired synthetic state-user injection must not return.')
 if 'ContextDocumentAdapter' in context_repository or 'AssistantConversationRecovery' in (ROOT / 'MobileHarness/Agents/Assistant/AssistantProcessing.swift').read_text():
     raise SystemExit('Retired Context JSON adapters and duplicate Task recovery blobs must stay removed.')
 print('Runtime memory-state and database record lifecycle boundaries pass.')
+
+# ApplicationControl owns runtime failure presentation policy; bindings only forward evidence.
+activity_source = (ROOT / 'MobileHarness/Agents/Support/ActionActivityWorkflow.swift').read_text()
+if any(marker in activity_source for marker in ('startContainerFailures', 'state.recordIssue(', 'state.replaceIssues(', 'func userMessage(')):
+    raise SystemExit('AgentBindings must not bypass ApplicationControl to present runtime failures.')
+application_control_config = json.loads((ROOT / 'MobileHarness/Resources/Agents/ApplicationControl/Agent.json').read_text())
+for contract in ('container.failure', 'runtime.failure'):
+    if not any(value['contract'] == contract and value.get('source') == 'runtime' for value in application_control_config['communication']['subscriptions']):
+        raise SystemExit(f'ApplicationControl must subscribe to {contract} from runtime.')
+runtime_presentation = (ROOT / 'MobileHarness/Actions/UI/Support/RuntimePresentation.swift').read_text()
+if 'invocation.context.source == "applicationControl"' not in runtime_presentation or 'showsToast: issue.userMessage != nil' not in runtime_presentation:
+    raise SystemExit('Runtime failure presentation requires ApplicationControl identity and explicit toast policy.')
+print('ApplicationControl owns diagnostic presentation policy; bindings remain transport projections.')
+
+# UI presentation models are owned by the UI root; consumers receive read-only capability protocols.
+ui_model_names = ('ConversationState', 'ActionActivityState', 'SettingsState', 'ModelResourcesState', 'NavigationState', 'ConversationHistoryState', 'BluetoothSettingsState', 'SpeechDiagnosticState', 'AudioDetectionState', 'ConversationExpressionPresentation', 'HomeEffectsWorkflow', 'CapturedPhotoPresentation')
+for source in (ROOT / 'MobileHarness').rglob('*.swift'):
+    if ROOT / 'MobileHarness/UI' in source.parents:
+        continue
+    if re.search(r'\b(?:' + '|'.join(ui_model_names) + r')\s*\(', source.read_text()):
+        raise SystemExit(f'UI root must own presentation construction: {source.relative_to(ROOT)}')
+ui_root_source = (ROOT / 'MobileHarness/UI/UIContainer.swift').read_text()
+ui_registry_source = (ROOT / 'MobileHarness/App/Composition/ApplicationContainer.swift').read_text()
+for property_name in ('home', 'camera', 'settings', 'modelResources', 'navigation', 'history', 'devices', 'diagnostics'):
+    if f'public let {property_name}:' not in ui_root_source or f'self.ui().{property_name}' not in ui_registry_source:
+        raise SystemExit(f'UI root and App must share the {property_name} capability.')
+conversation_view_source = (ROOT / 'MobileHarness/UI/Conversation/ConversationView.swift').read_text()
+if '.task(id: issue.id)' in conversation_view_source:
+    raise SystemExit('Toast expiry belongs to the UI root, never the page.')
+for source in (ROOT / 'MobileHarness/Agents').rglob('*.swift'):
+    if source.name in ('AgentApplicationUI.swift', 'ApplicationFeatures.swift', 'InteractionServices.swift'):
+        continue  # Read-only view-provider fields, not business mutation handles.
+    if re.search(r':\s*(?:' + '|'.join(ui_model_names[:9]) + r')\b', source.read_text()):
+        raise SystemExit(f'Agent business consumers require narrow presentation interfaces: {source.relative_to(ROOT)}')
+print('UI root owns eight capabilities and presentation construction; App shares them through explicit registration.')
+
+native_audio_source = (ROOT / 'MobileHarness/PlatformKit/Audio/AppleAudioIO.swift').read_text()
+if re.search(r'\.report\(\s*"audio"\s*,\s*"routeChanged"', native_audio_source):
+    raise SystemExit('Audio route facts must not be reported as container execution failures.')
+if re.search(r'NativeAudioEvent\s*:[^{]*\bError\b', audio_context.read_text()):
+    raise SystemExit('NativeAudioEvent must remain a device fact rather than an Error type.')
+print('Audio route facts are separate from container execution failures.')
+
+# Native output graph mutation must remain outside the MainActor controller.
+audio_io = (ROOT / 'MobileHarness/PlatformKit/Audio/AppleAudioIO.swift').read_text()
+audio_controller = audio_io.split('public final class AppleAudioIO', 1)[1]
+if 'private actor NativePlaybackGraph' not in audio_io or 'AVAudioPlayerNode()' in audio_controller:
+    raise SystemExit('Native playback graph must have its own actor owner')
+
+# UI organization: keep one owner per feature and retire comparison-only paths.
+ui_root = ROOT / 'MobileHarness/UI'
+retired_ui_files = (
+    'Components/CompanionEyes.swift', 'Camera/PoseOverlayProjection.swift',
+    'Conversation/ExecutionLogState.swift', 'Conversation/PresentationPorts.swift',
+    'Settings/SettingsProviderOperations.swift', 'Settings/ModelResourceRequests.swift',
+    'Settings/UISettingsContainers.swift', 'Settings/AudioDetectionState.swift',
+    'Settings/AudioDetectionSection.swift',
+)
+for relative in retired_ui_files:
+    if (ui_root / relative).exists():
+        raise SystemExit(f'Retired UI implementation must not return: {relative}')
+ui_sources = '\n'.join(source.read_text() for source in ui_root.rglob('*.swift'))
+if re.search(r'\b(?:ConversationVisualPreview|ActionActivityVisualPreview|OSSignposter|sensorPoint)\b', ui_sources):
+    raise SystemExit('UI must not retain synthetic preview routes, comparison probes or legacy projection')
+for relative, declarations in {
+    'UIContainer.swift': ('class UINavigationContainer', 'class NavigationState'),
+    'Settings/SettingsState.swift': ('class UISettingsContainer', 'struct SettingsProviderOperations'),
+    'Settings/ModelResourcesState.swift': ('class UIModelResourcesContainer', 'protocol ModelResourcesOperating'),
+    'Settings/ConversationHistoryState.swift': ('class UIHistoryContainer',),
+    'Settings/BluetoothSettingsState.swift': ('class UIDeviceSettingsContainer',),
+    'Diagnostics/AudioDetectionWorkflow.swift': ('class AudioDetectionState', 'struct AudioDetectionSection'),
+    'Components/NativeCompanionSurface.swift': ('struct CompanionEyes',),
+}.items():
+    content = (ui_root / relative).read_text()
+    if any(declaration not in content for declaration in declarations):
+        raise SystemExit(f'UI feature ownership drift: {relative}')
+print('UI feature ownership and retired comparison-code checks pass.')
+
+# Foundational modules expose native contracts only; Signal adaptation stays in Gateway.
+for module in ('PlatformKit', 'Storage', 'ModelKit'):
+    for source in (ROOT / 'MobileHarness' / module).rglob('*.swift'):
+        code = re.sub(r'//[^\n]*|/\*.*?\*/', '', source.read_text(), flags=re.S)
+        if re.search(r'\b(?:AgentInput|ActionInvocation|InputGateway|OutputGateway|SignalCausality|SignalMetadata)\b', code):
+            raise SystemExit(f'Communication/business contract in foundational SDK: {source.relative_to(ROOT)}')
+vision_container = (ROOT / 'MobileHarness/PlatformKit/Vision/VisionContainer.swift').read_text()
+audio_container = (ROOT / 'MobileHarness/PlatformKit/Audio/AudioContainer.swift').read_text()
+if not re.search(r'var camera:\s*any CameraCapturing', vision_container):
+    raise SystemExit('Vision root must expose its camera protocol')
+if not re.search(r'func io\([^)]*\)\s*->\s*any AudioInputOutput', audio_container):
+    raise SystemExit('Audio root must expose its I/O protocol')
+camera_contract = (ROOT / 'MobileHarness/PlatformKit/Vision/CameraCapturing.swift').read_text()
+if re.search(r'CameraEvent\s*:[^{]*\bError\b', camera_contract):
+    raise SystemExit('CameraEvent is a device fact, not an execution Error')
+if re.search(r'\b(?:prepareClip|discardPreparedClip|playbackSampleOffset|preparedClipRate)\b', audio_io):
+    raise SystemExit('Unused native output warmup/cursor API must remain retired')
+for folder in ('Agents', 'Actions'):
+    for source in (ROOT / 'MobileHarness' / folder).rglob('*.swift'):
+        if re.search(r':\s*AppleAudioIO\b', source.read_text()):
+            raise SystemExit(f'Business consumers require AudioInputOutput: {source.relative_to(ROOT)}')
+for retired in ('DocumentStorageError.swift', 'RecordStorageError.swift'):
+    if (ROOT / 'MobileHarness/Storage/Support/Contracts' / retired).exists():
+        raise SystemExit('Shared storage errors must have one source owner')
+print('Foundation capability ports, native facts and Gateway conversion boundaries pass.')
+
+for method, port in (('cue', 'CuePlaying'), ('haptic', 'HapticFeedbackProviding')):
+    if not re.search(r'func ' + method + r'\([^)]*\)\s*->\s*any ' + port, audio_container):
+        raise SystemExit(f'Audio root must expose {port}')
+for folder in ('Agents', 'Actions'):
+    for source in (ROOT / 'MobileHarness' / folder).rglob('*.swift'):
+        if re.search(r':\s*(?:NativeCuePlayback|NativeHapticFeedback)\s*[,\n)]', source.read_text()):
+            raise SystemExit(f'Business feedback consumers require protocol ports: {source.relative_to(ROOT)}')
+
+# App-owned model roots; production consumers receive ports, never process singletons.
+model_root = (ROOT / 'MobileHarness/ModelKit/ModelContainer.swift').read_text()
+if 'ProcessModels' in model_root or 'static let speechSelection' in model_root:
+    raise SystemExit('Model selection and manager ownership must be instance-local')
+for source in (ROOT / 'MobileHarness').rglob('*.swift'):
+    if 'ModelKit' in source.parts:
+        continue
+    if re.search(r'\bModelKitDefaults\s*\.', source.read_text()) or re.search(r'\bModelManager\s*\(', source.read_text()):
+        raise SystemExit(f'Production consumer bypasses injected model ports: {source}')
+for marker in ('Factory<ModelContainer>', 'Factory<ModelLanguageContainer>', 'Factory<ModelSpeechContainer>', 'Factory<ModelVisionContainer>', 'Factory<ModelArtifactsContainer>'):
+    if marker not in ui_registration:
+        raise SystemExit(f'Missing App model registration: {marker}')
+for marker in ('id: "model"', 'services.model.start()', 'services.model.invalidate', 'services.model.setForeground($0)', 'services.model.stop()'):
+    if marker not in storage_registration:
+        raise SystemExit(f'Missing model lifecycle connection: {marker}')
+print('Instance-local model root, injected ports and lifecycle ownership checks pass.')
+
+for source in (ROOT / 'MobileHarness').rglob('*.swift'):
+    if 'GemmaContextBudget' in source.read_text() and 'Gemma4' not in source.parts:
+        raise SystemExit(f'Local context fitting escaped its ModelKit provider: {source}')
+print('Local context fitting remains confined to ModelKitGemma4.')
+
+# Startup cleanup must not retire a replacement capture after an older attempt fails.
+# Executor placement is under a documented hardware baseline comparison; do not
+# freeze the experimental implementation in a source-shape assertion.
+audio_start_source = (ROOT / 'MobileHarness/PlatformKit/Audio/AppleAudioIO.swift').read_text()
+if 'guard captureToken == token else { throw primary }' not in audio_start_source:
+    raise SystemExit('Capture failure cleanup must remain token fenced')
+print('Native capture failure ownership checks pass.')
+
+# Home preparation is host lifecycle orchestration; no Foundation SDK locates models or IoC.
+home_preparation_composition = (ROOT / 'MobileHarness/App/Composition/ServiceFactories.swift').read_text()
+if 'ForegroundPreparation(' not in home_preparation_composition:
+    raise SystemExit('App must own the home readiness coordinator')
+home_preparation_registration = (ROOT / 'MobileHarness/App/Composition/ModuleRegistration.swift').read_text()
+for contract in ('id: "homePreparation"', 'await services.homePreparation.stop()'):
+    if contract not in home_preparation_registration:
+        raise SystemExit('Home preparation must join the lifecycle graph: ' + contract)
+print('Home readiness remains App-owned with explicit lifecycle cleanup.')
+
+# Independent foundation envelopes share a schema, never a cross-SDK dependency.
+foundation_errors = [
+    ROOT / 'MobileHarness/Storage/StorageFailure.swift',
+    ROOT / 'MobileHarness/PlatformKit/PlatformFailure.swift',
+    ROOT / 'MobileHarness/ModelKit/ModelFailure.swift',
+    ROOT / 'MobileHarness/UI/UIFailure.swift',
+]
+canonical_schema = None
+for source in foundation_errors:
+    content = source.read_text()
+    schema = content.split('    private static func classify(', 1)[0]
+    schema = schema.replace(source.stem, 'FoundationFailure')
+    if canonical_schema is None:
+        canonical_schema = schema
+    elif schema != canonical_schema:
+        raise SystemExit(f'Foundation failure schema drift: {source.relative_to(ROOT)}')
+    if set(re.findall(r'\bimport\s+(\w+)', content)) != {'Foundation'}:
+        raise SystemExit(f'Foundation failure must remain independent: {source.relative_to(ROOT)}')
+for directory in ('Storage', 'PlatformKit', 'ModelKit', 'UI'):
+    for source in (ROOT / 'MobileHarness' / directory).rglob('*.swift'):
+        if re.search(r'\b(?:StorageLifecycleFailure|StoragePreparationFailure|PlatformCleanupFailure|ModelCleanupFailure|ModelArtifactCleanupFailure)\b', source.read_text()):
+            raise SystemExit(f'Retired cleanup envelope: {source.relative_to(ROOT)}')
+print('Four independent foundation error schemas and retired cleanup types pass.')
+
+# Physical entry points do not merge the independent compiled capability layers.
+for directory, prefix, container_target, failure_target in (
+    ('Storage', 'Storage', 'Storage', 'StorageCore'),
+    ('PlatformKit', 'Platform', 'PlatformKit', 'PlatformKit'),
+    ('ModelKit', 'Model', 'ModelKitDefaults', 'ModelKit'),
+    ('UI', 'UI', 'UI', 'UI'),
+):
+    root = ROOT / 'MobileHarness' / directory
+    for suffix, owner in (('Container', container_target), ('Failure', failure_target)):
+        source = root / (prefix + suffix + '.swift')
+        if not source.is_file():
+            raise SystemExit(f'Missing foundation root entry: {source.relative_to(ROOT)}')
+        actual = {name for name, target in targets.items() if target.get('path') and source.resolve() in target_sources(target)}
+        if actual != {owner}:
+            raise SystemExit(f'Foundation root source owner mismatch: {source.relative_to(ROOT)} -> {actual}')
+        if list(root.rglob(source.name)) != [source]:
+            raise SystemExit(f'Duplicate foundation root entry: {source.name}')
+print('Foundation Container/Failure root layout and unique compiled owners pass.')

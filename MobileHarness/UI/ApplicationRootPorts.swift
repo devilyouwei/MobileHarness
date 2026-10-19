@@ -2,19 +2,24 @@
     import Foundation
     import SwiftUI
 
-    @MainActor public protocol ApplicationSessionProviding: AnyObject {
+    @MainActor
+    public protocol ApplicationSessionProviding: AnyObject {
         var conversation: ConversationState { get }
         var actionActivity: ActionActivityState { get }
         var audioDetectionState: AudioDetectionState { get }
         var audioDetectionControls: any AudioDetectionControlling { get }
-        func stopVoice()
         func toggleVoice()
         func voicePressChanged(_ pressing: Bool)
         func speechValidationContent() -> AnyView
         func chatValidationContent() -> AnyView
     }
 
-    @MainActor public protocol ApplicationRootProviding: AnyObject {
+    @MainActor
+    public protocol ApplicationRootProviding: AnyObject {
+        var homePreparation: HomeModelPreparation { get }
+        func retryHomePreparation()
+        func interactionActivityChanged()
+        func modelRequirementsChanged()
         var startupIssue: String? { get }
         func retry()
         var session: (any ApplicationSessionProviding)? { get }
@@ -30,7 +35,6 @@
         var recordDestinations: [AgentRecordDestination] { get }
         func navigate(_ destination: AppDestination?)
         func cameraPreview() -> AnyView
-        func setHomeVisible(_ visible: Bool)
         func navigationChanged()
         func prepare(progress: @MainActor (String) -> Void) async throws
     }

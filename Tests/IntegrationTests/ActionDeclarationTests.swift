@@ -2,8 +2,8 @@ import Actions
 import Agents
 import Foundation
 import FunctionContracts
-import Storage
 import StorageChat
+import StorageCore
 import Testing
 
 @Test(.actionCatalog) func actionMacroOwnsSchemasAndModuleProjection() throws {

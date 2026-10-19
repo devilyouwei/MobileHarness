@@ -1,7 +1,7 @@
 import Foundation
 import FunctionContracts
-import Storage
 import StorageChat
+import StorageCore
 
 /// Archive-only mutation validation; persistence remains an atomic Storage transaction.
 public struct HistoryMutationService: HistoryMutationCapability {

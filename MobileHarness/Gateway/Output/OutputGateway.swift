@@ -68,8 +68,10 @@ public actor OutputGateway {
         }
         failures.append(
             .init(
-                source: envelope.source, title: title, message: message, failureCode: code?.rawValue,
-                inputID: envelope.inputID))
+                source: envelope.source, title: envelope.failure?.category.rawValue ?? title,
+                message: envelope.failure?.detail ?? message, failureCode: envelope.failure?.code ?? code?.rawValue,
+                inputID: envelope.inputID, diagnostic: envelope.failure,
+                sessionID: envelope.sessionID, roundID: envelope.roundID))
         failureRevision &+= 1
         let snapshot = failureSnapshot()
         for observer in failureObservers.values { observer.yield(snapshot) }

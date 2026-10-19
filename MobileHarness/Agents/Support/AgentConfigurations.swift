@@ -45,7 +45,35 @@ public enum AgentConfigurations {
         public let description: String
         public let dependencies: [String]
         public let functions: [Binding]
-        public let contextFields: [String]
+        public let useState: [String]
+        public init(from decoder: any Decoder) throws {
+            struct Key: CodingKey {
+                var stringValue: String
+                var intValue: Int? { nil }
+                init?(stringValue: String) { self.stringValue = stringValue }
+                init?(intValue: Int) { return nil }
+            }
+            let fields = try decoder.container(keyedBy: CodingKeys.self)
+            let all = try decoder.container(keyedBy: Key.self)
+            guard
+                Set(all.allKeys.map(\.stringValue))
+                    == Set(["version", "id", "revision", "description", "dependencies", "functions", "useState"])
+            else {
+                throw AgentConfigurationError.invalidFormat
+            }
+            version = try fields.decode(Int.self, forKey: .version)
+            id = try fields.decode(String.self, forKey: .id)
+            revision = try fields.decode(Int.self, forKey: .revision)
+            description = try fields.decode(String.self, forKey: .description)
+            dependencies = try fields.decode([String].self, forKey: .dependencies)
+            functions = try fields.decode([Binding].self, forKey: .functions)
+            useState = try fields.decode([String].self, forKey: .useState)
+            guard version == 2, revision > 0, dependencies.count <= 16,
+                functions.count <= 128, Set(functions.map(\.path)).count == functions.count,
+                useState.count <= 16, Set(useState).count == useState.count,
+                Set(useState).isSubset(of: ["camera", "robot", "task"])
+            else { throw AgentConfigurationError.invalidFormat }
+        }
     }
     private struct Catalog: Decodable {
         let version: Int
@@ -90,10 +118,7 @@ public enum AgentConfigurations {
         if let cached = cache.lock.withLock({ cache.skills[id] }) { return cached }
         guard let path = try catalog().skills[id] else { throw AgentConfigurationError.resourceMissing(id) }
         let value = try JSONDecoder().decode(Skill.self, from: data(path))
-        guard value.version == 1, value.id == id, value.revision > 0, value.dependencies.count <= 16,
-            value.functions.count <= 128, Set(value.functions.map(\.path)).count == value.functions.count,
-            Set(value.contextFields).isSubset(of: ["runtimeFacts", "taskState", "actionResults"])
-        else { throw AgentConfigurationError.invalidFormat }
+        guard value.id == id else { throw AgentConfigurationError.invalidFormat }
         cache.lock.withLock { cache.skills[id] = value }
         return value
     }

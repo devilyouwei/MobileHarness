@@ -3,7 +3,9 @@ import Foundation
 import Observation
 
 /// One renderer request. The host owns the operation and releases the image after acknowledgment.
-@MainActor @Observable public final class PhotoDeparture {
+@MainActor
+@Observable
+public final class PhotoDeparture {
     public enum Kind: String, Sendable { case save, discard }
     public struct Request: Equatable, Sendable {
         public let id: String

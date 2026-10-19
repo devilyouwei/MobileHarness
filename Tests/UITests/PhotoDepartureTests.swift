@@ -1,7 +1,8 @@
 import CoreGraphics
 import Foundation
 import Testing
-import UI
+
+@testable import UI
 
 @MainActor private func requestedDeparture(_ value: PhotoDeparture) async throws -> PhotoDeparture.Request {
     for _ in 0..<1000 {

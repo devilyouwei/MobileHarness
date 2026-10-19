@@ -10,6 +10,8 @@
     @available(iOS 27, *)
     public final class ModelDownloadBackgroundService: NSObject, UIApplicationDelegate {
         private var completions: [String: (String, () -> Void)] = [:]
+        private var prepare: (@MainActor () async throws -> Void)?
+        public func connect(prepare: @escaping @MainActor () async throws -> Void) { self.prepare = prepare }
         private let allowance = NativeBackgroundAllowance()
         public private(set) var lastFailure: String?
         public func applicationDidEnterBackground(_ application: UIApplication) {
@@ -35,14 +37,8 @@
             completions[identifier] = (generation, completionHandler)
             Task {
                 do {
-                    let root = URL.applicationSupportDirectory.appendingPathComponent("MobileHarness/Models")
-                    let catalog = try ModelArtifactCatalog.read(
-                        Bundle.main.bundleURL.appendingPathComponent("Models/model-catalog.json"))
-                    let storage = try ModelArtifactStorageAdapter(root: root)
-                    let manager = try await ModelKitDefaults.configureArtifacts(
-                        resources: root.appendingPathComponent("installed"), catalog: catalog, storage: storage,
-                        downloader: HuggingFaceArtifactDownloader())
-                    _ = try await manager.artifactSnapshots()
+                    guard let prepare else { throw ModelArtifactError.storage }
+                    try await prepare()
                 } catch {
                     lastFailure = String(String(describing: error).prefix(2048))
                     finish(identifier, generation: generation)

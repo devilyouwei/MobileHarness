@@ -4,9 +4,9 @@ import Foundation
 import Gateway
 import PlatformKit
 import Testing
-import UI
 
 @testable import AgentBindings
+@testable import UI
 
 @MainActor
 private final class SettingsFacadeFixture {

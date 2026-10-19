@@ -1,22 +1,45 @@
 import Foundation
 import Observation
 
-@MainActor @Observable
+@MainActor
+@Observable
 public final class ConversationHistoryState {
+    @ObservationIgnored var presentationAdmission: UIPresentationAdmission?
+    public var isPresentationAvailable: Bool { presentationAdmission.map { $0.started && !$0.stopped } ?? true }
+
     public let title: String
-    public var selectedConversation: HistoryConversation?
-    public var archive: HistorySnapshot?
-    public var status: String?
-    public var isBusy = false
-    public var isRefreshing = false
-    public var hasMoreArchives = false
-    public var archivePaging = HistoryPageLoading<String>()
+    public internal(set) var selectedConversation: HistoryConversation?
+    public internal(set) var archive: HistorySnapshot?
+    public internal(set) var status: String?
+    public internal(set) var isBusy = false
+    public internal(set) var isRefreshing = false
+    public internal(set) var hasMoreArchives = false
+    public internal(set) var archivePaging = HistoryPageLoading<String>()
     public func present(_ snapshot: HistorySnapshot, status: String?) {
+        guard presentationAdmission?.acceptsRetained() ?? true else { return }
         archive = snapshot
         self.status = status
     }
     public init(title: String = "Assistant 聊天记录") {
         self.title = title
+    }
+
+    @discardableResult
+    public func present(_ update: HistoryUpdate) -> Bool {
+        guard presentationAdmission?.acceptsRetained() ?? true else { return false }
+        apply(update)
+        return true
+    }
+    func apply(_ update: HistoryUpdate) {
+        switch update {
+        case .selectedConversation(let value): selectedConversation = value
+        case .archive(let value): archive = value
+        case .status(let value): status = value
+        case .isBusy(let value): isBusy = value
+        case .isRefreshing(let value): isRefreshing = value
+        case .hasMoreArchives(let value): hasMoreArchives = value
+        case .archivePaging(let value): archivePaging = value
+        }
     }
 }
 
@@ -81,6 +104,74 @@ public struct HistoryRequestNavigation {
         self.turn = turn
         isPresented = true
     }
+}
+
+/// Page-owned read: one active read and one latest candidate, never a chain of waiting tasks.
+@MainActor
+@Observable
+final class HistoryMessageLoader {
+    private struct Request {
+        let id: UUID
+        let read: @MainActor () async throws -> HistoryTurn
+        let show: @MainActor (HistoryTurn) -> Void
+    }
+    private(set) var isLoading = false
+    private(set) var error: String?
+    @ObservationIgnored private var worker: Task<Void, Never>?
+    @ObservationIgnored private var readTask: Task<HistoryTurn, Error>?
+    @ObservationIgnored private var pending: Request?
+    private var requestID: UUID?
+
+    func open(
+        read: @escaping @MainActor () async throws -> HistoryTurn, show: @escaping @MainActor (HistoryTurn) -> Void
+    ) {
+        guard !isLoading else { return }
+        let id = UUID()
+        requestID = id
+        isLoading = true
+        error = nil
+        pending = Request(id: id, read: read, show: show)
+        guard worker == nil else { return }
+        worker = Task { [weak self] in
+            while let request = self?.takePending() {
+                let task = Task {
+                    try Task.checkCancellation()
+                    return try await request.read()
+                }
+                self?.readTask = task
+                let result = await task.result
+                self?.readTask = nil
+                self?.complete(request, result: result)
+            }
+            self?.worker = nil
+        }
+    }
+    private func takePending() -> Request? {
+        defer { pending = nil }
+        return pending
+    }
+    private func complete(_ request: Request, result: Result<HistoryTurn, Error>) {
+        guard requestID == request.id else { return }
+        requestID = nil
+        isLoading = false
+        switch result {
+        case .success(let turn): request.show(turn)
+        case .failure(let failure):
+            if !(failure is CancellationError) { error = "读取失败：\(failure)" }
+        }
+    }
+    func cancel() {
+        requestID = nil
+        pending = nil
+        isLoading = false
+        error = nil
+        readTask?.cancel()
+    }
+    func stopAndWait() async {
+        cancel()
+        await worker?.value
+    }
+    deinit { readTask?.cancel() }
 }
 
 @MainActor
@@ -173,10 +264,16 @@ public struct HistoryTokenUsage: Codable, Sendable, Equatable {
     public let input: Int
     public let generated: Int
     public let total: Int
-    public init(input: Int, generated: Int, total: Int) {
+    public let cachedInput: Int?
+    public let cacheWriteInput: Int?
+    public init(
+        input: Int, generated: Int, total: Int, cachedInput: Int? = nil, cacheWriteInput: Int? = nil
+    ) {
         self.input = input
         self.generated = generated
         self.total = total
+        self.cachedInput = cachedInput
+        self.cacheWriteInput = cacheWriteInput
     }
 }
 
@@ -307,3 +404,63 @@ public enum HistoryTimelineItem: Identifiable, Sendable {
 }
 
 public enum HistoryDetailError: Error { case unavailable }
+
+public enum HistoryUpdate {
+    case selectedConversation(HistoryConversation?)
+    case archive(HistorySnapshot?)
+    case status(String?)
+    case isBusy(Bool)
+    case isRefreshing(Bool)
+    case hasMoreArchives(Bool)
+    case archivePaging(HistoryPageLoading<String>)
+}
+
+@MainActor
+public protocol HistoryPresenting: UIPresentationAccess {
+    var selectedConversation: HistoryConversation? { get }
+    var archive: HistorySnapshot? { get }
+    var status: String? { get }
+    var isBusy: Bool { get }
+    var isRefreshing: Bool { get }
+    var hasMoreArchives: Bool { get }
+    var archivePaging: HistoryPageLoading<String> { get }
+    var title: String { get }
+    @discardableResult
+    func present(_ update: HistoryUpdate) -> Bool
+    func present(_ snapshot: HistorySnapshot, status: String?)
+}
+
+extension ConversationHistoryState: HistoryPresenting {}
+
+extension HistoryPresenting {
+    public func beginArchivePage(after id: String, retry: Bool) -> UUID? {
+        var paging = archivePaging
+        guard let ticket = paging.begin(after: id, retry: retry), present(.archivePaging(paging)) else { return nil }
+        return ticket
+    }
+    public func cancelArchivePage(_ ticket: UUID) {
+        var paging = archivePaging
+        paging.cancel(ticket)
+        present(.archivePaging(paging))
+    }
+    public func finishArchivePage(_ ticket: UUID, error: String? = nil) {
+        var paging = archivePaging
+        paging.finish(ticket, error: error)
+        present(.archivePaging(paging))
+    }
+    public func appendArchives(_ page: [HistoryConversation]) {
+        guard var value = archive else { return }
+        value.past.append(contentsOf: page)
+        present(.archive(value))
+    }
+}
+
+@MainActor
+public final class UIHistoryContainer {
+    public let state: ConversationHistoryState
+    public var presentation: any HistoryPresenting { state }
+    init(title: String, admission: UIPresentationAdmission) {
+        state = ConversationHistoryState(title: title)
+        state.presentationAdmission = admission
+    }
+}

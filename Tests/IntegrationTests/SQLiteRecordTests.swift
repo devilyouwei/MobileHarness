@@ -7,11 +7,11 @@ import PlatformKit
 import StorageMedia
 import StorageTasks
 import Testing
-import UI
 
-@testable import Storage
 @testable import StorageChat
+@testable import StorageCore
 @testable import StorageSQLite
+@testable import UI
 
 #if os(macOS)
     import Darwin

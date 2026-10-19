@@ -7,11 +7,17 @@ import Foundation
 import FunctionContracts
 import Gateway
 import ModelKit
-import Storage
+import StorageCore
+import StorageState
 import Testing
 
 @Test(.actionCatalog) func lifecycleAndBoundedQueue() async throws {
-    let agent = try AssistantAgent(capacity: 1, chat: FixedTextChat())
+    let agent = try AssistantAgent(
+        stateContext: try publicStateFixture(),
+        capacity: 1, chat: FixedTextChat(),
+        context: try AgentContextRepository(
+            agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState())
+    )
     let input = AgentInput(
         id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("hello"))
     await #expect(throws: HarnessError.notRunning) { try await agent.receive(input) }
@@ -29,8 +35,12 @@ import Testing
 
 @Test(.actionCatalog) func outputOverflowFailsAgent() async throws {
     let agent = try AssistantAgent(
+        stateContext: try publicStateFixture(),
         outputCapacity: 2,
-        chat: FixedTextChat(text: "<express emotion=\"happy\"/><express emotion=\"sad\"/><express emotion=\"love\"/>"))
+        chat: FixedTextChat(text: "<express emotion=\"happy\"/><express emotion=\"sad\"/><express emotion=\"love\"/>"),
+        context: try AgentContextRepository(
+            agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState())
+    )
     try await agent.start()
     try await agent.receive(
         AgentInput(
@@ -49,7 +59,12 @@ import Testing
 }
 
 @Test(.actionCatalog) func capabilitiesRejectUndeclaredActions() throws {
-    let descriptor = try AssistantAgent(chat: FixedTextChat()).descriptor
+    let descriptor = try AssistantAgent(
+        stateContext: try publicStateFixture(),
+        chat: FixedTextChat(),
+        context: try AgentContextRepository(
+            agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState())
+    ).descriptor
     #expect(throws: HarnessError.forbiddenFunction) {
         try OutputValidator.validate(.actionCall(expectedActionCall(name: "move")), descriptor: descriptor)
     }
@@ -84,7 +99,12 @@ private func textRoutingConfiguration(_ id: String, subscribes: Bool = true) thr
 
 @Test(.actionCatalog) func subscriptionRoutingIsolatesUnavailableTargets() async throws {
     let manager = AgentManager()
-    let agent = try AssistantAgent(chat: FixedTextChat())
+    let agent = try AssistantAgent(
+        stateContext: try publicStateFixture(),
+        chat: FixedTextChat(),
+        context: try AgentContextRepository(
+            agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState())
+    )
     try await manager.register(agent)
     await #expect(throws: HarnessError.duplicateAgent) { try await manager.register(agent) }
     try await manager.start(.assistant)
@@ -107,7 +127,12 @@ private func textRoutingConfiguration(_ id: String, subscribes: Bool = true) thr
 
 @Test(.actionCatalog) func publicationWithoutPolicyDoesNotFallBackToAssistant() async throws {
     let manager = AgentManager()
-    let agent = try AssistantAgent(chat: FixedTextChat())
+    let agent = try AssistantAgent(
+        stateContext: try publicStateFixture(),
+        chat: FixedTextChat(),
+        context: try AgentContextRepository(
+            agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState())
+    )
     try await manager.register(agent)
     try await manager.start(.assistant)
     let gateway = InputGateway(manager: manager, allowsExternalSend: true)
@@ -123,7 +148,12 @@ private func textRoutingConfiguration(_ id: String, subscribes: Bool = true) thr
 
 @Test(.actionCatalog) func directedAdmissionBypassesSubscriptionsButEnforcesInputSupport() async throws {
     let manager = AgentManager()
-    let agent = try AssistantAgent(chat: FixedTextChat())
+    let agent = try AssistantAgent(
+        stateContext: try publicStateFixture(),
+        chat: FixedTextChat(),
+        context: try AgentContextRepository(
+            agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState())
+    )
     try await manager.register(agent)
     try await manager.start(.assistant)
     let policy = try CommunicationPolicy(
@@ -179,7 +209,11 @@ private struct StatusRoundTripChat: ChatCapability {
 @Test(.actionCatalog, arguments: [false, true]) func toolRoundTripPreservesSessionAndCallID(_ fails: Bool) async throws
 {
     let manager = AgentManager()
-    let agent = try FixtureNativeAgent(chat: StatusRoundTripChat())
+    let agent = try FixtureNativeAgent(
+        chat: StatusRoundTripChat(),
+        context: try AgentContextRepository(
+            agent: FixtureNativeChatState.agentID, scope: UUID().uuidString, state: FixtureNativeChatState())
+    )
     try await manager.register(agent)
     let speechRequests = try await bindSpeechRequests(agent)
     try await manager.start(.assistant)
@@ -229,7 +263,12 @@ private struct StatusRoundTripChat: ChatCapability {
 
 @Test(.actionCatalog) func functionDispatchResolvesAgentTagThroughRegisteredPath() async throws {
     let manager = AgentManager()
-    try await manager.register(FixtureNativeAgent(chat: FixedTextChat()))
+    try await manager.register(
+        FixtureNativeAgent(
+            chat: FixedTextChat(),
+            context: try AgentContextRepository(
+                agent: FixtureNativeChatState.agentID, scope: UUID().uuidString, state: FixtureNativeChatState())
+        ))
     let requests = InputGateway(manager: manager, allowsExternalSend: true)
     let recorder = Recorder()
     let missing = OutputGateway(manager: manager, requests: requests, tools: ToolRegistry()) { _ in }
@@ -317,7 +356,12 @@ private struct StatusRoundTripChat: ChatCapability {
 
 @Test(.actionCatalog) func gatewayForwardsWaitBoundariesAndRejectsUnbalancedCompletion() async throws {
     let manager = AgentManager()
-    try await manager.register(FixtureNativeAgent(chat: FixedTextChat()))
+    try await manager.register(
+        FixtureNativeAgent(
+            chat: FixedTextChat(),
+            context: try AgentContextRepository(
+                agent: FixtureNativeChatState.agentID, scope: UUID().uuidString, state: FixtureNativeChatState())
+        ))
     let recorder = Recorder()
     let scheduler = ChannelScheduler(
         registry: try ActionRegistry(definitions: [

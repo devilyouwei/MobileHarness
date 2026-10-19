@@ -9,24 +9,21 @@
         public init(services: any ApplicationRootProviding) { assembly = services }
         private var container: (any ApplicationSessionProviding)? { assembly.session }
         @Environment(\.scenePhase) private var scenePhase
-        private var showingSettings: Bool { !assembly.navigation.path.isEmpty }
         @State private var startupError: String?
         @State private var startupStatus = "正在准备…"
         public var body: some View {
             Group {
-                NavigationStack(
+                PersistentHomeNavigation(
                     path: Binding(get: { assembly.navigation.path }, set: { assembly.navigation.path = $0 })
                 ) {
                     Group {
-                        if isVisualPreview {
-                            visualPreview
-                        } else if isDiagnostic {
+                        if isDiagnostic {
                             startupContent
                         } else {
                             CameraConversationSurface(
                                 camera: assembly.cameraState, controls: assembly.cameraControls,
+                                blocksNewActions: assembly.homePreparation.blocksNewActions,
                                 openSettings: {
-                                    container?.stopVoice()
                                     assembly.navigate(.settings)
                                 }
                             ) {
@@ -34,24 +31,30 @@
                             } content: {
                                 startupContent
                             }
+                            .overlay {
+                                if let session = container, session.conversation.showsModelRetry {
+                                    HomeModelPreparationRetry(retry: assembly.retryHomePreparation)
+                                }
+                            }
                         }
                     }
-                    .navigationTitle("首页")
-                    .toolbar(.hidden, for: .navigationBar)
-                    .navigationDestination(for: AppDestination.self) { destination in destinationView(destination) }
-
-                }
-                .onChange(of: showingSettings) { _, showing in
-                    if !isVisualPreview && !isDiagnostic { assembly.setHomeVisible(!showing) }
+                } destination: { destination in
+                    destinationView(destination)
                 }
                 .onChange(of: assembly.navigation.path) { _, path in
                     assembly.navigationChanged()
+                }
+                .onChange(of: container?.conversation.hasActiveInteraction) { _, _ in
+                    assembly.interactionActivityChanged()
+                }
+                .onChange(of: assembly.cameraState.isEnabled) { _, _ in
+                    assembly.modelRequirementsChanged()
                 }
                 .onChange(of: keepsHomeScreenAwake, initial: true) { _, keepsAwake in
                     UIApplication.shared.isIdleTimerDisabled = keepsAwake
                 }
                 .task {
-                    if !isVisualPreview { await prepare() }
+                    await prepare()
                 }
             }
         }
@@ -83,30 +86,7 @@
         }
 
         private var keepsHomeScreenAwake: Bool {
-            scenePhase == .active && !showingSettings && !isDiagnostic && !isVisualPreview
-        }
-
-        @ViewBuilder
-        private var visualPreview: some View {
-            #if DEBUG
-                if ProcessInfo.processInfo.arguments.contains("-actions-preview") {
-                    ActionActivityVisualPreview()
-                } else {
-                    ConversationVisualPreview()
-                }
-            #else
-                EmptyView()
-            #endif
-        }
-
-        private var isVisualPreview: Bool {
-            #if DEBUG
-                (ProcessInfo.processInfo.arguments.contains("-conversation-preview")
-                    || ProcessInfo.processInfo.arguments.contains("-companion-cycle-preview"))
-                    || ProcessInfo.processInfo.arguments.contains("-actions-preview")
-            #else
-                false
-            #endif
+            scenePhase == .active && !isDiagnostic
         }
 
         private var isDiagnostic: Bool {

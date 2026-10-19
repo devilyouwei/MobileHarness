@@ -1,6 +1,6 @@
 import AgentCore
 import Foundation
-import Storage
+import StorageCore
 
 func expectedActionCall(name: String, parameters: [String: String] = [:]) -> ActionCall {
     let module = name == "say" ? "Speech" : "UI"

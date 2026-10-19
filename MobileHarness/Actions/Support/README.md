@@ -1,5 +1,7 @@
 # Actions Support — 共用协议与函数作者工具
 
+✅ Expression.setReplyWaiting 复用 print／beginReplyTurn 的 direct 呈现注册，完成为状态接纳，无 Channel 动画排队；权限由可信内部 grant 限定。
+
 ## 简介
 
 为全部业务域提供公共输入/输出契约、编译期函数声明接口和生产目录组合。域专用值类型、能力端口及算法由各业务域的 Support 负责。
@@ -60,3 +62,16 @@ BehaviorAssembly.swift、BehaviorProtocolBindings.swift 和 NativeCleanupFailure
 ## 待实现
 
 - 暂无本目录独立的实现待办；跨模块及实际模型/设备验收见所属模块说明。
+
+✅ Implemented: BehaviorProtocolBindings explicitly supports Action+Tool for History list/read, Provider readSettings, resource snapshot and Device readStatus. Action callers use their Skill Channel; the Tool projection remains direct. Other functions are unchanged.
+
+## ApplicationControl 异常展示
+
+✅ 已实现：BehaviorProtocolBindings 将 UI.RuntimeDiagnostics 注册为直接、返回结果的内部 Tool；不添加模型 Action 授权，沿用实际调用身份与失败回执。
+
+✅ 已实现：独立UI.BluetoothStatus直接Tool组承载首页与设置两个蓝牙状态呈现函数；不暴露为模型Action别名。
+
+✅ 已实现：BluetoothStatusActions.swift单独拥有UI.BluetoothStatus.showBluetoothHome／showBluetoothSettings；连接状态不归RuntimeDiagnostics异常函数组。使用现有Actions/UI目录和编译目标。
+
+
+✅ UI.Expression.setLoading单独注册为direct／returning Tool，沿用Gateway身份授权与反馈，不进入有限表情Action调度队列；其他Expression函数语义保持。

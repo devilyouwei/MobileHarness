@@ -4,9 +4,10 @@ import AgentBindings
 import Foundation
 import Gateway
 import PlatformKit
-import Storage
+import StorageCore
 import Testing
-import UI
+
+@testable import UI
 
 @MainActor private final class PreferenceFacadeFixture {
     var value = ModelResourceSourceDraft()

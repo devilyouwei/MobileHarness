@@ -53,8 +53,12 @@ list 的 turnCount 是存储的输入块数量；read 的 total 是 indexedHisto
 
 标题计算由注入闭包执行，本域只声明 summarize 的 60 秒函数预算。失败或取消时先加入标题错误状态的持久化，再传播原始原因；如果记录错误本身失败，保留两个原因的报告。异常不触发这里的写入重放。
 
-[Actions 设计](../README.md) · [查询与事务实现](Support/README.md) · [共享会话仓库](../../Storage/Chat/README.md)
+[Actions 设计](../README.md) · [查询与事务实现](Support/README.md) · [共享会话仓库](../../Storage/Database/Chat/README.md)
 
 ## 待实现
 
 - 本接口没有全文搜索或完整会话导出；返回内容是显式截断的预览。
+
+## Storage 依赖
+
+✅ 存储访问使用独立的 State、Cache、Database 和 Files 接口；App 注册根实例，消费者通过构造器获得所需能力。存储容器不接管本目录的业务验证、执行和完成语义。

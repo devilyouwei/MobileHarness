@@ -9,8 +9,7 @@
 | 文件 | 职责 |
 | --- | --- |
 | ApplicationControlAgent.swift | 根生命周期、接纳、环境及事务结果 |
-| ApplicationControlWorkflow.swift | 查询、提交、配置和失败呈现的固定步骤 |
-| ApplicationControlProcessing.swift | State、预处理及固定调用绑定 |
+| ApplicationControlProcessing.swift | State、预处理、固定调用绑定及异常分类/提示策略 |
 
 状态保存待执行调用、类型化环境值与事务关联；Builder/执行器只使用已提交快照。具体资源、Provider 和设备函数契约见 [System Actions](../../Actions/System/README.md)，UI/原生实现由 App 注入。
 
@@ -32,3 +31,33 @@
 
 - 共享 push 型资源状态源及对应的观察适配能力。
 - 真实模型调用、原生配置/设备交互与后台资源传输的独立验收。
+
+## Storage 依赖
+
+✅ 存储访问使用独立的 State、Cache、Database 和 Files 接口；App 注册根实例，消费者通过构造器获得所需能力。存储容器不接管本目录的业务验证、执行和完成语义。
+
+## ApplicationControl 异常展示
+
+✅ 已实现：ApplicationControl 声明 container.failure 与 runtime.failure/runtime 订阅，以确定性代码校验、合并有界异常证据、选择分类和提示文案，通过内部 UI.RuntimeDiagnostics.recordFailure 调用提交展示；不调用模型、不写 Storage。异常展示回执独立于原失败完成语义，展示失败保留证据且不递归生成提示。
+
+异常 Signal 通过独立、无持久化的被动接纳路径处理，允许 running/paused，拒绝错误来源、会话、执行作用域及过期信封。最近 128 个事件键保存合并版本；内部呈现调用最多 128 个未完成，输出沿用 256 上限，超限明确拒绝。容器计数仅接纳增长，runtime 事件按 ID 去重。首次发生且距离现在 −5…15 秒的无 callID 异常可提示，历史、重复及调用关联异常只留记录。缺少专用提示时使用有界原始详情；UI 保留自身展示过期与去重防线。
+
+内部呈现失败保留最多 128 条有界回执详情，Gateway 原始失败记录仍可观察；不自动重放效果，不递归提示或终止无关设置事务。停止清空接纳状态，迟到 Signal 被拒绝。应用尚未建立角色运行图时由 App 保留启动错误展示；此路径不保证关闭期间的异常还能送到已停止角色。
+
+## UI 全量容器化
+
+✅ 应用级 UI 状态由八个子容器统一创建，消费者注入所需 Presenting 接口并提交 UI 自有值，不直接写字段。App 注册并管理同一 UI 根；原业务身份/版本校验、原生完成和基础库依赖边界保持。跨模块连接迁移仍是独立待办。
+✅ ModelResourceInteractionWorkflow唯一拥有下载源防抖任务和共享初始恢复任务；已恢复页面刷新库存与声音偏好，不覆盖端点草稿，明确失败后的restore允许重试。编辑意图更新草稿、合并最新端点，忙碌完成事件驱动续存而非轮询；停止关闭接纳、取消并加入自有任务，不重放失败保存。
+
+✅ 资源操作接纳时调用 beginRefresh 使旧库存刷新失效；该处不发起按代次读取，显式丢弃返回的 generation，实际刷新路径继续校验代次。
+
+✅ 已实现：确定性Bluetooth连接状态处理使用devices事实（availability／connection／recovery），同根revision去重；已知连接条件不调用异常呈现，而更新状态（有实际事实时不以迟到错误覆盖）。分别发出首页和设置两个内部呈现Tool；有界沿用128在途调用，身份校验、迟到和失败仍显式处理。
+
+✅ 已实现：BluetoothStatusActions.swift单独拥有UI.BluetoothStatus.showBluetoothHome／showBluetoothSettings；连接状态不归RuntimeDiagnostics异常函数组。使用现有Actions/UI目录和编译目标。
+
+
+✅ modelPreparation事实驱动代码私有UI.Expression.setLoading工具，传入enabled及事实sequence作为revision；每个新版本均提交，避免前后台idle被最新事实合并后漏掉重新开启。沿用128在途诊断调用和回执错误保留，不调用模型或等待动画循环。
+
+✅ 已实现：连接超时的原生事件和 connect 返回错误均通过稳定连接条件进入现有蓝牙状态呈现，不弹 Toast；连接事实仍优先，基础库继续完整上报。
+
+✅ 已实现：app.environment 按类别保留最新版本；来源、会话、信封和内容先校验。晚到旧版本及相同版本相同内容不重复呈现、不产生 outOfOrder；同版本不同内容明确拒绝。仅适用于环境快照，不改变 PCM、业务动作和结果的顺序契约。回归覆盖逆序、重复、冲突及 loading 不被旧事实重新打开。

@@ -174,7 +174,45 @@ private enum LifecycleTestFailure: Error { case start, cleanup }
     #expect(invalidations == 1)
     release.continuation.yield(())
     try await lifecycle.waitForForeground()
-    #expect(values == [true, true])
+    #expect(values == [true, false, true])
+    try await lifecycle.stop()
+}
+
+@Test(.timeLimit(.minutes(1))) @MainActor
+func rapidReactivationJoinsEverySuspensionBeforeResumingAnyService() async throws {
+    let entered = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingOldest(1))
+    let release = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingOldest(1))
+    var events: [String] = []
+    var cancellationFinished = false
+    let lifecycle = try ApplicationLifecycle(services: [
+        .init(
+            id: "agents", start: {},
+            foreground: { active in
+                events.append("agents \(active)")
+                if !active { cancellationFinished = true }
+                if active, events.count > 2 { #expect(cancellationFinished) }
+            }, stop: {}),
+        .init(
+            id: "native", dependencies: ["agents"], start: {},
+            foreground: { active in
+                events.append("native \(active)")
+                if !active {
+                    entered.continuation.yield(())
+                    for await _ in release.stream { break }
+                }
+            }, stop: {}),
+    ])
+    try await lifecycle.start()
+    try await lifecycle.waitForForeground()
+    events.removeAll()
+    lifecycle.setForeground(false)
+    for await _ in entered.stream { break }
+    lifecycle.setForeground(true)
+    #expect(events == ["native false"] && !cancellationFinished)
+    release.continuation.yield(())
+    try await lifecycle.waitForForeground()
+    #expect(events == ["native false", "agents false", "agents true", "native true"])
+    #expect(cancellationFinished)
     try await lifecycle.stop()
 }
 
@@ -294,4 +332,321 @@ private enum LifecycleTestFailure: Error { case start, cleanup }
     await #expect(throws: ApplicationLifecycleFailure.self) { try await lifecycle.start() }
     #expect(lifecycle.state == .failed && failures == 1 && lifecycle.failure?.service == "service")
     try await lifecycle.stop()
+}
+
+@MainActor private final class PreparationTestLatch {
+    private var waiter: CheckedContinuation<Void, Never>?
+    private var opened = false
+    func wait() async {
+        if opened { return }
+        await withCheckedContinuation { waiter = $0 }
+    }
+    func open() {
+        opened = true
+        waiter?.resume()
+        waiter = nil
+    }
+}
+
+@Test(.timeLimit(.minutes(1))) @MainActor
+func homePreparationSkipsReadyAndSeriallyPreparesColdSteps() async {
+    var events: [String] = []
+    var loaded = false
+    let ready = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingOldest(1))
+    let workflow = ForegroundPreparation(
+        steps: {
+            [
+                .init(
+                    id: "warm",
+                    isReady: {
+                        events.append("check.warm")
+                        return true
+                    }, prepare: { _ in Issue.record("Already ready") }),
+                .init(
+                    id: "cold", isReady: { loaded },
+                    prepare: { loading in
+                        loading(true)
+                        events.append("prepare.cold")
+                        loaded = true
+                    }),
+                .init(
+                    id: "last",
+                    isReady: {
+                        events.append("check.last")
+                        return true
+                    }, prepare: { _ in Issue.record("Already ready") }),
+            ]
+        }, canPrepare: { true }, project: { if $0 == .ready { ready.continuation.yield(()) } })
+    workflow.setActive(true)
+    workflow.setActive(true)
+    for await _ in ready.stream { break }
+    #expect(events == ["check.warm", "prepare.cold", "check.last", "check.warm", "check.last"])
+    workflow.setActive(false)
+    #expect(workflow.state == .inactive)
+    await workflow.stop()
+}
+
+@Test(.timeLimit(.minutes(1))) @MainActor
+func homePreparationDeactivationFencesLateSuccessAndJoinsBeforeReplacement() async {
+    let entered = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingOldest(1))
+    let release = PreparationTestLatch()
+    let ready = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingOldest(1))
+    var attempts = 0
+    var loaded = false
+    var readyCount = 0
+    let workflow = ForegroundPreparation(
+        steps: {
+            [
+                .init(
+                    id: "cold", isReady: { loaded },
+                    prepare: { loading in
+                        loading(true)
+                        attempts += 1
+                        entered.continuation.yield(())
+                        await release.wait()
+                        loaded = true
+                    })
+            ]
+        }, canPrepare: { true },
+        project: {
+            if $0 == .ready {
+                readyCount += 1
+                ready.continuation.yield(())
+            }
+        })
+    workflow.setActive(true)
+    for await _ in entered.stream { break }
+    workflow.setActive(false)
+    #expect(workflow.state == .inactive)
+    workflow.setActive(true)
+    #expect(attempts == 1 && readyCount == 0)
+    release.open()
+    for await _ in ready.stream { break }
+    #expect(attempts == 1 && readyCount == 1)
+    await workflow.stop()
+    await workflow.stop()
+    workflow.refresh()
+    workflow.setActive(true)
+    #expect(workflow.state == .inactive && attempts == 1)
+}
+
+@Test(.timeLimit(.minutes(1))) @MainActor
+func homePreparationDefersColdWorkDuringAnActiveSessionAndRetriesFailure() async {
+    let updates = AsyncStream<ForegroundPreparation.State>.makeStream(bufferingPolicy: .bufferingOldest(16))
+    var busy = true
+    var fail = true
+    var loaded = false
+    var attempts = 0
+    let workflow = ForegroundPreparation(
+        steps: {
+            [
+                .init(
+                    id: "cold", isReady: { loaded },
+                    prepare: { loading in
+                        loading(true)
+                        attempts += 1
+                        if fail { throw LifecycleTestFailure.start }
+                        loaded = true
+                    })
+            ]
+        }, canPrepare: { !busy }, project: { updates.continuation.yield($0) },
+        onValidationFailure: { _, _ in Issue.record("Provider errors must retain their owning failure channel") })
+    workflow.setActive(true)
+    for await state in updates.stream { if state == .deferred { break } }
+    #expect(attempts == 0)
+    busy = false
+    workflow.refresh()
+    for await state in updates.stream {
+        if case .failed(let component, _) = state {
+            #expect(component == "cold")
+            break
+        }
+    }
+    fail = false
+    workflow.refresh()
+    for await state in updates.stream { if state == .ready { break } }
+    #expect(attempts == 2)
+    await workflow.stop()
+}
+
+@Test(.timeLimit(.minutes(1))) @MainActor
+func homePreparationStopWaitsForNonCancellableNativePreparation() async {
+    let entered = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingOldest(1))
+    let release = PreparationTestLatch()
+    let stopping = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingOldest(1))
+    var stopped = false
+    var projectedReady = false
+    let workflow = ForegroundPreparation(
+        steps: {
+            [
+                .init(
+                    id: "native", isReady: { false },
+                    prepare: { loading in
+                        loading(true)
+                        entered.continuation.yield(())
+                        await release.wait()
+                    })
+            ]
+        }, canPrepare: { true }, project: { if $0 == .ready { projectedReady = true } })
+    workflow.setActive(true)
+    for await _ in entered.stream { break }
+    let task = Task {
+        stopping.continuation.yield(())
+        await workflow.stop()
+        stopped = true
+    }
+    for await _ in stopping.stream { break }
+    #expect(!stopped)
+    release.open()
+    await task.value
+    #expect(stopped && !projectedReady)
+}
+
+@Test(.timeLimit(.minutes(1))) @MainActor
+func homePreparationDoesNotClaimReadyWhenALaterLoadEvictsEarlierResources() async {
+    var firstLoaded = false
+    var secondLoaded = false
+    let failed = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingOldest(1))
+    var ready = false
+    var failures: [(String, ForegroundPreparation.ValidationError)] = []
+    let workflow = ForegroundPreparation(
+        steps: {
+            [
+                .init(
+                    id: "first", isReady: { firstLoaded },
+                    prepare: { loading in
+                        loading(true)
+                        firstLoaded = true
+                    }),
+                .init(
+                    id: "second", isReady: { secondLoaded },
+                    prepare: { loading in
+                        loading(true)
+                        secondLoaded = true
+                        firstLoaded = false
+                    }),
+            ]
+        }, canPrepare: { true },
+        project: {
+            if $0 == .ready { ready = true }
+            if case .failed(let component, _) = $0 {
+                #expect(component == "first")
+                failed.continuation.yield(())
+            }
+        }, onValidationFailure: { component, error in failures.append((component, error)) })
+    workflow.setActive(true)
+    for await _ in failed.stream { break }
+    #expect(!ready && !firstLoaded && secondLoaded)
+    #expect(failures.count == 1 && failures.first?.0 == "first" && failures.first?.1 == .notReady)
+    await workflow.stop()
+}
+
+@Test(.timeLimit(.minutes(1))) @MainActor
+func homePreparationConfigurationChangesCoalesceAndCannotPublishAnOldReadyResult() async {
+    let entered = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingOldest(1))
+    let release = PreparationTestLatch()
+    let finished = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingOldest(1))
+    var selection = 0
+    var loadedSelection = -1
+    var attempts = 0
+    var readyCount = 0
+    let workflow = ForegroundPreparation(
+        steps: {
+            [
+                .init(
+                    id: "selected", isReady: { loadedSelection == selection },
+                    prepare: { loading in
+                        loading(true)
+                        let selected = selection
+                        attempts += 1
+                        entered.continuation.yield(())
+                        await release.wait()
+                        loadedSelection = selected
+                    })
+            ]
+        }, canPrepare: { true },
+        project: {
+            if $0 == .ready {
+                readyCount += 1
+                finished.continuation.yield(())
+            }
+        })
+    workflow.setActive(true)
+    for await _ in entered.stream { break }
+    selection = 1
+    for _ in 0..<100 { workflow.refresh() }
+    #expect(attempts == 1 && readyCount == 0)
+    release.open()
+    for await _ in finished.stream { break }
+    #expect(attempts == 2 && readyCount == 1 && loadedSelection == 1)
+    await workflow.stop()
+}
+
+@Test(.timeLimit(.minutes(1))) @MainActor
+func homePreparationSeparatesLoadingFromChecksAndWarmReentry() async {
+    var loaded = false
+    var states: [ForegroundPreparation.State] = []
+    let ready = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingOldest(1))
+    let workflow = ForegroundPreparation(
+        steps: {
+            [
+                .init(
+                    id: "language",
+                    isReady: {
+                        #expect(states.last == .checking)
+                        return loaded
+                    },
+                    prepare: { loading in
+                        loading(true)
+                        #expect(states.last == .preparing("language"))
+                        loaded = true
+                    })
+            ]
+        }, canPrepare: { true },
+        project: {
+            states.append($0)
+            if $0 == .ready { ready.continuation.yield(()) }
+        })
+    workflow.setActive(true)
+    for await _ in ready.stream { break }
+    #expect(states.contains(.preparing("language")))
+    for _ in 0..<2 {
+        workflow.setActive(false)
+        states.removeAll()
+        workflow.setActive(true)
+        for await _ in ready.stream { break }
+        #expect(states == [.checking, .ready])
+    }
+    await workflow.stop()
+}
+
+@Test(.timeLimit(.minutes(1))) @MainActor
+func homePreparationDoesNotShowLoadingForObjectAssemblyAndFencesLateReports() async {
+    var loaded = false
+    var states: [ForegroundPreparation.State] = []
+    var lateReport: ForegroundPreparation.LoadingReport?
+    let ready = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingOldest(1))
+    let workflow = ForegroundPreparation(
+        steps: {
+            [
+                .init(
+                    id: "unmanaged", isReady: { loaded },
+                    prepare: { report in
+                        #expect(states.last == .checking)
+                        lateReport = report
+                        loaded = true
+                    })
+            ]
+        }, canPrepare: { true },
+        project: {
+            states.append($0)
+            if $0 == .ready { ready.continuation.yield(()) }
+        })
+    workflow.setActive(true)
+    for await _ in ready.stream { break }
+    #expect(!states.contains(.preparing("unmanaged")))
+    workflow.setActive(false)
+    lateReport?(true)
+    #expect(workflow.state == .inactive)
+    await workflow.stop()
 }

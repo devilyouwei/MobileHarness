@@ -1,25 +1,24 @@
-# Backend-independent Contracts
+# Shared Storage Values
 
-## Responsibility and implementation
+✅ StorageFailure.swift 移至 ../../StorageFailure.swift，StorageError.swift 的领域错误／报告器继续留在本目录，二者仍编译于 StorageCore。
 
-DocumentRepository supplies typed Codable snapshots, UUID revisions, optimistic save and replacement. BinaryObjectStore supplies bounded reads/info, non-overwriting put, remove and bounded best-effort listing. StorageDurability explicitly distinguishes memory and persistent success. RecordStorageError, BusinessRecordID and ContentFingerprint are shared values/validation, never allocation services.
+✅ StorageCore 编译本目录，无项目/第三方依赖。StorageOwner 表达命名空间和 source/session/input 身份；StorageDurability 区分内存成功与持久化成功。StorageError、RecordStorageError、DocumentStorageError 提供共享机制错误；BusinessRecordID 与 ContentFingerprint 只格式化/验证及计算指纹，不分配全局身份。
 
-## Direct relationships
+RecordStorageError.notReady 表示数据库端口尚未发布，closed 表示作用域关闭；conflict 表示仓库前置条件被并发变化破坏。错误不包含展示文案，原始失败由生产者保留。
 
-Compiled in Storage; Foundation/CryptoKit only. Domain/App consumers use protocols and immutable values. Concrete File/Memory/SQLite mechanisms implement their own applicable contracts.
+状态注册契约归 [State](../../State/README.md)，文档、字节、文件保护与发布契约归 [Files](../../Files/README.md)。各领域返回拥有的数据，禁止跨目标暴露 SQL 对象或共享可写值。
 
-## Lifecycle and failure contracts
+[Support](../README.md)
 
-Keys are confined relative names; listing cursors are opaque and at most128 items/steps. Cancel/close, conflict, capacity, ownership and publication errors are explicit; BinaryPublicationError retains original and cleanup failures. Native filesystem directory materialization is a separate capability, not simulated by every binary backend.
+## 待完成
 
-[Parent](../README.md)
+暂无本目录独立待办。
 
-Binary object contract: BinaryObjectStore describes byte objects only, with no file-protection or regular-file flags in its interface. File protection is configured when App constructs LocalFileStore; directory/non-blob keys are absent from object info. Preserve Media pending recovery through that neutral contract.
+## 统一容器异常通道
 
-StateRepository: synchronous typed read/replace for a single process-local owned snapshot; no codec/database APIs or hidden durability. Owner validates bounds and serializes transactions.
+✅ StorageError.swift 新增 StorageFailureReporter，以组件/操作/原错误回调向宿主报告；Storage 子能力共享注入实例，不依赖框架模块。调用者必须提供有界非阻塞接收，不在存储锁内等待。
 
-RecordStorageError.conflict explicitly reports a repository precondition invalidated by a concurrent/current-dialog change; it is distinct from invalid content, missing records and busy admission.
+✅ StorageError.swift 集中声明通用、文档和记录三类错误及注入报告器，值错误统一 Error/Equatable/Sendable；StorageDurability 单独表达持久化事实。各错误名称和 case 保持独立，不用一类泛化错误抹平语义。
 
-## 待实现
 
-- 暂无本目录独立实现待办；领域仓库接口由对应领域拥有。
+✅ 模块根目录 [StorageFailure.swift](../../StorageFailure.swift) 定义Error／Sendable／CustomStringConvertible封装及稳定Code、Source。字段为code/component/operation/message/underlying/cleanupErrors/source；默认记录包装调用处fileID/function/line，不采集线程堆栈。同模块再次包装保留首次来源和主错误，追加清理错误。无额外清理失败的CancellationError才属于正常取消；不认识Signal或业务恢复策略。

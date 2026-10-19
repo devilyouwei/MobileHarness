@@ -1,66 +1,70 @@
-# Reusable UI Components
+# Components — 原生呈现组件
 
-## Summary
+✅ 加载动画改为两个独立缩放图层按1.2秒周期左右一大一小交换，恒定明暗和位置；减少动态效果时保留静态大小眼。退出／失活清理动画及缩放，不新增线程或逐帧 Task。
 
-State-driven eye geometry, numeric spectrum bars and streaming captions.
+## 职责与上下游
 
-## Ownership and boundaries
+消费 Conversation／Camera 提供的 UI 值，输出原生图层和带身份的动画回执。不拥有设备、模型、业务队列或 IoC。UIKit 管理视图／图层挂载，Metal 所有者管理各自显示线程及真实 GPU 完成。
 
-SwiftUI presentation with native Core Animation/Metal rendering. Components consume UI values and emit renderer acknowledgment; they own no inference/device/scheduling services.
+## 文件归类
 
-## External relationships and data flow
+| 文件 | 职责 |
+| --- | --- |
+| NativeCompanionSurface.swift | 眼睛、视线、眨眼、呼吸及光环挂载，启动眼睛包装 |
+| EyeGeometry.swift | 可跨平台验证的连续眼睛曲线 |
+| ListeningMotion.swift | 归一化光源、单调时间运动状态及光环接纳／去重 |
+| MetalHaloRenderer.swift / ListeningHalo.metal | 光环管线、显示线程和像素光效 |
+| VoiceBars.swift | 顶部／底部频谱原生图层及固定拓扑几何 |
+| FadingCaption.swift | 单Text字幕、run出生时间与TextRenderer透明度绘制 |
+| RetainedFullScreenCover.swift | 保留下层挂载的原生全屏覆盖 |
 
-Runtime arrows show data or capability calls; dashed arrows show injection.
+✅ 启动眼睛包装与原生眼睛同属 NativeCompanionSurface，频谱及其可测试几何归 VoiceBars。组件保留真实动画／GPU 回执，运行路径不含临时性能对比程序。
 
-```mermaid
-flowchart LR
- Pages[Conversation and camera] -->|expression, gaze, phase, numeric bands| Eyes[CompanionEyes and VoiceBars]
- Pages -->|full caption text and color| Caption[FadingCaption]
- Eyes -->|request-scoped completion and availability| Host[Injected presentation callback]
-```
+## 眼睛与光源
 
-## Eyes and completion
+✅ 全部表情共用八段顺时针三次曲线及对应控制点，形状插值保留连续接点；不交换表情图片。眼宽、间距、眼高分别按脸宽的21%、19%、25%布局。视线使用归一化输入及有界位移。
 
-Both eyes preserve shape identity/path topology across clear, smile, happy, laugh, thinking, surprised, sad, love, angry, scared and playful states. Each eye is 21% of face width, gap 19%, height 25%. EyePose supplies smile/slant/heart/opening/width/rotation/color/offset values; native layers interpolate matched paths and transforms without swapping images or emoji.
+原生路径／shadowPath／变换从 presentation 当前值开始插值，持续基态和有限表演身份分开。常规变化650ms，唤醒180ms，闭合460ms，视线320ms；Reduce Motion 简化重复动画。眨眼和呼吸为独立图层动画，唤醒后延迟启动，休眠／失活／离窗时停止。完成回调不能将替换或不可用当作成功。
 
-Normal expression changes use a 0.65-second eased layer transition. Waking from closed uses a 180 ms cubic ease-out (0.16, 1, 0.3, 1); closure uses 460 ms ease-in-out. A native animation delegate acknowledges the request ID and whether its duration completed; replaced or unavailable requests do not fabricate success. One-shot emphasis adds 6% then returns, including when the emotion matches the persistent base. Gaze uses horizontal 14%/vertical 9% face-width offsets and a 0.32-second eased transition. Blink/breath are independent layer animations, delayed 1.2 seconds after waking and removed when inactive, reduced motion or resting closed. Disappearance/inactivity reports unavailable so the host can cancel a wait. Reduce Motion uses a 0.2-second acknowledgment transaction and suppresses repetitive motion.
+ListeningLightOrigin 接受有限归一化坐标并逐轴回退／截断；ListeningMotion 仅在新 generation 锁定光源和起点。眼睛、光环使用同一时刻提交，稳定期改变光源不会移动正在运行的波。装饰光有独立身份；移除装饰覆盖不会重播聆听唤醒。
 
-## Spectrum and captions
+## Metal 光环
 
-`VoiceBars` draws 32 supplied bands, without FFT or audio generation. Production metering and synthetic preview values remain distinct. Geometry uses public safe-area values, without modifying system island UI. Decorative drawing ignores touch and VoiceOver.
+✅ 管线离 MainActor 准备；一个全屏三角形绘制扩散前沿、尾部及边缘光，不叠加全屏 SwiftUI 模糊。入场初始透明度至少0.85，进入／退出透明度各320ms，扩散约720ms并在约1.05秒稳定。Reduce Motion 保留静态场和简化过渡。
 
-✅ FadingCaption 将完整当前值同步交给原生 caption surface，不保存异步 SwiftUI 文本副本。CaptionPresentation 保留最多 320 个完整 Characters，输出稳定前缀的 UTF-16 边界；定稿/Reduce Motion 直接显示全值。两个 UILabel 使用相同完整字符串、字体、段落和排版，仅颜色范围不同；新增范围通过 CABasicAnimation.opacity 在 250 ms 内淡入。模型层透明度始终为 1，取消、替换、离窗或移动不会使文字停在低透明度。UIScrollView 仅在内容/布局变化时定位尾部，不随每段文字启动另一条滚动动画；没有逐字 timer、逐帧 SwiftUI body 或后台任务。18 pt 边缘留白/渐变和完整文本辅助功能保留。真实设备帧率需要测量，不由 API 选择推断。采用 Apple [Core Animation 图层动画](https://developer.apple.com/library/archive/documentation/Cocoa/Conceptual/CoreAnimation_guide/CreatingBasicAnimations/CreatingBasicAnimations.html)；模型层保存可读终值，呈现层仅负责过渡。
+渲染器拥有独立线程和 CAMetalDisplayLink；一个最新快照、最多一个合并唤醒、最多三个 GPU 在途命令。满载跳过显示机会，不累计帧。过渡请求屏幕支持的刷新率，稳定流动请求60Hz，无需更新时暂停；请求不保证实际帧率。停止关闭接纳，在线程上注销显示链并等待真实 GPU 完成，不阻塞主线程。
 
-Parameterized expressions, request-scoped animation completion, numeric bars and bounded caption rendering.
+✅ 光环线程句柄与退出标记统一由锁保护；Thread 句柄本身不具备 Sendable，控制结构仅以锁保护的引用发布／唤醒方式跨域，采用与相机相同的受限 unchecked Sendable 契约；退出使用可明确停止的 RunLoop；等待真实 GPU 完成后归还全部槽位，并提供非主线程完成屏障。频谱固定颜色／线宽／布局仅在对应配置变化时提交，数值变化只更新路径。
 
-## Related design
+管线／GPU 失败通过注入回调报告；眼睛仍保持自己的动画完成语义。布局仅在 frame、scale 或 drawableSize 变化时更新，禁用隐式事务。
 
-[Parent design](../README.md)
+## 原生频谱
 
-## Native companion rendering
+✅ 已实现：岛布局由Conversation仅在圆弧切点之间挂载本组件，外层硬遮罩裁掉端点辉光，水平缩放适配紧凑／展开直线段，顶部锚点的有限纵向动画形成向下冒出；组件仍生成32根竖直柱，不感知蓝牙或任务策略。
 
-`EyeGeometry.swift` supplies eight clockwise cubic segments with shared anchors and equal incoming/outgoing tangent handles. Smile/slant and closed-eye deformations apply the same derivative to their handles; slant lowers the selected brow within the eye bounds. Love uses corresponding top/lobe/side/bottom anchors and a softly rounded notch/tip. Linear path interpolation preserves continuous derivatives at every join, avoiding the former side reversal and protruding curves. The geometry remains portable and topology is identical across all expressions. `NativeCompanionSurface.swift` owns a stable UIView, CAShapeLayer eyes and a CAMetalLayer rim. Explicit path/shadowPath/transform interpolation starts from presentation values on interruption. Shadows have explicit bounded eye paths; no full-screen blur or per-frame SwiftUI eye body is used. `CompanionEyes` is only the startup/standalone wrapper for this same implementation.
+✅ 已实现：VoiceBars.swift的回复频谱改为32根同一水平基线向下的直柱，覆盖传入宽度的两端，无弧角、曲线rim或侧向法线。几何及图层不包含弧形边沿；底部麦克风频谱保持原方向。NativeSpectrumView提供停止图层动画接口供岛组件统一清理，失活不继续路径动画；仍只消费实测频带。岛身／对称扩展及同步揭示由[Conversation](../Conversation/README.md)拥有。
 
-`ListeningMotion.swift` uses a monotonic epoch and actual listening generation. One native update supplies the same timestamp to both eye animations and halo state; every new generation replays the front even if SwiftUI coalesces off/on. The cached bundled Metal pipeline is prepared off MainActor before a coordinated wake commits. Pipeline/GPU failures reach an injected display callback; eyes still retain genuine animation acknowledgment when the halo is unavailable.
+✅ 上下频谱只消费32个实测频带，不计算 FFT、不生成模拟音频。常驻 UIView、CAGradientLayer、CAShapeLayer 持有固定拓扑；数值更新提交路径，由 CABasicAnimation 插值，无逐帧 SwiftUI Canvas 或 timer。
 
-`ListeningHalo.metal` draws one premultiplied fullscreen triangle pass. A soft point-source flash, circular radial front and filled luminous tail expand from the generation-latched contact point and converge into the rim over 720 ms, settles by 1.05 seconds, and combines cyan/blue/violet/pink/amber fields with local highlights. A 320 ms entry starts at at least 0.85 visibility and rises to 1; the 320 ms smoothstep exit preserves current opacity during reversal; there is no duplicate SwiftUI fade. Reduce Motion uses a static field and 200 ms fade.
+保留上下位置、渐变和有界阴影；非有限值清理、频带截断、失活和 Reduce Motion 使用固定展示值。相同输入不重画，尺寸未变不重复布局。原生图层方式不代表所有工作均在 GPU，实际合成／功耗另行测量。
 
-`MetalHaloRenderer.swift` owns a user-interactive run-loop thread and CAMetalDisplayLink, sampling targetPresentationTimestamp. UIKit passes only a latest immutable state snapshot through Mutex. Wake notifications coalesce to one pending slot; at most three GPU commands are in flight. A full frame budget drops only that display frame instead of queueing. Transitions request the attached screen's supported refresh rate; settled flow requests 60 Hz. Idle/reduced settled/inactive rendering pauses after the needed frame. Disposal is idempotent, invalidates on the render thread and joins GPU completions off MainActor before stopping its loop. Frame callbacks use an autorelease pool, and the terminated owner releases its Thread reference. Views own no microphone, camera or model lifetime.
+## 字幕
 
-finite eye-layer transitions explicitly request the attached screen's supported CAAnimation preferredFrameRateRange, matching the Metal transition request. Actual ProMotion refresh remains system-controlled.
+✅ 保留最新320个完整Characters，CaptionPresentation维护可测试的稳定／修订边界，CaptionRenderState只保存有界字素与单调出生时间。流式追加延续旧文字淡入，滚动窗口保留仍在显示的文字进度；修订只重置变化后缀，组合字符不会拆开。
 
-ListeningLightOrigin validates finite normalized coordinates; ListeningMotion latches the origin on a new generation. NativeCompanionSurface maps the local content point, including safe-area offsets, into a SIMD2 uniform in the full-window Metal layer; per-pixel radial distance drives edge arrival.
+一个SwiftUI Text布局，按相邻出生时间合并run并附加TextAttribute；TextRenderer绘制时只改变对应run透明度，新增部分从0.15到1，250ms后完全可见。定稿／Reduce Motion立即不透明；清空、根代际变化、离窗或失活撤销旧动画。无双标签、NSAttributedString覆盖或UIKit字幕备用路径。
 
-The host-facing origin value is `ListeningLightOrigin(x:y:)`, with coordinates in 0…1 relative to home content bounds (top-left origin). Nonfinite values use the eye-center default per axis; out-of-range finite values clamp. `ConversationState.listeningLightOrigin = nil` uses the current eye center. UIKit converts content coordinates into the full-window layer before the activation latches them; only a fresh generation starts a new wave. Steady-state updates do not relocate a running/fading wave.
+Text在TimelineView闭包外由最新输入构造；仅挂载且前台的淡入期间请求不快于60Hz的动画节奏，结束后暂停，不创建线程、逐字Task或定时器。ScrollView在文字提交及实际布局尺寸变化后定位尾部，保留18pt边缘渐变与完整辅助功能值。字号随Dynamic Type更新，文字布局和动画的实际开销仍需采样，不保证比旧实现更快。
 
-normal entry visibility starts at at least 0.85. A native discrete z-position animation places the existing Metal flash above eyes only during the 0.9 s activation pulse, then restores the original settled/exit stacking. Reduce Motion retains its static field. Exit opacity duration/easing remain unchanged.
+## 全屏覆盖
 
-UI.Notice.showNotice/dismissNotice and UI.Light.updateLight are canonical presentation Actions for trusted business calls, currently registered by no Skill. Neutral Actions values cross RuntimePresentation into root-owned HomeEffectsWorkflow, which retains one replaceable notice expiry and one light expiry, UUID-fenced cleanup, and explicit stop. Notices remain separate from factual ExecutionIssue history; actual upper-layer errors have display priority and Action failures remain panel-only. Decorative light accepts normalized origin, initial opacity/intensity and duration; it never changes consent, microphone or eyes. Native renderer separates light generations from listening eye generations and preserves existing exit fade. RuntimePresentation converts neutral Action requests into UI-owned values; HomeEffectsWorkflow now belongs to UI with no project dependencies. UI remains a presentation-only consumer of injected values.
+RetainedFullScreenCover 通过 UIKit overFullScreen 保留首页及相机挂载；一个转换标记合并最新呈现期望，不排待呈现队列。关闭后以实际 dismissal 发送一次回调，源销毁不重新呈现。覆盖只负责页面生命周期，不拥有设备或业务清理。
 
-UIModule.effectDefinitions exposes the same canonical factories for isolated hosts, with nil capability explicitly unavailable. Isolated effect tests provide explicit capabilities. Clearing a decorative override restores an already-active listening rim without replaying its wake burst; its new generation still replays normally.
+❌ 频谱缓存的实际收益、全屏光效功耗、原生交互和持续帧率仍须分别测量／验收，不以技术选型代替结论。
 
-## 待实现
+[UI 根](../README.md) · [验证记录](../../../docs/validation/PlatformKit-Containers.md)
 
-- Multistage performance queues and gesture-driven gaze.
+✅ 光环故障对当前实例锁存并停止接纳，仅报告首次故障；相同运动／尺寸／可见性不唤醒线程，刷新率仅变化时提交。失败只停止光环，眼睛仍独立回执；新渲染实例重新接纳。保持GPU完成回收与现有帧率。
 
-- Requested refresh is not guaranteed FPS. Synthetic device traces and live camera/ASR/model acceptance are distinct; see [validation history](../../../docs/validation/Validation-History.md).
+
+✅ loading双眼采用同拓扑睁眼轮廓，独立父图层由 Core Animation 按1.2秒周期缩放，左右在1.12与0.68之间反向交替；位置与明暗保持。缩放与眼形／镜像／视线变换分离，不增加线程、Canvas或逐帧Task；减少动态效果时保留静态大小眼，终态／离窗／后台／销毁移除循环并恢复缩放，不依赖Metal光环或聆听启用。

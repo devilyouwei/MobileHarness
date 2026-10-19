@@ -31,7 +31,9 @@ flowchart LR
 
 Maximum JSON size is 64 KiB; total capabilities including internal grants are bounded to 128, Channels to 16 and parameter sets to 32. Group keys provide default Channels; empty groups declare Channels. Old channels/textActions/hidden/defaultChannel fields reject. Aliases are globally unique and sorted group traversal makes prompt construction deterministic.
 
-Actions use domain/module/function paths and model aliases. Native Tools bind a distinct provider function definition to the same path representation. Required/optional argument names must be disjoint; unknown/missing/oversized values reject. Native string-property enums are checked during resolution and Gateway authorization. Full JSON Schema is not implemented.
+Actions use domain/module/function paths and model aliases. Native Tools bind a distinct provider function definition to the same path representation. Required/optional argument names must be disjoint.
+
+✅ CapabilityRegistry.resolveAction validates raw parameter count/name/value bounds and required keys, then discards keys outside the visible Action's required/optional names before creating ActionCall. Unknown XML attributes cannot reach handlers or acquire internal-only parameters. Missing required parameters and oversized input still reject. Native Tools and Gateway authorization of already constructed calls retain strict key validation. Native string-property enums remain checked during resolution and Gateway authorization. Full JSON Schema is not implemented.
 
 InternalAction/InternalTool carry code-owned paths/parameter names; permits includes them, resolveAction/resolveTool does not. XML examples validate against the model-only catalog.
 
@@ -64,3 +66,5 @@ AgentConfiguration.restrictingCommunication(to:contracts:) derives a new immutab
 ## 待实现
 
 - Full JSON Schema and configuration hot reload are not implemented.
+
+✅ Implemented: CapabilityContextBuilder selects Action-only teaching/boundary when the visible Tool catalog is empty; mixed catalogs retain generic dual-protocol teaching. No native runtime grants are removed or exposed as aliases.

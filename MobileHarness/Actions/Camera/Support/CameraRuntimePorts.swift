@@ -23,9 +23,26 @@
         public init(resources: any CameraResourceAccess) { self.resources = resources }
     }
 
-    @MainActor public protocol CameraVisionRunning: AnyObject, Sendable {
-        func run(
-            frames: AsyncThrowingStream<CameraFrame, Error>, sessionID: String,
-            mirroredGaze: Bool, endpoint: any CameraOutputHandling) async throws
+    /// Agent-owned integration callbacks, supplied to the App-owned Coordinator factory.
+    @MainActor public struct CameraIntegrationBindings {
+        public let makeRuntime: @MainActor () throws -> CameraRuntimeDependencies
+        public let nativeEvent: @Sendable (CameraEvent) async throws -> Void
+        public let connectFrames:
+            @MainActor (
+                AsyncThrowingStream<CameraFrame, Error>, String, Bool, any CameraOutputHandling
+            ) async throws -> Void
+        public init(
+            nativeEvent: @escaping @Sendable (CameraEvent) async throws -> Void,
+            makeRuntime: @escaping @MainActor () throws -> CameraRuntimeDependencies,
+            connectFrames:
+                @escaping @MainActor (
+                    AsyncThrowingStream<CameraFrame, Error>, String, Bool, any CameraOutputHandling
+                ) async throws -> Void
+        ) {
+            self.makeRuntime = makeRuntime
+            self.nativeEvent = nativeEvent
+            self.connectFrames = connectFrames
+        }
     }
+
 #endif

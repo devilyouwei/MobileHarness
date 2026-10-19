@@ -9,7 +9,7 @@ Purpose: build/sign the iOS application host and maintain physical-device, simul
 - ✅ MobileHarness and MobileHarnessSimulator compile App/MobileHarnessApp.swift, Composition, Lifecycle and Adapters.
 - ✅ The root HarnessKit product supplies shared runtime modules, the independent UI target and AppWorkflows. Xcode navigates these sources without adding them to either App Sources phase. Model SDK adapters remain separate package targets.
 - ✅ UI owns iOS pages/components and portable presentation state/operation interfaces. AppWorkflows owns history, configuration and explicit speech/chat diagnostics. Native preview/image/value adapters compile with App.
-- ✅ App source membership includes CurrentChatCapability; ChatDiagnosticWorkflow is package-owned navigation only. VoiceSessionCoordinator, VisionSession, ApplicationRuntime and UI component file references match their current responsibilities.
+- ✅ CurrentChatCapability is compiled only by ModelKitRuntime; its navigator reference does not add it to App Sources. ChatDiagnosticWorkflow is package-owned navigation only. VoiceSessionCoordinator, VisionSession, ApplicationRuntime and UI component file references match their current responsibilities.
 - ✅ Shared configuration, entitlements and privacy declarations retain their existing values. Local signing remains in ignored Config/Local.xcconfig.
 - ✅ Platform input/output file lists stage only the shared source catalog/license notices on both device and simulator. Physical inference uses sandbox-installed Nemotron, Gemma4, Silero, YOLO and MOSS; Kokoro is unregistered. Simulator local models report unavailable; explicitly configured cloud chat remains supported.
 
@@ -37,7 +37,7 @@ NexArmAimCommand 的导航引用指向 Actions/Support；文件由现有 Actions
 
 ## Storage domain organization
 
-✅ Storage/Chat now owns the ConversationHistory.swift reference and README. SwiftPM compiles StorageChat separately; no duplicate App Sources membership is introduced.
+✅ Storage/Database/Chat now owns the ConversationHistory.swift reference and README. SwiftPM compiles StorageChat separately; no duplicate App Sources membership is introduced.
 
 ✅ Photographer, Robot.aim and the NexArm frame sources are navigator references. SwiftPM compiles them; they are not added to App Sources.
 
@@ -136,3 +136,33 @@ Implemented: business IDs are allocated by Storage; Foundation libraries use nat
 ✅ StorageSQLite compiles GRDB.swift 7.11.1 privately through a separate adapter target; common Storage/domain consumers have no GRDB dependency. The lockfile pins it and App owns records.sqlite initialization. New internal Storage directories/targets implement approved ownership boundaries; signing is unchanged. Required simulator/device build outcomes are recorded separately in docs/validation/Validation-History.md.
 
 ✅ Storage repository refactor: HarnessKit/App composition links the explicit StorageSQLite adapter product and existing domain targets; no new first-level application module or signing change.
+
+Storage 四类容器通过本地 HarnessKit 产品暴露，AppStorage 单独编译注册源码；App Sources 不重复包含 ApplicationContainer。FactoryKit 3.4.1 由 SwiftPM 固定解析，存储目录引用与新路径一致。
+
+## 公开 State 边界
+
+✅ StorageState 仅承载公开事实；边界检查禁止完整 AgentContext 注册，校验 Skill schema v2/useState。沿用现有源码归属及目标，ActionBindings 显式依赖 StorageState。
+
+[公开 State 契约](../MobileHarness/Storage/State/README.md)
+
+✅ Platform 容器、设备输入和同帧渲染文件更新导航引用；移除已删除的媒体适配、VisionSession 与原生预览引用，SwiftPM 仍唯一编译这些源码。
+
+## UI 容器与相机能力注入
+
+✅ 导航加入 UIContainer、UICameraContainer 和 CameraCapturing，均只由现有 SwiftPM 目标编译；不新增目录、目标或本地签名配置。
+
+## Container diagnostics source ownership
+
+Implemented: ContainerFailureChannel.swift is a Gateway SwiftPM source and navigator reference only, never duplicated into the App executable.
+
+## ApplicationControl 异常展示
+
+✅ 已实现：内部 RuntimeDiagnostics 函数由本地包 Actions 编译；不新增 Xcode 目标或目录，Foundation/UI 依赖边界不变。
+
+## UI 全量容器化
+
+✅ 应用级 UI 状态由八个子容器统一创建，消费者注入所需 Presenting 接口并提交 UI 自有值，不直接写字段。App 注册并管理同一 UI 根；原业务身份/版本校验、原生完成和基础库依赖边界保持。跨模块连接迁移仍是独立待办。
+
+✅ UI 工程导航指向实际存在的归类文件，SwiftPM 保持唯一编译归属；没有重复 App Sources 成员，签名、target 与依赖边界保持。
+
+✅ 共享存储错误由一个源文件编译，CurrentChatCapability 由 ModelKitRuntime 唯一编译；工程导航不添加重复 App Sources，target 与签名配置保持。

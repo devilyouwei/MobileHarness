@@ -1,8 +1,8 @@
 import ActionBindings
 import Foundation
 import PlatformKit
-import Storage
 import StorageChat
+import StorageCore
 import UI
 
 public enum HistoryImageLoadingError: Error { case invalidReference, busy, oversizedImage }
@@ -10,7 +10,7 @@ public enum HistoryImageLoadingError: Error { case invalidReference, busy, overs
 /// One root-owned history operation slot. Cancel keeps admission closed until cleanup finishes.
 @MainActor
 public final class ConversationHistoryWorkflow: ConversationHistoryControlling {
-    public let state: ConversationHistoryState
+    public let state: any HistoryPresenting
     private let deleteArchive: @MainActor (String) async throws -> Void
     private let refresh: @MainActor () async throws -> Void
     private let prepare: @MainActor () async throws -> Void
@@ -28,7 +28,7 @@ public final class ConversationHistoryWorkflow: ConversationHistoryControlling {
     private var task: Task<Void, Never>?
     private var archivePageTask: Task<Void, Never>?
     public init(
-        state: ConversationHistoryState, prepare: @escaping @MainActor () async throws -> Void,
+        state: any HistoryPresenting, prepare: @escaping @MainActor () async throws -> Void,
         refresh: @escaping @MainActor () async throws -> Void,
         deleteArchive: @escaping @MainActor (String) async throws -> Void,
         startNew: @escaping @MainActor () async throws -> Void,
@@ -61,24 +61,24 @@ public final class ConversationHistoryWorkflow: ConversationHistoryControlling {
     }
     public func load() async {
         guard !state.isRefreshing, !state.isBusy || archivePageTask != nil else { return }
-        state.isRefreshing = true
-        defer { state.isRefreshing = false }
+        state.present(.isRefreshing(true))
+        defer { state.present(.isRefreshing(false)) }
         if let archivePageTask {
             archivePageTask.cancel()
             await archivePageTask.value
         }
         guard !Task.isCancelled else { return }
-        state.isBusy = true
-        defer { state.isBusy = false }
+        state.present(.isBusy(true))
+        defer { state.present(.isBusy(false)) }
         do {
             try await prepare()
             try Task.checkCancellation()
-            state.status = nil
+            state.present(.status(nil))
             try await refresh()
-            state.hasMoreArchives = state.archive?.past.count == HistoryPaging.pageSize
-            state.archivePaging = .init()
+            state.present(.hasMoreArchives(state.archive?.past.count == HistoryPaging.pageSize))
+            state.present(.archivePaging(.init()))
             loaded = true
-        } catch { state.status = "历史读取失败：\(error)" }
+        } catch { state.present(.status("历史读取失败：\(error)")) }
     }
     public func loadConversation(_ id: String) async throws -> HistoryConversation {
         guard let recordID = BusinessRecordID(rawValue: id), recordID.kind == .dialog else {
@@ -86,7 +86,7 @@ public final class ConversationHistoryWorkflow: ConversationHistoryControlling {
         }
         let selected = try await readConversation(recordID.rawValue)
         guard selected.id == id else { throw HistoryDetailError.unavailable }
-        state.selectedConversation = selected
+        state.present(.selectedConversation(selected))
         detailTurns.removeAll()
         return selected
     }
@@ -107,12 +107,12 @@ public final class ConversationHistoryWorkflow: ConversationHistoryControlling {
         guard !Task.isCancelled, !state.isRefreshing, !state.isBusy, state.hasMoreArchives,
             let id = state.archive?.past.last?.id,
             let cursor = BusinessRecordID(rawValue: id)?.number,
-            let ticket = state.archivePaging.begin(after: id, retry: retry)
+            let ticket = state.beginArchivePage(after: id, retry: retry)
         else { return }
-        state.isBusy = true
+        state.present(.isBusy(true))
         let worker = Task {
             defer {
-                state.isBusy = false
+                state.present(.isBusy(false))
                 archivePageTask = nil
             }
             await loadArchivePage(after: cursor, id: id, ticket: ticket)
@@ -131,7 +131,7 @@ public final class ConversationHistoryWorkflow: ConversationHistoryControlling {
             try Task.checkCancellation()
             guard state.archivePaging.accepts(ticket) else { return }
             guard state.archive?.past.last?.id == id else {
-                state.archivePaging.cancel(ticket)
+                state.cancelArchivePage(ticket)
                 return
             }
             guard page.count <= HistoryPaging.pageSize,
@@ -140,16 +140,16 @@ public final class ConversationHistoryWorkflow: ConversationHistoryControlling {
                     return key.number < cursor
                 })
             else { throw HistoryDetailError.unavailable }
-            state.archive?.past.append(contentsOf: page)
-            state.hasMoreArchives = page.count == HistoryPaging.pageSize
-            state.archivePaging.finish(ticket)
+            state.appendArchives(page)
+            state.present(.hasMoreArchives(page.count == HistoryPaging.pageSize))
+            state.finishArchivePage(ticket)
         } catch is CancellationError {
-            state.archivePaging.cancel(ticket)
+            state.cancelArchivePage(ticket)
         } catch {
             if Task.isCancelled {
-                state.archivePaging.cancel(ticket)
+                state.cancelArchivePage(ticket)
             } else {
-                state.archivePaging.finish(ticket, error: "读取失败：\(error)")
+                state.finishArchivePage(ticket, error: "读取失败：\(error)")
             }
         }
     }
@@ -174,15 +174,15 @@ public final class ConversationHistoryWorkflow: ConversationHistoryControlling {
     }
     private func perform(_ operation: @escaping @MainActor () async throws -> Void) {
         guard !state.isRefreshing, !state.isBusy, loaded else { return }
-        state.isBusy = true
+        state.present(.isBusy(true))
         task = Task {
             defer {
-                state.isBusy = false
+                state.present(.isBusy(false))
                 task = nil
             }
             do { try await operation() } catch ConversationHistoryError.busy {
-                state.status = "正在回复或处理输入，请结束后再开始新对话。"
-            } catch { state.status = "历史操作失败：\(error)" }
+                state.present(.status("正在回复或处理输入，请结束后再开始新对话。"))
+            } catch { state.present(.status("历史操作失败：\(error)")) }
         }
     }
     public func cancel() { task?.cancel() }

@@ -1,6 +1,7 @@
 import Foundation
 import Testing
-import UI
+
+@testable import UI
 
 @Test func historyReturningFromChildKeepsInitialLoadClosedUntilPageIsRecreated() {
     var lifecycle = HistoryInitialLoad()
@@ -254,6 +255,9 @@ private func conversation(archived: Bool = false, title: String? = nil, user: St
     #expect(rows.count == 2 && rows.map(\.id) == [firstID, secondID])
     #expect(rows[0].user == "question" && rows[0].isReACT == false)
     #expect(rows[0].raw.isEmpty && rows[0].outputSummary == "Tool Call：inspect")
+    #expect(
+        rows[0].toolCalls?.first?.responseReport
+            == "Tool Call · inspect · completed\n\nArguments:\n{}\n\nResult:\nactual-result")
     #expect(rows[0].firstTokenReport == "首 token 耗时：")
     #expect(rows[1].user == "[tool]\nactual-result" && rows[1].isReACT == true)
     #expect(rows[1].raw == "observed" && rows[1].toolCalls?.isEmpty == true)
@@ -268,6 +272,43 @@ private func conversation(archived: Bool = false, title: String? = nil, user: St
     let firstExport = try JSONDecoder().decode(
         HistoryTurn.self, from: ConversationHistoryPresentation.jsonData(rows[0]))
     #expect(firstExport.toolCalls?.first?.output == "actual-result")
+}
+
+@Test func historyToolResponsesKeepMixedTextMultipleCallsAndFailures() throws {
+    let calls: [[String: Any]] = [
+        [
+            "id": "first", "providerID": "provider-1", "name": "History.list", "argumentsJSON": "{}",
+            "state": "completed", "output": "",
+        ],
+        [
+            "id": "second", "providerID": "provider-2", "name": "History.read",
+            "argumentsJSON": #"{"id":"dialog_1"}"#, "state": "failed", "error": "missingConversation",
+        ],
+        [
+            "id": "third", "providerID": "provider-3", "name": "History.list", "argumentsJSON": "{}",
+            "state": "received",
+        ],
+    ]
+    let page = try historyFixture(extra: [
+        "modelRequests": [
+            [
+                "historyOrder": 1, "id": "mixed", "date": 0, "input": "read", "requestJSON": "[]",
+                "response": "checking",
+                "toolCalls": calls, "state": "completed",
+                "modelRequestStartedAt": 10, "firstTokenAt": 10.125, "firstTokenLatency": 0.125,
+            ]
+        ]
+    ])
+    let turn = try #require(ConversationHistoryPresentation.turns(page).first)
+    let reports = try #require(turn.toolCalls).map(\.responseReport)
+    #expect(turn.raw == "checking" && reports.count == 3)
+    #expect(reports[0].hasSuffix("Result:\n"))
+    #expect(reports[1].contains(#"{"id":"dialog_1"}"#))
+    #expect(reports[1].hasSuffix("Error:\nmissingConversation") && !reports[1].contains("Result:"))
+    #expect(!reports[2].contains("Result:") && !reports[2].contains("Error:"))
+    #expect(turn.firstTokenReport == "首 token 耗时：0.125 秒")
+    let exported = try JSONDecoder().decode(HistoryTurn.self, from: ConversationHistoryPresentation.jsonData(turn))
+    #expect(exported.response == "checking" && exported.toolCalls?.count == 3)
 }
 
 @Test func historyKeepsSentDefinitionsEvenWithoutCallsAndMalformedRequestIsVisible() throws {
@@ -475,4 +516,92 @@ private func taskReferenceFixture(owner: String?, snapshot: String?) throws -> H
 ])
 func historyFunctionCatalogRejectsCorruptSnapshotsRatherThanInventingEmptyGroups(_ json: String) {
     #expect(throws: DecodingError.self) { try ConversationHistoryPresentation.functionCatalog(json) }
+}
+
+@Test func historyCacheUsageDistinguishesZeroFromMissingAndPreservesExport() throws {
+    let legacy = try JSONDecoder().decode(
+        HistoryTokenUsage.self, from: Data(#"{"input":12,"generated":2,"total":14}"#.utf8))
+    #expect(legacy.cachedInput == nil && legacy.cacheWriteInput == nil)
+    let snapshot = try historyFixture(extra: [
+        "tokenUsage": ["input": 12, "generated": 2, "total": 14, "cachedInput": 0, "cacheWriteInput": 4]
+    ])
+    let turn = try #require(snapshot.turns.first)
+    #expect(turn.tokenReport.contains("缓存读取：0 tokens"))
+    #expect(turn.tokenReport.contains("缓存写入：4 tokens"))
+    let exported = try JSONDecoder().decode(HistoryTurn.self, from: ConversationHistoryPresentation.jsonData(turn))
+    #expect(exported.tokenUsage?.cachedInput == 0 && exported.tokenUsage?.cacheWriteInput == 4)
+    let older = try historyFixture(extra: ["tokenUsage": ["input": 12, "generated": 2, "total": 14]])
+    #expect(older.turns.first?.tokenReport.contains("缓存") == false)
+}
+
+@MainActor private func awaitHistoryRead(_ ready: () -> Bool) async throws {
+    let deadline = ContinuousClock.now + .seconds(2)
+    while !ready(), ContinuousClock.now < deadline { try await Task.sleep(for: .milliseconds(2)) }
+    try #require(ready())
+}
+
+@Test @MainActor func historyMessageReadCancellationRejectsLateNavigationAndErrors() async throws {
+    let loader = HistoryMessageLoader()
+    let turn = try #require(conversation(user: "read").turns.first)
+    var pending: CheckedContinuation<HistoryTurn, Error>?
+    var shown: HistoryTurn?
+    loader.open(read: { try await withCheckedThrowingContinuation { pending = $0 } }, show: { shown = $0 })
+    try await awaitHistoryRead { pending != nil }
+    loader.cancel()
+    pending?.resume(returning: turn)
+    await loader.stopAndWait()
+    #expect(shown == nil && loader.error == nil && !loader.isLoading)
+    loader.open(read: { throw CancellationError() }, show: { shown = $0 })
+    try await awaitHistoryRead { !loader.isLoading }
+    #expect(loader.error == nil && shown == nil)
+    await loader.stopAndWait()
+}
+
+@Test @MainActor func historyMessageReadsRejectDuplicatesAndJoinBeforeReplacement() async throws {
+    let loader = HistoryMessageLoader()
+    let turn = try #require(conversation(user: "read").turns.first)
+    var pending: CheckedContinuation<HistoryTurn, Error>?
+    var reads = 0
+    var shows = 0
+    loader.open(
+        read: {
+            reads += 1
+            return try await withCheckedThrowingContinuation { pending = $0 }
+        }, show: { _ in shows += 1 })
+    loader.open(
+        read: {
+            reads += 1
+            return turn
+        }, show: { _ in shows += 1 })
+    try await awaitHistoryRead { pending != nil }
+    #expect(reads == 1)
+    loader.cancel()
+    loader.open(
+        read: {
+            reads += 1
+            return turn
+        }, show: { _ in shows += 1 })
+    for _ in 0..<5 { await Task.yield() }
+    #expect(reads == 1)
+    pending?.resume(returning: turn)
+    try await awaitHistoryRead { shows == 1 }
+    #expect(reads == 2 && loader.error == nil && !loader.isLoading)
+    await loader.stopAndWait()
+}
+
+@Test func historyAsyncProjectionPreservesTimelineAndCancelledCatalogDoesNotComplete() async throws {
+    let page = try taskPreviewPage()
+    let projected = try await ConversationHistoryPresentation.timelineOffMain(page)
+    #expect(projected.map(\.id) == ConversationHistoryPresentation.timeline(page).map(\.id))
+    let catalog = try await ConversationHistoryPresentation.functionCatalogOffMain(#"{"actions":[],"tools":[]}"#)
+    #expect(catalog.actions.isEmpty && catalog.tools.isEmpty)
+    let cancelled = Task {
+        while !Task.isCancelled { await Task.yield() }
+        return try await ConversationHistoryPresentation.functionCatalogOffMain(#"{"actions":[],"tools":[]}"#)
+    }
+    cancelled.cancel()
+    do {
+        _ = try await cancelled.value
+        Issue.record("Cancelled catalog parsing must reject its result")
+    } catch is CancellationError {}
 }

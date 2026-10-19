@@ -9,7 +9,7 @@ import Foundation
 import FunctionContracts
 import Gateway
 import PlatformKit
-import Storage
+import StorageCore
 import Testing
 
 /// Reuse scheduler fixtures in argument validation tests while constructing a genuine immediate Tool envelope.

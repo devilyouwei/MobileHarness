@@ -1,6 +1,6 @@
 import Foundation
 import FunctionContracts
-import Storage
+import StorageCore
 
 /// Session-owned playback of an already decoded handle, including checkout, drain and cleanup.
 public protocol SpeechPlaybackCapability: Sendable {

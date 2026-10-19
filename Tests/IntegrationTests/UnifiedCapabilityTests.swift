@@ -8,7 +8,7 @@ import Foundation
 import FunctionContracts
 import Gateway
 import PlatformKit
-import Storage
+import StorageCore
 import Testing
 
 private struct UnifiedFixtureModule: ActionBindingModule {

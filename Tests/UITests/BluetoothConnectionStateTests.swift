@@ -1,6 +1,7 @@
 import Foundation
 import Testing
-import UI
+
+@testable import UI
 
 @Test @MainActor
 func bluetoothConnectionLabelsIgnoreExecutionMessagesAndManualActivity() {
@@ -168,4 +169,22 @@ func bluetoothCurrentStateDoesNotBorrowAnotherDevicesRecoveryOrRetainIdleError()
     state.recoveryStage = .idle
     #expect(state.currentMessage(for: current.id) == nil)
     #expect(!state.canControl(current.id))
+}
+
+@Test @MainActor func bluetoothPagePresentationIsVersionedAndNeverGrantsDeviceControl() async throws {
+    let root = UIContainer()
+    try root.start()
+    #expect(root.home.conversation.presentBluetoothConnection(.connecting, revision: 1))
+    #expect(root.devices.state.presentBluetoothConnection(.connecting, revision: 1))
+    #expect(root.home.conversation.bluetoothStatus.isConnecting)
+    #expect(root.devices.state.presentBluetoothConnection(.connected, revision: 2))
+    #expect(!root.devices.state.controlReady)
+    #expect(!root.devices.state.presentBluetoothConnection(.disconnected, revision: 1))
+    #expect(!root.devices.state.presentBluetoothConnection(.connecting, revision: 2))
+    #expect(root.devices.state.connectionPresentation == .connected)
+    root.invalidate()
+    #expect(root.home.conversation.presentBluetoothConnection(.disconnected, revision: 3))
+    await root.stop()
+    #expect(!root.home.conversation.presentBluetoothConnection(.connected, revision: 4))
+    #expect(!root.devices.state.presentBluetoothConnection(.connected, revision: 4))
 }

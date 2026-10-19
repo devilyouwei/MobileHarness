@@ -115,3 +115,20 @@ ActionBindings 编译 NexArmControlService、NexArmConnectionState、BluetoothRe
 ## 待实现
 
 - 暂无本目录独立的实现待办；跨模块及实际模型/设备验收见所属模块说明。
+
+## Storage 依赖
+
+✅ 存储访问使用独立的 State、Cache、Database 和 Files 接口；App 注册根实例，消费者通过构造器获得所需能力。存储容器不接管本目录的业务验证、执行和完成语义。
+
+## 公开 State 边界
+
+✅ NexArmControlService 通过唯一写端口同步发布 robot.connected/controlAvailable。连接来自最新原生链路快照，可控制性还检查前台、恢复、接管和在途工作。状态及服务字段变化触发去重发布，失败记录原始错误并失效公开视图；不公开设备标识、连接句柄或队列。
+
+[公开 State 契约](../../../Storage/State/README.md)
+
+✅ 原生连接快照通过注入的 nativeObservation 端口提交 Gateway；业务状态转换和重连仍归本目录，投递失败保留为明确接入错误，不重放控制。
+
+## UI 全量容器化
+
+✅ 应用级 UI 状态由八个子容器统一创建，消费者注入所需 Presenting 接口并提交 UI 自有值，不直接写字段。App 注册并管理同一 UI 根；原业务身份/版本校验、原生完成和基础库依赖边界保持。跨模块连接迁移仍是独立待办。
+✅ 已实现：DeviceControlAdapter.readStatus补充真实recovery阶段供Agent判定重连；业务连接／运动状态与详细设置投影仍由现有能力拥有。

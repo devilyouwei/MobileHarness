@@ -5,11 +5,13 @@ import Foundation
     import UIKit
 
     /// One image and one bounded presentation transaction; no device or storage ownership.
-    @MainActor @Observable public final class CapturedPhotoPresentation {
+    @MainActor
+    @Observable
+    public final class CapturedPhotoPresentation {
         public let id: String
         public let image: UIImage
-        public var isThumbnail = false
-        public var opacity = 0.0
+        public internal(set) var isThumbnail = false
+        public internal(set) var opacity = 0.0
         public private(set) var didReachThumbnail = false
         public let departure = PhotoDeparture()
         private let completed: @MainActor (Bool) -> Void
@@ -27,7 +29,8 @@ import Foundation
         }
     }
 
-    @MainActor struct CapturedPhotoView: View {
+    @MainActor
+    struct CapturedPhotoView: View {
         @Bindable var photo: CapturedPhotoPresentation
         @Bindable var camera: CameraState
         let controls: any CameraControlling
@@ -163,7 +166,7 @@ import Foundation
             .onChange(of: camera.capturedPhoto?.id) { _, id in
                 if id != photo.id { inspecting = false }
             }
-            .fullScreenCover(
+            .retainedFullScreenCover(
                 isPresented: $inspecting,
                 onDismiss: {
                     inspectorVisible = false

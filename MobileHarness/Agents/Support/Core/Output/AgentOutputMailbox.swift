@@ -44,13 +44,13 @@ public final class AgentOutputMailbox: @unchecked Sendable {
         result.1?.resume(returning: envelope)
         return result.0
     }
-    public func close(terminal: OutputEnvelope? = nil) {
+    public func close(terminal: OutputEnvelope? = nil, discardingState: Bool = true) {
         let waiting = lock.withLock {
             guard !state.closed else { return nil as CheckedContinuation<OutputEnvelope?, Never>? }
             state.closed = true
+            if discardingState || terminal != nil { state.entries.removeAll { $0.key != nil } }
             if let terminal {
                 // A terminal event may replace state snapshots, never an accepted discrete Action.
-                state.entries.removeAll { $0.key != nil }
                 state.entries.append(Entry(envelope: terminal, key: nil))
             }
             let waiting = state.waiting

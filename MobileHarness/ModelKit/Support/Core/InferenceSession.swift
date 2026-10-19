@@ -58,6 +58,10 @@ public final class InferenceSession<Event: Sendable>: Sendable {
         )
     }
 
+    /// One owner diagnostic observer; installing after failure delivers the original failure once.
+    public func observeFailure(_ observer: @escaping @Sendable (any Error) -> Void) {
+        storage.observeFailure(observer)
+    }
     public func cancel() { storage.end(.cancelled) }
     func requireOpen() throws { _ = try storage.activeContinuation() }
     func fail(_ error: any Error) {
@@ -144,6 +148,8 @@ private final class SessionStorage<Event: Sendable>: Sendable {
     private struct State {
         var continuation: AsyncThrowingStream<Event, Error>.Continuation?
         var termination: SessionTermination?
+        var failureObserver: (@Sendable (any Error) -> Void)?
+        var observationInstalled = false
         var consumerClaimed = false
         var outstanding = 0
         var capacityWaiter: CheckedContinuation<Void, Error>?
@@ -226,6 +232,17 @@ private final class SessionStorage<Event: Sendable>: Sendable {
         }
     }
 
+    func observeFailure(_ observer: @escaping @Sendable (any Error) -> Void) {
+        let failure: (any Error)? = state.withLock {
+            guard !$0.observationInstalled else { return nil }
+            $0.observationInstalled = true
+            if case .failed(let error) = $0.termination { return error }
+            if $0.termination == nil { $0.failureObserver = observer }
+            return nil
+        }
+        if let failure { observer(failure) }
+    }
+
     func end(_ termination: SessionTermination) {
         let continuation = state.withLock { state -> AsyncThrowingStream<Event, Error>.Continuation? in
             guard state.termination == nil else {
@@ -253,6 +270,12 @@ private final class SessionStorage<Event: Sendable>: Sendable {
         case .failed(let error): continuation.finish(throwing: error)
         case .cancelled: continuation.finish(throwing: CancellationError())
         }
+        let observer = state.withLock { value in
+            let observer = value.failureObserver
+            value.failureObserver = nil
+            return observer
+        }
+        if case .failed(let error) = termination { observer?(error) }
         onTermination(termination)
     }
 }

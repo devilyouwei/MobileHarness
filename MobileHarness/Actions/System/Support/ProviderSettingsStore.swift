@@ -1,5 +1,6 @@
 import Foundation
-import Storage
+import StorageCore
+import StorageFiles
 
 public protocol ProviderCredentialStorage: Sendable {
     func legacy() throws -> Data?
@@ -23,21 +24,21 @@ public struct UserSettingsDocument: Codable, Sendable {
 
 /// Business schema and credential migration; Storage owns document consistency.
 public actor ProviderSettingsStore: ProviderSettingsPersistence {
-    private var document: (any DocumentRepository<UserSettingsDocument>)?
+    private var document: (any DocumentStore<UserSettingsDocument>)?
     private var snapshot: DocumentSnapshot<UserSettingsDocument>?
     private var loaded = false
     private var busy = false
     private let credentials: any ProviderCredentialStorage
-    private let makeDocument: @Sendable () throws -> any DocumentRepository<UserSettingsDocument>
+    private let makeDocument: @Sendable () throws -> any DocumentStore<UserSettingsDocument>
     public init(
         credentials: any ProviderCredentialStorage,
-        document: @escaping @Sendable () throws -> any DocumentRepository<UserSettingsDocument>
+        document: @escaping @Sendable () throws -> any DocumentStore<UserSettingsDocument>
     ) {
         self.credentials = credentials
         makeDocument = document
     }
 
-    private func documents() throws -> any DocumentRepository<UserSettingsDocument> {
+    private func documents() throws -> any DocumentStore<UserSettingsDocument> {
         if let document { return document }
         let document = try makeDocument()
         self.document = document

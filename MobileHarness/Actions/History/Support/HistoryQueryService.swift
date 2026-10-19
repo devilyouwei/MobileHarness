@@ -1,7 +1,7 @@
 import Foundation
 import FunctionContracts
-import Storage
 import StorageChat
+import StorageCore
 
 public enum HistoryQueryError: Error, Equatable, Sendable, ActionExecutionFailureProviding {
     case missingConversation, resultTooLarge, currentConversation

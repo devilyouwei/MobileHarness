@@ -1,17 +1,75 @@
+import Foundation
+import StorageCache
+import StorageFiles
+import StorageState
+
+/// Joins a session without letting source completion race away its terminal diagnostic.
+public enum VisionPipelineWorkflow {
+    public enum Failure: Error, Sendable { case inputEnded, outputEnded, unexpectedCancellation }
+    private enum Branch: Sendable { case input, output, monitor }
+    public static func run(
+        input: @escaping @Sendable () async throws -> Void,
+        inputFailed: @escaping @Sendable (any Error) async -> Void,
+        output: @escaping @Sendable () async throws -> Void,
+        stopInput: @escaping @Sendable () async -> Void,
+        monitor: (@Sendable () async throws -> Void)? = nil
+    ) async throws {
+        do {
+            try await withThrowingTaskGroup(of: Branch.self) { group in
+                group.addTask {
+                    do {
+                        try await input()
+                        try Task.checkCancellation()
+                        await inputFailed(Failure.inputEnded)
+                    } catch is CancellationError {
+                        if !Task.isCancelled { await inputFailed(Failure.unexpectedCancellation) }
+                    } catch {
+                        await inputFailed(error)
+                    }
+                    return .input
+                }
+                group.addTask {
+                    try await output()
+                    return .output
+                }
+                if let monitor {
+                    group.addTask {
+                        try await monitor()
+                        return .monitor
+                    }
+                }
+                defer { group.cancelAll() }
+                while let branch = try await group.next() {
+                    if case .output = branch {
+                        await stopInput()
+                        group.cancelAll()
+                        break
+                    }
+                }
+                try Task.checkCancellation()
+            }
+        } catch {
+            await stopInput()
+            throw error
+        }
+        await stopInput()
+    }
+}
+
 #if os(iOS)
     import ActionBindings
     import StorageDevices
     import Actions
     import AgentCore
+    import Gateway
     import Agents
-    import Foundation
     import ModelKit
     import ModelKitDefaults
     import ModelKitHub
     import ModelKitRuntime
     import Observation
     import PlatformKit
-    import Storage
+    import StorageCore
     import StorageChat
     import StorageMedia
     import StorageTasks
@@ -21,22 +79,77 @@
     @MainActor @Observable
     @available(iOS 27, *)
     public final class ApplicationFeatures {
-        @ObservationIgnored private let sqliteRepositories: Result<ApplicationRepositories, any Error>
+        @ObservationIgnored private let containerFailures: ContainerFailureChannel
+        @ObservationIgnored private let repositories: @Sendable () throws -> ApplicationRepositories
         @ObservationIgnored private let capturedPhotos: CapturedPhotoStore
-        @ObservationIgnored private let cameraDevice: AppleCamera
-        @ObservationIgnored private let artifacts: ArtifactServices
-        @ObservationIgnored private let resources: URL
+        @ObservationIgnored private let audio: AudioContainer
+        @ObservationIgnored private let cameraDevice: any CameraCapturing
+        let cameraState: CameraState
+        @ObservationIgnored private let cameraPresentation: any CameraPresenting
+        @ObservationIgnored private let cameraFactory: @MainActor (CameraIntegrationBindings) -> CameraCoordinator
+        @ObservationIgnored private let languageModels: any ModelLanguageProviding
+        @ObservationIgnored private let speechModels: any ModelSpeechProviding
+        @ObservationIgnored private let visionModels: any ModelVisionProviding
+        @ObservationIgnored private let modelArtifacts: any ModelArtifactsManaging
+        @ObservationIgnored private let memoryPressure: @Sendable () async -> Void
+        @ObservationIgnored private var publicStateScope: StateScope?
+        private func installPublicState() throws {
+            guard publicStateScope == nil else { return }
+            let scope = try stateStorage.makeScope()
+            try camera.connectPublicState(scope: scope)
+            try bluetooth.service.connectPublicState(scope: scope)
+            publicStateScope = scope
+        }
+        public var onModelConfigurationChanged: (@MainActor () -> Void)?
+        private let homeUI: UIHomeContainer
+        private let settingsUI: UISettingsContainer
+        private let resourcesUI: UIModelResourcesContainer
+        private let navigationUI: UINavigationContainer
+        private let historyUI: UIHistoryContainer
+        let devicesUI: UIDeviceSettingsContainer
+        private let diagnosticsUI: UIDiagnosticsContainer
+        private let stateStorage: StateContainer
+        private let cacheStorage: CacheContainer
+        private let filesStorage: FilesContainer
         let bluetooth: BluetoothWorkflow
         public init(
-            repositories: Result<ApplicationRepositories, any Error>, photos: CapturedPhotoStore,
-            camera: AppleCamera, bluetooth: BluetoothWorkflow, artifacts: ArtifactServices, resources: URL
+            containerFailures: ContainerFailureChannel,
+            home: UIHomeContainer, settings: UISettingsContainer, modelResources: UIModelResourcesContainer,
+            navigation: UINavigationContainer, history: UIHistoryContainer, devices: UIDeviceSettingsContainer,
+            diagnostics: UIDiagnosticsContainer,
+            repositories: @escaping @Sendable () throws -> ApplicationRepositories, state: StateContainer,
+            cache: CacheContainer, files: FilesContainer, photos: CapturedPhotoStore,
+            camera: any CameraCapturing, cameraState: CameraState, cameraPresentation: any CameraPresenting,
+            makeCamera: @escaping @MainActor (CameraIntegrationBindings) -> CameraCoordinator,
+            bluetooth: BluetoothWorkflow, audio: AudioContainer,
+            languageModels: any ModelLanguageProviding, speechModels: any ModelSpeechProviding,
+            visionModels: any ModelVisionProviding, modelArtifacts: any ModelArtifactsManaging,
+            memoryPressure: @escaping @Sendable () async -> Void
         ) {
-            sqliteRepositories = repositories
+            self.containerFailures = containerFailures
+            homeUI = home
+            settingsUI = settings
+            resourcesUI = modelResources
+            navigationUI = navigation
+            historyUI = history
+            devicesUI = devices
+            diagnosticsUI = diagnostics
+            self.audio = audio
+            self.stateStorage = state
+            self.cacheStorage = cache
+            self.filesStorage = files
+            self.repositories = repositories
             capturedPhotos = photos
             cameraDevice = camera
+            self.cameraState = cameraState
+            self.cameraPresentation = cameraPresentation
+            cameraFactory = makeCamera
             self.bluetooth = bluetooth
-            self.resources = resources
-            self.artifacts = artifacts
+            self.languageModels = languageModels
+            self.speechModels = speechModels
+            self.visionModels = visionModels
+            self.modelArtifacts = modelArtifacts
+            self.memoryPressure = memoryPressure
         }
         private(set) var container: InteractionServices?
         @ObservationIgnored private var runtimeValue: AgentServices?
@@ -52,7 +165,7 @@
             ResourceObservationWorkflow(
                 read: { [weak self] in
                     guard let self else { throw CancellationError() }
-                    let state = self.camera.state
+                    let state = self.cameraState
                     let displayedMediaID = state.capturedPhoto?.id
                     let savedMediaID = state.savedMediaID
                     guard
@@ -101,9 +214,9 @@
                     let device = try self.deviceControl.readStatus()
                     let data = try JSONSerialization.data(
                         withJSONObject: [
-                            "bluetooth": device, "cameraEnabled": self.camera.state.isEnabled,
-                            "cameraVisible": self.camera.state.isVisible,
-                            "cameraNeedsSettings": self.camera.state.needsSettings,
+                            "bluetooth": device, "cameraEnabled": self.cameraState.isEnabled,
+                            "cameraVisible": self.cameraState.isVisible,
+                            "cameraNeedsSettings": self.cameraState.needsSettings,
                         ], options: [.sortedKeys])
                     let value = String(decoding: data, as: UTF8.self)
                     guard data.count <= 16_384 else { throw DeviceControlError.invalidRequest }
@@ -122,6 +235,10 @@
                     case .failed(let message): return .retry(message)
                     }
                 }, invalidate: {}, report: { [weak self] message in self?.recordEnvironmentFailure(message) })
+        }
+
+        public func reportModelPreparation(loading: Bool) {
+            reportEnvironment(.modelPreparation, value: loading ? "loading" : "idle")
         }
 
         func reportEnvironment(_ category: AppEnvironmentFact.Category, value: String) {
@@ -150,7 +267,10 @@
                 failureCode: "environment.delivery")
         }
         @ObservationIgnored private var resourceObservationForeground = false
-        private func artifactManager() async throws -> ModelManager { try await artifacts.manager() }
+        private func artifactManager() async throws -> any ModelArtifactsManaging {
+            try await modelArtifacts.prepare()
+            return modelArtifacts
+        }
         @ObservationIgnored private lazy var modelResourcesWorkflow = makeModelResourcesWorkflow()
         private func makeModelResourcesWorkflow() -> ModelResourcesWorkflow {
             ModelResourcesWorkflow(
@@ -199,9 +319,9 @@
                 throw SettingsModelResourcesAdapter.preferenceFailure(message)
             }
         }
-        let modelResources = ModelResourcesState()
+        var modelResources: ModelResourcesState { resourcesUI.state }
         @ObservationIgnored lazy var modelResourceControls = ModelResourceInteractionWorkflow(
-            state: modelResources, operations: modelResourcesWorkflow)
+            state: resourcesUI.presentation, operations: modelResourcesWorkflow)
         private func quiesceForModelRemoval(_ id: String) async {
             if id == "yolo26n-pose" {
                 await camera.pauseVisionForModelMaintenance()
@@ -224,24 +344,25 @@
                     guard let self else { throw CancellationError() }
                     try await self.runtime().saveProvider(draft)
                 }), presentsResults: true)
-        @ObservationIgnored lazy var settings = SettingsState(initial: SettingsProviderAdapter.initial)
+        var settings: SettingsState { settingsUI.state }
         @ObservationIgnored lazy var settingsControls = SettingsInteractionWorkflow(
-            state: settings, operations: settingsWorkflow, defaultModel: SettingsProviderAdapter.initial.model)
+            state: settingsUI.presentation, operations: settingsWorkflow,
+            defaultModel: SettingsProviderAdapter.initial.model)
         @ObservationIgnored lazy var cameraControls = makeCameraControls()
         private func makeCameraControls() -> CameraInteractionWorkflow {
             CameraInteractionWorkflow(
-                state: camera.state,
+                presentation: cameraPresentation,
                 perform: { [weak self] intent, facing, mediaID in
                     guard let self else { throw CancellationError() }
                     _ = try await self.runtime().photographerIntents.perform(intent, facing: facing, mediaID: mediaID)
                 })
         }
-        let navigation = NavigationState()
+        var navigation: NavigationState { navigationUI.state }
         @ObservationIgnored lazy var deviceControl = DeviceControlAdapter(bluetooth: bluetooth)
         @ObservationIgnored lazy var bluetoothControls = makeBluetoothControls()
         private func makeBluetoothControls() -> BluetoothInteractionWorkflow {
             BluetoothInteractionWorkflow(
-                state: bluetooth.state,
+                state: devicesUI.presentation,
                 initialFence: deviceControl.fence, fenceStop: { [deviceControl] in deviceControl.stopFence() },
                 pageVisibility: { [bluetooth] visible in
                     if visible { bluetooth.openPage() } else { bluetooth.closePage() }
@@ -253,39 +374,143 @@
         }
 
         func navigate(_ destination: AppDestination?) {
-            navigation.show(destination)
+            navigationUI.presentation.show(destination)
         }
         @ObservationIgnored lazy var camera = makeCamera()
         private func makeCamera() -> CameraCoordinator {
-            let device = cameraDevice
-            return CameraCoordinator(
-                camera: device, state: CameraState(), photos: capturedPhotos,
-                makeRuntime: { [weak self] in
-                    guard let self else { throw CancellationError() }
-                    return try self.runtime().cameraDependencies
-                },
-                makeSession: { [weak self] in
-                    guard let self else { throw CancellationError() }
-                    let models = try await ModelKitDefaults.manager(resources: self.resources)
-                    let pose = try await models.get(.pose, load: false)
-                    let context = try self.runtime().visionContext()
-                    return try VisionSession(runtime: self.runtime().visionDependencies) {
-                        sessionID, configuration, mirroredGaze in
-                        try VisionPerceptionAgent(
-                            pose: pose, sessionID: sessionID, sampling: configuration, mirroredGaze: mirroredGaze,
-                            context: context)
-                    }
-                })
+            cameraFactory(
+                CameraIntegrationBindings(
+                    nativeEvent: { [weak self] event in
+                        guard let self else { throw CancellationError() }
+                        let runtime = try await self.runtime()
+                        try await runtime.input.publish(
+                            DeviceInputAdapter.cameraEvent(event, sessionID: runtime.interactionSessionID))
+                    },
+                    makeRuntime: { [weak self] in
+                        guard let self else { throw CancellationError() }
+                        return try self.runtime().cameraDependencies
+                    },
+                    connectFrames: { [weak self] frames, sessionID, mirrored, endpoint in
+                        guard let self else { throw CancellationError() }
+                        do {
+                            try await self.runVision(
+                                frames: frames, sessionID: sessionID, mirrored: mirrored, endpoint: endpoint)
+                        } catch is CancellationError {
+                            throw CancellationError()
+                        } catch {
+                            let diagnostic = AgentFailureDiagnostic(
+                                category: .runtime, code: "vision.pipeline.failed", detail: String(describing: error))
+                            self.runtimeValue?.actionActivity.recordFailure(
+                                title: "视觉会话异常", source: "visionPerception", message: diagnostic.detail,
+                                failureCode: diagnostic.code,
+                                context: .init(workerID: "visionPerception", sessionID: sessionID),
+                                diagnostic: diagnostic)
+                            throw error
+                        }
+                    }))
         }
-        private let historyState = ConversationHistoryState(title: "Assistant")
+
+        /// Role lifecycle and tracking policy stay here; native-to-Signal conversion belongs to Gateway.
+        private func runVision(
+            frames: AsyncThrowingStream<CameraFrame, Error>, sessionID: String, mirrored: Bool,
+            endpoint: any CameraOutputHandling
+        ) async throws {
+            let runtime = try runtime()
+            let pose = visionModels
+            let vision = try VisionPerceptionAgent(
+                pose: pose, sessionID: sessionID, mirroredGaze: mirrored, context: runtime.visionContext())
+            try runtime.presentation.bindCamera(endpoint)
+            defer { runtime.presentation.unbindCamera(endpoint) }
+            try await runtime.manager.register(vision, sessionID: sessionID)
+            var tracking = false
+            do {
+                try await runtime.photographerIntents.attachTracking(sessionID: sessionID)
+                tracking = true
+                try await runtime.manager.start(.visionPerception)
+                let consumer = try await runtime.output.consumer(for: vision)
+                let connection = DeviceInputConnection(frames: frames, sessionID: sessionID, input: runtime.input)
+                try await VisionPipelineWorkflow.run(
+                    input: { try await connection.wait() },
+                    inputFailed: { error in await vision.failInput(error) },
+                    output: {
+                        try await IndependentOutputWorkflow.consumeSignals(
+                            vision.outputs,
+                            replacementKey: { VisionPerceptionAgent.outputReplacementKey($0.output) },
+                            onMediaExpired: { envelope in
+                                await vision.presentationFinished(
+                                    failure: "Pose media expired before presentation; sequence=\(envelope.sequence)")
+                            },
+                            dispatch: { envelope in
+                                try Task.checkCancellation()
+                                if case .control(let value) = envelope.output, value.hasPrefix("agent.error:") {
+                                    // Present before dispatch: a transport rejection must not hide the failure.
+                                    await endpoint.visionStatus("姿态识别已停止，请重试", sessionID: sessionID)
+                                }
+                                let result = try await consumer.execute(envelope)
+                                if envelope.media != nil, !result.isCancellationOnly {
+                                    let details = [
+                                        result.failure, result.tool?.isError == true ? result.tool?.value : nil,
+                                    ]
+                                    .compactMap { $0 }.joined(separator: "; ")
+                                    await vision.presentationFinished(
+                                        failure: result.isError
+                                            ? (details.isEmpty ? "Media Tool execution failed" : details) : nil)
+                                }
+                            })
+                        try Task.checkCancellation()
+                        guard await vision.status().lifecycle == .failed else {
+                            throw VisionPipelineWorkflow.Failure.outputEnded
+                        }
+                    },
+                    stopInput: { await connection.stop() },
+                    monitor: {
+                        try await self.monitorVision(vision, endpoint: endpoint, runtime: runtime, sessionID: sessionID)
+                    })
+                if tracking { await runtime.photographerIntents.detachTracking(sessionID: sessionID) }
+                try await runtime.manager.remove(.visionPerception)
+                await runtime.output.cancel(sessionID: sessionID)
+                try Task.checkCancellation()
+            } catch {
+                if tracking { await runtime.photographerIntents.detachTracking(sessionID: sessionID) }
+                try? await runtime.manager.remove(.visionPerception)
+                await runtime.output.cancel(sessionID: sessionID)
+                throw error
+            }
+        }
+
+        private func monitorVision(
+            _ vision: VisionPerceptionAgent, endpoint: any CameraOutputHandling,
+            runtime: AgentServices, sessionID: String
+        ) async throws {
+            var reported: String?
+            while true {
+                try await Task.sleep(for: .seconds(1))
+                try Task.checkCancellation()
+                guard await vision.status().lifecycle == .running else { continue }
+                let health = await vision.health()
+                if let diagnostic = health.diagnostic {
+                    guard reported != diagnostic.code else { continue }
+                    reported = diagnostic.code
+                    runtime.actionActivity.recordFailure(
+                        title: "视觉管线无进展", source: "visionPerception", message: diagnostic.detail,
+                        failureCode: diagnostic.code,
+                        context: .init(workerID: "visionPerception", sessionID: sessionID, inputID: health.inputID),
+                        diagnostic: diagnostic)
+                    await endpoint.visionStatus("姿态识别长时间无有效结果，请查看日志", sessionID: sessionID)
+                } else if reported != nil {
+                    reported = nil
+                    await endpoint.visionStatus(nil, sessionID: sessionID)
+                }
+            }
+        }
+
+        private var historyState: ConversationHistoryState { historyUI.state }
         @ObservationIgnored lazy var history = makeHistory()
         private func makeHistory() -> ConversationHistoryWorkflow {
             return ConversationHistoryWorkflow(
-                state: historyState,
+                state: historyUI.presentation,
                 prepare: { [weak self] in
                     guard let self else { throw CancellationError() }
-                    await self.container?.lifecycle.beginSettingsChange()
-                    defer { self.container?.lifecycle.endSettingsChange() }
                     try Task.checkCancellation()
                     _ = try self.runtime()
                 },
@@ -361,14 +586,13 @@
             await container?.lifecycle.beginSettingsChange()
             defer { container?.lifecycle.endSettingsChange() }
             try Task.checkCancellation()
-            let models = try await ModelKitDefaults.manager(resources: resources)
-            return CurrentChatCapability(models: models)
+            return languageModels
         }
         private func runtime() throws -> AgentServices {
-            _ = try sqliteRepositories.get()
+            _ = try repositories()
             if let runtimeValue { return runtimeValue }
             let resourceAdapter = ModelResourceCapabilityAdapter(
-                manager: { [weak self] in
+                artifacts: { [weak self] in
                     guard let self else { throw CancellationError() }
                     return try await self.artifactManager()
                 },
@@ -376,27 +600,36 @@
                 bindSpeech: { [weak self] recognition, synthesis in
                     guard let self else { throw CancellationError() }
                     await self.container?.lifecycle.beginSettingsChange()
-                    await ModelKitDefaults.configureSpeech(recognition: recognition, synthesis: synthesis)
-                    self.container?.lifecycle.endSettingsChange()
+                    defer {
+                        self.container?.lifecycle.endSettingsChange()
+                        self.onModelConfigurationChanged?()
+                    }
+                    try await self.speechModels.configure(recognition: recognition, synthesis: synthesis)
                 })
+            try installPublicState()
             let runtime = try AgentServices(
-                chatRecords: try sqliteRepositories.get().chat, taskRecords: try sqliteRepositories.get().tasks,
+                containerFailures: containerFailures, home: homeUI,
+                state: stateStorage, cache: cacheStorage, files: filesStorage,
+                chatRecords: try repositories().chat, taskRecords: try repositories().tasks,
                 camera: cameraDevice,
                 readHistoryPhoto: { [capturedPhotos] id, inputID in
                     try await capturedPhotos.readForInput(id, source: "assistant", input: inputID)
                 }, cameraControl: camera, bluetooth: bluetooth, historyState: historyState,
-                resourceState: modelResources, providerState: settings, navigationState: navigation,
+                resourceState: modelResources, providerState: settings, navigationState: navigationUI.presentation,
                 device: deviceControl,
                 modelResources: resourceAdapter,
                 providerSettingsRuntime: SettingsProviderAdapter.runtime(
-                    resources: resources,
+                    language: languageModels,
                     beginChange: { [weak self] in await self?.container?.lifecycle.beginSettingsChange() },
-                    endChange: { [weak self] in self?.container?.lifecycle.endSettingsChange() }),
+                    endChange: { [weak self] in
+                        self?.container?.lifecycle.endSettingsChange()
+                        self?.onModelConfigurationChanged?()
+                    }),
                 resourcePreferences: ModelResourcePreferencesService(
                     store: {
-                        try LocalDocumentStore<ModelResourcePreferences>(
-                            url: URL.applicationSupportDirectory.appendingPathComponent(
-                                "MobileHarness/Models/download-source.json"), maximumBytes: 4096)
+                        try self.filesStorage.document(
+                            ModelResourcePreferences.self, in: self.filesStorage.models, name: "download-source.json",
+                            maximumBytes: 4096)
                     },
                     validate: { try await SettingsModelResourcesAdapter.validatePreferences($0) },
                     installed: { [weak self] in
@@ -420,10 +653,7 @@
                     guard let self else { throw CancellationError() }
                     return await self.settingsWorkflow.modelName
                 },
-                chatProvider: { [resources] in
-                    let models = try await ModelKitDefaults.manager(resources: resources)
-                    return try await models.get(.chat)
-                })
+                chatProvider: { [languageModels] in languageModels })
             runtimeValue = runtime
             return runtime
         }
@@ -441,11 +671,13 @@
         @ObservationIgnored private var bluetoothObservation: Task<Void, Never>?
         @ObservationIgnored private var cameraEvents: Task<Void, Never>?
         private var foreground = true
-        private var homeVisible = true
+        func updateCameraAvailability() {
+            camera.setForeground(foreground && navigation.path.isEmpty)
+        }
         var isolatedPresentation: Bool {
             let arguments = ProcessInfo.processInfo.arguments
             return [
-                "-conversation-preview", "-companion-cycle-preview", "-actions-preview", "-gemma4-validation",
+                "-gemma4-validation",
                 "-moss-benchmark",
             ].contains { arguments.contains($0) }
         }
@@ -487,15 +719,11 @@
         public func setForeground(_ value: Bool) {
             foreground = value
             guard !isolatedPresentation else { return }
-            camera.setForeground(value && homeVisible)
+            updateCameraAvailability()
             bluetooth.setForeground(value)
             setResourceObservationForeground(value)
             reportEnvironment(.scene, value: value ? "active" : "background")
             if !value { invalidateNative() }
-        }
-        func setHomeVisible(_ visible: Bool) {
-            homeVisible = visible
-            camera.setForeground(foreground && visible)
         }
         public func stopNativeServices() async throws {
             invalidateNative()
@@ -507,6 +735,7 @@
             await bluetoothObservation?.value
             cameraEvents = nil
             bluetoothObservation = nil
+            await modelResourceControls.stopAndWait()
             var cleanupErrors: [any Error] = []
             do { try await camera.shutdown() } catch { cleanupErrors.append(error) }
             do { try await bluetooth.shutdown() } catch { cleanupErrors.append(error) }
@@ -522,9 +751,11 @@
             await environmentObservation.shutdown()
             await runtimeValue?.resourceObservation.shutdown()
             await runtimeValue?.shutdown()
+            publicStateScope?.close()
+            publicStateScope = nil
         }
         private func prepareServices(progress: @MainActor (String) -> Void) async throws {
-            _ = try sqliteRepositories.get()
+            _ = try repositories()
             guard container == nil else { return }
             _ = try await artifactManager()
             try await runtime().start()
@@ -532,7 +763,10 @@
             try await settingsControls.restore()
             let workflow = settingsWorkflow
             let prepared = try await InteractionServices(
-                resources: resources, runtime: runtime(), modelName: { await workflow.modelName }, progress: progress)
+                home: homeUI, diagnostics: diagnosticsUI, language: languageModels, speech: speechModels,
+                memoryPressure: memoryPressure, audio: audio, runtime: runtime(),
+                modelName: { await workflow.modelName },
+                progress: progress)
             try Task.checkCancellation()
             container = prepared
             runtimeValue?.resourceObservation.setForeground(resourceObservationForeground)

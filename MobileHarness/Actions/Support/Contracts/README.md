@@ -81,3 +81,7 @@ ActionReport.empty 表示没有叶子记录；其 status 运算为 succeeded，�
 ## 待实现
 
 - 暂无本目录独立的实现待办；跨模块及实际模型/设备验收见所属模块说明。
+
+## Platform 根、设备接入与同帧呈现
+
+✅ FunctionInput 增加可选的进程内 Sendable attachment，缺省为空；FunctionInvocation 显式绑定，不从参数字符串解析。契约仍无项目依赖，不识别 CameraFrame、Agent 或 Gateway。普通调用和外部参数不能伪造原生附件。

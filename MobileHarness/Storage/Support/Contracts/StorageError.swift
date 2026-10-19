@@ -1,3 +1,31 @@
+import Foundation
+
+/// A native, nonblocking reporting port. The host owns transport and diagnostics retention.
+public struct StorageFailureReporter: Sendable {
+    private let receive: @Sendable (String, String, any Error) -> Void
+    public init(receive: @escaping @Sendable (String, String, any Error) -> Void = { _, _, _ in }) {
+        self.receive = receive
+    }
+    @discardableResult public func report(
+        _ component: String, _ operation: String, _ error: any Error,
+        fileID: String = #fileID, function: String = #function, line: UInt = #line
+    ) -> StorageFailure {
+        let failure = StorageFailure(
+            component: component, operation: operation, underlying: error,
+            fileID: fileID, function: function, line: line)
+        receive(failure.component, failure.operation, failure)
+        return failure
+    }
+}
+
 public enum StorageError: Error, Equatable, Sendable {
     case busy, capacityExceeded, missing, timedOut, duplicate, closed, expired, forbidden
+}
+
+public enum DocumentStorageError: Error, Equatable, Sendable {
+    case invalidConfiguration, capacityExceeded, unsupportedVersion, conflict, invalidFile
+}
+
+public enum RecordStorageError: Error, Equatable, Sendable {
+    case invalidID, missingRecord, busy, invalidRecord, conflict, notReady, closed
 }

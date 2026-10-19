@@ -2,8 +2,20 @@
     import AVFoundation
     import Foundation
 
+    /// Bounded PCM feedback port; no session routing or application policy.
+    @MainActor
+    public protocol CuePlaying: AnyObject, Sendable {
+        func play(_ pcm: PlaybackPCM, onStarted: (@MainActor () -> Void)?) async throws
+        func stop()
+        func stopAndWait() async
+    }
+    extension CuePlaying {
+        public func play(_ pcm: PlaybackPCM) async throws { try await play(pcm, onStarted: nil) }
+    }
+
     /// One short native player; leaves the shared audio session and other audio owners intact.
-    @MainActor public final class NativeCuePlayback {
+    @MainActor
+    public final class NativeCuePlayback: CuePlaying {
         public enum Failure: Error, Sendable {
             case busy, failed, invalidDuration
             case decoding(String)
@@ -12,8 +24,32 @@
         private var player: AVAudioPlayer?
         private var delegate: CueCompletionDelegate?
         private var waiter: CheckedContinuation<Void, any Error>?
-        public init() {}
+        private let admission: PlatformAdmission?
+        private var operation: Task<Void, any Error>?
+        public init(admission: PlatformAdmission? = nil) { self.admission = admission }
         public func play(_ pcm: PlaybackPCM, onStarted: (@MainActor () -> Void)? = nil) async throws {
+            do {
+                try admission?.check()
+                guard operation == nil else { throw Failure.busy }
+                let task = Task { try await self.perform(pcm, onStarted: onStarted) }
+                operation = task
+                defer { operation = nil }
+                try await withTaskCancellationHandler {
+                    try await task.value
+                } onCancel: {
+                    task.cancel()
+                }
+            } catch {
+                admission?.report("audio.cue", "play", error)
+                throw error
+            }
+        }
+        public func stopAndWait() async {
+            let task = operation
+            stop()
+            _ = await task?.result
+        }
+        private func perform(_ pcm: PlaybackPCM, onStarted: (@MainActor () -> Void)?) async throws {
             try Task.checkCancellation()
             guard operationID == nil else { throw Failure.busy }
             let id = UUID().uuidString
@@ -25,6 +61,7 @@
                 }.value
                 try Task.checkCancellation()
                 guard operationID == id else { throw CancellationError() }
+                try admission?.check()
                 let native = try AVAudioPlayer(data: data, fileTypeHint: AVFileType.wav.rawValue)
                 guard native.duration.isFinite, native.duration > 0, native.duration <= 1.01 else {
                     throw Failure.invalidDuration
@@ -53,6 +90,7 @@
             }
         }
         public func stop() {
+            operation?.cancel()
             if let id = operationID { finish(id: id, result: .failure(CancellationError())) }
         }
         private func finish(id: String, result: Result<Void, any Error>) {
@@ -67,7 +105,8 @@
             pending?.resume(with: result)
         }
     }
-    @MainActor private final class CueCompletionDelegate: NSObject, AVAudioPlayerDelegate {
+    @MainActor
+    private final class CueCompletionDelegate: NSObject, AVAudioPlayerDelegate {
         nonisolated let completed: @Sendable (Bool, String?) -> Void
         init(completed: @escaping @Sendable (Bool, String?) -> Void) { self.completed = completed }
         nonisolated func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {

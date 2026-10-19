@@ -14,6 +14,21 @@ public struct BluetoothDeviceRow: Identifiable, Sendable, Hashable {
         self.name = name
     }
 }
+public enum BluetoothConnectionStatus: String, Equatable, Sendable {
+    case disconnected, connecting, connected
+    public var isConnecting: Bool { self == .connecting }
+    public var title: String {
+        switch self {
+        case .disconnected: "未连接"
+        case .connecting: "正在连接…"
+        case .connected: "已连接"
+        }
+    }
+}
+@MainActor public protocol BluetoothConnectionPresenting: AnyObject, Sendable {
+    @discardableResult func presentBluetoothConnection(_ value: BluetoothConnectionStatus, revision: UInt64) -> Bool
+}
+
 @MainActor
 public protocol BluetoothControlling: AnyObject {
     func reconnect(_ id: String)
@@ -72,19 +87,24 @@ public enum BluetoothRecoveryStage: Sendable {
 }
 
 /// Presentation values only; NexArmControlService owns discovery, connections, persistence and motion.
-@MainActor @Observable
+@MainActor
+@Observable
 public final class BluetoothSettingsState {
-    public var availability: BluetoothAvailability = .unknown
-    public var phase: BluetoothConnectionPhase = .idle
-    public var scanning = false
-    public var remembered: BluetoothDeviceRow?
-    public var nearby: [BluetoothDeviceRow] = []
-    public var selected: BluetoothDeviceRow?
-    public var recoveryStage: BluetoothRecoveryStage = .idle
-    public var recoveryDeviceID: String?
-    public var recoveryAttempt = 0
+    @ObservationIgnored var presentationAdmission: UIPresentationAdmission?
+    @ObservationIgnored var pendingPresentation: BluetoothViewSnapshot?
+    public var isPresentationAvailable: Bool { presentationAdmission.map { $0.started && !$0.stopped } ?? true }
+
+    public internal(set) var availability: BluetoothAvailability = .unknown
+    public internal(set) var phase: BluetoothConnectionPhase = .idle
+    public internal(set) var scanning = false
+    public internal(set) var remembered: BluetoothDeviceRow?
+    public internal(set) var nearby: [BluetoothDeviceRow] = []
+    public internal(set) var selected: BluetoothDeviceRow?
+    public internal(set) var recoveryStage: BluetoothRecoveryStage = .idle
+    public internal(set) var recoveryDeviceID: String?
+    public internal(set) var recoveryAttempt = 0
     /// Latest native communication issue, adapted by ActionBindings.
-    public var transportIssue: String?
+    public internal(set) var transportIssue: String?
     /// Connected or remembered devices belong to My Devices; a new pending selection stays nearby.
     public var myDevice: BluetoothDeviceRow? {
         if phase == .connected, let selected { return selected }
@@ -112,15 +132,28 @@ public final class BluetoothSettingsState {
         if recoveryStage != .idle { return error ?? notice }
         return phase == .failed ? error : nil
     }
-    public var error: String?
-    public var notice: String?
-    public var jogging = false
-    public var joints: [Int] = []
-    public var pose: [Int] = []
-    public var sampledAt: Date?
+    public internal(set) var error: String?
+    public internal(set) var notice: String?
+    public internal(set) var jogging = false
+    public internal(set) var joints: [Int] = []
+    public internal(set) var pose: [Int] = []
+    public internal(set) var sampledAt: Date?
     /// Manual controls remain available for takeover while a previous operation is active.
     public var canControl: Bool { phase == .connected && !recoveryStage.busy }
 
+    public internal(set) var connectionPresentation: BluetoothConnectionStatus = .disconnected
+    private var connectionRevision: UInt64 = 0
+    @discardableResult public func presentBluetoothConnection(_ value: BluetoothConnectionStatus, revision: UInt64)
+        -> Bool
+    {
+        guard presentationAdmission?.acceptsRetained() ?? true, revision > 0, revision >= connectionRevision else {
+            return false
+        }
+        guard revision != connectionRevision || value == connectionPresentation else { return false }
+        connectionRevision = revision
+        connectionPresentation = value
+        return true
+    }
     public init() {}
     public var controlReady: Bool { phase == .connected && !recoveryStage.busy }
     public var connectionBusy: Bool {
@@ -152,6 +185,33 @@ public final class BluetoothSettingsState {
             }
         }
     }
+
+    @discardableResult
+    public func present(_ update: DeviceSettingsUpdate) -> Bool {
+        guard presentationAdmission?.acceptsRetained() ?? true else { return false }
+        apply(update)
+        return true
+    }
+    func apply(_ update: DeviceSettingsUpdate) {
+        switch update {
+        case .availability(let value): availability = value
+        case .phase(let value): phase = value
+        case .scanning(let value): scanning = value
+        case .remembered(let value): remembered = value
+        case .nearby(let value): nearby = value
+        case .selected(let value): selected = value
+        case .recoveryStage(let value): recoveryStage = value
+        case .recoveryDeviceID(let value): recoveryDeviceID = value
+        case .recoveryAttempt(let value): recoveryAttempt = value
+        case .transportIssue(let value): transportIssue = value
+        case .error(let value): error = value
+        case .notice(let value): notice = value
+        case .jogging(let value): jogging = value
+        case .joints(let value): joints = value
+        case .pose(let value): pose = value
+        case .sampledAt(let value): sampledAt = value
+        }
+    }
 }
 
 public struct BluetoothViewSnapshot: Sendable {
@@ -176,6 +236,11 @@ public struct BluetoothViewSnapshot: Sendable {
 
 extension BluetoothSettingsState {
     public func apply(_ snapshot: BluetoothViewSnapshot) {
+        if let admission = presentationAdmission, !admission.started, !admission.stopped {
+            pendingPresentation = snapshot
+            return
+        }
+        guard presentationAdmission?.acceptsRetained() ?? true else { return }
         availability = snapshot.availability
         phase = snapshot.phase
         scanning = snapshot.scanning
@@ -193,4 +258,74 @@ extension BluetoothSettingsState {
         pose = snapshot.pose
         sampledAt = snapshot.sampledAt
     }
+}
+
+public enum DeviceSettingsUpdate {
+    case availability(BluetoothAvailability)
+    case phase(BluetoothConnectionPhase)
+    case scanning(Bool)
+    case remembered(BluetoothDeviceRow?)
+    case nearby([BluetoothDeviceRow])
+    case selected(BluetoothDeviceRow?)
+    case recoveryStage(BluetoothRecoveryStage)
+    case recoveryDeviceID(String?)
+    case recoveryAttempt(Int)
+    case transportIssue(String?)
+    case error(String?)
+    case notice(String?)
+    case jogging(Bool)
+    case joints([Int])
+    case pose([Int])
+    case sampledAt(Date?)
+}
+
+@MainActor
+public protocol DeviceSettingsPresenting: UIPresentationAccess, BluetoothConnectionPresenting {
+    var availability: BluetoothAvailability { get }
+    var phase: BluetoothConnectionPhase { get }
+    var scanning: Bool { get }
+    var remembered: BluetoothDeviceRow? { get }
+    var nearby: [BluetoothDeviceRow] { get }
+    var selected: BluetoothDeviceRow? { get }
+    var recoveryStage: BluetoothRecoveryStage { get }
+    var recoveryDeviceID: String? { get }
+    var recoveryAttempt: Int { get }
+    var transportIssue: String? { get }
+    var error: String? { get }
+    var notice: String? { get }
+    var jogging: Bool { get }
+    var joints: [Int] { get }
+    var pose: [Int] { get }
+    var sampledAt: Date? { get }
+    var canControl: Bool { get }
+    var canConnect: Bool { get }
+    var canScan: Bool { get }
+    var summary: String { get }
+    var controlReady: Bool { get }
+    var connectionBusy: Bool { get }
+    @discardableResult
+    func present(_ update: DeviceSettingsUpdate) -> Bool
+    func apply(_ snapshot: BluetoothViewSnapshot)
+    func rowIntent(for id: String) -> BluetoothDeviceRowIntent
+    func isConnected(_ id: String) -> Bool
+    func hasConnectionIssue(_ id: String) -> Bool
+    func canControl(_ id: String) -> Bool
+    func currentMessage(for id: String) -> String?
+    func status(for id: String) -> String
+}
+
+extension BluetoothSettingsState: DeviceSettingsPresenting {}
+
+@MainActor
+public final class UIDeviceSettingsContainer {
+    public let state = BluetoothSettingsState()
+    public var presentation: any DeviceSettingsPresenting { state }
+    func startPresentation() {
+        if let pending = state.pendingPresentation {
+            state.pendingPresentation = nil
+            state.apply(pending)
+        }
+    }
+    func stopPresentation() { state.pendingPresentation = nil }
+    init(admission: UIPresentationAdmission) { state.presentationAdmission = admission }
 }

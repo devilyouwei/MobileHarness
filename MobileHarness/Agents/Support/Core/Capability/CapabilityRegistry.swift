@@ -56,10 +56,14 @@ public struct CapabilityRegistry: Sendable {
         -> ActionCall
     {
         guard let action = actions.first(where: { $0.alias == alias }) else { throw GenerationError.unknownCapability }
-        try Self.validate(parameters, required: action.requiredParameters, optional: action.optionalParameters)
+        try Self.validate(
+            parameters, required: action.requiredParameters, optional: action.optionalParameters,
+            ignoringUnknownKeys: true)
         let selected = channel ?? action.defaultChannel
         guard channels.contains(selected) else { throw GenerationError.forbiddenChannel }
-        return ActionCall(actionPath: action.path, channel: selected, parameters: parameters)
+        let allowed = action.requiredParameters.union(action.optionalParameters)
+        return ActionCall(
+            actionPath: action.path, channel: selected, parameters: parameters.filter { allowed.contains($0.key) })
     }
 
     public func resolveTool(_ alias: String, arguments: [String: String], id: String? = nil) throws -> ToolCall {
@@ -134,9 +138,11 @@ public struct CapabilityRegistry: Sendable {
         else { throw GenerationError.invalidParameters }
     }
 
-    static func validate(_ values: [String: String], required: Set<String>, optional: Set<String>) throws {
+    static func validate(
+        _ values: [String: String], required: Set<String>, optional: Set<String>, ignoringUnknownKeys: Bool = false
+    ) throws {
         let keys = Set(values.keys)
-        guard required.isSubset(of: keys), keys.isSubset(of: required.union(optional)),
+        guard required.isSubset(of: keys), ignoringUnknownKeys || keys.isSubset(of: required.union(optional)),
             values.count <= 32, values.allSatisfy({ validName($0.key) && $0.value.utf8.count <= 4096 })
         else { throw GenerationError.invalidParameters }
     }

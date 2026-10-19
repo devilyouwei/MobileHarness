@@ -4,7 +4,7 @@ import CallRuntime
 import ExecutionRuntime
 import Foundation
 import FunctionContracts
-import Storage
+import StorageCore
 import UI
 
 /// Host adaptation only; gesture/execution business policy remains in Actions.
@@ -197,7 +197,7 @@ public struct NexArmBehaviorAdapter {
         return String(
             decoding: try JSONSerialization.data(
                 withJSONObject: [
-                    "connection": String(describing: state.phase),
+                    "connection": String(describing: state.phase), "recovery": String(describing: state.recoveryStage),
                     "availability": String(describing: state.availability), "canControl": state.canControl,
                     "issue": state.error ?? state.transportIssue ?? "",
                     "nearby": devices,

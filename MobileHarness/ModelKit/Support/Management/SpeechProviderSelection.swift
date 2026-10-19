@@ -62,7 +62,7 @@ actor SelectedSynthesis: SpeechSynthesisCapability {
     }
     func selected() async throws -> ModelID {
         try await selection.resolve(
-            manager: manager, artifact: "moss-tts-nano", local: ModelKitDefaults.mossNano,
+            manager: manager, artifact: "moss-tts-nano", local: DefaultModelAssembly.mossNano,
             system: ModelID("apple-synthesis"), capability: .synthesis)
     }
     var availability: CapabilityAvailability {

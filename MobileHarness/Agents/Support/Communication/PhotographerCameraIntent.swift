@@ -1,9 +1,9 @@
 import AgentCore
 import Foundation
-import Storage
+import StorageCore
 
 /// Camera work owned by Photographer; request identity is opaque, never an executable path.
-public struct PhotographerCameraIntent: Codable, Sendable, Equatable {
+public struct PhotographerCameraIntent: ExternalInputProviding, Codable, Sendable, Equatable {
     public static let contract = "photography.camera"
     public enum Operation: String, Codable, Sendable { case open, close, flip, retry, savePhoto, ignorePhoto, cancel }
     public enum Facing: String, Codable, Sendable { case front, back }
@@ -28,12 +28,11 @@ public struct PhotographerCameraIntent: Codable, Sendable, Equatable {
                 }
             })
     }
-    public func input(sessionID: String) throws -> AgentInput {
+    public func externalInput(sessionID: String, sequence: UInt64) throws -> ExternalInputDraft {
         let payload = InputPayload.observation(message)
-        return AgentInput(
-            id: requestID, sessionID: sessionID, payload: payload,
-            metadata: InputMetadata(
-                payload: payload, source: operation == .cancel ? "runtime" : "user", rootID: requestID))
+        return ExternalInputDraft(
+            id: requestID, sessionID: sessionID, payload: payload, source: operation == .cancel ? "runtime" : "user",
+            rootID: requestID)
     }
 }
 extension AgentMessage {
@@ -41,7 +40,7 @@ extension AgentMessage {
 }
 
 /// Actual host camera facts, independent of commands and task execution receipts.
-public struct CameraStateObservation: Codable, Sendable, Equatable {
+public struct CameraStateObservation: ExternalInputProviding, Codable, Sendable, Equatable {
     public static let contract = "camera.state"
     public static let source = "phone.camera"
     public let sequence: UInt64
@@ -78,12 +77,9 @@ public struct CameraStateObservation: Codable, Sendable, Equatable {
     public var message: AgentMessage {
         AgentMessage(contract: Self.contract, content: self, maximumBytes: 2048, validate: { try $0.validate() })
     }
-    public func input(sessionID: String) throws -> AgentInput {
+    public func externalInput(sessionID: String, sequence: UInt64) throws -> ExternalInputDraft {
         let payload = InputPayload.observation(message)
-        let id = UUID().uuidString
-        return AgentInput(
-            id: id,
-            sessionID: sessionID, payload: payload,
-            metadata: InputMetadata(payload: payload, source: Self.source, sequence: sequence, rootID: id))
+        return ExternalInputDraft(
+            sessionID: sessionID, payload: payload, source: Self.source, sequence: self.sequence)
     }
 }

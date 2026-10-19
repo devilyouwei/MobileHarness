@@ -1,5 +1,21 @@
 import Foundation
 
+/// Agent-owned failure classification; producers retain the original typed cause.
+public struct AgentFailureDiagnostic: Equatable, Sendable {
+    public enum Category: String, Sendable {
+        case modelResponse, modelTransport, generation, context, runtime
+    }
+    public let category: Category
+    public let code: String
+    public let detail: String
+    public init(category: Category, code: String, detail: String) {
+        precondition(!code.isEmpty && code.utf8.count <= 64)
+        self.category = category
+        self.code = code
+        self.detail = String(detail.prefix(2048))
+    }
+}
+
 public enum AgentOutput: Equatable, Sendable {
     case communication(CommunicationAction)
     case rejectedCall(CallRejection)

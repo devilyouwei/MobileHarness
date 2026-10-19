@@ -219,13 +219,14 @@ import Foundation
         @State private var isRefreshing = false
         @State private var expandedTasks: Set<String> = []
         @State private var taskPages: [String: HistoryConversation] = [:]
-        @State private var loadingRequest = false
+        @Environment(\.scenePhase) private var scenePhase
+        @State private var messageLoader = HistoryMessageLoader()
+        @State private var items: [HistoryTimelineItem] = []
         @State private var pageLoading = HistoryPageLoading<UInt64>()
         @State private var taskLoading: [String: HistoryPageLoading<UInt64>] = [:]
         @State private var pageWorker: Task<Void, Never>?
         @State private var taskWorkers: [String: Task<Void, Never>] = [:]
         @State private var requestNavigation = HistoryRequestNavigation()
-        private var items: [HistoryTimelineItem] { ConversationHistoryPresentation.timeline(loaded ?? seed) }
         let title: String
         let controls: any ConversationHistoryControlling
         init(conversation: HistoryConversation, controls: any ConversationHistoryControlling) {
@@ -235,9 +236,9 @@ import Foundation
         }
         var body: some View {
             List {
-                if let loadError {
+                if let error = loadError ?? messageLoader.error {
                     Section {
-                        Text(loadError).font(.footnote).foregroundStyle(.secondary).textSelection(.enabled)
+                        Text(error).font(.footnote).foregroundStyle(.secondary).textSelection(.enabled)
                         Button("重试") { Task { await reload() } }.disabled(isRefreshing)
                     }
                 }
@@ -280,6 +281,10 @@ import Foundation
             }
             .task(id: seed.id) {
                 guard loaded == nil, initialLoad.begin() else { return }
+                do { items = try await ConversationHistoryPresentation.timelineOffMain(seed) } catch {
+                    initialLoad.finish(succeeded: false)
+                    return
+                }
                 await reload()
                 initialLoad.finish(succeeded: !Task.isCancelled && loaded != nil)
             }
@@ -287,6 +292,8 @@ import Foundation
             .overlay {
                 if loaded == nil && loadError == nil { ProgressView("加载对话…") }
             }
+            .onDisappear { messageLoader.cancel() }
+            .onChange(of: scenePhase) { _, phase in if phase != .active { messageLoader.cancel() } }
             .navigationTitle(String(title.prefix(40)))
             .navigationDestination(isPresented: $requestNavigation.isPresented) {
                 if let turn = requestNavigation.turn { ConversationTurnDetail(turn: turn, controls: controls) }
@@ -337,14 +344,8 @@ import Foundation
         }
         private func requestRow(_ turn: HistoryTurn, showsIcon: Bool = true, endsTask: Bool = false) -> some View {
             Button {
-                guard !loadingRequest, !requestNavigation.isPresented else { return }
-                loadingRequest = true
-                Task {
-                    defer { loadingRequest = false }
-                    do { requestNavigation.open(try await controls.loadMessage(turn)) } catch {
-                        loadError = "读取失败：\(error)"
-                    }
-                }
+                guard !requestNavigation.isPresented else { return }
+                messageLoader.open(read: { try await controls.loadMessage(turn) }) { requestNavigation.open($0) }
             } label: {
                 HStack(alignment: .top, spacing: 12) {
                     if showsIcon {
@@ -380,6 +381,7 @@ import Foundation
         private func reload() async {
             guard !isRefreshing, !Task.isCancelled else { return }
             isRefreshing = true
+            messageLoader.cancel()
             defer { isRefreshing = false }
             let readers = Array(taskWorkers.values) + [pageWorker].compactMap { $0 }
             for reader in readers { reader.cancel() }
@@ -390,8 +392,10 @@ import Foundation
             do {
                 try Task.checkCancellation()
                 let conversation = try await controls.loadConversation(seed.id)
+                let timeline = try await ConversationHistoryPresentation.timelineOffMain(conversation)
                 try Task.checkCancellation()
                 loaded = conversation
+                items = timeline
                 taskPages.removeAll()
                 loadError = nil
                 initialLoad.finish(succeeded: true)
@@ -423,7 +427,13 @@ import Foundation
                 try Task.checkCancellation()
                 guard pageLoading.accepts(ticket) else { return }
                 guard page.nextPosition.map({ $0 > after }) ?? true else { throw HistoryDetailError.unavailable }
-                try loaded?.appendPage(page)
+                guard var conversation = loaded else { throw HistoryDetailError.unavailable }
+                try conversation.appendPage(page)
+                let timeline = try await ConversationHistoryPresentation.timelineOffMain(conversation)
+                try Task.checkCancellation()
+                guard pageLoading.accepts(ticket) else { return }
+                loaded = conversation
+                items = timeline
                 pageLoading.finish(ticket)
             } catch is CancellationError {
                 pageLoading.cancel(ticket)
@@ -532,25 +542,16 @@ import Foundation
     private struct ConversationTurnDetail: View {
         let turn: HistoryTurn
         let controls: any ConversationHistoryControlling
-        private let catalog: HistoryFunctionCatalog?
-        private let catalogError: String?
+        @State private var catalog: HistoryFunctionCatalog?
+        @State private var catalogError: String?
+        @State private var catalogSource: String?
         @State private var interpretation = ""
+        @State private var catalogExpanded = false
+        @State private var catalogRawExpanded = false
 
         init(turn: HistoryTurn, controls: any ConversationHistoryControlling) {
             self.turn = turn
             self.controls = controls
-            if let metadata = turn.decisionMetadata {
-                do {
-                    catalog = try ConversationHistoryPresentation.functionCatalog(metadata.catalogJSON)
-                    catalogError = nil
-                } catch {
-                    catalog = nil
-                    catalogError = error.localizedDescription
-                }
-            } else {
-                catalog = nil
-                catalogError = nil
-            }
         }
 
         var body: some View {
@@ -561,7 +562,10 @@ import Foundation
                     }
                     selectable(turn.displayInput)
                 }
-                Section("Assistant Response") { selectable(turn.raw) }
+                Section("Assistant Response") {
+                    if !turn.raw.isEmpty || (turn.toolCalls ?? []).isEmpty { selectable(turn.raw) }
+                    ForEach(turn.toolCalls ?? []) { call in selectable(call.responseReport) }
+                }
                 if turn.historyTaskID != nil || turn.decisionMetadata != nil {
                     Section("Tasks and Skills") {
                         ViewThatFits(in: .horizontal) {
@@ -653,6 +657,21 @@ import Foundation
                 }
             }
             .task { interpretation = controls.preview(turn) }
+            .task(id: turn.decisionMetadata?.catalogJSON) {
+                guard let source = turn.decisionMetadata?.catalogJSON, source != catalogSource else { return }
+                catalog = nil
+                catalogError = nil
+                do {
+                    let result = try await ConversationHistoryPresentation.functionCatalogOffMain(source)
+                    try Task.checkCancellation()
+                    catalog = result
+                    catalogSource = source
+                } catch {
+                    guard !Task.isCancelled else { return }
+                    catalogError = error.localizedDescription
+                    catalogSource = source
+                }
+            }
         }
 
         private var taskInformation: some View {
@@ -681,21 +700,8 @@ import Foundation
             .frame(maxWidth: .infinity, alignment: .leading)
         }
 
-        private var functionCatalog: some View {
-            DisclosureGroup {
-                if let catalog {
-                    VStack(alignment: .leading, spacing: 16) {
-                        catalogGroup("Actions", entries: catalog.actions, color: .blue)
-                        Divider()
-                        catalogGroup("Tools", entries: catalog.tools, color: .purple)
-                    }
-                    .padding(.vertical, 8)
-                } else if let catalogError {
-                    Text("Unable to read Function Catalog").foregroundStyle(.orange)
-                    selectable(catalogError)
-                    DisclosureGroup("Raw JSON") { selectable(turn.decisionMetadata?.catalogJSON ?? "") }
-                }
-            } label: {
+        @ViewBuilder private var functionCatalog: some View {
+            HistoryCatalogToggle(isExpanded: $catalogExpanded) {
                 HStack {
                     Text("Function Catalog")
                     Spacer()
@@ -705,39 +711,28 @@ import Foundation
                     }
                 }
             }
-        }
-
-        private func catalogGroup(_ title: String, entries: [HistoryFunctionRegistration], color: Color) -> some View {
-            VStack(alignment: .leading, spacing: 12) {
-                Text("\(title) · \(entries.count)").font(.subheadline.weight(.semibold)).foregroundStyle(color)
-                ForEach(Array(entries.sorted { ($0.alias, $0.path) < ($1.alias, $1.path) }.enumerated()), id: \.offset)
-                {
-                    index, entry in
-                    if index > 0 { Divider() }
-                    DisclosureGroup {
-                        VStack(alignment: .leading, spacing: 8) {
-                            if let channel = entry.channel { selectable("Channel: " + channel) }
-                            if !entry.required.isEmpty {
-                                selectable("Required: " + entry.required.sorted().joined(separator: ", "))
-                            }
-                            if !entry.optional.isEmpty {
-                                selectable("Optional: " + entry.optional.sorted().joined(separator: ", "))
-                            }
-                            if entry.required.isEmpty && entry.optional.isEmpty {
-                                Text("No parameters").font(.caption).foregroundStyle(.secondary)
-                            }
-                            if let definition = entry.definitionJSON, !definition.isEmpty {
-                                DisclosureGroup("Definition") { selectable(definition) }
-                            }
-                        }
-                        .padding(.vertical, 6)
-                    } label: {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(verbatim: entry.alias).font(.system(.subheadline, design: .monospaced))
-                            Text(verbatim: entry.path).font(.caption).foregroundStyle(.secondary)
-                        }
+            if catalogExpanded {
+                if let catalog {
+                    catalogGroup("Actions", entries: catalog.actions, color: .blue)
+                    catalogGroup("Tools", entries: catalog.tools, color: .purple)
+                } else if let catalogError {
+                    Text("Unable to read Function Catalog").foregroundStyle(.orange)
+                    selectable(catalogError)
+                    HistoryCatalogToggle(isExpanded: $catalogRawExpanded) { Text("Raw JSON") }
+                    if catalogRawExpanded {
+                        selectable(turn.decisionMetadata?.catalogJSON ?? "")
                     }
                 }
+            }
+        }
+
+        @ViewBuilder private func catalogGroup(
+            _ title: String, entries: [HistoryFunctionRegistration], color: Color
+        ) -> some View {
+            Text("\(title) · \(entries.count)").font(.subheadline.weight(.semibold)).foregroundStyle(color)
+            ForEach(Array(entries.sorted { ($0.alias, $0.path) < ($1.alias, $1.path) }.enumerated()), id: \.offset) {
+                _, entry in
+                HistoryCatalogEntryRow(entry: entry)
             }
         }
 
@@ -762,6 +757,72 @@ import Foundation
         private func selectable(_ text: String) -> some View {
             Text(verbatim: text)
                 .font(.system(.caption, design: .monospaced)).textSelection(.enabled)
+        }
+    }
+
+    /// Each toggle is a separate Form row; no ancestor row contains child buttons.
+    private struct HistoryCatalogToggle<Label: View>: View {
+        @Binding var isExpanded: Bool
+        @ViewBuilder var label: () -> Label
+
+        var body: some View {
+            Button {
+                isExpanded.toggle()
+            } label: {
+                HStack(spacing: 8) {
+                    label()
+                    Spacer(minLength: 0)
+                    Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
+                        .font(.caption.weight(.semibold)).foregroundStyle(.tertiary)
+                        .accessibilityHidden(true)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityValue(isExpanded ? "Expanded" : "Collapsed")
+        }
+    }
+
+    private struct HistoryCatalogEntryRow: View {
+        let entry: HistoryFunctionRegistration
+        @State private var isExpanded = false
+        @State private var definitionExpanded = false
+
+        var body: some View {
+            Group {
+                HistoryCatalogToggle(isExpanded: $isExpanded) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(verbatim: entry.alias).font(.system(.subheadline, design: .monospaced))
+                        Text(verbatim: entry.path).font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+                .padding(.leading, 16)
+                if isExpanded {
+                    VStack(alignment: .leading, spacing: 8) {
+                        if let channel = entry.channel { Text(verbatim: "Channel: " + channel) }
+                        if !entry.required.isEmpty {
+                            Text(verbatim: "Required: " + entry.required.sorted().joined(separator: ", "))
+                        }
+                        if !entry.optional.isEmpty {
+                            Text(verbatim: "Optional: " + entry.optional.sorted().joined(separator: ", "))
+                        }
+                        if entry.required.isEmpty && entry.optional.isEmpty {
+                            Text("No parameters").foregroundStyle(.secondary)
+                        }
+                    }
+                    .font(.system(.caption, design: .monospaced)).textSelection(.enabled)
+                    .padding(.leading, 32)
+                    if let definition = entry.definitionJSON, !definition.isEmpty {
+                        HistoryCatalogToggle(isExpanded: $definitionExpanded) { Text("Definition") }
+                            .padding(.leading, 32)
+                        if definitionExpanded {
+                            Text(verbatim: definition).font(.system(.caption, design: .monospaced))
+                                .textSelection(.enabled).padding(.leading, 48)
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -859,7 +920,7 @@ import Foundation
                 }
                 loading = false
             }
-            .fullScreenCover(isPresented: $inspecting) {
+            .retainedFullScreenCover(isPresented: $inspecting) {
                 ZStack(alignment: .topTrailing) {
                     Color.black.ignoresSafeArea()
                     if let data { HistoryImagePreview(data: data) }

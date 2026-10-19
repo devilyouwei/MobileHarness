@@ -1,6 +1,6 @@
 import AgentCore
 import Foundation
-import Storage
+import StorageCore
 
 /// Photographer business service entry point; tracking policy is a co-located component.
 public actor PhotographerAgent: Agent {
@@ -47,13 +47,10 @@ public actor PhotographerAgent: Agent {
         sessionID: String, configuration: AgentConfiguration? = nil, controlsArm: Bool = false,
         outputCapacity: Int = PhotographerSignalPreprocessor.outputCapacity,
         controlAvailable: @escaping @Sendable () async -> Bool = { true },
-        context: AgentContextRepository<PhotographerContextState>? = nil
+        context: AgentContextRepository<PhotographerContextState>
     ) throws {
         guard (1...8192).contains(outputCapacity) else { throw CommunicationError.invalidPayload }
-        self.contextRepository =
-            context
-            ?? AgentContextRepository(
-                agent: .photographer, scope: UUID().uuidString, state: PhotographerContextState())
+        self.contextRepository = context
         guard contextRepository.agentID == .photographer else { throw AgentConfigurationError.identityMismatch }
         let configuration = try configuration ?? AgentConfigurations.load(named: "Photographer")
         guard configuration.agentID == .photographer else { throw AgentConfigurationError.identityMismatch }

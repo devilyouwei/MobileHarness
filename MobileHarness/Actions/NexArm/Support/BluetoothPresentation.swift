@@ -1,6 +1,6 @@
 import Foundation
 import PlatformKit
-import Storage
+import StorageCore
 
 /// App presentation policy, independent of packet admission and motion execution.
 public enum BluetoothPresentation {

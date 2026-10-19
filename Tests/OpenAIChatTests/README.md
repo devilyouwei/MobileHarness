@@ -14,7 +14,7 @@
 | 流与背压 | 字节级 Unicode、CRLF/多行 SSE、慢消费和暂停、终态 usage、取消/卸载/关闭后复用与拒绝 |
 | 失败 | HTTP 安全分类、credit_balance_exhausted、缺失/错误/重复 usage、拒绝/截断/未知或超限输出、无效配置 |
 | reasoning | Alibaba reasoning item/delta/done 的结构验证与私有文本过滤、native 输出 index 与配对保持、非思考请求选项及强制思考模型拒绝 |
-| 计时与清理 | 首个有效文本时间、幂等 start、实际清理屏障、并发请求拒绝、共享句柄替换与卸载 |
+| 计时与清理 | 首个有效文本时间、幂等 start、实际清理屏障、并发请求拒绝、共享句柄替换与卸载；native 参数增量首样本、空增量/私有推理忽略、文本/native 先到者及终态前不发布调用 |
 
 ## 显式在线探针
 
@@ -23,3 +23,14 @@ liveProviderPreservesConsecutiveUsers 从调用进程获取 HARNESS_LIVE_CHAT_UR
 ## 待实现
 
 - 真实第三方 Provider 兼容性、认证与 iPhone 网络生命周期验收，需要显式提供端点/凭据。
+
+✅ 离线 SSE fixtures 覆盖缓存读取/写入缺失、零、有效值和非法类型/范围，不访问真实 API。
+
+✅ 离线编码验证固定 system、完整 native 调用/结果组和后置 system 事实的顺序保持，不混入用户正文。
+
+✅ 将千问实测的无后缀/未声明 native 名称归一为合成身份 fixture，验证当前解码器在 output_item.added 明确拒绝并不输出调用；这描述当前失败边界，不将其记为名称兼容已修复。
+
+
+## 分类异常诊断
+
+✅ 离线 SSE 回归精确断言未声明/缺失名称、身份、顺序、参数格式及增量不一致、终态、用量和脱敏有界诊断；不放宽错误为接受，不运行云请求。

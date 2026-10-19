@@ -1,5 +1,7 @@
 # UI Support — 中立呈现接口、载荷与反馈生成
 
+✅ UIUpdateCapability 与 VoiceOutputHandling 转发请求等待；ConversationPresentation 按会话／轮次／任务／序号校验，再提交 UI 自有请求 ID，不能修改模型准备状态。
+
 ## 简介
 
 定义与 UI 框架无关的能力协议、请求值、姿态载荷、反馈 PCM，以及三个呈现目录的依赖绑定。核心值/函数源编译于 Actions；RuntimePresentation 等外层集成源由互斥清单编译于 ActionBindings，通过 UI 公开接口呈现。
@@ -91,3 +93,29 @@ HomeEffectsWorkflow 的 timer、文本/UUID 围栏和状态在 UI/Conversation�
 ## 待实现
 
 - showPose 当前只读取 payload，没有统一拒绝其它参数键；调用规范应只发送 payload。
+
+## Storage 依赖
+
+✅ 存储访问使用独立的 State、Cache、Database 和 Files 接口；App 注册根实例，消费者通过构造器获得所需能力。存储容器不接管本目录的业务验证、执行和完成语义。
+
+## Platform 根、设备接入与同帧呈现
+
+✅ PosePresentationCapability 增加携带 FunctionInput 的提交入口；通用独立宿主可使用原有无像素端口，生产 RuntimePresentation 则从受控 attachment 取得同帧 CameraFrame 并交给相机呈现端点。缺失/错帧/过期在生产端明确失败，不回退到单独骨架或原生视频。
+
+## ApplicationControl 异常展示
+
+✅ 已实现：UIModule 绑定 RuntimeDiagnostics；中立 RuntimeFailurePresentationCapability/RuntimeIssue 值不依赖 Agent/UI。RuntimePresentation 验证 ApplicationControl 根身份后写入注入的同一 ActionActivityState，不决定分类或提示文案。
+
+## UI 全量容器化
+
+✅ 应用级 UI 状态由八个子容器统一创建，消费者注入所需 Presenting 接口并提交 UI 自有值，不直接写字段。App 注册并管理同一 UI 根；原业务身份/版本校验、原生完成和基础库依赖边界保持。跨模块连接迁移仍是独立待办。
+✅ 已实现：BluetoothStatusPresentationCapability与RuntimePresentation提供两个窄呈现端点，校验ApplicationControl来源／根会话／无task及递增revision，注入同根home和devices，不创建备用UI状态。
+
+✅ 已实现：BluetoothStatusActions.swift单独拥有UI.BluetoothStatus.showBluetoothHome／showBluetoothSettings；连接状态不归RuntimeDiagnostics异常函数组。使用现有Actions/UI目录和编译目标。
+
+
+✅ UIModule注册setLoading，RuntimePresentation校验applicationControl来源、根会话、无Task及取消，再提交UI自有ExpressionPresenting.setLoading；不借用聆听开关或有限表情回执。
+
+✅ setLoading为state函数，必须使用Void handler产生completed，禁止value完成；回归通过FunctionExecutor校验完成类型和Tool返回成功，不能只检查UI副作用。
+
+✅ 已实现：setLoading 区分正常被更新取代的呈现与非法提交；applied／superseded 为状态投影完成，rejected 仍抛错，身份校验和取消保持。

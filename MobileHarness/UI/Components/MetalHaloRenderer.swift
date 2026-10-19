@@ -31,14 +31,14 @@
         static func prewarm() { DispatchQueue.global(qos: .userInteractive).async { _ = prepared } }
     }
 
-    private struct HaloControl: Sendable {
-        var motion = ListeningMotion()
-        var size = SIMD2<Float>(1, 1)
-        var visible = false
+    // Thread is only published/read under the control mutex; perform(on:) is a cross-thread wake.
+    private struct HaloControl: @unchecked Sendable {
+        var state = HaloRenderState()
         var wakeQueued = false
-        var stopping = false
-        var maximumFPS: Float = 60
+        var finished = false
+        var thread: Thread?
     }
+
     private struct HaloUniforms {
         var size: SIMD2<Float>
         var origin: SIMD2<Float>
@@ -56,51 +56,48 @@
         private let control = Mutex(HaloControl())
         private let slots = DispatchSemaphore(value: 3)
         private let failure: @Sendable (String) -> Void
-        private var renderThread: Thread!
+        let completion = DispatchGroup()
         // Render-thread-only fields.
         private var displayLink: CAMetalDisplayLink?
         private var stopped = false
+        private var requestedRate: (minimum: Float, maximum: Float)?
 
         init(layer: CAMetalLayer, context: HaloPipeline, failure: @escaping @Sendable (String) -> Void) {
             metalLayer = layer
             self.context = context
             self.failure = failure
             super.init()
-            renderThread = Thread { [self] in run() }
-            renderThread.name = "MobileHarness.CompanionMetal"
-            renderThread.qualityOfService = .userInteractive
-            renderThread.start()
+            completion.enter()
+            let thread = Thread { [self] in run() }
+            thread.name = "MobileHarness.CompanionMetal"
+            thread.qualityOfService = .userInteractive
+            control.withLock { $0.thread = thread }
+            thread.start()
         }
         func update(motion: ListeningMotion, size: CGSize, visible: Bool, maximumFPS: Int) {
-            let accepted = control.withLock { state in
-                guard !state.stopping else { return false }
-                state.motion = motion
-                state.size = SIMD2(Float(max(1, size.width)), Float(max(1, size.height)))
-                state.visible = visible
-                state.maximumFPS = Float(maximumFPS)
-                return true
+            let accepted = control.withLock {
+                $0.state.update(motion: motion, size: size, visible: visible, maximumFPS: maximumFPS)
             }
-            guard accepted else { return }
-            scheduleRefresh()
+            if accepted { scheduleRefresh() }
         }
         func stop() {
-            let accepted = control.withLock { state in
-                guard !state.stopping else { return false }
-                state.stopping = true
-                return true
-            }
-            guard accepted else { return }
+            if control.withLock({ $0.state.stop() }) { scheduleRefresh() }
+        }
+        private func fail(_ message: String) {
+            guard control.withLock({ $0.state.fail() }) else { return }
+            failure(message)
             scheduleRefresh()
         }
         private func scheduleRefresh() {
-            let wake = control.withLock { state in
-                guard !state.wakeQueued else { return false }
+            let thread = control.withLock { state -> Thread? in
+                guard !state.finished, !state.wakeQueued else { return nil }
                 state.wakeQueued = true
-                return true
+                return state.thread
             }
-            if wake { perform(#selector(refresh), on: renderThread, with: nil, waitUntilDone: false) }
+            if let thread { perform(#selector(refresh), on: thread, with: nil, waitUntilDone: false) }
         }
         private func run() {
+            defer { completion.leave() }
             let port = Port()
             RunLoop.current.add(port, forMode: .default)
             let link = CAMetalDisplayLink(metalLayer: metalLayer)
@@ -110,21 +107,26 @@
             displayLink = link
             link.add(to: .current, forMode: .default)
             refresh()
-            while !stopped { RunLoop.current.run(until: Date(timeIntervalSinceNow: 60)) }
+            while !stopped { CFRunLoopRun() }
             port.invalidate()
-            renderThread = nil
+            control.withLock {
+                $0.finished = true
+                $0.thread = nil
+            }
         }
         @objc private func refresh() {
             guard !stopped else { return }
             let snapshot = control.withLock { state in
                 state.wakeQueued = false
-                return state
+                return state.state
             }
             if snapshot.stopping {
                 displayLink?.invalidate()
                 displayLink = nil
                 // GPU completion callbacks run off this thread. Never block the UI during teardown.
                 for _ in 0..<3 { slots.wait() }
+                // Joining borrows all permits; restore them before semaphore destruction.
+                for _ in 0..<3 { slots.signal() }
                 stopped = true
                 CFRunLoopStop(CFRunLoopGetCurrent())
             } else {
@@ -136,7 +138,7 @@
             autoreleasepool { render(link, update: update) }
         }
         private func render(_ link: CAMetalDisplayLink, update: CAMetalDisplayLink.Update) {
-            let snapshot = control.withLock { $0 }
+            let snapshot = control.withLock { $0.state }
             guard snapshot.visible, !snapshot.stopping else {
                 link.isPaused = true
                 return
@@ -146,14 +148,17 @@
                 snapshot.motion.isEntering(at: time)
                 || (!snapshot.motion.active && snapshot.motion.opacity(at: time) > 0)
             let maximumFPS = snapshot.maximumFPS
-            link.preferredFrameRateRange = CAFrameRateRange(
-                minimum: min(30, maximumFPS), maximum: fast ? maximumFPS : min(60, maximumFPS),
-                preferred: fast ? maximumFPS : min(60, maximumFPS))
-            guard slots.wait(timeout: .now()) == .success else { return }  // Drop this frame; never queue it.
+            let minimum = min(30, maximumFPS)
+            let maximum = fast ? maximumFPS : min(60, maximumFPS)
+            if requestedRate?.minimum != minimum || requestedRate?.maximum != maximum {
+                link.preferredFrameRateRange = CAFrameRateRange(minimum: minimum, maximum: maximum, preferred: maximum)
+                requestedRate = (minimum, maximum)
+            }
+            guard slots.wait(timeout: .now()) == .success else { return }
+            // Drop this frame; never queue it.
             guard let command = context.queue.makeCommandBuffer() else {
                 slots.signal()
-                failure("无法创建光环渲染帧")
-                link.isPaused = true
+                fail("无法创建光环渲染帧")
                 return
             }
             let pass = MTLRenderPassDescriptor()
@@ -163,8 +168,7 @@
             pass.colorAttachments[0].clearColor = MTLClearColorMake(0, 0, 0, 0)
             guard let encoder = command.makeRenderCommandEncoder(descriptor: pass) else {
                 slots.signal()
-                failure("无法创建光环渲染器")
-                link.isPaused = true
+                fail("无法创建光环渲染器")
                 return
             }
             var uniforms = HaloUniforms(
@@ -177,9 +181,9 @@
             encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 3)
             encoder.endEncoding()
             command.present(update.drawable)
-            command.addCompletedHandler { [slots, failure] buffer in
+            command.addCompletedHandler { [weak self, slots] buffer in
+                if buffer.status == .error { self?.fail(buffer.error?.localizedDescription ?? "光环 GPU 执行失败") }
                 slots.signal()
-                if buffer.status == .error { failure(buffer.error?.localizedDescription ?? "光环 GPU 执行失败") }
             }
             command.commit()
             if !snapshot.motion.needsFrame(at: time) { link.isPaused = true }

@@ -2177,7 +2177,7 @@ sequenceDiagram
 
 ## MobileHarness/Storage/Audio/README.md
 
-[现行 README](../../MobileHarness/Storage/Audio/README.md)
+[现行 README](../../MobileHarness/Storage/Cache/Audio/README.md)
 
 ````markdown
 ## Stream behavior
@@ -2191,7 +2191,7 @@ sequenceDiagram
 
 ## MobileHarness/Storage/Chat/README.md
 
-[现行 README](../../MobileHarness/Storage/Chat/README.md)
+[现行 README](../../MobileHarness/Storage/Database/Chat/README.md)
 
 ````markdown
 ## Task, queries and archives
@@ -2207,7 +2207,7 @@ sequenceDiagram
 
 ## MobileHarness/Storage/Devices/README.md
 
-[现行 README](../../MobileHarness/Storage/Devices/README.md)
+[现行 README](../../MobileHarness/Storage/Database/Devices/README.md)
 
 ````markdown
 ## Outstanding work
@@ -2217,7 +2217,7 @@ sequenceDiagram
 
 ## MobileHarness/Storage/Media/README.md
 
-[现行 README](../../MobileHarness/Storage/Media/README.md)
+[现行 README](../../MobileHarness/Storage/Database/Media/README.md)
 
 ````markdown
 ## Outstanding work
@@ -2265,7 +2265,7 @@ sequenceDiagram
 
 ## MobileHarness/Storage/Support/Persistence/File/README.md
 
-[现行 README](../../MobileHarness/Storage/Support/Persistence/File/README.md)
+[现行 README](../../MobileHarness/Storage/Files/README.md)
 
 ````markdown
 ## Outstanding work
@@ -2277,7 +2277,7 @@ sequenceDiagram
 
 ## MobileHarness/Storage/Support/Persistence/README.md
 
-[现行 README](../../MobileHarness/Storage/Support/Persistence/README.md)
+[现行 README](../../MobileHarness/Storage/Database/README.md)
 
 ````markdown
 ## Outstanding work
@@ -2287,7 +2287,7 @@ sequenceDiagram
 
 ## MobileHarness/Storage/Support/Persistence/SQLite/README.md
 
-[现行 README](../../MobileHarness/Storage/Support/Persistence/SQLite/README.md)
+[现行 README](../../MobileHarness/Storage/Database/SQLite/README.md)
 
 ````markdown
 ## Outstanding work
@@ -2307,7 +2307,7 @@ sequenceDiagram
 
 ## MobileHarness/Storage/Tasks/README.md
 
-[现行 README](../../MobileHarness/Storage/Tasks/README.md)
+[现行 README](../../MobileHarness/Storage/Database/Tasks/README.md)
 
 ````markdown
 ## Outstanding work

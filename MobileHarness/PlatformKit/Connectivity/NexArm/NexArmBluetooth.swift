@@ -189,41 +189,133 @@ public protocol NexArmBluetoothLink: NexArmObservableLink {
 /// Actor-facing transport; CoreBluetooth objects never leave their main-actor delegate owner.
 public actor NexArmBluetooth: NexArmBluetoothLink, NexArmObservableLink {
     public nonisolated let updates: AsyncStream<NexArmBluetoothSnapshot>
-    private let driver: Task<NexArmBLEDriver, Never>
-    public init() {
+    private var driver: Task<NexArmBLEDriver, Never>?
+    private let continuation: AsyncStream<NexArmBluetoothSnapshot>.Continuation
+    private let admission: PlatformAdmission?
+    private let initialSnapshot = NexArmBluetoothSnapshot()
+    private func native() throws -> Task<NexArmBLEDriver, Never> {
+        do {
+            try admission?.check()
+            if let driver { return driver }
+            let continuation = continuation
+            let admission = admission
+            let value = Task { @MainActor in NexArmBLEDriver(updates: continuation, admission: admission) }
+            driver = value
+            return value
+        } catch {
+            admission?.report("connectivity.bluetooth", "native", error)
+            throw error
+        }
+    }
+    public init(admission: PlatformAdmission? = nil) {
+        self.admission = admission
         let pair = AsyncStream<NexArmBluetoothSnapshot>.makeStream(bufferingPolicy: .bufferingNewest(1))
         updates = pair.stream
-        driver = Task { @MainActor in NexArmBLEDriver(updates: pair.continuation) }
+        continuation = pair.continuation
     }
-    public func beginObservation() async throws -> String { try await driver.value.beginObservation() }
+    public func beginObservation() async throws -> String {
+        do {
+            return try await native().value.beginObservation()
+        } catch {
+            admission?.report("connectivity.bluetooth", "beginObservation", error)
+            throw error
+        }
+    }
     public func sendObserved(_ packet: NexArmPacket, session: String) async throws -> Bool {
-        try await driver.value.sendObserved(packet, session: session)
+        do {
+            return try await native().value.sendObserved(packet, session: session)
+        } catch {
+            admission?.report("connectivity.bluetooth", "sendObserved", error)
+            throw error
+        }
     }
     public func latestObservation(after sequence: UInt64, session: String) async throws -> NexArmTelemetry? {
-        try await driver.value.latestObservation(after: sequence, session: session)
+        do {
+            return try await native().value.latestObservation(after: sequence, session: session)
+        } catch {
+            admission?.report("connectivity.bluetooth", "latestObservation", error)
+            throw error
+        }
     }
-    public func endObservation(_ session: String) async { await driver.value.endObservation(session) }
-    public func status() async -> NexArmBluetoothSnapshot { await driver.value.status() }
-    public func scan() async throws { try await driver.value.scan() }
-    public func stopScan() async { await driver.value.stopScan() }
-    public func beginLiveControl() async throws -> String { try await driver.value.beginLiveControl() }
+    public func endObservation(_ session: String) async { await driver?.value.endObservation(session) }
+    public func status() async -> NexArmBluetoothSnapshot {
+        guard let driver = try? native() else { return await currentStatus() }
+        return await driver.value.status()
+    }
+    public func currentStatus() async -> NexArmBluetoothSnapshot {
+        await driver?.value.status() ?? initialSnapshot
+    }
+    public func scan() async throws {
+        do {
+            try await native().value.scan()
+        } catch {
+            admission?.report("connectivity.bluetooth", "scan", error)
+            throw error
+        }
+    }
+    public func stopScan() async { await driver?.value.stopScan() }
+    public func beginLiveControl() async throws -> String {
+        do {
+            return try await native().value.beginLiveControl()
+        } catch {
+            admission?.report("connectivity.bluetooth", "beginLiveControl", error)
+            throw error
+        }
+    }
     public func sendLive(_ packet: NexArmPacket, session: String) async throws -> Bool {
-        try await driver.value.sendLive(packet, session: session)
+        do {
+            return try await native().value.sendLive(packet, session: session)
+        } catch {
+            admission?.report("connectivity.bluetooth", "sendLive", error)
+            throw error
+        }
     }
     public func restoreLive(_ packet: NexArmPacket, session: String) async throws -> Bool {
-        try await driver.value.restoreLive(packet, session: session)
+        do {
+            return try await native().value.restoreLive(packet, session: session)
+        } catch {
+            admission?.report("connectivity.bluetooth", "restoreLive", error)
+            throw error
+        }
     }
-    public func endLiveControl(_ session: String) async { await driver.value.endLiveControl(session) }
-    public func clearDiscovery() async { await driver.value.clearDiscovery() }
-    public func forgetDevice() async throws { try await driver.value.forgetDevice() }
-    public func connect(_ id: String) async throws { try await driver.value.connect(id) }
-    public func disconnect() async { await driver.value.disconnect() }
+    public func endLiveControl(_ session: String) async { await driver?.value.endLiveControl(session) }
+    public func clearDiscovery() async { await driver?.value.clearDiscovery() }
+    public func forgetDevice() async throws {
+        do {
+            try await native().value.forgetDevice()
+        } catch {
+            admission?.report("connectivity.bluetooth", "forgetDevice", error)
+            throw error
+        }
+    }
+    public func connect(_ id: String) async throws {
+        do {
+            try await native().value.connect(id)
+        } catch {
+            admission?.report("connectivity.bluetooth", "connect", error)
+            throw error
+        }
+    }
+    public func disconnect() async { await driver?.value.disconnect() }
     public func close() async { await disconnect() }
-    public func write(_ packet: NexArmPacket) async throws { try await driver.value.write(packet) }
+    public func write(_ packet: NexArmPacket) async throws {
+        do {
+            try await native().value.write(packet)
+        } catch {
+            admission?.report("connectivity.bluetooth", "write", error)
+            throw error
+        }
+    }
     public func exchange(_ packet: NexArmPacket, replyID: UInt8, replyCommand: UInt8, replyCount: Int) async throws
         -> NexArmPacket
     {
-        try await driver.value.exchange(packet, replyID: replyID, replyCommand: replyCommand, replyCount: replyCount)
+        do {
+            return try await native().value.exchange(
+                packet, replyID: replyID, replyCommand: replyCommand, replyCount: replyCount)
+        } catch {
+            admission?.report("connectivity.bluetooth", "exchange", error)
+            throw error
+        }
     }
 }
 
@@ -231,7 +323,7 @@ public actor NexArmBluetooth: NexArmBluetoothLink, NexArmObservableLink {
 public enum NexArmBluetoothStep: String, Sendable, Equatable {
     case connecting, services, characteristics, notifications, writing, response
 }
-public enum NexArmBluetoothFailure: Sendable, Equatable {
+public enum NexArmBluetoothFailure: Error, Sendable, Equatable {
     public enum ProtocolViolation: Sendable, Equatable { case invalidPacket, receiveOverflow }
     case protocolViolation(ProtocolViolation)
     case timeout(NexArmBluetoothStep)
@@ -285,6 +377,7 @@ struct NexArmBLEReply {
 private final class NexArmBLEDriver: NSObject, @preconcurrency CBCentralManagerDelegate,
     @preconcurrency CBPeripheralDelegate
 {
+    private let admission: PlatformAdmission?
     private var trafficBudget = NexArmBLETrafficBudget()
     private var telemetry = NexArmTelemetryCache()
     private var controlWriteWindow = NexArmBLEControlWriteWindow()
@@ -293,6 +386,7 @@ private final class NexArmBLEDriver: NSObject, @preconcurrency CBCentralManagerD
     private var feedbackWatchdog: NexArmFeedbackWatchdog?
     private var feedbackMonitor: Task<Void, Never>?
     func beginObservation() throws -> String {
+        try admission?.check()
         guard snapshot.phase == .connected, let tx, rx?.isNotifying == true else { throw NexArmError.disconnected }
         guard liveControlID == nil, request == nil, observationID == nil else { throw NexArmError.busy }
         _ = try writeMode(tx, preferred: .unacknowledged)
@@ -352,13 +446,19 @@ private final class NexArmBLEDriver: NSObject, @preconcurrency CBCentralManagerD
     private var liveDrainUntil: ContinuousClock.Instant?
     private var disconnectTask: Task<Void, Never>?
 
-    init(updates: AsyncStream<NexArmBluetoothSnapshot>.Continuation) {
+    init(updates: AsyncStream<NexArmBluetoothSnapshot>.Continuation, admission: PlatformAdmission?) {
+        self.admission = admission
         self.updates = updates
         super.init()
         publish()
     }
     // Replace only presentation snapshots, never commands/results.
+    private var reportedFailure: NexArmBluetoothFailure?
     private func publish() {
+        if let failure = snapshot.failure, failure != reportedFailure {
+            admission?.report("connectivity.bluetooth", "nativeEvent", failure)
+        }
+        reportedFailure = snapshot.failure
         snapshot.revision &+= 1
         snapshot.queriesQuarantined = queryTimeoutLatched
         snapshot.traffic = trafficBudget.diagnostics()
@@ -405,6 +505,7 @@ private final class NexArmBLEDriver: NSObject, @preconcurrency CBCentralManagerD
         return true  // Native admission; physical completion still requires feedback.
     }
     private func admitWrite(_ peripheral: CBPeripheral, systemReady: Bool) throws -> Bool {
+        try admission?.check()
         let accepted = trafficBudget.canSend(at: .now, systemReady: systemReady)
         if trafficBudget.isSendBlocked() {
             fail(NexArmError.timeout, overriding: .sendBlocked)
@@ -418,6 +519,7 @@ private final class NexArmBLEDriver: NSObject, @preconcurrency CBCentralManagerD
         return value
     }
     func scan() throws {
+        try admission?.check()
         try Task.checkCancellation()
         guard snapshot.phase == .disconnected else { throw NexArmError.busy }
         let central = manager()
@@ -465,6 +567,7 @@ private final class NexArmBLEDriver: NSObject, @preconcurrency CBCentralManagerD
         publish()
     }
     func connect(_ id: String) async throws {
+        try admission?.check()
         try Task.checkCancellation()
         guard snapshot.phase == .disconnected, connection == nil, disconnectTask == nil else { throw NexArmError.busy }
         let central = manager()
@@ -511,6 +614,7 @@ private final class NexArmBLEDriver: NSObject, @preconcurrency CBCentralManagerD
         try Task.checkCancellation()
     }
     func beginLiveControl() throws -> String {
+        try admission?.check()
         guard snapshot.phase == .connected, let tx else { throw NexArmError.disconnected }
         _ = try writeMode(tx, preferred: .unacknowledged)
         let token = UUID().uuidString
@@ -650,13 +754,20 @@ private final class NexArmBLEDriver: NSObject, @preconcurrency CBCentralManagerD
         }
     }
     func disconnect() async {
+        let workers = [scanTimer, connectionTimer, requestTimer, requestSender, controlWriteTimer, feedbackMonitor]
+            .compactMap { $0 }
+        for worker in workers { worker.cancel() }
+        await disconnectNative()
+        for worker in workers { await worker.value }
+    }
+    private func disconnectNative() async {
         stopScan()
         failPending(NexArmError.disconnected)
-        guard let peripheral else { return }
         if let disconnectTask {
             await disconnectTask.value
             return
         }
+        guard let peripheral else { return }
         snapshot.phase = .disconnecting
         tx = nil
         rx = nil

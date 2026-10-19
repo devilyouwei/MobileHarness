@@ -1,6 +1,6 @@
 import Foundation
 import FunctionContracts
-import Storage
+import StorageCore
 
 /// Camera.Capture function ownership; current invocation paths remain compatible.
 extension CameraActions {

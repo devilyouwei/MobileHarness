@@ -9,8 +9,9 @@ import FunctionContracts
 import Gateway
 import ModelKit
 import PlatformKit
-import Storage
-import StorageAudio
+import StorageCache
+import StorageCore
+import StorageState
 import Synchronization
 import Testing
 
@@ -44,10 +45,10 @@ private struct RecognitionFixture: SpeechRecognitionCapability {
 private actor VoiceProbe {
     var spokenText: [String] = []
     var displayedText: [String] = []
-    var audio: [SpeechPCMFrame] = []
+    var audio: [StorageCache.AudioFrame] = []
     func synthesized(_ text: String) { spokenText.append(text) }
     func displayed(_ text: String) { displayedText.append(text) }
-    func played(_ frame: SpeechPCMFrame) { audio.append(frame) }
+    func played(_ frame: StorageCache.AudioFrame) { audio.append(frame) }
 }
 
 private struct SynthesisFixture: SpeechSynthesisCapability {
@@ -67,18 +68,21 @@ private struct SynthesisFixture: SpeechSynthesisCapability {
     }
 }
 
-private func sampleFrame() throws -> AudioFrame {
-    try AudioFrame(
+private func sampleFrame() throws -> ModelKit.AudioFrame {
+    try ModelKit.AudioFrame(
         data: Data(repeating: 0, count: 320),
-        format: AudioFormat(sampleRate: 16_000, channels: 1, encoding: .float32), sequence: 0, timestamp: 0)
+        format: ModelKit.AudioFormat(sampleRate: 16_000, channels: 1, encoding: .float32), sequence: 0, timestamp: 0)
 }
 
 private func preparedSpeech(
     text: String, input: AgentInput, probe: VoiceProbe, producesAudio: Bool = true
-) async throws -> (SpeechSynthesisAgent, SpeechAudioStore, SpeechPlayback, any FunctionInput) {
-    let store = SpeechAudioStore()
+) async throws -> (SpeechSynthesisAgent, AudioCache, SpeechPlayback, any FunctionInput) {
+    let store = AudioCache()
     let agent = try SpeechSynthesisAgent(
-        synthesis: SynthesisFixture(probe: probe, producesAudio: producesAudio), store: store)
+        synthesis: SynthesisFixture(probe: probe, producesAudio: producesAudio), store: store,
+        context: try AgentContextRepository(
+            agent: AgentID(rawValue: "speechSynthesis"), scope: UUID().uuidString, state: SpeechSynthesisContextState())
+    )
     try await agent.start()
     let request = try SpeechSynthesisInput(text: text)
     let payload = InputPayload.observation(.speechSynthesis(request))
@@ -99,12 +103,21 @@ private func preparedSpeech(
 
 @Test(.actionCatalog) func voiceGatewaysRoundTripThroughSayAndPrint() async throws {
     let manager = AgentManager()
-    let agent = try AssistantAgent(chat: FixedTextChat(text: "固定回复"))
+    let agent = try AssistantAgent(
+        stateContext: try publicStateFixture(),
+        chat: FixedTextChat(text: "固定回复"),
+        context: try AgentContextRepository(
+            agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState())
+    )
     try await manager.register(agent)
 
     let probe = VoiceProbe()
-    let store = SpeechAudioStore()
-    let synth = try SpeechSynthesisAgent(synthesis: SynthesisFixture(probe: probe), store: store)
+    let store = AudioCache()
+    let synth = try SpeechSynthesisAgent(
+        synthesis: SynthesisFixture(probe: probe), store: store,
+        context: try AgentContextRepository(
+            agent: AgentID(rawValue: "speechSynthesis"), scope: UUID().uuidString, state: SpeechSynthesisContextState())
+    )
     try await manager.register(synth)
     try await synth.start()
     let policy = try CommunicationPolicy(
@@ -165,7 +178,12 @@ private func preparedSpeech(
 
 @Test(.actionCatalog) func partialRecognitionNeverSubmitsAgentInput() async throws {
     let manager = AgentManager()
-    let agent = try AssistantAgent(chat: FixedTextChat())
+    let agent = try AssistantAgent(
+        stateContext: try publicStateFixture(),
+        chat: FixedTextChat(),
+        context: try AgentContextRepository(
+            agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState())
+    )
     try await manager.register(agent)
     try await agent.start()
     let recognition = RecognitionFixture(text: "", includeFinal: false)
@@ -194,7 +212,13 @@ private func preparedSpeech(
 
 @Test(.actionCatalog) func cancellingDuringPlaybackDoesNotDeliverLaterAudio() async throws {
     let manager = AgentManager()
-    try await manager.register(AssistantAgent(chat: FixedTextChat()))
+    try await manager.register(
+        AssistantAgent(
+            stateContext: try publicStateFixture(),
+            chat: FixedTextChat(),
+            context: try AgentContextRepository(
+                agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState())
+        ))
     let probe = VoiceProbe()
     let input = AgentInput(
         id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("你好"))
@@ -229,7 +253,12 @@ private func preparedSpeech(
 
 @Test(.actionCatalog) func longVoiceTurnRecognizesChunksButSubmitsOnlyOnce() async throws {
     let manager = AgentManager()
-    let agent = try AssistantAgent(chat: FixedTextChat())
+    let agent = try AssistantAgent(
+        stateContext: try publicStateFixture(),
+        chat: FixedTextChat(),
+        context: try AgentContextRepository(
+            agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState())
+    )
     try await manager.register(agent)
     try await agent.start()
     let gateway = InputGateway(manager: manager, allowsExternalSend: true)
@@ -311,7 +340,12 @@ private struct LiveRecognitionFixture: SpeechRecognitionCapability {
 
 @Test(.actionCatalog) func livePreviewArrivesBeforeEndpointAndDoesNotTriggerAgent() async throws {
     let manager = AgentManager()
-    let agent = try AssistantAgent(chat: FixedTextChat())
+    let agent = try AssistantAgent(
+        stateContext: try publicStateFixture(),
+        chat: FixedTextChat(),
+        context: try AgentContextRepository(
+            agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState())
+    )
     try await manager.register(agent)
     try await agent.start()
     let recognition = LiveRecognitionFixture()
@@ -430,11 +464,11 @@ func expressionPreservesSemanticIdentifier(_ emotion: UIActions.Emotion) async t
 
 private struct EndpointVAD: VoiceActivityCapability {
     var availability: CapabilityAvailability { .available }
-    func detectVoiceActivity(format: AudioFormat) -> any VoiceActivitySession { EndpointVADSession() }
+    func detectVoiceActivity(format: ModelKit.AudioFormat) -> any VoiceActivitySession { EndpointVADSession() }
 }
 private actor EndpointVADSession: VoiceActivitySession {
     private var position: Int64 = 0
-    func process(_ frame: AudioFrame) throws -> [VoiceActivityScore] {
+    func process(_ frame: ModelKit.AudioFrame) throws -> [VoiceActivityScore] {
         defer { position += Int64(frame.sampleCount) }
         return [
             try VoiceActivityScore(
@@ -458,7 +492,11 @@ private actor EndpointVADSession: VoiceActivitySession {
     let manager = AgentManager()
     let assistant = ObservationRecorder(id: "assistant")
     let speech = try SpeechPerceptionAgent(
-        recognition: RecognitionFixture(text: "你好", includeFinal: true), vad: EndpointVAD(), sessionID: session)
+        recognition: RecognitionFixture(text: "你好", includeFinal: true), vad: EndpointVAD(), sessionID: session,
+        context: try AgentContextRepository(
+            agent: AgentID(rawValue: "speechPerception"), scope: UUID().uuidString,
+            state: SpeechPerceptionContextState())
+    )
     try await manager.register(assistant, sessionID: session)
     await assistant.start()
     try await manager.register(speech, sessionID: session)
@@ -549,7 +587,11 @@ private actor EndpointVADSession: VoiceActivitySession {
 @Test(.actionCatalog) func speechRawAudioQueueRejectsOverflowAndExpiredInput() async throws {
     let session = UUID().uuidString
     let speech = try SpeechPerceptionAgent(
-        recognition: RecognitionFixture(text: "hello", includeFinal: true), vad: EndpointVAD(), sessionID: session)
+        recognition: RecognitionFixture(text: "hello", includeFinal: true), vad: EndpointVAD(), sessionID: session,
+        context: try AgentContextRepository(
+            agent: AgentID(rawValue: "speechPerception"), scope: UUID().uuidString,
+            state: SpeechPerceptionContextState())
+    )
     try await speech.bind(AgentMessaging { _, _, _ in DeliveryReport(delivered: [.assistant]) })
     try await speech.start()
     try await speech.pause()
@@ -607,7 +649,12 @@ private actor EndpointVADSession: VoiceActivitySession {
 {
     let session = UUID().uuidString
     let manager = AgentManager()
-    let assistant = try AssistantAgent(chat: FixedTextChat(text: "must not generate"))
+    let assistant = try AssistantAgent(
+        stateContext: try publicStateFixture(),
+        chat: FixedTextChat(text: "must not generate"),
+        context: try AgentContextRepository(
+            agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState())
+    )
     let source = ObservationRecorder(id: "speechPerception")
     try await manager.register(assistant, sessionID: session)
     try await manager.register(source, sessionID: session)
@@ -795,11 +842,11 @@ private actor EndpointVADSession: VoiceActivitySession {
 
 @Test(.actionCatalog) func speechBoundaryPaddingUsesSampleBudgetForVariableWindows() throws {
     var policy = SpeechBoundaryPolicy()
-    let format = try AudioFormat(sampleRate: 16000, channels: 1, encoding: .float32)
+    let format = try ModelKit.AudioFormat(sampleRate: 16000, channels: 1, encoding: .float32)
     var position = 0
-    func frame(_ samples: Int) throws -> AudioFrame {
+    func frame(_ samples: Int) throws -> ModelKit.AudioFrame {
         defer { position += samples }
-        return try AudioFrame(
+        return try ModelKit.AudioFrame(
             data: Data(repeating: 0, count: samples * 4), format: format,
             sequence: UInt64(position), timestamp: Double(position) / 16000)
     }
@@ -823,11 +870,11 @@ private actor NativeRateVADProbe: VoiceActivityCapability, VoiceActivitySession 
     private(set) var requestedRate: Int?
     private(set) var receivedRate: Int?
     private(set) var receivedSamples = 0
-    func detectVoiceActivity(format: AudioFormat) -> any VoiceActivitySession {
+    func detectVoiceActivity(format: ModelKit.AudioFormat) -> any VoiceActivitySession {
         requestedRate = format.sampleRate
         return self
     }
-    func process(_ frame: AudioFrame) -> [VoiceActivityScore] {
+    func process(_ frame: ModelKit.AudioFrame) -> [VoiceActivityScore] {
         receivedRate = frame.format.sampleRate
         receivedSamples += frame.sampleCount
         return []
@@ -843,7 +890,11 @@ private actor NativeRateVADProbe: VoiceActivityCapability, VoiceActivitySession 
     let probe = NativeRateVADProbe()
     let session = UUID().uuidString
     let agent = try SpeechPerceptionAgent(
-        recognition: RecognitionFixture(text: "", includeFinal: false), vad: probe, sessionID: session)
+        recognition: RecognitionFixture(text: "", includeFinal: false), vad: probe, sessionID: session,
+        context: try AgentContextRepository(
+            agent: AgentID(rawValue: "speechPerception"), scope: UUID().uuidString,
+            state: SpeechPerceptionContextState())
+    )
     try await agent.bind(AgentMessaging { _, _, _ in DeliveryReport() })
     try await agent.start()
     let samples = [Float](repeating: 0.1, count: 8192)
@@ -876,7 +927,12 @@ private actor FailOnceRecognition: SpeechRecognitionCapability {
     async throws
 {
     let session = UUID().uuidString
-    let agent = try SpeechPerceptionAgent(recognition: FailOnceRecognition(), vad: EndpointVAD(), sessionID: session)
+    let agent = try SpeechPerceptionAgent(
+        recognition: FailOnceRecognition(), vad: EndpointVAD(), sessionID: session,
+        context: try AgentContextRepository(
+            agent: AgentID(rawValue: "speechPerception"), scope: UUID().uuidString,
+            state: SpeechPerceptionContextState())
+    )
     let events = AsyncStream<String>.makeStream(bufferingPolicy: .bufferingOldest(16))
     try await agent.bind(
         AgentMessaging { message, _, _ in
@@ -922,7 +978,11 @@ private actor FailOnceRecognition: SpeechRecognitionCapability {
     let session = UUID().uuidString
     let agent = try SpeechPerceptionAgent(
         recognition: RecognitionFixture(text: "", includeFinal: false),
-        vad: NativeRateVADProbe(), sessionID: session)
+        vad: NativeRateVADProbe(), sessionID: session,
+        context: try AgentContextRepository(
+            agent: AgentID(rawValue: "speechPerception"), scope: UUID().uuidString,
+            state: SpeechPerceptionContextState())
+    )
     try await agent.start()
     try await agent.pauseAudioAdmission()
     try await agent.resumeListening()
@@ -983,7 +1043,11 @@ func speechPerceptionOwnsConsentAcrossCaptureEpochsAndRejectsStaleActivity() asy
     let incarnation = UUID().uuidString
     let agent = try SpeechPerceptionAgent(
         recognition: RecognitionFixture(text: "", includeFinal: false), vad: NativeRateVADProbe(),
-        sessionID: session, interactionSessionID: session, residentListening: true)
+        sessionID: session, interactionSessionID: session, residentListening: true,
+        context: try AgentContextRepository(
+            agent: AgentID(rawValue: "speechPerception"), scope: UUID().uuidString,
+            state: SpeechPerceptionContextState())
+    )
     try await agent.start()
     let probe = PerceptionListeningProbe()
     let pump = Task { for await output in agent.outputs { await probe.record(output) } }
@@ -1063,7 +1127,11 @@ func replyTerminalImmediatelyEmitsListeningResumeWithoutDisablingConsent() async
     let incarnation = UUID().uuidString
     let agent = try SpeechPerceptionAgent(
         recognition: RecognitionFixture(text: "", includeFinal: false), vad: NativeRateVADProbe(),
-        sessionID: session, interactionSessionID: session, residentListening: true)
+        sessionID: session, interactionSessionID: session, residentListening: true,
+        context: try AgentContextRepository(
+            agent: AgentID(rawValue: "speechPerception"), scope: UUID().uuidString,
+            state: SpeechPerceptionContextState())
+    )
     try await agent.start()
     var outputs = agent.outputs.makeAsyncIterator()
     try await agent.receive(ListeningIntent().input(sessionID: session))
@@ -1107,7 +1175,11 @@ func replyTerminalImmediatelyEmitsListeningResumeWithoutDisablingConsent() async
     let session = UUID().uuidString
     let agent = try SpeechPerceptionAgent(
         recognition: RecognitionFixture(text: "", includeFinal: false), vad: NativeRateVADProbe(),
-        sessionID: session, interactionSessionID: session, residentListening: true)
+        sessionID: session, interactionSessionID: session, residentListening: true,
+        context: try AgentContextRepository(
+            agent: AgentID(rawValue: "speechPerception"), scope: UUID().uuidString,
+            state: SpeechPerceptionContextState())
+    )
     try await agent.start()
     await #expect(throws: CommunicationError.scopeClosed) {
         try await agent.receive(ListeningIntent().input(sessionID: UUID().uuidString))
@@ -1131,8 +1203,17 @@ func listeningIntentAndReplyFactsCrossGatewaysWithPerceptionExecutionOwner() asy
     let manager = AgentManager()
     let speech = try SpeechPerceptionAgent(
         recognition: RecognitionFixture(text: "", includeFinal: false), vad: NativeRateVADProbe(),
-        sessionID: session, interactionSessionID: session, residentListening: true)
-    let assistant = try AssistantAgent(reportsReplyActivity: true, chat: FixedTextChat(text: ""))
+        sessionID: session, interactionSessionID: session, residentListening: true,
+        context: try AgentContextRepository(
+            agent: AgentID(rawValue: "speechPerception"), scope: UUID().uuidString,
+            state: SpeechPerceptionContextState())
+    )
+    let assistant = try AssistantAgent(
+        stateContext: try publicStateFixture(),
+        reportsReplyActivity: true, chat: FixedTextChat(text: ""),
+        context: try AgentContextRepository(
+            agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState())
+    )
     try await manager.register(speech)
     try await manager.register(assistant, sessionID: session)
     try await manager.start(.speechPerception)
@@ -1191,7 +1272,11 @@ func listeningIntentAndReplyFactsCrossGatewaysWithPerceptionExecutionOwner() asy
     let session = UUID().uuidString
     let speech = try SpeechPerceptionAgent(
         recognition: RecognitionFixture(text: "", includeFinal: false), vad: NativeRateVADProbe(),
-        sessionID: session, interactionSessionID: session, residentListening: true)
+        sessionID: session, interactionSessionID: session, residentListening: true,
+        context: try AgentContextRepository(
+            agent: AgentID(rawValue: "speechPerception"), scope: UUID().uuidString,
+            state: SpeechPerceptionContextState())
+    )
     try await speech.start()
     let probe = PerceptionListeningProbe()
     let pump = Task { for await envelope in speech.outputs { await probe.record(envelope) } }
@@ -1215,7 +1300,11 @@ func finalASRGatesNextUtteranceBeforePublicationUntilReplyCompletes() async thro
     let epoch = UUID().uuidString
     let speech = try SpeechPerceptionAgent(
         recognition: RecognitionFixture(text: "你好", includeFinal: true), vad: EndpointVAD(),
-        sessionID: session, interactionSessionID: session, residentListening: true)
+        sessionID: session, interactionSessionID: session, residentListening: true,
+        context: try AgentContextRepository(
+            agent: AgentID(rawValue: "speechPerception"), scope: UUID().uuidString,
+            state: SpeechPerceptionContextState())
+    )
     try await speech.start()
     let probe = PerceptionListeningProbe()
     let pump = Task { for await envelope in speech.outputs { await probe.record(envelope) } }
@@ -1259,7 +1348,11 @@ func finalASRGatesNextUtteranceBeforePublicationUntilReplyCompletes() async thro
     let incarnation = UUID().uuidString
     let agent = try SpeechPerceptionAgent(
         recognition: RecognitionFixture(text: "", includeFinal: false), vad: NativeRateVADProbe(),
-        sessionID: session, interactionSessionID: session, residentListening: true)
+        sessionID: session, interactionSessionID: session, residentListening: true,
+        context: try AgentContextRepository(
+            agent: AgentID(rawValue: "speechPerception"), scope: UUID().uuidString,
+            state: SpeechPerceptionContextState())
+    )
     try await agent.start()
     let probe = PerceptionListeningProbe()
     let pump = Task { for await output in agent.outputs { await probe.record(output) } }
@@ -1315,11 +1408,11 @@ private actor ColdVoiceActivity: VoiceActivityCapability, VoiceActivitySession {
     nonisolated let gate = ColdVoiceGate()
     nonisolated let caughtUp = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingOldest(1))
     private var position: Int64 = 0
-    func detectVoiceActivity(format: AudioFormat) async throws -> any VoiceActivitySession {
+    func detectVoiceActivity(format: ModelKit.AudioFormat) async throws -> any VoiceActivitySession {
         try await gate.wait()
         return self
     }
-    func process(_ frame: AudioFrame) throws -> [VoiceActivityScore] {
+    func process(_ frame: ModelKit.AudioFrame) throws -> [VoiceActivityScore] {
         let probability: Float = frame.data.withUnsafeBytes {
             $0.loadUnaligned(as: Float.self) > 0 ? 1 : 0
         }
@@ -1341,7 +1434,11 @@ func coldVADAndASRPreserveRecordedPrefixAndJoinLiveAudioInOrder() async throws {
     let root = UUID().uuidString
     let epoch = UUID().uuidString
     let speech = try SpeechPerceptionAgent(
-        recognition: recognition, vad: vad, sessionID: root, interactionSessionID: root, residentListening: true)
+        recognition: recognition, vad: vad, sessionID: root, interactionSessionID: root, residentListening: true,
+        context: try AgentContextRepository(
+            agent: AgentID(rawValue: "speechPerception"), scope: UUID().uuidString,
+            state: SpeechPerceptionContextState())
+    )
     let final = AsyncStream<String>.makeStream(bufferingPolicy: .bufferingOldest(1))
     try await speech.start()
     let output = Task {
@@ -1413,9 +1510,9 @@ func cancellingColdRecognitionClearsBufferedPrefixBeforeNextTurn() async throws 
     await #expect(throws: CapabilityError.sessionClosed) { try await turn.finish() }
     let next = SpeechRecognitionTurn(recognition: recognition, sessionID: UUID().uuidString) { _ in }
     let samples: [Float] = [0.25, 0.5]
-    let frame = try AudioFrame(
+    let frame = try ModelKit.AudioFrame(
         data: samples.withUnsafeBytes { Data($0) },
-        format: AudioFormat(sampleRate: 16000, channels: 1, encoding: .float32), sequence: 0, timestamp: 0)
+        format: ModelKit.AudioFormat(sampleRate: 16000, channels: 1, encoding: .float32), sequence: 0, timestamp: 0)
     recognition.gate.open()
     try await next.enqueue([.audio([frame]), .end(.silence)])
     #expect(try await next.finish() == "cold-start")
@@ -1432,8 +1529,8 @@ func coldRecognitionRejectsOverflowWithoutDroppingPreviouslyQueuedPCM() async th
     let samples = [Float](repeating: 0.25, count: 16000)
     let data = samples.withUnsafeBytes { Data($0) }
     let frames = try (0..<30).map { sequence in
-        try AudioFrame(
-            data: data, format: AudioFormat(sampleRate: 16000, channels: 1, encoding: .float32),
+        try ModelKit.AudioFrame(
+            data: data, format: ModelKit.AudioFormat(sampleRate: 16000, channels: 1, encoding: .float32),
             sequence: UInt64(sequence + 1), timestamp: Double(sequence + 1))
     }
     try await turn.enqueue([.audio(frames)])
@@ -1450,7 +1547,11 @@ func coldRecognitionRejectsOverflowWithoutDroppingPreviouslyQueuedPCM() async th
 func speechRawAudioQueueEnforcesPacketAndMemoryBounds(memoryBound: Bool) async throws {
     let root = UUID().uuidString
     let speech = try SpeechPerceptionAgent(
-        recognition: RecognitionFixture(text: "", includeFinal: false), vad: EndpointVAD(), sessionID: root)
+        recognition: RecognitionFixture(text: "", includeFinal: false), vad: EndpointVAD(), sessionID: root,
+        context: try AgentContextRepository(
+            agent: AgentID(rawValue: "speechPerception"), scope: UUID().uuidString,
+            state: SpeechPerceptionContextState())
+    )
     try await speech.start()
     try await speech.pause()
     let capacity = memoryBound ? SpeechPerceptionSignalPreprocessor.maximumQueuedSamples : 4096
@@ -1476,4 +1577,18 @@ func speechRawAudioQueueEnforcesPacketAndMemoryBounds(memoryBound: Bool) async t
     #expect(await speech.status().queuedInputs == queued)
     await speech.stop()
     #expect(await speech.status().queuedInputs == 0)
+}
+
+@Test @MainActor func spectrumOffMainMatchesSynchronousAndRejectsCancelledWork() async throws {
+    let samples = (0..<AudioSpectrum.sampleCount).map { index in
+        Float(sin(Double(index) * 2 * .pi * 440 / 16000))
+    }
+    let expected = AudioSpectrum.measure(samples, sampleRate: 16000)
+    let actual = try await AudioSpectrum.measureOffMain(samples, sampleRate: 16000)
+    #expect(actual == expected)
+    let cancelled = Task { @MainActor in
+        try await AudioSpectrum.measureOffMain(samples, sampleRate: 16000)
+    }
+    cancelled.cancel()
+    await #expect(throws: CancellationError.self) { try await cancelled.value }
 }

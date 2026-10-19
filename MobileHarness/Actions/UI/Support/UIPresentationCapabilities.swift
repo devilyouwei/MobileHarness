@@ -1,6 +1,6 @@
 import Foundation
 import FunctionContracts
-import Storage
+import StorageCore
 
 /// Finite transition/restore acknowledgments and independent persistent-state commitment.
 public protocol UIPresentationCapability: Sendable {
@@ -9,18 +9,29 @@ public protocol UIPresentationCapability: Sendable {
     func setExpression(_ emotion: UIActions.Emotion, invocation: any FunctionInput) async throws
 }
 
+public protocol LoadingExpressionPresentationCapability: Sendable {
+    func setLoadingExpression(_ enabled: Bool, revision: UInt64, invocation: any FunctionInput) async throws
+}
+
 /// Typed presentation operations; completion means the endpoint accepted the update.
 public protocol UIUpdateCapability: Sendable {
     func present(_ text: String, invocation: any FunctionInput) async throws
     func presentTranscript(_ text: String, invocation: any FunctionInput) async throws
     func finishTranscript(invocation: any FunctionInput) async throws
     func beginReplyTurn(invocation: any FunctionInput) async throws
+    func setReplyWaiting(_ enabled: Bool, requestID: String, invocation: any FunctionInput) async throws
     func presentVoiceState(_ state: UIActions.VoiceState, invocation: any FunctionInput) async throws
     func present(_ target: UIActions.Gaze, invocation: any FunctionInput) async throws
 }
 
 public protocol PosePresentationCapability: Sendable {
     func present(_ overlay: PoseOverlay, sessionID: String) async throws
+    func present(_ overlay: PoseOverlay, invocation: any FunctionInput) async throws
+}
+extension PosePresentationCapability {
+    public func present(_ overlay: PoseOverlay, invocation: any FunctionInput) async throws {
+        try await present(overlay, sessionID: invocation.context.sessionID)
+    }
 }
 
 public protocol HistoryPresentationCapability: Sendable {
@@ -47,4 +58,17 @@ extension ResourcePresentationCapability {
     {
         throw ResourcePresentationError.unavailable
     }
+}
+
+/// Commits diagnostic presentation; classification and toast selection remain with the caller.
+public protocol RuntimeFailurePresentationCapability: Sendable {
+    func recordRuntimeFailure(_ issue: RuntimeIssue, invocation: any FunctionInput) async throws
+}
+
+public enum BluetoothPresentationPhase: String, Sendable { case disconnected, connecting, connected }
+public protocol BluetoothStatusPresentationCapability: Sendable {
+    func presentBluetoothHome(_ phase: BluetoothPresentationPhase, revision: UInt64, invocation: any FunctionInput)
+        async throws
+    func presentBluetoothSettings(_ phase: BluetoothPresentationPhase, revision: UInt64, invocation: any FunctionInput)
+        async throws
 }

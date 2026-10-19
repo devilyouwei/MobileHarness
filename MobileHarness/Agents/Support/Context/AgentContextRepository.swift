@@ -1,16 +1,18 @@
 import AgentCore
 import Foundation
-import Storage
+import StorageCore
 
-/// Validated runtime transactions over one Storage-owned process-memory snapshot.
+public struct AgentPublicProjectionFailure: Error, Sendable {
+    public let committedRevision: UInt64
+    public let underlying: any Error
+}
+
+/// Private actor-owned memory. Only an explicit owner projection may publish public facts.
 public actor AgentContextRepository<State: AgentContextState> {
     public nonisolated let scopeID: String
     public nonisolated let agentID: AgentID
-    private let memory: any StateRepository<AgentContext<State>>
-    private var value: AgentContext<State> {
-        get { memory.read() }
-        set { memory.replace(newValue) }
-    }
+    private var memory: AgentContext<State>
+    private var publish: (@Sendable (AgentContext<State>) throws -> Void)?
     private let persistence: AgentContextPersistence<State>?
     private var committedRevision: UInt64?
     private var loaded = false
@@ -19,11 +21,22 @@ public actor AgentContextRepository<State: AgentContextState> {
     public init(
         agent: AgentID, scope: String, state: State,
         persistence: AgentContextPersistence<State>? = nil
-    ) {
+    ) throws {
         self.scopeID = scope
         self.agentID = agent
-        memory = MemoryStateStore(AgentContext(agentID: agent, scopeID: scope, state: state))
+        memory = AgentContext(agentID: agent, scopeID: scope, state: state)
+        try memory.validate(agent: agent, scope: scope)
         self.persistence = persistence
+    }
+    public func installPublicProjection(_ publish: @escaping @Sendable (AgentContext<State>) throws -> Void)
+        async throws
+    {
+        try await acquire()
+        defer { release() }
+        try await load()
+        guard self.publish == nil else { throw CommunicationError.invalidPayload }
+        try publish(memory)
+        self.publish = publish
     }
     private func acquire() async throws {
         if !writing {
@@ -40,24 +53,24 @@ public actor AgentContextRepository<State: AgentContextState> {
     private func load() async throws {
         guard !loaded else { return }
         if var saved = try await persistence?.load() {
-            try saved.validate(agent: value.agentID, scope: value.scopeID)
+            try saved.validate(agent: agentID, scope: scopeID)
             let priorRevision = saved.revision
             saved.state.recoverInterruptedWork()
             saved.tasks.recover()
             saved.recoverWork()
             try saved.advanceRevision()
             try await persistence?.commit(saved, priorRevision)
-            value = saved
+            memory = saved
             committedRevision = saved.revision
         }
-        try value.validate(agent: agentID, scope: scopeID)
+        try memory.validate(agent: agentID, scope: scopeID)
         loaded = true
     }
     public func snapshot() async throws -> AgentContext<State> {
         try await acquire()
         defer { release() }
         try await load()
-        return value
+        return memory
     }
     public func exists() async throws -> Bool {
         try await acquire()
@@ -75,13 +88,17 @@ public actor AgentContextRepository<State: AgentContextState> {
         try await acquire()
         defer { release() }
         try await load()
-        var next = value
+        var next = memory
         let result = try mutation(&next)
         try next.advanceRevision()
-        try next.validate(agent: value.agentID, scope: value.scopeID)
+        try next.validate(agent: agentID, scope: scopeID)
         try await persistence?.commit(next, committedRevision)
-        value = next
+        memory = next
         committedRevision = next.revision
+        // A failed public projection cannot undo a durable/private business commit.
+        do { try publish?(next) } catch {
+            throw AgentPublicProjectionFailure(committedRevision: next.revision, underlying: error)
+        }
         return result
     }
 

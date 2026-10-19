@@ -22,7 +22,26 @@ public struct UIModule: CapabilityModule {
         self.effects = effects
     }
     public var definitions: [ActionFunction] {
-        expressionFunctions + presentationFunctions + feedbackFunctions + effectFunctions
+        expressionFunctions + presentationFunctions + feedbackFunctions + effectFunctions + [
+            UIActions.recordFailureDefinition(completing: { [updates] invocation in
+                guard let presentation = updates as? any RuntimeFailurePresentationCapability else {
+                    throw UIActions.PresentationError.invalidCall
+                }
+                return .value(try await UIActions.recordFailure(invocation: invocation, using: presentation))
+            }),
+            UIActions.showBluetoothHomeDefinition(completing: { [updates] invocation in
+                guard let presentation = updates as? any BluetoothStatusPresentationCapability else {
+                    throw UIActions.PresentationError.invalidCall
+                }
+                return .value(try await UIActions.showBluetoothHome(invocation: invocation, using: presentation))
+            }),
+            UIActions.showBluetoothSettingsDefinition(completing: { [updates] invocation in
+                guard let presentation = updates as? any BluetoothStatusPresentationCapability else {
+                    throw UIActions.PresentationError.invalidCall
+                }
+                return .value(try await UIActions.showBluetoothSettings(invocation: invocation, using: presentation))
+            }),
+        ]
     }
     private var expressionFunctions: [ActionFunction] {
         [
@@ -35,6 +54,17 @@ public struct UIModule: CapabilityModule {
                     restoring: {
                         try await expression.restoreExpression(invocation: $0)
                     })
+            }),
+            UIActions.setReplyWaitingDefinition(handler: { [updates] invocation in
+                try await UIActions.setReplyWaiting(invocation: invocation) {
+                    try await updates.setReplyWaiting($0, requestID: $1, invocation: $2)
+                }
+            }),
+            UIActions.setLoadingDefinition(handler: { [updates] invocation in
+                guard let presentation = updates as? any LoadingExpressionPresentationCapability else {
+                    throw UIActions.PresentationError.invalidCall
+                }
+                try await UIActions.setLoading(invocation: invocation, using: presentation)
             }),
             UIActions.setExpressionDefinition(handler: { [expression] invocation in
                 try await UIActions.setExpression(invocation: invocation) {
@@ -87,8 +117,8 @@ public struct UIModule: CapabilityModule {
                 }),
             UIActions.showPoseDefinition(
                 handler: { [pose] invocation in
-                    try await UIActions.showPose(invocation: invocation) {
-                        try await pose.present($0, sessionID: $1.sessionID)
+                    try await UIActions.showPose(invocation: invocation) { overlay, _ in
+                        try await pose.present(overlay, invocation: invocation)
                     }
                 }),
         ]

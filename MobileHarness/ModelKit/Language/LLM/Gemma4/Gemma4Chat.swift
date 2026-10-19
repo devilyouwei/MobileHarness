@@ -6,11 +6,9 @@ import ModelKit
 public actor Gemma4Chat: ChatCapability {
     private let resource: ModelResource<GemmaLanguageEngine>
     private let root: URL
-    private let contextLimit: Int
 
     public init(context: ModelContext, artifacts: URL) throws {
         root = artifacts
-        contextLimit = 4096
         resource = try context.resource {
             try Self.requireHardware()
             return try await GemmaLanguageEngine(directory: artifacts)
@@ -42,17 +40,13 @@ public actor Gemma4Chat: ChatCapability {
         try Task.checkCancellation()
         let lease = try await resource.acquire()
         do {
-            let tokens = await lease.model.tokenize(
-                request.messages.map {
-                    GemmaLanguageTurn(role: $0.role.rawValue, content: $0.content)
-                })
-            let maximumTokens = request.maximumOutputTokens ?? (contextLimit - tokens.count)
-            guard !tokens.isEmpty, maximumTokens > 0, maximumTokens <= contextLimit,
-                tokens.count <= contextLimit - maximumTokens
-            else {
-                throw CapabilityError.invalidRequest(
-                    "Prompt plus output budget exceeds 4096 tokens; shorten history explicitly")
+            let prepared = try await GemmaContextBudget.prepare(request, contextLimit: lease.model.contextLimit) {
+                messages in
+                await lease.model.tokenize(
+                    messages.map { GemmaLanguageTurn(role: $0.role.rawValue, content: $0.content) })
             }
+            let tokens = prepared.tokens
+            let maximumTokens = prepared.maximumOutputTokens
             try Task.checkCancellation()
             let control = InferenceTaskControl()
             let pair = InferenceSession<ChatEvent>.make(
@@ -108,16 +102,84 @@ public actor Gemma4Chat: ChatCapability {
             throw CapabilityError.invalidRequest("Local native tool calls are unavailable")
         }
         guard request.messages.count <= 64,
-            request.messages.reduce(0, { $0 + $1.content.utf8.count }) <= 65536,
-            request.messages.last?.role == .user,
-            request.messages.allSatisfy({ !$0.content.isEmpty })
+            request.messages.reduce(0, { $0 + $1.content.utf8.count }) <= 65536
         else {
             throw CapabilityError.invalidRequest(
-                "Gemma4 requires 1–64 nonempty messages ending in user, at most 64 KiB, and an output budget fitting the local context window"
+                "Gemma4 source request exceeds 64 messages or 64 KiB"
             )
         }
-        guard !request.messages.dropFirst().contains(where: { $0.role == .system }) else {
-            throw CapabilityError.invalidRequest("System instructions must be the first message")
+        // Identify the current turn before filtering: an empty user must never fall back to an older input.
+        guard let current = request.messages.last(where: { $0.role != .system }), current.role == .user else {
+            throw CapabilityError.invalidRequest("Gemma4 requires the last non-system message to be user")
         }
+        guard hasText(current) else {
+            throw CapabilityError.invalidRequest("Gemma4 current user input is empty or whitespace")
+        }
+    }
+
+    private static func hasText(_ message: ChatMessage) -> Bool {
+        !message.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    /// System-free local diagnostic inference; the caller's original request remains unchanged.
+    static func renderedMessages(_ request: ChatRequest) -> [ChatMessage] {
+        request.messages.filter { $0.role != .system && hasText($0) }
+    }
+}
+
+/// Provider-only inference copy. The caller's request, stored history and cloud adapters are unchanged.
+@available(iOS 27, macOS 27, *)
+enum GemmaContextBudget {
+    static let contextLimit = 4096
+    static let defaultOutputTokens = 1024
+    static let maximumMessages = 5
+    typealias Tokenize = @Sendable ([ChatMessage]) async throws -> [Int]
+
+    struct Prepared: Sendable {
+        let messages: [ChatMessage]
+        let tokens: [Int]
+        let maximumOutputTokens: Int
+    }
+
+    /// Pinned CoreAI's iOS dynamic-KV guard (apple/coreai-models#124) is tighter than the graph window.
+    static func effectiveContextLimit(modelLimit: Int, isIOS: Bool) -> Int {
+        min(modelLimit, isIOS ? 1024 : contextLimit)
+    }
+
+    static func prepare(_ request: ChatRequest, contextLimit: Int = contextLimit, tokenize: Tokenize) async throws
+        -> Prepared
+    {
+        try Gemma4Chat.validate(request)
+        guard (2...Self.contextLimit).contains(contextLimit) else {
+            throw CapabilityError.invalidRequest("Invalid local backend context limit: \(contextLimit)")
+        }
+        let normalized = Gemma4Chat.renderedMessages(request)
+        var history = Array(normalized.suffix(maximumMessages))
+        guard let current = history.last else { throw CapabilityError.invalidRequest("Missing current local input") }
+        let minimum = try await encode([current], tokenize: tokenize)
+        guard !minimum.isEmpty, minimum.count < contextLimit else {
+            throw CapabilityError.invalidRequest(
+                "Current input alone leaves no generation space in the local \(contextLimit)-token window")
+        }
+        let reserve = min(defaultOutputTokens, contextLimit / 4)
+        let output = min(request.maximumOutputTokens ?? reserve, contextLimit - minimum.count)
+        let inputLimit = contextLimit - output
+        var tokens = try await encode(history, tokenize: tokenize)
+        while tokens.count > inputLimit, history.count > 1 {
+            history.removeFirst()
+            tokens = try await encode(history, tokenize: tokenize)
+        }
+        let maximumOutput = min(request.maximumOutputTokens ?? contextLimit, contextLimit - tokens.count)
+        guard !tokens.isEmpty, maximumOutput > 0, tokens.count <= contextLimit - maximumOutput else {
+            throw CapabilityError.invalidRequest("Local prompt and generation exceed the \(contextLimit)-token window")
+        }
+        return Prepared(messages: history, tokens: tokens, maximumOutputTokens: maximumOutput)
+    }
+
+    private static func encode(_ messages: [ChatMessage], tokenize: Tokenize) async throws -> [Int] {
+        try Task.checkCancellation()
+        let result = try await tokenize(messages)
+        try Task.checkCancellation()
+        return result
     }
 }

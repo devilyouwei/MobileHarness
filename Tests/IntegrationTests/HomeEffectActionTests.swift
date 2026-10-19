@@ -3,7 +3,7 @@ import Agents
 import ExecutionRuntime
 import Foundation
 import FunctionContracts
-import Storage
+import StorageCore
 import Testing
 
 private func effectInput(_ parameters: [String: String]) -> FunctionInvocation {

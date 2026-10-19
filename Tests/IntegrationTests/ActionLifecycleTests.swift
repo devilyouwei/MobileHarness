@@ -6,7 +6,7 @@ import ExecutionRuntime
 import Foundation
 import FunctionContracts
 import Gateway
-import Storage
+import StorageCore
 import Testing
 
 private actor LifecycleGate {
@@ -311,7 +311,7 @@ func cancelledLeaseCleanupPreservesAcknowledgedUnlock(operation: String) async t
         }
     }
     await started.wait()
-    // CameraCoordinator cancels VisionSession before its catch removes the Photographer.
+    // CameraCoordinator cancels its vision connection before its catch removes the Photographer.
     let closeCamera = Task {
         withUnsafeCurrentTask { $0?.cancel() }
         try await manager.remove(.photographer)

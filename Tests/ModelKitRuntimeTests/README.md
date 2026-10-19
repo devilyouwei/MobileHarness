@@ -1,5 +1,7 @@
 # ModelKitRuntimeTests
 
+✅ 显式 gate／租约测试验证非终止暂停取消并加入活动推理、拒绝旧接纳、恢复复用权重和终止后不可恢复。
+
 Purpose: validate shared ModelManager registration, identity, loading, typed capability acquisition and lifecycle. Design goals: deterministic contract tests and explicit separation of real-model acceptance.
 
 - Tests use explicit contexts for isolated adapters; shared-container behavior is tested in ModelKitRuntimeTests.
@@ -41,3 +43,9 @@ RuntimeBoundaryTests cover invalid manager configuration, nondefault limits reac
 ## 待实现
 
 - iPhone 网络/后台生命周期、文件保护、安装回执与实际设备资源发布验收。
+
+✅ 制品存储作用域重绑回归：释放旧 Files 绑定后，同一模型管理器应使用新存储；关闭制品服务拒绝新请求并加入已接纳工作。
+
+✅ 已实现：回归缓存路径字符集合后的Unicode合法路径、标点及危险路径拒绝；优化不放宽规则。
+
+✅ 已实现：验证报告区间对应真实冷加载，暖模型／unmanaged 无事件，失败成对结束且保留原错。

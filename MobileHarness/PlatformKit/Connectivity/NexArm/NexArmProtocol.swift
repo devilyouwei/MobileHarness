@@ -27,7 +27,7 @@ public struct NexArmPacket: Equatable, Sendable {
         isTrackingRegisterWrite || isTrackingSpeedSync
     }
     private var isTrackingRegisterWrite: Bool {
-        guard (id == 1 || id == 4), command == 3 else { return false }
+        guard id == 1 || id == 4, command == 3 else { return false }
         switch payload.count {
         case 2:
             return (payload[0] == 40 || payload[0] == 33) && (payload[1] == 0 || payload[1] == 1)

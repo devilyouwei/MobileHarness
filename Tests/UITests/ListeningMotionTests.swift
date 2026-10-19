@@ -122,3 +122,29 @@ import Testing
     #expect(motion.elapsed(at: 2) == 2 && !motion.isEntering(at: 2))
     #expect(motion.opacity(at: 2) == 1)
 }
+
+@Test func haloFailureLatchesAndIdenticalSnapshotsDoNotWake() {
+    var state = HaloRenderState()
+    var motion = ListeningMotion()
+    motion.update(active: true, generation: "one", reduceMotion: false, at: 1)
+    let size = CGSize(width: 390, height: 844)
+    let initial = state.update(motion: motion, size: size, visible: true, maximumFPS: 120)
+    #expect(initial)
+    for _ in 0..<300 {
+        let repeated = state.update(motion: motion, size: size, visible: true, maximumFPS: 120)
+        #expect(!repeated)
+    }
+    let hidden = state.update(motion: motion, size: size, visible: false, maximumFPS: 120)
+    let failure = state.fail()
+    let repeatedFailure = state.fail()
+    let repeatedStop = state.stop()
+    let late = state.update(motion: motion, size: size, visible: true, maximumFPS: 60)
+    #expect(hidden && failure && !repeatedFailure && !repeatedStop && !late)
+    var replacement = HaloRenderState()
+    let restarted = replacement.update(motion: motion, size: size, visible: true, maximumFPS: 60)
+    let stopped = replacement.stop()
+    // A real in-flight GPU failure may still be reported once during explicit teardown.
+    let stoppingFailure = replacement.fail()
+    let duplicateFailure = replacement.fail()
+    #expect(restarted && stopped && stoppingFailure && !duplicateFailure)
+}

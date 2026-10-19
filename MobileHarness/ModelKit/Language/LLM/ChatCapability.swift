@@ -1,6 +1,83 @@
 import Foundation
 import Synchronization
 
+/// Safe protocol evidence, independent of Agent policy, UI strings and provider response bodies.
+public struct ChatFailureDiagnostic: Equatable, Sendable, CustomStringConvertible {
+    public enum Reason: String, Sendable {
+        case malformedEvent = "response.malformedEvent"
+        case invalidText = "response.invalidText"
+        case invalidItem = "response.invalidItem"
+        case invalidToolIdentity = "tool.invalidIdentity"
+        case undeclaredTool = "tool.undeclaredName"
+        case invalidToolArguments = "tool.invalidArguments"
+        case toolArgumentsMismatch = "tool.argumentsMismatch"
+        case toolSequence = "tool.sequenceMismatch"
+        case invalidCompletion = "response.invalidCompletion"
+        case invalidUsage = "response.invalidUsage"
+        case invalidReasoning = "response.invalidReasoning"
+        case unsupportedOutput = "response.unsupportedOutput"
+        case providerFailure = "provider"
+        case httpStatus = "httpStatus"
+        case invalidHTTPResponse = "response.invalidHTTP"
+        case unexpectedContentType = "response.contentType"
+        case truncatedStream = "stream.truncated"
+        case responseTooLarge = "stream.limitExceeded"
+        case transport
+    }
+    public enum Stage: String, Sendable {
+        case http, framing, event, toolStart, toolArguments, toolEnd, completion, usage, reasoning
+    }
+    public let reason: Reason
+    public let stage: Stage
+    public let event: String?
+    public let field: String?
+    public let outputIndex: Int?
+    public let toolName: String?
+    public let declaredNames: [String]
+    public let declaredCount: Int
+    public let statusCode: Int?
+    public let providerCode: String?
+    public init(
+        _ reason: Reason, stage: Stage, event: String? = nil, field: String? = nil, outputIndex: Int? = nil,
+        toolName: String? = nil, declaredNames: [String] = [], statusCode: Int? = nil, providerCode: String? = nil
+    ) {
+        self.reason = reason
+        self.stage = stage
+        self.event = event.map { Self.identifier($0, limit: 96) }
+        self.field = field.map { Self.identifier($0, limit: 96) }
+        self.outputIndex = outputIndex
+        self.toolName = toolName.map { Self.identifier($0, limit: 64) }
+        self.declaredNames = declaredNames.prefix(8).map { Self.identifier($0, limit: 64) }
+        self.declaredCount = declaredNames.count
+        self.statusCode = statusCode
+        self.providerCode = providerCode.map { Self.identifier($0, limit: 128) }
+    }
+    private static func identifier(_ value: String, limit: Int) -> String {
+        guard !value.isEmpty, value.utf8.count <= limit,
+            value.allSatisfy({ $0.isASCII && ($0.isLetter || $0.isNumber || "_.-".contains($0)) })
+        else { return "<invalid-identifier>" }
+        return value
+    }
+    public var description: String {
+        var lines = ["code=\(reason.rawValue)", "stage=\(stage.rawValue)"]
+        if let event { lines.append("event=\(event)") }
+        if let field { lines.append("field=\(field)") }
+        if let outputIndex { lines.append("outputIndex=\(outputIndex)") }
+        if let toolName { lines.append("tool=\(toolName)") }
+        if declaredCount > 0 || reason == .undeclaredTool {
+            lines.append("declaredTools(\(declaredCount))=\(declaredNames.joined(separator: ","))")
+            if declaredCount > declaredNames.count { lines.append("declaredToolsTruncated=true") }
+        }
+        if let statusCode { lines.append("httpStatus=\(statusCode)") }
+        if let providerCode { lines.append("providerCode=\(providerCode)") }
+        return lines.joined(separator: "\n")
+    }
+}
+
+public protocol ChatFailureProviding: Error {
+    var chatFailure: ChatFailureDiagnostic { get }
+}
+
 /// Bounded image bytes, independent of platform images and Agent storage.
 public struct ChatImage: Codable, Equatable, Sendable {
     public let id: String
@@ -86,6 +163,14 @@ public final class ChatTiming: Sendable {
     }
     public func recordText(_ text: String) {
         guard !text.isEmpty else { return }
+        recordFirstOutput()
+    }
+    /// Called by the provider after validating a streamed native argument delta's identity.
+    public func recordToolArguments(_ delta: String) {
+        guard !delta.isEmpty else { return }
+        recordFirstOutput()
+    }
+    private func recordFirstOutput() {
         state.withLock {
             guard let start = $0.started, $0.firstTokenAt == nil else { return }
             let elapsed = start.duration(to: .now).components
@@ -173,13 +258,23 @@ public struct ChatTokenUsage: Equatable, Sendable {
     public let input: Int
     public let generated: Int
     public let total: Int
-    public init(input: Int, generated: Int, total: Int) throws {
-        guard input >= 0, generated >= 0, total >= 0 else {
+    public let cachedInput: Int?
+    public let cacheWriteInput: Int?
+    public init(
+        input: Int, generated: Int, total: Int, cachedInput: Int? = nil, cacheWriteInput: Int? = nil
+    ) throws {
+        guard input >= 0, generated >= 0, total >= 0,
+            cachedInput.map({ (0...input).contains($0) }) ?? true,
+            cacheWriteInput.map({ (0...input).contains($0) }) ?? true,
+            (cachedInput ?? 0) <= input - (cacheWriteInput ?? 0)
+        else {
             throw CapabilityError.invalidRequest("Invalid token usage")
         }
         self.input = input
         self.generated = generated
         self.total = total
+        self.cachedInput = cachedInput
+        self.cacheWriteInput = cacheWriteInput
     }
 }
 
@@ -194,7 +289,7 @@ public enum ChatEvent: Equatable, Sendable {
         switch self {
         case .text(let value): value.utf8.count + 32
         case .toolCall(let call): call.id.utf8.count + call.name.utf8.count + call.argumentsJSON.utf8.count + 64
-        case .usage: 56
+        case .usage: 88
         case .finished: 32
         }
     }
