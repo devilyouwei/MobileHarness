@@ -2,7 +2,7 @@
 
 ## 简介
 
-FunctionContracts uses Foundation and Storage-owned neutral business identity values. It does not import Agent, protocol, scheduler, model, transport or UI implementations.
+FunctionContracts 仅依赖 Foundation，拥有协议中立的函数输入、参数、执行约束、完成与失败契约，不导入其他项目模块或其实现。
 
 ## 上下游关系（一级）
 
@@ -13,7 +13,7 @@ flowchart LR
     CallRuntime -->|调用协议适配| C
     ExecutionRuntime -->|预算执行与结果校验| C
     Gateway -->|执行关联与资源协调| C
-    Host[ActionBindings 能力端点] -->|输入与结果实现| C
+    Host[Actions 能力端点] -->|输入与结果实现| C
 ```
 
 这些模块是契约的直接消费者；契约不回调它们的具体实现。
@@ -43,7 +43,7 @@ flowchart TB
 | --- | --- |
 | ActionIdentifier | 三段地址，显式 domain/module/function 与合法名称检查 |
 | FunctionRequest | 已解析地址及 `[String:String]` 参数，不含 Channel |
-| FunctionInput / FunctionInvocation | 请求、executionID、关联 context 与报告端口；后者是具体值实现 |
+| FunctionInput / FunctionInvocation | 请求、executionID、关联 context、报告端口及可选 Sendable attachment；后者是具体值实现 |
 | ActionExecutionContext | source、session/input、sequence、correlation/ordinal、decision/task/executor 等不透明关联信息 |
 | ActionArguments | 允许键、字符串字节数、整数范围、有限数值与枚举解析 |
 | ActionDeclaration / ActionParameter | 函数说明、语义参数类型、必填性、约束与枚举候选 |
@@ -78,10 +78,4 @@ ActionReport.empty 表示没有叶子记录；其 status 运算为 succeeded，�
 
 [共享 Support](../README.md) · [Actions 设计](../../README.md) · [执行实现](../../../Gateway/Runtime/README.md)
 
-## 待实现
-
-- 暂无本目录独立的实现待办；跨模块及实际模型/设备验收见所属模块说明。
-
-## Platform 根、设备接入与同帧呈现
-
-✅ FunctionInput 增加可选的进程内 Sendable attachment，缺省为空；FunctionInvocation 显式绑定，不从参数字符串解析。契约仍无项目依赖，不识别 CameraFrame、Agent 或 Gateway。普通调用和外部参数不能伪造原生附件。
+FunctionInput.attachment 只传递内部调用的类型化附件，例如请求私有结果端口；公共契约不解释附件，不包含全局请求注册或模型协议。具体业务拥有附件的身份、容量、取消与清理。

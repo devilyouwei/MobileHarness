@@ -1,6 +1,9 @@
+import Actions
 import AgentCore
 import Foundation
+import Gateway
 import StorageCore
+import UI
 
 /// Memory business service entry point; domain workflows own their processing policy.
 public actor MemoryAgent: Agent {
@@ -12,15 +15,19 @@ public actor MemoryAgent: Agent {
 
     // MARK: - State and dependencies
 
+    let uiHistory: UIHistoryContainer?
+    let beforeNewConversation: @Sendable () async throws -> Void
+    var uiInputs = AgentUIInputs()
+    var uiExecution = AgentUIExecution()
+    var historyReadWorkers: [String: Task<HistoryReadResult, any Error>] = [:]
     private let contextRepository: AgentContextRepository<MemoryContextState>
     private let preprocessor = MemorySignalPreprocessor()
     private let contextBuilder = MemoryContextBuilder()
 
     private let continuation: AsyncStream<OutputEnvelope>.Continuation
-    public nonisolated let historyReads: MemoryHistoryReadRequests?
-    private let sessionID: String
+    let sessionID: String
     private var lifecycle = AgentLifecycle.registered
-    private var processed = 0
+    var processed = 0
     private var sequence: UInt64 = 0
     private var history = MemoryHistoryWorkflow()
 
@@ -36,10 +43,12 @@ public actor MemoryAgent: Agent {
     }
 
     public init(
-        sessionID: String, configuration: AgentConfiguration? = nil,
-        historyReads: MemoryHistoryReadRequests? = nil,
+        sessionID: String, configuration: AgentConfiguration? = nil, uiHistory: UIHistoryContainer? = nil,
+        beforeNewConversation: @escaping @Sendable () async throws -> Void = {},
         context: AgentContextRepository<MemoryContextState>
     ) throws {
+        self.beforeNewConversation = beforeNewConversation
+        self.uiHistory = uiHistory
         self.contextRepository = context
         guard contextRepository.agentID == .memory else { throw AgentConfigurationError.identityMismatch }
         let configuration = try configuration ?? AgentConfigurations.load(named: "Memory")
@@ -50,7 +59,6 @@ public actor MemoryAgent: Agent {
             capabilities: try Self.runtimeCapabilities(configuration.capabilities))
         taskCoordinator = AgentFixedTaskCoordinator(context: self.contextRepository)
         self.sessionID = sessionID
-        self.historyReads = historyReads
         let stream = AsyncStream<OutputEnvelope>.makeStream(
             bufferingPolicy: .bufferingOldest(MemorySignalPreprocessor.outputCapacity))
         outputs = stream.stream
@@ -73,9 +81,11 @@ public actor MemoryAgent: Agent {
                 }
             }
         }
+        try await startUIInputs()
     }
 
     public func pause() async throws {
+        await stopUIInputs()
         guard lifecycle == .running else { throw HarnessError.invalidTransition }
         await taskCoordinator.pause()
         lifecycle = .paused
@@ -83,15 +93,21 @@ public actor MemoryAgent: Agent {
 
     public func resume() async throws {
         guard lifecycle == .paused else { throw HarnessError.invalidTransition }
+        await stopUIInputs()
         await taskCoordinator.resume()
         lifecycle = .running
+        try await startUIInputs()
     }
 
     public func stop() async {
+        let reads = historyReadWorkers
+        for task in reads.values { task.cancel() }
+        for (id, task) in reads where id != HistoryReadWork.requestID { _ = await task.result }
+        await stopUIInputs()
+        uiExecution.consumer = nil
         admission.close()
         lifecycle = .stopped
         history.reset()
-        await historyReads?.shutdown()
         fixedTaskInputs.removeAll()
         await taskCoordinator.stop()
         taskPump?.cancel()
@@ -129,7 +145,8 @@ public actor MemoryAgent: Agent {
                 try await taskCoordinator.receive(input)
                 return
             }
-            let fixed = try AgentFixedTaskInput.unwrap(signal, input: input, executor: descriptor.id)
+            let fixed = try AgentFixedTaskInput.unwrap(
+                signal, input: input, executor: descriptor.id, decode: MemoryHistoryIntent.taskMessage)
             guard fixedTaskInputs.count < 32 else { throw CommunicationError.capacityExceeded }
             try await taskCoordinator.admitFixedTask(signal, input: input)
             fixedTaskInputs[fixed.id] = fixed
@@ -138,24 +155,14 @@ public actor MemoryAgent: Agent {
 
         try await admission.acquire()
         defer { admission.release() }
-        if case .observation(let message) = input.payload, case .query(let id)? = message.historyIntent {
-            guard let historyReads else { throw CommunicationError.unavailableTarget }
-            do {
-                try Task.checkCancellation()
-                guard lifecycle == .running else { throw HarnessError.notRunning }
-                guard input.sessionID == sessionID, input.metadata.source == "user", input.id == id,
-                    !input.metadata.expired, input.taskScope == nil
-                else { throw CommunicationError.unauthorized }
-                try await historyReads.execute(id, sessionID: input.sessionID)
-                processed += 1
-            } catch {
-                await historyReads.reject(id, sessionID: input.sessionID, error: error)
-                throw error
-            }
-            return
-        }
         try Task.checkCancellation()
-        guard lifecycle == .running else { throw HarnessError.invalidTransition }
+        let cleanup: Bool
+        if case .observation(let message) = input.payload, case .cancel? = message.historyIntent {
+            cleanup = input.metadata.origin == .local && input.metadata.source == "runtime"
+        } else {
+            cleanup = false
+        }
+        guard lifecycle == .running || (lifecycle == .paused && cleanup) else { throw HarnessError.invalidTransition }
         guard input.sessionID == sessionID || input.taskScope?.executor == .memory else {
             throw CommunicationError.unauthorized
         }
@@ -177,7 +184,10 @@ public actor MemoryAgent: Agent {
 
     private func emit(_ output: AgentOutput, for input: AgentInput) throws {
         sequence += 1
-        let envelope = OutputEnvelope(source: descriptor.id, input: input, output: output, sequence: sequence)
+        let envelope = OutputEnvelope(
+            source: descriptor.id, context: input.context, output: output, sequence: sequence,
+            taskScope: input.taskScope)
+        if try uiExecution.capture(envelope) { return }
         guard case .enqueued = continuation.yield(envelope) else {
             history.reset()
             lifecycle = .failed
@@ -194,8 +204,9 @@ public actor MemoryAgent: Agent {
             turn: envelope.turn, taskScope: envelope.taskScope)
         let result = continuation.yield(
             OutputEnvelope(
-                source: descriptor.id, input: input,
-                output: envelope.output, sequence: sequence, roundID: envelope.roundID, callID: envelope.callID))
+                source: descriptor.id, context: input.context,
+                output: envelope.output, sequence: sequence, roundID: envelope.roundID, callID: envelope.callID,
+                taskScope: input.taskScope))
         if case .enqueued = result { return true }
         lifecycle = .failed
         continuation.finish()

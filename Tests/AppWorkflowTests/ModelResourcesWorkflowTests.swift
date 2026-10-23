@@ -1,6 +1,5 @@
-import ActionBindings
 import Actions
-import AgentBindings
+import Agents
 import Foundation
 import Gateway
 import PlatformKit
@@ -23,8 +22,8 @@ import Testing
         if fail { throw CocoaError(.coderInvalidValue) }
         return value
     }
-    func workflow() -> ModelResourcesWorkflow {
-        ModelResourcesWorkflow(
+    func workflow() -> ModelResourcesClient {
+        ModelResourcesClient(
             read: { _ in .init(items: []) }, restore: { try await self.restore() }, save: { try await self.save($0) },
             download: { _, source in self.downloads.append(source.endpoint) }, cancel: { _ in }, remove: { _ in })
     }
@@ -80,7 +79,7 @@ import Testing
 }
 @MainActor @Test func concurrentPreferenceRestoreSharesAgentRequestAndPageCancellationDoesNotOwnIt() async throws {
     let fixture = HeldPreferenceFacadeFixture()
-    let workflow = ModelResourcesWorkflow(
+    let workflow = ModelResourcesClient(
         read: { _ in .init(items: []) }, restore: { await fixture.restore() }, save: { $0 },
         download: { _, _ in }, cancel: { _ in }, remove: { _ in })
     var started = fixture.started.stream.makeAsyncIterator()

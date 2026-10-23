@@ -4,51 +4,21 @@
   "communication": {
     "inputs": [
       {
-        "contract": "media.audio",
-        "version": 1,
-        "kind": "audio"
-      },
-      {
         "contract": "action.result",
         "version": 1,
         "kind": "actionResult"
       },
       {
-        "contract": "speech.listening",
-        "version": 1,
-        "kind": "observation"
-      },
-      {
         "contract": "interaction.replyActivity",
-        "version": 1,
-        "kind": "observation"
-      },
-      {
-        "contract": "speech.captureEnded",
         "version": 1,
         "kind": "observation"
       }
     ],
     "subscriptions": [
       {
-        "contract": "media.audio",
-        "source": "phone.microphone",
-        "topic": "media.audio"
-      },
-      {
-        "contract": "speech.listening",
-        "source": "user",
-        "topic": "speech.listening"
-      },
-      {
         "contract": "interaction.replyActivity",
         "source": "assistant",
         "topic": "interaction.replyActivity"
-      },
-      {
-        "contract": "speech.captureEnded",
-        "source": "phone.microphone",
-        "topic": "speech.captureEnded"
       }
     ],
     "publications": [

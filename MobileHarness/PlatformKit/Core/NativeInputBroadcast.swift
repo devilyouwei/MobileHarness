@@ -55,22 +55,3 @@ public final class NativeInputBroadcast<Value: Sendable>: Sendable {
         for entry in entries.values { entry.continuation.finish(throwing: error) }
     }
 }
-
-/// Callback-owned generation fence; no forwarding task, executor hop or additional queue.
-public final class NativeInputSession<Value: Sendable>: Sendable {
-    private let active = Mutex(true)
-    private let broadcast: NativeInputBroadcast<Value>
-    public init(broadcast: NativeInputBroadcast<Value>) { self.broadcast = broadcast }
-    public var isActive: Bool { active.withLock { $0 } }
-    public func send(_ value: Value) {
-        active.withLock { if $0 { broadcast.send(value) } }
-    }
-    public func finish(throwing error: (any Error)? = nil) {
-        active.withLock {
-            guard $0 else { return }
-            $0 = false
-            broadcast.finish(throwing: error)
-        }
-    }
-    deinit { finish() }
-}

@@ -1,6 +1,4 @@
-import ActionBindings
 import Actions
-import AgentBindings
 import AgentCore
 import Agents
 import ExecutionRuntime
@@ -66,7 +64,7 @@ func saturatedControlMemoryRestoresPreferencesAcrossRootGatewayAndRetainsBounded
     let installed = InstalledPreferenceFixture()
     await installed.set(["nemotron", "moss-tts-nano"])
     let binding = PreferenceBindingFixture()
-    let runtime = try resourceRuntime(
+    let runtime = try await resourceRuntime(
         binding, preferences: preferencesService(preferences, installed: installed), suppliedContext: repository)
     for _ in 0..<2 {
         let result = try await runtime.preferences(.restoreSource)
@@ -124,7 +122,7 @@ func saturatedControlMemoryRestoresPreferencesAcrossRootGatewayAndRetainsBounded
     let installed = InstalledPreferenceFixture()
     await installed.set(["nemotron"])
     let binding = PreferenceBindingFixture()
-    let runtime = try resourceRuntime(binding, preferences: preferencesService(store, installed: installed))
+    let runtime = try await resourceRuntime(binding, preferences: preferencesService(store, installed: installed))
     await binding.failNext()
     await #expect(throws: (any Error).self) {
         _ = try await runtime.preferences(
@@ -147,7 +145,7 @@ func saturatedControlMemoryRestoresPreferencesAcrossRootGatewayAndRetainsBounded
         .init(allowsCellular: false, useCustomRecognition: true, useCustomSynthesis: true), expecting: nil)
     let installed = InstalledPreferenceFixture()
     let binding = PreferenceBindingFixture()
-    let runtime = try resourceRuntime(binding, preferences: preferencesService(store, installed: installed))
+    let runtime = try await resourceRuntime(binding, preferences: preferencesService(store, installed: installed))
     _ = try await runtime.preferences(.restoreSource)
     let value = try #require(await store.refresh()?.value)
     #expect(value.allowsCellular && !value.useCustomRecognition && !value.useCustomSynthesis)
@@ -248,7 +246,7 @@ private actor PreferencePresentationFixture: ResourcePresentationCapability {
     let installed = InstalledPreferenceFixture()
     let binding = PreferenceBindingFixture()
     let presentation = PreferencePresentationFixture()
-    let runtime = try resourceRuntime(
+    let runtime = try await resourceRuntime(
         binding, preferences: preferencesService(store, installed: installed), presentation: presentation)
     for intent in [
         ModelResourceIntent.saveSource(endpoint: "bad", allowsCellular: true, recognition: false, synthesis: false),
@@ -273,7 +271,7 @@ private actor PreferencePresentationFixture: ResourcePresentationCapability {
     await installed.set(["nemotron"])
     let binding = PreferenceBindingFixture()
     let presentation = PreferencePresentationFixture()
-    let runtime = try resourceRuntime(
+    let runtime = try await resourceRuntime(
         binding, preferences: preferencesService(store, installed: installed), presentation: presentation)
     await binding.failNext()
     do {
@@ -310,17 +308,21 @@ func preferenceGateStaysHeldUntilFailurePresentationCompletes(
     let presentation = PreferencePresentationFixture()
     await presentation.hold()
     var entries = presentation.entered.makeAsyncIterator()
-    let runtime = try resourceRuntime(
+    let runtime = try await resourceRuntime(
         binding, preferences: preferencesService(store, installed: installed), presentation: presentation)
     let request = Task {
         try await runtime.preferences(
             .saveSource(endpoint: "https://huggingface.co", allowsCellular: true, recognition: true, synthesis: false))
     }
     #expect(await entries.next() == (bindingFailure ? .execution : .recognitionRequired))
-    await #expect(throws: ApplicationControlIntentFailure.self) { _ = try await runtime.preferences(.restoreSource) }
-    await #expect(throws: ApplicationControlIntentFailure.self) {
-        try await runtime.perform(.configureSpeech(recognition: false, synthesis: false))
+    let queued = Task { try await runtime.preferences(.restoreSource) }
+    for _ in 0..<200 {
+        if await runtime.resources.requests.outstanding == 2 { break }
+        try await Task.sleep(for: .milliseconds(5))
     }
+    #expect(await runtime.resources.requests.outstanding == 2)
+    queued.cancel()
+    await #expect(throws: CancellationError.self) { _ = try await queued.value }
     #expect(await binding.calls == (bindingFailure ? [[true, false]] : []))
     await presentation.resume()
     do {
@@ -344,7 +346,7 @@ func preferenceGateStaysHeldUntilFailurePresentationCompletes(
         let binding = PreferenceBindingFixture()
         let presentation = PreferencePresentationFixture()
         await presentation.fail()
-        let runtime = try resourceRuntime(
+        let runtime = try await resourceRuntime(
             binding, preferences: preferencesService(store, installed: installed), presentation: presentation,
             includePreferenceFailurePresentation: !missing)
         do {
@@ -373,7 +375,7 @@ private struct SpoofedPreferenceFailure: ModelResourcePreferencesCapability {
 }
 @Test(.actionCatalog) func preferenceFailureTextDoesNotSubstituteForProducerCode() async throws {
     let presentation = PreferencePresentationFixture()
-    let runtime = try resourceRuntime(
+    let runtime = try await resourceRuntime(
         UnusedModelResourceCapability(), preferences: SpoofedPreferenceFailure(), presentation: presentation)
     do {
         _ = try await runtime.preferences(.restoreSource)

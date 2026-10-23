@@ -1,7 +1,6 @@
-import ActionBindings
 import Actions
-import AgentBindings
 import AgentCore
+import Agents
 import CallRuntime
 import ExecutionRuntime
 import Foundation
@@ -187,12 +186,12 @@ private actor UnifiedReceiptAgent: Agent {
     try await manager.register(agent, sessionID: session)
     try await manager.start(agent.descriptor.id)
     let gateway = OutputGateway(
-        manager: manager, requests: InputGateway(manager: manager, allowsExternalSend: true),
+        manager: manager, requests: InputGateway(manager: manager),
         tools: try ToolRegistry(modules: [module.tools]), actions: scheduler, sink: { _ in })
     let first = AgentInput(id: UUID().uuidString, sessionID: session, payload: .event("fixture"))
     try await gateway.dispatch(
         .init(
-            source: agent.descriptor.id, input: first,
+            source: agent.descriptor.id, context: first.context,
             output: .actionCall(
                 .init(
                     actionPath: .init(domain: path.domain, module: path.module, function: path.function),
@@ -202,7 +201,7 @@ private actor UnifiedReceiptAgent: Agent {
     let call = ToolCall(id: UUID().uuidString, toolPath: path.description, arguments: ["mode": "second"])
     let work = Task {
         try await gateway.execute(
-            .init(source: agent.descriptor.id, input: native, output: .toolCall(call), sequence: 2))
+            .init(source: agent.descriptor.id, context: native.context, output: .toolCall(call), sequence: 2))
     }
     let rejected = try await work.value
     #expect(rejected.isError == true)
@@ -211,7 +210,7 @@ private actor UnifiedReceiptAgent: Agent {
     try await scheduler.finish(inputID: first.id, source: agent.descriptor.id)
     let result = try await gateway.dispatch(
         .init(
-            source: agent.descriptor.id, input: native,
+            source: agent.descriptor.id, context: native.context,
             output: .toolCall(
                 ToolCall(id: UUID().uuidString, toolPath: path.description, arguments: call.arguments)),
             sequence: 2))
@@ -224,7 +223,7 @@ private actor UnifiedReceiptAgent: Agent {
     let cancellation = Task {
         try await gateway.dispatch(
             .init(
-                source: agent.descriptor.id, input: held,
+                source: agent.descriptor.id, context: held.context,
                 output: .toolCall(
                     .init(id: UUID().uuidString, toolPath: path.description, arguments: ["mode": "hold"])),
                 sequence: 3))
@@ -391,12 +390,12 @@ private struct PureFunctionFixture: CapabilityModule {
     try await manager.start(agent.descriptor.id)
     let scheduler = ChannelScheduler(registry: try ActionRegistry(modules: [module.actions]))
     let gateway = OutputGateway(
-        manager: manager, requests: InputGateway(manager: manager, allowsExternalSend: true),
+        manager: manager, requests: InputGateway(manager: manager),
         tools: try ToolRegistry(modules: [module.tools]), actions: scheduler, sink: { _ in })
     let failed = try await gateway.dispatch(
         .init(
             source: agent.descriptor.id,
-            input: .init(id: UUID().uuidString, sessionID: session, payload: .event("failure")),
+            context: AgentInput(id: UUID().uuidString, sessionID: session, payload: .event("failure")).context,
             output: .toolCall(
                 .init(id: UUID().uuidString, toolPath: path.description, arguments: ["mode": "fail"])),
             sequence: 1))
@@ -410,7 +409,7 @@ private struct PureFunctionFixture: CapabilityModule {
     let next = try await gateway.dispatch(
         .init(
             source: agent.descriptor.id,
-            input: .init(id: UUID().uuidString, sessionID: session, payload: .event("next")),
+            context: AgentInput(id: UUID().uuidString, sessionID: session, payload: .event("next")).context,
             output: .toolCall(
                 .init(id: UUID().uuidString, toolPath: path.description, arguments: ["mode": "next"])),
             sequence: 2))

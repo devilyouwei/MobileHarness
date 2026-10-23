@@ -11,6 +11,8 @@ public actor ModelArtifactStore {
         let source: ModelDownloadSource
         var task: Task<Void, Never>?
     }
+    private let changes = ArtifactChanges()
+    public func observeChanges() throws -> AsyncStream<UInt64> { try changes.observe() }
     private var fixtureDownload: (@Sendable (URL, URL, Int64) async throws -> URL)?
     private let downloader: (any ModelArtifactDownloader)?
     private final class ProgressMeter: Sendable { let value = Mutex<Double>(0) }
@@ -19,10 +21,10 @@ public actor ModelArtifactStore {
     private let storage: any ModelArtifactStorage
     private var transfers: [String: Transfer] = [:]
     private var queue: [String] = []
-    private var phases: [String: ModelArtifactPhase] = [:]
+    private var phases: [String: ModelArtifactPhase] = [:] { didSet { changes.changed() } }
     private var liveTransports: [String: ArtifactDownloadTransport] = [:]
-    private var progress: [String: Int64] = [:]
-    private var failures: [String: String] = [:]
+    private var progress: [String: Int64] = [:] { didSet { changes.changed() } }
+    private var failures: [String: String] = [:] { didSet { changes.changed() } }
     private var closing = false
     private var closeTask: Task<Void, any Error>?
     private var admitted = 0
@@ -179,14 +181,17 @@ public actor ModelArtifactStore {
                 let meter = ProgressMeter()
                 hubProgress[id] = meter
                 defer { hubProgress[id] = nil }
+                let changes = changes
                 try await downloader.download(artifact, source: source, into: stage) { fraction in
                     meter.value.withLock { $0 = max(0, min(1, fraction)) }
+                    changes.changed()
                 }
                 progress[id] = artifact.downloadBytes
             } else {
                 guard let url = artifact.source.url else { throw ModelArtifactError.invalidCatalog }
                 let transport = ArtifactDownloadTransport(
-                    identifier: "dev.mobileharness.artifacts." + id, allowsCellular: source.allowsCellular)
+                    identifier: "dev.mobileharness.artifacts." + id, allowsCellular: source.allowsCellular,
+                    onProgress: { [changes] in changes.changed() })
                 liveTransports[id] = transport
                 defer {
                     transport.finishTransfers()
@@ -324,6 +329,7 @@ public actor ModelArtifactStore {
     public func close() async throws {
         if let closeTask { return try await closeTask.value }
         closing = true
+        changes.finish()
         queue.removeAll()
         let task = Task { [self] in try await finishClose() }
         closeTask = task
@@ -462,4 +468,45 @@ public actor ModelArtifactStore {
         }
         guard Set(artifact.requiredFiles).isSubset(of: seen) else { throw ModelArtifactError.integrity }
     }
+}
+
+/// Native progress callbacks coalesce without creating a Task per packet.
+private final class ArtifactChanges: Sendable {
+    private struct State {
+        var revision: UInt64 = 0
+        var closed = false
+        var observers: [UUID: AsyncStream<UInt64>.Continuation] = [:]
+    }
+    private let state = Mutex(State())
+    func observe() throws -> AsyncStream<UInt64> {
+        let id = UUID()
+        let pair = AsyncStream<UInt64>.makeStream(bufferingPolicy: .bufferingNewest(1))
+        pair.continuation.onTermination = { [weak self] _ in self?.state.withLock { $0.observers[id] = nil } }
+        let initial = try state.withLock { value in
+            guard !value.closed else { throw ModelArtifactError.storage }
+            guard value.observers.count < 16 else { throw ModelArtifactError.busy }
+            value.observers[id] = pair.continuation
+            return value.revision
+        }
+        pair.continuation.yield(initial)
+        return pair.stream
+    }
+    func changed() {
+        let next = state.withLock { value -> (UInt64, [AsyncStream<UInt64>.Continuation]) in
+            guard !value.closed else { return (value.revision, []) }
+            value.revision &+= 1
+            return (value.revision, Array(value.observers.values))
+        }
+        for observer in next.1 { observer.yield(next.0) }
+    }
+    func finish() {
+        let observers = state.withLock { value in
+            value.closed = true
+            let result = Array(value.observers.values)
+            value.observers.removeAll()
+            return result
+        }
+        for observer in observers { observer.finish() }
+    }
+    deinit { finish() }
 }

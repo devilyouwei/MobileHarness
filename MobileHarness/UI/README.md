@@ -10,18 +10,28 @@
 
 UI 是零项目依赖的基础模块，不导入 FactoryKit、PlatformKit、Storage、Actions 或 Agents。只接收 UI 自有值和注入的操作接口，拥有展示状态、原生渲染及交互回执；不拥有设备、模型、仓库或业务策略。
 
-App 缓存唯一 UIContainer 并管理生命周期；AgentBindings / ActionBindings 将业务值转换后提交呈现端口，页面将用户意图交给注入的控制端口。ApplicationControl 决定异常是否提示，UI 只负责呈现、去重和期限。
+App 缓存唯一 UIContainer 并管理生命周期；Actions 将业务值转换后提交呈现端口，Agents 选择策略和业务调用，页面向 UI 自有类型化请求源提交数据，Agent 主动订阅这些源。ApplicationControl 决定异常是否提示，UI 只负责呈现、去重和期限。
 
 ## 模块关系与数据流
 
 ```mermaid
 flowchart LR
  App["App 装配与生命周期"] -.-> Root["UIContainer"]
- Bindings["业务集成"] -->|"UI 自有值／呈现接口"| Root
+ Agent["Agents：主动订阅"] -->|"读取 UI 自有请求源"| Requests["子容器类型化请求／回执"]
+ Actions["Actions：业务呈现"] -->|"UI 自有呈现值"| Root
  Root --> State["八个子容器的展示状态"]
  State --> Views["页面与原生渲染"]
- Views -->|"用户意图／真实动画回执"| Bindings
+ Views -->|"提交 UI 自有输入值"| Requests
+ Root --- Requests
+ classDef ui fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e
+ classDef agent fill:#eef2ff,stroke:#6366f1,color:#312e81
+ classDef action fill:#ffe4e6,stroke:#e11d48,color:#881337
+ class Root,State,Views,Requests ui
+ class Agent agent
+ class Actions action
 ```
+
+UI 不持有 Agent 引用、身份或回调，不选择业务消费者，也不调用 Agent 方法；构造注入和订阅任务由上层拥有。
 
 外部只描述直接相邻关系；业务和原生设备的完整链路见[总体设计](../README.md)。
 
@@ -84,3 +94,26 @@ ApplicationRootPorts 定义 UI 自有请求契约。ApplicationRootView 使用 P
 ✅ home.expressions拥有独立加载状态与revision；模型准备中可显示两个加载眼睛，即使聆听关闭。UI不接触模型或Signal；终态／失活／停止同步清理，Action只是提交呈现。
 
 ✅ 已实现：首页检查仍保留交互门，但不挂载加载文字层；真实准备仅显示等待眼睛，失败只显示重试按钮。
+
+
+## Direct container contract
+
+UI-owned typed request/reply capabilities have one consumer and at most 64 outstanding requests, including accepted work. Acceptance does not complete a request. Cancellation, consumer exit, root invalidation and late replies are generation-fenced. Foundation dependencies remain empty. Current cross-module ownership is defined by the [overall design](../README.md).
+
+Control requests use a separate single-slot stream under the same consumer lifetime. They can execute while ordinary work awaits completion; overflow rejects explicitly. Ordinary outstanding work stays bounded to 64.
+
+## Agent-owned UI inputs
+
+✅ UI subcontainers expose typed request sources. The injected business consumer owns listening and processing; UI retains receipt identity, capacity and generation only. Home text uses the ordinary request source; home listening has a control-only single-slot source and cannot enlarge the ordinary 64-request bound. Both sources share root availability/stop. UI keeps no Agent identity or business execution authority.
+
+✅ 订阅关闭携带消费者 token，旧订阅退出不能关闭恢复后的消费者；恢复前加入旧消费任务。暂停期间仅允许经身份校验的本地取消／retire 清理，不接纳新的业务请求。
+
+## 直连链路当前契约
+
+✅ 页面只向 Container 提交语音／检测请求；UI 不持有检测业务任务，业务呈现经 Actions。
+
+✅ 性能采样待接入：仅在显式 `-direct-input-measurements` 启动参数开启时记录 UI 排队／完成及 PCM／相机接纳年龄；不记录内容或原始媒体，默认关闭。
+
+## Request cancellation ownership
+
+✅ A request owns one cancellation callback bound to its Agent-owned processing task. Page cancellation, root invalidation and consumer closure cancel admitted work as well as ending the receipt. The Agent joins its task before consuming replacement ordinary work; the source and unrelated requests remain available. The common consumer owns the existing 120-second deadline, removing role-specific deadline wrappers. No event bus or media buffer is added.

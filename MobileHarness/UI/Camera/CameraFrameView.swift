@@ -105,6 +105,11 @@
         }
         private func submit() {
             guard !failed else { return }
+            if let video, video.sequence % 120 == 0,
+                ProcessInfo.processInfo.arguments.contains("-direct-input-diagnostics")
+            {
+                print("DIRECT_CAMERA_SURFACE width=\(bounds.width) height=\(bounds.height)")
+            }
             renderer?.submit(
                 CameraRenderSnapshot(
                     frame: video, pose: pose, mirrored: mirrored, size: bounds.size,
@@ -376,7 +381,15 @@
             let retained = CameraGPUFrame(frame: snapshot.frame, texture: texture)
             command.addCompletedHandler { [self] completion in
                 withExtendedLifetime(retained) {}
-                if completion.status == .completed { completedFrames.withLock { $0 += 1 } }
+                if completion.status == .completed {
+                    let first = completedFrames.withLock { count in
+                        count += 1
+                        return count == 1
+                    }
+                    if first, ProcessInfo.processInfo.arguments.contains("-direct-input-diagnostics") {
+                        print("DIRECT_CAMERA_GPU completed")
+                    }
+                }
                 release(slot)
                 if completion.status == .error { fail(completion.error?.localizedDescription ?? "Camera GPU failure") }
             }

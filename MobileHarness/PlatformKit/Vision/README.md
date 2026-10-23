@@ -6,7 +6,7 @@ Acquire camera preview, transport immutable native frames, capture one JPEG and 
 
 ## Ownership and boundaries
 
-AppleCamera owns AVCaptureSession mutation on its actor. ActionBindings owns foreground intent, preview geometry and failure presentation. This directory performs no model inference, pose policy or audio capture.
+AppleCamera owns AVCaptureSession mutation on its actor. Actions owns foreground intent, preview geometry and failure presentation. This directory performs no model inference, pose policy or audio capture.
 
 ## External relationships and data flow
 
@@ -14,11 +14,11 @@ Runtime arrows show data or capability calls; dashed arrows show injection.
 
 ```mermaid
 flowchart LR
- Bindings[Module integrations]
- Bindings -->|start, switch, capture, stop| Camera[AppleCamera]
+ Actions -->|start, switch, capture, stop| Camera[AppleCamera]
  Camera <--> Native[AVFoundation camera]
- Camera -->|preview source and newest frames| Bindings
- Bindings --> Photos[ApplePhotoLibrary]
+ Camera -->|preview source| Actions
+ Camera -->|read-only newest frames| Vision[VisionPerception]
+ Actions --> Photos[ApplePhotoLibrary]
  Photos -->|add-only authorization and joined import| Library[System Photos]
 ```
 
@@ -38,7 +38,7 @@ The capacity-one newest stream replaces obsolete observations. A mutex fences st
 
 One active photo delegate has a ten-second terminal bound. Cancellation checks occur again before native request. Native callbacks are joined before delegate release; old callbacks cannot complete a new photo. Nonempty JPEG is limited to 4 MiB; native shutter behavior is preserved.
 
-`ApplePhotoLibrary.saveJPEG` performs add-only authorization and bounded PHAsset creation. It checks cancellation before authorization and commit. Once issued, import is joined and cannot be rolled back by caller cancellation. It returns technical permission/image failures; photo selection/export receipts belong to ActionBindings.
+`ApplePhotoLibrary.saveJPEG` performs add-only authorization and bounded PHAsset creation. It checks cancellation before authorization and commit. Once issued, import is joined and cannot be rolled back by caller cancellation. It returns technical permission/image failures; photo selection/export receipts belong to Actions.
 
 Foreground camera, native preview/frame transport, healthy input switch, JPEG capture and Photos import.
 
@@ -60,18 +60,12 @@ Input is one JPEG/PNG, at most 4 MiB, with bounded valid dimensions. Upright JPE
 
 - Movie recording and background capture. Physical camera/permission/latency evidence is tracked in [validation history](../../../docs/validation/Validation-History.md).
 
-## Platform 根、设备接入与同帧呈现
-
-✅ VisionContainer 惰性持有唯一相机和最多一个相册导入任务，根 stop 取消并加入照片回调/导入。CameraCaptureOrientation 由设备 RotationCoordinator 更新，不再依赖预览层；原生帧保持未镜像传输。
-
-✅ AppleCamera.start 返回主帧流，subscribeFrames 提供最多 16 个独立的最新帧观察流；订阅本身不启动设备，停止/换镜头结束旧观察。CameraFrame 只读保留像素，Gateway 包装传输，Agents 才执行模型预处理。原生设备事件和业务呈现分开，照片提交后不因取消伪造回滚。
 
 ## UI 容器与相机能力注入
 
 ✅ 新增跨平台可替身的 CameraCapturing 原生接口与相机枚举/错误；AppleCamera 实现权限、帧订阅、启停、切换、照片、状态、事件和拍照方向能力。接口无 UI/业务依赖，静态权限方法保留原有原生入口，Coordinator 使用实例接口。
 
-## 统一容器异常通道
 
-✅ VisionContainer/AppleCamera 报告操作及相机原生错误/中断，照片导入保留原失败；正常镜头切换/停止不产生故障。报告不消费原有相机 events 单消费流，不改变帧路径。
+## Direct container contract
 
-✅ VisionContainer.camera 返回 CameraCapturing，容器内部唯一持有原生驱动。CameraEvent 为 String/Sendable 事实；中断／运行失败使用 CameraError，存在系统原错误时保留原错误。Signal 适配由 Gateway 执行，相机生命周期与图像路径保持。
+Native data/observation capabilities remain independent of business and transport modules. Capture control stays with execution owners; read-only observation never requests permission or opens a device. Current cross-module ownership is defined by the [overall design](../../README.md).

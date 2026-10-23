@@ -133,19 +133,16 @@ private func completedTurn(_ outputs: inout FixtureGenerationOutputs.Iterator) a
     try await agent.start()
     let policy = try CommunicationPolicy(
         contracts: AgentContracts.communication,
-        externalSources: [
-            "runtime", "user", "phone.microphone", "phone.camera", "model.resources", "app.resources",
-            "app.environment",
-        ],
         configurations: AgentConfigurations.all())
     let gateway = InputGateway(manager: manager, policy: policy)
     let session = UUID().uuidString
-    try await gateway.publish(AgentInput(id: UUID().uuidString, sessionID: session, payload: .text("wait")))
+    try await manager.publishLocally(
+        AgentInput(id: UUID().uuidString, sessionID: session, payload: .text("wait")), to: .assistant)
     await model.waitForPending()
     _ = try #require(await model.pending)
     try await agent.pause()
     try await agent.receive(AgentInput(id: UUID().uuidString, sessionID: session, payload: .text("queued")))
-    try await gateway.publish(AssistantControl.cancelSession.input(sessionID: session))
+    try await manager.publishLocally(AssistantSessionControl.cancelSession.input(sessionID: session), to: .assistant)
     await gateway.flushPublications()
     #expect(await agent.status().queuedInputs == 0)
     try await agent.resume()
@@ -406,7 +403,7 @@ func assistantContinuesAfterRejectedNativeTool(_ arguments: String) async throws
     try await agent.receive(
         AgentInput(id: UUID().uuidString, sessionID: cancelledSession, payload: .text("discard")))
     try await agent.receive(retained)
-    try await agent.receive(AssistantControl.cancelSession.input(sessionID: cancelledSession))
+    try await agent.receive(AssistantSessionControl.cancelSession.input(sessionID: cancelledSession))
     #expect(await agent.status().queuedInputs == 1)
     #expect(await agent.status().processedInputs == 0)
     try await agent.resume()
@@ -429,20 +426,20 @@ func invalidAssistantControlCannotCancelQueuedWork(_ kind: String) async throws 
     let session = UUID().uuidString
     try await agent.receive(
         AgentInput(id: UUID().uuidString, sessionID: session, payload: .text("retained")))
-    let valid = try AssistantControl.cancelSession.input(sessionID: session)
+    let valid = try AssistantSessionControl.cancelSession.input(sessionID: session)
     let payload: InputPayload
     if kind == "legacy" {
         payload = .event("assistant.cancel")
     } else if kind == "foreign" {
         payload = .observation(
-            AgentMessage(contract: AssistantControl.contract, content: "cancelSession", validate: { _ in }))
+            AgentMessage(contract: AssistantSessionControl.contract, content: "cancelSession", validate: { _ in }))
     } else {
         payload = valid.payload
     }
     let metadata = InputMetadata(
         payload: payload, source: kind == "user" ? "user" : "runtime",
         incarnation: kind == "incarnation" || kind == "agent" ? UUID().uuidString : nil,
-        origin: kind == "agent" ? .agent : (kind == "runtime" ? .runtime : .external),
+        origin: kind == "agent" ? .agent : (kind == "runtime" ? .runtime : .local),
         rootID: UUID().uuidString,
         deadline: kind == "expired" ? .now.advanced(by: .seconds(-1)) : nil)
     await #expect(throws: (any Error).self) {
@@ -451,59 +448,6 @@ func invalidAssistantControlCannotCancelQueuedWork(_ kind: String) async throws 
     }
     #expect(await agent.status().queuedInputs == 1)
     #expect(await agent.status().lifecycle == .paused)
-    await agent.stop()
-}
-
-@Test(.actionCatalog) func assistantControlSchemaAndGatewayRejectForeignContentAndLegacyContract() async throws {
-    let configuration = try AgentConfigurations.load(named: "Assistant")
-    let contracts = try AgentContracts.communication
-    #expect(!configuration.communication.inputs.contains { $0.contract == "runtime.event" })
-    let control = try AssistantControl.cancelSession.input(sessionID: UUID().uuidString)
-    #expect(control.metadata.origin == .external)
-    #expect(control.metadata.rootID == control.id)
-    #expect(control.metadata.parentID == nil)
-    guard case .observation(let message) = control.payload else {
-        Issue.record("Expected typed control")
-        return
-    }
-    #expect(try contracts.validatedSize(message) <= 512)
-    #expect(try JSONDecoder().decode(AssistantControl.self, from: message.encodedContent()) == .cancelSession)
-    let foreign = AgentMessage(contract: AssistantControl.contract, content: "cancelSession", validate: { _ in })
-    #expect(throws: CommunicationError.invalidPayload) { try contracts.validatedSize(foreign) }
-    let manager = AgentManager()
-    let agent = try AssistantAgent(
-        stateContext: try publicStateFixture(),
-        chat: ChatFixture(),
-        context: try AgentContextRepository(
-            agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState())
-    )
-    try await manager.register(agent)
-    try await agent.start()
-    try await agent.pause()
-    try await agent.receive(
-        AgentInput(id: UUID().uuidString, sessionID: control.sessionID, payload: .text("retained")))
-    let policy = try CommunicationPolicy(
-        contracts: contracts,
-        externalSources: [
-            "runtime", "user", "phone.microphone", "phone.camera", "model.resources", "app.resources",
-            "app.environment",
-        ],
-        configurations: AgentConfigurations.all())
-    let gateway = InputGateway(manager: manager, policy: policy, allowsExternalSend: true)
-    await #expect(throws: CommunicationError.invalidPayload) {
-        try await gateway.send(
-            AgentInput(id: UUID().uuidString, sessionID: control.sessionID, payload: .observation(foreign)),
-            to: .assistant)
-    }
-    let legacy = try await gateway.send(
-        AgentInput(id: UUID().uuidString, sessionID: control.sessionID, payload: .event("assistant.cancel")),
-        to: .assistant)
-    #expect(legacy.delivered.isEmpty)
-    #expect(!legacy.rejected.isEmpty)
-    #expect(await agent.status().queuedInputs == 1)
-    let accepted = try await gateway.send(control, to: .assistant)
-    #expect(accepted.rejected.isEmpty)
-    #expect(await agent.status().queuedInputs == 0)
     await agent.stop()
 }
 
@@ -675,7 +619,7 @@ func hostCancelTerminatesActiveInferenceBeforeQueuedCancellationAndOtherSessionR
     _ = try #require(await model.pending)
     try await agent.receive(queued)
     try await agent.receive(retained)
-    try await agent.receive(AgentSessionControl.cancelSession.input(sessionID: session))
+    try await agent.receive(AssistantSessionControl.cancelSession.input(sessionID: session))
     var outputs = FixtureGenerationOutputs(agent: agent).makeAsyncIterator()
     var cancelled: [OutputEnvelope] = []
     var next: [OutputEnvelope] = []
@@ -724,7 +668,7 @@ func closingSessionCancelsRunningAndWaitingForegroundTasksAndAllowsFreshConversa
         await model.waitForPending()
         _ = try #require(await model.pending)
     }
-    try await agent.receive(AgentSessionControl.cancelSession.input(sessionID: session))
+    try await agent.receive(AssistantSessionControl.cancelSession.input(sessionID: session))
     let state = try #require(try await repository.snapshot().state.skillState)
     #expect(state.activeTaskID == nil)
     #expect(state.tasks.last?.status == "cancelled")
@@ -779,7 +723,7 @@ func executionInterruptionPreservesConversationSkillsGoalAndPublicScope(control:
     if control == "pause" {
         try await agent.pause()
     } else {
-        try await agent.receive(AgentSessionControl.interruptSession.input(sessionID: session))
+        try await agent.receive(AssistantSessionControl.interruptSession.input(sessionID: session))
     }
     let retained = try #require(try await repository.snapshot().state.skillState)
     #expect(retained.loaded == skills.loaded)
@@ -808,7 +752,7 @@ func executionInterruptionPreservesConversationSkillsGoalAndPublicScope(control:
     #expect(request.messages[0].content.contains("Action closeCamera:"))
     let continued = try #require(try await repository.snapshot().state.skillState)
     #expect(continued.recentSkills["photography"]?.remainingDecisions == (mode == "recent" ? 4 : nil))
-    try await agent.receive(AgentSessionControl.cancelSession.input(sessionID: session))
+    try await agent.receive(AssistantSessionControl.cancelSession.input(sessionID: session))
     #expect(try await repository.snapshot().state.skillState?.loaded.contains("photography") == false)
     #expect(throws: StateError.closed) { try publicContext.snapshot(session: session, names: ["task"]) }
     await agent.stop()

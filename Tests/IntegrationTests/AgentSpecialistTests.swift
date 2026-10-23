@@ -1,6 +1,4 @@
-import ActionBindings
 import Actions
-import AgentBindings
 import AgentCore
 import Agents
 import CallRuntime
@@ -14,6 +12,7 @@ import StorageChat
 import StorageCore
 import StorageState
 import Testing
+import UI
 
 private actor SpecialistEffects {
     private(set) var owners: [String] = []
@@ -49,17 +48,15 @@ private func specialistEventually(_ predicate: @Sendable () async throws -> Bool
 
 private struct SpecialistTools: ToolModule { let definitions: [ActionBinding] }
 @Test(.actionCatalog, .timeLimit(.minutes(1)))
-func specialistTypedUIBypassesAssistantAndCompletesWithoutModels() async throws {
+@MainActor func specialistTypedUIBypassesAssistantAndCompletesWithoutModels() async throws {
+    let ui = UIContainer()
+    try ui.start()
     let session = UUID().uuidString
     let manager = AgentManager()
     let policy = try CommunicationPolicy(
         contracts: AgentContracts.communication,
-        externalSources: [
-            "user", "runtime", "phone.microphone", "phone.camera", "model.resources", "app.resources",
-            "app.environment",
-        ],
         configurations: AgentConfigurations.all())
-    let input = InputGateway(manager: manager, policy: policy, allowsExternalSend: true)
+    let input = InputGateway(manager: manager, policy: policy)
     let effects = SpecialistEffects()
     let definition = ActionBinding(
         path: .init(domain: "Camera", module: "Capture", function: "open"),
@@ -77,19 +74,18 @@ func specialistTypedUIBypassesAssistantAndCompletesWithoutModels() async throws 
         agent: AgentID.assistant, scope: UUID().uuidString, state: AssistantContextState()
     )
     let parent = try AssistantAgent(stateContext: try publicStateFixture(), context: repository)
-    let camera = PhotographerIntentRuntime(
-        sessionID: session, manager: manager, input: input, output: gateway,
+    let camera = PhotographerExecutionSession(
+        manager: manager, output: gateway,
         agent: try PhotographerAgent(
-            sessionID: session,
+            sessionID: session, uiCamera: ui.camera,
             context: try AgentContextRepository(
                 agent: AgentID(rawValue: "photographer"), scope: UUID().uuidString, state: PhotographerContextState())
         ), report: { await effects.fail($0) })
-    let root = AgentInteractionRuntime(
-        agent: parent, manager: manager, input: input, output: gateway,
-        startChildren: { try await camera.prepareForInteraction() }, report: { await effects.fail($0) },
-        inputRejected: { await camera.rejectInput($0, reason: $1) })
+    let root = AssistantExecutionSession(
+        agent: parent, manager: manager, output: gateway,
+        startChildren: { try await camera.prepareForInteraction() }, report: { await effects.fail($0) })
     try await root.start()
-    let operation = Task { try await camera.perform(.open) }
+    let operation = Task { try await ui.camera.requests.submit(.init(.open)) }
     do {
         try await operation.value
         #expect(await effects.owners == ["photographer"])
@@ -99,7 +95,7 @@ func specialistTypedUIBypassesAssistantAndCompletesWithoutModels() async throws 
         var observation = try await input.observeSignals().makeAsyncIterator()
         let signals = try #require(await observation.next()).records
         #expect(
-            signals.contains { $0.contract == "photography.camera" && $0.branches.map(\.target) == [.photographer] })
+            !signals.contains { $0.contract == "photography.camera" })
         #expect(!signals.contains { $0.task?.kind == .request })
         #expect(await effects.failures == [])
     } catch {
@@ -231,10 +227,6 @@ func assistantReportsReplyActivityWithoutOwningListening() async throws {
     let manager = AgentManager()
     let policy = try CommunicationPolicy(
         contracts: AgentContracts.communication,
-        externalSources: [
-            "user", "runtime", "phone.microphone", "phone.camera", "model.resources", "app.resources",
-            "app.environment",
-        ],
         configurations: AgentConfigurations.all())
     let input = InputGateway(manager: manager, policy: policy)
     let resource = ResourceID(rawValue: "nexarm.motor.1")
@@ -272,8 +264,8 @@ func assistantReportsReplyActivityWithoutOwningListening() async throws {
         } catch is CancellationError {} catch { await effects.fail(String(describing: error)) }
     }
     do {
-        try await input.publish(
-            .init(id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("跳舞")))
+        try await manager.publishLocally(
+            .init(id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("跳舞")), to: .assistant)
         try await specialistEventually { await effects.finished.contains(.assistant) }
         #expect(await effects.owners == ["assistant"])
         #expect(await effects.failures.isEmpty)
@@ -314,8 +306,8 @@ func assistantReportsReplyActivityWithoutOwningListening() async throws {
     )
     let entered = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingOldest(1))
     let release = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingOldest(1))
-    let runtime = AgentInteractionRuntime(
-        agent: parent, manager: manager, input: input, output: gateway,
+    let runtime = AssistantExecutionSession(
+        agent: parent, manager: manager, output: gateway,
         startChildren: {
             entered.continuation.yield(())
             var iterator = release.stream.makeAsyncIterator()
@@ -434,4 +426,44 @@ func assistantReportsReplyActivityWithoutOwningListening() async throws {
     #expect(PhotographerContextState.phase(context, input: input) == .failed)
     #expect(context.state.cameraState == nil)
     #expect(context.state.taskViews?[task.id]?.scope.id == task.id)
+}
+
+@Test(.actionCatalog, .timeLimit(.minutes(1))) @MainActor
+func memoryOwnsItsInjectedHistoryContainerWithoutAnInputHost() async throws {
+    let ui = UIContainer()
+    try ui.start()
+    let store = ConversationHistoryStore()
+    let runtime = try await intentRuntime(
+        sessionID: "history-ui",
+        presentation: HistoryPresentationAdapter(state: ui.history.presentation, store: store, sessionID: "history-ui"),
+        reads: HistoryReadFixture { _ in .archives([]) }, uiHistory: ui.history)
+    try await runtime.prepareForInteraction()
+    guard case .archives(let values) = try await ui.history.requests.submit(.archives(0)) else {
+        Issue.record("Memory must return the protected typed read")
+        await runtime.shutdown()
+        return
+    }
+    #expect(values.isEmpty)
+    #expect(await runtime.agent.status().processedInputs == 1)
+    await runtime.shutdown()
+    await ui.stop()
+}
+
+@Test(.actionCatalog, .timeLimit(.minutes(1))) @MainActor
+func assistantOwnsHomeRequestsAndPreservesUIRequestGenerationAndTurn() async throws {
+    let ui = UIContainer()
+    try ui.start()
+    let agent = try AssistantAgent(
+        stateContext: publicStateFixture(), uiHome: ui.home, uiSessionID: "assistant-ui", chat: FixedTextChat(),
+        context: AgentContextRepository(agent: .assistant, scope: UUID().uuidString, state: AssistantContextState()))
+    try await agent.start()
+    var outputs = agent.outputs.makeAsyncIterator()
+    try await ui.home.requests.submit(.text("hello"))
+    let first = try #require(await outputs.next())
+    #expect(first.sessionID == "assistant-ui")
+    #expect(first.inputMetadata.generation == ui.home.requests.generation.uuidString)
+    #expect(first.turn?.id == first.inputID && first.turn?.ordinal == 1)
+    await agent.stop()
+    await #expect(throws: UIRequestError.unavailable) { try await ui.home.requests.submit(.text("late")) }
+    await ui.stop()
 }

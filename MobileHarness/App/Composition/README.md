@@ -42,25 +42,17 @@ StorageContainer 在自己的后台启动任务中完成后端打开、迁移和
 
 AppStorage 目标只编译 Composition/ApplicationContainer.swift，使用 FactoryKit 实例内缓存；业务目标不导入 IoC。Services 持有注册容器、StorageContainer、PlatformContainer、UIContainer 和 ModelContainer，连接所需子接口。模型后台事件只转交 model.artifacts；模型根停止加入制品后再停止存储。
 
-## Platform 根、设备接入与同帧呈现
-
-✅ ApplicationContainer 注册 Storage、Platform、UI 与 Model 根及子能力，FactoryKit 只在现有 AppStorage 目标中使用。ServiceFactories 解析根并提供 Coordinator 构造工厂，不创建 AppleAudioIO/AppleCamera/BLE，也不转发帧。ModuleRegistration 将 platform 注册为独立服务，Agents 依赖 storage/platform/ui/model，native 只保留业务接入和观察。
 
 ## UI 容器与相机能力注入
 
-✅ ApplicationContainer 缓存 UI 根及相机子能力，AppStorage 显式依赖 UI。Services 持有 UIContainer；ServiceFactories 定义唯一 Coordinator 工厂，ApplicationFeatures 只在原有惰性时机调用它。ModuleRegistration 注册 ui 生命周期，Agents 依赖 storage/platform/ui/model。
+✅ ApplicationContainer 缓存 UI 根及相机子能力，AppStorage 显式依赖 UI。Services 持有 UIContainer；ServiceFactories 定义唯一 Coordinator 工厂，AgentApplication 只在原有惰性时机调用它。ModuleRegistration 注册 ui 生命周期，Agents 依赖 storage/platform/ui/model。
 
-## 统一容器异常通道
-
-✅ ApplicationContainer 注册根作用域故障通道，并注入 Storage/Platform/UI 原生报告器。Services 持有同一通道，ModuleRegistration 包装服务生命周期错误及清理阶段；diagnostics 依赖在基础库之前启动，最后取消/加入。AppComposition 的 onFailure 连接保留启动错误展示，不重复广播同一故障。根替换不继承旧通道队列。
-
-生命周期包装区分调用方已请求的取消与服务自行抛出的意外取消：前者不升级，后者仍报告故障。published 仅表示提交到 Gateway 发布入口，不冒充 Agent 已处理；实际接纳结果仍看 Signal 诊断。
 
 ## UI 全量容器化
 
 ✅ ApplicationContainer 缓存唯一 UIContainer，并将八个子能力注册为根属性的别名，不单独缓存备用实例。ServiceFactories 显式传入设置初值，再注入界面状态和所需呈现能力；不在 App 创建状态或逐帧转发。生命周期继续使用 diagnostics → storage/platform/ui → agents → native，业务消费者先停再停 UI，重试创建新根。
 
-✅ ApplicationFeatures 注入同根相机呈现端口供点击请求忙碌/提示投影，仍共用页面 CameraState，不创建备用根。
+✅ AgentApplication 注入同根相机呈现端口供点击请求忙碌/提示投影，仍共用页面 CameraState，不创建备用根。
 
 ✅ 后台 URLSession 可以在前台生命周期启动前准备同根制品；组合根记录该作用域已被使用，重建时在生命周期停止后显式加入幂等 model.stop/storage.stop，避免未加入 started 列表的后台所有者泄漏。后台准备不启动相机、音频、UI 或推理。
 
@@ -72,8 +64,30 @@ AppStorage 目标只编译 Composition/ApplicationContainer.swift，使用 Facto
 ✅ ApplicationContainer.failureDetails只投影四种模块自有Failure的稳定code及isCancellation，交给同根Gateway报告通道；模型生命周期拒绝保留不广播，真实清理失败例外。ModuleRegistration在保留结构化诊断后，将无清理失败的取消转换为通用宿主CancellationError以保持生命周期语义，不决定业务展示。
 
 
-✅ 准备状态投影同时更新UI交互门并向AgentBindings报告loading／idle事实，App不直接设置表情；已有会话延后冷准备，终态／失活立即清理展示。
+✅ 准备状态投影同时更新UI交互门并向Agents报告loading／idle事实，App不直接设置表情；已有会话延后冷准备，终态／失活立即清理展示。
 
 ✅ 已实现：模型准备事实仅在 preparing 投影 loading，checking 投影 idle，返回首页仅检查已加载能力时不触发加载表情。
 
 ✅ 已实现：首页步骤从 ModelKit 接收实际权重加载开始／结束，不再把调用 prepare 本身当作加载；检查、已就绪、无需挂载不投影 loading。
+
+
+## Direct container contract
+
+App creates shared foundational roots and injects public role/execution capabilities. It performs no external Signal encoding or per-frame forwarding. Current cross-module ownership is defined by the [overall design](../../README.md).
+
+✅ App 注入实际 UI 子容器；UI 业务事件订阅、处理和回执由 Agent 生命周期拥有。装配层保留页面交互能力构造及提交端口，不订阅、解释或向执行会话转交 UI 输入。
+
+## 语音执行归属收敛
+
+✅ 已实现：唯一根及能力装配保持；语音执行在 Actions 创建和持有，感知角色仍接收同根只读原生端口；生命周期停机先取消加入执行和角色，再释放基础根。
+
+✅ ApplicationPresentation 实现根 UI 协议，内部 SessionPresentation 实现会话展示协议，组合历史／诊断页面并连接导航回调；语音能力由 Agents 注入，App 不持有感知任务。会话展示对象按语音会话实例复用，只组合已有状态、请求端口和页面，不订阅或转发输入。
+
+
+## Actions 接入契约
+
+Actions 按业务能力组织源码，保持原编译目标。生产调用显式连接独立相机、语音、UI 呈现和 Task 端点；不通过无关能力的类型转换探测。验证和导航按实际源码所有权维护，业务授权与生命周期继续由原拥有者负责。
+
+## Agents 角色与共享机制
+
+具体角色装配归 Agents 根级，Support 保留通用机制；角色私有载荷和会话控制由角色解释，通过注入的解码／Context 钩子接入共享准入。输入身份、Task scope、取消加入和真实结果保持独立，源码和验证按其实际所有者维护。

@@ -1,6 +1,4 @@
-import ActionBindings
 import Actions
-import AgentBindings
 import AgentCore
 import Agents
 import AppLifecycle
@@ -79,7 +77,7 @@ private actor FailedDiagnosticDatabase: DatabaseStorage {
     let manager: AgentManager
     let input: InputGateway
     let output: OutputGateway
-    let runtime: ApplicationControlIntentRuntime
+    let runtime: ApplicationControlExecutionSession
     let context: AgentContextRepository<ApplicationControlContextState>
     let sessionID: String
     init(activity: ActionActivityWorkflow, rejectPresentation: Bool = false) throws {
@@ -90,17 +88,13 @@ private actor FailedDiagnosticDatabase: DatabaseStorage {
             "ApplicationControl",
         ].map { try AgentConfigurations.load(named: $0) }
         let policy = try CommunicationPolicy(
-            contracts: AgentContracts.communication,
-            externalSources: [
-                "user", "runtime", "phone.camera", "phone.microphone", "phone.bluetooth", "app.environment",
-                "app.resources", "model.resources",
-            ], configurations: configurations)
+            contracts: AgentContracts.communication, configurations: configurations)
         input = InputGateway(manager: manager, policy: policy)
         context = try AgentContextRepository(
             agent: .applicationControl, scope: sessionID, state: ApplicationControlContextState())
         let agent = try ApplicationControlAgent(sessionID: sessionID, context: context)
         let presentation = RuntimePresentation(
-            cameraControl: UnusedCameraControl(), rootSessionID: sessionID, activity: activity.state,
+            rootSessionID: sessionID, activity: activity.state,
             effects: ui.home.effects, expressions: ui.home.expressions,
             homeBluetooth: ui.home.conversation, deviceBluetooth: ui.devices.state)
         let function = UIActions.recordFailureDefinition(completing: { invocation in
@@ -126,17 +120,17 @@ private actor FailedDiagnosticDatabase: DatabaseStorage {
                     ].map(BehaviorProtocolBindings.bind))
             ]),
             policy: policy, sink: { _ in })
-        runtime = ApplicationControlIntentRuntime(
-            sessionID: sessionID, manager: manager, input: input, output: output, agent: agent)
+        runtime = ApplicationControlExecutionSession(
+            manager: manager, output: output, agent: agent)
     }
     func start(activity: ActionActivityWorkflow) async throws {
         try ui.start()
         try await runtime.prepareForInteraction()
         activity.startFailures { try await output.observeFailures() }
-        activity.connectFailureSignals(input: input, sessionID: sessionID)
+        activity.connectFailures { event in try await runtime.agent.observeFailure(event) }
     }
     func stop(activity: ActionActivityWorkflow) async {
-        await activity.stopFailureSignals()
+        await activity.stopFailureObservations()
         await runtime.shutdown()
         await output.shutdown()
         await input.shutdown()
@@ -153,7 +147,7 @@ private actor FailedDiagnosticDatabase: DatabaseStorage {
     try await fixture.start(activity: activity)
     let channel = ContainerFailureChannel()
     channel.start()
-    channel.connect(input: fixture.input, sessionID: fixture.sessionID)
+    channel.connect { event in try await fixture.runtime.agent.observeFailure(event) }
     let preparation = ForegroundPreparation(
         steps: { [.init(id: "language", isReady: { false }, prepare: { _ in })] },
         canPrepare: { true }, project: { _ in },
@@ -217,10 +211,6 @@ private actor FailedDiagnosticDatabase: DatabaseStorage {
     }
     let policy = try CommunicationPolicy(
         contracts: AgentContracts.communication,
-        externalSources: [
-            "user", "runtime", "phone.camera", "phone.microphone", "phone.bluetooth", "app.environment",
-            "app.resources", "model.resources",
-        ],
         configurations: configurations)
     let input = InputGateway(manager: manager, policy: policy)
     let context = try AgentContextRepository(
@@ -237,7 +227,7 @@ private actor FailedDiagnosticDatabase: DatabaseStorage {
     let display = UIContainer()
     try display.start()
     let presentation = RuntimePresentation(
-        cameraControl: UnusedCameraControl(), rootSessionID: "diagnostic-session", activity: activity.state,
+        rootSessionID: "diagnostic-session", activity: activity.state,
         effects: display.home.effects, expressions: display.home.expressions,
         homeBluetooth: display.home.conversation, deviceBluetooth: display.devices.state)
     let function = UIActions.recordFailureDefinition(completing: { invocation in
@@ -247,14 +237,17 @@ private actor FailedDiagnosticDatabase: DatabaseStorage {
         manager: manager, requests: input,
         tools: try ToolRegistry(modules: [DiagnosticTools(definitions: [try BehaviorProtocolBindings.bind(function)])]),
         policy: policy, sink: { _ in })
-    let runtime = ApplicationControlIntentRuntime(
-        sessionID: "diagnostic-session", manager: manager, input: input, output: output, agent: control)
+    let runtime = ApplicationControlExecutionSession(
+        manager: manager, output: output, agent: control)
     try await runtime.prepareForInteraction()
     channel.report(
         module: "storage", component: "database", operation: "read", error: InjectedContainerFailure.operation(1))
     #expect(channel.snapshot().records.first?.delivery == .pending)
     channel.start()
-    channel.connect(input: input, sessionID: "diagnostic-session")
+    channel.connect { event in
+        try await control.observeFailure(event)
+        try await agent.observeFailure(event)
+    }
     try await containerEventually {
         await agent.receivedContainerFailures().count == 1 && activity.state.backgroundIssues.count == 1
     }
@@ -285,9 +278,7 @@ private actor FailedDiagnosticDatabase: DatabaseStorage {
     var traces = try await input.observeSignals().makeAsyncIterator()
     let records = try #require(await traces.next()).records
     #expect(
-        records.contains {
-            $0.contract == ContainerFailureEvent.contract && $0.source == "runtime" && $0.phase == .accepted
-        })
+        !records.contains { $0.contract == ContainerFailureEvent.contract })
     channel.disconnect()
     await runtime.shutdown()
     await output.shutdown()
@@ -530,12 +521,12 @@ private actor FailedDiagnosticDatabase: DatabaseStorage {
     let event = RuntimeFailureEvent(
         id: "stale", source: "visionPerception", title: "Vision", message: "old native failure",
         time: Date().addingTimeInterval(-60), failureCode: "vision.pose.failed", category: "runtime")
-    try await fixture.input.publishRuntimeFailure(event, sessionID: fixture.sessionID)
+    try await fixture.runtime.agent.observeFailure(event)
     try await containerEventually { activity.state.backgroundIssues.count == 1 }
     #expect(activity.state.errorToast == nil)
     #expect(activity.state.backgroundIssues.first?.category == "Agent 运行异常")
     let processed = await fixture.runtime.agent.status().processedInputs
-    try await fixture.input.publishRuntimeFailure(event, sessionID: fixture.sessionID)
+    try await fixture.runtime.agent.observeFailure(event)
     // Joining publication shutdown below also joins the duplicate delivery.
     await fixture.input.shutdown()
     #expect(await fixture.runtime.agent.status().processedInputs == processed)
@@ -557,7 +548,7 @@ private actor FailedDiagnosticDatabase: DatabaseStorage {
     // Barrier: observe and forward the failed presentation snapshot, then close the forwarding owner.
     var snapshots = try await fixture.output.observeFailures().makeAsyncIterator()
     #expect(await snapshots.next()?.records.count == 1)
-    await activity.stopFailureSignals()
+    await activity.stopFailureObservations()
     #expect(await fixture.runtime.agent.status().processedInputs == 1)
     #expect(try await fixture.context.snapshot().revision == 0)
     await fixture.stop(activity: activity)
@@ -568,12 +559,12 @@ private actor FailedDiagnosticDatabase: DatabaseStorage {
     for index in 0..<101 {
         activity.recordFailure(title: "runtime", source: "runtime", message: "failure \(index)")
     }
-    #expect(activity.rejectedFailureSignals == 1)
+    #expect(activity.rejectedFailureEvents == 1)
     #expect(activity.state.observationUnavailable)
     #expect(activity.state.backgroundIssues.isEmpty)
-    await activity.stopFailureSignals()
+    await activity.stopFailureObservations()
     activity.recordFailure(title: "runtime", source: "runtime", message: "late")
-    #expect(activity.rejectedFailureSignals == 2)
+    #expect(activity.rejectedFailureEvents == 2)
 }
 
 private func diagnosticInput(
@@ -639,7 +630,7 @@ private func diagnosticInput(
     let workflow = ActionActivityWorkflow(state: state)
     let fixture = try RuntimeFailurePresentationFixture(activity: workflow)
     try await fixture.runtime.prepareForInteraction()
-    workflow.connectFailureSignals(input: fixture.input, sessionID: fixture.sessionID)
+    workflow.connectFailures { event in try await fixture.runtime.agent.observeFailure(event) }
     let pair = AsyncStream<OutputFailureSnapshot>.makeStream(bufferingPolicy: .bufferingNewest(1))
     workflow.startFailures { pair.stream }
     let issue = OutputFailureRecord(source: .assistant, title: "Fixture.Control.tool", message: "Resource rejected")
@@ -683,7 +674,7 @@ private func diagnosticInput(
     let workflow = ActionActivityWorkflow(state: state)
     let fixture = try RuntimeFailurePresentationFixture(activity: workflow)
     try await fixture.runtime.prepareForInteraction()
-    workflow.connectFailureSignals(input: fixture.input, sessionID: fixture.sessionID)
+    workflow.connectFailures { event in try await fixture.runtime.agent.observeFailure(event) }
     let pair = AsyncStream<OutputFailureSnapshot>.makeStream(bufferingPolicy: .bufferingNewest(1))
     workflow.startFailures { pair.stream }
     let inputID = UUID().uuidString
@@ -705,7 +696,7 @@ private func diagnosticInput(
     let workflow = ActionActivityWorkflow(state: state)
     let fixture = try RuntimeFailurePresentationFixture(activity: workflow)
     try await fixture.runtime.prepareForInteraction()
-    workflow.connectFailureSignals(input: fixture.input, sessionID: fixture.sessionID)
+    workflow.connectFailures { event in try await fixture.runtime.agent.observeFailure(event) }
     let pair = AsyncStream<OutputFailureSnapshot>.makeStream(bufferingPolicy: .bufferingNewest(1))
     workflow.startFailures { pair.stream }
     let detail =
@@ -854,18 +845,20 @@ private func bluetoothEnvironment(
     try await fixture.start(activity: activity)
     let channel = ContainerFailureChannel()
     channel.start()
-    channel.connect(input: fixture.input, sessionID: fixture.sessionID)
+    channel.connect { event in try await fixture.runtime.agent.observeFailure(event) }
     channel.report(
         module: "platform", component: "connectivity.bluetooth", operation: "scan",
         error: NexArmBluetoothError.unavailable)
     try await containerEventually { await fixture.runtime.agent.status().processedInputs >= 1 }
-    try await fixture.runtime.observeEnvironment(bluetoothEnvironment(connection: "connecting", sequence: 1))
+    try await fixture.runtime.prepareForInteraction()
+    try await fixture.runtime.agent.observeEnvironment(bluetoothEnvironment(connection: "connecting", sequence: 1))
     try await containerEventually {
         fixture.ui.home.conversation.bluetoothStatus == .connecting
             && fixture.ui.devices.state.connectionPresentation == .connecting
     }
     #expect(activity.state.errorToast == nil && activity.state.backgroundIssues.isEmpty)
-    try await fixture.runtime.observeEnvironment(bluetoothEnvironment(connection: "connected", sequence: 2))
+    try await fixture.runtime.prepareForInteraction()
+    try await fixture.runtime.agent.observeEnvironment(bluetoothEnvironment(connection: "connected", sequence: 2))
     try await containerEventually {
         fixture.ui.home.conversation.bluetoothStatus == .connected
             && fixture.ui.devices.state.connectionPresentation == .connected
@@ -878,10 +871,12 @@ private func bluetoothEnvironment(
         await fixture.runtime.agent.status().processedInputs > processedBeforeLateCondition
     }
     #expect(fixture.ui.home.conversation.bluetoothStatus == .connected)
-    try await fixture.runtime.observeEnvironment(
+    try await fixture.runtime.prepareForInteraction()
+    try await fixture.runtime.agent.observeEnvironment(
         bluetoothEnvironment(connection: "idle", recovery: "waiting", sequence: 3))
     try await containerEventually { fixture.ui.home.conversation.bluetoothStatus == .connecting }
-    try await fixture.runtime.observeEnvironment(
+    try await fixture.runtime.prepareForInteraction()
+    try await fixture.runtime.agent.observeEnvironment(
         bluetoothEnvironment(connection: "idle", availability: "poweredOff", sequence: 4))
     try await containerEventually {
         fixture.ui.home.conversation.bluetoothStatus == .disconnected
@@ -910,7 +905,7 @@ private func bluetoothEnvironment(
     let root = UIContainer()
     try root.start()
     let presentation = RuntimePresentation(
-        cameraControl: UnusedCameraControl(), rootSessionID: "bluetooth-root", activity: root.home.activity,
+        rootSessionID: "bluetooth-root", activity: root.home.activity,
         effects: root.home.effects, expressions: root.home.expressions,
         homeBluetooth: root.home.conversation, deviceBluetooth: root.devices.state)
     func invocation(
@@ -998,16 +993,21 @@ private struct DetailedContainerError: Error, CustomStringConvertible {
     try await fixture.start(activity: activity)
     fixture.ui.home.presentModelPreparation(.preparing("language"))
     #expect(!fixture.ui.home.conversation.isVoiceActive)
-    try await fixture.runtime.observeEnvironment(.init(category: .modelPreparation, sequence: 1, value: "loading"))
+    try await fixture.runtime.prepareForInteraction()
+    try await fixture.runtime.agent.observeEnvironment(
+        .init(category: .modelPreparation, sequence: 1, value: "loading"))
     try await containerEventually { fixture.ui.home.conversation.displayedExpression == .loading }
     #expect(fixture.ui.home.activity.errorToast == nil)
     fixture.ui.invalidate()
     try fixture.ui.setForeground(true)
     fixture.ui.home.presentModelPreparation(.preparing("language"))
-    try await fixture.runtime.observeEnvironment(.init(category: .modelPreparation, sequence: 2, value: "loading"))
+    try await fixture.runtime.prepareForInteraction()
+    try await fixture.runtime.agent.observeEnvironment(
+        .init(category: .modelPreparation, sequence: 2, value: "loading"))
     try await containerEventually { fixture.ui.home.conversation.displayedExpression == .loading }
     fixture.ui.home.presentModelPreparation(.ready)
-    try await fixture.runtime.observeEnvironment(.init(category: .modelPreparation, sequence: 3, value: "idle"))
+    try await fixture.runtime.prepareForInteraction()
+    try await fixture.runtime.agent.observeEnvironment(.init(category: .modelPreparation, sequence: 3, value: "idle"))
     try await containerEventually { !fixture.ui.home.conversation.loadingExpression }
     #expect(fixture.ui.home.conversation.displayedExpression == .closed)
     #expect(!fixture.ui.home.conversation.isVoiceActive)
@@ -1024,11 +1024,12 @@ private struct UnusedLoadingHistory: HistoryPresentationCapability {
     try root.start()
     root.home.presentModelPreparation(.preparing("language"))
     let presentation = RuntimePresentation(
-        cameraControl: UnusedCameraControl(), rootSessionID: "loading-root", activity: root.home.activity,
+        rootSessionID: "loading-root", activity: root.home.activity,
         effects: root.home.effects, expressions: root.home.expressions,
         homeBluetooth: root.home.conversation, deviceBluetooth: root.devices.state)
     let module = UIModule(
-        expression: presentation, pose: presentation, updates: presentation, history: UnusedLoadingHistory())
+        expression: presentation, pose: presentation, updates: presentation, history: UnusedLoadingHistory(),
+        loading: presentation)
     let definition = try #require(module.definitions.first { $0.path.description == "UI.Expression.setLoading" })
     let binding = try BehaviorProtocolBindings.bind(definition)
     let registry = try ToolRegistry(modules: [DiagnosticTools(definitions: [binding])])

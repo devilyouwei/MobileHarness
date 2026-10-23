@@ -457,6 +457,8 @@ extension HistoryPresenting {
 
 @MainActor
 public final class UIHistoryContainer {
+    public let requests = UIRequests<HistoryInput, HistoryReply>()
+
     public let state: ConversationHistoryState
     public var presentation: any HistoryPresenting { state }
     init(title: String, admission: UIPresentationAdmission) {

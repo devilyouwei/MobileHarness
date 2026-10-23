@@ -72,48 +72,51 @@
         try #require(predicate(), Comment(rawValue: stage))
     }
 
-    @Test(.timeLimit(.minutes(1))) @MainActor
-    func deepNavigationRetainsNativeHomeAndItsWorkUntilRootDestruction() async throws {
-        _ = NSApplication.shared
-        let state = NavigationHarnessState()
-        let evidence = HomeMountEvidence()
-        let window = NSWindow(
-            contentRect: NSRect(x: -10000, y: -10000, width: 500, height: 800),
-            styleMask: [.borderless], backing: .buffered, defer: false)
-        window.isReleasedWhenClosed = false
-        let host = NSHostingView(rootView: AnyView(NavigationHarness(state: state, evidence: evidence)))
-        window.contentView = host
-        window.orderBack(nil)
-        defer {
-            evidence.hold.continuation.finish()
-            window.contentView = nil
-            window.close()
-        }
-        host.layoutSubtreeIfNeeded()
-        try await awaitNavigation("Initial native home mount and task") {
-            evidence.taskStarted && evidence.view?.window === window
-        }
-        let original = try #require(evidence.view)
-
-        // Settings → history → conversation → context → request details, then pop back.
-        for depth in [1, 2, 3, 4, 5, 4, 2, 1, 0, 3, 0] {
-            state.path = Array(1...max(1, depth)).prefix(depth).map { $0 }
-            state.tick += 1
-            let tick = state.tick
-            host.layoutSubtreeIfNeeded()
-            try await awaitNavigation("Navigation depth \(depth), update \(tick)") {
-                evidence.ticks.contains(tick) && (depth == 0 || evidence.visited.contains(depth))
+    extension NativePresentationTests {
+        @Test(.timeLimit(.minutes(1))) @MainActor
+        func deepNavigationRetainsNativeHomeAndItsWorkUntilRootDestruction() async throws {
+            _ = NSApplication.shared
+            let state = NavigationHarnessState()
+            let evidence = HomeMountEvidence()
+            let window = NSWindow(
+                contentRect: NSRect(x: -10000, y: -10000, width: 500, height: 800),
+                styleMask: [.borderless], backing: .buffered, defer: false)
+            window.isReleasedWhenClosed = false
+            let host = NSHostingView(rootView: AnyView(NavigationHarness(state: state, evidence: evidence)))
+            window.contentView = host
+            window.orderBack(nil)
+            defer {
+                evidence.hold.continuation.finish()
+                window.contentView = nil
+                window.close()
             }
-            #expect(evidence.view === original)
-            #expect(original.window === window)
-            #expect(evidence.creations == 1 && evidence.detachments == 0)
-            #expect(!evidence.taskEnded)
-        }
+            host.layoutSubtreeIfNeeded()
+            try await awaitNavigation("Initial native home mount and task") {
+                evidence.taskStarted && evidence.view?.window === window
+            }
+            let original = try #require(evidence.view)
 
-        host.rootView = AnyView(EmptyView())
-        try await awaitNavigation("Root destruction cancels home work") {
-            evidence.taskEnded && original.window == nil
+            // Settings → history → conversation → context → request details, then pop back.
+            for depth in [1, 2, 3, 4, 5, 4, 2, 1, 0, 3, 0] {
+                state.path = Array(1...max(1, depth)).prefix(depth).map { $0 }
+                state.tick += 1
+                let tick = state.tick
+                host.layoutSubtreeIfNeeded()
+                try await awaitNavigation("Navigation depth \(depth), update \(tick)") {
+                    evidence.ticks.contains(tick) && (depth == 0 || evidence.visited.contains(depth))
+                }
+                #expect(evidence.view === original)
+                #expect(original.window === window)
+                #expect(evidence.creations == 1 && evidence.detachments == 0)
+                #expect(!evidence.taskEnded)
+            }
+
+            host.rootView = AnyView(EmptyView())
+            host.layoutSubtreeIfNeeded()
+            try await awaitNavigation("Root destruction cancels home work") {
+                evidence.taskEnded && original.window == nil
+            }
+            #expect(evidence.detachments == 1)
         }
-        #expect(evidence.detachments == 1)
     }
 #endif

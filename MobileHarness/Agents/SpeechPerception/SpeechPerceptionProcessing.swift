@@ -20,17 +20,13 @@ public struct SpeechPerceptionContextState: AgentContextState {
 
 public struct SpeechPerceptionSignalPreprocessor: SignalPreprocessor {
     public static let evidenceCapacity = 256
-    public static let inputCapacity = 4096
-    public static let maximumQueuedSamples = 8_388_608
-    public static let maximumQueuedDuration: TimeInterval = 30
     public static let outputCapacity = 32
 
     public init() {}
     public func classify(_ input: AgentInput, state: SpeechPerceptionContextState) throws -> SignalDisposition {
         guard !input.metadata.expired else { throw CommunicationError.expired }
         switch input.payload {
-        case .actionResult, .toolResult, .roundResult: return .feedback
-        case .audio: return .enqueue(priority: 0)
+        case .actionResult: return .feedback
         case .observation(let message)
         where [ListeningIntent.contract, ReplyActivity.contract, SpeechCaptureEnded.contract].contains(message.contract):
             return .control

@@ -2,29 +2,7 @@ import AgentCore
 import Foundation
 import PlatformKit
 
-/// Cheap image evidence; holds one inference reference and one union mask, each 64x64.
-/// YOLO cadence's fixed sample is a business attachment, not a framework image variant.
-public struct SampledImageAttachment: ImageAttachment {
-    public let gray64: Data
-    public let source: any ImageAttachment
-    public init(gray64: Data, source: any ImageAttachment) throws {
-        guard gray64.count == 4096 else { throw ImageInputError.invalidFrame }
-        self.gray64 = gray64
-        self.source = source
-    }
-}
-
-extension ImageInput {
-    public init(
-        width: Int, height: Int, gray64: Data, attachment: any ImageAttachment,
-        sequence: UInt64, timestamp: TimeInterval, rotation: Int, capturedAt: ContinuousClock.Instant? = nil
-    ) throws {
-        try self.init(
-            width: width, height: height, attachment: SampledImageAttachment(gray64: gray64, source: attachment),
-            sequence: sequence, timestamp: timestamp, rotation: rotation, capturedAt: capturedAt)
-    }
-}
-
+/// Fixed native-frame motion evidence, owned by the consuming role.
 struct FrameMotionAnalyzer: Sendable {
     private var reference: [UInt8]?
     private var referenceTime: TimeInterval?
@@ -103,29 +81,9 @@ struct FrameMotionAnalyzer: Sendable {
         }
     }
     static func sample(_ frame: ImageInput) throws -> [UInt8] {
-        switch frame.content {
-        case .attachment(let attachment):
-            if let native = attachment as? ImageValueAttachment<CameraFrame> { return Array(native.value.gray64) }
-            guard let value = attachment as? SampledImageAttachment else { throw ImageInputError.invalidFrame }
-            return Array(value.gray64)
-        case .rgb(let rgb):
-            // Match PlatformKit's luminance weights and pixel-center sampling; no image/backend imports.
-            var gray = [UInt8](repeating: 0, count: 4096)
-            rgb.withUnsafeBytes { bytes in
-                let pixels = bytes.bindMemory(to: UInt8.self)
-                for y in 0..<64 {
-                    let sy = min(frame.height - 1, (2 * y + 1) * frame.height / 128)
-                    for x in 0..<64 {
-                        let sx = min(frame.width - 1, (2 * x + 1) * frame.width / 128)
-                        let offset = (sy * frame.width + sx) * 3
-                        gray[y * 64 + x] = UInt8(
-                            (77 * Int(pixels[offset]) + 150 * Int(pixels[offset + 1]) + 29 * Int(pixels[offset + 2])
-                                + 128) >> 8)
-                    }
-                }
-            }
-            return gray
-        }
+        guard let native = frame.attachment as? CameraFrame, native.gray64.count == 4096
+        else { throw ImageInputError.invalidFrame }
+        return Array(native.gray64)
     }
     private static func range(_ values: [UInt8]) -> Int {
         var histogram = [Int](repeating: 0, count: 256)

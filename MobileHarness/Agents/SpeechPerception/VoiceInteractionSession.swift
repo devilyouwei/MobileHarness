@@ -1,0 +1,174 @@
+#if os(iOS)
+
+    import Actions
+    import Foundation
+    import ModelKit
+    import ModelKitDefaults
+    import ModelKitRuntime
+    import PlatformKit
+    import Synchronization
+    import UI
+    import UIKit
+
+    /// Resolves default capabilities once; consumers receive shared, managed capability instances.
+    @MainActor
+    @available(iOS 27, *)
+    public final class VoiceInteractionSession {
+        private var memoryWarnings: Task<Void, Never>?
+        private var starting: Task<Void, any Error>?
+        private var started = false
+        private let voiceAgents: VoiceAgentSession
+        private let recognition: any SpeechRecognitionCapability
+        private let vad: any VoiceActivityCapability
+        private let synthesis: any SpeechSynthesisCapability
+        private let voiceInput: any AudioCaptureObserving
+        public let listeningRequests: UIRequests<ListeningInput, Void>
+        func startInteraction() async throws {
+            if started { return }
+            if let starting { return try await starting.value }
+            let task = Task { [self] in
+                do {
+                    let store = try await voiceAgents.audioStore()
+                    let perception = try await voiceAgents.start(
+                        recognition, vad: vad, synthesis: synthesis,
+                        input: voiceInput, store: store, report: { _ in })
+                    try Task.checkCancellation()
+                    try await lifecycle.start(perception: perception, audioStore: store)
+                    try await voiceAgents.startInteraction()
+                    started = true
+                } catch {
+                    await lifecycle.shutdown()
+                    await voiceAgents.stop()
+                    throw error
+                }
+            }
+            starting = task
+            defer { starting = nil }
+            try await task.value
+        }
+        func shutdown() async throws {
+            starting?.cancel()
+            _ = await starting?.result
+            memoryWarnings?.cancel()
+            await memoryWarnings?.value
+            var cleanupErrors: [any Error] = []
+            await audioDetection.stopAndWait()
+            await lifecycle.shutdown()
+            await voiceAgents.stop()
+            started = false
+            do { try await diagnostic.stopAndWait() } catch { cleanupErrors.append(error) }
+            if !cleanupErrors.isEmpty { throw NativeCleanupFailure(errors: cleanupErrors) }
+        }
+        let lifecycle: VoiceSessionCoordinator
+        public let conversation: ConversationState
+        public let actionActivity: ActionActivityState
+        public let diagnostic: SpeechDiagnosticWorkflow
+        public let diagnosticState: SpeechDiagnosticState
+        public let audioDetectionState: AudioDetectionState
+        let audioDetection: AudioDetectionPresentation
+        public let detectionRequests: UIRequests<AudioDetectionInput, Void>
+
+        private var detectionInvalidation: Task<Void, Never>?
+        func invalidateDetection() {
+            guard detectionInvalidation == nil else { return }
+            detectionInvalidation = Task { [self] in
+                await audioDetection.stopAndWait()
+                detectionInvalidation = nil
+            }
+        }
+        #if DEBUG
+            public let validateVoiceModels: @Sendable () async throws -> String
+        #endif
+
+        deinit {
+            memoryWarnings?.cancel()
+        }
+
+        init(
+            home: UIHomeContainer, diagnostics: UIDiagnosticsContainer,
+            language: any ModelLanguageProviding, speech: any ModelSpeechProviding,
+            memoryPressure: @escaping @Sendable () async -> Void, audio: AudioContainer, runtime: AgentRuntime,
+            modelName: @escaping @Sendable () async throws -> String,
+            progress: @MainActor (String) -> Void
+        ) async throws {
+            audioDetectionState = diagnostics.audioDetection
+            actionActivity = home.activity
+            let recognition = speech.recognition
+            let chat = language
+            let vad = speech.voiceActivity
+            let synthesis = speech.synthesis
+            self.recognition = recognition
+            self.vad = vad
+            self.synthesis = synthesis
+            voiceInput = audio.io(.voice)
+            listeningRequests = home.listeningRequests
+            let validationModel = synthesis
+            let diagnosticState = diagnostics.speech
+            self.diagnosticState = diagnosticState
+            diagnostic = SpeechDiagnosticWorkflow(
+                state: diagnosticState, player: audio.io(.diagnostic), provider: validationModel,
+                load: { try await speech.warmup(.synthesis) },
+                unload: { try await speech.unload(.synthesis) })
+            #if DEBUG
+                validateVoiceModels = {
+                    try await ChatDiagnosticWorkflow.validate(chat: chat) {
+                        try await speech.warmup(.recognition)
+                        try await language.warmup()
+                    }
+                }
+            #endif
+            // Preparation is deferred to explicit voice admission; missing downloads do not block Settings/history.
+            progress("本地模型可在设置中下载")
+            try Task.checkCancellation()
+            let state = home.conversation
+            let spectrum = MicrophoneSpectrumPresentation(state: state)
+            let voiceAgents = VoiceAgentSession(runtime: runtime.voiceDependencies, spectrum: spectrum)
+            self.voiceAgents = voiceAgents
+            let lifecycle = VoiceSessionCoordinator(
+                runtime: voiceAgents.connections, state: state,
+                audio: audio.io(.voice), cue: audio.cue(.voice), haptic: audio.haptic(.voice), recognition: recognition,
+                synthesis: synthesis, voiceActivity: vad)
+            self.lifecycle = lifecycle
+            let audioDetection = AudioDetectionPresentation(
+                state: diagnostics.audioDetection,
+                endpoint: AudioDetectionSession(
+                    connections: AudioDetectionAgentSession.connections(recognition: recognition, vad: vad),
+                    execution: AudioDetectionExecution(
+                        audio: audio.io(.detection),
+                        beforeStart: { [weak lifecycle] in await lifecycle?.stopVoiceAndWait() })))
+            self.audioDetection = audioDetection
+            detectionRequests = diagnostics.detectionRequests
+            runtime.endpoints.speech.audioDetection = audioDetection
+            lifecycle.beforeVoiceStart = { [weak audioDetection] in await audioDetection?.stopAndWait() }
+            conversation = state
+            let warnings = memoryWarningStream()
+            memoryWarnings = Task {
+                for await _ in warnings {
+                    guard !Task.isCancelled else { break }
+                    await memoryPressure()
+                }
+            }
+        }
+    }
+
+    /// Memory warnings are coalescible notifications: retain only the latest pending warning.
+    private func memoryWarningStream() -> AsyncStream<Void> {
+        let token = Mutex<(any NSObjectProtocol)?>(nil)
+        return AsyncStream(bufferingPolicy: .bufferingNewest(1)) { continuation in
+            token.withLock {
+                $0 = NotificationCenter.default.addObserver(
+                    forName: UIApplication.didReceiveMemoryWarningNotification, object: nil, queue: nil
+                ) { _ in continuation.yield(()) }
+            }
+            continuation.onTermination = { _ in
+                let observer = token.withLock { value in
+                    let observer = value
+                    value = nil
+                    return observer
+                }
+                if let observer { NotificationCenter.default.removeObserver(observer) }
+            }
+        }
+    }
+
+#endif

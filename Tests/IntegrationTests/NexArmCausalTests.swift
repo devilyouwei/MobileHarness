@@ -215,73 +215,75 @@ import Testing
         }
     }
 
-    @Test(.actionCatalog, .enabled(if: ProcessInfo.processInfo.environment["NEXARM_CAUSAL_TEST"] == "1"))
-    func nexArmUSBPhysicalCausalTrial() async throws {
-        let env = ProcessInfo.processInfo.environment
-        let trialName = try #require(env["NEXARM_CAUSAL_TRIAL"])
-        let trial = try #require(CausalTrial(rawValue: trialName))
-        let gesture: NexArmGesture
-        switch env["NEXARM_CAUSAL_GESTURE"] {
-        case "dance": gesture = .dance
-        case "celebrate": gesture = .celebrate
-        default: throw NexArmError.invalidMotion
-        }
-        let link = try CausalSerialTrace(path: #require(env["NEXARM_PORT"]))
-        let controller = NexArmActionController(link: link)
-        print("CAUSAL BEGIN trial=\(trial.rawValue) gesture=\(gesture)")
-        do {
-            _ = try await controller.verifyCompatibility()
-            let first = try await controller.readState()
-            try await Task.sleep(for: .milliseconds(200))
-            let second = try await controller.readState()
-            // A separately selected, supervised home command may leave a hunting pose.
-            // A failed comparison never selects this mode automatically.
-            if trial != .home {
-                try #require(zip(first.joints, second.joints).allSatisfy { abs($0 - $1) <= 2 })
+    extension LiveRuntimeTests {
+        @Test(.actionCatalog, .enabled(if: ProcessInfo.processInfo.environment["NEXARM_CAUSAL_TEST"] == "1"))
+        func nexArmUSBPhysicalCausalTrial() async throws {
+            let env = ProcessInfo.processInfo.environment
+            let trialName = try #require(env["NEXARM_CAUSAL_TRIAL"])
+            let trial = try #require(CausalTrial(rawValue: trialName))
+            let gesture: NexArmGesture
+            switch env["NEXARM_CAUSAL_GESTURE"] {
+            case "dance": gesture = .dance
+            case "celebrate": gesture = .celebrate
+            default: throw NexArmError.invalidMotion
             }
-            try #require(
-                hypot(Double(second.pose[0]), Double(second.pose[1])) <= 450 && (50...600).contains(second.pose[2]))
-            if trial == .ik {
-                // Vendor CMD_IKINE_RESULT_GET calculates targets without driving servos.
-                let home = try #require(causalFrames(gesture, trial: .baseline).last)
-                let reply = try await link.exchange(
-                    NexArmPacket(command: 7, payload: home.packet.payload),
-                    replyID: 255, replyCommand: 7, replyCount: 24)
-                print("CAUSAL IK bytes=\(reply.payload)")
-            } else if trial == .home {
-                try await controller.resetPosition()
-            } else if trial == .baseline {
-                try await controller.performGesture(gesture, repetitions: 1)
-            } else if trial != .preflight {
-                // Historical six-axis causal variants remain data-only; never move the gripper.
-                throw NexArmError.invalidMotion
-            }
-            if trial != .preflight && trial != .ik {
-                // A finite target duration does not guarantee that the next serial receipt
-                // is fresh or already settled. Observe final home for up to three seconds.
-                // These read-only queries occur after playback and never replay movement.
-                let start = ContinuousClock.now
-                var finalTracker = NexArmArrivalTracker(
-                    target: [200, 0, 200, 0, 0, 0], final: true, started: start,
-                    durationMilliseconds: 0, actionDeadline: start.advanced(by: .seconds(3)), includeClaw: false)
-                while true {
-                    let sample = try await controller.readState()
-                    finalTracker.observe(pose: sample.pose, joints: sample.joints, at: .now)
-                    switch finalTracker.outcome(at: .now) {
-                    case .arrived: break
-                    case .feedbackTimeout, .completionTimeout: throw NexArmError.timeout
-                    case .waiting: break
-                    }
-                    if finalTracker.outcome(at: .now) == .arrived { break }
-                    try await Task.sleep(for: .milliseconds(150))
+            let link = try CausalSerialTrace(path: #require(env["NEXARM_PORT"]))
+            let controller = NexArmActionController(link: link)
+            print("CAUSAL BEGIN trial=\(trial.rawValue) gesture=\(gesture)")
+            do {
+                _ = try await controller.verifyCompatibility()
+                let first = try await controller.readState()
+                try await Task.sleep(for: .milliseconds(200))
+                let second = try await controller.readState()
+                // A separately selected, supervised home command may leave a hunting pose.
+                // A failed comparison never selects this mode automatically.
+                if trial != .home {
+                    try #require(zip(first.joints, second.joints).allSatisfy { abs($0 - $1) <= 2 })
                 }
+                try #require(
+                    hypot(Double(second.pose[0]), Double(second.pose[1])) <= 450 && (50...600).contains(second.pose[2]))
+                if trial == .ik {
+                    // Vendor CMD_IKINE_RESULT_GET calculates targets without driving servos.
+                    let home = try #require(causalFrames(gesture, trial: .baseline).last)
+                    let reply = try await link.exchange(
+                        NexArmPacket(command: 7, payload: home.packet.payload),
+                        replyID: 255, replyCommand: 7, replyCount: 24)
+                    print("CAUSAL IK bytes=\(reply.payload)")
+                } else if trial == .home {
+                    try await controller.resetPosition()
+                } else if trial == .baseline {
+                    try await controller.performGesture(gesture, repetitions: 1)
+                } else if trial != .preflight {
+                    // Historical six-axis causal variants remain data-only; never move the gripper.
+                    throw NexArmError.invalidMotion
+                }
+                if trial != .preflight && trial != .ik {
+                    // A finite target duration does not guarantee that the next serial receipt
+                    // is fresh or already settled. Observe final home for up to three seconds.
+                    // These read-only queries occur after playback and never replay movement.
+                    let start = ContinuousClock.now
+                    var finalTracker = NexArmArrivalTracker(
+                        target: [200, 0, 200, 0, 0, 0], final: true, started: start,
+                        durationMilliseconds: 0, actionDeadline: start.advanced(by: .seconds(3)), includeClaw: false)
+                    while true {
+                        let sample = try await controller.readState()
+                        finalTracker.observe(pose: sample.pose, joints: sample.joints, at: .now)
+                        switch finalTracker.outcome(at: .now) {
+                        case .arrived: break
+                        case .feedbackTimeout, .completionTimeout: throw NexArmError.timeout
+                        case .waiting: break
+                        }
+                        if finalTracker.outcome(at: .now) == .arrived { break }
+                        try await Task.sleep(for: .milliseconds(150))
+                    }
+                }
+                await link.close()
+                print("CAUSAL END trial=\(trial.rawValue) result=PASS")
+            } catch {
+                await link.close()
+                print("CAUSAL END trial=\(trial.rawValue) result=STOP error=\(error)")
+                throw error
             }
-            await link.close()
-            print("CAUSAL END trial=\(trial.rawValue) result=PASS")
-        } catch {
-            await link.close()
-            print("CAUSAL END trial=\(trial.rawValue) result=STOP error=\(error)")
-            throw error
         }
     }
 #endif

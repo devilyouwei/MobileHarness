@@ -111,7 +111,7 @@ Weights are acquired in Settings through Management/ModelKitHub and installed in
 
 ## MobileHarness/Actions/System/Support/README.md
 
-[现行 README](../../MobileHarness/Actions/System/Support/README.md)
+[现行 README](../../MobileHarness/Actions/System/README.md)
 
 ````markdown
 ## Provider 请求暂存与容量
@@ -1329,7 +1329,7 @@ Model exposure comes from [../../Resources/Agents/VisionPerception/Agent.json](.
 ````markdown
 ## Skill/task-mode contract
 
-✅ SpeechFailurePresentation 删除不存在的 Agent 合成/缓存超时分类；超时展示来自 ActionResult 的真实函数结果，网络失败保留底层来源。
+✅ SpeechPlaybackFailure 删除不存在的 Agent 合成/缓存超时分类；超时展示来自 ActionResult 的真实函数结果，网络失败保留底层来源。
 
 ## Action timeout contract (2026-10-12)
 
@@ -2551,13 +2551,13 @@ Source application failure is projected using the last confirmed view flags; err
 
 ## Provider configuration transactions
 
-✅ Implemented: replace tests of App-owned provider persistence with injected SettingsWorkflow facade tests. Transaction-order regressions move to Actions integration fixtures, preserving prior observable ordering and rollback assertions.
+✅ Implemented: replace tests of App-owned provider persistence with injected ProviderSettingsClient facade tests. Transaction-order regressions move to Actions integration fixtures, preserving prior observable ordering and rollback assertions.
 
 ## Completion batch — provider presentation and capability policy
 
 <!-- 同段原文其他来源：Tests/IntegrationTests/README.md / Completion batch — provider presentation and capability policy；Tests/OpenAIChatTests/README.md / Completion batch — provider presentation and capability policy；Tests/UITests/README.md / Completion batch — provider presentation and capability policy -->
 
-✅ Implemented: provider discovery model-family eligibility belongs to Actions ProviderModelList; ModelKit validates/decodes raw IDs only. Preserve filtering/dedup/order and bounds at the app boundary. SettingsState becomes a passive editable snapshot, with no tasks or injected execution; SettingsInteractionWorkflow in the existing Settings directory owns bounded form admission, revision and page-independent saves. UI forwards edits/discovery/cancellation/save through SettingsControlling.
+✅ Implemented: provider discovery model-family eligibility belongs to Actions ProviderModelList; ModelKit validates/decodes raw IDs only. Preserve filtering/dedup/order and bounds at the app boundary. SettingsState becomes a passive editable snapshot, with no tasks or injected execution; SettingsFormController in the existing Settings directory owns bounded form admission, revision and page-independent saves. UI forwards edits/discovery/cancellation/save through SettingsControlling.
 
 <!-- 同段原文其他来源：Tests/IntegrationTests/README.md / Completion batch — provider presentation and capability policy；Tests/OpenAIChatTests/README.md / Completion batch — provider presentation and capability policy；Tests/UITests/README.md / Completion batch — provider presentation and capability policy -->
 

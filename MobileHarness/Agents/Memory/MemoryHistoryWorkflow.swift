@@ -15,7 +15,9 @@ struct MemoryHistoryWorkflow {
     private static let deletion = InternalTool(path: "History.Conversation.delete", required: ["id"])
     private static let presentation = InternalTool(path: "UI.HistoryPresentation.showHistory")
     static func runtimeCapabilities(_ capabilities: CapabilityRegistry) throws -> CapabilityRegistry {
-        try capabilities.adding(internalTools: [presentation, deletion, archive, title])
+        try capabilities.adding(internalTools: [
+            presentation, deletion, archive, title, InternalTool(path: "History.Conversation.readFull"),
+        ])
     }
 
     var pendingRequestIDs: [String] { pending.map { [$0.callID] } ?? [] }
@@ -76,7 +78,6 @@ struct MemoryHistoryWorkflow {
             throw CommunicationError.invalidPayload
         }
         switch intent {
-        case .query: throw CommunicationError.invalidPayload
         case .cancel(let id):
             guard input.metadata.source == "runtime", id == input.id, pending == nil || pending?.input.id == id
             else {

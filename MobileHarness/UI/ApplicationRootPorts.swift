@@ -7,9 +7,8 @@
         var conversation: ConversationState { get }
         var actionActivity: ActionActivityState { get }
         var audioDetectionState: AudioDetectionState { get }
-        var audioDetectionControls: any AudioDetectionControlling { get }
-        func toggleVoice()
-        func voicePressChanged(_ pressing: Bool)
+        var audioDetectionRequests: UIRequests<AudioDetectionInput, Void> { get }
+        var listeningRequests: UIRequests<ListeningInput, Void> { get }
         func speechValidationContent() -> AnyView
         func chatValidationContent() -> AnyView
     }

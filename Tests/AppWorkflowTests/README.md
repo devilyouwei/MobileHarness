@@ -19,7 +19,7 @@
 | IndependentOutputTests | 各协议消费独立、拒绝不丢后续输出、取消与实际执行终态 |
 | SettingsTransactionTests / SettingsInteractionTests | 先提交后应用、草稿/私有结果、操作重叠、失败与显式重试 |
 | ModelResourcesWorkflowTests / ModelResourceInteractionWorkflowTests | 保存源、偏好、资源准入/删除、配置前置条件与页面无关 lifetime |
-| ResourceObservationWorkflowTests | 根采样、指纹/版本、失败/恢复、单工作者及 shutdown join |
+| ResourceObservationWorkflowTests | 资源变化触发无参数通知，不轮询或生成序号；重复前台不重订阅，shutdown 取消并加入 |
 | AudioDetectionWorkflowTests | 权限/首帧、自动完成、单次接纳、取消清理和晚到回调 |
 | ListeningActivationTests / ListeningCaptureWorkflowTests | 能力/权限准备→首帧收音→并行 cue/haptic、阶段失败保留实际效果、取消 join、同意/占用、半双工与快速切换 |
 | NativeInteractionWorkflowTests | UI 手势到 root intent、角色/会话围栏与取消 |
@@ -31,7 +31,7 @@
 
 ## 组合根与集成回归
 
-测试显式导入 AgentBindings、ActionBindings、AppLifecycle、Gateway、PlatformKit 和相应基础目标，不依赖 AppWorkflows 统一导出。ApplicationLifecycleTests 覆盖非法/超限图、依赖顺序、重复停止、部分启动回滚、保留多个清理错误、启动中的即时后台失效和迟到完成。
+测试显式导入 Agents、Actions、AppLifecycle、Gateway、PlatformKit 和相应基础目标，不依赖 AppWorkflows 统一导出。ApplicationLifecycleTests 覆盖非法/超限图、依赖顺序、重复停止、部分启动回滚、保留多个清理错误、启动中的即时后台失效和迟到完成。
 
 旧功能回归仍通过实际拥有者接口验证关联、容量、取消和真实完成；iOS 原生接入源由真实 iOS build 核验，macOS 条件编译不会提供假的设备实现。
 
@@ -54,7 +54,7 @@ UI 呈现边界回归覆盖设置修订拒绝过期更新、实际表情动画�
 
 ## 分类异常诊断
 
-✅ 验证异常分类从 Gateway 快照到 AgentBindings/UI 的短 toast 与完整日志双通道，保留关联信息及取消/去重/过期契约。
+✅ 验证异常分类从 Gateway 快照到 Agents/UI 的短 toast 与完整日志双通道，保留关联信息及取消/去重/过期契约。
 
 ## ApplicationControl 异常展示
 
@@ -77,3 +77,31 @@ UI 呈现边界回归覆盖设置修订拒绝过期更新、实际表情动画�
 ✅ HomeEffectsTests 覆盖恢复聆听时清理已定稿用户字幕（含无回复文本），不清理新一轮部分转写，旧回复到期后新输入仍保留。
 
 ✅ 已实现：ListeningActivationTests在同一会话、同一反馈端点连续执行五次独立启动，逐次验证先收音再执行提示音和触觉、子context及成功回执；替身只证明重复提交，不代表真机震动。
+
+
+## Direct container contract
+
+Direct-input regressions cover typed request receipts, bounds, cancellation/generations, native subscriptions and unchanged authorized execution. Synthetic tests do not establish real model, UI or hardware acceptance. Current cross-module ownership is defined by the [overall design](../../MobileHarness/README.md).
+
+✅ 通过屏障持有扫描请求，确认停止扫描可在扫描终态前提交，根关闭加入普通与控制 worker。
+
+## 语音执行归属收敛
+
+✅ 已实现：语音实际执行迁入 Actions 后继续验证聆听激活顺序、失败反馈、原生关闭加入、播放恢复、取消及独立输入消费；原生 iOS 执行与真机验收分别记账。
+
+## 直连链路收尾（待实现）
+
+❌ 验证业务完整终态及设备互斥，测试同步使用明确屏障。
+
+✅ HomeEffectsWorkflow 的 owner 围栏直接使用 UI.PresentationOwner 测试；移除已退役的 FunctionInput 身份转换扩展依赖。Actions 授权与调用参数仍由 HomeEffectActionTests 验证。
+
+✅ 环境事实源覆盖同类合并、投递失败和停止加入；不以应用壳直接写失败记录代替 Agent 决策。
+
+
+## Actions 接入契约
+
+Actions 按业务能力组织源码，保持原编译目标。生产调用显式连接独立相机、语音、UI 呈现和 Task 端点；不通过无关能力的类型转换探测。验证和导航按实际源码所有权维护，业务授权与生命周期继续由原拥有者负责。
+
+## Agents 角色与共享机制
+
+具体角色装配归 Agents 根级，Support 保留通用机制；角色私有载荷和会话控制由角色解释，通过注入的解码／Context 钩子接入共享准入。输入身份、Task scope、取消加入和真实结果保持独立，源码和验证按其实际所有者维护。

@@ -6,7 +6,7 @@
 
 ## 职责与编译边界
 
-ApplicationLifecycle.swift 独立编译为 AppLifecycle，只依赖 Foundation。它管理服务图，不实现语音、相机、蓝牙、配置或展示。ApplicationSystemDelegate.swift 仅由 App executable 编译，把 OS 回调原样转交 ActionBindings 的 ModelDownloadBackgroundService。
+ApplicationLifecycle.swift 独立编译为 AppLifecycle，只依赖 Foundation。它管理服务图，不实现语音、相机、蓝牙、配置或展示。ApplicationSystemDelegate.swift 仅由 App executable 编译，把 OS 回调原样转交 Actions 的 ModelDownloadBackgroundService。
 
 ## 公开接口
 
@@ -49,3 +49,8 @@ ManagedService 声明 id、dependencies、start、同步 invalidate、异步 for
 ✅ 已实现：实际 prepare 返回后先投影 checking 再复查，就绪检查不再属于模型加载展示区间。
 
 ✅ 已实现：Step.prepare 接受加载事实回调，worker 只在当前代际回调 true 时投影 preparing，false 立即 checking；普通检查和准备调用入口不发布加载。
+
+
+## Direct container contract
+
+App creates shared foundational roots and injects public role/execution capabilities. It performs no external Signal encoding or per-frame forwarding. Current cross-module ownership is defined by the [overall design](../../README.md).

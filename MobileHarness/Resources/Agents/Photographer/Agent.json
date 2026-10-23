@@ -4,17 +4,7 @@
   "communication": {
     "inputs": [
       {
-        "contract": "camera.state",
-        "version": 1,
-        "kind": "observation"
-      },
-      {
         "contract": "vision.pose",
-        "version": 1,
-        "kind": "observation"
-      },
-      {
-        "contract": "photography.camera",
         "version": 1,
         "kind": "observation"
       },
@@ -56,24 +46,9 @@
     ],
     "subscriptions": [
       {
-        "contract": "camera.state",
-        "source": "phone.camera",
-        "topic": "camera.state"
-      },
-      {
         "contract": "vision.pose",
         "source": "visionPerception",
         "topic": "vision.pose"
-      },
-      {
-        "contract": "photography.camera",
-        "source": "runtime",
-        "topic": "photography.camera"
-      },
-      {
-        "contract": "photography.camera",
-        "source": "user",
-        "topic": "photography.camera"
       }
     ],
     "publications": [],

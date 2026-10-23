@@ -38,9 +38,9 @@ struct PhotographerCameraWorkflow {
             guard message.contract == PhotographerCameraIntent.contract, let intent = message.photographerCamera,
                 input.metadata.contract == PhotographerCameraIntent.contract, input.metadata.version == 1
             else { throw CommunicationError.invalidPayload }
-            _ = try message.validatedSize()
+            try input.validate(message)
             if intent.operation == .cancel {
-                guard input.metadata.origin == .external, input.metadata.source == "runtime",
+                guard input.metadata.origin == .local, input.metadata.source == "runtime",
                     input.sessionID == rootSessionID, input.id == intent.requestID,
                     pending == nil || pending?.requestID == intent.requestID
                 else { throw CommunicationError.unauthorized }
@@ -48,7 +48,7 @@ struct PhotographerCameraWorkflow {
                 return (.control("photographer.camera.cancelled"), input)
             }
             let human =
-                input.metadata.origin == .external && input.metadata.incarnation == nil
+                input.metadata.origin == .local && input.metadata.incarnation == nil
                 && input.metadata.source == "user" && input.sessionID == rootSessionID
             let assistant =
                 input.metadata.origin == .agent && input.metadata.incarnation != nil

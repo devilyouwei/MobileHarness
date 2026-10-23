@@ -37,6 +37,8 @@ public actor VisionPerceptionAgent: Agent {
     public private(set) var modelFailures = 0
     public private(set) var consecutiveModelFailures = 0
     public private(set) var lastModelError: String?
+    private let cameraInput: (any CameraFrameObserving)?
+    private var nativeInput: Task<Void, any Error>?
     private let pose: any PoseCapability
     private let sessionID: String
     private var lifecycle: AgentLifecycle = .registered
@@ -69,7 +71,8 @@ public actor VisionPerceptionAgent: Agent {
     // MARK: - Registration
 
     public init(
-        pose: any PoseCapability, sessionID: String, configuration: AgentConfiguration? = nil,
+        pose: any PoseCapability, sessionID: String, cameraInput: (any CameraFrameObserving)? = nil,
+        configuration: AgentConfiguration? = nil,
         sampling: FrameSamplingConfiguration? = nil, mirroredGaze: Bool = false,
         context: AgentContextRepository<VisionPerceptionContextState>
     ) throws {
@@ -84,6 +87,7 @@ public actor VisionPerceptionAgent: Agent {
             capabilities: try Self.runtimeCapabilities(configuration.capabilities))
         self.cadence = FrameCadence(configuration: try sampling ?? FrameSamplingConfiguration())
         self.gaze = FaceGazeTracker(mirrored: mirroredGaze)
+        self.cameraInput = cameraInput
         self.pose = pose
         self.sessionID = sessionID
         let mailbox = AgentOutputMailbox(capacity: 18)
@@ -103,18 +107,47 @@ public actor VisionPerceptionAgent: Agent {
         try await contextRepository.update { $0.state.perceptionSessionID = id }
         startedAt = .now
         lifecycle = .running
+        try await startCameraInput()
     }
-    public func pause() throws {
+    public func pause() async throws {
         guard lifecycle == .running else { throw HarnessError.invalidTransition }
         lifecycle = .paused
+        await stopInput()
+        if cameraInput != nil {
+            pending = nil
+            pendingPublication = nil
+            let inference = worker
+            let publication = publisher
+            inference?.cancel()
+            publication?.cancel()
+            await inference?.value
+            await publication?.value
+        }
     }
-    public func resume() throws {
+    public func resume() async throws {
         guard lifecycle == .paused else { throw HarnessError.invalidTransition }
         lifecycle = .running
+        try await startCameraInput()
         drain()
         drainPublication()
     }
+    private func startCameraInput() async throws {
+        guard let cameraInput else { return }
+        let frames = try await cameraInput.subscribeFrames()
+        try Task.checkCancellation()
+        guard lifecycle == .running else { throw HarnessError.notRunning }
+        let generation = sessionID
+        nativeInput = Task { try await self.consumeCamera(frames, generation: generation) }
+    }
+    public func waitForInput() async throws { try await nativeInput?.value }
+    public func stopInput() async {
+        let task = nativeInput
+        nativeInput = nil
+        task?.cancel()
+        _ = await task?.result
+    }
     public func stop() async {
+        await stopInput()
         lifecycle = .stopped
         pending = nil
         pendingPublication = nil
@@ -146,6 +179,17 @@ public actor VisionPerceptionAgent: Agent {
             resultInbox.accept(result)
             return
         }
+        throw HarnessError.unsupportedInput
+    }
+
+    func admitCamera(_ input: AgentInput) throws {
+        guard lifecycle == .running || lifecycle == .paused else { throw HarnessError.notRunning }
+        guard input.sessionID == sessionID else { throw CommunicationError.scopeClosed }
+        guard !input.metadata.expired else {
+            expiredInputs += 1
+            throw CommunicationError.expired
+        }
+        try input.context.validate()
         // Image admission is state-independent; do not queue capture behind a persistence commit.
         guard case .image(let image) = input.payload else { throw HarnessError.unsupportedInput }
         guard lastSequence.map({ image.sequence > $0 }) ?? true,
@@ -309,8 +353,9 @@ public actor VisionPerceptionAgent: Agent {
         publisher?.cancel()
         mailbox.close(
             terminal: OutputEnvelope(
-                source: descriptor.id, input: input,
+                source: descriptor.id, context: input.context,
                 output: .control("agent.error: pose processing failed"),
+                taskScope: input.taskScope,
                 failure: AgentFailureDiagnostic(
                     category: .runtime, code: code, detail: String(describing: error))))
     }
@@ -404,8 +449,8 @@ public actor VisionPerceptionAgent: Agent {
         let key = Self.outputReplacementKey(output)
         let replaced = try mailbox.admit(
             OutputEnvelope(
-                source: descriptor.id, input: input, output: output, sequence: image.sequence,
-                media: key == "overlay" && Self.hasNativeImage(image) ? image : nil),
+                source: descriptor.id, context: input.context, output: output, sequence: image.sequence,
+                taskScope: input.taskScope, media: key == "overlay" ? image : nil),
             replacing: key)
         if let replaced {
             if case .toolCall(let call) = replaced.output, call.toolPath == "UI.Pose.showPose" {
@@ -416,11 +461,6 @@ public actor VisionPerceptionAgent: Agent {
                 gazeReplacements += 1
             }
         }
-    }
-
-    private static func hasNativeImage(_ image: ImageInput) -> Bool {
-        guard case .attachment(let value) = image.content else { return false }
-        return value is ImageValueAttachment<CameraFrame>
     }
 
     // MARK: - Communication output
@@ -447,8 +487,6 @@ public actor VisionPerceptionAgent: Agent {
     private func prepareSignal(_ input: AgentInput) async throws {
         let snapshot = try await contextRepository.snapshot()
         let disposition = try preprocessor.classify(input, state: snapshot.state)
-        if input.payload.kind == .audio || input.payload.kind == .image { return }
-        if case .replaceLatest = disposition { return }
         try await contextRepository.recordSignal(
             input, disposition: disposition, admissionSequence: snapshot.revision + 1,
             consumed: disposition != .feedback, retainingLast: VisionPerceptionSignalPreprocessor.evidenceCapacity)

@@ -94,44 +94,9 @@ public struct RuntimeFailureEvent: Codable, Sendable, Equatable, Identifiable {
     }
 }
 
-/// Untrusted host content and causal hints. Only Gateway turns this into a Signal envelope.
-public struct ExternalInputDraft: Sendable {
-    public let id: String?
-    public let sessionID: String
-    public let payload: InputPayload
-    public let source: String
-    public let sequence: UInt64
-    public let rootID: String?
-    public let parentID: String?
-    public let hops: Int
-    public let deadline: ContinuousClock.Instant?
-    public let turn: AgentTurn?
-    public init(
-        id: String? = nil, sessionID: String, payload: InputPayload, source: String,
-        sequence: UInt64 = 0, rootID: String? = nil, parentID: String? = nil, hops: Int = 0,
-        deadline: ContinuousClock.Instant? = nil, turn: AgentTurn? = nil
-    ) {
-        self.id = id
-        self.sessionID = sessionID
-        self.payload = payload
-        self.source = source
-        self.sequence = sequence
-        self.rootID = rootID
-        self.parentID = parentID
-        self.hops = hops
-        self.deadline = deadline
-        self.turn = turn
-    }
-}
-
-/// Domain-owned content adaptation; transport encoding is supplied by Gateway.
-public protocol ExternalInputProviding: Sendable {
-    func externalInput(sessionID: String, sequence: UInt64) throws -> ExternalInputDraft
-}
-
 /// Provenance is independent of payload meaning; Gateway entry points enforce authority.
 public enum SignalOrigin: String, Codable, Sendable {
-    case external, agent, runtime
+    case local, agent, runtime
 }
 
 public enum InputPayload: Sendable {
@@ -192,6 +157,7 @@ public struct AgentInput: Sendable {
 }
 
 public struct InputMetadata: Sendable {
+    public let generation: String?
     public let origin: SignalOrigin
     public let contract: String
     public let version: Int
@@ -205,9 +171,9 @@ public struct InputMetadata: Sendable {
     public let hops: Int
     public let deadline: ContinuousClock.Instant?
     public init(
-        payload: InputPayload, source: String? = nil, incarnation: String? = nil, origin: SignalOrigin = .external,
+        payload: InputPayload, source: String? = nil, incarnation: String? = nil, origin: SignalOrigin = .local,
         capturedAt: TimeInterval? = nil, sequence: UInt64 = 0, rootID: String,
-        parentID: String? = nil, hops: Int = 0, deadline: ContinuousClock.Instant? = nil
+        parentID: String? = nil, hops: Int = 0, deadline: ContinuousClock.Instant? = nil, generation: String? = nil
     ) {
         let contract: String
         var defaultSource = "runtime"
@@ -230,6 +196,7 @@ public struct InputMetadata: Sendable {
         case .observation(let observation):
             contract = observation.contract
         }
+        self.generation = generation
         self.origin = origin
         self.contract = contract
         version = 1

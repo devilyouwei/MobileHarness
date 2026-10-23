@@ -421,3 +421,17 @@ private actor ResumableHubFixture: ModelArtifactDownloader {
         #expect(!ModelArtifactCatalog.validInstalledPath(path))
     }
 }
+
+@Test func artifactObservationIsBoundedAndEndsAtItsOwningLifetime() async throws {
+    let store = ModelArtifactStore(catalog: try fixtureCatalog(), storage: ArtifactFixtureStorage())
+    var changes = try await store.observeChanges().makeAsyncIterator()
+    #expect(await changes.next() == 0)
+    var others: [AsyncStream<UInt64>] = []
+    for _ in 0..<15 { others.append(try await store.observeChanges()) }
+    #expect(others.count == 15)
+    await #expect(throws: ModelArtifactError.busy) { try await store.observeChanges() }
+    try await store.remove("fixture")
+    #expect(try #require(await changes.next()) > 0)
+    try await store.close()
+    #expect(await changes.next() == nil)
+}

@@ -1,5 +1,7 @@
+import Actions
+
 #if os(iOS)
-    import ActionBindings
+
     import UIKit
 
     /// Native callbacks are forwarded to the registered domain handler without interpreting payloads.

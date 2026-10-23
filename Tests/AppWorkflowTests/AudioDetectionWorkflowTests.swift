@@ -1,6 +1,5 @@
-import ActionBindings
 import Actions
-import AgentBindings
+import Agents
 import Foundation
 import Gateway
 import PlatformKit
@@ -48,61 +47,59 @@ private enum DetectionFixtureError: LocalizedError {
     let state = AudioDetectionState()
     let endpoint = DetectionEndpoint()
     endpoint.holdCleanup = true
-    let workflow = AudioDetectionWorkflow(state: state, endpoint: endpoint)
-    workflow.start()
-    workflow.start()
+    let workflow = AudioDetectionPresentation(state: state, endpoint: endpoint)
+    let first = Task { try await workflow.run(readiness: AudioDetectionReadiness()) }
     try await detectionWait { state.phase == .running }
-    #expect(endpoint.calls == 1)
     let oldUpdate = try #require(endpoint.updates.first)
     var active = state.snapshot
     active.direction = .active
     active.azimuthDegrees = 45
     active.directionExpiresAt = .now.advanced(by: .milliseconds(500))
     oldUpdate(active)
-    workflow.stop()
-    #expect(state.snapshot.azimuthDegrees == nil)
+    let stopping = Task { await workflow.stopAndWait() }
+    try await detectionWait { endpoint.cleanup != nil }
     oldUpdate(active)
     #expect(state.phase == .stopping && state.snapshot.azimuthDegrees == nil)
-    try await detectionWait { endpoint.cleanup != nil }
-    workflow.start()
-    #expect(endpoint.calls == 1)
+    await #expect(throws: AudioDetectionError.busy) { try await workflow.run(readiness: AudioDetectionReadiness()) }
     endpoint.cleanup?.resume()
     endpoint.cleanup = nil
-    await workflow.stopAndWait()
+    await stopping.value
+    _ = await first.result
     #expect(state.phase == .stopped)
     endpoint.holdCleanup = false
-    workflow.start()
+    let next = Task { try await workflow.run(readiness: AudioDetectionReadiness()) }
     try await detectionWait { endpoint.calls == 2 && state.phase == .running }
     oldUpdate(active)
     #expect(state.snapshot.azimuthDegrees == nil)
     await workflow.stopAndWait()
-    #expect(state.phase == .stopped)
+    _ = await next.result
 }
-
 @Test @MainActor func audioDetectionFinishesAutomaticallyAndClearsDirection() async throws {
     let state = AudioDetectionState()
     let endpoint = DetectionEndpoint()
-    let workflow = AudioDetectionWorkflow(state: state, endpoint: endpoint, duration: .milliseconds(120))
-    workflow.start()
-    try await detectionWait { state.phase == .finished }
-    #expect(endpoint.cleanupStarted)
-    #expect(state.snapshot.capture == .mono)
+    let workflow = AudioDetectionPresentation(state: state, endpoint: endpoint)
+    let readiness = AudioDetectionReadiness()
+    let operation = Task { try await workflow.run(readiness: readiness) }
+    // The role's duration expires only after actual capture readiness.
+    for await _ in readiness.events { break }
+    readiness.cancel(completed: true)
+    operation.cancel()
+    _ = await operation.result
+    #expect(state.phase == .finished && endpoint.cleanupStarted)
     #expect(state.snapshot.level == 0 && state.snapshot.azimuthDegrees == nil)
-    #expect(!state.isActive)
 }
-
 @Test @MainActor func audioDetectionKeepsFailedPermissionResultAndAllowsRetry() async throws {
     let state = AudioDetectionState()
     let endpoint = DetectionEndpoint()
     endpoint.failure = DetectionFixtureError.denied
-    let workflow = AudioDetectionWorkflow(state: state, endpoint: endpoint)
-    workflow.start()
-    try await detectionWait { state.phase == .failed }
-    #expect(state.snapshot.permissionGranted == false)
+    let workflow = AudioDetectionPresentation(state: state, endpoint: endpoint)
+    await #expect(throws: (any Error).self) { try await workflow.run(readiness: AudioDetectionReadiness()) }
+    #expect(state.snapshot.permissionGranted == false && state.phase == .failed)
     #expect(state.error?.contains("请允许麦克风访问") == true)
     endpoint.failure = nil
-    workflow.start()
+    let operation = Task { try await workflow.run(readiness: AudioDetectionReadiness()) }
     try await detectionWait { state.phase == .running }
     #expect(state.error == nil && state.snapshot.permissionGranted == true)
     await workflow.stopAndWait()
+    _ = await operation.result
 }

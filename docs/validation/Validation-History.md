@@ -991,7 +991,7 @@ No installation or new physical motion/layout/gesture verification was performed
 
 Branch: codex/agent-driven-app. Scope: Assistant-owned request context, token-fenced exact journal admission, UI-owned titles and producer-owned speech failures; no new Agent or device workflow.
 
-✅ Swift 6.4 strict formatting, architecture boundaries, six Python checks, diff whitespace and project/privacy/entitlements plist validation passed. The final targeted run passed 32 tests across history/context/admission, speech errors, title presentation and history workflows, including the audio detection retry regression. The unsigned generic iOS device build passed with Xcode 27, including SpeechFailurePresentation and VoiceSessionCoordinator.
+✅ Swift 6.4 strict formatting, architecture boundaries, six Python checks, diff whitespace and project/privacy/entitlements plist validation passed. The final targeted run passed 32 tests across history/context/admission, speech errors, title presentation and history workflows, including the audio detection retry regression. The unsigned generic iOS device build passed with Xcode 27, including SpeechPlaybackFailure and VoiceSessionCoordinator.
 
 ❌ Full scripts/check.sh returned failure: all 476 integration tests passed, but AppWorkflowTests.audioDetectionKeepsFailedPermissionResultAndAllowsRetry timed out in the full run. Its isolated final rerun passed; whole-suite success is not claimed. scripts/build-ios.sh failed at the first simulator scheme because external CoreAIShared cannot resolve CoreAI; its remaining three schemes were not attempted. No real-model inference, physical device interaction, audio latency or UI gesture acceptance was performed. Original Technical_Design.docx remains unchanged.
 
@@ -1823,11 +1823,11 @@ Every row passed the shared structure, graph, link, navigation and current-desig
 | 50 | [MobileHarness/Actions/Speech/README.md](../../MobileHarness/Actions/Speech/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
 | 51 | [MobileHarness/Actions/System/README.md](../../MobileHarness/Actions/System/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
 | 52 | [MobileHarness/Actions/UI/README.md](../../MobileHarness/Actions/UI/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
-| 53 | [MobileHarness/Actions/Camera/Support/README.md](../../MobileHarness/Actions/Camera/Support/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
-| 54 | [MobileHarness/Actions/History/Support/README.md](../../MobileHarness/Actions/History/Support/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
+| 53 | [MobileHarness/Actions/Camera/Support/README.md](../../MobileHarness/Actions/Camera/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
+| 54 | [MobileHarness/Actions/History/Support/README.md](../../MobileHarness/Actions/History/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
 | 55 | [MobileHarness/Actions/NexArm/Support/README.md](../../MobileHarness/Actions/NexArm/Support/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
 | 56 | [MobileHarness/Actions/Speech/Support/README.md](../../MobileHarness/Actions/Speech/Support/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
-| 57 | [MobileHarness/Actions/System/Support/README.md](../../MobileHarness/Actions/System/Support/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
+| 57 | [MobileHarness/Actions/System/Support/README.md](../../MobileHarness/Actions/System/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
 | 58 | [MobileHarness/Actions/UI/Support/README.md](../../MobileHarness/Actions/UI/Support/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
 | 59 | [MobileHarness/ModelKit/README.md](../../MobileHarness/ModelKit/README.md) | 0 / 0 | 2 | ✅ Current technical design reconciled |
 | 60 | [MobileHarness/ModelKit/Backends/README.md](../../MobileHarness/ModelKit/Support/Backends/README.md) | 0 / 0 | 2 | ✅ Current technical design reconciled |

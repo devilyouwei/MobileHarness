@@ -10,8 +10,10 @@ final class ArtifactDownloadTransport: NSObject, URLSessionDownloadDelegate, Sen
         var results: [Int: Result<URL, Error>] = [:]
     }
     private let state = Mutex(State())
+    private let onProgress: @Sendable () -> Void
     private let identifier: String
-    init(identifier: String, allowsCellular: Bool) {
+    init(identifier: String, allowsCellular: Bool, onProgress: @escaping @Sendable () -> Void = {}) {
+        self.onProgress = onProgress
         self.identifier = identifier
         super.init()
         #if os(iOS)
@@ -93,6 +95,7 @@ final class ArtifactDownloadTransport: NSObject, URLSessionDownloadDelegate, Sen
         totalBytesWritten: Int64, totalBytesExpectedToWrite: Int64
     ) {
         state.withLock { $0.received = totalBytesWritten }
+        onProgress()
         guard let limit = downloadTask.taskDescription?.split(separator: "\n").last.flatMap({ Int64($0) }) else {
             downloadTask.cancel()
             return

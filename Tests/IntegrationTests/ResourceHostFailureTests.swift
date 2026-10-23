@@ -1,6 +1,4 @@
-import ActionBindings
 import Actions
-import AgentBindings
 import AgentCore
 import Agents
 import Foundation
@@ -10,6 +8,7 @@ import PlatformKit
 import StorageCore
 import StorageState
 import Testing
+import UI
 
 private actor HostResourceFixture: ModelResourceCapability {
     var calls: [String] = []
@@ -46,7 +45,8 @@ private actor HostPresentationFixture: ResourcePresentationCapability {
 @Test(.actionCatalog) func resourceHostDispatchPresentsWithoutReplayingNativeEffect() async throws {
     let native = HostResourceFixture()
     let ui = HostPresentationFixture()
-    let runtime = try resourceRuntime(native, presentation: ui, nonReturningPaths: ["System.ModelResources.download"])
+    let runtime = try await resourceRuntime(
+        native, presentation: ui, nonReturningPaths: ["System.ModelResources.download"])
     do {
         try await runtime.perform(.download(id: "model", endpoint: "https://example.com", allowsCellular: false))
         Issue.record("Non-returning dispatch must fail")
@@ -65,15 +65,17 @@ private actor HostPresentationFixture: ResourcePresentationCapability {
 {
     let native = HostResourceFixture()
     let ui = HostPresentationFixture(failing: true)
-    let runtime = try resourceRuntime(
+    let runtime = try await resourceRuntime(
         native, presentation: ui, includeOperationFailurePresentation: !missing,
         nonReturningPaths: ["System.ModelResources.download"])
     do {
         try await runtime.perform(.download(id: "model", endpoint: "https://example.com", allowsCellular: false))
         Issue.record("Failed diagnostic must retain original failure")
-    } catch ApplicationControlIntentFailure.execution(let message) {
+    } catch let error as NativeCleanupFailure {
+        #expect(error.errors.count == 2)
+        let message = String(describing: error)
         #expect(message.contains("returning feedback"))
-        #expect(message.contains("diagnostic:"))
+        #expect(message.contains(missing ? "Unknown tool" : "diagnostic fixture failed"))
     }
     #expect(await native.calls.isEmpty)
     #expect(await ui.calls.count == (missing ? 0 : 1))
@@ -131,7 +133,7 @@ private actor HostPreferencesFixture: ModelResourcePreferencesCapability {
     let native = HostResourceFixture()
     let ui = HostPresentationFixture()
     let preferences = HostPreferencesFixture()
-    let runtime = try resourceRuntime(native, preferences: preferences, presentation: ui)
+    let runtime = try await resourceRuntime(native, preferences: preferences, presentation: ui)
     do {
         _ = try await runtime.preferences(.restoreSource)
         Issue.record("Malformed preference feedback must fail")
@@ -164,43 +166,93 @@ private actor HeldHostBinding: ModelResourceCapability {
     func cancel(_ id: String) async throws { throw CancellationError() }
     func remove(_ id: String) async throws { throw CancellationError() }
 }
-@Test(.actionCatalog) func resourceHostRejectedAdmissionPresentsWithoutReleasingActiveBinding() async throws {
+@Test(.actionCatalog) func resourceUIQueuesBindingWithoutReleasingActiveOwner() async throws {
     let native = HeldHostBinding()
     let ui = HostPresentationFixture()
-    let runtime = try resourceRuntime(native, presentation: ui)
+    let runtime = try await resourceRuntime(native, presentation: ui)
     var entries = native.entered.stream.makeAsyncIterator()
     let original = Task { try await runtime.perform(.configureSpeech(recognition: true, synthesis: false)) }
     _ = await entries.next()
-    do {
-        try await runtime.perform(.configureSpeech(recognition: false, synthesis: true))
-        Issue.record("Overlapping binding must reject")
-    } catch ApplicationControlIntentFailure.presented(let message) {
-        #expect(message.contains("rejected"))
-    }
+    let next = Task { try await runtime.perform(.configureSpeech(recognition: false, synthesis: true)) }
     #expect(await native.count == 1)
-    #expect(await ui.calls == ["preference:execution"])
-    #expect(await runtime.agent.status().queuedInputs == 1)
+    #expect(await ui.calls.isEmpty)
     await native.release()
     try await original.value
+    _ = await entries.next()
+    #expect(await native.count == 2)
+    await native.release()
+    try await next.value
     #expect(await runtime.agent.status().queuedInputs == 0)
     await runtime.shutdown()
 }
 
-@Test(.actionCatalog) func resourceHostAcknowledgmentContinuesThroughPause() async throws {
+@Test(.actionCatalog) func resourceUIPauseClosesAdmissionAfterCommittedDiagnostic() async throws {
     let native = HostResourceFixture()
     let ui = HostPresentationFixture()
-    let runtime = try resourceRuntime(native, presentation: ui, nonReturningPaths: ["System.ModelResources.download"])
-    await ui.pauseAfterCommit(runtime.agent)
-    do {
+    let runtime = try await resourceRuntime(
+        native, presentation: ui, nonReturningPaths: ["System.ModelResources.download"])
+    await #expect(throws: ApplicationControlIntentFailure.self) {
         try await runtime.perform(.download(id: "model", endpoint: "https://example.com", allowsCellular: false))
-        Issue.record("Original dispatch failure must be preserved through pause")
-    } catch ApplicationControlIntentFailure.presented(let message) {
-        #expect(message.contains("returning feedback"))
-        #expect(!message.contains("diagnostic:"))
     }
+    try await runtime.agent.pause()
+    await #expect(throws: UIRequestError.unavailable) { try await runtime.perform(.cancel("model")) }
     #expect(await runtime.agent.status().lifecycle == .paused)
     #expect(await runtime.agent.status().queuedInputs == 0)
     #expect(await ui.calls == ["operation"])
     #expect(await native.calls.isEmpty)
     await runtime.shutdown()
+}
+
+@Test(.actionCatalog, .timeLimit(.minutes(1)), arguments: [false, true]) @MainActor
+func uiOwnedResourceDispatchChecksReturningFeedbackBeforeEffectsAndKeepsDiagnostics(failing: Bool) async throws {
+    let root = UIContainer()
+    try root.start()
+    let native = HostResourceFixture()
+    let presentation = HostPresentationFixture(failing: failing)
+    let host = try await resourceRuntime(
+        native, presentation: presentation, nonReturningPaths: ["System.ModelResources.download"],
+        uiResources: root.modelResources)
+    try await host.prepareForInteraction()
+    do {
+        _ = try await root.modelResources.requests.submit(.download("model", .init()))
+        Issue.record("A missing result contract must fail before native admission")
+    } catch ApplicationControlIntentFailure.presented(let message) {
+        #expect(!failing && message.contains("returning feedback"))
+    } catch let failure as NativeCleanupFailure {
+        #expect(failing && failure.errors.count == 2)
+        #expect(String(describing: failure.errors[0]).contains("returning feedback"))
+    }
+    #expect(await native.calls.isEmpty)
+    #expect(await presentation.calls == ["operation"])
+    _ = try await root.modelResources.requests.submitControl(.cancel("model"))
+    #expect(await native.calls == ["cancel"])
+    await host.shutdown()
+    await root.stop()
+}
+
+@Test(.actionCatalog, .timeLimit(.minutes(1))) @MainActor
+func uiActionCanPauseItsOwnAgentAndResumeAfterJoinedCleanup() async throws {
+    let root = UIContainer()
+    try root.start()
+    let native = HostResourceFixture()
+    let presentation = HostPresentationFixture()
+    let host = try await resourceRuntime(
+        native, presentation: presentation, nonReturningPaths: ["System.ModelResources.download"],
+        uiResources: root.modelResources)
+    try await host.prepareForInteraction()
+    await presentation.pauseAfterCommit(host.agent)
+    await #expect(throws: (any Error).self) {
+        _ = try await root.modelResources.requests.submit(.download("model", .init()))
+    }
+    let deadline = ContinuousClock.now.advanced(by: .seconds(3))
+    while await host.agent.status().lifecycle != .paused {
+        guard ContinuousClock.now < deadline else { throw CommunicationError.expired }
+        await Task.yield()
+    }
+    try await host.agent.resume()
+    _ = try await root.modelResources.requests.submitControl(.cancel("model"))
+    #expect(await native.calls == ["cancel"])
+    #expect(root.modelResources.requests.outstanding == 0)
+    await host.shutdown()
+    await root.stop()
 }

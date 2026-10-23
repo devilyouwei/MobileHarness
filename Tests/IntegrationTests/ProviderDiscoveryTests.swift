@@ -1,6 +1,4 @@
-import ActionBindings
 import Actions
-import AgentBindings
 import AgentCore
 import Agents
 import ExecutionRuntime
@@ -31,26 +29,19 @@ private actor DiscoveryNativeFixture: ModelResourceCapability {
     let recorder = DiscoveryRecorder()
     let requests = ProviderDiscoveryRequests { await recorder.query($0) }
     let native = DiscoveryNativeFixture()
-    let runtime = try resourceRuntime(native, providerDiscovery: requests, sessionID: session)
+    let runtime = try await resourceRuntime(native, providerDiscovery: requests, sessionID: session)
     let secret = "fixture-private-credential"
     let id = try await requests.stage(.init(url: "https://provider.example", key: secret), sessionID: session)
-    let intent = ProviderDiscoveryIntent(requestID: id)
-    let data = try JSONEncoder().encode(intent)
-    let json = String(decoding: data, as: UTF8.self)
-    #expect(!json.contains(secret))
-    #expect(!json.contains("provider.example"))
-    #expect(json.contains(id))
-    let raw = try await runtime.discoverProvider(requestID: id)
-    #expect(try JSONDecoder().decode([String].self, from: Data(raw.utf8)) == ["chat-small", "chat-large"])
-    #expect(await recorder.queries == 1)
-    do {
-        _ = try await runtime.discoverProvider(requestID: id)
-        Issue.record("Consumed request must reject")
-    } catch let error as ProviderIntentFailure {
-        #expect(error.failureCode == "provider.request")
-        #expect(!error.message.contains(secret))
+    let json = String(decoding: try JSONEncoder().encode(ProviderDiscoveryIntent(requestID: id)), as: UTF8.self)
+    #expect(!json.contains(secret) && !json.contains("provider.example") && json.contains(id))
+    _ = try await requests.discoverModels(requestID: id, sessionID: session)
+    await #expect(throws: ProviderDiscoveryError.self) {
+        _ = try await requests.discoverModels(requestID: id, sessionID: session)
     }
-    #expect(await recorder.queries == 1)
+    let models = try await runtime.discover(
+        .init(enabled: true, url: "https://provider.example", key: secret, model: "fixture"))
+    #expect(models == ["chat-small", "chat-large"])
+    #expect(await recorder.queries == 2)
     try await runtime.perform(.cancel("model"))
     #expect(await native.cancellations == 1)
     #expect(await runtime.agent.status().queuedInputs == 0)
@@ -91,20 +82,15 @@ private struct SecretDiscoveryFailure: LocalizedError {
     var errorDescription: String? { "fixture-private-credential" }
 }
 @Test(.actionCatalog) func providerDiscoveryFailureDoesNotLeakCredentialsOrRetry() async throws {
-    let session = UUID().uuidString
     let requests = ProviderDiscoveryRequests { _ in throw SecretDiscoveryFailure() }
-    let runtime = try resourceRuntime(UnusedModelResourceCapability(), providerDiscovery: requests, sessionID: session)
-    let id = try await requests.stage(
-        .init(url: "https://provider.example", key: "fixture-private-credential"), sessionID: session)
+    let runtime = try await resourceRuntime(UnusedModelResourceCapability(), providerDiscovery: requests)
     do {
-        _ = try await runtime.discoverProvider(requestID: id)
+        _ = try await runtime.discover(
+            .init(enabled: true, url: "https://provider.example", key: "fixture-private-credential", model: "fixture"))
         Issue.record("Query should fail")
     } catch let error as ProviderIntentFailure {
         #expect(error.failureCode == "provider.unavailable")
         #expect(!error.message.contains("fixture-private-credential"))
-    }
-    await #expect(throws: ProviderDiscoveryError.self) {
-        _ = try await requests.discoverModels(requestID: id, sessionID: session)
     }
     await runtime.shutdown()
 }
@@ -123,12 +109,11 @@ private enum InvalidProviderModels: CaseIterable, Sendable {
 @Test(.actionCatalog, arguments: InvalidProviderModels.allCases)
 private func providerDiscoveryRejectsMalformedModelLists(value: InvalidProviderModels) async throws {
     let models = value.models
-    let session = UUID().uuidString
     let requests = ProviderDiscoveryRequests { _ in models }
-    let runtime = try resourceRuntime(UnusedModelResourceCapability(), providerDiscovery: requests, sessionID: session)
-    let id = try await requests.stage(.init(url: "https://provider.example", key: "fixture"), sessionID: session)
+    let runtime = try await resourceRuntime(UnusedModelResourceCapability(), providerDiscovery: requests)
     do {
-        _ = try await runtime.discoverProvider(requestID: id)
+        _ = try await runtime.discover(
+            .init(enabled: true, url: "https://provider.example", key: "fixture", model: "fixture"))
         Issue.record("Malformed list must fail wholly")
     } catch let error as ProviderIntentFailure { #expect(error.failureCode == "provider.models") }
     await runtime.shutdown()
@@ -184,31 +169,30 @@ private actor HeldDiscovery {
         waiter = nil
     }
 }
-@Test(.actionCatalog) func providerDiscoveryAdmissionSurvivesCancelledPageCaller() async throws {
-    let session = UUID().uuidString
+@Test(.actionCatalog) func providerDiscoveryPageCancellationCancelsAndJoinsActualQuery() async throws {
     let native = HeldDiscovery()
     let requests = ProviderDiscoveryRequests { await native.query($0) }
-    let runtime = try resourceRuntime(UnusedModelResourceCapability(), providerDiscovery: requests, sessionID: session)
-    let id = try await requests.stage(.init(url: "https://provider.example", key: "fixture"), sessionID: session)
+    let runtime = try await resourceRuntime(UnusedModelResourceCapability(), providerDiscovery: requests)
     var iterator = native.entered.stream.makeAsyncIterator()
-    let caller = Task { try await runtime.discoverProvider(requestID: id) }
+    let caller = Task {
+        try await runtime.discover(
+            .init(enabled: true, url: "https://provider.example", key: "fixture", model: "fixture"))
+    }
     _ = await iterator.next()
     caller.cancel()
     await native.release()
-    let raw = try await caller.value
-    #expect(try JSONDecoder().decode([String].self, from: Data(raw.utf8)) == ["chat-small"])
-    #expect(await native.cancelled == false)
-    #expect(await runtime.agent.status().queuedInputs == 0)
+    await #expect(throws: CancellationError.self) { _ = try await caller.value }
     await runtime.shutdown()
+    #expect(await native.cancelled)
+    #expect(await runtime.agent.status().queuedInputs == 0)
 }
 
 @Test(.actionCatalog) func providerDiscoveryPreservesSDKCompatibleLargeLists() async throws {
-    let session = UUID().uuidString
     let models = (0..<256).map { "model-\($0)" }
     let requests = ProviderDiscoveryRequests { _ in models }
-    let runtime = try resourceRuntime(UnusedModelResourceCapability(), providerDiscovery: requests, sessionID: session)
-    let id = try await requests.stage(.init(url: "https://provider.example", key: "fixture"), sessionID: session)
-    let raw = try await runtime.discoverProvider(requestID: id)
-    #expect(try JSONDecoder().decode([String].self, from: Data(raw.utf8)) == models)
+    let runtime = try await resourceRuntime(UnusedModelResourceCapability(), providerDiscovery: requests)
+    let actual = try await runtime.discover(
+        .init(enabled: true, url: "https://provider.example", key: "fixture", model: "fixture"))
+    #expect(actual == models)
     await runtime.shutdown()
 }

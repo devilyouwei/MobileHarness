@@ -19,9 +19,7 @@
         private let captureTiming = OSSignposter(subsystem: "dev.mobileharness", category: .pointsOfInterest)
 
         /// Nil means the built-in route cannot supply FOA, before any hardware is started.
-        func start(observation: NativeInputSession<MicrophoneFrame>) async throws -> AsyncThrowingStream<
-            MicrophoneFrame, Error
-        >? {
+        func start() async throws -> MicrophoneCapture? {
             let configuration = captureTiming.beginInterval("Spatial.Start", id: captureTiming.makeSignpostID())
             defer { captureTiming.endInterval("Spatial.Start", configuration) }
             guard let device = AVCaptureDevice.default(for: .audio) else { return nil }
@@ -41,14 +39,14 @@
             output.spatialAudioChannelLayoutTag = kAudioChannelLayoutTag_HOA_ACN_SN3D | 4
             session.addInput(input)
             session.addOutput(output)
-            let pair = AsyncThrowingStream<MicrophoneFrame, Error>.makeStream(bufferingPolicy: .bufferingOldest(64))
+            let source = MicrophoneCapture()
             let readiness = AudioCaptureReadiness()
             let receiver = SpatialAudioReceiver(
-                continuation: pair.continuation, readiness: readiness, observation: observation, admission: admission)
+                source: source, readiness: readiness, admission: admission)
             self.receiver = receiver
             output.setSampleBufferDelegate(receiver, queue: callbackQueue)
             self.observation = SpatialAudioObservation(
-                session: session, continuation: pair.continuation, readiness: readiness, observation: observation,
+                session: session, source: source, readiness: readiness,
                 admission: admission)
             session.commitConfiguration()
             session.startRunning()
@@ -56,7 +54,7 @@
                 log.error(
                     "Spatial capture startup: running=\(self.session.isRunning, privacy: .public), interrupted=\(self.session.isInterrupted, privacy: .public)"
                 )
-                pair.continuation.finish(throwing: AudioIOError.invalidFormat)
+                source.finish(throwing: AudioIOError.invalidFormat)
                 stop()
                 throw AudioIOError.invalidFormat
             }
@@ -66,13 +64,13 @@
                 stop()
                 throw error
             }
-            return pair.stream
+            return source
         }
         func stop() {
             session.stopRunning()
             callbackQueue.sync {}  // Join callbacks before allowing a replacement capture backend.
             receiver?.readiness.resolve(.failure(CancellationError()))
-            receiver?.continuation.finish()
+            receiver?.source.finish()
             receiver = nil
             observation = nil
         }
@@ -82,8 +80,8 @@
         private let tokens: [NSObjectProtocol]
         private static let log = Logger(subsystem: "dev.mobileharness", category: "AudioCapture")
         init(
-            session: AVCaptureSession, continuation: AsyncThrowingStream<MicrophoneFrame, Error>.Continuation,
-            readiness: AudioCaptureReadiness, observation: NativeInputSession<MicrophoneFrame>,
+            session: AVCaptureSession, source: MicrophoneCapture,
+            readiness: AudioCaptureReadiness,
             admission: PlatformAdmission?
         ) {
             tokens = [
@@ -96,8 +94,7 @@
                     )
                     admission?.report("audio.spatial", "nativeEvent", AudioIOError.invalidFormat)
                     readiness.resolve(.failure(AudioIOError.invalidFormat))
-                    observation.finish(throwing: AudioIOError.invalidFormat)
-                    continuation.finish(throwing: AudioIOError.invalidFormat)
+                    source.finish(throwing: AudioIOError.invalidFormat)
                 },
                 NotificationCenter.default.addObserver(
                     forName: AVCaptureSession.wasInterruptedNotification, object: session, queue: nil
@@ -106,8 +103,7 @@
                     Self.log.error("Spatial capture interrupted: reason=\(reason?.intValue ?? 0, privacy: .public)")
                     admission?.report("audio.spatial", "nativeEvent", AudioIOError.invalidFormat)
                     readiness.resolve(.failure(AudioIOError.invalidFormat))
-                    observation.finish(throwing: AudioIOError.invalidFormat)
-                    continuation.finish(throwing: AudioIOError.invalidFormat)
+                    source.finish(throwing: AudioIOError.invalidFormat)
                 },
             ]
         }
@@ -116,28 +112,25 @@
 
     /// Immutable bridge plus mutex-protected sequence. Never touches App/MainActor state.
     private final class SpatialAudioReceiver: NSObject, AVCaptureAudioDataOutputSampleBufferDelegate, Sendable {
-        let continuation: AsyncThrowingStream<MicrophoneFrame, Error>.Continuation
+        let source: MicrophoneCapture
         let readiness: AudioCaptureReadiness
-        private let observation: NativeInputSession<MicrophoneFrame>
         private let admission: PlatformAdmission?
         private let sequence = Mutex<UInt64>(0)
         private let timeline = Mutex(AudioPCMContinuity())
         private let reported = Mutex((format: false, failure: false))
         private let log = Logger(subsystem: "dev.mobileharness", category: "AudioCapture")
         init(
-            continuation: AsyncThrowingStream<MicrophoneFrame, Error>.Continuation,
-            readiness: AudioCaptureReadiness, observation: NativeInputSession<MicrophoneFrame>,
+            source: MicrophoneCapture, readiness: AudioCaptureReadiness,
             admission: PlatformAdmission?
         ) {
-            self.continuation = continuation
+            self.source = source
             self.readiness = readiness
-            self.observation = observation
             self.admission = admission
         }
         func captureOutput(
             _ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection
         ) {
-            guard observation.isActive else { return }
+            guard source.isActive else { return }
             var stage = "format description"
             do {
                 if reported.withLock({ value in
@@ -233,14 +226,7 @@
                             samples: samples, sampleRate: Int(asbd.mSampleRate), sequence: number,
                             layout: .firstOrderAmbisonicsACNSN3D, timestamp: timestamp + delta,
                             capturedAt: capturedAt.advanced(by: .seconds(delta)))
-                        observation.send(frame)
-                        switch continuation.yield(frame) {
-                        case .enqueued:
-                            readiness.resolve(.success(()))
-                        case .dropped: throw AudioIOError.overflow
-                        case .terminated: return
-                        @unknown default: throw AudioIOError.invalidFormat
-                        }
+                        if try source.send(frame) { readiness.resolve(.success(())) }
                     }
                 }
             } catch {
@@ -254,8 +240,7 @@
                 }
                 readiness.resolve(.failure(error))
                 admission?.report("audio.spatial", "callback", error)
-                observation.finish(throwing: error)
-                continuation.finish(throwing: error)
+                source.finish(throwing: error)
             }
         }
     }

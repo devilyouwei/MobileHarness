@@ -126,7 +126,7 @@
 
 ## 统一外部 Signal 接入与宿主动态订阅（2026-10-17）
 
-✅ 已迁移全部现有宿主业务输入工厂：AppEnvironmentFact、AppInteractionIntent、ListeningIntent、SpeechCaptureEnded、ProviderDiscoveryIntent、ProviderSettingsIntent、PhotographerCameraIntent、CameraStateObservation、ModelResourceIntent、ModelResourceObservation、ModelResourceHostFailure、MemoryHistoryIntent、AgentSessionControl、AgentTaskInputIntent。领域仅提供 ExternalInputDraft，不创建 AgentInput/InputMetadata；Gateway 的 ExternalInputAdapter 和通用 input 扩展统一创建外部信封。普通 Signal ID/root 由 Gateway 生成，已有业务请求 ID、来源、序号、parent/hops、deadline 和 turn 按契约保留。相机/麦克风/BLE 适配复用同一入口；外部不能生成执行反馈或 Task 授权。
+✅ 已迁移全部现有宿主业务输入工厂：AppEnvironmentFact、AppInteractionIntent、ListeningIntent、SpeechCaptureEnded、ProviderDiscoveryIntent、ProviderSettingsIntent、PhotographerCameraIntent、CameraStateObservation、ModelResourceIntent、ModelResourceObservation、ModelResourceHostFailure、MemoryHistoryIntent、AssistantSessionControl、AgentTaskInputIntent。领域仅提供 ExternalInputDraft，不创建 AgentInput/InputMetadata；Gateway 的 ExternalInputAdapter 和通用 input 扩展统一创建外部信封。普通 Signal ID/root 由 Gateway 生成，已有业务请求 ID、来源、序号、parent/hops、deadline 和 turn 按契约保留。相机/麦克风/BLE 适配复用同一入口；外部不能生成执行反馈或 Task 授权。
 
 ✅ InputGateway 增加宿主精确动态订阅/取消，限制 schema、目标输入、来源和 publisher 声明，绑定会话/incarnation。静态与动态目标合并分发，外部与 Agent 广播均生效；旧实例关系不被新实例继承。每目标静态/动态关系合计16、动态总数256、话题64、单 contract/source 目标16，超限明确拒绝；不新增消息队列或设备任务。取消阻止后续发布，已接纳发布可完成；shutdown 清空关系并取消/加入发布。拥有者仍需显式取消。宿主会话控制改用订阅目标的 Gateway send，保留原执行取消完成屏障及真实分支拒绝。
 

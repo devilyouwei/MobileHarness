@@ -65,7 +65,9 @@ public actor AgentFixedTaskCoordinator<State: AgentContextState> {
         sequence += 1
         guard
             case .enqueued = continuation.yield(
-                OutputEnvelope(source: agent, input: input, output: .communication(action), sequence: sequence))
+                OutputEnvelope(
+                    source: agent, context: input.context, output: .communication(action), sequence: sequence,
+                    taskScope: input.taskScope))
         else {
             await receipts.cancel(action.id)
             throw HarnessError.queueFull
@@ -73,6 +75,27 @@ public actor AgentFixedTaskCoordinator<State: AgentContextState> {
         let report = try await receipts.wait(action.id)
         guard report.delivered.contains(scope.requester), report.rejected.isEmpty, report.failure == nil else {
             throw CommunicationError.unavailableTarget
+        }
+    }
+}
+
+/// Task status retained by deterministic Agents without conversational execution.
+public protocol AgentTaskContextState: AgentContextState {
+    var taskViews: [String: AgentTaskView]? { get set }
+}
+
+extension AgentTaskContextState {
+    public func validateTaskState() throws {
+        guard (taskViews ?? [:]).allSatisfy({ $0.key == $0.value.scope.id }),
+            (taskViews?.count ?? 0) <= 256,
+            (taskViews ?? [:]).values.filter({ !$0.terminal }).count <= 32
+        else { throw CommunicationError.invalidPayload }
+    }
+    public mutating func recoverTaskState() {
+        for id in (taskViews ?? [:]).keys where taskViews?[id]?.terminal == false {
+            taskViews?[id]?.terminal = true
+            taskViews?[id]?.stage = .completed
+            taskViews?[id]?.text = "Interrupted; actions are never replayed"
         }
     }
 }

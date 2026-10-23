@@ -97,6 +97,16 @@ public final class UIContainer {
         devices = UIDeviceSettingsContainer(admission: admission)
         diagnostics = UIDiagnosticsContainer(admission: admission)
     }
+    private func setInputAvailable(_ value: Bool) {
+        home.requests.setAvailable(value)
+        home.listeningRequests.setAvailable(value)
+        camera.requests.setAvailable(value)
+        settings.requests.setAvailable(value)
+        modelResources.requests.setAvailable(value)
+        history.requests.setAvailable(value)
+        devices.requests.setAvailable(value)
+        diagnostics.detectionRequests.setAvailable(value)
+    }
     public var isAvailable: Bool { admission.active }
     public var rejectedUpdates: UInt64 { admission.rejected }
     public func start() throws(UIFailure) {
@@ -107,10 +117,12 @@ public final class UIContainer {
         }
         guard !admission.started else { return }
         admission.start()
+        setInputAvailable(true)
         devices.startPresentation()
         camera.setAvailable(true)
     }
     public func invalidate() {
+        setInputAvailable(false)
         admission.setActive(false)
         home.invalidate()
         camera.setAvailable(false)
@@ -131,6 +143,7 @@ public final class UIContainer {
             invalidate()
         } else {
             admission.setActive(true)
+            setInputAvailable(true)
             camera.setAvailable(true)
         }
     }
@@ -140,6 +153,14 @@ public final class UIContainer {
         settings.clearSensitiveDraft()
         devices.stopPresentation()
         admission.close()
+        home.requests.stop()
+        home.listeningRequests.stop()
+        diagnostics.detectionRequests.stop()
+        camera.requests.stop()
+        settings.requests.stop()
+        modelResources.requests.stop()
+        history.requests.stop()
+        devices.requests.stop()
         let task = Task { [home, camera] in
             await home.stop()
             await camera.stop()

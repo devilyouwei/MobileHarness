@@ -124,189 +124,210 @@ private func armSpeeds(in frame: [UInt8]) throws -> [Int] {
 @Test(.actionCatalog) func photographerPolicyAcceptsVisionPose() throws {
     let policy = try CommunicationPolicy(
         contracts: AgentContracts.communication,
-        externalSources: [
-            "user", "runtime", "phone.microphone", "phone.camera", "model.resources", "app.resources",
-            "app.environment",
-        ],
         configurations: AgentConfigurations.all())
     let input = observation(
         try pose(noseX: 50, noseY: 50, sequence: 1, timestamp: 0), session: UUID().uuidString)
     #expect(policy.destinations(for: input) == [.photographer])
 }
 
-@Test(.actionCatalog) func photographerOnTheLeftAimsBaseAndHoldsTheOtherJoints() async throws {
-    let session = UUID().uuidString
-    let agent = try PhotographerAgent(
-        sessionID: session, controlsArm: true,
-        context: try AgentContextRepository(
-            agent: AgentID(rawValue: "photographer"), scope: UUID().uuidString, state: PhotographerContextState())
-    )
-    try await agent.start()
-    try await agent.receive(observation(try pose(noseX: 10, noseY: 50, sequence: 1, timestamp: 0), session: session))
-    var stream = agent.outputs.makeAsyncIterator()
-    let aimed = try #require(await stream.next())
-    guard case .toolCall(let call) = aimed.output else {
-        Issue.record("Missing aim")
-        return
-    }
-    #expect(call.toolPath == "NexArm.Tracking.aim")
-    try await NexArmActions.aim(
-        invocation: ActionInvocation(
-            call: ToolRequest(id: UUID().uuidString, toolPath: call.toolPath, arguments: call.arguments),
-            context: ActionExecutionContext(
-                source: aimed.source.rawValue, sessionID: aimed.sessionID, inputID: aimed.inputID))
-    ) { base, pitch, _ in
-        #expect(base < 0)
-        #expect(abs(pitch) < 0.001)
-        let frame = try NexArmJointCommand.aimFrame(base: base, pitch: pitch)
-        let joints = try armTargets(in: frame)
-        let home = NexArmJointCommand.armHome
-        #expect(joints[0] < home[0])
-        #expect(joints[1] == home[1])
-        #expect(joints[2] == home[2])
-        #expect(joints[3] == home[3])
-        #expect(joints[4] == home[4])
-    }
-    await agent.stop()
-}
-
-@Test(.actionCatalog) func photographerFreshnessUsesActualPoseAdmissionAndStopsWithLifecycle() async throws {
-    let session = UUID().uuidString
-    let agent = try PhotographerAgent(
-        sessionID: session, controlsArm: true,
-        context: try AgentContextRepository(
-            agent: AgentID(rawValue: "photographer"), scope: UUID().uuidString, state: PhotographerContextState())
-    )
-    try await agent.start()
-    #expect(await !agent.hasFreshPose())
-    // A future sensor timestamp cannot prolong physical input freshness.
-    try await agent.receive(observation(try pose(noseX: 50, noseY: 50, sequence: 1, timestamp: 1e12), session: session))
-    #expect(await agent.hasFreshPose(maximumAge: .milliseconds(200)))
-    try await Task.sleep(for: .milliseconds(250))
-    #expect(await !agent.hasFreshPose(maximumAge: .milliseconds(200)))
-    try await agent.receive(
-        observation(try pose(noseX: 50, noseY: 50, sequence: 2, timestamp: 1e12, people: 0), session: session))
-    #expect(await !agent.hasFreshPose(maximumAge: .milliseconds(200)))
-    try await agent.receive(observation(try pose(noseX: 50, noseY: 50, sequence: 3, timestamp: 1e12), session: session))
-    #expect(await agent.hasFreshPose())
-    try await agent.pause()
-    #expect(await !agent.hasFreshPose())
-    await agent.stop()
-    #expect(await !agent.hasFreshPose())
-    var outputs = agent.outputs.makeAsyncIterator()
-    #expect(await outputs.next() == nil)
-}
-
-@Test(.actionCatalog) func hiddenNoseUsesTheVisibleJointMidpoint() async throws {
-    let session = UUID().uuidString
-    let agent = try PhotographerAgent(
-        sessionID: session, controlsArm: true,
-        context: try AgentContextRepository(
-            agent: AgentID(rawValue: "photographer"), scope: UUID().uuidString, state: PhotographerContextState())
-    )
-    try await agent.start()
-    let body = try pose(noseX: 0, noseY: 0, noseConfidence: 0.1, others: 80, sequence: 1, timestamp: 0)
-    try await agent.receive(observation(body, session: session))
-    var stream = agent.outputs.makeAsyncIterator()
-    let aimed = try #require(await stream.next())
-    guard case .toolCall(let call) = aimed.output else {
-        Issue.record("Missing aim")
-        return
-    }
-    let base = try #require(Double(call.arguments["base"] ?? ""))
-    let pitch = try #require(Double(call.arguments["pitch"] ?? ""))
-    #expect(base > 0)
-    #expect(pitch > 0)
-    #expect(base < 0.2)
-    #expect(pitch < 0.2)
-    #expect(base > pitch)
-    await agent.stop()
-}
-
-@Test(.actionCatalog) func emptyPoseDoesNotAim() async throws {
-    let session = UUID().uuidString
-    let agent = try PhotographerAgent(
-        sessionID: session, controlsArm: true,
-        context: try AgentContextRepository(
-            agent: AgentID(rawValue: "photographer"), scope: UUID().uuidString, state: PhotographerContextState())
-    )
-    try await agent.start()
-    let empty = try PoseObservation(width: 100, height: 100, sequence: 1, timestamp: 0, rotation: 1, people: [])
-    try await agent.receive(observation(empty, session: session))
-    var stream = agent.outputs.makeAsyncIterator()
-    await agent.stop()
-    #expect(await stream.next() == nil)
-}
-
-@Test(.actionCatalog) func centeredPersonDoesNotAim() async throws {
-    let session = UUID().uuidString
-    let agent = try PhotographerAgent(
-        sessionID: session, controlsArm: true,
-        context: try AgentContextRepository(
-            agent: AgentID(rawValue: "photographer"), scope: UUID().uuidString, state: PhotographerContextState())
-    )
-    try await agent.start()
-    try await agent.receive(observation(try pose(noseX: 50, noseY: 50, sequence: 1, timestamp: 0), session: session))
-    var stream = agent.outputs.makeAsyncIterator()
-    await agent.stop()
-    #expect(await stream.next() == nil)
-}
-
-@Test(.actionCatalog) func baseKeepsSteppingWhileThePersonStaysOffCenter() async throws {
-    let session = UUID().uuidString
-    let agent = try PhotographerAgent(
-        sessionID: session, controlsArm: true,
-        context: try AgentContextRepository(
-            agent: AgentID(rawValue: "photographer"), scope: UUID().uuidString, state: PhotographerContextState())
-    )
-    try await agent.start()
-    try await agent.receive(observation(try pose(noseX: 10, noseY: 50, sequence: 1, timestamp: 0), session: session))
-    try await agent.receive(observation(try pose(noseX: 10, noseY: 50, sequence: 2, timestamp: 0.25), session: session))
-    var stream = agent.outputs.makeAsyncIterator()
-    let first = try #require(await stream.next())
-    let second = try #require(await stream.next())
-    guard case .toolCall(let firstCall) = first.output, case .toolCall(let secondCall) = second.output else {
-        Issue.record("Missing aim")
-        return
-    }
-    let firstBase = try #require(Double(firstCall.arguments["base"] ?? ""))
-    let secondBase = try #require(Double(secondCall.arguments["base"] ?? ""))
-    #expect(firstBase < 0)
-    #expect(secondBase < firstBase)
-    #expect(secondBase > -0.3)
-    await agent.stop()
-}
-
-@Test(.actionCatalog) func aimWaitsForTimeAndMovement() async throws {
-    let session = UUID().uuidString
-    let agent = try PhotographerAgent(
-        sessionID: session, controlsArm: true,
-        context: try AgentContextRepository(
-            agent: AgentID(rawValue: "photographer"), scope: UUID().uuidString, state: PhotographerContextState())
-    )
-    try await agent.start()
-    try await agent.receive(observation(try pose(noseX: 10, noseY: 50, sequence: 1, timestamp: 0), session: session))
-    try await agent.receive(observation(try pose(noseX: 10, noseY: 50, sequence: 2, timestamp: 0.1), session: session))
-    var stream = agent.outputs.makeAsyncIterator()
-    _ = try #require(await stream.next())
-    await agent.stop()
-    #expect(await stream.next() == nil)
-}
-
-@Test(.actionCatalog) func aimActionRejectsANonFiniteAngleBeforeSend() async throws {
-    let input = AgentInput(
-        id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("test"))
-    let call = ToolCall(
-        id: UUID().uuidString, toolPath: "NexArm.Tracking.aim", arguments: ["base": "nan", "pitch": "0"])
-    let envelope = OutputEnvelope(source: .photographer, input: input, output: .toolCall(call))
-    await #expect(throws: NexArmActions.AimError.invalidAngle) {
+extension LiveRuntimeTests {
+    @Test(.actionCatalog) func photographerOnTheLeftAimsBaseAndHoldsTheOtherJoints() async throws {
+        let session = UUID().uuidString
+        let agent = try PhotographerAgent(
+            sessionID: session, controlsArm: true,
+            context: try AgentContextRepository(
+                agent: AgentID(rawValue: "photographer"), scope: UUID().uuidString, state: PhotographerContextState())
+        )
+        try await agent.start()
+        try await agent.receive(
+            observation(try pose(noseX: 10, noseY: 50, sequence: 1, timestamp: 0), session: session))
+        var stream = agent.outputs.makeAsyncIterator()
+        let aimed = try #require(await stream.next())
+        guard case .toolCall(let call) = aimed.output else {
+            Issue.record("Missing aim")
+            return
+        }
+        #expect(call.toolPath == "NexArm.Tracking.aim")
         try await NexArmActions.aim(
             invocation: ActionInvocation(
                 call: ToolRequest(id: UUID().uuidString, toolPath: call.toolPath, arguments: call.arguments),
                 context: ActionExecutionContext(
-                    source: envelope.source.rawValue, sessionID: envelope.sessionID, inputID: envelope.inputID))
-        ) { _, _, _ in
-            Issue.record("Invalid angle was sent")
+                    source: aimed.source.rawValue, sessionID: aimed.sessionID, inputID: aimed.inputID))
+        ) { base, pitch, _ in
+            #expect(base < 0)
+            #expect(abs(pitch) < 0.001)
+            let frame = try NexArmJointCommand.aimFrame(base: base, pitch: pitch)
+            let joints = try armTargets(in: frame)
+            let home = NexArmJointCommand.armHome
+            #expect(joints[0] < home[0])
+            #expect(joints[1] == home[1])
+            #expect(joints[2] == home[2])
+            #expect(joints[3] == home[3])
+            #expect(joints[4] == home[4])
+        }
+        await agent.stop()
+    }
+}
+
+extension LiveRuntimeTests {
+    @Test(.actionCatalog) func photographerFreshnessUsesActualPoseAdmissionAndStopsWithLifecycle() async throws {
+        let session = UUID().uuidString
+        let agent = try PhotographerAgent(
+            sessionID: session, controlsArm: true,
+            context: try AgentContextRepository(
+                agent: AgentID(rawValue: "photographer"), scope: UUID().uuidString, state: PhotographerContextState())
+        )
+        try await agent.start()
+        #expect(await !agent.hasFreshPose())
+        // A future sensor timestamp cannot prolong physical input freshness.
+        try await agent.receive(
+            observation(try pose(noseX: 50, noseY: 50, sequence: 1, timestamp: 1e12), session: session))
+        #expect(await agent.hasFreshPose(maximumAge: .milliseconds(200)))
+        try await Task.sleep(for: .milliseconds(250))
+        #expect(await !agent.hasFreshPose(maximumAge: .milliseconds(200)))
+        try await agent.receive(
+            observation(try pose(noseX: 50, noseY: 50, sequence: 2, timestamp: 1e12, people: 0), session: session))
+        #expect(await !agent.hasFreshPose(maximumAge: .milliseconds(200)))
+        try await agent.receive(
+            observation(try pose(noseX: 50, noseY: 50, sequence: 3, timestamp: 1e12), session: session))
+        #expect(await agent.hasFreshPose())
+        try await agent.pause()
+        #expect(await !agent.hasFreshPose())
+        await agent.stop()
+        #expect(await !agent.hasFreshPose())
+        var outputs = agent.outputs.makeAsyncIterator()
+        #expect(await outputs.next() == nil)
+    }
+}
+
+extension LiveRuntimeTests {
+    @Test(.actionCatalog) func hiddenNoseUsesTheVisibleJointMidpoint() async throws {
+        let session = UUID().uuidString
+        let agent = try PhotographerAgent(
+            sessionID: session, controlsArm: true,
+            context: try AgentContextRepository(
+                agent: AgentID(rawValue: "photographer"), scope: UUID().uuidString, state: PhotographerContextState())
+        )
+        try await agent.start()
+        let body = try pose(noseX: 0, noseY: 0, noseConfidence: 0.1, others: 80, sequence: 1, timestamp: 0)
+        try await agent.receive(observation(body, session: session))
+        var stream = agent.outputs.makeAsyncIterator()
+        let aimed = try #require(await stream.next())
+        guard case .toolCall(let call) = aimed.output else {
+            Issue.record("Missing aim")
+            return
+        }
+        let base = try #require(Double(call.arguments["base"] ?? ""))
+        let pitch = try #require(Double(call.arguments["pitch"] ?? ""))
+        #expect(base > 0)
+        #expect(pitch > 0)
+        #expect(base < 0.2)
+        #expect(pitch < 0.2)
+        #expect(base > pitch)
+        await agent.stop()
+    }
+}
+
+extension LiveRuntimeTests {
+    @Test(.actionCatalog) func emptyPoseDoesNotAim() async throws {
+        let session = UUID().uuidString
+        let agent = try PhotographerAgent(
+            sessionID: session, controlsArm: true,
+            context: try AgentContextRepository(
+                agent: AgentID(rawValue: "photographer"), scope: UUID().uuidString, state: PhotographerContextState())
+        )
+        try await agent.start()
+        let empty = try PoseObservation(width: 100, height: 100, sequence: 1, timestamp: 0, rotation: 1, people: [])
+        try await agent.receive(observation(empty, session: session))
+        var stream = agent.outputs.makeAsyncIterator()
+        await agent.stop()
+        #expect(await stream.next() == nil)
+    }
+}
+
+extension LiveRuntimeTests {
+    @Test(.actionCatalog) func centeredPersonDoesNotAim() async throws {
+        let session = UUID().uuidString
+        let agent = try PhotographerAgent(
+            sessionID: session, controlsArm: true,
+            context: try AgentContextRepository(
+                agent: AgentID(rawValue: "photographer"), scope: UUID().uuidString, state: PhotographerContextState())
+        )
+        try await agent.start()
+        try await agent.receive(
+            observation(try pose(noseX: 50, noseY: 50, sequence: 1, timestamp: 0), session: session))
+        var stream = agent.outputs.makeAsyncIterator()
+        await agent.stop()
+        #expect(await stream.next() == nil)
+    }
+}
+
+extension LiveRuntimeTests {
+    @Test(.actionCatalog) func baseKeepsSteppingWhileThePersonStaysOffCenter() async throws {
+        let session = UUID().uuidString
+        let agent = try PhotographerAgent(
+            sessionID: session, controlsArm: true,
+            context: try AgentContextRepository(
+                agent: AgentID(rawValue: "photographer"), scope: UUID().uuidString, state: PhotographerContextState())
+        )
+        try await agent.start()
+        try await agent.receive(
+            observation(try pose(noseX: 10, noseY: 50, sequence: 1, timestamp: 0), session: session))
+        try await agent.receive(
+            observation(try pose(noseX: 10, noseY: 50, sequence: 2, timestamp: 0.25), session: session))
+        var stream = agent.outputs.makeAsyncIterator()
+        let first = try #require(await stream.next())
+        let second = try #require(await stream.next())
+        guard case .toolCall(let firstCall) = first.output, case .toolCall(let secondCall) = second.output else {
+            Issue.record("Missing aim")
+            return
+        }
+        let firstBase = try #require(Double(firstCall.arguments["base"] ?? ""))
+        let secondBase = try #require(Double(secondCall.arguments["base"] ?? ""))
+        #expect(firstBase < 0)
+        #expect(secondBase < firstBase)
+        #expect(secondBase > -0.3)
+        await agent.stop()
+    }
+}
+
+extension LiveRuntimeTests {
+    @Test(.actionCatalog) func aimWaitsForTimeAndMovement() async throws {
+        let session = UUID().uuidString
+        let agent = try PhotographerAgent(
+            sessionID: session, controlsArm: true,
+            context: try AgentContextRepository(
+                agent: AgentID(rawValue: "photographer"), scope: UUID().uuidString, state: PhotographerContextState())
+        )
+        try await agent.start()
+        try await agent.receive(
+            observation(try pose(noseX: 10, noseY: 50, sequence: 1, timestamp: 0), session: session))
+        try await agent.receive(
+            observation(try pose(noseX: 10, noseY: 50, sequence: 2, timestamp: 0.1), session: session))
+        var stream = agent.outputs.makeAsyncIterator()
+        _ = try #require(await stream.next())
+        await agent.stop()
+        #expect(await stream.next() == nil)
+    }
+}
+
+extension LiveRuntimeTests {
+    @Test(.actionCatalog) func aimActionRejectsANonFiniteAngleBeforeSend() async throws {
+        let input = AgentInput(
+            id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("test"))
+        let call = ToolCall(
+            id: UUID().uuidString, toolPath: "NexArm.Tracking.aim", arguments: ["base": "nan", "pitch": "0"])
+        let envelope = OutputEnvelope(
+            source: .photographer, context: input.context, output: .toolCall(call), taskScope: input.taskScope)
+        await #expect(throws: NexArmActions.AimError.invalidAngle) {
+            try await NexArmActions.aim(
+                invocation: ActionInvocation(
+                    call: ToolRequest(id: UUID().uuidString, toolPath: call.toolPath, arguments: call.arguments),
+                    context: ActionExecutionContext(
+                        source: envelope.source.rawValue, sessionID: envelope.sessionID, inputID: envelope.inputID))
+            ) { _, _, _ in
+                Issue.record("Invalid angle was sent")
+            }
         }
     }
 }
@@ -340,88 +361,98 @@ private actor AimLink: NexArmWritableLink {
     func close() {}
 }
 
-@Test(.actionCatalog) func controllerAimWritesFiveAxesAfterVerification() async throws {
-    let link = AimLink()
-    let controller = NexArmActionController(link: link, compatibilityPolicy: .nexArmBLEProtocol)
-    await #expect(throws: NexArmExecutionError.firmwareUnavailable) {
-        try await controller.aim(base: 0, pitch: 0)
+extension LiveRuntimeTests {
+    @Test(.actionCatalog) func controllerAimWritesFiveAxesAfterVerification() async throws {
+        let link = AimLink()
+        let controller = NexArmActionController(link: link, compatibilityPolicy: .nexArmBLEProtocol)
+        await #expect(throws: NexArmExecutionError.firmwareUnavailable) {
+            try await controller.aim(base: 0, pitch: 0)
+        }
+        #expect(await link.writes.isEmpty)
+        #expect(try await controller.verifyCompatibility() == .poseProtocol)
+        let reads = await link.exchanges
+        try await controller.aim(base: -0.32, pitch: 0)
+        let writes = await link.writes
+        let packet = try #require(writes.first)
+        #expect(try armTargets(in: packet.bytes) == NexArmJointCommand.positions(base: -0.32, pitch: 0))
+        #expect(await link.exchanges == reads)
     }
-    #expect(await link.writes.isEmpty)
-    #expect(try await controller.verifyCompatibility() == .poseProtocol)
-    let reads = await link.exchanges
-    try await controller.aim(base: -0.32, pitch: 0)
-    let writes = await link.writes
-    let packet = try #require(writes.first)
-    #expect(try armTargets(in: packet.bytes) == NexArmJointCommand.positions(base: -0.32, pitch: 0))
-    #expect(await link.exchanges == reads)
 }
 
-@Test(.actionCatalog) func trackingWriteFailureRequiresExplicitRecoveryAndNeverReplays() async throws {
-    let link = AimLink()
-    let controller = NexArmActionController(link: link, compatibilityPolicy: .nexArmBLEProtocol)
-    _ = try await controller.verifyCompatibility()
-    await link.setWriteFailure(true)
-    await #expect(throws: NexArmActionError.uncertainMotion) { try await controller.aim(base: 0, pitch: 0) }
-    await link.setWriteFailure(false)
-    await #expect(throws: NexArmActionError.uncertainMotion) { try await controller.aim(base: 0.1, pitch: 0) }
-    #expect(await link.writes.count == 1)
-    _ = try await controller.recoverState()
-    #expect(await link.writes.count == 1)
-    try await controller.aim(base: 0.1, pitch: 0)
-    #expect(await link.writes.count == 2)
+extension LiveRuntimeTests {
+    @Test(.actionCatalog) func trackingWriteFailureRequiresExplicitRecoveryAndNeverReplays() async throws {
+        let link = AimLink()
+        let controller = NexArmActionController(link: link, compatibilityPolicy: .nexArmBLEProtocol)
+        _ = try await controller.verifyCompatibility()
+        await link.setWriteFailure(true)
+        await #expect(throws: NexArmActionError.uncertainMotion) { try await controller.aim(base: 0, pitch: 0) }
+        await link.setWriteFailure(false)
+        await #expect(throws: NexArmActionError.uncertainMotion) { try await controller.aim(base: 0.1, pitch: 0) }
+        #expect(await link.writes.count == 1)
+        _ = try await controller.recoverState()
+        #expect(await link.writes.count == 1)
+        try await controller.aim(base: 0.1, pitch: 0)
+        #expect(await link.writes.count == 2)
+    }
 }
 
-@Test(.actionCatalog) func photographerOverflowRejectsWithoutStoppingOrReplacingAcceptedAims() async throws {
-    let session = UUID().uuidString
-    let agent = try PhotographerAgent(
-        sessionID: session, controlsArm: true, outputCapacity: 8,
-        context: try AgentContextRepository(
-            agent: AgentID(rawValue: "photographer"), scope: UUID().uuidString, state: PhotographerContextState())
-    )
-    try await agent.start()
-    for index in 0..<8 {
-        try await agent.receive(
-            observation(
-                try pose(
-                    noseX: index.isMultiple(of: 2) ? 10 : 90, noseY: 50,
-                    sequence: UInt64(index + 1), timestamp: Double(index)), session: session))
+extension LiveRuntimeTests {
+    @Test(.actionCatalog) func photographerOverflowRejectsWithoutStoppingOrReplacingAcceptedAims() async throws {
+        let session = UUID().uuidString
+        let agent = try PhotographerAgent(
+            sessionID: session, controlsArm: true, outputCapacity: 8,
+            context: try AgentContextRepository(
+                agent: AgentID(rawValue: "photographer"), scope: UUID().uuidString, state: PhotographerContextState())
+        )
+        try await agent.start()
+        for index in 0..<8 {
+            try await agent.receive(
+                observation(
+                    try pose(
+                        noseX: index.isMultiple(of: 2) ? 10 : 90, noseY: 50,
+                        sequence: UInt64(index + 1), timestamp: Double(index)), session: session))
+        }
+        await #expect(throws: HarnessError.queueFull) {
+            try await agent.receive(
+                observation(
+                    try pose(noseX: 10, noseY: 50, sequence: 9, timestamp: 8), session: session))
+        }
+        #expect(await agent.status().lifecycle == .running)
+        await agent.stop()
+        var accepted = 0
+        for await _ in agent.outputs { accepted += 1 }
+        #expect(accepted == 8)
     }
-    await #expect(throws: HarnessError.queueFull) {
-        try await agent.receive(
-            observation(
-                try pose(noseX: 10, noseY: 50, sequence: 9, timestamp: 8), session: session))
-    }
-    #expect(await agent.status().lifecycle == .running)
-    await agent.stop()
-    var accepted = 0
-    for await _ in agent.outputs { accepted += 1 }
-    #expect(accepted == 8)
 }
 
-@Test(.actionCatalog) func photographerRejectsMalformedDecodedPoseBeforeIndexingJoints() async throws {
-    let session = UUID().uuidString
-    let agent = try PhotographerAgent(
-        sessionID: session, controlsArm: true,
-        context: try AgentContextRepository(
-            agent: AgentID(rawValue: "photographer"), scope: UUID().uuidString, state: PhotographerContextState())
-    )
-    try await agent.start()
-    let pose = try JSONDecoder().decode(
-        PoseObservation.self,
-        from: Data(
-            #"{"width":100,"height":100,"sequence":1,"timestamp":0,"rotation":1,"people":[[]]}"#.utf8))
-    await #expect(throws: CommunicationError.invalidPayload) {
-        try await agent.receive(observation(pose, session: session))
+extension LiveRuntimeTests {
+    @Test(.actionCatalog) func photographerRejectsMalformedDecodedPoseBeforeIndexingJoints() async throws {
+        let session = UUID().uuidString
+        let agent = try PhotographerAgent(
+            sessionID: session, controlsArm: true,
+            context: try AgentContextRepository(
+                agent: AgentID(rawValue: "photographer"), scope: UUID().uuidString, state: PhotographerContextState())
+        )
+        try await agent.start()
+        let pose = try JSONDecoder().decode(
+            PoseObservation.self,
+            from: Data(
+                #"{"width":100,"height":100,"sequence":1,"timestamp":0,"rotation":1,"people":[[]]}"#.utf8))
+        await #expect(throws: CommunicationError.invalidPayload) {
+            try await agent.receive(observation(pose, session: session))
+        }
+        #expect(await agent.status().processedInputs == 0)
+        await agent.stop()
     }
-    #expect(await agent.status().processedInputs == 0)
-    await agent.stop()
 }
 
-@Test(.actionCatalog) func robotAimPublishesIntentWithoutHoldingTheWorkersMotorFence() async throws {
-    let module = NexArmTrackingModule { _, _, _ in }
-    let registry = try ToolRegistry(modules: [module])
-    let resources = await registry.resources(for: "NexArm.Tracking.aim")
-    #expect(resources.isEmpty)
+extension LiveRuntimeTests {
+    @Test(.actionCatalog) func robotAimPublishesIntentWithoutHoldingTheWorkersMotorFence() async throws {
+        let module = NexArmTrackingModule { _, _, _ in }
+        let registry = try ToolRegistry(modules: [module])
+        let resources = await registry.resources(for: "NexArm.Tracking.aim")
+        #expect(resources.isEmpty)
+    }
 }
 
 private actor ArmAvailability {
@@ -429,77 +460,86 @@ private actor ArmAvailability {
     func enable() { ready = true }
 }
 
-@Test(.actionCatalog) func photographerSuppressesOfflineCommandsAndResumesFromFreshPose() async throws {
-    let session = UUID().uuidString
-    let availability = ArmAvailability()
-    let agent = try PhotographerAgent(
-        sessionID: session, controlsArm: true, controlAvailable: { await availability.ready },
-        context: try AgentContextRepository(
-            agent: AgentID(rawValue: "photographer"), scope: UUID().uuidString, state: PhotographerContextState())
-    )
-    try await agent.start()
-    try await agent.receive(observation(try pose(noseX: 10, noseY: 50, sequence: 1, timestamp: 0), session: session))
-    await availability.enable()
-    try await agent.receive(observation(try pose(noseX: 10, noseY: 50, sequence: 2, timestamp: 0.1), session: session))
-    await agent.stop()
-    var sequences: [UInt64] = []
-    for await output in agent.outputs { sequences.append(output.inputMetadata.sequence) }
-    #expect(sequences == [2])
+extension LiveRuntimeTests {
+    @Test(.actionCatalog) func photographerSuppressesOfflineCommandsAndResumesFromFreshPose() async throws {
+        let session = UUID().uuidString
+        let availability = ArmAvailability()
+        let agent = try PhotographerAgent(
+            sessionID: session, controlsArm: true, controlAvailable: { await availability.ready },
+            context: try AgentContextRepository(
+                agent: AgentID(rawValue: "photographer"), scope: UUID().uuidString, state: PhotographerContextState())
+        )
+        try await agent.start()
+        try await agent.receive(
+            observation(try pose(noseX: 10, noseY: 50, sequence: 1, timestamp: 0), session: session))
+        await availability.enable()
+        try await agent.receive(
+            observation(try pose(noseX: 10, noseY: 50, sequence: 2, timestamp: 0.1), session: session))
+        await agent.stop()
+        var sequences: [UInt64] = []
+        for await output in agent.outputs { sequences.append(output.inputMetadata.sequence) }
+        #expect(sequences == [2])
+    }
 }
 
-@Test(.actionCatalog) func controllerTrackingSpeedUsesPreviousAcceptedTarget() async throws {
-    let link = AimLink()
-    let controller = NexArmActionController(link: link, compatibilityPolicy: .nexArmBLEProtocol)
-    _ = try await controller.verifyCompatibility()
-    try await controller.aim(base: -0.32, pitch: 0)
-    try await controller.aim(base: -0.33, pitch: 0)
-    let packets = await link.writes
-    let prior = try armTargets(in: packets[0].bytes)
-    let target = try armTargets(in: packets[1].bytes)
-    let speeds = try armSpeeds(in: packets[1].bytes)
-    #expect(speeds[0] == Int(ceil(Double(abs(target[0] - prior[0])) * 1250 / 200)))
-    #expect(speeds[0] < 100)
-    #expect(speeds.dropFirst().allSatisfy { $0 == 1 })
+extension LiveRuntimeTests {
+    @Test(.actionCatalog) func controllerTrackingSpeedUsesPreviousAcceptedTarget() async throws {
+        let link = AimLink()
+        let controller = NexArmActionController(link: link, compatibilityPolicy: .nexArmBLEProtocol)
+        _ = try await controller.verifyCompatibility()
+        try await controller.aim(base: -0.32, pitch: 0)
+        try await controller.aim(base: -0.33, pitch: 0)
+        let packets = await link.writes
+        let prior = try armTargets(in: packets[0].bytes)
+        let target = try armTargets(in: packets[1].bytes)
+        let speeds = try armSpeeds(in: packets[1].bytes)
+        #expect(speeds[0] == Int(ceil(Double(abs(target[0] - prior[0])) * 1250 / 200)))
+        #expect(speeds[0] < 100)
+        #expect(speeds.dropFirst().allSatisfy { $0 == 1 })
+    }
 }
 
-@Test(.actionCatalog) func rejectedTrackingOutputDoesNotAdvanceAccumulatedTarget() async throws {
-    let session = UUID().uuidString
-    let agent = try PhotographerAgent(
-        sessionID: session, controlsArm: true, outputCapacity: 8,
-        context: try AgentContextRepository(
-            agent: AgentID(rawValue: "photographer"), scope: UUID().uuidString, state: PhotographerContextState())
-    )
-    try await agent.start()
-    for sequence in 1...8 {
+extension LiveRuntimeTests {
+    @Test(.actionCatalog) func rejectedTrackingOutputDoesNotAdvanceAccumulatedTarget() async throws {
+        let session = UUID().uuidString
+        let agent = try PhotographerAgent(
+            sessionID: session, controlsArm: true, outputCapacity: 8,
+            context: try AgentContextRepository(
+                agent: AgentID(rawValue: "photographer"), scope: UUID().uuidString, state: PhotographerContextState())
+        )
+        try await agent.start()
+        for sequence in 1...8 {
+            try await agent.receive(
+                observation(
+                    try pose(noseX: 43, noseY: 50, sequence: UInt64(sequence), timestamp: Double(sequence)),
+                    session: session))
+        }
+        await #expect(throws: HarnessError.queueFull) {
+            try await agent.receive(
+                observation(try pose(noseX: 43, noseY: 50, sequence: 9, timestamp: 9), session: session))
+        }
+        var iterator = agent.outputs.makeAsyncIterator()
+        var lastBase = 0.0
+        for _ in 0..<8 {
+            let output = try #require(await iterator.next())
+            guard case .toolCall(let call) = output.output else {
+                Issue.record("Missing aim")
+                return
+            }
+            lastBase = try #require(Double(call.arguments["base"] ?? ""))
+        }
         try await agent.receive(
-            observation(
-                try pose(noseX: 43, noseY: 50, sequence: UInt64(sequence), timestamp: Double(sequence)),
-                session: session))
-    }
-    await #expect(throws: HarnessError.queueFull) {
-        try await agent.receive(
-            observation(try pose(noseX: 43, noseY: 50, sequence: 9, timestamp: 9), session: session))
-    }
-    var iterator = agent.outputs.makeAsyncIterator()
-    var lastBase = 0.0
-    for _ in 0..<8 {
-        let output = try #require(await iterator.next())
-        guard case .toolCall(let call) = output.output else {
+            observation(try pose(noseX: 43, noseY: 50, sequence: 10, timestamp: 10), session: session))
+        let resumed = try #require(await iterator.next())
+        guard case .toolCall(let call) = resumed.output else {
             Issue.record("Missing aim")
             return
         }
-        lastBase = try #require(Double(call.arguments["base"] ?? ""))
+        let resumedBase = try #require(Double(call.arguments["base"] ?? ""))
+        // Filtered error -0.0225, gain1.15, elapsed capped0.4: only one admitted step.
+        #expect(abs(resumedBase - lastBase + 0.01035) < 0.000001)
+        await agent.stop()
     }
-    try await agent.receive(observation(try pose(noseX: 43, noseY: 50, sequence: 10, timestamp: 10), session: session))
-    let resumed = try #require(await iterator.next())
-    guard case .toolCall(let call) = resumed.output else {
-        Issue.record("Missing aim")
-        return
-    }
-    let resumedBase = try #require(Double(call.arguments["base"] ?? ""))
-    // Filtered error -0.0225, gain1.15, elapsed capped0.4: only one admitted step.
-    #expect(abs(resumedBase - lastBase + 0.01035) < 0.000001)
-    await agent.stop()
 }
 
 @Test func aimCommandSendsMotorsOneAndFourOncePerAdmittedTarget() throws {

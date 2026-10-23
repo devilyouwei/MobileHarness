@@ -100,7 +100,7 @@ private func lifecycleInvocation(
     try ScheduledAction(
         envelope: OutputEnvelope(
             source: owner.agent,
-            input: AgentInput(id: UUID().uuidString, sessionID: owner.sessionID, payload: .event("test")),
+            context: AgentInput(id: UUID().uuidString, sessionID: owner.sessionID, payload: .event("test")).context,
             output: .actionCall(ActionCall(actionPath: path, channel: "Ordered"))),
         owner: owner, feedback: feedback, lease: lease)
 }
@@ -299,7 +299,7 @@ func cancelledLeaseCleanupPreservesAcknowledgedUnlock(operation: String) async t
     ])
     let scheduler = ChannelScheduler(registry: registry, resources: resources)
     let output = OutputGateway(
-        manager: manager, requests: InputGateway(manager: manager, allowsExternalSend: true), tools: ToolRegistry(),
+        manager: manager, requests: InputGateway(manager: manager), tools: ToolRegistry(),
         actions: scheduler, sink: { _ in })
     _ = try await output.resourceControl(for: .photographer, sessionID: visionSession)
     let owner = ExecutionOwner(
@@ -325,8 +325,9 @@ func cancelledLeaseCleanupPreservesAcknowledgedUnlock(operation: String) async t
     let parent = AgentInput(id: UUID().uuidString, sessionID: replySession, payload: .event("move"))
     try await output.dispatch(
         OutputEnvelope(
-            source: .assistant, input: parent,
-            output: .actionCall(ActionCall(actionPath: lifecyclePath, channel: "Ordered"))))
+            source: .assistant, context: parent.context,
+            output: .actionCall(ActionCall(actionPath: lifecyclePath, channel: "Ordered")), taskScope: parent.taskScope)
+    )
     try await scheduler.finish(inputID: parent.id, source: .assistant)
     #expect(await actions.value == 1)
     #expect(await scheduler.diagnosticSnapshot().records.last?.phase == .succeeded)
@@ -495,7 +496,7 @@ func cancelledLeaseCleanupPreservesAcknowledgedUnlock(operation: String) async t
     try await manager.start(.assistant)
     let owner = ExecutionOwner(
         agent: .assistant, incarnation: try await manager.identity(.assistant), sessionID: session)
-    let input = InputGateway(manager: manager, allowsExternalSend: true)
+    let input = InputGateway(manager: manager)
     let counter = LifecycleCounter()
     let registry = try ActionRegistry(definitions: [
         ActionBinding(path: lifecyclePath, displayName: "测试动作", kind: .finite, completion: "Effect completed.") {
@@ -517,7 +518,7 @@ func cancelledLeaseCleanupPreservesAcknowledgedUnlock(operation: String) async t
         #expect(await input.deliverActionResult(result) == .accepted)
         #expect(await agent.results().count == 1)
         await #expect(throws: CommunicationError.unauthorized) {
-            try await input.send(
+            try await manager.receiveLocally(
                 AgentInput(id: UUID().uuidString, sessionID: session, payload: .actionResult(result)),
                 to: .assistant)
         }
@@ -536,7 +537,7 @@ func cancelledLeaseCleanupPreservesAcknowledgedUnlock(operation: String) async t
     let replacement = try ReceiptAgent()
     try await manager.register(replacement, sessionID: session)
     try await manager.start(.assistant)
-    let input = InputGateway(manager: manager, allowsExternalSend: true)
+    let input = InputGateway(manager: manager)
     let result = ActionResult(
         executionID: UUID().uuidString, owner: owner, path: lifecyclePath, causality: .root(),
         status: .succeeded, effect: .contractCompleted, completion: .completed)
@@ -761,7 +762,7 @@ private actor RevocationDevice {
     let session = UUID().uuidString
     try await manager.register(agent, sessionID: session)
     try await manager.start(otherAgent)
-    let input = InputGateway(manager: manager, allowsExternalSend: true)
+    let input = InputGateway(manager: manager)
     let count = LifecycleCounter()
     let definition = ActionBinding(
         path: .init(domain: "Fixture", module: "Control", function: "move"), displayName: "Move",
@@ -776,7 +777,7 @@ private actor RevocationDevice {
         try await output.dispatch(
             OutputEnvelope(
                 source: otherAgent,
-                input: AgentInput(id: UUID().uuidString, sessionID: session, payload: .event("test")),
+                context: AgentInput(id: UUID().uuidString, sessionID: session, payload: .event("test")).context,
                 output: .toolCall(
                     ToolCall(id: UUID().uuidString, toolPath: "Fixture.Control.move", arguments: [:]))))
     }
@@ -792,7 +793,7 @@ private actor RevocationDevice {
     try await manager.register(agent, sessionID: session)
     try await manager.start(.assistant)
     let output = OutputGateway(
-        manager: manager, requests: InputGateway(manager: manager, allowsExternalSend: true), tools: ToolRegistry(),
+        manager: manager, requests: InputGateway(manager: manager), tools: ToolRegistry(),
         actions: ChannelScheduler(registry: ActionRegistry(), resources: resources), sink: { _ in })
     let control = try await output.resourceControl(for: .assistant, sessionID: session)
     let lease = try await control.acquire([armResource], .seconds(10))
@@ -820,7 +821,7 @@ private actor RevocationDevice {
     let scheduler = ChannelScheduler(registry: registry, resources: resources)
     let manager = AgentManager()
     let output = OutputGateway(
-        manager: manager, requests: InputGateway(manager: manager, allowsExternalSend: true), tools: ToolRegistry(),
+        manager: manager, requests: InputGateway(manager: manager), tools: ToolRegistry(),
         actions: scheduler, sink: { _ in })
     let owner = lifecycleOwner()
     try await scheduler.enqueue(invocation: lifecycleInvocation(owner: owner, feedback: .none))
@@ -851,7 +852,7 @@ private actor RevocationDevice {
     try await manager.start(.assistant)
     let owner = ExecutionOwner(
         agent: .assistant, incarnation: try await manager.identity(.assistant), sessionID: session)
-    let input = InputGateway(manager: manager, allowsExternalSend: true)
+    let input = InputGateway(manager: manager)
     let registry = try ActionRegistry(definitions: [
         ActionBinding(
             path: lifecyclePath, displayName: "Simulated failure", kind: .finite, completion: "Report retained.",
@@ -886,7 +887,7 @@ private struct DynamicResourceToolFixture: ToolModule { let definitions: [Action
     try await manager.start(.assistant)
     let owner = ExecutionOwner(
         agent: .assistant, incarnation: try await manager.identity(.assistant), sessionID: session)
-    let inputGateway = InputGateway(manager: manager, allowsExternalSend: true)
+    let inputGateway = InputGateway(manager: manager)
     let root = UUID().uuidString
     let turn = AgentTurn(id: UUID().uuidString, ordinal: 9)
     let payload = InputPayload.event("fixture")
@@ -898,7 +899,7 @@ private struct DynamicResourceToolFixture: ToolModule { let definitions: [Action
             deadline: .now.advanced(by: .seconds(-1))), turn: turn)
     let call = ActionCall(actionPath: lifecyclePath, channel: "main")
     let invocation = try ScheduledAction(
-        envelope: .init(source: .assistant, input: input, output: .actionCall(call), sequence: 17),
+        envelope: .init(source: .assistant, context: input.context, output: .actionCall(call), sequence: 17),
         owner: owner, feedback: .terminal)
     let registry = try ActionRegistry(definitions: [
         ActionBinding(
@@ -929,7 +930,7 @@ private struct DynamicResourceToolFixture: ToolModule { let definitions: [Action
     try await manager.start(.assistant)
     let owner = ExecutionOwner(
         agent: .assistant, incarnation: try await manager.identity(.assistant), sessionID: session)
-    let gateway = InputGateway(manager: manager, allowsExternalSend: true)
+    let gateway = InputGateway(manager: manager)
     let context = SignalCausality(
         inputID: UUID().uuidString, rootID: UUID().uuidString, hops: hops,
         turn: AgentTurn(id: UUID().uuidString, ordinal: 3))
@@ -998,8 +999,9 @@ func hostProducerCancellationPreservesOtherSessionAndOtherAgent() async throws {
     ] {
         let input = AgentInput(id: UUID().uuidString, sessionID: owner.sessionID, payload: .text(id))
         let envelope = OutputEnvelope(
-            source: owner.agent, input: input,
-            output: .actionCall(ActionCall(actionPath: lifecyclePath, channel: "Control", parameters: ["id": id])))
+            source: owner.agent, context: input.context,
+            output: .actionCall(ActionCall(actionPath: lifecyclePath, channel: "Control", parameters: ["id": id])),
+            taskScope: input.taskScope)
         if id == "current" { original = envelope }
         try await scheduler.enqueue(invocation: ScheduledAction(envelope: envelope, owner: owner, feedback: .none))
     }

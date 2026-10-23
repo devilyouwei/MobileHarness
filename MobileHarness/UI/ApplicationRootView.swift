@@ -76,7 +76,7 @@
                     group: destination == .recognition
                         ? .recognition : (destination == .synthesis ? .synthesis : .vision),
                     audioDetection: destination == .recognition ? container?.audioDetectionState : nil,
-                    audioDetectionControls: destination == .recognition ? container?.audioDetectionControls : nil)
+                    audioDetectionRequests: destination == .recognition ? container?.audioDetectionRequests : nil)
             }
         }
         private func saveSettings() async -> Bool {
@@ -138,7 +138,7 @@
             } else {
                 ConversationView(
                     state: container.conversation, activity: container.actionActivity,
-                    toggleVoice: container.toggleVoice, voicePressChanged: container.voicePressChanged)
+                    listeningRequests: container.listeningRequests)
             }
         }
 

@@ -190,6 +190,8 @@ public protocol ProviderRequestFailure: Error {
 
 @MainActor
 public final class UISettingsContainer {
+    public let requests = UIRequests<SettingsInput, SettingsReply>()
+
     public let state: SettingsState
     public var presentation: any SettingsPresenting { state }
     init(initial: CloudSettingsDraft, admission: UIPresentationAdmission) {

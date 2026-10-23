@@ -1,46 +1,110 @@
-# Memory
+# Memory — 历史事务与标题生成
 
-## 职责与直接接口
+## 职责与注入能力
 
-处理历史读取、归档、删除、展示与独立标题生成事务，不生成普通对话。UI/AgentBindings 的 history.intent 经 Gateway 进入；Memory 发出固定调用，Actions 通过注入的 StorageChat/呈现端口执行，结果回原事务。Assistant 的 history-query 查询 Actions直接使用同一批函数，不需要把用户对话转发到 Memory。
+MemoryAgent 构造注入 `UIHistoryContainer`、会话身份、私有 `AgentContextRepository` 和新会话前的业务屏障；直接订阅历史请求。它不持有完整历史仓库或四大基础根，历史读取和变更均通过 Gateway → Actions。
 
-## 内部结构
+`ConversationTitleGenerator` 是独立计算能力，显式接受 ModelKit `ChatCapability` 与已读取的会话值，由装配提供给 History 执行服务；不是 MemoryAgent 的普通对话 Worker。
+
+## 文件与职责
 
 | 文件 | 职责 |
 | --- | --- |
-| MemoryAgent.swift | 接纳、生命周期与事务结果 |
-| MemoryHistoryWorkflow.swift | 固定调用、关联与历史步骤 |
-| MemoryProcessing.swift | State、预处理及上下文 |
-| ConversationTitleGenerator.swift | 仅生成标题的独立模型请求 |
+| [ConversationTitleGenerator.swift](ConversationTitleGenerator.swift) | 有界标题采样与注入 Chat 的标题生成策略 |
+| [HistoryExecutionPreview.swift](HistoryExecutionPreview.swift) | 真实调用记录到历史预览的纯格式化 |
+| [MemoryAgent.swift](MemoryAgent.swift) | 历史请求与确定性固定 Task 的准入、调用及真实结果 |
+| [MemoryExecutionSession.swift](MemoryExecutionSession.swift) | Memory 注册、输出泵、失败与停止加入 |
+| [MemoryHistoryIntent.swift](MemoryHistoryIntent.swift) | 历史意图与本角色固定任务载荷解码，拒绝远程取消私有请求 |
+| [MemoryHistoryWorkflow.swift](MemoryHistoryWorkflow.swift) | 历史查询／修改操作的顺序、请求槽与结果关联 |
+| [MemoryProcessing.swift](MemoryProcessing.swift) | Memory 私有 Context、预处理和决策输入 |
+| [MemoryUI.swift](MemoryUI.swift) | history 订阅、请求私有完整读取端口和取消加入 |
 
-运行时保存调用/事务关联，不把标题请求写入普通对话。历史记录接口由 [StorageChat](../../Storage/Database/Chat/README.md) 拥有；函数与参数由 [History Actions](../../Actions/History/README.md) 拥有。
+## 外部关系（一层）
 
-## 历史与标题流程
+```mermaid
+flowchart LR
+ A["Memory"]:::agent
+ G["Gateway：调用／Signal／反馈"]:::gateway
+ C["AgentCore：身份／契约"]:::host
+ H["Agents 根级装配：构造与生命周期"]:::host
+ H -.-> A
+ A --> C
+ A <-->|"受身份绑定的输出与反馈"| G
+ U["UI.history"]:::ui
+ U -->|"主动订阅历史请求"| A
+ X["Actions：History 与类型化结果端口"]:::action
+ A -.-> X
+ M["ModelKit.ChatCapability：仅标题辅助计算"]:::model
+ A -.->|"目录中的独立标题生成器"| M
+ subgraph Peers["其他 Agent：仅经 Gateway 通信"]
+ AS["Assistant"]:::agent
+ end
+ AS -->|"task.request／input／cancel"| G
+ G -->|"task.progress／result"| AS
 
-归档先提交，再独立生成标题；标题失败不撤回已提交归档。标题从全会话等距抽样至多 32 轮，每个 user/assistant 摘录至多 80 Characters，发两条消息、64-token 输出预算、temperature=0，30 秒取消并加入的截止时间。只接受明确 stop、单行非空且不超过 80 Characters 的文本；拒绝动作、Tool、截断和空结果，不执行模型输出。
+ classDef ui fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e
+ classDef platform fill:#dcfce7,stroke:#16a34a,color:#14532d
+ classDef model fill:#f3e8ff,stroke:#9333ea,color:#581c87
+ classDef storage fill:#fef3c7,stroke:#d97706,color:#78350f
+ classDef agent fill:#eef2ff,stroke:#6366f1,color:#312e81
+ classDef gateway fill:#ffedd5,stroke:#ea580c,color:#7c2d12
+ classDef action fill:#ffe4e6,stroke:#e11d48,color:#881337
+ classDef host fill:#f1f5f9,stroke:#64748b,color:#334155
+```
 
-Cloud 非思考参数由 [OpenAI 请求编码器](../../ModelKit/Language/LLM/OpenAI/README.md#non-thinking-request-policy) 拥有；Memory 不写 vendor 字段或用更大预算自动重试。定向结果必须匹配原输入、会话和调用身份，独立标题工作由根 owner 取消/清理。
+角色间消息经 Gateway 递送；基础能力通过构造注入，输入订阅由角色持有。
 
-## 注册、状态与失败
+## 内部结构与执行链
 
-[Agent.json](../../Resources/Agents/Memory/Agent.json) 声明 history.intent 订阅、定向 task.progress/result 和 baseSkills=history-query。固定 startNew/summarize/delete/showHistory 调用在 workflow 注册；模型查询绑定由 Skill 声明。没有普通用户文本 Chat worker，也不把函数能力当作其他角色的历史权限。
+```mermaid
+flowchart LR
+ U["注入 UI.history.requests"]:::ui
+ subgraph Role["Memory"]
+ H["MemoryUI：读取／变更类型化处理"]:::agent
+ W["HistoryWorkflow／固定 Task／私有 Context"]:::agent
+ R["请求私有 HistoryReadInvocation／结果端口"]:::agent
+ end
+ U --> H --> W
+ H --> R
+ W --> G["Gateway：绑定执行身份"]:::gateway
+ R --> G
+ G --> X["History.Conversation.readFull<br/>History.Conversation.startNew<br/>History.Conversation.summarize<br/>History.Conversation.delete"]:::action
+ G --> Y["UI.HistoryPresentation.showHistory"]:::action
+ X --> S["Storage.database.chat：实际查询／归档／删除"]:::storage
+ X --> T["注入的 ConversationTitleGenerator"]:::agent
+ T --> M["ModelKit.language：标题请求"]:::model
+ Y --> UI["UI.history：列表／详情呈现"]:::ui
+ X -->|"完整类型化结果，不转模型 JSON"| R
+ classDef ui fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e
+ classDef platform fill:#dcfce7,stroke:#16a34a,color:#14532d
+ classDef model fill:#f3e8ff,stroke:#9333ea,color:#581c87
+ classDef storage fill:#fef3c7,stroke:#d97706,color:#78350f
+ classDef agent fill:#eef2ff,stroke:#6366f1,color:#312e81
+ classDef gateway fill:#ffedd5,stroke:#ea580c,color:#7c2d12
+ classDef action fill:#ffe4e6,stroke:#e11d48,color:#881337
+ classDef host fill:#f1f5f9,stroke:#64748b,color:#334155
+```
 
-最近 4096 条 Signal 证据/消费批次采用有计数的滚动保留；调用、任务和历史记录独立保存。输出容量 256、状态接纳与通信容量按 [公共机制](../Support/README.md) 处理。提交失败不执行依赖步骤，取消加入已接纳工作，重启标记未完成业务记录中断而不重放。角色热状态在内存，业务事实通过注入的仓库持久化。
+## 查询、变更与完成
+
+五类完整历史读取走私有 `History.Conversation.readFull`，调用携带单次类型化结果端口，校验真实 source/session/input，不使用全局结果暂存表。最多四个实际读取任务；普通 UI 请求仍受每源 64 个未终态项限制。页面取消及角色停止取消并加入已授权读取；端口不可重复执行或终态后复用。
+
+`MemoryUI.swift` 在 MemoryAgent 隔离域内同步读取角色状态；历史执行前和异步结果返回后均检查角色仍在运行，Gateway 执行与结果端口读取保持异步。
+
+新会话先通过业务屏障取消活跃 Assistant Task，再归档；归档提交后独立生成标题，标题失败不撤回归档。固定操作和模型 history-query 暴露范围分别声明，Assistant 可直接调用相同 History Actions。回执等待真实读取／变更／呈现结果，接纳不等于完成。
+
+## 标题算法
+
+从整个会话等距抽样至多 32 轮，user/assistant 每段最多 80 Characters。两条消息，64-token 输出预算、temperature=0，30 秒截止后取消并加入。只接受 stop、单行非空且至多 80 Characters 的文本；拒绝 Tool、动作、截断及空结果，不执行输出，也不自动重试。供应商编码归 ModelKit。
+
+## 状态、生命周期与失败
+
+输出 256；接纳等待 32；证据／批次滚动窗口 4096。Context 保持在内存，持久化事实由 Actions 使用领域仓库提交。提交失败阻止依赖步骤，取消加入实际工作；pause/stop 关闭并加入 UI 消费，resume 加入旧消费者后重订阅。重启不重放已发出的操作。
+
+通信声明见 [Agent.json](../../Resources/Agents/Memory/Agent.json)，效果契约见 [History Actions](../../Actions/History/README.md)。
+
+本角色通过 [固定任务准入](../Support/Communication/README.md#固定任务准入) 接收 Assistant 委派。MemoryHistoryIntent.taskMessage 只解释 history.intent，拒绝将角色私有 cancel 意图作为 Task 业务载荷。
 
 ## 待实现
 
-- 超出记录事务与标题生成范围的语义记忆能力。
-- 历史原生交互、真实模型标题与端到端取消/恢复验收。
-
-
-## 历史只读请求接入
-
-✅ UI 的记录分页、消息、归档及授权图片读取也经 MemoryHistoryIntent.query 的实际 Gateway/Memory 接入；不再由 UI 请求适配器直接读仓库。MemoryHistoryReadRequests 为根持有的类型化只读请求暂存，最多四个请求，每个请求一个结果等待者；Signal 只携带随机 ID，结果保留规范仓库返回值。请求/结果有界，120 秒未返回明确超时，取消/停止加入实际读取，迟到结果不更新 UI；不新增模型函数或重放副作用。
-
-## Storage 依赖
-
-✅ 存储访问使用独立的 State、Cache、Database 和 Files 接口；App 注册根实例，消费者通过构造器获得所需能力。存储容器不接管本目录的业务验证、执行和完成语义。
-
-## UI 全量容器化
-
-✅ 应用级 UI 状态由八个子容器统一创建，消费者注入所需 Presenting 接口并提交 UI 自有值，不直接写字段。App 注册并管理同一 UI 根；原业务身份/版本校验、原生完成和基础库依赖边界保持。跨模块连接迁移仍是独立待办。
+❌ 语义记忆与活跃历史事务的持久化恢复。

@@ -1,6 +1,4 @@
-import ActionBindings
 import Actions
-import AgentBindings
 import AgentCore
 import Agents
 import CallRuntime
@@ -251,12 +249,8 @@ import Testing
         try await manager.register(assistant, sessionID: session)
         let policy = try CommunicationPolicy(
             contracts: AgentContracts.communication,
-            externalSources: [
-                "user", "runtime", "phone.microphone", "phone.camera", "model.resources", "app.resources",
-                "app.environment",
-            ],
             configurations: AgentConfigurations.all())
-        let input = InputGateway(manager: manager, policy: policy, allowsExternalSend: true)
+        let input = InputGateway(manager: manager, policy: policy)
         let assembly = try BehaviorAssembly(
             actionModules: [
                 ScheduledFunctionFixture(
@@ -310,7 +304,7 @@ import Testing
         do {
             try await assistant.bind(output.messaging(for: .assistant))
             try await assistant.start()
-            let report = try await input.send(
+            let report = try await manager.receiveLocally(
                 AgentInput(id: UUID().uuidString, sessionID: session, payload: .text("执行串口验收动作")),
                 to: .assistant)
             try #require(report.rejected.isEmpty)
@@ -341,390 +335,404 @@ import Testing
         }
     }
 
-    @Test(
-        .actionCatalog,
-        .enabled(if: ProcessInfo.processInfo.environment["NEXARM_SERIAL_TRACKING_ACCEPTANCE"] == "1"),
-        .timeLimit(.minutes(3)))
-    @MainActor
-    func nexArmSerialSettingsTakeoverAndPhotographerToolAcceptance() async throws {
-        let path = try #require(ProcessInfo.processInfo.environment["NEXARM_PORT"])
-        let file = FileManager.default.temporaryDirectory.appendingPathComponent(
-            "serial-tracking-\(UUID().uuidString).json")
-        defer { try? FileManager.default.removeItem(at: file) }
-        let link = SerialSettingsLink(path: path)
-        let workflow = BluetoothWorkflow(
-            state: BluetoothSettingsState(), link: link,
-            makeDeviceRepository: { try SQLiteRepositories(url: file).devices })
-        let observer = Task { await workflow.run() }
-        let resources = try ResourceCoordinator(
-            definitions: (1...6).map {
-                ResourceDefinition(
-                    id: ResourceID(rawValue: "nexarm.motor.\($0)"), allowedOwners: [.assistant, .photographer]
-                ) {}
-            })
-        let manager = AgentManager()
-        let session = UUID().uuidString
-        let photographer = try PhotographerAgent(
-            sessionID: session, controlsArm: true, controlAvailable: { await workflow.trackingAvailable },
-            context: try AgentContextRepository(
-                agent: AgentID(rawValue: "photographer"), scope: UUID().uuidString, state: PhotographerContextState())
-        )
-        try await manager.register(photographer, sessionID: session)
-        let policy = try CommunicationPolicy(
-            contracts: AgentContracts.communication,
-            externalSources: ["user", "runtime", "phone.camera", "phone.microphone"],
-            configurations: AgentConfigurations.all())
-        let input = InputGateway(manager: manager, policy: policy, allowsExternalSend: true)
-        let failures = SerialControlFailureProbe()
-        let tools = try ToolRegistry(modules: [
-            NexArmTrackingModule { base, pitch, invocation in
-                try await workflow.aim(
-                    base: base, pitch: pitch,
-                    origin: .init(
-                        source: invocation.context.source, sessionID: invocation.context.sessionID,
-                        inputID: invocation.context.inputID, callID: invocation.executionID),
-                    failed: { await failures.record($0) })
-            }
-        ])
-        let output = OutputGateway(
-            manager: manager, requests: input, tools: tools,
-            actions: ChannelScheduler(registry: ActionRegistry(), resources: resources), policy: policy, sink: { _ in })
-        do {
-            workflow.openPage()
-            try await serialWait("discovery") { !workflow.state.nearby.isEmpty }
-            workflow.connect(try link.businessID)
-            await workflow.waitUntilIdle()
-            try await serialWait(seconds: 5, "passive feedback") { workflow.state.joints.count == 6 }
-            // Tracking setup explicitly selects its own rest; ordinary reset keeps the legacy home.
-            for (index, target) in NexArmJointCommand.armHome.enumerated() {
-                try await serialAssistant(
-                    "<moveMotor motor=\"\(index + 1)\" target=\"\(target)\" speed=\"400\" acceleration=\"30\"/>",
-                    workflow: workflow, expected: .succeeded)
-            }
-            workflow.withMotorResources = bluetoothResourceGuard(resources)
-            try await photographer.start()
-            var iterator = photographer.outputs.makeAsyncIterator()
-            let baseline = workflow.state.joints
-            let before = await link.writes
-            for index in 1...6 {
-                let sequence = UInt64(index)
-                let pose = try PoseObservation(
-                    width: 100, height: 100, sequence: sequence, timestamp: Double(index) * 0.25, rotation: 1,
-                    people: [Array(repeating: .init(x: 35, y: 50, confidence: 0.9), count: 17)])
-                let payload = InputPayload.observation(.pose(pose))
-                let delivery = try await input.send(
-                    AgentInput(
-                        id: UUID().uuidString,
-                        sessionID: session, payload: payload,
-                        metadata: InputMetadata(
-                            payload: payload, source: "runtime", sequence: sequence,
-                            rootID: UUID().uuidString)),
-                    to: .photographer)
-                try #require(delivery.rejected.isEmpty)
-                let envelope = try #require(await iterator.next())
-                print("SERIAL PHOTOGRAPHER TOOL \(envelope.output)")
-                let result = try await output.execute(envelope)
-                try #require(!result.isError)
-                try await Task.sleep(for: .milliseconds(250))
-            }
-            await workflow.waitUntilIdle()
-            try await Task.sleep(for: .milliseconds(400))
-            try #require(await link.writes > before)
-            try #require(baseline[0] - workflow.state.joints[0] >= 30)
-            try #require(abs(baseline[4] - workflow.state.joints[4]) <= 4)
-            try #require(abs(baseline[5] - workflow.state.joints[5]) <= 4)
-            let results = await output.executionResults(source: .photographer)
-            try #require(results.outputs.count == 6 && results.outputs.allSatisfy { !$0.isError })
-            try #require(await failures.failure == nil)
-            print(
-                "SERIAL TOOL PASS writes=\(await link.writes - before) start=\(baseline) actual=\(workflow.state.joints)"
+    extension LiveRuntimeTests {
+        @Test(
+            .actionCatalog,
+            .enabled(if: ProcessInfo.processInfo.environment["NEXARM_SERIAL_TRACKING_ACCEPTANCE"] == "1"),
+            .timeLimit(.minutes(3)))
+        @MainActor
+        func nexArmSerialSettingsTakeoverAndPhotographerToolAcceptance() async throws {
+            let path = try #require(ProcessInfo.processInfo.environment["NEXARM_PORT"])
+            let file = FileManager.default.temporaryDirectory.appendingPathComponent(
+                "serial-tracking-\(UUID().uuidString).json")
+            defer { try? FileManager.default.removeItem(at: file) }
+            let link = SerialSettingsLink(path: path)
+            let workflow = BluetoothWorkflow(
+                state: BluetoothSettingsState(), link: link,
+                makeDeviceRepository: { try SQLiteRepositories(url: file).devices })
+            let observer = Task { await workflow.run() }
+            let resources = try ResourceCoordinator(
+                definitions: (1...6).map {
+                    ResourceDefinition(
+                        id: ResourceID(rawValue: "nexarm.motor.\($0)"), allowedOwners: [.assistant, .photographer]
+                    ) {}
+                })
+            let manager = AgentManager()
+            let session = UUID().uuidString
+            let photographer = try PhotographerAgent(
+                sessionID: session, controlsArm: true, controlAvailable: { await workflow.trackingAvailable },
+                context: try AgentContextRepository(
+                    agent: AgentID(rawValue: "photographer"), scope: UUID().uuidString,
+                    state: PhotographerContextState())
             )
-
-            if ProcessInfo.processInfo.environment["NEXARM_SERIAL_AIM_STRESS"] == "1" {
-                // Explicit Tool fixtures isolate publication rate from YOLO/Photographer policy.
-                // Centered observations still cross InputGateway and keep the real freshness guard active.
-                let permission = InternalTool(path: "NexArm.Tracking.aim", required: ["base", "pitch"])
-                var sequence: UInt64 = 6
-                for phase in 0..<3 {
-                    let count = phase == 1 ? 300 : 30
-                    let interval: Duration = phase == 1 ? .milliseconds(20) : .milliseconds(200)
-                    let before = await link.writes
-                    let started = ContinuousClock.now
-                    print("SERIAL STRESS BEGIN phase=\(phase) calls=\(count) interval=\(interval)")
-                    for index in 0..<count {
-                        sequence += 1
-                        let pose = try PoseObservation(
-                            width: 100, height: 100, sequence: sequence,
-                            timestamp: Double(sequence), rotation: 1,
-                            people: [Array(repeating: .init(x: 50, y: 50, confidence: 0.9), count: 17)])
-                        let payload = InputPayload.observation(.pose(pose))
-                        let observation = AgentInput(
+            try await manager.register(photographer, sessionID: session)
+            let policy = try CommunicationPolicy(
+                contracts: AgentContracts.communication,
+                configurations: AgentConfigurations.all())
+            let input = InputGateway(manager: manager, policy: policy)
+            let failures = SerialControlFailureProbe()
+            let tools = try ToolRegistry(modules: [
+                NexArmTrackingModule { base, pitch, invocation in
+                    try await workflow.aim(
+                        base: base, pitch: pitch,
+                        origin: .init(
+                            source: invocation.context.source, sessionID: invocation.context.sessionID,
+                            inputID: invocation.context.inputID, callID: invocation.executionID),
+                        failed: { await failures.record($0) })
+                }
+            ])
+            let output = OutputGateway(
+                manager: manager, requests: input, tools: tools,
+                actions: ChannelScheduler(registry: ActionRegistry(), resources: resources), policy: policy,
+                sink: { _ in })
+            do {
+                workflow.openPage()
+                try await serialWait("discovery") { !workflow.state.nearby.isEmpty }
+                workflow.connect(try link.businessID)
+                await workflow.waitUntilIdle()
+                try await serialWait(seconds: 5, "passive feedback") { workflow.state.joints.count == 6 }
+                // Tracking setup explicitly selects its own rest; ordinary reset keeps the legacy home.
+                for (index, target) in NexArmJointCommand.armHome.enumerated() {
+                    try await serialAssistant(
+                        "<moveMotor motor=\"\(index + 1)\" target=\"\(target)\" speed=\"400\" acceleration=\"30\"/>",
+                        workflow: workflow, expected: .succeeded)
+                }
+                workflow.withMotorResources = bluetoothResourceGuard(resources)
+                try await photographer.start()
+                var iterator = photographer.outputs.makeAsyncIterator()
+                let baseline = workflow.state.joints
+                let before = await link.writes
+                for index in 1...6 {
+                    let sequence = UInt64(index)
+                    let pose = try PoseObservation(
+                        width: 100, height: 100, sequence: sequence, timestamp: Double(index) * 0.25, rotation: 1,
+                        people: [Array(repeating: .init(x: 35, y: 50, confidence: 0.9), count: 17)])
+                    let payload = InputPayload.observation(.pose(pose))
+                    let delivery = try await manager.receiveLocally(
+                        AgentInput(
                             id: UUID().uuidString,
                             sessionID: session, payload: payload,
                             metadata: InputMetadata(
                                 payload: payload, source: "runtime", sequence: sequence,
-                                rootID: UUID().uuidString))
-                        let delivery = try await input.send(observation, to: .photographer)
-                        try #require(delivery.rejected.isEmpty)
-                        let base: Double
-                        switch phase {
-                        case 0: base = -0.08 + 0.16 * Double(index) / Double(count - 1)
-                        case 1: base = 0.08
-                        default: base = 0.08 + (index.isMultiple(of: 2) ? -0.01 : 0.01)
-                        }
-                        let call = try permission.call(["base": String(base), "pitch": "0"])
-                        let envelope = OutputEnvelope(
-                            source: .photographer, input: observation, output: .toolCall(call), sequence: sequence)
-                        let result = try await output.execute(envelope)
-                        try #require(!result.isError)
-                        try #require(await failures.failure == nil)
-                        try await Task.sleep(for: interval)
-                    }
-                    print(
-                        "SERIAL STRESS END phase=\(phase) calls=\(count) writes=\(await link.writes - before) elapsed=\(ContinuousClock.now - started) joints=\(workflow.state.joints)"
-                    )
+                                rootID: UUID().uuidString)),
+                        to: .photographer)
+                    try #require(delivery.rejected.isEmpty)
+                    let envelope = try #require(await iterator.next())
+                    print("SERIAL PHOTOGRAPHER TOOL \(envelope.output)")
+                    let result = try await output.execute(envelope)
+                    try #require(!result.isError)
+                    try await Task.sleep(for: .milliseconds(250))
                 }
-            } else {
-                // Hold an Agent-side lease with no motion; manual controls must bypass it.
-                let owner = ExecutionOwner(
-                    agent: .assistant, incarnation: UUID().uuidString, sessionID: session)
-                let lease = try await resources.acquire(
-                    resources: [ResourceID(rawValue: "nexarm.motor.5")], owner: owner, duration: .seconds(30),
-                    revoke: { _ in })
-                let manualStart = await link.writes
-                workflow.tryAction(.shakeHead)
-                try await serialWait("first manual packet") { await link.writes > manualStart }
-                try await Task.sleep(for: .milliseconds(250))
-                workflow.setMotorVelocity(id: 5, value: -0.5)
-                try await Task.sleep(for: .milliseconds(350))
+                await workflow.waitUntilIdle()
+                try await Task.sleep(for: .milliseconds(400))
+                try #require(await link.writes > before)
+                try #require(baseline[0] - workflow.state.joints[0] >= 30)
+                try #require(abs(baseline[4] - workflow.state.joints[4]) <= 4)
+                try #require(abs(baseline[5] - workflow.state.joints[5]) <= 4)
+                let results = await output.executionResults(source: .photographer)
+                try #require(results.outputs.count == 6 && results.outputs.allSatisfy { !$0.isError })
+                try #require(await failures.failure == nil)
+                print(
+                    "SERIAL TOOL PASS writes=\(await link.writes - before) start=\(baseline) actual=\(workflow.state.joints)"
+                )
+
+                if ProcessInfo.processInfo.environment["NEXARM_SERIAL_AIM_STRESS"] == "1" {
+                    // Explicit Tool fixtures isolate publication rate from YOLO/Photographer policy.
+                    // Centered observations still cross InputGateway and keep the real freshness guard active.
+                    let permission = InternalTool(path: "NexArm.Tracking.aim", required: ["base", "pitch"])
+                    var sequence: UInt64 = 6
+                    for phase in 0..<3 {
+                        let count = phase == 1 ? 300 : 30
+                        let interval: Duration = phase == 1 ? .milliseconds(20) : .milliseconds(200)
+                        let before = await link.writes
+                        let started = ContinuousClock.now
+                        print("SERIAL STRESS BEGIN phase=\(phase) calls=\(count) interval=\(interval)")
+                        for index in 0..<count {
+                            sequence += 1
+                            let pose = try PoseObservation(
+                                width: 100, height: 100, sequence: sequence,
+                                timestamp: Double(sequence), rotation: 1,
+                                people: [Array(repeating: .init(x: 50, y: 50, confidence: 0.9), count: 17)])
+                            let payload = InputPayload.observation(.pose(pose))
+                            let observation = AgentInput(
+                                id: UUID().uuidString,
+                                sessionID: session, payload: payload,
+                                metadata: InputMetadata(
+                                    payload: payload, source: "runtime", sequence: sequence,
+                                    rootID: UUID().uuidString))
+                            let delivery = try await manager.receiveLocally(observation, to: .photographer)
+                            try #require(delivery.rejected.isEmpty)
+                            let base: Double
+                            switch phase {
+                            case 0: base = -0.08 + 0.16 * Double(index) / Double(count - 1)
+                            case 1: base = 0.08
+                            default: base = 0.08 + (index.isMultiple(of: 2) ? -0.01 : 0.01)
+                            }
+                            let call = try permission.call(["base": String(base), "pitch": "0"])
+                            let envelope = OutputEnvelope(
+                                source: .photographer, context: observation.context, output: .toolCall(call),
+                                sequence: sequence, taskScope: observation.taskScope)
+                            let result = try await output.execute(envelope)
+                            try #require(!result.isError)
+                            try #require(await failures.failure == nil)
+                            try await Task.sleep(for: interval)
+                        }
+                        print(
+                            "SERIAL STRESS END phase=\(phase) calls=\(count) writes=\(await link.writes - before) elapsed=\(ContinuousClock.now - started) joints=\(workflow.state.joints)"
+                        )
+                    }
+                } else {
+                    // Hold an Agent-side lease with no motion; manual controls must bypass it.
+                    let owner = ExecutionOwner(
+                        agent: .assistant, incarnation: UUID().uuidString, sessionID: session)
+                    let lease = try await resources.acquire(
+                        resources: [ResourceID(rawValue: "nexarm.motor.5")], owner: owner, duration: .seconds(30),
+                        revoke: { _ in })
+                    let manualStart = await link.writes
+                    workflow.tryAction(.shakeHead)
+                    try await serialWait("first manual packet") { await link.writes > manualStart }
+                    try await Task.sleep(for: .milliseconds(250))
+                    workflow.setMotorVelocity(id: 5, value: -0.5)
+                    try await Task.sleep(for: .milliseconds(350))
+                    workflow.setMotorVelocity(id: 5, value: 0)
+                    await workflow.waitUntilIdle()
+                    let finished = await link.writes
+                    try await Task.sleep(for: .milliseconds(600))
+                    try #require(await link.writes == finished)
+                    try #require(workflow.state.phase == .connected && workflow.state.transportIssue == nil)
+                    try await resources.release(lease, owner: owner)
+                    print("SERIAL TAKEOVER PASS manual bypassed Agent lease; no old preset replay")
+                }
+
+                await output.shutdown()
+                await photographer.stop()
+                workflow.disconnect()
+                await workflow.waitUntilIdle()
+                observer.cancel()
+                await observer.value
+            } catch {
+                print("SERIAL TRACKING STOP error=\(error) joints=\(workflow.state.joints)")
+                workflow.stopMotorControl()
+                await workflow.stopActions()
+                await output.shutdown()
+                await photographer.stop()
+                workflow.disconnect()
+                await workflow.waitUntilIdle()
+                observer.cancel()
+                await observer.value
+                throw error
+            }
+        }
+    }
+
+    extension LiveRuntimeTests {
+        @Test(
+            .actionCatalog, .enabled(if: ProcessInfo.processInfo.environment["NEXARM_SERIAL_ACCEPTANCE"] == "1"),
+            .timeLimit(.minutes(3)))
+        @MainActor
+        func nexArmSerialSettingsAndAgentAcceptance() async throws {
+            let path = try #require(ProcessInfo.processInfo.environment["NEXARM_PORT"])
+            let file = FileManager.default.temporaryDirectory.appendingPathComponent(
+                "serial-acceptance-\(UUID().uuidString).json")
+            defer { try? FileManager.default.removeItem(at: file) }
+            let link = SerialSettingsLink(path: path)
+            let workflow = BluetoothWorkflow(
+                state: BluetoothSettingsState(), link: link,
+                makeDeviceRepository: { try SQLiteRepositories(url: file).devices })
+            let observer = Task { await workflow.run() }
+            do {
+                workflow.openPage()
+                try await serialWait("discovery") { !workflow.state.nearby.isEmpty }
+                let row = try #require(workflow.state.nearby.first)
+                workflow.connect(row.id)
+                await workflow.waitUntilIdle()
+                try #require(workflow.state.isConnected(try link.businessID))
+                try await serialWait(seconds: 5, "real passive feedback") { workflow.state.joints.count == 6 }
+                let initial = workflow.state.joints
+                print("SERIAL APP CONNECTED joints=\(initial)")
+
+                // Small supervised single-motor motion first; actual terminal feedback is required.
+                let target = initial[4] + (initial[4] < 3000 ? 80 : -80)
+                try await serialAssistant(
+                    "<moveMotor motor=\"5\" target=\"\(target)\" speed=\"400\" acceleration=\"30\"/>",
+                    workflow: workflow, expected: .succeeded)
+                try #require(abs(workflow.state.joints[4] - target) <= 16)
+                try #require(abs(workflow.state.joints[4] - initial[4]) >= 40)
+                try await serialAssistant(
+                    "<moveMotor motor=\"5\" target=\"\(initial[4])\" speed=\"400\" acceleration=\"30\"/>",
+                    workflow: workflow, expected: .succeeded)
+
+                for action in [BluetoothArmAction.nod, .shakeHead] {
+                    let before = await link.writes
+                    let home = workflow.state.joints
+                    let began = ContinuousClock.now
+                    workflow.tryAction(action)
+                    try #require(ContinuousClock.now - began < .milliseconds(100))
+                    await workflow.waitUntilIdle()
+                    try #require(await link.writes >= before + 6)
+                    try #require(workflow.state.phase == .connected)
+                    let motor = action == .nod ? 4 : 5
+                    try #require(abs(workflow.state.joints[motor - 1] - home[motor - 1]) <= 32)
+                    print("SERIAL SETTINGS PASS action=\(action) writes=\(await link.writes - before)")
+                }
+
+                let jogStart = workflow.state.joints
+                let beforeJog = await link.writes
+                workflow.setMotorVelocity(id: 5, value: 0.6)
+                try await Task.sleep(for: .milliseconds(450))
                 workflow.setMotorVelocity(id: 5, value: 0)
                 await workflow.waitUntilIdle()
-                let finished = await link.writes
-                try await Task.sleep(for: .milliseconds(600))
-                try #require(await link.writes == finished)
-                try #require(workflow.state.phase == .connected && workflow.state.transportIssue == nil)
-                try await resources.release(lease, owner: owner)
-                print("SERIAL TAKEOVER PASS manual bypassed Agent lease; no old preset replay")
-            }
+                try await Task.sleep(for: .milliseconds(500))
+                try #require(await link.writes > beforeJog)
+                try #require(workflow.state.joints[4] - jogStart[4] >= 30)
+                let held = workflow.state.joints[4]
+                try await Task.sleep(for: .milliseconds(400))
+                try #require(abs(workflow.state.joints[4] - held) <= 4)
+                print(
+                    "SERIAL SETTINGS JOG PASS writes=\(await link.writes - beforeJog) start=\(jogStart[4]) held=\(held)"
+                )
 
-            await output.shutdown()
-            await photographer.stop()
-            workflow.disconnect()
-            await workflow.waitUntilIdle()
-            observer.cancel()
-            await observer.value
-        } catch {
-            print("SERIAL TRACKING STOP error=\(error) joints=\(workflow.state.joints)")
-            workflow.stopMotorControl()
-            await workflow.stopActions()
-            await output.shutdown()
-            await photographer.stop()
-            workflow.disconnect()
-            await workflow.waitUntilIdle()
-            observer.cancel()
-            await observer.value
-            throw error
-        }
-    }
+                // Invalid arguments must fail through the actual scheduler without a native write.
+                let beforeInvalid = await link.writes
+                try await serialAssistant(
+                    "<moveMotor motor=\"5\" target=\"5000\"/>", workflow: workflow, expected: .failed)
+                try #require(await link.writes == beforeInvalid)
+                try #require(workflow.state.transportIssue == nil)
 
-    @Test(
-        .actionCatalog, .enabled(if: ProcessInfo.processInfo.environment["NEXARM_SERIAL_ACCEPTANCE"] == "1"),
-        .timeLimit(.minutes(3)))
-    @MainActor
-    func nexArmSerialSettingsAndAgentAcceptance() async throws {
-        let path = try #require(ProcessInfo.processInfo.environment["NEXARM_PORT"])
-        let file = FileManager.default.temporaryDirectory.appendingPathComponent(
-            "serial-acceptance-\(UUID().uuidString).json")
-        defer { try? FileManager.default.removeItem(at: file) }
-        let link = SerialSettingsLink(path: path)
-        let workflow = BluetoothWorkflow(
-            state: BluetoothSettingsState(), link: link,
-            makeDeviceRepository: { try SQLiteRepositories(url: file).devices })
-        let observer = Task { await workflow.run() }
-        do {
-            workflow.openPage()
-            try await serialWait("discovery") { !workflow.state.nearby.isEmpty }
-            let row = try #require(workflow.state.nearby.first)
-            workflow.connect(row.id)
-            await workflow.waitUntilIdle()
-            try #require(workflow.state.isConnected(try link.businessID))
-            try await serialWait(seconds: 5, "real passive feedback") { workflow.state.joints.count == 6 }
-            let initial = workflow.state.joints
-            print("SERIAL APP CONNECTED joints=\(initial)")
-
-            // Small supervised single-motor motion first; actual terminal feedback is required.
-            let target = initial[4] + (initial[4] < 3000 ? 80 : -80)
-            try await serialAssistant(
-                "<moveMotor motor=\"5\" target=\"\(target)\" speed=\"400\" acceleration=\"30\"/>",
-                workflow: workflow, expected: .succeeded)
-            try #require(abs(workflow.state.joints[4] - target) <= 16)
-            try #require(abs(workflow.state.joints[4] - initial[4]) >= 40)
-            try await serialAssistant(
-                "<moveMotor motor=\"5\" target=\"\(initial[4])\" speed=\"400\" acceleration=\"30\"/>",
-                workflow: workflow, expected: .succeeded)
-
-            for action in [BluetoothArmAction.nod, .shakeHead] {
-                let before = await link.writes
-                let home = workflow.state.joints
-                let began = ContinuousClock.now
-                workflow.tryAction(action)
-                try #require(ContinuousClock.now - began < .milliseconds(100))
+                workflow.disconnect()
                 await workflow.waitUntilIdle()
-                try #require(await link.writes >= before + 6)
-                try #require(workflow.state.phase == .connected)
-                let motor = action == .nod ? 4 : 5
-                try #require(abs(workflow.state.joints[motor - 1] - home[motor - 1]) <= 32)
-                print("SERIAL SETTINGS PASS action=\(action) writes=\(await link.writes - before)")
-            }
-
-            let jogStart = workflow.state.joints
-            let beforeJog = await link.writes
-            workflow.setMotorVelocity(id: 5, value: 0.6)
-            try await Task.sleep(for: .milliseconds(450))
-            workflow.setMotorVelocity(id: 5, value: 0)
-            await workflow.waitUntilIdle()
-            try await Task.sleep(for: .milliseconds(500))
-            try #require(await link.writes > beforeJog)
-            try #require(workflow.state.joints[4] - jogStart[4] >= 30)
-            let held = workflow.state.joints[4]
-            try await Task.sleep(for: .milliseconds(400))
-            try #require(abs(workflow.state.joints[4] - held) <= 4)
-            print("SERIAL SETTINGS JOG PASS writes=\(await link.writes - beforeJog) start=\(jogStart[4]) held=\(held)")
-
-            // Invalid arguments must fail through the actual scheduler without a native write.
-            let beforeInvalid = await link.writes
-            try await serialAssistant(
-                "<moveMotor motor=\"5\" target=\"5000\"/>", workflow: workflow, expected: .failed)
-            try #require(await link.writes == beforeInvalid)
-            try #require(workflow.state.transportIssue == nil)
-
-            workflow.disconnect()
-            await workflow.waitUntilIdle()
-            try #require(!workflow.state.canControl(try link.businessID))
-            let beforeOffline = await link.writes
-            workflow.tryAction(.nod)
-            workflow.setMotorVelocity(id: 5, value: 0.5)
-            try await serialAssistant(
-                "<moveMotor motor=\"5\" target=\"2048\"/>", workflow: workflow, expected: .failed)
-            try #require(await link.writes == beforeOffline)
-            print("SERIAL OFFLINE PASS disabled controls and failed Agent result")
-            observer.cancel()
-            await observer.value
-        } catch {
-            print(
-                "SERIAL ACCEPTANCE STOP error=\(error) current=\(workflow.state.phase) joints=\(workflow.state.joints)")
-            workflow.stopMotorControl()
-            await workflow.stopActions()
-            workflow.disconnect()
-            await workflow.waitUntilIdle()
-            observer.cancel()
-            await observer.value
-            throw error
-        }
-    }
-
-    @Test(
-        .actionCatalog,
-        .enabled(if: ProcessInfo.processInfo.environment["NEXARM_SERIAL_PRESETS_ACCEPTANCE"] == "1"),
-        .timeLimit(.minutes(5)))
-    @MainActor
-    func nexArmSerialAllSettingsAndAssistantPresetsAcceptance() async throws {
-        let path = try #require(ProcessInfo.processInfo.environment["NEXARM_PORT"])
-        let file = FileManager.default.temporaryDirectory.appendingPathComponent(
-            "serial-presets-\(UUID().uuidString).json")
-        defer { try? FileManager.default.removeItem(at: file) }
-        let link = SerialSettingsLink(path: path)
-        let workflow = BluetoothWorkflow(
-            state: BluetoothSettingsState(), link: link,
-            makeDeviceRepository: { try SQLiteRepositories(url: file).devices })
-        let observer = Task { await workflow.run() }
-        let presets: [(BluetoothArmAction, NexArmGesture, String)] = [
-            (.nod, .nod, "<nodHead cycles=\"1\"/>"),
-            (.shakeHead, .shakeHead, "<shakeHead cycles=\"1\"/>"),
-            (.shakeBase, .baseSway, "<shakeBase cycles=\"1\"/>"),
-            (.wave, .wave, "<waveWrist count=\"1\"/>"),
-            (.tiltLeft, .tiltLeft, "<tiltWrist direction=\"left\"/>"),
-            (.tiltRight, .tiltRight, "<tiltWrist direction=\"right\"/>"),
-            (.lookAround, .lookAround, "<lookAround cycles=\"1\"/>"),
-            (.celebrate, .celebrate, "<celebrate cycles=\"1\"/>"),
-            (.dance, .dance, "<dance cycles=\"1\"/>"),
-        ]
-        do {
-            workflow.openPage()
-            try await serialWait("discovery") { !workflow.state.nearby.isEmpty }
-            workflow.connect(try link.businessID)
-            await workflow.waitUntilIdle()
-            try await serialWait(seconds: 5, "passive feedback") { workflow.state.joints.count == 6 }
-            for (manual, gesture, markup) in presets {
-                let before = await link.writes
-                print("SERIAL FULL SETTINGS BEGIN \(manual)")
-                workflow.tryAction(manual)
-                await workflow.waitUntilIdle()
-                try #require(await link.writes - before == gesture.settingsTestFrames().count)
-                let targets = await link.targets
-                try #require(!targets.isEmpty)
-                try #require(
-                    targets.allSatisfy { id, target in
-                        abs(workflow.state.joints[id - 1] - target) <= NexArmMotorProfiles.profile(for: id).tolerance
-                    })
-                print("SERIAL FULL SETTINGS PASS \(manual) actual=\(workflow.state.joints)")
-                print("SERIAL FULL ASSISTANT BEGIN \(gesture)")
-                try await serialAssistant(markup, workflow: workflow, expected: .succeeded)
-            }
-            workflow.tryAction(.reset)
-            await workflow.waitUntilIdle()
-            try #require(
-                zip(workflow.state.joints.prefix(5), NexArmGesture.referenceHomeJoints.prefix(5)).enumerated()
-                    .allSatisfy {
-                        index, pair in
-                        abs(pair.0 - pair.1) <= NexArmMotorProfiles.profile(for: index + 1).tolerance
-                    })
-            print("SERIAL FULL SETTINGS RESET PASS actual=\(workflow.state.joints)")
-            try await serialAssistant("<resetArm/>", workflow: workflow, expected: .succeeded)
-            workflow.disconnect()
-            await workflow.waitUntilIdle()
-            observer.cancel()
-            await observer.value
-        } catch {
-            print("SERIAL FULL PRESETS STOP error=\(error) joints=\(workflow.state.joints)")
-            workflow.stopMotorControl()
-            await workflow.stopActions()
-            workflow.disconnect()
-            await workflow.waitUntilIdle()
-            observer.cancel()
-            await observer.value
-            throw error
-        }
-    }
-
-    @Test(.actionCatalog, .enabled(if: ProcessInfo.processInfo.environment["NEXARM_SERIAL_PREFLIGHT"] == "1"))
-    func nexArmSerialReadOnlyPreflight() async throws {
-        let link = try NexArmSerial(path: #require(ProcessInfo.processInfo.environment["NEXARM_PORT"]))
-        do {
-            let controller = NexArmActionController(link: link)
-            do {
-                let compatibility = try await controller.verifyCompatibility()
-                print("SERIAL PREFLIGHT compatibility=\(compatibility)")
+                try #require(!workflow.state.canControl(try link.businessID))
+                let beforeOffline = await link.writes
+                workflow.tryAction(.nod)
+                workflow.setMotorVelocity(id: 5, value: 0.5)
+                try await serialAssistant(
+                    "<moveMotor motor=\"5\" target=\"2048\"/>", workflow: workflow, expected: .failed)
+                try #require(await link.writes == beforeOffline)
+                print("SERIAL OFFLINE PASS disabled controls and failed Agent result")
+                observer.cancel()
+                await observer.value
             } catch {
-                print("SERIAL PREFLIGHT version unavailable=\(error); checking read-only position separately")
+                print(
+                    "SERIAL ACCEPTANCE STOP error=\(error) current=\(workflow.state.phase) joints=\(workflow.state.joints)"
+                )
+                workflow.stopMotorControl()
+                await workflow.stopActions()
+                workflow.disconnect()
+                await workflow.waitUntilIdle()
+                observer.cancel()
+                await observer.value
+                throw error
             }
-            let first = try await controller.readState()
-            try await Task.sleep(for: .milliseconds(400))
-            let second = try await controller.readState()
-            print("SERIAL PREFLIGHT pose=\(second.pose) joints=\(second.joints)")
-            try #require(zip(first.joints, second.joints).allSatisfy { abs($0 - $1) <= 3 })
-            let session = try await link.beginObservation()
-            await link.close()
-            await #expect(throws: NexArmError.disconnected) {
-                try await link.latestObservation(after: 0, session: session)
+        }
+    }
+
+    extension LiveRuntimeTests {
+        @Test(
+            .actionCatalog,
+            .enabled(if: ProcessInfo.processInfo.environment["NEXARM_SERIAL_PRESETS_ACCEPTANCE"] == "1"),
+            .timeLimit(.minutes(5)))
+        @MainActor
+        func nexArmSerialAllSettingsAndAssistantPresetsAcceptance() async throws {
+            let path = try #require(ProcessInfo.processInfo.environment["NEXARM_PORT"])
+            let file = FileManager.default.temporaryDirectory.appendingPathComponent(
+                "serial-presets-\(UUID().uuidString).json")
+            defer { try? FileManager.default.removeItem(at: file) }
+            let link = SerialSettingsLink(path: path)
+            let workflow = BluetoothWorkflow(
+                state: BluetoothSettingsState(), link: link,
+                makeDeviceRepository: { try SQLiteRepositories(url: file).devices })
+            let observer = Task { await workflow.run() }
+            let presets: [(BluetoothArmAction, NexArmGesture, String)] = [
+                (.nod, .nod, "<nodHead cycles=\"1\"/>"),
+                (.shakeHead, .shakeHead, "<shakeHead cycles=\"1\"/>"),
+                (.shakeBase, .baseSway, "<shakeBase cycles=\"1\"/>"),
+                (.wave, .wave, "<waveWrist count=\"1\"/>"),
+                (.tiltLeft, .tiltLeft, "<tiltWrist direction=\"left\"/>"),
+                (.tiltRight, .tiltRight, "<tiltWrist direction=\"right\"/>"),
+                (.lookAround, .lookAround, "<lookAround cycles=\"1\"/>"),
+                (.celebrate, .celebrate, "<celebrate cycles=\"1\"/>"),
+                (.dance, .dance, "<dance cycles=\"1\"/>"),
+            ]
+            do {
+                workflow.openPage()
+                try await serialWait("discovery") { !workflow.state.nearby.isEmpty }
+                workflow.connect(try link.businessID)
+                await workflow.waitUntilIdle()
+                try await serialWait(seconds: 5, "passive feedback") { workflow.state.joints.count == 6 }
+                for (manual, gesture, markup) in presets {
+                    let before = await link.writes
+                    print("SERIAL FULL SETTINGS BEGIN \(manual)")
+                    workflow.tryAction(manual)
+                    await workflow.waitUntilIdle()
+                    try #require(await link.writes - before == gesture.settingsTestFrames().count)
+                    let targets = await link.targets
+                    try #require(!targets.isEmpty)
+                    try #require(
+                        targets.allSatisfy { id, target in
+                            abs(workflow.state.joints[id - 1] - target)
+                                <= NexArmMotorProfiles.profile(for: id).tolerance
+                        })
+                    print("SERIAL FULL SETTINGS PASS \(manual) actual=\(workflow.state.joints)")
+                    print("SERIAL FULL ASSISTANT BEGIN \(gesture)")
+                    try await serialAssistant(markup, workflow: workflow, expected: .succeeded)
+                }
+                workflow.tryAction(.reset)
+                await workflow.waitUntilIdle()
+                try #require(
+                    zip(workflow.state.joints.prefix(5), NexArmGesture.referenceHomeJoints.prefix(5)).enumerated()
+                        .allSatisfy {
+                            index, pair in
+                            abs(pair.0 - pair.1) <= NexArmMotorProfiles.profile(for: index + 1).tolerance
+                        })
+                print("SERIAL FULL SETTINGS RESET PASS actual=\(workflow.state.joints)")
+                try await serialAssistant("<resetArm/>", workflow: workflow, expected: .succeeded)
+                workflow.disconnect()
+                await workflow.waitUntilIdle()
+                observer.cancel()
+                await observer.value
+            } catch {
+                print("SERIAL FULL PRESETS STOP error=\(error) joints=\(workflow.state.joints)")
+                workflow.stopMotorControl()
+                await workflow.stopActions()
+                workflow.disconnect()
+                await workflow.waitUntilIdle()
+                observer.cancel()
+                await observer.value
+                throw error
             }
-            await #expect(throws: NexArmError.disconnected) {
-                try await link.sendObserved(NexArmPacket(command: 11), session: session)
+        }
+    }
+
+    extension LiveRuntimeTests {
+        @Test(.actionCatalog, .enabled(if: ProcessInfo.processInfo.environment["NEXARM_SERIAL_PREFLIGHT"] == "1"))
+        func nexArmSerialReadOnlyPreflight() async throws {
+            let link = try NexArmSerial(path: #require(ProcessInfo.processInfo.environment["NEXARM_PORT"]))
+            do {
+                let controller = NexArmActionController(link: link)
+                do {
+                    let compatibility = try await controller.verifyCompatibility()
+                    print("SERIAL PREFLIGHT compatibility=\(compatibility)")
+                } catch {
+                    print("SERIAL PREFLIGHT version unavailable=\(error); checking read-only position separately")
+                }
+                let first = try await controller.readState()
+                try await Task.sleep(for: .milliseconds(400))
+                let second = try await controller.readState()
+                print("SERIAL PREFLIGHT pose=\(second.pose) joints=\(second.joints)")
+                try #require(zip(first.joints, second.joints).allSatisfy { abs($0 - $1) <= 3 })
+                let session = try await link.beginObservation()
+                await link.close()
+                await #expect(throws: NexArmError.disconnected) {
+                    try await link.latestObservation(after: 0, session: session)
+                }
+                await #expect(throws: NexArmError.disconnected) {
+                    try await link.sendObserved(NexArmPacket(command: 11), session: session)
+                }
+                print("SERIAL PREFLIGHT closed-session errors=disconnected, not caller cancellation")
+            } catch {
+                await link.close()
+                throw error
             }
-            print("SERIAL PREFLIGHT closed-session errors=disconnected, not caller cancellation")
-        } catch {
-            await link.close()
-            throw error
         }
     }
 #endif

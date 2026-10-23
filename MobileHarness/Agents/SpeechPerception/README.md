@@ -1,59 +1,129 @@
-# Speech Perception and Listening Authority
+# SpeechPerception — PCM 消费、语音识别与聆听政策
 
-## Summary
+## 职责与注入能力
 
-Resident listening policy, streaming VAD/ASR and native sound-source observations under one bounded audio-processing owner.
+构造注入 PlatformKit `AudioCaptureObserving`、ModelKit `SpeechRecognitionCapability`／`VoiceActivityCapability`、可选 `UIHomeContainer`、Actions `MicrophoneSpectrumPresentation`、低频测量回调和私有 Context。角色直接取得 PCM，负责声道／采样率／序号／连续性、VAD、ASR、声源和半双工政策；不直接开启麦克风或启动动画。
 
-## Ownership and boundaries
+UI.home.listeningRequests 是本角色单独订阅的控制源，提供 enabled/toggle/press 数据。UI 不调用角色；订阅本身不请求权限或开启设备。soundSourceOnly 模式不获得识别呈现权限。
 
-User consent and revisioned reply occupancy are interpreted here. AgentBindings/ActionBindings execute physical capture and confirmed-utterance/playback barriers. ModelKit supplies VAD/ASR; PlatformKit supplies generic PCM conversion. The diagnostic soundSourceOnly mode has no recognition/presentation grants.
+## 文件与职责
 
-## External relationships and data flow
+| 文件 | 职责 |
+| --- | --- |
+| [AudioDetectionAgentSession.swift](AudioDetectionAgentSession.swift) | 隔离检测角色注册及其结果泵，不控制采集 |
+| [AudioDetectionSession.swift](AudioDetectionSession.swift) | 组合检测角色与 Actions 执行，保留独占准入和加入清理 |
+| [SoundSourceEstimator.swift](SoundSourceEstimator.swift) | 声道测量到有限方向估计的算法 |
+| [SpeechBoundaryPolicy.swift](SpeechBoundaryPolicy.swift) | 边界、结束与恢复的纯策略 |
+| [SpeechListeningInputs.swift](SpeechListeningInputs.swift) | 聆听手势／策略输入和采集结束事实 |
+| [SpeechPerceptionAgent.swift](SpeechPerceptionAgent.swift) | 聆听策略、输入代际、VAD／ASR 协调与角色消息 |
+| [SpeechPerceptionMicrophone.swift](SpeechPerceptionMicrophone.swift) | 只读 PCM 的唯一角色订阅、布局校验与模型输入转换 |
+| [SpeechPerceptionProcessing.swift](SpeechPerceptionProcessing.swift) | 感知角色私有 Context、预处理和聆听策略 |
+| [SpeechPlaybackFailure.swift](SpeechPlaybackFailure.swift) | 播放清理边界的用户错误适配，保留合成／缓存原始错误 |
+| [SpeechRecognitionTurn.swift](SpeechRecognitionTurn.swift) | 已提交片段、冷启动前缀和转写聚合的有界工作 |
+| [VoiceActivitySegmenter.swift](VoiceActivitySegmenter.swift) | VAD 分段、尾静音及实际片段结束判定 |
+| [VoiceAgentSession.swift](VoiceAgentSession.swift) | 语音角色注册、模型图与身份绑定输出泵 |
+| [VoiceInteractionSession.swift](VoiceInteractionSession.swift) | 根语音／诊断功能的显式组合与生命周期 |
 
-Runtime arrows show data or capability calls; dashed arrows show injection.
+## 外部关系（一层）
 
 ```mermaid
 flowchart LR
- Gateway -->|PCM, consent, occupancy and termination facts| Perception[SpeechPerception]
- Perception -->|VAD and ASR requests| ModelKit
- PlatformKit -->|Streaming resampler primitive| Perception
- Perception -->|Speech and sound facts, UI calls, listening Actions| Gateway
- App -.->|Capture epochs and playback admission| Perception
+ A["SpeechPerception"]:::agent
+ G["Gateway：调用／Signal／反馈"]:::gateway
+ C["AgentCore：身份／契约"]:::host
+ H["Agents 根级装配：构造与生命周期"]:::host
+ H -.-> A
+ A --> C
+ A <-->|"受身份绑定的输出与反馈"| G
+ U["UI.home.listeningRequests"]:::ui
+ U -->|"主动订阅聆听控制数据"| A
+ P["PlatformKit.audio：AudioCaptureObserving"]:::platform
+ P -->|"直接 PCM"| A
+ M["ModelKit.speech：VAD／ASR"]:::model
+ A <--> M
+ X["Actions：频谱呈现／语音执行窄协议"]:::action
+ A -->|"低频测量；无 PCM 转交"| X
+ subgraph Peers["其他 Agent：仅经 Gateway 通信"]
+ AS["Assistant"]:::agent
+ end
+ AS -->|"interaction.replyActivity"| G
+ G -->|"speech.final／speech.phase"| AS
+
+ classDef ui fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e
+ classDef platform fill:#dcfce7,stroke:#16a34a,color:#14532d
+ classDef model fill:#f3e8ff,stroke:#9333ea,color:#581c87
+ classDef storage fill:#fef3c7,stroke:#d97706,color:#78350f
+ classDef agent fill:#eef2ff,stroke:#6366f1,color:#312e81
+ classDef gateway fill:#ffedd5,stroke:#ea580c,color:#7c2d12
+ classDef action fill:#ffe4e6,stroke:#e11d48,color:#881337
+ classDef host fill:#f1f5f9,stroke:#64748b,color:#334155
 ```
 
-## Internal components
+角色间消息经 Gateway 递送；基础能力通过构造注入，输入订阅由角色持有。
+
+`speech.partial`、`sound.source` 也被发布，目前静态配置没有订阅角色；不能把已声明可发布等同于已有消费者。
+
+## 内部结构与执行链
 
 ```mermaid
 flowchart LR
- Agent[SpeechPerceptionAgent] --> Policy[Listening policy and capture epoch]
- Audio[Admitted native PCM] --> Sound[SoundSourceEstimator]
- Audio --> Resampler[Streaming mono resampler]
- Resampler --> Segmenter[VoiceActivitySegmenter]
- Segmenter --> Boundary[SpeechBoundaryPolicy]
- Boundary --> Turn[SpeechRecognitionTurn]
- Turn -->|Transcript revisions and final| Agent
- Sound --> Publisher[One latest sound publication]
- Policy -->|Admission and reset| Resampler
- Agent --> Output[Speech facts and internal presentation]
+ subgraph Injected["注入基础能力"]
+ U["UI.home.listeningRequests"]:::ui
+ P["Platform.audio：只读 PCM／采集代"]:::platform
+ M["ModelKit：VAD／ASR"]:::model
+ end
+ subgraph Role["SpeechPerception"]
+ V["VoiceInteractionSession：能力装配／语音与检测会话生命周期"]:::agent
+ L["同意／epoch／reply occupancy"]:::agent
+ N["Microphone 消费：一个长期任务"]:::agent
+ R["声道选择／16kHz resampler"]:::agent
+ B["VoiceActivitySegmenter／BoundaryPolicy"]:::agent
+ T["RecognitionTurn：partial／final"]:::agent
+ S["SoundSourceEstimator／频谱测量"]:::agent
+ end
+ V -.-> L
+ V -.-> N
+ U --> L
+ P --> N
+ L --> N
+ N --> R --> B --> T
+ N --> S
+ M <--> B
+ M <--> T
+ L --> G["Gateway"]:::gateway
+ T --> G
+ G --> X["Speech.Listening.update<br/>Speech.Listening.prepare"]:::action
+ G --> Y["UI.Caption.setTranscript<br/>UI.Caption.finishTranscript<br/>UI.VoiceState.setVoiceState"]:::action
+ X --> PC["Platform.audio：权限／采集／播放屏障"]:::platform
+ X --> UE["UI.home：准备提示／触觉等效果"]:::ui
+ Y --> UC["UI.home：字幕／语音状态"]:::ui
+ S --> AP["注入 Actions 频谱／检测呈现服务"]:::action
+ AP --> US["UI.home／diagnostics：低频测量"]:::ui
+ classDef ui fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e
+ classDef platform fill:#dcfce7,stroke:#16a34a,color:#14532d
+ classDef model fill:#f3e8ff,stroke:#9333ea,color:#581c87
+ classDef storage fill:#fef3c7,stroke:#d97706,color:#78350f
+ classDef agent fill:#eef2ff,stroke:#6366f1,color:#312e81
+ classDef gateway fill:#ffedd5,stroke:#ea580c,color:#7c2d12
+ classDef action fill:#ffe4e6,stroke:#e11d48,color:#881337
+ classDef host fill:#f1f5f9,stroke:#64748b,color:#334155
 ```
 
-This role uses typed media requests and deterministic policy, with no Chat system prompt or role prompt asset.
+低频频谱／检测测量走注入的 Actions 呈现服务；字幕、聆听和语音状态走受保护调用。原始 PCM 始终留在角色消费路径，Actions 原生执行服务只控制采集与屏障。
 
-## Input and processing
+## PCM 与模型输入
 
-Native interleaved Float32 AudioInput retains rate 8–192 kHz, mono or ACN/SN3D FOA, sequence, timestamp and monotonic capture instant. Validate capture epoch, increasing sequence/nondecreasing time and expiry. ✅ Inputs retain at most 4096 packets, 30 seconds of queued media and 8,388,608 scalar samples (32 MiB); each packet is at most 64,000 bytes. FOA accounting includes all channels. Controls bypass audio capacity.
+原生源单消费者，64 包有序 FIFO 加当前处理包；一个长期任务完成当前包后才取下一包，包括冷模型获取期间，不增加第二个原生积压 FIFO，不逐包创建处理 Task。保留 Float 存储及原生序号，8–192 kHz，mono 或 ACN/SN3D FOA；半双工门控不重新编号。每包至多 64,000 字节。通用 AgentInput 不接纳 PCM，不存在程序化媒体兼容入口或额外积压队列。
 
-Select mono/W and process at most 8192 samples per conversion chunk through a stateful StreamingMonoPCMResampler to 16 kHz ModelKit.AudioFrame. VAD boundary policy owns onset/pre-roll/silence/padding and maximum segment length. SpeechRecognitionTurn owns ASR events, segment revisions and final sealing: 2048 events/480,000 queued mono samples (30 seconds), with no utterance duration cap or finish watchdog. Internal 12-second ASR segment boundaries do not end the user utterance. Rejected updates do not mutate transcript state.
+选择 mono/W，每次转换至多 8192 samples，状态化重采样为 16 kHz ModelKit.AudioFrame。ASR turn 最多 2048 事件、480,000 排队 mono samples；12 秒仅为内部段边界，没有整句时长截止。缓冲满显式失败，不扩大容量等待模型。采集代重绑重置格式、声源与 DSP，旧代 PCM 不可进入新会话。
 
-✅ Resident capture opens before model loading. The first PCM starts VAD resource acquisition; its worker retains the first packet while subsequent packets enter the native FIFO. Confirmed speech starts ASR acquisition in SpeechRecognitionTurn; committed PCM stays ordered in that FIFO until the session is ready. Both queues reject new work explicitly at their bounds, preserving previously accepted input and sequence state. Close/cancel joins workers/model acquisition and clears queues; no PCM crosses capture epochs. These limits bound pending work, not total utterance duration or model-load latency.
-
-## Segmentation algorithm
+## 分段算法
 
 `VoiceActivitySegmenter` validates contiguous scores over 16 kHz mono Float32: at most 16000 samples per frame, 32000 pending samples and 64 scores per process call. Default probability threshold is 0.5, valid 0.05…0.95. Overlap rejects inputBusy; failure closes/cancels the VAD session and clears damaged state.
 
 `SpeechBoundaryPolicy` uses sample counts: confirmed onset 1536 (96 ms), pre-roll budget 4096 (256 ms), endpoint silence 12800 (800 ms), endpoint padding 3072 (192 ms), and model-sized segment 192000 (12 s). Silence is held back, then preserved in full if speech resumes; only endpoint padding is forwarded at utterance end. Prefix/suffix operations preserve whole frames, so padding is quantized to VAD windows. Maximum-duration boundaries keep speaking/hysteresis and stable utterance identity; there is no sixty-second complete-turn cutoff. Finish includes pending speaking tail and an explicit inputFinished event. Reset clears DSP/segmentation state without choosing a new device.
 
-## Output contracts
+## 输出契约
 
 | Contract / function | Payload and semantics |
 | --- | --- |
@@ -67,31 +137,26 @@ Select mono/W and process at most 8192 samples per conversion chunk through a st
 
 Publication is one-way. A subscriber rejection cannot stop inference; output protocol/context failures remain local errors. Internal presentation completion is state acceptance, not screen rendering. Output capacity is 32 with oldest-buffer retention; normal output yield failure throws queueFull. Audio FIFO overflow rejects the new packet before advancing sequence/time. Evidence retains 256 summaries with counted eviction. Final/phase use the stable interaction scope; raw/partial recognition retains capture generation.
 
-## Listening state and recovery
+## 聆听、取消与完成
 
-speech.listening controls session-only consent. Up to four source/incarnation/revision-fenced interaction.replyActivity snapshots and one pending final root suppress new utterance admission. Final ASR closes admission before publication; matching Assistant acknowledgment transfers the hold to occupancy. Occupancy ends on explicit terminal/activity or lifecycle facts; there is no lease timer. Generic busy is not reply occupancy.
+同意只在本会话有效；撤销／暂停推进接纳 epoch，并在异步提交后重验 UI 代际，拒绝迟到启用。原生 owner 的 `stopListening(sessionID:)` 只撤销，不可重新同意；物理停止不依赖 UI 队列可用。
 
-Native speech.captureEnded clears consent only for the current revision. User-off stops physical capture; policy pause closes recognition admission and the voice integration stops native capture after confirmed utterance completion while retaining logical consent. the voice integration additionally joins confirmed utterance completion and playback drain/audio cleanup; capture resumes immediately when policy and these barriers permit. Policy is not restored after process restart. openCapture/closeCapture cancel/join a capture epoch without stopping the resident Agent; full stop also joins recovery/publisher and closes output.
+最多四个 source/incarnation/revision 围栏的 replyActivity 快照及一个 pending final root 抑制新句接纳。最终识别先关接纳再发布，Assistant 匹配回复事实接管 occupancy；释放依赖真实终态／生命周期，没有占用定时器。半双工暂停保留逻辑同意，Actions 加入已确认语句、播放 drain 和音频清理后才恢复；用户撤销后不自动恢复。
 
-## Sound-source algorithm
+startInput 只订阅当前已开启采集代。半双工关闭只取消空闲取帧，当前包自然处理完退出；完整 close/stop 先取消识别，再加入原生任务、获取模型和发布者。恢复最多 32 个可取消当前包等待者，只等待已接纳工作，不承载 PCM。UI 回执确认策略接纳；原生停机和播放终态由执行服务单独确认。
+
+## 声源算法
 
 SoundSourceEstimator retains scalar statistics for one 100 ms native-rate window (fractional rate rounding permits at most 101 ms). Correlate W with Y/Z/X: captured-field X front, Y left, Z up; azimuth/elevation are radians. RMS threshold is −50 dBFS and correlation quality threshold 0.6, a heuristic rather than probability. Quiet windows clear direction immediately and become inactive after 200 ms. No distance, identity, robot-frame or camera-mirror mapping is inferred.
 
 Mono publishes unavailable once per format/listening epoch and still supports ASR. Format/resume resets DSP; reply pause clears FOA direction. One publisher and one latest pending sound observation retain 500 ms window-end freshness. No subscribers is allowed loss. Stop joins publisher and processing without self-joining a failure path.
 
-## Registration and authority
+## 失败与限制
 
-[Agent.json](../../Resources/Agents/SpeechPerception/Agent.json) admits native audio, user listening consent, Assistant reply occupancy and matching capture-ended facts. Only Assistant currently publishes authorized reply occupancy. Internal caption/voice-state Tools and Speech.Listening.update are code-bound; there are no model-callable functions. AgentBindings/ActionBindings own physical microphone/playback and confirmed-utterance barriers; the Agent owns consent/occupancy and revisioned listening policy. Consent is explicit/idempotent when enabled is supplied; otherwise the input toggles consent. Reply termination never restores revoked consent.
+`reportError` 未校验输出 yield，32 槽满载／关闭时诊断可能丢失；普通输出失败会显式抛错。
 
-Input/request identity is retained in ModelKit requests; scopeID is opaque to the SDK. Final-ASR admission rejection or recognition/publication failure releases this input's pending-final hold and publishes current policy; it does not forge another Agent's terminal fact. No fixed post-reply wait, occupancy lease timer or whole-utterance watchdog is used.
+❌ barge-in 与后台聆听未实现。
 
-## 待实现
+通信见 [Agent.json](../../Resources/Agents/SpeechPerception/Agent.json)，原生执行见 [Actions/Speech](../../Actions/Speech/Support/README.md)。
 
-- Barge-in and background listening are not implemented.
-- `reportError` ignores the output stream's yield result. When its 32-slot buffer is full or closed, an `agent.error` diagnostic can be lost. Normal output emission checks yield failure; reliable diagnostic delivery is not guaranteed by this implementation.
-
-[Agents](../README.md) · [Communication](../Support/Communication/README.md)
-
-## Storage 依赖
-
-✅ 存储访问使用独立的 State、Cache、Database 和 Files 接口；App 注册根实例，消费者通过构造器获得所需能力。存储容器不接管本目录的业务验证、执行和完成语义。
+AudioDetectionAgentSession 只注册检测角色、构造模型 Context 并绑定结果泵；AudioDetectionSession 组合该角色与 Actions.AudioDetectionExecution，不消费或转交原始 PCM。SpeechPlaybackFailure 在已加入播放清理后转换可展示文案，原始合成／缓存错误仍保留。

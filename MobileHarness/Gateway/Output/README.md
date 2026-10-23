@@ -97,9 +97,6 @@ Direct Tool/communication dispatch has an owned cancellable Task, with at most12
 
 ✅ Gateway 从 Agent 终止输出复制异常分类/代码/详情与会话/轮次到失败快照，仍有界100条。不解析底层错误、不提供文案、不重试。
 
-## Platform 根、设备接入与同帧呈现
-
-✅ 只有显式媒体输出保留 ImageInput 附件；Tool 分发验证原生帧一致性与新鲜度，CallRuntime 通过中立附件字段传递。流式媒体使用独立最新态通道，不占用离散函数 FIFO 的像素保留空间。
 
 ## 视觉停顿恢复修复
 
@@ -112,3 +109,16 @@ Direct Tool/communication dispatch has an owned cancellable Task, with at most12
 ## 视觉 queueFull 修复
 
 ✅ 最新状态 Tool 与广播各用容量 16 的独立替换邮箱，每个邮箱一个串行消费者；媒体容量 1；离散函数 FIFO 256、离散通信 FIFO 16 保持原策略。
+
+
+## Direct container contract
+
+Gateway routes bound Agent communication and execution feedback only. It has no native input adapter, host dynamic subscription or foundational SDK dependency. Current cross-module ownership is defined by the [overall design](../../README.md).
+
+## Fixed UI result contract
+
+✅ 绑定身份的 GatewayOutputConsumer 提供 executeReturning，用于必须收到真实结果的固定调用。在准入任何效果前检查 Tool 的返回反馈注册；不满足即拒绝。UI 输入仍不进入 Gateway，此接口只约束已由 Agent 选择的输出执行。
+
+## 直连链路当前契约
+
+✅ 仅在校验真实执行者、权限和作用域后透传中立执行附件，不解释业务值。

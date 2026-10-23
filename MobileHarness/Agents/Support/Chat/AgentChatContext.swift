@@ -3,21 +3,17 @@ import Foundation
 import ModelKit
 import StorageChat
 import StorageCore
-import StorageState
-import Synchronization
 
-/// Task status retained by deterministic Agents without conversational execution.
-public protocol AgentTaskContextState: AgentContextState {
-    var taskViews: [String: AgentTaskView]? { get set }
-}
+/// Generic lifecycle intent, independent of any role's communication contract.
+public enum AgentChatSessionControl: Sendable, Equatable { case interrupt, close }
 
 /// Role-owned business schema exposes only the fields needed by the shared Chat adapter.
 public protocol AgentChatContextState: AgentTaskContextState {
     static var supportsSkills: Bool { get }
+    static func sessionControl(_ message: AgentMessage) throws -> AgentChatSessionControl?
     static var tracksDelegatedReplies: Bool { get }
     static var agentID: AgentID { get }
     static var configurationName: String { get }
-    static var requiresParentCommit: Bool { get }
     static var acceptsDirectedUserInput: Bool { get }
     static var commitDependentTargets: Set<AgentID> { get }
     static func runtimeCapabilities(_ capabilities: CapabilityRegistry) throws -> CapabilityRegistry
@@ -33,32 +29,6 @@ public protocol AgentChatContextState: AgentTaskContextState {
     var skillState: AgentTaskSkillState? { get set }
     var history: ConversationArchive { get set }
     var admissionSequence: UInt64 { get set }
-    var taskViews: [String: AgentTaskView]? { get set }
-}
-
-struct AgentChatRequestBuilder<State: AgentChatContextState>: ContextBuilder {
-    struct Request: Sendable {
-        let input: AgentInput
-        let state: State
-        let batch: SignalBatch
-        let conversation: StoredConversation
-        func messages(system: String, user: String) throws -> [ChatMessage] {
-            try State.buildChatMessages(system: system, user: user, conversation: conversation)
-        }
-    }
-    func build(state: AgentDecisionContext<State>, batch: SignalBatch) throws -> Request {
-        let input = try state.selected(by: batch)
-        var conversation = state.snapshot.state.history.current
-        if let task = input.taskScope {
-            let ids = Set(
-                state.snapshot.records.filter { $0.taskID == task.id }.compactMap {
-                    try? JSONDecoder().decode(SignalEvidence.self, from: $0.data).signalID
-                })
-            conversation.turns = conversation.turns.filter { ids.contains($0.id) }
-            conversation.taskCompressions.removeAll { !$0.sources.allSatisfy { ids.contains($0.inputID) } }
-        }
-        return Request(input: input, state: state.snapshot.state, batch: batch, conversation: conversation)
-    }
 }
 
 /// Transactional projection of the Agent-owned authoritative history.
@@ -121,6 +91,7 @@ public enum AgentChatHistoryContext {
 }
 
 extension AgentChatContextState {
+    public static func sessionControl(_ message: AgentMessage) throws -> AgentChatSessionControl? { nil }
     public static func systemPrompt(_ capabilities: CapabilityRegistry, skills: AgentTaskSkillState?) throws -> String {
         try systemPrompt(capabilities) + (try skills?.instructions() ?? "")
     }
@@ -142,7 +113,6 @@ extension AgentChatContextState {
             templates: AgentPrompts.load(named: configurationName))
     }
     public static var tracksDelegatedReplies: Bool { false }
-    public static var requiresParentCommit: Bool { false }
     public static var acceptsDirectedUserInput: Bool { false }
     public static var commitDependentTargets: Set<AgentID> { [] }
     public static func validateCommunication(_ signal: AgentTaskSignal, state: Self) throws {}
@@ -151,22 +121,6 @@ extension AgentChatContextState {
 public struct AgentChatObservation: Sendable {
     public let path: String
     public let result: ToolResult
-}
-
-extension AgentTaskContextState {
-    public func validateTaskState() throws {
-        guard (taskViews ?? [:]).allSatisfy({ $0.key == $0.value.scope.id }),
-            (taskViews?.count ?? 0) <= 256,
-            (taskViews ?? [:]).values.filter({ !$0.terminal }).count <= 32
-        else { throw CommunicationError.invalidPayload }
-    }
-    public mutating func recoverTaskState() {
-        for id in (taskViews ?? [:]).keys where taskViews?[id]?.terminal == false {
-            taskViews?[id]?.terminal = true
-            taskViews?[id]?.stage = .completed
-            taskViews?[id]?.text = "Interrupted; actions are never replayed"
-        }
-    }
 }
 
 extension AgentChatContextState {
@@ -221,98 +175,5 @@ extension AgentChatContextState {
             if reconcile(&history.past[index]) { changed = true }
         }
         if changed { history.revision += 1 }
-    }
-}
-
-/// Agent-owned public Task projection. Private task registries and Skill ownership never enter State.
-public final class AgentStateContext: Sendable {
-    public struct TaskFact: Codable, Sendable, Equatable {
-        public let goal: String
-        public let status: String
-    }
-    private struct Session: Sendable {
-        let scope: StateScope
-        let task: StateWriter<PublishedState<TaskFact>>
-        let reader: any StateContextReading
-        var last: TaskFact?
-        var invalidated = false
-    }
-    private struct Sessions: Sendable {
-        var closed = false
-        var values: [String: Session] = [:]
-    }
-    private let sessions = Mutex(Sessions())
-    private let storage: StateContainer
-    private let publishers: (any Sendable)?
-    private let agent: AgentID
-    public init(storage: StateContainer, agent: AgentID, retainingPublishers: (any Sendable)? = nil) throws {
-        self.publishers = retainingPublishers
-        self.storage = storage
-        self.agent = agent
-        try storage.declare([
-            StateDeclaration("camera", scope: .application), StateDeclaration("robot", scope: .application),
-            StateDeclaration("task", scope: .conversation),
-        ])
-    }
-    public func open(session id: String) throws {
-        try sessions.withLock { sessions in
-            guard !sessions.closed else { throw StateError.closed }
-            guard sessions.values[id] == nil else { return }
-            let domain = StateDomain.conversation(agent: agent.rawValue, session: id)
-            let scope = try storage.makeScope(domain: domain)
-            let task = try scope.register(StateKey<PublishedState<TaskFact>>("task"), initial: PublishedState())
-            let reader = try storage.contextReader(domain: domain, scope: scope)
-            sessions.values[id] = Session(scope: scope, task: task, reader: reader)
-        }
-    }
-    public func snapshot(session: String, names: [String]) throws -> StateContextSnapshot {
-        try sessions.withLock { sessions in
-            guard !sessions.closed, let entry = sessions.values[session] else { throw StateError.closed }
-            return try entry.reader.snapshot(names: names)
-        }
-    }
-    func publish(_ skills: AgentTaskSkillState?) throws {
-        try sessions.withLock { sessions in
-            for id in sessions.values.keys {
-                guard var session = sessions.values[id] else { continue }
-                let active = skills?.tasks.first { $0.id == skills?.activeTaskID && $0.sessionID == id }
-                let fact: TaskFact?
-                if let active {
-                    if ["running", "waitingUser"].contains(active.status) {
-                        fact = TaskFact(goal: active.goal, status: active.status)
-                    } else if ["finishing", "cancelling"].contains(active.status) {
-                        fact = session.last
-                    } else {
-                        fact = nil
-                    }
-                } else {
-                    fact = nil
-                }
-                do {
-                    let current = try session.task.get()
-                    if fact != session.last || current.value.availability != .available || session.invalidated {
-                        try session.task.set(PublishedState(fact), expecting: current.revision)
-                    }
-                    session.invalidated = false
-                    session.last = fact
-                    sessions.values[id] = session
-                } catch {
-                    session.task.invalidate()
-                    session.invalidated = true
-                    sessions.values[id] = session
-                    throw error
-                }
-            }
-        }
-    }
-    public func close(session: String) {
-        sessions.withLock { $0.values.removeValue(forKey: session)?.scope.close() }
-    }
-    public func close() {
-        sessions.withLock { sessions in
-            sessions.closed = true
-            for session in sessions.values.values { session.scope.close() }
-            sessions.values.removeAll()
-        }
     }
 }

@@ -1,4 +1,5 @@
 import Foundation
+import Synchronization
 
 public enum MicrophoneChannelLayout: Sendable, Equatable {
     case mono
@@ -63,4 +64,84 @@ struct AudioPCMContinuity: Sendable {
         end = timestamp + Double(frameCount) / sampleRate
         rate = sampleRate
     }
+}
+
+/// Read-only current capture. Subscription never requests permission or starts hardware.
+public protocol AudioCaptureObserving: Sendable {
+    func subscribeCapture() async throws -> MicrophoneCaptureInput
+}
+
+/// Explicit capture execution. Read-only observers receive AudioCaptureObserving instead.
+@MainActor public protocol AudioCaptureControlling: AudioCaptureObserving {
+    var captureContext: AudioCaptureContext { get }
+    var cleanupFailure: (any Error)? { get }
+    func requestPermissions() async throws
+    func subscribeEvents() throws -> AsyncThrowingStream<NativeAudioEvent, any Error>
+    func startCapture(preferSpatial: Bool) async throws
+    func stopCapture() async
+    func stop() async
+}
+
+public enum AudioIOError: Error, Equatable { case microphoneDenied, invalidFormat, overflow, busy, interrupted }
+
+/// The native generation and its single ordered source; no forwarding queue.
+public struct MicrophoneCaptureInput: Sendable {
+    public let generation: String
+    public let frames: AsyncThrowingStream<MicrophoneFrame, any Error>
+    public init(generation: String, frames: AsyncThrowingStream<MicrophoneFrame, any Error>) {
+        self.generation = generation
+        self.frames = frames
+    }
+}
+
+/// One native callback generation, one 64-packet queue and one business consumer.
+final class MicrophoneCapture: Sendable {
+    let generation = UUID().uuidString
+    private let frames: AsyncThrowingStream<MicrophoneFrame, any Error>
+    private let continuation: AsyncThrowingStream<MicrophoneFrame, any Error>.Continuation
+    private struct State {
+        var active = true
+        var subscribed = false
+    }
+    private let state = Mutex(State())
+    init() {
+        let pair = AsyncThrowingStream<MicrophoneFrame, any Error>.makeStream(bufferingPolicy: .bufferingOldest(64))
+        frames = pair.stream
+        continuation = pair.continuation
+    }
+    var isActive: Bool { state.withLock { $0.active } }
+    func subscribe() throws -> MicrophoneCaptureInput {
+        try state.withLock {
+            guard !$0.subscribed else { throw AudioIOError.busy }
+            $0.subscribed = true
+            return MicrophoneCaptureInput(generation: generation, frames: frames)
+        }
+    }
+    @discardableResult func send(_ frame: MicrophoneFrame) throws -> Bool {
+        try state.withLock {
+            guard $0.active else { return false }
+            switch continuation.yield(frame) {
+            case .enqueued: return true
+            case .dropped:
+                $0.active = false
+                continuation.finish(throwing: AudioIOError.overflow)
+                throw AudioIOError.overflow
+            case .terminated:
+                $0.active = false
+                return false
+            @unknown default:
+                $0.active = false
+                continuation.finish(throwing: AudioIOError.invalidFormat)
+                throw AudioIOError.invalidFormat
+            }
+        }
+    }
+    func finish(throwing error: (any Error)? = nil) {
+        state.withLock {
+            guard $0.active else { return }
+            $0.active = false
+            continuation.finish(throwing: error)
+        }
+    }
+    deinit { continuation.finish() }
 }

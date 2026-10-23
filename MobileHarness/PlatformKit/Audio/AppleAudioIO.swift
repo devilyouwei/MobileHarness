@@ -4,8 +4,6 @@
     import OSLog
     import Synchronization
 
-    public enum AudioIOError: Error, Equatable { case microphoneDenied, invalidFormat, overflow, busy, interrupted }
-
     public struct AudioIOCleanupError: Error, Sendable {
         public let primary: any Error
         public let cleanup: any Error
@@ -102,15 +100,8 @@
 
     }
 
-    /// Native I/O port; callers own session policy, Signal encoding and presentation.
     @MainActor
-    public protocol AudioInputOutput: AnyObject, Sendable {
-        var captureContext: AudioCaptureContext { get }
-        var cleanupFailure: (any Error)? { get }
-        func requestPermissions() async throws
-        func subscribeEvents() throws -> AsyncThrowingStream<NativeAudioEvent, Error>
-        func subscribeCapture() throws -> AsyncThrowingStream<MicrophoneFrame, Error>
-        func startCapture(preferSpatial: Bool) async throws -> AsyncThrowingStream<MicrophoneFrame, Error>
+    public protocol AudioInputOutput: AudioCaptureControlling {
         func playbackSpectrum() async -> [Float]?
         func playClip(_ pcm: PlaybackPCM, onStarted: (@MainActor () -> Void)?) async throws
         func playStream(
@@ -118,11 +109,9 @@
         ) async throws
         func stopPlayback()
         func waitForPlaybackStop() async
-        func stopCapture() async
-        func stop() async
     }
     extension AudioInputOutput {
-        public func startCapture() async throws -> AsyncThrowingStream<MicrophoneFrame, Error> {
+        public func startCapture() async throws {
             try await startCapture(preferSpatial: false)
         }
         public func playClip(_ pcm: PlaybackPCM) async throws { try await playClip(pcm, onStarted: nil) }
@@ -190,12 +179,12 @@
                 inputs: route.inputs.map { "\($0.portType.rawValue):\($0.uid)" },
                 outputs: route.outputs.map { "\($0.portType.rawValue):\($0.uid)" })
         }
-        private let observations: NativeInputBroadcast<MicrophoneFrame>
-        private var captureObservation: NativeInputSession<MicrophoneFrame>?
-        public func subscribeCapture() throws -> AsyncThrowingStream<MicrophoneFrame, Error> {
+        private var captureSource: MicrophoneCapture?
+        public func subscribeCapture() async throws -> MicrophoneCaptureInput {
             do {
                 try admitAvailability()
-                return try observations.subscribe(.ordered)
+                guard captureToken != nil, let captureSource else { throw PlatformError.unavailable }
+                return try captureSource.subscribe()
             } catch {
                 platformAdmission?.report("audio", "subscribeCapture", error)
                 throw error
@@ -211,7 +200,6 @@
         private var captureReadiness: AudioCaptureReadiness?
         private var spatialCapture: SpatialAudioCapture?
         private let log = Logger(subsystem: "dev.mobileharness", category: "AudioCapture")
-        private var capture: AsyncThrowingStream<MicrophoneFrame, Error>.Continuation?
         private var hasTap = false
         private var playbackWaiter: CheckedContinuation<Void, Error>?
         private var playbackToken: String?
@@ -244,9 +232,6 @@
             deviceEvents = NativeInputBroadcast { error in
                 platformAdmission?.report("audio.events", "subscriber", error)
             }
-            observations = NativeInputBroadcast { error in
-                platformAdmission?.report("audio.capture", "subscriber", error)
-            }
             self.admitAvailability = admitAvailability
             self.admit = admit
             self.release = release
@@ -273,9 +258,7 @@
             }
         }
 
-        public func startCapture(preferSpatial: Bool = false) async throws -> AsyncThrowingStream<
-            MicrophoneFrame, Error
-        > {
+        public func startCapture(preferSpatial: Bool = false) async throws {
             do {
                 await stop()
                 try claim()
@@ -290,12 +273,10 @@
                     var fallback: AudioCaptureContext.Fallback?
                     captureContext = AudioCaptureContext(input: input)
                     if preferSpatial, audio.currentRoute.inputs.contains(where: { $0.portType == .builtInMic }) {
-                        let observation = NativeInputSession(broadcast: observations)
-                        captureObservation = observation
                         let backend = SpatialAudioCapture(admission: platformAdmission)
                         spatialCapture = backend
                         do {
-                            if let frames = try await backend.start(observation: observation) {
+                            if let source = try await backend.start() {
                                 guard captureToken == token, !Task.isCancelled else {
                                     await backend.stop()
                                     throw CancellationError()
@@ -303,7 +284,8 @@
                                 captureContext = AudioCaptureContext(
                                     input: captureInput(audio), spatialSupport: .supported)
                                 watchEvents()
-                                return frames
+                                captureSource = source
+                                return
                             }
                             spatialSupport = await backend.supportsSpatialCapture == false ? .unsupported : .unknown
                             fallback = spatialSupport == .unsupported ? .unsupported : .startupFailed
@@ -329,33 +311,28 @@
                     }
                     captureContext = AudioCaptureContext(
                         input: captureInput(audio), spatialSupport: spatialSupport, fallback: fallback)
-                    captureObservation?.finish()
-                    let observation = NativeInputSession(broadcast: observations)
-                    captureObservation = observation
+                    captureSource?.finish()
+                    let source = MicrophoneCapture()
+                    captureSource = source
                     let node = captureEngine.inputNode
                     let format = node.outputFormat(forBus: 0)
                     guard format.channelCount > 0, format.sampleRate >= 8000 else { throw AudioIOError.invalidFormat }
-                    let pair = AsyncThrowingStream<MicrophoneFrame, Error>.makeStream(
-                        bufferingPolicy: .bufferingOldest(64))
-                    capture = pair.continuation
                     let counter = Mutex<UInt64>(0)
-                    let continuation = pair.continuation
                     let readiness = AudioCaptureReadiness()
                     captureReadiness = readiness
                     let admission = platformAdmission
                     node.installTap(onBus: 0, bufferSize: 1024, format: format) { @Sendable buffer, when in
-                        guard observation.isActive else { return }
-                        guard let source = buffer.floatChannelData?[0], buffer.frameLength > 0,
+                        guard source.isActive else { return }
+                        guard let samplesPointer = buffer.floatChannelData?[0], buffer.frameLength > 0,
                             buffer.frameLength <= 8192
                         else {
                             admission?.report("audio.capture", "callback", AudioIOError.invalidFormat)
                             readiness.resolve(.failure(AudioIOError.invalidFormat))
-                            observation.finish(throwing: AudioIOError.invalidFormat)
-                            continuation.finish(throwing: AudioIOError.invalidFormat)
+                            source.finish(throwing: AudioIOError.invalidFormat)
                             return
                         }
                         let stride = buffer.format.isInterleaved ? Int(buffer.format.channelCount) : 1
-                        let samples = (0..<Int(buffer.frameLength)).map { source[$0 * stride] }
+                        let samples = (0..<Int(buffer.frameLength)).map { samplesPointer[$0 * stride] }
                         let number = counter.withLock { value in
                             defer { value += 1 }
                             return value
@@ -366,21 +343,12 @@
                                 ? AVAudioTime.seconds(forHostTime: when.hostTime)
                                 : ProcessInfo.processInfo.systemUptime,
                             capturedAt: .now)
-                        observation.send(frame)
-                        switch continuation.yield(frame) {
-                        case .enqueued:
-                            readiness.resolve(.success(()))
-                        case .dropped:
-                            admission?.report("audio.capture", "callback", AudioIOError.overflow)
-                            readiness.resolve(.failure(AudioIOError.overflow))
-                            observation.finish(throwing: AudioIOError.overflow)
-                            continuation.finish(throwing: AudioIOError.overflow)
-                        case .terminated: return
-                        @unknown default:
-                            admission?.report("audio.capture", "callback", AudioIOError.invalidFormat)
-                            readiness.resolve(.failure(AudioIOError.invalidFormat))
-                            observation.finish(throwing: AudioIOError.invalidFormat)
-                            continuation.finish(throwing: AudioIOError.invalidFormat)
+                        do {
+                            if try source.send(frame) { readiness.resolve(.success(())) }
+                        } catch {
+                            admission?.report("audio.capture", "callback", error)
+                            readiness.resolve(.failure(error))
+                            source.finish(throwing: error)
                         }
                     }
                     hasTap = true
@@ -396,7 +364,7 @@
                         throw error
                     }
                     watchEvents()
-                    return pair.stream
+                    return
                 } catch {
                     let primary = error
                     guard captureToken == token else { throw primary }
@@ -597,12 +565,9 @@
             await cleanup?.value
         }
         public func stopCapture() async {
-            let hadCapture = captureToken != nil
             captureToken = nil
-            let observation = captureObservation
-            captureObservation = nil
-            observation?.finish()
-            if hadCapture { observations.finish() }
+            captureSource?.finish()
+            captureSource = nil
             captureReadiness?.resolve(.failure(CancellationError()))
             captureReadiness = nil
             let backend = spatialCapture
@@ -613,8 +578,6 @@
                 hasTap = false
             }
             captureEngine.stop()
-            capture?.finish()
-            capture = nil
         }
         public func stop() async {
             if let stopOperation { return await stopOperation.value }

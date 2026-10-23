@@ -75,8 +75,9 @@ private actor CompositionCounter {
     let scheduler = ChannelScheduler(registry: registry)
     for first in [true, false] {
         let envelope = OutputEnvelope(
-            source: .assistant, input: input,
-            output: .actionCall(ActionCall(actionPath: path, channel: "Robot", parameters: ["first": String(first)])))
+            source: .assistant, context: input.context,
+            output: .actionCall(ActionCall(actionPath: path, channel: "Robot", parameters: ["first": String(first)])),
+            taskScope: input.taskScope)
         try await scheduler.enqueue(invocation: ScheduledAction(envelope: envelope, owner: owner, feedback: .terminal))
     }
     try await scheduler.finish(inputID: input.id, source: AgentID(rawValue: "assistant"))

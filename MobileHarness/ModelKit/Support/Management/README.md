@@ -136,3 +136,15 @@ ModelLanguageContainer 属于默认装配目标，按每个请求解析当前 ch
 ✅ ModelScope为全部原生异常报告包装ModelFailure，根生命周期使用throws(ModelFailure)。装配／制品释放的主错误和清理错误统一分开保留，不再声明专用清理聚合类型；availability／推理流仍遵循各自领域协议，不以根容器迁移冒充所有SDK抛错已替换。
 
 ✅ 已实现：warmup 提供模块自有 reportLoading(Bool) 回调；先构造后端，再由真实资源 load 区间报告开始／结束；ready／unmanaged 不报告，语音按当前选中后端统一准备。回调不包含 UI／Signal，失败结束后原样上抛。
+
+## Artifact observation
+
+The artifact capability exposes independent bounded newest-one revision observation. Changes wake consumers without JSON fingerprints or business polling. Native progress reports synchronously coalesce; cancellation detaches observers and shutdown ends streams.
+
+## Direct container contract
+
+Artifact revision observers are independently bounded to 16 newest-one streams. Native progress coalesces synchronously, changes wake consumers without JSON polling, and close ends observation. Current cross-module ownership is defined by the [overall design](../../../README.md).
+
+## 直连链路当前契约
+
+✅ 模拟器依赖闭包排除 CoreAI，真实设备保持现有模型绑定，不注入假模型。

@@ -125,11 +125,15 @@ private func contractDefinition(
     let input = AgentInput(
         id: UUID().uuidString, sessionID: UUID().uuidString, payload: .event("contract"))
     #expect(throws: ActionExecutionError.invalidInvocation) {
-        try ActionInvocation(envelope: OutputEnvelope(source: .assistant, input: input, output: .control("finish")))
+        try ActionInvocation(
+            envelope: OutputEnvelope(
+                source: .assistant, context: input.context, output: .control("finish"), taskScope: input.taskScope))
     }
     let call = ActionCall(actionPath: contractPath, channel: "Ordered", parameters: ["count": "2"])
     let invocation = try ActionInvocation(
-        envelope: OutputEnvelope(source: .assistant, input: input, output: .actionCall(call), sequence: 7))
+        envelope: OutputEnvelope(
+            source: .assistant, context: input.context, output: .actionCall(call), sequence: 7,
+            taskScope: input.taskScope))
     #expect(invocation.call == call.executionRequest.functionRequest)
     #expect(invocation.channel == "Ordered")
     #expect(invocation.testEnvelope.inputID == input.id && invocation.testEnvelope.sequence == 7)
@@ -198,9 +202,9 @@ private func contractDefinition(
     let second = try ActionInvocation(
         envelope: OutputEnvelope(
             source: .assistant,
-            input: AgentInput(
+            context: (AgentInput(
                 id: first.testEnvelope.inputID, sessionID: first.testEnvelope.sessionID,
-                payload: .event("contract")),
+                payload: .event("contract"))).context,
             output: .actionCall(ActionCall(actionPath: setPath, channel: "Ordered", parameters: ["emotion": "smile"]))))
     let firstID = try await scheduler.enqueue(invocation: first)
     await started.wait()

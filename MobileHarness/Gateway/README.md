@@ -6,7 +6,7 @@ Validates Signal transport and resolved output, coordinates execution and return
 
 ## Ownership and boundaries
 
-Gateway owns authority/admission/routing/execution coordination; Agents owns business meaning and alias resolution. Gateway imports AgentCore, FunctionContracts, ExecutionRuntime and CallRuntime; its native input adapters additionally use PlatformKit. It never imports concrete Actions, UI, ModelKit or App. Foundation calls inside an Agent do not pass through Gateway.
+Gateway owns bound Agent communication, execution authorization/admission, resources, ordering, cancellation and feedback. It imports AgentCore, FunctionContracts, ExecutionRuntime and CallRuntime only. Native/UI/model/storage input consumption belongs to Agents; foundational capabilities never construct a Signal.
 
 ## External relationships and data flow
 
@@ -14,7 +14,7 @@ Runtime arrows show data or capability calls; dashed arrows show injection.
 
 ```mermaid
 flowchart LR
- App -->|External Signals and host bindings| Gateway
+ Gateway -->|Bounded execution diagnostics| App
  Gateway -->|Admitted Signals and runtime feedback| Agents
  Agents -->|Resolved calls and communication| Gateway
  Actions -.->|Injected canonical function interfaces| Gateway
@@ -42,7 +42,7 @@ flowchart LR
 
 ## Public interfaces and protocol policy
 
-InputGateway validates external/Agent/runtime provenance, source/session/schema/deadline and bounds. External production facts use publish with exact static or host-controlled dynamic subscriptions. Explicit host controls may use subscribed send and await admission; arbitrary external targets remain disabled by default. OutputGateway validates the bound actor/incarnation and permissions before calling functions, communicating or scheduling. Source authority cannot come from payloads.
+InputGateway admits only bound Agent messages and owner-fenced execution feedback. Local inputs and untrusted external provenance are rejected. OutputGateway binds the actual producer/incarnation, validates capabilities and task grants, and preserves processing causality in execution results.
 
 | Protocol | Execution | Feedback |
 | --- | --- | --- |
@@ -102,11 +102,6 @@ Producer/session cancellation joins scheduled and direct native execution, prese
 
 ✅ Agent 失败诊断随原终止控制进入有界失败快照，保留分类、代码和输入/会话/轮次；Gateway 不重新归因、提供业务文案或发起重试。
 
-## Platform 根、设备接入与同帧呈现
-
-✅ Gateway/Input 拥有 DeviceInputAdapter 和 DeviceInputConnection，单向依赖 PlatformKit；原生输入适配与通用分发分开，Gateway 不依赖具体 Agents、Actions 或 UI。适配器固定 external 来源与无 incarnation 的信封，InputGateway 继续拒绝外部伪造运行结果。业务消息语义仍由所属模块解释。
-
-✅ 输出信封可携带按需保留的通用图像附件；Gateway 校验帧一致性、新鲜度和已绑定生产者后，将只读原生值绑定到单次 Tool 执行。附件不进入 JSON、诊断、历史或 State。
 
 ## 视觉停顿恢复修复
 
@@ -120,14 +115,18 @@ Producer/session cancellation joins scheduled and direct native execution, prese
 
 ✅ consumeSignals 支持拥有者显式声明 latest 替换键；普通离散 FIFO 溢出仍拒绝，报告具体队列、容量、来源和序号。
 
-## 统一外部输入与动态订阅
 
-✅ ExternalInputAdapter 统一封装业务、文字、设备和扩展传感器输入，不引用具体业务模块。InputGateway 提供宿主订阅，校验注册 schema、目标输入和来源权限。静态/动态关系合并去重，外部与 Agent 广播共享分发；订阅不能获得执行或反馈权限。
-
-## 统一容器异常通道
-
-✅ 新增容器异常通道，保持不依赖 Storage/UI/具体 Agents。注入回调转换中立错误，记录与投递分离；按来源根/组件/操作/代码/有界描述合并故障。Agent 不可用时保留事件和未送达状态，通道自身投递失败只更新状态，不能递归产生异常。
 
 ## ApplicationControl 异常展示
 
 ✅ 已实现：异常展示链路调整为：Gateway Signal → ApplicationControl 确定性策略 → 内部 UI.RuntimeDiagnostics.recordFailure → UI 运行异常/Toast。移除绑定层直接监听容器异常生成展示的旧链路；Assistant 保留可选被动诊断，App 保留启动失败兜底。容器原始抛错及模块组合装配本轮不变。
+
+
+## Direct container contract
+
+Gateway routes bound Agent communication and execution feedback only. It has no native input adapter, host dynamic subscription or foundational SDK dependency. Current cross-module ownership is defined by the [overall design](../README.md).
+
+## Fixed UI result contract
+
+✅ 绑定身份的 GatewayOutputConsumer 提供 executeReturning，用于必须收到真实结果的固定调用。在准入任何效果前检查 Tool 的返回反馈注册；不满足即拒绝。UI 输入仍不进入 Gateway，此接口只约束已由 Agent 选择的输出执行。
+✅ 来源枚举仅有 local、agent、runtime；本地输入不能进入 Gateway 的角色消息接纳，原生／UI 直接由角色消费。

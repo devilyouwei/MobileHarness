@@ -1,6 +1,5 @@
-import ActionBindings
 import Actions
-import AgentBindings
+import Agents
 import Foundation
 import Gateway
 import PlatformKit
@@ -29,7 +28,7 @@ private actor InventoryFixture: ModelResourceInventoryCapability {
             id: "moss-tts-nano", name: "TTS", bytes: 100, completedBytes: 42, phase: .downloading,
             failure: "network:fixture"),
     ])
-    let runtime = try resourceRuntime(UnusedModelResourceCapability(), inventory: fixture)
+    let runtime = try await resourceRuntime(UnusedModelResourceCapability(), inventory: fixture)
     let inventory = try ModelResourceInventory.decode(await runtime.inventory())
     #expect(inventory.items[0].progress == 1)
     #expect(inventory.items[1].progress == 0.42)
@@ -46,7 +45,7 @@ private actor InventoryFixture: ModelResourceInventoryCapability {
     async throws
 {
     let fixture = InventoryFixture()
-    let runtime = try resourceRuntime(UnusedModelResourceCapability(), inventory: fixture)
+    let runtime = try await resourceRuntime(UnusedModelResourceCapability(), inventory: fixture)
     let item = ModelResourceFact(id: "model", name: "Model", bytes: 10, phase: .notInstalled)
     await fixture.set([item, item])
     await #expect(throws: ApplicationControlIntentFailure.self) { _ = try await runtime.inventory() }
@@ -90,7 +89,7 @@ private actor InventoryFixture: ModelResourceInventoryCapability {
     let expected = ModelResourceInventory(items: items)
     #expect(try expected.encoded().utf8.count > 48 * 1024)
     await fixture.set(items)
-    let runtime = try resourceRuntime(UnusedModelResourceCapability(), inventory: fixture)
+    let runtime = try await resourceRuntime(UnusedModelResourceCapability(), inventory: fixture)
     #expect(try ModelResourceInventory.decode(await runtime.inventory()) == expected)
     let oversized = (0..<32).map { index in
         ModelResourceFact(

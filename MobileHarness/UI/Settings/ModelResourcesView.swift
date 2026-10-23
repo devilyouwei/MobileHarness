@@ -7,25 +7,25 @@
         private let controls: any ModelResourcesControlling
         private let group: ModelResourceGroup
         private let audioDetection: AudioDetectionState?
-        private let audioDetectionControls: (any AudioDetectionControlling)?
+        private let audioDetectionRequests: (UIRequests<AudioDetectionInput, Void>)?
         public init(
             state: ModelResourcesState, controls: any ModelResourcesControlling, group: ModelResourceGroup,
             audioDetection: AudioDetectionState? = nil,
-            audioDetectionControls: (any AudioDetectionControlling)? = nil
+            audioDetectionRequests: (UIRequests<AudioDetectionInput, Void>)? = nil
         ) {
             self.state = state
             self.controls = controls
             self.group = group
             self.audioDetection = audioDetection
-            self.audioDetectionControls = audioDetectionControls
+            self.audioDetectionRequests = audioDetectionRequests
         }
         private var customEnabled: Bool {
             group == .recognition ? state.source.useCustomRecognition : state.source.useCustomSynthesis
         }
         public var body: some View {
             Form {
-                if group == .recognition, let audioDetection, let audioDetectionControls {
-                    AudioDetectionSection(state: audioDetection, controls: audioDetectionControls)
+                if group == .recognition, let audioDetection, let audioDetectionRequests {
+                    AudioDetectionSection(state: audioDetection, requests: audioDetectionRequests)
                 }
                 if group == .recognition || group == .synthesis {
                     Section {

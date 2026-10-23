@@ -536,6 +536,32 @@ extension ConversationHistoryStore {
     #expect(try await store.snapshot().current.turns.isEmpty)
 }
 
+@Test(.actionCatalog) func historyAdmitsUserAfterReplyUpdatesWithoutWeakeningRequestFence() async throws {
+    let store = ConversationHistoryStore()
+    let first = UUID().uuidString
+    _ = try await store.admitUserInput(id: first, user: "first", model: "pending")
+    let prior = try await store.readCurrent()
+    try await store.append("partial reply", to: first)
+    let second = UUID().uuidString
+    await #expect(throws: ConversationHistoryError.conflict) {
+        try await store.begin(
+            id: second, user: "second", request: [], expecting: prior.token, model: "fixture")
+    }
+    let admitted = try await store.admitUserInput(id: second, user: "second", model: "pending")
+    #expect(admitted.awaitingModel && admitted.request.isEmpty && admitted.state == .generating)
+    let snapshot = try await store.snapshot()
+    let current = snapshot.current
+    #expect(current.id == prior.current.id)
+    #expect(current.turns.map(\.id) == [first, second])
+    #expect(current.turns.first?.response == "partial reply")
+    await #expect(throws: ConversationHistoryError.invalidRecord) {
+        try await store.admitUserInput(id: second, user: "second", model: "pending")
+    }
+    let afterDuplicate = try await store.snapshot()
+    #expect(afterDuplicate.revision == snapshot.revision)
+    #expect(afterDuplicate.current.turns.map(\.id) == [first, second])
+}
+
 @Test(.actionCatalog) func assistantConflictDoesNotCallModelOrWriteNewTurn() async throws {
     let store = ConversationHistoryStore()
     let model = HistoryModel("should not run")

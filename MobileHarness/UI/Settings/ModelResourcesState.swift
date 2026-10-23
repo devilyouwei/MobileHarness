@@ -272,6 +272,8 @@ public struct ModelResourceSelectionError: LocalizedError, Sendable {
 
 @MainActor
 public final class UIModelResourcesContainer {
+    public let requests = UIRequests<ResourcesInput, ResourcesReply>()
+
     public let state = ModelResourcesState()
     public var presentation: any ModelResourcesPresenting { state }
     init(admission: UIPresentationAdmission) { state.presentationAdmission = admission }

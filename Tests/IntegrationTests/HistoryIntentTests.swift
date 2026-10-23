@@ -1,6 +1,4 @@
-import ActionBindings
 import Actions
-import AgentBindings
 import AgentCore
 import Agents
 import CallRuntime
@@ -21,27 +19,33 @@ private struct HistoryPresentationModule: ToolModule {
     let definitions: [ActionBinding]
 }
 
-private struct UnusedHistoryMutation: HistoryMutationCapability {
+struct UnusedHistoryMutation: HistoryMutationCapability {
     func startNew() async throws -> String? { throw CommunicationError.unsupportedContract }
     func summarizeArchived(_ id: String) async throws { throw CommunicationError.unsupportedContract }
     func deleteArchived(_ id: String) async throws { throw CommunicationError.unsupportedContract }
 }
-private func intentRuntime(
+struct HistoryReadFixture: HistoryFullReadCapability {
+    let operation: @Sendable (HistoryReadQuery) async throws -> HistoryReadResult
+    init(_ operation: @escaping @Sendable (HistoryReadQuery) async throws -> HistoryReadResult) {
+        self.operation = operation
+    }
+    func read(_ query: HistoryReadQuery) async throws -> HistoryReadResult { try await operation(query) }
+}
+@MainActor func intentRuntime(
     sessionID: String, presentation: any HistoryPresentationCapability,
     mutations: any HistoryMutationCapability = UnusedHistoryMutation(),
-    reads: MemoryHistoryReadRequests? = nil
+    reads: HistoryReadFixture? = nil, uiHistory: UIHistoryContainer? = nil
 ) throws
-    -> HistoryIntentRuntime
+    -> HistoryTestRuntime
 {
+    let ui = UIContainer()
+    try ui.start()
+    let historyUI = uiHistory ?? ui.history
     let manager = AgentManager()
     let policy = try CommunicationPolicy(
         contracts: AgentContracts.communication,
-        externalSources: [
-            "user", "runtime", "phone.microphone", "phone.camera", "model.resources", "app.resources",
-            "app.environment",
-        ],
         configurations: AgentConfigurations.all())
-    let input = InputGateway(manager: manager, policy: policy, allowsExternalSend: true)
+    let input = InputGateway(manager: manager, policy: policy)
     let definition = ActionBinding(
         function: UIActions.showHistoryDefinition(handler: { invocation in
             try await UIActions.showHistory(invocation: invocation, using: presentation)
@@ -61,23 +65,32 @@ private func intentRuntime(
     let gateway = OutputGateway(
         manager: manager, requests: input,
         tools: try ToolRegistry(modules: [
-            HistoryPresentationModule(definitions: [definition, deletion, archive, title])
+            HistoryPresentationModule(
+                definitions: [definition, deletion, archive, title]
+                    + (reads.map {
+                        [
+                            ActionBinding(
+                                function: HistoryActions.fullReadFunction(using: $0), protocols: [.tool],
+                                executionPolicy: .direct)
+                        ]
+                    } ?? []))
         ]),
         actions: ChannelScheduler(registry: ActionRegistry()), policy: policy, sink: { _ in })
-    return try HistoryIntentRuntime(
-        sessionID: sessionID, manager: manager, input: input, output: gateway,
+    let host = try MemoryExecutionSession(
+        manager: manager, output: gateway,
         agent: MemoryAgent(
-            sessionID: sessionID, historyReads: reads,
+            sessionID: sessionID, uiHistory: historyUI,
             context: try AgentContextRepository(
                 agent: AgentID(rawValue: "memory"), scope: UUID().uuidString, state: MemoryContextState())
         ))
+    return HistoryTestRuntime(host: host, ui: ui, history: historyUI)
 }
 
 @Test(.actionCatalog) @MainActor func historyRefreshTravelsThroughBothGatewaysWithoutVoiceOrModels() async throws {
     let session = UUID().uuidString
     let store = ConversationHistoryStore()
     let state = ConversationHistoryState()
-    let runtime = try intentRuntime(
+    let runtime = try await intentRuntime(
         sessionID: session, presentation: HistoryPresentationAdapter(state: state, store: store, sessionID: session))
     #expect(state.archive == nil)
     try await runtime.refresh()
@@ -113,21 +126,22 @@ private actor HeldHistoryPresentation: HistoryPresentationCapability {
         release = nil
     }
 }
-@Test(.actionCatalog) func historyRefreshRejectsOverlapAndJoinsCancellationBeforeRetry() async throws {
+@Test(.actionCatalog) func historyRefreshQueuesRetryAndJoinsCancelledWork() async throws {
     let endpoint = HeldHistoryPresentation()
-    let runtime = try intentRuntime(sessionID: UUID().uuidString, presentation: endpoint)
+    let runtime = try await intentRuntime(sessionID: UUID().uuidString, presentation: endpoint)
     var started = endpoint.started.stream.makeAsyncIterator()
     let first = Task { try await runtime.refresh() }
     await started.next()
-    await #expect(throws: CommunicationError.capacityExceeded) { try await runtime.refresh() }
+    let queuedRefresh = Task { try await runtime.refresh() }
     var cancelled = endpoint.cancelled.stream.makeAsyncIterator()
     first.cancel()
     await cancelled.next()
     await endpoint.finish()
     await #expect(throws: CancellationError.self) { try await first.value }
-    #expect(await endpoint.completed == 0)
-    try await runtime.refresh()
+    try await queuedRefresh.value
     #expect(await endpoint.completed == 1)
+    try await runtime.refresh()
+    #expect(await endpoint.completed == 2)
     #expect(await runtime.agent.status().lifecycle == .running)
 }
 
@@ -184,7 +198,7 @@ func historyDeleteUsesCorrelatedRuntimeResultBeforePresentation() async throws {
     let id = try await archivedHistory(store)
     let session = UUID().uuidString
     let state = ConversationHistoryState()
-    let runtime = try intentRuntime(
+    let runtime = try await intentRuntime(
         sessionID: session,
         presentation: HistoryPresentationAdapter(state: state, store: store, sessionID: session),
         mutations: HistoryMutationService(store: store, summarizeTitle: { _ in "Unused fixture title" }))
@@ -203,7 +217,7 @@ func historyDeleteRejectsCurrentAndMissingIDsAndAllowsRefreshAfterFailure()
     let store = ConversationHistoryStore()
     let session = UUID().uuidString
     let state = ConversationHistoryState()
-    let runtime = try intentRuntime(
+    let runtime = try await intentRuntime(
         sessionID: session,
         presentation: HistoryPresentationAdapter(state: state, store: store, sessionID: session),
         mutations: HistoryMutationService(store: store, summarizeTitle: { _ in "Unused fixture title" }))
@@ -251,7 +265,7 @@ func historyDeleteCancellationJoinsCleanupWithoutRollingBackCommittedData()
     let session = UUID().uuidString
     let state = ConversationHistoryState()
     let mutation = HeldHistoryMutation(store: store)
-    let runtime = try intentRuntime(
+    let runtime = try await intentRuntime(
         sessionID: session,
         presentation: HistoryPresentationAdapter(state: state, store: store, sessionID: session), mutations: mutation)
     try await runtime.refresh()
@@ -261,11 +275,12 @@ func historyDeleteCancellationJoinsCleanupWithoutRollingBackCommittedData()
     await started.next()
     deletion.cancel()
     await cancelled.next()
-    await #expect(throws: CommunicationError.capacityExceeded) { try await runtime.refresh() }
+    let queuedRefresh = Task { try await runtime.refresh() }
     #expect(state.archive?.past.count == 1)
     #expect(try await store.snapshot().past.isEmpty)
     await mutation.finish()
     await #expect(throws: CancellationError.self) { try await deletion.value }
+    try await queuedRefresh.value
     try await runtime.refresh()
     #expect(state.archive?.past.isEmpty == true)
 }
@@ -327,7 +342,7 @@ func memoryDeleteRejectsUncorrelatedOrForeignFeedbackAndOverlappingIntent() asyn
     let contracts = try AgentContracts.communication
     let invalid = AgentMessage(
         contract: MemoryHistoryIntent.contract, content: "history.refresh", validate: { _ in })
-    #expect(throws: CommunicationError.invalidPayload) { try contracts.validatedSize(invalid) }
+    #expect(throws: CommunicationError.unsupportedContract) { try contracts.validatedSize(invalid) }
     let session = UUID().uuidString
     let agent = try MemoryAgent(
         sessionID: session,
@@ -335,6 +350,9 @@ func memoryDeleteRejectsUncorrelatedOrForeignFeedbackAndOverlappingIntent() asyn
             agent: AgentID(rawValue: "memory"), scope: UUID().uuidString, state: MemoryContextState())
     )
     try await agent.start()
+    await #expect(throws: CommunicationError.invalidPayload) {
+        try await agent.receive(ProcessingContext(sessionID: session).input(.observation(invalid)))
+    }
     let payload = InputPayload.event("history.refresh")
     await #expect(throws: CommunicationError.invalidPayload) {
         try await agent.receive(
@@ -383,7 +401,7 @@ func archiveCommitsAndReturnsBeforeRootTitleCompletes() async throws {
     let session = UUID().uuidString
     let mutations = HistoryMutationService(
         store: store, summarizeTitle: { try await ConversationTitleGenerator.summarize($0, using: chat) })
-    let runtime = try intentRuntime(
+    let runtime = try await intentRuntime(
         sessionID: session, presentation: HistoryPresentationAdapter(state: state, store: store, sessionID: session),
         mutations: mutations)
     var started = chat.started.stream.makeAsyncIterator()
@@ -427,7 +445,7 @@ func emptyHistoryArchiveDoesNotInferOrReplaceCurrentConversation()
     let current = try await store.snapshot().current.id
     let state = ConversationHistoryState()
     let session = UUID().uuidString
-    let runtime = try intentRuntime(
+    let runtime = try await intentRuntime(
         sessionID: session, presentation: HistoryPresentationAdapter(state: state, store: store, sessionID: session),
         mutations: HistoryMutationService(
             store: store,
@@ -449,7 +467,7 @@ func emptyHistoryArchiveDoesNotInferOrReplaceCurrentConversation()
     let state = ConversationHistoryState()
     let chat = ControlledTitle()
     let session = UUID().uuidString
-    let runtime = try intentRuntime(
+    let runtime = try await intentRuntime(
         sessionID: session, presentation: HistoryPresentationAdapter(state: state, store: store, sessionID: session),
         mutations: HistoryMutationService(
             store: store, summarizeTitle: { try await ConversationTitleGenerator.summarize($0, using: chat) }))
@@ -473,7 +491,7 @@ func summarizeRejectsCurrentAndMissingArchivesWithoutInference() async throws {
     let store = ConversationHistoryStore()
     let session = UUID().uuidString
     let state = ConversationHistoryState()
-    let runtime = try intentRuntime(
+    let runtime = try await intentRuntime(
         sessionID: session, presentation: HistoryPresentationAdapter(state: state, store: store, sessionID: session),
         mutations: HistoryMutationService(
             store: store,
@@ -495,7 +513,7 @@ private struct FailedArchivePresentation: HistoryPresentationCapability {
     let store = try await completedConversation()
     let old = try await store.snapshot().current.id
     let mutations = HistoryMutationService(store: store, summarizeTitle: { _ in "Completed title" })
-    let runtime = try intentRuntime(
+    let runtime = try await intentRuntime(
         sessionID: UUID().uuidString, presentation: FailedArchivePresentation(), mutations: mutations)
     await #expect(throws: HistoryIntentFailure.self) { try await runtime.startNew() }
     await mutations.waitForTitles()
@@ -632,13 +650,13 @@ private struct FailedArchivePresentation: HistoryPresentationCapability {
 @Test(.actionCatalog) @MainActor func historyReadQueryIsAdmittedByMemoryWithoutPresentationOrModel() async throws {
     let store = ConversationHistoryStore()
     let current = try await store.readCurrent()
-    let reads = MemoryHistoryReadRequests { query in
+    let reads = HistoryReadFixture { query in
         guard case .conversation(let id) = query else { throw CommunicationError.invalidPayload }
         return .conversation(try await store.page(id))
     }
     let state = ConversationHistoryState()
     let session = UUID().uuidString
-    let runtime = try intentRuntime(
+    let runtime = try await intentRuntime(
         sessionID: session,
         presentation: HistoryPresentationAdapter(state: state, store: store, sessionID: session), reads: reads)
     let result = try await runtime.query(.conversation(current.current.id))
@@ -652,31 +670,33 @@ private struct FailedArchivePresentation: HistoryPresentationCapability {
     await runtime.shutdown()
 }
 
-@Test(.actionCatalog) func historyReadStagingRejectsOverflowAndWrongSessionWithoutReading() async throws {
-    let reads = MemoryHistoryReadRequests { _ in .photo(nil) }
-    let session = UUID().uuidString
-    var ids: [String] = []
-    for _ in 0..<4 { ids.append(try await reads.stage(.photo(id: "media_1", inputID: "input"), sessionID: session)) }
-    await #expect(throws: CommunicationError.capacityExceeded) {
-        try await reads.stage(.archives(before: 10), sessionID: session)
+@Test(.actionCatalog) func historyReadPrivatePortRejectsWrongOwnerAndDuplicateCompletion() async throws {
+    let port = try HistoryReadInvocation(query: .archives(before: 10), requestID: "read", sessionID: "session")
+    let call = ToolRequest(id: "call", toolPath: "History.Conversation.readFull")
+    let wrong = FunctionInvocation(
+        tool: call, context: .init(source: "assistant", sessionID: "session", inputID: "read"), attachment: port)
+    await #expect(throws: (any Error).self) { try await port.accept(wrong) }
+    let actual = FunctionInvocation(
+        tool: call, context: .init(source: "memory", sessionID: "session", inputID: "read"), attachment: port)
+    try await port.accept(actual)
+    await #expect(throws: (any Error).self) { try await port.accept(actual) }
+    try await port.complete(.archives([]))
+    await #expect(throws: (any Error).self) { try await port.complete(.archives([])) }
+    guard case .archives(let value) = try await port.take() else {
+        Issue.record("Expected typed archives")
+        return
     }
-    await #expect(throws: CommunicationError.scopeClosed) {
-        try await reads.execute(ids[0], sessionID: UUID().uuidString)
-    }
-    for id in ids { await reads.discard(id) }
-    let id = try await reads.stage(.archives(before: 10), sessionID: session)
-    await reads.discard(id)
-    await reads.shutdown()
-    await #expect(throws: CommunicationError.scopeClosed) {
-        try await reads.stage(.archives(before: 10), sessionID: session)
-    }
+    #expect(value.isEmpty)
+    await #expect(throws: (any Error).self) { try await port.take() }
+    await port.close()
+    await #expect(throws: (any Error).self) { try await port.complete(.archives([])) }
 }
 
 @Test(.actionCatalog) @MainActor func historyReadCancellationJoinsActualReaderAndReleasesAdmission() async throws {
     let entered = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingOldest(1))
     let cancelled = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingOldest(1))
     let release = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingOldest(1))
-    let reads = MemoryHistoryReadRequests { _ in
+    let reads = HistoryReadFixture { _ in
         try await withTaskCancellationHandler {
             entered.continuation.yield(())
             for await _ in release.stream { break }
@@ -688,7 +708,7 @@ private struct FailedArchivePresentation: HistoryPresentationCapability {
     }
     let store = ConversationHistoryStore()
     let session = UUID().uuidString
-    let runtime = try intentRuntime(
+    let runtime = try await intentRuntime(
         sessionID: session,
         presentation: HistoryPresentationAdapter(state: ConversationHistoryState(), store: store, sessionID: session),
         reads: reads)
@@ -698,24 +718,109 @@ private struct FailedArchivePresentation: HistoryPresentationCapability {
     for await _ in cancelled.stream { break }
     release.continuation.yield(())
     await #expect(throws: CancellationError.self) { try await operation.value }
-    let next = try await reads.stage(.archives(before: 10), sessionID: session)
-    await reads.discard(next)
     await runtime.shutdown()
 }
 
 private enum HistoryReadFixtureFailure: Error, Equatable { case unavailable }
 
 @Test(.actionCatalog) @MainActor func historyReadFailurePreservesProducerAndDoesNotPresent() async throws {
-    let reads = MemoryHistoryReadRequests { _ in throw HistoryReadFixtureFailure.unavailable }
+    let reads = HistoryReadFixture { _ in throw HistoryReadFixtureFailure.unavailable }
     let state = ConversationHistoryState()
     let session = UUID().uuidString
-    let runtime = try intentRuntime(
+    let runtime = try await intentRuntime(
         sessionID: session,
         presentation: HistoryPresentationAdapter(state: state, store: ConversationHistoryStore(), sessionID: session),
         reads: reads)
     await #expect(throws: HistoryReadFixtureFailure.unavailable) { try await runtime.query(.archives(before: 10)) }
     #expect(state.archive == nil)
-    let next = try await reads.stage(.archives(before: 10), sessionID: session)
-    await reads.discard(next)
     await runtime.shutdown()
+}
+
+@Test(.actionCatalog, .timeLimit(.minutes(1))) @MainActor
+func protectedHistoryReadsKeepFourWorkersAndJoinRootStop() async throws {
+    let entered = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingOldest(4))
+    let hold = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingOldest(1))
+    let reads = HistoryReadFixture { _ in
+        entered.continuation.yield(())
+        for await _ in hold.stream { break }
+        try Task.checkCancellation()
+        return .archives([])
+    }
+    let store = ConversationHistoryStore()
+    let runtime = try await intentRuntime(
+        sessionID: "bounded-reads",
+        presentation: HistoryPresentationAdapter(
+            state: ConversationHistoryState(), store: store, sessionID: "bounded-reads"), reads: reads)
+    try await runtime.prepareForInteraction()
+    let agent = runtime.agent
+    let requests = (0..<4).map { _ in
+        Task {
+            try await agent.readHistory(.archives(before: 10), context: ProcessingContext(sessionID: "bounded-reads"))
+        }
+    }
+    var starts = entered.stream.makeAsyncIterator()
+    for _ in 0..<4 { _ = try #require(await starts.next()) }
+    await #expect(throws: CommunicationError.capacityExceeded) {
+        try await agent.readHistory(.archives(before: 10), context: ProcessingContext(sessionID: "bounded-reads"))
+    }
+    await #expect(throws: CommunicationError.scopeClosed) {
+        try await agent.readHistory(.archives(before: 10), context: ProcessingContext(sessionID: "wrong"))
+    }
+    await runtime.shutdown()
+    for request in requests { await #expect(throws: CancellationError.self) { try await request.value } }
+}
+
+private actor UIHistoryCancellationGate {
+    nonisolated let entered = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingOldest(1))
+    nonisolated let cancelled = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingOldest(1))
+    private var release: CheckedContinuation<Void, Never>?
+    private(set) var readCount = 0
+    func read(_ query: HistoryReadQuery) async throws -> HistoryReadResult {
+        readCount += 1
+        if readCount == 1 {
+            await withTaskCancellationHandler {
+                await withCheckedContinuation {
+                    release = $0
+                    entered.continuation.yield(())
+                }
+            } onCancel: {
+                cancelled.continuation.yield(())
+            }
+            try Task.checkCancellation()
+        }
+        return .archives([])
+    }
+    func finishCleanup() {
+        release?.resume()
+        release = nil
+    }
+}
+@Test(.actionCatalog, .timeLimit(.minutes(1))) @MainActor
+func cancellingAUIReadJoinsWorkAndKeepsTheAgentConsumerAvailable() async throws {
+    let ui = UIContainer()
+    try ui.start()
+    let gate = UIHistoryCancellationGate()
+    let runtime = try await intentRuntime(
+        sessionID: "ui-read-cancel",
+        presentation: HistoryPresentationAdapter(
+            state: ui.history.presentation, store: ConversationHistoryStore(), sessionID: "ui-read-cancel"),
+        reads: HistoryReadFixture { try await gate.read($0) }, uiHistory: ui.history)
+    try await runtime.prepareForInteraction()
+    let first = Task { try await ui.history.requests.submit(.archives(0)) }
+    for await _ in gate.entered.stream { break }
+    first.cancel()
+    await #expect(throws: CancellationError.self) { try await first.value }
+    for await _ in gate.cancelled.stream { break }
+    let next = Task { try await ui.history.requests.submit(.archives(0)) }
+    #expect(await gate.readCount == 1)
+    await gate.finishCleanup()
+    guard case .archives(let values) = try await next.value else {
+        Issue.record("Expected typed result")
+        return
+    }
+    #expect(values.isEmpty)
+    #expect(await gate.readCount == 2)
+    #expect(ui.history.requests.outstanding == 0)
+    await runtime.shutdown()
+    await ui.stop()
 }

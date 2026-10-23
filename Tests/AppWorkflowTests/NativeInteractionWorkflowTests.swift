@@ -1,6 +1,4 @@
-import ActionBindings
 import Actions
-import AgentBindings
 import Agents
 import Foundation
 import Gateway
@@ -11,19 +9,19 @@ import Testing
 @testable import UI
 
 @MainActor private final class HeldInteraction {
-    var calls: [AppInteractionIntent] = []
-    var cameraFacings: [PhotographerCameraIntent.Facing?] = []
+    var calls: [[String: String]] = []
+    var cameraFacings: [CameraDirection?] = []
     var cameraMediaIDs: [String?] = []
-    var cameraCalls: [PhotographerCameraIntent.Operation] = []
+    var cameraCalls: [CameraInput.Operation] = []
     var pending: CheckedContinuation<Void, any Error>?
     let started = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingOldest(1))
     var hold = true
-    func perform(_ intent: AppInteractionIntent) async throws {
+    func perform(_ intent: [String: String]) async throws {
         calls.append(intent)
         try await wait()
     }
     func performCamera(
-        _ operation: PhotographerCameraIntent.Operation, facing: PhotographerCameraIntent.Facing?,
+        _ operation: CameraInput.Operation, facing: CameraDirection?,
         mediaID: String? = nil
     )
         async throws
@@ -73,11 +71,31 @@ import Testing
     host.finish(throwing: CancellationError())
     await controls.waitUntilIdle()
     #expect(fences == 2)
-    #expect(host.calls.map { $0.parameters["operation"] } == ["scan"])
+    #expect(host.calls.map { $0["operation"] } == ["scan"])
     #expect(state.error == nil)
     controls.setMotorVelocity(id: 1, value: 0.5)
     await controls.waitUntilIdle()
-    #expect(host.calls.last?.parameters["value"] == "0.5")
+    #expect(host.calls.last?["value"] == "0.5")
+    await controls.shutdown()
+}
+@Test @MainActor func deviceStopDoesNotWaitForOrdinaryRequestCompletion() async throws {
+    let host = HeldInteraction()
+    let controls = BluetoothInteractionWorkflow(
+        state: BluetoothSettingsState(), initialFence: UUID().uuidString,
+        fenceStop: { UUID().uuidString }, pageVisibility: { _ in }, openSettings: {},
+        perform: { try await host.perform($0) })
+    var started = host.started.stream.makeAsyncIterator()
+    controls.scan()
+    await started.next()
+    controls.stopScan()
+    for _ in 0..<1000 {
+        if host.calls.count == 2 { break }
+        await Task.yield()
+    }
+    #expect(host.pending != nil)
+    #expect(host.calls.map { $0["operation"] } == ["scan", "stopScan"])
+    host.finish()
+    await controls.waitUntilIdle()
     await controls.shutdown()
 }
 @Test @MainActor func cameraCommandRejectsOverlapAndRecoversAfterFailure() async throws {

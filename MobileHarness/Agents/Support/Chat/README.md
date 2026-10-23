@@ -1,42 +1,90 @@
-# Shared Chat Decision Worker
+# Chat — 通用模型决策与执行反馈续轮
 
-✅ 仅报告前台回复活动的 Worker 在 collect 前提交请求等待，首个非空文本／原生工具或终态清除；请求 ID 围栏与现有轮次授权共同拒绝迟到清理。不将装饰呈现计为模型有效回复，不改变模型、音频和分段策略。
+## 职责与直接接口
 
-## 职责与边界
+AgentChatWorker 将注入 ChatCapability、UIHomeContainer、AgentStateContext、领域历史仓库和角色 Context 组合为有界 Decision／ReACT。角色提供类型、systemPrompt、业务预处理及照片观察策略；共享层拥有模型请求、文本／native 消费、调用结果屏障与历史投影。当前普通 Chat 角色是 Assistant；确定性角色使用固定任务协调。
 
-把注入的 ChatCapability 适配为有界决策、执行反馈和观察续轮。Assistant 使用动态 Skill；确定性角色使用固定任务协调器，不拥有普通 Chat worker。角色拥有身份、预处理、业务状态和请求选择；本目录拥有请求组装、协议消费、屏障、取消与历史投影。Gateway 执行调用，ModelKit 管 provider 传输。
-
-## 直接关系与数据流
-
-```mermaid
-flowchart LR
- Role[Role State and systemPrompt] -->|System context and fresh facts| Worker[AgentChatWorker]
- Assets[Role-owned JSON templates] -.-> Loader[AgentPrompts]
- Loader -.->|Validated templates| Role
- Loader -.-> Worker
- Core[Function Token guide and visible catalog] -.-> Role
- Repository[Context repository] -->|Immutable snapshot| Worker
- Worker -->|Exact request copy| ModelKit
- ModelKit -->|ChatEvents| Driver[AgentChatDriver]
- Driver -->|Text queue| Text[Action-text consumer]
- Driver -->|Native-call queue| Native[Tool consumer]
- Driver -->|Usage and timing evidence| History[Conversation history]
- Text -->|Accumulate response in memory, parse and resolve| Worker
- Native -->|Record calls in memory, parse and resolve| Worker
- Worker -->|Calls and sealed rounds| Gateway
- Gateway -->|Owner-directed feedback| Worker
-```
+## 文件与职责
 
 | 文件 | 职责 |
 | --- | --- |
-| AgentChatWorker.swift | 接纳、文本/native 调用、Task/Skill 控制、结果屏障、取消及终态 |
-| AgentChatDriver.swift | provider session、独立 text/native 消费、时序与完成清理 |
-| AgentChatContext.swift | 角色状态钩子、被动观察及历史仓库适配 |
-| AgentChatContextBuilder.swift | 有界历史投影、native 配对与紧凑模型观察 |
-| AgentCommunicationAdapter.swift | 定向 send 的元数据与业务消息校验 |
-| AgentPrompts.swift | Bundle 模板、缓存与必需键校验 |
+| [AgentChatContext.swift](AgentChatContext.swift) | 角色 Context 协议、通用会话控制意图与历史事务适配 |
+| [AgentChatContextBuilder.swift](AgentChatContextBuilder.swift) | 历史／执行观察投影、请求预算及公开 State 消息选择 |
+| [AgentChatDriver.swift](AgentChatDriver.swift) | Provider 会话、文本与 native 事件消费和取消加入 |
+| [AgentChatWorker.swift](AgentChatWorker.swift) | Decision／ReACT、UI 接纳、Task／Skill 控制、输出与结果屏障 |
+| [AgentCommunicationAdapter.swift](AgentCommunicationAdapter.swift) | 定向消息内容和因果元数据校验 |
+| [AgentPrompts.swift](AgentPrompts.swift) | 按显式配置读取和校验 Chat 模板 |
 
-每次请求独立构造解析状态；文本和 native 消费者在 driver 的同一 task group 中独立运行。共享实现不共享角色仓库、权限或可写历史。
+## 外部关系（一层）
+
+```mermaid
+flowchart LR
+ A["角色类型／Context／配置"]:::agent
+ W["Chat Worker"]:::agent
+ U["UI.home：Worker 主动订阅文本"]:::ui
+ M["ModelKit.ChatCapability"]:::model
+ S["Storage.State／Chat／Task 领域接口"]:::storage
+ C["AgentCore：解析／目录／输出契约"]:::host
+ G["Gateway：真实调用／消息／结果"]:::gateway
+ A -.-> W
+ U --> W
+ W <--> M
+ W <--> S
+ W --> C
+ W <--> G
+ classDef ui fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e
+ classDef platform fill:#dcfce7,stroke:#16a34a,color:#14532d
+ classDef model fill:#f3e8ff,stroke:#9333ea,color:#581c87
+ classDef storage fill:#fef3c7,stroke:#d97706,color:#78350f
+ classDef agent fill:#eef2ff,stroke:#6366f1,color:#312e81
+ classDef gateway fill:#ffedd5,stroke:#ea580c,color:#7c2d12
+ classDef action fill:#ffe4e6,stroke:#e11d48,color:#881337
+ classDef host fill:#f1f5f9,stroke:#64748b,color:#334155
+```
+
+<a id="直接关系与数据流"></a>
+
+## 内部组件与数据流
+
+```mermaid
+flowchart LR
+ I["UI 文本／speech.final／固定控制"]:::agent
+ B["AgentChatContextBuilder：完整历史／最新 State"]:::agent
+ K["冻结 Skill／有效目录／提示词"]:::agent
+ W["AgentChatWorker：Decision／轮次屏障"]:::agent
+ D["AgentChatDriver：provider 生命周期"]:::agent
+ T["独立文本队列／FunctionTokenParser"]:::host
+ N["独立 native 队列／ToolCallParser"]:::host
+ G["Gateway：已解析输出／结果回原轮次"]:::gateway
+ I --> W
+ B --> W
+ K --> W
+ W --> D
+ D --> T
+ D --> N
+ T --> W
+ N --> W
+ W <--> G
+ G -->|"真实结果重建观察"| B
+ classDef ui fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e
+ classDef platform fill:#dcfce7,stroke:#16a34a,color:#14532d
+ classDef model fill:#f3e8ff,stroke:#9333ea,color:#581c87
+ classDef storage fill:#fef3c7,stroke:#d97706,color:#78350f
+ classDef agent fill:#eef2ff,stroke:#6366f1,color:#312e81
+ classDef gateway fill:#ffedd5,stroke:#ea580c,color:#7c2d12
+ classDef action fill:#ffe4e6,stroke:#e11d48,color:#881337
+ classDef host fill:#f1f5f9,stroke:#64748b,color:#334155
+```
+
+各角色有独立仓库、权限及可写历史，不因复用 Worker 而共享状态。
+
+UI 文本处理只接纳 Decision，回执不等待模型／播放终态；start 订阅、pause/stop 关闭加入、resume 重订阅。turn 由角色赋予，保留 UI 请求／代际／因果身份。聆听不是本 Worker 的转发职责。
+
+## 角色接口
+
+AgentChatContextState 提供预处理、systemPrompt、历史消息构造、通信验证和观察策略。sessionControl 是本地会话控制的解释入口，默认返回 nil；角色可返回 AgentChatSessionControl.interrupt 或 close。Worker 校验消息契约、版本及 local／runtime／无 incarnation 的本地来源后执行生命周期屏障，不解释具体角色协议。
+
+commitDependentTargets 声明需要父历史提交确认的目标；Worker 在真实提交后通知这些目标。实际角色协议、相机业务值和照片预算由角色目录拥有。
 
 ## 请求、提示词与快照
 
@@ -64,7 +112,7 @@ Action 正文含原轮次 call 序号、当前 action 别名、真实 status 与
 
 历史按单调 historyOrder 排序，完整 native 配对一起保留；failed/interrupted/unresolved 请求只作为文本历史证据。终态 Task 在首个来源位置替换为摘要，运行 Task/普通背景仍在窗口内，原记录可查询。选取最近十个投影块，再应用消息/字节/图片限制。
 
-Task 创建先验证候选、提交业务身份，再绑定运行时上下文，绑定失败显式关闭该身份。完整模型消息、观察和终态按各自边界 checkpoint；delta 和队列在内存。持久化失败阻止依赖后续步骤，不把本地投影当作已落盘。真实数据库访问通过注入 Chat/Task 仓库，重启不重放效果。
+用户文本接纳在历史仓库单次原子操作中选择当前会话并建立 awaitingModel 记录；模型请求校验精确快照 token。Task 创建先验证候选、提交业务身份，再绑定运行时上下文，绑定失败显式关闭该身份。完整模型消息、观察和终态按各自边界 checkpoint；delta 和队列在内存。持久化失败阻止依赖后续步骤，不把本地投影当作已落盘。真实数据库访问通过注入 Chat/Task 仓库，重启不重放效果。
 
 ## Bounds and overflow
 
@@ -75,17 +123,17 @@ Task 创建先验证候选、提交业务身份，再绑定运行时上下文，
 | Driver native queue | 128 complete calls; failed yield terminates the round. Each generation permits 120 calls; the cumulative decision has no native-call cap. |
 | Decision lifetime | Completion/cancellation/error-owned, no cumulative requests/native calls/time limit. Generated calls (120) and feedback bytes (64 KiB) reset each round. |
 | Queue lifetime | Owner cancellation/terminal state; no elapsed-time expiry |
-| Task views / prompt reports | 256 identities, at most 32 live; only terminal views may be retired. Data messages include only same-session active background tasks or the current directed task (maximum 17); legacy terminal views remain history only. |
+| Task views / prompt reports | 256 identities, at most 32 live; only terminal views may be retired. Data messages include only same-session active background tasks or the current directed task (maximum 17); terminal views remain history only. |
 
 The driver's secondary queues use synchronous checked yields. They do not suspend the provider producer; ModelKit adapters define the upstream ChatEvent queue policy. Cancellation or failure cancels the provider session, finishes both queues and joins all consumers. Only normal provider completion flushes the Action parser; partial failed/cancelled syntax is not finished or replayed.
 
 ## 生命周期、时序与错误
 
-worker 独立于 UI 页面；结果必须匹配 call/round/task/session/incarnation 与封闭屏障。Pause/stop 取消并加入拥有的工作，输出传输失败也必须清理。Reply occupancy 是有界完整 revision 快照，证据提交先于占用移交；终态事实释放占用，不使用租约定时器，也不授予麦克风权。
+worker 独立于 UI 页面；结果必须匹配 call/round/task/session/incarnation 与封闭屏障。pause／interrupt 取消并加入当前 Decision，保留 Task／Skill 与公开状态作用域，目标回到 waitingUser，被中断 Decision 不扣闲置次数；close 关闭匹配会话，stop 关闭全部。输出传输失败也必须清理。Reply occupancy 是有界完整 revision 快照，证据提交先于占用移交；终态事实释放占用，不使用租约定时器，也不授予麦克风权。
 
-✅ ChatTiming 由支持的 provider 在请求发出及首个非空文本或已校验身份的原生工具参数增量时取单调样本；取先到者，排除私有推理和工具执行时间。不支持计时或没有有效增量时不产生 TTFT；driver 沿用同一快照持久化链路。消费、ASR、TTS 与 UI 耗时不是模型首 token 时延。网络传输自身超时和实时感知 freshness 不作为整个决策时限。
+ChatTiming 由支持的 provider 在请求发出及首个非空文本或已校验身份的原生工具参数增量时取单调样本；取先到者，排除私有推理和工具执行时间。不支持计时或没有有效增量时不产生 TTFT；driver 沿用同一快照持久化链路。消费、ASR、TTS 与 UI 耗时不是模型首 token 时延。网络传输自身超时和实时感知 freshness 不作为整个决策时限。
 
-错误保留原生产者语义：provider HTTP/transport/response 错误、GenerationError、CapabilityError 与提交错误分别传播；不伪造空值成功或不确定副作用的重试。执行者超时通过真实 ActionResult 返回。
+错误保留原生产者语义：provider HTTP/transport/response 错误、GenerationError、CapabilityError 与提交错误分别传播，并保留原始清理错误。取消输出 agent.cancelled，不产生失败 Toast；被动容器故障不触发模型或自动硬件恢复。执行者超时通过真实 ActionResult 返回。
 
 ## Continuation outcome matrix
 
@@ -94,7 +142,7 @@ worker 独立于 UI 页面；结果必须匹配 call/round/task/session/incarnat
 | Successful `.value`, including `""` | Business output; continue after the full barrier. Empty string is an explicit value, not absence of a value. |
 | Successful `.report`, empty or nonempty | Execution evidence only; keep all steps/details/history and join the barrier, without requesting ReACT. A report is not a business value. |
 | Successful `.activityStarted` / `.activityStopped` | Lifecycle acknowledgment only; the identity does not independently request ReACT. Business data must be returned explicitly as `.value`. Later activity events have no generic automatic continuation integration. |
-| Legacy native ToolResult with `value` and no `completion` | Preserve value semantics and continue, including an empty value. Legacy ActionResult without completion is normalized to `.completed`. |
+| Native ToolResult with `value` and no `completion` | Preserve value semantics and continue, including an empty value. ActionResult without completion is normalized to `.completed`. |
 | Failed/partially failed Action invocation | Preserve actual failures/effects and continue while the input owner remains live. |
 | Cancelled Action/Tool invocation | Preserve cancelled evidence; no incident or ReACT. Independent real failures in a mixed report remain failures. |
 | Tool `isError`, nonnil non-cancellation `failureCode`, failed report | Real failure takes precedence over absence of business output; continue. |
@@ -123,36 +171,8 @@ AgentChatWorker 默认 TextSegmentationPolicy 为首段 Han/其他字符 20/60�
 
 请求值本身的消息/图片/定义/配对限制由 [ChatRequest](../../../ModelKit/Language/LLM/README.md#request-validation-bounds) 拥有；解析器和 provider 队列分别见所属目录。
 
-## 待实现
+## 未实现范围
 
-- 暂停/中断的 Task 状态投影与 per-input 提交仍无统一最终 flush；现有提交边界分别保留错误，不伪造统一 checkpoint。
-- 活跃 worker 的持久化恢复、跨进程传输与真实模型/原生交互验收。
+❌ 暂停／中断时 Task 状态投影与 per-input 提交的统一最终 flush、活跃 worker 的持久化恢复与跨进程传输。各提交边界独立传播错误，不提供统一 checkpoint。
 
 [Support](../README.md) · [Context](../Context/README.md) · [Generation](../Core/Generation/README.md) · [Capability](../Core/Capability/README.md)
-
-## Storage 依赖
-
-✅ 存储访问使用独立的 State、Cache、Database 和 Files 接口；App 注册根实例，消费者通过构造器获得所需能力。存储容器不接管本目录的业务验证、执行和完成语义。
-
-## 公开 State 边界
-
-✅ AgentStateContext 拥有按 Agent/会话隔离的 task 注册代际和只读快照能力。每轮 executeRound 固定 Skill/目录/useState 集合，文本 Action 与 native Tool 解析共用该次冻结目录，读取最新公开快照并重建唯一 CURRENT STATE 系统数据块；预算包含该块，历史保存实际请求。中断加入后保留会话；显式 cancelSession 才关闭会话，stop 关闭全部注册。observe 不触发模型。标题请求不经过此 Skill 链路。
-
-[公开 State 契约](../../../Storage/State/README.md)
-
-Task 关闭后的历史重建复用真实 Action executionObservations，不再额外生成 mode/activeTaskID/skills 等 Task 转换状态摘要；当前任务事实只从 CURRENT STATE 读取。
-
-✅ pause 与可信 interruptSession 复用当前取消/join 屏障，但保留 Task/Skill 和 AgentStateContext 作用域；被中断 Decision 不结算闲置次数，运行目标回到 waitingUser。cancelSession 才关闭公开端口并释放会话 Skill。处理中的显式 finish/cancel 仍按真实屏障结算终态。
-
-✅ State 单独系统消息按每请求刷新，放在最新 user 消息之前或完整 native 结果组之后；历史选择保留 system 与配对，预算包含 State。缓存用量透传到真实请求证据。
-
-
-## 分类异常诊断
-
-✅ 模型失败使用类型化诊断生成 AgentFailureDiagnostic；分类代码、可读细节随现有 agent.error 输出。清理附带错误继续保留，原始模型失败不被降为普通运行错误；取消继续使用 agent.cancelled，不产生错误 toast。
-
-## 统一容器异常通道
-
-✅ AgentChatWorker 在普通决策前接收已授权的 container.failure，维护最多128条被动诊断，按事件 ID 更新次数，超限计数淘汰。仅内存，不写可能故障的 Storage、不启动模型/Task/自动重试；拒绝错误来源、伪造授权和失效会话。
-
-✅ 取消已封闭的 round 不再注册清理 Action；退出由既有回复占用清空／UI 生命周期完成，请求身份在 Worker 内同步释放。

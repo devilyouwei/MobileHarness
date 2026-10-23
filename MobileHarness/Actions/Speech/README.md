@@ -1,41 +1,32 @@
-# Speech — 播放与聆听策略函数
+# Speech — 业务函数与执行设计
 
-✅ 原生提示音预备与播放共用 ActionBindings 的单份私有 PCM 缓存；Speech 函数继续只转发配置和真实 invocation，不接管设备或聆听策略。
+## 职责与模块关系
 
-## 简介
+拥有播放、聆听与音频检测函数及真实执行。SpeechExecutionEndpoint 提供稳定的窄端口，弱绑定根语音会话；SpeechModule 显式接收播放、聆听、手势与检测能力，不从无关能力推断可用性。生成、策略与原始 PCM 消费属于上游角色。
 
-提供 `Speech.Playback.speak` 与 `Speech.Listening.update`。前者播放已有音频句柄，后者传递可信聆听策略和启动反馈配置；本域不生成语音、不持有音频流，也不选择聆听策略。
+Gateway 通过注册函数调用本域，Agents 决定请求与策略，App 注入唯一基础能力和根生命周期。本域消费 FunctionContracts 及需要的基础能力，不导入 Agents、Gateway 实现或 App。全部域内源码由 Actions 单一目标编译。
 
-## 上下游关系（一级）
+## 目录与文件
 
-```mermaid
-flowchart LR
-    Gateway -->|FunctionInput| S[Speech 函数]
-    S -->|完成或异常| Gateway
-    Host[ActionBindings 播放与聆听端点] -.->|能力注入| S
-    S -->|音频句柄与策略配置| Host
-    Contracts[FunctionContracts] -.->|输入与预算类型| S
-    UIValues[Actions/UI 反馈类型] -.->|提示音与触觉请求| S
-```
+| 文件 | 当前职责 |
+| --- | --- |
+| [SpeechActions.swift](SpeechActions.swift) | 业务函数的参数校验、能力调用与完成值 |
+| [SpeechExecutionEndpoint.swift](SpeechExecutionEndpoint.swift) | 语音会话的稳定端口与身份校验，弱绑定实际所有者 |
+| [SpeechModule.swift](SpeechModule.swift) | 显式绑定播放、聆听、手势和检测能力 |
 
-SpeechPerception 的策略选择和音频生成在调用上游；本域只通过已注册函数接收请求。原生播放、捕获与会话寿命属于注入的 ActionBindings 能力。
+| 目录 | 责任 |
+| --- | --- |
+| [Detection](Detection/README.md) | 检测只消费角色已计算的观测值；原始 PCM 订阅属于角色 |
+| [Listening](Listening/README.md) | 实际感知注册与模型图属于注入的上游角色；本目录拥有权限、捕获启停、半双工、启动反馈及真实播放屏障 |
+| [Playback](Playback/README.md) | 播放只消费已经生成的音频句柄，不选择模型或生成语音；借出、真实排空、取消和租约释放均由播放执行拥有 |
 
-## 内部模块关系
+[Support](Support/README.md) 仅维护跨业务能力共用的契约或算法。
 
-```mermaid
-flowchart LR
-    Namespace[SpeechActions] --> Playback[PlaybackActions.swift]
-    Namespace --> Listening[ListeningActions.swift]
-    Module[Support/SpeechModule] -->|绑定| Playback
-    Module -->|绑定| Listening
-    Playback --> Port1[SpeechPlaybackCapability]
-    Listening --> Feedback[ListeningFeedback]
-    Listening --> Port2[SpeechListeningCapability]
-    Feedback --> Port2
-```
+## 函数与完成
+
+Speech.Playback.speak 等待音频排空；Speech.Listening.update 接收策略与反馈；内部 Speech.Listening.prepare 接收手势反馈；内部 Speech.Detection.run 关联请求私有就绪与检测执行。后两者的函数工厂与同类入口同处业务目录，执行服务不定义注册入口。缺少可选能力时保留定义并明确失败。
 
 ## 接口与关键技术
-
 | 函数 | 解析与完成 | 静态 timeout |
 | --- | --- | --- |
 | speak | 只接受 audioID，最多 36 字节且可解析为 ID；调用播放端点并等待它返回 | 300 秒 |
@@ -45,20 +36,6 @@ speak 将所有参数解析错误映射为 missingAudio，并在播放前后检�
 
 update 拒绝未知键。cue 可选 wake/confirm/cancel/error/soft/save/discard（默认 wake），volume 为有限 0…1（默认 0.85），hapticStyle 可选 light/medium/heavy/rigid/soft（默认 heavy），hapticIntensity 为有限 0…1（默认 1）。解析结果包装为 ListeningFeedback，并连同真实 invocation 交给宿主。
 
-update 的固定使用者是 SpeechPerception；实际 source/session/revision 准入由宿主验证，Actions 本身不解释权限。新启动的反馈与捕获由端点组合，子结果通过父 invocation 的报告端口保存。策略更新不等于每次都播放启动反馈。
+update 的固定使用者是 SpeechPerception；实际 source/session/revision 准入由 Actions 执行端点验证，函数入口不重复解释权限。新启动的反馈与捕获由端点组合，子结果通过父 invocation 的报告端口保存。策略更新不等于每次都播放启动反馈。
 
-## 生命周期与失败处理
-
-SpeechModule 必须注入播放能力，聆听能力可选；缺少聆听能力时 update 抛 listeningUnavailable。入口没有排队、后台 worker 或自动恢复循环，取消传递与清理由端点及执行层共同实现。
-
-聆听恢复、播放屏障、原生捕获和声学时序属于 AgentBindings/ActionBindings/SpeechPerception 的契约，不在本域设定固定恢复等待。端点返回可能表示策略接纳、加入启动完成或实际播放排空，应按对应接口解释；失败不触发这里的隐式语音重试。
-
-[Actions 设计](../README.md) · [能力目录](Support/README.md) · [语音集成生命周期](../../Agents/Support/README.md)
-
-## 待实现
-
-- 暂无本目录独立的实现待办；跨模块及实际模型/设备验收见所属模块说明。
-
-## Storage 依赖
-
-✅ 存储访问使用独立的 State、Cache、Database 和 Files 接口；App 注册根实例，消费者通过构造器获得所需能力。存储容器不接管本目录的业务验证、执行和完成语义。
+[Actions 设计](../README.md) · [公共函数契约](../Support/Contracts/README.md)

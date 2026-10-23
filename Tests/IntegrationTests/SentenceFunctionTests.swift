@@ -79,7 +79,7 @@ private actor StreamingSentenceChat: ChatCapability {
     var outputs = FixtureGenerationOutputs(agent: agent).makeAsyncIterator()
     _ = try #require(try await outputs.next())
     _ = try #require(try await outputs.next())
-    try await agent.receive(AssistantControl.cancelSession.input(sessionID: input.sessionID))
+    try await agent.receive(AssistantSessionControl.cancelSession.input(sessionID: input.sessionID))
     let cancelled = try #require(try await outputs.next())
     #expect(cancelled.inputID == input.id)
     #expect(cancelled.output == .control("agent.cancelled"))

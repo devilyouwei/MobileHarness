@@ -1,67 +1,77 @@
-# Neutral Communication and Task Contracts
+# Communication — 通用消息、Task 与投递回执
 
-## Summary
+## 职责与外部关系
 
-Typed immutable messaging, declaration validation, scoped tasks and admission receipts without transport workers.
-
-## Ownership and boundaries
-
-Gateway selects recipients and owns bounded delivery tasks. Agents own inbox/processing/task state. Core defines generic content/rights/catalogs and no concrete speech, pose or device policy.
-
-## External relationships and data flow
-
-Runtime arrows show data or capability calls; dashed arrows show injection.
+定义不可变消息、精确通信声明、scoped Task 与投递证据，不运行传输 Worker，不认识语音／姿态等业务 schema。Gateway 拥有目标选择和有界投递任务，Agents 拥有处理与业务终态。
 
 ```mermaid
 flowchart LR
- Agent -->|CommunicationAction| Gateway
- Policy[CommunicationPolicy and Contracts] -->|Authorization and schema| Gateway
- Gateway -->|Directed admission| Receiver[Target Agent]
- Receiver -->|Admission only| Receipt[CommunicationReceipt]
- Receipt --> Agent
- Gateway -->|One-way publication| Subscribers[Exact static / host dynamic subscribers]
+ A["Agents：发布／定向输出"]:::agent
+ G["Gateway：校验／选择接收者／投递"]:::gateway
+ C["CommunicationPolicy／Contracts／Task 值"]:::host
+ R["目标 Agent：接纳与处理"]:::agent
+ A -->|"CommunicationAction"| G
+ C -->|"中立权限与 schema 契约"| G
+ G --> R
+ R -->|"仅 send 产生接纳回执"| G
+ G --> A
+ classDef ui fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e
+ classDef platform fill:#dcfce7,stroke:#16a34a,color:#14532d
+ classDef model fill:#f3e8ff,stroke:#9333ea,color:#581c87
+ classDef storage fill:#fef3c7,stroke:#d97706,color:#78350f
+ classDef agent fill:#eef2ff,stroke:#6366f1,color:#312e81
+ classDef gateway fill:#ffedd5,stroke:#ea580c,color:#7c2d12
+ classDef action fill:#ffe4e6,stroke:#e11d48,color:#881337
+ classDef host fill:#f1f5f9,stroke:#64748b,color:#334155
 ```
 
-## Policy and provenance
+## 文件与职责
 
-JSON v6/v7 declares supported inputs, exact contract/source/topic subscriptions, publications and target-specific sends. Supporting a contract is not subscribing. Unknown identities, wildcard/default-Agent fallback and incompatible declarations reject. Catalog capacity is 128; external source allowlist 16; policy bounds 64 Agents/topics and 16 subscriptions/recipients.
+| 文件 | 职责 |
+| --- | --- |
+| [AgentMessaging.swift](AgentMessaging.swift) | AgentMessage 类型擦除／验证、身份绑定传输端口与 DeliveryReport |
+| [CommunicationPolicy.swift](CommunicationPolicy.swift) | 契约目录、精确输入／订阅／发布／定向声明及权限判断 |
+| [AgentTaskSignal.swift](AgentTaskSignal.swift) | Task 作用域／信封与有界注册表的接纳和状态校验 |
+| [DeliveryHistory.swift](DeliveryHistory.swift) | 单传输端口的有界投递结果证据 |
+| [SignalObservation.swift](SignalObservation.swift) | Signal 的因果、分支接纳状态、摘要及可选 Task 信封快照 |
 
-AgentMessage captures checked immutable content and encoded size. Schemas declare expected type, validator, byte limit and whether publication starts work. Signals have no default TTL; explicit perception freshness remains producer-owned. Causal metadata preserves incarnation, root/parent/session/turn and at most eight hops. Runtime feedback authority cannot be supplied externally.
+## 内部契约
 
-## Delivery and task state
+```mermaid
+flowchart LR
+ D["声明：inputs／subscriptions／publications／sends"]:::host
+ P["CommunicationPolicy：来源／目标／权限"]:::host
+ S["CommunicationContracts：类型／大小／内容校验"]:::host
+ M["AgentMessage：不可变业务内容"]:::host
+ T["AgentTaskSignal／Registry：Task 作用域"]:::host
+ H["DeliveryHistory／SignalObservation：被动证据"]:::host
+ D --> P
+ S --> M
+ P --> T
+ M --> T
+ T --> H
+ classDef ui fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e
+ classDef platform fill:#dcfce7,stroke:#16a34a,color:#14532d
+ classDef model fill:#f3e8ff,stroke:#9333ea,color:#581c87
+ classDef storage fill:#fef3c7,stroke:#d97706,color:#78350f
+ classDef agent fill:#eef2ff,stroke:#6366f1,color:#312e81
+ classDef gateway fill:#ffedd5,stroke:#ea580c,color:#7c2d12
+ classDef action fill:#ffe4e6,stroke:#e11d48,color:#881337
+ classDef host fill:#f1f5f9,stroke:#64748b,color:#334155
+```
 
-CommunicationAction uses the identity-bound output consumer. send selects a live target and returns correlated admission; publish returns Void without receipt/history, even with no subscribers. Publisher validation failures are explicit; subscriber/observer failures are independent diagnostics. No transport FIFO, exactly-once promise, retry or duplicate suppression is provided.
+## 授权与身份
 
-TaskRequest/Input/Progress/Result/Cancel carry scoped business data: at most 65536 bytes of opaque business data and 131072 bytes for the encoded envelope. Only result carries terminal status; requester/executor/session and runtime provenance are validated separately from payload content. AgentTaskRegistry retains 256 records, at most 128 accepted Signal IDs per task and rejects wrong scope, duplicate reports or post-terminal inputs. At capacity only terminal identities can be retired; reports for retired identities reject. Late admission cannot overwrite an earlier true terminal result. Restart interrupts active tasks.
+配置精确列 contract/source/topic/target；支持输入不等于订阅。发布者必须是声明的 Agent，无 wildcard、默认 Agent 回落或外部来源表。schema catalog 128，policy 至多 64 个 Agent/topics、16 个订阅／接收者。消息校验类型、内容、字节和可否启动工作；runtime 来源不能由外部文本伪造。
 
-Compatibility AgentMessaging is limited to Gateway/isolated hosts; production roles emit CommunicationAction. Directed receipt history retains 128 entries with counted oldest eviction. SignalTrace snapshots are payload-free passive diagnostics, never publisher acknowledgments.
+因果值保留 incarnation/root/parent/session/turn，最多八跳。Signal 无默认 TTL；显式感知 freshness 由生产者和接收者校验。容器／运行故障由上层直接观察，不在通信注册表发布。
 
-Strict messaging declarations, scoped task state and distinct admission/terminal contracts are implemented.
+## 投递、任务与完成
 
-## Related design
+send 使用身份绑定输出消费器，选择存活目标并产生关联接纳回执；publish 无回执、无投递历史，即使无订阅者也可完成。发布者校验失败显式返回，订阅者／观察者失败独立记录；不承诺全局 FIFO、exactly-once、自动重试或通用去重。
 
-[Parent design](../README.md)
+Task request/input/progress/result/cancel 保存中立作用域与业务 Data，业务最多 65536 字节，编码信封最多 131072；只有 result 表达终态。Registry 最多 256 条记录、16 个非终态后台任务，每任务 128 个已接纳 Signal ID；校验 requester/executor/session/incarnation、重复和终态后输入。满载只淘汰终态，已淘汰身份拒绝迟到报告，迟到接纳不得覆盖真实终态。
 
-## 泛化 Task 与独立 Skill
+Task execution 前台／后台是中立值，反序列化缺少 execution 字段时按 foreground 读入；Core 不加载 Skill。DeliveryHistory 历史最多 128，最旧淘汰计数。SignalTraceRecord 保存因果、摘要及最多 16 个目标分支；Task 消息可附带业务 Data 不超过 64 KiB 的原任务信封，其他消息不保留原始内容。该快照是被动证据，不向发布者确认。AgentMessaging 为 Gateway／隔离宿主提供身份绑定传输端口；生产角色发出 CommunicationAction。
 
-Core provides business-neutral AgentTaskExecution and backward-readable scope.execution, plus bounded goal/requestedSkills evidence. Registry owns admission, delivery and cancellation transitions: 256 records and 16 nonterminal background tasks. Core does not load Skill resources or compose prompts. Missing legacy execution decodes as foreground.
-
-## Lifecycle-owned conversation and audio
-
-Signal 默认没有过期时间；通信授权不附加隐式 TTL。实时感知输入可以声明新鲜度，接收方仍须校验来源、会话和作用域。Task 的终态、显式取消与 owner 清理决定生命周期；请求/调用数和队列容量独立受限。
-
-## 待实现
-
-- Remote serialization and durable delivery are not implemented.
-
-## 动态订阅边界
-
-✅ Gateway 在不可变 CommunicationPolicy 的 schema/来源权限之上增加宿主控制的有界动态订阅；Core 不拥有运行时订阅表，动态关系不得扩展目标输入或发布者权限。
-
-## 统一容器异常通道
-
-✅ container.failure 是中立标准 observation，来源 runtime，严格验证事件身份/组件/操作/代码/内容/次数。它是外部技术事实，不获得 runtime feedback、Task 或执行授权。
-
-## ApplicationControl 异常展示
-
-✅ 标准注册表包含 runtime.failure（16 KiB）与 container.failure（8 KiB）的 observation 类型验证。发布者身份由外部接纳验证；这些事实不代表 ActionResult，不启动新业务执行作用域。
+停止和显式取消决定生命周期，重启标 interrupted，不重放设备效果。❌ 远程序列化和持久化投递未实现。业务契约见 [Agents/Communication](../../Communication/README.md)。

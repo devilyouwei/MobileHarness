@@ -1,6 +1,4 @@
-import ActionBindings
 import Actions
-import AgentBindings
 import AgentCore
 import Agents
 import CallRuntime
@@ -258,11 +256,7 @@ private func synthesisClientConfiguration(_ name: String, permitted: Bool) throw
         synthesisClientConfiguration("denied", permitted: false), AgentConfigurations.load(named: "SpeechSynthesis"),
     ]
     let policy = try CommunicationPolicy(
-        contracts: AgentContracts.communication,
-        externalSources: [
-            "user", "runtime", "phone.microphone", "phone.camera", "model.resources", "app.resources",
-            "app.environment",
-        ], configurations: configs)
+        contracts: AgentContracts.communication, configurations: configs)
     let manager = AgentManager()
     let store = AudioCache()
     let model = PlaybackSynthesisFixture()
@@ -274,7 +268,7 @@ private func synthesisClientConfiguration(_ name: String, permitted: Bool) throw
     try await manager.register(synthesizer)
     try await synthesizer.start()
     let gateway = OutputGateway(
-        manager: manager, requests: InputGateway(manager: manager, policy: policy, allowsExternalSend: true),
+        manager: manager, requests: InputGateway(manager: manager, policy: policy),
         tools: ToolRegistry(),
         policy: policy, sink: { _ in })
     for config in configs.prefix(3) {
@@ -333,10 +327,10 @@ private enum ReplyInterruptionFailure: Error, Equatable { case unavailable }
 
 @Test(.actionCatalog, .timeLimit(.minutes(1)), arguments: ["completed", "failed", "cancelled"])
 @MainActor func voiceReplyCancellationJoinsPlaybackBeforeRetiringSessionAudio(outcome: String) async throws {
-    let failures = Mutex<[String]>([])
+    let failures = Mutex<[any Error]>([])
     let cache = CacheContainer(
         failures: StorageFailureReporter { component, operation, error in
-            failures.withLock { $0.append("\(component).\(operation): \(error)") }
+            failures.withLock { $0.append(error) }
         })
     let session = UUID().uuidString
     let store = try await cache.audioScope(session)
@@ -402,7 +396,10 @@ private enum ReplyInterruptionFailure: Error, Equatable { case unavailable }
     } else {
         try await interruption.value
     }
-    #expect(failures.withLock { $0 }.isEmpty)
+    #expect(
+        failures.withLock {
+            $0.allSatisfy { ($0 as? StorageFailure)?.isCancellation == true || $0 is CancellationError }
+        })
     await #expect(throws: AudioCacheError.missingAudio) { try await store.validate(queued, owner: owner) }
     await cache.close()
 }
@@ -437,16 +434,19 @@ private enum ReplyInterruptionFailure: Error, Equatable { case unavailable }
         ))
     try await manager.start(.assistant)
     let gateway = OutputGateway(
-        manager: manager, requests: InputGateway(manager: manager, allowsExternalSend: true), tools: ToolRegistry(),
+        manager: manager, requests: InputGateway(manager: manager), tools: ToolRegistry(),
         actions: scheduler, sink: { _ in })
     try await gateway.dispatch(
         OutputEnvelope(
-            source: .assistant, input: input,
-            output: .actionCall(ActionCall(actionPath: path, channel: "Display", parameters: ["emotion": "smile"]))))
+            source: .assistant, context: input.context,
+            output: .actionCall(ActionCall(actionPath: path, channel: "Display", parameters: ["emotion": "smile"])),
+            taskScope: input.taskScope))
     await started.wait()
     let finishing = Task {
         try await gateway.dispatch(
-            OutputEnvelope(source: .assistant, input: input, output: .control("agent.finished")))
+            OutputEnvelope(
+                source: .assistant, context: input.context, output: .control("agent.finished"),
+                taskScope: input.taskScope))
         await store.cancel(inputID: input.id, source: "assistant")
     }
     try await store.validate(id, owner: owner)
@@ -474,7 +474,7 @@ private enum ReplyInterruptionFailure: Error, Equatable { case unavailable }
                 agent: FixtureNativeChatState.agentID, scope: UUID().uuidString, state: FixtureNativeChatState())
         ))
     let gateway = OutputGateway(
-        manager: manager, requests: InputGateway(manager: manager, allowsExternalSend: true), tools: ToolRegistry(),
+        manager: manager, requests: InputGateway(manager: manager), tools: ToolRegistry(),
         sink: { _ in })
     await #expect(throws: ActionExecutionError.missingHandler(job.2.call.actionPath)) {
         try await gateway.dispatch(job.2.testEnvelope)

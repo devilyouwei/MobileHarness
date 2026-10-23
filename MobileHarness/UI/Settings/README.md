@@ -60,3 +60,20 @@ JSON 分享延迟编码实际展示的 Codable 值，保留原始 requestJSON；
 历史详情读取的容量约束：一个实际读取与一个最新候选，取消清除候选并取消实际读取；候选替换不创建等待任务链，实际读取完成后才接纳下一项。
 
 ✅ 已实现：devices呈现Action维护独立连接摘要，设置页展示该状态；详细设备／机械臂控制资格仍消费原真实状态，不由显示摘要解锁设备。
+
+
+## Direct container contract
+
+UI-owned typed request/reply capabilities have one consumer and at most 64 outstanding requests, including accepted work. Acceptance does not complete a request. Cancellation, consumer exit, root invalidation and late replies are generation-fenced. Foundation dependencies remain empty. Current cross-module ownership is defined by the [overall design](../../README.md).
+
+## Agent-owned UI inputs
+
+✅ Settings, resource, device and history subcontainers own their typed request/reply sources and UI generations. Business consumers are constructor-injected owners outside UI; pages and local interaction facades submit through these sources. UI contains no business event subscriber or Gateway dependency. Actual query/effect failure remains a failed receipt, with late completion fenced by generation.
+
+## 直连链路当前契约
+
+✅ 未提交表单和页面状态留 UI，业务提交、结果与运行事实的呈现归 Actions。
+
+## Provider 表单控制
+
+SettingsFormController 只拥有草稿规范化、默认选项、请求忙态和迟到结果围栏；经 SettingsOperating 提交 UI 自有请求，不导入业务或设备模块，不执行凭据持久化、模型切换或实际 Provider 发现。根持有控制器，页面退出取消发现并推进 revision。

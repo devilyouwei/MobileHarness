@@ -18,11 +18,14 @@ public struct AgentMessage: Sendable {
     public func content<Content: Encodable & Sendable>(as type: Content.Type) -> Content? {
         value as? Content
     }
-    public func encodedContent() throws -> Data {
+    public func validate() throws {
         guard !contract.isEmpty, contract.utf8.count <= 64, (1...262_144).contains(maximumBytes) else {
             throw CommunicationError.invalidPayload
         }
         try validateContent()
+    }
+    public func encodedContent() throws -> Data {
+        try validate()
         let data = try JSONEncoder().encode(value)
         guard data.count <= maximumBytes else { throw CommunicationError.invalidPayload }
         return data

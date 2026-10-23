@@ -1,6 +1,5 @@
-import ActionBindings
 import Actions
-import AgentBindings
+import Agents
 import Foundation
 import Gateway
 import PlatformKit

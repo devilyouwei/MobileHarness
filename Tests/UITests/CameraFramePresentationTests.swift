@@ -34,17 +34,19 @@ import Testing
     #expect(state.visionMessage == "姿态识别暂不可用")
 }
 
-@Test @MainActor func cameraPoseExpiresWithoutRemovingLiveVideo() async throws {
-    let state = CameraState()
-    try state.presentVideo(frame(10))
-    try state.present(
-        frame: frame(3, age: .milliseconds(700)),
-        pose: PoseOverlay(sequence: 3, timestamp: 0, rotation: 0, people: []))
-    #expect(state.videoFrame?.sequence == 10)
-    #expect(state.skeleton?.sequence == 3)
-    try await awaitCameraState { state.skeleton == nil }
-    #expect(state.videoFrame?.sequence == 10)
-    #expect(state.skeleton == nil)
+extension NativePresentationTests {
+    @Test @MainActor func cameraPoseExpiresWithoutRemovingLiveVideo() async throws {
+        let state = CameraState()
+        try state.presentVideo(frame(10))
+        try state.present(
+            frame: frame(3, age: .milliseconds(700)),
+            pose: PoseOverlay(sequence: 3, timestamp: 0, rotation: 0, people: []))
+        #expect(state.videoFrame?.sequence == 10)
+        #expect(state.skeleton?.sequence == 3)
+        try await awaitCameraState { state.skeleton == nil }
+        #expect(state.videoFrame?.sequence == 10)
+        #expect(state.skeleton == nil)
+    }
 }
 
 @Test @MainActor func cameraRejectsStaleVideoAndMismatchedPose() throws {
@@ -58,18 +60,20 @@ import Testing
     #expect(state.videoFrame?.sequence == 5)
 }
 
-@Test @MainActor func cameraVideoExpiresAndCloseClearsBothOutputs() async throws {
-    let state = CameraState()
-    try state.presentVideo(frame(1, age: .milliseconds(700)))
-    try await awaitCameraState { state.videoFrame == nil }
-    #expect(state.videoFrame == nil)
-    try state.presentVideo(frame(2))
-    try state.present(frame: frame(2), pose: PoseOverlay(sequence: 2, timestamp: 0, rotation: 0, people: []))
-    state.present(.isVisible(false))
-    #expect(state.videoFrame == nil)
-    #expect(state.skeleton == nil)
-    try state.presentVideo(frame(1))
-    #expect(state.videoFrame?.sequence == 1)
+extension NativePresentationTests {
+    @Test @MainActor func cameraVideoExpiresAndCloseClearsBothOutputs() async throws {
+        let state = CameraState()
+        try state.presentVideo(frame(1, age: .milliseconds(700)))
+        try await awaitCameraState { state.videoFrame == nil }
+        #expect(state.videoFrame == nil)
+        try state.presentVideo(frame(2))
+        try state.present(frame: frame(2), pose: PoseOverlay(sequence: 2, timestamp: 0, rotation: 0, people: []))
+        state.present(.isVisible(false))
+        #expect(state.videoFrame == nil)
+        #expect(state.skeleton == nil)
+        try state.presentVideo(frame(1))
+        #expect(state.videoFrame?.sequence == 1)
+    }
 }
 
 @Test @MainActor func rendererFailureRemainsLatchedUntilNewCameraGeneration() throws {
@@ -181,196 +185,246 @@ import Testing
     import QuartzCore
     import Synchronization
 
-    @MainActor private func awaitCameraRenderer(_ predicate: () -> Bool) async throws {
+    @MainActor private func awaitCameraRenderer(
+        _ predicate: () -> Bool, diagnostics: () -> String = { "" }
+    ) async throws {
         let deadline = ContinuousClock.now + .seconds(5)
-        while !predicate(), ContinuousClock.now < deadline { try await Task.sleep(for: .milliseconds(10)) }
-        try #require(predicate())
+        while !predicate(), ContinuousClock.now < deadline {
+            while let event = NSApplication.shared.nextEvent(
+                matching: .any, until: .distantPast, inMode: .default, dequeue: true)
+            {
+                NSApplication.shared.sendEvent(event)
+            }
+            NSApplication.shared.updateWindows()
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        try #require(predicate(), "\(diagnostics())")
     }
 
-    @Test(.timeLimit(.minutes(1)), .enabled(if: MTLCreateSystemDefaultDevice() != nil)) @MainActor
-    func cameraNativeMetalDrawStopAndLayerHandoff() async throws {
-        _ = NSApplication.shared
-        let layer = CAMetalLayer()
-        layer.device = MTLCreateSystemDefaultDevice()
-        layer.pixelFormat = .bgra8Unorm
-        layer.maximumDrawableCount = 2
-        layer.drawableSize = CGSize(width: 64, height: 64)
-        let window = NSWindow(
-            contentRect: NSRect(x: 20, y: 20, width: 64, height: 64),
-            styleMask: .borderless, backing: .buffered, defer: false)
-        window.isReleasedWhenClosed = false
-        let view = NSView(frame: NSRect(x: 0, y: 0, width: 64, height: 64))
-        view.wantsLayer = true
-        view.layer = layer
-        window.contentView = view
-        window.orderFrontRegardless()
-        defer {
-            window.contentView = nil
-            window.close()
-        }
-        var pixels: CVPixelBuffer?
-        let attributes: [CFString: Any] = [
-            kCVPixelBufferMetalCompatibilityKey: true,
-            kCVPixelBufferIOSurfacePropertiesKey: [:] as [String: Any],
-        ]
-        #expect(
-            CVPixelBufferCreate(nil, 64, 64, kCVPixelFormatType_32BGRA, attributes as CFDictionary, &pixels)
-                == kCVReturnSuccess)
-        let buffer = try #require(pixels)
-        #expect(CVPixelBufferLockBaseAddress(buffer, []) == kCVReturnSuccess)
-        if let base = CVPixelBufferGetBaseAddress(buffer) { memset(base, 0, CVPixelBufferGetDataSize(buffer)) }
-        #expect(CVPixelBufferUnlockBaseAddress(buffer, []) == kCVReturnSuccess)
-        let failures = Mutex<[String]>([])
-        var previous: DispatchGroup?
-        var completions: [DispatchGroup] = []
-        for index in 0..<12 {
-            let renderer = CameraMetalRenderer(layer: layer, previousCompletion: previous) { message in
-                failures.withLock { $0.append(message) }
+    extension NativePresentationTests {
+        @Test(.timeLimit(.minutes(1)), .enabled(if: MTLCreateSystemDefaultDevice() != nil)) @MainActor
+        func cameraNativeMetalDrawStopAndLayerHandoff() async throws {
+            let application = NSApplication.shared
+            try #require(application.setActivationPolicy(.regular))
+            application.finishLaunching()
+            application.activate(ignoringOtherApps: true)
+            let layer = CAMetalLayer()
+            layer.device = MTLCreateSystemDefaultDevice()
+            layer.pixelFormat = .bgra8Unorm
+            layer.maximumDrawableCount = 2
+            layer.drawableSize = CGSize(width: 64, height: 64)
+            let window = NSWindow(
+                contentRect: NSRect(x: 20, y: 20, width: 64, height: 64),
+                styleMask: .borderless, backing: .buffered, defer: false)
+            window.isReleasedWhenClosed = false
+            defer {
+                window.contentView = nil
+                window.close()
             }
-            defer { renderer.stop() }
-            if index >= 2 {
-                renderer.submit(
-                    CameraRenderSnapshot(
-                        frame: CameraVideoFrame(
-                            pixels: buffer, width: 64, height: 64, rotation: 0,
-                            sequence: UInt64(index), capturedAt: .now),
-                        pose: renderPose(), mirrored: index.isMultiple(of: 2),
-                        size: CGSize(width: 64, height: 64), pixelSize: CGSize(width: 64, height: 64)))
-                try await awaitCameraRenderer { renderer.completedFrameCount == 1 }
+            window.level = .floating
+            window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+            if let screen = NSScreen.main {
+                window.setFrameOrigin(NSPoint(x: screen.visibleFrame.midX - 32, y: screen.visibleFrame.midY - 32))
             }
-            renderer.stop()
-            completions.append(renderer.completion)
-            previous = renderer.completion
+            let view = NSView(frame: NSRect(x: 0, y: 0, width: 64, height: 64))
+            view.wantsLayer = true
+            view.layer = layer
+            layer.frame = view.bounds
+            window.contentView = view
+            window.makeKeyAndOrderFront(nil)
+            window.orderFrontRegardless()
+            view.layoutSubtreeIfNeeded()
+            window.displayIfNeeded()
+            CATransaction.flush()
+            try #require(layer.bounds.width > 0 && layer.bounds.height > 0)
+            try await awaitCameraRenderer(
+                { window.occlusionState.contains(.visible) },
+                diagnostics: {
+                    "window=\(window.windowNumber) visible=\(window.isVisible) occlusion=\(window.occlusionState.rawValue) active=\(application.isActive) running=\(application.isRunning) screens=\(NSScreen.screens.count)"
+                })
+            var pixels: CVPixelBuffer?
+            let attributes: [CFString: Any] = [
+                kCVPixelBufferMetalCompatibilityKey: true,
+                kCVPixelBufferIOSurfacePropertiesKey: [:] as [String: Any],
+            ]
+            #expect(
+                CVPixelBufferCreate(nil, 64, 64, kCVPixelFormatType_32BGRA, attributes as CFDictionary, &pixels)
+                    == kCVReturnSuccess)
+            let buffer = try #require(pixels)
+            #expect(CVPixelBufferLockBaseAddress(buffer, []) == kCVReturnSuccess)
+            if let base = CVPixelBufferGetBaseAddress(buffer) { memset(base, 0, CVPixelBufferGetDataSize(buffer)) }
+            #expect(CVPixelBufferUnlockBaseAddress(buffer, []) == kCVReturnSuccess)
+            let failures = Mutex<[String]>([])
+            var previous: DispatchGroup?
+            var completions: [DispatchGroup] = []
+            for index in 0..<12 {
+                let renderer = CameraMetalRenderer(layer: layer, previousCompletion: previous) { message in
+                    failures.withLock { $0.append(message) }
+                }
+                defer { renderer.stop() }
+                if index >= 2 {
+                    renderer.submit(
+                        CameraRenderSnapshot(
+                            frame: CameraVideoFrame(
+                                pixels: buffer, width: 64, height: 64, rotation: 0,
+                                sequence: UInt64(index), capturedAt: .now),
+                            pose: renderPose(), mirrored: index.isMultiple(of: 2),
+                            size: CGSize(width: 64, height: 64), pixelSize: CGSize(width: 64, height: 64)))
+                    try await awaitCameraRenderer(
+                        { renderer.completedFrameCount == 1 || failures.withLock { !$0.isEmpty } },
+                        diagnostics: {
+                            "index=\(index) visible=\(window.occlusionState.contains(.visible)) failures=\(failures.withLock { $0 })"
+                        })
+                    try #require(
+                        failures.withLock { $0.isEmpty }, "\(failures.withLock { $0.joined(separator: "; ") })")
+                    #expect(renderer.completedFrameCount == 1)
+                }
+                renderer.stop()
+                completions.append(renderer.completion)
+                previous = renderer.completion
+            }
+            // New workers may start before old cleanup finishes; keep Core Animation's main run loop available.
+            try await awaitCameraRenderer({ completions.allSatisfy { $0.wait(timeout: .now()) == .success } })
+            #expect(failures.withLock { $0.isEmpty })
         }
-        // New workers may start before old cleanup finishes; keep Core Animation's main run loop available.
-        try await awaitCameraRenderer { completions.allSatisfy { $0.wait(timeout: .now()) == .success } }
-        #expect(failures.withLock { $0.isEmpty })
     }
 #endif
 
-@Test @MainActor func uiCameraRootOwnsOnePassiveDisplayAndFencesMedia() async throws {
-    let root = UIContainer()
-    let presentation: any CameraPresenting = root.camera
-    let other = UIContainer()
-    #expect(root.camera.state !== other.camera.state)
-    #expect(!root.isAvailable)
-    #expect(!presentation.snapshot.isEnabled)
-    #expect(root.camera.state.videoFrame == nil)
-    let video = try frame(1)
-    #expect(throws: UIContainerError.unavailable) { try presentation.presentVideo(video) }
-    try root.start()
-    try presentation.presentVideo(video)
-    try presentation.present(
-        frame: video, pose: PoseOverlay(sequence: 1, timestamp: 0, rotation: 0, people: []))
-    #expect(root.camera.state.videoFrame?.sequence == 1)
-    #expect(presentation.snapshot.skeleton?.sequence == 1)
-    root.invalidate()
-    #expect(!root.isAvailable)
-    #expect(root.camera.state.videoFrame == nil)
-    #expect(presentation.snapshot.skeleton == nil)
-    #expect(throws: UIContainerError.unavailable) { try presentation.presentVideo(video) }
-    #expect(throws: UIContainerError.unavailable) {
-        try presentation.present(frame: video, pose: renderPose())
+extension NativePresentationTests {
+    @Test @MainActor func uiCameraRootOwnsOnePassiveDisplayAndFencesMedia() async throws {
+        let root = UIContainer()
+        let presentation: any CameraPresenting = root.camera
+        let other = UIContainer()
+        #expect(root.camera.state !== other.camera.state)
+        #expect(!root.isAvailable)
+        #expect(!presentation.snapshot.isEnabled)
+        #expect(root.camera.state.videoFrame == nil)
+        let video = try frame(1)
+        #expect(throws: UIContainerError.unavailable) { try presentation.presentVideo(video) }
+        try root.start()
+        try presentation.presentVideo(video)
+        try presentation.present(
+            frame: video, pose: PoseOverlay(sequence: 1, timestamp: 0, rotation: 0, people: []))
+        #expect(root.camera.state.videoFrame?.sequence == 1)
+        #expect(presentation.snapshot.skeleton?.sequence == 1)
+        root.invalidate()
+        #expect(!root.isAvailable)
+        #expect(root.camera.state.videoFrame == nil)
+        #expect(presentation.snapshot.skeleton == nil)
+        #expect(throws: UIContainerError.unavailable) { try presentation.presentVideo(video) }
+        #expect(throws: UIContainerError.unavailable) {
+            try presentation.present(frame: video, pose: renderPose())
+        }
+        presentation.present(.message("已停止"))
+        #expect(presentation.snapshot.message == "已停止")
+        try root.start()
+        #expect(!root.isAvailable)
+        try root.setForeground(true)
+        try presentation.presentVideo(try frame(1))
+        #expect(root.camera.state.videoFrame?.sequence == 1)
+        await root.stop()
+        await other.stop()
     }
-    presentation.present(.message("已停止"))
-    #expect(presentation.snapshot.message == "已停止")
-    try root.start()
-    #expect(!root.isAvailable)
-    try root.setForeground(true)
-    try presentation.presentVideo(try frame(1))
-    #expect(root.camera.state.videoFrame?.sequence == 1)
-    await root.stop()
-    await other.stop()
 }
 
-@Test @MainActor func uiCameraStopJoinsExpiryAndCannotReopenTheOldRoot() async throws {
-    let root = UIContainer()
-    try root.start()
-    let presentation: any CameraPresenting = root.camera
-    let video = try frame(7)
-    try presentation.presentVideo(video)
-    try presentation.present(frame: video, pose: PoseOverlay(sequence: 7, timestamp: 0, rotation: 0, people: []))
-    let generation = root.camera.state.videoGeneration
-    await root.stop()
-    await root.stop()
-    #expect(!root.isAvailable)
-    #expect(root.camera.state.videoFrame == nil)
-    #expect(presentation.snapshot.skeleton == nil)
-    #expect(root.camera.state.videoGeneration > generation)
-    #expect(throws: UIFailure.self) { try root.start() }
-    #expect(throws: UIFailure.self) { try root.setForeground(true) }
-    #expect(throws: UIContainerError.stopped) { try presentation.presentVideo(video) }
-    let replacement = UIContainer()
-    try replacement.start()
-    try replacement.camera.presentVideo(try frame(1))
-    #expect(replacement.camera.state.videoFrame?.sequence == 1)
-    #expect(root.camera.state.videoFrame == nil)
-    await replacement.stop()
+extension NativePresentationTests {
+    @Test @MainActor func uiCameraStopJoinsExpiryAndCannotReopenTheOldRoot() async throws {
+        let root = UIContainer()
+        try root.start()
+        let presentation: any CameraPresenting = root.camera
+        let video = try frame(7)
+        try presentation.presentVideo(video)
+        try presentation.present(frame: video, pose: PoseOverlay(sequence: 7, timestamp: 0, rotation: 0, people: []))
+        let generation = root.camera.state.videoGeneration
+        await root.stop()
+        await root.stop()
+        #expect(!root.isAvailable)
+        #expect(root.camera.state.videoFrame == nil)
+        #expect(presentation.snapshot.skeleton == nil)
+        #expect(root.camera.state.videoGeneration > generation)
+        #expect(throws: UIFailure.self) { try root.start() }
+        #expect(throws: UIFailure.self) { try root.setForeground(true) }
+        #expect(throws: UIContainerError.stopped) { try presentation.presentVideo(video) }
+        let replacement = UIContainer()
+        try replacement.start()
+        try replacement.camera.presentVideo(try frame(1))
+        #expect(replacement.camera.state.videoFrame?.sequence == 1)
+        #expect(root.camera.state.videoFrame == nil)
+        await replacement.stop()
+    }
 }
 
-@Test @MainActor func uiCameraStatusFactsAndPoseFailureKeepIndependentVideo() async throws {
-    let root = UIContainer()
-    try root.start()
-    let presentation: any CameraPresenting = root.camera
-    var changed = 0
-    presentation.connectFactsObserver { changed += 1 }
-    presentation.present(.isEnabled(true))
-    #expect(changed == 1)
-    let before = presentation.snapshot
-    presentation.present(.isBusy(true))
-    #expect(!before.isBusy)
-    #expect(presentation.snapshot.isBusy)
-    let video = try frame(1)
-    try presentation.presentVideo(video)
-    try presentation.present(frame: video, pose: renderPose())
-    presentation.present(.visionMessage("模型暂不可用"))
-    #expect(presentation.snapshot.skeleton == nil)
-    #expect(root.camera.state.videoFrame?.sequence == 1)
-    try root.setForeground(false)
-    #expect(root.camera.state.videoFrame == nil)
-    #expect(throws: UIContainerError.unavailable) { try presentation.presentVideo(video) }
-    await root.stop()
+extension NativePresentationTests {
+    @Test @MainActor func uiCameraStatusFactsAndPoseFailureKeepIndependentVideo() async throws {
+        let root = UIContainer()
+        try root.start()
+        let presentation: any CameraPresenting = root.camera
+        var changed = 0
+        presentation.connectFactsObserver { changed += 1 }
+        presentation.present(.isEnabled(true))
+        #expect(changed == 1)
+        let before = presentation.snapshot
+        presentation.present(.isBusy(true))
+        #expect(!before.isBusy)
+        #expect(presentation.snapshot.isBusy)
+        let video = try frame(1)
+        try presentation.presentVideo(video)
+        try presentation.present(frame: video, pose: renderPose())
+        presentation.present(.visionMessage("模型暂不可用"))
+        #expect(presentation.snapshot.skeleton == nil)
+        #expect(root.camera.state.videoFrame?.sequence == 1)
+        try root.setForeground(false)
+        #expect(root.camera.state.videoFrame == nil)
+        #expect(throws: UIContainerError.unavailable) { try presentation.presentVideo(video) }
+        await root.stop()
+    }
 }
 
-@Test @MainActor func cameraRenewedFrameSurvivesThePreviousDeadline() async throws {
-    let state = CameraState()
-    try state.presentVideo(frame(1, age: .milliseconds(650)))
-    // Allow the first sleep to begin before extending it with a fresh frame.
-    await Task.yield()
-    try state.presentVideo(frame(2))
-    try await Task.sleep(for: .milliseconds(180))
-    #expect(state.videoFrame?.sequence == 2)
-    // The replacement still expires from its own capture time, not from the old wake.
-    let deadline = ContinuousClock.now + .seconds(1)
-    while state.videoFrame != nil, ContinuousClock.now < deadline { try await Task.sleep(for: .milliseconds(10)) }
-    #expect(state.videoFrame == nil)
-    await state.stopPresentation()
+extension NativePresentationTests {
+    @Test @MainActor func cameraRenewedFrameSurvivesThePreviousDeadline() async throws {
+        let state = CameraState()
+        try state.presentVideo(frame(1, age: .milliseconds(650)))
+        // Allow the first sleep to begin before extending it with a fresh frame.
+        await Task.yield()
+        try state.presentVideo(frame(2))
+        try await Task.sleep(for: .milliseconds(180))
+        #expect(state.videoFrame?.sequence == 2)
+        // The replacement still expires from its own capture time, not from the old wake.
+        let deadline = ContinuousClock.now + .seconds(1)
+        while state.videoFrame != nil, ContinuousClock.now < deadline { try await Task.sleep(for: .milliseconds(10)) }
+        #expect(state.videoFrame == nil)
+        await state.stopPresentation()
+    }
 }
 
-@Test @MainActor func cameraEarlierCaptureDeadlineReplacesThePendingSleep() async throws {
-    let state = CameraState()
-    try state.presentVideo(frame(1))
-    await Task.yield()
-    // Sequence admission is independent of capture timestamp ordering.
-    try state.presentVideo(frame(2, age: .milliseconds(700)))
-    try await awaitCameraState { state.videoFrame == nil }
-    await state.stopPresentation()
+extension NativePresentationTests {
+    @Test @MainActor func cameraEarlierCaptureDeadlineReplacesThePendingSleep() async throws {
+        let state = CameraState()
+        try state.presentVideo(frame(1))
+        await Task.yield()
+        // Sequence admission is independent of capture timestamp ordering.
+        try state.presentVideo(frame(2, age: .milliseconds(700)))
+        try await awaitCameraState { state.videoFrame == nil }
+        await state.stopPresentation()
+    }
 }
 
-@Test @MainActor func cameraClearedDeadlineCannotExpireAReplacementSession() async throws {
-    let state = CameraState()
-    try state.presentVideo(frame(1, age: .milliseconds(650)))
-    await Task.yield()
-    state.present(.isVisible(false))
-    try state.presentVideo(frame(1))
-    try state.present(frame: frame(1), pose: PoseOverlay(sequence: 1, timestamp: 0, rotation: 0, people: []))
-    try await Task.sleep(for: .milliseconds(180))
-    #expect(state.videoFrame?.sequence == 1)
-    #expect(state.skeleton?.sequence == 1)
-    await state.stopPresentation()
-    await state.stopPresentation()
-    #expect(state.videoFrame == nil)
-    #expect(state.skeleton == nil)
+extension NativePresentationTests {
+    @Test @MainActor func cameraClearedDeadlineCannotExpireAReplacementSession() async throws {
+        let state = CameraState()
+        try state.presentVideo(frame(1, age: .milliseconds(650)))
+        await Task.yield()
+        state.present(.isVisible(false))
+        try state.presentVideo(frame(1))
+        try state.present(frame: frame(1), pose: PoseOverlay(sequence: 1, timestamp: 0, rotation: 0, people: []))
+        try await Task.sleep(for: .milliseconds(180))
+        #expect(state.videoFrame?.sequence == 1)
+        #expect(state.skeleton?.sequence == 1)
+        await state.stopPresentation()
+        await state.stopPresentation()
+        #expect(state.videoFrame == nil)
+        #expect(state.skeleton == nil)
+    }
 }
 
 @Test @MainActor func cameraDeadlineDoesNotRetainItsPresentationOwner() throws {
@@ -385,28 +439,32 @@ import Testing
 }
 
 #if os(iOS)
-    @Test @MainActor func haloStopJoinsWithoutFramesAndReleasesTheRenderer() async throws {
-        let context = try await Task.detached { try HaloPipeline.prepared.get() }.value
-        for _ in 0..<3 {
-            let layer = CAMetalLayer()
-            layer.device = context.device
-            weak var released: MetalHaloRenderer?
-            let completion: DispatchGroup
-            do {
-                let renderer = MetalHaloRenderer(layer: layer, context: context, failure: { _ in })
-                released = renderer
-                completion = renderer.completion
-                renderer.stop()
-                renderer.stop()
+    extension NativePresentationTests {
+        @Test @MainActor func haloStopJoinsWithoutFramesAndReleasesTheRenderer() async throws {
+            let context = try await Task.detached { try HaloPipeline.prepared.get() }.value
+            for _ in 0..<3 {
+                let layer = CAMetalLayer()
+                layer.device = context.device
+                weak var released: MetalHaloRenderer?
+                let completion: DispatchGroup
+                do {
+                    let renderer = MetalHaloRenderer(layer: layer, context: context, failure: { _ in })
+                    released = renderer
+                    completion = renderer.completion
+                    renderer.stop()
+                    renderer.stop()
+                }
+                let deadline = ContinuousClock.now + .seconds(3)
+                while completion.wait(timeout: .now()) != .success, ContinuousClock.now < deadline {
+                    try await Task.sleep(for: .milliseconds(10))
+                }
+                #expect(completion.wait(timeout: .now()) == .success)
+                // Completion leaves immediately before the thread releases its last owner.
+                while released != nil, ContinuousClock.now < deadline { try await Task.sleep(for: .milliseconds(10)) }
+                #expect(released == nil)
             }
-            let deadline = ContinuousClock.now + .seconds(3)
-            while completion.wait(timeout: .now()) != .success, ContinuousClock.now < deadline {
-                try await Task.sleep(for: .milliseconds(10))
-            }
-            #expect(completion.wait(timeout: .now()) == .success)
-            // Completion leaves immediately before the thread releases its last owner.
-            while released != nil, ContinuousClock.now < deadline { try await Task.sleep(for: .milliseconds(10)) }
-            #expect(released == nil)
         }
     }
 #endif
+
+@Suite(.serialized) struct NativePresentationTests {}

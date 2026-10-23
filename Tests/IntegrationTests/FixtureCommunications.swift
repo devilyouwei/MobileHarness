@@ -101,6 +101,9 @@ extension VisionPerceptionAgent {
 
 /// Explicit synthetic native-call role; its fixture catalog is independent of production Skill loading.
 struct FixtureNativeChatState: AgentChatContextState {
+    static func sessionControl(_ message: AgentMessage) throws -> AgentChatSessionControl? {
+        try AssistantContextState.sessionControl(message)
+    }
     static let agentID = AgentID.assistant
     static let configurationName = "Assistant"
     static func runtimeCapabilities(_ capabilities: CapabilityRegistry) throws -> CapabilityRegistry {

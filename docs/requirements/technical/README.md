@@ -15,3 +15,5 @@
 [Storage 四类容器与 State](Storage-Containers-Plan.md)：代码与专项验证已完成；全量声源回归和 Simulator 限制保留；公开事实/useState 的当前实现与后续验收见 [公开 State 计划](../Resource-State-Plan.md)。
 
 - [PlatformKit 容器与 Gateway 设备接入](PlatformKit-Containers-Plan.md)：代码已实现，保留全量回归、Simulator 与设备验收缺口。
+
+- [Direct container inputs](Direct-Container-Input-Plan.md): implementation and automated/build validation; native/device and comparable performance acceptance remain tracked.

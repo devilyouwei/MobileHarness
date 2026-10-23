@@ -1,42 +1,29 @@
-# NexArm — 电机运动、有限动作与跟踪目标
+# NexArm — 业务函数与执行设计
 
-## 简介
+## 职责与模块关系
 
-提供单电机移动/归位、整臂归位、有限表演动作和相机跟踪目标发布。业务域负责参数、资源、预算、动作规划及反馈完成；NexArmControlService 负责连接、前台准入和常驻跟踪 worker，模块绑定注入共享资源接口。
+拥有机械臂动作、连接业务、手动及跟踪执行。NexArmModule 统一注册函数；NexArmControlService 是连接代际、资源准入、工作模式互斥与任务取消加入的唯一协调者；独立的手动／跟踪状态保存各自规划。原生编码和链路属于 PlatformKit。
 
-## 上下游关系（一级）
+Gateway 通过注册函数调用本域，Agents 决定请求与策略，App 注入唯一基础能力和根生命周期。本域消费 FunctionContracts 及需要的基础能力，不导入 Agents、Gateway 实现或 App。全部域内源码由 Actions 单一目标编译。
 
-```mermaid
-flowchart LR
- Bindings[Module integrations]
-    Gateway -->|标准输入与已授予执行| N[NexArm 函数]
-    N -->|完成和报告| Gateway
-    Bindings -.->|动作与跟踪端点注入| N
-    N -->|类型化运动请求| Bindings
-    Bindings -->|手动复用计划与控制器| N
-    N -->|编码范围及链路接口| PlatformKit
-    PlatformKit -->|原生反馈与准入事实| N
-    Contracts[FunctionContracts] -.->|资源预算与结果类型| N
-```
+## 目录与文件
 
-只有本域 Support 导入 PlatformKit。入口不依赖具体 Bluetooth/App 对象；机械臂安全准入与连接寿命仍由宿主负责。
+| 文件 | 当前职责 |
+| --- | --- |
+| [NexArmActions.swift](NexArmActions.swift) | 业务函数的参数校验、能力调用与完成值 |
+| [NexArmBehaviorAdapter.swift](NexArmBehaviorAdapter.swift) | 有限动作与跟踪调用的参数、报告及失败适配 |
+| [NexArmControlService.swift](NexArmControlService.swift) | 连接代际、资源准入、工作模式互斥及所有任务取消加入 |
+| [NexArmModule.swift](NexArmModule.swift) | 完整目录及复用同一工厂的部分目录投影 |
 
-## 内部模块关系
+| 目录 | 责任 |
+| --- | --- |
+| [Connection](Connection/README.md) | 连接与控制状态由根控制服务拥有；本目录投影不把连接成功解释为电机到位 |
+| [Motion](Motion/README.md) | 有限计划只在连接内执行器中接纳，不另设 Channel 队列 |
+| [Tracking](Tracking/README.md) | 跟踪只保留最新目标，命令提案与实际接纳分开 |
 
-```mermaid
-flowchart TB
-    Namespace[NexArmActions] --> Motion[MotionActions]
-    Namespace --> Gesture[GestureActions]
-    Namespace --> Tracking[TrackingActions]
-    Catalog[Support/NexArmModule] --> Motion
-    Catalog --> Gesture
-    Catalog --> Tracking
-    Motion --> Registration[Support 资源与预算解析]
-    Gesture --> Registration
-    Motion --> Execution[Support 计划与反馈执行]
-    Gesture --> Execution
-    Tracking --> Planner[Support 关节映射与单包目标规划]
-```
+[Support](Support/README.md) 仅维护跨业务能力共用的契约或算法。
+
+
 
 ## 接口与电机范围
 
@@ -56,34 +43,22 @@ flowchart TB
 
 运动请求以 GestureRequest 或注入闭包传递。调用者实际获得的效果来自宿主绑定：有限动作的定义要求新鲜反馈判定完成；aim 只确认目标发布，常驻跟踪和资源持有属于宿主 worker。`NexArm.Tracking.aim` 的参数仍是 base/pitch 位置弧度，不暴露速度或模式。执行层把位置增量换成电机 1/4 的闭环速度：首次准入仍用位置指令把肩/肘放到跟踪 rest，然后这两颗跟踪轴扭矩关、模式 1、速度 0、扭矩开。之后只在目标变化时重算速度，目标不变就保持已发速度，不在下一个控制周期刹车。目标达到 0.30 秒不变才写一次速度 0。换算是 `|count 速率| × 2.2`，上限 600，并带有限的积分滞后补偿；2.2 未经速度模式标定。退出 live session 时速度 0、模式 0、扭矩开，再用位置指令停在最后目标。电机 1 的正速度寄存器值（最高位为 0）朝编码器减小的方向转，也就是向手臂左侧。电机 4 使用相反的方向位：同样的正速度让腕部低头，抬头置位最高位。腕滚转不参与跟踪，有限运动与手动 jog 仍是位置指令。
 
+
 ## 资源与预算
 
 NexArmRegistration 将资源命名为 `nexarm.motor.1` 至 `.6`。nod/shakeHead 只声明相应电机，move/resetMotor 解析指定电机，其余有限动作声明 1…5。无效单电机参数不能据空解析结果取得运动授权，函数参数校验仍会拒绝执行。
 
 有限函数使用 dynamicTimeout。注册前按速度/加速度、最大合法行程、动作段数估算：段内电机预算取最大，段间求和，每段包括一秒发送准入余量，整体再加入五秒准备/清理余量。实际逐电机 deadline 由控制器按已获得的位置计算。预计时间不插入最低等待，预算不包含调度排队。aim 使用共享的默认 30 秒发布预算。
 
+
 ## 完成、状态与失败
 
 Support 将动作转换为有界电机计划。整臂动作及归位只涉及 1…5；motor 6 只能由显式单电机路径操作，resetMotor(6) 必须配置软件 home。普通 passiveBLE 归位参考位置与跟踪 rest 是独立状态，不以发出的目标冒充测量值。
 
-新鲜的发送后反馈进入容差即完成；稳定未到位、运动超时、反馈丢失、断连、发送/准入/反馈异常各有明确结果。普通未到位或电机超时保留结果并执行后续段；取消停止后续写入，清理观察会话。详细算法、数值与状态位于 Support。
+新鲜的发送后反馈进入容差即完成；稳定未到位、运动超时、反馈丢失、断连、发送/准入/反馈异常各有明确结果。普通未到位或电机超时保留结果并执行后续段；取消停止后续写入，清理观察会话。详细算法、数值与状态位于对应业务目录。
 
 Controller 提供 motorResults 与 revision；宿主将逐电机结果写入本次 invocation 的报告端口，并保留后续异常。单个控制器一次只接纳一个物理执行，即使上层资源集合不相交也不会自动获得控制器内并行执行。
 
 本域没有另一套 Channel 队列或 Bluetooth 重连策略。取消加入软件清理不证明设备物理停止，已有运动不会通过隐式补偿或重发撤销；手动/跟踪操作的持续寿命与替换由宿主负责。
 
-[NexArm 算法与状态](Support/README.md) · [Actions 设计](../README.md) · [原生协议与链路](../../PlatformKit/Connectivity/NexArm/README.md)
-
-## 待实现
-
-- 暂无本目录独立的实现待办；跨模块及实际模型/设备验收见所属模块说明。
-
-## Storage 依赖
-
-✅ 存储访问使用独立的 State、Cache、Database 和 Files 接口；App 注册根实例，消费者通过构造器获得所需能力。存储容器不接管本目录的业务验证、执行和完成语义。
-
-## 公开 State 边界
-
-✅ NexArmControlService 通过唯一写端口同步发布 robot.connected/controlAvailable。连接来自最新原生链路快照，可控制性还检查前台、恢复、接管和在途工作。状态及服务字段变化触发去重发布，失败记录原始错误并失效公开视图；不公开设备标识、连接句柄或队列。
-
-[公开 State 契约](../../Storage/State/README.md)
+[Actions 设计](../README.md) · [公共函数契约](../Support/Contracts/README.md)

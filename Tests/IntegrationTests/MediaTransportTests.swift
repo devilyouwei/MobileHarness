@@ -37,12 +37,12 @@ private actor MediaTransportRecording {
     let release = MediaTransportGate()
     let notice = MediaTransportGate()
     let recorded = MediaTransportRecording()
-    let image = try ImageInput(width: 1, height: 1, rgb: Data([0, 0, 0]), sequence: 0, timestamp: 0, rotation: 0)
+    let image = try syntheticCameraImage(width: 1, height: 1, value: 0, sequence: 0, timestamp: 0, rotation: 0)
     let input = AgentInput(id: "input", sessionID: "session", payload: .image(image))
     func envelope(_ sequence: UInt64, media: Bool) -> OutputEnvelope {
         OutputEnvelope(
-            source: AgentID(rawValue: "fixture"), input: input,
-            output: .control("fixture"), sequence: sequence, media: media ? image : nil)
+            source: AgentID(rawValue: "fixture"), context: input.context,
+            output: .control("fixture"), sequence: sequence, taskScope: input.taskScope, media: media ? image : nil)
     }
     let pump = Task {
         try await IndependentOutputWorkflow.consumeSignals(source.stream) { value in
@@ -71,17 +71,19 @@ private actor MediaTransportRecording {
 }
 
 @Test(.timeLimit(.minutes(1))) func mediaTransportRejectsExpiredFrameWithoutStoppingDiscreteOutputs() async throws {
-    let old = try ImageInput(
-        width: 1, height: 1, rgb: Data([0, 0, 0]), sequence: 1, timestamp: 1, rotation: 0,
+    let old = try syntheticCameraImage(
+        width: 1, height: 1, value: 0, sequence: 1, timestamp: 1, rotation: 0,
         capturedAt: .now.advanced(by: .seconds(-1)))
     let input = AgentInput(id: "old", sessionID: "session", payload: .image(old))
     let source = AsyncStream<OutputEnvelope>.makeStream(bufferingPolicy: .bufferingOldest(4))
     source.continuation.yield(
         OutputEnvelope(
-            source: AgentID(rawValue: "fixture"), input: input, output: .control("media"), sequence: 1, media: old))
+            source: AgentID(rawValue: "fixture"), context: input.context, output: .control("media"), sequence: 1,
+            taskScope: input.taskScope, media: old))
     source.continuation.yield(
         OutputEnvelope(
-            source: AgentID(rawValue: "fixture"), input: input, output: .control("discrete"), sequence: 2))
+            source: AgentID(rawValue: "fixture"), context: input.context, output: .control("discrete"), sequence: 2,
+            taskScope: input.taskScope))
     source.continuation.finish()
     let recorded = MediaTransportRecording()
     try await IndependentOutputWorkflow.consumeSignals(
@@ -95,50 +97,53 @@ private actor MediaTransportRecording {
 }
 
 @Test(.timeLimit(.minutes(1))) func mediaTransportDoesNotHideFreshAttachmentOrAuthorityFailure() async throws {
-    let image = try ImageInput(width: 1, height: 1, rgb: Data([0, 0, 0]), sequence: 1, timestamp: 1, rotation: 0)
+    let image = try syntheticCameraImage(width: 1, height: 1, value: 0, sequence: 1, timestamp: 1, rotation: 0)
     let input = AgentInput(id: "fresh", sessionID: "session", payload: .image(image))
     let source = AsyncStream<OutputEnvelope>.makeStream(bufferingPolicy: .bufferingOldest(1))
     source.continuation.yield(
         OutputEnvelope(
-            source: AgentID(rawValue: "fixture"), input: input, output: .control("media"), sequence: 1, media: image))
+            source: AgentID(rawValue: "fixture"), context: input.context, output: .control("media"), sequence: 1,
+            taskScope: input.taskScope, media: image))
     source.continuation.finish()
     await #expect(throws: CommunicationError.expired) {
         try await IndependentOutputWorkflow.consumeSignals(source.stream) { _ in throw CommunicationError.expired }
     }
 }
 
-@Test(.timeLimit(.minutes(1))) func mediaTransportSurvivesExpiryDuringDispatchAndDisplaysNextFrame() async throws {
-    let source = AsyncStream<OutputEnvelope>.makeStream(bufferingPolicy: .bufferingOldest(4))
-    let entered = MediaTransportGate()
-    let release = MediaTransportGate()
-    let recorded = MediaTransportRecording()
-    func envelope(_ sequence: UInt64) throws -> OutputEnvelope {
-        let image = try ImageInput(
-            width: 1, height: 1, rgb: Data([0, 0, 0]), sequence: sequence, timestamp: Double(sequence), rotation: 0,
-            capturedAt: .now)
-        let input = AgentInput(id: "frame-\(sequence)", sessionID: "session", payload: .image(image))
-        return OutputEnvelope(
-            source: AgentID(rawValue: "fixture"), input: input,
-            output: .control("media"), sequence: sequence, media: image)
-    }
-    let pump = Task {
-        try await IndependentOutputWorkflow.consumeSignals(source.stream) { value in
-            if value.sequence == 1 {
-                await entered.release()
-                await release.wait()
-                throw CommunicationError.expired
-            }
-            await recorded.frame(value.sequence)
+extension LiveRuntimeTests {
+    @Test(.timeLimit(.minutes(1))) func mediaTransportSurvivesExpiryDuringDispatchAndDisplaysNextFrame() async throws {
+        let source = AsyncStream<OutputEnvelope>.makeStream(bufferingPolicy: .bufferingOldest(4))
+        let entered = MediaTransportGate()
+        let release = MediaTransportGate()
+        let recorded = MediaTransportRecording()
+        func envelope(_ sequence: UInt64) throws -> OutputEnvelope {
+            let image = try syntheticCameraImage(
+                width: 1, height: 1, value: 0, sequence: sequence, timestamp: Double(sequence), rotation: 0,
+                capturedAt: .now)
+            let input = AgentInput(id: "frame-\(sequence)", sessionID: "session", payload: .image(image))
+            return OutputEnvelope(
+                source: AgentID(rawValue: "fixture"), context: input.context,
+                output: .control("media"), sequence: sequence, taskScope: input.taskScope, media: image)
         }
+        let pump = Task {
+            try await IndependentOutputWorkflow.consumeSignals(source.stream) { value in
+                if value.sequence == 1 {
+                    await entered.release()
+                    await release.wait()
+                    throw CommunicationError.expired
+                }
+                await recorded.frame(value.sequence)
+            }
+        }
+        source.continuation.yield(try envelope(1))
+        await entered.wait()
+        try await Task.sleep(for: .milliseconds(780))
+        source.continuation.yield(try envelope(2))
+        source.continuation.finish()
+        await release.release()
+        try await pump.value
+        #expect(await recorded.frames == [2])
     }
-    source.continuation.yield(try envelope(1))
-    await entered.wait()
-    try await Task.sleep(for: .milliseconds(780))
-    source.continuation.yield(try envelope(2))
-    source.continuation.finish()
-    await release.release()
-    try await pump.value
-    #expect(await recorded.frames == [2])
 }
 
 private actor VisualStateRecording {
@@ -161,7 +166,8 @@ private func visualStateOutput(_ sequence: UInt64, broadcast: Bool) throws -> Ou
             ToolCall(id: "gaze-\(sequence)", toolPath: "UI.Gaze.moveEyes", arguments: ["x": "0", "y": "0"]))
     }
     return OutputEnvelope(
-        source: AgentID(rawValue: "visionPerception"), input: input, output: output, sequence: sequence)
+        source: AgentID(rawValue: "visionPerception"), context: input.context, output: output, sequence: sequence,
+        taskScope: input.taskScope)
 }
 
 @Test(.timeLimit(.minutes(1))) func visualLatestStateSurvivesSlowGazeAndPoseWithoutBlockingActions() async throws {
@@ -206,10 +212,11 @@ private func visualStateOutput(_ sequence: UInt64, broadcast: Bool) throws -> Ou
     let input = AgentInput(id: "discrete", sessionID: "vision-fixture", payload: .event("fixture"))
     source.continuation.yield(
         OutputEnvelope(
-            source: AgentID(rawValue: "visionPerception"), input: input,
+            source: AgentID(rawValue: "visionPerception"), context: input.context,
             output: .actionCall(
                 ActionCall(
-                    actionPath: .init(domain: "Fixture", module: "Control", function: "step"), channel: "fixture"))))
+                    actionPath: .init(domain: "Fixture", module: "Control", function: "step"), channel: "fixture")),
+            taskScope: input.taskScope))
     source.continuation.finish()
     await action.wait()
     #expect(await recorded.actions == 1)
@@ -238,8 +245,8 @@ private func visualStateOutput(_ sequence: UInt64, broadcast: Bool) throws -> Ou
     for sequence in 0..<300 {
         source.continuation.yield(
             OutputEnvelope(
-                source: AgentID(rawValue: "fixture"), input: input, output: .control("discrete"),
-                sequence: UInt64(sequence)))
+                source: AgentID(rawValue: "fixture"), context: input.context, output: .control("discrete"),
+                sequence: UInt64(sequence), taskScope: input.taskScope))
     }
     source.continuation.finish()
     do {
@@ -263,18 +270,23 @@ private func visualStateOutput(_ sequence: UInt64, broadcast: Bool) throws -> Ou
     let input = AgentInput(id: "fixture", sessionID: "fixture", payload: .event("fixture"))
     let pose = try PoseObservation(width: 4, height: 4, sequence: 1, timestamp: 1, rotation: 0, people: [])
     let invalid: [OutputEnvelope] = [
-        OutputEnvelope(source: .assistant, input: input, output: .control("agent.error: fixture")),
         OutputEnvelope(
-            source: .assistant, input: input,
+            source: .assistant, context: input.context, output: .control("agent.error: fixture"),
+            taskScope: input.taskScope),
+        OutputEnvelope(
+            source: .assistant, context: input.context,
             output: .actionCall(
                 ActionCall(
-                    actionPath: .init(domain: "Fixture", module: "Control", function: "step"), channel: "fixture"))),
+                    actionPath: .init(domain: "Fixture", module: "Control", function: "step"), channel: "fixture")),
+            taskScope: input.taskScope),
         OutputEnvelope(
-            source: .assistant, input: input,
-            output: .communication(try CommunicationAction(message: .pose(pose), target: .assistant))),
+            source: .assistant, context: input.context,
+            output: .communication(try CommunicationAction(message: .pose(pose), target: .assistant)),
+            taskScope: input.taskScope),
         OutputEnvelope(
-            source: .assistant, input: input,
-            output: .toolCall(ToolCall(id: "fixture", toolPath: "UI.Gaze.moveEyes")), roundID: "round"),
+            source: .assistant, context: input.context,
+            output: .toolCall(ToolCall(id: "fixture", toolPath: "UI.Gaze.moveEyes")), roundID: "round",
+            taskScope: input.taskScope),
     ]
     for envelope in invalid {
         let source = AsyncStream<OutputEnvelope>.makeStream(bufferingPolicy: .bufferingOldest(1))
@@ -297,7 +309,7 @@ private func visualStateOutput(_ sequence: UInt64, broadcast: Bool) throws -> Ou
     func envelope(_ sequence: UInt64, session: String) -> OutputEnvelope {
         OutputEnvelope(
             source: AgentID(rawValue: "visionPerception"),
-            input: AgentInput(id: "input-\(sequence)", sessionID: session, payload: .event("fixture")),
+            context: AgentInput(id: "input-\(sequence)", sessionID: session, payload: .event("fixture")).context,
             output: .toolCall(ToolCall(id: "gaze-\(sequence)", toolPath: "UI.Gaze.moveEyes")), sequence: sequence)
     }
     let task = Task {
@@ -322,7 +334,8 @@ private func visualStateOutput(_ sequence: UInt64, broadcast: Bool) throws -> Ou
     source.continuation.yield(
         OutputEnvelope(
             source: .assistant,
-            input: AgentInput(id: "marker", sessionID: "marker", payload: .event("fixture")), output: .control("marker")
+            context: AgentInput(id: "marker", sessionID: "marker", payload: .event("fixture")).context,
+            output: .control("marker")
         ))
     source.continuation.finish()
     await routed.wait()

@@ -22,20 +22,18 @@ import Testing
     }
 }
 
-private struct SampleAttachment: ImageAttachment {}
-@Test(.actionCatalog) func sampledNativeInputPreservesTransportAndValidatesSampleSize() throws {
-    let sample = Data(repeating: 7, count: 4096)
-    let input = try ImageInput(
-        width: 720, height: 1280, gray64: sample, attachment: SampleAttachment(),
+@Test(.actionCatalog) func cameraMotionSampleUsesNativeFrameAndRejectsInvalidSize() throws {
+    let frame = try syntheticCameraFrame(
+        width: 720, height: 1280, value: 7,
         sequence: 1, timestamp: 0, rotation: 1)
-    guard case .attachment(let value) = input.content, let sampleAttachment = value as? SampledImageAttachment else {
-        Issue.record("Missing native attachment transport")
-        return
-    }
-    #expect(sampleAttachment.gray64 == sample)
-    #expect(throws: ImageInputError.self) {
-        try ImageInput(
-            width: 720, height: 1280, gray64: Data(), attachment: SampleAttachment(), sequence: 1, timestamp: 0,
-            rotation: 1)
-    }
+    #expect(frame.gray64 == Data(repeating: 7, count: 4096))
+    let input = try syntheticCameraImage(
+        width: 720, height: 1280, value: 7,
+        sequence: 1, timestamp: 0, rotation: 1)
+    var cadence = FrameCadence(configuration: try FrameSamplingConfiguration(minimumInterval: 0))
+    #expect(try cadence.accepts(input))
+    let malformed = try syntheticCameraImage(
+        width: 720, height: 1280, gray64: Data(),
+        sequence: 2, timestamp: 1, rotation: 1)
+    #expect(throws: ImageInputError.self) { try cadence.accepts(malformed) }
 }

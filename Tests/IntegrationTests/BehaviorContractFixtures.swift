@@ -28,11 +28,11 @@ extension FunctionInput {
     var testEnvelope: OutputEnvelope {
         OutputEnvelope(
             source: AgentID(rawValue: context.source),
-            input: AgentInput(
+            context: (AgentInput(
                 id: context.inputID, sessionID: context.sessionID, payload: .event("test"),
                 turn: context.correlationID.flatMap { id in
                     context.ordinal.map { AgentTurn(id: id, ordinal: $0) }
-                }),
+                })).context,
             output: .actionCall(
                 ActionCall(
                     actionPath: .init(

@@ -4,6 +4,7 @@ import ModelKit
 import StorageChat
 import StorageCore
 import StorageTasks
+import UI
 
 private struct AgentChatRoundFailure: Error, CustomStringConvertible {
     let cause: any Error
@@ -37,6 +38,19 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
     private var containerFailures: [ContainerFailureEvent] = []
     public private(set) var containerFailureEvictions: UInt64 = 0
     public func receivedContainerFailures() -> [ContainerFailureEvent] { containerFailures }
+    public func observeFailure(_ event: ContainerFailureEvent) throws {
+        try event.validate()
+        guard lifecycle == .running || lifecycle == .paused else { throw HarnessError.notRunning }
+        if let index = containerFailures.firstIndex(where: { $0.id == event.id && $0.scopeID == event.scopeID }) {
+            if event.occurrences >= containerFailures[index].occurrences { containerFailures[index] = event }
+        } else {
+            if containerFailures.count == 128 {
+                containerFailures.removeFirst()
+                containerFailureEvictions += 1
+            }
+            containerFailures.append(event)
+        }
+    }
     private var lifecycle: AgentLifecycle = .registered
     private var queue: SignalInbox
     private var admitting = 0
@@ -119,7 +133,6 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
     private var routingWorkers: [String: Task<Void, Never>] = [:]
     private var routingSessions: [String: String] = [:]
     private var deferredCommunications: [(String, String, [String: String], Bool)] = []
-    private var awaitingParentCommit: [String: AgentInput] = [:]
 
     private static var beginReply: InternalAction {
         InternalAction(
@@ -142,10 +155,15 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
 
     // MARK: - Registration
 
+    private let uiHome: UIHomeContainer?
+    private let uiSessionID: String?
+    private var uiInputs = AgentUIInputs()
+    private var uiTextOrdinal: UInt64 = 0
     private let stateContext: AgentStateContext?
 
     public init(
         stateContext: AgentStateContext? = nil,
+        uiHome: UIHomeContainer? = nil, uiSessionID: String? = nil,
         capacity: Int = 32, reportsReplyActivity: Bool = false,
         outputCapacity: Int = 256, chat: (any ChatCapability)? = nil,
         chatProvider: (@Sendable () async throws -> any ChatCapability)? = nil,
@@ -162,6 +180,9 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
             try AgentConfigurations.backgroundSupport(target: $0, contract: $1, skills: $2)
         }
     ) throws {
+        self.uiHome = uiHome
+        self.uiSessionID = uiSessionID
+        guard uiHome == nil || uiSessionID != nil else { throw CommunicationError.invalidPayload }
         guard (1...8191).contains(capacity), (1...8192).contains(outputCapacity) else {
             throw CommunicationError.invalidPayload
         }
@@ -256,8 +277,32 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
         }
         if let skills = try await contextRepository.snapshot().state.skillState { skillContinuation.yield(skills) }
         lifecycle = .running
+        try await startUIInputs()
+    }
+    private func startUIInputs() async throws {
+        guard let uiHome, let uiSessionID else { return }
+        let source = await uiHome.requests
+        let task = try await consumeUI(source, sessionID: uiSessionID) { agent, value, context in
+            switch value {
+            case .text(let text): try await agent.handleUIText(text, context: context)
+            }
+        }
+        uiInputs.append(task)
+    }
+    private func stopUIInputs() async { await uiInputs.retire(for: descriptor.id)() }
+    private func handleUIText(_ text: String, context: ProcessingContext) async throws {
+        guard !text.isEmpty, text.utf8.count <= 4096, uiTextOrdinal < UInt64.max else {
+            throw CommunicationError.invalidPayload
+        }
+        uiTextOrdinal += 1
+        let processing = ProcessingContext(
+            requestID: context.requestID, sessionID: context.sessionID, generation: context.generation,
+            source: context.source, rootID: context.rootID, parentID: context.parentID,
+            turn: AgentTurn(id: context.requestID, ordinal: uiTextOrdinal))
+        try await receive(processing.input(.text(text)))
     }
     public func pause() async throws {
+        await stopUIInputs()
         guard lifecycle == .running else { throw HarnessError.invalidTransition }
         lifecycle = .paused
         var cancellationFailure: (any Error)?
@@ -310,12 +355,15 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
         if let skills = try await contextRepository.snapshot().state.skillState { skillContinuation.yield(skills) }
         if let cancellationFailure { throw cancellationFailure }
     }
-    public func resume() throws {
+    public func resume() async throws {
         guard lifecycle == .paused else { throw HarnessError.invalidTransition }
+        await stopUIInputs()
         lifecycle = .running
+        try await startUIInputs()
         drain()
     }
     public func stop() async {
+        await stopUIInputs()
         lifecycle = .stopped
         let queued = queue.inputs
         queue.removeAll()
@@ -340,7 +388,6 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
         await communicationReceipts.close()
         for task in routingWorkers.values { await task.value }
         routingWorkers.removeAll()
-        awaitingParentCommit.removeAll()
         await worker?.value
         replyInputs.removeAll()
         replyTasks.removeAll()
@@ -356,8 +403,15 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
     // MARK: - Input processing
 
     public func receive(_ input: AgentInput) async throws {
+        if input.metadata.origin == .local {
+            try input.context.validate()
+            if case .text(let text) = input.payload, text.utf8.count > 4096 { throw CommunicationError.invalidPayload }
+        }
         do { try await receiveSignal(input) } catch {
-            if input.metadata.origin == .external
+            if (error as? CommunicationError) == .invalidPayload {
+                ContainerInputMetrics.rejected(input, role: "ChatWorker")
+            }
+            if input.metadata.origin == .local
                 || { if case .some(.transcript(_, final: true)) = input.payload.perception { true } else { false } }(),
                 (error as? CommunicationError) != .unauthorized,
                 (error as? HarnessError) != .notRunning,
@@ -372,26 +426,7 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
 
     private func receiveSignal(_ input: AgentInput) async throws {
         if case .observation(let message) = input.payload, message.contract == ContainerFailureEvent.contract {
-            guard lifecycle == .running || lifecycle == .paused else { throw HarnessError.notRunning }
-            guard input.metadata.origin == .external, input.metadata.incarnation == nil, input.taskScope == nil,
-                input.metadata.source == ContainerFailureEvent.source,
-                communicationPolicy.inputs.contains(where: { $0.contract == ContainerFailureEvent.contract }),
-                let failure = message.content(as: ContainerFailureEvent.self)
-            else { throw CommunicationError.unauthorized }
-            try failure.validate()
-            guard !input.metadata.expired else { throw CommunicationError.expired }
-            if let index = containerFailures.firstIndex(where: { $0.id == failure.id && $0.scopeID == failure.scopeID })
-            {
-                if failure.occurrences >= containerFailures[index].occurrences { containerFailures[index] = failure }
-            } else {
-                if containerFailures.count == 128 {
-                    containerFailures.removeFirst()
-                    containerFailureEvictions &+= 1
-                }
-                containerFailures.append(failure)
-            }
-            // Diagnostics must remain available when persistence or the model itself has failed.
-            return
+            throw CommunicationError.unauthorized
         }
         if case .communicationReceipt(let receipt) = input.payload {
             guard input.metadata.origin == .runtime, receipt.owner.agent == descriptor.id,
@@ -419,7 +454,9 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
             return
         }
         guard lifecycle == .running || lifecycle == .paused else { throw HarnessError.notRunning }
-        guard descriptor.inputs.contains(input.payload.kind) else { throw HarnessError.unsupportedInput }
+        guard input.metadata.origin == .local || descriptor.inputs.contains(input.payload.kind) else {
+            throw HarnessError.unsupportedInput
+        }
         if case .event = input.payload { throw HarnessError.unsupportedInput }
         guard !input.metadata.expired else { throw CommunicationError.expired }
         if case .roundResult(let result) = input.payload {
@@ -487,16 +524,15 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
             throw CommunicationError.unauthorized
         }
         // Host control bypasses ordinary admission, including when the queue is full or paused.
-        if case .observation(let message) = input.payload, message.contract == AgentSessionControl.contract {
-            guard let control = message.assistantControl else { throw CommunicationError.invalidPayload }
-            guard input.metadata.contract == AgentSessionControl.contract, input.metadata.version == 1,
-                input.metadata.origin == .external, input.metadata.source == "runtime",
+        if case .observation(let message) = input.payload, let control = try State.sessionControl(message) {
+            guard input.metadata.contract == message.contract, input.metadata.version == 1,
+                input.metadata.origin == .local, input.metadata.source == "runtime",
                 input.metadata.incarnation == nil
             else { throw CommunicationError.unauthorized }
-            _ = try message.validatedSize()
+            try input.validate(message)
             switch control {
-            case .interruptSession, .cancelSession:
-                let closesSession = control == .cancelSession
+            case .interrupt, .close:
+                let closesSession = control == .close
                 guard !hostCancellationInProgress else { throw HarnessError.invalidTransition }
                 hostCancellationInProgress = true
                 hostCancellationSession = input.sessionID
@@ -644,10 +680,7 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
         }
         if let userText {
             do {
-                let snapshot = try await conversations.readCurrent()
-                _ = try await conversations.begin(
-                    id: input.id, user: userText, request: [], expecting: snapshot.token,
-                    model: "尚未开始", awaitingModel: true)
+                _ = try await conversations.admitUserInput(id: input.id, user: userText, model: "尚未开始")
             } catch {
                 let admissionFailure = error
                 do { try await contextRepository.update { try $0.transitionWork(input.id, to: .failed) } } catch {
@@ -1743,8 +1776,9 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
         }
         switch continuation.yield(
             OutputEnvelope(
-                source: descriptor.id, input: input, output: output, sequence: outputSequence, roundID: outputRoundID,
-                callID: callID, failure: failure))
+                source: descriptor.id, context: input.context, output: output, sequence: outputSequence,
+                roundID: outputRoundID,
+                callID: callID, taskScope: input.taskScope, failure: failure))
         {
         case .enqueued:
             // The terminal boundary joins playback before the subsequent resume command is consumed.
@@ -1966,19 +2000,6 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
             }
             return
         }
-        if signal.businessContract == "agent.parentCommitted" {
-            guard signal.kind == .input, State.requiresParentCommit,
-                let original = awaitingParentCommit[signal.scope.id]
-            else { throw CommunicationError.scopeClosed }
-            try await contextRepository.update { try $0.tasks.accept(signal, input: input, agent: State.agentID) }
-            awaitingParentCommit[signal.scope.id] = nil
-            let content = try AgentTaskContent.decode(try requireTaskSignal(original))
-            let decision = AgentInput(
-                id: original.id, sessionID: original.sessionID, payload: .text(content.text),
-                metadata: original.metadata, turn: original.turn, taskScope: signal.scope)
-            try await receive(decision)
-            return
-        }
         guard lifecycle == .running || lifecycle == .paused else { throw HarnessError.notRunning }
         if usesSkills && signal.scope.execution == .background && (signal.kind == .request || signal.kind == .input) {
             throw CommunicationError.unsupportedContract
@@ -2002,9 +2023,6 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
         if signal.kind == .input, signal.scope.execution == .foreground, prior?.stage == .waitingUser {
             guard content.interactionID == prior?.interactionID, content.artifactID == prior?.artifactID
             else { throw CommunicationError.scopeClosed }
-        }
-        if signal.kind == .request, State.requiresParentCommit {
-            guard awaitingParentCommit.count < 32 else { throw CommunicationError.capacityExceeded }
         }
         try await contextRepository.recordSignal(
             input, disposition: .control, admissionSequence: (try await contextRepository.snapshot()).revision + 1,
@@ -2048,7 +2066,6 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
             if foregroundInteraction == signal.scope.id { foregroundInteraction = nil }
             try await activateNextInteraction(parent: input)
         case .cancel:
-            awaitingParentCommit[signal.scope.id] = nil
             let pending = queue.inputs.filter { $0.taskScope?.id == signal.scope.id }
             for value in pending {
                 queue.remove(id: value.id)
@@ -2065,10 +2082,6 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
                 signal.scope, input: input,
                 result: ToolResult(callID: input.id, value: "Task cancelled", isError: true), status: .cancelled)
         case .request, .input:
-            if signal.kind == .request, State.requiresParentCommit {
-                awaitingParentCommit[signal.scope.id] = input
-                return
-            }
             let decision = AgentInput(
                 id: input.id, sessionID: input.sessionID, payload: .text(content.text),
                 metadata: input.metadata, turn: input.turn, taskScope: signal.scope)
@@ -2139,7 +2152,7 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
     }
 
     private func forwardDirectedInput(_ intent: AgentTaskInputIntent, input: AgentInput) async throws {
-        guard lifecycle == .running, input.metadata.origin == .external, input.metadata.source == "user",
+        guard lifecycle == .running, input.metadata.origin == .local, input.metadata.source == "user",
             input.metadata.incarnation == nil,
             let view = (try await contextRepository.snapshot()).state.taskViews?[intent.taskID],
             !view.terminal, view.scope.sessionID == input.sessionID, view.stage == .waitingUser,

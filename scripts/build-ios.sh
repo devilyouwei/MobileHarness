@@ -9,11 +9,14 @@ if ! xcodebuild -version >/dev/null 2>&1; then
     echo "Install Xcode 27+, launch it once, and select it with xcode-select before building." >&2
     exit 1
 fi
+simulator_derived_data="${MOBILEHARNESS_SIMULATOR_DERIVED_DATA:-build/SimulatorDerivedData}"
 for scheme in MobileHarnessSimulator ModelKitRuntime ModelKitNemotron ModelKitSilero; do
-    xcodebuild -project MobileHarness.xcodeproj -scheme "$scheme" \
+    MOBILEHARNESS_BUILD_VARIANT=simulator xcodebuild -project MobileHarness.xcodeproj -scheme "$scheme" \
         -configuration Debug -destination 'generic/platform=iOS Simulator' \
-        -derivedDataPath build/DerivedData CODE_SIGNING_ALLOWED=NO build
+        -derivedDataPath "$simulator_derived_data" \
+        -disableAutomaticPackageResolution -onlyUsePackageVersionsFromResolvedFile -skipPackageUpdates \
+        CODE_SIGNING_ALLOWED=NO build
     if [[ "$scheme" == MobileHarnessSimulator ]]; then
-        python3 scripts/verify-app-agent-resources.py build/DerivedData/Build/Products/Debug-iphonesimulator/MobileHarnessSimulator.app
+        python3 scripts/verify-app-agent-resources.py "$simulator_derived_data/Build/Products/Debug-iphonesimulator/MobileHarnessSimulator.app"
     fi
 done

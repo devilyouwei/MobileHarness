@@ -24,12 +24,12 @@ flowchart LR
  Audio <--> Hardware["系统与硬件"]
  Vision <--> Hardware
  Connectivity <--> Hardware
- Audio -->|"原生事实／数据"| Gateway["Gateway 适配器"]
- Vision -->|"原生事实／数据"| Gateway
- Connectivity -->|"原生事实／数据"| Gateway
+ Audio -->|"原生事实／数据"| Agents["负责的 Agent"]
+ Vision -->|"原生事实／数据"| Agents
+ Connectivity -->|"原生事实／数据"| Agents
 ```
 
-箭头到 Gateway 表示消费数据，不构成 SDK 编译依赖；Signal 的载荷、来源、会话和传输适配均在 Gateway。
+Native values and events are observed directly by the owning Agent or execution service. PlatformKit has no routing, Signal encoding, Agent/session authority or application presentation policy.
 
 ## 子能力接口
 
@@ -52,7 +52,7 @@ Audio/Vision/Connectivity 独立管理自己的取消、原生回调和清理。
 
 原生PCM保持有序、满载明确失败；相机／状态使用最新值替换。缓冲上限、单消费者／独立观察者及清理规则见各能力 README。
 
-NativeAudioEvent／CameraEvent 是 String/Sendable 原生事实，不采用 Error。实际设备失败使用 SDK 错误或原系统错误，事件编码留给 Gateway。PlatformAdmission 同步调用注入的非阻塞错误报告回调，保留原 throw／真实清理结果；正常取消和有意关闭不升级为设备故障。
+Native values and events are observed directly by the owning Agent or execution service. PlatformKit has no routing, Signal encoding, Agent/session authority or application presentation policy.
 
 公开错误和值属于本 SDK，不生成业务提示或应用身份。SDK日志仅保留有界原生格式／交通／错误事实，不记录媒体或业务上下文。
 
@@ -64,7 +64,18 @@ NativeAudioEvent／CameraEvent 是 String/Sendable 原生事实，不采用 Erro
 
 [总体设计](../README.md) · [Audio](Audio/README.md) · [Vision](Vision/README.md) · [Connectivity](Connectivity/README.md) · [Core](Core/README.md)
 
-✅ 已实现：PlatformAdmission 不再过滤取消／关闭错误，原始 Error 完整交给宿主统一报告端口；生命周期控制事件的广播抑制由宿主／Gateway 完成，底层协议保留类型化 throw，根生命周期使用 PlatformFailure。
+Native values and events are observed directly by the owning Agent or execution service. PlatformKit has no routing, Signal encoding, Agent/session authority or application presentation policy.
 
 
 ✅ PlatformFailure属于独立SDK；根start／setForeground／stop类型化抛错，PlatformAdmission为原生回调包装同一结构并保留首次来源。Audio与根的清理失败使用underlying＋cleanupErrors；上层通过原始类型识别蓝牙连接条件，清理失败不能降为连接状态。
+
+
+## Direct container contract
+
+Native data/observation capabilities remain independent of business and transport modules. Capture control stays with execution owners; read-only observation never requests permission or opens a device. Current cross-module ownership is defined by the [overall design](../README.md).
+
+## 原生输入端口收敛
+
+✅ 已实现：AudioCaptureObserving 为跨平台只读采集端口，返回当前原生代的唯一 PCM 订阅；控制端 startCapture 只确认采集就绪，不向业务宿主返回流。订阅不请求权限、不打开设备；拒绝重复消费者和无采集源，沿用单份 64 包有序缓冲及明确溢出。
+
+✅ 已实现：音频观察与控制以独立公开能力分离；控制端口可跨平台替换，具体 Apple 驱动仍仅在 iOS 创建。

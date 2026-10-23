@@ -1,6 +1,5 @@
-import ActionBindings
 import Actions
-import AgentBindings
+import Agents
 import Foundation
 import Gateway
 import PlatformKit
@@ -29,7 +28,7 @@ private final class ControlledSettings: SettingsOperating {
 func settingsSaveKeepsOneOperationAcrossPageLifetimeAndCanRetryAfterFailure() async throws {
     let operation = ControlledSettings()
     let state = SettingsState(initial: operation.original)
-    let controls = SettingsInteractionWorkflow(
+    let controls = SettingsFormController(
         state: state, operations: operation, defaultModel: operation.original.model)
     var started = operation.started.stream.makeAsyncIterator()
     state.url = "  https://example.test/v2  "
@@ -56,7 +55,7 @@ func settingsSaveKeepsOneOperationAcrossPageLifetimeAndCanRetryAfterFailure() as
 func restoringSettingsAgainPreservesUnsavedFormEdits() async throws {
     let operation = ControlledSettings()
     let state = SettingsState(initial: .init(enabled: false, url: "", key: "", model: "default"))
-    let controls = SettingsInteractionWorkflow(state: state, operations: operation, defaultModel: "default")
+    let controls = SettingsFormController(state: state, operations: operation, defaultModel: "default")
     try await controls.restore()
     #expect(state.selectedModel == operation.original.model)
     state.url = "https://new.example.test"

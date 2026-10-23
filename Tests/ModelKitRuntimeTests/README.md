@@ -49,3 +49,7 @@ RuntimeBoundaryTests cover invalid manager configuration, nondefault limits reac
 ✅ 已实现：回归缓存路径字符集合后的Unicode合法路径、标点及危险路径拒绝；优化不放宽规则。
 
 ✅ 已实现：验证报告区间对应真实冷加载，暖模型／unmanaged 无事件，失败成对结束且保留原错。
+
+## Direct container contract
+
+Direct-input regressions cover typed request receipts, bounds, cancellation/generations, native subscriptions and unchanged authorized execution. Synthetic tests do not establish real model, UI or hardware acceptance. Current cross-module ownership is defined by the [overall design](../../MobileHarness/README.md).

@@ -103,7 +103,7 @@ public final class BluetoothSettingsState {
     public internal(set) var recoveryStage: BluetoothRecoveryStage = .idle
     public internal(set) var recoveryDeviceID: String?
     public internal(set) var recoveryAttempt = 0
-    /// Latest native communication issue, adapted by ActionBindings.
+    /// Latest native communication issue, adapted by Actions.
     public internal(set) var transportIssue: String?
     /// Connected or remembered devices belong to My Devices; a new pending selection stays nearby.
     public var myDevice: BluetoothDeviceRow? {
@@ -318,6 +318,8 @@ extension BluetoothSettingsState: DeviceSettingsPresenting {}
 
 @MainActor
 public final class UIDeviceSettingsContainer {
+    public let requests = UIRequests<DeviceInput, Void>()
+
     public let state = BluetoothSettingsState()
     public var presentation: any DeviceSettingsPresenting { state }
     func startPresentation() {

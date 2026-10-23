@@ -110,3 +110,25 @@ extension HistoryActions {
         return result
     }
 }
+
+extension HistoryActions {
+    public static func fullReadFunction(using reads: any HistoryFullReadCapability) -> ActionFunction {
+        ActionFunction(
+            path: .init(domain: "History", module: "Conversation", function: "readFull"),
+            displayName: "读取完整历史", kind: .finite, completion: "completed", timeout: .seconds(120),
+            handler: { invocation in
+                try ActionArguments(invocation.call.parameters).validateAllowedKeys([])
+                guard let request = invocation.attachment as? HistoryReadInvocation else {
+                    throw HistoryQueryError.missingConversation
+                }
+                try await request.accept(invocation)
+                do {
+                    let result = try await reads.read(request.query)
+                    try await request.complete(result)
+                } catch {
+                    await request.fail(error)
+                    throw error
+                }
+            })
+    }
+}

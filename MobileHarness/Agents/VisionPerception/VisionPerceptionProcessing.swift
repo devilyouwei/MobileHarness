@@ -25,8 +25,7 @@ public struct VisionPerceptionSignalPreprocessor: SignalPreprocessor {
     public func classify(_ input: AgentInput, state: VisionPerceptionContextState) throws -> SignalDisposition {
         guard !input.metadata.expired else { throw CommunicationError.expired }
         switch input.payload {
-        case .actionResult, .toolResult, .roundResult: return .feedback
-        case .image: return .replaceLatest(key: "frame")
+        case .actionResult: return .feedback
         default: throw HarnessError.unsupportedInput
         }
     }
@@ -56,24 +55,13 @@ public struct VisionPerceptionContextBuilder: ContextBuilder {
         return Request(input: input, state: state.snapshot.state, batch: batch)
     }
     private static func resolveImage(_ input: ImageInput) throws -> ImageFrame {
-        switch input.content {
-        case .rgb(let rgb): return try ImageFrame(width: input.width, height: input.height, rgb: rgb)
-        case .attachment(let attachment):
-            let camera: CameraFrame
-            if let native = attachment as? ImageValueAttachment<CameraFrame> {
-                camera = native.value
-            } else if let sampled = attachment as? SampledImageAttachment,
-                let native = sampled.source as? ImageValueAttachment<CameraFrame>, native.value.gray64 == sampled.gray64
-            {
-                camera = native.value
-            } else {
-                throw ImageInputError.invalidFrame
-            }
-            guard camera.width == input.width, camera.height == input.height, camera.rotation == input.rotation,
-                camera.sequence == input.sequence, camera.timestamp == input.timestamp,
-                camera.capturedAt == input.capturedAt
-            else { throw ImageInputError.invalidFrame }
-            return try camera.withPixelBuffer { try ImageFrame(pixelBuffer: $0, rotation: input.rotation) }
-        }
+        guard let native = input.attachment as? CameraFrame
+        else { throw ImageInputError.invalidFrame }
+        let camera = native
+        guard camera.width == input.width, camera.height == input.height, camera.rotation == input.rotation,
+            camera.sequence == input.sequence, camera.timestamp == input.timestamp,
+            camera.capturedAt == input.capturedAt
+        else { throw ImageInputError.invalidFrame }
+        return try camera.withPixelBuffer { try ImageFrame(pixelBuffer: $0, rotation: input.rotation) }
     }
 }

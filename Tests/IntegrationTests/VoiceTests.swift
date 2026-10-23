@@ -1,6 +1,4 @@
-import ActionBindings
 import Actions
-import AgentBindings
 import AgentCore
 import CallRuntime
 import ExecutionRuntime
@@ -8,7 +6,6 @@ import Foundation
 import FunctionContracts
 import Gateway
 import ModelKit
-import PlatformKit
 import StorageCache
 import StorageCore
 import StorageState
@@ -16,6 +13,7 @@ import Synchronization
 import Testing
 
 @testable import Agents
+@testable import PlatformKit
 
 private struct RecognitionFixture: SpeechRecognitionCapability {
     let text: String
@@ -122,12 +120,8 @@ private func preparedSpeech(
     try await synth.start()
     let policy = try CommunicationPolicy(
         contracts: AgentContracts.communication,
-        externalSources: [
-            "user", "runtime", "phone.microphone", "phone.camera", "model.resources", "app.resources",
-            "app.environment",
-        ],
         configurations: AgentConfigurations.all())
-    let gateway = InputGateway(manager: manager, policy: policy, allowsExternalSend: true)
+    let gateway = InputGateway(manager: manager, policy: policy)
     let playback = SpeechPlayback(store: store)
     let scheduler = ChannelScheduler(
         registry: try testActionRegistry(handlers: [
@@ -143,7 +137,7 @@ private func preparedSpeech(
     ) { await gateway.deliverActionResult($0) }
     let tools = ToolRegistry()
     let response = OutputGateway(
-        manager: manager, requests: gateway, tools: tools, actions: scheduler, policy: policy,
+        manager: manager, requests: gateway, tools: tools, actions: scheduler, policy: policy
     ) { _ in }
     try await agent.bind(response.messaging(for: .assistant))
     try await agent.start()
@@ -153,7 +147,7 @@ private func preparedSpeech(
     try await turn.enqueue([.audio([sampleFrame()]), .end(.silence)])
     let text = try await turn.finish()
     await probe.displayed(text)
-    let report = try await gateway.send(
+    let report = try await manager.receiveLocally(
         AgentInput(id: UUID().uuidString, sessionID: sessionID, payload: .text(text)), to: .assistant)
     #expect(report.delivered == [.assistant])
     #expect(await agent.status().processedInputs == 1)
@@ -237,7 +231,7 @@ private func preparedSpeech(
             }
         ]))
     let responses = OutputGateway(
-        manager: manager, requests: InputGateway(manager: manager, allowsExternalSend: true),
+        manager: manager, requests: InputGateway(manager: manager),
         tools: ToolRegistry(), actions: actions
     ) { _ in }
     try await responses.dispatch(invocation.testEnvelope)
@@ -261,7 +255,7 @@ private func preparedSpeech(
     )
     try await manager.register(agent)
     try await agent.start()
-    let gateway = InputGateway(manager: manager, allowsExternalSend: true)
+    let gateway = InputGateway(manager: manager)
     let recognition = RecognitionFixture(text: "一段", includeFinal: true)
     let id = UUID().uuidString
     let turn = SpeechRecognitionTurn(recognition: recognition, sessionID: id) { _ in }
@@ -270,7 +264,7 @@ private func preparedSpeech(
     let text = try await turn.finish()
     #expect(text == "一段 一段")
     #expect(await agent.status().processedInputs == 0)
-    _ = try await gateway.send(
+    _ = try await manager.receiveLocally(
         AgentInput(id: UUID().uuidString, sessionID: id, payload: .text(text)), to: .assistant)
     #expect(await agent.status().processedInputs == 1)
     await #expect(throws: CapabilityError.self) {
@@ -483,10 +477,6 @@ private actor EndpointVADSession: VoiceActivitySession {
 @Test(.actionCatalog, .timeLimit(.minutes(1))) func speechPerceptionRoutesOnlyFinalAndRejectsAfterStop() async throws {
     let policy = try CommunicationPolicy(
         contracts: AgentContracts.communication,
-        externalSources: [
-            "user", "runtime", "phone.microphone", "phone.camera", "model.resources", "app.resources",
-            "app.environment",
-        ],
         configurations: AgentConfigurations.all())
     let session = UUID().uuidString
     let manager = AgentManager()
@@ -500,7 +490,7 @@ private actor EndpointVADSession: VoiceActivitySession {
     try await manager.register(assistant, sessionID: session)
     await assistant.start()
     try await manager.register(speech, sessionID: session)
-    let input = InputGateway(manager: manager, policy: policy, allowsExternalSend: true)
+    let input = InputGateway(manager: manager, policy: policy)
     let observed = AsyncStream<AgentInput>.makeStream(bufferingPolicy: .bufferingOldest(8))
     let captions = VoiceProbe()
     let scheduler = ChannelScheduler(registry: try testActionRegistry(handlers: [:]))
@@ -529,22 +519,22 @@ private actor EndpointVADSession: VoiceActivitySession {
     let outputTask = Task {
         for await envelope in fixtureOutputs(speech) { try await output.dispatch(envelope) }
     }
-    let first = try AudioInput(
+    let first = try syntheticAudioInput(
         samples: Data(repeating: 0, count: 1536 * 4), sampleRate: 16000, sequence: 0, timestamp: 0)
-    let second = try AudioInput(
+    let second = try syntheticAudioInput(
         samples: Data(repeating: 0, count: 12800 * 4), sampleRate: 16000, sequence: 1, timestamp: 0.096)
-    _ = try await input.publish(
+    _ = try await processMicrophoneFixture(
         AgentInput(
             id: UUID().uuidString,
             sessionID: session, payload: .audio(first),
             metadata: InputMetadata(
-                payload: .audio(first), source: "phone.microphone", rootID: UUID().uuidString)))
-    _ = try await input.publish(
+                payload: .audio(first), source: "phone.microphone", rootID: UUID().uuidString)), using: speech)
+    _ = try await processMicrophoneFixture(
         AgentInput(
             id: UUID().uuidString,
             sessionID: session, payload: .audio(second),
             metadata: InputMetadata(
-                payload: .audio(second), source: "phone.microphone", rootID: UUID().uuidString)))
+                payload: .audio(second), source: "phone.microphone", rootID: UUID().uuidString)), using: speech)
     for _ in 0..<10000 {
         if await assistant.inputs.contains(where: {
             if case .transcript(_, final: true)? = $0.payload.perception { return true }
@@ -574,47 +564,33 @@ private actor EndpointVADSession: VoiceActivitySession {
     #expect(!displayed.contains(""))
     await scheduler.shutdown()
     await #expect(throws: HarnessError.notRunning) {
-        try await speech.receive(
+        try await processMicrophoneFixture(
             AgentInput(
                 id: UUID().uuidString,
                 sessionID: session, payload: .audio(first),
                 metadata: InputMetadata(
-                    payload: .audio(first), source: "phone.microphone", rootID: UUID().uuidString)))
+                    payload: .audio(first), source: "phone.microphone", rootID: UUID().uuidString)), using: speech)
     }
     await manager.stopAll()
 }
 
-@Test(.actionCatalog) func speechRawAudioQueueRejectsOverflowAndExpiredInput() async throws {
+@Test(.actionCatalog) func speechRejectsGenericAudioIngressWithoutQueuing() async throws {
     let session = UUID().uuidString
     let speech = try SpeechPerceptionAgent(
         recognition: RecognitionFixture(text: "hello", includeFinal: true), vad: EndpointVAD(), sessionID: session,
         context: try AgentContextRepository(
-            agent: AgentID(rawValue: "speechPerception"), scope: UUID().uuidString,
-            state: SpeechPerceptionContextState())
-    )
-    try await speech.bind(AgentMessaging { _, _, _ in DeliveryReport(delivered: [.assistant]) })
+            agent: .speechPerception, scope: UUID().uuidString,
+            state: SpeechPerceptionContextState()))
     try await speech.start()
-    try await speech.pause()
-    for i: UInt64 in 0..<30 {
-        let audio = try AudioInput(
-            samples: Data(repeating: 0, count: 64000), sampleRate: 16000, sequence: i, timestamp: Double(i))
-        try await speech.receive(
-            AgentInput(id: UUID().uuidString, sessionID: session, payload: .audio(audio)))
+    let audio = try syntheticAudioInput(
+        samples: Data(repeating: 0, count: 640), sampleRate: 16000,
+        sequence: 0, timestamp: 0)
+    await #expect(throws: HarnessError.unsupportedInput) {
+        try await speech.receive(AgentInput(id: UUID().uuidString, sessionID: session, payload: .audio(audio)))
     }
-    let payload = InputPayload.audio(
-        try AudioInput(samples: Data(repeating: 0, count: 4), sampleRate: 16000, sequence: 30, timestamp: 30))
-    await #expect(throws: HarnessError.queueFull) {
-        try await speech.receive(AgentInput(id: UUID().uuidString, sessionID: session, payload: payload))
-    }
-    let expired = AgentInput(
-        id: UUID().uuidString,
-        sessionID: session, payload: payload,
-        metadata: InputMetadata(
-            payload: payload, rootID: UUID().uuidString, deadline: .now.advanced(by: .seconds(-1))))
-    await #expect(throws: CommunicationError.expired) { try await speech.receive(expired) }
-    #expect(await speech.status().queuedInputs == 30)
-    await speech.stop()
     #expect(await speech.status().queuedInputs == 0)
+    #expect(await speech.status().processedInputs == 0)
+    await speech.stop()
 }
 
 @Test(.actionCatalog) func transcriptActionAllowsClearAndRejectsInvalidPayloads() async throws {
@@ -662,12 +638,8 @@ private actor EndpointVADSession: VoiceActivitySession {
     await source.start()
     let policy = try CommunicationPolicy(
         contracts: AgentContracts.communication,
-        externalSources: [
-            "user", "runtime", "phone.microphone", "phone.camera", "model.resources", "app.resources",
-            "app.environment",
-        ],
         configurations: AgentConfigurations.all())
-    let input = InputGateway(manager: manager, policy: policy, allowsExternalSend: true)
+    let input = InputGateway(manager: manager, policy: policy)
     let probe = VoiceProbe()
     let scheduler = ChannelScheduler(
         registry: try testActionRegistry(handlers: [
@@ -686,7 +658,8 @@ private actor EndpointVADSession: VoiceActivitySession {
         id: UUID().uuidString,
         sessionID: session,
         payload: .audio(
-            try AudioInput(samples: Data(repeating: 0, count: 4), sampleRate: 16000, sequence: 0, timestamp: 0)),
+            try syntheticAudioInput(samples: Data(repeating: 0, count: 4), sampleRate: 16000, sequence: 0, timestamp: 0)
+        ),
         turn: AgentTurn(id: UUID().uuidString, ordinal: 1))
     try await port.publish(.speechPhase(.speaking), parent: parent)
     await input.flushPublications()
@@ -712,8 +685,8 @@ private actor EndpointVADSession: VoiceActivitySession {
     func envelope(_ turn: AgentTurn, _ sequence: UInt64, _ source: AgentID) -> OutputEnvelope {
         OutputEnvelope(
             source: source,
-            input: AgentInput(
-                id: UUID().uuidString, sessionID: session, payload: .text("fixture"), turn: turn),
+            context: (AgentInput(
+                id: UUID().uuidString, sessionID: session, payload: .text("fixture"), turn: turn)).context,
             output: .control("fixture"), sequence: sequence)
     }
     var state = ConversationPresentation()
@@ -898,9 +871,10 @@ private actor NativeRateVADProbe: VoiceActivityCapability, VoiceActivitySession 
     try await agent.bind(AgentMessaging { _, _, _ in DeliveryReport() })
     try await agent.start()
     let samples = [Float](repeating: 0.1, count: 8192)
-    let audio = try AudioInput(
+    let audio = try syntheticAudioInput(
         samples: samples.withUnsafeBytes { Data($0) }, sampleRate: 48000, sequence: 0, timestamp: 0)
-    try await agent.receive(AgentInput(id: UUID().uuidString, sessionID: session, payload: .audio(audio)))
+    try await processMicrophoneFixture(
+        AgentInput(id: UUID().uuidString, sessionID: session, payload: .audio(audio)), using: agent)
     for _ in 0..<1000 {
         if await probe.receivedSamples > 0 { break }
         try await Task.sleep(for: .milliseconds(2))
@@ -951,23 +925,23 @@ private actor FailOnceRecognition: SpeechRecognitionCapability {
     var sequence: UInt64 = 0
     func frame(_ speaking: Bool) throws -> AgentInput {
         defer { sequence += 1 }
-        let samples = [Float](repeating: speaking ? 0.1 : 0, count: 16000)
+        let samples = [Float](repeating: speaking ? 0.1 : 0, count: speaking ? 1536 : 12800)
         return AgentInput(
             id: UUID().uuidString,
             sessionID: session,
             payload: .audio(
-                try AudioInput(
+                try syntheticAudioInput(
                     samples: samples.withUnsafeBytes { Data($0) }, sampleRate: 16000,
                     sequence: sequence, timestamp: Double(sequence))))
     }
-    try await agent.receive(frame(true))
-    try await agent.receive(frame(false))
+    try await processMicrophoneFixture(frame(true), using: agent)
+    try await processMicrophoneFixture(frame(false), using: agent)
     #expect(await values.next() == "error")
     #expect(await agent.status().lifecycle == .running)
-    try await agent.receive(frame(true))
-    try await agent.receive(frame(false))
+    try await processMicrophoneFixture(frame(true), using: agent)
+    try await processMicrophoneFixture(frame(false), using: agent)
     #expect(await values.next() == "recovered")
-    await #expect(throws: CapabilityError.inputBusy) { try await agent.receive(frame(true)) }
+    await #expect(throws: CapabilityError.inputBusy) { try await processMicrophoneFixture(frame(true), using: agent) }
     try await agent.resumeListening()
     #expect(await agent.status().lifecycle == .running)
     await agent.stop()
@@ -987,14 +961,14 @@ private actor FailOnceRecognition: SpeechRecognitionCapability {
     try await agent.pauseAudioAdmission()
     try await agent.resumeListening()
     let samples = [Float](repeating: 0, count: 1024)
-    try await agent.receive(
+    try await processMicrophoneFixture(
         AgentInput(
             id: UUID().uuidString,
             sessionID: session,
             payload: .audio(
-                try AudioInput(
+                try syntheticAudioInput(
                     samples: samples.withUnsafeBytes { Data($0) }, sampleRate: 16000,
-                    sequence: 0, timestamp: 0))))
+                    sequence: 0, timestamp: 0))), using: agent)
     #expect(await agent.status().lifecycle == .running)
     await agent.stop()
 }
@@ -1197,75 +1171,77 @@ func replyTerminalImmediatelyEmitsListeningResumeWithoutDisablingConsent() async
     await agent.stop()
 }
 
-@Test(.actionCatalog, .timeLimit(.minutes(1)))
-func listeningIntentAndReplyFactsCrossGatewaysWithPerceptionExecutionOwner() async throws {
-    let session = UUID().uuidString
-    let manager = AgentManager()
-    let speech = try SpeechPerceptionAgent(
-        recognition: RecognitionFixture(text: "", includeFinal: false), vad: NativeRateVADProbe(),
-        sessionID: session, interactionSessionID: session, residentListening: true,
-        context: try AgentContextRepository(
-            agent: AgentID(rawValue: "speechPerception"), scope: UUID().uuidString,
-            state: SpeechPerceptionContextState())
-    )
-    let assistant = try AssistantAgent(
-        stateContext: try publicStateFixture(),
-        reportsReplyActivity: true, chat: FixedTextChat(text: ""),
-        context: try AgentContextRepository(
-            agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState())
-    )
-    try await manager.register(speech)
-    try await manager.register(assistant, sessionID: session)
-    try await manager.start(.speechPerception)
-    try await manager.start(.assistant)
-    let policy = try CommunicationPolicy(
-        contracts: AgentContracts.communication,
-        externalSources: [
-            "user", "runtime", "phone.microphone", "phone.camera", "model.resources", "app.resources",
-            "app.environment",
-        ],
-        configurations: AgentConfigurations.all())
-    let input = InputGateway(manager: manager, policy: policy)
-    let probe = PerceptionListeningProbe()
-    let binding = ActionBinding(
-        function: SpeechActions.updateDefinition(handler: { invocation in
-            #expect(invocation.context.source == "speechPerception")
-            #expect(invocation.context.sessionID == session)
-            try await SpeechActions.update(invocation: invocation) { _, paused, _, _ in
-                if !paused { try await speech.resumeListening() }
+extension LiveRuntimeTests {
+    @Test(.actionCatalog, .timeLimit(.minutes(1)))
+    func listeningIntentAndReplyFactsCrossGatewaysWithPerceptionExecutionOwner() async throws {
+        let session = UUID().uuidString
+        let manager = AgentManager()
+        let speech = try SpeechPerceptionAgent(
+            recognition: RecognitionFixture(text: "", includeFinal: false), vad: NativeRateVADProbe(),
+            sessionID: session, interactionSessionID: session, residentListening: true,
+            context: try AgentContextRepository(
+                agent: AgentID(rawValue: "speechPerception"), scope: UUID().uuidString,
+                state: SpeechPerceptionContextState())
+        )
+        let assistant = try AssistantAgent(
+            stateContext: try publicStateFixture(),
+            reportsReplyActivity: true, chat: FixedTextChat(text: ""),
+            context: try AgentContextRepository(
+                agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState())
+        )
+        try await manager.register(speech)
+        try await manager.register(assistant, sessionID: session)
+        try await manager.start(.speechPerception)
+        try await manager.start(.assistant)
+        let policy = try CommunicationPolicy(
+            contracts: AgentContracts.communication,
+            configurations: AgentConfigurations.all())
+        let input = InputGateway(manager: manager, policy: policy)
+        let probe = PerceptionListeningProbe()
+        let binding = ActionBinding(
+            function: SpeechActions.updateDefinition(handler: { invocation in
+                #expect(invocation.context.source == "speechPerception")
+                #expect(invocation.context.sessionID == session)
+                try await SpeechActions.update(invocation: invocation) { _, paused, _, _ in
+                    if !paused { try await speech.resumeListening() }
+                }
+            }), protocols: [.action], executionPolicy: .scheduled(channel: "Listening"))
+        let output = OutputGateway(
+            manager: manager, requests: input, tools: ToolRegistry(),
+            actions: ChannelScheduler(registry: try ActionRegistry(definitions: [binding])), policy: policy,
+            sink: { _ in })
+        let speechConsumer = try await output.consumer(for: speech)
+        let assistantConsumer = try await output.consumer(for: assistant)
+        let speechPump = Task {
+            try await IndependentOutputWorkflow.consumeSignals(speech.outputs) { envelope in
+                await probe.record(envelope)
+                try await speechConsumer.execute(envelope)
             }
-        }), protocols: [.action], executionPolicy: .scheduled(channel: "Listening"))
-    let output = OutputGateway(
-        manager: manager, requests: input, tools: ToolRegistry(),
-        actions: ChannelScheduler(registry: try ActionRegistry(definitions: [binding])), policy: policy, sink: { _ in })
-    let speechConsumer = try await output.consumer(for: speech)
-    let assistantConsumer = try await output.consumer(for: assistant)
-    let speechPump = Task {
-        try await IndependentOutputWorkflow.consumeSignals(speech.outputs) { envelope in
-            await probe.record(envelope)
-            try await speechConsumer.execute(envelope)
         }
-    }
-    let assistantPump = Task {
-        try await IndependentOutputWorkflow.consumeGeneration(assistant.outputs) {
-            try await assistantConsumer.execute($0)
+        let assistantPump = Task {
+            try await IndependentOutputWorkflow.consumeGeneration(assistant.outputs) {
+                try await assistantConsumer.execute($0)
+            }
         }
+        try await speech.receive(ListeningIntent().input(sessionID: session))
+        await input.flushPublications()
+        try await speech.openCapture(sessionID: UUID().uuidString)
+        try await manager.publishLocally(
+            AgentInput(id: UUID().uuidString, sessionID: session, payload: .text("hello")), to: .assistant)
+        let deadline = ContinuousClock.now.advanced(by: .seconds(3))
+        while await probe.values.count < 3, ContinuousClock.now < deadline {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        let values = await probe.values
+        #expect(values.count >= 3)
+        #expect(values.first?.enabled == true && values.first?.paused == false)
+        #expect(values.contains { $0.enabled && $0.paused })
+        #expect(values.last?.enabled == true && values.last?.paused == false)
+        await manager.stopAll()
+        _ = await speechPump.result
+        _ = await assistantPump.result
+        await output.shutdown()
     }
-    try await input.publish(ListeningIntent().input(sessionID: session))
-    await input.flushPublications()
-    try await speech.openCapture(sessionID: UUID().uuidString)
-    try await input.publish(AgentInput(id: UUID().uuidString, sessionID: session, payload: .text("hello")))
-    let deadline = ContinuousClock.now.advanced(by: .seconds(3))
-    while await probe.values.count < 3, ContinuousClock.now < deadline { try await Task.sleep(for: .milliseconds(10)) }
-    let values = await probe.values
-    #expect(values.count >= 3)
-    #expect(values.first?.enabled == true && values.first?.paused == false)
-    #expect(values.contains { $0.enabled && $0.paused })
-    #expect(values.last?.enabled == true && values.last?.paused == false)
-    await manager.stopAll()
-    _ = await speechPump.result
-    _ = await assistantPump.result
-    await output.shutdown()
 }
 
 @Test(.actionCatalog) func nativeCaptureTerminationCannotDisableNewerListeningConsent() async throws {
@@ -1316,20 +1292,24 @@ func finalASRGatesNextUtteranceBeforePublicationUntilReplyCompletes() async thro
             id: UUID().uuidString,
             sessionID: epoch,
             payload: .audio(
-                try AudioInput(
+                try syntheticAudioInput(
                     samples: samples.withUnsafeBytes { Data($0) }, sampleRate: 16000,
                     sequence: sequence, timestamp: Double(sequence))))
     }
-    try await speech.receive(frame(true, sequence: 0))
-    try await speech.receive(frame(false, sequence: 1))
+    try await processMicrophoneFixture(frame(true, sequence: 0), using: speech)
+    try await processMicrophoneFixture(frame(false, sequence: 1), using: speech)
     let deadline = ContinuousClock.now.advanced(by: .seconds(3))
     while await probe.finalRoots.isEmpty, ContinuousClock.now < deadline {
         try await Task.sleep(for: .milliseconds(10))
     }
     let root = try #require(await probe.finalRoots.first)
-    await #expect(throws: CapabilityError.inputBusy) { try await speech.receive(frame(true, sequence: 2)) }
+    await #expect(throws: CapabilityError.inputBusy) {
+        try await processMicrophoneFixture(frame(true, sequence: 2), using: speech)
+    }
     try await speech.resumeListening()
-    await #expect(throws: CapabilityError.inputBusy) { try await speech.receive(frame(true, sequence: 2)) }
+    await #expect(throws: CapabilityError.inputBusy) {
+        try await processMicrophoneFixture(frame(true, sequence: 2), using: speech)
+    }
     let incarnation = UUID().uuidString
     try await speech.receive(
         replyActivityInput(
@@ -1337,7 +1317,7 @@ func finalASRGatesNextUtteranceBeforePublicationUntilReplyCompletes() async thro
     )
     try await speech.receive(replyActivityInput(session: session, incarnation: incarnation, revision: 2, root: root))
     try await speech.resumeListening()
-    try await speech.receive(frame(true, sequence: 2))
+    try await processMicrophoneFixture(frame(true, sequence: 2), using: speech)
     #expect(await speech.status().lifecycle == .running)
     await speech.stop()
     await pump.value
@@ -1433,8 +1413,10 @@ func coldVADAndASRPreserveRecordedPrefixAndJoinLiveAudioInOrder() async throws {
     let vad = ColdVoiceActivity()
     let root = UUID().uuidString
     let epoch = UUID().uuidString
+    let microphone = NativeMicrophoneFixture()
     let speech = try SpeechPerceptionAgent(
         recognition: recognition, vad: vad, sessionID: root, interactionSessionID: root, residentListening: true,
+        microphoneInput: microphone,
         context: try AgentContextRepository(
             agent: AgentID(rawValue: "speechPerception"), scope: UUID().uuidString,
             state: SpeechPerceptionContextState())
@@ -1452,28 +1434,25 @@ func coldVADAndASRPreserveRecordedPrefixAndJoinLiveAudioInOrder() async throws {
     }
     try await speech.receive(ListeningIntent(enabled: true).input(sessionID: root))
     try await speech.openCapture(sessionID: epoch)
+    try await speech.startInput(sessionID: epoch)
     var expected = Data()
-    func packet(_ sequence: UInt64, silent: Bool = false) throws -> AgentInput {
+    func packet(_ sequence: UInt64, silent: Bool = false) throws -> MicrophoneFrame {
         let samples = [Float](repeating: silent ? 0 : Float(sequence + 1) / 100, count: 4000)
-        let data = samples.withUnsafeBytes { Data($0) }
-        return AgentInput(
-            id: UUID().uuidString, sessionID: epoch,
-            payload: .audio(
-                try AudioInput(
-                    samples: data, sampleRate: 16000, sequence: sequence,
-                    timestamp: Double(sequence) / 4)))
+        return MicrophoneFrame(
+            samples: samples, sampleRate: 16000,
+            sequence: sequence, timestamp: Double(sequence) / 4)
     }
     // Eight seconds, uniquely marked by packet, exceeds both previous PCM queue bounds.
     for sequence: UInt64 in 0..<32 {
         let input = try packet(sequence)
-        if case .audio(let audio) = input.payload { expected.append(audio.samples) }
-        try await speech.receive(input)
+        expected.append(input.samples.withUnsafeBytes { Data($0) })
+        try microphone.capture.send(input)
         if sequence == 0 {
             var entered = vad.gate.entered.stream.makeAsyncIterator()
             await entered.next()
         }
     }
-    #expect(await speech.status().queuedInputs == 31)
+    #expect(await speech.status().queuedInputs == 0)
     vad.gate.open()
     var recognizing = recognition.gate.entered.stream.makeAsyncIterator()
     await recognizing.next()
@@ -1483,9 +1462,9 @@ func coldVADAndASRPreserveRecordedPrefixAndJoinLiveAudioInOrder() async throws {
     recognition.gate.open()
     // Live input follows the buffered prefix through exactly the same model session.
     let live = try packet(32)
-    if case .audio(let audio) = live.payload { expected.append(audio.samples) }
-    try await speech.receive(live)
-    for sequence: UInt64 in 33..<37 { try await speech.receive(packet(sequence, silent: true)) }
+    expected.append(live.samples.withUnsafeBytes { Data($0) })
+    try microphone.capture.send(live)
+    for sequence: UInt64 in 33..<37 { try microphone.capture.send(packet(sequence, silent: true)) }
     var result = final.stream.makeAsyncIterator()
     #expect(await result.next() == "cold-start")
     let received = await recognition.received
@@ -1543,40 +1522,16 @@ func coldRecognitionRejectsOverflowWithoutDroppingPreviouslyQueuedPCM() async th
     #expect(received.dropFirst(320) == frames.reduce(into: Data()) { $0.append($1.data) })
 }
 
-@Test(.actionCatalog, arguments: [false, true])
-func speechRawAudioQueueEnforcesPacketAndMemoryBounds(memoryBound: Bool) async throws {
-    let root = UUID().uuidString
-    let speech = try SpeechPerceptionAgent(
-        recognition: RecognitionFixture(text: "", includeFinal: false), vad: EndpointVAD(), sessionID: root,
-        context: try AgentContextRepository(
-            agent: AgentID(rawValue: "speechPerception"), scope: UUID().uuidString,
-            state: SpeechPerceptionContextState())
-    )
-    try await speech.start()
-    try await speech.pause()
-    let capacity = memoryBound ? SpeechPerceptionSignalPreprocessor.maximumQueuedSamples : 4096
-    let packetSize = memoryBound ? 16000 : 1
-    var count = 0
-    var sequence: UInt64 = 0
-    while count < capacity {
-        let amount = min(packetSize, capacity - count)
-        let audio = try AudioInput(
-            samples: Data(repeating: 0, count: amount * 4), sampleRate: 192000,
-            sequence: sequence, timestamp: Double(sequence),
-            layout: memoryBound ? .firstOrderAmbisonicsACNSN3D : .mono)
-        try await speech.receive(AgentInput(id: UUID().uuidString, sessionID: root, payload: .audio(audio)))
-        count += amount
-        sequence += 1
-    }
-    let queued = await speech.status().queuedInputs
-    let audio = try AudioInput(
-        samples: Data(repeating: 0, count: 16), sampleRate: 192000, sequence: sequence, timestamp: Double(sequence))
-    await #expect(throws: HarnessError.queueFull) {
-        try await speech.receive(AgentInput(id: UUID().uuidString, sessionID: root, payload: .audio(audio)))
-    }
-    #expect(await speech.status().queuedInputs == queued)
-    await speech.stop()
-    #expect(await speech.status().queuedInputs == 0)
+@Test(.actionCatalog) func nativeMicrophoneQueueRejectsPacket65AndTerminates() async throws {
+    let source = NativeMicrophoneFixture()
+    let input = try await source.subscribeCapture()
+    let frame = MicrophoneFrame(samples: [0], sampleRate: 16000, sequence: 0)
+    for _ in 0..<64 { #expect(try source.capture.send(frame)) }
+    #expect(throws: AudioIOError.overflow) { try source.capture.send(frame) }
+    var iterator = input.frames.makeAsyncIterator()
+    for _ in 0..<64 { #expect(try await iterator.next() != nil) }
+    await #expect(throws: AudioIOError.overflow) { try await iterator.next() }
+    #expect(!source.capture.isActive)
 }
 
 @Test @MainActor func spectrumOffMainMatchesSynchronousAndRejectsCancelledWork() async throws {

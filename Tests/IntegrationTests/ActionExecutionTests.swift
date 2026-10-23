@@ -508,7 +508,8 @@ func resourceConflictFailsWithoutWaitingAndAdvancesItsChannel(sharedWriterGroup:
 }
 
 private func boundary(_ directive: SchedulingDirective, _ input: AgentInput) -> OutputEnvelope {
-    OutputEnvelope(source: .assistant, input: input, output: .scheduling(directive))
+    OutputEnvelope(
+        source: .assistant, context: input.context, output: .scheduling(directive), taskScope: input.taskScope)
 }
 
 @Test(.actionCatalog) func waitGroupsJoinBeforeAndAfterWithoutBlockingIndependentTasks() async throws {

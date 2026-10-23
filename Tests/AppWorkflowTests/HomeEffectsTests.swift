@@ -1,6 +1,5 @@
-import ActionBindings
 import Actions
-import AgentBindings
+import Agents
 import ExecutionRuntime
 import Foundation
 import FunctionContracts
@@ -11,32 +10,25 @@ import Testing
 
 @testable import UI
 
-private func homeEffectInput(session: String = UUID().uuidString) -> FunctionInvocation {
-    .init(
-        call: .init(actionPath: .init(domain: "UI", module: "Light", function: "updateLight")),
-        context: .init(source: "assistant", sessionID: session, inputID: UUID().uuidString),
-        executionID: UUID().uuidString, results: ActionReportStore())
-}
-
 @Test @MainActor func homeEffectsKeepConsentAndErrorEvidenceIndependent() async throws {
     let activity = ActionActivityState()
     let state = ConversationState()
     state.expressionRendererAvailable = true
     let effects = HomeEffectsWorkflow(activity: activity)
     effects.bind(state)
-    let input = homeEffectInput()
+    let owner = PresentationOwner(source: "assistant", session: UUID().uuidString)
     try await effects.updateLight(
-        .init(origin: .init(x: 0.1, y: 0.8), initialOpacity: 0.85, intensity: 1), invocation: input)
+        .init(origin: .init(x: 0.1, y: 0.8), initialOpacity: 0.85, intensity: 1), owner: owner)
     #expect(state.decorativeLight?.origin == .init(x: 0.1, y: 0.8))
     #expect(!state.isVoiceActive && state.displayedExpression == .closed && state.listeningAnimationID == nil)
-    try await effects.showNotice(.init(text: "提醒", tone: .info), invocation: input)
+    try await effects.showNotice(.init(text: "提醒", tone: .info), owner: owner)
     #expect(activity.visibleNotice?.text == "提醒" && activity.backgroundIssues.isEmpty)
     activity.recordIssue(.init(title: "失败", source: "assistant", message: "真实异常"))
     #expect(activity.visibleNotice?.text == "真实异常")
     await #expect(throws: HomeEffectsWorkflow.Error.self) {
-        try await effects.showNotice(.init(text: "不能覆盖异常", tone: .warning), invocation: input)
+        try await effects.showNotice(.init(text: "不能覆盖异常", tone: .warning), owner: owner)
     }
-    try await effects.dismissNotice(invocation: input)
+    try await effects.dismissNotice(owner: owner)
     #expect(activity.errorToast != nil && activity.notice == nil)
     effects.stop()
     #expect(state.decorativeLight == nil && activity.errorToast != nil)
@@ -48,16 +40,16 @@ private func homeEffectInput(session: String = UUID().uuidString) -> FunctionInv
     let activity = ActionActivityState()
     let effects = HomeEffectsWorkflow(activity: activity)
     effects.bind(state)
-    let input = homeEffectInput()
-    try await effects.showNotice(.init(text: "先", tone: .warning), durationMS: 500, invocation: input)
-    try await effects.showNotice(.init(text: "后", tone: .warning), durationMS: 30000, invocation: input)
+    let owner = PresentationOwner(source: "assistant", session: UUID().uuidString)
+    try await effects.showNotice(.init(text: "先", tone: .warning), durationMS: 500, owner: owner)
+    try await effects.showNotice(.init(text: "后", tone: .warning), durationMS: 30000, owner: owner)
     try await effects.updateLight(
-        .init(origin: .init(x: 0.5, y: 0.4), initialOpacity: 0.85, intensity: 1), durationMS: 500, invocation: input)
+        .init(origin: .init(x: 0.5, y: 0.4), initialOpacity: 0.85, intensity: 1), durationMS: 500, owner: owner)
     await #expect(throws: HomeEffectsWorkflow.Error.self) {
-        try await effects.dismissNotice(invocation: homeEffectInput())
+        try await effects.dismissNotice(owner: PresentationOwner(source: "assistant", session: UUID().uuidString))
     }
     await #expect(throws: HomeEffectsWorkflow.Error.self) {
-        try await effects.updateLight(nil, invocation: homeEffectInput())
+        try await effects.updateLight(nil, owner: PresentationOwner(source: "assistant", session: UUID().uuidString))
     }
     try await Task.sleep(for: .milliseconds(700))
     #expect(state.decorativeLight == nil && activity.notice?.text == "后")

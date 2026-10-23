@@ -1,6 +1,10 @@
+import Actions
 import AgentCore
 import Foundation
+import Gateway
+import PlatformKit
 import StorageCore
+import UI
 
 /// Root-session application operations; shared transaction state with no native or callable implementation imports.
 public actor ApplicationControlAgent: Agent {
@@ -12,13 +16,28 @@ public actor ApplicationControlAgent: Agent {
 
     // MARK: - State and dependencies
 
+    let connectionFacts: (@MainActor @Sendable () throws -> AsyncThrowingStream<NexArmConnectionFacts, any Error>)?
+    let resourceChanges: (@MainActor @Sendable () async throws -> AsyncStream<UInt64>)?
+    let observationFailure: @Sendable (any Error) -> Void
+    var resourceObservation: ResourceObservationSession?
+    let uiDiagnostics: UIDiagnosticsContainer?
+    var detection: Task<Void, any Error>?
+    let uiSettings: UISettingsContainer?
+    let uiResources: UIModelResourcesContainer?
+    let uiDevices: UIDeviceSettingsContainer?
+    let uiProviderSettings: ProviderSettingsRequests?
+    let uiProviderDiscovery: ProviderDiscoveryRequests?
+    let uiProviderPresentation: ProviderPresentationAdapter?
+    var uiInputs = AgentUIInputs()
+    var uiExecution = AgentUIExecution()
     private let contextRepository: AgentContextRepository<ApplicationControlContextState>
     private let preprocessor = ApplicationControlSignalPreprocessor()
     private let contextBuilder = ApplicationControlContextBuilder()
 
     private let continuation: AsyncStream<OutputEnvelope>.Continuation
-    private let sessionID: String
+    let sessionID: String
     private var lifecycle = AgentLifecycle.registered
+    var lifecycleIsActive: Bool { lifecycle == .running }
     private var pending: [String: AgentInput] = [:]
     private var inputs: Set<String> = []
     private var configurationCall: String?
@@ -34,7 +53,7 @@ public actor ApplicationControlAgent: Agent {
     private var providerPresentationCalls: [String: Bool] = [:]
     private var hostFailureCalls: Set<String> = []
     private var terminalFailureCalls: Set<String> = []
-    private var observationSequence: UInt64 = 0
+    private(set) var observationSequence: UInt64 = 0
     private var bluetoothState: ApplicationControlBluetoothState?
     private var bluetoothPresented: ApplicationControlBluetoothState?
     private var bluetoothRevision: UInt64 = 0
@@ -45,7 +64,7 @@ public actor ApplicationControlAgent: Agent {
     private var diagnosticOrder: [String] = []
     private var diagnosticCalls: Set<String> = []
     private var diagnosticPresentationFailures: [String] = []
-    private let diagnosticContracts: Set<String>
+    private let diagnosticContracts: Set<String> = [ContainerFailureEvent.contract, RuntimeFailureEvent.contract]
     public func failurePresentationErrors() -> [String] { diagnosticPresentationFailures }
 
     private var deviceResults = ActionResultInbox()
@@ -59,19 +78,37 @@ public actor ApplicationControlAgent: Agent {
 
     public init(
         sessionID: String, configuration: AgentConfiguration? = nil,
+        uiSettings: UISettingsContainer? = nil, uiResources: UIModelResourcesContainer? = nil,
+        uiDevices: UIDeviceSettingsContainer? = nil, uiDiagnostics: UIDiagnosticsContainer? = nil,
+        connectionFacts: (@MainActor @Sendable () throws -> AsyncThrowingStream<NexArmConnectionFacts, any Error>)? =
+            nil,
+        resourceChanges: (@MainActor @Sendable () async throws -> AsyncStream<UInt64>)? = nil,
+        observationFailure: @escaping @Sendable (any Error) -> Void = { _ in },
+        uiProviderSettings: ProviderSettingsRequests? = nil, uiProviderDiscovery: ProviderDiscoveryRequests? = nil,
+        uiProviderPresentation: ProviderPresentationAdapter? = nil,
         context: AgentContextRepository<ApplicationControlContextState>
     ) throws {
+        self.connectionFacts = connectionFacts
+        self.resourceChanges = resourceChanges
+        self.observationFailure = observationFailure
+        self.uiDiagnostics = uiDiagnostics
+        self.uiSettings = uiSettings
+        self.uiResources = uiResources
+        self.uiDevices = uiDevices
+        self.uiProviderSettings = uiProviderSettings
+        self.uiProviderDiscovery = uiProviderDiscovery
+        self.uiProviderPresentation = uiProviderPresentation
         self.contextRepository = context
         guard contextRepository.agentID == .applicationControl else { throw AgentConfigurationError.identityMismatch }
         let configuration = try configuration ?? AgentConfigurations.load(named: "ApplicationControl")
         guard configuration.agentID == .applicationControl else { throw AgentConfigurationError.identityMismatch }
-        diagnosticContracts = Set(configuration.communication.inputs.map(\.contract))
         descriptor = AgentDescriptor(
             id: .applicationControl, name: "ApplicationControl",
             inputs: Set(configuration.communication.inputs.map(\.kind)),
             outputs: [.communication, .actionCall, .toolCall, .control, .scheduling],
             capabilities: try configuration.capabilities.adding(internalTools: [
-                ApplicationControlFunctions.runtimeFailure, ApplicationControlFunctions.bluetoothHome,
+                InternalTool(path: "Speech.Detection.run"), ApplicationControlFunctions.runtimeFailure,
+                ApplicationControlFunctions.bluetoothHome,
                 ApplicationControlFunctions.bluetoothSettings, ApplicationControlFunctions.loadingExpression,
                 ApplicationControlFunctions.download, ApplicationControlFunctions.cancellation,
                 ApplicationControlFunctions.removal, ApplicationControlFunctions.speechBinding,
@@ -92,6 +129,49 @@ public actor ApplicationControlAgent: Agent {
         continuation = pair.continuation
     }
 
+    public func observeEnvironment(_ fact: AppEnvironmentFact) async throws {
+        try fact.validate()
+        try await receive(fact.input(sessionID: sessionID))
+    }
+    public func observeResource(_ fact: ModelResourceObservation, sequence: UInt64) async throws {
+        try fact.validate()
+        guard sequence > 0 else { throw CommunicationError.invalidPayload }
+        try await receive(fact.input(sessionID: sessionID, sequence: sequence))
+    }
+    public func observeConnection(_ facts: NexArmConnectionFacts) throws {
+        guard lifecycle == .running || lifecycle == .paused else { throw HarnessError.notRunning }
+        let phase: ApplicationControlBluetoothState
+        if facts.availability != .available {
+            phase = .disconnected
+        } else if facts.phase == .connected {
+            phase = .connected
+        } else if facts.phase == .connecting || [.cleaning, .waiting, .connecting].contains(facts.recovery) {
+            phase = .connecting
+        } else {
+            phase = .disconnected
+        }
+        bluetoothState = phase
+        let context = ProcessingContext(sessionID: sessionID, source: "runtime")
+        try presentBluetooth(phase, input: context.input(.event("connection.changed")))
+    }
+    public func observeFailure(_ event: ContainerFailureEvent) async throws {
+        try event.validate()
+        let message = AgentMessage(
+            contract: ContainerFailureEvent.contract, content: event, maximumBytes: 8192,
+            validate: { try $0.validate() })
+        try await receive(
+            ProcessingContext(requestID: event.id, sessionID: sessionID, source: "runtime").input(.observation(message))
+        )
+    }
+    public func observeFailure(_ event: RuntimeFailureEvent) async throws {
+        try event.validate()
+        let message = AgentMessage(
+            contract: RuntimeFailureEvent.contract, content: event, maximumBytes: 16384,
+            validate: { try $0.validate() })
+        try await receive(
+            ProcessingContext(requestID: event.id, sessionID: sessionID, source: "runtime").input(.observation(message))
+        )
+    }
     // MARK: - Lifecycle
 
     public func start() async throws {
@@ -108,18 +188,24 @@ public actor ApplicationControlAgent: Agent {
                 }
             }
         }
+        try await startUIInputs()
     }
     public func pause() async throws {
+        await stopUIInputs()
         guard lifecycle == .running else { throw HarnessError.invalidTransition }
         await taskCoordinator.pause()
         lifecycle = .paused
     }
     public func resume() async throws {
         guard lifecycle == .paused else { throw HarnessError.invalidTransition }
+        await stopUIInputs()
         await taskCoordinator.resume()
         lifecycle = .running
+        try await startUIInputs()
     }
     public func stop() async {
+        await stopUIInputs()
+        uiExecution.consumer = nil
         admission.close()
         lifecycle = .stopped
         diagnosticCalls.removeAll()
@@ -151,6 +237,9 @@ public actor ApplicationControlAgent: Agent {
 
     public func receive(_ input: AgentInput) async throws {
         do { try await receiveSignal(input) } catch {
+            if (error as? CommunicationError) == .invalidPayload {
+                ContainerInputMetrics.rejected(input, role: "ApplicationControl")
+            }
             let diagnosticInput: Bool
             if case .observation(let message) = input.payload {
                 diagnosticInput = [ContainerFailureEvent.contract, RuntimeFailureEvent.contract].contains(
@@ -158,14 +247,14 @@ public actor ApplicationControlAgent: Agent {
             } else {
                 diagnosticInput = false
             }
-            if !diagnosticInput, input.metadata.origin == .external, input.sessionID == sessionID,
+            if !diagnosticInput, input.metadata.origin == .local, input.sessionID == sessionID,
                 (error as? CommunicationError) != .unauthorized,
                 descriptor.inputs.contains(input.payload.kind)
             {
                 _ = relay(
                     OutputEnvelope(
-                        source: descriptor.id, input: input,
-                        output: .control("agent.error: input rejected: \(error)")))
+                        source: descriptor.id, context: input.context,
+                        output: .control("agent.error: input rejected: \(error)"), taskScope: input.taskScope))
             }
             throw error
         }
@@ -218,7 +307,8 @@ public actor ApplicationControlAgent: Agent {
                 guard
                     relay(
                         OutputEnvelope(
-                            source: descriptor.id, input: original, output: .control("agent.error: task cancelled")))
+                            source: descriptor.id, context: original.context,
+                            output: .control("agent.error: task cancelled"), taskScope: original.taskScope))
                 else { throw CommunicationError.capacityExceeded }
                 try await taskCoordinator.reportFixedTask(
                     signal.scope, input: original,
@@ -231,7 +321,8 @@ public actor ApplicationControlAgent: Agent {
                 try await taskCoordinator.receive(input)
                 return
             }
-            let fixed = try AgentFixedTaskInput.unwrap(signal, input: input, executor: descriptor.id)
+            let fixed = try AgentFixedTaskInput.unwrap(
+                signal, input: input, executor: descriptor.id, decode: ApplicationControlTaskInput.message)
             guard fixedTaskInputs.count < 32 else { throw CommunicationError.capacityExceeded }
             try await taskCoordinator.admitFixedTask(signal, input: input)
             fixedTaskInputs[fixed.id] = fixed
@@ -259,6 +350,7 @@ public actor ApplicationControlAgent: Agent {
             throw HarnessError.notRunning
         }
         for envelope in outputs {
+            if try uiExecution.capture(envelope) { continue }
             guard case .enqueued = continuation.yield(envelope) else {
                 await stop()
                 lifecycle = .failed
@@ -269,13 +361,13 @@ public actor ApplicationControlAgent: Agent {
     /// Failure presentation must work even when the context store or model has failed.
     private func receiveFailure(_ input: AgentInput, message: AgentMessage) throws {
         guard lifecycle == .running || lifecycle == .paused else { throw HarnessError.notRunning }
-        guard input.sessionID == sessionID, input.metadata.origin == .external,
+        guard input.sessionID == sessionID, input.metadata.origin == .local,
             input.metadata.incarnation == nil, input.taskScope == nil, input.metadata.source == "runtime",
             input.metadata.contract == message.contract, input.metadata.version == 1,
             diagnosticContracts.contains(message.contract)
         else { throw CommunicationError.unauthorized }
         guard !input.metadata.expired else { throw CommunicationError.expired }
-        _ = try message.validatedSize()
+        try input.validate(message)
         var parameters: [String: String]
         let key: String
         let count: UInt64
@@ -339,7 +431,9 @@ public actor ApplicationControlAgent: Agent {
         sequence &+= 1
         guard
             case .enqueued = continuation.yield(
-                OutputEnvelope(source: descriptor.id, input: input, output: .toolCall(call), sequence: sequence))
+                OutputEnvelope(
+                    source: descriptor.id, context: input.context, output: .toolCall(call), sequence: sequence,
+                    taskScope: input.taskScope))
         else { throw CommunicationError.capacityExceeded }
         diagnosticCalls.insert(call.id)
         if diagnosticCounts[key] == nil {
@@ -361,7 +455,9 @@ public actor ApplicationControlAgent: Agent {
         sequence &+= 1
         guard
             case .enqueued = continuation.yield(
-                OutputEnvelope(source: descriptor.id, input: input, output: .toolCall(call), sequence: sequence))
+                OutputEnvelope(
+                    source: descriptor.id, context: input.context, output: .toolCall(call), sequence: sequence,
+                    taskScope: input.taskScope))
         else { throw CommunicationError.capacityExceeded }
         diagnosticCalls.insert(call.id)
     }
@@ -380,7 +476,9 @@ public actor ApplicationControlAgent: Agent {
             sequence &+= 1
             guard
                 case .enqueued = continuation.yield(
-                    OutputEnvelope(source: descriptor.id, input: input, output: .toolCall(call), sequence: sequence))
+                    OutputEnvelope(
+                        source: descriptor.id, context: input.context, output: .toolCall(call), sequence: sequence,
+                        taskScope: input.taskScope))
             else { throw CommunicationError.capacityExceeded }
             diagnosticCalls.insert(call.id)
         }
@@ -390,7 +488,11 @@ public actor ApplicationControlAgent: Agent {
     private func acceptsPassive(_ input: AgentInput) -> Bool {
         switch input.payload {
         case .actionResult, .toolResult, .roundResult, .communicationReceipt: return true
-        case .observation(let message): return message.contract == AppEnvironmentFact.contract
+        case .observation(let message):
+            if case .retire? = message.resourceIntent {
+                return input.metadata.origin == .local && input.metadata.source == "runtime"
+            }
+            return message.contract == AppEnvironmentFact.contract
         default: return false
         }
     }
@@ -412,13 +514,13 @@ public actor ApplicationControlAgent: Agent {
             return
         case .observation(let message):
             if let fact = message.appEnvironment {
-                guard input.metadata.origin == .external, input.metadata.incarnation == nil,
+                guard input.metadata.origin == .local, input.metadata.incarnation == nil,
                     input.metadata.source == AppEnvironmentFact.source,
                     input.metadata.contract == AppEnvironmentFact.contract,
                     input.metadata.version == 1, input.metadata.sequence == fact.sequence
                 else { throw CommunicationError.invalidPayload }
                 try fact.validate()
-                _ = try message.validatedSize()
+                try input.validate(message)
                 if fact.category == .modelPreparation {
                     guard fact.value == "loading" || fact.value == "idle" else {
                         throw CommunicationError.invalidPayload
@@ -445,13 +547,13 @@ public actor ApplicationControlAgent: Agent {
             }
             if let interaction = message.appInteraction {
                 guard
-                    (input.metadata.origin == .external && input.metadata.incarnation == nil
+                    (input.metadata.origin == .local && input.metadata.incarnation == nil
                         && input.metadata.source == "user") || AgentFixedTaskInput.isTrusted(input),
                     input.metadata.contract == AppInteractionIntent.contract,
                     input.metadata.version == 1
                 else { throw CommunicationError.invalidPayload }
                 try interaction.validate()
-                _ = try message.validatedSize()
+                try input.validate(message)
                 guard pending.count < ApplicationControlSignalPreprocessor.inputCapacity, !inputs.contains(input.id)
                 else { throw CommunicationError.capacityExceeded }
                 let call = try
@@ -466,12 +568,12 @@ public actor ApplicationControlAgent: Agent {
             }
             if let settings = message.providerSettings {
                 guard
-                    (input.metadata.origin == .external && input.metadata.incarnation == nil
+                    (input.metadata.origin == .local && input.metadata.incarnation == nil
                         && input.metadata.source == "user") || AgentFixedTaskInput.isTrusted(input),
                     input.metadata.contract == ProviderSettingsIntent.contract,
                     input.metadata.version == 1, message.contract == ProviderSettingsIntent.contract
                 else { throw CommunicationError.invalidPayload }
-                _ = try message.validatedSize()
+                try input.validate(message)
                 guard pending.count < ApplicationControlSignalPreprocessor.inputCapacity, !inputs.contains(input.id),
                     providerSettingsRequest == nil,
                     preferenceRequest == nil, configurationCall == nil
@@ -489,12 +591,12 @@ public actor ApplicationControlAgent: Agent {
             }
             if let discovery = message.providerDiscovery {
                 guard
-                    (input.metadata.origin == .external && input.metadata.incarnation == nil
+                    (input.metadata.origin == .local && input.metadata.incarnation == nil
                         && input.metadata.source == "user") || AgentFixedTaskInput.isTrusted(input),
                     input.metadata.contract == ProviderDiscoveryIntent.contract,
                     input.metadata.version == 1, message.contract == ProviderDiscoveryIntent.contract
                 else { throw CommunicationError.invalidPayload }
-                _ = try message.validatedSize()
+                try input.validate(message)
                 guard pending.count < ApplicationControlSignalPreprocessor.inputCapacity, !inputs.contains(input.id)
                 else { throw CommunicationError.capacityExceeded }
                 let call = try ApplicationControlFunctions.providerDiscovery.call([
@@ -517,13 +619,13 @@ public actor ApplicationControlAgent: Agent {
                 return
             }
             guard
-                (input.metadata.origin == .external && input.metadata.incarnation == nil)
+                (input.metadata.origin == .local && input.metadata.incarnation == nil)
                     || AgentFixedTaskInput.isTrusted(input),
                 input.metadata.contract == ModelResourceIntent.contract,
                 input.metadata.version == 1, message.contract == ModelResourceIntent.contract,
                 let intent = message.resourceIntent
             else { throw CommunicationError.invalidPayload }
-            _ = try message.validatedSize()
+            try input.validate(message)
             if case .retire(let requestID) = intent {
                 guard input.metadata.source == "runtime", requestID == input.id else {
                     throw CommunicationError.invalidPayload
@@ -547,7 +649,7 @@ public actor ApplicationControlAgent: Agent {
                 throw CommunicationError.invalidPayload
             }
             try intent.validate()
-            _ = try message.validatedSize()
+            try input.validate(message)
             guard pending.count < ApplicationControlSignalPreprocessor.inputCapacity, !inputs.contains(input.id) else {
                 throw CommunicationError.capacityExceeded
             }
@@ -707,7 +809,7 @@ public actor ApplicationControlAgent: Agent {
     private func admitHostFailure(_ failure: ModelResourceHostFailure, message: AgentMessage, input: AgentInput)
         throws
     {
-        guard input.metadata.origin == .external, input.metadata.incarnation == nil,
+        guard input.metadata.origin == .local, input.metadata.incarnation == nil,
             input.metadata.source == ModelResourceHostFailure.source,
             input.metadata.contract == ModelResourceHostFailure.contract, input.metadata.version == 1,
             message.contract == ModelResourceHostFailure.contract,
@@ -715,7 +817,7 @@ public actor ApplicationControlAgent: Agent {
             input.id != failure.requestID, input.metadata.hops == 1
         else { throw CommunicationError.unauthorized }
         try failure.validate()
-        _ = try message.validatedSize()
+        try input.validate(message)
         guard pending.count < ApplicationControlSignalPreprocessor.inputCapacity, !inputs.contains(input.id) else {
             throw CommunicationError.capacityExceeded
         }
@@ -740,14 +842,14 @@ public actor ApplicationControlAgent: Agent {
     private func admitObservation(_ observation: ModelResourceObservation, message: AgentMessage, input: AgentInput)
         throws
     {
-        guard input.metadata.origin == .external, input.metadata.incarnation == nil,
+        guard input.metadata.origin == .local, input.metadata.incarnation == nil,
             input.metadata.source == ModelResourceObservation.source,
             input.metadata.contract == ModelResourceObservation.contract, input.metadata.version == 1,
             message.contract == ModelResourceObservation.contract,
             input.metadata.sequence > observationSequence
         else { throw CommunicationError.invalidPayload }
         try observation.validate()
-        _ = try message.validatedSize()
+        try input.validate(message)
         guard pending.count < ApplicationControlSignalPreprocessor.inputCapacity, !inputs.contains(input.id) else {
             throw CommunicationError.capacityExceeded
         }
@@ -775,7 +877,10 @@ public actor ApplicationControlAgent: Agent {
     private func emit(_ output: AgentOutput, for input: AgentInput) throws {
         sequence += 1
         guard stagedOutputs != nil, (stagedOutputs?.count ?? 0) < 64 else { throw CommunicationError.capacityExceeded }
-        stagedOutputs?.append(OutputEnvelope(source: descriptor.id, input: input, output: output, sequence: sequence))
+        stagedOutputs?.append(
+            OutputEnvelope(
+                source: descriptor.id, context: input.context, output: output, sequence: sequence,
+                taskScope: input.taskScope))
     }
 
     private func relay(_ envelope: OutputEnvelope) -> Bool {
@@ -786,8 +891,9 @@ public actor ApplicationControlAgent: Agent {
             turn: envelope.turn, taskScope: envelope.taskScope)
         let result = continuation.yield(
             OutputEnvelope(
-                source: descriptor.id, input: input,
-                output: envelope.output, sequence: sequence, roundID: envelope.roundID, callID: envelope.callID))
+                source: descriptor.id, context: input.context,
+                output: envelope.output, sequence: sequence, roundID: envelope.roundID, callID: envelope.callID,
+                taskScope: input.taskScope))
         if case .enqueued = result { return true }
         lifecycle = .failed
         continuation.finish()

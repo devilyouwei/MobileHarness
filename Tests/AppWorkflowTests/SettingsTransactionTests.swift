@@ -1,11 +1,10 @@
-import ActionBindings
 import Actions
+import Agents
 import Foundation
 import Gateway
 import PlatformKit
 import Testing
 
-@testable import AgentBindings
 @testable import UI
 
 @MainActor
@@ -14,8 +13,8 @@ private final class SettingsFacadeFixture {
     var restores = 0
     var failSave = false
     @available(macOS 27, iOS 27, *)
-    func workflow() -> SettingsWorkflow {
-        SettingsWorkflow(
+    func workflow() -> ProviderSettingsClient {
+        ProviderSettingsClient(
             provider: .init(
                 initial: value,
                 restore: {

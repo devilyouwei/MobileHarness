@@ -73,7 +73,7 @@ App 最终仅保留 MobileHarnessApp.swift、Composition/、Lifecycle/ 及各级
 ## 最终实现对账
 
 - App 只有入口、三个 Composition 源文件和两个 Lifecycle 源文件；通用生命周期单独编译，OS 委托只转交回调。删除旧适配器/工作流/行为装配目录、旧统一导出和旧特性目标。
-- VoiceSessionCoordinator 保留角色/同意/半双工策略；VoiceNativeEffects 执行原生反馈/播放，UI 拥有表情动画等待。CameraCoordinator 通过注入的 CameraVisionRunning/CameraResourceAccess 接口使用感知和资源；GatewayCameraResources 归 AgentBindings。蓝牙执行/恢复状态与 UI 快照投影分别归 NexArmControlService 和 BluetoothWorkflow；UI 状态不能授予执行权限。
+- VoiceSessionCoordinator 保留角色/同意/半双工策略；VoiceNativeEffects 执行原生反馈/播放，UI 拥有表情动画等待。CameraCoordinator 通过注入的 CameraVisionRunning/CameraResourceAccess 接口使用感知和资源；CameraResourceBinding 归 AgentBindings。蓝牙执行/恢复状态与 UI 快照投影分别归 NexArmControlService 和 BluetoothWorkflow；UI 状态不能授予执行权限。
 - UI 自有根页面、请求/呈现端口和展示值。ActionBindings 经公开呈现方法提交字幕、表情、照片、配置、历史和资源结果；Settings/模型资源保留修订围栏，表情渲染保留不透明事务 ID 及真实完成回调。
 - 历史只读请求由实际 Memory 接纳：暂存最多四项，ID/结果有界，取消/关闭加入实际读取，生产者失败原样返回，纯查询不主动呈现。
 - 生命周期回滚清理失败保留到 stop 结果，阻止未确认清理的根图被替换；权重按需加载，配置/资源页面仍可进入。

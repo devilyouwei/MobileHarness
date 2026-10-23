@@ -8,13 +8,15 @@ public enum CameraError: Error, Equatable, Sendable {
 }
 
 /// Native capability only. Permission requests and capture require an explicit caller operation.
-public protocol CameraCapturing: Sendable {
+public protocol CameraFrameObserving: Sendable {
+    func subscribeFrames() async throws -> AsyncThrowingStream<CameraFrame, Error>
+}
+public protocol CameraCapturing: CameraFrameObserving {
     var events: AsyncStream<CameraEvent> { get }
     var captureRotation: CGFloat { get async }
     func requestPermission() async -> Bool
     func start(facing: CameraFacing) async throws -> AsyncThrowingStream<CameraFrame, Error>
     func switchCamera(facing: CameraFacing) async throws -> AsyncThrowingStream<CameraFrame, Error>
-    func subscribeFrames() async throws -> AsyncThrowingStream<CameraFrame, Error>
     func capturePhoto(rotation: CGFloat) async throws -> Data
     func isRunning() async -> Bool
     func stop() async

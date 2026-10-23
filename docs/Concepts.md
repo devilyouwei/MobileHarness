@@ -2,13 +2,13 @@
 
 本文件定义术语及其区别。当前模块协作见 [Architecture](Architecture.md)，详细接口和运行边界见 [整体技术设计](../MobileHarness/README.md)。生物类比仅用于解释组织方式，不表示复现生物智能。
 
-## Signal → Cognition → Action
+## Input → Cognition → Action
 
 | 术语 | 含义 |
 | --- | --- |
-| Signal | Agent 接收的不可变意图、观测、通信或执行反馈；运行时携带可信来源和因果关系。 |
+| Signal | Bound Agent communication or execution feedback. UI requests, native frames and container facts are local inputs and do not enter Signal transport. |
 | Agent | 拥有独立角色、输入准入、业务状态和允许输出的处理者。 |
-| Gateway | 输入、通信与执行的验证/协调边界，不解释业务目标。 |
+| Gateway | Agent communication and authorized execution coordination; local input observation belongs to the owning Agent. |
 | Capability | 注入的类型化模型、设备、存储或展示能力。 |
 | Action | 协议中立的业务函数，定义参数、效果、完成和失败语义。 |
 | ActionCall | 使用任务内 Channel/wait 的文本行为调用协议。 |
@@ -39,3 +39,5 @@ Agent 实例、session/input、task、decision/call 和 Signal 因果链各有�
 ## 扩展概念
 
 “快慢认知”描述响应性与审慎处理的分工，“边云协作”描述显式选择的远端能力，“具身”表示可观测的环境效果。这些术语不自动承诺算力升级、后台常驻或物理安全。尚未落实的范围在 [需求索引](requirements/README.md) 单独定义。
+
+ProcessingContext records local request/session/generation/turn and causal identity. It does not grant Agent messaging, task or device execution authority. UI request acceptance, business completion and native/physical completion are separate boundaries.

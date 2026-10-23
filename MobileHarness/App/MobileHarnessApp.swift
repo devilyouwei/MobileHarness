@@ -1,4 +1,4 @@
-import ActionBindings
+import Actions
 import SwiftUI
 import UI
 

@@ -1,5 +1,7 @@
 # Conversation — 首页与运行记录呈现
 
+✅ 按压手势用 GestureState 保留本地按压状态，状态变化才提交 press(true/false)，移动不重复发起准备 Action；抬起、取消及页面离开自动复位。交互不可用时不提交新请求，原生取消仍归根生命周期。长按触发、原接纳容量、错误回执和业务判断保持；真机控制错误仍须独立定位。
+
 ✅ ConversationState 单独拥有 replyWaitingRequest；首个输出、匹配清理、新回复、停止聆听、恢复聆听和失活解除等待，旧请求不能清除新请求。模型准备 checking／ready 不清除请求等待。
 
 ✅ HomeModelPreparation 只在 failed 提供重试资格；移除 cancelled 用户状态、消息文案及手动取消端口。首页恢复提示仅含重试按钮，加载时没有文字／按钮；真实加载眼睛仍由表达 Action 接纳。
@@ -78,3 +80,16 @@ HomeEffectsWorkflow 拥有独立、可替换、按身份围栏的 Notice／光�
 ✅ 已实现：HomeModelPreparation 以 showsRetry 只允许 failed 显示重试；所有准备状态都不显示加载文字，preparing 的等待表情由独立 Expression Action 提交；检查不遮盖首页原内容。
 
 ✅ 请求等待属于可被有限表情演出覆盖的装饰，不使真实表情动作报 busy；模型实际加载仍保留原有独占契约。
+
+
+## Direct container contract
+
+UI-owned typed request/reply capabilities have one consumer and at most 64 outstanding requests, including accepted work. Acceptance does not complete a request. Cancellation, consumer exit, root invalidation and late replies are generation-fenced. Foundation dependencies remain empty. Current cross-module ownership is defined by the [overall design](../../README.md).
+
+## Agent-owned UI inputs
+
+✅ UIHomeContainer exposes ordinary HomeInput text requests and a separate control-only listeningRequests source. The listening source accepts submitControl only and permits one outstanding request; it is independent of text processing. Both sources follow the same UI root availability, generation, cancellation and stop rules. The business layer injects each source's owning container into its responsible consumer.
+
+## 直连链路当前契约
+
+✅ 类型化语音按压／切换请求直达角色，保留单槽控制入口与代际回执。

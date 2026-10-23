@@ -28,31 +28,11 @@ public struct CommunicationContract: Sendable {
 public struct CommunicationContracts: Sendable {
     private let entries: [String: CommunicationContract]
     public static let standard = CommunicationContracts(standard: [
-        CommunicationContract(
-            name: RuntimeFailureEvent.contract, kind: .observation, maximumBytes: 16_384,
-            validateMessage: { message in
-                guard let event = message.content(as: RuntimeFailureEvent.self) else {
-                    throw CommunicationError.invalidPayload
-                }
-                try event.validate()
-            }),
-        CommunicationContract(
-            name: ContainerFailureEvent.contract, kind: .observation, maximumBytes: 8192,
-            validateMessage: { message in
-                guard let event = message.content(as: ContainerFailureEvent.self) else {
-                    throw CommunicationError.invalidPayload
-                }
-                try event.validate()
-            }),
         CommunicationContract(name: "communication.receipt", kind: .communicationReceipt),
-        CommunicationContract(name: "user.text", kind: .text, maximumBytes: 4096),
-        CommunicationContract(name: "runtime.event", kind: .event),
         CommunicationContract(name: "tool.result", kind: .toolResult),
         CommunicationContract(name: "action.result", kind: .actionResult),
         CommunicationContract(name: "generation.round.result", kind: .roundResult),
         CommunicationContract(name: "activity.event", kind: .activityEvent),
-        CommunicationContract(name: "media.audio", kind: .audio),
-        CommunicationContract(name: "media.image", kind: .image),
     ])
     private init(standard: [CommunicationContract]) {
         entries = Dictionary(uniqueKeysWithValues: standard.map { ($0.name, $0) })
@@ -127,16 +107,11 @@ public struct CommunicationDeclaration: Codable, Sendable {
 public struct CommunicationPolicy: Sendable {
     public let agents: [AgentID: CommunicationDeclaration]
     public let contracts: CommunicationContracts
-    public let externalSources: Set<String>
     public init(
-        contracts: CommunicationContracts = .standard, externalSources: Set<String> = ["user", "runtime"],
+        contracts: CommunicationContracts = .standard,
         configurations: [AgentConfiguration]
     ) throws {
-        guard externalSources.count <= 16, externalSources.allSatisfy({ CapabilityRegistry.validName($0) }) else {
-            throw CommunicationError.invalidPayload
-        }
         self.contracts = contracts
-        self.externalSources = externalSources
         guard configurations.count <= 64, Set(configurations.map(\.agentID)).count == configurations.count else {
             throw CommunicationError.capacityExceeded
         }
@@ -149,10 +124,8 @@ public struct CommunicationPolicy: Sendable {
             for sub in declaration.subscriptions {
                 topics.insert(sub.topic)
                 subscribers[sub.topic, default: 0] += 1
-                if !externalSources.contains(sub.source) {
-                    guard agents[AgentID(rawValue: sub.source)]?.publications.contains(sub.contract) == true else {
-                        throw CommunicationError.unauthorized
-                    }
+                guard agents[AgentID(rawValue: sub.source)]?.publications.contains(sub.contract) == true else {
+                    throw CommunicationError.unauthorized
                 }
             }
             for send in declaration.sends {

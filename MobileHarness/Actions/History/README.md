@@ -1,35 +1,51 @@
-# History — 会话查询与归档事务
+# History — 业务函数与执行设计
 
-## 简介
+## 职责与模块关系
 
-为共享会话仓库提供有界分页预览及归档、标题生成和删除函数。入口负责参数与返回值，Support 服务负责投影和事务规则，StorageChat 负责权威数据与持久化。
+拥有历史查询、归档修改与结果呈现。HistoryModule 绑定预览、修改和内部完整读取；查询服务、请求结果槽、标题任务及 UI 投影分别拥有明确状态。所有服务共享注入的 ConversationHistoryStore。
 
-## 上下游关系（一级）
+Gateway 通过注册函数调用本域，Agents 决定请求与策略，App 注入唯一基础能力和根生命周期。本域消费 FunctionContracts 及需要的基础能力，不导入 Agents、Gateway 实现或 App。全部域内源码由 Actions 单一目标编译。
 
-```mermaid
-flowchart LR
- Bindings[Module integrations]
-    Gateway -->|FunctionInput| H[History 函数]
-    H -->|JSON 结果或异常| Gateway
-    Bindings -.->|共享仓库与标题计算注入| H
-    H -->|快照和原子修改| StorageChat
-    H -->|标题计算请求| Bindings
-    Contracts[FunctionContracts] -.->|输入与报告类型| H
-```
+## 目录与文件
 
-本域不拥有另一个会话仓库、模型循环或页面状态。调用者的授权、确认和后续呈现属于上游。
+| 文件 | 当前职责 |
+| --- | --- |
+| [ConversationActions.swift](ConversationActions.swift) | 业务函数的参数校验、能力调用与完成值 |
+| [ConversationHistoryWorkflow.swift](ConversationHistoryWorkflow.swift) | 历史浏览请求、取消加入与有界图片读取 |
+| [HistoryActions.swift](HistoryActions.swift) | 业务函数的参数校验、能力调用与完成值 |
+| [HistoryCapabilities.swift](HistoryCapabilities.swift) | 历史引用、查询／修改／呈现端口 |
+| [HistoryFullReadService.swift](HistoryFullReadService.swift) | 共享仓库的完整查询与照片读取 |
+| [HistoryModule.swift](HistoryModule.swift) | 绑定预览、修改与完整读取函数 |
+| [HistoryMutationService.swift](HistoryMutationService.swift) | 归档、删除及单槽标题工作 |
+| [HistoryPresentationActions.swift](HistoryPresentationActions.swift) | 业务函数的参数校验、能力调用与完成值 |
+| [HistoryPresentationAdapter.swift](HistoryPresentationAdapter.swift) | 仓库事实到 UI 值的版本化呈现 |
+| [HistoryQueryService.swift](HistoryQueryService.swift) | 有界预览、分页与编码 |
+| [HistoryReadRequest.swift](HistoryReadRequest.swift) | 完整读取查询／结果约束与单次请求结果槽 |
 
-## 内部模块关系
+## 查询、修改与完成
 
-```mermaid
-flowchart LR
-    Namespace[HistoryActions] --> Entries[ConversationActions.swift]
-    Module[Support/HistoryModule] -->|绑定五项工厂| Entries
-    Entries --> Query[HistoryQueryCapability]
-    Entries --> Mutation[HistoryMutationCapability]
-    Query --> QueryService[HistoryQueryService]
-    Mutation --> MutationService[HistoryMutationService]
-```
+预览按分页投影并限制 JSON 大小；完整读取经 HistoryReadInvocation 保存一个请求私有结果，验证来源、会话、输入身份与取消后完成，不创建全局请求表。HistoryMutationService 共享一个标题准入槽，自动标题和显式重试不并行创建第二套 worker；关闭加入标题工作，取消不能撤销已提交持久化。HistoryPresentationAdapter 通过 UI 公开端口提交真实仓库事实。
+
+## 查询算法与数据约束
+
+list 使用 store.listConversations 的当前会话与归档元数据，顺序沿用按 archivedAt 排序的索引，不加载归档正文。标题和 latestUser 预览各最多 40 UTF-8 字节，turnCount 取输入块数。
+
+read 查找当前或归档会话并调用 `indexedHistory()`，按项目分页。request 项取请求输入与 完整 response 字符串，带请求状态及输入/Task 关联；task 项取 goal 与 reportedSummary/failure 的组合，带实际终态和 Task 身份。user/response 分别限 80/160 UTF-8 字节，total 计算投影项数。
+
+Text 按 Swift Character 逐个累计字节，保留完整字符，并明确提供 truncated。Page 使用 ISO8601 日期、排序键和无斜杠转义的 JSON；整体最多 1800 字节。服务再次验证页范围，错误编码为 missingConversation、resultTooLarge、currentConversation 对应的执行失败代码。
+
+## 修改状态与失败处理
+
+startNew 等待可恢复归档与新 current 创建，返回可选旧会话 ID，并提交根持有的单个标题任务；标题不阻塞新会话。deleteArchived 按ID读取会话，拒绝当前或不存在的会话，在删除前检查取消，再等待仓库原子修改。
+
+summarizeArchived 读取并验证归档会话，执行注入的异步标题计算，检查取消后调用 setTitle。计算或提交失败时尝试保存 nil 标题与最多 1024 字符的错误状态；该记录加入结束后才抛出原始错误。若记录失败，抛 ActionReportedError，包含 title 与 retryState 两条结果，保留主要和次要失败。
+
+服务持有共享 actor 仓库和一个根所有者可取消/加入的标题 worker。自动标题与显式重试共用单个准入槽，溢出明确记录可重试失败；不创建第二个历史仓库或自动重试。取消不能撤销已经完成的持久化；并发与仓库一致性规则由 StorageChat 负责。查询和目录本身不授予历史访问或删除确认。
+
+
+✅ HistoryPresentationAdapter 编译到 Actions，将共享仓库事实转换为 UI 自有值并通过公开呈现接口提交，保留会话/版本围栏。UI 的完整读取由 Memory 直接接纳，经 Gateway → Actions 读取；每请求类型化执行附件承载真实结果，Memory 返回关联回执，纯查询不主动呈现第二次。
+
+
 
 ## 接口与结果
 
@@ -47,18 +63,4 @@ flowchart LR
 
 list 的 turnCount 是存储的输入块数量；read 的 total 是 indexedHistory 投影项数量，二者含义不同。read 项包含 kind=request/task、状态及适用的 taskID/inputID，读取已经持久化的请求片段或任务摘要，不生成摘要，也不执行历史函数。
 
-## 生命周期与失败处理
-
-入口在读取或修改前后检查取消；持久化完成后的取消不撤销提交。startNew 仅执行仓库归档，不自动生成标题。summarize/delete 明确拒绝当前会话和缺失的归档 ID。
-
-标题计算由注入闭包执行，本域只声明 summarize 的 60 秒函数预算。失败或取消时先加入标题错误状态的持久化，再传播原始原因；如果记录错误本身失败，保留两个原因的报告。异常不触发这里的写入重放。
-
-[Actions 设计](../README.md) · [查询与事务实现](Support/README.md) · [共享会话仓库](../../Storage/Database/Chat/README.md)
-
-## 待实现
-
-- 本接口没有全文搜索或完整会话导出；返回内容是显式截断的预览。
-
-## Storage 依赖
-
-✅ 存储访问使用独立的 State、Cache、Database 和 Files 接口；App 注册根实例，消费者通过构造器获得所需能力。存储容器不接管本目录的业务验证、执行和完成语义。
+[Actions 设计](../README.md) · [公共函数契约](../Support/Contracts/README.md)

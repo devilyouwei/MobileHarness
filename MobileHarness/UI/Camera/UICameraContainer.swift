@@ -6,7 +6,7 @@ import Foundation
 
 /// Presentation facts only; state mutation stays behind CameraPresenting.
 @MainActor
-public struct CameraPresentationSnapshot {
+public struct CameraPresentationSnapshot: Sendable {
     public let isEnabled: Bool
     public let isVisible: Bool
     public let isBusy: Bool
@@ -56,19 +56,31 @@ public protocol CameraPresenting: AnyObject, Sendable {
     func connectFactsObserver(_ observer: @escaping @MainActor () -> Void)
 }
 
+@MainActor public protocol CameraFactsObserving: AnyObject, Sendable {
+    func observeFacts() throws -> AsyncStream<CameraPresentationSnapshot>
+}
+
 /// One camera display state per UI root. Metal surfaces continue to own GPU completion.
 @MainActor
-public final class UICameraContainer: CameraPresenting {
+public final class UICameraContainer: CameraPresenting, CameraFactsObserving {
+    public let requests = UIRequests<CameraInput, String?>()
 
     public let state: CameraState
     public private(set) var isAvailable = false
     private var stopped = false
+    private var factObservers: [UUID: AsyncStream<CameraPresentationSnapshot>.Continuation] = [:]
+    private var factsCallback: @MainActor () -> Void = {}
     private let admission: UIPresentationAdmission
     public var token: UIPresentationToken { admission.token }
     init(admission: UIPresentationAdmission, onFailure: @escaping UIFailureReporting) {
         self.admission = admission
         state = CameraState(onFailure: onFailure)
         state.presentationAdmission = admission
+        state.connectFactsObserver { [weak self] in
+            guard let self else { return }
+            self.factsCallback()
+            for observer in self.factObservers.values { observer.yield(self.snapshot) }
+        }
     }
     public var snapshot: CameraPresentationSnapshot { CameraPresentationSnapshot(state) }
     public func present(_ update: CameraPresentationUpdate) {
@@ -111,8 +123,18 @@ public final class UICameraContainer: CameraPresenting {
     }
     public func clearFrame() { state.clearFrame() }
     public func clearPose() { state.clearPose() }
+    public func observeFacts() throws -> AsyncStream<CameraPresentationSnapshot> {
+        guard !stopped else { throw UIContainerError.stopped }
+        guard factObservers.count < 16 else { throw UIRequestError.capacityExceeded }
+        let id = UUID()
+        let pair = AsyncStream<CameraPresentationSnapshot>.makeStream(bufferingPolicy: .bufferingNewest(1))
+        factObservers[id] = pair.continuation
+        pair.continuation.yield(snapshot)
+        pair.continuation.onTermination = { [weak self] _ in Task { @MainActor in self?.factObservers[id] = nil } }
+        return pair.stream
+    }
     public func connectFactsObserver(_ observer: @escaping @MainActor () -> Void) {
-        state.connectFactsObserver(observer)
+        factsCallback = observer
     }
     private func checkAdmission() throws {
         guard !stopped else { throw UIContainerError.stopped }
@@ -132,6 +154,9 @@ public final class UICameraContainer: CameraPresenting {
     }
     func stop() async {
         state.connectFactsObserver {}
+        for observer in factObservers.values { observer.finish() }
+        factObservers.removeAll()
+        factsCallback = {}
         setAvailable(false)
         stopped = true
         isAvailable = false

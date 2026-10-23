@@ -1,6 +1,4 @@
-import ActionBindings
 import Actions
-import AgentBindings
 import AgentCore
 import Agents
 import ExecutionRuntime
@@ -71,7 +69,8 @@ private actor ResourcePresentationFixture: ResourcePresentationCapability {
 {
     let inventory = PresentedInventoryFixture()
     let presentation = ResourcePresentationFixture()
-    let runtime = try resourceRuntime(UnusedModelResourceCapability(), inventory: inventory, presentation: presentation)
+    let runtime = try await resourceRuntime(
+        UnusedModelResourceCapability(), inventory: inventory, presentation: presentation)
     let raw = try await runtime.presentInventory(generation: 1)
     #expect(try ModelResourceInventory.decode(raw).installedGroups == [.recognition])
     #expect(await presentation.snapshots == [1])
@@ -94,7 +93,8 @@ private actor ResourcePresentationFixture: ResourcePresentationCapability {
 @Test(.actionCatalog) func resourcePresentationFailureRetainsBothCausesAndDoesNotBlockNextRefresh() async throws {
     let inventory = PresentedInventoryFixture()
     let presentation = ResourcePresentationFixture()
-    let runtime = try resourceRuntime(UnusedModelResourceCapability(), inventory: inventory, presentation: presentation)
+    let runtime = try await resourceRuntime(
+        UnusedModelResourceCapability(), inventory: inventory, presentation: presentation)
     await presentation.failures(snapshot: true, error: true)
     do {
         _ = try await runtime.presentInventory(generation: 1)
@@ -115,7 +115,8 @@ private actor ResourcePresentationFixture: ResourcePresentationCapability {
 @Test(.actionCatalog) func zeroRefreshGenerationRejectsBeforeResourceOrPresentationEffects() async throws {
     let inventory = PresentedInventoryFixture()
     let presentation = ResourcePresentationFixture()
-    let runtime = try resourceRuntime(UnusedModelResourceCapability(), inventory: inventory, presentation: presentation)
+    let runtime = try await resourceRuntime(
+        UnusedModelResourceCapability(), inventory: inventory, presentation: presentation)
     await #expect(throws: (any Error).self) { _ = try await runtime.presentInventory(generation: 0) }
     #expect(await inventory.reads == 0)
     #expect(await presentation.snapshots.isEmpty)
@@ -161,7 +162,8 @@ private actor ResourcePresentationFixture: ResourcePresentationCapability {
     let inventory = PresentedInventoryFixture()
     await inventory.useLargeInventory()
     let presentation = ResourcePresentationFixture()
-    let runtime = try resourceRuntime(UnusedModelResourceCapability(), inventory: inventory, presentation: presentation)
+    let runtime = try await resourceRuntime(
+        UnusedModelResourceCapability(), inventory: inventory, presentation: presentation)
     let raw = try await runtime.presentInventory(generation: 1)
     #expect(raw.utf8.count > 48 * 1024)
     #expect(try ModelResourceInventory.decode(raw).items.count == 22)
@@ -173,7 +175,7 @@ private actor ResourcePresentationFixture: ResourcePresentationCapability {
 @Test(.actionCatalog) func unavailableErrorPresentationRetainsPrimaryFailureAndAllowsNextRead() async throws {
     let inventory = PresentedInventoryFixture()
     let presentation = ResourcePresentationFixture()
-    let runtime = try resourceRuntime(
+    let runtime = try await resourceRuntime(
         UnusedModelResourceCapability(), inventory: inventory, presentation: presentation,
         includeFailurePresentation: false)
     await inventory.failNext()
@@ -265,7 +267,7 @@ private actor OperationFailurePresentation: ResourcePresentationCapability {
 @Test(.actionCatalog) func resourceCommandFailuresPresentThroughGatewayWithoutReplayingNativeCommands() async throws {
     let native = FailingResourceCommands()
     let presentation = OperationFailurePresentation()
-    let runtime = try resourceRuntime(native, presentation: presentation)
+    let runtime = try await resourceRuntime(native, presentation: presentation)
     for intent in [
         ModelResourceIntent.download(id: "model", endpoint: "https://huggingface.co", allowsCellular: false),
         .cancel("model"), .remove("model"),
@@ -291,7 +293,7 @@ private actor OperationFailurePresentation: ResourcePresentationCapability {
     let native = FailingResourceCommands()
     let presentation = OperationFailurePresentation()
     await presentation.fail()
-    let runtime = try resourceRuntime(native, presentation: presentation)
+    let runtime = try await resourceRuntime(native, presentation: presentation)
     do {
         try await runtime.perform(.cancel("model"))
         Issue.record("Failed presentation must not claim accepted error state")
@@ -310,7 +312,8 @@ private actor OperationFailurePresentation: ResourcePresentationCapability {
 @Test(.actionCatalog) func unavailableResourceCommandPresentationRetainsCauseAndReleasesAgentRequest() async throws {
     let native = FailingResourceCommands()
     let presentation = OperationFailurePresentation()
-    let runtime = try resourceRuntime(native, presentation: presentation, includeOperationFailurePresentation: false)
+    let runtime = try await resourceRuntime(
+        native, presentation: presentation, includeOperationFailurePresentation: false)
     do {
         try await runtime.perform(.remove("model"))
         Issue.record("Unavailable presentation must fail explicitly")

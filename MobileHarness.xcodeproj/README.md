@@ -88,7 +88,7 @@ NexArmAimCommand 的导航引用指向 Actions/Support；文件由现有 Actions
 
 ❌ The iOS simulator SDK lacks CoreAI; the external CoreAILM target cannot build there. build-ios.sh currently stops on this limitation. Independent UI tests run on Mac; a separate simulator assembly remains outstanding.
 
-✅ Both App source phases include SpeechFailurePresentation; shared Storage/Agent/UI helpers remain package-owned. ❌ Simulator CoreAI availability and physical acceptance remain separate.
+✅ Both App source phases include SpeechPlaybackFailure; shared Storage/Agent/UI helpers remain package-owned. ❌ Simulator CoreAI availability and physical acceptance remain separate.
 
 ✅ ADR0151: file references for former Tools sources now point into Actions, matching the shared package's single source ownership. The legacy navigator group is labeled ToolCall Entries; Swift package targets determine compilation.
 ✅ Compatibility import targets have been removed. ❌ Physical acceptance remains separate work.
@@ -126,7 +126,6 @@ NexArmAimCommand 的导航引用指向 Actions/Support；文件由现有 Actions
 
 ✅ Shared Actions file references are grouped under Support, with Contracts as its own child and macro/catalog utilities directly under Support. SwiftPM remains the only compiler of these shared sources.
 
-
 ## Prefix-number identity migration
 
 Implemented: business IDs are allocated by Storage; Foundation libraries use native UUID tokens and accept opaque caller IDs without project dependencies. Identity is no longer a package target. See [identity design](../docs/completed/Prefix-Numeric-ID-Plan.md).
@@ -141,7 +140,7 @@ Storage 四类容器通过本地 HarnessKit 产品暴露，AppStorage 单独编�
 
 ## 公开 State 边界
 
-✅ StorageState 仅承载公开事实；边界检查禁止完整 AgentContext 注册，校验 Skill schema v2/useState。沿用现有源码归属及目标，ActionBindings 显式依赖 StorageState。
+✅ StorageState 仅承载公开事实；边界检查禁止完整 AgentContext 注册，校验 Skill schema v2/useState。Actions 显式依赖 StorageState；两个 Bindings 目标已删除，实际执行实现归 Actions。
 
 [公开 State 契约](../MobileHarness/Storage/State/README.md)
 
@@ -166,3 +165,22 @@ Implemented: ContainerFailureChannel.swift is a Gateway SwiftPM source and navig
 ✅ UI 工程导航指向实际存在的归类文件，SwiftPM 保持唯一编译归属；没有重复 App Sources 成员，签名、target 与依赖边界保持。
 
 ✅ 共享存储错误由一个源文件编译，CurrentChatCapability 由 ModelKitRuntime 唯一编译；工程导航不添加重复 App Sources，target 与签名配置保持。
+
+## 直连链路收尾（待实现）
+
+❌ 同步源码引用和模拟器构建依赖，保留设备 SDK 构建。
+
+✅ 移除仅有身份投影的 HomeEffectsBindings 文件引用；实现归既有 RuntimePresentation，SwiftPM 目录归属不变。
+
+## 职责归属与组织约束
+
+✅ Agents 角色专用文件位于既有角色目录；工程引用指向当前文件路径，SwiftPM 从 Agents 目录发现实现。被合并的文件没有工程引用，基础模块及 AgentCore 编译边界独立。
+
+
+## Actions 接入契约
+
+Actions 按业务能力组织源码，保持原编译目标。生产调用显式连接独立相机、语音、UI 呈现和 Task 端点；不通过无关能力的类型转换探测。验证和导航按实际源码所有权维护，业务授权与生命周期继续由原拥有者负责。
+
+## Agents 角色与共享机制
+
+具体角色装配归 Agents 根级，Support 保留通用机制；角色私有载荷和会话控制由角色解释，通过注入的解码／Context 钩子接入共享准入。输入身份、Task scope、取消加入和真实结果保持独立，源码和验证按其实际所有者维护。

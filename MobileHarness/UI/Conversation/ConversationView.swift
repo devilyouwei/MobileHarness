@@ -69,14 +69,22 @@ import Foundation
         private let voicePressChanged: ((Bool) -> Void)?
         public init(
             state: ConversationState, activity: ActionActivityState,
-            toggleVoice: @escaping () -> Void, voicePressChanged: ((Bool) -> Void)? = nil
+            listeningRequests: UIRequests<ListeningInput, Void>
         ) {
             self.state = state
             self.activity = activity
-            self.toggleVoice = toggleVoice
-            self.voicePressChanged = voicePressChanged
+            func submit(_ value: ListeningInput) {
+                Task {
+                    do { try await listeningRequests.submitControl(value) } catch {
+                        state.present(.listeningControlMessage(error.localizedDescription))
+                    }
+                }
+            }
+            self.toggleVoice = { submit(.toggle) }
+            self.voicePressChanged = { submit(.press($0)) }
         }
         @GestureState private var holdingVoice = false
+        @GestureState private var pressingVoice = false
         @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
         public var body: some View {
@@ -99,9 +107,9 @@ import Foundation
                         )
                         .simultaneousGesture(
                             DragGesture(minimumDistance: 0)
+                                .updating($pressingVoice) { _, pressed, _ in pressed = true }
                                 .onChanged { touch in
                                     guard state.allowsHomeInteraction else { return }
-                                    voicePressChanged?(true)
                                     let origin = ListeningLightOrigin(
                                         x: (touch.startLocation.x + (geometry.size.width - diameter) / 2)
                                             / geometry.size.width,
@@ -109,8 +117,11 @@ import Foundation
                                             / geometry.size.height)
                                     if state.listeningLightOrigin != origin { state.listeningLightOrigin = origin }
                                 }
-                                .onEnded { _ in voicePressChanged?(false) }
                         )
+                        .onChange(of: pressingVoice) { _, pressed in
+                            guard state.allowsHomeInteraction else { return }
+                            voicePressChanged?(pressed)
+                        }
                         .allowsHitTesting(state.allowsHomeInteraction)
                         .accessibilityElement(children: .ignore)
                         .accessibilityAddTraits(.isButton)

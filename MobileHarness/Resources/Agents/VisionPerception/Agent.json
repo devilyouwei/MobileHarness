@@ -4,23 +4,12 @@
   "communication": {
     "inputs": [
       {
-        "contract": "media.image",
-        "version": 1,
-        "kind": "image"
-      },
-      {
         "contract": "action.result",
         "version": 1,
         "kind": "actionResult"
       }
     ],
-    "subscriptions": [
-      {
-        "contract": "media.image",
-        "source": "phone.camera",
-        "topic": "media.image"
-      }
-    ],
+    "subscriptions": [],
     "publications": [
       "vision.pose"
     ],

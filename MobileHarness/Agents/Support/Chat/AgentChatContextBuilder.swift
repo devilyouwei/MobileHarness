@@ -130,11 +130,6 @@ public enum AgentChatContextBuilder {
             + message.toolCalls.reduce(0) { $0 + $1.id.utf8.count + $1.name.utf8.count + $1.argumentsJSON.utf8.count }
     }
 
-    public static func historyProjection(
-        system: String, user: String, conversation: StoredConversation, templates: PromptTemplates
-    ) throws -> [ConversationMessage] {
-        project(try request(system: system, user: user, conversation: conversation, templates: templates))
-    }
     public static func project(_ messages: [ChatMessage]) -> [ConversationMessage] {
         messages.compactMap {
             guard let role = ConversationMessage.Role(rawValue: $0.role.rawValue) else { return nil }
@@ -210,5 +205,30 @@ public enum AgentChatContextBuilder {
             messages.append(ChatMessage(role: .tool, content: content, toolCallID: call.providerID))
         }
         return messages
+    }
+}
+
+struct AgentChatRequestBuilder<State: AgentChatContextState>: ContextBuilder {
+    struct Request: Sendable {
+        let input: AgentInput
+        let state: State
+        let batch: SignalBatch
+        let conversation: StoredConversation
+        func messages(system: String, user: String) throws -> [ChatMessage] {
+            try State.buildChatMessages(system: system, user: user, conversation: conversation)
+        }
+    }
+    func build(state: AgentDecisionContext<State>, batch: SignalBatch) throws -> Request {
+        let input = try state.selected(by: batch)
+        var conversation = state.snapshot.state.history.current
+        if let task = input.taskScope {
+            let ids = Set(
+                state.snapshot.records.filter { $0.taskID == task.id }.compactMap {
+                    try? JSONDecoder().decode(SignalEvidence.self, from: $0.data).signalID
+                })
+            conversation.turns = conversation.turns.filter { ids.contains($0.id) }
+            conversation.taskCompressions.removeAll { !$0.sources.allSatisfy { ids.contains($0.inputID) } }
+        }
+        return Request(input: input, state: state.snapshot.state, batch: batch, conversation: conversation)
     }
 }

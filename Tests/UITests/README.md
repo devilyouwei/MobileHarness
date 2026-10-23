@@ -94,3 +94,25 @@ CaptionPresentationTests 覆盖部分文本→最终修订、定稿与移动不�
 ✅ 已实现：HomeBluetoothLayoutTests验证两侧等宽、整体居中、蓝牙轮廓无内侧空隙与完整可见、对称预留图标位置、直线段频谱底边共用布局；EyeGeometryTests验证回复频谱所有柱根共用水平基线、全部向下、端点覆盖组件传入宽度及无曲线路径，保留无效输入／拓扑／失活回归。
 
 ✅ 已实现：HomeBluetoothLayoutTests覆盖圆弧排除、紧凑／展开的直线段缩放、连接／连接中／断连与任务组合、后台、800ms内灰色收回和重连；任务快照回归区分未结束任务／终态历史及过滤。原生动画实际时序仍需iPhone验收。
+
+## 类型化输入回执
+
+✅ UIRequestsTests 覆盖无消费者、重复消费者、普通未终态 64 上限、接纳与完成分离、取消、关闭、根代际及迟到结果。独立单槽控制请求可以在普通请求未完成时执行，控制满载明确拒绝。业务授权与真实设备执行由 IntegrationTests 覆盖。
+
+## Agent-owned UI inputs
+
+✅ Home listening has its own control-only single-slot source; root availability/stop governs it alongside ordinary home requests. Existing receipt tests retain unavailable/duplicate/capacity/cancellation/generation coverage. Actual owning-Agent subscription and execution regressions belong to IntegrationTests.
+
+✅ 订阅关闭携带消费者 token，旧订阅退出不能关闭恢复后的消费者；恢复前加入旧消费任务。暂停期间仅允许经身份校验的本地取消／retire 清理，不接纳新的业务请求。
+
+## 直连链路收尾
+
+✅ 类型化入口与 Metal 真实绘制／停止／交接保留实际断言；窗口不可见仍失败，不以跳过或替身绘制完成验收。执行结果记录于 docs/validation。
+
+## Runtime validation isolation
+
+✅ CameraFramePresentationTests 的五个实际期限用例与三个相机根／媒体生命周期用例归入现有 NativePresentationTests 串行阶段，涵盖视频／骨架过期、续期、提前期限替换、旧会话清理和停止加入。iOS 原生 halo 停止用例也归此阶段。只改变测试调度，原断言、500 毫秒等待上限和 750 毫秒生产期限保持；默认检查执行 macOS 普通 UI 107 项、串行 UI 10 项。锁屏期间的无窗口验证显式排除两个可见窗口用例，不代替完整检查。
+
+The default check runs ordinary tests concurrently, then executes the live-runtime and native-window suites separately. These suites are serialized because their assertions use real capture freshness, mechanical deadlines, media expiry, or the process-wide AppKit application. Business concurrency remains exercised inside each test. No global parallelism flag or production deadline is changed; excluded cases in the first phase must execute in the second.
+
+Native window cleanup is registered immediately after creation, including failed visibility prerequisites. The command-line host dispatches available AppKit events between asynchronous yields while awaiting visibility and actual GPU completion. It does not enter a nested blocking application loop. A failed visibility prerequisite remains a failure, and production renderer behavior is unchanged.

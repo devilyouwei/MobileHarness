@@ -142,3 +142,5 @@ Assistant 的 Agent/Provider 异常终止当前 Decision 并保留历史/效果�
 ## ApplicationControl 异常展示
 
 ✅ ApplicationControl 的配置声明 container.failure/runtime.failure observation 输入和 runtime 来源订阅。Assistant 保留容器异常的被动订阅；异常呈现使用角色代码中的内部权限，不向模型扩展函数目录。
+
+✅ 通信注册表只保留 Agent 消息与执行反馈；删除本地 UI／媒体／环境／故障的历史 schema 和仅供外部来源的测试声明，本地类型自身继续验证。

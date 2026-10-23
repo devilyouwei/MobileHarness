@@ -60,43 +60,17 @@ public struct AgentTaskView: Codable, Sendable {
 
 /// Only Assistant can forward typed UI intent; model communication cannot construct this payload.
 public enum AgentFixedTaskInput {
-    public static func unwrap(_ signal: AgentTaskSignal, input: AgentInput, executor: AgentID) throws -> AgentInput {
+    public static func unwrap(
+        _ signal: AgentTaskSignal, input: AgentInput, executor: AgentID,
+        decode: (AgentTaskSignal) throws -> AgentMessage
+    ) throws -> AgentInput {
         guard signal.kind == .request || signal.kind == .input, signal.scope.requester == .assistant,
             signal.scope.executor == executor, input.taskScope == signal.scope,
             input.metadata.origin == .agent, input.metadata.source == AgentID.assistant.rawValue,
             input.metadata.incarnation != nil
         else { throw CommunicationError.unauthorized }
-        let message: AgentMessage
-        switch (executor, signal.businessContract) {
-        case (.photographer, PhotographerCameraIntent.contract):
-            message = try JSONDecoder().decode(PhotographerCameraIntent.self, from: signal.data).message
-        case (.memory, MemoryHistoryIntent.contract):
-            let value = try JSONDecoder().decode(MemoryHistoryIntent.self, from: signal.data)
-            if case .cancel = value { throw CommunicationError.unauthorized }
-            message = AgentMessage(
-                contract: signal.businessContract, content: value, maximumBytes: 512, validate: { _ in })
-        case (.applicationControl, AppInteractionIntent.contract):
-            let value = try JSONDecoder().decode(AppInteractionIntent.self, from: signal.data)
-            message = AgentMessage(
-                contract: signal.businessContract, content: value, maximumBytes: 2048, validate: { try $0.validate() })
-        case (.applicationControl, ModelResourceIntent.contract):
-            let value = try JSONDecoder().decode(ModelResourceIntent.self, from: signal.data)
-            if case .retire = value { throw CommunicationError.unauthorized }
-            message = AgentMessage(
-                contract: signal.businessContract, content: value, maximumBytes: 2048, validate: { try $0.validate() })
-        case (.applicationControl, ProviderSettingsIntent.contract):
-            message = AgentMessage(
-                contract: signal.businessContract,
-                content: try JSONDecoder().decode(ProviderSettingsIntent.self, from: signal.data), maximumBytes: 512,
-                validate: { _ in })
-        case (.applicationControl, ProviderDiscoveryIntent.contract):
-            message = AgentMessage(
-                contract: signal.businessContract,
-                content: try JSONDecoder().decode(ProviderDiscoveryIntent.self, from: signal.data), maximumBytes: 512,
-                validate: { _ in })
-        default: throw CommunicationError.unsupportedContract
-        }
-        _ = try message.validatedSize()
+        let message = try decode(signal)
+        try input.validate(message)
         let payload = InputPayload.observation(message)
         return AgentInput(
             id: input.metadata.rootID, sessionID: input.sessionID, payload: payload,
@@ -116,20 +90,23 @@ public enum AgentFixedTaskInput {
 }
 
 /// Explicit user reply targets an existing question; runtime ownership is not user-supplied.
-public struct AgentTaskInputIntent: ExternalInputProviding, Codable, Sendable, Equatable {
+public struct AgentTaskInputIntent: Codable, Sendable, Equatable {
     public static let contract = "agent.userInput"
     public let taskID: String
     public let interactionID: String
     public let artifactID: String?
     public let text: String
     public init(taskID: String, interactionID: String, artifactID: String? = nil, text: String) throws {
-        guard !text.isEmpty, text.utf8.count <= 4096 else { throw CommunicationError.invalidPayload }
+        guard !text.isEmpty, text.utf8.count <= 4096,
+            [taskID, interactionID].allSatisfy({ !$0.isEmpty && $0.utf8.count <= 128 }),
+            artifactID.map({ !$0.isEmpty && $0.utf8.count <= 128 }) ?? true
+        else { throw CommunicationError.invalidPayload }
         self.taskID = taskID
         self.interactionID = interactionID
         self.artifactID = artifactID
         self.text = text
     }
-    public func externalInput(sessionID: String, sequence: UInt64) throws -> ExternalInputDraft {
+    public func input(sessionID: String) throws -> AgentInput {
         let payload = InputPayload.observation(
             AgentMessage(
                 contract: Self.contract, content: self, maximumBytes: 16_384,
@@ -138,8 +115,7 @@ public struct AgentTaskInputIntent: ExternalInputProviding, Codable, Sendable, E
                         taskID: value.taskID, interactionID: value.interactionID, artifactID: value.artifactID,
                         text: value.text)
                 }))
-        return ExternalInputDraft(
-            sessionID: sessionID, payload: payload, source: "user")
+        return ProcessingContext(sessionID: sessionID, source: "user").input(payload)
     }
 }
 

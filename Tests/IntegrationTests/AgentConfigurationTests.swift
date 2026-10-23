@@ -10,9 +10,7 @@ private func document() -> [String: Any] {
         "version": 6,
         "communication": [
             "inputs": [
-                ["contract": "user.text", "version": 1, "kind": "text"],
-                ["contract": "runtime.event", "version": 1, "kind": "event"],
-                ["contract": "tool.result", "version": 1, "kind": "toolResult"],
+                ["contract": "tool.result", "version": 1, "kind": "toolResult"]
             ], "subscriptions": [], "publications": [], "sends": [],
         ],
         "id": "assistant",
@@ -442,11 +440,11 @@ func threeLevelConfigurationRejectsAmbiguousBindings(_ mutation: String) throws 
         "app.interaction": .applicationControl, "model.resource.intent": .applicationControl,
         "provider.settings": .applicationControl, "provider.discovery": .applicationControl,
     ]
-    for (contract, owner) in owners {
+    for contract in owners.keys {
         let subscribers = configurations.filter {
             $0.communication.subscriptions.contains { $0.source == "user" && $0.contract == contract }
         }.map(\.agentID)
-        #expect(subscribers == [owner])
+        #expect(subscribers.isEmpty)
     }
     let controls = try AgentConfigurations.load(named: "ApplicationControl").capabilities
     #expect(

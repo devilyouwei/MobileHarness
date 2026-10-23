@@ -2,7 +2,7 @@
 
 ## 职责与接口
 
-UICameraContainer 唯一拥有 CameraState，实现 CameraPresenting 的只读快照、视频／骨架提交、照片呈现、清屏、状态和事实通知。上游 ActionBindings 负责原生帧转换、权限、设备启停、资源租约及照片业务；UI 不创建原生相机或模型。
+UICameraContainer 唯一拥有 CameraState，实现 CameraPresenting 的只读快照、视频／骨架提交、照片呈现、清屏、状态和事实通知。上游 Actions 负责原生帧转换、权限、设备启停、资源租约及照片业务；UI 不创建原生相机或模型。
 
 ```mermaid
 flowchart LR
@@ -63,3 +63,18 @@ flowchart LR
 
 
 ✅ CameraState将渲染故障包装为UIFailure后同步交宿主，保留原技术描述和包装源码位置。CameraPresenting的帧新鲜度／方向／代际拒绝保持原领域错误及独立画面／骨架行为，不逐帧升级为全局Toast。
+
+
+## Direct container contract
+
+UI-owned typed request/reply capabilities have one consumer and at most 64 outstanding requests, including accepted work. Acceptance does not complete a request. Cancellation, consumer exit, root invalidation and late replies are generation-fenced. Foundation dependencies remain empty. Current cross-module ownership is defined by the [overall design](../../README.md).
+
+## Agent-owned UI inputs
+
+✅ UICameraContainer owns CameraInput requests and terminal receipts. The injected consumer listens directly; UI does not route camera events through a business adapter. Native preview and effect completion remain separate from request acceptance. Existing root/frame/photo generation fences still control presentation.
+
+## Native validation preconditions
+
+The macOS GPU regression creates a real hosted layer with explicit bounds and a visible test window before requesting drawables. A fully occluded WindowServer surface is a failed prerequisite, not a passed or skipped GPU result. The renderer's existing lifetime and completion contract remain unchanged; device/native evidence is tracked separately.
+
+✅ 在 `-direct-input-diagnostics` 下每 120 帧报告画面尺寸，并报告首个 GPU 完成；不记录像素、不新增队列或转发任务。性能计时不启用此输出；原生宿主测试与 iPhone 预览分别验收，黑屏根因仍待定位。

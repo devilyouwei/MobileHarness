@@ -153,14 +153,16 @@ private actor ObservableArmFixture: NexArmObservableLink {
     func close() { session = nil }
 }
 
-@Test(.actionCatalog) func nexArmPerformanceCompletionDoesNotRequireClawConvergence() async throws {
-    let link = ObservableArmFixture(.push)
-    await link.offsetClaw()
-    let controller = NexArmActionController(link: link)
-    try await controller.performGesture(.tiltLeft, repetitions: 1)
-    #expect(await link.writes == 3)
-    #expect(await controller.latestState.pose[5] == -6)
-    #expect(await controller.motionFailure == nil)
+extension LiveRuntimeTests {
+    @Test(.actionCatalog) func nexArmPerformanceCompletionDoesNotRequireClawConvergence() async throws {
+        let link = ObservableArmFixture(.push)
+        await link.offsetClaw()
+        let controller = NexArmActionController(link: link)
+        try await controller.performGesture(.tiltLeft, repetitions: 1)
+        #expect(await link.writes == 3)
+        #expect(await controller.latestState.pose[5] == -6)
+        #expect(await controller.motionFailure == nil)
+    }
 }
 
 @Test(.actionCatalog, arguments: [false, true])
@@ -206,66 +208,74 @@ func nexArmArmOnlyArrivalRetainsPoseJointAndDeadlineGates(nativeTarget: Bool) {
     #expect(missed.outcome(at: start.advanced(by: .seconds(3))) == .completionTimeout)
 }
 
-@Test(.actionCatalog, arguments: [NexArmGesture.tiltLeft, .celebrate, .dance])
-func nexArmChannelUsesFreshMotorFeedbackWithoutNominalWait(_ gesture: NexArmGesture) async throws {
-    let link = ObservableArmFixture(.push)
-    let controller = NexArmActionController(link: link)
-    let began = ContinuousClock.now
-    try await controller.performGesture(gesture, repetitions: 1)
-    let plan = try await controller.prepareArmControl()
-    let frames = try plan.motion(gesture, repetitions: 1, from: NexArmGesture.referenceHomeJoints).steps
-    #expect(await link.packets == frames.map(\.packet))
-    #expect(ContinuousClock.now - began < .seconds(3))
-    let times = await link.sentAt
-    for index in 1..<times.count {
-        #expect(times[index] - times[index - 1] < .milliseconds(400))
+extension LiveRuntimeTests {
+    @Test(.actionCatalog, arguments: [NexArmGesture.tiltLeft, .celebrate, .dance])
+    func nexArmChannelUsesFreshMotorFeedbackWithoutNominalWait(_ gesture: NexArmGesture) async throws {
+        let link = ObservableArmFixture(.push)
+        let controller = NexArmActionController(link: link)
+        let began = ContinuousClock.now
+        try await controller.performGesture(gesture, repetitions: 1)
+        let plan = try await controller.prepareArmControl()
+        let frames = try plan.motion(gesture, repetitions: 1, from: NexArmGesture.referenceHomeJoints).steps
+        #expect(await link.packets == frames.map(\.packet))
+        #expect(ContinuousClock.now - began < .seconds(3))
+        let times = await link.sentAt
+        for index in 1..<times.count {
+            #expect(times[index] - times[index - 1] < .milliseconds(400))
+        }
+        #expect(await link.queries == 0)
+        #expect(await link.session == nil)
     }
-    #expect(await link.queries == 0)
-    #expect(await link.session == nil)
 }
 
-@Test(.actionCatalog) func nexArmFeedbackLossAbortsWithoutQueryFallback() async throws {
-    let link = ObservableArmFixture(.queryOnly)
-    let controller = NexArmActionController(link: link)
-    await #expect(throws: NexArmExecutionError.feedbackTimeout) {
-        try await controller.performGesture(.tiltRight, repetitions: 1)
+extension LiveRuntimeTests {
+    @Test(.actionCatalog) func nexArmFeedbackLossAbortsWithoutQueryFallback() async throws {
+        let link = ObservableArmFixture(.queryOnly)
+        let controller = NexArmActionController(link: link)
+        await #expect(throws: NexArmExecutionError.feedbackTimeout) {
+            try await controller.performGesture(.tiltRight, repetitions: 1)
+        }
+        #expect(await link.queries == 0)
+        #expect(await controller.motionFailure == .feedbackTimeout)
+        #expect(await link.writes < 3)
+        #expect(await controller.motorResults.count == 15)
+        #expect(await controller.motorResults.allSatisfy { $0.failure == .feedbackLost })
+        #expect(await controller.motorResults.contains { !$0.started && $0.step == 3 })
     }
-    #expect(await link.queries == 0)
-    #expect(await controller.motionFailure == .feedbackTimeout)
-    #expect(await link.writes < 3)
-    #expect(await controller.motorResults.count == 15)
-    #expect(await controller.motorResults.allSatisfy { $0.failure == .feedbackLost })
-    #expect(await controller.motorResults.contains { !$0.started && $0.step == 3 })
 }
 
-@Test(.actionCatalog) func nexArmMissingFeedbackEndsAwaitWithoutReplayAndNextRequestCanRun() async throws {
-    let link = ObservableArmFixture(.silent)
-    let controller = NexArmActionController(link: link)
-    let began = ContinuousClock.now
-    await #expect(throws: NexArmExecutionError.feedbackTimeout) {
-        try await controller.performGesture(.wave, repetitions: 1)
+extension LiveRuntimeTests {
+    @Test(.actionCatalog) func nexArmMissingFeedbackEndsAwaitWithoutReplayAndNextRequestCanRun() async throws {
+        let link = ObservableArmFixture(.silent)
+        let controller = NexArmActionController(link: link)
+        let began = ContinuousClock.now
+        await #expect(throws: NexArmExecutionError.feedbackTimeout) {
+            try await controller.performGesture(.wave, repetitions: 1)
+        }
+        #expect(ContinuousClock.now - began < .seconds(8))
+        #expect(await controller.motionFailure == .feedbackTimeout)
+        let sentBeforeLoss = await link.writes
+        #expect(sentBeforeLoss < 6)
+        #expect(await link.session == nil)
+        await link.configure(.push)
+        try await controller.performGesture(.tiltLeft, repetitions: 1)
+        #expect(await link.writes == sentBeforeLoss + 3)
     }
-    #expect(ContinuousClock.now - began < .seconds(8))
-    #expect(await controller.motionFailure == .feedbackTimeout)
-    let sentBeforeLoss = await link.writes
-    #expect(sentBeforeLoss < 6)
-    #expect(await link.session == nil)
-    await link.configure(.push)
-    try await controller.performGesture(.tiltLeft, repetitions: 1)
-    #expect(await link.writes == sentBeforeLoss + 3)
 }
 
-@Test(.actionCatalog) func nexArmObservationTakeoverCancelsAwaitAndStopsFurtherFrames() async throws {
-    let link = ObservableArmFixture(.silent)
-    let controller = NexArmActionController(link: link)
-    let task = Task { try await controller.performGesture(.wave, repetitions: 1) }
-    for _ in 0..<100 {
-        if await link.writes > 0 { break }
-        try await Task.sleep(for: .milliseconds(10))
+extension LiveRuntimeTests {
+    @Test(.actionCatalog) func nexArmObservationTakeoverCancelsAwaitAndStopsFurtherFrames() async throws {
+        let link = ObservableArmFixture(.silent)
+        let controller = NexArmActionController(link: link)
+        let task = Task { try await controller.performGesture(.wave, repetitions: 1) }
+        for _ in 0..<100 {
+            if await link.writes > 0 { break }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        await link.revoke()
+        await #expect(throws: CancellationError.self) { try await task.value }
+        #expect(await link.writes == 1)
     }
-    await link.revoke()
-    await #expect(throws: CancellationError.self) { try await task.value }
-    #expect(await link.writes == 1)
 }
 
 @Test(.actionCatalog) func nexArmWholeActionDeadlineCannotBeExtendedByNewSegments() {
@@ -334,74 +344,82 @@ func nexArmEverySegmentRequiresFreshArrivalAfterNominalDuration(_ final: Bool) {
     #expect(tracker.outcome(at: legStart.advanced(by: .milliseconds(3800))) == .completionTimeout)
 }
 
-@Test(.actionCatalog) func nexArmPlaybackCongestionRejectsWithoutReplayingMotion() async throws {
-    let link = ObservableArmFixture(.queryOnly)
-    // Keep the fixture congested for the whole operation. A timed unblock races the
-    // next child admission after preparation and cannot prove zero committed writes.
-    await link.blockAdmission()
-    let controller = NexArmActionController(link: link)
-    await #expect(throws: NexArmExecutionError.admissionTimeout) {
-        try await controller.performGesture(.dance, repetitions: 1)
-    }
-    #expect(await link.writes == 0)
-    #expect(await link.queries == 0)
-    #expect(await link.session == nil)
-    #expect(await controller.motionFailure == .admission)
-}
-
-@Test(.actionCatalog) func nexArmChannelKeepsNextActionQueuedUntilFreshFinalHome() async throws {
-    let link = ObservableArmFixture(.push)
-    let controller = NexArmActionController(link: link)
-    let registry = try ActionRegistry(modules: [
-        NexArmGestureModule { request, _ in
-            try await controller.performGesture(
-                request.gesture == .celebrate ? .celebrate : .dance,
-                repetitions: request.repetitions)
+extension LiveRuntimeTests {
+    @Test(.actionCatalog) func nexArmPlaybackCongestionRejectsWithoutReplayingMotion() async throws {
+        let link = ObservableArmFixture(.queryOnly)
+        // Keep the fixture congested for the whole operation. A timed unblock races the
+        // next child admission after preparation and cannot prove zero committed writes.
+        await link.blockAdmission()
+        let controller = NexArmActionController(link: link)
+        await #expect(throws: NexArmExecutionError.admissionTimeout) {
+            try await controller.performGesture(.dance, repetitions: 1)
         }
-    ])
-    let scheduler = ChannelScheduler(registry: registry, resources: try nexArmTestResources())
-    let input = AgentInput(
-        id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("two gestures"))
-    for (function, channel) in [("celebrate", "Robot"), ("dance", "Robot")] {
-        try await scheduler.enqueue(
-            invocation: ActionInvocation(
-                source: .assistant, input: input,
-                call: ActionCall(
-                    actionPath: ActionPath(
-                        domain: "NexArm",
-                        module: ["shakeBase", "reset", "moveMotor", "resetMotor"].contains(function)
-                            ? "Motion" : "Gesture", function: function),
-                    channel: channel, parameters: ["cycles": "1"])))
+        #expect(await link.writes == 0)
+        #expect(await link.queries == 0)
+        #expect(await link.session == nil)
+        #expect(await controller.motionFailure == .admission)
     }
-    try await scheduler.finish(inputID: input.id, source: AgentID(rawValue: "assistant"))
-    #expect(await link.writes == 14)
-    #expect(await link.queries == 0)
-    #expect(await controller.lockedMotors.isEmpty)
 }
 
-@Test(.actionCatalog) func nexArmCachedHomeDuringPlaybackCannotConfirmFinalCompletion() async throws {
-    let link = ObservableArmFixture(.silent)
-    let controller = NexArmActionController(link: link)
-    await #expect(throws: NexArmExecutionError.feedbackTimeout) {
-        try await controller.performGesture(.tiltLeft, repetitions: 1)
+extension LiveRuntimeTests {
+    @Test(.actionCatalog) func nexArmChannelKeepsNextActionQueuedUntilFreshFinalHome() async throws {
+        let link = ObservableArmFixture(.push)
+        let controller = NexArmActionController(link: link)
+        let registry = try ActionRegistry(modules: [
+            NexArmGestureModule { request, _ in
+                try await controller.performGesture(
+                    request.gesture == .celebrate ? .celebrate : .dance,
+                    repetitions: request.repetitions)
+            }
+        ])
+        let scheduler = ChannelScheduler(registry: registry, resources: try nexArmTestResources())
+        let input = AgentInput(
+            id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("two gestures"))
+        for (function, channel) in [("celebrate", "Robot"), ("dance", "Robot")] {
+            try await scheduler.enqueue(
+                invocation: ActionInvocation(
+                    source: .assistant, input: input,
+                    call: ActionCall(
+                        actionPath: ActionPath(
+                            domain: "NexArm",
+                            module: ["shakeBase", "reset", "moveMotor", "resetMotor"].contains(function)
+                                ? "Motion" : "Gesture", function: function),
+                        channel: channel, parameters: ["cycles": "1"])))
+        }
+        try await scheduler.finish(inputID: input.id, source: AgentID(rawValue: "assistant"))
+        #expect(await link.writes == 14)
+        #expect(await link.queries == 0)
+        #expect(await controller.lockedMotors.isEmpty)
     }
-    #expect(await link.writes < 3)
-    #expect(await link.queries == 0)
-    #expect(await controller.motionFailure == .feedbackTimeout)
 }
 
-@Test(.actionCatalog) func nexArmIntermediateTimeoutAdvancesAndReportsMissingSegmentAfterEnding() async throws {
-    let link = ObservableArmFixture(.push)
-    await link.skip(2)
-    let controller = NexArmActionController(link: link)
-    await #expect(throws: NexArmActionError.targetsNotReached([2])) {
-        try await controller.performGesture(.dance, repetitions: 1)
+extension LiveRuntimeTests {
+    @Test(.actionCatalog) func nexArmCachedHomeDuringPlaybackCannotConfirmFinalCompletion() async throws {
+        let link = ObservableArmFixture(.silent)
+        let controller = NexArmActionController(link: link)
+        await #expect(throws: NexArmExecutionError.feedbackTimeout) {
+            try await controller.performGesture(.tiltLeft, repetitions: 1)
+        }
+        #expect(await link.writes < 3)
+        #expect(await link.queries == 0)
+        #expect(await controller.motionFailure == .feedbackTimeout)
     }
-    #expect(await link.writes == 8)
-    #expect(await link.queries == 0)
-    #expect(await controller.unreachedSegments == [2])
-    #expect(await controller.lockedMotors.isEmpty)
-    #expect(await controller.cachedJoints.prefix(5) == [2048, 2087, 1225, 1238, 2048])
+}
+
+extension LiveRuntimeTests {
+    @Test(.actionCatalog) func nexArmIntermediateTimeoutAdvancesAndReportsMissingSegmentAfterEnding() async throws {
+        let link = ObservableArmFixture(.push)
+        await link.skip(2)
+        let controller = NexArmActionController(link: link)
+        await #expect(throws: NexArmActionError.targetsNotReached([2])) {
+            try await controller.performGesture(.dance, repetitions: 1)
+        }
+        #expect(await link.writes == 8)
+        #expect(await link.queries == 0)
+        #expect(await controller.unreachedSegments == [2])
+        #expect(await controller.lockedMotors.isEmpty)
+        #expect(await controller.cachedJoints.prefix(5) == [2048, 2087, 1225, 1238, 2048])
+    }
 }
 
 @Test(.actionCatalog) func nexArmMotorScopeFreshnessAndFeedbackWatchdogAreIndependent() {

@@ -1,6 +1,4 @@
-import ActionBindings
 import Actions
-import AgentBindings
 import AgentCore
 import CallRuntime
 import ExecutionRuntime
@@ -288,7 +286,7 @@ private func roundHarness(
     _ = try await bindSpeechRequests(agent)
     let manager = AgentManager()
     try await manager.register(agent)
-    let input = InputGateway(manager: manager, allowsExternalSend: true)
+    let input = InputGateway(manager: manager)
     let paths = [
         "UI.Expression.express", "UI.Caption.print", "UI.Caption.beginReplyTurn", "Speech.Playback.speak",
         "Camera.Capture.takePhoto", "Camera.Capture.savePhoto", "Camera.Capture.ignorePhoto",
@@ -573,7 +571,7 @@ func generationRoundCancellationJoinsNativeCleanupAndPersistsCancellation() asyn
         action: false, toolCount: 0, handler: { _ in .completed })
     let envelope = OutputEnvelope(
         source: harness.agent.descriptor.id,
-        input: .init(id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("seal")),
+        context: (AgentInput(id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("seal"))).context,
         output: .roundFinished(UUID().uuidString), roundID: UUID().uuidString)
     let result = try await harness.gateway.execute(envelope)
     #expect(result.failure != nil)
@@ -724,8 +722,8 @@ private actor PhotoFunctionEndpoint: CameraControlCapability {
     let executor = ToolExecutor(registry: try ToolRegistry(modules: [RoundTools(definitions: [tool])]))
     let envelope = OutputEnvelope(
         source: .assistant,
-        input: .init(
-            id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("photo")),
+        context: (AgentInput(
+            id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("photo"))).context,
         output: .control("fixture"))
     let invalid = try #require(
         try await executor.execute(
@@ -1159,7 +1157,7 @@ private func agentRequestFailuresTerminateWithoutRetryOrEffectReplay(_ failure: 
     _ = try await bindSpeechRequests(agent)
     let manager = AgentManager()
     try await manager.register(agent)
-    let inputGateway = InputGateway(manager: manager, allowsExternalSend: true)
+    let inputGateway = InputGateway(manager: manager)
     let actions = ["UI.Expression.express", "UI.Caption.print", "UI.Caption.beginReplyTurn", "Speech.Playback.speak"]
         .map { path -> ActionBinding in
             let parts = path.split(separator: ".").map(String.init)
@@ -1386,7 +1384,8 @@ func hostCancellationTerminalStopsAdmittedActionThroughActualGateway(_ alreadySe
         var seals = harness.log.seals.stream.makeAsyncIterator()
         _ = await seals.next()
     }
-    async let model: Void = harness.agent.receive(AgentSessionControl.cancelSession.input(sessionID: input.sessionID))
+    async let model: Void = harness.agent.receive(
+        AssistantSessionControl.cancelSession.input(sessionID: input.sessionID))
     async let calls: Void = harness.gateway.cancelCalls(for: harness.agent, sessionID: input.sessionID)
     _ = try await (model, calls)
     try await pump.value
@@ -1474,7 +1473,8 @@ func hostCancellationJoinsDirectNativeToolWithoutWaitingForItsRoundBoundary() as
     let pump = try await harness.start(input)
     await gate.waitUntilEntered()
     async let calls: Void = harness.gateway.cancelCalls(for: harness.agent, sessionID: input.sessionID)
-    async let model: Void = harness.agent.receive(AgentSessionControl.cancelSession.input(sessionID: input.sessionID))
+    async let model: Void = harness.agent.receive(
+        AssistantSessionControl.cancelSession.input(sessionID: input.sessionID))
     _ = try await (calls, model)
     try await pump.value
     #expect(await gate.cleaned)

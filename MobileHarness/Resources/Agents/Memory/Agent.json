@@ -4,11 +4,6 @@
   "communication": {
     "inputs": [
       {
-        "contract": "history.intent",
-        "version": 1,
-        "kind": "observation"
-      },
-      {
         "contract": "tool.result",
         "version": 1,
         "kind": "toolResult"
@@ -44,18 +39,7 @@
         "kind": "communicationReceipt"
       }
     ],
-    "subscriptions": [
-      {
-        "contract": "history.intent",
-        "source": "runtime",
-        "topic": "history.intent"
-      },
-      {
-        "contract": "history.intent",
-        "source": "user",
-        "topic": "history.intent"
-      }
-    ],
+    "subscriptions": [],
     "publications": [],
     "sends": [
       {

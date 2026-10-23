@@ -1,18 +1,74 @@
-# Agent Runtime Context and Task State
+# Context — 私有事务、Task 与 Skill 生命周期
 
-热状态采用 v4 schema，分别保存 Task 根 Skill、会话根 Skill 的 remainingDecisions/最近使用顺序/最后使用会话和最多 32 个在途 Decision 使用集合。基础常驻；Task 持有项在终态回收，不转近期；无 Task 合法调用/显式加载续期为 5，整条用户 Decision 未使用扣 1，到零回收。Task 期间暂停未持有会话项倒计数。展开后非基础总数上限为 3，正文/增量函数目录上限为 24 KiB；超限淘汰非保护 LRU，在途 Decision 已使用项受保护。回收事件记录 idle/capacity/taskEnded/explicit/conversationClosed/sessionClosed 原因。定义缓存与模型激活独立，共享依赖按引用保留，加载验证和回收原子提交。新对话和重启清理全部会话保留；定向关闭只清理该会话近期项。Task 收尾与用户 Decision 结算分离，避免重复扣数。
+## 职责与关系
 
-## Responsibility and direct relationships
+AgentContextRepository actor 唯一持有 AgentCore.AgentContext 值，角色决定 schema、校验、保留窗口与业务语义。AgentTaskSkillState 管根 Skill 与任务状态；AgentFixedTaskCoordinator 管确定性 Task 调用及真实结果加入。生产私有 Context 在内存，不编码整份快照或隐式刷盘。
 
-AgentContextRepository compiles in Agents and owns its sole AgentCore context value inside the repository actor. AgentTaskSkillState owns Skill/task transitions; AgentFixedTaskCoordinator joins fixed-task results. Roles own schemas, admission, classification and retention. SQLite writes belong to injected Chat/Task repositories, not this directory.
+## 文件与职责
 
-## Runtime state ownership
+| 文件 | 职责 |
+| --- | --- |
+| [AgentContextRepository.swift](AgentContextRepository.swift) | 唯一私有 Context、FIFO 事务槽、可选提交接口、信号证据与同步公开投影 |
+| [AgentFixedTaskCoordinator.swift](AgentFixedTaskCoordinator.swift) | AgentTaskContextState 校验／恢复、确定性调用关联、固定任务准入及结果加入 |
+| [AgentStateContext.swift](AgentStateContext.swift) | 会话 StateScope、唯一 Task Writer、只读快照与关闭 |
+| [AgentTaskSkillState.swift](AgentTaskSkillState.swift) | Task 与根 Skill 纯状态转移、Decision 使用集合、依赖／容量和回收 |
 
-Every production role has one root-owned repository with a private value. It performs no whole-context encoding, file/database I/O or hidden flush in production. Returned values are snapshots; stable business IDs express references across owners. Actor transactions serialize at most16 FIFO waiters; overflow rejects. Copy, mutate, advance revision, validate and run any explicit persistence test hook before replacing the private value. Task/Skill remain fields of the same authoritative value; there is no writable mirror. No suspended model/device operation holds the slot.
+## 外部关系（一层）
 
-recordSignal encodes bounded neutral evidence into Data retained in memory, not a JSON file. Caller-selected rolling retention is4096 for deterministic role evidence/batches; unconfigured Core limits remain8192 with explicit rejection. Logical evidence Data totals at most32MiB; overflow rejects before publication without encoding the whole snapshot. Media bytes and credentials are excluded. Signal/delta updates never cause whole-context serialization or I/O.
+```mermaid
+flowchart LR
+ R["具体角色／Chat Worker"]:::agent
+ C["Context 机制"]:::agent
+ CO["AgentCore：通用 Context／Task／结果"]:::host
+ S["注入领域仓库：持久化由调用者拥有"]:::storage
+ R <--> C
+ C --> CO
+ C -->|"AgentStateContext：有限公开事实"| ST["Storage.StateContainer"]:::storage
+ R --> S
+ classDef ui fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e
+ classDef platform fill:#dcfce7,stroke:#16a34a,color:#14532d
+ classDef model fill:#f3e8ff,stroke:#9333ea,color:#581c87
+ classDef storage fill:#fef3c7,stroke:#d97706,color:#78350f
+ classDef agent fill:#eef2ff,stroke:#6366f1,color:#312e81
+ classDef gateway fill:#ffedd5,stroke:#ea580c,color:#7c2d12
+ classDef action fill:#ffe4e6,stroke:#e11d48,color:#881337
+ classDef host fill:#f1f5f9,stroke:#64748b,color:#334155
+```
 
-Injected load/commit hooks support atomicity/failure fixtures and preserve the previous value on commit failure; production installs no such hook. Durable restart tests use SQLite; fresh memory runtime repositories do not replay prior work.
+Storage 箭头属于调用者，ContextRepository 本身无数据库读写；持久化身份须在绑定 Task 内存状态前由所属流程提交。
+
+## 内部结构
+
+```mermaid
+flowchart LR
+ R["角色事务入口"]:::agent
+ Q["有界 FIFO 事务槽"]:::agent
+ C["复制 → 修改 → revision → validate"]:::agent
+ H["可选 AgentContextPersistence.commit"]:::host
+ V["替换唯一私有值"]:::agent
+ P["AgentStateContext：同步公开投影"]:::storage
+ K["AgentTaskSkillState：纯状态转移"]:::agent
+ F["FixedTaskCoordinator：调用与结果屏障"]:::agent
+ R --> Q --> C --> H --> V --> P
+ K --> C
+ F --> R
+ classDef ui fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e
+ classDef platform fill:#dcfce7,stroke:#16a34a,color:#14532d
+ classDef model fill:#f3e8ff,stroke:#9333ea,color:#581c87
+ classDef storage fill:#fef3c7,stroke:#d97706,color:#78350f
+ classDef agent fill:#eef2ff,stroke:#6366f1,color:#312e81
+ classDef gateway fill:#ffedd5,stroke:#ea580c,color:#7c2d12
+ classDef action fill:#ffe4e6,stroke:#e11d48,color:#881337
+ classDef host fill:#f1f5f9,stroke:#64748b,color:#334155
+```
+
+## 事务、容量与故障
+
+最多 16 个 FIFO 等待者；模型／设备操作不占事务槽。复制、变更、推进 revision、验证及可选 persistence.commit 成功后替换；提交前失败保留原值。首次读取可选 persistence.load 后，验证身份、恢复中断状态并提交推进后的 revision；生产装配不注入此接口。提交后的同步公开投影若失败抛 AgentPublicProjectionFailure，保留已提交值、revision 和原始错误，不能谎称私有提交回滚。
+
+recordSignal 只保存有界中立 Data 证据到内存，非 Signal 传输或文件序列化；确定性角色按 4096 滚动保留证据／批次，Core 默认 8192，逻辑 Data 总界 32 MiB。媒体和凭据排除，活跃工作不能被淘汰。持久化 Chat/Task 事实由领域仓库独立提交；重启丢弃热队列，不重放副作用。
+
+热 Skill 状态 schema v4，记录 Task 根、会话根、remainingDecisions、使用次序／会话与至多 32 个在途 Decision 使用集合。非基础展开总数最多 3，正文／增量目录 24 KiB；容量满仅淘汰未保护 LRU，没有空间则原子失败。基础项常驻，定义缓存与激活状态独立，共享依赖按引用保留。
 
 ## Task and Skill lifecycle
 
@@ -66,26 +122,10 @@ A pure Skill transition receives an already committed Task ID. The Chat worker v
 
 Task entry preserves ordinary background context and complete current-task evidence. Only terminal Tasks compress their process at the first source position; sources remain queryable. finishTask ends the decision unless continueDecision=true explicitly authorizes another objective; cancelTask ends it. Camera/media access does not require a Task authorization record.
 
-## Crash, cancellation and failures
+## 中断、完成与限制
 
-Restart discards hot state; App closes unfinished SQL identities as interrupted and never replays actions. Task compression comes from SQL source relationships, not a serialized Skill/registry snapshot. Cancellation cleanup is joined by the owner; failed persistence retains the terminal checkpoint and blocks subsequent model admission. Repository waiters release their granted slot even after cancellation. Snapshot/state/capacity/commit failures propagate without fallback.
+中断移除指定 Decision 使用集合而不扣数，保留 Task/Skill 并回到 waitingUser；显式新对话／匹配会话关闭／根关闭按所属清理规则释放。Task 终态必须加入真实执行／取消屏障，持久化失败保留待提交证据并阻止依赖后续模型接纳。取消等待者仍释放已授槽位，错误不降为成功。
 
-Private runtime state, bounded admission, independent terminal persistence and structured Task/Skill control are implemented.
+❌ 活跃 worker 持久化恢复、跨进程运行状态共享和 Skill 驱动动态 Context 订阅未实现。公开事实能力见 [Storage/State](../../../Storage/State/README.md)，模型流程见 [Chat](../Chat/README.md)。
 
-[Agents](../../README.md) · [Chat](../Chat/README.md) · [Storage](../../../Storage/README.md)
-
-## 待实现
-
-- Durable live-worker resumption, cross-process runtime sharing and Skill-driven context subscriptions are not implemented; generic bounded observation is provided by StorageState.
-
-## Storage 依赖
-
-✅ 存储访问使用独立的 State、Cache、Database 和 Files 接口；App 注册根实例，消费者通过构造器获得所需能力。存储容器不接管本目录的业务验证、执行和完成语义。
-
-## 公开 State 边界
-
-✅ 私有事务提交成功后才调用拥有者提供的同步公开投影钩子；钩子失败抛 AgentPublicProjectionFailure，保留已提交的值/修订和原始错误。Task 的公开视图由 Chat 层拥有，不把注册表、Skill 所有权或执行阶段放入共享 State。
-
-[公开 State 契约](../../../Storage/State/README.md)
-
-✅ 新增中断结算接口，移除指定 Decision 使用集合而不扣数；在途 Task 保留目标及 Skill 并进入 waitingUser，近期 Skill 的剩余次数不变。全局 pause 不再调用 resetSession；显式会话关闭/新对话/根关闭保留原清理规则。
+AgentStateContext 按会话管理 StateScope、唯一 Task Writer 与只读快照；仅投影目标和状态，不发布私有 Task 注册表、Skill 权限、媒体或模型上下文。同步写入失败使投影失效并保留原始错误；close 释放作用域，已关闭实例拒绝新会话。

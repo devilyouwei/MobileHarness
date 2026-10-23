@@ -1,42 +1,28 @@
-# System — 资源、Provider、设备与 Task 控制函数
+# System — 业务函数与执行设计
 
-## 简介
+## 职责与模块关系
 
-提供系统事实查询、模型资源管理、私有云配置事务及中立 Task 控制转发。入口维护参数、预算与真实结果，原生工作通过注入能力完成。
+拥有模型资源、Provider 配置、设备和 Task 控制业务，以及显式应用诊断。根级 SystemModule 仅绑定固定运行信息，具体业务目录各自拥有接口、事务和执行服务；UI 草稿与本地表单机制由基础 UI 拥有。
 
-## 上下游关系（一级）
+Gateway 通过注册函数调用本域，Agents 决定请求与策略，App 注入唯一基础能力和根生命周期。本域消费 FunctionContracts 及需要的基础能力，不导入 Agents、Gateway 实现或 App。全部域内源码由 Actions 单一目标编译。
 
-```mermaid
-flowchart LR
-    Gateway -->|FunctionInput| S[System 函数]
-    S -->|实际结果与失败| Gateway
-    Host[ActionBindings 能力端点] -.->|资源设备与 Task 能力| S
-    S -->|原生操作和控制请求| Host
-    S -->|配置文档持久化| Storage
-    Contracts[FunctionContracts] -.->|输入与 TaskControlCapability| S
-    S -->|资源快照类型提供| UI[Actions/UI]
-```
+## 目录与文件
 
-System 不导入 ModelKit、Agents、UI 或 Gateway 实现。它只调用中立端口；配置绑定、设备会话和 Task 状态由端点所属宿主负责。
+| 文件 | 当前职责 |
+| --- | --- |
+| [RuntimeActions.swift](RuntimeActions.swift) | 业务函数的参数校验、能力调用与完成值 |
+| [SystemActions.swift](SystemActions.swift) | 业务函数的参数校验、能力调用与完成值 |
+| [SystemModule.swift](SystemModule.swift) | 固定运行信息函数绑定 |
 
-## 内部模块关系
-
-```mermaid
-flowchart TB
-    Namespace[SystemActions] --> Resource[ModelResourcesActions]
-    Namespace --> Provider[ProviderActions]
-    Namespace --> Device[DeviceActions]
-    Namespace --> Task[TaskActions]
-    Namespace --> Runtime[RuntimeActions]
-    Resource --> ResourceSupport[Support 资源目录与偏好服务]
-    Provider --> ProviderSupport[Support Provider 目录暂存与事务]
-    Device --> DeviceSupport[Support/DeviceModule]
-    Task --> TaskSupport[Support/TaskControlModule]
-    Runtime --> RuntimeSupport[Support/SystemModule]
-```
+| 目录 | 责任 |
+| --- | --- |
+| [Device](Device/README.md) | 函数解析并限定操作专用参数，端口负责真实准入与结果 |
+| [Diagnostics](Diagnostics/README.md) | 显式诊断与授权 Agent Action 执行分开，不从合成检查推导真实业务或设备验收 |
+| [ModelResources](ModelResources/README.md) | 下载完成准入与制品实际下载完成分开 |
+| [Provider](Provider/README.md) | URL／密钥只在会话私有暂存和凭据端口中传递，函数参数仅带请求 ID |
+| [Task](Task/README.md) | 公开地址为 Agent.Task，源码归 System 的任务控制业务 |
 
 ## 函数接口与完成语义
-
 | 地址模块 | 函数 | 完成与静态预算 |
 | --- | --- | --- |
 | System.ModelResources | snapshotResources、restoreSource、saveSource、configureSpeech、download、cancel、remove | 全部 60 秒；下载是准入，取消/删除/绑定等待端点返回 |
@@ -50,29 +36,16 @@ flowchart TB
 TaskActions 属于 System 目录，但公开地址为 `Agent.Task`，这是显式的地址映射。它转发完整参数和 invocation，不在这里维护 Agent 状态或重复宿主的权限、参数及轮次验证。
 
 ## 参数、结果与私有数据
-
 资源下载需要 id（最多 64 字节）、endpoint（最多 1024 字节）及严格 true/false 的 allowsCellular。source 保存同时接受 recognition/synthesis 严格布尔字符串；configureSpeech 只改变注入端点绑定，偏好持久化是另一项操作。source 编码上限 2048 字节，资源快照上限 65536 字节。
 
 Provider 的发现、恢复、保存只传 requestID ID；URL/密钥留在同会话私有暂存中。发现结果最多 2048 个模型 ID、每项最多 512 字节、编码最多 65536 字节；过滤策略在 Support。readSettings 不返回 URL/密钥，不执行联网可用性探测。
 
 Device.control 的模型声明提供 scan/stopScan/connect/reconnect/disconnect/forget/refresh；实际解析还支持 preset、motorVelocity、stopMotorControl、openPage、closePage、openSystemSettings 等可信操作。
 
-✅ DeviceActions.control 按 operation 提取适用字段，忽略其他操作专用的 id/value/action，不传到设备端口。connect/reconnect 仍要求设备 ID；motorVelocity 仍要求电机 1…6 和有限 −1…1 的 value；preset 仍使用封闭动作名。可选 fence 始终校验 UUID。XML 额外未声明参数在 AgentCore 解析别名时过滤；可信直接入口仍拒绝未知键。disconnect 不需要设备 ID，即使附带 id 或其他操作字段也只提交断开请求。
+DeviceActions.control 按 operation 提取适用字段，忽略其他操作专用的 id/value/action，不传到设备端口。connect/reconnect 仍要求设备 ID；motorVelocity 仍要求电机 1…6 和有限 −1…1 的 value；preset 仍使用封闭动作名。可选 fence 始终校验 UUID。XML 额外未声明参数在 AgentCore 解析别名时过滤；可信直接入口仍拒绝未知键。disconnect 不需要设备 ID，即使附带 id 或其他操作字段也只提交断开请求。
 
 readStatus/readEnvironment 不接收参数，分别限制 16384/65536 UTF-8 字节，内容由端点提供；入口不追加事实或证明物理完成。runtimeInfo 直接返回固定文字，当前不解析参数，也不是实时健康检查。
 
 Task 声明描述 JSON 数组 Skills、前台/后台 Task 字段和终态控制：foreground 使用 goal 及可选 skills/execution；target/businessContract/payload 为后台字段。finishTask 的 continueDecision 默认 false，仅为同一输入剩余新目标声明显式续轮。实际验证、提交、清理与结果屏障均在宿主端口实现。
 
-## 生命周期与约束
-
-资源和 Provider 服务有独立准入及事务状态，见 Support。普通入口没有统一队列、原生设备 worker 或重试循环；异步异常和已经提交的结果按各端点契约返回。
-
-[Actions 设计](../README.md) · [System 服务实现](Support/README.md) · [共享契约](../Support/Contracts/README.md)
-
-## 待实现
-
-- runtimeInfo 没有实时诊断实现。声明参数与可信入口解析的开放范围不是同一个集合，不能据函数存在推断模型权限或原生能力可用。
-
-## Storage 依赖
-
-✅ 存储访问使用独立的 State、Cache、Database 和 Files 接口；App 注册根实例，消费者通过构造器获得所需能力。存储容器不接管本目录的业务验证、执行和完成语义。
+[Actions 设计](../README.md) · [公共函数契约](../Support/Contracts/README.md)

@@ -1,6 +1,4 @@
-import ActionBindings
 import Actions
-import AgentBindings
 import AgentCore
 import Agents
 import CallRuntime
@@ -86,22 +84,20 @@ private actor InteractionPresentation: ResourcePresentationCapability {
     func presentResourceOperationFailure(_ message: String, invocation: any FunctionInput) {}
     func presentResourceFailure(_ message: String, generation: UInt64, invocation: any FunctionInput) {}
 }
-@Test(.actionCatalog) func deviceAndNavigationIntentsUseRegisteredFunctionsAndRecover() async throws {
+@Test(.actionCatalog) func deviceContainerRequestsUseRegisteredFunctionsAndRecover() async throws {
     let device = InteractionDevice()
     let presentation = InteractionPresentation()
-    let runtime = try resourceRuntime(UnusedModelResourceCapability(), presentation: presentation, device: device)
-    try await runtime.interact(.init(kind: .device, parameters: ["operation": "scan"]))
+    let runtime = try await resourceRuntime(UnusedModelResourceCapability(), presentation: presentation, device: device)
+    try await runtime.controlDevice(["operation": "scan"])
     await #expect(throws: ApplicationControlIntentFailure.self) {
-        try await runtime.interact(.init(kind: .device, parameters: ["operation": "refresh"]))
+        try await runtime.controlDevice(["operation": "refresh"])
     }
     await #expect(throws: ApplicationControlIntentFailure.self) {
-        try await runtime.interact(
-            .init(kind: .device, parameters: ["operation": "motorVelocity", "id": "7", "value": "1"]))
+        try await runtime.controlDevice(["operation": "motorVelocity", "id": "7", "value": "1"])
     }
-    try await runtime.interact(.init(kind: .navigation, parameters: ["destination": "bluetooth"]))
-    try await runtime.interact(.init(kind: .device, parameters: ["operation": "stopScan"]))
+    try await runtime.controlDevice(["operation": "stopScan"])
     #expect(await device.calls == [.scan, .refresh, .stopScan])
-    #expect(await presentation.destinations == ["bluetooth"])
+    #expect(await presentation.destinations.isEmpty)
     #expect(await runtime.agent.status().queuedInputs == 0)
     await runtime.shutdown()
 }
@@ -109,19 +105,25 @@ private actor InteractionPresentation: ResourcePresentationCapability {
     let device = InteractionDevice()
     let manager = AgentManager()
     let input = InputGateway(manager: manager, policy: try resourceFixturePolicy())
-    let runtime = try resourceRuntime(
+    let runtime = try await resourceRuntime(
         UnusedModelResourceCapability(), device: device,
         manager: manager, suppliedInput: input)
-    try await runtime.observeEnvironment(.init(category: .scene, sequence: 1, value: "active"))
+    try await runtime.prepareForInteraction()
+    try await runtime.agent.observeEnvironment(.init(category: .scene, sequence: 1, value: "active"))
     await input.flushPublications()
     // Subscriber rejects stale state independently; the publishing API returns no acknowledgment.
-    try await runtime.observeEnvironment(.init(category: .scene, sequence: 1, value: "replay"))
+    await #expect(throws: CommunicationError.invalidPayload) {
+        try await runtime.prepareForInteraction()
+        try await runtime.agent.observeEnvironment(.init(category: .scene, sequence: 1, value: "replay"))
+    }
     await input.flushPublications()
     await #expect(throws: CommunicationError.self) {
-        try await runtime.observeEnvironment(
+        try await runtime.prepareForInteraction()
+        try await runtime.agent.observeEnvironment(
             .init(category: .devices, sequence: 2, value: String(repeating: "x", count: 16385)))
     }
-    try await runtime.observeEnvironment(.init(category: .scene, sequence: 3, value: "background"))
+    try await runtime.prepareForInteraction()
+    try await runtime.agent.observeEnvironment(.init(category: .scene, sequence: 3, value: "background"))
     await input.flushPublications()
     let snapshot = try await runtime.agent.environmentSnapshot()
     #expect(snapshot.contains("background"))
@@ -204,7 +206,7 @@ private actor InteractionPresentation: ResourcePresentationCapability {
         id: UUID().uuidString,
         sessionID: session, payload: payload,
         metadata: InputMetadata(
-            payload: payload, source: "user", origin: .external, rootID: UUID().uuidString))
+            payload: payload, source: "user", origin: .local, rootID: UUID().uuidString))
     await #expect(throws: CommunicationError.unauthorized) { try await agent.receive(forged) }
     try await agent.receive(
         AppEnvironmentFact(category: .scene, sequence: 1, value: "active").input(sessionID: session))

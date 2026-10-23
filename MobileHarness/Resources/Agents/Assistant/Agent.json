@@ -4,16 +4,6 @@
   "communication": {
     "inputs": [
       {
-        "contract": "user.text",
-        "version": 1,
-        "kind": "text"
-      },
-      {
-        "contract": "assistant.control",
-        "version": 1,
-        "kind": "observation"
-      },
-      {
         "contract": "tool.result",
         "version": 1,
         "kind": "toolResult"
@@ -67,16 +57,6 @@
         "contract": "task.cancel",
         "version": 1,
         "kind": "observation"
-      },
-      {
-        "contract": "agent.userInput",
-        "version": 1,
-        "kind": "observation"
-      },
-      {
-        "contract": "container.failure",
-        "version": 1,
-        "kind": "observation"
       }
     ],
     "subscriptions": [
@@ -86,29 +66,9 @@
         "topic": "speech.final"
       },
       {
-        "contract": "user.text",
-        "source": "user",
-        "topic": "user.text"
-      },
-      {
         "contract": "speech.phase",
         "source": "speechPerception",
         "topic": "speech.phase"
-      },
-      {
-        "contract": "agent.userInput",
-        "source": "user",
-        "topic": "agent.userInput"
-      },
-      {
-        "contract": "assistant.control",
-        "source": "runtime",
-        "topic": "assistant.control"
-      },
-      {
-        "contract": "container.failure",
-        "source": "runtime",
-        "topic": "container.failure"
       }
     ],
     "publications": [

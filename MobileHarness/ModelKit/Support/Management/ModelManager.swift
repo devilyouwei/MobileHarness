@@ -75,6 +75,10 @@ public actor ModelManager {
         artifactRelease = task
         try await task.value
     }
+    public func observeArtifactChanges() async throws -> AsyncStream<UInt64> {
+        guard !closed, let artifacts else { throw ModelArtifactError.missingArtifact }
+        return try await artifacts.observeChanges()
+    }
     public func artifactSnapshots() async throws -> [ModelArtifactSnapshot] {
         guard !closed, let artifacts else { throw ModelArtifactError.missingArtifact }
         return try await artifacts.snapshots()

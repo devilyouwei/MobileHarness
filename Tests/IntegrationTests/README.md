@@ -82,7 +82,6 @@ Run one explicitly selected physical test per process with `NEXARM_PORT=/dev/cu.
 
 执行方法与结果归 [validation](../../docs/validation/README.md)，不在本文件追加运行/安装记录。
 
-
 ## 历史只读请求接入
 
 ✅ UI 的记录分页、消息、归档及授权图片读取也经 MemoryHistoryIntent.query 的实际 Gateway/Memory 接入；不再由 UI 请求适配器直接读仓库。MemoryHistoryReadRequests 为根持有的类型化只读请求暂存，最多四个请求，每个请求一个结果等待者；Signal 只携带随机 ID，结果保留规范仓库返回值。请求/结果有界，120 秒未返回明确超时，取消/停止加入实际读取，迟到结果不更新 UI；不新增模型函数或重放副作用。
@@ -122,7 +121,6 @@ GenerationRoundTests 的 native-only 模型夹具报告合成参数首样本，�
 静态 system 正文预算分别为基础 Skill 23,500 UTF-8 bytes、含摄影30,500 bytes（不含 State/历史），包含常驻连续表情的完整示例及通用串行教学；完整请求继续执行现有64KiB总预算。示例由生产解析器验证，不把声明名称保护当作真实模型遵循证明。
 
 定向模板/示例检查已通过；完整云回归及全量自动化失败分别见[优化验证报告](../../docs/validation/Qwen-Prompt-Optimization.md)，不以定向通过替代全量验收。
-
 
 ## 分类异常诊断
 
@@ -170,7 +168,7 @@ PlatformContainerTests 验证注册隔离、根失效/恢复、重复停止和�
 
 ## ApplicationControl 异常展示
 
-✅ ContainerFailureTests 使用真实 Gateway、ApplicationControlIntentRuntime 与内部呈现函数验证容器/执行异常的首页记录和 Toast；覆盖重复、陈旧、暂停、伪造/过期/停止、容量、关联信息及呈现失败防递归。原 AppWorkflow 提示策略用例放到此集成路径；合成故障不代替真实设备验收。
+✅ ContainerFailureTests 使用真实 Gateway、ApplicationControlExecutionSession 与内部呈现函数验证容器/执行异常的首页记录和 Toast；覆盖重复、陈旧、暂停、伪造/过期/停止、容量、关联信息及呈现失败防递归。原 AppWorkflow 提示策略用例放到此集成路径；合成故障不代替真实设备验收。
 
 ## UI 全量容器化
 
@@ -179,7 +177,7 @@ PlatformContainerTests 验证注册隔离、根失效/恢复、重复停止和�
 ✅ VoiceTests 覆盖离主线程频谱入口与同步 FFT 输出一致、预取消拒绝，不将测试耗时阈值作为真机帧率证明。
 
 
-✅ 通过真实 CacheContainer/AudioCache/Gateway 故障通道验证正常 PCM 播放完成并 release 无故障；真实 missing 及生产流失败仍报告，单次使用与关闭取消仍成立。
+✅ 通过真实 CacheContainer/AudioCache/Agents 故障通道验证正常 PCM 播放完成并 release 无故障；真实 missing 及生产流失败仍报告，单次使用与关闭取消仍成立。
 
 
 ✅ 覆盖同输入/输出设备配置调整与 category/override 变化不触发重开，真实设备插拔、不可用路由、缺少旧快照保守投递；保持路由设备事实与容器错误的边界。
@@ -187,7 +185,7 @@ PlatformContainerTests 验证注册隔离、根失效/恢复、重复停止和�
 
 ✅ Pose payload 用例检查真实非法输入拒绝；生产网格／方向由原生呈现回归覆盖。UI 根及消费者继续通过原公开协议注入，完整检查失败单独记录。
 
-✅ 设备接入回归覆盖原生事实与 Error 分离、Gateway 音频／相机事件编码；容器故障回归覆盖音频接纳错误的公开操作单次报告。根缓存、停止、独立媒体及语音生命周期继续回归，真机行为单独验收。
+✅ 设备接入回归覆盖原生事实与 Error 分离、音频／相机原生只读订阅与代际；容器故障回归覆盖音频接纳错误的公开操作单次报告。根缓存、停止、独立媒体及语音生命周期继续回归，真机行为单独验收。
 
 ✅ 模型回归覆盖 App 同根四子能力／根隔离、流式错误观察者早／晚安装及取消无故障；资源暂停取消加入与权重保留由 Runtime 测试覆盖，默认根生命周期由 Defaults 测试覆盖。
 
@@ -201,7 +199,7 @@ PlatformContainerTests 验证注册隔离、根失效/恢复、重复停止和�
 ✅ FoundationFailureTests通过同一测试协议检查四种封装的字段语义、稳定代码集合、NSError身份、来源保留、多项清理错误和取消分类；同时回归Gateway稳定投影、包装后的蓝牙条件及单项清理错误不降级。根容器原有测试改为验证结构化错误与underlying。
 
 
-✅ modelPreparationLoadingEyesCrossGatewayAgentAndExpressionAction覆盖App环境事实经Gateway／ApplicationControl／独立Expression Tool到UI，未聆听显示及回前台重复loading事实重新开启，ready退出且不产生Toast。
+✅ modelPreparationLoadingEyesCrossGatewayAgentAndExpressionAction覆盖App环境事实直达ApplicationControl，再经Gateway／独立Expression Tool到UI，未聆听显示及回前台重复loading事实重新开启，ready退出且不产生Toast。
 
 ✅ setLoading为state函数，必须使用Void handler产生completed，禁止value完成；回归通过FunctionExecutor校验完成类型和Tool返回成功，不能只检查UI副作用。
 
@@ -222,3 +220,75 @@ PlatformContainerTests 验证注册隔离、根失效/恢复、重复停止和�
 ✅ PlatformContainerTests的断开未确认替身对所有写入口（含restoreLive）明确返回disconnected，不把恢复写请求当作停机或到位证明；真实原生链路及物理速度／方向／停机仍须单独验收。
 
 ✅ BluetoothArmFixture按已准入写入索引区分restoreLive与普通live写入；最新滑杆替换预设回归允许必要的旧跟踪模式恢复，但仍禁止普通旧预设的同步位置包，并断言所有恢复写入都在新滑杆首包之前结束。不会把恢复包从传输日志中移除，也不模拟到位。
+
+## Direct container contract
+
+Direct-input regressions cover typed request receipts, bounds, cancellation/generations, native subscriptions and unchanged authorized execution. Synthetic tests do not establish real model, UI or hardware acceptance. Current cross-module ownership is defined by the [overall design](../../MobileHarness/README.md).
+
+✅ 以原生 PCM 流的非零序号与业务门控丢弃验证，感知 Agent 接收保留采集序号和布局，不按已消费包重新编号。
+
+✅ 通信注册表只保留 Agent 消息与执行反馈；删除本地 UI／媒体／环境／故障的历史 schema 和仅供外部来源的测试声明，本地类型自身继续验证。
+
+✅ 移除编码校验后，本地类型仍拒绝超长 Provider、历史、媒体和任务标识；通信注册表不接受这些本地来源 schema。
+
+## Agent-owned UI inputs
+
+✅ Direct UI integration regressions instantiate owning Agents with actual UI subcontainers. They cover home request/turn identity, independent SpeechPerception listening, typed Memory reads, camera execution, resources pause/resume, private settings staging/presentation/failure, independent control admission, and stop joining an accepted Action. Synthetic native services are labelled fixtures; hardware acceptance remains separate.
+
+✅ UI 失活并暂停 SpeechPerception 后，原生生命周期停止仍撤销同意并输出禁用 Action，避免回复结束时重新开启采集。
+
+✅ 蓝牙晚到执行失败回归等待连接恢复的可控状态，再断言旧错误没有污染新连接；仅 phase=connected 尚不代表恢复阶段已退出。保留原错误／关联和清理断言。
+
+## 原生输入自有生命周期
+
+✅ 已实现：以只读 PCM／camera 替身验证 Agent 自行订阅与取消加入、真实采集代、半双工丢弃仍保留原序号、单份 64 包容量与溢出、旧回调隔离及暂停恢复。替身不证明硬件或实际模型性能。
+
+## 语音执行归属收敛
+
+✅ 已实现：验证 Actions 频谱呈现的原生代/根 token/旧关闭围栏、有界有限值及 UI 失活；语音取消和真实 Action 失败回归保留，不以源码移动代替执行验证。
+
+✅ 已实现：用可替换的 AudioCaptureControlling 验证实际 Actions 音频检测的权限失败、取消停止、事件终止及关闭期间迟到工厂清理；不以假 PCM 证明物理设备验收。
+
+## 直连链路收尾
+
+✅ 覆盖语音手势／检测直连、完整历史受保护执行、四个实际读取工作上限、根停止加入，以及页面取消加入后继续接纳下一请求。原生硬件与真实模型验收独立记录。
+
+## Runtime validation isolation
+
+The default check runs ordinary tests concurrently, then executes the live-runtime and native-window suites separately. These suites are serialized because their assertions use real capture freshness, mechanical deadlines, media expiry, or the process-wide AppKit application. Business concurrency remains exercised inside each test. No global parallelism flag or production deadline is changed; excluded cases in the first phase must execute in the second.
+
+✅ LiveRuntimeTests 统一承载机械控制实际反馈／准入期限、Agent 轮次期限、Signal SLA、根 UI 到期与原生帧生命周期的异步回归。用 Swift 语法树迁移完整测试声明，不修改用例本身；保留同一用例内的并发、超时、失败类型和取消断言。其余纯值／契约用例仍在普通并发阶段。
+
+✅ 监听同意／回复占用的跨 Gateway 回归同样依赖三秒真实轮次期限，归入 LiveRuntimeTests；不修改三个 revision、执行 owner 或真实反馈断言。
+
+✅ 历史接纳回归分别验证在途回复变更后用户记录可原子接纳、原回复保留、重复输入拒绝，以及真正模型请求仍拒绝旧／外来 token。沿用会话取消与其他会话继续处理回归。
+
+✅ ResourceObservationTests 通过注入 revision 流驱动实际角色自有订阅，验证首个及后续资源刷新经 Gateway／Actions 完成，且不产生 invalidPayload 观察故障。
+
+✅ 角色资源订阅回归覆盖暂停／恢复后的新源首个 revision，验证刷新继续接纳且不被误判为旧序号。
+
+## 职责归属与组织约束
+
+✅ 设置／资源、历史及摄影请求回归直接提交 UI 子容器请求并等待真实回执。测试夹具只提供提交便捷方法，不执行或重建宿主事务；回执结束与实际工作加入分别验证。独立角色读取容量、暂存私密值与 Action 校验按各自契约单独测试；角色宿主仅用于注册与输出绑定。
+✅ 感知测试以原生帧或注入的原生源驱动；移除旧语音补充队列测试，覆盖唯一原生缓冲、冷启动有序前缀、取消加入和通用媒体入口拒绝。合成帧构造仅存在测试侧，不引入生产兼容适配。
+
+✅ 队列替换、发布隔离和终态保留用例显式注入近零采样间隔，使合成帧突发只验证各自契约；默认采样节奏、单调时钟、延迟预算仍由专门的 cadence／freshness 用例验证，不放宽生产配置。
+
+✅ 中立媒体值只保存原生消费所需的 Float PCM 和不透明图像附件；合成字节数据转换由测试侧负责。执行附件继续校验帧身份与新鲜度。
+
+✅ 直接 CameraFrame 入口验证过期拒绝计数及后续同序号新鲜帧可接纳。
+
+✅ 共享姿态投递、慢订阅者、终态展示及摄影订阅拒绝用例使用真实原生捕获时钟，归入已有串行 LiveRuntimeTests，避免并发模型／构建负载改变 750 毫秒新鲜度判定；不修改生产预算。
+
+✅ 不透明图像附件直接保留 Sendable 原生帧本体；角色校验 CameraFrame，Gateway 无需引用 PlatformKit 即可保留和转交附件。
+
+✅ 会话控制测试使用 AssistantSessionControl；保留固定 Memory 的真实提交确认回归，泛化 Chat 不保留没有启用者的父提交等待策略。
+
+
+## Actions 接入契约
+
+Actions 按业务能力组织源码，保持原编译目标。生产调用显式连接独立相机、语音、UI 呈现和 Task 端点；不通过无关能力的类型转换探测。验证和导航按实际源码所有权维护，业务授权与生命周期继续由原拥有者负责。
+
+## Agents 角色与共享机制
+
+具体角色装配归 Agents 根级，Support 保留通用机制；角色私有载荷和会话控制由角色解释，通过注入的解码／Context 钩子接入共享准入。输入身份、Task scope、取消加入和真实结果保持独立，源码和验证按其实际所有者维护。

@@ -1,6 +1,4 @@
-import ActionBindings
 import Actions
-import AgentBindings
 import AgentCore
 import Agents
 import CallRuntime
@@ -12,6 +10,7 @@ import PlatformKit
 import StorageCore
 import StorageState
 import Testing
+import UI
 
 struct UnusedModelResourceCapability: ModelResourceCapability {
     func configureSpeech(recognition: Bool, synthesis: Bool) async throws { throw CancellationError() }
@@ -66,16 +65,11 @@ private struct ResourceTools: ToolModule { let definitions: [ActionBinding] }
 func resourceFixturePolicy() throws -> CommunicationPolicy {
     return try CommunicationPolicy(
         contracts: AgentContracts.communication,
-        externalSources: [
-            "phone.microphone", "phone.camera",
-            "user", "runtime", ModelResourceObservation.source, ModelResourceHostFailure.source,
-            AppEnvironmentFact.source,
-        ],
         configurations: AgentConfigurations.all())
 }
-func resourceRuntime(
+@MainActor func resourceRuntime(
     _ resources: any ModelResourceCapability,
-    preferences: any ModelResourcePreferencesCapability = UnusedModelResourcePreferencesCapability(),
+    preferences: any ModelResourcePreferencesCapability = ResourceTestPreferences(),
     inventory: any ModelResourceInventoryCapability = UnusedResourceInventory(),
     presentation: any ResourcePresentationCapability = UnusedResourcePresentation(),
     includeFailurePresentation: Bool = true,
@@ -86,19 +80,45 @@ func resourceRuntime(
     providerSettings: any ProviderSettingsCapability = UnusedProviderSettings(),
     device: any DeviceControlCapability = UnusedDeviceControl(),
     camera: any CameraControlCapability = UnusedCameraControl(),
+    uiResources: UIModelResourcesContainer? = nil, uiSettings: UISettingsContainer? = nil,
+    resourceChanges: (@MainActor @Sendable () async throws -> AsyncStream<UInt64>)? = nil,
+    observationFailure: @escaping @Sendable (any Error) -> Void = { _ in },
+    uiProviderSettings: ProviderSettingsRequests? = nil, uiProviderDiscovery: ProviderDiscoveryRequests? = nil,
+    uiProviderPresentation: ProviderPresentationAdapter? = nil,
     sessionID: String = UUID().uuidString, manager: AgentManager = AgentManager(),
     suppliedInput: InputGateway? = nil,
     suppliedContext: AgentContextRepository<ApplicationControlContextState>? = nil,
     outputSink: @escaping @Sendable (OutputEnvelope) async -> Void = { _ in }
-) throws -> ApplicationControlIntentRuntime {
+) throws -> ResourceTestRuntime {
+    let ui = UIContainer()
+    try ui.start()
+    let resourceUI = uiResources ?? ui.modelResources
+    let settingsUI = uiSettings ?? ui.settings
+    let inventoryProbe = ResourceInventoryProbe(inventory)
+    let settingsRequests =
+        uiProviderSettings ?? (providerSettings as? ProviderSettingsRequests)
+        ?? ProviderSettingsRequests(service: ResourceProviderPersistence().service())
+    let discoveryRequests =
+        uiProviderDiscovery ?? (providerDiscovery as? ProviderDiscoveryRequests)
+        ?? ProviderDiscoveryRequests { _ in [] }
+    let providerPresentation =
+        uiProviderPresentation
+        ?? ProviderPresentationAdapter(
+            state: settingsUI.presentation, sessionID: sessionID, settings: settingsRequests,
+            discovery: discoveryRequests)
+    let actualPresentation: any ResourcePresentationCapability =
+        presentation is UnusedResourcePresentation
+        ? ResourcePresentationAdapter(
+            state: resourceUI.presentation, sessionID: sessionID, provider: providerPresentation,
+            navigation: ui.navigation.presentation, acknowledge: {}) : presentation
     let session = sessionID
     let policy = try resourceFixturePolicy()
-    let input = suppliedInput ?? InputGateway(manager: manager, policy: policy, allowsExternalSend: true)
+    let input = suppliedInput ?? InputGateway(manager: manager, policy: policy)
     let functions =
-        ModelResourcesModule(resources: resources, preferences: preferences, inventory: inventory).definitions
-        + ResourcePresentationModule(inventory: inventory, presentation: presentation).definitions
+        ModelResourcesModule(resources: resources, preferences: preferences, inventory: inventoryProbe).definitions
+        + ResourcePresentationModule(inventory: inventoryProbe, presentation: actualPresentation).definitions
         + ProviderModule(discovery: providerDiscovery, settings: providerSettings).definitions
-        + DeviceModule(device: device).definitions + NavigationModule(presentation: presentation).definitions
+        + DeviceModule(device: device).definitions + NavigationModule(presentation: actualPresentation).definitions
         + CameraModule(camera: camera).definitions
     let bindings = functions.filter {
         (includeFailurePresentation || $0.path.function != "showResourceFailure")
@@ -113,17 +133,22 @@ func resourceRuntime(
         manager: manager, requests: input,
         tools: try ToolRegistry(modules: [ResourceTools(definitions: bindings)]),
         actions: ChannelScheduler(registry: ActionRegistry()), policy: policy, sink: outputSink)
-    return ApplicationControlIntentRuntime(
-        sessionID: session, manager: manager, input: input, output: output,
+    let host = ApplicationControlExecutionSession(
+        manager: manager, output: output,
         agent: try ApplicationControlAgent(
-            sessionID: session,
+            sessionID: session, uiSettings: settingsUI, uiResources: resourceUI, uiDevices: ui.devices,
+            resourceChanges: resourceChanges, observationFailure: observationFailure,
+            uiProviderSettings: settingsRequests, uiProviderDiscovery: discoveryRequests,
+            uiProviderPresentation: providerPresentation,
             context: suppliedContext
                 ?? AgentContextRepository(
                     agent: .applicationControl, scope: UUID().uuidString, state: ApplicationControlContextState())))
+    return ResourceTestRuntime(
+        host: host, ui: ui, resources: resourceUI, settings: settingsUI, inventoryProbe: inventoryProbe)
 }
 @Test(.actionCatalog) func modelResourceCommandsCrossGatewaysAndRecoverAfterNativeFailure() async throws {
     let fixture = ResourceFixture()
-    let runtime = try resourceRuntime(fixture)
+    let runtime = try await resourceRuntime(fixture)
     try await runtime.perform(.download(id: "model", endpoint: "https://example.invalid/model", allowsCellular: false))
     await #expect(throws: ApplicationControlIntentFailure.self) {
         try await runtime.perform(
@@ -181,9 +206,9 @@ private actor HeldResourceFixture: ModelResourceCapability {
         release = nil
     }
 }
-@Test(.actionCatalog) func resourcePageCancellationPreservesAdmissionAndExplicitCancelIsIndependent() async throws {
+@Test(.actionCatalog) func resourcePageCancellationCancelsWorkAndExplicitControlStillJoins() async throws {
     let fixture = HeldResourceFixture()
-    let runtime = try resourceRuntime(fixture)
+    let runtime = try await resourceRuntime(fixture)
     var started = fixture.started.stream.makeAsyncIterator()
     let download = Task {
         try await runtime.perform(.download(id: "model", endpoint: "https://example.invalid", allowsCellular: true))
@@ -191,13 +216,13 @@ private actor HeldResourceFixture: ModelResourceCapability {
     await started.next()
     download.cancel()
     try await runtime.perform(.cancel("model"))
-    try await download.value
+    await #expect(throws: CancellationError.self) { try await download.value }
     #expect(await runtime.agent.status().queuedInputs == 0)
     await runtime.shutdown()
 }
 @Test(.actionCatalog) func resourceShutdownCancelsAndJoinsWorkersBeforeReturning() async throws {
     let fixture = HeldResourceFixture()
-    let runtime = try resourceRuntime(fixture)
+    let runtime = try await resourceRuntime(fixture)
     var started = fixture.started.stream.makeAsyncIterator()
     var cancelled = fixture.cancelled.stream.makeAsyncIterator()
     let download = Task {
@@ -258,7 +283,7 @@ private actor HeldResourceFixture: ModelResourceCapability {
 
 @Test(.actionCatalog) func speechModelPreferenceTravelsThroughResourceAgentAndReturningFeedback() async throws {
     let fixture = ResourceFixture()
-    let runtime = try resourceRuntime(fixture)
+    let runtime = try await resourceRuntime(fixture)
     try await runtime.perform(.configureSpeech(recognition: true, synthesis: false))
     try await runtime.perform(.configureSpeech(recognition: false, synthesis: true))
     #expect(await fixture.calls == ["speech:true:false", "speech:false:true"])
@@ -292,7 +317,7 @@ private actor HeldResourceFixture: ModelResourceCapability {
 
 @Test(.actionCatalog) func speechBindingFailureIsInvocationLocalAndNextPreferenceCanExecute() async throws {
     let fixture = ResourceFixture()
-    let runtime = try resourceRuntime(fixture)
+    let runtime = try await resourceRuntime(fixture)
     await fixture.failNextSpeech()
     await #expect(throws: ApplicationControlIntentFailure.self) {
         try await runtime.perform(.configureSpeech(recognition: true, synthesis: true))
@@ -344,27 +369,121 @@ func environmentPublicationHasNoCompletionWaitAndReceiverErrorsStayIndependent()
     let policy = try resourceFixturePolicy()
     let input = InputGateway(manager: manager, policy: policy)
     let errors = AsyncStream<OutputEnvelope>.makeStream(bufferingPolicy: .bufferingOldest(8))
-    let runtime = try resourceRuntime(
+    let runtime = try await resourceRuntime(
         UnusedModelResourceCapability(), sessionID: session,
         manager: manager, suppliedInput: input,
         outputSink: { errors.continuation.yield($0) })
     try await runtime.prepareForInteraction()
     let start = ContinuousClock.now
-    try await runtime.observeEnvironment(.init(category: .devices, sequence: 1, value: "camera open"))
+    try await runtime.prepareForInteraction()
+    try await runtime.agent.observeEnvironment(.init(category: .devices, sequence: 1, value: "camera open"))
     #expect(start.duration(to: .now) < .seconds(2))
     await input.flushPublications()
     #expect(try await runtime.agent.environmentSnapshot().contains("camera open"))
     // Duplicate sequence is receiver-owned rejection; publication still completes successfully.
-    try await runtime.observeEnvironment(.init(category: .devices, sequence: 1, value: "camera closed"))
+    await #expect(throws: CommunicationError.invalidPayload) {
+        try await runtime.prepareForInteraction()
+        try await runtime.agent.observeEnvironment(.init(category: .devices, sequence: 1, value: "camera closed"))
+    }
     await input.flushPublications()
     var iterator = errors.stream.makeAsyncIterator()
     let error = try #require(await iterator.next())
     #expect(error.source == .applicationControl)
     if case .control(let message) = error.output {
-        #expect(message.contains("agent.error:") && message.contains("outOfOrder"))
+        #expect(message.contains("agent.inputRejected:") || message.contains("invalidPayload"))
     } else {
         Issue.record("Expected receiver-owned error, no environment completion acknowledgment")
     }
     await input.shutdown()
     await runtime.shutdown()
+}
+
+@Test(.actionCatalog, .timeLimit(.minutes(1))) @MainActor
+func resourcesContainerIsConsumedByItsAgentAndResubscribesAfterPause() async throws {
+    let ui = UIContainer()
+    try ui.start()
+    let native = ResourceFixture()
+    let host = try await resourceRuntime(native, uiResources: ui.modelResources)
+    await #expect(throws: UIRequestError.unavailable) {
+        _ = try await ui.modelResources.requests.submit(.cancel("before-start"))
+    }
+    try await host.prepareForInteraction()
+    _ = try await ui.modelResources.requests.submit(
+        .download("model", .init(endpoint: "https://example.invalid/model", allowsCellular: false)))
+    #expect(await native.calls == ["download:model:false"])
+    try await host.agent.pause()
+    await #expect(throws: UIRequestError.unavailable) {
+        _ = try await ui.modelResources.requests.submit(.remove("paused"))
+    }
+    try await host.agent.resume()
+    _ = try await ui.modelResources.requests.submitControl(.cancel("model"))
+    #expect(await native.calls == ["download:model:false", "cancel:model"])
+    await host.shutdown()
+    await #expect(throws: UIRequestError.unavailable) {
+        _ = try await ui.modelResources.requests.submit(.remove("stopped"))
+    }
+    await ui.stop()
+}
+
+private actor HeldUIResource: ModelResourceCapability {
+    let entered = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingOldest(1))
+    private var pending: CheckedContinuation<Void, any Error>?
+    private(set) var cancelled = false
+    private(set) var joined = false
+    func configureSpeech(recognition: Bool, synthesis: Bool) {}
+    func download(_ id: String, endpoint: String, allowsCellular: Bool) async throws {
+        defer { joined = true }
+        try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { continuation in
+                pending = continuation
+                entered.continuation.yield(())
+            }
+        } onCancel: {
+            Task { await self.finish(cancelled: true) }
+        }
+    }
+    func cancel(_ id: String) { finish(cancelled: false) }
+    func remove(_ id: String) {}
+    private func finish(cancelled: Bool) {
+        self.cancelled = cancelled
+        if cancelled { pending?.resume(throwing: CancellationError()) } else { pending?.resume() }
+        pending = nil
+    }
+}
+
+@Test(.actionCatalog, .timeLimit(.minutes(1))) @MainActor
+func agentUIControlBypassesAnOutstandingOrdinaryRequest() async throws {
+    let ui = UIContainer()
+    try ui.start()
+    let native = HeldUIResource()
+    let host = try await resourceRuntime(native, uiResources: ui.modelResources)
+    try await host.prepareForInteraction()
+    var entered = native.entered.stream.makeAsyncIterator()
+    let downloading = Task { try await ui.modelResources.requests.submit(.download("model", .init())) }
+    await entered.next()
+    #expect(ui.modelResources.requests.acceptedCount == 1)
+    _ = try await ui.modelResources.requests.submitControl(.cancel("model"))
+    _ = try await downloading.value
+    #expect(await native.joined)
+    #expect(await !native.cancelled)
+    await host.shutdown()
+    await ui.stop()
+}
+
+@Test(.actionCatalog, .timeLimit(.minutes(1))) @MainActor
+func agentStopClosesUIWaitersAndJoinsItsAcceptedAction() async throws {
+    let ui = UIContainer()
+    try ui.start()
+    let native = HeldUIResource()
+    let host = try await resourceRuntime(native, uiResources: ui.modelResources)
+    try await host.prepareForInteraction()
+    var entered = native.entered.stream.makeAsyncIterator()
+    let downloading = Task { try await ui.modelResources.requests.submit(.download("model", .init())) }
+    await entered.next()
+    await host.shutdown()
+    await #expect(throws: (any Error).self) { _ = try await downloading.value }
+    #expect(await native.cancelled)
+    #expect(await native.joined)
+    #expect(ui.modelResources.requests.outstanding == 0)
+    await ui.stop()
 }

@@ -61,10 +61,14 @@ GemmaLanguageEngine.render emits one prompt turn for each caller message, includ
 
 - Local native calls and image inference are not implemented.
 
-- The third-party CoreAIShared runtime imports CoreAI unconditionally and cannot currently compile against the simulator SDK. ModelKitDefaults' simulator source branch does not eliminate that package dependency. Build and live-model acceptance evidence belongs in docs.
+- The Gemma backend requires a real device or macOS SDK. The explicit simulator build variant removes Gemma from ModelKitDefaults dependencies; the default simulator chat capability reports unavailable without loading a fake model. The standalone backend target is not a simulator implementation. Build and live-model acceptance evidence belongs in docs.
 
 ✅ 验证原请求的能力与当前输入后，过滤空历史并移除全部 system，再由 GemmaContextBudget 拟合推理副本；保留当前 user 原文、原有不支持能力的明确拒绝及后端有效总预算。缓存仍逐次重建。
 
 ✅ Gemma按后端有效窗口拟合，而非假定4096可用；当前固定CoreAI版本的iOS动态KV安全限制为1024，macOS至多4096，并取模型声明更小值。引擎配置、防御校验及实际token裁剪使用同一限额；默认输出预留为min(1024, 有效窗口/4)，未指定输出上限时最终可使用剩余空间。限制仅属于ModelKit，不修改Agent；不得绕过上游缓存安全保护。
 
 ✅ 已实现：用原生signpost记录引擎加载、生成区间、首个原生token和首个可见文字，元信息仅含输入／输出预算和生成数量，不含提示词或输出正文。用于区分冷加载、预填充及隐藏thought等待，不修改通用ChatTiming语义。
+
+## 直连链路当前契约
+
+✅ 显式模拟器构建变体不链接 CoreAI 后端，返回能力不可用；真机和 macOS 固定后端不变。

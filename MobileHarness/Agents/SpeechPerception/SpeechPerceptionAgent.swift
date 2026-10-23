@@ -1,11 +1,13 @@
+import Actions
 import AgentCore
 import Foundation
 import ModelKit
 import PlatformKit
 import StorageCore
+import UI
 
-/// Streaming perception only. Device capture and playback remain composition-owned.
-public actor SpeechPerceptionAgent: Agent {
+/// Owns native PCM consumption and listening policy; Actions own capture and playback execution.
+public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
 
     // MARK: - Interface
 
@@ -14,6 +16,17 @@ public actor SpeechPerceptionAgent: Agent {
 
     // MARK: - State and dependencies
 
+    let microphoneSpectrum: MicrophoneSpectrumPresentation?
+    let microphoneInput: (any AudioCaptureObserving)?
+    let microphoneObservation: (@MainActor @Sendable (MicrophoneObservation) -> Void)?
+    var nativeInput: Task<Void, any Error>?
+    var nativeInputEpoch: UUID?
+    var nativeProcessing = false
+    private var nativePacketWaiters: [String: CheckedContinuation<Void, any Error>] = [:]
+    public internal(set) var suppressedMicrophonePackets = 0
+    private var nativeCaptureGeneration: String?
+    let uiHome: UIHomeContainer?
+    var uiInputs = AgentUIInputs()
     private let contextRepository: AgentContextRepository<SpeechPerceptionContextState>
     private let preprocessor = SpeechPerceptionSignalPreprocessor()
     private let contextBuilder = SpeechPerceptionContextBuilder()
@@ -34,16 +47,13 @@ public actor SpeechPerceptionAgent: Agent {
     private let residentListening: Bool
     private var captureOpen: Bool
     private var listeningPolicy = SpeechListeningPolicy()
+    private var listeningAdmissionEpoch = UUID()
     private static let listeningAction = InternalAction(
         domain: "Speech", module: "Listening", function: "update", channel: "Listening",
         required: ["enabled", "paused", "revision"])
     private var segmenter: VoiceActivitySegmenter?
     private var recognitionTurn: SpeechRecognitionTurn?
     private var lifecycle: AgentLifecycle = .registered
-    private var queue: [AgentInput] = []
-    private var queuedSamples = 0
-    private var queuedDuration: TimeInterval = 0
-    private var worker: Task<Void, Never>?
     private var lastSequence: UInt64?
     private var lastTimestamp: TimeInterval?
     private var processed = 0
@@ -67,12 +77,19 @@ public actor SpeechPerceptionAgent: Agent {
         recognition: any SpeechRecognitionCapability, vad: any VoiceActivityCapability,
         sessionID: String, interactionSessionID: String? = nil, configuration: AgentConfiguration? = nil,
         mode: Mode = .speechAndSoundSource, residentListening: Bool = false,
+        uiHome: UIHomeContainer? = nil, microphoneInput: (any AudioCaptureObserving)? = nil,
+        microphoneSpectrum: MicrophoneSpectrumPresentation? = nil,
+        microphoneObservation: (@MainActor @Sendable (MicrophoneObservation) -> Void)? = nil,
         context: AgentContextRepository<SpeechPerceptionContextState>
     ) throws {
         if residentListening {
             guard interactionSessionID != nil else { throw CommunicationError.scopeClosed }
             if case .soundSourceOnly = mode { throw CommunicationError.invalidPayload }
         }
+        self.microphoneSpectrum = microphoneSpectrum
+        self.microphoneInput = microphoneInput
+        self.microphoneObservation = microphoneObservation
+        self.uiHome = uiHome
         self.contextRepository = context
         guard contextRepository.agentID == .speechPerception else { throw AgentConfigurationError.identityMismatch }
         let configuration = try configuration ?? AgentConfigurations.load(named: "SpeechPerception")
@@ -98,7 +115,12 @@ public actor SpeechPerceptionAgent: Agent {
         continuation = stream.continuation
     }
     public nonisolated static func runtimeCapabilities(_ model: CapabilityRegistry) throws -> CapabilityRegistry {
-        try model.adding(internalActions: [listeningAction], internalTools: [transcript, voiceState, finishTranscript])
+        try model.adding(
+            internalActions: [listeningAction],
+            internalTools: [
+                transcript, voiceState, finishTranscript,
+                InternalTool(path: "Speech.Listening.prepare", required: ["pressed"]),
+            ])
     }
 
     // MARK: - Lifecycle
@@ -109,6 +131,7 @@ public actor SpeechPerceptionAgent: Agent {
         if mode == .soundSourceOnly || residentListening {
             try Task.checkCancellation()
             lifecycle = .running
+            try await startUIInputs()
             return
         }
         let session = try await vad.detectVoiceActivity(
@@ -119,28 +142,32 @@ public actor SpeechPerceptionAgent: Agent {
         }
         segmenter = VoiceActivitySegmenter(session: session)
         lifecycle = .running
+        try await startUIInputs()
         prepareRecognitionTurn()
     }
-    public func pause() throws {
+    public func pause() async throws {
+        listeningAdmissionEpoch = UUID()
+        await stopUIInputs()
         guard lifecycle == .running else { throw HarnessError.invalidTransition }
         lifecycle = .paused
+        if microphoneInput != nil { await closeCapture() }
         pendingSound = nil
         soundPublisher?.cancel()
         soundEstimator.reset()
     }
-    public func resume() throws {
+    public func resume() async throws {
         guard lifecycle == .paused else { throw HarnessError.invalidTransition }
+        await stopUIInputs()
         lifecycle = .running
+        try await startUIInputs()
         soundLayout = nil
         soundRate = nil
-        drain()
     }
     /// Runtime flow control, independent of a full audio inbox.
     public func isUtteranceActive() -> Bool { phase == .speaking || phase == .processing }
     public func acquirePlaybackAdmission() -> Bool {
         guard lifecycle == .running, !isUtteranceActive() else { return false }
         awaitingReply = true
-        clearPendingAudio()
         return true
     }
     public func pauseAudioAdmission() throws {
@@ -150,7 +177,7 @@ public actor SpeechPerceptionAgent: Agent {
         guard lifecycle == .running, awaitingReply else { return }
         guard !residentListening || (captureOpen && listeningPolicy.enabled && !listeningPolicy.paused) else { return }
         // Wait for final publication to finish before resetting its ASR/VAD state.
-        await worker?.value
+        try await joinNativePacket()
         guard lifecycle == .running else { throw HarnessError.notRunning }
         guard !residentListening || (captureOpen && listeningPolicy.enabled && !listeningPolicy.paused) else { return }
         guard let activeInput else {
@@ -163,12 +190,13 @@ public actor SpeechPerceptionAgent: Agent {
         try await transition(to: .listening, input: activeInput, publish: false)
     }
     public func stop() async {
+        listeningAdmissionEpoch = UUID()
+        await stopUIInputs()
         lifecycle = .stopped
-        clearPendingAudio()
-        worker?.cancel()
+        nativeInput?.cancel()
         await recognitionTurn?.cancel()
         await segmenter?.cancel()
-        await worker?.value
+        await stopInput()
         soundPublisher?.cancel()
         await soundPublisher?.value
         pendingSound = nil
@@ -194,12 +222,10 @@ public actor SpeechPerceptionAgent: Agent {
     }
     public func closeCapture() async {
         captureOpen = false
-        clearPendingAudio()
-        worker?.cancel()
+        nativeInput?.cancel()
         await recognitionTurn?.cancel()
         await segmenter?.cancel()
-        await worker?.value
-        worker = nil
+        await stopInput()
         soundPublisher?.cancel()
         await soundPublisher?.value
         soundPublisher = nil
@@ -217,14 +243,20 @@ public actor SpeechPerceptionAgent: Agent {
     private func receiveListening(_ input: AgentInput, message: AgentMessage) async throws {
         guard residentListening, input.sessionID == interactionSessionID else { throw CommunicationError.scopeClosed }
         if message.contract == ListeningIntent.contract {
-            guard input.metadata.origin == .external, input.metadata.source == "user",
+            guard input.metadata.origin == .local, input.metadata.source == "user",
                 let intent = message.content(as: ListeningIntent.self)
             else { throw CommunicationError.unauthorized }
+            let epoch = listeningAdmissionEpoch
             try await prepareSignal(input)
+            let generation = await uiHome?.listeningRequests.generation.uuidString
+            guard epoch == listeningAdmissionEpoch,
+                lifecycle == .running || (lifecycle == .paused && intent.enabled == false),
+                generation == nil || generation == input.metadata.generation
+            else { throw CommunicationError.scopeClosed }
             listeningPolicy.enabled = intent.enabled ?? !listeningPolicy.enabled
             if !listeningPolicy.enabled { listeningPolicy.pendingFinal = nil }
         } else if message.contract == SpeechCaptureEnded.contract {
-            guard input.metadata.origin == .external, input.metadata.source == "phone.microphone",
+            guard input.metadata.origin == .local, input.metadata.source == "phone.microphone",
                 let ended = message.content(as: SpeechCaptureEnded.self)
             else { throw CommunicationError.unauthorized }
             try await prepareSignal(input)
@@ -253,11 +285,10 @@ public actor SpeechPerceptionAgent: Agent {
             sessionID: interactionSessionID, payload: payload,
             metadata: InputMetadata(
                 payload: payload, source: "speechPerception", origin: .agent,
-                rootID: parent.metadata.rootID, parentID: parent.id))
+                rootID: parent.metadata.rootID, parentID: parent.id, generation: parent.metadata.generation))
         // Close the Agent gate synchronously when no confirmed utterance must finish first.
         if !listeningPolicy.enabled || listeningPolicy.paused, !isUtteranceActive() {
             awaitingReply = true
-            clearPendingAudio()
         }
         try emit(
             .actionCall(
@@ -267,6 +298,43 @@ public actor SpeechPerceptionAgent: Agent {
                 ])), input: command)
         try emit(.control("agent.finished"), input: command)
     }
+
+    /// Revocation is independent of UI availability; only the UI source admits renewed consent.
+    public func stopListening(sessionID: String) throws {
+        guard residentListening, sessionID == interactionSessionID,
+            lifecycle == .running || lifecycle == .paused
+        else { throw HarnessError.notRunning }
+        listeningAdmissionEpoch = UUID()
+        let wasEnabled = listeningPolicy.enabled
+        listeningPolicy.enabled = false
+        listeningPolicy.pendingFinal = nil
+        guard wasEnabled else { return }
+        let context = ProcessingContext(sessionID: sessionID, source: "runtime")
+        try applyListeningPolicy(parent: context.input(.event("listening.revoked")))
+    }
+    private func startUIInputs() async throws {
+        guard let uiHome, let interactionSessionID else { return }
+        let source = await uiHome.listeningRequests
+        let task = try await consumeUI(source, sessionID: interactionSessionID) { agent, value, context in
+            let enabled: Bool?
+            switch value {
+            case .setEnabled(let value): enabled = value
+            case .toggle: enabled = nil
+            case .press(let pressed):
+                let call = try InternalTool(path: "Speech.Listening.prepare", required: ["pressed"]).call([
+                    "pressed": String(pressed)
+                ])
+                try await agent.emit(.toolCall(call), input: context.input(.event("listening.press")))
+                return
+            }
+            let intent = ListeningIntent(enabled: enabled)
+            let input = try intent.input(sessionID: context.sessionID)
+            guard case .observation(let message) = input.payload else { throw CommunicationError.invalidPayload }
+            try await agent.receiveListening(context.input(.observation(message)), message: message)
+        }
+        uiInputs.append(task)
+    }
+    private func stopUIInputs() async { await uiInputs.retire(for: descriptor.id)() }
 
     // MARK: - Input processing
 
@@ -293,8 +361,16 @@ public actor SpeechPerceptionAgent: Agent {
             resultInbox.accept(result)
             return
         }
-        let state = try await contextRepository.snapshot().state
-        _ = try preprocessor.classify(input, state: state)
+        throw HarnessError.unsupportedInput
+    }
+    private func validateAudio(_ input: AgentInput) throws -> AudioInput {
+        guard lifecycle == .running || lifecycle == .paused else { throw HarnessError.notRunning }
+        guard input.sessionID == sessionID else { throw CommunicationError.scopeClosed }
+        guard !input.metadata.expired else { throw CommunicationError.expired }
+        try Task.checkCancellation()
+        if let nativeCaptureGeneration, case .audio = input.payload {
+            guard input.metadata.generation == nativeCaptureGeneration else { throw CommunicationError.scopeClosed }
+        }
         guard case .audio(let audio) = input.payload else { throw HarnessError.unsupportedInput }
         guard
             !residentListening
@@ -308,20 +384,76 @@ public actor SpeechPerceptionAgent: Agent {
         guard lastSequence.map({ audio.sequence > $0 }) ?? true,
             lastTimestamp.map({ audio.timestamp >= $0 }) ?? true
         else { throw CommunicationError.outOfOrder }
-        guard queue.count < SpeechPerceptionSignalPreprocessor.inputCapacity,
-            queuedSamples + audio.sampleCount <= SpeechPerceptionSignalPreprocessor.maximumQueuedSamples,
-            queuedDuration + Double(audio.frameCount) / Double(audio.sampleRate)
-                <= SpeechPerceptionSignalPreprocessor.maximumQueuedDuration + 1e-9
-        else {
-            reportError(HarnessError.queueFull, input: input)
-            throw HarnessError.queueFull
-        }
+        return audio
+    }
+    func processMicrophone(_ frame: MicrophoneFrame, sessionID: String, captureGeneration: String) async throws {
+        guard !nativeProcessing else { throw CapabilityError.inputBusy }
+        let audio = try AudioInput(
+            samples: frame.samples, sampleRate: frame.sampleRate,
+            sequence: frame.sequence, timestamp: frame.timestamp,
+            layout: frame.layout == .mono ? .mono : .firstOrderAmbisonicsACNSN3D, capturedAt: frame.capturedAt)
+        let context = ProcessingContext(
+            sessionID: sessionID, generation: captureGeneration, source: "phone.microphone", sequence: frame.sequence)
+        try context.validate()
+        let input = context.input(.audio(audio))
+        _ = try validateAudio(input)
         lastSequence = audio.sequence
         lastTimestamp = audio.timestamp
-        queue.append(input)
-        queuedSamples += audio.sampleCount
-        queuedDuration += Double(audio.frameCount) / Double(audio.sampleRate)
-        drain()
+        nativeProcessing = true
+        defer {
+            nativeProcessing = false
+            let pending = nativePacketWaiters.values
+            nativePacketWaiters.removeAll()
+            for waiter in pending { waiter.resume() }
+        }
+        do { try await processAudio(input) } catch is CancellationError {
+            throw CancellationError()
+        } catch {
+            guard lifecycle != .stopped else { throw CancellationError() }
+            await recoverRecognition(error)
+        }
+    }
+    private func joinNativePacket() async throws {
+        guard nativeProcessing else { return }
+        guard nativePacketWaiters.count < 32 else { throw CommunicationError.capacityExceeded }
+        let id = UUID().uuidString
+        try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { (waiter: CheckedContinuation<Void, any Error>) in
+                if Task.isCancelled {
+                    waiter.resume(throwing: CancellationError())
+                } else {
+                    nativePacketWaiters[id] = waiter
+                }
+            }
+        } onCancel: {
+            Task { await self.cancelNativePacketWaiter(id) }
+        }
+        try Task.checkCancellation()
+    }
+    private func cancelNativePacketWaiter(_ id: String) {
+        nativePacketWaiters.removeValue(forKey: id)?.resume(throwing: CancellationError())
+    }
+    func admitsMicrophone(sessionID: String) throws -> Bool {
+        guard lifecycle == .running else { throw HarnessError.notRunning }
+        guard sessionID == self.sessionID else { throw CommunicationError.scopeClosed }
+        return !awaitingReply
+            && (!residentListening
+                || (captureOpen && listeningPolicy.enabled && (!listeningPolicy.paused || isUtteranceActive())))
+    }
+    func bindMicrophoneGeneration(_ generation: String?) {
+        nativeCaptureGeneration = generation
+        lastSequence = nil
+        lastTimestamp = nil
+        soundEstimator.reset()
+        soundLayout = nil
+        soundRate = nil
+    }
+    func retireMicrophonePublications() async {
+        pendingSound = nil
+        let publisher = soundPublisher
+        publisher?.cancel()
+        await publisher?.value
+        soundPublisher = nil
     }
     private func prepareRecognitionTurn() {
         currentTurn = nil
@@ -377,39 +509,13 @@ public actor SpeechPerceptionAgent: Agent {
         awaitingReply = residentListening && (!captureOpen || !listeningPolicy.enabled || listeningPolicy.paused)
         activeInput = input
     }
-    private func clearPendingAudio() {
-        queue.removeAll()
-        queuedSamples = 0
-        queuedDuration = 0
-    }
+    // MARK: - Inline native packet processing
 
-    // MARK: - Decision workers
-
-    private func drain() {
-        guard lifecycle == .running, !awaitingReply, worker == nil, !queue.isEmpty else { return }
-        worker = Task { await self.consume() }
-    }
-    private func consume() async {
-        defer {
-            worker = nil
-            drain()
-        }
-        do {
-            while lifecycle == .running, !queue.isEmpty, !awaitingReply {
-                try await processAudio(queue.removeFirst())
-            }
-        } catch is CancellationError {} catch {
-            guard lifecycle != .stopped else { return }
-            await recoverRecognition(error)
-        }
-    }
     private func processAudio(_ acceptedInput: AgentInput) async throws {
         let input = acceptedInput
         let selection = AgentDecisionContext(snapshot: try await contextRepository.snapshot(), input: input)
         let decision = try contextBuilder.build(state: selection, batch: selection.batch())
         guard case .audio(let audio) = decision.input.payload else { throw HarnessError.unsupportedInput }
-        queuedSamples -= audio.sampleCount
-        queuedDuration = max(0, queuedDuration - Double(audio.frameCount) / Double(audio.sampleRate))
         guard !input.metadata.expired else { throw CommunicationError.expired }
         if mode == .speechAndSoundSource, segmenter == nil {
             let session = try await vad.detectVoiceActivity(
@@ -420,9 +526,7 @@ public actor SpeechPerceptionAgent: Agent {
             }
             segmenter = VoiceActivitySegmenter(session: session)
         }
-        let samples = audio.samples.withUnsafeBytes { bytes in
-            stride(from: 0, to: bytes.count, by: 4).map { bytes.loadUnaligned(fromByteOffset: $0, as: Float.self) }
-        }
+        let samples = audio.samples
         try Task.checkCancellation()
         if mode == .soundSourceOnly { activeInput = input }
         if soundLayout != audio.layout || soundRate != audio.sampleRate {
@@ -531,7 +635,6 @@ public actor SpeechPerceptionAgent: Agent {
                 capturedAt: audio.capturedAt)
         }
         // Buffered post-endpoint audio belongs to the explicitly suppressed reply interval.
-        clearPendingAudio()
         try await transition(to: .processing, input: input)
         let text = try await recognitionTurn.finish()
         try Task.checkCancellation()
@@ -555,8 +658,9 @@ public actor SpeechPerceptionAgent: Agent {
         outputSequence += 1
         continuation.yield(
             OutputEnvelope(
-                source: descriptor.id, input: input,
-                output: .control("agent.error: speech perception: \(error)"), sequence: outputSequence))
+                source: descriptor.id, context: input.context,
+                output: .control("agent.error: speech perception: \(error)"), sequence: outputSequence,
+                taskScope: input.taskScope))
     }
 
     /// A failed utterance does not close the resident Agent, microphone or output stream.
@@ -568,7 +672,6 @@ public actor SpeechPerceptionAgent: Agent {
                 do { try applyListeningPolicy(parent: activeInput) } catch { reportError(error, input: activeInput) }
             }
         }
-        clearPendingAudio()
         await recognitionTurn?.cancel()
         await segmenter?.cancel()
         segmenter = nil
@@ -595,7 +698,7 @@ public actor SpeechPerceptionAgent: Agent {
                 parentID: metadata.parentID, hops: metadata.hops,
                 deadline: min(
                     metadata.deadline ?? capturedAt.advanced(by: .milliseconds(500)),
-                    capturedAt.advanced(by: .milliseconds(500)))),
+                    capturedAt.advanced(by: .milliseconds(500))), generation: metadata.generation),
             turn: parent.turn)
         pendingSound = (value, scopedParent, capturedAt)
         if soundPublisher == nil { soundPublisher = Task { await self.publishSound() } }
@@ -630,7 +733,9 @@ public actor SpeechPerceptionAgent: Agent {
     private func emit(_ output: AgentOutput, input: AgentInput) throws {
         outputSequence += 1
         switch continuation.yield(
-            OutputEnvelope(source: descriptor.id, input: input, output: output, sequence: outputSequence))
+            OutputEnvelope(
+                source: descriptor.id, context: input.context, output: output, sequence: outputSequence,
+                taskScope: input.taskScope))
         {
         case .enqueued: return
         case .dropped, .terminated: throw HarnessError.queueFull
@@ -669,8 +774,6 @@ public actor SpeechPerceptionAgent: Agent {
     private func prepareSignal(_ input: AgentInput) async throws {
         let snapshot = try await contextRepository.snapshot()
         let disposition = try preprocessor.classify(input, state: snapshot.state)
-        if input.payload.kind == .audio || input.payload.kind == .image { return }
-        if case .replaceLatest = disposition { return }
         try await contextRepository.recordSignal(
             input, disposition: disposition, admissionSequence: snapshot.revision + 1,
             consumed: disposition != .feedback, retainingLast: SpeechPerceptionSignalPreprocessor.evidenceCapacity)
@@ -679,9 +782,13 @@ public actor SpeechPerceptionAgent: Agent {
     // MARK: - Observability
 
     public func status() -> AgentStatus {
-        AgentStatus(lifecycle: lifecycle, queuedInputs: queue.count, processedInputs: processed)
+        AgentStatus(lifecycle: lifecycle, queuedInputs: 0, processedInputs: processed)
     }
 
+    public func isRunning() -> Bool { lifecycle == .running }
+    public func captureEnded(revision: UInt64, sessionID: String) async throws {
+        try await receive(SpeechCaptureEnded(revision: revision).input(sessionID: sessionID))
+    }
     public func contextSnapshot() async throws -> AgentContext<SpeechPerceptionContextState> {
         try await contextRepository.snapshot()
     }

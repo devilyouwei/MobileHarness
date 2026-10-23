@@ -1,52 +1,91 @@
-# Pose Perception, Adaptive Cadence and Gaze
+# VisionPerception — 相机帧消费、姿态与视线策略
 
-## Summary
+## 职责与注入能力
 
-Processes the newest fresh camera frame, publishes validated pose facts and projects bounded skeleton/gaze display.
+构造注入 PlatformKit `CameraFrameObserving`、ModelKit `PoseCapability`、采样／镜像配置、会话身份及私有 Context。角色主动订阅原始 CameraFrame，负责节奏、运动证据、姿态关联、骨架和眼睛目标；不持有 UI 子容器、相机控制器或 Storage 根。
 
-## Ownership and boundaries
+## 文件与职责
 
-This role owns detection cadence, image-motion evidence, pose association and gaze policy. PlatformKit captures/gray-samples; ModelKit owns YOLO preprocessing/inference. Photographer owns tracking/device decisions. Pose values belong to Support/Communication; display values belong to UI/Actions with ActionBindings adaptation.
+| 文件 | 职责 |
+| --- | --- |
+| [FaceGazeTracker.swift](FaceGazeTracker.swift) | 人脸目标选择与视线平滑 |
+| [FrameCadence.swift](FrameCadence.swift) | 采样节奏、姿态需求与有界运动判据 |
+| [FrameMotionAnalyzer.swift](FrameMotionAnalyzer.swift) | 图像运动证据的纯计算 |
+| [PoseOverlayPayload.swift](PoseOverlayPayload.swift) | 推理观测到有界骨架调用载荷的转换 |
+| [VisionAgentSession.swift](VisionAgentSession.swift) | 视觉角色注册、推理／输出分支和停止加入 |
+| [VisionPerceptionAgent.swift](VisionPerceptionAgent.swift) | 视觉角色准入、单推理／最新候选和实际输出 |
+| [VisionPerceptionCamera.swift](VisionPerceptionCamera.swift) | 原始相机帧的角色只读订阅 |
+| [VisionPerceptionProcessing.swift](VisionPerceptionProcessing.swift) | 视觉私有 Context、预处理与采样配置 |
 
-## External relationships and data flow
-
-Runtime arrows show data or capability calls; dashed arrows show injection.
+## 外部关系（一层）
 
 ```mermaid
 flowchart LR
- Gateway -->|Native image attachment and gray64| Vision[VisionPerception]
- Vision -->|Validated PoseRequest| ModelKit
- ModelKit -->|PoseResult| Vision
- Vision -->|One-way vision.pose| Gateway
- Vision -->|Internal showPose and moveEyes| Gateway
- App -.->|Configuration and capability| Vision
+ A["VisionPerception"]:::agent
+ G["Gateway：调用／Signal／反馈"]:::gateway
+ C["AgentCore：身份／契约"]:::host
+ H["Agents 根级装配：构造与生命周期"]:::host
+ H -.-> A
+ A --> C
+ A <-->|"受身份绑定的输出与反馈"| G
+ P["PlatformKit.vision：CameraFrameObserving"]:::platform
+ P -->|"直接 CameraFrame"| A
+ M["ModelKit.vision：PoseCapability"]:::model
+ A <--> M
+ subgraph Peers["其他 Agent：仅经 Gateway 通信"]
+ PH["Photographer"]:::agent
+ end
+ G -->|"vision.pose"| PH
+
+ classDef ui fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e
+ classDef platform fill:#dcfce7,stroke:#16a34a,color:#14532d
+ classDef model fill:#f3e8ff,stroke:#9333ea,color:#581c87
+ classDef storage fill:#fef3c7,stroke:#d97706,color:#78350f
+ classDef agent fill:#eef2ff,stroke:#6366f1,color:#312e81
+ classDef gateway fill:#ffedd5,stroke:#ea580c,color:#7c2d12
+ classDef action fill:#ffe4e6,stroke:#e11d48,color:#881337
+ classDef host fill:#f1f5f9,stroke:#64748b,color:#334155
 ```
+
+角色间消息经 Gateway 递送；基础能力通过构造注入，输入订阅由角色持有。
 
 <a id="输入订阅与输出契约"></a>
 
-## Internal components
+## 内部结构与执行链
 
 ```mermaid
 flowchart LR
- Agent[VisionPerceptionAgent] --> Latest[One latest pending frame]
- Latest --> Cadence[FrameCadence]
- Gray[gray64 sample] --> Motion[FrameMotionAnalyzer]
- Motion --> Cadence
- Cadence -->|Admit newest fresh frame| Inference[One pose inference]
- Inference -->|Fresh pose and timing| Cadence
- Inference --> Pose[Validated PoseObservation]
- Pose --> Publisher[One latest pose publication]
- Pose --> Gaze[FaceGazeTracker]
- Pose --> Overlay[PoseOverlayPayload]
- Gaze --> Mailbox[Shared bounded output mailbox]
- Overlay --> Mailbox
+ P["注入 Platform.vision：只读帧"]:::platform
+ M["注入 ModelKit.vision：Pose"]:::model
+ subgraph Role["VisionPerception"]
+ N["Camera 消费／采集代／新鲜度"]:::agent
+ L["一个 latest 待处理槽"]:::agent
+ C["FrameMotionAnalyzer＋FrameCadence"]:::agent
+ I["一个在途 Pose 推理"]:::agent
+ O["PoseObservation／PoseOverlayPayload／FaceGazeTracker"]:::agent
+ Q["有界 mailbox／最新状态替换"]:::agent
+ end
+ P --> N --> L --> C --> I --> O --> Q
+ M <--> I
+ Q --> G["Gateway：执行授权／Signal 发布"]:::gateway
+ G --> X["UI.Pose.showPose／UI.Gaze.moveEyes"]:::action
+ X --> U["UI.camera：同帧骨架；UI.home：眼睛"]:::ui
+ G --> PH["Photographer：vision.pose"]:::agent
+ classDef ui fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e
+ classDef platform fill:#dcfce7,stroke:#16a34a,color:#14532d
+ classDef model fill:#f3e8ff,stroke:#9333ea,color:#581c87
+ classDef storage fill:#fef3c7,stroke:#d97706,color:#78350f
+ classDef agent fill:#eef2ff,stroke:#6366f1,color:#312e81
+ classDef gateway fill:#ffedd5,stroke:#ea580c,color:#7c2d12
+ classDef action fill:#ffe4e6,stroke:#e11d48,color:#881337
+ classDef host fill:#f1f5f9,stroke:#64748b,color:#334155
 ```
 
-This role uses typed media requests and deterministic policy, with no Chat system prompt or role prompt asset.
+`VisionPerceptionCamera.swift` 拥有唯一原生订阅及私有 ProcessingContext。start/resume 建立，pause/stop 关闭接纳并取消加入。订阅不请求权限、不启动／切换设备。相机预览由 Actions 相机执行服务直接呈现，不等待姿态推理；模型结果经受保护 Tool 呈现，同帧附件由 Actions 校验原生类型和 UI 代际。
 
 ## Input, workers and freshness
 
-Retain one active inference and one latest pending image. Validate session, strictly increasing sequence, nondecreasing time, geometry and expiry. ImageValueAttachment<CameraFrame> retains the native frame; conversion to ModelKit.ImageFrame happens only after cadence admission. RGB input is upright/unmirrored RGB8 up to 640×640; attachment transport permits dimensions 1–4096 and ≤4,194,304 pixels. gray64 is a fixed 4096-byte sample.
+Retain one active inference and one latest pending image. Validate session, strictly increasing sequence, nondecreasing time, geometry and expiry. ImageInput.attachment retains CameraFrame directly; conversion to ModelKit.ImageFrame happens only after cadence admission. Only CameraFrame enters media processing; there is no RGB compatibility ingress or secondary sample wrapper. Native geometry permits dimensions 1–4096 and ≤4,194,304 pixels. CameraFrame.gray64 is a fixed 4096-byte sample.
 
 Default cadence minimum/initial/maximum is 0/100/250 ms, with 750 ms maximum observation latency. Intervals must be finite ordered values within one second; latency is in (0,1] seconds. Future/expired/too-old inputs do not start. Stale results update only latency/cost feedback and expired counters, never pose association/ROI/publication/UI. Zero interval means immediate newest-frame processing after the single active inference finishes, not guaranteed FPS.
 
@@ -87,40 +126,18 @@ showPose payload is ≤3000 UTF-8 bytes with at most six full COCO-17 people. Co
 
 FaceGazeTracker requires two confident nose/eye points, prefers large reliable central faces and maintains a nearest spatial lock. Brief occlusion holds; recenter begins at 350 ms and lock releases at 550 ms. Deadband/adaptive smoothing and 20% gain produce x/y in [−1,1]. Crossing faces can exchange association; no identity model exists. No new result means no timeout-driven display change; camera cleanup resets gaze/overlay.
 
-OutputMailbox has 18 total slots shared by discrete output and the `overlay`/`gaze` replacement keys; there is no per-kind reservation. Same-key state replaces its pending predecessor with counted coalescing. New entries at full capacity reject explicitly; accepted discrete entries are never replaced. Evidence retains 256 summaries. Stop cancels/joins inference and publication, closes receipts and never restores inference on restart.
+OutputMailbox has 18 total slots shared by discrete output and the overlay/gaze/pose-publication replacement keys; there is no per-kind reservation. Same-key state replaces its pending predecessor with counted coalescing. New entries at full capacity reject explicitly; accepted discrete entries are never replaced. Evidence retains 256 summaries. Stop cancels/joins inference and publication, closes receipts and never restores inference on restart.
 
-## Registration and authority
+## 健康、失败与生命周期
 
-[Agent.json](../../Resources/Agents/VisionPerception/Agent.json) subscribes to phone.camera media.image and publishes vision.pose. Internal UI.Pose.showPose and UI.Gaze.moveEyes are code-bound completion-only Tools; no model-callable functions or ordinary Chat worker exist. ModelKit request/scope identities are opaque SDK correlation values; session validation and business policy remain here.
+仅模型 estimatePose 运行错误允许继续后续最新帧：记录原始错误，等待 250 ms，连续第三次失败终止；成功重置计数。invalidRequest/sessionClosed/multipleConsumers 等永久契约错误立即终止。取消加入同步模型工作，不启动重叠推理。
+
+接纳、推理开始／完成与新鲜结果时间形成健康快照；超过 3 秒推理未返回、输入结束或持续没有新鲜结果给出带序号／计数／最后模型错误的诊断。呈现实际失败也进入健康快照，由现有监视报告；同一连续故障只报告一次，成功呈现清除该项。
+
+图像接纳只校验类型、会话、新鲜度与单调序号并原子替换 latest；实际推理读取已提交 Context。角色邮箱和根级输出消费使用相同 overlay/gaze/pose 最新替换规则，离散结果不被状态更新挤掉。停止加入输入、推理、发布及回执，旧代结果不更新新代。
+
+通信见 [Agent.json](../../Resources/Agents/VisionPerception/Agent.json)。
 
 ## 待实现
 
-- Person identity tracking, separate face/depth models and thermal feedback are not implemented.
-
-[Agents](../README.md) · [Communication](../Support/Communication/README.md)
-
-## Storage 依赖
-
-✅ 存储访问使用独立的 State、Cache、Database 和 Files 接口；App 注册根实例，消费者通过构造器获得所需能力。存储容器不接管本目录的业务验证、执行和完成语义。
-
-## Platform 根、设备接入与同帧呈现
-
-✅ 原生相机输入使用 AgentCore 的 ImageValueAttachment<CameraFrame>，Gateway 不构造业务 SampledImageAttachment。感知层读取 CameraFrame 的 gray64，按采样接纳后才构造 ModelKit 输入；SampledImageAttachment 仍用于独立的数值采样输入/测试。
-
-✅ overlay 输出按需保留对应 ImageInput 作为进程内附件，与序号/时间/方向相同的 Pose 经内部 Tool 一次呈现。普通 gaze/业务 pose 广播不保留像素。过期结果不呈现；模型运行错误按下述有界恢复契约处理，永久错误结束角色；相机影像由独立订阅更新。
-
-## 视觉停顿恢复修复
-
-✅ 仅模型 estimatePose 的运行错误允许继续处理后续最新帧：每次失败记录原因和计数，保持一个在途推理，等待 250 ms 后继续；连续第三次失败终止，模型成功返回重置计数。invalidRequest/sessionClosed/multipleConsumers 等永久契约错误立即终止。取消仍加入实际推理，不抛弃未完成的同步 Core ML 操作。其他输入/上下文/输出错误保持终止。
-
-## 视觉静默停止与诊断补齐
-
-✅ 接纳输入、推理开始/结束及新鲜结果时间组成健康快照。超过 3 秒推理未返回、输入停止或持续无新鲜结果时返回明确诊断，附序号、处理/过期/失败计数与最后模型错误。健康读取不等待模型、不启动重叠推理。外部输入失败发布带诊断的终态，即使尚未收到首帧也能上报。
-
-✅ 根级消费检查媒体 Tool 的实际执行结果，将非取消的呈现失败纳入健康快照；一秒监视将其显示为 Agent 分类诊断和 toast，同一连续故障只报告一次，后续成功呈现清除该健康故障。
-
-✅ 图像接纳只做会话、新鲜度、单调序号及类型验证，原子替换 latest 槽；移除接纳前未使用的上下文快照读取，避免帧接纳等待上下文持久化写锁。真正开始推理时仍读取已提交快照。回归使用被阻塞的真实仓库 commit 验证接纳能独立返回。
-
-## 视觉 queueFull 修复
-
-✅ 统一 outputReplacementKey 声明 overlay/gaze/pose 广播三个最新状态；角色邮箱和根级 Gateway 消费复用同一策略。姿态广播从生成端也采用最新替换，替换分别计数，不挤入离散输出。
+❌ 身份跟踪、独立深度／人脸模型和热反馈。

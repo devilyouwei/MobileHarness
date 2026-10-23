@@ -88,3 +88,11 @@ extension ActionReport.Entry.Code {
     public static let feedbackFailed = Self(rawValue: "feedbackFailed")
     public static let sendingFailed = Self(rawValue: "sendingFailed")
 }
+
+extension NexArmActions {
+    public enum AimError: LocalizedError, Equatable, Sendable, ActionExecutionFailureProviding {
+        case invalidAngle
+        public var executionFailureCode: ActionExecutionFailureCode { .invalidArguments }
+        public var errorDescription: String? { "跟踪目标角度无效" }
+    }
+}

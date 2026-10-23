@@ -6,7 +6,7 @@
 
 ## 职责与边界
 
-App 只负责入口、创建、注册、组合、连接及应用级生命周期。业务流程、数据转换、领域状态、用户错误文案、页面树和功能工作者由所属模块拥有；注入闭包只连接公开接口。
+App 只负责入口、创建、注册、组合、连接及应用级生命周期。业务流程、数据转换、领域状态、用户错误文案、页面实现和功能工作者由所属模块拥有；App 可组合这些已有页面；注入闭包只连接公开接口。
 
 ## 直接上下游
 
@@ -14,19 +14,19 @@ App 只负责入口、创建、注册、组合、连接及应用级生命周期�
 flowchart TB
  OS[iOS / Scene / 系统回调] --> App
  Configuration[资源位置和模块声明] --> App
- App -.->|创建、注入、启停| AgentBindings
- App -.->|创建与注册| ActionBindings
+ App -.->|创建、注入、启停| Agents
+ App -.->|创建与注册| Actions
  App -.->|服务图管理| AppLifecycle
  App -.->|后端与原生实例| Foundations[UI / PlatformKit / Storage]
- UI -->|注入的业务请求接口| AgentBindings
- AgentBindings --> Gateway
+ UI -->|注入的业务请求接口| Agents
+ Agents --> Gateway
  Gateway --> Agents
  Agents -->|函数请求| Gateway
- Gateway --> ActionBindings
- ActionBindings -->|公开呈现及能力接口| Foundations
+ Gateway --> Actions
+ Actions -->|公开呈现及能力接口| Foundations
 ```
 
-App 不转发运行期业务请求、媒体帧或Signal；首页模型准备属于宿主生命周期编排，App仅提交这一准备状态给UI。Agents 核心拥有决策；Gateway 拥有传输和执行；ActionBindings/AgentBindings 是各自模块内的外层集成目标，不是新增一级模块。
+App creates and connects unique roots and manages lifecycle. Agents and Actions each own their complete implementation target; there is no outer binding target. Runtime UI/media/fact input goes directly to the responsible Agent, while business execution retains Gateway and Actions.
 
 ## 内部结构与数据流
 
@@ -79,22 +79,25 @@ AppStorage 目标只编译 Composition/ApplicationContainer.swift，使用 Facto
 
 [公开 State 契约](../Storage/State/README.md)
 
-## Platform 根、设备接入与同帧呈现
-
-✅ Services 持有实例级 PlatformContainer，向集成层注入 Audio/Vision 子能力和原生设备端口。AppLifecycle 管理 platform 的 start/invalidate/foreground/stop；业务接入依赖 storage 与 platform，先结束消费与业务作用域，再释放根。App 不转换帧、PCM 或 Pose。
 
 ## UI 容器与相机能力注入
 
 ✅ App 注册 UI 根及相机子能力，提供唯一 CameraCoordinator 工厂，注入相机与 UI 呈现接口及延迟 Agent 接入回调。App 不转换帧或 Pose；生命周期图为 storage/platform/ui → agents → native。
 
-## 统一容器异常通道
-
-✅ App 注册同一实例的 ContainerFailureChannel 与各库回调；诊断服务先于 Storage/Platform/UI/Agents 启动、最后停止。生命周期包装报告阶段及清理错误，保留 onFailure/启动界面和原错误返回。Agent 不可用仍记录，不为上报而启动设备或提前打开仓库。
 
 ## UI 全量容器化
 
-✅ 应用级 UI 状态由八个子容器统一创建，消费者注入所需 Presenting 接口并提交 UI 自有值，不直接写字段。App 注册并管理同一 UI 根；原业务身份/版本校验、原生完成和基础库依赖边界保持。跨模块连接迁移仍是独立待办。
+✅ 应用级 UI 状态由八个子容器统一创建，消费者注入所需 Presenting 接口并提交 UI 自有值，不直接写字段。App 注册并管理同一 UI 根；原业务身份/版本校验、原生完成和基础库依赖边界保持。当前跨模块链路见总体设计；设备和性能验收单独记录。
 
 ✅ 已实现：App新增首页模型准备的宿主生命周期编排例外，通过公开状态／warmup／load接口组合当前能力；不推理业务请求、不下载制品或转换Signal。
 
 ✅ Xcode 源码导航恢复 ModelKit Management 组，移除已删除 CurrentChatCapability 的组引用；编译源码仍由 SwiftPM 目标拥有。
+
+
+## Direct container contract
+
+App creates shared foundational roots and injects public role/execution capabilities. It performs no external Signal encoding or per-frame forwarding. Current cross-module ownership is defined by the [overall design](../README.md).
+
+✅ App 注入实际 UI 子容器；UI 业务事件订阅、处理和回执由 Agent 生命周期拥有。装配层保留页面交互能力构造及提交端口，不订阅、解释或向执行会话转交 UI 输入。
+
+✅ App 组合已有 UI 页面并实现 UI 自有根／会话展示协议，不创建业务订阅或转换业务结果；角色策略与执行属于 Agents／Actions。

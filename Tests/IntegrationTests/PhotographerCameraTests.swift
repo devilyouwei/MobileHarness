@@ -1,6 +1,4 @@
-import ActionBindings
 import Actions
-import AgentBindings
 import AgentCore
 import Agents
 import CallRuntime
@@ -12,6 +10,7 @@ import PlatformKit
 import StorageCore
 import StorageState
 import Testing
+import UI
 
 private actor CameraProbe {
     var operations: [PhotographerCameraIntent.Operation] = []
@@ -126,22 +125,21 @@ private actor CameraCaller: Agent {
     func status() -> AgentStatus { .init(lifecycle: .running, queuedInputs: 0, processedInputs: 0) }
 }
 private struct CameraFixture {
-    let runtime: PhotographerIntentRuntime
+    let runtime: CameraTestRuntime
     let probe: CameraProbe
     let gateway: OutputGateway
     let manager: AgentManager
     let root: String
-    init() async throws {
+    @MainActor init(uiCamera: UICameraContainer? = nil) async throws {
+        let ui = UIContainer()
+        try ui.start()
+        let cameraUI = uiCamera ?? ui.camera
         root = UUID().uuidString
         manager = AgentManager()
         let policy = try CommunicationPolicy(
             contracts: AgentContracts.communication,
-            externalSources: [
-                "user", "runtime", "phone.microphone", "phone.camera", "model.resources", "app.resources",
-                "app.environment",
-            ],
             configurations: AgentConfigurations.all())
-        let input = InputGateway(manager: manager, policy: policy, allowsExternalSend: true)
+        let input = InputGateway(manager: manager, policy: policy)
         probe = CameraProbe()
         let bridge = CameraBridge(probe: probe)
         let bindings = CameraModule(camera: bridge).definitions.map {
@@ -155,14 +153,15 @@ private struct CameraFixture {
         gateway = OutputGateway(
             manager: manager, requests: input, tools: tools,
             actions: ChannelScheduler(registry: actions), policy: policy, sink: { _ in })
-        runtime = PhotographerIntentRuntime(
-            sessionID: root, manager: manager, input: input, output: gateway,
+        let host = PhotographerExecutionSession(
+            manager: manager, output: gateway,
             agent: try PhotographerAgent(
-                sessionID: root,
+                sessionID: root, uiCamera: cameraUI,
                 context: try AgentContextRepository(
                     agent: AgentID(rawValue: "photographer"), scope: UUID().uuidString,
                     state: PhotographerContextState())
             ))
+        runtime = CameraTestRuntime(host: host, ui: ui, camera: cameraUI)
     }
 }
 @Test(.actionCatalog, .timeLimit(.minutes(1)))
@@ -197,7 +196,7 @@ func photographerCameraUsesSharedFunctionsAndRetainsFailuresBeforeRecovering()
     #expect(await f.probe.sources.allSatisfy { $0 == "photographer" })
     await f.runtime.shutdown()
 }
-@Test(.actionCatalog, .timeLimit(.minutes(1))) func photographerCameraCancellationJoinsBeforeRetryAndRejectsOverlap()
+@Test(.actionCatalog, .timeLimit(.minutes(1))) func photographerCameraCancellationJoinsBeforeQueuedRetry()
     async throws
 {
     let f = try await CameraFixture()
@@ -205,14 +204,16 @@ func photographerCameraUsesSharedFunctionsAndRetainsFailuresBeforeRecovering()
     var entered = f.probe.entered.stream.makeAsyncIterator()
     let opening = Task { try await f.runtime.perform(.open) }
     await entered.next()
-    await #expect(throws: CommunicationError.capacityExceeded) { try await f.runtime.perform(.close) }
+    let closing = Task { try await f.runtime.perform(.close) }
+    closing.cancel()
     var cancelled = f.probe.cancelled.stream.makeAsyncIterator()
     opening.cancel()
     await cancelled.next()
-    await #expect(throws: CommunicationError.capacityExceeded) { try await f.runtime.perform(.retry) }
+    let retry = Task { try await f.runtime.perform(.retry) }
     await f.probe.finish()
     await #expect(throws: CancellationError.self) { try await opening.value }
-    try await f.runtime.perform(.retry)
+    await #expect(throws: CancellationError.self) { try await closing.value }
+    _ = try await retry.value
     await f.runtime.shutdown()
 }
 @Test(.actionCatalog, .timeLimit(.minutes(1))) func photographerSurvivesVisionDetachAndRejectsRetiredPoseScopes()
@@ -241,10 +242,11 @@ func photographerCameraUsesSharedFunctionsAndRetainsFailuresBeforeRecovering()
         id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("switch camera"))
     let result = try await f.gateway.execute(
         OutputEnvelope(
-            source: .assistant, input: parent,
+            source: .assistant, context: parent.context,
             output: .toolCall(
                 ToolCall(
-                    id: UUID().uuidString, toolPath: "Camera.Capture.flip", arguments: ["facing": "back"]))))
+                    id: UUID().uuidString, toolPath: "Camera.Capture.flip", arguments: ["facing": "back"])),
+            taskScope: parent.taskScope))
     #expect(result.isError)
     #expect(await f.probe.operations.isEmpty)
     try await f.manager.remove(.assistant)
@@ -275,7 +277,7 @@ func photographerCameraUsesSharedFunctionsAndRetainsFailuresBeforeRecovering()
                 id: UUID().uuidString,
                 sessionID: root, payload: result,
                 metadata: InputMetadata(
-                    payload: result, source: "user", origin: .external, rootID: UUID().uuidString)))
+                    payload: result, source: "user", origin: .local, rootID: UUID().uuidString)))
     }
     await #expect(throws: CommunicationError.invalidPayload) {
         try await agent.receive(
@@ -359,10 +361,14 @@ func photographerCameraUsesSharedFunctionsAndRetainsFailuresBeforeRecovering()
         let call = try capabilities.resolveAction(
             alias, parameters: ["mediaID": await fixture.probe.mediaID])
         let result = try await fixture.gateway.execute(
-            OutputEnvelope(source: .photographer, input: input, output: .actionCall(call), sequence: 1))
+            OutputEnvelope(
+                source: .photographer, context: input.context, output: .actionCall(call), sequence: 1,
+                taskScope: input.taskScope))
         #expect(result.isError == false)
         _ = try await fixture.gateway.execute(
-            OutputEnvelope(source: .photographer, input: input, output: .control("agent.finished"), sequence: 2))
+            OutputEnvelope(
+                source: .photographer, context: input.context, output: .control("agent.finished"), sequence: 2,
+                taskScope: input.taskScope))
         let snapshot = await fixture.gateway.executionResults(inputID: input.id)
         let record = try #require(snapshot.actions.records.first)
         guard case .value(let raw)? = record.completion else {
@@ -386,10 +392,14 @@ func photographerCameraUsesSharedFunctionsAndRetainsFailuresBeforeRecovering()
         id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("invalid photo"))
     let call = try caller.descriptor.capabilities.resolveAction("savePhoto", parameters: ["mediaID": "invalid"])
     let result = try await fixture.gateway.execute(
-        OutputEnvelope(source: .photographer, input: input, output: .actionCall(call), sequence: 1))
+        OutputEnvelope(
+            source: .photographer, context: input.context, output: .actionCall(call), sequence: 1,
+            taskScope: input.taskScope))
     #expect(result.isError == false)
     _ = try await fixture.gateway.execute(
-        OutputEnvelope(source: .photographer, input: input, output: .control("agent.finished"), sequence: 2))
+        OutputEnvelope(
+            source: .photographer, context: input.context, output: .control("agent.finished"), sequence: 2,
+            taskScope: input.taskScope))
     let snapshot = await fixture.gateway.executionResults(inputID: input.id)
     #expect(snapshot.actions.records.first?.phase == .failed)
     #expect(await fixture.probe.exports == 0)
@@ -400,4 +410,18 @@ func photographerCameraUsesSharedFunctionsAndRetainsFailuresBeforeRecovering()
         ).message.validatedSize()
     }
     await fixture.runtime.shutdown()
+}
+
+@Test(.actionCatalog, .timeLimit(.minutes(1))) @MainActor
+func cameraContainerCallsPhotographerDirectlyAndWaitsForNativeCompletion() async throws {
+    let ui = UIContainer()
+    try ui.start()
+    let host = try await CameraFixture(uiCamera: ui.camera)
+    try await host.runtime.prepareForInteraction()
+    _ = try await ui.camera.requests.submit(.init(.open))
+    _ = try await ui.camera.requests.submit(.init(.close))
+    #expect(await host.probe.operations == [.open, .close])
+    #expect(await host.probe.sources.allSatisfy { $0 == "photographer" })
+    await host.runtime.shutdown()
+    await ui.stop()
 }

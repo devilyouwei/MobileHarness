@@ -1,6 +1,4 @@
-import ActionBindings
 import Actions
-import AgentBindings
 import AgentCore
 import Agents
 import Foundation
@@ -11,6 +9,7 @@ import StorageCore
 import StorageFiles
 import StorageState
 import Testing
+import UI
 
 @MainActor
 private final class ProviderTransactionFixture: ProviderSettingsPersistence {
@@ -76,32 +75,23 @@ private final class ProviderTransactionFixture: ProviderSettingsPersistence {
 {
     let fixture = ProviderTransactionFixture()
     let requests = ProviderSettingsRequests(service: fixture.service())
-    let session = UUID().uuidString
-    let runtime = try resourceRuntime(UnusedModelResourceCapability(), providerSettings: requests, sessionID: session)
-    let restoreID = try requests.stageRestore(sessionID: session)
-    try await runtime.configureProvider(.init(operation: .restore, requestID: restoreID))
-    #expect(try requests.take(restoreID, sessionID: session).key == "fixture-secret")
-    #expect(throws: ProviderSettingsError.self) { try requests.take(restoreID, sessionID: session) }
+    let runtime = try await resourceRuntime(UnusedModelResourceCapability(), providerSettings: requests)
+    let restored = try await runtime.restoreSettings()
+    #expect(restored.key == "fixture-secret" && restored.model == "old")
     fixture.events.removeAll()
     fixture.rollbackFails = true
-    let id = try requests.stageSave(
-        .init(enabled: true, url: "https://example.invalid", key: "fixture-secret", model: "new"), sessionID: session)
     do {
-        try await runtime.configureProvider(.init(operation: .save, requestID: id))
+        try await runtime.saveSettings(
+            .init(enabled: true, url: "https://example.invalid", key: "fixture-secret", model: "new"))
         Issue.record("Failed rollback must fail the request")
     } catch let error as ProviderIntentFailure {
         #expect(error.failureCode == "provider.rollback")
-        #expect(error.message.contains("provider.application"))
-        #expect(error.message.contains("provider.persistence"))
+        #expect(error.message.contains("provider.application") && error.message.contains("provider.persistence"))
         #expect(!error.message.contains("fixture-secret"))
     }
-    #expect(fixture.events.last == "end")
-    #expect(fixture.value?.model == "new")
-    #expect(throws: ProviderSettingsError.self) { try requests.take(id, sessionID: session) }
+    #expect(fixture.events.last == "end" && fixture.value?.model == "new")
     #expect(await runtime.agent.status().queuedInputs == 0)
-    let again = try requests.stageRestore(sessionID: session)
-    try await runtime.configureProvider(.init(operation: .restore, requestID: again))
-    #expect(try requests.take(again, sessionID: session).model == "old")
+    #expect(try await runtime.restoreSettings().model == "old")
     await runtime.shutdown()
 }
 @Test(.actionCatalog) @MainActor func providerSettingsCancelledApplyStillRollsBackBeforeRelease() async throws {
@@ -266,33 +256,25 @@ private final class ProviderCredentialFixture: ProviderCredentialStorage, @unche
     let fixture = ProviderTransactionFixture()
     let requests = ProviderSettingsRequests(service: fixture.service())
     let presenter = ProviderResultPresentationFixture(requests)
-    let session = UUID().uuidString
-    let runtime = try resourceRuntime(
-        UnusedModelResourceCapability(), presentation: presenter, providerSettings: requests, sessionID: session)
-    let restore = try requests.stageRestore(sessionID: session)
-    try await runtime.configureProvider(.init(operation: .restore, requestID: restore, presentation: true))
-    #expect(presenter.ids == [restore])
-    #expect(try requests.take(restore, sessionID: session).model == "old")
-    let save = try requests.stageSave(
-        .init(enabled: true, url: "https://example.invalid", key: "fixture-secret", model: "new"), sessionID: session)
+    let runtime = try await resourceRuntime(
+        UnusedModelResourceCapability(), presentation: presenter, providerSettings: requests)
+    #expect(try await runtime.restoreSettings().model == "old")
+    #expect(presenter.ids.count == 1)
     do {
-        try await runtime.configureProvider(.init(operation: .save, requestID: save, presentation: true))
+        try await runtime.saveSettings(
+            .init(enabled: true, url: "https://example.invalid", key: "fixture-secret", model: "new"))
         Issue.record("Expected failure")
     } catch let error as ProviderIntentFailure {
-        #expect(error.presented)
-        #expect(error.failureCode == "provider.application")
+        #expect(error.presented && error.failureCode == "provider.application")
     }
-    #expect(presenter.ids == [restore, save])
-    #expect(presenter.failures.last == "provider.application")
+    #expect(presenter.ids.count == 2 && presenter.failures.last == "provider.application")
     presenter.reject = true
-    let another = try requests.stageSave(
-        .init(enabled: true, url: "https://example.invalid", key: "fixture-secret", model: "new"), sessionID: session)
     do {
-        try await runtime.configureProvider(.init(operation: .save, requestID: another, presentation: true))
+        try await runtime.saveSettings(
+            .init(enabled: true, url: "https://example.invalid", key: "fixture-secret", model: "new"))
         Issue.record("Expected failure")
     } catch let error as ProviderIntentFailure {
-        #expect(!error.presented)
-        #expect(error.failureCode == "provider.application")
+        #expect(!error.presented && error.failureCode == "provider.application")
         #expect(error.message.contains("presentation"))
     }
     #expect(presenter.ids.count == 3)
@@ -341,4 +323,53 @@ private final class ProviderCredentialFixture: ProviderCredentialStorage, @unche
     let envelope = try #require(JSONSerialization.jsonObject(with: output) as? [String: Any])
     #expect(envelope["version"] as? Int == 1)
     #expect(!String(decoding: output, as: UTF8.self).contains("fixture-secret"))
+}
+
+@Test(.actionCatalog, .timeLimit(.minutes(1))) @MainActor
+func settingsContainerRunsInItsAgentWithPrivateStagingAndActualPresentation() async throws {
+    let ui = UIContainer()
+    try ui.start()
+    let fixture = ProviderTransactionFixture()
+    let requests = ProviderSettingsRequests(service: fixture.service())
+    let discovery = ProviderDiscoveryRequests { _ in ["fixture-model"] }
+    let session = UUID().uuidString
+    let providerPresentation = ProviderPresentationAdapter(
+        state: ui.settings.presentation, sessionID: session, settings: requests, discovery: discovery)
+    let presentation = ResourcePresentationAdapter(
+        state: ui.modelResources.presentation, sessionID: session, provider: providerPresentation,
+        navigation: ui.navigation.presentation, acknowledge: {})
+    let host = try await resourceRuntime(
+        UnusedModelResourceCapability(), presentation: presentation,
+        providerDiscovery: discovery, providerSettings: requests,
+        uiSettings: ui.settings, uiProviderSettings: requests, uiProviderDiscovery: discovery,
+        uiProviderPresentation: providerPresentation, sessionID: session)
+    try await host.prepareForInteraction()
+    guard case .draft(let restored) = try await ui.settings.requests.submit(.restore) else {
+        Issue.record("Restore must return the actual private result")
+        await host.shutdown()
+        return
+    }
+    #expect(restored.key == "fixture-secret" && restored.model == "old")
+    #expect(ui.settings.state.key == "fixture-secret")
+    guard case .models(let models) = try await ui.settings.requests.submit(.discover(restored)) else {
+        Issue.record("Discovery must return actual models")
+        await host.shutdown()
+        return
+    }
+    #expect(models == ["fixture-model"] && ui.settings.state.models == models)
+    fixture.rollbackFails = true
+    do {
+        _ = try await ui.settings.requests.submit(
+            .save(
+                .init(
+                    enabled: true, url: "https://example.invalid", key: "fixture-secret", model: "new")))
+        Issue.record("Rollback failure must fail the UI receipt")
+    } catch let error as ProviderIntentFailure {
+        #expect(error.failureCode == "provider.rollback")
+        #expect(error.presented)
+        #expect(!error.message.contains("fixture-secret"))
+    }
+    #expect(ui.settings.state.error != nil)
+    await host.shutdown()
+    await ui.stop()
 }

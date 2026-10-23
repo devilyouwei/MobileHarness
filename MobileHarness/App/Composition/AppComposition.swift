@@ -1,4 +1,4 @@
-import AgentBindings
+import Agents
 import AppLifecycle
 import Foundation
 import Observation
@@ -14,7 +14,7 @@ import Observation
         backgroundArtifactsPrepared = true
         try await services.model.artifacts.prepare()
     }
-    var features: AgentApplicationUI { services.ui }
+    var features: ApplicationPresentation { services.ui }
 
     init() {
         let created = ServiceFactories.make()

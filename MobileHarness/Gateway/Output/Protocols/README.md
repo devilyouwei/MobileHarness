@@ -58,7 +58,3 @@ Native Tool failureCode classifies pure cancellation as cancelled and mixed repo
 ## 待实现
 
 - 暂无本目录独立的实现待办；跨模块及实际模型/设备验收见所属模块说明。
-
-## Platform 根、设备接入与同帧呈现
-
-✅ ToolExecutor/FunctionInvocation 的显式 attachment 参数只传递进程内只读值，不从 ToolRequest.arguments 解析；执行、超时和结果语义保持原契约。CallRuntime 仍仅依赖独立执行与函数契约。

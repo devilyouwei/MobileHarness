@@ -6,12 +6,20 @@ import FunctionContracts
 
 /// A producer-bound port; the source cannot select or replace its registration identity.
 public struct GatewayOutputConsumer: Sendable {
-    private let consume: @Sendable (OutputEnvelope) async throws -> OutputExecutionResult
-    fileprivate init(_ consume: @escaping @Sendable (OutputEnvelope) async throws -> OutputExecutionResult) {
+    public enum AdmissionError: Error, CustomStringConvertible, LocalizedError {
+        case returningFeedbackRequired
+        public var description: String { "Call requires returning feedback" }
+        public var errorDescription: String? { description }
+    }
+    private let consume: @Sendable (OutputEnvelope, Bool) async throws -> OutputExecutionResult
+    fileprivate init(_ consume: @escaping @Sendable (OutputEnvelope, Bool) async throws -> OutputExecutionResult) {
         self.consume = consume
     }
     @discardableResult public func execute(_ envelope: OutputEnvelope) async throws -> OutputExecutionResult {
-        try await consume(envelope)
+        try await consume(envelope, false)
+    }
+    @discardableResult public func executeReturning(_ envelope: OutputEnvelope) async throws -> OutputExecutionResult {
+        try await consume(envelope, true)
     }
 }
 private enum OutputProducerBinding {
@@ -112,7 +120,7 @@ public actor OutputGateway {
         return false
     }
     private static func isInterruption(_ envelope: OutputEnvelope) -> Bool {
-        guard envelope.inputMetadata.origin == .external, envelope.inputMetadata.source == "runtime",
+        guard envelope.inputMetadata.origin == .local, envelope.inputMetadata.source == "runtime",
 
             case .communication(let communication) = envelope.output,
             communication.message.content(as: AgentTaskSignal.self)?.kind == .cancel
@@ -183,9 +191,14 @@ public actor OutputGateway {
     public func consumer(for producer: any Agent) async throws -> GatewayOutputConsumer {
         let id = producer.descriptor.id
         let incarnation = try await manager.outputIdentity(for: producer)
-        return GatewayOutputConsumer { [self] envelope in
+        return GatewayOutputConsumer { [self] envelope, requiresReturning in
             guard envelope.source == id else { throw CommunicationError.unauthorized }
             try await manager.validate(id, incarnation: incarnation, sessionID: envelope.sessionID)
+            if requiresReturning {
+                guard case .toolCall(let call) = envelope.output, await returnsToolResult(for: call) else {
+                    throw GatewayOutputConsumer.AdmissionError.returningFeedbackRequired
+                }
+            }
             return try await OutputProducerBinding.$identity.withValue(.init(agent: id, incarnation: incarnation)) {
                 try await execute(envelope)
             }
@@ -686,7 +699,7 @@ public actor OutputGateway {
         }
         if case .rejectedCall(let rejection) = envelope.output, rejection.kind == .tool {
             return ToolResponse(
-                callID: try rejection.callID ?? UUID().uuidString,
+                callID: rejection.callID ?? UUID().uuidString,
                 value: "\(rejection.reason): \(rejection.alias)", isError: true,
                 failureCode: rejection.reason == .invalidParameters ? .invalidArguments : .unknownTool)
         }

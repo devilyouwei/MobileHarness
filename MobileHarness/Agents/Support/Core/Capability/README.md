@@ -1,70 +1,80 @@
-# Capability Declarations and Permissions
+# Capability — 声明、模型目录与执行权限
 
-## Summary
+## 职责与外部关系
 
-Strict JSON v6/v7 configuration, model alias resolution and separate code-owned runtime grants.
-
-## Ownership and boundaries
-
-Core owns declaration/permission validation, not business argument meaning, physical authorization or provider transport. Application catalogs are injected. Model exposure and internal permission remain separate.
-
-## External relationships and data flow
-
-The graph shows declaration validation and context construction; dashed arrows supply immutable resources. Gateway receives a permission snapshot at assembly.
+Foundation-only 的配置验证、Action 别名／native 名称解析、运行期权限与目录渲染。业务参数含义、物理资格与 provider 传输不属于本目录。
 
 ```mermaid
 flowchart LR
- JSON[Bounded JSON v6/v7] --> Validation
- Catalog[Injected communication schemas] --> Validation
- Validation --> Config[Immutable model declarations]
- Config --> Resolver[Alias and native-name resolution]
- Internal[Code-owned InternalAction and InternalTool] --> Permissions[Runtime permission registry]
- Config --> Permissions
- Config --> Builder[CapabilityContextBuilder]
- Templates[Function Token templates] -.-> Builder
- Builder -->|Visible XML catalog| Role[Role system prompt]
- Config -->|Native definitions| Request[ChatRequest.tools]
- Permissions -->|Injected permission snapshot| Gateway
+ A["Agents：注入声明／schema／目录"]:::agent
+ C["Capability"]:::host
+ G["Gateway：校验权限快照"]:::gateway
+ A --> C
+ C -->|"中立注册与权限值"| G
+ classDef ui fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e
+ classDef platform fill:#dcfce7,stroke:#16a34a,color:#14532d
+ classDef model fill:#f3e8ff,stroke:#9333ea,color:#581c87
+ classDef storage fill:#fef3c7,stroke:#d97706,color:#78350f
+ classDef agent fill:#eef2ff,stroke:#6366f1,color:#312e81
+ classDef gateway fill:#ffedd5,stroke:#ea580c,color:#7c2d12
+ classDef action fill:#ffe4e6,stroke:#e11d48,color:#881337
+ classDef host fill:#f1f5f9,stroke:#64748b,color:#334155
 ```
 
-## Schema and resolution
+箭头表示值的使用与传递，不表示本目录导入 Gateway。
 
-Maximum JSON size is 64 KiB; total capabilities including internal grants are bounded to 128, Channels to 16 and parameter sets to 32. Group keys provide default Channels; empty groups declare Channels. Old channels/textActions/hidden/defaultChannel fields reject. Aliases are globally unique and sorted group traversal makes prompt construction deterministic.
+## 文件与职责
 
-Actions use domain/module/function paths and model aliases. Native Tools bind a distinct provider function definition to the same path representation. Required/optional argument names must be disjoint.
+| 文件 | 职责 |
+| --- | --- |
+| [AgentConfiguration.swift](AgentConfiguration.swift) | JSON 结构／版本、通信声明、函数配置和 native 参数 schema 校验 |
+| [ActionPath.swift](ActionPath.swift) | domain／module／function 的规范地址值 |
+| [ActionRegistration.swift](ActionRegistration.swift) | 模型可见 Action 与代码私有 InternalAction 声明 |
+| [ToolRegistration.swift](ToolRegistration.swift) | native Tool 定义、参数和代码私有 InternalTool 声明 |
+| [CapabilityRegistry.swift](CapabilityRegistry.swift) | 不可变可见目录、内部权限、别名解析与调用许可 |
+| [CapabilityDocumentation.swift](CapabilityDocumentation.swift) | 函数及参数文档值 |
+| [CapabilityContextBuilder.swift](CapabilityContextBuilder.swift) | 按有效目录渲染协议、Channel 和 Action 教学 |
 
-✅ CapabilityRegistry.resolveAction validates raw parameter count/name/value bounds and required keys, then discards keys outside the visible Action's required/optional names before creating ActionCall. Unknown XML attributes cannot reach handlers or acquire internal-only parameters. Missing required parameters and oversized input still reject. Native Tools and Gateway authorization of already constructed calls retain strict key validation. Native string-property enums remain checked during resolution and Gateway authorization. Full JSON Schema is not implemented.
+## 内部结构与数据流
 
-InternalAction/InternalTool carry code-owned paths/parameter names; permits includes them, resolveAction/resolveTool does not. XML examples validate against the model-only catalog.
+```mermaid
+flowchart LR
+ J["AgentConfiguration：JSON v6/v7"]:::host
+ V["结构／身份／通信声明验证"]:::host
+ R["CapabilityRegistry：可见 Action／Tool"]:::host
+ I["代码持有 InternalAction／InternalTool"]:::host
+ P["独立执行权限集"]:::host
+ B["CapabilityContextBuilder／Documentation"]:::host
+ T["Generation.PromptTemplates"]:::host
+ J --> V --> R --> B
+ R --> P
+ I --> P
+ T --> B
+ R -->|"resolveAction／resolveTool"| O["已解析调用"]:::host
+ classDef ui fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e
+ classDef platform fill:#dcfce7,stroke:#16a34a,color:#14532d
+ classDef model fill:#f3e8ff,stroke:#9333ea,color:#581c87
+ classDef storage fill:#fef3c7,stroke:#d97706,color:#78350f
+ classDef agent fill:#eef2ff,stroke:#6366f1,color:#312e81
+ classDef gateway fill:#ffedd5,stroke:#ea580c,color:#7c2d12
+ classDef action fill:#ffe4e6,stroke:#e11d48,color:#881337
+ classDef host fill:#f1f5f9,stroke:#64748b,color:#334155
+```
 
-The native definition retains a legacy function envelope as a neutral declaration; provider adapters convert it to their wire protocol. It does not imply Chat Completions transport. Communication configuration validates against the supplied catalog; Core has no speech/pose domains.
+## 声明与权限
 
-Strict v6/v7 validation and separate model/runtime permissions are implemented.
+JSON 至多 64 KiB；模型能力与内部授权合计 128，Channel 16，单函数参数集合 32。组键定义默认 Channel，空组只声明 Channel；别名全局唯一，排序遍历保证目录确定。配置只接受声明的字段，未知字段明确拒绝。
 
-## Model context construction
+Action 以 canonical domain/module/function 地址注册，并通过独立模型 alias 暴露；native Tool 保留 provider 定义，适配器负责传输格式。required 与 optional 不可重叠。XML Action 先验证原始参数数量／名称／值及必填项，再丢弃未在可见参数集中声明的键；native Tool 与 Gateway 对已构造调用严格验证键和 enum。未知别名或缺参返回真实拒绝，不获取内部参数权。
 
-CapabilityContextBuilder renders protocol and capability-description templates from [FunctionTokenPrompts.json](../Generation/FunctionTokenPrompts.json), using the current visible registry only. Roles supply identity and style; Skill instructions own procedural examples. Native definitions and internal grants remain outside the XML catalog. Channels are rendered in sorted order; Action metadata, parameter constraints and examples come from the current registrations. The final catalog is bounded to 65536 UTF-8 bytes. Resource/render failures propagate rather than substituting instructions.
+InternalAction/InternalTool 参与 permits，不参与模型 resolve，也不生成 XML alias。Skill 指令或可见目录不替代实例／任务／资源授权。
 
-## Related design
+## 提示词与通信收窄
 
-[Parent design](../README.md)
+CapabilityContextBuilder 从当前不可变目录渲染 Channel、Action 别名、doc、参数类型／必填性／约束，不显示内部授权。目录上限 65536 UTF-8 字节；相同 description/constraints 只显示一次。CapabilityDocumentation 只保留 doc/parameters；配置中的 examples 只在导入时验证，不进入实时目录。
 
-## Action-owned documentation and Skill instruction contract
+无可见 Tool 使用 Action-only protocol/boundary；存在 Tool 使用双协议教学，native 定义另交请求。模板读取／渲染失败明确传播。角色身份、业务示例与 Skill 步骤由上层提供。
 
-CapabilityDocumentation 只保留 doc/parameters，目录不渲染函数 examples。旧版配置导入时仍验证其历史 examples，但不进入实时元数据。新投影可省略该字段；参数、别名、容量及目录校验继续严格执行。
+restrictingCommunication 仅保留原声明中允许的 contract，对新不可变配置重新验证，不新增 source/target/grant，不改缓存资源。Core 不认识诊断场景或具体角色。
 
-输出协议不再提前显示函数目录标题；真正目录末尾明确只有已列Action别名可作自闭合标签，Skill名称不是函数。
-
-目录边界明确操作请求的回复必须推进执行；参数 description 与 constraints 完全相同则只展示一次，不删除独立约束。
-
-模型目录按 Channel 分组，展示 Action 别名、doc 和参数类型/必填性；真实注册、canonical path 与执行校验由不可变目录保留。
-
-## Isolated communication scopes
-
-AgentConfiguration.restrictingCommunication(to:contracts:) derives a new immutable configuration by retaining only existing inputs, subscriptions, publications and sends whose contract is explicitly allowed. Revalidate the projected declaration against the injected schema catalog; preserve identity, version and function capabilities. Never add a source, target, grant or cached-resource mutation. Core owns only this neutral restriction; AgentBindings chooses diagnostic contracts.
-
-## 待实现
-
-- Full JSON Schema and configuration hot reload are not implemented.
-
-✅ Implemented: CapabilityContextBuilder selects Action-only teaching/boundary when the visible Tool catalog is empty; mixed catalogs retain generic dual-protocol teaching. No native runtime grants are removed or exposed as aliases.
+❌ 完整 JSON Schema 和配置热更新未实现。解析见 [Generation](../Generation/README.md)，消息声明见 [Communication](../Communication/README.md)。

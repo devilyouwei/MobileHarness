@@ -1,6 +1,4 @@
-import ActionBindings
 import Actions
-import AgentBindings
 import AgentCore
 import Agents
 import Foundation
@@ -24,9 +22,9 @@ private enum TrackingUnavailable: Error { case offline }
     for sequence: UInt64 in [1, 2] {
         stream.continuation.yield(
             OutputEnvelope(
-                source: .photographer, input: input,
+                source: .photographer, context: input.context,
                 output: .toolCall(ToolCall(id: UUID().uuidString, toolPath: "NexArm.Tracking.aim")),
-                sequence: sequence))
+                sequence: sequence, taskScope: input.taskScope))
     }
     stream.continuation.finish()
     let record = OutputRecord()
@@ -46,8 +44,9 @@ private enum TrackingUnavailable: Error { case offline }
     let stream = AsyncStream<OutputEnvelope>.makeStream(bufferingPolicy: .bufferingOldest(1))
     stream.continuation.yield(
         OutputEnvelope(
-            source: .photographer, input: input,
-            output: .toolCall(ToolCall(id: UUID().uuidString, toolPath: "NexArm.Tracking.aim"))))
+            source: .photographer, context: input.context,
+            output: .toolCall(ToolCall(id: UUID().uuidString, toolPath: "NexArm.Tracking.aim")),
+            taskScope: input.taskScope))
     stream.continuation.finish()
     let record = OutputRecord()
     await #expect(throws: CancellationError.self) {
@@ -68,9 +67,9 @@ private enum TrackingUnavailable: Error { case offline }
     let record = OutputRecord()
     outputs.continuation.yield(
         OutputEnvelope(
-            source: .assistant, input: failedInput,
+            source: .assistant, context: failedInput.context,
             output: .toolCall(ToolCall(id: UUID().uuidString, toolPath: "Fixture.read")),
-            sequence: 1, roundID: UUID().uuidString))
+            sequence: 1, roundID: UUID().uuidString, taskScope: failedInput.taskScope))
     let consumer = Task {
         try await IndependentOutputWorkflow.consumeGeneration(outputs.stream) { envelope in
             if envelope.sequence == 1 {
@@ -91,21 +90,24 @@ private enum TrackingUnavailable: Error { case offline }
     _ = await startup.next()
     outputs.continuation.yield(
         OutputEnvelope(
-            source: .assistant, input: failedInput, output: .control("agent.error:fixture"), sequence: 2))
+            source: .assistant, context: failedInput.context, output: .control("agent.error:fixture"), sequence: 2,
+            taskScope: failedInput.taskScope))
     for (callSequence, sealSequence) in [(UInt64(3), UInt64(4)), (5, 6)] {
         let round = UUID().uuidString
         outputs.continuation.yield(
             OutputEnvelope(
-                source: .assistant, input: nextInput,
+                source: .assistant, context: nextInput.context,
                 output: .toolCall(ToolCall(id: UUID().uuidString, toolPath: "Fixture.read")),
-                sequence: callSequence, roundID: round))
+                sequence: callSequence, roundID: round, taskScope: nextInput.taskScope))
         outputs.continuation.yield(
             OutputEnvelope(
-                source: .assistant, input: nextInput, output: .roundFinished(round),
-                sequence: sealSequence, roundID: round))
+                source: .assistant, context: nextInput.context, output: .roundFinished(round),
+                sequence: sealSequence, roundID: round, taskScope: nextInput.taskScope))
     }
     outputs.continuation.yield(
-        OutputEnvelope(source: .assistant, input: nextInput, output: .control("agent.finished"), sequence: 7))
+        OutputEnvelope(
+            source: .assistant, context: nextInput.context, output: .control("agent.finished"), sequence: 7,
+            taskScope: nextInput.taskScope))
     outputs.continuation.finish()
     try await consumer.value
     #expect(await record.accepted == [1, 2, 3, 4, 5, 6, 7])
@@ -159,9 +161,9 @@ private actor ProtocolDispatchGate {
     for sequence in UInt64(1)...5 {
         outputs.continuation.yield(
             OutputEnvelope(
-                source: .assistant, input: input,
+                source: .assistant, context: input.context,
                 output: .toolCall(ToolCall(id: UUID().uuidString, toolPath: "Fixture.read")),
-                sequence: sequence, roundID: round))
+                sequence: sequence, roundID: round, taskScope: input.taskScope))
     }
     for (sequence, output) in [
         (UInt64(6), AgentOutput.scheduling(.beginWait)),
@@ -177,7 +179,9 @@ private actor ProtocolDispatchGate {
         (10, .control("agent.finished")),
     ] {
         outputs.continuation.yield(
-            OutputEnvelope(source: .assistant, input: input, output: output, sequence: sequence, roundID: round))
+            OutputEnvelope(
+                source: .assistant, context: input.context, output: output, sequence: sequence, roundID: round,
+                taskScope: input.taskScope))
     }
     outputs.continuation.finish()
     let consumer = Task {
@@ -209,21 +213,25 @@ private actor ProtocolDispatchGate {
     let gate = ProtocolDispatchGate()
     outputs.continuation.yield(
         OutputEnvelope(
-            source: .assistant, input: input,
+            source: .assistant, context: input.context,
             output: .actionCall(
                 ActionCall(
                     actionPath: ActionPath(domain: "UI", module: "Expression", function: "express"), channel: "Display")
             ),
-            sequence: 1, roundID: round))
+            sequence: 1, roundID: round, taskScope: input.taskScope))
     outputs.continuation.yield(
         OutputEnvelope(
-            source: .assistant, input: input,
+            source: .assistant, context: input.context,
             output: .toolCall(ToolCall(id: UUID().uuidString, toolPath: "Fixture.read")),
-            sequence: 2, roundID: round))
+            sequence: 2, roundID: round, taskScope: input.taskScope))
     outputs.continuation.yield(
-        OutputEnvelope(source: .assistant, input: input, output: .roundFinished(round), sequence: 3, roundID: round))
+        OutputEnvelope(
+            source: .assistant, context: input.context, output: .roundFinished(round), sequence: 3, roundID: round,
+            taskScope: input.taskScope))
     outputs.continuation.yield(
-        OutputEnvelope(source: .assistant, input: input, output: .control("agent.finished"), sequence: 4))
+        OutputEnvelope(
+            source: .assistant, context: input.context, output: .control("agent.finished"), sequence: 4,
+            taskScope: input.taskScope))
     outputs.continuation.finish()
     let consumer = Task {
         try await IndependentOutputWorkflow.consumeGeneration(outputs.stream) { envelope in
@@ -249,17 +257,17 @@ private actor ProtocolDispatchGate {
     let gate = ProtocolDispatchGate()
     outputs.continuation.yield(
         OutputEnvelope(
-            source: .assistant, input: input,
+            source: .assistant, context: input.context,
             output: .actionCall(
                 ActionCall(
                     actionPath: ActionPath(domain: "UI", module: "Expression", function: "express"), channel: "Display")
             ),
-            sequence: 1, roundID: round))
+            sequence: 1, roundID: round, taskScope: input.taskScope))
     outputs.continuation.yield(
         OutputEnvelope(
-            source: .assistant, input: input,
+            source: .assistant, context: input.context,
             output: .toolCall(ToolCall(id: UUID().uuidString, toolPath: "Fixture.read")),
-            sequence: 2, roundID: round))
+            sequence: 2, roundID: round, taskScope: input.taskScope))
     let consumer = Task {
         try await IndependentOutputWorkflow.consumeGeneration(outputs.stream) { envelope in
             try await gate.dispatch(envelope.sequence, hold: true)
@@ -282,12 +290,14 @@ private actor ProtocolDispatchGate {
     for sequence in UInt64(1)...17 {
         outputs.continuation.yield(
             OutputEnvelope(
-                source: .assistant, input: input,
+                source: .assistant, context: input.context,
                 output: .toolCall(ToolCall(id: UUID().uuidString, toolPath: "Fixture.read")),
-                sequence: sequence, roundID: round))
+                sequence: sequence, roundID: round, taskScope: input.taskScope))
     }
     outputs.continuation.yield(
-        OutputEnvelope(source: .assistant, input: input, output: .roundFinished(round), sequence: 18, roundID: round))
+        OutputEnvelope(
+            source: .assistant, context: input.context, output: .roundFinished(round), sequence: 18, roundID: round,
+            taskScope: input.taskScope))
     outputs.continuation.finish()
     let record = OutputRecord()
     try await IndependentOutputWorkflow.consumeGeneration(outputs.stream) { envelope in
@@ -310,12 +320,12 @@ private actor ProtocolDispatchGate {
     let gate = ProtocolDispatchGate()
     outputs.continuation.yield(
         OutputEnvelope(
-            source: .assistant, input: input,
+            source: .assistant, context: input.context,
             output: .actionCall(
                 ActionCall(
                     actionPath: ActionPath(domain: "UI", module: "Expression", function: "express"), channel: "Display")
             ),
-            sequence: 1, roundID: round))
+            sequence: 1, roundID: round, taskScope: input.taskScope))
     let consumer = Task {
         try await IndependentOutputWorkflow.consumeGeneration(outputs.stream) { envelope in
             if envelope.sequence == 2 { throw TrackingUnavailable.offline }
@@ -326,9 +336,9 @@ private actor ProtocolDispatchGate {
     _ = await events.next()
     outputs.continuation.yield(
         OutputEnvelope(
-            source: .assistant, input: input,
+            source: .assistant, context: input.context,
             output: .toolCall(ToolCall(id: UUID().uuidString, toolPath: "Fixture.read")),
-            sequence: 2, roundID: round))
+            sequence: 2, roundID: round, taskScope: input.taskScope))
     // Keep the producer open: the failing consumer must wake the owner on its own.
     await #expect(throws: TrackingUnavailable.offline) { try await consumer.value }
     #expect(await gate.active == 0)
@@ -353,7 +363,9 @@ private actor ProtocolDispatchGate {
         ),
     ] {
         outputs.continuation.yield(
-            OutputEnvelope(source: .assistant, input: input, output: output, sequence: sequence, roundID: round))
+            OutputEnvelope(
+                source: .assistant, context: input.context, output: output, sequence: sequence, roundID: round,
+                taskScope: input.taskScope))
     }
     let consumer = Task {
         try await IndependentOutputWorkflow.consumeGeneration(outputs.stream) { envelope in
@@ -367,16 +379,18 @@ private actor ProtocolDispatchGate {
     #expect(await gate.active == 2)
     outputs.continuation.yield(
         OutputEnvelope(
-            source: .assistant, input: input, output: .control("agent.cancelled"), sequence: 3, roundID: round))
+            source: .assistant, context: input.context, output: .control("agent.cancelled"), sequence: 3,
+            roundID: round, taskScope: input.taskScope))
     let nextRound = UUID().uuidString
     outputs.continuation.yield(
         OutputEnvelope(
-            source: .assistant, input: next,
+            source: .assistant, context: next.context,
             output: .toolCall(ToolCall(id: UUID().uuidString, toolPath: "Fixture.read")),
-            sequence: 4, roundID: nextRound))
+            sequence: 4, roundID: nextRound, taskScope: next.taskScope))
     outputs.continuation.yield(
         OutputEnvelope(
-            source: .assistant, input: next, output: .control("agent.finished"), sequence: 5, roundID: nextRound))
+            source: .assistant, context: next.context, output: .control("agent.finished"), sequence: 5,
+            roundID: nextRound, taskScope: next.taskScope))
     outputs.continuation.finish()
     try await consumer.value
     #expect(await gate.active == 0)

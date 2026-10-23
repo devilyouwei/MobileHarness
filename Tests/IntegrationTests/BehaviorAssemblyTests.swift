@@ -1,6 +1,4 @@
-import ActionBindings
 import Actions
-import AgentBindings
 import AgentCore
 import Agents
 import CallRuntime
@@ -13,6 +11,7 @@ import StorageChat
 import StorageCore
 import StorageState
 import Testing
+import UI
 
 private actor BehaviorEndpoint: UIPresentationCapability, UIUpdateCapability, SpeechPlaybackCapability,
     PosePresentationCapability, CameraControlCapability, HistoryPresentationCapability, ResourcePresentationCapability,
@@ -45,7 +44,7 @@ private actor BehaviorEndpoint: UIPresentationCapability, UIUpdateCapability, Sp
     }
     private(set) var emotion: UIActions.Emotion?
     private(set) var gaze: UIActions.Gaze?
-    private(set) var pose: PoseOverlay?
+    private(set) var pose: Actions.PoseOverlay?
     func play(audioID: String, invocation: any FunctionInput) async throws {}
     func present(_ text: String, invocation: any FunctionInput) async throws {}
     func presentTranscript(_ text: String, invocation: any FunctionInput) async throws {}
@@ -61,7 +60,7 @@ private actor BehaviorEndpoint: UIPresentationCapability, UIUpdateCapability, Sp
         self.emotion = emotion
     }
     func present(_ target: UIActions.Gaze, invocation: any FunctionInput) async throws { gaze = target }
-    func present(_ overlay: PoseOverlay, sessionID: String) async throws { pose = overlay }
+    func present(_ overlay: Actions.PoseOverlay, sessionID: String) async throws { pose = overlay }
 }
 
 private struct FixtureActionModule: ActionModule {
@@ -90,7 +89,7 @@ private func behaviorInvocation(_ function: String, parameters: [String: String]
         modelResources: UnusedModelResourceCapability(),
         resourcePreferences: UnusedModelResourcePreferencesCapability(), resourceInventory: UnusedResourceInventory(),
         resourcePresentation: endpoint, providerDiscovery: UnusedProviderDiscovery(),
-        providerSettings: UnusedProviderSettings(), device: UnusedDeviceControl(),
+        providerSettings: UnusedProviderSettings(), device: UnusedDeviceControl(), taskControl: endpoint,
         gesture: { _, _ in throw CancellationError() },
         shakeBase: { _, _ in throw CancellationError() },
         aim: { _, _, _ in throw ActionExecutionFailure(code: .handlerFailed, message: "Fixture dependency unavailable")
@@ -302,4 +301,163 @@ struct UnusedDeviceControl: DeviceControlCapability {
         throw DeviceControlError.unavailable
     }
     func readStatus() async throws -> String { throw DeviceControlError.unavailable }
+}
+
+@MainActor private final class EndpointCameraFixture: CameraControlCapability {
+    private(set) var calls = 0
+    let receipt = CameraPhotoCommandReceipt(
+        mediaID: "captured-photo", state: .saved, alreadySaved: true, feedbackIssues: ["first", "第二个反馈"])
+    var failure: (any Error)?
+    func setEnabled(_ enabled: Bool, invocation: any FunctionInput) async throws { calls += 1 }
+    func flip(_ facing: CameraActions.Facing, invocation: any FunctionInput) async throws { calls += 1 }
+    func savePhoto(_ id: String?, invocation: any FunctionInput) async throws -> CameraPhotoCommandReceipt {
+        calls += 1
+        if let failure { throw failure }
+        return receipt
+    }
+}
+
+private func endpointInvocation(source: String, session: String, decision: String? = nil) -> FunctionInvocation {
+    FunctionInvocation(
+        call: FunctionRequest(
+            actionPath: .init(domain: "Camera", module: "Capture", function: "savePhoto"), parameters: [:]),
+        context: .init(source: source, sessionID: session, inputID: "input", decisionID: decision),
+        executionID: UUID().uuidString, results: ActionReportStore())
+}
+
+@Test(.actionCatalog) @MainActor func cameraEndpointPreservesReceiptsAndRejectsForeignSessionsBeforeExecution()
+    async throws
+{
+    let native = EndpointCameraFixture()
+    var sessionChecks = 0
+    let endpoint = CameraExecutionEndpoint(
+        camera: native, rootSessionID: "root",
+        validateSession: { invocation in
+            sessionChecks += 1
+            guard invocation.context.sessionID == "active-turn" else { throw CommunicationError.scopeClosed }
+        })
+    let receipt = try await endpoint.savePhoto(
+        nil, invocation: endpointInvocation(source: "photographer", session: "root"))
+    #expect(receipt == native.receipt)
+    #expect(sessionChecks == 0 && native.calls == 1)
+    _ = try await endpoint.savePhoto(
+        nil, invocation: endpointInvocation(source: "assistant", session: "active-turn"))
+    #expect(sessionChecks == 1 && native.calls == 2)
+    await #expect(throws: CommunicationError.scopeClosed) {
+        try await endpoint.savePhoto(nil, invocation: endpointInvocation(source: "assistant", session: "retired-turn"))
+    }
+    await #expect(throws: CommunicationError.unauthorized) {
+        try await endpoint.savePhoto(nil, invocation: endpointInvocation(source: "memory", session: "root"))
+    }
+    #expect(native.calls == 2)
+    native.failure = CameraControlError.permissionDenied
+    await #expect(throws: CameraControlError.permissionDenied) {
+        try await endpoint.savePhoto(nil, invocation: endpointInvocation(source: "photographer", session: "root"))
+    }
+}
+
+@Test(.actionCatalog) @MainActor func taskEndpointKeepsAdmissionAndOriginalHandlerFailure() async throws {
+    let endpoint = TaskControlEndpoint(rootSessionID: "root")
+    await #expect(throws: CommunicationError.scopeClosed) {
+        try await endpoint.controlTask(
+            "startTask", arguments: [:], invocation: endpointInvocation(source: "assistant", session: "root"))
+    }
+    let accepted = LockedTaskRequests()
+    endpoint.handler = { operation, _, source, session, _, _ in
+        await accepted.record(operation + ":" + source + ":" + session)
+        throw CancellationError()
+    }
+    for invocation in [
+        endpointInvocation(source: "memory", session: "root"),
+        endpointInvocation(source: "assistant", session: "retired"),
+    ] {
+        await #expect(throws: CommunicationError.unauthorized) {
+            try await endpoint.controlTask("startTask", arguments: [:], invocation: invocation)
+        }
+    }
+    #expect(await accepted.values.isEmpty)
+    await #expect(throws: CancellationError.self) {
+        try await endpoint.controlTask(
+            "startTask", arguments: [:], invocation: endpointInvocation(source: "assistant", session: "root"))
+    }
+    #expect(await accepted.values == ["startTask:assistant:root"])
+}
+
+private actor LockedTaskRequests {
+    private(set) var values: [String] = []
+    func record(_ value: String) { values.append(value) }
+}
+
+@Test(.actionCatalog) func taskFunctionsRequireAnExplicitCapabilityInsteadOfPresentationConformance() throws {
+    let endpoint = BehaviorEndpoint()
+    func assemble(task: (any TaskControlCapability)?) throws -> BehaviorAssembly {
+        try BehaviorAssembly(
+            presentation: endpoint, playback: endpoint, pose: endpoint, historyPresentation: endpoint, camera: endpoint,
+            history: HistoryQueryService(store: ConversationHistoryStore()),
+            historyMutations: HistoryMutationService(
+                store: ConversationHistoryStore(), summarizeTitle: { _ in "fixture" }),
+            modelResources: UnusedModelResourceCapability(),
+            resourcePreferences: UnusedModelResourcePreferencesCapability(),
+            resourceInventory: UnusedResourceInventory(),
+            resourcePresentation: endpoint, providerDiscovery: UnusedProviderDiscovery(),
+            providerSettings: UnusedProviderSettings(), device: UnusedDeviceControl(), taskControl: task,
+            gesture: { _, _ in }, shakeBase: { _, _ in }, aim: { _, _, _ in })
+    }
+    let path = ActionIdentifier(domain: "Agent", module: "Task", function: "startTask")
+    #expect(try assemble(task: nil).functions.find(path) == nil)
+    #expect(try assemble(task: endpoint).functions.find(path) != nil)
+}
+
+@MainActor private final class EndpointVoiceFixture: VoiceOutputHandling {
+    private(set) var plays = 0
+    private(set) var captions = 0
+    func validateCameraControl(invocation: any FunctionInput) throws {}
+    func updateListening(
+        enabled: Bool, paused: Bool, revision: UInt64, feedback: SpeechActions.ListeningFeedback,
+        invocation: any FunctionInput
+    ) async throws {}
+    func playCue(_ request: UIActions.CueRequest, invocation: any FunctionInput) async throws {}
+    func vibrate(_ request: UIActions.HapticRequest, invocation: any FunctionInput) async throws {}
+    func play(audioID: String, invocation: any FunctionInput) async throws { plays += 1 }
+    func present(_ text: String, invocation: any FunctionInput) throws { captions += 1 }
+    func presentTranscript(_ text: String, invocation: any FunctionInput) throws {}
+    func finishTranscript(invocation: any FunctionInput) throws {}
+    func beginReplyTurn(invocation: any FunctionInput) throws {}
+    func setReplyWaiting(_ enabled: Bool, requestID: String, invocation: any FunctionInput) throws {}
+    func presentVoiceState(_ state: UIActions.VoiceState, invocation: any FunctionInput) throws {}
+    func presentExpression(_ emotion: UIActions.Emotion, invocation: any FunctionInput) async throws {}
+    func restoreExpression(invocation: any FunctionInput) async throws {}
+    func setExpression(_ emotion: UIActions.Emotion, invocation: any FunctionInput) throws {}
+    func observeTranscript(_ text: String, sessionID: String) {}
+    func observeEmptyUtterance(sessionID: String) {}
+    func show(_ envelope: OutputEnvelope) async {}
+}
+
+@Test(.actionCatalog) @MainActor func domainEndpointBindingsAreAtomicAndRetiredOwnersCannotUnbindReplacements()
+    async throws
+{
+    let ui = UIContainer()
+    let endpoints = ActionEndpoints(
+        cameraControl: EndpointCameraFixture(), rootSessionID: "root", activity: ui.home.activity,
+        effects: ui.home.effects, expressions: ui.home.expressions,
+        homeBluetooth: ui.home.conversation, deviceBluetooth: ui.devices.state)
+    let first = EndpointVoiceFixture()
+    let replacement = EndpointVoiceFixture()
+    let invocation = endpointInvocation(source: "assistant", session: "root")
+    try endpoints.bindVoice(first)
+    #expect(throws: CommunicationError.scopeClosed) { try endpoints.bindVoice(replacement) }
+    endpoints.unbindVoice(replacement)
+    try await endpoints.speech.play(audioID: "audio", invocation: invocation)
+    try await endpoints.presentation.present("caption", invocation: invocation)
+    #expect(first.plays == 1 && first.captions == 1 && replacement.plays == 0)
+    endpoints.unbindVoice(first)
+    await #expect(throws: CommunicationError.scopeClosed) {
+        try await endpoints.speech.play(audioID: "audio", invocation: invocation)
+    }
+    try endpoints.bindVoice(replacement)
+    endpoints.unbindVoice(first)
+    try await endpoints.speech.play(audioID: "audio", invocation: invocation)
+    try await endpoints.presentation.present("caption", invocation: invocation)
+    #expect(replacement.plays == 1 && replacement.captions == 1)
+    endpoints.unbindVoice(replacement)
 }

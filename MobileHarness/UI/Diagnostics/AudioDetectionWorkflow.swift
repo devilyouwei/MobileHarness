@@ -1,103 +1,6 @@
 import Foundation
 import Observation
 
-/// One operation and one freshness/deadline monitor; no pending diagnostic queue.
-@MainActor
-public final class AudioDetectionWorkflow: AudioDetectionControlling {
-    public let state: AudioDetectionState
-    private let endpoint: any AudioDetectionRunning
-    private let duration: Duration
-    private var operation: Task<Void, Never>?
-    private var monitor: Task<Void, Never>?
-    private var captureStart: ContinuousClock.Instant?
-    private var completed = false
-    private var generation: String?
-    public init(state: AudioDetectionState, endpoint: any AudioDetectionRunning, duration: Duration = .seconds(10)) {
-        self.state = state
-        self.endpoint = endpoint
-        self.duration = duration
-    }
-    public func start() {
-        guard operation == nil else { return }
-        state.present(.snapshot(AudioDetectionSnapshot()))
-        state.present(.error(nil))
-        state.present(.phase(.preparing))
-        captureStart = nil
-        completed = false
-        let generation = UUID().uuidString
-        self.generation = generation
-        operation = Task {
-            var terminalPhase: AudioDetectionState.Phase = .finished
-            do {
-                try await endpoint.run { [weak self] snapshot in
-                    guard let self, self.generation == generation, self.state.isActive,
-                        !Task.isCancelled, self.state.phase != .stopping
-                    else { return }
-                    self.state.present(.snapshot(snapshot))
-                    self.state.refresh()
-                    if snapshot.capturedAt != nil {
-                        if self.captureStart == nil { self.captureStart = .now }
-                        self.state.present(.phase(.running))
-                    }
-                }
-                try Task.checkCancellation()
-                terminalPhase = .finished
-            } catch is CancellationError {
-                terminalPhase = completed ? .finished : .stopped
-            } catch {
-                if Task.isCancelled {
-                    terminalPhase = completed ? .finished : .stopped
-                } else {
-                    state.present(.error("检测失败：\(error.localizedDescription)"))
-                    if state.snapshot.permissionGranted == true && state.snapshot.capture == .waiting {
-                        var snapshot = state.snapshot
-                        snapshot.signal = .noAudio
-                        state.present(.snapshot(snapshot))
-                    }
-                    terminalPhase = .failed
-                }
-            }
-            let previousMonitor = monitor
-            previousMonitor?.cancel()
-            await previousMonitor?.value
-            monitor = nil
-            state.present(.level(0))
-            state.clearDirection()
-            self.generation = nil
-            operation = nil
-            state.present(.phase(terminalPhase))
-        }
-        monitor = Task {
-            do {
-                while !Task.isCancelled {
-                    try await Task.sleep(for: .milliseconds(100))
-                    try Task.checkCancellation()
-                    state.refresh()
-                    if let start = captureStart, start.duration(to: .now) >= duration {
-                        completed = true
-                        stop()
-                        return
-                    }
-                }
-            } catch {}
-        }
-    }
-    public func stop() {
-        guard operation != nil, state.phase != .stopping else { return }
-        state.present(.phase(.stopping))
-        generation = nil
-        state.present(.level(0))
-        state.clearDirection()
-        monitor?.cancel()
-        operation?.cancel()
-    }
-    /// Settings/model mutation barriers can await actual microphone/Agent cleanup.
-    public func stopAndWait() async {
-        stop()
-        await operation?.value
-    }
-}
-
 /// Display-only values; the App maps native capture facts and Agent observations here.
 public struct AudioDetectionSnapshot: Sendable, Equatable {
     public enum Input: Sendable { case unknown, builtInMicrophone, headset, external }
@@ -168,12 +71,6 @@ public final class AudioDetectionState {
     }
 }
 
-@MainActor
-public protocol AudioDetectionControlling: AnyObject {
-    func start()
-    func stop()
-}
-
 /// Whole diagnostic endpoint supplied by App; neither UI nor the workflow constructs an Agent/device.
 @MainActor
 public protocol AudioDetectionRunning: AnyObject {
@@ -211,12 +108,12 @@ extension AudioDetectionPresenting {
     @MainActor
     struct AudioDetectionSection: View {
         @Bindable var state: AudioDetectionState
-        let controls: any AudioDetectionControlling
+        let requests: UIRequests<AudioDetectionInput, Void>
         @Environment(\.scenePhase) private var scenePhase
         var body: some View {
             Section {
                 Button(state.isActive ? "停止检测" : "开始检测") {
-                    if state.isActive { controls.stop() } else { controls.start() }
+                    submit(state.isActive ? .stop : .start)
                 }
                 .disabled(state.phase == .stopping)
                 .accessibilityIdentifier("settings.recognition.detect")
@@ -245,8 +142,19 @@ extension AudioDetectionPresenting {
             } footer: {
                 Text("检测 10 秒。方向使用采集坐标，未校准。")
             }
-            .onDisappear { controls.stop() }
-            .onChange(of: scenePhase) { _, phase in if phase != .active { controls.stop() } }
+            .onDisappear { submit(.stop) }
+            .onChange(of: scenePhase) { _, phase in if phase != .active { submit(.stop) } }
+        }
+        private func submit(_ value: AudioDetectionInput) {
+            Task {
+                do {
+                    if value == .stop {
+                        try await requests.submitControl(value)
+                    } else {
+                        try await requests.submit(value)
+                    }
+                } catch { state.present(.error(error.localizedDescription)) }
+            }
         }
         private var capture: String {
             switch state.snapshot.capture {
@@ -313,3 +221,5 @@ extension AudioDetectionPresenting {
         }
     }
 #endif
+
+public enum AudioDetectionInput: Sendable, Equatable { case start, stop }

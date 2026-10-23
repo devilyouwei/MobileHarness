@@ -1,6 +1,8 @@
 import AgentCore
 import Foundation
+import Gateway
 import StorageCore
+import UI
 
 /// Photographer business service entry point; tracking policy is a co-located component.
 public actor PhotographerAgent: Agent {
@@ -12,12 +14,18 @@ public actor PhotographerAgent: Agent {
 
     // MARK: - State and dependencies
 
+    var cameraFacts: Task<Void, Never>?
+    var cameraFactSequence: UInt64 = 0
+    let cameraObservationFailure: @Sendable (any Error) -> Void
+    let uiCamera: UICameraContainer?
+    var uiInputs = AgentUIInputs()
+    var uiExecution = AgentUIExecution()
     private let contextRepository: AgentContextRepository<PhotographerContextState>
     private let preprocessor = PhotographerSignalPreprocessor()
     private let contextBuilder = PhotographerContextBuilder()
 
     private let continuation: AsyncStream<OutputEnvelope>.Continuation
-    private let sessionID: String
+    let sessionID: String
     private var trackingSessionID: String?
     private var camera = PhotographerCameraWorkflow()
     private let controlsArm: Bool
@@ -44,12 +52,16 @@ public actor PhotographerAgent: Agent {
     }
 
     public init(
-        sessionID: String, configuration: AgentConfiguration? = nil, controlsArm: Bool = false,
+        sessionID: String, configuration: AgentConfiguration? = nil, uiCamera: UICameraContainer? = nil,
+        controlsArm: Bool = false,
+        cameraObservationFailure: @escaping @Sendable (any Error) -> Void = { _ in },
         outputCapacity: Int = PhotographerSignalPreprocessor.outputCapacity,
         controlAvailable: @escaping @Sendable () async -> Bool = { true },
         context: AgentContextRepository<PhotographerContextState>
     ) throws {
         guard (1...8192).contains(outputCapacity) else { throw CommunicationError.invalidPayload }
+        self.cameraObservationFailure = cameraObservationFailure
+        self.uiCamera = uiCamera
         self.contextRepository = context
         guard contextRepository.agentID == .photographer else { throw AgentConfigurationError.identityMismatch }
         let configuration = try configuration ?? AgentConfigurations.load(named: "Photographer")
@@ -86,9 +98,11 @@ public actor PhotographerAgent: Agent {
                 }
             }
         }
+        try await startUIInputs()
     }
 
     public func pause() async throws {
+        await stopUIInputs()
         guard lifecycle == .running else { throw HarnessError.invalidTransition }
         await taskCoordinator.pause()
         lifecycle = .paused
@@ -98,11 +112,15 @@ public actor PhotographerAgent: Agent {
 
     public func resume() async throws {
         guard lifecycle == .paused else { throw HarnessError.invalidTransition }
+        await stopUIInputs()
         await taskCoordinator.resume()
         lifecycle = .running
+        try await startUIInputs()
     }
 
     public func stop() async {
+        await stopUIInputs()
+        uiExecution.consumer = nil
         admission.close()
         lifecycle = .stopped
         trackingSessionID = nil
@@ -173,7 +191,8 @@ public actor PhotographerAgent: Agent {
                 try await taskCoordinator.receive(input)
                 return
             }
-            let fixed = try AgentFixedTaskInput.unwrap(signal, input: input, executor: descriptor.id)
+            let fixed = try AgentFixedTaskInput.unwrap(
+                signal, input: input, executor: descriptor.id, decode: PhotographerCameraIntent.taskMessage)
             guard fixedTaskInputs.count < 32 else { throw CommunicationError.capacityExceeded }
             try await taskCoordinator.admitFixedTask(signal, input: input)
             fixedTaskInputs[fixed.id] = fixed
@@ -193,7 +212,13 @@ public actor PhotographerAgent: Agent {
                 return false
             }()
         {
-            guard lifecycle == .running else { throw HarnessError.notRunning }
+            let cleanup: Bool
+            if case .observation(let message) = input.payload, message.photographerCamera?.operation == .cancel {
+                cleanup = input.metadata.origin == .local && input.metadata.source == "runtime"
+            } else {
+                cleanup = false
+            }
+            guard lifecycle == .running || (lifecycle == .paused && cleanup) else { throw HarnessError.notRunning }
             guard !input.metadata.expired else { throw CommunicationError.expired }
             var next = camera
             let (result, original) = try next.receive(input, rootSessionID: sessionID)
@@ -244,8 +269,11 @@ public actor PhotographerAgent: Agent {
 
     private func emit(_ output: AgentOutput, input: AgentInput, sequence: UInt64) throws {
         outputSequence += 1
-        switch continuation.yield(
-            OutputEnvelope(source: descriptor.id, input: input, output: output, sequence: outputSequence))
+        let envelope = OutputEnvelope(
+            source: descriptor.id, context: input.context, output: output, sequence: outputSequence,
+            taskScope: input.taskScope)
+        if try uiExecution.capture(envelope) { return }
+        switch continuation.yield(envelope)
         {
         case .enqueued: return
         case .dropped:
@@ -264,8 +292,9 @@ public actor PhotographerAgent: Agent {
             turn: envelope.turn, taskScope: envelope.taskScope)
         let result = continuation.yield(
             OutputEnvelope(
-                source: descriptor.id, input: input,
-                output: envelope.output, sequence: outputSequence, roundID: envelope.roundID, callID: envelope.callID))
+                source: descriptor.id, context: input.context,
+                output: envelope.output, sequence: outputSequence, roundID: envelope.roundID, callID: envelope.callID,
+                taskScope: input.taskScope))
         if case .enqueued = result { return true }
         lifecycle = .failed
         continuation.finish()
@@ -275,7 +304,7 @@ public actor PhotographerAgent: Agent {
     // MARK: - Context
 
     private func receiveCameraState(_ input: AgentInput, message: AgentMessage) async throws {
-        guard input.metadata.origin == .external, input.metadata.source == CameraStateObservation.source,
+        guard input.metadata.origin == .local, input.metadata.source == CameraStateObservation.source,
             input.sessionID == sessionID, input.metadata.contract == CameraStateObservation.contract,
             input.metadata.version == 1
         else { throw CommunicationError.unauthorized }
@@ -287,7 +316,7 @@ public actor PhotographerAgent: Agent {
         guard let value = message.content(as: CameraStateObservation.self),
             value.sequence == input.metadata.sequence
         else { throw CommunicationError.invalidPayload }
-        _ = try message.validatedSize()
+        try input.validate(message)
         try await contextRepository.update {
             guard value.sequence > ($0.state.cameraState?.sequence ?? 0) else { throw CommunicationError.outOfOrder }
             $0.state.cameraState = value

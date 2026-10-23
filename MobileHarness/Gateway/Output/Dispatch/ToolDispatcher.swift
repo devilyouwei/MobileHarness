@@ -9,6 +9,22 @@ struct ToolDispatcher: Sendable {
     let input: InputGateway
     let resources: ResourceCoordinator?
 
+    private static func executionAttachment(_ image: ImageInput?, sequence: UInt64) throws -> (any Sendable)? {
+        guard let image else { return nil }
+        guard image.sequence == sequence, let captured = image.capturedAt,
+            captured.duration(to: .now) >= .zero, captured.duration(to: .now) < .milliseconds(750)
+        else { throw CommunicationError.expired }
+        return image.attachment
+    }
+    private static func executionAttachment(_ envelope: OutputEnvelope) throws -> (any Sendable)? {
+        if let attachment = envelope.executionAttachment {
+            guard envelope.roundID == nil, envelope.taskScope == nil, envelope.media == nil,
+                envelope.inputMetadata.origin == .local
+            else { throw CommunicationError.unauthorized }
+            return attachment
+        }
+        return try executionAttachment(envelope.media, sequence: envelope.sequence)
+    }
     func dispatch(_ call: ToolCall, envelope: OutputEnvelope, owner: ExecutionOwner) async throws -> ToolResponse? {
         let required = Set(
             try await registry.resources(for: call.executionRequest).map { ResourceID(rawValue: $0.rawValue) })
@@ -16,7 +32,7 @@ struct ToolDispatcher: Sendable {
             try await ResourceExecutionContext.$owner.withValue(owner) {
                 try await ToolExecutor(registry: registry).execute(
                     call.executionRequest, context: envelope.executionContext, returning: envelope.roundID != nil,
-                    attachment: try DeviceInputAdapter.executionAttachment(envelope.media, sequence: envelope.sequence))
+                    attachment: try Self.executionAttachment(envelope))
             }
         }
         let result: ToolResponse?

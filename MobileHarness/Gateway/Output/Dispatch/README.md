@@ -57,11 +57,6 @@ IndependentOutputWorkflow 属于 Gateway，复用同一实际注册 incarnation 
 
 - Durable result transport is not implemented.
 
-## Platform 根、设备接入与同帧呈现
-
-✅ ToolDispatcher 在已绑定的生产者权限内验证媒体帧序号、尺寸、方向、时间和 750 ms 新鲜度，再绑定单次执行附件。验证失败明确拒绝；不会重新读取最新摄像头帧替代原帧。
-
-✅ consumeSignals 的媒体附件输出使用独立容量一、最新态替换邮箱，与离散函数 FIFO 和通信分开；避免慢呈现保留大量旧像素。停止关闭媒体邮箱并释放替换态，不丢弃已接纳离散操作。
 
 ## 视觉停顿恢复修复
 
@@ -74,3 +69,16 @@ IndependentOutputWorkflow 属于 Gateway，复用同一实际注册 incarnation 
 ## 视觉 queueFull 修复
 
 ✅ consumeSignals 增加 replacementKey 回调，仅接纳无 round 的 Tool 与非定向广播状态，拒绝将 Action/终态控制/定向通信标成最新状态；键按来源、会话、任务隔离，最长 64 字节、每个邮箱最多 16 个待处理键，另有一个在途派发。普通状态消费不会阻塞媒体或离散操作。所有分支使用逐项 group.next 及时传播首个失败，再取消并加入其余分支；不等待队列继续堆满而丢失原始错误。队列错误携带 lane、capacity、source、sequence 和输出标识，区分 full 与 closed。
+
+
+## Direct container contract
+
+Gateway routes bound Agent communication and execution feedback only. It has no native input adapter, host dynamic subscription or foundational SDK dependency. Current cross-module ownership is defined by the [overall design](../../../README.md).
+
+## 直连链路当前契约
+
+✅ 内部 Tool 执行透传执行附件，保留媒体附件校验，禁止模型输出凭空创建执行端口。
+
+✅ 中立媒体值只保存原生消费所需的 Float PCM 和不透明图像附件；合成字节数据转换由测试侧负责。执行附件继续校验帧身份与新鲜度。
+
+✅ 不透明图像附件直接保留 Sendable 原生帧本体；角色校验 CameraFrame，Gateway 无需引用 PlatformKit 即可保留和转交附件。

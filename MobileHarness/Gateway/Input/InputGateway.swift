@@ -1,34 +1,8 @@
 import AgentCore
 import Foundation
 
-/// Host-owned exact subscription. The token cannot grant an Agent new input or publication rights.
-public struct SignalSubscription: Sendable {
-    public let id: String
-    public let owner: ExecutionOwner
-    public let contract: String
-    public let source: String
-}
-
-/// A host waiting for admission retains every rejected branch rather than replacing its reason.
-public struct InputAdmissionFailure: Error, Sendable {
-    public let report: DeliveryReport
-    public init(report: DeliveryReport) { self.report = report }
-}
-
 public actor InputGateway {
-    /// Host diagnostic ingress; creates an external fact, never runtime execution authority.
-    public func publishRuntimeFailure(_ event: RuntimeFailureEvent, sessionID: String) async throws {
-        try event.validate()
-        let message = AgentMessage(
-            contract: RuntimeFailureEvent.contract, content: event, maximumBytes: 16_384,
-            validate: { try $0.validate() })
-        try await publish(
-            ExternalInputDraft(
-                sessionID: sessionID, payload: .observation(message), source: RuntimeFailureEvent.source,
-                rootID: event.id))
-    }
 
-    private var subscriptions: [String: SignalSubscription] = [:]
     private var signalRecords: [SignalTraceRecord] = []
     private var signalRevision: UInt64 = 0
     private var signalEvictions: UInt64 = 0
@@ -43,7 +17,6 @@ public actor InputGateway {
     private var publicationBranches = 0
     private var publicationBytes = 0
     private var closed = false
-    private let allowsExternalSend: Bool
     private let publicationFailure: @Sendable (AgentInput, AgentID?, String) async -> Void
     private var activeAdmissions = 0
     private var activeBranches = 0
@@ -51,7 +24,7 @@ public actor InputGateway {
     private let policy: CommunicationPolicy?
     private let manager: AgentManager
     public init(
-        manager: AgentManager, policy: CommunicationPolicy? = nil, allowsExternalSend: Bool = false,
+        manager: AgentManager, policy: CommunicationPolicy? = nil,
         signalAggregation: @escaping @Sendable (AgentInput) -> Bool = {
             [.audio, .image, .activityEvent].contains($0.payload.kind)
         },
@@ -60,7 +33,6 @@ public actor InputGateway {
     ) {
         self.signalAggregation = signalAggregation
         self.signalSummary = signalSummary
-        self.allowsExternalSend = allowsExternalSend
         self.publicationFailure = publicationFailure
         self.policy = policy
         self.manager = manager
@@ -192,86 +164,6 @@ public actor InputGateway {
         signalChanged()
     }
 
-    public func destinations(for input: AgentInput) throws -> [AgentID] {
-        guard let policy else { throw CommunicationError.unsupportedContract }
-        let targets = publicationTargets(input, staticTargets: policy.destinations(for: input).map { ($0, nil) })
-        guard !targets.isEmpty else { throw CommunicationError.noRecipients }
-        return targets.map(\.0)
-    }
-
-    /// Trusted host API, not a model function. Registration never starts an Agent or a device.
-    public func subscribe(owner: ExecutionOwner, contract: String, source: String) async throws -> SignalSubscription {
-        try Task.checkCancellation()
-        guard !closed else { throw CommunicationError.scopeClosed }
-        guard let policy, let declaration = policy.agents[owner.agent],
-            let schema = policy.contracts[contract],
-            declaration.inputs.contains(where: {
-                $0.contract == contract && $0.version == 1 && $0.kind == schema.kind
-            })
-        else { throw CommunicationError.unsupportedContract }
-        guard ExternalInputAdapter.validSource(source),
-            policy.externalSources.contains(source)
-                || policy.agents[AgentID(rawValue: source)]?.publications.contains(contract) == true
-        else { throw CommunicationError.unauthorized }
-        try await manager.validate(owner.agent, incarnation: owner.incarnation, sessionID: owner.sessionID)
-        try Task.checkCancellation()
-        // Re-check after the identity hop: shutdown or another registration may have interleaved.
-        guard !closed else { throw CommunicationError.scopeClosed }
-        subscriptions = subscriptions.filter {
-            $0.value.owner.agent != owner.agent || $0.value.owner.incarnation == owner.incarnation
-        }
-        guard !declaration.subscriptions.contains(where: { $0.contract == contract && $0.source == source }),
-            !subscriptions.values.contains(where: {
-                $0.owner == owner && $0.contract == contract && $0.source == source
-            })
-        else { throw CommunicationError.invalidPayload }
-        let targetCount = subscriptions.values.filter { $0.owner.agent == owner.agent }.count
-        var recipients = Set(
-            policy.agents.compactMap { id, entry in
-                entry.subscriptions.contains { $0.contract == contract && $0.source == source } ? id : nil
-            })
-        recipients.formUnion(
-            subscriptions.values.filter { $0.contract == contract && $0.source == source }.map {
-                $0.owner.agent
-            })
-        recipients.insert(owner.agent)
-        var topics = Set(policy.agents.values.flatMap { $0.subscriptions.map(\.topic) + $0.publications })
-        topics.formUnion(subscriptions.values.map(\.contract))
-        topics.insert(contract)
-        guard subscriptions.count < 256, declaration.subscriptions.count + targetCount < 16,
-            recipients.count <= 16, topics.count <= 64
-        else { throw CommunicationError.capacityExceeded }
-        let subscription = SignalSubscription(id: UUID().uuidString, owner: owner, contract: contract, source: source)
-        subscriptions[subscription.id] = subscription
-        return subscription
-    }
-
-    /// Future publications stop matching immediately; already admitted publications may finish.
-    public func unsubscribe(_ subscription: SignalSubscription) { subscriptions[subscription.id] = nil }
-
-    private func publicationTargets(_ input: AgentInput, staticTargets: [(AgentID, String?)]) -> [(AgentID, String?)] {
-        var targets = staticTargets
-        var seen = Set(targets.map(\.0))
-        for sub in subscriptions.values
-        where sub.contract == input.metadata.contract && sub.source == input.metadata.source
-            && input.metadata.topic == sub.contract && sub.owner.sessionID == input.sessionID
-        {
-            if seen.insert(sub.owner.agent).inserted { targets.append((sub.owner.agent, sub.owner.incarnation)) }
-        }
-        return targets
-    }
-
-    public func publish(_ draft: ExternalInputDraft) async throws {
-        try await publish(ExternalInputAdapter.signal(draft))
-    }
-
-    /// Directed host admission uses subscribed destinations, never an arbitrary caller-supplied target.
-    public func send(_ input: AgentInput) async throws -> DeliveryReport {
-        try validateExternal(input)
-        guard let policy else { throw CommunicationError.unsupportedContract }
-        let targets = publicationTargets(input, staticTargets: policy.destinations(for: input).map { ($0, nil) })
-        return try await deliver(input, targets: targets)
-    }
     // Module-internal: only OutputGateway supplies resolved targets and a bound source identity.
     func sendInternal(_ input: AgentInput, targets: [(AgentID, String)]) async throws -> DeliveryReport {
         guard input.metadata.origin == .agent, input.metadata.incarnation != nil else {
@@ -286,8 +178,7 @@ public actor InputGateway {
             input.metadata.capturedAt.isFinite, input.metadata.capturedAt >= 0
         else { throw CommunicationError.invalidPayload }
         switch input.metadata.origin {
-        case .external:
-            guard input.metadata.incarnation == nil else { throw CommunicationError.unauthorized }
+        case .local: throw CommunicationError.unauthorized
         case .agent:
             guard input.metadata.incarnation != nil else { throw CommunicationError.unauthorized }
         case .runtime:
@@ -321,34 +212,18 @@ public actor InputGateway {
         }
         return 0
     }
-    /// One-way external facts. Receiver outcomes belong to diagnostics, never to the publisher.
-    public func publish(_ input: AgentInput) async throws {
-        do {
-            try validateExternal(input)
-            guard let policy else { throw CommunicationError.unsupportedContract }
-            try await publishInternal(input, targets: policy.destinations(for: input).map { ($0, nil) })
-        } catch {
-            let id = beginSignal(input, mode: .publish, targets: [])
-            finishSignal(id, phase: .rejected, reason: String(describing: error))
-            throw error
-        }
-    }
+    /// Bound Agent publication retains one-way diagnostics without business acknowledgment.
 
     func publishInternal(
         _ input: AgentInput, targets: [(AgentID, String?)],
         observe: (@Sendable (AgentInput) async -> Void)? = nil
     ) async throws {
-        let targets = publicationTargets(input, staticTargets: targets)
         let traceID = beginSignal(input, mode: .publish, targets: targets.map(\.0))
         do {
             try Task.checkCancellation()
             let branches = targets.count + (observe == nil ? 0 : 1)
             let bytes = try validatePayload(input) * branches
-            if input.metadata.origin == .external {
-                guard (policy?.externalSources ?? []).contains(input.metadata.source) else {
-                    throw CommunicationError.unauthorized
-                }
-            }
+
             guard !closed else { throw CommunicationError.scopeClosed }
             guard branches > 0 else {
                 finishSignal(traceID, phase: .unobserved)
@@ -408,7 +283,6 @@ public actor InputGateway {
     }
     public func shutdown() async {
         closed = true
-        subscriptions.removeAll()
         let pending = Array(publications.values)
         for operation in pending { operation.cancel() }
         for operation in pending { await operation.value }
@@ -416,26 +290,6 @@ public actor InputGateway {
         signalObservers.removeAll()
         for observer in taskObservers.values { observer.finish() }
         taskObservers.removeAll()
-    }
-    /// Explicit opt-in for isolated legacy hosts; production external inputs are subscription-only.
-    public func send(_ input: AgentInput, to target: AgentID) async throws -> DeliveryReport {
-        guard allowsExternalSend else { throw CommunicationError.unauthorized }
-        try validateExternal(input)
-        return try await deliver(input, targets: [(target, nil)])
-    }
-    private func validateExternal(_ input: AgentInput) throws {
-        guard input.taskScope == nil else { throw CommunicationError.unauthorized }
-        if case .observation(let message) = input.payload, message.content(as: AgentTaskSignal.self) != nil {
-            throw CommunicationError.unauthorized
-        }
-        guard input.metadata.origin == .external, input.metadata.incarnation == nil else {
-            throw CommunicationError.unauthorized
-        }
-        switch input.payload {
-        case .communicationReceipt, .toolResult, .actionResult, .roundResult, .activityEvent:
-            throw CommunicationError.unauthorized
-        default: break
-        }
     }
 
     /// Module-internal: returning Tools bind the original execution owner, never public external admission.
@@ -591,11 +445,7 @@ public actor InputGateway {
         guard targets.count <= 16, Set(targets.map(\.0)).count == targets.count else {
             throw CommunicationError.capacityExceeded
         }
-        if input.metadata.origin == .external {
-            guard (policy?.externalSources ?? ["user", "runtime"]).contains(input.metadata.source) else {
-                throw CommunicationError.unauthorized
-            }
-        }
+
         let retainedBytes = encodedBytes * targets.count
         guard activeAdmissions < 128, activeBranches + targets.count <= 256,
             observationBytes + retainedBytes <= 8 * 1024 * 1024

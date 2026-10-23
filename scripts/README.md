@@ -1,5 +1,7 @@
 # Repository scripts
 
+✅ 边界检查约束角色专用文件归属，禁止 ExecutionSession 提供外部业务请求入口、请求表或结果等待器；Communication 只存业务值与通信契约。
+
 ✅ 基础模块检查要求四个根各有 Container／Failure 文件，旧路径退役，源码唯一归属保持；模型装配入口虽移到物理根，仍只属于 ModelKitDefaults。
 
 ✅ 源码检查要求 App 注册模型根与四子能力并接入生命周期，生产消费者不得调用静态 Defaults 或直接构造 ModelManager；基础 SDK 的依赖闭包仍独立检查。
@@ -16,7 +18,7 @@
 | --- | --- |
 | check.sh | Swift 版本、模块/依赖边界、离线 Python 检查、严格格式、根 Swift 测试及项目/权限 plist |
 | check-modelkit-boundaries.py | 项目/SwiftPM 目标与 import 边界、无环依赖、独立基础模块、业务函数/资源约束 |
-| build-ios.sh | 完整 Xcode 下依次构建四个 Simulator scheme，并验证 App 中的 Agent/Skill 资源 |
+| build-ios.sh | 完整 Xcode 下按 Package.resolved 锁定版本依次构建四个 Simulator scheme，禁止自动更新依赖，并验证 App 中的 Agent/Skill 资源 |
 | verify-app-agent-resources.py | 最终 Bundle Catalog 可发现、资源路径/字节与源码一致、Core 协议与函数声明打包边界 |
 
 完整 Xcode/SDK、具体模型和平台能力由相应工具自身校验；不能把缺失工具或失败命令记录为通过。执行结果、失败原因、版本和设备写入 [validation](../docs/validation/README.md)。
@@ -49,7 +51,7 @@ model_download.py 从生产 model-catalog.json 选择源，通过分页 Hub 元�
 
 ## App 组合根边界
 
-check-modelkit-boundaries.py 读取 SwiftPM 的显式源清单，区分 Agents/Actions 核心与同目录内的集成目标，验证每个生产源只有一个目标拥有者；App executable 只编译宿主文件，AppLifecycle 只依赖 Foundation。它禁止基础模块反向依赖集成、ActionBindings 导入 Agents/Gateway 实现、核心 Agents 导入 UI/执行实现，以及 App 中的领域意图/JSON/呈现转换。旧 AppWorkflows/功能目标和业务目录不能回归。
+check-modelkit-boundaries.py validates explicit dependency sets, one compiled owner per production source, independent foundational SDK closures and AgentCore, and direct local-input boundaries. Agents and Actions compile complete owning targets. App remains composition-only, Actions cannot depend on Agents/Gateway implementations, and retired binding targets, codecs, external subscriptions and JSON polling cannot return.
 
 ✅ 边界检查拒绝 App 直接构造 SQLiteRepositories、恢复记录或打开/关闭数据库；确认注册 SQLiteDatabaseStorage.start/stop 与 storage → agents 依赖。Agents/Actions 仍禁止导入具体后端。
 
@@ -66,7 +68,7 @@ Storage 四类容器边界检查覆盖 StorageCore/State/Cache/Files/Database/SQ
 
 ## 公开 State 边界
 
-✅ StorageState 仅承载公开事实；边界检查禁止完整 AgentContext 注册，校验 Skill schema v2/useState。沿用现有源码归属及目标，ActionBindings 显式依赖 StorageState。
+✅ StorageState 仅承载公开事实；边界检查禁止完整 AgentContext 注册，校验 Skill schema v2/useState。沿用现有源码归属及目标，Actions 显式依赖 StorageState。
 
 [公开 State 契约](../MobileHarness/Storage/State/README.md)
 
@@ -85,13 +87,15 @@ Storage 四类容器边界检查覆盖 StorageCore/State/Cache/Files/Database/SQ
 
 ## Platform 根、设备接入与同帧呈现
 
-check-modelkit-boundaries.py 保持四大基础模块无应用依赖、FactoryKit 仅在 AppStorage；Gateway 仅 DeviceInputAdapter.swift 可导入 PlatformKit 并声明设备来源。相机 UI 的 CoreVideo/Metal/QuartzCore 仅开放给帧值/渲染文件。check.sh 与 build-ios.sh 的失败和外部 SDK 限制见 [专项验证](../docs/validation/PlatformKit-Containers.md)。
+check-modelkit-boundaries.py 保持四大基础模块无应用依赖、FactoryKit 仅在 AppStorage；Gateway 不依赖 PlatformKit，不声明设备输入来源。相机 UI 的 CoreVideo/Metal/QuartzCore 仅开放给帧值/渲染文件。历史检查与 SDK 限制见 [专项验证](../docs/validation/PlatformKit-Containers.md)，当前验收见 [直连验证](../docs/validation/Direct-Container-Input.md)。
+
+✅ 边界收尾：移除退役 DeviceInputAdapter 的通用层例外，同时在 Agents 与 Gateway 禁止旧适配类型；本地领域输入从 ProcessingContext 构造接纳值，不交给 Gateway 编码外部 Signal。
 
 ✅ 相机渲染的系统 Synchronization 导入仅限 Camera/CameraFrameView.swift，用于原生渲染线程的最新状态/槽位互斥；UI 的应用模块依赖和其他文件许可保持原有边界。
 
 ## UI 容器与相机能力注入
 
-✅ 边界检查新增 App-only Coordinator 工厂、AgentBindings 禁止构造 CameraState/Coordinator、四大基础库相互隔离和 UI 生命周期注册约束；同步新增源码的唯一归属。
+✅ 边界检查新增 App-only Coordinator 工厂、Agents 禁止构造 CameraState/Coordinator、四大基础库相互隔离和 UI 生命周期注册约束；同步新增源码的唯一归属。
 
 ## 外部输入边界
 
@@ -136,3 +140,39 @@ check-modelkit-boundaries.py 保持四大基础模块无应用依赖、FactoryKi
 ✅ 已恢复：移除对应已撤回音频实验实现的形状检查，保留采集失败 token 隔离、模块边界及统一错误结构检查；不通过守卫强制保留未经硬件验收的音频实现。
 
 ✅ 已恢复（性能待真机对照）的基线：录音会话配置恢复到 6431d36f 的同步调用顺序，空间 AVCaptureSession 恢复为仅在录音后端实例创建时初始化并由后端持有；不改变四声道、首 PCM 就绪、错误上报和停止录音语义。移除仅服务于异步配置的 preparation Task／加入代码及其源码形状检查，保留 token 隔离；后端仍只在请求录音时创建，容器 boot 不打开设备。该对照不代表性能修复已验收。
+
+## Agent-owned UI inputs
+
+✅ Source guards require constructor-injected UI capabilities and role-owned subscription lifecycle, reject UI event dispatch/subscription in AgentApplication and reject ExecutionSession/InputGateway references in role UI handlers. Input format preparation is permitted in the actual perception Agent, including when it imports a UI capability.
+
+## 原生输入归属检查
+
+✅ 已实现：禁止 VoiceSessionCoordinator／AudioDetectionSession 消费原始 PCM、NativePerceptionInputs 或回调转交；要求感知角色直接注入／消费只读原生端口。保持基础模块独立和受保护的输出执行。
+
+## 语音执行归属收敛
+
+✅ 已实现：边界检查禁止 Agents 语音会话持有 AudioInputOutput 控制端或直接执行采集/播放/权限，禁止 SpeechPerception 直接写 UI；确认 Actions 实际拥有执行实现且无 Agents/Gateway 反向依赖。
+
+## 直连链路收尾
+
+✅ 边界检查覆盖角色自有订阅、Actions 实际执行、受保护的类型化历史读取及退役路径。模拟器变体显式排除不支持 Simulator SDK 的默认 Gemma 后端；四个 scheme 全部执行。检查保留普通测试并发，实际时钟和原生窗口用例在独立阶段串行运行；任一阶段失败仍执行另一阶段并返回失败。结果归验证记录。
+
+## Runtime validation isolation
+
+The default check runs ordinary tests concurrently, then executes the live-runtime and native-window suites separately. These suites are serialized because their assertions use real capture freshness, mechanical deadlines, media expiry, or the process-wide AppKit application. Business concurrency remains exercised inside each test. No global parallelism flag or production deadline is changed; excluded cases in the first phase must execute in the second.
+
+✅ 构建缓存隔离：`build-ios.sh` 支持可选 `MOBILEHARNESS_SIMULATOR_DERIVED_DATA` 路径，四个 scheme 与最终资源验证使用同一路径；默认仍为 `build/SimulatorDerivedData`，可在工作区外验证。不改变 App 配置或依赖版本；迁移已有缓存时须保留编译插件缓存的绝对路径引用。
+✅ 边界检查禁止感知角色通用媒体接纳、额外语音队列和旧采样包装；检查退役来源和未生效的本地工厂参数。
+
+✅ 不透明图像附件直接保留 Sendable 原生帧本体；角色校验 CameraFrame，Gateway 无需引用 PlatformKit 即可保留和转交附件。
+
+✅ 边界检查校验新文件归属、App 页面构造边界、独立 AgentCore 及固定 Memory 提交保护，并禁止退役别名、未使用投影和 Chat 父提交接收分支。
+
+
+## Actions 接入契约
+
+Actions 按业务能力组织源码，保持原编译目标。生产调用显式连接独立相机、语音、UI 呈现和 Task 端点；不通过无关能力的类型转换探测。验证和导航按实际源码所有权维护，业务授权与生命周期继续由原拥有者负责。
+
+## Agents 角色与共享机制
+
+具体角色装配归 Agents 根级，Support 保留通用机制；角色私有载荷和会话控制由角色解释，通过注入的解码／Context 钩子接入共享准入。输入身份、Task scope、取消加入和真实结果保持独立，源码和验证按其实际所有者维护。

@@ -6,6 +6,8 @@
 
 | 文档 | 职责 |
 | --- | --- |
+| [Agents / Actions 组织整理](Agents-Actions-Organization.md) | 目录归属、共享机制与端点解耦的回归、模拟器编译和原工程文件协调限制。 |
+| [外部输入直连 Container](Direct-Container-Input.md) | 直连迁移的自动检查、锁定依赖构建、设备修正版安装及尚未完成的原生／性能验收。 |
 | [项目验证日志](Validation-History.md) | 按日期记录仓库检查、构建、部署、问题调查与验证结果；专项报告有详细数据时使用链接。 |
 | [千问工作流回归](Qwen-Workflow-Regression.md) | 同套合成场景下真实 flash/plus/max 的 Action/Tool、Task/Skill 调用与边界；不等于物理设备验收。 |
 | [千问提示词修订回归](Qwen-Prompt-Optimization.md) | 基于原始失败修订教学后的同用例对照，保留 pilot、完整运行及残留失败；不改执行权限。 |
@@ -44,3 +46,5 @@
 [内置 Skill 全 Action 迁移](Skill-Action-Migration.md)记录生产注册、Query Channel、原生 Tool 基础能力保留，以及完整 Flash/Max 工作流的实际结果、残留失败和构建边界。早期隔离实验不作为本次生产迁移的验收替代。
 
 - [PlatformKit 容器与设备接入验证](PlatformKit-Containers.md)
+
+- [Direct container input validation](Direct-Container-Input.md): automated/build evidence and outstanding physical/performance checks.

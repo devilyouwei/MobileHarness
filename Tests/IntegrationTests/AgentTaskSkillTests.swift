@@ -1,6 +1,4 @@
-import ActionBindings
 import Actions
-import AgentBindings
 import AgentCore
 import CallRuntime
 import ExecutionRuntime
@@ -332,7 +330,7 @@ private func photographyAcceptance(
     _ = try await bindSpeechRequests(agent)
     let manager = AgentManager()
     try await manager.register(agent)
-    let input = InputGateway(manager: manager, allowsExternalSend: true)
+    let input = InputGateway(manager: manager)
     let effects = SkillEffects()
     let definitions = [
         "Camera.Capture.takePhoto", "Camera.Capture.savePhoto", "Camera.Capture.ignorePhoto", "Camera.Capture.open",
@@ -444,7 +442,7 @@ private func photographyAcceptance(
         id: UUID().uuidString,
         sessionID: session,
         payload: .text(captureOnly ? "可以帮我拍张照吗，但是不需要后续操作" : (live ? "你好，帮我拍张照。" : "拍照 fixture")))
-    _ = try await input.send(first, to: .assistant)
+    _ = try await manager.receiveLocally(first, to: .assistant)
     try await skillEventually {
         let completed = await effects.completed
         let failures = await effects.failures
@@ -490,7 +488,7 @@ private func photographyAcceptance(
         if let alias = followUpAlias {
             if expireBeforeFollowUp {
                 for index in 1...5 {
-                    _ = try await input.send(
+                    _ = try await manager.receiveLocally(
                         AgentInput(id: UUID().uuidString, sessionID: session, payload: .text("无关聊天 \(index)")),
                         to: .assistant)
                     try await skillEventually { await effects.completed == 1 + index }
@@ -500,7 +498,7 @@ private func photographyAcceptance(
                 }
             }
             let followUp = AgentInput(id: UUID().uuidString, sessionID: session, payload: .text("处理当前预览：\(alias)"))
-            _ = try await input.send(followUp, to: .assistant)
+            _ = try await manager.receiveLocally(followUp, to: .assistant)
             try await skillEventually { await effects.completed == (expireBeforeFollowUp ? 7 : 2) }
             let requests = await stub.requests
             #expect(requests.count == (expireBeforeFollowUp ? 13 : 6))
@@ -561,7 +559,7 @@ private func photographyAcceptance(
     let active = try #require(try await context.snapshot().state.skillState?.activeTaskID)
     #expect(try await context.snapshot().state.skillState?.tasks.last?.status == "waitingUser")
     if live && run == 2 {
-        _ = try await input.send(
+        _ = try await manager.receiveLocally(
             AgentInput(id: UUID().uuidString, sessionID: session, payload: .text("重新拍一张。")), to: .assistant)
         try await skillEventually {
             let completed = await effects.completed
@@ -574,7 +572,7 @@ private func photographyAcceptance(
         #expect(firstIgnore < secondCapture)
     }
     if replaceForeground {
-        _ = try await input.send(
+        _ = try await manager.receiveLocally(
             AgentInput(id: UUID().uuidString, sessionID: session, payload: .text("结束旧任务，再拍一张新照片")),
             to: .assistant)
         try await skillEventually { await effects.completed == 2 }
@@ -603,7 +601,7 @@ private func photographyAcceptance(
     }
     let ending = live && run == 1 ? "忽略这张照片，不要保存。" : "保存"
     let second = AgentInput(id: UUID().uuidString, sessionID: session, payload: .text(ending))
-    _ = try await input.send(second, to: .assistant)
+    _ = try await manager.receiveLocally(second, to: .assistant)
     try await skillEventually {
         let completed = await effects.completed
         let failures = await effects.failures
@@ -628,7 +626,7 @@ private func photographyAcceptance(
     if live {
         let query = AgentInput(
             id: UUID().uuidString, sessionID: session, payload: .text("只列出最近的对话标题，不要读取详情，不需要创建任务。"))
-        _ = try await input.send(query, to: .assistant)
+        _ = try await manager.receiveLocally(query, to: .assistant)
         try await skillEventually {
             let completed = await effects.completed
             return completed == (run == 2 ? 4 : 3)
@@ -649,7 +647,7 @@ private func photographyAcceptance(
                         PublishedState(FixtureCameraFact(enabled: true, running: true)),
                         expecting: publicOwner.camera.get().revision)
                 }
-                _ = try await input.send(
+                _ = try await manager.receiveLocally(
                     AgentInput(id: UUID().uuidString, sessionID: session, payload: .text(command)),
                     to: .assistant)
                 try await skillEventually {
@@ -718,7 +716,7 @@ private func photographyAcceptance(
         // A later human input in the still-active Task keeps its entry round too.
         #expect(calls[start + 3].messages.contains { $0.role == .assistant && $0.content.contains("<startTask") })
         if !rejectFirst {
-            _ = try await input.send(
+            _ = try await manager.receiveLocally(
                 AgentInput(id: UUID().uuidString, sessionID: session, payload: .text("再拍一张")), to: .assistant
             )
             try await skillEventually { await effects.completed == 3 }
@@ -939,11 +937,7 @@ private func photographyAcceptance(
     let child = ObservationRecorder(id: "memory")
     let configurations = try AgentConfigurations.all()
     let policy = try CommunicationPolicy(
-        contracts: AgentContracts.communication,
-        externalSources: [
-            "user", "runtime", "phone.microphone", "phone.camera", "model.resources", "app.resources",
-            "app.environment",
-        ], configurations: configurations)
+        contracts: AgentContracts.communication, configurations: configurations)
     let manager = AgentManager()
     try await manager.register(assistant, sessionID: session)
     try await manager.register(child, sessionID: session)
@@ -2368,7 +2362,8 @@ func assistantIdleExpiryChangesNextRequestCatalogButKeepsEarlierConversationEvid
         let input = AgentInput(id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("query fixture"))
         let call = try catalog.resolveAction(query.alias, parameters: parameters)
         let invocation = try ActionInvocation(
-            envelope: OutputEnvelope(source: .assistant, input: input, output: .actionCall(call)))
+            envelope: OutputEnvelope(
+                source: .assistant, context: input.context, output: .actionCall(call), taskScope: input.taskScope))
         #expect(try await ActionExecutor(registry: assembly.actions).execute(invocation) == .value(query.alias))
     }
 }

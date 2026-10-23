@@ -45,7 +45,9 @@ public struct ScheduledAction: Sendable {
     }
 
     public init(source: AgentID, input: AgentInput, call: ActionCall, sequence: UInt64 = 0, executionID: String) {
-        let envelope = OutputEnvelope(source: source, input: input, output: .actionCall(call), sequence: sequence)
+        let envelope = OutputEnvelope(
+            source: source, context: input.context, output: .actionCall(call), sequence: sequence,
+            taskScope: input.taskScope)
         self.owner = nil
         self.feedback = .none
         self.lease = nil

@@ -1,4 +1,3 @@
-import ActionBindings
 import Actions
 import AgentCore
 import Agents
@@ -437,7 +436,7 @@ private func qwenRun(_ scenario: QwenCase, provider: OpenAIChat) async throws ->
     let speechRequests = try await bindSpeechRequests(agent)
     let manager = AgentManager()
     try await manager.register(agent)
-    let inputGateway = InputGateway(manager: manager, allowsExternalSend: true)
+    let inputGateway = InputGateway(manager: manager)
     let effects = QwenEffects(scenario: scenario, facts: facts)
     let controls = TaskControlModule(capability: QwenControls(agent: agent))
     let assembly = try BehaviorAssembly(capabilityModules: [controls])
@@ -507,7 +506,7 @@ private func qwenRun(_ scenario: QwenCase, provider: OpenAIChat) async throws ->
         for turn in scenario.turns {
             await model.beginTurn()
             let input = AgentInput(id: UUID().uuidString, sessionID: session, payload: .text(turn.user))
-            _ = try await inputGateway.send(input, to: .assistant)
+            _ = try await manager.receiveLocally(input, to: .assistant)
             let deadline = ContinuousClock.now.advanced(by: .seconds(180))
             while !(await effects.completed(input.id)) {
                 try Task.checkCancellation()
@@ -605,7 +604,9 @@ func qwenExpressionSequenceScoringRejectsBrokenGroups(variant: String) async thr
             continue
         }
         await effects.record(
-            OutputEnvelope(source: .assistant, input: input, output: output, roundID: "offline"), aliases: [:])
+            OutputEnvelope(
+                source: .assistant, context: input.context, output: output, roundID: "offline",
+                taskScope: input.taskScope), aliases: [:])
     }
     let issues = qwenExpressionIssues(expected, calls: await effects.calls)
     if let issue = sample.1 {

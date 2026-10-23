@@ -56,3 +56,5 @@ HistoryPaging.pageSize supplies the shared20-item default for archived dialogs a
 ✅ 本目录的领域端口由 DatabaseStorage 发布；SQL 适配器统一归 Database/SQLite 编译，业务调用方不导入 SQLite 后端。
 
 ✅ ConversationTokenUsage 透传可选 cachedInput/cacheWriteInput；原始请求保存稳定 system 与当前 State 分开的消息。旧 Codable 数据缺失字段可读。
+
+✅ ConversationHistoryStore.admitUserInput 在一个写入 gate 内选择当前会话并接纳无模型请求的用户记录；begin 继续要求精确 read token，用于实际请求快照，不放宽旧 token／外来 token 检查。共用有界记录校验与实际 checkpoint，失败不伪造接纳。

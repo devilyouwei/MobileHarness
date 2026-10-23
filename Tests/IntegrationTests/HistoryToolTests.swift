@@ -1,6 +1,4 @@
-import ActionBindings
 import Actions
-import AgentBindings
 import AgentCore
 import Agents
 import CallRuntime
@@ -142,7 +140,8 @@ private actor HistoryQueryProbe: HistoryQueryCapability {
     ]).tools
     let input = AgentInput(
         id: UUID().uuidString, sessionID: UUID().uuidString, payload: .event("fixture"))
-    let envelope = OutputEnvelope(source: .assistant, input: input, output: .toolCall(call))
+    let envelope = OutputEnvelope(
+        source: .assistant, context: input.context, output: .toolCall(call), taskScope: input.taskScope)
     let response = try await ToolExecutor(registry: registry).execute(call, envelope: envelope)
     #expect(response?.callID == id && response?.isError == false)
 }

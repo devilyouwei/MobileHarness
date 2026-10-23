@@ -2,6 +2,9 @@ import Foundation
 
 @MainActor
 public final class UIHomeContainer {
+    public let requests = UIRequests<HomeInput, Void>()
+    public let listeningRequests = UIRequests<ListeningInput, Void>(controlOnly: true)
+
     public let conversation = ConversationState()
     public let activity = ActionActivityState()
     public var conversationPresentation: any ConversationPresenting { conversation }
@@ -51,4 +54,11 @@ public final class UIHomeContainer {
         conversation.isReady = false
         expressionOwner.resetExpression()
     }
+}
+
+/// User intent only. No execution identity, device handle or business routing.
+public enum ListeningInput: Sendable, Equatable {
+    case setEnabled(Bool)
+    case toggle
+    case press(Bool)
 }

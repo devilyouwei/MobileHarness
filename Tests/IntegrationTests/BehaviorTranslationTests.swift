@@ -19,7 +19,8 @@ import Testing
     let call = ActionCall(
         actionPath: .init(domain: "Fixture", module: "Control", function: "move"), channel: "Robot",
         parameters: ["target": "2048"])
-    let envelope = OutputEnvelope(source: .assistant, input: input, output: .actionCall(call), sequence: 42)
+    let envelope = OutputEnvelope(
+        source: .assistant, context: input.context, output: .actionCall(call), sequence: 42, taskScope: input.taskScope)
     let scheduled = try ScheduledAction(envelope: envelope, owner: owner, feedback: .terminal)
     let execution = scheduled.execution
     #expect(execution.executionID == scheduled.executionID)

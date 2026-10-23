@@ -520,6 +520,20 @@ public actor ConversationHistoryStore {
         return ConversationReadSnapshot(current: value.current, token: readToken)
     }
 
+    /// Admits user text before a model request exists, under one current-conversation write fence.
+    public func admitUserInput(id: String, user: String, model: String) async throws -> ConversationRecord {
+        try await acquireWrite()
+        defer { releaseWrite() }
+        try await load()
+        try await synchronizeCurrentLocked()
+        guard !value.current.turns.contains(where: { $0.id == id }) else {
+            throw ConversationHistoryError.invalidRecord
+        }
+        return try await beginLocked(
+            id: id, user: user, request: [], model: model,
+            maximumOutputTokens: nil, temperature: 0.7, awaitingModel: true)
+    }
+
     /// Persists the caller's exact request, rejecting intervening mutations.
     public func begin(
         id: String, user: String, request: [ConversationMessage], expecting token: ConversationReadToken,
@@ -530,7 +544,15 @@ public actor ConversationHistoryStore {
         try await load()
         try await synchronizeCurrentLocked()
         guard token == readToken else { throw ConversationHistoryError.conflict }
+        return try await beginLocked(
+            id: id, user: user, request: request, model: model,
+            maximumOutputTokens: maximumOutputTokens, temperature: temperature, awaitingModel: awaitingModel)
+    }
 
+    private func beginLocked(
+        id: String, user: String, request: [ConversationMessage], model: String,
+        maximumOutputTokens: Int?, temperature: Double, awaitingModel: Bool
+    ) async throws -> ConversationRecord {
         guard user.utf8.count <= 4096, model.utf8.count <= 512,
             request.count <= 514,
             request.allSatisfy({ $0.content.utf8.count <= ($0.role == .system ? 65536 : 262144) }),

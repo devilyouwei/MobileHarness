@@ -1,32 +1,66 @@
-# Generation — Output Parsing and Prompt Rendering
+# Generation — 增量解析与提示词模板
 
-## Summary
+## 职责与外部关系
 
-Provides incremental natural text/XML interpretation, native Tool-call parsing and bounded prompt-template rendering without model or execution dependencies.
-
-## Ownership and boundaries
-
-Raw aliases/text remain inside the Agent. FunctionTokenParser owns syntax; capability resolution owns permission binding; the role supplies text-to-output mapping; Gateway executes resolved calls. GenerationTrace is a non-executing diagnostic consumer.
-
-## External relationships and data flow
-
-Runtime arrows show data or capability calls; dashed arrows show injection.
+本目录只依赖中立 Core 值与 Foundation。解析自然文本／受限 XML、provider native Tool 完整调用及严格模板，不请求模型、不执行函数、不分配原生设备资源。
 
 ```mermaid
 flowchart LR
- Stream[UTF-8 text fragments] --> Parser[FunctionTokenParser]
- Parser -->|Text and scope boundaries| Sentences[SentenceFunctionBuffer]
- Sentences --> Mapping[Injected text mapping]
- Parser --> Resolver[CapabilityRegistry.resolveAction]
- Parser -->|Wait scheduling| Events[GenerationEvent]
- Resolver --> Events
- Mapping --> Events
- Native[Provider-native complete call] --> ToolParser[ToolCallParser]
- ToolParser --> NativeResolver[CapabilityRegistry.resolveTool]
- NativeResolver --> Tool[Resolved ToolCall]
- Tool --> Agent[Owning Agent output]
- Events --> Agent
- Agent --> Gateway
+ A["Agents／Chat：提供片段与映射策略"]:::agent
+ G["Generation"]:::host
+ C["Core.Capability：解析别名与权限绑定"]:::host
+ O["Core.Output：已解析调用／调度事件"]:::host
+ A --> G
+ G <--> C
+ G --> O
+ classDef ui fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e
+ classDef platform fill:#dcfce7,stroke:#16a34a,color:#14532d
+ classDef model fill:#f3e8ff,stroke:#9333ea,color:#581c87
+ classDef storage fill:#fef3c7,stroke:#d97706,color:#78350f
+ classDef agent fill:#eef2ff,stroke:#6366f1,color:#312e81
+ classDef gateway fill:#ffedd5,stroke:#ea580c,color:#7c2d12
+ classDef action fill:#ffe4e6,stroke:#e11d48,color:#881337
+ classDef host fill:#f1f5f9,stroke:#64748b,color:#334155
+```
+
+## 文件与职责
+
+| 文件 | 职责 |
+| --- | --- |
+| [FunctionToken.swift](FunctionToken.swift) | 解析事件、CallRejection、GenerationError 与调度边界值 |
+| [FunctionTokenParser.swift](FunctionTokenParser.swift) | 增量 UTF-8／XML 词法、实体与资源限制 |
+| [ChannelParser.swift](ChannelParser.swift) | 嵌套 Channel／wait 作用域及调度顺序 |
+| [SentenceFunctionBuffer.swift](SentenceFunctionBuffer.swift) | 句子／安全词边界与首段／后续软长度分段 |
+| [AgentGenerator.swift](AgentGenerator.swift) | 文本映射、Action 目录解析及有序输出事件 |
+| [ToolCallParser.swift](ToolCallParser.swift) | 完整 native 调用的字符串参数 JSON 校验与解析 |
+| [GenerationTrace.swift](GenerationTrace.swift) | 有界原始片段、解析错误位置和非执行事件证据 |
+| [PromptTemplates.swift](PromptTemplates.swift) | 严格模板加载、编译、缓存与单次替换 |
+| [FunctionTokenPrompts.json](FunctionTokenPrompts.json) | 通用输出协议、调度与目录模板资源 |
+
+## 内部结构
+
+```mermaid
+flowchart LR
+ S["UTF-8 fragments"]:::host
+ P["FunctionTokenParser／ChannelParser"]:::host
+ B["SentenceFunctionBuffer"]:::host
+ R["AgentGenerator：映射／目录解析"]:::host
+ N["ToolCallParser：native 参数 JSON"]:::host
+ T["PromptTemplates：加载／校验／单次替换"]:::host
+ TR["GenerationTrace：非执行证据"]:::host
+ S --> P --> B --> R
+ P --> R
+ N --> R
+ S --> TR
+ T -->|"协议／目录模板"| R
+ classDef ui fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e
+ classDef platform fill:#dcfce7,stroke:#16a34a,color:#14532d
+ classDef model fill:#f3e8ff,stroke:#9333ea,color:#581c87
+ classDef storage fill:#fef3c7,stroke:#d97706,color:#78350f
+ classDef agent fill:#eef2ff,stroke:#6366f1,color:#312e81
+ classDef gateway fill:#ffedd5,stroke:#ea580c,color:#7c2d12
+ classDef action fill:#ffe4e6,stroke:#e11d48,color:#881337
+ classDef host fill:#f1f5f9,stroke:#64748b,color:#334155
 ```
 
 ## Syntax and ordering
@@ -56,15 +90,13 @@ Examples illustrate syntax; aliases/parameters must be declared by the caller. S
 
 UTF-8 decoding handles arbitrary byte boundaries. Text segmentation uses sentence/safe-word boundaries and explicit soft limits of 1–2000 Characters; no timer flush exists. Text mapping returns at most eight ordered events per chunk; generation permits 120 calls. Wait count is 32 and combined lexical depth eight. Native Tool parsing is separate and creates no XML aliases or Channel/wait membership.
 
-✅ XML Action resolution discards undeclared attributes after raw input bounds validation; syntax parsing retains its existing limits and duplicate-attribute rejection. Unknown aliases and invalid/missing required parameters produce ordered non-executable CallRejection and continue, counting toward the call bound. Malformed XML, forbidden Channels, resource limits and cancellation terminate parsing. Finish flushes only normal completion; failed/cancelled models do not finish partial syntax or replay emitted effects.
+XML Action resolution discards undeclared attributes after raw input bounds validation; syntax parsing rejects duplicate attributes and enforces the limits above. Unknown aliases and invalid/missing required parameters produce ordered non-executable CallRejection and continue, counting toward the call bound. Malformed XML, forbidden Channels, resource limits and cancellation terminate parsing. Finish flushes only normal completion; failed/cancelled models do not finish partial syntax or replay emitted effects.
 
 GenerationTrace retains exact raw fragments up to 256 KiB/8192 fragments, including empties, without eviction. It retains the first parse error/location, stops interpretation and continues bounded raw collection. append throwing does not partially recover events. Trace retains ordered action/rejection/wait events and owns no worker, persistence or dispatch.
 
-Incremental parsing, explicit text mapping and bounded non-executing traces are implemented.
-
 ## Prompt resources and rendering
 
-PromptTemplates is a independent runtime framework JSON loader/compiler/renderer. Placeholders are `{{name}}`; substitution is single-pass, with no expression execution, recursion or automatic escaping. [FunctionTokenPrompts.json](FunctionTokenPrompts.json) owns generic protocol syntax/Channel/wait guidance, catalog formatting and communication usage metadata; it contains no concrete Agent identity or speech policy. Bundled immutable resources load once and preserve errors.
+PromptTemplates is an independent runtime framework JSON loader/compiler/renderer. Placeholders are `{{name}}`; substitution is single-pass, with no expression execution, recursion or automatic escaping. [FunctionTokenPrompts.json](FunctionTokenPrompts.json) owns generic protocol syntax/Channel/wait guidance, catalog formatting and communication usage metadata; it contains no concrete Agent identity or speech policy. Bundled immutable resources load once and preserve errors.
 
 Names are 1–64 ASCII bytes from letters, digits, `_` and `.`. The document has exactly `version` and `templates` fields, version 1 and 1–64 entries, with 65536 UTF-8 bytes per document/output and 16384 per template. Placeholders accept names only; stray closing delimiters, missing delimiters and invalid names reject at compilation. Every render requires exactly the referenced variable keys, including rejection of extra keys. `load(named:bundle:)` reads at most 65537 bytes to detect oversized resources; `FunctionTokenPrompts.load()` caches the Core bundle resource or its error.
 
@@ -79,36 +111,14 @@ flowchart LR
 
 Role assets are described by [shared Chat](../../Chat/README.md#请求提示词与快照). Templates change model instructions; grants and executable call validation remain code/configuration contracts.
 
-## Related design
+<a id="streaming-tts-latency"></a>
 
-[Parent design](../README.md)
+## 协议教学与分段
 
-后台补充输入：send 包含 content 摘要与 businessContract/payload 可选参数（必须配对）。后台 input 使用已声明类型化业务契约，后台取消继续通过 scoped send；不能因等待状态隐式捕获前台语音。
+FunctionTokenPrompts.json 包含 protocol、Action-only protocol、catalog 与 boundary，复用统一 Channel/wait/scheduling 约束；有可见 Tool 才呈现双协议教学。native 名称以实际定义为准，不从业务 prose 推断；具体角色、Task、设备步骤和业务例子归 Skill。
 
-FunctionTokenPrompts.json 是 Core Bundle 中的 Function Token 模板资源，加载器通过 Bundle API 定位并校验。
+同一响应可为已确定的多步输出连续 wait，每组内不同 Channel 可并行；依赖结果才能选择的步骤必须等待真实反馈。同名 Channel 跨 Task 独立，资源约束另外校验；模板不授予执行权。
 
-Core 提供语法、Channel/wait 与通信协议教学。具体函数与业务示例放在已加载 Skill 的 Instructions.md。
+SentenceFunctionBuffer 支持首段软长度与后续长度，首段状态跨 XML／scope flush 保留；按句子／安全单词边界及显式长度 flush，无计时 flush。实际语音分段默认值由 Chat 调用者配置。
 
-✅ scheduling 模板明确教学一次响应连续输出已确定的多步动作：每步一个 wait 实现跨 Channel 串行；每步内部不同 Channel 可并行，连续 wait 串行连接这些组。依赖结果才能选择的后续步骤仍须等待实际反馈，不因批量输出跳过前置条件。
-
-shared FunctionTokenPrompts guidance describes task-local Channel/wait ordering, independent same-name Channels across tasks and explicit resource conflict/takeover outcomes. Canonical addresses do not create queues; prompt text grants no execution authority.
-
-FunctionTokenPrompts 分别提供 protocol、catalog 标题与末尾 catalogBoundary；Channel/wait 语义由 protocol 定义。
-
-协议模板定义 XML、Channel、wait 与回复前检查；依赖顺序、嵌套/转义和资源边界各有单一规则来源。通信模板按实际消息 kind 生成。
-
-## Streaming TTS latency
-
-SentenceFunctionBuffer accepts optional first-segment length limits, retains the first-emission state across XML/scope flushes, and then uses steady limits. Safe word/sentence boundaries, exact text and explicit overflow remain; no timed text flush.
-
-## 待实现
-
-- Automatic syntax repair and timer-based flushing are not implemented.
-
-✅ 当目录显式含 Tool 时，FunctionTokenPrompts.protocol 说明 XML Actions 和接口原生 Tools 为两个独立输出通道；只从各自声明选择，复制原生 name 的全部字符，不从业务 prose 推导名称。catalogBoundary 提醒依赖实际反馈及当前公开阻断事实；不加入具体 Task/Skill/Camera/Robot 名称，不修改 token 解析或 native 名称映射。
-
-catalogBoundary 同时重申：上层要求独占调用时，整个响应只包含该调用，不添加过程旁白或第二个调用。具体哪些业务步骤独占仍由上层 Skill 声明。
-
-✅ 通用双协议教学仅用于含 Tool 的目录；内置 Skill 目录使用 actionProtocol/actionCatalogBoundary。两种教学共用 scheduling 模板中的 Channel/wait/语法约束。
-
-✅ Implemented: FunctionTokenPrompts adds Action-only protocol/boundary templates sharing the existing Channel/wait/syntax section with generic mixed guidance. Native Tool parsing remains supported.
+❌ 自动语法修复和计时 flush 未实现。上层流程见 [Chat](../../Chat/README.md)，配置与目录见 [Capability](../Capability/README.md)。

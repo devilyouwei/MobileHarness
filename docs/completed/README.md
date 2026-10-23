@@ -30,3 +30,10 @@
 [四项核心架构改进](../requirements/technical/Core-Architecture-Improvement-Plan.md) 只有存储接口子项完成；状态转换、全局错误处理和 App 解耦仍待实施，整份继续留在 requirements。相册与记忆、Resource 状态接入、摄影构图与运镜也继续留在各自待办分类。
 
 [未完成需求](../requirements/README.md) · [文档总索引](../README.md) · [验证记录](../validation/Validation-History.md)
+
+## 业务组织整理（2026-10-23）
+
+- [Actions 业务组织与端点解耦](Actions-Organization.md)：业务目录归位、共享 Support、显式端点及生命周期所有权。
+- [Agents 角色归属与共享机制](Agents-Organization.md)：根级装配、角色私有协议与通用机制分离，以及职责一致的文件组织。
+
+原定整理范围与完整自动检查已完成；模拟器构建使用隔离项目元数据读取同一工作区源码。原工程文件协调阻塞、修正过程及未进行的真实模型／设备验收见[验证记录](../validation/Agents-Actions-Organization.md)。

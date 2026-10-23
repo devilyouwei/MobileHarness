@@ -20,6 +20,11 @@ public struct AssistantPhotoInputPolicy: Sendable {
 
 public struct AssistantContextState: AgentChatContextState {
     public static let supportsSkills = true
+    public static func sessionControl(_ message: AgentMessage) throws -> AgentChatSessionControl? {
+        guard message.contract == AssistantSessionControl.contract else { return nil }
+        guard let control = message.assistantControl else { throw CommunicationError.invalidPayload }
+        return control == .cancelSession ? .close : .interrupt
+    }
     public static let tracksDelegatedReplies = true
     public static func buildChatMessages(system: String, user: String, conversation: StoredConversation)
         throws -> [ChatMessage]
