@@ -38,8 +38,6 @@ public enum VoiceReplyCancellation {
         let state: any ConversationPresenting
         private let runtime: VoiceSessionConnections
         private var speechPlayback: SpeechPlayback?
-        private var voicePressing = false
-        private var voiceCuePreparation: Task<Void, Never>?
         private var presentationPhase: VoicePhase = .loading { didSet { updatePhase() } }
         private var playbackActive = false { didSet { updatePhase() } }
         private lazy var projection = ConversationPresentationController(
@@ -132,8 +130,11 @@ public enum VoiceReplyCancellation {
                 speechPlayback = SpeechPlayback(store: audioStore)
                 speech = perception
                 presentationPhase = .idle
-                state.present(.isReady(true))
+                let request = try UIActions.CueRequest(cue: .wake, volume: 0.85)
+                try await nativeEffects.prepareCue(request)
+                try Task.checkCancellation()
                 nativeEffects.haptic.prepare()
+                state.present(.isReady(true))
             } catch {
                 await shutdown()
                 throw error
@@ -143,10 +144,6 @@ public enum VoiceReplyCancellation {
         public func shutdown() async {
             guard started else { return }
             state.present(.isReady(false))
-            voicePressing = false
-            voiceCuePreparation?.cancel()
-            await voiceCuePreparation?.value
-            voiceCuePreparation = nil
             stopVoice()
             await replyCancellationTask?.value
             await cleanupTask?.value
@@ -164,7 +161,6 @@ public enum VoiceReplyCancellation {
             guard state.isReady, !changingSettings, voiceGeneration == nil, !Task.isCancelled else {
                 throw CancellationError()
             }
-            await voiceCuePreparation?.value
             await replyCancellationTask?.value
             await cleanupTask?.value
             try Task.checkCancellation()
@@ -354,41 +350,9 @@ public enum VoiceReplyCancellation {
                 invocation.context.sessionID == runtime.interactionSessionID, invocation.context.taskID == nil,
                 started, !changingSettings
             else { throw CommunicationError.unauthorized }
-            voicePressChanged(pressed)
-        }
-        private func voicePressChanged(_ pressing: Bool) {
-            let wasPressing = voicePressing
-            voicePressing = pressing
-            guard state.isReady, !changingSettings, !pressing || !wasPressing else { return }
-            if !pressing {
-                guard voiceGeneration == nil else { return }
-                voiceCuePreparation?.cancel()
-                return
-            }
-            guard voiceGeneration == nil, !playbackActive,
-                !listeningPaused, voiceCuePreparation == nil
-            else { return }
-            nativeEffects.haptic.prepare()
-            voiceCuePreparation = Task { [weak self] in
-                guard let self else { return }
-                defer {
-                    voiceCuePreparation = nil
-                    // A newer press can arrive while its predecessor is cancelling; coalesce to one replacement.
-                    if Task.isCancelled, voicePressing, voiceGeneration == nil {
-                        voicePressing = false
-                        voicePressChanged(true)
-                    }
-                }
-                do {
-                    try Task.checkCancellation()
-                    guard voiceGeneration == nil else { return }
-                    let request = try UIActions.CueRequest(cue: .wake, volume: 0.85)
-                    try await nativeEffects.prepareCue(request)
-                } catch is CancellationError {} catch {
-                    state.present(.listeningControlMessage("提示音准备失败：\(error)"))
-                    record(state.listeningControlMessage ?? "提示音准备失败")
-                }
-            }
+            guard pressed else { return }
+            let request = try UIActions.CueRequest(cue: .wake, volume: 0.85)
+            try await nativeEffects.prepareCue(request)
         }
         private func requestReplyCancellation() {
             guard replyCancellationTask == nil else { return }
@@ -505,8 +469,6 @@ public enum VoiceReplyCancellation {
         }
 
         public func stopVoice(message: String = "语音已停止") {
-            voicePressing = false
-            voiceCuePreparation?.cancel()
             let oldGeneration = voiceGeneration
             if oldGeneration != nil || startupTask != nil || handlingTurn || hasPlaybackBarrier || state.isReplyActive {
                 requestReplyCancellation()

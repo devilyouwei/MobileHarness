@@ -1,6 +1,6 @@
 # Conversation — 首页与运行记录呈现
 
-✅ 按压手势用 GestureState 保留本地按压状态，状态变化才提交 press(true/false)，移动不重复发起准备 Action；抬起、取消及页面离开自动复位。交互不可用时不提交新请求，原生取消仍归根生命周期。长按触发、原接纳容量、错误回执和业务判断保持；真机控制错误仍须独立定位。
+✅ 首页触摸仅在 LongPressGesture 半秒门槛成功后提交一次 toggle；短按、双击、抬起和页面退出不提交 press 准备请求。拖动仅更新本地光源位置，长按视觉状态保持本地 GestureState。内部 press 能力保留兼容接口，首页不使用；实际启动提示音仍由聆听执行流程拥有。
 
 ✅ ConversationState 单独拥有 replyWaitingRequest；首个输出、匹配清理、新回复、停止聆听、恢复聆听和失活解除等待，旧请求不能清除新请求。模型准备 checking／ready 不清除请求等待。
 
@@ -46,7 +46,7 @@ Task 详情按实际 task/call 身份关联 Action；独立的 Agent 聊天记�
 
 ExecutionIssue 保留分类、短提示、最多2048字符详情及轮次关联。调用者决定 showsToast；UI 执行去重、身份替换、八秒到期及新输入撤销，保留日志。后台只记录不弹出，不在前台重放。replaceIssues 是独立宿主的纯值快照接口，当前应用使用 recordIssue。
 
-Toast 为最多三行的黄色图标／文字，不拦截触摸，出现时让出回复／状态区。事实异常优先于装饰 Notice；装饰光不改变聆听同意或设备状态。
+Toast 为最多三行的黄色图标／文字，不拦截触摸，无回复时占用状态区。事实异常优先于装饰 Notice；装饰光不改变聆听同意或设备状态。
 
 HomeEffectsWorkflow 拥有独立、可替换、按身份围栏的 Notice／光效到期任务和350ms回复清理任务。回复清理由外部完成策略触发；新文本、新轮次、停止可取消，stopAndWait 加入任务。Toast 到期由根拥有，不依赖页面存活。
 
@@ -93,3 +93,5 @@ UI-owned typed request/reply capabilities have one consumer and at most 64 outst
 ## 直连链路当前契约
 
 ✅ 类型化语音按压／切换请求直达角色，保留单槽控制入口与代际回执。
+
+✅ 回复文本存在时暂停首页 Notice 展示，避免连续异常遮挡字幕；新回复撤下错误 Toast，完整异常继续保留在日志。

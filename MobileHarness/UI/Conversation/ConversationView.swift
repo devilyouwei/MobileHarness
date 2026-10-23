@@ -66,7 +66,6 @@ import Foundation
         @Bindable var state: ConversationState
         @Bindable var activity: ActionActivityState
         private let toggleVoice: () -> Void
-        private let voicePressChanged: ((Bool) -> Void)?
         public init(
             state: ConversationState, activity: ActionActivityState,
             listeningRequests: UIRequests<ListeningInput, Void>
@@ -81,14 +80,13 @@ import Foundation
                 }
             }
             self.toggleVoice = { submit(.toggle) }
-            self.voicePressChanged = { submit(.press($0)) }
         }
         @GestureState private var holdingVoice = false
-        @GestureState private var pressingVoice = false
         @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
         public var body: some View {
             GeometryReader { geometry in
+                let presentationNotice = state.assistantReply.isEmpty ? activity.visibleNotice : nil
                 let diameter = min(geometry.size.width * 0.84, 360.0)
                 ZStack {
                     ConversationAtmosphere()
@@ -107,7 +105,6 @@ import Foundation
                         )
                         .simultaneousGesture(
                             DragGesture(minimumDistance: 0)
-                                .updating($pressingVoice) { _, pressed, _ in pressed = true }
                                 .onChanged { touch in
                                     guard state.allowsHomeInteraction else { return }
                                     let origin = ListeningLightOrigin(
@@ -118,10 +115,6 @@ import Foundation
                                     if state.listeningLightOrigin != origin { state.listeningLightOrigin = origin }
                                 }
                         )
-                        .onChange(of: pressingVoice) { _, pressed in
-                            guard state.allowsHomeInteraction else { return }
-                            voicePressChanged?(pressed)
-                        }
                         .allowsHitTesting(state.allowsHomeInteraction)
                         .accessibilityElement(children: .ignore)
                         .accessibilityAddTraits(.isButton)
@@ -169,13 +162,13 @@ import Foundation
                         .opacity(
                             ConversationCaptionVisibility.user(
                                 isListening: state.isVoiceActive, finalized: state.transcriptFinalized,
-                                hasNotice: activity.visibleNotice != nil) ? 1 : 0
+                                hasNotice: presentationNotice != nil) ? 1 : 0
                         )
                         .accessibilityHidden(
                             state.liveTranscript.isEmpty
                                 || !ConversationCaptionVisibility.user(
                                     isListening: state.isVoiceActive, finalized: state.transcriptFinalized,
-                                    hasNotice: activity.visibleNotice != nil)
+                                    hasNotice: presentationNotice != nil)
                         )
                         .frame(width: min(geometry.size.width - 56, 440), height: layout.captionHeight)
                         .position(x: geometry.size.width / 2, y: layout.captionCenterY)
@@ -226,10 +219,10 @@ import Foundation
                         y: geometry.size.height - (activity.items.isEmpty ? 120 : 240)
                     )
                     .animation(reduceMotion ? nil : .easeInOut(duration: 0.3), value: state.voicePhase)
-                    .opacity(ConversationCaptionVisibility.reply(hasNotice: activity.visibleNotice != nil) ? 1 : 0)
-                    .accessibilityHidden(activity.visibleNotice != nil)
+                    .opacity(ConversationCaptionVisibility.reply(hasNotice: presentationNotice != nil) ? 1 : 0)
+                    .accessibilityHidden(presentationNotice != nil)
 
-                    if let issue = activity.visibleNotice {
+                    if let issue = presentationNotice {
                         (Text(
                             Image(
                                 systemName: issue.tone == .info ? "info.circle.fill" : "exclamationmark.triangle.fill"))
@@ -278,12 +271,16 @@ import Foundation
 
                 }
             }
+            .onChange(of: state.assistantReply) { _, text in
+                if !text.isEmpty, let issue = activity.errorToast {
+                    activity.dismissErrorToast(id: issue.id)
+                }
+            }
             .onChange(of: state.liveTranscript) { _, text in
                 if !text.isEmpty && !state.transcriptFinalized, let issue = activity.errorToast {
                     activity.dismissErrorToast(id: issue.id)
                 }
             }
-            .onDisappear { voicePressChanged?(false) }
             .preferredColorScheme(.dark)
         }
         private var hint: String {

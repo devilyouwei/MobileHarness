@@ -18,3 +18,5 @@
 | [VoiceSessionCoordinator.swift](VoiceSessionCoordinator.swift) | 权限、采集、半双工播放屏障与根会话清理 |
 
 [所属域设计](../README.md) · [Actions 模块](../../README.md)
+
+✅ VoiceSessionCoordinator.start 在发布 isReady 前完成 wake/0.85 音效 PCM 缓存准备与触觉准备，失败传播并 shutdown；不播放、不申请录音权限、不打开采集。根启动调用拥有异步准备，页面和手势不拥有准备任务。移除按压预热任务及取消状态；prepareListening 兼容端口仅复用缓存，不再拥有任务。实际长按启动后沿用原播放、光效与采集流程。

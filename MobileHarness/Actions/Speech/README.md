@@ -24,7 +24,7 @@ Gateway 通过注册函数调用本域，Agents 决定请求与策略，App 注�
 
 ## 函数与完成
 
-Speech.Playback.speak 等待音频排空；Speech.Listening.update 接收策略与反馈；内部 Speech.Listening.prepare 接收手势反馈；内部 Speech.Detection.run 关联请求私有就绪与检测执行。后两者的函数工厂与同类入口同处业务目录，执行服务不定义注册入口。缺少可选能力时保留定义并明确失败。
+Speech.Playback.speak 等待音频排空；Speech.Listening.update 接收策略与反馈；内部 Speech.Listening.prepare 保留兼容缓存准备端口（首页不调用），启动根在 ready 前预载音效；内部 Speech.Detection.run 关联请求私有就绪与检测执行。后两者的函数工厂与同类入口同处业务目录，执行服务不定义注册入口。缺少可选能力时保留定义并明确失败。
 
 ## 接口与关键技术
 | 函数 | 解析与完成 | 静态 timeout |
