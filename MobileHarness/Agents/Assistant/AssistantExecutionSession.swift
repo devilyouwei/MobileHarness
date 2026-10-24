@@ -7,24 +7,24 @@ import StorageCore
 /// Application-owned entry transport. Admission never waits for reasoning or child completion.
 public actor AssistantExecutionSession {
     public nonisolated let agent: AssistantAgent
+    public private(set) var cleanupFailure: AgentFailure?
+    private var registeredForCleanup = false
     private let manager: AgentManager
     private let output: OutputGateway
-    private let startChildren: @Sendable () async throws -> Void
     private let report: @Sendable (String) async -> Void
     private var starting: Task<Void, Error>?
+    private var closing: Task<Void, Never>?
     private var pump: Task<Void, Never>?
     private var started = false
     private var closed = false
 
     public init(
         agent: AssistantAgent, manager: AgentManager, output: OutputGateway,
-        startChildren: @escaping @Sendable () async throws -> Void,
         report: @escaping @Sendable (String) async -> Void = { _ in }
     ) {
         self.agent = agent
         self.manager = manager
         self.output = output
-        self.startChildren = startChildren
         self.report = report
     }
 
@@ -37,7 +37,9 @@ public actor AssistantExecutionSession {
         }
         let operation = Task {
             try await manager.register(agent)
+            registeredForCleanup = true
             do {
+                try Task.checkCancellation()
                 try await manager.start(.assistant)
                 let consumer = try await output.consumer(for: agent)
                 pump = Task {
@@ -56,35 +58,36 @@ public actor AssistantExecutionSession {
                         }
                     } catch is CancellationError {} catch { await report("Agent output transport stopped: \(error)") }
                 }
-                try await startChildren()
                 guard !closed else { throw CommunicationError.scopeClosed }
                 started = true
             } catch {
-                try? await manager.remove(.assistant)
+                await removeRegistration()
                 pump?.cancel()
                 await pump?.value
                 pump = nil
+                if let cleanupFailure {
+                    throw AgentFailure(
+                        component: "assistant", operation: "start", underlying: error,
+                        cleanupErrors: [cleanupFailure])
+                }
                 throw error
             }
         }
         starting = operation
         defer { starting = nil }
-        try await operation.value
+        try await withTaskCancellationHandler {
+            try await operation.value
+        } onCancel: {
+            operation.cancel()
+        }
     }
 
-    /// Registration is part of startup; scene changes must not look up children before it joins.
+    /// Only the Assistant is affected; peer lifecycle belongs to the module root.
     public func setForeground(_ foreground: Bool) async throws {
         try await start()
-        for descriptor in await manager.descriptors()
-        where [AgentID.assistant, .photographer, .memory, .applicationControl].contains(descriptor.id) {
-            let target = try await manager.agent(descriptor.id)
-            let state = await target.status().lifecycle
-            if foreground, state == .paused {
-                try await target.resume()
-            } else if !foreground, state == .running {
-                try await target.pause()
-            }
-        }
+        let state = await agent.status().lifecycle
+        if foreground, state == .paused { try await agent.resume() }
+        if !foreground, state == .running { try await agent.pause() }
     }
 
     /// Stop accepted execution without ending the conversation or its public State scope.
@@ -99,14 +102,29 @@ public actor AssistantExecutionSession {
         try await agent.receive(control.input(sessionID: sessionID))
     }
 
+    private func removeRegistration() async {
+        guard registeredForCleanup else { return }
+        do {
+            try await manager.remove(.assistant)
+            registeredForCleanup = false
+        } catch {
+            cleanupFailure = AgentFailure(
+                component: "assistant", operation: "stop",
+                underlying: error, code: .cleanupFailed)
+        }
+    }
     public func shutdown() async {
-        guard !closed else { return }
+        if let closing { return await closing.value }
         closed = true
-        starting?.cancel()
-        _ = try? await starting?.value
-        if started { try? await manager.remove(.assistant) }
-        pump?.cancel()
-        await pump?.value
-        pump = nil
+        let task = Task {
+            starting?.cancel()
+            _ = await starting?.result
+            await removeRegistration()
+            pump?.cancel()
+            await pump?.value
+            pump = nil
+        }
+        closing = task
+        await task.value
     }
 }

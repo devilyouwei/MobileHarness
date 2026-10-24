@@ -27,7 +27,7 @@ One result classifier replaces host and role lists. All accepted calls still joi
 
 ## Current design entry
 
-The full trigger matrix, per-input budget scope, request/parser/provider limits, indefinite owned waits, delivery retry distinction and recovery gaps are maintained in [overall technical design Part III](../../MobileHarness/README.md#react-continuation-and-agent-recovery). This replaces scattered policy/time-limit descriptions; historical validation above remains dated evidence.
+The full trigger matrix, per-input budget scope, request/parser/provider limits, indefinite owned waits, delivery retry distinction and recovery gaps are maintained in [overall technical design Part III](../../MobileHarness/README.md#tasks-model-decisions-and-history). This replaces scattered policy/time-limit descriptions; historical validation above remains dated evidence.
 
 ## 2026-10-13 clarification — implemented and verified
 

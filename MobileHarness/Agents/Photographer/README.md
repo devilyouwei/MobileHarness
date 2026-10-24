@@ -1,5 +1,11 @@
 # Photographer — 摄影事务与机械跟踪
 
+## 角色容器
+
+✅ [PhotographerContainer.swift](PhotographerContainer.swift) 是 AgentContainer 的稳定子能力。持有角色执行会话、相机 UI 控制和跟踪输出生命周期。CameraCoordinator 由 Actions 实现，经根连接；跟踪 attach／detach 属于会话，停止加入角色和跟踪工作。
+
+生命周期由[模块根](../README.md#agent-container)统一编排；子容器能力不授予执行权。
+
 ## 职责与注入能力
 
 确定性角色，拥有相机 UI 请求、低频相机事实和跟踪策略，不运行普通 Chat，不消费视频帧。构造注入 `UICameraContainer`、私有 `AgentContextRepository`、`controlAvailable` 只读能力及观察失败回调；不注入 ModelKit 或原生相机控制接口。StorageCore 的中立值依赖不等于持有 Storage 根。

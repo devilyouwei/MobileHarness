@@ -14,10 +14,10 @@
         let manager: AgentManager
         let output: OutputGateway
         let endpoints: ActionEndpoints
+        let reportFailure: @Sendable (String, String, any Error) -> Void
         let interactionSessionID: String
         let startInteraction: @MainActor () async throws -> Void
         let cancelReply: @MainActor () async throws -> Void
-        let stopInteraction: @MainActor () async -> Void
         let makeSynthesis: (any SpeechSynthesisCapability, AudioCache) throws -> SpeechSynthesisAgent
         let makePerception:
             (
@@ -27,61 +27,50 @@
                 -> SpeechPerceptionAgent
     }
 
-    /// Owns actual role registration and bound output work. No device control or UI mutation.
+    /// Connection adapter only. Role containers independently own registration and output lifetime.
+    @available(iOS 27, *)
     @MainActor final class VoiceAgentSession {
         private let runtime: VoiceRuntimeDependencies
         private let spectrum: MicrophoneSpectrumPresentation
-        private var speech: SpeechPerceptionAgent?
-        private var outputTask: Task<Void, Never>?
-        init(runtime: VoiceRuntimeDependencies, spectrum: MicrophoneSpectrumPresentation) {
+        private unowned let perception: SpeechPerceptionContainer
+        private unowned let synthesis: SpeechSynthesisContainer
+        init(
+            runtime: VoiceRuntimeDependencies, spectrum: MicrophoneSpectrumPresentation,
+            perception: SpeechPerceptionContainer, synthesis: SpeechSynthesisContainer
+        ) {
             self.runtime = runtime
             self.spectrum = spectrum
+            self.perception = perception
+            self.synthesis = synthesis
         }
         var connections: VoiceSessionConnections {
             VoiceSessionConnections(
                 endpoints: runtime.endpoints, interactionSessionID: runtime.interactionSessionID,
                 cancelReply: runtime.cancelReply, adaptFailure: SpeechPlaybackFailure.adapting)
         }
-        var sessionID: String { runtime.interactionSessionID }
         func audioStore() async throws -> AudioCache {
             try await runtime.cache.audioScope(runtime.interactionSessionID)
         }
         func startInteraction() async throws { try await runtime.startInteraction() }
         func start(
             _ recognition: any SpeechRecognitionCapability, vad: any VoiceActivityCapability,
-            synthesis: any SpeechSynthesisCapability, input: any AudioCaptureObserving, store: AudioCache,
-            report: @escaping @MainActor (String) -> Void
+            synthesis capability: any SpeechSynthesisCapability, input: any AudioCaptureObserving, store: AudioCache
         ) async throws -> any VoicePerceptionHandling {
-            guard speech == nil else { throw CapabilityError.inputBusy }
-            let synthesizer = try runtime.makeSynthesis(synthesis, store)
-            try await runtime.manager.register(synthesizer)
-            try await runtime.manager.start(synthesizer.descriptor.id)
-            let speech = try runtime.makePerception(recognition, vad, runtime.interactionSessionID, input, spectrum)
-            try await runtime.manager.register(speech)
-            self.speech = speech
-            try await runtime.manager.start(.speechPerception)
-            let consumer = try await runtime.output.consumer(for: speech)
-            outputTask = Task {
-                do {
-                    try await IndependentOutputWorkflow.consumeSignals(speech.outputs) { @MainActor output in
-                        do { try await consumer.execute(output) } catch is CancellationError {
-                            throw CancellationError()
-                        } catch { report("输出失败：\(error)") }
-                    }
-                } catch is CancellationError {} catch { report("语音输出消费失败：\(error)") }
-            }
-            return speech
+            try await synthesis.start(synthesis: capability, store: store, runtime: runtime)
+            return try await perception.start(
+                recognition: recognition, vad: vad, input: input,
+                spectrum: spectrum, runtime: runtime)
         }
-        func stop() async {
-            await speech?.stop()
-            outputTask?.cancel()
-            await outputTask?.value
-            outputTask = nil
-            speech = nil
-            try? await runtime.manager.remove(.speechPerception)
-            await runtime.stopInteraction()
-            try? await runtime.manager.remove(AgentID(rawValue: "speechSynthesis"))
+        func stop() async throws {
+            var errors: [any Error] = []
+            do { try await perception.endSession() } catch { errors.append(error) }
+            do { try await synthesis.endSession() } catch { errors.append(error) }
             await runtime.cache.closeAudioScope(runtime.interactionSessionID)
+            if let primary = errors.first {
+                throw AgentFailure(
+                    component: "speech", operation: "stop", underlying: primary,
+                    cleanupErrors: Array(errors.dropFirst()), code: .cleanupFailed)
+            }
         }
     }
 #endif

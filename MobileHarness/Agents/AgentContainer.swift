@@ -22,18 +22,16 @@ import StorageState
     import StorageTasks
     import UI
 
-    /// The scene's composition root. Runtime services are lazy but never discovered by consumers.
+    /// Instance-local module root. Only explicit lifecycle operations create runtime work.
     @MainActor @Observable
     @available(iOS 27, *)
-    public final class AgentApplication {
+    public final class AgentContainer {
         @ObservationIgnored private let containerFailures: ContainerFailureChannel
         @ObservationIgnored private let repositories: @Sendable () throws -> AgentRepositories
         @ObservationIgnored private let capturedPhotos: CapturedPhotoStore
         @ObservationIgnored private let audio: AudioContainer
         @ObservationIgnored private let cameraDevice: any CameraCapturing
         private let cameraUI: UICameraContainer
-        public let cameraState: CameraState
-        @ObservationIgnored private let cameraPresentation: any CameraPresenting
         @ObservationIgnored private let cameraFactory: @MainActor (CameraSessionConnections) -> CameraCoordinator
         @ObservationIgnored private let languageModels: any ModelLanguageProviding
         @ObservationIgnored private let speechModels: any ModelSpeechProviding
@@ -44,9 +42,9 @@ import StorageState
         private func installPublicState() throws {
             guard publicStateScope == nil else { return }
             let scope = try stateStorage.makeScope()
+            publicStateScope = scope
             try camera.connectPublicState(scope: scope)
             try bluetooth.service.connectPublicState(scope: scope)
-            publicStateScope = scope
         }
         public var onModelConfigurationChanged: (@MainActor () -> Void)?
         private let homeUI: UIHomeContainer
@@ -54,7 +52,7 @@ import StorageState
         private let resourcesUI: UIModelResourcesContainer
         private let navigationUI: UINavigationContainer
         private let historyUI: UIHistoryContainer
-        public let devicesUI: UIDeviceSettingsContainer
+        private let devicesUI: UIDeviceSettingsContainer
         private let diagnosticsUI: UIDiagnosticsContainer
         private let stateStorage: StateContainer
         private let cacheStorage: CacheContainer
@@ -67,7 +65,7 @@ import StorageState
             diagnostics: UIDiagnosticsContainer,
             repositories: @escaping @Sendable () throws -> AgentRepositories, state: StateContainer,
             cache: CacheContainer, files: FilesContainer, photos: CapturedPhotoStore,
-            camera: any CameraCapturing, cameraState: CameraState, cameraPresentation: any CameraPresenting,
+            camera: any CameraCapturing, cameraPresentation: any CameraPresenting,
             cameraUI: UICameraContainer,
             makeCamera: @escaping @MainActor (CameraSessionConnections) -> CameraCoordinator,
             bluetooth: BluetoothWorkflow, audio: AudioContainer,
@@ -76,6 +74,13 @@ import StorageState
             memoryPressure: @escaping @Sendable () async -> Void
         ) {
             self.containerFailures = containerFailures
+            assistant = AssistantContainer(home: home)
+            speechPerception = SpeechPerceptionContainer(home: home, diagnostics: diagnostics)
+            applicationControl = ApplicationControlContainer(
+                settings: settings, resources: modelResources, diagnostics: diagnostics,
+                devices: devices, navigation: navigation, bluetooth: bluetooth, failures: containerFailures)
+            memory = MemoryContainer(history: history)
+            photographer = PhotographerContainer(camera: cameraUI, presentation: cameraPresentation)
             homeUI = home
             settingsUI = settings
             resourcesUI = modelResources
@@ -91,8 +96,6 @@ import StorageState
             capturedPhotos = photos
             cameraDevice = camera
             self.cameraUI = cameraUI
-            self.cameraState = cameraState
-            self.cameraPresentation = cameraPresentation
             cameraFactory = makeCamera
             self.bluetooth = bluetooth
             self.languageModels = languageModels
@@ -101,120 +104,42 @@ import StorageState
             self.modelArtifacts = modelArtifacts
             self.memoryPressure = memoryPressure
         }
-        public private(set) var container: VoiceInteractionSession?
+        public let assistant: AssistantContainer
+        public let applicationControl: ApplicationControlContainer
+        public let memory: MemoryContainer
+        public let photographer: PhotographerContainer
+        public let speechPerception: SpeechPerceptionContainer
+        public let speechSynthesis = SpeechSynthesisContainer()
+        public let visionPerception = VisionPerceptionContainer()
+        @ObservationIgnored private lazy var lifecycle = AgentContainerLifecycle(
+            start: { [unowned self] in try await self.startServices() },
+            invalidate: { [unowned self] in self.invalidateServices() },
+            foreground: { [unowned self] in try await self.applyForeground($0) },
+            stop: { [unowned self] in try await self.stopServices() },
+            report: { [containerFailures] failure in
+                containerFailures.report(
+                    module: "agents", component: failure.component, operation: failure.operation,
+                    error: failure, details: .init(code: failure.code.rawValue, isCancellation: failure.isCancellation))
+            })
+        public var isAvailable: Bool { lifecycle.isAvailable }
+        public func start() async throws(AgentFailure) { try await lifecycle.start() }
+        public func invalidate() { lifecycle.invalidate() }
+        public func setForeground(_ value: Bool) async throws(AgentFailure) { try await lifecycle.setForeground(value) }
+        public func stop() async throws(AgentFailure) { try await lifecycle.stop() }
         @ObservationIgnored private var runtimeValue: AgentRuntime?
-        @ObservationIgnored private lazy var environmentInputs: ApplicationEnvironmentInputs = makeEnvironmentInputs()
-        private func makeEnvironmentInputs() -> ApplicationEnvironmentInputs {
-            ApplicationEnvironmentInputs(
-                deliver: { [weak self] fact in
-                    guard let self else { throw CancellationError() }
-                    try await self.runtime().applicationControlSession.agent.observeEnvironment(fact)
-                },
-                failed: { [containerFailures] error in
-                    containerFailures.report(
-                        module: "agents", component: "applicationControl.environment",
-                        operation: "observe", error: error)
-                })
-        }
         public func reportModelPreparation(loading: Bool) {
             reportEnvironment(.modelPreparation, value: loading ? "loading" : "idle")
         }
         public func reportEnvironment(_ category: AppEnvironmentFact.Category, value: String) {
-            environmentInputs.report(category, value: value)
+            guard isAvailable else { return }
+            applicationControl.reportEnvironment(category, value: value)
         }
         private func artifactManager() async throws -> any ModelArtifactsManaging {
             try await modelArtifacts.prepare()
             return modelArtifacts
         }
-        @ObservationIgnored private lazy var modelResourcesWorkflow = makeModelResourcesWorkflow()
-        private func makeModelResourcesWorkflow() -> ModelResourcesClient {
-            ModelResourcesClient(
-                read: { [resourcesUI] generation in
-                    guard case .snapshot(let value) = try await resourcesUI.requests.submit(.refresh(generation)) else {
-                        throw UIRequestError.stale
-                    }
-                    return value
-                },
-                restore: { [resourcesUI] in
-                    guard case .source(let value) = try await resourcesUI.requests.submit(.restore) else {
-                        throw UIRequestError.stale
-                    }
-                    return value
-                },
-                save: { [resourcesUI] draft in
-                    guard case .source(let value) = try await resourcesUI.requests.submit(.save(draft)) else {
-                        throw UIRequestError.stale
-                    }
-                    return value
-                },
-                download: { [resourcesUI] id, draft in _ = try await resourcesUI.requests.submit(.download(id, draft))
-                },
-                cancel: { [resourcesUI] id in _ = try await resourcesUI.requests.submitControl(.cancel(id)) },
-                remove: { [resourcesUI] id in _ = try await resourcesUI.requests.submit(.remove(id)) })
-        }
-        public var modelResources: ModelResourcesState { resourcesUI.state }
-        @ObservationIgnored public lazy var modelResourceControls = ModelResourceInteractionWorkflow(
-            state: resourcesUI.presentation, operations: modelResourcesWorkflow)
-        private func quiesceForModelRemoval(_ id: String) async {
-            if id == "yolo26n-pose" {
-                await camera.pauseVisionForModelMaintenance()
-            } else {
-                await container?.lifecycle.beginSettingsChange()
-                container?.lifecycle.endSettingsChange()
-            }
-        }
-        @ObservationIgnored private lazy var settingsWorkflow = ProviderSettingsClient(
-            provider: SettingsProviderOperations(
-                initial: SettingsProviderAdapter.initial,
-                restore: { [settingsUI] in
-                    guard case .draft(let value) = try await settingsUI.requests.submit(.restore) else {
-                        throw UIRequestError.stale
-                    }
-                    return value
-                },
-                discover: { [settingsUI] draft in
-                    guard case .models(let values) = try await settingsUI.requests.submit(.discover(draft)) else {
-                        throw UIRequestError.stale
-                    }
-                    return values
-                }, save: { [settingsUI] draft in _ = try await settingsUI.requests.submit(.save(draft)) },
-                errorMessage: { SettingsProviderAdapter.errorMessage($0) }), presentsResults: true)
 
-        public var settings: SettingsState { settingsUI.state }
-        @ObservationIgnored public lazy var settingsControls = SettingsFormController(
-            state: settingsUI.presentation, operations: settingsWorkflow,
-            defaultModel: SettingsProviderAdapter.initial.model)
-        @ObservationIgnored public lazy var cameraControls = makeCameraControls()
-        private func makeCameraControls() -> CameraInteractionWorkflow {
-            CameraInteractionWorkflow(
-                presentation: cameraPresentation,
-                perform: { [cameraUI] operation, facing, mediaID in
-                    guard let operation = CameraInput.Operation(rawValue: operation.rawValue) else {
-                        throw UIRequestError.stale
-                    }
-                    _ = try await cameraUI.requests.submit(
-                        CameraInput(operation, facing: facing.map { $0 == .front ? .front : .back }, mediaID: mediaID))
-                })
-        }
         public var navigation: NavigationState { navigationUI.state }
-        @ObservationIgnored lazy var deviceControl = NexArmDeviceAdapter(bluetooth: bluetooth)
-        @ObservationIgnored public lazy var bluetoothControls = makeBluetoothControls()
-        private func makeBluetoothControls() -> BluetoothInteractionWorkflow {
-            BluetoothInteractionWorkflow(
-                state: devicesUI.presentation,
-                initialFence: deviceControl.fence, fenceStop: { [deviceControl] in deviceControl.stopFence() },
-                pageVisibility: { [bluetooth] visible in
-                    if visible { bluetooth.openPage() } else { bluetooth.closePage() }
-                }, openSettings: { [bluetooth] in bluetooth.openSystemSettings() },
-                perform: { [weak self] intent in
-                    guard let self else { throw CancellationError() }
-                    if ["stopScan", "disconnect", "forget"].contains(intent["operation"] ?? "") {
-                        try await self.devicesUI.requests.submitControl(DeviceInput(intent))
-                    } else {
-                        try await self.devicesUI.requests.submit(DeviceInput(intent))
-                    }
-                })
-        }
 
         public func navigate(_ destination: AppDestination?) {
             navigationUI.presentation.show(destination)
@@ -225,14 +150,16 @@ import StorageState
                 CameraSessionConnections(
                     makeRuntime: { [weak self] in
                         guard let self else { throw CancellationError() }
+                        try self.lifecycle.requireAvailable()
                         return try self.runtime().cameraDependencies
                     },
                     connectPerception: { [weak self] sessionID, mirrored, endpoint in
                         guard let self else { throw CancellationError() }
                         do {
-                            try await VisionAgentSession(
-                                runtime: self.runtime(), pose: self.visionModels, camera: self.cameraDevice
-                            ).run(sessionID: sessionID, mirrored: mirrored, endpoint: endpoint)
+                            try self.lifecycle.requireAvailable()
+                            try await self.visionPerception.run(
+                                runtime: self.runtime(), pose: self.visionModels, camera: self.cameraDevice,
+                                sessionID: sessionID, mirrored: mirrored, endpoint: endpoint)
                         } catch is CancellationError {
                             throw CancellationError()
                         } catch {
@@ -244,55 +171,24 @@ import StorageState
                     }))
         }
 
-        public var historyState: ConversationHistoryState { historyUI.state }
-        @ObservationIgnored public lazy var history = makeHistory()
-        private func makeHistory() -> ConversationHistoryWorkflow {
-            ConversationHistoryWorkflow(
-                state: historyUI.presentation,
-                prepare: {},
-                refresh: { [historyUI] in _ = try await historyUI.requests.submit(.refresh) },
-                deleteArchive: { [historyUI] id in _ = try await historyUI.requests.submit(.delete(id)) },
-                startNew: { [historyUI] in _ = try await historyUI.requests.submit(.startNew) },
-                summarize: { [historyUI] id in _ = try await historyUI.requests.submit(.summarize(id)) },
-                previewOutput: HistoryExecutionPreview.preview,
-                readConversation: { [historyUI] id in
-                    guard case .conversation(let value) = try await historyUI.requests.submit(.conversation(id)) else {
-                        throw UIRequestError.stale
-                    }
-                    return value
-                },
-                readPhoto: { [historyUI] id, inputID in
-                    guard case .photo(let value) = try await historyUI.requests.submit(.photo(id, inputID)) else {
-                        throw UIRequestError.stale
-                    }
-                    return value
-                },
-                readMessage: { [historyUI] id in
-                    guard case .conversation(let value) = try await historyUI.requests.submit(.message(id)) else {
-                        throw UIRequestError.stale
-                    }
-                    return value
-                },
-                readPage: { [historyUI] id, after, taskID in
-                    guard case .conversation(let value) = try await historyUI.requests.submit(.page(id, after, taskID))
-                    else { throw UIRequestError.stale }
-                    return value
-                },
-                readArchives: { [historyUI] cursor in
-                    guard case .archives(let values) = try await historyUI.requests.submit(.archives(cursor)) else {
-                        throw UIRequestError.stale
-                    }
-                    return values
-                })
-        }
         private func makeHistoryChat() async throws -> any ChatCapability {
-            try await settingsControls.restore()
-            await container?.lifecycle.beginSettingsChange()
-            defer { container?.lifecycle.endSettingsChange() }
+            try await applicationControl.settingsControls.restore()
+            await speechPerception.beginSettingsChange()
+            defer { speechPerception.endSettingsChange() }
             try Task.checkCancellation()
             return languageModels
         }
+        private func quiesceForModelRemoval(_ id: String) async {
+            if id == "yolo26n-pose" {
+                await camera.pauseVisionForModelMaintenance()
+            } else {
+                await speechPerception.beginSettingsChange()
+                speechPerception.endSettingsChange()
+            }
+        }
         private func runtime() throws -> AgentRuntime {
+            guard !lifecycle.isStopped else { throw AgentContainerError.stopped }
+            try Task.checkCancellation()
             _ = try repositories()
             if let runtimeValue { return runtimeValue }
             let resourceAdapter = ModelResourceCapabilityAdapter(
@@ -303,9 +199,9 @@ import StorageState
                 quiesce: { [weak self] id in await self?.quiesceForModelRemoval(id) },
                 bindSpeech: { [weak self] recognition, synthesis in
                     guard let self else { throw CancellationError() }
-                    await self.container?.lifecycle.beginSettingsChange()
+                    await self.speechPerception.beginSettingsChange()
                     defer {
-                        self.container?.lifecycle.endSettingsChange()
+                        self.speechPerception.endSettingsChange()
                         self.onModelConfigurationChanged?()
                     }
                     try await self.speechModels.configure(recognition: recognition, synthesis: synthesis)
@@ -313,27 +209,30 @@ import StorageState
             try installPublicState()
             let runtime = try AgentRuntime(
                 containerFailures: containerFailures, home: homeUI,
+                assistantContainer: assistant, applicationControlContainer: applicationControl,
+                memoryContainer: memory, photographerContainer: photographer,
                 state: stateStorage, cache: cacheStorage, files: filesStorage,
                 chatRecords: try repositories().chat, taskRecords: try repositories().tasks,
                 camera: cameraDevice, cameraUI: cameraUI, settingsUI: settingsUI,
                 resourcesUI: resourcesUI, devicesUI: devicesUI, historyUI: historyUI, diagnosticsUI: diagnosticsUI,
                 readHistoryPhoto: { [capturedPhotos] id, inputID in
                     try await capturedPhotos.readForInput(id, source: "assistant", input: inputID)
-                }, cameraControl: camera, bluetooth: bluetooth, historyState: historyState,
-                resourceState: modelResources, providerState: settings, navigationState: navigationUI.presentation,
-                device: deviceControl,
+                }, cameraControl: camera, bluetooth: bluetooth, historyState: memory.historyState,
+                resourceState: applicationControl.modelResources, providerState: applicationControl.settings,
+                navigationState: navigationUI.presentation,
+                device: applicationControl.deviceControl,
                 modelResources: resourceAdapter,
                 providerSettingsRuntime: SettingsProviderAdapter.runtime(
                     language: languageModels,
-                    beginChange: { [weak self] in await self?.container?.lifecycle.beginSettingsChange() },
+                    beginChange: { [weak self] in await self?.speechPerception.beginSettingsChange() },
                     endChange: { [weak self] in
-                        self?.container?.lifecycle.endSettingsChange()
+                        self?.speechPerception.endSettingsChange()
                         self?.onModelConfigurationChanged?()
                     }),
                 resourcePreferences: ModelResourcePreferencesService(
-                    store: {
-                        try self.filesStorage.document(
-                            ModelResourcePreferences.self, in: self.filesStorage.models, name: "download-source.json",
+                    store: { [filesStorage] in
+                        try filesStorage.document(
+                            ModelResourcePreferences.self, in: filesStorage.models, name: "download-source.json",
                             maximumBytes: 4096)
                     },
                     validate: { try await SettingsModelResourcesAdapter.validatePreferences($0) },
@@ -347,7 +246,9 @@ import StorageState
                     }),
                 resourceInventory: resourceAdapter,
                 resourceChanges: { [modelArtifacts] in try await modelArtifacts.observeArtifactChanges() },
-                resourceSnapshotAccepted: { [weak self] in self?.modelResourceControls.acceptPresentedSnapshot() },
+                resourceSnapshotAccepted: { [weak self] in
+                    self?.applicationControl.modelResourceControls.acceptPresentedSnapshot()
+                },
                 summarizeTitle: { [weak self] conversation in
                     guard let self else { throw CancellationError() }
                     let chat = try await self.makeHistoryChat()
@@ -356,14 +257,11 @@ import StorageState
                 },
                 modelName: { [weak self] in
                     guard let self else { throw CancellationError() }
-                    return await self.settingsWorkflow.modelName
+                    return await self.applicationControl.settingsWorkflow.modelName
                 },
                 chatProvider: { [languageModels] in languageModels })
             runtimeValue = runtime
             return runtime
-        }
-        public func setAgentForeground(_ value: Bool) async throws {
-            try await runtimeValue?.setForeground(value)
         }
         @ObservationIgnored private var preparation: Task<Void, Error>?
         @ObservationIgnored private var bluetoothObservation: Task<Void, Never>?
@@ -379,41 +277,49 @@ import StorageState
                 "-moss-benchmark",
             ].contains { arguments.contains($0) }
         }
-        public func prepare(progress: @MainActor (String) -> Void) async throws {
+        private func prepare(progress: @MainActor (String) -> Void) async throws {
             if let preparation { return try await preparation.value }
-            if container != nil { return }
+            if speechPerception.isReady { return }
             // Progress is a value update; no page lifetime owns the preparation task.
             let task = Task { try await self.prepareServices(progress: { _ in }) }
             preparation = task
             do {
-                try await task.value
+                try await withTaskCancellationHandler {
+                    try await task.value
+                } onCancel: {
+                    task.cancel()
+                }
                 progress("本地模型可在设置中下载")
             } catch {
                 preparation = nil
                 throw error
             }
         }
-        public func startAgents() async throws {
+        private func startAgents() async throws {
             guard !isolatedPresentation else { return }
-            try await runtime().start()
+            let runtime = try runtime()
+            try await applicationControl.start()
+            try await photographer.start()
+            try await memory.start()
+            try await assistant.start()
+            runtime.connectFailures()
         }
-        public func startNativeServices() async throws {
+        private func startNativeServices() async throws {
             guard !isolatedPresentation else { return }
             try await prepare(progress: { _ in })
-            try await container?.startInteraction()
+            try await speechPerception.startInteraction()
             guard bluetoothObservation == nil, cameraEvents == nil else { return }
             bluetoothObservation = Task { [bluetooth] in await bluetooth.run() }
             cameraEvents = Task { [camera] in await camera.observe() }
-            setForeground(foreground)
+            applyNativeForeground(foreground)
         }
-        public func invalidateNative() {
+        private func invalidateNative() {
             foreground = false
             camera.setForeground(false)
             bluetooth.setForeground(false)
-            container?.lifecycle.stopVoice(message: "已进入后台，按住双眼重新开始")
-            container?.invalidateDetection()
+            speechPerception.invalidate()
         }
-        public func setForeground(_ value: Bool) {
+        private func applyNativeForeground(_ value: Bool) {
             foreground = value
             guard !isolatedPresentation else { return }
             updateCameraAvailability()
@@ -421,7 +327,7 @@ import StorageState
             reportEnvironment(.scene, value: value ? "active" : "background")
             if !value { invalidateNative() }
         }
-        public func stopNativeServices() async throws {
+        private func stopNativeServices() async throws {
             invalidateNative()
             preparation?.cancel()
             _ = await preparation?.result
@@ -431,36 +337,101 @@ import StorageState
             await bluetoothObservation?.value
             cameraEvents = nil
             bluetoothObservation = nil
-            await modelResourceControls.stopAndWait()
+            await applicationControl.modelResourceControls.stopAndWait()
             var cleanupErrors: [any Error] = []
             do { try await camera.shutdown() } catch { cleanupErrors.append(error) }
             do { try await bluetooth.shutdown() } catch { cleanupErrors.append(error) }
-            await bluetoothControls.shutdown()
-            do { try await container?.shutdown() } catch { cleanupErrors.append(error) }
-            container = nil
+            await applicationControl.bluetoothControls.shutdown()
+            do { try await speechPerception.stop() } catch { cleanupErrors.append(error) }
+            do { try await speechSynthesis.stop() } catch { cleanupErrors.append(error) }
+            do { try await visionPerception.stop() } catch { cleanupErrors.append(error) }
             if !cleanupErrors.isEmpty { throw NativeCleanupFailure(errors: cleanupErrors) }
         }
-        public func stopAgents() async {
-            await environmentInputs.shutdown()
+        private func stopAgents() async throws {
+            var errors: [any Error] = []
+            do { try await assistant.stop() } catch { errors.append(error) }
+            do { try await photographer.stop() } catch { errors.append(error) }
+            do { try await memory.stop() } catch { errors.append(error) }
+            do { try await applicationControl.stop() } catch { errors.append(error) }
             await runtimeValue?.shutdown()
+            runtimeValue = nil
             publicStateScope?.close()
             publicStateScope = nil
+            if let primary = errors.first {
+                throw AgentFailure(
+                    component: "roles", operation: "stop", underlying: primary,
+                    cleanupErrors: Array(errors.dropFirst()), code: .cleanupFailed)
+            }
+        }
+        private func startServices() async throws {
+            try await startAgents()
+            try Task.checkCancellation()
+            try await startNativeServices()
+        }
+        private func setInputAvailable(_ value: Bool) {
+            assistant.setInputAvailable(value)
+            applicationControl.setInputAvailable(value)
+            memory.setInputAvailable(value)
+            photographer.setInputAvailable(value)
+            speechPerception.setInputAvailable(value)
+        }
+        private func invalidateServices() {
+            preparation?.cancel()
+            setInputAvailable(false)
+            invalidateNative()
+            visionPerception.invalidate()
+        }
+        private func applyForeground(_ value: Bool) async throws {
+            if !value {
+                var errors: [any Error] = []
+                do { try await camera.shutdown() } catch { errors.append(error) }
+                await speechPerception.suspend()
+                await bluetooth.waitUntilIdle()
+                do { try await visionPerception.suspend() } catch { errors.append(error) }
+                do { try await applicationControl.setForeground(false) } catch { errors.append(error) }
+                do { try await photographer.setForeground(false) } catch { errors.append(error) }
+                do { try await memory.setForeground(false) } catch { errors.append(error) }
+                do { try await assistant.setForeground(false) } catch { errors.append(error) }
+                if let primary = errors.first {
+                    throw AgentFailure(
+                        component: "root", operation: "suspend", underlying: primary,
+                        cleanupErrors: Array(errors.dropFirst()), code: .cleanupFailed)
+                }
+                return
+            }
+            try await applicationControl.setForeground(true)
+            try await photographer.setForeground(true)
+            try await memory.setForeground(true)
+            try await assistant.setForeground(true)
+            guard lifecycle.isForegroundRequested else { return }
+            applyNativeForeground(true)
+            setInputAvailable(true)
+        }
+        private func stopServices() async throws {
+            var errors: [any Error] = []
+            do { try await stopNativeServices() } catch { errors.append(error) }
+            do { try await stopAgents() } catch { errors.append(error) }
+            if let primary = errors.first {
+                throw AgentFailure(
+                    component: "root", operation: "stop", underlying: primary, cleanupErrors: Array(errors.dropFirst()),
+                    code: .cleanupFailed)
+            }
         }
         private func prepareServices(progress: @MainActor (String) -> Void) async throws {
             _ = try repositories()
-            guard container == nil else { return }
+            guard !speechPerception.isReady else { return }
             _ = try await artifactManager()
-            try await runtime().start()
-            _ = try await modelResourcesWorkflow.restoreSource()
-            try await settingsControls.restore()
-            let workflow = settingsWorkflow
+            _ = try await applicationControl.modelResourcesWorkflow.restoreSource()
+            try await applicationControl.settingsControls.restore()
+            let workflow = applicationControl.settingsWorkflow
             let prepared = try await VoiceInteractionSession(
                 home: homeUI, diagnostics: diagnosticsUI, language: languageModels, speech: speechModels,
                 memoryPressure: memoryPressure, audio: audio, runtime: runtime(),
+                perceptionContainer: speechPerception, synthesisContainer: speechSynthesis,
                 modelName: { await workflow.modelName },
                 progress: progress)
             try Task.checkCancellation()
-            container = prepared
+            try speechPerception.installInteraction(prepared)
         }
     }
 

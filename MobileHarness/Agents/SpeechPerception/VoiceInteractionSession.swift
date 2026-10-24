@@ -13,7 +13,7 @@
     /// Resolves default capabilities once; consumers receive shared, managed capability instances.
     @MainActor
     @available(iOS 27, *)
-    public final class VoiceInteractionSession {
+    final class VoiceInteractionSession {
         private var memoryWarnings: Task<Void, Never>?
         private var starting: Task<Void, any Error>?
         private var started = false
@@ -31,20 +31,36 @@
                     let store = try await voiceAgents.audioStore()
                     let perception = try await voiceAgents.start(
                         recognition, vad: vad, synthesis: synthesis,
-                        input: voiceInput, store: store, report: { _ in })
+                        input: voiceInput, store: store)
                     try Task.checkCancellation()
                     try await lifecycle.start(perception: perception, audioStore: store)
                     try await voiceAgents.startInteraction()
                     started = true
                 } catch {
+                    let primary = error
                     await lifecycle.shutdown()
-                    await voiceAgents.stop()
-                    throw error
+                    do { try await voiceAgents.stop() } catch {
+                        throw AgentFailure(
+                            component: "speech", operation: "start", underlying: primary,
+                            cleanupErrors: [error])
+                    }
+                    throw primary
                 }
             }
             starting = task
             defer { starting = nil }
-            try await task.value
+            try await withTaskCancellationHandler {
+                try await task.value
+            } onCancel: {
+                task.cancel()
+            }
+        }
+        func invalidateStartup() { starting?.cancel() }
+        func suspend() async {
+            _ = await starting?.result
+            await detectionInvalidation?.value
+            await audioDetection.stopAndWait()
+            await lifecycle.stopVoiceAndWait()
         }
         func shutdown() async throws {
             starting?.cancel()
@@ -52,9 +68,10 @@
             memoryWarnings?.cancel()
             await memoryWarnings?.value
             var cleanupErrors: [any Error] = []
+            await detectionInvalidation?.value
             await audioDetection.stopAndWait()
             await lifecycle.shutdown()
-            await voiceAgents.stop()
+            do { try await voiceAgents.stop() } catch { cleanupErrors.append(error) }
             started = false
             do { try await diagnostic.stopAndWait() } catch { cleanupErrors.append(error) }
             if !cleanupErrors.isEmpty { throw NativeCleanupFailure(errors: cleanupErrors) }
@@ -88,6 +105,7 @@
             home: UIHomeContainer, diagnostics: UIDiagnosticsContainer,
             language: any ModelLanguageProviding, speech: any ModelSpeechProviding,
             memoryPressure: @escaping @Sendable () async -> Void, audio: AudioContainer, runtime: AgentRuntime,
+            perceptionContainer: SpeechPerceptionContainer, synthesisContainer: SpeechSynthesisContainer,
             modelName: @escaping @Sendable () async throws -> String,
             progress: @MainActor (String) -> Void
         ) async throws {
@@ -122,7 +140,9 @@
             try Task.checkCancellation()
             let state = home.conversation
             let spectrum = MicrophoneSpectrumPresentation(state: state)
-            let voiceAgents = VoiceAgentSession(runtime: runtime.voiceDependencies, spectrum: spectrum)
+            let voiceAgents = VoiceAgentSession(
+                runtime: runtime.voiceDependencies, spectrum: spectrum,
+                perception: perceptionContainer, synthesis: synthesisContainer)
             self.voiceAgents = voiceAgents
             let lifecycle = VoiceSessionCoordinator(
                 runtime: voiceAgents.connections, state: state,

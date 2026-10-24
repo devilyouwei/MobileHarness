@@ -32,6 +32,8 @@ public final class ApplicationContainer: ManagedContainer, @unchecked Sendable {
     /// Structural projection only. Each independent SDK retains its own Failure definition.
     public nonisolated static func failureDetails(_ error: any Error) -> ContainerFailureDetails? {
         switch error {
+        case let failure as AgentFailure:
+            return ContainerFailureDetails(code: failure.code.rawValue, isCancellation: failure.isCancellation)
         case let failure as StorageFailure:
             return ContainerFailureDetails(code: failure.code.rawValue, isCancellation: failure.isCancellation)
         case let failure as PlatformFailure:
@@ -43,6 +45,17 @@ public final class ApplicationContainer: ManagedContainer, @unchecked Sendable {
         default: return nil
         }
     }
+    #if os(iOS)
+        @MainActor private var agentRoot: AnyObject?
+        /// Explicit application assembly is evaluated once per registry, never by a business consumer.
+        @available(iOS 27, *)
+        @MainActor public func agents(make: @MainActor () -> AgentContainer) -> AgentContainer {
+            if let agentRoot = agentRoot as? AgentContainer { return agentRoot }
+            let value = make()
+            agentRoot = value
+            return value
+        }
+    #endif
     public var containerFailures: Factory<ContainerFailureChannel> { self { ContainerFailureChannel() }.cached }
     @MainActor public var ui: Factory<UIContainer> {
         self {

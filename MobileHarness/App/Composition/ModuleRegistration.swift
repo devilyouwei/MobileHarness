@@ -1,3 +1,4 @@
+import Agents
 import AppLifecycle
 import AppStorage
 import Foundation
@@ -29,17 +30,12 @@ import Gateway
                 stop: { await services.uiContainer.stop() }),
             ManagedService(
                 id: "agents", dependencies: ["storage", "platform", "ui", "model"],
-                start: services.agents.startAgents,
-                foreground: services.agents.setAgentForeground,
-                stop: services.agents.stopAgents),
+                start: services.agents.start,
+                invalidate: services.agents.invalidate,
+                foreground: services.agents.setForeground,
+                stop: services.agents.stop),
             ManagedService(
-                id: "native", dependencies: ["agents"],
-                start: services.agents.startNativeServices,
-                invalidate: services.agents.invalidateNative,
-                foreground: { services.agents.setForeground($0) },
-                stop: services.agents.stopNativeServices),
-            ManagedService(
-                id: "homePreparation", dependencies: ["native"], start: {},
+                id: "homePreparation", dependencies: ["agents"], start: {},
                 invalidate: { services.homePreparation.setActive(false) },
                 foreground: { active in
                     services.homePreparation.setActive(

@@ -615,7 +615,7 @@ for root in ('UI', 'PlatformKit', 'ModelKit', 'Storage'):
     for source in (ROOT / 'MobileHarness' / root).rglob('*.swift'):
         if imported_modules(source.read_text()) & {'AgentBindings', 'ActionBindings', 'AppLifecycle'}:
             errors.append(f'Foundation depends on host integration: {source.relative_to(ROOT)}')
-resource_assembly = (ROOT / 'MobileHarness/Agents/AgentApplication.swift').read_text()
+resource_assembly = (ROOT / 'MobileHarness/Agents/AgentContainer.swift').read_text()
 if re.search(r'\.(?:downloadArtifact|cancelArtifact|removeArtifact)\(', resource_assembly):
     errors.append('Settings resource mutations must cross Agent/Gateway commands')
 # Preference application must enter Agent routing; native lifecycle binding stays injected.
@@ -637,7 +637,7 @@ for source in module_sources['Agents']:
         errors.append('Installed resource eligibility belongs to Actions inventory')
 # UI event consumers are part of the actual role, never application/root/session routing.
 if re.search(r'listenToContainers|containerInputs|handleSettings|handleResources|handleHistory|\.consumeUI\(', resource_assembly):
-    errors.append('AgentApplication must not consume or dispatch UI requests')
+    errors.append('AgentContainer must not consume or dispatch UI requests')
 for role, capability in [('ApplicationControl', 'uiSettings'), ('Photographer', 'uiCamera'), ('Memory', 'uiHistory')]:
     source = (ROOT / f'MobileHarness/Agents/{role}/{role}Agent.swift').read_text()
     ui_source = (ROOT / f'MobileHarness/Agents/{role}/{role}UI.swift').read_text()
@@ -724,14 +724,14 @@ if 'preempts: [.assistant: [.photographer], .applicationControl: [.photographer]
     errors.append('Composition must grant Assistant/fixed ApplicationControl writers joined takeover of Photographer')
 if 'trackingInputAvailable' not in runtime or '[weak photographerAgent]' not in runtime or 'hasFreshPose()' not in runtime:
     errors.append('Tracking freshness must be bound to the current Photographer without retaining its lifetime')
-assembly = (ROOT / 'MobileHarness/Agents/AgentApplication.swift').read_text()
-history_binding = assembly.split('private func makeHistory()', 1)[1].split('private func makeHistoryChat()', 1)[0]
+assembly = (ROOT / 'MobileHarness/Agents/AgentContainer.swift').read_text()
+history_binding = (ROOT / 'MobileHarness/Agents/Memory/MemoryContainer.swift').read_text().split('private func makeHistory()', 1)[1]
 if re.search(r'\b(?:stopVoice|beginSettingsChange|endSettingsChange)\b', history_binding):
     errors.append('Read-only Assistant history preparation must not stop the root listening session')
 camera_admission = assembly.split('func updateCameraAvailability()', 1)[1].split('var isolatedPresentation', 1)[0]
 if 'camera.setForeground(foreground && navigation.path.isEmpty)' not in camera_admission:
     errors.append('Camera admission must require both foreground and the uncovered home route')
-scene_admission = assembly.split('public func setForeground(_ value: Bool)', 1)[1].split('public func stopNativeServices()', 1)[0]
+scene_admission = assembly.split('private func applyNativeForeground(_ value: Bool)', 1)[1].split('private func stopNativeServices()', 1)[0]
 navigation_binding = (ROOT / 'MobileHarness/App/Composition/ApplicationPresentation.swift').read_text()
 navigation_admission = navigation_binding.split('public func navigationChanged()', 1)[1].split('public func prepare(', 1)[0]
 if 'updateCameraAvailability()' not in scene_admission or 'features.updateCameraAvailability()' not in navigation_admission:
@@ -1056,7 +1056,7 @@ for source in integration_sources:
         continue
     if re.search(r'\bImageFrame\s*\(|\bStreamingMonoPCMResampler\s*\(', source.read_text()):
         raise SystemExit(f'Model input preparation belongs to the calling Agent: {source.relative_to(ROOT)}')
-if 'resolveImage:' in (ROOT / 'MobileHarness/Agents/AgentApplication.swift').read_text():
+if 'resolveImage:' in (ROOT / 'MobileHarness/Agents/AgentContainer.swift').read_text():
     raise SystemExit('App must not inject model image conversion into VisionPerception')
 print('SDK-owned values and caller-owned model input adaptation passed.')
 
@@ -1243,7 +1243,7 @@ conversation_view_source = (ROOT / 'MobileHarness/UI/Conversation/ConversationVi
 if '.task(id: issue.id)' in conversation_view_source:
     raise SystemExit('Toast expiry belongs to the UI root, never the page.')
 for source in (ROOT / 'MobileHarness/Agents').rglob('*.swift'):
-    if source.name in ('AgentApplication.swift', 'VoiceInteractionSession.swift'):
+    if source.name in {'AgentContainer.swift', 'AssistantContainer.swift', 'ApplicationControlContainer.swift', 'MemoryContainer.swift', 'PhotographerContainer.swift', 'SpeechPerceptionContainer.swift', 'SpeechSynthesisContainer.swift', 'VisionPerceptionContainer.swift', 'VoiceInteractionSession.swift'}:
         continue  # Read-only view-provider fields, not business mutation handles.
     if re.search(r':\s*(?:' + '|'.join(ui_model_names[:9]) + r')\b', source.read_text()):
         raise SystemExit(f'Agent business consumers require narrow presentation interfaces: {source.relative_to(ROOT)}')
@@ -1460,7 +1460,7 @@ if 'makePerception' in detection_execution:
 if 'detectionRequests' not in ui_control or 'observeFacts()' not in (ROOT / 'MobileHarness/Agents/Photographer/PhotographerUI.swift').read_text():
     errors.append('Diagnostic and camera fact inputs must be owned by their actual Agent')
 assembly = (ROOT / 'MobileHarness/Agents/AgentRuntime.swift').read_text()
-features = (ROOT / 'MobileHarness/Agents/AgentApplication.swift').read_text()
+features = (ROOT / 'MobileHarness/Agents/AgentContainer.swift').read_text()
 if re.search(r'connectionObservation|resourceObservation =|startCameraFacts|historyStore\.(?:page|message|archivePage)\(', assembly + features):
     errors.append('Root assembly must not consume or forward local device/resource/history inputs')
 for retired in (
@@ -1523,7 +1523,7 @@ for source in (ROOT / 'MobileHarness/Agents').rglob('*.swift'):
         raise SystemExit(f'App must compose UI pages: {source.relative_to(ROOT)}')
 for marker in ('environmentSequence', 'pendingEnvironment', 'recordEnvironmentFailure', 'actionActivity.recordFailure'):
     if marker in assembly:
-        raise SystemExit(f'AgentApplication must only wire environment policy: {marker}')
+        raise SystemExit(f'AgentContainer must only wire environment policy: {marker}')
 for owner, names in {
     'ApplicationControl': ('ApplicationControlInputs.swift', 'ApplicationEnvironmentInputs.swift', 'ProviderInputs.swift', 'ModelResourceInputs.swift'),
     'Assistant': ('AssistantSessionControl.swift',),
@@ -1554,7 +1554,7 @@ print('Support ownership, retired policies and fixed Memory commit confirmation 
 
 # Shared mechanisms never decode concrete role business schemas or construct the application graph.
 for source in support.glob('*.swift'):
-    if source.name not in {'AgentConfigurations.swift', 'AgentSkillLoader.swift', 'AgentUIRequests.swift', 'AgentInputMetrics.swift', 'ContainerFailureChannel.swift'}:
+    if source.name not in {'AgentConfigurations.swift', 'AgentSkillLoader.swift', 'AgentUIRequests.swift', 'AgentInputMetrics.swift', 'ContainerFailureChannel.swift', 'AgentContainerLifecycle.swift'}:
         raise SystemExit(f'Concrete assembly in Agent Support: {source.relative_to(ROOT)}')
 for source in list((support / 'Chat').glob('*.swift')) + [(support / 'Communication/AgentTasks.swift')]:
     if re.search(r'\b(?:AssistantSessionControl|PhotographerCameraIntent|MemoryHistoryIntent|AppInteractionIntent|ModelResourceIntent|ProviderSettingsIntent|ProviderDiscoveryIntent)\b', source.read_text()):

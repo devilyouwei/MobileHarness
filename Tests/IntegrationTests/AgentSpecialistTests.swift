@@ -81,9 +81,10 @@ private struct SpecialistTools: ToolModule { let definitions: [ActionBinding] }
             context: try AgentContextRepository(
                 agent: AgentID(rawValue: "photographer"), scope: UUID().uuidString, state: PhotographerContextState())
         ), report: { await effects.fail($0) })
+    try await camera.prepareForInteraction()
     let root = AssistantExecutionSession(
         agent: parent, manager: manager, output: gateway,
-        startChildren: { try await camera.prepareForInteraction() }, report: { await effects.fail($0) })
+        report: { await effects.fail($0) })
     try await root.start()
     let operation = Task { try await ui.camera.requests.submit(.init(.open)) }
     do {
@@ -288,7 +289,7 @@ func assistantReportsReplyActivityWithoutOwningListening() async throws {
     await pump.value
 }
 
-@Test(.actionCatalog, .timeLimit(.minutes(1))) func interactionSceneChangeWaitsForChildRegistration() async throws {
+@Test(.actionCatalog, .timeLimit(.minutes(1))) func interactionSceneChangeOnlyControlsItsOwnRole() async throws {
     let manager = AgentManager()
     let input = InputGateway(manager: manager)
     let gateway = OutputGateway(
@@ -304,26 +305,12 @@ func assistantReportsReplyActivityWithoutOwningListening() async throws {
         context: try AgentContextRepository(
             agent: AgentID(rawValue: "photographer"), scope: UUID().uuidString, state: PhotographerContextState())
     )
-    let entered = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingOldest(1))
-    let release = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingOldest(1))
-    let runtime = AssistantExecutionSession(
-        agent: parent, manager: manager, output: gateway,
-        startChildren: {
-            entered.continuation.yield(())
-            var iterator = release.stream.makeAsyncIterator()
-            _ = await iterator.next()
-            try await manager.register(child)
-            try await child.start()
-        })
-    let transition = Task { try await runtime.setForeground(false) }
-    var iterator = entered.stream.makeAsyncIterator()
-    _ = await iterator.next()
-    #expect(await manager.descriptors().map(\.id) == [.assistant])
-    release.continuation.yield(())
-    release.continuation.finish()
-    try await transition.value
+    try await manager.register(child)
+    try await child.start()
+    let runtime = AssistantExecutionSession(agent: parent, manager: manager, output: gateway)
+    try await runtime.setForeground(false)
     #expect(await parent.status().lifecycle == .paused)
-    #expect(await child.status().lifecycle == .paused)
+    #expect(await child.status().lifecycle == .running)
     try await runtime.setForeground(true)
     #expect(await parent.status().lifecycle == .running)
     #expect(await child.status().lifecycle == .running)

@@ -398,7 +398,7 @@ Purpose: retain dated documentation corrections and architecture changes without
 
 ## 2026-09-28 — Documentation ownership
 
-The internal source/target map is now part of [MobileHarness/README.md's Project Structure](../../MobileHarness/README.md#source-structure-and-compilation-map). The unimplemented Photographer concept moved to [Photographer-Proposal.md](../requirements/Photographer-Proposal.md). [Architecture.md](../Architecture.md) now explains the product architecture externally, while source-directory READMEs own current module contracts. Dated UI/build observations moved to [Validation-History.md](../validation/Validation-History.md).
+The internal source/target map is now part of [MobileHarness/README.md's Project Structure](../../MobileHarness/README.md#target-map). The unimplemented Photographer concept moved to [Photographer-Proposal.md](../requirements/Photographer-Proposal.md). [Architecture.md](../Architecture.md) now explains the product architecture externally, while source-directory READMEs own current module contracts. Dated UI/build observations moved to [Validation-History.md](../validation/Validation-History.md).
 
 The full `docs/` review classified public architecture, roadmap, proposals, validation records, ADR history, original design sources and license notices. Historical technical designs and superseded ADRs now point to later decisions instead of presenting old models, UI, transport or Agent configuration as current. The original Word source and license texts remain unchanged.
 
@@ -866,3 +866,14 @@ Move analysis budgets and preparation invocation from ApplicationRuntime's hidde
 - Integrate feat/main-sh9037d3a6 into main's framework. NexArmAimCommand's first admitted command includes shoulder2087/elbow1984 at speed400 and acceleration30; a pan/tilt target outside the dead zone shares that packet. Later targets retain single-packet motors1/4 tracking. Admission remains distinct from physical arrival.
 - Preserve main's Agent/Skill services, FunctionContracts, native session identity, bounded recovery, takeover and cancellation cleanup. Merge both branches' test coverage; add preparation retry/reset coverage and retain the held-target and late-error checks from the previous merge. Current documentation follows main's structure, and the new decision is [ADR0216](../adr/0216-nexarm-tracking-level-rest.md), preserving main's existing ADR0143 storage decision.
 - Validation/build results and physical acceptance limits are recorded in [validation history](../validation/Validation-History.md#2026-10-15--merge-calibrated-tracking-rest-from-main-sh).
+
+## 2026-10-24 — Agents 容器文档核对与清理
+
+- 将 AgentContainer／AgentFailure、七个稳定角色容器、共享生命周期与 App 单节点接线整合为各目录的当前设计；明确冷根失效、启动回滚、必须暂停和终态加入。
+- 修正 App 模型依赖、按 SpeechPerceptionContainer 身份复用展示、故障通道所属模块；清除工程中的已删除目标／类型说明与过时 Simulator 失败结论。
+- 合并 App、工程、脚本和集成测试 README 累积的迁移摘要；测试目录仅描述覆盖与执行条件，运行和设备记录保留在 [容器验证](../validation/Agent-Containers.md)。有追溯价值的旧说明见 [README 历史摘录](Code-README-History.md#2026-10-24agents-容器化相关-readme-清理)。
+- 本次仅整理文档；具体链接、路径和格式核对结果见 [文档检查](../validation/Agent-Containers.md#documentation-audit)。
+
+## 2026-10-24 — AgentCore UUID 默认值警告清理
+
+AgentContext.Record.init 与 CapabilityRegistry.resolveTool 的缺省 ID 使用非抛错 UUID 生成，删除两处无效 try。显式 ID、字段／参数验证及真实错误传播保持原行为。编译诊断与仓库检查结果归 [容器验证](../validation/Agent-Containers.md#agentcore-warning-cleanup)。

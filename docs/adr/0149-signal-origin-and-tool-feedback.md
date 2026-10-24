@@ -4,7 +4,7 @@ Date: 2026-10-06. Status: implemented; validation recorded in Validation-History
 
 ## Decision
 
-Update the authoritative [Signal feedback contract](../../MobileHarness/README.md#execution-feedback-causality) before changing runtime code. Add SignalOrigin.external/agent/runtime to the existing InputMetadata, preserving one envelope and payload contracts. The default is External; constructors alone grant no routing authority.
+Update the authoritative [Signal feedback contract](../../MobileHarness/README.md#ui-requests-and-business-execution) before changing runtime code. Add SignalOrigin.external/agent/runtime to the existing InputMetadata, preserving one envelope and payload contracts. The default is External; constructors alone grant no routing authority.
 
 Public send/publish admit only External origin and reject execution feedback payloads. Identity-bound OutputGateway messaging constructs Agent origin. The runtime constructs Runtime feedback and validates captured ownership; returning Tool delivery is module-internal rather than ordinary public send. An Agent replaced under the same ID/session cannot receive the old execution's result.
 

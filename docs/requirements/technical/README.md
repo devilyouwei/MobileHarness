@@ -17,3 +17,5 @@
 - [PlatformKit 容器与 Gateway 设备接入](PlatformKit-Containers-Plan.md)：代码已实现，保留全量回归、Simulator 与设备验收缺口。
 
 - [Direct container inputs](Direct-Container-Input-Plan.md): implementation and automated/build validation; native/device and comparable performance acceptance remain tracked.
+
+- [Agent containers](Agent-Containers-Plan.md): root, seven roles and unified lifecycle implemented; validation and native acceptance tracked separately.

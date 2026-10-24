@@ -1,5 +1,11 @@
 # ApplicationControl — 设置、资源、设备与故障策略
 
+## 角色容器
+
+✅ [ApplicationControlContainer.swift](ApplicationControlContainer.swift) 是 AgentContainer 的稳定子能力。持有角色执行会话、设置／资源／设备工作流、环境事实 worker 和观察生命周期。停止先加入环境 worker，再清理角色；Provider 事务和原生执行仍归 Actions。
+
+生命周期由[模块根](../README.md#agent-container)统一编排；子容器能力不授予执行权。
+
 ## 职责与注入能力
 
 本角色执行确定性政策与事务关联，不运行 Chat。构造注入 `UISettingsContainer`、`UIModelResourcesContainer`、`UIDeviceSettingsContainer`、`UIDiagnosticsContainer`，主动订阅各自类型化请求。另注入连接事实流、ModelKit artifact revision 观察回调、Provider 私有请求／结果能力、观察失败回调及私有 Context。

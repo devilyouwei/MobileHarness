@@ -7,6 +7,7 @@ import UI
 /// Role registration and protected output ownership; UI requests are consumed by the Agent.
 public actor MemoryExecutionSession {
     public nonisolated let agent: MemoryAgent
+    public private(set) var cleanupFailure: AgentFailure?
     private let manager: AgentManager
     private let output: OutputGateway
     private var starting: Task<Void, Error>?
@@ -30,6 +31,7 @@ public actor MemoryExecutionSession {
             try await manager.register(agent)
             registered = true
             do {
+                try Task.checkCancellation()
                 let consumer = try await output.consumer(for: agent)
                 await agent.bindUIExecution(consumer)
                 try await manager.start(.memory)
@@ -59,7 +61,11 @@ public actor MemoryExecutionSession {
         }
         starting = operation
         defer { starting = nil }
-        try await operation.value
+        try await withTaskCancellationHandler {
+            try await operation.value
+        } onCancel: {
+            operation.cancel()
+        }
     }
     private func recordFailure(_ error: any Error) {
         lastExecutionFailure = String(String(describing: error).prefix(512))
@@ -78,6 +84,9 @@ public actor MemoryExecutionSession {
             if registered {
                 do { try await manager.remove(.memory) } catch {
                     lastExecutionFailure = String(describing: error)
+                    cleanupFailure = AgentFailure(
+                        component: "memory", operation: "stop",
+                        underlying: error, code: .cleanupFailed)
                 }
                 registered = false
             }

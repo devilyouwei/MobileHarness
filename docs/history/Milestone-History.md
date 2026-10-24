@@ -101,7 +101,7 @@ AgentCore 的 Signal、Agent 内解析与完整 ActionCall、Output 的 GhostShe
 
 ## 正式 README 目录与命名对齐（2026-09-24）
 
-✅ 权威设计链接更新；Actions/UI、Speech/Speak、ActionPath、AgentLifecycle 对齐；独立 ActionRuntime、Tools/System 与 ToolExecutor；ChannelParser/Channel 职责拆分；Package 和 Xcode 引用同步。当前目录映射见 [MobileHarness/README.md 的项目结构](../../MobileHarness/README.md#source-structure-and-compilation-map)；原始决策见 ADR 0020。
+✅ 权威设计链接更新；Actions/UI、Speech/Speak、ActionPath、AgentLifecycle 对齐；独立 ActionRuntime、Tools/System 与 ToolExecutor；ChannelParser/Channel 职责拆分；Package 和 Xcode 引用同步。当前目录映射见 [MobileHarness/README.md 的项目结构](../../MobileHarness/README.md#target-map)；原始决策见 ADR 0020。
 
 ❌ 目标大纲中的未来模块仍按实际需求实现；共享契约及根测试目录例外已说明。运行行为保留现有模型 alias、默认 Channel、FIFO/资源互斥和工具回流。
 

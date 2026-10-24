@@ -22,7 +22,7 @@ public struct AgentContext<State: AgentContextState>: Codable, Sendable {
             guard !kind.isEmpty, kind.utf8.count <= 64, data.count <= 524_288 else {
                 throw CommunicationError.invalidPayload
             }
-            self.id = try id ?? UUID().uuidString
+            self.id = id ?? UUID().uuidString
             self.taskID = taskID
             self.kind = kind
             self.date = Date()

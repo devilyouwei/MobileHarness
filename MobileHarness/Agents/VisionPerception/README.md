@@ -1,5 +1,11 @@
 # VisionPerception — 相机帧消费、姿态与视线策略
 
+## 角色容器
+
+✅ [VisionPerceptionContainer.swift](VisionPerceptionContainer.swift) 是 AgentContainer 的稳定子能力。持有至多一个捕获代任务，VisionAgentSession 在其内完成注册、原生观察和受保护输出消费。重叠 run 显式 busy；取消和 suspend 加入实际任务；根 stop 永久关闭容器。会话失败与清理失败分别保留。
+
+生命周期由[模块根](../README.md#agent-container)统一编排；子容器能力不授予执行权。
+
 ## 职责与注入能力
 
 构造注入 PlatformKit `CameraFrameObserving`、ModelKit `PoseCapability`、采样／镜像配置、会话身份及私有 Context。角色主动订阅原始 CameraFrame，负责节奏、运动证据、姿态关联、骨架和眼睛目标；不持有 UI 子容器、相机控制器或 Storage 根。
@@ -134,7 +140,7 @@ OutputMailbox has 18 total slots shared by discrete output and the overlay/gaze/
 
 接纳、推理开始／完成与新鲜结果时间形成健康快照；超过 3 秒推理未返回、输入结束或持续没有新鲜结果给出带序号／计数／最后模型错误的诊断。呈现实际失败也进入健康快照，由现有监视报告；同一连续故障只报告一次，成功呈现清除该项。
 
-图像接纳只校验类型、会话、新鲜度与单调序号并原子替换 latest；实际推理读取已提交 Context。角色邮箱和根级输出消费使用相同 overlay/gaze/pose 最新替换规则，离散结果不被状态更新挤掉。停止加入输入、推理、发布及回执，旧代结果不更新新代。
+图像接纳只校验类型、会话、新鲜度与单调序号并原子替换 latest；实际推理读取已提交 Context。角色邮箱和会话绑定输出消费使用相同 overlay/gaze/pose 最新替换规则，离散结果不被状态更新挤掉。停止加入输入、推理、发布及回执，旧代结果不更新新代。
 
 通信见 [Agent.json](../../Resources/Agents/VisionPerception/Agent.json)。
 

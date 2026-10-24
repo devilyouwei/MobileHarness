@@ -72,7 +72,7 @@ public struct CapabilityRegistry: Sendable {
         guard Self.permitsValues(arguments, definition: tool.definition) else {
             throw GenerationError.invalidParameters
         }
-        return ToolCall(id: try id ?? UUID().uuidString, toolPath: tool.path, arguments: arguments)
+        return ToolCall(id: id ?? UUID().uuidString, toolPath: tool.path, arguments: arguments)
     }
 
     public func adding(internalActions: [InternalAction] = [], internalTools: [InternalTool] = []) throws -> Self {

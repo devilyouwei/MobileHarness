@@ -1,5 +1,11 @@
 # Assistant — 对话、Task 与可扩展 Skill
 
+## 角色容器
+
+✅ [AssistantContainer.swift](AssistantContainer.swift) 是 AgentContainer 的稳定子能力。持有 AssistantExecutionSession，通过会话管理角色私有 Context、注册与绑定输出任务，并提供首页会话／活动投影。仅启停 Assistant，不控制平级角色。
+
+生命周期由[模块根](../README.md#agent-container)统一编排；子容器能力不授予执行权。
+
 ## 职责与注入能力
 
 Assistant 是 `AgentChatWorker<AssistantContextState>` 的角色绑定，负责用户对话、一个前台目标、动态 Skill 与结果驱动 ReACT。它主动订阅 UI.home 文本；最终语音文本才经 Agent Signal 到达。UI 不持有 Assistant 引用，也不分派给指定 Agent。

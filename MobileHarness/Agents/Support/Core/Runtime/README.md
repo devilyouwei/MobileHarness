@@ -72,6 +72,8 @@ ProcessingContext 是本地 request/session/generation/turn／因果值，不是
 
 ## Context 与工作状态
 
+✅ Record.init 对显式 id 原样保留，缺省 id 直接使用非抛错的 UUID 字符串；初始化的 throws 仅用于证据字段校验。
+
 AgentContext version 1 验证 agent/scope/revision，最多 8192 条记录（单条 ≤512 KiB）、8192 消费批次、256 work/task 记录；逻辑 Data 总上限 32 MiB。仅终态可淘汰，默认超限拒绝，显式滚动保留计数。DecisionContext 是不可变选取快照，校验 Signal／批次成员；不含 Storage 依赖。
 
 工作可经历 queued → running → awaitingFeedback → continuation → running，最终 completed/failed/cancelled/interrupted。此为常见角色流程，不是 Core 强制完整转移表；transitionWork 拒绝未知或已终态工作，角色决定非终态转移。重启恢复只标 interrupted，不重放效果。

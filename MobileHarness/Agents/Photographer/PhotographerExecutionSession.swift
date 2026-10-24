@@ -5,6 +5,8 @@ import Gateway
 /// Role-owned output pump and bounded tracking work. UI owns request receipts.
 public actor PhotographerExecutionSession {
     public nonisolated let agent: PhotographerAgent
+    public private(set) var cleanupFailure: AgentFailure?
+    private var registeredForCleanup = false
     private let manager: AgentManager
     private let output: OutputGateway
     private var consumer: GatewayOutputConsumer?
@@ -40,7 +42,9 @@ public actor PhotographerExecutionSession {
         }
         let task = Task {
             try await manager.register(agent)
+            registeredForCleanup = true
             do {
+                try Task.checkCancellation()
                 let bound = try await output.consumer(for: agent)
                 consumer = bound
                 await agent.bindUIExecution(bound)
@@ -57,12 +61,24 @@ public actor PhotographerExecutionSession {
                     }
                 }
             } catch {
-                try? await manager.remove(.photographer)
-                throw error
+                let original = error
+                await removeRegistration()
+                if let cleanupFailure {
+                    throw AgentFailure(
+                        component: "photographer", operation: "start",
+                        underlying: original, cleanupErrors: [cleanupFailure])
+                }
+                throw original
             }
         }
         starting = task
-        do { try await task.value } catch {
+        do {
+            try await withTaskCancellationHandler {
+                try await task.value
+            } onCancel: {
+                task.cancel()
+            }
+        } catch {
             starting = nil
             throw error
         }
@@ -115,6 +131,17 @@ public actor PhotographerExecutionSession {
         await worker?.value
         await output.cancel(sessionID: sessionID)
     }
+    private func removeRegistration() async {
+        guard registeredForCleanup else { return }
+        do {
+            try await manager.remove(.photographer)
+            registeredForCleanup = false
+        } catch {
+            cleanupFailure = AgentFailure(
+                component: "photographer", operation: "stop",
+                underlying: error, code: .cleanupFailed)
+        }
+    }
     public func shutdown() async {
         if let closing { return await closing.value }
         closed = true
@@ -122,7 +149,7 @@ public actor PhotographerExecutionSession {
             starting?.cancel()
             _ = await starting?.result
             if let session = trackingSession { await detachTracking(sessionID: session) }
-            if started { try? await manager.remove(.photographer) }
+            if registeredForCleanup { await removeRegistration() }
             pump?.cancel()
             await pump?.value
             pump = nil

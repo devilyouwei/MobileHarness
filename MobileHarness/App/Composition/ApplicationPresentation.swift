@@ -10,7 +10,7 @@
     /// Adapts domain-owned feature controls to UI-owned request ports; App performs no conversions.
     @available(iOS 27, *)
     @MainActor @Observable public final class ApplicationPresentation: ApplicationRootProviding {
-        private let features: AgentApplication
+        private let features: AgentContainer
         private let home: UIHomeContainer
         public var onHomeVisibilityChanged: (@MainActor (Bool) -> Void)?
         public var onPreparationRequested: (@MainActor () -> Void)?
@@ -27,34 +27,37 @@
         public var onRetry: (() -> Void)?
         private var startupFailure: (any Error)?
         public var startupIssue: String? { startupFailure.map { String(describing: $0) } }
-        public init(features: AgentApplication, home: UIHomeContainer) {
+        public init(features: AgentContainer, home: UIHomeContainer) {
             self.features = features
             self.home = home
             features.onModelConfigurationChanged = { [weak self] in self?.onPreparationRequested?() }
         }
         @ObservationIgnored private var sessionPresentation: SessionPresentation?
         public var session: (any ApplicationSessionProviding)? {
-            guard let source = features.container else {
+            guard features.speechPerception.isReady else {
                 sessionPresentation = nil
                 return nil
             }
+            let source = features.speechPerception
             if sessionPresentation?.source !== source {
                 sessionPresentation = SessionPresentation(source: source)
             }
             return sessionPresentation
         }
         public var navigation: NavigationState { features.navigation }
-        public var cameraState: CameraState { features.cameraState }
-        public var cameraControls: any CameraControlling { features.cameraControls }
-        public var bluetoothState: BluetoothSettingsState { features.devicesUI.state }
-        public var bluetoothControls: any BluetoothControlling { features.bluetoothControls }
-        public var settings: SettingsState { features.settings }
-        public var settingsControls: any SettingsControlling { features.settingsControls }
-        public var modelResources: ModelResourcesState { features.modelResources }
-        public var modelResourceControls: any ModelResourcesControlling { features.modelResourceControls }
+        public var cameraState: CameraState { features.photographer.cameraState }
+        public var cameraControls: any CameraControlling { features.photographer.cameraControls }
+        public var bluetoothState: BluetoothSettingsState { features.applicationControl.devices }
+        public var bluetoothControls: any BluetoothControlling { features.applicationControl.bluetoothControls }
+        public var settings: SettingsState { features.applicationControl.settings }
+        public var settingsControls: any SettingsControlling { features.applicationControl.settingsControls }
+        public var modelResources: ModelResourcesState { features.applicationControl.modelResources }
+        public var modelResourceControls: any ModelResourcesControlling {
+            features.applicationControl.modelResourceControls
+        }
         public var recordDestinations: [AgentRecordDestination] {
-            let state = features.historyState
-            let controls = features.history
+            let state = features.memory.historyState
+            let controls = features.memory.history
             return [
                 AgentRecordDestination(
                     id: "assistant", name: "Assistant 聊天记录",
@@ -66,7 +69,9 @@
         }
         public func navigate(_ destination: AppDestination?) { features.navigate(destination) }
         public func cameraPreview() -> AnyView {
-            AnyView(CameraFrameView(state: features.cameraState).id(features.cameraState.videoGeneration))
+            AnyView(
+                CameraFrameView(state: features.photographer.cameraState).id(
+                    features.photographer.cameraState.videoGeneration))
         }
         public func navigationChanged() {
             onHomeVisibilityChanged?(features.navigation.path.isEmpty)
@@ -77,7 +82,7 @@
         public func prepare(progress: @MainActor (String) -> Void) async throws {
             if let startupFailure { throw startupFailure }
             try await bootstrap?()
-            try await features.prepare(progress: progress)
+            try await features.start()
         }
         public func reportStartupFailure(_ error: any Error) { startupFailure = error }
         public func retry() { onRetry?() }
@@ -85,22 +90,44 @@
 
     @available(iOS 27, *)
     @MainActor private final class SessionPresentation: ApplicationSessionProviding {
-        let source: VoiceInteractionSession
-        init(source: VoiceInteractionSession) { self.source = source }
-        var conversation: ConversationState { source.conversation }
-        var actionActivity: ActionActivityState { source.actionActivity }
-        var audioDetectionState: AudioDetectionState { source.audioDetectionState }
-        var listeningRequests: UIRequests<ListeningInput, Void> { source.listeningRequests }
-        public var audioDetectionRequests: UIRequests<AudioDetectionInput, Void> { source.detectionRequests }
+        let source: SpeechPerceptionContainer
+        let conversation: ConversationState
+        let actionActivity: ActionActivityState
+        let audioDetectionState: AudioDetectionState
+        let listeningRequests: UIRequests<ListeningInput, Void>
+        let audioDetectionRequests: UIRequests<AudioDetectionInput, Void>
+        private let diagnosticState: SpeechDiagnosticState
+        private let diagnostic: SpeechDiagnosticWorkflow
+        init?(source: SpeechPerceptionContainer) {
+            guard let conversation = source.conversation, let activity = source.actionActivity,
+                let detection = source.audioDetectionState, let listening = source.listeningRequests,
+                let requests = source.detectionRequests, let diagnosticState = source.diagnosticState,
+                let diagnostic = source.diagnostic
+            else { return nil }
+            self.source = source
+            self.conversation = conversation
+            actionActivity = activity
+            audioDetectionState = detection
+            listeningRequests = listening
+            audioDetectionRequests = requests
+            self.diagnosticState = diagnosticState
+            self.diagnostic = diagnostic
+        }
         public func speechValidationContent() -> AnyView {
             AnyView(
                 MossValidationView(
-                    state: source.diagnosticState, controls: source.diagnostic,
+                    state: diagnosticState, controls: diagnostic,
                     autorun: ProcessInfo.processInfo.arguments.contains("-moss-autorun")))
         }
         public func chatValidationContent() -> AnyView {
             #if DEBUG
-                AnyView(ChatValidationView(validate: source.validateVoiceModels))
+                AnyView(
+                    ChatValidationView(validate: { [source] in
+                        guard let validate = await source.validateVoiceModels else {
+                            throw AgentContainerError.unavailable
+                        }
+                        return try await validate()
+                    }))
             #else
                 AnyView(EmptyView())
             #endif

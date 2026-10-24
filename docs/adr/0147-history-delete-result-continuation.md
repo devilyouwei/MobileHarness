@@ -4,7 +4,7 @@ Date: 2026-10-06. Status: implemented.
 
 ## Decision
 
-Update [Agent-Driven App Architecture](../../MobileHarness/README.md#deterministic-history-mutation-contract) before changing code. Move confirmed archive deletion out of the legacy feature effect into a ConversationMemory intent. The Agent emits internal History.delete(id), accepts only matching runtime Tool feedback and emits UI.showHistory after success. App binds effects and transports outputs; it does not select the next business operation.
+Update [Agent-Driven App Architecture](../../MobileHarness/README.md#tasks-model-decisions-and-history) before changing code. Move confirmed archive deletion out of the legacy feature effect into a ConversationMemory intent. The Agent emits internal History.delete(id), accepts only matching runtime Tool feedback and emits UI.showHistory after success. App binds effects and transports outputs; it does not select the next business operation.
 
 Tools.HistoryMutationService validates archive-only identity and invokes the atomic journal transaction; missing/current IDs fail. Assistant model catalog remains read-only. One pending mutation rejects overlap; descriptor/JSON declare tool.result input and code-owned deletion permission requires id. Duplicate/foreign feedback is rejected.
 

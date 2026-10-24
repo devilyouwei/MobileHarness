@@ -4,7 +4,7 @@ Date: 2026-10-06. Status: implemented source consolidation.
 
 ## Decision
 
-Update the [adopted design](../../MobileHarness/README.md#canonical-functions-and-protocol-bindings) before moving sources. Consolidate directories before unifying definitions: Actions owns all concrete query/effect domains and ActionRuntime owns both protocol runtimes. Preserve existing JSON v5, API names and behavior.
+Update the [adopted design](../../MobileHarness/README.md#ownership-and-compilation) before moving sources. Consolidate directories before unifying definitions: Actions owns all concrete query/effect domains and ActionRuntime owns both protocol runtimes. Preserve existing JSON v5, API names and behavior.
 
 Tools and ToolRuntime compile only re-export shims under Actions/Compatibility, depending respectively on Actions and ActionRuntime. No duplicate source compilation or reverse dependency is allowed. Actions acquires StorageChat for the moved History domain; only History may import that journal.
 

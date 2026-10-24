@@ -1,18 +1,14 @@
 # IntegrationTests
 
-✅ 覆盖 Worker 等待标记在首个有效输出及失败／取消的结束边界，继续保留真实模型和物理设备独立验收。
-
-✅ 宿主准备验证失败通过真实 ContainerFailureChannel／Gateway／ApplicationControl／呈现函数记录异常并显示 Toast，保留原始 ValidationError，不由 UI 或 App 决定 Toast。
-
 ## 职责与构造边界
 
 通过真实 Agent/Gateway/Action/Tool/Storage 接口和注入模型、设备及呈现端点验证跨模块契约。ActionCatalogFixture 在每个作用域安装相同不可变生产声明；并发、失败与完成使用显式 gate/反馈同步。常规用例不推理真实模型、不控制硬件；真实 provider 和串口验收必须单独启用。
 
 ## 当前覆盖
 
-✅ SpeechPlaybackTests 通过真实 AudioCache／SpeechPlayback 与显式退出 gate 验证 VoiceReplyCancellation；播放取消加入前、原生停止加入前均保留未播放句柄，最后会话清理无 missingAudio 故障；中断正常返回、失败或取消时均完成清理并保留原错误。PCM／原生停止为替身，不宣称真机或真实合成验收。
+SpeechPlaybackTests 通过真实 AudioCache／SpeechPlayback 与显式退出 gate 验证 VoiceReplyCancellation；播放取消加入前、原生停止加入前均保留未播放句柄，最后会话清理无 missingAudio 故障；中断正常返回、失败或取消时均完成清理并保留原错误。PCM／原生停止为替身，不宣称真机或真实合成验收。
 
-✅ PromptTemplateTests 通过生产目录和增量解析器读取 ExpressionInteraction 的子集串行/全量语音并行示例，核对每个 wait 的表情、默认 Channel、语音对应关系及全量示例对所有合法 express 值的覆盖，并检查默认请求包含教学。现有调度器 wait 回归验证组内跨 Channel 并行和组间完成屏障；合成测试不代表 Flash 真实模型遵循验收。
+PromptTemplateTests 通过生产目录和增量解析器读取 ExpressionInteraction 的子集串行/全量语音并行示例，核对每个 wait 的表情、默认 Channel、语音对应关系及全量示例对所有合法 express 值的覆盖，并检查默认请求包含教学。现有调度器 wait 回归验证组内跨 Channel 并行和组间完成屏障；合成测试不代表 Flash 真实模型遵循验收。
 
 | 文件/用例组 | 主要边界 |
 | --- | --- |
@@ -35,13 +31,39 @@
 
 Task/Skill 的边界矩阵包括四种预加载接管方式（指定、加载、操作 Action、查询 Action）和完成/失败/取消终态；最后一次闲置时使用/重载、零后重载、独立计数、错误快照、32 个在途 Decision、精确字节/数量预算、批量失败回滚、跨会话取消权及失败提交重试。通过实际 Assistant 请求检查后续目录到期、历史证据保留与内部 ReACT 单次结算。用例数量从源码/测试运行报告获取，不在 README 保存某次执行的计数或通过结论。
 
+## 容器与直接输入覆盖
+
+✅ AgentContainerTests 使用生产 AgentContainerLifecycle 和可控 gate，覆盖冷根失效、真实 ApplicationLifecycle 初始 inactive → active 组合、启动在途取消、并发启停、部分启动回滚、必须暂停、迟到恢复围栏、终态拒绝及原始／清理失败。AgentSpecialistTests 验证 Assistant 前后台切换不控制平级角色。
+
+iOS 条件用例验证 ApplicationContainer 同根缓存、七个子能力身份和跨根隔离，需要 iOS 测试宿主；macOS check.sh 不执行这些用例。具体执行状态归[容器验证](../../docs/validation/Agent-Containers.md)，README 只定义覆盖范围。
+
+| 用例边界 | 观察行为 |
+| --- | --- |
+| 角色 UI 输入 | 真实子容器请求／回执、单消费者、容量、独立控制、暂停恢复、取消加入、版本／来源隔离；设置私密参数暂存与失败呈现 |
+| 存储／公开 State | 无效果构造、打开恢复失败、停止与读写竞争、旧仓库拒绝；公开编码／作用域／代际／预算，完整 Context 不进入公开事实 |
+| 原生媒体 | 只读 PCM／CameraFrame 直接消费、原采集序号、布局与新鲜度、唯一有界缓冲、半双工丢弃、停止加入及旧回调围栏 |
+| 视觉输出 | latest 替换／会话隔离、离散结果保留、慢消费者、真实溢出、终态排空、输入结束／输出失败、错误证据及呈现 |
+| 容器异常 | 同根注入、原始错误与清理错误、取消分类、去重／容量、来源与关联；真实 Gateway／ApplicationControl／Actions 呈现和防递归 |
+| 首页准备 | loading／checking／ready 事实、真实呈现调用完成类型、代际及乱序版本、验证失败的完整错误链 |
+| 原生执行替身 | 语音权限／准备／停止围栏、播放清理、设备连接恢复和旧反馈隔离；替身不证明物理完成 |
+
+FeedbackActionTests 的 iOS 原生触觉用例通过 HAPTIC_DEVICE_ACCEPTANCE=1 显式启用，保留共享会话还原和清理失败；平台 API 接纳不代表实际震感已确认。其他真实模型／设备 gate 同样必须独立报告。
+
+## 执行与时钟隔离
+
+普通用例并发执行，LiveRuntimeTests 与原生窗口用例在独立阶段串行执行；任一阶段失败仍执行另一阶段并返回失败。涉及真实捕获新鲜度、机械期限、媒体到期和进程级 AppKit 状态的用例使用该阶段，用例内部业务并发仍保留。合成突发用例可显式注入采样间隔；默认 cadence／freshness 用例继续校验生产预算。
+
 ## 资源和历史约束
 
-✅ 参数容错回归覆盖 XML 未声明属性过滤、无参查询、必填缺失/拼写错误和原始容量拒绝、Tool/固定调用严格授权；设备回归验证 disconnect 附带 id/value/action 仍执行且不向端口透传，适用参数非法值仍失败。模型输出与设备端点使用合成替身，不代表真实 BLE 或物理机械臂验收。
+参数容错回归覆盖 XML 未声明属性过滤、无参查询、必填缺失/拼写错误和原始容量拒绝、Tool/固定调用严格授权；设备回归验证 disconnect 附带 id/value/action 仍执行且不向端口透传，适用参数非法值仍失败。模型输出与设备端点使用合成替身，不代表真实 BLE 或物理机械臂验收。
 
 生产 Skill 均由显式 Catalog 加载；模型函数绑定由 Skill 选择，真实参数来自 @Action。请求快照、旧原文及内部关联不被后来的加载或投影改写。Schema、revision、媒体和业务 ID 的断言应取实际资源/提交结果，不用已失效的文档示例代替权限。
 
 模型文字、PCM、图片和执行结果替身必须标明合成。保存/捕获次数、错误后不重放、等待用户、原生配对与持久化失败都应断言真实边界。生产资源当前没有 Skill 依赖，现有资产不能冒充共享/循环依赖图的验收。
+
+## 千问 Action / Tool 回归
+
+QwenWorkflowEvaluationTests 通过实际 Assistant／Gateway 链路运行显式启用的云模型场景，设备反馈和非设备呈现使用合成替身。检查生产 Skill 的 Action-only 请求、协议解析、顺序／wait 与业务流程，不将 HTTP 探针当作完整链路验证。场景数据归 [AgentModelEvaluationTests](../AgentModelEvaluationTests/README.md)，运行入口与凭据隔离见 [scripts](../../scripts/README.md#千问显式实验工具)，结果和已知失败只归 [千问报告](../../docs/validation/Qwen-Workflow-Regression.md)。
 
 ## Supervised serial App/Agent acceptance
 
@@ -53,8 +75,7 @@ Serial acceptance calls the same explicit workflow connection operation as the l
 flowchart LR
     Manual[UI state and Settings intents] --> Workflow[Production BluetoothWorkflow]
     Model[Fixed model text fixture] --> Assistant[Real Assistant and parser]
-    Pose[Injected pose observations] --> Input[InputGateway]
-    Input --> Photographer[Real Photographer]
+    Pose[Injected pose observations] --> Photographer[Real Photographer]
     Assistant --> Output[OutputGateway]
     Photographer --> Output
     Output --> Runtime[Action or Tool runtime and resource coordinator]
@@ -70,7 +91,7 @@ flowchart LR
     Facade --> Workflow
 ```
 
-Tests use the real Assistant/Gateway scheduler, domain Action/Tool registration, production App workflow and shared Action recipes. Model text, pose observations and non-device presentation handlers are explicit fixtures; App's private application assembly/behavior adapter and native SwiftUI touches are outside this test seam. Finite Agent success requires terminal execution records and measured movement. Tool acceptance is checked separately from measured tracking. Manual submission, cancellation/replacement, an Agent lease bypass, release hold, invalid arguments and disconnected admission have separate checks. No gripper, torque, firmware or calibration change is part of these trials. Failures stop software owners and close the port without movement replay or automatic return home.
+Tests use the real Assistant/Gateway scheduler, domain Action/Tool registration, production business workflow and shared Action recipes. Model text, pose observations and non-device presentation handlers are explicit fixtures; App's private application assembly and native SwiftUI touches are outside this test seam. Finite Agent success requires terminal execution records and measured movement. Tool acceptance is checked separately from measured tracking. Manual submission, cancellation/replacement, an Agent lease bypass, release hold, invalid arguments and disconnected admission have separate checks. No gripper, torque, firmware or calibration change is part of these trials. Failures stop software owners and close the port without movement replay or automatic return home.
 
 Run one explicitly selected physical test per process with `NEXARM_PORT=/dev/cu.usbserial-110` and its gate: `NEXARM_SERIAL_PREFLIGHT`, `NEXARM_SERIAL_ACCEPTANCE`, `NEXARM_SERIAL_TRACKING_ACCEPTANCE`, or `NEXARM_SERIAL_PRESETS_ACCEPTANCE` set to `1`. Default repository checks leave all gates disabled. Stop phone control and clear the physical workspace first. Serial results do not certify CoreBluetooth, radio recovery, native UI hit-testing, real model decisions, YOLO perception or sustained tracking under load. Dated observations belong to [physical acceptance](../../docs/validation/NexArm_Physical_Acceptance.md).
 
@@ -81,214 +102,3 @@ Run one explicitly selected physical test per process with `NEXARM_PORT=/dev/cu.
 - 可注入 Skill 依赖图及跨进程/持久活跃 worker 的独立验证环境。
 
 执行方法与结果归 [validation](../../docs/validation/README.md)，不在本文件追加运行/安装记录。
-
-## 历史只读请求接入
-
-✅ UI 的记录分页、消息、归档及授权图片读取也经 MemoryHistoryIntent.query 的实际 Gateway/Memory 接入；不再由 UI 请求适配器直接读仓库。MemoryHistoryReadRequests 为根持有的类型化只读请求暂存，最多四个请求，每个请求一个结果等待者；Signal 只携带随机 ID，结果保留规范仓库返回值。请求/结果有界，120 秒未返回明确超时，取消/停止加入实际读取，迟到结果不更新 UI；不新增模型函数或重放副作用。
-
-## Storage 生命周期回归
-
-✅ StorageRuntimeTests 覆盖构造无数据库效果、重复启停、恢复、原始失败、启动取消/停止竞争、停止等待在途读写、旧仓库关闭拒绝及根图回滚。显式 gate 控制执行顺序；媒体延迟注入覆盖 notReady 不被缓存。
-
-Storage 生命周期回归同时覆盖停止先于启动、损坏数据库无后端回退，以及实际 Storage 启动期间 Scene 非活跃的正常暂停和回滚。
-
-## Storage 依赖
-
-✅ 存储访问使用独立的 State、Cache、Database 和 Files 接口；App 注册根实例，消费者通过构造器获得所需能力。存储容器不接管本目录的业务验证、执行和完成语义。
-
-GenerationRoundTests 的 native-only 模型夹具报告合成参数首样本，验证 driver 到历史仓库保留原始计时，不把工具完成时间作为首 token。
-
-## 公开 State 边界
-
-✅ State 回归覆盖公开编码、作用域隔离、代际/容量/失败、Task 投影与每轮请求。Assistant fixture 显式注入隔离的公开事实源；测试替身和自动化结果不等于真实模型或物理设备验收。
-
-[公开 State 契约](../../MobileHarness/Storage/State/README.md)
-
-✅ 补充会话 interrupt/pause 与真实 close 的区别回归，覆盖近期 Skill 续期保留、运行/等待 Task、公开 task 作用域及恢复后新输入；中断不重放、不累计 idle，关闭仍拒绝旧代际。
-
-✅ 验证静态 system 稳定、每轮唯一最新 State、历史/工具配对不被拆分、上下文预算，以及精简教学后的 Task/Skill/相机既有契约；缓存计数保留并兼容旧证据。
-
-## 千问 Action / Tool 回归
-
-✅ 连续表情专项在真实 Flash/Max 调用中验证指定顺序、全量覆盖、静默串行与逐项语音/表情并行。QwenWorkflowEvaluationTests 保存每个已解析调用的 round 内 wait 路径及合成语音请求的原文映射；专项断言介绍版每项唯一独立 wait、同项语音/表情同组、默认 Channel 和同轮完整输出；纯静默版同 Display Channel 已保证串行，不强制多余 wait。全量无指定顺序时允许枚举重排，语音名称接受中英文常用同义词；执行端继续使用合成设备，不宣称原生动画/音频验收。新增结构判定另用离线反例覆盖遗漏、错组和错名称。执行方法与证据见[连续动作专项](../../docs/validation/Action-Sequence-Prompts.md)。
-
-✅ 显式 `MH_QWEN_EVAL=1` gate 使用生产 Assistant、公开 State、Task/Skill 控制及 Gateway，注入真实阿里 Responses 模型和合成设备/仓库执行者。共用场景位于 AgentModelEvaluationTests/Scenarios/qwen-workflows.json；每场景独立会话，按用户轮次断言调用协议、参数、顺序、Task/Skill 及禁止效果。普通检查不访问网络。每场景最多32模型请求、每用户输入最多10请求、每输入180秒；超限失败，取消并加入工作，不自动重试。证据仅含合成输入、实际请求/响应/调用和用量，不含凭据；通过不等于真实设备验收。
-
-相机替身同步发布事实，busy/权限/未开启/照片不可操作使用现有 CameraControlError；拍照不能在 busy 时被替身伪造成功。查询旁支保留 Task，替换确认单独测试；强制 Tool 查询需请求 State 未公开的电源/发现列表，避免把合理的 State 直接回答判错。
-
-✅ 针对 Qwen 实测失败补充调用教学守卫、普通忽略与重拍分支的可解析示例，以及无模板变量/无伪 native 函数示例检查；在有界静态正文预算内允许必要教学。既有53场景保留业务判定，另有6个连续表情专项；全 Action 迁移另外断言调用协议及实际请求无 native 声明。历史三模型结果保留，当前迁移回归只选择 flash/max。
-
-静态 system 正文预算分别为基础 Skill 23,500 UTF-8 bytes、含摄影30,500 bytes（不含 State/历史），包含常驻连续表情的完整示例及通用串行教学；完整请求继续执行现有64KiB总预算。示例由生产解析器验证，不把声明名称保护当作真实模型遵循证明。
-
-定向模板/示例检查已通过；完整云回归及全量自动化失败分别见[优化验证报告](../../docs/validation/Qwen-Prompt-Optimization.md)，不以定向通过替代全量验收。
-
-## 分类异常诊断
-
-✅ 注入确定性模型协议失败，验证 Agent 终止控制、类别/代码/轮次、请求证据和无执行/无重试；保留原取消及部分效果行为。
-
-✅ Implemented: bundled Skill regressions assert Action-only queries, Query Channel, value feedback, retention and Task adoption. Generic native/mixed protocol tests remain. Qwen full-suite assertions require all Skill calls to be Actions and every actual request to have no native declarations; original 53-case business expectations remain unchanged.
-
-✅ Implemented: FixtureGenerationOutputs accepts explicit synthetic Action completion/failure outcomes, so query-retention fixtures feed exactly one correlated value result instead of a completion followed by duplicate feedback. Generic native fixtures stay independent of bundled Skill registration.
-
-## Platform 根、设备接入与同帧呈现
-
-PlatformContainerTests 验证注册隔离、根失效/恢复、重复停止和保留断开失败；DeviceInputTests 验证原生媒体适配、独立订阅、FIFO 溢出和输入取消加入；NativeAttachmentTests 验证字符串参数不能伪造附件；MediaTransportTests 验证慢媒体呈现只保留最新包且不阻塞离散输出。构建与运行证据见 [专项验证](../../docs/validation/PlatformKit-Containers.md)。
-
-## 视觉停顿恢复修复
-
-✅ 新增媒体过期后继续输出/新鲜媒体拒绝仍失败、模型忙后恢复/连续三次停止/永久错误立即停止/恢复等待可取消的回归。
-
-✅ 验证原生回调单代围栏在关闭后拒绝迟到包，慢观察者溢出不影响另一个消费者，广播错误保留。
-
-## 视觉静默停止与诊断补齐
-
-✅ 新增视觉会话输入结束/错误等待终态排空、输出失败取消加入输入、用户取消不报故障、卡住/过期健康快照和视觉异常 Agent 分类与 toast 的行为回归。
-
-✅ 图像接纳只做会话、新鲜度、单调序号及类型验证，原子替换 latest 槽；移除接纳前未使用的上下文快照读取，避免帧接纳等待上下文持久化写锁。真正开始推理时仍读取已提交快照。回归使用被阻塞的真实仓库 commit 验证接纳能独立返回。
-
-✅ 真实 VisionPerception 终态经绑定 Gateway consumer、失败快照订阅映射到 Agent 异常与 toast，验证原始错误、会话和输入关联保留。
-
-## 视觉 queueFull 修复
-
-✅ 增加慢视线/姿态广播消费下数百次更新只交付首个和最新值、离散输出不受阻、原始派发错误不被 queueFull 覆盖、FIFO 真溢出携带队列详情、不允许 Action/定向通信误标 latest 的回归。
-
-✅ 最新状态替换键在不同会话间隔离；超过 16 个不同键明确拒绝，验证不会通过最新态策略引入无界缓存。
-
-## UI 容器与相机能力注入
-
-✅ 补充 AppStorage 的 UI 根/子能力缓存一致性、跨根隔离及 CameraCapturing 替身接口回归；不将 iOS-only Coordinator 的编译或主机替身当作真机功能验收。
-
-## 统一输入专项
-
-✅ DeviceInputTests 覆盖统一草稿/信封、业务身份与因果、内容/反馈伪造拒绝、合成传感器 schema、静态/动态合并、容量/取消/关闭与会话/incarnation 隔离。既有业务意图回归验证兼容；替身不证明硬件采集。
-
-## 统一容器异常通道
-
-✅ 容器故障专项：Foundation 回调到真实 Gateway/Assistant、无模型接收、原始错误保留、启动前积累、连接/断连、关闭后拒绝、清理阶段、同根注入、日志/待投递容量/重复计数和观察者限制。用合成故障，不宣称真实设备或进程崩溃已验收。
-
-## ApplicationControl 异常展示
-
-✅ ContainerFailureTests 使用真实 Gateway、ApplicationControlExecutionSession 与内部呈现函数验证容器/执行异常的首页记录和 Toast；覆盖重复、陈旧、暂停、伪造/过期/停止、容量、关联信息及呈现失败防递归。原 AppWorkflow 提示策略用例放到此集成路径；合成故障不代替真实设备验收。
-
-## UI 全量容器化
-
-✅ 应用级 UI 状态由八个子容器统一创建，消费者注入所需 Presenting 接口并提交 UI 自有值，不直接写字段。App 注册并管理同一 UI 根；原业务身份/版本校验、原生完成和基础库依赖边界保持。跨模块连接迁移仍是独立待办。
-
-✅ VoiceTests 覆盖离主线程频谱入口与同步 FFT 输出一致、预取消拒绝，不将测试耗时阈值作为真机帧率证明。
-
-
-✅ 通过真实 CacheContainer/AudioCache/Agents 故障通道验证正常 PCM 播放完成并 release 无故障；真实 missing 及生产流失败仍报告，单次使用与关闭取消仍成立。
-
-
-✅ 覆盖同输入/输出设备配置调整与 category/override 变化不触发重开，真实设备插拔、不可用路由、缺少旧快照保守投递；保持路由设备事实与容器错误的边界。
-
-
-✅ Pose payload 用例检查真实非法输入拒绝；生产网格／方向由原生呈现回归覆盖。UI 根及消费者继续通过原公开协议注入，完整检查失败单独记录。
-
-✅ 设备接入回归覆盖原生事实与 Error 分离、音频／相机原生只读订阅与代际；容器故障回归覆盖音频接纳错误的公开操作单次报告。根缓存、停止、独立媒体及语音生命周期继续回归，真机行为单独验收。
-
-✅ 模型回归覆盖 App 同根四子能力／根隔离、流式错误观察者早／晚安装及取消无故障；资源暂停取消加入与权重保留由 Runtime 测试覆盖，默认根生命周期由 Defaults 测试覆盖。
-
-✅ 已实现：录音启动隔离的源码归属守卫；就绪／取消／旧token回归沿用现有测试，原生阻塞改善另行真机采样。
-
-✅ 已实现：回归Gateway稳定连接条件代码、Agent无Toast状态降级、事实→两个呈现Action、重连／连接／断开变更、旧revision与伪造来源拒绝；严重传输故障保留原异常。
-
-✅ 自动化覆盖：完整原始错误及长文本保留、同前缀错误不合并、正常取消／生命周期拒绝保留但不广播，四根统一错误回调与原始抛错。
-
-
-✅ FoundationFailureTests通过同一测试协议检查四种封装的字段语义、稳定代码集合、NSError身份、来源保留、多项清理错误和取消分类；同时回归Gateway稳定投影、包装后的蓝牙条件及单项清理错误不降级。根容器原有测试改为验证结构化错误与underlying。
-
-
-✅ modelPreparationLoadingEyesCrossGatewayAgentAndExpressionAction覆盖App环境事实直达ApplicationControl，再经Gateway／独立Expression Tool到UI，未聆听显示及回前台重复loading事实重新开启，ready退出且不产生Toast。
-
-✅ setLoading为state函数，必须使用Void handler产生completed，禁止value完成；回归通过FunctionExecutor校验完成类型和Tool返回成功，不能只检查UI副作用。
-
-✅ 已实现：实际模型 preparing 使用独立加载 Action，checking 不启动加载表情。
-
-✅ 已实现：回归原始及 PlatformFailure 包装的 connect 超时保留证据、无 Toast，并验证同样 timeout 在 write 及清理失败时仍为故障。
-
-✅ 已实现：通过真实 setLoading ToolExecutor 验证检查／ready 后迟到加载和乱序版本正常完成且不改变 UI，错误身份、无效版本及冲突仍拒绝。
-
-✅ ModelKit reportLoading 的真实冷加载／暖模型／无资源／失败区间回归归 [ModelKitRuntimeTests](../ModelKitRuntimeTests/README.md)；本目录继续验证呈现 Action 链路。
-
-✅ 已实现：app.environment 按类别保留最新版本；来源、会话、信封和内容先校验。晚到旧版本及相同版本相同内容不重复呈现、不产生 outOfOrder；同版本不同内容明确拒绝。仅适用于环境快照，不改变 PCM、业务动作和结果的顺序契约。回归覆盖逆序、重复、冲突及 loading 不被旧事实重新打开。
-
-✅ 旧机械臂宿主的窄 UI fixture 补全新增内部等待函数声明，验证完整生产授权目录，不扩大生产模块依赖。
-
-✅ 已实现：FeedbackActionTests提供iOS原生触觉重复请求回归，以HAPTIC_DEVICE_ACCEPTANCE=1显式启用；同一NativeHapticFeedback实例在每次模拟录音重配关闭触觉开关后仍须恢复允许，含stop后重用。测试还原共享会话原值并保留清理失败，需支持触觉的真机；macOS不执行此原生用例，API接纳不等于已实测震感。
-
-✅ PlatformContainerTests的断开未确认替身对所有写入口（含restoreLive）明确返回disconnected，不把恢复写请求当作停机或到位证明；真实原生链路及物理速度／方向／停机仍须单独验收。
-
-✅ BluetoothArmFixture按已准入写入索引区分restoreLive与普通live写入；最新滑杆替换预设回归允许必要的旧跟踪模式恢复，但仍禁止普通旧预设的同步位置包，并断言所有恢复写入都在新滑杆首包之前结束。不会把恢复包从传输日志中移除，也不模拟到位。
-
-## Direct container contract
-
-Direct-input regressions cover typed request receipts, bounds, cancellation/generations, native subscriptions and unchanged authorized execution. Synthetic tests do not establish real model, UI or hardware acceptance. Current cross-module ownership is defined by the [overall design](../../MobileHarness/README.md).
-
-✅ 以原生 PCM 流的非零序号与业务门控丢弃验证，感知 Agent 接收保留采集序号和布局，不按已消费包重新编号。
-
-✅ 通信注册表只保留 Agent 消息与执行反馈；删除本地 UI／媒体／环境／故障的历史 schema 和仅供外部来源的测试声明，本地类型自身继续验证。
-
-✅ 移除编码校验后，本地类型仍拒绝超长 Provider、历史、媒体和任务标识；通信注册表不接受这些本地来源 schema。
-
-## Agent-owned UI inputs
-
-✅ Direct UI integration regressions instantiate owning Agents with actual UI subcontainers. They cover home request/turn identity, independent SpeechPerception listening, typed Memory reads, camera execution, resources pause/resume, private settings staging/presentation/failure, independent control admission, and stop joining an accepted Action. Synthetic native services are labelled fixtures; hardware acceptance remains separate.
-
-✅ UI 失活并暂停 SpeechPerception 后，原生生命周期停止仍撤销同意并输出禁用 Action，避免回复结束时重新开启采集。
-
-✅ 蓝牙晚到执行失败回归等待连接恢复的可控状态，再断言旧错误没有污染新连接；仅 phase=connected 尚不代表恢复阶段已退出。保留原错误／关联和清理断言。
-
-## 原生输入自有生命周期
-
-✅ 已实现：以只读 PCM／camera 替身验证 Agent 自行订阅与取消加入、真实采集代、半双工丢弃仍保留原序号、单份 64 包容量与溢出、旧回调隔离及暂停恢复。替身不证明硬件或实际模型性能。
-
-## 语音执行归属收敛
-
-✅ 已实现：验证 Actions 频谱呈现的原生代/根 token/旧关闭围栏、有界有限值及 UI 失活；语音取消和真实 Action 失败回归保留，不以源码移动代替执行验证。
-
-✅ 已实现：用可替换的 AudioCaptureControlling 验证实际 Actions 音频检测的权限失败、取消停止、事件终止及关闭期间迟到工厂清理；不以假 PCM 证明物理设备验收。
-
-## 直连链路收尾
-
-✅ 覆盖语音手势／检测直连、完整历史受保护执行、四个实际读取工作上限、根停止加入，以及页面取消加入后继续接纳下一请求。原生硬件与真实模型验收独立记录。
-
-## Runtime validation isolation
-
-The default check runs ordinary tests concurrently, then executes the live-runtime and native-window suites separately. These suites are serialized because their assertions use real capture freshness, mechanical deadlines, media expiry, or the process-wide AppKit application. Business concurrency remains exercised inside each test. No global parallelism flag or production deadline is changed; excluded cases in the first phase must execute in the second.
-
-✅ LiveRuntimeTests 统一承载机械控制实际反馈／准入期限、Agent 轮次期限、Signal SLA、根 UI 到期与原生帧生命周期的异步回归。用 Swift 语法树迁移完整测试声明，不修改用例本身；保留同一用例内的并发、超时、失败类型和取消断言。其余纯值／契约用例仍在普通并发阶段。
-
-✅ 监听同意／回复占用的跨 Gateway 回归同样依赖三秒真实轮次期限，归入 LiveRuntimeTests；不修改三个 revision、执行 owner 或真实反馈断言。
-
-✅ 历史接纳回归分别验证在途回复变更后用户记录可原子接纳、原回复保留、重复输入拒绝，以及真正模型请求仍拒绝旧／外来 token。沿用会话取消与其他会话继续处理回归。
-
-✅ ResourceObservationTests 通过注入 revision 流驱动实际角色自有订阅，验证首个及后续资源刷新经 Gateway／Actions 完成，且不产生 invalidPayload 观察故障。
-
-✅ 角色资源订阅回归覆盖暂停／恢复后的新源首个 revision，验证刷新继续接纳且不被误判为旧序号。
-
-## 职责归属与组织约束
-
-✅ 设置／资源、历史及摄影请求回归直接提交 UI 子容器请求并等待真实回执。测试夹具只提供提交便捷方法，不执行或重建宿主事务；回执结束与实际工作加入分别验证。独立角色读取容量、暂存私密值与 Action 校验按各自契约单独测试；角色宿主仅用于注册与输出绑定。
-✅ 感知测试以原生帧或注入的原生源驱动；移除旧语音补充队列测试，覆盖唯一原生缓冲、冷启动有序前缀、取消加入和通用媒体入口拒绝。合成帧构造仅存在测试侧，不引入生产兼容适配。
-
-✅ 队列替换、发布隔离和终态保留用例显式注入近零采样间隔，使合成帧突发只验证各自契约；默认采样节奏、单调时钟、延迟预算仍由专门的 cadence／freshness 用例验证，不放宽生产配置。
-
-✅ 中立媒体值只保存原生消费所需的 Float PCM 和不透明图像附件；合成字节数据转换由测试侧负责。执行附件继续校验帧身份与新鲜度。
-
-✅ 直接 CameraFrame 入口验证过期拒绝计数及后续同序号新鲜帧可接纳。
-
-✅ 共享姿态投递、慢订阅者、终态展示及摄影订阅拒绝用例使用真实原生捕获时钟，归入已有串行 LiveRuntimeTests，避免并发模型／构建负载改变 750 毫秒新鲜度判定；不修改生产预算。
-
-✅ 不透明图像附件直接保留 Sendable 原生帧本体；角色校验 CameraFrame，Gateway 无需引用 PlatformKit 即可保留和转交附件。
-
-✅ 会话控制测试使用 AssistantSessionControl；保留固定 Memory 的真实提交确认回归，泛化 Chat 不保留没有启用者的父提交等待策略。
-
-
-## Actions 接入契约
-
-Actions 按业务能力组织源码，保持原编译目标。生产调用显式连接独立相机、语音、UI 呈现和 Task 端点；不通过无关能力的类型转换探测。验证和导航按实际源码所有权维护，业务授权与生命周期继续由原拥有者负责。
-
-## Agents 角色与共享机制
-
-具体角色装配归 Agents 根级，Support 保留通用机制；角色私有载荷和会话控制由角色解释，通过注入的解码／Context 钩子接入共享准入。输入身份、Task scope、取消加入和真实结果保持独立，源码和验证按其实际所有者维护。

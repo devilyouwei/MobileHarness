@@ -56,6 +56,10 @@ Agents and Actions each compile their owning directory, with AgentCore and Funct
 
 Roots create stable instance-local capabilities. Construction/start does not implicitly request permission, open capture, run inference or scan devices. Consumers receive required interfaces through initializers, never discover roots through IoC or create native owners. Foundation modules do not import business or transport modules.
 
+### Business root
+
+✅ App caches one AgentContainer per registry scope. Its stable assistant, applicationControl, memory, photographer, speechPerception, speechSynthesis and visionPerception capabilities own role sessions and joined work. AgentRuntime assembles shared communication/execution facilities; Support holds reusable mechanisms, while each role interprets its own inputs and session policy. Actions assembles explicit camera, speech, presentation and task execution ports. See [Agents](Agents/README.md#agent-container) and [Actions](Actions/README.md) for local contracts.
+
 <a id="part-ii--module-responsibilities"></a>
 
 ## Modules and internal structure
@@ -93,7 +97,7 @@ Photographer owns camera commands, pose tracking and tracking freshness. Assista
 
 SpeechPerception directly consumes native MicrophoneFrame values, retaining immutable Float storage without a byte encode/decode round trip. Layout/sample rate/sequence/time validation and model conversion belong to the role. Native PCM remains ordered and overflow explicitly fails; capture generations and half-duplex admission prevent late audio from entering a new session.
 
-The resident listening role owns listening consent/policy and reply occupancy. Its actual start/stop/playback effects execute through Actions. Actions/Speech VoiceSessionCoordinator owns native voice lifetime, permission/capture readiness, playback barriers and voice presentation. Agents VoiceAgentSession owns role registration and bound output pumps. Both join their own cleanup. Final transcription is an Agent message through Gateway; partial updates do not independently submit user decisions. SpeechSynthesis owns generation, while native playback waits for real drain. [Speech perception](Agents/SpeechPerception/README.md) and [speech execution](Actions/Speech/Support/README.md) define details.
+The resident listening role owns listening consent/policy and reply occupancy. Its actual start/stop/playback effects execute through Actions. Actions/Speech VoiceSessionCoordinator owns native voice lifetime, permission/capture readiness, playback barriers and voice presentation. Agents SpeechPerceptionContainer and SpeechSynthesisContainer independently own role registration and bound work; VoiceAgentSession only connects their execution ports. Both join their own cleanup. Final transcription is an Agent message through Gateway; partial updates do not independently submit user decisions. SpeechSynthesis owns generation, while native playback waits for real drain. [Speech perception](Agents/SpeechPerception/README.md) and [speech execution](Actions/Speech/Support/README.md) define details.
 
 ### State, devices, resources and faults
 
@@ -111,7 +115,7 @@ SQLite records durable dialog/message/task/media/device facts. Runtime queues, d
 
 ### Lifecycle, cancellation and safety
 
-App starts dependency roots before consumers and stops consumers before releasing roots. Background invalidation immediately closes native/UI admission; asynchronous cleanup then cancels and joins actual work. Native physical safety never waits for model reasoning or depends on background execution.
+App registers diagnostics → storage → model, diagnostics → platform/UI, all four foundation roots → agents → homePreparation. It manages one Agent lifecycle node; the business root coordinates its internal native and role owners. App starts dependency roots before consumers and stops consumers before releasing roots. Background invalidation immediately closes native/UI admission; asynchronous cleanup then cancels and joins actual work. Native physical safety never waits for model reasoning or depends on background execution.
 
 The home renderer stays mounted outside navigation. Settings/history navigation preserves root listening; camera capture and pose processing require foreground plus the home route, retaining enabled intent across navigation. Explicit session interruption differs from session closure: interruption preserves Task/Skill ownership and does not replay a model decision on resume.
 
@@ -121,10 +125,4 @@ UI/request generations, capture generations, Agent incarnation/session, task gra
 
 Automated checks, iOS compilation, real models, native UI and physical-device acceptance are separate evidence categories. Direct-input migration acceptance and remaining device/performance work are tracked in [the requirement](../docs/requirements/technical/Direct-Container-Input-Plan.md) and [validation](../docs/validation/Direct-Container-Input.md). No performance magnitude is asserted without comparable device measurements.
 
-## Actions 业务端点与组织
-
-Actions 按业务能力聚合入口、能力接口与执行服务；Support 只保留共享机制。生产目录与协议策略归 Actions 根级，ActionEndpoints 显式组合相机、语音、UI 呈现和 Task 窄端点。CameraPhotoSession 独立拥有照片工作并由采集根取消加入；机械臂连接根保持工作互斥，手动与跟踪规划状态独立。具体内部接口见 [Actions](Actions/README.md)。
-
-## Agents 角色与共享机制
-
-具体角色装配归 Agents 根级，Support 保留通用机制；角色私有载荷和会话控制由角色解释，通过注入的解码／Context 钩子接入共享准入。输入身份、Task scope、取消加入和真实结果保持独立，源码和验证按其实际所有者维护。
+Agent container implementation and outstanding acceptance are tracked in [the plan](../docs/requirements/technical/Agent-Containers-Plan.md) and [validation](../docs/validation/Agent-Containers.md).

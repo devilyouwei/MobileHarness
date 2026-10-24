@@ -1,93 +1,58 @@
 # Application Composition
 
-✅ 组合根移除准备手动取消接线；准备复查未就绪通过同根异常通道上报原始验证错误，ModelKit 已报告的加载／查询错误继续走既有通道，不重复生成 Toast。
+## 职责与边界
 
-✅ ApplicationContainer 缓存 ModelContainer 并返回同根 language／speech／vision／artifacts。模型服务依赖 storage／diagnostics；Agents 依赖 model，消费者停止后再关闭模型和存储。
+✅ 创建、持有和连接模块实例，安装公开声明及静态生命周期描述，组合 UI 自有展示协议。不消费业务请求、不转换业务数据，不决定模型、相机、语音或设备策略。
 
-## 职责与接口
+## 组件、接口与关系
 
-只创建、持有和连接模块实例，安装模块公开声明及生命周期描述。不接收业务请求、不转换业务数据，也不决定模型/相机/语音/设备业务规则。
-
-## 组件与关系
-
-| 文件 | 职责 |
+| 文件 | 当前职责 |
 | --- | --- |
-| ApplicationContainer.swift | AppStorage 内的 Storage/Platform/UI/Model 根、子能力及容器故障通道注册 |
-| AppComposition.swift | 持有当前 Services 和生命周期图，连接 UI bootstrap/retry/failure 端口；显式重试替换整个根作用域 |
-| ServiceFactories.swift | 选择 Storage 运行工厂和数据库位置，获取原生能力、创建照片工厂、模型制品服务及 Agent 集成入口；注入延迟领域仓库接口 |
-| ModuleRegistration.swift | 注册 diagnostics → storage → model；platform / ui / model → agents → native 的静态依赖与公开启停/失效接口 |
+| [ApplicationContainer.swift](ApplicationContainer.swift) | AppStorage 目标的 FactoryKit 实例内缓存；持有四个基础根、根属性的子能力别名、故障通道及 Agent 根 |
+| [AppComposition.swift](AppComposition.swift) | 持有 Services 和生命周期图，连接 bootstrap／retry／failure，管理作用域替换 |
+| [ServiceFactories.swift](ServiceFactories.swift) | 选择存储后端和根 URL，装配公开能力、延迟仓库提供器、相机工厂与 Agent 根 |
+| [ModuleRegistration.swift](ModuleRegistration.swift) | 绑定模块生命周期及静态依赖，保留原始失败并归一化纯取消 |
+| [ApplicationPresentation.swift](ApplicationPresentation.swift) | 实现 UI 根／会话展示协议，组合既有页面、角色状态和请求端口，连接导航与准备回调 |
 
-配置中的资源路径属于组合输入。照片容量/FIFO、Provider 事务、模型选择、页面控制、意图编码和结果转换属于模块；App 不在绑定闭包中复制这些逻辑。
+AppStorage 只编译 ApplicationContainer.swift。业务目标不导入 IoC，不创建备用基础根。ApplicationContainer.agents(make:) 在 iOS 27 上缓存一个 AgentContainer；内部类型擦除存储适配包的部署版本，公开入口保持强类型。七个稳定角色能力及内部生命周期见 [Agents](../../Agents/README.md#agent-container)。
 
-## 生命周期与失败
+ApplicationPresentation 的 SessionPresentation 按稳定 SpeechPerceptionContainer 身份复用，仅在该角色准备就绪时提供；读取 conversation、actionActivity、聆听／检测请求和诊断投影，不持有内部 VoiceInteractionSession 或感知任务。设置、资源、历史、相机控制使用对应角色公开工作流。
 
-✅ 只有 Scene active 开启服务接纳；inactive/background 仍立即失效。初始作用域在 inactive 仅等待 active，不将正常等待当作启动失败。系统在启动中离开 active 后，清理成功的 suspended 图在下一次 active 由组合根停止并重建；一个替换任务合并重复事件；结束时按最新前台状态检查是否仍需恢复，不积累重建队列，不重放业务操作。启动错误和清理错误仍通过现有错误端口显示，手动重试规则保留。
+## 依赖与数据流
 
+```mermaid
+flowchart LR
+ diagnostics --> storage --> model
+ diagnostics --> model
+ diagnostics --> platform
+ diagnostics --> ui
+ storage --> agents
+ model --> agents
+ platform --> agents
+ ui --> agents
+ agents --> homePreparation
+```
 
-StorageContainer 在自己的后台启动任务中完成后端打开、迁移和恢复，成功后才发布仓库；App 通过 start 等待结果并按依赖顺序开放业务接纳。模块内部服务工厂返回明确端口；不存在全局 App 查找。
+✅ Services 持有同一注册作用域的 StorageContainer、PlatformContainer、UIContainer、ModelContainer 和 AgentContainer。存储 start 完成打开、迁移与恢复后才发布仓库，工厂注入延迟仓库接口，不直接执行数据库恢复。UI 八个子能力和模型四个子能力均来自同根属性。
 
-一个替换任务，没有重试队列；重复重试合并。旧图停止完成后才创建新实例和 scopeID。清理失败保留旧图和错误，不启动替代原生所有者。持久化设置/记录和媒体由仓库保留，不重放操作。
+唯一 CameraCoordinator 工厂由 App 提供，Agent 根按需调用；原生执行实现归 Actions。UI 请求的订阅、处理与回执由角色拥有。照片容量、Provider 事务、资源下载、页面控制和意图解释不在 App 绑定闭包中实现。
 
-[App](../README.md) · [生命周期](../Lifecycle/README.md) · [Agent 集成](../../Agents/Support/README.md) · [Action 集成](../../Actions/Support/README.md)
+## 生命周期、替换与失败
 
-✅ Services 持有 storage: StorageContainer；工厂持有独立 ApplicationContainer 并选择根 URL，注入领域仓库提供器。注册实际 storage.start/stop 与 diagnostics → storage → model；platform / ui / model → agents → native 依赖；不调用 SQLiteRepositories、FileManager 或恢复。
+只有 Scene active 开启接纳。初始 inactive 等待前台；启动中系统失活且回滚成功的 suspended 图，在后续 active 停止并重建。一个替换任务合并重复事件，结束时复查最新前台状态；无重建队列或操作重放。旧图清理失败保留其作用域和错误，不启动替代所有者。
+
+后台 URLSession 可在前台启动前使用同根模型制品／存储服务。组合根记录作用域已被使用，替换时在生命周期停止后显式加入幂等 model.stop／storage.stop，覆盖未进入 started 列表的后台所有者；不启动相机、音频、UI 或推理。
+
+ApplicationContainer.failureDetails 提取模块自有 Failure（含 AgentFailure）的稳定 code 和 isCancellation，交给同根故障通道。ModuleRegistration 先保留结构化诊断，再将无清理失败的取消转换为宿主 CancellationError；真实清理失败不降级。启动前故障由 UI bootstrap 失败端口兜底，业务异常展示由 Agents／Actions 决定。
+
+## 首页准备接线
+
+Services 持有唯一 ForegroundPreparation，生命周期前台屏障完成且首页可见时激活。导航、配置应用和交互终态请求复查；失活或切页关闭接纳，根替换先加入准备任务再停止模型。活跃会话只检查，不竞争冷准备；云端不发送探测生成请求，相机开启时才准备视觉。
+
+ModelKit 回调实际权重加载开始／结束；组合根更新 UI 交互门并向 Agents 报告 loading／idle 事实，不直接设置表情。普通检查、已就绪和无需加载不显示 loading。复查未就绪通过原始验证错误通道上报；模型能力已报告的失败不重复生成 Toast。算法与状态见 [Lifecycle](../Lifecycle/README.md)。
 
 ## 待实现
 
-- 多窗口实例隔离；强制中断非合作依赖仍不可用。
+❌ 多窗口实例隔离；非合作依赖的强制中断。
 
-## Storage 依赖
-
-✅ 存储访问使用独立的 State、Cache、Database 和 Files 接口；App 注册根实例，消费者通过构造器获得所需能力。存储容器不接管本目录的业务验证、执行和完成语义。
-
-AppStorage 目标只编译 Composition/ApplicationContainer.swift，使用 FactoryKit 实例内缓存；业务目标不导入 IoC。Services 持有注册容器、StorageContainer、PlatformContainer、UIContainer 和 ModelContainer，连接所需子接口。模型后台事件只转交 model.artifacts；模型根停止加入制品后再停止存储。
-
-
-## UI 容器与相机能力注入
-
-✅ ApplicationContainer 缓存 UI 根及相机子能力，AppStorage 显式依赖 UI。Services 持有 UIContainer；ServiceFactories 定义唯一 Coordinator 工厂，AgentApplication 只在原有惰性时机调用它。ModuleRegistration 注册 ui 生命周期，Agents 依赖 storage/platform/ui/model。
-
-
-## UI 全量容器化
-
-✅ ApplicationContainer 缓存唯一 UIContainer，并将八个子能力注册为根属性的别名，不单独缓存备用实例。ServiceFactories 显式传入设置初值，再注入界面状态和所需呈现能力；不在 App 创建状态或逐帧转发。生命周期继续使用 diagnostics → storage/platform/ui → agents → native，业务消费者先停再停 UI，重试创建新根。
-
-✅ AgentApplication 注入同根相机呈现端口供点击请求忙碌/提示投影，仍共用页面 CameraState，不创建备用根。
-
-✅ 后台 URLSession 可以在前台生命周期启动前准备同根制品；组合根记录该作用域已被使用，重建时在生命周期停止后显式加入幂等 model.stop/storage.stop，避免未加入 started 列表的后台所有者泄漏。后台准备不启动相机、音频、UI 或推理。
-
-✅ 已实现：Services持有唯一ForegroundPreparation协调器；App在生命周期前台屏障完成后、首页可见时激活。绑定导航／配置应用／交互结束的刷新回调；切页或失活立即取消接纳，根替换先加入协调器再停止模型。步骤串行、重复请求合并，准备检查已就绪状态；云端不发探测生成请求，相机开启时才准备视觉。
-
-✅ 已实现：四根注入同一原生错误签名；App 仅标识模型生命周期拒绝为不广播的控制结果，Gateway保留原始 Error。
-
-
-✅ ApplicationContainer.failureDetails只投影四种模块自有Failure的稳定code及isCancellation，交给同根Gateway报告通道；模型生命周期拒绝保留不广播，真实清理失败例外。ModuleRegistration在保留结构化诊断后，将无清理失败的取消转换为通用宿主CancellationError以保持生命周期语义，不决定业务展示。
-
-
-✅ 准备状态投影同时更新UI交互门并向Agents报告loading／idle事实，App不直接设置表情；已有会话延后冷准备，终态／失活立即清理展示。
-
-✅ 已实现：模型准备事实仅在 preparing 投影 loading，checking 投影 idle，返回首页仅检查已加载能力时不触发加载表情。
-
-✅ 已实现：首页步骤从 ModelKit 接收实际权重加载开始／结束，不再把调用 prepare 本身当作加载；检查、已就绪、无需挂载不投影 loading。
-
-
-## Direct container contract
-
-App creates shared foundational roots and injects public role/execution capabilities. It performs no external Signal encoding or per-frame forwarding. Current cross-module ownership is defined by the [overall design](../../README.md).
-
-✅ App 注入实际 UI 子容器；UI 业务事件订阅、处理和回执由 Agent 生命周期拥有。装配层保留页面交互能力构造及提交端口，不订阅、解释或向执行会话转交 UI 输入。
-
-## 语音执行归属收敛
-
-✅ 已实现：唯一根及能力装配保持；语音执行在 Actions 创建和持有，感知角色仍接收同根只读原生端口；生命周期停机先取消加入执行和角色，再释放基础根。
-
-✅ ApplicationPresentation 实现根 UI 协议，内部 SessionPresentation 实现会话展示协议，组合历史／诊断页面并连接导航回调；语音能力由 Agents 注入，App 不持有感知任务。会话展示对象按语音会话实例复用，只组合已有状态、请求端口和页面，不订阅或转发输入。
-
-
-## Actions 接入契约
-
-Actions 按业务能力组织源码，保持原编译目标。生产调用显式连接独立相机、语音、UI 呈现和 Task 端点；不通过无关能力的类型转换探测。验证和导航按实际源码所有权维护，业务授权与生命周期继续由原拥有者负责。
-
-## Agents 角色与共享机制
-
-具体角色装配归 Agents 根级，Support 保留通用机制；角色私有载荷和会话控制由角色解释，通过注入的解码／Context 钩子接入共享准入。输入身份、Task scope、取消加入和真实结果保持独立，源码和验证按其实际所有者维护。
+[App](../README.md) · [Actions 集成](../../Actions/Support/README.md)

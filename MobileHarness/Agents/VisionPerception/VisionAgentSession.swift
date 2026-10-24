@@ -78,6 +78,7 @@ public enum VisionPipelineWorkflow {
             defer { runtime.presentation.unbindCamera(endpoint) }
             try await runtime.manager.register(vision, sessionID: sessionID)
             var tracking = false
+            var registered = true
             do {
                 try await runtime.photographerSession.attachTracking(sessionID: sessionID)
                 tracking = true
@@ -123,13 +124,23 @@ public enum VisionPipelineWorkflow {
                     })
                 if tracking { await runtime.photographerSession.detachTracking(sessionID: sessionID) }
                 try await runtime.manager.remove(.visionPerception)
+                registered = false
                 await runtime.output.cancel(sessionID: sessionID)
                 try Task.checkCancellation()
             } catch {
                 if tracking { await runtime.photographerSession.detachTracking(sessionID: sessionID) }
-                try? await runtime.manager.remove(.visionPerception)
+                let primary = error
+                var cleanup: [any Error] = []
+                if registered {
+                    do { try await runtime.manager.remove(.visionPerception) } catch { cleanup.append(error) }
+                }
                 await runtime.output.cancel(sessionID: sessionID)
-                throw error
+                if !cleanup.isEmpty {
+                    throw AgentFailure(
+                        component: "visionPerception", operation: "session", underlying: primary,
+                        cleanupErrors: cleanup)
+                }
+                throw primary
             }
         }
 

@@ -4190,3 +4190,51 @@ verify-app-agent-resources.py verifies the exact Resources tree, independent Age
 
 ✅ Lifecycle boundary guard rejects production Agent Context document factories/runtime-context JSON paths and require Storage memory-state ownership. Configuration document/file APIs remain valid.
 ````
+
+## 2026-10-24：Agents 容器化相关 README 清理
+
+本次整理将容器接口、角色所有权、生命周期算法和 App 接线分别归入所属当前 README，去除跨目录重复粘贴的迁移摘要。旧的构建／测试／安装结论归验证文档；容器实现与冷启动问题经过见 [Agent 容器验证](../validation/Agent-Containers.md)。没有新增目录或修改运行代码。
+
+以下摘录来自整理前版本（无事件日期的段落不补定日期），仅保留旧目标、所有权、验收状态及撤回实验的追溯价值，不定义现行契约。重复的“已实现／新增／移除”摘要不重复归档；仍有效的接口和约束已合并入当前 README。
+
+### MobileHarness/App/README.md
+
+````markdown
+✅ 代码已迁移至上述边界，静态边界、专项回归及未签名 iOS 设备目标编译通过。❌ 全量回归和 Simulator 构建仍有单独记录的失败/限制，不作为通过。实现与验收记录见 [实施计划](../../docs/requirements/technical/App-Host-Boundaries-Plan.md) 和 [验证记录](../../docs/validation/Validation-History.md)。
+
+AppStorage 目标只编译 Composition/ApplicationContainer.swift，使用 FactoryKit 实例内缓存；业务目标不导入 IoC。Services 持有注册容器、StorageContainer、PlatformContainer 和 UIContainer，连接所需子接口。模型后台事件只转交 ArtifactServices；存储停止前先加入其制品清理。
+````
+
+### MobileHarness.xcodeproj/README.md
+
+````markdown
+- ✅ The root HarnessKit product supplies shared runtime modules, the independent UI target and AppWorkflows. Xcode navigates these sources without adding them to either App Sources phase. Model SDK adapters remain separate package targets.
+- ✅ UI owns iOS pages/components and portable presentation state/operation interfaces. AppWorkflows owns history, configuration and explicit speech/chat diagnostics. Native preview/image/value adapters compile with App.
+- ✅ CurrentChatCapability is compiled only by ModelKitRuntime; its navigator reference does not add it to App Sources. ChatDiagnosticWorkflow is package-owned navigation only. VoiceSessionCoordinator, VisionSession, ApplicationRuntime and UI component file references match their current responsibilities.
+
+✅ Action runtime stage 1 sources, scheduling errors and contract tests are referenced in the existing navigator groups. SwiftPM still compiles the shared source directories; no duplicate source or new target was added. ❌ Physical-device acceptance remains separate.
+
+✅ Stage 2 shared result/lease/inbox, Gateway Results/Resources and integration test files appear in the navigator. SwiftPM retains sole compilation ownership of these shared sources. ❌ No new physical-device acceptance is implied.
+
+
+✅ Models navigator references now show the shared catalog and separate Nemotron Mac profile; removed Audio8/Silero development references are cleaned up. Metadata-only staging is unchanged. ❌ Full Xcode build acceptance remains pending.
+
+❌ The iOS simulator SDK lacks CoreAI; the external CoreAILM target cannot build there. build-ios.sh currently stops on this limitation. Independent UI tests run on Mac; a separate simulator assembly remains outstanding.
+
+
+✅ Implemented: AppSpeechPlayback adds existing Actions and ExecutionRuntime products for child composition; new Swift files remain in existing package-owned directories. No source signing changes or new directories.
+
+✅ StorageSQLite compiles GRDB.swift 7.11.1 privately through a separate adapter target; common Storage/domain consumers have no GRDB dependency. The lockfile pins it and App owns records.sqlite initialization. New internal Storage directories/targets implement approved ownership boundaries; signing is unchanged. Required simulator/device build outcomes are recorded separately in docs/validation/Validation-History.md.
+
+Implemented: ContainerFailureChannel.swift is a Gateway SwiftPM source and navigator reference only, never duplicated into the App executable.
+
+✅ 共享存储错误由一个源文件编译，CurrentChatCapability 由 ModelKitRuntime 唯一编译；工程导航不添加重复 App Sources，target 与签名配置保持。
+````
+
+### scripts/README.md
+
+````markdown
+✅ 已恢复：移除对应已撤回音频实验实现的形状检查，保留采集失败 token 隔离、模块边界及统一错误结构检查；不通过守卫强制保留未经硬件验收的音频实现。
+
+✅ 已恢复（性能待真机对照）的基线：录音会话配置恢复到 6431d36f 的同步调用顺序，空间 AVCaptureSession 恢复为仅在录音后端实例创建时初始化并由后端持有；不改变四声道、首 PCM 就绪、错误上报和停止录音语义。移除仅服务于异步配置的 preparation Task／加入代码及其源码形状检查，保留 token 隔离；后端仍只在请求录音时创建，容器 boot 不打开设备。该对照不代表性能修复已验收。
+````

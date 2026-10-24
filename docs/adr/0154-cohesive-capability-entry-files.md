@@ -4,7 +4,7 @@ Date: 2026-10-06. Status: source layout implemented; addressing migration pendin
 
 ## Decision
 
-Refine the [staged design](../../MobileHarness/README.md#canonical-functions-and-protocol-bindings) before moving code. Split callable functions into cohesive module files under their business-domain directory. Domain Actions enums remain used namespace facades; implementations extend those enums, preserving existing API names and generated factories without forwarding wrappers. Domain catalogs remain the registration owners.
+Refine the [staged design](../../MobileHarness/README.md#ownership-and-compilation) before moving code. Split callable functions into cohesive module files under their business-domain directory. Domain Actions enums remain used namespace facades; implementations extend those enums, preserving existing API names and generated factories without forwarding wrappers. Domain catalogs remain the registration owners.
 
 UI: Expression, Gaze, Caption, VoiceState, Pose, HistoryPresentation. NexArm: Motion, Gesture, Tracking. Speech: Playback. Camera: Capture. History: Conversation. System: Runtime. Private helpers move with consumers; shared domain helpers retain their visibility. SpeechActionError belongs in Speech/Support/SpeechTypes.swift.
 

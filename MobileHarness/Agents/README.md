@@ -104,17 +104,16 @@ ProcessingContext 保存请求、会话、代际、轮次及因果身份，只�
 
 | 文件 | 职责 |
 | --- | --- |
-| [AgentApplication.swift](AgentApplication.swift) | 模块根及按需角色功能接线，持有环境事实观察与会话的公开生命周期 |
+| [AgentContainer.swift](AgentContainer.swift) | 唯一业务根、稳定角色能力和统一加入生命周期 |
+| [AgentFailure.swift](AgentFailure.swift) | 稳定错误码、原始错误、来源和清理错误，不决定展示策略 |
 | [AgentContracts.swift](AgentContracts.swift) | 显式角色身份与生产通信目录，不拥有角色私有载荷处理 |
 | [AgentRepositories.swift](AgentRepositories.swift) | 构造注入的 Chat／Task／Media／Device 仓库切片 |
 | [AgentResourceBindings.swift](AgentResourceBindings.swift) | 将相机所需资源端口接到 Gateway 公开租约保护，不消费媒体 |
-| [AgentRuntime.swift](AgentRuntime.swift) | 构造角色、Gateway 与 Actions 窄端点，连接真实注册、权限、资源和结果反馈 |
+| [AgentRuntime.swift](AgentRuntime.swift) | 共享 Gateway／Actions 图、角色工厂及观察者；注册与清理由角色容器拥有 |
 
-AgentApplication 接收基础能力与仓库工厂，按需创建 AgentRuntime、相机与语音功能，并向 App 暴露状态和交互接口。AgentRuntime 创建角色、Gateway 与 Actions 的窄执行端点，连接注册、权限、资源和反馈。AgentContracts 注册应用角色身份和通信目录；跨角色值位于 Support/Communication，角色专用载荷由接收角色解释。AgentResourceBindings 适配相机资源保护，不消费原始媒体。
+AgentContainer 构造七个稳定角色子容器，注入基础端口和仓库提供器。AgentRuntime 按需装配共享通信／执行图并将会话安装到所属容器，不启停角色会话；故障观察仅在装配和常驻角色启动成功后连接。AgentContracts 拥有身份与通信声明，角色私有值由接收角色解释。
 
 共享机制不通过具体角色类型表路由私有输入；固定任务的解码策略由实际执行角色提供，通用 Chat 的会话控制由角色 Context 提供。角色订阅不自动获得控制权，所有业务调用仍经过身份绑定的 Gateway。
-
-AgentApplication 的原生功能与角色分开停止：stopNativeServices 先撤销原生接纳，取消并加入观察和准备任务，再清理相机、蓝牙及语音；多个清理错误合并为 NativeCleanupFailure。stopAgents 关闭环境输入与 AgentRuntime，最后释放公开 StateScope。App 负责调用这些生命周期入口。
 
 ## 公共机制与目录
 
@@ -125,6 +124,22 @@ AgentApplication 的原生功能与角色分开停止：stopNativeServices 先�
 | [Support/Context](Support/Context/README.md) | 私有 Context 事务、Task／Skill 状态与固定任务协调 |
 | [Support/Communication](Support/Communication/README.md) | 跨角色业务值及通信契约；执行宿主由各角色目录拥有 |
 | [Support/Core](Support/Core/README.md) | 独立 AgentCore 目标：仅依赖 Foundation，提供中立运行契约 |
+
+<a id="agent-container"></a>
+
+## 容器接口与生命周期
+
+✅ App 每个注册作用域持有一个 AgentContainer，公开稳定属性 assistant、applicationControl、memory、photographer、speechPerception、speechSynthesis、visionPerception。构造只创建能力，不注册角色、订阅输入、加载模型、请求权限或操作设备；实际会话在依赖根就绪后按需装配。常驻业务会话与可替换语音／捕获代的差别由各角色文档定义。
+
+根公开 start()、invalidate()、setForeground(_:)、stop()；异步方法抛出 AgentFailure。App 只管理这一个业务生命周期节点，具体注入与依赖见 [Composition](../App/Composition/README.md)。
+
+启动合并并发调用，部分启动失败关闭接纳并加入回滚。首次 start 请求之前的 invalidate 无效果：冷根没有工作，不调用 UI／原生围栏，也不改变首次前台启动条件；启动在途失活仍立即围栏并取消、加入回滚。已失败或停止的根不可复用。
+
+运行失活同步关闭 UI／原生接纳，再加入相机、蓝牙、语音、视觉和常驻角色暂停。前后台只保留最新期望和一次必须完成的暂停，迟到恢复不能重新打开已失效代。中断保留 Task／Skill 所有权，不重放业务效果。
+
+stop 是终态，重复调用加入同一结果：先关闭接纳，取消并加入准备和原生会话，再停止常驻角色，释放共享输出、观察者、Gateway 和公开 StateScope。消费者完成清理后 App 才释放基础根。内部任务容量、失败保留和前后台协调算法见 [Support](Support/README.md#根生命周期机制)。
+
+AgentFailure 保留稳定 code、原始 Error、component／operation、source 和全部清理错误；纯取消与带清理失败的取消分开。注册／移除、视觉清理和前后台切换失败经既有故障通道保留；容器控制不替代 Gateway 身份、授权及代际校验。
 
 ## 生命周期、容量与完成
 

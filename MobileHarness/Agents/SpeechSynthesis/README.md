@@ -1,5 +1,11 @@
 # SpeechSynthesis — 定向文本合成与有界音频生产
 
+## 角色容器
+
+✅ [SpeechSynthesisContainer.swift](SpeechSynthesisContainer.swift) 是 AgentContainer 的稳定子能力。独立持有合成角色注册，与感知容器分别管理生命周期。endSession 仅移除当前合成角色，允许后续私有语音会话；根 stop 永久关闭容器。TTS 与 AudioCache 属于角色，播放归 Actions。
+
+生命周期由[模块根](../README.md#agent-container)统一编排；子容器能力不授予执行权。
+
 ## 职责与注入能力
 
 构造注入 ModelKit `SpeechSynthesisCapability`、StorageCache `AudioCache`、私有 Context 与通信配置。只接收授权定向合成／取消消息，不需要 UI 或 PlatformKit 容器，不开启麦克风、不播放音频，不运行普通 Chat。

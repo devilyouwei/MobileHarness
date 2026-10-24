@@ -1,5 +1,11 @@
 # Memory — 历史事务与标题生成
 
+## 角色容器
+
+✅ [MemoryContainer.swift](MemoryContainer.swift) 是 AgentContainer 的稳定子能力。持有角色执行会话和历史工作流，启动绑定唯一角色／输出消费者，停止加入已接纳工作。历史请求继续以 UI 回执和 Gateway 真实完成为边界。
+
+生命周期由[模块根](../README.md#agent-container)统一编排；子容器能力不授予执行权。
+
 ## 职责与注入能力
 
 MemoryAgent 构造注入 `UIHistoryContainer`、会话身份、私有 `AgentContextRepository` 和新会话前的业务屏障；直接订阅历史请求。它不持有完整历史仓库或四大基础根，历史读取和变更均通过 Gateway → Actions。

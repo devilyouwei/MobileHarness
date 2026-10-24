@@ -10,6 +10,7 @@ Support/Core 独立编译为 AgentCore，仅依赖 Foundation。其余文件由 
 
 | 文件／目录 | 职责 |
 | --- | --- |
+| [AgentContainerLifecycle.swift](AgentContainerLifecycle.swift) | 根拥有的启动、前后台协调、取消回滚及终态清理 |
 | [AgentConfigurations.swift](AgentConfigurations.swift) | 有界不可变配置资源、函数声明安装与版本校验 |
 | [AgentSkillLoader.swift](AgentSkillLoader.swift) | Skill 依赖组合与声明投影，不管理角色实例 |
 | [AgentUIRequests.swift](AgentUIRequests.swift) | UI 请求订阅、真实取消、执行输出关联与回执完成 |
@@ -19,6 +20,14 @@ Support/Core 独立编译为 AgentCore，仅依赖 Foundation。其余文件由 
 | [Context](Context/README.md) | 私有事务、Task／Skill 状态、固定任务结果加入和有限公开投影 |
 | [Communication](Communication/README.md) | 跨角色消息值及固定任务的协议中立准入机制 |
 | [Core](Core/README.md) | 身份、输入／输出、生命周期、队列、解析和通用运行契约 |
+
+## 根生命周期机制
+
+✅ AgentContainerLifecycle 是角色无关的 MainActor 所有者，通过注入的 start／invalidate／foreground／stop／report 回调控制工作，不查找角色、不转换业务 schema、不执行原生操作。公开业务接口见 [Agents](../README.md#agent-container)。
+
+分别持有至多一个 startup、transition、cleanup、shutdown 任务。并发 start／stop 复用对应任务；调用者取消启动会取消共享 startup。启动失败加入同一 cleanup，停止等待 startup 和在途 transition 后加入清理；保存的清理失败不会被后续 stop 覆盖为成功。
+
+首次启动请求前 invalidate 无效果；启动在途失效同步围栏并取消启动。运行期 invalidate 锁存必须暂停，单 worker 优先执行完整 foreground(false)，随后应用最新期望前台值；revision 防止迟到恢复发布可用状态，无事件队列或自动重试。切换失败关闭接纳并保留 transitionFailure，后续切换和停止仍报告该错误。关闭后拒绝启动／切换复用。
 
 ## 输入、执行与完成
 

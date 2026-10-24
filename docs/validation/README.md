@@ -6,6 +6,7 @@
 
 | 文档 | 职责 |
 | --- | --- |
+| [Agent containers](Agent-Containers.md) | Root/role ownership, lifecycle regression, build evidence and independent native acceptance. |
 | [Agents / Actions 组织整理](Agents-Actions-Organization.md) | 目录归属、共享机制与端点解耦的回归、模拟器编译和原工程文件协调限制。 |
 | [外部输入直连 Container](Direct-Container-Input.md) | 直连迁移的自动检查、锁定依赖构建、设备修正版安装及尚未完成的原生／性能验收。 |
 | [项目验证日志](Validation-History.md) | 按日期记录仓库检查、构建、部署、问题调查与验证结果；专项报告有详细数据时使用链接。 |

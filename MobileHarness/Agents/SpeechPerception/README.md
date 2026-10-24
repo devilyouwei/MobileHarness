@@ -1,5 +1,11 @@
 # SpeechPerception — PCM 消费、语音识别与聆听政策
 
+## 角色容器
+
+✅ [SpeechPerceptionContainer.swift](SpeechPerceptionContainer.swift) 是 AgentContainer 的稳定子能力。独立持有感知角色注册、输出任务及内部 VoiceInteractionSession。向 App 公开 ready、状态、请求和诊断投影，不公开内部会话；VoiceAgentSession 仅连接感知／合成容器与 Actions 执行端口，不注册角色或停止共享 runtime。结束当前会话清理该代注册，根停止终结容器并加入交互／检测清理。
+
+生命周期由[模块根](../README.md#agent-container)统一编排；子容器能力不授予执行权。
+
 ## 职责与注入能力
 
 构造注入 PlatformKit `AudioCaptureObserving`、ModelKit `SpeechRecognitionCapability`／`VoiceActivityCapability`、可选 `UIHomeContainer`、Actions `MicrophoneSpectrumPresentation`、低频测量回调和私有 Context。角色直接取得 PCM，负责声道／采样率／序号／连续性、VAD、ASR、声源和半双工政策；不直接开启麦克风或启动动画。
@@ -21,8 +27,8 @@ UI.home.listeningRequests 是本角色单独订阅的控制源，提供 enabled/
 | [SpeechPlaybackFailure.swift](SpeechPlaybackFailure.swift) | 播放清理边界的用户错误适配，保留合成／缓存原始错误 |
 | [SpeechRecognitionTurn.swift](SpeechRecognitionTurn.swift) | 已提交片段、冷启动前缀和转写聚合的有界工作 |
 | [VoiceActivitySegmenter.swift](VoiceActivitySegmenter.swift) | VAD 分段、尾静音及实际片段结束判定 |
-| [VoiceAgentSession.swift](VoiceAgentSession.swift) | 语音角色注册、模型图与身份绑定输出泵 |
-| [VoiceInteractionSession.swift](VoiceInteractionSession.swift) | 根语音／诊断功能的显式组合与生命周期 |
+| [VoiceAgentSession.swift](VoiceAgentSession.swift) | 独立感知／合成容器与 Actions 语音执行的连接适配器 |
+| [VoiceInteractionSession.swift](VoiceInteractionSession.swift) | 容器内部的语音／诊断组合与生命周期，不向 App 暴露 |
 
 ## 外部关系（一层）
 
