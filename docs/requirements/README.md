@@ -12,7 +12,7 @@
 
 ## 技术需求
 
-[四项核心架构改进](technical/Core-Architecture-Improvement-Plan.md) 中，通用内存状态转换、错误分类与分层展示、App 与业务解耦仍待完成；第 4 项存储抽象接口已完成。原需求整份保留在本目录，不能按单项完成归档；独立的 [Storage 接口分离实施记录](../completed/Storage-Repository-Plan.md) 按其自身完整范围归档。
+[四项核心架构改进](technical/Core-Architecture-Improvement-Plan.md) 中，通用内存状态机制与 App 结构迁移已实施；更多事实/Trigger/写入源治理、统一错误分类与分层展示及端到端验收仍待完成；第 4 项存储抽象接口已完成。原需求整份保留在本目录，不能按单项完成归档；独立的 [Storage 接口分离实施记录](../completed/Storage-Repository-Plan.md) 按其自身完整范围归档。
 
 ## 产品需求
 
@@ -44,3 +44,24 @@
 后续 bug 修复和 feature 扩展独立跟踪，不使原需求重新变为未完成；也不能将原范围的缺项改称后续扩展以提前归档。独立的模型/设备验收继续在 [Roadmap](../Roadmap.md#acceptance-work) 和验证文档中如实记录；若验收本就是原需求的完成条件，则完成前不能归档。
 
 [文档总索引](../README.md) · [当前产品范围](../Product-Scope.md) · [交付路线图](../Roadmap.md)
+
+## 全部待办汇总（2026-10-24）
+
+以下按当前需求正文汇总；实施、验收和待细化方向分别标注，历史失败不直接视为当前代码缺陷。
+
+| 类型 | 待办 | 正文来源 |
+| --- | --- | --- |
+| 新增功能 | 多云端模型 URL/Key 配置保存、管理与选择 | [新增需求 §1](product/Model-Web-Speech-Plan.md#1-多云端模型配置与选择) |
+| 新增功能 | WebKit HTML/CSS/脚本富内容与绘图组件 | [新增需求 §2](product/Model-Web-Speech-Plan.md#2-webkit-html-内容呈现组件) |
+| 新增功能 | 持续聆听与回复期间打断判断、取消及输入交接 | [新增需求 §3](product/Model-Web-Speech-Plan.md#3-持续聆听与打断判断的-speech-perception-agent) |
+| 功能 | 用户相册、摄影媒体聚合与视频完整链路 | [用户相册](product/User-Album-Memory-Plan.md) |
+| 功能 | 日记式记忆、周期增量整理、摘要/关键词/embedding 与来源检索页面 | [用户记忆](product/User-Album-Memory-Plan.md) |
+| 功能与策略 | 摄影自主构图、跟随与运镜及安全完成边界 | [摄影需求](Photographer-Proposal.md) |
+| 工程 | 更多公开事实、Trigger、完整写入源治理 | [State](Resource-State-Plan.md)、[核心架构](technical/Core-Architecture-Improvement-Plan.md) |
+| 工程 | 统一错误分类及用户文案/开发日志分层 | [核心架构](technical/Core-Architecture-Improvement-Plan.md) |
+| 回归与验收 | App 宿主、Storage 生命周期/容器、PlatformKit 容器的全量集成、Simulator 外部依赖及真实模型/UI/设备缺口 | [技术需求索引](technical/README.md)，具体结果以各正文链接的最新验证记录为准 |
+| 修复与验收 | iPhone 实时预览黑屏定位；直接输入迁移的完整业务/生命周期及同设备性能对照 | [直接容器输入](technical/Direct-Container-Input-Plan.md) |
+| 独立验收 | 连续语音、模型切换/恢复、原生 UI/生命周期、机械臂/BLE/跟踪、流式执行/清理；功耗、内存与持续性能 | [Roadmap 验收清单](../Roadmap.md#acceptance-work)、[PlatformKit 计划](technical/PlatformKit-Containers-Plan.md) |
+| 待细化 | Agent-driven 剩余接入、更多模型能力、原生 Tool 事件交互、快慢认知与算力路由、活动监督与多窗口 | [待细化方向](#其他待细化方向) |
+
+本汇总不将已完成的 State 基础、App 结构迁移、存储抽象、云端 Tool 调用或半双工聆听重复列为开发任务。未设交付顺序；新增三项的实现前设计需同步更新相关源码 README。
