@@ -237,13 +237,25 @@ struct ChatEventDecoder {
             }
             finished = true
             return events
-        case "response.reasoning_text.delta", "response.reasoning_text.done":
-            let field = type == "response.reasoning_text.delta" ? "delta" : "text"
+        case "response.reasoning_text.delta", "response.reasoning_text.done",
+            "response.reasoning_summary_text.delta", "response.reasoning_summary_text.done":
+            let field = type.hasSuffix(".delta") ? "delta" : "text"
             guard let index = object["output_index"] as? Int, (0..<128).contains(index),
                 let id = object["item_id"] as? String, !id.isEmpty, id.utf8.count <= 512,
                 object[field] is String
             else { throw failure(.invalidReasoning, stage: .reasoning, field: "reasoningEvent") }
+            if type.hasPrefix("response.reasoning_summary_") {
+                try validateSummaryIndex(object)
+            }
             // Reasoning is provider-private metadata, never public answer text or a native call.
+            return []
+        case "response.reasoning_summary_part.added", "response.reasoning_summary_part.done":
+            guard let index = object["output_index"] as? Int, (0..<128).contains(index),
+                let id = object["item_id"] as? String, !id.isEmpty, id.utf8.count <= 512,
+                let part = object["part"] as? [String: Any],
+                part["type"] as? String == "summary_text", part["text"] is String
+            else { throw failure(.invalidReasoning, stage: .reasoning, field: "summaryPart") }
+            try validateSummaryIndex(object)
             return []
         case "response.refusal.delta", "response.refusal.done":
             throw failure(.unsupportedOutput, stage: .event, field: "refusal")
@@ -297,6 +309,14 @@ struct ChatEventDecoder {
         guard item["type"] as? String == "message", let content = item["content"] as? [[String: Any]],
             content.allSatisfy({ $0["type"] as? String == "output_text" && $0["text"] is String })
         else { throw failure(.unsupportedOutput, stage: .completion, field: "output.content") }
+    }
+
+    private func validateSummaryIndex(_ object: [String: Any]) throws {
+        guard let number = object["summary_index"] as? NSNumber,
+            CFGetTypeID(number) != CFBooleanGetTypeID(),
+            let index = object["summary_index"] as? Int, (0..<128).contains(index),
+            number.doubleValue == Double(index)
+        else { throw failure(.invalidReasoning, stage: .reasoning, field: "summary_index") }
     }
 
     private func validateReasoning(_ item: [String: Any]) throws {

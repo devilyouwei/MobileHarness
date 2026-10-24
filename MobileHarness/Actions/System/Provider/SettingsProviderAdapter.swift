@@ -69,7 +69,7 @@ public enum SettingsProviderAdapter {
     public static func errorMessage(_ error: any Error) -> String? {
         if let query = error as? any ProviderRequestFailure {
             switch query.failureCode {
-            case "provider.configuration": return "配置无效，请检查 HTTPS URL、Key 和模型选择"
+            case "provider.configuration": return "配置无效，请检查 HTTP/HTTPS URL、Key 和模型选择"
             case "provider.models": return "服务返回的模型列表无效或数量过多，请检查服务配置"
             case "provider.persistence": return "本地配置读取或保存失败，可能已被修改，请重新启动后重试"
             case "provider.rollback": return "配置应用和回滚失败，请重新启动后检查配置"
@@ -136,7 +136,7 @@ public enum SettingsProviderAdapter {
         if let failureCode {
             let message =
                 SettingsProviderAdapter.errorMessage(ProviderPresentationFailure(failureCode: failureCode))
-                ?? "无法连接服务，请检查 HTTPS URL、Key 和网络后重试"
+                ?? "无法连接服务，请检查 HTTP/HTTPS URL、Key 和网络后重试"
             state.presentFailure(message, revision: entry.revision)
             return
         }
@@ -154,7 +154,10 @@ public enum SettingsProviderAdapter {
             state.presentRestored(
                 CloudSettingsDraft(
                     enabled: value.enabled, url: value.url, key: value.key,
-                    model: value.model.isEmpty ? SettingsProviderAdapter.initial.model : value.model),
+                    model: value.model.isEmpty ? SettingsProviderAdapter.initial.model : value.model,
+                    providers: value.providers.map {
+                        .init(enabled: false, url: $0.url, key: $0.key, model: $0.model, name: $0.name)
+                    }),
                 revision: entry.revision)
         case .save:
             let value = try settings.result(id, sessionID: sessionID)

@@ -6,7 +6,7 @@ Responses-only streaming ChatCapability with caller-owned history, bounded SSE/n
 
 ## Ownership and boundaries
 
-independent runtime framework adapter depends on ModelKit. Host supplies HTTPS endpoint/credentials/model/timeout; credentials stay private/redacted. Registration performs no network generation. Configured availability does not prove authentication/reachability.
+independent runtime framework adapter depends on ModelKit. Host supplies HTTP/HTTPS endpoint/credentials/model/timeout; credentials stay private/redacted. Registration performs no network generation. Configured availability does not prove authentication/reachability.
 
 ## External relationships and data flow
 
@@ -30,7 +30,7 @@ flowchart LR
 
 POST baseURL/responses with stream=true/store=false. History travels in input every request without conversation/previous_response_id. System/user text uses input_text, assistant text output_text with annotations=[], user images input_image JPEG/PNG data URLs/detail=auto. Native history uses paired function_call/function_call_output with original call_id. Request-local safe names include paired historical calls; tool declarations and output decoding use only the current request definitions. Definitions flatten the neutral function envelope and send strict=false to preserve caller-defined optional schema fields. The provider does not reinterpret business fields; the consumer validates arguments and execution authority.
 
-Temperature is retained; explicit output budget maps to max_output_tokens, absent stays absent. No protocol fallback, implicit retry or automatic provider switch exists. Providers must implement Responses. store=false preserves caller history control and does not override retention policy. Credentials/model/HTTPS endpoint validate; timeout is 1–600 seconds (default 60).
+Temperature is retained; explicit output budget maps to max_output_tokens, absent stays absent. No protocol fallback, implicit retry or automatic provider switch exists. Providers must implement Responses. store=false preserves caller history control and does not override retention policy. Credentials/model/HTTP/HTTPS endpoint validate; timeout is 1–600 seconds (default 60).
 
 ## Streaming and resource cleanup
 
@@ -80,3 +80,7 @@ All consumers, including Memory title requests (64 output tokens), pass through 
 ## 分类异常诊断
 
 ✅ ChatEventDecoder 在校验失败点记录明确 reason、stage、event、field、outputIndex、实际及允许的 Tool 名称（最多8项并保留总数）；不改变接纳条件、终态前不发布调用及流清理。OpenAIChatError 通过 ModelKit 中立诊断接口向 Agent 保留原因；旧通用错误仅兼容模型发现等未细分入口。
+
+✅ 配置、模型发现与 Responses 请求同时接纳 HTTP/HTTPS 域名、IPv4 和 IPv6，可带端口及路径；请求保留用户所选 scheme，不自动升级或回退。URL 中用户信息、query/fragment、非法凭据及其它参数仍校验；HTTPS 继续使用系统证书验证。iOS ATS 策略由 [Config](../../../../../Config/README.md) 拥有。
+
+✅ ChatEventDecoder 接纳 response.reasoning_summary_text.delta/done 和 response.reasoning_summary_part.added/done；校验有界 output_index/item_id、整数 summary_index（0..<128）、文本或 summary_text part 结构后过滤，不进入回答、工具调用或首 token 计时。原事件/总流大小、未知事件失败、工具配对及终态/用量校验保持不变。离线覆盖非法索引、结构和截断及 reasoning 后的工具索引；显式 liveOllamaResponsesReasoningCompatibility 用合成输入检验文本、工具调用和结果续轮，不执行设备效果。验证结果见 [Provider 验证](../../../../../docs/validation/Provider-Management.md)。

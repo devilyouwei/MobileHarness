@@ -49,6 +49,8 @@
 
     @MainActor
     public struct LanguageModelSettingsView: View {
+        @State private var providerEditor: ProviderEditorDraft?
+        @State private var deletingURL: String?
         @Bindable var settings: SettingsState
         let settingsControls: any SettingsControlling
         let modelResources: ModelResourcesState?
@@ -81,55 +83,52 @@
                     Text("关闭后使用本地 Gemma 4 E2B，需先下载模型。")
                 }
                 Section {
-                    HStack {
-                        TextField(
-                            "https://api.openai.com/v1",
-                            text: Binding(
-                                get: { settings.url },
-                                set: {
-                                    settings.url = $0
-                                    settingsControls.credentialsChanged()
-                                })
-                        )
-                        .keyboardType(.URL)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
-                        .accessibilityLabel("云端模型 URL")
-                        .accessibilityIdentifier("settings.cloud.url")
-                        PasteButton(payloadType: String.self) { values in
-                            if let value = values.first {
-                                settings.url = value.trimmingCharacters(in: .whitespacesAndNewlines)
-                                settingsControls.credentialsChanged()
+                    ForEach(settings.providers, id: \.url) { provider in
+                        HStack {
+                            Button {
+                                if let index = settings.providers.firstIndex(where: { $0.url == settings.url }) {
+                                    settings.providers[index].model = settings.selectedModel
+                                }
+                                settingsControls.cancelDiscovery()
+                                settings.url = provider.url
+                                settings.key = provider.key
+                                settings.selectedModel = provider.model
+                                settings.models = provider.model.isEmpty ? [] : [provider.model]
+                                settings.isEnabled = true
+                            } label: {
+                                HStack(spacing: 12) {
+                                    Image(systemName: settings.url == provider.url ? "checkmark.circle.fill" : "circle")
+                                        .font(.title3)
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text(provider.name).font(.body.weight(.medium)).foregroundStyle(.primary)
+                                            .lineLimit(1).truncationMode(.tail)
+                                        Text(provider.url).font(.caption).foregroundStyle(.secondary)
+                                            .lineLimit(1).truncationMode(.middle)
+                                    }
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .multilineTextAlignment(.leading)
+                                }
+                                .contentShape(Rectangle())
                             }
-                        }
-                        .labelStyle(.iconOnly)
-                        .accessibilityLabel("粘贴 URL")
-                        .accessibilityIdentifier("settings.cloud.url.paste")
-                    }
-                    HStack {
-                        SecureField(
-                            "API Key（可选）",
-                            text: Binding(
-                                get: { settings.key },
-                                set: {
-                                    settings.key = $0
-                                    settingsControls.credentialsChanged()
-                                })
-                        )
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
-                        .privacySensitive()
-                        .accessibilityIdentifier("settings.cloud.key")
-                        PasteButton(payloadType: String.self) { values in
-                            if let value = values.first {
-                                settings.key = value.trimmingCharacters(in: .whitespacesAndNewlines)
-                                settingsControls.credentialsChanged()
+                            Spacer()
+                            Button {
+                                var value = provider
+                                if settings.url == value.url { value.model = settings.selectedModel }
+                                providerEditor = ProviderEditorDraft(provider: value, existing: settings.providers)
+                            } label: {
+                                Image(systemName: "pencil")
                             }
-                        }
-                        .labelStyle(.iconOnly)
-                        .accessibilityLabel("粘贴 Key")
-                        .accessibilityIdentifier("settings.cloud.key.paste")
+                            .accessibilityLabel("编辑 \(provider.name)")
+                            Button(role: .destructive) {
+                                deletingURL = provider.url
+                            } label: {
+                                Image(systemName: "trash")
+                            }.accessibilityLabel("删除 \(provider.name)")
+                        }.buttonStyle(.borderless)
                     }
+                    Button("添加 Provider", systemImage: "plus.circle") {
+                        providerEditor = ProviderEditorDraft(provider: nil, existing: settings.providers)
+                    }.disabled(settings.providers.count >= 32)
                     Button(action: settingsControls.loadModels) {
                         HStack {
                             Text(settings.isLoading ? "正在加载模型…" : "加载模型")
@@ -151,7 +150,7 @@
                 } header: {
                     Text("云端服务")
                 } footer: {
-                    Text("URL 留空时使用 OpenAI 官方服务。")
+                    Text("一个 URL 对应一个 Provider。选择和编辑后，点击保存应用配置。")
                 }
                 if settings.isSaving || settings.error != nil || settings.notice != nil {
                     Section {
@@ -189,7 +188,118 @@
                     .accessibilityIdentifier("settings.save")
                 }
             }
+            .sheet(item: $providerEditor) { draft in
+                ProviderEditorView(initial: draft, existing: settings.providers) { value in
+                    if let index = settings.providers.firstIndex(where: { $0.url == settings.url }) {
+                        settings.providers[index].model = settings.selectedModel
+                    }
+                    if let index = settings.providers.firstIndex(where: { $0.url == draft.originalURL }) {
+                        settings.providers[index] = value
+                    } else {
+                        settings.providers.append(value)
+                    }
+                    if draft.originalURL == nil || settings.url == draft.originalURL {
+                        settingsControls.cancelDiscovery()
+                        settings.url = value.url
+                        settings.key = value.key
+                        settings.selectedModel = value.model
+                        settings.models = value.model.isEmpty ? [] : [value.model]
+                    }
+                }
+            }
+            .confirmationDialog(
+                "删除此 Provider？删除当前项将关闭云端，保存后生效。",
+                isPresented: Binding(get: { deletingURL != nil }, set: { if !$0 { deletingURL = nil } })
+            ) {
+                Button("删除", role: .destructive) {
+                    guard let url = deletingURL else { return }
+                    settings.providers.removeAll { $0.url == url }
+                    if settings.url == url {
+                        settingsControls.cancelDiscovery()
+                        settings.url = ""
+                        settings.key = ""
+                        settings.isEnabled = false
+                        settings.selectedModel = ""
+                        settings.models = []
+                    }
+                    deletingURL = nil
+                }
+            }
             .onDisappear { settingsControls.cancelDiscovery() }
+        }
+    }
+
+    @MainActor
+    private struct ProviderEditorView: View {
+        @Environment(\.dismiss) private var dismiss
+        @State var draft: ProviderEditorDraft
+        @State private var error: String?
+        let existing: [CloudSettingsDraft]
+        let confirm: (CloudSettingsDraft) -> Void
+        init(
+            initial: ProviderEditorDraft, existing: [CloudSettingsDraft],
+            confirm: @escaping (CloudSettingsDraft) -> Void
+        ) {
+            _draft = State(initialValue: initial)
+            self.existing = existing
+            self.confirm = confirm
+        }
+        var body: some View {
+            NavigationStack {
+                Form {
+                    Section {
+                        HStack {
+                            TextField("名称", text: $draft.name)
+                                .accessibilityIdentifier("settings.cloud.name")
+                            pasteButton("名称", text: $draft.name)
+                        }
+                        HStack {
+                            TextField("URL（可选，默认 OpenAI）", text: $draft.url)
+                                .keyboardType(.URL)
+                                .textInputAutocapitalization(.never)
+                                .autocorrectionDisabled()
+                                .accessibilityLabel("服务 URL，可选，留空使用 OpenAI")
+                                .accessibilityIdentifier("settings.cloud.url")
+                            pasteButton("URL", text: $draft.url)
+                        }
+                        HStack {
+                            SecureField("API Key（可选）", text: $draft.key)
+                                .textInputAutocapitalization(.never)
+                                .autocorrectionDisabled()
+                                .privacySensitive()
+                                .accessibilityIdentifier("settings.cloud.key")
+                            pasteButton("Key", text: $draft.key)
+                        }
+                    } footer: {
+                        Text("URL 留空时使用 OpenAI 官方服务。确认后返回列表，点击页面上的保存应用配置。")
+                    }
+                    if let error { Section { Text(error).foregroundStyle(.red) } }
+                }
+                .navigationTitle(draft.originalURL == nil ? "添加 Provider" : "编辑 Provider")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) { Button("取消") { dismiss() } }
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("确认") {
+                            do {
+                                let value = try draft.validated(existing: existing)
+                                confirm(value)
+                                dismiss()
+                            } catch { self.error = error.localizedDescription }
+                        }
+                    }
+                }
+            }
+            .preferredColorScheme(.dark)
+        }
+        private func pasteButton(_ title: String, text: Binding<String>) -> some View {
+            PasteButton(payloadType: String.self) { values in
+                if let value = values.first {
+                    text.wrappedValue = value.trimmingCharacters(in: .whitespacesAndNewlines)
+                }
+            }
+            .labelStyle(.iconOnly)
+            .accessibilityLabel("粘贴 \(title)")
         }
     }
 

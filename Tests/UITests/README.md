@@ -116,3 +116,11 @@ CaptionPresentationTests 覆盖部分文本→最终修订、定稿与移动不�
 The default check runs ordinary tests concurrently, then executes the live-runtime and native-window suites separately. These suites are serialized because their assertions use real capture freshness, mechanical deadlines, media expiry, or the process-wide AppKit application. Business concurrency remains exercised inside each test. No global parallelism flag or production deadline is changed; excluded cases in the first phase must execute in the second.
 
 Native window cleanup is registered immediately after creation, including failed visibility prerequisites. The command-line host dispatches available AppKit events between asynchronous yields while awaiting visibility and actual GPU completion. It does not enter a nested blocking application loop. A failed visibility prerequisite remains a failure, and production renderer behavior is unchanged.
+
+Provider 状态回归覆盖多配置恢复和 revision 围栏，敏感草稿在根停止时清空。
+
+Provider 名称持久化、默认名称生成、独立弹窗草稿、重复 URL 和空名称校验由自动化回归覆盖；原生弹窗布局与粘贴需设备验收。
+
+✅ providerModalAcceptsHTTPAndHTTPSIPAddresses 覆盖 HTTP/HTTPS IPv4、IPv6、端口与路径，仍拒绝 FTP；不访问真实网络。
+
+Implemented: Provider URL input is optional. Blank/whitespace input resolves to https://api.openai.com/v1 on modal confirmation, sharing the same URL identity as an explicit official endpoint. Keep name/key, duplicate checks, and nonempty HTTP/HTTPS validation. Cover default resolution and duplicate default providers.

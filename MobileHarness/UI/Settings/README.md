@@ -77,3 +77,13 @@ UI-owned typed request/reply capabilities have one consumer and at most 64 outst
 ## Provider 表单控制
 
 SettingsFormController 只拥有草稿规范化、默认选项、请求忙态和迟到结果围栏；经 SettingsOperating 提交 UI 自有请求，不导入业务或设备模块，不执行凭据持久化、模型切换或实际 Provider 发现。根持有控制器，页面退出取消发现并推进 revision。
+
+## 多 Provider 管理
+
+✅ 沿用私有设置事务传递至多 32 个 URL 唯一的 provider；当前配置与其余配置一起保存。UI 在加载模型上方提供单选、编辑、删除和末行添加，删除当前项关闭云端并要求重新选择。保存提交后生效，Key 保持钥匙串存储，旧单配置恢复为首项。
+
+✅ Provider 名称通过私有配置链路保存，旧数据以 URL 主机名补齐。新增/编辑采用独立 modal 草稿（name/url/key），默认生成未占用的 Provider N 名称；取消不修改选择和凭据，确认校验 URL 唯一性与名称。列表名称为主、URL 单行省略为辅，保留三字段粘贴和 Key 脱敏。
+
+✅ ProviderEditorDraft 同时接纳 HTTP 与 HTTPS（域名或 IP，可带端口和路径）；保留名称、URL 唯一性、凭据长度和容量校验，错误提示不再要求仅 HTTPS。实际网络策略见 [Config](../../../Config/README.md)。
+
+Implemented: Provider URL input is optional. Blank/whitespace input resolves to https://api.openai.com/v1 on modal confirmation, sharing the same URL identity as an explicit official endpoint. Keep name/key, duplicate checks, and nonempty HTTP/HTTPS validation. Cover default resolution and duplicate default providers.

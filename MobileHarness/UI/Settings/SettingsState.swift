@@ -2,15 +2,69 @@ import Foundation
 import Observation
 
 public struct CloudSettingsDraft: Sendable, Equatable {
+    public var providers: [CloudSettingsDraft] = []
+    public var name: String
     public var enabled: Bool
     public var url: String
     public var key: String
     public var model: String
-    public init(enabled: Bool, url: String, key: String, model: String) {
+    public init(
+        enabled: Bool, url: String, key: String, model: String, providers: [CloudSettingsDraft] = [], name: String = ""
+    ) {
+        self.name = name.isEmpty ? (URL(string: url)?.host ?? "Provider") : name
+        self.providers = providers
         self.enabled = enabled
         self.url = url
         self.key = key
         self.model = model
+    }
+}
+
+/// Local modal draft. Dismissal discards this value without changing the selected provider.
+public struct ProviderEditorDraft: Identifiable {
+    public let id = UUID()
+    public let originalURL: String?
+    public var name: String
+    public var url: String
+    public var key: String
+    public var model: String
+    public init(provider: CloudSettingsDraft?, existing: [CloudSettingsDraft]) {
+        originalURL = provider?.url
+        var number = 1
+        while existing.contains(where: { $0.name == "Provider \(number)" }) { number += 1 }
+        name = provider?.name ?? "Provider \(number)"
+        url = provider?.url ?? ""
+        key = provider?.key ?? ""
+        model = provider?.model ?? ""
+    }
+    public func validated(existing: [CloudSettingsDraft]) throws -> CloudSettingsDraft {
+        let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedURL = url.trimmingCharacters(in: .whitespacesAndNewlines)
+        let url = trimmedURL.isEmpty ? "https://api.openai.com/v1" : trimmedURL
+        guard !name.isEmpty, name.utf8.count <= 128 else { throw ProviderEditorError.name }
+        guard url.utf8.count <= 2048, let parsed = URL(string: url),
+            ["http", "https"].contains(parsed.scheme?.lowercased() ?? ""),
+            parsed.host != nil, parsed.user == nil, parsed.password == nil
+        else { throw ProviderEditorError.url }
+        guard !existing.contains(where: { $0.url == url && $0.url != originalURL }) else {
+            throw ProviderEditorError.duplicate
+        }
+        guard originalURL != nil || existing.count < 32 else { throw ProviderEditorError.capacity }
+        let key = key.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard key.utf8.count <= 4096 else { throw ProviderEditorError.key }
+        return .init(enabled: false, url: url, key: key, model: model, name: name)
+    }
+}
+public enum ProviderEditorError: LocalizedError {
+    case name, url, duplicate, capacity, key
+    public var errorDescription: String? {
+        switch self {
+        case .name: return "请输入名称（最多 128 字节）"
+        case .url: return "请输入有效的 HTTP 或 HTTPS 服务 URL"
+        case .duplicate: return "此 URL 已存在，请编辑已有 Provider"
+        case .capacity: return "最多可保存 32 个 Provider"
+        case .key: return "API Key 过长"
+        }
     }
 }
 
@@ -38,6 +92,7 @@ public final class SettingsState {
     @ObservationIgnored var presentationAdmission: UIPresentationAdmission?
     public var isPresentationAvailable: Bool { presentationAdmission.map { $0.started && !$0.stopped } ?? true }
 
+    public var providers: [CloudSettingsDraft] = []
     public internal(set) var isEnabled: Bool
     public internal(set) var url: String { didSet { if oldValue != url { revision += 1 } } }
     public internal(set) var key: String { didSet { if oldValue != key { revision += 1 } } }
@@ -49,6 +104,7 @@ public final class SettingsState {
     public internal(set) var notice: String?
     public private(set) var revision: UInt64 = 0
     public init(initial: CloudSettingsDraft) {
+        providers = initial.providers
         isEnabled = initial.enabled
         url = initial.url
         key = initial.key
@@ -79,6 +135,9 @@ public final class SettingsState {
     public func presentRestored(_ value: CloudSettingsDraft, revision: UInt64) -> Bool {
         guard presentationAdmission?.acceptsRetained() ?? true else { return false }
         guard revision == self.revision else { return false }
+        providers =
+            value.providers.isEmpty && !value.url.isEmpty
+            ? [.init(enabled: false, url: value.url, key: value.key, model: value.model)] : value.providers
         isEnabled = value.enabled
         url = value.url
         key = value.key
@@ -138,6 +197,7 @@ public enum SettingsUpdate {
 
 @MainActor
 public protocol SettingsPresenting: UIPresentationAccess {
+    var providers: [CloudSettingsDraft] { get set }
     var isEnabled: Bool { get }
     var url: String { get }
     var key: String { get }
@@ -200,6 +260,7 @@ public final class UISettingsContainer {
     }
     func clearSensitiveDraft() {
         state.key = ""
+        state.providers = []
         state.models = []
         state.isLoading = false
         state.isSaving = false

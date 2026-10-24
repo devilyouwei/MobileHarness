@@ -178,7 +178,7 @@ func liveProviderPreservesConsecutiveUsers() async throws {
     #expect(body["messages"] == nil && body["stream_options"] == nil && body["reasoning"] == nil)
     #expect(body["tools"] == nil && body["tool_choice"] == nil)
     #expect(!String(reflecting: configuration).contains("test-only"))
-    for url in ["http://example.test", "https://user:pass@example.test", "https://example.test?key=secret"] {
+    for url in ["ftp://example.test", "https://user:pass@example.test", "https://example.test?key=secret"] {
         #expect(throws: (any Error).self) {
             try OpenAIChatConfiguration(baseURL: #require(URL(string: url)), apiKey: "key", model: "model")
         }
@@ -938,8 +938,13 @@ private func reasoningWire() throws -> String {
     let call: [String: Any] = [
         "type": "function_call", "id": "item-1", "call_id": "call-1", "name": "Read_State_0", "arguments": "{}",
     ]
+    let summary = try eventWire([
+        "type": "response.reasoning_summary_text.delta", "output_index": 0, "item_id": "reason-1",
+        "summary_index": 0, "delta": "private fixture",
+    ])
     let wire =
-        try reasoningWire() + eventWire(["type": "response.output_item.added", "output_index": 1, "item": call])
+        try reasoningWire() + summary
+        + eventWire(["type": "response.output_item.added", "output_index": 1, "item": call])
         + eventWire([
             "type": "response.function_call_arguments.delta", "output_index": 1, "item_id": "item-1", "delta": "{}",
         ]) + eventWire(["type": "response.output_item.done", "output_index": 1, "item": call])
@@ -1268,4 +1273,132 @@ func nativeArgumentShapeAndIncrementMismatchHaveDifferentDiagnostics(arguments: 
     }
     expectResponseFailure(.invalidToolArguments) { try parse(prefix + delta + end) }
     expectResponseFailure(.toolArgumentsMismatch) { try parse(prefix + end) }
+}
+
+@Test func providerAcceptsHTTPAndHTTPSIPAddressesWithoutChangingRequestScheme() throws {
+    for endpoint in ["http://192.168.1.20:11434/v1", "https://192.168.1.20:8443/v1", "http://[::1]:8080/v1"] {
+        let configuration = try OpenAIChatConfiguration(
+            baseURL: OpenAIChatConfiguration.endpoint(endpoint), apiKey: "", model: "test-model")
+        let request = try configuration.request(ChatRequest(messages: [.init(role: .user, content: "test")]))
+        #expect(request.url?.absoluteString == endpoint + "/responses")
+        #expect(request.value(forHTTPHeaderField: "Authorization") == nil)
+    }
+}
+
+@Test func reasoningSummaryEventsAreValidatedAndNeverBecomeAnswerText() throws {
+    var prefix = try eventWire([
+        "type": "response.output_item.added", "output_index": 0,
+        "item": ["type": "reasoning", "id": "reason-1", "summary": []],
+    ])
+    for type in [
+        "response.reasoning_summary_part.added", "response.reasoning_summary_text.delta",
+        "response.reasoning_summary_text.done", "response.reasoning_summary_part.done",
+    ] {
+        var event: [String: Any] = ["type": type, "output_index": 0, "item_id": "reason-1", "summary_index": 0]
+        if type.contains("_part.") {
+            event["part"] = ["type": "summary_text", "text": "private fixture"]
+        } else {
+            event[type.hasSuffix(".delta") ? "delta" : "text"] = "private fixture"
+        }
+        prefix += try eventWire(event)
+        #expect(try decode(prefix).isEmpty)
+        for invalid: Any in [-1, 128, true, "0", 0.5] {
+            var malformed = event
+            malformed["summary_index"] = invalid
+            expectResponseFailure(.invalidReasoning) { try decode(try eventWire(malformed)) }
+        }
+        var missing = event
+        missing.removeValue(forKey: "summary_index")
+        expectResponseFailure(.invalidReasoning) { try decode(try eventWire(missing)) }
+        var malformed = event
+        if type.contains("_part.") {
+            malformed["part"] = ["type": "output_text", "text": "bad"]
+        } else {
+            malformed[type.hasSuffix(".delta") ? "delta" : "text"] = 1
+        }
+        expectResponseFailure(.invalidReasoning) { try decode(try eventWire(malformed)) }
+    }
+    let message: [String: Any] = ["type": "message", "content": [["type": "output_text", "text": "OK"]]]
+    let terminal = try eventWire([
+        "type": "response.completed",
+        "response": [
+            "status": "completed",
+            "output": [
+                [
+                    "type": "reasoning", "id": "reason-1",
+                    "summary": [["type": "summary_text", "text": "private fixture"]],
+                ], message,
+            ],
+        ],
+    ])
+    #expect(
+        try decode(prefix + eventWire(["type": "response.output_text.delta", "delta": "OK"]) + terminal) == [
+            .text("OK"), .finished(.stop),
+        ])
+    #expect(throws: OpenAIChatError.truncatedStream) { try decode(prefix + "data: [DONE]\n\n") }
+}
+
+@Test(.enabled(if: ProcessInfo.processInfo.environment["HARNESS_LIVE_OLLAMA"] == "1"))
+func liveOllamaResponsesReasoningCompatibility() async throws {
+    let endpoint = try #require(ProcessInfo.processInfo.environment["HARNESS_LIVE_CHAT_URL"])
+    let model = try #require(ProcessInfo.processInfo.environment["HARNESS_LIVE_CHAT_MODEL"])
+    let configuration = try OpenAIChatConfiguration(
+        baseURL: OpenAIChatConfiguration.endpoint(endpoint), apiKey: "", model: model, timeout: 120)
+    let context = try ModelContext(loadGate: ModelLoadGate(maximumConcurrentLoads: 4), maximumLoadWaiters: 32)
+    let capability = try OpenAIChat(context: context, configuration: configuration)
+    do {
+        let session = try await capability.chat(
+            ChatRequest(
+                messages: [.init(role: .user, content: "Reply with only OK.")], maximumOutputTokens: 1024,
+                temperature: 0))
+        var text = ""
+        var completed = false
+        for try await event in session.events {
+            if case .text(let delta) = event { text += delta }
+            if case .finished(.stop) = event { completed = true }
+        }
+        #expect(completed)
+        #expect(text.trimmingCharacters(in: .whitespacesAndNewlines) == "OK")
+        print(
+            "OLLAMA_LIVE completed=\(completed) answer_matches=\(text.trimmingCharacters(in: .whitespacesAndNewlines) == "OK")"
+        )
+        let tool = try ChatToolDefinition(
+            declaration: Data(
+                #"{"type":"function","function":{"name":"Read.State","description":"Read a synthetic test state","parameters":{"type":"object","properties":{},"required":[]}}}"#
+                    .utf8))
+        let prompt = ChatMessage(
+            role: .user,
+            content:
+                "Call the Read.State tool exactly once with empty arguments to read the test state. Do not answer before calling the tool."
+        )
+        let toolSession = try await capability.chat(
+            ChatRequest(messages: [prompt], maximumOutputTokens: 1024, temperature: 0, tools: [tool]))
+        var calls: [ChatToolCall] = []
+        var toolFinished = false
+        for try await event in toolSession.events {
+            if case .toolCall(let call) = event { calls.append(call) }
+            if case .finished(.toolCalls) = event { toolFinished = true }
+        }
+        #expect(toolFinished && calls.count == 1)
+        let call = try #require(calls.first)
+        #expect(call.name == "Read.State" && call.argumentsJSON == "{}")
+        let continuation = try await capability.chat(
+            ChatRequest(
+                messages: [
+                    prompt, .init(role: .assistant, content: "", toolCalls: calls),
+                    .init(role: .tool, content: "Test state is OK. Reply with only OK.", toolCallID: call.id),
+                ], maximumOutputTokens: 1024, temperature: 0, tools: [tool]))
+        var answer = ""
+        var continuationFinished = false
+        for try await event in continuation.events {
+            if case .text(let delta) = event { answer += delta }
+            if case .finished(.stop) = event { continuationFinished = true }
+        }
+        #expect(continuationFinished && answer.trimmingCharacters(in: .whitespacesAndNewlines) == "OK")
+        print("OLLAMA_LIVE native_call_validated=\(toolFinished) continuation_completed=\(continuationFinished)")
+        try await context.unload()
+    } catch {
+        try await context.unload()
+        throw error
+    }
 }

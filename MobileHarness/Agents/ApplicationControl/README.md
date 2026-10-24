@@ -157,3 +157,11 @@ Provider restore/save/discover 与资源偏好事务由 Actions 执行；偏好�
 本角色通过 [固定任务准入](../Support/Communication/README.md#固定任务准入) 接收 Assistant 委派。ApplicationControlTaskInput 解释 app.interaction、资源意图和 Provider 意图，拒绝远程构造资源 retire；Provider 的敏感草稿只保存在会话私有请求服务中。
 
 ApplicationControlFunctions 只声明代码拥有的内部调用权限；ApplicationControlPolicy 只分类事实与结果，不持有 UI、设备或模型。ProviderSettingsClient 和 ModelResourcesClient 是角色请求客户端；实际配置事务、模型绑定和下载由 Actions 执行，纯表单草稿由基础 UI 拥有。
+
+## 多 Provider 管理
+
+✅ 沿用私有设置事务传递至多 32 个 URL 唯一的 provider；当前配置与其余配置一起保存。UI 在加载模型上方提供单选、编辑、删除和末行添加，删除当前项关闭云端并要求重新选择。保存提交后生效，Key 保持钥匙串存储，旧单配置恢复为首项。
+
+✅ Provider 名称通过私有配置链路保存，旧数据以 URL 主机名补齐。新增/编辑采用独立 modal 草稿（name/url/key），默认生成未占用的 Provider N 名称；取消不修改选择和凭据，确认校验 URL 唯一性与名称。列表名称为主、URL 单行省略为辅，保留三字段粘贴和 Key 脱敏。
+
+✅ ProviderSettingsClient 的连接失败提示允许 HTTP/HTTPS；配置仍通过私有请求链路传递，网络与主机能力策略由 [Provider Actions](../../Actions/System/Provider/README.md) 和 [Config](../../../Config/README.md) 拥有。

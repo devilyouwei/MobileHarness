@@ -15,7 +15,8 @@ import Foundation
     private var draft: CloudSettingsDraft {
         .init(
             enabled: state.isEnabled, url: state.url.trimmingCharacters(in: .whitespacesAndNewlines),
-            key: state.key.trimmingCharacters(in: .whitespacesAndNewlines), model: state.selectedModel)
+            key: state.key.trimmingCharacters(in: .whitespacesAndNewlines), model: state.selectedModel,
+            providers: state.providers)
     }
     public func restore() async throws {
         guard !restored else { return }
@@ -23,6 +24,9 @@ import Foundation
         // A coalesced restore must not overwrite edits after the first caller applied its result.
         guard !restored else { return }
         if !operations.presentsResults {
+            state.providers =
+                value.providers.isEmpty && !value.url.isEmpty
+                ? [.init(enabled: false, url: value.url, key: value.key, model: value.model)] : value.providers
             state.present(.isEnabled(value.enabled))
             state.present(.url(value.url))
             state.present(.key(value.key))
@@ -71,7 +75,11 @@ import Foundation
         state.present(.notice(nil))
         defer { state.present(.isSaving(false)) }
         do {
-            let value = draft
+            var value = draft
+            if let index = value.providers.firstIndex(where: { $0.url == value.url }) {
+                value.providers[index].key = value.key
+                value.providers[index].model = value.model
+            }
             try await operations.save(value)
             restored = true
             if !operations.presentsResults { state.present(.notice(value.enabled ? "已保存，云端模型立即生效" : "已切换为本地模型")) }

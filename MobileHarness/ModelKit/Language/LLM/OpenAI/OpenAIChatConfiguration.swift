@@ -9,7 +9,7 @@ public struct OpenAIChatConfiguration: Sendable, Equatable, CustomStringConverti
     public static func endpoint(_ text: String) throws -> URL {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard let url = URL(string: trimmed.isEmpty ? defaultBaseURL : trimmed) else {
-            throw CapabilityError.invalidRequest("Invalid HTTPS endpoint")
+            throw CapabilityError.invalidRequest("Invalid HTTP/HTTPS endpoint")
         }
         return url
     }
@@ -20,12 +20,12 @@ public struct OpenAIChatConfiguration: Sendable, Equatable, CustomStringConverti
     private let apiKey: String
 
     public init(baseURL: URL, apiKey: String, model: String, timeout: TimeInterval = 60) throws {
-        guard baseURL.scheme?.lowercased() == "https", baseURL.host?.isEmpty == false,
+        guard ["http", "https"].contains(baseURL.scheme?.lowercased() ?? ""), baseURL.host?.isEmpty == false,
             baseURL.user == nil, baseURL.password == nil, baseURL.query == nil, baseURL.fragment == nil,
             !apiKey.contains(where: { $0.isNewline }),
             !model.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
             timeout.isFinite, (1...600).contains(timeout)
-        else { throw CapabilityError.invalidRequest("Invalid HTTPS endpoint, credential, model or timeout") }
+        else { throw CapabilityError.invalidRequest("Invalid HTTP/HTTPS endpoint, credential, model or timeout") }
         self.baseURL = baseURL
         self.apiKey = apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
         self.model = model

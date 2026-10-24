@@ -102,3 +102,9 @@ Run one explicitly selected physical test per process with `NEXARM_PORT=/dev/cu.
 - 可注入 Skill 依赖图及跨进程/持久活跃 worker 的独立验证环境。
 
 执行方法与结果归 [validation](../../docs/validation/README.md)，不在本文件追加运行/安装记录。
+
+Provider 设置新增多 URL 配置重开恢复、删除清理及普通文档无密钥回归。
+
+Provider 名称持久化、默认名称生成、独立弹窗草稿、重复 URL 和空名称校验由自动化回归覆盖；原生弹窗布局与粘贴需设备验收。
+
+✅ providerSettingsStagesHTTPIPConfiguration 覆盖 HTTP/HTTPS IP provider 的私有保存请求准入；使用替身服务，不代表真机局域网连通性。

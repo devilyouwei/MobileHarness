@@ -64,7 +64,7 @@ public final class ProviderSettingsClient: SettingsOperating {
     private func message(_ error: any Error) -> String {
         if let message = provider.errorMessage(error) { return message }
         if error is CancellationError { return "操作已取消" }
-        return "无法连接服务，请检查 HTTPS URL、Key 和网络后重试"
+        return "无法连接服务，请检查 HTTP/HTTPS URL、Key 和网络后重试"
     }
 }
 private struct WorkflowMessage: LocalizedError, SettingsFailurePresenting {

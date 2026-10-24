@@ -13,8 +13,10 @@ public protocol ProviderCredentialStorage: Sendable {
 public struct UserSettingsDocument: Codable, Sendable {
     let version: Int
     let cloud: CloudRecord?
+    var providers: [CloudRecord]? = nil
 
     struct CloudRecord: Codable, Sendable {
+        var name: String? = nil
         let enabled: Bool
         let url: String
         let model: String
@@ -52,8 +54,16 @@ public actor ProviderSettingsStore: ProviderSettingsPersistence {
         do {
             snapshot = try await documents().refresh()
             if let snapshot {
-                guard snapshot.value.version == 1 else { throw ProviderSettingsError.persistence }
-                let value = try resolve(snapshot.value.cloud)
+                guard snapshot.value.version == 1, (snapshot.value.providers?.count ?? 0) <= 32 else {
+                    throw ProviderSettingsError.persistence
+                }
+                let current = try resolve(snapshot.value.cloud)
+                let others = try (snapshot.value.providers ?? []).compactMap { try resolve($0) }
+                let value = current.map {
+                    ProviderSettings(
+                        enabled: $0.enabled, url: $0.url, key: $0.key, model: $0.model,
+                        providers: snapshot.value.providers == nil ? [$0] : others, name: $0.name)
+                }
                 loaded = true
                 return value
             }
@@ -84,22 +94,29 @@ public actor ProviderSettingsStore: ProviderSettingsPersistence {
     }
 
     private func persist(_ value: ProviderSettings?) async throws {
-        let oldID = snapshot?.value.cloud?.credentialID
-        let newID = UUID().uuidString
-        if let value { try credentials.insertKey(Data(value.key.utf8), id: newID) }
-        let record = value.map {
-            UserSettingsDocument.CloudRecord(
-                enabled: $0.enabled, url: $0.url, model: $0.model, credentialID: newID)
-        }
+        let oldIDs = ([snapshot?.value.cloud].compactMap { $0 } + (snapshot?.value.providers ?? [])).map(\.credentialID)
+        var inserted: [String] = []
         do {
-            snapshot = try await documents().save(
-                UserSettingsDocument(version: 1, cloud: record), expecting: snapshot?.revision)
+            var records: [UserSettingsDocument.CloudRecord] = []
+            for item in (value.map { [$0] } ?? []) + (value?.providers ?? []) {
+                let id = UUID().uuidString
+                try credentials.insertKey(Data(item.key.utf8), id: id)
+                inserted.append(id)
+                var record = UserSettingsDocument.CloudRecord(
+                    enabled: item.enabled, url: item.url, model: item.model, credentialID: id)
+                record.name = item.name
+                records.append(record)
+            }
+            let current = records.first
+            let others = Array(records.dropFirst())
+            var document = UserSettingsDocument(version: 1, cloud: current)
+            document.providers = others
+            snapshot = try await documents().save(document, expecting: snapshot?.revision)
         } catch {
-            if value != nil { try? credentials.removeKey(id: newID) }
+            for id in inserted { try? credentials.removeKey(id: id) }
             throw error
         }
-        // Cleanup is best-effort after commit. An interrupted cleanup may leave an unreferenced key.
-        if let oldID { try? credentials.removeKey(id: oldID) }
+        for id in oldIDs { try? credentials.removeKey(id: id) }
     }
 
     private func resolve(_ record: UserSettingsDocument.CloudRecord?) throws -> ProviderSettings? {
@@ -108,7 +125,8 @@ public actor ProviderSettingsStore: ProviderSettingsPersistence {
         else {
             throw ProviderSettingsError.persistence
         }
-        return ProviderSettings(enabled: record.enabled, url: record.url, key: key, model: record.model)
+        return ProviderSettings(
+            enabled: record.enabled, url: record.url, key: key, model: record.model, name: record.name ?? "")
     }
 
 }

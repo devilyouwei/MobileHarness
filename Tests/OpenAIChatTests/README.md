@@ -34,3 +34,8 @@ liveProviderPreservesConsecutiveUsers 从调用进程获取 HARNESS_LIVE_CHAT_UR
 ## 分类异常诊断
 
 ✅ 离线 SSE 回归精确断言未声明/缺失名称、身份、顺序、参数格式及增量不一致、终态、用量和脱敏有界诊断；不放宽错误为接受，不运行云请求。
+
+✅ providerAcceptsHTTPAndHTTPSIPAddressesWithoutChangingRequestScheme 覆盖 HTTP/HTTPS IPv4、IPv6 与端口路径，验证 Responses 请求保留 scheme；无效协议、URL 凭据和 query 仍拒绝。不调用真实网络。
+
+
+Reasoning summary regressions cover filtering, malformed indices/parts, truncation and preserved native-call indices. liveOllamaResponsesReasoningCompatibility is opt-in via HARNESS_LIVE_OLLAMA=1 plus HARNESS_LIVE_CHAT_URL/MODEL; it uses no API key, synthetic prompts/tool receipts, and validates text, one native call and a continuation without device effects. [Validation evidence](../../docs/validation/Provider-Management.md).

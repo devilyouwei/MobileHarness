@@ -148,7 +148,11 @@ extension ApplicationControlAgent {
             if case .save(let draft) = value {
                 operation = .save
                 id = try await settings.stageSave(
-                    .init(enabled: draft.enabled, url: draft.url, key: draft.key, model: draft.model),
+                    .init(
+                        enabled: draft.enabled, url: draft.url, key: draft.key, model: draft.model,
+                        providers: draft.providers.map {
+                            .init(enabled: false, url: $0.url, key: $0.key, model: $0.model, name: $0.name)
+                        }),
                     sessionID: sessionID)
             } else {
                 operation = .restore
@@ -164,7 +168,12 @@ extension ApplicationControlAgent {
                 await settings.discard(id, sessionID: sessionID)
                 await presentation.discard(id)
                 if operation == .save { return .completed }
-                return .draft(.init(enabled: stored.enabled, url: stored.url, key: stored.key, model: stored.model))
+                return .draft(
+                    .init(
+                        enabled: stored.enabled, url: stored.url, key: stored.key, model: stored.model,
+                        providers: stored.providers.map {
+                            .init(enabled: false, url: $0.url, key: $0.key, model: $0.model, name: $0.name)
+                        }))
             } catch {
                 await settings.discard(id, sessionID: sessionID)
                 await presentation.discard(id)

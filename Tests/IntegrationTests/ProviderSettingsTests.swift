@@ -373,3 +373,45 @@ func settingsContainerRunsInItsAgentWithPrivateStagingAndActualPresentation() as
     await host.shutdown()
     await ui.stop()
 }
+
+@Test(.actionCatalog) func multipleProvidersSurviveReopenAndDeletionWithoutPlaintextKeys() async throws {
+    let url = FileManager.default.temporaryDirectory.appendingPathComponent("providers-\(UUID().uuidString).json")
+    defer { try? FileManager.default.removeItem(at: url) }
+    let credentials = try ProviderCredentialFixture()
+    let store = ProviderSettingsStore(
+        credentials: credentials, document: { try FileDocumentStore<UserSettingsDocument>(url: url) })
+    _ = try await store.load()
+    let first = ProviderSettings(
+        enabled: false, url: "https://first.invalid/v1", key: "first-private-key", model: "first",
+        name: "First Provider")
+    let second = ProviderSettings(
+        enabled: false, url: "https://second.invalid/v1", key: "second-private-key", model: "second",
+        name: "Second Provider")
+    let selected = ProviderSettings(
+        enabled: true, url: second.url, key: second.key, model: second.model, providers: [first, second])
+    try await store.save(selected)
+    let reopened = ProviderSettingsStore(
+        credentials: credentials, document: { try FileDocumentStore<UserSettingsDocument>(url: url) })
+    #expect(try await reopened.load() == selected)
+    let text = try String(contentsOf: url, encoding: .utf8)
+    #expect(!text.contains(first.key) && !text.contains(second.key))
+    try await reopened.save(.init(enabled: false, url: "", key: "", model: "", providers: [first]))
+    let final = ProviderSettingsStore(
+        credentials: credentials, document: { try FileDocumentStore<UserSettingsDocument>(url: url) })
+    let restored = try #require(try await final.load())
+    #expect(!restored.enabled && restored.providers == [first])
+    #expect(credentials.keyCount == 2)
+}
+
+@Test(.actionCatalog) @MainActor func providerSettingsStagesHTTPIPConfiguration() async throws {
+    let fixture = ProviderTransactionFixture()
+    let service = fixture.service()
+    _ = try await service.restore()
+    let requests = ProviderSettingsRequests(service: service)
+    for url in ["http://192.168.1.20:11434/v1", "https://192.168.1.20:8443/v1"] {
+        let provider = ProviderSettings(enabled: false, url: url, key: "", model: "test-model")
+        let id = try requests.stageSave(
+            .init(enabled: true, url: url, key: "", model: "test-model", providers: [provider]), sessionID: "http-test")
+        requests.discard(id, sessionID: "http-test")
+    }
+}

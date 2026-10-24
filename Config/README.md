@@ -17,3 +17,5 @@
 ## 待实现
 
 - 签名设备性能、导出兼容性及后台传输的独立验收。
+
+✅ AppInfo.plist 设置 NSAppTransportSecurity.NSAllowsArbitraryLoads=true，以支持用户配置任意域名或 IP 的 HTTP 模型服务；不同时设置会覆盖该值的 NSAllowsLocalNetworking 等细粒度 ATS 项。NSLocalNetworkUsageDescription 声明加载局域网模型列表和发送对话的用途。HTTPS 使用系统证书验证。策略依据 [Apple ATS 文档](https://developer.apple.com/documentation/bundleresources/information-property-list/nsapptransportsecurity/nsallowsarbitraryloads)。

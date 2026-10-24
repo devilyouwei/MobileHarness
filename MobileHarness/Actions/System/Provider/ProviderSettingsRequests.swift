@@ -34,6 +34,17 @@ public final class ProviderSettingsRequests: ProviderSettingsCapability {
         guard value.url.utf8.count <= 2048, value.key.utf8.count <= 4096, value.model.utf8.count <= 512 else {
             throw ProviderSettingsError.invalidConfiguration
         }
+        guard value.providers.count <= 32,
+            Set(value.providers.map(\.url)).count == value.providers.count,
+            value.providers.allSatisfy({ provider in
+                guard let url = URL(string: provider.url) else { return false }
+                return !provider.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                    && provider.name.utf8.count <= 128 && provider.providers.isEmpty && provider.url.utf8.count <= 2048
+                    && provider.key.utf8.count <= 4096 && provider.model.utf8.count <= 512
+                    && ["http", "https"].contains(url.scheme?.lowercased() ?? "") && url.host != nil && url.user == nil
+                    && url.password == nil
+            })
+        else { throw ProviderSettingsError.invalidConfiguration }
         return try stage(.save(value), sessionID: sessionID)
     }
     private func stage(_ operation: Operation, sessionID: String) throws -> String {
