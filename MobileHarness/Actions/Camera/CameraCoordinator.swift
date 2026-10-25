@@ -1,11 +1,10 @@
 #if os(iOS)
 
-    import AgentCore
+    import FunctionContracts
     import CallRuntime
     import CoreGraphics
     import ExecutionRuntime
     import Foundation
-    import FunctionContracts
     import OSLog
     import PlatformKit
     import StorageCore
@@ -17,7 +16,7 @@
     @MainActor
     public final class CameraCoordinator: CameraOutputHandling, CameraControlCapability {
         public static let captureResource = ResourceID(rawValue: "camera.capture")
-        public static let resourceOwnerID = AgentID(rawValue: "runtime.camera")
+        public static let resourceOwnerID = "runtime.camera"
 
         private let captureOwner: ExecutionOwner
         private let makeRuntime: () throws -> CameraRuntimeDependencies
@@ -25,7 +24,7 @@
         private var captureLease: ResourceLease?
         private var leaseRenewal: Task<Void, Never>?
         private var eventSequence: UInt64 = 0
-        private(set) var captureEvent: ActivityEvent?
+        private(set) var captureEvent: CaptureActivityEvent?
         private let presentation: any CameraPresenting
         private var state: CameraPresentationSnapshot { presentation.snapshot }
         private var gazeSequence: UInt64?
@@ -75,7 +74,7 @@
         ) {
             self.photoCues = photoCues
             self.captureOwner = ExecutionOwner(
-                agent: Self.resourceOwnerID, incarnation: UUID().uuidString,
+                endpoint: Self.resourceOwnerID, incarnation: UUID().uuidString,
                 sessionID: UUID().uuidString)
             self.makeRuntime = makeRuntime
             self.presentation = presentation
@@ -372,7 +371,7 @@
                 throw CancellationError()
             }
             guard state.skeleton.map({ overlay.sequence > $0.sequence }) ?? true else {
-                throw CommunicationError.outOfOrder
+                throw ActionHostError.outOfOrder
             }
             guard let frame, frame.sequence == overlay.sequence, frame.rotation == overlay.rotation else {
                 throw CameraFramePresentationError.stale
@@ -397,11 +396,13 @@
             presentation.present(.visionMessage(nil))
         }
 
-        private func recordCapture(_ state: ActivityEvent.State, id: String) {
+        private func recordCapture(_ state: CaptureActivityEvent.State, id: String) {
             eventSequence &+= 1
-            let causality = captureEvent.flatMap { $0.activityID == id ? $0.causality : nil } ?? .root(id: id)
-            captureEvent = ActivityEvent(
-                activityID: id, owner: captureOwner, state: state, sequence: eventSequence, causality: causality)
+            let context =
+                captureEvent.flatMap { $0.activityID == id ? $0.context : nil }
+                ?? ActionExecutionContext(source: Self.resourceOwnerID, sessionID: captureOwner.sessionID, inputID: id)
+            captureEvent = CaptureActivityEvent(
+                activityID: id, owner: captureOwner, state: state, sequence: eventSequence, context: context)
         }
 
         private func startCapture(facing: CameraFacing) async throws -> AsyncThrowingStream<CameraFrame, Error> {

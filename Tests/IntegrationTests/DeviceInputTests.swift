@@ -1,11 +1,11 @@
 import AgentCore
-import Agents
 import CoreVideo
 import Foundation
 import ModelKit
 import StorageCore
 import Testing
 
+@testable import Agents
 @testable import PlatformKit
 
 extension LiveRuntimeTests {

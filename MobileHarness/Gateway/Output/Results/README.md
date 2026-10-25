@@ -1,67 +1,19 @@
-# Execution Outcomes and Feedback Delivery
+# Execution outcomes and delivery
 
-## Summary
+ExecutionResult.swift owns the neutral terminal outcome and ActionStatus projection. ActionResultLedger.swift owns the bounded delivery state; neither decodes cognitive correlation.
 
-Reserves and delivers bounded terminal results separately from effect execution and diagnostic retention.
+ActionResultLedger is scheduler-owned. Every feedback-producing admission reserves a terminal slot before effects. Feedback is none, failuresOnly or terminal; successful failuresOnly releases the reservation without delivery. Production cognitive bindings request terminal evidence for round completion. Gateway stores neutral ExecutionResult; Agents projects it into causal role results and validates receiver lifetime.
 
-## Ownership and boundaries
-
-ActionResultLedger is scheduler-owned; InputGateway validates the captured owner/incarnation/session. Tool outcomes retain their independent delivery failure. Feedback retries reuse immutable results and never repeat native effects.
-
-## External relationships and data flow
-
-Runtime arrows show data or capability calls; dashed arrows show injection.
-
-```mermaid
-flowchart LR
- Admit[Action admission] --> Reserve[Reserve result slot]
- Reserve --> Execute[Execution and joined cleanup]
- Execute --> Ledger[Immutable terminal result]
- Ledger --> Delivery[One bounded delivery worker]
- Delivery --> Input[InputGateway]
- Input -->|Accepted result| Agent[Actual executor]
- Input -->|retry or closed| Ledger
- Execute --> Diagnostics[Independent output outcome]
-```
-
-## Result reservation and transport
-
-Feedback is none/failuresOnly/terminal and requires supported actionResult input. Default production policy is failuresOnly; successful failuresOnly releases reservation without delivery. Generated calls use terminal round evidence. Reserve before effects; exhausted result capacity rejects admission.
-
-| Boundary | Limit / policy |
+| Boundary | Limit and policy |
 | --- | --- |
-| Reserved plus pending results | Default 512; configurable 1–1024 |
-| Delivery work | One worker and at most one active callback |
-| Attempt | One owned callback; retry backoff grows to 1 second without a retry-count cutoff |
-| Terminal validity | Until accepted, owner/session closed or explicit shutdown; no TTL |
-| Delivery history | 256 entries with counted oldest eviction |
-| Agent terminal history | Default 128; configurable 1–512, retained-ID deduplication |
+| Reserved and pending results | Default 512, configurable 1–1,024; full capacity rejects admission. |
+| Delivery workers | One worker, at most one owned active callback. |
+| Retry | Backoff grows to one second, without a retry-count cutoff. |
+| Result validity | Until accepted, scope closed or explicit shutdown; no hidden TTL. |
+| Delivery history | 256 entries; counted oldest eviction. |
 
-accepted means inbox admission. retry means bounded temporary admission exhaustion; closed means stale/missing owner/session/contract. A cancelled slow callback remains joined until return, preventing abandoned task accumulation; other results remain pending until admission or scope closure. Session/shutdown closes matching results. Generated round acknowledgment waits for scoped delivery and fails explicitly on closed state.
+Accepted means receiving admission, retry means temporary receiver pressure, and closed means stale/missing receiver/scope. An owned slow callback is cancelled and joined, preventing abandoned-task accumulation. Session/shutdown closes matching results. Round barriers in Agents can wait for scoped delivery and observe explicit closure. Retries redeliver immutable terminal evidence and never prepare/execute a function again.
 
-## Effect and failure evidence
+Queued cancellation is notStarted; failure/cancellation after starting conservatively has unknown effects; success is contractCompleted. Activity start is not activity completion. Returned reports retain successful/failed/cancelled leaves and independent execution/cleanup failure. Mixed failures survive concurrent cancellation. Rejected admission has no fabricated execution record.
 
-Queued cancellation is notStarted; failure/cancellation after start conservatively reports unknown; success is contractCompleted. Activity start acknowledges activity start, not final activity completion. Reports preserve every child result plus later exception/timeout and partialFailure.
-
-OutputExecutionResult retains 256 correlated output outcomes with counted eviction and ≤512-character descriptions. Rejected calls have no fabricated scheduled execution record. Tool value/isError/callID/producer code survive separate deliveryFailure. Handler failure is call-local; identity/scheduling structure failure cancels its Action tree. Explicit executing-task cancellation propagates rather than appending fabricated success.
-
-Pre-effect reservation, bounded message-only retry and separate effect/delivery evidence are implemented.
-
-## Related design
-
-[Parent design](../README.md)
-
-待投递 ActionResult 保存在有界 outbox，容量拒绝按退避重试，直到确认接纳、目标关闭或拥有会话清理；投递没有独立计时终止，不重放效果。
-
-OutputExecutionResult 已增加 isCancellationOnly 纯取消分类。原始调用结果、Tool isError 和取消报告仍保留在 executionResults；仅 cancelled 且不含其他执行/投递失败的结果不进入运行异常快照/首页 toast。不能按 CancellationError 文本过滤；读取类型化代码和完整报告，混合失败/超时/投递失败照常记录。OutputGateway 将局部抛出的 CancellationError 归为 cancelled，调用方真实任务取消仍传播并加入清理。
-
-OutputExecutionResult.isError excludes pure cancellation while preserving raw cancelled code/report/outcome. Independent real execution or result-delivery failures remain errors; no string-based filtering.
-
-## 待实现
-
-- Durable result delivery, crash recovery and generic activity outbox are not implemented.
-
-
-## 分类异常诊断
-
-✅ 失败快照透传 AgentFailureDiagnostic 与原输入/会话/轮次，诊断详情上限2048字符，普通消息仍512；取消过滤及 Action 完成语义保持。
+Tool-to-Agent response conversion, cognitive OutputExecutionResult, role diagnostics and continuation decisions live in [Agents Support](../../../Agents/Support/README.md), independently of this outbox. Passive execution snapshots belong to [Scheduling](../Scheduling/README.md). Root shutdown joins delivery before closing [transport](../../Input/README.md).

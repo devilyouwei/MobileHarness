@@ -1,6 +1,6 @@
-import Actions
 import AgentCore
 import Foundation
+import FunctionContracts
 import Gateway
 import UI
 
@@ -34,7 +34,8 @@ extension PhotographerAgent {
         }
         let consumer = try uiExecution.begin(context.requestID)
         defer { uiExecution.finish(context.requestID) }
-        let request = PhotoAlbumInvocation(input: value, requestID: context.requestID, sessionID: sessionID)
+        let request = ActionRequestSlot<AlbumInput, AlbumReply>(
+            input: value, requestID: context.requestID, sessionID: sessionID)
         let call = try InternalTool(path: "Camera.Album.perform").call([:])
         let envelope = OutputEnvelope(
             source: descriptor.id, context: context, output: .toolCall(call), executionAttachment: request)

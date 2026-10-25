@@ -1,6 +1,5 @@
 import Actions
 import AgentCore
-import Agents
 import CallRuntime
 import ExecutionRuntime
 import Foundation
@@ -11,6 +10,7 @@ import StorageCore
 import Testing
 import UI
 
+@testable import Agents
 @testable import PlatformKit
 
 /// Reuse scheduler fixtures in argument validation tests while constructing a genuine immediate Tool envelope.
@@ -397,7 +397,7 @@ func diagnosticContainerRequestsReachTheAgentAndStopJoinsProtectedExecution() as
     let tools = try ToolRegistry(modules: [
         DetectionFunctionModule(definitions: [BehaviorProtocolBindings.bind(function)])
     ])
-    let output = OutputGateway(
+    let output = await OutputGateway(
         manager: manager, requests: input, tools: tools,
         actions: ChannelScheduler(registry: ActionRegistry()), policy: policy, sink: { _ in })
     try await manager.register(agent)

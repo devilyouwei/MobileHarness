@@ -8,6 +8,7 @@ import UI
     private var state: CameraPresentationSnapshot { presentation.snapshot }
     private let perform: (CameraInput.Operation, CameraDirection?, String?) async throws -> Void
     private var worker: Task<Void, Never>?
+    private var stopped = false
     public init(
         presentation: any CameraPresenting,
         perform:
@@ -29,11 +30,17 @@ import UI
         }
         submit(operation, mediaID: mediaID.rawValue)
     }
+    public func shutdown() async {
+        stopped = true
+        worker?.cancel()
+        await worker?.value
+    }
     public func waitUntilIdle() async { await worker?.value }
     private func submit(
         _ operation: CameraInput.Operation, facing: CameraDirection? = nil,
         mediaID: String? = nil
     ) {
+        guard !stopped else { return }
         guard worker == nil else {
             if mediaID != nil {
                 presentation.present(.photoMessage("照片操作正在执行，请稍后重试"))

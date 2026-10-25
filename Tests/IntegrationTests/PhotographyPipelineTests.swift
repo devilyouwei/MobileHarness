@@ -1,6 +1,5 @@
 import Actions
 import AgentCore
-import Agents
 import CallRuntime
 import CoreVideo
 import ExecutionRuntime
@@ -11,6 +10,7 @@ import ModelKit
 import StorageCore
 import Testing
 
+@testable import Agents
 @testable import PlatformKit
 @testable import UI
 
@@ -275,7 +275,7 @@ extension LiveRuntimeTests {
                 await recorder.record(overlay.sequence)
             }
         }
-        let output = OutputGateway(
+        let output = await OutputGateway(
             manager: manager, requests: input, tools: tools, actions: actions, policy: policy,
             sink: { _ in })
         try await vision.bind(output.messaging(for: .visionPerception))
@@ -1435,12 +1435,12 @@ extension LiveRuntimeTests {
         let manager = AgentManager()
         try await manager.register(agent, sessionID: session)
         try await agent.start()
-        let gateway = OutputGateway(
+        let gateway = await OutputGateway(
             manager: manager, requests: InputGateway(manager: manager), tools: ToolRegistry(), sink: { _ in })
         let consumer = try await gateway.consumer(for: agent)
         let state = ActionActivityState()
         let workflow = ActionActivityWorkflow(state: state)
-        let fixture = try RuntimeFailurePresentationFixture(activity: workflow)
+        let fixture = try await RuntimeFailurePresentationFixture(activity: workflow)
         try await fixture.runtime.prepareForInteraction()
         workflow.connectFailures { event in try await fixture.runtime.agent.observeFailure(event) }
         workflow.startFailures { try await gateway.observeFailures() }

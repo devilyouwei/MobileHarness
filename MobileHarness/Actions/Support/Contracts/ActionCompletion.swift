@@ -34,3 +34,11 @@ extension ActionReportFailureProviding {
         }
     }
 }
+
+public protocol ExecutionFailurePreserving: Sendable { var hasExecutionFailure: Bool { get } }
+extension ActionCompletion: ExecutionFailurePreserving {
+    public var hasExecutionFailure: Bool {
+        if case .report(let report) = self { return report.hasFailures }
+        return false
+    }
+}

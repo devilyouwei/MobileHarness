@@ -2,7 +2,7 @@
 
 ## 角色容器
 
-✅ [MemoryContainer.swift](MemoryContainer.swift) 是 AgentContainer 的稳定子能力。持有角色执行会话和历史工作流，启动绑定唯一角色／输出消费者，停止加入已接纳工作。历史请求继续以 UI 回执和 Gateway 真实完成为边界。
+[MemoryContainer.swift](MemoryContainer.swift) 是 AgentContainer 的稳定子能力。持有角色执行会话和历史工作流，启动绑定唯一角色／输出消费者，停止加入已接纳工作。历史请求继续以 UI 回执和 Gateway 真实完成为边界。
 
 生命周期由[模块根](../README.md#agent-container)统一编排；子容器能力不授予执行权。
 
@@ -58,7 +58,7 @@ flowchart LR
  classDef host fill:#f1f5f9,stroke:#64748b,color:#334155
 ```
 
-角色间消息经 Gateway 递送；基础能力通过构造注入，输入订阅由角色持有。
+角色间消息经 Gateway 递送；基础能力通过构造注入，输入订阅由角色持有。角色、Skill 与 Task 授权归 Agents；Actions 来源的协作接口由 App 以中立窄端口绑定，Agents 不导入 Actions、CallRuntime 或 ExecutionRuntime。
 
 ## 内部结构与执行链
 
@@ -111,6 +111,7 @@ flowchart LR
 
 本角色通过 [固定任务准入](../Support/Communication/README.md#固定任务准入) 接收 Assistant 委派。MemoryHistoryIntent.taskMessage 只解释 history.intent，拒绝将角色私有 cancel 意图作为 Task 业务载荷。
 
-## 待实现
 
-❌ 语义记忆与活跃历史事务的持久化恢复。
+## Execution ownership and lifecycle
+
+Memory uses neutral ActionRequestSlot<HistoryInput, HistoryReply> for private full-read requests. Agents validates role/Task authority; Actions validates typed business input and current session. The history interaction facade and actual title/query/mutation services belong to ActionsContainer.

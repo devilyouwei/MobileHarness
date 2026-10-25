@@ -26,3 +26,12 @@ public struct ActionExecutionContext: Equatable, Sendable {
         self.taskExecutor = taskExecutor
     }
 }
+
+public struct ConversationTurn: Sendable, Equatable {
+    public let id: String
+    public let ordinal: UInt64
+    public init(id: String, ordinal: UInt64) {
+        self.id = id
+        self.ordinal = ordinal
+    }
+}

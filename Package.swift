@@ -94,7 +94,7 @@ let package = Package(
             ],
             exclude: ["README.md"]),
         .target(
-            name: "AgentCore", dependencies: [], path: "MobileHarness/Agents/Support/Core",
+            name: "AgentCore", dependencies: ["FunctionContracts"], path: "MobileHarness/Agents/Support/Core",
             exclude: [
                 "Input/README.md", "Communication/README.md", "Capability/README.md", "Generation/README.md",
                 "Output/README.md",
@@ -106,28 +106,38 @@ let package = Package(
             exclude: ["README.md"]),
         .target(
             name: "ExecutionRuntime", dependencies: ["FunctionContracts"],
-            path: "MobileHarness/Gateway/Runtime", exclude: ["README.md"]),
+            path: "MobileHarness/Actions/Support",
+            exclude: [
+                "ActionBinding.swift", "ActionBindingModule.swift", "ActionExecutor.swift", "ActionMacro.swift",
+                "ActionRegistry.swift", "Contracts", "README.md", "ToolExecutor.swift", "ToolModule.swift",
+                "ToolRegistry.swift",
+            ],
+            sources: [
+                "FunctionExecutor.swift", "FunctionRegistry.swift", "ActionDeadline.swift",
+                "CooperativeExecution.swift", "ActionComposition.swift",
+            ]),
         .target(
             name: "CallRuntime", dependencies: ["FunctionContracts", "ExecutionRuntime"],
-            path: "MobileHarness/Gateway/Output",
+            path: "MobileHarness/Actions/Support",
             exclude: [
-                "Dispatch", "Resources", "Results", "Routing", "Scheduling", "Validation", "OutputGateway.swift",
-                "README.md", "Registration/README.md", "Protocols/README.md",
-            ], sources: ["Registration", "Protocols"]),
+                "ActionComposition.swift", "ActionDeadline.swift", "ActionMacro.swift", "Contracts",
+                "CooperativeExecution.swift", "FunctionExecutor.swift", "FunctionRegistry.swift", "README.md",
+            ],
+            sources: [
+                "ActionBindingModule.swift", "ToolRegistry.swift", "ActionRegistry.swift", "ActionBinding.swift",
+                "ToolModule.swift", "ActionExecutor.swift", "ToolExecutor.swift",
+            ]),
         .target(
-            name: "Gateway",
-            dependencies: ["AgentCore", "FunctionContracts", "ExecutionRuntime", "CallRuntime"],
+            name: "Gateway", dependencies: ["FunctionContracts"],
             path: "MobileHarness/Gateway",
             exclude: [
-                "Runtime", "Output/Registration", "Output/Protocols",
-                "Input/README.md", "Output/Dispatch/README.md", "Output/README.md",
-                "Output/Routing/README.md", "Output/Scheduling/README.md", "Output/Validation/README.md",
-                "Output/Resources/README.md", "Output/Results/README.md", "README.md",
+                "README.md", "Input/README.md", "Output/README.md", "Output/Scheduling/README.md",
+                "Output/Dispatch/README.md", "Output/Resources/README.md", "Output/Results/README.md",
             ]),
         .target(
             name: "Actions",
             dependencies: [
-                "AgentCore", "BehaviorDefinitions", "CallRuntime", "ExecutionRuntime", "FunctionContracts", "ModelKit",
+                "BehaviorDefinitions", "CallRuntime", "ExecutionRuntime", "FunctionContracts", "ModelKit",
                 "ModelKitDefaults", "ModelKitHub", "ModelKitOpenAI", "ModelKitRuntime", "PlatformKit", "StorageCache",
                 "StorageChat", "StorageCore", "StorageDevices", "StorageFiles", "StorageMedia", "UI",
             ],
@@ -163,11 +173,24 @@ let package = Package(
                 "UI/Runtime/README.md",
                 "UI/Support/README.md",
                 "Support/Contracts",
+                "Support/FunctionExecutor.swift",
+                "Support/FunctionRegistry.swift",
+                "Support/ActionDeadline.swift",
+                "Support/CooperativeExecution.swift",
+                "Support/ActionComposition.swift",
+                "Support/ActionBindingModule.swift",
+                "Support/ToolRegistry.swift",
+                "Support/ActionRegistry.swift",
+                "Support/ActionBinding.swift",
+                "Support/ToolModule.swift",
+                "Support/ActionExecutor.swift",
+                "Support/ToolExecutor.swift",
+
             ]),
         .target(
             name: "Agents",
             dependencies: [
-                "Actions", "AgentCore", "CallRuntime", "ExecutionRuntime", "FunctionContracts", "Gateway", "ModelKit",
+                "AgentCore", "FunctionContracts", "Gateway", "ModelKit",
                 "ModelKitDefaults", "ModelKitHub", "ModelKitRuntime", "PlatformKit", "StorageCache", "StorageChat",
                 "StorageCore", "StorageDevices", "StorageFiles", "StorageMedia", "StorageTasks", "UI",
             ],
@@ -232,13 +255,15 @@ let package = Package(
         .target(
             name: "AppStorage",
             dependencies: [
+                "Actions",
                 "Storage", "StorageCore", "StorageCache", "StorageFiles", "StorageDatabase",
-                "StorageSQLite", "PlatformKit", "UI", "Agents", "ModelKit", "ModelKitDefaults",
+                "StorageSQLite", "PlatformKit", "UI", "Agents", "Gateway", "ModelKit", "ModelKitDefaults",
                 .product(name: "FactoryKit", package: "Factory"),
             ],
             path: "MobileHarness/App/Composition",
             exclude: [
                 "README.md", "AppComposition.swift", "ModuleRegistration.swift", "ServiceFactories.swift",
+                "AgentResourceBindings.swift", "ActionServiceAdapters.swift", "ApplicationActionAssembly.swift",
                 "ApplicationPresentation.swift",
             ],
             sources: ["ApplicationContainer.swift"]),

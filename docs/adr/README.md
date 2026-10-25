@@ -322,3 +322,5 @@ Historical [ADR0155 — Explicit Action serialization identity](0155-explicit-ac
 - ✅ [ADR0217 — Tracking speed mode](0217-nexarm-tracking-speed-mode.md): motors 1 and 4 track in closed-loop speed and hold that speed until the target changes. Aim still publishes positions. Motor 4 positive speed pitches down, so its direction bit is reversed.
 
 - [0218 - Direct container inputs](0218-direct-container-input.md): direct typed input observation, preserved authorized execution and merged business targets.
+
+- [0219 — Actions root and neutral Gateway](0219-actions-container-and-neutral-gateway.md): App-owned three-root lifecycle, canonical execution and cognition-free scheduling; supersedes ADR0161 ownership.

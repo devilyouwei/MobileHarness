@@ -1,8 +1,9 @@
 import AgentCore
-import Agents
 import Foundation
 import StorageCore
 import Testing
+
+@testable import Agents
 
 private func document() -> [String: Any] {
     [

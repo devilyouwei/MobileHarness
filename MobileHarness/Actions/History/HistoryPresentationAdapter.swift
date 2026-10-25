@@ -55,7 +55,7 @@ public final class HistoryPresentationAdapter: HistoryPresentationCapability {
         state.present(.status("历史刷新失败：\(error)"))
     }
     public func showHistory(invocation: any FunctionInput) async throws {
-        guard invocation.context.source == "memory", invocation.context.sessionID == sessionID else {
+        guard invocation.context.sessionID == sessionID else {
             throw HistoryPresentationFailure.init("Invalid history presentation scope")
         }
         try Task.checkCancellation()

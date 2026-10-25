@@ -1,6 +1,6 @@
-import Actions
 import AgentCore
 import Foundation
+import FunctionContracts
 import ModelKit
 import PlatformKit
 import StorageCore
@@ -16,7 +16,7 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
 
     // MARK: - State and dependencies
 
-    let microphoneSpectrum: MicrophoneSpectrumPresentation?
+    let microphoneSpectrum: (any SpectrumPresenting)?
     let microphoneInput: (any AudioCaptureObserving)?
     let microphoneObservation: (@MainActor @Sendable (MicrophoneObservation) -> Void)?
     var nativeInput: Task<Void, any Error>?
@@ -78,7 +78,7 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
         sessionID: String, interactionSessionID: String? = nil, configuration: AgentConfiguration? = nil,
         mode: Mode = .speechAndSoundSource, residentListening: Bool = false,
         uiHome: UIHomeContainer? = nil, microphoneInput: (any AudioCaptureObserving)? = nil,
-        microphoneSpectrum: MicrophoneSpectrumPresentation? = nil,
+        microphoneSpectrum: (any SpectrumPresenting)? = nil,
         microphoneObservation: (@MainActor @Sendable (MicrophoneObservation) -> Void)? = nil,
         context: AgentContextRepository<SpeechPerceptionContextState>
     ) throws {

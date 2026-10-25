@@ -1,6 +1,8 @@
+import Actions
 import Agents
 import FactoryKit
 import Foundation
+import Gateway
 import ModelKit
 import ModelKitDefaults
 import PlatformKit
@@ -31,6 +33,10 @@ public final class ApplicationContainer: ManagedContainer, @unchecked Sendable {
     /// Structural projection only. Each independent SDK retains its own Failure definition.
     public nonisolated static func failureDetails(_ error: any Error) -> ContainerFailureDetails? {
         switch error {
+        case let failure as ActionsFailure:
+            return ContainerFailureDetails(code: failure.code.rawValue, isCancellation: failure.isCancellation)
+        case let failure as GatewayFailure:
+            return ContainerFailureDetails(code: failure.code.rawValue, isCancellation: failure.isCancellation)
         case let failure as AgentFailure:
             return ContainerFailureDetails(code: failure.code.rawValue, isCancellation: failure.isCancellation)
         case let failure as StorageFailure:
@@ -56,6 +62,30 @@ public final class ApplicationContainer: ManagedContainer, @unchecked Sendable {
         }
     #endif
     public var containerFailures: Factory<ContainerFailureChannel> { self { ContainerFailureChannel() }.cached }
+    @MainActor public var actions: Factory<ActionsContainer> {
+        self {
+            MainActor.assumeIsolated {
+                ActionsContainer(onFailure: { [failures = self.containerFailures()] failure in
+                    failures.report(
+                        module: "actions", component: "container", operation: failure.operation,
+                        error: failure,
+                        details: .init(code: failure.code.rawValue, isCancellation: failure.isCancellation))
+                })
+            }
+        }.cached
+    }
+    @MainActor public var gateway: Factory<GatewayContainer> {
+        self {
+            MainActor.assumeIsolated {
+                GatewayContainer(onFailure: { [failures = self.containerFailures()] failure in
+                    failures.report(
+                        module: "gateway", component: failure.component, operation: failure.operation,
+                        error: failure,
+                        details: .init(code: failure.code.rawValue, isCancellation: failure.isCancellation))
+                })
+            }
+        }.cached
+    }
     @MainActor public var ui: Factory<UIContainer> {
         self {
             MainActor.assumeIsolated {

@@ -1,6 +1,5 @@
 import Actions
 import AgentCore
-import Agents
 import CallRuntime
 import ExecutionRuntime
 import Foundation
@@ -10,6 +9,8 @@ import PlatformKit
 import StorageCore
 import Testing
 import UI
+
+@testable import Agents
 
 struct UnusedModelResourceCapability: ModelResourceCapability {
     func configureSpeech(recognition: Bool, synthesis: Bool) async throws { throw CancellationError() }
@@ -88,7 +89,7 @@ func resourceFixturePolicy() throws -> CommunicationPolicy {
     suppliedInput: InputGateway? = nil,
     suppliedContext: AgentContextRepository<ApplicationControlContextState>? = nil,
     outputSink: @escaping @Sendable (OutputEnvelope) async -> Void = { _ in }
-) throws -> ResourceTestRuntime {
+) async throws -> ResourceTestRuntime {
     let ui = UIContainer()
     try ui.start()
     let resourceUI = uiResources ?? ui.modelResources
@@ -128,7 +129,7 @@ func resourceFixturePolicy() throws -> CommunicationPolicy {
             function: $0, protocols: [.tool], executionPolicy: .direct,
             directResultPolicy: nonReturningPaths.contains($0.path.description) ? .completionOnly : .returning)
     }
-    let output = OutputGateway(
+    let output = await OutputGateway(
         manager: manager, requests: input,
         tools: try ToolRegistry(modules: [ResourceTools(definitions: bindings)]),
         actions: ChannelScheduler(registry: ActionRegistry()), policy: policy, sink: outputSink)
@@ -139,6 +140,7 @@ func resourceFixturePolicy() throws -> CommunicationPolicy {
             resourceChanges: resourceChanges, observationFailure: observationFailure,
             uiProviderSettings: settingsRequests, uiProviderDiscovery: discoveryRequests,
             uiProviderPresentation: providerPresentation,
+            decodeResources: { try SettingsModelResourcesAdapter.items($0) },
             context: suppliedContext
                 ?? AgentContextRepository(
                     agent: .applicationControl, scope: UUID().uuidString, state: ApplicationControlContextState())))

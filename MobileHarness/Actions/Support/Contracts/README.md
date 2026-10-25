@@ -1,81 +1,45 @@
-# FunctionContracts — 函数输入、执行约束与结果契约
+# FunctionContracts — Neutral execution and host interfaces
 
-## 简介
+## Dependency and consumers
 
-FunctionContracts 仅依赖 Foundation，拥有协议中立的函数输入、参数、执行约束、完成与失败契约，不导入其他项目模块或其实现。
+This existing target imports Foundation and Synchronization only, with no project-target dependency. Actions, Gateway, Agents/AgentCore and App consume its values without importing one another's implementation. Values describe facts and capability ports; they do not perform role authorization, device orchestration or lifecycle lookup.
 
-## 上下游关系（一级）
+## Contract groups
 
-```mermaid
-flowchart LR
-    Actions -->|定义与处理器使用| C[FunctionContracts]
-    Agents -->|声明与中立控制端口使用| C
-    CallRuntime -->|调用协议适配| C
-    ExecutionRuntime -->|预算执行与结果校验| C
-    Gateway -->|执行关联与资源协调| C
-    Host[Actions 能力端点] -->|输入与结果实现| C
-```
-
-这些模块是契约的直接消费者；契约不回调它们的具体实现。
-
-## 内部模块关系
-
-```mermaid
-flowchart TB
-    Identifier[ActionIdentifier] --> Request[FunctionRequest]
-    Request --> Input[FunctionInput / FunctionInvocation]
-    Context[ActionExecutionContext] --> Input
-    Reporting[FunctionReporting] --> Input
-    Report[ActionReport] --> Reporting
-    Declaration[ActionDeclaration / ActionParameter] --> Function[ActionFunction]
-    Budget[ActionExecutionBudget] --> Function
-    Resource[ActionResource] --> Function
-    Input -->|处理器签名| Function
-    Completion[ActionCompletion] --> Function
-    Function --> Catalog[CapabilityModule / CapabilityCatalog]
-    Failure[失败代码与提供者协议] --> Report
-    Input --> Control[TaskControlCapability]
-```
-
-## 接口与数据流
-
-| 类型/文件 | 责任 |
+| Contracts | Responsibility |
 | --- | --- |
-| ActionIdentifier | 三段地址，显式 domain/module/function 与合法名称检查 |
-| FunctionRequest | 已解析地址及 `[String:String]` 参数，不含 Channel |
-| FunctionInput / FunctionInvocation | 请求、executionID、关联 context、报告端口及可选 Sendable attachment；后者是具体值实现 |
-| ActionExecutionContext | source、session/input、sequence、correlation/ordinal、decision/task/executor 等不透明关联信息 |
-| ActionArguments | 允许键、字符串字节数、整数范围、有限数值与枚举解析 |
-| ActionDeclaration / ActionParameter | 函数说明、语义参数类型、必填性、约束与枚举候选 |
-| ActionFunction | 处理器、kind、completion、资源、静态/动态预算及定义校验 |
-| ActionCompletion | completed、value、report、activityStarted、activityStopped 的中立结果 |
-| ActionReport | 有界逐叶结果、独立执行失败及失败描述 |
-| TaskControlCapability | 传递操作名、原始字符串参数及真实 invocation 的宿主控制端口 |
+| ActionIdentifier / FunctionRequest / ActionArguments | Canonical three-part address, string arguments and pure decoding/constraints. |
+| ActionDeclaration / ActionParameter / ActionFunction | One canonical metadata source, implementation, pure input validator, dynamic resources and budget. |
+| FunctionInput / FunctionInvocation / ActionExecutionContext | Invocation identity, source/session/input and opaque correlation, reporting and optional Sendable attachment. Cognitive Task/decision strings are opaque correlation, never permission. |
+| ActionExecutionDescriptor / ActionCatalogSnapshot | Immutable descriptions, call protocols and execution/return policies; no handler or mutation API. |
+| PreparedAction / ActionsExecutionPort | Effect-free prepare, one-use revision-bound credential, resources/budget, execute and discard. Root instances retain actual invocations privately. |
+| ActionCompletion / ActionReport / ActionFailure | Real completion/value/activity/report, per-leaf partial effects and independent failure. |
+| ExecutionOwner / ResourceDefinition / ResourceLease / ResourceExecutionPermit | Opaque endpoint owner, configured resource mechanisms and live revocable authority. No Agent identity or role lookup. |
+| ActionRequestSlot | Per-request typed attachment/result, session/input admission, single completion/take and explicit close; not a global table or role authorization gate. |
+| ActionAssemblyRequest / ActionMaintenancePorts / ActionUIFacades | Generic App-bound collaboration and UI-owned interfaces without foundation imports. |
+| TaskControlBinding / provider, camera, voice, detection ports | Narrow host collaboration; execution services cannot retain/search upstream containers. |
+| ContainerContextValue / native fact values | Bounded encoded read-only observations supplied by their actual owners. |
 
-协议只描述数据和接口。FunctionReporting 的存储、资源租约、超时取消、执行身份授权和 Task 状态都由消费者实现。
+Action/Tool requests and response encoding are protocol-neutral values. ActionNamespaces.swift declares the shared Camera/Speech/UI namespace names only; domain files supply callable definitions. ToolResponse.swift owns response values and completion/report encoding. ActionReport.swift owns the shared exception-to-report normalization. TaskControlCapability.swift owns both the execution capability and host binding; ActionExecutionContext.swift owns opaque execution and conversation-turn correlation. Native business service implementations remain in Actions.
 
-## 定义与声明校验
+## Validation and bounds
 
-地址每段最多 64 个 UTF-8 字节，首字符是 ASCII 字母或下划线；后续允许字母、数字、下划线、连字符，地址段不允许点。资源名校验允许点。构造值本身不意味着已经通过 validate。
+Address segments are ASCII identifiers, at most 64 UTF-8 bytes; first character is a letter/underscore, later characters may include digits, underscore and hyphen. Resource names may include dots. Construction alone does not mean validation has occurred.
 
-ActionDeclaration 要求合法地址、非空 doc（最多 2048 字节）、最多 32 个不同参数；参数名合法，description 非空且最多 2048 字节，constraints 最多 2048 字节，枚举候选最多 32 个且不重复。`nativeSchema` 将所有参数的传输类型生成为 string，保留 required、enum，并禁止额外属性；业务语义的整数/数值/布尔类型仍由处理器解析。`actionObject(alias:)` 先验证，再产生模型 Action 说明对象。
+Declarations require a valid address, nonempty description up to 2,048 bytes, at most 32 distinct parameters and bounded descriptions/constraints. Enum lists have at most 32 unique entries. Native schemas encode transport arguments as strings while retaining required/enumerated constraints; semantic integer/number/boolean parsing remains explicit. Function display name is nonempty up to 256 bytes, completion description up to 512 bytes, resource sets at most eight and timeout in (0, 86,400] seconds. CapabilityCatalog accepts at most 32 modules and 256 canonical functions and rejects duplicates.
 
-ActionFunction 校验 displayName 非空且不超过 256 字节，completion 非空且不超过 512 字节，声明地址匹配函数地址，资源最多八个，静态 timeout 位于 `(0, 86400]` 秒。动态资源解析结果同样限八个。CapabilityCatalog 最多接受 32 个模块、合计 256 个函数，并拒绝重复地址或无效定义。
+validateInput checks path, at most 32 arguments, keys up to 64 bytes and values up to 65,536 bytes. Declared parameters enforce allowed keys, required values, enumerations and scalar types. Definitions without declared parameters rely on their pure validator for domain decoding. Macro-generated validators reuse the leading pure argument-validation block; authors keep effects after injected capability use. The same validator runs during preparation and execution.
 
-## 预算算法
+Budget resolution validates the definition and uses dynamicTimeout before static/default timeout. The default is 30 seconds; expected duration is nonnegative and timeout positive, at least expected and at most 86,400 seconds. Serial budgets sum; parallel budgets take maxima; empty composition uses zero expected and a 100-ms timeout. Budget values do not themselves stop work.
 
-静态 timeout 缺省或 nil 时为 30 秒。`executionBudget(for:)` 先验证定义，再优先执行 dynamicTimeout；动态解析失败直接抛错。ActionExecutionBudget 要求 expected 非负、timeout 大于零且不小于 expected，最大 86400 秒。
+## Completion, failure and ownership
 
-串行组合分别累加 expected/timeout，并行组合分别取最大值；空组合为零预计时间和 100 毫秒 timeout。它们只是预算值运算，不启动计时器或强制中断执行。
+ActionReport holds at most 256 entries. Paths are nonempty up to 128 bytes; details hold at most 16 pairs, keys up to 64 bytes and values up to 512 bytes. Entry states are succeeded, failed, cancelled and notStarted. Independent execution failure is retained alongside prior child results. Producer failure codes are nonempty up to 64 bytes and some value initializers enforce preconditions; callers must provide valid identifiers.
 
-## 报告、取消与失败
+Failure classification prefers actual producer/report failure over pure cancellation. Real failures with successes are partialFailure; real failure without success is failed; cancellation-only is cancelled. ExecutionFailurePreserving prevents resource/scheduling cancellation checks from replacing a real failed report. NativeCleanupFailure retains original errors without performing retry or cleanup.
 
-报告最多 256 条；每条路径非空且最多 128 字节，details 最多 16 项，键非空且最多 64 字节、值最多 512 字节。条目 status 为 succeeded/failed/cancelled/notStarted；执行级 failure 与既有条目分开存放。失败代码是最多 64 字节的非空标识符；部分值构造约束通过 precondition 实现，调用方必须先提供合法数据。
+ActionRequestSlot admits only matching request/session once. Completion is rejected before admission, after closure or after a prior result. take consumes the result/failure and closes; close releases retained content. Role permission is checked before Gateway, independently of this attachment's business scope.
 
-`code(for:)` 依次识别 CancellationError、报告失败提供者、执行失败提供者，最后使用 handlerFailed。`recordingFailure` 在保留当前条目的同时附加异常代码与描述。真实失败优先于取消：包含成功条目的真实失败为 partialFailure，否则为 failed；没有真实失败时才归为 cancelled。`isCancellationOnly` 表示有取消而无独立真实失败。
+Prepared credentials are opaque to callers even though they travel as value types: only the owning root can resolve the retained UUID/catalog revision, and execution consumes it once. Cancellation/rejection/stop discards retained data. Gateway uses returned resource descriptors for arbitration; Actions rechecks live permits and business conditions. Result retries never reuse execution credentials.
 
-ActionReport.empty 表示没有叶子记录；其 status 运算为 succeeded，不代表实际效果已被证明。ActionReportedError 通过 throwing 接口保存完整报告。ActionCompletion 的 kind 匹配和 value 的 65536 字节执行上限由 ExecutionRuntime 验证，枚举本身不执行这些检查。
-
-[共享 Support](../README.md) · [Actions 设计](../../README.md) · [执行实现](../../../Gateway/Runtime/README.md)
-
-FunctionInput.attachment 只传递内部调用的类型化附件，例如请求私有结果端口；公共契约不解释附件，不包含全局请求注册或模型协议。具体业务拥有附件的身份、容量、取消与清理。
+[Support algorithms](../README.md) · [Actions root](../../README.md) · [overall chain](../../../README.md)

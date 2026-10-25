@@ -416,7 +416,7 @@ private func photographyAcceptance(
         ])
     ) { await input.deliverActionResult($0) }
     let tools = historyAssembly.tools
-    let gateway = OutputGateway(
+    let gateway = await OutputGateway(
         manager: manager, requests: input, tools: tools, actions: scheduler, sink: { _ in })
     try await agent.start()
     let consumer = try await gateway.consumer(for: agent)
@@ -943,7 +943,8 @@ private func photographyAcceptance(
     try await manager.register(assistant, sessionID: session)
     try await manager.register(child, sessionID: session)
     let input = InputGateway(manager: manager, policy: policy)
-    let output = OutputGateway(manager: manager, requests: input, tools: ToolRegistry(), policy: policy, sink: { _ in })
+    let output = await OutputGateway(
+        manager: manager, requests: input, tools: ToolRegistry(), policy: policy, sink: { _ in })
     try bindFixtureCommunications(assistant, port: await output.messaging(for: .assistant))
     try await assistant.start()
     await child.start()
@@ -1027,7 +1028,12 @@ private struct TaskControlAcknowledgmentFixture: TaskControlCapability {
     let module = TaskControlModule(capability: TaskControlAcknowledgmentFixture())
     for function in module.definitions {
         let invocation = ActionInvocation(
-            call: .init(actionPath: function.path, channel: "Control", parameters: [:]),
+            call: .init(
+                actionPath: function.path, channel: "Control",
+                parameters: [
+                    "loadSkills": ["skills": "[]"], "releaseSkills": ["skills": "[]"], "startTask": ["goal": "fixture"],
+                    "finishTask": ["summary": "fixture"], "cancelTask": ["reason": "fixture"],
+                ][function.path.function] ?? [:]),
             context: .init(
                 source: "assistant", sessionID: UUID().uuidString, inputID: UUID().uuidString,
                 sequence: 0), executionID: UUID().uuidString)

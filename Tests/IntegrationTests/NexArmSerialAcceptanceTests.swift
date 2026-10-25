@@ -1,6 +1,5 @@
 import Actions
 import AgentCore
-import Agents
 import CallRuntime
 import ExecutionRuntime
 import Foundation
@@ -13,6 +12,7 @@ import StorageSQLite
 import StorageTasks
 import Testing
 
+@testable import Agents
 @testable import PlatformKit
 @testable import UI
 
@@ -297,7 +297,7 @@ import Testing
             registry: assembly.actions, capacityPerChannel: 4, maximumTrackedInputs: 2,
             resources: try nexArmTestResources()
         ) { await input.deliverActionResult($0) }
-        let output = OutputGateway(
+        let output = await OutputGateway(
             manager: manager, requests: input, tools: assembly.tools, actions: scheduler, policy: policy,
             actionFeedback: .terminal, sink: { _ in })
         do {
@@ -380,7 +380,7 @@ import Testing
                         failed: { await failures.record($0) })
                 }
             ])
-            let output = OutputGateway(
+            let output = await OutputGateway(
                 manager: manager, requests: input, tools: tools,
                 actions: ChannelScheduler(registry: ActionRegistry(), resources: resources), policy: policy,
                 sink: { _ in })

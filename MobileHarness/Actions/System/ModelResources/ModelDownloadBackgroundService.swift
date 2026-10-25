@@ -1,3 +1,5 @@
+import FunctionContracts
+
 #if os(iOS)
     import Foundation
     import UIKit

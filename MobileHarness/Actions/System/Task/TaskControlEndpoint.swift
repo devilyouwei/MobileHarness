@@ -1,8 +1,7 @@
-import AgentCore
 import FunctionContracts
 
 /// Task invocation admission only; the Agent owner supplies actual task orchestration.
-@MainActor public final class TaskControlEndpoint: TaskControlCapability {
+@MainActor public final class TaskControlEndpoint: TaskControlCapability, TaskControlBinding {
     public typealias Handler =
         @Sendable (String, [String: String], String, String, String, String?) async throws -> String
     private let rootSessionID: String
@@ -11,11 +10,9 @@ import FunctionContracts
     public func controlTask(_ operation: String, arguments: [String: String], invocation: any FunctionInput)
         async throws -> String
     {
-        guard let handler else { throw CommunicationError.scopeClosed }
-        if invocation.context.decisionID == nil {
-            guard invocation.context.source == "assistant", invocation.context.sessionID == rootSessionID else {
-                throw CommunicationError.unauthorized
-            }
+        guard let handler else { throw ActionHostError.scopeClosed }
+        if invocation.context.decisionID == nil, invocation.context.sessionID != rootSessionID {
+            throw ActionHostError.scopeClosed
         }
         return try await handler(
             operation, arguments, invocation.context.source, invocation.context.sessionID,

@@ -1,5 +1,5 @@
 #if os(iOS)
-    import Actions
+    import FunctionContracts
     import Foundation
     import ModelKit
     import PlatformKit
@@ -13,13 +13,13 @@
         init() {}
         func run(
             runtime: AgentRuntime, pose: any PoseCapability, camera: any CameraFrameObserving,
-            sessionID: String, mirrored: Bool, endpoint: any CameraOutputHandling
+            sessionID: String, mirrored: Bool, status: @escaping @MainActor @Sendable (String?, String) -> Void
         ) async throws {
             guard !closed else { throw AgentContainerError.stopped }
             guard work == nil else { throw AgentContainerError.busy }
             let task = Task {
                 try await VisionAgentSession(runtime: runtime, pose: pose, camera: camera)
-                    .run(sessionID: sessionID, mirrored: mirrored, endpoint: endpoint)
+                    .run(sessionID: sessionID, mirrored: mirrored, status: status)
             }
             work = task
             defer { work = nil }

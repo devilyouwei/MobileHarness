@@ -39,3 +39,7 @@ BehaviorDefinitionMacro 将 dynamicTimeout 与 timeout 传入 ActionFunction，�
 ## 待实现
 
 - 宏生成代码与真实模型、原生 wire 协议交互的独立验收。
+
+## Pure input preparation
+
+@Action emits validatingInput by reusing leading pure argument-decoding/validation statements. Expansion stops before injected capability references, await or return. Authors keep that prefix effect-free; actual business preconditions/effects remain in the handler and run again at execution. Both preparation and execution use the same validator.

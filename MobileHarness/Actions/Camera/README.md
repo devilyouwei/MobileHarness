@@ -2,7 +2,7 @@
 
 ## 职责与模块关系
 
-拥有相机业务函数、原生采集／预览及照片处置。CameraModule 绑定七项 Capture 函数及一个私有 Album.perform 函数；CameraExecutionEndpoint 保留角色／会话准入，CameraCoordinator 管理采集，CameraPhotoSession 独立管理照片操作。
+拥有相机业务函数、原生采集／预览及照片处置。CameraModule 绑定七项 Capture 函数及一个私有 Album.perform 函数；CameraExecutionEndpoint 保留当前会话／业务状态准入，CameraCoordinator 管理采集，CameraPhotoSession 独立管理照片操作。
 
 Gateway 通过注册函数调用本域，Agents 决定请求与策略，App 注入唯一基础能力和根生命周期。本域消费 FunctionContracts 及需要的基础能力，不导入 Agents、Gateway 实现或 App。全部域内源码由 Actions 单一目标编译。
 
@@ -10,14 +10,14 @@ Gateway 通过注册函数调用本域，Agents 决定请求与策略，App 注�
 
 | 文件 | 当前职责 |
 | --- | --- |
-| [CameraActions.swift](CameraActions.swift) | 业务函数的参数校验、能力调用与完成值 |
-| [CameraCapabilities.swift](CameraCapabilities.swift) | 相机端口、镜头类型、照片回执及失败分类 |
+| [ActionNamespaces.swift](../Support/Contracts/ActionNamespaces.swift) | Shared CameraActions namespace only; callable implementations remain in the domain files below |
+| [CameraCapabilities.swift](../Support/Contracts/CameraCapabilities.swift) | 相机端口、镜头类型、照片回执及失败分类 |
 | [CameraCoordinator.swift](CameraCoordinator.swift) | 采集、资源租约、预览、姿态与公开事实的根协调者 |
 | [CameraExecutionEndpoint.swift](CameraExecutionEndpoint.swift) | 相机调用身份与会话准入，直接转发类型化回执 |
 | [CameraInteractionWorkflow.swift](CameraInteractionWorkflow.swift) | 单槽操作提交、忙态与实际错误反馈 |
 | [CameraModule.swift](CameraModule.swift) | 绑定相机与相册函数，不定义业务参数或调用协议 |
 | [CameraPhotoSession.swift](CameraPhotoSession.swift) | 拍照／处置任务、媒体所有权、呈现确认和反馈作用域 |
-| [CameraRuntimePorts.swift](CameraRuntimePorts.swift) | 注入资源仲裁和感知生命周期连接 |
+| [CameraRuntimePorts.swift](CameraRuntimePorts.swift) | Injected resource arbitration interface and runtime dependencies; perception connections are supplied by App composition |
 | [CameraStorageFactory.swift](CameraStorageFactory.swift) | 注入仓库并选择照片保留策略 |
 | [CaptureActions.swift](CaptureActions.swift) | 业务函数的参数校验、能力调用与完成值 |
 | [PhotoDispositionWorkflow.swift](PhotoDispositionWorkflow.swift) | 保存提交、动画、提示音与移除的实际完成组合 |
@@ -51,12 +51,12 @@ CameraCoordinator 独占采集意图、租约续期、预览和姿态代际；Ca
 
 ## 基础相册实施契约
 
-✅ savePhoto 改为 App 相册正式收录，不调用 Photos。新增 Album 服务与内部执行契约，分页40、原图并发2、缩略图并发4、变更单槽；保留收录照片不自动淘汰。
+savePhoto 改为 App 相册正式收录，不调用 Photos。新增 Album 服务与内部执行契约，分页40、原图并发2、缩略图并发4、变更单槽；保留收录照片不自动淘汰。
 
 
 ## 相册执行与请求附件
 
-PhotoAlbumService 通过共享 CapturedPhotoStore 完成分页、读取、导入与删除，系统导出使用注入的平台能力。PhotoAlbumInvocation 携带 UI 自有类型化请求和私有结果槽，绑定 photographer/root session/request ID、拒绝 Task 授权与重复执行。Camera.Album.perform 仅注册为直接 Tool，不进入 Photography Skill；参数必须为空，媒体只经附件传递。
+PhotoAlbumService 通过共享 CapturedPhotoStore 完成分页、读取、导入与删除，系统导出使用注入的平台能力。PhotoAlbumInvocation 携带 UI 自有类型化请求和私有结果槽，绑定 root session/request ID 并拒绝重复执行；角色与 Task 权限由 Agents 验证。Camera.Album.perform 仅注册为直接 Tool，不进入 Photography Skill；参数必须为空，媒体只经附件传递。
 
 原图最多2个、缩略图最多4个活跃读取；变更单槽，重叠明确 busy。当前 Photographer 普通请求消费为串行，因此实际UI读取并发可能更低。批量导入最多20张，逐张检查／保存，保留成功项并返回各失败项；单次请求仍受120秒截止及根停止取消加入约束。Photos提交后等待原生事务，取消不撤销已完成副本；不自动重试或跨重启重放。
 
@@ -66,4 +66,8 @@ PhotoAlbumService 通过共享 CapturedPhotoStore 完成分页、读取、导入
 
 ## Container 上下文
 
-✅ CameraCoordinator.contextSnapshot 读取 CameraCapturing.isRunning 的真实结果，再提取当前呈现／照片流程事实；没有独立公开Writer或运行状态缓存。CameraPhotoSession 不再为模型镜像发送更新通知。原有实时UI事实流继续服务实际UI请求。
+CameraCoordinator.contextSnapshot 读取 CameraCapturing.isRunning 的真实结果，再提取当前呈现／照片流程事实；没有独立公开Writer或运行状态缓存。CameraPhotoSession 不再为模型镜像发送更新通知。原有实时UI事实流继续服务实际UI请求。
+
+## Execution ownership and lifecycle
+
+ActionsContainer retains the camera and native cleanup. CameraExecutionEndpoint checks business/session state, not role names. CameraInteractionWorkflow is an Actions-owned UI request facade with one worker; shutdown closes admission, cancels and joins it. CaptureActivityEvent remains a camera-owned event. App supplies resource/perception collaboration through neutral ports. Album attachments use the generic per-request slot; Agents authorizes the caller before Gateway admission.

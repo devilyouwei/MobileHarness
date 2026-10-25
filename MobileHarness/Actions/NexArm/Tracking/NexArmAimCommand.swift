@@ -1,4 +1,5 @@
 import Foundation
+import FunctionContracts
 import PlatformKit
 
 /// Tracking command for motors 1 and 4. Shoulder and elbow stay on one position-mode preparation.

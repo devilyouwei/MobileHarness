@@ -2,7 +2,7 @@
 
 ## 角色容器
 
-✅ [PhotographerContainer.swift](PhotographerContainer.swift) 是 AgentContainer 的稳定子能力。持有角色执行会话、相机 UI 控制和跟踪输出生命周期。CameraCoordinator 由 Actions 实现，经根连接；跟踪 attach／detach 属于会话，停止加入角色和跟踪工作。
+[PhotographerContainer.swift](PhotographerContainer.swift) 是 AgentContainer 的稳定子能力。持有角色执行会话、相机 UI 控制和跟踪输出生命周期。CameraCoordinator 由 Actions 实现，经根连接；跟踪 attach／detach 属于会话，停止加入角色和跟踪工作。
 
 生命周期由[模块根](../README.md#agent-container)统一编排；子容器能力不授予执行权。
 
@@ -55,7 +55,7 @@ flowchart LR
  classDef host fill:#f1f5f9,stroke:#64748b,color:#334155
 ```
 
-角色间消息经 Gateway 递送；基础能力通过构造注入，输入订阅由角色持有。
+角色间消息经 Gateway 递送；基础能力通过构造注入，输入订阅由角色持有。角色、Skill 与 Task 授权归 Agents；Actions 来源的协作接口由 App 以中立窄端口绑定，Agents 不导入 Actions、CallRuntime 或 ExecutionRuntime。
 
 ## 内部结构与执行链
 
@@ -111,4 +111,8 @@ pause/stop 关闭接纳、取消并加入订阅／事务／跟踪；resume 加�
 
 ## 基础相册实施契约
 
-✅ 订阅UI.album并经身份绑定Gateway执行内部Album操作，根持有导入导出任务，停止取消并加入；相册不依赖相机开启。
+订阅UI.album并经身份绑定Gateway执行内部Album操作，根持有导入导出任务，停止取消并加入；相册不依赖相机开启。
+
+## Execution ownership and lifecycle
+
+Camera/device execution and CameraInteractionWorkflow belong to ActionsContainer. Photographer receives narrow App-bound access interfaces and UI-owned controls, owns authorization/tracking intent and cancels its execution scopes explicitly. Private album attachments validate request/session independently of role permission.

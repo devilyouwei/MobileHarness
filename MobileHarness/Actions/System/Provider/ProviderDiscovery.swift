@@ -2,15 +2,6 @@ import Foundation
 import FunctionContracts
 import StorageCore
 
-/// Secret-bearing host values deliberately have no Codable conformance.
-public struct ProviderDiscoveryConfiguration: Sendable {
-    public let url: String
-    public let key: String
-    public init(url: String, key: String) {
-        self.url = url
-        self.key = key
-    }
-}
 public enum ProviderDiscoveryError: LocalizedError, Sendable, ActionExecutionFailureProviding {
     case unavailable, invalidConfiguration, invalidRequest, capacityExceeded, expired, invalidModels
     case httpStatus(Int)

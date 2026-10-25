@@ -1,4 +1,5 @@
 import Foundation
+import FunctionContracts
 import StorageChat
 
 public struct HistoryFullReadService: HistoryFullReadCapability {

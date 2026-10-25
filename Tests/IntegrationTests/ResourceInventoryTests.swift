@@ -1,9 +1,10 @@
 import Actions
-import Agents
 import Foundation
 import Gateway
 import PlatformKit
 import Testing
+
+@testable import Agents
 
 private actor InventoryFixture: ModelResourceInventoryCapability {
     var items: [ModelResourceFact] = []

@@ -1,4 +1,5 @@
 import Foundation
+import FunctionContracts
 import Security
 
 /// Raw native credential access; reference replacement/migration belongs to Actions.

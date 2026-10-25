@@ -11,6 +11,6 @@
 | 文件 | 当前职责 |
 | --- | --- |
 | [UIPresentationCapabilities.swift](UIPresentationCapabilities.swift) | 跨呈现分组共享的更新端口 |
-| [UIPresentationTypes.swift](UIPresentationTypes.swift) | 跨文字／语音状态／视线使用的中立值与错误 |
+| [UIPresentationTypes.swift](../../Support/Contracts/UIPresentationTypes.swift) | 跨文字／语音状态／视线使用的中立值与错误 |
 
 [所属域设计](../README.md) · [公共契约](../../Support/Contracts/README.md)

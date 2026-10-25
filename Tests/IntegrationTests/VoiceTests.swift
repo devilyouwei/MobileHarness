@@ -135,7 +135,7 @@ private func preparedSpeech(
         ])
     ) { await gateway.deliverActionResult($0) }
     let tools = ToolRegistry()
-    let response = OutputGateway(
+    let response = await OutputGateway(
         manager: manager, requests: gateway, tools: tools, actions: scheduler, policy: policy
     ) { _ in }
     try await agent.bind(response.messaging(for: .assistant))
@@ -229,7 +229,7 @@ private func preparedSpeech(
                 }
             }
         ]))
-    let responses = OutputGateway(
+    let responses = await OutputGateway(
         manager: manager, requests: InputGateway(manager: manager),
         tools: ToolRegistry(), actions: actions
     ) { _ in }
@@ -509,7 +509,7 @@ private actor EndpointVADSession: VoiceActivitySession {
             await captions.displayed(text)
         }
     }
-    let output = OutputGateway(
+    let output = await OutputGateway(
         manager: manager, requests: input, tools: tools, actions: scheduler, policy: policy,
         observedContracts: ["speech.partial", "speech.phase"],
         observeEvent: { value in observed.continuation.yield(value) }, sink: { _ in })
@@ -649,7 +649,7 @@ private actor EndpointVADSession: VoiceActivitySession {
             }
         ]))
     let tools = ToolRegistry()
-    let output = OutputGateway(
+    let output = await OutputGateway(
         manager: manager, requests: input, tools: tools,
         actions: scheduler, policy: policy, sink: { _ in })
     let port = try await output.messaging(for: .speechPerception)
@@ -681,12 +681,13 @@ private actor EndpointVADSession: VoiceActivitySession {
     let session = UUID().uuidString
     let first = AgentTurn(id: UUID().uuidString, ordinal: 1)
     let second = AgentTurn(id: UUID().uuidString, ordinal: 2)
-    func envelope(_ turn: AgentTurn, _ sequence: UInt64, _ source: AgentID) -> OutputEnvelope {
+    func envelope(_ turn: AgentTurn, _ sequence: UInt64, _ source: AgentID) -> ActionExecutionContext {
         OutputEnvelope(
             source: source,
             context: (AgentInput(
                 id: UUID().uuidString, sessionID: session, payload: .text("fixture"), turn: turn)).context,
-            output: .control("fixture"), sequence: sequence)
+            output: .control("fixture"), sequence: sequence
+        ).executionContext
     }
     var state = ConversationPresentation()
     // A preview may beat Assistant's reset without being erased by that reset.
@@ -1205,7 +1206,7 @@ extension LiveRuntimeTests {
                     if !paused { try await speech.resumeListening() }
                 }
             }), protocols: [.action], executionPolicy: .scheduled(channel: "Listening"))
-        let output = OutputGateway(
+        let output = await OutputGateway(
             manager: manager, requests: input, tools: ToolRegistry(),
             actions: ChannelScheduler(registry: try ActionRegistry(definitions: [binding])), policy: policy,
             sink: { _ in })

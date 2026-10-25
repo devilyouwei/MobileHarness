@@ -2,11 +2,9 @@ import StorageCache
 import StorageFiles
 
 #if os(iOS)
-    import Actions
+    import FunctionContracts
     import AgentCore
 
-    import CallRuntime
-    import ExecutionRuntime
     import Foundation
     import FunctionContracts
     import Gateway
@@ -24,7 +22,6 @@ import StorageFiles
     final class AgentRuntime {
         private let uiHome: UIHomeContainer
         private let cacheStorage: CacheContainer
-        private let bluetooth: BluetoothWorkflow
         let applicationControlSession: ApplicationControlExecutionSession
         let photographerSession: PhotographerExecutionSession
         let memorySession: MemoryExecutionSession
@@ -46,55 +43,40 @@ import StorageFiles
             }
         }
 
-        private var titleMutations: HistoryMutationService?
         func shutdown() async {
             containerFailures.disconnect()
             containerFailuresConnected = false
+            await output.shutdown(closeResources: false)
             await actionActivity.shutdown()
             skillObservation?.cancel()
             await skillObservation?.value
-            await titleMutations?.shutdown()
-            await manager.stopAll()
-            await output.shutdown()
-            await resources.shutdown()
-            bluetooth.withMotorResources = nil
-            bluetooth.trackingInputAvailable = { false }
-            endpoints.tasks.handler = nil
+            business.bindTracking { false }
+            business.tasks.handler = nil
         }
         private let assistantContext: AgentContextRepository<AssistantContextState>
         let conversations: ConversationHistoryStore
+        let observations: AgentObservationAccess
         let manager: AgentManager
         let input: InputGateway
         let output: OutputGateway
-        let endpoints: ActionEndpoints
-        var presentation: RuntimePresentation { endpoints.presentation }
-        private let photoCamera: any CameraControlCapability
+        let business: AgentBusinessBindings
         let actions: ChannelScheduler
         let actionActivity: ActionActivityWorkflow
         let resources: ResourceCoordinator
 
         init(
+            prepareBusiness: @MainActor (AgentBusinessRequest) throws -> AgentBusinessBindings,
+            configureGateway: @MainActor (AgentGatewayConfiguration) throws -> AgentGatewayCapabilities,
+            maintenance: AgentMaintenancePorts,
             containerFailures: ContainerFailureChannel, home: UIHomeContainer,
             assistantContainer: AssistantContainer, applicationControlContainer: ApplicationControlContainer,
             memoryContainer: MemoryContainer, photographerContainer: PhotographerContainer,
-            stateContext: AgentStateContext, cache: CacheContainer, files: FilesContainer,
-            chatRecords: any ChatRepository, taskRecords: any TaskRepository, camera: any CameraCapturing,
-            cameraUI: UICameraContainer, albumUI: UIAlbumContainer? = nil,
-            album: (any PhotoAlbumCapability)? = nil, settingsUI: UISettingsContainer,
+            stateContext: AgentStateContext, cache: CacheContainer,
+            chatRecords: any ChatRepository, taskRecords: any TaskRepository,
+            cameraUI: UICameraContainer, albumUI: UIAlbumContainer? = nil, settingsUI: UISettingsContainer,
             resourcesUI: UIModelResourcesContainer, devicesUI: UIDeviceSettingsContainer, historyUI: UIHistoryContainer,
-            diagnosticsUI: UIDiagnosticsContainer,
-            readHistoryPhoto: @escaping @Sendable (String, String) async throws -> Data?,
-            cameraControl: any CameraControlCapability,
-            bluetooth: BluetoothWorkflow,
-            historyState: any HistoryPresenting, resourceState: any ModelResourcesPresenting,
-            providerState: any SettingsPresenting,
-            navigationState: any NavigationPresenting, device: NexArmDeviceAdapter,
-            modelResources: any ModelResourceCapability,
-            providerSettingsRuntime: ProviderSettingsRuntime,
-            resourcePreferences: any ModelResourcePreferencesCapability,
-            resourceInventory: any ModelResourceInventoryCapability,
+            diagnosticsUI: UIDiagnosticsContainer, cameraControl: any AgentCameraAccess,
             resourceChanges: @escaping @MainActor @Sendable () async throws -> AsyncStream<UInt64>,
-            resourceSnapshotAccepted: @escaping @MainActor () -> Void,
             summarizeTitle: @escaping @Sendable (StoredConversation) async throws -> String,
             modelName: @escaping @Sendable () async throws -> String = { "Unspecified model" },
             chatProvider: @escaping @Sendable () async throws -> any ChatCapability
@@ -104,28 +86,34 @@ import StorageFiles
             self.uiHome = home
             self.containerFailures = containerFailures
             self.cacheStorage = cache
-            try AgentConfigurations.installDeclarations(CapabilityModules.declarations)
-            self.photoCamera = cameraControl
             let assistantContext = try AgentContextRepository(
                 agent: .assistant, scope: contextScope, state: AssistantContextState())
             self.assistantContext = assistantContext
             let historyStore = try AssistantConversationStorage.store(
                 repository: assistantContext, chat: chatRecords, tasks: taskRecords)
             conversations = historyStore
-            let providerSettings = ProviderSettingsRequests(
-                service: ProviderSettingsService(
-                    store: ProviderSettingsStore(
-                        credentials: SettingsCredentialAdapter(),
-                        document: {
-                            try files.document(UserSettingsDocument.self, in: files.settings, name: "settings.json")
-                        }), runtime: providerSettingsRuntime
-                ))
             let applicationControlSessionID = UUID().uuidString
             self.interactionSessionID = applicationControlSessionID
-            let providerRequests = ProviderDiscoveryRequests(discover: SettingsProviderAdapter.discoverModels)
-            let providerPresentation = ProviderPresentationAdapter(
-                state: providerState, sessionID: applicationControlSessionID, settings: providerSettings,
-                discovery: providerRequests)
+            let activity = ActionActivityWorkflow(state: home.activityPresentation)
+            let business = try prepareBusiness(
+                AgentBusinessRequest(
+                    sessionID: applicationControlSessionID,
+                    conversations: conversations, activity: activity.state, failures: activity,
+                    maintenance: maintenance, summarizeTitle: summarizeTitle,
+                    titlePositions: { ConversationTitleGenerator.samplePositions(count: $0) },
+                    resourcePolicies: (1...6).map { motor in
+                        ResourcePolicy(
+                            id: ResourceID(rawValue: "nexarm.motor.\(motor)"),
+                            allowedOwners: Set([
+                                AgentID.assistant.rawValue, AgentID.applicationControl.rawValue,
+                                AgentID.photographer.rawValue,
+                            ]),
+                            executionGroup: ResourceID(rawValue: "nexarm.writer"),
+                            preempts: [
+                                AgentID.assistant.rawValue: [AgentID.photographer.rawValue],
+                                AgentID.applicationControl.rawValue: [AgentID.photographer.rawValue],
+                            ])
+                    }))
             let applicationContext = try Self.context(
                 .applicationControl, ApplicationControlContextState(), scope: contextScope)
             let photographerContext = try Self.context(.photographer, PhotographerContextState(), scope: contextScope)
@@ -133,30 +121,28 @@ import StorageFiles
             let applicationControlAgent = try ApplicationControlAgent(
                 sessionID: applicationControlSessionID,
                 uiSettings: settingsUI, uiResources: resourcesUI, uiDevices: devicesUI, uiDiagnostics: diagnosticsUI,
-                connectionFacts: { try bluetooth.service.observeConnectionFacts() },
+                connectionFacts: business.connectionFacts,
                 resourceChanges: resourceChanges,
                 observationFailure: { error in
                     containerFailures.report(
                         module: "agents", component: "resources", operation: "observe", error: error)
                 },
-                uiProviderSettings: providerSettings, uiProviderDiscovery: providerRequests,
-                uiProviderPresentation: providerPresentation,
+                uiProviderSettings: business.settings, uiProviderDiscovery: business.discovery,
+                uiProviderPresentation: business.providerPresentation, decodeResources: business.decodeResources,
                 context: applicationContext)
-            device.environment = { try await applicationControlAgent.environmentSnapshot() }
+            business.bindEnvironment { try await applicationControlAgent.environmentSnapshot() }
             let photographerSessionID = applicationControlSessionID
             let photographerAgent = try PhotographerAgent(
                 sessionID: photographerSessionID, uiCamera: cameraUI, controlsArm: true, uiAlbum: albumUI,
                 cameraObservationFailure: { error in
                     containerFailures.report(module: "agents", component: "camera", operation: "observe", error: error)
                 },
-                controlAvailable: { await bluetooth.trackingAvailable },
+                controlAvailable: business.trackingAvailable,
                 context: photographerContext)
-            bluetooth.trackingInputAvailable = { [weak photographerAgent] in
+            business.bindTracking { [weak photographerAgent] in
                 await photographerAgent?.hasFreshPose() ?? false
             }
             let historySessionID = applicationControlSessionID
-            let historyPresentation = HistoryPresentationAdapter(
-                state: historyState, store: conversations, sessionID: historySessionID)
             let policy = try CommunicationPolicy(
                 contracts: AgentContracts.communication,
                 configurations: [
@@ -166,41 +152,11 @@ import StorageFiles
                 .map {
                     try AgentConfigurations.load(named: $0)
                 })
-            let manager = AgentManager()
-            let activity = ActionActivityWorkflow(state: home.activityPresentation)
-            let input = InputGateway(
-                manager: manager, policy: policy,
-                signalSummary: { input in
-                    switch input.payload {
-                    case .text(let text): return String(text.prefix(256))
-                    case .observation(let message):
-                        if case .transcript(let text, _) = message.perception { return String(text.prefix(256)) }
-                        if let task = message.content(as: AgentTaskSignal.self),
-                            let content = try? AgentTaskContent.decode(task)
-                        {
-                            return String(content.text.prefix(256))
-                        }
-                        if let task = message.content(as: AgentTaskSignal.self),
-                            task.businessContract == "runtime.taskTermination"
-                        {
-                            return String(String(decoding: task.data, as: UTF8.self).prefix(256))
-                        }
-                        return ""
-                    case .toolResult(let result): return String(result.value.prefix(256))
-                    default: return ""
-                    }
-                },
-                publicationFailure: { _, _, _ in })
-            let endpoints = ActionEndpoints(
-                cameraControl: cameraControl, rootSessionID: photographerSessionID, activity: activity.state,
-                effects: home.effects, expressions: home.expressions,
-                homeBluetooth: home.conversation, deviceBluetooth: bluetooth.state)
-            let presentation = endpoints.presentation
             let historyAgent = try MemoryAgent(
                 sessionID: historySessionID, uiHistory: historyUI,
                 beforeNewConversation: {
                     if try await assistantContext.snapshot().state.skillState?.activeTaskID != nil {
-                        guard let control = await endpoints.tasks.handler else {
+                        guard let control = await business.tasks.handler else {
                             throw CommunicationError.unavailableTarget
                         }
                         _ = try await control(
@@ -208,83 +164,10 @@ import StorageFiles
                             applicationControlSessionID, UUID().uuidString, nil)
                     }
                 }, context: memoryContext)
-            self.bluetooth = bluetooth
-            let resources = try ResourceCoordinator(
-                definitions: [
-                    ResourceDefinition(
-                        id: CameraCoordinator.captureResource, allowedOwners: [CameraCoordinator.resourceOwnerID],
-                        requiresLease: true
-                    ) {
-                        await camera.stop()
-                    }
-                ]
-                    + (1...6).map { motor in
-                        ResourceDefinition(
-                            id: ResourceID(rawValue: "nexarm.motor.\(motor)"),
-                            allowedOwners: [.assistant, .applicationControl, .photographer],
-                            executionGroup: ResourceID(rawValue: "nexarm.writer"),
-                            preempts: [.assistant: [.photographer], .applicationControl: [.photographer]]
-                        ) {
-                            // Cancel and join software ownership; this is not a hardware stop acknowledgment.
-                            await bluetooth.stopAgentActions()
-                        }
-                    })
-            self.resources = resources
-            bluetooth.withMotorResources = { motors, operation in
-                do {
-                    let requested = Set(motors.map { ResourceID(rawValue: "nexarm.motor.\($0)") })
-                    let owner = ResourceExecutionContext.owner
-                    let lease =
-                        if let owner { await resources.lease(for: owner, resources: requested) } else {
-                            nil as ResourceLease?
-                        }
-                    try await resources.run(
-                        resources: requested, owner: owner, lease: lease, operation: operation)
-                } catch ResourceError.busy {
-                    throw NexArmExecutionError.resourceBusy
-                } catch let error as ResourceError {
-                    throw NexArmExecutionError.resourceUnavailable(String(describing: error))
-                }
-            }
-            device.deliverActionResult = { result, report in
-                let feedback = ActionResult(
-                    executionID: result.executionID, owner: result.owner, path: result.path,
-                    causality: result.causality,
-                    status: result.status, effect: result.effect, completion: report.map { .report($0.agentValue) },
-                    failure: result.failure, callID: result.callID, roundID: result.roundID)
-                return await input.deliverActionResult(feedback) == .accepted
-            }
-            device.activity = activity
-            let robot = NexArmBehaviorAdapter(bluetooth: bluetooth, activity: activity)
-            let mutations = HistoryMutationService(
-                store: conversations, summarizeTitle: summarizeTitle,
-                archiveChanged: { message in
-                    do {
-                        try await historyPresentation.refreshAfterMutation(message: message)
-                    } catch { await historyPresentation.recordRefreshFailure(error) }
-                }, titlePositions: { ConversationTitleGenerator.samplePositions(count: $0) })
-            titleMutations = mutations
-            let behaviors = try BehaviorAssembly(
-                presentation: presentation, playback: endpoints.speech, pose: presentation,
-                historyPresentation: historyPresentation, camera: endpoints.camera,
-                history: HistoryQueryService(store: conversations),
-                historyMutations: mutations,
-                fullHistory: HistoryFullReadService(store: historyStore, photo: readHistoryPhoto), album: album,
-                modelResources: modelResources, resourcePreferences: resourcePreferences,
-                resourceInventory: resourceInventory,
-                resourcePresentation: ResourcePresentationAdapter(
-                    state: resourceState, sessionID: applicationControlSessionID, provider: providerPresentation,
-                    navigation: navigationState,
-                    acknowledge: resourceSnapshotAccepted),
-                providerDiscovery: providerRequests, providerSettings: providerSettings, device: device,
-                feedback: presentation, effects: presentation, listening: endpoints.speech,
-                listeningGesture: endpoints.speech, detection: endpoints.speech, taskControl: endpoints.tasks,
-                loading: presentation, runtimeFailures: presentation, bluetoothStatus: presentation,
-                gesture: { request, invocation in try await robot.gesture(request, invocation) },
-                shakeBase: { cycles, invocation in try await robot.shakeBase(cycles, invocation) },
-                aim: { base, pitch, invocation in try await robot.aim(base, pitch, invocation) })
+            let execution = business.executor
+            let catalog = business.catalog
             try BehaviorCoverage.validate(
-                actions: behaviors.actions, toolPaths: behaviors.toolPaths,
+                catalog: catalog,
                 capabilities: [
                     AssistantAgent.runtimeCapabilities(AgentConfigurations.load(named: "Assistant").capabilities),
                     SpeechPerceptionAgent.runtimeCapabilities(
@@ -295,29 +178,61 @@ import StorageFiles
                     AgentConfigurations.load(named: "SpeechSynthesis").capabilities,
                     historyAgent.descriptor.capabilities, applicationControlAgent.descriptor.capabilities,
                 ] + AgentConfigurations.skillRegistries())
-            let actions = ChannelScheduler(registry: behaviors.actions, resources: resources) {
-                await input.deliverActionResult($0)
-            }
+            let facilities = try configureGateway(
+                AgentGatewayConfiguration(
+                    executor: execution, catalog: catalog, policy: policy, resources: business.resources,
+                    signalSummary: { input in
+                        switch input.payload {
+                        case .text(let text): return String(text.prefix(256))
+                        case .observation(let message):
+                            if case .transcript(let text, _) = message.perception { return String(text.prefix(256)) }
+                            if let task = message.content(as: AgentTaskSignal.self),
+                                let content = try? AgentTaskContent.decode(task)
+                            {
+                                return String(content.text.prefix(256))
+                            }
+                            if let task = message.content(as: AgentTaskSignal.self),
+                                task.businessContract == "runtime.taskTermination"
+                            {
+                                return String(String(decoding: task.data, as: UTF8.self).prefix(256))
+                            }
+                            return ""
+                        case .toolResult(let result): return String(result.value.prefix(256))
+                        default: return ""
+                        }
+                    },
+                    observedContracts: ["speech.partial", "speech.final", "speech.phase"],
+                    observeEvent: { input in
+                        guard let observation = input.payload.perception else { return }
+                        switch observation {
+                        case .transcript(let text, true): try await business.observeTranscript(text, input.sessionID)
+                        case .speechPhase(.empty): try await business.observeEmpty(input.sessionID)
+                        default: break
+                        }
+                    }, sink: { await business.output($0.actionObservation) }))
+            let manager = facilities.manager
+            let input = facilities.input
+            let resources = facilities.resources
+            let actions = facilities.actions
+            let gateway = facilities.output
+            self.observations = facilities.observations
             self.manager = manager
             self.input = input
-            self.endpoints = endpoints
+            self.resources = resources
             self.actions = actions
+            self.output = gateway
+            self.business = business
             actionActivity = activity
-            let gateway = OutputGateway(
-                manager: manager, requests: input, tools: behaviors.tools, actions: actions, policy: policy,
-                actionFeedback: .terminal,
-                observedContracts: ["speech.partial", "speech.final", "speech.phase"],
-                observeEvent: { input in
-                    guard let observation = input.payload.perception else { return }
-                    switch observation {
-                    case .transcript(let text, true):
-                        try await presentation.observeTranscript(text, sessionID: input.sessionID)
-                    case .speechPhase(.empty):
-                        try await presentation.observeEmptyUtterance(sessionID: input.sessionID)
-                    default: break
-                    }
-                }, sink: { await presentation.output($0) })
-            output = gateway
+            business.bindResources(resources, actions)
+            business.bindDeferredFailure { result in
+                let feedback = ActionResult(
+                    executionID: result.executionID, owner: result.owner,
+                    path: .init(domain: result.path.domain, module: result.path.module, function: result.path.function),
+                    causality: .init(inputID: result.context.inputID, rootID: result.context.inputID, hops: 0),
+                    status: result.report?.status == .partialFailure ? .partialFailure : .failed,
+                    effect: .unknown, completion: result.report.map { .report($0.agentValue) }, failure: .handlerFailed)
+                return await input.deliverActionResult(feedback) == .accepted
+            }
             let photography = PhotographerExecutionSession(
                 manager: manager,
                 output: gateway, agent: photographerAgent,
@@ -352,7 +267,7 @@ import StorageFiles
                                 maximumDimension: policy.maximumDimension, maximumPixels: policy.maximumPixels,
                                 maximumBytes: policy.maximumBytes, quality: policy.quality))
                     }), context: assistantContext)
-            endpoints.tasks.handler = { operation, arguments, source, session, input, decision in
+            business.tasks.handler = { operation, arguments, source, session, input, decision in
                 try await main.controlTask(
                     operation, arguments: arguments, source: source, sessionID: session, inputID: input,
                     decisionID: decision)
@@ -445,7 +360,7 @@ import StorageFiles
         }
         var voiceDependencies: VoiceRuntimeDependencies {
             VoiceRuntimeDependencies(
-                cache: cacheStorage, manager: manager, output: output, endpoints: endpoints,
+                cache: cacheStorage, manager: manager, output: output,
                 reportFailure: containerFailures.sink(module: "agents"),
                 interactionSessionID: interactionSessionID,
                 startInteraction: { [interaction] in try await interaction.start() },
@@ -469,9 +384,7 @@ import StorageFiles
         func visionContext() throws -> AgentContextRepository<VisionPerceptionContextState> {
             try Self.context(.visionPerception, VisionPerceptionContextState(), scope: contextScope)
         }
-        var cameraDependencies: CameraRuntimeDependencies {
-            .init(resources: CameraResourceBinding(resources: resources, actions: actions))
-        }
+
     }
 
 #endif

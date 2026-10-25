@@ -1,6 +1,5 @@
 import Actions
 import AgentCore
-import Agents
 import CallRuntime
 import ExecutionRuntime
 import Foundation
@@ -8,6 +7,8 @@ import FunctionContracts
 import Gateway
 import StorageCore
 import Testing
+
+@testable import Agents
 
 private actor CompositionCounter {
     var count = 0

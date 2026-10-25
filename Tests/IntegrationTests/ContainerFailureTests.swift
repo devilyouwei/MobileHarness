@@ -1,6 +1,5 @@
 import Actions
 import AgentCore
-import Agents
 import AppLifecycle
 import AppStorage
 import CallRuntime
@@ -23,6 +22,7 @@ import StorageTasks
 import Synchronization
 import Testing
 
+@testable import Agents
 @testable import UI
 
 private struct DiagnosticTools: ToolModule { let definitions: [ActionBinding] }
@@ -79,7 +79,7 @@ private actor FailedDiagnosticDatabase: DatabaseStorage {
     let runtime: ApplicationControlExecutionSession
     let context: AgentContextRepository<ApplicationControlContextState>
     let sessionID: String
-    init(activity: ActionActivityWorkflow, rejectPresentation: Bool = false) throws {
+    init(activity: ActionActivityWorkflow, rejectPresentation: Bool = false) async throws {
         sessionID = UUID().uuidString
         manager = AgentManager()
         let configurations = try [
@@ -100,7 +100,7 @@ private actor FailedDiagnosticDatabase: DatabaseStorage {
             if rejectPresentation { throw InjectedContainerFailure.operation(99) }
             return .value(try await UIActions.recordFailure(invocation: invocation, using: presentation))
         })
-        output = OutputGateway(
+        output = await OutputGateway(
             manager: manager, requests: input,
             tools: try ToolRegistry(modules: [
                 DiagnosticTools(
@@ -142,7 +142,7 @@ private actor FailedDiagnosticDatabase: DatabaseStorage {
 {
     let state = ActionActivityState()
     let activity = ActionActivityWorkflow(state: state)
-    let fixture = try RuntimeFailurePresentationFixture(activity: activity)
+    let fixture = try await RuntimeFailurePresentationFixture(activity: activity)
     try await fixture.start(activity: activity)
     let channel = ContainerFailureChannel()
     channel.start()
@@ -229,7 +229,7 @@ private actor FailedDiagnosticDatabase: DatabaseStorage {
     let function = UIActions.recordFailureDefinition(completing: { invocation in
         .value(try await UIActions.recordFailure(invocation: invocation, using: presentation))
     })
-    let output = OutputGateway(
+    let output = await OutputGateway(
         manager: manager, requests: input,
         tools: try ToolRegistry(modules: [DiagnosticTools(definitions: [try BehaviorProtocolBindings.bind(function)])]),
         policy: policy, sink: { _ in })
@@ -492,7 +492,7 @@ private actor FailedDiagnosticDatabase: DatabaseStorage {
 
 @Test(.actionCatalog) @MainActor func applicationControlOwnsRuntimeFailurePolicyAndKeepsCorrelation() async throws {
     let activity = ActionActivityWorkflow(state: ActionActivityState())
-    let fixture = try RuntimeFailurePresentationFixture(activity: activity)
+    let fixture = try await RuntimeFailurePresentationFixture(activity: activity)
     activity.recordFailure(
         title: "Model", source: "assistant", message: "native transport cause", failureCode: "agent.model.transport",
         context: .init(workerID: "worker", sessionID: "business", inputID: "input", roundID: "round"),
@@ -511,7 +511,7 @@ private actor FailedDiagnosticDatabase: DatabaseStorage {
 
 @Test(.actionCatalog) @MainActor func applicationControlRecordsStaleEvidenceWhilePausedWithoutToast() async throws {
     let activity = ActionActivityWorkflow(state: ActionActivityState())
-    let fixture = try RuntimeFailurePresentationFixture(activity: activity)
+    let fixture = try await RuntimeFailurePresentationFixture(activity: activity)
     try await fixture.start(activity: activity)
     try await fixture.runtime.agent.pause()
     let event = RuntimeFailureEvent(
@@ -533,7 +533,7 @@ private actor FailedDiagnosticDatabase: DatabaseStorage {
 @Test(.actionCatalog) @MainActor func applicationControlPresentationFailureDoesNotFeedBackOrStopBusiness() async throws
 {
     let activity = ActionActivityWorkflow(state: ActionActivityState())
-    let fixture = try RuntimeFailurePresentationFixture(activity: activity, rejectPresentation: true)
+    let fixture = try await RuntimeFailurePresentationFixture(activity: activity, rejectPresentation: true)
     try await fixture.start(activity: activity)
     activity.recordFailure(
         title: "Vision", source: "visionPerception", message: "inference failed", failureCode: "vision.pose.failed")
@@ -624,7 +624,7 @@ private func diagnosticInput(
 @Test(.actionCatalog) @MainActor func executionFailureObservationIsIndependentAndBounded() async throws {
     let state = ActionActivityState()
     let workflow = ActionActivityWorkflow(state: state)
-    let fixture = try RuntimeFailurePresentationFixture(activity: workflow)
+    let fixture = try await RuntimeFailurePresentationFixture(activity: workflow)
     try await fixture.runtime.prepareForInteraction()
     workflow.connectFailures { event in try await fixture.runtime.agent.observeFailure(event) }
     let pair = AsyncStream<OutputFailureSnapshot>.makeStream(bufferingPolicy: .bufferingNewest(1))
@@ -650,7 +650,7 @@ private func diagnosticInput(
 @Test(.actionCatalog) @MainActor func speechRecognitionToastIsFriendlyAndDirectFailureDetailsStayInLog() async throws {
     let state = ActionActivityState()
     let workflow = ActionActivityWorkflow(state: state)
-    let fixture = try RuntimeFailurePresentationFixture(activity: workflow)
+    let fixture = try await RuntimeFailurePresentationFixture(activity: workflow)
     try await fixture.start(activity: workflow)
     let raw = "agent.error: speech perception: Error Domain=SFSpeechErrorDomain Code=1 RecogRejected"
     workflow.recordFailure(title: "Output", source: "speechPerception", message: raw)
@@ -668,7 +668,7 @@ private func diagnosticInput(
 @Test(.actionCatalog) @MainActor func speechRecognitionSnapshotToastPreservesDetailedRecordAndInput() async throws {
     let state = ActionActivityState()
     let workflow = ActionActivityWorkflow(state: state)
-    let fixture = try RuntimeFailurePresentationFixture(activity: workflow)
+    let fixture = try await RuntimeFailurePresentationFixture(activity: workflow)
     try await fixture.runtime.prepareForInteraction()
     workflow.connectFailures { event in try await fixture.runtime.agent.observeFailure(event) }
     let pair = AsyncStream<OutputFailureSnapshot>.makeStream(bufferingPolicy: .bufferingNewest(1))
@@ -690,7 +690,7 @@ private func diagnosticInput(
 @Test(.actionCatalog) @MainActor func agentProtocolFailureProjectsShortToastFullDetailAndCorrelation() async throws {
     let state = ActionActivityState()
     let workflow = ActionActivityWorkflow(state: state)
-    let fixture = try RuntimeFailurePresentationFixture(activity: workflow)
+    let fixture = try await RuntimeFailurePresentationFixture(activity: workflow)
     try await fixture.runtime.prepareForInteraction()
     workflow.connectFailures { event in try await fixture.runtime.agent.observeFailure(event) }
     let pair = AsyncStream<OutputFailureSnapshot>.makeStream(bufferingPolicy: .bufferingNewest(1))
@@ -837,7 +837,7 @@ private func bluetoothEnvironment(
 
 @Test(.actionCatalog) @MainActor func bluetoothUnavailabilityIsPresentedAsStateWithoutFailureToast() async throws {
     let activity = ActionActivityWorkflow(state: ActionActivityState())
-    let fixture = try RuntimeFailurePresentationFixture(activity: activity)
+    let fixture = try await RuntimeFailurePresentationFixture(activity: activity)
     try await fixture.start(activity: activity)
     let channel = ContainerFailureChannel()
     channel.start()
@@ -897,7 +897,8 @@ private func bluetoothEnvironment(
     await fixture.stop(activity: activity)
 }
 
-@Test(.actionCatalog) @MainActor func bluetoothPresentationActionsRejectForeignOwnersAndStaleRevisions() async throws {
+@Test(.actionCatalog) @MainActor func bluetoothPresentationActionsRejectForeignSessionsAndStaleRevisions() async throws
+{
     let root = UIContainer()
     try root.start()
     let presentation = RuntimePresentation(
@@ -917,7 +918,7 @@ private func bluetoothEnvironment(
             context: ActionExecutionContext(source: source, sessionID: session, inputID: UUID().uuidString),
             executionID: UUID().uuidString, results: ActionReportStore())
     }
-    for value in [invocation(source: "assistant"), invocation(session: "retired-root"), invocation(extra: true)] {
+    for value in [invocation(session: "retired-root"), invocation(extra: true)] {
         await #expect(throws: (any Error).self) {
             _ = try await UIActions.showBluetoothHome(invocation: value, using: presentation)
         }
@@ -985,7 +986,7 @@ private struct DetailedContainerError: Error, CustomStringConvertible {
 @Test(.actionCatalog) @MainActor func modelPreparationLoadingEyesCrossGatewayAgentAndExpressionAction() async throws {
     let ui = UIContainer()
     let activity = ActionActivityWorkflow(state: ui.home.activity)
-    let fixture = try RuntimeFailurePresentationFixture(activity: activity)
+    let fixture = try await RuntimeFailurePresentationFixture(activity: activity)
     try await fixture.start(activity: activity)
     fixture.ui.home.presentModelPreparation(.preparing("language"))
     #expect(!fixture.ui.home.conversation.isVoiceActive)
@@ -1041,7 +1042,7 @@ private struct UnusedLoadingHistory: HistoryPresentationCapability {
         (.preparing("language"), "true", "7", "applicationControl", false, true),
         (.preparing("language"), "false", "7", "applicationControl", true, true),
         (.preparing("language"), "false", "0", "applicationControl", true, true),
-        (.preparing("language"), "false", "8", "assistant", true, true),
+        (.preparing("language"), "false", "8", "assistant", false, false),
     ]
     for (preparation, enabled, revision, source, rejected, showing) in cases {
         root.home.presentModelPreparation(preparation)

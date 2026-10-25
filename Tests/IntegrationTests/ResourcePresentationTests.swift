@@ -1,6 +1,5 @@
 import Actions
 import AgentCore
-import Agents
 import ExecutionRuntime
 import Foundation
 import FunctionContracts
@@ -8,6 +7,8 @@ import Gateway
 import PlatformKit
 import StorageCore
 import Testing
+
+@testable import Agents
 
 private enum PresentationFixtureError: Error { case queryFailure, snapshotFailure, failurePresentation }
 private actor PresentedInventoryFixture: ModelResourceInventoryCapability {

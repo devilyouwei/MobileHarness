@@ -2,7 +2,7 @@
 
 ## 角色容器
 
-✅ [ApplicationControlContainer.swift](ApplicationControlContainer.swift) 是 AgentContainer 的稳定子能力。持有角色执行会话、设置／资源／设备工作流、环境事实 worker 和观察生命周期。停止先加入环境 worker，再清理角色；Provider 事务和原生执行仍归 Actions。
+[ApplicationControlContainer.swift](ApplicationControlContainer.swift) 是 AgentContainer 的稳定子能力。持有角色执行会话、设置／资源／设备工作流、环境事实 worker 和观察生命周期。停止先加入环境 worker，再清理角色；Provider 事务和原生执行仍归 Actions。
 
 生命周期由[模块根](../README.md#agent-container)统一编排；子容器能力不授予执行权。
 
@@ -25,9 +25,9 @@
 | [ApplicationControlUI.swift](ApplicationControlUI.swift) | settings/resources/devices/diagnostics 的角色订阅和类型化处理 |
 | [ApplicationEnvironmentInputs.swift](ApplicationEnvironmentInputs.swift) | 单 worker、每环境类别一个最新候选的有界接纳 |
 | [ModelResourceInputs.swift](ModelResourceInputs.swift) | 资源意图、观察和原始业务失败值 |
-| [ModelResourcesClient.swift](ModelResourcesClient.swift) | 经角色请求提交资源操作，合并恢复及保存准入 |
+| [ModelResourcesClient.swift](../../Actions/System/ModelResources/ModelResourcesClient.swift) | 经角色请求提交资源操作，合并恢复及保存准入 |
 | [ProviderInputs.swift](ProviderInputs.swift) | 会话私有 Provider 设置／发现意图 |
-| [ProviderSettingsClient.swift](ProviderSettingsClient.swift) | 经注入操作提交 Provider 请求，缓存已确认配置、合并恢复并适配安全失败结果 |
+| [ProviderSettingsClient.swift](../../Actions/System/Provider/ProviderSettingsClient.swift) | 经注入操作提交 Provider 请求，缓存已确认配置、合并恢复并适配安全失败结果 |
 | [ResourceObservationSession.swift](ResourceObservationSession.swift) | 资源 revision 的单次订阅及前台代际切换 |
 
 ## 外部关系（一层）
@@ -67,7 +67,7 @@ flowchart LR
  classDef host fill:#f1f5f9,stroke:#64748b,color:#334155
 ```
 
-角色间消息经 Gateway 递送；基础能力通过构造注入，输入订阅由角色持有。
+角色间消息经 Gateway 递送；基础能力通过构造注入，输入订阅由角色持有。角色、Skill 与 Task 授权归 Agents；Actions 来源的协作接口由 App 以中立窄端口绑定，Agents 不导入 Actions、CallRuntime 或 ExecutionRuntime。
 
 ## 内部结构与执行链
 
@@ -91,7 +91,7 @@ flowchart LR
  M --> W
  F --> E --> D
  CF --> D
- W --> G["Gateway：身份／权限／取消"]:::gateway
+ W --> G["Gateway：端点／作用域／取消"]:::gateway
  D --> G
  subgraph SystemCalls["Actions：系统操作"]
  PRO["System.Provider.restoreSettings<br/>System.Provider.saveSettings<br/>System.Provider.discoverModels"]:::action
@@ -156,12 +156,16 @@ Provider restore/save/discover 与资源偏好事务由 Actions 执行；偏好�
 
 本角色通过 [固定任务准入](../Support/Communication/README.md#固定任务准入) 接收 Assistant 委派。ApplicationControlTaskInput 解释 app.interaction、资源意图和 Provider 意图，拒绝远程构造资源 retire；Provider 的敏感草稿只保存在会话私有请求服务中。
 
-ApplicationControlFunctions 只声明代码拥有的内部调用权限；ApplicationControlPolicy 只分类事实与结果，不持有 UI、设备或模型。ProviderSettingsClient 和 ModelResourcesClient 是角色请求客户端；实际配置事务、模型绑定和下载由 Actions 执行，纯表单草稿由基础 UI 拥有。
+ApplicationControlFunctions 只声明代码拥有的内部调用权限；ApplicationControlPolicy 只分类事实与结果，不持有 UI、设备或模型。ProviderSettingsClient 和 ModelResourcesClient 是 Actions 拥有的 UI 请求客户端；实际配置事务、模型绑定和下载由 Actions 执行，纯表单草稿由基础 UI 拥有。
 
 ## 多 Provider 管理
 
-✅ 沿用私有设置事务传递至多 32 个 URL 唯一的 provider；当前配置与其余配置一起保存。UI 在加载模型上方提供单选、编辑、删除和末行添加，删除当前项关闭云端并要求重新选择。保存提交后生效，Key 保持钥匙串存储，旧单配置恢复为首项。
+沿用私有设置事务传递至多 32 个 URL 唯一的 provider；当前配置与其余配置一起保存。UI 在加载模型上方提供单选、编辑、删除和末行添加，删除当前项关闭云端并要求重新选择。保存提交后生效，Key 保持钥匙串存储，旧单配置恢复为首项。
 
-✅ Provider 名称通过私有配置链路保存，旧数据以 URL 主机名补齐。新增/编辑采用独立 modal 草稿（name/url/key），默认生成未占用的 Provider N 名称；取消不修改选择和凭据，确认校验 URL 唯一性与名称。列表名称为主、URL 单行省略为辅，保留三字段粘贴和 Key 脱敏。
+Provider 名称通过私有配置链路保存，旧数据以 URL 主机名补齐。新增/编辑采用独立 modal 草稿（name/url/key），默认生成未占用的 Provider N 名称；取消不修改选择和凭据，确认校验 URL 唯一性与名称。列表名称为主、URL 单行省略为辅，保留三字段粘贴和 Key 脱敏。
 
-✅ ProviderSettingsClient 的连接失败提示允许 HTTP/HTTPS；配置仍通过私有请求链路传递，网络与主机能力策略由 [Provider Actions](../../Actions/System/Provider/README.md) 和 [Config](../../../Config/README.md) 拥有。
+ProviderSettingsClient 的连接失败提示允许 HTTP/HTTPS；配置仍通过私有请求链路传递，网络与主机能力策略由 [Provider Actions](../../Actions/System/Provider/README.md) 和 [Config](../../../Config/README.md) 拥有。
+
+## Execution ownership and lifecycle
+
+ProviderSettingsClient, ModelResourcesClient and UI interaction workflows belong to Actions. This role receives UI-owned facade interfaces and neutral staging/maintenance ports, owns Action and communication authorization, and submits calls through injected Gateway facilities. It does not construct business registries or native services.

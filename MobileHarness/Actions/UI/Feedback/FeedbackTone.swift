@@ -1,4 +1,5 @@
 import Foundation
+import FunctionContracts
 
 /// Seven finite original PCM profiles; no system/private sound ID or user recording is packaged.
 public enum FeedbackTone {

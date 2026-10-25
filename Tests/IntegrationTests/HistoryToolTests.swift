@@ -1,6 +1,5 @@
 import Actions
 import AgentCore
-import Agents
 import CallRuntime
 import ExecutionRuntime
 import Foundation
@@ -10,6 +9,8 @@ import PlatformKit
 import StorageChat
 import StorageCore
 import Testing
+
+@testable import Agents
 
 private func historyRequest(_ path: String, _ arguments: [String: String]) -> ActionInvocation {
     ActionInvocation(

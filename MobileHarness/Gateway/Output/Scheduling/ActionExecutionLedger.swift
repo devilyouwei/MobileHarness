@@ -1,6 +1,3 @@
-import AgentCore
-import CallRuntime
-import ExecutionRuntime
 import Foundation
 import FunctionContracts
 
@@ -18,7 +15,7 @@ struct ActionExecutionLedger {
         self.terminalCapacity = terminalCapacity
     }
 
-    mutating func admit(_ invocation: ScheduledAction, definition: ActionBinding) {
+    mutating func admit(_ invocation: ScheduledAction, definition: ActionExecutionDescriptor) {
         let semantics: ActionExecutionRecord.Semantics
         switch definition.kind {
         case .finite: semantics = .finite
@@ -47,7 +44,7 @@ struct ActionExecutionLedger {
         guard !(record.phase == .cancelling && phase == .running) else { return false }
         record.phase = phase
         if phase == .running { record.startedAt = .now }
-        record.completion = completion?.agentValue
+        record.completion = completion
         record.failureDescription = failureDescription.map { String($0.prefix(512)) }
         record.failure = failure
         if record.isTerminal {

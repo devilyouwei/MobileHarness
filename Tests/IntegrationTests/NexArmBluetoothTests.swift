@@ -1,6 +1,5 @@
 import Actions
 import AgentCore
-import Agents
 import CallRuntime
 import ExecutionRuntime
 import Foundation
@@ -13,6 +12,7 @@ import StorageSQLite
 import StorageTasks
 import Testing
 
+@testable import Agents
 @testable import PlatformKit
 @testable import UI
 
@@ -2462,7 +2462,7 @@ extension LiveRuntimeTests {
         let tools = try ToolRegistry(modules: [
             NexArmTrackingModule { base, pitch, _ in try await workflow.aim(base: base, pitch: pitch) }
         ])
-        let output = OutputGateway(
+        let output = await OutputGateway(
             manager: manager, requests: InputGateway(manager: manager), tools: tools,
             actions: ChannelScheduler(registry: ActionRegistry(), resources: resources), sink: { _ in })
         for sequence: UInt64 in 1...8 {
@@ -2791,7 +2791,7 @@ extension LiveRuntimeTests {
             NexArmTrackingModule { base, pitch, _ in try await workflow.aim(base: base, pitch: pitch) }
         ])
         try await tools.registerCompletion("UI.Caption.print") { _ in }
-        let output = OutputGateway(
+        let output = await OutputGateway(
             manager: manager, requests: input, tools: tools, actions: scheduler, actionFeedback: .terminal,
             sink: { _ in })
         let observer = Task { await workflow.run() }
@@ -3234,7 +3234,7 @@ extension LiveRuntimeTests {
         let link = BluetoothArmFixture()
         let workflow = bluetoothTestWorkflow(link, file: file)
         let activity = ActionActivityWorkflow(state: ActionActivityState())
-        let diagnosticFixture = try RuntimeFailurePresentationFixture(activity: activity)
+        let diagnosticFixture = try await RuntimeFailurePresentationFixture(activity: activity)
         try await diagnosticFixture.start(activity: activity)
         let observer = Task { await workflow.run() }
         workflow.openPage()
@@ -3344,7 +3344,7 @@ extension LiveRuntimeTests {
         let link = BluetoothArmFixture()
         let workflow = bluetoothTestWorkflow(link, file: file)
         let activity = ActionActivityWorkflow(state: ActionActivityState())
-        let diagnosticFixture = try RuntimeFailurePresentationFixture(activity: activity)
+        let diagnosticFixture = try await RuntimeFailurePresentationFixture(activity: activity)
         try await diagnosticFixture.start(activity: activity)
         let observer = Task { await workflow.run() }
         workflow.openPage()

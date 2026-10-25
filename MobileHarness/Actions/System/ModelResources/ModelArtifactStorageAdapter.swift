@@ -1,4 +1,5 @@
 import Foundation
+import FunctionContracts
 import ModelKitRuntime
 import StorageCore
 import StorageFiles

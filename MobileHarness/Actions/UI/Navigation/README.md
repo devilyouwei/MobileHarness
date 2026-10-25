@@ -17,8 +17,8 @@
 
 ## 对话打开相册
 
-✅ UI.Navigation.open 的允许目标与参数说明补齐 album，使用既有NavigationModule与会话校验端点，将UI路径设置为settings → album。presented仅表示导航状态已提交，不表示照片已经加载；未知目标、memory占位目标及无效会话仍拒绝。
+UI.Navigation.open 的允许目标与参数说明补齐 album，使用既有NavigationModule与会话校验端点，将UI路径设置为settings → album。presented仅表示导航状态已提交，不表示照片已经加载；未知目标、memory占位目标及无效会话仍拒绝。
 
 ## Container 上下文
 
-✅ 导航Action仍经真实身份／呈现准入提交路径，presented仅代表提交。页面确认及上下文属于UI NavigationState；模型按ui.navigation读取，Actions不建立第二份路由状态。
+导航Action仍经真实身份／呈现准入提交路径，presented仅代表提交。页面确认及上下文属于UI NavigationState；模型按ui.navigation读取，Actions不建立第二份路由状态。

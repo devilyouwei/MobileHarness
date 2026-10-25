@@ -182,7 +182,8 @@ private func waitForSound(_ predicate: () async -> Bool) async throws {
 }
 
 extension LiveRuntimeTests {
-    @Test(.actionCatalog) func soundSourceOnlyDiagnosticCrossesGatewaysWithoutModelsOrPresentationGrants() async throws
+    @Test(.actionCatalog) func soundSourceOnlyDiagnosticCrossesGatewaysWithoutModelsOrPresentationGrants()
+        async throws
     {
         let original = try AgentConfigurations.load(named: "SpeechPerception")
         #expect(throws: CommunicationError.unauthorized) {
@@ -200,7 +201,6 @@ extension LiveRuntimeTests {
         #expect(configuration.agentID == original.agentID && configuration.version == original.version)
         let policy = try CommunicationPolicy(
             contracts: AgentContracts.communication, configurations: [configuration])
-        let manager = AgentManager()
         let session = UUID().uuidString
         let values = SoundPublications()
         let speech = try SpeechPerceptionAgent(
@@ -212,21 +212,20 @@ extension LiveRuntimeTests {
         )
         #expect(speech.descriptor.capabilities.internalTools.isEmpty)
         #expect(speech.descriptor.capabilities.internalActions.isEmpty)
-        try await manager.register(speech, sessionID: session)
-        let input = InputGateway(manager: manager, policy: policy)
-        let output = OutputGateway(
-            manager: manager, requests: input, tools: ToolRegistry(), policy: policy,
-            observedContracts: ["sound.source"],
+        let root = await GatewayContainer()
+        let main = try await AgentGatewayAssembly.configure(
+            root: root,
+            configuration: .init(
+                executor: fixtureExecutionPort(actions: []), catalog: .init(revision: UUID(), entries: [])))
+        try await root.start()
+        let diagnostic = try await main.observations.open(
+            policy: policy, observedContracts: ["sound.source"],
             observeEvent: { input in
                 if case .soundSource(let value)? = input.payload.perception { await values.append(value) }
-            },
-            sink: { envelope in
-                guard case .communication(let action) = envelope.output, action.message.contract == "sound.source"
-                else {
-                    Issue.record("Diagnostic must emit only sound-source communication")
-                    return
-                }
             })
+        let manager = diagnostic.capabilities.manager
+        let output = diagnostic.capabilities.output
+        try await manager.register(speech, sessionID: session)
         try await speech.start()
         let consumer = try await output.consumer(for: speech)
         let pump = Task {
@@ -250,8 +249,9 @@ extension LiveRuntimeTests {
         #expect(await speech.status().lifecycle == .running)
         await speech.stop()
         try await pump.value
-        await output.shutdown()
-        try await manager.remove(.speechPerception)
+        try await main.observations.close(diagnostic)
+        #expect(await root.isAvailable)
+        try await root.stop()
     }
 }
 
@@ -391,7 +391,7 @@ extension LiveRuntimeTests {
         try await manager.register(recorder, sessionID: session)
         await recorder.start()
         let input = InputGateway(manager: manager, policy: policy)
-        let output = OutputGateway(
+        let output = await OutputGateway(
             manager: manager, requests: input, tools: ToolRegistry(), policy: policy, sink: { _ in })
         try await speech.bind(output.messaging(for: .speechPerception))
         try await speech.start()
@@ -569,7 +569,7 @@ extension LiveRuntimeTests {
             configurations: AgentConfigurations.all())
         try await manager.register(speech, sessionID: session)
         let input = InputGateway(manager: manager, policy: policy)
-        let output = OutputGateway(
+        let output = await OutputGateway(
             manager: manager, requests: input, tools: ToolRegistry(), policy: policy, sink: { _ in })
         let port = try await output.messaging(for: .speechPerception)
         try await speech.bind(port)

@@ -1,4 +1,3 @@
-import AgentCore
 import CallRuntime
 import ExecutionRuntime
 import Foundation
@@ -7,12 +6,6 @@ import OSLog
 import PlatformKit
 import StorageCore
 import StorageDevices
-
-public struct NexArmConnectionFacts: Sendable, Equatable {
-    public let availability: NexArmAvailability
-    public let phase: NexArmConnectionPhase
-    public let recovery: NexArmRecoveryStage
-}
 
 /// Execution provenance belongs to App; never supplied to the Bluetooth SDK.
 public struct NexArmControlOrigin: Sendable, Equatable {

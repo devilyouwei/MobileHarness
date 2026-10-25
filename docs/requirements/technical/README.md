@@ -21,3 +21,9 @@
 - [Agent containers](Agent-Containers-Plan.md): root, seven roles and unified lifecycle implemented; validation and native acceptance tracked separately.
 
 - [Container 状态与模型上下文](Container-State-Context.md)：替代共享Storage State，迁移到容器快照和Skill v3；验收见专项记录。
+
+Completed scope: [Actions container and one-way execution](../../completed/Actions-Container.md); current independent limitations remain in the follow-up document below.
+
+- [Container architecture follow-ups](Container-Architecture-Followups.md): inherited limitations and identified corrective work, including the current execution-policy routing discrepancy.
+
+Completed scope: [Execution layer cleanup](../../completed/Execution-Layers-Cleanup.md), including redundant source consolidation and Xcode ownership reconciliation.

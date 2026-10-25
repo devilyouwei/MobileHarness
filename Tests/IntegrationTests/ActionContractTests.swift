@@ -1,6 +1,5 @@
 import Actions
 import AgentCore
-import Agents
 import CallRuntime
 import ExecutionRuntime
 import Foundation
@@ -8,6 +7,8 @@ import FunctionContracts
 import Gateway
 import StorageCore
 import Testing
+
+@testable import Agents
 
 private actor ContractGate {
     private var open = false
@@ -102,7 +103,7 @@ private func contractDefinition(
     #expect(throws: ActionExecutionError.missingHandler(contractPath.executionIdentifier)) {
         try ActionRegistry().validate(capabilities: model)
     }
-    #expect(try registry.definition(for: contractPath).kind == .finite)
+    #expect(try registry.definition(for: contractPath.executionIdentifier).kind == .finite)
 }
 
 @Test(.actionCatalog) func assembledAgentCatalogsIncludeInternalActionsForStartupValidation() throws {

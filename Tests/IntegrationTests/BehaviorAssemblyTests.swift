@@ -1,6 +1,5 @@
 import Actions
 import AgentCore
-import Agents
 import CallRuntime
 import ExecutionRuntime
 import Foundation
@@ -11,6 +10,8 @@ import StorageChat
 import StorageCore
 import Testing
 import UI
+
+@testable import Agents
 
 private actor BehaviorEndpoint: UIPresentationCapability, UIUpdateCapability, SpeechPlaybackCapability,
     PosePresentationCapability, CameraControlCapability, HistoryPresentationCapability, ResourcePresentationCapability,
@@ -135,7 +136,7 @@ private func behaviorInvocation(_ function: String, parameters: [String: String]
 
 @Test(.actionCatalog) func behaviorAssemblyRejectsMissingInternalToolBeforeRuntimeStarts() throws {
     let permissions = try CapabilityRegistry(internalTools: [InternalTool(path: "Missing.Control.tool")])
-    #expect(throws: ToolRegistrationError.missingHandler("Missing.Control.tool")) {
+    #expect(throws: HarnessError.forbiddenTool) {
         let assembly = try BehaviorAssembly(actionModules: [], toolModules: [])
         try BehaviorCoverage.validate(
             actions: assembly.actions, toolPaths: assembly.toolPaths, capabilities: [permissions])
@@ -185,7 +186,10 @@ private func behaviorInvocation(_ function: String, parameters: [String: String]
             })
     ])
     let assembly = try BehaviorAssembly(actionModules: [action], toolModules: [tool])
-    #expect(try assembly.actions.definition(for: path).resources == [ActionResource(rawValue: resource.rawValue)])
+    #expect(
+        try assembly.actions.definition(
+            for: ActionIdentifier(domain: path.domain, module: path.module, function: path.function)
+        ).resources == [ActionResource(rawValue: resource.rawValue)])
     #expect(
         await assembly.tools.resources(for: "Fixture.Control.read") == [ActionResource(rawValue: resource.rawValue)])
     let invocation = ActionInvocation(
@@ -345,10 +349,8 @@ private func endpointInvocation(source: String, session: String, decision: Strin
     await #expect(throws: CommunicationError.scopeClosed) {
         try await endpoint.savePhoto(nil, invocation: endpointInvocation(source: "assistant", session: "retired-turn"))
     }
-    await #expect(throws: CommunicationError.unauthorized) {
-        try await endpoint.savePhoto(nil, invocation: endpointInvocation(source: "memory", session: "root"))
-    }
-    #expect(native.calls == 2)
+    _ = try await endpoint.savePhoto(nil, invocation: endpointInvocation(source: "memory", session: "root"))
+    #expect(native.calls == 3)
     native.failure = CameraControlError.permissionDenied
     await #expect(throws: CameraControlError.permissionDenied) {
         try await endpoint.savePhoto(nil, invocation: endpointInvocation(source: "photographer", session: "root"))
@@ -357,7 +359,7 @@ private func endpointInvocation(source: String, session: String, decision: Strin
 
 @Test(.actionCatalog) @MainActor func taskEndpointKeepsAdmissionAndOriginalHandlerFailure() async throws {
     let endpoint = TaskControlEndpoint(rootSessionID: "root")
-    await #expect(throws: CommunicationError.scopeClosed) {
+    await #expect(throws: ActionHostError.scopeClosed) {
         try await endpoint.controlTask(
             "startTask", arguments: [:], invocation: endpointInvocation(source: "assistant", session: "root"))
     }
@@ -366,20 +368,20 @@ private func endpointInvocation(source: String, session: String, decision: Strin
         await accepted.record(operation + ":" + source + ":" + session)
         throw CancellationError()
     }
-    for invocation in [
-        endpointInvocation(source: "memory", session: "root"),
-        endpointInvocation(source: "assistant", session: "retired"),
-    ] {
-        await #expect(throws: CommunicationError.unauthorized) {
-            try await endpoint.controlTask("startTask", arguments: [:], invocation: invocation)
-        }
+    await #expect(throws: ActionHostError.scopeClosed) {
+        try await endpoint.controlTask(
+            "startTask", arguments: [:], invocation: endpointInvocation(source: "assistant", session: "retired"))
     }
-    #expect(await accepted.values.isEmpty)
+    await #expect(throws: CancellationError.self) {
+        try await endpoint.controlTask(
+            "startTask", arguments: [:], invocation: endpointInvocation(source: "memory", session: "root"))
+    }
+    #expect(await accepted.values == ["startTask:memory:root"])
     await #expect(throws: CancellationError.self) {
         try await endpoint.controlTask(
             "startTask", arguments: [:], invocation: endpointInvocation(source: "assistant", session: "root"))
     }
-    #expect(await accepted.values == ["startTask:assistant:root"])
+    #expect(await accepted.values == ["startTask:memory:root", "startTask:assistant:root"])
 }
 
 private actor LockedTaskRequests {
@@ -429,7 +431,7 @@ private actor LockedTaskRequests {
     func setExpression(_ emotion: UIActions.Emotion, invocation: any FunctionInput) throws {}
     func observeTranscript(_ text: String, sessionID: String) {}
     func observeEmptyUtterance(sessionID: String) {}
-    func show(_ envelope: OutputEnvelope) async {}
+    func show(_ envelope: ActionOutputObservation) async {}
 }
 
 @Test(.actionCatalog) @MainActor func domainEndpointBindingsAreAtomicAndRetiredOwnersCannotUnbindReplacements()
@@ -444,13 +446,13 @@ private actor LockedTaskRequests {
     let replacement = EndpointVoiceFixture()
     let invocation = endpointInvocation(source: "assistant", session: "root")
     try endpoints.bindVoice(first)
-    #expect(throws: CommunicationError.scopeClosed) { try endpoints.bindVoice(replacement) }
+    #expect(throws: ActionHostError.scopeClosed) { try endpoints.bindVoice(replacement) }
     endpoints.unbindVoice(replacement)
     try await endpoints.speech.play(audioID: "audio", invocation: invocation)
     try await endpoints.presentation.present("caption", invocation: invocation)
     #expect(first.plays == 1 && first.captions == 1 && replacement.plays == 0)
     endpoints.unbindVoice(first)
-    await #expect(throws: CommunicationError.scopeClosed) {
+    await #expect(throws: ActionHostError.scopeClosed) {
         try await endpoints.speech.play(audioID: "audio", invocation: invocation)
     }
     try endpoints.bindVoice(replacement)

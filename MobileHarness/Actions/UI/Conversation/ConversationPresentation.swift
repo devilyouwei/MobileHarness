@@ -1,17 +1,16 @@
-import AgentCore
 import Foundation
 import FunctionContracts
 import StorageCore
 import UI
 
 /// Recognition and replies have independent identities: a queued task may reply after a later utterance.
-/// Session, active task and registered function permissions are checked by the calling host/Gateway.
+/// Session, active task and registered function permissions are checked by the calling Agents boundary.
 public struct ConversationPresentation: Sendable {
     public enum Update: Hashable, Sendable {
         case transcript, finishTranscript, voiceState, beginReply, reply, expression, replyWaiting
     }
-    public private(set) var turn: AgentTurn?
-    public private(set) var replyTurn: AgentTurn?
+    public private(set) var turn: ConversationTurn?
+    public private(set) var replyTurn: ConversationTurn?
     public private(set) var replySource: String?
     public private(set) var replyDecisionID: String?
     public private(set) var replyTaskID: String?
@@ -40,10 +39,6 @@ public struct ConversationPresentation: Sendable {
         for key in [Update.transcript, .finishTranscript, .voiceState] { sequences[key] = nil }
     }
 
-    public func isCurrent(_ envelope: OutputEnvelope) -> Bool {
-        envelope.turn != nil && envelope.turn == replyTurn && envelope.source.rawValue == replySource
-            && envelope.roundID == replyDecisionID && envelope.taskScope?.id == replyTaskID
-    }
     public func isRecognitionCurrent(_ context: ActionExecutionContext) -> Bool {
         context.correlationID != nil && context.correlationID == turn?.id && context.ordinal == turn?.ordinal
     }
@@ -51,19 +46,11 @@ public struct ConversationPresentation: Sendable {
         context.correlationID != nil && context.correlationID == replyTurn?.id && context.ordinal == replyTurn?.ordinal
             && context.source == replySource && context.decisionID == replyDecisionID && context.taskID == replyTaskID
     }
-    public mutating func accept(_ envelope: OutputEnvelope, update: Update) -> Bool {
-        accept(
-            source: envelope.source.rawValue, incoming: envelope.turn, sequence: envelope.sequence,
-            decisionID: envelope.roundID, taskID: envelope.taskScope?.id,
-            authorizedTask: envelope.taskScope?.executor == envelope.source,
-            update: update)
-    }
     public mutating func accept(_ context: ActionExecutionContext, update: Update) -> Bool {
         guard let id = context.correlationID, let ordinal = context.ordinal else { return false }
         return accept(
-            source: context.source, incoming: AgentTurn(id: id, ordinal: ordinal),
-            sequence: context.sequence, decisionID: context.decisionID, taskID: context.taskID,
-            authorizedTask: context.taskID != nil && context.taskExecutor == context.source, update: update)
+            source: context.source, incoming: ConversationTurn(id: id, ordinal: ordinal),
+            sequence: context.sequence, decisionID: context.decisionID, taskID: context.taskID, update: update)
     }
     /// Clear the previous visual round only after accepting a new recognition identity.
     @MainActor public mutating func accept(
@@ -76,13 +63,12 @@ public struct ConversationPresentation: Sendable {
     }
 
     private mutating func accept(
-        source: String, incoming: AgentTurn?, sequence: UInt64,
-        decisionID: String?, taskID: String?, authorizedTask: Bool, update: Update
+        source: String, incoming: ConversationTurn?, sequence: UInt64,
+        decisionID: String?, taskID: String?, update: Update
     ) -> Bool {
         guard let incoming, incoming.ordinal > 0, sequence > 0 else { return false }
         let recognition = update == .transcript || update == .finishTranscript || update == .voiceState
         if recognition {
-            guard source == "speechPerception" else { return false }
             if incoming != turn {
                 guard incoming.ordinal > (turn?.ordinal ?? 0) else { return false }
                 turn = incoming
@@ -94,7 +80,6 @@ public struct ConversationPresentation: Sendable {
             if update == .finishTranscript { transcriptClosed = true }
         } else {
             guard repliesEnabled, !cancelledTurns.contains(incoming.id) else { return false }
-            guard source == "assistant" || authorizedTask else { return false }
             if update == .beginReply {
                 guard sequence > (producerSequences[source] ?? 0),
                     incoming != replyTurn || source != replySource || decisionID != replyDecisionID

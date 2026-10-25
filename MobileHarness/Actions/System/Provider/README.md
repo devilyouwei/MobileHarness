@@ -45,10 +45,14 @@ ProviderSettingsStore 是 actor，以 busy 排斥重叠读写，保存 version=1
 
 ## 多 Provider 管理
 
-✅ 沿用私有设置事务传递至多 32 个 URL 唯一的 provider；当前配置与其余配置一起保存。UI 在加载模型上方提供单选、编辑、删除和末行添加，删除当前项关闭云端并要求重新选择。保存提交后生效，Key 保持钥匙串存储，旧单配置恢复为首项。
+沿用私有设置事务传递至多 32 个 URL 唯一的 provider；当前配置与其余配置一起保存。UI 在加载模型上方提供单选、编辑、删除和末行添加，删除当前项关闭云端并要求重新选择。保存提交后生效，Key 保持钥匙串存储，旧单配置恢复为首项。
 
-✅ Provider 名称通过私有配置链路保存，旧数据以 URL 主机名补齐。新增/编辑采用独立 modal 草稿（name/url/key），默认生成未占用的 Provider N 名称；取消不修改选择和凭据，确认校验 URL 唯一性与名称。列表名称为主、URL 单行省略为辅，保留三字段粘贴和 Key 脱敏。
+Provider 名称通过私有配置链路保存，旧数据以 URL 主机名补齐。新增/编辑采用独立 modal 草稿（name/url/key），默认生成未占用的 Provider N 名称；取消不修改选择和凭据，确认校验 URL 唯一性与名称。列表名称为主、URL 单行省略为辅，保留三字段粘贴和 Key 脱敏。
 
-✅ ProviderSettingsRequests 对 HTTP/HTTPS 的域名及 IP 配置采用一致的准入规则；安全错误提示同时列出两种协议。真实发现和推理的 URL 校验由 [OpenAI 适配器](../../../ModelKit/Language/LLM/OpenAI/README.md) 拥有。
+ProviderSettingsRequests 对 HTTP/HTTPS 的域名及 IP 配置采用一致的准入规则；安全错误提示同时列出两种协议。真实发现和推理的 URL 校验由 [OpenAI 适配器](../../../ModelKit/Language/LLM/OpenAI/README.md) 拥有。
 
-✅ SettingsProviderAdapter 的结果呈现调用显式忽略 UI 返回的接纳布尔值；会话及 revision 校验与现有呈现行为保持一致。
+SettingsProviderAdapter 的结果呈现调用显式忽略 UI 返回的接纳布尔值；会话及 revision 校验与现有呈现行为保持一致。
+
+## Execution ownership and lifecycle
+
+ProviderSettingsClient is an Actions-owned facade with coalesced restoration (at most 32 waiters) and joined shutdown. Provider draft/configuration and staging ports live in FunctionContracts; ApplicationControl owns cognitive authorization. UI SettingsFormController owns bounded discovery presentation workers and exposes joined shutdown, invoked by Actions cleanup.

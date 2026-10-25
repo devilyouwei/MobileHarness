@@ -1,5 +1,4 @@
 import Actions
-import Agents
 import Foundation
 import Gateway
 import PlatformKit
@@ -7,6 +6,7 @@ import StorageMedia
 import StorageTasks
 import Testing
 
+@testable import Agents
 @testable import StorageChat
 @testable import StorageCore
 @testable import StorageSQLite

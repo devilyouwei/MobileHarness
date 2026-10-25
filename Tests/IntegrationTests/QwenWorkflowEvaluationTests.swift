@@ -1,6 +1,5 @@
 import Actions
 import AgentCore
-import Agents
 import CallRuntime
 import ExecutionRuntime
 import Foundation
@@ -10,6 +9,8 @@ import Gateway
 import ModelKitOpenAI
 import StorageChat
 import Testing
+
+@testable import Agents
 
 private struct QwenCases: Decodable {
     let version: Int
@@ -477,7 +478,7 @@ private func qwenRun(_ scenario: QwenCase, provider: OpenAIChat) async throws ->
     let scheduler = ChannelScheduler(registry: try ActionRegistry(definitions: actionBindings)) {
         await inputGateway.deliverActionResult($0)
     }
-    let gateway = OutputGateway(
+    let gateway = await OutputGateway(
         manager: manager, requests: inputGateway,
         tools: try ToolRegistry(modules: [QwenTools(definitions: toolBindings)]), actions: scheduler, sink: { _ in })
     try await agent.start()

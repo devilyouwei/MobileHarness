@@ -13,7 +13,11 @@
 | [CaptionActions.swift](CaptionActions.swift) | 业务函数的参数校验、能力调用与完成值 |
 | [ConversationPresentation.swift](ConversationPresentation.swift) | 会话／轮次／任务／序号呈现围栏 |
 | [ConversationPresentationController.swift](ConversationPresentationController.swift) | 文字、语音显示与真实呈现确认 |
-| [VoicePresentationHandling.swift](VoicePresentationHandling.swift) | 仅含 UI 呈现的会话端口 |
+| [VoicePresentationHandling.swift](../../Support/Contracts/VoicePresentationHandling.swift) | 仅含 UI 呈现的会话端口 |
 | [VoiceStateActions.swift](VoiceStateActions.swift) | 业务函数的参数校验、能力调用与完成值 |
 
 [所属域设计](../README.md) · [Actions 模块](../../README.md)
+
+## Execution ownership and lifecycle
+
+ConversationPresentation uses neutral ConversationTurn and FunctionInput correlation/session fields. Role authorization is performed by Agents before Gateway admission. Business ordering, transcript/reply sequence and session/generation fences remain authoritative here.

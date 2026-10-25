@@ -1,6 +1,6 @@
-import Actions
 import AgentCore
 import Foundation
+import FunctionContracts
 import Gateway
 import UI
 
@@ -17,25 +17,8 @@ extension MemoryAgent {
     func stopUIInputs() async { await uiInputs.retire(for: descriptor.id)() }
     private func handleUI(_ value: HistoryInput, context: ProcessingContext) async throws -> HistoryReply {
         switch value {
-        case .conversation(let id):
-            return .conversation(try await conversation(await readHistory(.conversation(id), context: context)))
-        case .message(let id):
-            return .conversation(try await conversation(await readHistory(.message(id), context: context)))
-        case .page(let id, let after, let taskID):
-            return .conversation(
-                try await conversation(await readHistory(.page(id: id, after: after, taskID: taskID), context: context))
-            )
-        case .archives(let cursor):
-            guard case .archives(let values) = try await readHistory(.archives(before: cursor), context: context) else {
-                throw CommunicationError.invalidPayload
-            }
-            return .archives(try await MainActor.run { try values.map(HistoryPresentationAdapter.conversation) })
-        case .photo(let id, let inputID):
-            guard case .photo(let data) = try await readHistory(.photo(id: id, inputID: inputID), context: context)
-            else {
-                throw CommunicationError.invalidPayload
-            }
-            return .photo(data)
+        case .conversation, .message, .page, .archives, .photo:
+            return try await readHistory(value, context: context)
         case .startNew:
             try await beforeNewConversation()
             try await mutateUI(.startNew, context: context)
@@ -45,11 +28,7 @@ extension MemoryAgent {
         }
         return .completed
     }
-    private func conversation(_ result: HistoryReadResult) async throws -> HistoryConversation {
-        guard case .conversation(let value) = result else { throw CommunicationError.invalidPayload }
-        return try await HistoryPresentationAdapter.conversation(value)
-    }
-    public func readHistory(_ query: HistoryReadQuery, context: ProcessingContext) async throws -> HistoryReadResult {
+    public func readHistory(_ query: HistoryInput, context: ProcessingContext) async throws -> HistoryReply {
         guard context.sessionID == sessionID, status().lifecycle == .running else {
             throw CommunicationError.scopeClosed
         }
@@ -58,7 +37,8 @@ extension MemoryAgent {
         }
         let consumer = try uiExecution.begin(context.requestID)
         defer { uiExecution.finish(context.requestID) }
-        let invocation = try HistoryReadInvocation(query: query, requestID: context.requestID, sessionID: sessionID)
+        let invocation = ActionRequestSlot<HistoryInput, HistoryReply>(
+            input: query, requestID: context.requestID, sessionID: sessionID)
         let call = try InternalTool(path: "History.Conversation.readFull").call([:])
         let envelope = OutputEnvelope(
             source: descriptor.id, context: context, output: .toolCall(call), executionAttachment: invocation)

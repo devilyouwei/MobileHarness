@@ -120,5 +120,3 @@ FunctionTokenPrompts.json 包含 protocol、Action-only protocol、catalog 与 b
 同一响应可为已确定的多步输出连续 wait，每组内不同 Channel 可并行；依赖结果才能选择的步骤必须等待真实反馈。同名 Channel 跨 Task 独立，资源约束另外校验；模板不授予执行权。
 
 SentenceFunctionBuffer 支持首段软长度与后续长度，首段状态跨 XML／scope flush 保留；按句子／安全单词边界及显式长度 flush，无计时 flush。实际语音分段默认值由 Chat 调用者配置。
-
-❌ 自动语法修复和计时 flush 未实现。上层流程见 [Chat](../../Chat/README.md)，配置与目录见 [Capability](../Capability/README.md)。

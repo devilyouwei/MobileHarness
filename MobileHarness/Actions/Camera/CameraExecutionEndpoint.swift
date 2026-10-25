@@ -1,4 +1,3 @@
-import AgentCore
 import Foundation
 import FunctionContracts
 
@@ -16,9 +15,6 @@ import FunctionContracts
         self.validateSession = validateSession
     }
     private func validate(_ invocation: any FunctionInput) throws {
-        guard ["photographer", "assistant"].contains(invocation.context.source) else {
-            throw CommunicationError.unauthorized
-        }
         if invocation.context.sessionID != rootSessionID { try validateSession(invocation) }
     }
     public func savePhoto(_ id: String?, invocation: any FunctionInput) async throws -> CameraPhotoCommandReceipt {

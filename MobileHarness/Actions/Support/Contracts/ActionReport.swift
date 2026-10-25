@@ -108,3 +108,10 @@ public struct ActionReportedError: Error, Sendable, ActionReportProviding {
     public let actionReport: ActionReport
     public init(_ report: ActionReport) { actionReport = report }
 }
+
+extension ActionReport {
+    public static func failureReport(for error: any Error) -> ActionReport {
+        ((error as? any ActionReportProviding)?.actionReport ?? .failure(ActionReport.code(for: error)))
+            .recordingFailure(error)
+    }
+}

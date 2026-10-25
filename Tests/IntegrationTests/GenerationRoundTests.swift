@@ -314,7 +314,7 @@ private func roundHarness(
     let scheduler = ChannelScheduler(registry: try ActionRegistry(definitions: definitions)) {
         deliverActionFeedback ? await input.deliverActionResult($0) : .closed
     }
-    let gateway = OutputGateway(
+    let gateway = await OutputGateway(
         manager: manager, requests: input,
         tools: try ToolRegistry(modules: [RoundTools(definitions: [tool])]), actions: scheduler, sink: { _ in })
     return .init(
@@ -1178,7 +1178,7 @@ private func agentRequestFailuresTerminateWithoutRetryOrEffectReplay(_ failure: 
             await model.effectCompleted()
             return .value("confirmed-native-result")
         })
-    let gateway = OutputGateway(
+    let gateway = await OutputGateway(
         manager: manager, requests: inputGateway, tools: try ToolRegistry(modules: [RoundTools(definitions: [tool])]),
         actions: scheduler, sink: { _ in })
     try await agent.start()

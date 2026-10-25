@@ -1,4 +1,5 @@
 import Foundation
+import FunctionContracts
 import StorageCore
 import StorageFiles
 import StorageMedia

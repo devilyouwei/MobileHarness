@@ -3,7 +3,7 @@
     import Foundation
     import Observation
     import UI
-    import Actions
+    import FunctionContracts
 
     @available(iOS 27, *)
     @MainActor @Observable
@@ -15,11 +15,11 @@
         private let devicesUI: UIDeviceSettingsContainer
         private let diagnosticsUI: UIDiagnosticsContainer
         private let navigationUI: UINavigationContainer
-        private let bluetooth: BluetoothWorkflow
+        private let facades: AgentUIFacades
         private let failures: ContainerFailureChannel
         init(
             settings: UISettingsContainer, resources: UIModelResourcesContainer, diagnostics: UIDiagnosticsContainer,
-            devices: UIDeviceSettingsContainer, navigation: UINavigationContainer, bluetooth: BluetoothWorkflow,
+            devices: UIDeviceSettingsContainer, navigation: UINavigationContainer, facades: AgentUIFacades,
             failures: ContainerFailureChannel
         ) {
             diagnosticsUI = diagnostics
@@ -27,7 +27,7 @@
             resourcesUI = resources
             devicesUI = devices
             navigationUI = navigation
-            self.bluetooth = bluetooth
+            self.facades = facades
             self.failures = failures
         }
         public var devices: BluetoothSettingsState { devicesUI.state }
@@ -81,74 +81,14 @@
             guard !closed else { return }
             environmentInputs.report(category, value: value)
         }
-        @ObservationIgnored lazy var modelResourcesWorkflow = makeModelResourcesWorkflow()
-        private func makeModelResourcesWorkflow() -> ModelResourcesClient {
-            ModelResourcesClient(
-                read: { [resourcesUI] generation in
-                    guard case .snapshot(let value) = try await resourcesUI.requests.submit(.refresh(generation)) else {
-                        throw UIRequestError.stale
-                    }
-                    return value
-                },
-                restore: { [resourcesUI] in
-                    guard case .source(let value) = try await resourcesUI.requests.submit(.restore) else {
-                        throw UIRequestError.stale
-                    }
-                    return value
-                },
-                save: { [resourcesUI] draft in
-                    guard case .source(let value) = try await resourcesUI.requests.submit(.save(draft)) else {
-                        throw UIRequestError.stale
-                    }
-                    return value
-                },
-                download: { [resourcesUI] id, draft in _ = try await resourcesUI.requests.submit(.download(id, draft))
-                },
-                cancel: { [resourcesUI] id in _ = try await resourcesUI.requests.submitControl(.cancel(id)) },
-                remove: { [resourcesUI] id in _ = try await resourcesUI.requests.submit(.remove(id)) })
-        }
+        var modelResourcesWorkflow: any ModelResourcesOperating { facades.resourceOperations }
+        var settingsWorkflow: any SettingsOperating { facades.settingsOperations }
+        var modelName: String { facades.modelName() }
         public var modelResources: ModelResourcesState { resourcesUI.state }
-        @ObservationIgnored public lazy var modelResourceControls = ModelResourceInteractionWorkflow(
-            state: resourcesUI.presentation, operations: modelResourcesWorkflow)
-        @ObservationIgnored lazy var settingsWorkflow = ProviderSettingsClient(
-            provider: SettingsProviderOperations(
-                initial: SettingsProviderAdapter.initial,
-                restore: { [settingsUI] in
-                    guard case .draft(let value) = try await settingsUI.requests.submit(.restore) else {
-                        throw UIRequestError.stale
-                    }
-                    return value
-                },
-                discover: { [settingsUI] draft in
-                    guard case .models(let values) = try await settingsUI.requests.submit(.discover(draft)) else {
-                        throw UIRequestError.stale
-                    }
-                    return values
-                }, save: { [settingsUI] draft in _ = try await settingsUI.requests.submit(.save(draft)) },
-                errorMessage: { SettingsProviderAdapter.errorMessage($0) }), presentsResults: true)
-
+        public var modelResourceControls: any ModelResourcesControlling { facades.resources }
         public var settings: SettingsState { settingsUI.state }
-        @ObservationIgnored public lazy var settingsControls = SettingsFormController(
-            state: settingsUI.presentation, operations: settingsWorkflow,
-            defaultModel: SettingsProviderAdapter.initial.model)
-        @ObservationIgnored lazy var deviceControl = NexArmDeviceAdapter(bluetooth: bluetooth)
-        @ObservationIgnored public lazy var bluetoothControls = makeBluetoothControls()
-        private func makeBluetoothControls() -> BluetoothInteractionWorkflow {
-            BluetoothInteractionWorkflow(
-                state: devicesUI.presentation,
-                initialFence: deviceControl.fence, fenceStop: { [deviceControl] in deviceControl.stopFence() },
-                pageVisibility: { [bluetooth] visible in
-                    if visible { bluetooth.openPage() } else { bluetooth.closePage() }
-                }, openSettings: { [bluetooth] in bluetooth.openSystemSettings() },
-                perform: { [weak self] intent in
-                    guard let self else { throw CancellationError() }
-                    if ["stopScan", "disconnect", "forget"].contains(intent["operation"] ?? "") {
-                        try await self.devicesUI.requests.submitControl(DeviceInput(intent))
-                    } else {
-                        try await self.devicesUI.requests.submit(DeviceInput(intent))
-                    }
-                })
-        }
-
+        public var settingsControls: any SettingsControlling { facades.settings }
+        public var bluetoothControls: any BluetoothControlling { facades.bluetooth }
+        func acceptResourceSnapshot() { facades.resourcesPresented() }
     }
 #endif

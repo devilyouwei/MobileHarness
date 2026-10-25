@@ -1,6 +1,5 @@
 import Actions
 import AgentCore
-import Agents
 import ExecutionRuntime
 import Foundation
 import FunctionContracts
@@ -10,6 +9,7 @@ import StorageCore
 import StorageFiles
 import Testing
 
+@testable import Agents
 @testable import UI
 
 private actor InstalledPreferenceFixture {

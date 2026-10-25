@@ -1,5 +1,5 @@
 #if os(iOS)
-    import Actions
+    import FunctionContracts
     import AgentCore
     import Foundation
     import Gateway
@@ -13,7 +13,6 @@
         let cache: CacheContainer
         let manager: AgentManager
         let output: OutputGateway
-        let endpoints: ActionEndpoints
         let reportFailure: @Sendable (String, String, any Error) -> Void
         let interactionSessionID: String
         let startInteraction: @MainActor () async throws -> Void
@@ -22,7 +21,7 @@
         let makePerception:
             (
                 any SpeechRecognitionCapability, any VoiceActivityCapability, String, any AudioCaptureObserving,
-                MicrophoneSpectrumPresentation
+                any SpectrumPresenting
             ) throws
                 -> SpeechPerceptionAgent
     }
@@ -31,22 +30,17 @@
     @available(iOS 27, *)
     @MainActor final class VoiceAgentSession {
         private let runtime: VoiceRuntimeDependencies
-        private let spectrum: MicrophoneSpectrumPresentation
+        private let spectrum: any SpectrumPresenting
         private unowned let perception: SpeechPerceptionContainer
         private unowned let synthesis: SpeechSynthesisContainer
         init(
-            runtime: VoiceRuntimeDependencies, spectrum: MicrophoneSpectrumPresentation,
+            runtime: VoiceRuntimeDependencies, spectrum: any SpectrumPresenting,
             perception: SpeechPerceptionContainer, synthesis: SpeechSynthesisContainer
         ) {
             self.runtime = runtime
             self.spectrum = spectrum
             self.perception = perception
             self.synthesis = synthesis
-        }
-        var connections: VoiceSessionConnections {
-            VoiceSessionConnections(
-                endpoints: runtime.endpoints, interactionSessionID: runtime.interactionSessionID,
-                cancelReply: runtime.cancelReply, adaptFailure: SpeechPlaybackFailure.adapting)
         }
         func audioStore() async throws -> AudioCache {
             try await runtime.cache.audioScope(runtime.interactionSessionID)

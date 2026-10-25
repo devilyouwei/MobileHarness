@@ -7,6 +7,8 @@ import Foundation
     private let defaultModel: String
     private var discovery: Task<Void, Never>?
     private var restored = false
+    private var stopped = false
+    private var discoveries: [UUID: Task<Void, Never>] = [:]
     public init(state: any SettingsPresenting, operations: any SettingsOperating, defaultModel: String) {
         self.state = state
         self.operations = operations
@@ -19,6 +21,7 @@ import Foundation
             providers: state.providers)
     }
     public func restore() async throws {
+        guard !stopped else { throw CancellationError() }
         guard !restored else { return }
         let value = try await operations.restore()
         // A coalesced restore must not overwrite edits after the first caller applied its result.
@@ -36,7 +39,11 @@ import Foundation
         restored = true
     }
     public func loadModels() {
-        guard state.canLoad else { return }
+        guard !stopped, state.canLoad else { return }
+        guard discoveries.count < 32 else {
+            state.present(.error("同时处理的模型查询过多，请稍后重试"))
+            return
+        }
         cancelDiscovery()
         let current = state.revision
         let value = draft
@@ -45,7 +52,9 @@ import Foundation
         state.present(.notice(nil))
         state.present(.models([]))
         state.present(.selectedModel(defaultModel))
-        discovery = Task { [weak self, operations] in
+        let id = UUID()
+        let worker = Task { [weak self, operations] in
+            defer { self?.discoveries[id] = nil }
             do {
                 let result = try await operations.discover(value)
                 try Task.checkCancellation()
@@ -67,9 +76,18 @@ import Foundation
                 }
             }
         }
+        discoveries[id] = worker
+        discovery = worker
+    }
+    public func shutdown() async {
+        stopped = true
+        cancelDiscovery()
+        let workers = Array(discoveries.values)
+        for worker in workers { worker.cancel() }
+        for worker in workers { await worker.value }
     }
     public func save() async -> Bool {
-        guard state.canSave else { return false }
+        guard !stopped, state.canSave else { return false }
         state.present(.isSaving(true))
         state.present(.error(nil))
         state.present(.notice(nil))

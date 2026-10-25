@@ -22,7 +22,10 @@ import UI
         let platform: PlatformContainer
         let storage: StorageContainer
         let model: ModelContainer
+        let actions: ActionsContainer
+        let gateway: GatewayContainer
         let agents: AgentContainer
+        let actionAssembly: ApplicationActionAssembly
         let ui: ApplicationPresentation
         let homePreparation: ForegroundPreparation
     }
@@ -45,6 +48,11 @@ import UI
             repository: { try storage.database.media },
             files: { try files.file(files.photos) })
         let model = registry.model()
+        let actions = registry.actions()
+        let gateway = registry.gateway()
+        let actionAssembly = ApplicationActionAssembly(
+            actions: actions, gateway: gateway, storage: storage, model: model,
+            platform: platform, ui: uiContainer, photos: photos, bluetooth: bluetooth)
         let agents = registry.agents {
             AgentContainer(
                 containerFailures: containerFailures,
@@ -55,21 +63,17 @@ import UI
                     return try AgentRepositories(
                         chat: storage.database.chat, tasks: storage.database.tasks, media: storage.database.media,
                         devices: storage.database.devices)
-                }, cache: storage.cache, files: files, photos: photos, camera: camera,
+                }, cache: storage.cache, files: files, camera: camera,
                 cameraPresentation: presentation,
                 cameraUI: uiContainer.camera, albumUI: uiContainer.album,
-                exportPhoto: { data in try await platform.vision.savePhoto(data) },
-                makeCamera: { bindings in
-                    CameraCoordinator(
-                        camera: camera, presentation: presentation, photos: photos,
-                        photoCues: platform.audio.cue(.camera),
-                        makeRuntime: bindings.makeRuntime,
-                        connectPerception: bindings.connectPerception)
-                },
-                bluetooth: bluetooth, audio: platform.audio,
+                cameraAccess: AppCameraAccess(actionAssembly.business),
+                deviceAccess: AppDeviceAccess(actionAssembly.business),
+                facades: actionAssembly.business.facades,
+                audio: platform.audio,
                 languageModels: model.language, speechModels: model.speech, visionModels: model.vision,
                 modelArtifacts: model.artifacts, memoryPressure: { await model.handleMemoryPressure() })
         }
+        actionAssembly.agents = agents
         let home = uiContainer.home
         let homePreparation = ForegroundPreparation(
             steps: {
@@ -134,7 +138,7 @@ import UI
         return Services(
             registry: registry, containerFailures: containerFailures,
             uiContainer: uiContainer, platform: platform, storage: storage, model: model,
-            agents: agents,
+            actions: actions, gateway: gateway, agents: agents, actionAssembly: actionAssembly,
             ui: ApplicationPresentation(features: agents, home: home), homePreparation: homePreparation)
     }
 }

@@ -4,7 +4,7 @@
 
 <p align="center"><em>Your phone is the best robot brain!</em></p>
 
-MobileHarness is an Apple-native, bio-inspired multimodal Agent app that turns your iPhone into a harness for independent, stateful Agents. Built around a **Signal → Cognition → Action** loop, it coordinates the phone's hardware and sensors, such as its camera, microphone and speaker, so Agents can perceive the world, understand users, reason, converse and act. Its current robotic-body integration targets **NexArm**, allowing the phone to serve as the brain of an embodied Agent. The banner illustrates the broader vision of coordinating different kinds of robots.
+MobileHarness is an Apple-native, bio-inspired multimodal Agent app that turns your iPhone into a harness for independent, stateful Agents. Built around a **Signal → Cognition → Action** loop, it coordinates the phone's hardware and sensors, such as its camera, microphone and speaker, so Agents can perceive the world, understand users, reason, converse and act. Its current robotic-body integration targets **NexArm**, allowing the phone to serve as the brain of an embodied Agent.
 
 <p align="center">
   <img src="./agent-loop.svg" alt="Pastel blue Signal, lavender Cognition and peach Action form a counterclockwise triangular feedback loop.">

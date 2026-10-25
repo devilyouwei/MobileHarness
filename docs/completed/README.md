@@ -37,3 +37,11 @@
 - [Agents 角色归属与共享机制](Agents-Organization.md)：根级装配、角色私有协议与通用机制分离，以及职责一致的文件组织。
 
 原定整理范围与完整自动检查已完成；模拟器构建使用隔离项目元数据读取同一工作区源码。原工程文件协调阻塞、修正过程及未进行的真实模型／设备验收见[验证记录](../validation/Agents-Actions-Organization.md)。
+
+## Actions execution ownership (2026-10-25)
+
+- [Actions container and one-way execution](Actions-Container.md): one App-owned Actions root, composable business library, neutral Gateway preparation/scheduling and Agent-owned authorization. Required repository checks and all four Simulator builds passed; retained failure iterations and native/model/device evidence limits are in [validation](../validation/Actions-Container.md).
+
+## Execution layer cleanup (2026-10-25)
+
+- [Execution layer source ownership audit](Execution-Layers-Cleanup.md): consolidate six net Swift files, remove unused adapters/helpers, reconcile physical and Xcode ownership, and correct stale cognitive authorization diagrams. Full repository checks and all four Simulator schemes passed; [validation evidence](../validation/Execution-Layers-Cleanup.md) distinguishes build/test results from model/device acceptance.

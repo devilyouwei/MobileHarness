@@ -1,6 +1,5 @@
 import Actions
 import AgentCore
-import Agents
 import CallRuntime
 import ExecutionRuntime
 import Foundation
@@ -12,6 +11,8 @@ import StorageChat
 import StorageCore
 import Testing
 import UI
+
+@testable import Agents
 
 private actor SpecialistEffects {
     private(set) var owners: [String] = []
@@ -65,7 +66,7 @@ private struct SpecialistTools: ToolModule { let definitions: [ActionBinding] }
             await effects.capture(invocation.context.source)
             return .completed
         })
-    let gateway = OutputGateway(
+    let gateway = await OutputGateway(
         manager: manager, requests: input,
         tools: try ToolRegistry(modules: [SpecialistTools(definitions: [definition])]),
         actions: ChannelScheduler(registry: ActionRegistry()), policy: policy, sink: { _ in })
@@ -249,7 +250,7 @@ func assistantReportsReplyActivityWithoutOwningListening() async throws {
     let scheduler = ChannelScheduler(registry: try ActionRegistry(definitions: [binding]), resources: resources) {
         await input.deliverActionResult($0)
     }
-    let gateway = OutputGateway(
+    let gateway = await OutputGateway(
         manager: manager, requests: input, tools: ToolRegistry(), actions: scheduler, policy: policy, sink: { _ in })
     try await manager.register(assistant)
     try await assistant.start()
@@ -291,7 +292,7 @@ func assistantReportsReplyActivityWithoutOwningListening() async throws {
 @Test(.actionCatalog, .timeLimit(.minutes(1))) func interactionSceneChangeOnlyControlsItsOwnRole() async throws {
     let manager = AgentManager()
     let input = InputGateway(manager: manager)
-    let gateway = OutputGateway(
+    let gateway = await OutputGateway(
         manager: manager, requests: input, tools: ToolRegistry(), actions: ChannelScheduler(registry: ActionRegistry()),
         sink: { _ in })
     let parent = try AssistantAgent(

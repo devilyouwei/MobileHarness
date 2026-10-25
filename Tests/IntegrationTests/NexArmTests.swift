@@ -1,6 +1,5 @@
 import Actions
 import AgentCore
-import Agents
 import CallRuntime
 import ExecutionRuntime
 import Foundation
@@ -9,6 +8,8 @@ import Gateway
 import PlatformKit
 import StorageCore
 import Testing
+
+@testable import Agents
 
 /// Deliberately simple IK fixture; does not model physical kinematics.
 struct NexArmTestIK {
@@ -374,7 +375,7 @@ private func runNexArmAssistantMarkup(
     ) {
         await input.deliverActionResult($0)
     }
-    let output = OutputGateway(
+    let output = await OutputGateway(
         manager: manager, requests: input, tools: assembly.tools, actions: scheduler, policy: policy,
         actionFeedback: .terminal, sink: { _ in })
     do {

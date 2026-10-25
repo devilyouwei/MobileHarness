@@ -1,8 +1,9 @@
 import AgentCore
-import Agents
 import Foundation
 import Synchronization
 import Testing
+
+@testable import Agents
 
 private enum ContextFixtureFailure: Error { case encoding }
 private struct FailingContext: Encodable, Sendable {
@@ -45,6 +46,25 @@ private actor ContextReadBarrier {
     context.close()
     #expect(throws: ContainerContextError.closed) { try context.open(session: "one") }
     await #expect(throws: ContainerContextError.closed) { try await context.snapshot(session: "one", names: []) }
+}
+
+@Test func containerContextEncodedSourcesPreserveJSONObjectsAndFailures() async throws {
+    let data = Data(#"{"available":true,"count":2}"#.utf8)
+    let source = ContainerContextSource(encoded: { data })
+    #expect(try await source.contextSnapshot() == data)
+    let context = AgentStateContext()
+    try context.register("fixture.encoded", source: source)
+    try context.register(
+        "fixture.failure", source: ContainerContextSource(encoded: { throw ContextFixtureFailure.encoding }))
+    try context.open(session: "one")
+    let collected = try await context.snapshot(session: "one", names: ["fixture.encoded"])
+    let object = try #require(JSONSerialization.jsonObject(with: Data(collected.utf8)) as? [String: Any])
+    let snapshot = try #require(object["fixture.encoded"] as? [String: Any])
+    #expect(snapshot["available"] as? Bool == true)
+    #expect(snapshot["count"] as? Int == 2)
+    await #expect(throws: ContextFixtureFailure.self) {
+        try await context.snapshot(session: "one", names: ["fixture.failure"])
+    }
 }
 
 @Test func containerContextBudgetsAndEncodingFailureAreExplicit() async throws {

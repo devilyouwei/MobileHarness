@@ -4,7 +4,6 @@ import FunctionContracts
 
 /// Host-owned registration profiles, grouped by module rather than model aliases or function lists.
 public struct BehaviorProtocolBindings {
-    enum Error: Swift.Error { case unknownModule(ActionIdentifier) }
     public static func bind(_ function: ActionFunction) throws -> ActionBinding {
         if [
             "Camera.Album.perform", "History.Conversation.readFull", "Speech.Detection.run", "Speech.Listening.prepare",
@@ -67,7 +66,7 @@ public struct BehaviorProtocolBindings {
             "NexArm.Tracking":
             return ActionBinding(function: function, protocols: [.tool], executionPolicy: .direct)
         default:
-            throw Error.unknownModule(function.path)
+            return ActionBinding(function: function)
         }
     }
 }

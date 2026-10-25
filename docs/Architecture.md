@@ -1,6 +1,6 @@
 # Architecture
 
-Agents directly consume typed UI container requests, native PlatformKit streams and model/device/failure observations. UI, PlatformKit, ModelKit and Storage remain independent. Input observation and business execution have separate capabilities and owners.
+Agents directly consume typed UI container requests, native PlatformKit streams and model/device/failure observations. Perception roles turn sensory input into semantic role messages; cognitive roles consume those messages through Gateway or receive already typed local intent directly. Internal messages can also originate from any authorized role without new sensor input. The [source/perception/cognition/execution overview](../MobileHarness/README.md#native-input-and-internal-signals) distinguishes those paths and their feedback. UI, PlatformKit, ModelKit and Storage remain independent. Input observation and business execution have separate capabilities and owners.
 
 ```mermaid
 flowchart LR
@@ -16,7 +16,7 @@ User and model decisions share registered Actions, resource ownership, cancellat
 
 Each Agent owns its constructor-injected UI subscriptions independently of pages and joins cleanup; the application root assembles and starts/stops the owners. UI request receipts distinguish acceptance from business completion; State contains limited public facts with one owning writer. Raw frames, queues and full AgentContext remain private. Direct delivery never automatically retries a failed effect or claims physical completion.
 
-App 每个作用域缓存唯一 AgentContainer，通过一个 agents 生命周期节点管理它。七个稳定角色容器分别拥有会话、注册与清理；共享 AgentRuntime 只装配通信／执行图。依赖顺序与公开接口见 [Agents 当前契约](../MobileHarness/Agents/README.md#agent-container)，实施状态和独立验收见 [容器计划](requirements/technical/Agent-Containers-Plan.md)。
+App caches one ActionsContainer, GatewayContainer and AgentContainer per registration scope. Foundations → executionBindings → Actions → Gateway → Agents → homePreparation defines readiness; inverse cleanup retains all host ports until Gateway and Actions join. Actions owns canonical registration, pure preparation, validation and business/native execution; Agents owns role/Skill/Task authorization; Gateway owns neutral endpoint/envelope/scope admission, communication, scheduling, resources and delivery. Domains, modules and individual actions remain composable business library values without containers. The module APIs and ownership rules are defined in the [overall technical design](../MobileHarness/README.md).
 
 The complete current module graph, source ownership, speech/camera/history/model/resource flows and lifecycle contracts are maintained in [the overall technical design](../MobileHarness/README.md). Local interfaces and limits belong to each module README. [ADR 0218](adr/0218-direct-container-input.md) records the change in input boundaries; [validation](validation/Direct-Container-Input.md) separates automated, build and physical evidence.
 
@@ -26,6 +26,6 @@ Actions owns native voice capture/playback, diagnostic capture and voice present
 
 Home gestures and diagnostic start/stop requests are typed Container inputs owned by SpeechPerception and ApplicationControl. Actions neither create roles nor publish back into UI request sources. Registration and bound output consumers precede input admission; initialization never opens devices or loads models.
 
-Complete history queries execute through the private History.Conversation.readFull endpoint with a request-owned typed result attachment. Gateway transports it only after producer/permission checks, for local non-model calls without delegated scope or mixed media. Four actual read workers retain joined cancellation; model preview functions and Skill exposure remain unchanged.
+Complete history queries execute through the private History.Conversation.readFull endpoint with a request-owned typed result attachment. Agents authorizes the producer and request; Gateway transports it after neutral endpoint/scope checks, for local non-model calls without delegated scope or mixed media. Four actual read workers retain joined cancellation; model preview functions and Skill exposure remain unchanged.
 
-Business interaction feedback and activity projection services compile in Actions. Camera, resource and connection observers belong to their actual Agents. The explicit simulator build variant excludes the unsupported default CoreAI dependency; simulator capability unavailability is explicit, while device/macOS providers remain real.
+Business interaction feedback and callable presentation compile in Actions. Passive activity projection that interprets Agent/Task evidence compiles in Agents/Support. Camera, resource and connection observers belong to their actual Agents. The explicit simulator build variant excludes the unsupported default CoreAI dependency; simulator capability unavailability is explicit, while device/macOS providers remain real.

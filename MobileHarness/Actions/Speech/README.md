@@ -10,7 +10,7 @@ Gateway 通过注册函数调用本域，Agents 决定请求与策略，App 注�
 
 | 文件 | 当前职责 |
 | --- | --- |
-| [SpeechActions.swift](SpeechActions.swift) | 业务函数的参数校验、能力调用与完成值 |
+| [ActionNamespaces.swift](../Support/Contracts/ActionNamespaces.swift) | Shared SpeechActions namespace only; callable implementations remain in the domain files below |
 | [SpeechExecutionEndpoint.swift](SpeechExecutionEndpoint.swift) | 语音会话的稳定端口与身份校验，弱绑定实际所有者 |
 | [SpeechModule.swift](SpeechModule.swift) | 显式绑定播放、聆听、手势和检测能力 |
 

@@ -1,4 +1,5 @@
 import Foundation
+import FunctionContracts
 
 /// Latest target and admitted command state for one tracking lifetime; contains no device/task owner.
 struct NexArmTrackingSession {

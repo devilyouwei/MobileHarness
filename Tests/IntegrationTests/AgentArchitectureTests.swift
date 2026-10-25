@@ -1,6 +1,5 @@
 import Actions
 import AgentCore
-import Agents
 import CallRuntime
 import ExecutionRuntime
 import Foundation
@@ -11,6 +10,8 @@ import PlatformKit
 import StorageChat
 import StorageCore
 import Testing
+
+@testable import Agents
 
 private struct TaskFixtureState: AgentContextState {
     var dialogue: [String] = []
@@ -407,7 +408,7 @@ extension LiveRuntimeTests {
         ) {
             await input.deliverActionResult($0)
         }
-        let gateway = OutputGateway(
+        let gateway = await OutputGateway(
             manager: manager, requests: input, tools: ToolRegistry(), actions: scheduler, policy: policy, sink: { _ in }
         )
         let parentPump = Task {
@@ -558,7 +559,7 @@ extension LiveRuntimeTests {
     #expect(context.consumedBatches == [next] && context.evictedBatchCount == 1)
 }
 
-@Test(.actionCatalog) func replyIdentitySurvivesNewRecognitionAndRequiresChildGrant() {
+@Test(.actionCatalog) func replyIdentitySurvivesNewRecognitionAndFencesSourceAndTaskCorrelation() {
     let session = UUID().uuidString
     let old = AgentTurn(id: UUID().uuidString, ordinal: 1)
     let new = AgentTurn(id: UUID().uuidString, ordinal: 2)
@@ -577,12 +578,14 @@ extension LiveRuntimeTests {
     #expect(accepted2)
     let accepted3 = presentation.accept(context("assistant", old, 2), update: .reply)
     #expect(accepted3)
-    #expect(presentation.turn == new && presentation.replyTurn == old)
-    let accepted4 = !presentation.accept(context("taskPhotographer", old, 1), update: .beginReply)
+    #expect(
+        presentation.turn == ConversationTurn(id: new.id, ordinal: new.ordinal)
+            && presentation.replyTurn == ConversationTurn(id: old.id, ordinal: old.ordinal))
+    let accepted4 = presentation.accept(context("taskPhotographer", old, 1), update: .beginReply)
     #expect(accepted4)
-    let accepted5 = presentation.accept(context("taskPhotographer", old, 1, task: true), update: .beginReply)
+    let accepted5 = presentation.accept(context("taskPhotographer", old, 2, task: true), update: .beginReply)
     #expect(accepted5)
-    let accepted6 = presentation.accept(context("taskPhotographer", old, 2, task: true), update: .reply)
+    let accepted6 = presentation.accept(context("taskPhotographer", old, 3, task: true), update: .reply)
     #expect(accepted6)
     let accepted7 = !presentation.accept(context("assistant", old, 3), update: .reply)
     #expect(accepted7)
@@ -613,7 +616,7 @@ extension LiveRuntimeTests {
         await #expect(throws: CommunicationError.scopeClosed) {
             try await manager.registerExecution(UUID().uuidString, scope: scope, agent: child.descriptor.id)
         }
-        let gateway = OutputGateway(
+        let gateway = await OutputGateway(
             manager: manager, requests: InputGateway(manager: manager), tools: ToolRegistry(),
             sink: { _ in })
         let consumer = try await gateway.consumer(for: parent)
@@ -645,7 +648,7 @@ extension LiveRuntimeTests {
         let policy = try CommunicationPolicy(
             contracts: AgentContracts.communication, configurations: [parentConfiguration, childConfiguration])
         let input = InputGateway(manager: manager, policy: policy)
-        let gateway = OutputGateway(
+        let gateway = await OutputGateway(
             manager: manager, requests: input, tools: ToolRegistry(), policy: policy, sink: { _ in })
         let root = AgentInput(
             id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("delegation"))
@@ -771,7 +774,7 @@ extension LiveRuntimeTests {
         ) {
             await input.deliverActionResult($0)
         }
-        let gateway = OutputGateway(
+        let gateway = await OutputGateway(
             manager: manager, requests: input, tools: ToolRegistry(), actions: scheduler, policy: policy, sink: { _ in }
         )
         let parentConsumer = try await gateway.consumer(for: parent)
@@ -870,7 +873,7 @@ extension LiveRuntimeTests {
         try await parent.context.update { try $0.tasks.register(scope) }
         let policy = try CommunicationPolicy(
             contracts: AgentContracts.communication, configurations: [parentConfiguration, childConfiguration])
-        let gateway = OutputGateway(
+        let gateway = await OutputGateway(
             manager: manager, requests: InputGateway(manager: manager, policy: policy),
             tools: ToolRegistry(),
             policy: policy, sink: { _ in })

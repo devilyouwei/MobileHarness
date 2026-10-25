@@ -64,3 +64,40 @@ func restoringSettingsAgainPreservesUnsavedFormEdits() async throws {
     #expect(state.selectedModel == "unsaved-selection")
     #expect(state.url == "https://new.example.test")
 }
+
+@MainActor private final class DiscoveryCleanupFixture: SettingsOperating {
+    let started = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingOldest(1))
+    var release: CheckedContinuation<Void, Never>?
+    var ended = false
+    func restore() async throws -> CloudSettingsDraft {
+        .init(enabled: true, url: "https://example.test", key: "test", model: "test")
+    }
+    func save(_ draft: CloudSettingsDraft) async throws {}
+    func discover(_ draft: CloudSettingsDraft) async throws -> [String] {
+        await withCheckedContinuation {
+            release = $0
+            started.continuation.yield(())
+        }
+        ended = true
+        try Task.checkCancellation()
+        return ["late"]
+    }
+}
+
+@Test(.timeLimit(.minutes(1))) @MainActor func settingsShutdownJoinsCancelledDiscoveryAndRejectsNewWork() async throws {
+    let fixture = DiscoveryCleanupFixture()
+    let state = SettingsState(initial: try await fixture.restore())
+    let controls = SettingsFormController(state: state, operations: fixture, defaultModel: "test")
+    controls.loadModels()
+    var started = fixture.started.stream.makeAsyncIterator()
+    await started.next()
+    controls.cancelDiscovery()
+    let stop = Task { await controls.shutdown() }
+    await Task.yield()
+    #expect(!fixture.ended)
+    fixture.release?.resume()
+    await stop.value
+    #expect(fixture.ended && !state.models.contains("late"))
+    await #expect(throws: CancellationError.self) { try await controls.restore() }
+    #expect(await controls.save() == false)
+}

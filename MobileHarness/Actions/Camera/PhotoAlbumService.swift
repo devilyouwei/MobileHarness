@@ -98,42 +98,8 @@ public actor PhotoAlbumService: PhotoAlbumCapability {
     }
 }
 
-/// One identity-bound typed invocation. Media bytes never enter model JSON.
-public actor PhotoAlbumInvocation {
-    public let input: AlbumInput
-    private let requestID: String
-    private let sessionID: String
-    private var admitted = false
-    private var closed = false
-    private var result: AlbumReply?
-    private var failure: (any Error)?
-    public init(input: AlbumInput, requestID: String, sessionID: String) {
-        self.input = input
-        self.requestID = requestID
-        self.sessionID = sessionID
-    }
-    public func accept(_ invocation: any FunctionInput) throws {
-        guard !admitted, !closed, invocation.context.source == "photographer", invocation.context.inputID == requestID,
-            invocation.context.sessionID == sessionID, invocation.context.taskID == nil
-        else { throw PhotoAlbumError.invalidRequest }
-        admitted = true
-    }
-    public func complete(_ result: AlbumReply) throws {
-        guard admitted, !closed, self.result == nil else { throw PhotoAlbumError.invalidRequest }
-        self.result = result
-    }
-    public func fail(_ error: any Error) { failure = error }
-    public func take() throws -> AlbumReply {
-        defer {
-            closed = true
-            result = nil
-            failure = nil
-        }
-        if let failure { throw failure }
-        guard !closed, let result else { throw PhotoAlbumError.unavailable }
-        return result
-    }
-}
+public typealias PhotoAlbumInvocation = ActionRequestSlot<AlbumInput, AlbumReply>
+
 public enum PhotoAlbumActions {
     public static func function(using album: (any PhotoAlbumCapability)?) -> ActionFunction {
         ActionFunction(

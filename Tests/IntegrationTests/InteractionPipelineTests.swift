@@ -1,6 +1,5 @@
 import Actions
 import AgentCore
-import Agents
 import CallRuntime
 import Foundation
 import FunctionContracts
@@ -8,6 +7,8 @@ import Gateway
 import PlatformKit
 import StorageCore
 import Testing
+
+@testable import Agents
 
 private actor InteractionDevice: DeviceControlCapability {
     var calls: [DeviceControlRequest.Operation] = []

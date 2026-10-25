@@ -1,10 +1,11 @@
 import Actions
-import Agents
 import ExecutionRuntime
 import Foundation
 import FunctionContracts
 import StorageCore
 import Testing
+
+@testable import Agents
 
 private func effectInput(_ parameters: [String: String]) -> FunctionInvocation {
     .init(

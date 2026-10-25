@@ -1,6 +1,5 @@
 import Actions
 import AgentCore
-import Agents
 import Foundation
 @_spi(ModelManagement) import ModelKit
 import StorageChat
@@ -11,6 +10,7 @@ import StorageSQLite
 import StorageTasks
 import Testing
 
+@testable import Agents
 @testable import ModelKitOpenAI
 
 private actor LiveTitleChatProbe: ChatCapability {

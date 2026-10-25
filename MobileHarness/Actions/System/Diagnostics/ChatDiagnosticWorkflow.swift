@@ -1,3 +1,5 @@
+import FunctionContracts
+
 #if DEBUG
     import Foundation
     import ModelKit

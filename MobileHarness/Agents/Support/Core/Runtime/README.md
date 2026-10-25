@@ -2,25 +2,22 @@
 
 ## 职责与外部关系
 
-Foundation-only 的注册、生命周期、通用 Context、短接纳、任务授权与轮次协调。角色拥有实际订阅／Worker，持久化实现和原生清理由上层注入，不由本目录创建。
+Registration, lifecycle, generic Context, short admission, Task authorization and round coordination use system libraries and neutral FunctionContracts. 角色拥有实际订阅／Worker，持久化实现和原生清理由上层注入，不由本目录创建。
 
 ```mermaid
 flowchart LR
- A["Agents：具体角色与私有仓库实现"]:::agent
- R["Runtime 契约／机制"]:::host
- G["Gateway：实例身份／授权／结果"]:::gateway
- H["App：根生命周期"]:::host
- A <--> R
- G --> R
- H --> R
- classDef ui fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e
- classDef platform fill:#dcfce7,stroke:#16a34a,color:#14532d
- classDef model fill:#f3e8ff,stroke:#9333ea,color:#581c87
- classDef storage fill:#fef3c7,stroke:#d97706,color:#78350f
- classDef agent fill:#eef2ff,stroke:#6366f1,color:#312e81
- classDef gateway fill:#ffedd5,stroke:#ea580c,color:#7c2d12
- classDef action fill:#ffe4e6,stroke:#e11d48,color:#881337
- classDef host fill:#f1f5f9,stroke:#64748b,color:#334155
+    subgraph Cognition["AGENTS · Runtime ownership"]
+        A["Role implementations / private repositories"]:::agent
+        B["Agents input/output adapters<br/>Identity · Authorization · Results"]:::agent
+        R["AgentCore.Runtime<br/>Manager · Context · Round coordination"]:::agent
+        A -->|uses| R
+        B -->|uses| R
+    end
+    H["App · Root composition"]:::host
+    H -->|uses lifecycle contracts| R
+    classDef agent fill:#ede9fe,stroke:#7c3aed,color:#2e1065
+    classDef host fill:#dbeafe,stroke:#2563eb,color:#172554
+    style Cognition fill:#faf7fd,stroke:#a78bfa
 ```
 
 ## 文件与职责
@@ -72,7 +69,7 @@ ProcessingContext 是本地 request/session/generation/turn／因果值，不是
 
 ## Context 与工作状态
 
-✅ Record.init 对显式 id 原样保留，缺省 id 直接使用非抛错的 UUID 字符串；初始化的 throws 仅用于证据字段校验。
+Record.init 对显式 id 原样保留，缺省 id 直接使用非抛错的 UUID 字符串；初始化的 throws 仅用于证据字段校验。
 
 AgentContext version 1 验证 agent/scope/revision，最多 8192 条记录（单条 ≤512 KiB）、8192 消费批次、256 work/task 记录；逻辑 Data 总上限 32 MiB。仅终态可淘汰，默认超限拒绝，显式滚动保留计数。DecisionContext 是不可变选取快照，校验 Signal／批次成员；不含 Storage 依赖。
 
@@ -87,5 +84,3 @@ AgentAdmissionGate 用锁保护短 permit 与有界 FIFO 等待者；取消移�
 AgentRoundCoordinator 每轮最多登记 120 个调用，去重实际结果，在所有调用完成并 seal 后计算 needsReasoning；显式业务值或真实失败允许续推，纯取消不允许。ActionResultInbox 默认保留 128 个终态（可配 1–512），按 executionID 去重并累计淘汰，不是工作队列。
 
 AgentTaskBudget 跨同一输入的续轮累计用量，正数可选限制显式生效，生产 request/native 上限为 nil；计数饱和安全。新的用户输入有独立 Decision 预算，即使仍属于同一前台 Task。provider 网络和 Action 执行截止时间另有 owner，不等于整个 Decision 时限。
-
-❌ 通用 factory、自动重启和健康监督未实现。局部媒体见 [Input](../Input/README.md)，真实结果见 [Output](../Output/README.md)。

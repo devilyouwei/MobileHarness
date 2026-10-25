@@ -1,3 +1,5 @@
+import FunctionContracts
+
 public enum ActionSchedulingError: Error, Equatable, Sendable {
     case resultDeliveryFailed(executionID: String, path: String, state: String)
     case resultCapacityExceeded

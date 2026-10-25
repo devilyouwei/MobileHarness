@@ -2,7 +2,7 @@
     import Foundation
     import Observation
     import UI
-    import Actions
+    import FunctionContracts
 
     @available(iOS 27, *)
     @MainActor @Observable

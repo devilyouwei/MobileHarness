@@ -1,6 +1,6 @@
-import Actions
 import AgentCore
 import Foundation
+import FunctionContracts
 import Gateway
 import PlatformKit
 import StorageCore
@@ -22,12 +22,13 @@ public actor ApplicationControlAgent: Agent {
     var resourceObservation: ResourceObservationSession?
     let uiDiagnostics: UIDiagnosticsContainer?
     var detection: Task<Void, any Error>?
+    let decodeResources: @Sendable (String) throws -> ModelResourceViewSnapshot
     let uiSettings: UISettingsContainer?
     let uiResources: UIModelResourcesContainer?
     let uiDevices: UIDeviceSettingsContainer?
-    let uiProviderSettings: ProviderSettingsRequests?
-    let uiProviderDiscovery: ProviderDiscoveryRequests?
-    let uiProviderPresentation: ProviderPresentationAdapter?
+    let uiProviderSettings: (any ProviderSettingsStaging)?
+    let uiProviderDiscovery: (any ProviderDiscoveryStaging)?
+    let uiProviderPresentation: (any ProviderPresentationRegistering)?
     var uiInputs = AgentUIInputs()
     var uiExecution = AgentUIExecution()
     private let contextRepository: AgentContextRepository<ApplicationControlContextState>
@@ -84,10 +85,15 @@ public actor ApplicationControlAgent: Agent {
             nil,
         resourceChanges: (@MainActor @Sendable () async throws -> AsyncStream<UInt64>)? = nil,
         observationFailure: @escaping @Sendable (any Error) -> Void = { _ in },
-        uiProviderSettings: ProviderSettingsRequests? = nil, uiProviderDiscovery: ProviderDiscoveryRequests? = nil,
-        uiProviderPresentation: ProviderPresentationAdapter? = nil,
+        uiProviderSettings: (any ProviderSettingsStaging)? = nil,
+        uiProviderDiscovery: (any ProviderDiscoveryStaging)? = nil,
+        uiProviderPresentation: (any ProviderPresentationRegistering)? = nil,
+        decodeResources: @escaping @Sendable (String) throws -> ModelResourceViewSnapshot = { _ in
+            throw CommunicationError.invalidPayload
+        },
         context: AgentContextRepository<ApplicationControlContextState>
     ) throws {
+        self.decodeResources = decodeResources
         self.connectionFacts = connectionFacts
         self.resourceChanges = resourceChanges
         self.observationFailure = observationFailure

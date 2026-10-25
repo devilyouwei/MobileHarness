@@ -31,3 +31,7 @@ ModelResourcePreferencesService 是 actor，惰性获取注入的 DocumentStore�
 偏好解码支持 preferDownloadedSpeech 字段映射到两个独立开关；新编码只写当前字段。持久化不负责模型绑定，已提交偏好不会因另一项绑定失败自动撤销。
 
 [所属域设计](../README.md) · [Actions 模块](../../README.md)
+
+## Execution ownership and lifecycle
+
+ModelResourcesClient and ModelResourceInteractionWorkflow are Actions-owned UI facades. The root closes admission, cancels/joins restoration, autosave and up to 32 admitted UI operation workers. Coalesced source restoration has at most 32 waiters and explicit shutdown. ApplicationControl consumes typed intent and authorizes functions; actual preference/artifact services remain Actions-owned.

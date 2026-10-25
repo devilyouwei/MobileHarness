@@ -1,6 +1,5 @@
 import Actions
 import AgentCore
-import Agents
 import CallRuntime
 import ExecutionRuntime
 import Foundation
@@ -9,6 +8,8 @@ import Gateway
 import PlatformKit
 import StorageCore
 import Testing
+
+@testable import Agents
 
 @Test(.actionCatalog) func arrivalWinsWithoutStabilityAndStaleSamplesCannotComplete() throws {
     let start = ContinuousClock.now
@@ -118,7 +119,8 @@ extension LiveRuntimeTests {
                 domain: action.path.domain, module: action.path.module, function: action.path.function),
             channel: "Fixture")
         #expect(action.displayName == "Generated action")
-        #expect(try action.requiredResources(for: call) == [.init(rawValue: "fixture")])
+        #expect(
+            try action.requiredResources(for: call.executionRequest.functionRequest) == [.init(rawValue: "fixture")])
         let invocation = ActionInvocation(
             source: .assistant,
             input: .init(

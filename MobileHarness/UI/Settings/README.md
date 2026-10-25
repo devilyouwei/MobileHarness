@@ -13,11 +13,11 @@
 | 蓝牙展示 | BluetoothSettingsState、UIDeviceSettingsContainer | BluetoothSettingsView |
 | 历史记录 | ConversationHistoryState、UIHistoryContainer、ConversationHistoryPresentation | ConversationHistoryView |
 
-✅ 各子容器、呈现协议及请求接口与所属状态同文件；导航由 UI 根提供。音频检测属于 Diagnostics，本目录仅嵌入其公开 Section，不复制状态或控制实现。
+各子容器、呈现协议及请求接口与所属状态同文件；导航由 UI 根提供。音频检测属于 Diagnostics，本目录仅嵌入其公开 Section，不复制状态或控制实现。
 
 ## 表单与资源
 
-✅ Provider 草稿包含地址、模型和密钥，不写入模型历史／用户日志。发现、恢复、保存保留草稿 revision，迟到结果不覆盖新输入；页面离开取消发现任务。根停止清除敏感草稿。
+Provider 草稿包含地址、模型和密钥，不写入模型历史／用户日志。发现、恢复、保存保留草稿 revision，迟到结果不覆盖新输入；页面离开取消发现任务。根停止清除敏感草稿。
 
 资源界面按目录 ID 展示识别、合成、语言和视觉，接受宿主提供的安装／下载／删除／取消及偏好事实；刷新保留 generation。下载不自动开启自定义语音，资源资格由宿主判定。
 
@@ -49,17 +49,16 @@ JSON 分享延迟编码实际展示的 Codable 值，保留原始 requestJSON；
 
 ## 接纳、失败与待验收
 
-✅ 子容器统一创建状态，业务只读协议＋类型化提交；根停止后拒绝更新，后台允许保留事实。设置 revision、资源 generation、分页 ticket 独立于根接纳。
+子容器统一创建状态，业务只读协议＋类型化提交；根停止后拒绝更新，后台允许保留事实。设置 revision、资源 generation、分页 ticket 独立于根接纳。
 
-❌ 更多 Agent 记录 schema、历史页面重设计、交互返回／滚动保持、目录点按、分享接收端及蓝牙物理行为仍需单独验收，自动化状态测试不代替真机。
 
 [UI 根](../README.md) · [音频检测](../Diagnostics/README.md)
 
-✅ 历史消息读取有页面所有者、取消／身份校验与加入；目录在通用执行器解析，按原JSON身份缓存，时间线仅随加载／分页重建并预分组。资源下载源编辑提交窄控制接口，页面不轮询自动保存；外部唯一工作流合并初始恢复并拥有防抖、停止与错误上报。
+历史消息读取有页面所有者、取消／身份校验与加入；目录在通用执行器解析，按原JSON身份缓存，时间线仅随加载／分页重建并预分组。资源下载源编辑提交窄控制接口，页面不轮询自动保存；外部唯一工作流合并初始恢复并拥有防抖、停止与错误上报。
 
 历史详情读取的容量约束：一个实际读取与一个最新候选，取消清除候选并取消实际读取；候选替换不创建等待任务链，实际读取完成后才接纳下一项。
 
-✅ 已实现：devices呈现Action维护独立连接摘要，设置页展示该状态；详细设备／机械臂控制资格仍消费原真实状态，不由显示摘要解锁设备。
+已实现：devices呈现Action维护独立连接摘要，设置页展示该状态；详细设备／机械臂控制资格仍消费原真实状态，不由显示摘要解锁设备。
 
 
 ## Direct container contract
@@ -68,11 +67,11 @@ UI-owned typed request/reply capabilities have one consumer and at most 64 outst
 
 ## Agent-owned UI inputs
 
-✅ Settings, resource, device and history subcontainers own their typed request/reply sources and UI generations. Business consumers are constructor-injected owners outside UI; pages and local interaction facades submit through these sources. UI contains no business event subscriber or Gateway dependency. Actual query/effect failure remains a failed receipt, with late completion fenced by generation.
+Settings, resource, device and history subcontainers own their typed request/reply sources and UI generations. Business consumers are constructor-injected owners outside UI; pages and local interaction facades submit through these sources. UI contains no business event subscriber or Gateway dependency. Actual query/effect failure remains a failed receipt, with late completion fenced by generation.
 
 ## 直连链路当前契约
 
-✅ 未提交表单和页面状态留 UI，业务提交、结果与运行事实的呈现归 Actions。
+未提交表单和页面状态留 UI，业务提交、结果与运行事实的呈现归 Actions。
 
 ## Provider 表单控制
 
@@ -80,21 +79,21 @@ SettingsFormController 只拥有草稿规范化、默认选项、请求忙态和
 
 ## 多 Provider 管理
 
-✅ 沿用私有设置事务传递至多 32 个 URL 唯一的 provider；当前配置与其余配置一起保存。UI 在加载模型上方提供单选、编辑、删除和末行添加，删除当前项关闭云端并要求重新选择。保存提交后生效，Key 保持钥匙串存储，旧单配置恢复为首项。
+沿用私有设置事务传递至多 32 个 URL 唯一的 provider；当前配置与其余配置一起保存。UI 在加载模型上方提供单选、编辑、删除和末行添加，删除当前项关闭云端并要求重新选择。保存提交后生效，Key 保持钥匙串存储，旧单配置恢复为首项。
 
-✅ Provider 名称通过私有配置链路保存，旧数据以 URL 主机名补齐。新增/编辑采用独立 modal 草稿（name/url/key），默认生成未占用的 Provider N 名称；取消不修改选择和凭据，确认校验 URL 唯一性与名称。列表名称为主、URL 单行省略为辅，保留三字段粘贴和 Key 脱敏。
+Provider 名称通过私有配置链路保存，旧数据以 URL 主机名补齐。新增/编辑采用独立 modal 草稿（name/url/key），默认生成未占用的 Provider N 名称；取消不修改选择和凭据，确认校验 URL 唯一性与名称。列表名称为主、URL 单行省略为辅，保留三字段粘贴和 Key 脱敏。
 
-✅ ProviderEditorDraft 同时接纳 HTTP 与 HTTPS（域名或 IP，可带端口和路径）；保留名称、URL 唯一性、凭据长度和容量校验，错误提示不再要求仅 HTTPS。实际网络策略见 [Config](../../../Config/README.md)。
+ProviderEditorDraft 同时接纳 HTTP 与 HTTPS（域名或 IP，可带端口和路径）；保留名称、URL 唯一性、凭据长度和容量校验，错误提示不再要求仅 HTTPS。实际网络策略见 [Config](../../../Config/README.md)。
 
 Implemented: Provider URL input is optional. Blank/whitespace input resolves to https://api.openai.com/v1 on modal confirmation, sharing the same URL identity as an explicit official endpoint. Keep name/key, duplicate checks, and nonempty HTTP/HTTPS validation. Cover default resolution and duplicate default providers.
 
 ## 用户板块入口
 
-✅ SettingsView 用户板块依次呈现“记忆”“相册”“Agent 记录”。记忆为无点击行为的静态 Label；相册进入独立照片管理页面，Agent 记录继续使用现有导航。
+SettingsView 用户板块依次呈现“记忆”“相册”“Agent 记录”。记忆为无点击行为的静态 Label；相册进入独立照片管理页面，Agent 记录继续使用现有导航。
 
 ## 基础相册实施契约
 
-✅ 启用相册导航，时间倒序网格每页40项、详情缩放、最多20张系统选择器导入、单张导出及确认删除。记忆保留静态项。长操作由根持有，页面退出不取消已接纳变更。
+启用相册导航，时间倒序网格每页40项、详情缩放、最多20张系统选择器导入、单张导出及确认删除。记忆保留静态项。长操作由根持有，页面退出不取消已接纳变更。
 
 删除回执区分逻辑删除成功与文件清理问题；逻辑提交后即从当前UI列表移除，清理失败明确提示并保留恢复状态。
 
@@ -102,4 +101,8 @@ Implemented: Provider URL input is optional. Blank/whitespace input resolves to 
 
 ## Container 上下文
 
-✅ UIAlbumContainer.ContextSnapshot 提供内容状态、当前已加载数量、后续页标记及importing/exporting/deleting操作。导航公开相册详情对象、照片选择器／删除确认框，以及历史列表、对话及轮次详情。局部内容变化只能更新当前确认位置；过期代际拒绝。离页不取消根拥有的相册变更。
+UIAlbumContainer.ContextSnapshot 提供内容状态、当前已加载数量、后续页标记及importing/exporting/deleting操作。导航公开相册详情对象、照片选择器／删除确认框，以及历史列表、对话及轮次详情。局部内容变化只能更新当前确认位置；过期代际拒绝。离页不取消根拥有的相册变更。
+
+## Execution ownership and lifecycle
+
+SettingsFormController retains up to 32 active/cancelled discovery workers. Overflow reports an explicit UI error. Cancellation advances revision immediately, while shutdown closes new work and cancels/joins every retained worker. Actions invokes this UI-owned cleanup through its injected facade; UI imports no business module.

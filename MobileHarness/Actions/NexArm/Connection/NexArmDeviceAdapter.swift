@@ -1,4 +1,3 @@
-import AgentCore
 import CallRuntime
 import ExecutionRuntime
 import Foundation
@@ -11,7 +10,7 @@ import UI
     public let bluetooth: BluetoothWorkflow
     public private(set) var fence = UUID().uuidString
     public var environment: (@Sendable () async throws -> String)?
-    public var deliverActionResult: (@Sendable (ActionResult, ActionReport?) async -> Bool)?
+    public var deliverActionResult: (@Sendable (DeferredActionFailure) async -> Bool)?
     public var activity: (any ExecutionFailureReporting)?
     public func readEnvironment() async throws -> String {
         guard let environment else { throw DeviceControlError.unavailable }
@@ -35,8 +34,7 @@ import UI
             if let owner = ResourceExecutionContext.owner, let deliverActionResult, let activity {
                 let executionID = invocation.executionID
                 let path = invocation.call.actionPath
-                let causality = SignalCausality(
-                    inputID: invocation.context.inputID, rootID: invocation.context.inputID, hops: 0)
+                let context = invocation.context
                 bluetooth.manualFailureReporter = { failure in
                     await activity.recordFailure(
                         title: "手动机械臂操作失败", source: origin.source, message: failure.message, failureCode: failure.code,
@@ -44,15 +42,10 @@ import UI
                             workerID: failure.workerID, sessionID: origin.sessionID,
                             inputID: origin.inputID,
                             callID: origin.callID))
-                    let result = ActionResult(
-                        executionID: executionID, owner: owner,
-                        path: .init(domain: path.domain, module: path.module, function: path.function),
-                        causality: causality,
-                        status: failure.report?.entries.contains(where: { $0.status == .succeeded }) == true
-                            ? .partialFailure : .failed, effect: .unknown,
-                        completion: nil,
-                        failure: .handlerFailed)
-                    let delivery = await deliverActionResult(result, failure.report)
+                    let result = DeferredActionFailure(
+                        executionID: executionID, owner: owner, path: path,
+                        context: context, report: failure.report)
+                    let delivery = await deliverActionResult(result)
                     if !delivery {
                         await activity.recordFailure(
                             title: "设备结果反馈失败", source: origin.source, message: "原始执行失败已保留，反馈未被接收",

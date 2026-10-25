@@ -1,6 +1,5 @@
 import Actions
 import AgentCore
-import Agents
 import CallRuntime
 import ExecutionRuntime
 import Foundation
@@ -9,6 +8,8 @@ import Gateway
 import PlatformKit
 import StorageCore
 import Testing
+
+@testable import Agents
 
 private struct UnifiedFixtureModule: ActionBindingModule {
     let definitions: [ActionBinding]
@@ -95,7 +96,7 @@ private actor UnifiedFixtureLog {
     let permissions = try CapabilityRegistry(internalActions: [
         InternalAction(domain: "Fixture", module: "Query", function: "read", channel: "main")
     ])
-    #expect(throws: ActionExecutionError.missingHandler(path.executionIdentifier)) {
+    #expect(throws: HarnessError.forbiddenFunction) {
         try BehaviorCoverage.validate(
             actions: ActionRegistry(modules: [module.actions]),
             toolPaths: [path.description], capabilities: [permissions])
@@ -185,7 +186,7 @@ private actor UnifiedReceiptAgent: Agent {
     let session = UUID().uuidString
     try await manager.register(agent, sessionID: session)
     try await manager.start(agent.descriptor.id)
-    let gateway = OutputGateway(
+    let gateway = await OutputGateway(
         manager: manager, requests: InputGateway(manager: manager),
         tools: try ToolRegistry(modules: [module.tools]), actions: scheduler, sink: { _ in })
     let first = AgentInput(id: UUID().uuidString, sessionID: session, payload: .event("fixture"))
@@ -217,7 +218,7 @@ private actor UnifiedReceiptAgent: Agent {
     #expect(result?.completion == .value("second"))
     #expect(await log.values == ["first:" + first.id, "second:" + native.id])
     let receipts = await agent.receipts
-    #expect(receipts.count == 1 && receipts.last?.completion == .value("second"))
+    #expect(receipts.count == 2 && receipts.first?.isError == true && receipts.last?.completion == .value("second"))
     try await scheduler.finish(inputID: first.id, source: agent.descriptor.id)
     let held = AgentInput(id: UUID().uuidString, sessionID: session, payload: .event("hold"))
     let cancellation = Task {
@@ -233,7 +234,7 @@ private actor UnifiedReceiptAgent: Agent {
     await #expect(throws: CancellationError.self) { try await cancellation.value }
     await cleaned.wait()
     #expect(await scheduler.executionSnapshot().records.count == 1)
-    #expect(await agent.receipts.count == 1)
+    #expect(await agent.receipts.count == 2)
     await gateway.shutdown()
 }
 
@@ -281,7 +282,7 @@ private struct PureFunctionFixture: CapabilityModule {
     let definitions: [ActionFunction]
 }
 
-@Test(.actionCatalog) func pureCatalogValidatesBeforeRegistrationAndHostRejectsUnknownModules() throws {
+@Test(.actionCatalog) func pureCatalogValidatesAndAdditionalDomainsRegisterWithoutGatewayChanges() throws {
     let path = ActionIdentifier(domain: "Fixture", module: "Query", function: "read")
     let function = ActionFunction(
         path: path, displayName: "Read", kind: .finite, completion: "Read completed.", handler: { _ in })
@@ -293,9 +294,8 @@ private struct PureFunctionFixture: CapabilityModule {
     #expect(throws: ActionExecutionError.invalidDefinition(path)) {
         try CapabilityCatalog(modules: [PureFunctionFixture(definitions: [invalid])])
     }
-    #expect(throws: (any Error).self) {
-        try BehaviorAssembly(capabilityModules: [PureFunctionFixture(definitions: [function])])
-    }
+    let extended = try BehaviorAssembly(capabilityModules: [PureFunctionFixture(definitions: [function])])
+    #expect(extended.actions.functions.contains(path))
 }
 
 @Test(.actionCatalog) func producerFailureCodeIsIndependentOfCallProtocol() async throws {
@@ -389,7 +389,7 @@ private struct PureFunctionFixture: CapabilityModule {
     try await manager.register(agent, sessionID: session)
     try await manager.start(agent.descriptor.id)
     let scheduler = ChannelScheduler(registry: try ActionRegistry(modules: [module.actions]))
-    let gateway = OutputGateway(
+    let gateway = await OutputGateway(
         manager: manager, requests: InputGateway(manager: manager),
         tools: try ToolRegistry(modules: [module.tools]), actions: scheduler, sink: { _ in })
     let failed = try await gateway.dispatch(
@@ -425,4 +425,59 @@ private struct PureFunctionFixture: CapabilityModule {
     #expect(feedback.executionFailure?.rawValue == returned.executionFailure?.rawValue)
     #expect(feedback.failureDescription == returned.failureDescription)
     #expect(receipts.last?.completion == .value("next completed"))
+}
+
+@Test(.actionCatalog, .timeLimit(.minutes(1))) func cancelledDirectCallRetainsIndependentFailureInExecutionEvidence()
+    async throws
+{
+    let path = ActionIdentifier(domain: "Fixture", module: "Cleanup", function: "run")
+    let started = UnifiedGate()
+    let function = ActionFunction(
+        path: path, displayName: "Cleanup", kind: .finite, completion: "Joined.",
+        completing: { _ in
+            await started.open()
+            do {
+                try await Task.sleep(for: .seconds(30))
+                return .completed
+            } catch {
+                return .report(
+                    try ActionReport(entries: [
+                        .init(path: "committed", status: .succeeded),
+                        .init(path: "cleanup", status: .failed, code: .handlerFailed),
+                    ]))
+            }
+        })
+    let binding = ActionBinding(
+        function: function, protocols: [.tool], executionPolicy: .direct, directResultPolicy: .returning)
+    let module = UnifiedFixtureModule(definitions: [binding])
+    let agent = UnifiedReceiptAgent(
+        capabilities: try CapabilityRegistry(tools: [ToolRegistration(alias: "run", path: path.description)]))
+    let manager = AgentManager()
+    let session = UUID().uuidString
+    try await manager.register(agent, sessionID: session)
+    try await manager.start(agent.descriptor.id)
+    let gateway = await OutputGateway(
+        manager: manager, requests: InputGateway(manager: manager), tools: try ToolRegistry(modules: [module.tools]),
+        sink: { _ in })
+    let input = AgentInput(id: UUID().uuidString, sessionID: session, payload: .event("fixture"))
+    let execution = Task {
+        try await gateway.execute(
+            .init(
+                source: agent.descriptor.id, context: input.context,
+                output: .toolCall(.init(id: UUID().uuidString, toolPath: path.description)), sequence: 1))
+    }
+    await started.wait()
+    execution.cancel()
+    await #expect(throws: CancellationError.self) { try await execution.value }
+    let evidence = await gateway.executionResults(inputID: input.id)
+    guard case .report(let report) = evidence.outputs.first?.tool?.completion else {
+        Issue.record("Independent cleanup failure was discarded")
+        await gateway.shutdown()
+        await manager.stopAll()
+        return
+    }
+    #expect(report.status == .partialFailure && evidence.outputs.first?.isError == true)
+    #expect(await agent.receipts.isEmpty)
+    await gateway.shutdown()
+    await manager.stopAll()
 }

@@ -15,3 +15,7 @@
 | [TaskControlModule.swift](TaskControlModule.swift) | Task 函数的中立端口绑定 |
 
 [所属域设计](../README.md) · [Actions 模块](../../README.md)
+
+## Execution ownership and lifecycle
+
+TaskControlEndpoint validates the bound root/session and invokes TaskControlBinding, a neutral injected host capability. It does not authorize an assistant role or retain AgentContainer/AgentManager. Agents owns Task/Skill policy and binds the actual Task controller through App.

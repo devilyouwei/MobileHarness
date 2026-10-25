@@ -15,7 +15,7 @@
 | [LightActions.swift](LightActions.swift) | 业务函数的参数校验、能力调用与完成值 |
 | [NoticeActions.swift](NoticeActions.swift) | 业务函数的参数校验、能力调用与完成值 |
 | [UIEffectTypes.swift](UIEffectTypes.swift) | 瞬时提示与装饰光的值及端口 |
-| [UIFeedbackTypes.swift](UIFeedbackTypes.swift) | 提示音、触觉请求和能力端口 |
+| [UIFeedbackTypes.swift](../../Support/Contracts/UIFeedbackTypes.swift) | 提示音、触觉请求和能力端口 |
 
 ## 反馈音频算法
 

@@ -1,5 +1,6 @@
 import Actions
 import AgentCore
+import Agents
 import CallRuntime
 import ExecutionRuntime
 import Foundation
@@ -10,13 +11,17 @@ import StorageCore
 // Test callers explicitly cross the same validated Gateway boundary as production.
 extension ActionInvocation {
     init(envelope: OutputEnvelope) throws {
-        self = try ScheduledAction(envelope: envelope).execution
+        guard case .actionCall(let call) = envelope.output else { throw ActionExecutionError.invalidInvocation }
+        self.init(call: call.executionRequest, context: envelope.executionContext, executionID: UUID().uuidString)
     }
     init(source: AgentID, input: AgentInput, call: ActionCall, sequence: UInt64 = 0) {
-        self =
-            ScheduledAction(
-                source: source, input: input, call: call, sequence: sequence, executionID: UUID().uuidString
-            ).execution
+        self.init(
+            call: call.executionRequest,
+            context: OutputEnvelope(
+                source: source, context: input.context,
+                output: .actionCall(call), sequence: sequence, taskScope: input.taskScope
+            ).executionContext,
+            executionID: UUID().uuidString)
     }
 }
 extension ChannelScheduler {
@@ -96,5 +101,23 @@ struct ScheduledFunctionFixture: ActionModule {
     let definitions: [ActionBinding]
     init(_ module: any CapabilityModule) {
         definitions = module.definitions.map { ActionBinding(function: $0) }
+    }
+}
+
+extension ScheduledAction {
+    init(source: AgentID, input: AgentInput, call: ActionCall, sequence: UInt64 = 0, executionID: String) {
+        let envelope = OutputEnvelope(
+            source: source, context: input.context, output: .actionCall(call), sequence: sequence,
+            taskScope: input.taskScope)
+        // Parser/Agent construction has validated the Channel; error is surfaced by enqueue for external calls.
+        self = Self.validatedFixture(envelope: envelope.schedulingEnvelope, call: call, executionID: executionID)
+    }
+    private static func validatedFixture(envelope: ExecutionEnvelope, call: ActionCall, executionID: String) -> Self {
+        // Kept out of production API after test callers migrate to the throwing initializer.
+        do {
+            return try Self(
+                envelope: envelope, call: call.executionRequest.functionRequest, channel: call.channel,
+                executionID: executionID)
+        } catch { preconditionFailure("Invalid scheduled invocation: \(error)") }
     }
 }

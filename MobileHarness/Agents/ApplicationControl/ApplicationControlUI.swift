@@ -1,6 +1,6 @@
-import Actions
 import AgentCore
 import Foundation
+import FunctionContracts
 import Gateway
 import UI
 
@@ -188,9 +188,11 @@ extension ApplicationControlAgent {
                         ProviderDiscoveryIntent(requestID: id, presentation: true).input(sessionID: sessionID),
                         context: context, provider: true)
                 else { throw CommunicationError.invalidPayload }
-                guard raw.utf8.count <= 65_536 else { throw ProviderDiscoveryError.invalidModels }
+                guard raw.utf8.count <= 65_536 else { throw CommunicationError.invalidPayload }
                 let models = try JSONDecoder().decode([String].self, from: Data(raw.utf8))
-                _ = try ProviderModelList.encoded(models)
+                guard models.count <= 2048, models.allSatisfy({ $0.utf8.count <= 512 }) else {
+                    throw CommunicationError.invalidPayload
+                }
                 await discovery.discard(id, sessionID: sessionID)
                 await presentation.discard(id)
                 return .models(models)
@@ -227,7 +229,7 @@ extension ApplicationControlAgent {
         switch value {
         case .refresh:
             guard let result else { throw CommunicationError.invalidPayload }
-            return .snapshot(try SettingsModelResourcesAdapter.items(result))
+            return .snapshot(try decodeResources(result))
         case .restore, .save:
             guard let result else { throw CommunicationError.invalidPayload }
             return .source(try JSONDecoder().decode(ModelResourceSourceDraft.self, from: Data(result.utf8)))

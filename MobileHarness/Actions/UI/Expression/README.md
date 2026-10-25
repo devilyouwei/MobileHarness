@@ -13,6 +13,6 @@
 | [ExpressionActions.swift](ExpressionActions.swift) | 业务函数的参数校验、能力调用与完成值 |
 | [ExpressionCapabilities.swift](ExpressionCapabilities.swift) | 表情与加载状态的呈现端口 |
 | [EyeExpression.swift](EyeExpression.swift) | 表情执行预算与呈现辅助 |
-| [ExpressionTypes.swift](ExpressionTypes.swift) | 表情词汇、参数错误及双重清理错误 |
+| [ExpressionTypes.swift](../../Support/Contracts/ExpressionTypes.swift) | 表情词汇、参数错误及双重清理错误 |
 
 [所属域设计](../README.md) · [Actions 模块](../../README.md)

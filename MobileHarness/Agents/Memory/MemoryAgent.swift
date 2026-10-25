@@ -1,6 +1,6 @@
-import Actions
 import AgentCore
 import Foundation
+import FunctionContracts
 import Gateway
 import StorageCore
 import UI
@@ -19,7 +19,7 @@ public actor MemoryAgent: Agent {
     let beforeNewConversation: @Sendable () async throws -> Void
     var uiInputs = AgentUIInputs()
     var uiExecution = AgentUIExecution()
-    var historyReadWorkers: [String: Task<HistoryReadResult, any Error>] = [:]
+    var historyReadWorkers: [String: Task<HistoryReply, any Error>] = [:]
     private let contextRepository: AgentContextRepository<MemoryContextState>
     private let preprocessor = MemorySignalPreprocessor()
     private let contextBuilder = MemoryContextBuilder()

@@ -1,5 +1,5 @@
 #if os(iOS)
-    import AgentCore
+    import FunctionContracts
     import Foundation
     import PlatformKit
 
@@ -21,27 +21,6 @@
     @MainActor public struct CameraRuntimeDependencies {
         public let resources: any CameraResourceAccess
         public init(resources: any CameraResourceAccess) { self.resources = resources }
-    }
-
-    /// Agent-owned integration callbacks, supplied to the App-owned Coordinator factory.
-    @MainActor public struct CameraSessionConnections {
-        public let makeRuntime: @MainActor () throws -> CameraRuntimeDependencies
-
-        public let connectPerception:
-            @MainActor (
-                String, Bool, any CameraOutputHandling
-            ) async throws -> Void
-        public init(
-
-            makeRuntime: @escaping @MainActor () throws -> CameraRuntimeDependencies,
-            connectPerception:
-                @escaping @MainActor (
-                    String, Bool, any CameraOutputHandling
-                ) async throws -> Void
-        ) {
-            self.makeRuntime = makeRuntime
-            self.connectPerception = connectPerception
-        }
     }
 
 #endif

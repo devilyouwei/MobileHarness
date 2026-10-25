@@ -10,6 +10,7 @@
 | [镜头切换准入](Camera-Control-Availability.md) | 全局模型准备与原生相机按钮解耦，状态回归及真机验收边界。 |
 | [基础相册](Album.md) | App 收录、格式保持导入、独立系统导出、容量保护及删除恢复；真机验收与自动化区分。 |
 | [多 Provider 管理](Provider-Management.md) | 多配置持久化、凭据清理及模拟器验证范围。 |
+| [Gateway container](Gateway-Container.md) | App-owned Gateway lifetime, admission/cleanup regression, bounded diagnostic isolation and build evidence. |
 | [Agent containers](Agent-Containers.md) | Root/role ownership, lifecycle regression, build evidence and independent native acceptance. |
 | [Agents / Actions 组织整理](Agents-Actions-Organization.md) | 目录归属、共享机制与端点解耦的回归、模拟器编译和原工程文件协调限制。 |
 | [外部输入直连 Container](Direct-Container-Input.md) | 直连迁移的自动检查、锁定依赖构建、设备修正版安装及尚未完成的原生／性能验收。 |
@@ -53,3 +54,15 @@
 - [PlatformKit 容器与设备接入验证](PlatformKit-Containers.md)
 
 - [Direct container input validation](Direct-Container-Input.md): automated/build evidence and outstanding physical/performance checks.
+
+- [Actions container and neutral execution validation](Actions-Container.md): automated/Simulator evidence, retained iteration failures and separate device/model limitations.
+
+- [Execution layer cleanup](Execution-Layers-Cleanup.md): redundant adapters/contracts, physical/Xcode source ownership, context snapshot regression and automated/build evidence.
+
+- [Overall technical design audit](Overall-Design-Audit.md): source-aligned root/authorization/routing contracts, corrected workflow figure placement, 23 rendered Mermaid figures and a tracked execution-policy discrepancy.
+
+- [Native input and internal Signal overview](Signal-Flow-Overview.md): direct sensory/local intake, perception/cognition responsibilities, semantic role communication and execution/feedback, with rendered diagram and evidence boundaries.
+
+- [Action lifecycle responsibilities](Action-Lifecycle-Responsibilities.md): registration, semantic authorization, neutral scheduling/resource validity, business validation and completion ownership, with source-boundary and rendered-diagram evidence.
+
+- [State and conversation context pipeline](State-Context-Pipeline.md): live owner reads, explicit source registration, private Task/Skill projection, per-request message composition and rendered architecture evidence.

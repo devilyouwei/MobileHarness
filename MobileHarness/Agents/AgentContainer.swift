@@ -5,7 +5,7 @@ import StorageFiles
 #if os(iOS)
 
     import StorageDevices
-    import Actions
+    import FunctionContracts
     import AgentCore
     import Gateway
 
@@ -27,13 +27,10 @@ import StorageFiles
     public final class AgentContainer {
         @ObservationIgnored private let containerFailures: ContainerFailureChannel
         @ObservationIgnored private let repositories: @Sendable () throws -> AgentRepositories
-        @ObservationIgnored private let capturedPhotos: CapturedPhotoStore
         @ObservationIgnored private let audio: AudioContainer
         @ObservationIgnored private let cameraDevice: any CameraCapturing
         private let albumUI: UIAlbumContainer
-        private let albumService: PhotoAlbumService
         private let cameraUI: UICameraContainer
-        @ObservationIgnored private let cameraFactory: @MainActor (CameraSessionConnections) -> CameraCoordinator
         @ObservationIgnored private let languageModels: any ModelLanguageProviding
         @ObservationIgnored private let speechModels: any ModelSpeechProviding
         @ObservationIgnored private let visionModels: any ModelVisionProviding
@@ -43,14 +40,14 @@ import StorageFiles
             let context = AgentStateContext()
             try context.register(
                 "actions.camera",
-                source: ContainerContextSource { [camera] in
-                    await camera.contextSnapshot()
-                })
+                source: ContainerContextSource(encoded: { [camera] in
+                    try await camera.contextSnapshot()
+                }))
             try context.register(
                 "actions.robot",
-                source: ContainerContextSource { [service = bluetooth.service] in
-                    await service.contextSnapshot()
-                })
+                source: ContainerContextSource(encoded: { [bluetooth] in
+                    try await bluetooth.contextSnapshot()
+                }))
             try context.register(
                 "ui.navigation",
                 source: ContainerContextSource { [navigation = navigationUI.state, album = albumUI] in
@@ -87,19 +84,19 @@ import StorageFiles
         private let diagnosticsUI: UIDiagnosticsContainer
         private let cacheStorage: CacheContainer
         private let filesStorage: FilesContainer
-        let bluetooth: BluetoothWorkflow
+        let bluetooth: any AgentDeviceAccess
+        let camera: any AgentCameraAccess
         public init(
             containerFailures: ContainerFailureChannel,
             home: UIHomeContainer, settings: UISettingsContainer, modelResources: UIModelResourcesContainer,
             navigation: UINavigationContainer, history: UIHistoryContainer, devices: UIDeviceSettingsContainer,
             diagnostics: UIDiagnosticsContainer,
             repositories: @escaping @Sendable () throws -> AgentRepositories,
-            cache: CacheContainer, files: FilesContainer, photos: CapturedPhotoStore,
+            cache: CacheContainer, files: FilesContainer,
             camera: any CameraCapturing, cameraPresentation: any CameraPresenting,
             cameraUI: UICameraContainer, albumUI: UIAlbumContainer,
-            exportPhoto: @escaping @Sendable (Data) async throws -> Void = { _ in throw PhotoAlbumError.unavailable },
-            makeCamera: @escaping @MainActor (CameraSessionConnections) -> CameraCoordinator,
-            bluetooth: BluetoothWorkflow, audio: AudioContainer,
+            cameraAccess: any AgentCameraAccess, deviceAccess: any AgentDeviceAccess, facades: AgentUIFacades,
+            audio: AudioContainer,
             languageModels: any ModelLanguageProviding, speechModels: any ModelSpeechProviding,
             visionModels: any ModelVisionProviding, modelArtifacts: any ModelArtifactsManaging,
             memoryPressure: @escaping @Sendable () async -> Void
@@ -109,9 +106,9 @@ import StorageFiles
             speechPerception = SpeechPerceptionContainer(home: home, diagnostics: diagnostics)
             applicationControl = ApplicationControlContainer(
                 settings: settings, resources: modelResources, diagnostics: diagnostics,
-                devices: devices, navigation: navigation, bluetooth: bluetooth, failures: containerFailures)
-            memory = MemoryContainer(history: history)
-            photographer = PhotographerContainer(camera: cameraUI, presentation: cameraPresentation)
+                devices: devices, navigation: navigation, facades: facades, failures: containerFailures)
+            memory = MemoryContainer(history: history, facades: facades)
+            photographer = PhotographerContainer(camera: cameraUI, facades: facades)
             homeUI = home
             settingsUI = settings
             resourcesUI = modelResources
@@ -123,13 +120,11 @@ import StorageFiles
             self.cacheStorage = cache
             self.filesStorage = files
             self.repositories = repositories
-            capturedPhotos = photos
             cameraDevice = camera
             self.albumUI = albumUI
-            self.albumService = PhotoAlbumService(photos: photos, export: exportPhoto)
             self.cameraUI = cameraUI
-            cameraFactory = makeCamera
-            self.bluetooth = bluetooth
+            self.camera = cameraAccess
+            self.bluetooth = deviceAccess
             self.languageModels = languageModels
             self.speechModels = speechModels
             self.visionModels = visionModels
@@ -177,31 +172,21 @@ import StorageFiles
         public func navigate(_ destination: AppDestination?) {
             navigationUI.presentation.show(destination)
         }
-        @ObservationIgnored lazy var camera = makeCamera()
-        private func makeCamera() -> CameraCoordinator {
-            cameraFactory(
-                CameraSessionConnections(
-                    makeRuntime: { [weak self] in
-                        guard let self else { throw CancellationError() }
-                        try self.lifecycle.requireAvailable()
-                        return try self.runtime().cameraDependencies
-                    },
-                    connectPerception: { [weak self] sessionID, mirrored, endpoint in
-                        guard let self else { throw CancellationError() }
-                        do {
-                            try self.lifecycle.requireAvailable()
-                            try await self.visionPerception.run(
-                                runtime: self.runtime(), pose: self.visionModels, camera: self.cameraDevice,
-                                sessionID: sessionID, mirrored: mirrored, endpoint: endpoint)
-                        } catch is CancellationError {
-                            throw CancellationError()
-                        } catch {
-                            self.containerFailures.report(
-                                module: "agents", component: "visionPerception",
-                                operation: "session", error: error)
-                            throw error
-                        }
-                    }))
+        /// App binds the native presentation endpoint before starting this cognitive receive loop.
+        public func connectVision(
+            sessionID: String, mirrored: Bool,
+            status: @escaping @MainActor @Sendable (String?, String) -> Void
+        ) async throws {
+            do {
+                try lifecycle.requireAvailable()
+                try await visionPerception.run(
+                    runtime: runtime(), pose: visionModels, camera: cameraDevice,
+                    sessionID: sessionID, mirrored: mirrored, status: status)
+            } catch is CancellationError { throw CancellationError() } catch {
+                containerFailures.report(
+                    module: "agents", component: "visionPerception", operation: "session", error: error)
+                throw error
+            }
         }
 
         private func makeHistoryChat() async throws -> any ChatCapability {
@@ -219,12 +204,18 @@ import StorageFiles
                 speechPerception.endSettingsChange()
             }
         }
-        private func runtime() throws -> AgentRuntime {
+        /// Called by App's executionBindings node after foundational repositories are ready.
+        public func prepareExecutionBindings(
+            declarations: [ActionDeclaration],
+            prepareBusiness: @MainActor (AgentBusinessRequest) throws -> AgentBusinessBindings,
+            configure: @MainActor (AgentGatewayConfiguration) throws -> AgentGatewayCapabilities
+        ) throws {
             guard !lifecycle.isStopped else { throw AgentContainerError.stopped }
+            guard runtimeValue == nil else { throw GatewayContainerError.alreadyConfigured }
             try Task.checkCancellation()
             _ = try repositories()
-            if let runtimeValue { return runtimeValue }
-            let resourceAdapter = ModelResourceCapabilityAdapter(
+            try AgentConfigurations.installDeclarations(declarations)
+            let maintenance = AgentMaintenancePorts(
                 artifacts: { [weak self] in
                     guard let self else { throw CancellationError() }
                     return try await self.artifactManager()
@@ -238,49 +229,24 @@ import StorageFiles
                         self.onModelConfigurationChanged?()
                     }
                     try await self.speechModels.configure(recognition: recognition, synthesis: synthesis)
-                })
+                },
+                beginSettings: { [weak self] in await self?.speechPerception.beginSettingsChange() },
+                endSettings: { [weak self] in
+                    self?.speechPerception.endSettingsChange()
+                    self?.onModelConfigurationChanged?()
+                },
+                resourcesPresented: { [weak self] in self?.applicationControl.acceptResourceSnapshot() })
             let runtime = try AgentRuntime(
+                prepareBusiness: prepareBusiness, configureGateway: configure, maintenance: maintenance,
                 containerFailures: containerFailures, home: homeUI,
                 assistantContainer: assistant, applicationControlContainer: applicationControl,
                 memoryContainer: memory, photographerContainer: photographer,
-                stateContext: try makeStateContext(), cache: cacheStorage, files: filesStorage,
+                stateContext: try makeStateContext(), cache: cacheStorage,
                 chatRecords: try repositories().chat, taskRecords: try repositories().tasks,
-                camera: cameraDevice, cameraUI: cameraUI, albumUI: albumUI, album: albumService, settingsUI: settingsUI,
+                cameraUI: cameraUI, albumUI: albumUI, settingsUI: settingsUI,
                 resourcesUI: resourcesUI, devicesUI: devicesUI, historyUI: historyUI, diagnosticsUI: diagnosticsUI,
-                readHistoryPhoto: { [capturedPhotos] id, inputID in
-                    try await capturedPhotos.readForInput(id, source: "assistant", input: inputID)
-                }, cameraControl: camera, bluetooth: bluetooth, historyState: memory.historyState,
-                resourceState: applicationControl.modelResources, providerState: applicationControl.settings,
-                navigationState: navigationUI.presentation,
-                device: applicationControl.deviceControl,
-                modelResources: resourceAdapter,
-                providerSettingsRuntime: SettingsProviderAdapter.runtime(
-                    language: languageModels,
-                    beginChange: { [weak self] in await self?.speechPerception.beginSettingsChange() },
-                    endChange: { [weak self] in
-                        self?.speechPerception.endSettingsChange()
-                        self?.onModelConfigurationChanged?()
-                    }),
-                resourcePreferences: ModelResourcePreferencesService(
-                    store: { [filesStorage] in
-                        try filesStorage.document(
-                            ModelResourcePreferences.self, in: filesStorage.models, name: "download-source.json",
-                            maximumBytes: 4096)
-                    },
-                    validate: { try await SettingsModelResourcesAdapter.validatePreferences($0) },
-                    installed: { [weak self] in
-                        guard let self else { throw CancellationError() }
-                        let manager = try await self.artifactManager()
-                        return Set(
-                            try await manager.artifactSnapshots().filter { $0.phase == .installed }.map {
-                                $0.artifact.id
-                            })
-                    }),
-                resourceInventory: resourceAdapter,
+                cameraControl: camera,
                 resourceChanges: { [modelArtifacts] in try await modelArtifacts.observeArtifactChanges() },
-                resourceSnapshotAccepted: { [weak self] in
-                    self?.applicationControl.modelResourceControls.acceptPresentedSnapshot()
-                },
                 summarizeTitle: { [weak self] conversation in
                     guard let self else { throw CancellationError() }
                     let chat = try await self.makeHistoryChat()
@@ -289,15 +255,22 @@ import StorageFiles
                 },
                 modelName: { [weak self] in
                     guard let self else { throw CancellationError() }
-                    return await self.applicationControl.settingsWorkflow.modelName
+                    return await self.applicationControl.modelName
                 },
                 chatProvider: { [languageModels] in languageModels })
             runtimeValue = runtime
-            return runtime
+        }
+        /// App calls this after Gateway stops, retaining execution endpoints through cleanup.
+        public func releaseExecutionBindings() async {
+            await runtimeValue?.shutdown()
+            runtimeValue = nil
+        }
+        private func runtime() throws -> AgentRuntime {
+            guard !lifecycle.isStopped else { throw AgentContainerError.stopped }
+            guard let runtimeValue else { throw AgentContainerError.unavailable }
+            return runtimeValue
         }
         @ObservationIgnored private var preparation: Task<Void, Error>?
-        @ObservationIgnored private var bluetoothObservation: Task<Void, Never>?
-        @ObservationIgnored private var cameraEvents: Task<Void, Never>?
         private var foreground = true
         public func updateCameraAvailability() {
             camera.setForeground(foreground && navigation.path.isEmpty)
@@ -340,9 +313,6 @@ import StorageFiles
             guard !isolatedPresentation else { return }
             try await prepare(progress: { _ in })
             try await speechPerception.startInteraction()
-            guard bluetoothObservation == nil, cameraEvents == nil else { return }
-            bluetoothObservation = Task { [bluetooth] in await bluetooth.run() }
-            cameraEvents = Task { [camera] in await camera.observe() }
             applyNativeForeground(foreground)
         }
         private func invalidateNative() {
@@ -363,17 +333,8 @@ import StorageFiles
             invalidateNative()
             preparation?.cancel()
             _ = await preparation?.result
-            cameraEvents?.cancel()
-            bluetoothObservation?.cancel()
-            await cameraEvents?.value
-            await bluetoothObservation?.value
-            cameraEvents = nil
-            bluetoothObservation = nil
-            await applicationControl.modelResourceControls.stopAndWait()
             var cleanupErrors: [any Error] = []
             do { try await camera.shutdown() } catch { cleanupErrors.append(error) }
-            do { try await bluetooth.shutdown() } catch { cleanupErrors.append(error) }
-            await applicationControl.bluetoothControls.shutdown()
             do { try await speechPerception.stop() } catch { cleanupErrors.append(error) }
             do { try await speechSynthesis.stop() } catch { cleanupErrors.append(error) }
             do { try await visionPerception.stop() } catch { cleanupErrors.append(error) }
@@ -385,8 +346,6 @@ import StorageFiles
             do { try await photographer.stop() } catch { errors.append(error) }
             do { try await memory.stop() } catch { errors.append(error) }
             do { try await applicationControl.stop() } catch { errors.append(error) }
-            await runtimeValue?.shutdown()
-            runtimeValue = nil
             if let primary = errors.first {
                 throw AgentFailure(
                     component: "roles", operation: "stop", underlying: primary,
@@ -453,12 +412,11 @@ import StorageFiles
             _ = try await artifactManager()
             _ = try await applicationControl.modelResourcesWorkflow.restoreSource()
             try await applicationControl.settingsControls.restore()
-            let workflow = applicationControl.settingsWorkflow
             let prepared = try await VoiceInteractionSession(
                 home: homeUI, diagnostics: diagnosticsUI, language: languageModels, speech: speechModels,
                 memoryPressure: memoryPressure, audio: audio, runtime: runtime(),
                 perceptionContainer: speechPerception, synthesisContainer: speechSynthesis,
-                modelName: { await workflow.modelName },
+                modelName: { [applicationControl] in await applicationControl.modelName },
                 progress: progress)
             try Task.checkCancellation()
             try speechPerception.installInteraction(prepared)

@@ -2,7 +2,7 @@
     import Foundation
     import Observation
     import UI
-    import Actions
+    import FunctionContracts
 
     @available(iOS 27, *)
     @MainActor @Observable
@@ -10,7 +10,11 @@
         @ObservationIgnored private var session: MemoryExecutionSession?
         @ObservationIgnored private var closed = false
         private let historyUI: UIHistoryContainer
-        init(history: UIHistoryContainer) { historyUI = history }
+        private let facades: AgentUIFacades
+        init(history: UIHistoryContainer, facades: AgentUIFacades) {
+            historyUI = history
+            self.facades = facades
+        }
 
         func setInputAvailable(_ value: Bool) { historyUI.requests.setAvailable(value) }
         func install(_ session: MemoryExecutionSession) throws {
@@ -36,46 +40,7 @@
             if let failure = await session?.cleanupFailure { throw failure }
         }
         public var historyState: ConversationHistoryState { historyUI.state }
-        @ObservationIgnored public lazy var history = makeHistory()
-        private func makeHistory() -> ConversationHistoryWorkflow {
-            ConversationHistoryWorkflow(
-                state: historyUI.presentation,
-                prepare: {},
-                refresh: { [historyUI] in _ = try await historyUI.requests.submit(.refresh) },
-                deleteArchive: { [historyUI] id in _ = try await historyUI.requests.submit(.delete(id)) },
-                startNew: { [historyUI] in _ = try await historyUI.requests.submit(.startNew) },
-                summarize: { [historyUI] id in _ = try await historyUI.requests.submit(.summarize(id)) },
-                previewOutput: HistoryExecutionPreview.preview,
-                readConversation: { [historyUI] id in
-                    guard case .conversation(let value) = try await historyUI.requests.submit(.conversation(id)) else {
-                        throw UIRequestError.stale
-                    }
-                    return value
-                },
-                readPhoto: { [historyUI] id, inputID in
-                    guard case .photo(let value) = try await historyUI.requests.submit(.photo(id, inputID)) else {
-                        throw UIRequestError.stale
-                    }
-                    return value
-                },
-                readMessage: { [historyUI] id in
-                    guard case .conversation(let value) = try await historyUI.requests.submit(.message(id)) else {
-                        throw UIRequestError.stale
-                    }
-                    return value
-                },
-                readPage: { [historyUI] id, after, taskID in
-                    guard case .conversation(let value) = try await historyUI.requests.submit(.page(id, after, taskID))
-                    else { throw UIRequestError.stale }
-                    return value
-                },
-                readArchives: { [historyUI] cursor in
-                    guard case .archives(let values) = try await historyUI.requests.submit(.archives(cursor)) else {
-                        throw UIRequestError.stale
-                    }
-                    return values
-                })
-        }
-
+        public var history: any ConversationHistoryControlling { facades.history }
+        public static func previewHistory(_ turn: HistoryTurn) -> String { HistoryExecutionPreview.preview(turn) }
     }
 #endif

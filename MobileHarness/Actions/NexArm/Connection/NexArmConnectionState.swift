@@ -1,28 +1,7 @@
 import Foundation
+import FunctionContracts
 import Observation
 
-public struct NexArmDeviceReference: Sendable, Equatable {
-    public let id: String
-    public let name: String
-    public init(id: String, name: String) {
-        self.id = id
-        self.name = name
-    }
-}
-public enum NexArmManualAction: String, Sendable {
-    case shakeBase, nod, shakeHead, wave, tiltLeft, tiltRight, lookAround, celebrate, dance, reset
-}
-public enum NexArmAvailability: String, Sendable { case unknown, available, poweredOff, denied, unsupported }
-public enum NexArmConnectionPhase: String, Sendable { case idle, connecting, connected, disconnecting, failed }
-public enum NexArmRecoveryStage: String, Sendable {
-    case idle, cleaning, waiting, connecting, waitingForBluetooth, suspended, failed
-    public var busy: Bool {
-        switch self {
-        case .cleaning, .waiting, .connecting: true
-        default: false
-        }
-    }
-}
 @MainActor @Observable public final class NexArmConnectionState {
     @ObservationIgnored public var onFactsChanged: (@MainActor () -> Void)?
     public var availability: NexArmAvailability = .unknown { didSet { onFactsChanged?() } }

@@ -1,6 +1,5 @@
 import Actions
 import AgentCore
-import Agents
 import CallRuntime
 import ExecutionRuntime
 import Foundation
@@ -13,6 +12,8 @@ import StorageMedia
 import StorageSQLite
 import Testing
 import UI
+
+@testable import Agents
 
 #if canImport(ImageIO)
     import ImageIO
@@ -273,7 +274,7 @@ func albumUIRequestsExecuteThroughPhotographerAndGateway() async throws {
         contracts: AgentContracts.communication, configurations: AgentConfigurations.all())
     let inputs = InputGateway(manager: manager, policy: policy)
     let binding = try BehaviorProtocolBindings.bind(PhotoAlbumActions.function(using: service))
-    let gateway = OutputGateway(
+    let gateway = await OutputGateway(
         manager: manager, requests: inputs,
         tools: try ToolRegistry(modules: [AlbumTools(definitions: [binding])]),
         actions: ChannelScheduler(registry: try ActionRegistry(definitions: [])),

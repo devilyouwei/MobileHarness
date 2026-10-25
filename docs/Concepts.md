@@ -6,6 +6,9 @@
 
 | 术语 | 含义 |
 | --- | --- |
+| Local/native input | A typed UI request, native sensor stream or container observation consumed directly by its responsible role; it has local processing identity but no inter-role transport authority. |
+| Perception | Agent-owned interpretation of native observations, such as VAD/ASR or pose processing; may produce semantic messages or authorized reactive calls. |
+| Cognition | Agent-owned interpretation, context, decisions and authorization; may be deterministic or model-assisted. Perception and cognition are responsibilities within Agents. |
 | Signal | Bound Agent communication or execution feedback. UI requests, native frames and container facts are local inputs and do not enter Signal transport. |
 | Agent | 拥有独立角色、输入准入、业务状态和允许输出的处理者。 |
 | Gateway | Agent communication and authorized execution coordination; local input observation belongs to the owning Agent. |
@@ -41,3 +44,7 @@ Agent 实例、session/input、task、decision/call 和 Signal 因果链各有�
 “快慢认知”描述响应性与审慎处理的分工，“边云协作”描述显式选择的远端能力，“具身”表示可观测的环境效果。这些术语不自动承诺算力升级、后台常驻或物理安全。尚未落实的范围在 [需求索引](requirements/README.md) 单独定义。
 
 ProcessingContext records local request/session/generation/turn and causal identity. It does not grant Agent messaging, task or device execution authority. UI request acceptance, business completion and native/physical completion are separate boundaries.
+
+## Native input and semantic Signal flow
+
+The main sensory path is raw data → perception → semantic Signal through Gateway → cognitive role → authorized Gateway execution → Actions and foundation capabilities, with real outcomes and subsequent observations forming feedback. Typed local requests may enter the owning cognitive role directly; role messages may originate without sensory input; perception can issue its own authorized reactive calls. The [overall input/Signal figure](../MobileHarness/README.md#native-input-and-internal-signals) defines the complete current graph. “External signal” is an informal stimulus description, not a runtime external-Signal input API.

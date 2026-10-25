@@ -1,6 +1,3 @@
-import AgentCore
-import CallRuntime
-import ExecutionRuntime
 import Foundation
 import FunctionContracts
 
@@ -9,13 +6,13 @@ struct ActionResultLedger {
     enum DeliveryState: String, Sendable { case reserved, pending, accepted, closed }
     struct Record: Sendable {
         let executionID: String
-        let result: ActionResult?
+        let result: ExecutionResult?
         let state: DeliveryState
     }
     private struct Entry {
         let invocation: ScheduledAction
         let order: UInt64
-        var result: ActionResult?
+        var result: ExecutionResult?
         var attempts = 0
         var nextAttempt: ContinuousClock.Instant = .now
     }
@@ -43,23 +40,22 @@ struct ActionResultLedger {
     }
 
     mutating func complete(
-        _ invocation: ScheduledAction, status: ActionResult.Status, effect: ActionResult.Effect,
-        completion: ActionCompletion? = nil, failure: ActionResult.Failure? = nil
+        _ invocation: ScheduledAction, status: ExecutionResult.Status, effect: ExecutionResult.Effect,
+        completion: ActionCompletion? = nil, failure: ExecutionResult.Failure? = nil
     ) {
         guard var entry = entries[invocation.executionID], let owner = invocation.owner else { return }
         if invocation.feedback == .failuresOnly && status == .succeeded {
             entries[invocation.executionID] = nil
             return
         }
-        entry.result = ActionResult(
+        entry.result = ExecutionResult(
             executionID: invocation.executionID, owner: owner, path: invocation.call.actionPath,
-            causality: SignalCausality(envelope: invocation.envelope),
-            status: status, effect: effect, completion: completion?.agentValue, failure: failure,
-            callID: invocation.envelope.callID, roundID: invocation.envelope.roundID)
+            envelope: invocation.envelope,
+            status: status, effect: effect, completion: completion, failure: failure)
         entries[invocation.executionID] = entry
     }
 
-    mutating func ready() -> ActionResult? {
+    mutating func ready() -> ExecutionResult? {
         return entries.values.filter { $0.result != nil && $0.nextAttempt <= .now }
             .min(by: { $0.order < $1.order })?.result
     }

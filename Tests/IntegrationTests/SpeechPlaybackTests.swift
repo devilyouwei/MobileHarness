@@ -1,6 +1,5 @@
 import Actions
 import AgentCore
-import Agents
 import CallRuntime
 import ExecutionRuntime
 import Foundation
@@ -12,6 +11,8 @@ import StorageCache
 import StorageCore
 import Synchronization
 import Testing
+
+@testable import Agents
 
 private func pcm(_ sequence: UInt64 = 0) throws -> ModelKit.AudioFrame {
     try ModelKit.AudioFrame(
@@ -266,7 +267,7 @@ private func synthesisClientConfiguration(_ name: String, permitted: Bool) throw
     )
     try await manager.register(synthesizer)
     try await synthesizer.start()
-    let gateway = OutputGateway(
+    let gateway = await OutputGateway(
         manager: manager, requests: InputGateway(manager: manager, policy: policy),
         tools: ToolRegistry(),
         policy: policy, sink: { _ in })
@@ -432,7 +433,7 @@ private enum ReplyInterruptionFailure: Error, Equatable { case unavailable }
                 agent: FixtureNativeChatState.agentID, scope: UUID().uuidString, state: FixtureNativeChatState())
         ))
     try await manager.start(.assistant)
-    let gateway = OutputGateway(
+    let gateway = await OutputGateway(
         manager: manager, requests: InputGateway(manager: manager), tools: ToolRegistry(),
         actions: scheduler, sink: { _ in })
     try await gateway.dispatch(
@@ -472,7 +473,7 @@ private enum ReplyInterruptionFailure: Error, Equatable { case unavailable }
             context: try AgentContextRepository(
                 agent: FixtureNativeChatState.agentID, scope: UUID().uuidString, state: FixtureNativeChatState())
         ))
-    let gateway = OutputGateway(
+    let gateway = await OutputGateway(
         manager: manager, requests: InputGateway(manager: manager), tools: ToolRegistry(),
         sink: { _ in })
     await #expect(throws: ActionExecutionError.missingHandler(job.2.call.actionPath)) {

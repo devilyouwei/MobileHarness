@@ -65,4 +65,4 @@ Controller 提供 motorResults 与 revision；宿主将逐电机结果写入本�
 
 ## Container 上下文
 
-✅ NexArmControlService.contextSnapshot 从当前连接、控制器、跟踪与反馈健康状态提取 connected/controlAvailable；不复制到Storage。既有连接事实订阅继续服务角色生命周期，模型读取不产生订阅或设备动作。
+NexArmControlService.contextSnapshot 从当前连接、控制器、跟踪与反馈健康状态提取 connected/controlAvailable；不复制到Storage。既有连接事实订阅继续服务角色生命周期，模型读取不产生订阅或设备动作。

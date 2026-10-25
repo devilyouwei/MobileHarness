@@ -2,27 +2,25 @@
 
 ## 职责与外部关系
 
-定义不可变消息、精确通信声明、scoped Task 与投递证据，不运行传输 Worker，不认识语音／姿态等业务 schema。Gateway 拥有目标选择和有界投递任务，Agents 拥有处理与业务终态。
+定义不可变消息、精确通信声明、scoped Task 与投递证据，不运行传输 Worker，不认识语音／姿态等业务 schema。Agents InputGateway owns role policy, semantic validation and receiver selection; Gateway SignalTransport owns generic endpoint/envelope validation and bounded transport. Receiving roles own processing and business terminal state.
 
 ```mermaid
 flowchart LR
- A["Agents：发布／定向输出"]:::agent
- G["Gateway：校验／选择接收者／投递"]:::gateway
- C["CommunicationPolicy／Contracts／Task 值"]:::host
- R["目标 Agent：接纳与处理"]:::agent
- A -->|"CommunicationAction"| G
- C -->|"中立权限与 schema 契约"| G
- G --> R
- R -->|"仅 send 产生接纳回执"| G
- G --> A
- classDef ui fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e
- classDef platform fill:#dcfce7,stroke:#16a34a,color:#14532d
- classDef model fill:#f3e8ff,stroke:#9333ea,color:#581c87
- classDef storage fill:#fef3c7,stroke:#d97706,color:#78350f
- classDef agent fill:#eef2ff,stroke:#6366f1,color:#312e81
- classDef gateway fill:#ffedd5,stroke:#ea580c,color:#7c2d12
- classDef action fill:#ffe4e6,stroke:#e11d48,color:#881337
- classDef host fill:#f1f5f9,stroke:#64748b,color:#334155
+    subgraph Cognition["AGENTS · Communication semantics"]
+        A["Producing role"]:::agent
+        P["InputGateway / OutputGateway<br/>Policy · Schema · Receiver selection"]:::agent
+        C["AgentCore.Communication<br/>Contracts · Task · Causal evidence"]:::agent
+        R["Receiving role"]:::agent
+        A -->|CommunicationAction| P
+        C -->|used by| P
+    end
+    G["Gateway.SignalTransport<br/>Bound endpoints · Opaque payloads"]:::gateway
+    P ==>|authorized envelope| G
+    G -.->|bound callback / admission receipt| P
+    P -->|validated AgentInput| R
+    classDef agent fill:#ede9fe,stroke:#7c3aed,color:#2e1065
+    classDef gateway fill:#fef3c7,stroke:#d97706,color:#451a03
+    style Cognition fill:#faf7fd,stroke:#a78bfa
 ```
 
 ## 文件与职责
@@ -72,6 +70,4 @@ send 使用身份绑定输出消费器，选择存活目标并产生关联接纳
 
 Task request/input/progress/result/cancel 保存中立作用域与业务 Data，业务最多 65536 字节，编码信封最多 131072；只有 result 表达终态。Registry 最多 256 条记录、16 个非终态后台任务，每任务 128 个已接纳 Signal ID；校验 requester/executor/session/incarnation、重复和终态后输入。满载只淘汰终态，已淘汰身份拒绝迟到报告，迟到接纳不得覆盖真实终态。
 
-Task execution 前台／后台是中立值，反序列化缺少 execution 字段时按 foreground 读入；Core 不加载 Skill。DeliveryHistory 历史最多 128，最旧淘汰计数。SignalTraceRecord 保存因果、摘要及最多 16 个目标分支；Task 消息可附带业务 Data 不超过 64 KiB 的原任务信封，其他消息不保留原始内容。该快照是被动证据，不向发布者确认。AgentMessaging 为 Gateway／隔离宿主提供身份绑定传输端口；生产角色发出 CommunicationAction。
-
-停止和显式取消决定生命周期，重启标 interrupted，不重放设备效果。❌ 远程序列化和持久化投递未实现。业务契约见 [Agents/Communication](../../Communication/README.md)。
+Task execution 前台／后台是中立值，反序列化缺少 execution 字段时按 foreground 读入；Core 不加载 Skill。DeliveryHistory 历史最多 128，最旧淘汰计数。SignalTraceRecord 保存因果、摘要及最多 16 个目标分支；Task 消息可附带业务 Data 不超过 64 KiB 的原任务信封，其他消息不保留原始内容。该快照是被动证据，不向发布者确认。AgentMessaging defines cognitive identity-bound messaging ports for Agents adapters and isolated hosts; Gateway SignalTransport exposes its separate generic endpoint API. Production roles emit CommunicationAction.

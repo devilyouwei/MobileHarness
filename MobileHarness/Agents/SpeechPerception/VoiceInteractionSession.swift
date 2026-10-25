@@ -1,6 +1,6 @@
 #if os(iOS)
 
-    import Actions
+    import FunctionContracts
     import Foundation
     import ModelKit
     import ModelKitDefaults
@@ -18,6 +18,7 @@
         private var starting: Task<Void, any Error>?
         private var started = false
         private let voiceAgents: VoiceAgentSession
+        private let stopDiagnostic: @MainActor () async throws -> Void
         private let recognition: any SpeechRecognitionCapability
         private let vad: any VoiceActivityCapability
         private let synthesis: any SpeechSynthesisCapability
@@ -70,19 +71,19 @@
             var cleanupErrors: [any Error] = []
             await detectionInvalidation?.value
             await audioDetection.stopAndWait()
-            await lifecycle.shutdown()
+            await lifecycle.stopVoiceAndWait()
             do { try await voiceAgents.stop() } catch { cleanupErrors.append(error) }
             started = false
-            do { try await diagnostic.stopAndWait() } catch { cleanupErrors.append(error) }
+            do { try await stopDiagnostic() } catch { cleanupErrors.append(error) }
             if !cleanupErrors.isEmpty { throw NativeCleanupFailure(errors: cleanupErrors) }
         }
-        let lifecycle: VoiceSessionCoordinator
+        let lifecycle: any AgentVoiceLifecycle
         public let conversation: ConversationState
         public let actionActivity: ActionActivityState
-        public let diagnostic: SpeechDiagnosticWorkflow
+        public let diagnostic: any SpeechDiagnosticControlling
         public let diagnosticState: SpeechDiagnosticState
         public let audioDetectionState: AudioDetectionState
-        let audioDetection: AudioDetectionPresentation
+        let audioDetection: any AgentDetectionControl
         public let detectionRequests: UIRequests<AudioDetectionInput, Void>
 
         private var detectionInvalidation: Task<Void, Never>?
@@ -120,46 +121,31 @@
             self.synthesis = synthesis
             voiceInput = audio.io(.voice)
             listeningRequests = home.listeningRequests
-            let validationModel = synthesis
             let diagnosticState = diagnostics.speech
             self.diagnosticState = diagnosticState
-            diagnostic = SpeechDiagnosticWorkflow(
-                state: diagnosticState, player: audio.io(.diagnostic), provider: validationModel,
-                load: { try await speech.warmup(.synthesis) },
-                unload: { try await speech.unload(.synthesis) })
-            #if DEBUG
-                validateVoiceModels = {
-                    try await ChatDiagnosticWorkflow.validate(chat: chat) {
-                        try await speech.warmup(.recognition)
-                        try await language.warmup()
-                    }
-                }
-            #endif
             // Preparation is deferred to explicit voice admission; missing downloads do not block Settings/history.
             progress("本地模型可在设置中下载")
             try Task.checkCancellation()
             let state = home.conversation
-            let spectrum = MicrophoneSpectrumPresentation(state: state)
+            let native = try runtime.business.makeVoice(
+                AgentVoiceHost(
+                    sessionID: runtime.interactionSessionID,
+                    cancelReply: runtime.voiceDependencies.cancelReply,
+                    detection: AudioDetectionAgentSession.connections(
+                        recognition: recognition, vad: vad, gateway: runtime.observations)))
+            let spectrum = native.spectrum
+            diagnostic = native.diagnostic
+            stopDiagnostic = native.stopDiagnostic
+            #if DEBUG
+                validateVoiceModels = native.validate
+            #endif
             let voiceAgents = VoiceAgentSession(
                 runtime: runtime.voiceDependencies, spectrum: spectrum,
                 perception: perceptionContainer, synthesis: synthesisContainer)
             self.voiceAgents = voiceAgents
-            let lifecycle = VoiceSessionCoordinator(
-                runtime: voiceAgents.connections, state: state,
-                audio: audio.io(.voice), cue: audio.cue(.voice), haptic: audio.haptic(.voice), recognition: recognition,
-                synthesis: synthesis, voiceActivity: vad)
-            self.lifecycle = lifecycle
-            let audioDetection = AudioDetectionPresentation(
-                state: diagnostics.audioDetection,
-                endpoint: AudioDetectionSession(
-                    connections: AudioDetectionAgentSession.connections(recognition: recognition, vad: vad),
-                    execution: AudioDetectionExecution(
-                        audio: audio.io(.detection),
-                        beforeStart: { [weak lifecycle] in await lifecycle?.stopVoiceAndWait() })))
-            self.audioDetection = audioDetection
+            self.lifecycle = native.lifecycle
+            self.audioDetection = native.detection
             detectionRequests = diagnostics.detectionRequests
-            runtime.endpoints.speech.audioDetection = audioDetection
-            lifecycle.beforeVoiceStart = { [weak audioDetection] in await audioDetection?.stopAndWait() }
             conversation = state
             let warnings = memoryWarningStream()
             memoryWarnings = Task {

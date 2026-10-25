@@ -50,7 +50,7 @@ model_download.py 从生产 model-catalog.json 选择源，通过分页 Hub 元�
 | 根与生命周期 | 四个基础 Container／Failure、App 同根注册和依赖；AgentContainer、角色容器和 Support 生命周期机制按实际所有者检查 |
 | App | 仅组合公开能力，不构造 SQLite 后端、执行恢复、订阅业务输入或逐帧转发；首页准备由宿主生命周期拥有 |
 | 角色输入 | 构造注入 UI 子容器与原生只读端口；角色拥有订阅和回执，根／ExecutionSession 不提供外部业务路由；感知不添加额外语音队列或通用媒体适配 |
-| 执行与呈现 | Gateway 授权、Actions 实际拥有相机／语音／UI 执行；禁止反向实现依赖、直接写 UI 字段和越权原生控制 |
+| 执行与呈现 | Agents authorizes, Gateway schedules, and Actions owns camera/voice/UI execution；禁止反向实现依赖、直接写 UI 字段和越权原生控制 |
 | 存储／事实／错误 | 公开 State 不保存完整 Context；业务不依赖具体后端或 IoC；基础错误结构独立且保留原始失败，路由事实不当作执行错误 |
 | 资源与系统导入 | Skill Action／Channel 声明、生产资源及模板；系统框架按实际原生实现文件许可，业务模块不能进入基础库 |
 
@@ -85,3 +85,15 @@ compare-qwen-protocols.py 仅对显式 flash／max 运行隔离的阿里 Respons
 ## Qwen / GPT-4.1 提示词回归扩展
 
 ✅ 沿用59场景／85输入及生产提示词，evaluate-qwen.py接受三款Qwen与gpt-4.1；每个子进程仅注入对应Provider凭据，GPT使用OpenAI端点。运行前后记录生产上下文／Skill／解析与执行源hash，不修改提示词或放宽断言。报告保留失败与实际响应；本轮使用合成设备／仓库，不能替代真机验收。
+
+## Gateway container ownership
+
+✅ check-modelkit-boundaries.py rejects production Gateway core construction inside Agents, global shutdown in AgentRuntime, missing App gateway registration/dependency ordering and a missing AppStorage → Gateway target dependency. Existing SDK and source-ownership rules remain enforced.
+
+## One-way execution boundary checks
+
+The architecture checker enforces Gateway → FunctionContracts only, AgentCore → FunctionContracts only, Actions without AgentCore/Gateway, and Agents without Actions/CallRuntime/ExecutionRuntime. Existing ExecutionRuntime/CallRuntime targets have explicit Actions/Support source lists; no new target or per-domain container is permitted. App registration and lifecycle ordering retain all three business roots.
+
+## Execution layer source ownership
+
+The boundary checker requires Agents/Gateway/Actions Xcode groups to mirror the physical source directories, with one reference per file, complete Swift/README/JSON coverage and no misplaced or stale groups. This navigation check does not change target source membership or runtime behavior.

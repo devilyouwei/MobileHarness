@@ -1,6 +1,7 @@
 import Foundation
 import FunctionContracts
 import StorageCore
+import UI
 
 /// History.Conversation function ownership.
 extension HistoryActions {
@@ -123,8 +124,26 @@ extension HistoryActions {
                 }
                 try await request.accept(invocation)
                 do {
-                    let result = try await reads.read(request.query)
-                    try await request.complete(result)
+                    let query: HistoryReadQuery
+                    switch request.input {
+                    case .conversation(let id): query = .conversation(id)
+                    case .message(let id): query = .message(id)
+                    case .page(let id, let after, let taskID): query = .page(id: id, after: after, taskID: taskID)
+                    case .archives(let before): query = .archives(before: before)
+                    case .photo(let id, let input): query = .photo(id: id, inputID: input)
+                    default: throw HistoryQueryError.missingConversation
+                    }
+                    let result = try await reads.read(query)
+                    let reply: HistoryReply
+                    switch result {
+                    case .conversation(let value):
+                        reply = .conversation(try await HistoryPresentationAdapter.conversation(value))
+                    case .archives(let values):
+                        reply = .archives(
+                            try await MainActor.run { try values.map(HistoryPresentationAdapter.conversation) })
+                    case .photo(let value): reply = .photo(value)
+                    }
+                    try await request.complete(reply)
                 } catch {
                     await request.fail(error)
                     throw error

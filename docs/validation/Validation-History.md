@@ -1806,15 +1806,15 @@ Every row passed the shared structure, graph, link, navigation and current-desig
 | 33 | [MobileHarness/Gateway/README.md](../../MobileHarness/Gateway/README.md) | 0 / 0 | 2 | ✅ Current technical design reconciled |
 | 34 | [MobileHarness/Gateway/Input/README.md](../../MobileHarness/Gateway/Input/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
 | 35 | [MobileHarness/Gateway/Output/README.md](../../MobileHarness/Gateway/Output/README.md) | 0 / 0 | 2 | ✅ Current technical design reconciled |
-| 36 | [MobileHarness/Gateway/Runtime/README.md](../../MobileHarness/Gateway/Runtime/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
+| 36 | `MobileHarness/Gateway/Runtime/README.md` (retired; [current owner](../../MobileHarness/Actions/Support/README.md)) | 0 / 0 | 1 | ✅ Current technical design reconciled |
 | 37 | [MobileHarness/Gateway/Output/Dispatch/README.md](../../MobileHarness/Gateway/Output/Dispatch/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
-| 38 | [MobileHarness/Gateway/Output/Protocols/README.md](../../MobileHarness/Gateway/Output/Protocols/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
-| 39 | [MobileHarness/Gateway/Output/Registration/README.md](../../MobileHarness/Gateway/Output/Registration/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
+| 38 | `MobileHarness/Gateway/Output/Protocols/README.md` (retired; [current owner](../../MobileHarness/Actions/Support/Contracts/README.md)) | 0 / 0 | 1 | ✅ Current technical design reconciled |
+| 39 | `MobileHarness/Gateway/Output/Registration/README.md` (retired; [current owner](../../MobileHarness/Actions/Support/README.md)) | 0 / 0 | 1 | ✅ Current technical design reconciled |
 | 40 | [MobileHarness/Gateway/Output/Resources/README.md](../../MobileHarness/Gateway/Output/Resources/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
 | 41 | [MobileHarness/Gateway/Output/Results/README.md](../../MobileHarness/Gateway/Output/Results/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
-| 42 | [MobileHarness/Gateway/Output/Routing/README.md](../../MobileHarness/Gateway/Output/Routing/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
+| 42 | `MobileHarness/Gateway/Output/Routing/README.md` (retired; [current owner](../../MobileHarness/Agents/Support/README.md)) | 0 / 0 | 1 | ✅ Current technical design reconciled |
 | 43 | [MobileHarness/Gateway/Output/Scheduling/README.md](../../MobileHarness/Gateway/Output/Scheduling/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
-| 44 | [MobileHarness/Gateway/Output/Validation/README.md](../../MobileHarness/Gateway/Output/Validation/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
+| 44 | `MobileHarness/Gateway/Output/Validation/README.md` (retired; [current owner](../../MobileHarness/Agents/Support/README.md)) | 0 / 0 | 1 | ✅ Current technical design reconciled |
 | 45 | [MobileHarness/Actions/README.md](../../MobileHarness/Actions/README.md) | 0 / 0 | 2 | ✅ Current technical design reconciled |
 | 46 | [MobileHarness/Actions/Camera/README.md](../../MobileHarness/Actions/Camera/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
 | 47 | [MobileHarness/Actions/Contracts/README.md](../../MobileHarness/Actions/Support/Contracts/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
@@ -3405,3 +3405,50 @@ After device compilation completed, a second isolated run of bluetoothLateNative
 - PASS: `./scripts/build-ios.sh`, all four simulator schemes, log `/tmp/mobileharness-build4.log`; signed Debug device build, log `/tmp/mobileharness-device4.log`; diff whitespace checks.
 - Earlier superseded test runs were terminated after user clarified the interaction contract; they are not final validation evidence.
 - Installed successfully on the paired iPhone 17 Pro using devicectl, preserving application data. Native interaction acceptance remains pending: rapid single/double taps must have no business effect or error; holding 0.5 seconds must trigger the existing cue/light/listening sequence. Automated tests/builds and installation do not establish native gesture or audio timing acceptance.
+
+## 2026-10-25 — Current checkpoint installed on iPhone 17 Pro
+
+- Built commit `b0d39662` for the paired physical iPhone 17 Pro with the existing local signing configuration. Signed Debug build passes; final app signature verification and all 25 packaged Agent/Skill resource checks pass. Bundle `dev.mobileharness.app`, version `0.1.0` (build `1`).
+- Installation and launch through devicectl both succeed (installation sequence 4856). Updated the existing app without uninstalling or clearing its data. No source or signing configuration changes were made for deployment.
+- This records build, package verification, installation and launch only. Camera switching, conversational album navigation, native photo import/export, container context behavior and other device interactions still require separate acceptance. Full automated checks were not repeated for this installation.
+- Host-local logs: `/tmp/mobileharness-device-20261025-build.log`, `/tmp/mobileharness-device-20261025-install.log`, `/tmp/mobileharness-device-20261025-launch.log`.
+
+
+## 2026-10-25 — App-owned Gateway container
+
+Gateway root ownership, independent App lifecycle ordering, draining admission and isolated diagnostic sessions are covered by the [Gateway container report](Gateway-Container.md). `./scripts/check.sh` and all four `./scripts/build-ios.sh` schemes passed on final source, including packaged resource verification. Detailed evidence is recorded there; automated fixtures and simulator compilation do not constitute real-model, manual native-UI or physical-device acceptance.
+
+## 2026-10-25 — Actions root and neutral execution chain
+
+Actions/Gateway/Agents ownership migration, canonical Action/Tool registration, pure preparation, one-use credentials, bounded admission and cancellation/failure preservation are recorded in [Actions container validation](Actions-Container.md). Final `./scripts/check.sh` passes (864 ordinary integration tests and 221 separate runtime tests, plus the other package targets), as do all four `./scripts/build-ios.sh` Simulator schemes. Earlier failed/aborted iterations remain in the report. No new real-model, iOS native interaction or physical-arm acceptance is claimed.
+
+## 2026-10-25 — Execution layer source cleanup
+
+[Audit and changes](../completed/Execution-Layers-Cleanup.md) consolidate redundant Agents/Gateway/Actions source files and clean stale Xcode navigation. Required full checks passed, including 865 ordinary IntegrationTests and 221 isolated LiveRuntime tests; all four Simulator schemes built successfully. No new real-model/native iOS/physical-device acceptance was performed. Details and retained warning/iteration evidence: [validation](Execution-Layers-Cleanup.md).
+
+## 2026-10-25 — Overall technical design audit
+
+The overall README was reconciled with current App/Agents/Gateway/Actions ownership. Misplaced workflow figures were corrected, a Function Token overview was added, and all 23 Mermaid figures parsed/rendered successfully. Local links/anchors and whitespace checks passed. The audit identified a protocol-versus-executionPolicy routing discrepancy; current docs now describe actual behavior and corrective work is tracked without changing runtime code. See [audit evidence](Overall-Design-Audit.md). No new build/test/model/device run is claimed.
+
+## 2026-10-25 — Native input and internal Signal overview
+
+The total technical design now depicts direct native/local intake separately from semantic role Signals and authorized execution. The new source/perception/cognition/execution figure and all 23 existing figures render successfully; source review, links and whitespace checks passed. This is documentation work; the user's better operational experience is recorded as qualitative feedback without a newly measured performance claim. See [evidence](Signal-Flow-Overview.md).
+
+
+## 2026-10-25 — Action registration-to-completion responsibilities
+
+The overall design now separates App lifetime, Actions registration/business validity, Agents semantic authorization and Gateway neutral coordination in one lifecycle diagram and ownership matrix. Gateway has no Agent implementation dependency. Source boundary checks, all 24 Mermaid renderings, affected links/anchors and whitespace checks pass. The existing protocol/executionPolicy routing discrepancy remains documented. This documentation-only audit adds no new full test/build, model, native UI or device acceptance claim. See [audit evidence](Action-Lifecycle-Responsibilities.md).
+
+
+## 2026-10-25 — Actions architecture working tree installed on iPhone
+
+- At the user's request, built and signed the current working tree for the paired iPhone 17 Pro. MobileHarness Debug 0.1.0/build 2026102501 passes the generic iOS-device build with existing local signing and a command-only version override. No source/signing/version configuration was changed for deployment.
+- Deep/strict signature verification, unexpired provisioning for the target phone, all 25 packaged Agent/Skill assets and Core protocol resources pass. All 655 captured source/configuration/resource inputs remain unchanged across build and installation.
+- In-place installation succeeds (installation sequence 4864), launch succeeds, and independent installed-app inventory confirms dev.mobileharness.app 0.1.0/build 2026102501, replacing build 1. No uninstall or application-data reset was performed.
+- This records build, package verification, installation and OS launch only. Full automated checks were not repeated for this installation-only request; native UI, live-model, microphone/camera and physical-device behavior require separate acceptance. No commit or merge.
+- Host-local evidence: `/tmp/mobileharness-actions-install-build.log`, `/tmp/mobileharness-actions-install-inputs.json`, `/tmp/mobileharness-actions-install-receipt.json`, `/tmp/mobileharness-actions-install-launch.json`, `/tmp/mobileharness-actions-install-before.json` and `/tmp/mobileharness-actions-install-after.json`.
+
+
+## 2026-10-25 — State acquisition and conversation context audit
+
+The overall design now diagrams explicit owner snapshot reads and Task/Skill/history-to-request composition. The audit distinguishes the five production business/UI sources from private Agent runtime state and documents fresh per-request sampling, minimal AGENT CONTEXT, CURRENT STATE and native-result-safe placement. Source boundaries, 25 overall plus nine owning-document Mermaid renderings, local references and diff formatting pass. Twenty-three unrelated overall diagrams remain unchanged. No new runtime code, full-suite/build, model or native-device acceptance is claimed. See [audit evidence](State-Context-Pipeline.md).

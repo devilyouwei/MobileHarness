@@ -13,11 +13,11 @@ private func activityRecord(
     id: String = UUID().uuidString, channel: String = "Robot",
     phase: ActionExecutionRecord.Phase = .running,
     semantics: ActionExecutionRecord.Semantics = .finite, at time: Date = .now,
-    failure: ActionExecutionRecord.Failure? = nil, completion: AgentActionCompletion? = nil
+    failure: ActionExecutionRecord.Failure? = nil, completion: ActionCompletion? = nil
 ) -> ActionExecutionRecord {
     ActionExecutionRecord(
-        id: id, path: ActionPath(domain: "NexArm", module: "Gesture", function: "dance"), displayName: "跳舞",
-        source: .assistant,
+        id: id, path: ActionIdentifier(domain: "NexArm", module: "Gesture", function: "dance"), displayName: "跳舞",
+        source: AgentID.assistant.rawValue,
         sessionID: UUID().uuidString, inputID: UUID().uuidString, channel: channel,
         semantics: semantics, phase: phase,
         admittedAt: time, startedAt: phase == .queued ? nil : time,
@@ -106,9 +106,9 @@ private func activityRecord(
 @Test @MainActor func actionActivityShowsEveryScheduledActionRegardlessOfModuleOrSource() async {
     func record(module: String, source: AgentID, channel: String) -> ActionExecutionRecord {
         ActionExecutionRecord(
-            id: UUID().uuidString, path: ActionPath(domain: module, module: "Control", function: "fixture"),
+            id: UUID().uuidString, path: ActionIdentifier(domain: module, module: "Control", function: "fixture"),
             displayName: "跳舞",
-            source: source,
+            source: source.rawValue,
             sessionID: UUID().uuidString, inputID: UUID().uuidString, channel: channel,
             semantics: .finite)
     }
@@ -161,7 +161,7 @@ extension ActionActivityState {
 }
 
 @Test @MainActor func composedActionIssuesRemainVisibleBeyondSummary() throws {
-    let report = try AgentActionReport(entries: [
+    let report = try ActionReport(entries: [
         .init(
             path: "one", status: .failed, code: .init(rawValue: "targetNotReached"),
             details: ["motor": "3", "target": "1443", "observed": "1418"]),
@@ -171,8 +171,8 @@ extension ActionActivityState {
     let item = ActionActivityItem(
         execution: ActionExecutionRecord(
             id: UUID().uuidString,
-            path: ActionPath(domain: "NexArm", module: "Gesture", function: "dance"), displayName: "跳舞",
-            source: .assistant,
+            path: ActionIdentifier(domain: "NexArm", module: "Gesture", function: "dance"), displayName: "跳舞",
+            source: AgentID.assistant.rawValue,
             sessionID: UUID().uuidString, inputID: UUID().uuidString, channel: "Robot",
             semantics: .finite, phase: .failed,
             completion: .report(report)))
@@ -183,12 +183,12 @@ extension ActionActivityState {
 }
 
 @Test @MainActor func singleHandlerFailurePreservesUnderlyingSpeechDescription() throws {
-    let report = try AgentActionReport(entries: [.init(path: "root", status: .failed, code: .handlerFailed)])
+    let report = try ActionReport(entries: [.init(path: "root", status: .failed, code: .handlerFailed)])
     let item = ActionActivityItem(
         execution: ActionExecutionRecord(
-            id: UUID().uuidString, path: ActionPath(domain: "Speech", module: "Playback", function: "speak"),
+            id: UUID().uuidString, path: ActionIdentifier(domain: "Speech", module: "Playback", function: "speak"),
             displayName: "朗读回复",
-            source: .assistant,
+            source: AgentID.assistant.rawValue,
             sessionID: UUID().uuidString, inputID: UUID().uuidString, channel: "Speech",
             semantics: .finite, phase: .failed,
             completion: .report(report), failureDescription: "语音合成返回了无效音频"))
@@ -196,7 +196,7 @@ extension ActionActivityState {
 }
 
 @Test @MainActor func unknownProviderFailureHasSafePresentationFallback() throws {
-    let report = try AgentActionReport(entries: [
+    let report = try ActionReport(entries: [
         .init(
             path: "fixture", status: .failed, code: .init(rawValue: "fixture.unknown"),
             details: ["sensor": "depth"])
@@ -211,7 +211,7 @@ extension ActionActivityState {
         .init(
             execution: .init(
                 id: UUID().uuidString, path: .init(domain: "UI", module: "Caption", function: "print"),
-                displayName: "字幕", source: .assistant, sessionID: UUID().uuidString,
+                displayName: "字幕", source: AgentID.assistant.rawValue, sessionID: UUID().uuidString,
                 inputID: UUID().uuidString, channel: "Display",
                 semantics: .finite, phase: phase, admittedAt: .now))
     }

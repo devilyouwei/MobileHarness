@@ -1,3 +1,4 @@
+import Actions
 import Agents
 import AppLifecycle
 import AppStorage
@@ -29,7 +30,33 @@ import Gateway
                 foreground: { try services.uiContainer.setForeground($0) },
                 stop: { await services.uiContainer.stop() }),
             ManagedService(
-                id: "agents", dependencies: ["storage", "platform", "ui", "model"],
+                id: "executionBindings", dependencies: ["storage", "platform", "ui", "model"],
+                start: {
+                    try services.agents.prepareExecutionBindings(
+                        declarations: CapabilityModules.declarations, prepareBusiness: services.actionAssembly.prepare,
+                        configure: { try AgentGatewayAssembly.configure(root: services.gateway, configuration: $0) })
+                },
+                stop: {
+                    var failure: (any Error)?
+                    if services.gateway.state == .cold || services.gateway.state == .configured {
+                        do { try await services.gateway.stop() } catch { failure = error }
+                    }
+                    if !services.actions.isShutdownRequested {
+                        do { try await services.actions.stop() } catch { if failure == nil { failure = error } }
+                    }
+                    await services.agents.releaseExecutionBindings()
+                    if let failure { throw failure }
+                }),
+            ManagedService(
+                id: "actions", dependencies: ["executionBindings"], start: { try services.actions.start() },
+                invalidate: services.actions.invalidate, foreground: services.actions.setForeground,
+                stop: services.actions.stop),
+            ManagedService(
+                id: "gateway", dependencies: ["actions"], start: services.gateway.start,
+                invalidate: services.gateway.invalidate, foreground: services.gateway.setForeground,
+                stop: services.gateway.stop),
+            ManagedService(
+                id: "agents", dependencies: ["gateway"],
                 start: services.agents.start,
                 invalidate: services.agents.invalidate,
                 foreground: services.agents.setForeground,

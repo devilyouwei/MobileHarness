@@ -107,3 +107,7 @@ Actions 按业务能力组织源码，保持原编译目标。生产调用显式
 具体角色装配归 Agents 根级，Support 保留通用机制；角色私有载荷和会话控制由角色解释，通过注入的解码／Context 钩子接入共享准入。输入身份、Task scope、取消加入和真实结果保持独立，源码和验证按其实际所有者维护。
 
 ✅ 相机已提交保存、后续UI请求失败时，断言保留“已保存到 App 相册”的真实提交反馈；保存目标不再是系统Photos。
+
+## Gateway container ownership
+
+✅ Generic service-graph ordering and rollback remain covered here. GatewayContainerTests in IntegrationTests additionally exercises a real Gateway root under ApplicationLifecycle to verify executionBindings → gateway → agents ordering and retained binding lifetime.

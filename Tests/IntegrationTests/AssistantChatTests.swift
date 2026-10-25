@@ -1,5 +1,4 @@
 import AgentCore
-import Agents
 import CallRuntime
 import Foundation
 import Gateway
@@ -7,6 +6,8 @@ import ModelKit
 import StorageChat
 import StorageCore
 import Testing
+
+@testable import Agents
 
 private actor ChatFixture: ChatCapability {
     let availability: CapabilityAvailability = .available
@@ -809,7 +810,7 @@ func modelProtocolFailureKeepsAgentClassificationHistoryAndGatewayCorrelation() 
     let manager = AgentManager()
     try await manager.register(agent, sessionID: session)
     try await agent.start()
-    let gateway = OutputGateway(
+    let gateway = await OutputGateway(
         manager: manager, requests: InputGateway(manager: manager), tools: ToolRegistry(), sink: { _ in })
     let consumer = try await gateway.consumer(for: agent)
     let stream = try await gateway.observeFailures()

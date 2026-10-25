@@ -14,10 +14,10 @@ Runtime arrows show data or capability calls; dashed arrows show injection.
 
 ```mermaid
 flowchart LR
- Dispatch[ActionDispatcher] --> Admit[Bounded task tree admission]
+ Dispatch[Neutral scheduled invocation] --> Admit[Bounded task tree admission]
  Admit --> Active[Active phase lane heads]
  Active --> Resources[ResourceCoordinator]
- Resources --> Executor[ActionExecutor]
+ Resources --> Executor[Injected Actions execution port]
  Executor -->|Joined terminal outcome| Advance[Advance lanes after cleanup]
  Advance --> Active
  Advance --> Results[Result ledger and execution snapshots]
@@ -58,26 +58,12 @@ Eight observers receive newest-one complete snapshots, including initial/final s
 
 Bounded wait/FIFO scheduling, scoped feedback barriers and passive observation are implemented.
 
-## Related design
+## Preparation and root lifetime
 
-[Parent design](../README.md)
+The scheduler owns at most 128 preparation-admission tasks. It reserves Channel capacity before the asynchronous prepare hop, validates matching envelope/context and registered endpoint scope, and rechecks scope/admission after actor hops. Rejection discards the credential; each accepted job retains the same report store. Caller cancellation and matching scope cancellation join preparation as well as queued/running work.
 
-## Channel-owned Action ordering
+ActionsExecutionPort supplies prepared descriptors/resources and executes under ResourceCoordinator's permit. Gateway imports no registry or function executor. Action budgets apply during execution, not queue residence; Channel/wait has no hidden overall timeout. Business conditions are checked again by the actual Actions handler after queueing.
 
-No definition/path/module exclusion remains. Same-lane execution stays occupied through joined cleanup; different Channels/tasks may progress independently. Resource busy failures are terminal call outcomes and allow following lane work.
+Suspend cancels and joins preparation and accepted trees without destroying passive observation. Pending bounded result retries remain root-owned across pause. Terminal shutdown joins admissions, jobs, discarded credentials and delivery callbacks before ending observers. Opaque endpoint/incarnation/session cancellation retains a cancelled boundary until its ordered seal/terminal arrives; retained boundaries count against tracked-input capacity.
 
-ActionFunction 基础默认执行超时为 30 秒，dynamicTimeout 优先于静态 timeout；未声明也有默认预算。Speech.Playback 使用显式 300 秒。超时取消并加入清理，保留真实效果，以 ActionResult 返回；工具复用同一函数契约。通信转发不制造 TTL，队列和整个对话不附加默认时限。
-
-## Action timeout contract
-
-Action 执行采用基础默认或业务静态/动态预算，计时从执行开始；Channel/wait 自身不附加固定总时限，组合使用自身合成预算。
-
-cancel(agent:incarnation:sessionID:) adds optional session selection to existing producer-incarnation cancellation; nil retains lifecycle closure behavior. It cancels/joins selected trees without whole-session result-ledger/resource closure.
-
-producer/session host cancellation retains an already-settled cancelled tree until its ordered round seal or cancel terminal arrives, so a late finish reports cancellation instead of success. Retained trees still count toward the existing 64-task bound; terminal/lifecycle/full shutdown releases them. No tombstone/replay queue is added.
-
-Handler throws and returned reports share typed cancellation classification. Cancellation has cancelled phase and no observation failure; independent failures remain failed/partialFailure. Queue cancellation remains notStarted and active cancellation joins actual cleanup without rollback.
-
-## 待实现
-
-- Global fairness/priority, cross-task barriers and Channel-level leases are not implemented. Channel.swift retains always-unlocked metadata only; ResourceCoordinator is authoritative.
+Pure cancellation remains cancelled without an independent failure. Mixed real failures and child reports remain failed/partialFailure. No automatic effect replay, global fairness queue or Channel-level lease is implied. [Output](../README.md) · [Actions execution](../../../Actions/Support/README.md)

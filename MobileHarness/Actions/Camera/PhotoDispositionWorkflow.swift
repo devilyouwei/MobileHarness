@@ -1,4 +1,5 @@
 import Foundation
+import FunctionContracts
 
 /// Native commit and optional feedback have different failure semantics.
 public enum PhotoDispositionWorkflow {

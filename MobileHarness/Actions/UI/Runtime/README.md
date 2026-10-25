@@ -10,8 +10,8 @@
 
 | 文件 | 当前职责 |
 | --- | --- |
-| [ActionActivityPresentation.swift](ActionActivityPresentation.swift) | 执行／任务／信号事实到活动 UI 值的映射 |
-| [ActionActivityWorkflow.swift](ActionActivityWorkflow.swift) | 有界活动观察与展示寿命 |
+| [ActionActivityPresentation.swift](../../../Agents/Support/ActionActivityPresentation.swift) | 执行／任务／信号事实到活动 UI 值的映射 |
+| [ActionActivityWorkflow.swift](../../../Agents/Support/ActionActivityWorkflow.swift) | 有界活动观察与展示寿命 |
 | [BluetoothStatusActions.swift](BluetoothStatusActions.swift) | 业务函数的参数校验、能力调用与完成值 |
 | [MicrophoneSpectrumPresentation.swift](MicrophoneSpectrumPresentation.swift) | 频谱测量校验、平滑与根／采集代际接纳 |
 | [RuntimeDiagnosticsActions.swift](RuntimeDiagnosticsActions.swift) | 业务函数的参数校验、能力调用与完成值 |
@@ -19,3 +19,7 @@
 | [RuntimePresentationCapabilities.swift](RuntimePresentationCapabilities.swift) | 异常、蓝牙状态的呈现契约 |
 
 [所属域设计](../README.md) · [Actions 模块](../../README.md)
+
+## Execution ownership and lifecycle
+
+ActionActivityWorkflow and ActionActivityPresentation live in Agents/Support because they interpret passive role/Task evidence. Callable RuntimePresentation remains in Actions, validates business/session state and presents already-classified facts. MicrophoneSpectrumPresentation implements the neutral SpectrumPresenting interface with UUID handles.

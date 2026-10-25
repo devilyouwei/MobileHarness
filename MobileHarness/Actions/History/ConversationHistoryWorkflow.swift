@@ -24,6 +24,7 @@ public final class ConversationHistoryWorkflow: ConversationHistoryControlling {
     private var photoReads: Set<UUID> = []
     private var detailTurns: [String: HistoryTurn] = [:]
     private var loaded = false
+    private var stopped = false
     private var task: Task<Void, Never>?
     private var archivePageTask: Task<Void, Never>?
     public init(
@@ -59,7 +60,7 @@ public final class ConversationHistoryWorkflow: ConversationHistoryControlling {
         self.readArchives = readArchives
     }
     public func load() async {
-        guard !state.isRefreshing, !state.isBusy || archivePageTask != nil else { return }
+        guard !stopped, !state.isRefreshing, !state.isBusy || archivePageTask != nil else { return }
         state.present(.isRefreshing(true))
         defer { state.present(.isRefreshing(false)) }
         if let archivePageTask {
@@ -103,7 +104,7 @@ public final class ConversationHistoryWorkflow: ConversationHistoryControlling {
         return result
     }
     public func loadMoreArchives(retry: Bool) async {
-        guard !Task.isCancelled, !state.isRefreshing, !state.isBusy, state.hasMoreArchives,
+        guard !stopped, !Task.isCancelled, !state.isRefreshing, !state.isBusy, state.hasMoreArchives,
             let id = state.archive?.past.last?.id,
             let cursor = BusinessRecordID(rawValue: id)?.number,
             let ticket = state.beginArchivePage(after: id, retry: retry)
@@ -172,7 +173,7 @@ public final class ConversationHistoryWorkflow: ConversationHistoryControlling {
         }
     }
     private func perform(_ operation: @escaping @MainActor () async throws -> Void) {
-        guard !state.isRefreshing, !state.isBusy, loaded else { return }
+        guard !stopped, !state.isRefreshing, !state.isBusy, loaded else { return }
         state.present(.isBusy(true))
         task = Task {
             defer {
@@ -183,6 +184,13 @@ public final class ConversationHistoryWorkflow: ConversationHistoryControlling {
                 state.present(.status("正在回复或处理输入，请结束后再开始新对话。"))
             } catch { state.present(.status("历史操作失败：\(error)")) }
         }
+    }
+    public func shutdown() async {
+        stopped = true
+        task?.cancel()
+        archivePageTask?.cancel()
+        await task?.value
+        await archivePageTask?.value
     }
     public func cancel() { task?.cancel() }
     public func waitUntilIdle() async { await task?.value }

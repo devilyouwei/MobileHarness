@@ -1,5 +1,5 @@
 #if os(iOS)
-    import Actions
+    import FunctionContracts
     import AgentCore
     import Foundation
     import Gateway
@@ -32,7 +32,7 @@
         public var audioDetectionState: AudioDetectionState? { interaction?.audioDetectionState }
         public var listeningRequests: UIRequests<ListeningInput, Void>? { interaction?.listeningRequests }
         public var detectionRequests: UIRequests<AudioDetectionInput, Void>? { interaction?.detectionRequests }
-        public var diagnostic: SpeechDiagnosticWorkflow? { interaction?.diagnostic }
+        public var diagnostic: (any SpeechDiagnosticControlling)? { interaction?.diagnostic }
         public var diagnosticState: SpeechDiagnosticState? { interaction?.diagnosticState }
         #if DEBUG
             public var validateVoiceModels: (@Sendable () async throws -> String)? { interaction?.validateVoiceModels }
@@ -53,7 +53,7 @@
         func endSettingsChange() { interaction?.lifecycle.endSettingsChange() }
         func start(
             recognition: any SpeechRecognitionCapability, vad: any VoiceActivityCapability,
-            input: any AudioCaptureObserving, spectrum: MicrophoneSpectrumPresentation,
+            input: any AudioCaptureObserving, spectrum: any SpectrumPresenting,
             runtime: VoiceRuntimeDependencies
         ) async throws -> any VoicePerceptionHandling {
             guard !closed else { throw AgentContainerError.stopped }

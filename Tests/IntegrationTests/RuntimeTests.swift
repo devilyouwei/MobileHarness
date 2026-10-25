@@ -1,6 +1,5 @@
 import Actions
 import AgentCore
-import Agents
 import CallRuntime
 import ExecutionRuntime
 import Foundation
@@ -9,6 +8,8 @@ import Gateway
 import ModelKit
 import StorageCore
 import Testing
+
+@testable import Agents
 
 @Test(.actionCatalog) func lifecycleAndBoundedQueue() async throws {
     let agent = try AssistantAgent(
@@ -130,7 +131,7 @@ private struct StatusRoundTripChat: ChatCapability {
             ActionPath(domain: "Speech", module: "Playback", function: "speak"): { _ in },
             ActionPath(domain: "UI", module: "Caption", function: "print"): { _ in },
         ]))
-    let responses = OutputGateway(manager: manager, requests: requests, tools: tools, actions: actions) {
+    let responses = await OutputGateway(manager: manager, requests: requests, tools: tools, actions: actions) {
         await recorder.record($0)
     }
     let session = UUID().uuidString
@@ -172,7 +173,7 @@ private struct StatusRoundTripChat: ChatCapability {
         ))
     let requests = InputGateway(manager: manager)
     let recorder = Recorder()
-    let missing = OutputGateway(manager: manager, requests: requests, tools: ToolRegistry()) { _ in }
+    let missing = await OutputGateway(manager: manager, requests: requests, tools: ToolRegistry()) { _ in }
     let input = AgentInput(
         id: UUID().uuidString, sessionID: UUID().uuidString, payload: .event("test"))
     let envelope = OutputEnvelope(
@@ -184,7 +185,7 @@ private struct StatusRoundTripChat: ChatCapability {
         registry: try testActionRegistry(handlers: [
             ActionPath(domain: "UI", module: "Expression", function: "express"): { _ in await recorder.act() }
         ]))
-    let responses = OutputGateway(manager: manager, requests: requests, tools: ToolRegistry(), actions: actions) {
+    let responses = await OutputGateway(manager: manager, requests: requests, tools: ToolRegistry(), actions: actions) {
         _ in
     }
     try await responses.dispatch(envelope)
@@ -281,7 +282,7 @@ private struct StatusRoundTripChat: ChatCapability {
                     return []
                 }, handler: { _ in await recorder.act() })
         ]))
-    let gateway = OutputGateway(
+    let gateway = await OutputGateway(
         manager: manager, requests: InputGateway(manager: manager), tools: ToolRegistry(),
         actions: scheduler
     ) { _ in }
@@ -352,7 +353,7 @@ private struct StatusRoundTripChat: ChatCapability {
     let registry = ToolRegistry()
     try await registry.registerCompletion("UI.Caption.print") { _ in throw HarnessError.notRunning }
     try await registry.registerCompletion("UI.Caption.beginReplyTurn") { _ in }
-    let gateway = OutputGateway(
+    let gateway = await OutputGateway(
         manager: manager, requests: InputGateway(manager: manager), tools: registry,
         sink: { _ in })
     let failures = try await gateway.observeFailures()
@@ -451,7 +452,7 @@ private struct StatusRoundTripChat: ChatCapability {
     try await agent.receive(input)
     let tools = ToolRegistry()
     try await tools.register("UI.Caption.print") { _ in "completed value" }
-    let gateway = OutputGateway(
+    let gateway = await OutputGateway(
         manager: manager, requests: InputGateway(manager: manager), tools: tools,
         sink: { _ in })
     let result = try await gateway.execute(
@@ -592,7 +593,7 @@ private actor SignalFeedbackRecorder: Agent {
             "subscriptions":[],"publications":[],"sends":[]}}
             """#.utf8))
     let policy = try CommunicationPolicy(configurations: [configuration])
-    let gateway = OutputGateway(
+    let gateway = await OutputGateway(
         manager: manager, requests: InputGateway(manager: manager, policy: policy),
         tools: registry, policy: policy
     ) { _ in }
@@ -659,7 +660,7 @@ private actor HeldSignalTool {
     let held = HeldSignalTool()
     let registry = ToolRegistry()
     try await registry.register("System.Runtime.runtimeInfo") { _ in try await held.execute() }
-    let gateway = OutputGateway(
+    let gateway = await OutputGateway(
         manager: manager, requests: InputGateway(manager: manager), tools: registry
     ) { _ in }
     let parent = AgentInput(id: UUID().uuidString, sessionID: session, payload: .text("intent"))
@@ -701,7 +702,7 @@ private actor HeldSignalTool {
         await recorder.act()
         return "Completed once"
     }
-    let gateway = OutputGateway(
+    let gateway = await OutputGateway(
         manager: manager, requests: InputGateway(manager: manager), tools: registry
     ) { _ in }
     let payload = InputPayload.text("intent")
@@ -782,7 +783,7 @@ func interruptedVoiceStateIsCancelledWithoutHidingRealFailures(mode: String) asy
             throw CancellationError()
         }
     }
-    let gateway = OutputGateway(
+    let gateway = await OutputGateway(
         manager: manager, requests: InputGateway(manager: manager), tools: registry,
         sink: { _ in })
     let call = try voiceState.call(["state": "processing"])

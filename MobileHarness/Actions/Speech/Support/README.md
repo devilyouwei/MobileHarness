@@ -11,6 +11,6 @@
 | 文件 | 当前职责 |
 | --- | --- |
 | [SpeechCapabilities.swift](SpeechCapabilities.swift) | 跨语音能力使用的播放／聆听契约 |
-| [SpeechTypes.swift](SpeechTypes.swift) | 共享语音错误与反馈配置 |
+| [SpeechTypes.swift](../../Support/Contracts/SpeechTypes.swift) | 共享语音错误与反馈配置 |
 
 [所属域设计](../README.md) · [公共契约](../../Support/Contracts/README.md)

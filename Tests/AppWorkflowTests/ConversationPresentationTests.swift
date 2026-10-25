@@ -77,7 +77,7 @@ import Testing
     state.assistantReply = "当前回复"
     #expect(state.transcriptFinalized && state.liveTranscript == "新的用户输入")
     #expect(state.assistantReply == "当前回复")
-    #expect(presentation.replyTurn == second)
+    #expect(presentation.replyTurn == ConversationTurn(id: second.id, ordinal: second.ordinal))
 }
 
 @Test @MainActor func firstTranscriptCanResetCaptionsWithoutAnEarlierOnsetUpdate() {

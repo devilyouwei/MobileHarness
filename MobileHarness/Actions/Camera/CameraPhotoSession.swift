@@ -1,8 +1,7 @@
 #if os(iOS)
-    import AgentCore
+    import FunctionContracts
     import ExecutionRuntime
     import Foundation
-    import FunctionContracts
     import OSLog
     import PlatformKit
     import StorageCore

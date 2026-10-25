@@ -17,3 +17,7 @@
 | [DetectionActions.swift](DetectionActions.swift) | 业务函数的参数校验、能力调用与完成值 |
 
 [所属域设计](../README.md) · [Actions 模块](../../README.md)
+
+## Execution ownership and lifecycle
+
+AudioDetectionSession is Actions-owned native orchestration. DetectionConnections carries generic observation/input ports; Agents supplies cognitive callbacks through App binding. AudioDetectionReadiness and AudioDetectionError are neutral contracts. SpeechPerception retains model/consent/observation policy, without owning native session execution. ActionsContainer retains diagnostic/native stop cleanup.

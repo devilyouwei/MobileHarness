@@ -1,6 +1,5 @@
 import Actions
 import AgentCore
-import Agents
 import CallRuntime
 import ExecutionRuntime
 import Foundation
@@ -9,6 +8,7 @@ import PlatformKit
 import StorageCore
 import Testing
 
+@testable import Agents
 @testable import Gateway
 @testable import UI
 
@@ -254,7 +254,7 @@ func actionObservationTracksParallelChannelsAndQueuedWorkWithoutFeedbackOptIn()
 
 @Test(.actionCatalog, arguments: [false, true])
 func cancelledActionPresentationRetainsOnlyIndependentRealIssues(_ mixed: Bool) throws {
-    let report = try AgentActionReport(
+    let report = try ActionReport(
         entries: [
             .init(
                 path: "cancelled", status: .cancelled, code: .cancelled,
@@ -264,7 +264,7 @@ func cancelledActionPresentationRetainsOnlyIndependentRealIssues(_ mixed: Bool) 
     .withExecutionFailure(.cancelled, description: "CancellationError()")
     let record = ActionExecutionRecord(
         id: UUID().uuidString, path: .init(domain: "UI", module: "Caption", function: "print"),
-        displayName: "Caption", source: .assistant, sessionID: UUID().uuidString,
+        displayName: "Caption", source: AgentID.assistant.rawValue, sessionID: UUID().uuidString,
         inputID: UUID().uuidString, channel: "Display",
         semantics: .finite, phase: mixed ? .failed : .cancelled, completion: .report(report))
     let item = ActionActivityItem(execution: record)
@@ -390,7 +390,7 @@ private actor VisionSessionRecorder {
     ] {
         let state = ActionActivityState()
         let workflow = ActionActivityWorkflow(state: state)
-        let fixture = try RuntimeFailurePresentationFixture(activity: workflow)
+        let fixture = try await RuntimeFailurePresentationFixture(activity: workflow)
         try await fixture.start(activity: workflow)
         let diagnostic = AgentFailureDiagnostic(category: .runtime, code: code, detail: "fixture native cause")
         workflow.recordFailure(

@@ -1,6 +1,5 @@
 import Actions
 import AgentCore
-import Agents
 import CallRuntime
 import ExecutionRuntime
 import Foundation
@@ -9,6 +8,8 @@ import Gateway
 import PlatformKit
 import StorageCore
 import Testing
+
+@testable import Agents
 
 private func telemetryPacket(_ pose: [Int]) throws -> NexArmPacket {
     let values = pose + [2048, 2087, 1198, 1238, 2048, 2048]

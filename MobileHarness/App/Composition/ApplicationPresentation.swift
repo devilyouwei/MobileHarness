@@ -98,7 +98,7 @@
         let listeningRequests: UIRequests<ListeningInput, Void>
         let audioDetectionRequests: UIRequests<AudioDetectionInput, Void>
         private let diagnosticState: SpeechDiagnosticState
-        private let diagnostic: SpeechDiagnosticWorkflow
+        private let diagnostic: any SpeechDiagnosticControlling
         init?(source: SpeechPerceptionContainer) {
             guard let conversation = source.conversation, let activity = source.actionActivity,
                 let detection = source.audioDetectionState, let listening = source.listeningRequests,

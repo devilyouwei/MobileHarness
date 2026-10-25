@@ -1,6 +1,7 @@
 import Actions
-import Agents
 import Testing
+
+@testable import Agents
 
 struct ActionCatalogFixture: TestTrait, TestScoping {
     private static let installation = Result {

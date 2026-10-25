@@ -1,6 +1,5 @@
 import Actions
 import AgentCore
-import Agents
 import Foundation
 import FunctionContracts
 import Gateway
@@ -9,6 +8,8 @@ import StorageCore
 import Synchronization
 import Testing
 import UI
+
+@testable import Agents
 
 private actor ObservationInventory: ModelResourceInventoryCapability {
     var reads = 0

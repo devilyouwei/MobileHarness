@@ -101,8 +101,8 @@ public enum SettingsProviderAdapter {
 }
 
 /// Session/revision-fenced native UI endpoint. Private credentials never enter call payloads.
-@MainActor public final class ProviderPresentationAdapter {
-    public enum Operation { case restore, save, discovery }
+@MainActor public final class ProviderPresentationAdapter: ProviderPresentationRegistering {
+    public typealias Operation = ProviderPresentationOperation
     private struct Entry {
         let operation: Operation
         let revision: UInt64

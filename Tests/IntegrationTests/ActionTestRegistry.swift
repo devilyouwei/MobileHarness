@@ -1,12 +1,13 @@
 import Actions
 import AgentCore
-import Agents
 import CallRuntime
 import ExecutionRuntime
 import FunctionContracts
 import Gateway
 import PlatformKit
 import StorageCache
+
+@testable import Agents
 
 /// Explicit implementation metadata for generic scheduler fixtures, not production registration.
 func testActionRegistry(handlers: [ActionPath: ActionHandler]) throws -> ActionRegistry {

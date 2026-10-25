@@ -1,4 +1,5 @@
 import Foundation
+import FunctionContracts
 import PlatformKit
 
 /// Five arm axes and one motors-1–5 aim packet. The suction cup occupies the gripper and is not addressed.

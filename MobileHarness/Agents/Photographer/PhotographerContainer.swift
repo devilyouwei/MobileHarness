@@ -2,7 +2,7 @@
     import Foundation
     import Observation
     import UI
-    import Actions
+    import FunctionContracts
 
     @available(iOS 27, *)
     @MainActor @Observable
@@ -10,10 +10,10 @@
         @ObservationIgnored private var session: PhotographerExecutionSession?
         @ObservationIgnored private var closed = false
         private let cameraUI: UICameraContainer
-        private let cameraPresentation: any CameraPresenting
-        init(camera: UICameraContainer, presentation: any CameraPresenting) {
+        private let facades: AgentUIFacades
+        init(camera: UICameraContainer, facades: AgentUIFacades) {
             cameraUI = camera
-            cameraPresentation = presentation
+            self.facades = facades
         }
         public var cameraState: CameraState { cameraUI.state }
 
@@ -40,17 +40,6 @@
             await session?.shutdown()
             if let failure = await session?.cleanupFailure { throw failure }
         }
-        @ObservationIgnored public lazy var cameraControls = makeCameraControls()
-        private func makeCameraControls() -> CameraInteractionWorkflow {
-            CameraInteractionWorkflow(
-                presentation: cameraPresentation,
-                perform: { [cameraUI] operation, facing, mediaID in
-                    guard let operation = CameraInput.Operation(rawValue: operation.rawValue) else {
-                        throw UIRequestError.stale
-                    }
-                    _ = try await cameraUI.requests.submit(
-                        CameraInput(operation, facing: facing.map { $0 == .front ? .front : .back }, mediaID: mediaID))
-                })
-        }
+        public var cameraControls: any CameraControlling { facades.camera }
     }
 #endif

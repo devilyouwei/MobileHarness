@@ -1,5 +1,4 @@
 import AgentCore
-import Agents
 import Foundation
 import StorageChat
 import StorageCore
@@ -7,6 +6,8 @@ import StorageFiles
 import StorageMedia
 import StorageSQLite
 import StorageTasks
+
+@testable import Agents
 
 func testSQLiteRepositories(_ directory: URL) throws -> SQLiteRepositories {
     try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)

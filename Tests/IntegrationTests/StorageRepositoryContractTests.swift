@@ -1,5 +1,4 @@
 import AgentCore
-import Agents
 import Foundation
 import ModelKitRuntime
 import StorageChat
@@ -9,6 +8,7 @@ import StorageSQLite
 import StorageTasks
 import Testing
 
+@testable import Agents
 @testable import StorageMedia
 
 private struct ContractDocument: Codable, Sendable, Equatable { let text: String }

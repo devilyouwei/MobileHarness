@@ -1,6 +1,6 @@
-import Actions
 import AgentCore
 import Foundation
+import FunctionContracts
 import ModelKit
 import PlatformKit
 
@@ -55,7 +55,7 @@ extension SpeechPerceptionAgent {
     }
     private func consumeMicrophone(
         _ capture: MicrophoneCaptureInput, sessionID: String, epoch: UUID,
-        display: MicrophoneSpectrumPresentation.Handle?
+        display: UUID?
     ) async throws {
         var meterSamples: [Float] = []
         var meterRate = 0

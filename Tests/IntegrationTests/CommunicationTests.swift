@@ -1,6 +1,5 @@
 import Actions
 import AgentCore
-import Agents
 import CallRuntime
 import ExecutionRuntime
 import Foundation
@@ -8,6 +7,8 @@ import FunctionContracts
 import Gateway
 import StorageCore
 import Testing
+
+@testable import Agents
 
 func communicationConfiguration(_ id: String, subscribes: Bool = false, publishes: Bool = false) throws
     -> AgentConfiguration
@@ -80,7 +81,7 @@ extension LiveRuntimeTests {
             await agent.start()
         }
         let input = InputGateway(manager: manager, policy: policy)
-        let output = OutputGateway(
+        let output = await OutputGateway(
             manager: manager, requests: input, tools: ToolRegistry(), policy: policy, sink: { _ in })
         let port = try await output.messaging(for: source.descriptor.id)
         let parent = AgentInput(id: UUID().uuidString, sessionID: session, payload: .text("source"))
@@ -121,7 +122,8 @@ private func directFixture(blockText: String? = nil, reject: Bool = false) async
         await agent.start()
     }
     let input = InputGateway(manager: manager, policy: policy)
-    let output = OutputGateway(manager: manager, requests: input, tools: ToolRegistry(), policy: policy, sink: { _ in })
+    let output = await OutputGateway(
+        manager: manager, requests: input, tools: ToolRegistry(), policy: policy, sink: { _ in })
     return (manager, input, output, try await output.messaging(for: source.descriptor.id), direct, session)
 }
 
@@ -225,7 +227,7 @@ extension LiveRuntimeTests {
             await agent.start()
         }
         let input = InputGateway(manager: manager, policy: policy)
-        let output = OutputGateway(
+        let output = await OutputGateway(
             manager: manager, requests: input, tools: ToolRegistry(), policy: policy, sink: { _ in })
         let port = try await output.messaging(for: source.descriptor.id)
         try await port.publish(
@@ -331,7 +333,7 @@ extension LiveRuntimeTests {
             await agent.start()
         }
         let gateway = InputGateway(manager: manager, policy: policy)
-        let output = OutputGateway(
+        let output = await OutputGateway(
             manager: manager, requests: gateway, tools: ToolRegistry(), policy: policy, sink: { _ in })
         let port = try await output.messaging(for: producer.descriptor.id)
         let payload = InputPayload.event("parent")
@@ -410,7 +412,7 @@ extension LiveRuntimeTests {
             await agent.start()
         }
         let input = InputGateway(manager: manager, policy: policy)
-        let output = OutputGateway(
+        let output = await OutputGateway(
             manager: manager, requests: input, tools: ToolRegistry(), policy: policy, sink: { _ in })
         let port = try await output.messaging(for: source.descriptor.id)
         let started = ContinuousClock.now
@@ -453,7 +455,7 @@ extension LiveRuntimeTests {
         }
         let observed = AsyncStream<String>.makeStream(bufferingPolicy: .bufferingOldest(1))
         let input = InputGateway(manager: manager, policy: policy)
-        let output = OutputGateway(
+        let output = await OutputGateway(
             manager: manager, requests: input, tools: ToolRegistry(), policy: policy,
             observedContracts: ["speech.final"],
             observeEvent: { value in
@@ -498,7 +500,7 @@ extension LiveRuntimeTests {
             publicationFailure: { _, _, _ in
                 Issue.record("Overflow diagnostics must not call back into the publisher path")
             })
-        let output = OutputGateway(
+        let output = await OutputGateway(
             manager: manager, requests: input, tools: ToolRegistry(), policy: policy,
             observedContracts: ["speech.partial"],
             observeEvent: { _ in

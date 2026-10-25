@@ -1,34 +1,5 @@
-import AgentCore
 import Foundation
-
-public enum ResourceError: Error, Equatable, Sendable {
-    case invalidDefinition, unknownResource, unauthorized, busy, staleLease, staleUse, capacityExceeded
-    case invalidDuration, shutdown
-}
-
-public struct ResourceDefinition: Sendable {
-    public let id: ResourceID
-    public let allowedOwners: Set<AgentID>
-    public let requiresLease: Bool
-    /// Resources sharing a physical writer exclude one another even when their declared IDs differ.
-    public let executionGroup: ResourceID?
-    /// Host-owned policy: a requesting Agent may interrupt only these existing owners.
-    public let preempts: [AgentID: Set<AgentID>]
-    public let stop: @Sendable () async throws -> Void
-
-    public init(
-        id: ResourceID, allowedOwners: Set<AgentID>, requiresLease: Bool = false,
-        executionGroup: ResourceID? = nil, preempts: [AgentID: Set<AgentID>] = [:],
-        stop: @escaping @Sendable () async throws -> Void
-    ) {
-        self.id = id
-        self.allowedOwners = allowedOwners
-        self.requiresLease = requiresLease
-        self.executionGroup = executionGroup
-        self.preempts = preempts
-        self.stop = stop
-    }
-}
+import FunctionContracts
 
 /// Process-wide ownership shared by Actions, Tools and host lifecycle operations.
 public actor ResourceCoordinator {
@@ -65,12 +36,13 @@ public actor ResourceCoordinator {
         var waiting = true
         var finished = false
         var observers: [String: AsyncStream<CleanupResult>.Continuation] = [:]
-        let task: Task<Void, Never>
+        let task: Task<CleanupResult, Never>
     }
     private enum CleanupResult: Sendable {
         case success
         case failure(any Error)
     }
+    private let admission: GatewayAdmission?
     private let definitions: [ResourceID: ResourceDefinition]
     // The sole authority for occupancy; leases/uses/cleanups retain lifecycle metadata only.
     private var holdings: [ResourceID: Holding] = [:]
@@ -79,8 +51,10 @@ public actor ResourceCoordinator {
     private var cleanups: [String: Cleanup] = [:]
     private var expiry: Task<Void, Never>?
     private var closed = false
+    public private(set) var cleanupFailure: GatewayFailure?
 
-    public init(definitions: [ResourceDefinition]) throws {
+    public init(definitions: [ResourceDefinition], admission: GatewayAdmission? = nil) throws {
+        self.admission = admission
         guard definitions.count <= 64 else {
             throw ResourceError.invalidDefinition
         }
@@ -120,6 +94,7 @@ public actor ResourceCoordinator {
         resources: Set<ResourceID>, owner: ExecutionOwner?, lease: ResourceLease?, admitting: Bool
     ) throws {
         guard !closed else { throw ResourceError.shutdown }
+        try admission?.check()
         guard resources.count <= 8 else { throw ResourceError.capacityExceeded }
         for id in resources {
             guard let definition = definitions[id] else { throw ResourceError.unknownResource }
@@ -164,11 +139,12 @@ public actor ResourceCoordinator {
     ) async throws -> ResourceLease {
         try Task.checkCancellation()
         guard !closed else { throw ResourceError.shutdown }
+        try admission?.check()
         try validateDuration(duration)
         guard !requested.isEmpty, requested.count <= 8 else { throw ResourceError.capacityExceeded }
         for id in requested {
             guard let definition = definitions[id] else { throw ResourceError.unknownResource }
-            guard definition.allowedOwners.contains(owner.agent) else { throw ResourceError.unauthorized }
+            guard definition.allowedOwners.contains(owner.endpoint) else { throw ResourceError.unauthorized }
         }
         let affected = cleanupScope(executionScope(requested))
         try checkNoHandoff(affected)
@@ -185,6 +161,7 @@ public actor ResourceCoordinator {
         defer { finishHandoff(token) }
         try Task.checkCancellation()
         guard !closed else { throw ResourceError.shutdown }
+        try admission?.check()
         let lease = ResourceLease(
             id: UUID().uuidString, owner: owner, resources: requested, deadline: .now.advanced(by: duration))
         let scope = executionScope(requested)
@@ -198,6 +175,7 @@ public actor ResourceCoordinator {
     public func renew(_ lease: ResourceLease, owner: ExecutionOwner, duration: Duration) throws -> ResourceLease {
         try Task.checkCancellation()
         guard !closed else { throw ResourceError.shutdown }
+        try admission?.check()
         try validateDuration(duration)
         guard var record = leases[lease.id], record.lease.owner == owner, lease.owner == owner,
             record.lease.resources == lease.resources, record.lease.deadline > .now,
@@ -238,7 +216,7 @@ public actor ResourceCoordinator {
                 victims.allSatisfy({ victim in
                     guard victim.leaseID == nil, let previous = victim.owner else { return false }
                     return resources.allSatisfy {
-                        definitions[$0]?.preempts[owner.agent]?.contains(previous.agent) == true
+                        definitions[$0]?.preempts[owner.endpoint]?.contains(previous.endpoint) == true
                     }
                 })
             else { throw ResourceError.busy }
@@ -265,14 +243,15 @@ public actor ResourceCoordinator {
             }
             try Task.checkCancellation()
         }
-        let task = Task {
+        let task = Task { [admission] in
             try Task.checkCancellation()
+            try admission?.check()
             let value = try await ResourceExecutionContext.$owner.withValue(owner) {
                 try await ResourceExecutionContext.$held.withValue(resources) {
                     try await ResourceExecutionContext.$permit.withValue(permit) { try await operation() }
                 }
             }
-            try Task.checkCancellation()
+            if (value as? any ExecutionFailurePreserving)?.hasExecutionFailure != true { try Task.checkCancellation() }
             return value
         }
         uses[id] = Use(
@@ -284,6 +263,7 @@ public actor ResourceCoordinator {
         defer { finishUse(id) }
         return try await withTaskCancellationHandler {
             let value = try await task.value
+            if (value as? any ExecutionFailurePreserving)?.hasExecutionFailure == true { return value }
             try Task.checkCancellation()
             try validateUse(id, resources: resources)
             return value
@@ -331,15 +311,15 @@ public actor ResourceCoordinator {
         for id in resources { if case .handoff = holdings[id]?.kind { throw ResourceError.busy } }
     }
 
-    public func close(agent: AgentID, incarnation: String) async {
+    public func close(endpoint: String, incarnation: String) async {
         let selected = leases.values.filter {
-            $0.lease.owner.agent == agent && $0.lease.owner.incarnation == incarnation
+            $0.lease.owner.endpoint == endpoint && $0.lease.owner.incarnation == incarnation
         }
         for record in selected { do { try await release(record.lease, owner: record.lease.owner) } catch {} }
-        let selectedUses = uses.values.filter { $0.owner?.agent == agent && $0.owner?.incarnation == incarnation }
+        let selectedUses = uses.values.filter { $0.owner?.endpoint == endpoint && $0.owner?.incarnation == incarnation }
         let owned = Set(
             holdings.compactMap { id, holding in
-                holding.owner?.agent == agent && holding.owner?.incarnation == incarnation ? id : nil
+                holding.owner?.endpoint == endpoint && holding.owner?.incarnation == incarnation ? id : nil
             })
         await stopUses(selectedUses, owned: owned)
     }
@@ -351,14 +331,60 @@ public actor ResourceCoordinator {
         await stopUses(uses.values.filter { $0.owner?.sessionID == sessionID }, owned: owned)
     }
 
-    public func shutdown() async {
-        closed = true
-        expiry?.cancel()
+    /// Container lifecycle joins real cleanup and preserves native stop errors.
+    func closeLifecycle(permanently: Bool) async throws {
+        if permanently { closed = true }
+        let expiring = expiry
+        expiring?.cancel()
         expiry = nil
+        var errors: [any Error] = []
+        let active = Array(uses.values)
+        for use in active { use.cancel() }
+        let existing = cleanups.map { ($0.key, $0.value.task) }
         for record in Array(leases.values) {
-            do { try await release(record.lease, owner: record.lease.owner) } catch {}
+            if record.scope.contains(where: {
+                if case .handoff = holdings[$0]?.kind { return true }
+                return false
+            }) {
+                leases[record.lease.id] = nil
+                continue
+            }
+            do { try await release(record.lease, owner: record.lease.owner) } catch { errors.append(error) }
         }
-        await stopUses(Array(uses.values), owned: Set(holdings.keys))
+        let remaining = Set(
+            holdings.keys.filter {
+                if case .handoff = holdings[$0]?.kind { return false }
+                return true
+            })
+        if !remaining.isEmpty {
+            do {
+                let token = try await clean(cleanupScope(remaining), nextOwner: nil, revoke: { _ in })
+                finishHandoff(token)
+            } catch { errors.append(error) }
+        }
+        for (id, task) in existing {
+            if case .failure(let error) = await task.value { errors.append(error) }
+            finishHandoff(id)
+        }
+        for use in active { await use.join() }
+        await expiring?.value
+        if let primary = errors.first {
+            cleanupFailure = GatewayFailure(
+                component: "resources", operation: "close", underlying: primary,
+                cleanupErrors: Array(errors.dropFirst()), code: .cleanupFailed)
+        }
+        if let cleanupFailure { throw cleanupFailure }
+    }
+
+    /// Standalone compatibility entry point; lifecycle failures remain observable.
+    public func shutdown() async {
+        do { try await closeLifecycle(permanently: true) } catch {
+            if cleanupFailure == nil {
+                cleanupFailure = GatewayFailure(
+                    component: "resources", operation: "shutdown", underlying: error,
+                    code: .cleanupFailed)
+            }
+        }
     }
 
     private func stopUses(_ selected: [Use], owned: Set<ResourceID>) async {
@@ -429,7 +455,7 @@ public actor ResourceCoordinator {
         let task = Task {
             // Collect stop errors without cancelling sibling stop/join tasks. An error is an
             // outcome for this request, not proof that a completed writer remains occupied.
-            let result = await withTaskGroup(of: CleanupResult.self) { group in
+            let result: CleanupResult = await withTaskGroup(of: CleanupResult.self) { group in
                 group.addTask {
                     await revoke(resources)
                     return .success
@@ -448,15 +474,21 @@ public actor ResourceCoordinator {
                         return .success
                     }
                 }
-                var result = CleanupResult.success
+                var errors: [any Error] = []
                 for await value in group {
-                    if case .failure = value, case .success = result { result = value }
+                    if case .failure(let error) = value { errors.append(error) }
                 }
-                return result
+                guard let primary = errors.first else { return .success }
+                if errors.count == 1 { return .failure(primary) }
+                return .failure(
+                    GatewayFailure(
+                        component: "resources", operation: "cleanup", underlying: primary,
+                        cleanupErrors: Array(errors.dropFirst()), code: .cleanupFailed))
             }
-            self.cleanupFinished(id)
+            self.cleanupFinished(id, result: result)
             pair.continuation.yield(result)
             pair.continuation.finish()
+            return result
         }
         cleanups[id] = Cleanup(resources: resources, retiredUses: Set(selected.keys), nextOwner: nextOwner, task: task)
         let acknowledgment = Task {
@@ -482,14 +514,14 @@ public actor ResourceCoordinator {
         if cleanup.finished { finishHandoff(id) }
     }
 
-    private func cleanupFinished(_ id: String) {
+    private func cleanupFinished(_ id: String, result: CleanupResult) {
         guard var cleanup = cleanups[id] else { return }
         // Native writers have joined even if their run callers have not resumed yet. Retire
         // these exact identities now so lifecycle closure cannot mistake them for a new owner.
         for use in cleanup.retiredUses { finishUse(use) }
         cleanup.finished = true
         for observer in cleanup.observers.values {
-            observer.yield(.success)
+            observer.yield(result)
             observer.finish()
         }
         cleanup.observers.removeAll()

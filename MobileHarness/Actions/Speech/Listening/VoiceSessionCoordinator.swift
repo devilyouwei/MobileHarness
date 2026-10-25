@@ -22,10 +22,9 @@ public enum VoiceReplyCancellation {
 
 #if os(iOS)
 
-    import AgentCore
+    import FunctionContracts
 
     import Foundation
-    import FunctionContracts
     import ModelKit
     import OSLog
     import PlatformKit
@@ -123,7 +122,7 @@ public enum VoiceReplyCancellation {
                 started = false
                 presentationPhase = .failed
                 state.present(.voiceStatus("语音呈现接口已被占用"))
-                throw CommunicationError.scopeClosed
+                throw ActionHostError.scopeClosed
             }
             do {
                 speechAudioStore = audioStore
@@ -255,7 +254,7 @@ public enum VoiceReplyCancellation {
         private func validateFeedback(_ invocation: any FunctionInput) throws {
             try Task.checkCancellation()
             guard accepts(session: invocation.context.sessionID) else { throw CancellationError() }
-            if invocation.context.source == "speechPerception" {
+            if invocation.context.sessionID == runtime.interactionSessionID, invocation.context.correlationID == nil {
                 guard invocation.context.sessionID == runtime.interactionSessionID, voiceGeneration != nil else {
                     throw CancellationError()
                 }
@@ -346,10 +345,9 @@ public enum VoiceReplyCancellation {
 
         public func prepareListening(pressed: Bool, invocation: any FunctionInput) async throws {
             try Task.checkCancellation()
-            guard invocation.context.source == "speechPerception",
-                invocation.context.sessionID == runtime.interactionSessionID, invocation.context.taskID == nil,
+            guard invocation.context.sessionID == runtime.interactionSessionID, invocation.context.taskID == nil,
                 started, !changingSettings
-            else { throw CommunicationError.unauthorized }
+            else { throw ActionHostError.unauthorized }
             guard pressed else { return }
             let request = try UIActions.CueRequest(cue: .wake, volume: 0.85)
             try await nativeEffects.prepareCue(request)
@@ -390,8 +388,7 @@ public enum VoiceReplyCancellation {
             enabled: Bool, paused: Bool, revision: UInt64, feedback: SpeechActions.ListeningFeedback,
             invocation: any FunctionInput
         ) async throws {
-            guard invocation.context.source == "speechPerception",
-                invocation.context.sessionID == runtime.interactionSessionID,
+            guard invocation.context.sessionID == runtime.interactionSessionID,
                 revision > listeningRevision
             else { return }
             listeningRevision = revision
@@ -559,7 +556,7 @@ public enum VoiceReplyCancellation {
             runtime.endpoints.presentation.homeEffects.replyDidFinish()
         }
         public func play(audioID: String, invocation: any FunctionInput) async throws {
-            guard let speechPlayback else { throw CommunicationError.scopeClosed }
+            guard let speechPlayback else { throw ActionHostError.scopeClosed }
             guard acceptsPlayback(invocation.context) else { throw CancellationError() }
             playbackCount += 1
             var playbackFailure: (any Error)?
@@ -626,8 +623,7 @@ public enum VoiceReplyCancellation {
 
         public func validateCameraControl(invocation: any FunctionInput) throws {
             try Task.checkCancellation()
-            guard ["photographer", "assistant"].contains(invocation.context.source),
-                accepts(session: invocation.context.sessionID)
+            guard accepts(session: invocation.context.sessionID)
             else { throw CancellationError() }
         }
 
@@ -661,18 +657,18 @@ public enum VoiceReplyCancellation {
             record(text)
         }
 
-        public func show(_ envelope: OutputEnvelope) async {
-            if case .control(let value) = envelope.output,
+        public func show(_ envelope: ActionOutputObservation) async {
+            if case .control(let value) = envelope.kind,
                 value == "agent.cancelled" || value.hasPrefix("agent.error:") || value.hasPrefix("assistant.error:")
             {
-                await speechAudioStore?.cancel(inputID: envelope.inputID, source: envelope.source.rawValue)
+                await speechAudioStore?.cancel(inputID: envelope.inputID, source: envelope.source)
             }
-            switch envelope.output {
-            case .toolCall(let call): record("工具调用：\(call.toolPath)")
+            switch envelope.kind {
+            case .tool(let path): record("工具调用：\(path)")
             case .control(let state):
                 record("状态：\(state)")
             // Factual Agent errors are projected by the root failure observer, never copied into captions.
-            case .actionCall, .communication, .scheduling, .rejectedCall, .roundFinished: break
+            case .other: break
             }
         }
         private func record(_ text: String) {

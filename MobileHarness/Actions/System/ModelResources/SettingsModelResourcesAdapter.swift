@@ -145,10 +145,7 @@ public enum SettingsModelResourcesAdapter {
     }
     public func navigate(_ destination: String, invocation: any FunctionInput) async throws {
         let context = invocation.context
-        guard ["applicationControl", "assistant"].contains(context.source),
-            context.sessionID == sessionID
-                || (context.taskID != nil && context.taskExecutor == context.source)
-        else { throw ResourcePresentationError.staleGeneration }
+        guard context.sessionID == sessionID else { throw ResourcePresentationError.staleGeneration }
         guard destination == "home" || AppDestination(rawValue: destination) != nil else {
             throw ResourcePresentationError.invalidGeneration
         }

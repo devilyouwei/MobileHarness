@@ -19,13 +19,30 @@ public struct BehaviorDefinitionMacro: PeerMacro {
             })
         let name = function.name.text
         guard let domain = values["domain"], let module = values["module"] else { throw MacroError.missingMetadata }
+        let parameters = function.signature.parameterClause.parameters
+        let inputName =
+            parameters.first(where: { $0.type.trimmedDescription.contains("FunctionInput") })
+            .map { ($0.secondName ?? $0.firstName).text } ?? "invocation"
+        let injected = Set(parameters.map { ($0.secondName ?? $0.firstName).text }.filter { $0 != inputName })
+        var checks: [String] = []
+        for statement in function.body?.statements ?? CodeBlockItemListSyntax([]) {
+            let references = ParameterReferences(viewMode: .sourceAccurate)
+            references.walk(Syntax(statement))
+            let text = statement.trimmedDescription
+            // Stop before the first injected capability, async operation or returned effect.
+            if !references.names.isDisjoint(with: injected) || text.contains("await ") || text.hasPrefix("return ") {
+                break
+            }
+            checks.append(text)
+        }
+        let validation = "{ \(inputName) in\n" + checks.joined(separator: "\n") + "\n}"
         let metadata = """
             path: ActionIdentifier(domain: \(domain), module: \(module), function: "\(name)"),
             declaration: \(name)Declaration,
             displayName: \(values["title"] ?? "\"\(name)\""),
             kind: \(values["kind"] ?? ".finite"), completion: \(values["completion"] ?? "\"Complete after joined execution.\""),
             resources: \(values["resources"] ?? "[]"), timeout: \(values["timeout"] ?? "nil"),
-            resolvingResources: \(values["resolvingResources"] ?? "nil"), dynamicTimeout: \(values["dynamicTimeout"] ?? "nil")
+            resolvingResources: \(values["resolvingResources"] ?? "nil"), dynamicTimeout: \(values["dynamicTimeout"] ?? "nil"), validatingInput: \(validation)
             """
         return [
             DeclSyntax(
@@ -48,6 +65,13 @@ public struct BehaviorDefinitionMacro: PeerMacro {
                     }
                     """),
         ]
+    }
+    private final class ParameterReferences: SyntaxVisitor {
+        var names: Set<String> = []
+        override func visit(_ node: DeclReferenceExprSyntax) -> SyntaxVisitorContinueKind {
+            names.insert(node.baseName.text)
+            return .visitChildren
+        }
     }
     enum MacroError: Error, CustomStringConvertible {
         case staticFunctionRequired, missingMetadata

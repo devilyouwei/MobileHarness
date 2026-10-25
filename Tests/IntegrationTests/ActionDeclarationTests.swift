@@ -1,10 +1,11 @@
 import Actions
-import Agents
 import Foundation
 import FunctionContracts
 import StorageChat
 import StorageCore
 import Testing
+
+@testable import Agents
 
 @Test(.actionCatalog) func actionMacroOwnsSchemasAndModuleProjection() throws {
     let declarations = CapabilityModules.declarations

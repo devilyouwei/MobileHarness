@@ -1,69 +1,68 @@
-# Actions — 业务函数集合与执行服务
+# Actions — Business execution and module lifetime
 
-## 职责与边界
+## Responsibilities and boundaries
 
-Actions 拥有可调用的业务操作、查询及其真实执行：参数验证、资源需求、预算、完成与失败，以及注入基础能力后的原生效果和呈现。Agents 拥有策略和受保护调用；Gateway 拥有身份授权、Channel、资源仲裁、取消与反馈；App 创建唯一基础根并连接公开生命周期。Actions 不导入 Agents、Gateway 实现或 App。
+ActionsContainer is the single App-scoped execution root. It owns compiled function registration, immutable catalog metadata, effect-free input preparation, budgets/resources, actual execution, output validation and joined business/native cleanup. App constructs and manages it; Gateway invokes its neutral execution port. Agents owns authorization and supplies cognitive host callbacks through App-bound neutral interfaces.
 
-业务函数只依赖标准 FunctionInput 和注入能力，不因 Action 或 Tool 调用而复制实现。注册不授予角色或 Skill 权限；编译／注册存在不等于设备就绪或业务效果已经完成。
+Domains, modules and individual actions remain extensible declarations and function composition. They have no container, lifecycle node or App registration. Stateful execution services are retained by the module root and composed through narrow interfaces. Registration establishes implementation availability, not Skill permission or device readiness. Actions imports neither AgentCore, Agents, Gateway nor App.
 
-## 源码组织与编译
-
-目录按业务能力聚合，文件按一致职责聚合：函数入口、能力契约、目录绑定、执行服务各有明确所有者。Support 只维护当前范围内跨能力共享的契约、算法与核心机制；域专用实现位于业务目录。同一业务入口不散落到 Module 或执行服务文件。
-
-| 目录／根文件 | 责任 |
-| --- | --- |
-| [Camera](Camera/README.md) | 相机控制、采集／预览与独立照片操作会话 |
-| [History](History/README.md) | 预览／完整查询、归档修改、请求结果槽和历史呈现 |
-| [NexArm](NexArm/README.md) | 连接恢复、有限运动、手动及跟踪执行 |
-| [Speech](Speech/README.md) | 播放、聆听、音频检测与原生会话 |
-| [System](System/README.md) | 资源、Provider、设备、Task 和显式诊断 |
-| [UI](UI/README.md) | 表情、会话、反馈、骨架、导航与业务事实呈现 |
-| [Support](Support/README.md) | 公共函数契约、作者宏和通用清理错误 |
-| [CapabilityModules.swift](CapabilityModules.swift) | 静态声明汇总与显式能力绑定的生产目录 |
-| [BehaviorProtocolBindings.swift](BehaviorProtocolBindings.swift) | 具体函数的协议、执行和返回策略 |
-| [BehaviorAssembly.swift](BehaviorAssembly.swift) | 校验并构造共享函数表和 Action／Tool 注册表 |
-| [ActionEndpoints.swift](ActionEndpoints.swift) | 实例级窄端点组合与语音端点原子绑定，不实现业务能力 |
-
-Support/Contracts 独立编译为 FunctionContracts；其余源码统一编译为 Actions，没有按目录隐式获得依赖的机制或第二套绑定目标。Actions 通过公开接口消费 UI、PlatformKit、ModelKit、Storage 和必要的中立执行／调用契约；基础模块无反向业务依赖。
-
-## 直接模块关系
+## Direct relationships
 
 ```mermaid
 flowchart LR
-    Agents -->|注入能力和创建目录| Assembly[Actions 根级组装]
-    Assembly -->|组合| Domains[六个业务域]
-    Gateway -->|FunctionInput| Domains
-    Domains -->|真实完成和失败| Gateway
-    Domains -->|注入的公开能力| Foundations[UI / PlatformKit / ModelKit / Storage]
-    Domains -->|使用| Contracts[FunctionContracts]
-    Assembly -->|构造注册表| Registries[CallRuntime / ExecutionRuntime]
+    App["App · Construction / lifecycle"] -.-> X
+    G["Gateway · Scheduling"] ==>|prepare / execute / discard| X
+    subgraph Execution["ACTIONS MODULE"]
+        X["ActionsContainer"] --> A["Business assembly / owned services"]
+        X --> L["Composable Domains · Modules · Functions"]
+        A --> L
+    end
+    X -.->|completion / failure| G
+    X --> C["FunctionContracts · Immutable catalog / execution ports"]
+    A --> F["Selected public foundation capabilities"]
+    classDef host fill:#eaf2ff,stroke:#5078b8,color:#203b64
+    classDef gateway fill:#fff2d9,stroke:#bf842c,color:#694511
+    classDef action fill:#ffecef,stroke:#b86178,color:#6b2b3d
+    class App host
+    class G gateway
+    class X,A,L action
+    style Execution fill:#fff5f6,stroke:#b86178
 ```
 
-Speech 使用 UI 的反馈／会话呈现接口，UI 资源呈现使用 System 资源值；NexArm 实现 System 的中立设备控制端口。这些是同一编译目标内部的显式关系，不要求基础模块知道业务身份。各域 README 维护具体接口和内部状态。
+Lifecycle uses dashed arrows, execution uses thick arrows, and results use dashed return arrows. Cognitive collaboration (Task control, perception connection, model maintenance) uses explicit host ports. Actions does not retain or search an upstream container.
 
-## 目录组装与调用流
+## Source and target ownership
 
-1. @Action 生成函数声明和工厂，域目录显式注入端点并绑定同一业务实现。
-2. CapabilityModules.declarations 保存完整静态声明；builtIn 根据本次显式能力构造可调用目录。可选能力缺失时明确失败；Task 控制端口缺失时不注册 Task 目录。
-3. BehaviorAssembly 依次校验 CapabilityCatalog 和 ActionBindingCatalog，再以同一组函数构造 FunctionRegistry、ActionRegistry、ToolRegistry 和组装时 Tool 地址集合。重复地址、无效定义和容量超限直接抛出。
-4. Agents/AgentRuntime 将 Action 注册表交 ChannelScheduler、Tool 注册表交 OutputGateway，并校验角色能力覆盖。调用最终到达所属域端点，返回实际完成、业务值或失败报告。
+| Owner | Responsibility |
+| --- | --- |
+| ActionsContainer / ActionsFailure | Unique root, admission state, preparation credentials, execution workers and structured lifecycle errors. |
+| ActionsBusinessAssembly / ActionsBusinessBindings / ActionsUIFacades | Actions-owned service construction and narrow public binding ports; helper objects retained by the root, not peer containers. |
+| CapabilityModules / BehaviorProtocolBindings / BehaviorAssembly | Explicit compiled declarations, protocol policies and canonical function assembly. Unknown domains can use default bindings; builtin policies remain explicit. |
+| ActionEndpoints | Instance-level composition of presentation, speech, camera and Task ports; no capability lookup/downcast. |
+| [Camera](Camera/README.md) | Capture, camera control and private photo/album operations. |
+| [History](History/README.md) | Queries, full reads, mutations, title jobs and history presentation. |
+| [NexArm](NexArm/README.md) | Connection recovery, finite motion, manual/tracking execution and actual feedback. |
+| [Speech](Speech/README.md) | Playback, listening, detection and native voice sessions. |
+| [System](System/README.md) | Provider, artifacts, device, Task host operations and diagnostics. |
+| [UI](UI/README.md) | Callable presentation and interaction facades using UI-owned protocols. Passive Agent activity interpretation remains with Agents. |
+| [Support](Support/README.md) | FunctionContracts plus explicitly compiled ExecutionRuntime and CallRuntime mechanisms. |
 
-具体协议策略集中于 BehaviorProtocolBindings；Action 和 Tool 共用业务元数据、资源与预算。协议开放范围和角色授权分别维护，不能以注册推导权限。
+FunctionContracts has no project dependencies. ExecutionRuntime and CallRuntime retain existing target identities with explicit source lists under Support. Actions imports them and selected foundation SDKs; directory placement alone grants no dependency.
 
-## 实例端点与生命周期
+## Registration and validation
 
-ActionEndpoints 显式组合 UI RuntimePresentation、SpeechExecutionEndpoint、CameraExecutionEndpoint、TaskControlEndpoint。UI 端点只呈现；相机端点验证角色／会话并直接传递类型化回执；语音端点弱绑定实际会话并验证聆听／检测准入；Task 端点转发给上游实际任务所有者。能力不从无关 presentation 或 playback 端口向下转换探测。
+Macros emit canonical declarations and factories. CapabilityModules explicitly binds compiled business functions; there is no hot discovery/update. BehaviorAssembly validates definitions and canonical address uniqueness and produces Action/Tool views over the same implementation. Missing required bindings, duplicate definitions, invalid metadata and capacity excess prevent configuration. Optional Task capability is absent from the catalog when unbound. Catalog readers receive descriptors only, without handlers or mutation access. Registration is implementation availability; Agents owns exposure and authorization, Gateway owns neutral coordination, and this module owns business validity. The [overall lifecycle matrix](../README.md#action-lifecycle-responsibilities) describes their complete interaction.
 
-语音执行与呈现绑定必须同时成功，失败回滚本次绑定；旧所有者解绑不能清除替换后的绑定。原生会话和长任务由根作用域拥有，页面生命周期不负责停止实际设备。取消先关闭准入，再取消并加入工作和清理；所有队列／槽的容量及拒绝策略由所属目录明确维护。
+`prepare` validates the registered protocol, argument shape and pure domain decoding, resolves dynamic resources and budget, and retains the invocation behind a single-use PreparedAction. The credential is bound to the root's catalog revision. Gateway owns Channel/wait/resource arbitration and supplies the resource execution context. `execute` consumes the credential, verifies a live permit for declared resources and rechecks current business conditions through the actual handler. The same FunctionExecutor validates inputs, deadlines, completion/report/value output and cancellation for both call protocols.
 
-完成语义由业务定义：状态接纳、动画恢复、音频排空、下载准入和电机到位具有不同边界。已经提交的业务效果不会因后续取消或反馈失败自动撤销。ActionReport 保留逐叶结果和执行失败，NativeCleanupFailure 保留并存的原始错误。
+Agents alone checks roles, Skills, Tasks and decision snapshots. Actions checks service availability, current session/generation, media/native ownership, business preconditions and permits; it does not authorize role names. Already-admitted work never re-queries Skill permissions.
 
-[整体技术设计](../README.md) · [函数契约](Support/Contracts/README.md) · [Gateway 执行](../Gateway/Output/README.md)
+## Lifecycle, bounds and failures
 
-## 基础相册实施契约
+Construction is inert. App configures after foundations and starts Actions before Gateway/Agents. States are cold, configured, running, suspended, stopping, stopped and failed. Reconfiguration fails. The configured catalog may be read before start, but execution requires running state.
 
-✅ Camera 拥有相册内部操作及真实完成，采用请求私有类型化附件传递文件和结果，不加入模型公开Skill。
+The root accepts at most 256 registered addresses, 1,024 prepared invocations, 256 executing calls, eight long-lived workers and 32 cleanup callbacks. Overflow rejects explicitly. Discard, invalidation and stop release preparation; execute consumes a credential once even when admission or a permit later fails. Caller cancellation cancels and joins its owned execution task. Pure preparation never operates a device.
 
-## Container 上下文
+Synchronous invalidation closes execution and cancels active work; foreground transitions join suspension and fence late reopen by revision. App stops Agents and Gateway before Actions, retaining native/host ports through cleanup. Actions stop coalesces, cancels/joins work, invokes cleanup in reverse order and joins native observers. Camera/history/resource/settings interaction workers are included. Primary and multiple cleanup errors remain structured; successful stop releases handlers, descriptors and retained business services. Delivery retries belong to Gateway and cannot re-execute a handler.
 
-✅ 业务事实留在所属 Camera／NexArm 实例内存；contextSnapshot 显式提取有限公开值，ContainerContextSource 在上层适配并序列化。Action 调用类型化能力接口，不修改基础模块公开字段。
+State acceptance, animation restoration, audio drain, download admission and motor arrival have distinct completion contracts. Committed effects are not undone by later cancellation/delivery failure. See the owning domain READMEs for native bounds and [overall design](../README.md) for cross-module flows.

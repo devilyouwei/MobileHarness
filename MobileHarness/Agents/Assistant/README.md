@@ -2,7 +2,7 @@
 
 ## 角色容器
 
-✅ [AssistantContainer.swift](AssistantContainer.swift) 是 AgentContainer 的稳定子能力。持有 AssistantExecutionSession，通过会话管理角色私有 Context、注册与绑定输出任务，并提供首页会话／活动投影。仅启停 Assistant，不控制平级角色。
+[AssistantContainer.swift](AssistantContainer.swift) 是 AgentContainer 的稳定子能力。持有 AssistantExecutionSession，通过会话管理角色私有 Context、注册与绑定输出任务，并提供首页会话／活动投影。仅启停 Assistant，不控制平级角色。
 
 生命周期由[模块根](../README.md#agent-container)统一编排；子容器能力不授予执行权。
 
@@ -43,7 +43,7 @@ flowchart LR
  U -->|"Agent 订阅文本数据"| A
  M["ModelKit.language"]:::model
  A <-->|"Chat 请求／事件"| M
- S["Storage.state／领域仓库"]:::storage
+ S["Storage · Chat / Task repositories"]:::storage
  A <--> S
  P["PlatformKit：注入 JPEG 准备能力"]:::platform
  A --> P
@@ -70,7 +70,7 @@ flowchart LR
  classDef host fill:#f1f5f9,stroke:#64748b,color:#334155
 ```
 
-角色间消息经 Gateway 递送；基础能力通过构造注入，输入订阅由角色持有。
+角色间消息经 Gateway 递送；基础能力通过构造注入，输入订阅由角色持有。角色、Skill 与 Task 授权归 Agents；Actions 来源的协作接口由 App 以中立窄端口绑定，Agents 不导入 Actions、CallRuntime 或 ExecutionRuntime。
 
 ## 内部结构与执行链
 
@@ -79,7 +79,7 @@ flowchart LR
  subgraph Injected["注入基础能力"]
  U["UI.home.requests"]:::ui
  M["ModelKit.language.ChatCapability"]:::model
- S["Storage.state／chat／tasks"]:::storage
+ S["Storage · Chat / Task repositories"]:::storage
  P["PlatformKit：JPEG 准备"]:::platform
  RD["Actions.Camera：注入只读 readPhoto 闭包"]:::action
  end
@@ -96,7 +96,7 @@ flowchart LR
  D <--> M
  RD -->|"真实照片读取"| C
  P -->|"受预算约束的照片"| C
- O --> G["Gateway：权限／租约／取消"]:::gateway
+ O --> G["Gateway：端点／租约／取消"]:::gateway
  G --> X["当前 Skill 绑定的可扩展 Actions"]:::action
  G --> PR["UI.Caption.beginReplyTurn<br/>UI.Caption.print<br/>UI.Expression.setReplyWaiting<br/>Speech.Playback.speak"]:::action
  PR --> F
@@ -118,7 +118,9 @@ Skill 通过注册声明持续扩展可见函数，图中不固定穷举 Action�
 
 ## Context 与 Builder
 
-根拥有的私有仓库保存 history、skillState 与后台任务报告。Builder 每轮读取公开 State 的不可变快照，作为唯一 CURRENT STATE 系统数据块注入；不添加状态类 user 消息，不拆开 native 配对。普通对话背景和完整当前 Task 过程保留在容量窗口内；终态 Task 在原始来源位置投影摘要，不修改原始证据。
+The private AgentContextRepository owns history, skillState and runtime task correlation/report views. Each actual model request freezes Skill/catalog/teaching selection and the matching active Task goal/status from that committed value. The loaded Skill ID list and minimal Task form AGENT CONTEXT; internal task registries, grants and Skill-retention bookkeeping stay private.
+
+AgentChatWorker then samples the selected owner facts through AgentStateContext and combines them as CURRENT STATE in the same fresh system data message. It does not read a Storage.State mirror or route these reads through Gateway. The data message follows history and precedes the latest user input, or follows the complete native result group. Old system data is replaced on continuation. Ordinary background conversation and current Task evidence remain within the bounded history window; terminal Tasks can project summaries without altering source evidence. See [request assembly](../Support/Chat/README.md#request-state-assembly), [source mapping](../Support/Context/README.md#container-context-read-path) and the [overall context figure](../../README.md#model-context-composition).
 
 ## System 提示词结构与来源
 
@@ -140,7 +142,7 @@ block-beta
 
     E["Agent.json · baseSkills<br/>＋当前状态中的 loaded<br/>展开依赖，读取 Instructions.md"] space S5["⑤ LOADED SKILL INSTRUCTIONS<br/>当前已加载 Skill 的完整教学<br/>基础项常驻，其他项动态增减"]
 
-    F["已加载 Skill.json · functions<br/>＋真实 @Action 声明<br/>组合 Registry，按 Channel 渲染"] space S6["⑥ EFFECTIVE ACTION CATALOG<br/>当前 Action 的别名、描述、参数<br/>随 Skill 加载与回收动态改变"]
+    F["Loaded Skill.json · useActions<br/>＋真实 @Action 声明<br/>组合 Registry，按 Channel 渲染"] space S6["⑥ EFFECTIVE ACTION CATALOG<br/>当前 Action 的别名、描述、参数<br/>随 Skill 加载与回收动态改变"]
 
     G["FunctionTokenPrompts.json<br/>读取 catalogBoundary 模板<br/>由目录渲染器追加"] space S7["⑦ RESPONSE CHECK<br/>输出前检查规则<br/>固定"]
 
@@ -172,9 +174,9 @@ block-beta
 
 资源由 [AgentConfigurations](../Support/AgentConfigurations.swift) 按打包 Bundle 中的 [Catalog.json](../../Resources/Catalog.json) 显式映射读取并缓存，不扫描目录或热更新。协议与短检查来自 [FunctionTokenPrompts.json](../Support/Core/Generation/FunctionTokenPrompts.json)，角色来自 [Instructions.md](../../Resources/Agents/Assistant/Instructions.md)，独立 Agent 职责来自 [Prompts.json](../../Resources/Agents/Assistant/Prompts.json) 的 delegation。Skill 概览读取各 Skill.json 的 id/description，按 ID 排序，总预算 4 KiB，必要时截短描述并保留 ID。
 
-基础列表来自 [Agent.json](../../Resources/Agents/Assistant/Agent.json) 的 baseSkills；[AgentSkillLoader](../Support/AgentSkillLoader.swift) 展开当前激活项的依赖并合并函数绑定，⑤拼接对应 Instructions.md，⑥通过 [CapabilityContextBuilder](../Support/Core/Capability/CapabilityContextBuilder.swift) 渲染当前 Action 目录。别名/Channel 来自 Skill 绑定，描述、参数与约束来自真实 @Action 声明；⑦由同一目录渲染器追加。实际请求把唯一 CURRENT STATE 作为独立 system 数据消息放在完整历史之后、最新 user 输入/观察之前；末尾为 native Tool 结果时，State 位于完整调用/结果组之后。
+基础列表来自 [Agent.json](../../Resources/Agents/Assistant/Agent.json) 的 baseSkills；[AgentSkillLoader](../Support/AgentSkillLoader.swift) 展开当前激活项的依赖并合并函数绑定，⑤拼接对应 Instructions.md，⑥通过 [CapabilityContextBuilder](../Support/Core/Capability/CapabilityContextBuilder.swift) 渲染当前 Action 目录。别名/Channel 来自 Skill 绑定，描述、参数与约束来自真实 @Action 声明；⑦由同一目录渲染器追加。实际请求的独立 system 数据消息同时包含 AGENT CONTEXT 和 CURRENT STATE；放置规则见上文 Context 与 Builder。
 
-[共享 Chat Worker](../Support/Chat/README.md) 在每次新输入及 ReACT 请求中按当前 Skill 快照重新组装 system/工具定义；已发出的请求与历史证据不重写。system 正文最多 64 KiB，超限明确失败。Task/相机/机械臂公开事实进入 CURRENT STATE 系统数据块，Skill 归属/剩余次数保持私有；历史与真实 ReACT 执行观察保留在各自消息中；原生 Tool 定义放在 request.tools，仅模型支持 Tool Calls 时提供，均不属于上图的 system 正文。
+[共享 Chat Worker](../Support/Chat/README.md) 在每次新输入及 ReACT 请求中按当前 Skill 快照重新组装 system/工具定义；已发出的请求与历史证据不重写。system 正文最多 64 KiB，超限明确失败。当前会话的 Task 目标/阶段及已加载 Skill ID 进入 AGENT CONTEXT；选定的相机/机械臂/UI 事实进入 CURRENT STATE，Skill 归属/剩余次数保持私有；历史与真实 ReACT 执行观察保留在各自消息中；原生 Tool 定义放在 request.tools，仅模型支持 Tool Calls 时提供，均不属于上图的 system 正文。
 
 ## Task 与 Skill 生命周期
 
@@ -206,10 +208,7 @@ Check cancellation before reading, before preparation and before retaining resul
 
 These are Assistant-owned analysis and transport budgets. Native image conversion is described in [PlatformKit/Vision](../../PlatformKit/Vision/README.md#native-image-compression).
 
-## 待实现
-
-❌ 场景挂起期间前台目标及最终 checkpoint 的完整落盘；公共限制见 [Chat](../Support/Chat/README.md#未实现范围)。
 
 ## Container 上下文
 
-✅ Assistant 消费根注入的只读容器来源，Task／Skill 来自自身私有决策快照；根生命周期结束关闭来源接纳，不保留历史公共Task镜像。
+Assistant 消费根注入的只读容器来源，Task／Skill 来自自身私有决策快照；根生命周期结束关闭来源接纳，不保留历史公共Task镜像。

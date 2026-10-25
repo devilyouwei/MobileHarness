@@ -2,13 +2,13 @@
 
 ## 角色容器
 
-✅ [SpeechPerceptionContainer.swift](SpeechPerceptionContainer.swift) 是 AgentContainer 的稳定子能力。独立持有感知角色注册、输出任务及内部 VoiceInteractionSession。向 App 公开 ready、状态、请求和诊断投影，不公开内部会话；VoiceAgentSession 仅连接感知／合成容器与 Actions 执行端口，不注册角色或停止共享 runtime。结束当前会话清理该代注册，根停止终结容器并加入交互／检测清理。
+[SpeechPerceptionContainer.swift](SpeechPerceptionContainer.swift) 是 AgentContainer 的稳定子能力。独立持有感知角色注册、输出任务及内部 VoiceInteractionSession。向 App 公开 ready、状态、请求和诊断投影，不公开内部会话；VoiceAgentSession 仅连接感知／合成容器与 Actions 执行端口，不注册角色或停止共享 runtime。结束当前会话清理该代注册，根停止终结容器并加入交互／检测清理。
 
 生命周期由[模块根](../README.md#agent-container)统一编排；子容器能力不授予执行权。
 
 ## 职责与注入能力
 
-构造注入 PlatformKit `AudioCaptureObserving`、ModelKit `SpeechRecognitionCapability`／`VoiceActivityCapability`、可选 `UIHomeContainer`、Actions `MicrophoneSpectrumPresentation`、低频测量回调和私有 Context。角色直接取得 PCM，负责声道／采样率／序号／连续性、VAD、ASR、声源和半双工政策；不直接开启麦克风或启动动画。
+构造注入 PlatformKit `AudioCaptureObserving`、ModelKit `SpeechRecognitionCapability`／`VoiceActivityCapability`、可选 `UIHomeContainer`、FunctionContracts `SpectrumPresenting`、低频测量回调和私有 Context。角色直接取得 PCM，负责声道／采样率／序号／连续性、VAD、ASR、声源和半双工政策；不直接开启麦克风或启动动画。
 
 UI.home.listeningRequests 是本角色单独订阅的控制源，提供 enabled/toggle/press 数据。UI 不调用角色；订阅本身不请求权限或开启设备。soundSourceOnly 模式不获得识别呈现权限。
 
@@ -16,8 +16,7 @@ UI.home.listeningRequests 是本角色单独订阅的控制源，提供 enabled/
 
 | 文件 | 职责 |
 | --- | --- |
-| [AudioDetectionAgentSession.swift](AudioDetectionAgentSession.swift) | 隔离检测角色注册及其结果泵，不控制采集 |
-| [AudioDetectionSession.swift](AudioDetectionSession.swift) | 组合检测角色与 Actions 执行，保留独占准入和加入清理 |
+| [AudioDetectionAgentSession.swift](AudioDetectionAgentSession.swift) | Isolated diagnostic role, result pump and neutral detection connection type specializations; no native capture ownership |
 | [SoundSourceEstimator.swift](SoundSourceEstimator.swift) | 声道测量到有限方向估计的算法 |
 | [SpeechBoundaryPolicy.swift](SpeechBoundaryPolicy.swift) | 边界、结束与恢复的纯策略 |
 | [SpeechListeningInputs.swift](SpeechListeningInputs.swift) | 聆听手势／策略输入和采集结束事实 |
@@ -65,7 +64,7 @@ flowchart LR
  classDef host fill:#f1f5f9,stroke:#64748b,color:#334155
 ```
 
-角色间消息经 Gateway 递送；基础能力通过构造注入，输入订阅由角色持有。
+角色间消息经 Gateway 递送；基础能力通过构造注入，输入订阅由角色持有。角色、Skill 与 Task 授权归 Agents；Actions 来源的协作接口由 App 以中立窄端口绑定，Agents 不导入 Actions、CallRuntime 或 ExecutionRuntime。
 
 `speech.partial`、`sound.source` 也被发布，目前静态配置没有订阅角色；不能把已声明可发布等同于已有消费者。
 
@@ -161,8 +160,15 @@ Mono publishes unavailable once per format/listening epoch and still supports AS
 
 `reportError` 未校验输出 yield，32 槽满载／关闭时诊断可能丢失；普通输出失败会显式抛错。
 
-❌ barge-in 与后台聆听未实现。
 
 通信见 [Agent.json](../../Resources/Agents/SpeechPerception/Agent.json)，原生执行见 [Actions/Speech](../../Actions/Speech/Support/README.md)。
 
-AudioDetectionAgentSession 只注册检测角色、构造模型 Context 并绑定结果泵；AudioDetectionSession 组合该角色与 Actions.AudioDetectionExecution，不消费或转交原始 PCM。SpeechPlaybackFailure 在已加入播放清理后转换可展示文案，原始合成／缓存错误仍保留。
+AudioDetectionAgentSession 只注册检测角色、构造模型 Context 并绑定结果泵；Actions 中的 AudioDetectionSession 经中立连接端口组合该角色与 AudioDetectionExecution，不消费或转交原始 PCM。SpeechPlaybackFailure 在已加入播放清理后转换可展示文案，原始合成／缓存错误仍保留。
+
+## App-owned diagnostic transport
+
+AudioDetectionAgentSession borrows one isolated observation session through GatewayObservationAccess supplied by AgentRuntime. It creates only its diagnostic SpeechPerception actor and output pump; GatewayContainer creates and retains the communication facilities. Diagnostic capture remains owned by Actions. Root admission and stop include the borrowed session; release does not stop normal voice registration or the application Gateway. The session has observation-only catalogs, reports acquisition/cleanup failures explicitly and never invokes business functions.
+
+## Execution ownership and lifecycle
+
+AudioDetectionAgentSession also declares the neutral connection/observation type specializations. Actual native detection/voice sessions live in Actions. VoiceInteractionSession owns cognitive role preparation and connects narrow voice/detection interfaces; root cleanup is retained until downstream Actions joins. SpectrumPresenting is a neutral UUID-based port.

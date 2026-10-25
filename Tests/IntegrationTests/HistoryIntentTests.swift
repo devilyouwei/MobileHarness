@@ -1,6 +1,5 @@
 import Actions
 import AgentCore
-import Agents
 import CallRuntime
 import ExecutionRuntime
 import Foundation
@@ -12,6 +11,7 @@ import StorageChat
 import StorageCore
 import Testing
 
+@testable import Agents
 @testable import UI
 
 private struct HistoryPresentationModule: ToolModule {
@@ -34,7 +34,7 @@ struct HistoryReadFixture: HistoryFullReadCapability {
     sessionID: String, presentation: any HistoryPresentationCapability,
     mutations: any HistoryMutationCapability = UnusedHistoryMutation(),
     reads: HistoryReadFixture? = nil, uiHistory: UIHistoryContainer? = nil
-) throws
+) async throws
     -> HistoryTestRuntime
 {
     let ui = UIContainer()
@@ -61,7 +61,7 @@ struct HistoryReadFixture: HistoryFullReadCapability {
         function: HistoryActions.summarizeDefinition(completing: { invocation in
             .value(try await HistoryActions.summarize(invocation: invocation, using: mutations))
         }), protocols: [.tool], executionPolicy: .direct, directResultPolicy: .returning)
-    let gateway = OutputGateway(
+    let gateway = await OutputGateway(
         manager: manager, requests: input,
         tools: try ToolRegistry(modules: [
             HistoryPresentationModule(
@@ -669,11 +669,11 @@ private struct FailedArchivePresentation: HistoryPresentationCapability {
     await runtime.shutdown()
 }
 
-@Test(.actionCatalog) func historyReadPrivatePortRejectsWrongOwnerAndDuplicateCompletion() async throws {
-    let port = try HistoryReadInvocation(query: .archives(before: 10), requestID: "read", sessionID: "session")
+@Test(.actionCatalog) func historyReadPrivatePortRejectsWrongScopeAndDuplicateCompletion() async throws {
+    let port = try HistoryReadInvocation(input: .archives(10), requestID: "read", sessionID: "session")
     let call = ToolRequest(id: "call", toolPath: "History.Conversation.readFull")
     let wrong = FunctionInvocation(
-        tool: call, context: .init(source: "assistant", sessionID: "session", inputID: "read"), attachment: port)
+        tool: call, context: .init(source: "memory", sessionID: "stale-session", inputID: "read"), attachment: port)
     await #expect(throws: (any Error).self) { try await port.accept(wrong) }
     let actual = FunctionInvocation(
         tool: call, context: .init(source: "memory", sessionID: "session", inputID: "read"), attachment: port)
@@ -754,16 +754,16 @@ func protectedHistoryReadsKeepFourWorkersAndJoinRootStop() async throws {
     let agent = runtime.agent
     let requests = (0..<4).map { _ in
         Task {
-            try await agent.readHistory(.archives(before: 10), context: ProcessingContext(sessionID: "bounded-reads"))
+            try await agent.readHistory(.archives(10), context: ProcessingContext(sessionID: "bounded-reads"))
         }
     }
     var starts = entered.stream.makeAsyncIterator()
     for _ in 0..<4 { _ = try #require(await starts.next()) }
     await #expect(throws: CommunicationError.capacityExceeded) {
-        try await agent.readHistory(.archives(before: 10), context: ProcessingContext(sessionID: "bounded-reads"))
+        try await agent.readHistory(.archives(10), context: ProcessingContext(sessionID: "bounded-reads"))
     }
     await #expect(throws: CommunicationError.scopeClosed) {
-        try await agent.readHistory(.archives(before: 10), context: ProcessingContext(sessionID: "wrong"))
+        try await agent.readHistory(.archives(10), context: ProcessingContext(sessionID: "wrong"))
     }
     await runtime.shutdown()
     for request in requests { await #expect(throws: CancellationError.self) { try await request.value } }

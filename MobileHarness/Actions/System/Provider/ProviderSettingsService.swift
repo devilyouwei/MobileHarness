@@ -3,35 +3,6 @@ import FunctionContracts
 import StorageCore
 import StorageFiles
 
-/// Private configuration value; decoding exists only for the legacy credential record.
-public struct ProviderSettings: Decodable, Equatable, Sendable {
-    public let providers: [ProviderSettings]
-    public let name: String
-    public let enabled: Bool
-    public let url: String
-    public let key: String
-    public let model: String
-    public init(
-        enabled: Bool, url: String, key: String, model: String, providers: [ProviderSettings] = [], name: String = ""
-    ) {
-        self.name = name.isEmpty ? (URL(string: url)?.host ?? "Provider") : name
-        self.providers = providers
-        self.enabled = enabled
-        self.url = url
-        self.key = key
-        self.model = model
-    }
-    private enum CodingKeys: String, CodingKey { case enabled, url, key, model, name }
-    public init(from decoder: any Decoder) throws {
-        let values = try decoder.container(keyedBy: CodingKeys.self)
-        name = try values.decodeIfPresent(String.self, forKey: .name) ?? "Provider"
-        providers = []
-        enabled = try values.decodeIfPresent(Bool.self, forKey: .enabled) ?? true
-        url = try values.decode(String.self, forKey: .url)
-        key = try values.decode(String.self, forKey: .key)
-        model = try values.decode(String.self, forKey: .model)
-    }
-}
 public enum ProviderSettingsError: LocalizedError, Sendable, ActionExecutionFailureProviding {
     case invalidSelection, invalidConfiguration, persistence, busy, application, cancelled
     case keychain(Int32)

@@ -1,23 +1,13 @@
-# InputGateway - Agent communication and execution feedback
+# Signal transport
 
-## Responsibility and interfaces
+SignalTransport owns opaque endpoint registration and bounded in-process delivery. Endpoint addresses/incarnations are caller-defined identities; private tokens fence stale endpoint handles. Re-registering the same incarnation returns its stable port. Replacing an incarnation invalidates old tokens. Gateway never interprets role, Skill, Task or payload business schemas.
 
-InputGateway validates Agent/runtime provenance, schema, source identity, session/incarnation, causality, deadline and capacity. Only OutputGateway's bound internal send/publication paths and execution feedback enter admission. There are no public external send/publish, dynamic host subscriptions, native codecs or container fault channels.
+App creates stable inert transport with the Gateway root. Agents-owned adapters bind actual role instances and apply semantic communication permissions. Generic consumers can use the same transport without AgentCore. Execution admission validates registered endpoint/incarnation and matching neutral source/session/input context; it does not consult cognitive permissions.
 
-Local UI, device frames, OS facts and container errors are consumed directly by their owning Agents. `local` provenance is rejected by transport validation; no external-input origin exists. Static Agent subscriptions are declared in role configuration and must name a real registered publisher.
+SignalEnvelope carries bounded ID/session/contract, version, hops, declared payload bytes, optional deadline and cleanup flag. Admission validates version 1, hops 0–8, nonempty IDs/contracts up to 128 bytes, payload size and deadline. Sending validates both endpoint tokens again immediately before receiver entry. A runtime-supplied source may be absent for trusted injected completion; the target must remain valid.
 
-## Data flow and ownership
+Endpoints are limited to 128, active sends to 256 and declared retained payload bytes to 8 MiB. Full capacity explicitly rejects. There is no waiting queue, durable delivery or automatic business retry. Payload byte accounting is supplied by the trusted contract adapter. Acceptance of delivery does not establish business completion.
 
-OutputGateway supplies bound message sources and resolved destinations; execution delivers owner-fenced Tool/Action/activity/round feedback. Recipients own their inboxes, ordering, fusion and business meaning. The transport does not infer, capture, render or maintain an independent waiting queue.
+Each accepted send owns a cancellable task; caller cancellation cancels/joins it. Retirement removes the matching endpoint, cancels and joins deliveries involving it, excluding the current self-delivery to avoid self-join. Its enclosing transport still owns that completion. Pause joins ordinary sends and permits explicitly marked cleanup to drain. Terminal shutdown closes admission, cancels/joins all deliveries and releases endpoints. Parent/root generation controls isolated observation transports.
 
-Agent publication is bounded one-way fan-out. It does not acknowledge business consumption; no recipients and rejected branches remain observable diagnostics. Directed messages return admission evidence, while actual task completion uses its explicit contract. Shutdown cancels and joins in-flight publications, closes observers and retires no side effect by replay.
-
-## Bounds and failure contracts
-
-Admission/publication retains 128 operations, 256 branches, 16 targets and 8 MiB observation retention. Ordinary schema payloads and hop/deadline/session checks remain enforced. Receivers admit or reject promptly; full buffers reject explicitly rather than awaiting model progress.
-
-Signal and task diagnostics each retain 256 rows with counted eviction and share eight newest-one observers. Task history/observations remain isolated from ordinary traffic. Media and credentials are excluded from summaries. Feedback preserves original processing causality, owner/session/incarnation and genuine execution completion; transport retry cannot re-execute effects.
-
-## Outstanding work
-
-Remote transport and durable feedback delivery remain unimplemented. See [Gateway](../README.md) and [overall flow](../../README.md).
+Semantic Signal traces, role policy, Task messages and receiver interpretation belong to [Agents Support](../../Agents/Support/README.md). Root lifetime belongs to [GatewayContainer](../README.md).

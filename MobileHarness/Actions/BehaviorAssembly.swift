@@ -4,6 +4,7 @@ import FunctionContracts
 
 /// Pure behavior assembly. Device creation and runtime lifetime stay with the host.
 public struct BehaviorAssembly: Sendable {
+    public let bindings: [ActionBinding]
     public let functions: FunctionRegistry
     public let actions: ActionRegistry
     public let tools: ToolRegistry
@@ -68,6 +69,17 @@ public struct BehaviorAssembly: Sendable {
             )
         let actions = try ActionRegistry(modules: actionModules, functions: store)
         let tools = try ToolRegistry(modules: toolModules, functions: store)
+        self.bindings =
+            try actionModules.flatMap(\.definitions).map {
+                ActionBinding(
+                    function: try store.definition(for: $0.path), protocols: [.action],
+                    executionPolicy: $0.executionPolicy, directResultPolicy: $0.directResultPolicy)
+            }
+            + toolModules.flatMap(\.definitions).map {
+                ActionBinding(
+                    function: try store.definition(for: $0.path), protocols: [.tool],
+                    executionPolicy: $0.executionPolicy, directResultPolicy: $0.directResultPolicy)
+            }
         self.functions = store
         self.actions = actions
         self.tools = tools

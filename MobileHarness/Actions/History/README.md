@@ -43,7 +43,7 @@ summarizeArchived 读取并验证归档会话，执行注入的异步标题计�
 服务持有共享 actor 仓库和一个根所有者可取消/加入的标题 worker。自动标题与显式重试共用单个准入槽，溢出明确记录可重试失败；不创建第二个历史仓库或自动重试。取消不能撤销已经完成的持久化；并发与仓库一致性规则由 StorageChat 负责。查询和目录本身不授予历史访问或删除确认。
 
 
-✅ HistoryPresentationAdapter 编译到 Actions，将共享仓库事实转换为 UI 自有值并通过公开呈现接口提交，保留会话/版本围栏。UI 的完整读取由 Memory 直接接纳，经 Gateway → Actions 读取；每请求类型化执行附件承载真实结果，Memory 返回关联回执，纯查询不主动呈现第二次。
+HistoryPresentationAdapter 编译到 Actions，将共享仓库事实转换为 UI 自有值并通过公开呈现接口提交，保留会话/版本围栏。UI 的完整读取由 Memory 直接接纳，经 Gateway → Actions 读取；每请求类型化执行附件承载真实结果，Memory 返回关联回执，纯查询不主动呈现第二次。
 
 
 
@@ -64,3 +64,7 @@ summarizeArchived 读取并验证归档会话，执行注入的异步标题计�
 list 的 turnCount 是存储的输入块数量；read 的 total 是 indexedHistory 投影项数量，二者含义不同。read 项包含 kind=request/task、状态及适用的 taskID/inputID，读取已经持久化的请求片段或任务摘要，不生成摘要，也不执行历史函数。
 
 [Actions 设计](../README.md) · [公共函数契约](../Support/Contracts/README.md)
+
+## Execution ownership and lifecycle
+
+HistoryReadInvocation is ActionRequestSlot<UI.HistoryInput, UI.HistoryReply>. HistoryActions converts the typed request, executes the same HistoryFullReadCapability and returns a typed private result. Session/input and duplicate checks remain local; role/Task authorization stays in Memory. ConversationHistoryWorkflow belongs to Actions and joins mutation/paging workers at shutdown. ActionsContainer retains title jobs and business services.

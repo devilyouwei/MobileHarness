@@ -1,6 +1,5 @@
 import Actions
 import AgentCore
-import Agents
 import CallRuntime
 import ExecutionRuntime
 import Foundation
@@ -8,6 +7,8 @@ import FunctionContracts
 import PlatformKit
 import StorageCore
 import Testing
+
+@testable import Agents
 
 private func pose(
     noseX: Float, noseY: Float, noseConfidence: Float = 0.9, others: Float = 50,

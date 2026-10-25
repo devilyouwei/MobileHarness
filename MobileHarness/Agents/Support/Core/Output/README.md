@@ -2,26 +2,24 @@
 
 ## 职责与外部关系
 
-中立 Action/Tool 调用、身份／因果信封、实际结果、资源许可与被动执行快照。无 Actions、Gateway、原生设备或 UI 实现依赖；仅持有身份字段不证明执行资格。
+Cognitive Action/Tool calls, causal output envelopes, Agent-facing outcomes, mailbox and passive output-failure observations. Neutral execution snapshots and permits are imported from FunctionContracts. This target has no Actions/Gateway implementation, native device or UI dependency; identity fields alone grant no authority.
 
 ```mermaid
 flowchart LR
- A["Agents：解析并生成输出"]:::agent
- O["Core.Output 值／Mailbox"]:::host
- G["Gateway：绑定 owner／授权／执行"]:::gateway
- X["Actions／执行契约：真实结果"]:::action
- A --> O
- O --> G
- X -->|"中立结果契约"| O
- G -->|"反馈回原 owner"| A
- classDef ui fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e
- classDef platform fill:#dcfce7,stroke:#16a34a,color:#14532d
- classDef model fill:#f3e8ff,stroke:#9333ea,color:#581c87
- classDef storage fill:#fef3c7,stroke:#d97706,color:#78350f
- classDef agent fill:#eef2ff,stroke:#6366f1,color:#312e81
- classDef gateway fill:#ffedd5,stroke:#ea580c,color:#7c2d12
- classDef action fill:#ffe4e6,stroke:#e11d48,color:#881337
- classDef host fill:#f1f5f9,stroke:#64748b,color:#334155
+    subgraph Cognition["AGENTS · Cognitive output"]
+        A["Role / authorized output adapter"]:::agent
+        O["AgentCore.Output<br/>Calls · Causality · Results · Mailbox"]:::agent
+        A -->|uses| O
+    end
+    F["FunctionContracts<br/>Neutral execution values"]:::contract
+    G["Gateway public ports"]:::gateway
+    O -->|imports| F
+    A ==>|authorized requests| G
+    G -.->|neutral outcomes| A
+    classDef agent fill:#ede9fe,stroke:#7c3aed,color:#2e1065
+    classDef gateway fill:#fef3c7,stroke:#d97706,color:#451a03
+    classDef contract fill:#f1f5f9,stroke:#64748b,color:#334155
+    style Cognition fill:#faf7fd,stroke:#a78bfa
 ```
 
 ## 文件与职责
@@ -38,8 +36,8 @@ flowchart LR
 | [ActionResult.swift](ActionResult.swift) | 执行所有者、因果值、Action 完成／反馈与活动事件 |
 | [ToolResult.swift](ToolResult.swift) | Tool 完成值、失败码与续推判断 |
 | [ActionReport.swift](ActionReport.swift) | 有界多步骤结果及部分失败 |
-| [ActionExecutionState.swift](ActionExecutionState.swift) | 执行阶段、完成结果与输出失败的被动快照 |
-| [ResourceLease.swift](ResourceLease.swift) | 资源标识、租约、身份绑定资源端口与执行许可 |
+| [OutputFailureState.swift](OutputFailureState.swift) | Passive cognitive output-failure records and snapshots; execution snapshots belong to FunctionContracts |
+| [ResourceLease.swift](../../../../Actions/Support/Contracts/ResourceLease.swift) | 资源标识、租约、身份绑定资源端口与执行许可 |
 
 ## 内部结构
 
@@ -81,4 +79,7 @@ CommunicationReceipts 最多 16 个关联槽，证据提交后确认；提交失
 
 执行快照保留身份、地址、Channel、阶段、displayName、完成结果与最多 512 字符失败文本，不保存原调用参数或媒体附件；完成结果可以包含业务 value 或多步骤 report。AgentFailureDiagnostic 限分类／code／2048 字符详情，仅失败输出可携带；被动快照不能触发推理或确认投递。可选中立执行附件服务授权类型化结果端口，不作为外部输入总线。
 
-❌ 持久化执行递送与 control(String) 的完整类型化未实现。轮次协调见 [Runtime](../Runtime/README.md)。
+
+## Execution ownership and lifecycle
+
+ExecutionOwner, resource lease/permit, ActionExecutionRecord and ActionExecutionSnapshot are neutral FunctionContracts values. AgentCore supplies cognitive identity adaptation only. ActionResult keeps Agent causality/Task semantics; Agents/Support projects neutral Gateway outcomes. Generic scheduling does not import these cognitive contracts.

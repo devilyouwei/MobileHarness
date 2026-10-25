@@ -54,7 +54,7 @@ public enum VisionPipelineWorkflow {
 }
 
 #if os(iOS)
-    import Actions
+    import FunctionContracts
     import AgentCore
     import Gateway
     import ModelKit
@@ -69,13 +69,11 @@ public enum VisionPipelineWorkflow {
         /// Assemble the role and its protected output; VisionPerception owns its native subscription.
         func run(
             sessionID: String, mirrored: Bool,
-            endpoint: any CameraOutputHandling
+            status: @escaping @MainActor @Sendable (String?, String) -> Void
         ) async throws {
             let vision = try VisionPerceptionAgent(
                 pose: pose, sessionID: sessionID, cameraInput: camera, mirroredGaze: mirrored,
                 context: runtime.visionContext())
-            try runtime.presentation.bindCamera(endpoint)
-            defer { runtime.presentation.unbindCamera(endpoint) }
             try await runtime.manager.register(vision, sessionID: sessionID)
             var tracking = false
             var registered = true
@@ -100,7 +98,7 @@ public enum VisionPipelineWorkflow {
                                 try Task.checkCancellation()
                                 if case .control(let value) = envelope.output, value.hasPrefix("agent.error:") {
                                     // Present before dispatch: a transport rejection must not hide the failure.
-                                    await endpoint.visionStatus("姿态识别已停止，请重试", sessionID: sessionID)
+                                    await status("姿态识别已停止，请重试", sessionID)
                                 }
                                 let result = try await consumer.execute(envelope)
                                 if envelope.media != nil, !result.isCancellationOnly {
@@ -120,7 +118,7 @@ public enum VisionPipelineWorkflow {
                     },
                     stopInput: { await vision.stopInput() },
                     monitor: {
-                        try await self.monitorVision(vision, endpoint: endpoint, runtime: runtime, sessionID: sessionID)
+                        try await self.monitorVision(vision, status: status, runtime: runtime, sessionID: sessionID)
                     })
                 if tracking { await runtime.photographerSession.detachTracking(sessionID: sessionID) }
                 try await runtime.manager.remove(.visionPerception)
@@ -145,7 +143,7 @@ public enum VisionPipelineWorkflow {
         }
 
         private func monitorVision(
-            _ vision: VisionPerceptionAgent, endpoint: any CameraOutputHandling,
+            _ vision: VisionPerceptionAgent, status: @escaping @MainActor @Sendable (String?, String) -> Void,
             runtime: AgentRuntime, sessionID: String
         ) async throws {
             var reported: String?
@@ -162,10 +160,10 @@ public enum VisionPipelineWorkflow {
                         failureCode: diagnostic.code,
                         context: .init(workerID: "visionPerception", sessionID: sessionID, inputID: health.inputID),
                         diagnostic: diagnostic)
-                    await endpoint.visionStatus("姿态识别长时间无有效结果，请查看日志", sessionID: sessionID)
+                    await status("姿态识别长时间无有效结果，请查看日志", sessionID)
                 } else if reported != nil {
                     reported = nil
-                    await endpoint.visionStatus(nil, sessionID: sessionID)
+                    await status(nil, sessionID)
                 }
             }
         }

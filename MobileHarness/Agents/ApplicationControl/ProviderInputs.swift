@@ -1,6 +1,7 @@
 import AgentCore
 import Foundation
 import StorageCore
+import UI
 
 public struct ProviderDiscoveryIntent: Codable, Sendable, Equatable {
     public static let contract = "provider.discovery"
@@ -45,4 +46,8 @@ public struct ProviderSettingsIntent: Codable, Sendable, Equatable {
 }
 extension AgentMessage {
     public var providerSettings: ProviderSettingsIntent? { content(as: ProviderSettingsIntent.self) }
+}
+
+extension ProviderIntentFailure: SettingsFailurePresenting {
+    public var wasPresented: Bool { presented }
 }

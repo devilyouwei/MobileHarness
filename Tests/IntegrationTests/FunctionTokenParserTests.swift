@@ -1,9 +1,10 @@
 import AgentCore
-import Agents
 import Foundation
 import ModelKit
 import StorageCore
 import Testing
+
+@testable import Agents
 
 private func generator() throws -> AgentGenerator {
     try AgentGenerator(

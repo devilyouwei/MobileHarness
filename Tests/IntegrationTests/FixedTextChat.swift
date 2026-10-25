@@ -1,8 +1,9 @@
 import AgentCore
-import Agents
 import Foundation
 import ModelKit
 import Synchronization
+
+@testable import Agents
 
 /// Test-only deterministic capability; production Assistant always requires an injected model.
 struct FixedTextChat: ChatCapability {

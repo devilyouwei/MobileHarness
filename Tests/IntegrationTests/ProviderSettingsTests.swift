@@ -1,6 +1,5 @@
 import Actions
 import AgentCore
-import Agents
 import Foundation
 import FunctionContracts
 import Gateway
@@ -9,6 +8,8 @@ import StorageCore
 import StorageFiles
 import Testing
 import UI
+
+@testable import Agents
 
 @MainActor
 private final class ProviderTransactionFixture: ProviderSettingsPersistence {

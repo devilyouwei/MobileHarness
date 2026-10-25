@@ -6,7 +6,7 @@ Actor-owned arbitration for declared function and host resources, with live perm
 
 ## Ownership and boundaries
 
-module registration injects concrete owner/preemption/stop policy. holdings is the sole occupancy authority; device health, physical stop and Channel ordering are separate. ResourceCoordinator owns leases/uses/cleanup, not business retry or native isolation.
+Agents authors opaque owner/preemption policy, Actions supplies native stop callbacks, and App binds them through ResourceDefinition. holdings is the sole occupancy authority; device health, physical stop and Channel ordering are separate. ResourceCoordinator owns leases/uses/cleanup, not business retry or native isolation.
 
 ## External relationships and data flow
 
@@ -26,7 +26,7 @@ flowchart LR
 
 Public snapshots are unlocked or locked(ExecutionOwner?); nil means host use. Internally holdings carries lease/use/handoff tokens. Release/late completion removes only its matching token. There is no faulted health latch or recover API. Definition declares owners, lease requirement, executionGroup, explicit preempts and stop callback; intersecting multi-resource siblings retire together.
 
-run reserves the actual writer before starting its task, binds owner/held IDs/ResourceExecutionPermit and removes matching transient holdings after joined return. Effects validate the inherited permit; ended/revoked/handoff uses reject. Caller cancellation remains cancellation. Lease-bound effects also check live lease/deadline.
+run reserves the actual writer before starting its task, binds owner/held IDs/ResourceExecutionPermit and removes matching transient holdings after joined return. Effects validate the inherited permit; ended/revoked/handoff uses reject. Caller cancellation remains cancellation unless a returned report contains an independent real execution/cleanup failure, which is preserved. Lease-bound effects also check live lease/deadline.
 
 ## Handoff and cleanup
 
@@ -76,7 +76,3 @@ flowchart TD
 ```
 
 没有默认清理确认时限。取消调用者不会将未完成 cleanup 当作完成；独立 coordinator owner 继续持有资源直到旧 writer 实际退出。显式安全租约期限与清理 join 是不同机制。
-
-## 待实现
-
-- Durable leases, global fairness and forced unlock of unfinished native work are not implemented.

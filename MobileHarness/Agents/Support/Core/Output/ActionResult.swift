@@ -1,20 +1,5 @@
 import Foundation
 
-/// Trusted runtime ownership, captured before admission rather than supplied by model parameters.
-public struct ExecutionOwner: Codable, Hashable, Sendable {
-    public let agent: AgentID
-    public let incarnation: String
-    public let sessionID: String
-
-    public init(agent: AgentID, incarnation: String, sessionID: String) {
-        self.agent = agent
-        self.incarnation = incarnation
-        self.sessionID = sessionID
-    }
-}
-
-public enum ActionFeedback: Sendable { case none, failuresOnly, terminal }
-
 public enum AgentActionCompletion: Codable, Equatable, Sendable {
     case completed
     case value(String)
@@ -117,11 +102,4 @@ public struct ActivityEvent: Sendable, Equatable {
         self.state = state
         self.sequence = sequence
     }
-}
-
-/// Input admission is distinct from the physical effect and from business consumption.
-public enum ActionResultDelivery: Sendable {
-    case accepted
-    case retry
-    case closed
 }

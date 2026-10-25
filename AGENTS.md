@@ -12,8 +12,8 @@ Read the relevant documentation before designing or implementing a change. Docum
 | `MobileHarness/README.md` | Overall technical design: core modules, the complete framework, cross-module flows, data flow, and key architectural designs. |
 | Code-directory `README.md` files | Detailed technical design and implementation for the owning directory, with increasing detail at deeper levels. |
 
-- Keep documentation under `MobileHarness/` aligned with the latest code. Clearly distinguish implemented behavior (✅) from outstanding work (❌); remove superseded descriptions from the current design contract.
-- Every code directory, including nested directories, must have a `README.md` describing its purpose, design goals, current design and implementation, and outstanding work.
+- Keep documentation under `MobileHarness/` aligned with the latest code. Technical documentation under MobileHarness/, including module and nested directory documents, describes implemented designs only and uses no implementation status markers. Keep proposed designs, plans and outstanding work in docs/; remove superseded descriptions from the current design contract.
+- Every code directory, including nested directories, must have a `README.md` describing its purpose, design goals, current implemented design and implementation.
 - Each first-level module README must describe responsibilities and boundaries, direct upstream/downstream relationships and interfaces, internal submodule designs and relationships, data flow, and key technical decisions. Describe external relationships one level deep only.
 - Nested READMEs must focus on their own directory: interfaces, algorithms, state, lifecycle, failure handling, and constraints as applicable. Link to other documentation instead of duplicating it.
 - Update the overall design when a change affects module boundaries or cross-module flows. Update the relevant `docs/` documents when requirements, plans, decisions, or validation records change.
@@ -35,18 +35,18 @@ Read the relevant documentation before designing or implementing a change. Docum
 
 ## 4. Update Documentation Before Code
 
-- For every feature or fix, update the affected directory READMEs before editing code. Describe the intended changes to the relevant files, responsibilities, behavior, interfaces, and flows.
-- For changes spanning directories, update each owning README. Update module-level and overall design documents first when their boundaries or flows are affected.
-- Mark the intended implementation as pending until it is implemented. After implementation, reconcile the documentation with the actual result.
+- For every feature or fix, document intended changes in the relevant docs/ requirements or plans before editing code. Describe affected files, responsibilities, behavior, interfaces and flows. Keep MobileHarness/ technical READMEs limited to implemented designs.
+- For changes spanning directories, plan changes to each owning design document and cross-module boundaries in docs/. After implementation, update each affected README and the overall design.
+- Track pending implementation in docs/ only. After implementation, reconcile technical documentation with the actual result without status markers.
 - If the design changes during implementation, revise the documentation before continuing code changes.
 
 ## 5. Reconcile Documentation and Remove Obsolete Code
 
 Before completing a code change:
 
-- Verify that affected documentation accurately describes the latest design, actual implementation, and remaining work.
+- Verify that affected documentation accurately describes the latest design, actual implementation; track remaining work in docs/.
 - Remove replaced code, redundant or duplicate implementations, and stale references within the scope of the change.
-- Do not leave old and new implementations side by side without a documented migration need. Record the reason and remaining cleanup in the owning README when transitional code must remain.
+- Do not leave old and new implementations side by side without a documented migration need. Describe the actual transitional behavior and its reason in the owning README; track remaining cleanup in docs/.
 
 ## 6. Validate Changes and Report Evidence
 

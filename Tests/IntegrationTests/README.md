@@ -126,3 +126,13 @@ Photography完成示例使用明确的“App相册”文案；保持与BasicSkil
 ## Qwen / GPT-4.1 提示词回归扩展
 
 ✅ 沿用59场景／85输入及生产提示词，evaluate-qwen.py接受三款Qwen与gpt-4.1；每个子进程仅注入对应Provider凭据，GPT使用OpenAI端点。运行前后记录生产上下文／Skill／解析与执行源hash，不修改提示词或放宽断言。报告保留失败与实际响应；本轮使用合成设备／仓库，不能替代真机验收。
+
+## Gateway container ownership
+
+✅ GatewayContainerTests covers App-scoped identity, inert construction, once-only configuration, failure propagation, cached-port fencing, terminal controls, scheduled/direct cancellation, joined native cleanup, root replacement and host ordering using synthetic functions and resources. Observation-session coverage checks bounded diagnostic isolation and App-root cleanup. SoundSourceTests exercises the root-owned observation path with synthetic PCM, without real inference or device control.
+
+## Actions execution chain coverage
+
+ActionsContainerTests exercises pure preparation, credentials, both call protocols, resource permits, budgets, output validation, bounded retention and joined cleanup. GatewayContainerTests uses actual ActionsContainer ports with neutral endpoint/scope and root lifecycle fixtures. ContainerExecutionFixtures supplies legacy scenario constructors in tests only; production has no registry-based Gateway API. Synthetic business/native substitutes do not establish real-device or real-model acceptance.
+
+ContainerContextTests also verifies that an explicitly encoded owner snapshot remains a JSON object through collection and that read failures propagate, rather than encoding Data as a base64 string.

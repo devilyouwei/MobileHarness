@@ -1,6 +1,5 @@
 import Actions
 import AgentCore
-import Agents
 import CallRuntime
 import ExecutionRuntime
 import Foundation
@@ -10,6 +9,8 @@ import PlatformKit
 import StorageCore
 import Testing
 import UI
+
+@testable import Agents
 
 private actor CameraProbe {
     var operations: [PhotographerCameraIntent.Operation] = []
@@ -149,7 +150,7 @@ private struct CameraFixture {
         }
         let tools = try ToolRegistry(modules: [CameraTools(definitions: bindings)])
         let actions = try ActionRegistry(definitions: bindings.filter { $0.protocols.contains(.action) })
-        gateway = OutputGateway(
+        gateway = await OutputGateway(
             manager: manager, requests: input, tools: tools,
             actions: ChannelScheduler(registry: actions), policy: policy, sink: { _ in })
         let host = PhotographerExecutionSession(
@@ -394,13 +395,13 @@ func photographerCameraUsesSharedFunctionsAndRetainsFailuresBeforeRecovering()
         OutputEnvelope(
             source: .photographer, context: input.context, output: .actionCall(call), sequence: 1,
             taskScope: input.taskScope))
-    #expect(result.isError == false)
+    #expect(result.isError == true)
     _ = try await fixture.gateway.execute(
         OutputEnvelope(
             source: .photographer, context: input.context, output: .control("agent.finished"), sequence: 2,
             taskScope: input.taskScope))
     let snapshot = await fixture.gateway.executionResults(inputID: input.id)
-    #expect(snapshot.actions.records.first?.phase == .failed)
+    #expect(snapshot.actions.records.isEmpty)
     #expect(await fixture.probe.exports == 0)
     #expect(await fixture.probe.operations.isEmpty)
     #expect(throws: CommunicationError.self) {

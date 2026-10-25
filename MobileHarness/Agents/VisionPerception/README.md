@@ -2,7 +2,7 @@
 
 ## 角色容器
 
-✅ [VisionPerceptionContainer.swift](VisionPerceptionContainer.swift) 是 AgentContainer 的稳定子能力。持有至多一个捕获代任务，VisionAgentSession 在其内完成注册、原生观察和受保护输出消费。重叠 run 显式 busy；取消和 suspend 加入实际任务；根 stop 永久关闭容器。会话失败与清理失败分别保留。
+[VisionPerceptionContainer.swift](VisionPerceptionContainer.swift) 是 AgentContainer 的稳定子能力。持有至多一个捕获代任务，VisionAgentSession 在其内完成注册、原生观察和受保护输出消费。重叠 run 显式 busy；取消和 suspend 加入实际任务；根 stop 永久关闭容器。会话失败与清理失败分别保留。
 
 生命周期由[模块根](../README.md#agent-container)统一编排；子容器能力不授予执行权。
 
@@ -53,7 +53,7 @@ flowchart LR
  classDef host fill:#f1f5f9,stroke:#64748b,color:#334155
 ```
 
-角色间消息经 Gateway 递送；基础能力通过构造注入，输入订阅由角色持有。
+角色间消息经 Gateway 递送；基础能力通过构造注入，输入订阅由角色持有。角色、Skill 与 Task 授权归 Agents；Actions 来源的协作接口由 App 以中立窄端口绑定，Agents 不导入 Actions、CallRuntime 或 ExecutionRuntime。
 
 <a id="输入订阅与输出契约"></a>
 
@@ -73,7 +73,7 @@ flowchart LR
  end
  P --> N --> L --> C --> I --> O --> Q
  M <--> I
- Q --> G["Gateway：执行授权／Signal 发布"]:::gateway
+ Q --> G["Gateway：调度／Signal 递送"]:::gateway
  G --> X["UI.Pose.showPose／UI.Gaze.moveEyes"]:::action
  X --> U["UI.camera：同帧骨架；UI.home：眼睛"]:::ui
  G --> PH["Photographer：vision.pose"]:::agent
@@ -143,7 +143,3 @@ OutputMailbox has 18 total slots shared by discrete output and the overlay/gaze/
 图像接纳只校验类型、会话、新鲜度与单调序号并原子替换 latest；实际推理读取已提交 Context。角色邮箱和会话绑定输出消费使用相同 overlay/gaze/pose 最新替换规则，离散结果不被状态更新挤掉。停止加入输入、推理、发布及回执，旧代结果不更新新代。
 
 通信见 [Agent.json](../../Resources/Agents/VisionPerception/Agent.json)。
-
-## 待实现
-
-❌ 身份跟踪、独立深度／人脸模型和热反馈。

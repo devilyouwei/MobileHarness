@@ -1,6 +1,5 @@
 import Actions
 import AgentCore
-import Agents
 import CallRuntime
 import ExecutionRuntime
 import Foundation
@@ -8,6 +7,7 @@ import FunctionContracts
 import StorageCore
 import Testing
 
+@testable import Agents
 @testable import Gateway
 
 @Test(.actionCatalog) func behaviorTranslationPreservesCorrelationWithoutAgentObjectsInExecution() throws {

@@ -2,7 +2,7 @@
 
 ## 角色容器
 
-✅ [SpeechSynthesisContainer.swift](SpeechSynthesisContainer.swift) 是 AgentContainer 的稳定子能力。独立持有合成角色注册，与感知容器分别管理生命周期。endSession 仅移除当前合成角色，允许后续私有语音会话；根 stop 永久关闭容器。TTS 与 AudioCache 属于角色，播放归 Actions。
+[SpeechSynthesisContainer.swift](SpeechSynthesisContainer.swift) 是 AgentContainer 的稳定子能力。独立持有合成角色注册，与感知容器分别管理生命周期。endSession 仅移除当前合成角色，允许后续私有语音会话；根 stop 永久关闭容器。TTS 与 AudioCache 属于角色，播放归 Actions。
 
 生命周期由[模块根](../README.md#agent-container)统一编排；子容器能力不授予执行权。
 
@@ -47,7 +47,7 @@ flowchart LR
  classDef host fill:#f1f5f9,stroke:#64748b,color:#334155
 ```
 
-角色间消息经 Gateway 递送；基础能力通过构造注入，输入订阅由角色持有。
+角色间消息经 Gateway 递送；基础能力通过构造注入，输入订阅由角色持有。角色、Skill 与 Task 授权归 Agents；Actions 来源的协作接口由 App 以中立窄端口绑定，Agents 不导入 Actions、CallRuntime 或 ExecutionRuntime。
 
 这里 Gateway 仅递送定向消息；本角色 descriptor.outputs 为空，无业务 Action／Tool／发布／send 输出。播放由请求方的执行链控制，不应画成本角色发出 Playback Action。
 

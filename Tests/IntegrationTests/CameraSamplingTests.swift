@@ -1,8 +1,8 @@
 import AgentCore
-import Agents
 import Foundation
 import Testing
 
+@testable import Agents
 @testable import PlatformKit
 
 @Test(.actionCatalog) func cameraGraySamplePreservesStrideAndOrientation() throws {

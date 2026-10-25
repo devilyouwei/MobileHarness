@@ -1,6 +1,5 @@
 import Actions
 import AgentCore
-import Agents
 import CallRuntime
 import ExecutionRuntime
 import Foundation
@@ -8,6 +7,8 @@ import FunctionContracts
 import Gateway
 import StorageCore
 import Testing
+
+@testable import Agents
 
 private actor LifecycleGate {
     private var open = false
@@ -298,7 +299,7 @@ func cancelledLeaseCleanupPreservesAcknowledgedUnlock(operation: String) async t
         ) { _ in await actions.increment() }
     ])
     let scheduler = ChannelScheduler(registry: registry, resources: resources)
-    let output = OutputGateway(
+    let output = await OutputGateway(
         manager: manager, requests: InputGateway(manager: manager), tools: ToolRegistry(),
         actions: scheduler, sink: { _ in })
     _ = try await output.resourceControl(for: .photographer, sessionID: visionSession)
@@ -770,17 +771,16 @@ private actor RevocationDevice {
         resolvingResources: { _ in [ActionResource(rawValue: armResource.rawValue)] },
         handler: { _ in await count.increment() })
     let tools = try ToolRegistry(modules: [DynamicResourceToolFixture(definitions: [definition])])
-    let output = OutputGateway(
+    let output = await OutputGateway(
         manager: manager, requests: input, tools: tools,
         actions: ChannelScheduler(registry: ActionRegistry(), resources: resources), sink: { _ in })
-    await #expect(throws: ResourceError.staleLease) {
-        try await output.dispatch(
-            OutputEnvelope(
-                source: otherAgent,
-                context: AgentInput(id: UUID().uuidString, sessionID: session, payload: .event("test")).context,
-                output: .toolCall(
-                    ToolCall(id: UUID().uuidString, toolPath: "Fixture.Control.move", arguments: [:]))))
-    }
+    let rejected = try await output.dispatch(
+        OutputEnvelope(
+            source: otherAgent,
+            context: AgentInput(id: UUID().uuidString, sessionID: session, payload: .event("test")).context,
+            output: .toolCall(
+                ToolCall(id: UUID().uuidString, toolPath: "Fixture.Control.move", arguments: [:]))))
+    #expect(rejected?.isError == true)
     #expect(await count.value == 0)
     try await resources.release(lease, owner: original)
 }
@@ -792,7 +792,7 @@ private actor RevocationDevice {
     let session = UUID().uuidString
     try await manager.register(agent, sessionID: session)
     try await manager.start(.assistant)
-    let output = OutputGateway(
+    let output = await OutputGateway(
         manager: manager, requests: InputGateway(manager: manager), tools: ToolRegistry(),
         actions: ChannelScheduler(registry: ActionRegistry(), resources: resources), sink: { _ in })
     let control = try await output.resourceControl(for: .assistant, sessionID: session)
@@ -820,7 +820,7 @@ private actor RevocationDevice {
     ])
     let scheduler = ChannelScheduler(registry: registry, resources: resources)
     let manager = AgentManager()
-    let output = OutputGateway(
+    let output = await OutputGateway(
         manager: manager, requests: InputGateway(manager: manager), tools: ToolRegistry(),
         actions: scheduler, sink: { _ in })
     let owner = lifecycleOwner()
@@ -915,7 +915,7 @@ private struct DynamicResourceToolFixture: ToolModule { let definitions: [Action
     #expect(received.metadata.hops == 4 && received.metadata.sequence == 17)
     #expect(received.turn == turn && received.metadata.origin == .runtime)
     #expect(!received.metadata.expired && received.id != input.id)
-    #expect(await agent.results().first?.causality == SignalCausality(envelope: invocation.envelope))
+    #expect(await agent.results().first?.causality == invocation.envelope.correlation as? SignalCausality)
     await scheduler.shutdown()
     try await manager.stop(.assistant)
 }
@@ -982,7 +982,7 @@ func hostProducerCancellationPreservesOtherSessionAndOtherAgent() async throws {
             completing: { invocation in try await probe.run(try #require(invocation.call.parameters["id"])) })
     ])
     let scheduler = ChannelScheduler(registry: registry)
-    let gateway = OutputGateway(
+    let gateway = await OutputGateway(
         manager: manager, requests: InputGateway(manager: manager), tools: ToolRegistry(),
         actions: scheduler, sink: { _ in })
     let session = UUID().uuidString

@@ -64,8 +64,11 @@ import UI
         stopped = true
         pendingEndpoint = nil
         autosaveDeadline = nil
+        let activeRequests = Array(requests.values)
+        for request in activeRequests { request.cancel() }
         restoration?.cancel()
         autosave?.cancel()
+        for request in activeRequests { _ = await request.result }
         await restoration?.value
         await autosave?.value
         restoration = nil
@@ -212,6 +215,7 @@ import UI
         pending[item.id] != nil || admitted.contains(item.id) || cancelling.contains(item.id) || item.active
     }
     public func perform(_ id: String, operation: ModelResourceOperation) async {
+        guard !stopped else { return }
         guard let item = state.items.first(where: { $0.id == id }) else { return }
         if operation == .cancel {
             guard isDownloading(item), !cancelling.contains(id), pending[id] != .remove else { return }

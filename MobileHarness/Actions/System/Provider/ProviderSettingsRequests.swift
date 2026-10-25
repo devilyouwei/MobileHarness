@@ -8,7 +8,7 @@ public protocol ProviderSettingsCapability: Sendable {
     func saveSettings(requestID: String, sessionID: String) async throws
 }
 @MainActor
-public final class ProviderSettingsRequests: ProviderSettingsCapability {
+public final class ProviderSettingsRequests: ProviderSettingsCapability, ProviderSettingsStaging {
     private enum Operation {
         case restore
         case save(ProviderSettings)

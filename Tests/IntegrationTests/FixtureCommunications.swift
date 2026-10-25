@@ -1,8 +1,9 @@
 import AgentCore
-import Agents
 import Foundation
 import StorageChat
 import StorageCore
+
+@testable import Agents
 
 /// Test-only transport bridge: production Agents emit communication Actions exclusively.
 private enum FixtureCommunicationStreams {

@@ -1,6 +1,5 @@
 import Actions
 import AgentCore
-import Agents
 import Foundation
 import FunctionContracts
 import Gateway
@@ -8,6 +7,8 @@ import PlatformKit
 import StorageCore
 import Testing
 import UI
+
+@testable import Agents
 
 private actor HostResourceFixture: ModelResourceCapability {
     var calls: [String] = []

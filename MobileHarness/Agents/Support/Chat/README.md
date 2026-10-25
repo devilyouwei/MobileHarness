@@ -23,7 +23,7 @@ flowchart LR
  W["Chat Worker"]:::agent
  U["UI.home：Worker 主动订阅文本"]:::ui
  M["ModelKit.ChatCapability"]:::model
- S["Storage.State／Chat／Task 领域接口"]:::storage
+ S["Storage · Chat / Task repositories"]:::storage
  C["AgentCore：解析／目录／输出契约"]:::host
  G["Gateway：真实调用／消息／结果"]:::gateway
  A -.-> W
@@ -92,7 +92,22 @@ Worker 在选择 provider 前登记原始 Decision，内部 ReACT 复用该输�
 
 AgentPrompts 通过显式资源 Catalog 读取模板，要求 executionObservations/historicalExecution/toolFailure。标题模板由 Memory 独立读取。渲染规则见 [Generation](../Core/Generation/README.md#prompt-resources-and-rendering)：单次替换、精确变量、缺失/超限明确失败，无资源热更新。
 
-每次实际模型请求按已加载 Skill 的 useStates 采集所选容器快照（各来源自洽，不承诺跨容器原子一致）；首条 system 保留稳定指令/目录，独立 system 消息承载唯一 CURRENT STATE，放在历史后、最新 user 输入/观察前；末尾为 native Tool 结果时追加在完整结果组之后。旧 State 不带入续轮，不通过 user 消息注入私有 Task/Skill 管理状态。Native Tool 定义位于 ChatRequest.tools。缓存命中由 provider 决定，本层不假定服务端边界或价格。
+### Request state assembly
+
+AgentChatWorker.executeRound is the final assembly boundary for skills-enabled requests. AgentChatContextBuilder owns history/result projection and request-budget fitting; it does not discover containers or mutate their state.
+
+1. Read a committed AgentContextRepository snapshot. Freeze its loaded Skill IDs and compose the immutable capability catalog under the role's communication policy. Keep that catalog for this round's parsing/output authorization.
+2. Resolve the loaded Skills' useStates union and call the injected AgentStateContext for the current session. Its callbacks read actual owners; failures stop request construction. Business collection is separate from the private actor snapshot and is not a global atomic observation.
+3. Encode the same private snapshot's minimal Task/Skill projection. Construct one system data message containing AGENT CONTEXT, then CURRENT STATE with the explicit facts-only boundary. Limit this combined block to 16 KiB.
+4. Rebuild State.systemPrompt from the same catalog and Skill snapshot. Remove old system messages and insert the instruction/catalog prefix at index zero. Insert the fresh data message immediately before a trailing latest user message; otherwise append it after the complete native call/result group. Never split native result pairing.
+5. Apply retainingRecent to complete message groups, preserving system messages, current intent and the required continuation suffix. The final request is bounded to 64 messages, 64 KiB of counted text/call fields and four images; inability to fit protected content is an error. Native definitions are supplied separately in ChatRequest.tools when supported.
+6. Persist the actual request messages and decision metadata before collecting provider output. A continuation repeats this assembly, refreshing facts and the effective catalog rather than accumulating old State messages.
+
+The prefix contains role/protocol instructions, Skill overview, current loaded teaching and the effective catalog. It remains stable while those inputs remain unchanged; load/release changes the next request's prefix. CURRENT STATE is owner-sampled business/presentation data. AGENT CONTEXT contains only the matching active Task goal/status and effective loaded Skill IDs. The entire private task registry, delegated views, authorization records and idle counters stay out of that projection. Owner/source mappings belong in [Context](../Context/README.md#container-context-read-path).
+
+The usual message order is instruction/catalog system → selected history → fresh Agent/business system data → latest user input/observation. Native feedback instead preserves assistant-call and tool-result messages contiguously and places the data block afterward. Historical requests are reconstructed from input/response/actual call evidence; their old system facts are not reinjected as current facts. Terminal Task summaries remain historical data, separately from the current Task projection. Provider token fitting and prompt-cache behavior remain ModelKit responsibilities.
+
+Roles without dynamic Skills do not automatically receive this public-state collection pipeline; the production Chat role using it is Assistant. Deterministic roles maintain their own private Context and typed observations without creating a model request merely to read State.
 
 ## Task/Skill 控制与执行边界
 
@@ -123,7 +138,7 @@ Action 正文含原轮次 call 序号、当前 action 别名、真实 status 与
 | Driver native queue | 128 complete calls; failed yield terminates the round. Each generation permits 120 calls; the cumulative decision has no native-call cap. |
 | Decision lifetime | Completion/cancellation/error-owned, no cumulative requests/native calls/time limit. Generated calls (120) and feedback bytes (64 KiB) reset each round. |
 | Queue lifetime | Owner cancellation/terminal state; no elapsed-time expiry |
-| Task views / prompt reports | 256 identities, at most 32 live; only terminal views may be retired. Data messages include only same-session active background tasks or the current directed task (maximum 17); terminal views remain history only. |
+| Private task views | 256 identities, at most 32 live; only terminal views may be retired. These runtime correlation/report views are not serialized wholesale into AGENT CONTEXT. The current conversational Task projection contains only the matching active goal/status. |
 
 The driver's secondary queues use synchronous checked yields. They do not suspend the provider producer; ModelKit adapters define the upstream ChatEvent queue policy. Cancellation or failure cancels the provider session, finishes both queues and joins all consumers. Only normal provider completion flushes the Action parser; partial failed/cancelled syntax is not finished or replayed.
 
@@ -171,12 +186,4 @@ AgentChatWorker 默认 TextSegmentationPolicy 为首段 Han/其他字符 20/60�
 
 请求值本身的消息/图片/定义/配对限制由 [ChatRequest](../../../ModelKit/Language/LLM/README.md#request-validation-bounds) 拥有；解析器和 provider 队列分别见所属目录。
 
-## 未实现范围
-
-❌ 暂停／中断时 Task 状态投影与 per-input 提交的统一最终 flush、活跃 worker 的持久化恢复与跨进程传输。各提交边界独立传播错误，不提供统一 checkpoint。
-
 [Support](../README.md) · [Context](../Context/README.md) · [Generation](../Core/Generation/README.md) · [Capability](../Core/Capability/README.md)
-
-## Container 上下文
-
-✅ 每次实际模型请求冻结 Skill及私有决策快照，采集 useStates 后，将 AGENT CONTEXT 与 CURRENT STATE 放进同一独立 system 消息。包括标题的动态块最多16KiB；来源各自保证完整快照，不保证跨容器同时刻一致。失败终止本次请求，不沿用旧值；下一请求重新采集。

@@ -1,6 +1,7 @@
 import Foundation
 import FunctionContracts
 import StorageChat
+import UI
 
 public enum HistoryReadQuery: Sendable {
     case conversation(String)
@@ -43,49 +44,7 @@ public enum HistoryReadResult: Sendable {
     }
 }
 
-/// One request-owned result slot, never a global staging table or input queue.
-public actor HistoryReadInvocation {
-    public let query: HistoryReadQuery
-    public let requestID: String
-    public let sessionID: String
-    private var result: HistoryReadResult?
-    private var closed = false
-    private var admitted = false
-    private var failure: (any Error)?
-    public init(query: HistoryReadQuery, requestID: String, sessionID: String) throws {
-        try query.validate()
-        self.query = query
-        self.requestID = requestID
-        self.sessionID = sessionID
-    }
-    public func accept(_ invocation: any FunctionInput) throws {
-        guard !closed, !admitted, invocation.context.source == "memory",
-            invocation.context.sessionID == sessionID, invocation.context.inputID == requestID,
-            invocation.context.taskID == nil
-        else { throw HistoryQueryError.missingConversation }
-        admitted = true
-    }
-    public func complete(_ value: HistoryReadResult) throws {
-        try Task.checkCancellation()
-        try value.validate()
-        guard !closed, admitted, result == nil else { throw HistoryQueryError.missingConversation }
-        result = value
-    }
-    public func take() throws -> HistoryReadResult {
-        try Task.checkCancellation()
-        guard !closed, let result else { throw HistoryQueryError.missingConversation }
-        self.result = nil
-        closed = true
-        return result
-    }
-    public func fail(_ error: any Error) { if !closed { failure = error } }
-    public func throwFailure() throws { if let failure { throw failure } }
-    public func close() {
-        closed = true
-        result = nil
-        failure = nil
-    }
-}
+public typealias HistoryReadInvocation = ActionRequestSlot<HistoryInput, HistoryReply>
 
 public protocol HistoryFullReadCapability: Sendable {
     func read(_ query: HistoryReadQuery) async throws -> HistoryReadResult

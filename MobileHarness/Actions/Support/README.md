@@ -1,23 +1,28 @@
-# Actions Support — 公共函数契约与作者接口
+# Actions Support — Contracts and execution mechanisms
 
-## 职责与边界
+## Ownership and compilation
 
-本目录只提供跨业务域复用的契约、编译期函数声明接口和通用清理错误。具体业务目录组合、协议策略和实例端点组合由 Actions 根级拥有；域内执行服务由所属业务目录拥有。
+Support contains mechanisms shared across business domains. Explicit Package.swift source lists preserve three existing compilation targets; directory placement never grants business or role dependencies.
 
-## 文件与编译关系
+| Target / sources | Responsibility and dependencies |
+| --- | --- |
+| [FunctionContracts](Contracts/README.md) | Neutral catalog, invocation, preparation/execution, resource and host ports; Foundation/Synchronization only. |
+| ExecutionRuntime: FunctionRegistry, FunctionExecutor, ActionDeadline, CooperativeExecution, ActionComposition | Canonical function table, validation, cooperative deadlines, composition and report preservation; FunctionContracts only. |
+| CallRuntime: ActionBindingModule, ActionBinding, ActionRegistry, ToolModule, ToolRegistry, ActionExecutor, ToolExecutor | Action/Tool projections over common functions and protocol metadata; FunctionContracts/ExecutionRuntime only. |
+| Actions: ActionMacro | @Action / @ActionCatalog author API; [macro implementation](../../../Macros/BehaviorDefinitions/README.md) emits definitions and pure preflight. |
 
-| 文件／目录 | 职责 | 编译目标 |
-| --- | --- | --- |
-| [Contracts](Contracts/README.md) | 函数输入、声明、资源、预算、完成、报告与目录校验 | 独立 FunctionContracts，无项目依赖 |
-| [ActionMacro.swift](ActionMacro.swift) | @Action 和 @ActionCatalog 作者接口，展开由 BehaviorDefinitions 插件实现 | Actions |
-| [NativeCleanupFailure.swift](NativeCleanupFailure.swift) | 保存多个原始执行／清理错误 | Actions |
+Actual App execution uses ActionsContainer's port. Gateway does not import these registries/executors or invoke raw handlers. Agents reads neutral metadata and performs cognitive authorization separately. Business-specific services remain in their owning domains.
 
-各业务域使用宏及公共契约，ExecutionRuntime、CallRuntime、Gateway、Agents 通过独立 FunctionContracts 使用中立值；本目录不创建基础容器、设备、任务或队列。
+## Validation and preparation
 
-## 宏与失败契约
+ActionFunction carries one declaration, handler, resources, budget and optional pure input validator. Macro-generated preflight reuses leading argument-decoding/validation statements before injected capability use, await or return; it cannot execute business effects. Preparation and real execution use the same validators. Dynamic resource/budget failures propagate before scheduling.
 
-@Action 生成同名 Declaration 和 Definition 工厂，传递参数、资源、预算及完成语义，不决定调用协议或权限。@ActionCatalog 分析本类型内的工厂调用和本地 helper，生成去重、排序的静态声明列表；不进行运行时发现。展开细节由[宏插件](../../../Macros/BehaviorDefinitions/README.md)拥有。
+FunctionExecutor checks invocation/definition consistency, input, deadline and output. Values, bounded reports and nonempty bounded activity IDs retain their distinct contracts. Real report/cleanup failures survive concurrent cancellation rather than becoming fabricated cancellation-only results. Reports preserve successful leaves, failed/not-started leaves and independent execution failure.
 
-NativeCleanupFailure 只保存原始 Error 数组，不执行清理、重试或判断成功。实际生命周期所有者负责取消、加入并收集失败，不能用后续清理异常覆盖原始执行失败。
+## Runtime, cancellation and composition
 
-[Actions 组装与调用关系](../README.md) · [整体目标地图](../../README.md#target-map)
+Execution budgets are cooperative: timeout requests cancellation and joins actual work, rather than claiming a noncooperative dependency has stopped. Serial/parallel composition records each leaf and preserves partial effects and cleanup evidence. FunctionReporting storage and composition depth/leaf bounds are defined by the contracts and algorithms, without role/Task policy.
+
+Call adapters project Action/Tool syntax into the same canonical function implementation. Protocol/execution/return policies are independent metadata; address registration does not grant permission. FunctionRegistry rejects duplicate/invalid definitions. Registry mutation is retained only inside assembly/support author APIs; public module catalogs expose descriptors only.
+
+NativeCleanupFailure, neutral outcomes and resource permits live in FunctionContracts. The actual lifecycle owner performs cleanup and preserves errors; these values do not perform retry or device stop. See [ActionsContainer](../README.md) for root bounds/lifetime and [Contracts](Contracts/README.md) for value constraints.

@@ -1,6 +1,5 @@
 import Actions
 import AgentCore
-import Agents
 import CallRuntime
 import ExecutionRuntime
 import Foundation
@@ -8,6 +7,8 @@ import FunctionContracts
 import Gateway
 import Testing
 import UI
+
+@testable import Agents
 
 @Test(.actionCatalog) @MainActor
 func conversationalAlbumNavigationUsesRegisteredAliasAndRealPresentation() async throws {
@@ -58,9 +59,8 @@ func conversationalAlbumNavigationUsesRegisteredAliasAndRealPresentation() async
         _ = try await executor.execute(ActionInvocation(source: .assistant, input: stale, call: call))
     }
     #expect(ui.navigation.state.path == [.settings])
-    await #expect(throws: (any Error).self) {
-        _ = try await executor.execute(ActionInvocation(source: .photographer, input: input, call: call))
-    }
-    #expect(ui.navigation.state.path == [.settings])
+    // Role availability is authorized by Agents before Gateway; this endpoint checks the live UI session.
+    _ = try await executor.execute(ActionInvocation(source: .photographer, input: input, call: call))
+    #expect(ui.navigation.state.path == [.settings, .album])
     await ui.stop()
 }

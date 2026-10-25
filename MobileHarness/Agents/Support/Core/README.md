@@ -2,7 +2,7 @@
 
 ## 职责与编译边界
 
-本目录单独编译为 AgentCore，仅依赖 Foundation。定义泛化 Agent、身份、生命周期、局部处理值、通信权限、生成解析与输出证据，不导入 UI、PlatformKit、ModelKit、Storage、Agents 业务实现或 Gateway 实现。物理目录位于 Agents 下不改变独立编译边界。
+本目录单独编译为 AgentCore，依赖 Foundation 与 FunctionContracts。定义泛化 Agent、身份、生命周期、局部处理值、通信权限、生成解析与输出证据，不导入 UI、PlatformKit、ModelKit、Storage、Agents 业务实现或 Gateway 实现。物理目录位于 Agents 下不改变独立编译边界。
 
 ## 文件与职责
 
@@ -19,28 +19,24 @@
 
 ```mermaid
 flowchart LR
- A["Agents：具体角色／策略"]:::agent
- G["Gateway：通信／执行授权"]:::gateway
- X["Actions／执行契约使用者"]:::action
- H["App：生命周期装配"]:::host
- C["AgentCore"]:::host
- F["Foundation"]:::host
- A --> C
- G --> C
- X --> C
- H --> C
- C --> F
- classDef ui fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e
- classDef platform fill:#dcfce7,stroke:#16a34a,color:#14532d
- classDef model fill:#f3e8ff,stroke:#9333ea,color:#581c87
- classDef storage fill:#fef3c7,stroke:#d97706,color:#78350f
- classDef agent fill:#eef2ff,stroke:#6366f1,color:#312e81
- classDef gateway fill:#ffedd5,stroke:#ea580c,color:#7c2d12
- classDef action fill:#ffe4e6,stroke:#e11d48,color:#881337
- classDef host fill:#f1f5f9,stroke:#64748b,color:#334155
+    subgraph Cognition["AGENTS · Cognition"]
+        A["Role implementations / adapters"]:::agent
+        C["AgentCore<br/>Cognitive contracts"]:::agent
+        A -->|imports| C
+    end
+    H["App · Composition"]:::host
+    F["FunctionContracts"]:::contract
+    S["Foundation / system libraries"]:::contract
+    H -->|uses cognitive values| C
+    C -->|imports| F
+    C -->|imports| S
+    classDef agent fill:#ede9fe,stroke:#7c3aed,color:#2e1065
+    classDef host fill:#dbeafe,stroke:#2563eb,color:#172554
+    classDef contract fill:#f1f5f9,stroke:#64748b,color:#334155
+    style Cognition fill:#faf7fd,stroke:#a78bfa
 ```
 
-依赖箭头指向被使用的契约；Core 不创建上层角色或基础容器。
+Dependency arrows point to imported contracts. Gateway and Actions do not import AgentCore; Agents adapters translate at their boundary. Core creates no role implementation or foundational container.
 
 ## 内部结构
 
@@ -73,7 +69,7 @@ flowchart LR
 
 Agent 协议暴露 descriptor、outputs、start/pause/resume/stop、receive/status 与可选 effectiveCapabilities(roundID)。角色持有自己的 Worker 和订阅，Core 不提供业务路由。有效目录是每轮不可变值；固定执行者可返回 nil，Core 不知道 Skill 载入政策。
 
-ProcessingContext 保存 request/session/generation/source/sequence/root/parent/hops/deadline/turn；身份字段非空且至多 128 UTF-8 字节，hops 为 0…8。它可创建本地 AgentInput、用于构造 OutputEnvelope，但不授予执行者身份。SignalOrigin 区分 local/agent/runtime；Gateway 拒绝 local 输入，外部输入没有 Signal 来源标记。
+ProcessingContext 保存 request/session/generation/source/sequence/root/parent/hops/deadline/turn；身份字段非空且至多 128 UTF-8 字节，hops 为 0…8。它可创建本地 AgentInput、用于构造 OutputEnvelope，但不授予执行者身份。SignalOrigin 区分 local/agent/runtime；Agents InputGateway rejects local input as inter-role communication，外部输入没有 Signal 来源标记。
 
 AgentInput／InputMetadata 是进程内值，capturedAt 使用 uptime，deadline 使用 ContinuousClock，不是远程 wire format。payload 有 text/event/audio/image/observation、Action/Tool/round 结果、communicationReceipt 和 activityEvent。业务 observation 的具体 schema 和角色含义由上层注入。
 
@@ -89,10 +85,11 @@ RuntimeFailureEvent／ContainerFailureEvent 保存中立有界诊断与关联；
 
 [Capability](Capability/README.md) 管声明与权限；[Communication](Communication/README.md) 管通用消息和任务；[Generation](Generation/README.md) 管解析与模板；[Input](Input/README.md) 管媒体值；[Output](Output/README.md) 管调用／证据；[Runtime](Runtime/README.md) 管实例、Context 与协调。
 
-## 待实现
-
-❌ 通用 factory、自动重启、远程传输和持久化执行递送。
 
 ## Container 上下文
 
-✅ ContainerContext.swift 定义 ContainerContextProviding 异步只读协议、泛型 ContainerContextValue 与类型擦除 ContainerContextSource。适配器每次调用拥有者，再统一编码；Core 不导入基础模块，不提供可变状态仓库。
+ContainerContext.swift 定义 ContainerContextProviding 异步只读协议、泛型 ContainerContextValue 与类型擦除 ContainerContextSource。适配器每次调用拥有者，再统一编码；Core 不导入基础模块，不提供可变状态仓库。
+
+## Read-only container context interfaces
+
+ContainerContextSource is the single type-erased snapshot reader. Its generic initializer encodes an Encodable value; its explicit `encoded:` initializer passes existing JSON Data through unchanged. The source owns no facts, cache or lifecycle. Agents/Support/Context performs bounded JSON collection and session fencing; actual owners produce and validate snapshots.

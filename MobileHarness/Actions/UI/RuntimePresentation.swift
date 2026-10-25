@@ -1,4 +1,3 @@
-import AgentCore
 import CallRuntime
 import ExecutionRuntime
 import Foundation
@@ -34,9 +33,9 @@ public final class RuntimePresentation: UIPresentationCapability, UIUpdateCapabi
     }
     private func validateApplicationControl(_ invocation: any FunctionInput) throws {
         try Task.checkCancellation()
-        guard invocation.context.source == "applicationControl", invocation.context.sessionID == rootSessionID,
+        guard invocation.context.sessionID == rootSessionID,
             invocation.context.taskID == nil
-        else { throw CommunicationError.unauthorized }
+        else { throw ActionHostError.unauthorized }
     }
     public func setLoadingExpression(_ enabled: Bool, revision: UInt64, invocation: any FunctionInput) async throws {
         try validateApplicationControl(invocation)
@@ -48,9 +47,9 @@ public final class RuntimePresentation: UIPresentationCapability, UIUpdateCapabi
     private let activity: any ActivityPresenting
     public func recordRuntimeFailure(_ issue: RuntimeIssue, invocation: any FunctionInput) async throws {
         try Task.checkCancellation()
-        guard invocation.context.source == "applicationControl", invocation.context.sessionID == rootSessionID,
+        guard invocation.context.sessionID == rootSessionID,
             invocation.context.taskID == nil
-        else { throw CommunicationError.unauthorized }
+        else { throw ActionHostError.unauthorized }
         try activity.requirePresentation()
         activity.recordIssue(
             .init(
@@ -70,7 +69,7 @@ public final class RuntimePresentation: UIPresentationCapability, UIUpdateCapabi
         effects: any HomeEffectsPresenting, expressions: any ExpressionPresenting,
         homeBluetooth: any BluetoothConnectionPresenting, deviceBluetooth: any BluetoothConnectionPresenting,
         authorizeEffects: @escaping @MainActor (any FunctionInput) throws -> Void = { _ in
-            throw CommunicationError.unauthorized
+            throw ActionHostError.unauthorized
         }
     ) {
         self.homeBluetooth = homeBluetooth
@@ -109,7 +108,7 @@ public final class RuntimePresentation: UIPresentationCapability, UIUpdateCapabi
     private weak var voice: (any VoicePresentationHandling)?
     private weak var camera: (any CameraOutputHandling)?
     public func bindVoice(_ value: any VoicePresentationHandling) throws {
-        guard voice == nil else { throw CommunicationError.scopeClosed }
+        guard voice == nil else { throw ActionHostError.scopeClosed }
         voice = value
     }
     public func unbindVoice(_ value: any VoicePresentationHandling) {
@@ -119,83 +118,79 @@ public final class RuntimePresentation: UIPresentationCapability, UIUpdateCapabi
         }
     }
     public func bindCamera(_ value: any CameraOutputHandling) throws {
-        guard camera == nil else { throw CommunicationError.scopeClosed }
+        guard camera == nil else { throw ActionHostError.scopeClosed }
         camera = value
     }
     public func unbindCamera(_ value: any CameraOutputHandling) {
         if camera === value { camera = nil }
     }
     public func playCue(_ request: UIActions.CueRequest, invocation: any FunctionInput) async throws {
-        guard let feedback else { throw CommunicationError.scopeClosed }
+        guard let feedback else { throw ActionHostError.scopeClosed }
         try await feedback.playCue(request, invocation: invocation)
     }
     public func vibrate(_ request: UIActions.HapticRequest, invocation: any FunctionInput) async throws {
-        guard let feedback else { throw CommunicationError.scopeClosed }
+        guard let feedback else { throw ActionHostError.scopeClosed }
         try await feedback.vibrate(request, invocation: invocation)
     }
     public func present(_ text: String, invocation: any FunctionInput) async throws {
-        guard let voice else { throw CommunicationError.scopeClosed }
+        guard let voice else { throw ActionHostError.scopeClosed }
         try voice.present(text, invocation: invocation)
     }
     public func presentTranscript(_ text: String, invocation: any FunctionInput) async throws {
-        guard let voice else { throw CommunicationError.scopeClosed }
+        guard let voice else { throw ActionHostError.scopeClosed }
         try voice.presentTranscript(text, invocation: invocation)
     }
     public func finishTranscript(invocation: any FunctionInput) async throws {
-        guard let voice else { throw CommunicationError.scopeClosed }
+        guard let voice else { throw ActionHostError.scopeClosed }
         try voice.finishTranscript(invocation: invocation)
     }
     public func setReplyWaiting(_ enabled: Bool, requestID: String, invocation: any FunctionInput) async throws {
-        guard let voice else { throw CommunicationError.scopeClosed }
+        guard let voice else { throw ActionHostError.scopeClosed }
         try voice.setReplyWaiting(enabled, requestID: requestID, invocation: invocation)
     }
     public func beginReplyTurn(invocation: any FunctionInput) async throws {
-        guard let voice else { throw CommunicationError.scopeClosed }
+        guard let voice else { throw ActionHostError.scopeClosed }
         try voice.beginReplyTurn(invocation: invocation)
     }
     public func presentVoiceState(_ state: UIActions.VoiceState, invocation: any FunctionInput) async throws {
-        guard let voice else { throw CommunicationError.scopeClosed }
+        guard let voice else { throw ActionHostError.scopeClosed }
         try voice.presentVoiceState(state, invocation: invocation)
     }
     public func presentExpression(_ emotion: UIActions.Emotion, invocation: any FunctionInput) async throws {
-        guard let voice else { throw CommunicationError.scopeClosed }
+        guard let voice else { throw ActionHostError.scopeClosed }
         try await voice.presentExpression(emotion, invocation: invocation)
     }
     public func restoreExpression(invocation: any FunctionInput) async throws {
-        guard let voice else { throw CommunicationError.scopeClosed }
+        guard let voice else { throw ActionHostError.scopeClosed }
         try await voice.restoreExpression(invocation: invocation)
     }
     public func setExpression(_ emotion: UIActions.Emotion, invocation: any FunctionInput) async throws {
-        guard let voice else { throw CommunicationError.scopeClosed }
+        guard let voice else { throw ActionHostError.scopeClosed }
         try voice.setExpression(emotion, invocation: invocation)
     }
     public func present(_ target: UIActions.Gaze, invocation: any FunctionInput) async throws {
-        guard let camera else { throw CommunicationError.scopeClosed }
+        guard let camera else { throw ActionHostError.scopeClosed }
         try camera.present(target, invocation: invocation)
     }
     public func present(_ overlay: Actions.PoseOverlay, sessionID: String) async throws {
-        guard let camera else { throw CommunicationError.scopeClosed }
+        guard let camera else { throw ActionHostError.scopeClosed }
         try camera.present(overlay, frame: nil, sessionID: sessionID)
     }
     public func present(_ overlay: Actions.PoseOverlay, invocation: any FunctionInput) async throws {
-        guard let camera else { throw CommunicationError.scopeClosed }
+        guard let camera else { throw ActionHostError.scopeClosed }
         try camera.present(
             overlay, frame: invocation.attachment as? CameraFrame, sessionID: invocation.context.sessionID)
     }
 
     public func observeTranscript(_ text: String, sessionID: String) throws {
-        guard let voice else { throw CommunicationError.scopeClosed }
+        guard let voice else { throw ActionHostError.scopeClosed }
         voice.observeTranscript(text, sessionID: sessionID)
     }
     public func observeEmptyUtterance(sessionID: String) throws {
-        guard let voice else { throw CommunicationError.scopeClosed }
+        guard let voice else { throw ActionHostError.scopeClosed }
         voice.observeEmptyUtterance(sessionID: sessionID)
     }
-    public func output(_ envelope: OutputEnvelope) async {
-        guard
-            ["assistant", "photographer", "memory", "applicationControl", "speechPerception"].contains(
-                envelope.source.rawValue)
-        else { return }
+    public func output(_ envelope: ActionOutputObservation) async {
         await voice?.show(envelope)
     }
 }

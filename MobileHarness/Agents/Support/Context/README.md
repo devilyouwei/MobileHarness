@@ -126,10 +126,33 @@ Task entry preserves ordinary background context and complete current-task evide
 
 中断移除指定 Decision 使用集合而不扣数，保留 Task/Skill 并回到 waitingUser；显式新对话／匹配会话关闭／根关闭按所属清理规则释放。Task 终态必须加入真实执行／取消屏障，持久化失败保留待提交证据并阻止依赖后续模型接纳。取消等待者仍释放已授槽位，错误不降为成功。
 
-❌ 活跃 worker 持久化恢复、跨进程运行状态共享和 Skill 驱动动态 Context 订阅未实现。只读来源见本目录 AgentStateContext，模型流程见 [Chat](../Chat/README.md)。
 
 AgentStateContext 管理只读来源和会话接纳，不持有Task副本；关闭后旧读取失效。
 
-## Container 上下文
+## Container context read path
 
-✅ AgentStateContext 是只读能力注册表：256个来源、64个活动会话；每请求最多32来源，单来源8KiB、完整动态系统块16KiB。同步锁仅保护注册与会话代际，不跨 await 持锁，不缓存事实。来源按名称排序顺序读取；取消、未知来源、编码和容量失败明确传播。关闭并重开同名会话也使旧采集失效。AgentTaskSkillState.contextSnapshot(session:) 只输出本会话当前任务目标／阶段和已加载Skill，直接来自私有状态。
+AgentStateContext stores named read capabilities and session generations. It owns neither business fact values nor a mirrored Task. AgentContainer.makeStateContext constructs the production registry; App supplies the camera/device access implementations and stable UI owners. A source name is an explicit contract, not reflection over a container tree.
+
+| Source | Concrete read path | Snapshot fields |
+| --- | --- | --- |
+| `actions.camera` | AgentCameraAccess → AppCameraAccess → ActionsBusinessAssembly.cameraContext → CameraCoordinator.contextSnapshot | availability plus enabled, running, selectedFacing, busy, needsSettings, displayedMediaID and savedMediaID. Running comes from the camera capability; business/presentation conditions come from the owning camera workflow. |
+| `actions.robot` | AgentDeviceAccess → AppDeviceAccess → ActionsBusinessAssembly.deviceContext → NexArmControlService.contextSnapshot | availability plus connected and controlAvailable, derived from current link/control/foreground/cleanup conditions. |
+| `ui.navigation` | MainActor read of injected NavigationState with UIAlbumContainer projection | availability plus path, phase, current location, overlay, content and operation. Presentation admission must be available. |
+| `ui.camera` | MainActor read of injected UICameraContainer | availability plus enabled, visible, busy, facing and needsSettings. Presentation availability must pass. |
+| `ui.album` | MainActor read of injected UIAlbumContainer, guarded by navigation presentation admission | availability plus content, loadedCount, hasMore and operation. |
+
+The production sources encode ContainerContextValue with `availability` (`unknown`, `available` or `unavailable`) and `value`. An owner may return an unavailable fact or throw a read error; the registry does not fabricate an empty success. Encoded Actions snapshots use ContainerContextSource(encoded:) so JSON objects are not converted into base64 strings. Foundation containers do not import AgentCore; the adapter lives above the owner. Neither Gateway nor Storage participates in collection.
+
+For every skills-enabled model request, AgentSkillLoader.useStates takes the already expanded effective loaded Skill IDs, unions their source names, deduplicates and sorts them. BasicSkill selects ui.navigation; Photography adds actions.camera, ui.camera and ui.album; RobotInteraction adds actions.robot. Current ApplicationControl, HistoryQuery and ExpressionInteraction add no source names. Releasing a Skill changes future selection without removing the source registration or stopping its owner.
+
+Collection first captures the session generation and selected callbacks under a synchronous lock, then reads sources sequentially without holding the lock across await. It checks cancellation, source JSON and byte bounds, rechecks session generation, and emits a sorted named JSON object. There is no stored fact cache, subscription fan-out, Signal, Action call or automatic source discovery. An owner determines its snapshot consistency; the collection is not atomic across owners or with the private Agent snapshot.
+
+The registry permits 256 sources and 64 active sessions. One request selects at most 32 unique names; one source is limited to 8 KiB and aggregate facts to 16 KiB. Chat additionally limits the full AGENT CONTEXT plus CURRENT STATE block to 16 KiB. Duplicate/invalid registrations, unknown selected names, encoding, cancellation, stale session and capacity errors propagate. Closing and reopening the same session name creates a new generation and rejects old collection; global close releases sessions and callbacks permanently.
+
+## Private Task and Skill projection
+
+AgentContextRepository remains the private actor-owned source for the role's AgentContext. Chat takes one committed value for the request's Skill IDs, effective function catalog, teaching and AgentTaskSkillState.contextSnapshot(session:). Business reads happen afterward and do not extend the private transaction lock.
+
+The model projection contains only `task` and `skills`: task is the matching session's active goal/status, or null; skills is the current effective loaded ID list, including base and dependency Skills. Task IDs, task arrays, runtime delegation registries/views, grants, input bindings, root ownership and retention counters are not serialized into that block. The loaded Skill list is the role's effective capability set; it does not promise that every loaded Skill is owned by the current Task.
+
+Private Task/Skill transitions, retained history and actual execution outcomes can change later requests, but collecting context does not perform a transition. Task creation/terminal records are separately committed through the injected Task repository; production does not persist or restore a whole active AgentContext snapshot. Message placement and history/feedback composition belong in [Chat](../Chat/README.md#request-state-assembly), and the cross-module overview belongs in the [overall design](../../../README.md#container-state-read-path).

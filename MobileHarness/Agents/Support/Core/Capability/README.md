@@ -2,26 +2,25 @@
 
 ## 职责与外部关系
 
-Foundation-only 的配置验证、Action 别名／native 名称解析、运行期权限与目录渲染。业务参数含义、物理资格与 provider 传输不属于本目录。
+Configuration validation, Action/native-name resolution, cognitive permission checks and catalog rendering use system libraries and neutral FunctionContracts. 业务参数含义、物理资格与 provider 传输不属于本目录。
 
 ```mermaid
 flowchart LR
- A["Agents：注入声明／schema／目录"]:::agent
- C["Capability"]:::host
- G["Gateway：校验权限快照"]:::gateway
- A --> C
- C -->|"中立注册与权限值"| G
- classDef ui fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e
- classDef platform fill:#dcfce7,stroke:#16a34a,color:#14532d
- classDef model fill:#f3e8ff,stroke:#9333ea,color:#581c87
- classDef storage fill:#fef3c7,stroke:#d97706,color:#78350f
- classDef agent fill:#eef2ff,stroke:#6366f1,color:#312e81
- classDef gateway fill:#ffedd5,stroke:#ea580c,color:#7c2d12
- classDef action fill:#ffe4e6,stroke:#e11d48,color:#881337
- classDef host fill:#f1f5f9,stroke:#64748b,color:#334155
+    subgraph Cognition["AGENTS · Capability policy"]
+        A["Roles / Skill selection"]:::agent
+        C["AgentCore.Capability<br/>Catalog · Alias resolution · Permissions"]:::agent
+        B["Agents output adapter<br/>Frozen decision authorization"]:::agent
+        A -->|builds / reads| C
+        C -->|immutable catalog| B
+    end
+    G["Gateway public ports"]:::gateway
+    B ==>|authorized request| G
+    classDef agent fill:#ede9fe,stroke:#7c3aed,color:#2e1065
+    classDef gateway fill:#fef3c7,stroke:#d97706,color:#451a03
+    style Cognition fill:#faf7fd,stroke:#a78bfa
 ```
 
-箭头表示值的使用与传递，不表示本目录导入 Gateway。
+Agents uses the frozen capability catalog before submission to Gateway. Gateway never imports or queries this cognitive permission contract.
 
 ## 文件与职责
 
@@ -63,11 +62,11 @@ flowchart LR
 
 ## 声明与权限
 
-✅ resolveTool 在参数及枚举校验成功后原样保留显式 id，缺省 id 直接使用非抛错的 UUID 字符串；throws 只用于真实解析／验证失败。
+resolveTool 在参数及枚举校验成功后原样保留显式 id，缺省 id 直接使用非抛错的 UUID 字符串；throws 只用于真实解析／验证失败。
 
 JSON 至多 64 KiB；模型能力与内部授权合计 128，Channel 16，单函数参数集合 32。组键定义默认 Channel，空组只声明 Channel；别名全局唯一，排序遍历保证目录确定。配置只接受声明的字段，未知字段明确拒绝。
 
-Action 以 canonical domain/module/function 地址注册，并通过独立模型 alias 暴露；native Tool 保留 provider 定义，适配器负责传输格式。required 与 optional 不可重叠。XML Action 先验证原始参数数量／名称／值及必填项，再丢弃未在可见参数集中声明的键；native Tool 与 Gateway 对已构造调用严格验证键和 enum。未知别名或缺参返回真实拒绝，不获取内部参数权。
+Action 以 canonical domain/module/function 地址注册，并通过独立模型 alias 暴露；native Tool 保留 provider 定义，适配器负责传输格式。required 与 optional 不可重叠。XML Action 先验证原始参数数量／名称／值及必填项，再丢弃未在可见参数集中声明的键；native Tool parsing and Actions preparation strictly validate constructed argument keys and enumerations。未知别名或缺参返回真实拒绝，不获取内部参数权。
 
 InternalAction/InternalTool 参与 permits，不参与模型 resolve，也不生成 XML alias。Skill 指令或可见目录不替代实例／任务／资源授权。
 
@@ -78,5 +77,3 @@ CapabilityContextBuilder 从当前不可变目录渲染 Channel、Action 别名�
 无可见 Tool 使用 Action-only protocol/boundary；存在 Tool 使用双协议教学，native 定义另交请求。模板读取／渲染失败明确传播。角色身份、业务示例与 Skill 步骤由上层提供。
 
 restrictingCommunication 仅保留原声明中允许的 contract，对新不可变配置重新验证，不新增 source/target/grant，不改缓存资源。Core 不认识诊断场景或具体角色。
-
-❌ 完整 JSON Schema 和配置热更新未实现。解析见 [Generation](../Generation/README.md)，消息声明见 [Communication](../Communication/README.md)。

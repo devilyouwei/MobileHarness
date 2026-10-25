@@ -1,164 +1,75 @@
-# Agents — 输入消费、业务决策与角色协作
+# Agents — Cognition, authorization and role coordination
 
-## 职责与依赖边界
+## Responsibilities and boundaries
 
-Agents 解释外部输入、维护私有业务状态、调用模型并选择操作。每个角色只构造注入所需的基础子容器、只读观察接口或领域仓库，**不要求每个 Agent 都依赖 UI、PlatformKit、ModelKit、Storage 四个根**。App 创建唯一基础根并提供能力，Agent 不全局查找容器。
+AgentContainer is the App-scoped cognitive root. It owns AgentManager, role lifecycle, private context, Skills, Tasks, decision snapshots, Action availability, communication permissions and explicit authorization revocation. App injects Gateway communication/scheduling capabilities and narrow host ports. Agents imports AgentCore, FunctionContracts, Gateway and selected foundation SDKs; it does not import Actions, CallRuntime or ExecutionRuntime.
 
-UI、PlatformKit、ModelKit、Storage 不导入 Agents、Actions 或 Gateway。UI 页面只提交 UI 自有值到子容器；Agent 持有订阅并主动读取。本文中的“UI 请求”是带回执的数据契约，不是 UI 对 Agent 的方法调用、控制或路由。
+UI requests and native observations reach their responsible roles directly. Roles subscribe and process typed input; foundations never call a role or construct business Signals. Each role receives only required capabilities, without requiring every foundation root. Models support cognition; deterministic input processing does not create inference unnecessarily. Business effects use the registered execution chain rather than direct native calls.
 
-## 外部关系
-
-```mermaid
-flowchart LR
- subgraph Foundations["独立基础模块"]
- U["UI：类型化请求／事实"]:::ui
- P["PlatformKit：PCM／CameraFrame／设备事实"]:::platform
- M["ModelKit：推理与资源变化"]:::model
- S["Storage：公开事实与领域仓库"]:::storage
- end
- A["Agents"]:::agent
- H["App：创建根、注入与生命周期"]:::host
- C["AgentCore：中立契约"]:::host
- G["Gateway：通信／授权执行／反馈"]:::gateway
- X["Actions：函数声明与执行服务接口"]:::action
- H -.-> A
- U -->|"Agent 订阅读取"| A
- P -->|"Agent 订阅读取"| A
- A -->|"按需推理"| M
- A -->|"按需读取／提交"| S
- A -->|"使用通用契约"| C
- A -->|"调用与 Agent 消息"| G
- G -->|"结果／回执／轮次"| A
- A -.->|"装配公开能力与函数声明"| X
- classDef ui fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e
- classDef platform fill:#dcfce7,stroke:#16a34a,color:#14532d
- classDef model fill:#f3e8ff,stroke:#9333ea,color:#581c87
- classDef storage fill:#fef3c7,stroke:#d97706,color:#78350f
- classDef agent fill:#eef2ff,stroke:#6366f1,color:#312e81
- classDef gateway fill:#ffedd5,stroke:#ea580c,color:#7c2d12
- classDef action fill:#ffe4e6,stroke:#e11d48,color:#881337
- classDef host fill:#f1f5f9,stroke:#64748b,color:#334155
-```
-
-图只列本模块的一层邻接关系。完整 Gateway → Actions → 基础能力执行链见[总体设计](../README.md)；基础库不存在指回 Agents 的编译依赖。
-
-## 通用内部设计
+## Direct relationships
 
 ```mermaid
 flowchart LR
- subgraph Inputs["按角色注入的能力"]
- U["UI 子容器 requests／control"]:::ui
- P["只读 PCM／相机／设备观察"]:::platform
- M["模型能力"]:::model
- S["State／Cache／领域仓库"]:::storage
- end
- subgraph Roles["Agent 独立拥有"]
- L["start 建立长期订阅"]:::agent
- V["校验／接纳／ProcessingContext"]:::agent
- R["类型化角色处理方法"]:::agent
- C["私有 Context／Task／Skill"]:::agent
- D["Chat/ReACT 或确定性／感知策略"]:::agent
- O["解析调用／封闭轮次／等待真实结果"]:::agent
- end
- U --> L
- P --> L
- L --> V --> R --> D --> O
- C <--> R
- M <--> D
- S <--> C
- O --> G["身份绑定 Gateway"]:::gateway
- G --> X["Actions／内部 Tool"]:::action
- X --> F["所需基础能力：设备控制／呈现／持久化"]:::host
- G -->|"执行反馈"| O
- classDef ui fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e
- classDef platform fill:#dcfce7,stroke:#16a34a,color:#14532d
- classDef model fill:#f3e8ff,stroke:#9333ea,color:#581c87
- classDef storage fill:#fef3c7,stroke:#d97706,color:#78350f
- classDef agent fill:#eef2ff,stroke:#6366f1,color:#312e81
- classDef gateway fill:#ffedd5,stroke:#ea580c,color:#7c2d12
- classDef action fill:#ffe4e6,stroke:#e11d48,color:#881337
- classDef host fill:#f1f5f9,stroke:#64748b,color:#334155
+    App["App · Construction / lifecycle"] -.-> A
+    subgraph Cognition["AGENTS"]
+        A["AgentContainer / AgentRuntime"] --> Roles["Roles · Private Context · Skill · Task"]
+        Roles --> Policy["InputGateway / OutputGateway<br/>Policy and decision authorization"]
+    end
+    Inputs["UI requests / Native observations"] --> Roles
+    Roles --> F["Selected ModelKit / Storage capabilities"]
+    Policy -->|authorized calls / messages| G["Injected Gateway ports"]
+    G -.->|outcomes / Signals| Policy
+    Catalog["Immutable FunctionContracts catalog"] -.-> Roles
+    classDef host fill:#eaf2ff,stroke:#5078b8,color:#203b64
+    classDef agent fill:#f0eaff,stroke:#8261b5,color:#463065
+    classDef gateway fill:#fff2d9,stroke:#bf842c,color:#694511
+    class App host
+    class A,Roles,Policy agent
+    class G gateway
+    style Cognition fill:#faf7fd,stroke:#b1a0c4
 ```
 
-直接输入角色在 start 建立订阅，循环校验并调用类型化处理方法；一个输入源有一个长期消费任务，不逐帧创建转发 Task，不把原始输入包装为外部 Signal。pause 的行为由角色定义：对话取消当前决策，合成保留队列并允许活跃 producer 结束，直接输入角色关闭相应接纳；stop 取消并加入所拥有的工作。
+App binds camera/device/voice and maintenance collaboration through neutral ports. No adapter retains or searches an Actions/Gateway upstream container. The complete execution path is in the [overall design](../README.md); this diagram shows only direct neighbors.
 
-ProcessingContext 保存请求、会话、代际、轮次及因果身份，只用于本地处理与构造 OutputEnvelope，不授予执行权。Gateway 另行校验真实实例、权限、任务授权、资源租约、取消及结果归属。设备开关、拍照、播放、业务查询和动画等业务效果由 Actions 执行。
+## Roles and internal structure
 
-## 角色能力与通信
-
-| 角色 | 直接输入／计算能力 | 主要协作 |
-| --- | --- | --- |
-| [Assistant](Assistant/README.md) | UI.home 文本；Chat；公开 State／会话与任务仓库；照片读取与 JPEG 准备能力 | SpeechPerception 的 final/phase；向 SpeechSynthesis 定向请求；向三个固定角色委派 Task；动态 Skill → Actions |
-| [ApplicationControl](ApplicationControl/README.md) | settings/modelResources/devices/diagnostics 请求；设备连接与模型资源变化；直接故障观察 | Assistant Task；系统、资源、设备和诊断呈现 Actions |
-| [Memory](Memory/README.md) | history 请求与私有角色 Context；标题生成器独立注入 Chat | Assistant Task；历史查询／变更／呈现 Actions |
-| [Photographer](Photographer/README.md) | camera 请求及低频事实；跟踪可用性；私有角色 Context | VisionPerception pose、Assistant Task；Camera／NexArm Actions |
-| [SpeechPerception](SpeechPerception/README.md) | home.listeningRequests；只读 PCM；VAD／ASR | Assistant replyActivity；发布识别／阶段／声源；Listening 与呈现 Actions |
-| [SpeechSynthesis](SpeechSynthesis/README.md) | 定向合成／取消；TTS；Cache.audio | Assistant 发起合成，Actions 播放读取缓存；自身无业务调用输出 |
-| [VisionPerception](VisionPerception/README.md) | 只读 CameraFrame；Pose | 向 Photographer 发布 pose；骨架／眼睛内部 Tool |
-
-表中列的是实际能力归属，不把通过 Actions 间接使用的基础库画成 Agent 构造依赖。具体注入类型、函数地址和 Signal 字段由各角色 README 说明。
-
-## 模块根与具体装配
-
-具体应用装配位于本模块根级，Support 保存跨角色机制。七个角色保持平级，角色专用输入值、策略、观察、执行会话与业务状态归各自目录。
-
-| 文件 | 职责 |
+| Owner | Inputs and collaboration |
 | --- | --- |
-| [AgentContainer.swift](AgentContainer.swift) | 唯一业务根、稳定角色能力和统一加入生命周期 |
-| [AgentFailure.swift](AgentFailure.swift) | 稳定错误码、原始错误、来源和清理错误，不决定展示策略 |
-| [AgentContracts.swift](AgentContracts.swift) | 显式角色身份与生产通信目录，不拥有角色私有载荷处理 |
-| [AgentRepositories.swift](AgentRepositories.swift) | 构造注入的 Chat／Task／Media／Device 仓库切片 |
-| [AgentResourceBindings.swift](AgentResourceBindings.swift) | 将相机所需资源端口接到 Gateway 公开租约保护，不消费媒体 |
-| [AgentRuntime.swift](AgentRuntime.swift) | 共享 Gateway／Actions 图、角色工厂及观察者；注册与清理由角色容器拥有 |
+| [Assistant](Assistant/README.md) | Home text, Chat and private decision context; receives speech finals, requests synthesis and delegates fixed Tasks; selects dynamic Skills. |
+| [ApplicationControl](ApplicationControl/README.md) | Settings/resources/devices/diagnostics requests and device/artifact/failure observations; owns administrative and diagnostic policy. |
+| [Memory](Memory/README.md) | History requests and private context; authorizes history calls and fixed Task results. |
+| [Photographer](Photographer/README.md) | Camera/album requests, pose and tracking availability; owns capture/tracking intent and policy. |
+| [SpeechPerception](SpeechPerception/README.md) | Listening requests, native PCM, VAD/ASR and sound-source computation; owns consent/half-duplex policy and transcript messages. |
+| [SpeechSynthesis](SpeechSynthesis/README.md) | Directed synthesis/cancel, TTS and owned cache production; does not issue playback calls itself. |
+| [VisionPerception](VisionPerception/README.md) | Read-only camera frames, Pose inference and projection; publishes pose and requests protected presentation. |
+| [Support](Support/README.md) | Cognitive Gateway adapters, policy, routing, coverage, Chat, Context and common lifecycle mechanisms. |
 
-AgentContainer 构造七个稳定角色子容器，注入基础端口和仓库提供器。AgentRuntime 按需装配共享通信／执行图并将会话安装到所属容器，不启停角色会话；故障观察仅在装配和常驻角色启动成功后连接。AgentContracts 拥有身份与通信声明，角色私有值由接收角色解释。
+AgentContainer explicitly registers five read-only context sources over injected UI owners and App-bound camera/device snapshot ports. AgentStateContext retains capabilities rather than fact copies. Each skills-enabled model request combines freshly selected owner reads with a minimal Task/Skill projection from the private AgentContextRepository; Gateway and a Storage state mirror are absent from this path. The [overall context design](../README.md#model-context-composition) and [source mappings](Support/Context/README.md#container-context-read-path) define the boundaries.
 
-共享机制不通过具体角色类型表路由私有输入；固定任务的解码策略由实际执行角色提供，通用 Chat 的会话控制由角色 Context 提供。角色订阅不自动获得控制权，所有业务调用仍经过身份绑定的 Gateway。
+AgentRuntime assembles cognitive services and role hosts. It sends a neutral business assembly request through the App-bound callback; Actions constructs actual domain services and returns neutral metadata/host ports. Role-specific resource takeover policy is authored here and injected as opaque endpoint values. Native stop callbacks belong to the execution owner.
 
-## 公共机制与目录
+## Native intake and semantic roles
 
-| 目录 | 通用机制 |
-| --- | --- |
-| [Support](Support/README.md) | 跨角色 UI 订阅、执行关联、故障聚合和资源配置加载 |
-| [Support/Chat](Support/Chat/README.md) | 模型请求、协议消费、反馈续轮及历史边界 |
-| [Support/Context](Support/Context/README.md) | 私有 Context 事务、Task／Skill 状态与固定任务协调 |
-| [Support/Communication](Support/Communication/README.md) | 跨角色业务值及通信契约；执行宿主由各角色目录拥有 |
-| [Support/Core](Support/Core/README.md) | 独立 AgentCore 目标：仅依赖 Foundation，提供中立运行契约 |
+Perception and cognition describe role responsibilities within Agents. SpeechPerception and VisionPerception consume constructor-injected native PCM/frame observations directly and produce meaningful speech/pose messages for other roles. These messages use Agents authorization and Gateway endpoint delivery; the raw stream is not an inter-role Signal. UI requests and device/model/container facts can reach their responsible role directly. Any authorized role can originate internal messages or execution requests without first passing through perception.
+
+Perception does not require a second cognitive role for every reaction, and cognition does not require model inference for every input. A perception role may issue an authorized presentation/listening call; business effects still use Gateway and Actions. Read-only input subscriptions do not own capture startup or native control. The [overall input/Signal figure](../README.md#native-input-and-internal-signals) owns the complete source-to-effect and feedback view; local speech/vision READMEs own their algorithms and buffering.
+
+## Authorization and communication
+
+OutputGateway binds the actual producing role/incarnation and frozen decision catalog before forwarding canonical calls. Skill availability, Task grants, role communication and semantic receiver checks are entirely cognitive policy. Model-supplied parameters cannot forge producer identity. Fixed calls use their registered role descriptors. Registration does not imply authorization. Actions owns registration and authoritative business validation; Gateway owns endpoint/resource/scheduling validity. The [registration-to-completion matrix](../README.md#action-lifecycle-responsibilities) defines the full chain.
+
+InputGateway binds each role to a generic SignalTransport endpoint. Agents checks publish/send contracts and target permissions; Gateway transports opaque payloads under endpoint/envelope/capacity/scope checks. Agent A and B use independent bound endpoints on the same Gateway root. Semantic interpretation remains in the receiving role.
+
+After Gateway admission, Skill permissions are not queried again. Revocation explicitly cancels the affected execution scope. Agents projects neutral outcomes back to cognitive causality and decides history, Task advancement and continuation. Delivery acceptance is separate from business consumption. Reply/round barriers join the relevant execution and feedback before continuation.
+
+## Lifetime, inputs and failures
 
 <a id="agent-container"></a>
 
-## 容器接口与生命周期
+App creates one AgentContainer and starts it after Gateway. Stable role subcontainers are internal cognitive components, not additional App roots. Startup installs declarations, context sources, coverage and typed hosts before role work begins. Root lifecycle coordinates role startup, invalidation, foreground transitions and joined stop independently of pages.
 
-✅ App 每个注册作用域持有一个 AgentContainer，公开稳定属性 assistant、applicationControl、memory、photographer、speechPerception、speechSynthesis、visionPerception。构造只创建能力，不注册角色、订阅输入、加载模型、请求权限或操作设备；实际会话在依赖根就绪后按需装配。常驻业务会话与可替换语音／捕获代的差别由各角色文档定义。
+Each direct input source has a long-lived owning consumer rather than per-frame forwarding tasks. ProcessingContext carries request/session/generation/turn and causality, without granting authority. UI request/reply generations and native stream generations remain distinct. Roles own their decision, subscriptions and model producers; Actions owns actual voice/camera/device execution and interaction facades. Passive activity projection interprets Agent/Task evidence here and never executes callable effects.
 
-根公开 start()、invalidate()、setForeground(_:)、stop()；异步方法抛出 AgentFailure。App 只管理这一个业务生命周期节点，具体注入与依赖见 [Composition](../App/Composition/README.md)。
+Stop closes cognitive admission, cancels and joins role work, and retains original terminal/cleanup ports while Gateway and Actions drain. App releases bindings only afterward. Role shutdown does not globally stop borrowed scheduler/transport roots. Primary and cleanup failures remain explicit; a failed cleanup prevents replacing native owners. Conversation interruption can retain Task/Skill, while session closure releases them; neither automatically replays effects.
 
-启动合并并发调用，部分启动失败关闭接纳并加入回滚。首次 start 请求之前的 invalidate 无效果：冷根没有工作，不调用 UI／原生围栏，也不改变首次前台启动条件；启动在途失活仍立即围栏并取消、加入回滚。已失败或停止的根不可复用。
-
-运行失活同步关闭 UI／原生接纳，再加入相机、蓝牙、语音、视觉和常驻角色暂停。前后台只保留最新期望和一次必须完成的暂停，迟到恢复不能重新打开已失效代。中断保留 Task／Skill 所有权，不重放业务效果。
-
-stop 是终态，重复调用加入同一结果：先关闭接纳，取消并加入准备和原生会话，再停止常驻角色，释放共享输出、观察者、Gateway 和容器上下文读取接纳。消费者完成清理后 App 才释放基础根。内部任务容量、失败保留和前后台协调算法见 [Support](Support/README.md#根生命周期机制)。
-
-AgentFailure 保留稳定 code、原始 Error、component／operation、source 和全部清理错误；纯取消与带清理失败的取消分开。注册／移除、视觉清理和前后台切换失败经既有故障通道保留；容器控制不替代 Gateway 身份、授权及代际校验。
-
-## 生命周期、容量与完成
-
-UI 普通请求每源最多 64 个未终态项；控制使用独立单槽。无消费者、重复消费者、满载、取消及代际失效显式结束回执。接纳与业务完成分开：Assistant 文本回执确认进入决策；设置保存、历史读取和摄影事务等待真实结果；聆听回执确认策略接纳。角色加入取消，旧 token 不能关闭新消费者。
-
-原始 PCM 接纳只有原生 64 包有序缓冲，溢出显式失败；VAD 已提交的模型工作和冷初始化前缀由 SpeechRecognitionTurn 独立有界保留。视觉为最新帧替换及一个在途推理。媒体转换由消费角色负责，订阅不请求权限、不启动或切换设备。原生预览与模型推理分开；频谱等低频测量交给 Actions 呈现服务。
-
-各 Container 内存持有自身状态，显式快照只输出有限事实；Agent注册只读能力，完整Context、Skill所有权、PCM、帧及队列保持私有。会话／任务／消息领域事实按实际提交边界持久化，重启将未完成记录标为 interrupted，不重放副作用。
-
-容器故障在 Support 聚合，ApplicationControl 直接观察并决定 Actions 展示，Assistant 被动保留诊断。根消费者独立于页面，停止先关闭接纳，再取消加入工作，最后释放基础根；启动前故障由 App 兜底。
-
-## 待实现
-
-❌ 通用生产后台任务的完整业务契约、跨场景前台 Task 的统一最终 checkpoint、活跃 worker 的持久化恢复。
-
-## 基础相册实施契约
-
-✅ Photographer 消费 UI.album 请求，经Gateway调用Camera.Album；不把相册操作交给记忆抽取。
-
-## Container 上下文
-
-✅ AgentContainer 为每个 Assistant runtime 创建只读来源注册表，绑定 actions.camera、actions.robot、ui.navigation、ui.camera、ui.album；注册表不拥有业务值。停止 Agent 关闭读取接纳。Task／Skill 直接从同一次私有决策快照生成，不发布第二份状态。
+Public containers expose UI-owned state/control interfaces and narrow role capabilities, without exposing mutable registries, raw handlers or private role state. Capacity, algorithms and failure contracts live in the linked role and [Support](Support/README.md) READMEs.

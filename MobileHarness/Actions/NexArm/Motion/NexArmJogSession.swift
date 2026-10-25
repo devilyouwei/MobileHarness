@@ -1,4 +1,5 @@
 import Foundation
+import FunctionContracts
 
 /// One manual intent state. Only admitted proposals advance the planner.
 struct NexArmJogSession {
