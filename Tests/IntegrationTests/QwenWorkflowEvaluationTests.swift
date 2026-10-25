@@ -9,7 +9,6 @@ import Gateway
 @_spi(ModelManagement) import ModelKit
 import ModelKitOpenAI
 import StorageChat
-import StorageState
 import Testing
 
 private struct QwenCases: Decodable {
@@ -112,28 +111,29 @@ private struct QwenRobotFact: Encodable, Sendable {
     let controlAvailable: Bool
 }
 private final class QwenFacts: Sendable {
-    let scope: StateScope
-    let camera: StateWriter<PublishedState<FixtureCameraFact>>
-    init(storage: StateContainer, scenario: QwenCase) throws {
-        scope = try storage.makeScope()
-        var cameraValue = FixtureCameraFact(
+    let camera: FixtureFactCell<FixtureCameraFact>
+    let robot: QwenRobotFact
+    init(scenario: QwenCase) {
+        var value = FixtureCameraFact(
             enabled: scenario.cameraEnabled ?? false, running: scenario.cameraEnabled ?? false)
-        cameraValue.busy = scenario.cameraBusy ?? false
-        cameraValue.displayedMediaID = scenario.preview
-        camera = try scope.register(StateKey("camera"), initial: PublishedState(cameraValue))
-        _ = try scope.register(
-            StateKey("robot"),
-            initial: PublishedState(
-                QwenRobotFact(
-                    connected: scenario.robotConnected ?? true, controlAvailable: scenario.robotAvailable ?? true)))
+        value.busy = scenario.cameraBusy ?? false
+        value.displayedMediaID = scenario.preview
+        camera = FixtureFactCell(value)
+        robot = QwenRobotFact(
+            connected: scenario.robotConnected ?? true, controlAvailable: scenario.robotAvailable ?? true)
     }
-    func change(_ update: @Sendable (inout FixtureCameraFact) -> Void) throws {
-        try camera.transition(expecting: camera.get().revision) {
-            var value = $0.value ?? FixtureCameraFact()
-            update(&value)
-            $0 = PublishedState(value)
+    func context() throws -> AgentStateContext {
+        let context = AgentStateContext()
+        try context.register(
+            "actions.camera", source: ContainerContextSource { [self] in ContainerContextValue(camera.read()) })
+        try context.register("actions.robot", source: ContainerContextSource { [self] in ContainerContextValue(robot) })
+        for name in ["ui.navigation", "ui.camera", "ui.album"] {
+            try context.register(name, source: ContainerContextSource { ContainerContextValue([String: String]()) })
         }
+        return context
     }
+    func change(_ update: @Sendable (inout FixtureCameraFact) -> Void) throws { camera.update(update) }
+
 }
 private struct QwenControls: TaskControlCapability {
     let agent: AssistantAgent
@@ -230,9 +230,9 @@ private actor QwenEffects {
                 try facts.change { $0.selectedFacing = args["facing"] ?? "front" }
                 return .value(#"{"operation":"flip","enabled":true}"#)
             case "takePhoto":
-                let current = try facts.camera.get().value.value
-                guard current?.busy != true else { throw CameraControlError.busy }
-                guard current?.running == true else { throw CameraControlError.disabled }
+                let current = try facts.camera.read()
+                guard current.busy != true else { throw CameraControlError.busy }
+                guard current.running == true else { throw CameraControlError.disabled }
                 photoCount += 1
                 let id = "media_\(photoCount)"
                 try facts.change { $0.displayedMediaID = id }
@@ -241,7 +241,7 @@ private actor QwenEffects {
                 }
                 return .value(#"{"mediaID":"\#(id)","width":640,"height":480}"#)
             case "savePhoto", "ignorePhoto":
-                let id = try facts.camera.get().value.value?.displayedMediaID
+                let id = try facts.camera.read().displayedMediaID
                 guard id != nil, id == args["mediaID"] else { throw CameraControlError.photoUnavailable }
                 if scenario.failure == "saveFailure" { throw QwenEvalError.syntheticFailure }
                 let saved = invocation.call.actionPath.function == "savePhoto"
@@ -407,9 +407,8 @@ private func qwenIssues(_ expected: QwenTurn, calls: [QwenCall], skills: AgentTa
 private func qwenRun(_ scenario: QwenCase, provider: OpenAIChat) async throws -> QwenCaseResult {
     let started = Date()
     let session = UUID().uuidString
-    let storage = StateContainer()
-    let facts = try QwenFacts(storage: storage, scenario: scenario)
-    let state = try AgentStateContext(storage: storage, agent: .assistant, retainingPublishers: facts)
+    let facts = try QwenFacts(scenario: scenario)
+    let state = try facts.context()
     let configuration = try AgentConfigurations.load(named: "Assistant")
     let fixed = try AssistantAgent.runtimeCapabilities(configuration.capabilities)
     let history = ConversationHistoryStore()
@@ -584,8 +583,7 @@ func qwenExpressionSequenceScoringRejectsBrokenGroups(variant: String) async thr
         user: "Synthetic offline fixture", expressionSequence: ["happy", "thinking"],
         expressionSpeech: variant != "silent")
     let scenario = QwenCase(id: "offline", category: "expression-sequence", turns: [expected])
-    let storage = StateContainer()
-    let effects = QwenEffects(scenario: scenario, facts: try QwenFacts(storage: storage, scenario: scenario))
+    let effects = QwenEffects(scenario: scenario, facts: try QwenFacts(scenario: scenario))
     let config = try AgentConfigurations.load(named: "Assistant")
     let catalog = try AgentSkillLoader.registry(
         AgentConfigurations.baseSkills(named: "Assistant"), fixed: config.capabilities)

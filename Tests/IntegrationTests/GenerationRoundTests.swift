@@ -12,7 +12,6 @@ import StorageCore
 import StorageFiles
 import StorageMedia
 import StorageSQLite
-import StorageState
 import StorageTasks
 import Testing
 
@@ -243,7 +242,7 @@ private func roundHarness(
     let store = ConversationHistoryStore()
     let agent: any Agent
     if photo || photoCommand != nil {
-        let declared = try AgentConfigurations.registry(AgentConfigurations.skill("photography").functions)
+        let declared = try AgentConfigurations.registry(AgentConfigurations.skill("photography").useActions)
         let capabilities = try CapabilityRegistry(actions: declared.actions, channels: declared.channels)
         agent = try FixtureNativeAgent(
             chat: model, conversations: store,

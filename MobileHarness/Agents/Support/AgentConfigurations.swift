@@ -44,8 +44,9 @@ public enum AgentConfigurations {
         public let revision: Int
         public let description: String
         public let dependencies: [String]
-        public let functions: [Binding]
-        public let useState: [String]
+        public let useActions: [Binding]
+        public let useStates: [String]
+        public let useInstructions: [String]
         public init(from decoder: any Decoder) throws {
             struct Key: CodingKey {
                 var stringValue: String
@@ -57,7 +58,11 @@ public enum AgentConfigurations {
             let all = try decoder.container(keyedBy: Key.self)
             guard
                 Set(all.allKeys.map(\.stringValue))
-                    == Set(["version", "id", "revision", "description", "dependencies", "functions", "useState"])
+                    .isSubset(
+                        of: Set([
+                            "version", "id", "revision", "description", "dependencies", "useActions", "useStates",
+                            "useInstructions",
+                        ]))
             else {
                 throw AgentConfigurationError.invalidFormat
             }
@@ -66,12 +71,24 @@ public enum AgentConfigurations {
             revision = try fields.decode(Int.self, forKey: .revision)
             description = try fields.decode(String.self, forKey: .description)
             dependencies = try fields.decode([String].self, forKey: .dependencies)
-            functions = try fields.decode([Binding].self, forKey: .functions)
-            useState = try fields.decode([String].self, forKey: .useState)
-            guard version == 2, revision > 0, dependencies.count <= 16,
-                functions.count <= 128, Set(functions.map(\.path)).count == functions.count,
-                useState.count <= 16, Set(useState).count == useState.count,
-                Set(useState).isSubset(of: ["camera", "robot", "task"])
+            useActions = try fields.decode([Binding].self, forKey: .useActions)
+            useStates = try fields.decode([String].self, forKey: .useStates)
+            useInstructions = try fields.decodeIfPresent([String].self, forKey: .useInstructions) ?? ["Instructions.md"]
+            guard version == 3, revision > 0, dependencies.count <= 16,
+                useActions.count <= 128, Set(useActions.map(\.path)).count == useActions.count,
+                useStates.count <= 16, Set(useStates).count == useStates.count,
+                useStates.allSatisfy({
+                    !$0.isEmpty && $0.utf8.count <= 256 && $0.split(separator: ".").count >= 2 && !$0.hasPrefix(".")
+                        && !$0.hasSuffix(".") && !$0.contains("..")
+                        && $0.utf8.allSatisfy { (97...122).contains($0) || (48...57).contains($0) || $0 == 46 }
+                }),
+                useInstructions.count <= 16, Set(useInstructions).count == useInstructions.count,
+                useInstructions.allSatisfy({
+                    !$0.isEmpty && $0.hasSuffix(".md") && !$0.hasPrefix("/") && !$0.contains("\\")
+                        && $0.split(separator: "/", omittingEmptySubsequences: false).allSatisfy {
+                            !$0.isEmpty && $0 != "." && $0 != ".."
+                        }
+                })
             else { throw AgentConfigurationError.invalidFormat }
         }
     }
@@ -124,7 +141,7 @@ public enum AgentConfigurations {
     }
     /// Independent catalogs for implementation coverage; Skills need not all compose together.
     public static func skillRegistries() throws -> [CapabilityRegistry] {
-        try catalog().skills.keys.sorted().map { try registry(skill($0).functions) }
+        try catalog().skills.keys.sorted().map { try registry(skill($0).useActions) }
     }
     public static func baseSkills(named name: String) throws -> [String] {
         guard let path = try catalog().agents[name],
@@ -160,11 +177,14 @@ public enum AgentConfigurations {
         _ = try AgentSkillLoader.registry(expanded, fixed: load(named: name).capabilities)
     }
     public static func skillInstructions(_ id: String) throws -> String {
-        guard let path = try catalog().skills[id],
-            let text = String(
-                data: try data(String(path.dropLast("Skill.json".count)) + "Instructions.md"), encoding: .utf8)
-        else { throw AgentConfigurationError.invalidFormat }
-        return text
+        guard let path = try catalog().skills[id] else { throw AgentConfigurationError.resourceMissing(id) }
+        let root = String(path.dropLast("Skill.json".count))
+        return try skill(id).useInstructions.map { name in
+            guard let text = String(data: try data(root + name), encoding: .utf8) else {
+                throw AgentConfigurationError.invalidFormat
+            }
+            return text
+        }.joined(separator: "\n\n")
     }
     public static func skillOverview() throws -> String {
         let skills = try catalog().skills.keys.sorted().map { try skill($0) }

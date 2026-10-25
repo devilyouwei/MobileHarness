@@ -16,11 +16,11 @@ Document values default64KiB and failed/stale writes preserve the snapshot. Bina
 
 Cancellation completion: ordinary gate callers reject cancellation before their body; captured Chat checkpoints instead run a joined, store-owned operation independent of the cancelled caller, so cancelled/failed messages still commit. An actual cancelled-Task terminal checkpoint regression verifies received text and both terminal message states.
 
-Registered state now belongs to [State](../../State/README.md); StateWriter atomically retains a typed public fact and its bounded encoded projection. Private AgentContext memory remains inside Agents.
+Runtime state belongs to each capability or business Container. Agent context adapters read explicit snapshots; this directory only provides bounded memory primitives.
 
 ## 待实现
 
-- Registered transitions/subscriptions are implemented in StorageState; durable streams remain outstanding.
+- Durable streams remain outstanding. Container context reads have no shared storage register.
 
 
 ✅ MemoryLeaseStore 的移除回调使用明确 released/failure 原因。正常 release 仍留下 missing tombstone、关闭旧值并加入生产者取消；真实 fail/过期保留原错误，二者不再依靠同一个 Error 推断。

@@ -137,7 +137,7 @@ AgentContainer 构造七个稳定角色子容器，注入基础端口和仓库�
 
 运行失活同步关闭 UI／原生接纳，再加入相机、蓝牙、语音、视觉和常驻角色暂停。前后台只保留最新期望和一次必须完成的暂停，迟到恢复不能重新打开已失效代。中断保留 Task／Skill 所有权，不重放业务效果。
 
-stop 是终态，重复调用加入同一结果：先关闭接纳，取消并加入准备和原生会话，再停止常驻角色，释放共享输出、观察者、Gateway 和公开 StateScope。消费者完成清理后 App 才释放基础根。内部任务容量、失败保留和前后台协调算法见 [Support](Support/README.md#根生命周期机制)。
+stop 是终态，重复调用加入同一结果：先关闭接纳，取消并加入准备和原生会话，再停止常驻角色，释放共享输出、观察者、Gateway 和容器上下文读取接纳。消费者完成清理后 App 才释放基础根。内部任务容量、失败保留和前后台协调算法见 [Support](Support/README.md#根生命周期机制)。
 
 AgentFailure 保留稳定 code、原始 Error、component／operation、source 和全部清理错误；纯取消与带清理失败的取消分开。注册／移除、视觉清理和前后台切换失败经既有故障通道保留；容器控制不替代 Gateway 身份、授权及代际校验。
 
@@ -147,7 +147,7 @@ UI 普通请求每源最多 64 个未终态项；控制使用独立单槽。无�
 
 原始 PCM 接纳只有原生 64 包有序缓冲，溢出显式失败；VAD 已提交的模型工作和冷初始化前缀由 SpeechRecognitionTurn 独立有界保留。视觉为最新帧替换及一个在途推理。媒体转换由消费角色负责，订阅不请求权限、不启动或切换设备。原生预览与模型推理分开；频谱等低频测量交给 Actions 呈现服务。
 
-State 只保存有限公开事实，拥有者持唯一 Writer；完整 Context、Skill 所有权、PCM、帧及队列保持私有。会话／任务／消息领域事实按实际提交边界持久化，重启将未完成记录标为 interrupted，不重放副作用。
+各 Container 内存持有自身状态，显式快照只输出有限事实；Agent注册只读能力，完整Context、Skill所有权、PCM、帧及队列保持私有。会话／任务／消息领域事实按实际提交边界持久化，重启将未完成记录标为 interrupted，不重放副作用。
 
 容器故障在 Support 聚合，ApplicationControl 直接观察并决定 Actions 展示，Assistant 被动保留诊断。根消费者独立于页面，停止先关闭接纳，再取消加入工作，最后释放基础根；启动前故障由 App 兜底。
 
@@ -158,3 +158,7 @@ State 只保存有限公开事实，拥有者持唯一 Writer；完整 Context�
 ## 基础相册实施契约
 
 ✅ Photographer 消费 UI.album 请求，经Gateway调用Camera.Album；不把相册操作交给记忆抽取。
+
+## Container 上下文
+
+✅ AgentContainer 为每个 Assistant runtime 创建只读来源注册表，绑定 actions.camera、actions.robot、ui.navigation、ui.camera、ui.album；注册表不拥有业务值。停止 Agent 关闭读取接纳。Task／Skill 直接从同一次私有决策快照生成，不发布第二份状态。

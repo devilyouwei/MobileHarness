@@ -118,3 +118,7 @@ Photography完成示例使用明确的“App相册”文案；保持与BasicSkil
 ## 对话打开相册
 
 ✅ AlbumNavigationTests使用真实Skill目录／XML解析、NavigationModule／ActionExecutor和ResourcePresentationAdapter，验证album路径、presented回执、非法参数及无效会话不改变路径。
+
+## Container 上下文
+
+✅ ContainerContextTests覆盖读取真实拥有者、来源去重／容量／编码、关闭及同名会话替换、取消、Skill读取集合、Task会话隔离及指令路径。Storage寄存器专属测试已被替换；原有相册／摄影／权限执行回归保留。

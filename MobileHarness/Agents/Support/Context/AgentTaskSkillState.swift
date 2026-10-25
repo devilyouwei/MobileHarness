@@ -150,7 +150,7 @@ public struct AgentTaskSkillState: Codable, Sendable {
             roots.filter { root in
                 try AgentSkillLoader.expand([root]).contains { id in
                     guard snapshotSkills.contains(id) else { return false }
-                    return try AgentConfigurations.skill(id).functions.contains {
+                    return try AgentConfigurations.skill(id).useActions.contains {
                         $0.path == path && $0.callType == callType
                     }
                 }
@@ -439,5 +439,26 @@ public struct AgentTaskSkillState: Codable, Sendable {
         return overview
             + "\n# LOADED SKILL INSTRUCTIONS\n"
             + (try loaded.map { try AgentConfigurations.skillInstructions($0) }.joined(separator: "\n"))
+    }
+}
+
+extension AgentTaskSkillState {
+    public struct ContextSnapshot: Encodable, Sendable, Equatable {
+        public struct Task: Encodable, Sendable, Equatable {
+            public let goal: String
+            public let status: String
+        }
+        public let task: Task?
+        public let skills: [String]
+        private enum CodingKeys: String, CodingKey { case task, skills }
+        public func encode(to encoder: any Encoder) throws {
+            var fields = encoder.container(keyedBy: CodingKeys.self)
+            try fields.encode(task, forKey: .task)
+            try fields.encode(skills, forKey: .skills)
+        }
+    }
+    public func contextSnapshot(session: String) -> ContextSnapshot {
+        let active = tasks.first { $0.id == activeTaskID && $0.sessionID == session }
+        return ContextSnapshot(task: active.map { .init(goal: $0.goal, status: $0.status) }, skills: loaded)
     }
 }

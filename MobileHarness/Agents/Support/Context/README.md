@@ -8,9 +8,9 @@ AgentContextRepository actor 唯一持有 AgentCore.AgentContext 值，角色决
 
 | 文件 | 职责 |
 | --- | --- |
-| [AgentContextRepository.swift](AgentContextRepository.swift) | 唯一私有 Context、FIFO 事务槽、可选提交接口、信号证据与同步公开投影 |
+| [AgentContextRepository.swift](AgentContextRepository.swift) | 唯一私有 Context、FIFO 事务槽、可选提交接口、信号证据与私有快照 |
 | [AgentFixedTaskCoordinator.swift](AgentFixedTaskCoordinator.swift) | AgentTaskContextState 校验／恢复、确定性调用关联、固定任务准入及结果加入 |
-| [AgentStateContext.swift](AgentStateContext.swift) | 会话 StateScope、唯一 Task Writer、只读快照与关闭 |
+| [AgentStateContext.swift](AgentStateContext.swift) | 容器只读来源注册、会话代际、按请求采集与关闭 |
 | [AgentTaskSkillState.swift](AgentTaskSkillState.swift) | Task 与根 Skill 纯状态转移、Decision 使用集合、依赖／容量和回收 |
 
 ## 外部关系（一层）
@@ -23,7 +23,7 @@ flowchart LR
  S["注入领域仓库：持久化由调用者拥有"]:::storage
  R <--> C
  C --> CO
- C -->|"AgentStateContext：有限公开事实"| ST["Storage.StateContainer"]:::storage
+ C -->|"只读能力"| ST["注入的 Container 快照"]:::host
  R --> S
  classDef ui fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e
  classDef platform fill:#dcfce7,stroke:#16a34a,color:#14532d
@@ -46,7 +46,7 @@ flowchart LR
  C["复制 → 修改 → revision → validate"]:::agent
  H["可选 AgentContextPersistence.commit"]:::host
  V["替换唯一私有值"]:::agent
- P["AgentStateContext：同步公开投影"]:::storage
+ P["私有决策快照：Task／Skill 上下文"]:::agent
  K["AgentTaskSkillState：纯状态转移"]:::agent
  F["FixedTaskCoordinator：调用与结果屏障"]:::agent
  R --> Q --> C --> H --> V --> P
@@ -64,7 +64,7 @@ flowchart LR
 
 ## 事务、容量与故障
 
-最多 16 个 FIFO 等待者；模型／设备操作不占事务槽。复制、变更、推进 revision、验证及可选 persistence.commit 成功后替换；提交前失败保留原值。首次读取可选 persistence.load 后，验证身份、恢复中断状态并提交推进后的 revision；生产装配不注入此接口。提交后的同步公开投影若失败抛 AgentPublicProjectionFailure，保留已提交值、revision 和原始错误，不能谎称私有提交回滚。
+最多 16 个 FIFO 等待者；模型／设备操作不占事务槽。复制、变更、推进 revision、验证及可选 persistence.commit 成功后替换；提交前失败保留原值。首次读取可选 persistence.load 后，验证身份、恢复中断状态并提交推进后的 revision；生产装配不注入此接口。模型上下文采集独立于私有事务；采集失败不改变已提交的业务状态。
 
 recordSignal 只保存有界中立 Data 证据到内存，非 Signal 传输或文件序列化；确定性角色按 4096 滚动保留证据／批次，Core 默认 8192，逻辑 Data 总界 32 MiB。媒体和凭据排除，活跃工作不能被淘汰。持久化 Chat/Task 事实由领域仓库独立提交；重启丢弃热队列，不重放副作用。
 
@@ -126,6 +126,10 @@ Task entry preserves ordinary background context and complete current-task evide
 
 中断移除指定 Decision 使用集合而不扣数，保留 Task/Skill 并回到 waitingUser；显式新对话／匹配会话关闭／根关闭按所属清理规则释放。Task 终态必须加入真实执行／取消屏障，持久化失败保留待提交证据并阻止依赖后续模型接纳。取消等待者仍释放已授槽位，错误不降为成功。
 
-❌ 活跃 worker 持久化恢复、跨进程运行状态共享和 Skill 驱动动态 Context 订阅未实现。公开事实能力见 [Storage/State](../../../Storage/State/README.md)，模型流程见 [Chat](../Chat/README.md)。
+❌ 活跃 worker 持久化恢复、跨进程运行状态共享和 Skill 驱动动态 Context 订阅未实现。只读来源见本目录 AgentStateContext，模型流程见 [Chat](../Chat/README.md)。
 
-AgentStateContext 按会话管理 StateScope、唯一 Task Writer 与只读快照；仅投影目标和状态，不发布私有 Task 注册表、Skill 权限、媒体或模型上下文。同步写入失败使投影失效并保留原始错误；close 释放作用域，已关闭实例拒绝新会话。
+AgentStateContext 管理只读来源和会话接纳，不持有Task副本；关闭后旧读取失效。
+
+## Container 上下文
+
+✅ AgentStateContext 是只读能力注册表：256个来源、64个活动会话；每请求最多32来源，单来源8KiB、完整动态系统块16KiB。同步锁仅保护注册与会话代际，不跨 await 持锁，不缓存事实。来源按名称排序顺序读取；取消、未知来源、编码和容量失败明确传播。关闭并重开同名会话也使旧采集失效。AgentTaskSkillState.contextSnapshot(session:) 只输出本会话当前任务目标／阶段和已加载Skill，直接来自私有状态。

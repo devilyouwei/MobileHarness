@@ -75,8 +75,8 @@ func invalidHapticArgumentsNeverInvokeNativeEffect(_ arguments: [String: String]
     let feedback = UIModule.declarations.filter { $0.path.module == "Feedback" }
     #expect(Set(feedback.map(\.path.function)) == ["playCue", "vibrate"])
     let skill = try AgentConfigurations.skill("expression-interaction")
-    #expect(!skill.functions.contains { $0.path == "UI.Feedback.playCue" })
-    #expect(!skill.functions.contains { $0.path == "UI.Feedback.vibrate" })
+    #expect(!skill.useActions.contains { $0.path == "UI.Feedback.playCue" })
+    #expect(!skill.useActions.contains { $0.path == "UI.Feedback.vibrate" })
     let cue = try #require(feedback.first { $0.path.function == "playCue" })
     #expect(
         cue.parameters.first { $0.name == "cue" }?.values == [

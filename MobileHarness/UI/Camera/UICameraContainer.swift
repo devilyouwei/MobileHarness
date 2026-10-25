@@ -53,7 +53,6 @@ public protocol CameraPresenting: AnyObject, Sendable {
     func present(frame: CameraVideoFrame, pose: PoseOverlay) throws
     func clearFrame()
     func clearPose()
-    func connectFactsObserver(_ observer: @escaping @MainActor () -> Void)
 }
 
 @MainActor public protocol CameraFactsObserving: AnyObject, Sendable {
@@ -69,7 +68,6 @@ public final class UICameraContainer: CameraPresenting, CameraFactsObserving {
     public private(set) var isAvailable = false
     private var stopped = false
     private var factObservers: [UUID: AsyncStream<CameraPresentationSnapshot>.Continuation] = [:]
-    private var factsCallback: @MainActor () -> Void = {}
     private let admission: UIPresentationAdmission
     public var token: UIPresentationToken { admission.token }
     init(admission: UIPresentationAdmission, onFailure: @escaping UIFailureReporting) {
@@ -78,9 +76,21 @@ public final class UICameraContainer: CameraPresenting, CameraFactsObserving {
         state.presentationAdmission = admission
         state.connectFactsObserver { [weak self] in
             guard let self else { return }
-            self.factsCallback()
             for observer in self.factObservers.values { observer.yield(self.snapshot) }
         }
+    }
+    public struct ContextSnapshot: Encodable, Sendable, Equatable {
+        public let enabled: Bool
+        public let visible: Bool
+        public let busy: Bool
+        public let facing: String
+        public let needsSettings: Bool
+    }
+    public func contextSnapshot() -> ContextSnapshot {
+        ContextSnapshot(
+            enabled: state.isEnabled, visible: state.isVisible,
+            busy: state.isBusy || state.controlBusy || state.photoBusy,
+            facing: state.facing == .front ? "front" : "back", needsSettings: state.needsSettings)
     }
     public var snapshot: CameraPresentationSnapshot { CameraPresentationSnapshot(state) }
     public func present(_ update: CameraPresentationUpdate) {
@@ -133,9 +143,6 @@ public final class UICameraContainer: CameraPresenting, CameraFactsObserving {
         pair.continuation.onTermination = { [weak self] _ in Task { @MainActor in self?.factObservers[id] = nil } }
         return pair.stream
     }
-    public func connectFactsObserver(_ observer: @escaping @MainActor () -> Void) {
-        factsCallback = observer
-    }
     private func checkAdmission() throws {
         guard !stopped else { throw UIContainerError.stopped }
         guard isAvailable else { throw UIContainerError.unavailable }
@@ -156,7 +163,6 @@ public final class UICameraContainer: CameraPresenting, CameraFactsObserving {
         state.connectFactsObserver {}
         for observer in factObservers.values { observer.finish() }
         factObservers.removeAll()
-        factsCallback = {}
         setAvailable(false)
         stopped = true
         isAvailable = false

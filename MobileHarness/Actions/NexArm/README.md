@@ -62,3 +62,7 @@ Controller 提供 motorResults 与 revision；宿主将逐电机结果写入本�
 本域没有另一套 Channel 队列或 Bluetooth 重连策略。取消加入软件清理不证明设备物理停止，已有运动不会通过隐式补偿或重发撤销；手动/跟踪操作的持续寿命与替换由宿主负责。
 
 [Actions 设计](../README.md) · [公共函数契约](../Support/Contracts/README.md)
+
+## Container 上下文
+
+✅ NexArmControlService.contextSnapshot 从当前连接、控制器、跟踪与反馈健康状态提取 connected/controlAvailable；不复制到Storage。既有连接事实订阅继续服务角色生命周期，模型读取不产生订阅或设备动作。

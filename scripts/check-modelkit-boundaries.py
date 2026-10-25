@@ -9,7 +9,7 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
 KIT = ROOT / 'MobileHarness/ModelKit'
-FORBIDDEN = {'Storage', 'StorageState', 'StorageFiles', 'StorageCore', 'StorageDatabase', 'AppStorage', 'FactoryKit', 'StorageTasks', 'StorageMedia', 'StorageDevices', 'StorageSQLite', 'AgentCore', 'Agents', 'Gateway', 'StorageCore', 'StorageChat', 'StorageCache', 'Actions', 'Tools', 'PlatformKit', 'SwiftUI', 'UIKit', 'HarnessKit', 'UI', 'AppWorkflows', 'BehaviorAssembly', 'Types'}
+FORBIDDEN = {'Storage', 'StorageFiles', 'StorageCore', 'StorageDatabase', 'AppStorage', 'FactoryKit', 'StorageTasks', 'StorageMedia', 'StorageDevices', 'StorageSQLite', 'AgentCore', 'Agents', 'Gateway', 'StorageCore', 'StorageChat', 'StorageCache', 'Actions', 'Tools', 'PlatformKit', 'SwiftUI', 'UIKit', 'HarnessKit', 'UI', 'AppWorkflows', 'BehaviorAssembly', 'Types'}
 SYSTEM_MODULES = {
     'Foundation', 'Synchronization', 'CoreFoundation', 'Darwin', 'os', 'OSLog',
     'AVFAudio', 'Speech', 'CoreVideo', 'CoreML', 'CoreAI', 'Metal',
@@ -310,7 +310,6 @@ for source in (ROOT / 'MobileHarness/Gateway').rglob('*.swift'):
 # Storage graph: independent mechanisms, narrow domain ports and one concrete SQL target.
 expected_storage = {
     'StorageCore': set(),
-    'StorageState': {'StorageCore'},
     'StorageCache': {'StorageCore'},
     'StorageFiles': {'StorageCore'},
     'StorageTasks': {'StorageCore'},
@@ -319,7 +318,7 @@ expected_storage = {
     'StorageDevices': {'StorageCore'},
     'StorageDatabase': {'StorageCore', 'StorageChat', 'StorageTasks', 'StorageMedia', 'StorageDevices'},
     'StorageSQLite': {'StorageCore', 'StorageDatabase', 'StorageChat', 'StorageTasks', 'StorageMedia', 'StorageDevices', 'GRDB'},
-    'Storage': {'StorageCore', 'StorageState', 'StorageCache', 'StorageFiles', 'StorageDatabase'},
+    'Storage': {'StorageCore', 'StorageCache', 'StorageFiles', 'StorageDatabase'},
 }
 for name, expected in expected_storage.items():
     target = targets.get(name, {})
@@ -551,10 +550,10 @@ for source in list((ROOT / 'MobileHarness').rglob('*.swift')) + list((ROOT / 'Te
 expected_business = {
     'Actions': {'AgentCore', 'BehaviorDefinitions', 'CallRuntime', 'ExecutionRuntime', 'FunctionContracts',
         'ModelKit', 'ModelKitDefaults', 'ModelKitHub', 'ModelKitOpenAI', 'ModelKitRuntime', 'PlatformKit',
-        'StorageCore', 'StorageState', 'StorageFiles', 'StorageChat', 'StorageMedia', 'StorageCache', 'StorageDevices', 'UI'},
+        'StorageCore', 'StorageFiles', 'StorageChat', 'StorageMedia', 'StorageCache', 'StorageDevices', 'UI'},
     'Agents': {'Actions', 'AgentCore', 'Gateway', 'CallRuntime', 'ExecutionRuntime', 'FunctionContracts',
         'ModelKit', 'ModelKitDefaults', 'ModelKitHub', 'ModelKitRuntime', 'PlatformKit', 'UI',
-        'StorageCore', 'StorageState', 'StorageFiles', 'StorageChat', 'StorageMedia', 'StorageCache', 'StorageTasks', 'StorageDevices'},
+        'StorageCore', 'StorageFiles', 'StorageChat', 'StorageMedia', 'StorageCache', 'StorageTasks', 'StorageDevices'},
 }
 system_imports = {'Foundation', 'Observation', 'Synchronization', 'Security', 'UIKit', 'SwiftUI',
                   'CoreGraphics', 'AVFoundation', 'AVFAudio', 'OSLog'}
@@ -840,13 +839,13 @@ for layer, allowed in {
     'Core': {'Foundation', 'StorageCore'},
     'Communication': {'Foundation', 'AgentCore', 'FunctionContracts', 'StorageCore'},
     'Context': {'Foundation', 'AgentCore', 'StorageCore'},
-    'Chat': {'Foundation', 'AgentCore', 'ModelKit', 'StorageChat', 'StorageTasks', 'StorageCore', 'StorageState', 'Synchronization'},
+    'Chat': {'Foundation', 'AgentCore', 'ModelKit', 'StorageChat', 'StorageTasks', 'StorageCore', 'Synchronization'},
 }.items():
     for source in (ROOT / 'MobileHarness/Agents/Support' / layer).rglob('*.swift'):
         if source.resolve() in integration_sources:
             continue
         imports = set(re.findall(r'\bimport\s+(\w+)', source.read_text()))
-        source_allowed = allowed | ({'StorageState', 'Synchronization'} if layer == 'Context' and source.name == 'AgentStateContext.swift' else set())
+        source_allowed = allowed | ({'Synchronization'} if layer == 'Context' and source.name == 'AgentStateContext.swift' else set())
         if imports - source_allowed:
             errors.append(f'Forbidden Support/{layer} imports {sorted(imports - source_allowed)}: {source.relative_to(ROOT)}')
 
@@ -971,7 +970,7 @@ if targets['Agents'].get('path') != 'MobileHarness' or targets['Agents'].get('so
     errors.append('Agents must compile only Agents sources while packaging shared assets')
 asset_root = ROOT / 'MobileHarness/Resources'
 asset_catalog = json.loads((asset_root / 'Catalog.json').read_text())
-for group, version in [('agents', 7), ('skills', 2)]:
+for group, version in [('agents', 7), ('skills', 3)]:
     for name, relative in asset_catalog[group].items():
         source = asset_root / relative
         parts = Path(relative).parts
@@ -995,11 +994,11 @@ for group, version in [('agents', 7), ('skills', 2)]:
                 errors.append(f'Unknown Agent base Skill: {relative}')
             functions = []
         elif group == 'skills':
-            functions = configuration['functions']
-            states = configuration.get('useState')
+            functions = configuration['useActions']
+            states = configuration.get('useStates')
             if (not isinstance(states, list) or len(states) > 16 or len(set(states)) != len(states)
-                    or not set(states).issubset({'camera', 'robot', 'task'}) or 'contextFields' in configuration):
-                errors.append(f'Invalid useState declaration: {relative}')
+                    or any(not re.fullmatch(r'[a-z0-9]+(?:\.[a-z0-9]+)+', name) for name in states) or 'contextFields' in configuration):
+                errors.append(f'Invalid useStates declaration: {relative}')
         else: continue
         paths = [f['path'] for f in functions]
         aliases = [f['alias'] for f in functions]
@@ -1206,7 +1205,7 @@ for source in (ROOT / 'MobileHarness').rglob('*.swift'):
     if re.search(r'\b(?:StateKey|StateWriter)\s*<\s*AgentContext\b', source.read_text()):
         raise SystemExit(f'{source}: Private AgentContext cannot be a public State value.')
 context_repository = (ROOT / 'MobileHarness/Agents/Support/Context/AgentContextRepository.swift').read_text()
-if 'StorageState' in context_repository or 'stateScope.register' in context_repository:
+if 'installPublicProjection' in context_repository:
     raise SystemExit('Private AgentContext must not be registered in public State.')
 for relative in ('Agents/Assistant/AssistantProcessing.swift', 'Agents/Support/Chat/AgentChatWorker.swift'):
     text = (ROOT / 'MobileHarness' / relative).read_text()
@@ -1565,3 +1564,10 @@ if 'decode: (AgentTaskSignal) throws -> AgentMessage' not in (support / 'Communi
 if 'State.sessionControl(message)' not in chat_worker:
     raise SystemExit('Chat lifecycle contract must be interpreted by its role Context')
 print('Agent role schemas, concrete assembly and shared mechanism boundaries pass.')
+
+# Retired shared business-state storage must not be reintroduced.
+for source in (ROOT / 'MobileHarness').rglob('*.swift'):
+    if 'import StorageState' in source.read_text():
+        raise SystemExit(f'{source}: Container context must not depend on retired StorageState.')
+if (ROOT / 'MobileHarness/Storage/State').exists():
+    raise SystemExit('Storage must not own the Container state registry.')

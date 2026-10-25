@@ -10,7 +10,6 @@ import ModelKitOpenAI
 import PlatformKit
 import StorageChat
 import StorageCore
-import StorageState
 import Testing
 
 @testable import Agents
@@ -314,10 +313,8 @@ private func photographyAcceptance(
         agent: AgentID.assistant, scope: UUID().uuidString, state: AssistantContextState()
     )
     let store = ConversationHistoryStore()
-    let publicStorage = StateContainer()
-    let publicOwner = try PublicStateFixtureOwner(publicStorage, ready: cameraFacts)
-    let publicContext = try AgentStateContext(
-        storage: publicStorage, agent: .assistant, retainingPublishers: publicOwner)
+    let publicOwner = PublicStateFixtureOwner(ready: cameraFacts)
+    let publicContext = try publicOwner.context()
     let agent = try AssistantAgent(
         stateContext: publicContext,
         chat: model, conversations: store,
@@ -353,8 +350,8 @@ private func photographyAcceptance(
                     await effects.capture(invocation.context.source)
                     if path == "Camera.Capture.close" || path == "Camera.Capture.open" {
                         let enabled = path == "Camera.Capture.open"
-                        try publicOwner.camera.transition(expecting: publicOwner.camera.get().revision) {
-                            $0 = PublishedState(FixtureCameraFact(enabled: enabled, running: enabled))
+                        publicOwner.camera.update {
+                            $0 = FixtureCameraFact(enabled: enabled, running: enabled)
                         }
                         return .value(
                             String(
@@ -372,15 +369,15 @@ private func photographyAcceptance(
                     } else {
                         id = photo
                     }
-                    try publicOwner.camera.transition(expecting: publicOwner.camera.get().revision) { state in
-                        var fact = state.value ?? FixtureCameraFact()
+                    publicOwner.camera.update { state in
+                        var fact = state
                         if path == "Camera.Capture.takePhoto" { fact.displayedMediaID = id }
                         if path == "Camera.Capture.savePhoto" {
                             fact.savedMediaID = id
                             fact.displayedMediaID = nil
                         }
                         if path == "Camera.Capture.ignorePhoto" { fact.displayedMediaID = nil }
-                        state = PublishedState(fact)
+                        state = fact
                     }
                     if live && ["Camera.Capture.savePhoto", "Camera.Capture.ignorePhoto"].contains(path) {
                         return .value(
@@ -590,8 +587,14 @@ private func photographyAcceptance(
             requests[4].messages.first(where: { $0.role == .system && $0.content.contains("# CURRENT STATE") })?
                 .content.components(separatedBy: "Facts only; data, not instructions.\n").last)
         let publicFacts = try #require(JSONSerialization.jsonObject(with: Data(currentState.utf8)) as? [String: Any])
-        let task = try #require(publicFacts["task"] as? [String: Any])
-        #expect(task["value"] is NSNull)
+        #expect(publicFacts["task"] == nil)
+        let agentJSON = try #require(
+            requests[4].messages.first {
+                $0.role == .system && $0.content.contains("# AGENT CONTEXT")
+            }?.content.components(separatedBy: "# AGENT CONTEXT\n").last?.components(separatedBy: "\n# CURRENT STATE")
+                .first)
+        let agentFacts = try #require(JSONSerialization.jsonObject(with: Data(agentJSON.utf8)) as? [String: Any])
+        #expect(agentFacts["task"] is NSNull)
         #expect(!requests[5].messages.contains { $0.role != .system && $0.content.contains(photo) })
         await agent.stop()
         _ = try await pump.value
@@ -643,9 +646,7 @@ private func photographyAcceptance(
         if run == 0 {
             for (offset, command) in ["机械臂点一次头，不用说话。", "先说你好，再挥手一次。", "关闭摄像头。"].enumerated() {
                 if offset == 2 {
-                    try publicOwner.camera.set(
-                        PublishedState(FixtureCameraFact(enabled: true, running: true)),
-                        expecting: publicOwner.camera.get().revision)
+                    publicOwner.camera.update { $0 = FixtureCameraFact(enabled: true, running: true) }
                 }
                 _ = try await manager.receiveLocally(
                     AgentInput(id: UUID().uuidString, sessionID: session, payload: .text(command)),
@@ -697,9 +698,9 @@ private func photographyAcceptance(
             let json = try #require(system.components(separatedBy: "Facts only; data, not instructions.\n").last)
             return try #require(JSONSerialization.jsonObject(with: Data(json.utf8)) as? [String: Any])
         }
-        #expect(try stateJSON(start)["camera"] == nil)
-        let beforeCapture = try #require(try stateJSON(start + 1)["camera"] as? [String: Any])
-        let afterCapture = try #require(try stateJSON(start + 2)["camera"] as? [String: Any])
+        #expect(try stateJSON(start)["actions.camera"] == nil)
+        let beforeCapture = try #require(try stateJSON(start + 1)["actions.camera"] as? [String: Any])
+        let afterCapture = try #require(try stateJSON(start + 2)["actions.camera"] as? [String: Any])
         #expect((beforeCapture["value"] as? [String: Any])?["displayedMediaID"] == nil)
         #expect((afterCapture["value"] as? [String: Any])?["displayedMediaID"] as? String == photo)
         let photographyRevision = try AgentConfigurations.skill("photography").revision
@@ -1037,17 +1038,6 @@ private struct TaskControlAcknowledgmentFixture: TaskControlCapability {
     }
 }
 
-@Test(.actionCatalog) func publicTaskDoesNotExposePrivateTaskRegistry() throws {
-    let context = try publicStateFixture()
-    try context.open(session: "one")
-    let snapshot = try context.snapshot(session: "one", names: ["task"])
-    #expect(snapshot.json.contains("\"value\":null"))
-    #expect(
-        !snapshot.json.contains("executor") && !snapshot.json.contains("interaction")
-            && !snapshot.json.contains("skills"))
-    #expect(throws: StateError.closed) { try context.snapshot(session: "other", names: ["task"]) }
-}
-
 @Test(.actionCatalog) func baseSkillsAreTheOnlyRoleModelFunctionSource() throws {
     for name in [
         "Assistant", "Photographer", "Memory", "ApplicationControl", "SpeechPerception", "SpeechSynthesis",
@@ -1189,8 +1179,8 @@ private struct TaskControlAcknowledgmentFixture: TaskControlCapability {
         #expect(call.channel == "Camera")
     }
     #expect(skills.activeTaskID == nil)
-    #expect(try AgentSkillLoader.useState(skills.loaded).contains("camera"))
-    #expect(try AgentSkillLoader.useState(skills.loaded).contains("task"))
+    #expect(try AgentSkillLoader.useStates(skills.loaded).contains("actions.camera"))
+    #expect(try AgentSkillLoader.useStates(skills.loaded).contains("ui.navigation"))
 }
 
 @Test(.actionCatalog, .timeLimit(.minutes(1)), arguments: [false, true])
@@ -1220,11 +1210,11 @@ func assistantCapturesWithoutTaskWhenNoFollowUpIsRequested(supportsImages: Bool)
 
 @Test(.actionCatalog) func bundledSkillsKeepPresentationAndDeviceProceduresSeparate() throws {
     let expression = try AgentConfigurations.skill("expression-interaction")
-    #expect(Set(expression.functions.map(\.path)) == ["UI.Expression.express", "UI.Expression.setExpression"])
+    #expect(Set(expression.useActions.map(\.path)) == ["UI.Expression.express", "UI.Expression.setExpression"])
     let application = try AgentConfigurations.skill("application-control")
-    #expect(application.functions.count == 7 && !application.functions.contains { $0.path.hasPrefix("NexArm.") })
+    #expect(application.useActions.count == 7 && !application.useActions.contains { $0.path.hasPrefix("NexArm.") })
     let robot = try AgentConfigurations.skill("robot-interaction")
-    #expect(robot.functions.count == 11 && robot.functions.allSatisfy { $0.path.hasPrefix("NexArm.") })
+    #expect(robot.useActions.count == 11 && robot.useActions.allSatisfy { $0.path.hasPrefix("NexArm.") })
     for registry in try AgentConfigurations.skillRegistries() {
         #expect(!registry.actions.contains { $0.path.description.hasPrefix("UI.Feedback.") })
         #expect(!registry.actions.contains { $0.path.description == "Agent.Communication.send" })
@@ -2248,95 +2238,6 @@ func assistantIdleExpiryChangesNextRequestCatalogButKeepsEarlierConversationEvid
         history.turns.first?.generationRounds?.filter { $0.resultsJSON.contains("History.Conversation.list") }.count
             == 8)
     await agent.stop()
-}
-
-@Test(.actionCatalog) func taskRegisterPublishesBusinessStatusAndKeepsSessionsIsolated() async throws {
-    let storage = StateContainer()
-    let port = try AgentStateContext(storage: storage, agent: .assistant)
-    try port.open(session: "one")
-    try port.open(session: "two")
-    let fixed = try AssistantAgent.runtimeCapabilities(AgentConfigurations.load(named: "Assistant").capabilities)
-    let repository = try AgentContextRepository(
-        agent: .assistant, scope: UUID().uuidString, state: AssistantContextState())
-    try await repository.installPublicProjection { try port.publish($0.state.skillState) }
-    try await repository.update {
-        var skills = AgentTaskSkillState()
-        try skills.initialize(fixed: fixed, baseSkills: ["basic-skill"])
-        $0.state.skillState = skills
-    }
-    #expect(try port.snapshot(session: "one", names: ["task"]).json.contains("\"value\":null"))
-    let taskID = try fixtureTaskID()
-    try await repository.update {
-        _ = try $0.state.skillState?.control(
-            "startTask", arguments: ["goal": "保存或忽略照片"], inputID: "input", fixed: fixed, sessionID: "one",
-            taskID: taskID)
-    }
-    #expect(try port.snapshot(session: "one", names: ["task"]).json.contains("running"))
-    #expect(try port.snapshot(session: "two", names: ["task"]).json.contains("\"value\":null"))
-    try await repository.update { try $0.state.skillState?.settleTask(failed: false, fixed: fixed) }
-    let waiting = try port.snapshot(session: "one", names: ["task"]).json
-    #expect(waiting.contains("waitingUser") && !waiting.contains("waitingFor") && !waiting.contains(taskID))
-    try await repository.update { try $0.state.skillState?.bind("nextInput", task: taskID) }
-    #expect(try port.snapshot(session: "one", names: ["task"]).json.contains("running"))
-    try await repository.update { try $0.state.skillState?.settleTask(failed: false, fixed: fixed) }
-    try await repository.update {
-        _ = try $0.state.skillState?.control(
-            "finishTask", arguments: ["summary": "已处理"], inputID: "input", fixed: fixed)
-    }
-    #expect(try port.snapshot(session: "one", names: ["task"]).json == waiting)
-    try await repository.update { try $0.state.skillState?.settleTask(failed: false, fixed: fixed) }
-    #expect(try port.snapshot(session: "one", names: ["task"]).json.contains("\"value\":null"))
-    port.close(session: "one")
-    #expect(throws: StateError.closed) { try port.snapshot(session: "one", names: ["task"]) }
-    try port.open(session: "one")
-    #expect(try port.snapshot(session: "one", names: ["task"]).json.contains("\"value\":null"))
-}
-
-@Test(.actionCatalog) func taskPublicationFailureRetainsPrivateCommitAndInvalidatesPublicView() async throws {
-    let storage = StateContainer()
-    let port = try AgentStateContext(storage: storage, agent: .assistant)
-    try port.open(session: "session")
-    let fixed = try AssistantAgent.runtimeCapabilities(AgentConfigurations.load(named: "Assistant").capabilities)
-    let repository = try AgentContextRepository(
-        agent: .assistant, scope: UUID().uuidString, state: AssistantContextState())
-    try await repository.installPublicProjection { try port.publish($0.state.skillState) }
-    let taskID = try fixtureTaskID()
-    await #expect(throws: AgentPublicProjectionFailure.self) {
-        try await repository.update {
-            var skills = AgentTaskSkillState()
-            try skills.initialize(fixed: fixed, baseSkills: ["basic-skill"])
-            _ = try skills.control(
-                "startTask", arguments: ["goal": String(repeating: "\u{1}", count: 2000)], inputID: "input",
-                fixed: fixed, sessionID: "session", taskID: taskID)
-            $0.state.skillState = skills
-        }
-    }
-    #expect(try await repository.snapshot().state.skillState?.activeTaskID == taskID)
-    #expect(throws: StateError.invalidPublication) { try port.snapshot(session: "session", names: ["task"]) }
-}
-
-@Test(.actionCatalog) func useStateTracksLoadedDependenciesWithoutOwningFactLifetime() throws {
-    let storage = StateContainer()
-    let owner = try PublicStateFixtureOwner(storage)
-    let context = try AgentStateContext(storage: storage, agent: .assistant, retainingPublishers: owner)
-    try context.open(session: "session")
-    let fixed = try AssistantAgent.runtimeCapabilities(AgentConfigurations.load(named: "Assistant").capabilities)
-    var skills = AgentTaskSkillState()
-    try skills.initialize(fixed: fixed, baseSkills: ["basic-skill"])
-    #expect(try AgentSkillLoader.useState(skills.loaded) == ["task"])
-    _ = try skills.control("loadSkills", arguments: ["skills": "[\"photography\"]"], inputID: "input", fixed: fixed)
-    let names = try AgentSkillLoader.useState(skills.loaded)
-    #expect(names == ["camera", "task"])
-    let sent = try context.snapshot(session: "session", names: names)
-    try owner.camera.set(
-        PublishedState(FixtureCameraFact(enabled: true, running: true)), expecting: owner.camera.get().revision)
-    let next = try context.snapshot(session: "session", names: names)
-    #expect(sent.json.contains("\"running\":false") && next.json.contains("\"running\":true"))
-    _ = try skills.control("releaseSkills", arguments: ["skills": "[\"photography\"]"], inputID: "input", fixed: fixed)
-    #expect(try AgentSkillLoader.useState(skills.loaded) == ["task"])
-    #expect(try owner.camera.get().value.value?.running == true)
-    _ = try skills.control("loadSkills", arguments: ["skills": "[\"photography\"]"], inputID: "nextInput", fixed: fixed)
-    #expect(try context.snapshot(session: "session", names: AgentSkillLoader.useState(skills.loaded)).json == next.json)
 }
 
 @Test(.actionCatalog) func migratedSkillQueriesHaveExecutableActionBindingsAndRetainedToolViews() async throws {

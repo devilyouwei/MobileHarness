@@ -12,7 +12,6 @@ import StorageCache
 import StorageCore
 import StorageMedia
 import StorageSQLite
-import StorageState
 import UI
 
 @MainActor enum ServiceFactories {
@@ -56,7 +55,7 @@ import UI
                     return try AgentRepositories(
                         chat: storage.database.chat, tasks: storage.database.tasks, media: storage.database.media,
                         devices: storage.database.devices)
-                }, state: storage.state, cache: storage.cache, files: files, photos: photos, camera: camera,
+                }, cache: storage.cache, files: files, photos: photos, camera: camera,
                 cameraPresentation: presentation,
                 cameraUI: uiContainer.camera, albumUI: uiContainer.album,
                 exportPhoto: { data in try await platform.vision.savePhoto(data) },

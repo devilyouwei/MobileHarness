@@ -29,6 +29,7 @@
     }
     @MainActor public struct AlbumView: View {
         @Bindable private var album: UIAlbumContainer
+        @State private var showsPicker = false
         @State private var selection: [PhotosPickerItem] = []
         @State private var selected: AlbumPhoto?
         public init(album: UIAlbumContainer) { self.album = album }
@@ -62,12 +63,17 @@
             }
             .navigationTitle("相册").navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                PhotosPicker(
-                    selection: $selection, maxSelectionCount: 20, matching: .images, preferredItemEncoding: .current
-                ) {
-                    Label("导入", systemImage: "plus")
-                }.disabled(album.busy).accessibilityIdentifier("album.import")
+                Button("导入", systemImage: "plus") { showsPicker = true }
+                    .disabled(album.busy).accessibilityIdentifier("album.import")
             }
+            .photosPicker(
+                isPresented: $showsPicker, selection: $selection, maxSelectionCount: 20,
+                matching: .images, preferredItemEncoding: .current
+            )
+            .navigationContext(
+                .album, content: album.contextSnapshot().content,
+                overlay: showsPicker ? .photoPicker : nil
+            )
             .safeAreaInset(edge: .bottom) {
                 VStack(spacing: 4) {
                     if album.busy { ProgressView("正在处理…") }
@@ -151,6 +157,11 @@
                         .disabled(album.busy).accessibilityIdentifier("album.delete")
                 }.padding()
             }
+            .navigationContext(
+                .albumPhoto, itemID: photo.id,
+                content: data != nil ? .ready : error != nil ? .failed : .loading,
+                overlay: confirmingDelete ? .deleteConfirmation : nil
+            )
             .navigationTitle("照片").navigationBarTitleDisplayMode(.inline)
             .task(id: photo.id) {
                 album.clearMessage()

@@ -2,9 +2,9 @@
 
 ✅ StorageFailure.swift 的物理文件移到模块根，仍由 StorageCore 编译；Support 的 Contracts／Memory 继续复用该定义，不引入根容器目标依赖。
 
-✅ StorageCore 编译 Contracts 与 Memory，无其他项目或第三方依赖。Contracts 提供身份、持久化标识、通用错误和指纹；Memory 提供有界流、owner 租约与接纳门。State、Cache、Files、数据库领域和后端使用这些机制。
+✅ StorageCore 编译 Contracts 与 Memory，无其他项目或第三方依赖。Contracts 提供身份、持久化标识、通用错误和指纹；Memory 提供有界流、owner 租约与接纳门。Cache、Files、数据库领域和后端使用这些机制。
 
-文件与文档契约归 Files；注册状态归 State；音频归 Cache/Audio；SQL 机制与领域 SQL 实现归 Database/SQLite。公共机制不解释业务状态、模型、设备、UI 或 SQL schema，不提供全局查找与后端回退。
+文件与文档契约归 Files；运行状态归所属外部 Container；音频归 Cache/Audio；SQL 机制与领域 SQL 实现归 Database/SQLite。公共机制不解释业务状态、模型、设备、UI 或 SQL schema，不提供全局查找与后端回退。
 
 [契约](Contracts/README.md) · [内存机制](Memory/README.md) · [Storage](../README.md)
 

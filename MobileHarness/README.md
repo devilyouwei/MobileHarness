@@ -131,7 +131,7 @@ The resident listening role owns listening consent/policy and reply occupancy. I
 
 ### State, devices, resources and faults
 
-StateContainer stores bounded public facts with one owning Writer and generation-scoped readers. It contains no raw media, request queues, complete AgentContext or execution authority. Role-private context and durable business records retain their existing owners; Skill useState freezes only the selected public facts for each model request.
+Container owns runtime facts in isolated memory. AgentCore defines a read-only context protocol; upper-layer adapters register container readers with AgentStateContext. Skill v3 selects useActions/useStates/useInstructions. Each model request reads fresh bounded facts and derives Task/Skill context from its private decision snapshot. Foundation modules do not depend on AgentCore or each other; cross-container snapshots are not atomic. Storage persists records and bytes only.
 
 Camera UI facts, connection/recovery facts and artifact revisions are observed directly. Native latest-value notifications wake the consumer without JSON fingerprints or periodic input publication. Resource observers re-read current facts through registered business operations; they do not replay mutations. Artifact progress callbacks coalesce synchronously into a bounded revision stream.
 
@@ -160,3 +160,20 @@ Agent container implementation and outstanding acceptance are tracked in [the pl
 ## 基础相册实施契约
 
 ✅ 相册使用 UI.album 类型化请求 → Photographer → Gateway → Camera.Album 内部函数 → Storage.media／Platform.vision。savePhoto 只收录 App 相册，系统导出只在详情执行；App 注入唯一存储及原生能力。
+
+## Container 上下文
+
+✅ Container owns runtime facts in isolated memory. AgentCore defines a read-only context protocol; upper-layer adapters register container readers with AgentStateContext. Skill v3 selects useActions/useStates/useInstructions. Each model request reads fresh bounded facts and derives Task/Skill context from its private decision snapshot. Foundation modules do not depend on AgentCore or each other; cross-container snapshots are not atomic. Storage persists records and bytes only.
+
+```mermaid
+flowchart LR
+ Skill["Skill v3：useActions / useStates / useInstructions"] --> Agent["Agent：冻结私有决策与读取集合"]
+ Agent --> Registry["只读来源注册表"]
+ Registry --> Owners["基础／业务 Container：内存状态与类型化快照"]
+ Owners --> Facts["CURRENT STATE：本次请求事实"]
+ Agent --> Private["AGENT CONTEXT：Task / Skill"]
+ Facts --> Request["LLM 请求"]
+ Private --> Request
+ Request --> Gateway["Gateway → Action"]
+ Gateway --> Owners
+```

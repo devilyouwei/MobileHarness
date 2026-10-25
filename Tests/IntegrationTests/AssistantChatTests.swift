@@ -6,7 +6,6 @@ import Gateway
 import ModelKit
 import StorageChat
 import StorageCore
-import StorageState
 import Testing
 
 private actor ChatFixture: ChatCapability {
@@ -715,7 +714,7 @@ func executionInterruptionPreservesConversationSkillsGoalAndPublicScope(control:
     let agent = try AssistantAgent(stateContext: publicContext, chat: model, context: repository)
     _ = try await bindSpeechRequests(agent)
     try await agent.start()
-    let before = try publicContext.snapshot(session: session, names: ["task"])
+    let before = try await repository.snapshot().state.skillState?.contextSnapshot(session: session)
     if mode == "running" {
         try await agent.receive(original)
         await model.waitForPending()
@@ -738,9 +737,9 @@ func executionInterruptionPreservesConversationSkillsGoalAndPublicScope(control:
         #expect(retained.tasks.last?.failure == nil)
         #expect(retained.taskSkillRoots == skills.taskSkillRoots)
     }
-    let after = try publicContext.snapshot(session: session, names: ["task"])
-    if mode != "running" { #expect(after.json == before.json) }
-    if mode != "recent" { #expect(after.json.contains("waitingUser")) }
+    let after = try await repository.snapshot().state.skillState?.contextSnapshot(session: session)
+    if mode != "running" { #expect(after == before) }
+    if mode != "recent" { #expect(after?.task?.status == "waitingUser") }
     #expect(await model.requests.count == (mode == "running" ? 1 : 0))
     if control == "pause" { try await agent.resume() }
     // New input, never automatic replay of the cancelled capture/model request.
@@ -754,7 +753,9 @@ func executionInterruptionPreservesConversationSkillsGoalAndPublicScope(control:
     #expect(continued.recentSkills["photography"]?.remainingDecisions == (mode == "recent" ? 4 : nil))
     try await agent.receive(AssistantSessionControl.cancelSession.input(sessionID: session))
     #expect(try await repository.snapshot().state.skillState?.loaded.contains("photography") == false)
-    #expect(throws: StateError.closed) { try publicContext.snapshot(session: session, names: ["task"]) }
+    await #expect(throws: ContainerContextError.closed) {
+        try await publicContext.snapshot(session: session, names: [])
+    }
     await agent.stop()
 }
 

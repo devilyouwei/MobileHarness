@@ -359,10 +359,10 @@ extension NativePresentationTests {
         let root = UIContainer()
         try root.start()
         let presentation: any CameraPresenting = root.camera
-        var changed = 0
-        presentation.connectFactsObserver { changed += 1 }
+        var changes = try root.camera.observeFacts().makeAsyncIterator()
+        _ = await changes.next()
         presentation.present(.isEnabled(true))
-        #expect(changed == 1)
+        #expect(await changes.next()?.isEnabled == true)
         let before = presentation.snapshot
         presentation.present(.isBusy(true))
         #expect(!before.isBusy)

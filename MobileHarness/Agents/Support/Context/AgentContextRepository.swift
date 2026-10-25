@@ -2,17 +2,11 @@ import AgentCore
 import Foundation
 import StorageCore
 
-public struct AgentPublicProjectionFailure: Error, Sendable {
-    public let committedRevision: UInt64
-    public let underlying: any Error
-}
-
-/// Private actor-owned memory. Only an explicit owner projection may publish public facts.
+/// Private actor-owned memory; model context reads the committed value directly.
 public actor AgentContextRepository<State: AgentContextState> {
     public nonisolated let scopeID: String
     public nonisolated let agentID: AgentID
     private var memory: AgentContext<State>
-    private var publish: (@Sendable (AgentContext<State>) throws -> Void)?
     private let persistence: AgentContextPersistence<State>?
     private var committedRevision: UInt64?
     private var loaded = false
@@ -27,16 +21,6 @@ public actor AgentContextRepository<State: AgentContextState> {
         memory = AgentContext(agentID: agent, scopeID: scope, state: state)
         try memory.validate(agent: agent, scope: scope)
         self.persistence = persistence
-    }
-    public func installPublicProjection(_ publish: @escaping @Sendable (AgentContext<State>) throws -> Void)
-        async throws
-    {
-        try await acquire()
-        defer { release() }
-        try await load()
-        guard self.publish == nil else { throw CommunicationError.invalidPayload }
-        try publish(memory)
-        self.publish = publish
     }
     private func acquire() async throws {
         if !writing {
@@ -95,10 +79,6 @@ public actor AgentContextRepository<State: AgentContextState> {
         try await persistence?.commit(next, committedRevision)
         memory = next
         committedRevision = next.revision
-        // A failed public projection cannot undo a durable/private business commit.
-        do { try publish?(next) } catch {
-            throw AgentPublicProjectionFailure(committedRevision: next.revision, underlying: error)
-        }
         return result
     }
 

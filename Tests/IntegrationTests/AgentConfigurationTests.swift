@@ -2,7 +2,6 @@ import AgentCore
 import Agents
 import Foundation
 import StorageCore
-import StorageState
 import Testing
 
 private func document() -> [String: Any] {
@@ -539,18 +538,18 @@ func historyPreviewRecognizesDirectedTaskActions(_ scenario: (String, String, St
 }
 
 @Test(
-    .actionCatalog, arguments: ["missing", "old", "duplicate", "unknown", "wildcard", "fieldPath", "tooMany", "schema"])
+    .actionCatalog, arguments: ["missing", "old", "duplicate", "unknown", "wildcard", "malformed", "tooMany", "schema"])
 func skillUseStateRejectsInvalidDeclarations(_ mutation: String) throws {
     let skill = try AgentConfigurations.skill("basic-skill")
     var json = try #require(JSONSerialization.jsonObject(with: JSONEncoder().encode(skill)) as? [String: Any])
     switch mutation {
-    case "missing": json.removeValue(forKey: "useState")
+    case "missing": json.removeValue(forKey: "useStates")
     case "old": json["contextFields"] = ["runtimeFacts"]
-    case "duplicate": json["useState"] = ["camera", "camera"]
-    case "unknown": json["useState"] = ["privateContext"]
-    case "wildcard": json["useState"] = ["*"]
-    case "fieldPath": json["useState"] = ["camera.running"]
-    case "tooMany": json["useState"] = Array(repeating: "camera", count: 17)
+    case "duplicate": json["useStates"] = ["camera", "camera"]
+    case "unknown": json["useStates"] = ["privateContext"]
+    case "wildcard": json["useStates"] = ["*"]
+    case "malformed": json["useStates"] = ["camera..running"]
+    case "tooMany": json["useStates"] = Array(repeating: "camera", count: 17)
     default: json["version"] = 1
     }
     let data = try JSONSerialization.data(withJSONObject: json)

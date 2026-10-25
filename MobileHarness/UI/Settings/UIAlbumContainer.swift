@@ -54,12 +54,34 @@ public enum AlbumReply: Sendable {
     public private(set) var hasLoaded = false
     public private(set) var busy = false
     public private(set) var message: String?
+    public private(set) var operation: PageOperation?
+    private var loadFailed = false
+    public struct ContextSnapshot: Encodable, Sendable, Equatable {
+        public let content: PageContent
+        public let loadedCount: Int
+        public let hasMore: Bool
+        public let operation: PageOperation?
+        private enum CodingKeys: String, CodingKey { case content, loadedCount, hasMore, operation }
+        public func encode(to encoder: any Encoder) throws {
+            var fields = encoder.container(keyedBy: CodingKeys.self)
+            try fields.encode(content, forKey: .content)
+            try fields.encode(loadedCount, forKey: .loadedCount)
+            try fields.encode(hasMore, forKey: .hasMore)
+            try fields.encode(operation, forKey: .operation)
+        }
+    }
+    public func contextSnapshot() -> ContextSnapshot {
+        ContextSnapshot(
+            content: loading ? .loading : loadFailed ? .failed : !hasLoaded ? .idle : items.isEmpty ? .empty : .ready,
+            loadedCount: items.count, hasMore: next != nil, operation: operation)
+    }
     private var generation = UUID()
     @ObservationIgnored private var mutation: Task<Void, Never>?
     public init() {}
     public func loadMore(reset: Bool = false) async {
         guard !loading else { return }
         guard reset || !hasLoaded || next != nil else { return }
+        loadFailed = false
         loading = true
         let ticket = generation
         defer { if ticket == generation { loading = false } }
@@ -73,7 +95,10 @@ public enum AlbumReply: Sendable {
             items += values.filter { !existing.contains($0.id) }
             next = cursor
             hasLoaded = true
-        } catch is CancellationError {} catch { message = error.localizedDescription }
+        } catch is CancellationError {} catch {
+            loadFailed = true
+            message = error.localizedDescription
+        }
     }
     public func image(_ id: String, thumbnail: Bool) async throws -> Data {
         guard case .image(let data) = try await requests.submit(.image(id, thumbnail: thumbnail)) else {
@@ -90,10 +115,17 @@ public enum AlbumReply: Sendable {
             message = "相册正在处理其他操作"
             return
         }
+        switch value {
+        case .importPhotos: operation = .importing
+        case .export: operation = .exporting
+        case .delete: operation = .deleting
+        default: return
+        }
         busy = true
         message = nil
         mutation = Task { [self] in
             defer {
+                operation = nil
                 busy = false
                 mutation = nil
             }

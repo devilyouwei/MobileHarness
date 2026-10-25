@@ -8,7 +8,6 @@ import FunctionContracts
 import Gateway
 import ModelKit
 import StorageCore
-import StorageState
 import Testing
 
 @Test(.actionCatalog) func lifecycleAndBoundedQueue() async throws {

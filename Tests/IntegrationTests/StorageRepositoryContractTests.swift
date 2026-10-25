@@ -6,7 +6,6 @@ import StorageChat
 import StorageCore
 import StorageFiles
 import StorageSQLite
-import StorageState
 import StorageTasks
 import Testing
 
@@ -190,22 +189,6 @@ private actor PausedBinaryStore: FileStore {
     }
     let emitted = try JSONDecoder().decode(OriginalEnvelope.self, from: Data(contentsOf: url))
     #expect(emitted.version == 1 && emitted.value.first?.generation.uuidString == transfer.generation)
-}
-
-@Test func registeredPublicStateSharesTypedValueAndEncodedProjection() throws {
-    struct RuntimeState: Codable, Sendable { var active: String? }
-    let scope = try StateContainer().makeScope()
-    let writer = try scope.register(StateKey<RuntimeState>("runtime"), initial: RuntimeState(active: nil))
-    let first = writer.reader
-    let second = writer.reader
-    let prior = try first.get()
-    var snapshot = prior.value
-    snapshot.active = "task_1"
-    #expect(try second.get().value.active == nil)
-    try writer.set(snapshot, expecting: prior.revision)
-    #expect(try second.get().value.active == "task_1")
-    try writer.set(.init(active: nil), expecting: second.get().revision)
-    #expect(try first.get().value.active == nil)
 }
 
 @Test func runtimeMemoryEvidenceBudgetRejectsWithoutPublishingPartialMutation() async throws {

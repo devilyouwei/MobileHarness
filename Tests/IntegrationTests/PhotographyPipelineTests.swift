@@ -9,7 +9,6 @@ import FunctionContracts
 import Gateway
 import ModelKit
 import StorageCore
-import StorageState
 import Testing
 
 @testable import PlatformKit

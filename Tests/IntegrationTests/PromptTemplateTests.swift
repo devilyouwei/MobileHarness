@@ -146,12 +146,9 @@ func promptRenderingRejectsMalformedExpressions(body: String) throws {
     _ = try skills.control(
         "startTask", arguments: ["goal": "拍照并保存", "skills": "[\"photography\"]"], inputID: input.id,
         fixed: config.capabilities, taskID: try fixtureTaskID())
-    let publicState = try publicStateFixture()
-    try publicState.open(session: input.sessionID)
-    // Bind the owner's Task to the same admitted session.
     skills.tasks[0].sessionID = input.sessionID
-    try publicState.publish(skills)
-    let facts = try publicState.snapshot(session: input.sessionID, names: ["task"]).json
+    let facts = String(
+        decoding: try JSONEncoder().encode(skills.contextSnapshot(session: input.sessionID)), as: UTF8.self)
     #expect(facts.contains("拍照并保存") && facts.contains("running"))
     #expect(!facts.contains("inputIDs") && !facts.contains("updatedAt") && !facts.contains("loadedSkills"))
 }
@@ -349,7 +346,7 @@ func businessSkillTeachingCannotFinishAnAbsentOrUnrelatedTask(skill: String) thr
     if skill == "photography" {
         #expect(text.contains("matching Task was actually created"))
         #expect(text.contains("BasicSkill owns Task selection/closure"))
-        #expect(text.contains("use its current Task facts"))
+        #expect(text.contains("use AGENT CONTEXT task"))
     } else {
         #expect(text.contains("current facts show an active matching query Task"))
         #expect(text.contains("With no Task, answer and end without finishTask or cancelTask"))

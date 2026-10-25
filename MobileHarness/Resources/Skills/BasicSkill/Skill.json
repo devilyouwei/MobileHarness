@@ -1,10 +1,10 @@
 {
-  "version": 2,
+  "version": 3,
   "id": "basic-skill",
-  "revision": 26,
+  "revision": 27,
   "description": "Task and Skill orchestration, grounded environment reading and a single continuing foreground goal.",
   "dependencies": [],
-  "functions": [
+  "useActions": [
     {
       "path": "Agent.Task.loadSkills",
       "callType": "action",
@@ -42,7 +42,10 @@
       "channel": "System"
     }
   ],
-  "useState": [
-    "task"
+  "useStates": [
+    "ui.navigation"
+  ],
+  "useInstructions": [
+    "Instructions.md"
   ]
 }

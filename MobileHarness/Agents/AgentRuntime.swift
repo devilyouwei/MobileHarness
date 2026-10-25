@@ -1,6 +1,5 @@
 import StorageCache
 import StorageFiles
-import StorageState
 
 #if os(iOS)
     import Actions
@@ -78,7 +77,7 @@ import StorageState
             containerFailures: ContainerFailureChannel, home: UIHomeContainer,
             assistantContainer: AssistantContainer, applicationControlContainer: ApplicationControlContainer,
             memoryContainer: MemoryContainer, photographerContainer: PhotographerContainer,
-            state: StateContainer, cache: CacheContainer, files: FilesContainer,
+            stateContext: AgentStateContext, cache: CacheContainer, files: FilesContainer,
             chatRecords: any ChatRepository, taskRecords: any TaskRepository, camera: any CameraCapturing,
             cameraUI: UICameraContainer, albumUI: UIAlbumContainer? = nil,
             album: (any PhotoAlbumCapability)? = nil, settingsUI: UISettingsContainer,
@@ -335,7 +334,7 @@ import StorageState
                 manager: manager, output: gateway, agent: historyAgent)
             memorySession = history
             let main = try AssistantAgent(
-                stateContext: AgentStateContext(storage: state, agent: .assistant),
+                stateContext: stateContext,
                 uiHome: home, uiSessionID: applicationControlSessionID,
                 reportsReplyActivity: true, chatProvider: chatProvider, conversations: conversations,
                 modelName: modelName,

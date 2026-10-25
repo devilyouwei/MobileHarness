@@ -63,3 +63,7 @@ PhotoAlbumService 通过共享 CapturedPhotoStore 完成分页、读取、导入
 缩略图在工作任务内通过Image I/O有界下采样，不存入原片区。原片、照片ready、App收录和系统副本是独立事实。
 
 删除回执区分逻辑删除成功与文件清理问题；逻辑提交后即从当前UI列表移除，清理失败明确提示并保留恢复状态。
+
+## Container 上下文
+
+✅ CameraCoordinator.contextSnapshot 读取 CameraCapturing.isRunning 的真实结果，再提取当前呈现／照片流程事实；没有独立公开Writer或运行状态缓存。CameraPhotoSession 不再为模型镜像发送更新通知。原有实时UI事实流继续服务实际UI请求。

@@ -6,7 +6,7 @@
 
 RecordStorageError.notReady 表示数据库端口尚未发布，closed 表示作用域关闭；conflict 表示仓库前置条件被并发变化破坏。错误不包含展示文案，原始失败由生产者保留。
 
-状态注册契约归 [State](../../State/README.md)，文档、字节、文件保护与发布契约归 [Files](../../Files/README.md)。各领域返回拥有的数据，禁止跨目标暴露 SQL 对象或共享可写值。
+运行状态与上下文由所属外部 Container 和 Agent 读取适配器管理；文档、字节、文件保护与发布契约归 [Files](../../Files/README.md)。各领域返回拥有的数据，禁止跨目标暴露 SQL 对象或共享可写值。
 
 [Support](../README.md)
 

@@ -60,3 +60,7 @@ ModelKit 回调实际权重加载开始／结束；组合根更新 UI 交互门�
 ## 基础相册实施契约
 
 ✅ 注入共享CapturedPhotoStore与Platform.vision照片能力至相册服务；ApplicationPresentation公开UI自有album子能力。
+
+## Container 上下文
+
+✅ 装配不再创建或注入Storage.state；AgentContainer接收实际基础能力与业务容器，组装只读上下文来源。App不转换领域状态、不管理Task公共投影。

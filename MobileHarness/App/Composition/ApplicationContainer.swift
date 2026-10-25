@@ -10,7 +10,6 @@ import StorageCore
 import StorageDatabase
 import StorageFiles
 import StorageSQLite
-import StorageState
 import UI
 
 /// Instance-local registration; the App owns asynchronous startup and shutdown explicitly.
@@ -152,7 +151,6 @@ public final class ApplicationContainer: ManagedContainer, @unchecked Sendable {
                 files: files, failures: failures)
         }.cached
     }
-    public var state: Factory<StateContainer> { self { self.storage().state } }
     public var cache: Factory<CacheContainer> { self { self.storage().cache } }
     public var files: Factory<FilesContainer> { self { self.storage().files } }
     public var database: Factory<any DatabaseStorage> { self { self.storage().database } }

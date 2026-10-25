@@ -294,7 +294,7 @@ private enum ContainerTestFailure: Error { case startup, cleanup }
                     try AgentRepositories(
                         chat: storage.database.chat, tasks: storage.database.tasks,
                         media: storage.database.media, devices: storage.database.devices)
-                }, state: storage.state, cache: storage.cache, files: storage.files, photos: photos,
+                }, cache: storage.cache, files: storage.files, photos: photos,
                 camera: camera, cameraPresentation: presentation, cameraUI: ui.camera, albumUI: ui.album,
                 makeCamera: { connections in
                     CameraCoordinator(

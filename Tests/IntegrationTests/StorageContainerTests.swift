@@ -9,88 +9,12 @@ import StorageDevices
 import StorageFiles
 import StorageMedia
 import StorageSQLite
-import StorageState
 import StorageTasks
 import Testing
 
 private enum ContainerFixtureError: Error, Equatable { case invalid, start, cleanup }
 private func containerRoot() -> URL { FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString) }
 
-@Suite struct RegisteredStateTests {
-    @Test func registrationPermissionsAndGenerations() throws {
-        let container = StateContainer()
-        let scope = try container.makeScope()
-        let writer = try scope.register(StateKey<Int>("value"), initial: 1)
-        #expect(throws: StateError.duplicate) { try scope.register(StateKey<Int>("value"), initial: 2) }
-        #expect(throws: StateError.typeMismatch) { try scope.register(StateKey<String>("value"), initial: "2") }
-        let before = try writer.get()
-        try writer.set(2, expecting: before.revision)
-        #expect(throws: StateError.conflict) { try writer.set(3, expecting: before.revision) }
-        #expect(try writer.reader.get().value == 2)
-        writer.unregister()
-        #expect(throws: StateError.missing) { try writer.get() }
-        let replacement = try scope.register(StateKey<Int>("value"), initial: 4)
-        #expect(try replacement.get().generation != before.generation)
-        #expect(throws: StateError.missing) { try writer.set(5, expecting: before.revision) }
-        scope.close()
-        #expect(throws: StateError.closed) { try replacement.get() }
-        #expect(throws: StateError.closed) { try scope.register(StateKey<Int>("new"), initial: 1) }
-    }
-    @Test func rejectedTransitionsDoNotPublish() throws {
-        let container = StateContainer()
-        let scope = try container.makeScope()
-        let writer = try scope.register(StateKey<Int>("value"), initial: 0) {
-            if $0 < 0 { throw ContainerFixtureError.invalid }
-        }
-        let before = try writer.get()
-        #expect(throws: ContainerFixtureError.invalid) {
-            try writer.transition(expecting: before.revision) { $0 = -1 }
-        }
-        #expect(try writer.get().value == 0)
-        #expect(try writer.get().revision == before.revision)
-        let other = try scope.register(StateKey<String>("other"), initial: "ready")
-        let snapshot = try container.snapshot([writer.reader.selection, other.reader.selection])
-        try writer.set(1, expecting: before.revision)
-        #expect(try snapshot.get(writer.reader).value == 0)
-        #expect(try snapshot.get(other.reader).value == "ready")
-        let foreign = StateContainer()
-        #expect(throws: StateError.missing) { try foreign.snapshot([writer.reader.selection]) }
-    }
-    @Test func observationCoalescesAndCloses() async throws {
-        let container = StateContainer(limits: .init(registrations: 1, scopes: 1, observers: 1))
-        let scope = try container.makeScope()
-        let writer = try scope.register(StateKey<Int>("value"), initial: 0)
-        #expect(throws: StateError.capacityExceeded) { try container.makeScope() }
-        #expect(throws: StateError.capacityExceeded) { try scope.register(StateKey<Int>("other"), initial: 0) }
-        var changes = try writer.reader.observe().makeAsyncIterator()
-        #expect(throws: StateError.capacityExceeded) { try writer.reader.observe() }
-        for value in 1...3 { try writer.set(value, expecting: writer.get().revision) }
-        #expect(try await changes.next()?.revision == writer.get().revision)
-        container.close()
-        await #expect(throws: StateError.closed) { try await changes.next() }
-        #expect(throws: StateError.closed) { try writer.get() }
-    }
-    @Test func concurrentCASPreservesEveryAcceptedUpdate() async throws {
-        let container = StateContainer()
-        let scope = try container.makeScope()
-        let writer = try scope.register(StateKey<Int>("counter"), initial: 0)
-        try await withThrowingTaskGroup(of: Void.self) { group in
-            for _ in 0..<32 {
-                group.addTask {
-                    while true {
-                        let before = try writer.get()
-                        do {
-                            try writer.transition(expecting: before.revision) { $0 += 1 }
-                            return
-                        } catch StateError.conflict { await Task.yield() }
-                    }
-                }
-            }
-            try await group.waitForAll()
-        }
-        #expect(try writer.get().value == 32)
-    }
-}
 @Suite struct SharedCacheTests {
     @Test func buffersKeepIdentityAndMemoryAcrossNamespaces() throws {
         let cache = BufferCache()
@@ -153,7 +77,6 @@ private func containerRoot() -> URL { FileManager.default.temporaryDirectory.app
         let same = registry.storage()
         let second = ApplicationContainer(root: root).storage()
         #expect(first === same && first !== second)
-        #expect(registry.state() === first.state)
         #expect(registry.files() === first.files)
         #expect(registry.cache() === first.cache)
         #expect(!FileManager.default.fileExists(atPath: root.path))
@@ -221,8 +144,6 @@ extension StorageContainerTests {
             settings: root.appendingPathComponent("Settings"), photos: root.appendingPathComponent("Photos"),
             models: root.appendingPathComponent("Models"))
         let storage = StorageContainer(database: database, files: files)
-        let scope = try storage.state.makeScope()
-        let writer = try scope.register(StateKey<Int>("value"), initial: 1)
         do {
             try await storage.start()
             Issue.record("Expected database preparation failure")
@@ -231,7 +152,6 @@ extension StorageContainerTests {
             #expect(error.cleanupErrors.count == 1)
             #expect(error.cleanupErrors.first as? ContainerFixtureError == .cleanup)
         }
-        #expect(throws: StateError.closed) { try writer.get() }
         #expect(throws: StorageError.closed) { try files.file(files.photos) }
         #expect(throws: StorageError.closed) { try storage.cache.images.put(CacheBuffer(Data([1])), key: "late") }
         await #expect(throws: StorageFailure.self) { try await storage.start() }
@@ -294,81 +214,5 @@ extension SharedCacheTests {
         await #expect(throws: StorageError.closed) { try await cache.audioScope("other") }
         #expect(throws: StorageError.closed) { try cache.images.put(CacheBuffer(Data([1])), key: "late") }
         await cache.close()
-    }
-}
-
-@Suite struct PublicStateRegisterTests {
-    @Test func scopedNamesNeverFallBackAndOldReadersStayClosed() throws {
-        let storage = StateContainer()
-        try storage.declare([.init("camera", scope: .application), .init("task", scope: .conversation)])
-        let app = try storage.makeScope()
-        let camera = try app.register(
-            StateKey("camera"), initial: PublishedState<Bool>(false, availability: .unavailable))
-        let domain = StateDomain.conversation(agent: "assistant", session: "one")
-        let first = try storage.makeScope(domain: domain)
-        let other = try storage.makeScope(domain: .conversation(agent: "assistant", session: "two"))
-        let agent = try storage.makeScope(domain: .conversation(agent: "other", session: "one"))
-        _ = try first.register(StateKey("task"), initial: PublishedState("first"))
-        _ = try other.register(StateKey("task"), initial: PublishedState("second"))
-        _ = try agent.register(StateKey("task"), initial: PublishedState("differentAgent"))
-        let reader = try storage.contextReader(domain: domain, scope: first)
-        let snapshot = try reader.snapshot(names: ["camera", "task"])
-        #expect(
-            snapshot.json.contains("first") && !snapshot.json.contains("second")
-                && !snapshot.json.contains("differentAgent"))
-        #expect(snapshot.json.contains("unavailable"))
-        #expect(throws: StateError.missing) { try reader.snapshot(names: ["unknown"]) }
-        #expect(throws: StateError.typeMismatch) { try storage.declare([.init("task", scope: .application)]) }
-        #expect(throws: StateError.missing) { try storage.contextReader(domain: domain) }
-        let duplicate = try storage.makeScope(domain: domain)
-        #expect(throws: StateError.duplicate) {
-            try duplicate.register(StateKey("task"), initial: PublishedState("duplicate"))
-        }
-        first.close()
-        let replacement = try storage.makeScope(domain: domain)
-        _ = try replacement.register(StateKey("task"), initial: PublishedState("replacement"))
-        #expect(throws: StateError.closed) { try reader.snapshot(names: ["task"]) }
-        #expect(try camera.get().value.availability == .unavailable)
-    }
-    @Test func encodingFailureAndInvalidationAreExplicitAndAtomic() async throws {
-        struct Fact: Encodable, Sendable {
-            let valid: Bool
-            func encode(to encoder: any Encoder) throws {
-                if !valid { throw ContainerFixtureError.invalid }
-                var value = encoder.singleValueContainer()
-                try value.encode("confirmed")
-            }
-        }
-        let storage = StateContainer()
-        let scope = try storage.makeScope()
-        let writer = try scope.register(StateKey("fact"), initial: Fact(valid: true))
-        let reader = try storage.contextReader(scope: scope)
-        let old = try reader.snapshot(names: ["fact"])
-        #expect(throws: ContainerFixtureError.invalid) {
-            try writer.set(Fact(valid: false), expecting: writer.get().revision)
-        }
-        #expect(try reader.snapshot(names: ["fact"]).json == old.json)
-        #expect(try reader.snapshot(names: ["fact"]).revision == old.revision)
-        var watch = try writer.reader.observe().makeAsyncIterator()
-        #expect(try await watch.next()?.revision == old.revision)
-        writer.invalidate()
-        #expect(try await watch.next()!.revision > old.revision)
-        #expect(throws: StateError.invalidPublication) { try reader.snapshot(names: ["fact"]) }
-        try writer.set(Fact(valid: true), expecting: writer.get().revision)
-        #expect(try reader.snapshot(names: ["fact"]).json == old.json)
-    }
-    @Test func publicBudgetsRejectInsteadOfTruncating() throws {
-        let storage = StateContainer()
-        let scope = try storage.makeScope()
-        #expect(throws: StateError.capacityExceeded) {
-            try scope.register(StateKey("large"), initial: String(repeating: "x", count: 8192))
-        }
-        for key in ["one", "two", "three"] {
-            _ = try scope.register(StateKey(key), initial: String(repeating: "x", count: 6000))
-        }
-        let reader = try storage.contextReader(scope: scope)
-        #expect(throws: StateError.capacityExceeded) { try reader.snapshot(names: ["one", "two", "three"]) }
-        #expect(throws: StateError.capacityExceeded) { try reader.snapshot(names: (0..<33).map { "name\($0)" }) }
-        #expect(try reader.snapshot(names: ["one", "two"]).json.utf8.count < 16 * 1024)
     }
 }

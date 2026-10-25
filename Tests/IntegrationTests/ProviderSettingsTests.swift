@@ -7,7 +7,6 @@ import Gateway
 import PlatformKit
 import StorageCore
 import StorageFiles
-import StorageState
 import Testing
 import UI
 

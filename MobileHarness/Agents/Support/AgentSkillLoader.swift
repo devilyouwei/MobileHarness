@@ -18,13 +18,13 @@ public enum AgentSkillLoader {
         for id in ids { try visit(id, path: []) }
         return result
     }
-    public static func useState(_ loaded: [String]) throws -> [String] {
-        try Set(loaded.flatMap { try AgentConfigurations.skill($0).useState }).sorted()
+    public static func useStates(_ loaded: [String]) throws -> [String] {
+        try Set(loaded.flatMap { try AgentConfigurations.skill($0).useStates }).sorted()
     }
     static func bindings(_ loaded: [String]) throws -> [AgentConfigurations.Binding] {
         var bindings: [AgentConfigurations.Binding] = []
         for id in loaded {
-            for b in try AgentConfigurations.skill(id).functions {
+            for b in try AgentConfigurations.skill(id).useActions {
                 if let existing = bindings.first(where: { $0.path == b.path }) {
                     guard existing == b else { throw GenerationError.duplicateAlias }
                 } else {

@@ -14,7 +14,7 @@ Assistant 是 `AgentChatWorker<AssistantContextState>` 的角色绑定，负责�
 | --- | --- |
 | UIHomeContainer | 直接订阅 home.requests；聆听控制由 SpeechPerception 单独订阅 |
 | ChatCapability／chatProvider | ModelKit.language：按请求选择并使用模型 |
-| AgentStateContext | Storage.state：读取 Skill.useState 指定公开事实，维护本角色 task 公开投影 |
+| AgentStateContext | 读取 Skill.useStates 指定容器事实；Task从私有上下文生成 |
 | ConversationHistoryStore／TaskRepository | Storage 数据库领域接口；会话、消息与任务提交 |
 | 照片读取、prepareJPEG 回调 | 装配时注入 Actions.Camera 的只读 readPhoto 闭包与 PlatformKit JPEG 准备能力；角色制定预算，不持有相机控制器 |
 | AgentContextRepository／配置与目录 | Agents 私有 Context、Skill 状态与 AgentCore 不可变执行声明 |
@@ -209,3 +209,7 @@ These are Assistant-owned analysis and transport budgets. Native image conversio
 ## 待实现
 
 ❌ 场景挂起期间前台目标及最终 checkpoint 的完整落盘；公共限制见 [Chat](../Support/Chat/README.md#未实现范围)。
+
+## Container 上下文
+
+✅ Assistant 消费根注入的只读容器来源，Task／Skill 来自自身私有决策快照；根生命周期结束关闭来源接纳，不保留历史公共Task镜像。

@@ -45,7 +45,7 @@ flowchart LR
 
 ## 控制、事实与照片
 
-控制忙碌使用 controlBusy/controlMessage，与原生设备或照片错误分开；重叠操作提示在真实请求结束后清除。isEnabled 表示意图，原生停机确认由设备拥有者负责。connectFactsObserver 只报告 UI 值变化，不查询设备或仓库。
+控制忙碌使用 controlBusy/controlMessage，与原生设备或照片错误分开；重叠操作提示在真实请求结束后清除。isEnabled 表示意图，原生停机确认由设备拥有者负责。UI内部变更通知只驱动有界事实流，不再提供公共状态镜像回调。
 
 背景遮暗42%；开关／镜头／设置使用48pt目标，操作期间禁用冲突按钮，权限拒绝可进入系统设置。YOLO 统计初始折叠，展开为页面局部状态。
 
@@ -86,3 +86,7 @@ The macOS GPU regression creates a real hosted layer with explicit bounds and a 
 ## 镜头切换准入
 
 ✅ CameraState.canSwitchCamera 统一提供翻转按钮准入：UI前台可用、相机已启用且原生采集确认可见，无权限问题且相机控制／拍照／照片处置均空闲。CameraConversationSurface不再以全局模型准备状态禁用翻转；开启和重试门禁保持既有契约。原生执行端仍独立校验权限、资源与前后台，不以按钮可用替代真实完成。
+
+## Container 上下文
+
+✅ UICameraContainer.ContextSnapshot 显式输出enabled/visible/busy/facing/needsSettings，不包含视频、骨架、错误原文或图像字节；读取无外部效果，状态继续由UI呈现接口维护。

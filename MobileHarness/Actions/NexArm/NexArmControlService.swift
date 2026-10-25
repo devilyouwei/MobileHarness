@@ -7,7 +7,6 @@ import OSLog
 import PlatformKit
 import StorageCore
 import StorageDevices
-import StorageState
 
 public struct NexArmConnectionFacts: Sendable, Equatable {
     public let availability: NexArmAvailability
@@ -71,17 +70,17 @@ public final class NexArmControlService {
     private let link: any NexArmBluetoothLink
     private let makeDeviceRepository: @Sendable () throws -> any DeviceRepository
     private var records: (any DeviceRepository)?
-    private var controller: NexArmActionController? { didSet { publishPublicFacts() } }
-    private var operation: Task<Void, Never>? { didSet { publishPublicFacts() } }
-    private var cleanup: Task<Void, Never>? { didSet { publishPublicFacts() } }
-    private var motion: Task<Void, any Error>? { didSet { publishPublicFacts() } }
+    private var controller: NexArmActionController? { didSet { publishConnectionFacts() } }
+    private var operation: Task<Void, Never>? { didSet { publishConnectionFacts() } }
+    private var cleanup: Task<Void, Never>? { didSet { publishConnectionFacts() } }
+    private var motion: Task<Void, any Error>? { didSet { publishConnectionFacts() } }
     private var liveTask: Task<Void, Never>?
     private var jog = NexArmJogSession()
     private var tracking = NexArmTrackingSession()
     private var controlRevision = UUID().uuidString
     private var manualRevision = UUID().uuidString
-    private var pendingArmAction: NexArmManualAction? { didSet { publishPublicFacts() } }
-    private var settingsWorker: Task<Void, Never>? { didSet { publishPublicFacts() } }
+    private var pendingArmAction: NexArmManualAction? { didSet { publishConnectionFacts() } }
+    private var settingsWorker: Task<Void, Never>? { didSet { publishConnectionFacts() } }
     private var settingsPlayback: Task<Void, any Error>?
     public var withMotorResources:
         (@Sendable (Set<Int>, @escaping @Sendable () async throws -> Void) async throws -> Void)?
@@ -94,7 +93,7 @@ public final class NexArmControlService {
     }
     private var motionID: String?
     private var generation = UUID().uuidString
-    private var foreground = true { didSet { publishPublicFacts() } }
+    private var foreground = true { didSet { publishConnectionFacts() } }
     private var observing = false
     private var pageVisible = false
     private var scanWanted = false
@@ -104,7 +103,7 @@ public final class NexArmControlService {
     private var reconnectEnabled = false
     private var manualDisconnectPending = false
     private var recovery: Task<Void, Never>?
-    private var suspension: Task<Void, Never>? { didSet { publishPublicFacts() } }
+    private var suspension: Task<Void, Never>? { didSet { publishConnectionFacts() } }
     private var recoveryID = UUID().uuidString
     private var recoveryPending = false
     private var recoveryNeedsUser = false
@@ -114,7 +113,7 @@ public final class NexArmControlService {
     private var connectionError: (any Error)?
     private var latestLinkSnapshot = NexArmBluetoothSnapshot() {
         didSet {
-            defer { publishPublicFacts() }
+            defer { publishConnectionFacts() }
             state.transportIssue = BluetoothPresentation.currentIssue(latestLinkSnapshot)
             switch latestLinkSnapshot.power {
             case .poweredOn: state.availability = .available
@@ -133,49 +132,23 @@ public final class NexArmControlService {
         self.state = state
         self.link = link
         self.makeDeviceRepository = makeDeviceRepository
+        state.onFactsChanged = { [weak self] in self?.publishConnectionFacts() }
     }
-    public struct PublicFacts: Encodable, Sendable, Equatable {
+    public struct ContextSnapshot: Encodable, Sendable, Equatable {
         public let connected: Bool
         public let controlAvailable: Bool
     }
-    private var publicFacts: StateWriter<PublishedState<PublicFacts>>?
-    private var lastPublicFacts: PublicFacts?
-    public private(set) var publicStateFailure: (any Error)?
-    public func connectPublicState(scope: StateScope) throws {
-        guard publicFacts == nil else { throw StateError.duplicate }
-        publicFacts = try scope.register(
-            StateKey("robot"), initial: PublishedState<PublicFacts>(availability: .unknown))
-        state.onFactsChanged = { [weak self] in self?.publishPublicFacts() }
-        publishPublicFacts()
-        if let publicStateFailure { throw publicStateFailure }
-    }
-    private func publishPublicFacts() {
-        publishConnectionFacts()
-        guard let publicFacts else { return }
+    public func contextSnapshot() -> ContainerContextValue<ContextSnapshot> {
         let connected = latestLinkSnapshot.phase == .connected
-        let fact = PublicFacts(
+        let fact = ContextSnapshot(
             connected: connected,
             controlAvailable: connected && trackingAvailable && controller != nil
-                && !latestLinkSnapshot.queriesQuarantined
-                && latestLinkSnapshot.feedbackHealthy)
-        let availability: StateAvailability =
+                && !latestLinkSnapshot.queriesQuarantined && latestLinkSnapshot.feedbackHealthy)
+        let availability: ContextAvailability =
             state.availability == .unknown
             ? .unknown
             : state.availability == .available ? .available : .unavailable
-        do {
-            let old = try publicFacts.get()
-            guard fact != lastPublicFacts || old.value.availability != availability || publicStateFailure != nil else {
-                return
-            }
-            try publicFacts.set(PublishedState(fact, availability: availability), expecting: old.revision)
-            lastPublicFacts = fact
-            publicStateFailure = nil
-        } catch {
-            publicFacts.invalidate()
-            publicStateFailure = error
-            Logger(subsystem: "dev.mobileharness", category: "RobotState").error(
-                "Robot public State publication failed: \(String(describing: error), privacy: .public)")
-        }
+        return ContainerContextValue(fact, availability: availability)
     }
 
     public func shutdown() async throws {

@@ -92,3 +92,7 @@ RuntimeFailureEvent／ContainerFailureEvent 保存中立有界诊断与关联；
 ## 待实现
 
 ❌ 通用 factory、自动重启、远程传输和持久化执行递送。
+
+## Container 上下文
+
+✅ ContainerContext.swift 定义 ContainerContextProviding 异步只读协议、泛型 ContainerContextValue 与类型擦除 ContainerContextSource。适配器每次调用拥有者，再统一编码；Core 不导入基础模块，不提供可变状态仓库。

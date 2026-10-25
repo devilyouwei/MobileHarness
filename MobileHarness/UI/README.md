@@ -122,3 +122,9 @@ Control requests use a separate single-slot stream under the same consumer lifet
 ## 基础相册实施契约
 
 ✅ 新增稳定 album 子能力，Settings 内页面消费照片分页、缩略图、原图与管理回执；UI 无业务模块依赖。
+
+## Container 上下文
+
+✅ NavigationContext.swift 定义类型化页面、对象ID、内容状态、覆盖层和操作值。NavigationState唯一持有路径及确认事实；路径变化更新代际并进入transitioning，匹配页面确认后settled。UIKit／SwiftUI展示仍由UI拥有；基础模块不导入AgentCore。
+
+导航settled表示SwiftUI页面已出现，不承诺转场动画或GPU完成。未提供内容事实的页面为idle，不推测其异步业务已完成。

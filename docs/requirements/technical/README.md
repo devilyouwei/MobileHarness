@@ -8,7 +8,7 @@
 | [Storage 生命周期边界](Storage-Lifecycle-Boundary-Plan.md) | 实现与专项回归完成；全量集成与 Simulator 限制保留，见验证记录。 |
 | [App 宿主职责与目录调整方案](App-Host-Boundaries-Plan.md) | 核心架构第 3 项的纯组合根重构已实现；保留全量感知回归、Simulator 依赖与真实模型/原生 UI/物理设备验收。 |
 
-通用 State 注册、版本和纯转换机制已实现；camera/robot/task 与 Skill useState 每轮上下文已接通；更多事实和真实模型/UI/设备验收继续跟进。已完成的存储接口与后端分离记录在 [Storage 实施历史](../../completed/Storage-Repository-Plan.md)，不再列为未实现需求。
+共享State方案已由Container上下文方案替代，当前状态读取与后续验收见下方迁移需求；旧需求保留历史范围。已完成的存储接口与后端分离记录在 [Storage 实施历史](../../completed/Storage-Repository-Plan.md)，不再列为未实现需求。
 
 部分完成时保留整份需求并更新状态；原范围全部完成后整份迁入 completed，更新当前设计和验证记录。分类及维护规则见 [需求总索引](../README.md)。
 
@@ -19,3 +19,5 @@
 - [Direct container inputs](Direct-Container-Input-Plan.md): implementation and automated/build validation; native/device and comparable performance acceptance remain tracked.
 
 - [Agent containers](Agent-Containers-Plan.md): root, seven roles and unified lifecycle implemented; validation and native acceptance tracked separately.
+
+- [Container 状态与模型上下文](Container-State-Context.md)：替代共享Storage State，迁移到容器快照和Skill v3；验收见专项记录。

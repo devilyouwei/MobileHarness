@@ -1,10 +1,10 @@
 {
-  "version": 2,
+  "version": 3,
   "id": "photography",
-  "revision": 25,
+  "revision": 26,
   "description": "Control camera/lens and capture/save-to-App-album/ignore/reshoot in Assistant, including capture-only. Use a local Task for continuing photo decisions; never delegate.",
   "dependencies": [],
-  "functions": [
+  "useActions": [
     {
       "path": "Camera.Capture.flip",
       "callType": "action",
@@ -48,7 +48,12 @@
       "channel": "Camera"
     }
   ],
-  "useState": [
-    "camera"
+  "useStates": [
+    "actions.camera",
+    "ui.camera",
+    "ui.album"
+  ],
+  "useInstructions": [
+    "Instructions.md"
   ]
 }

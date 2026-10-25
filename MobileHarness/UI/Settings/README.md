@@ -99,3 +99,7 @@ Implemented: Provider URL input is optional. Blank/whitespace input resolves to 
 删除回执区分逻辑删除成功与文件清理问题；逻辑提交后即从当前UI列表移除，清理失败明确提示并保留恢复状态。
 
 详情展示采用原生 Image I/O 最长边4096像素的按需显示图以限制解码内存，UIScrollView提供1～5倍缩放；导出始终读取原片文件，不导出显示图。
+
+## Container 上下文
+
+✅ UIAlbumContainer.ContextSnapshot 提供内容状态、当前已加载数量、后续页标记及importing/exporting/deleting操作。导航公开相册详情对象、照片选择器／删除确认框，以及历史列表、对话及轮次详情。局部内容变化只能更新当前确认位置；过期代际拒绝。离页不取消根拥有的相册变更。

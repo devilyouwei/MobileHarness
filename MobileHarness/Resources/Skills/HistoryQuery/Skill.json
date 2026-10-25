@@ -1,10 +1,10 @@
 {
-  "version": 2,
+  "version": 3,
   "id": "history-query",
-  "revision": 12,
+  "revision": 13,
   "description": "Read-only paged conversation search and recall with native history Tools; no history mutation.",
   "dependencies": [],
-  "functions": [
+  "useActions": [
     {
       "path": "History.Conversation.list",
       "callType": "action",
@@ -18,5 +18,8 @@
       "channel": "Query"
     }
   ],
-  "useState": []
+  "useStates": [],
+  "useInstructions": [
+    "Instructions.md"
+  ]
 }

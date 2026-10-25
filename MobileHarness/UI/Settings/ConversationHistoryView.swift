@@ -30,6 +30,8 @@ import Foundation
             List(destinations) { destination in
                 NavigationLink {
                     destination.makeView()
+                        .environment(\.recordContextID, destination.id)
+                        .navigationContext(.agentRecords, itemID: destination.id)
                 } label: {
                     VStack(alignment: .leading, spacing: 5) {
                         Text(destination.name)
@@ -56,6 +58,7 @@ import Foundation
 
     @MainActor
     private struct AgentConversationHistoryList: View {
+        @Environment(\.recordContextID) private var recordContextID
         @Bindable var state: ConversationHistoryState
         let controls: any ConversationHistoryControlling
         @Environment(\.scenePhase) private var scenePhase
@@ -122,6 +125,11 @@ import Foundation
                     Text("历史记录仅保存在此设备。")
                 }
             }
+            .navigationContext(
+                .agentRecords, itemID: recordContextID,
+                content: state.archive == nil ? state.status == nil ? .loading : .failed : .ready,
+                overlay: deleting != nil ? .deleteConfirmation : nil
+            )
             .navigationTitle(state.title)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar(.visible, for: .navigationBar)
@@ -294,6 +302,10 @@ import Foundation
             }
             .onDisappear { messageLoader.cancel() }
             .onChange(of: scenePhase) { _, phase in if phase != .active { messageLoader.cancel() } }
+            .navigationContext(
+                .conversation, itemID: seed.id,
+                content: loadError != nil ? .failed : loaded == nil || isRefreshing ? .loading : .ready
+            )
             .navigationTitle(String(title.prefix(40)))
             .navigationDestination(isPresented: $requestNavigation.isPresented) {
                 if let turn = requestNavigation.turn { ConversationTurnDetail(turn: turn, controls: controls) }
@@ -650,6 +662,7 @@ import Foundation
                     Text(turn.tokenReport)
                 }
             }
+            .navigationContext(.turn, itemID: turn.id)
             .navigationTitle("对话详情")
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {

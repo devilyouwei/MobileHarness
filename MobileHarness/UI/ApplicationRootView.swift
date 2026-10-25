@@ -38,9 +38,13 @@
                             }
                         }
                     }
+                    .navigationContext(.home, content: .ready)
                 } destination: { destination in
                     destinationView(destination)
+                        .navigationContext(destination.contextPage)
+                        .id(assembly.navigation.generation)
                 }
+                .environment(\.navigationContext, assembly.navigation)
                 .onChange(of: assembly.navigation.path) { _, path in
                     assembly.navigationChanged()
                 }

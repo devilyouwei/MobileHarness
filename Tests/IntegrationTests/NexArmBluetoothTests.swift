@@ -10,7 +10,6 @@ import ModelKit
 import StorageCore
 import StorageMedia
 import StorageSQLite
-import StorageState
 import StorageTasks
 import Testing
 
@@ -3620,25 +3619,23 @@ extension LiveRuntimeTests {
         defer { try? FileManager.default.removeItem(at: file) }
         let link = BluetoothArmFixture()
         let workflow = bluetoothTestWorkflow(link, file: file)
-        let storage = StateContainer()
-        let scope = try storage.makeScope()
-        try workflow.service.connectPublicState(scope: scope)
-        let reader = try storage.contextReader(scope: scope)
-        #expect(try reader.snapshot(names: ["robot"]).json.contains("unknown"))
+        func snapshot() throws -> String {
+            String(decoding: try JSONEncoder().encode(workflow.service.contextSnapshot()), as: UTF8.self)
+        }
+        #expect(try snapshot().contains("unknown"))
         let observer = Task { await workflow.run() }
         workflow.openPage()
         try await until { !workflow.state.nearby.isEmpty }
         workflow.connect(try link.businessID)
         try await until { workflow.trackingAvailable }
-        let connected = try reader.snapshot(names: ["robot"]).json
+        let connected = try snapshot()
         #expect(connected.contains("\"connected\":true") && connected.contains("\"controlAvailable\":true"))
         workflow.setForeground(false)
-        #expect(try reader.snapshot(names: ["robot"]).json.contains("\"controlAvailable\":false"))
+        #expect(try snapshot().contains("\"controlAvailable\":false"))
         try await workflow.shutdown()
-        #expect(try reader.snapshot(names: ["robot"]).json.contains("\"connected\":false"))
+        #expect(try snapshot().contains("\"connected\":false"))
         observer.cancel()
         await observer.value
-        scope.close()
-        #expect(throws: StateError.closed) { try reader.snapshot(names: ["robot"]) }
+
     }
 }

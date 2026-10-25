@@ -6,7 +6,6 @@ import FunctionContracts
 import Gateway
 import PlatformKit
 import StorageCore
-import StorageState
 import Synchronization
 import Testing
 import UI

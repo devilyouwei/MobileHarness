@@ -8,7 +8,6 @@ import FunctionContracts
 import Gateway
 import PlatformKit
 import StorageCore
-import StorageState
 import Testing
 
 /// Deliberately simple IK fixture; does not model physical kinematics.
@@ -346,8 +345,8 @@ private func runNexArmAssistantMarkup(
     }
 ) async throws {
     let defaultBindings =
-        try AgentConfigurations.skill("expression-interaction").functions
-        + AgentConfigurations.skill("robot-interaction").functions
+        try AgentConfigurations.skill("expression-interaction").useActions
+        + AgentConfigurations.skill("robot-interaction").useActions
     let assistant = try AgentChatWorker<AssistantContextState>(
         stateContext: try publicStateFixture(),
         chat: FixedTextChat(text: markup),

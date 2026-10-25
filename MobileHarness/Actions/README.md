@@ -63,3 +63,7 @@ ActionEndpoints 显式组合 UI RuntimePresentation、SpeechExecutionEndpoint、
 ## 基础相册实施契约
 
 ✅ Camera 拥有相册内部操作及真实完成，采用请求私有类型化附件传递文件和结果，不加入模型公开Skill。
+
+## Container 上下文
+
+✅ 业务事实留在所属 Camera／NexArm 实例内存；contextSnapshot 显式提取有限公开值，ContainerContextSource 在上层适配并序列化。Action 调用类型化能力接口，不修改基础模块公开字段。

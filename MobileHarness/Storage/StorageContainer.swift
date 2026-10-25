@@ -3,11 +3,9 @@ import StorageCache
 import StorageCore
 import StorageDatabase
 import StorageFiles
-import StorageState
 
 /// Owns the storage graph. Backend selection and application ordering remain in App.
 public actor StorageContainer {
-    public nonisolated let state: StateContainer
     public nonisolated let cache: CacheContainer
     public nonisolated let database: any DatabaseStorage
     public nonisolated let files: FilesContainer
@@ -19,7 +17,6 @@ public actor StorageContainer {
         self.failures = failures
         self.database = database
         self.files = files
-        state = StateContainer(failures: failures)
         cache = CacheContainer(failures: failures)
     }
     public func start() async throws(StorageFailure) {
@@ -29,7 +26,7 @@ public actor StorageContainer {
             if let startup {
                 task = startup
             } else {
-                task = Task { [database, files, cache, state] in
+                task = Task { [database, files, cache] in
                     do {
                         try Task.checkCancellation()
                         try files.start()
@@ -37,7 +34,6 @@ public actor StorageContainer {
                         try Task.checkCancellation()
                     } catch {
                         let primary = error
-                        state.close()
                         await cache.close()
                         await files.close()
                         var cleanup: [any Error] = []
@@ -73,7 +69,6 @@ public actor StorageContainer {
             if let shutdown { return try await shutdown.value }
             closed = true
             startup?.cancel()
-            state.close()
             cache.beginClosing()
             files.beginClosing()
             let task = Task { [startup, database, files, cache] in

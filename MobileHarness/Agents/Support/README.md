@@ -17,7 +17,7 @@ Support/Core 独立编译为 AgentCore，仅依赖 Foundation。其余文件由 
 | [AgentInputMetrics.swift](AgentInputMetrics.swift) | UI／PCM／相机输入的可选汇总诊断，不保存内容或创建队列 |
 | [ContainerFailureChannel.swift](ContainerFailureChannel.swift) | 原始故障聚合、有界投递及原生错误分类 |
 | [Chat](Chat/README.md) | 模型请求、解析、真实结果屏障、历史与续轮 |
-| [Context](Context/README.md) | 私有事务、Task／Skill 状态、固定任务结果加入和有限公开投影 |
+| [Context](Context/README.md) | 私有事务、Task／Skill 状态、固定任务结果加入和容器只读上下文来源 |
 | [Communication](Communication/README.md) | 跨角色消息值及固定任务的协议中立准入机制 |
 | [Core](Core/README.md) | 身份、输入／输出、生命周期、队列、解析和通用运行契约 |
 

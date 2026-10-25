@@ -1,7 +1,6 @@
 import Foundation
 import StorageCache
 import StorageFiles
-import StorageState
 
 #if os(iOS)
 
@@ -40,13 +39,43 @@ import StorageState
         @ObservationIgnored private let visionModels: any ModelVisionProviding
         @ObservationIgnored private let modelArtifacts: any ModelArtifactsManaging
         @ObservationIgnored private let memoryPressure: @Sendable () async -> Void
-        @ObservationIgnored private var publicStateScope: StateScope?
-        private func installPublicState() throws {
-            guard publicStateScope == nil else { return }
-            let scope = try stateStorage.makeScope()
-            publicStateScope = scope
-            try camera.connectPublicState(scope: scope)
-            try bluetooth.service.connectPublicState(scope: scope)
+        private func makeStateContext() throws -> AgentStateContext {
+            let context = AgentStateContext()
+            try context.register(
+                "actions.camera",
+                source: ContainerContextSource { [camera] in
+                    await camera.contextSnapshot()
+                })
+            try context.register(
+                "actions.robot",
+                source: ContainerContextSource { [service = bluetooth.service] in
+                    await service.contextSnapshot()
+                })
+            try context.register(
+                "ui.navigation",
+                source: ContainerContextSource { [navigation = navigationUI.state, album = albumUI] in
+                    try await MainActor.run {
+                        try navigation.requirePresentation()
+                        return ContainerContextValue(navigation.contextSnapshot(album: album.contextSnapshot()))
+                    }
+                })
+            try context.register(
+                "ui.camera",
+                source: ContainerContextSource { [cameraUI] in
+                    try await MainActor.run {
+                        guard cameraUI.state.isPresentationAvailable else { throw UIContainerError.unavailable }
+                        return ContainerContextValue(cameraUI.contextSnapshot())
+                    }
+                })
+            try context.register(
+                "ui.album",
+                source: ContainerContextSource { [albumUI, navigation = navigationUI.state] in
+                    try await MainActor.run {
+                        try navigation.requirePresentation()
+                        return ContainerContextValue(albumUI.contextSnapshot())
+                    }
+                })
+            return context
         }
         public var onModelConfigurationChanged: (@MainActor () -> Void)?
         private let homeUI: UIHomeContainer
@@ -56,7 +85,6 @@ import StorageState
         private let historyUI: UIHistoryContainer
         private let devicesUI: UIDeviceSettingsContainer
         private let diagnosticsUI: UIDiagnosticsContainer
-        private let stateStorage: StateContainer
         private let cacheStorage: CacheContainer
         private let filesStorage: FilesContainer
         let bluetooth: BluetoothWorkflow
@@ -65,7 +93,7 @@ import StorageState
             home: UIHomeContainer, settings: UISettingsContainer, modelResources: UIModelResourcesContainer,
             navigation: UINavigationContainer, history: UIHistoryContainer, devices: UIDeviceSettingsContainer,
             diagnostics: UIDiagnosticsContainer,
-            repositories: @escaping @Sendable () throws -> AgentRepositories, state: StateContainer,
+            repositories: @escaping @Sendable () throws -> AgentRepositories,
             cache: CacheContainer, files: FilesContainer, photos: CapturedPhotoStore,
             camera: any CameraCapturing, cameraPresentation: any CameraPresenting,
             cameraUI: UICameraContainer, albumUI: UIAlbumContainer,
@@ -92,7 +120,6 @@ import StorageState
             devicesUI = devices
             diagnosticsUI = diagnostics
             self.audio = audio
-            self.stateStorage = state
             self.cacheStorage = cache
             self.filesStorage = files
             self.repositories = repositories
@@ -212,12 +239,11 @@ import StorageState
                     }
                     try await self.speechModels.configure(recognition: recognition, synthesis: synthesis)
                 })
-            try installPublicState()
             let runtime = try AgentRuntime(
                 containerFailures: containerFailures, home: homeUI,
                 assistantContainer: assistant, applicationControlContainer: applicationControl,
                 memoryContainer: memory, photographerContainer: photographer,
-                state: stateStorage, cache: cacheStorage, files: filesStorage,
+                stateContext: try makeStateContext(), cache: cacheStorage, files: filesStorage,
                 chatRecords: try repositories().chat, taskRecords: try repositories().tasks,
                 camera: cameraDevice, cameraUI: cameraUI, albumUI: albumUI, album: albumService, settingsUI: settingsUI,
                 resourcesUI: resourcesUI, devicesUI: devicesUI, historyUI: historyUI, diagnosticsUI: diagnosticsUI,
@@ -361,8 +387,6 @@ import StorageState
             do { try await applicationControl.stop() } catch { errors.append(error) }
             await runtimeValue?.shutdown()
             runtimeValue = nil
-            publicStateScope?.close()
-            publicStateScope = nil
             if let primary = errors.first {
                 throw AgentFailure(
                     component: "roles", operation: "stop", underlying: primary,

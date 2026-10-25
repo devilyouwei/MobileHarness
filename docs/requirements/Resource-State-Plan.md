@@ -1,5 +1,8 @@
 # State 公开寄存器与 useState 实施
 
+> 架构替代说明：本文保留原共享寄存器需求与历史完成证据。当前实现迁移至 [Container 状态与模型上下文](technical/Container-State-Context.md)，不再使用 StorageState、公共 task 或 Skill v2。后续验收以新需求及当前源码 README 为准。
+
+
 状态：✅ 本轮代码与专项自动化已实施；❌ 真实模型、原生 UI 与物理设备验收待执行。替换旧资源快照计划与完整 AgentContext 托管方案；历史证据保留在 validation/history。
 
 State 仅发布 LLM 所需的有限公开事实，不集中保存程序执行状态。保留版本、代际、类型化端口、一致快照、容量和观察；增加名称/应用或 Agent 会话作用域及编码投影。AgentContextRepository 持有私有内存，保留事务、验证与提交测试钩子。

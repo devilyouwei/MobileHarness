@@ -95,7 +95,7 @@ flowchart LR
 
 ## 请求、事实与跟踪
 
-`PhotographerUI.swift` 在 start 建立请求与事实消费，按真实 Camera Tool 结果推进 open/close/flip/retry/save/ignore。回执在原生结果及角色终态完成后结束，媒体处理使用真实 mediaID；取消加入调用后 retire 状态。事实不通过 camera.state Signal 镜像；相机公开投影由拥有者的唯一 Writer 提交。
+`PhotographerUI.swift` 在 start 建立请求与事实消费，按真实 Camera Tool 结果推进 open/close/flip/retry/save/ignore。回执在原生结果及角色终态完成后结束，媒体处理使用真实 mediaID；取消加入调用后 retire 状态。事实不通过 camera.state Signal 镜像；相机上下文在模型请求时读取所属容器快照。
 
 Assistant 的 photography Skill 可以直接调用 Camera Actions，不必须委派 Photographer Task。跟踪另行消费 VisionPerception 的 `vision.pose`：前台、连接与准入满足且姿态新鲜才发内部 aim。输出间隔至少 0.2 秒；角色提供 base/pitch 目标，电机模式、速度整形、资源冲突和物理停机归 Actions/NexArm 与 PlatformKit。
 

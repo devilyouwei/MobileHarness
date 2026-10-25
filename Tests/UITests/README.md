@@ -128,3 +128,7 @@ Implemented: Provider URL input is optional. Blank/whitespace input resolves to 
 ✅ 镜头切换回归覆盖全局准备checking／preparing／deferred／failed时已就绪相机仍可切换，并验证拍照／相机操作、未启用／未就绪、权限与前后台准入。
 
 前后台回归遵循原有清屏契约：返回前台本身不代表采集已恢复；收到新的相机就绪确认后才允许翻转。
+
+## Container 上下文
+
+✅ NavigationContextTests覆盖手动路径回写、路径提交与确认分离、详情／覆盖层、迟到代际和父页更新拒绝，以及离开相册后的操作事实隔离。视图挂载和真实手势仍需原生验收。

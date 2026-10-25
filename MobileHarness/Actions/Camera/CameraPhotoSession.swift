@@ -20,7 +20,6 @@
         private let isForeground: @MainActor () -> Bool
         private let captureRevision: @MainActor () -> Int
         private let ensureCaptureAvailable: @MainActor () throws -> Void
-        private let factsChanged: @MainActor () -> Void
         private var foreground: Bool { isForeground() }
         private var revision: Int { captureRevision() }
         private let log = Logger(subsystem: "dev.mobileharness", category: "CameraPhotos")
@@ -34,8 +33,7 @@
             camera: any CameraCapturing, presentation: any CameraPresenting, photos: CapturedPhotoStore,
             photoCues: any CuePlaying,
             isForeground: @escaping @MainActor () -> Bool, captureRevision: @escaping @MainActor () -> Int,
-            ensureCaptureAvailable: @escaping @MainActor () throws -> Void,
-            factsChanged: @escaping @MainActor () -> Void
+            ensureCaptureAvailable: @escaping @MainActor () throws -> Void
         ) {
             self.camera = camera
             self.presentation = presentation
@@ -44,7 +42,6 @@
             self.isForeground = isForeground
             self.captureRevision = captureRevision
             self.ensureCaptureAvailable = ensureCaptureAvailable
-            self.factsChanged = factsChanged
         }
         func cancel() {
             photoTask?.cancel()
@@ -223,7 +220,6 @@
                 presentation.present(.photoMessage(nil))
                 try presentation.presentPhoto(id: id, image: image) { [weak self] success in
                     guard let self, self.state.capturedPhoto?.id == id else { return }
-                    self.factsChanged()
                     self.presentationFinished = (id, success)
                 }
                 let deadline = ContinuousClock.now.advanced(by: .seconds(3))

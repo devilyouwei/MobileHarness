@@ -19,7 +19,6 @@ import StorageDevices
 import StorageFiles
 import StorageMedia
 import StorageSQLite
-import StorageState
 import StorageTasks
 import Synchronization
 import Testing
@@ -177,8 +176,6 @@ private actor FailedDiagnosticDatabase: DatabaseStorage {
     #expect(channel !== other.containerFailures())
     let storage = registry.storage()
     #expect(!FileManager.default.fileExists(atPath: root.path))
-    let scope = try storage.state.makeScope()
-    #expect(throws: StateError.invalidKey) { try scope.register(StateKey<Int>(""), initial: 0) }
     #expect(throws: StorageError.missing) { try storage.cache.buffers.get("missing") }
     #expect(throws: StorageError.forbidden) { try storage.files.file(other.storage().files.photos) }
     #expect(throws: RecordStorageError.notReady) { try storage.database.chat }
@@ -188,12 +185,11 @@ private actor FailedDiagnosticDatabase: DatabaseStorage {
     let snapshot = channel.snapshot()
     #expect(
         Set(snapshot.records.map { $0.event.component }).isSuperset(of: [
-            "state", "cache.buffers", "files", "database", "camera.renderer",
+            "cache.buffers", "files", "database", "camera.renderer",
         ]))
     #expect(snapshot.records.allSatisfy { $0.event.scopeID == channel.scopeID })
     #expect(other.containerFailures().snapshot().records.isEmpty)
     #expect(!FileManager.default.fileExists(atPath: root.path))
-    scope.close()
     await display.stop()
     await channel.stop()
     await other.containerFailures().stop()

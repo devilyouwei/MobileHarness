@@ -8,7 +8,6 @@ import StorageCore
 import StorageFiles
 import StorageMedia
 import StorageSQLite
-import StorageState
 import StorageTasks
 import Testing
 

@@ -2,7 +2,7 @@ import AgentCore
 import Agents
 import Foundation
 import ModelKit
-import StorageState
+import Synchronization
 
 /// Test-only deterministic capability; production Assistant always requires an injected model.
 struct FixedTextChat: ChatCapability {
@@ -29,18 +29,27 @@ struct FixtureCameraFact: Codable, Sendable {
     var displayedMediaID: String?
     var savedMediaID: String?
 }
+final class FixtureFactCell<Value: Sendable>: Sendable {
+    private let memory: Mutex<Value>
+    init(_ value: Value) { memory = Mutex(value) }
+    func read() -> Value { memory.withLock { $0 } }
+    func update(_ change: (inout Value) -> Void) { memory.withLock { change(&$0) } }
+}
 final class PublicStateFixtureOwner: Sendable {
-    let scope: StateScope
-    let camera: StateWriter<PublishedState<FixtureCameraFact>>
-    init(_ storage: StateContainer, ready: Bool = false) throws {
-        scope = try storage.makeScope()
-        camera = try scope.register(
-            StateKey("camera"), initial: PublishedState(FixtureCameraFact(enabled: ready, running: ready)))
-        _ = try scope.register(StateKey<PublishedState<Bool>>("robot"), initial: PublishedState(false))
+    let camera: FixtureFactCell<FixtureCameraFact>
+    init(ready: Bool = false) { camera = FixtureFactCell(FixtureCameraFact(enabled: ready, running: ready)) }
+    func context() throws -> AgentStateContext {
+        let context = AgentStateContext()
+        try context.register(
+            "actions.camera",
+            source: ContainerContextSource { [self] in
+                ContainerContextValue(camera.read())
+            })
+        try context.register("actions.robot", source: ContainerContextSource { ContainerContextValue(false) })
+        for name in ["ui.navigation", "ui.camera", "ui.album"] {
+            try context.register(name, source: ContainerContextSource { ContainerContextValue([String: String]()) })
+        }
+        return context
     }
 }
-func publicStateFixture() throws -> AgentStateContext {
-    let storage = StateContainer()
-    let owner = try PublicStateFixtureOwner(storage)
-    return try AgentStateContext(storage: storage, agent: .assistant, retainingPublishers: owner)
-}
+func publicStateFixture() throws -> AgentStateContext { try PublicStateFixtureOwner().context() }

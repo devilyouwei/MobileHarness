@@ -7,7 +7,6 @@ import FunctionContracts
 import Gateway
 import PlatformKit
 import StorageCore
-import StorageState
 import Testing
 
 private actor DiscoveryRecorder {

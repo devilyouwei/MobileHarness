@@ -1,10 +1,10 @@
 {
-  "version": 2,
+  "version": 3,
   "id": "application-control",
-  "revision": 10,
+  "revision": 11,
   "description": "Conversational page navigation, resource/provider/Bluetooth status and explicit supported device/resource operations.",
   "dependencies": [],
-  "functions": [
+  "useActions": [
     {
       "path": "UI.Navigation.open",
       "callType": "action",
@@ -48,5 +48,8 @@
       "channel": "System"
     }
   ],
-  "useState": []
+  "useStates": [],
+  "useInstructions": [
+    "Instructions.md"
+  ]
 }

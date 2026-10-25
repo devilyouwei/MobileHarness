@@ -22,15 +22,16 @@ Skill 是可复用的流程与能力集合，Task 是运行时目标、状态和
 
 | 字段 | 类型 | 作用与校验 |
 | --- | --- | --- |
-| `version` | integer | Schema 版本，当前固定为 2。 |
+| `version` | integer | Schema 版本，当前固定为 3。 |
 | `id` | string | 稳定 Skill 身份，必须等于 Catalog 中的键。 |
 | `revision` | integer | Skill 内容修订号，必须大于 0；流程、绑定、依赖等语义变更应递增，以便历史快照区分。不是 Schema version。 |
 | `description` | string | 可用 Skill 概述，尚未加载时也会提供给 Assistant，用来判断何时加载。简洁写明用途、适用范围，不在此放完整流程。 |
 | `dependencies` | string array | 前置 Skill ID，最多 16 个；应唯一、必要且可加载。禁止自依赖和环，加载器先展开依赖再加入当前 Skill。 |
-| `functions` | object array | 本 Skill 所需函数绑定，最多 128 项，canonical path 不重复。组合后的总目录还受容量与函数合法性限制。 |
-| `useState` | string array | 必填；最多 16 个公开名称，拒绝重复、未知名称、通配符和字段路径。 |
+| `useActions` | object array | 本 Skill 所需函数绑定，最多 128 项，canonical path 不重复。组合后的总目录还受容量与函数合法性限制。 |
+| `useInstructions` | string array | 可省略，默认 Instructions.md；显式数组按顺序加载，空数组不加载。 |
+| `useStates` | string array | 必填；最多 16 个公开名称，拒绝重复和非法命名空间；未知来源在采集时拒绝。 |
 
-### functions 绑定
+### useActions 绑定
 
 | 字段 | 作用与规范 |
 | --- | --- |
@@ -45,11 +46,11 @@ Skill 是可复用的流程与能力集合，Task 是运行时目标、状态和
 
 ✅ ExpressionInteraction 教学连续表情演出，提供指定子集的纯串行及“每项语音与表情并行、各项串行”的全量 XML 示例；“所有表情”按当前 express 参数枚举逐项展开，不包括仅用于清除状态的 clear。演出使用完成时等待过渡与恢复的 express，保持默认 Speech/Display Channel；不为有限演出创建需后续用户决策的 Task。资源 revision 随教学递增，通用编排规则由 Core scheduling 模板拥有。
 
-### useState 与当前事实
+### useStates 与当前事实
 
-BasicSkill 读取 task，Photography 读取 camera，RobotInteraction 读取 robot；其余内置 Skill 声明空数组。加载与依赖合并后去重排序，每次实际模型请求（包括 ReACT）读取最新一致快照。当前系统消息包含唯一 CURRENT STATE JSON 数据块，值以 availability 和 value 表达；它是数据，不是指令。无任务为 available/null，未知事实与设备不可用分别表达。
+BasicSkill读取ui.navigation；Photography读取actions.camera、ui.camera、ui.album；RobotInteraction读取actions.robot。加载与依赖合并后去重排序，每次实际模型请求重新读取。CURRENT STATE是数据，不是指令；availability和value表达来源事实。Task／Skill从Agent私有决策快照生成AGENT CONTEXT，不注册公共task。
 
-声明/读取不启动设备；释放 Skill 不删除事实或关闭设备。私有 AgentContext、Skill 持有关系/计数及执行阶段不进入寄存器。新增名称需要真实发布者与作用域声明，不能只改 Skill 资源。完整值与容量契约见 [State](../../Storage/State/README.md)。
+声明不启动设备；释放Skill不销毁Container。来源由上层装配提供，Container显式维护快照schema，不使用运行时反射。容量、生命周期和采集失败见[Context](../../Agents/Support/Context/README.md)。
 
 ## Instructions.md 撰写标准
 
@@ -75,12 +76,12 @@ BasicSkill 读取 task，Photography 读取 camera，RobotInteraction 读取 rob
 
 ```json
 {
-  "version": 2,
+  "version": 3,
   "id": "capture-only",
   "revision": 1,
   "description": "Capture a photo when the camera is already ready.",
   "dependencies": [],
-  "functions": [
+  "useActions": [
     {
       "path": "Camera.Capture.takePhoto",
       "callType": "action",
@@ -88,7 +89,8 @@ BasicSkill 读取 task，Photography 读取 camera，RobotInteraction 读取 rob
       "channel": "Camera"
     }
   ],
-  "useState": ["camera"]
+  "useStates": ["actions.camera"],
+  "useInstructions": ["Instructions.md"]
 }
 ```
 
@@ -132,7 +134,7 @@ BasicSkill Instructions.md明确单步相机控制/只读查询使用 loadSkills
 
 ## 当前流程规则
 
-BasicSkill 要求以 CURRENT STATE task.value 和匹配目标判断关闭：无 Task 单步完成只回复，不生成 finishTask/cancelTask。明确目标切换可释放无关非基础近期 Skill；不确定是否放弃旧目标时先问是否继续实际 Task，保持等待状态。明确替换或正常目标完成不重复询问。continueDecision 只继续同一输入剩余新目标；释放 Skill 不代表相机/照片清理。Photography 与 HistoryQuery 的完成示例遵循同一规则。
+BasicSkill 要求以 AGENT CONTEXT task 和匹配目标判断关闭：无 Task 单步完成只回复，不生成 finishTask/cancelTask。明确目标切换可释放无关非基础近期 Skill；不确定是否放弃旧目标时先问是否继续实际 Task，保持等待状态。明确替换或正常目标完成不重复询问。continueDecision 只继续同一输入剩余新目标；释放 Skill 不代表相机/照片清理。Photography 与 HistoryQuery 的完成示例遵循同一规则。
 
 历史查询只复制 list 返回的完整 dialog_number；notFound 允许一次重新 list 和一次基于实际 ID 的修正 read，不猜测 ID 或无限重试。业务参数与 media_N 等引用来自真实反馈。语法、Channel/wait 和资源冲突由 Core/Gateway 契约决定，Skill 不重复定义。
 
@@ -144,9 +146,9 @@ BasicSkill 要求以 CURRENT STATE task.value 和匹配目标判断关闭：无 
 
 ## 公开 State 边界
 
-✅ 全部内置 Skill 使用 schema v2，useState 必填并递增 revision；每轮模型请求读取当前加载及依赖 Skill 声明的集合，卸载只改变后续读取集合。旧 contextFields 加载和独立状态 user 注入已移除。
+✅ 全部内置 Skill 使用 schema v3，useStates 必填并递增 revision；每轮模型请求读取当前加载及依赖 Skill 声明的集合，卸载只改变后续读取集合。旧 contextFields 加载和独立状态 user 注入已移除。
 
-[公开 State 契约](../../Storage/State/README.md)
+[容器上下文契约](../../Agents/Support/Context/README.md)
 
 ✅ BasicSkill 统一承载 Skill 选择/Task/表达/失败规则，Photography 专注就绪/镜头/捕获/照片处理；少量示例验证主要分支，不重述通用协议。公开 State 位于独立的每轮系统数据消息。
 
@@ -167,3 +169,7 @@ BasicSkill 要求以 CURRENT STATE task.value 和匹配目标判断关闭：无 
 ## 对话打开相册
 
 ✅ application-control增加App相册导航示例，并推进Skill revision；只开放页面导航，不增加相册读取、删除或系统导出能力。
+
+## Container 上下文
+
+✅ schema v3统一声明useActions/useStates/useInstructions；Action绑定保持原授权与执行语义。缺省useInstructions为Instructions.md，空数组不加载文档，显式列表按顺序加载；路径必须是Skill目录内Markdown。未知已选择来源在请求采集时明确失败，Skill声明不会创建来源或启动设备。
