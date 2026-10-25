@@ -34,6 +34,29 @@ class QwenRunnerTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 evaluation.read_aliyun_env(path)
 
+    def test_provider_credentials_are_isolated_and_openai_defaults_to_official_endpoint(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "environment"
+            path.write_text("OPENAI_API_KEY=openai-fixture\n"
+                            "ALIYUN_API_URL=https://aliyun.example.invalid/v1\n"
+                            "ALIYUN_API_KEY=aliyun-fixture\n")
+            self.assertEqual(evaluation.model_credentials(path, "gpt-4.1"), {
+                "MH_QWEN_EVAL_API_KEY": "openai-fixture",
+                "MH_QWEN_EVAL_API_URL": "https://api.openai.com/v1",
+            })
+            self.assertEqual(evaluation.model_credentials(path, "qwen3.8-flash"), {
+                "MH_QWEN_EVAL_API_KEY": "aliyun-fixture",
+                "MH_QWEN_EVAL_API_URL": "https://aliyun.example.invalid/v1",
+            })
+            path.write_text("OPENAI_API_KEY=openai-fixture\nOPENAI_BASE_URL=https://openai.example.invalid/v1\n")
+            self.assertEqual(evaluation.model_credentials(path, "gpt-4.1")["MH_QWEN_EVAL_API_URL"],
+                             "https://openai.example.invalid/v1")
+            with self.assertRaises(ValueError):
+                evaluation.model_credentials(path, "qwen3.8-flash")
+            path.write_text("ALIYUN_API_KEY=aliyun-fixture\n")
+            with self.assertRaises(ValueError):
+                evaluation.model_credentials(path, "gpt-4.1")
+
     def test_compact_evidence_accepts_array_and_object_messages(self):
         messages = [{"role": "system", "content": "stable"},
                     {"role": "system", "content": "# CURRENT STATE\n{}"}]

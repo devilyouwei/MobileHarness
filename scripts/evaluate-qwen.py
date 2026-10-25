@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Opt-in, bounded Qwen regression through the production Swift Agent/Gateway."""
+"""Opt-in, bounded Qwen / GPT-4.1 prompt regression through the production Swift Agent/Gateway."""
 
 import argparse
 from concurrent.futures import ThreadPoolExecutor
@@ -16,19 +16,36 @@ import sys
 ROOT = Path(__file__).resolve().parent.parent
 
 
-def read_aliyun_env(path):
+def read_provider_env(path, allowed):
     values = {}
     for line in path.read_text().splitlines():
         line = line.strip()
         if not line or line.startswith("#"):
             continue
         match = re.fullmatch(r"(?:export\s+)?([A-Za-z_][A-Za-z_0-9]*)\s*=\s*(.*)", line)
-        if not match or match[1] not in {"ALIYUN_API_URL", "ALIYUN_API_KEY"}:
+        if not match or match[1] not in allowed:
             continue
         value = match[2].strip()
         if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
             value = value[1:-1]
         values[match[1]] = value
+    return values
+
+
+def model_credentials(path, model):
+    if model == "gpt-4.1":
+        values = read_provider_env(path, {"OPENAI_API_KEY", "OPENAI_API_URL", "OPENAI_BASE_URL"})
+        if not values.get("OPENAI_API_KEY"):
+            raise ValueError("ENV must define OPENAI_API_KEY")
+        return {"MH_QWEN_EVAL_API_KEY": values["OPENAI_API_KEY"],
+                "MH_QWEN_EVAL_API_URL": values.get("OPENAI_API_URL") or values.get("OPENAI_BASE_URL") or "https://api.openai.com/v1"}
+    values = read_aliyun_env(path)
+    return {"MH_QWEN_EVAL_API_KEY": values["ALIYUN_API_KEY"],
+            "MH_QWEN_EVAL_API_URL": values["ALIYUN_API_URL"]}
+
+
+def read_aliyun_env(path):
+    values = read_provider_env(path, {"ALIYUN_API_URL", "ALIYUN_API_KEY"})
     if not all(values.get(key) for key in ("ALIYUN_API_URL", "ALIYUN_API_KEY")):
         raise ValueError("ENV must define ALIYUN_API_URL and ALIYUN_API_KEY")
     return values
@@ -36,7 +53,7 @@ def read_aliyun_env(path):
 
 def source_hashes():
     paths = list((ROOT / "MobileHarness/Resources").rglob("*.json"))
-    paths += list((ROOT / "MobileHarness/Resources").rglob("Instructions.md"))
+    paths += list((ROOT / "MobileHarness/Resources").rglob("*.md"))
     paths += [ROOT / relative for relative in (
         "MobileHarness/Agents/Support/Core/Generation/FunctionTokenPrompts.json",
         "MobileHarness/Agents/Assistant/AssistantProcessing.swift",
@@ -44,6 +61,9 @@ def source_hashes():
         "Tests/IntegrationTests/QwenWorkflowEvaluationTests.swift",
         "Tests/AgentModelEvaluationTests/Scenarios/qwen-workflows.json",
     )]
+    for directory in ("Agents", "Actions", "UI", "ModelKit/Language/LLM/OpenAI"):
+        paths += list((ROOT / "MobileHarness" / directory).rglob("*.swift"))
+    paths += [ROOT / "Tests/IntegrationTests/FixedTextChat.swift", Path(__file__).resolve()]
     return {str(p.relative_to(ROOT)): hashlib.sha256(p.read_bytes()).hexdigest()
             for p in sorted(paths)}
 
@@ -88,21 +108,21 @@ def main():
     parser.add_argument("--cases", help="Comma-separated workflow IDs; omitted runs the complete suite")
     parser.add_argument("--output-prefix", type=Path, default=Path("/tmp/qwen-workflow-regression"))
     parser.add_argument("--skip-build", action="store_true")
-    parser.add_argument("--parallel", type=int, choices=(1, 2, 3), default=3)
+    parser.add_argument("--parallel", type=int, choices=(1, 2, 3, 4), default=3)
     args = parser.parse_args()
-    if len(args.models) > 3 or len(set(args.models)) != len(args.models):
-        parser.error("Choose at most three distinct model IDs")
-    if any(not re.fullmatch(r"qwen[a-zA-Z0-9.-]+", m) for m in args.models):
-        parser.error("Use exact Qwen model IDs")
+    if len(args.models) > 4 or len(set(args.models)) != len(args.models):
+        parser.error("Choose at most four distinct model IDs")
+    if any(m != "gpt-4.1" and not re.fullmatch(r"qwen[a-zA-Z0-9.-]+", m) for m in args.models):
+        parser.error("Use exact Qwen model IDs or gpt-4.1")
     fixture_path = ROOT / "Tests/AgentModelEvaluationTests/Scenarios/qwen-workflows.json"
     expected = selected_ids(json.loads(fixture_path.read_text())["cases"], args.cases)
     for model in args.models:
         raw_path = Path(str(args.output_prefix) + "-" + model + ".json")
         if raw_path.exists() or raw_path.with_suffix(".log").exists():
             raise ValueError("Output already exists; use a fresh output prefix")
-    credentials = read_aliyun_env(args.env_file)
+    credentials = {model: model_credentials(args.env_file, model) for model in args.models}
     environment = {key: value for key, value in os.environ.items()
-                   if not key.startswith("MH_QWEN_EVAL")}
+                   if not key.startswith(("MH_QWEN_EVAL", "OPENAI_", "ALIYUN_", "DASHSCOPE_"))}
     environment.pop("OPENAI_API_KEY", None)
     environment.pop("MH_QWEN_EVAL", None)
     environment.setdefault("DEVELOPER_DIR", "/Applications/Xcode.app/Contents/Developer")
@@ -132,7 +152,7 @@ def main():
         log_path = raw_path.with_suffix(".log")
         if raw_path.exists() or log_path.exists():
             raise ValueError("Output already exists; use a fresh output prefix")
-        child_env = dict(environment, **credentials, MH_QWEN_EVAL="1",
+        child_env = dict(environment, **credentials[model], MH_QWEN_EVAL="1",
                          MH_QWEN_EVAL_MODEL=model, MH_QWEN_EVAL_OUTPUT=str(raw_path))
         if args.cases:
             child_env["MH_QWEN_EVAL_CASES"] = args.cases
@@ -160,7 +180,7 @@ def main():
     report = {"version": 1, "createdAt": datetime.now(timezone.utc).isoformat(),
               "models": args.models, "filter": args.cases, "sourceHashes": hashes,
               "sourceUnchanged": source_hashes() == hashes,
-              "scope": "Real Qwen Responses, production Agent/Gateway, synthetic device/storage executors",
+              "scope": "Real Qwen / OpenAI Responses, production Agent/Gateway, synthetic device/storage executors",
               "results": results}
     path = Path(str(args.output_prefix) + ".summary.json")
     path.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n")

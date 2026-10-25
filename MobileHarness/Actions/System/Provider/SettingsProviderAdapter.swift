@@ -137,21 +137,21 @@ public enum SettingsProviderAdapter {
             let message =
                 SettingsProviderAdapter.errorMessage(ProviderPresentationFailure(failureCode: failureCode))
                 ?? "无法连接服务，请检查 HTTP/HTTPS URL、Key 和网络后重试"
-            state.presentFailure(message, revision: entry.revision)
+            _ = state.presentFailure(message, revision: entry.revision)
             return
         }
         switch entry.operation {
         case .discovery:
             let models = try await discovery.result(id, sessionID: sessionID)
             try state.requirePresentation()
-            state.presentModels(
+            _ = state.presentModels(
                 models,
                 notice: models.isEmpty ? "此服务没有返回可识别的聊天模型" : "请选择用于对话的模型",
                 revision: entry.revision)
         case .restore:
             let value = try settings.result(id, sessionID: sessionID)
             try state.requirePresentation()
-            state.presentRestored(
+            _ = state.presentRestored(
                 CloudSettingsDraft(
                     enabled: value.enabled, url: value.url, key: value.key,
                     model: value.model.isEmpty ? SettingsProviderAdapter.initial.model : value.model,
@@ -162,7 +162,7 @@ public enum SettingsProviderAdapter {
         case .save:
             let value = try settings.result(id, sessionID: sessionID)
             try state.requirePresentation()
-            state.presentNotice(value.enabled ? "已保存，云端模型立即生效" : "已切换为本地模型", revision: entry.revision)
+            _ = state.presentNotice(value.enabled ? "已保存，云端模型立即生效" : "已切换为本地模型", revision: entry.revision)
         }
     }
 }

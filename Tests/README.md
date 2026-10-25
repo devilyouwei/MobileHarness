@@ -41,13 +41,13 @@
 
 ## Storage 依赖
 
-✅ 存储访问使用独立的 State、Cache、Database 和 Files 接口；App 注册根实例，消费者通过构造器获得所需能力。存储容器不接管本目录的业务验证、执行和完成语义。
+✅ 存储访问使用独立的 Cache、Database 和 Files 接口；App 注册根实例，消费者通过构造器获得所需能力。存储容器不接管本目录的业务验证、执行和完成语义。
 
-## 公开 State 边界
+## Container 上下文边界
 
-✅ State 回归覆盖公开编码、作用域隔离、代际/容量/失败、Task 投影与每轮请求。Assistant fixture 显式注入隔离的公开事实源；测试替身和自动化结果不等于真实模型或物理设备验收。
+✅ Container上下文回归覆盖显式编码、会话隔离、代际／容量／失败和每轮重新采集；Task从Agent私有决策快照生成，不建立Storage镜像。Assistant fixture显式注入只读容器来源；测试替身和自动化结果不等于真实模型或物理设备验收。
 
-[公开 State 契约](../MobileHarness/Storage/State/README.md)
+[容器上下文契约](../MobileHarness/Agents/Support/Context/README.md)
 
 ✅ test_evaluate_qwen.py 离线验证 ENV 仅选择阿里字段、不执行 shell 内容，以及数组/对象请求证据的压缩兼容性；通过单独 unittest 命令运行，不访问网络。
 
@@ -55,3 +55,7 @@
 
 
 ✅ test_compare_qwen_protocols.py 离线验证受控协议组的声明与评分、合法混合响应、错误通道/名称/参数及依赖先后；测试不访问云。生产框架混合调用能力继续由 GenerationRoundTests 的既有混合轮次/屏障用例验证。
+
+## Qwen / GPT-4.1 提示词回归扩展
+
+✅ 沿用59场景／85输入及生产提示词，evaluate-qwen.py接受三款Qwen与gpt-4.1；每个子进程仅注入对应Provider凭据，GPT使用OpenAI端点。运行前后记录生产上下文／Skill／解析与执行源hash，不修改提示词或放宽断言。报告保留失败与实际响应；本轮使用合成设备／仓库，不能替代真机验收。

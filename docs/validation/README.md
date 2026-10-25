@@ -14,7 +14,7 @@
 | [Agents / Actions 组织整理](Agents-Actions-Organization.md) | 目录归属、共享机制与端点解耦的回归、模拟器编译和原工程文件协调限制。 |
 | [外部输入直连 Container](Direct-Container-Input.md) | 直连迁移的自动检查、锁定依赖构建、设备修正版安装及尚未完成的原生／性能验收。 |
 | [项目验证日志](Validation-History.md) | 按日期记录仓库检查、构建、部署、问题调查与验证结果；专项报告有详细数据时使用链接。 |
-| [千问工作流回归](Qwen-Workflow-Regression.md) | 同套合成场景下真实 flash/plus/max 的 Action/Tool、Task/Skill 调用与边界；不等于物理设备验收。 |
+| [Qwen／GPT-4.1提示词回归](Qwen-Workflow-Regression.md) | 最新59场景Qwen三模型结果、GPT-4.1鉴权阻塞及历史协议样本；不等于物理设备验收。 |
 | [千问提示词修订回归](Qwen-Prompt-Optimization.md) | 基于原始失败修订教学后的同用例对照，保留 pilot、完整运行及残留失败；不改执行权限。 |
 | [连续动作提示词验证](Action-Sequence-Prompts.md) | 串行动作、组内语音/表情并行的生产示例与预算回归；包含 Flash/Max 三轮专项及完整原始数据，保留完整检查、构建与原生效果验收限制。 |
 | [语音验收指南](Voice.md) | 当前可重复的语音体验检查步骤及记录要求，不固定某次模型默认或宣称已经通过。 |

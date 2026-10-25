@@ -64,7 +64,7 @@ check.sh 在未显式设置 DEVELOPER_DIR 且系统选中 CLT 时优先使用标
 
 ## 千问显式实验工具
 
-evaluate-qwen.py 从指定 ENV（默认 .env.local）读取 ALIYUN_API_URL／ALIYUN_API_KEY，先编译离线检查，再对显式模型列表运行 opt-in IntegrationTests；最多三个模型并行，不自动换模型或重试。凭据只经子进程环境传递，不输出、不写报告，不读取 OpenAI Key。普通 check 不触发真实调用。
+evaluate-qwen.py 从指定 ENV（默认 .env.local）读取 ALIYUN_API_URL／ALIYUN_API_KEY，先编译离线检查，再对显式模型列表运行 opt-in IntegrationTests；最多四个模型并行，不自动换模型或重试。Qwen仅注入Aliyun凭据，gpt-4.1仅注入OpenAI凭据及端点（默认官方）；凭据只经子进程环境传递，不输出、不写报告。普通 check 不触发真实调用。
 
 完整 Xcode 的 Swift Testing helper 和 swift build --show-bin-path 用于执行独立测试进程；缺失 helper／bundle 明确失败。输出前缀不得覆盖原结果；summary 保存输入 hash、实际 State／响应／调用和请求 hash，原始报告保存完整请求。输入 hash 包含 AgentCore 的 FunctionTokenPrompts.json。实际结果归 [千问报告](../docs/validation/Qwen-Workflow-Regression.md)。
 
@@ -81,3 +81,7 @@ compare-qwen-protocols.py 仅对显式 flash／max 运行隔离的阿里 Respons
 ## Container 上下文
 
 ✅ 架构检查验证Skill v3和命名空间来源，禁止恢复Storage/State及运行时StorageState导入；保留四基础模块独立性、唯一源码编译拥有者和执行授权检查。
+
+## Qwen / GPT-4.1 提示词回归扩展
+
+✅ 沿用59场景／85输入及生产提示词，evaluate-qwen.py接受三款Qwen与gpt-4.1；每个子进程仅注入对应Provider凭据，GPT使用OpenAI端点。运行前后记录生产上下文／Skill／解析与执行源hash，不修改提示词或放宽断言。报告保留失败与实际响应；本轮使用合成设备／仓库，不能替代真机验收。

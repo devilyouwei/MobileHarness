@@ -1,5 +1,7 @@
 # Qwen Action / Tool workflow regression
 
+最新结果见本文末尾“2026-10-25 Container 上下文迁移后复测”：三款Qwen完整59场景，GPT-4.1鉴权阻塞。早期章节保留当时协议和历史结果，不代表当前实现。
+
 ## Scope and method
 
 Run date: 2026-10-17. Branch: `codex/storage-lifecycle-boundary`, following checkpoint `4edff0f3`, with the uncommitted prompt optimization. This is an opt-in paid cloud-model experiment, not physical-device acceptance.
@@ -130,3 +132,82 @@ Real camera/photo/robot/Bluetooth effects, native UI, perception/image quality, 
 Final full-check failures: atomicStableOffTargetEndsBeforeOverallDeadlineAndKeepsError; soundSourceStopCancelsAndJoinsAnInFlightPublisher; soundSourceMonoIsUnavailableAndRejectedPublicationDoesNotStopRecognition; soundSourceBroadcastCrossesGatewaysWithBoundIdentityAndCaptureDeadline; soundSourceNonSpeechBroadcastDoesNotRequireSubscribersOrOpenASR; soundSourceReplyGateClearsDirectionAndResumeStartsANewWindow; soundSourceOnlyDiagnosticCrossesGatewaysWithoutModelsOrPresentationGrants; soundSourceSlowSubscriberDoesNotBlockFollowingDirections. Their earlier failure evidence is preserved in Validation-History; isolated passes do not establish a repair.
 
 Host-local logs: /tmp/qwen-eval-compile.log, /tmp/qwen-eval-offline-final.log, /tmp/qwen-regression-20261017-run1*.json/log, /tmp/qwen-regression-20261017-run2*.json/log, /tmp/qwen-native-probe.sse, /tmp/qwen-native-minimal-*.sse, /tmp/qwen-regression-check.log, /tmp/qwen-check-rechecks.json and per-case logs, /tmp/qwen-regression-ios.log. These paths are temporary; the linked durable reports preserve tested results and limits.
+
+## 2026-10-25 Container 上下文迁移后复测
+
+### 范围与方法
+
+用户要求复测几款Qwen并加入GPT-4.1，专门验证当前提示词。沿用现有evaluate-qwen.py及59个固定场景／85个用户输入，包含6个连续表情专项；本轮没有修改生产提示词、场景内容、评分断言或执行权限。生产实现是Container内存快照、独立AGENT CONTEXT及Skill v3，已加载函数使用现行Action-only教学；不能把与早期53场景／混合native协议的差异直接归因于某条提示词。
+
+仅扩展测试Provider选择：Qwen子进程使用Aliyun配置，gpt-4.1使用OpenAI配置，二者凭据隔离。用户明确授权复用本地OpenAI密钥；未修改或导出密钥。模型列表预检确认Aliyun提供qwen3.8-flash、qwen3.7-plus、qwen3.8-max；不把plus写成3.8。
+
+每模型每场景独立会话；同场景多输入保留Task／Skill与上下文。沿用temperature=0.7、Qwen生产适配器thinking关闭、默认输出预算、每场景32请求／每输入10请求、90秒传输超时和180秒输入期限。不自动重试、换模型或挑选最佳样本。三个Qwen进程并行；时延不作为性能排名。
+
+设备、语音、导航与仓库执行为明确的合成替身，无真实相机、Photos、蓝牙、机械臂动作或用户数据。当前测试的ui.navigation/ui.camera/ui.album提供空合成值，不覆盖真实页面识别；Camera fixture的缺省可选媒体字段仍可能省略，不能声称与iPhone请求字节一致。真实Task／Skill上下文、生产提示词、解析和Gateway链路实际运行。
+
+### 完整样本结果
+
+| 模型 | 通过／场景 | 实际用户输入 | 模型请求 | 状态 |
+| --- | --- | --- | --- | --- |
+| `qwen3.8-flash` | **57/59** | 85 | 165 | 完整，保留全部失败 |
+| `qwen3.7-plus` | **56/59** | 85 | 163 | 完整，保留全部失败 |
+| `qwen3.8-max` | **57/59** | 85 | 168 | 完整，保留全部失败 |
+| `gpt-4.1` | 未评分 | 1次诊断输入 | 1次推理请求，HTTP401 | 鉴权阻塞；未运行其余58场景 |
+
+三款Qwen合计177次场景运行、255个用户输入、496次模型请求，170/177通过。每款模型均覆盖全部59个场景；六个连续表情场景三款均6/6。各模型进程及runner因真实评分失败返回1，但complete均为true，属于完整失败样本，不是运行中断。sourceUnchanged=true，398个生产／测试输入文件的hash在采样前后一致；没有一边改提示词一边比较。
+
+这是各模型一次随机样本，不是统计排名、改进幅度证明或真机验收。通过指该场景的既定断言满足，不评价语言自然度和真实设备完成。
+
+### 保留的失败
+
+| 模型 | 场景 | 实际观察与失败条件 |
+| --- | --- | --- |
+| flash | save-without-preview | 无预览时仍调用`savePhoto mediaID=""`，违反禁止保存断言；后续回复没有可保存照片。未发生原生保存。 |
+| flash | bluetooth-connect-unknown | 将人类可读名称“机械币”直接作为connect的id，违反未知设备连接参数约束；合成执行反馈连接失败。 |
+| plus | camera-close-cold | 加载摄影Skill时夹带“我先加载它”等文案，违反loadSkills独占输出；后续确实关闭相机。 |
+| plus | photo-ignore-workflow | 完成拍照、等待用户、忽略，但没有为明确跨轮等待创建Task，因而缺失startTask和对应finishTask。 |
+| plus | bluetooth-scan-connect | loadSkills夹带文案；用户明确要求持续连接Task却未startTask，最后调用finishTask得到无活动Task反馈。合成扫描／连接效果本身完成。 |
+| max | camera-close-cold | 相机关闭后立即releaseSkills且与确认文案同输出，违反独占输出及本场景摄影Skill保留断言。 |
+| max | skill-idle-expiry-reloads | 闲置后正确重新加载并关闭，但随后将releaseSkills与文案混在同次输出；不能据此认定私有闲置计数实现损坏。 |
+
+本轮Qwen未出现agent.error模型传输／invalidResponse失败。残留问题主要是显式业务前置条件和控制步骤教学遵循；执行层仍负责拒绝不合法请求，不能靠提示词替代准入。
+
+### GPT-4.1 阻塞证据
+
+本地没有OpenAI自定义端点配置，按既有适配器默认访问api.openai.com。GET /v1/models返回HTTP401；随后只运行plain-chat场景，生产Responses推理也返回HTTP401，诊断为`code=httpStatus / stage=http / httpStatus=401`。未取得模型文本或用量回执，没有继续其余58个场景，也没有重复请求或静默切换Provider。
+
+原始测试报告将该诊断标为0/1；本验证文档将其归为基础设施阻塞，不计算GPT-4.1提示词通过率。需要有效凭据后另行补齐；不能声称四模型完整回归已完成。
+
+### 用量与证据
+
+| 模型 | 输入token | 其中缓存输入 | 输出token |
+| --- | --- | --- | --- |
+| `qwen3.8-flash` | 1,069,122 | 925,440 | 2,183 |
+| `qwen3.7-plus` | 1,052,334 | 934,912 | 2,310 |
+| `qwen3.8-max` | 1,087,401 | 985,088 | 2,662 |
+
+用量取实际请求回执，不据此推算费用或性能。GPT-4.1无用量回执。
+
+[完整持久化证据](../measurements/prompt-regression-2026-10-25.json)包含59场景规格、三款模型全部实际回复、调用、上下文、执行日志、Token用量、源hash和GPT鉴权诊断。超过160字符的重复字符串用`{"$text":"SHA256"}`引用textPool；requestJSON解析为requestMessages语义消息，并保留原序列化字节数及SHA256。该格式避免重复保存静态教学，不声称是HTTP/SSE wire捕获。已核对不含本地API Key，不含用户设备记录或媒体。
+
+基于提交3767d6c的工作区，增加了本轮测试Provider扩展；源hash记录实际未提交测试版本。完整主机报告及日志保留于`/tmp/prompt-regression-20261025-qwen-{model}.json/.log`和`/tmp/prompt-regression-20261025-gpt-auth-gpt-4.1.json/.log`，持久化证据不依赖临时文件才能审查。
+
+### 实际命令与仓库检查
+
+先执行离线用例／评分合法性检查与Python runner回归，再执行：
+
+```sh
+python3 scripts/evaluate-qwen.py \
+  --models qwen3.8-flash qwen3.7-plus qwen3.8-max \
+  --parallel 3 --skip-build \
+  --output-prefix /tmp/prompt-regression-20261025-qwen
+python3 scripts/evaluate-qwen.py \
+  --models gpt-4.1 --cases plain-chat --parallel 1 --skip-build \
+  --output-prefix /tmp/prompt-regression-20261025-gpt-auth
+```
+
+- Python runner／协议脚本回归9项通过，新增测试覆盖Provider凭据隔离、官方默认端点和缺失配置。
+- 离线场景合法性及8种表情评分变体通过；真实调用只在显式MH_QWEN_EVAL门开启时执行。
+- `./scripts/check.sh`退出0：主集成833项通过，原生阶段221项通过，保留普通检查不触发付费调用的行为。
+- `./scripts/build-ios.sh`退出0，MobileHarnessSimulator、ModelKitRuntime、ModelKitNemotron、ModelKitSilero四方案全部成功，资源校验通过。
+- 本轮未改提示词以追求分数、未安装，也未进行真实语音、原生导航、相册系统导出或机械臂验收。

@@ -623,8 +623,8 @@ func qwenActionToolWorkflowRegression() async throws {
     let provider = try OpenAIChat(
         context: context,
         configuration: OpenAIChatConfiguration(
-            baseURL: OpenAIChatConfiguration.endpoint(try #require(environment["ALIYUN_API_URL"])),
-            apiKey: try #require(environment["ALIYUN_API_KEY"]), model: modelID, timeout: 90))
+            baseURL: OpenAIChatConfiguration.endpoint(try #require(environment["MH_QWEN_EVAL_API_URL"])),
+            apiKey: try #require(environment["MH_QWEN_EVAL_API_KEY"]), model: modelID, timeout: 90))
     var results: [QwenCaseResult] = []
     let filter = environment["MH_QWEN_EVAL_CASES"].map { Set($0.split(separator: ",").map(String.init)) }
     let encoder = JSONEncoder()

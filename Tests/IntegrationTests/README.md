@@ -122,3 +122,7 @@ Photography完成示例使用明确的“App相册”文案；保持与BasicSkil
 ## Container 上下文
 
 ✅ ContainerContextTests覆盖读取真实拥有者、来源去重／容量／编码、关闭及同名会话替换、取消、Skill读取集合、Task会话隔离及指令路径。Storage寄存器专属测试已被替换；原有相册／摄影／权限执行回归保留。
+
+## Qwen / GPT-4.1 提示词回归扩展
+
+✅ 沿用59场景／85输入及生产提示词，evaluate-qwen.py接受三款Qwen与gpt-4.1；每个子进程仅注入对应Provider凭据，GPT使用OpenAI端点。运行前后记录生产上下文／Skill／解析与执行源hash，不修改提示词或放宽断言。报告保留失败与实际响应；本轮使用合成设备／仓库，不能替代真机验收。
