@@ -2,7 +2,7 @@
 
 ## Summary
 
-Acquire camera preview, transport immutable native frames, capture one JPEG and import bounded JPEG data into Photos.
+Acquire camera preview, transport immutable native frames, capture one JPEG and export bounded photo resources into Photos.
 
 ## Ownership and boundaries
 
@@ -38,7 +38,7 @@ The capacity-one newest stream replaces obsolete observations. A mutex fences st
 
 One active photo delegate has a ten-second terminal bound. Cancellation checks occur again before native request. Native callbacks are joined before delegate release; old callbacks cannot complete a new photo. Nonempty JPEG is limited to 4 MiB; native shutter behavior is preserved.
 
-`ApplePhotoLibrary.saveJPEG` performs add-only authorization and bounded PHAsset creation. It checks cancellation before authorization and commit. Once issued, import is joined and cannot be rolled back by caller cancellation. It returns technical permission/image failures; photo selection/export receipts belong to Actions.
+`ApplePhotoLibrary.savePhoto` validates JPEG/HEIC/PNG up to 32 MiB/100 million pixels, then performs add-only authorization and PHAsset creation with the actual file format. `saveJPEG` retains its 4 MiB compatibility bound. It checks cancellation before authorization and commit. Once issued, import is joined and cannot be rolled back by caller cancellation. It returns technical permission/image failures; photo selection/export receipts belong to Actions.
 
 Foreground camera, native preview/frame transport, healthy input switch, JPEG capture and Photos import.
 
@@ -69,3 +69,7 @@ Input is one JPEG/PNG, at most 4 MiB, with bounded valid dimensions. Upright JPE
 ## Direct container contract
 
 Native data/observation capabilities remain independent of business and transport modules. Capture control stays with execution owners; read-only observation never requests permission or opens a device. Current cross-module ownership is defined by the [overall design](../../README.md).
+
+## 基础相册实施契约
+
+✅ 提供有界原生照片检查、缩略图和格式保持的Photos资源导出；JPEG／HEIC／PNG，32MiB／100百万像素，add-only权限，提交后等待真实完成。

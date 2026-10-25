@@ -31,6 +31,7 @@ public final class SQLiteRepositories: Sendable {
                         "CREATE INDEX task_active ON tasks(id) WHERE status IN ('running','finishing')",
                     ]
                 ),
+                ("photo-album-v3", [SQLiteMediaRepository.albumMigrationSQL]),
             ])
         } catch {
             let primary = error

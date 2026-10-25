@@ -73,3 +73,7 @@ compare-qwen-protocols.py 仅对显式 flash／max 运行隔离的阿里 Respons
 ## 验收范围
 
 ❌ 原生 UI、麦克风／相机、真实模型准确率、设备动作和持续温度／性能由独立验收记录确认，脚本通过不能替代这些结果。
+
+## 相册原生依赖
+
+✅ 仅允许 UI/Settings/AlbumView.swift 使用 PhotosUI、CoreTransferable、UniformTypeIdentifiers、ImageIO 系统框架完成系统选择器及有界文件传输；UI 仍禁止项目模块依赖。根能力检查加入相册，要求 App 工厂复用 UIContainer.album。

@@ -7,6 +7,13 @@ import UI
 extension PhotographerAgent {
     public func bindUIExecution(_ consumer: GatewayOutputConsumer) { uiExecution.consumer = consumer }
     func startUIInputs() async throws {
+        if let uiAlbum {
+            let source = await uiAlbum.requests
+            let task = try await consumeUI(source, sessionID: sessionID) { agent, value, context in
+                try await agent.handleAlbum(value, context: context)
+            }
+            uiInputs.append(task)
+        }
         guard let uiCamera else { return }
         try await startCameraFacts(uiCamera)
         let source = await uiCamera.requests
@@ -20,6 +27,24 @@ extension PhotographerAgent {
         await cameraFacts?.value
         cameraFacts = nil
         await uiInputs.retire(for: descriptor.id)()
+    }
+    private func handleAlbum(_ value: AlbumInput, context: ProcessingContext) async throws -> AlbumReply {
+        guard status().lifecycle == .running, context.sessionID == sessionID else {
+            throw CommunicationError.scopeClosed
+        }
+        let consumer = try uiExecution.begin(context.requestID)
+        defer { uiExecution.finish(context.requestID) }
+        let request = PhotoAlbumInvocation(input: value, requestID: context.requestID, sessionID: sessionID)
+        let call = try InternalTool(path: "Camera.Album.perform").call([:])
+        let envelope = OutputEnvelope(
+            source: descriptor.id, context: context, output: .toolCall(call), executionAttachment: request)
+        let result = try await consumer.execute(envelope)
+        if result.isError {
+            // take preserves the original storage/platform failure when the handler ran.
+            _ = try await request.take()
+            throw PhotographerIntentFailure.execution(result)
+        }
+        return try await request.take()
     }
     private func startCameraFacts(_ camera: UICameraContainer) async throws {
         guard cameraFacts == nil else { return }

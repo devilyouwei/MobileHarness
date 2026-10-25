@@ -320,8 +320,8 @@ private func skillResponseExamples(_ id: String) throws -> [String] {
         AgentConfigurations.baseSkills(named: "Assistant") + ["photography"], fixed: config.capabilities)
     let basic = try skillResponseExamples("basic-skill")
     let photo = try skillResponseExamples("photography")
-    for examples in [basic, photo] {
-        let standalone = try #require(examples.first { $0 == "照片已保存。" })
+    for (examples, expected) in [(basic, "照片已保存。"), (photo, "照片已保存到 App 相册。")] {
+        let standalone = try #require(examples.first { $0 == expected })
         var trace = GenerationTrace(capabilities: catalog, textMapping: AssistantAgent.mapText)
         try trace.append(standalone)
         trace.finish()

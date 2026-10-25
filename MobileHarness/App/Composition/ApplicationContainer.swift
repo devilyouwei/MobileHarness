@@ -78,6 +78,9 @@ public final class ApplicationContainer: ManagedContainer, @unchecked Sendable {
     @MainActor public var navigationPresentation: Factory<UINavigationContainer> {
         self { MainActor.assumeIsolated { self.ui().navigation } }
     }
+    @MainActor public var albumPresentation: Factory<UIAlbumContainer> {
+        self { MainActor.assumeIsolated { self.ui().album } }
+    }
     @MainActor public var historyPresentation: Factory<UIHistoryContainer> {
         self { MainActor.assumeIsolated { self.ui().history } }
     }

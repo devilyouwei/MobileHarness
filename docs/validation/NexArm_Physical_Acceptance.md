@@ -2,6 +2,24 @@
 
 Each dated section is an independent hardware experiment with its own transport, configuration, observations and limits. This report includes September controller trials and October serial/decoder investigations; no single section defines the current implementation or proves iPhone BLE acceptance. Current contracts belong to module READMEs; raw samples are indexed in [measurements](../measurements/README.md).
 
+## 2026-10-24 — Restore motors 1 and 4 to position mode
+
+The user reported motors 1 and 4 remaining in speed mode and authorized restoring angle/position mode, explicitly requesting reference to Photographer's code. Source review followed Photographer's `NexArm.Tracking.aim` route to `NexArmAimCommand.releasePackets`, `NexArmControlService.releaseTracking`, and `NexArmMotorCommands`: tracking deliberately enters mode 1; release writes both speeds to zero, then mode 0 and torque enabled per axis. Register 33 owns mode, 40 torque and 46 speed. The current release also holds a last tracking goal; this one-off recovery has no trustworthy last goal and must not fabricate one or command a home position.
+
+The first port check found no USB serial device; the user then confirmed connection and the port `/dev/cu.usbserial-110` became visible. ✅ A bounded exclusive 1 Mbps/8N1 session verified ESP32/AT32 1.0.2 and transmitted these five recovery packets once each, with complete native writes and controller debug receipts:
+
+| Purpose | Exact packet |
+| --- | --- |
+| Motors 1 and 4 zero speed | `FF FF FE 0A 83 2E 02 01 00 00 04 00 00 3F` |
+| Motor 1 mode 0 | `FF FF 01 04 03 21 00 D6` |
+| Motor 1 torque enabled | `FF FF 01 04 03 28 01 CE` |
+| Motor 4 mode 0 | `FF FF 04 04 03 21 00 D3` |
+| Motor 4 torque enabled | `FF FF 04 04 03 28 01 CB` |
+
+Subsequent one-byte mode-register reads at address 33 for each axis returned controller receipts and aggregate telemetry, but no direct servo response. All checksum-valid CMD11 frames, before and after restoration, contained unsigned joint words `[65304,2399,1792,3176,2048,2048]`. Motor 1's raw 65304 is outside the production single-turn 0–4095 telemetry contract; its meaning and freshness are unresolved. These frames were retained as raw evidence and must not be described as valid production joint observations, proof of arrival or a measured safe hold target. No position target, home, ID, calibration, NVS-unlock, other-axis control write or automatic retry was sent. Serial closed normally after approximately 5.5 seconds.
+
+❌ Independent mode restoration, physical stop/angle-control acceptance and motor 1's abnormal position feedback remain unverified. The user must distinguish controller receipt from actual servo behavior; Photographer tracking intentionally re-enters mode 1 when active. Evidence: `/tmp/mobileharness-nexarm-position-mode-20261024-120128.json` retains exact packets, native write lengths and raw captures. Only this validation document changed; documentation diff formatting passed. Application builds/tests and native UI acceptance were not run for this hardware recovery.
+
 ## 2026-10-18 — Replacement joint 3 responds to joint 1 commands
 
 The user reported that the replacement servo installed at joint 3 responds to joint 1 commands. The replacement model and whether the original ID1 servo remains connected were not confirmed during this read-only investigation.

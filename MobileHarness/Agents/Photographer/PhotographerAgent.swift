@@ -17,6 +17,7 @@ public actor PhotographerAgent: Agent {
     var cameraFacts: Task<Void, Never>?
     var cameraFactSequence: UInt64 = 0
     let cameraObservationFailure: @Sendable (any Error) -> Void
+    let uiAlbum: UIAlbumContainer?
     let uiCamera: UICameraContainer?
     var uiInputs = AgentUIInputs()
     var uiExecution = AgentUIExecution()
@@ -48,12 +49,14 @@ public actor PhotographerAgent: Agent {
     // MARK: - Registration
 
     public static func runtimeCapabilities(_ capabilities: CapabilityRegistry) throws -> CapabilityRegistry {
-        try PhotographerCameraWorkflow.runtimeCapabilities(capabilities).adding(internalTools: [aimPermission])
+        try PhotographerCameraWorkflow.runtimeCapabilities(capabilities).adding(internalTools: [
+            aimPermission, InternalTool(path: "Camera.Album.perform"),
+        ])
     }
 
     public init(
         sessionID: String, configuration: AgentConfiguration? = nil, uiCamera: UICameraContainer? = nil,
-        controlsArm: Bool = false,
+        controlsArm: Bool = false, uiAlbum: UIAlbumContainer? = nil,
         cameraObservationFailure: @escaping @Sendable (any Error) -> Void = { _ in },
         outputCapacity: Int = PhotographerSignalPreprocessor.outputCapacity,
         controlAvailable: @escaping @Sendable () async -> Bool = { true },
@@ -61,6 +64,7 @@ public actor PhotographerAgent: Agent {
     ) throws {
         guard (1...8192).contains(outputCapacity) else { throw CommunicationError.invalidPayload }
         self.cameraObservationFailure = cameraObservationFailure
+        self.uiAlbum = uiAlbum
         self.uiCamera = uiCamera
         self.contextRepository = context
         guard contextRepository.agentID == .photographer else { throw AgentConfigurationError.identityMismatch }

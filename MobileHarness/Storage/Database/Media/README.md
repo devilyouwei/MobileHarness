@@ -1,27 +1,29 @@
-# Media Records and JPEG Delivery
+# Media Records and App Album
 
-## Responsibility and implementation
+## Responsibility and relationships
 
-MediaRepository.swift defines metadata reservation/state/read contract. CapturedPhotoStore.swift owns JPEG policy and pending/publication/ready compensation over injected MediaRepository and FileStore. SQLiteMediaRepository.swift owns media_files schema/SQL and timestamp/key names; it compiles only in StorageSQLite.
+MediaRepository defines file reservations and independent album collection records. CapturedPhotoStore combines injected metadata and byte stores; SQLiteMediaRepository owns the SQL adapter in StorageSQLite. StorageMedia depends on StorageCore and StorageFiles only. Actions owns photo validation, native effects and presentation; Storage never imports UI, PlatformKit or Agents.
 
-## Direct relationships
+AlbumRecord defines photo metadata (MIME, dimensions, optional capture time, camera/import origin), collection time, original creation time and stable keyset cursors. CapturedPhotoStore exposes capture save/read, explicit collect, importPhoto, albumPage, readAlbum and deleteAlbum. Camera/model/history reads retain their original source/session/input authorization; user album reads require actual ready collection.
 
-StorageMedia depends only on Storage. App chooses metadata and byte backends; camera/history consumers use owned media IDs. Audio owns live PCM, while this directory indexes retained media files. No camera/album/codec/native effects are implemented here.
+## Publication, collection and recovery
 
-## Lifecycle and failure contracts
+✅ Camera capture remains a ready JPEG file until collect commits album_added_at. Ignoring a preview does not collect it. Imports reserve metadata with collection intent before publishing bytes; only ready files become visible. A crash after publication can recover pending files by matching byte size without losing import intent. Legacy records have null collection time and remain available to authorized history reads without appearing in the album.
 
-StorageOperationGate serializes one operation/16 waiters across backend awaits; reads cannot reconcile or clean an in-progress publication. Defaults32 files/128MiB, App1024 files/2GiB, JPEG4MiB, reject/FIFO policy. Non-overwriting publication happens outside database transactions; ready is required before ID delivery. Pending recovery checks regular-file size. Cleanup inspects128 names per operation with a bounded listing cursor, closes it on errors and preserves unrelated files. Failed/unavailable rows retain references; cleanup failure preserves both causes. Reads check producer/session/input or original source/input.
+Non-overwriting file publication occurs outside SQL transactions. Failed publication preserves the original error and any compensation error. The original bytes are immutable. Camera JPEG remains limited to 4 MiB; imports permit JPEG/HEIC/PNG up to 32 MiB, with format/dimension validation supplied by the caller. Raw model/history reads retain their 4 MiB bound.
 
-[Storage](../../README.md)
+## Capacity and concurrency
 
-Binary object contract: FileStore describes byte objects only, with no file-protection or regular-file flags in its interface. File protection is configured when App constructs DiskFileStore; directory/non-blob keys are absent from object info. Preserve Media pending recovery through that neutral contract.
+✅ One StorageOperationGate serializes file/metadata combinations with 16 bounded waiters. Defaults are 32 files/128 MiB; production uses 1024 retained files/2 GiB. Reject policy never evicts. FIFO policy may evict only uncollected files, oldest first; protected collections alone exceeding admission capacity reject the new file. Failed/unavailable/deleted rows remain as evidence.
 
-✅ CapturedPhotoStore 增加 Sendable 延迟 MediaRepository 提供器，兼容直接注入和 Result 初始化；使用时解析，避免组合时打开数据库或永久缓存 notReady。文件与容量策略不变。
+Queries return at most 40 photos, ordered by capture time (creation time when absent) and numeric stable ID descending. A cursor uses both values; deleting an earlier row cannot shift later pages as offset pagination would.
 
-## 待实现
+✅ Deletion commits state=deleting before removing bytes, then commits deleted. Neither state appears in album queries or authorized history image reads. Failed cleanup is explicit; subsequent operations retry at most 128 pending deletions before proceeding. Failed cleanup can block storage operations until resolved; it cannot resurrect a deleted photo. Cleanup lists at most 128 names per operation, matches only owned capture/import/temp naming conventions and retains pending/ready resources.
 
-- Current producer is JPEG only; video/audio/document producers and real camera acceptance remain outstanding.
+## Remaining work
 
-## Storage 容器关系
+❌ Video/audio/document producers, media analysis, vectors, memory extraction and physical-device acceptance. See [album validation](../../../../docs/validation/Album.md).
 
-✅ 本目录的领域端口由 DatabaseStorage 发布；SQL 适配器统一归 Database/SQLite 编译，业务调用方不导入 SQLite 后端。
+[Storage](../../README.md) · [Database](../README.md)
+
+删除回执区分逻辑删除成功与文件清理问题；逻辑提交后即从当前UI列表移除，清理失败明确提示并保留恢复状态。

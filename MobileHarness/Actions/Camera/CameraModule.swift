@@ -3,9 +3,14 @@ import FunctionContracts
 @ActionCatalog
 public struct CameraModule: CapabilityModule {
     private let camera: any CameraControlCapability
-    public init(camera: any CameraControlCapability) { self.camera = camera }
+    private let album: (any PhotoAlbumCapability)?
+    public init(camera: any CameraControlCapability, album: (any PhotoAlbumCapability)? = nil) {
+        self.camera = camera
+        self.album = album
+    }
     public var definitions: [ActionFunction] {
         [
+            PhotoAlbumActions.function(using: album),
             CameraActions.savePhotoDefinition(completing: { [camera] invocation in
                 .value(try await CameraActions.savePhoto(invocation: invocation, using: camera))
             }),

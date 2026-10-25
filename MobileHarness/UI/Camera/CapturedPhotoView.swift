@@ -105,7 +105,7 @@ import Foundation
                                 .background(.black.opacity(0.65))
                                 .contentShape(Rectangle())
                             }
-                            .accessibilityLabel("保存照片到系统相册")
+                            .accessibilityLabel("保存照片到 App 相册")
                             .accessibilityIdentifier("camera.photo.save")
                             .disabled(camera.photoBusy || camera.savedMediaID == photo.id)
                         }
@@ -177,7 +177,7 @@ import Foundation
                         Color.black.ignoresSafeArea()
                         Image(uiImage: photo.image).resizable().scaledToFit()
                         HStack(spacing: 20) {
-                            Button("保存到相册") {
+                            Button("保存到 App 相册") {
                                 inspecting = false
                                 controls.savePhoto(photo.id)
                             }

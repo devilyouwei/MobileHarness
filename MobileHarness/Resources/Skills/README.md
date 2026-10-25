@@ -159,3 +159,11 @@ BasicSkill 要求以 CURRENT STATE task.value 和匹配目标判断关闭：无 
 ## Action-only bundled Skill policy
 
 ✅ Implemented: every bundled function has callType=action and an explicit Channel. History.list/read, ModelResources.snapshot, Provider.readSettings and Bluetooth.readStatus use Query. Instructions use exact XML aliases; query values enter existing round feedback. The generic loader still supports Tool declarations for isolated hosts/tests; production resources must not declare Tools. BasicSkill, ApplicationControl and HistoryQuery revisions identify the new instructions/registration.
+
+## 基础相册实施契约
+
+✅ Photography保存语义改为App相册；系统导出及删除不开放给Skill。
+
+## 对话打开相册
+
+✅ application-control增加App相册导航示例，并推进Skill revision；只开放页面导航，不增加相册读取、删除或系统导出能力。

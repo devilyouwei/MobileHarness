@@ -59,3 +59,7 @@ ActionEndpoints 显式组合 UI RuntimePresentation、SpeechExecutionEndpoint、
 完成语义由业务定义：状态接纳、动画恢复、音频排空、下载准入和电机到位具有不同边界。已经提交的业务效果不会因后续取消或反馈失败自动撤销。ActionReport 保留逐叶结果和执行失败，NativeCleanupFailure 保留并存的原始错误。
 
 [整体技术设计](../README.md) · [函数契约](Support/Contracts/README.md) · [Gateway 执行](../Gateway/Output/README.md)
+
+## 基础相册实施契约
+
+✅ Camera 拥有相册内部操作及真实完成，采用请求私有类型化附件传递文件和结果，不加入模型公开Skill。

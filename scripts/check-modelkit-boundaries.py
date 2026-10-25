@@ -390,6 +390,7 @@ if ui_dependencies:
 allowed_ui = {'Foundation', 'CoreGraphics', 'Observation', 'SwiftUI', 'UIKit'}
 # Public rendering frameworks are confined to the native rendering implementations.
 native_ui_imports = {
+    'Settings/AlbumView.swift': {'PhotosUI', 'CoreTransferable', 'UniformTypeIdentifiers', 'ImageIO'},
     'Camera/CameraVideoFrame.swift': {'CoreVideo'},
     'Camera/CameraFrameView.swift': {'CoreVideo', 'Metal', 'QuartzCore', 'Synchronization'},
     'Components/VoiceBars.swift': {'QuartzCore'},
@@ -1236,7 +1237,7 @@ for source in (ROOT / 'MobileHarness').rglob('*.swift'):
         raise SystemExit(f'UI root must own presentation construction: {source.relative_to(ROOT)}')
 ui_root_source = (ROOT / 'MobileHarness/UI/UIContainer.swift').read_text()
 ui_registry_source = (ROOT / 'MobileHarness/App/Composition/ApplicationContainer.swift').read_text()
-for property_name in ('home', 'camera', 'settings', 'modelResources', 'navigation', 'history', 'devices', 'diagnostics'):
+for property_name in ('home', 'camera', 'settings', 'modelResources', 'navigation', 'history', 'album', 'devices', 'diagnostics'):
     if f'public let {property_name}:' not in ui_root_source or f'self.ui().{property_name}' not in ui_registry_source:
         raise SystemExit(f'UI root and App must share the {property_name} capability.')
 conversation_view_source = (ROOT / 'MobileHarness/UI/Conversation/ConversationView.swift').read_text()
@@ -1247,7 +1248,7 @@ for source in (ROOT / 'MobileHarness/Agents').rglob('*.swift'):
         continue  # Read-only view-provider fields, not business mutation handles.
     if re.search(r':\s*(?:' + '|'.join(ui_model_names[:9]) + r')\b', source.read_text()):
         raise SystemExit(f'Agent business consumers require narrow presentation interfaces: {source.relative_to(ROOT)}')
-print('UI root owns eight capabilities and presentation construction; App shares them through explicit registration.')
+print('UI root owns nine capabilities and presentation construction; App shares them through explicit registration.')
 
 native_audio_source = (ROOT / 'MobileHarness/PlatformKit/Audio/AppleAudioIO.swift').read_text()
 if re.search(r'\.report\(\s*"audio"\s*,\s*"routeChanged"', native_audio_source):

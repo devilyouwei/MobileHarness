@@ -19,6 +19,10 @@ Requested Settings navigation:
 ```xml
 <openPage destination="settings"/>
 ```
+Requested App album navigation (opens the page; does not export or delete photos):
+```xml
+<openPage destination="album"/>
+```
 Requested scan:
 ```xml
 <Bluetooth.control operation="scan"/>

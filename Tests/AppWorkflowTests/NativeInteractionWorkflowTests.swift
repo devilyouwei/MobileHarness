@@ -176,7 +176,7 @@ import Testing
     await controls.waitUntilIdle()
     #expect(calls == 1)
     #expect(state.savedMediaID == id)
-    #expect(state.photoMessage?.hasPrefix("已保存到相册") == true)
+    #expect(state.photoMessage?.hasPrefix("已保存到 App 相册") == true)
 }
 
 @Test @MainActor func cameraOverlapHintClearsOnCompletionWithoutReplacingDeviceFailure() async throws {

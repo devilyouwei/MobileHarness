@@ -68,6 +68,10 @@ public actor CapturedPhotoStore {
             limits.maximumBytes <= 32 * 1024 * 1024 * 1024
         else { throw FileStorageError.invalidFile }
         do {
+            for item in try await repository.pendingPhotoDeletions() {
+                try await files.remove(item.path)
+                try await repository.setMedia(item.id, state: "deleted")
+            }
             if !prepared {
                 for item in try await repository.retainedMedia() where item.state == "pending" {
                     let info = try await files.info(item.path)
@@ -92,6 +96,7 @@ public actor CapturedPhotoStore {
         for name in page.keys {
             guard
                 name.range(of: "^[0-9]{8}_[0-9]{6}_[0-9]+\\.jpg$", options: .regularExpression) != nil
+                    || name.range(of: "^[0-9A-Fa-f-]{36}\\.(jpg|png|heic)$", options: .regularExpression) != nil
                     || name.hasPrefix(".media-") || name.hasPrefix(".store-")
             else { continue }
             if !retained.contains(name) { try await files.remove(name) }
@@ -102,7 +107,9 @@ public actor CapturedPhotoStore {
         try await operationGate.withAccess { [self] in try await saveLocked(data, owner: owner, capturedAt: capturedAt)
         }
     }
-    private func saveLocked(_ data: Data, owner: StorageOwner, capturedAt: Date = Date()) async throws -> String {
+    private func saveLocked(
+        _ data: Data, owner: StorageOwner, capturedAt: Date = Date(), metadata: PhotoMetadata? = nil
+    ) async throws -> String {
         try Task.checkCancellation()
         let repository = try makeRepository()
         let files = try makeFiles()
@@ -110,17 +117,35 @@ public actor CapturedPhotoStore {
             throw FileStorageError.invalidFile
         }
         try await prepare()
-        guard !data.isEmpty, data.count <= 4 * 1024 * 1024, data.count <= limits.maximumBytes else {
+        guard !data.isEmpty, data.count <= (metadata == nil ? 4 : 32) * 1024 * 1024, data.count <= limits.maximumBytes
+        else {
             throw FileStorageError.capacityExceeded
         }
+        if let metadata { try metadata.validate() }
         let old = try await repository.retainedMedia()
-        if limits.overflowPolicy == .reject,
-            old.count >= limits.maximumPhotos || old.reduce(0, { $0 + $1.bytes }) + data.count > limits.maximumBytes
-        {
-            throw FileStorageError.capacityExceeded
+        var count = old.count + 1
+        var totalBytes = old.reduce(data.count) { $0 + $1.bytes }
+        let reclaimable = old.filter { $0.albumAddedAt == nil }
+        guard old.filter({ $0.albumAddedAt != nil }).count + 1 <= limits.maximumPhotos,
+            old.filter({ $0.albumAddedAt != nil }).reduce(data.count, { $0 + $1.bytes }) <= limits.maximumBytes
+        else { throw FileStorageError.capacityExceeded }
+        if count > limits.maximumPhotos || totalBytes > limits.maximumBytes {
+            guard limits.overflowPolicy == .evictOldest else { throw FileStorageError.capacityExceeded }
+            for retired in reclaimable where count > limits.maximumPhotos || totalBytes > limits.maximumBytes {
+                try await repository.setMedia(retired.id, state: "unavailable")
+                try await files.remove(retired.path)
+                count -= 1
+                totalBytes -= retired.bytes
+            }
         }
-        let item = try await repository.reserveMedia(
-            bytes: data.count, source: owner.source, session: owner.session, input: owner.input, date: capturedAt)
+        let item: MediaFileRecord
+        if let metadata {
+            item = try await repository.reservePhoto(
+                bytes: data.count, owner: owner, metadata: metadata, createdAt: capturedAt)
+        } else {
+            item = try await repository.reserveMedia(
+                bytes: data.count, source: owner.source, session: owner.session, input: owner.input, date: capturedAt)
+        }
         var published = false
         do {
             try await files.putIfAbsent(data, key: item.path)
@@ -137,20 +162,58 @@ public actor CapturedPhotoStore {
             }
             throw original
         }
-        if limits.overflowPolicy == .evictOldest {
-            var count = old.count + 1
-            var bytes = old.reduce(data.count) { $0 + $1.bytes }
-            for retired in old where count > limits.maximumPhotos || bytes > limits.maximumBytes {
-                try await repository.setMedia(retired.id, state: "unavailable")
-                do { try await files.remove(retired.path) } catch {
-                    await resetCleanup()
-                    throw error
-                }
-                count -= 1
-                bytes -= retired.bytes
-            }
-        }
         return item.id
+    }
+    public func collect(_ id: String, owner: StorageOwner, metadata: PhotoMetadata) async throws {
+        try await operationGate.withAccess { [self] in
+            try await prepare()
+            let repository = try makeRepository()
+            guard let item = try await repository.media(id), item.state == "ready", item.source == owner.source,
+                item.session == owner.session, item.input == owner.input
+            else { throw FileStorageError.invalidFile }
+            _ = try await bytes(item)
+            try Task.checkCancellation()
+            try await repository.collectPhoto(id, metadata: metadata, at: Date())
+        }
+    }
+    public func importPhoto(_ data: Data, owner: StorageOwner, metadata: PhotoMetadata) async throws -> String {
+        try await operationGate.withAccess { [self] in
+            let id = try await saveLocked(data, owner: owner, metadata: metadata)
+            // Once bytes commit, finish the matching collection transaction before returning.
+            try await makeRepository().collectPhoto(id, metadata: nil, at: Date())
+            return id
+        }
+    }
+    public func albumPage(before: AlbumCursor? = nil) async throws -> AlbumPage {
+        try await operationGate.withAccess { [self] in
+            try await prepare()
+            return try await makeRepository().albumPage(before: before, limit: 40)
+        }
+    }
+    public func readAlbum(_ id: String) async throws -> Data {
+        try await operationGate.withAccess { [self] in
+            try await prepare()
+            let repository = try makeRepository()
+            guard try await repository.albumPhoto(id) != nil, let item = try await repository.media(id) else {
+                throw FileStorageError.invalidFile
+            }
+            return try await bytes(item, maximumBytes: 32 * 1024 * 1024)
+        }
+    }
+    public func deleteAlbum(_ id: String) async throws {
+        try await operationGate.withAccess { [self] in
+            try await prepare()
+            let repository = try makeRepository()
+            let files = try makeFiles()
+            guard let item = try await repository.media(id) else { throw FileStorageError.invalidFile }
+            try Task.checkCancellation()
+            try await repository.deletePhoto(id)
+            // Logical deletion is committed even if physical cleanup fails.
+            do {
+                try await files.remove(item.path)
+                try await repository.setMedia(id, state: "deleted")
+            } catch { throw PhotoDeletionCleanupFailure(error) }
+        }
     }
     public func read(_ id: String, owner: StorageOwner) async throws -> Data {
         try await operationGate.withAccess { [self] in try await readLocked(id, owner: owner) }
@@ -175,8 +238,8 @@ public actor CapturedPhotoStore {
         guard try await files.info(item.path) != nil else { return nil }
         return try await bytes(item)
     }
-    private func bytes(_ item: MediaFileRecord) async throws -> Data {
-        guard let result = try await makeFiles().read(item.path, maximumBytes: 4 * 1024 * 1024),
+    private func bytes(_ item: MediaFileRecord, maximumBytes: Int = 4 * 1024 * 1024) async throws -> Data {
+        guard let result = try await makeFiles().read(item.path, maximumBytes: maximumBytes),
             result.count == item.bytes
         else { throw FileStorageError.invalidFile }
         return result

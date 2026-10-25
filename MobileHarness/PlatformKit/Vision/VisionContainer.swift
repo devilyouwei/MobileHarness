@@ -13,13 +13,17 @@ public final class VisionContainer {
         }
         private var photoImport: Task<Void, any Error>?
         public func saveJPEG(_ data: Data) async throws {
+            guard data.count <= 4 * 1024 * 1024 else { throw ApplePhotoLibrary.Failure.invalidImage }
+            try await savePhoto(data)
+        }
+        public func savePhoto(_ data: Data) async throws {
             do {
                 try admission.check()
                 guard photoImport == nil else { throw PlatformError.busy }
                 let admission = admission
                 let task = Task {
                     try admission.check()
-                    try await ApplePhotoLibrary.saveJPEG(data)
+                    try await ApplePhotoLibrary.savePhoto(data)
                 }
                 photoImport = task
                 defer { photoImport = nil }

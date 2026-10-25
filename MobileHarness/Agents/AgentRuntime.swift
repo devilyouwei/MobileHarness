@@ -80,7 +80,8 @@ import StorageState
             memoryContainer: MemoryContainer, photographerContainer: PhotographerContainer,
             state: StateContainer, cache: CacheContainer, files: FilesContainer,
             chatRecords: any ChatRepository, taskRecords: any TaskRepository, camera: any CameraCapturing,
-            cameraUI: UICameraContainer, settingsUI: UISettingsContainer,
+            cameraUI: UICameraContainer, albumUI: UIAlbumContainer? = nil,
+            album: (any PhotoAlbumCapability)? = nil, settingsUI: UISettingsContainer,
             resourcesUI: UIModelResourcesContainer, devicesUI: UIDeviceSettingsContainer, historyUI: UIHistoryContainer,
             diagnosticsUI: UIDiagnosticsContainer,
             readHistoryPhoto: @escaping @Sendable (String, String) async throws -> Data?,
@@ -145,7 +146,7 @@ import StorageState
             device.environment = { try await applicationControlAgent.environmentSnapshot() }
             let photographerSessionID = applicationControlSessionID
             let photographerAgent = try PhotographerAgent(
-                sessionID: photographerSessionID, uiCamera: cameraUI, controlsArm: true,
+                sessionID: photographerSessionID, uiCamera: cameraUI, controlsArm: true, uiAlbum: albumUI,
                 cameraObservationFailure: { error in
                     containerFailures.report(module: "agents", component: "camera", operation: "observe", error: error)
                 },
@@ -269,7 +270,7 @@ import StorageState
                 historyPresentation: historyPresentation, camera: endpoints.camera,
                 history: HistoryQueryService(store: conversations),
                 historyMutations: mutations,
-                fullHistory: HistoryFullReadService(store: historyStore, photo: readHistoryPhoto),
+                fullHistory: HistoryFullReadService(store: historyStore, photo: readHistoryPhoto), album: album,
                 modelResources: modelResources, resourcePreferences: resourcePreferences,
                 resourceInventory: resourceInventory,
                 resourcePresentation: ResourcePresentationAdapter(

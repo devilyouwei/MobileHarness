@@ -80,6 +80,7 @@ public final class UIContainer {
     public let settings: UISettingsContainer
     public let modelResources: UIModelResourcesContainer
     public let navigation: UINavigationContainer
+    public let album: UIAlbumContainer = UIAlbumContainer()
     public let history: UIHistoryContainer
     public let devices: UIDeviceSettingsContainer
     public let diagnostics: UIDiagnosticsContainer
@@ -104,6 +105,7 @@ public final class UIContainer {
         settings.requests.setAvailable(value)
         modelResources.requests.setAvailable(value)
         history.requests.setAvailable(value)
+        album.requests.setAvailable(value)
         devices.requests.setAvailable(value)
         diagnostics.detectionRequests.setAvailable(value)
     }
@@ -161,7 +163,8 @@ public final class UIContainer {
         modelResources.requests.stop()
         history.requests.stop()
         devices.requests.stop()
-        let task = Task { [home, camera] in
+        let task = Task { [home, camera, album] in
+            await album.stop()
             await home.stop()
             await camera.stop()
         }
@@ -178,7 +181,7 @@ public final class UINavigationContainer {
 }
 
 public enum AppDestination: String, Hashable, Sendable {
-    case settings, language, recognition, synthesis, vision, bluetooth, history
+    case settings, language, recognition, synthesis, vision, bluetooth, history, album
 }
 @MainActor
 @Observable

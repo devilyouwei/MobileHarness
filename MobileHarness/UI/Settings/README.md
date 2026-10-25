@@ -87,3 +87,15 @@ SettingsFormController 只拥有草稿规范化、默认选项、请求忙态和
 ✅ ProviderEditorDraft 同时接纳 HTTP 与 HTTPS（域名或 IP，可带端口和路径）；保留名称、URL 唯一性、凭据长度和容量校验，错误提示不再要求仅 HTTPS。实际网络策略见 [Config](../../../Config/README.md)。
 
 Implemented: Provider URL input is optional. Blank/whitespace input resolves to https://api.openai.com/v1 on modal confirmation, sharing the same URL identity as an explicit official endpoint. Keep name/key, duplicate checks, and nonempty HTTP/HTTPS validation. Cover default resolution and duplicate default providers.
+
+## 用户板块入口
+
+✅ SettingsView 用户板块依次呈现“记忆”“相册”“Agent 记录”。记忆为无点击行为的静态 Label；相册进入独立照片管理页面，Agent 记录继续使用现有导航。
+
+## 基础相册实施契约
+
+✅ 启用相册导航，时间倒序网格每页40项、详情缩放、最多20张系统选择器导入、单张导出及确认删除。记忆保留静态项。长操作由根持有，页面退出不取消已接纳变更。
+
+删除回执区分逻辑删除成功与文件清理问题；逻辑提交后即从当前UI列表移除，清理失败明确提示并保留恢复状态。
+
+详情展示采用原生 Image I/O 最长边4096像素的按需显示图以限制解码内存，UIScrollView提供1～5倍缩放；导出始终读取原片文件，不导出显示图。

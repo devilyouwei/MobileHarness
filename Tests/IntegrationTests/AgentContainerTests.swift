@@ -295,12 +295,11 @@ private enum ContainerTestFailure: Error { case startup, cleanup }
                         chat: storage.database.chat, tasks: storage.database.tasks,
                         media: storage.database.media, devices: storage.database.devices)
                 }, state: storage.state, cache: storage.cache, files: storage.files, photos: photos,
-                camera: camera, cameraPresentation: presentation, cameraUI: ui.camera,
+                camera: camera, cameraPresentation: presentation, cameraUI: ui.camera, albumUI: ui.album,
                 makeCamera: { connections in
                     CameraCoordinator(
                         camera: camera, presentation: presentation, photos: photos,
                         photoCues: platform.audio.cue(.camera),
-                        saveJPEG: { try await platform.vision.saveJPEG($0) },
                         makeRuntime: connections.makeRuntime, connectPerception: connections.connectPerception)
                 }, bluetooth: bluetooth, audio: platform.audio,
                 languageModels: model.language, speechModels: model.speech, visionModels: model.vision,

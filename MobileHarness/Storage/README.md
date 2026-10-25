@@ -50,7 +50,7 @@ flowchart TB
 
 ✅ State 保存可编码的有限公开事实及只读投影；Cache 保存不可变缓冲区。数据库和文件写入成功才承诺对应持久化，不把内存成功解释为重启可恢复。Task/Skill 业务状态仍由 Agents 维护；照片发布仍由 CapturedPhotoStore 组合数据库元数据和文件。
 
-数据库 schema、ID、配置 envelope version 1、文件路径、照片恢复和 FIFO 契约保持。Models 的文件目录能力是真实路径，不用内存实现伪造文件 URL。业务错误保留在生产者；Storage 不生成用户文案。
+数据库 schema、ID、配置 envelope version 1、文件路径、照片恢复与仅回收未收录媒体的 FIFO 契约适用。Models 的文件目录能力是真实路径，不用内存实现伪造文件 URL。业务错误保留在生产者；Storage 不生成用户文案。
 
 ## 子目录与待完成
 
@@ -80,3 +80,7 @@ flowchart TB
 
 
 ✅ StorageFailure由StorageCore拥有，根start／stop使用throws(StorageFailure)，报告器统一交付同形结构；底层State／Cache／Files／数据库协议仍可抛领域错误。清理错误与underlying主错误分离，原始取消通过isCancellation判断；结构定义见根目录 [StorageFailure.swift](StorageFailure.swift)，公共机制见[公共契约](Support/Contracts/README.md)。
+
+## 基础相册实施契约
+
+✅ Media扩展独立相册收录元数据与照片资源操作，SQLite迁移默认不收录旧媒体；已收录照片不FIFO淘汰。

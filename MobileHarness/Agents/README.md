@@ -154,3 +154,7 @@ State 只保存有限公开事实，拥有者持唯一 Writer；完整 Context�
 ## 待实现
 
 ❌ 通用生产后台任务的完整业务契约、跨场景前台 Task 的统一最终 checkpoint、活跃 worker 的持久化恢复。
+
+## 基础相册实施契约
+
+✅ Photographer 消费 UI.album 请求，经Gateway调用Camera.Album；不把相册操作交给记忆抽取。

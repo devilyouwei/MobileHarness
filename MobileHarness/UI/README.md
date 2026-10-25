@@ -19,7 +19,7 @@ flowchart LR
  App["App 装配与生命周期"] -.-> Root["UIContainer"]
  Agent["Agents：主动订阅"] -->|"读取 UI 自有请求源"| Requests["子容器类型化请求／回执"]
  Actions["Actions：业务呈现"] -->|"UI 自有呈现值"| Root
- Root --> State["八个子容器的展示状态"]
+ Root --> State["九个子容器的展示状态"]
  State --> Views["页面与原生渲染"]
  Views -->|"提交 UI 自有输入值"| Requests
  Root --- Requests
@@ -37,7 +37,7 @@ UI 不持有 Agent 引用、身份或回调，不选择业务消费者，也不�
 
 ## 子容器与源码归属
 
-✅ 根构造时一次创建八个子容器，不在首次回复或页面切换时补建；构造与 start 不请求权限、不读取仓库、不启动设备或模型。
+✅ 根构造时一次创建九个子容器，不在首次回复或页面切换时补建；构造与 start 不请求权限、不读取仓库、不启动设备或模型。
 
 | 子容器 | 拥有的展示状态 | 源码 |
 | --- | --- | --- |
@@ -47,6 +47,7 @@ UI 不持有 Agent 引用、身份或回调，不选择业务消费者，也不�
 | modelResources | 资源列表、偏好、安装状态及 generation | [Settings](Settings/README.md) |
 | navigation | 应用路径与导航呈现 | UIContainer.swift |
 | history | 历史列表、详情及分页展示 | [Settings](Settings/README.md) |
+| album | 照片分页、详情读取、导入／导出／删除回执及根持有的变更任务 | [Settings](Settings/README.md) |
 | devices | 蓝牙展示快照 | [Settings](Settings/README.md) |
 | diagnostics | 语音合成与音频检测展示 | [Diagnostics](Diagnostics/README.md) |
 
@@ -117,3 +118,7 @@ Control requests use a separate single-slot stream under the same consumer lifet
 ## Request cancellation ownership
 
 ✅ A request owns one cancellation callback bound to its Agent-owned processing task. Page cancellation, root invalidation and consumer closure cancel admitted work as well as ending the receipt. The Agent joins its task before consuming replacement ordinary work; the source and unrelated requests remain available. The common consumer owns the existing 120-second deadline, removing role-specific deadline wrappers. No event bus or media buffer is added.
+
+## 基础相册实施契约
+
+✅ 新增稳定 album 子能力，Settings 内页面消费照片分页、缩略图、原图与管理回执；UI 无业务模块依赖。

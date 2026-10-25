@@ -7,7 +7,7 @@ extension CameraActions {
     @Action(
         domain: "Camera", module: "Capture", title: "savePhoto",
         doc:
-            "Save the displayed photo to Photos, join departure animation/cue and remove the preview. Import failure retains the photo. Receipt distinguishes committed save from feedbackIssues; repeated exact saved String does not duplicate import.",
+            "Collect the preview into the App album, then join departure/cue. Failure retains preview. Receipt reports committed save and feedbackIssues; repeated exact saved ID is idempotent. Phone Photos export is only in the album page.",
         parameters: [
             .init(
                 "mediaID", type: .string, required: true, description: "Exact captured photo String.",

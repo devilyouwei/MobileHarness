@@ -16,6 +16,7 @@ public struct BehaviorAssembly: Sendable {
         historyPresentation: any HistoryPresentationCapability, camera: any CameraControlCapability,
         history: any HistoryQueryCapability, historyMutations: any HistoryMutationCapability,
         fullHistory: (any HistoryFullReadCapability)? = nil,
+        album: (any PhotoAlbumCapability)? = nil,
         modelResources: any ModelResourceCapability, resourcePreferences: any ModelResourcePreferencesCapability,
         resourceInventory: any ModelResourceInventoryCapability,
         resourcePresentation: any ResourcePresentationCapability,
@@ -36,7 +37,7 @@ public struct BehaviorAssembly: Sendable {
         let modules = CapabilityModules.builtIn(
             presentation: presentation, playback: playback, pose: pose,
             historyPresentation: historyPresentation, camera: camera,
-            history: history, historyMutations: historyMutations, fullHistory: fullHistory,
+            history: history, historyMutations: historyMutations, fullHistory: fullHistory, album: album,
             modelResources: modelResources,
             resourcePreferences: resourcePreferences, resourceInventory: resourceInventory,
             resourcePresentation: resourcePresentation, providerDiscovery: providerDiscovery,

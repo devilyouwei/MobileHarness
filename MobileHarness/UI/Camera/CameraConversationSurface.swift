@@ -82,7 +82,7 @@
                                 Image(systemName: "arrow.triangle.2.circlepath.camera")
                                     .frame(width: 48, height: 48)
                             }
-                            .disabled(blocksNewActions || !camera.isEnabled || camera.isBusy || camera.controlBusy)
+                            .disabled(!camera.canSwitchCamera)
                             .accessibilityLabel(camera.facing == .front ? "切换到后置摄像头" : "切换到前置摄像头")
                             .accessibilityIdentifier("camera.switch")
 

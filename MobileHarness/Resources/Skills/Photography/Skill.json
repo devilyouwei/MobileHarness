@@ -1,8 +1,8 @@
 {
   "version": 2,
   "id": "photography",
-  "revision": 24,
-  "description": "Camera opening/closing/lens selection and photo capture/save/discard/reshoot within Assistant. Load photography for direct camera operations, including capture-only requests; use a local Task for continuing photo decisions. Never delegate this conversation.",
+  "revision": 25,
+  "description": "Control camera/lens and capture/save-to-App-album/ignore/reshoot in Assistant, including capture-only. Use a local Task for continuing photo decisions; never delegate.",
   "dependencies": [],
   "functions": [
     {

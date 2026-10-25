@@ -56,3 +56,7 @@ ModelKit 回调实际权重加载开始／结束；组合根更新 UI 交互门�
 ❌ 多窗口实例隔离；非合作依赖的强制中断。
 
 [App](../README.md) · [Actions 集成](../../Actions/Support/README.md)
+
+## 基础相册实施契约
+
+✅ 注入共享CapturedPhotoStore与Platform.vision照片能力至相册服务；ApplicationPresentation公开UI自有album子能力。

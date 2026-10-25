@@ -25,6 +25,9 @@
                         identifier: "settings.bluetooth.open")
                 }
                 Section("用户") {
+                    Label("记忆", systemImage: "brain.head.profile")
+                        .accessibilityIdentifier("settings.user.memory")
+                    destination(.album, title: "相册", icon: "photo.on.rectangle", identifier: "settings.user.album")
                     destination(
                         .history, title: "Agent 记录", icon: "doc.text.magnifyingglass",
                         identifier: "settings.agent.records")

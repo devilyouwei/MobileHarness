@@ -32,3 +32,7 @@ accept named domain-supplied migrations, including partial unfinished-message an
 
 
 ✅ 初始化与清理复合失败统一使用StorageCore.StorageFailure，不再使用独立准备失败类型；underlying保留初始化主错误，cleanupErrors保留附加错误。未确认清理继续阻止旧作用域被复用，stop不丢弃多项清理错误。
+
+## 基础相册实施契约
+
+✅ 添加相册元数据迁移和索引，旧media_files不自动收录；领域SQL继续由SQLiteMediaRepository拥有。

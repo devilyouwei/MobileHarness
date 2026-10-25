@@ -6,6 +6,8 @@
 
 | 文档 | 职责 |
 | --- | --- |
+| [镜头切换准入](Camera-Control-Availability.md) | 全局模型准备与原生相机按钮解耦，状态回归及真机验收边界。 |
+| [基础相册](Album.md) | App 收录、格式保持导入、独立系统导出、容量保护及删除恢复；真机验收与自动化区分。 |
 | [多 Provider 管理](Provider-Management.md) | 多配置持久化、凭据清理及模拟器验证范围。 |
 | [Agent containers](Agent-Containers.md) | Root/role ownership, lifecycle regression, build evidence and independent native acceptance. |
 | [Agents / Actions 组织整理](Agents-Actions-Organization.md) | 目录归属、共享机制与端点解耦的回归、模拟器编译和原工程文件协调限制。 |

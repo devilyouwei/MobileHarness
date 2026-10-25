@@ -17,7 +17,6 @@
         private var state: CameraPresentationSnapshot { presentation.snapshot }
         private let photos: CapturedPhotoStore
         private let photoCues: any CuePlaying
-        private let saveJPEG: @Sendable (Data) async throws -> Void
         private let isForeground: @MainActor () -> Bool
         private let captureRevision: @MainActor () -> Int
         private let ensureCaptureAvailable: @MainActor () throws -> Void
@@ -33,7 +32,7 @@
         var isBusy: Bool { photoTask != nil || photoCommand != nil }
         init(
             camera: any CameraCapturing, presentation: any CameraPresenting, photos: CapturedPhotoStore,
-            photoCues: any CuePlaying, saveJPEG: @escaping @Sendable (Data) async throws -> Void,
+            photoCues: any CuePlaying,
             isForeground: @escaping @MainActor () -> Bool, captureRevision: @escaping @MainActor () -> Int,
             ensureCaptureAvailable: @escaping @MainActor () throws -> Void,
             factsChanged: @escaping @MainActor () -> Void
@@ -42,7 +41,6 @@
             self.presentation = presentation
             self.photos = photos
             self.photoCues = photoCues
-            self.saveJPEG = saveJPEG
             self.isForeground = isForeground
             self.captureRevision = captureRevision
             self.ensureCaptureAvailable = ensureCaptureAvailable
@@ -105,20 +103,21 @@
             let selected = try selectedPhoto(id)
             guard let photo = state.capturedPhoto else { throw CameraControlError.photoUnavailable }
             presentation.present(.photoBusy(true))
-            presentation.present(.photoMessage("正在保存到相册…"))
+            presentation.present(.photoMessage("正在保存到 App 相册…"))
             let task = Task<CameraPhotoCommandReceipt, Error> {
                 let issues = try await departPhoto(photo, kind: .save, invocation: invocation) { [self] in
                     let data = try await photos.read(selected.id, owner: selected.owner)
+                    let info = try await NativeAlbumImage.inspect(data)
                     try Task.checkCancellation()
                     guard foreground, state.capturedPhoto?.id == selected.id else { throw CancellationError() }
-                    do { try await saveJPEG(data) } catch ApplePhotoLibrary.Failure.permissionDenied {
-                        throw CameraControlError.permissionDenied
-                    } catch ApplePhotoLibrary.Failure.invalidImage {
-                        throw CameraControlError.photoUnavailable
-                    }
-                    // An actual import remains committed if feedback subsequently fails or is cancelled.
+                    try await photos.collect(
+                        selected.id, owner: selected.owner,
+                        metadata: PhotoMetadata(
+                            mime: info.mime, width: info.width, height: info.height, capturedAt: info.capturedAt,
+                            origin: "camera"))
+                    // App album collection remains committed if subsequent feedback fails.
                     presentation.present(.savedMediaID(selected.id))
-                    presentation.present(.photoMessage("已保存到相册"))
+                    presentation.present(.photoMessage("已保存到 App 相册"))
                 }
                 return CameraPhotoCommandReceipt(
                     mediaID: selected.id, state: .saved, feedbackIssues: issues.isEmpty ? nil : issues)
@@ -138,7 +137,7 @@
                 presentation.present(
                     .photoMessage(
                         state.savedMediaID == selected.id
-                            ? "已保存到相册，退场反馈已中断" : "保存失败：" + error.localizedDescription))
+                            ? "已保存到 App 相册，退场反馈已中断" : "保存失败：" + error.localizedDescription))
                 throw error
             }
         }

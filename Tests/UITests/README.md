@@ -124,3 +124,7 @@ Provider 名称持久化、默认名称生成、独立弹窗草稿、重复 URL 
 ✅ providerModalAcceptsHTTPAndHTTPSIPAddresses 覆盖 HTTP/HTTPS IPv4、IPv6、端口与路径，仍拒绝 FTP；不访问真实网络。
 
 Implemented: Provider URL input is optional. Blank/whitespace input resolves to https://api.openai.com/v1 on modal confirmation, sharing the same URL identity as an explicit official endpoint. Keep name/key, duplicate checks, and nonempty HTTP/HTTPS validation. Cover default resolution and duplicate default providers.
+
+✅ 镜头切换回归覆盖全局准备checking／preparing／deferred／failed时已就绪相机仍可切换，并验证拍照／相机操作、未启用／未就绪、权限与前后台准入。
+
+前后台回归遵循原有清屏契约：返回前台本身不代表采集已恢复；收到新的相机就绪确认后才允许翻转。

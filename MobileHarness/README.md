@@ -38,7 +38,7 @@ flowchart LR
 | FunctionContracts | Independent business function inputs, declarations, reports and completion contracts. |
 | Gateway | Bound Agent communication, execution authorization, resources, scheduling, cancellation and feedback; depends only on AgentCore and function/execution/call contracts. |
 | ExecutionRuntime / CallRuntime | Shared lifetime/reporting mechanisms and protocol-neutral registration/call projections. |
-| UI | Zero project dependencies; eight subcontainers own UI values, typed requests, presentation state, renderers and native completion receipts. |
+| UI | Zero project dependencies; nine subcontainers own UI values, typed requests, presentation state, renderers and native completion receipts. |
 | PlatformKit | Zero project dependencies; audio, camera, connectivity and bounded native observation. |
 | ModelKit SDK targets | Independent processing and model/artifact lifecycle; the entire dependency closure stays inside the SDK and approved third-party/system SDKs. |
 | Storage targets | Independent state/cache/file/database capabilities and domain repositories. Only StorageSQLite owns GRDB; only application construction selects the backend. |
@@ -52,7 +52,7 @@ Agents and Actions each compile their owning directory, with AgentCore and Funct
 | ModelContainer | language, speech, vision, artifacts | ModelFailure |
 | PlatformContainer | audio, vision, connectivity | PlatformFailure |
 | StorageContainer | state, cache, files, database | StorageFailure |
-| UIContainer | home, camera, settings, modelResources, navigation, history, devices, diagnostics | UIFailure |
+| UIContainer | home, camera, settings, modelResources, navigation, history, album, devices, diagnostics | UIFailure |
 
 Roots create stable instance-local capabilities. Construction/start does not implicitly request permission, open capture, run inference or scan devices. Consumers receive required interfaces through initializers, never discover roots through IoC or create native owners. Foundation modules do not import business or transport modules.
 
@@ -83,7 +83,37 @@ Each participating UI subcontainer owns its typed request/reply capability. The 
 
 Local processing uses ProcessingContext for request/session/generation/turn/causality. AgentInput can represent a private local processing value with origin `local`; it is not published as a Signal and Gateway rejects local provenance. OutputEnvelope is constructed from ProcessingContext and explicit task authorization. Gateway binds the actual registered producer/incarnation and validates every executable output.
 
-User gestures and model decisions select the same registered Actions. Actions validate arguments and ownership, use injected capability ports, and return actual completion or failures. Local input does not bypass Channel ordering, leases, resource conflicts, output cancellation or feedback fences. UI completion is tied to a request generation and is separate from native animation/GPU/physical completion.
+Gestures that request business effects and model decisions select the same registered Actions. Actions validate arguments and ownership, use injected capability ports, and return actual completion or failures. Local business input does not bypass Channel ordering, leases, resource conflicts, output cancellation or feedback fences. UI completion is tied to a request generation and is separate from native animation/GPU/physical completion.
+
+#### Page navigation
+
+Touch navigation uses an App-injected callback and an AgentContainer forwarding method to update UI-owned navigation state; it does not invoke model reasoning or execute an Action. Conversational navigation loads the application-control Skill in Assistant, resolves the openPage alias to UI.Navigation.open and crosses Gateway authorization before Actions validates the destination and presentation scope. Both paths converge on NavigationState.path. The arrows below represent runtime calls and data flow, not compilation dependencies.
+
+```mermaid
+flowchart TD
+    Touch["手动点击：设置／相册等入口"]
+    Speech["对话：打开受支持的页面"]
+
+    Speech --> Assistant["Assistant：理解用户意图"]
+    Assistant --> Skill["加载 application-control Skill"]
+    Skill --> LLM["LLM 生成 openPage 调用"]
+    LLM --> Gateway["Gateway：校验调用身份与执行权限"]
+    Gateway --> Action["Actions：UI.Navigation.open<br/>校验 destination 白名单"]
+    Action --> Endpoint["Actions 导航端点<br/>校验会话与呈现可用性"]
+
+    Touch --> Forward["App 注入的导航回调<br/>经 AgentContainer 简单转发"]
+
+    Forward --> State["UI：NavigationState.path"]
+    Endpoint --> State
+
+    State --> Host["PersistentHomeNavigation<br/>根据路径管理导航层"]
+    Host --> View["ApplicationRootView<br/>创建对应页面"]
+
+    Action -.实际调用结果.-> Gateway
+    Gateway -.执行反馈.-> Assistant
+```
+
+Navigation completion confirms that the path was submitted, not that the destination's data finished loading. The home surface stays mounted beneath the navigation layer. Destination admission and function bindings belong to [Navigation Actions](Actions/UI/Navigation/README.md); navigation state and rendering belong to [UI](UI/README.md).
 
 ### Camera, vision and photography
 
@@ -91,7 +121,7 @@ CameraCoordinator in Actions owns enabled intent, native capture, permissions, c
 
 Native preview remains independent of pose inference. VisionPerception emits the existing gaze/pose internal calls and publishes typed pose observations through Agent communication. Same-frame presentation uses a generic opaque attachment; Gateway checks sequence/freshness without importing PlatformKit, and the Action endpoint validates the native frame and UI generation.
 
-Photographer owns camera commands, pose tracking and tracking freshness. Assistant can call photography functions without creating a Task; actual captured media and model image support determine subsequent photo observation. Original storage/Photos import and bounded model JPEG preparation remain separate. [Camera execution](Actions/Camera/README.md), [vision policy](Agents/VisionPerception/README.md) and [photographer policy](Agents/Photographer/README.md) own local details.
+Photographer owns camera commands, pose tracking and tracking freshness. Assistant can call photography functions without creating a Task; actual captured media and model image support determine subsequent photo observation. App album collection, explicit system Photos export and bounded model JPEG preparation remain separate. [Camera execution](Actions/Camera/README.md), [vision policy](Agents/VisionPerception/README.md) and [photographer policy](Agents/Photographer/README.md) own local details.
 
 ### Speech, listening and playback
 
@@ -126,3 +156,7 @@ UI/request generations, capture generations, Agent incarnation/session, task gra
 Automated checks, iOS compilation, real models, native UI and physical-device acceptance are separate evidence categories. Direct-input migration acceptance and remaining device/performance work are tracked in [the requirement](../docs/requirements/technical/Direct-Container-Input-Plan.md) and [validation](../docs/validation/Direct-Container-Input.md). No performance magnitude is asserted without comparable device measurements.
 
 Agent container implementation and outstanding acceptance are tracked in [the plan](../docs/requirements/technical/Agent-Containers-Plan.md) and [validation](../docs/validation/Agent-Containers.md).
+
+## 基础相册实施契约
+
+✅ 相册使用 UI.album 类型化请求 → Photographer → Gateway → Camera.Album 内部函数 → Storage.media／Platform.vision。savePhoto 只收录 App 相册，系统导出只在详情执行；App 注入唯一存储及原生能力。

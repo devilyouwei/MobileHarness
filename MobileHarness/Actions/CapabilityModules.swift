@@ -25,6 +25,7 @@ public enum CapabilityModules {
         pose: any PosePresentationCapability, historyPresentation: any HistoryPresentationCapability,
         camera: any CameraControlCapability, history: any HistoryQueryCapability,
         historyMutations: any HistoryMutationCapability, fullHistory: (any HistoryFullReadCapability)? = nil,
+        album: (any PhotoAlbumCapability)? = nil,
         modelResources: any ModelResourceCapability,
         resourcePreferences: any ModelResourcePreferencesCapability,
         resourceInventory: any ModelResourceInventoryCapability,
@@ -50,7 +51,7 @@ public enum CapabilityModules {
                 bluetoothStatus: bluetoothStatus),
             ResourcePresentationModule(inventory: resourceInventory, presentation: resourcePresentation),
             SpeechModule(playback: playback, listening: listening, gesture: listeningGesture, detection: detection),
-            CameraModule(camera: camera),
+            CameraModule(camera: camera, album: album),
             HistoryModule(history: history, mutations: historyMutations, fullReads: fullHistory), SystemModule(),
             ModelResourcesModule(
                 resources: modelResources, preferences: resourcePreferences, inventory: resourceInventory),

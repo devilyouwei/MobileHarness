@@ -8,7 +8,7 @@ extension UIActions {
         parameters: [
             .init(
                 "destination", type: .string, required: true, description: "Existing application destination.",
-                constraints: "home, settings, language, recognition, synthesis, vision, bluetooth or history.")
+                constraints: "home, settings, language, recognition, synthesis, vision, bluetooth, history or album.")
         ], timeout: .seconds(5))
     public static func open(invocation: any FunctionInput, using presentation: any ResourcePresentationCapability)
         async throws -> String
@@ -17,8 +17,8 @@ extension UIActions {
         try args.validateAllowedKeys(["destination"])
         let destination = try args.requiredString("destination", maximumUTF8Bytes: 32)
         guard
-            ["home", "settings", "language", "recognition", "synthesis", "vision", "bluetooth", "history"].contains(
-                destination)
+            ["home", "settings", "language", "recognition", "synthesis", "vision", "bluetooth", "history", "album"]
+                .contains(destination)
         else { throw ResourcePresentationError.invalidGeneration }
         try Task.checkCancellation()
         try await presentation.navigate(destination, invocation: invocation)

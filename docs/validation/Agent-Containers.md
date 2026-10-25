@@ -74,3 +74,11 @@ A diagnostic -warnings-as-errors build before the fix failed first on an existin
 Post-fix ./scripts/check.sh completed with exit code 0: 827 main integration tests and 221 serialized LiveRuntimeTests (206.223 seconds) passed, along with the other configured test products, boundary checks, formatting and project/plist checks. The three existing AgentCore warnings listed above and an incremental SwiftPM UI-bundle “missing creator for mutated node” warning remained; neither changed file emitted its prior warning. Evidence: /tmp/mobileharness-agent-container-final-check.log.
 
 Post-fix ./scripts/build-ios.sh completed with exit code 0: MobileHarnessSimulator, ModelKitRuntime, ModelKitNemotron and ModelKitSilero all reported BUILD SUCCEEDED, and bundled Agent resources were verified. The app build retained the toolchain's “Metadata extraction skipped, no AppIntents.framework dependency found” warning. Evidence: /tmp/mobileharness-agent-container-final-ios.log. Markdown local paths/anchors and git diff --check passed. This warning-only follow-up did not rerun device installation or physical acceptance; the user's first-entry confirmation above remains the device evidence.
+
+## Main-branch physical-device installation (2026-10-24)
+
+Built main at commit 86aed2f6 with the signed MobileHarness Debug device scheme and CURRENT_PROJECT_VERSION=2026102403 as a command-only override. Build, strict/deep signature verification and all 25 Agent/Skill assets plus Core protocol checks passed. No source or local signing configuration changed.
+
+Installed version 0.1.0/build 2026102403 over the existing App on the paired iPhone 17 Pro without uninstalling or resetting data/model storage. Initial post-install launch and inventory queries failed with CoreDeviceError 4000 (device disconnected immediately after connecting). A device-details reconnect succeeded; sequential inventory then independently confirmed the installed build, and launch retry succeeded. Native UI/business acceptance for this build was not observed.
+
+Evidence: /tmp/mobileharness-main-device-2026102403-build.log, /tmp/mobileharness-main-device-2026102403-install.json, /tmp/mobileharness-main-device-2026102403-reconnect.json, /tmp/mobileharness-main-device-2026102403-verified-retry.json and /tmp/mobileharness-main-device-2026102403-launch-retry.json.

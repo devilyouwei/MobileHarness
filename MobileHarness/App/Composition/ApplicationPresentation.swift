@@ -55,6 +55,7 @@
         public var modelResourceControls: any ModelResourcesControlling {
             features.applicationControl.modelResourceControls
         }
+        public var album: UIAlbumContainer { features.album }
         public var recordDestinations: [AgentRecordDestination] {
             let state = features.memory.historyState
             let controls = features.memory.history

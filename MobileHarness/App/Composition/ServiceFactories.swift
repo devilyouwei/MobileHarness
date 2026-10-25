@@ -58,12 +58,12 @@ import UI
                         devices: storage.database.devices)
                 }, state: storage.state, cache: storage.cache, files: files, photos: photos, camera: camera,
                 cameraPresentation: presentation,
-                cameraUI: uiContainer.camera,
+                cameraUI: uiContainer.camera, albumUI: uiContainer.album,
+                exportPhoto: { data in try await platform.vision.savePhoto(data) },
                 makeCamera: { bindings in
                     CameraCoordinator(
                         camera: camera, presentation: presentation, photos: photos,
                         photoCues: platform.audio.cue(.camera),
-                        saveJPEG: { data in try await platform.vision.saveJPEG(data) },
                         makeRuntime: bindings.makeRuntime,
                         connectPerception: bindings.connectPerception)
                 },

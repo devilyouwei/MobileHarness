@@ -23,6 +23,10 @@ public final class CameraState {
     public internal(set) var controlMessage: String?
     public internal(set) var message: String?
     public internal(set) var needsSettings = false
+    public var canSwitchCamera: Bool {
+        (presentationAdmission?.active ?? true) && isEnabled && isVisible
+            && !isBusy && !controlBusy && !photoBusy && !needsSettings
+    }
     public private(set) var rendererFailure: String?
     public private(set) var videoGeneration: UInt64 = 0
     public private(set) var videoFrame: CameraVideoFrame?

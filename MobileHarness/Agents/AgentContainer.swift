@@ -31,6 +31,8 @@ import StorageState
         @ObservationIgnored private let capturedPhotos: CapturedPhotoStore
         @ObservationIgnored private let audio: AudioContainer
         @ObservationIgnored private let cameraDevice: any CameraCapturing
+        private let albumUI: UIAlbumContainer
+        private let albumService: PhotoAlbumService
         private let cameraUI: UICameraContainer
         @ObservationIgnored private let cameraFactory: @MainActor (CameraSessionConnections) -> CameraCoordinator
         @ObservationIgnored private let languageModels: any ModelLanguageProviding
@@ -66,7 +68,8 @@ import StorageState
             repositories: @escaping @Sendable () throws -> AgentRepositories, state: StateContainer,
             cache: CacheContainer, files: FilesContainer, photos: CapturedPhotoStore,
             camera: any CameraCapturing, cameraPresentation: any CameraPresenting,
-            cameraUI: UICameraContainer,
+            cameraUI: UICameraContainer, albumUI: UIAlbumContainer,
+            exportPhoto: @escaping @Sendable (Data) async throws -> Void = { _ in throw PhotoAlbumError.unavailable },
             makeCamera: @escaping @MainActor (CameraSessionConnections) -> CameraCoordinator,
             bluetooth: BluetoothWorkflow, audio: AudioContainer,
             languageModels: any ModelLanguageProviding, speechModels: any ModelSpeechProviding,
@@ -95,6 +98,8 @@ import StorageState
             self.repositories = repositories
             capturedPhotos = photos
             cameraDevice = camera
+            self.albumUI = albumUI
+            self.albumService = PhotoAlbumService(photos: photos, export: exportPhoto)
             self.cameraUI = cameraUI
             cameraFactory = makeCamera
             self.bluetooth = bluetooth
@@ -139,6 +144,7 @@ import StorageState
             return modelArtifacts
         }
 
+        public var album: UIAlbumContainer { albumUI }
         public var navigation: NavigationState { navigationUI.state }
 
         public func navigate(_ destination: AppDestination?) {
@@ -213,7 +219,7 @@ import StorageState
                 memoryContainer: memory, photographerContainer: photographer,
                 state: stateStorage, cache: cacheStorage, files: filesStorage,
                 chatRecords: try repositories().chat, taskRecords: try repositories().tasks,
-                camera: cameraDevice, cameraUI: cameraUI, settingsUI: settingsUI,
+                camera: cameraDevice, cameraUI: cameraUI, albumUI: albumUI, album: albumService, settingsUI: settingsUI,
                 resourcesUI: resourcesUI, devicesUI: devicesUI, historyUI: historyUI, diagnosticsUI: diagnosticsUI,
                 readHistoryPhoto: { [capturedPhotos] id, inputID in
                     try await capturedPhotos.readForInput(id, source: "assistant", input: inputID)

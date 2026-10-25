@@ -31,6 +31,7 @@
         var settingsControls: any SettingsControlling { get }
         var modelResources: ModelResourcesState { get }
         var modelResourceControls: any ModelResourcesControlling { get }
+        var album: UIAlbumContainer { get }
         var recordDestinations: [AgentRecordDestination] { get }
         func navigate(_ destination: AppDestination?)
         func cameraPreview() -> AnyView

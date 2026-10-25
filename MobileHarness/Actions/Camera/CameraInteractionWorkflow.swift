@@ -52,7 +52,7 @@ import UI
             }
             do { try await perform(operation, facing, mediaID) } catch {
                 if operation == .savePhoto, let mediaID, state.savedMediaID == mediaID {
-                    presentation.present(.photoMessage("已保存到相册，后续请求未完成：" + error.localizedDescription))
+                    presentation.present(.photoMessage("已保存到 App 相册，后续请求未完成：" + error.localizedDescription))
                 } else if mediaID != nil {
                     presentation.present(.photoMessage("照片操作失败：" + error.localizedDescription))
                 } else {

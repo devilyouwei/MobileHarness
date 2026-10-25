@@ -108,3 +108,13 @@ Provider 设置新增多 URL 配置重开恢复、删除清理及普通文档无
 Provider 名称持久化、默认名称生成、独立弹窗草稿、重复 URL 和空名称校验由自动化回归覆盖；原生弹窗布局与粘贴需设备验收。
 
 ✅ providerSettingsStagesHTTPIPConfiguration 覆盖 HTTP/HTTPS IP provider 的私有保存请求准入；使用替身服务，不代表真机局域网连通性。
+
+## 基础相册实施契约
+
+✅ 覆盖相册迁移／收录／保护保留／分页／删除清理／导入字节与权限失败，区别自动化与真机验收。
+
+Photography完成示例使用明确的“App相册”文案；保持与BasicSkill各自的独立成功示例解析和不结束无关Task的断言。
+
+## 对话打开相册
+
+✅ AlbumNavigationTests使用真实Skill目录／XML解析、NavigationModule／ActionExecutor和ResourcePresentationAdapter，验证album路径、presented回执、非法参数及无效会话不改变路径。

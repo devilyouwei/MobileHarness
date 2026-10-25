@@ -51,11 +51,10 @@
         private var revision = 0
         private var worker: Task<Void, Never>?
         private let photos: CapturedPhotoStore
-        private let saveJPEG: @Sendable (Data) async throws -> Void
 
         private let photoCues: any CuePlaying
         private lazy var photoSession = CameraPhotoSession(
-            camera: camera, presentation: presentation, photos: photos, photoCues: photoCues, saveJPEG: saveJPEG,
+            camera: camera, presentation: presentation, photos: photos, photoCues: photoCues,
             isForeground: { [weak self] in self?.foreground ?? false },
             captureRevision: { [weak self] in self?.revision ?? -1 },
             ensureCaptureAvailable: { [weak self] in
@@ -68,7 +67,6 @@
         public init(
             camera: any CameraCapturing, presentation: any CameraPresenting, photos: CapturedPhotoStore,
             photoCues: any CuePlaying,
-            saveJPEG: @escaping @Sendable (Data) async throws -> Void,
 
             makeRuntime: @escaping () throws -> CameraRuntimeDependencies,
             connectPerception:
@@ -76,7 +74,6 @@
                     String, Bool, any CameraOutputHandling
                 ) async throws -> Void
         ) {
-            self.saveJPEG = saveJPEG
             self.photoCues = photoCues
             self.captureOwner = ExecutionOwner(
                 agent: Self.resourceOwnerID, incarnation: UUID().uuidString,

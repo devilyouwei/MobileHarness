@@ -59,7 +59,7 @@ flowchart LR
 
 [UI 根](../README.md) · [原生组件](../Components/README.md) · [验证记录](../../../docs/validation/PlatformKit-Containers.md)
 
-✅ 已实现：宿主准备门禁禁止新开相机／切镜头，已开启相机仍可关闭，设置入口不受门禁影响；保留原相机忙碌及权限围栏。
+✅ 已实现：宿主准备门禁禁止新开相机，已开启相机仍可关闭；镜头切换仅依据相机自身状态，设置入口不受门禁影响；保留原相机忙碌及权限围栏。
 
 
 ✅ CameraState将渲染故障包装为UIFailure后同步交宿主，保留原技术描述和包装源码位置。CameraPresenting的帧新鲜度／方向／代际拒绝保持原领域错误及独立画面／骨架行为，不逐帧升级为全局Toast。
@@ -78,3 +78,11 @@ UI-owned typed request/reply capabilities have one consumer and at most 64 outst
 The macOS GPU regression creates a real hosted layer with explicit bounds and a visible test window before requesting drawables. A fully occluded WindowServer surface is a failed prerequisite, not a passed or skipped GPU result. The renderer's existing lifetime and completion contract remain unchanged; device/native evidence is tracked separately.
 
 ✅ 在 `-direct-input-diagnostics` 下每 120 帧报告画面尺寸，并报告首个 GPU 完成；不记录像素、不新增队列或转发任务。性能计时不启用此输出；原生宿主测试与 iPhone 预览分别验收，黑屏根因仍待定位。
+
+## App 相册收录
+
+✅ 照片保存按钮、确认菜单和无障碍标签明确表示“保存到 App 相册”；系统Photos导出只在相册详情提供，预览保存不申请Photos权限。
+
+## 镜头切换准入
+
+✅ CameraState.canSwitchCamera 统一提供翻转按钮准入：UI前台可用、相机已启用且原生采集确认可见，无权限问题且相机控制／拍照／照片处置均空闲。CameraConversationSurface不再以全局模型准备状态禁用翻转；开启和重试门禁保持既有契约。原生执行端仍独立校验权限、资源与前后台，不以按钮可用替代真实完成。

@@ -19,3 +19,7 @@ SQLiteDatabaseStorage 在后台任务完成目录、打开、迁移和恢复后�
 ## 统一容器异常通道
 
 ✅ SQLiteDatabaseFactory 接收 StorageFailureReporter，根及后端读/写/迁移/关闭错误进入相同宿主回调；DatabaseStorage 不导入框架事件。后端选择仍属于 App。
+
+## 基础相册实施契约
+
+✅ media端口扩展照片格式／尺寸／时间／来源与相册收录查询，继续使用同一后端和命名空间。

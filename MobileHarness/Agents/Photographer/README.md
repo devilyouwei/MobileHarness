@@ -8,7 +8,7 @@
 
 ## 职责与注入能力
 
-确定性角色，拥有相机 UI 请求、低频相机事实和跟踪策略，不运行普通 Chat，不消费视频帧。构造注入 `UICameraContainer`、私有 `AgentContextRepository`、`controlAvailable` 只读能力及观察失败回调；不注入 ModelKit 或原生相机控制接口。StorageCore 的中立值依赖不等于持有 Storage 根。
+确定性角色，拥有相机 UI 请求、低频相机事实和跟踪策略，不运行普通 Chat，不消费视频帧。构造注入 `UICameraContainer`、可选 `UIAlbumContainer`、私有 `AgentContextRepository`、`controlAvailable` 只读能力及观察失败回调；不注入 ModelKit 或原生相机控制接口。StorageCore 的中立值依赖不等于持有 Storage 根。
 
 ## 文件与职责
 
@@ -108,3 +108,7 @@ pause/stop 关闭接纳、取消并加入订阅／事务／跟踪；resume 加�
 通信以 [Agent.json](../../Resources/Agents/Photographer/Agent.json) 为准，函数契约见 [Camera](../../Actions/Camera/README.md)、[NexArm](../../Actions/NexArm/README.md)。
 
 本角色通过 [固定任务准入](../Support/Communication/README.md#固定任务准入) 接收 Assistant 委派。PhotographerCameraIntent.taskMessage 只解释 photography.camera；PhotographerCameraWorkflow 要求私有 cancel 来自本地 runtime 且匹配根会话与请求身份，远程业务载荷不能获得清理权。Task 取消通过 task.cancel 契约进入协调器。
+
+## 基础相册实施契约
+
+✅ 订阅UI.album并经身份绑定Gateway执行内部Album操作，根持有导入导出任务，停止取消并加入；相册不依赖相机开启。

@@ -69,6 +69,7 @@
                     modelResources: assembly.modelResources, modelResourceControls: assembly.modelResourceControls,
                     save: saveSettings)
             case .bluetooth: BluetoothSettingsView(state: assembly.bluetoothState, controls: assembly.bluetoothControls)
+            case .album: AlbumView(album: assembly.album)
             case .history: AgentRecordsView(destinations: assembly.recordDestinations)
             case .recognition, .synthesis, .vision:
                 ModelResourcesView(
