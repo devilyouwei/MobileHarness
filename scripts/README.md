@@ -97,3 +97,5 @@ The architecture checker enforces Gateway → FunctionContracts only, AgentCore 
 ## Execution layer source ownership
 
 The boundary checker requires Agents/Gateway/Actions Xcode groups to mirror the physical source directories, with one reference per file, complete Swift/README/JSON coverage and no misplaced or stale groups. This navigation check does not change target source membership or runtime behavior.
+
+The architecture boundary audit explicitly classifies AgentPlatformState as an Agents Support SDK adapter; Support/Context remains independent of PlatformKit and all foundation module isolation rules continue to apply.

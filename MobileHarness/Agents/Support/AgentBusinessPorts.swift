@@ -88,7 +88,6 @@ public typealias AgentBusinessRequest = ActionAssemblyRequest<
     public let connectionFacts: @MainActor @Sendable () throws -> AsyncThrowingStream<NexArmConnectionFacts, any Error>
     public let trackingAvailable: @Sendable () async -> Bool
     public let bindTracking: @MainActor (@escaping @Sendable () async -> Bool) -> Void
-    public let bindEnvironment: @MainActor (@escaping @Sendable () async throws -> String) -> Void
     public let bindDeferredFailure: @MainActor (@escaping @Sendable (DeferredActionFailure) async -> Bool) -> Void
     public let bindResources: @MainActor (ResourceCoordinator, ChannelScheduler) -> Void
     public let observeTranscript: @MainActor @Sendable (String, String) throws -> Void
@@ -105,7 +104,6 @@ public typealias AgentBusinessRequest = ActionAssemblyRequest<
             @escaping @MainActor @Sendable () throws -> AsyncThrowingStream<NexArmConnectionFacts, any Error>,
         trackingAvailable: @escaping @Sendable () async -> Bool,
         bindTracking: @escaping @MainActor (@escaping @Sendable () async -> Bool) -> Void,
-        bindEnvironment: @escaping @MainActor (@escaping @Sendable () async throws -> String) -> Void,
         bindDeferredFailure: @escaping @MainActor (@escaping @Sendable (DeferredActionFailure) async -> Bool) -> Void,
         bindResources: @escaping @MainActor (ResourceCoordinator, ChannelScheduler) -> Void,
         observeTranscript: @escaping @MainActor @Sendable (String, String) throws -> Void,
@@ -124,7 +122,6 @@ public typealias AgentBusinessRequest = ActionAssemblyRequest<
         self.connectionFacts = connectionFacts
         self.trackingAvailable = trackingAvailable
         self.bindTracking = bindTracking
-        self.bindEnvironment = bindEnvironment
         self.bindDeferredFailure = bindDeferredFailure
         self.bindResources = bindResources
         self.observeTranscript = observeTranscript

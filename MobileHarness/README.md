@@ -10,13 +10,13 @@ All technical documentation under `MobileHarness/`, including this document and 
 
 <a id="part-i--overall-architecture"></a>
 
-## Part I — Overall Architecture
+## Part I — Architecture
 
 ### 1. Biomimetic design
 
 MobileHarness draws on the perception–cognition–action feedback loop: it observes its environment, interprets information, coordinates behavior, acts through available capabilities and uses the observed outcomes to inform subsequent decisions. This biomimetic idea guides the separation of responsibilities and the flow of feedback across the system.
 
-**Agents provide cognition and role coordination.** They interpret observations and intent, maintain goals and context, select behavior and coordinate specialized roles. Agents own role policy and Skill/Task scope. They use deterministic processing or model inference as needed; ModelKit supplies inference as a capability within this cognitive process.
+**Agents provide perception and cognition.** Perception roles process native audio, visual observations and other typed inputs into meaningful information. Cognitive roles interpret observations and intent, maintain goals and context, select behavior and coordinate specialized roles. Agents own role policy and Skill/Task scope. They use deterministic processing or model inference as needed; ModelKit supplies inference as a capability within this cognitive process.
 
 **Gateway provides nervous-system coordination.** It relays Agent messages and execution feedback, validates transport identity and admission, and coordinates scheduling and shared resources. It connects decisions to execution while preserving the identity and lifecycle of each request. Business goals and role policy belong to Agents; business operations belong to Actions.
 
@@ -90,7 +90,7 @@ The figure shows runtime relationships. Lifecycle arrows to a frame apply to its
 
 The nervous-system analogy describes coordination, not a universal data funnel. Local UI requests and native observations reach their responsible Agents directly. Gateway carries Agent communication and governs executable output and feedback; raw sensor streams do not need to travel through it. Local presentation mechanics remain within UI.
 
-### 3. Design principles
+### 3. Principles
 
 IoC and module containers form the framework's core design pattern. The following principles define composition, module independence and public contracts.
 
@@ -732,6 +732,7 @@ flowchart TB
         direction LR
         subgraph Foundation["PLATFORMKIT"]
             Native["Actual native device facts"]:::platform
+            System["Time / power / thermal / locale<br/>Audio / permissions / network / accessibility"]:::platform
         end
         subgraph Business["ACTIONS"]
             Services["Owned camera / robot services<br/>Business conditions + native observations"]:::action
@@ -739,9 +740,13 @@ flowchart TB
         subgraph Presentation["UI"]
             UIState["Navigation / camera / album owners<br/>Presentation state"]:::ui
         end
+        subgraph Application["AGENTS · APPLICATION"]
+            AppState["ApplicationControl<br/>Admitted scene / model preparation"]:::agent
+        end
         Native -->|"typed observations / reads"| Services
     end
     Ports["App-bound camera / device access<br/>Neutral snapshot methods"]:::app
+    NativePort["App-injected PlatformStateReading<br/>Finite native JSON read port"]:::app
     subgraph Cognition["AGENTS · READERS"]
         Registry["AgentStateContext<br/>Named readers + session generations"]:::agent
         Select["Loaded Skills' useStates<br/>Union / deduplicate / sort"]:::agent
@@ -756,10 +761,16 @@ flowchart TB
     UIState -.->|"ui.navigation / ui.camera / ui.album"| Registry
     App -.->|"inject capabilities"| Ports
     App -.->|"inject UI owners"| Registry
+    System -.->|"selected native snapshot"| NativePort
+    NativePort -.->|"eight platform.* readers"| Registry
+    App -.->|"inject native port"| NativePort
+    AppState -.->|"agents.application summary"| Registry
+    App -.->|"report application observations"| AppState
     style Owners fill:#fafbfc,stroke:#939bad
     style Foundation fill:#edf8ef,stroke:#6b9d77
     style Business fill:#ffecef,stroke:#b86178
     style Presentation fill:#e8f5ff,stroke:#5f96b6
+    style Application fill:#f0eaff,stroke:#8261b5
     style Cognition fill:#faf7fd,stroke:#b1a0c4
     classDef app fill:#eaf2ff,stroke:#5078b8,color:#203b64
     classDef agent fill:#f0eaff,stroke:#8261b5,color:#463065
@@ -768,22 +779,28 @@ flowchart TB
     classDef platform fill:#edf8ef,stroke:#6b9d77,color:#315a3a
     linkStyle 0,1,2 stroke:#5078b8,stroke-width:1.5px
     linkStyle 3 stroke:#747bb8,stroke-width:1.5px
-    linkStyle 4,5,6 stroke:#438463,stroke-width:1.5px,stroke-dasharray:2 3
-    linkStyle 7,8 stroke:#939bad,stroke-width:1.5px,stroke-dasharray:8 4
+    linkStyle 4,5,6,9,10,12,13 stroke:#438463,stroke-width:1.5px,stroke-dasharray:2 3
+    linkStyle 7,8,11 stroke:#939bad,stroke-width:1.5px,stroke-dasharray:8 4
 ```
 
 The figure follows snapshot data toward the request. Registration stores callbacks; actual source methods run when collection invokes them. Gateway is not in this read path, and no read sends a Signal or schedules an Action. Reading does not start capture, load a model, scan for a device or mutate a Task. Containerization does not automatically expose every module or all of its internal fields.
 
 | State boundary | Owner and implemented behavior |
 | --- | --- |
+| Native system facts | Eight `platform.*` sources read the existing Platform root through an App-injected neutral SDK port. Core, Audio, Vision and Connectivity own time, power, thermal, network, authorization, audio, locale and accessibility facts; no model/role or execution policy is added to the SDK. |
 | Business facts | `actions.camera` and `actions.robot` read Actions-owned domain services through App-bound neutral access ports. Those services compose actual business/presentation conditions with native observations. They are not generic copies of the Actions root's lifecycle. |
 | Presentation facts | `ui.navigation`, `ui.camera` and `ui.album` read the injected UI owners on MainActor, including their presentation-availability checks. UI supplies presentation facts; Actions supplies business execution conditions. |
+| Application observations | `agents.application` reads the existing ApplicationControl role's admitted foreground/background and model-preparation summary, with per-field sequences and explicit unknown values. It does not include a last execution result, raw capability strings or a second navigation copy. |
 | Agent lifecycle and work | Agent lifecycle uses registered, running, paused, stopped and failed. AgentContext separately tracks queued/running/awaitingFeedback/continuation and terminal work. These private runtime states are not automatically included in CURRENT STATE. |
 | Task and Skill transitions | Agents owns private Task/Skill state and its minimal AGENT CONTEXT projection. Waiting for user input retains a Task; finishing/failure/cancellation joins the owned execution/cleanup barriers before terminal evidence. Skill retention follows Task ownership and completed Decision usage. |
 | Execution observation | Gateway records queued/running/cancelling/terminal execution and delivers actual results. Passive execution records, result delivery and native telemetry are distinct; cancelling is not proof of completed cleanup. They are not implicitly registered as model State sources. |
 | Persistence | Storage owns durable conversation/Task evidence and domain repositories. It is not a shared live State mirror. Persisting a request captures what was sent; it does not make those facts current for a later request or restore active execution. |
 
-AgentStateContext owns read capabilities and session generations, not cached fact values or a Task copy. Collection reads selected names in deterministic order and validates the session again after the reads. Unknown sources, unavailable source errors, invalid encoding, capacity failure and cancellation remain explicit; a closed/replaced session invalidates an in-flight collection. Each source defines its own snapshot consistency; the combined private/business context is not an atomic cross-owner view. The exact five source mappings and schemas belong in [Context](Agents/Support/Context/README.md#container-context-read-path).
+AgentStateContext owns read capabilities and session generations, not cached fact values or a Task copy. Collection reads selected names in deterministic order and validates the session again after the reads. Unknown sources, unavailable source errors, invalid encoding, capacity failure and cancellation remain explicit; a closed/replaced session invalidates an in-flight collection. Each source defines its own snapshot consistency; the combined private/business context is not an atomic cross-owner view. The fourteen registered source mappings and schemas belong in [Context](Agents/Support/Context/README.md#container-context-read-path).
+
+BasicSkill selects agents.application, ui.navigation and all eight native sources. Each actual request samples them again, including ReACT continuations. Time carries the sampled local date/time to seconds, weekday and zone/offset; it is not a clock that updates an in-flight request. Permission denial and unknown/null native facts remain data. Network observations describe a path rather than a successful provider connection. Raw route identities, SSIDs, IPs and sensor streams are excluded. Platform start/foreground/stop owns passive observation generations; state reads themselves never activate an audio session, start hardware, request permissions, scan or probe a server. Location/motion/depth/proximity and magnetic attachment are not part of these sources.
+
+State is the default low-cost summary for decisions. Sufficient current facts are answered directly. Specific Actions supply missing details under their own contracts, such as Bluetooth status/device IDs, resource inventory or history records; they may overlap a summary without creating another owner or fact cache. No generic environment-query Action is registered. Fresh collection means a new read, not a forced native observation or an active probe. Actual execution results remain correlated feedback/history, and Actions rechecks live business conditions after queueing.
 
 Observation does not establish authority or successful execution. Actions still checks live business preconditions and permits after Gateway queueing; model output cannot directly advance another owner's state machine. Real results update their owning histories and private state, and a later request re-reads the facts. Recovery does not replay effects. Generic runtime contracts belong in [AgentCore Runtime](Agents/Support/Core/Runtime/README.md), execution observations in [function contracts](Actions/Support/Contracts/README.md), and authorization ownership in the [Action lifecycle](#action-lifecycle-responsibilities).
 

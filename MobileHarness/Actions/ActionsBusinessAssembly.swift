@@ -165,7 +165,6 @@
                 connectionFacts: { [bluetooth] in try bluetooth.service.observeConnectionFacts() },
                 trackingAvailable: { [bluetooth] in await bluetooth.trackingAvailable },
                 bindTracking: { [bluetooth] in bluetooth.trackingInputAvailable = $0 },
-                bindEnvironment: { [device] in device.environment = $0 },
                 bindDeferredFailure: { [device] in device.deliverActionResult = $0 },
                 bindResourceRun: { [bluetooth] run in
                     bluetooth.withMotorResources = { motors, operation in

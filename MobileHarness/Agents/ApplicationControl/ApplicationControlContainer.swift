@@ -33,6 +33,14 @@
         public var devices: BluetoothSettingsState { devicesUI.state }
         public var navigation: NavigationState { navigationUI.state }
 
+        func contextSnapshot() async throws -> ContainerContextValue<ApplicationStateSnapshot> {
+            guard !closed else { throw AgentContainerError.stopped }
+            guard let session else { throw AgentContainerError.unavailable }
+            let value = try await session.agent.applicationState()
+            guard !closed else { throw AgentContainerError.stopped }
+            return value
+        }
+
         func setInputAvailable(_ value: Bool) {
             settingsUI.requests.setAvailable(value)
             resourcesUI.requests.setAvailable(value)

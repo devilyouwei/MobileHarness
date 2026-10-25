@@ -3,6 +3,7 @@ import Foundation
 @MainActor
 public final class VisionContainer {
     private let admission: PlatformAdmission
+    func authorizationSnapshot() -> [String: String] { NativeVisionAuthorization.snapshot() }
     #if os(iOS)
         private var nativeCamera: AppleCamera?
         public var camera: any CameraCapturing {

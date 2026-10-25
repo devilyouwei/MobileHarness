@@ -69,7 +69,7 @@ import UI
                 cameraAccess: AppCameraAccess(actionAssembly.business),
                 deviceAccess: AppDeviceAccess(actionAssembly.business),
                 facades: actionAssembly.business.facades,
-                audio: platform.audio,
+                audio: platform.audio, platformState: platform,
                 languageModels: model.language, speechModels: model.speech, visionModels: model.vision,
                 modelArtifacts: model.artifacts, memoryPressure: { await model.handleMemoryPressure() })
         }

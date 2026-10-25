@@ -4,7 +4,7 @@
 
 连接与控制状态由根控制服务拥有；本目录投影不把连接成功解释为电机到位。恢复预算有界，旧连接代际不能修改新连接；手动停止保留独立入口，停止软件工作不证明物理停机。
 
-本目录由所属域目录绑定，接受标准 FunctionInput；调用权限、通用调度与资源仲裁由上游 Gateway 保持。下游只消费注入的基础能力。
+本目录由所属域目录绑定，接受标准 FunctionInput；调用授权归 Agents；通用调度与资源仲裁归 Gateway。下游只消费注入的基础能力。
 
 ## 文件与实现
 
@@ -18,3 +18,7 @@
 | [NexArmDeviceAdapter.swift](NexArmDeviceAdapter.swift) | System.Device 到机械臂能力的类型化适配与延迟失败反馈 |
 
 [所属域设计](../README.md) · [Actions 模块](../../README.md)
+
+## Device read ownership
+
+NexArmDeviceAdapter exposes typed control, specific Bluetooth status and deferred failure delivery. Application/Agent observation and last-result readers are outside this adapter; it has no generic environment callback. Status reads retain Bluetooth ownership and do not scan, connect, move hardware or prove physical completion.

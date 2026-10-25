@@ -73,3 +73,7 @@ Native data/observation capabilities remain independent of business and transpor
 ## 基础相册实施契约
 
 ✅ 提供有界原生照片检查、缩略图和格式保持的Photos资源导出；JPEG／HEIC／PNG，32MiB／100百万像素，add-only权限，提交后等待真实完成。
+
+## Passive native authorization facts
+
+NativeVisionAuthorization queries camera and Photos add-only/read-write statuses without requesting permission, starting a camera or presenting a picker. PlatformContainer combines these with the other native permission facts through its read-only State port. Denied/restricted/notDetermined/limited are observed values; they do not become a business execution grant. Each actual camera/photo operation continues to enforce current platform permissions under its own lifecycle.

@@ -4,6 +4,11 @@ public enum ConnectivityCleanupError: Error { case disconnectUnconfirmed }
 
 @MainActor public final class ConnectivityContainer {
     private let admission: PlatformAdmission
+    private let networkState = NativeNetworkState()
+    func startStateObservation() { networkState.start() }
+    func invalidateStateObservation() { networkState.invalidate() }
+    func networkSnapshot() throws -> Data { try networkState.snapshot() }
+    var bluetoothAuthorization: String { NativeNetworkState.bluetoothAuthorization }
     #if os(macOS)
         private var serial: NexArmSerial?
         public func openSerial(path: String) throws -> any NexArmObservableLink {
@@ -25,6 +30,7 @@ public enum ConnectivityCleanupError: Error { case disconnectUnconfirmed }
         self.bluetooth = bluetooth ?? NexArmBluetooth(admission: admission)
     }
     func stop() async throws {
+        await networkState.stop()
         do {
             #if os(macOS)
                 await serial?.close()

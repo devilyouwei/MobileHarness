@@ -333,17 +333,15 @@ private func photographyAcceptance(
         "Camera.Capture.takePhoto", "Camera.Capture.savePhoto", "Camera.Capture.ignorePhoto", "Camera.Capture.open",
         "Camera.Capture.close", "Camera.Capture.flip", "Camera.Capture.retry", "NexArm.Gesture.nodHead",
         "NexArm.Gesture.waveWrist", "UI.Caption.beginReplyTurn", "UI.Caption.print",
-        "Speech.Playback.speak", "UI.Expression.express", "System.Device.readEnvironment",
+        "Speech.Playback.speak", "UI.Expression.express",
     ].map { path in
         let parts = path.split(separator: ".").map(String.init)
         return ActionBinding(
             path: .init(domain: parts[0], module: parts[1], function: parts[2]), displayName: path,
             kind: .finite, completion: "Synthetic confirmed effect",
             completing: { invocation in
-                if path == "System.Device.readEnvironment" {
-                    return .value(
-                        "Synthetic device fixture: App foreground; camera enabled and ready; facing front; robot arm connected with clear space. No physical device effect is being tested."
-                    )
+                if path == "Camera.Capture.takePhoto" {
+                    publicOwner.application.update { $0["modelPreparation"] = "loading" }
                 }
                 await effects.performed(path)
                 if path.hasPrefix("Camera.") {
@@ -533,6 +531,8 @@ private func photographyAcceptance(
                 #expect(systems.count == 2)
                 #expect(!systems[0].content.contains("# CURRENT STATE"))
                 #expect(systems[1].content.components(separatedBy: "# CURRENT STATE").count == 2)
+                for name in AgentPlatformState.sourceNames { #expect(systems[1].content.contains("\"" + name + "\"")) }
+                #expect(systems[1].content.contains("2026-10-25T12:00:00+08:00"))
                 #expect(request.messages.dropFirst().contains { $0.role != .system })
                 if request.messages.last?.role == .user {
                     #expect(request.messages.dropLast().last?.content == systems[1].content)
@@ -699,6 +699,10 @@ private func photographyAcceptance(
             return try #require(JSONSerialization.jsonObject(with: Data(json.utf8)) as? [String: Any])
         }
         #expect(try stateJSON(start)["actions.camera"] == nil)
+        let appBefore = try #require(try stateJSON(start)["agents.application"] as? [String: Any])
+        let appAfter = try #require(try stateJSON(start + 2)["agents.application"] as? [String: Any])
+        #expect((appBefore["value"] as? [String: String])?["modelPreparation"] == "idle")
+        #expect((appAfter["value"] as? [String: String])?["modelPreparation"] == "loading")
         let beforeCapture = try #require(try stateJSON(start + 1)["actions.camera"] as? [String: Any])
         let afterCapture = try #require(try stateJSON(start + 2)["actions.camera"] as? [String: Any])
         #expect((beforeCapture["value"] as? [String: Any])?["displayedMediaID"] == nil)
@@ -1066,7 +1070,7 @@ private struct TaskControlAcknowledgmentFixture: TaskControlCapability {
     #expect(basic.tools.isEmpty)
     #expect(basic.actions.contains { $0.alias == "startTask" })
     #expect(!basic.actions.contains { $0.alias == "send" })
-    #expect(basic.actions.contains { $0.alias == "readEnvironment" })
+    #expect(!basic.actions.contains { $0.alias == "readEnvironment" })
     let identity = try AgentConfigurations.identityInstructions(named: "Assistant")
     #expect(!identity.contains("startTask") && !identity.contains("loadSkills"))
 }

@@ -1,35 +1,21 @@
-# External Device Connectivity
+# Connectivity — Native links and network-path facts
 
-## Summary
+## Responsibilities and boundaries
 
-Transport and protocol capabilities for external hardware; the current implementation is NexArm USB/BLE.
+ConnectivityContainer owns NexArm USB/BLE capability instances and passive IP path observations. It uses system frameworks only. It defines no gesture catalog, Agent/Task policy, recovery decision, provider selection or application presentation. Callers own command meaning and physical completion.
 
-## Ownership and boundaries
+[NexArm](NexArm/README.md) owns framing, protocol values, native session fencing and USB/CoreBluetooth observations. Discrete operations reject excess work; live writes report actual admission and never replay failed commands. Connection or subscription does not establish motor arrival or pose success.
 
-No gesture catalog, presentation, Agent admission or recovery policy. NexArm owns bounded framing, native session fencing and connection facts; callers own what commands mean.
+## Network observation
 
-## External relationships and data flow
+NativeNetworkState owns one NWPathMonitor and one serial callback queue. start creates a fresh UUID generation and an unknown snapshot, then subscribes without an endpoint request, device scan or permission prompt. Each callback atomically replaces one value containing status, sorted interface types, expensive/constrained flags and observedAt. No queue of historical paths or per-event Task is retained. Before the first event flags/time are null and status is unknown.
 
-Runtime arrows show data or capability calls; dashed arrows show injection.
+Invalidation clears the generation/value before cancelling the monitor. stop also drains callbacks already queued on the serial queue; a late callback cannot update a retired or replacement generation. App foreground resume starts a fresh monitor after cleanup. This observer is part of PlatformContainer lifetime and independent of UI page lifetime. No path update emits a Signal or starts an inference.
 
-```mermaid
-flowchart LR
- Callers[Actions] <--> NexArm[NexArm SDK]
- NexArm <--> Device[USB or BLE firmware]
-```
+The snapshot describes a path, not endpoint availability, request success, bandwidth or exact network charges. It excludes interface names, addresses, SSIDs and device identifiers. PlatformContainer exposes it through its finite native State port only while admission is open.
 
-## Structure and contract
+## Authorization and failure
 
-[NexArm](NexArm/README.md) owns the link protocols, packet encoder/decoder, timestamped telemetry, USB serial and CoreBluetooth implementations. Connection/subscription success exposes a usable transport without pose probes or indication motion. Motion arrival is a caller-owned interpretation of feedback.
+Bluetooth authorization uses the static CBManager query. State reads do not create a central manager, scan or connect; actual link operations remain explicitly requested. Permission states are not Agent/Skill authority. Native enum additions map to unknown. stop closes owned USB/BLE links and verifies disconnection, retaining real cleanup failures through PlatformFailure.
 
-Discrete operations reject excess work explicitly. Live control returns whether a packet was actually admitted; the caller owns its latest intent. Disconnect invalidates old observation/control sessions, and no failed command is replayed.
-
-NexArm transports and protocol values.
-
-## Related design
-
-[Parent design](../README.md) · [NexArm](NexArm/README.md)
-
-## 待实现
-
-- 暂无本目录独立的实现待办；跨模块及实际模型/设备验收见所属模块说明。
+[PlatformKit](../README.md) · [NexArm protocol](NexArm/README.md)

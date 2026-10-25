@@ -66,3 +66,9 @@
 - [Action lifecycle responsibilities](Action-Lifecycle-Responsibilities.md): registration, semantic authorization, neutral scheduling/resource validity, business validation and completion ownership, with source-boundary and rendered-diagram evidence.
 
 - [State and conversation context pipeline](State-Context-Pipeline.md): live owner reads, explicit source registration, private Task/Skill projection, per-request message composition and rendered architecture evidence.
+
+- [Passive platform system State](Platform-System-State.md): eight native sources, explicit App injection, bounded observation lifecycle, request context and automated/native evidence limits.
+
+- [Current State before redundant queries](Current-State-First.md): environment-reader scope, BasicSkill direct answers, instruction budgets and model-adherence limits.
+
+- [State summaries and specific queries](State-And-Query-Responsibilities.md): application summary ownership, removed generic environment path, correlated feedback and admission/test/build evidence.

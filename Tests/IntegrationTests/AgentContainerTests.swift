@@ -301,7 +301,7 @@ private enum ContainerTestFailure: Error { case startup, cleanup }
                         camera: camera, presentation: presentation, photos: photos,
                         photoCues: platform.audio.cue(.camera),
                         makeRuntime: connections.makeRuntime, connectPerception: connections.connectPerception)
-                }, bluetooth: bluetooth, audio: platform.audio,
+                }, bluetooth: bluetooth, audio: platform.audio, platformState: platform,
                 languageModels: model.language, speechModels: model.speech, visionModels: model.vision,
                 modelArtifacts: model.artifacts, memoryPressure: { await model.handleMemoryPressure() })
         }

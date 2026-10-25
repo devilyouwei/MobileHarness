@@ -3452,3 +3452,33 @@ The overall design now separates App lifetime, Actions registration/business val
 ## 2026-10-25 — State acquisition and conversation context audit
 
 The overall design now diagrams explicit owner snapshot reads and Task/Skill/history-to-request composition. The audit distinguishes the five production business/UI sources from private Agent runtime state and documents fresh per-request sampling, minimal AGENT CONTEXT, CURRENT STATE and native-result-safe placement. Source boundaries, 25 overall plus nine owning-document Mermaid renderings, local references and diff formatting pass. Twenty-three unrelated overall diagrams remain unchanged. No new runtime code, full-suite/build, model or native-device acceptance is claimed. See [audit evidence](State-Context-Pipeline.md).
+
+## 2026-10-25 — Passive native State for BasicSkill
+
+Committed prior container/documentation work as checkpoint 0fb86445 before implementing eight native platform.* sources. App injects a read-only PlatformKit port; Agents registers thirteen total business/UI/native readers and BasicSkill samples native facts per model request. Time, passive observation generations, foreground invalidation/resume, context encoding and prompt inclusion have regression coverage. No directory, target, container or external dependency was added.
+
+Final ./scripts/check.sh passes, including 874 ordinary IntegrationTests and 221 isolated runtime tests; all four ./scripts/build-ios.sh Simulator schemes and 25 packaged Agent/Skill assets pass. Original instruction byte budgets are preserved (base 23,120; photography 30,496). Diagrams, references, source navigation and diff formatting pass. Earlier isolation/lint/prompt-budget failures are retained in the [validation report](Platform-System-State.md). The [completed plan](../completed/Platform-System-State.md) records implemented scope. No new real-model, phone installation or native/system-setting/physical-device acceptance is claimed.
+
+## 2026-10-25 - Current State before redundant queries
+
+BasicSkill revision 29 answers directly when CURRENT STATE supplies the requested facts, without redundant Skill loading or environment/query Actions. System.Device.readEnvironment canonical teaching and owning documentation identify admitted application observations and optional lastDeviceResult, not native platform-State refresh. Execution and completion rules remain unchanged.
+
+Required checks pass: 874 ordinary IntegrationTests and 221 isolated runtime tests, all other package targets/boundary/format checks, and all four iOS Simulator builds/resource verification. Instruction budgets remain unchanged; final base=23,078 and photography=30,454 bytes. Earlier failed budget iteration and unverified real LLM/native-device adherence remain in the [validation report](Current-State-First.md). [Completed plan](../completed/Current-State-First.md).
+
+## 2026-10-25 - Static instruction headroom
+
+At the user's request, raised only Assistant static instruction regression thresholds by 1,500 UTF-8 bytes each: base <25,000 and photography <32,000. Actual prompt sizes remain 23,078 / 30,454 bytes; runtime State/request bounds and safety/catalog assertions are unchanged. Full check passes (874 ordinary IntegrationTests, 221 isolated runtime tests and other required checks), along with all four iOS Simulator builds/resource verification. [Evidence](Current-State-First.md#follow-up-static-instruction-headroom) retains the previous limits and results. No new model/device acceptance.
+
+## 2026-10-26 - State summaries and specific detail queries
+
+BasicSkill revision 30 selects the new role-owned agents.application summary alongside existing native/navigation facts. Generic readEnvironment registration, capability, reverse binding and last-result projection are removed; specific Bluetooth/resource/provider/history queries and real execution feedback retain their owning contracts. Duplicate navigation observations are removed. The summary exposes only closed scene/preparation values, unknowns and admitted per-field sequences.
+
+Final required checks pass: 875 ordinary IntegrationTests, 221 isolated runtime tests and other package/boundary/format/Python/plist checks; all four iOS Simulator schemes and resource verification pass. All 25 overall diagrams render; the owner/read-path figure was visually inspected, and documentation references/diff formatting pass. Initial catalog assertion and Gateway pause-race failures are retained in the [validation report](State-And-Query-Responsibilities.md), with the early admission-fence correction and final passing evidence. [Completed plan](../completed/State-And-Query-Responsibilities.md). No new real-provider, native UI, phone installation or physical-device acceptance.
+
+## 2026-10-26 - Current State/query working tree installed on iPhone
+
+- At the user's request, built and signed the current working tree as MobileHarness Debug 0.1.0/build2026102601 using existing ignored local signing configuration and a command-only build-version override. Generic iOS-device build passes. No source/signing/version configuration was changed for deployment.
+- Deep/strict signature verification, unexpired target-phone provisioning and all25 packaged Agent/Skill assets plus Core protocol verify. All751 captured source/configuration/resource inputs remain unchanged across build and installation.
+- In-place installation on the paired iPhone17 Pro succeeds (installation sequence4872), OS launch succeeds (PID6555), and independent app inventory confirms dev.mobileharness.app 0.1.0/build2026102601 replacing2026102501. No uninstall or application-data reset was performed. The installation includes the native/application State sources, BasicSkill revision30 and removed generic environment query.
+- This records package/build/install and OS launch, not native UI, actual model adherence, camera/microphone or physical-device acceptance. Full automated checks were not repeated for this installation-only request. No commit or merge.
+- Host-local evidence: /tmp/mh-install-2026102601-build.log, /tmp/mh-install-2026102601-inputs.json, /tmp/mh-install-20261026-apps-before.json, /tmp/mh-install-2026102601-receipt.json, /tmp/mh-install-2026102601-launch.json and /tmp/mh-install-2026102601-apps-after.json.

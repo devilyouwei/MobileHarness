@@ -1,81 +1,35 @@
-# PlatformKit — 原生设备能力
+# PlatformKit — Native capabilities and system facts
 
-✅ Audio 内统一重复会话配置，执行隔离、设备生命周期及错误传播不变；调试时序收敛到持久总区间。
+## Responsibilities and boundaries
 
-✅ 根目录 PlatformContainer.swift 保留容器与接纳机制，PlatformFailure.swift 集中统一异常封装和 PlatformError 生命周期错误；不改变类型或传播行为。
+PlatformKit is an independent foundation SDK using system frameworks only. It owns native audio, camera, connectivity, typed observations, platform admission, native errors and passive system facts. It imports no Agent, Gateway, Actions, UI, Storage, ModelKit or application composition code. App constructs its single scoped root and controls lifetime; business consent, resource arbitration, interpretation and execution policy remain above the SDK.
 
-## 职责与边界
+## Public relationships and components
 
-PlatformKit 是不依赖其他项目模块的基础 SDK，只使用系统框架。提供原生设备能力、有限缓冲的输入、运行事实和执行错误；不认识 Signal、Agent、Action、UI 或 FactoryKit。
+| Component | Capabilities and owner |
+| --- | --- |
+| PlatformContainer | Root admission, lifecycle/failure projection and the finite PlatformStateReading port. Constructor creates capabilities without starting observations or devices. |
+| [Core](Core/README.md) | Native background allowance, bounded observation primitives, finite State source contract and system time/power/thermal/locale/accessibility reads. |
+| [Audio](Audio/README.md) | Native capture/playback, cues/haptics, numerical processing, native session events and application audio/permission facts. |
+| [Vision](Vision/README.md) | Camera/immutable frames/photo access and image preparation; camera/Photos authorization queries. |
+| [Connectivity](Connectivity/README.md) | NexArm USB/BLE protocol values, connection observations, passive IP path monitoring and Bluetooth authorization queries. |
 
-App 创建根并管理生命周期，业务拥有同意、资源租约、动作含义和感知策略。模块内部只创建／持有原生驱动，对外按能力协议接入。
+Native observation capabilities are injected directly into their responsible Agent or execution owner. They never generate business Signals. Read-only capture subscription does not start hardware; capture control stays with its owner. PCM remains ordered and bounded, while camera/native state observations retain newest values under the owning contracts.
 
-## 上下游与内部结构
+## Native State port
 
-```mermaid
-flowchart LR
- App["App 装配与启停"] -.-> Root["PlatformContainer"]
- Root --> Audio["AudioContainer"]
- Root --> Vision["VisionContainer"]
- Root --> Connectivity["ConnectivityContainer"]
- Consumer["注入的业务消费者"] -->|"原生能力协议"| Audio
- Consumer -->|"相机协议"| Vision
- Consumer -->|"链路协议"| Connectivity
- Audio <--> Hardware["系统与硬件"]
- Vision <--> Hardware
- Connectivity <--> Hardware
- Audio -->|"原生事实／数据"| Agents["负责的 Agent"]
- Vision -->|"原生事实／数据"| Agents
- Connectivity -->|"原生事实／数据"| Agents
-```
+PlatformStateSource has eight cases: time, power, thermal, network, permissions, audio, locale and accessibility. PlatformStateReading.snapshot returns one bounded JSON object for the selected source. It has no model-context envelope, role identity, Task or Skill semantics. App injects this narrow port into Agents; Agents supplies the platform.* source names and availability/value envelope. The [overall State flow](../README.md#container-state-read-path) describes that adapter and request sampling.
 
-Native values and events are observed directly by the owning Agent or execution service. PlatformKit has no routing, Signal encoding, Agent/session authority or application presentation policy.
+System time is sampled to seconds with a Gregorian date, fixed English weekday, current time-zone identifier and UTC offset. Power exposes battery level/charge/Low Power Mode; thermal exposes the OS pressure enum. Locale exposes locale/language/region identifiers, not physical location. Accessibility exposes VoiceOver, reduced motion, captions and mono audio. Permissions combine camera, microphone, Photos add-only/read-write and Bluetooth query results. Audio exposes port types, input mute and observed interruption; network exposes current path properties and last observation time. No device names, route UIDs, SSIDs, IPs, credentials or sensor streams are included.
 
-## 子能力接口
+Unknown native readings remain unknown/null. A denied permission is a successfully observed native condition, not a read error or business grant. Network path satisfaction is not evidence of endpoint success. The root rejects reads while cold, suspended or stopped and bounds each source to 8 KiB. OS/platform errors remain explicit rather than returning fabricated success.
 
-| 子能力 | 对外接口 | 完成与所有权 |
-| --- | --- | --- |
-| Audio | AudioInputOutput、CuePlaying、HapticFeedbackProviding | 首个有效PCM后就绪；播放等待真实dataPlayedBack；停止可加入 |
-| Vision | CameraCapturing，受控JPEG相册导入 | 相机actor管理图；独立最新帧；单次照片回调加入 |
-| Connectivity | NexArmBluetoothLink、NexArmObservableLink | 原生读写及观察；写入成功不代表物理到达 |
-| Core | 有界广播、单代输入围栏、采样与OS清理额度 | 不选择业务反应，不授予设备后台执行资格 |
+## Root lifetime, observation and cleanup
 
-Audio 的 voice/diagnostic/detection/camera 是有限原生作用域，作用域内实例缓存一致，共享会话互斥。原生实现的构造／配置留在子容器；协议参数只包含 SDK／系统值。
+start opens admission and starts passive battery/network/audio-event observation. It does not request permissions, open capture/playback, scan Bluetooth or probe a network endpoint. Battery monitoring restores its previous setting on invalidation. Audio retains two synchronous notification observers and a generation-fenced optional interruption fact. Network owns one monitor, one serial callback queue and one latest value; invalidation clears the generation before cancellation. Cleanup drains already queued callbacks; late generations cannot publish into a replacement.
 
-## 根生命周期
+invalidate closes admission synchronously, fences passive observations and requests native shutdown. setForeground(false) joins that cleanup; resume starts fresh observations only after the old cleanup succeeds and its foreground revision still matches. A newer invalidation prevents a late resume from reopening admission. Repeated stop shares the same joined result and retains cleanup failures. A stopped root cannot reopen. No observation event creates a model decision or executes business work.
 
-✅ 构造和 start 不请求权限、不打开设备、不扫描；start 开放同步 admission。invalidate 同步关门并请求原生停止，setForeground(false)/stop 加入实际停止；重复停止共享结果。失败保留，已停止根不可重用；消费者先停止，再释放根。
+Audio/Vision/Connectivity own their native stop/join semantics; short background allowance only assists cleanup/reassociation and cannot guarantee background inference or physical safety. Physical completion remains evidence supplied by the actual device owner. Detailed limits, cancellation and native failures belong in each component README.
 
-Audio/Vision/Connectivity 独立管理自己的取消、原生回调和清理。恢复／重建由拥有者明确决定，不自动重放设备动作；物理安全不依赖后台调度。
-
-## 数据、事件与失败
-
-原生PCM保持有序、满载明确失败；相机／状态使用最新值替换。缓冲上限、单消费者／独立观察者及清理规则见各能力 README。
-
-Native values and events are observed directly by the owning Agent or execution service. PlatformKit has no routing, Signal encoding, Agent/session authority or application presentation policy.
-
-公开错误和值属于本 SDK，不生成业务提示或应用身份。SDK日志仅保留有界原生格式／交通／错误事实，不记录媒体或业务上下文。
-
-## 源码风格与待完成
-
-✅ 根及相关 Audio/Vision 能力使用统一声明／导入格式；能力协议与实现同目录，具体驱动不进入业务成员类型。无调用的PCM预热／游标接口不属于当前公开端口，实际播放actor隔离和停止加入保持。
-
-❌ 视频录制、自主硬件安全控制器及完整原生／物理验收仍待完成。协议化、编译和替身测试不等于真实设备验收。
-
-[总体设计](../README.md) · [Audio](Audio/README.md) · [Vision](Vision/README.md) · [Connectivity](Connectivity/README.md) · [Core](Core/README.md)
-
-Native values and events are observed directly by the owning Agent or execution service. PlatformKit has no routing, Signal encoding, Agent/session authority or application presentation policy.
-
-
-✅ PlatformFailure属于独立SDK；根start／setForeground／stop类型化抛错，PlatformAdmission为原生回调包装同一结构并保留首次来源。Audio与根的清理失败使用underlying＋cleanupErrors；上层通过原始类型识别蓝牙连接条件，清理失败不能降为连接状态。
-
-
-## Direct container contract
-
-Native data/observation capabilities remain independent of business and transport modules. Capture control stays with execution owners; read-only observation never requests permission or opens a device. Current cross-module ownership is defined by the [overall design](../README.md).
-
-## 原生输入端口收敛
-
-✅ 已实现：AudioCaptureObserving 为跨平台只读采集端口，返回当前原生代的唯一 PCM 订阅；控制端 startCapture 只确认采集就绪，不向业务宿主返回流。订阅不请求权限、不打开设备；拒绝重复消费者和无采集源，沿用单份 64 包有序缓冲及明确溢出。
-
-✅ 已实现：音频观察与控制以独立公开能力分离；控制端口可跨平台替换，具体 Apple 驱动仍仅在 iOS 创建。
+[Overall design](../README.md) · [App composition](../App/Composition/README.md)

@@ -28,3 +28,9 @@ Shutdown reverses that order. Agents closes requests and joins roles; Gateway jo
 Initial inactive waits for active. Synchronous invalidation closes admission before asynchronous pause. Rapid reactivation completes necessary suspension first. One replacement task coalesces retries and rechecks foreground state; there is no replay queue. Durable records/media remain independent from runtime work.
 
 ForegroundPreparation is root-owned and active only for visible foreground home. It uses public readiness/preparation interfaces, independently of ordinary conversation waiting. Background artifact restoration may use the same model/storage roots before foreground startup; replacement still joins those owners. Native UI, real-model and physical-device evidence remains separate in [validation](../../docs/validation/README.md).
+
+## System facts and context injection
+
+App binds the PlatformStateReading port from its existing Platform root into Agents. It does not mirror native facts or generate model context. Passive native observation follows Platform lifecycle; Agents requests selected snapshots while its own request admission is live. See [composition](Composition/README.md#native-state-capability-binding) and the [overall State path](../README.md#container-state-read-path).
+
+Application observations flow to the Agents-owned summary source; App does not bind a generic environment-query callback into Actions. Navigation is read from its existing UI State owner. See [composition](Composition/README.md#observation-and-query-composition).

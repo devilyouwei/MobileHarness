@@ -67,3 +67,5 @@ ActionsExecutionPort supplies prepared descriptors/resources and executes under 
 Suspend cancels and joins preparation and accepted trees without destroying passive observation. Pending bounded result retries remain root-owned across pause. Terminal shutdown joins admissions, jobs, discarded credentials and delivery callbacks before ending observers. Opaque endpoint/incarnation/session cancellation retains a cancelled boundary until its ordered seal/terminal arrives; retained boundaries count against tracked-input capacity.
 
 Pure cancellation remains cancelled without an independent failure. Mixed real failures and child reports remain failed/partialFailure. No automatic effect replay, global fairness queue or Channel-level lease is implied. [Output](../README.md) · [Actions execution](../../../Actions/Support/README.md)
+
+A root-bound enqueue checks the admission fence before allocating preparation work, then checks again within preparation and commit. A request arriving after root suspension is rejected as unavailable rather than starting a task that races suspension cancellation. Work already admitted retains its existing cancellation/join semantics.

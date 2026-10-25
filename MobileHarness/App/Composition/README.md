@@ -54,3 +54,11 @@ Background URLSession completion can use the same model/storage scope before for
 ApplicationContainer projects each module's structured Failure, including ActionsFailure and GatewayFailure, into the existing diagnostic channel while preserving original errors. ModuleRegistration normalizes only pure cancellation after recording evidence; mixed cleanup errors remain failures. App supplies bootstrap failure before roles can present diagnostics.
 
 ForegroundPreparation is activated after the lifecycle foreground barrier and visible-home check. ModelKit reports actual load transitions; App updates interaction readiness and forwards facts to Agents for presentation. Ordinary checks, already-ready state and cloud configuration do not fabricate loading. See [Lifecycle](../Lifecycle/README.md) and [overall flows](../../README.md).
+
+## Native State capability binding
+
+ServiceFactories injects PlatformContainer as the narrow PlatformStateReading port into AgentContainer. This binding adds no App sampler, JSON schema conversion or extra lifecycle node. Platform startup owns passive native observation; Agents selects per-request reads, and roots retain their existing reverse cleanup order. Neither Actions nor Gateway is an intermediary for native State reads.
+
+## Observation and query composition
+
+App binds stable native/business read capabilities and reports scene/model preparation to Agents. AgentContainer registers agents.application from its ApplicationControl owner. Navigation reads its UI owner directly, without an additional application-environment publication. Specific business query Actions retain their owning services; App binds no generic environment/last-result callback from Agents into Actions.

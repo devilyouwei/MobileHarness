@@ -231,18 +231,19 @@ private struct RoundHarness {
 private func roundHarness(
     action: Bool, toolCount: Int,
     deliverActionFeedback: Bool = true, photo: Bool = false, supportsImages: Bool = false, photoCommand: String? = nil,
-    environment: Bool = false, playbackDelay: Duration = .zero, requestRounds: Int = 1, actionCount: Int = 1,
+    deviceStatus: Bool = false, playbackDelay: Duration = .zero, requestRounds: Int = 1, actionCount: Int = 1,
     photoObservation: (@Sendable (String, AgentInput) async throws -> ChatImage)? = nil,
     handler: @escaping ActionCompletionHandler
 ) async throws -> RoundHarness {
     let model = RoundModel(
         action: action, toolCount: toolCount, photo: photo, supportsImages: supportsImages,
-        photoCommand: environment ? "readEnvironment" : photoCommand, requestRounds: requestRounds,
+        photoCommand: deviceStatus ? "Bluetooth.readStatus" : photoCommand, requestRounds: requestRounds,
         actionCount: actionCount)
     let store = ConversationHistoryStore()
     let agent: any Agent
-    if photo || photoCommand != nil {
-        let declared = try AgentConfigurations.registry(AgentConfigurations.skill("photography").useActions)
+    if photo || photoCommand != nil || deviceStatus {
+        let declared = try AgentConfigurations.registry(
+            AgentConfigurations.skill(deviceStatus ? "application-control" : "photography").useActions)
         let capabilities = try CapabilityRegistry(actions: declared.actions, channels: declared.channels)
         agent = try FixtureNativeAgent(
             chat: model, conversations: store,
@@ -289,7 +290,7 @@ private func roundHarness(
     let paths = [
         "UI.Expression.express", "UI.Caption.print", "UI.Caption.beginReplyTurn", "Speech.Playback.speak",
         "Camera.Capture.takePhoto", "Camera.Capture.savePhoto", "Camera.Capture.ignorePhoto",
-        "System.Device.readEnvironment",
+        "System.Device.readStatus",
     ]
     let definitions = paths.map { path -> ActionBinding in
         let parts = path.split(separator: ".").map(String.init)
@@ -299,7 +300,7 @@ private func roundHarness(
             completing: { invocation in
                 if path == "Speech.Playback.speak" { try await Task.sleep(for: playbackDelay) }
                 if path == "UI.Expression.express" || path.hasPrefix("Camera.Capture.")
-                    || path == "System.Device.readEnvironment"
+                    || path == "System.Device.readStatus"
                 {
                     return try await handler(invocation)
                 }
@@ -968,25 +969,25 @@ private actor RoundAdmissionGate {
     }
 }
 
-@Test(.actionCatalog, .timeLimit(.minutes(1))) func assistantEnvironmentQueryUsesActionAndObservedContinuation()
+@Test(.actionCatalog, .timeLimit(.minutes(1))) func specificDeviceQueryUsesActionAndObservedContinuation()
     async throws
 {
     let harness = try await roundHarness(
-        action: false, toolCount: 0, environment: true, handler: { _ in .value("actual-environment") })
+        action: false, toolCount: 0, deviceStatus: true, handler: { _ in .value("actual-device-details") })
     let input = AgentInput(
         id: UUID().uuidString, sessionID: UUID().uuidString,
-        payload: .text("Read the current environment"))
+        payload: .text("Read discovered Bluetooth device details"))
     let pump = try await harness.start(input)
     try await pump.value
     let requests = await harness.model.requests
     #expect(requests.count == 2)
     #expect(requests.allSatisfy { $0.tools.isEmpty })
-    #expect(requests.last?.messages.contains { $0.content.contains("actual-environment") } == true)
+    #expect(requests.last?.messages.contains { $0.content.contains("actual-device-details") } == true)
     let outputs = await harness.log.outputs
     #expect(
         outputs.contains { envelope in
             if case .actionCall(let call) = envelope.output {
-                return call.actionPath.description == "System.Device.readEnvironment" && call.channel == "System"
+                return call.actionPath.description == "System.Device.readStatus" && call.channel == "Query"
             }
             return false
         })

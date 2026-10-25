@@ -43,14 +43,30 @@ import Testing
 private actor UnconfirmedPlatformLink: NexArmBluetoothLink {
     nonisolated let updates = AsyncStream<NexArmBluetoothSnapshot> { $0.finish() }
     private(set) var disconnects = 0
+    private var holdClose: Bool
+    private let unconfirmed: Bool
+    private var closeWaiter: CheckedContinuation<Void, Never>?
+    init(holdClose: Bool = false, unconfirmed: Bool = true) {
+        self.holdClose = holdClose
+        self.unconfirmed = unconfirmed
+    }
+    func waitForClose() async { while closeWaiter == nil { await Task.yield() } }
+    func releaseClose() {
+        holdClose = false
+        closeWaiter?.resume()
+        closeWaiter = nil
+    }
     func status() -> NexArmBluetoothSnapshot {
         var result = NexArmBluetoothSnapshot()
-        result.failure = .disconnectUnconfirmed
-        result.phase = .connected
+        result.failure = unconfirmed ? .disconnectUnconfirmed : nil
+        result.phase = unconfirmed ? .connected : .disconnected
         return result
     }
     func disconnect() { disconnects += 1 }
-    func close() { disconnects += 1 }
+    func close() async {
+        disconnects += 1
+        if holdClose { await withCheckedContinuation { closeWaiter = $0 } }
+    }
     func scan() throws { throw NexArmError.disconnected }
     func stopScan() {}
     func clearDiscovery() {}
@@ -181,4 +197,28 @@ private enum UIConsumerFailure: Error, Equatable { case start }
     #expect(root.language !== other.language)
     try await root.stop()
     try await other.stop()
+}
+
+@Test @MainActor func platformStateResumeCannotOutliveNewerInvalidation() async throws {
+    let link = UnconfirmedPlatformLink(holdClose: true, unconfirmed: false)
+    let root = PlatformContainer(makeConnectivity: { ConnectivityContainer(admission: $0, bluetooth: link) })
+    try root.start()
+    root.invalidate()
+    await link.waitForClose()
+    let ready = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingNewest(1))
+    let resume = Task { @MainActor in
+        ready.continuation.yield(())
+        try await root.setForeground(true)
+    }
+    var events = ready.stream.makeAsyncIterator()
+    _ = await events.next()
+    root.invalidate()
+    await link.releaseClose()
+    try await resume.value
+    ready.continuation.finish()
+    #expect(!root.isAvailable)
+    #expect(throws: PlatformError.unavailable) { try root.snapshot(.time) }
+    try await root.setForeground(true)
+    #expect(root.isAvailable)
+    try await root.stop()
 }

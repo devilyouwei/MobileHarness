@@ -52,19 +52,6 @@ extension SystemActions {
         return "{\"status\":\"accepted\",\"operation\":\"\(operation.rawValue)\"}"
     }
     @Action(
-        domain: "System", module: "Device", title: "readEnvironment",
-        doc:
-            "Read the latest admitted scene, navigation and device capability facts only when needed and absent from context. These are observations, not proof of physical completion. Wait for the result before deciding dependent actions.",
-        parameters: [])
-    public static func readEnvironment(invocation: any FunctionInput, using device: any DeviceControlCapability)
-        async throws -> String
-    {
-        try ActionArguments(invocation.call.parameters).validateAllowedKeys([])
-        let value = try await device.readEnvironment()
-        guard value.utf8.count <= 65_536 else { throw DeviceControlError.invalidRequest }
-        return value
-    }
-    @Action(
         domain: "System", module: "Device", title: "readStatus",
         doc: "Read current Bluetooth power/connection and discovered device IDs. Does not scan or move a robot.",
         parameters: [])

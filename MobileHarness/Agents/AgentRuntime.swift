@@ -130,7 +130,6 @@ import StorageFiles
                 uiProviderSettings: business.settings, uiProviderDiscovery: business.discovery,
                 uiProviderPresentation: business.providerPresentation, decodeResources: business.decodeResources,
                 context: applicationContext)
-            business.bindEnvironment { try await applicationControlAgent.environmentSnapshot() }
             let photographerSessionID = applicationControlSessionID
             let photographerAgent = try PhotographerAgent(
                 sessionID: photographerSessionID, uiCamera: cameraUI, controlsArm: true, uiAlbum: albumUI,

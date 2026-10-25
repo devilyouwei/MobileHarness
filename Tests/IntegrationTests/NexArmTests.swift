@@ -303,13 +303,7 @@ struct NexArmAssistantUIModule: ActionModule {
                 kind: .finite,
                 completion: "Test must never request speech.", handler: { _ in Issue.record("Unexpected speech") })
         ]
-            + [
-                ActionBinding(
-                    path: ActionPath(domain: "System", module: "Device", function: "readEnvironment"),
-                    displayName: "Unavailable environment fixture", kind: .finite,
-                    completion: "No environment reader is bound in robot fixtures.",
-                    handler: { _ in throw DeviceControlError.unavailable })
-            ]
+
     }
 }
 

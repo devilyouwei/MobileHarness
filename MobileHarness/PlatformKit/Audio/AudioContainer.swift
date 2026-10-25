@@ -5,6 +5,11 @@ import Foundation
 public final class AudioContainer {
     public enum Scope: CaseIterable, Sendable { case voice, diagnostic, detection, camera }
     private let admission: PlatformAdmission
+    private let systemState = NativeAudioState()
+    func startStateObservation() { systemState.start() }
+    func invalidateStateObservation() { systemState.stop() }
+    func systemSnapshot() throws -> Data { try systemState.snapshot() }
+    var microphoneAuthorization: String { NativeAudioState.microphoneAuthorization }
     #if os(iOS)
         private var instances: [Scope: AppleAudioIO] = [:]
         private var cues: [Scope: NativeCuePlayback] = [:]

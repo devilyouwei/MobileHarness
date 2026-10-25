@@ -45,3 +45,11 @@
 ## Execution layer cleanup (2026-10-25)
 
 - [Execution layer source ownership audit](Execution-Layers-Cleanup.md): consolidate six net Swift files, remove unused adapters/helpers, reconcile physical and Xcode ownership, and correct stale cognitive authorization diagrams. Full repository checks and all four Simulator schemes passed; [validation evidence](../validation/Execution-Layers-Cleanup.md) distinguishes build/test results from model/device acceptance.
+
+- [Platform system facts](Platform-System-State.md): eight passive native sources and BasicSkill context, implemented with required checks/builds; independent native acceptance limits remain explicit.
+
+- [Current State before redundant queries](Current-State-First.md): BasicSkill direct answers, precise environment-query scope and unchanged instruction budgets; [validation](../validation/Current-State-First.md) separates automated/build checks from real LLM adherence.
+
+## State summaries and detail queries (2026-10-26)
+
+- [State and query responsibilities](State-And-Query-Responsibilities.md): agents.application summary, removal of the generic environment Action/reverse binding, preserved specific queries and correlated feedback, with [automated/build evidence](../validation/State-And-Query-Responsibilities.md).

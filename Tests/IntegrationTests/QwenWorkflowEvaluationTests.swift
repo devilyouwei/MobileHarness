@@ -125,6 +125,12 @@ private final class QwenFacts: Sendable {
     }
     func context() throws -> AgentStateContext {
         let context = AgentStateContext()
+        try AgentPlatformState.register(in: context, reading: FixedPlatformState())
+        try context.register(
+            "agents.application",
+            source: ContainerContextSource {
+                ContainerContextValue(["scene": "active", "modelPreparation": "idle"])
+            })
         try context.register(
             "actions.camera", source: ContainerContextSource { [self] in ContainerContextValue(camera.read()) })
         try context.register("actions.robot", source: ContainerContextSource { [self] in ContainerContextValue(robot) })
@@ -257,8 +263,6 @@ private actor QwenEffects {
             }
         }
         switch path {
-        case "System.Device.readEnvironment":
-            return .value(#"{"foreground":true,"spaceClear":true,"cameraPermission":"authorized"}"#)
         case "System.Device.control":
             let operation = args["operation"] ?? ""
             if operation == "scan" { scanned = true }

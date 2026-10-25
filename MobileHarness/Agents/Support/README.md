@@ -11,6 +11,7 @@ Support owns reusable cognitive input/execution correlation, authorization, rout
 | InputGateway / OutputGateway | Real role/incarnation binding, semantic communication policy, frozen decision/Skill catalogs, Task grants, round/result ownership and explicit scope cancellation. |
 | ActionDispatcher / ToolDispatcher / ExecutionRouter | Cognitive output translation, protocol-specific dispatch and authorized submission to injected neutral Gateway facilities. No raw handlers or function registry. |
 | BehaviorCoverage / OutputValidator | Catalog coverage and cognitive request validation. |
+| AgentPlatformState | App-injected PlatformStateReading adapter, finite native source registration and bounded JSON context wrapping; Context mechanisms remain independent of PlatformKit. |
 | AgentGatewayBindings / AgentBusinessPorts / GatewayProjections | App-bound neutral hosts, generic observation scopes and immutable catalog. GatewayProjections owns all cognitive-to-neutral call/envelope and outcome conversion in one place. |
 | ActionActivityWorkflow / ActionActivityPresentation | Passive Agent/Task activity projection into UI values, never callable native/business execution. |
 | AgentContainerLifecycle | Coalesced startup/transition/cleanup/shutdown tasks, revision fencing and preserved failure. |
@@ -36,3 +37,5 @@ consumeUI has one ordinary and one control consumer, joining both on exit and cl
 ContainerFailureChannel retains 128 records and at most 64 pending deliveries, evicting oldest with explicit counters. One worker records delivery failure without recursive reporting; eight observers each retain a latest snapshot. Stop cancels/joins delivery before ending observations. OutputGateway owns cognitive execution-failure classification; Gateway owns neutral execution/outbox evidence. Pure cancellation remains distinct from real/mixed failure.
 
 Role shutdown cancels only owned work and never shuts down a borrowed global scheduler/transport. App retains terminal and cleanup ports through downstream root shutdown, then unbinds. No shared adapter searches a container or directly operates a device. See [Agents](../README.md) and the [overall design](../../README.md).
+
+Application summaries are read directly from the owning ApplicationControl role through agents.application. AgentBusinessPorts carries no generic environment/result reader into Actions. Specific query submission still uses the frozen catalog and neutral Gateway interfaces; result observations retain their actual call correlation.

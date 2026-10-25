@@ -77,8 +77,6 @@
         public func navigationChanged() {
             onHomeVisibilityChanged?(features.navigation.path.isEmpty)
             features.updateCameraAvailability()
-            features.reportEnvironment(
-                .navigation, value: features.navigation.path.map(\.rawValue).joined(separator: "/"))
         }
         public func prepare(progress: @MainActor (String) -> Void) async throws {
             if let startupFailure { throw startupFailure }

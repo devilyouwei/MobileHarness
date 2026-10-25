@@ -527,6 +527,9 @@ public actor ApplicationControlAgent: Agent {
                 else { throw CommunicationError.invalidPayload }
                 try fact.validate()
                 try input.validate(message)
+                if fact.category == .scene, !["active", "background"].contains(fact.value) {
+                    throw CommunicationError.invalidPayload
+                }
                 if fact.category == .modelPreparation {
                     guard fact.value == "loading" || fact.value == "idle" else {
                         throw CommunicationError.invalidPayload
@@ -935,32 +938,14 @@ public actor ApplicationControlAgent: Agent {
 
     // MARK: - Observability
 
-    public func environmentSnapshot() throws -> String {
+    public func applicationState() throws -> ContainerContextValue<ApplicationStateSnapshot> {
         guard lifecycle == .running || lifecycle == .paused else { throw HarnessError.notRunning }
-        let facts = try JSONSerialization.jsonObject(
-            with: JSONEncoder().encode(environment.values.sorted { $0.category.rawValue < $1.category.rawValue }))
-        var snapshot: [String: Any] = ["facts": facts]
-        if let result = deviceResults.results.last {
-            var value: [String: Any] = [
-                "executionID": result.executionID, "inputID": result.inputID,
-                "status": result.status.rawValue, "effect": result.effect.rawValue, "path": result.path.description,
-            ]
-            if let report = result.report {
-                value["failureDescription"] = report.failureDescription
-                value["executionFailure"] = report.executionFailure?.rawValue
-                value["entries"] = report.entries.map { entry -> [String: Any] in
-                    var value: [String: Any] = [
-                        "path": entry.path, "status": entry.status.rawValue, "details": entry.details,
-                    ]
-                    if let code = entry.code { value["code"] = code.rawValue }
-                    return value
-                }
-            }
-            snapshot["lastDeviceResult"] = value
-        }
-        let data = try JSONSerialization.data(withJSONObject: snapshot, options: [.sortedKeys])
-        guard data.count <= 65_536 else { throw CommunicationError.invalidPayload }
-        return String(decoding: data, as: UTF8.self)
+        return ContainerContextValue(
+            ApplicationStateSnapshot(
+                scene: environment[.scene]?.value ?? "unknown",
+                modelPreparation: environment[.modelPreparation]?.value ?? "unknown",
+                sceneSequence: environment[.scene]?.sequence,
+                modelPreparationSequence: environment[.modelPreparation]?.sequence))
     }
 
     public func manualResults() -> [ActionResult] { deviceResults.results }

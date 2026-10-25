@@ -1,8 +1,8 @@
 {
   "version": 3,
   "id": "basic-skill",
-  "revision": 27,
-  "description": "Task and Skill orchestration, grounded environment reading and a single continuing foreground goal.",
+  "revision": 30,
+  "description": "Task and Skill orchestration, current State summaries and a single continuing foreground goal.",
   "dependencies": [],
   "useActions": [
     {
@@ -34,16 +34,19 @@
       "callType": "action",
       "alias": "cancelTask",
       "channel": "Control"
-    },
-    {
-      "path": "System.Device.readEnvironment",
-      "callType": "action",
-      "alias": "readEnvironment",
-      "channel": "System"
     }
   ],
   "useStates": [
-    "ui.navigation"
+    "agents.application",
+    "ui.navigation",
+    "platform.time",
+    "platform.power",
+    "platform.thermal",
+    "platform.network",
+    "platform.permissions",
+    "platform.audio",
+    "platform.locale",
+    "platform.accessibility"
   ],
   "useInstructions": [
     "Instructions.md"

@@ -58,7 +58,7 @@ final class ApplicationActionAssembly {
             discovery: ports.discovery, providerPresentation: ports.providerPresentation, tasks: ports.tasks,
             resources: ports.resources, connectionFacts: ports.connectionFacts,
             trackingAvailable: ports.trackingAvailable,
-            bindTracking: ports.bindTracking, bindEnvironment: ports.bindEnvironment,
+            bindTracking: ports.bindTracking,
             bindDeferredFailure: ports.bindDeferredFailure,
             bindResources: { resources, _ in
                 ports.bindResourceRun { requested, operation in

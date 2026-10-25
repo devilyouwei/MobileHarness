@@ -217,6 +217,7 @@ public actor ChannelScheduler {
     /// Returns after admission, never after execution. All dormant jobs count toward capacity.
     @discardableResult
     public func enqueue(invocation submitted: ScheduledAction) async throws -> String {
+        try admission?.check()
         guard admissionWork.count < 128 else { throw ActionSchedulingError.inputCapacityExceeded }
         let id = UUID()
         let task = Task { try await self.admit(submitted) }

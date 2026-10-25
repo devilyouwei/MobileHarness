@@ -1,30 +1,21 @@
-# Platform Core — 通用原生生命周期工具
+# Platform Core — Native lifetime tools and system facts
 
-## 职责与边界
+## Ownership and interfaces
 
-PlatformKit Core 只依赖 Foundation/Synchronization/UIKit，不识别 Agent、Gateway、Action、UI 展示或应用业务。业务所有者注入读取、发布及错误报告回调；工具不选择领域反应。
+Core uses system libraries only. It does not know Agents, Signals, Actions, Gateway, UI presentation or application policy. NativeBackgroundAllowance owns a single OS background allowance/deadline and ends a replaced allowance idempotently; it grants no long-lived background execution guarantee. NativeInputBroadcast distributes SDK values without starting capture or choosing a business response.
 
-## 接口与运行契约
+NativeSystemState.swift defines the exhaustive PlatformStateSource enum and PlatformStateReading JSON read contract. PlatformContainer implements that port; this directory owns system time, power, thermal, locale and accessibility queries. Audio, Vision and Connectivity own their respective native facts; the root composes those public SDK values without business interpretation.
 
-资源观察的业务寿命不属于本目录；此处不实现采样、指纹比较或 Gateway 发布。
+## Time and synchronous facts
 
-✅ NativeBackgroundAllowance（iOS）持有一个系统后台额度和一个到期任务，替换先结束旧额度；OS 到期或明确 end 均幂等释放。它只为短期清理/重新关联提供额度，不保证后台模型或物理设备执行。
+A time read captures one injected Date and one current TimeZone. Gregorian formatting with en_US_POSIX produces localDateTime to seconds with an offset, an English weekday and the zone identifier. All fields derive from that same pair. No clock timer, Task or cached time is maintained; clock/zone replacement is testable. Nonfinite input rejects explicitly. Wall-clock observations do not replace monotonic deadlines used by native execution.
 
-## 直接关系与生命周期
+Power contains batteryLevel (0…1 or null), batteryState and lowPowerMode. Root start explicitly enables iOS battery monitoring; stop restores the prior setting. Unknown readings do not become zero percent. Thermal contains the OS nominal/fair/serious/critical level, with unknown for unrecognized future values. Locale contains identifier, preferredLanguage and region; it is not geolocation or an instruction overriding user preference. Accessibility contains voiceOver, reduceMotion, closedCaptions and monoAudio. Unsupported host fields remain null. Reads do not request permissions, activate audio or operate hardware.
 
-NativeInputBroadcast provides bounded independent observation. Capture-generation fences belong to the concrete Audio/Vision input sources. Native device shutdown remains owned by Audio, Vision and Connectivity; this directory owns no business sampler or Gateway publication.
+NativeSystemState.encode validates bounded JSON output of at most 8 KiB. These JSON objects contain native facts only; Agents owns source names and the model envelope. Unavailable root admission rejects collection. There is no global fact mirror, periodic sampler, Gateway publication or implicit capability discovery.
 
-[PlatformKit](../README.md)
+## Broadcast and cancellation
 
-## 待实现
+NativeInputBroadcast permits at most 16 subscriptions. latest retains one value per subscriber with replacement counters; ordered retains 64 values and terminates only the overflowing subscriber with an explicit error. finish closes current subscriptions, without executing native stop or replaying data. Capture generations and native device cleanup remain owned by Audio/Vision/Connectivity.
 
-❌ 非合作原生操作的强制中断和物理设备停止确认不由这些工具实现。
-
-✅ NativeInputBroadcast 只提供原生值分发，最多 16 个订阅者；latest 每订阅者保留一项并计数替换，ordered 每订阅者 64 项、溢出只终止该订阅并保留明确错误。finish 关闭当前全部订阅；不启停设备、不提供 Signal 或业务重放。
-
-✅ 音频围栏和单源容量由 Audio/MicrophoneCapture 拥有，相关回归验证实际音频源；本目录不再提供额外的采集广播围栏。
-
-
-## Direct container contract
-
-Native data/observation capabilities remain independent of business and transport modules. Capture control stays with execution owners; read-only observation never requests permission or opens a device. Current cross-module ownership is defined by the [overall design](../../README.md).
+[PlatformKit](../README.md) · [State read path](../../Agents/Support/Context/README.md#container-context-read-path)

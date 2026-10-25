@@ -27,3 +27,9 @@ Completed scope: [Actions container and one-way execution](../../completed/Actio
 - [Container architecture follow-ups](Container-Architecture-Followups.md): inherited limitations and identified corrective work, including the current execution-policy routing discrepancy.
 
 Completed scope: [Execution layer cleanup](../../completed/Execution-Layers-Cleanup.md), including redundant source consolidation and Xcode ownership reconciliation.
+
+Completed scope: [Platform system facts](../../completed/Platform-System-State.md), including eight native sources, App injection, BasicSkill context and required automated checks. Native acceptance limits remain in the validation record.
+
+Completed scope: [Prefer current facts](../../completed/Current-State-First.md): BasicSkill uses sufficient CURRENT STATE before Skill/function selection; model-adherence limits remain explicit.
+
+Completed scope: [State summaries and explicit queries](../../completed/State-And-Query-Responsibilities.md): role-owned application summary, generic environment-query removal and preserved specific detail queries.

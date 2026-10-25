@@ -111,3 +111,7 @@ Actions 按业务能力组织源码，保持原编译目标。生产调用显式
 ## Gateway container ownership
 
 ✅ Generic service-graph ordering and rollback remain covered here. GatewayContainerTests in IntegrationTests additionally exercises a real Gateway root under ApplicationLifecycle to verify executionBindings → gateway → agents ordering and retained binding lifetime.
+
+## Application observation worker
+
+ApplicationEnvironmentInputsTests exercises the existing bounded per-category worker with model-preparation loading/idle replacement, independent scene/device admission, explicit failure reporting and joined shutdown. Navigation is read directly through UI State and has no duplicate environment category/report. These tests exercise delivery mechanics with synthetic facts; role summary validation belongs to IntegrationTests.

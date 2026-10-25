@@ -125,9 +125,9 @@ private actor InteractionPresentation: ResourcePresentationCapability {
     try await runtime.prepareForInteraction()
     try await runtime.agent.observeEnvironment(.init(category: .scene, sequence: 3, value: "background"))
     await input.flushPublications()
-    let snapshot = try await runtime.agent.environmentSnapshot()
-    #expect(snapshot.contains("background"))
-    #expect(!snapshot.contains("replay"))
+    let snapshot = try await runtime.agent.applicationState()
+    #expect(snapshot.value?.scene == "background")
+    #expect(snapshot.value?.sceneSequence == 3)
     #expect(await device.calls.isEmpty)
     await input.shutdown()
     await runtime.shutdown()
@@ -161,9 +161,9 @@ private actor InteractionPresentation: ResourcePresentationCapability {
     await #expect(throws: CommunicationError.unauthorized) {
         try await agent.receive(loading.input(sessionID: UUID().uuidString))
     }
-    let snapshot = try await agent.environmentSnapshot()
-    #expect(snapshot.contains("idle") && snapshot.contains("active"))
-    #expect(!snapshot.contains("loading"))
+    let snapshot = try await agent.applicationState()
+    #expect(snapshot.value?.modelPreparation == "idle" && snapshot.value?.scene == "active")
+    #expect(snapshot.value?.modelPreparationSequence == 4)
     await agent.stop()
     var emitted = 0
     for await envelope in agent.outputs {
@@ -201,7 +201,9 @@ private actor InteractionPresentation: ResourcePresentationCapability {
     try await agent.receive(feedback)
     #expect(await agent.manualResults().count == 1)
     #expect(await agent.status().queuedInputs == 0)
-    #expect(try await agent.environmentSnapshot().contains("device.unavailable"))
+    #expect(await agent.manualResults().first?.report?.executionFailure?.rawValue == "device.unavailable")
+    let publicState = String(decoding: try JSONEncoder().encode(await agent.applicationState()), as: UTF8.self)
+    #expect(!publicState.contains(result.executionID) && !publicState.contains("lastDeviceResult"))
     let forged = AgentInput(
         id: UUID().uuidString,
         sessionID: session, payload: payload,
@@ -210,6 +212,47 @@ private actor InteractionPresentation: ResourcePresentationCapability {
     await #expect(throws: CommunicationError.unauthorized) { try await agent.receive(forged) }
     try await agent.receive(
         AppEnvironmentFact(category: .scene, sequence: 1, value: "active").input(sessionID: session))
-    #expect(try await agent.environmentSnapshot().contains("active"))
+    #expect(try await agent.applicationState().value?.scene == "active")
     await agent.stop()
+}
+
+@Test(.actionCatalog) func applicationStateUsesAdmittedSummaryWithoutQueryOrPrivateResultLeakage() async throws {
+    let session = UUID().uuidString
+    let agent = try ApplicationControlAgent(
+        sessionID: session,
+        context: AgentContextRepository(
+            agent: .applicationControl, scope: UUID().uuidString, state: ApplicationControlContextState()))
+    await #expect(throws: HarnessError.notRunning) { try await agent.applicationState() }
+    let context = AgentStateContext()
+    try context.register("agents.application", source: ContainerContextSource { try await agent.applicationState() })
+    try context.open(session: session)
+    try await agent.start()
+    let unknown = try await agent.applicationState()
+    #expect(unknown.value?.scene == "unknown" && unknown.value?.modelPreparation == "unknown")
+    #expect(unknown.value?.sceneSequence == nil && unknown.value?.modelPreparationSequence == nil)
+    try await agent.observeEnvironment(.init(category: .scene, sequence: 2, value: "active"))
+    try await agent.observeEnvironment(.init(category: .scene, sequence: 1, value: "background"))
+    try await agent.observeEnvironment(.init(category: .modelPreparation, sequence: 3, value: "idle"))
+    try await agent.observeEnvironment(.init(category: .capabilities, sequence: 4, value: "private-business-detail"))
+    await #expect(throws: CommunicationError.invalidPayload) {
+        try await agent.observeEnvironment(.init(category: .scene, sequence: 5, value: "invented-state"))
+    }
+    let first = try await context.snapshot(session: session, names: ["agents.application"])
+    let json = try #require(JSONSerialization.jsonObject(with: Data(first.utf8)) as? [String: [String: Any]])
+    let value = try #require(json["agents.application"]?["value"] as? [String: Any])
+    #expect(value["scene"] as? String == "active" && value["sceneSequence"] as? Int == 2)
+    #expect(value["modelPreparation"] as? String == "idle")
+    #expect(!first.contains("private-business-detail") && !first.contains(session) && first.utf8.count < 1024)
+    try await agent.pause()
+    try await agent.observeEnvironment(.init(category: .scene, sequence: 6, value: "background"))
+    #expect(try await agent.applicationState().value?.scene == "background")
+    let second = try await context.snapshot(session: session, names: ["agents.application"])
+    #expect(second != first && second.contains("background"))
+    await agent.stop()
+    await #expect(throws: HarnessError.notRunning) {
+        try await context.snapshot(session: session, names: ["agents.application"])
+    }
+    context.close()
+    #expect(!CapabilityModules.declarations.contains { $0.path.description == "System.Device.readEnvironment" })
+    #expect(CapabilityModules.declarations.contains { $0.path.description == "System.Device.readStatus" })
 }

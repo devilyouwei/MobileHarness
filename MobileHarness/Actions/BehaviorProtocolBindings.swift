@@ -28,7 +28,7 @@ public struct BehaviorProtocolBindings {
         if (function.path.domain == "Camera" && function.path.module == "Capture")
             || (function.path.domain == "UI" && function.path.module == "Navigation")
             || (function.path.domain == "System" && function.path.module == "Device"
-                && ["readEnvironment", "control"].contains(function.path.function))
+                && function.path.function == "control")
             || (function.path.domain == "System" && function.path.module == "ModelResources"
                 && ["download", "cancel"].contains(function.path.function))
         {

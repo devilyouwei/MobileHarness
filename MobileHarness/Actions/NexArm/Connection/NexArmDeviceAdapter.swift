@@ -9,13 +9,8 @@ import UI
 @MainActor public final class NexArmDeviceAdapter: DeviceControlCapability {
     public let bluetooth: BluetoothWorkflow
     public private(set) var fence = UUID().uuidString
-    public var environment: (@Sendable () async throws -> String)?
     public var deliverActionResult: (@Sendable (DeferredActionFailure) async -> Bool)?
     public var activity: (any ExecutionFailureReporting)?
-    public func readEnvironment() async throws -> String {
-        guard let environment else { throw DeviceControlError.unavailable }
-        return try await environment()
-    }
     public init(bluetooth: BluetoothWorkflow) { self.bluetooth = bluetooth }
     public func stopFence() -> String {
         fence = UUID().uuidString

@@ -28,6 +28,7 @@ import StorageFiles
         @ObservationIgnored private let containerFailures: ContainerFailureChannel
         @ObservationIgnored private let repositories: @Sendable () throws -> AgentRepositories
         @ObservationIgnored private let audio: AudioContainer
+        @ObservationIgnored private let platformState: any PlatformStateReading
         @ObservationIgnored private let cameraDevice: any CameraCapturing
         private let albumUI: UIAlbumContainer
         private let cameraUI: UICameraContainer
@@ -38,6 +39,12 @@ import StorageFiles
         @ObservationIgnored private let memoryPressure: @Sendable () async -> Void
         private func makeStateContext() throws -> AgentStateContext {
             let context = AgentStateContext()
+            try AgentPlatformState.register(in: context, reading: platformState)
+            try context.register(
+                "agents.application",
+                source: ContainerContextSource { [applicationControl] in
+                    try await applicationControl.contextSnapshot()
+                })
             try context.register(
                 "actions.camera",
                 source: ContainerContextSource(encoded: { [camera] in
@@ -96,7 +103,7 @@ import StorageFiles
             camera: any CameraCapturing, cameraPresentation: any CameraPresenting,
             cameraUI: UICameraContainer, albumUI: UIAlbumContainer,
             cameraAccess: any AgentCameraAccess, deviceAccess: any AgentDeviceAccess, facades: AgentUIFacades,
-            audio: AudioContainer,
+            audio: AudioContainer, platformState: any PlatformStateReading,
             languageModels: any ModelLanguageProviding, speechModels: any ModelSpeechProviding,
             visionModels: any ModelVisionProviding, modelArtifacts: any ModelArtifactsManaging,
             memoryPressure: @escaping @Sendable () async -> Void
@@ -117,6 +124,7 @@ import StorageFiles
             devicesUI = devices
             diagnosticsUI = diagnostics
             self.audio = audio
+            self.platformState = platformState
             self.cacheStorage = cache
             self.filesStorage = files
             self.repositories = repositories

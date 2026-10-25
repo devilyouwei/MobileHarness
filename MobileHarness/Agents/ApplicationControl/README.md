@@ -83,7 +83,7 @@ flowchart LR
  subgraph Role["ApplicationControl"]
  H["ApplicationControlUI：类型化处理"]:::agent
  W["设置／资源事务；固定 Task 协调"]:::agent
- E["ApplicationEnvironmentInputs：五类事实合并／序号／停止加入"]:::agent
+ E["ApplicationEnvironmentInputs：四类事实合并／序号／停止加入"]:::agent
  D["事实去重／异常分类／展示策略"]:::agent
  end
  U --> H --> W
@@ -169,3 +169,9 @@ ProviderSettingsClient 的连接失败提示允许 HTTP/HTTPS；配置仍通过�
 ## Execution ownership and lifecycle
 
 ProviderSettingsClient, ModelResourcesClient and UI interaction workflows belong to Actions. This role receives UI-owned facade interfaces and neutral staging/maintenance ports, owns Action and communication authorization, and submits calls through injected Gateway facilities. It does not construct business registries or native services.
+
+## Application summary State
+
+applicationState projects the role's existing admitted observation ledger as ContainerContextValue<ApplicationStateSnapshot>. agents.application contains only scene (active/background/unknown), modelPreparation (loading/idle/unknown) and each known field's admitted sequence. No second fact cache, observer, timer, native poll or execution-result lookup is created. Unobserved fields remain unknown; sequences are not wall-clock freshness guarantees. Scene and preparation inputs have closed value sets. The role accepts summaries while running/paused and rejects cold/stopped reads; the owning container checks closure again after await.
+
+BasicSkill selects the source for every actual model request. Navigation is read directly through ui.navigation; it has no duplicate role environment report. Device/capability observations remain private policy inputs, and actual results remain in the bounded correlated result inbox and feedback/history. Raw observation strings, result IDs and lastDeviceResult are not model State. Specific status/resource/history Actions retain their own detail contracts, without a generic environment query or reverse business callback.

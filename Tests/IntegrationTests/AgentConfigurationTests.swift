@@ -212,7 +212,7 @@ func agentConfigurationRejectsInvalidDocuments(_ mutation: String) throws {
     try skills.initialize(fixed: maximum, baseSkills: try AgentConfigurations.baseSkills(named: "Assistant"))
     let registry = try skills.registry(fixed: maximum)
     let prompt = try AssistantAgent.systemPrompt(capabilities: registry)
-    #expect(prompt.contains("Available Channels: Control, Display, Robot, Speech, System"))
+    #expect(prompt.contains("Available Channels: Control, Display, Robot, Speech\n"))
     #expect(prompt.contains("Action express:"))
     #expect(prompt.contains("Use listed default Channels."))
     #expect(prompt.contains("Action dance:"))

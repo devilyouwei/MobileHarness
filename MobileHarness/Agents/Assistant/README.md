@@ -212,3 +212,7 @@ These are Assistant-owned analysis and transport budgets. Native image conversio
 ## Container 上下文
 
 Assistant 消费根注入的只读容器来源，Task／Skill 来自自身私有决策快照；根生命周期结束关闭来源接纳，不保留历史公共Task镜像。
+
+## Basic native observations
+
+BasicSkill includes eight passive platform.* sources in addition to ui.navigation. These enter CURRENT STATE on every actual request through the injected PlatformStateReading adapter. Native time, power, thermal, path, permissions, audio, locale and accessibility are observations; they never override frozen capability authorization or current business execution checks. Task/Skill projection remains private AGENT CONTEXT. See [Context](../Support/Context/README.md#native-platform-sources).

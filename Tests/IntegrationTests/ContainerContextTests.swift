@@ -124,24 +124,32 @@ private actor ContextReadBarrier {
     }
 }
 
-@Test func skillStatesFollowDependenciesWithoutOwningFacts() async throws {
+@Test(.actionCatalog) func skillStatesFollowDependenciesWithoutOwningFacts() async throws {
     let owner = PublicStateFixtureOwner()
     let context = try owner.context()
     try context.open(session: "one")
     let fixed = try AssistantAgent.runtimeCapabilities(AgentConfigurations.load(named: "Assistant").capabilities)
     var skills = AgentTaskSkillState()
     try skills.initialize(fixed: fixed, baseSkills: ["basic-skill"])
-    #expect(try AgentSkillLoader.useStates(skills.loaded) == ["ui.navigation"])
+    #expect(
+        try AgentSkillLoader.useStates(skills.loaded)
+            == (AgentPlatformState.sourceNames + ["agents.application", "ui.navigation"]).sorted())
     _ = try skills.control("loadSkills", arguments: ["skills": "[\"photography\"]"], inputID: "input", fixed: fixed)
     let names = try AgentSkillLoader.useStates(skills.loaded)
-    #expect(names == ["actions.camera", "ui.album", "ui.camera", "ui.navigation"])
+    #expect(
+        names
+            == (AgentPlatformState.sourceNames + [
+                "actions.camera", "agents.application", "ui.album", "ui.camera", "ui.navigation",
+            ]).sorted())
     _ = try skills.control("releaseSkills", arguments: ["skills": "[\"photography\"]"], inputID: "input", fixed: fixed)
     owner.camera.update { $0.running = true }
-    #expect(try AgentSkillLoader.useStates(skills.loaded) == ["ui.navigation"])
+    #expect(
+        try AgentSkillLoader.useStates(skills.loaded)
+            == (AgentPlatformState.sourceNames + ["agents.application", "ui.navigation"]).sorted())
     #expect(try await context.snapshot(session: "one", names: ["actions.camera"]).contains("\"running\":true"))
 }
 
-@Test func agentTaskContextIsSessionBoundAndHasNoPrivateRegistry() throws {
+@Test(.actionCatalog) func agentTaskContextIsSessionBoundAndHasNoPrivateRegistry() throws {
     var skills = AgentTaskSkillState()
     let fixed = try AssistantAgent.runtimeCapabilities(AgentConfigurations.load(named: "Assistant").capabilities)
     try skills.initialize(fixed: fixed, baseSkills: ["basic-skill"])

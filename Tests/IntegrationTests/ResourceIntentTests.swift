@@ -251,7 +251,7 @@ private actor HeldResourceFixture: ModelResourceCapability {
     try await agent.pause()
     let fact = AppEnvironmentFact(category: .devices, sequence: 1, value: "camera: available")
     try await agent.receive(fact.input(sessionID: session))
-    #expect(try await agent.environmentSnapshot().contains("camera: available"))
+    #expect(try await agent.contextSnapshot().state.environmentContracts.contains("devices"))
     await #expect(throws: HarnessError.notRunning) {
         try await agent.receive(ModelResourceIntent.cancel("model").input(sessionID: session))
     }
@@ -259,7 +259,7 @@ private actor HeldResourceFixture: ModelResourceCapability {
     try await agent.resume()
     try await agent.receive(
         AppEnvironmentFact(category: .devices, sequence: 2, value: "camera: closed").input(sessionID: session))
-    #expect(try await agent.environmentSnapshot().contains("camera: closed"))
+    #expect(try await agent.contextSnapshot().state.environmentContracts.contains("devices"))
     await agent.stop()
 }
 
@@ -380,7 +380,7 @@ func environmentPublicationHasNoCompletionWaitAndReceiverErrorsStayIndependent()
     try await runtime.agent.observeEnvironment(.init(category: .devices, sequence: 1, value: "camera open"))
     #expect(start.duration(to: .now) < .seconds(2))
     await input.flushPublications()
-    #expect(try await runtime.agent.environmentSnapshot().contains("camera open"))
+    #expect(try await runtime.agent.contextSnapshot().state.environmentContracts.contains("devices"))
     // Duplicate sequence is receiver-owned rejection; publication still completes successfully.
     await #expect(throws: CommunicationError.invalidPayload) {
         try await runtime.prepareForInteraction()

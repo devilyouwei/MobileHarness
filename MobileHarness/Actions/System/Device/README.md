@@ -2,9 +2,9 @@
 
 ## 职责与关系
 
-函数解析并限定操作专用参数，端口负责真实准入与结果。控制返回 accepted 不代表蓝牙已连通或电机到位；机械臂具体适配属于 NexArm/Connection。缺少环境能力明确返回 unavailable。
+函数解析并限定操作专用参数，端口负责真实准入与结果。控制返回 accepted 不代表蓝牙已连通或电机到位；机械臂具体适配属于 NexArm/Connection。缺少设备能力明确返回 unavailable。
 
-本目录由所属域目录绑定，接受标准 FunctionInput；调用权限、通用调度与资源仲裁由上游 Gateway 保持。下游只消费注入的基础能力。
+本目录由所属域目录绑定，接受标准 FunctionInput；调用授权归 Agents；通用调度与资源仲裁归 Gateway。下游只消费注入的基础能力。
 
 ## 文件与实现
 
@@ -15,3 +15,7 @@
 | [DeviceModule.swift](DeviceModule.swift) | 设备状态／环境／操作绑定 |
 
 [所属域设计](../README.md) · [Actions 模块](../../README.md)
+
+## Specific device query boundary
+
+readStatus returns the owning Bluetooth workflow's power/connection state and discovered device IDs; it takes no arguments, performs no scan/motion and retains the 16,384-byte response bound. It is an explicit detail query, independent of the small actions.robot execution-readiness summary and platform Bluetooth permission fact. control owns requested effects and their admission checks. This module registers no generic environment query and holds no callback into an Agent's observation/result ledger. State supplies ordinary application/native facts; actual operation outcomes arrive as correlated execution feedback.

@@ -1,8 +1,16 @@
 import AgentCore
 import Foundation
 
+/// Small model-facing projection of admitted application observations, independent of execution results.
+public struct ApplicationStateSnapshot: Codable, Sendable, Equatable {
+    public let scene: String
+    public let modelPreparation: String
+    public let sceneSequence: UInt64?
+    public let modelPreparationSequence: UInt64?
+}
+
 public struct AppEnvironmentFact: Codable, Sendable, Equatable {
-    public enum Category: String, Codable, Sendable { case scene, devices, navigation, capabilities, modelPreparation }
+    public enum Category: String, Codable, Sendable { case scene, devices, capabilities, modelPreparation }
     public static let contract = "app.environment"
     public static let source = "app.environment"
     public let category: Category

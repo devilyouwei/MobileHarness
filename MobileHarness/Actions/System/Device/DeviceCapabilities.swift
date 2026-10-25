@@ -26,7 +26,6 @@ public struct DeviceControlRequest: Sendable {
 }
 public protocol DeviceControlCapability: Sendable {
     func control(_ request: DeviceControlRequest, invocation: any FunctionInput) async throws
-    func readEnvironment() async throws -> String
     func readStatus() async throws -> String
 }
 public enum DeviceControlError: String, Error, Sendable, ActionExecutionFailureProviding {
@@ -34,8 +33,4 @@ public enum DeviceControlError: String, Error, Sendable, ActionExecutionFailureP
     case unavailable = "device.unavailable"
     case stale = "device.stale"
     public var executionFailureCode: ActionExecutionFailureCode { .init(rawValue: rawValue) }
-}
-
-extension DeviceControlCapability {
-    public func readEnvironment() async throws -> String { throw DeviceControlError.unavailable }
 }

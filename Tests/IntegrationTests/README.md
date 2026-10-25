@@ -136,3 +136,15 @@ Photography完成示例使用明确的“App相册”文案；保持与BasicSkil
 ActionsContainerTests exercises pure preparation, credentials, both call protocols, resource permits, budgets, output validation, bounded retention and joined cleanup. GatewayContainerTests uses actual ActionsContainer ports with neutral endpoint/scope and root lifecycle fixtures. ContainerExecutionFixtures supplies legacy scenario constructors in tests only; production has no registry-based Gateway API. Synthetic business/native substitutes do not establish real-device or real-model acceptance.
 
 ContainerContextTests also verifies that an explicitly encoded owner snapshot remains a JSON object through collection and that read failures propagate, rather than encoding Data as a base64 string.
+
+## Passive native State regressions
+
+PlatformStateTests covers deterministic local-time midnight/weekday/leap-day/DST/zone behavior, invalid dates, native observation replacement and unknown values, root admission/resume/stop, context JSON wrapping/re-read and malformed/oversized snapshots. BasicSkill's eight-source contract is asserted. Existing photography/ReACT acceptance inspects all eight sources in actual model requests and preserved request history. Shared and Qwen fixtures use explicitly synthetic FixedPlatformState rather than host device facts; model/device performance and native hardware acceptance are separate.
+
+## Static instruction growth limits
+
+PromptTemplateTests bounds the assembled Assistant static instruction/catalog text to fewer than 25,000 UTF-8 bytes for base Skills and 32,000 with Photography. These are regression thresholds for instruction growth, not token counts or model context windows. Dynamic State and complete-request runtime limits are independent; catalog and safety assertions remain enforced.
+
+## State summaries and explicit queries
+
+ApplicationControl tests cover unknown/admitted/paused/stopped summary reads, per-field sequence fencing, closed scene values and exclusion of raw environment/private result data. Production catalogs reject the removed generic environment address while preserving specific device queries. Shared and Qwen fixtures register an explicit synthetic agents.application owner. Photography/ReACT assertions verify its changes in subsequent actual requests. GenerationRoundTests exercises the registered Bluetooth detail query on Query, real Action feedback and continuation without native Tool calls. These fixtures do not establish real LLM adherence or hardware readiness.
