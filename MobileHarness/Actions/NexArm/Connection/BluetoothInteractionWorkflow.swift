@@ -57,7 +57,7 @@ import UI
             state.present(.error("设备交互已关闭"))
             return
         }
-        guard (1...6).contains(id), value.isFinite, (-1...1).contains(value) else {
+        guard NexArmDeviceLimits.motorIDs.contains(id), value.isFinite, (-1...1).contains(value) else {
             state.present(.error("电机操作参数无效"))
             return
         }

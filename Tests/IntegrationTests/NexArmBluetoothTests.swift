@@ -165,7 +165,6 @@ private actor BluetoothArmFixture: NexArmBluetoothLink {
     }
     var waitingForPose: Bool { pendingPose != nil }
     private(set) var liveCommands: [NexArmPacket] = []
-    private(set) var restoredCommandIndices: Set<Int> = []
     private(set) var poseReads = 0
     func blockLive(_ value: Bool) {
         liveBlocked = value
@@ -189,13 +188,9 @@ private actor BluetoothArmFixture: NexArmBluetoothLink {
         pendingLiveFailure?.resume()
         pendingLiveFailure = nil
     }
-    func restoreLive(_ packet: NexArmPacket, session: String) async throws -> Bool {
-        try await deliverLive(packet, session: session, restoring: true)
-    }
     func sendLive(_ packet: NexArmPacket, session: String) async throws -> Bool {
-        try await deliverLive(packet, session: session, restoring: false)
-    }
-    private func deliverLive(_ packet: NexArmPacket, session: String, restoring: Bool) async throws -> Bool {
+        try Task.checkCancellation()
+        guard packet.isLiveControl else { throw NexArmError.invalidPacket }
         guard liveSession == session, snapshot.phase == .connected else { throw NexArmError.disconnected }
         if failNextLiveValidation {
             failNextLiveValidation = false
@@ -212,7 +207,6 @@ private actor BluetoothArmFixture: NexArmBluetoothLink {
         guard try admitFixtureWrite() else { return false }
         if limitLiveRate, let lastLiveWrite, ContinuousClock.now - lastLiveWrite < .milliseconds(50) { return false }
         lastLiveWrite = .now
-        if restoring { restoredCommandIndices.insert(liveCommands.count) }
         liveCommands.append(packet)
         // Unacknowledged command admission is recorded separately; no fake feedback completion.
         if let targets = packet.motorTargets {
@@ -1403,7 +1397,7 @@ func aimFinalCountRemainsPendingUntilNativeAdmission(motor: Int, delta: Int) thr
     let stopped = planner.targets
     planner.stop(id: 1)
     #expect(planner.targets == stopped && planner.velocities[0] == 0)
-    #expect(try NexArmPacket(id: 1, command: 3, payload: [40, 0]).isLiveControl)
+    #expect(try !NexArmPacket(id: 1, command: 3, payload: [40, 0]).isLiveControl)
     #expect(try !NexArmPacket(id: 2, command: 3, payload: [40, 0]).isLiveControl)
     #expect(try !NexArmPacket(id: 1, command: 3, payload: [33, 2]).isLiveControl)
     #expect(try !NexArmPacket(command: 51, payload: [1, 0, 8, 20, 0]).isLiveControl)
@@ -1708,7 +1702,7 @@ extension LiveRuntimeTests {
 
 extension LiveRuntimeTests {
     @Test(.actionCatalog, .timeLimit(.minutes(1))) @MainActor
-    func bluetoothAimHoldsSpeedWhileTheTargetStaysPut() async throws {
+    func bluetoothAimUsesFinitePositionsAndDoesNotRewriteAQuietTarget() async throws {
         let file = bluetoothTestFile()
         defer { try? FileManager.default.removeItem(at: file) }
         let link = BluetoothArmFixture()
@@ -1723,20 +1717,18 @@ extension LiveRuntimeTests {
         try await workflow.aim(base: 0.6, pitch: 0.5)
         try await until {
             await link.liveCommands.contains { packet in
-                guard packet.id == 254, packet.command == 131, packet.payload.count == 8 else { return false }
-                let base = Int(packet.payload[3]) | Int(packet.payload[4]) << 8
-                let pitch = Int(packet.payload[6]) | Int(packet.payload[7]) << 8
-                return base != 0 || pitch != 0
+                packet.motorTargets?[1] != nil && packet.motorTargets?[4] != nil
             }
         }
         let commands = await link.liveCommands
         let level = try #require(commands.first)
         let addressed = try #require(level.motorTargets)
-        #expect(Set(addressed.keys) == Set([2, 3]))
+        #expect(Set(addressed.keys) == Set([1, 2, 3, 4]))
         #expect(addressed[2] == NexArmJointCommand.armHome[1])
         #expect(addressed[3] == NexArmJointCommand.armHome[2])
+        #expect(commands.allSatisfy { $0.isSynchronousPositionWrite })
         let admitted = commands.count
-        // Inside the 0.30 second hold window the admitted speed stays on the servo and is not rewritten.
+        // A quiet target sends no further writes; the servo has a finite position endpoint.
         try await Task.sleep(for: .milliseconds(150))
         #expect(await link.liveCommands.count == admitted)
         await workflow.stopActions()
@@ -2676,11 +2668,9 @@ extension LiveRuntimeTests {
         workflow.stopMotorControl()
         await workflow.waitUntilIdle()
         let commands = await link.liveCommands
-        let restored = await link.restoredCommandIndices
         let later = commands.indices.filter { $0 >= before }
-        #expect(later.allSatisfy { restored.contains($0) || !commands[$0].isSynchronousPositionWrite })
-        let firstSlider = try #require(later.first { commands[$0].id == 6 })
-        #expect(restored.filter { $0 >= before }.allSatisfy { $0 < firstSlider })
+        #expect(later.allSatisfy { !commands[$0].isSynchronousPositionWrite })
+        #expect(later.contains { commands[$0].id == 6 })
         #expect(workflow.state.error == nil && workflow.state.canControl)
         workflow.disconnect()
         await workflow.waitUntilIdle()

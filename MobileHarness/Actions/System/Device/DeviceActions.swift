@@ -10,9 +10,15 @@ extension SystemActions {
         parameters: [
             .init(
                 "operation", type: .string, required: true, description: "operation",
-                constraints: "One of: scan, stopScan, connect, reconnect, disconnect, forget, refresh",
-                values: ["scan", "stopScan", "connect", "reconnect", "disconnect", "forget", "refresh"]),
+                constraints: "One of the supported device connection, page or motor control operations",
+                values: [
+                    "scan", "stopScan", "connect", "reconnect", "disconnect", "forget", "refresh", "preset",
+                    "motorVelocity", "stopMotorControl", "openPage", "closePage", "openSystemSettings",
+                ]),
             .init("id", type: .string, required: false, description: "id", constraints: ""),
+            .init("value", type: .string, required: false, description: "Motor velocity", constraints: ""),
+            .init("action", type: .string, required: false, description: "Preset action", constraints: ""),
+            .init("fence", type: .string, required: false, description: "Device session fence UUID", constraints: ""),
         ], timeout: .seconds(60))
     public static func control(invocation: any FunctionInput, using device: any DeviceControlCapability) async throws
         -> String

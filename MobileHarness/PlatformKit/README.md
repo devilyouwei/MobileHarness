@@ -12,7 +12,7 @@ PlatformKit is an independent foundation SDK using system frameworks only. It ow
 | [Core](Core/README.md) | Native background allowance, bounded observation primitives, finite State source contract and system time/power/thermal/locale/accessibility reads. |
 | [Audio](Audio/README.md) | Native capture/playback, cues/haptics, numerical processing, native session events and application audio/permission facts. |
 | [Vision](Vision/README.md) | Camera/immutable frames/photo access and image preparation; camera/Photos authorization queries. |
-| [Connectivity](Connectivity/README.md) | NexArm USB/BLE protocol values, connection observations, passive IP path monitoring and Bluetooth authorization queries. |
+| [Connectivity](Connectivity/README.md) | NexArm device constraints and bounded USB/BLE writes, protocol values, connection observations, passive IP path monitoring and Bluetooth authorization queries. |
 
 Native observation capabilities are injected directly into their responsible Agent or execution owner. They never generate business Signals. Read-only capture subscription does not start hardware; capture control stays with its owner. PCM remains ordered and bounded, while camera/native state observations retain newest values under the owning contracts.
 
@@ -33,3 +33,5 @@ invalidate closes admission synchronously, fences passive observations and reque
 Audio/Vision/Connectivity own their native stop/join semantics; short background allowance only assists cleanup/reassociation and cannot guarantee background inference or physical safety. Physical completion remains evidence supplied by the actual device owner. Detailed limits, cancellation and native failures belong in each component README.
 
 [Overall design](../README.md) · [App composition](../App/Composition/README.md)
+
+NexArm通用设备参数、允许误差、位置反馈观察、经验行程估算与原生恢复分类/预算由 PlatformKit 拥有；Actions 仅消费这些能力并拥有动作目标、资源、执行报告、设备选择及业务生命周期协调。硬件错误保持SDK类型，上层仅适配展示与动作结果，基础模块不依赖业务模块。

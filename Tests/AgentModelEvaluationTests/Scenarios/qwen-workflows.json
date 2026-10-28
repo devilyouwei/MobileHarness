@@ -1726,6 +1726,384 @@
         "photography"
       ],
       "taskGoal": "拍照并等待用户决定保存或忽略"
+    },
+    {
+      "id": "robot-right-90",
+      "category": "robot-motor",
+      "skills": [
+        "robot-interaction"
+      ],
+      "turns": [
+        {
+          "user": "向右转90度。",
+          "robotSequence": [
+            {
+              "alias": "moveMotor",
+              "parameters": {
+                "motor": "1",
+                "deltaDegrees": "90"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "robot-left-45",
+      "category": "robot-motor",
+      "skills": [
+        "robot-interaction"
+      ],
+      "turns": [
+        {
+          "user": "底座从当前位置向左转45度，速度400，加速度30。",
+          "robotSequence": [
+            {
+              "alias": "moveMotor",
+              "parameters": {
+                "motor": "1",
+                "deltaDegrees": "-45",
+                "speed": "400",
+                "acceleration": "30"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "robot-wrist-count",
+      "category": "robot-motor",
+      "skills": [
+        "robot-interaction"
+      ],
+      "turns": [
+        {
+          "user": "只将腕部俯仰关节移到编码器1500，其他电机不动。",
+          "robotSequence": [
+            {
+              "alias": "moveMotor",
+              "parameters": {
+                "motor": "4",
+                "target": "1500"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "robot-elbow-relative",
+      "category": "robot-motor",
+      "skills": [
+        "robot-interaction"
+      ],
+      "turns": [
+        {
+          "user": "只把肘关节沿编码器增加方向转22.5度。",
+          "robotSequence": [
+            {
+              "alias": "moveMotor",
+              "parameters": {
+                "motor": "3",
+                "deltaDegrees": "22.5"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "robot-shoulder-reset",
+      "category": "robot-motor",
+      "skills": [
+        "robot-interaction"
+      ],
+      "turns": [
+        {
+          "user": "只归位肩部抬升关节。",
+          "robotSequence": [
+            {
+              "alias": "resetMotor",
+              "parameters": {
+                "motor": "2"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "robot-roll-reset",
+      "category": "robot-motor",
+      "skills": [
+        "robot-interaction"
+      ],
+      "turns": [
+        {
+          "user": "只把腕部滚转舵机归位。",
+          "robotSequence": [
+            {
+              "alias": "resetMotor",
+              "parameters": {
+                "motor": "5"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "robot-absolute-count",
+      "category": "robot-motor",
+      "skills": [
+        "robot-interaction"
+      ],
+      "turns": [
+        {
+          "user": "将1号电机设到3072计数，速度600，加速度40。",
+          "robotSequence": [
+            {
+              "alias": "moveMotor",
+              "parameters": {
+                "motor": "1",
+                "target": "3072",
+                "speed": "600",
+                "acceleration": "40"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "robot-absolute-angle-ambiguous",
+      "category": "robot-motor",
+      "skills": [
+        "robot-interaction"
+      ],
+      "turns": [
+        {
+          "user": "把4号电机设为绝对90度。",
+          "robotSequence": []
+        }
+      ]
+    },
+    {
+      "id": "robot-axis-limit",
+      "category": "robot-motor",
+      "skills": [
+        "robot-interaction"
+      ],
+      "turns": [
+        {
+          "user": "把3号电机设到900计数。",
+          "robotSequence": []
+        }
+      ]
+    },
+    {
+      "id": "robot-bad-speed",
+      "category": "robot-motor",
+      "skills": [
+        "robot-interaction"
+      ],
+      "turns": [
+        {
+          "user": "向右转90度，速度2000，不要替我改速度。",
+          "robotSequence": []
+        }
+      ]
+    },
+    {
+      "id": "robot-compound",
+      "category": "robot-motor",
+      "skills": [
+        "robot-interaction"
+      ],
+      "turns": [
+        {
+          "user": "依次：底座右转90度，腕俯仰移到1500计数，点头两次，底座左转45度，最后整臂归位。",
+          "robotSequence": [
+            {
+              "alias": "moveMotor",
+              "parameters": {
+                "motor": "1",
+                "deltaDegrees": "90"
+              }
+            },
+            {
+              "alias": "moveMotor",
+              "parameters": {
+                "motor": "4",
+                "target": "1500"
+              }
+            },
+            {
+              "alias": "nodHead",
+              "parameters": {
+                "cycles": "2"
+              }
+            },
+            {
+              "alias": "moveMotor",
+              "parameters": {
+                "motor": "1",
+                "deltaDegrees": "-45"
+              }
+            },
+            {
+              "alias": "resetArm",
+              "parameters": {}
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "robot-mixed-gestures",
+      "category": "robot-motor",
+      "skills": [
+        "robot-interaction"
+      ],
+      "turns": [
+        {
+          "user": "依次挥手一次、向左歪头、摇头两次、最后只归位5号电机。",
+          "robotSequence": [
+            {
+              "alias": "waveWrist",
+              "parameters": {
+                "count": "1"
+              }
+            },
+            {
+              "alias": "tiltWrist",
+              "parameters": {
+                "direction": "left"
+              }
+            },
+            {
+              "alias": "shakeHead",
+              "parameters": {
+                "cycles": "2"
+              }
+            },
+            {
+              "alias": "resetMotor",
+              "parameters": {
+                "motor": "5"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "robot-relative-failure",
+      "category": "robot-motor",
+      "skills": [
+        "robot-interaction"
+      ],
+      "turns": [
+        {
+          "user": "底座右转90度。",
+          "robotSequence": [
+            {
+              "alias": "moveMotor",
+              "parameters": {
+                "motor": "1",
+                "deltaDegrees": "90"
+              }
+            }
+          ]
+        }
+      ],
+      "failure": "robotPartial"
+    },
+    {
+      "id": "robot-relative-disconnected",
+      "category": "robot-motor",
+      "skills": [
+        "robot-interaction"
+      ],
+      "turns": [
+        {
+          "user": "向右转90度，再全部归位。",
+          "robotSequence": []
+        }
+      ],
+      "robotConnected": false
+    },
+    {
+      "id": "robot-five-axes",
+      "category": "robot-motor",
+      "skills": [
+        "robot-interaction"
+      ],
+      "turns": [
+        {
+          "user": "按顺序：底座到2048计数，肩部抬升关节到2087计数，肘关节到1500计数，腕俯仰到1600计数，腕滚转到1900计数。不要动夹爪，不要归位。",
+          "robotSequence": [
+            {
+              "alias": "moveMotor",
+              "parameters": {
+                "motor": "1",
+                "target": "2048"
+              }
+            },
+            {
+              "alias": "moveMotor",
+              "parameters": {
+                "motor": "2",
+                "target": "2087"
+              }
+            },
+            {
+              "alias": "moveMotor",
+              "parameters": {
+                "motor": "3",
+                "target": "1500"
+              }
+            },
+            {
+              "alias": "moveMotor",
+              "parameters": {
+                "motor": "4",
+                "target": "1600"
+              }
+            },
+            {
+              "alias": "moveMotor",
+              "parameters": {
+                "motor": "5",
+                "target": "1900"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "robot-conditional-failure",
+      "category": "robot-motor",
+      "skills": [
+        "robot-interaction"
+      ],
+      "failure": "robotPartial",
+      "turns": [
+        {
+          "user": "先右转30度，只有确认成功后才点头一次；失败就停下并告诉我，不要重试或归位。",
+          "robotSequence": [
+            {
+              "alias": "moveMotor",
+              "parameters": {
+                "motor": "1",
+                "deltaDegrees": "30"
+              }
+            }
+          ]
+        }
+      ]
     }
   ]
 }

@@ -374,3 +374,49 @@ extension LiveRuntimeTests {
         #expect(report.entries.last?.status == .notStarted)
     }
 }
+
+@Test func sdkFeedbackToleranceIncludesEachAxisBoundaryButRejectsOutside() throws {
+    let expected = [16, 20, 56, 32, 16, 24]
+    let now = ContinuousClock.now
+    for motor in 1...6 {
+        let tolerance = PlatformKit.NexArmMotorProfiles.profile(for: motor).tolerance
+        #expect(tolerance == expected[motor - 1])
+        for sign in [-1, 1] {
+            var observer = PlatformKit.NexArmPositionObservation(
+                targets: [motor: 2048], started: now, deadline: now + .seconds(1))
+            var joints = Array(repeating: 2048, count: 6)
+            joints[motor - 1] += sign * (tolerance + 1)
+            observer.observe(joints: joints, at: now)
+            #expect(observer.outcome(at: now) == .waiting)
+            joints[motor - 1] = 2048 + sign * tolerance
+            observer.observe(joints: joints, at: now + .milliseconds(1))
+            #expect(observer.outcome(at: now + .milliseconds(1)) == .arrived)
+        }
+    }
+}
+
+@Test func sdkFeedbackConfigurationRejectsInvalidOverridesWithNativeError() throws {
+    for value in [-1, 65] {
+        #expect(throws: NexArmError.invalidMotion) { try NexArmFeedbackConfiguration(tolerance: value) }
+    }
+    #expect(throws: NexArmError.invalidMotion) { try NexArmFeedbackConfiguration(stableTolerance: 9) }
+    #expect(throws: NexArmError.invalidMotion) { try NexArmFeedbackConfiguration(feedbackMilliseconds: 199) }
+    #expect(throws: NexArmError.invalidMotion) { try NexArmFeedbackConfiguration(offTargetMilliseconds: 99) }
+    #expect(throws: NexArmError.invalidMotion) { try NexArmFeedbackConfiguration(timeoutMilliseconds: 199) }
+    #expect(try NexArmFeedbackConfiguration(tolerance: 0).tolerance == 0)
+    #expect(try NexArmFeedbackConfiguration(tolerance: 64).tolerance == 64)
+}
+
+@Test func sdkRecoveryClassifiesNativeFailuresAndBoundsBackoff() {
+    var snapshot = NexArmBluetoothSnapshot()
+    #expect(NexArmBluetoothRecoveryPolicy.canRetry(NexArmError.disconnected, snapshot: snapshot))
+    #expect(!NexArmBluetoothRecoveryPolicy.canRetry(NexArmError.invalidPacket, snapshot: snapshot))
+    snapshot.failure = .protocolViolation(.invalidPacket)
+    #expect(NexArmBluetoothRecoveryPolicy.canRetry(NexArmError.invalidPacket, snapshot: snapshot))
+    snapshot.power = .unauthorized
+    #expect(!NexArmBluetoothRecoveryPolicy.canRetry(NexArmBluetoothError.unavailable, snapshot: snapshot))
+    #expect(!NexArmBluetoothRecoveryPolicy.canRetry(CancellationError(), snapshot: snapshot))
+    #expect(NexArmBluetoothRecoveryPolicy.delay(attempt: Int.min) == .seconds(1))
+    #expect(NexArmBluetoothRecoveryPolicy.delay(attempt: 2) == .seconds(2))
+    #expect(NexArmBluetoothRecoveryPolicy.delay(attempt: Int.max) == .seconds(4))
+}

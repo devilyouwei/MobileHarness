@@ -53,3 +53,11 @@
 ## State summaries and detail queries (2026-10-26)
 
 - [State and query responsibilities](State-And-Query-Responsibilities.md): agents.application summary, removal of the generic environment Action/reverse binding, preserved specific queries and correlated feedback, with [automated/build evidence](../validation/State-And-Query-Responsibilities.md).
+
+[NexArm 位置跟踪恢复](NexArm-Position-Tracking-Restore.md)：恢复有限角度目标，删除持续速度及取消恢复写入，收紧USB/BLE原始寄存器写校验。代码和自动化验证完成，实机边界见归档记录。
+
+2026-10-27：[NexArm 位置跟随平滑](NexArm-Smooth-Position-Tracking.md) 已完成位置目标 20 Hz 更新、时间滤波、最新目标派发和 PlatformKit 设备约束归属，自动检查与 iOS 构建通过；未安装或验证机械臂实物。
+
+2026-10-27：[NexArm 通用设备反馈与连接错误归属](NexArm-Device-Feedback-Ownership.md) 完成SDK容差、位置观察、行程估算及原生恢复预算/分类迁移；全量自动检查和四项iOS构建通过，未安装或实物测试。
+
+- [NexArm motor teaching and regression](NexArm-Robot-Skill-Teaching.md): relative motor requests, unit/axis teaching and three-model experiments with retained failure evidence.

@@ -72,3 +72,5 @@
 - [Current State before redundant queries](Current-State-First.md): environment-reader scope, BasicSkill direct answers, instruction budgets and model-adherence limits.
 
 - [State summaries and specific queries](State-And-Query-Responsibilities.md): application summary ownership, removed generic environment path, correlated feedback and admission/test/build evidence.
+
+- [NexArm motor teaching and regression](NexArm-Robot-Skill-Regression.md): axis/units teaching, relative motor requests and real-model synthetic-action evidence.

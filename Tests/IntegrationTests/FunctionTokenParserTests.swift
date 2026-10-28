@@ -24,7 +24,7 @@ private func generator() throws -> AgentGenerator {
                 + "<Bluetooth.readStatus id='irrelevant' unexpected='extra'/>") + parser.finish()
     let calls = events.compactMap(\.actionCall)
     #expect(calls.count == 2)
-    #expect(calls.first?.parameters == ["operation": "disconnect", "id": "irrelevant"])
+    #expect(calls.first?.parameters == ["operation": "disconnect", "id": "irrelevant", "fence": "untrusted"])
     #expect(calls.last?.parameters == [:])
     #expect(calls.allSatisfy { capabilities.permits($0) })
 

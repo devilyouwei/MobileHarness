@@ -55,56 +55,5 @@ public struct NexArmMotionPlan: Sendable {
 
 }
 
-/// Fresh encoder feedback determines progress; there is no nominal-duration gate.
-public struct NexArmSegmentTracker: Sendable {
-    public enum Outcome: Equatable, Sendable { case waiting, arrived, unreached, timedOut }
-    private let targets: [Int: Int]
-    private let policy: NexArmMotorCompletion?
-    private let started: ContinuousClock.Instant
-    private let deadline: ContinuousClock.Instant
-    private var lastSample: ContinuousClock.Instant?
-    private var anchor: [Int: Int] = [:]
-    private var stableSince: ContinuousClock.Instant?
-    private var sampleCount = 0
-    private var atTarget = false
-    public init(
-        targets: [Int: Int], started: ContinuousClock.Instant, deadline: ContinuousClock.Instant,
-        policy: NexArmMotorCompletion? = nil
-    ) {
-        self.policy = policy
-        self.targets = targets
-        self.started = started
-        self.deadline = deadline
-    }
-    public mutating func observe(joints: [Int], at time: ContinuousClock.Instant) {
-        guard joints.count == 6, !targets.isEmpty, targets.keys.allSatisfy({ (1...6).contains($0) }),
-            time >= started, lastSample.map({ time > $0 }) ?? true
-        else { return }
-        lastSample = time
-        atTarget = targets.allSatisfy { id, target in
-            abs(joints[id - 1] - target) <= (policy?.tolerance ?? NexArmMotorProfiles.profile(for: id).tolerance)
-        }
-        let stable =
-            !anchor.isEmpty
-            && anchor.allSatisfy { id, value in abs(joints[id - 1] - value) <= (policy?.stableTolerance ?? 2) }
-        if stable {
-            sampleCount += 1
-        } else {
-            anchor = Dictionary(uniqueKeysWithValues: targets.keys.map { ($0, joints[$0 - 1]) })
-            stableSince = time
-            sampleCount = 1
-        }
-    }
-    public func outcome(at now: ContinuousClock.Instant) -> Outcome {
-        // Arrival takes priority over stability and the polling deadline.
-        if let lastSample, lastSample <= deadline, atTarget { return .arrived }
-        // Silence is not stability: only fresh samples extend this interval.
-        if let policy, let stableSince, let lastSample, lastSample <= deadline,
-            !atTarget, sampleCount >= 2,
-            lastSample - stableSince >= .milliseconds(policy.offTargetMilliseconds)
-        {
-            return .unreached
-        }
-        return now >= deadline ? .timedOut : .waiting
-    }
-}
+/// Compatibility name for the SDK-owned position observer.
+public typealias NexArmSegmentTracker = NexArmPositionObservation

@@ -205,7 +205,10 @@ public actor NexArmActionController {
     /// Builds the shared recipe without a resource fence. Resolve only missing Cartesian targets;
     /// passive simple/reset plans issue no queries.
     /// A nil gesture selects whole-arm home. App owns cancellation and the live sending session.
-    public func manualPlan(gesture: NexArmGesture?, repetitions: Int = 1, speed: Int = 1400, acceleration: Int = 30)
+    public func manualPlan(
+        gesture: NexArmGesture?, repetitions: Int = 1, speed: Int = NexArmDeviceLimits.defaultSpeed,
+        acceleration: Int = NexArmDeviceLimits.defaultAcceleration
+    )
         async throws
         -> NexArmMotionPlan
     {
@@ -240,7 +243,9 @@ public actor NexArmActionController {
     }
 
     /// Explicit whole-arm reset, the only reset operation that owns all motors1–5.
-    public func resetPosition(speed: Int = 1400, acceleration: Int = 30) async throws {
+    public func resetPosition(
+        speed: Int = NexArmDeviceLimits.defaultSpeed, acceleration: Int = NexArmDeviceLimits.defaultAcceleration
+    ) async throws {
         try Task.checkCancellation()
         guard !busy else { throw NexArmExecutionError.busy }
         busy = true
@@ -259,7 +264,10 @@ public actor NexArmActionController {
     }
 
     /// Feedback-based Channel execution shares its recipe with manualPlan, not its arrival policy.
-    public func performGesture(_ gesture: NexArmGesture, repetitions: Int, speed: Int = 1400, acceleration: Int = 30)
+    public func performGesture(
+        _ gesture: NexArmGesture, repetitions: Int, speed: Int = NexArmDeviceLimits.defaultSpeed,
+        acceleration: Int = NexArmDeviceLimits.defaultAcceleration
+    )
         async throws
     {
         try Task.checkCancellation()
@@ -285,7 +293,7 @@ public actor NexArmActionController {
 
     /// Software reset target only; does not write calibration or firmware registers.
     public func configureMotorHome(id: Int, target: Int) throws {
-        guard !busy, (1...6).contains(id), NexArmJogPlanner.limits[id - 1].contains(target) else {
+        guard !busy, NexArmDeviceLimits.motorIDs.contains(id), NexArmJogPlanner.limits[id - 1].contains(target) else {
             throw NexArmExecutionError.invalidArguments
         }
         motorHomes[id] = target
@@ -307,6 +315,28 @@ public actor NexArmActionController {
         defer { busy = false }
         motorResults = []
         _ = try await requireCompatibility()
+        let packet = try NexArmMotorCommands.move(motor: id, target: target, options: options)
+        try await execute(
+            NexArmMotionPlan(lockedMotors: [id], frames: [.init(packet: packet, milliseconds: 1000)]),
+            policy: completion)
+    }
+    /// Resolve a relative request under the same exclusive owner as the finite motion.
+    public func moveMotor(
+        id: Int, deltaDegrees: Double, options: NexArmMotorOptions,
+        completion: NexArmMotorCompletion
+    ) async throws {
+        guard !busy else { throw NexArmExecutionError.busy }
+        guard NexArmDeviceLimits.motorIDs.contains(id), deltaDegrees.isFinite,
+            NexArmDeviceLimits.relativeDegrees.contains(deltaDegrees)
+        else { throw NexArmExecutionError.invalidArguments }
+        busy = true
+        defer { busy = false }
+        motorResults = []
+        _ = try await requireCompatibility()
+        let sample = try await position()
+        try Task.checkCancellation()
+        let target = try NexArmMotorCommands.relativeTarget(
+            motor: id, from: sample.joints[id - 1], deltaDegrees: deltaDegrees)
         let packet = try NexArmMotorCommands.move(motor: id, target: target, options: options)
         try await execute(
             NexArmMotionPlan(lockedMotors: [id], frames: [.init(packet: packet, milliseconds: 1000)]),
@@ -512,7 +542,9 @@ public actor NexArmActionController {
         let p = response.payload
         guard p.count == 24 else { throw NexArmError.invalidPacket }
         let joints = stride(from: 12, to: 24, by: 2).map { Int(p[$0]) | Int(p[$0 + 1]) << 8 }
-        guard joints.allSatisfy({ (0...4095).contains($0) }) else { throw NexArmError.invalidPacket }
+        guard joints.allSatisfy({ NexArmDeviceLimits.encoderCounts.contains($0) }) else {
+            throw NexArmError.invalidPacket
+        }
         let roll = Int(Int16(bitPattern: UInt16(p[8]) | UInt16(p[9]) << 8))
         let pose = stride(from: 0, to: 12, by: 2).map {
             Int(Int16(bitPattern: UInt16(p[$0]) | UInt16(p[$0 + 1]) << 8))

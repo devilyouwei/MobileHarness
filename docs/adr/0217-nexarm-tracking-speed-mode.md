@@ -1,6 +1,6 @@
 # ADR0217 — Tracking uses closed-loop speed on motors 1 and 4
 
-Status: accepted, 2026-10-16. Supersedes the one position packet per target in [ADR0215](0215-nexarm-aim-one-shot.md) for live tracking only.
+Status: superseded, 2026-10-27, by [position tracking restoration](../completed/NexArm-Position-Tracking-Restore.md). The following records the historical speed-mode design, not current implementation. Supersedes the one position packet per target in [ADR0215](0215-nexarm-aim-one-shot.md) for live tracking only.
 
 ## Context
 

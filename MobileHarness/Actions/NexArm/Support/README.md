@@ -10,8 +10,14 @@
 
 | 文件 | 当前职责 |
 | --- | --- |
-| [NexArmMotorExecution.swift](NexArmMotorExecution.swift) | 共享电机结果、完成策略与失败类型 |
-| [NexArmMotorProfiles.swift](NexArmMotorProfiles.swift) | 共享电机容差及经验预算 |
+| [NexArmMotorExecution.swift](NexArmMotorExecution.swift) | 动作电机结果、SDK反馈配置兼容别名与执行失败 |
+| [NexArmMotorProfiles.swift](NexArmMotorProfiles.swift) | 动作Step中的原生参数解析（容差/预算由SDK拥有） |
 | [NexArmTypes.swift](NexArmTypes.swift) | 跨动作的请求、参数错误与报告代码 |
 
 [所属域设计](../README.md) · [公共契约](../../Support/Contracts/README.md)
+
+`NexArmMotorCompletion` 仅是SDK `NexArmFeedbackConfiguration` 的兼容别名，非法配置返回SDK invalidMotion。
+
+原生运动参数默认值和合法范围引用 PlatformKit `NexArmDeviceLimits`；本层只传递参数及解释业务结果，不另定义设备限制。
+
+`GestureRequest` carries optional `target` (absolute counts) or `deltaDegrees` (relative degrees) for a motor move; the Action validates their exclusive choice before dispatch. Neither field is used to guess a reset home.

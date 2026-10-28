@@ -5,10 +5,10 @@ import PlatformKit
 /// Bounded velocity shaping with finite look-ahead position goals; no telemetry/ACK dependency.
 public struct NexArmJogPlanner: Sendable {
     public static let limits = NexArmMotorCommands.positionLimits
-    public static let period = 0.03
-    public static let maximumSpeed = 600.0
-    public static let maximumAcceleration = 1800.0
-    public static let maximumJerk = 12000.0
+    public static let period = NexArmDeviceLimits.minimumBLEWriteIntervalSeconds
+    public static let maximumSpeed = Double(NexArmDeviceLimits.livePositionMaximumSpeed)
+    public static let maximumAcceleration = NexArmDeviceLimits.livePositionMaximumAcceleration
+    public static let maximumJerk = NexArmDeviceLimits.livePositionMaximumJerk
     /// Tracking crawl. A full stick may still use `maximumSpeed`; aim must not sprint the whole gap.
     public static let aimMaximumSpeed = 200.0
     /// Shoulder lift and elbow tracking speed. 60 counts/s was verified for the paired move on 2026-10-03.
@@ -32,13 +32,13 @@ public struct NexArmJogPlanner: Sendable {
         fileprivate let acceleration: Double
     }
     public init(positions: [Int]) throws {
-        guard positions.count == 6, positions.allSatisfy({ (0...4095).contains($0) }) else {
+        guard positions.count == 6, positions.allSatisfy({ NexArmDeviceLimits.encoderCounts.contains($0) }) else {
             throw NexArmError.invalidPacket
         }
         states = positions.map { State(position: Double($0), lastTarget: $0) }
     }
     public func proposal(id: Int, deflection: Double, elapsed: Double = period) throws -> Proposal? {
-        guard (1...6).contains(id), deflection.isFinite, (-1...1).contains(deflection),
+        guard NexArmDeviceLimits.motorIDs.contains(id), deflection.isFinite, (-1...1).contains(deflection),
             elapsed.isFinite, elapsed > 0
         else { throw NexArmExecutionError.invalidArguments }
         guard abs(deflection) > 0.04 else { return nil }
@@ -72,11 +72,10 @@ public struct NexArmJogPlanner: Sendable {
         if target == old.lastTarget {
             packet = nil  // Preserve fractional integration without restarting an identical servo goal.
         } else {
-            let speed = min(600, max(1, Int(abs(velocity).rounded())))
-            // Vendor HX_30HM write_pos_ex: ACC, position, PWM=0, speed. No unsolicited pose query.
-            packet = try NexArmPacket(
-                id: UInt8(id), command: 3,
-                payload: [41, 30, UInt8(target & 255), UInt8(target >> 8), 0, 0, UInt8(speed & 255), UInt8(speed >> 8)])
+            let speed = min(
+                NexArmDeviceLimits.livePositionMaximumSpeed,
+                max(NexArmDeviceLimits.speed.lowerBound, Int(abs(velocity).rounded())))
+            packet = try NexArmMotorCommands.move(motor: id, target: target, options: .init(speed: speed))
         }
         return Proposal(
             id: id, packet: packet, target: Double(target), position: position,
@@ -113,9 +112,8 @@ public struct NexArmJogPlanner: Sendable {
             if holdCount == old.lastTarget {
                 packet = nil
             } else {
-                packet = try NexArmPacket(
-                    id: UInt8(id), command: 3,
-                    payload: [41, 30, UInt8(holdCount & 255), UInt8(holdCount >> 8), 0, 0, 1, 0])
+                packet = try NexArmMotorCommands.move(
+                    motor: id, target: holdCount, options: .init(speed: NexArmDeviceLimits.speed.lowerBound))
             }
             return Proposal(
                 id: id, packet: packet, target: Double(holdCount), position: hold,
@@ -151,10 +149,10 @@ public struct NexArmJogPlanner: Sendable {
         if next == old.lastTarget {
             packet = nil
         } else {
-            let speed = min(600, max(1, Int(abs(velocity).rounded())))
-            packet = try NexArmPacket(
-                id: UInt8(id), command: 3,
-                payload: [41, 30, UInt8(next & 255), UInt8(next >> 8), 0, 0, UInt8(speed & 255), UInt8(speed >> 8)])
+            let speed = min(
+                NexArmDeviceLimits.livePositionMaximumSpeed,
+                max(NexArmDeviceLimits.speed.lowerBound, Int(abs(velocity).rounded())))
+            packet = try NexArmMotorCommands.move(motor: id, target: next, options: .init(speed: speed))
         }
         return Proposal(
             id: id, packet: packet, target: Double(next), position: position,
@@ -170,7 +168,7 @@ public struct NexArmJogPlanner: Sendable {
     }
     /// Release discards future velocity, keeping the last finite target; never sends a return move.
     public mutating func stop(id: Int) {
-        guard (1...6).contains(id) else { return }
+        guard NexArmDeviceLimits.motorIDs.contains(id) else { return }
         let target = states[id - 1].lastTarget
         states[id - 1] = State(position: Double(target), lastTarget: target)
     }

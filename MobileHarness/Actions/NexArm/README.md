@@ -41,7 +41,7 @@ Gateway 通过注册函数调用本域，Agents 决定请求与策略，App 注�
 
 有限运动可选 speed 1…1400（默认 1400）、acceleration 1…254（默认 30）；未知键拒绝。target 在执行编码时进一步受设备电机范围约束。入口不接受时间、减速度、力矩、模式或校准参数。
 
-运动请求以 GestureRequest 或注入闭包传递。调用者实际获得的效果来自宿主绑定：有限动作的定义要求新鲜反馈判定完成；aim 只确认目标发布，常驻跟踪和资源持有属于宿主 worker。`NexArm.Tracking.aim` 的参数仍是 base/pitch 位置弧度，不暴露速度或模式。执行层把位置增量换成电机 1/4 的闭环速度：首次准入仍用位置指令把肩/肘放到跟踪 rest，然后这两颗跟踪轴扭矩关、模式 1、速度 0、扭矩开。之后只在目标变化时重算速度，目标不变就保持已发速度，不在下一个控制周期刹车。目标达到 0.30 秒不变才写一次速度 0。换算是 `|count 速率| × 2.2`，上限 600，并带有限的积分滞后补偿；2.2 未经速度模式标定。退出 live session 时速度 0、模式 0、扭矩开，再用位置指令停在最后目标。电机 1 的正速度寄存器值（最高位为 0）朝编码器减小的方向转，也就是向手臂左侧。电机 4 使用相反的方向位：同样的正速度让腕部低头，抬头置位最高位。腕滚转不参与跟踪，有限运动与手动 jog 仍是位置指令。
+运动请求以 GestureRequest 或注入闭包传递。有限动作要求新鲜反馈判定完成；aim 只确认最新目标发布，跟踪和资源持有属于根 worker。`NexArm.Tracking.aim` 接收 base/pitch 位置弧度，直接映射为有限编码器位置目标。单目标位置算法使用 3 count 死区，有限前瞻不超过本次已接纳目标步幅并钳制到 PlatformKit 六轴位置范围；根据实际采样间隔选择位置动作速度，最高速度与原生参数校验由 PlatformKit 提供。跟踪 worker 使用 SDK 的 50 ms 更新间隔，手动 worker 使用 SDK 的最小 BLE 写间隔；原生链路最终执行连接级限频与背压。首次接纳包包含肩/肘水平准备，后续只寻址1/4，不操作5/6。停止只关闭并加入 live session，不再补发目标、扭矩、模式或持续速度指令。收到包不等于实际到位；设备须预先处于位置模式。
 
 
 ## 资源与预算
@@ -55,7 +55,7 @@ NexArmRegistration 将资源命名为 `nexarm.motor.1` 至 `.6`。nod/shakeHead 
 
 Support 将动作转换为有界电机计划。整臂动作及归位只涉及 1…5；motor 6 只能由显式单电机路径操作，resetMotor(6) 必须配置软件 home。普通 passiveBLE 归位参考位置与跟踪 rest 是独立状态，不以发出的目标冒充测量值。
 
-新鲜的发送后反馈进入容差即完成；稳定未到位、运动超时、反馈丢失、断连、发送/准入/反馈异常各有明确结果。普通未到位或电机超时保留结果并执行后续段；取消停止后续写入，清理观察会话。详细算法、数值与状态位于对应业务目录。
+新鲜的发送后反馈进入容差即完成；稳定未到位、运动超时、反馈丢失、断连、发送/准入/反馈异常各有明确结果。普通未到位或电机超时保留结果并执行后续段；取消停止后续写入，清理观察会话。通用反馈算法和数值位于 PlatformKit，动作结果与执行状态位于对应业务目录。
 
 Controller 提供 motorResults 与 revision；宿主将逐电机结果写入本次 invocation 的报告端口，并保留后续异常。单个控制器一次只接纳一个物理执行，即使上层资源集合不相交也不会自动获得控制器内并行执行。
 
@@ -66,3 +66,7 @@ Controller 提供 motorResults 与 revision；宿主将逐电机结果写入本�
 ## Container 上下文
 
 NexArmControlService.contextSnapshot 从当前连接、控制器、跟踪与反馈健康状态提取 connected/controlAvailable；不复制到Storage。既有连接事实订阅继续服务角色生命周期，模型读取不产生订阅或设备动作。
+
+NexArm通用设备参数、允许误差、位置反馈观察、经验行程估算与原生恢复分类/预算由 PlatformKit 拥有；Actions 仅消费这些能力并拥有动作目标、资源、执行报告、设备选择及业务生命周期协调。硬件错误保持SDK类型，上层仅适配展示与动作结果，基础模块不依赖业务模块。
+
+Motor Actions expose absolute encoder targets or relative encoder-space degrees. Actions acquires the fresh starting measurement and owns the move; PlatformKit owns conversion and final target bounds. RobotInteraction teaches axis selection and composition using these declarations.

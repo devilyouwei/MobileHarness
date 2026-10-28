@@ -20,33 +20,12 @@ public struct NexArmPacket: Equatable, Sendable {
     /// Observation sessions admit supported addressed position writes and read-only telemetry requests.
     public var isObservedControl: Bool {
         (id == 255 && command == 11 && payload.isEmpty) || isSynchronousPositionWrite || isSinglePositionWrite
-            || isTrackingSpeedControl
     }
-    /// Live tracking may switch motors 1 and 4 between position mode and closed-loop speed, and may write their speeds.
-    public var isTrackingSpeedControl: Bool {
-        isTrackingRegisterWrite || isTrackingSpeedSync
-    }
-    private var isTrackingRegisterWrite: Bool {
-        guard id == 1 || id == 4, command == 3 else { return false }
-        switch payload.count {
-        case 2:
-            return (payload[0] == 40 || payload[0] == 33) && (payload[1] == 0 || payload[1] == 1)
-        case 3:
-            return payload[0] == 46 && Self.legalSpeed(Array(payload.dropFirst()))
-        default:
-            return false
+    /// All addressed register writes must be bounded position commands, including finite/raw sends.
+    public func validateMotorWrite() throws {
+        if command == 3 || command == 131 {
+            guard isSinglePositionWrite || isSynchronousPositionWrite else { throw NexArmError.invalidPacket }
         }
-    }
-    private var isTrackingSpeedSync: Bool {
-        guard id == 254, command == 131, payload.count == 8, payload[0] == 46, payload[1] == 2,
-            payload[2] == 1, payload[5] == 4
-        else { return false }
-        return Self.legalSpeed(Array(payload[3..<5])) && Self.legalSpeed(Array(payload[6..<8]))
-    }
-    private static func legalSpeed(_ bytes: [UInt8]) -> Bool {
-        guard bytes.count >= 2 else { return false }
-        let magnitude = (Int(bytes[0]) | Int(bytes[1]) << 8) & 0x7FFF
-        return (0...1400).contains(magnitude)
     }
     public var isSynchronousPositionWrite: Bool {
         guard id == 254, command == 131, (10...50).contains(payload.count), (payload.count - 2) % 8 == 0,
@@ -54,14 +33,14 @@ public struct NexArmPacket: Equatable, Sendable {
         else { return false }
         var motors: Set<UInt8> = []
         for start in stride(from: 2, to: payload.count, by: 8) {
-            guard (1...6).contains(payload[start]), motors.insert(payload[start]).inserted,
-                (1...254).contains(payload[start + 1]),
+            guard NexArmDeviceLimits.motorIDs.contains(Int(payload[start])), motors.insert(payload[start]).inserted,
+                NexArmDeviceLimits.acceleration.contains(Int(payload[start + 1])),
                 payload[start + 4] == 0, payload[start + 5] == 0
             else { return false }
             let target = Int(payload[start + 2]) | Int(payload[start + 3]) << 8
             let speed = Int(payload[start + 6]) | Int(payload[start + 7]) << 8
             guard NexArmMotorCommands.positionLimits[Int(payload[start]) - 1].contains(target),
-                (1...1400).contains(speed)
+                NexArmDeviceLimits.speed.contains(speed)
             else {
                 return false
             }
@@ -69,12 +48,14 @@ public struct NexArmPacket: Equatable, Sendable {
         return true
     }
     private var isSinglePositionWrite: Bool {
-        guard (1...6).contains(id), command == 3, payload.count == 8,
-            payload[0] == 41, (1...254).contains(payload[1]), payload[4] == 0, payload[5] == 0
+        guard NexArmDeviceLimits.motorIDs.contains(Int(id)), command == 3, payload.count == 8,
+            payload[0] == 41, NexArmDeviceLimits.acceleration.contains(Int(payload[1])), payload[4] == 0,
+            payload[5] == 0
         else { return false }
         let position = Int(payload[2]) | Int(payload[3]) << 8
         let speed = Int(payload[6]) | Int(payload[7]) << 8
-        return NexArmMotorCommands.positionLimits[Int(id) - 1].contains(position) && (1...1400).contains(speed)
+        return NexArmMotorCommands.positionLimits[Int(id) - 1].contains(position)
+            && NexArmDeviceLimits.speed.contains(speed)
     }
     public var motorTargets: [Int: Int]? {
         if isSynchronousPositionWrite {
@@ -87,7 +68,7 @@ public struct NexArmPacket: Equatable, Sendable {
         return nil
     }
     public var isLiveControl: Bool {
-        isSinglePositionWrite || isSynchronousPositionWrite || isTrackingSpeedControl
+        isSinglePositionWrite || isSynchronousPositionWrite
     }
     public var bytes: [UInt8] {
         let body = [id, UInt8(payload.count + 2), command] + payload

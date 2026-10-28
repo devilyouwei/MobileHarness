@@ -1,4 +1,5 @@
 import FunctionContracts
+import PlatformKit
 
 /// NexArm.Gesture function ownership; current invocation paths remain compatible.
 extension NexArmActions {
@@ -36,8 +37,11 @@ extension NexArmActions {
         try await perform(
             GestureRequest(
                 gesture: .nod, repetitions: cycles,
-                speed: try motionValue("speed", invocation, default: 1400, range: 1...1400),
-                acceleration: try motionValue("acceleration", invocation, default: 30, range: 1...254)), invocation)
+                speed: try motionValue(
+                    "speed", invocation, default: NexArmDeviceLimits.defaultSpeed, range: NexArmDeviceLimits.speed),
+                acceleration: try motionValue(
+                    "acceleration", invocation, default: NexArmDeviceLimits.defaultAcceleration,
+                    range: NexArmDeviceLimits.acceleration)), invocation)
         try Task.checkCancellation()
     }
 
@@ -75,8 +79,11 @@ extension NexArmActions {
         try await perform(
             GestureRequest(
                 gesture: .shakeHead, repetitions: cycles,
-                speed: try motionValue("speed", invocation, default: 1400, range: 1...1400),
-                acceleration: try motionValue("acceleration", invocation, default: 30, range: 1...254)), invocation)
+                speed: try motionValue(
+                    "speed", invocation, default: NexArmDeviceLimits.defaultSpeed, range: NexArmDeviceLimits.speed),
+                acceleration: try motionValue(
+                    "acceleration", invocation, default: NexArmDeviceLimits.defaultAcceleration,
+                    range: NexArmDeviceLimits.acceleration)), invocation)
         try Task.checkCancellation()
     }
 
@@ -113,8 +120,11 @@ extension NexArmActions {
         try await perform(
             GestureRequest(
                 gesture: .wave, repetitions: count,
-                speed: try motionValue("speed", invocation, default: 1400, range: 1...1400),
-                acceleration: try motionValue("acceleration", invocation, default: 30, range: 1...254)), invocation)
+                speed: try motionValue(
+                    "speed", invocation, default: NexArmDeviceLimits.defaultSpeed, range: NexArmDeviceLimits.speed),
+                acceleration: try motionValue(
+                    "acceleration", invocation, default: NexArmDeviceLimits.defaultAcceleration,
+                    range: NexArmDeviceLimits.acceleration)), invocation)
         try Task.checkCancellation()
     }
 
@@ -151,8 +161,11 @@ extension NexArmActions {
         try await perform(
             GestureRequest(
                 gesture: direction == .left ? .tiltLeft : .tiltRight, repetitions: 1,
-                speed: try motionValue("speed", invocation, default: 1400, range: 1...1400),
-                acceleration: try motionValue("acceleration", invocation, default: 30, range: 1...254)), invocation)
+                speed: try motionValue(
+                    "speed", invocation, default: NexArmDeviceLimits.defaultSpeed, range: NexArmDeviceLimits.speed),
+                acceleration: try motionValue(
+                    "acceleration", invocation, default: NexArmDeviceLimits.defaultAcceleration,
+                    range: NexArmDeviceLimits.acceleration)), invocation)
         try Task.checkCancellation()
     }
 
@@ -189,8 +202,11 @@ extension NexArmActions {
         try await perform(
             GestureRequest(
                 gesture: .lookAround, repetitions: count,
-                speed: try motionValue("speed", invocation, default: 1400, range: 1...1400),
-                acceleration: try motionValue("acceleration", invocation, default: 30, range: 1...254)), invocation)
+                speed: try motionValue(
+                    "speed", invocation, default: NexArmDeviceLimits.defaultSpeed, range: NexArmDeviceLimits.speed),
+                acceleration: try motionValue(
+                    "acceleration", invocation, default: NexArmDeviceLimits.defaultAcceleration,
+                    range: NexArmDeviceLimits.acceleration)), invocation)
         try Task.checkCancellation()
     }
 
@@ -227,8 +243,11 @@ extension NexArmActions {
         try await perform(
             GestureRequest(
                 gesture: .celebrate, repetitions: count,
-                speed: try motionValue("speed", invocation, default: 1400, range: 1...1400),
-                acceleration: try motionValue("acceleration", invocation, default: 30, range: 1...254)), invocation)
+                speed: try motionValue(
+                    "speed", invocation, default: NexArmDeviceLimits.defaultSpeed, range: NexArmDeviceLimits.speed),
+                acceleration: try motionValue(
+                    "acceleration", invocation, default: NexArmDeviceLimits.defaultAcceleration,
+                    range: NexArmDeviceLimits.acceleration)), invocation)
         try Task.checkCancellation()
     }
 
@@ -265,8 +284,11 @@ extension NexArmActions {
         try await perform(
             GestureRequest(
                 gesture: .dance, repetitions: count,
-                speed: try motionValue("speed", invocation, default: 1400, range: 1...1400),
-                acceleration: try motionValue("acceleration", invocation, default: 30, range: 1...254)), invocation)
+                speed: try motionValue(
+                    "speed", invocation, default: NexArmDeviceLimits.defaultSpeed, range: NexArmDeviceLimits.speed),
+                acceleration: try motionValue(
+                    "acceleration", invocation, default: NexArmDeviceLimits.defaultAcceleration,
+                    range: NexArmDeviceLimits.acceleration)), invocation)
         try Task.checkCancellation()
     }
 }

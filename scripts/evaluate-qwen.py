@@ -104,7 +104,8 @@ def compact_case(case):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--env-file", type=Path, default=ROOT / ".env.local")
-    parser.add_argument("--models", nargs="+", required=True)
+    parser.add_argument("--models", nargs="+", default=["gpt-4.1", "qwen3.8-flash", "qwen3.8-max"])
+    parser.add_argument("--robot-only", action="store_true", help="Run all robot-prefixed scenarios")
     parser.add_argument("--cases", help="Comma-separated workflow IDs; omitted runs the complete suite")
     parser.add_argument("--output-prefix", type=Path, default=Path("/tmp/qwen-workflow-regression"))
     parser.add_argument("--skip-build", action="store_true")
@@ -115,7 +116,12 @@ def main():
     if any(m != "gpt-4.1" and not re.fullmatch(r"qwen[a-zA-Z0-9.-]+", m) for m in args.models):
         parser.error("Use exact Qwen model IDs or gpt-4.1")
     fixture_path = ROOT / "Tests/AgentModelEvaluationTests/Scenarios/qwen-workflows.json"
-    expected = selected_ids(json.loads(fixture_path.read_text())["cases"], args.cases)
+    cases = json.loads(fixture_path.read_text())["cases"]
+    if args.robot_only:
+        if args.cases:
+            parser.error("Choose --robot-only or --cases")
+        args.cases = ",".join(case["id"] for case in cases if case["id"].startswith("robot-"))
+    expected = selected_ids(cases, args.cases)
     for model in args.models:
         raw_path = Path(str(args.output_prefix) + "-" + model + ".json")
         if raw_path.exists() or raw_path.with_suffix(".log").exists():

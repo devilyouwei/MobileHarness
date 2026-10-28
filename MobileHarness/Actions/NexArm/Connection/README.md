@@ -12,7 +12,7 @@
 | --- | --- |
 | [BluetoothInteractionWorkflow.swift](BluetoothInteractionWorkflow.swift) | 有界手动请求与停止入口 |
 | [BluetoothPresentation.swift](BluetoothPresentation.swift) | 设备事实的展示名称与状态投影 |
-| [BluetoothRecovery.swift](BluetoothRecovery.swift) | 恢复原因、预算与失败策略 |
+| [BluetoothRecovery.swift](BluetoothRecovery.swift) | 恢复原因/错误展示及存储错误过滤，预算和原生分类来自SDK |
 | [BluetoothWorkflow.swift](BluetoothWorkflow.swift) | 业务状态到 UI 的投影及连接／控制端口 |
 | [NexArmConnectionState.swift](NexArmConnectionState.swift) | 连接、控制资格、恢复及测量事实 |
 | [NexArmDeviceAdapter.swift](NexArmDeviceAdapter.swift) | System.Device 到机械臂能力的类型化适配与延迟失败反馈 |
@@ -22,3 +22,9 @@
 ## Device read ownership
 
 NexArmDeviceAdapter exposes typed control, specific Bluetooth status and deferred failure delivery. Application/Agent observation and last-result readers are outside this adapter; it has no generic environment callback. Status reads retain Bluetooth ownership and do not scan, connect, move hardware or prove physical completion.
+
+原生运动参数默认值和合法范围引用 PlatformKit `NexArmDeviceLimits`；本层只传递参数及解释业务结果，不另定义设备限制。
+
+原生重连预算、退避、可恢复错误分类及失败类型由 PlatformKit 提供；本层不复制分类。根服务保留记住设备选择、主动断开、前后台/业务资格和恢复任务生命周期。连接/断开/隔离的原生执行及事实一直由SDK拥有；中文提示留在本层。
+
+The workflow forwards relative motor requests without converting units or guessing current position; the connection-owned executor obtains feedback before resolving the target.

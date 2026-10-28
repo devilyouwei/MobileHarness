@@ -88,7 +88,10 @@ private actor InteractionPresentation: ResourcePresentationCapability {
     let device = InteractionDevice()
     let presentation = InteractionPresentation()
     let runtime = try await resourceRuntime(UnusedModelResourceCapability(), presentation: presentation, device: device)
-    try await runtime.controlDevice(["operation": "scan"])
+    let fence = UUID().uuidString
+    try await runtime.controlDevice(["operation": "scan", "fence": fence])
+    try await runtime.controlDevice(["operation": "connect", "id": "device_17", "fence": fence])
+    try await runtime.controlDevice(["operation": "forget", "fence": fence])
     await #expect(throws: ApplicationControlIntentFailure.self) {
         try await runtime.controlDevice(["operation": "refresh"])
     }
@@ -96,7 +99,10 @@ private actor InteractionPresentation: ResourcePresentationCapability {
         try await runtime.controlDevice(["operation": "motorVelocity", "id": "7", "value": "1"])
     }
     try await runtime.controlDevice(["operation": "stopScan"])
-    #expect(await device.calls == [.scan, .refresh, .stopScan])
+    #expect(await device.calls == [.scan, .connect, .forget, .refresh, .stopScan])
+    let requests = await device.requests
+    #expect(requests[1].id == "device_17" && requests[1].fence == fence)
+    #expect(requests[2].id == nil && requests[2].fence == fence)
     #expect(await presentation.destinations.isEmpty)
     #expect(await runtime.agent.status().queuedInputs == 0)
     await runtime.shutdown()

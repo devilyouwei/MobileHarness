@@ -97,9 +97,11 @@ flowchart LR
 
 `PhotographerUI.swift` 在 start 建立请求与事实消费，按真实 Camera Tool 结果推进 open/close/flip/retry/save/ignore。回执在原生结果及角色终态完成后结束，媒体处理使用真实 mediaID；取消加入调用后 retire 状态。事实不通过 camera.state Signal 镜像；相机上下文在模型请求时读取所属容器快照。
 
-Assistant 的 photography Skill 可以直接调用 Camera Actions，不必须委派 Photographer Task。跟踪另行消费 VisionPerception 的 `vision.pose`：前台、连接与准入满足且姿态新鲜才发内部 aim。输出间隔至少 0.2 秒；角色提供 base/pitch 目标，电机模式、速度整形、资源冲突和物理停机归 Actions/NexArm 与 PlatformKit。
+Assistant 的 photography Skill 可以直接调用 Camera Actions，不必须委派 Photographer Task。跟踪另行消费 VisionPerception 的 `vision.pose`：前台、连接与准入满足且姿态新鲜才发内部 aim。输出使用 PlatformKit 的位置更新建议间隔 50 ms，最多 20 Hz（实际受姿态产出频率限制）；滤波采用按观测时间计算的 120 ms 时间常数，积分使用实际目标间隔且至多 0.2 秒，画面中心立即停止累加，重复/倒退时间不推进。角色保留画面死区、构图窗口和追随增益，提供 base/pitch 目标；这些是摄影策略，设备编码器范围、运行参数和通信上限由 PlatformKit 拥有，Actions/NexArm 编译有限位置包。角色不转换速度方向位、不切换舵机模式。资源冲突与执行生命周期仍归 Actions/NexArm；设备位置模式为运行前提，软件限位不等于硬件保护。
 
 ## 状态、生命周期与失败
+
+跟踪派发仅保留正在执行一个和待执行最新一个目标；新意图覆盖未执行旧意图，饱和计数 `supersededTrackingTargets` 记录替换。已开始执行的调用保持完成/失败语义；detach 清空单槽并取消加入 worker。普通摄影事务不采用覆盖语义。
 
 输出默认 256；短接纳等待容量 32；最近 4096 条证据／消费批次滚动保留并计数，不淘汰待执行事务。每个 UI 源普通未终态请求最多 64，控制独立单槽；相机事务自身只允许一个 pending。
 

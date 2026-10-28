@@ -1647,3 +1647,7 @@ Independent fences include UI generation, capture generation, endpoint incarnati
 | Navigation/inactivity | UI lifetime or App invalidation → owned cancellation/join. | Committed creations remain; root cleanup outlives pages. |
 
 Automated checks, iOS builds, real-model samples, native UI and physical-device acceptance are separate evidence categories maintained in [validation](../docs/validation/README.md). Requirements and decisions live in [requirements](../docs/requirements/README.md) and [ADR](../docs/adr/README.md); historical design rationale lives in [documentation history](../docs/history/Documentation-History.md).
+
+Photographer → Gateway → Actions/NexArm 跟踪链仅传递有限角度/位置目标；Photographer 按 PlatformKit 推荐节奏生成目标，派发保留正在执行一个和待执行最新一个并记录替换计数，Actions 保留最新目标并编译有界位置包。设备位置/运行参数限制及通信上限统一由 PlatformKit 提供，USB/BLE 在发包前验证寄存器写和位置范围，BLE 对所有生产者共享发送预算及原生背压。运行时不切换舵机模式或发送持续速度，取消加入不附加运动。设备硬件限位与位置模式配置不由该链写入，详见 [NexArm SDK](PlatformKit/Connectivity/NexArm/README.md)。
+
+NexArm通用设备参数、允许误差、位置反馈观察、经验行程估算与原生恢复分类/预算由 PlatformKit 拥有；Actions 仅消费这些能力并拥有动作目标、资源、执行报告、设备选择及业务生命周期协调。硬件错误保持SDK类型，上层仅适配展示与动作结果，基础模块不依赖业务模块。

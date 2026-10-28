@@ -573,3 +573,25 @@ func actionStoredResultsRetainSubsequentHandlerFailure(_ reported: Bool) async t
         }
     }
 }
+
+@Test(.actionCatalog) func deviceControlDeclarationAdmitsTrustedUIOperationsAndRejectsUnknownInputs() throws {
+    let definition = SystemActions.controlDefinition(completing: { _ in .value("accepted") })
+    for operation in [
+        "scan", "stopScan", "connect", "reconnect", "disconnect", "forget", "refresh", "preset",
+        "motorVelocity", "stopMotorControl", "openPage", "closePage", "openSystemSettings",
+    ] {
+        let call = FunctionRequest(
+            actionPath: ActionIdentifier(domain: "System", module: "Device", function: "control"),
+            parameters: [
+                "operation": operation, "id": UUID().uuidString, "fence": UUID().uuidString,
+                "value": "0.5", "action": "reset",
+            ])
+        try definition.validateInput(call)
+    }
+    for parameters in [["operation": "connect", "unexpected": "value"], ["operation": "unsupported"]] {
+        let call = FunctionRequest(
+            actionPath: ActionIdentifier(domain: "System", module: "Device", function: "control"),
+            parameters: parameters)
+        #expect(throws: (any Error).self) { try definition.validateInput(call) }
+    }
+}

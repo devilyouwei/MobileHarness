@@ -38,7 +38,7 @@ App binds camera/device/voice and maintenance collaboration through neutral port
 | [Assistant](Assistant/README.md) | Home text, Chat and private decision context; receives speech finals, requests synthesis and delegates fixed Tasks; selects dynamic Skills. |
 | [ApplicationControl](ApplicationControl/README.md) | Settings/resources/devices/diagnostics requests and device/artifact/failure observations; owns administrative and diagnostic policy. |
 | [Memory](Memory/README.md) | History requests and private context; authorizes history calls and fixed Task results. |
-| [Photographer](Photographer/README.md) | Camera/album requests, pose and tracking availability; owns capture/tracking intent and policy. |
+| [Photographer](Photographer/README.md) | Camera/album requests, pose and tracking availability; owns capture/tracking intent and policy. Consumes PlatformKit position-update cadence; tracking dispatch retains only the newest pending intent. |
 | [SpeechPerception](SpeechPerception/README.md) | Listening requests, native PCM, VAD/ASR and sound-source computation; owns consent/half-duplex policy and transcript messages. |
 | [SpeechSynthesis](SpeechSynthesis/README.md) | Directed synthesis/cancel, TTS and owned cache production; does not issue playback calls itself. |
 | [VisionPerception](VisionPerception/README.md) | Read-only camera frames, Pose inference and projection; publishes pose and requests protected presentation. |

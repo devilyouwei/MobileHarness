@@ -11,7 +11,8 @@ enum NexArmRegistration {
         case "shakeHead": motors = [5]
         case "moveMotor", "resetMotor":
 
-            guard let raw = call.parameters["motor"], let motor = Int(raw), (1...6).contains(motor) else { return [] }
+            guard let raw = call.parameters["motor"], let motor = Int(raw), NexArmDeviceLimits.motorIDs.contains(motor)
+            else { return [] }
             motors = [motor]
         default: motors = Set(1...5)
         }
@@ -24,8 +25,10 @@ enum NexArmRegistration {
             return value
         }
         let options = try NexArmMotorOptions(
-            speed: value("speed", fallback: 1400, range: 1...1400),
-            acceleration: value("acceleration", fallback: 30, range: 1...254))
+            speed: value("speed", fallback: NexArmDeviceLimits.defaultSpeed, range: NexArmDeviceLimits.speed),
+            acceleration: value(
+                "acceleration", fallback: NexArmDeviceLimits.defaultAcceleration, range: NexArmDeviceLimits.acceleration
+            ))
         let cycles: Int
         do {
             cycles = try value(call.actionPath.function == "waveWrist" ? "count" : "cycles", fallback: 1, range: 1...3)

@@ -1,5 +1,6 @@
 import Foundation
 import FunctionContracts
+import PlatformKit
 
 extension NexArmActions {
     public enum Gesture: Sendable, Equatable {
@@ -10,14 +11,17 @@ extension NexArmActions {
         public let repetitions: Int
         public let motor: Int?
         public let target: Int?
+        public let deltaDegrees: Double?
         public let speed: Int
         public let acceleration: Int
         public init(
-            gesture: Gesture, repetitions: Int, motor: Int? = nil, target: Int? = nil, speed: Int = 1400,
-            acceleration: Int = 30
+            gesture: Gesture, repetitions: Int, motor: Int? = nil, target: Int? = nil, deltaDegrees: Double? = nil,
+            speed: Int = NexArmDeviceLimits.defaultSpeed,
+            acceleration: Int = NexArmDeviceLimits.defaultAcceleration
         ) {
             self.motor = motor
             self.target = target
+            self.deltaDegrees = deltaDegrees
             self.speed = speed
             self.acceleration = acceleration
             self.gesture = gesture

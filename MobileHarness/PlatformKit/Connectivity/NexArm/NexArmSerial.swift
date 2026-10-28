@@ -118,6 +118,7 @@
         private func send(_ packet: NexArmPacket) throws {
             do {
                 try admission?.check()
+                try packet.validateMotorWrite()
                 let bytes = packet.bytes
                 let written = bytes.withUnsafeBytes { Darwin.write(fd, $0.baseAddress, $0.count) }
                 guard written == bytes.count else { throw NexArmError.io(written < 0 ? errno : EIO) }

@@ -1,8 +1,10 @@
 import Foundation
+import PlatformKit
 
 /// Photographer-owned tracking state; no device effects or runtime scheduling.
 struct PhotographerTrackingPolicy {
     private var lastAim: (base: Double, pitch: Double, time: TimeInterval)?
+    private var lastSampleTime: TimeInterval?
     private var filteredBase = 0.0
     private var filteredPitch = 0.0
     private var commandedBase = 0.0
@@ -17,6 +19,7 @@ struct PhotographerTrackingPolicy {
 
     mutating func reset() {
         lastAim = nil
+        lastSampleTime = nil
         filteredBase = 0
         filteredPitch = 0
         commandedBase = 0
@@ -26,25 +29,31 @@ struct PhotographerTrackingPolicy {
     /// First published person. Nose at confidence ≥ 0.3 inside the image, otherwise the midpoint of such joints.
     /// `base` turns the base; `pitch` tips the wrist. Both advance in limited steps from the last command.
     mutating func nextAim(_ pose: PoseObservation) -> (base: Double, pitch: Double)? {
+        guard pose.timestamp.isFinite, lastSampleTime.map({ pose.timestamp > $0 }) ?? true else { return nil }
         guard let person = pose.people.first else { return nil }
         guard let point = Self.aimPoint(person, width: pose.width, height: pose.height) else { return nil }
+        let interval = NexArmDeviceLimits.positionUpdateIntervalSeconds
+        let sampleDt = lastSampleTime.map { min(0.2, pose.timestamp - $0) } ?? interval
+        lastSampleTime = pose.timestamp
         let errorX = point.x / Double(pose.width) - 0.5
         let errorY = point.y / Double(pose.height) - 0.5
-        let baseError = Self.track(&filteredBase, error: errorX)
-        let pitchError = Self.track(&filteredPitch, error: errorY)
-        if let lastAim, pose.timestamp - lastAim.time < 0.2 { return nil }
-        let dt = lastAim.map { min(0.4, max(0.05, pose.timestamp - $0.time)) } ?? 0.2
+        let baseError = Self.track(&filteredBase, error: errorX, dt: sampleDt)
+        let pitchError = Self.track(&filteredPitch, error: errorY, dt: sampleDt)
+        // No catch-up bursts: only the current sample can produce one new target.
+        if let lastAim, pose.timestamp - lastAim.time < interval - 1e-9 { return nil }
+        let dt = lastAim.map { min(0.2, pose.timestamp - $0.time) } ?? interval
         let baseStep = rateStep(baseError, gain: 1.15, limit: 0.55, dt: dt)
         let pitchStep = rateStep(pitchError, gain: 0.85, limit: 0.40, dt: dt)
-        guard abs(baseStep) >= 0.004 || abs(pitchStep) >= 0.004 else { return nil }
+        guard abs(baseStep) >= 0.001 || abs(pitchStep) >= 0.001 else { return nil }
         let base = min(1, max(-1, commandedBase + baseStep))
         let pitch = min(0.7, max(-0.7, commandedPitch + pitchStep))
         guard base != commandedBase || pitch != commandedPitch else { return nil }
         return (base, pitch)
     }
 
-    /// Soft dead zone, then a smoothed error. A direction change starts from half the new error.
-    private static func track(_ filtered: inout Double, error: Double) -> Double {
+    /// Time-based filtering gives the same response at different observation rates.
+    /// Reversing clears the old direction; centered samples stop accumulating immediately.
+    private static func track(_ filtered: inout Double, error: Double, dt: TimeInterval) -> Double {
         let zone = 0.04
         let magnitude = abs(error)
         let shaped: Double
@@ -57,11 +66,11 @@ struct PhotographerTrackingPolicy {
         if shaped == 0 {
             filtered = 0
         } else if filtered * shaped < 0 {
-            filtered = shaped * 0.5
+            filtered = shaped * (1 - exp(-dt / 0.12))
         } else if filtered == 0 {
             filtered = shaped
         } else {
-            filtered += 0.55 * (shaped - filtered)
+            filtered += (1 - exp(-dt / 0.12)) * (shaped - filtered)
         }
         return filtered
     }

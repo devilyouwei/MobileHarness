@@ -167,9 +167,6 @@ import Testing
             guard observation == session else { throw NexArmError.disconnected }
             return try await send(packet)
         }
-        func restoreLive(_ packet: NexArmPacket, session: String) async throws -> Bool {
-            try await sendLive(packet, session: session)
-        }
         func sendLive(_ packet: NexArmPacket, session: String) async throws -> Bool {
             guard live == session else { throw NexArmError.disconnected }
             return try await send(packet)

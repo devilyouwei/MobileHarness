@@ -2,6 +2,7 @@ import CallRuntime
 import ExecutionRuntime
 import Foundation
 import FunctionContracts
+import PlatformKit
 import StorageCore
 import UI
 
@@ -46,7 +47,7 @@ public struct NexArmBehaviorAdapter {
             case .moveMotor, .resetMotor:
                 guard let motor = request.motor else { throw NexArmExecutionError.invalidArguments }
                 try await bluetooth.moveMotor(
-                    id: motor, target: request.target, speed: request.speed,
+                    id: motor, target: request.target, deltaDegrees: request.deltaDegrees, speed: request.speed,
                     acceleration: request.acceleration, recordReport: { try await reports.record($0) })
             default:
                 let gesture: NexArmGesture
@@ -82,10 +83,11 @@ public struct NexArmBehaviorAdapter {
             let args = ActionArguments(invocation.call.parameters)
             let speed =
                 try invocation.call.parameters["speed"] == nil
-                ? 1400 : args.requiredInt("speed", range: 1...1400)
+                ? NexArmDeviceLimits.defaultSpeed : args.requiredInt("speed", range: NexArmDeviceLimits.speed)
             let acceleration =
                 try invocation.call.parameters["acceleration"] == nil
-                ? 30 : args.requiredInt("acceleration", range: 1...254)
+                ? NexArmDeviceLimits.defaultAcceleration
+                : args.requiredInt("acceleration", range: NexArmDeviceLimits.acceleration)
             try await bluetooth.performGesture(
                 .baseSway, repetitions: cycles, speed: speed, acceleration: acceleration,
                 recordReport: { try await reports.record($0) })

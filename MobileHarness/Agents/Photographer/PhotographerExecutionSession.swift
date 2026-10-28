@@ -18,7 +18,9 @@ public actor PhotographerExecutionSession {
     private var starting: Task<Void, Error>?
     private var trackingSession: String?
     private var trackingWorker: Task<Void, Never>?
-    private var trackingQueue: [OutputEnvelope] = []
+    /// Superseded intents are observable; they have never been submitted as device actions.
+    public private(set) var supersededTrackingTargets: UInt64 = 0
+    private var pendingTracking: OutputEnvelope?
     public init(
         manager: AgentManager, output: OutputGateway, agent: PhotographerAgent,
         report: @escaping @Sendable (String) async -> Void = { _ in }
@@ -98,17 +100,16 @@ public actor PhotographerExecutionSession {
             return
         }
         guard envelope.sessionID == trackingSession else { return }
-        guard trackingQueue.count < 8 else {
-            await report("Photographer tracking dispatch capacity exceeded")
-            return
+        if pendingTracking != nil, supersededTrackingTargets < .max {
+            supersededTrackingTargets += 1
         }
-        trackingQueue.append(envelope)
+        pendingTracking = envelope
         if trackingWorker == nil { trackingWorker = Task { await consumeTracking() } }
     }
     private func consumeTracking() async {
         defer { trackingWorker = nil }
-        while !Task.isCancelled, !trackingQueue.isEmpty {
-            let envelope = trackingQueue.removeFirst()
+        while !Task.isCancelled, let envelope = pendingTracking {
+            pendingTracking = nil
             do {
                 let result = try await boundConsumer().execute(envelope)
                 if result.isError { await report(result.failure ?? result.tool?.value ?? "Tracking failed") }
@@ -125,7 +126,7 @@ public actor PhotographerExecutionSession {
         guard trackingSession == sessionID else { return }
         trackingSession = nil
         do { try await agent.unbindTracking(sessionID: sessionID) } catch { await report("保存追踪结束状态失败：\(error)") }
-        trackingQueue.removeAll()
+        pendingTracking = nil
         let worker = trackingWorker
         worker?.cancel()
         await worker?.value

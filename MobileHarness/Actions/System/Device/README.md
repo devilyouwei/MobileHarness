@@ -19,3 +19,5 @@
 ## Specific device query boundary
 
 readStatus returns the owning Bluetooth workflow's power/connection state and discovered device IDs; it takes no arguments, performs no scan/motion and retains the 16,384-byte response bound. It is an explicit detail query, independent of the small actions.robot execution-readiness summary and platform Bluetooth permission fact. control owns requested effects and their admission checks. This module registers no generic environment query and holds no callback into an Agent's observation/result ledger. State supplies ordinary application/native facts; actual operation outcomes arrive as correlated execution feedback.
+
+control 的生成声明覆盖端口支持的全部连接、页面及电机操作，以及 operation/id/value/action/fence 字段。统一准备校验和业务解析接受相同字段；fence 在业务层校验 UUID，设备适配层验证当前会话。Skill 参数投影采用同一声明；未知字段仍被 XML 归一化过滤，直接入口仍拒绝未知字段。

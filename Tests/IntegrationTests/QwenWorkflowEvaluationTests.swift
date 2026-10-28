@@ -47,12 +47,17 @@ private struct QwenTurn: Codable, Sendable {
     var expressionSequence: [String]?
     var expressionSpeech: Bool?
     var unorderedExpressions: Bool?
+    var robotSequence: [QwenExpectedRobotCall]?
+}
+private struct QwenExpectedRobotCall: Codable, Sendable {
+    let alias: String
+    let parameters: [String: String]
 }
 private func qwenCases() throws -> [QwenCase] {
     let url = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
         .appendingPathComponent("AgentModelEvaluationTests/Scenarios/qwen-workflows.json")
     let document = try JSONDecoder().decode(QwenCases.self, from: Data(contentsOf: url))
-    guard document.version == 1, (1...64).contains(document.cases.count) else { throw QwenEvalError.fixture }
+    guard document.version == 1, (1...96).contains(document.cases.count) else { throw QwenEvalError.fixture }
     return document.cases
 }
 private enum QwenEvalError: Error { case fixture, requestLimit, deadline, syntheticFailure }
@@ -358,6 +363,19 @@ private func qwenExpressionIssues(_ expected: QwenTurn, calls: [QwenCall]) -> [S
 
 private func qwenIssues(_ expected: QwenTurn, calls: [QwenCall], skills: AgentTaskSkillState) -> [String] {
     var issues = qwenExpressionIssues(expected, calls: calls)
+    if let sequence = expected.robotSequence {
+        let actual = calls.filter { $0.path.hasPrefix("NexArm.") }
+        if actual.count != sequence.count { issues.append("robotSequenceCount:\(actual.count)") }
+        for (call, wanted) in zip(actual, sequence) {
+            if call.alias != wanted.alias || !wanted.parameters.allSatisfy({ call.parameters[$0.key] == $0.value }) {
+                issues.append("robotSequenceMismatch:\(call.alias):\(call.parameters)")
+            }
+            if call.channel != "Robot" { issues.append("robotChannel") }
+            if call.parameters["target"] != nil && call.parameters["deltaDegrees"] != nil {
+                issues.append("ambiguousMotorTarget")
+            }
+        }
+    }
     for call in calls where call.kind != "action" { issues.append("nonActionSkillCall:\(call.alias)") }
     for alias in expected.required ?? [] where !calls.contains(where: { $0.alias == alias }) {
         issues.append("missing:\(alias)")
@@ -645,4 +663,24 @@ func qwenActionToolWorkflowRegression() async throws {
         #expect(passed, "\(modelID)/\(scenario.id): \(issues)")
     }
     try await context.unload()
+}
+
+@Test(.actionCatalog) func qwenRobotSequenceScoringRejectsWrongAxisOrderAndExtraMoves() {
+    let expected = QwenTurn(
+        user: "synthetic",
+        robotSequence: [
+            .init(alias: "moveMotor", parameters: ["motor": "1", "deltaDegrees": "90"]),
+            .init(alias: "moveMotor", parameters: ["motor": "1", "deltaDegrees": "-45"]),
+        ])
+    func call(_ motor: String, _ degrees: String) -> QwenCall {
+        QwenCall(
+            alias: "moveMotor", path: "NexArm.Motion.moveMotor", kind: "action",
+            parameters: ["motor": motor, "deltaDegrees": degrees], channel: "Robot",
+            round: "fixture", input: "fixture", waitPath: [])
+    }
+    let valid = [call("1", "90"), call("1", "-45")]
+    #expect(qwenIssues(expected, calls: valid, skills: .init()).isEmpty)
+    for invalid in [Array(valid.reversed()), [call("5", "90"), valid[1]], valid + [valid[0]], [valid[0]]] {
+        #expect(!qwenIssues(expected, calls: invalid, skills: .init()).isEmpty)
+    }
 }

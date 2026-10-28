@@ -74,7 +74,6 @@ private actor UnconfirmedPlatformLink: NexArmBluetoothLink {
     func connect(_ id: String) throws { throw NexArmError.disconnected }
     func beginLiveControl() throws -> String { throw NexArmError.disconnected }
     func sendLive(_ packet: NexArmPacket, session: String) throws -> Bool { throw NexArmError.disconnected }
-    func restoreLive(_ packet: NexArmPacket, session: String) throws -> Bool { throw NexArmError.disconnected }
     func endLiveControl(_ session: String) {}
     func beginObservation() throws -> String { throw NexArmError.disconnected }
     func endObservation(_ session: String) {}

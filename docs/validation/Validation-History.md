@@ -3482,3 +3482,64 @@ Final required checks pass: 875 ordinary IntegrationTests, 221 isolated runtime 
 - In-place installation on the paired iPhone17 Pro succeeds (installation sequence4872), OS launch succeeds (PID6555), and independent app inventory confirms dev.mobileharness.app 0.1.0/build2026102601 replacing2026102501. No uninstall or application-data reset was performed. The installation includes the native/application State sources, BasicSkill revision30 and removed generic environment query.
 - This records package/build/install and OS launch, not native UI, actual model adherence, camera/microphone or physical-device acceptance. Full automated checks were not repeated for this installation-only request. No commit or merge.
 - Host-local evidence: /tmp/mh-install-2026102601-build.log, /tmp/mh-install-2026102601-inputs.json, /tmp/mh-install-20261026-apps-before.json, /tmp/mh-install-2026102601-receipt.json, /tmp/mh-install-2026102601-launch.json and /tmp/mh-install-2026102601-apps-after.json.
+
+
+## 2026-10-27 — Device.control 参数声明修复版真机安装
+
+按用户要求，以现有本地签名构建当前工作树 MobileHarness Debug 0.1.0/build2026102701，命令行覆盖版本，不修改源码版本或签名配置。generic iOS 构建、deep/strict 签名校验、目标手机 provisioning 有效期/UDID、25 项 Agent/Skill 资源及 Core 协议验证均通过。
+
+devicectl 在已配对 iPhone 17 Pro 原位安装成功（sequence4920），独立应用清单确认 dev.mobileharness.app 从2026102601更新为2026102701；系统启动成功，PID9075。未卸载或清空 App 数据。此版本包含 Device.control 的 fence/完整操作声明修复；安装和系统启动不等同手机蓝牙连接、忽略或物理动作验收。本轮仅构建/安装，没有向机械臂发送测试动作。
+
+本机证据：/tmp/mh-device-contract-2026102701-build.log、-install.json、-launch.json、-apps-after.json；安装前清单 /tmp/mh-device-contract-apps-before.json。代码回归及全量检查限制见 [修复记录](../requirements/technical/Device-Control-Declaration-Fix.md)。
+
+
+## 2026-10-27 — 恢复 Photographer 有限位置跟踪与原生写入边界
+
+[恢复记录](../completed/NexArm-Position-Tracking-Restore.md) 核对了 main-sh 合并和后续速度算法历史。当前实现恢复 ADR0215/0216 的有限位置目标：首次肩肘准备，后续仅1/4轴，无速度方向位/积分、模式/扭矩切换或取消后补发。PlatformKit 的live/observed及USB/BLE原始CMD3/CMD131写入均只接受范围内位置包，移除restoreLive及所有替身。
+
+scripts/check.sh退出0，876项普通集成测试、221项隔离运行时测试及其他包测试通过，边界/格式/Python/plist检查通过。scripts/build-ios.sh退出0，四个Simulator scheme和资源验证通过；git diff --check通过。日志 /tmp/mh-position-tracking-check.log 和 /tmp/mh-position-tracking-ios.log。
+
+无实机发包、安装或硬件配置写入。此前真机版本2026102701仍使用旧速度算法。positionLimits是主机边界，不是舵机硬件角度/过载保护配置；恢复不自动纠正设备持久模式。真实方向、限位、载荷和硬件保护需独立验收，测试替身不能确定用户报告烧毁的唯一原因。
+
+## 2026-10-27 — NexArm 位置跟随平滑与设备约束归属
+
+[实施记录](../completed/NexArm-Smooth-Position-Tracking.md)：位置目标最多20 Hz，3 count目标门槛，按时间滤波/计算位置动作速度，仅接纳后提交前瞻历史；Photographer慢派发保留正在执行一个及待执行最新一个，替换计数可读。PlatformKit集中位置、寄存器参数、连续位置规划限制和BLE30 ms共享发送预算，上层不定义设备范围。保留位置包限制及取消不补发语义。
+
+- `/tmp/mh-smooth-focused.log`：15项软件专项通过，1项USB实物测试跳过。
+- `/tmp/mh-smooth-dispatch.log`：3项派发/拒绝回归通过，覆盖第一条调用阻塞期间20条新意图只保留最新一条。初次专项编译因测试的Issue.record字符串参数类型错误失败，修正测试后通过。
+- `/tmp/mh-smooth-position-check.log`：`./scripts/check.sh` exit0；普通集成分组报告882项，运行时分组报告221项，架构/依赖/格式/Python/其它Swift包/plist检查通过。可选真实模型、服务、原生专项和USB硬件验收按环境开关跳过，未作为物理验收通过。
+- `/tmp/mh-smooth-position-ios.log`：`./scripts/build-ios.sh` exit0；MobileHarnessSimulator、ModelKitRuntime、ModelKitNemotron、ModelKitSilero均BUILD SUCCEEDED；最终应用25项Skill资源与函数声明检查通过。
+- `git diff --check`、受影响Markdown本地链接检查通过。
+
+本轮不安装手机、不连接或驱动电机；未验证实物跟随手感、堵转/温升、固件模式、硬件限位及机械标定。20 Hz为目标上限，不保证真实姿态推理/链路始终达到该频率；BLE软件背压与有限位置边界不替代固件保护。
+
+## 2026-10-27 — 位置跟随优化版安装到 iPhone
+
+用户要求安装后，以既有本地签名构建当前工作树 MobileHarness Debug 0.1.0/build2026102702（命令行覆盖版本，不修改签名或源码版本配置）。generic iOS 构建、deep/strict 签名校验、目标手机 provisioning/有效期以及最终25项Skill/函数资源校验均通过。
+
+已在配对的 iPhone 17 Pro 原位安装 dev.mobileharness.app（sequence4928）；独立应用清单确认版本从2026102701更新到2026102702。系统启动成功，PID9095，后续进程查询确认该进程存在且可执行路径属于新安装包。未卸载或清空应用数据。
+
+此安装包含有限位置模式恢复、最多20 Hz跟随目标、3 count门槛、按时间滤波/速度计算、最新目标派发，以及PlatformKit统一设备限制和30 ms BLE共享预算。安装和进程启动不等同手机UI、蓝牙连接或机械臂物理平滑/限位验收；本轮未发送机械臂测试动作。
+
+本机证据：`/tmp/mh-smooth-position-2026102702-build.log`、`-install.json`、`-apps-after.json`、`-launch.json`、`-process.json`；安装前清单`/tmp/mh-smooth-position-apps-before.json`。软件验证沿用上一节通过结果，安装阶段没有修改应用代码。
+
+## 2026-10-27 — PlatformKit 设备约束边界确认
+
+用户明确更新节奏、速度/加速度等 limit 属于设备的物理/软件约束，应由 PlatformKit 集中拥有。撤回中途将20 Hz及600/1800/12000常量移到上层的改动，全部引用恢复为已验证/已安装2026102702的源码归属；移除临时迁移计划及上层重复常量。摄影选人、构图、滤波/跟随算法、归位、肩肘准备及动作编排一直位于Agents/Actions。基础模块的软件限制不等于已写入固件的硬件保护。
+
+本次仅撤回未完成的迁移并记录边界，未改变原控制行为、未重新安装或驱动机械臂；沿用恢复前原版本的检查/构建证据，不宣称本轮重新执行全量测试。
+
+## 2026-10-27 — 通用电机反馈及连接错误迁入 PlatformKit
+
+[实施记录](../completed/NexArm-Device-Feedback-Ownership.md)：SDK独立拥有容差/行程估算NexArmMotorProfiles、反馈配置NexArmFeedbackConfiguration、位置观察NexArmPositionObservation及原生恢复分类/预算NexArmBluetoothRecoveryPolicy、NexArmBluetoothRecoveryError。Actions保留兼容别名、目标与资源/报告、已记住设备及显式停止协调、存储错误过滤和中文呈现。默认容差及既有到位行为不变；非法反馈配置现抛SDK invalidMotion；退避对非法attempt输入钳制到有界范围。
+
+- scripts/check.sh退出0；普通集成分组报告885项、运行时分组报告221项；架构/依赖/格式/Python/其他Swift包/plist检查通过。可选实物/服务/模型测试按开关跳过，未当作实物通过。证据/tmp/mh-device-feedback-check.log。
+- 新增SDK六轴容差内外边界、非法配置、原生恢复分类/有界退避3项测试通过；既有反馈时间、稳定/超时、动作与蓝牙恢复集成测试通过。
+- scripts/build-ios.sh退出0，MobileHarnessSimulator、ModelKitRuntime、ModelKitNemotron、ModelKitSilero四scheme及最终25项Skill资源校验通过。证据/tmp/mh-device-feedback-ios.log。
+- diff格式和受影响文档本地链接检查通过；SDK仍无项目模块依赖或业务/本地化符号，没有放宽原依赖边界检查。
+
+本轮未重新安装手机、未发出机械臂测试动作，手机仍是2026102702。软件迁移与模拟测试不代表实物到位精度或硬件保护验收。
+
+## 2026-10-27 — NexArm motor teaching and relative commands
+
+Added relative-degree position requests, axis/unit/limit teaching and 16 robot regression cases. Final real-model synthetic-executor results: GPT-4.1 21/21, Qwen3.8-Flash 20/21, Qwen3.8-Max 21/21; all added cases passed, with Flash readiness failure retained. Final check.sh and four Simulator builds completed. No physical motion or installation. [Detailed evidence](NexArm-Robot-Skill-Regression.md).

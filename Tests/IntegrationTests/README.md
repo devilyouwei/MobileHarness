@@ -27,7 +27,7 @@ PromptTemplateTests 通过生产目录和增量解析器读取 ExpressionInterac
 | PhotographyPipelineTests / CameraSamplingTests | 原生帧输入、最新态替换、共享姿态推理、skeleton/gaze 投影 |
 | Resource/Provider/Settings 用例 | 私有参数暂存、保存/绑定/呈现顺序、版本冲突、资源准入及失败后状态 |
 | Storage 用例 | domain 仓库、配置文档、提交身份、完整消息 checkpoint、容量/损坏/并发与缓存 |
-| NexArm/Bluetooth 用例 | 包与几何、反馈／归位、断连与恢复、资源接管、机械臂状态和协议隔离；首次肩／肘水平准备、电机1／4速度模式进入、准入重试／替换、目标变化后的速度保持、静止停止及退出恢复；取消／后台清理和最新手动意图的加入／接管 |
+| NexArm/Bluetooth 用例 | 包与几何、反馈／归位、断连与恢复、资源接管、机械臂状态和协议隔离；首次肩／肘水平准备、电机1／4有限位置目标、准入重试／替换、目标死区与前瞻限位、取消后无追加动作；取消／后台清理和最新手动意图的加入／接管 |
 
 Task/Skill 的边界矩阵包括四种预加载接管方式（指定、加载、操作 Action、查询 Action）和完成/失败/取消终态；最后一次闲置时使用/重载、零后重载、独立计数、错误快照、32 个在途 Decision、精确字节/数量预算、批量失败回滚、跨会话取消权及失败提交重试。通过实际 Assistant 请求检查后续目录到期、历史证据保留与内部 ReACT 单次结算。用例数量从源码/测试运行报告获取，不在 README 保存某次执行的计数或通过结论。
 
@@ -125,7 +125,7 @@ Photography完成示例使用明确的“App相册”文案；保持与BasicSkil
 
 ## Qwen / GPT-4.1 提示词回归扩展
 
-✅ 沿用59场景／85输入及生产提示词，evaluate-qwen.py接受三款Qwen与gpt-4.1；每个子进程仅注入对应Provider凭据，GPT使用OpenAI端点。运行前后记录生产上下文／Skill／解析与执行源hash，不修改提示词或放宽断言。报告保留失败与实际响应；本轮使用合成设备／仓库，不能替代真机验收。
+✅ 使用生产提示词与 qwen-workflows.json 中的有界场景集，evaluate-qwen.py接受三款Qwen与gpt-4.1；每个子进程仅注入对应Provider凭据，GPT使用OpenAI端点。运行前后记录生产上下文／Skill／解析与执行源hash，不修改提示词或放宽断言。报告保留失败与实际响应；本轮使用合成设备／仓库，不能替代真机验收。
 
 ## Gateway container ownership
 
@@ -148,3 +148,13 @@ PromptTemplateTests bounds the assembled Assistant static instruction/catalog te
 ## State summaries and explicit queries
 
 ApplicationControl tests cover unknown/admitted/paused/stopped summary reads, per-field sequence fencing, closed scene values and exclusion of raw environment/private result data. Production catalogs reject the removed generic environment address while preserving specific device queries. Shared and Qwen fixtures register an explicit synthetic agents.application owner. Photography/ReACT assertions verify its changes in subsequent actual requests. GenerationRoundTests exercises the registered Bluetooth detail query on Query, real Action feedback and continuation without native Tool calls. These fixtures do not establish real LLM adherence or hardware readiness.
+
+ActionContractTests 直接验证生产 Device.control 生成声明，覆盖携带会话 fence 的连接／忽略与完整可信 UI 操作集合，并检查未知参数、非法操作仍在执行前被拒绝。此测试不访问真实蓝牙或机械臂。
+
+NexArmAimTests 覆盖位置跟踪的方向、死区、有限前瞻/六轴边界和速度/模式/扭矩寄存器拒绝；NexArmBluetoothTests 使用替身验证单目标有限位置包及取消后无追加运动。无真实机械臂验收。
+
+位置跟随回归覆盖 20 Hz 发布、采样率无关的位移/滤波、过时输入和卡顿、慢 Gateway 消费者仅执行最新待发目标、未接纳提案隔离、3 count 更新及 SDK 设备参数边界。混合生产者 BLE 预算和背压测试验证约 33 Hz 连接级上限；替身测试不证明物理平滑或舵机保护。
+
+NexArmArrivalPolicyTests直接验证PlatformKit六轴容差边界、非法反馈配置的原生错误以及原生恢复分类/有界退避；现有动作测试验证SDK观察结果到动作报告的映射。
+
+NexArm relative-motor regression covers encoder conversion, all-axis bounds, fresh measured starts, failed reads without cached fallback, mutually exclusive arguments and rejected writes. Robot workflow scoring rejects wrong axes, order, missing steps and extra moves; live model workflows use synthetic device execution only.

@@ -489,6 +489,8 @@ extension LiveRuntimeTests {
 
 /// Telemetry simulator only: never opens Bluetooth or serial hardware.
 private actor GestureArmFixture: NexArmObservableLink {
+    private var readFailure = false
+    func failReads() { readFailure = true }
     private var observation: String?
     private var telemetry = NexArmTelemetryCache()
     private var lastPush = ContinuousClock.now.advanced(by: .seconds(-1))
@@ -594,6 +596,7 @@ private actor GestureArmFixture: NexArmObservableLink {
         if disturbOtherJoint { joints[2] += 60 }
     }
     func exchange(_ packet: NexArmPacket, replyID: UInt8, replyCommand: UInt8, replyCount: Int) throws -> NexArmPacket {
+        if readFailure { throw NexArmError.timeout }
         if packet.command == 7 { return try ik.reply(packet) }
         guard packet.command == 11 else { throw NexArmError.invalidPacket }
         let values = pose + joints
@@ -1345,3 +1348,99 @@ extension LiveRuntimeTests {
         }
     }
 #endif
+
+@Test(.actionCatalog) func nexArmRelativeDegreesRejectLimitsAndDoNotWrap() throws {
+    #expect(try NexArmMotorCommands.relativeTarget(motor: 1, from: 2048, deltaDegrees: 90) == 3072)
+    #expect(try NexArmMotorCommands.relativeTarget(motor: 1, from: 2048, deltaDegrees: -45) == 1536)
+    #expect(try NexArmMotorCommands.relativeTarget(motor: 3, from: 1200, deltaDegrees: 22.5) == 1456)
+    for id in 1...6 {
+        let range = NexArmDeviceLimits.positions[id - 1]
+        #expect(
+            try NexArmMotorCommands.relativeTarget(motor: id, from: range.upperBound, deltaDegrees: 0)
+                == range.upperBound)
+        #expect(throws: NexArmError.invalidMotion) {
+            try NexArmMotorCommands.relativeTarget(motor: id, from: range.upperBound, deltaDegrees: 1)
+        }
+        #expect(throws: NexArmError.invalidMotion) {
+            try NexArmMotorCommands.relativeTarget(motor: id, from: range.lowerBound, deltaDegrees: -1)
+        }
+    }
+    for delta in [Double.nan, .infinity, -.infinity, 361, -361] {
+        #expect(throws: NexArmError.invalidMotion) {
+            try NexArmMotorCommands.relativeTarget(motor: 1, from: 2048, deltaDegrees: delta)
+        }
+    }
+}
+
+extension LiveRuntimeTests {
+    @Test(.actionCatalog) func relativeMotorMoveReadsActualPositionAndRejectsWithoutWrite() async throws {
+        let link = GestureArmFixture()
+        let controller = NexArmActionController(link: link, compatibilityPolicy: .passiveBLE)
+        let options = try NexArmMotorOptions(speed: 400)
+        try await controller.moveMotor(id: 1, target: 2200, options: options, completion: .init())
+        try await controller.moveMotor(id: 1, deltaDegrees: 90, options: options, completion: .init())
+        #expect(await link.commands.last?.motorTargets == [1: 3224])
+        try await controller.moveMotor(id: 1, deltaDegrees: -45, options: options, completion: .init())
+        #expect(await link.commands.last?.motorTargets == [1: 2712])
+        await #expect(throws: NexArmError.invalidMotion) {
+            try await controller.moveMotor(id: 1, deltaDegrees: 180, options: options, completion: .init())
+        }
+        #expect(await link.commands.count == 3)
+    }
+}
+
+extension LiveRuntimeTests {
+    @Test(.actionCatalog) func motorActionRejectsAmbiguousAndInvalidTargetsBeforeEffects() async throws {
+        let registry = try ActionRegistry(modules: [
+            NexArmGestureModule { _, _ in Issue.record("Invalid motor request reached device binding") }
+        ])
+        for parameters in [
+            ["motor": "1"], ["motor": "1", "target": "2048", "deltaDegrees": "90"],
+            ["motor": "3", "target": "900"], ["motor": "1", "deltaDegrees": "nan"],
+            ["motor": "1", "deltaDegrees": "361"], ["motor": "7", "deltaDegrees": "10"],
+            ["motor": "1", "deltaDegrees": "90", "speed": "2000"],
+        ] {
+            let invocation = ActionInvocation(
+                source: .assistant,
+                input: AgentInput(id: UUID().uuidString, sessionID: UUID().uuidString, payload: .event("fixture")),
+                call: ActionCall(
+                    actionPath: ActionPath(domain: "NexArm", module: "Motion", function: "moveMotor"),
+                    channel: "Robot", parameters: parameters))
+            await #expect(throws: (any Error).self) {
+                try await ActionExecutor(registry: registry).execute(invocation)
+            }
+        }
+    }
+}
+
+extension LiveRuntimeTests {
+    @Test(.actionCatalog) func relativeMotorMoveDoesNotUseCachedPoseAfterReadFailure() async throws {
+        let link = GestureArmFixture()
+        let controller = NexArmActionController(link: link, compatibilityPolicy: .passiveBLE)
+        _ = try await controller.readState()
+        await link.failReads()
+        await #expect(throws: NexArmError.timeout) {
+            try await controller.moveMotor(id: 1, deltaDegrees: 90, options: .init(), completion: .init())
+        }
+        #expect(await link.commands.isEmpty)
+    }
+}
+
+extension LiveRuntimeTests {
+    @Test(.actionCatalog) func motorActionDispatchesRelativeDegreesWithoutInventingTarget() async throws {
+        let registry = try ActionRegistry(modules: [
+            NexArmGestureModule { request, _ in
+                #expect(request.gesture == .moveMotor)
+                #expect(request.motor == 1 && request.target == nil && request.deltaDegrees == -45)
+                #expect(request.speed == 400 && request.acceleration == 30)
+            }
+        ])
+        let invocation = ActionInvocation(
+            source: .assistant,
+            input: AgentInput(id: UUID().uuidString, sessionID: UUID().uuidString, payload: .event("fixture")),
+            call: ActionCall(
+                actionPath: ActionPath(domain: "NexArm", module: "Motion", function: "moveMotor"), channel: "Robot",
+                parameters: ["motor": "1", "deltaDegrees": "-45", "speed": "400", "acceleration": "30"]))
+        try await ActionExecutor(registry: registry).execute(invocation)
+    }
+}

@@ -318,8 +318,8 @@ Historical [ADR0155 — Explicit Action serialization identity](0155-explicit-ac
 
 - ✅ [ADR0215 — One pan/tilt packet per tracking target](0215-nexarm-aim-one-shot.md): single-packet pan/tilt tracking, bounded lead/dead zone and native-admission commit; ADR0216 adds shoulder/elbow preparation to the first admitted packet. Main framework and lifecycle contracts are retained. Physical acceptance limits remain in the decision.
 
-- ✅ [ADR0216 — Tracking starts from the calibrated level rest](0216-nexarm-tracking-level-rest.md): first admitted command prepares shoulder/elbow, later commands remain pan/tilt only. Physical arrival remains separate. Live speed control is superseded by ADR0217.
-- ✅ [ADR0217 — Tracking speed mode](0217-nexarm-tracking-speed-mode.md): motors 1 and 4 track in closed-loop speed and hold that speed until the target changes. Aim still publishes positions. Motor 4 positive speed pitches down, so its direction bit is reversed.
+- ✅ [ADR0216 — Tracking starts from the calibrated level rest](0216-nexarm-tracking-level-rest.md): first admitted command prepares shoulder/elbow, later commands remain pan/tilt only. Physical arrival remains separate. The finite-position path is restored by the [2026-10-27 decision](../completed/NexArm-Position-Tracking-Restore.md).
+- Historical, superseded: [ADR0217 — Tracking speed mode](0217-nexarm-tracking-speed-mode.md). Runtime speed/mode/torque writes are removed by the [position restoration](../completed/NexArm-Position-Tracking-Restore.md).
 
 - [0218 - Direct container inputs](0218-direct-container-input.md): direct typed input observation, preserved authorized execution and merged business targets.
 

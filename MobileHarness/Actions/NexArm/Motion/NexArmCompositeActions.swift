@@ -162,7 +162,9 @@ public struct NexArmArmPlan: Sendable {
     }
 
     public func compile(_ frames: [NexArmGesture.TestFrame], from joints: [Int]) throws -> [NexArmGesture.TestFrame] {
-        guard joints.count == 6, joints.allSatisfy({ (0...4095).contains($0) }), frames.count <= 20 else {
+        guard joints.count == 6, joints.allSatisfy({ NexArmDeviceLimits.encoderCounts.contains($0) }),
+            frames.count <= 20
+        else {
             throw NexArmExecutionError.invalidArguments
         }
         return try frames.map { frame in

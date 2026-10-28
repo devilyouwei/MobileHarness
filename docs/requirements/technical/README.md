@@ -33,3 +33,13 @@ Completed scope: [Platform system facts](../../completed/Platform-System-State.m
 Completed scope: [Prefer current facts](../../completed/Current-State-First.md): BasicSkill uses sufficient CURRENT STATE before Skill/function selection; model-adherence limits remain explicit.
 
 Completed scope: [State summaries and explicit queries](../../completed/State-And-Query-Responsibilities.md): role-owned application summary, generic environment-query removal and preserved specific detail queries.
+
+[Device.control 声明一致性修复](Device-Control-Declaration-Fix.md)：修复手机连接／忽略携带 fence 被执行声明拒绝的问题，自动化和手机复验结果见该记录。
+
+已完成的 [NexArm 位置跟踪恢复](../../completed/NexArm-Position-Tracking-Restore.md) 已归档；真实硬件配置与动作验收独立记录，不将软件检查作为物理安全证明。
+
+Completed scope: [NexArm 位置跟随平滑与设备约束](../../completed/NexArm-Smooth-Position-Tracking.md)。软件验证完成，物理平滑与硬件保护仍需独立验收。
+
+Completed scope: [NexArm 通用设备反馈与连接错误归属](../../completed/NexArm-Device-Feedback-Ownership.md)。
+
+Completed scope: [NexArm motor teaching and regression](../../completed/NexArm-Robot-Skill-Teaching.md): parameter/Skill teaching, relative motion and bounded model validation; residual model failures remain documented.

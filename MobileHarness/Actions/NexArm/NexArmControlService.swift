@@ -609,7 +609,7 @@ public final class NexArmControlService {
         disconnect(preserveReconnect: true, cancelRecovery: false)
         recovery = Task { [self] in
             let deadline = Task { @MainActor [weak self] in
-                do { try await Task.sleep(for: BluetoothRecoveryPolicy.episodeTimeout) } catch { return }
+                do { try await Task.sleep(for: NexArmBluetoothRecoveryPolicy.episodeTimeout) } catch { return }
                 guard let self, identity == self.recoveryID else { return }
                 self.disconnect(preserveReconnect: true, cancelRecovery: false)
                 self.recovery?.cancel()
@@ -631,7 +631,7 @@ public final class NexArmControlService {
                 finishRecoveryFailure(connectionError ?? BluetoothRecoveryError.notRetryable)
                 return
             }
-            while recoveryAttempts < BluetoothRecoveryPolicy.maximumAttempts {
+            while recoveryAttempts < NexArmBluetoothRecoveryPolicy.maximumAttempts {
                 guard identity == recoveryID, !Task.isCancelled, foreground, reconnectEnabled else { return }
                 var native = await link.status()
                 if native.power == .unknown || native.power == .resetting {
@@ -659,7 +659,7 @@ public final class NexArmControlService {
                     return
                 }
                 if let started = recoveryStarted,
-                    ContinuousClock.now - started >= BluetoothRecoveryPolicy.episodeTimeout
+                    ContinuousClock.now - started >= NexArmBluetoothRecoveryPolicy.episodeTimeout
                 {
                     finishRecoveryFailure(BluetoothRecoveryError.episodeTimeout)
                     return
@@ -667,7 +667,7 @@ public final class NexArmControlService {
                 let attempt = recoveryAttempts + 1
                 state.recoveryStage = .waiting
                 state.notice = "等待重新连接，第 \(attempt)/3 次"
-                do { try await Task.sleep(for: BluetoothRecoveryPolicy.delay(attempt: attempt)) } catch {
+                do { try await Task.sleep(for: NexArmBluetoothRecoveryPolicy.delay(attempt: attempt)) } catch {
                     return
                 }
                 guard identity == recoveryID, !Task.isCancelled, foreground, reconnectEnabled else { return }
@@ -844,7 +844,7 @@ public final class NexArmControlService {
         while motion != nil || operation != nil, !Task.isCancelled { await Task.yield() }
     }
     public func setMotorVelocity(id: Int, value: Double) {
-        guard (1...6).contains(id), value.isFinite else { return }
+        guard NexArmDeviceLimits.motorIDs.contains(id), value.isFinite else { return }
         if value == 0 {
             jog.inputs[id - 1] = 0
             return
@@ -944,7 +944,9 @@ public final class NexArmControlService {
                         {
                             break
                         }
-                        try await Task.sleep(until: tickStart.advanced(by: .milliseconds(30)), clock: .continuous)
+                        try await Task.sleep(
+                            until: tickStart.advanced(by: NexArmDeviceLimits.minimumBLEWriteInterval),
+                            clock: .continuous)
                     }
                 } catch {
                     failed = !(error is CancellationError)
@@ -1003,7 +1005,7 @@ public final class NexArmControlService {
         await aim?.value
     }
     public func resetArm(
-        speed: Int = 1400, acceleration: Int = 30,
+        speed: Int = NexArmDeviceLimits.defaultSpeed, acceleration: Int = NexArmDeviceLimits.defaultAcceleration,
         recordReport: @escaping @Sendable (ActionReport) async throws -> Void = { _ in }
     ) async throws {
         try await runMotion(recordReport: recordReport) {
@@ -1011,7 +1013,8 @@ public final class NexArmControlService {
         }
     }
     public func performGesture(
-        _ gesture: NexArmGesture, repetitions: Int, speed: Int = 1400, acceleration: Int = 30,
+        _ gesture: NexArmGesture, repetitions: Int, speed: Int = NexArmDeviceLimits.defaultSpeed,
+        acceleration: Int = NexArmDeviceLimits.defaultAcceleration,
         recordReport: @escaping @Sendable (ActionReport) async throws -> Void = { _ in }
     )
         async throws
@@ -1020,7 +1023,7 @@ public final class NexArmControlService {
             try await $0.performGesture(gesture, repetitions: repetitions, speed: speed, acceleration: acceleration)
         }
     }
-    /// Keeps only the latest aim. Tracking enters speed mode on motors 1 and 4 and does not wait for arrival.
+    /// Keeps only the latest aim. Tracking writes finite position goals and does not wait for arrival.
     public func aim(
         base: Double, pitch: Double, origin: NexArmControlOrigin? = nil,
         failed: @escaping @Sendable (NexArmControlFailure) async -> Void = { _ in }
@@ -1051,12 +1054,8 @@ public final class NexArmControlService {
             worker?.cancel()
         }
     }
-    /// Polls the latest pan/tilt target. The first admitted write places motors 2 and 3 on the calibrated
-    /// level rest. Motors 1 and 4 then enter closed-loop speed mode. A changed target updates their combined
-    /// speed; an unchanged target keeps that speed. Speed 0 is written once after the target stays unchanged
-    /// for 0.3 seconds. Motor 5 stays uncommanded. A newer aim replaces an unsent speed. The 30 ms pause only
-    /// checks freshness and admission. A further quiet period ends live control and returns motors 1 and 4
-    /// to position mode.
+    /// Polls the latest finite pan/tilt position target. The first admitted command also levels motors 2/3.
+    /// Later commands address only motors 1/4; quiet targets end the session without further motion writes.
     private func startAimFollow(
         _ controller: NexArmActionController, origin: NexArmControlOrigin?,
         failed reportFailure: @escaping @Sendable (NexArmControlFailure) async -> Void
@@ -1130,7 +1129,9 @@ public final class NexArmControlService {
                                 break
                             }
                         }
-                        try await Task.sleep(until: tickStart.advanced(by: .milliseconds(30)), clock: .continuous)
+                        try await Task.sleep(
+                            until: tickStart.advanced(by: NexArmDeviceLimits.positionUpdateInterval), clock: .continuous
+                        )
                     }
                 } catch {
                     failed = true
@@ -1144,7 +1145,6 @@ public final class NexArmControlService {
                     }
                 }
                 if let session {
-                    await releaseTracking(session: session)
                     await link.endLiveControl(session)
                 }
                 tracking.command.reset()
@@ -1183,20 +1183,6 @@ public final class NexArmControlService {
         }
         return startup.stream
     }
-    /// Returns motors 1 and 4 to position mode even when the tracking task is already cancelled.
-    private func releaseTracking(session: String) async {
-        let packets = tracking.command.releasePackets(
-            base: tracking.goal?.base ?? lastBaseFallback, pitch: tracking.goal?.pitch ?? lastPitchFallback)
-        guard !packets.isEmpty else { return }
-        for packet in packets {
-            for _ in 0..<8 {
-                if (try? await link.restoreLive(packet, session: session)) == true { break }
-                await Task.detached { try? await Task.sleep(for: .milliseconds(40)) }.value
-            }
-        }
-    }
-    private var lastBaseFallback: Int { NexArmJointCommand.armHome[0] }
-    private var lastPitchFallback: Int { NexArmJointCommand.armHome[3] }
     private func validateAgentWriter(_ resources: Set<ResourceID>) async throws {
         guard let permit = ResourceExecutionContext.permit else { return }
         do { try await permit.validate(resources) } catch {
@@ -1307,13 +1293,17 @@ public final class NexArmControlService {
             })
     }
     public func moveMotor(
-        id: Int, target: Int?, speed: Int, acceleration: Int,
+        id: Int, target: Int?, deltaDegrees: Double? = nil, speed: Int, acceleration: Int,
         recordReport: @escaping @Sendable (ActionReport) async throws -> Void = { _ in }
     ) async throws {
+        guard target == nil || deltaDegrees == nil else { throw NexArmExecutionError.invalidArguments }
         let options = try NexArmMotorOptions(speed: speed, acceleration: acceleration)
         let completion = try NexArmMotorCompletion()
         try await runMotion(motors: [id], recordReport: recordReport) { controller in
-            if let target {
+            if let deltaDegrees {
+                try await controller.moveMotor(
+                    id: id, deltaDegrees: deltaDegrees, options: options, completion: completion)
+            } else if let target {
                 try await controller.moveMotor(id: id, target: target, options: options, completion: completion)
             } else {
                 try await controller.resetMotor(id: id, options: options, completion: completion)
@@ -1321,6 +1311,9 @@ public final class NexArmControlService {
         }
     }
     private static func message(_ error: any Error) -> String {
+        if let recovery = error as? NexArmBluetoothRecoveryError {
+            return BluetoothRecoveryPresentation.message(recovery)
+        }
         return ActionReport.description(for: error)
     }
 }

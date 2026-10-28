@@ -5,7 +5,7 @@ import PlatformKit
 /// Five arm axes and one motors-1–5 aim packet. The suction cup occupies the gripper and is not addressed.
 /// Joint order: shoulder_pan, shoulder_lift, elbow_flex, wrist_flex, wrist_roll.
 public enum NexArmJointCommand {
-    public static let countsPerRadian = 4096.0 / (2 * Double.pi)
+    public static let countsPerRadian = Double(NexArmDeviceLimits.countsPerRevolution) / (2 * Double.pi)
     /// Nominal duration used only to choose a legal motor speed. It is not a measured travel time.
     public static let aimMilliseconds = 200
     /// Tracking rest and highest camera position, read over Bluetooth on 2026-10-03 (X299 Z327 mm, end pitch -1.9°).
@@ -53,7 +53,11 @@ public enum NexArmJointCommand {
         else { throw NexArmControlError.invalidPosition }
         let atoms = try positions.enumerated().map { index, position in
             let distance = abs(position - previous[index])
-            let speed = max(1, min(700, Int(ceil(Double(distance) * 1250 / Double(aimMilliseconds)))))
+            let speed = max(
+                1,
+                min(
+                    NexArmDeviceLimits.livePositionMaximumSpeed,
+                    Int(ceil(Double(distance) * 1250 / Double(aimMilliseconds)))))
             return try NexArmMotorCommands.move(
                 motor: index + 1, target: position, options: NexArmMotorOptions(speed: speed))
         }

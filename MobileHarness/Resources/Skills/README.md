@@ -181,3 +181,5 @@ BasicSkill selects agents.application and ui.navigation plus platform.time/power
 ## Prefer current facts before query selection
 
 BasicSkill answers questions directly from sufficient CURRENT STATE facts before selecting functions or loading Skills. It does not reload facts through a query merely because the user asks a state question. Only missing or stale facts justify a query that actually provides them; unknown/unavailable values are not readiness. Requested effects still require registered execution and real feedback. agents.application provides the role-owned application summary; specific status/resource/history queries supply details under their own contracts. No generic environment query is registered.
+
+RobotInteraction teaches six-axis anatomy, absolute counts versus relative degrees, base-left/right viewpoint, native speed/acceleration units, per-axis limits and ordered compound examples. Relative motor requests use fresh executor feedback; undefined absolute angle origins require clarification. Its revision identifies this teaching contract.

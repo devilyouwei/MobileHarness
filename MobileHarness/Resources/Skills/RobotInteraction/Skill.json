@@ -1,7 +1,7 @@
 {
   "version": 3,
   "id": "robot-interaction",
-  "revision": 10,
+  "revision": 11,
   "description": "User-requested arm gestures and movements with explicit ordering, device checks and actual motion feedback.",
   "dependencies": [],
   "useActions": [

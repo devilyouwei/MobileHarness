@@ -84,7 +84,7 @@ compare-qwen-protocols.py 仅对显式 flash／max 运行隔离的阿里 Respons
 
 ## Qwen / GPT-4.1 提示词回归扩展
 
-✅ 沿用59场景／85输入及生产提示词，evaluate-qwen.py接受三款Qwen与gpt-4.1；每个子进程仅注入对应Provider凭据，GPT使用OpenAI端点。运行前后记录生产上下文／Skill／解析与执行源hash，不修改提示词或放宽断言。报告保留失败与实际响应；本轮使用合成设备／仓库，不能替代真机验收。
+✅ 使用生产提示词与 qwen-workflows.json 中的有界场景集，evaluate-qwen.py接受三款Qwen与gpt-4.1；每个子进程仅注入对应Provider凭据，GPT使用OpenAI端点。运行前后记录生产上下文／Skill／解析与执行源hash，不修改提示词或放宽断言。报告保留失败与实际响应；本轮使用合成设备／仓库，不能替代真机验收。
 
 ## Gateway container ownership
 
@@ -99,3 +99,5 @@ The architecture checker enforces Gateway → FunctionContracts only, AgentCore 
 The boundary checker requires Agents/Gateway/Actions Xcode groups to mirror the physical source directories, with one reference per file, complete Swift/README/JSON coverage and no misplaced or stale groups. This navigation check does not change target source membership or runtime behavior.
 
 The architecture boundary audit explicitly classifies AgentPlatformState as an Agents Support SDK adapter; Support/Context remains independent of PlatformKit and all foundation module isolation rules continue to apply.
+
+`evaluate-qwen.py --robot-only` selects all robot-prefixed scenarios. The default model list is `gpt-4.1 qwen3.8-flash qwen3.8-max`; `--models` overrides it. `--cases` and `--robot-only` are mutually exclusive. Credentials remain provider-specific and reports retain production-source hashes.

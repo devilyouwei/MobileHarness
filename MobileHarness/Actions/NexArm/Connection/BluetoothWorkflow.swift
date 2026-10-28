@@ -182,14 +182,15 @@ import UI
         project()
     }
     public func resetArm(
-        speed: Int = 1400, acceleration: Int = 30,
+        speed: Int = NexArmDeviceLimits.defaultSpeed, acceleration: Int = NexArmDeviceLimits.defaultAcceleration,
         recordReport: @escaping @Sendable (ActionReport) async throws -> Void = { _ in }
     ) async throws {
         try await service.resetArm(speed: speed, acceleration: acceleration, recordReport: recordReport)
         project()
     }
     public func performGesture(
-        _ gesture: NexArmGesture, repetitions: Int, speed: Int = 1400, acceleration: Int = 30,
+        _ gesture: NexArmGesture, repetitions: Int, speed: Int = NexArmDeviceLimits.defaultSpeed,
+        acceleration: Int = NexArmDeviceLimits.defaultAcceleration,
         recordReport: @escaping @Sendable (ActionReport) async throws -> Void = { _ in }
     ) async throws {
         try await service.performGesture(
@@ -197,11 +198,12 @@ import UI
         project()
     }
     public func moveMotor(
-        id: Int, target: Int?, speed: Int, acceleration: Int,
+        id: Int, target: Int?, deltaDegrees: Double? = nil, speed: Int, acceleration: Int,
         recordReport: @escaping @Sendable (ActionReport) async throws -> Void = { _ in }
     ) async throws {
         try await service.moveMotor(
-            id: id, target: target, speed: speed, acceleration: acceleration, recordReport: recordReport)
+            id: id, target: target, deltaDegrees: deltaDegrees, speed: speed, acceleration: acceleration,
+            recordReport: recordReport)
         project()
     }
     public func aim(

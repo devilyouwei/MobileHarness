@@ -73,7 +73,7 @@ public struct NexArmBluetoothTraffic: Sendable, Equatable {
 
 /// One connection-wide budget for requests and both streaming modes; no queued packets.
 struct NexArmBLETrafficBudget {
-    static let minimumInterval: Duration = .milliseconds(30)
+    static let minimumInterval = NexArmDeviceLimits.minimumBLEWriteInterval
     private(set) var nextWrite: ContinuousClock.Instant?
     private(set) var statistics = NexArmBluetoothTraffic()
     private var lastNotification: ContinuousClock.Instant?
@@ -177,8 +177,6 @@ public protocol NexArmBluetoothLink: NexArmObservableLink {
     func stopScan() async
     func beginLiveControl() async throws -> String
     func sendLive(_ packet: NexArmPacket, session: String) async throws -> Bool
-    /// Speed-mode exit. The tracking task may already be cancelled; this send still attempts delivery.
-    func restoreLive(_ packet: NexArmPacket, session: String) async throws -> Bool
     func endLiveControl(_ session: String) async
     func clearDiscovery() async
     func forgetDevice() async throws
@@ -267,14 +265,6 @@ public actor NexArmBluetooth: NexArmBluetoothLink, NexArmObservableLink {
             return try await native().value.sendLive(packet, session: session)
         } catch {
             admission?.report("connectivity.bluetooth", "sendLive", error)
-            throw error
-        }
-    }
-    public func restoreLive(_ packet: NexArmPacket, session: String) async throws -> Bool {
-        do {
-            return try await native().value.restoreLive(packet, session: session)
-        } catch {
-            admission?.report("connectivity.bluetooth", "restoreLive", error)
             throw error
         }
     }
@@ -639,9 +629,6 @@ private final class NexArmBLEDriver: NSObject, @preconcurrency CBCentralManagerD
         try Task.checkCancellation()
         return try deliverLive(packet, session: session)
     }
-    func restoreLive(_ packet: NexArmPacket, session: String) throws -> Bool {
-        return try deliverLive(packet, session: session)
-    }
     private func deliverLive(_ packet: NexArmPacket, session: String) throws -> Bool {
         guard liveControlID == session else { throw NexArmError.disconnected }
         guard snapshot.phase == .connected, let peripheral, let tx else { throw NexArmError.disconnected }
@@ -671,6 +658,7 @@ private final class NexArmBLEDriver: NSObject, @preconcurrency CBCentralManagerD
         acknowledgmentOnly: Bool
     ) async throws -> NexArmPacket {
         try Task.checkCancellation()
+        try packet.validateMotorWrite()
         guard liveControlID == nil, observationID == nil else { throw NexArmError.busy }
         if let liveDrainUntil, ContinuousClock.now < liveDrainUntil {
             try await Task.sleep(until: liveDrainUntil, clock: .continuous)
@@ -1062,4 +1050,40 @@ private final class NexArmBLEDriver: NSObject, @preconcurrency CBCentralManagerD
         requestTimer = nil
         request.resume(returning: packet)
     }
+}
+
+/// Device recovery bounds and native fault classification; no remembered-device or UI policy.
+public struct NexArmBluetoothRecoveryPolicy {
+    public static let maximumAttempts = 3
+    public static let episodeTimeout: Duration = .seconds(120)
+    public static func delay(attempt: Int) -> Duration { .seconds(1 << (min(maximumAttempts, max(1, attempt)) - 1)) }
+
+    public static func canRetry(_ error: any Error, snapshot: NexArmBluetoothSnapshot) -> Bool {
+        if error is CancellationError { return false }
+        if let native = error as? NexArmError {
+            switch native {
+            case .timeout, .disconnected, .io: return true
+            case .invalidPacket, .overflow:
+                if case .protocolViolation = snapshot.failure { return true }
+                return false
+            case .busy, .sessionReplaced, .invalidMotion: return false
+            }
+        }
+        if let bluetooth = error as? NexArmBluetoothError {
+            switch bluetooth {
+            case .unavailable: return snapshot.power != .unauthorized && snapshot.power != .unsupported
+            case .unknownDevice, .incompatibleService, .packetTooLarge: return false
+            }
+        }
+        // Retry an untyped system error only when the SDK recorded that same native failure.
+        if case .native(_, let domain, let code) = snapshot.failure {
+            let system = error as NSError
+            return system.domain == domain && system.code == code
+        }
+        return false
+    }
+}
+
+public enum NexArmBluetoothRecoveryError: Error, Sendable, Equatable {
+    case episodeTimeout, disconnectUnconfirmed, notRetryable
 }

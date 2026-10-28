@@ -27,3 +27,5 @@ Purpose: retain bounded raw model/device measurements independently of productio
 [生产 Skill 全 Action 完整回归](qwen-all-action-2026-10-17-full1.json)保留 Flash/Max 各53场景、320次模型请求的实际输出/调用/State、规范化请求、原编码 hash、源清单和失败。大字符串通过 textPool 去重；原始判断不改变。[迁移与验收报告](../validation/Skill-Action-Migration.md)区分模型调用、合成执行、自动化、Simulator限制和无签名设备目标构建。
 
 - [2026-10-25提示词复测](prompt-regression-2026-10-25.json)：Qwen三模型完整59场景及GPT-4.1的401诊断；消息语义、实际回复／调用／上下文及源hash持久化。字符串按textPool去重，解释见[验证报告](../validation/Qwen-Workflow-Regression.md#2026-10-25-container-上下文迁移后复测)。
+
+- [NexArm motor teaching experiments](nexarm-robot-teaching-2026-10-27.json): six prompt variants, three real models, synthetic device execution, actual calls/responses and normalized requests with deduplicated strings. See the [validation report](../validation/NexArm-Robot-Skill-Regression.md).

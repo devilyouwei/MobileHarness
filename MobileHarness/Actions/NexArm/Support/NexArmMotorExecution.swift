@@ -2,29 +2,9 @@ import Foundation
 import FunctionContracts
 import PlatformKit
 
-public struct NexArmMotorCompletion: Sendable, Equatable {
-    public let tolerance: Int?
-    public let stableTolerance: Int
-    public let offTargetMilliseconds: Int
-    public let feedbackMilliseconds: Int
-    public let timeoutMilliseconds: Int?
-    public init(
-        tolerance: Int? = nil, stableTolerance: Int = 2,
-        offTargetMilliseconds: Int = 600, feedbackMilliseconds: Int = 2000,
-        timeoutMilliseconds: Int? = nil
-    ) throws {
-        guard tolerance.map({ (0...64).contains($0) }) ?? true, (0...8).contains(stableTolerance),
-            (100...60_000).contains(offTargetMilliseconds),
-            (200...5000).contains(feedbackMilliseconds),
-            timeoutMilliseconds.map({ (200...86_400_000).contains($0) }) ?? true
-        else { throw NexArmExecutionError.invalidArguments }
-        self.tolerance = tolerance
-        self.stableTolerance = stableTolerance
-        self.offTargetMilliseconds = offTargetMilliseconds
-        self.feedbackMilliseconds = feedbackMilliseconds
-        self.timeoutMilliseconds = timeoutMilliseconds
-    }
-}
+/// Compatibility name for the SDK-owned feedback configuration.
+public typealias NexArmMotorCompletion = NexArmFeedbackConfiguration
+
 public struct NexArmMotorResult: Sendable, Equatable {
     public enum Failure: String, Sendable {
         case targetNotReached, timedOut, feedbackLost, disconnected, sendingFailed, admissionFailed, feedbackFailed,
