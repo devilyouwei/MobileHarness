@@ -3567,3 +3567,9 @@ Platform seeds resident native facts at startup, updates through subscriptions/o
 ## 2026-10-31 — State producer/consumer decoupling re-audit
 
 Rechecked 32 concrete Containers and published backend/logical/resource nodes. Corrected model routing preference classification, Storage lifecycle-to-Business projection, swallowed permission read errors, Audio debug encoding and a stale navigation/album operation projection. Producer State stays complete and caller-independent; Assistant/Skill selection remains consumer-owned. Final check.sh passed (IntegrationTests regular/runtime 923/225), all four Simulator schemes built, and documentation/diff checks passed. Real-model/iPhone/physical-arm acceptance was not performed. [Inventory and evidence](Container-Reflexivity.md#producerconsumer-decoupling-re-audit--2026-10-31).
+
+## 2026-10-31 — Portrait-locked camera preview orientation
+
+Separated gravity-upright capture/inference/photo orientation from actual-interface preview geometry. Shared Metal image/skeleton/gaze mapping keeps portrait framing stable when the phone rotates, preserving the existing iPhone portrait policy. Final standalone check.sh passed (regular UI/integration 125/923 and isolated runtime 225), four Simulator schemes and signed device build passed. An existing notification fixture timeout during concurrent builds passed unchanged on the standalone rerun. Device installation/physical rotation acceptance is pending reconnecting the unavailable iPhone. [Evidence](Camera-Preview-Orientation.md).
+
+2026-10-31 camera preview follow-up: the repair was installed successfully on iPhone 17 Pro, and the user subsequently confirmed the reported rotation/enlargement defect is fixed. This is user-reported acceptance of the original issue; the broader physical regression matrix remains individually unreported. See [device result](Camera-Preview-Orientation.md#user-confirmed-device-result--2026-10-31).

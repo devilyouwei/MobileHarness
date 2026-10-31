@@ -85,3 +85,8 @@ The owning stateSnapshot entry point reads current local business/capability val
 State classifies authorization as Business; camera allocation, import task existence and admission as Runtime.
 
 Permission State projections read cached observations only. Unavailable owner scope remains unknown; an admitted cached-source/schema failure propagates through the standard throwing snapshot method instead of being converted to unknown.
+
+
+## Capture and preview orientation
+
+CameraFrame.rotation/width/height and gray64 describe the gravity-upright observation used by perception. JPEG capture retains the precise horizon-level capture angle. During native camera graph configuration on iOS 27, RotationCoordinator.videoRotationAngleRelative(toDeviceOrientation: .portrait) supplies a separate sensor-to-portrait quarter-turn reference, published as optional CameraFrame.portraitRotation alongside the existing immutable frame. The reference is captured under the same frame-state mutex/generation as rotation, never inferred from the device's current physical pose. This avoids treating gravity-level capture as fixed-interface preview geometry. Lens changes bind the new camera reference before starting the replacement stream. Older SDK clients without the static API publish nil and retain their original upright-frame contract; the complete app requires iOS 27. No pixel copy, capture connection rotation, second stream or per-frame Task is added. UI owns the interface-to-preview transform.

@@ -31,7 +31,7 @@ flowchart LR
 
 ✅ 相机默认关闭，UI 构造／启动不请求权限。视频和姿态独立接纳：视频直接更新最新原生像素展示值；姿态验证 Tool 随附来源帧，仅更新骨架。模型加载、空检测、失败或停止不清视频。关闭、后台及真实呈现失败按生命周期清理。
 
-两路按捕获后750ms分别到期，并核对尺寸、方向、单调序号和根实时 token。骨架与当前背景可以来自不同序号，但原始姿态与其附件必须匹配。图像和关节共用 upright/aspect-fill/镜像变换。推理统计不包含 UI／GPU 上屏时间。
+两路按捕获后750ms分别到期，并核对尺寸、方向、单调序号和根实时 token。骨架与当前背景可以来自不同序号，但原始姿态与其附件必须匹配。图像和关节共用从采集 upright 坐标到实际界面方向的旋转、aspect-fill 和显示坐标镜像变换。推理统计不包含 UI／GPU 上屏时间。
 
 ✅ 视频和骨架各用一个可续期的到期所有者；正常连续帧只更新截止时间，不逐帧取消／创建任务，也不由到期闭包持有像素帧。仅更早期限、清屏或重启取消旧等待，替换仍加入旧任务；stop 取消并加入，不假冒 GPU 结束。
 
@@ -94,3 +94,10 @@ UICameraContainer.stateSnapshot 在 Business 显式输出 enabled/visible/busy/f
 ## Passive state observation
 
 The owning stateSnapshot entry point reads current local business/capability values and runtime admission/work facts in the owner's isolation domain. It performs no action, acquisition or device activation. The module root composes the explicitly selected fields; unknown diagnostic coverage is not healthy evidence. Domain-specific completion and failure contracts above remain authoritative.
+
+
+## Interface-based preview geometry
+
+CameraVideoFrame retains the native portrait sensor reference independently of its gravity-upright source rotation/size. CameraPreviewBasis and CameraPreviewGeometry convert model-space joints and camera texture sampling into the actual window interface coordinates before aspect-fill and display-axis mirroring. Metal image and skeleton use the same display dimensions/crop; capture gravity changes do not swap the framing of a portrait-locked interface. Mailbox equality and mesh cache keys include source reference and interface orientation. Frames without a sensor reference preserve the supplied upright-frame geometry.
+
+CameraFrameSurface reads UIWindowScene.effectiveGeometry.interfaceOrientation during layout/submission, without enabling interface autorotation or using physical-device gravity as UI orientation. A single coalesced view-owned task reports discrete changes outside the UIViewRepresentable update transaction; renderer replacement/detachment cancels it and epoch checks reject late reports. CameraState keeps a small source basis only when it changes, so ordinary video updates do not invalidate gaze content every frame. Existing already-mirrored attention vectors are converted to display axes, mirroring once after the rotation. Capture/source matching, 750 ms freshness, independent media expiry and joined GPU retirement retain their existing contracts; changed sensor references clear old skeletons and reject mismatched pose attachments.

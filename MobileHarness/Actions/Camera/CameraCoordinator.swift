@@ -336,7 +336,8 @@
             frame.withPixelBuffer {
                 UI.CameraVideoFrame(
                     pixels: $0, width: frame.width, height: frame.height,
-                    rotation: frame.rotation, sequence: frame.sequence, capturedAt: frame.capturedAt)
+                    rotation: frame.rotation, sequence: frame.sequence, capturedAt: frame.capturedAt,
+                    portraitRotation: frame.portraitRotation)
             }
         }
         public func visionStatus(_ message: String?, sessionID: String) {

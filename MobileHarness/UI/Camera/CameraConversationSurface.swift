@@ -55,7 +55,7 @@
     private struct CameraGazeContent<Content: View>: View {
         let camera: CameraState
         let content: () -> Content
-        var body: some View { content().environment(\.eyeGaze, camera.gaze) }
+        var body: some View { content().environment(\.eyeGaze, camera.displayGaze) }
     }
     @MainActor
     private struct CameraControlsOverlay: View {

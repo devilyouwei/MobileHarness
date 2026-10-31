@@ -132,3 +132,5 @@ Implemented: Provider URL input is optional. Blank/whitespace input resolves to 
 ## Container 上下文
 
 ✅ NavigationContextTests覆盖手动路径回写、路径提交与确认分离、详情／覆盖层、迟到代际和父页更新拒绝，以及离开相册后的操作事实隔离。视图挂载和真实手势仍需原生验收。
+
+Camera orientation regression uses asymmetric synthetic sensor geometry across all capture/interface quarter-turns and mirror cases. It verifies portrait-lock crop stability, image/pose and gaze axes, nil-reference compatibility, orientation-only mailbox/mesh invalidation, stale sensor-reference rejection and no per-video invalidation of gaze presentation. These checks do not substitute for physical iPhone rotation or native camera acceptance.

@@ -1,0 +1,27 @@
+# Camera preview orientation and crop stability
+
+## Problem and scope
+
+2026-10-31: physical iPhone screenshot shows a physically rotated phone still presenting an upright person enlarged into the center. iPhone interface policy is portrait-only. AppleCamera uses the gravity-based horizon-level capture angle for the shared frame; Metal fits that gravity-upright image into the fixed interface viewport. When capture orientation changes, width/height swap and aspect-fill crops the landscape image into a portrait surface, creating the reported zoom.
+
+Retain the existing iPhone portrait interface policy by default; the user explicitly chose portrait UI with naturally rotating camera preview, without gravity-level forced enlargement. Preview must follow the actual window interface coordinates, independently of physical-device/capture orientation. Keep photo rotation, inference/gray sampling, pose source identity, capture sessions, resources and State reflection unchanged. Do not use the private user image as a committed fixture.
+
+## Intended implementation and boundaries
+
+- PlatformKit/Vision CameraFrame/CameraFrameReceiver/AppleCamera: retain gravity-upright frame rotation/size and JPEG capture rotation. Record an additional optional portrait sensor reference, measured from the active camera with the public iOS 27 RotationCoordinator static orientation API during camera graph configuration. Publish it atomically with each existing immutable frame; no pixel conversion, hardware polling, per-frame Task or second stream. Lens changes drain old callbacks and bind the new reference under the existing generation fences.
+- Actions/Camera CameraCoordinator: forward native portrait-reference metadata into the UI-owned immutable frame adapter. No UI scene lookup, model reorientation, command change or new capture ownership.
+- UI/Camera: own a pure interface-orientation/preview-geometry mapping alongside CameraVideoFrame. Derive display dimensions, crop, raw texture rotation and upright-joint projection from the native sensor reference plus the current window scene orientation. Metal image and skeleton share this mapping, with mirroring applied once in display coordinates. Add the interface basis/reference to mailbox and mesh invalidation keys. Legacy/synthetic frames lacking a reference keep their explicitly supplied upright rotation.
+- CameraFrameSurface: read actual UIWindowScene effectiveGeometry.interfaceOrientation during layout/submission. Report discrete interface changes back to CameraState via one coalesced, generation-fenced view-owned task; cancel it on detach/renderer replacement. Do not use device-gravity notifications to rotate a locked interface.
+- CameraState/CameraConversationSurface: keep a small orientation basis only when it changes, not a per-frame SwiftUI gaze dependency. Transform the existing already-mirrored gaze vector into the same display axes. Preserve frame/pose freshness, source matching, independent expiry and GPU cleanup.
+
+Affected implemented design documents: PlatformKit/Vision README, UI/Camera README, Actions/Camera README and overall camera-flow design. New implementation remains in existing files/directories; no new module, dependency or interface-orientation entitlement/configuration change.
+
+## Validation
+
+Use asymmetric synthetic rectangles and all four capture/interface quarter-turns, front/back mirror cases, to verify fixed-interface crop invariance, image/pose coordinate agreement, gaze axes, square/landscape/portrait sizes, nil-reference compatibility and orientation-only mailbox/mesh invalidation. Existing capture gray-sampling and all camera presentation regressions must remain valid. Run scripts/check.sh and all scripts/build-ios.sh schemes; build the signed device variant and install for user follow-up under the existing installation authorization. Automated geometry/Metal-host checks and installation do not establish physical rotation correctness; portrait/left/right rotation, front/back switching, pose alignment, voice coexistence, photo direction and foreground resume require explicit device observation.
+
+## Implementation and remaining acceptance
+
+The user confirmed portrait UI with naturally rotating camera preview. Implementation and automated validation are complete: all capture/interface rotation and mirror geometry, shared crop/pose/gaze projection, reference/epoch fences and observer invalidation regressions pass. Full check.sh passed (125 regular UI, 923 regular integration and 225 isolated runtime tests); four Simulator schemes and the signed generic-device build passed. The first notification-recovery test timeout during concurrent builds was rerun successfully without changing its timeout or assertions. See [validation evidence](../../validation/Camera-Preview-Orientation.md).
+
+The signed repair bundle was subsequently installed successfully on the reconnected iPhone 17 Pro, with installer success and app-registration confirmation. After installation, the user confirmed the originally reported physical-rotation/person-orientation and enlargement issue is fixed. This completes user acceptance of the reported defect. The separately listed lens/pose/gaze/photo/voice/resume and individual left/right matrix results have not been reported; retain this plan until those planned checks are reconciled, without expanding the user confirmation into a full hardware-matrix pass.

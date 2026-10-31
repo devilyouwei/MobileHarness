@@ -7,18 +7,89 @@ public struct CameraVideoFrame: @unchecked Sendable {
     public let width: Int
     public let height: Int
     public let rotation: Int
+    public let portraitRotation: Int?
     public let sequence: UInt64
     public let capturedAt: ContinuousClock.Instant
     public init(
         pixels: CVPixelBuffer, width: Int, height: Int, rotation: Int, sequence: UInt64,
-        capturedAt: ContinuousClock.Instant
+        capturedAt: ContinuousClock.Instant, portraitRotation: Int? = nil
     ) {
         self.pixels = pixels
         self.width = width
         self.height = height
         self.rotation = rotation
+        self.portraitRotation = portraitRotation
         self.sequence = sequence
         self.capturedAt = capturedAt
+    }
+}
+
+/// Interface coordinates, not physical-device gravity. Values are clockwise turns from portrait.
+enum CameraInterfaceOrientation: Int, CaseIterable, Sendable {
+    case portrait = 0
+    case landscapeLeft = 1
+    case portraitUpsideDown = 2
+    case landscapeRight = 3
+}
+
+struct CameraPreviewBasis: Equatable, Sendable {
+    let rotation: Int
+    let portraitRotation: Int?
+    func displayRotation(_ orientation: CameraInterfaceOrientation) -> Int {
+        portraitRotation.map { ($0 + orientation.rawValue) % 4 } ?? rotation
+    }
+    func turns(_ orientation: CameraInterfaceOrientation) -> Int {
+        (displayRotation(orientation) - rotation + 4) % 4
+    }
+    func point(_ point: CGPoint, orientation: CameraInterfaceOrientation, mirrored: Bool) -> CGPoint {
+        let rotated: CGPoint
+        switch turns(orientation) {
+        case 1: rotated = CGPoint(x: 1 - point.y, y: point.x)
+        case 2: rotated = CGPoint(x: 1 - point.x, y: 1 - point.y)
+        case 3: rotated = CGPoint(x: point.y, y: 1 - point.x)
+        default: rotated = point
+        }
+        return CGPoint(x: mirrored ? 1 - rotated.x : rotated.x, y: rotated.y)
+    }
+    /// Face attention arrives mirrored in capture coordinates; mirror once in the display axes.
+    func gaze(_ gaze: CGSize, orientation: CameraInterfaceOrientation, mirrored: Bool) -> CGSize {
+        let x = mirrored ? -gaze.width : gaze.width
+        let y = gaze.height
+        let rotated: CGSize
+        switch turns(orientation) {
+        case 1: rotated = CGSize(width: -y, height: x)
+        case 2: rotated = CGSize(width: -x, height: -y)
+        case 3: rotated = CGSize(width: y, height: -x)
+        default: rotated = CGSize(width: x, height: y)
+        }
+        return CGSize(width: mirrored ? -rotated.width : rotated.width, height: rotated.height)
+    }
+}
+
+/// Shared aspect-fill geometry for raw texture sampling and upright model joints.
+struct CameraPreviewGeometry {
+    let basis: CameraPreviewBasis
+    let orientation: CameraInterfaceOrientation
+    let imageSize: CGSize
+    let size: CGSize
+    let scale: CGFloat
+    init(frame: CameraVideoFrame, size: CGSize, orientation: CameraInterfaceOrientation) {
+        basis = CameraPreviewBasis(rotation: frame.rotation, portraitRotation: frame.portraitRotation)
+        self.orientation = orientation
+        self.size = size
+        let swapped = basis.turns(orientation) % 2 != 0
+        imageSize = CGSize(width: swapped ? frame.height : frame.width, height: swapped ? frame.width : frame.height)
+        scale = max(size.width / imageSize.width, size.height / imageSize.height)
+    }
+    var displayRotation: Int { basis.displayRotation(orientation) }
+    var crop: CGSize {
+        CGSize(width: size.width / (imageSize.width * scale), height: size.height / (imageSize.height * scale))
+    }
+    func project(_ point: CGPoint, mirrored: Bool) -> CGPoint {
+        let point = basis.point(point, orientation: orientation, mirrored: mirrored)
+        let width = imageSize.width * scale
+        let height = imageSize.height * scale
+        return CGPoint(x: (size.width - width) / 2 + point.x * width, y: (size.height - height) / 2 + point.y * height)
     }
 }
 
@@ -29,11 +100,13 @@ struct CameraRenderSnapshot: Sendable {
     var mirrored: Bool
     var size: CGSize
     var pixelSize: CGSize
+    var orientation: CameraInterfaceOrientation = .portrait
 
     func matches(_ other: Self) -> Bool {
         frame?.sequence == other.frame?.sequence && frame?.capturedAt == other.frame?.capturedAt
             && frame?.width == other.frame?.width && frame?.height == other.frame?.height
-            && frame?.rotation == other.frame?.rotation && pose == other.pose
+            && frame?.rotation == other.frame?.rotation && frame?.portraitRotation == other.frame?.portraitRotation
+            && orientation == other.orientation && pose == other.pose
             && mirrored == other.mirrored && size == other.size && pixelSize == other.pixelSize
     }
 }
@@ -73,6 +146,8 @@ struct CameraSkeletonMesh {
     private var imageSize: CGSize = .zero
     private var mirrored = false
     private var rotation = -1
+    private var portraitRotation: Int?
+    private var orientation = CameraInterfaceOrientation.portrait
 
     mutating func update(_ value: CameraRenderSnapshot) {
         let imageSize = CGSize(width: value.frame?.width ?? 0, height: value.frame?.height ?? 0)
@@ -80,12 +155,15 @@ struct CameraSkeletonMesh {
         guard
             pose != value.pose || size != value.size || self.imageSize != imageSize
                 || mirrored != value.mirrored || self.rotation != rotation
+                || portraitRotation != value.frame?.portraitRotation || orientation != value.orientation
         else { return }
         pose = value.pose
         size = value.size
         self.imageSize = imageSize
         mirrored = value.mirrored
         self.rotation = rotation
+        portraitRotation = value.frame?.portraitRotation
+        orientation = value.orientation
         revision &+= 1
         vertices = Self.makeVertices(value)
     }
@@ -95,10 +173,7 @@ struct CameraSkeletonMesh {
             pose.people.count <= 6, pose.people.allSatisfy({ $0.count == 17 })
         else { return [] }
         let size = value.size
-        let mirrored = value.mirrored
-        let scale = max(size.width / CGFloat(frame.width), size.height / CGFloat(frame.height))
-        let width = CGFloat(frame.width) * scale
-        let height = CGFloat(frame.height) * scale
+        let geometry = CameraPreviewGeometry(frame: frame, size: size, orientation: value.orientation)
         var vertices: [SIMD2<Float>] = []
         vertices.reserveCapacity(maximumVertices)
         func vertex(_ point: CGPoint) -> SIMD2<Float> {
@@ -115,9 +190,7 @@ struct CameraSkeletonMesh {
             let points = person.map { point in
                 let x = CGFloat(point.x) / 10000
                 let y = CGFloat(point.y) / 10000
-                return CGPoint(
-                    x: (size.width - width) / 2 + (mirrored ? 1 - x : x) * width,
-                    y: (size.height - height) / 2 + y * height)
+                return geometry.project(CGPoint(x: x, y: y), mirrored: value.mirrored)
             }
             for (a, b) in edges where person[a].confidence >= 300 && person[b].confidence >= 300 {
                 let first = points[a]

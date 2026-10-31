@@ -11,6 +11,9 @@
         public func updateUIView(_ view: CameraFrameSurface, context: Context) {
             let state = state
             let generation = state.videoGeneration
+            view.onOrientationChange = { [weak state] orientation in
+                state?.presentInterfaceOrientation(orientation, generation: generation)
+            }
             view.onFailure = { [weak state] _ in state?.presentRendererFailure("相机画面渲染不可用", generation: generation) }
             view.update(
                 frame: state.videoFrame, pose: state.skeleton, mirrored: state.facing == .front, generation: generation)
@@ -31,6 +34,10 @@
         private var pose: PoseOverlay?
         private var mirrored = false
         private var failed = false
+        private var interfaceOrientation = CameraInterfaceOrientation.portrait
+        private var reportedOrientation: CameraInterfaceOrientation?
+        private var orientationTask: Task<Void, Never>?
+        var onOrientationChange: (@MainActor (CameraInterfaceOrientation) -> Void)?
         public var onFailure: (@MainActor (String) -> Void)?
 
         public override init(frame: CGRect) {
@@ -42,7 +49,10 @@
             metalLayer.isOpaque = true
         }
         public required init?(coder: NSCoder) { nil }
-        deinit { renderer?.stop() }
+        deinit {
+            orientationTask?.cancel()
+            renderer?.stop()
+        }
         public func update(frame: CameraVideoFrame?, pose: PoseOverlay?, mirrored: Bool, generation: UInt64) {
             if cameraGeneration != generation {
                 stopRenderer()
@@ -97,14 +107,38 @@
             submit()
         }
         fileprivate func stopRenderer() {
+            orientationTask?.cancel()
+            orientationTask = nil
+            reportedOrientation = nil
             epoch &+= 1
             metalLayer.isHidden = true
             renderer?.stop()
             if let renderer { previousCompletion = renderer.completion }
             renderer = nil
         }
+        private func updateInterfaceOrientation() {
+            switch window?.windowScene?.effectiveGeometry.interfaceOrientation {
+            case .portraitUpsideDown: interfaceOrientation = .portraitUpsideDown
+            case .landscapeLeft: interfaceOrientation = .landscapeLeft
+            case .landscapeRight: interfaceOrientation = .landscapeRight
+            default: interfaceOrientation = .portrait
+            }
+            guard window != nil, renderer != nil, reportedOrientation != interfaceOrientation else { return }
+            reportedOrientation = interfaceOrientation
+            orientationTask?.cancel()
+            let orientation = interfaceOrientation
+            let generation = epoch
+            // Coalesce UI geometry reporting outside UIViewRepresentable's update transaction.
+            orientationTask = Task { [weak self] in
+                await Task.yield()
+                guard let self, self.epoch == generation, self.window != nil, !Task.isCancelled else { return }
+                self.onOrientationChange?(orientation)
+                self.orientationTask = nil
+            }
+        }
         private func submit() {
             guard !failed else { return }
+            updateInterfaceOrientation()
             if let video, video.sequence % 120 == 0,
                 ProcessInfo.processInfo.arguments.contains("-direct-input-diagnostics")
             {
@@ -113,7 +147,7 @@
             renderer?.submit(
                 CameraRenderSnapshot(
                     frame: video, pose: pose, mirrored: mirrored, size: bounds.size,
-                    pixelSize: metalLayer.drawableSize))
+                    pixelSize: metalLayer.drawableSize, orientation: interfaceOrientation))
         }
     }
 
@@ -351,12 +385,11 @@
                     fail("Camera texture unavailable: \(status)")
                     return
                 }
-                let scale = max(
-                    snapshot.size.width / CGFloat(frame.width), snapshot.size.height / CGFloat(frame.height))
+                let projection = CameraPreviewGeometry(
+                    frame: frame, size: snapshot.size, orientation: snapshot.orientation)
                 var geometry = SIMD4<Float>(
-                    Float(frame.rotation), snapshot.mirrored ? 1 : 0,
-                    Float(snapshot.size.width / (CGFloat(frame.width) * scale)),
-                    Float(snapshot.size.height / (CGFloat(frame.height) * scale)))
+                    Float(projection.displayRotation), snapshot.mirrored ? 1 : 0,
+                    Float(projection.crop.width), Float(projection.crop.height))
                 encoder.setRenderPipelineState(resources.pipeline)
                 encoder.setFragmentTexture(image, index: 0)
                 encoder.setFragmentBytes(&geometry, length: MemoryLayout<SIMD4<Float>>.size, index: 0)

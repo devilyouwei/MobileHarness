@@ -14,9 +14,11 @@ public struct CameraFrame: @unchecked Sendable {
     /// Monotonic callback arrival, independent of the media presentation clock.
     public let capturedAt: ContinuousClock.Instant
     public let rotation: Int
+    /// Static sensor-to-portrait reference; independent of the gravity-upright capture rotation.
+    public let portraitRotation: Int?
     init(
         width: Int, height: Int, pixels: CVPixelBuffer, gray64: Data, sequence: UInt64,
-        timestamp: TimeInterval, capturedAt: ContinuousClock.Instant, rotation: Int
+        timestamp: TimeInterval, capturedAt: ContinuousClock.Instant, rotation: Int, portraitRotation: Int? = nil
     ) {
         self.width = width
         self.height = height
@@ -26,6 +28,7 @@ public struct CameraFrame: @unchecked Sendable {
         self.timestamp = timestamp
         self.capturedAt = capturedAt
         self.rotation = rotation
+        self.portraitRotation = portraitRotation
     }
 }
 
@@ -41,12 +44,14 @@ public struct CameraFrame: @unchecked Sendable {
             var sequence: UInt64 = 0
             var timestamp: Double = -1
             var rotation = 1
+            var portraitRotation: Int?
         }
 
         private let state = Mutex(State())
         private let observations = NativeInputBroadcast<CameraFrame>()
         func subscribe() throws -> AsyncThrowingStream<CameraFrame, Error> { try observations.subscribe(.latest) }
 
+        func setPortraitRotation(_ rotation: Int?) { state.withLock { $0.portraitRotation = rotation } }
         func setRotation(_ rotation: Int) { state.withLock { $0.rotation = rotation } }
         func begin() -> AsyncThrowingStream<CameraFrame, Error> {
             if state.withLock({ $0.active }) { observations.finish() }
@@ -99,15 +104,15 @@ public struct CameraFrame: @unchecked Sendable {
             let capturedAt = ContinuousClock.now
             let timestamp = CMSampleBufferGetPresentationTimeStamp(sampleBuffer).seconds
             let snapshot = state.withLock {
-                value -> (AsyncThrowingStream<CameraFrame, Error>.Continuation?, UInt64, Int, String)? in
+                value -> (AsyncThrowingStream<CameraFrame, Error>.Continuation?, UInt64, Int, Int?, String)? in
                 guard value.active, timestamp.isFinite, timestamp >= 0,
                     timestamp > value.timestamp, value.sequence < UInt64.max
                 else { return nil }
                 value.timestamp = timestamp
                 value.sequence += 1
-                return (value.output, value.sequence, value.rotation, value.generation)
+                return (value.output, value.sequence, value.rotation, value.portraitRotation, value.generation)
             }
-            guard let (continuation, sequence, rotation, generation) = snapshot else { return }
+            guard let (continuation, sequence, rotation, portraitRotation, generation) = snapshot else { return }
 
             guard let pixels = CMSampleBufferGetImageBuffer(sampleBuffer),
                 CVPixelBufferGetPixelFormatType(pixels) == kCVPixelFormatType_32BGRA,
@@ -141,7 +146,8 @@ public struct CameraFrame: @unchecked Sendable {
             // Retain immutable native storage, shared by all independent subscriptions.
             let frame = CameraFrame(
                 width: width, height: height, pixels: pixels, gray64: gray,
-                sequence: sequence, timestamp: timestamp, capturedAt: capturedAt, rotation: rotation)
+                sequence: sequence, timestamp: timestamp, capturedAt: capturedAt, rotation: rotation,
+                portraitRotation: portraitRotation)
             let accepted = state.withLock { value in
                 guard value.active, value.generation == generation else { return false }
                 observations.send(frame)

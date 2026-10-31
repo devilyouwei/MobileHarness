@@ -66,7 +66,7 @@ PhotoAlbumService 通过共享 CapturedPhotoStore 完成分页、读取、导入
 
 ## Container 上下文
 
-CameraCoordinator.stateSnapshot 读取 CameraCapturing.isRunning 的真实结果，再提取当前呈现／照片流程事实；没有独立公开Writer或运行状态缓存。CameraPhotoSession 不再为模型镜像发送更新通知。原有实时UI事实流继续服务实际UI请求。
+CameraCoordinator.stateSnapshot 读取由观察／操作生命周期维护的 observedRunning 与当前呈现／照片流程事实；不会在快照读取时调用原生 getter。CameraPhotoSession 不再为模型镜像发送更新通知。原有实时UI事实流继续服务实际UI请求。
 
 ## Execution ownership and lifecycle
 
@@ -80,3 +80,5 @@ Business holds camera switch/running/facing, photo activity, permission requirem
 
 
 Camera State serialization reads its resident observedRunning value. The existing owner observation worker first queries the actual native running status, then reconciles native interruption/error events; capture/switch/release and shutdown completion also refresh that value. Before initialization it is unknown. Revision fencing prevents an older suspended status read from overwriting a newer one. Operational admission/cleanup still checks the native device and keeps its existing failure semantics; a State read itself never calls camera.isRunning(), requests permission or starts capture.
+
+Preview frame adaptation forwards the native optional portrait sensor reference into CameraVideoFrame without changing gravity-upright capture dimensions, pose coordinates or JPEG orientation. UI owns scene orientation and final preview/skeleton/gaze projection; Actions does not query interface geometry or reorient inference input.

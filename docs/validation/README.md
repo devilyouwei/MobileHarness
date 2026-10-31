@@ -76,3 +76,5 @@
 - [NexArm motor teaching and regression](NexArm-Robot-Skill-Regression.md): axis/units teaching, relative motor requests and real-model synthetic-action evidence.
 
 - [Container reflexivity](Container-Reflexivity.md): passive module snapshots, bounded internal tree, Skill-selected disclosure and separate native/device acceptance.
+
+- [Camera preview orientation](Camera-Preview-Orientation.md): portrait-lock crop stability, separate capture/preview axes, geometry regressions and device follow-up.

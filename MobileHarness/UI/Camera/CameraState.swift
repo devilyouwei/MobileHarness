@@ -30,6 +30,15 @@ public final class CameraState {
     public private(set) var rendererFailure: String?
     public private(set) var videoGeneration: UInt64 = 0
     public private(set) var videoFrame: CameraVideoFrame?
+    private(set) var interfaceOrientation = CameraInterfaceOrientation.portrait
+    func presentInterfaceOrientation(_ orientation: CameraInterfaceOrientation, generation: UInt64) {
+        guard presentationAdmission?.stopped != true, generation == videoGeneration else { return }
+        interfaceOrientation = orientation
+    }
+    private(set) var previewBasis: CameraPreviewBasis?
+    var displayGaze: CGSize {
+        previewBasis?.gaze(gaze, orientation: interfaceOrientation, mirrored: facing == .front) ?? gaze
+    }
     @ObservationIgnored private let frameExpiry = CameraMediaExpiry()
     @ObservationIgnored private let poseExpiry = CameraMediaExpiry()
     private var lastPoseSequence: UInt64?
@@ -50,10 +59,13 @@ public final class CameraState {
         if let previous = lastFrameSequence, frame.sequence <= previous { throw CameraFramePresentationError.stale }
         if let previous = videoFrame,
             previous.rotation != frame.rotation || previous.width != frame.width || previous.height != frame.height
+                || previous.portraitRotation != frame.portraitRotation
         {
             clearPose()
         }
         lastFrameSequence = frame.sequence
+        let basis = CameraPreviewBasis(rotation: frame.rotation, portraitRotation: frame.portraitRotation)
+        if previewBasis != basis { previewBasis = basis }
         videoFrame = frame
         frameExpiry.update(frame.capturedAt.advanced(by: .milliseconds(750))) { [weak self] in
             self?.clearFrame()
@@ -61,7 +73,8 @@ public final class CameraState {
     }
     private func validate(_ frame: CameraVideoFrame) throws {
         guard (1...4096).contains(frame.width), (1...4096).contains(frame.height),
-            frame.width * frame.height <= 4_194_304,
+            frame.width * frame.height <= 4_194_304, (0...3).contains(frame.rotation),
+            frame.portraitRotation.map({ (0...3).contains($0) }) ?? true,
             frame.capturedAt.duration(to: .now) >= .zero,
             frame.capturedAt.duration(to: .now) < .milliseconds(750)
         else { throw CameraFramePresentationError.stale }
@@ -75,7 +88,7 @@ public final class CameraState {
         else { throw CameraFramePresentationError.stale }
         if let videoFrame {
             guard frame.rotation == videoFrame.rotation, frame.width == videoFrame.width,
-                frame.height == videoFrame.height
+                frame.height == videoFrame.height, frame.portraitRotation == videoFrame.portraitRotation
             else { throw CameraFramePresentationError.stale }
         }
         lastPoseSequence = pose.sequence
@@ -91,6 +104,7 @@ public final class CameraState {
     public func clearFrame() {
         frameExpiry.cancel()
         videoFrame = nil
+        previewBasis = nil
         clearPose()
     }
     public private(set) var skeleton: PoseOverlay?

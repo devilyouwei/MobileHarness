@@ -235,6 +235,12 @@
             if let device = input?.device {
                 let rotation = AVCaptureDevice.RotationCoordinator(device: device, previewLayer: nil)
                 rotationCoordinator = rotation
+                if #available(iOS 27, *) {
+                    let portraitAngle = rotation.videoRotationAngleRelative(toDeviceOrientation: .portrait)
+                    receiver.setPortraitRotation(((Int((portraitAngle / 90).rounded()) % 4) + 4) % 4)
+                } else {
+                    receiver.setPortraitRotation(nil)
+                }
                 let orientation = orientation
                 let generation = orientation.bind()
                 orientation.update(rotation.videoRotationAngleForHorizonLevelCapture, generation: generation)
