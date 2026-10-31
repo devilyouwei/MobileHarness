@@ -166,6 +166,7 @@ public actor ModelResource<Model: Sendable>: ModelResourceLifecycle {
     }
     fileprivate func endMaintenance() { maintenance = false }
 
+    fileprivate var inferenceActive: Bool { activeLease != nil }
     fileprivate var state: ModelResourceState {
         if closed { return .closed }
         if unloading || maintenance { return .unloading }
@@ -230,6 +231,7 @@ public actor ModelResource<Model: Sendable>: ModelResourceLifecycle {
 
 private protocol ModelResourceLifecycle: Sendable {
     var state: ModelResourceState { get async }
+    var inferenceActive: Bool { get async }
     func load() async throws
     func load(reportLoading: @Sendable (Bool) async -> Void) async throws
     func unload() async throws
@@ -276,6 +278,9 @@ public final class ModelContext: Sendable {
         }
     }
 
+    @_spi(ModelManagement) public var inferenceActive: Bool {
+        get async { await state.withLock { $0.resource }?.inferenceActive ?? false }
+    }
     @_spi(ModelManagement) public var status: ModelResourceState {
         get async { await state.withLock { $0.resource }?.state ?? .unmanaged }
     }

@@ -457,6 +457,16 @@ extension HistoryPresenting {
 
 @MainActor
 public final class UIHistoryContainer {
+    public func stateSnapshot() async throws -> UIStateSnapshot {
+        try Task.checkCancellation()
+        return UIStateSnapshot(
+            path: "ui.history",
+            business: [
+                "busy": .flag(state.isBusy), "refreshing": .flag(state.isRefreshing),
+                "hasMore": .flag(state.hasMoreArchives),
+            ], runtime: ["available": .flag(state.isPresentationAvailable)])
+    }
+
     public let requests = UIRequests<HistoryInput, HistoryReply>()
 
     public let state: ConversationHistoryState

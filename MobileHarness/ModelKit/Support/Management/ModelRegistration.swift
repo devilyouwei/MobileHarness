@@ -2,7 +2,7 @@ import Foundation
 import ModelKit
 
 /// Manager snapshot includes registration/construction, independently of Core resource residency.
-public enum ModelState: Sendable, Equatable {
+public enum ModelState: String, CaseIterable, Sendable, Equatable {
     case registered, constructing, unmanaged, unloaded, loading, ready, unloading, closed
 
     init(resourceState: ModelResourceState) {

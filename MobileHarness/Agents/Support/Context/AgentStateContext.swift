@@ -16,7 +16,7 @@ public final class AgentStateContext: Sendable {
             guard !value.closed else { throw ContainerContextError.closed }
             guard !name.isEmpty, name.utf8.count <= 256,
                 name.split(separator: ".").count >= 2, !name.hasPrefix("."), !name.hasSuffix("."), !name.contains(".."),
-                name.utf8.allSatisfy({ (97...122).contains($0) || (48...57).contains($0) || $0 == 46 })
+                name.utf8.allSatisfy({ (97...122).contains($0) || (48...57).contains($0) || [45, 46, 95].contains($0) })
             else { throw ContainerContextError.invalidName }
             guard value.sources[name] == nil else { throw ContainerContextError.duplicate }
             guard value.sources.count < 256 else { throw ContainerContextError.capacityExceeded }

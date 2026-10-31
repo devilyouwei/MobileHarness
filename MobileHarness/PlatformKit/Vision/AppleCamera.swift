@@ -103,7 +103,12 @@
         public nonisolated static func requestPermission() async -> Bool {
             switch AVCaptureDevice.authorizationStatus(for: .video) {
             case .authorized: return true
-            case .notDetermined: return await AVCaptureDevice.requestAccess(for: .video)
+            case .notDetermined:
+                let granted = await AVCaptureDevice.requestAccess(for: .video)
+                await MainActor.run {
+                    NotificationCenter.default.post(name: NativeStateCollection.permissionsDidChange, object: nil)
+                }
+                return granted
             default: return false
             }
         }

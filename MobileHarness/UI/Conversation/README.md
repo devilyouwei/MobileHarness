@@ -95,3 +95,11 @@ UI-owned typed request/reply capabilities have one consumer and at most 64 outst
 ✅ 类型化语音按压／切换请求直达角色，保留单槽控制入口与代际回执。
 
 ✅ 回复文本存在时暂停首页 Notice 展示，避免连续异常遮挡字幕；新回复撤下错误 Toast，完整异常继续保留在日志。
+
+## Expression state projection
+
+ConversationExpressionPresentation.expressionSnapshot reads its actual base expression and override owner plus ConversationState.displayedExpression, transition waiter, renderer availability and loading. The effective value is a display target; transition completion remains the renderer's existing identity-matched acknowledgment. Cancellation/restoration clears only its owner and restores the current base. ConversationExpressionPresentation owns the ui.home.expression local State reader. UIHomeContainer only returns that child path index; its stateReaders catalog binds the existing expression owner without reading its state.
+
+UIHomeContainer.stateSnapshot contains only home interaction facts and an expression index. Ready/admission and renderer availability remain Runtime. The container provides no Assistant-specific expression snapshot.
+
+voicePhase uses the declared VoicePhase raw values for user-interaction activity; it is distinct from renderer/admission readiness in Runtime.

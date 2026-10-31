@@ -80,7 +80,9 @@ public enum AgentConfigurations {
                 useStates.allSatisfy({
                     !$0.isEmpty && $0.utf8.count <= 256 && $0.split(separator: ".").count >= 2 && !$0.hasPrefix(".")
                         && !$0.hasSuffix(".") && !$0.contains("..")
-                        && $0.utf8.allSatisfy { (97...122).contains($0) || (48...57).contains($0) || $0 == 46 }
+                        && $0.utf8.allSatisfy {
+                            (97...122).contains($0) || (48...57).contains($0) || [45, 46, 95].contains($0)
+                        }
                 }),
                 useInstructions.count <= 16, Set(useInstructions).count == useInstructions.count,
                 useInstructions.allSatisfy({

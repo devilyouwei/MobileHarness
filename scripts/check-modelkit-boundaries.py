@@ -421,6 +421,72 @@ for source in (ROOT / 'MobileHarness/App').rglob('*.swift'):
         errors.append(f'App invokes a domain behavior helper: {source.relative_to(ROOT)}')
     if re.search(r'\bActionPath\s*\(|\.register\s*\(\s*"', content):
         errors.append(f'App contains a concrete behavior path: {source.relative_to(ROOT)}')
+# Direct reads must have the same classified module contract as root-composed child nodes.
+state_types = {
+    'Actions': 'ActionsStateSnapshot', 'Agents': 'AgentStateSnapshot', 'Gateway': 'GatewayStateSnapshot',
+    'ModelKit': 'ModelStateSnapshot', 'PlatformKit': 'PlatformStateSnapshot',
+    'Storage': 'StorageStateSnapshot', 'UI': 'UIStateSnapshot',
+}
+for source in (ROOT / 'MobileHarness').rglob('*.swift'):
+    module = source.relative_to(ROOT / 'MobileHarness').parts[0]
+    if module not in state_types:
+        continue
+    content = source.read_text()
+    declarations = list(re.finditer(r'\b(?:class|actor)\s+(\w*Container)\b', content))
+    for index, declaration in enumerate(declarations):
+        end = declarations[index + 1].start() if index + 1 < len(declarations) else len(content)
+        body = content[declaration.end():end]
+        signature = re.search(r'func stateSnapshot\(\)\s+async\s+throws\s*->\s*(\w+)', body)
+        if signature is None or signature.group(1) != state_types[module]:
+            errors.append(f'Container lacks a standard classified direct State read: {declaration.group(1)} in {source.relative_to(ROOT)}')
+        if re.search(r'(?:func|var) stateDescriptor\b', body):
+            # Snapshot's descriptor property lives outside the Container declaration at the end of root files.
+            prefix = body.split('public struct ' + state_types[module], 1)[0]
+            if re.search(r'(?:func|var) stateDescriptor\b', prefix):
+                errors.append(f'Container duplicates descriptor sampling instead of using snapshot.stateDescriptor: {declaration.group(1)}')
+# Local snapshot bodies cannot recursively sample child snapshots or create work.
+for source in (ROOT / 'MobileHarness').rglob('*.swift'):
+    if source.is_relative_to(ROOT / 'MobileHarness/App'):
+        continue
+    content = source.read_text()
+    for signature in re.finditer(r'public func stateSnapshot\(\) async throws -> \w+StateSnapshot \{', content):
+        start = signature.end()
+        depth = 1
+        end = start
+        for token in re.finditer(r'"(?:\\.|[^"\\])*"|[{}]', content[start:], re.S):
+            if token.group() == '{': depth += 1
+            elif token.group() == '}': depth -= 1
+            if depth == 0:
+                end = start + token.start()
+                break
+        body = content[start:end]
+        if re.search(r'\.stateSnapshot\(\)|\bTask\s*(?:\{|\()', body):
+            errors.append(f'State read recursively samples a child or creates runtime work: {source.relative_to(ROOT)}')
+        if re.search(r'\b(?:camera\.isRunning|bluetooth\.(?:status|observedStatus)|NativeVisionAuthorization\.snapshot|NativeAudioState\.microphoneAuthorization|NativeNetworkState\.bluetoothAuthorization)\b|\.agent\.contextSnapshot\(', body):
+            errors.append(f'State read samples raw native facts or initializes private context: {source.relative_to(ROOT)}')
+        if 'String(describing:' in body or re.search(r'\bAssistantStateBindings\s*\.|\b(?:loadSkills|releaseSkills)\s*\(', body):
+            errors.append(f'State producer includes debug encoding or caller-specific disclosure policy: {source.relative_to(ROOT)}')
+# Foundation independence uses local types; their Value codecs must keep one wire contract.
+state_sources = [
+    'Actions/ActionsContainer.swift', 'Agents/AgentContainer.swift', 'Gateway/GatewayContainer.swift',
+    'ModelKit/ModelContainer.swift', 'PlatformKit/PlatformContainer.swift',
+    'Storage/Support/Contracts/StorageStateSnapshot.swift', 'UI/UIContainer.swift',
+    'App/Composition/ApplicationStateInspection.swift',
+]
+canonical_value_codec = None
+for path in state_sources:
+    content = (ROOT / 'MobileHarness' / path).read_text()
+    codec = re.search(r'public indirect enum Value:.*?(?=    public enum Health:)', content, re.S)
+    if codec is None:
+        errors.append(f'Missing standard State Value codec: {path}')
+        continue
+    if not re.search(r'(?:let|var) children: \[Reference\]', content) or 'children: [Self]' in content:
+        errors.append(f'State children are not path-only references: {path}')
+    normalized = re.sub(r'\s+', '', codec.group())
+    if canonical_value_codec is None:
+        canonical_value_codec = normalized
+    elif normalized != canonical_value_codec:
+        errors.append(f'State Value encoding differs from the common wire contract: {path}')
 # Historical polling controllers must not re-enter production Action sources.
 controller = (ROOT / 'MobileHarness/Actions/NexArm/Motion/NexArmActionController.swift').read_text()
 if re.search(r'public func (?:nudgeWrist|shakeBase)\(', controller):
@@ -584,7 +650,7 @@ for source in target_sources(targets['AppLifecycle']):
     if imported_modules(source.read_text()) - {'Foundation'}:
         errors.append(f'AppLifecycle acquired a domain dependency: {source.relative_to(ROOT)}')
 for source in (ROOT / 'MobileHarness/App').rglob('*.swift'):
-    if re.search(r'JSON(?:Encoder|Decoder)|\b(?:AgentInput|AgentTurn|FunctionInput|UIActions|ModelResourceIntent|PhotographerCameraIntent)\b|\b(?:switch destination|finishProviderSettings|resourcePreference|presentTranscript)\b', source.read_text()):
+    if (source.name != 'ApplicationStateInspection.swift' and re.search(r'JSON(?:Encoder|Decoder)', source.read_text())) or re.search(r'\b(?:AgentInput|AgentTurn|FunctionInput|UIActions|ModelResourceIntent|PhotographerCameraIntent)\b|\b(?:switch destination|finishProviderSettings|resourcePreference|presentTranscript)\b', source.read_text()):
         errors.append(f'App contains business adaptation: {source.relative_to(ROOT)}')
 # Execution integration submits UI-owned values through explicit public rendering methods.
 for relative in (
@@ -608,7 +674,7 @@ for name, target in targets.items():
         source_owners.setdefault(source, []).append(name)
 for source in (ROOT / 'MobileHarness').rglob('*.swift'):
     owners = source_owners.get(source.resolve(), [])
-    host_source = source.is_relative_to(ROOT / 'MobileHarness/App') and source.name not in {'ApplicationLifecycle.swift', 'ApplicationContainer.swift'}
+    host_source = source.is_relative_to(ROOT / 'MobileHarness/App') and source.name not in {'ApplicationLifecycle.swift', 'ApplicationContainer.swift', 'ApplicationStateInspection.swift'}
     if len(owners) != (0 if host_source else 1):
         errors.append(f'Unexpected source owners {owners}: {source.relative_to(ROOT)}')
 for root in ('UI', 'PlatformKit', 'ModelKit', 'Storage'):
@@ -678,6 +744,13 @@ resource_implementation = re.sub(
     r'(?ms)^@MainActor\s+public protocol ModelResources(?:Operating|Controlling)\b.*?^}\n?', '', resource_state)
 resource_implementation = re.sub(
     r'(?ms)^public struct ModelResourceSelectionError\b.*?^}\n?', '', resource_implementation)
+# A standard local State read is async only for protocol/isolation and cancellation.
+local_state_read = re.search(r'(?ms)^    public func stateSnapshot\(\) async throws -> UIStateSnapshot \{.*?^    \}\n?', resource_implementation)
+if local_state_read:
+    read_body = local_state_read.group()
+    if re.search(r'\bawait\b|\bTask\s*(?:\{|\()', read_body):
+        errors.append('Resource UI State read must remain local and cannot own asynchronous effects')
+    resource_implementation = resource_implementation.replace(read_body, '')
 if re.search(r'\bTask\b|\basync\b|\bModelResourcesOperating\b', resource_implementation):
     errors.append('ModelResourcesState owns resource operation effects')
 if 'ModelResourceSelectionError' in resource_implementation or 'func isInstalled(in:' in resource_implementation:
@@ -1600,7 +1673,7 @@ print('Support ownership, retired policies and fixed Memory commit confirmation 
 
 # Shared mechanisms never decode concrete role business schemas or construct the application graph.
 for source in support.glob('*.swift'):
-    if source.name not in {'AgentConfigurations.swift', 'AgentSkillLoader.swift', 'AgentUIRequests.swift', 'AgentInputMetrics.swift', 'ContainerFailureChannel.swift', 'AgentContainerLifecycle.swift', 'ActionActivityPresentation.swift', 'ActionActivityWorkflow.swift', 'ActionDispatcher.swift', 'AgentBusinessPorts.swift', 'AgentPlatformState.swift', 'AgentGatewayBindings.swift', 'BehaviorCoverage.swift', 'ExecutionRouter.swift', 'GatewayProjections.swift', 'IndependentOutputWorkflow.swift', 'InputGateway.swift', 'OutputExecutionResult.swift', 'OutputGateway.swift', 'OutputValidator.swift', 'ToolDispatcher.swift'}:
+    if source.name not in {'AgentConfigurations.swift', 'AgentSkillLoader.swift', 'AgentUIRequests.swift', 'AgentInputMetrics.swift', 'ContainerFailureChannel.swift', 'AgentContainerLifecycle.swift', 'ActionActivityPresentation.swift', 'ActionActivityWorkflow.swift', 'ActionDispatcher.swift', 'AgentBusinessPorts.swift', 'AgentGatewayBindings.swift', 'BehaviorCoverage.swift', 'ExecutionRouter.swift', 'GatewayProjections.swift', 'IndependentOutputWorkflow.swift', 'InputGateway.swift', 'OutputExecutionResult.swift', 'OutputGateway.swift', 'OutputValidator.swift', 'ToolDispatcher.swift'}:
         raise SystemExit(f'Concrete assembly in Agent Support: {source.relative_to(ROOT)}')
 for source in list((support / 'Chat').glob('*.swift')) + [(support / 'Communication/AgentTasks.swift')]:
     if re.search(r'\b(?:AssistantSessionControl|PhotographerCameraIntent|MemoryHistoryIntent|AppInteractionIntent|ModelResourceIntent|ProviderSettingsIntent|ProviderDiscoveryIntent)\b', source.read_text()):

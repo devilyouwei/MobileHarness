@@ -47,6 +47,18 @@ public enum AlbumReply: Sendable {
 }
 
 @MainActor @Observable public final class UIAlbumContainer {
+    public func stateSnapshot() async throws -> UIStateSnapshot {
+        try Task.checkCancellation()
+        return UIStateSnapshot(
+            path: "ui.album",
+            business: [
+                "content": .text(contextSnapshot().content.rawValue),
+                "operation": operation.map { .text($0.rawValue) } ?? .unknown,
+                "loadedCount": .count(items.count), "hasMore": .flag(next != nil),
+                "loading": .flag(loading), "busy": .flag(busy), "hasLoaded": .flag(hasLoaded),
+            ])
+    }
+
     public let requests = UIRequests<AlbumInput, AlbumReply>()
     public private(set) var items: [AlbumPhoto] = []
     public private(set) var next: AlbumPageToken?

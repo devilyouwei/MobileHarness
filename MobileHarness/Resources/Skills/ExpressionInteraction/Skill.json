@@ -1,7 +1,7 @@
 {
   "version": 3,
   "id": "expression-interaction",
-  "revision": 13,
+  "revision": 16,
   "description": "双眼表情互动：按对话需要或用户要求展示短暂表情、设置持续表情。",
   "dependencies": [],
   "useActions": [
@@ -18,7 +18,9 @@
       "channel": "Display"
     }
   ],
-  "useStates": [],
+  "useStates": [
+    "ui.home.expression"
+  ],
   "useInstructions": [
     "Instructions.md"
   ]

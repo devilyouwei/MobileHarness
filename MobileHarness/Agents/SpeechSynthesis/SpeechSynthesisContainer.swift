@@ -9,6 +9,19 @@
     @available(iOS 27, *)
     @MainActor
     public final class SpeechSynthesisContainer {
+        public func stateSnapshot() async throws -> AgentStateSnapshot {
+            try Task.checkCancellation()
+            let status = await agent?.status()
+            return AgentStateSnapshot(
+                path: "agents.speechsynthesis",
+                runtime: [
+                    "rolePhase": status.map { .text($0.lifecycle.rawValue) } ?? .unknown,
+                    "queuedInputs": status.map { .count($0.queuedInputs) } ?? .unknown,
+                    "processedInputs": status.map { .count($0.processedInputs) } ?? .unknown, "closed": .flag(closed),
+                    "installed": .flag(agent != nil),
+                ])
+        }
+
         private var agent: SpeechSynthesisAgent?
         private var manager: AgentManager?
         private var closed = false

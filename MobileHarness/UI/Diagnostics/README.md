@@ -43,3 +43,11 @@ AudioDetectionSnapshot 区分输入、空间支持、实际布局、回退、PCM
 ✅ 检测页面提交类型化请求，业务计时及执行交给 Agent／Actions，显示刷新仍由 UI 持有。
 
 ✅ DEBUG ChatValidationView 增加串行再次验证入口，实际请求完成后才可重试，用于同进程冷／热调用测量；任务仍有限且页面退出取消，结果／错误来自原能力，不授予业务或设备操作权限。
+
+## Passive state observation
+
+The owning stateSnapshot entry point reads current local business/capability values and runtime admission/work facts in the owner's isolation domain. It performs no action, acquisition or device activation. The module root composes the explicitly selected fields; unknown diagnostic coverage is not healthy evidence. Domain-specific completion and failure contracts above remain authoritative.
+
+Diagnostic test running/stopping, audio workflow phase, support/capture/fallback and sample rate are Runtime. The audio child Business contains actual input route, signal/level, direction/angles and optional permission observations. Stable raw-value enums, units and value sets describe these fields. Reading does not refresh, alter expiry or activate capture. Business sampleAgeSeconds/signalFresh/directionFresh distinguish historical display values from current receipt/angle evidence; missing receipt/deadline remains unknown.
+
+UIDiagnosticsContainer returns only its local admission and speech/audio indices. SpeechDiagnosticState and AudioDetectionState own independent stateSnapshot() async throws readers. Sampling the root never reads child workflow, configuration or sensory values.

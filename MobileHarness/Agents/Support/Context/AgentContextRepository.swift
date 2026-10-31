@@ -50,6 +50,9 @@ public actor AgentContextRepository<State: AgentContextState> {
         try memory.validate(agent: agentID, scope: scopeID)
         loaded = true
     }
+    /// Last initialized committed value only; never restores or waits for an in-flight write.
+    public func residentSnapshot() -> AgentContext<State>? { loaded ? memory : nil }
+
     public func snapshot() async throws -> AgentContext<State> {
         try await acquire()
         defer { release() }

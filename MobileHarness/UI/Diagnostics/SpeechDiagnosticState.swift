@@ -4,6 +4,15 @@ import Observation
 @MainActor
 @Observable
 public final class SpeechDiagnosticState {
+    public func stateSnapshot() async throws -> UIStateSnapshot {
+        try Task.checkCancellation()
+        return UIStateSnapshot(
+            path: "ui.diagnostics.speech",
+            runtime: [
+                "running": .flag(isRunning), "stopping": .flag(isStopping), "available": .flag(isPresentationAvailable),
+            ])
+    }
+
     @ObservationIgnored var presentationAdmission: UIPresentationAdmission?
     public var isPresentationAvailable: Bool { presentationAdmission.map { $0.started && !$0.stopped } ?? true }
 

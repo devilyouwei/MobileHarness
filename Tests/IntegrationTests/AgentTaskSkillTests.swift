@@ -531,7 +531,7 @@ private func photographyAcceptance(
                 #expect(systems.count == 2)
                 #expect(!systems[0].content.contains("# CURRENT STATE"))
                 #expect(systems[1].content.components(separatedBy: "# CURRENT STATE").count == 2)
-                for name in AgentPlatformState.sourceNames { #expect(systems[1].content.contains("\"" + name + "\"")) }
+                for name in FixedPlatformState.sourceNames { #expect(systems[1].content.contains("\"" + name + "\"")) }
                 #expect(systems[1].content.contains("2026-10-25T12:00:00+08:00"))
                 #expect(request.messages.dropFirst().contains { $0.role != .system })
                 if request.messages.last?.role == .user {
@@ -699,8 +699,8 @@ private func photographyAcceptance(
             return try #require(JSONSerialization.jsonObject(with: Data(json.utf8)) as? [String: Any])
         }
         #expect(try stateJSON(start)["actions.camera"] == nil)
-        let appBefore = try #require(try stateJSON(start)["agents.application"] as? [String: Any])
-        let appAfter = try #require(try stateJSON(start + 2)["agents.application"] as? [String: Any])
+        let appBefore = try #require(try stateJSON(start)["agents.applicationcontrol"] as? [String: Any])
+        let appAfter = try #require(try stateJSON(start + 2)["agents.applicationcontrol"] as? [String: Any])
         #expect((appBefore["value"] as? [String: String])?["modelPreparation"] == "idle")
         #expect((appAfter["value"] as? [String: String])?["modelPreparation"] == "loading")
         let beforeCapture = try #require(try stateJSON(start + 1)["actions.camera"] as? [String: Any])

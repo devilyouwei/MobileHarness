@@ -1,6 +1,6 @@
 import Foundation
 import StorageCache
-import StorageCore
+@_exported import StorageCore
 import StorageDatabase
 import StorageFiles
 
@@ -11,6 +11,9 @@ public actor StorageContainer {
     public nonisolated let files: FilesContainer
     private var startup: Task<Void, any Error>?
     private var shutdown: Task<Void, any Error>?
+    private var ready = false
+    private var stopped = false
+    private var failed = false
     private var closed = false
     private let failures: StorageFailureReporter
     public init(database: any DatabaseStorage, files: FilesContainer, failures: StorageFailureReporter = .init()) {
@@ -18,6 +21,26 @@ public actor StorageContainer {
         self.database = database
         self.files = files
         cache = CacheContainer(failures: failures)
+    }
+    public func stateSnapshot() async throws -> StorageStateSnapshot {
+        try Task.checkCancellation()
+        return StorageStateSnapshot(
+            path: "storage",
+            runtime: ["ready": .flag(ready), "closed": .flag(closed), "stopped": .flag(stopped)],
+            health: failed ? .fault : .unknown,
+            issues: failed ? [.init(code: "lifecycleFailed", impact: "storageUnavailable")] : [],
+            children: [.init(path: "storage.cache"), .init(path: "storage.files"), .init(path: "storage.database")])
+    }
+    public func stateReaders() async throws -> [String: StorageStateSnapshot.Reader] {
+        let cache = cache
+        let files = files
+        let database = database
+        return [
+            "storage": StorageStateSnapshot.reader(of: self) { try await $0.stateSnapshot() },
+            "storage.cache": StorageStateSnapshot.reader(of: cache) { try await $0.stateSnapshot() },
+            "storage.files": StorageStateSnapshot.reader(of: files) { try await $0.stateSnapshot() },
+            "storage.database": { try await database.stateSnapshot() },
+        ]
     }
     public func start() async throws(StorageFailure) {
         do {
@@ -49,6 +72,7 @@ public actor StorageContainer {
                 try await withTaskCancellationHandler {
                     try await task.value
                     try Task.checkCancellation()
+                    ready = !closed
                 } onCancel: {
                     task.cancel()
                 }
@@ -60,6 +84,7 @@ public actor StorageContainer {
                 throw CancellationError()
             }
         } catch {
+            failed = !(error is CancellationError)
             throw failures.report("root", "start", error)
         }
     }
@@ -68,6 +93,7 @@ public actor StorageContainer {
         do {
             if let shutdown { return try await shutdown.value }
             closed = true
+            ready = false
             startup?.cancel()
             cache.beginClosing()
             files.beginClosing()
@@ -90,7 +116,9 @@ public actor StorageContainer {
             }
             shutdown = task
             try await task.value
+            stopped = true
         } catch {
+            failed = true
             throw failures.report("root", "stop", error)
         }
     }

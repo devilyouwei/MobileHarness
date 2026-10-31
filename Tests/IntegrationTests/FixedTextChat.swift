@@ -43,9 +43,9 @@ final class PublicStateFixtureOwner: Sendable {
     init(ready: Bool = false) { camera = FixtureFactCell(FixtureCameraFact(enabled: ready, running: ready)) }
     func context() throws -> AgentStateContext {
         let context = AgentStateContext()
-        try AgentPlatformState.register(in: context, reading: FixedPlatformState())
+        try FixedPlatformState.register(in: context)
         try context.register(
-            "agents.application",
+            "agents.applicationcontrol",
             source: ContainerContextSource { [self] in
                 ContainerContextValue(application.read())
             })
@@ -55,7 +55,9 @@ final class PublicStateFixtureOwner: Sendable {
                 ContainerContextValue(camera.read())
             })
         try context.register("actions.robot", source: ContainerContextSource { ContainerContextValue(false) })
-        for name in ["ui.navigation", "ui.camera", "ui.album"] {
+        try context.register(
+            "actions.robot.motion", source: ContainerContextSource { ContainerContextValue([String: String]()) })
+        for name in ["ui.navigation", "ui.camera", "ui.album", "ui.home.expression"] {
             try context.register(name, source: ContainerContextSource { ContainerContextValue([String: String]()) })
         }
         return context
@@ -65,6 +67,19 @@ func publicStateFixture() throws -> AgentStateContext { try PublicStateFixtureOw
 
 /// Explicit synthetic native facts; shared workflow tests never sample the host device.
 struct FixedPlatformState: PlatformStateReading {
+    nonisolated static var sourceNames: [String] {
+        PlatformStateSource.allCases.map { "platform.system." + $0.rawValue }.sorted()
+    }
+    nonisolated static func register(in context: AgentStateContext) throws {
+        try AssistantStateBindings.register(in: context, names: sourceNames) { path in
+            guard let raw = path.split(separator: ".").last,
+                let source = PlatformStateSource(rawValue: String(raw))
+            else { throw ContainerContextError.missing }
+            let data = try await FixedPlatformState().snapshot(source)
+            let facts = try JSONDecoder().decode([String: PlatformStateSnapshot.Value].self, from: data)
+            return PlatformStateSnapshot(path: path, business: facts)
+        }
+    }
     func snapshot(_ source: PlatformStateSource) throws -> Data {
         let fields: [String: Any]
         switch source {

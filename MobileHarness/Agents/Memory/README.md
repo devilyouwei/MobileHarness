@@ -115,3 +115,7 @@ flowchart LR
 ## Execution ownership and lifecycle
 
 Memory uses neutral ActionRequestSlot<HistoryInput, HistoryReply> for private full-read requests. Agents validates role/Task authority; Actions validates typed business input and current session. The history interaction facade and actual title/query/mutation services belong to ActionsContainer.
+
+## Passive container state
+
+stateSnapshot projects local installation/closure, Agent lifecycle/queue counters and initialized committed task/Skill fields without message content. residentContext() reads the repository’s last committed memory only; context fields are unknown before initialization. Agent start owns initialization/restoration and its failures. The root catalog binds independent readers without sampling roles or maintaining another mutable role-state registry.

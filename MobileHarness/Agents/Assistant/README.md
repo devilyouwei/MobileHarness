@@ -215,4 +215,16 @@ Assistant 消费根注入的只读容器来源，Task／Skill 来自自身私有
 
 ## Basic native observations
 
-BasicSkill includes eight passive platform.* sources in addition to ui.navigation. These enter CURRENT STATE on every actual request through the injected PlatformStateReading adapter. Native time, power, thermal, path, permissions, audio, locale and accessibility are observations; they never override frozen capability authorization or current business execution checks. Task/Skill projection remains private AGENT CONTEXT. See [Context](../Support/Context/README.md#native-platform-sources).
+BasicSkill includes eight passive platform.* sources in addition to ui.navigation. These enter CURRENT STATE through Assistant-owned field selection over the complete classified State read. Native time, power, thermal, path, permissions, audio, locale and accessibility are observations; they never override frozen capability authorization or current business execution checks. Task/Skill projection remains private AGENT CONTEXT. See [Context](../Support/Context/README.md#native-platform-sources).
+
+## Passive container state
+
+stateSnapshot projects local installation/closure, Agent lifecycle/queue counters and initialized committed task/Skill fields without message content. residentContext() reads the repository’s last committed memory only; context fields are unknown before initialization. Agent start owns initialization/restoration and its failures. The root catalog binds independent readers without sampling roles or maintaining another mutable role-state registry.
+
+## State selection ownership
+
+[AssistantStateBindings.swift](AssistantStateBindings.swift) registers canonical exact paths from App-injected local State reads. It chooses explicit Business fields, including nested location/target keys. Runtime, health/issues, metadata, child indices and new unselected fields do not enter CURRENT STATE. Missing observations remain unknown; source errors propagate. Selecting a parent never expands descendants, and a child can be selected without its ancestors. There are no alias or whole-tree health/diagnostic sources.
+
+Skill useStates selects the next request's reads. Container stateSnapshot() async throws samples only its own node; descriptors come from the returned value. Generic AgentStateContext/Chat remains policy-neutral for other callers.
+
+Navigation State selection includes only navigation-owned path/phase/location/overlay/content. Album operations come from the independently selected ui.album node; navigation grants no implicit album operation read.

@@ -65,8 +65,20 @@ Controller 提供 motorResults 与 revision；宿主将逐电机结果写入本�
 
 ## Container 上下文
 
-NexArmControlService.contextSnapshot 从当前连接、控制器、跟踪与反馈健康状态提取 connected/controlAvailable；不复制到Storage。既有连接事实订阅继续服务角色生命周期，模型读取不产生订阅或设备动作。
+NexArmControlService.stateSnapshot 从当前连接、控制器、跟踪与反馈健康状态提取 connected/controlAvailable；不复制到Storage。既有连接事实订阅继续服务角色生命周期，模型读取不产生订阅或设备动作。
 
 NexArm通用设备参数、允许误差、位置反馈观察、经验行程估算与原生恢复分类/预算由 PlatformKit 拥有；Actions 仅消费这些能力并拥有动作目标、资源、执行报告、设备选择及业务生命周期协调。硬件错误保持SDK类型，上层仅适配展示与动作结果，基础模块不依赖业务模块。
 
 Motor Actions expose absolute encoder targets or relative encoder-space degrees. Actions acquires the fresh starting measurement and owns the move; PlatformKit owns conversion and final target bounds. RobotInteraction teaches axis selection and composition using these declarations.
+
+## Reflexive business facts
+
+NexArmControlService owns connection/recovery intent and jogging/tracking phases. Its local passive State includes the latest connected-session native positions in motor-ID order, receipt age in seconds, two-second freshness and connection identity. It never queries hardware; null positions are unknown and stale values are historical. Control availability retains its existing execution conditions and is not fabricated from target positions.
+
+stateSnapshot() async throws reads only service-owned connection/tracking/position facts and returns a motion index. Motion and six axis nodes have independent exact readers bound to the already-owned controller, separating active target counts, last target, last observed result and result revision. Target registration follows the existing per-step execution scope and is cleared when that scope exits; completion results remain controller-owned. Tracking base/pitch goals are separate business targets. This view changes no device completion, arrival, cancellation or safety policy.
+
+actions.robot.motion independently exposes controller busy/locks/revision in Runtime and active targetCounts in Business without device I/O; reading actions.robot does not sample that controller. Assistant selects domain targets and measurements, excluding motionBusy/recovery/session identity. Targets are keyed by motor ID; trackingTargetCounts is ordered [motor 1/base, motor 4/pitch], in encoder counts. A connection-generation change discards the sampled controller target instead of combining it with a replacement connection. Unknown positions, age and goals encode explicit null.
+
+Business holds connection/control availability, jogging/tracking, measured positions with receipt age/freshness, active targets and per-axis outcomes. Runtime holds controller busy/locks/result revision, recovery stage, connection identity, foreground and cleanup. These are separate classifications in one State read, with no model-specific convenience snapshot.
+
+Each axis Business.lastResult has a finite outcome vocabulary: arrived, notReached, timedOut, cancelled or unconfirmed. Runtime.lastFailure retains the original native/admission/transport code. Unconfirmed establishes neither arrival nor physical damage. This projection does not alter the controller, motion, cancellation or recovery policies. Connection phase and control eligibility are separately described in State metadata.

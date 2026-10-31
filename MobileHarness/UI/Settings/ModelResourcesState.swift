@@ -272,6 +272,22 @@ public struct ModelResourceSelectionError: LocalizedError, Sendable {
 
 @MainActor
 public final class UIModelResourcesContainer {
+    public func stateSnapshot() async throws -> UIStateSnapshot {
+        try Task.checkCancellation()
+        return UIStateSnapshot(
+            path: "ui.modelresources",
+            business: [
+                "itemCount": .count(state.items.count),
+                "problem": state.error == nil ? .unknown : .text("resourceSettingsOperationFailed"),
+                "saving": .flag(state.saving),
+            ],
+            runtime: ["available": .flag(state.isPresentationAvailable)],
+            meanings: [
+                "business.itemCount": "Number of catalog entries currently presented; not installed model count",
+                "business.saving": "Resource-source or custom-speech preference save in progress; not a model download",
+            ])
+    }
+
     public let requests = UIRequests<ResourcesInput, ResourcesReply>()
 
     public let state = ModelResourcesState()

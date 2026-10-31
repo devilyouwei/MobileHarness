@@ -60,3 +60,9 @@ NexArmMotorResult 保存 step/motor/target/observed/failure/started；最多 20 
 ## Relative motor requests
 
 `moveMotor` accepts exactly one of absolute `target` (encoder counts) or signed `deltaDegrees` (relative encoder-space degrees), plus native speed/acceleration. The executor holds its busy ownership across a fresh CMD11 exchange, SDK conversion/limit validation and finite feedback-observed execution. Read failure or an illegal final target produces no motion; no home/cached fallback, clamp or wrap is used. Canonical declarations expose axis anatomy and count limits. Base-right increases counts in the current arm convention.
+
+## Passive motion observation
+
+NexArmActionController.stateSnapshot reads busy/faulted, locked axes, active per-step targets and existing motor results/revision. It sends no packet. Targets are declared during the current execute step and cleared on exit; they are never measured positions. Retained results distinguish actual arrival, timeout, feedback loss, cancellation and unsent admission failure. Motor result Codable support preserves its explicit domain fields and failure enum.
+
+stateSnapshot() async throws returns only the motion node with targetCounts, execution instrumentation and six axis path references. stateReaders() builds weak-owner exact capabilities; a selected motor reader samples that axis record directly without reading a parent snapshot. These reads do not change motion, cancellation or result ownership.

@@ -76,4 +76,12 @@ Native data/observation capabilities remain independent of business and transpor
 
 ## Passive native authorization facts
 
-NativeVisionAuthorization queries camera and Photos add-only/read-write statuses without requesting permission, starting a camera or presenting a picker. PlatformContainer combines these with the other native permission facts through its read-only State port. Denied/restricted/notDetermined/limited are observed values; they do not become a business execution grant. Each actual camera/photo operation continues to enforce current platform permissions under its own lifecycle.
+NativeVisionAuthorization queries camera and Photos add-only/read-write statuses without requesting permission, starting a camera or presenting a picker. PlatformContainer collects these with the other permission facts at start, permission-operation completion and foreground resume. VisionContainer and the native State port read that shared resident sample; they do not query authorization while serializing State. Denied/restricted/notDetermined/limited are observed values; they do not become a business execution grant. Each actual camera/photo operation continues to enforce current platform permissions under its own lifecycle.
+
+## Passive state observation
+
+The owning stateSnapshot entry point reads current local business/capability values and runtime admission/work facts in the owner's isolation domain. It performs no action, acquisition or device activation. The module root composes the explicitly selected fields; unknown diagnostic coverage is not healthy evidence. Domain-specific completion and failure contracts above remain authoritative.
+
+State classifies authorization as Business; camera allocation, import task existence and admission as Runtime.
+
+Permission State projections read cached observations only. Unavailable owner scope remains unknown; an admitted cached-source/schema failure propagates through the standard throwing snapshot method instead of being converted to unknown.

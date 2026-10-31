@@ -47,6 +47,16 @@ public actor SignalTransport {
         let receive: @Sendable (GatewaySignal) async throws -> Void
     }
     private let admission: GatewayAdmission?
+    public func stateSnapshot() async throws -> GatewayStateSnapshot {
+        try Task.checkCancellation()
+        return GatewayStateSnapshot(
+            path: "gateway.signals",
+            runtime: [
+                "endpoints": .count(endpoints.count), "deliveries": .count(deliveries.count),
+                "active": .count(active), "bytes": .count(bytes),
+                "closed": .flag(closed),
+            ])
+    }
     private var endpoints: [String: Endpoint] = [:]
     private struct Delivery {
         let source: SignalEndpoint?

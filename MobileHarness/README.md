@@ -723,82 +723,28 @@ Each actual model request, including an internal ReACT continuation, samples aga
 
 <a id="container-state-read-path"></a>
 
-A State snapshot is a read-only projection of an owner's state machine. It is not a global state machine, a lifecycle manager or a second mutable source of truth. App supplies stable dependencies; Agents registers explicit readers and invokes only those selected for the request.
+All seven modules and their concrete child Containers read local state through `stateSnapshot() async throws`. Returned snapshots share the same path/business/runtime/health/issues/children/collectedAt/meanings/units/stateValues wire contract; module-local types preserve foundation independence. `children` contains path-only Reference indices, never child state values or serialized owner objects. Reflection comes from the already sampled value's `stateDescriptor`, without another Container read.
+
+State follows its Container/authoritative domain owner's lifetime. Startup seeds externally observable facts after installing observation; notifications/owned source clocks update resident memory, and foreground resume reconciles missed changes. Snapshot reads only project that memory (including pure receipt-age derivation); they never query hardware/OS sources or restore private context. Existing actor-owned software state remains authoritative without duplicate caches. Platform seeds synchronous native sources before opening admission; asynchronous network/device feedback remains explicitly awaiting observation/unknown until an actual receipt. Stop fences callbacks before cancellation and joins observation cleanup. Skill loading controls visibility, independently of collection and device activation.
+
+Business describes owned domain attributes, activities, measurements and outcomes. Backend-routing preferences and root lifecycle failures do not become Business merely because a consumer might use them. Producers publish their full classified schema independently of the caller; visibility selection remains in that caller. Typed commands, domain receipts and effect-time validation retain their own interfaces. Runtime contains lifecycle/configuration, queues, ownership and resource instrumentation. Health/issues describe local engineering evidence and do not automatically aggregate descendants. Declared metadata must refer to actual fields; finite states use raw enums and counters retain exact UInt64 values. Storage shares its own schema through StorageCore within its module.
+
+Each module root exposes `stateReaders() async throws`: a metadata catalog mapping exact node paths to read-only runtime capabilities. The catalog binds existing owners, primarily through weak references, and never samples their snapshots or constructs lazy capabilities. App registers catalog factories rather than copied State values. `inspection.snapshot(path:)` resolves and samples only the requested node; resolving a.b.c reads neither a nor a.b. Unknown/missing paths, cancellation, invalid classification/metadata and byte limits remain explicit. Expired owners cannot be kept alive by ordinary node readers.
 
 ```mermaid
-flowchart TB
-    App["APP<br/>Construct roots / bind stable read ports"]:::app
-    subgraph Owners["LIVE FACT OWNERS"]
-        direction LR
-        subgraph Foundation["PLATFORMKIT"]
-            Native["Actual native device facts"]:::platform
-            System["Time / power / thermal / locale<br/>Audio / permissions / network / accessibility"]:::platform
-        end
-        subgraph Business["ACTIONS"]
-            Services["Owned camera / robot services<br/>Business conditions + native observations"]:::action
-        end
-        subgraph Presentation["UI"]
-            UIState["Navigation / camera / album owners<br/>Presentation state"]:::ui
-        end
-        subgraph Application["AGENTS · APPLICATION"]
-            AppState["ApplicationControl<br/>Admitted scene / model preparation"]:::agent
-        end
-        Native -->|"typed observations / reads"| Services
-    end
-    Ports["App-bound camera / device access<br/>Neutral snapshot methods"]:::app
-    NativePort["App-injected PlatformStateReading<br/>Finite native JSON read port"]:::app
-    subgraph Cognition["AGENTS · READERS"]
-        Registry["AgentStateContext<br/>Named readers + session generations"]:::agent
-        Select["Loaded Skills' useStates<br/>Union / deduplicate / sort"]:::agent
-        Read["Per-request collection<br/>Read selected owners, validate session / JSON / bounds"]:::agent
-        Facts["CURRENT STATE<br/>Named availability / value snapshots"]:::agent
-        Registry --> Read
-        Select -->|"selected names"| Read
-        Read --> Facts
-    end
-    Services -.->|"encoded snapshots"| Ports
-    Ports -.->|"actions.camera / actions.robot"| Registry
-    UIState -.->|"ui.navigation / ui.camera / ui.album"| Registry
-    App -.->|"inject capabilities"| Ports
-    App -.->|"inject UI owners"| Registry
-    System -.->|"selected native snapshot"| NativePort
-    NativePort -.->|"eight platform.* readers"| Registry
-    App -.->|"inject native port"| NativePort
-    AppState -.->|"agents.application summary"| Registry
-    App -.->|"report application observations"| AppState
-    style Owners fill:#fafbfc,stroke:#939bad
-    style Foundation fill:#edf8ef,stroke:#6b9d77
-    style Business fill:#ffecef,stroke:#b86178
-    style Presentation fill:#e8f5ff,stroke:#5f96b6
-    style Application fill:#f0eaff,stroke:#8261b5
-    style Cognition fill:#faf7fd,stroke:#b1a0c4
-    classDef app fill:#eaf2ff,stroke:#5078b8,color:#203b64
-    classDef agent fill:#f0eaff,stroke:#8261b5,color:#463065
-    classDef action fill:#ffecef,stroke:#b86178,color:#6b2b3d
-    classDef ui fill:#e8f5ff,stroke:#5f96b6,color:#244d65
-    classDef platform fill:#edf8ef,stroke:#6b9d77,color:#315a3a
-    linkStyle 0,1,2 stroke:#5078b8,stroke-width:1.5px
-    linkStyle 3 stroke:#747bb8,stroke-width:1.5px
-    linkStyle 4,5,6,9,10,12,13 stroke:#438463,stroke-width:1.5px,stroke-dasharray:2 3
-    linkStyle 7,8,11 stroke:#939bad,stroke-width:1.5px,stroke-dasharray:8 4
+flowchart LR
+ Owners["Existing module / node owners"] --> Catalog["stateReaders metadata catalog<br/>Path → readonly capability"]
+ Skill["Loaded Skill.useStates<br/>Explicit exact paths"] --> Select["Assistant source selection"]
+ Catalog --> Resolve["App exact-path lookup"]
+ Select --> Resolve
+ Resolve --> Local["One stateSnapshot read<br/>Own data + child indices"]
+ Local --> Business["Assistant-owned Business field selection"]
+ Business --> Context["CURRENT STATE"]
 ```
 
-The figure follows snapshot data toward the request. Registration stores callbacks; actual source methods run when collection invokes them. Gateway is not in this read path, and no read sends a Signal or schedules an Action. Reading does not start capture, load a model, scan for a device or mutate a Task. Containerization does not automatically expose every module or all of its internal fields.
+Skill registration is precise: selecting a does not select a.b or a.b.c, and a.b.c requires no ancestor State grant. Assistant sources use actual canonical node paths (`agents.applicationcontrol`, `ui.home.expression`, `platform.system.*`, etc.). RobotInteraction explicitly selects `actions.robot.motion` for active targets, independently from robot connection/tracking facts. There is no model-facing whole-tree health/diagnostic source, wildcard, automatic discovery or loadState. Source indices and engineering metadata do not become Assistant business facts automatically. Other internal consumers choose their own full classified reads without Assistant policy.
 
-| State boundary | Owner and implemented behavior |
-| --- | --- |
-| Native system facts | Eight `platform.*` sources read the existing Platform root through an App-injected neutral SDK port. Core, Audio, Vision and Connectivity own time, power, thermal, network, authorization, audio, locale and accessibility facts; no model/role or execution policy is added to the SDK. |
-| Business facts | `actions.camera` and `actions.robot` read Actions-owned domain services through App-bound neutral access ports. Those services compose actual business/presentation conditions with native observations. They are not generic copies of the Actions root's lifecycle. |
-| Presentation facts | `ui.navigation`, `ui.camera` and `ui.album` read the injected UI owners on MainActor, including their presentation-availability checks. UI supplies presentation facts; Actions supplies business execution conditions. |
-| Application observations | `agents.application` reads the existing ApplicationControl role's admitted foreground/background and model-preparation summary, with per-field sequences and explicit unknown values. It does not include a last execution result, raw capability strings or a second navigation copy. |
-| Agent lifecycle and work | Agent lifecycle uses registered, running, paused, stopped and failed. AgentContext separately tracks queued/running/awaitingFeedback/continuation and terminal work. These private runtime states are not automatically included in CURRENT STATE. |
-| Task and Skill transitions | Agents owns private Task/Skill state and its minimal AGENT CONTEXT projection. Waiting for user input retains a Task; finishing/failure/cancellation joins the owned execution/cleanup barriers before terminal evidence. Skill retention follows Task ownership and completed Decision usage. |
-| Execution observation | Gateway records queued/running/cancelling/terminal execution and delivers actual results. Passive execution records, result delivery and native telemetry are distinct; cancelling is not proof of completed cleanup. They are not implicitly registered as model State sources. |
-| Persistence | Storage owns durable conversation/Task evidence and domain repositories. It is not a shared live State mirror. Persisting a request captures what was sent; it does not make those facts current for a later request or restore active execution. |
-
-AgentStateContext owns read capabilities and session generations, not cached fact values or a Task copy. Collection reads selected names in deterministic order and validates the session again after the reads. Unknown sources, unavailable source errors, invalid encoding, capacity failure and cancellation remain explicit; a closed/replaced session invalidates an in-flight collection. Each source defines its own snapshot consistency; the combined private/business context is not an atomic cross-owner view. The fourteen registered source mappings and schemas belong in [Context](Agents/Support/Context/README.md#container-context-read-path).
-
-BasicSkill selects agents.application, ui.navigation and all eight native sources. Each actual request samples them again, including ReACT continuations. Time carries the sampled local date/time to seconds, weekday and zone/offset; it is not a clock that updates an in-flight request. Permission denial and unknown/null native facts remain data. Network observations describe a path rather than a successful provider connection. Raw route identities, SSIDs, IPs and sensor streams are excluded. Platform start/foreground/stop owns passive observation generations; state reads themselves never activate an audio session, start hardware, request permissions, scan or probe a server. Location/motion/depth/proximity and magnetic attachment are not part of these sources.
+[ApplicationStateInspection](App/Composition/README.md#internal-state-inspection) offers a separate explicit `inspectTree(path:depth:)` operation for internal diagnostic callers. It walks indices and materializes its own Tree structure; this is not Container snapshot behavior or a Skill permission. Internal health/history projections remain diagnostic caller operations. Reads do not execute actions, activate devices, request permissions, prepare models, change Task/Skill state or establish execution authority. Cross-owner sampling remains non-atomic.
 
 State is the default low-cost summary for decisions. Sufficient current facts are answered directly. Specific Actions supply missing details under their own contracts, such as Bluetooth status/device IDs, resource inventory or history records; they may overlap a summary without creating another owner or fact cache. No generic environment-query Action is registered. Fresh collection means a new read, not a forced native observation or an active probe. Actual execution results remain correlated feedback/history, and Actions rechecks live business conditions after queueing.
 
@@ -1651,3 +1597,7 @@ Automated checks, iOS builds, real-model samples, native UI and physical-device 
 Photographer → Gateway → Actions/NexArm 跟踪链仅传递有限角度/位置目标；Photographer 按 PlatformKit 推荐节奏生成目标，派发保留正在执行一个和待执行最新一个并记录替换计数，Actions 保留最新目标并编译有界位置包。设备位置/运行参数限制及通信上限统一由 PlatformKit 提供，USB/BLE 在发包前验证寄存器写和位置范围，BLE 对所有生产者共享发送预算及原生背压。运行时不切换舵机模式或发送持续速度，取消加入不附加运动。设备硬件限位与位置模式配置不由该链写入，详见 [NexArm SDK](PlatformKit/Connectivity/NexArm/README.md)。
 
 NexArm通用设备参数、允许误差、位置反馈观察、经验行程估算与原生恢复分类/预算由 PlatformKit 拥有；Actions 仅消费这些能力并拥有动作目标、资源、执行报告、设备选择及业务生命周期协调。硬件错误保持SDK类型，上层仅适配展示与动作结果，基础模块不依赖业务模块。
+
+### Local observation metadata
+
+Module snapshots explicitly declare business/capability and runtime fields, health issues, child nodes and collection time. Module-local Value types share the same Codable scalar, object and array representation; classification is in data, not in filtered container methods. Descriptors carry only the selected node's field names, domain meanings, units, child indices and finite state values where declared by the owner; they do not enumerate private Swift storage. Native motor receipts carry monotonic age/session identity and targets remain business-owned. UI, Platform and Model runtime stopped flags represent their existing admission fences; cleanupJoined separately records successful joined stop and makes no physical-device claim.

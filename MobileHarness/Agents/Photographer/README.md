@@ -118,3 +118,7 @@ pause/stop 关闭接纳、取消并加入订阅／事务／跟踪；resume 加�
 ## Execution ownership and lifecycle
 
 Camera/device execution and CameraInteractionWorkflow belong to ActionsContainer. Photographer receives narrow App-bound access interfaces and UI-owned controls, owns authorization/tracking intent and cancels its execution scopes explicitly. Private album attachments validate request/session independently of role permission.
+
+## Passive container state
+
+stateSnapshot projects local installation/closure, Agent lifecycle/queue counters and initialized committed task/Skill fields without message content. residentContext() reads the repository’s last committed memory only; context fields are unknown before initialization. Agent start owns initialization/restoration and its failures. The root catalog binds independent readers without sampling roles or maintaining another mutable role-state registry.

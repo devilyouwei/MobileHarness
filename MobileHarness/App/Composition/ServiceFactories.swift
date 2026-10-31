@@ -25,6 +25,7 @@ import UI
         let actions: ActionsContainer
         let gateway: GatewayContainer
         let agents: AgentContainer
+        let inspection: ApplicationStateInspection
         let actionAssembly: ApplicationActionAssembly
         let ui: ApplicationPresentation
         let homePreparation: ForegroundPreparation
@@ -69,10 +70,61 @@ import UI
                 cameraAccess: AppCameraAccess(actionAssembly.business),
                 deviceAccess: AppDeviceAccess(actionAssembly.business),
                 facades: actionAssembly.business.facades,
-                audio: platform.audio, platformState: platform,
+                audio: platform.audio,
                 languageModels: model.language, speechModels: model.speech, visionModels: model.vision,
                 modelArtifacts: model.artifacts, memoryPressure: { await model.handleMemoryPressure() })
         }
+        let inspection = ApplicationStateInspection(failures: containerFailures)
+        // Root paths are compile-time declarations; duplicates indicate a composition defect.
+        do {
+            try inspection.registerRoot(
+                "ui",
+                readers: { [weak uiContainer] in
+                    guard let uiContainer else { throw StateInspectionError.missing }
+                    return try await uiContainer.stateReaders()
+                })
+            try inspection.registerRoot(
+                "platform",
+                readers: { [weak platform] in
+                    guard let platform else { throw StateInspectionError.missing }
+                    return try await platform.stateReaders()
+                })
+            try inspection.registerRoot(
+                "storage",
+                readers: { [weak storage] in
+                    guard let storage else { throw StateInspectionError.missing }
+                    return try await storage.stateReaders()
+                })
+            try inspection.registerRoot(
+                "model",
+                readers: { [weak model] in
+                    guard let model else { throw StateInspectionError.missing }
+                    return try await model.stateReaders()
+                })
+            try inspection.registerRoot(
+                "actions",
+                readers: { [weak actions] in
+                    guard let actions else { throw StateInspectionError.missing }
+                    return try await actions.stateReaders()
+                })
+            try inspection.registerRoot(
+                "gateway",
+                readers: { [weak gateway] in
+                    guard let gateway else { throw StateInspectionError.missing }
+                    return try await gateway.stateReaders()
+                })
+            try inspection.registerRoot(
+                "agents",
+                readers: { [weak agents] in
+                    guard let agents else { throw StateInspectionError.missing }
+                    return try await agents.stateReaders()
+                })
+        } catch {
+            // Preserve bootstrap failure through the existing diagnostic path.
+            inspection.rejectConfiguration(error)
+            containerFailures.report(module: "app", component: "state", operation: "register", error: error)
+        }
+        agents.readState = { path in try await inspection.snapshot(path: path) }
         actionAssembly.agents = agents
         let home = uiContainer.home
         let homePreparation = ForegroundPreparation(
@@ -138,7 +190,7 @@ import UI
         return Services(
             registry: registry, containerFailures: containerFailures,
             uiContainer: uiContainer, platform: platform, storage: storage, model: model,
-            actions: actions, gateway: gateway, agents: agents, actionAssembly: actionAssembly,
+            actions: actions, gateway: gateway, agents: agents, inspection: inspection, actionAssembly: actionAssembly,
             ui: ApplicationPresentation(features: agents, home: home), homePreparation: homePreparation)
     }
 }

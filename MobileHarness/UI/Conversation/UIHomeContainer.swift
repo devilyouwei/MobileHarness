@@ -2,6 +2,24 @@ import Foundation
 
 @MainActor
 public final class UIHomeContainer {
+    public func stateSnapshot() async throws -> UIStateSnapshot {
+        try Task.checkCancellation()
+        return UIStateSnapshot(
+            path: "ui.home",
+            business: [
+                "voicePhase": .text(conversation.voicePhase.rawValue), "voiceActive": .flag(conversation.isVoiceActive),
+                "replyActive": .flag(conversation.isReplyActive),
+            ], runtime: ["available": .flag(admission.active), "ready": .flag(conversation.isReady)],
+            children: [.init(path: "ui.home.expression")],
+            stateValues: ["business.voicePhase": VoicePhase.allCases.map(\.rawValue)])
+    }
+    public func stateReaders() async throws -> [String: UIStateSnapshot.Reader] {
+        [
+            "ui.home": UIStateSnapshot.reader(of: self) { try await $0.stateSnapshot() },
+            "ui.home.expression": UIStateSnapshot.reader(of: expressionOwner) { try await $0.stateSnapshot() },
+        ]
+    }
+
     public let requests = UIRequests<HomeInput, Void>()
     public let listeningRequests = UIRequests<ListeningInput, Void>(controlOnly: true)
 

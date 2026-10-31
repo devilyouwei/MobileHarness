@@ -21,3 +21,9 @@
 原生运动参数默认值和合法范围引用 PlatformKit `NexArmDeviceLimits`；本层只传递参数及解释业务结果，不另定义设备限制。
 
 `GestureRequest` carries optional `target` (absolute counts) or `deltaDegrees` (relative degrees) for a motor move; the Action validates their exclusive choice before dispatch. Neither field is used to guess a reset home.
+
+## State result encoding
+
+NexArmMotorResult encodes step/motor/target/observed/failure/started as its existing explicit fields. Its serialized failure preserves admission, feedback, timeout and cancellation distinctions. Encoding introduces no alternative execution ledger.
+
+NexArmMotorResult.outcome is a stable domain interpretation of the retained operation result. Technical failures map to unconfirmed while their original failure codes remain available to engineering consumers; a result without started evidence cannot report arrived.

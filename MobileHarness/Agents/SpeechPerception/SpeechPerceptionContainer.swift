@@ -12,6 +12,19 @@
     @available(iOS 27, *)
     @MainActor @Observable
     public final class SpeechPerceptionContainer {
+        public func stateSnapshot() async throws -> AgentStateSnapshot {
+            try Task.checkCancellation()
+            let status = await agent?.status()
+            return AgentStateSnapshot(
+                path: "agents.speechperception",
+                runtime: [
+                    "rolePhase": status.map { .text($0.lifecycle.rawValue) } ?? .unknown,
+                    "queuedInputs": status.map { .count($0.queuedInputs) } ?? .unknown,
+                    "processedInputs": status.map { .count($0.processedInputs) } ?? .unknown, "closed": .flag(closed),
+                    "installed": .flag(agent != nil),
+                ])
+        }
+
         @ObservationIgnored private var agent: SpeechPerceptionAgent?
         @ObservationIgnored private var manager: AgentManager?
         @ObservationIgnored private var outputTask: Task<Void, Never>?

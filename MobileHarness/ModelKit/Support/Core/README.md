@@ -69,3 +69,7 @@ ModelLoadGate requires an explicit positive maximumConcurrentLoads. ModelContext
 ✅ 模块根目录 [ModelFailure](../../ModelFailure.swift) 为只依赖Foundation的中立错误封装，仍编译于基础 ModelKit，结构同其他基础根；Source只记录包装处源码位置，不承诺异步调用堆栈。InferenceAdmissionError分类为unavailable／stopped，未知提供者错误为execution.failed并完整保留underlying，不在Core依赖领域能力或业务模块。
 
 ✅ 已实现：ModelResource 在 actor 内通过实际无缓存资源加载分支报告 loading；已有缓存直接返回，不发送事件；共享任务的等待方按真实等待结束报告退出，错误仍传播，不新增线程或订阅队列。
+
+## Passive inference activity
+
+ModelContext's management SPI reads an existing resource's inferenceActive flag. The flag follows its authoritative active lease, including acquire/cleanup barriers; it creates no resource and performs no load. Resource phase and lease activity are separate observations.

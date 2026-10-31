@@ -7,6 +7,26 @@
     @available(iOS 27, *)
     @MainActor @Observable
     public final class AssistantContainer {
+        public func stateSnapshot() async throws -> AgentStateSnapshot {
+            try Task.checkCancellation()
+            let status = await session?.agent.status()
+            let context = await session?.agent.residentContext()
+            return AgentStateSnapshot(
+                path: "agents.assistant",
+                business: [
+                    "taskPhase": context?.state.skillState?.tasks.first(where: {
+                        $0.id == context?.state.skillState?.activeTaskID
+                    }).map { .text($0.status) } ?? .unknown
+                ],
+                runtime: [
+                    "rolePhase": status.map { .text($0.lifecycle.rawValue) } ?? .unknown,
+                    "queuedInputs": status.map { .count($0.queuedInputs) } ?? .unknown,
+                    "processedInputs": status.map { .count($0.processedInputs) } ?? .unknown,
+                    "loadedSkills": context?.state.skillState.map { .count($0.loaded.count) } ?? .unknown,
+                    "closed": .flag(closed), "installed": .flag(session != nil),
+                ])
+        }
+
         @ObservationIgnored private var session: AssistantExecutionSession?
         @ObservationIgnored private var closed = false
         private let home: UIHomeContainer

@@ -106,3 +106,13 @@ UIAlbumContainer.ContextSnapshot 提供内容状态、当前已加载数量、�
 ## Execution ownership and lifecycle
 
 SettingsFormController retains up to 32 active/cancelled discovery workers. Overflow reports an explicit UI error. Cancellation advances revision immediately, while shutdown closes new work and cancels/joins every retained worker. Actions invokes this UI-owned cleanup through its injected facade; UI imports no business module.
+
+## Passive state observation
+
+The owning stateSnapshot entry point reads current local business/capability values and runtime admission/work facts in the owner's isolation domain. It performs no action, acquisition or device activation. The module root composes the explicitly selected fields; unknown diagnostic coverage is not healthy evidence. Domain-specific completion and failure contracts above remain authoritative.
+
+Album State includes content and operation alongside list facts. Device recovery machinery is Runtime; visible connection/scanning are Business.
+
+Settings Business.enabled is the editable cloud switch, loading is provider/model discovery, and saving is a settings write. Resource itemCount counts presented catalog entries; saving is source/custom-speech preference persistence, not download activity. These meanings are included in descriptors. Form operation failures are typed Business problems and album load failure is Business.content=failed; UI engineering health remains unknown without actual presentation-health evidence.
+
+The State operation attribute belongs to ui.album. ui.navigation reflects navigation-owned facts only; its State projection does not include the album operation. Existing typed UI context composition remains a page-rendering interface.

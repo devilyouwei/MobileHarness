@@ -98,6 +98,19 @@ The architecture checker enforces Gateway → FunctionContracts only, AgentCore 
 
 The boundary checker requires Agents/Gateway/Actions Xcode groups to mirror the physical source directories, with one reference per file, complete Swift/README/JSON coverage and no misplaced or stale groups. This navigation check does not change target source membership or runtime behavior.
 
-The architecture boundary audit explicitly classifies AgentPlatformState as an Agents Support SDK adapter; Support/Context remains independent of PlatformKit and all foundation module isolation rules continue to apply.
 
 `evaluate-qwen.py --robot-only` selects all robot-prefixed scenarios. The default model list is `gpt-4.1 qwen3.8-flash qwen3.8-max`; `--models` overrides it. `--cases` and `--robot-only` are mutually exclusive. Credentials remain provider-specific and reports retain production-source hashes.
+
+## Reflexivity boundaries
+
+The boundary check requires container source owners to expose explicit stateSnapshot reads. Generic App tree serialization is isolated to ApplicationStateInspection in AppStorage; the App prohibition on concrete business adaptation and per-function registration remains active everywhere. Source-owner validation includes this composition-only file.
+
+Assistant State selection belongs to Agents/Assistant; App inspection keeps structural serialization isolated. No shared Support/native pass-through defines Assistant visibility.
+
+The State boundary audit checks each concrete Container direct-read return type and identical Value codecs across the seven module-local schemas plus the App view. It no longer accepts a nonstandard child read merely because another method in that file has stateSnapshot.
+
+State audits require stateSnapshot() async throws on each Container, snapshot-only descriptor reflection, identical Value codecs and path-only child references. Read bodies cannot recursively call child stateSnapshot() or create Tasks. Resource UI passive-read validation permits the uniform async cancellation signature while still rejecting asynchronous effects.
+
+State read audits also reject native camera/status/authorization sampling and lazy private-context initialization from direct snapshot bodies. Resident source seeding, bounded/coalesced notification updates and invalidation fences are covered by PlatformStateTests; repository initialization remains owner-driven.
+
+Direct State producer bodies also reject debug descriptions, Assistant selection calls and Skill mutation calls; consumer selection remains separate from producer schema classification.

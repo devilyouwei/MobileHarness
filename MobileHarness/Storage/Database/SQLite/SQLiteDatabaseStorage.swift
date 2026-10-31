@@ -30,6 +30,8 @@ public actor SQLiteDatabaseStorage: DatabaseStorage {
     private let open: @Sendable () throws -> SQLiteRepositories
     private var startup: Task<Void, any Error>?
     private var shutdown: Task<Void, any Error>?
+    private var ready = false
+    private var stopped = false
     private var closed = false
     private var failure: (any Error)?
 
@@ -48,6 +50,18 @@ public actor SQLiteDatabaseStorage: DatabaseStorage {
         }
     }
 
+    public func stateSnapshot() async throws -> StorageStateSnapshot {
+        try Task.checkCancellation()
+        let phase: DatabasePhase =
+            failure != nil
+            ? .failed
+            : stopped ? .stopped : closed ? .stopping : ready ? .ready : startup != nil ? .starting : .cold
+        return .init(
+            path: "storage.database", runtime: ["phase": .text(phase.rawValue)],
+            health: phase == .failed ? .fault : .unknown,
+            issues: phase == .failed ? [.init(code: "databaseFailed", impact: "databaseUnavailable")] : [],
+            stateValues: ["runtime.phase": DatabasePhase.allCases.map(\.rawValue)])
+    }
     public func start() async throws {
         do {
             guard !closed else { throw RecordStorageError.closed }
@@ -77,6 +91,7 @@ public actor SQLiteDatabaseStorage: DatabaseStorage {
                 }
                 if let failure { throw failure }
                 guard !closed else { throw RecordStorageError.closed }
+                ready = true
             } catch {
                 if failure == nil { failure = error }
                 access.closeAdmission()
@@ -107,7 +122,9 @@ public actor SQLiteDatabaseStorage: DatabaseStorage {
             }
             shutdown = task
             try await task.value
+            stopped = true
         } catch {
+            if failure == nil { failure = error }
             failures.report("database", "stop", error)
             throw error
         }

@@ -23,3 +23,7 @@ SQLiteDatabaseStorage 在后台任务完成目录、打开、迁移和恢复后�
 ## 基础相册实施契约
 
 ✅ media端口扩展照片格式／尺寸／时间／来源与相册收录查询，继续使用同一后端和命名空间。
+
+## Passive state reads
+
+DatabaseStorage.stateSnapshot returns StorageCore.StorageStateSnapshot with its phase in Runtime and declared DatabasePhase values, without accessing repositories. Unsupported backends default to unknown. The phase vocabulary is unknown/cold/starting/ready/stopping/stopped/failed; lifecycle evidence belongs to the backend rather than inferred repository getter success.

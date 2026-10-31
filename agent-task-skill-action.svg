@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="700" height="340" viewBox="0 0 700 340" role="img" aria-labelledby="title description">
-  <title id="title">Agent, Task, Skill and Action relationships</title>
-  <desc id="description">An Agent manages a Task and loads Skills. A Task preserves a goal and context and combines Skills. Skills provide instructions and expose callable Actions. The Agent invokes Actions through Gateway and observes actual results to inform its next decision. Skills can also be loaded without a Task.</desc>
+  <title id="title">Agent, Task, Skill, States and Action relationships</title>
+  <desc id="description">An Agent manages a Task and loads Skills. A Task preserves a goal and context and combines Skills. Skills declare Instructions, callable Actions and read-only States, progressively disclosed when loaded. Modules own the underlying state; selected facts are read on each actual model request. The Agent invokes Actions through Gateway and observes actual results to inform its next decision. Skills can also be loaded without a Task.</desc>
   <defs>
     <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M 0 0 L 10 5 L 0 10 z" fill="#64748b"/>
@@ -24,13 +24,14 @@
     <g fill="#1e293b" font-size="20" font-weight="600">
       <text x="98" y="132">Agent</text>
       <text x="342" y="57">Task</text>
-      <text x="342" y="213">Skill</text>
+      <text x="342" y="201">Skill</text>
       <text x="598" y="213">Action</text>
     </g>
     <g fill="#475569" font-size="13">
       <text x="98" y="158">Reason + converse</text>
       <text x="342" y="83">Goal + context</text>
-      <text x="342" y="239">Instructions + functions</text>
+      <text x="342" y="227">Instructions + Actions</text>
+      <text x="342" y="248">States · on demand</text>
       <text x="598" y="239">Execute via Gateway</text>
     </g>
     <g fill="#475569" font-size="14">

@@ -26,3 +26,5 @@ resetMotor homes one axis(default1–5); resetArm excludes gripper. Gestures ret
 ### Results
 Acceptance is not arrival. Report failures without retry/reset/reconnect/compensation. Cancellation cannot undo motion. No connection-test movements.
 “先右转30度，只有成功才点头；失败就停” → first response ONLY <moveMotor motor="1" deltaDegrees="30"/>. Emit the call, not a plan/success claim/nodHead. Failure → report, NO further motion. wait orders work, not success conditions. Successful void completion ends the decision; no automatic conditional continuation.
+
+actions.robot.value separates connection/control availability, connection phase, jogging/tracking and native positionsCounts (motors 1–6, encoder counts). feedbackAgeSeconds is monotonic receipt age; feedbackFresh requires a connected session and age no greater than two seconds. Null is unknown. Stale positions are historical observations, never readiness or a target. Session identity and recovery machinery remain internal. actions.robot.motion.value.targetCounts and actions.robot.value.trackingTargetCounts are desired business positions, never measurements. State reads do not query or move the arm.

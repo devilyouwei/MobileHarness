@@ -25,3 +25,7 @@ DocumentStore 提供 load/refresh/invalidate、UUID revision 的 save/CAS 和 re
 ✅ FilesContainer 与 FileAccess 将相同错误报告器传入 DiskFileStore/FileDocumentStore，工厂及实际文件操作异常原样抛出并报告；不增加磁盘回退或重试，回调不等待消费者。
 
 ✅ FileStorageError 与其他存储值错误一致声明 Equatable/Sendable，FileStore/DocumentStore 保持独立协议；显式内存后端是受限的可用实现，不是生产失败时的隐式回退。
+
+## Passive state reads
+
+FilesContainer.stateSnapshot returns StorageCore.StorageStateSnapshot directly; closed and file/document handle counts are Runtime, sampled under the same mutex. The returned snapshot.stateDescriptor reflects the same sampled data. Paths, keys and document data are excluded. It does not call start, create a directory, open a file or alter admission.

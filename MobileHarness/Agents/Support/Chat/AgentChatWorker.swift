@@ -2256,6 +2256,11 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
         AgentStatus(lifecycle: lifecycle, queuedInputs: queue.count, processedInputs: processed)
     }
 
+    /// Passive State reflection, independent of persistence initialization.
+    public func residentContext() async -> AgentContext<State>? {
+        await contextRepository.residentSnapshot()
+    }
+
     public func contextSnapshot() async throws -> AgentContext<State> {
         try await contextRepository.snapshot()
     }

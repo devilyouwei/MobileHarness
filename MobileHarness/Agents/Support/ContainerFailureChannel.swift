@@ -18,8 +18,16 @@ public struct ContainerFailureRecord: Sendable {
     public var event: ContainerFailureEvent
     public let error: any Error
     public let fullMessage: String
+    public let firstOccurred: Date
     public var delivery: Delivery = .pending
     public var deliveryFailure: String?
+    public init(event: ContainerFailureEvent, error: any Error, fullMessage: String, delivery: Delivery = .pending) {
+        self.event = event
+        self.error = error
+        self.fullMessage = fullMessage
+        self.delivery = delivery
+        firstOccurred = event.lastOccurred
+    }
 }
 public struct ContainerFailureSnapshot: Sendable {
     public let revision: UInt64

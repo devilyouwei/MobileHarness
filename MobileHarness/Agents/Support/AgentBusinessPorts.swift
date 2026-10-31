@@ -13,14 +13,12 @@ import UI
 
 /// App binds native services to these narrow role-facing ports. No business implementation is imported.
 @MainActor public protocol AgentCameraAccess: AnyObject, Sendable {
-    func contextSnapshot() async throws -> Data
     func setForeground(_ value: Bool)
     func pauseVisionForModelMaintenance() async
     func shutdown() async throws
     func readPhoto(_ id: String, source: String, sessionID: String, inputID: String) async throws -> Data
 }
 @MainActor public protocol AgentDeviceAccess: AnyObject, Sendable {
-    func contextSnapshot() async throws -> Data
     func setForeground(_ value: Bool)
     func waitUntilIdle() async
     func openPage()

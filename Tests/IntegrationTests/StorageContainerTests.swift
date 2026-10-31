@@ -152,6 +152,10 @@ extension StorageContainerTests {
             #expect(error.cleanupErrors.count == 1)
             #expect(error.cleanupErrors.first as? ContainerFixtureError == .cleanup)
         }
+        let reflected = try await storage.stateSnapshot()
+        #expect(reflected.business.isEmpty)
+        #expect(reflected.health == .fault)
+        #expect(reflected.issues.contains { $0.code == "lifecycleFailed" && $0.impact == "storageUnavailable" })
         #expect(throws: StorageError.closed) { try files.file(files.photos) }
         #expect(throws: StorageError.closed) { try storage.cache.images.put(CacheBuffer(Data([1])), key: "late") }
         await #expect(throws: StorageFailure.self) { try await storage.start() }
@@ -215,4 +219,37 @@ extension SharedCacheTests {
         #expect(throws: StorageError.closed) { try cache.images.put(CacheBuffer(Data([1])), key: "late") }
         await cache.close()
     }
+}
+
+private actor StateReadSpyDatabase: DatabaseStorage {
+    private var stateReads = 0
+    nonisolated var chat: any ChatRepository { get throws { throw ContainerFixtureError.invalid } }
+    nonisolated var tasks: any TaskRepository { get throws { throw ContainerFixtureError.invalid } }
+    nonisolated var media: any MediaRepository { get throws { throw ContainerFixtureError.invalid } }
+    nonisolated var devices: any DeviceRepository { get throws { throw ContainerFixtureError.invalid } }
+    func start() async throws {}
+    func stop() async throws {}
+    func stateSnapshot() async throws -> StorageStateSnapshot {
+        stateReads += 1
+        return .init(path: "storage.database", runtime: ["phase": .text("cold")])
+    }
+    func observedReads() -> Int { stateReads }
+}
+
+@Test func singleNodeStorageRootAndCatalogNeverSampleTheDatabaseChild() async throws {
+    let location = containerRoot()
+    let database = StateReadSpyDatabase()
+    let files = FilesContainer(
+        settings: location.appendingPathComponent("settings"), photos: location.appendingPathComponent("photos"),
+        models: location.appendingPathComponent("models"))
+    let root = StorageContainer(database: database, files: files)
+    let own = try await root.stateSnapshot()
+    #expect(own.children.map(\.path).contains("storage.database"))
+    #expect(await database.observedReads() == 0)
+    let readers = try await root.stateReaders()
+    #expect(await database.observedReads() == 0)
+    let read = try #require(readers["storage.database"])
+    #expect(try await read().runtime["phase"] == .text("cold"))
+    #expect(await database.observedReads() == 1)
+    #expect(!FileManager.default.fileExists(atPath: location.path))
 }

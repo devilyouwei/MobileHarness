@@ -1079,3 +1079,55 @@ private struct ControlAgnosticChatState: AgentChatContextState {
     func validateContextState() throws { try validateChatState() }
     mutating func recoverInterruptedWork() { recoverChatState() }
 }
+
+@Test func residentAgentContextDoesNotRestoreUntilTheOwnerInitializesIt() async throws {
+    let loads = FixtureFactCell(0)
+    let commits = FixtureFactCell(0)
+    let repository = try AgentContextRepository(
+        agent: .assistant, scope: UUID().uuidString, state: AssistantContextState(),
+        persistence: .init(
+            load: {
+                loads.update { $0 += 1 }
+                return nil
+            },
+            commit: { _, _ in commits.update { $0 += 1 } }))
+    #expect(await repository.residentSnapshot() == nil)
+    #expect(loads.read() == 0 && commits.read() == 0)
+    let initialized = try await repository.snapshot()
+    #expect(loads.read() == 1)
+    #expect(await repository.residentSnapshot()?.revision == initialized.revision)
+    try await repository.update { _ in }
+    #expect(await repository.residentSnapshot()?.revision == initialized.revision + 1)
+    #expect(loads.read() == 1 && commits.read() == 1)
+}
+
+@Test func residentAgentContextDoesNotFabricateInitializationAfterRestoreFailure() async throws {
+    let repository = try AgentContextRepository(
+        agent: .assistant, scope: UUID().uuidString, state: AssistantContextState(),
+        persistence: .init(load: { throw CommunicationError.invalidPayload }, commit: { _, _ in }))
+    #expect(await repository.residentSnapshot() == nil)
+    await #expect(throws: CommunicationError.invalidPayload) { _ = try await repository.snapshot() }
+    #expect(await repository.residentSnapshot() == nil)
+}
+
+@Test func residentAgentContextReadsPriorCommittedValueDuringAWrite() async throws {
+    let entered = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingOldest(1))
+    let release = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingOldest(1))
+    let repository = try AgentContextRepository(
+        agent: .assistant, scope: UUID().uuidString, state: AssistantContextState(),
+        persistence: .init(
+            load: { nil },
+            commit: { _, _ in
+                entered.continuation.yield(())
+                for await _ in release.stream { break }
+            }))
+    let before = try await repository.snapshot()
+    let writer = Task { try await repository.update { _ in } }
+    for await _ in entered.stream { break }
+    #expect(await repository.residentSnapshot()?.revision == before.revision)
+    release.continuation.yield(())
+    try await writer.value
+    #expect(await repository.residentSnapshot()?.revision == before.revision + 1)
+    entered.continuation.finish()
+    release.continuation.finish()
+}

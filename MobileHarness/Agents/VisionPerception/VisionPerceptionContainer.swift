@@ -8,6 +8,13 @@
     @available(iOS 27, *)
     @MainActor
     public final class VisionPerceptionContainer {
+        public func stateSnapshot() async throws -> AgentStateSnapshot {
+            try Task.checkCancellation()
+            return AgentStateSnapshot(
+                path: "agents.visionperception",
+                runtime: ["working": .flag(work != nil), "closed": .flag(closed), "installed": .flag(work != nil)])
+        }
+
         private var work: Task<Void, any Error>?
         private var closed = false
         init() {}

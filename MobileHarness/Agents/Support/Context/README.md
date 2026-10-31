@@ -131,41 +131,28 @@ AgentStateContext 管理只读来源和会话接纳，不持有Task副本；关�
 
 ## Container context read path
 
-AgentStateContext stores named read capabilities and session generations. It owns neither business fact values nor a mirrored Task. AgentContainer.makeStateContext constructs the production registry; App supplies the camera/device access implementations and stable UI owners. A source name is an explicit contract, not reflection over a container tree.
+AgentStateContext stores named read capabilities and session generations, never business facts or a Task mirror. [AssistantStateBindings](../../Assistant/AssistantStateBindings.swift) registers the exact canonical source paths used by bundled Skills. App's injected read returns one complete classified node; Assistant alone selects the approved Business fields. Generic Context/Chat and original Containers do not impose Assistant policy on other callers.
 
-| Source | Concrete read path | Snapshot fields |
-| --- | --- | --- |
-| `agents.application` | ApplicationControlContainer.contextSnapshot -> ApplicationControlAgent.applicationState | scene/modelPreparation (unknown until admitted), with per-field sequences; no raw strings or last execution result. |
-| `actions.camera` | AgentCameraAccess → AppCameraAccess → ActionsBusinessAssembly.cameraContext → CameraCoordinator.contextSnapshot | availability plus enabled, running, selectedFacing, busy, needsSettings, displayedMediaID and savedMediaID. Running comes from the camera capability; business/presentation conditions come from the owning camera workflow. |
-| `actions.robot` | AgentDeviceAccess → AppDeviceAccess → ActionsBusinessAssembly.deviceContext → NexArmControlService.contextSnapshot | availability plus connected and controlAvailable, derived from current link/control/foreground/cleanup conditions. |
-| `ui.navigation` | MainActor read of injected NavigationState with UIAlbumContainer projection | availability plus path, phase, current location, overlay, content and operation. Presentation admission must be available. |
-| `ui.camera` | MainActor read of injected UICameraContainer | availability plus enabled, visible, busy, facing and needsSettings. Presentation availability must pass. |
-| `ui.album` | MainActor read of injected UIAlbumContainer, guarded by navigation presentation admission | availability plus content, loadedCount, hasMore and operation. |
+| Skill source | Own Business attributes |
+| --- | --- |
+| agents.applicationcontrol | admitted modelPreparation; no scene/sequences |
+| actions.camera | camera/photo activity, permission requirements, facing and media identities |
+| actions.robot | connection/control phase, jogging/tracking goals and observed positions/freshness |
+| actions.robot.motion | active targetCounts; no execution locks/revisions/busy instrumentation |
+| ui.navigation | owned path, confirmed page/content/overlay; album operation remains ui.album-owned |
+| ui.camera / ui.album | camera presentation; album content/list/operation |
+| ui.home.expression | base/effective/overridden/transitioning/loading; no renderer instrumentation |
+| platform.system.time/power/thermal/network/permissions/audio/locale/accessibility | explicitly selected passive native Business facts |
 
-The production sources encode ContainerContextValue with `availability` (`unknown`, `available` or `unavailable`) and `value`. An owner may return an unavailable fact or throw a read error; the registry does not fabricate an empty success. Encoded Actions snapshots use ContainerContextSource(encoded:) so JSON objects are not converted into base64 strings. Foundation containers do not import AgentCore; the adapter lives above the owner. Neither Gateway nor Storage participates in collection.
+Every source reads one node. children indices are not followed, decoded as recursive state or injected as Business. Selecting a does not select a.b; selecting a.b.c needs no ancestor State selection. There is no whole-tree system.health/system.diagnostics source, alias, wildcard, state discovery tool or loadState.
 
-For every skills-enabled model request, AgentSkillLoader.useStates takes the already expanded effective loaded Skill IDs, unions their source names, deduplicates and sorts them. BasicSkill selects ui.navigation plus the eight native platform sources below; Photography adds actions.camera, ui.camera and ui.album; RobotInteraction adds actions.robot. Current ApplicationControl, HistoryQuery and ExpressionInteraction add no source names. Releasing a Skill changes future selection without removing the source registration or stopping its owner.
+The effective loaded Skills' useStates are unioned, deduplicated and sorted on each actual request. BasicSkill selects agents.applicationcontrol, ui.navigation and eight platform.system.* sources. ExpressionInteraction selects ui.home.expression; RobotInteraction explicitly selects actions.robot and actions.robot.motion; Photography selects actions.camera/ui.camera/ui.album; ApplicationControl and HistoryQuery add no State source. Release changes subsequent disclosure without stopping a producer or removing its registration.
 
-Collection first captures the session generation and selected callbacks under a synchronous lock, then reads sources sequentially without holding the lock across await. It checks cancellation, source JSON and byte bounds, rechecks session generation, and emits a sorted named JSON object. There is no stored fact cache, subscription fan-out, Signal, Action call or automatic source discovery. An owner determines its snapshot consistency; the collection is not atomic across owners or with the private Agent snapshot.
-
-The registry permits 256 sources and 64 active sessions. One request selects at most 32 unique names; one source is limited to 8 KiB and aggregate facts to 16 KiB. Chat additionally limits the full AGENT CONTEXT plus CURRENT STATE block to 16 KiB. Duplicate/invalid registrations, unknown selected names, encoding, cancellation, stale session and capacity errors propagate. Closing and reopening the same session name creates a new generation and rejects old collection; global close releases sessions and callbacks permanently.
+Missing observations remain null/unknown. Availability describes selected observation coverage, not execution permission or physical readiness. Source errors propagate. Nested location and motor-target fields are also explicit. The registry bounds 256 sources, 64 sessions, 32 selected names, 8 KiB/source and 16 KiB total; Chat's complete dynamic block also has a 16 KiB bound. Collection reads sequentially outside the registry lock, checks cancellation and validates the session generation afterward. No fact cache, stream, polling, Signal or Action is created.
 
 ## Native platform sources
 
-App injects PlatformStateReading into AgentContainer; The [Support adapter](../AgentPlatformState.swift) registers eight platform.* capabilities alongside the five existing business/UI sources. PlatformKit returns one bounded JSON object without an Agent schema. The adapter rejects oversized/non-object payloads, then wraps the object as availability=available/value without base64 conversion. Here availability means the fact query succeeded: a denied permission, unknown battery or unobserved network/interruption remains explicit inside the value. Root unavailability and real encoding/read failures propagate.
-
-| Source | Native owner and value |
-| --- | --- |
-| platform.time | Core: one current Date/time zone, offset-bearing Gregorian localDateTime to seconds, English weekday and timeZone ID. |
-| platform.power | Core: batteryLevel or null, batteryState and lowPowerMode. |
-| platform.thermal | Core: OS thermal state, including unknown future cases. |
-| platform.network | Connectivity: latest path status, interface types, expensive/constrained and last observedAt; unknown until the active monitor reports. |
-| platform.permissions | Platform root composes Vision camera/Photos levels, Audio microphone and Connectivity Bluetooth authorization. Querying does not request access. |
-| platform.audio | Audio: current application route port types, inputMuted and observed interrupted or null. No activation or capture start. |
-| platform.locale | Core: locale identifier, preferredLanguage and region; not geolocation or user instructions. |
-| platform.accessibility | Core: VoiceOver, reduceMotion, closedCaptions and monoAudio flags. |
-
-BasicSkill's source declaration makes these facts available to every skills-enabled Basic request, including ReACT. Each request reads again; the registry caches no native values. SDK observers retain bounded latest event facts under Platform lifetime, separate from that registry. No Signal, Gateway/Actions call, periodic model trigger, location/motion capture or magnetic attachment inference is added. The finite source enum and SDK ownership live in [PlatformKit](../../../PlatformKit/README.md#native-state-port).
+Native sources retain PlatformKit ownership. The root catalog locates one source without sampling other sources or starting any monitor/device. Existing SDK observations follow their original lifecycle; state reads do not request permission, activate capture/audio, scan or probe. Time/permission/path unknowns remain factual data, not authorizations. See [PlatformKit](../../../PlatformKit/README.md#native-state-port).
 
 ## Private Task and Skill projection
 
@@ -178,3 +165,10 @@ Private Task/Skill transitions, retained history and actual execution outcomes c
 ### Current facts before explicit queries
 
 BasicSkill uses sufficient CURRENT STATE facts directly before function/Skill selection. The role-owned application summary, passive platform.* facts and selected UI/business snapshots are read for each actual request; reading an observed value does not force its native producer to update. Query Actions provide missing/stale details only under their specific contracts. They may share an owner with State without creating duplicate state. No generic environment query is exposed or registered. Queries cannot override unknown/unavailable readiness, initiate undeclared probes or replace actual effect feedback. The context builder does not suppress model calls automatically; normal catalog/authorization validation rejects removed addresses.
+
+## Reflexivity disclosure boundary
+
+The producer classifies its own complete node data; Assistant chooses Business fields only after the exact Skill selection. Child indices and runtime reader references are separate from state values. Internal programs can explicitly traverse indices through App diagnostics and choose different data; their traversal/summary is never inherited by Assistant. Changes to Task/Skill/catalog and native effect validation retain their independent contracts.
+
+
+residentSnapshot() returns the last initialized committed Context without acquiring the transaction slot, restoring persistence or mutating state. Before initialization it returns nil; an in-flight commit leaves the previous committed value readable. Role State reads use their owning Agent’s residentContext() accessor; Agent start() performs the existing initialization through snapshot(). Operational snapshot()/transaction semantics remain unchanged, including validation, recovery and explicit persistence failure.

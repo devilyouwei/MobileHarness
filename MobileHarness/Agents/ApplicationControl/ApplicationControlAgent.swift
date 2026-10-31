@@ -955,6 +955,11 @@ public actor ApplicationControlAgent: Agent {
             lifecycle: lifecycle, queuedInputs: pending.count + diagnosticCalls.count, processedInputs: processed)
     }
 
+    /// Passive State reflection, independent of persistence initialization.
+    public func residentContext() async -> AgentContext<ApplicationControlContextState>? {
+        await contextRepository.residentSnapshot()
+    }
+
     public func contextSnapshot() async throws -> AgentContext<ApplicationControlContextState> {
         try await contextRepository.snapshot()
     }

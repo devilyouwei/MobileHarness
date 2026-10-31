@@ -172,6 +172,10 @@ ProviderSettingsClient, ModelResourcesClient and UI interaction workflows belong
 
 ## Application summary State
 
-applicationState projects the role's existing admitted observation ledger as ContainerContextValue<ApplicationStateSnapshot>. agents.application contains only scene (active/background/unknown), modelPreparation (loading/idle/unknown) and each known field's admitted sequence. No second fact cache, observer, timer, native poll or execution-result lookup is created. Unobserved fields remain unknown; sequences are not wall-clock freshness guarantees. Scene and preparation inputs have closed value sets. The role accepts summaries while running/paused and rejects cold/stopped reads; the owning container checks closure again after await.
+applicationState retains the role's internal admitted observation ledger, including scene, modelPreparation and sequences. The container's complete State puts modelPreparation in Business and scene/sequence metadata in Runtime. Assistant's agents.applicationcontrol source selects modelPreparation only. Unobserved fields remain unknown; running/paused reads never start a cold role. Internal applicationState remains independent of Assistant's selection.
 
 BasicSkill selects the source for every actual model request. Navigation is read directly through ui.navigation; it has no duplicate role environment report. Device/capability observations remain private policy inputs, and actual results remain in the bounded correlated result inbox and feedback/history. Raw observation strings, result IDs and lastDeviceResult are not model State. Specific status/resource/history Actions retain their own detail contracts, without a generic environment query or reverse business callback.
+
+## Passive container state
+
+stateSnapshot projects local installation/closure, Agent lifecycle/queue counters and initialized committed task/Skill fields without message content. residentContext() reads the repository’s last committed memory only; context fields are unknown before initialization. Agent start owns initialization/restoration and its failures. The root catalog binds independent readers without sampling roles or maintaining another mutable role-state registry.

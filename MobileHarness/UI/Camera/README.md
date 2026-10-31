@@ -89,4 +89,8 @@ The macOS GPU regression creates a real hosted layer with explicit bounds and a 
 
 ## Container 上下文
 
-✅ UICameraContainer.ContextSnapshot 显式输出enabled/visible/busy/facing/needsSettings，不包含视频、骨架、错误原文或图像字节；读取无外部效果，状态继续由UI呈现接口维护。
+UICameraContainer.stateSnapshot 在 Business 显式输出 enabled/visible/busy/facing/needsSettings，Runtime 保留呈现 admission；不包含视频、骨架、错误原文或图像字节。读取无外部效果。
+
+## Passive state observation
+
+The owning stateSnapshot entry point reads current local business/capability values and runtime admission/work facts in the owner's isolation domain. It performs no action, acquisition or device activation. The module root composes the explicitly selected fields; unknown diagnostic coverage is not healthy evidence. Domain-specific completion and failure contracts above remain authoritative.

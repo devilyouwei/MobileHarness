@@ -11,7 +11,6 @@ Support owns reusable cognitive input/execution correlation, authorization, rout
 | InputGateway / OutputGateway | Real role/incarnation binding, semantic communication policy, frozen decision/Skill catalogs, Task grants, round/result ownership and explicit scope cancellation. |
 | ActionDispatcher / ToolDispatcher / ExecutionRouter | Cognitive output translation, protocol-specific dispatch and authorized submission to injected neutral Gateway facilities. No raw handlers or function registry. |
 | BehaviorCoverage / OutputValidator | Catalog coverage and cognitive request validation. |
-| AgentPlatformState | App-injected PlatformStateReading adapter, finite native source registration and bounded JSON context wrapping; Context mechanisms remain independent of PlatformKit. |
 | AgentGatewayBindings / AgentBusinessPorts / GatewayProjections | App-bound neutral hosts, generic observation scopes and immutable catalog. GatewayProjections owns all cognitive-to-neutral call/envelope and outcome conversion in one place. |
 | ActionActivityWorkflow / ActionActivityPresentation | Passive Agent/Task activity projection into UI values, never callable native/business execution. |
 | AgentContainerLifecycle | Coalesced startup/transition/cleanup/shutdown tasks, revision fencing and preserved failure. |
@@ -38,4 +37,10 @@ ContainerFailureChannel retains 128 records and at most 64 pending deliveries, e
 
 Role shutdown cancels only owned work and never shuts down a borrowed global scheduler/transport. App retains terminal and cleanup ports through downstream root shutdown, then unbinds. No shared adapter searches a container or directly operates a device. See [Agents](../README.md) and the [overall design](../../README.md).
 
-Application summaries are read directly from the owning ApplicationControl role through agents.application. AgentBusinessPorts carries no generic environment/result reader into Actions. Specific query submission still uses the frozen catalog and neutral Gateway interfaces; result observations retain their actual call correlation.
+Assistant reads the owning ApplicationControl Business facts through agents.applicationcontrol on the unified State read path. AgentBusinessPorts carries no generic environment/result reader into Actions. Specific query submission still uses the frozen catalog and neutral Gateway interfaces; result observations retain their actual call correlation.
+
+## Reflexive health evidence
+
+AgentContainerLifecycle retains actual execution/cleanup failure independently from ordinary unavailable/stopped/cancelled controls. ContainerFailureRecord retains first occurrence alongside the existing latest occurrence and repeat count; publication/suppression remains unchanged. This journal is historical evidence, not a second authority for current domain health. Current role snapshots read their owned status/context directly.
+
+Assistant-specific State selection lives in AssistantStateBindings, outside shared Support. AgentStateContext enforces registration/session/size contracts only. Camera/device lifecycle ports no longer carry model-only context methods; App injects the complete State inspector separately.

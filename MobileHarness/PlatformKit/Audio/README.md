@@ -81,6 +81,16 @@ Native data/observation capabilities remain independent of business and transpor
 
 ## Passive application audio facts
 
-NativeAudioState is owned by AudioContainer and observed only during the Platform root's active lifetime. It reads current AVAudioSession input/output port types and AVAudioApplication input mute without activating a session or changing category/mode. Native port names and UIDs are excluded. Microphone authorization is queried without requesting permission.
+NativeAudioState is owned by AudioContainer and observed only during the Platform root's active lifetime. The root collection samples AVAudioSession input/output port types and AVAudioApplication input mute at start and native change events without activating a session or changing category/mode. Native port names and UIDs are excluded. Microphone authorization is seeded without requesting permission, then refreshed after native permission completion and foreground reconciliation. AudioContainer State reads that same resident permission sample, returning unknown before start or after invalidation.
 
-Two NotificationCenter observers synchronously update one generation-fenced interruption value: begin=true, end=false, and media-service reset=unknown. Before an observed event and after suspension/replacement, interruption is unknown rather than an assumed normal state. No per-notification Task or event queue is added. Invalidation clears the generation before removing observers; old callbacks cannot affect the next lifetime. These facts do not claim listening intent, capture readiness, audible playback or reply ownership, which remain with their existing owners.
+Three NotificationCenter observers synchronously update one generation-fenced interruption value: begin=true, end=false, and media-service loss/reset=unknown. Before an observed event and after suspension/replacement, interruption is unknown rather than an assumed normal state. No per-notification Task or event queue is added. Invalidation clears the generation before removing observers; old callbacks cannot affect the next lifetime. These facts do not claim listening intent, capture readiness, audible playback or reply ownership, which remain with their existing owners.
+
+## Passive state observation
+
+The owning stateSnapshot entry point reads current local business/capability values and runtime admission/work facts in the owner's isolation domain. It performs no action, acquisition or device activation. The module root composes the explicitly selected fields; unknown diagnostic coverage is not healthy evidence. Domain-specific completion and failure contracts above remain authoritative.
+
+State classifies microphone authorization as Business; scope owner/counts and admission as Runtime.
+
+Permission State projections read cached observations only. Unavailable owner scope remains unknown; an admitted cached-source/schema failure propagates through the standard throwing snapshot method instead of being converted to unknown.
+
+The Runtime scope owner is encoded using Scope.rawValue with a finite descriptor vocabulary (voice, diagnostic, detection, camera), independently of debug descriptions.

@@ -43,3 +43,5 @@ Completed scope: [NexArm 位置跟随平滑与设备约束](../../completed/NexA
 Completed scope: [NexArm 通用设备反馈与连接错误归属](../../completed/NexArm-Device-Feedback-Ownership.md)。
 
 Completed scope: [NexArm motor teaching and regression](../../completed/NexArm-Robot-Skill-Teaching.md): parameter/Skill teaching, relative motion and bounded model validation; residual model failures remain documented.
+
+- [Container reflexivity](Container-Reflexivity.md): local state ownership, internal recursive reads and Skill-selected disclosure.

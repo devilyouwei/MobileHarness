@@ -1,7 +1,7 @@
 {
   "version": 3,
   "id": "application-control",
-  "revision": 11,
+  "revision": 14,
   "description": "Conversational page navigation, resource/provider/Bluetooth status and explicit supported device/resource operations.",
   "dependencies": [],
   "useActions": [

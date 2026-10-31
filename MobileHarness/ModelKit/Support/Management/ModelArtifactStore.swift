@@ -89,6 +89,19 @@ public actor ModelArtifactStore {
         }
         try await storage.saveTransfers(records)
     }
+    public struct StateSnapshot: Sendable {
+        public let restored: Bool
+        public let queued: Int
+        public let transfers: Int
+        public let deleting: Int
+        public let failures: Int
+        public let closed: Bool
+    }
+    public func stateSnapshot() -> StateSnapshot {
+        StateSnapshot(
+            restored: restored, queued: queue.count, transfers: transfers.count, deleting: deleting.count,
+            failures: failures.count, closed: closing)
+    }
     public func snapshots() async throws -> [ModelArtifactSnapshot] {
         try admit()
         defer { releaseAdmission() }

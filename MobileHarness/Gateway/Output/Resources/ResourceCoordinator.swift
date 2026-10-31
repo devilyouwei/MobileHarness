@@ -53,6 +53,18 @@ public actor ResourceCoordinator {
     private var closed = false
     public private(set) var cleanupFailure: GatewayFailure?
 
+    public func stateSnapshot() async throws -> GatewayStateSnapshot {
+        try Task.checkCancellation()
+        return GatewayStateSnapshot(
+            path: "gateway.resources",
+            runtime: [
+                "holdings": .count(holdings.count), "leases": .count(leases.count),
+                "uses": .count(uses.count), "cleanups": .count(cleanups.count),
+                "closed": .flag(closed),
+            ],
+            health: cleanupFailure == nil ? .unknown : .fault,
+            issues: cleanupFailure == nil ? [] : [.init(code: "cleanupFailed", impact: "resourceReleaseUnconfirmed")])
+    }
     public init(definitions: [ResourceDefinition], admission: GatewayAdmission? = nil) throws {
         self.admission = admission
         guard definitions.count <= 64 else {

@@ -3,12 +3,12 @@ import Observation
 
 /// Display-only values; the App maps native capture facts and Agent observations here.
 public struct AudioDetectionSnapshot: Sendable, Equatable {
-    public enum Input: Sendable { case unknown, builtInMicrophone, headset, external }
-    public enum Support: Sendable { case unknown, supported, unsupported, inputUnavailable }
-    public enum Capture: Sendable { case waiting, spatial, mono }
-    public enum Fallback: Sendable { case inputUnavailable, unsupported, startupFailed }
-    public enum Signal: Sendable { case waiting, receiving, noAudio }
-    public enum Direction: Sendable { case waiting, active, inactive, uncertain, unavailable }
+    public enum Input: String, CaseIterable, Sendable { case unknown, builtInMicrophone, headset, external }
+    public enum Support: String, CaseIterable, Sendable { case unknown, supported, unsupported, inputUnavailable }
+    public enum Capture: String, CaseIterable, Sendable { case waiting, spatial, mono }
+    public enum Fallback: String, CaseIterable, Sendable { case inputUnavailable, unsupported, startupFailed }
+    public enum Signal: String, CaseIterable, Sendable { case waiting, receiving, noAudio }
+    public enum Direction: String, CaseIterable, Sendable { case waiting, active, inactive, uncertain, unavailable }
     public var permissionGranted: Bool?
     public var input: Input = .unknown
     public var support: Support = .unknown
@@ -28,10 +28,65 @@ public struct AudioDetectionSnapshot: Sendable, Equatable {
 @MainActor
 @Observable
 public final class AudioDetectionState {
+    public func stateSnapshot() async throws -> UIStateSnapshot {
+        try Task.checkCancellation()
+        let observation = snapshot
+        let now = ContinuousClock.now
+        let age = observation.capturedAt.map { $0.duration(to: now) }
+        let seconds = age.map { max(0, Double($0.components.seconds) + Double($0.components.attoseconds) / 1e18) }
+        let directionFresh: UIStateSnapshot.Value =
+            observation.direction == .active
+            ? observation.directionExpiresAt.map { .flag(now < $0) } ?? .unknown : .flag(false)
+        return .init(
+            path: "ui.diagnostics.audio",
+            business: [
+                "input": .text(observation.input.rawValue), "signal": .text(observation.signal.rawValue),
+                "direction": .text(observation.direction.rawValue), "level": .number(observation.level),
+                "azimuthDegrees": observation.azimuthDegrees.map { .number($0) } ?? .unknown,
+                "elevationDegrees": observation.elevationDegrees.map { .number($0) } ?? .unknown,
+                "permissionGranted": observation.permissionGranted.map { .flag($0) } ?? .unknown,
+                "sampleAgeSeconds": seconds.map { .number($0) } ?? .unknown,
+                "signalFresh": seconds.map { .flag($0 <= 1) } ?? .unknown,
+                "directionFresh": directionFresh,
+            ],
+            runtime: [
+                "phase": .text(phase.rawValue), "support": .text(observation.support.rawValue),
+                "capture": .text(observation.capture.rawValue), "sampleRate": .count(observation.sampleRate),
+                "fallback": observation.fallback.map { .text($0.rawValue) } ?? .unknown,
+                "available": .flag(isPresentationAvailable),
+            ],
+            meanings: [
+                "business.direction":
+                    "Retained direction observation; directionFresh determines whether the angle evidence is current",
+                "business.level":
+                    "Displayed level; signalFresh distinguishes recent sample evidence from retained display values",
+                "business.signalFresh":
+                    "A sample receipt exists with age at most one second; unknown before receipt",
+                "business.directionFresh":
+                    "Active direction has a future expiry deadline; unknown without that deadline",
+                "runtime.phase": "Diagnostic workflow phase, not a user listening/speaking phase",
+            ],
+            units: [
+                "business.azimuthDegrees": "degrees", "business.elevationDegrees": "degrees",
+                "runtime.sampleRate": "Hz", "business.sampleAgeSeconds": "seconds",
+            ],
+            stateValues: [
+                "business.input": AudioDetectionSnapshot.Input.allCases.map(\.rawValue),
+                "business.signal": AudioDetectionSnapshot.Signal.allCases.map(\.rawValue),
+                "business.direction": AudioDetectionSnapshot.Direction.allCases.map(\.rawValue),
+                "runtime.phase": AudioDetectionState.Phase.allCases.map(\.rawValue),
+                "runtime.support": AudioDetectionSnapshot.Support.allCases.map(\.rawValue),
+                "runtime.capture": AudioDetectionSnapshot.Capture.allCases.map(\.rawValue),
+                "runtime.fallback": AudioDetectionSnapshot.Fallback.allCases.map(\.rawValue),
+            ])
+    }
+
     @ObservationIgnored var presentationAdmission: UIPresentationAdmission?
     public var isPresentationAvailable: Bool { presentationAdmission.map { $0.started && !$0.stopped } ?? true }
 
-    public enum Phase { case idle, preparing, running, stopping, finished, stopped, failed }
+    public enum Phase: String, CaseIterable, Sendable {
+        case idle, preparing, running, stopping, finished, stopped, failed
+    }
     public internal(set) var phase: Phase = .idle
     public internal(set) var snapshot = AudioDetectionSnapshot()
     public internal(set) var error: String?

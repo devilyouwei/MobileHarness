@@ -78,3 +78,5 @@
 | 8 `codex/state-triggers` | 从已交付场景选择事实与触发，明确唯一写入源、触发授权、去重/限频/容量和重启行为 | 实际场景需求；不是前述功能的统一阻塞项 |
 
 每个代码分支：先更新拥有目录 README（跨模块先更新总体设计），实现并清除替代路径，执行 check.sh 和可用的 build-ios.sh；报告实际通过、失败与未执行项。行为变化增加有意义的回归测试。真实模型、原生 UI、物理动作和功耗/内存/热状态独立记录，不能用构建代替。必要验收未完成时保留需求开放。每个阶段收尾再决定下一支，不创建后台自动任务或自动合并。
+
+- Container reflexivity: implementation and acceptance are tracked in [the technical requirement](requirements/technical/Container-Reflexivity.md); [validation evidence](validation/Container-Reflexivity.md) separates automated/build results from native/model/device acceptance.

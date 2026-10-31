@@ -7,6 +7,11 @@ public actor DirectExecutionDispatcher {
     private let executor: ActionsExecutionPort
     private let resources: ResourceCoordinator
     private let admission: GatewayAdmission
+    public func stateSnapshot() async throws -> GatewayStateSnapshot {
+        try Task.checkCancellation()
+        return GatewayStateSnapshot(
+            path: "gateway.direct", runtime: ["executing": .count(work.count), "closed": .flag(closed)])
+    }
     private var work: [UUID: Task<ActionCompletion, any Error>] = [:]
     private var closed = false
     init(

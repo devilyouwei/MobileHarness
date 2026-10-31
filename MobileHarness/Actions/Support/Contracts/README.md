@@ -43,3 +43,5 @@ ActionRequestSlot admits only matching request/session once. Completion is rejec
 Prepared credentials are opaque to callers even though they travel as value types: only the owning root can resolve the retained UUID/catalog revision, and execution consumes it once. Cancellation/rejection/stop discards retained data. Gateway uses returned resource descriptors for arbitration; Actions rechecks live permits and business conditions. Result retries never reuse execution credentials.
 
 [Support algorithms](../README.md) · [Actions root](../../README.md) · [overall chain](../../../README.md)
+
+Connection and recovery fact enums expose stable raw values and finite cases for State metadata. Connection facts describe link workflow, independently from physical motion outcomes.

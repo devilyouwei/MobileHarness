@@ -1,13 +1,228 @@
+import Actions
 import AgentCore
+import AppStorage
 import Foundation
+import Gateway
+import ModelKitDefaults
+import PlatformKit
+import Storage
 import Synchronization
 import Testing
 
 @testable import Agents
+@testable import UI
 
 private enum ContextFixtureFailure: Error { case encoding }
 private struct FailingContext: Encodable, Sendable {
     func encode(to encoder: any Encoder) throws { throw ContextFixtureFailure.encoding }
+}
+
+@Test func reflexivitySevenSchemasPreserveTheSameWireContractAndExactCounters() throws {
+    let snapshots: [any Encodable & Sendable] = [
+        ActionsStateSnapshot(path: "actions", runtime: ["revision": .unsigned(.max)]),
+        AgentStateSnapshot(path: "agents", runtime: ["revision": .unsigned(.max)]),
+        GatewayStateSnapshot(path: "gateway", runtime: ["revision": .unsigned(.max)]),
+        ModelStateSnapshot(path: "model", runtime: ["revision": .unsigned(.max)]),
+        PlatformStateSnapshot(path: "platform", runtime: ["revision": .unsigned(.max)]),
+        StorageStateSnapshot(path: "storage", runtime: ["revision": .unsigned(.max)]),
+        UIStateSnapshot(path: "ui", runtime: ["revision": .unsigned(.max)]),
+    ]
+    let expected: Set<String> = [
+        "path", "business", "runtime", "health", "issues", "children", "collectedAt", "meanings", "units",
+        "stateValues",
+    ]
+    for snapshot in snapshots {
+        let data = try JSONEncoder().encode(snapshot)
+        let object = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        #expect(Set(object.keys) == expected)
+        let decoded = try JSONDecoder().decode(AppStorage.ApplicationStateSnapshot.self, from: data)
+        #expect(decoded.runtime["revision"] == .unsigned(UInt64.max))
+        #expect(decoded.business.isEmpty && decoded.children.isEmpty && decoded.health == .unknown)
+        let roundTrip = try JSONDecoder().decode(
+            AppStorage.ApplicationStateSnapshot.self, from: JSONEncoder().encode(decoded))
+        #expect(roundTrip.runtime["revision"] == .unsigned(UInt64.max))
+    }
+}
+
+@Test @MainActor func reflexivityStorageDirectChildrenReturnTheSameClassifiedContractAsTheTree() async throws {
+    let location = URL.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    let root = ApplicationContainer(root: location).storage()
+    let own = try await root.stateSnapshot()
+    let readers = try await root.stateReaders()
+    #expect(own.children.map(\.path) == ["storage.cache", "storage.files", "storage.database"])
+    for reference in own.children {
+        let read = try #require(readers[reference.path])
+        let child = try await read()
+        #expect(child.path == reference.path && child.business.isEmpty && !child.runtime.isEmpty)
+        let encoded = try JSONSerialization.jsonObject(with: JSONEncoder().encode(reference)) as? [String: Any]
+        #expect(Set(encoded?.keys.map { $0 } ?? []) == ["path"])
+    }
+    #expect(!FileManager.default.fileExists(atPath: location.path))
+}
+
+@Test @MainActor func reflexivityDiagnosticWorkAndConfigurationAreRuntimeWhileMeasurementsAreBusiness() async throws {
+    let root = UIContainer()
+    try root.start()
+    root.diagnostics.speech.presentRunning(true)
+    root.diagnostics.speech.presentStopping(true)
+    var observation = AudioDetectionSnapshot()
+    observation.input = .external
+    observation.capture = .spatial
+    observation.support = .supported
+    observation.signal = .receiving
+    observation.direction = .active
+    observation.sampleRate = 48000
+    observation.azimuthDegrees = 30
+    observation.capturedAt = .now.advanced(by: .seconds(-2))
+    observation.directionExpiresAt = .now.advanced(by: .seconds(-1))
+    observation.permissionGranted = true
+    root.diagnostics.audioDetection.present(.snapshot(observation))
+    root.diagnostics.audioDetection.present(.phase(.running))
+    let diagnostic = try await root.diagnostics.speech.stateSnapshot()
+    let audio = try await root.diagnostics.audioDetection.stateSnapshot()
+    #expect(diagnostic.business.isEmpty && diagnostic.runtime["running"] == .flag(true))
+    #expect(audio.business["azimuthDegrees"] == .number(30) && audio.business["input"] == .text("external"))
+    #expect(audio.runtime["phase"] == .text("running") && audio.runtime["sampleRate"] == .count(48000))
+    #expect(audio.business["signalFresh"] == .flag(false) && audio.business["directionFresh"] == .flag(false))
+    #expect(root.diagnostics.audioDetection.snapshot.direction == .active)
+    #expect(audio.business["capture"] == nil && audio.business["support"] == nil && audio.business["phase"] == nil)
+    #expect(audio.stateDescriptor.stateValues["runtime.phase"]?.contains("stopping") == true)
+}
+
+@Test @MainActor func reflexivityFormFailureIsABusinessOutcomeRatherThanPresentationHealth() async throws {
+    let root = UIContainer()
+    try root.start()
+    root.settings.state.present(.error("Provider discovery failed"))
+    root.modelResources.state.present(.error("Invalid source endpoint"))
+    let settings = try await root.settings.stateSnapshot()
+    let resources = try await root.modelResources.stateSnapshot()
+    #expect(settings.business["problem"] == .text("settingsOperationFailed"))
+    #expect(resources.business["problem"] == .text("resourceSettingsOperationFailed"))
+    #expect(settings.health == .unknown && resources.health == .unknown)
+    #expect(!String(decoding: try JSONEncoder().encode(settings), as: UTF8.self).contains("Provider discovery failed"))
+}
+
+@Test func reflexivityMotorBusinessOutcomesDoNotPublishInternalFailureCodes() throws {
+    for code in [
+        "targetNotReached", "timedOut", "cancelled", "feedbackLost", "disconnected", "sendingFailed", "admissionFailed",
+        "feedbackFailed",
+    ] {
+        let object: [String: Any] = ["step": 0, "motor": 1, "target": 1000, "started": true, "failure": code]
+        let result = try JSONDecoder().decode(
+            NexArmMotorResult.self, from: JSONSerialization.data(withJSONObject: object))
+        switch code {
+        case "targetNotReached": #expect(result.outcome == .notReached)
+        case "timedOut": #expect(result.outcome == .timedOut)
+        case "cancelled": #expect(result.outcome == .cancelled)
+        default: #expect(result.outcome == .unconfirmed)
+        }
+        #expect(result.failure?.rawValue == code)
+    }
+}
+
+@Test @MainActor func reflexivityInspectionRejectsAmbiguousCategoriesAndInvalidReflectionMetadata() async throws {
+    for node in [
+        UIStateSnapshot(path: "ui", business: ["phase": .text("visible")], runtime: ["phase": .text("running")]),
+        UIStateSnapshot(path: "ui", meanings: ["business.missing": "Undeclared attribute"]),
+        UIStateSnapshot(
+            path: "ui", runtime: ["phase": .text("typo")], stateValues: ["runtime.phase": ["cold", "running"]]),
+    ] {
+        let inspection = ApplicationStateInspection()
+        try inspection.registerRoot("ui") { node }
+        await #expect(throws: StateInspectionError.invalidSnapshot) { try await inspection.snapshot(path: "ui") }
+    }
+}
+
+@Test func assistantStateBindingsSelectOnlyBusinessAndKeepNestedFieldsExplicit() async throws {
+    let reads = FixtureFactCell([String]())
+    let expression = FixtureFactCell("smile")
+    let context = AgentStateContext()
+    try AssistantStateBindings.register(in: context) { path in
+        reads.update { $0.append(path) }
+        return AgentStateSnapshot(
+            path: path,
+            business: [
+                "effective": .text(expression.read()), "base": .text("smile"),
+                "operation": .text("hiddenLegacyAlbumOperation"),
+                "rendererAvailable": .text("hiddenBusinessField"),
+                "current": .object([
+                    "page": .text("albumPhoto"), "itemID": .text("photo1"), "queue": .text("hiddenNestedField"),
+                ]),
+            ],
+            runtime: ["effective": .text("hiddenRuntime"), "queue": .count(123)],
+            health: .fault, issues: [.init(code: "hiddenHealth", impact: "hiddenImpact")],
+            children: [.init(path: path + ".hiddenChild")], meanings: ["business.effective": "hiddenMetadata"])
+    }
+    try context.open(session: "assistant")
+    let first = try await context.snapshot(session: "assistant", names: ["ui.home.expression"])
+    #expect(first.contains("\"effective\":\"smile\""))
+    #expect(!first.contains("hidden") && !first.contains("queue") && !first.contains("health"))
+    expression.update { $0 = "sad" }
+    let second = try await context.snapshot(session: "assistant", names: ["ui.home.expression", "ui.navigation"])
+    #expect(second.contains("\"effective\":\"sad\"") && second.contains("\"itemID\":\"photo1\""))
+    #expect(!second.contains("hidden") && !second.contains("queue"))
+    #expect(reads.read() == ["ui.home.expression", "ui.home.expression", "ui.navigation"])
+}
+
+@Test func assistantStateBindingsPreserveUnknownAndDoNotTurnDiagnosticsIntoBusinessDamage() async throws {
+    let context = AgentStateContext()
+    try AssistantStateBindings.register(in: context) { path in
+        AgentStateSnapshot(
+            path: path, runtime: ["closed": .flag(true), "queue": .count(1)], health: .fault,
+            issues: [.init(code: "cleanupFailure", impact: "diagnosticOnly")])
+    }
+    try context.open(session: "assistant")
+    let unknown = try await context.snapshot(session: "assistant", names: ["ui.home.expression"])
+    #expect(unknown.contains("\"availability\":\"unknown\""))
+    #expect(!unknown.contains("cleanupFailure") && !unknown.contains("closed") && !unknown.contains("diagnosticOnly"))
+    await #expect(throws: ContainerContextError.missing) {
+        try await context.snapshot(session: "assistant", names: ["system.health"])
+    }
+}
+
+@Test func assistantStateBindingsSelectParentAndChildIndependently() async throws {
+    let reads = FixtureFactCell([String]())
+    let context = AgentStateContext()
+    try AssistantStateBindings.register(in: context) { path in
+        reads.update { $0.append(path) }
+        return AgentStateSnapshot(
+            path: path, business: ["connected": .flag(true), "targetCounts": .object(["1": .count(1000)])],
+            children: [.init(path: path + ".motor1")])
+    }
+    try context.open(session: "assistant")
+    let parent = try await context.snapshot(session: "assistant", names: ["actions.robot"])
+    #expect(reads.read() == ["actions.robot"])
+    #expect(!parent.contains("motor1") && !parent.contains("targetCounts"))
+    let motion = try await context.snapshot(session: "assistant", names: ["actions.robot.motion"])
+    #expect(motion.contains("1000") && reads.read() == ["actions.robot", "actions.robot.motion"])
+}
+
+@Test func assistantStateBindingsPropagateReadFailuresAndRespectSourceSelection() async throws {
+    let context = AgentStateContext()
+    try AssistantStateBindings.register(in: context) { _ in throw ContextFixtureFailure.encoding }
+    try context.open(session: "assistant")
+    #expect(try await context.snapshot(session: "assistant", names: []) == "{}")
+    await #expect(throws: ContextFixtureFailure.self) {
+        try await context.snapshot(session: "assistant", names: ["actions.robot"])
+    }
+}
+
+@Test @MainActor func reflexivityRuntimeCountersRemainAvailableWithoutBusinessClassification() async throws {
+    let actions = ActionsContainer()
+    let snapshot = try await actions.stateSnapshot()
+    #expect(snapshot.business.isEmpty)
+    #expect(snapshot.runtime["prepared"] == .count(0) && snapshot.runtime["executing"] == .count(0))
+    let ui = UIContainer()
+    try ui.start()
+    ui.navigation.state.show(.album)
+    let navigation = try await ui.navigation.stateSnapshot()
+    #expect(navigation.business["operation"] == nil)
+    #expect(try await ui.album.stateSnapshot().business["operation"] == .unknown)
+    #expect(navigation.business["path"] == .texts(["settings", "album"]))
+    #expect(navigation.business["phase"] == .text("transitioning"))
+    #expect(navigation.runtime["available"] == .flag(true))
+    #expect(try await ui.home.stateSnapshot().business["ready"] == nil)
+    await ui.stop()
 }
 private actor ContextReadBarrier {
     private var entered = false
@@ -133,19 +348,23 @@ private actor ContextReadBarrier {
     try skills.initialize(fixed: fixed, baseSkills: ["basic-skill"])
     #expect(
         try AgentSkillLoader.useStates(skills.loaded)
-            == (AgentPlatformState.sourceNames + ["agents.application", "ui.navigation"]).sorted())
+            == (AssistantStateBindings.sourceNames.filter { $0.hasPrefix("platform.") } + [
+                "agents.applicationcontrol", "ui.navigation",
+            ]).sorted())
     _ = try skills.control("loadSkills", arguments: ["skills": "[\"photography\"]"], inputID: "input", fixed: fixed)
     let names = try AgentSkillLoader.useStates(skills.loaded)
     #expect(
         names
-            == (AgentPlatformState.sourceNames + [
-                "actions.camera", "agents.application", "ui.album", "ui.camera", "ui.navigation",
+            == (AssistantStateBindings.sourceNames.filter { $0.hasPrefix("platform.") } + [
+                "actions.camera", "agents.applicationcontrol", "ui.album", "ui.camera", "ui.navigation",
             ]).sorted())
     _ = try skills.control("releaseSkills", arguments: ["skills": "[\"photography\"]"], inputID: "input", fixed: fixed)
     owner.camera.update { $0.running = true }
     #expect(
         try AgentSkillLoader.useStates(skills.loaded)
-            == (AgentPlatformState.sourceNames + ["agents.application", "ui.navigation"]).sorted())
+            == (AssistantStateBindings.sourceNames.filter { $0.hasPrefix("platform.") } + [
+                "agents.applicationcontrol", "ui.navigation",
+            ]).sorted())
     #expect(try await context.snapshot(session: "one", names: ["actions.camera"]).contains("\"running\":true"))
 }
 
@@ -181,4 +400,274 @@ private actor ContextReadBarrier {
     }
     json["version"] = 2
     #expect(throws: AgentConfigurationError.self) { try decode() }
+}
+
+@Test @MainActor func reflexivityReadsExpressionOwnerAndRestoresBase() async throws {
+    let ui = UIContainer()
+    try ui.start()
+    let home = ui.home
+    let read = try #require(try await home.stateReaders()["ui.home.expression"])
+    home.conversation.isVoiceActive = true
+    home.expressions.setBase(.smile)
+    #expect(try await read().business["base"] == .text("smile"))
+    #expect(try await read().business["effective"] == .text("smile"))
+    home.conversation.expressionRendererAvailable = true
+    let performance = Task { try await home.expressions.perform(.sad, owner: "test") }
+    while try await read().business["transitioning"] != .flag(true) { await Task.yield() }
+    #expect(try await read().business["overridden"] == .flag(true))
+    #expect(try await read().business["effective"] == .text("sad"))
+    performance.cancel()
+    _ = await performance.result
+    try await home.expressions.restore(owner: "test", accepts: false)
+    #expect(try await read().business["overridden"] == .flag(false))
+    #expect(try await read().business["effective"] == .text("smile"))
+    let children = try await ui.stateSnapshot().children.map(\.path)
+    #expect(children.count == 9 && Set(children).count == 9)
+    await ui.stop()
+}
+
+@Test @MainActor func reflexivityColdReadsDoNotPrepareModelsOrNativeDrivers() async throws {
+    let prepared = FixtureFactCell(0)
+    let model = ModelContainer(
+        resources: .temporaryDirectory,
+        prepareArtifacts: {
+            prepared.update { $0 += 1 }
+            throw ContextFixtureFailure.encoding
+        })
+    #expect(try await model.stateSnapshot().children.count == 4)
+    #expect(try await model.language.stateSnapshot().runtime["assembled"] == .flag(false))
+    _ = try await model.stateReaders()
+    #expect(prepared.read() == 0)
+    let platform = PlatformContainer()
+    #expect(try await platform.stateSnapshot().children.count == 4)
+    let reader = try #require(try await platform.stateReaders()["platform.connectivity.nexarm"])
+    let arm = try await reader()
+    #expect(arm.business["positionsCounts"] == .unknown)
+    #expect(arm.business["feedbackFresh"] == .flag(false))
+    #expect(platform.connectivity.bluetooth.reflectedState?.snapshot()?.revision == 0)
+}
+
+@Test @MainActor func reflexivityTreeBoundsPartialFailureAndExplicitFields() async throws {
+    let inspector = ApplicationStateInspection()
+    let calls = FixtureFactCell([String]())
+    try inspector.registerRoot(
+        "ui",
+        readers: {
+            [
+                "ui": { @Sendable in
+                    calls.update { $0.append("ui") }
+                    return UIStateSnapshot(path: "ui", children: [.init(path: "ui.home")])
+                },
+                "ui.home": { @Sendable in
+                    calls.update { $0.append("ui.home") }
+                    return UIStateSnapshot(
+                        path: "ui.home", business: ["ready": .flag(true)], children: [.init(path: "ui.home.expression")]
+                    )
+                },
+                "ui.home.expression": { @Sendable in
+                    calls.update { $0.append("ui.home.expression") }
+                    return UIStateSnapshot(path: "ui.home.expression", business: ["effective": .text("smile")])
+                },
+            ]
+        })
+    try inspector.registerRoot("model") { () throws -> UIStateSnapshot in throw ContextFixtureFailure.encoding }
+    let leaf = try await inspector.snapshot(path: "ui.home.expression")
+    #expect(leaf.business["effective"] == .text("smile"))
+    #expect(calls.read() == ["ui.home.expression"])
+    let own = try await inspector.snapshot(path: "ui")
+    #expect(own.children.map(\.path) == ["ui.home"] && calls.read() == ["ui.home.expression", "ui"])
+    let zero = try await inspector.inspectTree(path: "ui.home", depth: 0)
+    #expect(zero.children.isEmpty && zero.state.children.count == 1)
+    #expect(try await inspector.describe(path: "ui.home").children.first?.path == "ui.home.expression")
+    #expect(try await inspector.snapshot(path: "model").readFailure == "ownerReadFailed")
+    await #expect(throws: StateInspectionError.missing) { try await inspector.snapshot(path: "ui.missing") }
+    await #expect(throws: StateInspectionError.capacityExceeded) {
+        try await inspector.inspectTree(path: "ui", depth: 17)
+    }
+    let tree = try await inspector.inspectTree(path: "ui")
+    #expect(tree.nodeCount == 3)
+    let summary = try await inspector.healthSummary()
+    #expect(summary.unknown && summary.entries.isEmpty)
+}
+
+@Test @MainActor func reflexivityTreeRejectsOversizeDuplicatePathsAndCancellation() async throws {
+    let oversized = ApplicationStateInspection()
+    try oversized.registerRoot("ui") {
+        UIStateSnapshot(path: "ui", business: ["large": .text(String(repeating: "x", count: 256 * 1024))])
+    }
+    await #expect(throws: StateInspectionError.capacityExceeded) { try await oversized.snapshot(path: "ui") }
+    let duplicate = ApplicationStateInspection()
+    try duplicate.registerRoot("ui") {
+        UIStateSnapshot(path: "ui", children: [.init(path: "ui.home"), .init(path: "ui.home")])
+    }
+    await #expect(throws: StateInspectionError.invalidSnapshot) { try await duplicate.snapshot(path: "ui") }
+    let cancelled = Task { @MainActor in
+        withUnsafeCurrentTask { $0?.cancel() }
+        return try await duplicate.snapshot(path: "ui")
+    }
+    await #expect(throws: CancellationError.self) { try await cancelled.value }
+}
+
+@Test @MainActor func reflexivityHealthIsBoundedAndDoesNotClaimUnknownIsHealthy() async throws {
+    let inspector = ApplicationStateInspection()
+    try inspector.registerRoot(
+        "ui",
+        readers: {
+            var readers: [String: UIStateSnapshot.Reader] = [
+                "ui": { .init(path: "ui", children: (0..<10).map { .init(path: "ui.capability" + String($0)) }) }
+            ]
+            for index in 0..<10 {
+                readers["ui.capability" + String(index)] = {
+                    .init(
+                        path: "ui.capability" + String(index), health: index == 9 ? .fault : .limited,
+                        issues: [.init(code: "test", impact: "blocked")])
+                }
+            }
+            return readers
+        })
+    let summary = try await inspector.healthSummary()
+    #expect(summary.total == 10 && summary.entries.count == 8 && summary.omitted == 2)
+    #expect(summary.entries.first?.severity == "fault" && summary.unknown)
+}
+
+@Test(.actionCatalog) func reflexivityDisclosureFollowsEffectiveSkillsAndRelease() async throws {
+    let fixed = try AssistantAgent.runtimeCapabilities(AgentConfigurations.load(named: "Assistant").capabilities)
+    var skills = AgentTaskSkillState()
+    try skills.initialize(fixed: fixed, baseSkills: ["basic-skill"])
+    let basic = try AgentSkillLoader.useStates(skills.loaded)
+    #expect(!basic.contains("system.health"))
+    #expect(
+        !basic.contains("ui.home.expression") && !basic.contains("actions.robot")
+            && !basic.contains("system.diagnostics"))
+    _ = try skills.control(
+        "loadSkills", arguments: ["skills": "[\"expression-interaction\"]"], inputID: "input", fixed: fixed)
+    #expect(try AgentSkillLoader.useStates(skills.loaded).contains("ui.home.expression"))
+    _ = try skills.control(
+        "releaseSkills", arguments: ["skills": "[\"expression-interaction\"]"], inputID: "input", fixed: fixed)
+    #expect(!((try AgentSkillLoader.useStates(skills.loaded)).contains("ui.home.expression")))
+}
+
+@Test @MainActor func reflexivityAllModuleShapesComposeWithoutCreatingStorage() async throws {
+    let location = URL.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    let registry = ApplicationContainer(root: location)
+    let ui = registry.ui()
+    let platform = registry.platform()
+    let model = registry.model()
+    let storage = registry.storage()
+    let actions = registry.actions()
+    let gateway = registry.gateway()
+    let inspector = ApplicationStateInspection()
+    try inspector.registerRoot("ui", readers: { try await ui.stateReaders() })
+    try inspector.registerRoot("platform", readers: { try await platform.stateReaders() })
+    try inspector.registerRoot("model", readers: { try await model.stateReaders() })
+    try inspector.registerRoot("storage", readers: { try await storage.stateReaders() })
+    try inspector.registerRoot("actions", readers: { try await actions.stateReaders() })
+    try inspector.registerRoot("gateway", readers: { try await gateway.stateReaders() })
+    try inspector.registerRoot("agents") { AgentStateSnapshot(path: "agents") }
+    #expect(inspector.rootPaths.count == 7)
+    var all: [AppStorage.ApplicationStateSnapshot] = []
+    func nodes(_ tree: ApplicationStateInspection.Tree) -> [AppStorage.ApplicationStateSnapshot] {
+        [tree.state] + tree.children.flatMap(nodes)
+    }
+    for path in inspector.rootPaths { all += nodes(try await inspector.inspectTree(path: path)) }
+    #expect(all.allSatisfy { $0.readFailure == nil })
+    for node in all where node.path.hasPrefix("gateway") { #expect(node.business.isEmpty && !node.runtime.isEmpty) }
+    let cache = try #require(all.first { $0.path == "storage.cache" })
+    #expect(cache.business.isEmpty && cache.runtime["maximumBytes"] != nil)
+    let language = try #require(all.first { $0.path == "model.language" })
+    #expect(language.business.isEmpty && language.runtime["assembled"] == .flag(false))
+    let audio = try #require(all.first { $0.path == "platform.audio" })
+    #expect(audio.business["microphoneAuthorization"] != nil && audio.business["owner"] == nil)
+    #expect(!FileManager.default.fileExists(atPath: location.path))
+    #expect(
+        try await inspector.describe(path: "ui.home.expression").stateValues["business.effective"]?.contains("smile")
+            == true)
+}
+
+@Test @MainActor func reflexivityDiagnosticHistoryKeepsEvidenceWithoutLeakingMessages() async throws {
+    let failures = ContainerFailureChannel()
+    let inspector = ApplicationStateInspection(failures: failures)
+    try inspector.registerRoot("ui") { UIStateSnapshot(path: "ui", health: .unknown) }
+    for index in 0..<40 {
+        _ = failures.report(
+            module: "ui", component: "capability", operation: "test\(index)",
+            error: ContextFixtureFailure.encoding)
+    }
+    let data = try await inspector.diagnosticProjection()
+    #expect(data.count <= 8192)
+    let object = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
+    let history = try #require(object["history"] as? [[String: Any]])
+    #expect(!history.isEmpty && history.count <= 32)
+    #expect((object["omittedHistory"] as? Int) == 40 - history.count)
+    #expect(
+        history.allSatisfy {
+            $0["firstOccurred"] != nil && $0["lastOccurred"] != nil && ($0["status"] as? String) == "historical"
+        })
+    #expect(!String(decoding: data, as: UTF8.self).contains("encoding"))
+    #expect(try await inspector.healthSummary().entries.isEmpty)
+}
+
+@Test(.actionCatalog) func singleNodeSkillsDeclareCanonicalChildrenWithoutAncestorOrSummaryGrants() throws {
+    #expect(try AgentConfigurations.skill("expression-interaction").useStates == ["ui.home.expression"])
+    let robot = try AgentConfigurations.skill("robot-interaction").useStates
+    #expect(robot == ["actions.robot", "actions.robot.motion"])
+    let skillIDs = [
+        "basic-skill", "expression-interaction", "robot-interaction", "photography", "application-control",
+        "history-query",
+    ]
+    let selected = try Set(skillIDs.flatMap { try AgentConfigurations.skill($0).useStates })
+    #expect(selected == Set(AssistantStateBindings.sourceNames))
+    #expect(!selected.contains("ui") && !selected.contains("ui.home"))
+    #expect(!selected.contains("system.health") && !selected.contains("system.diagnostics"))
+}
+
+@Test @MainActor func singleNodeReaderCapabilitiesDoNotRetainReleasedContainers() async throws {
+    func makeReader() -> UIStateSnapshot.Reader {
+        let owner = UIContainer()
+        return UIStateSnapshot.reader(of: owner) { try await $0.stateSnapshot() }
+    }
+    let read = makeReader()
+    await #expect(throws: UIStateSnapshot.ReadError.self) { try await read() }
+}
+
+@Test @MainActor func reflexivitySpeechRoutingPreferencesRemainRuntimeAndDoNotPrepareProviders() async throws {
+    let prepared = FixtureFactCell(0)
+    let root = ModelContainer(
+        resources: .temporaryDirectory,
+        prepareArtifacts: {
+            prepared.update { $0 += 1 }
+            throw ContextFixtureFailure.encoding
+        })
+    try await root.speech.configure(recognition: true, synthesis: false)
+    let first = try await root.speech.stateSnapshot()
+    #expect(first.business.isEmpty)
+    #expect(first.runtime["preferCustomRecognition"] == .flag(true))
+    #expect(first.runtime["preferCustomSynthesis"] == .flag(false))
+    try await root.speech.configure(recognition: false, synthesis: true)
+    let second = try await root.speech.stateSnapshot()
+    #expect(second.business.isEmpty)
+    #expect(second.runtime["preferCustomRecognition"] == .flag(false))
+    #expect(second.runtime["preferCustomSynthesis"] == .flag(true))
+    #expect(prepared.read() == 0)
+    try await root.stop()
+}
+
+@Test @MainActor func assistantStateSelectionDoesNotAlterTheProducersFullState() async throws {
+    let root = UIContainer()
+    try root.start()
+    root.home.conversation.expressionRendererAvailable = true
+    root.home.expressions.setBase(.smile)
+    let inspection = ApplicationStateInspection()
+    try inspection.registerRoot("ui", readers: { try await root.stateReaders() })
+    let full = try await inspection.snapshot(path: "ui.home.expression")
+    #expect(full.runtime["rendererAvailable"] == .flag(true))
+    let context = AgentStateContext()
+    try AssistantStateBindings.register(in: context) { path in try await inspection.snapshot(path: path) }
+    try context.open(session: "decoupling")
+    let assistant = try await context.snapshot(session: "decoupling", names: ["ui.home.expression"])
+    #expect(assistant.contains("smile") && !assistant.contains("rendererAvailable"))
+    let after = try await inspection.snapshot(path: "ui.home.expression")
+    #expect(after.business == full.business && after.runtime == full.runtime)
+    context.close()
+    await root.stop()
 }

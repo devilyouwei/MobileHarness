@@ -101,3 +101,7 @@ The worker advances after synthesis terminal state without waiting for playback.
 ## 错误呈现与接口
 
 播放清理后的文案适配由 [SpeechPerception/SpeechPlaybackFailure](../SpeechPerception/SpeechPlaybackFailure.swift) 拥有，合成角色保留 producer 原始失败，不依赖 UI 或原生播放。通信见 [Agent.json](../../Resources/Agents/SpeechSynthesis/Agent.json)。
+
+## Passive container state
+
+stateSnapshot projects local installation/closure and existing work or Agent lifecycle/queue counters directly from memory. Reading starts no role, persistence restoration or inference. Initialization remains in the existing owner lifecycle. The root catalog binds independent readers without sampling roles or maintaining another mutable role-state registry.

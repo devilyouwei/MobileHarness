@@ -266,7 +266,7 @@ let package = Package(
                 "AgentResourceBindings.swift", "ActionServiceAdapters.swift", "ApplicationActionAssembly.swift",
                 "ApplicationPresentation.swift",
             ],
-            sources: ["ApplicationContainer.swift"]),
+            sources: ["ApplicationContainer.swift", "ApplicationStateInspection.swift"]),
         .target(
             name: "ModelKit", dependencies: [], path: "MobileHarness/ModelKit",
             exclude: [

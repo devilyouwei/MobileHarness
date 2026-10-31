@@ -250,6 +250,23 @@ public protocol ProviderRequestFailure: Error {
 
 @MainActor
 public final class UISettingsContainer {
+    public func stateSnapshot() async throws -> UIStateSnapshot {
+        try Task.checkCancellation()
+        return UIStateSnapshot(
+            path: "ui.settings",
+            business: [
+                "enabled": .flag(state.isEnabled),
+                "problem": state.error == nil ? .unknown : .text("settingsOperationFailed"),
+                "loading": .flag(state.isLoading), "saving": .flag(state.isSaving),
+            ], runtime: ["available": .flag(state.isPresentationAvailable)],
+            meanings: [
+                "business.enabled":
+                    "Cloud-provider switch in the current editable settings draft; not saved configuration or module readiness",
+                "business.loading": "Provider/model discovery currently shown by the settings workflow",
+                "business.saving": "Settings save in progress; not proof the draft is persisted",
+            ])
+    }
+
     public let requests = UIRequests<SettingsInput, SettingsReply>()
 
     public let state: SettingsState

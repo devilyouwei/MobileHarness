@@ -128,3 +128,15 @@ Control requests use a separate single-slot stream under the same consumer lifet
 ✅ NavigationContext.swift 定义类型化页面、对象ID、内容状态、覆盖层和操作值。NavigationState唯一持有路径及确认事实；路径变化更新代际并进入transitioning，匹配页面确认后settled。UIKit／SwiftUI展示仍由UI拥有；基础模块不导入AgentCore。
 
 导航settled表示SwiftUI页面已出现，不承诺转场动画或GPU完成。未提供内容事实的页面为idle，不推测其异步业务已完成。
+
+## Reflexive state reads
+
+`UIContainer.stateSnapshot() async throws` returns its own lifecycle facts and indices for nine stable child containers using local UIStateSnapshot. Public business fields are explicit projections; settings keys, URLs, draft models, chat captions and media bytes are excluded. Admission and rejected-update counts are runtime facts. Settings/resource operation errors and album load failures are domain outcomes, without inferring presentation-health damage. Current UI values remain MainActor-owned.
+
+Home indexes an independent expression node owned by ConversationExpressionPresentation's actual base/override owner. Its effective expression is the display target, not a pixel receipt. [Conversation](Conversation/README.md) defines transition and restoration semantics.
+
+Business describes visible page/content/operation, expression intent, camera presentation and user activity. Admission/readiness fences, renderer availability and recovery machinery are Runtime. Navigation State reads only its owned path/phase/location/overlay/content; album content/operation is separately ui.album-owned. Navigation exposes no album operation field. Domain presentation DTOs remain UI interfaces; State reading does not expose a separate Assistant view.
+
+Diagnostic execution/configuration is Runtime; sensory observations are Business. Operation errors in settings or album content are domain outcomes, not evidence of a broken presentation container. State enums use declared raw values rather than debug descriptions; descriptors provide meanings, units and finite values.
+
+All Containers use stateSnapshot() async throws and return only local data plus child indices. stateReaders() binds existing owners for direct canonical path lookup. UIHome does not sample expression, and Diagnostics does not sample speech/audio child State. Navigation reads its owned admitted context; current album operation is separately ui.album-owned. Descriptors come from sampled values.

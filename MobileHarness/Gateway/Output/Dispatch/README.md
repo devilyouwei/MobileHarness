@@ -9,3 +9,7 @@ ChannelScheduler owns scheduled ordering and uses the same neutral preparation/e
 [Results/ExecutionResult.swift](../Results/ExecutionResult.swift) owns the terminal outcome contract, preserving execution/path/owner/envelope, status, effect, completion and failure separately. The asynchronous return path does not introduce a reverse implementation dependency. Real report failures are retained even during cancellation, and result retry never repeats effects.
 
 [Output](../README.md) · [Scheduling](../Scheduling/README.md) · [Actions contracts](../../../Actions/Support/Contracts/README.md)
+
+## Passive state observation
+
+The owning stateSnapshot entry point reads current local business/capability values and runtime admission/work facts in the owner's isolation domain. It performs no action, acquisition or device activation. The module root composes the explicitly selected fields; unknown diagnostic coverage is not healthy evidence. Domain-specific completion and failure contracts above remain authoritative.

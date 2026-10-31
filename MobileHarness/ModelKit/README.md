@@ -185,3 +185,15 @@ The artifact capability exposes independent bounded newest-one revision observat
 ## Direct container contract
 
 Artifact revision observers are independently bounded to 16 newest-one streams. Native progress coalesces synchronously, changes wake consumers without JSON polling, and close ends observation. Current cross-module ownership is defined by the [overall design](../README.md).
+
+## Reflexive state reads
+
+The root and four child ports expose module-local ModelStateSnapshot through stateSnapshot() async throws. Root and capability snapshots return local assembly/preferences/instrumentation and resource path indices only. stateReaders() binds existing resource identities through ModelManager.resourceIDs without sampling phase/lease data or constructing providers. Each selected resource reads its own status/lease directly. No read calls prepare, provider resolution, artifact restoration, load or file probing. Actual lifecycle/cleanup failures remain local health; retained operation failure counts remain Runtime.
+
+The scope's assembled flag means a manager was successfully published by preparation; an unobserved pending/completed assembly task is not treated as a published resource fact. Stopped is the admission fence; cleanupJoined separately confirms joined shutdown.
+
+Registration/resource phases, inference lease/activity indicators, preparation waiters and artifact transfer/deletion/failure counts are Runtime. Speech backend-routing preferences are Runtime configuration, even when a user-facing settings workflow changes them. Editable UI drafts remain owned by UI. Engineering failures are health evidence, not an automatic assertion that a business resource is unavailable.
+
+ModelState Runtime values and resource-child phases use the declared raw-value vocabulary with finite descriptor values, independently of domain preferences and inference results.
+
+Retained artifact-operation failure counts remain Runtime; they do not establish current ModelKit health. Explicit root lifecycle/cleanup failure remains independently reported.

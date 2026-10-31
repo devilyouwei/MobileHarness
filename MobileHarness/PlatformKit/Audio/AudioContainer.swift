@@ -3,13 +3,29 @@ import Foundation
 /// Finite named native scopes. The session fence rejects conflicting owners rather than replacing them.
 @MainActor
 public final class AudioContainer {
-    public enum Scope: CaseIterable, Sendable { case voice, diagnostic, detection, camera }
+    public func stateSnapshot() async throws -> PlatformStateSnapshot {
+        try Task.checkCancellation()
+        let facts: [String: PlatformStateSnapshot.Value] = [
+            "microphoneAuthorization": .text(try microphoneAuthorization)
+        ]
+        var runtime: [String: PlatformStateSnapshot.Value] = ["available": .flag(admission.isOpen)]
+        var stateValues: [String: [String]] = [:]
+        #if os(iOS)
+            stateValues["runtime.owner"] = Scope.allCases.map(\.rawValue)
+            runtime["owner"] = owner.map { .text($0.rawValue) } ?? .unknown
+            runtime["createdScopes"] = .count(instances.count)
+        #endif
+        return PlatformStateSnapshot(
+            path: "platform.audio", business: facts, runtime: runtime, stateValues: stateValues)
+    }
+    public enum Scope: String, CaseIterable, Sendable { case voice, diagnostic, detection, camera }
     private let admission: PlatformAdmission
     private let systemState = NativeAudioState()
     func startStateObservation() { systemState.start() }
     func invalidateStateObservation() { systemState.stop() }
     func systemSnapshot() throws -> Data { try systemState.snapshot() }
-    var microphoneAuthorization: String { NativeAudioState.microphoneAuthorization }
+    var readMicrophoneAuthorization: () throws -> String = { "unknown" }
+    var microphoneAuthorization: String { get throws { try readMicrophoneAuthorization() } }
     #if os(iOS)
         private var instances: [Scope: AppleAudioIO] = [:]
         private var cues: [Scope: NativeCuePlayback] = [:]

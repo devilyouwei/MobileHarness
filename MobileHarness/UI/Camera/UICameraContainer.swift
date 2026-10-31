@@ -64,6 +64,18 @@ public protocol CameraPresenting: AnyObject, Sendable {
 public final class UICameraContainer: CameraPresenting, CameraFactsObserving {
     public let requests = UIRequests<CameraInput, String?>()
 
+    public func stateSnapshot() async throws -> UIStateSnapshot {
+        try Task.checkCancellation()
+        return UIStateSnapshot(
+            path: "ui.camera",
+            business: [
+                "enabled": .flag(state.isEnabled), "visible": .flag(state.isVisible),
+                "busy": .flag(state.isBusy || state.controlBusy || state.photoBusy),
+                "facing": .text(state.facing == .front ? "front" : "back"), "needsSettings": .flag(state.needsSettings),
+            ],
+            runtime: ["available": .flag(state.isPresentationAvailable)])
+    }
+
     public let state: CameraState
     public private(set) var isAvailable = false
     private var stopped = false
@@ -78,19 +90,6 @@ public final class UICameraContainer: CameraPresenting, CameraFactsObserving {
             guard let self else { return }
             for observer in self.factObservers.values { observer.yield(self.snapshot) }
         }
-    }
-    public struct ContextSnapshot: Encodable, Sendable, Equatable {
-        public let enabled: Bool
-        public let visible: Bool
-        public let busy: Bool
-        public let facing: String
-        public let needsSettings: Bool
-    }
-    public func contextSnapshot() -> ContextSnapshot {
-        ContextSnapshot(
-            enabled: state.isEnabled, visible: state.isVisible,
-            busy: state.isBusy || state.controlBusy || state.photoBusy,
-            facing: state.facing == .front ? "front" : "back", needsSettings: state.needsSettings)
     }
     public var snapshot: CameraPresentationSnapshot { CameraPresentationSnapshot(state) }
     public func present(_ update: CameraPresentationUpdate) {

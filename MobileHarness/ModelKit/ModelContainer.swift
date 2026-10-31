@@ -55,8 +55,10 @@ public struct ModelArtifactConfiguration: Sendable {
     public let artifacts: ModelArtifactsContainer
     private let scope: ModelScope
     private let admission: InferenceAdmission
+    private var rootFailure: ModelFailure?
     private var started = false
     private var stopped = false
+    private var cleanupJoined = false
     private var suspension: Task<Void, Never>?
     private var shutdown: Task<Void, Error>?
     public init(
@@ -74,6 +76,31 @@ public struct ModelArtifactConfiguration: Sendable {
         vision = ModelVisionContainer(scope: scope)
         artifacts = ModelArtifactsContainer(scope: scope)
     }
+    public func stateSnapshot() async throws -> ModelStateSnapshot {
+        try Task.checkCancellation()
+        return ModelStateSnapshot(
+            path: "model",
+            runtime: ["started": .flag(started), "stopped": .flag(stopped), "cleanupJoined": .flag(cleanupJoined)],
+            health: rootFailure == nil ? .unknown : .fault,
+            issues: rootFailure.map { [.init(code: $0.code.rawValue, impact: "modelCapabilityUnavailable")] } ?? [],
+            children: ["model.language", "model.speech", "model.vision", "model.artifacts"].map { .init(path: $0) })
+    }
+    public func stateReaders() async throws -> [String: ModelStateSnapshot.Reader] {
+        var readers: [String: ModelStateSnapshot.Reader] = [
+            "model": ModelStateSnapshot.reader(of: self) { try await $0.stateSnapshot() },
+            "model.language": ModelStateSnapshot.reader(of: language) { try await $0.stateSnapshot() },
+            "model.speech": ModelStateSnapshot.reader(of: speech) { try await $0.stateSnapshot() },
+            "model.vision": ModelStateSnapshot.reader(of: vision) { try await $0.stateSnapshot() },
+            "model.artifacts": ModelStateSnapshot.reader(of: artifacts) { try await $0.stateSnapshot() },
+        ]
+        for (component, capabilities) in [
+            ("language", [ProvidedCapability.chat]), ("speech", [.recognition, .synthesis, .voiceActivity]),
+            ("vision", [.pose]),
+        ] {
+            readers.merge(try await scope.resourceStateReaders(component, capabilities: capabilities)) { _, new in new }
+        }
+        return readers
+    }
     public func start() async throws(ModelFailure) {
         do {
             guard !stopped else { throw InferenceAdmissionError.stopped }
@@ -83,7 +110,9 @@ public struct ModelArtifactConfiguration: Sendable {
             started = true
             // Foreground is granted by the lifecycle graph, after all required starts succeed.
         } catch {
-            throw scope.report("root", "start", error)
+            let failure = scope.report("root", "start", error)
+            if failure.code == .cleanupFailed || failure.code == .executionFailed { rootFailure = failure }
+            throw failure
         }
     }
     public func invalidate() {
@@ -101,7 +130,9 @@ public struct ModelArtifactConfiguration: Sendable {
                 try admission.resume()
             }
         } catch {
-            throw scope.report("root", "setForeground", error)
+            let failure = scope.report("root", "setForeground", error)
+            if failure.code == .cleanupFailed || failure.code == .executionFailed { rootFailure = failure }
+            throw failure
         }
     }
     public func handleMemoryPressure() async { await scope.memoryPressure() }
@@ -117,8 +148,11 @@ public struct ModelArtifactConfiguration: Sendable {
             }
             shutdown = task
             try await task.value
+            cleanupJoined = true
         } catch {
-            throw scope.report("root", "stop", error)
+            let failure = scope.report("root", "stop", error)
+            if failure.code == .cleanupFailed || failure.code == .executionFailed { rootFailure = failure }
+            throw failure
         }
     }
 }
@@ -129,6 +163,7 @@ private actor ModelScope {
     let selection = SpeechSelection()
     let failure: @Sendable (String, String, any Error) -> Void
     private let prepareArtifacts: (@Sendable () async throws -> ModelArtifactConfiguration)?
+    private var preparedManager: ModelManager?
     private var assembly: Task<ModelManager, Error>?
     private var closed = false
     private var waiters = 0
@@ -143,6 +178,51 @@ private actor ModelScope {
         self.admission = admission
         self.prepareArtifacts = prepareArtifacts
         failure = onFailure
+    }
+    func stateSnapshot(_ component: String, capabilities: [ProvidedCapability]) async throws -> ModelStateSnapshot {
+        try Task.checkCancellation()
+        var runtime: [String: ModelStateSnapshot.Value] = [:]
+        let ids = await preparedManager?.resourceIDs(capabilities: Set(capabilities)) ?? []
+        let children = ids.map { ModelStateSnapshot.Reference(path: "model." + component + "." + $0) }
+        if component == "speech" {
+            let preferences = await selection.stateSnapshot()
+            runtime["preferCustomRecognition"] = .flag(preferences.recognition)
+            runtime["preferCustomSynthesis"] = .flag(preferences.synthesis)
+        }
+        if component == "artifacts", let value = await preparedManager?.artifactStateSnapshot() {
+            runtime.merge([
+                "restored": .flag(value.restored), "queued": .count(value.queued), "transfers": .count(value.transfers),
+                "deleting": .count(value.deleting), "failures": .count(value.failures), "closed": .flag(value.closed),
+            ]) { _, new in new }
+        }
+        try Task.checkCancellation()
+        return ModelStateSnapshot(
+            path: "model." + component,
+            runtime: runtime.merging([
+                "assembled": .flag(preparedManager != nil), "closed": .flag(closed),
+                "preparationWaiters": .count(waiters), "updating": .flag(updating),
+            ]) { _, new in new },
+            children: children)
+    }
+    func resourceStateReaders(_ component: String, capabilities: [ProvidedCapability]) async throws -> [String:
+        ModelStateSnapshot.Reader]
+    {
+        guard let manager = preparedManager else { return [:] }
+        let ids = await manager.resourceIDs(capabilities: Set(capabilities))
+        return Dictionary(
+            uniqueKeysWithValues: ids.map { id in
+                let path = "model." + component + "." + id
+                return (
+                    path,
+                    ModelStateSnapshot.reader(of: manager) { owner in
+                        let value = try await owner.resourceStateSnapshot(id)
+                        return .init(
+                            path: path,
+                            runtime: ["phase": .text(value.phase), "inferenceActive": .flag(value.inferenceActive)],
+                            stateValues: ["runtime.phase": ModelState.allCases.map(\.rawValue)])
+                    }
+                )
+            })
     }
     func prepare() async throws -> ModelManager {
         try admission.checkAlive()
@@ -182,6 +262,7 @@ private actor ModelScope {
         let manager = try await assembly.value
         try Task.checkCancellation()
         guard !closed else { throw InferenceAdmissionError.stopped }
+        preparedManager = manager
         return manager
     }
     @discardableResult nonisolated func report(
@@ -288,6 +369,11 @@ private actor ModelScope {
 }
 
 public final class ModelLanguageContainer: ModelLanguageProviding, Sendable {
+    public func stateSnapshot() async throws -> ModelStateSnapshot {
+        try Task.checkCancellation()
+        return try await scope.stateSnapshot("language", capabilities: [.chat])
+    }
+
     private let scope: ModelScope
     fileprivate init(scope: ModelScope) { self.scope = scope }
     public var availability: CapabilityAvailability {
@@ -334,6 +420,11 @@ public final class ModelLanguageContainer: ModelLanguageProviding, Sendable {
 }
 
 public final class ModelSpeechContainer: ModelSpeechProviding, Sendable {
+    public func stateSnapshot() async throws -> ModelStateSnapshot {
+        try Task.checkCancellation()
+        return try await scope.stateSnapshot("speech", capabilities: [.recognition, .synthesis, .voiceActivity])
+    }
+
     private let scope: ModelScope
     public let recognition: any SpeechRecognitionCapability
     public let synthesis: any SpeechSynthesisCapability
@@ -466,6 +557,11 @@ private struct ActivitySession: VoiceActivitySession {
     func cancel() async { await session.cancel() }
 }
 public final class ModelVisionContainer: ModelVisionProviding, Sendable {
+    public func stateSnapshot() async throws -> ModelStateSnapshot {
+        try Task.checkCancellation()
+        return try await scope.stateSnapshot("vision", capabilities: [.pose])
+    }
+
     private let scope: ModelScope
     fileprivate init(scope: ModelScope) { self.scope = scope }
     public var availability: CapabilityAvailability {
@@ -493,6 +589,11 @@ public final class ModelVisionContainer: ModelVisionProviding, Sendable {
     }
 }
 public final class ModelArtifactsContainer: ModelArtifactsManaging, Sendable {
+    public func stateSnapshot() async throws -> ModelStateSnapshot {
+        try Task.checkCancellation()
+        return try await scope.stateSnapshot("artifacts", capabilities: [])
+    }
+
     private let scope: ModelScope
     fileprivate init(scope: ModelScope) { self.scope = scope }
     public func prepare() async throws { try await scope.perform("artifacts", "prepare", inference: false) { _ in } }
@@ -535,5 +636,129 @@ enum DefaultModelAssembly {
             await manager.shutdown()
             throw error
         }
+    }
+}
+
+/// Module-local, explicitly projected facts. This type never inspects private storage.
+public struct ModelStateSnapshot: Codable, Sendable {
+    public struct Reference: Codable, Sendable, Hashable {
+        public let path: String
+        public init(path: String) { self.path = path }
+    }
+    public enum ReadError: Error, Sendable { case ownerReleased }
+    public typealias Reader = @Sendable () async throws -> ModelStateSnapshot
+    /// Runtime capability only. Serialization carries Reference indices, never owner objects.
+    public static func reader<Owner: AnyObject & Sendable>(
+        of owner: Owner, read: @escaping @Sendable (Owner) async throws -> ModelStateSnapshot
+    ) -> Reader {
+        { [weak owner] in
+            try Task.checkCancellation()
+            guard let owner else { throw ReadError.ownerReleased }
+            return try await read(owner)
+        }
+    }
+    public indirect enum Value: Codable, Sendable, Equatable {
+        case text(String)
+        case flag(Bool)
+        case count(Int)
+        case unsigned(UInt64)
+        case number(Double)
+        case integers([Int])
+        case texts([String])
+        case object([String: Value])
+        case array([Value])
+        case unknown
+        public init(from decoder: any Decoder) throws {
+            let value = try decoder.singleValueContainer()
+            if value.decodeNil() {
+                self = .unknown
+            } else if let flag = try? value.decode(Bool.self) {
+                self = .flag(flag)
+            } else if let count = try? value.decode(Int.self) {
+                self = .count(count)
+            } else if let unsigned = try? value.decode(UInt64.self) {
+                self = .unsigned(unsigned)
+            } else if let number = try? value.decode(Double.self) {
+                self = .number(number)
+            } else if let integers = try? value.decode([Int].self) {
+                self = .integers(integers)
+            } else if let texts = try? value.decode([String].self) {
+                self = .texts(texts)
+            } else if let object = try? value.decode([String: Value].self) {
+                self = .object(object)
+            } else if let array = try? value.decode([Value].self) {
+                self = .array(array)
+            } else {
+                self = .text(try value.decode(String.self))
+            }
+        }
+        public func encode(to encoder: any Encoder) throws {
+            var value = encoder.singleValueContainer()
+            switch self {
+            case .text(let item): try value.encode(item)
+            case .flag(let item): try value.encode(item)
+            case .count(let item): try value.encode(item)
+            case .unsigned(let item): try value.encode(item)
+            case .number(let item): try value.encode(item)
+            case .integers(let item): try value.encode(item)
+            case .texts(let item): try value.encode(item)
+            case .object(let item): try value.encode(item)
+            case .array(let item): try value.encode(item)
+            case .unknown: try value.encodeNil()
+            }
+        }
+    }
+    public enum Health: String, Codable, Sendable { case healthy, limited, fault, unknown }
+    public struct Issue: Codable, Sendable {
+        public let code: String
+        public let impact: String
+        public init(code: String, impact: String) {
+            self.code = code
+            self.impact = impact
+        }
+    }
+    public struct Descriptor: Codable, Sendable {
+        public let path: String
+        public let business: [String]
+        public let runtime: [String]
+        public let children: [Reference]
+        public let meanings: [String: String]
+        public let units: [String: String]
+        public let stateValues: [String: [String]]
+    }
+    public let path: String
+    public let business: [String: Value]
+    public let runtime: [String: Value]
+    public let health: Health
+    public let issues: [Issue]
+    public let children: [Reference]
+    /// Collection time only; measurement age belongs to the owning business fact.
+    public let collectedAt: Date
+    public let meanings: [String: String]
+    public let units: [String: String]
+    public let stateValues: [String: [String]]
+    public var stateDescriptor: Descriptor {
+        Descriptor(
+            path: path, business: business.keys.sorted(), runtime: runtime.keys.sorted(),
+            children: children, meanings: meanings, units: units,
+            stateValues: stateValues.merging(["health": ["healthy", "limited", "fault", "unknown"]]) { current, _ in
+                current
+            })
+    }
+    public init(
+        path: String, business: [String: Value] = [:], runtime: [String: Value] = [:],
+        health: Health = .unknown, issues: [Issue] = [], children: [Reference] = [],
+        meanings: [String: String] = [:], units: [String: String] = [:], stateValues: [String: [String]] = [:]
+    ) {
+        self.path = path
+        self.meanings = meanings
+        self.units = units
+        self.stateValues = stateValues
+        self.business = business
+        self.runtime = runtime
+        self.health = health
+        self.issues = issues
+        self.children = children
+        collectedAt = Date()
     }
 }

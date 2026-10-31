@@ -127,21 +127,86 @@ public final class NexArmControlService {
         self.makeDeviceRepository = makeDeviceRepository
         state.onFactsChanged = { [weak self] in self?.publishConnectionFacts() }
     }
-    public struct ContextSnapshot: Encodable, Sendable, Equatable {
-        public let connected: Bool
-        public let controlAvailable: Bool
-    }
-    public func contextSnapshot() -> ContainerContextValue<ContextSnapshot> {
+    public func stateSnapshot() async throws -> ActionsStateSnapshot {
+        try Task.checkCancellation()
         let connected = latestLinkSnapshot.phase == .connected
-        let fact = ContextSnapshot(
-            connected: connected,
-            controlAvailable: connected && trackingAvailable && controller != nil
-                && !latestLinkSnapshot.queriesQuarantined && latestLinkSnapshot.feedbackHealthy)
-        let availability: ContextAvailability =
-            state.availability == .unknown
-            ? .unknown
-            : state.availability == .available ? .available : .unavailable
-        return ContainerContextValue(fact, availability: availability)
+        let health: ActionsStateSnapshot.Health =
+            state.recoveryStage == .failed ? .fault : .unknown
+        let age = latestLinkSnapshot.feedbackReceivedAt.map { $0.duration(to: .now) }
+        let seconds = age.map { max(0, Double($0.components.seconds) + Double($0.components.attoseconds) / 1e18) }
+        return ActionsStateSnapshot(
+            path: "actions.robot",
+            business: [
+                "connected": .flag(connected),
+                "controlAvailable": .flag(
+                    connected && trackingAvailable && controller != nil && !latestLinkSnapshot.queriesQuarantined
+                        && latestLinkSnapshot.feedbackHealthy),
+                "phase": .text(state.phase.rawValue),
+                "positionsCounts": connected
+                    ? (latestLinkSnapshot.feedbackPacket?.observedMotorPositions).map { .integers($0) } ?? .unknown
+                    : .unknown,
+                "feedbackAgeSeconds": seconds.map { .number($0) } ?? .unknown,
+                "feedbackFresh": .flag(
+                    connected && latestLinkSnapshot.feedbackPacket?.observedMotorPositions != nil
+                        && seconds.map { $0 <= 2 } == true),
+                "trackingTargetCounts": tracking.goal.map { .integers([$0.base, $0.pitch]) } ?? .unknown,
+                "problem": health == .fault ? .text("robotControlRequiresValidation") : .unknown,
+                "jogging": .flag(state.jogging), "tracking": .flag(tracking.isFollowing),
+                "trackingBaseTargetCounts": tracking.goal.map { .count($0.base) } ?? .unknown,
+                "trackingPitchTargetCounts": tracking.goal.map { .count($0.pitch) } ?? .unknown,
+            ],
+            runtime: [
+                "foreground": .flag(foreground), "cleanupPending": .flag(cleanup != nil),
+                "recovery": .text(state.recoveryStage.rawValue),
+                "connectionID": .text(latestLinkSnapshot.connectionID),
+            ], health: health,
+            issues: health == .fault
+                ? [.init(code: "robotOperationFailed", impact: "robotControlRequiresValidation")] : [],
+            children: [.init(path: "actions.robot.motion")],
+            meanings: [
+                "business.phase": "Connection workflow phase; does not describe physical arm motion",
+                "business.controlAvailable":
+                    "Current control eligibility; not proof of physical safety or target arrival",
+                "business.feedbackFresh":
+                    "A position receipt exists for the connected session with age at most two seconds",
+            ],
+            units: [
+                "business.positionsCounts": "encoder counts",
+                "business.feedbackAgeSeconds": "seconds",
+            ],
+            stateValues: [
+                "business.phase": NexArmConnectionPhase.allCases.map(\.rawValue),
+                "runtime.recovery": NexArmRecoveryStage.allCases.map(\.rawValue),
+            ])
+    }
+
+    public func stateReaders() async throws -> [String: ActionsStateSnapshot.Reader] {
+        var readers: [String: ActionsStateSnapshot.Reader] = [
+            "actions.robot": ActionsStateSnapshot.reader(of: self) { try await $0.stateSnapshot() }
+        ]
+        let readGeneration = generation
+        let paths = ["actions.robot.motion"] + (1...6).map { "actions.robot.motion.motor" + String($0) }
+        let observed = try await controller?.stateReaders() ?? [:]
+        for path in paths {
+            let read = observed[path]
+            readers[path] = ActionsStateSnapshot.reader(of: self) { owner in
+                guard await owner.stateReadIsCurrent(readGeneration), let read else {
+                    return .init(
+                        path: path, runtime: ["created": .flag(false)],
+                        children: path == "actions.robot.motion"
+                            ? (1...6).map { .init(path: path + ".motor" + String($0)) } : [])
+                }
+                let value = try await read()
+                guard await owner.stateReadIsCurrent(readGeneration) else {
+                    return .init(path: path, runtime: ["available": .flag(false)])
+                }
+                return value
+            }
+        }
+        return readers
+    }
+    private func stateReadIsCurrent(_ value: String) -> Bool {
+        generation == value && latestLinkSnapshot.phase == .connected
     }
 
     public func shutdown() async throws {

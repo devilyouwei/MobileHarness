@@ -251,7 +251,9 @@
 
         public func requestPermissions() async throws {
             do {
-                guard await AVAudioApplication.requestRecordPermission() else { throw AudioIOError.microphoneDenied }
+                let granted = await AVAudioApplication.requestRecordPermission()
+                NotificationCenter.default.post(name: NativeStateCollection.permissionsDidChange, object: nil)
+                guard granted else { throw AudioIOError.microphoneDenied }
             } catch {
                 platformAdmission?.report("audio", "requestPermissions", error)
                 throw error

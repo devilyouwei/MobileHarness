@@ -34,3 +34,5 @@ For “所有表情挨个做，边做边说名称”, put each expression and it
 
 ### Workflow boundaries
 This Skill exposes only express and setExpression. Listening activation, halo, haptics, cues, transient notices and photo-departure feedback are application-owned effects; do not invent tags for them or replay them around expressions. Natural reply text is already spoken/displayed by the host.
+
+ui.home.expression.value describes base, effective display target, overridden, transitioning and loading. Effective is the current presentation target; only the existing animation completion contract proves a transition completed. Reading or loading this Skill never changes expression.

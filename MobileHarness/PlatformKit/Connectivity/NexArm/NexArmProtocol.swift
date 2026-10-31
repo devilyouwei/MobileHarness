@@ -11,6 +11,13 @@ public struct NexArmPacket: Equatable, Sendable {
     public let command: UInt8
     public let payload: [UInt8]
 
+    /// Passive validated six-axis feedback, in encoder counts. Never interprets a target command as feedback.
+    public var observedMotorPositions: [Int]? {
+        guard id == 255, command == 11, payload.count == 24 else { return nil }
+        let positions = stride(from: 12, to: 24, by: 2).map { Int(payload[$0]) | Int(payload[$0 + 1]) << 8 }
+        guard positions.allSatisfy(NexArmDeviceLimits.encoderCounts.contains) else { return nil }
+        return positions
+    }
     public init(id: UInt8 = 0xFF, command: UInt8, payload: [UInt8] = []) throws {
         guard payload.count <= 253 else { throw NexArmError.invalidPacket }
         self.id = id
@@ -129,11 +136,7 @@ public struct NexArmTelemetryCache: Sendable {
     public mutating func receive(_ bytes: [UInt8], at time: ContinuousClock.Instant = .now) throws {
         try decoder.append(bytes)
         while let packet = try decoder.next() {
-            guard packet.id == 255, packet.command == 11, packet.payload.count == 24 else { continue }
-            let p = packet.payload
-            guard stride(from: 12, to: 24, by: 2).allSatisfy({ (Int(p[$0]) | Int(p[$0 + 1]) << 8) <= 4095 }) else {
-                continue
-            }
+            guard packet.observedMotorPositions != nil else { continue }
             sequence &+= 1
             latest = NexArmTelemetry(sequence: sequence, receivedAt: time, packet: packet)
         }

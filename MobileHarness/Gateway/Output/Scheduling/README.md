@@ -69,3 +69,7 @@ Suspend cancels and joins preparation and accepted trees without destroying pass
 Pure cancellation remains cancelled without an independent failure. Mixed real failures and child reports remain failed/partialFailure. No automatic effect replay, global fairness queue or Channel-level lease is implied. [Output](../README.md) · [Actions execution](../../../Actions/Support/README.md)
 
 A root-bound enqueue checks the admission fence before allocating preparation work, then checks again within preparation and commit. A request arriving after root suspension is rejected as unavailable rather than starting a task that races suspension cancellation. Work already admitted retains its existing cancellation/join semantics.
+
+## Passive state observation
+
+The owning stateSnapshot entry point reads current local business/capability values and runtime admission/work facts in the owner's isolation domain. It performs no action, acquisition or device activation. The module root composes the explicitly selected fields; unknown diagnostic coverage is not healthy evidence. Domain-specific completion and failure contracts above remain authoritative.

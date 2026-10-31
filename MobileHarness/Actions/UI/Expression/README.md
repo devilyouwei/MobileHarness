@@ -16,3 +16,7 @@
 | [ExpressionTypes.swift](../../Support/Contracts/ExpressionTypes.swift) | 表情词汇、参数错误及双重清理错误 |
 
 [所属域设计](../README.md) · [Actions 模块](../../README.md)
+
+## State ownership
+
+Expression execution and restoration keep their existing Action completion contracts. The persistent base, temporary override and effective display target are owned by UI ConversationExpressionPresentation, whose explicit snapshot supplies ExpressionInteraction State. Actions keeps no mirrored expression state; loading a Skill or reading State never performs an expression.

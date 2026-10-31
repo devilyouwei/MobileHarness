@@ -18,6 +18,7 @@ import Testing
 
 /// Explicit simulation. Default tests never create a CoreBluetooth manager or move physical hardware.
 private actor BluetoothArmFixture: NexArmBluetoothLink {
+    nonisolated let reflectedState: NexArmBluetoothState? = NexArmBluetoothState()
     var ik = NexArmTestIK()
     private(set) var ikRequests: [NexArmPacket] = []
     private var rejectIK = false
@@ -94,7 +95,10 @@ private actor BluetoothArmFixture: NexArmBluetoothLink {
     nonisolated var businessID: String {
         get throws { "device_1" }
     }
-    var snapshot = NexArmBluetoothSnapshot()
+    func installObservedState(_ value: NexArmBluetoothSnapshot) { snapshot = value }
+    var snapshot = NexArmBluetoothSnapshot() {
+        didSet { reflectedState?.update(snapshot) }
+    }
     var dropPositionReplies = false
     func dropPositions() { dropPositionReplies = true }
     var failNextPosition = false
@@ -3609,23 +3613,68 @@ extension LiveRuntimeTests {
         defer { try? FileManager.default.removeItem(at: file) }
         let link = BluetoothArmFixture()
         let workflow = bluetoothTestWorkflow(link, file: file)
-        func snapshot() throws -> String {
-            String(decoding: try JSONEncoder().encode(workflow.service.contextSnapshot()), as: UTF8.self)
+        func snapshot() async throws -> String {
+            String(decoding: try await JSONEncoder().encode(workflow.service.stateSnapshot()), as: UTF8.self)
         }
-        #expect(try snapshot().contains("unknown"))
+        #expect(try await snapshot().contains("unknown"))
         let observer = Task { await workflow.run() }
         workflow.openPage()
         try await until { !workflow.state.nearby.isEmpty }
         workflow.connect(try link.businessID)
         try await until { workflow.trackingAvailable }
-        let connected = try snapshot()
+        let connected = try await snapshot()
         #expect(connected.contains("\"connected\":true") && connected.contains("\"controlAvailable\":true"))
         workflow.setForeground(false)
-        #expect(try snapshot().contains("\"controlAvailable\":false"))
+        #expect(try await snapshot().contains("\"controlAvailable\":false"))
         try await workflow.shutdown()
-        #expect(try snapshot().contains("\"connected\":false"))
+        #expect(try await snapshot().contains("\"connected\":false"))
         observer.cancel()
         await observer.value
 
     }
+}
+
+@Test @MainActor func reflexivityNativePositionReadsArePassiveFreshnessAwareAndSessionScoped() async throws {
+    let link = BluetoothArmFixture()
+    let root = PlatformContainer(makeConnectivity: { ConnectivityContainer(admission: $0, bluetooth: link) })
+    var native = NexArmBluetoothSnapshot()
+    native.phase = .connected
+    native.power = .poweredOn
+    native.connectionID = "first"
+    var payload = [UInt8](repeating: 0, count: 24)
+    for index in 0..<6 {
+        let position = 1000 + index
+        payload[12 + index * 2] = UInt8(position & 255)
+        payload[13 + index * 2] = UInt8(position >> 8)
+    }
+    native.feedbackPacket = try NexArmPacket(command: 11, payload: payload)
+    native.feedbackReceivedAt = .now.advanced(by: .seconds(-3))
+    await link.installObservedState(native)
+    let readers = try await root.stateReaders()
+    let readArm = try #require(readers["platform.connectivity.nexarm"])
+    let readMotor = try #require(readers["platform.connectivity.nexarm.motor1"])
+    let arm = try await readArm()
+    #expect(arm.business["positionsCounts"] == .integers((1000..<1006).map { $0 }))
+    #expect(arm.business["feedbackFresh"] == .flag(false))
+    #expect(arm.children.count == 6)
+    #expect(try await readMotor().business["positionCounts"] == .count(1000))
+    #expect(arm.business["problem"] == .text("positionFeedbackUnavailable"))
+    native.feedbackReceivedAt = .now
+    native.queriesQuarantined = true
+    native.feedbackHealthy = false
+    native.revision = .max
+    await link.installObservedState(native)
+    let quarantined = try await readArm()
+    #expect(quarantined.business["problem"] == .unknown)
+    #expect(quarantined.business["feedbackFresh"] == .flag(true))
+    #expect(quarantined.runtime["queriesQuarantined"] == .flag(true))
+    #expect(quarantined.runtime["revision"] == .unsigned(UInt64.max))
+    native.phase = .disconnected
+    native.connectionID = "second"
+    await link.installObservedState(native)
+    let disconnected = try await readArm()
+    #expect(disconnected.business["positionsCounts"] == .unknown)
+    #expect(await link.writes == 0)
+    #expect(await link.connects == 0)
+    #expect(await link.observedCommands.isEmpty)
 }

@@ -14,6 +14,9 @@
             let fileExtension = info.mime == "image/png" ? "png" : info.mime == "image/heic" ? "heic" : "jpg"
             try Task.checkCancellation()
             let permission = await PHPhotoLibrary.requestAuthorization(for: .addOnly)
+            await MainActor.run {
+                NotificationCenter.default.post(name: NativeStateCollection.permissionsDidChange, object: nil)
+            }
             guard permission == .authorized || permission == .limited else { throw Failure.permissionDenied }
             // A cancelled permission request must not later issue an album write.
             try Task.checkCancellation()

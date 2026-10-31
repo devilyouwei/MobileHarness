@@ -10,7 +10,6 @@ final class AppCameraAccess: AgentCameraAccess {
     let business: ActionsBusinessAssembly
     var value: CameraCoordinator { business.camera }
     init(_ business: ActionsBusinessAssembly) { self.business = business }
-    func contextSnapshot() async throws -> Data { try await business.cameraContext() }
     func setForeground(_ active: Bool) { value.setForeground(active) }
     func pauseVisionForModelMaintenance() async { await value.pauseVisionForModelMaintenance() }
     func shutdown() async throws { try await value.shutdown() }
@@ -23,7 +22,6 @@ final class AppCameraAccess: AgentCameraAccess {
     var value: BluetoothWorkflow { business.bluetooth }
     var device: NexArmDeviceAdapter { business.device }
     init(_ business: ActionsBusinessAssembly) { self.business = business }
-    func contextSnapshot() async throws -> Data { try await business.deviceContext() }
     func setForeground(_ active: Bool) { value.setForeground(active) }
     func waitUntilIdle() async { await value.waitUntilIdle() }
     func openPage() { value.openPage() }

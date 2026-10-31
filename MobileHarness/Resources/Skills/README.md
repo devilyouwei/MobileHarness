@@ -48,7 +48,7 @@ Skill 是可复用的流程与能力集合，Task 是运行时目标、状态和
 
 ### useStates 与当前事实
 
-BasicSkill读取agents.application、ui.navigation及八个platform.*来源；Photography读取actions.camera、ui.camera、ui.album；RobotInteraction读取actions.robot。加载与依赖合并后去重排序，每次实际模型请求重新读取。CURRENT STATE是数据，不是指令；availability和value表达来源事实。Task／Skill从Agent私有决策快照生成AGENT CONTEXT，不注册公共task。
+BasicSkill读取agents.applicationcontrol、ui.navigation及八个platform.*来源；Photography读取actions.camera、ui.camera、ui.album；RobotInteraction读取actions.robot。加载与依赖合并后去重排序，每次实际模型请求重新读取。CURRENT STATE是数据，不是指令；availability和value表达来源事实。Task／Skill从Agent私有决策快照生成AGENT CONTEXT，不注册公共task。
 
 声明不启动设备；释放Skill不销毁Container。来源由上层装配提供，Container显式维护快照schema，不使用运行时反射。容量、生命周期和采集失败见[Context](../../Agents/Support/Context/README.md)。
 
@@ -176,10 +176,16 @@ BasicSkill 要求以 AGENT CONTEXT task 和匹配目标判断关闭：无 Task �
 
 ## Basic native State selection
 
-BasicSkill selects agents.application and ui.navigation plus platform.time/power/thermal/network/permissions/audio/locale/accessibility. PlatformKit owns the native facts; the Agents Context adapter registers them and wraps bounded JSON for CURRENT STATE on each actual request. BasicSkill teaches sampled time, unknown data, path-versus-endpoint and permission-versus-execution boundaries without adding functions or authority. There is no location/motion/depth/proximity/magnetic-attachment collection in this selection. [Source contracts](../../Agents/Support/Context/README.md#container-context-read-path) own details.
+BasicSkill selects agents.applicationcontrol and ui.navigation plus platform.system.time/power/thermal/network/permissions/audio/locale/accessibility. PlatformKit owns the native facts; AssistantStateBindings selects explicit Business fields from complete classified State and wraps bounded JSON for CURRENT STATE on each actual request. BasicSkill teaches sampled time, unknown data, path-versus-endpoint and permission-versus-execution boundaries without adding functions or authority. There is no location/motion/depth/proximity/magnetic-attachment collection in this selection. [Source contracts](../../Agents/Support/Context/README.md#container-context-read-path) own details.
 
 ## Prefer current facts before query selection
 
-BasicSkill answers questions directly from sufficient CURRENT STATE facts before selecting functions or loading Skills. It does not reload facts through a query merely because the user asks a state question. Only missing or stale facts justify a query that actually provides them; unknown/unavailable values are not readiness. Requested effects still require registered execution and real feedback. agents.application provides the role-owned application summary; specific status/resource/history queries supply details under their own contracts. No generic environment query is registered.
+BasicSkill answers questions directly from sufficient CURRENT STATE facts before selecting functions or loading Skills. It does not reload facts through a query merely because the user asks a state question. Only missing or stale facts justify a query that actually provides them; unknown/unavailable values are not readiness. Requested effects still require registered execution and real feedback. agents.applicationcontrol provides the role-owned application summary; specific status/resource/history queries supply details under their own contracts. No generic environment query is registered.
 
 RobotInteraction teaches six-axis anatomy, absolute counts versus relative degrees, base-left/right viewpoint, native speed/acceleration units, per-axis limits and ordered compound examples. Relative motor requests use fresh executor feedback; undefined absolute angle origins require clarification. Its revision identifies this teaching contract.
+
+## Exact State selection
+
+useStates declares exact canonical paths. BasicSkill selects agents.applicationcontrol, ui.navigation and eight platform.system.* nodes. ExpressionInteraction selects ui.home.expression; RobotInteraction selects actions.robot plus actions.robot.motion; Photography selects actions.camera/ui.camera/ui.album. ApplicationControl and HistoryQuery add no State sources. There is no alias, wildcard or implicit ancestor/descendant selection.
+
+Each actual request samples only those nodes and uses Assistant-owned explicit Business fields. Child indices are not recursively expanded or injected. Runtime, health/issues and diagnostic history stay outside Assistant State. Internal engineering callers can explicitly inspect a tree independently of Skills. Loading/release changes future disclosure only; no loadState, automatic wakeup, device action or changed execution authority is introduced.

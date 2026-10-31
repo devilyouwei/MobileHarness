@@ -364,6 +364,11 @@ public actor PhotographerAgent: Agent {
         AgentStatus(lifecycle: lifecycle, queuedInputs: 0, processedInputs: processed)
     }
 
+    /// Passive State reflection, independent of persistence initialization.
+    public func residentContext() async -> AgentContext<PhotographerContextState>? {
+        await contextRepository.residentSnapshot()
+    }
+
     public func contextSnapshot() async throws -> AgentContext<PhotographerContextState> {
         try await contextRepository.snapshot()
     }

@@ -5,10 +5,23 @@ import PlatformKit
 /// Compatibility name for the SDK-owned feedback configuration.
 public typealias NexArmMotorCompletion = NexArmFeedbackConfiguration
 
-public struct NexArmMotorResult: Sendable, Equatable {
-    public enum Failure: String, Sendable {
+public struct NexArmMotorResult: Codable, Sendable, Equatable {
+    public enum Failure: String, Codable, Sendable {
         case targetNotReached, timedOut, feedbackLost, disconnected, sendingFailed, admissionFailed, feedbackFailed,
             cancelled
+    }
+    public enum Outcome: String, CaseIterable, Codable, Sendable {
+        case arrived, notReached, timedOut, cancelled, unconfirmed
+    }
+    /// Domain outcome only. Native/admission/transport detail remains in failure.
+    public var outcome: Outcome {
+        switch failure {
+        case nil: started ? .arrived : .unconfirmed
+        case .targetNotReached: .notReached
+        case .timedOut: .timedOut
+        case .cancelled: .cancelled
+        case .feedbackLost, .disconnected, .sendingFailed, .admissionFailed, .feedbackFailed: .unconfirmed
+        }
     }
     public let step: Int
     public let motor: Int

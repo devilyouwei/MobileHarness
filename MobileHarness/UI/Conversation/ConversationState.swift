@@ -17,7 +17,9 @@ public enum HomeModelPreparation: Equatable, Sendable {
     }
 }
 
-public enum VoicePhase: Sendable, Equatable { case idle, loading, listening, processing, speaking, failed }
+public enum VoicePhase: String, CaseIterable, Sendable, Equatable {
+    case idle, loading, listening, processing, speaking, failed
+}
 
 public enum EyeExpression: String, CaseIterable, Sendable {
     case clear, closed, loading, smile, happy, laugh, thinking, surprised, sad, love, angry, scared, playful
@@ -230,6 +232,26 @@ public enum LoadingExpressionUpdate: Sendable, Equatable { case applied, superse
 /// UI-owned transaction and renderer acknowledgment; IDs fence replacement and late callbacks.
 @MainActor
 public final class ConversationExpressionPresentation: ExpressionPresenting {
+    public func stateSnapshot() async throws -> UIStateSnapshot {
+        try Task.checkCancellation()
+        let expression = expressionSnapshot()
+        return UIStateSnapshot(
+            path: "ui.home.expression",
+            business: [
+                "base": .text(expression.base), "effective": .text(expression.effective),
+                "overridden": .flag(expression.overridden),
+                "transitioning": .flag(expression.transitioning), "loading": .flag(expression.loading),
+            ], runtime: ["rendererAvailable": .flag(expression.rendererAvailable)],
+            meanings: [
+                "business.effective": "Display target; not a rendered pixel receipt",
+                "business.base": "Persistent expression restored after the override",
+            ],
+            stateValues: [
+                "business.effective": EyeExpression.allCases.map(\.rawValue),
+                "business.base": EyeExpression.allCases.map(\.rawValue),
+            ])
+    }
+
     var presentationAdmission: UIPresentationAdmission?
     private let state: ConversationState
     private var loadingRevision: UInt64 = 0
@@ -261,6 +283,21 @@ public final class ConversationExpressionPresentation: ExpressionPresenting {
     private var expressionOwner: String?
     private var expressionWaiter: CheckedContinuation<Void, Error>?
     private var expressionWaitID: String?
+    /// Explicit expression facts; effective is a display target, not a pixel receipt.
+    public struct ExpressionSnapshot: Encodable, Sendable, Equatable {
+        public let base: String
+        public let effective: String
+        public let overridden: Bool
+        public let transitioning: Bool
+        public let rendererAvailable: Bool
+        public let loading: Bool
+    }
+    public func expressionSnapshot() -> ExpressionSnapshot {
+        ExpressionSnapshot(
+            base: baseExpression?.rawValue ?? "clear", effective: state.displayedExpression.rawValue,
+            overridden: expressionOwner != nil, transitioning: expressionWaiter != nil,
+            rendererAvailable: state.expressionRendererAvailable, loading: state.showsLoadingExpression)
+    }
     public init(state: ConversationState) { self.state = state }
     public func setBase(_ expression: EyeExpression?) {
         guard presentationAdmission?.acceptsLive() ?? true else { return }

@@ -66,8 +66,17 @@ PhotoAlbumService 通过共享 CapturedPhotoStore 完成分页、读取、导入
 
 ## Container 上下文
 
-CameraCoordinator.contextSnapshot 读取 CameraCapturing.isRunning 的真实结果，再提取当前呈现／照片流程事实；没有独立公开Writer或运行状态缓存。CameraPhotoSession 不再为模型镜像发送更新通知。原有实时UI事实流继续服务实际UI请求。
+CameraCoordinator.stateSnapshot 读取 CameraCapturing.isRunning 的真实结果，再提取当前呈现／照片流程事实；没有独立公开Writer或运行状态缓存。CameraPhotoSession 不再为模型镜像发送更新通知。原有实时UI事实流继续服务实际UI请求。
 
 ## Execution ownership and lifecycle
 
 ActionsContainer retains the camera and native cleanup. CameraExecutionEndpoint checks business/session state, not role names. CameraInteractionWorkflow is an Actions-owned UI request facade with one worker; shutdown closes admission, cancels and joins it. CaptureActivityEvent remains a camera-owned event. App supplies resource/perception collaboration through neutral ports. Album attachments use the generic per-request slot; Agents authorizes the caller before Gateway admission.
+
+## Passive inspection
+
+CameraCoordinator.stateSnapshot reports switch intent, native running observation, work/permission conditions, vision connection, foreground and local failure without starting capture. ActionsBusinessAssembly only includes an already-created camera owner; the absent owner is an explicit uncreated node. Inspection does not evaluate the lazy camera/cue constructor.
+
+Business holds camera switch/running/facing, photo activity, permission requirements, displayed/saved media identity and observed domain failure. Vision session existence, foreground and worker existence are Runtime. stateSnapshot is the complete read; Assistant chooses its fields independently.
+
+
+Camera State serialization reads its resident observedRunning value. The existing owner observation worker first queries the actual native running status, then reconciles native interruption/error events; capture/switch/release and shutdown completion also refresh that value. Before initialization it is unknown. Revision fencing prevents an older suspended status read from overwriting a newer one. Operational admission/cleanup still checks the native device and keeps its existing failure semantics; a State read itself never calls camera.isRunning(), requests permission or starts capture.

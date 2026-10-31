@@ -19,6 +19,7 @@ final class AgentContainerLifecycle {
     private var desiredForeground = true
     private var needsSuspension = false
     private var revision: UInt64 = 0
+    private(set) var healthFailure: AgentFailure?
     var isStopped: Bool { closed }
     var isForegroundRequested: Bool { desiredForeground && !closed }
     var isAvailable: Bool { started && active && !closed }
@@ -163,6 +164,7 @@ final class AgentContainerLifecycle {
     }
     private func failure(_ operation: String, _ error: any Error) -> AgentFailure {
         let value = AgentFailure(component: "root", operation: operation, underlying: error)
+        if value.code == .executionFailed || value.code == .cleanupFailed { healthFailure = value }
         report(value)
         return value
     }

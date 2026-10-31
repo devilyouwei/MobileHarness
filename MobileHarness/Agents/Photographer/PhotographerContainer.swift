@@ -7,6 +7,25 @@
     @available(iOS 27, *)
     @MainActor @Observable
     public final class PhotographerContainer {
+        public func stateSnapshot() async throws -> AgentStateSnapshot {
+            try Task.checkCancellation()
+            let status = await session?.agent.status()
+            let context = await session?.agent.residentContext()
+            return AgentStateSnapshot(
+                path: "agents.photographer",
+                business: [
+                    "taskPhases": context?.state.taskViews.map { .texts($0.values.map { $0.stage.rawValue }.sorted()) }
+                        ?? .unknown
+                ],
+                runtime: [
+                    "rolePhase": status.map { .text($0.lifecycle.rawValue) } ?? .unknown,
+                    "queuedInputs": status.map { .count($0.queuedInputs) } ?? .unknown,
+                    "processedInputs": status.map { .count($0.processedInputs) } ?? .unknown,
+                    "taskViews": context?.state.taskViews.map { .count($0.count) } ?? .unknown, "closed": .flag(closed),
+                    "installed": .flag(session != nil),
+                ])
+        }
+
         @ObservationIgnored private var session: PhotographerExecutionSession?
         @ObservationIgnored private var closed = false
         private let cameraUI: UICameraContainer

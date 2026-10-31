@@ -87,6 +87,18 @@ public final class BufferCache: Sendable {
         self.capacity = capacity
         self.maximumBytes = maximumBytes
     }
+    public struct RuntimeStatistics: Sendable {
+        public let entries: Int
+        public let retainedBytes: Int
+        public let maximumBytes: Int
+        public let closed: Bool
+    }
+    public func runtimeStatistics() -> RuntimeStatistics {
+        state.withLock {
+            RuntimeStatistics(
+                entries: $0.values.count, retainedBytes: $0.bytes, maximumBytes: maximumBytes, closed: $0.closed)
+        }
+    }
     public func put(_ buffer: CacheBuffer, key: String, namespace: String = "images") throws {
         do {
             guard !key.isEmpty, key.utf8.count <= 256, !namespace.isEmpty, namespace.utf8.count <= 256 else {
@@ -200,6 +212,17 @@ public actor CacheContainer {
     public init(failures: StorageFailureReporter = .init()) {
         self.failures = failures
         buffers = BufferCache(failures: failures)
+    }
+    public func stateSnapshot() async throws -> StorageStateSnapshot {
+        try Task.checkCancellation()
+        let value = buffers.runtimeStatistics()
+        return StorageStateSnapshot(
+            path: "storage.cache",
+            runtime: [
+                "entries": .count(value.entries), "retainedBytes": .count(value.retainedBytes),
+                "maximumBytes": .count(value.maximumBytes), "audioScopes": .count(audio.count),
+                "closingScopes": .count(closing.count), "closed": .flag(value.closed),
+            ], units: ["runtime.retainedBytes": "bytes", "runtime.maximumBytes": "bytes"])
     }
     public func audioScope(_ id: String) throws -> AudioCache {
         do {

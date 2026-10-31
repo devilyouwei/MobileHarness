@@ -2,8 +2,22 @@ import Foundation
 
 @MainActor
 public final class VisionContainer {
+    public func stateSnapshot() async throws -> PlatformStateSnapshot {
+        try Task.checkCancellation()
+        let facts = try authorizationSnapshot().mapValues { PlatformStateSnapshot.Value.text($0) }
+        var runtime: [String: PlatformStateSnapshot.Value] = ["available": .flag(admission.isOpen)]
+        #if os(iOS)
+            runtime["cameraCreated"] = .flag(nativeCamera != nil)
+            runtime["photoImporting"] = .flag(photoImport != nil)
+        #endif
+        return PlatformStateSnapshot(
+            path: "platform.vision", business: facts, runtime: runtime)
+    }
     private let admission: PlatformAdmission
-    func authorizationSnapshot() -> [String: String] { NativeVisionAuthorization.snapshot() }
+    var readAuthorization: () throws -> [String: String] = {
+        ["camera": "unknown", "photosAddOnly": "unknown", "photosReadWrite": "unknown"]
+    }
+    func authorizationSnapshot() throws -> [String: String] { try readAuthorization() }
     #if os(iOS)
         private var nativeCamera: AppleCamera?
         public var camera: any CameraCapturing {

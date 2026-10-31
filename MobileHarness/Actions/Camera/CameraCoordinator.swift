@@ -46,6 +46,8 @@
         private let camera: any CameraCapturing
         private var foreground = false
         private var failed = false
+        private var observedRunning: Bool?
+        private var runningRevision = UUID()
         private var revision = 0
         private var worker: Task<Void, Never>?
         private let photos: CapturedPhotoStore
@@ -83,43 +85,28 @@
             self.photos = photos
         }
 
-        public struct ContextSnapshot: Encodable, Sendable, Equatable {
-            public let enabled: Bool
-            public let running: Bool
-            public let selectedFacing: String
-            public let busy: Bool
-            public let needsSettings: Bool
-            public let displayedMediaID: String?
-            public let savedMediaID: String?
-            private enum CodingKeys: String, CodingKey {
-                case enabled, running, selectedFacing, busy, needsSettings, displayedMediaID, savedMediaID
-            }
-            public func encode(to encoder: any Encoder) throws {
-                var fields = encoder.container(keyedBy: CodingKeys.self)
-                try fields.encode(enabled, forKey: .enabled)
-                try fields.encode(running, forKey: .running)
-                try fields.encode(selectedFacing, forKey: .selectedFacing)
-                try fields.encode(busy, forKey: .busy)
-                try fields.encode(needsSettings, forKey: .needsSettings)
-                try fields.encode(displayedMediaID, forKey: .displayedMediaID)
-                try fields.encode(savedMediaID, forKey: .savedMediaID)
-            }
+        public func stateSnapshot() async throws -> ActionsStateSnapshot {
+            try Task.checkCancellation()
+            return ActionsStateSnapshot(
+                path: "actions.camera",
+                business: [
+                    "enabled": .flag(state.isEnabled), "running": observedRunning.map { .flag($0) } ?? .unknown,
+                    "busy": .flag(state.isBusy || state.photoBusy), "needsSettings": .flag(state.needsSettings),
+                    "selectedFacing": .text(state.facing == .front ? "front" : "back"),
+                    "displayedMediaID": state.capturedPhoto?.didReachThumbnail == true
+                        ? state.capturedPhoto.map { .text($0.id) } ?? .unknown : .unknown,
+                    "savedMediaID": state.savedMediaID.map { .text($0) } ?? .unknown,
+                    "problem": failed
+                        ? .text("cameraUnavailable")
+                        : state.needsSettings ? .text("cameraPermissionRequired") : .unknown,
+                ],
+                runtime: [
+                    "foreground": .flag(foreground), "worker": .flag(worker != nil),
+                    "visionConnected": .flag(visionSession != nil),
+                ],
+                health: failed ? .fault : .unknown,
+                issues: failed ? [.init(code: "cameraFailed", impact: "cameraExecutionUnavailable")] : [])
         }
-        public func contextSnapshot() async -> ContainerContextValue<ContextSnapshot> {
-            let running = await camera.isRunning()
-            let fact = ContextSnapshot(
-                enabled: state.isEnabled, running: running,
-                selectedFacing: state.facing == .front ? "front" : "back",
-                busy: state.isBusy || state.photoBusy, needsSettings: state.needsSettings,
-                displayedMediaID: state.capturedPhoto?.didReachThumbnail == true ? state.capturedPhoto?.id : nil,
-                savedMediaID: state.savedMediaID)
-            let availability: ContextAvailability =
-                state.needsSettings
-                    || (state.message != nil && state.isEnabled && !state.isVisible && !state.isBusy)
-                ? .unavailable : .available
-            return ContainerContextValue(fact, availability: availability)
-        }
-
         public func readPhoto(_ id: String, source: String, sessionID: String, inputID: String) async throws -> Data {
             try await photoSession.readPhoto(id, source: source, sessionID: sessionID, inputID: inputID)
         }
@@ -149,7 +136,7 @@
             if state.isEnabled == enabled {
                 if enabled, state.isVisible { return }
                 if !enabled, captureLease == nil {
-                    guard !failed, !(await camera.isRunning()) else { throw CameraControlError.unavailable }
+                    guard !failed, !(await refreshRunning()) else { throw CameraControlError.unavailable }
                     try Task.checkCancellation()
                     return
                 }
@@ -186,7 +173,7 @@
             try Task.checkCancellation()
             guard revision == expectedRevision else { throw CancellationError() }
             guard foreground else { throw CameraControlError.notForeground }
-            let running = await camera.isRunning()
+            let running = await refreshRunning()
             try Task.checkCancellation()
             guard revision == expectedRevision else { throw CancellationError() }
             if state.needsSettings { throw CameraControlError.permissionDenied }
@@ -219,12 +206,14 @@
             await worker?.value
             await visionRestart.stop()
             let released = await stopCapture()
-            guard released, !(await camera.isRunning()) else { throw CameraControlError.unavailable }
+            guard released, !(await refreshRunning()) else { throw CameraControlError.unavailable }
         }
 
         public func observe() async {
+            _ = await refreshRunning()
             for await event in camera.events {
                 if Task.isCancelled { break }
+                _ = await refreshRunning()
                 guard state.isEnabled, foreground else { continue }
                 switch event {
                 case .interrupted:
@@ -420,6 +409,7 @@
                     guard await camera.isRunning() else { throw CameraError.unavailable }
                     return frames
                 }
+                _ = await refreshRunning()
                 recordCapture(.started, id: lease.id)
                 leaseRenewal = Task { [weak self] in
                     while !Task.isCancelled {
@@ -445,6 +435,14 @@
             }
         }
 
+        private func refreshRunning() async -> Bool {
+            let revision = UUID()
+            runningRevision = revision
+            let value = await camera.isRunning()
+            if runningRevision == revision { observedRunning = value }
+            return value
+        }
+
         /// Releasing an old lease never calls the device directly and cannot stop a replacement owner.
         private func stopCapture() async -> Bool {
             await photoSession.stopAndWait()
@@ -456,14 +454,17 @@
             captureLease = nil
             do {
                 try await runtime.resources.release(lease, owner: captureOwner)
+                _ = await refreshRunning()
                 recordCapture(.stopped, id: lease.id)
                 return true
             } catch CameraResourceFailure.staleLease {
                 if await runtime.resources.isReleased(CameraCoordinator.captureResource) {
+                    _ = await refreshRunning()
                     recordCapture(.revoked, id: lease.id)
                     return true
                 }
             } catch {}
+            _ = await refreshRunning()
             recordCapture(.failed, id: lease.id)
             failed = true
             presentation.present(.isVisible(false))
@@ -479,7 +480,7 @@
             while true {
                 let current = revision
                 if hotSwitchRevision == current, foreground, state.isEnabled, !failed,
-                    let lease = captureLease, let runtime = resourceRuntime, await camera.isRunning()
+                    let lease = captureLease, let runtime = resourceRuntime, await refreshRunning()
                 {
                     do {
                         let switchingStarted = ContinuousClock.now
@@ -488,7 +489,7 @@
                             resources: [CameraCoordinator.captureResource], owner: captureOwner, lease: lease
                         ) { [camera] in try await camera.switchCamera(facing: facing) }
                         guard current == revision else { continue }
-                        let running = await camera.isRunning()
+                        let running = await refreshRunning()
                         guard current == revision else { continue }
                         guard running else { throw CameraError.startFailed }
                         let elapsed = switchingStarted.duration(to: .now).components
@@ -522,7 +523,7 @@
                     if authorized {
                         do {
                             let frames = try await startCapture(facing: state.facing == .front ? .front : .back)
-                            let running = await camera.isRunning()
+                            let running = await refreshRunning()
                             if current == revision {
                                 presentation.present(.isVisible(running))
                                 presentation.present(.message(running ? nil : "相机暂时不可用，请重试"))

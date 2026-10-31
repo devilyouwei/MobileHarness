@@ -11,3 +11,7 @@ Endpoints are limited to 128, active sends to 256 and declared retained payload 
 Each accepted send owns a cancellable task; caller cancellation cancels/joins it. Retirement removes the matching endpoint, cancels and joins deliveries involving it, excluding the current self-delivery to avoid self-join. Its enclosing transport still owns that completion. Pause joins ordinary sends and permits explicitly marked cleanup to drain. Terminal shutdown closes admission, cancels/joins all deliveries and releases endpoints. Parent/root generation controls isolated observation transports.
 
 Semantic Signal traces, role policy, Task messages and receiver interpretation belong to [Agents Support](../../Agents/Support/README.md). Root lifetime belongs to [GatewayContainer](../README.md).
+
+## Passive state observation
+
+The owning stateSnapshot entry point reads current local business/capability values and runtime admission/work facts in the owner's isolation domain. It performs no action, acquisition or device activation. The module root composes the explicitly selected fields; unknown diagnostic coverage is not healthy evidence. Domain-specific completion and failure contracts above remain authoritative.

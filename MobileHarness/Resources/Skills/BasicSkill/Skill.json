@@ -1,7 +1,7 @@
 {
   "version": 3,
   "id": "basic-skill",
-  "revision": 30,
+  "revision": 33,
   "description": "Task and Skill orchestration, current State summaries and a single continuing foreground goal.",
   "dependencies": [],
   "useActions": [
@@ -37,16 +37,16 @@
     }
   ],
   "useStates": [
-    "agents.application",
+    "agents.applicationcontrol",
     "ui.navigation",
-    "platform.time",
-    "platform.power",
-    "platform.thermal",
-    "platform.network",
-    "platform.permissions",
-    "platform.audio",
-    "platform.locale",
-    "platform.accessibility"
+    "platform.system.time",
+    "platform.system.power",
+    "platform.system.thermal",
+    "platform.system.network",
+    "platform.system.permissions",
+    "platform.system.audio",
+    "platform.system.locale",
+    "platform.system.accessibility"
   ],
   "useInstructions": [
     "Instructions.md"

@@ -143,3 +143,7 @@ OutputMailbox has 18 total slots shared by discrete output and the overlay/gaze/
 图像接纳只校验类型、会话、新鲜度与单调序号并原子替换 latest；实际推理读取已提交 Context。角色邮箱和会话绑定输出消费使用相同 overlay/gaze/pose 最新替换规则，离散结果不被状态更新挤掉。停止加入输入、推理、发布及回执，旧代结果不更新新代。
 
 通信见 [Agent.json](../../Resources/Agents/VisionPerception/Agent.json)。
+
+## Passive container state
+
+stateSnapshot projects local installation/closure and existing work or Agent lifecycle/queue counters directly from memory. Reading starts no role, persistence restoration or inference. Initialization remains in the existing owner lifecycle. The root catalog binds independent readers without sampling roles or maintaining another mutable role-state registry.

@@ -1,4 +1,5 @@
 import StorageChat
+@_exported import StorageCore
 import StorageDevices
 import StorageMedia
 import StorageTasks
@@ -25,6 +26,20 @@ public protocol DatabaseStorage: Sendable {
     var tasks: any TaskRepository { get throws }
     var media: any MediaRepository { get throws }
     var devices: any DeviceRepository { get throws }
+    func stateSnapshot() async throws -> StorageStateSnapshot
     func start() async throws
     func stop() async throws
+}
+
+/// Backend lifecycle is Runtime; no repository getter or database operation is performed by inspection.
+public enum DatabasePhase: String, CaseIterable, Sendable {
+    case unknown, cold, starting, ready, stopping, stopped, failed
+}
+extension DatabaseStorage {
+    public func stateSnapshot() async throws -> StorageStateSnapshot {
+        try Task.checkCancellation()
+        return .init(
+            path: "storage.database", runtime: ["phase": .unknown],
+            stateValues: ["runtime.phase": DatabasePhase.allCases.map(\.rawValue)])
+    }
 }

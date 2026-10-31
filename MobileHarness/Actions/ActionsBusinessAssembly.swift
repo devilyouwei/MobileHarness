@@ -48,23 +48,35 @@
             self.makeCameraRuntime = makeCameraRuntime
             self.connectVision = connectVision
         }
-        public lazy var camera = CameraCoordinator(
-            camera: platform.vision.camera, presentation: ui.camera, photos: photos,
-            photoCues: platform.audio.cue(.camera),
-            makeRuntime: { [weak self] in
-                guard let self else { throw ActionsContainerError.stopped }
-                return try self.makeCameraRuntime()
-            },
-            connectPerception: { [weak self] session, mirrored, endpoint in
-                guard let self, let endpoints = self.endpoints else { throw ActionsContainerError.unavailable }
-                try endpoints.presentation.bindCamera(endpoint)
-                defer { endpoints.presentation.unbindCamera(endpoint) }
-                try await self.connectVision(session, mirrored, endpoint)
-            })
+        private var observedCamera: CameraCoordinator?
+        public lazy var camera: CameraCoordinator = {
+            let owner = CameraCoordinator(
+                camera: platform.vision.camera, presentation: ui.camera, photos: photos,
+                photoCues: platform.audio.cue(.camera),
+                makeRuntime: { [weak self] in
+                    guard let self else { throw ActionsContainerError.stopped }
+                    return try self.makeCameraRuntime()
+                },
+                connectPerception: { [weak self] session, mirrored, endpoint in
+                    guard let self, let endpoints = self.endpoints else { throw ActionsContainerError.unavailable }
+                    try endpoints.presentation.bindCamera(endpoint)
+                    defer { endpoints.presentation.unbindCamera(endpoint) }
+                    try await self.connectVision(session, mirrored, endpoint)
+                })
+            observedCamera = owner
+            return owner
+        }()
 
-        public func cameraContext() async throws -> Data { try JSONEncoder().encode(await camera.contextSnapshot()) }
-        public func deviceContext() async throws -> Data {
-            try JSONEncoder().encode(await bluetooth.service.contextSnapshot())
+        public func stateReaders() async throws -> [String: ActionsStateSnapshot.Reader] {
+            var readers = try await bluetooth.service.stateReaders()
+            if let camera = observedCamera {
+                readers["actions.camera"] = ActionsStateSnapshot.reader(of: camera) { try await $0.stateSnapshot() }
+            } else {
+                readers["actions.camera"] = ActionsStateSnapshot.reader(of: self) { _ in
+                    .init(path: "actions.camera", runtime: ["created": .flag(false)])
+                }
+            }
+            return readers
         }
         public func prepare(_ request: ActionsBusinessRequest) throws -> ActionsBusinessBindings {
             let files = self.files

@@ -12,8 +12,10 @@ public enum NexArmManualAction: String, Sendable {
     case shakeBase, nod, shakeHead, wave, tiltLeft, tiltRight, lookAround, celebrate, dance, reset
 }
 public enum NexArmAvailability: String, Sendable { case unknown, available, poweredOff, denied, unsupported }
-public enum NexArmConnectionPhase: String, Sendable { case idle, connecting, connected, disconnecting, failed }
-public enum NexArmRecoveryStage: String, Sendable {
+public enum NexArmConnectionPhase: String, CaseIterable, Sendable {
+    case idle, connecting, connected, disconnecting, failed
+}
+public enum NexArmRecoveryStage: String, CaseIterable, Sendable {
     case idle, cleaning, waiting, connecting, waitingForBluetooth, suspended, failed
     public var busy: Bool {
         switch self {

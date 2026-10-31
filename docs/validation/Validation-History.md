@@ -3543,3 +3543,27 @@ scripts/check.sh退出0，876项普通集成测试、221项隔离运行时测试
 ## 2026-10-27 — NexArm motor teaching and relative commands
 
 Added relative-degree position requests, axis/unit/limit teaching and 16 robot regression cases. Final real-model synthetic-executor results: GPT-4.1 21/21, Qwen3.8-Flash 20/21, Qwen3.8-Max 21/21; all added cases passed, with Flash readiness failure retained. Final check.sh and four Simulator builds completed. No physical motion or installation. [Detailed evidence](NexArm-Robot-Skill-Regression.md).
+
+## 2026-10-29 — Container reflexivity
+
+Module-local state snapshots/descriptors, bounded internal inspection and Skill-selected health/expression/robot projections were verified with scripts/check.sh and the four simulator build schemes. Integration regular/runtime phases passed 896/225 tests; focused State/UI/prompt regression passed 24. Prompt byte limits remain unchanged. Real model, iPhone presentation and physical arm acceptance were not run. See [the dedicated evidence](Container-Reflexivity.md).
+
+## 2026-10-31 — Caller-owned Business State selection
+
+Reclassified seven-module Business/Runtime fields and moved Assistant-only selection into AssistantStateBindings over complete inspection reads. Skill disclosure stays request-scoped; internal consumers retain Runtime access. Final check.sh passed (IntegrationTests regular/runtime: 901/225), all four Simulator builds passed, and prompt budgets/local documentation links passed. No real-model or physical-device acceptance was run. [Evidence](Container-Reflexivity.md#caller-owned-state-selection--2026-10-31).
+
+## 2026-10-31 — Recursive Container State contract audit
+
+Audited 32 concrete non-App Containers and published reflection subnodes. Corrected Storage direct child contract mismatches, diagnostic/configuration classification, form versus health outcomes, axis outcome versus failure codes, exact counters and explicit native source schemas. Final check.sh passed (IntegrationTests regular/runtime 907/225), all four Simulator builds passed, and links/diff checks passed. No real-model or physical-device acceptance. [Inventory and evidence](Container-Reflexivity.md#recursive-contract-audit--2026-10-31).
+
+## 2026-10-31 — Exact local State reads
+
+Unified all Container read signatures, changed children to indices, separated exact-path lookup from explicit diagnostic traversal and migrated canonical Skill source paths. Whole-tree Assistant summaries and implicit descendant sampling were removed. Final check.sh passed (IntegrationTests regular/runtime 910/225) and all four Simulator schemes built. Real-model/iPhone/physical-arm acceptance was not run. [Evidence](Container-Reflexivity.md#single-node-state-and-exact-skill-paths--2026-10-31).
+
+## 2026-10-31 — Container-owned State collection lifecycle
+
+Platform seeds resident native facts at startup, updates through subscriptions/owned clocks, reseeds on resume and fences/joins observation cleanup. Native BLE uses its publisher-owned State reference, camera reflection uses recorded running observations, and private Agent State reads no longer initialize persistence. Exact Skill disclosure and existing software owners remain intact. Final check.sh passed (IntegrationTests regular/runtime 919/225), four Simulator schemes built, and documentation/diff checks passed. A clock-dependent fixture failure was corrected and the full checks rerun. Real-model/iPhone/physical-arm acceptance was not performed. [Evidence](Container-Reflexivity.md#container-owned-state-collection-lifecycle--2026-10-31).
+
+## 2026-10-31 — State producer/consumer decoupling re-audit
+
+Rechecked 32 concrete Containers and published backend/logical/resource nodes. Corrected model routing preference classification, Storage lifecycle-to-Business projection, swallowed permission read errors, Audio debug encoding and a stale navigation/album operation projection. Producer State stays complete and caller-independent; Assistant/Skill selection remains consumer-owned. Final check.sh passed (IntegrationTests regular/runtime 923/225), all four Simulator schemes built, and documentation/diff checks passed. Real-model/iPhone/physical-arm acceptance was not performed. [Inventory and evidence](Container-Reflexivity.md#producerconsumer-decoupling-re-audit--2026-10-31).

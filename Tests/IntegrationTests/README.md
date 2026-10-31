@@ -158,3 +158,17 @@ NexArmAimTests 覆盖位置跟踪的方向、死区、有限前瞻/六轴边界�
 NexArmArrivalPolicyTests直接验证PlatformKit六轴容差边界、非法反馈配置的原生错误以及原生恢复分类/有界退避；现有动作测试验证SDK观察结果到动作报告的映射。
 
 NexArm relative-motor regression covers encoder conversion, all-axis bounds, fresh measured starts, failed reads without cached fallback, mutually exclusive arguments and rejected writes. Robot workflow scoring rejects wrong axes, order, missing steps and extra moves; live model workflows use synthetic device execution only.
+
+## Reflexive State regression
+
+ContainerContextTests validates passive cold reads, expression override/cancellation/restoration, internal tree paths/depth/capacity/cancellation/partial failures, health-summary bounds, field allowlists and Skill load/release selection. NexArmBluetoothTests uses an explicit simulated passive link to verify encoder positions, freshness, disconnected-session invalidation and zero control writes/queries. These tests do not establish physical-device acceptance.
+
+ContainerContextTests covers Assistant-owned Business selection, nested-field exclusion, fresh reads, unknown observations, propagation of read failures and independent full Runtime inspection. Native robot tests read the unified State contract.
+
+State audit regressions cover seven-schema wire equivalence and exact UInt64 counters, direct Storage child/tree equivalence without I/O, diagnostic and form-outcome classification, motor outcome/code separation, native quarantine versus valid feedback and invalid category/descriptor rejection.
+
+Single-node regression covers path-only Reference encoding, exact descendant lookup without ancestor/sibling reads, root/catalog zero child reads, weak-owner capability expiry, explicit diagnostic traversal, canonical Skill source equality and unchanged generation/cancellation/bounds. Prior recursive snapshot fixtures are replaced by explicit node catalogs.
+
+PlatformStateTests covers startup seeding, resident reads without resampling, event coalescing, collection failure/recovery, clock updates without readers, generation replacement, foreground reseeding and permission-sharing across child containers. AgentArchitectureTests covers passive Context reads before initialization and after failed restoration. NexArm reflection tests read the publisher-owned resident State without issuing commands or consuming the business stream. Camera read purity is additionally enforced by the architecture audit and compiled in the iOS Simulator build; these checks do not establish physical-device behavior.
+
+State decoupling regression verifies model speech routing stays Runtime without provider preparation, storage root lifecycle failure remains health/issues, permission child reads preserve cached-source errors, scope owner serialization uses stable raw values, and Assistant selection leaves a real producer’s complete Business/Runtime State unchanged.

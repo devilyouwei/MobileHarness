@@ -230,7 +230,8 @@ private actor InteractionPresentation: ResourcePresentationCapability {
             agent: .applicationControl, scope: UUID().uuidString, state: ApplicationControlContextState()))
     await #expect(throws: HarnessError.notRunning) { try await agent.applicationState() }
     let context = AgentStateContext()
-    try context.register("agents.application", source: ContainerContextSource { try await agent.applicationState() })
+    try context.register(
+        "agents.applicationcontrol", source: ContainerContextSource { try await agent.applicationState() })
     try context.open(session: session)
     try await agent.start()
     let unknown = try await agent.applicationState()
@@ -243,20 +244,20 @@ private actor InteractionPresentation: ResourcePresentationCapability {
     await #expect(throws: CommunicationError.invalidPayload) {
         try await agent.observeEnvironment(.init(category: .scene, sequence: 5, value: "invented-state"))
     }
-    let first = try await context.snapshot(session: session, names: ["agents.application"])
+    let first = try await context.snapshot(session: session, names: ["agents.applicationcontrol"])
     let json = try #require(JSONSerialization.jsonObject(with: Data(first.utf8)) as? [String: [String: Any]])
-    let value = try #require(json["agents.application"]?["value"] as? [String: Any])
+    let value = try #require(json["agents.applicationcontrol"]?["value"] as? [String: Any])
     #expect(value["scene"] as? String == "active" && value["sceneSequence"] as? Int == 2)
     #expect(value["modelPreparation"] as? String == "idle")
     #expect(!first.contains("private-business-detail") && !first.contains(session) && first.utf8.count < 1024)
     try await agent.pause()
     try await agent.observeEnvironment(.init(category: .scene, sequence: 6, value: "background"))
     #expect(try await agent.applicationState().value?.scene == "background")
-    let second = try await context.snapshot(session: session, names: ["agents.application"])
+    let second = try await context.snapshot(session: session, names: ["agents.applicationcontrol"])
     #expect(second != first && second.contains("background"))
     await agent.stop()
     await #expect(throws: HarnessError.notRunning) {
-        try await context.snapshot(session: session, names: ["agents.application"])
+        try await context.snapshot(session: session, names: ["agents.applicationcontrol"])
     }
     context.close()
     #expect(!CapabilityModules.declarations.contains { $0.path.description == "System.Device.readEnvironment" })

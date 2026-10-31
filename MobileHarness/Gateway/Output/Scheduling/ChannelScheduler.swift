@@ -176,6 +176,16 @@ public actor ChannelScheduler {
         return ticket.resources
     }
 
+    public func stateSnapshot() async throws -> GatewayStateSnapshot {
+        try Task.checkCancellation()
+        return GatewayStateSnapshot(
+            path: "gateway.scheduler",
+            runtime: [
+                "inputs": .count(inputs.count), "channels": .count(channelCounts.count),
+                "preparing": .count(preparationCount), "trackedResults": .count(resultLedger.snapshot().count),
+                "closed": .flag(isShutdown),
+            ])
+    }
     public func diagnosticSnapshot() -> ActionDiagnostics.Snapshot { diagnostics.snapshot() }
 
     public init(

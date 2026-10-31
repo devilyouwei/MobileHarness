@@ -10,15 +10,17 @@ MobileHarness is an Apple-native, bio-inspired multimodal Agent app that turns y
   <img src="./agent-loop.svg" alt="Pastel blue Signal, lavender Cognition and peach Action form a counterclockwise triangular feedback loop.">
 </p>
 
-**In MobileHarness, every input is a _Signal_, and every output is an _Action_.** Human interaction requests, multimodal data from the real world, system events, _inter-Agent_ messages and _Action_ results are all unified as _Signals_. _InputGateway_ delivers these _Signals_ to the _Agents_, which interpret them and decide what _Action_ to take next through direct logic or model reasoning. _OutputGateway_ coordinates execution through the _Actions_ module, and execution results return through _InputGateway_ as new _Signals_, closing the loop.
+**MobileHarness connects perception, cognition and execution through explicit module interfaces.** Native observations and local UI requests reach their responsible _Agents_ through typed ports. _Gateway_ carries inter-Agent _Signals_ and coordinates admitted _Action_ execution, scheduling, shared resources and correlated feedback. Agents interpret inputs through direct logic or model reasoning, then use the _Actions_ module to perform business operations through the phone's capabilities. Actual outcomes inform subsequent decisions, closing the loop.
 
 <p align="center">
-  <img src="./agent-task-skill-action.svg" alt="A lavender Agent manages a pastel blue Task and loads mint green Skills, which expose peach Actions; Action results return to the Agent to inform its next decision.">
+  <img src="./agent-task-skill-action.svg" alt="An Agent manages a Task and loads Skills, which declare Instructions, Actions and on-demand States; Action results inform subsequent decisions.">
 </p>
 
-MobileHarness supports **Skills** and **Tasks** for complex, long-running Agent work. **Tasks** preserve goals, context and loaded Skills across conversation turns. **Skills** combine callable functions with workflow instructions so Agents can understand their state, operate the phone's software and hardware, and control robotic bodies such as **NexArm**. The **Assistant** manages user conversation and one foreground Task, loading Skills as needed. **Action Results** and recoverable execution or Agent errors drive a **ReACT** loop: the Agent observes outcomes, reasons and continues toward its goal. See the [Agent design](MobileHarness/Agents/README.md) and [Skill catalog](MobileHarness/Resources/Skills/README.md).
+MobileHarness combines **Skills** and **Tasks** to support complex, long-horizon agent tasks. **Tasks** preserve goals, context and required Skills across conversation turns. **Skills** declare **Actions**, **States** and **Instructions**: callable operations, read-only views of current facts and workflow guidance. Loading a Skill progressively discloses its authorized functions and State views; selected facts are read again on each actual model request. Modules and their containers own the underlying state machines independently of Skill loading, so releasing a Skill changes visibility without stopping a capability.
 
-Biological inspiration runs throughout MobileHarness. **Agents** resemble specialized parts of the human brain, processing different **Signals** through capabilities such as speech recognition, visual pose detection and reasoning. **Gateway** acts like a central nervous system, carrying Signals to Agents and routing their Actions to the phone and connected robotic bodies.
+This gives Agents a form of **proprioception**: module snapshots distinguish business facts, runtime conditions and health, including effective expressions, robotic-arm targets versus measured positions, and unknown or stale feedback. Callers select their own State views. The **Assistant** sees selected business attributes only; runtime and engineering diagnostics remain available to internal callers. Skills explicitly name the State nodes they disclose; selecting a parent does not disclose its children. The **Assistant** manages user conversation and one foreground Task, loading Skills as needed. Actual business values and recoverable failures can continue a **ReACT** loop after execution completes; a successful void result does not automatically trigger another model request. See the [Agent design](MobileHarness/Agents/README.md), [Skill catalog](MobileHarness/Resources/Skills/README.md) and [State ownership](MobileHarness/README.md#container-state-read-path).
+
+Biological inspiration runs throughout MobileHarness. **Agents** resemble specialized parts of the human brain, processing observations and **Signals** through capabilities such as speech recognition, visual pose detection and reasoning. **Gateway** provides nervous-system coordination for Agent communication and execution. **UI**, **PlatformKit**, **ModelKit** and **Storage** provide independent presentation, native I/O, inference and storage capabilities; **App** assembles the modules and owns their lifetimes.
 
 **Keywords:** Apple-native · Bio-inspired · Embodied Agent · Multimodal · Multi-Agent · Agent Harness · Mobile Agent
 
@@ -55,7 +57,7 @@ sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
 open MobileHarness.xcodeproj
 ```
 
-The complete app's CoreAILM dependency currently requires CoreAI APIs unavailable in the simulator SDK. Use the physical-device **MobileHarness** scheme. Independent UI/shared-package clients can be checked on Mac where their dependencies permit; a separate working full simulator assembly remains outstanding. See [Gemma4](MobileHarness/ModelKit/Language/LLM/Gemma4/README.md) for the platform boundary.
+Use the physical-device **MobileHarness** scheme for the complete local-inference configuration. For simulator builds, `./scripts/build-ios.sh` selects **MobileHarnessSimulator** and sets `MOBILEHARNESS_BUILD_VARIANT=simulator` during package resolution to exclude the device-only Gemma backend. Local Gemma chat is unavailable in that variant; conversation requires an explicitly configured cloud provider. See [Gemma4](MobileHarness/ModelKit/Language/LLM/Gemma4/README.md) for the platform boundary.
 
 ### 3. Configure device signing
 
@@ -88,7 +90,7 @@ For offline development and opt-in Mac/model tests, existing `scripts/download-*
 ./scripts/build-ios.sh
 ```
 
-`check.sh` runs static dependency/ownership checks, Python provisioning tests, strict Swift formatting, shared-package tests and project/privacy/entitlement metadata checks. `build-ios.sh` attempts four unsigned simulator schemes with full Xcode and validates packaged Agent/Skill resources after the app build. The known CoreAI simulator boundary can stop that script before later schemes; invocation alone is not a successful build result. Real-model/native/device trials use their separate opt-in resources and recorded procedures.
+`check.sh` runs static dependency/ownership checks, Python provisioning tests, strict Swift formatting, shared-package tests and project/privacy/entitlement metadata checks. `build-ios.sh` builds four unsigned simulator schemes with full Xcode using the explicit simulator variant and validates packaged Agent/Skill resources after the app build. Build results and real-model/native/device acceptance are recorded separately; see the [State validation record](docs/validation/Container-Reflexivity.md).
 
 [Package.swift](Package.swift) maps the existing source tree into independent targets; tests live in [Tests](Tests/README.md). ModelKit, PlatformKit, Storage and UI are foundational modules; base capability targets have no upper-layer project dependencies, while domain/adaptor targets retain their explicit internal dependencies. AgentCore and FunctionContracts are independent contracts. The complete target map, queue limits, cancellation and completion rules belong to [MobileHarness/README.md](MobileHarness/README.md).
 

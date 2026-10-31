@@ -36,3 +36,9 @@ accept named domain-supplied migrations, including partial unfinished-message an
 ## 基础相册实施契约
 
 ✅ 添加相册元数据迁移和索引，旧media_files不自动收录；领域SQL继续由SQLiteMediaRepository拥有。
+
+## Passive state reads
+
+SQLiteDatabaseStorage.stateSnapshot reports its own lifecycle evidence. Ready is set only after startup and recovery complete; stopped only after joined shutdown. A retained startup failure reports failed. Reading the snapshot performs no SQLite or filesystem operation and does not access a repository getter.
+
+SQLite stateSnapshot returns the same StorageCore classified State as the Storage root and other children. DatabasePhase is Runtime; an actual backend failure is diagnostic health/issues. Reading never opens or accesses a repository.

@@ -46,6 +46,9 @@ final class NativeAudioInterruption: Sendable {
                 NotificationCenter.default.addObserver(
                     forName: AVAudioSession.mediaServicesWereResetNotification, object: nil, queue: nil
                 ) { _ in interruption.accept(nil, generation: generation) },
+                NotificationCenter.default.addObserver(
+                    forName: AVAudioSession.mediaServicesWereLostNotification, object: nil, queue: nil
+                ) { _ in interruption.accept(nil, generation: generation) },
             ]
         #endif
     }

@@ -1,8 +1,10 @@
 import Foundation
 import Observation
 
-public enum BluetoothAvailability: Sendable { case unknown, available, poweredOff, denied, unsupported }
-public enum BluetoothConnectionPhase: Sendable {
+public enum BluetoothAvailability: String, CaseIterable, Sendable {
+    case unknown, available, poweredOff, denied, unsupported
+}
+public enum BluetoothConnectionPhase: String, CaseIterable, Sendable {
     case idle, connecting, connected, disconnecting, failed
 }
 public enum BluetoothDeviceRowIntent: Sendable { case connect, openDetail, unavailable }
@@ -65,7 +67,7 @@ public enum BluetoothArmAction: String, CaseIterable, Identifiable, Sendable {
     }
 }
 
-public enum BluetoothRecoveryStage: Sendable {
+public enum BluetoothRecoveryStage: String, CaseIterable, Sendable {
     case idle, cleaning, waiting, connecting, waitingForBluetooth, suspended, failed
     public var title: String {
         switch self {
@@ -318,6 +320,23 @@ extension BluetoothSettingsState: DeviceSettingsPresenting {}
 
 @MainActor
 public final class UIDeviceSettingsContainer {
+    public func stateSnapshot() async throws -> UIStateSnapshot {
+        try Task.checkCancellation()
+        return UIStateSnapshot(
+            path: "ui.devices",
+            business: [
+                "phase": .text(state.phase.rawValue), "scanning": .flag(state.scanning),
+            ],
+            runtime: [
+                "available": .flag(state.isPresentationAvailable),
+                "recovery": .text(state.recoveryStage.rawValue),
+            ], meanings: ["business.phase": "Displayed device connection phase; not a physical motion phase"],
+            stateValues: [
+                "business.phase": BluetoothConnectionPhase.allCases.map(\.rawValue),
+                "runtime.recovery": BluetoothRecoveryStage.allCases.map(\.rawValue),
+            ])
+    }
+
     public let requests = UIRequests<DeviceInput, Void>()
 
     public let state = BluetoothSettingsState()

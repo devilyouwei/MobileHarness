@@ -7,6 +7,7 @@ import ModelKitRuntime
 actor SpeechSelection {
     private var recognitionEnabled = false
     private var synthesisEnabled = false
+    func stateSnapshot() -> (recognition: Bool, synthesis: Bool) { (recognitionEnabled, synthesisEnabled) }
     func configure(recognition: Bool, synthesis: Bool) {
         recognitionEnabled = recognition
         synthesisEnabled = synthesis

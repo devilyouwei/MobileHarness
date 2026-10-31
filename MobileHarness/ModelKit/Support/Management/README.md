@@ -148,3 +148,11 @@ Artifact revision observers are independently bounded to 16 newest-one streams. 
 ## 直连链路当前契约
 
 ✅ 模拟器依赖闭包排除 CoreAI，真实设备保持现有模型绑定，不注入假模型。
+
+## Passive state reads
+
+ModelManager exposes registered resource state snapshots and inference-lease activity without constructing or loading providers. ModelArtifactStore.stateSnapshot reads only in-memory transfer/queue/delete/failure/restoration state, unlike snapshots() which can restore transfer records and inspect installation. SpeechSelection.stateSnapshot reads backend-routing preferences classified as Runtime; it does not resolve providers or probe artifacts. ModelScope retains the already-prepared manager as an owner alias for passive reads.
+
+ModelState has stable raw values and finite cases for registration/resource State reflection. Container Runtime and resource child descriptors share that vocabulary; no debug description is used as the State wire value.
+
+ModelManager.resourceIDs returns registry identities only. resourceStateSnapshot(id) reads one selected resource; module metadata catalogs never enumerate all resource state values. Capability parent State contains indices, with resource phase/lease reflection available only through the exact resource reader.

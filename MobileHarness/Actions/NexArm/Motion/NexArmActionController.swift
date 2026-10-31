@@ -42,6 +42,53 @@ public actor NexArmActionController {
     public var latestState: (joints: [Int], pose: [Int]) { (cachedJoints, cachedPose) }
     public private(set) var lastFailure: String?
     public private(set) var motionFailure: NexArmMotionFailure?
+    private var activeTargets: [Int: Int] = [:]
+    public func stateSnapshot() async throws -> ActionsStateSnapshot {
+        try Task.checkCancellation()
+        return .init(
+            path: "actions.robot.motion",
+            business: [
+                "targetCounts": .object(activeTargets.reduce(into: [:]) { $0[String($1.key)] = .count($1.value) })
+            ],
+            runtime: [
+                "busy": .flag(busy), "lockedMotors": .integers(lockedMotors.sorted()),
+                "resultRevision": .unsigned(motorResultRevision),
+            ],
+            health: faulted ? .fault : .unknown,
+            children: (1...6).map { .init(path: "actions.robot.motion.motor" + String($0)) },
+            meanings: ["business.targetCounts": "Currently commanded targets; not measured positions"],
+            units: ["business.targetCounts": "encoder counts"])
+    }
+    public func stateReaders() async throws -> [String: ActionsStateSnapshot.Reader] {
+        var readers: [String: ActionsStateSnapshot.Reader] = [
+            "actions.robot.motion": ActionsStateSnapshot.reader(of: self) { try await $0.stateSnapshot() }
+        ]
+        for motor in 1...6 {
+            readers["actions.robot.motion.motor" + String(motor)] = ActionsStateSnapshot.reader(of: self) {
+                try await $0.motorStateSnapshot(motor)
+            }
+        }
+        return readers
+    }
+    private func motorStateSnapshot(_ motor: Int) async throws -> ActionsStateSnapshot {
+        try Task.checkCancellation()
+        let result = motorResults.last { $0.motor == motor }
+        return .init(
+            path: "actions.robot.motion.motor" + String(motor),
+            business: [
+                "targetCounts": activeTargets[motor].map { .count($0) } ?? .unknown,
+                "lastTargetCounts": result.map { .count($0.target) } ?? .unknown,
+                "lastObservedCounts": result?.observed.map { .count($0) } ?? .unknown,
+                "lastResult": result.map { .text($0.outcome.rawValue) } ?? .unknown,
+            ],
+            runtime: ["lastFailure": result?.failure.map { .text($0.rawValue) } ?? .unknown],
+            meanings: ["business.lastResult": "Operation outcome; unconfirmed establishes neither arrival nor damage"],
+            units: [
+                "business.targetCounts": "encoder counts", "business.lastTargetCounts": "encoder counts",
+                "business.lastObservedCounts": "encoder counts",
+            ],
+            stateValues: ["business.lastResult": NexArmMotorResult.Outcome.allCases.map(\.rawValue)])
+    }
     public init(link: any NexArmLink, compatibilityPolicy: NexArmCompatibilityPolicy = .strictFirmware) {
         self.link = link
         self.compatibilityPolicy = compatibilityPolicy
@@ -396,6 +443,8 @@ public actor NexArmActionController {
             }
         }
         for (index, step) in plan.steps.enumerated() {
+            activeTargets = step.targets
+            defer { activeTargets = [:] }
             var pending = step.targets
             func result(_ motor: Int, _ failure: NexArmMotorResult.Failure?, started: Bool) -> NexArmMotorResult {
                 NexArmMotorResult(

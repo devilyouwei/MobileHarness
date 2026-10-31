@@ -74,3 +74,5 @@
 - [State summaries and specific queries](State-And-Query-Responsibilities.md): application summary ownership, removed generic environment path, correlated feedback and admission/test/build evidence.
 
 - [NexArm motor teaching and regression](NexArm-Robot-Skill-Regression.md): axis/units teaching, relative motor requests and real-model synthetic-action evidence.
+
+- [Container reflexivity](Container-Reflexivity.md): passive module snapshots, bounded internal tree, Skill-selected disclosure and separate native/device acceptance.

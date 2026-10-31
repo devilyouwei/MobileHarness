@@ -8,6 +8,30 @@
     @available(iOS 27, *)
     @MainActor @Observable
     public final class ApplicationControlContainer {
+        public func stateSnapshot() async throws -> AgentStateSnapshot {
+            try Task.checkCancellation()
+            let status = await session?.agent.status()
+            let context = await session?.agent.residentContext()
+            let environment = try await contextSnapshotIfAvailable()
+            return AgentStateSnapshot(
+                path: "agents.applicationcontrol",
+                business: [
+                    "modelPreparation": environment.map { .text($0.modelPreparation) } ?? .unknown,
+                    "taskPhases": context?.state.taskViews.map { .texts($0.values.map { $0.stage.rawValue }.sorted()) }
+                        ?? .unknown,
+                ],
+                runtime: [
+                    "scene": environment.map { .text($0.scene) } ?? .unknown,
+                    "sceneSequence": environment?.sceneSequence.map { .unsigned($0) } ?? .unknown,
+                    "modelPreparationSequence": environment?.modelPreparationSequence.map { .unsigned($0) }
+                        ?? .unknown, "rolePhase": status.map { .text($0.lifecycle.rawValue) } ?? .unknown,
+                    "queuedInputs": status.map { .count($0.queuedInputs) } ?? .unknown,
+                    "processedInputs": status.map { .count($0.processedInputs) } ?? .unknown,
+                    "taskViews": context?.state.taskViews.map { .count($0.count) } ?? .unknown, "closed": .flag(closed),
+                    "installed": .flag(session != nil),
+                ])
+        }
+
         @ObservationIgnored private var session: ApplicationControlExecutionSession?
         @ObservationIgnored private var closed = false
         private let settingsUI: UISettingsContainer
@@ -33,12 +57,13 @@
         public var devices: BluetoothSettingsState { devicesUI.state }
         public var navigation: NavigationState { navigationUI.state }
 
-        func contextSnapshot() async throws -> ContainerContextValue<ApplicationStateSnapshot> {
-            guard !closed else { throw AgentContainerError.stopped }
-            guard let session else { throw AgentContainerError.unavailable }
+        private func contextSnapshotIfAvailable() async throws -> ApplicationStateSnapshot? {
+            guard !closed, let session else { return nil }
+            let status = await session.agent.status()
+            guard status.lifecycle == .running || status.lifecycle == .paused else { return nil }
             let value = try await session.agent.applicationState()
-            guard !closed else { throw AgentContainerError.stopped }
-            return value
+            guard !closed else { return nil }
+            return value.value
         }
 
         func setInputAvailable(_ value: Bool) {

@@ -115,3 +115,9 @@ Fixed-size saturating counters record writes, pacing/system deferrals, flow-cont
 ## Relative position conversion
 
 `NexArmMotorCommands.relativeTarget` converts signed encoder-space degrees from a supplied measured count using `round(degrees × 4096 / 360)`. It validates motor ID, encoder input, finite degrees in -360…360 and the resulting per-axis target. It never clamps or wraps. The helper performs no I/O and assigns no physical left/right meaning; the caller owns measurement acquisition and motion orchestration.
+
+## Passive reflexive reads
+
+NexArmBluetoothLink.reflectedState is a resident State reference. Unsupported implementations return nil; NexArmBluetooth seeds the actual disconnected/unknown-power state at construction and the native publisher updates the reference before yielding each business event. Inspection reads memory without calling native(), creating a driver or consuming the business stream. Operational status() retains its original behavior. Connectivity projects connection/revision, feedback age/freshness and six motor positions in encoder counts (motor IDs 1–6); no feedback is unknown, and disconnect invalidates current positions. The two-second freshness criterion is observation validity, not motion arrival, physical clearance or an automatic control policy. Native faults, feedback loss and query quarantine remain distinguishable from business targets.
+
+Native power/connection enums declare stable raw-value vocabularies for State observation. Runtime generation/revision counters retain exact UInt64 values. No State read starts a native operation.

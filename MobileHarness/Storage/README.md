@@ -29,7 +29,7 @@ flowchart TB
 | 目录                                 | 编译目标        | 责任与依赖                                                    |
 | ------------------------------------ | --------------- | ------------------------------------------------------------- |
 | 根 StorageContainer.swift            | Storage         | 三类容器组合、启动回滚与加入停止；依赖自身子目标，不依赖 GRDB |
-| 根 StorageFailure.swift、Support      | StorageCore     | 公共身份、错误、容量门、有界流和租约；无项目/第三方依赖       |
+| 根 StorageFailure.swift、Support      | StorageCore     | 公共身份、错误、State 数据契约、容量门、有界流和租约；无项目/第三方依赖       |
 | Cache（含 Audio）                    | StorageCache    | 不可变字节、租约、音频作用域；只依赖 StorageCore              |
 | Files                                | StorageFiles    | 文档、字节和受控目录；只依赖 StorageCore                      |
 | Database 根                          | StorageDatabase | 数据库生命周期协议与四个领域端口                              |
@@ -78,3 +78,9 @@ flowchart TB
 ## Container 上下文
 
 ✅ Storage仅拥有Cache／Database／Files及其生命周期；运行状态和模型上下文来源属于外部容器。照片、聊天、任务等领域记录仍由所属数据库契约持久化，不建立公共运行状态镜像。
+
+## Reflexive state reads
+
+`StorageStateSnapshot` is owned by [StorageCore contracts](Support/Contracts/StorageStateSnapshot.swift). StorageContainer, CacheContainer, FilesContainer and DatabaseStorage return this same classified Codable/Sendable structure directly. The root returns its own data and three child indices; stateReaders() provides independent read capabilities without sampling the children. All reads use stateSnapshot() async throws, and descriptors come from the returned value. Cache reports entry/retained-byte budgets and audio-scope counts; files reports existing handle counts and closure; database reports its lifecycle phase. Reads never create directories, acquire repository handles, open SQLite or read content. DatabaseStorage's default observation is unknown for backends without an implementation. SQLite owns its ready/stopping/stopped/failed evidence. Snapshot collection does not assert cross-backend atomicity.
+
+Cache budgets/retained bytes, audio scopes, file handles and database/root lifecycle belong to Runtime. A root lifecycle failure is engineering evidence under health/issues; it does not synthesize a Business problem summary. Domain repository/operation outcomes keep their typed owning interfaces. Consumers select from the same complete State read.

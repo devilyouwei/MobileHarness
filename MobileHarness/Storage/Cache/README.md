@@ -24,3 +24,7 @@ CacheBuffer 持有不可变 Data，Cache 存取只转交相同实例。CacheLeas
 
 
 ✅ AudioCache 区分句柄正常释放与失败；正常回收不进入统一异常通道，真正的缓存访问失败仍保留原错误与上报。
+
+## Passive state reads
+
+CacheContainer.stateSnapshot returns StorageCore.StorageStateSnapshot directly, with all budgets, handle counts and closure in Runtime and a matching snapshot.stateDescriptor. BufferCache.runtimeStatistics is the low-level locked observation used to compose the container State; it is not another container State format. It neither acquires a buffer lease nor creates an audio scope. Retained bytes include live leased storage, so removing a key does not imply memory release.

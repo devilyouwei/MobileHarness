@@ -22,3 +22,9 @@ RecordStorageError.notReady 表示数据库端口尚未发布，closed 表示作
 
 
 ✅ 模块根目录 [StorageFailure.swift](../../StorageFailure.swift) 定义Error／Sendable／CustomStringConvertible封装及稳定Code、Source。字段为code/component/operation/message/underlying/cleanupErrors/source；默认记录包装调用处fileID/function/line，不采集线程堆栈。同模块再次包装保留首次来源和主错误，追加清理错误。无额外清理失败的CancellationError才属于正常取消；不认识Signal或业务恢复策略。
+
+## Classified Storage State
+
+[StorageStateSnapshot.swift](StorageStateSnapshot.swift) defines the Codable/Sendable path, Business, Runtime, health/issues, path-only child references, collection time and descriptor metadata used directly by all Storage containers and the database port. It is shared within StorageCore so Cache/Files/Database never depend on the root Storage target. Value includes exact UInt64 counters, scalar/structured data and null unknowns. The contract contains no consumer-specific visibility rule or mutable state.
+
+All Container/node reads use stateSnapshot() async throws. Reference is Codable path-only metadata; Reader is an unencoded weak-owner capability for exact lookup, and Descriptor.children contains indices rather than descendant descriptors.

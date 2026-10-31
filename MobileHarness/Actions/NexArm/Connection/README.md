@@ -28,3 +28,7 @@ NexArmDeviceAdapter exposes typed control, specific Bluetooth status and deferre
 原生重连预算、退避、可恢复错误分类及失败类型由 PlatformKit 提供；本层不复制分类。根服务保留记住设备选择、主动断开、前后台/业务资格和恢复任务生命周期。连接/断开/隔离的原生执行及事实一直由SDK拥有；中文提示留在本层。
 
 The workflow forwards relative motor requests without converting units or guessing current position; the connection-owned executor obtains feedback before resolving the target.
+
+## State projection
+
+The business read projection exposes connection/recovery phase independently from native feedback. Native sample age comes from the monotonic receipt instant; disconnected sessions expose no current positions. Internal motion detail is read from the existing controller. State reads create no scan, connection, query or recovery work.

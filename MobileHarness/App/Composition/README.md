@@ -57,8 +57,18 @@ ForegroundPreparation is activated after the lifecycle foreground barrier and vi
 
 ## Native State capability binding
 
-ServiceFactories injects PlatformContainer as the narrow PlatformStateReading port into AgentContainer. This binding adds no App sampler, JSON schema conversion or extra lifecycle node. Platform startup owns passive native observation; Agents selects per-request reads, and roots retain their existing reverse cleanup order. Neither Actions nor Gateway is an intermediary for native State reads.
+ServiceFactories injects the complete ApplicationStateInspection.snapshot read into AgentContainer. Native facts retain PlatformContainer ownership; Assistant selects their Business fields. This binding adds no App sampler, JSON schema conversion or extra lifecycle node. Platform startup owns passive native observation; Agents selects per-request reads, and roots retain their existing reverse cleanup order. Neither Actions nor Gateway is an intermediary for native State reads.
 
 ## Observation and query composition
 
-App binds stable native/business read capabilities and reports scene/model preparation to Agents. AgentContainer registers agents.application from its ApplicationControl owner. Navigation reads its UI owner directly, without an additional application-environment publication. Specific business query Actions retain their owning services; App binds no generic environment/last-result callback from Agents into Actions.
+App binds complete inspection.snapshot(path:) reads and reports scene/model preparation to Agents. Assistant owns its source field selection; App does not convert or filter domain schemas. Navigation State includes UI-owned page and album context. Specific business query Actions retain their owning services; App binds no generic environment/last-result callback from Agents into Actions.
+
+## Internal state inspection
+
+`ApplicationStateInspection` registers seven scoped module catalog factories, each returning exact paths and read-only reader capabilities for existing owners. Factories contain no state copies, filtering policy or service creation. Module-local data is structurally encoded/decoded only in this adapter; independent foundations do not import a shared State module.
+
+`snapshot(path:)` resolves and reads exactly one node, without reading ancestors or siblings. `describe(path:)` derives that node's descriptor; callers with a snapshot use its stateDescriptor directly. Local snapshots contain child Reference indices only. Registration/lookup bounds catalogs to 256 nodes and encoded samples to 256 KiB. Category overlap, invalid child indices/metadata/enums, malformed paths and cancellation propagate. Owner read/encoding failure is readFailure with unknown health; a rejected configuration fences reads. The registry and State contain no global atomicity claim.
+
+`inspectTree(path:depth:)` is explicit internal caller orchestration: read a node, follow its indices within depth 16 / 256 nodes / 256 KiB, and materialize a separate Tree. Diagnostic health aggregates are Tree properties, never Container State fields. Internal healthProjection/diagnosticProjection use this explicit traversal and preserve bounded historical evidence independently from current health. These operations are not Assistant sources or model tools.
+
+App binds only exact snapshot(path:) into Agents. Assistant owns Business field selection for canonical Skill-declared paths. No alias or system.health/system.diagnostics scan can reveal an undeclared descendant. The weak Agent catalog binding avoids retaining the Agent root through its injected read callback. Lifetime, execution, UI and device behavior remain owned by their existing modules.

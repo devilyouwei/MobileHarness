@@ -79,6 +79,7 @@ public actor ModelManager {
         guard !closed, let artifacts else { throw ModelArtifactError.missingArtifact }
         return try await artifacts.observeChanges()
     }
+    public func artifactStateSnapshot() async -> ModelArtifactStore.StateSnapshot? { await artifacts?.stateSnapshot() }
     public func artifactSnapshots() async throws -> [ModelArtifactSnapshot] {
         guard !closed, let artifacts else { throw ModelArtifactError.missingArtifact }
         return try await artifacts.snapshots()
@@ -174,6 +175,26 @@ public actor ModelManager {
         try await warmup(defaultID(for: capability), reportLoading: reportLoading)
     }
     public func unload(_ capability: ProvidedCapability) async throws { try await unload(defaultID(for: capability)) }
+    public struct ResourceStateSnapshot: Sendable {
+        public let id: String
+        public let phase: String
+        public let inferenceActive: Bool
+    }
+    /// Registry identities only; never samples resource state or constructs a provider.
+    public func resourceIDs(capabilities: Set<ProvidedCapability>) -> [String] {
+        entries.values.filter { !$0.registration.capabilities.isDisjoint(with: capabilities) }
+            .map { $0.registration.id.rawValue }.sorted()
+    }
+    public func resourceStateSnapshot(_ id: String) async throws -> ResourceStateSnapshot {
+        let key = ModelID(id)
+        let item = try entry(key)
+        return .init(id: id, phase: try await status(key).rawValue, inferenceActive: await item.context.inferenceActive)
+    }
+    public func inferenceActive(_ capability: ProvidedCapability) async throws -> Bool {
+        if closed { return false }
+        let id = try defaultID(for: capability)
+        return await (try entry(id)).context.inferenceActive
+    }
     public func status(_ capability: ProvidedCapability) async throws -> ModelState {
         try await status(defaultID(for: capability))
     }

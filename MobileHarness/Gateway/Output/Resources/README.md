@@ -76,3 +76,7 @@ flowchart TD
 ```
 
 没有默认清理确认时限。取消调用者不会将未完成 cleanup 当作完成；独立 coordinator owner 继续持有资源直到旧 writer 实际退出。显式安全租约期限与清理 join 是不同机制。
+
+## Passive state observation
+
+The owning stateSnapshot entry point reads current local business/capability values and runtime admission/work facts in the owner's isolation domain. It performs no action, acquisition or device activation. The module root composes the explicitly selected fields; unknown diagnostic coverage is not healthy evidence. Domain-specific completion and failure contracts above remain authoritative.

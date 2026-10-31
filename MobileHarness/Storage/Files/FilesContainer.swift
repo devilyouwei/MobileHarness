@@ -33,6 +33,17 @@ public final class FilesContainer: Sendable {
         self.photos = FileNamespace(root: photos, owner: id)
         self.models = FileNamespace(root: models, owner: id)
     }
+    public func stateSnapshot() async throws -> StorageStateSnapshot {
+        try Task.checkCancellation()
+        return state.withLock {
+            StorageStateSnapshot(
+                path: "storage.files",
+                runtime: [
+                    "closed": .flag($0.closed), "files": .count($0.files.count),
+                    "documents": .count($0.documents.count),
+                ])
+        }
+    }
     public func start() throws {
         do {
             try access.check()
