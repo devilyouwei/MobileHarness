@@ -46,7 +46,7 @@ App binds camera/device/voice and maintenance collaboration through neutral port
 
 AgentContainer delegates sixteen exact canonical source bindings to AssistantStateBindings. App injects a local node read; loaded Skill.useStates controls exact paths and Assistant chooses Business fields. Ancestors/descendants are not implicitly read or disclosed. Generic Context/Chat remains independent of that policy. See [source mappings](Support/Context/README.md#container-context-read-path).
 
-AgentRuntime assembles cognitive services and role hosts. It sends a neutral business assembly request through the App-bound callback; Actions constructs actual domain services and returns neutral metadata/host ports. Role-specific resource takeover policy is authored here and injected as opaque endpoint values. Native stop callbacks belong to the execution owner.
+AgentRuntime assembles cognitive services and role hosts. Its preparation stage returns a neutral business request to App. App calls ActionsContainer configuration, passes the resulting host ports into the single-use Agent validation stage, configures Gateway from the resulting configuration, then calls AgentContainer.bindExecution. AgentRuntime does not invoke Actions/Gateway configuration callbacks. Preparation and binding handles consume their continuation before execution; failures require scope rollback rather than retrying a partially prepared scope. Role-specific resource takeover policy is authored here and injected as opaque endpoint values. Native stop callbacks belong to the execution owner.
 
 ## Native intake and semantic roles
 

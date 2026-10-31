@@ -51,8 +51,7 @@ final class ApplicationActionAssembly {
     var camera: CameraCoordinator { business.camera }
     var device: NexArmDeviceAdapter { business.device }
     func prepare(_ request: AgentBusinessRequest) throws -> AgentBusinessBindings {
-        try actions.configureBusiness(business)
-        let ports = try business.prepare(request)
+        let ports = try actions.configureBusiness(business, request: request)
         return AgentBusinessBindings(
             executor: ports.executor, catalog: ports.catalog, settings: ports.settings,
             discovery: ports.discovery, providerPresentation: ports.providerPresentation, tasks: ports.tasks,

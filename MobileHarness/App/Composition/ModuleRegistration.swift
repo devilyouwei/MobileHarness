@@ -32,9 +32,13 @@ import Gateway
             ManagedService(
                 id: "executionBindings", dependencies: ["storage", "platform", "ui", "model"],
                 start: {
-                    try services.agents.prepareExecutionBindings(
-                        declarations: CapabilityModules.declarations, prepareBusiness: services.actionAssembly.prepare,
-                        configure: { try AgentGatewayAssembly.configure(root: services.gateway, configuration: $0) })
+                    let preparation = try services.agents.prepareExecutionBindings(
+                        declarations: CapabilityModules.declarations)
+                    let business = try services.actionAssembly.prepare(preparation.request)
+                    let binding = try preparation.validate(business)
+                    let facilities = try AgentGatewayAssembly.configure(
+                        root: services.gateway, configuration: binding.configuration)
+                    try services.agents.bindExecution(binding, facilities: facilities)
                 },
                 stop: {
                     var failure: (any Error)?

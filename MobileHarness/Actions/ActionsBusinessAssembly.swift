@@ -236,7 +236,9 @@
 #if os(iOS)
     @available(iOS 27, *)
     extension ActionsContainer {
-        public func configureBusiness(_ assembly: ActionsBusinessAssembly) throws {
+        public func configureBusiness(_ assembly: ActionsBusinessAssembly, request: ActionsBusinessRequest) throws
+            -> ActionsBusinessBindings
+        {
             guard state == .cold, businessOwner == nil else { throw ActionsContainerError.alreadyConfigured }
             businessOwner = assembly
             try registerPreparationCleanup { try await assembly.camera.shutdown() }
@@ -244,6 +246,7 @@
             try registerPreparationCleanup {
                 await assembly.stopInteractions()
             }
+            return try assembly.prepare(request)
         }
     }
 #endif

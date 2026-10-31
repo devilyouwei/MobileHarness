@@ -216,14 +216,14 @@ import StorageFiles
                 speechPerception.endSettingsChange()
             }
         }
+        private var executionPreparationStarted = false
         /// Called by App's executionBindings node after foundational repositories are ready.
         public func prepareExecutionBindings(
-            declarations: [ActionDeclaration],
-            prepareBusiness: @MainActor (AgentBusinessRequest) throws -> AgentBusinessBindings,
-            configure: @MainActor (AgentGatewayConfiguration) throws -> AgentGatewayCapabilities
-        ) throws {
+            declarations: [ActionDeclaration]
+        ) throws -> AgentExecutionPreparation {
             guard !lifecycle.isStopped else { throw AgentContainerError.stopped }
-            guard runtimeValue == nil else { throw GatewayContainerError.alreadyConfigured }
+            guard !executionPreparationStarted else { throw GatewayContainerError.alreadyConfigured }
+            executionPreparationStarted = true
             try Task.checkCancellation()
             _ = try repositories()
             try AgentConfigurations.installDeclarations(declarations)
@@ -248,8 +248,8 @@ import StorageFiles
                     self?.onModelConfigurationChanged?()
                 },
                 resourcesPresented: { [weak self] in self?.applicationControl.acceptResourceSnapshot() })
-            let runtime = try AgentRuntime(
-                prepareBusiness: prepareBusiness, configureGateway: configure, maintenance: maintenance,
+            return try AgentRuntime.prepare(
+                maintenance: maintenance,
                 containerFailures: containerFailures, home: homeUI,
                 assistantContainer: assistant, applicationControlContainer: applicationControl,
                 memoryContainer: memory, photographerContainer: photographer,
@@ -270,7 +270,11 @@ import StorageFiles
                     return await self.applicationControl.modelName
                 },
                 chatProvider: { [languageModels] in languageModels })
-            runtimeValue = runtime
+        }
+        public func bindExecution(_ binding: AgentExecutionBinding, facilities: AgentGatewayCapabilities) throws {
+            guard !lifecycle.isStopped else { throw AgentContainerError.stopped }
+            guard runtimeValue == nil else { throw GatewayContainerError.alreadyConfigured }
+            runtimeValue = try binding.finish(facilities)
         }
         /// App calls this after Gateway stops, retaining execution endpoints through cleanup.
         public func releaseExecutionBindings() async {

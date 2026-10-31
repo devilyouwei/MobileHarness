@@ -16,6 +16,40 @@ import StorageFiles
     import StorageTasks
     import UI
 
+    @MainActor @available(iOS 27, *)
+    public final class AgentExecutionPreparation {
+        public let request: AgentBusinessRequest
+        private var operation: ((AgentBusinessBindings) throws -> AgentExecutionBinding)?
+        init(
+            request: AgentBusinessRequest, operation: @escaping (AgentBusinessBindings) throws -> AgentExecutionBinding
+        ) {
+            self.request = request
+            self.operation = operation
+        }
+        public func validate(_ business: AgentBusinessBindings) throws -> AgentExecutionBinding {
+            guard let operation else { throw AgentContainerError.unavailable }
+            self.operation = nil
+            return try operation(business)
+        }
+    }
+    @MainActor @available(iOS 27, *)
+    public final class AgentExecutionBinding {
+        public let configuration: AgentGatewayConfiguration
+        private var operation: ((AgentGatewayCapabilities) throws -> AgentRuntime)?
+        init(
+            configuration: AgentGatewayConfiguration,
+            operation: @escaping (AgentGatewayCapabilities) throws -> AgentRuntime
+        ) {
+            self.configuration = configuration
+            self.operation = operation
+        }
+        func finish(_ facilities: AgentGatewayCapabilities) throws -> AgentRuntime {
+            guard let operation else { throw AgentContainerError.unavailable }
+            self.operation = nil
+            return try operation(facilities)
+        }
+    }
+
     /// Root-owned communication assembly, available before voice models are ready.
     @MainActor
     @available(iOS 27, *)
@@ -64,9 +98,7 @@ import StorageFiles
         let actionActivity: ActionActivityWorkflow
         let resources: ResourceCoordinator
 
-        init(
-            prepareBusiness: @MainActor (AgentBusinessRequest) throws -> AgentBusinessBindings,
-            configureGateway: @MainActor (AgentGatewayConfiguration) throws -> AgentGatewayCapabilities,
+        static func prepare(
             maintenance: AgentMaintenancePorts,
             containerFailures: ContainerFailureChannel, home: UIHomeContainer,
             assistantContainer: AssistantContainer, applicationControlContainer: ApplicationControlContainer,
@@ -80,105 +112,102 @@ import StorageFiles
             summarizeTitle: @escaping @Sendable (StoredConversation) async throws -> String,
             modelName: @escaping @Sendable () async throws -> String = { "Unspecified model" },
             chatProvider: @escaping @Sendable () async throws -> any ChatCapability
-        ) throws {
+        ) throws -> AgentExecutionPreparation {
             let contextScope = UUID().uuidString
-            self.contextScope = contextScope
-            self.uiHome = home
-            self.containerFailures = containerFailures
-            self.cacheStorage = cache
             let assistantContext = try AgentContextRepository(
                 agent: .assistant, scope: contextScope, state: AssistantContextState())
-            self.assistantContext = assistantContext
             let historyStore = try AssistantConversationStorage.store(
                 repository: assistantContext, chat: chatRecords, tasks: taskRecords)
-            conversations = historyStore
             let applicationControlSessionID = UUID().uuidString
-            self.interactionSessionID = applicationControlSessionID
             let activity = ActionActivityWorkflow(state: home.activityPresentation)
-            let business = try prepareBusiness(
-                AgentBusinessRequest(
-                    sessionID: applicationControlSessionID,
-                    conversations: conversations, activity: activity.state, failures: activity,
-                    maintenance: maintenance, summarizeTitle: summarizeTitle,
-                    titlePositions: { ConversationTitleGenerator.samplePositions(count: $0) },
-                    resourcePolicies: (1...6).map { motor in
-                        ResourcePolicy(
-                            id: ResourceID(rawValue: "nexarm.motor.\(motor)"),
-                            allowedOwners: Set([
-                                AgentID.assistant.rawValue, AgentID.applicationControl.rawValue,
-                                AgentID.photographer.rawValue,
-                            ]),
-                            executionGroup: ResourceID(rawValue: "nexarm.writer"),
-                            preempts: [
-                                AgentID.assistant.rawValue: [AgentID.photographer.rawValue],
-                                AgentID.applicationControl.rawValue: [AgentID.photographer.rawValue],
-                            ])
-                    }))
-            let applicationContext = try Self.context(
-                .applicationControl, ApplicationControlContextState(), scope: contextScope)
-            let photographerContext = try Self.context(.photographer, PhotographerContextState(), scope: contextScope)
-            let memoryContext = try Self.context(.memory, MemoryContextState(), scope: contextScope)
-            let applicationControlAgent = try ApplicationControlAgent(
+            let conversations = historyStore
+            let request = AgentBusinessRequest(
                 sessionID: applicationControlSessionID,
-                uiSettings: settingsUI, uiResources: resourcesUI, uiDevices: devicesUI, uiDiagnostics: diagnosticsUI,
-                connectionFacts: business.connectionFacts,
-                resourceChanges: resourceChanges,
-                observationFailure: { error in
-                    containerFailures.report(
-                        module: "agents", component: "resources", operation: "observe", error: error)
-                },
-                uiProviderSettings: business.settings, uiProviderDiscovery: business.discovery,
-                uiProviderPresentation: business.providerPresentation, decodeResources: business.decodeResources,
-                context: applicationContext)
-            let photographerSessionID = applicationControlSessionID
-            let photographerAgent = try PhotographerAgent(
-                sessionID: photographerSessionID, uiCamera: cameraUI, controlsArm: true, uiAlbum: albumUI,
-                cameraObservationFailure: { error in
-                    containerFailures.report(module: "agents", component: "camera", operation: "observe", error: error)
-                },
-                controlAvailable: business.trackingAvailable,
-                context: photographerContext)
-            business.bindTracking { [weak photographerAgent] in
-                await photographerAgent?.hasFreshPose() ?? false
-            }
-            let historySessionID = applicationControlSessionID
-            let policy = try CommunicationPolicy(
-                contracts: AgentContracts.communication,
-                configurations: [
-                    "Assistant", "SpeechPerception", "VisionPerception", "Photographer", "SpeechSynthesis",
-                    "Memory", "ApplicationControl",
-                ]
-                .map {
-                    try AgentConfigurations.load(named: $0)
+                conversations: conversations, activity: activity.state, failures: activity,
+                maintenance: maintenance, summarizeTitle: summarizeTitle,
+                titlePositions: { ConversationTitleGenerator.samplePositions(count: $0) },
+                resourcePolicies: (1...6).map { motor in
+                    ResourcePolicy(
+                        id: ResourceID(rawValue: "nexarm.motor.\(motor)"),
+                        allowedOwners: Set([
+                            AgentID.assistant.rawValue, AgentID.applicationControl.rawValue,
+                            AgentID.photographer.rawValue,
+                        ]),
+                        executionGroup: ResourceID(rawValue: "nexarm.writer"),
+                        preempts: [
+                            AgentID.assistant.rawValue: [AgentID.photographer.rawValue],
+                            AgentID.applicationControl.rawValue: [AgentID.photographer.rawValue],
+                        ])
                 })
-            let historyAgent = try MemoryAgent(
-                sessionID: historySessionID, uiHistory: historyUI,
-                beforeNewConversation: {
-                    if try await assistantContext.snapshot().state.skillState?.activeTaskID != nil {
-                        guard let control = await business.tasks.handler else {
-                            throw CommunicationError.unavailableTarget
+            return AgentExecutionPreparation(request: request) { business in
+                let applicationContext = try Self.context(
+                    .applicationControl, ApplicationControlContextState(), scope: contextScope)
+                let photographerContext = try Self.context(
+                    .photographer, PhotographerContextState(), scope: contextScope)
+                let memoryContext = try Self.context(.memory, MemoryContextState(), scope: contextScope)
+                let applicationControlAgent = try ApplicationControlAgent(
+                    sessionID: applicationControlSessionID,
+                    uiSettings: settingsUI, uiResources: resourcesUI, uiDevices: devicesUI,
+                    uiDiagnostics: diagnosticsUI,
+                    connectionFacts: business.connectionFacts,
+                    resourceChanges: resourceChanges,
+                    observationFailure: { error in
+                        containerFailures.report(
+                            module: "agents", component: "resources", operation: "observe", error: error)
+                    },
+                    uiProviderSettings: business.settings, uiProviderDiscovery: business.discovery,
+                    uiProviderPresentation: business.providerPresentation, decodeResources: business.decodeResources,
+                    context: applicationContext)
+                let photographerSessionID = applicationControlSessionID
+                let photographerAgent = try PhotographerAgent(
+                    sessionID: photographerSessionID, uiCamera: cameraUI, controlsArm: true, uiAlbum: albumUI,
+                    cameraObservationFailure: { error in
+                        containerFailures.report(
+                            module: "agents", component: "camera", operation: "observe", error: error)
+                    },
+                    controlAvailable: business.trackingAvailable,
+                    context: photographerContext)
+                business.bindTracking { [weak photographerAgent] in
+                    await photographerAgent?.hasFreshPose() ?? false
+                }
+                let historySessionID = applicationControlSessionID
+                let policy = try CommunicationPolicy(
+                    contracts: AgentContracts.communication,
+                    configurations: [
+                        "Assistant", "SpeechPerception", "VisionPerception", "Photographer", "SpeechSynthesis",
+                        "Memory", "ApplicationControl",
+                    ]
+                    .map {
+                        try AgentConfigurations.load(named: $0)
+                    })
+                let historyAgent = try MemoryAgent(
+                    sessionID: historySessionID, uiHistory: historyUI,
+                    beforeNewConversation: {
+                        if try await assistantContext.snapshot().state.skillState?.activeTaskID != nil {
+                            guard let control = await business.tasks.handler else {
+                                throw CommunicationError.unavailableTarget
+                            }
+                            _ = try await control(
+                                "cancelTask", ["reason": "用户开始新对话"], "assistant",
+                                applicationControlSessionID, UUID().uuidString, nil)
                         }
-                        _ = try await control(
-                            "cancelTask", ["reason": "用户开始新对话"], "assistant",
-                            applicationControlSessionID, UUID().uuidString, nil)
-                    }
-                }, context: memoryContext)
-            let execution = business.executor
-            let catalog = business.catalog
-            try BehaviorCoverage.validate(
-                catalog: catalog,
-                capabilities: [
-                    AssistantAgent.runtimeCapabilities(AgentConfigurations.load(named: "Assistant").capabilities),
-                    SpeechPerceptionAgent.runtimeCapabilities(
-                        AgentConfigurations.load(named: "SpeechPerception").capabilities),
-                    VisionPerceptionAgent.runtimeCapabilities(
-                        AgentConfigurations.load(named: "VisionPerception").capabilities),
-                    PhotographerAgent.runtimeCapabilities(AgentConfigurations.load(named: "Photographer").capabilities),
-                    AgentConfigurations.load(named: "SpeechSynthesis").capabilities,
-                    historyAgent.descriptor.capabilities, applicationControlAgent.descriptor.capabilities,
-                ] + AgentConfigurations.skillRegistries())
-            let facilities = try configureGateway(
-                AgentGatewayConfiguration(
+                    }, context: memoryContext)
+                let execution = business.executor
+                let catalog = business.catalog
+                try BehaviorCoverage.validate(
+                    catalog: catalog,
+                    capabilities: [
+                        AssistantAgent.runtimeCapabilities(AgentConfigurations.load(named: "Assistant").capabilities),
+                        SpeechPerceptionAgent.runtimeCapabilities(
+                            AgentConfigurations.load(named: "SpeechPerception").capabilities),
+                        VisionPerceptionAgent.runtimeCapabilities(
+                            AgentConfigurations.load(named: "VisionPerception").capabilities),
+                        PhotographerAgent.runtimeCapabilities(
+                            AgentConfigurations.load(named: "Photographer").capabilities),
+                        AgentConfigurations.load(named: "SpeechSynthesis").capabilities,
+                        historyAgent.descriptor.capabilities, applicationControlAgent.descriptor.capabilities,
+                    ] + AgentConfigurations.skillRegistries())
+                let configuration = AgentGatewayConfiguration(
                     executor: execution, catalog: catalog, policy: policy, resources: business.resources,
                     signalSummary: { input in
                         switch input.payload {
@@ -208,7 +237,40 @@ import StorageFiles
                         case .speechPhase(.empty): try await business.observeEmpty(input.sessionID)
                         default: break
                         }
-                    }, sink: { await business.output($0.actionObservation) }))
+                    }, sink: { await business.output($0.actionObservation) })
+                return AgentExecutionBinding(configuration: configuration) { facilities in
+                    try AgentRuntime(
+                        facilities: facilities, business: business, contextScope: contextScope, home: home,
+                        containerFailures: containerFailures, cache: cache, assistantContext: assistantContext,
+                        conversations: conversations, applicationControlSessionID: applicationControlSessionID,
+                        activity: activity, photographerAgent: photographerAgent,
+                        applicationControlAgent: applicationControlAgent, historyAgent: historyAgent,
+                        stateContext: stateContext, cameraControl: cameraControl, chatProvider: chatProvider,
+                        modelName: modelName, assistantContainer: assistantContainer,
+                        applicationControlContainer: applicationControlContainer, memoryContainer: memoryContainer,
+                        photographerContainer: photographerContainer)
+                }
+            }
+        }
+        private init(
+            facilities: AgentGatewayCapabilities, business: AgentBusinessBindings, contextScope: String,
+            home: UIHomeContainer, containerFailures: ContainerFailureChannel, cache: CacheContainer,
+            assistantContext: AgentContextRepository<AssistantContextState>, conversations: ConversationHistoryStore,
+            applicationControlSessionID: String, activity: ActionActivityWorkflow, photographerAgent: PhotographerAgent,
+            applicationControlAgent: ApplicationControlAgent, historyAgent: MemoryAgent,
+            stateContext: AgentStateContext, cameraControl: any AgentCameraAccess,
+            chatProvider: @escaping @Sendable () async throws -> any ChatCapability,
+            modelName: @escaping @Sendable () async throws -> String, assistantContainer: AssistantContainer,
+            applicationControlContainer: ApplicationControlContainer, memoryContainer: MemoryContainer,
+            photographerContainer: PhotographerContainer
+        ) throws {
+            self.contextScope = contextScope
+            self.uiHome = home
+            self.containerFailures = containerFailures
+            self.cacheStorage = cache
+            self.assistantContext = assistantContext
+            self.conversations = conversations
+            self.interactionSessionID = applicationControlSessionID
             let manager = facilities.manager
             let input = facilities.input
             let resources = facilities.resources

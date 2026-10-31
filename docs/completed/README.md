@@ -61,3 +61,5 @@
 2026-10-27：[NexArm 通用设备反馈与连接错误归属](NexArm-Device-Feedback-Ownership.md) 完成SDK容差、位置观察、行程估算及原生恢复预算/分类迁移；全量自动检查和四项iOS构建通过，未安装或实物测试。
 
 - [NexArm motor teaching and regression](NexArm-Robot-Skill-Teaching.md): relative motor requests, unit/axis teaching and three-model experiments with retained failure evidence.
+
+- [Explicit execution composition](Explicit-Execution-Composition.md): App-sequenced preparation and module-owned configuration; automated checks and simulator build passed.
