@@ -2,7 +2,7 @@
 
 ## 职责与关系
 
-实际感知注册与模型图属于注入的上游角色；本目录拥有权限、捕获启停、半双工、启动反馈及真实播放屏障。原始 PCM 由感知角色直接订阅。关闭先取消并加入执行和播放，再释放共享音频；页面离开不释放根会话。
+实际感知注册与模型图属于注入的上游角色；本目录拥有权限、捕获启停、半双工、启动反馈及真实播放屏障。原始 PCM 由感知角色直接订阅。关闭停止并加入原生采集和播放清理，再释放共享音频；回复执行的取消边界见下文。页面离开不释放根会话。
 
 本目录由所属域目录绑定，接受标准 FunctionInput；调用权限、通用调度与资源仲裁由上游 Gateway 保持。下游只消费注入的基础能力。
 
@@ -24,3 +24,11 @@ VoiceSessionCoordinator.start 在发布 isReady 前完成 wake/0.85 音效 PCM �
 ## Execution ownership and lifecycle
 
 VoiceSessionCoordinator is retained and cleaned by ActionsContainer. Voice output/presentation/perception protocols and typed values live in FunctionContracts. Business checks use current session/generation/native conditions, without role-name permission tests. Agent cancellation policy arrives through the injected narrow host interface.
+
+## BasicSkill 启停与关闭完成
+
+startListening / stopListening 由 @Action 声明并在 SpeechModule 显式绑定；参数校验位于能力调用前，可用于纯 preflight。VoiceSessionCoordinator.setListening 验证根会话、已启动与设置状态，经 VoicePerceptionHandling.setListening 取得权威 enabled/paused/revision，复用内部策略应用。revision 拒绝迟到快照；启动保留权限、反馈、清理加入及半双工屏障。
+
+stopListening 先撤销感知许可，再同步停止原生播放、失效采集代并屏蔽麦克风，返回前加入 cleanupTask（含既有清理、采集关闭与感知 closeCapture）。Action 关闭分支不调用 cancelReply，避免当前执行取消并等待自己；它不隐式关闭业务 Task。UI 手势、系统中断与生命周期原路径仍取消回复。取消不会恢复已撤销许可；后续回复活动和播放清理只能在许可有效时恢复采集。下一次启用由长按或用户明确要求的 startListening 发起。
+
+明确关闭在未启动或已关闭时同样归一为“语音已停止”；内部策略停机保留已有失败诊断状态。

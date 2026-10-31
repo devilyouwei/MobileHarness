@@ -1547,3 +1547,53 @@ func coldRecognitionRejectsOverflowWithoutDroppingPreviouslyQueuedPCM() async th
     cancelled.cancel()
     await #expect(throws: CancellationError.self) { try await cancelled.value }
 }
+
+@Test(.actionCatalog) func listeningActionConsentSurvivesReplyCompletionAndAllowsExplicitReactivation() async throws {
+    let session = UUID().uuidString
+    let agent = try SpeechPerceptionAgent(
+        recognition: RecognitionFixture(text: "", includeFinal: false), vad: NativeRateVADProbe(),
+        sessionID: session, interactionSessionID: session, residentListening: true,
+        context: try AgentContextRepository(
+            agent: AgentID(rawValue: "speechPerception"), scope: UUID().uuidString,
+            state: SpeechPerceptionContextState()))
+    await #expect(throws: HarnessError.self) {
+        try await agent.setListening(enabled: true, sessionID: session)
+    }
+    try await agent.start()
+    let probe = PerceptionListeningProbe()
+    let pump = Task { for await output in agent.outputs { await probe.record(output) } }
+    await #expect(throws: HarnessError.self) {
+        try await agent.setListening(enabled: true, sessionID: "wrong-session")
+    }
+    let started = try await agent.setListening(enabled: true, sessionID: session)
+    #expect(started.enabled && !started.paused)
+    let incarnation = UUID().uuidString
+    try await agent.receive(
+        replyActivityInput(session: session, incarnation: incarnation, revision: 1, inputs: ["reply"]))
+    let stopped = try await agent.setListening(enabled: false, sessionID: session)
+    #expect(!stopped.enabled && stopped.paused && stopped.revision > started.revision)
+    let stoppedAgain = try await agent.setListening(enabled: false, sessionID: session)
+    #expect(!stoppedAgain.enabled && stoppedAgain.revision > stopped.revision)
+    try await agent.receive(replyActivityInput(session: session, incarnation: incarnation, revision: 2))
+    let off = try await agent.setListening(enabled: false, sessionID: session)
+    #expect(!off.enabled && !off.paused)
+    // A fresh physical hold still uses the existing trusted user-intent path.
+    try await agent.receive(ListeningIntent(enabled: true).input(sessionID: session))
+    let on = try await agent.setListening(enabled: true, sessionID: session)
+    #expect(on.enabled && !on.paused && on.revision > off.revision)
+    try await agent.pause()
+    await #expect(throws: HarnessError.self) {
+        try await agent.setListening(enabled: true, sessionID: session)
+    }
+    #expect(try await !agent.setListening(enabled: false, sessionID: session).enabled)
+    await agent.stop()
+    await pump.value
+    let updates = await probe.values
+    #expect(updates.count == 3)  // Direct Action control does not recursively enqueue updates.
+    #expect(updates[0].enabled && updates[0].paused)
+    #expect(!updates[1].enabled && !updates[1].paused)
+    #expect(updates[2].enabled && !updates[2].paused)
+    await #expect(throws: HarnessError.self) {
+        try await agent.setListening(enabled: true, sessionID: session)
+    }
+}

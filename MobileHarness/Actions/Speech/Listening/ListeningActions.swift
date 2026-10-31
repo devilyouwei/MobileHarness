@@ -81,3 +81,38 @@ extension SpeechActions {
             })
     }
 }
+
+// Public intent Actions never accept the internal policy revision or reply pause.
+extension SpeechActions {
+    @Action(
+        domain: "Speech", module: "Listening", title: "打开聆听",
+        doc:
+            "Enable listening.",
+        kind: .finite, completion: "Activated.",
+        timeout: .seconds(90))
+    public static func startListening(
+        invocation: any FunctionInput, using listening: any SpeechListeningCapability
+    ) async throws {
+        let arguments = ActionArguments(invocation.call.parameters)
+        try arguments.validateAllowedKeys([])
+        try Task.checkCancellation()
+        try await listening.setListening(enabled: true, invocation: invocation)
+        try Task.checkCancellation()
+    }
+
+    @Action(
+        domain: "Speech", module: "Listening", title: "关闭聆听",
+        doc:
+            "End conversation/listening.",
+        kind: .finite, completion: "Capture stopped.",
+        timeout: .seconds(90))
+    public static func stopListening(
+        invocation: any FunctionInput, using listening: any SpeechListeningCapability
+    ) async throws {
+        let arguments = ActionArguments(invocation.call.parameters)
+        try arguments.validateAllowedKeys([])
+        try Task.checkCancellation()
+        try await listening.setListening(enabled: false, invocation: invocation)
+        try Task.checkCancellation()
+    }
+}

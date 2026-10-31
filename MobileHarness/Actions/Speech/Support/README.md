@@ -14,3 +14,5 @@
 | [SpeechTypes.swift](../../Support/Contracts/SpeechTypes.swift) | 共享语音错误与反馈配置 |
 
 [所属域设计](../README.md) · [公共契约](../../Support/Contracts/README.md)
+
+SpeechListeningCapability 同时提供内部策略应用 updateListening 和公开意图执行 setListening；后者不接收 revision/paused，默认实现明确抛出 listeningUnavailable，保证缺失控制能力不会伪造成功。SpeechModule 的显式聆听依赖绑定这两个入口。

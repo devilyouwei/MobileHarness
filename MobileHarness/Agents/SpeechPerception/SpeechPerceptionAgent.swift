@@ -299,7 +299,24 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
         try emit(.control("agent.finished"), input: command)
     }
 
-    /// Revocation is independent of UI availability; only the UI source admits renewed consent.
+    /// Action execution applies the returned revision directly; it must not enqueue a second Action.
+    public func setListening(enabled: Bool, sessionID: String) async throws -> SpeechActions.ListeningPolicy {
+        try Task.checkCancellation()
+        guard residentListening, sessionID == interactionSessionID,
+            lifecycle == .running || (lifecycle == .paused && !enabled)
+        else { throw HarnessError.notRunning }
+        listeningAdmissionEpoch = UUID()
+        listeningPolicy.enabled = enabled
+        if !enabled {
+            listeningPolicy.pendingFinal = nil
+            awaitingReply = true
+        }
+        listeningPolicy.revision += 1
+        return SpeechActions.ListeningPolicy(
+            enabled: listeningPolicy.enabled, paused: listeningPolicy.paused, revision: listeningPolicy.revision)
+    }
+
+    /// Lifecycle revocation is independent of UI availability and cannot grant renewed consent.
     public func stopListening(sessionID: String) throws {
         guard residentListening, sessionID == interactionSessionID,
             lifecycle == .running || lifecycle == .paused

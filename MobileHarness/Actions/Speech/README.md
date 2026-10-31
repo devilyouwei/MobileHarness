@@ -39,3 +39,7 @@ update 拒绝未知键。cue 可选 wake/confirm/cancel/error/soft/save/discard�
 update 的固定使用者是 SpeechPerception；实际 source/session/revision 准入由 Actions 执行端点验证，函数入口不重复解释权限。新启动的反馈与捕获由端点组合，子结果通过父 invocation 的报告端口保存。策略更新不等于每次都播放启动反馈。
 
 [Actions 设计](../README.md) · [公共函数契约](../Support/Contracts/README.md)
+
+## 公开聆听控制
+
+`Speech.Listening.startListening` / `stopListening` 均为无参数有限 Action，拒绝未知键，timeout 为 90 秒。SpeechModule 通过显式 SpeechListeningCapability.setListening 绑定；未绑定能力或不支持控制时抛出 listeningUnavailable。SpeechExecutionEndpoint 校验根会话并调用弱绑定的 VoiceOutputHandling。启停直接取得感知策略并实际应用，不通过 UI 请求或二次 Action 排队。模型不能提交内部 update 的 revision/paused。完成及取消边界见 [Listening](Listening/README.md)。

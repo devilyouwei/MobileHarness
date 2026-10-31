@@ -86,3 +86,5 @@ App explicitly sequences execution preparation: AgentContainer prepares cognitiv
 ActionsContainer owns camera/device scene invalidation and joined native suspension through its configured nativeForeground callback. Suspension joins executing work and native cleanup before resume; failures prevent reopening admission. Camera page visibility is a separate App-supplied input combined with scene admission. Agents never shuts down these execution owners.
 
 ActionsContainer.makeBusiness receives ActionsDependencies, creates the private ActionsBusinessAssembly, Bluetooth workflow and photo store, and returns the root plus ActionsHostCapabilities. Public camera/device protocols and UI facades expose only host operations. The root owns cleanup immediately, including stop before catalog configuration. configureBusiness(request:) consumes the internally owned assembly after foundations are ready; App cannot construct or access it.
+
+Speech 的公开聆听启停由 BasicSkill 经 Gateway 调用。Actions 通过中立感知端口取得权威策略 revision 后直接应用并加入原生清理，不将模型输入当作内部策略快照。关闭 Action 不取消并等待其所属回复；生命周期与手势停机仍沿用回复取消契约。详见 [聆听设计](Speech/Listening/README.md)。

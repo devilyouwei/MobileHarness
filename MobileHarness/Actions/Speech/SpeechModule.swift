@@ -22,6 +22,14 @@ public struct SpeechModule: CapabilityModule {
                     try await playback.play(audioID: $0, invocation: $1)
                 }
             }),
+            SpeechActions.startListeningDefinition(handler: { [listening] invocation in
+                guard let listening else { throw SpeechActionError.listeningUnavailable }
+                try await SpeechActions.startListening(invocation: invocation, using: listening)
+            }),
+            SpeechActions.stopListeningDefinition(handler: { [listening] invocation in
+                guard let listening else { throw SpeechActionError.listeningUnavailable }
+                try await SpeechActions.stopListening(invocation: invocation, using: listening)
+            }),
             SpeechActions.updateDefinition(handler: { [listening] invocation in
                 guard let listening else { throw SpeechActionError.listeningUnavailable }
                 try await SpeechActions.update(invocation: invocation) { enabled, paused, revision, feedback in

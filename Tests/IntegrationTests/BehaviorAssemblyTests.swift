@@ -412,6 +412,8 @@ private actor LockedTaskRequests {
 @MainActor private final class EndpointVoiceFixture: VoiceOutputHandling {
     private(set) var plays = 0
     private(set) var captions = 0
+    private(set) var listening: [Bool] = []
+    func setListening(enabled: Bool, invocation: any FunctionInput) throws { listening.append(enabled) }
     func validateCameraControl(invocation: any FunctionInput) throws {}
     func updateListening(
         enabled: Bool, paused: Bool, revision: UInt64, feedback: SpeechActions.ListeningFeedback,
@@ -461,4 +463,44 @@ private actor LockedTaskRequests {
     try await endpoints.presentation.present("caption", invocation: invocation)
     #expect(replacement.plays == 1 && replacement.captions == 1)
     endpoints.unbindVoice(replacement)
+}
+
+@Test(.actionCatalog) @MainActor func listeningControlEndpointRejectsWrongSessionAndMissingOwner() async throws {
+    let endpoint = SpeechExecutionEndpoint(rootSessionID: "root")
+    let input = endpointInvocation(source: "assistant", session: "root")
+    await #expect(throws: ActionHostError.scopeClosed) {
+        try await endpoint.setListening(enabled: false, invocation: input)
+    }
+    let voice = EndpointVoiceFixture()
+    try endpoint.bind(voice)
+    await #expect(throws: ActionHostError.unauthorized) {
+        try await endpoint.setListening(
+            enabled: true, invocation: endpointInvocation(source: "assistant", session: "other"))
+    }
+    #expect(voice.listening.isEmpty)
+    try await endpoint.setListening(enabled: true, invocation: input)
+    try await endpoint.setListening(enabled: false, invocation: input)
+    #expect(voice.listening == [true, false])
+    endpoint.unbind(voice)
+    await #expect(throws: ActionHostError.scopeClosed) {
+        try await endpoint.setListening(enabled: true, invocation: input)
+    }
+}
+
+@Test(.actionCatalog) func listeningCatalogUsesBasicSkillBindingsAndFailsWithoutCapability() async throws {
+    let registry = try AgentSkillLoader.registry(["basic-skill"], fixed: CapabilityRegistry())
+    let module = SpeechModule(playback: BehaviorEndpoint())
+    for name in ["startListening", "stopListening"] {
+        let path = ActionIdentifier(domain: "Speech", module: "Listening", function: name)
+        let binding = try #require(registry.actions.first { $0.path.description == path.description })
+        #expect(binding.alias == name && binding.defaultChannel == "ListeningControl")
+        let definition = try #require(module.definitions.first { $0.path == path })
+        let input = FunctionInvocation(
+            call: .init(actionPath: path),
+            context: .init(source: "assistant", sessionID: "root", inputID: UUID().uuidString, sequence: 1),
+            executionID: UUID().uuidString, results: ActionReportStore())
+        await #expect(throws: SpeechActionError.listeningUnavailable) {
+            try await definition.handler(input)
+        }
+    }
 }

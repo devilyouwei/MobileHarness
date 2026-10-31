@@ -384,9 +384,33 @@ public enum VoiceReplyCancellation {
             }
         }
 
+        public func setListening(enabled: Bool, invocation: any FunctionInput) async throws {
+            try Task.checkCancellation()
+            guard invocation.context.sessionID == runtime.interactionSessionID, started, !changingSettings,
+                let speech
+            else { throw ActionHostError.unauthorized }
+            let policy = try await speech.setListening(enabled: enabled, sessionID: runtime.interactionSessionID)
+            let feedback = SpeechActions.ListeningFeedback(
+                cue: try UIActions.CueRequest(cue: .wake, volume: 0.85),
+                haptic: try UIActions.HapticRequest(style: .heavy, intensity: 1))
+            try await applyListening(
+                enabled: policy.enabled, paused: policy.paused, revision: policy.revision, feedback: feedback,
+                invocation: invocation, cancelReply: false)
+            if !enabled { await cleanupTask?.value }
+        }
+
         public func updateListening(
             enabled: Bool, paused: Bool, revision: UInt64, feedback: SpeechActions.ListeningFeedback,
             invocation: any FunctionInput
+        ) async throws {
+            try await applyListening(
+                enabled: enabled, paused: paused, revision: revision, feedback: feedback,
+                invocation: invocation, cancelReply: true)
+        }
+
+        private func applyListening(
+            enabled: Bool, paused: Bool, revision: UInt64, feedback: SpeechActions.ListeningFeedback,
+            invocation: any FunctionInput, cancelReply: Bool
         ) async throws {
             guard invocation.context.sessionID == runtime.interactionSessionID,
                 revision > listeningRevision
@@ -397,8 +421,10 @@ public enum VoiceReplyCancellation {
             listeningPause = nil
             previousPause?.cancel()
             if !enabled {
-                requestReplyCancellation()
-                stopVoice(message: voiceGeneration == nil ? state.voiceStatus : "语音已停止")
+                if cancelReply { requestReplyCancellation() }
+                stopVoice(
+                    message: voiceGeneration == nil && cancelReply ? state.voiceStatus : "语音已停止",
+                    cancelReply: cancelReply)
                 await previousPause?.value
                 return
             }
@@ -466,8 +492,14 @@ public enum VoiceReplyCancellation {
         }
 
         public func stopVoice(message: String = "语音已停止") {
+            stopVoice(message: message, cancelReply: true)
+        }
+
+        private func stopVoice(message: String, cancelReply: Bool) {
             let oldGeneration = voiceGeneration
-            if oldGeneration != nil || startupTask != nil || handlingTurn || hasPlaybackBarrier || state.isReplyActive {
+            if cancelReply,
+                oldGeneration != nil || startupTask != nil || handlingTurn || hasPlaybackBarrier || state.isReplyActive
+            {
                 requestReplyCancellation()
             }
             conversationPresentation.suspendReplies()

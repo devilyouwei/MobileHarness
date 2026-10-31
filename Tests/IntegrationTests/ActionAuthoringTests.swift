@@ -99,3 +99,43 @@ private enum UnifiedAuthoringFixture {
     #expect(definition.resources == [.init(rawValue: "fixtureResource")])
     #expect(definition.timeout == .seconds(2))
 }
+
+private actor ListeningEntryProbe: SpeechListeningCapability {
+    private(set) var enabled: [Bool] = []
+    let failure: Bool
+    init(failure: Bool = false) { self.failure = failure }
+    func setListening(enabled: Bool, invocation: any FunctionInput) throws {
+        if failure { throw AuthoringFailure.device }
+        self.enabled.append(enabled)
+    }
+    func updateListening(
+        enabled: Bool, paused: Bool, revision: UInt64, feedback: SpeechActions.ListeningFeedback,
+        invocation: any FunctionInput
+    ) throws { throw AuthoringFailure.device }
+}
+
+@Test(.actionCatalog) func listeningActionsRejectPolicyArgumentsAndPreserveFailuresAndCancellation() async throws {
+    let probe = ListeningEntryProbe()
+    for parameters in [["enabled": "true"], ["revision": "1"], ["paused": "false"]] {
+        await #expect(throws: ActionArguments.ValidationError.self) {
+            try await SpeechActions.startListening(invocation: authoringInvocation(parameters), using: probe)
+        }
+        await #expect(throws: ActionArguments.ValidationError.self) {
+            try await SpeechActions.stopListening(invocation: authoringInvocation(parameters), using: probe)
+        }
+    }
+    #expect(await probe.enabled.isEmpty)
+    let input = authoringInvocation([:])
+    try await SpeechActions.startListening(invocation: input, using: probe)
+    try await SpeechActions.stopListening(invocation: input, using: probe)
+    #expect(await probe.enabled == [true, false])
+    await #expect(throws: AuthoringFailure.self) {
+        try await SpeechActions.stopListening(invocation: input, using: ListeningEntryProbe(failure: true))
+    }
+    let cancelled = Task {
+        withUnsafeCurrentTask { $0?.cancel() }
+        try await SpeechActions.startListening(invocation: input, using: probe)
+    }
+    await #expect(throws: CancellationError.self) { try await cancelled.value }
+    #expect(await probe.enabled == [true, false])
+}

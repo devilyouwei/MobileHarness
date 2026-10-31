@@ -1,5 +1,6 @@
 @MainActor
 public protocol VoiceOutputHandling: VoicePresentationHandling {
+    func setListening(enabled: Bool, invocation: any FunctionInput) async throws
     func prepareListening(pressed: Bool, invocation: any FunctionInput) async throws
     func validateCameraControl(invocation: any FunctionInput) throws
     func updateListening(
@@ -11,6 +12,10 @@ public protocol VoiceOutputHandling: VoicePresentationHandling {
 }
 
 extension VoiceOutputHandling {
+    public func setListening(enabled: Bool, invocation: any FunctionInput) async throws {
+        throw SpeechActionError.listeningUnavailable
+    }
+
     public func prepareListening(pressed: Bool, invocation: any FunctionInput) async throws {
         throw ActionHostError.unsupportedContract
     }

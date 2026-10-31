@@ -29,6 +29,12 @@ public final class SpeechExecutionEndpoint: SpeechPlaybackCapability, SpeechList
         guard let voice else { throw ActionHostError.scopeClosed }
         try await voice.prepareListening(pressed: pressed, invocation: invocation)
     }
+    public func setListening(enabled: Bool, invocation: any FunctionInput) async throws {
+        try Task.checkCancellation()
+        guard invocation.context.sessionID == rootSessionID else { throw ActionHostError.unauthorized }
+        guard let voice else { throw ActionHostError.scopeClosed }
+        try await voice.setListening(enabled: enabled, invocation: invocation)
+    }
     public func updateListening(
         enabled: Bool, paused: Bool, revision: UInt64, feedback: SpeechActions.ListeningFeedback,
         invocation: any FunctionInput

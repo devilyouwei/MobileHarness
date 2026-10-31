@@ -178,3 +178,5 @@ ActionsContainer regression tests cover native suspension joining before resume 
 The explicit Actions root registration test verifies that repeated registry access returns the supplied root and preserves its stopped state.
 
 Resource-context regressions cover inherited lease resolution, missing-owner rejection and transient-versus-settled holdings. Existing failure-channel tests cover lifecycle-error suppression while retaining journal evidence. Retired App-only health-summary/diagnostic-projection tests were removed with the unused APIs.
+
+聆听控制回归由 ActionAuthoringTests、BehaviorAssemblyTests 与 VoiceTests 覆盖：公开无参数入口、参数拒绝、失败/取消、根会话和弱绑定端点校验，以及许可撤销后回复终态不重开、显式再次启用和不递归排队。受控替身不证明真机麦克风停机或模型退出意图命中。

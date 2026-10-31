@@ -1,7 +1,7 @@
 {
   "version": 3,
   "id": "basic-skill",
-  "revision": 33,
+  "revision": 34,
   "description": "Task and Skill orchestration, current State summaries and a single continuing foreground goal.",
   "dependencies": [],
   "useActions": [
@@ -34,6 +34,18 @@
       "callType": "action",
       "alias": "cancelTask",
       "channel": "Control"
+    },
+    {
+      "path": "Speech.Listening.startListening",
+      "callType": "action",
+      "alias": "startListening",
+      "channel": "ListeningControl"
+    },
+    {
+      "path": "Speech.Listening.stopListening",
+      "callType": "action",
+      "alias": "stopListening",
+      "channel": "ListeningControl"
     }
   ],
   "useStates": [

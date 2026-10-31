@@ -69,3 +69,7 @@
 - [Actions assembly encapsulation](Actions-Assembly-Encapsulation.md): private business construction and public host capabilities.
 
 - [App responsibility cleanup](App-Responsibility-Cleanup.md): root/entry boundaries, module-owned mechanisms and retired projections.
+
+## BasicSkill 聆听控制
+
+[聆听启停 Actions](Listening-Actions-Plan.md)：无参数 startListening/stopListening、统一许可 owner、原生清理加入及 BasicSkill 教学。代码、文档和自动检查已完成；独立真实模型/真机验收见 [验证记录](../validation/Listening-Actions.md)。
