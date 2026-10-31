@@ -3,7 +3,6 @@ import Actions
 #if os(iOS)
 
     import FunctionContracts
-    import AgentCore
     import Foundation
     import Gateway
     import PlatformKit
@@ -14,9 +13,7 @@ import Actions
         func acquire(resources requested: Set<ResourceID>, owner: ExecutionOwner, duration: Duration) async throws
             -> ResourceLease
         {
-            try await resources.acquire(resources: requested, owner: owner, duration: duration) { [actions] in
-                await actions.cancel(resources: $0)
-            }
+            try await resources.acquire(resources: requested, owner: owner, duration: duration, cancelling: actions)
         }
         func run(
             resources requested: Set<ResourceID>, owner: ExecutionOwner, lease: ResourceLease,
@@ -32,13 +29,8 @@ import Actions
                 throw CameraResourceFailure.staleLease
             }
         }
-        func isReleased(_ resource: ResourceID) async -> Bool {
-            let current = await resources.snapshot()[resource]
-            if current == .unlocked { return true }
-            if case .locked(let owner?) = current {
-                return await resources.lease(for: owner, resources: [resource]) != nil
-            }
-            return false
+        func isSettled(_ resource: ResourceID) async -> Bool {
+            await resources.isSettled(resource)
         }
     }
 #endif

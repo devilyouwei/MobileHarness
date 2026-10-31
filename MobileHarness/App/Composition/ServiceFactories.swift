@@ -5,13 +5,10 @@ import AppStorage
 import Foundation
 import Gateway
 import ModelKitDefaults
-import ModelKitRuntime
 import PlatformKit
 import Storage
 import StorageCache
 import StorageCore
-import StorageMedia
-import StorageSQLite
 import UI
 
 @MainActor enum ServiceFactories {
@@ -42,18 +39,20 @@ import UI
         let presentation = registry.cameraPresentation()
         let platform = registry.platform()
         let camera = platform.vision.camera
-        let bluetooth = BluetoothWorkflow(
-            state: uiContainer.devices.presentation, link: platform.connectivity.bluetooth,
-            makeDeviceRepository: { try storage.database.devices })
-        let photos = CameraStorageFactory.make(
-            repository: { try storage.database.media },
-            files: { try files.file(files.photos) })
         let model = registry.model()
-        let actions = registry.actions()
         let gateway = registry.gateway()
-        let actionAssembly = ApplicationActionAssembly(
-            actions: actions, gateway: gateway, storage: storage, model: model,
-            platform: platform, ui: uiContainer, photos: photos, bluetooth: bluetooth)
+        let actionAssembly = ApplicationActionAssembly(gateway: gateway)
+        let actionHost = ActionsContainer.makeBusiness(
+            dependencies: actionAssembly.dependencies(
+                storage: storage, model: model, platform: platform, ui: uiContainer),
+            onFailure: { [containerFailures] failure in
+                containerFailures.report(
+                    module: "actions", component: "container", operation: failure.operation,
+                    error: failure, details: .init(code: failure.code.rawValue, isCancellation: failure.isCancellation))
+            })
+        let actions = actionHost.container
+        registry.registerActions(actions)
+        let hosts = actionHost.capabilities
         let agents = registry.agents {
             AgentContainer(
                 containerFailures: containerFailures,
@@ -67,14 +66,14 @@ import UI
                 }, cache: storage.cache, files: files, camera: camera,
                 cameraPresentation: presentation,
                 cameraUI: uiContainer.camera, albumUI: uiContainer.album,
-                cameraAccess: AppCameraAccess(actionAssembly.business),
-                deviceAccess: AppDeviceAccess(actionAssembly.business),
-                facades: actionAssembly.business.facades,
+                cameraAccess: AppCameraAccess(hosts.camera),
+                deviceAccess: AppDeviceAccess(hosts.device),
+                facades: hosts.facades,
                 audio: platform.audio,
                 languageModels: model.language, speechModels: model.speech, visionModels: model.vision,
                 modelArtifacts: model.artifacts, memoryPressure: { await model.handleMemoryPressure() })
         }
-        let inspection = ApplicationStateInspection(failures: containerFailures)
+        let inspection = ApplicationStateInspection()
         // Root paths are compile-time declarations; duplicates indicate a composition defect.
         do {
             try inspection.registerRoot(
@@ -129,46 +128,13 @@ import UI
         let home = uiContainer.home
         let homePreparation = ForegroundPreparation(
             steps: {
-                var steps: [ForegroundPreparation.Step] = [
-                    .init(
-                        id: "language",
-                        isReady: {
-                            switch try await model.language.status() {
-                            case .ready, .unmanaged: true
-                            default: false
-                            }
-                        }, prepare: { report in try await model.language.warmup(reportLoading: { await report($0) }) })
-                ]
-                for (id, capability) in [
-                    ("recognition", ProvidedCapability.recognition), ("synthesis", .synthesis),
-                    ("voiceActivity", .voiceActivity),
-                ] {
-                    steps.append(
-                        .init(
-                            id: id,
-                            isReady: {
-                                switch try await model.speech.status(capability) {
-                                case .ready, .unmanaged: true
-                                default: false
-                                }
-                            },
-                            prepare: { report in
-                                try await model.speech.warmup(capability, reportLoading: { await report($0) })
-                            }))
+                model.preparationSteps(for: agents.foregroundModelRequirements).map { step in
+                    ForegroundPreparation.Step(
+                        id: step.id, isReady: step.isReady,
+                        prepare: { report in
+                            try await step.prepare { await report($0) }
+                        })
                 }
-                if uiContainer.camera.state.isEnabled {
-                    steps.append(
-                        .init(
-                            id: "vision",
-                            isReady: {
-                                switch try await model.vision.status() {
-                                case .ready, .unmanaged: true
-                                default: false
-                                }
-                            }, prepare: { report in try await model.vision.warmup(reportLoading: { await report($0) }) }
-                        ))
-                }
-                return steps
             }, canPrepare: { !home.conversation.hasActiveInteraction },
             project: { [weak home] state in
                 let value: HomeModelPreparation

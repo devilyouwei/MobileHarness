@@ -80,3 +80,5 @@ flowchart TD
 ## Passive state observation
 
 The owning stateSnapshot entry point reads current local business/capability values and runtime admission/work facts in the owner's isolation domain. It performs no action, acquisition or device activation. The module root composes the explicitly selected fields; unknown diagnostic coverage is not healthy evidence. Domain-specific completion and failure contracts above remain authoritative.
+
+runInCurrentContext resolves the inherited execution owner and its lease inside the coordinator before running work. The coordinated acquire overload cancels intersecting scheduler work through the injected ChannelScheduler. isSettled is an atomic holding check: unlocked and stable lease holdings are settled; transient uses and handoffs are not. A settled lease is not a released lease or proof of physical completion. Unknown resources return false.

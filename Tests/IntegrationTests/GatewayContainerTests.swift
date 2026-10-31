@@ -486,3 +486,13 @@ private func gatewaySignal(id: String = UUID().uuidString, cleanup: Bool = false
     await scheduler.shutdown()
     try await harness.stop()
 }
+
+@Test @MainActor func appRegistryRetainsExplicitActionsRoot() async throws {
+    let registry = ApplicationContainer(root: URL.temporaryDirectory.appendingPathComponent(UUID().uuidString))
+    let root = ActionsContainer()
+    registry.registerActions(root)
+    #expect(registry.actions() === root)
+    #expect(registry.actions() === root)
+    try await root.stop()
+    #expect(registry.actions().state == .stopped)
+}

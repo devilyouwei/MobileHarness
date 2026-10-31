@@ -91,6 +91,30 @@ public actor ResourceCoordinator {
                 (id, holdings[id].map { .locked($0.owner) } ?? .unlocked)
             })
     }
+    /// A stable lease or an unoccupied resource has no transient handoff to await.
+    /// This does not establish device completion or release of another owner's lease.
+    public func isSettled(_ resource: ResourceID) -> Bool {
+        guard definitions[resource] != nil else { return false }
+        guard let holding = holdings[resource] else { return true }
+        guard case .lease(let token) = holding.kind, let record = leases[token] else { return false }
+        return record.scope.allSatisfy { holdings[$0]?.kind == .lease(token) }
+    }
+    public func acquire(
+        resources: Set<ResourceID>, owner: ExecutionOwner, duration: Duration,
+        cancelling scheduler: ChannelScheduler
+    ) async throws -> ResourceLease {
+        try await acquire(resources: resources, owner: owner, duration: duration) { resources in
+            await scheduler.cancel(resources: resources)
+        }
+    }
+    public func runInCurrentContext<Value: Sendable>(
+        resources: Set<ResourceID>,
+        operation: @escaping @Sendable () async throws -> Value
+    ) async throws -> Value {
+        let owner = ResourceExecutionContext.owner
+        let lease = owner.flatMap { self.lease(for: $0, resources: resources) }
+        return try await run(resources: resources, owner: owner, lease: lease, operation: operation)
+    }
     public func activeCleanupCount() -> Int { cleanups.count }
 
     public func validate(resources: Set<ResourceID>, owner: ExecutionOwner?, lease: ResourceLease?) throws {

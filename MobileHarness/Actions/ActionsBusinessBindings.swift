@@ -4,9 +4,57 @@
     import ModelKitDefaults
     import PlatformKit
     import StorageChat
+    import StorageDevices
+    import StorageFiles
+    import StorageMedia
     import StorageCore
     import UI
 
+    @MainActor public protocol ActionsCameraAccess: AnyObject {
+        func pauseVisionForModelMaintenance() async
+        func readPhoto(_ id: String, source: String, sessionID: String, inputID: String) async throws -> Data
+    }
+    @MainActor public protocol ActionsDeviceAccess: AnyObject {
+        func openPage()
+        func closePage()
+        func openSystemSettings()
+        var initialFence: String { get }
+        func stopFence() -> String
+    }
+    @MainActor public struct ActionsHostCapabilities {
+        public let camera: any ActionsCameraAccess
+        public let device: any ActionsDeviceAccess
+        public let facades: ActionsUIFacades
+    }
+    @MainActor public struct ActionsDependencies {
+        let files: FilesContainer
+        let model: ModelContainer
+        let platform: PlatformContainer
+        let ui: UIContainer
+        let media: @Sendable () throws -> any MediaRepository
+        let devices: @Sendable () throws -> any DeviceRepository
+        let previewHistory: @MainActor (HistoryTurn) -> String
+        let makeCameraRuntime: @MainActor () throws -> CameraRuntimeDependencies
+        let connectVision: @MainActor (String, Bool, any CameraOutputHandling) async throws -> Void
+        public init(
+            files: FilesContainer, model: ModelContainer, platform: PlatformContainer, ui: UIContainer,
+            media: @escaping @Sendable () throws -> any MediaRepository,
+            devices: @escaping @Sendable () throws -> any DeviceRepository,
+            previewHistory: @escaping @MainActor (HistoryTurn) -> String,
+            makeCameraRuntime: @escaping @MainActor () throws -> CameraRuntimeDependencies,
+            connectVision: @escaping @MainActor (String, Bool, any CameraOutputHandling) async throws -> Void
+        ) {
+            self.files = files
+            self.model = model
+            self.platform = platform
+            self.ui = ui
+            self.media = media
+            self.devices = devices
+            self.previewHistory = previewHistory
+            self.makeCameraRuntime = makeCameraRuntime
+            self.connectVision = connectVision
+        }
+    }
     public typealias ActionsUIFacades = ActionUIFacades<
         any CameraControlling, any ConversationHistoryControlling, any ModelResourcesControlling,
         any BluetoothControlling, any SettingsControlling, any ModelResourcesOperating, any SettingsOperating

@@ -407,6 +407,12 @@ On inactivity, synchronous invalidation fences new work before asynchronous paus
 
 App explicitly sequences execution preparation: AgentContainer prepares cognitive inputs; ActionsContainer.configureBusiness owns business assembly preparation and returns execution/catalog/host ports; the Agent preparation validates Skill coverage and returns Gateway configuration; App configures Gateway and calls AgentContainer.bindExecution with the resulting facilities. The executionBindings lifecycle node retains this configuration boundary for partial-start rollback and reverse cleanup. Actions owns internal function binding; App owns the cross-module sequence.
 
+App directly invokes GatewayContainer.configureExecution with the neutral configuration produced by cognitive adapter preparation, then binds returned public capabilities into Agents. ActionsContainer exclusively owns camera/device scene invalidation, joined native suspension and shutdown; Agents owns its roles and perception work. App forwards page visibility separately, and Actions combines it with scene admission so navigation cannot reopen a background camera.
+
+ActionsContainer.makeBusiness constructs its private business assembly and returns public camera/device/UI host capabilities alongside the root. App supplies foundation dependencies, deferred repositories and cross-module callbacks, registers the returned root, and connects only public capabilities. Actions owns preparation cleanup from construction; configureBusiness(request:) configures its catalog after foundations become ready.
+
+App owns application activation and dependency injection. Agents supplies foreground model requirements and a complete speech-session presentation capability; ModelKit supplies preparation steps; Gateway owns resource context and lease mechanisms. UI preparation enters only the application bootstrap. App state inspection preserves per-owner snapshots and explicit bounded trees without application health ranking or unused diagnostic projections.
+
 The lifecycle runner currently starts services serially in this order: diagnostics → storage → model → platform → ui → executionBindings → actions → gateway → agents → homePreparation. The graph expresses required dependencies; the order between independent foundation roots follows registration order. executionBindings configures Actions catalogs and cleanup ports and injects its execution port into Gateway before either root starts.
 
 Shutdown orders homePreparation → agents → gateway → actions → executionBindings → ui → platform → model → storage → diagnostics, respecting the graph's other dependencies. Bindings and native stop callbacks remain retained until Gateway and Actions have joined their work. Partial startup failure cleans the current node and its started dependencies; primary and cleanup failures remain visible. Unconfirmed cleanup prevents replacement. See [Composition](App/Composition/README.md), [Gateway](Gateway/README.md) and [Lifecycle](App/Lifecycle/README.md).
@@ -725,7 +731,7 @@ Each actual model request, including an internal ReACT continuation, samples aga
 
 <a id="container-state-read-path"></a>
 
-All seven modules and their concrete child Containers read local state through `stateSnapshot() async throws`. Returned snapshots share the same path/business/runtime/health/issues/children/collectedAt/meanings/units/stateValues wire contract; module-local types preserve foundation independence. `children` contains path-only Reference indices, never child state values or serialized owner objects. Reflection comes from the already sampled value's `stateDescriptor`, without another Container read.
+All seven modules and their concrete child Containers read local state through `stateSnapshot() async throws`. Returned snapshots share the same path/business/runtime/health/issues/children/collectedAt/meanings/units/stateValues wire contract; module-local types preserve foundation independence and use the same Codable scalar, object and array representation. `children` contains path-only Reference indices, never child state values or serialized owner objects. Reflection comes from the already sampled value's `stateDescriptor`, without another Container read. Descriptors expose only the selected node's declared fields, domain meanings, units, child indices and finite state values; they do not enumerate private Swift storage. `collectedAt` records snapshot collection time, independently of native observation age.
 
 State follows its Container/authoritative domain owner's lifetime. Startup seeds externally observable facts after installing observation; notifications/owned source clocks update resident memory, and foreground resume reconciles missed changes. Snapshot reads only project that memory (including pure receipt-age derivation); they never query hardware/OS sources or restore private context. Existing actor-owned software state remains authoritative without duplicate caches. Platform seeds synchronous native sources before opening admission; asynchronous network/device feedback remains explicitly awaiting observation/unknown until an actual receipt. Stop fences callbacks before cancellation and joins observation cleanup. Skill loading controls visibility, independently of collection and device activation.
 
@@ -746,7 +752,7 @@ flowchart LR
 
 Skill registration is precise: selecting a does not select a.b or a.b.c, and a.b.c requires no ancestor State grant. Assistant sources use actual canonical node paths (`agents.applicationcontrol`, `ui.home.expression`, `platform.system.*`, etc.). RobotInteraction explicitly selects `actions.robot.motion` for active targets, independently from robot connection/tracking facts. There is no model-facing whole-tree health/diagnostic source, wildcard, automatic discovery or loadState. Source indices and engineering metadata do not become Assistant business facts automatically. Other internal consumers choose their own full classified reads without Assistant policy.
 
-[ApplicationStateInspection](App/Composition/README.md#internal-state-inspection) offers a separate explicit `inspectTree(path:depth:)` operation for internal diagnostic callers. It walks indices and materializes its own Tree structure; this is not Container snapshot behavior or a Skill permission. Internal health/history projections remain diagnostic caller operations. Reads do not execute actions, activate devices, request permissions, prepare models, change Task/Skill state or establish execution authority. Cross-owner sampling remains non-atomic.
+[ApplicationStateInspection](App/Composition/README.md#internal-state-inspection) offers a separate explicit `inspectTree(path:depth:)` operation for internal diagnostic callers. It walks indices and materializes its own Tree structure; this is not Container snapshot behavior or a Skill permission. Reads do not execute actions, activate devices, request permissions, prepare models, change Task/Skill state or establish execution authority. Cross-owner sampling remains non-atomic.
 
 State is the default low-cost summary for decisions. Sufficient current facts are answered directly. Specific Actions supply missing details under their own contracts, such as Bluetooth status/device IDs, resource inventory or history records; they may overlap a summary without creating another owner or fact cache. No generic environment-query Action is registered. Fresh collection means a new read, not a forced native observation or an active probe. Actual execution results remain correlated feedback/history, and Actions rechecks live business conditions after queueing.
 
@@ -1110,6 +1116,8 @@ sequenceDiagram
 
 Authorized camera calls pass through Gateway to Actions CameraCoordinator, which owns permission, capture leases and native capture through PlatformKit. Preview and inference are independent: native preview and camera-only controls can work before the vision model is ready. Vision retains one inference and a latest candidate instead of queueing old frames.
 
+Camera observations retain gravity-upright source orientation for inference and photo capture, plus an independent native sensor-to-portrait reference. Actions forwards that immutable metadata; UI combines it with actual window interface orientation for shared video/skeleton/gaze geometry. Physical rotation does not force a portrait-locked preview into gravity-upright aspect-fill. Native capture ownership and the iPhone portrait interface policy remain unchanged. Detailed geometry belongs in [UI Camera](UI/Camera/README.md#interface-based-preview-geometry) and [Platform Vision](PlatformKit/Vision/README.md#capture-and-preview-orientation).
+
 VisionPerception owns cadence, motion evidence, target association and projection. Agents authorizes protected presentation/tracking calls; Gateway checks generic identity, envelopes and scheduling. Actions validates frame sequence, freshness, orientation and UI generation. Model/overlay failure preserves valid native preview. Photographer selects tracking from real fresh pose evidence; device output still requires authorization and a live resource permit. See [Camera](Actions/Camera/README.md), [VisionPerception](Agents/VisionPerception/README.md) and [Photographer](Agents/Photographer/README.md).
 
 ### 14. Photo capture, App album and system export
@@ -1188,8 +1196,6 @@ flowchart TB
     linkStyle 15 stroke:#438463,stroke-width:1.5px,stroke-dasharray:2 3
 ```
 
-Camera observations retain gravity-upright source orientation for inference and photo capture, plus an independent native sensor-to-portrait reference. Actions forwards that immutable metadata; UI combines it with actual window interface orientation for shared video/skeleton/gaze geometry. Physical rotation does not force a portrait-locked preview into gravity-upright aspect-fill. Native capture ownership and the iPhone portrait interface policy remain unchanged. Detailed geometry belongs in [UI Camera](UI/Camera/README.md#interface-based-preview-geometry) and [Platform Vision](PlatformKit/Vision/README.md#capture-and-preview-orientation).
-
 Photo bytes ready, current preview, formal App album inclusion and a system Photos copy are four separate facts. `savePhoto` includes the photo in the App album without requesting system-library permission. Existing bytes do not prove user retention; ignoring preview does not delete an included photo.
 
 Album browse/import/export/delete uses UI.album → Photographer authorization → Gateway → the internal album function. Original reads, thumbnails and mutations have separate bounds; imports retain per-item successes. The root owns admitted changes across navigation and joins them at shutdown. The ordinary Photography Skill does not expose system export or album deletion.
@@ -1253,7 +1259,9 @@ flowchart TB
     linkStyle 9 stroke:#3985a4,stroke-width:1.5px
 ```
 
-Agents authorizes Assistant/Photographer/device-control intent; Gateway arbitrates opaque motor resource policy; Actions interprets motion plans, manual/tracking commands and feedback. PlatformKit owns transport, protocol I/O and connection facts. Some decoded joint/pose caches remain Actions controller state; the platform does not own every servo state.
+Agents authorizes Assistant/Photographer/device-control intent; Gateway arbitrates opaque motor resource policy; Actions owns motion targets, plans, resources and execution reports, and interprets manual/tracking commands and feedback. PlatformKit owns transport, protocol I/O, connection facts, device limits, feedback tolerances, position observations and travel-time estimates. Some decoded joint/pose caches remain Actions controller state; the platform does not own every servo state. Native motor receipts retain monotonic age and session identity, independently of business-owned targets.
+
+Photographer sends finite position targets through Gateway to Actions/NexArm using PlatformKit's recommended cadence. Photographer and Actions replace pending tracking targets with the latest intent under their own bounded policies; their pacing and queue details belong in [Photographer](Agents/Photographer/README.md) and [NexArm tracking](Actions/NexArm/Tracking/README.md). PlatformKit validates register writes and position ranges before USB/BLE transmission. Runtime tracking does not switch servo mode or issue continuous velocity, and cancellation joins work without adding motion. Device position-mode configuration and hardware limits remain external prerequisites; see [NexArm SDK](PlatformKit/Connectivity/NexArm/README.md).
 
 Handoff joins old writers. Manual control and tracking cannot write the same hardware concurrently merely because they use different Channels. Sending is not arrival: observed feedback, rather than targets, determines results. Not reached, timeout, feedback loss, disconnection and cancellation preserve distinct outcomes. Joined software stop does not establish physical spatial safety. The model-visible robot summary exposes actual connection/control availability. See [NexArm](Actions/NexArm/README.md) and [native protocol](PlatformKit/Connectivity/NexArm/README.md).
 
@@ -1292,7 +1300,7 @@ sequenceDiagram
 
 ApplicationControl consumes typed device requests and authorizes domain calls through Gateway. Actions connection services use PlatformKit discovery/connection/feedback and Storage device mappings, then present real facts through UI. Scan admission is not discovery; connection admission is not a connection. Only actual returned device identity is usable; names and model examples cannot replace IDs. Persisted selections do not prove a current native connection.
 
-Disconnection, feedback health, query isolation and recovery remain connection/domain state. Low-rate native observations reach their owners directly without periodic JSON fingerprints or repeated inference. Business policy decides control eligibility and required user intervention; a successful protocol write does not prove compatibility or motion. See [Connection](Actions/NexArm/Connection/README.md) and [ApplicationControl](Agents/ApplicationControl/README.md).
+Disconnection, feedback health, query isolation and recovery remain connection/domain state. Low-rate native observations reach their owners directly without periodic JSON fingerprints or repeated inference. PlatformKit owns native recovery classifications and budgets, and BLE shares transmission pacing and native backpressure across producers. Hardware failures retain their SDK types; Actions adapts them for presentation and execution results, owns device selection and coordinates the business lifecycle. Business policy decides control eligibility and required user intervention; a successful protocol write does not prove compatibility or motion. See [Connection](Actions/NexArm/Connection/README.md), [NexArm SDK](PlatformKit/Connectivity/NexArm/README.md) and [ApplicationControl](Agents/ApplicationControl/README.md).
 
 ### 17. Settings, Provider and model-resource workflows
 
@@ -1572,6 +1580,8 @@ Interruption retains Task/Skill while stopping current decisions; resumption doe
 
 Agents closes new cognitive work and explicitly cancels its scopes. Gateway joins transport, direct/scheduled execution and result delivery while Actions remains alive for cleanup. Actions joins remaining business/native work; only then does App release execution bindings and stop foundations. Failed startup rolls back completed stages while preserving both primary and cleanup failures.
 
+UI, PlatformKit and ModelKit runtime `stopped` flags describe their admission fences. `cleanupJoined` separately records successful joined shutdown; neither flag establishes physical-device completion or safety.
+
 | Boundary | Completion establishes | It does not establish |
 | --- | --- | --- |
 | Request/message admission | Acceptance or explicit rejection | Business completion or another inference round |
@@ -1597,11 +1607,3 @@ Independent fences include UI generation, capture generation, endpoint incarnati
 | Navigation/inactivity | UI lifetime or App invalidation → owned cancellation/join. | Committed creations remain; root cleanup outlives pages. |
 
 Automated checks, iOS builds, real-model samples, native UI and physical-device acceptance are separate evidence categories maintained in [validation](../docs/validation/README.md). Requirements and decisions live in [requirements](../docs/requirements/README.md) and [ADR](../docs/adr/README.md); historical design rationale lives in [documentation history](../docs/history/Documentation-History.md).
-
-Photographer → Gateway → Actions/NexArm 跟踪链仅传递有限角度/位置目标；Photographer 按 PlatformKit 推荐节奏生成目标，派发保留正在执行一个和待执行最新一个并记录替换计数，Actions 保留最新目标并编译有界位置包。设备位置/运行参数限制及通信上限统一由 PlatformKit 提供，USB/BLE 在发包前验证寄存器写和位置范围，BLE 对所有生产者共享发送预算及原生背压。运行时不切换舵机模式或发送持续速度，取消加入不附加运动。设备硬件限位与位置模式配置不由该链写入，详见 [NexArm SDK](PlatformKit/Connectivity/NexArm/README.md)。
-
-NexArm通用设备参数、允许误差、位置反馈观察、经验行程估算与原生恢复分类/预算由 PlatformKit 拥有；Actions 仅消费这些能力并拥有动作目标、资源、执行报告、设备选择及业务生命周期协调。硬件错误保持SDK类型，上层仅适配展示与动作结果，基础模块不依赖业务模块。
-
-### Local observation metadata
-
-Module snapshots explicitly declare business/capability and runtime fields, health issues, child nodes and collection time. Module-local Value types share the same Codable scalar, object and array representation; classification is in data, not in filtered container methods. Descriptors carry only the selected node's field names, domain meanings, units, child indices and finite state values where declared by the owner; they do not enumerate private Swift storage. Native motor receipts carry monotonic age/session identity and targets remain business-owned. UI, Platform and Model runtime stopped flags represent their existing admission fences; cleanupJoined separately records successful joined stop and makes no physical-device claim.

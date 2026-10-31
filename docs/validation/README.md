@@ -78,3 +78,9 @@
 - [Container reflexivity](Container-Reflexivity.md): passive module snapshots, bounded internal tree, Skill-selected disclosure and separate native/device acceptance.
 
 - [Camera preview orientation](Camera-Preview-Orientation.md): portrait-lock crop stability, separate capture/preview axes, geometry regressions and device follow-up.
+
+- [Module lifecycle ownership](Module-Lifecycle-Ownership.md): App Gateway configuration and Actions native lifecycle regression evidence.
+
+- [Actions assembly encapsulation](Actions-Assembly-Encapsulation.md): root construction, registry identity and public-host boundary validation.
+
+- [App responsibility cleanup](App-Responsibility-Cleanup.md): resource/model/session ownership and obsolete App API cleanup.

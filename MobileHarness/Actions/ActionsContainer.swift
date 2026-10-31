@@ -53,6 +53,7 @@ import Foundation
     private var workers: [@Sendable () async -> Void] = []
     private var runningWorkers: [Task<Void, Never>] = []
     private var invalidateNative: @MainActor @Sendable () -> Void = {}
+    private var nativeForeground: @MainActor @Sendable (Bool) async throws -> Void = { _ in }
     private var shutdown: Task<Void, any Error>?
     private var suspension: Task<Void, any Error>?
     private var revision: UInt64 = 0
@@ -77,7 +78,8 @@ import Foundation
     }
     public func configure(
         _ assembly: BehaviorAssembly, cleanup: [@MainActor @Sendable () async throws -> Void] = [],
-        workers: [@Sendable () async -> Void] = [], invalidateNative: @escaping @MainActor @Sendable () -> Void = {}
+        workers: [@Sendable () async -> Void] = [], invalidateNative: @escaping @MainActor @Sendable () -> Void = {},
+        nativeForeground: @escaping @MainActor @Sendable (Bool) async throws -> Void = { _ in }
     ) throws {
         guard state == .cold else { throw ActionsContainerError.alreadyConfigured }
         do {
@@ -86,6 +88,7 @@ import Foundation
             }
             self.cleanup.append(contentsOf: cleanup)
             self.workers = workers
+            self.nativeForeground = nativeForeground
             self.invalidateNative = invalidateNative
             var grouped: [ActionIdentifier: [ActionBinding]] = [:]
             for binding in assembly.bindings {
@@ -118,10 +121,6 @@ import Foundation
         if state == .running { return }
         state = .running
         runningWorkers = workers.map { work in Task { await work() } }
-    }
-    func registerPreparationCleanup(_ operation: @escaping @MainActor @Sendable () async throws -> Void) throws {
-        guard state == .cold, cleanup.count < 32 else { throw ActionsContainerError.capacityExceeded }
-        cleanup.append(operation)
     }
     public func addCleanup(_ operation: @escaping @MainActor @Sendable () async throws -> Void) throws {
         guard state == .configured || state == .running else { throw ActionsContainerError.unavailable }
@@ -186,7 +185,11 @@ import Foundation
         let selected = Array(active.values)
         for task in selected { task.cancel() }
         if suspension == nil {
-            suspension = Task { for task in selected { _ = await task.result } }
+            let nativeForeground = nativeForeground
+            suspension = Task {
+                for task in selected { _ = await task.result }
+                try await nativeForeground(false)
+            }
         }
     }
     public func setForeground(_ active: Bool) async throws {
@@ -197,6 +200,8 @@ import Foundation
         try await suspension?.value
         guard current == revision, state != .stopping, state != .stopped, state != .failed else { return }
         if active {
+            try await nativeForeground(true)
+            guard current == revision, state != .stopping, state != .stopped, state != .failed else { return }
             suspension = nil
             state = .running
         }
@@ -377,3 +382,37 @@ public struct ActionsStateSnapshot: Codable, Sendable {
         collectedAt = Date()
     }
 }
+
+#if os(iOS)
+    @available(iOS 27, *)
+    extension ActionsContainer {
+        public static func makeBusiness(
+            dependencies: ActionsDependencies,
+            onFailure: @escaping @Sendable (ActionsFailure) -> Void = { _ in }
+        ) -> (container: ActionsContainer, capabilities: ActionsHostCapabilities) {
+            let root = ActionsContainer(onFailure: onFailure)
+            let bluetooth = BluetoothWorkflow(
+                state: dependencies.ui.devices.presentation,
+                link: dependencies.platform.connectivity.bluetooth, makeDeviceRepository: dependencies.devices)
+            let photos = CameraStorageFactory.make(
+                repository: dependencies.media,
+                files: { try dependencies.files.file(dependencies.files.photos) })
+            let assembly = ActionsBusinessAssembly(
+                actions: root, files: dependencies.files,
+                model: dependencies.model, platform: dependencies.platform, ui: dependencies.ui,
+                photos: photos, bluetooth: bluetooth, previewHistory: dependencies.previewHistory,
+                makeCameraRuntime: dependencies.makeCameraRuntime, connectVision: dependencies.connectVision)
+            root.businessOwner = assembly
+            root.cleanup = [
+                { try await assembly.camera.shutdown() },
+                { try await assembly.bluetooth.shutdown() }, { await assembly.stopInteractions() },
+            ]
+            return (
+                root,
+                ActionsHostCapabilities(
+                    camera: ActionsCameraHost(assembly.camera),
+                    device: ActionsDeviceHost(bluetooth: bluetooth, device: assembly.device), facades: assembly.facades)
+            )
+        }
+    }
+#endif

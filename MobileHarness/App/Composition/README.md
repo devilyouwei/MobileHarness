@@ -8,7 +8,7 @@ This directory constructs and connects public module interfaces, installs static
 | --- | --- |
 | ApplicationContainer | FactoryKit instance cache for seven roots, root capability aliases and the failure channel; compiled as AppStorage. |
 | ServiceFactories | Scoped backend selection, deferred repositories, module roots and thin public capability adapters. |
-| ApplicationActionAssembly | Calls Actions-owned business assembly and binds public cognitive/execution ports. |
+| ApplicationActionAssembly | Supplies Actions dependencies and adapts public cognitive/execution ports. |
 | ActionServiceAdapters / AgentResourceBindings | Narrow camera/device/voice/detection and resource-run adapters; no business service registry. |
 | ModuleRegistration | Public lifecycle bindings and explicit startup/rollback/stop graph. |
 | AppComposition | Services lifetime, bootstrap, retry and scope replacement. |
@@ -69,8 +69,14 @@ App binds complete inspection.snapshot(path:) reads and reports scene/model prep
 
 `snapshot(path:)` resolves and reads exactly one node, without reading ancestors or siblings. `describe(path:)` derives that node's descriptor; callers with a snapshot use its stateDescriptor directly. Local snapshots contain child Reference indices only. Registration/lookup bounds catalogs to 256 nodes and encoded samples to 256 KiB. Category overlap, invalid child indices/metadata/enums, malformed paths and cancellation propagate. Owner read/encoding failure is readFailure with unknown health; a rejected configuration fences reads. The registry and State contain no global atomicity claim.
 
-`inspectTree(path:depth:)` is explicit internal caller orchestration: read a node, follow its indices within depth 16 / 256 nodes / 256 KiB, and materialize a separate Tree. Diagnostic health aggregates are Tree properties, never Container State fields. Internal healthProjection/diagnosticProjection use this explicit traversal and preserve bounded historical evidence independently from current health. These operations are not Assistant sources or model tools.
+`inspectTree(path:depth:)` is explicit internal caller orchestration: read a node, follow its indices within depth 16 / 256 nodes / 256 KiB, and materialize a separate Tree. Trees preserve each owner’s health without ranking or aggregating it. Tree traversal is not an Assistant source or model tool.
 
 App binds only exact snapshot(path:) into Agents. Assistant owns Business field selection for canonical Skill-declared paths. No alias or system.health/system.diagnostics scan can reveal an undeclared descendant. The weak Agent catalog binding avoids retaining the Agent root through its injected read callback. Lifetime, execution, UI and device behavior remain owned by their existing modules.
 
 App explicitly sequences execution preparation: AgentContainer prepares cognitive inputs; ActionsContainer.configureBusiness owns business assembly preparation and returns execution/catalog/host ports; the Agent preparation validates Skill coverage and returns Gateway configuration; App configures Gateway and calls AgentContainer.bindExecution with the resulting facilities. The executionBindings lifecycle node retains this configuration boundary for partial-start rollback and reverse cleanup. Actions owns internal function binding; App owns the cross-module sequence.
+
+ModuleRegistration directly calls GatewayContainer.configureExecution after AgentGatewayAssembly prepares cognitive adapters and result delivery. App returns the resulting capabilities for cognitive binding. AppComposition forwards home visibility to ActionsContainer separately from scene lifecycle; Actions combines visibility with scene admission. Agents stops its own roles/perception, Gateway drains execution, and Actions owns camera/device joins and cleanup.
+
+ServiceFactories supplies ActionsDependencies through the App callback bridge, asks ActionsContainer.makeBusiness for the root and host capabilities, and registers that same root in ApplicationContainer. AppCameraAccess/AppDeviceAccess adapt Actions-owned public protocols to Agent-owned protocols; they never retain the private assembly or concrete execution workflows. Runtime configuration calls ActionsContainer.configureBusiness(request:) after foundations start.
+
+ApplicationPresentation requires bootstrap and delegates complete session availability to SpeechPerception.presentation. Gateway owns runInCurrentContext, coordinated acquire and isSettled; the resource adapter contains only forwarding and boundary error conversion. Foreground model requirements come from Agents and preparation steps come from ModelKit. ServiceFactories maps those generic steps into the App-owned lifecycle coordinator without inspecting ModelState or selecting model providers.

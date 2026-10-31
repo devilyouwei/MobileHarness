@@ -197,3 +197,5 @@ Registration/resource phases, inference lease/activity indicators, preparation w
 ModelState Runtime values and resource-child phases use the declared raw-value vocabulary with finite descriptor values, independently of domain preferences and inference results.
 
 Retained artifact-operation failure counts remain Runtime; they do not establish current ModelKit health. Explicit root lifecycle/cleanup failure remains independently reported.
+
+ModelPreparationRequirement and ModelPreparationStep expose generic language/recognition/synthesis/voiceActivity/vision preparation. ModelContainer.preparationSteps preserves requested order, deduplicates requirements and binds the same root capabilities. ModelKit interprets ready/unmanaged as ready and forwards actual loading reports; callers choose required capabilities and activation time. No UI, Agent or AppLifecycle dependency is introduced.

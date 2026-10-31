@@ -486,8 +486,6 @@ private actor ContextReadBarrier {
     }
     let tree = try await inspector.inspectTree(path: "ui")
     #expect(tree.nodeCount == 3)
-    let summary = try await inspector.healthSummary()
-    #expect(summary.unknown && summary.entries.isEmpty)
 }
 
 @Test @MainActor func reflexivityTreeRejectsOversizeDuplicatePathsAndCancellation() async throws {
@@ -506,28 +504,6 @@ private actor ContextReadBarrier {
         return try await duplicate.snapshot(path: "ui")
     }
     await #expect(throws: CancellationError.self) { try await cancelled.value }
-}
-
-@Test @MainActor func reflexivityHealthIsBoundedAndDoesNotClaimUnknownIsHealthy() async throws {
-    let inspector = ApplicationStateInspection()
-    try inspector.registerRoot(
-        "ui",
-        readers: {
-            var readers: [String: UIStateSnapshot.Reader] = [
-                "ui": { .init(path: "ui", children: (0..<10).map { .init(path: "ui.capability" + String($0)) }) }
-            ]
-            for index in 0..<10 {
-                readers["ui.capability" + String(index)] = {
-                    .init(
-                        path: "ui.capability" + String(index), health: index == 9 ? .fault : .limited,
-                        issues: [.init(code: "test", impact: "blocked")])
-                }
-            }
-            return readers
-        })
-    let summary = try await inspector.healthSummary()
-    #expect(summary.total == 10 && summary.entries.count == 8 && summary.omitted == 2)
-    #expect(summary.entries.first?.severity == "fault" && summary.unknown)
 }
 
 @Test(.actionCatalog) func reflexivityDisclosureFollowsEffectiveSkillsAndRelease() async throws {
@@ -582,29 +558,6 @@ private actor ContextReadBarrier {
     #expect(
         try await inspector.describe(path: "ui.home.expression").stateValues["business.effective"]?.contains("smile")
             == true)
-}
-
-@Test @MainActor func reflexivityDiagnosticHistoryKeepsEvidenceWithoutLeakingMessages() async throws {
-    let failures = ContainerFailureChannel()
-    let inspector = ApplicationStateInspection(failures: failures)
-    try inspector.registerRoot("ui") { UIStateSnapshot(path: "ui", health: .unknown) }
-    for index in 0..<40 {
-        _ = failures.report(
-            module: "ui", component: "capability", operation: "test\(index)",
-            error: ContextFixtureFailure.encoding)
-    }
-    let data = try await inspector.diagnosticProjection()
-    #expect(data.count <= 8192)
-    let object = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
-    let history = try #require(object["history"] as? [[String: Any]])
-    #expect(!history.isEmpty && history.count <= 32)
-    #expect((object["omittedHistory"] as? Int) == 40 - history.count)
-    #expect(
-        history.allSatisfy {
-            $0["firstOccurred"] != nil && $0["lastOccurred"] != nil && ($0["status"] as? String) == "historical"
-        })
-    #expect(!String(decoding: data, as: UTF8.self).contains("encoding"))
-    #expect(try await inspector.healthSummary().entries.isEmpty)
 }
 
 @Test(.actionCatalog) func singleNodeSkillsDeclareCanonicalChildrenWithoutAncestorOrSummaryGrants() throws {

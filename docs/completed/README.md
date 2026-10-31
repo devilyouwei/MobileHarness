@@ -63,3 +63,9 @@
 - [NexArm motor teaching and regression](NexArm-Robot-Skill-Teaching.md): relative motor requests, unit/axis teaching and three-model experiments with retained failure evidence.
 
 - [Explicit execution composition](Explicit-Execution-Composition.md): App-sequenced preparation and module-owned configuration; automated checks and simulator build passed.
+
+- [Module lifecycle ownership](Module-Lifecycle-Ownership.md): Actions owns native scene cleanup; App directly configures Gateway.
+
+- [Actions assembly encapsulation](Actions-Assembly-Encapsulation.md): private business construction and public host capabilities.
+
+- [App responsibility cleanup](App-Responsibility-Cleanup.md): root/entry boundaries, module-owned mechanisms and retired projections.

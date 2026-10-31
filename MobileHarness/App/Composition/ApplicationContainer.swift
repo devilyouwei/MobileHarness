@@ -62,6 +62,9 @@ public final class ApplicationContainer: ManagedContainer, @unchecked Sendable {
         }
     #endif
     public var containerFailures: Factory<ContainerFailureChannel> { self { ContainerFailureChannel() }.cached }
+    @MainActor public func registerActions(_ root: ActionsContainer) {
+        actions.register { root }
+    }
     @MainActor public var actions: Factory<ActionsContainer> {
         self {
             MainActor.assumeIsolated {
@@ -132,11 +135,7 @@ public final class ApplicationContainer: ManagedContainer, @unchecked Sendable {
                     },
                     onFailure: self.containerFailures().sink(
                         module: "model",
-                        shouldPublish: {
-                            guard let failure = $0 as? ModelFailure else { return !($0 is InferenceAdmissionError) }
-                            return failure.code == .cleanupFailed || !failure.cleanupErrors.isEmpty
-                                || !(failure.underlying is InferenceAdmissionError)
-                        }, details: Self.failureDetails))
+                        details: Self.failureDetails))
             }
         }.cached
     }

@@ -288,8 +288,10 @@ import StorageFiles
         }
         @ObservationIgnored private var preparation: Task<Void, Error>?
         private var foreground = true
-        public func updateCameraAvailability() {
-            camera.setForeground(foreground && navigation.path.isEmpty)
+        public var foregroundModelRequirements: [ModelPreparationRequirement] {
+            var requirements: [ModelPreparationRequirement] = [.language, .recognition, .synthesis, .voiceActivity]
+            if cameraUI.state.isEnabled { requirements.append(.vision) }
+            return requirements
         }
         public var isolatedPresentation: Bool {
             let arguments = ProcessInfo.processInfo.arguments
@@ -333,15 +335,11 @@ import StorageFiles
         }
         private func invalidateNative() {
             foreground = false
-            camera.setForeground(false)
-            bluetooth.setForeground(false)
             speechPerception.invalidate()
         }
         private func applyNativeForeground(_ value: Bool) {
             foreground = value
             guard !isolatedPresentation else { return }
-            updateCameraAvailability()
-            bluetooth.setForeground(value)
             reportEnvironment(.scene, value: value ? "active" : "background")
             if !value { invalidateNative() }
         }
@@ -350,7 +348,6 @@ import StorageFiles
             preparation?.cancel()
             _ = await preparation?.result
             var cleanupErrors: [any Error] = []
-            do { try await camera.shutdown() } catch { cleanupErrors.append(error) }
             do { try await speechPerception.stop() } catch { cleanupErrors.append(error) }
             do { try await speechSynthesis.stop() } catch { cleanupErrors.append(error) }
             do { try await visionPerception.stop() } catch { cleanupErrors.append(error) }
@@ -389,9 +386,7 @@ import StorageFiles
         private func applyForeground(_ value: Bool) async throws {
             if !value {
                 var errors: [any Error] = []
-                do { try await camera.shutdown() } catch { errors.append(error) }
                 await speechPerception.suspend()
-                await bluetooth.waitUntilIdle()
                 do { try await visionPerception.suspend() } catch { errors.append(error) }
                 do { try await applicationControl.setForeground(false) } catch { errors.append(error) }
                 do { try await photographer.setForeground(false) } catch { errors.append(error) }

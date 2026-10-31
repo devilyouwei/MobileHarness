@@ -40,20 +40,12 @@
             home.listeningRequests.setAvailable(value)
         }
         public var isReady: Bool { interaction != nil }
-        public var conversation: ConversationState? { interaction?.conversation }
-        public var actionActivity: ActionActivityState? { interaction?.actionActivity }
-        public var audioDetectionState: AudioDetectionState? { interaction?.audioDetectionState }
-        public var listeningRequests: UIRequests<ListeningInput, Void>? { interaction?.listeningRequests }
-        public var detectionRequests: UIRequests<AudioDetectionInput, Void>? { interaction?.detectionRequests }
-        public var diagnostic: (any SpeechDiagnosticControlling)? { interaction?.diagnostic }
-        public var diagnosticState: SpeechDiagnosticState? { interaction?.diagnosticState }
-        #if DEBUG
-            public var validateVoiceModels: (@Sendable () async throws -> String)? { interaction?.validateVoiceModels }
-        #endif
+        public private(set) var presentation: SpeechSessionPresentation?
         func installInteraction(_ value: VoiceInteractionSession) throws {
             guard !closed else { throw AgentContainerError.stopped }
             guard interaction == nil else { throw AgentContainerError.busy }
             interaction = value
+            presentation = SpeechSessionPresentation(value)
         }
         func startInteraction() async throws { try await interaction?.startInteraction() }
         func invalidate() {
@@ -99,15 +91,51 @@
         }
         func stop() async throws {
             closed = true
+            presentation?.invalidate()
             var errors: [any Error] = []
             do { try await interaction?.shutdown() } catch { errors.append(error) }
             interaction = nil
+            presentation = nil
             do { try await endSession() } catch { errors.append(error) }
             if let primary = errors.first {
                 throw AgentFailure(
                     component: "speechPerception", operation: "stop", underlying: primary,
                     cleanupErrors: Array(errors.dropFirst()), code: .cleanupFailed)
             }
+        }
+    }
+    @MainActor @available(iOS 27, *)
+    public final class SpeechSessionPresentation {
+        public let conversation: ConversationState
+        public let actionActivity: ActionActivityState
+        public let audioDetectionState: AudioDetectionState
+        public let listeningRequests: UIRequests<ListeningInput, Void>
+        public let detectionRequests: UIRequests<AudioDetectionInput, Void>
+        public let diagnostic: any SpeechDiagnosticControlling
+        public let diagnosticState: SpeechDiagnosticState
+        #if DEBUG
+            private var validation: (@Sendable () async throws -> String)?
+            public func validateVoiceModels() async throws -> String {
+                guard let validation else { throw AgentContainerError.stopped }
+                return try await validation()
+            }
+        #endif
+        func invalidate() {
+            #if DEBUG
+                validation = nil
+            #endif
+        }
+        init(_ session: VoiceInteractionSession) {
+            conversation = session.conversation
+            actionActivity = session.actionActivity
+            audioDetectionState = session.audioDetectionState
+            listeningRequests = session.listeningRequests
+            detectionRequests = session.detectionRequests
+            diagnostic = session.diagnostic
+            diagnosticState = session.diagnosticState
+            #if DEBUG
+                validation = session.validateVoiceModels
+            #endif
         }
     }
 #endif

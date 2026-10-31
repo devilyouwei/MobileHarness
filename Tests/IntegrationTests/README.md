@@ -161,7 +161,7 @@ NexArm relative-motor regression covers encoder conversion, all-axis bounds, fre
 
 ## Reflexive State regression
 
-ContainerContextTests validates passive cold reads, expression override/cancellation/restoration, internal tree paths/depth/capacity/cancellation/partial failures, health-summary bounds, field allowlists and Skill load/release selection. NexArmBluetoothTests uses an explicit simulated passive link to verify encoder positions, freshness, disconnected-session invalidation and zero control writes/queries. These tests do not establish physical-device acceptance.
+ContainerContextTests validates passive cold reads, expression override/cancellation/restoration, internal tree paths/depth/capacity/cancellation/partial failures, per-owner health preservation and Skill load/release selection. NexArmBluetoothTests uses an explicit simulated passive link to verify encoder positions, freshness, disconnected-session invalidation and zero control writes/queries. These tests do not establish physical-device acceptance.
 
 ContainerContextTests covers Assistant-owned Business selection, nested-field exclusion, fresh reads, unknown observations, propagation of read failures and independent full Runtime inspection. Native robot tests read the unified State contract.
 
@@ -172,3 +172,9 @@ Single-node regression covers path-only Reference encoding, exact descendant loo
 PlatformStateTests covers startup seeding, resident reads without resampling, event coalescing, collection failure/recovery, clock updates without readers, generation replacement, foreground reseeding and permission-sharing across child containers. AgentArchitectureTests covers passive Context reads before initialization and after failed restoration. NexArm reflection tests read the publisher-owned resident State without issuing commands or consuming the business stream. Camera read purity is additionally enforced by the architecture audit and compiled in the iOS Simulator build; these checks do not establish physical-device behavior.
 
 State decoupling regression verifies model speech routing stays Runtime without provider preparation, storage root lifecycle failure remains health/issues, permission child reads preserve cached-source errors, scope owner serialization uses stable raw values, and Assistant selection leaves a real producer’s complete Business/Runtime State unchanged.
+
+ActionsContainer regression tests cover native suspension joining before resume and failure preventing admission reopening. SoundSource observation integration explicitly configures Gateway at the host boundary.
+
+The explicit Actions root registration test verifies that repeated registry access returns the supplied root and preserves its stopped state.
+
+Resource-context regressions cover inherited lease resolution, missing-owner rejection and transient-versus-settled holdings. Existing failure-channel tests cover lifecycle-error suppression while retaining journal evidence. Retired App-only health-summary/diagnostic-projection tests were removed with the unused APIs.

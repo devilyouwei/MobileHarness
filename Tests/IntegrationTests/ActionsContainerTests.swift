@@ -288,3 +288,50 @@ private func containerInput(_ parameters: [String: String] = [:], path: ActionId
     #expect(report.status == .partialFailure && report.entries.count == 2)
     try await root.stop()
 }
+
+@Test @MainActor func nativeSuspensionCompletesBeforeActionsResume() async throws {
+    let entered = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingOldest(1))
+    let release = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingOldest(1))
+    var events: [String] = []
+    let root = ActionsContainer()
+    try root.configure(
+        BehaviorAssembly(capabilityModules: []),
+        nativeForeground: { active in
+            if active {
+                events.append("resume")
+            } else {
+                events.append("suspend")
+                entered.continuation.yield(())
+                for await _ in release.stream { break }
+                events.append("joined")
+            }
+        })
+    try root.start()
+    root.invalidate()
+    for await _ in entered.stream { break }
+    let resume = Task { try await root.setForeground(true) }
+    #expect(root.state == .suspended)
+    #expect(events == ["suspend"])
+    release.continuation.yield(())
+    try await resume.value
+    #expect(events == ["suspend", "joined", "resume"])
+    #expect(root.state == .running)
+    try await root.stop()
+}
+
+private enum NativePauseFailure: Error { case failed }
+@Test @MainActor func failedNativeSuspensionPreventsActionsResume() async throws {
+    var resumed = false
+    let root = ActionsContainer()
+    try root.configure(
+        BehaviorAssembly(capabilityModules: []),
+        nativeForeground: { active in
+            if active { resumed = true } else { throw NativePauseFailure.failed }
+        })
+    try root.start()
+    root.invalidate()
+    await #expect(throws: NativePauseFailure.self) { try await root.setForeground(true) }
+    #expect(!resumed)
+    #expect(root.state == .suspended)
+    await #expect(throws: ActionsFailure.self) { try await root.stop() }
+}

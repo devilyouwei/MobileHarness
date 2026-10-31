@@ -44,3 +44,7 @@ Assistant reads the owning ApplicationControl Business facts through agents.appl
 AgentContainerLifecycle retains actual execution/cleanup failure independently from ordinary unavailable/stopped/cancelled controls. ContainerFailureRecord retains first occurrence alongside the existing latest occurrence and repeat count; publication/suppression remains unchanged. This journal is historical evidence, not a second authority for current domain health. Current role snapshots read their owned status/context directly.
 
 Assistant-specific State selection lives in AssistantStateBindings, outside shared Support. AgentStateContext enforces registration/session/size contracts only. Camera/device lifecycle ports no longer carry model-only context methods; App injects the complete State inspector separately.
+
+AgentGatewayAssembly accepts SignalTransport and GatewayAdmission capabilities, prepares AgentManager/InputGateway and result conversion, and exposes GatewayConfiguration. App calls GatewayContainer.configureExecution; bind accepts returned capabilities and observation access to construct OutputGateway. No Agent assembly receives or configures the Gateway root. AgentCameraAccess/AgentDeviceAccess exclude scene foreground, shutdown and native idle joins.
+
+NativeFailureClassification handles model and platform lifecycle admission failures in the failure channel. Suppression retains original journal evidence; cleanup failures remain publishable. sink accepts module identity and structural error details without a separate caller-owned publication predicate.

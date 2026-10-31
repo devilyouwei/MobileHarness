@@ -801,16 +801,17 @@ assembly = (ROOT / 'MobileHarness/Agents/AgentContainer.swift').read_text()
 history_binding = (ROOT / 'MobileHarness/Actions/History/ConversationHistoryWorkflow.swift').read_text()
 if re.search(r'\b(?:stopVoice|beginSettingsChange|endSettingsChange)\b', history_binding):
     errors.append('Read-only Assistant history preparation must not stop the root listening session')
-camera_admission = assembly.split('func updateCameraAvailability()', 1)[1].split('var isolatedPresentation', 1)[0]
-if 'camera.setForeground(foreground && navigation.path.isEmpty)' not in camera_admission:
-    errors.append('Camera admission must require both foreground and the uncovered home route')
-scene_admission = assembly.split('private func applyNativeForeground(_ value: Bool)', 1)[1].split('private func stopNativeServices()', 1)[0]
-navigation_binding = (ROOT / 'MobileHarness/App/Composition/ApplicationPresentation.swift').read_text()
-navigation_admission = navigation_binding.split('public func navigationChanged()', 1)[1].split('public func prepare(', 1)[0]
-if 'updateCameraAvailability()' not in scene_admission or 'features.updateCameraAvailability()' not in navigation_admission:
-    errors.append('Scene and navigation changes must both reconcile camera admission')
-if re.search(r'\b(?:stopVoice|beginSettingsChange|invalidateNative|setForeground)\b', navigation_admission):
-    errors.append('Navigation changes must not suspend the whole native service or listening session')
+camera_admission = (ROOT / 'MobileHarness/Actions/ActionsBusinessAssembly.swift').read_text()
+if 'camera.setForeground(sceneActive && visible)' not in camera_admission:
+    errors.append('Actions camera admission must combine scene and page visibility')
+if 'camera.shutdown()' in assembly or 'bluetooth.setForeground(' in assembly:
+    errors.append('Agents must not own Actions native lifecycle')
+app_scene = (ROOT / 'MobileHarness/App/Composition/AppComposition.swift').read_text()
+if 'actions.setCameraVisible(visible)' not in app_scene:
+    errors.append('App must forward page visibility to Actions')
+agent_gateway = (ROOT / 'MobileHarness/Agents/Support/AgentGatewayBindings.swift').read_text()
+if 'GatewayContainer' in agent_gateway or '.configureExecution(' in agent_gateway:
+    errors.append('Agents must not configure Gateway roots')
 bluetooth_binding = (ROOT / 'MobileHarness/App/Composition/ServiceFactories.swift').read_text()
 # Composition supplies concrete camera/UI instances; consumers only use injected ports.
 for source in module_sources['Agents']:
@@ -820,8 +821,11 @@ if not all(marker in camera_ownership for marker in ('any CameraCapturing', 'any
     errors.append('Camera execution must receive native and presentation interfaces')
 if re.search(r'\b(?:AppleCamera|CameraCaptureOrientation|CameraState)\b', camera_ownership):
     errors.append('Camera execution acquired a concrete device or UI state dependency')
-if 'CameraCoordinator(' not in (ROOT / 'MobileHarness/Actions/ActionsBusinessAssembly.swift').read_text() or 'ActionsBusinessAssembly(' not in (ROOT / 'MobileHarness/App/Composition/ApplicationActionAssembly.swift').read_text():
-    errors.append('App must wire the Actions-owned camera service through public assembly')
+if 'CameraCoordinator(' not in (ROOT / 'MobileHarness/Actions/ActionsBusinessAssembly.swift').read_text() or 'ActionsBusinessAssembly(' not in (ROOT / 'MobileHarness/Actions/ActionsContainer.swift').read_text():
+    errors.append('ActionsContainer must construct its own business assembly')
+for source in (ROOT / 'MobileHarness/App').rglob('*.swift'):
+    if re.search(r'\b(?:ActionsBusinessAssembly|BluetoothWorkflow|CameraStorageFactory)\b', source.read_text()):
+        errors.append(f'App must consume Actions host capabilities rather than internal assembly/services: {source.relative_to(ROOT)}')
 ui_registration = (ROOT / 'MobileHarness/App/Composition/ApplicationContainer.swift').read_text()
 if not all(marker in ui_registration for marker in ('Factory<UIContainer>', 'Factory<UICameraContainer>')):
     errors.append('App must register the UI root and its camera capability')
@@ -1731,3 +1735,15 @@ print('App-owned Actions/Gateway/Agents roots and one-way capability boundaries 
 activity_observer = (ROOT / 'MobileHarness/Agents/Support/ActionActivityWorkflow.swift').read_text()
 if re.search(r'\bFunctionInput\b|\.(?:startCapture|playStream|sendLive|performPlan)\(', activity_observer):
     raise SystemExit('Cognitive activity observation must not execute actions or native work.')
+
+# App adapters delegate mechanisms and module readiness to their owning roots.
+app_presentation = (ROOT / 'MobileHarness/App/Composition/ApplicationPresentation.swift').read_text()
+if 'features.start()' in app_presentation or 'bootstrap?()' in app_presentation:
+    raise SystemExit('UI preparation must require the application bootstrap without starting Agents separately')
+app_actions = (ROOT / 'MobileHarness/App/Composition/ApplicationActionAssembly.swift').read_text()
+app_resources = (ROOT / 'MobileHarness/App/Composition/AgentResourceBindings.swift').read_text()
+if 'ResourceExecutionContext' in app_actions or '.snapshot()' in app_resources or '.lease(for:' in app_resources:
+    raise SystemExit('App must delegate resource context and holding interpretation to Gateway')
+app_factories = (ROOT / 'MobileHarness/App/Composition/ServiceFactories.swift').read_text()
+if 'ProvidedCapability' in app_factories or '.warmup(' in app_factories:
+    raise SystemExit('App must delegate model readiness/preparation details to ModelKit')

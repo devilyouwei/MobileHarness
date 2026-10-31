@@ -114,3 +114,9 @@ State audits require stateSnapshot() async throws on each Container, snapshot-on
 State read audits also reject native camera/status/authorization sampling and lazy private-context initialization from direct snapshot bodies. Resident source seeding, bounded/coalesced notification updates and invalidation fences are covered by PlatformStateTests; repository initialization remains owner-driven.
 
 Direct State producer bodies also reject debug descriptions, Assistant selection calls and Skill mutation calls; consumer selection remains separate from producer schema classification.
+
+The boundary check enforces Actions-owned camera/device scene lifecycle and rejects Gateway root configuration inside the Agent communication assembly.
+
+The boundary checker rejects App references to ActionsBusinessAssembly, BluetoothWorkflow and CameraStorageFactory; business service construction belongs to ActionsContainer.
+
+App responsibility checks reject independent Agent startup from UI preparation, optional bootstrap invocation, resource-context/holding interpretation in adapters and model warmup implementation in ServiceFactories.

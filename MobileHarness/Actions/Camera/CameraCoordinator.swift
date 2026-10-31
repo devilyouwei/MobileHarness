@@ -459,7 +459,7 @@
                 recordCapture(.stopped, id: lease.id)
                 return true
             } catch CameraResourceFailure.staleLease {
-                if await runtime.resources.isReleased(CameraCoordinator.captureResource) {
+                if await runtime.resources.isSettled(CameraCoordinator.captureResource) {
                     _ = await refreshRunning()
                     recordCapture(.revoked, id: lease.id)
                     return true

@@ -14,22 +14,28 @@
 
     /// Module-owned business assembly. Its lifetime is retained and closed by ActionsContainer.
     @MainActor @available(iOS 27, *)
-    public final class ActionsBusinessAssembly {
+    final class ActionsBusinessAssembly {
         unowned let actions: ActionsContainer
         let files: FilesContainer
         let model: ModelContainer
         let platform: PlatformContainer
         let ui: UIContainer
         let photos: CapturedPhotoStore
-        public let bluetooth: BluetoothWorkflow
-        public let device: NexArmDeviceAdapter
+        let bluetooth: BluetoothWorkflow
+        let device: NexArmDeviceAdapter
         let previewHistory: @MainActor (HistoryTurn) -> String
-        public lazy var facades = makeUIFacades()
+        lazy var facades = makeUIFacades()
         var stopInteractions: @MainActor () async -> Void = {}
         private let makeCameraRuntime: @MainActor () throws -> CameraRuntimeDependencies
         private let connectVision: @MainActor (String, Bool, any CameraOutputHandling) async throws -> Void
+        private var sceneActive = false
+        private var cameraVisible = true
+        func setCameraVisible(_ visible: Bool) {
+            cameraVisible = visible
+            camera.setForeground(sceneActive && visible)
+        }
         private var endpoints: ActionEndpoints?
-        public init(
+        init(
             actions: ActionsContainer, files: FilesContainer, model: ModelContainer,
             platform: PlatformContainer, ui: UIContainer, photos: CapturedPhotoStore, bluetooth: BluetoothWorkflow,
             previewHistory: @escaping @MainActor (HistoryTurn) -> String,
@@ -49,7 +55,7 @@
             self.connectVision = connectVision
         }
         private var observedCamera: CameraCoordinator?
-        public lazy var camera: CameraCoordinator = {
+        lazy var camera: CameraCoordinator = {
             let owner = CameraCoordinator(
                 camera: platform.vision.camera, presentation: ui.camera, photos: photos,
                 photoCues: platform.audio.cue(.camera),
@@ -67,7 +73,7 @@
             return owner
         }()
 
-        public func stateReaders() async throws -> [String: ActionsStateSnapshot.Reader] {
+        func stateReaders() async throws -> [String: ActionsStateSnapshot.Reader] {
             var readers = try await bluetooth.service.stateReaders()
             if let camera = observedCamera {
                 readers["actions.camera"] = ActionsStateSnapshot.reader(of: camera) { try await $0.stateSnapshot() }
@@ -78,7 +84,7 @@
             }
             return readers
         }
-        public func prepare(_ request: ActionsBusinessRequest) throws -> ActionsBusinessBindings {
+        func prepare(_ request: ActionsBusinessRequest) throws -> ActionsBusinessBindings {
             let files = self.files
             let providerSettings = ProviderSettingsRequests(
                 service: ProviderSettingsService(
@@ -165,9 +171,24 @@
                 cleanup: [
                     { await mutations.shutdown() }
                 ], workers: [{ [camera] in await camera.observe() }, { [bluetooth] in await bluetooth.run() }],
-                invalidateNative: { [camera, bluetooth] in
+                invalidateNative: { [weak self, camera, bluetooth] in
+                    self?.sceneActive = false
                     camera.setForeground(false)
                     bluetooth.setForeground(false)
+                },
+                nativeForeground: { [weak self, camera, bluetooth] active in
+                    guard let self else { throw ActionsContainerError.stopped }
+                    if active {
+                        self.sceneActive = true
+                        camera.setForeground(self.cameraVisible)
+                        bluetooth.setForeground(true)
+                    } else {
+                        defer { self.sceneActive = false }
+                        var failure: (any Error)?
+                        do { try await camera.shutdown() } catch { failure = error }
+                        await bluetooth.waitUntilIdle()
+                        if let failure { throw failure }
+                    }
                 })
             return ActionsBusinessBindings(
                 executor: actions.execution, catalog: try actions.catalog(),
@@ -231,20 +252,43 @@
         }
     }
 
+    @MainActor @available(iOS 27, *)
+    final class ActionsCameraHost: ActionsCameraAccess {
+        let camera: CameraCoordinator
+        init(_ camera: CameraCoordinator) { self.camera = camera }
+        func pauseVisionForModelMaintenance() async { await camera.pauseVisionForModelMaintenance() }
+        func readPhoto(_ id: String, source: String, sessionID: String, inputID: String) async throws -> Data {
+            try await camera.readPhoto(id, source: source, sessionID: sessionID, inputID: inputID)
+        }
+    }
+    @MainActor final class ActionsDeviceHost: ActionsDeviceAccess {
+        let bluetooth: BluetoothWorkflow
+        let device: NexArmDeviceAdapter
+        init(bluetooth: BluetoothWorkflow, device: NexArmDeviceAdapter) {
+            self.bluetooth = bluetooth
+            self.device = device
+        }
+        func openPage() { bluetooth.openPage() }
+        func closePage() { bluetooth.closePage() }
+        func openSystemSettings() { bluetooth.openSystemSettings() }
+        var initialFence: String { device.fence }
+        func stopFence() -> String { device.stopFence() }
+    }
+
 #endif
 
 #if os(iOS)
     @available(iOS 27, *)
     extension ActionsContainer {
-        public func configureBusiness(_ assembly: ActionsBusinessAssembly, request: ActionsBusinessRequest) throws
-            -> ActionsBusinessBindings
-        {
-            guard state == .cold, businessOwner == nil else { throw ActionsContainerError.alreadyConfigured }
-            businessOwner = assembly
-            try registerPreparationCleanup { try await assembly.camera.shutdown() }
-            try registerPreparationCleanup { try await assembly.bluetooth.shutdown() }
-            try registerPreparationCleanup {
-                await assembly.stopInteractions()
+        public func setCameraVisible(_ visible: Bool) {
+            guard let business = businessOwner as? ActionsBusinessAssembly else { return }
+            business.setCameraVisible(visible)
+        }
+
+        public func configureBusiness(request: ActionsBusinessRequest) throws -> ActionsBusinessBindings {
+            guard state == .cold else { throw ActionsContainerError.alreadyConfigured }
+            guard let assembly = businessOwner as? ActionsBusinessAssembly else {
+                throw ActionsContainerError.missingBinding
             }
             return try assembly.prepare(request)
         }

@@ -1017,3 +1017,46 @@ func hostProducerCancellationPreservesOtherSessionAndOtherAgent() async throws {
     #expect(await probe.cleaned == ["current", "otherSession", "otherAgent"])
     await manager.stopAll()
 }
+
+@Test(.actionCatalog) func currentContextResourceRunFindsLeaseAndRejectsMissingOwner() async throws {
+    let owner = lifecycleOwner()
+    let resources = try ResourceCoordinator(definitions: [
+        ResourceDefinition(id: armResource, allowedOwners: [.assistant], requiresLease: true, stop: {})
+    ])
+    let lease = try await resources.acquire(
+        resources: [armResource], owner: owner, duration: .seconds(30), revoke: { _ in })
+    #expect(await resources.isSettled(armResource))
+    await #expect(throws: ResourceError.staleLease) {
+        try await resources.runInCurrentContext(resources: [armResource]) { 1 }
+    }
+    let value = try await ResourceExecutionContext.$owner.withValue(owner) {
+        try await resources.runInCurrentContext(resources: [armResource]) {
+            #expect(ResourceExecutionContext.owner == owner)
+            try await ResourceExecutionContext.permit?.validate([armResource])
+            return 7
+        }
+    }
+    #expect(value == 7)
+    try await resources.release(lease, owner: owner)
+    #expect(await resources.isSettled(armResource))
+    await resources.shutdown()
+}
+
+@Test(.actionCatalog) func resourceSettlementDistinguishesActiveTransientWork() async throws {
+    let resources = try lifecycleResources()
+    let entered = LifecycleGate()
+    let finish = LifecycleGate()
+    #expect(await resources.isSettled(armResource))
+    let work = Task {
+        try await resources.runInCurrentContext(resources: [armResource]) {
+            await entered.release()
+            await finish.wait()
+        }
+    }
+    await entered.wait()
+    #expect(await !resources.isSettled(armResource))
+    await finish.release()
+    try await work.value
+    #expect(await resources.isSettled(armResource))
+    await resources.shutdown()
+}

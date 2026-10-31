@@ -1,4 +1,3 @@
-import Agents
 import Foundation
 
 /// Composition-only view. Module owners retain their local types and mutable state.
@@ -109,8 +108,7 @@ public enum StateInspectionError: Error, Equatable, Sendable {
     public func rejectConfiguration(_ error: any Error) { configurationFailure = error }
     private typealias Reader = @Sendable () async throws -> Data
     private var catalogs: [String: @MainActor @Sendable () async throws -> [String: Reader]] = [:]
-    private let failures: ContainerFailureChannel?
-    public init(failures: ContainerFailureChannel? = nil) { self.failures = failures }
+    public init() {}
     public var rootPaths: [String] { catalogs.keys.sorted() }
     public func registerRoot<Snapshot: Encodable & Sendable>(
         _ path: String,
@@ -197,12 +195,6 @@ public enum StateInspectionError: Error, Equatable, Sendable {
     public struct Tree: Encodable, Sendable {
         public let state: ApplicationStateSnapshot
         public let children: [Tree]
-        public var effectiveHealth: ApplicationStateSnapshot.Health {
-            let levels = [state.health] + children.map(\.effectiveHealth)
-            if levels.contains(.fault) { return .fault }
-            if levels.contains(.limited) { return .limited }
-            return levels.allSatisfy { $0 == .healthy } ? .healthy : .unknown
-        }
         public var nodeCount: Int { 1 + children.reduce(0) { $0 + $1.nodeCount } }
     }
     public func inspectTree(path: String, depth: Int = 16) async throws -> Tree {
@@ -221,110 +213,5 @@ public enum StateInspectionError: Error, Equatable, Sendable {
         let tree = try await visit(path, remaining: depth)
         guard try JSONEncoder().encode(tree).count <= 256 * 1024 else { throw StateInspectionError.capacityExceeded }
         return tree
-    }
-    private func inspectForest() async throws -> [Tree] {
-        var trees: [Tree] = []
-        for path in rootPaths {
-            trees.append(try await inspectTree(path: path))
-            guard trees.reduce(0, { $0 + $1.nodeCount }) <= 256 else { throw StateInspectionError.capacityExceeded }
-        }
-        guard try JSONEncoder().encode(trees).count <= 256 * 1024 else { throw StateInspectionError.capacityExceeded }
-        return trees
-    }
-    public struct HealthSummary: Encodable, Sendable {
-        public struct Entry: Encodable, Sendable {
-            public let capability: String
-            public let severity: String
-            public let impact: String
-        }
-        public let availability: String
-        public let entries: [Entry]
-        public let total: Int
-        public let omitted: Int
-        public let unknown: Bool
-    }
-    public func healthSummary() async throws -> HealthSummary {
-        let trees = try await inspectForest()
-        var entries: [HealthSummary.Entry] = []
-        var unknown = false
-        func collect(_ tree: Tree) {
-            let node = tree.state
-            if node.health == .unknown || node.readFailure != nil { unknown = true }
-            if node.health == .fault || node.health == .limited {
-                entries.append(
-                    .init(
-                        capability: node.path, severity: node.health.rawValue,
-                        impact: node.issues.first?.impact ?? "capabilityRequiresValidation"))
-            }
-            for child in tree.children { collect(child) }
-        }
-        for tree in trees { collect(tree) }
-        entries.sort { lhs, rhs in
-            if lhs.severity != rhs.severity { return lhs.severity == "fault" }
-            return lhs.capability < rhs.capability
-        }
-        return HealthSummary(
-            availability: "available", entries: Array(entries.prefix(8)), total: entries.count,
-            omitted: max(0, entries.count - 8), unknown: unknown)
-    }
-    public func healthProjection() async throws -> Data {
-        struct Envelope: Encodable {
-            let availability = "available"
-            let value: HealthSummary
-        }
-        let value = try await healthSummary()
-        let data = try JSONEncoder().encode(Envelope(value: value))
-        guard data.count <= 8192 else { throw StateInspectionError.capacityExceeded }
-        return data
-    }
-    /// Explicit diagnostic allowlist. No business dictionaries, content or error strings are forwarded.
-    public func diagnosticProjection() async throws -> Data {
-        struct Diagnostic: Encodable {
-            struct Root: Encodable {
-                let module: String
-                let health: String
-                let runtime: [String: ApplicationStateSnapshot.Value]
-                let readFailure: String?
-            }
-            struct HistoricalFailure: Encodable {
-                let module: String
-                let component: String
-                let code: String
-                let firstOccurred: Date
-                let lastOccurred: Date
-                let occurrences: UInt64
-                // Journal entries are evidence of past failure, never assertions of active injury.
-                let status = "historical"
-            }
-            let availability = "available"
-            let value: [Root]
-            let history: [HistoricalFailure]
-            let omittedHistory: Int
-            let evictedHistory: UInt64
-        }
-        let allowed: Set<String> = [
-            "phase", "available", "started", "stopped", "closed", "ready", "foregroundRequested",
-        ]
-        let roots = try await inspectForest().map {
-            Diagnostic.Root(
-                module: $0.state.path, health: $0.effectiveHealth.rawValue,
-                runtime: $0.state.runtime.filter { allowed.contains($0.key) }, readFailure: $0.state.readFailure)
-        }
-        let journal = failures?.snapshot()
-        let records = journal?.records.filter { $0.delivery != .suppressed } ?? []
-        var history = records.suffix(32).map {
-            Diagnostic.HistoricalFailure(
-                module: $0.event.module, component: $0.event.component, code: $0.event.code,
-                firstOccurred: $0.firstOccurred, lastOccurred: $0.event.lastOccurred, occurrences: $0.event.occurrences)
-        }
-        while true {
-            let data = try JSONEncoder().encode(
-                Diagnostic(
-                    value: roots, history: history, omittedHistory: records.count - history.count,
-                    evictedHistory: journal?.evictedRecords ?? 0))
-            if data.count <= 8192 { return data }
-            guard !history.isEmpty else { throw StateInspectionError.capacityExceeded }
-            history.removeFirst()
-        }
     }
 }

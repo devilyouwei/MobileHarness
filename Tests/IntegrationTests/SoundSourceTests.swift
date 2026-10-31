@@ -213,10 +213,12 @@ extension LiveRuntimeTests {
         #expect(speech.descriptor.capabilities.internalTools.isEmpty)
         #expect(speech.descriptor.capabilities.internalActions.isEmpty)
         let root = await GatewayContainer()
-        let main = try await AgentGatewayAssembly.configure(
-            root: root,
+        let assembly = await AgentGatewayAssembly(
+            signals: root.signals, admission: root.admissionPort,
             configuration: .init(
                 executor: fixtureExecutionPort(actions: []), catalog: .init(revision: UUID(), entries: [])))
+        let ports = try await root.configureExecution(assembly.configuration)
+        let main = await assembly.bind(ports: ports, observations: root.observations)
         try await root.start()
         let diagnostic = try await main.observations.open(
             policy: policy, observedContracts: ["sound.source"],

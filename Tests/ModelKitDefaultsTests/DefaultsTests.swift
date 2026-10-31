@@ -68,3 +68,14 @@ import Testing
     try await first.stop()
     try await second.stop()
 }
+
+@Test @MainActor func modelPreparationStepsPreserveDemandAndRejectStoppedScope() async throws {
+    let root = ModelContainer(resources: URL.temporaryDirectory.appendingPathComponent(UUID().uuidString))
+    let steps = root.preparationSteps(for: [.vision, .language, .vision])
+    #expect(steps.map(\.id) == ["vision", "language"])
+    try await root.start()
+    #expect(try await !steps[0].isReady())
+    #expect(try await !steps[1].isReady())
+    try await root.stop()
+    await #expect(throws: InferenceAdmissionError.self) { try await steps[0].prepare { _ in } }
+}

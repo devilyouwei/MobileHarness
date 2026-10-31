@@ -7,6 +7,8 @@
     import SwiftUI
     import UI
 
+    private enum ApplicationPresentationError: Error { case missingBootstrap }
+
     /// Adapts domain-owned feature controls to UI-owned request ports; App performs no conversions.
     @available(iOS 27, *)
     @MainActor @Observable public final class ApplicationPresentation: ApplicationRootProviding {
@@ -34,11 +36,10 @@
         }
         @ObservationIgnored private var sessionPresentation: SessionPresentation?
         public var session: (any ApplicationSessionProviding)? {
-            guard features.speechPerception.isReady else {
+            guard let source = features.speechPerception.presentation else {
                 sessionPresentation = nil
                 return nil
             }
-            let source = features.speechPerception
             if sessionPresentation?.source !== source {
                 sessionPresentation = SessionPresentation(source: source)
             }
@@ -76,12 +77,11 @@
         }
         public func navigationChanged() {
             onHomeVisibilityChanged?(features.navigation.path.isEmpty)
-            features.updateCameraAvailability()
         }
         public func prepare(progress: @MainActor (String) -> Void) async throws {
             if let startupFailure { throw startupFailure }
-            try await bootstrap?()
-            try await features.start()
+            guard let bootstrap else { throw ApplicationPresentationError.missingBootstrap }
+            try await bootstrap()
         }
         public func reportStartupFailure(_ error: any Error) { startupFailure = error }
         public func retry() { onRetry?() }
@@ -89,7 +89,7 @@
 
     @available(iOS 27, *)
     @MainActor private final class SessionPresentation: ApplicationSessionProviding {
-        let source: SpeechPerceptionContainer
+        let source: SpeechSessionPresentation
         let conversation: ConversationState
         let actionActivity: ActionActivityState
         let audioDetectionState: AudioDetectionState
@@ -97,20 +97,15 @@
         let audioDetectionRequests: UIRequests<AudioDetectionInput, Void>
         private let diagnosticState: SpeechDiagnosticState
         private let diagnostic: any SpeechDiagnosticControlling
-        init?(source: SpeechPerceptionContainer) {
-            guard let conversation = source.conversation, let activity = source.actionActivity,
-                let detection = source.audioDetectionState, let listening = source.listeningRequests,
-                let requests = source.detectionRequests, let diagnosticState = source.diagnosticState,
-                let diagnostic = source.diagnostic
-            else { return nil }
+        init(source: SpeechSessionPresentation) {
             self.source = source
-            self.conversation = conversation
-            actionActivity = activity
-            audioDetectionState = detection
-            listeningRequests = listening
-            audioDetectionRequests = requests
-            self.diagnosticState = diagnosticState
-            self.diagnostic = diagnostic
+            conversation = source.conversation
+            actionActivity = source.actionActivity
+            audioDetectionState = source.audioDetectionState
+            listeningRequests = source.listeningRequests
+            audioDetectionRequests = source.detectionRequests
+            diagnosticState = source.diagnosticState
+            diagnostic = source.diagnostic
         }
         public func speechValidationContent() -> AnyView {
             AnyView(
@@ -122,10 +117,7 @@
             #if DEBUG
                 AnyView(
                     ChatValidationView(validate: { [source] in
-                        guard let validate = await source.validateVoiceModels else {
-                            throw AgentContainerError.unavailable
-                        }
-                        return try await validate()
+                        try await source.validateVoiceModels()
                     }))
             #else
                 AnyView(EmptyView())

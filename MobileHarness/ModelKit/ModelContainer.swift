@@ -762,3 +762,42 @@ public struct ModelStateSnapshot: Codable, Sendable {
         collectedAt = Date()
     }
 }
+
+public enum ModelPreparationRequirement: String, Sendable {
+    case language, recognition, synthesis, voiceActivity, vision
+}
+@MainActor public struct ModelPreparationStep {
+    public let id: String
+    public let isReady: @MainActor () async throws -> Bool
+    public let prepare: @MainActor (@escaping @Sendable (Bool) async -> Void) async throws -> Void
+}
+extension ModelContainer {
+    @MainActor public func preparationSteps(for requirements: [ModelPreparationRequirement]) -> [ModelPreparationStep] {
+        var seen: Set<String> = []
+        return requirements.filter { seen.insert($0.rawValue).inserted }.map { requirement in
+            let status: @MainActor () async throws -> ModelState
+            let warmup: @MainActor (@escaping @Sendable (Bool) async -> Void) async throws -> Void
+            switch requirement {
+            case .language:
+                status = { try await self.language.status() }
+                warmup = { try await self.language.warmup(reportLoading: $0) }
+            case .vision:
+                status = { try await self.vision.status() }
+                warmup = { try await self.vision.warmup(reportLoading: $0) }
+            case .recognition, .synthesis, .voiceActivity:
+                let capability: ProvidedCapability =
+                    requirement == .recognition
+                    ? .recognition
+                    : requirement == .synthesis ? .synthesis : .voiceActivity
+                status = { try await self.speech.status(capability) }
+                warmup = { try await self.speech.warmup(capability, reportLoading: $0) }
+            }
+            return ModelPreparationStep(
+                id: requirement.rawValue,
+                isReady: {
+                    let value = try await status()
+                    return value == .ready || value == .unmanaged
+                }, prepare: warmup)
+        }
+    }
+}

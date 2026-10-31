@@ -8,7 +8,7 @@ App creates and retains the unique scoped roots, injects narrow public interface
 | --- | --- |
 | iOS / Scene | Activity changes and background URLSession callbacks. |
 | Storage, ModelKit, PlatformKit, UI | One root per scope; aliases reference owning root capabilities. |
-| Actions | One ActionsContainer plus Actions-owned public business assembly and execution/catalog ports. |
+| Actions | One ActionsContainer with public host capabilities and execution/catalog ports; its business assembly is private. |
 | Gateway | One GatewayContainer configured with neutral execution, resource mechanisms and result delivery. |
 | Agents | One AgentContainer receiving Gateway ports, immutable metadata and neutral host collaboration ports. |
 | AppLifecycle | Generic ManagedService graph, preparation, rollback and foreground barriers. |
@@ -17,7 +17,7 @@ App creates and retains the unique scoped roots, injects narrow public interface
 
 [Composition](Composition/README.md) owns registration, factories, public adapters and lifecycle installation. [Lifecycle](Lifecycle/README.md) owns the generic graph and preparation/system callback mechanisms. MobileHarnessApp mounts UI.ApplicationRootView and forwards Scene state. ApplicationPresentation composes existing UI/role interfaces; pages do not own module work.
 
-ServiceFactories creates roots and thin adapters. Actions constructs domain services and business functions; Agents constructs cognitive roles and policy. App binds Task control/perception/resource collaboration without decoding business schemas or reaching into implementation state. Domains, modules and functions have no App registrations or peer containers.
+ServiceFactories creates roots and thin adapters. Actions constructs domain services and business functions; Agents constructs cognitive roles and policy. App injects Task control/perception/resource interfaces without decoding business schemas or interpreting resource ownership. Domains, modules and functions have no App registrations or peer containers.
 
 ## Lifecycle and failure
 
@@ -42,3 +42,15 @@ App binds the seven already-owned module state ports into the exact-path Applica
 Container snapshots are local; App exact-path resolution does not sample ancestors. Full diagnostic traversal is an explicit inspectTree operation, not the read callback injected into Assistant.
 
 App explicitly sequences execution preparation: AgentContainer prepares cognitive inputs; ActionsContainer.configureBusiness owns business assembly preparation and returns execution/catalog/host ports; the Agent preparation validates Skill coverage and returns Gateway configuration; App configures Gateway and calls AgentContainer.bindExecution with the resulting facilities. The executionBindings lifecycle node retains this configuration boundary for partial-start rollback and reverse cleanup. Actions owns internal function binding; App owns the cross-module sequence.
+
+App directly configures GatewayContainer using Agent-prepared neutral configuration, then supplies public Gateway capabilities back to Agents. Home visibility is forwarded to Actions independently of scene lifecycle. Actions owns camera/device scene cleanup; Agents owns role/perception cleanup.
+
+App injects foundation capabilities and deferred repositories through ActionsDependencies. ActionsContainer.makeBusiness returns a scoped root and public camera/device/UI host capabilities; ApplicationContainer caches that root. Business service construction and cleanup remain within Actions.
+
+## Responsibility boundaries
+
+ApplicationPresentation.prepare requires AppComposition bootstrap; it never starts a module independently. SpeechPerception publishes a complete session presentation capability with stable identity; App adapts it to UI interfaces without reconstructing readiness from optional fields.
+
+Agents declares foreground model requirements. ModelKit returns preparation steps with native readiness and warmup semantics. App owns only activation by scene/home visibility, interaction gating, the generic preparation worker and structural UI-state adaptation. Resource context resolution, lease lookup, coordinated acquisition and settlement interpretation are Gateway operations; App adapters forward those operations across public protocols. Model error publication classification belongs to Agents' failure channel, while App injects error sinks and structurally projects module errors.
+
+ApplicationStateInspection supports exact reads, descriptors and explicit bounded trees. It contains no health ranking, diagnostic allowlist or historical-failure projection. The failure journal remains with its existing owner.

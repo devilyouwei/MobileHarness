@@ -13,7 +13,7 @@
         ) async throws -> AsyncThrowingStream<CameraFrame, Error>
         func renew(_ lease: ResourceLease, owner: ExecutionOwner, duration: Duration) async throws -> ResourceLease
         func release(_ lease: ResourceLease, owner: ExecutionOwner) async throws
-        func isReleased(_ resource: ResourceID) async -> Bool
+        func isSettled(_ resource: ResourceID) async -> Bool
     }
 
     public enum CameraResourceFailure: Error { case staleLease }

@@ -84,26 +84,32 @@ public struct AgentObservationAccess: Sendable {
     }
 }
 
-@MainActor public enum AgentGatewayAssembly {
-    public static func configure(root: GatewayContainer, configuration: AgentGatewayConfiguration) throws
-        -> AgentGatewayCapabilities
-    {
+@MainActor public final class AgentGatewayAssembly {
+    public let configuration: GatewayConfiguration
+    private let manager: AgentManager
+    private let input: InputGateway
+    private let cognitive: AgentGatewayConfiguration
+    public init(signals: SignalTransport, admission: GatewayAdmission, configuration: AgentGatewayConfiguration) {
         let manager = AgentManager()
         let input = InputGateway(
-            manager: manager, policy: configuration.policy, signals: root.signals,
-            signalSummary: configuration.signalSummary, admission: root.admissionPort)
-        let ports = try root.configureExecution(
-            .init(
-                executor: configuration.executor, resources: configuration.resources,
-                deliverResult: { await input.deliverActionResult($0.agentValue) }))
+            manager: manager, policy: configuration.policy, signals: signals,
+            signalSummary: configuration.signalSummary, admission: admission)
+        self.manager = manager
+        self.input = input
+        self.cognitive = configuration
+        self.configuration = GatewayConfiguration(
+            executor: configuration.executor, resources: configuration.resources,
+            deliverResult: { await input.deliverActionResult($0.agentValue) })
+    }
+    public func bind(ports: GatewayCapabilities, observations: GatewayObservationAccess) -> AgentGatewayCapabilities {
         let output = OutputGateway(
-            manager: manager, requests: input, catalog: configuration.catalog,
-            actions: ports.actions, direct: ports.direct, policy: configuration.policy,
-            actionFeedback: .terminal, observedContracts: configuration.observedContracts,
-            observeEvent: configuration.observeEvent, admission: root.admissionPort, sink: configuration.sink)
+            manager: manager, requests: input, catalog: cognitive.catalog,
+            actions: ports.actions, direct: ports.direct, policy: cognitive.policy,
+            actionFeedback: .terminal, observedContracts: cognitive.observedContracts,
+            observeEvent: cognitive.observeEvent, admission: ports.admission, sink: cognitive.sink)
         return .init(
-            observations: .init(access: root.observations),
-            manager: manager, input: input, output: output, actions: ports.actions, resources: ports.resources)
+            observations: .init(access: observations), manager: manager, input: input,
+            output: output, actions: ports.actions, resources: ports.resources)
     }
 }
 

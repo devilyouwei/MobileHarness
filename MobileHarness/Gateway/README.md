@@ -76,3 +76,5 @@ Scheduled entry checks the root admission fence before creating preparation work
 `GatewayContainer.stateSnapshot() async throws` returns root data and indices for existing facilities. stateReaders() binds independent SignalTransport/ChannelScheduler/DirectExecutionDispatcher/ResourceCoordinator readers without opening capabilities, observation scopes or sampling any facility. Nodes describe tracked endpoints/deliveries/bytes, inputs/channels/preparations/results, direct work and resource holdings/leases/uses/cleanups. Resource cleanup failure remains distinct from execution failure and result-delivery state. Root and child reads remain actor-isolated; collection is not a transaction across facilities.
 
 Gateway State queue depths, endpoint/delivery counts, scheduling/direct work, resource holdings/leases and cleanup counts are Runtime. Its engineering health/issues remain separate; no transport counter is a Business attribute.
+
+ResourceCoordinator exposes current-context execution, coordinated lease acquisition and atomic settlement queries. App adapters consume these operations rather than interpret holdings or resolve leases.

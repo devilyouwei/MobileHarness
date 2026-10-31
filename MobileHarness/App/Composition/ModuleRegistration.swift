@@ -34,10 +34,14 @@ import Gateway
                 start: {
                     let preparation = try services.agents.prepareExecutionBindings(
                         declarations: CapabilityModules.declarations)
-                    let business = try services.actionAssembly.prepare(preparation.request)
+                    let business = try services.actionAssembly.prepare(preparation.request, actions: services.actions)
+                    services.actions.setCameraVisible(services.uiContainer.navigation.state.path.isEmpty)
                     let binding = try preparation.validate(business)
-                    let facilities = try AgentGatewayAssembly.configure(
-                        root: services.gateway, configuration: binding.configuration)
+                    let communication = AgentGatewayAssembly(
+                        signals: services.gateway.signals,
+                        admission: services.gateway.admissionPort, configuration: binding.configuration)
+                    let ports = try services.gateway.configureExecution(communication.configuration)
+                    let facilities = communication.bind(ports: ports, observations: services.gateway.observations)
                     try services.agents.bindExecution(binding, facilities: facilities)
                 },
                 stop: {

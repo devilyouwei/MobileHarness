@@ -1,5 +1,6 @@
 import AgentCore
 import Foundation
+import ModelKit
 import PlatformKit
 import Synchronization
 
@@ -64,12 +65,12 @@ public final class ContainerFailureChannel: Sendable {
         state.withLock { $0.worker?.cancel() }
     }
     public func sink(
-        module: String, shouldPublish: @escaping @Sendable (any Error) -> Bool = { _ in true },
+        module: String,
         details: @escaping @Sendable (any Error) -> ContainerFailureDetails? = { _ in nil }
     ) -> @Sendable (String, String, any Error) -> Void {
         { [self] component, operation, error in
             report(
-                module: module, component: component, operation: operation, error: error, publish: shouldPublish(error),
+                module: module, component: component, operation: operation, error: error,
                 details: details(error))
         }
     }
@@ -244,6 +245,13 @@ public final class ContainerFailureChannel: Sendable {
 
 enum NativeFailureClassification {
     static func isLifecycleControl(module: String, error: any Error) -> Bool {
+        if module == "model" {
+            if let failure = error as? ModelFailure {
+                guard failure.code != .cleanupFailed, failure.cleanupErrors.isEmpty else { return false }
+                return failure.underlying is InferenceAdmissionError
+            }
+            return error is InferenceAdmissionError
+        }
         guard module == "platform" else { return false }
         if let failure = error as? PlatformFailure, failure.code == .cleanupFailed || !failure.cleanupErrors.isEmpty {
             return false

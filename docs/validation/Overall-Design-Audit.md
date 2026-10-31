@@ -34,3 +34,11 @@ Source inspection also found a runtime/documentation discrepancy: Actions catalo
 Rendered checks are temporary review artifacts under `/tmp/mh-readme-figure-*.svg`, `/tmp/mh-readme-figure-*.png` and `/tmp/mh-readme-contact-sheet.png`; Mermaid source in the README remains authoritative. An early local rendering pass caught and corrected a group/node identifier collision before the final successful pass. Browser setup used the installed Chrome after the bundled headless executable was unavailable.
 
 This is a documentation-only task; no new repository build/test run, real-model inference or physical-device acceptance is claimed.
+
+## 2026-10-31 follow-up: content organization
+
+Planned scope: consolidate the trailing `Local observation metadata` supplement in `MobileHarness/README.md` into section 6 (State schema and reflection), section 15 (motor observations versus business targets) and section 21 (admission fences versus joined cleanup), removing duplicated prose. Integrate the adjacent NexArm ownership and tracking paragraphs into sections 15–16, with local pacing and queue details remaining in their owning module READMEs. Move the camera orientation paragraph from photo capture (section 14) to preview/vision (section 13). Preserve the existing interfaces, diagrams, chapter numbering and business behavior; the overall README should end with section 22 and its documentation navigation.
+
+Verification scope: compare the consolidated statements with owning module documentation, check local links/anchors and chapter placement, and run `git diff --check`. No source changes or build/device acceptance are part of this follow-up.
+
+Result: the planned consolidation is complete. State schema/reflection now sits in section 6; motor receipt/target and tracking ownership in section 15; transport/recovery ownership in section 16; admission versus joined cleanup in section 21; camera orientation in section 13. The document ends with section 22 and documentation navigation. Local queue/pacing details remain in the linked module documents. Checked 100 local paths/anchors, sequential workflow numbering 1–22, the camera paragraph's unique placement and unchanged Mermaid sources; `git diff --check` passes. No repository build, automated business test, real-model or physical-device validation was run for this documentation-only follow-up.

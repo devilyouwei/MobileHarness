@@ -1065,3 +1065,19 @@ private struct UnusedLoadingHistory: HistoryPresentationCapability {
     }
     await root.stop()
 }
+
+@Test func modelCleanupFailureIsNotSuppressedAsAdmissionControl() async throws {
+    let channel = ContainerFailureChannel()
+    channel.report(module: "model", component: "root", operation: "prepare", error: InferenceAdmissionError.inactive)
+    channel.report(
+        module: "model", component: "root", operation: "stop",
+        error: ModelFailure(
+            component: "root", operation: "stop", underlying: InferenceAdmissionError.stopped,
+            cleanupErrors: [CancellationError()]))
+    let records = channel.snapshot().records
+    #expect(records.count == 2)
+    #expect(records.first?.delivery == .suppressed)
+    #expect(records.last?.delivery != .suppressed)
+    #expect((records.last?.error as? ModelFailure)?.cleanupErrors.count == 1)
+    await channel.stop()
+}
