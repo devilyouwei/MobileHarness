@@ -228,3 +228,7 @@ stateSnapshot projects local installation/closure, Agent lifecycle/queue counter
 Skill useStates selects the next request's reads. Container stateSnapshot() async throws samples only its own node; descriptors come from the returned value. Generic AgentStateContext/Chat remains policy-neutral for other callers.
 
 Navigation State selection includes only navigation-owned path/phase/location/overlay/content. Album operations come from the independently selected ui.album node; navigation grants no implicit album operation read.
+
+AssistantStateBindings selects windows and focusedID from ui.windows only when a loaded Skill requests it. Photography and ApplicationControl share the same Window.* aliases; window facts are sampled with the other current-state sources.
+
+Assistant State selection reads actual Camera running/phase/facing/photo dimensions from platform.vision.camera. actions.camera contributes branch intents, lensOwner, business availability and media identity. ui.camera contributes presentation readiness and ordering. The Camera native child is selected by Photography/ApplicationControl Skills and is absent from BasicSkill’s resident selection.

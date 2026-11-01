@@ -8,6 +8,8 @@ import Foundation
 @MainActor
 public struct CameraPresentationSnapshot: Sendable {
     public let isEnabled: Bool
+    public let perceptionEnabled: Bool
+    public let lensOwner: CameraSurface?
     public let isVisible: Bool
     public let isBusy: Bool
     public let controlBusy: Bool
@@ -22,6 +24,8 @@ public struct CameraPresentationSnapshot: Sendable {
     #endif
     init(_ state: CameraState) {
         isEnabled = state.isEnabled
+        perceptionEnabled = state.perceptionEnabled
+        lensOwner = state.lensOwner
         isVisible = state.isVisible
         isBusy = state.isBusy
         controlBusy = state.controlBusy
@@ -69,6 +73,8 @@ public final class UICameraContainer: CameraPresenting, CameraFactsObserving {
         return UIStateSnapshot(
             path: "ui.camera",
             business: [
+                "perceptionEnabled": .flag(state.perceptionEnabled),
+                "lensOwner": state.lensOwner.map { .text($0.rawValue) } ?? .unknown,
                 "enabled": .flag(state.isEnabled), "visible": .flag(state.isVisible),
                 "busy": .flag(state.isBusy || state.controlBusy || state.photoBusy),
                 "facing": .text(state.facing == .front ? "front" : "back"), "needsSettings": .flag(state.needsSettings),
@@ -95,7 +101,7 @@ public final class UICameraContainer: CameraPresenting, CameraFactsObserving {
     public func present(_ update: CameraPresentationUpdate) {
         guard !stopped else { return }
         switch update {
-        case .isEnabled(true), .isVisible(true), .gaze: guard isAvailable else { return }
+        case .isEnabled(true), .perceptionEnabled(true), .isVisible(true), .gaze: guard isAvailable else { return }
         default: break
         }
         state.present(update)

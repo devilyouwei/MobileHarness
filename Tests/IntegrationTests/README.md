@@ -6,6 +6,8 @@
 
 ## 当前覆盖
 
+PromptTemplateTests 验证摄影完成示例先单独解析为 Camera.Capture.close，下一示例才允许 Agent.Task.finishTask；装配提示保留关闭失败、独立视觉及重拍分支。此处验证资源和解析契约，不代表真实模型会遵循收尾流程。
+
 SpeechPlaybackTests 通过真实 AudioCache／SpeechPlayback 与显式退出 gate 验证 VoiceReplyCancellation；播放取消加入前、原生停止加入前均保留未播放句柄，最后会话清理无 missingAudio 故障；中断正常返回、失败或取消时均完成清理并保留原错误。PCM／原生停止为替身，不宣称真机或真实合成验收。
 
 PromptTemplateTests 通过生产目录和增量解析器读取 ExpressionInteraction 的子集串行/全量语音并行示例，核对每个 wait 的表情、默认 Channel、语音对应关系及全量示例对所有合法 express 值的覆盖，并检查默认请求包含教学。现有调度器 wait 回归验证组内跨 Channel 并行和组间完成屏障；合成测试不代表 Flash 真实模型遵循验收。
@@ -180,3 +182,13 @@ The explicit Actions root registration test verifies that repeated registry acce
 Resource-context regressions cover inherited lease resolution, missing-owner rejection and transient-versus-settled holdings. Existing failure-channel tests cover lifecycle-error suppression while retaining journal evidence. Retired App-only health-summary/diagnostic-projection tests were removed with the unused APIs.
 
 聆听控制回归由 ActionAuthoringTests、BehaviorAssemblyTests 与 VoiceTests 覆盖：公开无参数入口、参数拒绝、失败/取消、根会话和弱绑定端点校验，以及许可撤销后回复终态不重开、显式再次启用和不递归排队。受控替身不证明真机麦克风停机或模型退出意图命中。
+
+WindowGatewayTests follows the real typed UI request → ApplicationControl → Gateway → WindowModule chain, using synthetic renderer receipts. It verifies shared Skill aliases and that BasicSkill remains unchanged. Fixed State fixtures include ui.windows; UI root registry assertions include its tenth child. These checks do not exercise native window animations or camera hardware.
+
+Perception camera UI intent is exercised through Photographer, fixed Perception Actions and Gateway with a test capability. Camera Foundation snapshot reads are checked for no lazy creation or device activation. Synthetic camera fixtures publish actual-state fields separately from business intent; device results remain independent.
+
+CameraSamplingTests validates native-selected preview/photo geometry, accepting native quarter-turn output dimensions and rejecting incompatible aspect, invalid sizes, over-budget buffers and absent compatible photo formats. WindowGatewayTests verifies Vision aliases resolve only to Camera.Perception Actions while photography retains Camera.Capture; BasicSkill grants neither. PromptTemplateTests also checks that both cold and Photography-loaded Assistant prompts receive the vision/photo routing guidance. Geometry, catalog and prompt tests do not substitute for AVFoundation device capture or real-model intent selection.
+
+NativeImageCompressionTests exercises a synthetic noisy JPEG above4MiB through camera preparation: orientation and aspect are preserved within the4MiB result budget, while the ordinary input budget still rejects that original. Smaller camera JPEGs retain exact bytes/EXIF; explicit input byte/dimension/pixel limits, malformed/oversized input and cancellation fail explicitly. These image-processing tests do not trigger a physical shutter or exercise AVFoundation callbacks.
+
+Camera preparation also uses a padded synthetic mirrored JPEG to verify that normalization preserves visible left/right composition instead of flipping the front-camera image a second time.

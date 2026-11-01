@@ -185,7 +185,10 @@ public enum HomeInput: Sendable {
     case text(String)
 }
 public struct CameraInput: Sendable {
-    public enum Operation: String, Sendable { case open, close, flip, retry, savePhoto, ignorePhoto }
+    public enum Operation: String, Sendable {
+        case open, close, flip, retry, takePhoto, savePhoto, ignorePhoto, perceptionOpen, perceptionClose,
+            perceptionFlip, perceptionRetry
+    }
     public let operation: Operation
     public let facing: CameraDirection?
     public let mediaID: String?

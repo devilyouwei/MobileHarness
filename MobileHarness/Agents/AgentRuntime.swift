@@ -105,7 +105,8 @@ import StorageFiles
             memoryContainer: MemoryContainer, photographerContainer: PhotographerContainer,
             stateContext: AgentStateContext, cache: CacheContainer,
             chatRecords: any ChatRepository, taskRecords: any TaskRepository,
-            cameraUI: UICameraContainer, albumUI: UIAlbumContainer? = nil, settingsUI: UISettingsContainer,
+            cameraUI: UICameraContainer, albumUI: UIAlbumContainer? = nil, windowsUI: WindowState? = nil,
+            settingsUI: UISettingsContainer,
             resourcesUI: UIModelResourcesContainer, devicesUI: UIDeviceSettingsContainer, historyUI: UIHistoryContainer,
             diagnosticsUI: UIDiagnosticsContainer, cameraControl: any AgentCameraAccess,
             resourceChanges: @escaping @MainActor @Sendable () async throws -> AsyncStream<UInt64>,
@@ -148,7 +149,7 @@ import StorageFiles
                 let applicationControlAgent = try ApplicationControlAgent(
                     sessionID: applicationControlSessionID,
                     uiSettings: settingsUI, uiResources: resourcesUI, uiDevices: devicesUI,
-                    uiDiagnostics: diagnosticsUI,
+                    uiDiagnostics: diagnosticsUI, uiWindows: windowsUI,
                     connectionFacts: business.connectionFacts,
                     resourceChanges: resourceChanges,
                     observationFailure: { error in

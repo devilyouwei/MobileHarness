@@ -2,6 +2,9 @@ import AgentCore
 
 /// Code-owned permissions, independent of model-callable JSON catalogs.
 enum ApplicationControlFunctions {
+    static let windows = ["focus", "minimize", "maximize", "restore", "move", "close"].map {
+        InternalTool(path: "UI.Window." + $0, required: $0 == "move" ? ["windowID", "x", "y"] : ["windowID"])
+    }
     static let loadingExpression = InternalTool(path: "UI.Expression.setLoading", required: ["enabled", "revision"])
     static let bluetoothHome = InternalTool(
         path: "UI.BluetoothStatus.showBluetoothHome", required: ["phase", "revision"])

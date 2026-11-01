@@ -107,6 +107,7 @@ public final class ApplicationContainer: ManagedContainer, @unchecked Sendable {
     @MainActor public var modelResourcesPresentation: Factory<UIModelResourcesContainer> {
         self { MainActor.assumeIsolated { self.ui().modelResources } }
     }
+    @MainActor public var windowPresentation: Factory<WindowState> { self { self.ui().windows }.cached }
     @MainActor public var navigationPresentation: Factory<UINavigationContainer> {
         self { MainActor.assumeIsolated { self.ui().navigation } }
     }

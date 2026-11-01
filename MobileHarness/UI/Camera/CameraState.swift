@@ -2,6 +2,8 @@ import CoreGraphics
 import Foundation
 import Observation
 
+public enum CameraSurface: String, Sendable { case capture, perception }
+
 public enum CameraDirection: Sendable { case front, back }
 
 @MainActor
@@ -16,6 +18,28 @@ public final class CameraState {
     public internal(set) var photoMessage: String?
     public internal(set) var savedMediaID: String?
     public internal(set) var isEnabled = false
+    public internal(set) var perceptionEnabled = false
+    public var faceVisible = false
+    public weak var windows: WindowState?
+    public internal(set) var lensHandoff = false
+    public var lensOwner: CameraSurface? {
+        guard isPresentationAvailable, !lensHandoff else { return nil }
+        if let windows {
+            guard windows.available, !windows.windows.contains(where: { !$0.presentationConfirmed }) else { return nil }
+            if let item = windows.windows.first(where: { $0.content == WindowContent.camera.rawValue }),
+                item.mode != .minimized, windows.hasVisibleContent(item.id, topInset: 52, bottomInset: 96)
+            {
+                return .capture
+            }
+            return perceptionEnabled && faceVisible && windows.hasVisibleBackground() ? .perception : nil
+        }
+        return isEnabled ? .capture : (perceptionEnabled && faceVisible ? .perception : nil)
+    }
+    public func canSwitch(_ surface: CameraSurface) -> Bool {
+        (presentationAdmission?.active ?? true) && lensOwner == surface && isVisible
+            && (surface == .capture ? isEnabled : perceptionEnabled)
+            && !isBusy && !controlBusy && !photoBusy && !needsSettings
+    }
     public internal(set) var facing: CameraDirection = .front
     public internal(set) var isVisible = false
     public internal(set) var isBusy = false
@@ -24,16 +48,29 @@ public final class CameraState {
     public internal(set) var message: String?
     public internal(set) var needsSettings = false
     public var canSwitchCamera: Bool {
-        (presentationAdmission?.active ?? true) && isEnabled && isVisible
-            && !isBusy && !controlBusy && !photoBusy && !needsSettings
+        canSwitch(.capture)
     }
     public private(set) var rendererFailure: String?
+    public private(set) var photoRendererFailure: String?
     public private(set) var videoGeneration: UInt64 = 0
     public private(set) var videoFrame: CameraVideoFrame?
     private(set) var interfaceOrientation = CameraInterfaceOrientation.portrait
     func presentInterfaceOrientation(_ orientation: CameraInterfaceOrientation, generation: UInt64) {
         guard presentationAdmission?.stopped != true, generation == videoGeneration else { return }
         interfaceOrientation = orientation
+    }
+    private var photoOrientation = CameraInterfaceOrientation.portrait
+    func presentPhotoOrientation(_ orientation: CameraInterfaceOrientation, generation: UInt64) {
+        guard presentationAdmission?.stopped != true, generation == videoGeneration else { return }
+        photoOrientation = orientation
+        if let frame = videoFrame { updatePhotoAspect(frame) }
+    }
+    public private(set) var photoAspect: Double = 3.0 / 4.0
+    private func updatePhotoAspect(_ frame: CameraVideoFrame) {
+        let geometry = CameraPreviewGeometry(
+            frame: frame, size: .init(width: 1, height: 1), orientation: photoOrientation)
+        let aspect = geometry.imageSize.width / geometry.imageSize.height
+        if photoAspect != aspect { photoAspect = aspect }
     }
     private(set) var previewBasis: CameraPreviewBasis?
     var displayGaze: CGSize {
@@ -43,18 +80,20 @@ public final class CameraState {
     @ObservationIgnored private let poseExpiry = CameraMediaExpiry()
     private var lastPoseSequence: UInt64?
     private var lastFrameSequence: UInt64?
-    public func presentRendererFailure(_ message: String, generation: UInt64) {
+    public func presentRendererFailure(_ message: String, generation: UInt64, surface: CameraSurface = .perception) {
         guard presentationAdmission?.stopped != true, generation == videoGeneration else { return }
         let failure = UIFailure(
             component: "camera.renderer", operation: "render", underlying: CameraRendererFailure(message: message))
         onFailure(failure.component, failure.operation, failure)
-        rendererFailure = message
-        clearFrame()
-        visionMessage = message
+        if surface == .capture {
+            photoRendererFailure = message
+        } else {
+            rendererFailure = message
+            visionMessage = message
+        }
     }
     public func presentVideo(_ frame: CameraVideoFrame) throws {
         try presentationAdmission?.requireLive()
-        guard rendererFailure == nil else { throw CameraFramePresentationError.unavailable }
         try validate(frame)
         if let previous = lastFrameSequence, frame.sequence <= previous { throw CameraFramePresentationError.stale }
         if let previous = videoFrame,
@@ -66,6 +105,7 @@ public final class CameraState {
         lastFrameSequence = frame.sequence
         let basis = CameraPreviewBasis(rotation: frame.rotation, portraitRotation: frame.portraitRotation)
         if previewBasis != basis { previewBasis = basis }
+        updatePhotoAspect(frame)
         videoFrame = frame
         frameExpiry.update(frame.capturedAt.advanced(by: .milliseconds(750))) { [weak self] in
             self?.clearFrame()
@@ -133,12 +173,15 @@ public final class CameraState {
         case .photoMessage(let value): photoMessage = value
         case .savedMediaID(let value): savedMediaID = value
         case .isEnabled(let value): isEnabled = value
+        case .perceptionEnabled(let value): perceptionEnabled = value
+        case .lensHandoff(let value): lensHandoff = value
         case .facing(let value): facing = value
         case .isVisible(let value):
             isVisible = value
             if !value {
                 videoGeneration &+= 1
                 rendererFailure = nil
+                photoRendererFailure = nil
                 lastFrameSequence = nil
                 lastPoseSequence = nil
                 clearFrame()
@@ -163,8 +206,13 @@ public final class CameraState {
 /// User controls only; capture, permission and inference lifetimes belong to module services.
 @MainActor
 public protocol CameraControlling: AnyObject {
+    func takePhoto()
+    func open()
     func toggle()
     func switchCamera()
+    func togglePerception()
+    func retryPerception()
+    func switchPerceptionCamera()
     func retry()
     func savePhoto(_ id: String)
     func ignorePhoto(_ id: String)
@@ -175,6 +223,8 @@ public enum CameraPresentationUpdate {
     case photoMessage(String?)
     case savedMediaID(String?)
     case isEnabled(Bool)
+    case perceptionEnabled(Bool)
+    case lensHandoff(Bool)
     case facing(CameraDirection)
     case isVisible(Bool)
     case isBusy(Bool)
@@ -247,4 +297,11 @@ private final class CameraMediaExpiry {
         if self.revision == revision { task = nil }
     }
     deinit { task?.cancel() }
+}
+
+extension CameraControlling {
+    public func open() { retry() }
+    public func togglePerception() {}
+    public func retryPerception() {}
+    public func switchPerceptionCamera() {}
 }

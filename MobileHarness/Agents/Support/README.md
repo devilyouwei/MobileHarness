@@ -48,3 +48,5 @@ Assistant-specific State selection lives in AssistantStateBindings, outside shar
 AgentGatewayAssembly accepts SignalTransport and GatewayAdmission capabilities, prepares AgentManager/InputGateway and result conversion, and exposes GatewayConfiguration. App calls GatewayContainer.configureExecution; bind accepts returned capabilities and observation access to construct OutputGateway. No Agent assembly receives or configures the Gateway root. AgentCameraAccess/AgentDeviceAccess exclude scene foreground, shutdown and native idle joins.
 
 NativeFailureClassification handles model and platform lifecycle admission failures in the failure channel. Suppression retains original journal evidence; cleanup failures remain publishable. sink accepts module identity and structural error details without a separate caller-owned publication predicate.
+
+AgentUIRequests keeps the default single ordinary worker; callers can explicitly select at most4 concurrent workers, used by independent windows. Each request retains its cancellation handle and deadline; group shutdown cancels and joins all children. The separate control stream remains one worker and one outstanding slot.

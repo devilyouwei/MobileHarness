@@ -23,6 +23,7 @@
 | 需求 | 未实现范围 |
 | --- | --- |
 | [State 公开寄存器与 useState](Resource-State-Plan.md) | 首批 camera/robot/task、作用域与每轮上下文已实施；真实模型/UI/物理验收及后续 Trigger/写入源治理另行跟进。 |
+| [Face 窗口与 App 内灵动岛](Face-Window-Island-Plan.md) | 通用窗口/拍照首版已安装真机；取景比例、双用途共享采集和可见层级镜头权限已实现并自动化验证，本轮真机验收及独立岛保留。 |
 | [摄影构图与运镜](Photographer-Proposal.md) | 摄影任务的构图和跟随体验，以及相应感知契约、运动策略与完成/安全边界。 |
 
 ## 其他待细化方向

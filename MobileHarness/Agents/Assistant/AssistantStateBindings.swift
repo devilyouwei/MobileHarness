@@ -14,7 +14,8 @@ public enum AssistantStateBindings {
         "actions.camera": .init(
             path: "actions.camera",
             fields: [
-                "enabled", "running", "selectedFacing", "busy", "needsSettings", "displayedMediaID", "savedMediaID",
+                "enabled", "perceptionEnabled", "lensOwner", "busy", "needsSettings", "displayedMediaID",
+                "savedMediaID",
                 "problem",
             ]),
         "actions.robot": .init(
@@ -27,7 +28,12 @@ public enum AssistantStateBindings {
         "actions.robot.motion": .init(path: "actions.robot.motion", fields: ["targetCounts"]),
         "ui.navigation": .init(
             path: "ui.navigation", fields: ["path", "phase", "current", "overlay", "content"]),
-        "ui.camera": .init(path: "ui.camera", fields: ["enabled", "visible", "busy", "facing", "needsSettings"]),
+        "ui.windows": .init(path: "ui.windows", fields: ["windows", "focusedID"]),
+        "platform.vision.camera": .init(
+            path: "platform.vision.camera", fields: ["running", "phase", "facing", "photoWidth", "photoHeight"]),
+        "ui.camera": .init(
+            path: "ui.camera",
+            fields: ["enabled", "perceptionEnabled", "lensOwner", "visible", "busy", "needsSettings"]),
         "ui.album": .init(path: "ui.album", fields: ["content", "loadedCount", "hasMore", "operation"]),
         "ui.home.expression": .init(
             path: "ui.home.expression", fields: ["base", "effective", "overridden", "transitioning", "loading"]),

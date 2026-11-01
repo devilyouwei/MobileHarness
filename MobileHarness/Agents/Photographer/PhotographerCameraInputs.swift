@@ -5,7 +5,19 @@ import StorageCore
 /// Camera work owned by Photographer; request identity is opaque, never an executable path.
 public struct PhotographerCameraIntent: Codable, Sendable, Equatable {
     public static let contract = "photography.camera"
-    public enum Operation: String, Codable, Sendable { case open, close, flip, retry, savePhoto, ignorePhoto, cancel }
+    public enum Operation: String, Codable, Sendable {
+        case open, close, flip, retry, takePhoto, savePhoto, ignorePhoto, cancel
+        case perceptionOpen, perceptionClose, perceptionFlip, perceptionRetry
+        var actionPath: String {
+            switch self {
+            case .perceptionOpen: "Camera.Perception.openVision"
+            case .perceptionClose: "Camera.Perception.closeVision"
+            case .perceptionFlip: "Camera.Perception.flipVision"
+            case .perceptionRetry: "Camera.Perception.retryVision"
+            default: "Camera.Capture." + rawValue
+            }
+        }
+    }
     public enum Facing: String, Codable, Sendable { case front, back }
     public let mediaID: String?
     public let facing: Facing?
@@ -21,7 +33,7 @@ public struct PhotographerCameraIntent: Codable, Sendable, Equatable {
         AgentMessage(
             contract: Self.contract, content: self, maximumBytes: 512,
             validate: { intent in
-                guard (intent.operation == .flip) == (intent.facing != nil),
+                guard (intent.operation == .flip || intent.operation == .perceptionFlip) == (intent.facing != nil),
                     intent.mediaID == nil || intent.operation == .savePhoto || intent.operation == .ignorePhoto,
                     !intent.requestID.isEmpty, intent.requestID.utf8.count <= 128,
                     intent.mediaID.map({ !$0.isEmpty && $0.utf8.count <= 128 }) ?? true

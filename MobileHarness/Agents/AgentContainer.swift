@@ -30,6 +30,7 @@ import StorageFiles
         @ObservationIgnored private let audio: AudioContainer
         @ObservationIgnored private let cameraDevice: any CameraCapturing
         private let albumUI: UIAlbumContainer
+        public let windows: WindowState
         private let cameraUI: UICameraContainer
         @ObservationIgnored private let languageModels: any ModelLanguageProviding
         @ObservationIgnored private let speechModels: any ModelSpeechProviding
@@ -106,7 +107,7 @@ import StorageFiles
             repositories: @escaping @Sendable () throws -> AgentRepositories,
             cache: CacheContainer, files: FilesContainer,
             camera: any CameraCapturing, cameraPresentation: any CameraPresenting,
-            cameraUI: UICameraContainer, albumUI: UIAlbumContainer,
+            cameraUI: UICameraContainer, albumUI: UIAlbumContainer, windows: WindowState,
             cameraAccess: any AgentCameraAccess, deviceAccess: any AgentDeviceAccess, facades: AgentUIFacades,
             audio: AudioContainer,
             languageModels: any ModelLanguageProviding, speechModels: any ModelSpeechProviding,
@@ -135,6 +136,7 @@ import StorageFiles
             cameraDevice = camera
             self.albumUI = albumUI
             self.cameraUI = cameraUI
+            self.windows = windows
             self.camera = cameraAccess
             self.bluetooth = deviceAccess
             self.languageModels = languageModels
@@ -255,7 +257,7 @@ import StorageFiles
                 memoryContainer: memory, photographerContainer: photographer,
                 stateContext: try makeStateContext(), cache: cacheStorage,
                 chatRecords: try repositories().chat, taskRecords: try repositories().tasks,
-                cameraUI: cameraUI, albumUI: albumUI, settingsUI: settingsUI,
+                cameraUI: cameraUI, albumUI: albumUI, windowsUI: windows, settingsUI: settingsUI,
                 resourcesUI: resourcesUI, devicesUI: devicesUI, historyUI: historyUI, diagnosticsUI: diagnosticsUI,
                 cameraControl: camera,
                 resourceChanges: { [modelArtifacts] in try await modelArtifacts.observeArtifactChanges() },
@@ -290,7 +292,7 @@ import StorageFiles
         private var foreground = true
         public var foregroundModelRequirements: [ModelPreparationRequirement] {
             var requirements: [ModelPreparationRequirement] = [.language, .recognition, .synthesis, .voiceActivity]
-            if cameraUI.state.isEnabled { requirements.append(.vision) }
+            if cameraUI.state.perceptionEnabled { requirements.append(.vision) }
             return requirements
         }
         public var isolatedPresentation: Bool {

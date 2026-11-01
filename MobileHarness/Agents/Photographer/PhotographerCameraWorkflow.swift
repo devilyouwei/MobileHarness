@@ -10,13 +10,16 @@ struct PhotographerCameraWorkflow {
     }
     private var pending: Pending?
     private(set) var lastResult: ToolResult?
-    private static let permissions = ["open", "close", "flip", "retry", "savePhoto", "ignorePhoto"].map {
+    private static let permissions = ["open", "close", "flip", "retry", "takePhoto", "savePhoto", "ignorePhoto"].map {
         InternalTool(
             path: "Camera.Capture." + $0, required: $0 == "flip" ? ["facing"] : [],
             optional: $0 == "savePhoto" || $0 == "ignorePhoto" ? ["mediaID"] : [])
     }
+    private static let perceptionPermissions = ["open", "close", "flip", "retry"].map {
+        InternalTool(path: "Camera.Perception." + $0 + "Vision", required: $0 == "flip" ? ["facing"] : [])
+    }
     static func runtimeCapabilities(_ capabilities: CapabilityRegistry) throws -> CapabilityRegistry {
-        try capabilities.adding(internalTools: permissions)
+        try capabilities.adding(internalTools: permissions + perceptionPermissions)
     }
     var requestID: String? { pending?.requestID }
     mutating func reset() { pending = nil }
@@ -56,8 +59,8 @@ struct PhotographerCameraWorkflow {
             guard human || assistant else { throw CommunicationError.unauthorized }
             guard pending == nil else { throw CommunicationError.capacityExceeded }
             guard
-                let permission = Self.permissions.first(where: {
-                    $0.path == "Camera.Capture." + intent.operation.rawValue
+                let permission = (Self.permissions + Self.perceptionPermissions).first(where: {
+                    $0.path == intent.operation.actionPath
                 })
             else {
                 throw CommunicationError.invalidPayload

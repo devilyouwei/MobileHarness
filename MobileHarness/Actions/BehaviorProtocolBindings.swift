@@ -25,8 +25,8 @@ public struct BehaviorProtocolBindings {
                 function: function, protocols: [.action, .tool], executionPolicy: .direct,
                 directResultPolicy: .returning)
         }
-        if (function.path.domain == "Camera" && function.path.module == "Capture")
-            || (function.path.domain == "UI" && function.path.module == "Navigation")
+        if (function.path.domain == "Camera" && ["Capture", "Perception"].contains(function.path.module))
+            || (function.path.domain == "UI" && ["Navigation", "Window"].contains(function.path.module))
             || (function.path.domain == "System" && function.path.module == "Device"
                 && function.path.function == "control")
             || (function.path.domain == "System" && function.path.module == "ModelResources"

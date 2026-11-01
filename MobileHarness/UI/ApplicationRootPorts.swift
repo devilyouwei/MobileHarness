@@ -22,6 +22,7 @@
         var startupIssue: String? { get }
         func retry()
         var session: (any ApplicationSessionProviding)? { get }
+        var windows: WindowState { get }
         var navigation: NavigationState { get }
         var cameraState: CameraState { get }
         var cameraControls: any CameraControlling { get }

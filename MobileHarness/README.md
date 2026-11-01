@@ -655,7 +655,7 @@ Manual navigation uses App-injected callbacks and AgentContainer forwarding with
 
 UI owns NavigationStack and path generations. A path change enters transitioning; a matching visible-page acknowledgment settles it. Settled does not mean data, animation or GPU completion. Details, object IDs, pickers and confirmation sheets remain distinct from the top-level path. Stale callbacks cannot overwrite the current detail.
 
-Home remains a persistent sibling of navigation. Settings/history/album preserve home rendering and root listening; camera capture and pose processing require foreground and uncovered home. Returning home reconciles retained enable intent. `useStates` supplies page facts to subsequent decisions; execution checks live conditions. See [UI](UI/README.md) and [navigation](Actions/UI/Navigation/README.md).
+Face remains a persistent sibling of navigation. WindowHost overlays both without a fullscreen hit mask. Settings/history/album preserve Face rendering and listening; the Camera window lifecycle controls capture independently of navigation. Minimize joins capture cleanup; restore re-admits capture; background clears capture intent and foreground requires an explicit reopen. `useStates` supplies page facts to subsequent decisions; execution checks live conditions. See [UI](UI/README.md) and [navigation](Actions/UI/Navigation/README.md).
 
 ### 5. Skill composition, Task and model context
 
@@ -1609,3 +1609,17 @@ Independent fences include UI generation, capture generation, endpoint incarnati
 | Navigation/inactivity | UI lifetime or App invalidation → owned cancellation/join. | Committed creations remain; root cleanup outlives pages. |
 
 Automated checks, iOS builds, real-model samples, native UI and physical-device acceptance are separate evidence categories maintained in [validation](../docs/validation/README.md). Requirements and decisions live in [requirements](../docs/requirements/README.md) and [ADR](../docs/adr/README.md); historical design rationale lives in [documentation history](../docs/history/Documentation-History.md).
+
+## Window and camera flow
+
+UIContainer owns WindowState and the ui.windows reader. ApplicationControl consumes bounded typed window requests and invokes registered UI.Window functions through Gateway. Actions' WindowExecutionService serializes replacements per instance, joins cancellation and delegates lifecycle to WindowContentLifecycle. CameraCoordinator implements pause/resume/close, retaining photo ownership independently of view mounting. Camera.Capture.open is the photo-window opening entry and combines real presentation with capture readiness, adding windowID. Camera.Perception.openVision independently enables background vision/following without a photo window.
+
+UI manages geometry, focus, stacking, retained identity and UIKit completion. It never owns device leases or photo disposition. A photo close decision is rendered as UI values and interpreted by the Camera domain; cancel retains the window, save/discard must complete before cleanup and dismissal. Foundation dependencies remain unchanged. Details: [UI](UI/README.md), [window execution](Actions/UI/Navigation/README.md), [camera](Actions/Camera/README.md).
+
+Photography Skill closes the photo window through Camera.Capture.close after the matching Task's successful final disposition, then awaits the close receipt before Task termination. BasicSkill respects that cleanup on completion, cancellation and replacement. Failure retains the Task; pending photos remain subject to user disposition. Closing photography leaves independently enabled background vision running.
+
+### Shared Camera demand and visible-surface lens control
+
+Photo and background vision are independent Actions-owned demands over one PlatformKit Camera capability. Either demand keeps capture active; the second consumer reuses the same immutable native stream, and only the last close releases capture. Minimizing retains photo demand but unmounts its renderer. App background clears both demands and joins cleanup; foreground alone does not reopen either. YOLO/tracking is created only for visual demand and never drawn in the photo window.
+
+UI owns actual surface ordering, safe-area geometry and presentation completion. Actions reads the same lensOwner projection as the buttons: the highest visible camera surface can switch; an expanded visible photo window outranks Face, while minimization yields to visible enabled Face vision. Other windows confer no camera rights. Transitions fence new switches and join admitted native work. PlatformKit alone changes input/captures photos; successful switching updates both displays, invalidates the old pose scope and reacquires tracking. Native running/facing/phase facts are published at platform.vision.camera, independently of business intent. The photo window uses native image aspect plus chrome/controls; generic windows retain their default size.

@@ -245,9 +245,9 @@ private actor ContextReadBarrier {
     let owner = PublicStateFixtureOwner()
     let context = try owner.context()
     try context.open(session: "one")
-    let before = try await context.snapshot(session: "one", names: ["actions.camera"])
+    let before = try await context.snapshot(session: "one", names: ["platform.vision.camera"])
     owner.camera.update { $0.running = true }
-    let after = try await context.snapshot(session: "one", names: ["actions.camera"])
+    let after = try await context.snapshot(session: "one", names: ["platform.vision.camera"])
     #expect(before.contains("\"running\":false") && after.contains("\"running\":true"))
     #expect(throws: ContainerContextError.duplicate) {
         try context.register("actions.camera", source: ContainerContextSource { true })
@@ -348,24 +348,25 @@ private actor ContextReadBarrier {
     try skills.initialize(fixed: fixed, baseSkills: ["basic-skill"])
     #expect(
         try AgentSkillLoader.useStates(skills.loaded)
-            == (AssistantStateBindings.sourceNames.filter { $0.hasPrefix("platform.") } + [
+            == (AssistantStateBindings.sourceNames.filter { $0.hasPrefix("platform.system.") } + [
                 "agents.applicationcontrol", "ui.navigation",
             ]).sorted())
     _ = try skills.control("loadSkills", arguments: ["skills": "[\"photography\"]"], inputID: "input", fixed: fixed)
     let names = try AgentSkillLoader.useStates(skills.loaded)
     #expect(
         names
-            == (AssistantStateBindings.sourceNames.filter { $0.hasPrefix("platform.") } + [
-                "actions.camera", "agents.applicationcontrol", "ui.album", "ui.camera", "ui.navigation",
+            == (AssistantStateBindings.sourceNames.filter { $0.hasPrefix("platform.system.") } + [
+                "actions.camera", "agents.applicationcontrol", "platform.vision.camera", "ui.album", "ui.camera",
+                "ui.navigation", "ui.windows",
             ]).sorted())
     _ = try skills.control("releaseSkills", arguments: ["skills": "[\"photography\"]"], inputID: "input", fixed: fixed)
     owner.camera.update { $0.running = true }
     #expect(
         try AgentSkillLoader.useStates(skills.loaded)
-            == (AssistantStateBindings.sourceNames.filter { $0.hasPrefix("platform.") } + [
+            == (AssistantStateBindings.sourceNames.filter { $0.hasPrefix("platform.system.") } + [
                 "agents.applicationcontrol", "ui.navigation",
             ]).sorted())
-    #expect(try await context.snapshot(session: "one", names: ["actions.camera"]).contains("\"running\":true"))
+    #expect(try await context.snapshot(session: "one", names: ["platform.vision.camera"]).contains("\"running\":true"))
 }
 
 @Test(.actionCatalog) func agentTaskContextIsSessionBoundAndHasNoPrivateRegistry() throws {
@@ -422,7 +423,7 @@ private actor ContextReadBarrier {
     #expect(try await read().business["overridden"] == .flag(false))
     #expect(try await read().business["effective"] == .text("smile"))
     let children = try await ui.stateSnapshot().children.map(\.path)
-    #expect(children.count == 9 && Set(children).count == 9)
+    #expect(children.count == 10 && Set(children).count == 10)
     await ui.stop()
 }
 
@@ -623,4 +624,17 @@ private actor ContextReadBarrier {
     #expect(after.business == full.business && after.runtime == full.runtime)
     context.close()
     await root.stop()
+}
+
+@Test @MainActor func cameraFoundationSnapshotDoesNotCreateOrActivateCamera() async throws {
+    let platform = PlatformContainer()
+    let before = try await platform.vision.stateSnapshot()
+    let first = try await platform.vision.cameraStateSnapshot()
+    let second = try await platform.vision.cameraStateSnapshot()
+    #expect(first.business["running"] == .flag(false))
+    #expect(first.business["phase"] == .text("stopped"))
+    #expect(first.business["facing"] == .unknown)
+    #expect(first.runtime["created"] == .flag(false) && second.runtime["created"] == .flag(false))
+    #expect(before.children.contains { $0.path == "platform.vision.camera" })
+    #expect(try await platform.vision.stateSnapshot().runtime == before.runtime)
 }

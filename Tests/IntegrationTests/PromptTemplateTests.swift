@@ -291,13 +291,16 @@ private func skillResponseExamples(_ id: String) throws -> [String] {
         let prompt = try AssistantContextState.systemPrompt(catalog, skills: state)
         #expect(prompt.contains(basic) && prompt.contains(identity))
         #expect(prompt.contains("startTask must be the ENTIRE response"))
-        #expect(prompt.contains("including close/save/ignore"))
+        #expect(prompt.contains("photo close/save/ignore also require photography"))
+        #expect(prompt.contains("opens background vision via application-control (Vision.open), never a photo window"))
+        #expect(prompt.contains("拍照/拍摄照片 opens the photo window via photography"))
         #expect(prompt.contains("Capacity may evict unprotected recent Skills"))
         #expect(prompt.contains("task=null means neither is valid"))
         #expect(prompt.contains("Completing one operation need not complete the goal"))
         #expect(prompt.contains("retain the Task and perform no replacement effects while waiting"))
         #expect(prompt.contains("Explicit replacement already authorizes closing the old goal"))
         #expect(prompt.contains("SAME input"))
+        #expect(prompt.contains("Before completing, cancelling or replacing a photography Task"))
         #expect(prompt.contains("including text inside wait"))
         #expect(prompt.contains("Say useful new information once"))
         if loaded {
@@ -306,9 +309,38 @@ private func skillResponseExamples(_ id: String) throws -> [String] {
             #expect(prompt.contains("preparation was already spoken"))
             #expect(prompt.contains("Standalone save/ignore/close/lens operations need no new Task"))
             #expect(prompt.contains("<savePhoto mediaID=\"media_1\"/>"))
+            #expect(prompt.contains("Await operation=close and enabled=false"))
+            #expect(prompt.contains("never Vision.close"))
+            #expect(prompt.contains("Cancelled/failed close retains Task/window"))
+            #expect(prompt.contains("Reshoot retains the SAME Task/window"))
             #expect(!prompt.contains("11111111-2222-4333-8444-555555555555"))
         }
     }
+}
+
+@Test(.actionCatalog) func photographyCleanupExamplesWaitForCloseBeforeTaskTermination() throws {
+    let config = try AgentConfigurations.load(named: "Assistant")
+    let catalog = try AgentSkillLoader.registry(
+        AgentConfigurations.baseSkills(named: "Assistant") + ["photography"], fixed: config.capabilities)
+    let examples = try skillResponseExamples("photography")
+    var closures = 0
+    for (index, example) in examples.enumerated() where example.contains("<finishTask") {
+        #expect(index > 0 && examples[index - 1] == "<closeCamera/>")
+        var close = GenerationTrace(capabilities: catalog, textMapping: AssistantAgent.mapText)
+        try close.append(examples[index - 1])
+        close.finish()
+        #expect(close.parserError == nil)
+        #expect(close.calls.count == 1)
+        #expect(close.calls.first?.actionPath.description == "Camera.Capture.close")
+        var finish = GenerationTrace(capabilities: catalog, textMapping: AssistantAgent.mapText)
+        try finish.append(example)
+        finish.finish()
+        #expect(finish.parserError == nil)
+        #expect(finish.calls.filter { $0.actionPath.domain == "Agent" }.count == 1)
+        #expect(!finish.calls.contains { $0.actionPath.domain == "Camera" })
+        closures += 1
+    }
+    #expect(closures == 2)
 }
 
 @Test(.actionCatalog) func bundledCompletionAndIntentExamplesSeparateTaskClosureFromStandaloneSuccess() throws {

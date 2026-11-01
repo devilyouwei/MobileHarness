@@ -705,7 +705,8 @@ private func photographyAcceptance(
         #expect((appAfter["value"] as? [String: String])?["modelPreparation"] == "loading")
         let beforeCapture = try #require(try stateJSON(start + 1)["actions.camera"] as? [String: Any])
         let afterCapture = try #require(try stateJSON(start + 2)["actions.camera"] as? [String: Any])
-        #expect((beforeCapture["value"] as? [String: Any])?["displayedMediaID"] == nil)
+        let beforeID = (beforeCapture["value"] as? [String: Any])?["displayedMediaID"]
+        #expect(beforeID == nil || beforeID is NSNull)
         #expect((afterCapture["value"] as? [String: Any])?["displayedMediaID"] as? String == photo)
         let photographyRevision = try AgentConfigurations.skill("photography").revision
         #expect(
@@ -1222,7 +1223,7 @@ func assistantCapturesWithoutTaskWhenNoFollowUpIsRequested(supportsImages: Bool)
     let expression = try AgentConfigurations.skill("expression-interaction")
     #expect(Set(expression.useActions.map(\.path)) == ["UI.Expression.express", "UI.Expression.setExpression"])
     let application = try AgentConfigurations.skill("application-control")
-    #expect(application.useActions.count == 7 && !application.useActions.contains { $0.path.hasPrefix("NexArm.") })
+    #expect(application.useActions.count == 17 && !application.useActions.contains { $0.path.hasPrefix("NexArm.") })
     let robot = try AgentConfigurations.skill("robot-interaction")
     #expect(robot.useActions.count == 11 && robot.useActions.allSatisfy { $0.path.hasPrefix("NexArm.") })
     for registry in try AgentConfigurations.skillRegistries() {

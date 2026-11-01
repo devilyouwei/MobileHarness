@@ -1,7 +1,7 @@
 {
   "version": 3,
   "id": "basic-skill",
-  "revision": 34,
+  "revision": 36,
   "description": "Task and Skill orchestration, current State summaries and a single continuing foreground goal.",
   "dependencies": [],
   "useActions": [

@@ -179,3 +179,5 @@ BasicSkill selects the source for every actual model request. Navigation is read
 ## Passive container state
 
 stateSnapshot projects local installation/closure, Agent lifecycle/queue counters and initialized committed task/Skill fields without message content. residentContext() reads the repository’s last committed memory only; context fields are unknown before initialization. Agent start owns initialization/restoration and its failures. The root catalog binds independent readers without sampling roles or maintaining another mutable role-state registry.
+
+WindowState.requests is a typed UI source consumed with maximum concurrency4 plus the existing one-slot control source. Code-owned permissions enumerate the six UI.Window tools; the handler supplies only windowID and uses the identity-bound Gateway consumer. It does not operate camera devices or choose photo disposition. Shutdown closes and joins the same root subscriptions.

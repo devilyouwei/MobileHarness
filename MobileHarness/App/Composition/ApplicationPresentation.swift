@@ -45,6 +45,7 @@
             }
             return sessionPresentation
         }
+        public var windows: WindowState { features.windows }
         public var navigation: NavigationState { features.navigation }
         public var cameraState: CameraState { features.photographer.cameraState }
         public var cameraControls: any CameraControlling { features.photographer.cameraControls }
@@ -72,7 +73,7 @@
         public func navigate(_ destination: AppDestination?) { features.navigate(destination) }
         public func cameraPreview() -> AnyView {
             AnyView(
-                CameraFrameView(state: features.photographer.cameraState).id(
+                CameraFrameView(state: features.photographer.cameraState, showsPose: false).id(
                     features.photographer.cameraState.videoGeneration))
         }
         public func navigationChanged() {

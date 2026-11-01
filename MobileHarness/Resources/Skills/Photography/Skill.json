@@ -1,8 +1,8 @@
 {
   "version": 3,
   "id": "photography",
-  "revision": 26,
-  "description": "Control camera/lens and capture/save-to-App-album/ignore/reshoot in Assistant, including capture-only. Use a local Task for continuing photo decisions; never delegate.",
+  "revision": 30,
+  "description": "拍照、拍摄照片: open the photo window and capture/save/ignore/reshoot. Background vision/tracking belongs to application-control. Use a local Task only for continuing photo decisions.",
   "dependencies": [],
   "useActions": [
     {
@@ -46,12 +46,50 @@
       "callType": "action",
       "alias": "retryCamera",
       "channel": "Camera"
+    },
+    {
+      "path": "UI.Window.focus",
+      "callType": "action",
+      "alias": "Window.focus",
+      "channel": "Display"
+    },
+    {
+      "path": "UI.Window.minimize",
+      "callType": "action",
+      "alias": "Window.minimize",
+      "channel": "Display"
+    },
+    {
+      "path": "UI.Window.maximize",
+      "callType": "action",
+      "alias": "Window.maximize",
+      "channel": "Display"
+    },
+    {
+      "path": "UI.Window.restore",
+      "callType": "action",
+      "alias": "Window.restore",
+      "channel": "Display"
+    },
+    {
+      "path": "UI.Window.move",
+      "callType": "action",
+      "alias": "Window.move",
+      "channel": "Display"
+    },
+    {
+      "path": "UI.Window.close",
+      "callType": "action",
+      "alias": "Window.close",
+      "channel": "Display"
     }
   ],
   "useStates": [
     "actions.camera",
     "ui.camera",
-    "ui.album"
+    "ui.album",
+    "ui.windows",
+    "platform.vision.camera"
   ],
   "useInstructions": [
     "Instructions.md"

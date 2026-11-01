@@ -2,61 +2,44 @@
     import SwiftUI
     import UIKit
 
-    /// Camera is always behind content; preview and dimming layer never intercept touches.
+    /// Independent background visual surface; photo content stays in the window host.
     @MainActor
-    public struct CameraConversationSurface<Content: View, Preview: View>: View {
+    public struct CameraConversationSurface<Content: View>: View {
         let camera: CameraState
         let controls: any CameraControlling
         let blocksNewActions: Bool
-        let preview: () -> Preview
         let openSettings: () -> Void
         @ViewBuilder let content: () -> Content
-
         public init(
             camera: CameraState, controls: any CameraControlling, blocksNewActions: Bool = false,
-            openSettings: @escaping () -> Void,
-            @ViewBuilder preview: @escaping () -> Preview, @ViewBuilder content: @escaping () -> Content
+            openSettings: @escaping () -> Void, @ViewBuilder content: @escaping () -> Content
         ) {
-            self.blocksNewActions = blocksNewActions
             self.camera = camera
             self.controls = controls
+            self.blocksNewActions = blocksNewActions
             self.openSettings = openSettings
-            self.preview = preview
             self.content = content
         }
-
         public var body: some View {
             ZStack {
                 Color.black.ignoresSafeArea()
-                CameraBackground(camera: camera, preview: preview)
-                Color.black.opacity(0.42).ignoresSafeArea().allowsHitTesting(false)
-                CameraGazeContent(camera: camera, content: content)
+                if camera.perceptionEnabled && camera.isVisible && camera.faceVisible
+                    && (camera.windows?.hasVisibleBackground() ?? true)
+                {
+                    CameraFrameView(state: camera).ignoresSafeArea().opacity(0.30)
+                        .allowsHitTesting(false).accessibilityHidden(true)
+                }
+                content().environment(\.eyeGaze, camera.displayGaze)
             }
             .overlay(alignment: .topTrailing) {
                 CameraControlsOverlay(
                     camera: camera, controls: controls, blocksNewActions: blocksNewActions, openSettings: openSettings)
             }
             .overlay(alignment: .topLeading) { CameraStatisticsOverlay(camera: camera) }
-            .overlay { CameraPhotoOverlay(camera: camera, controls: controls) }
             .preferredColorScheme(.dark)
         }
     }
 
-    @MainActor
-    private struct CameraBackground<Preview: View>: View {
-        let camera: CameraState
-        let preview: () -> Preview
-        var body: some View {
-            preview().ignoresSafeArea().opacity(camera.isVisible ? 1 : 0)
-                .allowsHitTesting(false).accessibilityHidden(true)
-        }
-    }
-    @MainActor
-    private struct CameraGazeContent<Content: View>: View {
-        let camera: CameraState
-        let content: () -> Content
-        var body: some View { content().environment(\.eyeGaze, camera.displayGaze) }
-    }
     @MainActor
     private struct CameraControlsOverlay: View {
         let camera: CameraState
@@ -68,24 +51,23 @@
         var body: some View {
             VStack(alignment: .trailing, spacing: 12) {
                 HStack(spacing: 12) {
-                    Button(action: controls.toggle) {
-                        Image(systemName: camera.isEnabled ? "video.fill" : "video.slash.fill")
+                    Button(action: controls.togglePerception) {
+                        Image(systemName: camera.perceptionEnabled ? "eye.fill" : "eye")
                             .frame(width: 48, height: 48)
                     }
-                    .accessibilityLabel(camera.isEnabled ? "关闭摄像头" : "开启摄像头")
-                    .accessibilityValue(camera.isVisible ? "已开启" : (camera.isEnabled ? "等待相机" : "已关闭"))
+                    .accessibilityLabel(camera.perceptionEnabled ? "关闭视觉" : "打开视觉")
+                    .accessibilityValue(camera.perceptionEnabled ? (camera.isVisible ? "已开启" : "等待相机") : "已关闭")
                     .accessibilityIdentifier("camera.toggle")
-                    .disabled(camera.isBusy || camera.controlBusy || (blocksNewActions && !camera.isEnabled))
-                    if camera.isEnabled {
+                    .disabled(camera.isBusy || camera.controlBusy || (blocksNewActions && !camera.perceptionEnabled))
+                    if camera.perceptionEnabled {
                         HStack(spacing: 12) {
-                            Button(action: controls.switchCamera) {
+                            Button(action: controls.switchPerceptionCamera) {
                                 Image(systemName: "arrow.triangle.2.circlepath.camera")
                                     .frame(width: 48, height: 48)
                             }
-                            .disabled(!camera.canSwitchCamera)
+                            .disabled(!camera.canSwitch(.perception))
                             .accessibilityLabel(camera.facing == .front ? "切换到后置摄像头" : "切换到前置摄像头")
                             .accessibilityIdentifier("camera.switch")
-
                         }
                         .font(.system(size: 18, weight: .medium))
                         .transition(.opacity.combined(with: .scale(scale: 0.9, anchor: .trailing)))
@@ -100,7 +82,9 @@
                 .buttonStyle(.plain)
                 .background(.black.opacity(0.4), in: Capsule())
                 .overlay(Capsule().strokeBorder(.white.opacity(0.18)))
-                if let message = camera.controlMessage ?? camera.message ?? camera.visionMessage, camera.isEnabled {
+                if let message = camera.controlMessage ?? camera.message ?? camera.visionMessage,
+                    camera.perceptionEnabled
+                {
                     VStack(alignment: .trailing, spacing: 8) {
                         Text(message).font(.footnote)
                             .multilineTextAlignment(.trailing)
@@ -109,7 +93,7 @@
                                 if let url = URL(string: UIApplication.openSettingsURLString) { openURL(url) }
                             }
                         } else {
-                            Button("重试", action: controls.retry).disabled(
+                            Button("重试", action: controls.retryPerception).disabled(
                                 blocksNewActions || camera.isBusy || camera.controlBusy)
                         }
                     }
@@ -122,7 +106,7 @@
             .foregroundStyle(.white)
             .padding(.horizontal, 20)
             .padding(.top, 8)
-            .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: camera.isEnabled)
+            .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: camera.perceptionEnabled)
         }
     }
     @MainActor
@@ -131,7 +115,9 @@
         @State private var statisticsExpanded = false
         @Environment(\.accessibilityReduceMotion) private var reduceMotion
         var body: some View {
-            if camera.isVisible, let statistics = camera.skeleton?.statistics {
+            if camera.perceptionEnabled, camera.isVisible, camera.faceVisible,
+                let statistics = camera.skeleton?.statistics
+            {
                 VStack(alignment: .leading, spacing: 0) {
                     Button {
                         withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.2)) {
@@ -179,14 +165,61 @@
             return String(format: "%.1f %@", value, suffix)
         }
     }
-    @MainActor
-    private struct CameraPhotoOverlay: View {
+
+    @MainActor public struct CameraWindowContent<Preview: View>: View {
         let camera: CameraState
         let controls: any CameraControlling
-        var body: some View {
-            if let photo = camera.capturedPhoto {
-                CapturedPhotoView(photo: photo, camera: camera, controls: controls).id(photo.id).ignoresSafeArea()
-            }
+        let rendersPreview: Bool
+        let preview: () -> Preview
+        @Environment(\.openURL) private var openURL
+        public init(
+            camera: CameraState, controls: any CameraControlling, rendersPreview: Bool,
+            @ViewBuilder preview: @escaping () -> Preview
+        ) {
+            self.camera = camera
+            self.controls = controls
+            self.rendersPreview = rendersPreview
+            self.preview = preview
+        }
+        public var body: some View {
+            VStack(spacing: 0) {
+                ZStack {
+                    Color.black
+                    if rendersPreview && camera.isEnabled && camera.isVisible {
+                        preview().aspectRatio(camera.photoAspect, contentMode: .fit).allowsHitTesting(false)
+                    }
+                    if let photo = camera.capturedPhoto {
+                        CapturedPhotoView(photo: photo, camera: camera, controls: controls).id(photo.id)
+                    }
+                    if camera.isBusy { ProgressView().tint(.white) }
+                }.frame(maxWidth: .infinity, maxHeight: .infinity).clipped()
+                    .overlay(alignment: .top) {
+                        if let message = camera.controlMessage ?? camera.photoRendererFailure ?? camera.message {
+                            Text(message).font(.caption).multilineTextAlignment(.center).padding(8).background(
+                                .black.opacity(0.6))
+                        }
+                    }
+                HStack(spacing: 24) {
+                    Button(action: controls.switchCamera) {
+                        Image(systemName: "arrow.triangle.2.circlepath.camera").frame(width: 48, height: 48)
+                    }.accessibilityLabel("切换镜头").disabled(!camera.canSwitchCamera)
+                    if camera.isEnabled && camera.isVisible {
+                        Button(action: controls.takePhoto) {
+                            Circle().fill(.white).frame(width: 54, height: 54).padding(5)
+                                .overlay(Circle().stroke(.white, lineWidth: 2))
+                        }.accessibilityLabel("拍照").accessibilityIdentifier("camera.capture")
+                            .disabled(camera.controlBusy || camera.photoBusy || camera.isBusy)
+                    } else if camera.needsSettings {
+                        Button("打开系统设置") {
+                            if let url = URL(string: UIApplication.openSettingsURLString) { openURL(url) }
+                        }
+                    } else {
+                        Button("开启相机", action: controls.open).frame(minHeight: 44)
+                            .disabled(camera.controlBusy || camera.isBusy)
+                    }
+                    Text("照片").font(.subheadline).frame(width: 48)
+                }.buttonStyle(.plain).padding(16)
+            }.foregroundStyle(.white).background(.black)
         }
     }
 #endif

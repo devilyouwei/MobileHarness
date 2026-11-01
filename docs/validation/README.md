@@ -86,3 +86,5 @@
 - [App responsibility cleanup](App-Responsibility-Cleanup.md): resource/model/session ownership and obsolete App API cleanup.
 
 [BasicSkill 聆听控制](Listening-Actions.md)：启停 Action、许可与会话边界的自动化证据，以及独立真机验收步骤。
+
+- [Window / Camera](Window-Camera.md)：通用窗口、Action 请求链和拍照迁移的自动化证据与独立真机验收边界。

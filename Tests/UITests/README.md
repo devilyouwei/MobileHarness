@@ -6,6 +6,8 @@
 
 ## 职责与边界
 
+WindowStateTests 验证窗口在向左右拖动、Action位置更新及安全区缩窄后的完整标题栏可达性，并保留普通／最大化／卡片位置独立性。标题视觉居中、按钮点击与标题拖动隔离仍需iOS原生界面验收。
+
 根 Package.swift 的 UITests target 只依赖 UI，测试 UI-owned 状态和值，不引用 App、Agent、数据库、模型或设备实现。以 Swift 状态测试为主；常驻导航使用原生 macOS 挂载回归，iOS 触摸/渲染验收另行进行。
 
 ✅ PersistentHomeNavigationTests 在 macOS 原生 SwiftUI/AppKit 窗口中挂载与生产相同的常驻导航容器，验证多层 push/pop、覆盖时首页原生视图身份/窗口挂载、持续状态更新与 page task 不取消，以及根销毁时清理。该回归不替代 iPhone 的 Core Animation、语音和物理动作验收。
@@ -134,3 +136,9 @@ Implemented: Provider URL input is optional. Blank/whitespace input resolves to 
 ✅ NavigationContextTests覆盖手动路径回写、路径提交与确认分离、详情／覆盖层、迟到代际和父页更新拒绝，以及离开相册后的操作事实隔离。视图挂载和真实手势仍需原生验收。
 
 Camera orientation regression uses asymmetric synthetic sensor geometry across all capture/interface quarter-turns and mirror cases. It verifies portrait-lock crop stability, image/pose and gaze axes, nil-reference compatibility, orientation-only mailbox/mesh invalidation, stale sensor-reference rejection and no per-video invalidation of gaze presentation. These checks do not substitute for physical iPhone rotation or native camera acceptance.
+
+WindowStateTests uses explicit synthetic presentation acknowledgments to verify geometry, capacity, focus, identity/color stability, independent positions, cancellation and stale-generation rejection. These are state-contract tests, not native animation or device acceptance.
+
+Window regression covers image-aspect sizing, visible camera lens authority, minimized/restore handoff, occlusion, hidden Face and failed/stale presentation receipts. Renderer-failure tests prove shared frames remain available to the other surface.
+
+Photo geometry tests retain all four image corners under fit, rotation and mirroring. Observation tests ensure unchanged frame dimensions do not invalidate the root-facing photoAspect value. They do not replace physical lens field-of-view measurements.

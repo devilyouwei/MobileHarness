@@ -36,7 +36,7 @@ struct AgentUISubscription: Sendable {
 
 extension Agent {
     func consumeUI<Value: Sendable, Reply: Sendable>(
-        _ requests: UIRequests<Value, Reply>, sessionID: String,
+        _ requests: UIRequests<Value, Reply>, sessionID: String, maximumConcurrent: Int = 1,
         handle: @escaping @Sendable (isolated Self, Value, ProcessingContext) async throws -> Reply
     ) async throws -> AgentUISubscription {
         let stream = try await requests.listen()
@@ -50,8 +50,13 @@ extension Agent {
         let task = Task { [self] in
             await AgentUIInputs.$owner.withValue(descriptor.id) {
                 await withTaskGroup(of: Void.self) { group in
-                    group.addTask { await self.consumeUIStream(stream, sessionID: sessionID, handle: handle) }
-                    group.addTask { await self.consumeUIStream(controls, sessionID: sessionID, handle: handle) }
+                    group.addTask {
+                        await self.consumeUIStream(
+                            stream, sessionID: sessionID, maximumConcurrent: maximumConcurrent, handle: handle)
+                    }
+                    group.addTask {
+                        await self.consumeUIStream(controls, sessionID: sessionID, maximumConcurrent: 1, handle: handle)
+                    }
                     await group.next()
                     group.cancelAll()
                 }
@@ -61,49 +66,60 @@ extension Agent {
         return AgentUISubscription(task: task, close: close)
     }
     private func consumeUIStream<Value: Sendable, Reply: Sendable>(
-        _ stream: AsyncThrowingStream<UIRequest<Value, Reply>, any Error>, sessionID: String,
+        _ stream: AsyncThrowingStream<UIRequest<Value, Reply>, any Error>, sessionID: String, maximumConcurrent: Int,
         handle: @escaping @Sendable (isolated Self, Value, ProcessingContext) async throws -> Reply
     ) async {
-        do {
-            for try await request in stream {
-                try Task.checkCancellation()
-                guard await request.accept() else { continue }
-                let submitted = await request.submittedAt
-                ContainerInputMetrics.record("UI.Admit", since: submitted)
-                let context = await ProcessingContext(
-                    requestID: request.id.uuidString, sessionID: sessionID,
-                    generation: request.generation.uuidString)
-                do {
-                    let value = await request.value
-                    let cancellation = AgentRequestCancellation()
-                    await request.onCancellation { cancellation.cancel() }
-                    let work = Task {
-                        try Task.checkCancellation()
-                        guard !cancellation.isCancelled else { throw CancellationError() }
-                        return try await withUIRequestDeadline {
-                            try await ProcessingContext.$current.withValue(context) {
-                                try await handle(self, value, context)
-                            }
-                        }
+        await withTaskGroup(of: Void.self) { group in
+            var count = 0
+            do {
+                for try await request in stream {
+                    try Task.checkCancellation()
+                    if count == max(1, min(4, maximumConcurrent)) {
+                        await group.next()
+                        count -= 1
                     }
-                    cancellation.install { work.cancel() }
-                    defer { cancellation.finish() }
-                    let result = try await withTaskCancellationHandler {
-                        try await work.value
-                    } onCancel: {
-                        work.cancel()
-                    }
-                    ContainerInputMetrics.record("UI.Complete", since: submitted)
-                    await request.complete(.success(result))
-                } catch {
-                    ContainerInputMetrics.record("UI.Fail", since: submitted)
-                    await request.complete(.failure(error))
+                    group.addTask { await self.processUIRequest(request, sessionID: sessionID, handle: handle) }
+                    count += 1
                 }
-            }
-        } catch {
-            // The source closes every outstanding receipt when the consumer exits.
+            } catch {}
+            group.cancelAll()
         }
     }
+    private func processUIRequest<Value: Sendable, Reply: Sendable>(
+        _ request: UIRequest<Value, Reply>, sessionID: String,
+        handle: @escaping @Sendable (isolated Self, Value, ProcessingContext) async throws -> Reply
+    ) async {
+        guard !Task.isCancelled, await request.accept() else { return }
+        let submitted = await request.submittedAt
+        ContainerInputMetrics.record("UI.Admit", since: submitted)
+        let context = await ProcessingContext(
+            requestID: request.id.uuidString, sessionID: sessionID, generation: request.generation.uuidString)
+        do {
+            let value = await request.value
+            let cancellation = AgentRequestCancellation()
+            await request.onCancellation { cancellation.cancel() }
+            let work = Task {
+                try Task.checkCancellation()
+                guard !cancellation.isCancelled else { throw CancellationError() }
+                return try await withUIRequestDeadline {
+                    try await ProcessingContext.$current.withValue(context) { try await handle(self, value, context) }
+                }
+            }
+            cancellation.install { work.cancel() }
+            defer { cancellation.finish() }
+            let result = try await withTaskCancellationHandler {
+                try await work.value
+            } onCancel: {
+                work.cancel()
+            }
+            ContainerInputMetrics.record("UI.Complete", since: submitted)
+            await request.complete(.success(result))
+        } catch {
+            ContainerInputMetrics.record("UI.Fail", since: submitted)
+            await request.complete(.failure(error))
+        }
+    }
+
 }
 
 /// Bounded output staging inside the owning Agent, not an input router or execution service.

@@ -18,9 +18,14 @@ import UI
         self.presentation = presentation
         self.perform = perform
     }
+    public func takePhoto() { submit(.takePhoto) }
+    public func open() { submit(.open) }
     public func toggle() { submit(state.isEnabled ? .close : .open) }
     public func switchCamera() { submit(.flip, facing: state.facing == .front ? .back : .front) }
     public func retry() { submit(.retry) }
+    public func togglePerception() { submit(state.perceptionEnabled ? .perceptionClose : .perceptionOpen) }
+    public func retryPerception() { submit(.perceptionRetry) }
+    public func switchPerceptionCamera() { submit(.perceptionFlip, facing: state.facing == .front ? .back : .front) }
     public func savePhoto(_ id: String) { submitPhoto(.savePhoto, id: id) }
     public func ignorePhoto(_ id: String) { submitPhoto(.ignorePhoto, id: id) }
     private func submitPhoto(_ operation: CameraInput.Operation, id: String) {
@@ -58,14 +63,24 @@ import UI
                 presentation.present(.controlMessage(nil))
             }
             do { try await perform(operation, facing, mediaID) } catch {
+                let message = Self.message(for: error)
                 if operation == .savePhoto, let mediaID, state.savedMediaID == mediaID {
-                    presentation.present(.photoMessage("已保存到 App 相册，后续请求未完成：" + error.localizedDescription))
+                    presentation.present(.photoMessage("已保存到 App 相册，后续请求未完成：" + message))
                 } else if mediaID != nil {
-                    presentation.present(.photoMessage("照片操作失败：" + error.localizedDescription))
+                    presentation.present(.photoMessage("照片操作失败：" + message))
                 } else {
-                    presentation.present(.message("相机操作失败：" + error.localizedDescription))
+                    presentation.present(.message("相机操作失败：" + message))
                 }
             }
+        }
+    }
+    private static func message(for error: any Error) -> String {
+        if error is CancellationError { return "操作已取消，请重试" }
+        guard let request = error as? UIRequestError else { return error.localizedDescription }
+        switch request {
+        case .unavailable, .stale, .consumerEnded: return "请求因应用状态变化结束，请重试"
+        case .capacityExceeded: return "请求过多，请稍后重试"
+        case .duplicateConsumer: return "相机请求通道异常，请重新启动应用"
         }
     }
 }

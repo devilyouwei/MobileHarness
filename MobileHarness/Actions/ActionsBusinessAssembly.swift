@@ -28,12 +28,6 @@
         var stopInteractions: @MainActor () async -> Void = {}
         private let makeCameraRuntime: @MainActor () throws -> CameraRuntimeDependencies
         private let connectVision: @MainActor (String, Bool, any CameraOutputHandling) async throws -> Void
-        private var sceneActive = false
-        private var cameraVisible = true
-        func setCameraVisible(_ visible: Bool) {
-            cameraVisible = visible
-            camera.setForeground(sceneActive && visible)
-        }
         private var endpoints: ActionEndpoints?
         init(
             actions: ActionsContainer, files: FilesContainer, model: ModelContainer,
@@ -58,7 +52,7 @@
         lazy var camera: CameraCoordinator = {
             let owner = CameraCoordinator(
                 camera: platform.vision.camera, presentation: ui.camera, photos: photos,
-                photoCues: platform.audio.cue(.camera),
+                photoCues: platform.audio.cue(.camera), windows: ui.windows,
                 makeRuntime: { [weak self] in
                     guard let self else { throw ActionsContainerError.stopped }
                     return try self.makeCameraRuntime()
@@ -142,6 +136,8 @@
                 })
             let album = PhotoAlbumService(
                 photos: photos, export: { [platform] data in try await platform.vision.savePhoto(data) })
+            let windowExecution = WindowExecutionService(
+                state: ui.windows, lifecycles: [WindowContent.camera.rawValue: camera])
             let assembly = try BehaviorAssembly(
                 presentation: presentation, playback: endpoints.speech, pose: presentation,
                 historyPresentation: history, camera: endpoints.camera,
@@ -151,7 +147,8 @@
                     store: request.conversations,
                     photo: { [photos] id, input in try await photos.readForInput(id, source: "assistant", input: input)
                     }),
-                album: album, modelResources: resourceAdapter, resourcePreferences: preferences,
+                album: album, windows: windowExecution, modelResources: resourceAdapter,
+                resourcePreferences: preferences,
                 resourceInventory: resourceAdapter,
                 resourcePresentation: ResourcePresentationAdapter(
                     state: ui.modelResources.presentation, sessionID: request.sessionID,
@@ -169,21 +166,17 @@
             try actions.configure(
                 assembly,
                 cleanup: [
-                    { await mutations.shutdown() }
+                    { await mutations.shutdown() }, { await windowExecution.stop() },
                 ], workers: [{ [camera] in await camera.observe() }, { [bluetooth] in await bluetooth.run() }],
-                invalidateNative: { [weak self, camera, bluetooth] in
-                    self?.sceneActive = false
+                invalidateNative: { [camera, bluetooth] in
                     camera.setForeground(false)
                     bluetooth.setForeground(false)
                 },
-                nativeForeground: { [weak self, camera, bluetooth] active in
-                    guard let self else { throw ActionsContainerError.stopped }
+                nativeForeground: { [camera, bluetooth] active in
                     if active {
-                        self.sceneActive = true
-                        camera.setForeground(self.cameraVisible)
+                        camera.setForeground(true)
                         bluetooth.setForeground(true)
                     } else {
-                        defer { self.sceneActive = false }
                         var failure: (any Error)?
                         do { try await camera.shutdown() } catch { failure = error }
                         await bluetooth.waitUntilIdle()
@@ -280,11 +273,6 @@
 #if os(iOS)
     @available(iOS 27, *)
     extension ActionsContainer {
-        public func setCameraVisible(_ visible: Bool) {
-            guard let business = businessOwner as? ActionsBusinessAssembly else { return }
-            business.setCameraVisible(visible)
-        }
-
         public func configureBusiness(request: ActionsBusinessRequest) throws -> ActionsBusinessBindings {
             guard state == .cold else { throw ActionsContainerError.alreadyConfigured }
             guard let assembly = businessOwner as? ActionsBusinessAssembly else {

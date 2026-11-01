@@ -11,7 +11,7 @@
 | check.sh | Swift 版本、模块/依赖边界、离线 Python 检查、严格格式、根 Swift 测试及项目/权限 plist |
 | check-modelkit-boundaries.py | 项目/SwiftPM 目标与 import 边界、无环依赖、独立基础模块、业务函数/资源约束 |
 | build-ios.sh | 完整 Xcode 下按 Package.resolved 锁定版本依次构建四个 Simulator scheme，禁止自动更新依赖，并验证 App 中的 Agent/Skill 资源 |
-| verify-app-agent-resources.py | 最终 Bundle Catalog 可发现、资源路径/字节与源码一致、Core 协议与函数声明打包边界 |
+| verify-app-agent-resources.py | 最终 Bundle Catalog 可发现、资源路径/字节与源码一致、Core 协议与函数声明打包边界；只排除资源根标准签名元数据，签名包与未签名包采用同一资源校验 |
 
 完整 Xcode/SDK、具体模型和平台能力由相应工具自身校验；不能把缺失工具或失败命令记录为通过。执行结果、失败原因、版本和设备写入 [validation](../docs/validation/README.md)。
 

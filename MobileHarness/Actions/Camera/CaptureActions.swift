@@ -79,8 +79,8 @@ extension CameraActions {
     @Action(
         domain: "Camera", module: "Capture", title: "open",
         doc:
-            "Enable camera preview/vision; permission is required. Returns capture readiness, not pose-model readiness.",
-        parameters: [])
+            "Present the Camera window and start capture after permission. Returns readiness and windowID; capture failure retains a retryable window.",
+        parameters: [], timeout: .seconds(60))
     public static func open(invocation: any FunctionInput, using camera: any CameraControlCapability) async throws
         -> String
     {
@@ -89,14 +89,16 @@ extension CameraActions {
         try await camera.setEnabled(true, invocation: invocation)
         try Task.checkCancellation()
         return String(
-            decoding: try JSONEncoder().encode(CameraCommandReceipt(operation: "open", enabled: true)), as: UTF8.self)
+            decoding: try JSONEncoder().encode(
+                CameraCommandReceipt(operation: "open", enabled: true, windowID: await camera.windowID())),
+            as: UTF8.self)
     }
 
     @Action(
         domain: "Camera", module: "Capture", title: "close",
         doc:
-            "Disable camera preview/vision and join cleanup. Returns the resulting camera state.",
-        parameters: [])
+            "Close the Camera window after photo disposition and joined capture cleanup. Cancel retains the window.",
+        parameters: [], timeout: .seconds(60))
     public static func close(invocation: any FunctionInput, using camera: any CameraControlCapability) async throws
         -> String
     {
@@ -111,7 +113,7 @@ extension CameraActions {
     @Action(
         domain: "Camera", module: "Capture", title: "flip",
         doc:
-            "Select the requested lens on an enabled camera. Already-selected lens is unchanged; disabled/busy/unavailable fails. Returns lens state.",
+            "Select the shared lens only when the visible photo window owns lens control. Minimized/covered/disabled/busy/unavailable fails. Returns the confirmed lens.",
         parameters: [
             .init(
                 "facing", type: .string, required: true, description: "Requested front or back lens.",

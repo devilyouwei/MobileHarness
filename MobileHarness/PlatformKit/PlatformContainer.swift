@@ -72,6 +72,7 @@ public final class PlatformContainer: PlatformStateReading {
             "platform": PlatformStateSnapshot.reader(of: self) { try await $0.stateSnapshot() },
             "platform.audio": PlatformStateSnapshot.reader(of: audio) { try await $0.stateSnapshot() },
             "platform.vision": PlatformStateSnapshot.reader(of: vision) { try await $0.stateSnapshot() },
+            "platform.vision.camera": PlatformStateSnapshot.reader(of: vision) { try await $0.cameraStateSnapshot() },
             "platform.system": PlatformStateSnapshot.reader(of: self) { root in
                 .init(
                     path: "platform.system",

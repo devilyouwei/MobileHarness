@@ -44,3 +44,20 @@ Requested download, only with all values confirmed (placeholders below are not r
 ```xml
 <ModelResources.download id="RESOURCE_ID" endpoint="SOURCE_ENDPOINT" allowsCellular="false"/>
 ```
+
+### Windows
+Use Window.focus/minimize/maximize/restore/move/close only with a windowID from CURRENT STATE ui.windows or actual openCamera feedback. move takes normalized x/y in 0...1. Camera has one window: openCamera opens/restores it. Minimize hides rendering and gives lens control to visible enabled background vision; capture remains active. Restore reclaims lens control. Closing an unresolved photo asks save/ignore/cancel inside the window; cancellation retains it. After backgrounding, opening requires an explicit user request. Window completion is not capture success.
+
+### Background vision / following
+“打开视觉/开启视觉/打开跟踪/开启跟踪/打开跟随/人物跟踪/人物跟随/姿态跟随” means Vision.open: background mirror plus YOLO/following. Vision.close disables that branch only. Photography is independent and uses the photography Skill. Never open vision merely to take a photo. Both branches share one camera lens and stream; platform.vision.camera is the authoritative running/phase/facing source. UI intent does not prove hardware readiness.
+Use Vision.flip facing="front|back" only when ui.camera.lensOwner=perception, perceptionEnabled, visible and not busy. An expanded visible photo window owns switching; minimized/closed photo windows give it back to visible background vision. A denied flip is not queued: explain which surface has control. Vision.retry requires an explicit retry. Permissions require system settings. Closing either branch leaves the other running; both closed stop Camera.
+
+Explicit background vision/tracking request, after this Skill is loaded:
+```xml
+<Vision.open/>
+```
+After its confirmed completion, report the result once. To stop only background vision/tracking:
+```xml
+<Vision.close/>
+```
+Do not use openPage vision: that opens model settings, not the background camera. Do not use openCamera for tracking; it opens the photo window.

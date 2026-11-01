@@ -22,3 +22,11 @@ UI.Navigation.open 的允许目标与参数说明补齐 album，使用既有Navi
 ## Container 上下文
 
 导航Action仍经真实身份／呈现准入提交路径，presented仅代表提交。页面确认及上下文属于UI NavigationState；模型按ui.navigation读取，Actions不建立第二份路由状态。
+
+## Window execution
+
+WindowActions supplies focus/minimize/maximize/restore/move/close with pure windowID/position validation. WindowModule binds all six explicitly. WindowExecutionService holds at most one operation per admitted window; replacements cancel and join, closing rejects conflicting operations, and other instances continue independently. Public modes/geometry belong to UI WindowState. WindowContentLifecycle supplies domain pause/resume/close; minimize pauses before transition, restoring a minimized window presents before resuming, close joins domain work before exit. move accepts finite normalized0...1 coordinates.
+
+All six use direct/returning Action and Tool bindings. Finite transitions wait for UIKit receipts, fenced by UI revision/generation. Invalid identity, closed root, resource/permission failure, busy domain and cleanup failures propagate; completed presentation never means captured/saved media.
+
+WindowContentLifecycle.beginWindowTransition/endWindowTransition bracket lifecycle work and real UI completion. Domains can fence new device operations and join existing work before a presentation handoff. Default implementations are no-ops for content without such coordination. Failure/cancellation always releases a successfully acquired transition scope; minimized/restore semantics remain domain-owned.

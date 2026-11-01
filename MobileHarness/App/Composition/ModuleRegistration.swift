@@ -35,7 +35,6 @@ import Gateway
                     let preparation = try services.agents.prepareExecutionBindings(
                         declarations: CapabilityModules.declarations)
                     let business = try services.actionAssembly.prepare(preparation.request, actions: services.actions)
-                    services.actions.setCameraVisible(services.uiContainer.navigation.state.path.isEmpty)
                     let binding = try preparation.validate(business)
                     let communication = AgentGatewayAssembly(
                         signals: services.gateway.signals,

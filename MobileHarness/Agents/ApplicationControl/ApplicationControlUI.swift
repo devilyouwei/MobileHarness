@@ -8,6 +8,13 @@ extension ApplicationControlAgent {
     public func bindUIExecution(_ consumer: GatewayOutputConsumer) { uiExecution.consumer = consumer }
     func startUIInputs() async throws {
         do {
+            if let uiWindows {
+                let source = await uiWindows.requests
+                uiInputs.append(
+                    try await consumeUI(source, sessionID: sessionID, maximumConcurrent: 4) { agent, value, context in
+                        try await agent.handleWindow(value, context: context)
+                    })
+            }
             if let connectionFacts {
                 let stream = try await connectionFacts()
                 let task = Task { [self] in
@@ -58,6 +65,29 @@ extension ApplicationControlAgent {
         } catch {
             await stopUIInputs()
             throw error
+        }
+    }
+    private func handleWindow(_ value: WindowInput, context: ProcessingContext) async throws {
+        guard status().lifecycle == .running, context.sessionID == sessionID else {
+            throw CommunicationError.scopeClosed
+        }
+        let consumer = try uiExecution.begin(context.requestID)
+        defer { uiExecution.finish(context.requestID) }
+        guard
+            let permission = ApplicationControlFunctions.windows.first(where: {
+                $0.path == "UI.Window." + value.command.rawValue
+            })
+        else { throw CommunicationError.invalidPayload }
+        guard windowCalls.count < 5 else { throw CommunicationError.capacityExceeded }
+        let call = try permission.call(["windowID": value.id.uuidString])
+        windowCalls.insert(call.id)
+        defer { windowCalls.remove(call.id) }
+        let result = try await consumer.executeReturning(
+            OutputEnvelope(source: descriptor.id, context: context, output: .toolCall(call)))
+        try Task.checkCancellation()
+        if result.isCancellationOnly { throw CancellationError() }
+        if result.isError {
+            throw ApplicationControlIntentFailure.execution(result.failure ?? result.tool?.value ?? "Window failed")
         }
     }
     func stopUIInputs() async {

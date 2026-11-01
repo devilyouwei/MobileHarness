@@ -4,6 +4,19 @@ import ImageIO
 
 /// Generic native image preparation. The caller owns upload/storage policy and lifetime.
 public enum NativeImageCompression {
+    public struct InputLimits: Sendable {
+        public let maximumBytes: Int
+        public let maximumDimension: Int
+        public let maximumPixels: Int
+        public init(
+            maximumBytes: Int = 4 * 1024 * 1024, maximumDimension: Int = 65535,
+            maximumPixels: Int = 268_435_456
+        ) {
+            self.maximumBytes = maximumBytes
+            self.maximumDimension = maximumDimension
+            self.maximumPixels = maximumPixels
+        }
+    }
     public struct Limits: Sendable {
         public let maximumDimension: Int
         public let maximumPixels: Int
@@ -23,10 +36,12 @@ public enum NativeImageCompression {
     }
 
     /// Uses a joined native worker so callers on MainActor do not decode or encode images there.
-    public static func jpeg(from data: Data, limits: Limits) async throws -> Data {
+    public static func jpeg(from data: Data, limits: Limits, inputLimits: InputLimits = InputLimits()) async throws
+        -> Data
+    {
         try Task.checkCancellation()
         let worker = Task.detached(priority: Task.currentPriority) {
-            try autoreleasepool { try encode(data, limits: limits) }
+            try autoreleasepool { try encode(data, limits: limits, inputLimits: inputLimits) }
         }
         return try await withTaskCancellationHandler {
             let result = try await worker.value
@@ -37,21 +52,35 @@ public enum NativeImageCompression {
         }
     }
 
-    private static func encode(_ data: Data, limits: Limits) throws -> Data {
+    /// Camera output is trusted encoded JPEG, but its native byte size is scene-dependent.
+    static func cameraPhotoJPEG(from data: Data) async throws -> Data {
+        try Task.checkCancellation()
+        guard !data.isEmpty, data.count <= 32 * 1024 * 1024 else { throw Failure.invalidImage }
+        if data.count <= 4 * 1024 * 1024 { return data }
+        return try await jpeg(
+            from: data,
+            limits: .init(
+                maximumDimension: 4096, maximumPixels: 16_777_216, maximumBytes: 4 * 1024 * 1024, quality: 0.85),
+            inputLimits: .init(maximumBytes: 32 * 1024 * 1024, maximumDimension: 4096, maximumPixels: 16_777_216))
+    }
+
+    private static func encode(_ data: Data, limits: Limits, inputLimits: InputLimits) throws -> Data {
         try Task.checkCancellation()
         guard (1...4096).contains(limits.maximumDimension), (1...16_777_216).contains(limits.maximumPixels),
             (1024...4 * 1024 * 1024).contains(limits.maximumBytes),
-            limits.quality.isFinite, (0.5...1).contains(limits.quality)
+            limits.quality.isFinite, (0.5...1).contains(limits.quality),
+            (1...32 * 1024 * 1024).contains(inputLimits.maximumBytes),
+            (1...65535).contains(inputLimits.maximumDimension), (1...268_435_456).contains(inputLimits.maximumPixels)
         else { throw Failure.invalidLimits }
-        guard !data.isEmpty, data.count <= 4 * 1024 * 1024,
+        guard !data.isEmpty, data.count <= inputLimits.maximumBytes,
             let source = CGImageSourceCreateWithData(
                 data as CFData, [kCGImageSourceShouldCache: false] as CFDictionary),
             CGImageSourceGetCount(source) == 1,
             let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
             let width = properties[kCGImagePropertyPixelWidth] as? Int,
             let height = properties[kCGImagePropertyPixelHeight] as? Int,
-            (1...65535).contains(width), (1...65535).contains(height),
-            Double(width) * Double(height) <= 268_435_456
+            (1...inputLimits.maximumDimension).contains(width), (1...inputLimits.maximumDimension).contains(height),
+            Double(width) * Double(height) <= Double(inputLimits.maximumPixels)
         else { throw Failure.invalidImage }
         guard let type = CGImageSourceGetType(source), ["public.jpeg", "public.png"].contains(type as String) else {
             throw Failure.unsupportedImage

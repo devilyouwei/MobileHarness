@@ -95,6 +95,12 @@ private actor CameraBridge: CameraControlCapability {
     func setEnabled(_ enabled: Bool, invocation: any FunctionInput) async throws {
         try await perform(enabled ? .open : .close, invocation: invocation)
     }
+    func setPerceptionEnabled(_ enabled: Bool, invocation: any FunctionInput) async throws {
+        try await perform(enabled ? .perceptionOpen : .perceptionClose, invocation: invocation)
+    }
+    func flipPerception(_ facing: CameraActions.Facing, invocation: any FunctionInput) async throws {
+        try await perform(.perceptionFlip, facing: facing, invocation: invocation)
+    }
     func retry(invocation: any FunctionInput) async throws { try await perform(.retry, invocation: invocation) }
     func flip(_ facing: CameraActions.Facing, invocation: any FunctionInput) async throws {
         try await perform(.flip, facing: facing, invocation: invocation)
@@ -424,4 +430,14 @@ func cameraContainerCallsPhotographerDirectlyAndWaitsForNativeCompletion() async
     #expect(await host.probe.sources.allSatisfy { $0 == "photographer" })
     await host.runtime.shutdown()
     await ui.stop()
+}
+
+@Test(.actionCatalog) func perceptionUIRequestsUseFixedSeparateActionsThroughGateway() async throws {
+    let f = try await CameraFixture()
+    try await f.runtime.perform(.perceptionOpen)
+    try await f.runtime.perform(.perceptionFlip, facing: .back)
+    try await f.runtime.perform(.perceptionClose)
+    #expect(await f.probe.operations == [.perceptionOpen, .perceptionFlip, .perceptionClose])
+    #expect(await f.probe.facings == ["back"])
+    await f.runtime.shutdown()
 }

@@ -85,7 +85,7 @@ public final class UIContainer {
                 "available": .flag(isAvailable), "rejectedUpdates": .unsigned(rejectedUpdates),
             ],
             children: [
-                .init(path: "ui.home"), .init(path: "ui.camera"), .init(path: "ui.settings"),
+                .init(path: "ui.windows"), .init(path: "ui.home"), .init(path: "ui.camera"), .init(path: "ui.settings"),
                 .init(path: "ui.modelresources"), .init(path: "ui.navigation"), .init(path: "ui.album"),
                 .init(path: "ui.history"), .init(path: "ui.devices"), .init(path: "ui.diagnostics"),
             ])
@@ -95,6 +95,7 @@ public final class UIContainer {
         var readers: [String: UIStateSnapshot.Reader] = [
             "ui": UIStateSnapshot.reader(of: self) { try await $0.stateSnapshot() }
         ]
+        readers["ui.windows"] = UIStateSnapshot.reader(of: windows) { try await $0.stateSnapshot() }
         readers["ui.camera"] = UIStateSnapshot.reader(of: camera) { try await $0.stateSnapshot() }
         readers["ui.settings"] = UIStateSnapshot.reader(of: settings) { try await $0.stateSnapshot() }
         readers["ui.modelresources"] = UIStateSnapshot.reader(of: modelResources) { try await $0.stateSnapshot() }
@@ -106,6 +107,7 @@ public final class UIContainer {
         readers.merge(try await diagnostics.stateReaders()) { _, new in new }
         return readers
     }
+    public let windows: WindowState = WindowState()
     public let home: UIHomeContainer
     public let camera: UICameraContainer
     public let settings: UISettingsContainer
@@ -131,6 +133,7 @@ public final class UIContainer {
         diagnostics = UIDiagnosticsContainer(admission: admission)
     }
     private func setInputAvailable(_ value: Bool) {
+        windows.setAvailable(value)
         home.requests.setAvailable(value)
         home.listeningRequests.setAvailable(value)
         camera.requests.setAvailable(value)
@@ -187,6 +190,7 @@ public final class UIContainer {
         settings.clearSensitiveDraft()
         devices.stopPresentation()
         admission.close()
+        await windows.stop()
         home.requests.stop()
         home.listeningRequests.stop()
         diagnostics.detectionRequests.stop()

@@ -1,8 +1,8 @@
 {
   "version": 3,
   "id": "application-control",
-  "revision": 14,
-  "description": "Conversational page navigation, resource/provider/Bluetooth status and explicit supported device/resource operations.",
+  "revision": 17,
+  "description": "打开视觉、跟踪、人物/姿态跟随: background vision through Vision.open, without a photo window. Also page/window navigation and resource/provider/Bluetooth controls.",
   "dependencies": [],
   "useActions": [
     {
@@ -46,9 +46,73 @@
       "callType": "action",
       "alias": "ModelResources.cancel",
       "channel": "System"
+    },
+    {
+      "path": "UI.Window.focus",
+      "callType": "action",
+      "alias": "Window.focus",
+      "channel": "Display"
+    },
+    {
+      "path": "UI.Window.minimize",
+      "callType": "action",
+      "alias": "Window.minimize",
+      "channel": "Display"
+    },
+    {
+      "path": "UI.Window.maximize",
+      "callType": "action",
+      "alias": "Window.maximize",
+      "channel": "Display"
+    },
+    {
+      "path": "UI.Window.restore",
+      "callType": "action",
+      "alias": "Window.restore",
+      "channel": "Display"
+    },
+    {
+      "path": "UI.Window.move",
+      "callType": "action",
+      "alias": "Window.move",
+      "channel": "Display"
+    },
+    {
+      "path": "UI.Window.close",
+      "callType": "action",
+      "alias": "Window.close",
+      "channel": "Display"
+    },
+    {
+      "path": "Camera.Perception.openVision",
+      "callType": "action",
+      "alias": "Vision.open",
+      "channel": "Camera"
+    },
+    {
+      "path": "Camera.Perception.closeVision",
+      "callType": "action",
+      "alias": "Vision.close",
+      "channel": "Camera"
+    },
+    {
+      "path": "Camera.Perception.flipVision",
+      "callType": "action",
+      "alias": "Vision.flip",
+      "channel": "Camera"
+    },
+    {
+      "path": "Camera.Perception.retryVision",
+      "callType": "action",
+      "alias": "Vision.retry",
+      "channel": "Camera"
     }
   ],
-  "useStates": [],
+  "useStates": [
+    "ui.windows",
+    "ui.camera",
+    "platform.vision.camera"
+  ],
   "useInstructions": [
     "Instructions.md"
   ]

@@ -6,17 +6,30 @@
     @MainActor
     public struct CameraFrameView: UIViewRepresentable {
         @Bindable private var state: CameraState
-        public init(state: CameraState) { self.state = state }
+        private let showsPose: Bool
+        public init(state: CameraState, showsPose: Bool = true) {
+            self.state = state
+            self.showsPose = showsPose
+        }
         public func makeUIView(context: Context) -> CameraFrameSurface { CameraFrameSurface() }
         public func updateUIView(_ view: CameraFrameSurface, context: Context) {
             let state = state
             let generation = state.videoGeneration
+            let showsPose = showsPose
             view.onOrientationChange = { [weak state] orientation in
+                guard showsPose else {
+                    state?.presentPhotoOrientation(orientation, generation: generation)
+                    return
+                }
                 state?.presentInterfaceOrientation(orientation, generation: generation)
             }
-            view.onFailure = { [weak state] _ in state?.presentRendererFailure("相机画面渲染不可用", generation: generation) }
+            view.onFailure = { [weak state] _ in
+                state?.presentRendererFailure(
+                    "相机画面渲染不可用", generation: generation, surface: showsPose ? .perception : .capture)
+            }
             view.update(
-                frame: state.videoFrame, pose: state.skeleton, mirrored: state.facing == .front, generation: generation)
+                frame: state.videoFrame, pose: showsPose ? state.skeleton : nil, mirrored: state.facing == .front,
+                generation: generation, fitsImage: !showsPose)
         }
         public static func dismantleUIView(_ view: CameraFrameSurface, coordinator: ()) { view.stopRenderer() }
     }
@@ -33,6 +46,7 @@
         private var video: CameraVideoFrame?
         private var pose: PoseOverlay?
         private var mirrored = false
+        private var fitsImage = false
         private var failed = false
         private var interfaceOrientation = CameraInterfaceOrientation.portrait
         private var reportedOrientation: CameraInterfaceOrientation?
@@ -53,7 +67,9 @@
             orientationTask?.cancel()
             renderer?.stop()
         }
-        public func update(frame: CameraVideoFrame?, pose: PoseOverlay?, mirrored: Bool, generation: UInt64) {
+        public func update(
+            frame: CameraVideoFrame?, pose: PoseOverlay?, mirrored: Bool, generation: UInt64, fitsImage: Bool = false
+        ) {
             if cameraGeneration != generation {
                 stopRenderer()
                 cameraGeneration = generation
@@ -62,6 +78,7 @@
             video = frame
             self.pose = pose
             self.mirrored = mirrored
+            self.fitsImage = fitsImage
             startRenderer()
             submit()
         }
@@ -147,7 +164,7 @@
             renderer?.submit(
                 CameraRenderSnapshot(
                     frame: video, pose: pose, mirrored: mirrored, size: bounds.size,
-                    pixelSize: metalLayer.drawableSize, orientation: interfaceOrientation))
+                    pixelSize: metalLayer.drawableSize, orientation: interfaceOrientation, fitsImage: fitsImage))
         }
     }
 
@@ -179,6 +196,7 @@
                 fragment float4 cameraPixel(Vertex v [[stage_in]], texture2d<float> image [[texture(0)]],
                     constant float4& geometry [[buffer(0)]]) {
                     float2 uv=(v.uv-0.5)*geometry.zw+0.5;
+                    if (any(uv < 0.0) || any(uv > 1.0)) return float4(0,0,0,1);
                     if (geometry.y>0.5) uv.x=1-uv.x;
                     int r=int(geometry.x);
                     if(r==1) uv=float2(uv.y,1-uv.x);
@@ -386,7 +404,7 @@
                     return
                 }
                 let projection = CameraPreviewGeometry(
-                    frame: frame, size: snapshot.size, orientation: snapshot.orientation)
+                    frame: frame, size: snapshot.size, orientation: snapshot.orientation, fitsImage: snapshot.fitsImage)
                 var geometry = SIMD4<Float>(
                     Float(projection.displayRotation), snapshot.mirrored ? 1 : 0,
                     Float(projection.crop.width), Float(projection.crop.height))

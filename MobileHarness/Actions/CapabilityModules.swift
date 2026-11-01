@@ -7,6 +7,7 @@ public enum CapabilityModules {
         let modules: [[ActionDeclaration]] = [
             UIModule.declarations,
             NavigationModule.declarations,
+            WindowModule.declarations,
             ResourcePresentationModule.declarations,
             SpeechModule.declarations,
             CameraModule.declarations,
@@ -26,6 +27,7 @@ public enum CapabilityModules {
         camera: any CameraControlCapability, history: any HistoryQueryCapability,
         historyMutations: any HistoryMutationCapability, fullHistory: (any HistoryFullReadCapability)? = nil,
         album: (any PhotoAlbumCapability)? = nil,
+        windows: (any WindowControlCapability)? = nil,
         modelResources: any ModelResourceCapability,
         resourcePreferences: any ModelResourcePreferencesCapability,
         resourceInventory: any ModelResourceInventoryCapability,
@@ -62,6 +64,7 @@ public enum CapabilityModules {
         if let controls = taskControl {
             modules.append(TaskControlModule(capability: controls))
         }
+        if let windows { modules.append(WindowModule(windows: windows)) }
         return modules
     }
 }

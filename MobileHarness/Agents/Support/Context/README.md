@@ -172,3 +172,5 @@ The producer classifies its own complete node data; Assistant chooses Business f
 
 
 residentSnapshot() returns the last initialized committed Context without acquiring the transaction slot, restoring persistence or mutating state. Before initialization it returns nil; an in-flight commit leaves the previous committed value readable. Role State reads use their owning Agent’s residentContext() accessor; Agent start() performs the existing initialization through snapshot(). Operational snapshot()/transaction semantics remain unchanged, including validation, recovery and explicit persistence failure.
+
+ui.windows reports windowID/title/content/mode/phase and focusedID from the UI owner. Photography and ApplicationControl select it explicitly; BasicSkill remains unchanged. It contains no capture, media or Task authority.

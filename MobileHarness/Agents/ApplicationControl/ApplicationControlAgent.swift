@@ -25,6 +25,7 @@ public actor ApplicationControlAgent: Agent {
     let decodeResources: @Sendable (String) throws -> ModelResourceViewSnapshot
     let uiSettings: UISettingsContainer?
     let uiResources: UIModelResourcesContainer?
+    let uiWindows: WindowState?
     let uiDevices: UIDeviceSettingsContainer?
     let uiProviderSettings: (any ProviderSettingsStaging)?
     let uiProviderDiscovery: (any ProviderDiscoveryStaging)?
@@ -63,6 +64,7 @@ public actor ApplicationControlAgent: Agent {
     private var processed = 0
     private var diagnosticCounts: [String: UInt64] = [:]
     private var diagnosticOrder: [String] = []
+    var windowCalls: Set<String> = []
     private var diagnosticCalls: Set<String> = []
     private var diagnosticPresentationFailures: [String] = []
     private let diagnosticContracts: Set<String> = [ContainerFailureEvent.contract, RuntimeFailureEvent.contract]
@@ -81,6 +83,7 @@ public actor ApplicationControlAgent: Agent {
         sessionID: String, configuration: AgentConfiguration? = nil,
         uiSettings: UISettingsContainer? = nil, uiResources: UIModelResourcesContainer? = nil,
         uiDevices: UIDeviceSettingsContainer? = nil, uiDiagnostics: UIDiagnosticsContainer? = nil,
+        uiWindows: WindowState? = nil,
         connectionFacts: (@MainActor @Sendable () throws -> AsyncThrowingStream<NexArmConnectionFacts, any Error>)? =
             nil,
         resourceChanges: (@MainActor @Sendable () async throws -> AsyncStream<UInt64>)? = nil,
@@ -101,6 +104,7 @@ public actor ApplicationControlAgent: Agent {
         self.uiSettings = uiSettings
         self.uiResources = uiResources
         self.uiDevices = uiDevices
+        self.uiWindows = uiWindows
         self.uiProviderSettings = uiProviderSettings
         self.uiProviderDiscovery = uiProviderDiscovery
         self.uiProviderPresentation = uiProviderPresentation
@@ -112,21 +116,22 @@ public actor ApplicationControlAgent: Agent {
             id: .applicationControl, name: "ApplicationControl",
             inputs: Set(configuration.communication.inputs.map(\.kind)),
             outputs: [.communication, .actionCall, .toolCall, .control, .scheduling],
-            capabilities: try configuration.capabilities.adding(internalTools: [
-                InternalTool(path: "Speech.Detection.run"), ApplicationControlFunctions.runtimeFailure,
-                ApplicationControlFunctions.bluetoothHome,
-                ApplicationControlFunctions.bluetoothSettings, ApplicationControlFunctions.loadingExpression,
-                ApplicationControlFunctions.download, ApplicationControlFunctions.cancellation,
-                ApplicationControlFunctions.removal, ApplicationControlFunctions.speechBinding,
-                ApplicationControlFunctions.restoration, ApplicationControlFunctions.saving,
-                ApplicationControlFunctions.inventory,
-                ApplicationControlFunctions.presentation, ApplicationControlFunctions.failurePresentation,
-                ApplicationControlFunctions.operationFailurePresentation,
-                ApplicationControlFunctions.preferenceFailurePresentation,
-                ApplicationControlFunctions.providerDiscovery, ApplicationControlFunctions.providerRestoration,
-                ApplicationControlFunctions.providerSaving, ApplicationControlFunctions.providerPresentation,
-                ApplicationControlFunctions.deviceControl, ApplicationControlFunctions.navigation,
-            ]))
+            capabilities: try configuration.capabilities.adding(
+                internalTools: [
+                    InternalTool(path: "Speech.Detection.run"), ApplicationControlFunctions.runtimeFailure,
+                    ApplicationControlFunctions.bluetoothHome,
+                    ApplicationControlFunctions.bluetoothSettings, ApplicationControlFunctions.loadingExpression,
+                    ApplicationControlFunctions.download, ApplicationControlFunctions.cancellation,
+                    ApplicationControlFunctions.removal, ApplicationControlFunctions.speechBinding,
+                    ApplicationControlFunctions.restoration, ApplicationControlFunctions.saving,
+                    ApplicationControlFunctions.inventory,
+                    ApplicationControlFunctions.presentation, ApplicationControlFunctions.failurePresentation,
+                    ApplicationControlFunctions.operationFailurePresentation,
+                    ApplicationControlFunctions.preferenceFailurePresentation,
+                    ApplicationControlFunctions.providerDiscovery, ApplicationControlFunctions.providerRestoration,
+                    ApplicationControlFunctions.providerSaving, ApplicationControlFunctions.providerPresentation,
+                    ApplicationControlFunctions.deviceControl, ApplicationControlFunctions.navigation,
+                ] + ApplicationControlFunctions.windows))
         taskCoordinator = AgentFixedTaskCoordinator(context: self.contextRepository)
         self.sessionID = sessionID
         let pair = AsyncStream<OutputEnvelope>.makeStream(
@@ -215,6 +220,7 @@ public actor ApplicationControlAgent: Agent {
         admission.close()
         lifecycle = .stopped
         diagnosticCalls.removeAll()
+        windowCalls.removeAll()
         diagnosticCounts.removeAll()
         diagnosticOrder.removeAll()
         pending.removeAll()
@@ -271,6 +277,14 @@ public actor ApplicationControlAgent: Agent {
             [ContainerFailureEvent.contract, RuntimeFailureEvent.contract].contains(message.contract)
         {
             try receiveFailure(input, message: message)
+            return
+        }
+        if case .toolResult(let result) = input.payload, windowCalls.contains(result.callID) {
+            guard lifecycle == .running || lifecycle == .paused else { throw HarnessError.notRunning }
+            guard input.metadata.origin == .runtime, input.metadata.source == "runtime",
+                input.sessionID == sessionID, input.taskScope == nil
+            else { throw CommunicationError.unauthorized }
+            windowCalls.remove(result.callID)
             return
         }
         if case .toolResult(let result) = input.payload, diagnosticCalls.contains(result.callID) {

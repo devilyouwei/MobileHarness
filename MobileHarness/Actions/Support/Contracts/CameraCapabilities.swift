@@ -10,10 +10,12 @@ public struct CameraCommandReceipt: Codable, Sendable, Equatable {
     public let operation: String
     public let enabled: Bool?
     public let facing: CameraActions.Facing?
-    public init(operation: String, enabled: Bool? = nil, facing: CameraActions.Facing? = nil) {
+    public let windowID: String?
+    public init(operation: String, enabled: Bool? = nil, facing: CameraActions.Facing? = nil, windowID: String? = nil) {
         self.operation = operation
         self.enabled = enabled
         self.facing = facing
+        self.windowID = windowID
     }
 }
 
@@ -48,6 +50,9 @@ public struct CameraPhotoCommandReceipt: Codable, Sendable, Equatable {
 }
 
 public protocol CameraControlCapability: Sendable {
+    func windowID() async -> String?
+    func setPerceptionEnabled(_ enabled: Bool, invocation: any FunctionInput) async throws
+    func flipPerception(_ facing: CameraActions.Facing, invocation: any FunctionInput) async throws
     func savePhoto(_ id: String?, invocation: any FunctionInput) async throws -> CameraPhotoCommandReceipt
     func ignorePhoto(_ id: String?, invocation: any FunctionInput) async throws -> CameraPhotoCommandReceipt
     func takePhoto(invocation: any FunctionInput) async throws -> CameraPhotoReceipt
@@ -64,6 +69,7 @@ public enum CameraControlError: Error, Equatable, Sendable, ActionExecutionFailu
     case permissionDenied
     case unavailable
     case photoUnavailable
+    case lensNotOwned
     public var errorDescription: String? {
         switch self {
         case .notForeground: "请回到应用前台再操作"
@@ -71,6 +77,7 @@ public enum CameraControlError: Error, Equatable, Sendable, ActionExecutionFailu
         case .disabled: "相机尚未开启"
         case .permissionDenied: "未获得所需权限，请在系统设置中允许"
         case .unavailable: "相机或照片能力暂不可用"
+        case .lensNotOwned: "请使用当前最上层的相机画面切换镜头"
         case .photoUnavailable: "这张照片已被忽略或替换，当前没有可操作的照片"
         }
     }
@@ -82,11 +89,19 @@ public enum CameraControlError: Error, Equatable, Sendable, ActionExecutionFailu
         case .disabled: .init(rawValue: "disabled")
         case .unavailable: .init(rawValue: "unavailable")
         case .photoUnavailable: .init(rawValue: "photoUnavailable")
+        case .lensNotOwned: .init(rawValue: "lensNotOwned")
         }
     }
 }
 
 extension CameraControlCapability {
+    public func windowID() async -> String? { nil }
+    public func setPerceptionEnabled(_ enabled: Bool, invocation: any FunctionInput) async throws {
+        throw CameraControlError.unavailable
+    }
+    public func flipPerception(_ facing: CameraActions.Facing, invocation: any FunctionInput) async throws {
+        throw CameraControlError.unavailable
+    }
     public func savePhoto(_ id: String?, invocation: any FunctionInput) async throws -> CameraPhotoCommandReceipt {
         throw CameraControlError.unavailable
     }

@@ -11,7 +11,27 @@ public final class VisionContainer {
             runtime["photoImporting"] = .flag(photoImport != nil)
         #endif
         return PlatformStateSnapshot(
-            path: "platform.vision", business: facts, runtime: runtime)
+            path: "platform.vision", business: facts, runtime: runtime,
+            children: [.init(path: "platform.vision.camera")])
+    }
+    public func cameraStateSnapshot() async throws -> PlatformStateSnapshot {
+        try Task.checkCancellation()
+        var value = CameraHardwareSnapshot()
+        var created = false
+        #if os(iOS)
+            if let camera = nativeCamera {
+                value = camera.hardwareSnapshot
+                created = true
+            }
+        #endif
+        return .init(
+            path: "platform.vision.camera",
+            business: [
+                "running": .flag(value.running), "phase": .text(value.phase.rawValue),
+                "facing": value.facing.map { .text($0 == .front ? "front" : "back") } ?? .unknown,
+                "photoWidth": value.photoWidth.map { .number(Double($0)) } ?? .unknown,
+                "photoHeight": value.photoHeight.map { .number(Double($0)) } ?? .unknown,
+            ], runtime: ["created": .flag(created)])
     }
     private let admission: PlatformAdmission
     var readAuthorization: () throws -> [String: String] = {

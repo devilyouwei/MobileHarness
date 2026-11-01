@@ -1,10 +1,12 @@
 # UI — 呈现与人机交互
 
-✅ home 接纳带身份的大模型等待值，与模型准备独立，二者复用 loading 大小眼；请求等待不阻止停止聆听、不增加文字或取消按钮。
+通用窗口标题居中，最小化／最大化控制在左侧、关闭在右侧。WindowState 的移动、拖动和旋转重约束保持完整标题栏处于安全区横向范围内，避免任一侧按钮不可达；纵向允许内容移出，保留52pt标题栏。标题区域与控制按钮触摸隔离，具体布局见[Components](Components/README.md)。
 
-✅ 移除首页准备状态文字和取消端口；准备失败只提供重试按钮。真实加载仅通过独立 expression Action 呈现左右大小眼等待动画，UI 不决定失败 Toast。
+home 接纳带身份的大模型等待值，与模型准备独立，二者复用 loading 大小眼；请求等待不阻止停止聆听、不增加文字或取消按钮。
 
-✅ 已实现：常驻首页保留挂载，但应用导航覆盖时由注入的导航通知暂停相机；返回首页按原开启意图恢复。导航保持根聆听，深层 Assistant 历史加载不得停止会话；真正场景失活仍遵循 App 策略。
+移除首页准备状态文字和取消端口；准备失败只提供重试按钮。真实加载仅通过独立 expression Action 呈现左右大小眼等待动画，UI 不决定失败 Toast。
+
+常驻 Face 保留挂载，WindowHost 覆盖导航和首页。相机采集由拍摄与背景视觉的独立领域需求及应用前台决定，导航路径不控制相机。导航保持根聆听。
 
 ## 职责与边界
 
@@ -19,7 +21,7 @@ flowchart LR
  App["App 装配与生命周期"] -.-> Root["UIContainer"]
  Agent["Agents：主动订阅"] -->|"读取 UI 自有请求源"| Requests["子容器类型化请求／回执"]
  Actions["Actions：业务呈现"] -->|"UI 自有呈现值"| Root
- Root --> State["九个子容器的展示状态"]
+ Root --> State["十个子容器的展示状态"]
  State --> Views["页面与原生渲染"]
  Views -->|"提交 UI 自有输入值"| Requests
  Root --- Requests
@@ -37,10 +39,11 @@ UI 不持有 Agent 引用、身份或回调，不选择业务消费者，也不�
 
 ## 子容器与源码归属
 
-✅ 根构造时一次创建九个子容器，不在首次回复或页面切换时补建；构造与 start 不请求权限、不读取仓库、不启动设备或模型。
+根构造时一次创建十个子容器，不在首次回复或页面切换时补建；构造与 start 不请求权限、不读取仓库、不启动设备或模型。
 
 | 子容器 | 拥有的展示状态 | 源码 |
 | --- | --- | --- |
+| windows | 窗口身份、模式、位置、层级、回执与类型化请求 | WindowState.swift |
 | home | 会话、表情回执、字幕、频谱、运行日志、Toast、Notice、装饰光 | [Conversation](Conversation/README.md) |
 | camera | 视频、骨架、照片及离场呈现 | [Camera](Camera/README.md) |
 | settings | Provider 草稿、发现／保存状态及 revision | [Settings](Settings/README.md) |
@@ -55,46 +58,45 @@ UI 不持有 Agent 引用、身份或回调，不选择业务消费者，也不�
 
 ## 接纳、生命周期与完成
 
-- ✅ 业务通过只读 Presenting 协议及类型化更新提交；应用级状态由子容器唯一创建，字段写权限留在 UI。App 注册的子能力均来自同一根。
-- ✅ start 开启接纳；invalidate 同步使实时代际凭证失效，关闭视频／骨架／实时会话及动画接纳，解除动画等待。
-- ✅ 后台保留导航、草稿、历史、资源／设备事实和异常记录；后台不弹 Toast，回前台不重放旧异常或自动恢复旧会话。
-- ✅ stop 幂等关闭全部接纳，取消并加入 UI 自有期限任务，清理敏感草稿及展示回调；旧根不可重启，旧端口不能修改新根。
-- ✅ 会话／轮次、设置 revision、资源 generation、分页 ticket、相机序号／方向等业务围栏独立保留，根代际不替代它们。
-- ✅ 状态接纳不代表 GPU 上屏、动画结束或设备停机。原生视图拥有 Metal 生命周期和真实 GPU 完成，照片及表情通过身份匹配返回真实回执。
+- 业务通过只读 Presenting 协议及类型化更新提交；应用级状态由子容器唯一创建，字段写权限留在 UI。App 注册的子能力均来自同一根。
+- start 开启接纳；invalidate 同步使实时代际凭证失效，关闭视频／骨架／实时会话及动画接纳，解除动画等待。
+- 后台保留导航、草稿、历史、资源／设备事实和异常记录；后台不弹 Toast，回前台不重放旧异常或自动恢复旧会话。
+- stop 幂等关闭全部接纳，取消并加入 UI 自有期限任务，清理敏感草稿及展示回调；旧根不可重启，旧端口不能修改新根。
+- 会话／轮次、设置 revision、资源 generation、分页 ticket、相机序号／方向等业务围栏独立保留，根代际不替代它们。
+- 状态接纳不代表 GPU 上屏、动画结束或设备停机。原生视图拥有 Metal 生命周期和真实 GPU 完成，照片及表情通过身份匹配返回真实回执。
 
 ## 应用根与导航
 
-✅ PersistentHomeNavigation 显式清除 iOS 导航容器背景，目的页面自己绘制不透明背景并随原生转场移动；返回手势揭示下方常驻首页，不再通过路径驱动整个 iOS 导航层透明度。命中与辅助功能仍由路径控制，导航不重建首页或停止聆听，相机继续按首页准入暂停／恢复。
+PersistentHomeNavigation 显式清除 iOS 导航容器背景，目的页面自己绘制不透明背景并随原生转场移动；返回手势揭示下方常驻首页，不再通过路径驱动整个 iOS 导航层透明度。命中与辅助功能仍由路径控制，导航不重建首页或停止聆听，相机窗口独立于导航路径。
 
-ApplicationRootPorts 定义 UI 自有请求契约。ApplicationRootView 使用 PersistentHomeNavigation，将首页和原生相机／表情树常驻在 NavigationStack 外；导航和图片覆盖保留首页身份及窗口挂载。覆盖只调整命中与辅助功能，离窗仍如实撤销回执。前台页面保持亮屏；场景失活由 App 关闭业务接纳。
+ApplicationRootPorts 定义 UI 自有请求契约。ApplicationRootView 使用 PersistentHomeNavigation，将首页与原生表情树常驻在 NavigationStack 外，相机原生树由根窗口宿主按实际呈现挂载；导航和图片覆盖保留首页身份及窗口挂载。覆盖只调整命中与辅助功能，离窗仍如实撤销回执。前台页面保持亮屏；场景失活由 App 关闭业务接纳。
 
-设置／历史导航保持根聆听；相机仅在首页且 App 前台时运行，覆盖期间暂停，返回按原开启意图恢复。bootstrap/retry 由注入的生命周期接口执行。保留真实聊天／语音诊断入口，诊断结果不作为生产或硬件验收。
+设置／历史导航保持根聆听；Camera 在拍摄或背景视觉任一需求开启且 App 前台时运行。最小化保留采集、停止窗口渲染并让出翻转权，后台结束两路开启意图，回前台需要显式重新开启。bootstrap/retry 由注入的生命周期接口执行。保留真实聊天／语音诊断入口，诊断结果不作为生产或硬件验收。
 
-## 约束与待完成项
+## 约束与验证边界
 
-✅ 子容器和所属状态、接口同文件归类；导航归 UI 根，音频检测归 Diagnostics，眼睛和频谱分别拥有原生实现。应用根只提供实际页面与真实诊断入口，不承载模拟状态或性能对比程序。导入顺序、声明属性和格式由统一规则维护。
-
-❌ Metal 持续挂载／重启稳定性、全量集成失败、原生取帧暂停及完整真机验收仍待关闭。渲染方式选择不等于性能已最优，详见[验证记录](../../docs/validation/PlatformKit-Containers.md)。
-
-✅ 光环渲染线程退出与 GPU 槽位回收已有明确完成屏障；相机媒体复用到期任务，频谱缓存固定属性。保持两个显示线程和现有帧率，实际内存、功耗与流畅度仍须真机测量。
-
-✅ 光环失败锁存与状态去重；历史详情读取随页面取消、目录异步解析、时间线按数据变更缓存；资源编辑只发意图，由唯一业务拥有者合并恢复与自动保存。图片及空闲日志刷新保留现状，等待实测。
-
-✅ 字幕已改为单个SwiftUI Text＋TextRenderer，移除双UILabel／富文本覆盖路径；只在有限250ms淡入期间启用本地显示节奏，保留完整文字、320 Character边界、滚动、无障碍与生命周期取消。仅使用原生API，实际性能另测。
-
-✅ 已实现：home提供独立模型准备呈现值及加载眼睛；UI不导入ModelKit或App。根页面连接失败重试与活动变化通知，设置和已有停止入口可用，不阻塞主线程。
-
-✅ 已实现：home／devices各持有UI自有BluetoothConnectionStatus及版本围栏；接纳保留事实更新，后台无需重放Toast。基础库不引入Signal／Actions。
-
-✅ UI 使用 UIContainerError 及原始渲染错误报告，过期提交以显式 Bool／拒绝计数表达；错误展示值由上层提交，UI 根不决定 Toast／语音／状态机策略。
+子容器和所属状态、接口同文件归类；导航归 UI 根，音频检测归 Diagnostics，眼睛和频谱分别拥有原生实现。应用根只提供实际页面与真实诊断入口，不承载模拟状态或性能对比程序。导入顺序、声明属性和格式由统一规则维护。
 
 
-✅ UIFailure与其他基础根采用同形结构，根start／setForeground类型化抛错，渲染失败使用同一报告。逐帧过期／方向校验保留既有领域异常及Bool接纳协议，不自动产生逐帧故障广播；UI不选择错误的业务呈现方式。
+光环渲染线程退出与 GPU 槽位回收已有明确完成屏障；相机媒体复用到期任务，频谱缓存固定属性。保持两个显示线程和现有帧率，实际内存、功耗与流畅度仍须真机测量。
+
+光环失败锁存与状态去重；历史详情读取随页面取消、目录异步解析、时间线按数据变更缓存；资源编辑只发意图，由唯一业务拥有者合并恢复与自动保存。图片及空闲日志刷新保留现状，等待实测。
+
+字幕已改为单个SwiftUI Text＋TextRenderer，移除双UILabel／富文本覆盖路径；只在有限250ms淡入期间启用本地显示节奏，保留完整文字、320 Character边界、滚动、无障碍与生命周期取消。仅使用原生API，实际性能另测。
+
+home提供独立模型准备呈现值及加载眼睛；UI不导入ModelKit或App。根页面连接失败重试与活动变化通知，设置和已有停止入口可用，不阻塞主线程。
+
+home／devices各持有UI自有BluetoothConnectionStatus及版本围栏；接纳保留事实更新，后台无需重放Toast。基础库不引入Signal／Actions。
+
+UI 使用 UIContainerError 及原始渲染错误报告，过期提交以显式 Bool／拒绝计数表达；错误展示值由上层提交，UI 根不决定 Toast／语音／状态机策略。
 
 
-✅ home.expressions拥有独立加载状态与revision；模型准备中可显示两个加载眼睛，即使聆听关闭。UI不接触模型或Signal；终态／失活／停止同步清理，Action只是提交呈现。
+UIFailure与其他基础根采用同形结构，根start／setForeground类型化抛错，渲染失败使用同一报告。逐帧过期／方向校验保留既有领域异常及Bool接纳协议，不自动产生逐帧故障广播；UI不选择错误的业务呈现方式。
 
-✅ 已实现：首页检查仍保留交互门，但不挂载加载文字层；真实准备仅显示等待眼睛，失败只显示重试按钮。
+
+home.expressions拥有独立加载状态与revision；模型准备中可显示两个加载眼睛，即使聆听关闭。UI不接触模型或Signal；终态／失活／停止同步清理，Action只是提交呈现。
+
+首页检查仍保留交互门，但不挂载加载文字层；真实准备仅显示等待眼睛，失败只显示重试按钮。
 
 
 ## Direct container contract
@@ -105,33 +107,33 @@ Control requests use a separate single-slot stream under the same consumer lifet
 
 ## Agent-owned UI inputs
 
-✅ UI subcontainers expose typed request sources. The injected business consumer owns listening and processing; UI retains receipt identity, capacity and generation only. Home text uses the ordinary request source; home listening has a control-only single-slot source and cannot enlarge the ordinary 64-request bound. Both sources share root availability/stop. UI keeps no Agent identity or business execution authority.
+UI subcontainers expose typed request sources. The injected business consumer owns listening and processing; UI retains receipt identity, capacity and generation only. Home text uses the ordinary request source; home listening has a control-only single-slot source and cannot enlarge the ordinary 64-request bound. Both sources share root availability/stop. UI keeps no Agent identity or business execution authority.
 
-✅ 订阅关闭携带消费者 token，旧订阅退出不能关闭恢复后的消费者；恢复前加入旧消费任务。暂停期间仅允许经身份校验的本地取消／retire 清理，不接纳新的业务请求。
+订阅关闭携带消费者 token，旧订阅退出不能关闭恢复后的消费者；恢复前加入旧消费任务。暂停期间仅允许经身份校验的本地取消／retire 清理，不接纳新的业务请求。
 
 ## 直连链路当前契约
 
-✅ 页面只向 Container 提交语音／检测请求；UI 不持有检测业务任务，业务呈现经 Actions。
+页面只向 Container 提交语音／检测请求；UI 不持有检测业务任务，业务呈现经 Actions。
 
-✅ 性能采样待接入：仅在显式 `-direct-input-measurements` 启动参数开启时记录 UI 排队／完成及 PCM／相机接纳年龄；不记录内容或原始媒体，默认关闭。
+性能采样待接入：仅在显式 `-direct-input-measurements` 启动参数开启时记录 UI 排队／完成及 PCM／相机接纳年龄；不记录内容或原始媒体，默认关闭。
 
 ## Request cancellation ownership
 
-✅ A request owns one cancellation callback bound to its Agent-owned processing task. Page cancellation, root invalidation and consumer closure cancel admitted work as well as ending the receipt. The Agent joins its task before consuming replacement ordinary work; the source and unrelated requests remain available. The common consumer owns the existing 120-second deadline, removing role-specific deadline wrappers. No event bus or media buffer is added.
+A request owns one cancellation callback bound to its Agent-owned processing task. Page cancellation, root invalidation and consumer closure cancel admitted work as well as ending the receipt. The Agent joins its task before consuming replacement ordinary work; the source and unrelated requests remain available. The common consumer owns the existing 120-second deadline, removing role-specific deadline wrappers. No event bus or media buffer is added.
 
 ## 基础相册实施契约
 
-✅ 新增稳定 album 子能力，Settings 内页面消费照片分页、缩略图、原图与管理回执；UI 无业务模块依赖。
+新增稳定 album 子能力，Settings 内页面消费照片分页、缩略图、原图与管理回执；UI 无业务模块依赖。
 
 ## Container 上下文
 
-✅ NavigationContext.swift 定义类型化页面、对象ID、内容状态、覆盖层和操作值。NavigationState唯一持有路径及确认事实；路径变化更新代际并进入transitioning，匹配页面确认后settled。UIKit／SwiftUI展示仍由UI拥有；基础模块不导入AgentCore。
+NavigationContext.swift 定义类型化页面、对象ID、内容状态、覆盖层和操作值。NavigationState唯一持有路径及确认事实；路径变化更新代际并进入transitioning，匹配页面确认后settled。UIKit／SwiftUI展示仍由UI拥有；基础模块不导入AgentCore。
 
 导航settled表示SwiftUI页面已出现，不承诺转场动画或GPU完成。未提供内容事实的页面为idle，不推测其异步业务已完成。
 
 ## Reflexive state reads
 
-`UIContainer.stateSnapshot() async throws` returns its own lifecycle facts and indices for nine stable child containers using local UIStateSnapshot. Public business fields are explicit projections; settings keys, URLs, draft models, chat captions and media bytes are excluded. Admission and rejected-update counts are runtime facts. Settings/resource operation errors and album load failures are domain outcomes, without inferring presentation-health damage. Current UI values remain MainActor-owned.
+`UIContainer.stateSnapshot() async throws` returns its own lifecycle facts and indices for ten stable child containers using local UIStateSnapshot. Public business fields are explicit projections; settings keys, URLs, draft models, chat captions and media bytes are excluded. Admission and rejected-update counts are runtime facts. Settings/resource operation errors and album load failures are domain outcomes, without inferring presentation-health damage. Current UI values remain MainActor-owned.
 
 Home indexes an independent expression node owned by ConversationExpressionPresentation's actual base/override owner. Its effective expression is the display target, not a pixel receipt. [Conversation](Conversation/README.md) defines transition and restoration semantics.
 
@@ -140,3 +142,17 @@ Business describes visible page/content/operation, expression intent, camera pre
 Diagnostic execution/configuration is Runtime; sensory observations are Business. Operation errors in settings or album content are domain outcomes, not evidence of a broken presentation container. State enums use declared raw values rather than debug descriptions; descriptors provide meanings, units and finite values.
 
 All Containers use stateSnapshot() async throws and return only local data plus child indices. stateReaders() binds existing owners for direct canonical path lookup. UIHome does not sample expression, and Diagnostics does not sample speech/audio child State. Navigation reads its owned admitted context; current album operation is separately ui.album-owned. Descriptors come from sampled values.
+
+## 通用窗口
+
+WindowState 是 UIContainer 构造的唯一窗口 owner，拥有最多4个窗口（含卡片）、focusedID、普通/卡片几何、模式和独立过渡阶段。WindowContent 是领域呈现身份，不接受模型提供的 View 或执行代码。窗口实例内颜色固定。窗口状态只描述 UI 事实，ui.windows 不复制相机或 Task。
+
+WindowHost 位于 PersistentHomeNavigation 之上；UIKit 宿主的透明区域 hitTest 返回 nil，窗口内触摸正常转发并置顶。默认安全区宽度减32pt、高度2/3，最大化填满安全区，卡片160×48。标题区拖动与点击互斥，按钮至少44pt。旋转重新约束位置。
+
+UIRequests 普通未完成请求上限64、关闭控制槽1；UI 每实例保留一个可替换提交任务。ApplicationControl 订阅并调用固定窗口 Action；UI 无 Agent 身份、设备停机或存储业务。根失活撤销请求和动画等待、保留窗口状态，stop 清除实例。revision 和根 generation 丢弃迟到回执。业务决策以有限标题/选项展示，UI 只返回选项身份。
+
+## Camera surface ordering and content sizing
+
+WindowSizing.standard keeps the generic 2/3 safe-area default. WindowSizing.image fits an image aspect plus 52pt title and supplied controls height into safe bounds, narrowing and centering when needed. Image size changes preserve the normal frame center and re-constrain it; maximized geometry remains safe-area sized. WindowState computes visible area after subtracting the union of higher settled window rectangles, including cards. CameraState projects a lens holder from these presentation facts, active Face visibility and a domain handoff gate. ApplicationRootView keeps the Face tree and mounts independent background and window camera renderers. Presentation code never acquires camera resources.
+
+Windows retain their last successfully presented revision. Failed receipts and remounting cannot grant lens authority. The photo image region must intersect the safe area and retain uncovered area to count as a visible camera surface.

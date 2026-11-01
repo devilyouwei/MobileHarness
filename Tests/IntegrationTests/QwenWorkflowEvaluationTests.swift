@@ -130,18 +130,19 @@ private final class QwenFacts: Sendable {
     }
     func context() throws -> AgentStateContext {
         let context = AgentStateContext()
-        try FixedPlatformState.register(in: context)
+        try FixedPlatformState.register(in: context, camera: { [camera] in camera.read() })
         try context.register(
             "agents.applicationcontrol",
             source: ContainerContextSource {
                 ContainerContextValue(["scene": "active", "modelPreparation": "idle"])
             })
         try context.register(
-            "actions.camera", source: ContainerContextSource { [self] in ContainerContextValue(camera.read()) })
+            "actions.camera", source: ContainerContextSource { [self] in ContainerContextValue(camera.read().business) }
+        )
         try context.register("actions.robot", source: ContainerContextSource { [self] in ContainerContextValue(robot) })
         try context.register(
             "actions.robot.motion", source: ContainerContextSource { ContainerContextValue([String: String]()) })
-        for name in ["ui.navigation", "ui.camera", "ui.album", "ui.home.expression"] {
+        for name in ["ui.navigation", "ui.camera", "ui.album", "ui.home.expression", "ui.windows"] {
             try context.register(name, source: ContainerContextSource { ContainerContextValue([String: String]()) })
         }
         return context

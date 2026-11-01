@@ -37,7 +37,14 @@ if pathlib.Path(lookup).resolve() != (bundle / 'Catalog.json').resolve():
 expected = {pathlib.Path('Catalog.json'): source / 'Catalog.json'}
 for group in ('Agents', 'Skills'):
     expected.update({p.relative_to(source): p for p in (source / group).rglob('*') if p.is_file()})
-actual = {p.relative_to(bundle): p for p in bundle.rglob('*') if p.is_file() and p.name != 'Info.plist'}
+signature_metadata = {
+    pathlib.Path('_CodeSignature') / name
+    for name in ('CodeResources', 'CodeRequirements', 'CodeDirectory', 'CodeSignature')
+}
+actual = {
+    p.relative_to(bundle): p for p in bundle.rglob('*')
+    if p.is_file() and p.name != 'Info.plist' and p.relative_to(bundle) not in signature_metadata
+}
 if set(expected) != set(actual):
     raise SystemExit(f'Agent asset mismatch: missing={set(expected)-set(actual)}, stale={set(actual)-set(expected)}')
 for path, original in expected.items():

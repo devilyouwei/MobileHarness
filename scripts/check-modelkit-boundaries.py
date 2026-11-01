@@ -802,13 +802,13 @@ history_binding = (ROOT / 'MobileHarness/Actions/History/ConversationHistoryWork
 if re.search(r'\b(?:stopVoice|beginSettingsChange|endSettingsChange)\b', history_binding):
     errors.append('Read-only Assistant history preparation must not stop the root listening session')
 camera_admission = (ROOT / 'MobileHarness/Actions/ActionsBusinessAssembly.swift').read_text()
-if 'camera.setForeground(sceneActive && visible)' not in camera_admission:
-    errors.append('Actions camera admission must combine scene and page visibility')
+if 'windows: ui.windows' not in camera_admission or 'camera.setForeground(sceneActive && visible)' in camera_admission:
+    errors.append('Camera window lifecycle must be independent of home navigation visibility')
 if 'camera.shutdown()' in assembly or 'bluetooth.setForeground(' in assembly:
     errors.append('Agents must not own Actions native lifecycle')
 app_scene = (ROOT / 'MobileHarness/App/Composition/AppComposition.swift').read_text()
-if 'actions.setCameraVisible(visible)' not in app_scene:
-    errors.append('App must forward page visibility to Actions')
+if 'actions.setCameraVisible(' in app_scene:
+    errors.append('Home navigation must not control camera window capture')
 agent_gateway = (ROOT / 'MobileHarness/Agents/Support/AgentGatewayBindings.swift').read_text()
 if 'GatewayContainer' in agent_gateway or '.configureExecution(' in agent_gateway:
     errors.append('Agents must not configure Gateway roots')
@@ -1360,7 +1360,7 @@ for source in (ROOT / 'MobileHarness').rglob('*.swift'):
         raise SystemExit(f'UI root must own presentation construction: {source.relative_to(ROOT)}')
 ui_root_source = (ROOT / 'MobileHarness/UI/UIContainer.swift').read_text()
 ui_registry_source = (ROOT / 'MobileHarness/App/Composition/ApplicationContainer.swift').read_text()
-for property_name in ('home', 'camera', 'settings', 'modelResources', 'navigation', 'history', 'album', 'devices', 'diagnostics'):
+for property_name in ('home', 'camera', 'settings', 'modelResources', 'navigation', 'history', 'album', 'devices', 'diagnostics', 'windows'):
     if f'public let {property_name}:' not in ui_root_source or f'self.ui().{property_name}' not in ui_registry_source:
         raise SystemExit(f'UI root and App must share the {property_name} capability.')
 conversation_view_source = (ROOT / 'MobileHarness/UI/Conversation/ConversationView.swift').read_text()
@@ -1371,7 +1371,7 @@ for source in (ROOT / 'MobileHarness/Agents').rglob('*.swift'):
         continue  # Read-only view-provider fields, not business mutation handles.
     if re.search(r':\s*(?:' + '|'.join(ui_model_names[:9]) + r')\b', source.read_text()):
         raise SystemExit(f'Agent business consumers require narrow presentation interfaces: {source.relative_to(ROOT)}')
-print('UI root owns nine capabilities and presentation construction; App shares them through explicit registration.')
+print('UI root owns ten capabilities and presentation construction; App shares them through explicit registration.')
 
 native_audio_source = (ROOT / 'MobileHarness/PlatformKit/Audio/AppleAudioIO.swift').read_text()
 if re.search(r'\.report\(\s*"audio"\s*,\s*"routeChanged"', native_audio_source):

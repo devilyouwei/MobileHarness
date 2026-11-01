@@ -55,3 +55,5 @@ Notice 的非空文字限 1024 UTF-8 字节，tone 为 info/warning/error（默�
 资源呈现使用正 UInt64 generation；错误文本限 2048 字节，偏好错误 reason 为 invalidSource/recognitionRequired/synthesisRequired/execution。Provider 呈现使用 ID requestID，可选失败码最多 64 字节且以 provider. 开头，不传递 URL/密钥。导航目标为 home/settings/language/recognition/synthesis/vision/bluetooth/history。
 
 [Actions 设计](../README.md) · [公共函数契约](../Support/Contracts/README.md)
+
+WindowModule and WindowExecutionService in Navigation provide generic window controls. UI owns presentation; injected WindowContentLifecycle owns domain pause/resume/close. No device or Task state is copied into the window manager.

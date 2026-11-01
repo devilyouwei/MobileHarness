@@ -15,8 +15,11 @@ import UI
 
 private actor BehaviorEndpoint: UIPresentationCapability, UIUpdateCapability, SpeechPlaybackCapability,
     PosePresentationCapability, CameraControlCapability, HistoryPresentationCapability, ResourcePresentationCapability,
-    TaskControlCapability
+    TaskControlCapability, WindowControlCapability
 {
+    func performWindow(_ operation: WindowOperation, id: UUID, x: Double?, y: Double?, invocation: any FunctionInput)
+        async throws
+    { throw CancellationError() }
     func controlTask(_ operation: String, arguments: [String: String], invocation: any FunctionInput) async throws
         -> String
     {
@@ -86,7 +89,7 @@ private func behaviorInvocation(_ function: String, parameters: [String: String]
         history: HistoryQueryService(store: ConversationHistoryStore()),
         historyMutations: HistoryMutationService(
             store: ConversationHistoryStore(), summarizeTitle: { _ in "Unused fixture title" }),
-        modelResources: UnusedModelResourceCapability(),
+        windows: endpoint, modelResources: UnusedModelResourceCapability(),
         resourcePreferences: UnusedModelResourcePreferencesCapability(), resourceInventory: UnusedResourceInventory(),
         resourcePresentation: endpoint, providerDiscovery: UnusedProviderDiscovery(),
         providerSettings: UnusedProviderSettings(), device: UnusedDeviceControl(), taskControl: endpoint,

@@ -296,6 +296,7 @@ private enum ContainerTestFailure: Error { case startup, cleanup }
                         media: storage.database.media, devices: storage.database.devices)
                 }, cache: storage.cache, files: storage.files, photos: photos,
                 camera: camera, cameraPresentation: presentation, cameraUI: ui.camera, albumUI: ui.album,
+                windows: ui.windows,
                 makeCamera: { connections in
                     CameraCoordinator(
                         camera: camera, presentation: presentation, photos: photos,

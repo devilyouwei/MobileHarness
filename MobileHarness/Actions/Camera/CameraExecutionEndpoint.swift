@@ -14,6 +14,15 @@ import FunctionContracts
         self.rootSessionID = rootSessionID
         self.validateSession = validateSession
     }
+    public func windowID() async -> String? { await camera.windowID() }
+    public func setPerceptionEnabled(_ enabled: Bool, invocation: any FunctionInput) async throws {
+        try validate(invocation)
+        try await camera.setPerceptionEnabled(enabled, invocation: invocation)
+    }
+    public func flipPerception(_ facing: CameraActions.Facing, invocation: any FunctionInput) async throws {
+        try validate(invocation)
+        try await camera.flipPerception(facing, invocation: invocation)
+    }
     private func validate(_ invocation: any FunctionInput) throws {
         if invocation.context.sessionID != rootSessionID { try validateSession(invocation) }
     }

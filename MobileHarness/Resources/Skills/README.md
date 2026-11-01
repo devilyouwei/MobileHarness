@@ -134,6 +134,8 @@ BasicSkill Instructions.md先检查CURRENT STATE：已有足够事实直接回�
 
 ## 当前流程规则
 
+Photography 的匹配摄影 Task 在保存／忽略成功且不重拍后，单独执行 closeCamera，收到 operation=close、enabled=false 后才 finishTask；取消和替换同样先完成窗口收尾，BasicSkill 的终态规则与示例遵守该次序。未处置照片保留窗口内保存／忽略／取消决策，关闭失败或取消不结束 Task、不重放已成功的处置。Capture 关闭不关闭背景视觉。独立拍照／保存／忽略操作不创建 Task，也不自动关窗；重拍保留原 Task 和窗口。
+
 BasicSkill 要求以 AGENT CONTEXT task 和匹配目标判断关闭：无 Task 单步完成只回复，不生成 finishTask/cancelTask。明确目标切换可释放无关非基础近期 Skill；不确定是否放弃旧目标时先问是否继续实际 Task，保持等待状态。明确替换或正常目标完成不重复询问。continueDecision 只继续同一输入剩余新目标；释放 Skill 不代表相机/照片清理。Photography 与 HistoryQuery 的完成示例遵循同一规则。
 
 历史查询只复制 list 返回的完整 dialog_number；notFound 允许一次重新 list 和一次基于实际 ID 的修正 read，不猜测 ID 或无限重试。业务参数与 media_N 等引用来自真实反馈。语法、Channel/wait 和资源冲突由 Core/Gateway 契约决定，Skill 不重复定义。
@@ -152,7 +154,7 @@ BasicSkill 要求以 AGENT CONTEXT task 和匹配目标判断关闭：无 Task �
 
 ✅ BasicSkill 统一承载 Skill 选择/Task/表达/失败规则，Photography 专注就绪/镜头/捕获/照片处理；少量示例验证主要分支，不重述通用协议。公开 State 位于独立的每轮系统数据消息。
 
-✅ BasicSkill 教学明确五种控制都是 XML、加载/替换关闭的独占响应与后续请求边界，查询旁支保留 Task，最近 Skill 不因短暂旁支而主动释放。Photography 明确 busy/needsSettings 门、真实 preview ID、已保存事实与未执行保存的区别；普通忽略成功结束匹配 Task，明确重拍则保留。RobotInteraction 以 connected/controlAvailable 同时为 true 作为动作前提，不以环境查询覆盖明确阻断。ApplicationControl/HistoryQuery 使用 Query Channel 的精确 XML 查询别名与跨请求结果示例。教学保持简洁，增加有针对性的正向分支示例，不扩展新能力。
+✅ BasicSkill 教学明确五种控制都是 XML、加载/替换关闭的独占响应与后续请求边界，查询旁支保留 Task，最近 Skill 不因短暂旁支而主动释放。Photography 明确 busy/needsSettings 门、真实 preview ID、已保存事实与未执行保存的区别；普通忽略成功经窗口收尾后结束匹配 Task，明确重拍则保留。RobotInteraction 以 connected/controlAvailable 同时为 true 作为动作前提，不以环境查询覆盖明确阻断。ApplicationControl/HistoryQuery 使用 Query Channel 的精确 XML 查询别名与跨请求结果示例。教学保持简洁，增加有针对性的正向分支示例，不扩展新能力。
 
 ✅ 当前 Action 目录中的查询可直接使用，不重复加载 Skill；摄影示例区分“用户请求但尚未拍摄”和“收到成功反馈”，缺失 displayedMediaID 字段也不能传空 ID。沿用相同能力、用例和执行错误，不通过放宽校验兼容错误输出。
 
@@ -191,3 +193,9 @@ useStates declares exact canonical paths. BasicSkill selects agents.applicationc
 Each actual request samples only those nodes and uses Assistant-owned explicit Business fields. Child indices are not recursively expanded or injected. Runtime, health/issues and diagnostic history stay outside Assistant State. Internal engineering callers can explicitly inspect a tree independently of Skills. Loading/release changes future disclosure only; no loadState, automatic wakeup, device action or changed execution authority is introduced.
 
 BasicSkill 常驻提供 `Speech.Listening.startListening` / `stopListening`，别名同函数名，使用独立 ListeningControl Channel。退出语音意图仅输出 stopListening，不在关闭后追加语音或自动重开，不隐式改变业务 Task；启动只响应明确用户意图。参数和真实完成语义由 [Listening Actions](../../Actions/Speech/Listening/README.md) 拥有。
+
+Photography and ApplicationControl share six Window.* aliases and select ui.windows; BasicSkill has no window catalog or State additions. Camera.Capture.open remains the only photo-window creation entry. Photography instructions retain separate-request capture/disposition examples within the existing prompt budget.
+
+ApplicationControl exposes background Vision.open/close/flip/retry aliases for Camera.Perception.*Vision. Photography retains Capture aliases and window controls. Both select platform.vision.camera for actual native facts. Only the visible lensOwner may flip; minimizing photo retains capture and hands lens authority to visible enabled background vision. BasicSkill’s resident catalog is unchanged.
+
+BasicSkill routes 打开视觉／跟踪／人物或姿态跟随 to application-control and Vision.open; 拍照／拍摄照片 to photography and its capture Actions. The unloaded Skill descriptions carry this distinction, and both Skill instruction sets repeat the boundary after loading. openPage vision is model settings navigation, not vision activation. No new Camera Actions are resident in BasicSkill.

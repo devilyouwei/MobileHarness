@@ -3,12 +3,12 @@ import CoreGraphics
 import Foundation
 import ImageIO
 import ModelKit
-import PlatformKit
 import StorageCore
 import Testing
 
 @testable import Agents
 @testable import ModelKitOpenAI
+@testable import PlatformKit
 
 let modelPhotoLimits = NativeImageCompression.Limits(
     maximumDimension: 1568, maximumPixels: 1_048_576, maximumBytes: 1024 * 1024)
@@ -133,6 +133,70 @@ func nativeImageCompressionPreservesCompositionAndBounds(size: (Int, Int)) async
     let result = try await NativeImageCompression.jpeg(from: original, limits: modelPhotoLimits)
     let image = try preparedImage(result)
     #expect(image.width == 160 && image.height == 80)
+}
+
+@Test func nativeCameraPhotoPreparationFitsLargeJPEGWithoutAnotherCapture() async throws {
+    let original = try compressionFixture(width: 3072, height: 2304, orientation: 6, noise: true)
+    try #require(original.count > 4 * 1024 * 1024)
+    await #expect(throws: NativeImageCompression.Failure.invalidImage) {
+        try await NativeImageCompression.jpeg(from: original, limits: modelPhotoLimits)
+    }
+    let result = try await NativeImageCompression.cameraPhotoJPEG(from: original)
+    let image = try preparedImage(result)
+    #expect(result.count <= 4 * 1024 * 1024)
+    #expect(image.width <= 2304 && image.height <= 3072)
+    #expect(abs(Double(image.width) / Double(image.height) - 0.75) < 0.002)
+}
+
+@Test func nativeCameraPhotoPreparationPreservesSmallOriginalAndRejectsInvalidDataOrCancellation() async throws {
+    let original = try compressionFixture(width: 80, height: 40, orientation: 6)
+    #expect(try await NativeImageCompression.cameraPhotoJPEG(from: original) == original)
+    for invalid in [
+        Data(), Data(repeating: 0, count: 4 * 1024 * 1024 + 1),
+        Data(repeating: 0, count: 32 * 1024 * 1024 + 1),
+    ] {
+        await #expect(throws: NativeImageCompression.Failure.invalidImage) {
+            try await NativeImageCompression.cameraPhotoJPEG(from: invalid)
+        }
+    }
+    let cancelled = Task {
+        withUnsafeCurrentTask { $0?.cancel() }
+        return try await NativeImageCompression.cameraPhotoJPEG(from: original)
+    }
+    await #expect(throws: CancellationError.self) { try await cancelled.value }
+}
+
+@Test func nativeCameraPhotoPreparationPreservesMirroredComposition() async throws {
+    var original = try compressionFixture(width: 80, height: 40, orientation: 2)
+    // Synthetic trailing padding forces preparation without changing the image or its EXIF mirror.
+    original.append(Data(repeating: 0, count: 4 * 1024 * 1024))
+    let result = try await NativeImageCompression.cameraPhotoJPEG(from: original)
+    let image = try preparedImage(result)
+    #expect(image.width == 80 && image.height == 40)
+    let left = try compressionColor(image, x: 20, y: 20)
+    let right = try compressionColor(image, x: 60, y: 20)
+    #expect(left[2] > 200 && left[0] < 50 && right[0] > 200 && right[2] < 50)
+}
+
+@Test func nativeImageCompressionEnforcesExplicitInputBudgets() async throws {
+    let original = try compressionFixture(width: 80, height: 40)
+    for inputLimits in [
+        NativeImageCompression.InputLimits(maximumBytes: 0), .init(maximumBytes: 32 * 1024 * 1024 + 1),
+        .init(maximumDimension: 0), .init(maximumDimension: 65536), .init(maximumPixels: 0),
+        .init(maximumPixels: 268_435_457),
+    ] {
+        await #expect(throws: NativeImageCompression.Failure.invalidLimits) {
+            try await NativeImageCompression.jpeg(from: original, limits: modelPhotoLimits, inputLimits: inputLimits)
+        }
+    }
+    for inputLimits in [
+        NativeImageCompression.InputLimits(maximumBytes: original.count - 1), .init(maximumDimension: 79),
+        .init(maximumPixels: 3199),
+    ] {
+        await #expect(throws: NativeImageCompression.Failure.invalidImage) {
+            try await NativeImageCompression.jpeg(from: original, limits: modelPhotoLimits, inputLimits: inputLimits)
+        }
+    }
 }
 
 actor ModelPhotoReadCounter {

@@ -38,7 +38,6 @@ import Observation
         }
         features.onHomeVisibilityChanged = { [weak self] visible in
             guard let self, selected == self.scopeID else { return }
-            self.services.actions.setCameraVisible(visible)
             let running = (try? self.owner.get().state) == .running
             self.services.homePreparation.setActive(
                 visible && self.foreground && running && self.features.preparesHomeModels)

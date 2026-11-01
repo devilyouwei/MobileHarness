@@ -73,13 +73,16 @@ struct CameraPreviewGeometry {
     let imageSize: CGSize
     let size: CGSize
     let scale: CGFloat
-    init(frame: CameraVideoFrame, size: CGSize, orientation: CameraInterfaceOrientation) {
+    init(frame: CameraVideoFrame, size: CGSize, orientation: CameraInterfaceOrientation, fitsImage: Bool = false) {
         basis = CameraPreviewBasis(rotation: frame.rotation, portraitRotation: frame.portraitRotation)
         self.orientation = orientation
         self.size = size
         let swapped = basis.turns(orientation) % 2 != 0
         imageSize = CGSize(width: swapped ? frame.height : frame.width, height: swapped ? frame.width : frame.height)
-        scale = max(size.width / imageSize.width, size.height / imageSize.height)
+        scale =
+            fitsImage
+            ? min(size.width / imageSize.width, size.height / imageSize.height)
+            : max(size.width / imageSize.width, size.height / imageSize.height)
     }
     var displayRotation: Int { basis.displayRotation(orientation) }
     var crop: CGSize {
@@ -101,12 +104,13 @@ struct CameraRenderSnapshot: Sendable {
     var size: CGSize
     var pixelSize: CGSize
     var orientation: CameraInterfaceOrientation = .portrait
+    var fitsImage = false
 
     func matches(_ other: Self) -> Bool {
         frame?.sequence == other.frame?.sequence && frame?.capturedAt == other.frame?.capturedAt
             && frame?.width == other.frame?.width && frame?.height == other.frame?.height
             && frame?.rotation == other.frame?.rotation && frame?.portraitRotation == other.frame?.portraitRotation
-            && orientation == other.orientation && pose == other.pose
+            && orientation == other.orientation && fitsImage == other.fitsImage && pose == other.pose
             && mirrored == other.mirrored && size == other.size && pixelSize == other.pixelSize
     }
 }

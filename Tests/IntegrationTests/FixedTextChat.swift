@@ -30,6 +30,15 @@ struct FixtureCameraFact: Codable, Sendable {
     var needsSettings = false
     var displayedMediaID: String?
     var savedMediaID: String?
+    var business: [String: PlatformStateSnapshot.Value] {
+        [
+            "enabled": .flag(enabled), "perceptionEnabled": .flag(false),
+            "lensOwner": enabled ? .text("capture") : .unknown,
+            "busy": .flag(busy), "needsSettings": .flag(needsSettings),
+            "displayedMediaID": displayedMediaID.map { .text($0) } ?? .unknown,
+            "savedMediaID": savedMediaID.map { .text($0) } ?? .unknown,
+        ]
+    }
 }
 final class FixtureFactCell<Value: Sendable>: Sendable {
     private let memory: Mutex<Value>
@@ -43,7 +52,7 @@ final class PublicStateFixtureOwner: Sendable {
     init(ready: Bool = false) { camera = FixtureFactCell(FixtureCameraFact(enabled: ready, running: ready)) }
     func context() throws -> AgentStateContext {
         let context = AgentStateContext()
-        try FixedPlatformState.register(in: context)
+        try FixedPlatformState.register(in: context, camera: { [camera] in camera.read() })
         try context.register(
             "agents.applicationcontrol",
             source: ContainerContextSource { [self] in
@@ -52,12 +61,12 @@ final class PublicStateFixtureOwner: Sendable {
         try context.register(
             "actions.camera",
             source: ContainerContextSource { [self] in
-                ContainerContextValue(camera.read())
+                ContainerContextValue(camera.read().business)
             })
         try context.register("actions.robot", source: ContainerContextSource { ContainerContextValue(false) })
         try context.register(
             "actions.robot.motion", source: ContainerContextSource { ContainerContextValue([String: String]()) })
-        for name in ["ui.navigation", "ui.camera", "ui.album", "ui.home.expression"] {
+        for name in ["ui.navigation", "ui.camera", "ui.album", "ui.home.expression", "ui.windows"] {
             try context.register(name, source: ContainerContextSource { ContainerContextValue([String: String]()) })
         }
         return context
@@ -70,7 +79,18 @@ struct FixedPlatformState: PlatformStateReading {
     nonisolated static var sourceNames: [String] {
         PlatformStateSource.allCases.map { "platform.system." + $0.rawValue }.sorted()
     }
-    nonisolated static func register(in context: AgentStateContext) throws {
+    nonisolated static func register(
+        in context: AgentStateContext, camera: @escaping @Sendable () -> FixtureCameraFact = { FixtureCameraFact() }
+    ) throws {
+        try AssistantStateBindings.register(in: context, names: ["platform.vision.camera"]) { _ in
+            let value = camera()
+            return PlatformStateSnapshot(
+                path: "platform.vision.camera",
+                business: [
+                    "running": .flag(value.running), "phase": .text(value.running ? "running" : "stopped"),
+                    "facing": .text(value.selectedFacing),
+                ])
+        }
         try AssistantStateBindings.register(in: context, names: sourceNames) { path in
             guard let raw = path.split(separator: ".").last,
                 let source = PlatformStateSource(rawValue: String(raw))

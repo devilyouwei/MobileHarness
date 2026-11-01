@@ -122,3 +122,7 @@ Camera/device execution and CameraInteractionWorkflow belong to ActionsContainer
 ## Passive container state
 
 stateSnapshot projects local installation/closure, Agent lifecycle/queue counters and initialized committed task/Skill fields without message content. residentContext() reads the repository’s last committed memory only; context fields are unknown before initialization. Agent start owns initialization/restoration and its failures. The root catalog binds independent readers without sampling roles or maintaining another mutable role-state registry.
+
+The fixed camera input workflow includes takePhoto for the window shutter. Its authorized Tool is Camera.Capture.takePhoto, sharing the existing capture/receipt/ownership pipeline. Camera window management is handled by ApplicationControl; Photographer retains camera and album business requests.
+
+Typed camera intent also includes perceptionOpen/perceptionClose/perceptionFlip/perceptionRetry, mapped to fixed Camera.Perception.openVision/closeVision/flipVision/retryVision calls. The same bounded request workflow and Gateway authorization apply. Pose/tracking scope exists independently of the photo window; stopping it joins tracking output before a replacement scope. Root model requirements include vision only while background visual demand is enabled.

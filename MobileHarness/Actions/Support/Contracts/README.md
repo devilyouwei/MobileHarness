@@ -47,3 +47,7 @@ Prepared credentials are opaque to callers even though they travel as value type
 Connection and recovery fact enums expose stable raw values and finite cases for State metadata. Connection facts describe link workflow, independently from physical motion outcomes.
 
 VoicePerceptionHandling.setListening 接收明确 enabled 与会话，返回 SpeechActions.ListeningPolicy 的 enabled/paused/revision。感知 owner 只更新许可并返回快照，调用方负责原生应用；此路径不再次排队 Action。默认实现明确抛出 listeningUnavailable。VoiceOutputHandling.setListening 是原生执行控制端口，完成语义由 Actions/Speech/Listening 定义；旧的 stopListening(sessionID:) 保持仅撤销并发布内部策略的生命周期契约。
+
+WindowCapabilities defines neutral WindowOperation and WindowControlCapability. CameraCommandReceipt includes optional windowID; CameraControlCapability exposes an asynchronous identity read with nil default for hosts without window presentation. Native lifecycle ownership stays in Actions, not these value contracts.
+
+CameraControlCapability distinguishes photo setEnabled/flip from setPerceptionEnabled/flipPerception; each Action binds a fixed branch without accepting a caller-provided authority field. lensNotOwned reports a denied switch. CameraCommandReceipt still describes the requested completed branch operation; actual native facts belong to PlatformKit.

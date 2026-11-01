@@ -78,13 +78,19 @@ extension NativePresentationTests {
     }
 }
 
-@Test @MainActor func rendererFailureRemainsLatchedUntilNewCameraGeneration() throws {
+@Test @MainActor func rendererFailuresRemainSurfaceLocalUntilNewCameraGeneration() throws {
     let state = CameraState()
     let generation = state.videoGeneration
     state.presentRendererFailure("Renderer unavailable", generation: generation)
     state.present(.visionMessage(nil))
     #expect(state.visionMessage == "Renderer unavailable")
-    #expect(throws: CameraFramePresentationError.self) { try state.presentVideo(frame(1)) }
+    try state.presentVideo(frame(1))
+    #expect(state.videoFrame?.sequence == 1)
+    state.presentRendererFailure("Photo renderer unavailable", generation: generation, surface: .capture)
+    #expect(state.photoRendererFailure == "Photo renderer unavailable")
+    #expect(state.visionMessage == "Renderer unavailable")
+    try state.presentVideo(frame(2))
+    #expect(state.videoFrame?.sequence == 2)
     state.present(.isVisible(false))
     state.presentRendererFailure("Late old renderer", generation: generation)
     #expect(state.rendererFailure == nil)
@@ -643,4 +649,37 @@ extension NativePresentationTests {
     await root.stop()
     state.presentInterfaceOrientation(.landscapeRight, generation: state.videoGeneration)
     #expect(state.interfaceOrientation == .portrait)
+}
+
+@Test @MainActor func photoAspectObservationDoesNotInvalidateOnEachVideoFrame() throws {
+    let state = CameraState()
+    try state.presentVideo(frame(1))
+    let changes = Mutex(0)
+    withObservationTracking {
+        _ = state.photoAspect
+    } onChange: {
+        changes.withLock { $0 += 1 }
+    }
+    try state.presentVideo(frame(2))
+    #expect(changes.withLock { $0 } == 0)
+    try state.presentVideo(orientedFrame(3, rotation: 0))
+    #expect(changes.withLock { $0 } == 1)
+    let aspect = state.photoAspect
+    state.presentInterfaceOrientation(.landscapeLeft, generation: state.videoGeneration)
+    #expect(state.photoAspect == aspect)
+}
+
+@Test @MainActor func cameraPhotoFitRetainsAllFourImageCornersAcrossOrientationAndMirroring() throws {
+    for orientation in CameraInterfaceOrientation.allCases {
+        let geometry = CameraPreviewGeometry(
+            frame: try orientedFrame(rotation: 0), size: CGSize(width: 400, height: 300),
+            orientation: orientation, fitsImage: true)
+        for mirrored in [true, false] {
+            for point in [CGPoint.zero, CGPoint(x: 1, y: 0), CGPoint(x: 0, y: 1), CGPoint(x: 1, y: 1)] {
+                let visible = geometry.project(point, mirrored: mirrored)
+                #expect(visible.x >= -0.0001 && visible.x <= 400.0001)
+                #expect(visible.y >= -0.0001 && visible.y <= 300.0001)
+            }
+        }
+    }
 }

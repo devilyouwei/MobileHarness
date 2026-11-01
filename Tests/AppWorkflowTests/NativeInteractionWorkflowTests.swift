@@ -179,6 +179,30 @@ import Testing
     #expect(state.photoMessage?.hasPrefix("已保存到 App 相册") == true)
 }
 
+@Test(arguments: [UIRequestError.stale, .unavailable, .consumerEnded])
+@MainActor func interruptedCameraRequestOffersRetryAndReleasesBusyState(_ failure: UIRequestError) async throws {
+    let ui = UIContainer()
+    try ui.start()
+    var attempts = 0
+    let controls = CameraInteractionWorkflow(
+        presentation: ui.camera,
+        perform: { _, _, _ in
+            attempts += 1
+            if attempts == 1 { throw failure }
+            ui.camera.present(.message(nil))
+        })
+    controls.open()
+    await controls.waitUntilIdle()
+    #expect(ui.camera.state.message == "相机操作失败：请求因应用状态变化结束，请重试")
+    #expect(!ui.camera.state.controlBusy)
+    controls.retry()
+    await controls.waitUntilIdle()
+    #expect(attempts == 2)
+    #expect(ui.camera.state.message == nil)
+    await controls.shutdown()
+    await ui.stop()
+}
+
 @Test @MainActor func cameraOverlapHintClearsOnCompletionWithoutReplacingDeviceFailure() async throws {
     let ui = UIContainer()
     try ui.start()

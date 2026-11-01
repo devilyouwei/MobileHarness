@@ -22,7 +22,7 @@
 | ResourceObservationWorkflowTests | 资源变化触发无参数通知，不轮询或生成序号；重复前台不重订阅，shutdown 取消并加入 |
 | AudioDetectionWorkflowTests | 权限/首帧、自动完成、单次接纳、取消清理和晚到回调 |
 | ListeningActivationTests / ListeningCaptureWorkflowTests | 能力/权限准备→首帧收音→并行 cue/haptic、阶段失败保留实际效果、取消 join、同意/占用、半双工与快速切换 |
-| NativeInteractionWorkflowTests | UI 手势到 root intent、角色/会话围栏与取消 |
+| NativeInteractionWorkflowTests | UI 手势到 root intent、角色/会话围栏与取消；相机请求失活明确提示重试，保留已保存照片事实 |
 | CameraVisionRestartTests | camera/vision 代际替换、取消加入、失效回调和重启次序 |
 | PhotoDispositionWorkflowTests | 保存/忽略提交、原生退出/反馈、错误与已发生效果分离 |
 | HomeEffectsTests | notice/light/caption 的 owner、替换、时限及纯取消展示 |
@@ -115,3 +115,7 @@ Actions 按业务能力组织源码，保持原编译目标。生产调用显式
 ## Application observation worker
 
 ApplicationEnvironmentInputsTests exercises the existing bounded per-category worker with model-preparation loading/idle replacement, independent scene/device admission, explicit failure reporting and joined shutdown. Navigation is read directly through UI State and has no duplicate environment category/report. These tests exercise delivery mechanics with synthetic facts; role summary validation belongs to IntegrationTests.
+
+WindowExecutionTests supplies lifecycle probes and synthetic UI receipts to verify failure retention, resume ordering, per-instance replacement and close preemption, plus Action input validation. It does not claim real camera/animation acceptance.
+
+Window lifecycle regressions assert the transition gate spans presentation completion and releases on failure. These pure workflow tests do not exercise physical camera capture or iPhone rendering.

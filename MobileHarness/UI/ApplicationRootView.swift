@@ -22,13 +22,11 @@
                         } else {
                             CameraConversationSurface(
                                 camera: assembly.cameraState, controls: assembly.cameraControls,
-                                blocksNewActions: assembly.homePreparation.blocksNewActions,
+                                blocksNewActions: container == nil || assembly.startupIssue != nil,
                                 openSettings: {
                                     assembly.navigate(.settings)
                                 }
                             ) {
-                                assembly.cameraPreview()
-                            } content: {
                                 startupContent
                             }
                             .overlay {
@@ -44,14 +42,35 @@
                         .navigationContext(destination.contextPage)
                         .id(assembly.navigation.generation)
                 }
+                .overlay {
+                    WindowHost(state: assembly.windows) { item in
+                        if item.content == WindowContent.camera.rawValue {
+                            AnyView(
+                                CameraWindowContent(
+                                    camera: assembly.cameraState, controls: assembly.cameraControls,
+                                    rendersPreview: !assembly.windows.isCovered(item.id)
+                                ) { assembly.cameraPreview() })
+                        } else {
+                            AnyView(Text("窗口内容不可用").foregroundStyle(.white))
+                        }
+                    }
+                }
                 .environment(\.navigationContext, assembly.navigation)
-                .onChange(of: assembly.navigation.path) { _, path in
+                .onChange(of: assembly.navigation.path, initial: true) { _, path in
+                    assembly.cameraState.windows = assembly.windows
+                    assembly.cameraState.faceVisible = path.isEmpty
                     assembly.navigationChanged()
                 }
                 .onChange(of: container?.conversation.hasActiveInteraction) { _, _ in
                     assembly.interactionActivityChanged()
                 }
-                .onChange(of: assembly.cameraState.isEnabled) { _, _ in
+                .onChange(of: assembly.cameraState.photoAspect) { _, aspect in
+                    if let item = assembly.windows.windows.first(where: { $0.content == WindowContent.camera.rawValue })
+                    {
+                        assembly.windows.resizeContent(item.id, sizing: .image(aspect: aspect, controlsHeight: 96))
+                    }
+                }
+                .onChange(of: assembly.cameraState.perceptionEnabled) { _, _ in
                     assembly.modelRequirementsChanged()
                 }
                 .onChange(of: keepsHomeScreenAwake, initial: true) { _, keepsAwake in

@@ -131,6 +131,7 @@ import Foundation
             }
             .task(id: photo.id) {
                 withAnimation(.easeOut(duration: 0.15)) { photo.opacity = 1 }
+                guard !photo.didReachThumbnail else { return }
                 do { try await Task.sleep(for: .milliseconds(400)) } catch {
                     photo.finish()
                     return
@@ -166,13 +167,14 @@ import Foundation
             .onChange(of: camera.capturedPhoto?.id) { _, id in
                 if id != photo.id { inspecting = false }
             }
-            .retainedFullScreenCover(
-                isPresented: $inspecting,
-                onDismiss: {
+            .onChange(of: inspecting) { _, visible in
+                if !visible {
                     inspectorVisible = false
                     if let request = photo.departure.request { animateDeparture(request) }
-                },
-                content: {
+                }
+            }
+            .overlay {
+                if inspecting {
                     ZStack(alignment: .topTrailing) {
                         Color.black.ignoresSafeArea()
                         Image(uiImage: photo.image).resizable().scaledToFit()
@@ -194,7 +196,8 @@ import Foundation
                             if let message = camera.photoMessage { Text(message).padding(20) }
                         }.allowsHitTesting(false)
                     }.foregroundStyle(.white)
-                })
+                }
+            }
         }
 
         private func animateDeparture(_ request: PhotoDeparture.Request) {
