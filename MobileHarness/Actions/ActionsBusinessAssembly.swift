@@ -135,7 +135,8 @@
                         try await manager.artifactSnapshots().filter { $0.phase == .installed }.map { $0.artifact.id })
                 })
             let album = PhotoAlbumService(
-                photos: photos, export: { [platform] data in try await platform.vision.savePhoto(data) })
+                photos: photos, export: { [platform] data in try await platform.vision.savePhoto(data) },
+                exportVideo: { [platform] file in try await platform.vision.saveVideo(file) })
             let windowExecution = WindowExecutionService(
                 state: ui.windows, lifecycles: [WindowContent.camera.rawValue: camera])
             let assembly = try BehaviorAssembly(
@@ -214,6 +215,14 @@
                 state: ui.home.conversation, audio: platform.audio.io(.voice), cue: platform.audio.cue(.voice),
                 haptic: platform.audio.haptic(.voice), recognition: speech.recognition, synthesis: speech.synthesis,
                 voiceActivity: speech.voiceActivity)
+            if camera.recordingAudioHeld { lifecycle.holdVideoAudioOnBinding() }
+            camera.acquireRecordingAudio = { [weak lifecycle] in
+                guard let lifecycle else { throw ActionsContainerError.unavailable }
+                try await lifecycle.beginVideoAudio()
+            }
+            camera.releaseRecordingAudio = { [weak lifecycle] resume in
+                try await lifecycle?.endVideoAudio(resume: resume)
+            }
             let detection = AudioDetectionPresentation(
                 state: ui.diagnostics.audioDetection,
                 endpoint: Actions.AudioDetectionSession(

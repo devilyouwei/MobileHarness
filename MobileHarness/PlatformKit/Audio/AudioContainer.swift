@@ -31,6 +31,14 @@ public final class AudioContainer {
         private var cues: [Scope: NativeCuePlayback] = [:]
         private var haptics: [Scope: NativeHapticFeedback] = [:]
         private var owner: Scope?
+        func acquireCameraRecording() throws {
+            try admission.check()
+            guard owner == nil else { throw PlatformError.busy }
+            owner = .camera
+        }
+        func releaseCameraRecording() {
+            if owner == .camera { owner = nil }
+        }
         public func io(_ scope: Scope) -> any AudioInputOutput {
             if let existing = instances[scope] { return existing }
             let value = AppleAudioIO(

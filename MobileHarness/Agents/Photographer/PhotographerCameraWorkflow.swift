@@ -10,16 +10,23 @@ struct PhotographerCameraWorkflow {
     }
     private var pending: Pending?
     private(set) var lastResult: ToolResult?
-    private static let permissions = ["open", "close", "flip", "retry", "takePhoto", "savePhoto", "ignorePhoto"].map {
+    private static let permissions = [
+        "open", "close", "flip", "retry", "takePhoto", "savePhoto", "ignorePhoto", "configure", "cancelCapture",
+    ].map {
         InternalTool(
             path: "Camera.Capture." + $0, required: $0 == "flip" ? ["facing"] : [],
-            optional: $0 == "savePhoto" || $0 == "ignorePhoto" ? ["mediaID"] : [])
+            optional: $0 == "configure"
+                ? ["mode", "delaySeconds", "flash", "zoom", "durationSeconds"]
+                : $0 == "savePhoto" || $0 == "ignorePhoto" ? ["mediaID"] : [])
+    }
+    private static let videoPermissions = ["startRecording", "stopRecording", "saveVideo", "ignoreVideo"].map {
+        InternalTool(path: "Camera.Video." + $0, required: $0 == "startRecording" ? [] : ["recordingID"])
     }
     private static let perceptionPermissions = ["open", "close", "flip", "retry"].map {
         InternalTool(path: "Camera.Perception." + $0 + "Vision", required: $0 == "flip" ? ["facing"] : [])
     }
     static func runtimeCapabilities(_ capabilities: CapabilityRegistry) throws -> CapabilityRegistry {
-        try capabilities.adding(internalTools: permissions + perceptionPermissions)
+        try capabilities.adding(internalTools: permissions + perceptionPermissions + videoPermissions)
     }
     var requestID: String? { pending?.requestID }
     mutating func reset() { pending = nil }
@@ -59,13 +66,20 @@ struct PhotographerCameraWorkflow {
             guard human || assistant else { throw CommunicationError.unauthorized }
             guard pending == nil else { throw CommunicationError.capacityExceeded }
             guard
-                let permission = (Self.permissions + Self.perceptionPermissions).first(where: {
+                let permission = (Self.permissions + Self.perceptionPermissions + Self.videoPermissions).first(where: {
                     $0.path == intent.operation.actionPath
                 })
             else {
                 throw CommunicationError.invalidPayload
             }
             var arguments = intent.facing.map { ["facing": $0.rawValue] } ?? [:]
+            if let settings = intent.settings {
+                arguments = [
+                    "mode": settings.mode, "delaySeconds": String(settings.delaySeconds), "flash": settings.flash,
+                    "zoom": String(settings.zoom), "durationSeconds": String(settings.durationSeconds),
+                ]
+            }
+            if let id = intent.recordingID { arguments["recordingID"] = id }
             if let id = intent.mediaID { arguments["mediaID"] = id }
             let permitted = try permission.call(arguments)
             let call = ToolCall(id: intent.requestID, toolPath: permitted.toolPath, arguments: permitted.arguments)

@@ -14,6 +14,30 @@ import FunctionContracts
         self.rootSessionID = rootSessionID
         self.validateSession = validateSession
     }
+    public func startRecording(invocation: any FunctionInput) async throws -> CameraVideoReceipt {
+        try validate(invocation)
+        return try await camera.startRecording(invocation: invocation)
+    }
+    public func stopRecording(_ id: String, invocation: any FunctionInput) async throws -> CameraVideoReceipt {
+        try validate(invocation)
+        return try await camera.stopRecording(id, invocation: invocation)
+    }
+    public func saveVideo(_ id: String, invocation: any FunctionInput) async throws -> CameraVideoReceipt {
+        try validate(invocation)
+        return try await camera.saveVideo(id, invocation: invocation)
+    }
+    public func ignoreVideo(_ id: String, invocation: any FunctionInput) async throws -> CameraVideoReceipt {
+        try validate(invocation)
+        return try await camera.ignoreVideo(id, invocation: invocation)
+    }
+    public func configureCapture(_ settings: CameraCaptureSettings, invocation: any FunctionInput) async throws {
+        try validate(invocation)
+        try await camera.configureCapture(settings, invocation: invocation)
+    }
+    public func cancelCapture(invocation: any FunctionInput) async throws {
+        try validate(invocation)
+        try await camera.cancelCapture(invocation: invocation)
+    }
     public func windowID() async -> String? { await camera.windowID() }
     public func setPerceptionEnabled(_ enabled: Bool, invocation: any FunctionInput) async throws {
         try validate(invocation)

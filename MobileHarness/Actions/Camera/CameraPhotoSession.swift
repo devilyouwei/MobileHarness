@@ -1,3 +1,27 @@
+import Foundation
+import FunctionContracts
+
+/// A monotonic countdown inside the caller's owned capture task; no independent timer or queued shutter.
+@MainActor enum CameraCountdown {
+    static func wait(
+        seconds: Int, now: ContinuousClock.Instant = .now,
+        publish: (Int?) -> Void,
+        sleep: (ContinuousClock.Instant) async throws -> Void = { try await Task.sleep(until: $0, clock: .continuous) }
+    ) async throws {
+        defer { publish(nil) }
+        guard (0...30).contains(seconds) else { throw CameraControlError.unavailable }
+        try Task.checkCancellation()
+        guard seconds > 0 else { return }
+        let deadline = now.advanced(by: .seconds(seconds))
+        for remaining in (1...seconds).reversed() {
+            try Task.checkCancellation()
+            publish(remaining)
+            try await sleep(deadline.advanced(by: .seconds(1 - remaining)))
+        }
+        try Task.checkCancellation()
+    }
+}
+
 #if os(iOS)
     import FunctionContracts
     import ExecutionRuntime
@@ -189,15 +213,25 @@
             throw UIActions.FeedbackError.unavailable
         }
 
-        public func takePhoto(invocation: any FunctionInput) async throws -> CameraPhotoReceipt {
+        public func cancelCountdown() async {
+            guard state.countdown != nil else { return }
+            let pending = photoTask
+            pending?.cancel()
+            _ = await pending?.result
+        }
+        public func takePhoto(delaySeconds: Int = 0, invocation: any FunctionInput) async throws -> CameraPhotoReceipt {
             try Task.checkCancellation()
             guard foreground else { throw CameraControlError.notForeground }
             guard photoTask == nil, photoCommand == nil else { throw CameraControlError.busy }
             try ensureCaptureAvailable()
             let expectedRevision = revision
             let task = Task<CameraPhotoReceipt, Error> {
-                let rotation = await camera.captureRotation
-                let data = try await camera.capturePhoto(rotation: rotation)
+                try await CameraCountdown.wait(seconds: delaySeconds) { presentation.present(.countdown($0)) }
+                try Task.checkCancellation()
+                guard foreground, revision == expectedRevision else { throw CancellationError() }
+                try ensureCaptureAvailable()
+                guard let rotation = state.photoCaptureRotation else { throw CameraControlError.unavailable }
+                let data = try await camera.capturePhoto(rotation: CGFloat(rotation))
                 try Task.checkCancellation()
                 guard foreground, state.isVisible, revision == expectedRevision else { throw CancellationError() }
                 guard let image = UIImage(data: data), image.size.width > 0, image.size.height > 0 else {
@@ -243,6 +277,7 @@
             presentation.present(.photoBusy(true))
             defer {
                 photoTask = nil
+                presentation.present(.countdown(nil))
                 presentation.present(.photoBusy(false))
             }
             return try await withTaskCancellationHandler {

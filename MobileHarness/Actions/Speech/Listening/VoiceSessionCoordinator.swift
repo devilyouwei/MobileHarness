@@ -1,3 +1,25 @@
+import Foundation
+import PlatformKit
+
+/// A native audio handoff includes owner release, not just stopping microphone samples.
+@MainActor enum VoiceRecordingAudioHandoff {
+    static func run(audio: any AudioCaptureControlling, pause: () async throws -> Void) async throws {
+        let primary: (any Error)?
+        do {
+            try await pause()
+            primary = nil
+        } catch { primary = error }
+        await audio.stop()
+        if let failure = audio.cleanupFailure {
+            throw PlatformFailure(
+                component: "audio", operation: "recordingHandoff",
+                underlying: primary ?? failure, cleanupErrors: primary == nil ? [] : [failure], code: .cleanupFailed)
+        }
+        if let primary { throw primary }
+        try Task.checkCancellation()
+    }
+}
+
 /// The session owner joins execution and native playback before retiring shared audio handles.
 /// cancelReply must join accepted calls even on failure; cleanup completes before that error is rethrown.
 @MainActor
@@ -24,10 +46,8 @@ public enum VoiceReplyCancellation {
 
     import FunctionContracts
 
-    import Foundation
     import ModelKit
     import OSLog
-    import PlatformKit
     import StorageCache
     import UI
     import UIKit
@@ -87,6 +107,32 @@ public enum VoiceReplyCancellation {
         private var listeningRevision: UInt64 = 0
         private var listeningPaused = false {
             didSet { updateReplyActivity() }
+        }
+        private var videoAudioHeld = false
+        private var videoListeningGeneration: String?
+        public func holdVideoAudioOnBinding() { videoAudioHeld = true }
+        public func beginVideoAudio() async throws {
+            guard !videoAudioHeld else { throw AudioIOError.busy }
+            videoAudioHeld = true
+            videoListeningGeneration = voiceGeneration
+            try await VoiceRecordingAudioHandoff.run(audio: audio) {
+                try await microphone.setEnabled(false)
+            }
+            let oldEvents = routeTask
+            routeTask = nil
+            oldEvents?.cancel()
+            await oldEvents?.value
+            handlingTurn = true
+            presentationPhase = .processing
+            state.present(.voiceStatus("录像中 · 聆听已暂停"))
+        }
+        public func endVideoAudio(resume: Bool) async throws {
+            let previous = videoListeningGeneration
+            videoListeningGeneration = nil
+            videoAudioHeld = false
+            if resume, let previous, previous == voiceGeneration, state.isReady, !changingSettings {
+                try await resumeListening(generation: previous)
+            }
         }
         private var playbackCount = 0 {
             didSet { updateReplyActivity() }
@@ -155,15 +201,19 @@ public enum VoiceReplyCancellation {
         }
 
         public func startVoice(invocation: any FunctionInput, feedback: SpeechActions.ListeningFeedback) async throws {
-            guard state.isReady, !changingSettings, voiceGeneration == nil else { throw CancellationError() }
+            guard state.isReady, !changingSettings, !videoAudioHeld, voiceGeneration == nil else {
+                throw CancellationError()
+            }
             await beforeVoiceStart()
-            guard state.isReady, !changingSettings, voiceGeneration == nil, !Task.isCancelled else {
+            guard state.isReady, !changingSettings, !videoAudioHeld, voiceGeneration == nil, !Task.isCancelled else {
                 throw CancellationError()
             }
             await replyCancellationTask?.value
             await cleanupTask?.value
             try Task.checkCancellation()
-            guard state.isReady, !changingSettings, voiceGeneration == nil else { throw CancellationError() }
+            guard state.isReady, !changingSettings, !videoAudioHeld, voiceGeneration == nil else {
+                throw CancellationError()
+            }
             projection.beginPresentationSession()
             let generation = UUID().uuidString
             voiceGeneration = generation
@@ -189,22 +239,7 @@ public enum VoiceReplyCancellation {
                     presentationPhase = handlingTurn ? .processing : .listening
                     state.present(.voiceStatus(handlingTurn ? "正在回复 · 聆听已暂停" : "正在聆听 · 停顿后自动识别"))
                 }
-                let events = try audio.subscribeEvents()
-                routeTask = Task { [weak self] in
-                    do {
-                        for try await event in events {
-                            guard !Task.isCancelled, let self, self.voiceGeneration == generation else { return }
-                            try await self.speech?.closeCapture()
-                            self.stopVoice(
-                                message: event == .interrupted
-                                    ? "音频被系统中断，请按住双眼重新开始" : "音频设备已变化，请按住双眼重新开始")
-                            return
-                        }
-                    } catch {
-                        guard let self, self.voiceGeneration == generation else { return }
-                        self.stopVoice(message: "音频事件接入失败：\(error)")
-                    }
-                }
+                try observeAudioEvents(generation: generation)
             } catch {
                 if voiceGeneration == generation {
                     let description: String
@@ -216,6 +251,27 @@ public enum VoiceReplyCancellation {
                     stopVoice(message: error is CancellationError ? "语音已停止" : "无法开始语音：" + description)
                 }
                 throw error
+            }
+        }
+
+        private func observeAudioEvents(generation: String) throws {
+            routeTask?.cancel()
+            let events = try audio.subscribeEvents()
+            routeTask = Task { [weak self] in
+                do {
+                    for try await event in events {
+                        guard !Task.isCancelled, let self, self.voiceGeneration == generation else { return }
+                        try await self.speech?.closeCapture()
+                        guard !Task.isCancelled, self.voiceGeneration == generation else { return }
+                        self.stopVoice(
+                            message: event == .interrupted
+                                ? "音频被系统中断，请按住双眼重新开始" : "音频设备已变化，请按住双眼重新开始")
+                        return
+                    }
+                } catch {
+                    guard !Task.isCancelled, let self, self.voiceGeneration == generation else { return }
+                    self.stopVoice(message: "音频事件接入失败：\(error)")
+                }
             }
         }
 
@@ -245,7 +301,7 @@ public enum VoiceReplyCancellation {
             try await speech.openCapture(sessionID: generation)
             try Task.checkCancellation()
             guard voiceGeneration == generation else { throw CancellationError() }
-            handlingTurn = listeningPaused || hasPlaybackBarrier
+            handlingTurn = listeningPaused || hasPlaybackBarrier || videoAudioHeld
             if !handlingTurn {
                 try await microphone.setEnabled(true)
             }
@@ -264,7 +320,10 @@ public enum VoiceReplyCancellation {
         }
 
         public func playCue(_ request: UIActions.CueRequest, invocation: any FunctionInput) async throws {
-            try await nativeEffects.playCue(request, invocation: invocation) { try self.validateFeedback(invocation) }
+            try await nativeEffects.playCue(request, invocation: invocation) {
+                guard !self.videoAudioHeld else { throw AudioIOError.busy }
+                try self.validateFeedback(invocation)
+            }
         }
         public func vibrate(_ request: UIActions.HapticRequest, invocation: any FunctionInput) async throws {
             try await nativeEffects.vibrate(request, invocation: invocation) { try self.validateFeedback(invocation) }
@@ -272,12 +331,13 @@ public enum VoiceReplyCancellation {
 
         private func startMicrophone() async throws {
             try Task.checkCancellation()
-            guard let generation = voiceGeneration, !listeningPaused, !hasPlaybackBarrier, let speech else {
+            guard let generation = voiceGeneration, !listeningPaused, !hasPlaybackBarrier, !videoAudioHeld, let speech
+            else {
                 throw CancellationError()
             }
             try await audio.startCapture(preferSpatial: true)
             try Task.checkCancellation()
-            guard voiceGeneration == generation, !listeningPaused, !hasPlaybackBarrier else {
+            guard voiceGeneration == generation, !listeningPaused, !hasPlaybackBarrier, !videoAudioHeld else {
                 throw CancellationError()
             }
             let epoch = UUID().uuidString
@@ -458,7 +518,7 @@ public enum VoiceReplyCancellation {
                         try await self.pauseListening(generation: generation, revision: revision)
                     } catch is CancellationError {} catch { self.stopVoice(message: "聆听暂停异常：\(error)") }
                 }
-            } else if !hasPlaybackBarrier {
+            } else if !hasPlaybackBarrier && !videoAudioHeld {
                 try await resumeListening(generation: generation)
             }
         }
@@ -474,7 +534,7 @@ public enum VoiceReplyCancellation {
             }
             guard revision == listeningRevision, voiceGeneration == generation else {
                 // A late acquire must not undo a newer resume, or reopen a user-off session.
-                if !listeningPaused, voiceGeneration == generation, !hasPlaybackBarrier {
+                if !listeningPaused, voiceGeneration == generation, !hasPlaybackBarrier, !videoAudioHeld {
                     try await resumeListening(generation: generation)
                 }
                 return
@@ -556,12 +616,12 @@ public enum VoiceReplyCancellation {
             record("你（语音）：\(text)")
         }
         public func observeEmptyUtterance(sessionID: String) {
-            guard accepts(session: sessionID), !listeningPaused, !hasPlaybackBarrier else { return }
+            guard accepts(session: sessionID), !listeningPaused, !hasPlaybackBarrier, !videoAudioHeld else { return }
             handlingTurn = false
         }
         private func resumeListening(generation: String) async throws {
             func canResume() -> Bool {
-                voiceGeneration == generation && !listeningPaused && !hasPlaybackBarrier
+                voiceGeneration == generation && !listeningPaused && !hasPlaybackBarrier && !videoAudioHeld
             }
             guard canResume() else { return }
             do { try await speech?.resumeListening() } catch is CancellationError { try Task.checkCancellation() } catch
@@ -582,12 +642,14 @@ public enum VoiceReplyCancellation {
                 throw error
             }
             guard canResume() else { return }
+            try observeAudioEvents(generation: generation)
             // Commit after resume acknowledgment; its emitted perception update may arrive while admission is closed.
             presentationPhase = .listening
             state.present(.voiceStatus("正在聆听 · 停顿后自动识别"))
             runtime.endpoints.presentation.homeEffects.replyDidFinish()
         }
         public func play(audioID: String, invocation: any FunctionInput) async throws {
+            guard !videoAudioHeld else { throw AudioIOError.busy }
             guard let speechPlayback else { throw ActionHostError.scopeClosed }
             guard acceptsPlayback(invocation.context) else { throw CancellationError() }
             playbackCount += 1
@@ -598,14 +660,16 @@ public enum VoiceReplyCancellation {
                 if let speech {
                     while !(await speech.acquirePlaybackAdmission()) {
                         try Task.checkCancellation()
-                        guard accepts(session: invocation.context.sessionID) else { throw CancellationError() }
+                        guard accepts(session: invocation.context.sessionID), !videoAudioHeld else {
+                            throw CancellationError()
+                        }
                         guard await speech.isRunning() else { throw CapabilityError.sessionClosed }
                         try await Task.sleep(for: .milliseconds(10))
                     }
                 }
                 handlingTurn = true
                 try await microphone.setEnabled(false)
-                guard acceptsPlayback(invocation.context) else { throw CancellationError() }
+                guard acceptsPlayback(invocation.context), !videoAudioHeld else { throw CancellationError() }
                 try await speechPlayback.play(audioID: audioID, invocation: invocation) {
                     [weak self] stream, invocation in
                     guard let self else { throw CancellationError() }
@@ -641,7 +705,9 @@ public enum VoiceReplyCancellation {
             try await nativeEffects.play(
                 stream, context: envelope,
                 validate: { [weak self] in
-                    guard let self, self.acceptsPlayback(envelope) else { throw CancellationError() }
+                    guard let self, self.acceptsPlayback(envelope), !self.videoAudioHeld else {
+                        throw CancellationError()
+                    }
                 }, currentSession: { [weak self] in self?.accepts(session: envelope.sessionID) ?? false },
                 activeChanged: { [weak self] in self?.playbackActive = $0 })
         }

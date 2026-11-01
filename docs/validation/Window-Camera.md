@@ -1,5 +1,29 @@
 # Window / Camera 验证
 
+## 2026-11-01 录像音频交接与照片方向回归
+
+用户在2026110110真机反馈：录像启动报告PlatformError busy，取景框直立而拍后缩略图横转。代码定位到聆听暂停仅停止麦克风采样，未释放AudioContainer的voice owner；成片使用重力captureRotation，与窗口界面方向不一致。修复加入完整音频I/O停止与清理失败检查、播放准入围栏及恢复后的事件重订阅；照片和录像在执行时冻结实际窗口角度，原生输出连接验证并写入方向，未改动YOLO重力坐标。
+
+专项验证通过：1项UI方向测试、4项集成测试函数（其中音频交接含成功／取消／清理失败3个参数案例），日志`/tmp/camera-fixes-targeted.log`。合成帧覆盖前后传感器参考、四种窗口方向与四种重力方向，原生录制端口为受控替身。它们不证明真实麦克风收音或JPEG／movie结果。
+
+四个iOS构建全部通过：MobileHarnessSimulator、ModelKitRuntime、ModelKitNemotron、ModelKitSilero；包内25项资源通过（`/tmp/camera-fixes-ios.log`）。真机构建通过（`/tmp/camera-fixes-device.log`），严格签名与25项资源校验通过。build2026110111原位安装到iPhone17 Pro，安装流水5348；系统应用清单确认0.1.0／2026110111，并成功启动（`/tmp/camera-fixes-install.log`、`/tmp/camera-fixes-launch.log`）。未卸载或删除用户数据。
+
+完整check.sh退出0：边界检查、Python6、严格Swift格式、各产品测试、952项集成测试（63.794秒）、225项实时回归（204.162秒）和plist全部通过（`/tmp/camera-fixes-check.log`）。修改文档的本地链接与git diff --check通过。已请求真机确认聆听开启时的10秒有声录像／停止回放，以及相同持机姿态下的照片方向；尚未收到结果，安装／启动不能替代这两项验收。
+
+## 2026-11-01 拍照增强与有声录像
+
+用户确认倒计时／取消、闪光灯、变焦，以及带声音录像并暂停聆听。实现保持背景Vision与Camera窗口独立需求、单Foundation视频流；录像使用原生开始／终态回执、最长600秒／512MiB，关闭与后台停止封装，最小化继续录制。相册增加视频回放、导出和删除。
+
+完整`check.sh`退出0：边界、Python6、严格Swift格式、各产品测试、950项集成测试（63.972秒）、225项实时回归（204.486秒）及plist通过，日志`/tmp/camera-enhance-check.log`。新增专项验证参数拒绝、单调倒计时及取消、录像停止／音频恢复、后台文件保留、幂等保存、文件所有权／配额／禁止图片读取和真实Photographer→Gateway→Action链。最后追加的启动取消及快速前后台聆听围栏通过7项专项（`/tmp/camera-enhance-final-targeted.log`）；领域录像与媒体内容使用明确替身，不代表原生编码／收音验收。
+
+提示词实测base24971、Photography35246 UTF-8字节，分别在25000／36000预算内；Photography新增六项Action与录制流程，Basic常驻Actions未增加。早期iOS构建暴露SwiftUI方法引用歧义，已改为明确闭包；边界检查发现Video声明与文件归属不符，已按规范移到VideoActions.swift，并将AVKit仅允许在本地播放组件中。后续构建结果记录如下。
+
+最终源码的四个iOS构建全部通过：MobileHarnessSimulator、ModelKitRuntime、ModelKitNemotron、ModelKitSilero，模拟器包25项资源校验通过（`/tmp/camera-enhance-ios-final.log`）。
+
+真机最终构建通过（`/tmp/camera-enhance-device-final.log`），严格签名及25项资源校验通过；build2026110110已原位安装到iPhone17 Pro，安装流水5340，系统应用清单确认版本0.1.0／2026110110（`/tmp/camera-enhance-install.log`）。未卸载或清除App数据。安装后尝试启动被iPhone锁屏拒绝（CoreDevice10002／FBSOpenApplicationErrorDomain7，`/tmp/camera-enhance-launch.log`），没有把启动失败或未执行的录制验收记为成功。最终格式与边界复检通过（`/tmp/camera-enhance-format.log`、`/tmp/camera-enhance-boundaries.log`）。
+
+原生界面测试工具检测Mac锁屏，已请求解锁；模拟器不证明真机摄像头／麦克风行为。真机仍需独立确认：前后镜头照片、倒计时取消、支持设备的闪光灯与变焦、10秒有声录像／手动停止、两路预览与YOLO、最小化录制、后台封装、原聆听意图恢复、视频保存／回放／导出／忽略。性能与功耗未实测，不从动画或编码实现推断。
+
 ## 2026-11-01 通用标题栏布局
 
 WindowChrome展开状态采用左右等宽88pt区域，左侧最小化／最大化（或还原），右侧加载占位／关闭；标题相对整个窗口居中。卡片左右各44pt，标题居中、关闭在右。按钮保留44pt命中区，标题单／双击和拖动仍独立。WindowState同步改为横向保留完整标题栏，防止移到右侧的关闭按钮被拖出安全区；纵向内容仍可部分移出。

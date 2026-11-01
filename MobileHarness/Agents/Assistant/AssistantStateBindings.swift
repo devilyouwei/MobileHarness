@@ -15,8 +15,8 @@ public enum AssistantStateBindings {
             path: "actions.camera",
             fields: [
                 "enabled", "perceptionEnabled", "lensOwner", "busy", "needsSettings", "displayedMediaID",
-                "savedMediaID",
-                "problem",
+                "savedMediaID", "mode", "delaySeconds", "flash", "zoom", "maximumZoom", "supportedFlash",
+                "durationSeconds", "recordingPhase", "recordingID", "countdown", "problem",
             ]),
         "actions.robot": .init(
             path: "actions.robot",
@@ -30,7 +30,8 @@ public enum AssistantStateBindings {
             path: "ui.navigation", fields: ["path", "phase", "current", "overlay", "content"]),
         "ui.windows": .init(path: "ui.windows", fields: ["windows", "focusedID"]),
         "platform.vision.camera": .init(
-            path: "platform.vision.camera", fields: ["running", "phase", "facing", "photoWidth", "photoHeight"]),
+            path: "platform.vision.camera",
+            fields: ["running", "phase", "facing", "photoWidth", "photoHeight", "recording", "zoom"]),
         "ui.camera": .init(
             path: "ui.camera",
             fields: ["enabled", "perceptionEnabled", "lensOwner", "visible", "busy", "needsSettings"]),

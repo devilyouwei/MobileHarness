@@ -11,7 +11,7 @@ PlatformKit is an independent foundation SDK using system frameworks only. It ow
 | PlatformContainer | Root admission, lifecycle/failure projection and the finite PlatformStateReading port. Constructor creates capabilities without starting observations or devices. |
 | [Core](Core/README.md) | Native background allowance, bounded observation primitives, finite State source contract and system time/power/thermal/locale/accessibility reads. |
 | [Audio](Audio/README.md) | Native capture/playback, cues/haptics, numerical processing, native session events and application audio/permission facts. |
-| [Vision](Vision/README.md) | Camera/immutable frames/photo access and image preparation; camera/Photos authorization queries. |
+| [Vision](Vision/README.md) | Camera/immutable frames/photo and audio-video file access, bounded media preparation; camera/Photos authorization queries. |
 | [Connectivity](Connectivity/README.md) | NexArm device constraints and bounded USB/BLE writes, protocol values, connection observations, passive IP path monitoring and Bluetooth authorization queries. |
 
 Native observation capabilities are injected directly into their responsible Agent or execution owner. They never generate business Signals. Read-only capture subscription does not start hardware; capture control stays with its owner. PCM remains ordered and bounded, while camera/native state observations retain newest values under the owning contracts.
@@ -54,3 +54,7 @@ Permission completion from microphone/camera/Photos operations and Bluetooth pow
 Permission child readers preserve the same source failure contract: cold/suspended/released ownership yields unknown, while an admitted cached-source or decoding/schema failure throws. The source and Audio/Vision/Connectivity projections do not convert an actual read error into an observed unknown permission.
 
 VisionContainer additionally indexes and registers platform.vision.camera. This exact child projects AppleCamera resident native phase/running/facing/photo dimensions without lazy construction or hardware sampling on State reads. Camera intent, consumer arbitration and presentation priority belong to callers, not this foundation.
+
+## Camera/audio cooperation
+
+PlatformContainer injects AudioContainer's native owner reservation into VisionContainer's AppleCamera. One capture session supplies preview plus photo or movie output; movie microphone use is mutually exclusive with other native audio owners. Native start/terminal callbacks define recording completion. VisionContainer owns a single joined photo/video Photos-import slot. These are foundation capability constraints; listening intent, window behavior, recording duration choice and media collection remain with callers.

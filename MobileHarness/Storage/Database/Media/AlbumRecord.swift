@@ -19,11 +19,12 @@ public struct PhotoMetadata: Sendable, Equatable {
         switch mime {
         case "image/png": "png"
         case "image/heic": "heic"
+        case "video/quicktime": "mov"
         default: "jpg"
         }
     }
     public func validate() throws {
-        guard ["image/jpeg", "image/heic", "image/png"].contains(mime), width > 0, height > 0,
+        guard ["image/jpeg", "image/heic", "image/png", "video/quicktime"].contains(mime), width > 0, height > 0,
             width <= 100_000, height <= 100_000, Int64(width) * Int64(height) <= 100_000_000,
             ["camera", "import"].contains(origin)
         else { throw FileStorageError.invalidFile }

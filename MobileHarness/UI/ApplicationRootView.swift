@@ -67,7 +67,7 @@
                 .onChange(of: assembly.cameraState.photoAspect) { _, aspect in
                     if let item = assembly.windows.windows.first(where: { $0.content == WindowContent.camera.rawValue })
                     {
-                        assembly.windows.resizeContent(item.id, sizing: .image(aspect: aspect, controlsHeight: 96))
+                        assembly.windows.resizeContent(item.id, sizing: .image(aspect: aspect, controlsHeight: 140))
                     }
                 }
                 .onChange(of: assembly.cameraState.perceptionEnabled) { _, _ in

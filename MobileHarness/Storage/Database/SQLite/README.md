@@ -42,3 +42,7 @@ accept named domain-supplied migrations, including partial unfinished-message an
 SQLiteDatabaseStorage.stateSnapshot reports its own lifecycle evidence. Ready is set only after startup and recovery complete; stopped only after joined shutdown. A retained startup failure reports failed. Reading the snapshot performs no SQLite or filesystem operation and does not access a repository getter.
 
 SQLite stateSnapshot returns the same StorageCore classified State as the Storage root and other children. DatabasePhase is Runtime; an actual backend failure is diagnostic health/issues. Reading never opens or accesses a repository.
+
+## Video media rows
+
+SQLiteMediaRepository reserves kind=video/MIME=video/quicktime/.mov rows without album_added_at. It uses existing dimensions/origin fields and explicit collection, so no new migration or second album table is needed. reservePhoto rejects video metadata. Shared ready/collection/deleting/deleted predicates and keyset pagination apply to both media kinds; SQL never validates a native asset or owns file copying.

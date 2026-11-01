@@ -7,6 +7,11 @@ import Foundation
 /// Presentation facts only; state mutation stays behind CameraPresenting.
 @MainActor
 public struct CameraPresentationSnapshot: Sendable {
+    public let photoCaptureRotation: Double?
+    public let recording: CameraRecordingPresentation
+    public let recordedVideo: CameraRecordedVideo?
+    public let settings: CameraSettings
+    public let countdown: Int?
     public let isEnabled: Bool
     public let perceptionEnabled: Bool
     public let lensOwner: CameraSurface?
@@ -23,6 +28,11 @@ public struct CameraPresentationSnapshot: Sendable {
         public let capturedPhoto: CapturedPhotoPresentation?
     #endif
     init(_ state: CameraState) {
+        photoCaptureRotation = state.photoCaptureRotation
+        recording = state.recording
+        recordedVideo = state.recordedVideo
+        settings = state.settings
+        countdown = state.countdown
         isEnabled = state.isEnabled
         perceptionEnabled = state.perceptionEnabled
         lensOwner = state.lensOwner
@@ -73,6 +83,10 @@ public final class UICameraContainer: CameraPresenting, CameraFactsObserving {
         return UIStateSnapshot(
             path: "ui.camera",
             business: [
+                "mode": .text(state.settings.mode),
+                "countdown": state.countdown.map { .count($0) } ?? .unknown,
+                "recordingPhase": .text(state.recording.phase.rawValue),
+                "recordingID": state.recording.id.map { .text($0) } ?? .unknown,
                 "perceptionEnabled": .flag(state.perceptionEnabled),
                 "lensOwner": state.lensOwner.map { .text($0.rawValue) } ?? .unknown,
                 "enabled": .flag(state.isEnabled), "visible": .flag(state.isVisible),

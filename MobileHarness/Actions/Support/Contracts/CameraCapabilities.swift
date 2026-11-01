@@ -49,7 +49,40 @@ public struct CameraPhotoCommandReceipt: Codable, Sendable, Equatable {
     }
 }
 
+public struct CameraCaptureSettings: Codable, Sendable, Equatable {
+    public let mode: String
+    public let delaySeconds: Int
+    public let flash: String
+    public let zoom: Double
+    public let durationSeconds: Int
+    public init(
+        mode: String = "photo", delaySeconds: Int = 0, flash: String = "off", zoom: Double = 1,
+        durationSeconds: Int = 600
+    ) {
+        self.mode = mode
+        self.delaySeconds = delaySeconds
+        self.flash = flash
+        self.zoom = zoom
+        self.durationSeconds = durationSeconds
+    }
+    public func validate() throws {
+        guard ["photo", "video"].contains(mode), (0...30).contains(delaySeconds),
+            ["off", "on", "auto"].contains(flash),
+            zoom.isFinite, (1...6).contains(zoom), (1...600).contains(durationSeconds)
+        else {
+            throw ActionArguments.ValidationError.invalidValue("captureSettings")
+        }
+    }
+}
+
 public protocol CameraControlCapability: Sendable {
+    func startRecording(invocation: any FunctionInput) async throws -> CameraVideoReceipt
+    func stopRecording(_ id: String, invocation: any FunctionInput) async throws -> CameraVideoReceipt
+    func saveVideo(_ id: String, invocation: any FunctionInput) async throws -> CameraVideoReceipt
+    func ignoreVideo(_ id: String, invocation: any FunctionInput) async throws -> CameraVideoReceipt
+    func configureCapture(_ settings: CameraCaptureSettings, invocation: any FunctionInput) async throws
+    func cancelCapture(invocation: any FunctionInput) async throws
+
     func windowID() async -> String?
     func setPerceptionEnabled(_ enabled: Bool, invocation: any FunctionInput) async throws
     func flipPerception(_ facing: CameraActions.Facing, invocation: any FunctionInput) async throws
@@ -95,6 +128,23 @@ public enum CameraControlError: Error, Equatable, Sendable, ActionExecutionFailu
 }
 
 extension CameraControlCapability {
+    public func startRecording(invocation: any FunctionInput) async throws -> CameraVideoReceipt {
+        throw CameraControlError.unavailable
+    }
+    public func stopRecording(_ id: String, invocation: any FunctionInput) async throws -> CameraVideoReceipt {
+        throw CameraControlError.unavailable
+    }
+    public func saveVideo(_ id: String, invocation: any FunctionInput) async throws -> CameraVideoReceipt {
+        throw CameraControlError.unavailable
+    }
+    public func ignoreVideo(_ id: String, invocation: any FunctionInput) async throws -> CameraVideoReceipt {
+        throw CameraControlError.unavailable
+    }
+    public func configureCapture(_ settings: CameraCaptureSettings, invocation: any FunctionInput) async throws {
+        throw CameraControlError.unavailable
+    }
+    public func cancelCapture(invocation: any FunctionInput) async throws { throw CameraControlError.unavailable }
+
     public func windowID() async -> String? { nil }
     public func setPerceptionEnabled(_ enabled: Bool, invocation: any FunctionInput) async throws {
         throw CameraControlError.unavailable
@@ -115,4 +165,22 @@ extension CameraControlCapability {
         throw CameraControlError.unavailable
     }
     public func retry(invocation: any FunctionInput) async throws { try await setEnabled(true, invocation: invocation) }
+}
+
+public struct CameraVideoReceipt: Codable, Sendable, Equatable {
+    public let recordingID: String
+    public let state: String
+    public let mediaID: String?
+    public let durationSeconds: Double?
+    public let stopReason: String?
+    public init(
+        recordingID: String, state: String, mediaID: String? = nil, durationSeconds: Double? = nil,
+        stopReason: String? = nil
+    ) {
+        self.recordingID = recordingID
+        self.state = state
+        self.mediaID = mediaID
+        self.durationSeconds = durationSeconds
+        self.stopReason = stopReason
+    }
 }

@@ -192,3 +192,9 @@ CameraSamplingTests validates native-selected preview/photo geometry, accepting 
 NativeImageCompressionTests exercises a synthetic noisy JPEG above4MiB through camera preparation: orientation and aspect are preserved within the4MiB result budget, while the ordinary input budget still rejects that original. Smaller camera JPEGs retain exact bytes/EXIF; explicit input byte/dimension/pixel limits, malformed/oversized input and cancellation fail explicitly. These image-processing tests do not trigger a physical shutter or exercise AVFoundation callbacks.
 
 Camera preparation also uses a padded synthetic mirrored JPEG to verify that normalization preserves visible left/right composition instead of flipping the front-camera image a second time.
+
+## Capture enhancements
+
+CameraEnhancementTests checks pure settings rejection, monotonic countdown deadlines/cancellation, domain recording stop/join/audio-release/background behavior, idempotent collection and file-backed video ownership/retention/image isolation. Native recording callbacks and metadata in domain tests are explicit fixtures, not camera/microphone acceptance. PhotographerCameraTests routes all added UI operations through the actual role/Gateway/declared-Action chain. PromptTemplateTests covers loaded aliases, task cleanup ordering and the enlarged Photography catalog budget.
+
+Recording handoff tests exercise the production VoiceRecordingAudioHandoff with an explicit suspended native-stop receipt: microphone sample stop retains ownership, recording admission waits for release, cancellation still joins, and cleanup failure rejects admission. Recording tests assert the actual window-derived angle reaches the native port. Native audio ownership and encoded file orientation still require device acceptance.

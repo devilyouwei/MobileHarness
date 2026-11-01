@@ -92,3 +92,7 @@ Speech 的公开聆听启停由 BasicSkill 经 Gateway 调用。Actions 通过�
 The Window module binds six generic presentation controls in the standard catalog and direct/returning policy. WindowExecutionService delegates business lifecycle through WindowContentLifecycle; CameraCoordinator supplies the first implementation. The same UI state and finite receipts are used for model and button requests.
 
 Camera coordinates independent photo and background visual demand over one PlatformKit capture capability. CameraModule binds Capture and Perception explicitly; Perception uses openVision/closeVision/retryVision/flipVision in the unified CameraActions namespace. Both groups use direct/returning Action and Tool policies. Business lens admission reads UI presentation ordering, then invokes the same native switch; device running/facing State belongs solely to platform.vision.camera.
+
+## Photo/video and listening coordination
+
+ActionsBusinessAssembly connects CameraCoordinator's recording audio hold to the active VoiceSessionCoordinator and injects joined image/video export through PlatformKit.Vision. CameraRecordingSession owns recording completion and pending media independently of window mounting; speech owns listening generation/restoration. Camera, UI, PlatformKit and Storage keep separate facts and completion contracts. The fixed Capture/Video/Perception entry points remain domain-owned @Actions; direct-return protocol policy is shared by all three Camera modules. See [Camera](Camera/README.md) and [Listening](Speech/Listening/README.md).

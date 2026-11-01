@@ -60,6 +60,48 @@
             windows?.windows.first(where: { $0.content == WindowContent.camera.rawValue })?.id.uuidString
         }
 
+        var acquireRecordingAudio: @MainActor () async throws -> Void = {}
+        var releaseRecordingAudio: @MainActor (Bool) async throws -> Void = { _ in }
+        private(set) var recordingAudioHeld = false
+        private lazy var recordingSession = CameraRecordingSession(
+            camera: camera, photos: photos, presentation: presentation,
+            foreground: { [weak self] in self?.foreground ?? false },
+            acquireAudio: { [weak self] in
+                guard let self else { throw CameraControlError.unavailable }
+                self.recordingAudioHeld = true
+                try await self.acquireRecordingAudio()
+            },
+            releaseAudio: { [weak self] resume in
+                guard let self else { return }
+                self.recordingAudioHeld = false
+                try await self.releaseRecordingAudio(resume)
+            },
+            activity: { [weak self] value in
+                guard let self, let windows = self.windows,
+                    let item = windows.windows.first(where: { $0.content == WindowContent.camera.rawValue })
+                else { return }
+                windows.setActivity(item.id, label: value)
+            })
+        public func startRecording(invocation: any FunctionInput) async throws -> CameraVideoReceipt {
+            guard foreground, state.isEnabled, state.isVisible, state.settings.mode == "video" else {
+                throw CameraControlError.disabled
+            }
+            guard state.lensOwner == .capture else { throw CameraControlError.lensNotOwned }
+            guard !photoSession.isBusy, state.capturedPhoto == nil, worker == nil, !changingDemand, !windowTransition
+            else { throw CameraControlError.busy }
+            return try await recordingSession.start(duration: state.settings.durationSeconds, invocation: invocation)
+        }
+        public func stopRecording(_ id: String, invocation: any FunctionInput) async throws -> CameraVideoReceipt {
+            try await recordingSession.stop(id)
+        }
+        public func saveVideo(_ id: String, invocation: any FunctionInput) async throws -> CameraVideoReceipt {
+            guard foreground else { throw CameraControlError.notForeground }
+            return try await recordingSession.save(id)
+        }
+        public func ignoreVideo(_ id: String, invocation: any FunctionInput) async throws -> CameraVideoReceipt {
+            guard foreground else { throw CameraControlError.notForeground }
+            return try await recordingSession.ignore(id)
+        }
         private let photoCues: any CuePlaying
         private lazy var photoSession = CameraPhotoSession(
             camera: camera, presentation: presentation, photos: photos, photoCues: photoCues,
@@ -99,6 +141,14 @@
             return ActionsStateSnapshot(
                 path: "actions.camera",
                 business: [
+                    "mode": .text(state.settings.mode), "delaySeconds": .count(state.settings.delaySeconds),
+                    "flash": .text(state.settings.flash), "zoom": .number(state.settings.zoom),
+                    "maximumZoom": .number(state.settings.maximumZoom),
+                    "supportedFlash": .text(state.settings.supportedFlash.joined(separator: ",")),
+                    "durationSeconds": .count(state.settings.durationSeconds),
+                    "recordingPhase": .text(state.recording.phase.rawValue),
+                    "recordingID": state.recording.id.map { .text($0) } ?? .unknown,
+                    "countdown": state.countdown.map { .count($0) } ?? .unknown,
                     "enabled": .flag(state.isEnabled), "perceptionEnabled": .flag(state.perceptionEnabled),
                     "lensOwner": state.lensOwner.map { .text($0.rawValue) } ?? .unknown,
                     "busy": .flag(state.isBusy || state.photoBusy), "needsSettings": .flag(state.needsSettings),
@@ -127,6 +177,8 @@
             try await photoSession.savePhoto(id, invocation: invocation)
         }
         public func takePhoto(invocation: any FunctionInput) async throws -> CameraPhotoReceipt {
+            guard !changingDemand, !windowTransition, worker == nil else { throw CameraControlError.busy }
+            guard !recordingSession.busy, !recordingSession.hasClip else { throw CameraControlError.busy }
             if let windows, let item = windows.windows.first(where: { $0.content == WindowContent.camera.rawValue }),
                 item.mode == .minimized
             {
@@ -135,7 +187,55 @@
                 try await windows.change(item.id, command: .restore)
                 try await resumeWindow(invocation: invocation)
             }
-            return try await photoSession.takePhoto(invocation: invocation)
+            guard state.settings.mode == "photo" else { throw CameraControlError.unavailable }
+            return try await photoSession.takePhoto(delaySeconds: state.settings.delaySeconds, invocation: invocation)
+        }
+
+        public func configureCapture(_ settings: CameraCaptureSettings, invocation: any FunctionInput) async throws {
+            try settings.validate()
+            guard foreground, state.isEnabled, state.isVisible else { throw CameraControlError.disabled }
+            guard !photoSession.isBusy, !recordingSession.busy, !recordingSession.hasClip, worker == nil,
+                !changingDemand, !windowTransition
+            else { throw CameraControlError.busy }
+            guard state.lensOwner == .capture else { throw CameraControlError.lensNotOwned }
+            changingDemand = true
+            defer { changingDemand = false }
+            guard state.capturedPhoto == nil || settings.mode == state.settings.mode else {
+                throw CameraControlError.busy
+            }
+            let previous = state.settings
+            let configured: CameraPhotoConfiguration
+            do {
+                try await camera.setVideoMode(settings.mode == "video")
+                configured = try await camera.configurePhoto(
+                    flash: CameraFlash(rawValue: settings.flash) ?? .off, zoom: settings.zoom)
+            } catch {
+                let original = error
+                // Restore with an uncancelled cleanup owner before returning the failed configuration.
+                let cleanup = Task {
+                    try await camera.setVideoMode(previous.mode == "video")
+                    _ = try await camera.configurePhoto(
+                        flash: CameraFlash(rawValue: previous.flash) ?? .off, zoom: previous.zoom)
+                }
+                do { try await cleanup.value } catch {
+                    presentation.present(.message("拍摄设置恢复失败：" + error.localizedDescription))
+                    throw error
+                }
+                throw original
+            }
+            var display = CameraSettings()
+            display.mode = settings.mode
+            display.delaySeconds = settings.delaySeconds
+            display.flash = configured.flash.rawValue
+            display.zoom = configured.zoom
+            display.durationSeconds = settings.durationSeconds
+            display.maximumZoom = configured.maximumZoom
+            display.supportedFlash = configured.supportedFlash.map(\.rawValue)
+            presentation.present(.settings(display))
+        }
+        public func cancelCapture(invocation: any FunctionInput) async throws {
+            try Task.checkCancellation()
+            await photoSession.cancelCountdown()
         }
 
         public func pauseVisionForModelMaintenance() async {
@@ -154,7 +254,7 @@
                 if let windows {
                     do {
                         _ = try await windows.present(
-                            content: .camera, title: "相机", sizing: .image(aspect: 3.0 / 4.0, controlsHeight: 96))
+                            content: .camera, title: "相机", sizing: .image(aspect: 3.0 / 4.0, controlsHeight: 140))
                     } catch let error as WindowError {
                         throw WindowExecutionFailure(error: error)
                     }
@@ -173,7 +273,7 @@
             windowTransition = true
             presentation.present(.lensHandoff(true))
             await worker?.value
-            if photoSession.isBusy {
+            if photoSession.isBusy || recordingSession.changing {
                 endWindowTransition()
                 throw CameraControlError.busy
             }
@@ -194,6 +294,28 @@
             guard !photoSession.isBusy else { throw CameraControlError.busy }
             await worker?.value
             try Task.checkCancellation()
+            if let id = recordingSession.id {
+                if state.recording.active { _ = try await recordingSession.stop(id) }
+                if recordingSession.hasClip {
+                    guard let windows,
+                        let item = windows.windows.first(where: { $0.content == WindowContent.camera.rawValue })
+                    else { throw CameraControlError.unavailable }
+                    if item.mode == .minimized { try await windows.change(item.id, command: .restore) }
+                    let choice = try await windows.ask(
+                        item.id,
+                        prompt: .init(
+                            title: "关闭前如何处理这段视频？",
+                            choices: [
+                                .init(id: "save", title: "保存"), .init(id: "discard", title: "忽略"),
+                                .init(id: "cancel", title: "取消"),
+                            ]))
+                    switch choice {
+                    case "save": _ = try await recordingSession.save(id)
+                    case "discard": _ = try await recordingSession.ignore(id)
+                    default: throw CancellationError()
+                    }
+                }
+            }
             if let photo = state.capturedPhoto, let windows,
                 let item = windows.windows.first(where: { $0.content == WindowContent.camera.rawValue })
             {
@@ -268,6 +390,7 @@
             try Task.checkCancellation()
             guard foreground else { throw CameraControlError.notForeground }
             guard worker == nil, !photoSession.isBusy, !changingDemand else { throw CameraControlError.busy }
+            guard !recordingSession.busy else { throw CameraControlError.busy }
             guard source == .capture ? state.isEnabled : state.perceptionEnabled else {
                 throw CameraControlError.disabled
             }
@@ -296,6 +419,15 @@
             try Task.checkCancellation()
             guard revision == expectedRevision else { throw CancellationError() }
             if state.needsSettings { throw CameraControlError.permissionDenied }
+            if enabled && running {
+                let native = try await camera.photoConfiguration()
+                var settings = state.settings
+                settings.flash = native.flash.rawValue
+                settings.zoom = native.zoom
+                settings.maximumZoom = native.maximumZoom
+                settings.supportedFlash = native.supportedFlash.map(\.rawValue)
+                presentation.present(.settings(settings))
+            }
             guard enabled ? state.isVisible && running : captureLease == nil && !failed && !running else {
                 throw CameraControlError.unavailable
             }
@@ -311,6 +443,7 @@
             guard foreground != value else { return }
             foreground = value
             if !value {
+                recordingSession.invalidateForeground()
                 photoCues.stop()
                 presentation.present(.isEnabled(false))
                 presentation.present(.perceptionEnabled(false))
@@ -574,6 +707,7 @@
 
         /// Releasing an old lease never calls the device directly and cannot stop a replacement owner.
         private func stopCapture() async -> Bool {
+            await recordingSession.background()
             await photoSession.stopAndWait()
             leaseRenewal?.cancel()
             leaseRenewal = nil

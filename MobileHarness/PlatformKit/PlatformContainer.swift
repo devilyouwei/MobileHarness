@@ -51,7 +51,7 @@ public final class PlatformContainer: PlatformStateReading {
         self.admission = admission
         systemState = NativeSystemState(now: now, timeZone: timeZone)
         audio = AudioContainer(admission: admission)
-        vision = VisionContainer(admission: admission)
+        vision = VisionContainer(admission: admission, audio: audio)
         connectivity = makeConnectivity(admission)
     }
     public func stateSnapshot() async throws -> PlatformStateSnapshot {

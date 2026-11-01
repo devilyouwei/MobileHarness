@@ -26,10 +26,19 @@ public struct BinaryPublicationError: Error, Sendable {
 /// Keys are confined relative names. Listing is bounded/best effort, not a cross-write snapshot.
 public protocol FileStore: Sendable {
     var durability: StorageDurability { get }
+    func importFile(_ source: URL, key: String, maximumBytes: Int) async throws
+    func fileURL(_ key: String, maximumBytes: Int) async throws -> URL
     func read(_ key: String, maximumBytes: Int) async throws -> Data?
     func info(_ key: String) async throws -> BinaryObjectInfo?
     func putIfAbsent(_ data: Data, key: String) async throws
     func remove(_ key: String) async throws
     func listObjects(cursor: String?, limit: Int) async throws -> BinaryObjectPage
     func closeListing(_ cursor: String) async
+}
+
+extension FileStore {
+    public func importFile(_ source: URL, key: String, maximumBytes: Int) async throws {
+        throw FileStorageError.invalidFile
+    }
+    public func fileURL(_ key: String, maximumBytes: Int) async throws -> URL { throw FileStorageError.invalidFile }
 }

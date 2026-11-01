@@ -23,7 +23,7 @@
     }
 
     /// Synchronous configuration shared by native callers, on each caller's existing executor.
-    private func configureNativeAudioSession() throws {
+    func configureNativeAudioSession() throws {
         let session = AVAudioSession.sharedInstance()
         try session.setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker, .allowBluetoothHFP])
         try session.setAllowHapticsAndSystemSoundsDuringRecording(true)

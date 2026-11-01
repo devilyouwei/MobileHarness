@@ -13,8 +13,8 @@
             let devicesUI = ui.devices
             let camera = CameraInteractionWorkflow(
                 presentation: cameraUI,
-                perform: { operation, facing, media in
-                    _ = try await cameraUI.requests.submit(CameraInput(operation, facing: facing, mediaID: media))
+                perform: { input in
+                    _ = try await cameraUI.requests.submit(input)
                 })
             let history = ConversationHistoryWorkflow(
                 state: historyUI.presentation, prepare: {},

@@ -1,6 +1,21 @@
 import Foundation
 
 public enum CameraFacing: Sendable, Equatable { case front, back }
+public enum CameraFlash: String, Sendable, Codable { case off, on, auto }
+public struct CameraPhotoConfiguration: Sendable, Equatable {
+    public let flash: CameraFlash
+    public let zoom: Double
+    public let maximumZoom: Double
+    public let supportedFlash: [CameraFlash]
+    public init(
+        flash: CameraFlash = .off, zoom: Double = 1, maximumZoom: Double = 1, supportedFlash: [CameraFlash] = [.off]
+    ) {
+        self.flash = flash
+        self.zoom = zoom
+        self.maximumZoom = maximumZoom
+        self.supportedFlash = supportedFlash
+    }
+}
 public enum CameraEvent: String, Sendable { case interrupted, interruptionEnded, failed }
 public enum CameraError: Error, Equatable, Sendable {
     case permissionDenied, unavailable, configurationFailed, startFailed, photoBusy, photoFailed, photoTimedOut
@@ -37,9 +52,38 @@ public protocol CameraCapturing: CameraFrameObserving {
     func start(facing: CameraFacing) async throws -> AsyncThrowingStream<CameraFrame, Error>
     func switchCamera(facing: CameraFacing) async throws -> AsyncThrowingStream<CameraFrame, Error>
     func capturePhoto(rotation: CGFloat) async throws -> Data
+    func setVideoMode(_ enabled: Bool) async throws
+    func beginRecording(durationSeconds: Int, rotation: CGFloat) async throws -> String
+    func stopRecording(_ id: String) async throws -> CameraMovie
+    func waitForRecording(_ id: String) async throws -> CameraMovie
+    func photoConfiguration() async throws -> CameraPhotoConfiguration
+    func configurePhoto(flash: CameraFlash, zoom: Double) async throws -> CameraPhotoConfiguration
     func isRunning() async -> Bool
     func stop() async
     func stopAndWait() async
+}
+
+public struct CameraMovie: Sendable {
+    public let file: URL
+    public let stopReason: String
+    public init(file: URL, stopReason: String) {
+        self.file = file
+        self.stopReason = stopReason
+    }
+}
+
+extension CameraCapturing {
+    public func setVideoMode(_ enabled: Bool) async throws { if enabled { throw CameraError.unavailable } }
+    public func beginRecording(durationSeconds: Int, rotation: CGFloat) async throws -> String {
+        throw CameraError.unavailable
+    }
+    public func stopRecording(_ id: String) async throws -> CameraMovie { throw CameraError.unavailable }
+    public func waitForRecording(_ id: String) async throws -> CameraMovie { throw CameraError.unavailable }
+
+    public func photoConfiguration() async throws -> CameraPhotoConfiguration { .init() }
+    public func configurePhoto(flash: CameraFlash, zoom: Double) async throws -> CameraPhotoConfiguration {
+        throw CameraError.configurationFailed
+    }
 }
 
 /// Resident facts owned by the native capability; observation never activates the device.
@@ -50,5 +94,7 @@ public struct CameraHardwareSnapshot: Sendable, Equatable {
     public var facing: CameraFacing?
     public var photoWidth: Int?
     public var photoHeight: Int?
+    public var zoom: Double?
+    public var recording = false
     public init() {}
 }

@@ -232,3 +232,7 @@ Navigation State selection includes only navigation-owned path/phase/location/ov
 AssistantStateBindings selects windows and focusedID from ui.windows only when a loaded Skill requests it. Photography and ApplicationControl share the same Window.* aliases; window facts are sampled with the other current-state sources.
 
 Assistant State selection reads actual Camera running/phase/facing/photo dimensions from platform.vision.camera. actions.camera contributes branch intents, lensOwner, business availability and media identity. ui.camera contributes presentation readiness and ordering. The Camera native child is selected by Photography/ApplicationControl Skills and is absent from BasicSkill’s resident selection.
+
+## Photography state selection
+
+Photography loads capture/video Actions and settings/recording fields from actions.camera: mode, delaySeconds, flash, supportedFlash, zoom, maximumZoom, durationSeconds, countdown, recordingPhase and recordingID. Native platform.vision.camera independently supplies actual running/recording/lens/zoom. State selection does not activate the camera or confer permission. Photo/video instructions require separate configuration/start receipts, real media IDs and window cleanup before matching Task completion.

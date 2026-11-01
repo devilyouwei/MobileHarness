@@ -1,6 +1,6 @@
 # Audio — 原生音频、反馈与数值能力
 
-✅ 录音与播放共用文件私有的同步 AVAudioSession 配置函数，各调用者继续在自身隔离域执行，不增加调度；移除临时细分计时，只保留空间启动总区间。保留完整停止、原生错误、四声道及首 PCM 就绪。
+✅ 录音与播放共用模块内部的同步 AVAudioSession 配置函数，各调用者继续在自身隔离域执行，不增加调度；移除临时细分计时，只保留空间启动总区间。保留完整停止、原生错误、四声道及首 PCM 就绪。
 
 ## 职责与公开协议
 
@@ -94,3 +94,7 @@ State classifies microphone authorization as Business; scope owner/counts and ad
 Permission State projections read cached observations only. Unavailable owner scope remains unknown; an admitted cached-source/schema failure propagates through the standard throwing snapshot method instead of being converted to unknown.
 
 The Runtime scope owner is encoded using Scope.rawValue with a finite descriptor vocabulary (voice, diagnostic, detection, camera), independently of debug descriptions.
+
+## Camera audio reservation
+
+PlatformContainer injects AudioContainer's native owner fence into VisionContainer/AppleCamera. acquireCameraRecording requires no current owner and reserves camera scope; voice, diagnostic and detection I/O then reject busy. Native movie finalization removes its microphone and releases that reservation. The shared synchronous AVAudioSession setup is reused within PlatformKit; it permits native system sounds while recording. This module does not decide whether listening should resume; Actions owns that intent and generation fence.

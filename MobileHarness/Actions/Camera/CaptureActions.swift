@@ -56,7 +56,7 @@ extension CameraActions {
         domain: "Camera", module: "Capture", title: "takePhoto",
         doc:
             "Capture once with the ready foreground camera, show preview and return mediaID/image evidence. Does not save to Photos.",
-        parameters: [], timeout: .seconds(15))
+        parameters: [], timeout: .seconds(50))
     public static func takePhoto(invocation: any FunctionInput, using camera: any CameraControlCapability) async throws
         -> String
     {
@@ -130,5 +130,53 @@ extension CameraActions {
         try Task.checkCancellation()
         return String(
             decoding: try JSONEncoder().encode(CameraCommandReceipt(operation: "flip", facing: facing)), as: UTF8.self)
+    }
+}
+
+extension CameraActions {
+    @Action(
+        domain: "Camera", module: "Capture", title: "设置拍摄",
+        doc:
+            "Replace capture settings before capture. Omitted values default to photo, no delay, flash off, 1x, 600s maximum video. Read current settings to preserve other choices. Unsupported hardware settings fail.",
+        parameters: [
+            .init("mode", required: false, description: "Photo or video mode.", values: ["photo", "video"]),
+            .init(
+                "delaySeconds", type: .integer, required: false, description: "Photo countdown.",
+                constraints: "0...30 seconds"),
+            .init("flash", required: false, description: "Photo flash mode.", values: ["off", "on", "auto"]),
+            .init(
+                "zoom", type: .number, required: false, description: "Shared camera zoom.",
+                constraints: "1...6; actual device maximum applies"),
+            .init(
+                "durationSeconds", type: .integer, required: false, description: "Video automatic stop limit.",
+                constraints: "1...600 seconds"),
+        ])
+    public static func configure(invocation: any FunctionInput, using camera: any CameraControlCapability) async throws
+        -> String
+    {
+        let a = ActionArguments(invocation.call.parameters)
+        try a.validateAllowedKeys(["mode", "delaySeconds", "flash", "zoom", "durationSeconds"])
+        let p = invocation.call.parameters
+        let settings = CameraCaptureSettings(
+            mode: p["mode"] == nil ? "photo" : try a.requiredString("mode", maximumUTF8Bytes: 5),
+            delaySeconds: p["delaySeconds"] == nil ? 0 : try a.requiredInt("delaySeconds", range: 0...30),
+            flash: p["flash"] == nil ? "off" : try a.requiredString("flash", maximumUTF8Bytes: 4),
+            zoom: p["zoom"] == nil ? 1 : try a.requiredFiniteDouble("zoom", range: 1...6),
+            durationSeconds: p["durationSeconds"] == nil ? 600 : try a.requiredInt("durationSeconds", range: 1...600))
+        try settings.validate()
+        try Task.checkCancellation()
+        try await camera.configureCapture(settings, invocation: invocation)
+        return String(decoding: try JSONEncoder().encode(settings), as: UTF8.self)
+    }
+    @Action(
+        domain: "Camera", module: "Capture", title: "取消倒计时",
+        doc: "Cancel and join a pending photo countdown. Does not discard a captured photo or stop video.",
+        parameters: [])
+    public static func cancelCapture(invocation: any FunctionInput, using camera: any CameraControlCapability)
+        async throws -> String
+    {
+        try ActionArguments(invocation.call.parameters).validateAllowedKeys([])
+        try await camera.cancelCapture(invocation: invocation)
+        return "{\"countdown\":null}"
     }
 }

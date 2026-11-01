@@ -239,31 +239,36 @@
                     } else {
                         Color.clear.frame(width: 44).allowsHitTesting(false)
                     }
-                    Text(item.title).font(.subheadline.weight(.semibold)).lineLimit(1)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .contentShape(Rectangle())
-                        .gesture(
-                            DragGesture(minimumDistance: 6, coordinateSpace: .global).onChanged { value in
-                                guard item.mode != .maximized else { return }
-                                if dragOrigin == nil { dragOrigin = state.frame(item) }
-                                if let origin = dragOrigin {
-                                    do {
-                                        try state.drag(
-                                            item.id, x: origin.x + value.translation.width,
-                                            y: origin.y + value.translation.height)
-                                    } catch { state.report(item.id, message: error.localizedDescription) }
-                                }
-                            }.onEnded { _ in
-                                dragOrigin = nil
-                                state.endDrag(item.id)
+                    VStack(spacing: 0) {
+                        Text(item.title).font(.subheadline.weight(.semibold)).lineLimit(1)
+                        if item.mode == .minimized, let activity = item.activity {
+                            Text(activity).font(.caption2).lineLimit(1)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .contentShape(Rectangle())
+                    .gesture(
+                        DragGesture(minimumDistance: 6, coordinateSpace: .global).onChanged { value in
+                            guard item.mode != .maximized else { return }
+                            if dragOrigin == nil { dragOrigin = state.frame(item) }
+                            if let origin = dragOrigin {
+                                do {
+                                    try state.drag(
+                                        item.id, x: origin.x + value.translation.width,
+                                        y: origin.y + value.translation.height)
+                                } catch { state.report(item.id, message: error.localizedDescription) }
                             }
-                            .exclusively(
-                                before: TapGesture(count: item.mode == .minimized ? 1 : 2).onEnded {
-                                    state.submit(
-                                        item.id,
-                                        command: item.mode == .minimized || item.mode == .maximized
-                                            ? .restore : .maximize)
-                                }))
+                        }.onEnded { _ in
+                            dragOrigin = nil
+                            state.endDrag(item.id)
+                        }
+                        .exclusively(
+                            before: TapGesture(count: item.mode == .minimized ? 1 : 2).onEnded {
+                                state.submit(
+                                    item.id,
+                                    command: item.mode == .minimized || item.mode == .maximized
+                                        ? .restore : .maximize)
+                            }))
                     if item.mode != .minimized {
                         ZStack {
                             if item.phase == .opening || item.phase == .changing {

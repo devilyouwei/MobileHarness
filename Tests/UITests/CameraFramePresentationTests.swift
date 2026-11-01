@@ -683,3 +683,22 @@ extension NativePresentationTests {
         }
     }
 }
+
+@Test @MainActor func shutterOrientationMatchesWindowInsteadOfGravityAndFreezesAtCapture() throws {
+    for reference in [1, 3] {
+        for orientation in CameraInterfaceOrientation.allCases {
+            let state = CameraState()
+            for gravity in 0..<4 {
+                try state.presentVideo(
+                    orientedFrame(UInt64(gravity + 1), rotation: gravity, portraitRotation: reference))
+                state.presentPhotoOrientation(orientation, generation: state.videoGeneration)
+                let shutter = CameraPresentationSnapshot(state).photoCaptureRotation
+                #expect(shutter == Double((reference + orientation.rawValue) % 4 * 90))
+                // A later Face-only layout/rotation cannot alter the photo window's captured basis.
+                state.presentInterfaceOrientation(.landscapeRight, generation: state.videoGeneration)
+                #expect(CameraPresentationSnapshot(state).photoCaptureRotation == shutter)
+            }
+        }
+    }
+    #expect(CameraPresentationSnapshot(CameraState()).photoCaptureRotation == nil)
+}

@@ -34,6 +34,7 @@ public struct AlbumImportSource: Sendable {
 public enum AlbumInput: Sendable {
     case page(AlbumPageToken?)
     case image(String, thumbnail: Bool)
+    case video(String)
     case importPhotos([AlbumImportSource])
     case export(String)
     case delete(String)
@@ -41,6 +42,7 @@ public enum AlbumInput: Sendable {
 public enum AlbumReply: Sendable {
     case page([AlbumPhoto], AlbumPageToken?)
     case image(Data)
+    case video(URL)
     case imported(Int, [String])
     case deleted(String, cleanupIssue: String?)
     case completed
@@ -117,6 +119,10 @@ public enum AlbumReply: Sendable {
             throw UIRequestError.stale
         }
         return data
+    }
+    public func video(_ id: String) async throws -> URL {
+        guard case .video(let file) = try await requests.submit(.video(id)) else { throw UIRequestError.stale }
+        return file
     }
     public func importPhotos(_ sources: [AlbumImportSource]) { mutate(.importPhotos(sources)) }
     public func export(_ id: String) { mutate(.export(id)) }

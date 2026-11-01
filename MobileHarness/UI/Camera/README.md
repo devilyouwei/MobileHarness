@@ -49,7 +49,7 @@ Face 背景视觉使用0.30不透明度叠在黑色底板上，使面部主体�
 
 控制忙碌使用 controlBusy/controlMessage，与原生设备或照片错误分开；重叠操作提示在真实请求结束后清除。isEnabled 表示意图，原生停机确认由设备拥有者负责。UI内部变更通知只驱动有界事实流，不再提供公共状态镜像回调。
 
-Face 右上角保留胶囊式视觉／跟随开关（eye 图标）和设置入口；仅视觉开启时显示背景翻转，翻转可用性仍服从最上层镜头权限。Face 不额外提供拍摄窗口快捷按钮，拍摄由 Photography Action 打开窗口。视觉开启时在 Face 后方挂载含姿态的 CameraFrameView；拍摄不启用背景。相机入口受应用会话建立、根启动失败及相机控制忙碌状态约束，不依赖对话模型准备成功；请求仍经过类型化端口与 Action 的实际准入。CameraWindowContent 在独立窗口内显示原生预览、照片模式、镜头切换和快门，权限失败可进入系统设置，普通错误可重新开启。完全被上层窗口覆盖时卸载预览渲染器，采集仍由领域拥有。
+Face 右上角保留胶囊式视觉／跟随开关（eye 图标）和设置入口；仅视觉开启时显示背景翻转，翻转可用性仍服从最上层镜头权限。Face 不额外提供拍摄窗口快捷按钮，拍摄由 Photography Action 打开窗口。视觉开启时在 Face 后方挂载含姿态的 CameraFrameView；拍摄不启用背景。相机入口受应用会话建立、根启动失败及相机控制忙碌状态约束，不依赖对话模型准备成功；请求仍经过类型化端口与 Action 的实际准入。CameraWindowContent 在独立窗口内显示原生预览、照片／视频模式、镜头切换和快门，权限失败可进入系统设置，普通错误可重新开启。完全被上层窗口覆盖时卸载预览渲染器，采集仍由领域拥有。
 
 照片按身份出现、保持并缩成96×128缩略图；真实动画完成后才开放后续交互。检查器是同一窗口内容内的覆盖，不再弹出全屏图片页面。窗口最小化不渲染内容，恢复已确认缩略图不重放首次照片动画。保存先放大再右移离场，忽略向右下缩小离场；替换、后台或离窗明确撤销旧等待，Reduce Motion 使用简化过渡。实际保存、声音、相册事务和移除策略留在上游。
 
@@ -107,10 +107,18 @@ CameraFrameSurface reads UIWindowScene.effectiveGeometry.interfaceOrientation du
 
 Both renderers retain the same immutable CameraVideoFrame; only the background passes skeleton data. Each renderer owns its native completion and its own failure surface; a failed photo renderer cannot clear shared frames or disable background rendering. Background renderer unmounts when Face is hidden or completely covered; photo renderer unmounts while minimized or fully covered. Neither unmount changes device demand.
 
-Photo rendering uses aspect-fit and explicit black letterboxing, with a separate interface-orientation report. photoAspect derives from native frame dimensions and the sensor-to-interface transform. CameraWindowContent reserves 96pt for controls, overlays errors without changing framing, and sizes its image region independently of window chrome. The root updates the typed image sizing policy as the actual aspect changes. Background keeps aspect-fill and common video/pose/gaze geometry.
+Photo rendering uses aspect-fit and explicit black letterboxing, with a separate interface-orientation report. photoAspect derives from native frame dimensions and the sensor-to-interface transform. CameraWindowContent reserves 140pt for controls, overlays errors without changing framing, and sizes its image region independently of window chrome. The root updates the typed image sizing policy as the actual aspect changes. Background keeps aspect-fill and common video/pose/gaze geometry.
 
 Background vision presents status, system-permission settings and explicit retry controls inside Face. These use the typed request chain without opening a photo window.
 
 photoAspect is a retained scalar updated only when geometry changes. Root window layout observes this value rather than the per-frame video reference, so new pixels do not rebuild root window content.
 
 Face 左上角在背景视觉启用且存在新鲜姿态统计时显示 YOLO FPS，可折叠展开采样间隔、画面运动、排队／推理／总延迟及跳过帧数。数值来自同一骨架观测的真实 statistics，失效后不保留旧统计；拍摄窗口不显示 YOLO。视觉开关的无障碍状态以视觉分支为准，拍摄独立运行不会使其显示已开启。
+
+## Capture settings and movie presentation
+
+CameraSettings carries full mode/countdown/flash/zoom/duration selections plus actual capability bounds. The140pt control region offers photo/video selection, a settings menu, bounded zoom choices and one shutter/stop location. Configuration, cancel, start/stop and video disposition go through typed CameraInput; no view invokes native capture. countdown presents the domain's remaining seconds and cancel control. Recording uses startedAt for SwiftUI's timer display, a red indicator, listening-paused text and explicit stop.
+
+CameraRecordingPresentation separates idle/starting/recording/finishing/ready/failed. Ready clips use a local URL and LocalVideoPlayer; save/ignore remains available on a retained failed clip. Busy states disable incompatible controls. Both visual surfaces disable lens switching throughout recording startup/active/finalization, including minimized recording. Window aspect follows real preview dimensions plus140pt controls and52pt chrome. Hidden content does not retain preview/player rendering; business recording continues under its domain owner.
+
+CameraState.photoCaptureRotation and CameraPresentationSnapshot expose the current photo window’s sensor-to-interface quarter-turn angle as a read-only scalar. It combines the native portrait sensor reference with photoOrientation, independently of Face orientation and gravity. Without an admitted frame/basis it is nil. Actions snapshots it at the shutter or recording start; the UI does not reorient existing encoded media when the device moves.

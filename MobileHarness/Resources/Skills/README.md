@@ -199,3 +199,9 @@ Photography and ApplicationControl share six Window.* aliases and select ui.wind
 ApplicationControl exposes background Vision.open/close/flip/retry aliases for Camera.Perception.*Vision. Photography retains Capture aliases and window controls. Both select platform.vision.camera for actual native facts. Only the visible lensOwner may flip; minimizing photo retains capture and hands lens authority to visible enabled background vision. BasicSkill’s resident catalog is unchanged.
 
 BasicSkill routes 打开视觉／跟踪／人物或姿态跟随 to application-control and Vision.open; 拍照／拍摄照片 to photography and its capture Actions. The unloaded Skill descriptions carry this distinction, and both Skill instruction sets repeat the boundary after loading. openPage vision is model settings navigation, not vision activation. No new Camera Actions are resident in BasicSkill.
+
+## Photo/video workflow
+
+Photography revision31 exposes Capture.configure/cancelCapture plus Video.startRecording/stopRecording/saveVideo/ignoreVideo using the existing Camera channel and stable aliases. configureCamera replaces the full settings; unrelated values are preserved from facts. A native countdown belongs to takePhoto; video start, file completion and App album inclusion are separate receipts. The Skill gives spoken preparation before recording, then relies on the stop button or configured duration while listening is paused. Failed/uncertain work is not automatically replayed. Confirmed save/ignore closes the matching photography window before Task completion; background Vision is independent.
+
+BasicSkill revision37 routes 拍照/录像 to Photography without adding permanent camera Actions. Prompt regression budgets remain25,000 UTF-8 bytes for the base catalog and36,000 with Photography, which includes six additional Action declarations and recording lifecycle instructions. These are context-size checks, not model or device acceptance.

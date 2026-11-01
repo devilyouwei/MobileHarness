@@ -142,3 +142,5 @@ WindowStateTests uses explicit synthetic presentation acknowledgments to verify 
 Window regression covers image-aspect sizing, visible camera lens authority, minimized/restore handoff, occlusion, hidden Face and failed/stale presentation receipts. Renderer-failure tests prove shared frames remain available to the other surface.
 
 Photo geometry tests retain all four image corners under fit, rotation and mirroring. Observation tests ensure unchanged frame dimensions do not invalidate the root-facing photoAspect value. They do not replace physical lens field-of-view measurements.
+
+Shutter-orientation regression checks both native portrait sensor references across all window/gravity quarter-turn combinations, frozen snapshots, Face/window independence and missing-frame rejection. It validates geometry values, not native JPEG metadata or a physical shutter.

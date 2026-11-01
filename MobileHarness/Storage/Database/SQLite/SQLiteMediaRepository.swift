@@ -70,10 +70,33 @@ public final class SQLiteMediaRepository: MediaRepository {
             guard db.changesCount == 1 else { throw RecordStorageError.missingRecord }
         }
     }
+    public func reserveVideo(bytes: Int, owner: StorageOwner, metadata: PhotoMetadata, createdAt: Date) throws
+        -> MediaFileRecord
+    {
+        try metadata.validate()
+        guard metadata.mime == "video/quicktime", bytes > 0, bytes <= 512 * 1024 * 1024 else {
+            throw RecordStorageError.invalidRecord
+        }
+        return try database.write { db in
+            let path = UUID().uuidString + ".mov"
+            try db.execute(
+                sql:
+                    "INSERT INTO media_files(kind,mime,relative_path,bytes,source,session_id,input_id,created_at,captured_at,state,photo_width,photo_height,photo_origin) VALUES('video',?,?,?,?,?,?,?,?,'pending',?,?,?)",
+                arguments: [
+                    metadata.mime, path, bytes, owner.source, owner.session, owner.input,
+                    createdAt.timeIntervalSince1970,
+                    metadata.capturedAt?.timeIntervalSince1970, metadata.width, metadata.height, metadata.origin,
+                ])
+            return MediaFileRecord(
+                id: SQLiteRecordKey.id(.media, db.lastInsertedRowID), path: path, bytes: bytes,
+                source: owner.source, session: owner.session, input: owner.input, state: "pending")
+        }
+    }
     public func reservePhoto(bytes: Int, owner: StorageOwner, metadata: PhotoMetadata, createdAt: Date) throws
         -> MediaFileRecord
     {
         try metadata.validate()
+        guard metadata.mime != "video/quicktime" else { throw RecordStorageError.invalidRecord }
         return try database.write { db in
             let path = UUID().uuidString + "." + metadata.fileExtension
             try db.execute(

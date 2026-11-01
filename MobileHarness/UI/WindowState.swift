@@ -57,6 +57,7 @@ public struct WindowPresentation: Identifiable, Sendable {
     public var revision: UInt64 = 1
     public var presentedRevision: UInt64 = 0
     public var presentationConfirmed: Bool { phase == .settled && presentedRevision == revision }
+    public var activity: String?
     public var failure: String?
     public var prompt: WindowPrompt?
 }
@@ -204,6 +205,10 @@ public struct WindowPresentation: Identifiable, Sendable {
         let item = windows.remove(at: index)
         windows.append(item)
         focusedID = id
+    }
+    public func setActivity(_ id: UUID, label: String?) {
+        guard let i = windows.firstIndex(where: { $0.id == id }) else { return }
+        windows[i].activity = label.map { String($0.prefix(64)) }
     }
     public func move(_ id: UUID, x: Double, y: Double) throws {
         guard x.isFinite, y.isFinite else { throw WindowError.invalidPosition }

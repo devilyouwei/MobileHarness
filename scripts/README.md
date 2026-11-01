@@ -120,3 +120,5 @@ The boundary check enforces Actions-owned camera/device scene lifecycle and reje
 The boundary checker rejects App references to ActionsBusinessAssembly, BluetoothWorkflow and CameraStorageFactory; business service construction belongs to ActionsContainer.
 
 App responsibility checks reject independent Agent startup from UI preparation, optional bootstrap invocation, resource-context/holding interpretation in adapters and model warmup implementation in ServiceFactories.
+
+The UI native-rendering allowlist permits AVKit only in Components/LocalVideoPlayer.swift for local-file playback. Camera.Video declarations follow the existing filename-to-module ownership check in VideoActions.swift; capture, permissions and media storage remain forbidden UI responsibilities.

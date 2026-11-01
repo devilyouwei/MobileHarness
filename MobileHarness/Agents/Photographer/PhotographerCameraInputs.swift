@@ -1,15 +1,18 @@
 import AgentCore
 import Foundation
+import FunctionContracts
 import StorageCore
 
 /// Camera work owned by Photographer; request identity is opaque, never an executable path.
 public struct PhotographerCameraIntent: Codable, Sendable, Equatable {
     public static let contract = "photography.camera"
     public enum Operation: String, Codable, Sendable {
-        case open, close, flip, retry, takePhoto, savePhoto, ignorePhoto, cancel
+        case open, close, flip, retry, takePhoto, savePhoto, ignorePhoto, configure, cancelCapture, startRecording,
+            stopRecording, saveVideo, ignoreVideo, cancel
         case perceptionOpen, perceptionClose, perceptionFlip, perceptionRetry
         var actionPath: String {
             switch self {
+            case .startRecording, .stopRecording, .saveVideo, .ignoreVideo: "Camera.Video." + rawValue
             case .perceptionOpen: "Camera.Perception.openVision"
             case .perceptionClose: "Camera.Perception.closeVision"
             case .perceptionFlip: "Camera.Perception.flipVision"
@@ -19,11 +22,18 @@ public struct PhotographerCameraIntent: Codable, Sendable, Equatable {
         }
     }
     public enum Facing: String, Codable, Sendable { case front, back }
+    public let recordingID: String?
+    public let settings: CameraCaptureSettings?
     public let mediaID: String?
     public let facing: Facing?
     public let operation: Operation
     public let requestID: String
-    public init(_ operation: Operation, facing: Facing? = nil, mediaID: String? = nil, requestID: String) {
+    public init(
+        _ operation: Operation, facing: Facing? = nil, mediaID: String? = nil, settings: CameraCaptureSettings? = nil,
+        recordingID: String? = nil, requestID: String
+    ) {
+        self.settings = settings
+        self.recordingID = recordingID
         self.mediaID = mediaID
         self.facing = facing
         self.operation = operation
@@ -33,7 +43,12 @@ public struct PhotographerCameraIntent: Codable, Sendable, Equatable {
         AgentMessage(
             contract: Self.contract, content: self, maximumBytes: 512,
             validate: { intent in
-                guard (intent.operation == .flip || intent.operation == .perceptionFlip) == (intent.facing != nil),
+                try intent.settings?.validate()
+                guard (intent.operation == .configure) == (intent.settings != nil),
+                    [.stopRecording, .saveVideo, .ignoreVideo].contains(intent.operation)
+                        == (intent.recordingID != nil),
+                    intent.recordingID.map({ UUID(uuidString: $0) != nil }) ?? true,
+                    (intent.operation == .flip || intent.operation == .perceptionFlip) == (intent.facing != nil),
                     intent.mediaID == nil || intent.operation == .savePhoto || intent.operation == .ignorePhoto,
                     !intent.requestID.isEmpty, intent.requestID.utf8.count <= 128,
                     intent.mediaID.map({ !$0.isEmpty && $0.utf8.count <= 128 }) ?? true

@@ -106,7 +106,8 @@ import Testing
     #expect(!state.isEnabled)
     let controls = CameraInteractionWorkflow(
         presentation: ui.camera,
-        perform: { operation, facing, mediaID in
+        perform: { input in
+            let (operation, facing, mediaID) = (input.operation, input.facing, input.mediaID)
             try await host.performCamera(operation, facing: facing, mediaID: mediaID)
         })
     var started = host.started.stream.makeAsyncIterator()
@@ -140,7 +141,8 @@ import Testing
     let state = ui.camera.state
     let controls = CameraInteractionWorkflow(
         presentation: ui.camera,
-        perform: { operation, facing, id in try await host.performCamera(operation, facing: facing, mediaID: id) })
+        perform: { input in try await host.performCamera(input.operation, facing: input.facing, mediaID: input.mediaID)
+        })
     let original = "media_1"
     let replacement = "media_2"
     var started = host.started.stream.makeAsyncIterator()
@@ -167,7 +169,8 @@ import Testing
     var calls = 0
     let controls = CameraInteractionWorkflow(
         presentation: ui.camera,
-        perform: { _, _, selected in
+        perform: { input in
+            let selected = input.mediaID
             calls += 1
             state.savedMediaID = selected
             throw CancellationError()
@@ -186,7 +189,7 @@ import Testing
     var attempts = 0
     let controls = CameraInteractionWorkflow(
         presentation: ui.camera,
-        perform: { _, _, _ in
+        perform: { _ in
             attempts += 1
             if attempts == 1 { throw failure }
             ui.camera.present(.message(nil))
@@ -210,7 +213,8 @@ import Testing
     let host = HeldInteraction()
     let controls = CameraInteractionWorkflow(
         presentation: ui.camera,
-        perform: { operation, facing, id in try await host.performCamera(operation, facing: facing, mediaID: id) })
+        perform: { input in try await host.performCamera(input.operation, facing: input.facing, mediaID: input.mediaID)
+        })
     var started = host.started.stream.makeAsyncIterator()
     controls.toggle()
     // Busy is visible synchronously, before the asynchronous dispatch starts.

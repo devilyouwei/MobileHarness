@@ -89,3 +89,7 @@ AgentContainer declares foregroundModelRequirements from its role needs and curr
 ApplicationControl owns fixed UI window requests through Gateway, with four independent ordinary operations and one close control slot. Photographer retains camera/album requests, including the camera-window shutter. Assistant's Photography and ApplicationControl Skills select ui.windows and share Window.* aliases without expanding BasicSkill.
 
 Background visual demand alone adds the vision model requirement. Photographer routes fixed photo and visual UI operations through distinct Capture/Perception Actions while retaining one request owner. Assistant selects Foundation camera State via the relevant loaded Skill; it does not infer actual device state from UI intent.
+
+## Photo/video UI flow
+
+Photographer consumes typed photo/video settings and recording controls through its existing single UI request path, emits fixed internal calls to Gateway and returns actual Action results. Assistant's Photography Skill governs conversational capture decisions and Task/window closure; it does not start background vision. Recording disables microphone listening, so the Skill uses a stop button or native duration limit rather than promising a voice stop. See [Photographer](Photographer/README.md) and [Assistant](Assistant/README.md).

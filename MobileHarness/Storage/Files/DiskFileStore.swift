@@ -84,6 +84,59 @@ public actor DiskFileStore: FileStore {
             throw error
         }
     }
+    public func fileURL(_ key: String, maximumBytes: Int) throws -> URL {
+        try access.check()
+        guard maximumBytes > 0, let info = try info(key), info.bytes > 0, info.bytes <= maximumBytes else {
+            throw FileStorageError.capacityExceeded
+        }
+        return try location(key)
+    }
+    public func importFile(_ source: URL, key: String, maximumBytes: Int) throws {
+        try access.check()
+        try Task.checkCancellation()
+        guard source.isFileURL, maximumBytes > 0 else { throw FileStorageError.invalidFile }
+        let values = try source.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey, .fileSizeKey])
+        guard values.isRegularFile == true, values.isSymbolicLink != true,
+            let count = values.fileSize, count > 0, count <= maximumBytes, Int64(count) <= self.maximumBytes
+        else {
+            throw FileStorageError.capacityExceeded
+        }
+        let target = try location(key)
+        guard !FileManager.default.fileExists(atPath: target.path) else { throw FileStorageError.busy }
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let temporary = root.appendingPathComponent(".store-" + UUID().uuidString)
+        do {
+            try FileManager.default.copyItem(at: source, to: temporary)
+            #if os(iOS)
+                try FileManager.default.setAttributes(
+                    [
+                        .protectionKey: objectProtection == .afterFirstUnlock
+                            ? FileProtectionType.completeUntilFirstUserAuthentication : .complete
+                    ], ofItemAtPath: temporary.path)
+            #endif
+            let copied = try temporary.resourceValues(forKeys: [.fileSizeKey]).fileSize
+            guard copied == count else { throw FileStorageError.invalidFile }
+            let handle = try FileHandle(forWritingTo: temporary)
+            do {
+                try handle.synchronize()
+                try handle.close()
+            } catch {
+                try? handle.close()
+                throw error
+            }
+            try Task.checkCancellation()
+            try FileManager.default.moveItem(at: temporary, to: target)
+        } catch {
+            let primary = error
+            do {
+                if FileManager.default.fileExists(atPath: temporary.path) {
+                    try FileManager.default.removeItem(at: temporary)
+                }
+            } catch { throw BinaryPublicationError(publication: primary, cleanup: error) }
+            throw primary
+        }
+    }
+
     public func read(_ relative: String, maximumBytes: Int) throws -> Data? {
         do {
             try access.check()

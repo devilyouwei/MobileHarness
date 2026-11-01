@@ -89,3 +89,54 @@ public enum NativePhotoFailure: Error, Sendable { case invalidImage }
         }
     }
 #endif
+
+#if canImport(AVFoundation) && canImport(ImageIO)
+    import AVFoundation
+    public struct NativeMovieInfo: Sendable {
+        public let width: Int
+        public let height: Int
+        public let duration: Double
+        public init(width: Int, height: Int, duration: Double) {
+            self.width = width
+            self.height = height
+            self.duration = duration
+        }
+    }
+    public enum NativeAlbumMovie {
+        public static func inspect(_ file: URL) async throws -> NativeMovieInfo {
+            try Task.checkCancellation()
+            guard file.isFileURL, let bytes = try file.resourceValues(forKeys: [.fileSizeKey]).fileSize,
+                bytes > 0, bytes <= 512 * 1024 * 1024
+            else { throw CameraError.unavailable }
+            let asset = AVURLAsset(url: file)
+            let duration = try await asset.load(.duration).seconds
+            guard duration.isFinite, duration > 0, duration <= 605,
+                let track = try await asset.loadTracks(withMediaType: .video).first
+            else { throw CameraError.unavailable }
+            let (size, transform) = try await track.load(.naturalSize, .preferredTransform)
+            let oriented = CGRect(origin: .zero, size: size).applying(transform)
+            let width = Int(abs(oriented.width).rounded())
+            let height = Int(abs(oriented.height).rounded())
+            guard width > 0, height > 0, width <= 4096, height <= 4096 else { throw CameraError.unavailable }
+            try Task.checkCancellation()
+            return NativeMovieInfo(width: width, height: height, duration: duration)
+        }
+        public static func thumbnail(_ file: URL) async throws -> Data {
+            _ = try await inspect(file)
+            let generator = AVAssetImageGenerator(asset: AVURLAsset(url: file))
+            generator.appliesPreferredTrackTransform = true
+            generator.maximumSize = CGSize(width: 320, height: 320)
+            let image = try await generator.image(at: .zero).image
+            try Task.checkCancellation()
+            let data = NSMutableData()
+            guard let destination = CGImageDestinationCreateWithData(data, UTType.jpeg.identifier as CFString, 1, nil)
+            else { throw CameraError.unavailable }
+            CGImageDestinationAddImage(
+                destination, image, [kCGImageDestinationLossyCompressionQuality: 0.75] as CFDictionary)
+            guard CGImageDestinationFinalize(destination), data.length <= 1024 * 1024 else {
+                throw CameraError.unavailable
+            }
+            return data as Data
+        }
+    }
+#endif

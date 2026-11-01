@@ -29,3 +29,7 @@ DocumentStore 提供 load/refresh/invalidate、UUID revision 的 save/CAS 和 re
 ## Passive state reads
 
 FilesContainer.stateSnapshot returns StorageCore.StorageStateSnapshot directly; closed and file/document handle counts are Runtime, sampled under the same mutex. The returned snapshot.stateDescriptor reflects the same sampled data. Paths, keys and document data are excluded. It does not call start, create a directory, open a file or alter admission.
+
+## Bounded file-backed media
+
+FileStore.importFile and fileURL support bounded local-file resources without whole-file Data. DiskFileStore rejects symbolic links/non-regular files, invalid paths, empty/oversized sources and existing destinations. Import copies to a confined temporary file, applies data protection, validates byte count, synchronizes/closes and atomically moves without overwrite. Cancellation before publication removes the temporary copy; publication/cleanup failures remain explicit. fileURL requires a present bounded file inside the namespace; caller lifetime/disposition remains above Files. MemoryFileStore explicitly rejects these native-file operations.

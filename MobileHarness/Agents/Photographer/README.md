@@ -126,3 +126,7 @@ stateSnapshot projects local installation/closure, Agent lifecycle/queue counter
 The fixed camera input workflow includes takePhoto for the window shutter. Its authorized Tool is Camera.Capture.takePhoto, sharing the existing capture/receipt/ownership pipeline. Camera window management is handled by ApplicationControl; Photographer retains camera and album business requests.
 
 Typed camera intent also includes perceptionOpen/perceptionClose/perceptionFlip/perceptionRetry, mapped to fixed Camera.Perception.openVision/closeVision/flipVision/retryVision calls. The same bounded request workflow and Gateway authorization apply. Pose/tracking scope exists independently of the photo window; stopping it joins tracking output before a replacement scope. Root model requirements include vision only while background visual demand is enabled.
+
+## Capture enhancement requests
+
+CameraInput maps to a bounded PhotographerCameraIntent containing optional complete CameraCaptureSettings or a UUID recordingID. Intent validation enforces operation-specific fields before the role invokes fixed Capture.configure/cancelCapture or Video.startRecording/stopRecording/saveVideo/ignoreVideo. The single pending request and source/session checks are shared with photo/lens controls; file/native work remains in Actions. UI countdown cancellation cancels and joins its existing request, or submits the fixed cancelCapture operation when the countdown was started elsewhere.

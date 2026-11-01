@@ -5,6 +5,21 @@
     /// Native add-only photo import. Callers own admission and join through the OS completion.
     public enum ApplePhotoLibrary {
         public enum Failure: Error { case permissionDenied, invalidImage }
+        public static func saveVideo(_ file: URL) async throws {
+            _ = try await NativeAlbumMovie.inspect(file)
+            let permission = await PHPhotoLibrary.requestAuthorization(for: .addOnly)
+            await MainActor.run {
+                NotificationCenter.default.post(name: NativeStateCollection.permissionsDidChange, object: nil)
+            }
+            guard permission == .authorized || permission == .limited else { throw Failure.permissionDenied }
+            try Task.checkCancellation()
+            try await PHPhotoLibrary.shared().performChanges {
+                let request = PHAssetCreationRequest.forAsset()
+                let options = PHAssetResourceCreationOptions()
+                options.originalFilename = "MobileHarness-Video.mov"
+                request.addResource(with: .video, fileURL: file, options: options)
+            }
+        }
         public static func saveJPEG(_ data: Data) async throws {
             guard data.count <= 4 * 1024 * 1024 else { throw Failure.invalidImage }
             try await savePhoto(data)

@@ -10,8 +10,8 @@ public enum PhotoAlbumError: Error, Sendable, LocalizedError {
     public var errorDescription: String? {
         switch self {
         case .busy: "相册正在处理其他操作，请稍后再试"
-        case .unavailable: "照片不可用"
-        case .invalidRequest: "照片格式不支持或超过大小限制"
+        case .unavailable: "媒体不可用"
+        case .invalidRequest: "媒体格式不支持或超过大小限制"
         }
     }
 }
@@ -21,12 +21,17 @@ public protocol PhotoAlbumCapability: Sendable {
 public actor PhotoAlbumService: PhotoAlbumCapability {
     private let photos: CapturedPhotoStore
     private let export: @Sendable (Data) async throws -> Void
+    private let exportVideo: @Sendable (URL) async throws -> Void
     private var mutating = false
     private var originals = 0
     private var thumbnails = 0
-    public init(photos: CapturedPhotoStore, export: @escaping @Sendable (Data) async throws -> Void) {
+    public init(
+        photos: CapturedPhotoStore, export: @escaping @Sendable (Data) async throws -> Void,
+        exportVideo: @escaping @Sendable (URL) async throws -> Void = { _ in throw PhotoAlbumError.unavailable }
+    ) {
         self.photos = photos
         self.export = export
+        self.exportVideo = exportVideo
     }
     public func perform(_ input: AlbumInput, owner: StorageOwner) async throws -> AlbumReply {
         try Task.checkCancellation()
@@ -39,10 +44,16 @@ public actor PhotoAlbumService: PhotoAlbumCapability {
                         id: item.id, date: item.sortDate, mime: item.metadata.mime, width: item.metadata.width,
                         height: item.metadata.height, bytes: item.bytes, origin: item.metadata.origin)
                 }, page.next.map { AlbumPageToken(date: $0.date, id: $0.id) })
+        case .video(let id):
+            return .video(try await photos.videoURL(id))
         case .image(let id, let thumbnail):
             guard thumbnail ? thumbnails < 4 : originals < 2 else { throw PhotoAlbumError.busy }
             if thumbnail { thumbnails += 1 } else { originals += 1 }
             defer { if thumbnail { thumbnails -= 1 } else { originals -= 1 } }
+            if try await photos.isAlbumVideo(id) {
+                guard thumbnail else { throw PhotoAlbumError.invalidRequest }
+                return .image(try await NativeAlbumMovie.thumbnail(photos.videoURL(id)))
+            }
             let data = try await photos.readAlbum(id)
             #if canImport(ImageIO)
                 return .image(thumbnail ? try await NativeAlbumImage.thumbnail(data) : data)
@@ -80,9 +91,15 @@ public actor PhotoAlbumService: PhotoAlbumCapability {
             guard !mutating else { throw PhotoAlbumError.busy }
             mutating = true
             defer { mutating = false }
-            let data = try await photos.readAlbum(id)
-            try Task.checkCancellation()
-            try await export(data)
+            if try await photos.isAlbumVideo(id) {
+                let file = try await photos.videoURL(id)
+                try Task.checkCancellation()
+                try await exportVideo(file)
+            } else {
+                let data = try await photos.readAlbum(id)
+                try Task.checkCancellation()
+                try await export(data)
+            }
             return .completed
         case .delete(let id):
             guard !mutating else { throw PhotoAlbumError.busy }

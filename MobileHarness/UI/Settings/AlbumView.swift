@@ -38,8 +38,8 @@
                 if !album.hasLoaded, album.loading { ProgressView().padding() }
                 if album.hasLoaded, album.items.isEmpty {
                     ContentUnavailableView(
-                        "相册暂无照片", systemImage: "photo.on.rectangle",
-                        description: Text("拍照后保存到 App 相册，或导入手机中的照片。Live Photo 仅导入静态照片。"))
+                        "相册暂无内容", systemImage: "photo.on.rectangle",
+                        description: Text("拍照或录像后保存到 App 相册，也可导入手机中的照片。"))
                 }
                 if let message = album.message {
                     Text(message).font(.footnote).foregroundStyle(.secondary).padding()
@@ -51,7 +51,8 @@
                             selected = photo
                         } label: {
                             AlbumThumbnail(album: album, photo: photo)
-                        }.buttonStyle(.plain).accessibilityLabel("照片，" + photo.date.formatted())
+                        }.buttonStyle(.plain).accessibilityLabel(
+                            (photo.mime == "video/quicktime" ? "视频，" : "照片，") + photo.date.formatted())
                     }
                 }.padding(.horizontal, 3)
                 if album.next != nil {
@@ -118,6 +119,11 @@
                 }
             }
             .frame(height: 115).frame(maxWidth: .infinity).clipped()
+            .overlay(alignment: .bottomTrailing) {
+                if photo.mime == "video/quicktime" {
+                    Image(systemName: "video.fill").padding(6).background(.black.opacity(0.6)).foregroundStyle(.white)
+                }
+            }
             .task(id: photo.id) {
                 do {
                     let data = try await album.image(photo.id, thumbnail: true)
@@ -133,15 +139,18 @@
         let album: UIAlbumContainer
         let photo: AlbumPhoto
         @Environment(\.dismiss) private var dismiss
+        @State private var video: URL?
         @State private var data: Data?
         @State private var error: String?
         @State private var confirmingDelete = false
         var body: some View {
             VStack(spacing: 12) {
-                if let data {
+                if let video {
+                    LocalVideoPlayer(file: video)
+                } else if let data {
                     AlbumZoomImage(data: data)
                 } else if let error {
-                    ContentUnavailableView("照片不可用", systemImage: "exclamationmark.triangle", description: Text(error))
+                    ContentUnavailableView("媒体不可用", systemImage: "exclamationmark.triangle", description: Text(error))
                 } else {
                     ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
@@ -151,7 +160,7 @@
                 }
                 HStack {
                     Button("保存到手机相册", systemImage: "square.and.arrow.down") { album.export(photo.id) }
-                        .disabled(album.busy || data == nil).accessibilityIdentifier("album.export")
+                        .disabled(album.busy || (data == nil && video == nil)).accessibilityIdentifier("album.export")
                     Spacer()
                     Button("删除", systemImage: "trash", role: .destructive) { confirmingDelete = true }
                         .disabled(album.busy).accessibilityIdentifier("album.delete")
@@ -159,20 +168,29 @@
             }
             .navigationContext(
                 .albumPhoto, itemID: photo.id,
-                content: data != nil ? .ready : error != nil ? .failed : .loading,
+                content: data != nil || video != nil ? .ready : error != nil ? .failed : .loading,
                 overlay: confirmingDelete ? .deleteConfirmation : nil
             )
-            .navigationTitle("照片").navigationBarTitleDisplayMode(.inline)
+            .navigationTitle(photo.mime == "video/quicktime" ? "视频" : "照片").navigationBarTitleDisplayMode(.inline)
             .task(id: photo.id) {
                 album.clearMessage()
-                do { data = try await album.image(photo.id, thumbnail: false) } catch is CancellationError {} catch {
+                do {
+                    if photo.mime == "video/quicktime" {
+                        video = try await album.video(photo.id)
+                    } else {
+                        data = try await album.image(photo.id, thumbnail: false)
+                    }
+                } catch is CancellationError {} catch {
                     self.error = error.localizedDescription
                 }
             }
-            .confirmationDialog("从 App 相册删除这张照片？", isPresented: $confirmingDelete, titleVisibility: .visible) {
-                Button("删除照片", role: .destructive) { album.delete(photo.id) }
+            .confirmationDialog(
+                photo.mime == "video/quicktime" ? "从 App 相册删除这段视频？" : "从 App 相册删除这张照片？", isPresented: $confirmingDelete,
+                titleVisibility: .visible
+            ) {
+                Button("删除", role: .destructive) { album.delete(photo.id) }
             } message: {
-                Text("仅删除 App 内照片，不影响手机相册中的副本。关联聊天中的原图将不可用。")
+                Text("仅删除 App 内内容，不影响手机相册中的副本。关联聊天中的原图将不可用。")
             }
             .onChange(of: album.items) { _, values in
                 if album.hasLoaded, !values.contains(where: { $0.id == photo.id }), !album.busy { dismiss() }

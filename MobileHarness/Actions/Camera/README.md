@@ -2,7 +2,7 @@
 
 ## 职责与模块关系
 
-拥有相机业务函数、原生采集／预览及照片处置。CameraModule 显式绑定七项 Capture、四项 Perception 函数及一个私有 Album.perform 函数；CameraExecutionEndpoint 保留当前会话／业务状态准入，CameraCoordinator 管理采集，CameraPhotoSession 独立管理照片操作。
+拥有相机业务函数、原生采集／预览及照片处置。CameraModule 显式绑定九项 Capture、四项 Video、四项 Perception 函数及一个私有 Album.perform 函数；CameraExecutionEndpoint 保留当前会话／业务状态准入，CameraCoordinator 管理采集，CameraPhotoSession 独立管理照片操作。
 
 Gateway 通过注册函数调用本域，Agents 决定请求与策略，App 注入唯一基础能力和根生命周期。本域消费 FunctionContracts 及需要的基础能力，不导入 Agents、Gateway 实现或 App。全部域内源码由 Actions 单一目标编译。
 
@@ -28,14 +28,14 @@ Gateway 通过注册函数调用本域，Agents 决定请求与策略，App 注�
 CameraCoordinator 独占两个业务需求、共享采集租约续期、预览和独立姿态代际；CameraPhotoSession 独占一个拍照或处置任务、媒体所有权、缩略图确认和反馈作用域。两者通过只读前台／采集版本闭包连接；业务关闭拒绝忙碌照片操作，完成照片决策后清理采集；后台/根停止取消并加入照片操作。保存已提交后，反馈失败不能抹掉 App 相册收录结果。照片存储策略最多 1024 张、2 GiB、仅淘汰未收录文件的 evictOldest，由 CameraStorageFactory 注入仓库和根路径。
 
 ## 接口与完成语义
-拍摄地址位于 `Camera.Capture`，包含七个函数。相册内部入口另见下节。
+拍摄地址位于 `Camera.Capture`，包含九个函数。相册内部入口另见下节。
 
 | 函数 | 实际入口参数 | 返回与预算 |
 | --- | --- | --- |
 | open / close | 无 | 组合窗口/设备启闭完成后返回 operation/enabled；open 增加 windowID；60 秒 |
 | flip | facing=front/back | 注入镜头切换完成后返回 operation/facing；默认 30 秒 |
 | retry | 无 | 等待端点重试完成，Void/completed；默认 30 秒 |
-| takePhoto | 无 | JSON：mediaID、width、height、mimeType；15 秒 |
+| takePhoto | 无 | JSON：mediaID、width、height、mimeType；50 秒（包含最长30秒倒计时） |
 | savePhoto | 可解析 mediaID ID | JSON：saved、mediaID、alreadySaved、可选 feedbackIssues；60 秒 |
 | ignorePhoto | 可解析 mediaID ID | JSON：ignored、mediaID、alreadySaved、可选 feedbackIssues；默认 30 秒 |
 
@@ -87,12 +87,26 @@ CameraCoordinator implements WindowContentLifecycle using the root WindowState i
 
 Minimize rejects conflicting photo work and hides rendering, retaining the photo branch and its capture demand. Restore mounts before confirming readiness. takePhoto restores a minimized window and awaits native readiness. Closing performs save/discard/cancel in the window; cancel retains identity. Photo and visual demand are independent: a healthy existing capture/lease is reused when adding or removing either branch. Only zero demand releases the lease and joins native stop. Background clears both demands and joins pose/preview/photo cleanup; foreground does not restart solely because a window exists.
 
-The preview worker feeds one immutable display frame shared by both surfaces. A separate pose task exists only for visual demand. Enabling/disabling pose joins only that task, without cancelling preview or restarting hardware. Native lens changes invalidate old pose/gaze and join the perception/tracking scope before renewing frames; old mechanical targets cannot survive that scope. Model failure preserves preview. Video recording remains absent.
+The preview worker feeds one immutable display frame shared by both surfaces. A separate pose task exists only for visual demand. Enabling/disabling pose joins only that task, without cancelling preview or restarting hardware. Native lens changes invalidate old pose/gaze and join the perception/tracking scope before renewing frames; old mechanical targets cannot survive that scope. Model failure preserves preview. Photo and video modes share this graph; video installs a movie output without removing the preview source.
 
 Lens control is admitted by the same UI presentation projection used by buttons: the visible expanded Camera window takes priority; minimized/closed/fully covered camera windows yield to enabled visible Face vision. Other windows never acquire control. No visible camera surface means no holder. Capture.flip and Perception.flipVision have fixed sources; caller parameters cannot choose a more privileged source. Native switching stays in CameraCapturing. Requested facing is distinct from displayed actual facing and is published only after successful native completion.
 
 Window lifecycle begin/end gates lens requests across real presentation completion. Beginning a transition joins an admitted native worker; conflicting photo work rejects busy. At most one demand mutation and one native worker are admitted; excess requests fail rather than queue. Cancellation/background invalidates capture revision and UI generation. Presentation does not acknowledge photo success.
 
-CameraInteractionWorkflow maps typed UI intent through Photographer and Gateway into fixed Capture or Perception functions. No UI callback directly starts/stops/switches native capture.
+CameraInteractionWorkflow maps typed UI intent through Photographer and Gateway into fixed Capture, Video or Perception functions. No UI callback directly starts/stops/switches native capture.
 
 System permission prompts can invalidate the active scene's request generation. The interaction facade reports cancelled/stale/unavailable requests as explicit retry guidance, preserves committed photo saves, and never exposes UI request enum codes as user-facing errors. It does not automatically replay the interrupted operation.
+
+## Capture settings and recording
+
+Capture.configure replaces mode/photo-video, delaySeconds0…30, flash/off-on-auto, zoom1…6 (further bounded by hardware), durationSeconds1…600. Validation is pure; native capability checks remain in CameraCapturing. Failed mode/settings changes join rollback before reporting failure. Settings and supportedFlash/maximumZoom are exposed by actions.camera. Capture.cancelCapture cancels and joins only the owned countdown. CameraCountdown uses monotonic absolute deadlines inside photoTask; cancellation/background prevents the subsequent shutter and clears the display.
+
+VideoActions.swift owns Camera.Video.startRecording/stopRecording/saveVideo/ignoreVideo; CameraModule binds all explicitly. Start waits for native didStart and returns recordingID/state=recording. Stop joins didFinish, validates the file and publishes an uncollected video before state=ready; neither receipt means album collection. Native duration/size completion follows the same path. Stop/save/ignore use a real UUID recordingID. Invalid identity, permission, busy, file validation and cleanup failures propagate.
+
+CameraRecordingSession owns one start task, one joined completion and at most one pending clip; no page owns them. It joins listening pause and full native audio-owner release before native start, and releases native audio before attempting to resume the original valid listening generation. Failed startup releases the hold. Minimize preserves recording and presents a generic activity label; recording blocks both surfaces' lens controls. Close stops and asks save/ignore/cancel. Background synchronously invalidates the recording’s listening-resume permit, joins stop/finalization, retains the clip for later decisions and never automatically reopens capture/listening, even after a quick foreground return. Window transitions reject startup/finalization/disposition conflicts.
+
+Raw native movie files remain owned until explicit save/ignore. The store publishes a bounded file copy and keeps a pending mediaID. Save removes the source before album commit, then clears preview; repeated confirmed save returns the cached receipt. Ignore removes the uncollected copy and source; collected media cannot be discarded through this endpoint. Failed preparation retains the source and identity for explicit retry or ignore. Photos and clips cannot be captured over each other. Duration limit is600 seconds and movie size512MiB; App album total remains2GiB/1024 files.
+
+PhotoAlbumService routes video thumbnails through NativeAlbumMovie and returns validated local URLs for playback/export; it never loads a whole movie into Data. Native export uses VisionContainer's root-owned joined import slot. Image/model reads retain image-only budgets. The same album supports collection, playback, export and deletion; duration is derived from the native asset rather than a new SQL schema.
+
+Photo capture freezes presentation.snapshot.photoCaptureRotation after countdown/readiness checks, immediately before the native shutter. Recording freezes the same window-derived angle after audio handoff and before beginRecording. Missing live geometry rejects unavailable; gravity-only rotation and Face orientation do not override the photo window. Native JPEG metadata and movie transforms remain authoritative for thumbnail, playback and storage; Actions does not rotate or crop encoded media after capture.

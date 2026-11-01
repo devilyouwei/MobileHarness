@@ -51,3 +51,7 @@ VoicePerceptionHandling.setListening 接收明确 enabled 与会话，返回 Spe
 WindowCapabilities defines neutral WindowOperation and WindowControlCapability. CameraCommandReceipt includes optional windowID; CameraControlCapability exposes an asynchronous identity read with nil default for hosts without window presentation. Native lifecycle ownership stays in Actions, not these value contracts.
 
 CameraControlCapability distinguishes photo setEnabled/flip from setPerceptionEnabled/flipPerception; each Action binds a fixed branch without accepting a caller-provided authority field. lensNotOwned reports a denied switch. CameraCommandReceipt still describes the requested completed branch operation; actual native facts belong to PlatformKit.
+
+## Capture configuration and movie receipts
+
+CameraCaptureSettings is a complete validated settings value (photo/video mode, countdown, flash, zoom, duration). CameraControlCapability includes configure/cancel and typed recording start/stop/save/ignore. CameraVideoReceipt separates recording, ready, saved and ignored, carrying recordingID, optional mediaID/duration/stopReason. These values contain no native device or UI implementation. Defaults on capability test adapters reject unavailable operations rather than fabricating a recording.

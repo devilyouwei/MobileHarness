@@ -6,18 +6,36 @@ import UI
 @MainActor public final class CameraInteractionWorkflow: CameraControlling {
     private let presentation: any CameraPresenting
     private var state: CameraPresentationSnapshot { presentation.snapshot }
-    private let perform: (CameraInput.Operation, CameraDirection?, String?) async throws -> Void
+    private let perform: (CameraInput) async throws -> Void
     private var worker: Task<Void, Never>?
     private var stopped = false
+    private var cancelledCountdown = false
     public init(
         presentation: any CameraPresenting,
         perform:
-            @escaping (CameraInput.Operation, CameraDirection?, String?) async throws ->
+            @escaping (CameraInput) async throws ->
             Void
     ) {
         self.presentation = presentation
         self.perform = perform
     }
+    public func configure(_ settings: CameraSettings) { submit(.configure, settings: settings) }
+    public func cancelCapture() {
+        guard state.countdown != nil else { return }
+        if let worker {
+            cancelledCountdown = true
+            worker.cancel()
+        } else {
+            submit(.cancelCapture)
+        }
+    }
+    public func startRecording() { submit(.startRecording) }
+    public func stopRecording() {
+        guard let id = state.recording.id else { return }
+        submit(.stopRecording, recordingID: id)
+    }
+    public func saveVideo(_ id: String) { submit(.saveVideo, recordingID: id) }
+    public func ignoreVideo(_ id: String) { submit(.ignoreVideo, recordingID: id) }
     public func takePhoto() { submit(.takePhoto) }
     public func open() { submit(.open) }
     public func toggle() { submit(state.isEnabled ? .close : .open) }
@@ -43,7 +61,7 @@ import UI
     public func waitUntilIdle() async { await worker?.value }
     private func submit(
         _ operation: CameraInput.Operation, facing: CameraDirection? = nil,
-        mediaID: String? = nil
+        mediaID: String? = nil, settings: CameraSettings? = nil, recordingID: String? = nil
     ) {
         guard !stopped else { return }
         guard worker == nil else {
@@ -59,10 +77,19 @@ import UI
         worker = Task {
             defer {
                 worker = nil
+                cancelledCountdown = false
                 presentation.present(.controlBusy(false))
                 presentation.present(.controlMessage(nil))
             }
-            do { try await perform(operation, facing, mediaID) } catch {
+            do {
+                try await perform(
+                    CameraInput(
+                        operation, facing: facing, mediaID: mediaID, settings: settings, recordingID: recordingID))
+            } catch {
+                if cancelledCountdown && error is CancellationError {
+                    presentation.present(.photoMessage("已取消倒计时"))
+                    return
+                }
                 let message = Self.message(for: error)
                 if operation == .savePhoto, let mediaID, state.savedMediaID == mediaID {
                     presentation.present(.photoMessage("已保存到 App 相册，后续请求未完成：" + message))

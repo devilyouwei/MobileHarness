@@ -80,6 +80,29 @@ private actor CameraProbe {
 private actor CameraBridge: CameraControlCapability {
     let probe: CameraProbe
     init(probe: CameraProbe) { self.probe = probe }
+    func configureCapture(_ settings: CameraCaptureSettings, invocation: any FunctionInput) async throws {
+        try settings.validate()
+        try await perform(.configure, invocation: invocation)
+    }
+    func cancelCapture(invocation: any FunctionInput) async throws {
+        try await perform(.cancelCapture, invocation: invocation)
+    }
+    func startRecording(invocation: any FunctionInput) async throws -> CameraVideoReceipt {
+        try await perform(.startRecording, invocation: invocation)
+        return .init(recordingID: "11111111-2222-4333-8444-555555555555", state: "recording")
+    }
+    func stopRecording(_ id: String, invocation: any FunctionInput) async throws -> CameraVideoReceipt {
+        try await perform(.stopRecording, invocation: invocation)
+        return .init(recordingID: id, state: "ready")
+    }
+    func saveVideo(_ id: String, invocation: any FunctionInput) async throws -> CameraVideoReceipt {
+        try await perform(.saveVideo, invocation: invocation)
+        return .init(recordingID: id, state: "saved")
+    }
+    func ignoreVideo(_ id: String, invocation: any FunctionInput) async throws -> CameraVideoReceipt {
+        try await perform(.ignoreVideo, invocation: invocation)
+        return .init(recordingID: id, state: "ignored")
+    }
     func savePhoto(_ id: String?, invocation: any FunctionInput) async throws -> CameraPhotoCommandReceipt {
         try await photo(.savePhoto, id: id, invocation: invocation)
     }
@@ -440,4 +463,37 @@ func cameraContainerCallsPhotographerDirectlyAndWaitsForNativeCompletion() async
     #expect(await f.probe.operations == [.perceptionOpen, .perceptionFlip, .perceptionClose])
     #expect(await f.probe.facings == ["back"])
     await f.runtime.shutdown()
+}
+
+@Test(.actionCatalog) @MainActor func cameraVideoButtonsUsePhotographerGatewayAndDeclaredActions() async throws {
+    let fixture = try await CameraFixture()
+    try await fixture.runtime.prepareForInteraction()
+    let requests = fixture.runtime.camera.requests
+    var settings = CameraSettings()
+    settings.mode = "video"
+    settings.durationSeconds = 10
+    _ = try await requests.submit(.init(.configure, settings: settings))
+    let start = try #require(try await requests.submit(.init(.startRecording)))
+    let receipt = try JSONDecoder().decode(CameraVideoReceipt.self, from: Data(start.utf8))
+    _ = try await requests.submit(.init(.stopRecording, recordingID: receipt.recordingID))
+    _ = try await requests.submit(.init(.saveVideo, recordingID: receipt.recordingID))
+    _ = try await requests.submit(.init(.ignoreVideo, recordingID: receipt.recordingID))
+    _ = try await requests.submit(.init(.cancelCapture))
+    #expect(
+        await fixture.probe.operations == [
+            .configure, .startRecording, .stopRecording, .saveVideo, .ignoreVideo, .cancelCapture,
+        ])
+    #expect(await fixture.probe.sources.allSatisfy { $0 == "photographer" })
+    let catalog = try AgentSkillLoader.registry(
+        ["photography"], fixed: AgentConfigurations.load(named: "Assistant").capabilities)
+    for (alias, path) in [
+        ("configureCamera", "Camera.Capture.configure"), ("startRecording", "Camera.Video.startRecording"),
+        ("stopRecording", "Camera.Video.stopRecording"), ("saveVideo", "Camera.Video.saveVideo"),
+        ("ignoreVideo", "Camera.Video.ignoreVideo"),
+    ] {
+        let parameters =
+            ["stopRecording", "saveVideo", "ignoreVideo"].contains(alias) ? ["recordingID": receipt.recordingID] : [:]
+        #expect(try catalog.resolveAction(alias, parameters: parameters).actionPath.description == path)
+    }
+    await fixture.runtime.shutdown()
 }

@@ -27,3 +27,7 @@ SQLiteDatabaseStorage 在后台任务完成目录、打开、迁移和恢复后�
 ## Passive state reads
 
 DatabaseStorage.stateSnapshot returns StorageCore.StorageStateSnapshot with its phase in Runtime and declared DatabasePhase values, without accessing repositories. Unsupported backends default to unknown. The phase vocabulary is unknown/cold/starting/ready/stopping/stopped/failed; lifecycle evidence belongs to the backend rather than inferred repository getter success.
+
+## Media kinds
+
+The existing media repository includes bounded video reservations and shared explicit album inclusion. SQLiteMediaRepository stores kind/MIME plus the existing dimension/origin fields; file copying remains in Files and native movie inspection belongs to PlatformKit callers. There is no separate video database or migration. See [Media](Media/README.md).

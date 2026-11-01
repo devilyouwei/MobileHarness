@@ -77,3 +77,9 @@ WindowChrome 只提供标题/控制/内容插槽、有限过渡加载指示、�
 展开标题栏左右各88pt控制槽：左侧为最小化、最大化／还原，右侧为44pt加载空槽和44pt关闭按钮，标题相对窗口中心对齐，加载状态不推动标题。最小化卡片两侧各44pt，左侧留空、右侧关闭，标题同样居中。按钮保持44pt触摸范围，只有中间标题区域响应拖动及单／双击；长标题单行截断，不侵占按钮。
 
 Camera surfaces share immutable input but have separate renderer lifetime. The photo surface fits the native aspect and emits black outside the image; background pose uses its existing fill projection. Window chrome remains content-neutral; sizing and visibility come from WindowState.
+
+## Local media and minimized activity
+
+LocalVideoPlayer uses AVKit VideoPlayer only for an already-owned local file URL. It owns one AVPlayer, pauses/replaces it on URL change, pauses on scene inactivity, and releases it on disappearance. It never requests camera/microphone/Photos permission or decides file disposition. Playback is manual. AVKit is permitted only for this rendering file by the import boundary checker.
+
+WindowChrome optionally shows WindowPresentation.activity beneath a minimized title; labels are capped at64 characters by WindowState. The generic shell does not interpret recording state or run a business timer. The title's drag/tap arbitration and separate right close target are retained.

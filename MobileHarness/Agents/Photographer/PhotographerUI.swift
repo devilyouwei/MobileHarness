@@ -81,7 +81,12 @@ extension PhotographerAgent {
         defer { uiExecution.finish(context.requestID) }
         let intent = PhotographerCameraIntent(
             operation, facing: value.facing.map { $0 == .front ? .front : .back }, mediaID: value.mediaID,
-            requestID: context.requestID)
+            settings: value.settings.map {
+                CameraCaptureSettings(
+                    mode: $0.mode, delaySeconds: $0.delaySeconds, flash: $0.flash, zoom: $0.zoom,
+                    durationSeconds: $0.durationSeconds)
+            },
+            recordingID: value.recordingID, requestID: context.requestID)
         do {
             try intent.message.validate()
             try await receive(context.input(.observation(intent.message)))

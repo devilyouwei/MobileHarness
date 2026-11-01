@@ -1,11 +1,16 @@
 ## Photography
 ### Facts and gates
-拍照/拍摄照片 uses this Skill and the photo window. 打开视觉/打开跟踪/跟随 uses application-control and Vision.open; do not open photography for that intent.
+拍照/拍摄照片/录像/拍摄视频 uses this Skill and the Camera window. 打开视觉/打开跟踪/跟随 uses application-control and Vision.open; do not open photography for that intent.
 actions.camera: enabled=photo intent; busy blocks work; needsSettings requires settings; displayedMediaID=preview; savedMediaID=confirmed save. platform.vision.camera owns running/phase/facing. Unknown is not ready. flipCamera requires lensOwner=capture. Photography never enables background vision.
 BasicSkill owns Task selection/closure; use AGENT CONTEXT task. Standalone save/ignore/close/lens operations need no new Task. Capture-only keeps the photo; if a matching Task was actually created, follow task cleanup.
-Busy: explain and wait, no mutation. Permission denied: system settings, not open/retry. retryCamera requires explicit intent. No automatic retry, video, album deletion or delegation. Keep the lens unless requested.
+Busy: explain and wait, no mutation. Permission denied: system settings, not open/retry. retryCamera requires explicit intent. No automatic retry, album deletion or delegation. Keep the lens unless requested.
+### Settings and recording
+configureCamera replaces the full settings: mode=photo/video, delaySeconds=0...30, flash=off/on/auto, zoom=1...6 limited by maximumZoom, durationSeconds=1...600. Preserve the current unrelated settings from actions.camera; video uses flash=off. Await configuration success before capture. Unsupported flash/zoom fails explicitly; do not guess capabilities. Never change mode with pending media.
+Photo countdown runs in the app; no model wait/timer. cancelCapture cancels and joins only a pending countdown. takePhoto waits countdown plus actual capture.
+Video: openCamera, configureCamera mode=video with requested duration (default maximum600 seconds), then startRecording in separate requests after success. Start receipt means recording began, not saved; give any spoken cue before start, then stay silent during recording. Audio recording pauses listening: tell the user to use the stop button or duration limit; do not rely on a spoken stop while recording. Recording continues minimized; stopRecording uses the exact recordingID from facts/receipt and joins native finalization. No lens switch, photo, zoom or mode change during recording. Background stops and finalizes; foreground never restarts automatically.
+Ready clip: saveVideo or ignoreVideo with actual recordingID, authorized by user. Save collects into App album, export from album page. Do not send video as an image or invent its contents. Failed finalization/storage retains actionable clip where available; only explicit save retry, never recapture. After a matching Task resolves, use task cleanup below. Interrupted/uncertain start: inspect facts, never repeat blindly.
 ### Capture and decisions
-After gates: disabled -> openCamera; wrong requested lens -> flipCamera; ready -> takePhoto. Await open/flip success; emit these in separate requests. FIFO/wait cannot test success.
+After gates: disabled -> openCamera; wrong requested lens -> flipCamera; ready in photo mode -> takePhoto (configure mode=photo first if needed). Await open/flip success; emit these in separate requests. FIFO/wait cannot test success.
 Capture once. If preparation was already spoken, omit it; otherwise one useful cue inside wait before takePhoto. Feedback supplies mediaID/image evidence. Never replay completed/uncertain capture/save.
 Capture-only: “拍好了。”, no evaluation/save/question. Ordinary photography: concise image-grounded comment, ask save/ignore/reshoot, retain Task/photo. No image: do not invent details. No exaggerated praise or pressure to smile.
 Save/ignore requires actual current displayedMediaID or still-actionable capture ID; never missing/null/empty/stale/example IDs.
@@ -15,10 +20,10 @@ Save/ignore requires actual current displayedMediaID or still-actionable capture
 Save/ignore never captures. Disposal needs authorization. Cancellation cannot undo save.
 ### Task cleanup
 Matching Task resolved after save/ignore: separately closeCamera. Await operation=close and enabled=false, then finishTask. Never combine disposal/close/finish in one response. Close Capture only, never Vision.close.
-Cancel/replacement also waits for close; pending photos require save/ignore/cancel, never automatic disposal. Cancelled/failed close retains Task/window; report without retry or repeating committed save/ignore. Already closed/disabled needs no close.
+Cancel/replacement also waits for close; pending media require save/ignore/cancel, never automatic disposal. Cancelled/failed close retains Task/window; report without retry or repeating committed save/ignore. Already closed/disabled needs no close.
 Reshoot retains the SAME Task/window. No Task: no automatic close or finish. Never finish unrelated Tasks.
 ### Windows
-Window.* uses an actual windowID from ui.windows/openCamera. move takes x/y in0...1. openCamera opens/restores the single Camera window. Minimize hides preview and yields lens control to background vision; capture stays on. Restore before save/ignore; resume failure preserves photos. Close asks save/ignore/cancel. App background stops both branches; reopening needs user intent. Window completion is not photo success.
+Window.* uses an actual windowID from ui.windows/openCamera. move takes x/y in0...1. openCamera opens/restores the single Camera window. Minimize hides preview and yields lens control to background vision; capture stays on. Restore before save/ignore; resume failure preserves photos. Close asks save/ignore/cancel. App background stops both branches; reopening needs user intent. Window completion is not capture success. Recording locks lens switching even when minimized.
 ### Separate-request examples
 Disabled, gates clear:
 ```xml

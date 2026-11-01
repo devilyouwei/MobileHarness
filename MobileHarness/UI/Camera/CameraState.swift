@@ -2,7 +2,38 @@ import CoreGraphics
 import Foundation
 import Observation
 
+public struct CameraRecordingPresentation: Sendable, Equatable {
+    public enum Phase: String, Sendable { case idle, starting, recording, finishing, ready, failed }
+    public var phase: Phase = .idle
+    public var id: String?
+    public var startedAt: Date?
+    public var durationLimit = 600
+    public var active: Bool { [.starting, .recording, .finishing].contains(phase) }
+    public init() {}
+}
+public struct CameraRecordedVideo: Sendable, Equatable {
+    public let id: String
+    public let file: URL
+    public let duration: Double
+    public init(id: String, file: URL, duration: Double) {
+        self.id = id
+        self.file = file
+        self.duration = duration
+    }
+}
+
 public enum CameraSurface: String, Sendable { case capture, perception }
+
+public struct CameraSettings: Sendable, Equatable {
+    public var mode = "photo"
+    public var delaySeconds = 0
+    public var flash = "off"
+    public var zoom = 1.0
+    public var durationSeconds = 600
+    public var maximumZoom = 1.0
+    public var supportedFlash = ["off"]
+    public init() {}
+}
 
 public enum CameraDirection: Sendable { case front, back }
 
@@ -14,6 +45,10 @@ public final class CameraState {
     #if os(iOS)
         public internal(set) var capturedPhoto: CapturedPhotoPresentation?
     #endif
+    public internal(set) var recording = CameraRecordingPresentation()
+    public internal(set) var recordedVideo: CameraRecordedVideo?
+    public internal(set) var settings = CameraSettings()
+    public internal(set) var countdown: Int?
     public internal(set) var photoBusy = false
     public internal(set) var photoMessage: String?
     public internal(set) var savedMediaID: String?
@@ -27,7 +62,7 @@ public final class CameraState {
         if let windows {
             guard windows.available, !windows.windows.contains(where: { !$0.presentationConfirmed }) else { return nil }
             if let item = windows.windows.first(where: { $0.content == WindowContent.camera.rawValue }),
-                item.mode != .minimized, windows.hasVisibleContent(item.id, topInset: 52, bottomInset: 96)
+                item.mode != .minimized, windows.hasVisibleContent(item.id, topInset: 52, bottomInset: 140)
             {
                 return .capture
             }
@@ -38,7 +73,7 @@ public final class CameraState {
     public func canSwitch(_ surface: CameraSurface) -> Bool {
         (presentationAdmission?.active ?? true) && lensOwner == surface && isVisible
             && (surface == .capture ? isEnabled : perceptionEnabled)
-            && !isBusy && !controlBusy && !photoBusy && !needsSettings
+            && !isBusy && !controlBusy && !photoBusy && !recording.active && !needsSettings
     }
     public internal(set) var facing: CameraDirection = .front
     public internal(set) var isVisible = false
@@ -64,6 +99,11 @@ public final class CameraState {
         guard presentationAdmission?.stopped != true, generation == videoGeneration else { return }
         photoOrientation = orientation
         if let frame = videoFrame { updatePhotoAspect(frame) }
+    }
+    /// Sensor-to-window angle of the current preview, frozen by the capture caller at shutter time.
+    public var photoCaptureRotation: Double? {
+        guard videoFrame != nil, let previewBasis else { return nil }
+        return Double(previewBasis.displayRotation(photoOrientation) * 90)
     }
     public private(set) var photoAspect: Double = 3.0 / 4.0
     private func updatePhotoAspect(_ frame: CameraVideoFrame) {
@@ -169,6 +209,10 @@ public final class CameraState {
             }
         }
         switch update {
+        case .recording(let value): recording = value
+        case .recordedVideo(let value): recordedVideo = value
+        case .settings(let value): settings = value
+        case .countdown(let value): countdown = value
         case .photoBusy(let value): photoBusy = value
         case .photoMessage(let value): photoMessage = value
         case .savedMediaID(let value): savedMediaID = value
@@ -206,6 +250,12 @@ public final class CameraState {
 /// User controls only; capture, permission and inference lifetimes belong to module services.
 @MainActor
 public protocol CameraControlling: AnyObject {
+    func startRecording()
+    func stopRecording()
+    func saveVideo(_ id: String)
+    func ignoreVideo(_ id: String)
+    func configure(_ settings: CameraSettings)
+    func cancelCapture()
     func takePhoto()
     func open()
     func toggle()
@@ -219,6 +269,10 @@ public protocol CameraControlling: AnyObject {
 }
 
 public enum CameraPresentationUpdate {
+    case recording(CameraRecordingPresentation)
+    case recordedVideo(CameraRecordedVideo?)
+    case settings(CameraSettings)
+    case countdown(Int?)
     case photoBusy(Bool)
     case photoMessage(String?)
     case savedMediaID(String?)
@@ -300,6 +354,12 @@ private final class CameraMediaExpiry {
 }
 
 extension CameraControlling {
+    public func startRecording() {}
+    public func stopRecording() {}
+    public func saveVideo(_ id: String) {}
+    public func ignoreVideo(_ id: String) {}
+    public func configure(_ settings: CameraSettings) {}
+    public func cancelCapture() {}
     public func open() { retry() }
     public func togglePerception() {}
     public func retryPerception() {}

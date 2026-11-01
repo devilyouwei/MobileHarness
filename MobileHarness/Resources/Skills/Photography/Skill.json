@@ -1,8 +1,8 @@
 {
   "version": 3,
   "id": "photography",
-  "revision": 30,
-  "description": "拍照、拍摄照片: open the photo window and capture/save/ignore/reshoot. Background vision/tracking belongs to application-control. Use a local Task only for continuing photo decisions.",
+  "revision": 31,
+  "description": "拍照/录像: photo/video window, countdown, flash, zoom, timed audio recording and save/ignore. Background vision/tracking belongs to application-control. Use a Task for continuing media decisions.",
   "dependencies": [],
   "useActions": [
     {
@@ -45,6 +45,42 @@
       "path": "Camera.Capture.retry",
       "callType": "action",
       "alias": "retryCamera",
+      "channel": "Camera"
+    },
+    {
+      "path": "Camera.Capture.configure",
+      "callType": "action",
+      "alias": "configureCamera",
+      "channel": "Camera"
+    },
+    {
+      "path": "Camera.Capture.cancelCapture",
+      "callType": "action",
+      "alias": "cancelCapture",
+      "channel": "Camera"
+    },
+    {
+      "path": "Camera.Video.startRecording",
+      "callType": "action",
+      "alias": "startRecording",
+      "channel": "Camera"
+    },
+    {
+      "path": "Camera.Video.stopRecording",
+      "callType": "action",
+      "alias": "stopRecording",
+      "channel": "Camera"
+    },
+    {
+      "path": "Camera.Video.saveVideo",
+      "callType": "action",
+      "alias": "saveVideo",
+      "channel": "Camera"
+    },
+    {
+      "path": "Camera.Video.ignoreVideo",
+      "callType": "action",
+      "alias": "ignoreVideo",
       "channel": "Camera"
     },
     {

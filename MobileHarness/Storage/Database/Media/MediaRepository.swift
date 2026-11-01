@@ -1,5 +1,6 @@
 import Foundation
 import StorageCore
+import StorageFiles
 
 public struct MediaFileRecord: Sendable {
     public let id: String
@@ -26,6 +27,8 @@ public struct MediaFileRecord: Sendable {
 }
 
 public protocol MediaRepository: Sendable {
+    func reserveVideo(bytes: Int, owner: StorageOwner, metadata: PhotoMetadata, createdAt: Date) async throws
+        -> MediaFileRecord
     func reserveMedia(bytes: Int, source: String, session: String, input: String, date: Date) async throws
         -> MediaFileRecord
     func reservePhoto(bytes: Int, owner: StorageOwner, metadata: PhotoMetadata, createdAt: Date) async throws
@@ -41,6 +44,10 @@ public protocol MediaRepository: Sendable {
 }
 
 extension MediaRepository {
+    public func reserveVideo(bytes: Int, owner: StorageOwner, metadata: PhotoMetadata, createdAt: Date) async throws
+        -> MediaFileRecord
+    { throw FileStorageError.invalidFile }
+
     public func setMedia(_ id: String, state: String) async throws {
         try await setMedia(id, state: state, failure: nil)
     }

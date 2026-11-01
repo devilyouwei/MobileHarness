@@ -387,6 +387,7 @@ if ui_dependencies:
 allowed_ui = {'Foundation', 'CoreGraphics', 'Observation', 'SwiftUI', 'UIKit'}
 # Public rendering frameworks are confined to the native rendering implementations.
 native_ui_imports = {
+    'Components/LocalVideoPlayer.swift': {'AVKit'},
     'Settings/AlbumView.swift': {'PhotosUI', 'CoreTransferable', 'UniformTypeIdentifiers', 'ImageIO'},
     'Camera/CameraVideoFrame.swift': {'CoreVideo'},
     'Camera/CameraFrameView.swift': {'CoreVideo', 'Metal', 'QuartzCore', 'Synchronization'},

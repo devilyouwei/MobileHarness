@@ -156,3 +156,7 @@ UIRequests 普通未完成请求上限64、关闭控制槽1；UI 每实例保留
 WindowSizing.standard keeps the generic 2/3 safe-area default. WindowSizing.image fits an image aspect plus 52pt title and supplied controls height into safe bounds, narrowing and centering when needed. Image size changes preserve the normal frame center and re-constrain it; maximized geometry remains safe-area sized. WindowState computes visible area after subtracting the union of higher settled window rectangles, including cards. CameraState projects a lens holder from these presentation facts, active Face visibility and a domain handoff gate. ApplicationRootView keeps the Face tree and mounts independent background and window camera renderers. Presentation code never acquires camera resources.
 
 Windows retain their last successfully presented revision. Failed receipts and remounting cannot grant lens authority. The photo image region must intersect the safe area and retain uncovered area to count as a visible camera surface.
+
+## Photo/video window and album
+
+CameraState holds presentation-only capture settings, countdown and recording phases. The Camera window reuses preview/chrome/control space for photos and video; UI sends typed requests through Photographer. LocalVideoPlayer renders an injected file via AVKit without owning capture or persistence. Album MIME selects image versus video presentation. WindowState's generic activity text lets minimized windows show domain status without hidden-content rendering. UI remains independent of Actions, Agents, Gateway, Storage and PlatformKit.

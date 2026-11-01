@@ -11,6 +11,24 @@ public struct CameraModule: CapabilityModule {
     public var definitions: [ActionFunction] {
         [
             PhotoAlbumActions.function(using: album),
+            CameraActions.startRecordingDefinition(completing: { [camera] in
+                .value(try await CameraActions.startRecording(invocation: $0, using: camera))
+            }),
+            CameraActions.stopRecordingDefinition(completing: { [camera] in
+                .value(try await CameraActions.stopRecording(invocation: $0, using: camera))
+            }),
+            CameraActions.saveVideoDefinition(completing: { [camera] in
+                .value(try await CameraActions.saveVideo(invocation: $0, using: camera))
+            }),
+            CameraActions.ignoreVideoDefinition(completing: { [camera] in
+                .value(try await CameraActions.ignoreVideo(invocation: $0, using: camera))
+            }),
+            CameraActions.configureDefinition(completing: { [camera] in
+                .value(try await CameraActions.configure(invocation: $0, using: camera))
+            }),
+            CameraActions.cancelCaptureDefinition(completing: { [camera] in
+                .value(try await CameraActions.cancelCapture(invocation: $0, using: camera))
+            }),
             CameraActions.openVisionDefinition(handler: { [camera] in
                 try await CameraActions.openVision(invocation: $0, using: camera)
             }),

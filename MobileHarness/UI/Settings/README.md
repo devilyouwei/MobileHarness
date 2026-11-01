@@ -116,3 +116,7 @@ Album State includes content and operation alongside list facts. Device recovery
 Settings Business.enabled is the editable cloud switch, loading is provider/model discovery, and saving is a settings write. Resource itemCount counts presented catalog entries; saving is source/custom-speech preference persistence, not download activity. These meanings are included in descriptors. Form operation failures are typed Business problems and album load failure is Business.content=failed; UI engineering health remains unknown without actual presentation-health evidence.
 
 The State operation attribute belongs to ui.album. ui.navigation reflects navigation-owned facts only; its State projection does not include the album operation. Existing typed UI context composition remains a page-rendering interface.
+
+## Album video presentation
+
+Album items carry MIME; video/quicktime shows a play badge and opens a local-file player using AlbumInput.video → AlbumReply.video(URL). Thumbnail requests remain image Data and are decoded by the existing thumbnail renderer. Export/delete share existing typed requests and busy/admission behavior, with media-aware labels. Leaving detail clears the URL/player. The photo picker still imports static photos only; video capture comes from Camera.

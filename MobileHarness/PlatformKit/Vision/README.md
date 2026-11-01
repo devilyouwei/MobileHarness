@@ -2,13 +2,13 @@
 
 ## Summary
 
-Acquire camera preview, transport immutable native frames, capture one JPEG and export bounded photo resources into Photos.
+Acquire camera preview, transport immutable native frames, capture bounded JPEG or audio/video files and export bounded media resources into Photos.
 
 ## Ownership and boundaries
 
 Photo capture uses AVCapturePhotoOutput's built-in shutter sound with its default suppression disabled. No synthetic sound is layered over it; audibility remains subject to system sound/silent settings. The shared audio setup permits system sounds during microphone recording. This is not an assertion that a particular device produced audible feedback. See Apple's [recording sound policy](https://developer.apple.com/documentation/avfaudio/avaudiosession/setallowhapticsandsystemsoundsduringrecording(_:)).
 
-AppleCamera owns AVCaptureSession mutation on its actor. Actions owns foreground capture demand and failure policy; UI owns display projection. This directory performs no model inference, pose policy or audio capture.
+AppleCamera owns AVCaptureSession mutation on its actor. Actions owns foreground capture demand and failure policy; UI owns display projection. This directory performs no model inference or pose policy. Movie audio uses the same native graph and the PlatformKit audio owner fence.
 
 ## External relationships and data flow
 
@@ -26,9 +26,9 @@ flowchart LR
 
 ## Graph and preview
 
-The graph has one front/back wide-angle input, the photo session preset, bounded preview video and one JPEG output. It has no microphone/movie output and disables application audio-session auto-configuration. CameraCaptureOrientation supplies capture rotation independently of UI. UI owns image/pose crop and mirroring in the same render pass.
+The graph has one front/back wide-angle input and bounded preview video. Photo mode uses the photo preset and JPEG output; video mode uses1080p and AVCaptureMovieFileOutput. Mode changes remove the alternate capture output, validate canAddOutput/hardwareCost and roll back on failure. Microphone input exists only during recording. Application audio-session auto-configuration stays disabled. CameraCaptureOrientation supplies gravity-upright observation metadata independently of UI; photo/movie calls supply their frozen output rotation. UI owns image/pose crop and mirroring in the same render pass.
 
-A healthy `switchCamera(facing:)` replaces only the input inside begin/commit configuration, restores the old input on admission failure, drains/renews the frame stream and reapplies unmirrored sensor settings. It does not restart the session. Permission, running state and no photo in flight are required. Stop closes frames; interruption/error notifications use newest-one status storage.
+A healthy `switchCamera(facing:)` replaces only the input inside begin/commit configuration, restores the old input on admission failure, drains/renews the frame stream and reapplies unmirrored sensor settings. It does not restart the session. Permission, running state and no photo/recording/preparation in flight are required. Stop closes frames; interruption/error notifications use newest-one status storage.
 
 ## Frame contract
 
@@ -58,9 +58,7 @@ Input is one JPEG/PNG with explicit InputLimits: the default remains 4 MiB, 6553
 
 ✅ CameraVisionRestartWorkflow 是泛型的最新意图替换工具：一个 pending 值、一个切换 worker、一个活跃任务；替换取消旧任务并加入后启动最新意图。stop 清空 pending、取消并加入旧任务；不选择摄像头、感知模型或业务反馈。
 
-## 待实现
-
-- Movie recording and background capture. Physical camera/permission/latency evidence is tracked in [validation history](../../../docs/validation/Validation-History.md).
+Physical camera/permission/latency evidence is tracked in [validation history](../../../docs/validation/Validation-History.md). Background capture is not offered.
 
 
 ## UI 容器与相机能力注入
@@ -91,11 +89,11 @@ Permission State projections read cached observations only. Unavailable owner sc
 
 ## Capture and preview orientation
 
-CameraFrame.rotation/width/height and gray64 describe the gravity-upright observation used by perception. JPEG capture retains the precise horizon-level capture angle. During native camera graph configuration on iOS 27, RotationCoordinator.videoRotationAngleRelative(toDeviceOrientation: .portrait) supplies a separate sensor-to-portrait quarter-turn reference, published as optional CameraFrame.portraitRotation alongside the existing immutable frame. The reference is captured under the same frame-state mutex/generation as rotation, never inferred from the device's current physical pose. This avoids treating gravity-level capture as fixed-interface preview geometry. Lens changes bind the new camera reference before starting the replacement stream. Older SDK clients without the static API publish nil and retain their original upright-frame contract; the complete app requires iOS 27. No pixel copy, capture connection rotation, second stream or per-frame Task is added. UI owns the interface-to-preview transform.
+CameraFrame.rotation/width/height and gray64 describe the gravity-upright observation used by perception. Photo and movie output connections take the caller’s frozen rotation, validated as finite and natively supported. The application uses the active window preview angle at shutter/recording start, so a gravity change alone cannot rotate the result away from that view. AVFoundation records orientation through photo metadata or movie track transforms; consumers respect those native values. During native camera graph configuration on iOS 27, RotationCoordinator.videoRotationAngleRelative(toDeviceOrientation: .portrait) supplies a separate sensor-to-portrait quarter-turn reference, published as optional CameraFrame.portraitRotation alongside the existing immutable frame. The reference is captured under the same frame-state mutex/generation as rotation, never inferred from the device's current physical pose. This avoids treating gravity-level capture as fixed-interface preview geometry. Lens changes bind the new camera reference before starting the replacement stream. Older SDK clients without the static API publish nil and retain their original upright-frame contract; the complete app requires iOS 27. No pixel copy, capture connection rotation, second stream or per-frame Task is added. UI owns the interface-to-preview transform.
 
 ## Native geometry and authoritative Camera facts
 
-AppleCamera configures unrotated, unmirrored video and explicitly enables native preview-sized buffers after disabling automatic buffer-size configuration. It requests BGRA without custom width/height keys: AVFoundation owns preview downscaling and its active-format/orientation constraints. It reads the resulting native preview and source dimensions after configuration, using dynamicDimensions for formats supporting dynamic aspect ratio and formatDescription otherwise; CameraOutputDimensions requires positive dimensions, matching source aspect up to the native output’s quarter-turn orientation, at most 4096 per preview side and 4194304 preview pixels. Photo dimensions select the smallest supported size with that aspect and no side above 4096. Missing dimensions, incompatible aspect or exceeded budgets fail configuration explicitly. Start and healthy lens switch use the same configuration path. Preview stabilization is disabled to avoid a video-only field-of-view crop. JPEG uses the selected maxPhotoDimensions, native capture rotation and front-lens mirroring, retaining the 4 MiB output limit. No full-resolution continuous BGRA or synthetic image stretching is used.
+AppleCamera configures unrotated, unmirrored video and explicitly enables native preview-sized buffers after disabling automatic buffer-size configuration. It requests BGRA without custom width/height keys: AVFoundation owns preview downscaling and its active-format/orientation constraints. It reads the resulting native preview and source dimensions after configuration, using dynamicDimensions for formats supporting dynamic aspect ratio and formatDescription otherwise; CameraOutputDimensions requires positive dimensions, matching source aspect up to the native output’s quarter-turn orientation, at most 4096 per preview side and 4194304 preview pixels. Photo dimensions select the smallest supported size with that aspect and no side above 4096. Missing dimensions, incompatible aspect or exceeded budgets fail configuration explicitly. Start and healthy lens switch use the same configuration path. Preview stabilization is disabled to avoid a video-only field-of-view crop. JPEG uses the selected maxPhotoDimensions, native capture rotation and front-lens mirroring, retaining the 4 MiB output limit. Video mode validates its preview against the active video dimensions; it does not configure a photo output. No full-resolution continuous BGRA or synthetic image stretching is used.
 
 CameraHardwareSnapshot is resident native state protected by a mutex. Graph operations and native interruption/error callbacks update phase, actual running, actual input facing and selected photo dimensions. VisionContainer.cameraStateSnapshot projects this into platform.vision.camera without creating AppleCamera, querying hardware or performing effects. An uncreated camera is stopped with unknown facing/dimensions. platform.vision indexes the child; PlatformContainer registers its exact reader. UI/Actions intent does not determine these facts.
 
@@ -106,3 +104,15 @@ Photo settings request native JPEG quality 0.85 using AVVideoCompressionProperti
 The native preview configuration follows [Apple preview-buffer documentation](https://developer.apple.com/documentation/avfoundation/avcapturevideodataoutput/deliverspreviewsizedoutputbuffers) and [videoSettings constraints](https://developer.apple.com/documentation/avfoundation/avcapturevideodataoutput/videosettings). Invalid custom width/height can throw an Objective-C exception outside Swift error handling; the capability does not pass those keys. Frame admission independently enforces the same preview pixel budget.
 
 In -direct-input-diagnostics mode, photo callbacks report processing/terminal error domains and codes, dimensions, and input/output byte counts only. Photos are never written or logged by this diagnostic path.
+
+## Settings, movies and native audio ownership
+
+photoConfiguration reads actual device zoom, maximumZoom capped at6, and supportedFlashModes. configurePhoto checks finite/ranged zoom and actual flash support before locking the device. Photos use native flash/shutter behavior; video mode supports flash=off. Lens replacement resets flash and reports the new device zoom capabilities.
+
+beginRecording(durationSeconds:rotation:) accepts the frozen output angle, requests microphone authorization, rechecks cancellation/root/camera epoch, reserves AudioContainer's camera owner and installs audio input on the same AVCaptureSession. It retains one delegate until native terminal completion. didStart is the start receipt; didFinish is the file receipt. Usable native limit/interruption results retain stopReason; unusable errors preserve original error identity and remove failed output. Limits are600 seconds,512MiB and64MiB free disk reserve. Native rotation/front mirroring and disabled stabilization match preview geometry; no second video session is opened. Cancellation requests native stop and joins the delegate; stopAndWait joins photo and recording work. There is no synthetic success timer.
+
+Native terminal cleanup removes the microphone input and releases its audio scope before returning the movie. Hardware facts publish actual recording and zoom; photo dimensions are unknown in video mode. Actions owns recording intent, listening policy and final disposition. Temporary .mov files use the OS temporary area and do not imply cross-process window/session recovery.
+
+NativeAlbumMovie validates a bounded local asset, duration up to605 seconds and dimensions up to4096, and creates a320px JPEG thumbnail up to1MiB. ApplePhotoLibrary.saveVideo uses add-only permission and file-backed PHAsset resource creation; it joins the actual Photos transaction. VisionContainer serializes image/video imports in one root-owned cancellable task; submitted imports are joined before shutdown.
+
+Output orientation follows Apple’s [RotationCoordinator capture contract](https://developer.apple.com/documentation/avfoundation/avcapturedevice/rotationcoordinator/videorotationangleforhorizonlevelcapture): the output connection owns native photo metadata/movie transform. Preview geometry and gravity-level perception remain separate inputs; Actions chooses the requested output angle.
