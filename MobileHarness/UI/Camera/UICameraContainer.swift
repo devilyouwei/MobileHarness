@@ -65,8 +65,28 @@ public protocol CameraPresenting: AnyObject, Sendable {
     func present(_ update: CameraPresentationUpdate)
     func presentVideo(_ frame: CameraVideoFrame) throws
     func present(frame: CameraVideoFrame, pose: PoseOverlay) throws
+    func waitForPhotoCaptureRotation(timeout: Duration) async throws -> Double
     func clearFrame()
     func clearPose()
+}
+
+public enum CameraPreviewReadinessError: Error, Sendable, Equatable, CustomStringConvertible {
+    case busy, timedOut, invalidTimeout
+    case rendererFailed(String)
+    public var description: String {
+        switch self {
+        case .busy: return "相机首帧已有等待中的操作"
+        case .invalidTimeout: return "相机首帧等待时限须在0到10秒内"
+        case .timedOut: return "等待相机有效预览首帧超时，尚未开始拍摄"
+        case .rendererFailed(let message): return "相机预览失败：" + message
+        }
+    }
+}
+
+extension CameraPresenting {
+    public func waitForPhotoCaptureRotation() async throws -> Double {
+        try await waitForPhotoCaptureRotation(timeout: .seconds(10))
+    }
 }
 
 @MainActor public protocol CameraFactsObserving: AnyObject, Sendable {
@@ -100,6 +120,14 @@ public final class UICameraContainer: CameraPresenting, CameraFactsObserving {
     public private(set) var isAvailable = false
     private var stopped = false
     private var factObservers: [UUID: AsyncStream<CameraPresentationSnapshot>.Continuation] = [:]
+    private struct PreviewWaiter {
+        let id: UUID
+        let token: UIPresentationToken
+        let generation: UInt64
+        let continuation: CheckedContinuation<Result<Double, any Error>, Never>
+    }
+    private var previewWaiter: PreviewWaiter?
+    var hasPendingPreviewWaiter: Bool { previewWaiter != nil }
     private let admission: UIPresentationAdmission
     public var token: UIPresentationToken { admission.token }
     init(admission: UIPresentationAdmission, onFailure: @escaping UIFailureReporting) {
@@ -108,6 +136,7 @@ public final class UICameraContainer: CameraPresenting, CameraFactsObserving {
         state.presentationAdmission = admission
         state.connectFactsObserver { [weak self] in
             guard let self else { return }
+            self.resolvePreviewWaiter()
             for observer in self.factObservers.values { observer.yield(self.snapshot) }
         }
     }
@@ -144,11 +173,62 @@ public final class UICameraContainer: CameraPresenting, CameraFactsObserving {
     public func presentVideo(_ frame: CameraVideoFrame) throws {
         try checkAdmission()
         try state.presentVideo(frame)
-
+        resolvePreviewWaiter()
     }
     public func present(frame: CameraVideoFrame, pose: PoseOverlay) throws {
         try checkAdmission()
         try state.present(frame: frame, pose: pose)
+    }
+    /// Waits for admitted frame geometry, not a fixed warm-up delay or GPU completion.
+    public func waitForPhotoCaptureRotation(timeout: Duration) async throws -> Double {
+        try Task.checkCancellation()
+        try checkAdmission()
+        try admission.requireLive()
+        guard timeout > .zero, timeout <= .seconds(10) else { throw CameraPreviewReadinessError.invalidTimeout }
+        guard previewWaiter == nil else { throw CameraPreviewReadinessError.busy }
+        if let failure = state.photoRendererFailure { throw CameraPreviewReadinessError.rendererFailed(failure) }
+        if let rotation = state.photoCaptureRotation { return rotation }
+        let id = UUID()
+        let deadline = Task { @MainActor [weak self] in
+            do { try await Task.sleep(for: timeout) } catch { return }
+            self?.finishPreviewWaiter(id, result: .failure(CameraPreviewReadinessError.timedOut))
+        }
+        let result: Result<Double, any Error> = await withTaskCancellationHandler {
+            await withCheckedContinuation { continuation in
+                if Task.isCancelled {
+                    continuation.resume(returning: .failure(CancellationError()))
+                } else {
+                    previewWaiter = PreviewWaiter(
+                        id: id, token: token, generation: state.videoGeneration, continuation: continuation)
+                    resolvePreviewWaiter()
+                }
+            }
+        } onCancel: {
+            Task { @MainActor [weak self] in
+                self?.finishPreviewWaiter(id, result: .failure(CancellationError()))
+            }
+        }
+        deadline.cancel()
+        await deadline.value
+        try Task.checkCancellation()
+        return try result.get()
+    }
+    private func finishPreviewWaiter(_ id: UUID, result: Result<Double, any Error>) {
+        guard let waiter = previewWaiter, waiter.id == id else { return }
+        previewWaiter = nil
+        waiter.continuation.resume(returning: result)
+    }
+    private func resolvePreviewWaiter() {
+        guard let waiter = previewWaiter else { return }
+        do {
+            try checkAdmission()
+            try admission.requireLive(waiter.token)
+            guard waiter.generation == state.videoGeneration else { throw UIContainerError.stale }
+            if let failure = state.photoRendererFailure { throw CameraPreviewReadinessError.rendererFailed(failure) }
+            if let rotation = state.photoCaptureRotation { finishPreviewWaiter(waiter.id, result: .success(rotation)) }
+        } catch {
+            finishPreviewWaiter(waiter.id, result: .failure(error))
+        }
     }
     public func clearFrame() { state.clearFrame() }
     public func clearPose() { state.clearPose() }
@@ -179,6 +259,7 @@ public final class UICameraContainer: CameraPresenting, CameraFactsObserving {
         }
     }
     func stop() async {
+        if let waiter = previewWaiter { finishPreviewWaiter(waiter.id, result: .failure(UIContainerError.stopped)) }
         state.connectFactsObserver {}
         for observer in factObservers.values { observer.finish() }
         factObservers.removeAll()

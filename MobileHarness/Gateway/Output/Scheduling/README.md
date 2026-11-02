@@ -48,7 +48,7 @@ finish seals root and joins accepted work; unclosed waits fail invalidSchedule a
 
 Resource validateAdmission is distinct from execution run. A configured takeover owner may enqueue later bounded work while old writer cleanup proceeds, but cannot execute through the handoff. Scheduler has no Agent/device priority names. Native recovery does not remove queued Actions; each call may fail offline or later succeed normally.
 
-Generated scheduling uses envelope.schedulingID (round identity); round acknowledgment joins scoped ActionResult delivery. Ordinary finish and delivery are distinct contracts. Failure reports retain execution ID/path/delivery state rather than conflating delivery with task closure. Stale producers must not reuse released task identity.
+Generated scheduling uses envelope.schedulingID (round identity); round acknowledgment joins scoped ActionResult delivery. Ordinary finish and delivery are distinct contracts. Failure reports retain execution ID/path/delivery state rather than conflating delivery with task closure. A successful value receipt remains the terminal observation even when the invocation stores successful child reports; failed/cancelled evidence still overrides a value. Internal composition steps do not enter scheduler lanes or generate separate result deliveries. Stale producers must not reuse released task identity.
 
 ## Passive execution observation
 

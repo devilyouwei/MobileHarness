@@ -82,14 +82,22 @@
                 else { return }
                 windows.setActivity(item.id, label: value)
             })
-        public func startRecording(invocation: any FunctionInput) async throws -> CameraVideoReceipt {
-            guard foreground, state.isEnabled, state.isVisible, state.settings.mode == "video" else {
+        public func startRecording(durationSeconds: Int?, invocation: any FunctionInput) async throws
+            -> CameraVideoReceipt
+        {
+            guard foreground, state.isEnabled, state.isVisible else {
                 throw CameraControlError.disabled
             }
             guard state.lensOwner == .capture else { throw CameraControlError.lensNotOwned }
             guard !photoSession.isBusy, state.capturedPhoto == nil, worker == nil, !changingDemand, !windowTransition
             else { throw CameraControlError.busy }
-            return try await recordingSession.start(duration: state.settings.durationSeconds, invocation: invocation)
+            changingDemand = true
+            defer { changingDemand = false }
+            return try await recordingSession.start(
+                duration: durationSeconds ?? state.settings.durationSeconds, invocation: invocation)
+        }
+        public func waitForRecording(_ id: String, invocation: any FunctionInput) async throws -> CameraVideoReceipt {
+            try await recordingSession.wait(id)
         }
         public func stopRecording(_ id: String, invocation: any FunctionInput) async throws -> CameraVideoReceipt {
             try await recordingSession.stop(id)
@@ -179,15 +187,15 @@
         public func takePhoto(invocation: any FunctionInput) async throws -> CameraPhotoReceipt {
             guard !changingDemand, !windowTransition, worker == nil else { throw CameraControlError.busy }
             guard !recordingSession.busy, !recordingSession.hasClip else { throw CameraControlError.busy }
-            if let windows, let item = windows.windows.first(where: { $0.content == WindowContent.camera.rawValue }),
-                item.mode == .minimized
-            {
-                try await beginWindowTransition()
-                defer { endWindowTransition() }
-                try await windows.change(item.id, command: .restore)
-                try await resumeWindow(invocation: invocation)
+            changingDemand = true
+            defer { changingDemand = false }
+            if state.settings.mode != "photo" {
+                guard state.capturedPhoto == nil else { throw CameraControlError.busy }
+                guard foreground, state.isEnabled, state.isVisible else { throw CameraControlError.disabled }
+                guard state.lensOwner == .capture else { throw CameraControlError.lensNotOwned }
+                try await CameraCaptureConfiguration.preparePhoto(camera: camera, presentation: presentation)
             }
-            guard state.settings.mode == "photo" else { throw CameraControlError.unavailable }
+            try Task.checkCancellation()
             return try await photoSession.takePhoto(delaySeconds: state.settings.delaySeconds, invocation: invocation)
         }
 
@@ -203,35 +211,7 @@
             guard state.capturedPhoto == nil || settings.mode == state.settings.mode else {
                 throw CameraControlError.busy
             }
-            let previous = state.settings
-            let configured: CameraPhotoConfiguration
-            do {
-                try await camera.setVideoMode(settings.mode == "video")
-                configured = try await camera.configurePhoto(
-                    flash: CameraFlash(rawValue: settings.flash) ?? .off, zoom: settings.zoom)
-            } catch {
-                let original = error
-                // Restore with an uncancelled cleanup owner before returning the failed configuration.
-                let cleanup = Task {
-                    try await camera.setVideoMode(previous.mode == "video")
-                    _ = try await camera.configurePhoto(
-                        flash: CameraFlash(rawValue: previous.flash) ?? .off, zoom: previous.zoom)
-                }
-                do { try await cleanup.value } catch {
-                    presentation.present(.message("拍摄设置恢复失败：" + error.localizedDescription))
-                    throw error
-                }
-                throw original
-            }
-            var display = CameraSettings()
-            display.mode = settings.mode
-            display.delaySeconds = settings.delaySeconds
-            display.flash = configured.flash.rawValue
-            display.zoom = configured.zoom
-            display.durationSeconds = settings.durationSeconds
-            display.maximumZoom = configured.maximumZoom
-            display.supportedFlash = configured.supportedFlash.map(\.rawValue)
-            presentation.present(.settings(display))
+            try await CameraCaptureConfiguration.apply(settings, camera: camera, presentation: presentation)
         }
         public func cancelCapture(invocation: any FunctionInput) async throws {
             try Task.checkCancellation()
@@ -260,6 +240,9 @@
                     }
                 }
                 try await setCaptureEnabled(true, invocation: invocation)
+                _ = try await presentation.waitForPhotoCaptureRotation()
+                try Task.checkCancellation()
+                guard foreground, state.isVisible else { throw CameraControlError.notForeground }
             } else {
                 try await closeWindow(invocation: invocation)
                 if let windows, let item = windows.windows.first(where: { $0.content == WindowContent.camera.rawValue })

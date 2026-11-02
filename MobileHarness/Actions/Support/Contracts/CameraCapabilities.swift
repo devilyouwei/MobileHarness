@@ -76,7 +76,8 @@ public struct CameraCaptureSettings: Codable, Sendable, Equatable {
 }
 
 public protocol CameraControlCapability: Sendable {
-    func startRecording(invocation: any FunctionInput) async throws -> CameraVideoReceipt
+    func startRecording(durationSeconds: Int?, invocation: any FunctionInput) async throws -> CameraVideoReceipt
+    func waitForRecording(_ id: String, invocation: any FunctionInput) async throws -> CameraVideoReceipt
     func stopRecording(_ id: String, invocation: any FunctionInput) async throws -> CameraVideoReceipt
     func saveVideo(_ id: String, invocation: any FunctionInput) async throws -> CameraVideoReceipt
     func ignoreVideo(_ id: String, invocation: any FunctionInput) async throws -> CameraVideoReceipt
@@ -128,7 +129,11 @@ public enum CameraControlError: Error, Equatable, Sendable, ActionExecutionFailu
 }
 
 extension CameraControlCapability {
-    public func startRecording(invocation: any FunctionInput) async throws -> CameraVideoReceipt {
+    public func startRecording(durationSeconds: Int?, invocation: any FunctionInput) async throws -> CameraVideoReceipt
+    {
+        throw CameraControlError.unavailable
+    }
+    public func waitForRecording(_ id: String, invocation: any FunctionInput) async throws -> CameraVideoReceipt {
         throw CameraControlError.unavailable
     }
     public func stopRecording(_ id: String, invocation: any FunctionInput) async throws -> CameraVideoReceipt {
@@ -173,14 +178,16 @@ public struct CameraVideoReceipt: Codable, Sendable, Equatable {
     public let mediaID: String?
     public let durationSeconds: Double?
     public let stopReason: String?
+    public let fileName: String?
     public init(
         recordingID: String, state: String, mediaID: String? = nil, durationSeconds: Double? = nil,
-        stopReason: String? = nil
+        stopReason: String? = nil, fileName: String? = nil
     ) {
         self.recordingID = recordingID
         self.state = state
         self.mediaID = mediaID
         self.durationSeconds = durationSeconds
         self.stopReason = stopReason
+        self.fileName = fileName
     }
 }

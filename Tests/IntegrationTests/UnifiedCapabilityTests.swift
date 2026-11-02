@@ -252,12 +252,18 @@ private actor UnifiedReceiptAgent: Agent {
     }
 }
 
-@Test(.actionCatalog) func normalizedNativeInvocationRetainsReportPrecedenceAndCallIdentity() async throws {
+@Test(.actionCatalog, arguments: ["success", "failure", "cancelled"])
+func normalizedNativeInvocationRetainsFailurePrecedenceValueAndCallIdentity(_ outcome: String) async throws {
     let id = UUID().uuidString
     let context = ActionExecutionContext(
         source: "fixture", sessionID: UUID().uuidString, inputID: UUID().uuidString, sequence: 7,
         correlationID: UUID().uuidString, ordinal: 3)
-    let report = try ActionReport(entries: [.init(path: "Fixture.Query.read", status: .succeeded)])
+    let report = try ActionReport(entries: [
+        .init(
+            path: "Fixture.Query.read",
+            status: outcome == "success" ? .succeeded : outcome == "failure" ? .failed : .cancelled,
+            code: outcome == "success" ? nil : outcome == "failure" ? .handlerFailed : .cancelled)
+    ])
     let definition = ActionBinding(
         path: .init(domain: "Fixture", module: "Query", function: "read"),
         displayName: "Read", kind: .finite, completion: "Read acknowledged.",
@@ -268,14 +274,14 @@ private actor UnifiedReceiptAgent: Agent {
             #expect(invocation.context == context)
             #expect(invocation.call.parameters == ["value": "native"])
             try await invocation.results.record(report)
-            return .value("lower priority value")
+            return .value("actual result")
         })
     let module = UnifiedFixtureModule(definitions: [definition])
     let response = try #require(
         try await ToolExecutor(registry: ToolRegistry(modules: [module.tools])).execute(
             ToolRequest(id: id, toolPath: "Fixture.Query.read", arguments: ["value": "native"]), context: context))
-    #expect(response.callID == id && !response.isError)
-    #expect(response.completion == .report(report))
+    #expect(response.callID == id && response.isError == (outcome != "success"))
+    #expect(response.completion == (outcome == "success" ? .value("actual result") : .report(report)))
 }
 
 private struct PureFunctionFixture: CapabilityModule {

@@ -3,6 +3,7 @@ import FunctionContracts
 
 /// Validated finite tree; children inherit the root's resource fence, never reacquire it.
 public struct ActionComposition: Sendable {
+    public enum FailurePolicy: Sendable { case continueOnFailure, stopOnFailure }
     public indirect enum Node: Sendable {
         case action(
             String, Set<ActionResource>, maximumResults: Int = 1, budget: ActionExecutionBudget? = nil,
@@ -26,7 +27,7 @@ public struct ActionComposition: Sendable {
                 }
             }
         }
-        case sequence([Node])
+        case sequence([Node], failurePolicy: FailurePolicy = .continueOnFailure)
         case parallel([Node])
         case repeated(Int, Node)
         case delay(Duration)
@@ -57,7 +58,7 @@ public struct ActionComposition: Sendable {
             let v = try validate(child, depth: depth + 1)
             guard v.count * count <= 256 else { throw ConfigurationError.limit }
             return (v.count * count, v.resources)
-        case .sequence(let children), .parallel(let children):
+        case .sequence(let children, _), .parallel(let children):
             guard children.count <= 256 else { throw ConfigurationError.limit }
             var count = 0
             var resources: Set<ActionResource> = []
@@ -82,7 +83,7 @@ public struct ActionComposition: Sendable {
             return try ActionExecutionBudget(expected: duration, timeout: duration + .milliseconds(100))
         case .repeated(let count, let child):
             return try .sequence(Array(repeating: budget(child), count: count))
-        case .sequence(let nodes): return try .sequence(nodes.map { try budget($0) })
+        case .sequence(let nodes, _): return try .sequence(nodes.map { try budget($0) })
         case .parallel(let nodes): return try .parallel(nodes.map { try budget($0) })
         }
     }
@@ -146,12 +147,62 @@ public struct ActionComposition: Sendable {
                 .withExecutionFailure(.cancelled)
         }
     }
+    private actor ValueStore<Value: Sendable> {
+        var value: Value?
+        func record(_ value: Value) { self.value = value }
+    }
+    /// Preparations must succeed before the final typed operation. Child evidence stays on the parent invocation.
+    public func run<Value: Sendable>(
+        returning name: String, budget: ActionExecutionBudget, results: any FunctionReporting,
+        operation: @escaping @Sendable () async throws -> Value
+    ) async throws -> Value {
+        let store = ValueStore<Value>()
+        let chain = try ActionComposition(
+            .sequence(
+                [
+                    root,
+                    .action(name, [], budget: budget) {
+                        await store.record(try await operation())
+                        return .completed
+                    },
+                ], failurePolicy: .stopOnFailure))
+        let report = try await chain.run()
+        try await results.record(report)
+        guard !report.hasFailures, !report.isCancelled else { throw ActionReportedError(report) }
+        try Task.checkCancellation()
+        guard let value = await store.value else { throw ActionExecutionError.invalidCompletion }
+        return value
+    }
+    private static func skipped(_ node: Node, path: String, code: ActionReport.Entry.Code) -> [ActionReport.Entry] {
+        switch node {
+        case .action(let name, _, _, _, _):
+            return [.init(path: "\(path).\(name)", status: .notStarted, code: code)]
+        case .delay:
+            return [.init(path: path, status: .notStarted, code: code)]
+        case .sequence(let children, _), .parallel(let children):
+            return children.enumerated().flatMap { skipped($0.element, path: "\(path).\($0.offset)", code: code) }
+        case .repeated(let count, let child):
+            return (0..<count).flatMap { skipped(child, path: "\(path).\($0)", code: code) }
+        }
+    }
     private static func run(_ node: Node, path: String) async -> [ActionReport.Entry] {
         switch node {
-        case .sequence(let nodes):
+        case .sequence(let nodes, let policy):
             var results: [ActionReport.Entry] = []
+            var blocked: ActionReport.Entry.Code?
             for (index, child) in nodes.enumerated() {
-                results += await run(child, path: "\(path).\(index)")
+                let childPath = "\(path).\(index)"
+                if let blocked {
+                    results += skipped(child, path: childPath, code: blocked)
+                    continue
+                }
+                let entries = await run(child, path: childPath)
+                results += entries
+                if Task.isCancelled {
+                    blocked = .cancelled
+                } else if policy == .stopOnFailure, entries.contains(where: { $0.status != .succeeded }) {
+                    blocked = .dependencyFailed
+                }
             }
             return results
         case .parallel(let nodes):

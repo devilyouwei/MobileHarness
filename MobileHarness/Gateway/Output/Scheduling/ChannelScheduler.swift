@@ -501,6 +501,8 @@ public actor ChannelScheduler {
                         // The executor already merged stored children with the terminal error/deadline.
                         // Re-reading the older store must not erase terminal entries or its captured cause.
                         outcome = .success(.report(terminal))
+                    case .success(.value) where !report.hasFailures && !report.isCancelled:
+                        break  // Successful child evidence must not replace the final business receipt.
                     case .success:
                         outcome = .success(.report(report))
                     }

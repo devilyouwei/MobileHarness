@@ -77,6 +77,37 @@ private actor RecordingCameraFixture: CameraCapturing {
     let file: URL
     let id = UUID().uuidString
     var started = false
+    var trace: [String] = []
+    var duration: Int?
+    var failConfiguration = false
+    var holdConfiguration = false
+    let configurationEntered = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingOldest(1))
+    var configurationWaiter: CheckedContinuation<Void, Never>?
+    func configureFailure(held: Bool) {
+        failConfiguration = !held
+        holdConfiguration = held
+    }
+    func releaseConfiguration() {
+        configurationWaiter?.resume()
+        configurationWaiter = nil
+    }
+    func setVideoMode(_ enabled: Bool) { trace.append("video:\(enabled)") }
+    func configurePhoto(flash: CameraFlash, zoom: Double) async throws -> CameraPhotoConfiguration {
+        trace.append("settings:\(flash.rawValue):\(zoom)")
+        if failConfiguration {
+            failConfiguration = false
+            throw CameraError.configurationFailed
+        }
+        if holdConfiguration {
+            holdConfiguration = false
+            await withCheckedContinuation {
+                configurationWaiter = $0
+                configurationEntered.continuation.yield(())
+            }
+            try Task.checkCancellation()
+        }
+        return .init(flash: flash, zoom: zoom, maximumZoom: 6, supportedFlash: [.off, .on, .auto])
+    }
     var recordedRotation: CGFloat?
     var terminal: CameraMovie?
     var waiter: CheckedContinuation<CameraMovie, any Error>?
@@ -90,6 +121,8 @@ private actor RecordingCameraFixture: CameraCapturing {
     func stop() { complete("interrupted") }
     func stopAndWait() { stop() }
     func beginRecording(durationSeconds: Int, rotation: CGFloat) -> String {
+        trace.append("start")
+        duration = durationSeconds
         started = true
         recordedRotation = rotation
         return id
@@ -123,20 +156,34 @@ private actor RecordingCameraFixture: CameraCapturing {
     let ui = UIContainer()
     try ui.start()
     let frame = try syntheticCameraFrame(width: 8, height: 8, sequence: 1, timestamp: 0)
-    try ui.camera.presentVideo(
-        frame.withPixelBuffer {
-            CameraVideoFrame(
-                pixels: $0, width: 8, height: 8, rotation: 0, sequence: 1, capturedAt: .now, portraitRotation: 1)
-        })
     let native = RecordingCameraFixture(file: source)
     var audio: [String] = []
     var activities: [String?] = []
     let session = CameraRecordingSession(
         camera: native, photos: store, presentation: ui.camera,
-        foreground: { true }, acquireAudio: { audio.append("pause") },
+        foreground: { true },
+        acquireAudio: {
+            audio.append("pause")
+            try ui.camera.presentVideo(
+                frame.withPixelBuffer {
+                    CameraVideoFrame(
+                        pixels: $0, width: 8, height: 8, rotation: 0, sequence: 1, capturedAt: .now, portraitRotation: 1
+                    )
+                })
+        },
         releaseAudio: { audio.append($0 ? "resume" : "release") },
         activity: { activities.append($0) }, inspect: { _ in .init(width: 1920, height: 1080, duration: 2) })
+    var settings = CameraSettings()
+    settings.flash = "auto"
+    settings.zoom = 2
+    settings.delaySeconds = 3
+    ui.camera.present(.settings(settings))
     let start = try await session.start(duration: 10, invocation: captureInput())
+    #expect(await native.trace == ["video:true", "settings:off:2.0", "start"])
+    #expect(await native.duration == 10)
+    #expect(ui.camera.snapshot.settings.mode == "video" && ui.camera.snapshot.settings.flash == "off")
+    #expect(ui.camera.snapshot.settings.zoom == 2 && ui.camera.snapshot.settings.delaySeconds == 3)
+    #expect(ui.camera.snapshot.settings.durationSeconds == 10)
     #expect(start.state == "recording" && ui.camera.snapshot.recording.active)
     #expect(await native.recordedRotation == 90)
     await #expect(throws: CameraControlError.busy) {
@@ -170,19 +217,27 @@ private actor RecordingCameraFixture: CameraCapturing {
     let ui = UIContainer()
     try ui.start()
     let frame = try syntheticCameraFrame(width: 8, height: 8, sequence: 1, timestamp: 0)
-    try ui.camera.presentVideo(
-        frame.withPixelBuffer {
-            CameraVideoFrame(
-                pixels: $0, width: 8, height: 8, rotation: 0, sequence: 1, capturedAt: .now, portraitRotation: 1)
-        })
     let native = RecordingCameraFixture(file: source)
     var foreground = true
     var resumed: [Bool] = []
     let session = CameraRecordingSession(
         camera: native, photos: store, presentation: ui.camera,
-        foreground: { foreground }, acquireAudio: {}, releaseAudio: { resumed.append($0) }, activity: { _ in },
+        foreground: { foreground },
+        acquireAudio: {
+            try ui.camera.presentVideo(
+                frame.withPixelBuffer {
+                    CameraVideoFrame(
+                        pixels: $0, width: 8, height: 8, rotation: 0, sequence: 1, capturedAt: .now, portraitRotation: 1
+                    )
+                })
+        }, releaseAudio: { resumed.append($0) }, activity: { _ in },
         inspect: { _ in .init(width: 1920, height: 1080, duration: 1) })
+    var configured = CameraSettings()
+    configured.mode = "video"
+    configured.durationSeconds = 1
+    ui.camera.present(.settings(configured))
     let start = try await session.start(duration: 1, invocation: captureInput())
+    #expect(await native.trace == ["start"])
     foreground = false
     session.invalidateForeground()
     // Even a quick foreground return cannot revive the old recording's listening permit.
@@ -313,4 +368,218 @@ func recordingAudioHandoffWaitsForSessionOwnerRelease(_ outcome: String) async t
     }
     #expect(!audio.owned && audio.trace.contains("sessionReleased"))
     if outcome != "success" { #expect(!audio.trace.contains("cameraMayAcquire")) }
+}
+
+@Test(.timeLimit(.minutes(1)), arguments: ["stopped", "durationLimit", "cancelled", "invalidFile"]) @MainActor
+func recordingTerminalWaitJoinsSingleFileAndPublishesBeforeAudioResume(_ ending: String) async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: root) }
+    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+    let file = root.appendingPathComponent("recording.mov")
+    try Data([1, 2, 3]).write(to: file)
+    let records = try SQLiteRepositories(url: root.appendingPathComponent("store.sqlite"))
+    let store = CapturedPhotoStore(
+        repository: records.media, files: try DiskFileStore(root: root.appendingPathComponent("media")))
+    let ui = UIContainer()
+    try ui.start()
+    let frame = try syntheticCameraFrame(width: 8, height: 8, sequence: 1, timestamp: 0)
+    let native = RecordingCameraFixture(file: file)
+    var releases: [CameraRecordingPresentation.Phase] = []
+    let session = CameraRecordingSession(
+        camera: native, photos: store, presentation: ui.camera, foreground: { true },
+        acquireAudio: {
+            try ui.camera.presentVideo(
+                frame.withPixelBuffer {
+                    CameraVideoFrame(
+                        pixels: $0, width: 8, height: 8, rotation: 0, sequence: 1, capturedAt: .now, portraitRotation: 1
+                    )
+                })
+        },
+        releaseAudio: { _ in releases.append(ui.camera.snapshot.recording.phase) }, activity: { _ in },
+        inspect: { _ in
+            if ending == "invalidFile" { throw CameraControlError.unavailable }
+            return .init(width: 1920, height: 1080, duration: 4.8)
+        })
+    let started = try await session.start(duration: 10, invocation: captureInput())
+    let waiting = Task { try await session.wait(started.recordingID) }
+    if ending == "cancelled" {
+        waiting.cancel()
+    } else {
+        await native.complete(ending == "invalidFile" ? "stopped" : ending)
+    }
+    if ending == "cancelled" {
+        await #expect(throws: CancellationError.self) { _ = try await waiting.value }
+        #expect(releases == [.ready])
+    } else if ending == "invalidFile" {
+        await #expect(throws: CameraControlError.unavailable) { _ = try await waiting.value }
+        #expect(releases == [.failed])
+    } else {
+        let ready = try await waiting.value
+        #expect(ready.state == "ready" && ready.durationSeconds == 4.8 && ready.stopReason == ending)
+        #expect(ready.mediaID != nil && ready.fileName?.hasSuffix(".mov") == true)
+        #expect(ready.fileName?.contains("/") == false)
+        #expect(releases == [.ready])
+        // Repeated completion reads join the same result and do not prepare another file.
+        #expect(try await session.wait(started.recordingID) == ready)
+        #expect(try await session.stop(started.recordingID) == ready)
+    }
+    #expect(!ui.camera.snapshot.recording.active && session.hasClip)
+    #expect(releases.count == 1)
+    _ = try await session.ignore(started.recordingID)
+    #expect(try records.media.retainedMedia().isEmpty)
+    await ui.stop()
+    try await records.shutdown()
+}
+
+@Test func recordingCompletionModeValidatesBeforeEffectsAndHasBoundedBudgets() async throws {
+    let camera = CaptureConfigurationProbe()
+    for parameters in [
+        ["waitForCompletion": "yes"], ["unexpected": "true"], ["durationSeconds": "0"],
+        ["durationSeconds": "601"], ["durationSeconds": "nan"], ["durationSeconds": "1.5"],
+    ] {
+        await #expect(throws: ActionArguments.ValidationError.self) {
+            _ = try await CameraActions.startRecording(invocation: captureInput(parameters: parameters), using: camera)
+        }
+    }
+    let definition = try #require(
+        CameraModule(camera: camera).definitions.first { $0.path.function == "startRecording" })
+    #expect(try definition.executionBudget(for: captureInput().call).timeout == .seconds(780))
+    #expect(
+        try definition.executionBudget(for: captureInput(parameters: ["waitForCompletion": "false"]).call).timeout
+            == .seconds(120))
+}
+
+@Test(.timeLimit(.minutes(1)), arguments: [false, true]) @MainActor
+func recordingConfigurationFailureOrCancellationRollsBackWithoutAudioOrCapture(_ cancel: Bool) async throws {
+    let database = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".sqlite")
+    let records = try SQLiteRepositories(url: database, removeOnClose: true)
+    let ui = UIContainer()
+    try ui.start()
+    var settings = CameraSettings()
+    settings.flash = "auto"
+    settings.zoom = 2
+    ui.camera.present(.settings(settings))
+    let camera = RecordingCameraFixture(
+        file: FileManager.default.temporaryDirectory.appendingPathComponent("unused.mov"))
+    await camera.configureFailure(held: cancel)
+    var audioAcquired = 0
+    let session = CameraRecordingSession(
+        camera: camera, photos: CapturedPhotoStore(repository: records.media, files: try MemoryFileStore()),
+        presentation: ui.camera, foreground: { true }, acquireAudio: { audioAcquired += 1 },
+        releaseAudio: { _ in Issue.record("No audio was acquired") }, activity: { _ in })
+    let starting = Task { try await session.start(duration: 10, invocation: captureInput()) }
+    if cancel {
+        var entered = camera.configurationEntered.stream.makeAsyncIterator()
+        await entered.next()
+        starting.cancel()
+        await camera.releaseConfiguration()
+        await #expect(throws: CancellationError.self) { _ = try await starting.value }
+    } else {
+        await #expect(throws: CameraError.configurationFailed) { _ = try await starting.value }
+    }
+    #expect(await camera.trace == ["video:true", "settings:off:2.0", "video:false", "settings:auto:2.0"])
+    #expect(await camera.started == false)
+    #expect(audioAcquired == 0 && !session.busy && !session.hasClip)
+    #expect(ui.camera.snapshot.settings.mode == "photo" && ui.camera.snapshot.settings.flash == "auto")
+    #expect(ui.camera.snapshot.settings.zoom == 2 && ui.camera.snapshot.recording.phase == .failed)
+    await ui.stop()
+    try await records.shutdown()
+}
+
+/// Deterministic device/window boundary; exercises the real CameraModule and composition, not AVFoundation.
+private actor AutomaticCaptureProbe: CameraControlCapability {
+    var trace: [String] = []
+    let denyOpen: Bool
+    let failCapture: Bool
+    init(denyOpen: Bool = false, failCapture: Bool = false) {
+        self.denyOpen = denyOpen
+        self.failCapture = failCapture
+    }
+    func setEnabled(_ enabled: Bool, invocation: any FunctionInput) throws {
+        trace.append("open")
+        #expect(invocation.call.actionPath.description == "Camera.Capture.open")
+        #expect(invocation.call.parameters.isEmpty)
+        #expect(invocation.context.inputID == "recording-input")
+        if denyOpen { throw CameraControlError.permissionDenied }
+    }
+    func flip(_ facing: CameraActions.Facing, invocation: any FunctionInput) {}
+    func takePhoto(invocation: any FunctionInput) throws -> CameraPhotoReceipt {
+        trace.append("photo")
+        if failCapture { throw CameraControlError.busy }
+        return try .init(mediaID: "media_151", width: 640, height: 480)
+    }
+    func startRecording(durationSeconds: Int?, invocation: any FunctionInput) throws -> CameraVideoReceipt {
+        trace.append("video:\(durationSeconds ?? 600)")
+        if failCapture { throw CameraControlError.busy }
+        return .init(recordingID: "11111111-2222-4333-8444-555555555555", state: "recording")
+    }
+    func waitForRecording(_ id: String, invocation: any FunctionInput) -> CameraVideoReceipt {
+        trace.append("ready")
+        return .init(
+            recordingID: id, state: "ready", mediaID: "media_152", durationSeconds: 10,
+            stopReason: "durationLimit", fileName: "video.mov")
+    }
+}
+
+@Test(.actionCatalog, arguments: ["photo", "video", "interactiveVideo"], ["success", "openFailure", "captureFailure"])
+func cameraCompositeReturnsOnlyCaptureResultAndStopsOnPreparationFailure(_ kind: String, _ outcome: String) async throws
+{
+    let camera = AutomaticCaptureProbe(denyOpen: outcome == "openFailure", failCapture: outcome == "captureFailure")
+    let function = kind == "photo" ? "takePhoto" : "startRecording"
+    let parameters =
+        kind == "photo" ? [:] : ["durationSeconds": "10", "waitForCompletion": kind == "video" ? "true" : "false"]
+    let input = FunctionInvocation(
+        call: .init(
+            actionPath: .init(domain: "Camera", module: kind == "photo" ? "Capture" : "Video", function: function),
+            parameters: parameters),
+        context: captureInput().context, executionID: UUID().uuidString, results: ActionReportStore())
+    let definition = try #require(CameraModule(camera: camera).definitions.first { $0.path == input.call.actionPath })
+    let completion = try await FunctionExecutor.perform(input, definition: definition)
+    let trace = await camera.trace
+    #expect(trace.first == "open")
+    if outcome == "success" {
+        guard case .value(let value) = completion else {
+            Issue.record("Receipt was replaced by child report")
+            return
+        }
+        if kind == "photo" {
+            #expect(try JSONDecoder().decode(CameraPhotoReceipt.self, from: Data(value.utf8)).mediaID == "media_151")
+            #expect(trace == ["open", "photo"])
+        } else {
+            let receipt = try JSONDecoder().decode(CameraVideoReceipt.self, from: Data(value.utf8))
+            #expect(receipt.state == (kind == "video" ? "ready" : "recording"))
+            #expect(trace == (kind == "video" ? ["open", "video:10", "ready"] : ["open", "video:10"]))
+        }
+    } else {
+        guard case .report(let report) = completion else {
+            Issue.record("Expected step failure report")
+            return
+        }
+        #expect(report.hasFailures)
+        #expect(trace.count == (outcome == "openFailure" ? 1 : 2))
+        #expect(report.entries.last?.status == (outcome == "openFailure" ? .notStarted : .failed))
+        #expect(
+            report.entries.contains { $0.code?.rawValue == (outcome == "openFailure" ? "permissionDenied" : "busy") })
+    }
+}
+
+@Test(.actionCatalog, arguments: ["photo", "video"]) @MainActor
+func automaticPhotoModePreservesSettingsAndAvoidsRedundantConfiguration(_ mode: String) async throws {
+    let ui = UIContainer()
+    try ui.start()
+    var settings = CameraSettings()
+    settings.mode = mode
+    settings.flash = "off"
+    settings.zoom = 2
+    settings.delaySeconds = 3
+    settings.durationSeconds = 10
+    ui.camera.present(.settings(settings))
+    let camera = RecordingCameraFixture(
+        file: FileManager.default.temporaryDirectory.appendingPathComponent("unused.mov"))
+    try await CameraCaptureConfiguration.preparePhoto(camera: camera, presentation: ui.camera)
+    let after = ui.camera.snapshot.settings
+    #expect(after.mode == "photo" && after.zoom == 2 && after.flash == "off")
+    #expect(after.delaySeconds == 3 && after.durationSeconds == 10)
+    #expect(await camera.trace == (mode == "video" ? ["video:false", "settings:off:2.0"] : []))
+    await ui.stop()
 }

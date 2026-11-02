@@ -87,7 +87,7 @@ private actor CameraBridge: CameraControlCapability {
     func cancelCapture(invocation: any FunctionInput) async throws {
         try await perform(.cancelCapture, invocation: invocation)
     }
-    func startRecording(invocation: any FunctionInput) async throws -> CameraVideoReceipt {
+    func startRecording(durationSeconds: Int?, invocation: any FunctionInput) async throws -> CameraVideoReceipt {
         try await perform(.startRecording, invocation: invocation)
         return .init(recordingID: "11111111-2222-4333-8444-555555555555", state: "recording")
     }
@@ -481,7 +481,7 @@ func cameraContainerCallsPhotographerDirectlyAndWaitsForNativeCompletion() async
     _ = try await requests.submit(.init(.cancelCapture))
     #expect(
         await fixture.probe.operations == [
-            .configure, .startRecording, .stopRecording, .saveVideo, .ignoreVideo, .cancelCapture,
+            .configure, .open, .startRecording, .stopRecording, .saveVideo, .ignoreVideo, .cancelCapture,
         ])
     #expect(await fixture.probe.sources.allSatisfy { $0 == "photographer" })
     let catalog = try AgentSkillLoader.registry(

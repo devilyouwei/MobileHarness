@@ -1,5 +1,67 @@
 # Window / Camera 验证
 
+## 2026-11-03 组合拍摄首帧竞态（152）
+
+- 证据：已只读复制连接 iPhone 的 records.sqlite 与 WAL 到 /tmp/task116-records.sqlite；task_116 的持久化观察与用户RTF一致：root.0.open succeeded，root.1.takePhoto failed/unavailable，随后生成失败回复。截图中的上一轮是startTask反馈，不能单独作为提前完成证据。数据库在线复制并非事务级导出，未修改手机数据库。
+- 原因：原生采集运行后，预览消费者异步启动；旧open不等待首帧，照片/录像立即读取尚为nil的photoCaptureRotation。修复以真实帧接纳解除等待，不添加固定启动休眠，不变更ReAct调度规则。
+- 定向回归已通过：UI就绪3条测试（包含6种清理情形）；组合/录像9条测试。首次定向编译发现新测试Issue.record的字符串类型问题，修正后通过。新增真实Agent/Gateway/Action+UI首帧端口测试，设备边界仍为替身；验证未接纳首帧时不拍摄、不增加模型请求，首帧后仅返回一次照片结果。
+- 首次完整check：UI179项及新增端到端首帧回归通过，Integration979项中旧录像fixture失败1项；其单帧在全量负载下已过期。fixture改为音频交接时提供新鲜帧，不放宽正式代码的750ms期限。LiveRuntime225项通过（206.272秒）。日志/tmp/capture152-check.log。修正后完整check.sh退出0：UI179、Integration979、Workflow138、LiveRuntime225项通过（实时阶段205.378秒）；结构、格式、Python及plist检查通过，日志/tmp/capture152-check-final.log。NativePresentation仅见启动，未见完成，不宣称该原生Metal验收通过。
+- 四项iOS构建全部成功（/tmp/capture152-ios.log）；真机2026110303编译成功（/tmp/capture152-device.log）。25项Skill资源、WidgetKit嵌入及版本、codesign --deep --strict校验通过（/tmp/capture152-{agent-resources,island-resources,signature}.log）。iPhone安装成功（sequence5660）并成功启动，见/tmp/capture152-{install,launch}.log。未操作模拟器界面；真实摄录与用户模型验收尚待真机确认。
+
+## 2026-11-03 拍摄组合入口（151）
+
+- takePhoto/startRecording内部复用canonical open，前置成功才拍摄；未改变公开路径、Photographer Tool路由或背景视觉需求。照片自动选photo并保持其他设置，录像保留150配置及149终态反馈。删除旧takePhoto局部窗口恢复分支；open统一处理关闭／已有／最小化窗口。
+- ActionComposition顺序节点默认continueOnFailure，新增stopOnFailure及dependencyFailed/notStarted叶子；类型化结果步骤与前置阶段共用单个有界组合。成功步骤报告保留于父invocation，但FunctionExecutor/ChannelScheduler不再用成功报告覆盖最终value；失败／取消仍优先，不生成子步骤ReAct。
+- 首次定向回归发现机械臂既有单步截止后继续的测试，明确将单步截止归入策略；整个组合取消／截止仍停止并加入。另发现Gateway旧报告覆盖导致录像观察丢失，以及Skill超出并存预算，已修正中立完成合并并压缩指令，未扩大预算。第二轮16项定向测试通过（`/tmp/capture151-targeted2.log`），含组合双策略、嵌套、机械臂单步超时兼容、9组相机成功／打开失败／拍摄失败、真实Action/Agent/Gateway录像手动停止单次终态；原生和模型为明确测试替身。
+- 首次完整check发现两条旧断言：成功报告一律优于value、UI录像没有内部open。断言已同步新契约，原生Tool测试扩展成功／失败／取消三种结果，仍验证身份和失败优先。照片模式设置保留／无重复配置纳入回归。补充拍照真实组合链测试时，首次因Swift实参顺序错误编译失败；调整后6项链路回归通过（`/tmp/capture151-chain-final.log`）：拍照附图仅最终回合续推、录像单终态、UI按钮路由、成功value／失败及取消优先、照片模式设置保留。完整检查、构建、安装及真实设备验收结果续记。
+
+
+
+- 最终完整`./scripts/check.sh`退出0（`/tmp/capture151-check-final.log`）：176项UI、978项集成、138项Workflow、225项LiveRuntime（206.298秒）及格式／边界／plist检查通过。NativePresentation的Metal用例本轮仍只有started，无完成摘要，不能记为通过。未操作模拟器界面。
+
+
+- `./scripts/build-ios.sh`四项目标全部成功（`/tmp/capture151-ios.log`），模拟器包Agent/Widget资源校验通过；未操作模拟器界面。真机Debug2026110302构建成功，25项Agent资源、Widget身份／版本／入口及codesign深度严格校验通过（`/tmp/capture151-device.log`及`/tmp/capture151-{agent-resources,island-resources,signature}.log`）。
+- 已安装连接的iPhone17 Pro，流水5652，并成功启动（`/tmp/capture151-install.log`、`/tmp/capture151-launch.log`）。真实模型／AVFoundation验收待用户确认：关闭窗口直接拍照／限时录像，已有窗口复用、最小化恢复、视频后拍照自动选模式、前置失败不拍摄、录像手动停止后一次ready询问；背景视觉不得被隐式开启。未commit；修改文档本地链接及diff格式通过。
+
+## 2026-11-03 录像自动模式与并列示例（150）
+
+- startRecording 接收可选 durationSeconds1…600，省略沿用现有时长；在已开窗口内部自动切video/flash off，保留镜头、zoom与照片delay。CameraCoordinator 的变更门覆盖配置和didStart，录像会话启动任务拥有配置/取消；与显式configure共用CameraCaptureConfiguration事务，失败加入回滚并保留原始及清理错误。待处置照片/视频不被自动丢弃，未开窗口仍要求openCamera。
+- 保留149的终态等待与手动Tool独立停止。Photography revision35并列Photo/Video示例，覆盖普通/限时开始、ready询问、保存/忽略、各自close后finish及无Task独立成功；无需为录像额外configure。
+- 9项录像定向测试通过（`/tmp/recording150-targeted.log`），含实际领域配置顺序、参数/时长转发、设置保留、匹配video不重复配置、失败/取消回滚且无音频/原生启动、终态/手动停止/模型续推。原生及模型为测试替身，不能当真机验收。
+- 初次完整check的972项集成中，Skill重排触发18项断言：原契约关键措辞/无Task示例遗漏，及新增视频后原来只允许两条Task关闭示例和全局禁用UUID的旧断言。恢复规则与逐步关闭示例；关闭数改为照片/录像四条，并将照片不可用UUID的检查限定到photo参数，视频仍必须使用真实UUID。首次单项示例还因准备语句过长被切为两段而失败，缩短为单条提示。未放宽Skill容量、解析或完成要求。
+- 7项Skill定向复查已通过6项，剩余为Vision边界措辞；恢复“never Vision.close”后该项与三Skill合并容量再次通过（`/tmp/recording150-skill-confirmed.log`）。最终结果见下。
+
+
+- 最终完整`./scripts/check.sh`退出0（`/tmp/recording150-check-final.log`）：176项UI、972项集成、138项Workflow、225项LiveRuntime（206.469秒）及其余检查通过。本轮NativePresentation的Metal测试只有started无结束摘要，不单独记通过；首次检查中该用例及10项NativePresentation有通过摘要，证据只对应首次运行。
+- `./scripts/build-ios.sh`四项构建退出0（`/tmp/recording150-ios.log`），模拟器包Agent/Widget资源校验通过；未操作模拟器界面。真机Debug版本2026110301构建成功，25项Agent资源、Widget身份/版本/入口、codesign深度严格校验通过（`/tmp/recording150-device.log`及`/tmp/recording150-{agent-resources,island-resources,signature}.log`）。
+- 已安装到连接的iPhone17 Pro，流水5644，并成功启动（`/tmp/recording150-install.log`、`/tmp/recording150-launch.log`）。真实模型/原生摄录闭环待用户验收：照片模式直接说“录十秒视频”，确认无需configure、先提示后录制、结束后一次真实时长及处置询问。自动化不能替代该验收。修改文档相对链接和diff格式通过；未commit。
+
+
+## 2026-11-02 task_104 录像重复回复与完成通知审查（149）
+
+- 用户授权读取连接iPhone的SQLite。只复制records.sqlite及其WAL到仓库外`/tmp/task104-records.sqlite`，以只读SQLite连接分析；quick_check=ok。未修改手机数据、复制媒体或重新执行录像。数据库为在线顺序复制，不声称全库事务级导出；本任务已结束且对应记录可完整解析。原始对话和数据库不加入仓库。
+- task_104属于Assistant前台目标“录像并等待保存、忽略或重拍”，最终completed。北京时间21:37:05.045请求输出准备语音wait+startRecording；21:37:09.932的下一轮输入只有startRecording成功/state=recording。随后“录像已开始”播放失败busy；21:37:11.931、13.058、14.128三个失败观察连续触发三次“录像进行中，需要停止时请告诉我”。对应请求/回复身份不同，属于真实三次生成，不是历史列表重复渲染。
+- 用户输入message_5003的generationRounds确认：只有一次Camera.Video.startRecording成功；准备语音成功；之后Speech.Playback.speak连续三次failed/handlerFailed/busy，最后一次succeeded。没有证据表明前三条重复内容都实际播放。最后请求21:37:14.139，首token21:37:15.015；未收录视频记录21:37:15.101落库，最终保存回执时长4.833333秒、stopReason=stopped、mediaID=media_249。音频恢复附近旧回复获准播放与用户描述一致；数据库没有精确按钮触摸/扬声器起播时间，不伪造二者精确先后。
+- 21:37:09/11/13/14四轮CURRENT STATE均为actions.camera.recordingPhase=recording、platform.vision.camera.recording=true。21:37:25用户说明已经停止并要求保存后，下一请求已是ready/false。不能把问题归结为State永久卡在recording；实际有请求采样到播放之间的过期窗口，以及缺失完成续推。
+- 根因1：CameraRecordingSession.start在didStart后返回recording回执，CameraModule以value完成；ToolResult将显式业务值认定需要ReAct。即录像开始立即续推，而不是等待录像终态。
+- 根因2：VoiceSessionCoordinator.play在videoAudioHeld时抛busy；ToolResult.hasFailure全部请求续推。模型用自然语言解释失败又自动转换Speech.Playback.speak，重复撞同一个音频占用门；没有录制期间等待终态的编排或同类播放阻塞的停止重试保护。Photography已有“先提示、录制静默、按钮停止”说明，实测模型仍违反；不能只靠新增提示词修复。
+- 根因3：CameraRecordingSession.completion仅由内部持有，finish向UI发布ready；手动stop经Photographer固定Tool返给UI，CameraInteractionWorkflow丢弃成功返回值。没有按原Assistant任务/输入身份投递录像终态的桥。Assistant历史从start后只有Speech失败，没有stop/ready完成观察；直到用户再次讲话才采到ready。定时结束走同一内部completion，也缺这条续推链。
+- 根因4：finish在prepareClip之前returnAudio，已生成/进行中的旧回复可能在媒体ready提交前恢复播放；CURRENT STATE只提供录制phase/id及配置durationSeconds（上限），不提供当前视频mediaID、实际时长或文件名。显示的savedMediaID仍是上一张照片，不能当当前视频证据。视频回执本身已有mediaID/实际durationSeconds/stopReason，但没有文件显示名，且ready回执未投给原任务。
+- 建议修复边界（尚未实施）：开始只确认生命周期、不继续追问；根拥有按recordingID及原任务/输入绑定的终态等待，手动/限时停止合流、文件准备后仅投递一次真实ready或failure；携带媒体身份、实际时长、显示文件名及处置状态。保留失败日志，但中止同一播放受阻引起的自动语音重试，终态释放时淘汰旧录制态回复。不能简单把所有start调用阻塞到结束，否则UI/Photographer单pending槽可能阻塞手动stop；需分开启动接纳和会话终态等待。录像采音/关键词唤醒另行设计，本审查不修改VAD。
+- 现有CameraEnhancementTests覆盖本地start/stop/文件/音频归还，PhotographerCameraTests覆盖按钮映射，但未串联Assistant生成→录像持有音频→Speech失败→用户按钮停止→原任务续推。需要补该跨链路回归，以及限时结束、失败收尾、结束并发去重、取消/切任务迟到终态场景。
+- 本轮仅数据库/源码审查及文档记录；未改代码、未运行构建或真实模型复现，未安装/commit。
+
+
+### 149 实施与验证（录像终态）
+
+- 实际修复保留 UI → Photographer → Gateway ToolCall → Actions；ToolDispatcher 使用 DirectExecutionDispatcher，不进入 ChannelScheduler。此前“经过 Agent 就会阻塞手动停止”的表述不成立。
+- 采用同一 startRecording 的显式完成模式：默认 waitForCompletion=true 等唯一 completion，按钮固定 false 仅等待原生开始。取代上方初步建议中的额外终态投递桥，直接复用原 Action 身份/取消/完成反馈，避免第二条通知。等待取消仅停止对应 nativeID 并加入；真实收尾错误优先于取消。文件准备和 ready 发布先于音频归还；回执增加无路径 fileName。
+- 回归覆盖真实 Photography 声明/模型回合工作者/ChannelScheduler、UI请求/Photographer/ToolDispatcher：模型等待时按钮停止可完成，模型总共两轮（启动选择、结束后响应），仅一条终态观察含 ready、mediaID、实际时长及文件名。模型和原生设备为明确测试替身，不计真实模型/硬件验收。另覆盖限时完成、取消、文件验证失败、一次媒体准备和音频归还顺序、按钮短回执及参数/预算。
+- 首次直接 swift test 使用 CommandLineTools，因找不到 metal 未能构建；切换完整 Xcode 后定向测试运行。首轮新增模型观察断言按字符串搜索4.8失败（JSON浮点编码表达差异），改为解码数值比较后通过。
+- 首次完整 check.sh 的970项集成仅 Skill 合并容量用例失败；扩展指令/元数据超预算，已缩短文本，未提高容量。该轮其余检查及225项LiveRuntime通过；修订后8项定向测试（含容量、Skill示例及录像链）通过。最终完整`./scripts/check.sh`退出0（`/tmp/recording149-check-final.log`）：176项UI、970项集成、138项Workflow、225项LiveRuntime（206.060秒）及其余检查通过。NativePresentation的Metal用例仍仅见started无完成摘要，不单独记通过。
+- `./scripts/build-ios.sh`四项构建退出0（`/tmp/recording149-ios.log`），模拟器包Skill/Widget资源校验通过；未操作模拟器界面。真机Debug版本2026110221构建成功（`/tmp/recording149-device.log`），25项Agent资源、Widget身份/版本/入口、codesign深度严格校验均通过（`/tmp/recording149-{agent-resources,island-resources,signature}.log`）。
+- 已安装到连接的iPhone17 Pro，流水5636（`/tmp/recording149-install.log`），并成功启动（`/tmp/recording149-launch.log`）。真实麦克风/录像/模型闭环尚未独立验收；需语音开始→录制静默→手动停止→一次结束说明及保存/忽略询问，并验证限时停止。未commit；文档本地链接、diff格式通过。
+
 ## 2026-11-02 紧凑岛外侧留白（148）
 
 - 外侧padding从5pt调到8pt，每边增加3pt；几何与视图共用原常量，不改变高度、符号、中央保护区、展开正文和系统Widget边距。既有尺寸断言同步更新。

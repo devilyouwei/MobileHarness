@@ -61,3 +61,5 @@ Face原生树与导航保持身份；页面打开/返回不停止根聆听。窗
 [总体设计](../README.md)
 
 灵动岛默认系统状态通过根构造的只读UI值端口注入，本地组件拥有刷新/布局及实际挂载标志；Root绑定系统状态栏隐藏和恢复。系统状态不进入Action内容接口，UI不创建平台采样器。见[Island](Components/Island/README.md#默认系统状态条)。
+
+CameraPresenting exposes a bounded, cancellable fresh-frame geometry receipt for capture startup. UICameraContainer resolves it from admitted camera frames or lifecycle failure, without broadcasting frame traffic as Facts; Actions awaits the receipt before requesting device capture. See [Camera](Camera/README.md) for admission, deadlines and cleanup.

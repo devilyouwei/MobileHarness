@@ -403,7 +403,9 @@ Thin blue arrows show preparation dependencies; thick amber arrows emphasize the
 
 Construction creates roots and connects ports without capture, inference or device scanning. Storage startup prepares repositories; model startup registers capabilities without requiring weight loading. Once foundations are ready, App's executionBindings node connects the Actions-owned business assembly to Agents-owned cognitive host ports, validates Skill coverage against the immutable catalog, configures Gateway with the neutral execution port, and binds role hosts to the resulting capabilities. Actions starts before Gateway opens admission; Agents then registers and starts roles. Unconfigured execution and repeated configuration fail explicitly.
 
-On inactivity, synchronous invalidation fences new work before asynchronous pause joins existing execution and native cleanup. Terminal feedback and cancellation remain identity-bound and available during draining. Rapid reactivation waits for required suspension; no effect is automatically replayed. Existing bounded feedback retries retain their evidence across pause; terminal shutdown joins delivery workers.
+Once the application is running, Scene visibility is separate from root-session availability. App uses `ManagedService.continuesInBackground` to retain ModelKit, PlatformKit, UI, Actions, Gateway and Agents roots. Scene notifications close camera/tracking and foreground-only device services and unmount local windows and Island rendering. User-enabled audio, VAD/ASR, conversation, business execution and replies continue under native audio activity and OS authorization. UI retains session facts and Island generation; ActivityKit receives current summaries and foreground remount displays current content. Live Activity does not grant background execution, and capability owners reject foreground-only operations.
+
+Startup interruption, full invalidation and stop still fence all roots and join cleanup in dependency order. Terminal feedback and cancellation remain identity-bound during draining. Rapid reactivation waits for required suspension; no device effect is automatically replayed.
 
 App explicitly sequences execution preparation: AgentContainer prepares cognitive inputs; ActionsContainer.configureBusiness owns business assembly preparation and returns execution/catalog/host ports; the Agent preparation validates Skill coverage and returns Gateway configuration; App configures Gateway and calls AgentContainer.bindExecution with the resulting facilities. The executionBindings lifecycle node retains this configuration boundary for partial-start rollback and reverse cleanup. Actions owns internal function binding; App owns the cross-module sequence.
 
@@ -640,6 +642,12 @@ The two Actions nodes represent the same shared execution capability. Actions ow
 **Routing rule for development:** keep changes limited to UI presentation state on the direct path. Route business data queries or mutations, persistence, device operations and domain lifecycle coordination through the responsible Agent → Gateway → Actions. Classify by the actual effect, not by whether the input is a click or voice command. A combined interaction may use both paths: opening a page is presentation-only, while loading its business data uses the business path; closing a window that must stop capture requires business lifecycle coordination. UI handlers submit business intent rather than implementing the business operation themselves. Voice-selected presentation commands still enter through Agent execution; presentation-only classification does not bypass that voice decision path.
 
 Execution and completion contracts follow the shared workflow above; local presentation details belong to the [UI module](UI/README.md).
+
+#### Window presentation and domain lifecycle
+
+UIContainer owns WindowState and the `ui.windows` reader. ApplicationControl consumes typed window requests and invokes registered UI.Window functions through Gateway. Actions delegates domain lifecycle to WindowContentLifecycle; CameraCoordinator retains media ownership independently of view mounting. `Camera.Capture.open` combines photo-window presentation with capture readiness and returns windowID; `Camera.Perception.openVision` enables vision independently of that window.
+
+UI owns geometry, focus, stacking and presentation completion. Camera owns device leases and media disposition: cancel retains the window, while save/discard must finish before cleanup and dismissal. Photography Skill awaits the close receipt after the matching Task's successful final disposition before Task termination. Completion, cancellation and replacement join that cleanup; failure retains the Task and pending media requires user disposition. Closing photography leaves independently enabled vision running. See [window execution](Actions/UI/Navigation/README.md), [Camera](Actions/Camera/README.md) and [Skill lifecycle](Agents/Support/README.md).
 
 ### 4. Page navigation and visible page context
 
@@ -1172,7 +1180,13 @@ Camera observations retain gravity-upright source orientation for inference and 
 
 VisionPerception owns cadence, motion evidence, target association and projection. Agents authorizes protected presentation/tracking calls; Gateway checks generic identity, envelopes and scheduling. Actions validates frame sequence, freshness, orientation and UI generation. Model/overlay failure preserves valid native preview. Photographer selects tracking from real fresh pose evidence; device output still requires authorization and a live resource permit. See [Camera](Actions/Camera/README.md), [VisionPerception](Agents/VisionPerception/README.md) and [Photographer](Agents/Photographer/README.md).
 
-### 14. Photo capture, App album and system export
+#### Shared capture and lens authority
+
+Photo and background vision are independent Actions-owned demands over one PlatformKit Camera capability. Either demand keeps capture active; the second consumer reuses the same immutable native stream, and only the last close releases capture. Minimizing retains photo demand but unmounts its renderer. App background clears both demands and joins cleanup; foreground alone does not reopen either. YOLO/tracking is created only for visual demand and never drawn in the photo window.
+
+UI owns actual surface ordering, safe-area geometry and presentation completion. Actions reads the same lensOwner projection as the buttons: the highest visible camera surface can switch; an expanded visible photo window outranks Face, while minimization yields to visible enabled Face vision. Other windows confer no camera rights. Transitions fence new switches and join admitted native work. PlatformKit alone changes input/captures photos; successful switching updates both displays, invalidates the old pose scope and reacquires tracking. Native running/facing/phase facts are published at platform.vision.camera, independently of business intent. Surface layout belongs to [UI Camera](UI/Camera/README.md) and [Window](UI/Components/Window/README.md).
+
+### 14. Photo/video capture, App album and system export
 
 ```mermaid
 flowchart TB
@@ -1253,6 +1267,18 @@ Photo bytes ready, current preview, formal App album inclusion and a system Phot
 Album browse/import/export/delete uses UI.album → Photographer authorization → Gateway → the internal album function. Original reads, thumbnails and mutations have separate bounds; imports retain per-item successes. The root owns admitted changes across navigation and joins them at shutdown. The ordinary Photography Skill does not expose system export or album deletion.
 
 System export waits for the actual Photos transaction. Denied permission or write failure preserves the App original. Each explicit click creates a copy without automatic export, retry or synchronization. App deletion commits the logical record before file cleanup and retains recovery evidence; system copies remain independent. Chat originals may become unavailable. Model/history media reads retain source/session/input ownership and bounded image preparation. See [Camera album](Actions/Camera/README.md), [UI Settings](UI/Settings/README.md), [Media](Storage/Database/Media/README.md) and [Platform Vision](PlatformKit/Vision/README.md).
+
+#### Recording, microphone handoff and media completion
+
+Camera UI settings/countdown/start-stop/disposition requests flow through Photographer → Gateway → declared Camera.Capture/Video Actions. Assistant's Photography Skill uses the same declarations, selected facts and separate operation receipts. CameraCoordinator keeps photo/video demand independent of background Vision; both consume the same PlatformKit camera session and immutable preview. UI's file player and window activity labels are presentation-only.
+
+takePhoto/startRecording compose the canonical camera-open step with capture under one invocation. The unique window is opened/restored or reused before mode preparation; failures stop dependent work, and only the final media receipt produces model feedback. openCamera remains available for preview-only use. Generic sequence composition defaults to continuing after failed leaves for existing robot workflows, while camera preparation selects stop-on-failure. Successful child reports never replace the final value in Actions or Gateway.
+
+Before recording, Actions automatically prepares video mode in the Camera window, preserving lens/zoom/photo delay and applying an optional duration limit; configuration failure joins rollback and never starts capture. Actions then blocks new voice audio playback, joins VoiceSessionCoordinator's microphone pause and full native audio-owner release, and retains the prior listening generation. AppleCamera then reserves PlatformKit.Audio's native owner, adds microphone/movie output to its existing graph and waits for didStart. didFinish removes/releases native audio; Actions validates/publishes a pending local file through StorageMedia before resuming valid foreground listening intent and offers save/ignore. Model startRecording defaults to awaiting that terminal receipt under the original execution identity; only then does its ready result trigger ReAct with mediaID, fileName and actual duration. Photographer's interactive start Tool explicitly requests startup-only acknowledgement and releases its UI request slot. The UI stop Tool bypasses ChannelScheduler and joins the same recording completion; it does not independently notify the Assistant, so manual stop produces one original-call terminal observation. Cancellation joins matching native stop/finalization rather than leaving an orphan recording. Collection into the App album is a separate commit. Album playback uses a bounded local URL; system export joins a Photos transaction through VisionContainer. No movie is passed into model/history image decoding.
+
+The recording owner survives minimized/hidden content; recording locks lens switching on both surfaces. Close stops/joins before media decisions; background stops/finalizes and preserves the pending clip without automatic foreground recording. Actual native recording facts belong to PlatformKit, business phase/settings to Actions, display/geometry to UI, and durable inclusion to Storage. Detailed limits/failures live in [Camera Actions](Actions/Camera/README.md), [Platform Vision](PlatformKit/Vision/README.md), [Listening](Actions/Speech/Listening/README.md) and [Media](Storage/Database/Media/README.md).
+
+Camera opening awaits both native running and a fresh UI preview-geometry receipt before the composed capture step can run. Photo/movie execution rechecks that receipt at capture time and freezes the UI camera window’s sensor-to-interface angle and passes it to PlatformKit’s validated output connection. Perception retains independent gravity-upright frame coordinates; encoded photo metadata/movie transforms determine later media display. No Foundation dependency on UI or Actions is introduced.
 
 ### 15. Robot motion, hardware facts and control handoff
 
@@ -1593,6 +1619,16 @@ Pure cancellation is distinct from real or mixed execution/cleanup failure; clas
 
 UI presentation admission differs from native completion. Finite expressions await their presentation/restoration; persistent base state acknowledges admission. Metal owns window/layer/GPU completion. Photo disappearance/display receipts retain media and generation identity. Updating a UI field cannot prove GPU or physical completion. See [UI](UI/README.md), [ApplicationControl](Agents/ApplicationControl/README.md) and [runtime presentation](Actions/UI/Runtime/README.md).
 
+#### Shared in-app and system Island presentation
+
+Actions' root-owned IslandDomainPresentation projects existing Task, Camera, Voice and connection facts into neutral UI content. Task details carry goal text/thumbnail and phase identity. UIContainer.island owns presentation state; the in-app host and ActivityKit adapter report local completion and system submission separately. WidgetKit consumes shared display values. System permission or submission failure does not erase local content; iOS controls actual system display.
+
+Detail activity and live status are selected independently, preserving the user's detail expansion preference while the top indicators change. UI owns layout, animation, thumbnail resources and bounded display admission. Measured spectrum updates remain local presentation data rather than per-frame Actions or ActivityKit submissions. See [Island component](UI/Components/Island/README.md) for these contracts and [Actions Runtime](Actions/UI/Runtime/README.md) for domain projections.
+
+Scene inactivity unmounts local rendering while retaining current activity facts for system presentation. Full root invalidation clears local generations and publishes paused system state; stop joins cleanup. System Island taps restore the existing scene without a navigation destination or device operation. App's native termination callback requests bounded best-effort ActivityKit cleanup; iOS may terminate without that callback, so stale presentation and next-start cleanup cannot guarantee immediate removal. Island presentation does not own Task completion or background device lifetime.
+
+For the in-app system status strip, PlatformKit owns native network/battery facts, App adapts them into UI-owned read-only values, and the Island component controls reads and layout while mounted. UI Root hides/restores the native status bar from actual mount state. Actions and Agents do not modify system status; UI and PlatformKit remain independent foundations. See [composition adapter](App/Composition/README.md) and [Island status](UI/Components/Island/README.md).
+
 ### 21. Cross-module cancellation, pressure and completion
 
 ```mermaid
@@ -1659,43 +1695,3 @@ Independent fences include UI generation, capture generation, endpoint incarnati
 | Navigation/inactivity | UI lifetime or App invalidation → owned cancellation/join. | Committed creations remain; root cleanup outlives pages. |
 
 Automated checks, iOS builds, real-model samples, native UI and physical-device acceptance are separate evidence categories maintained in [validation](../docs/validation/README.md). Requirements and decisions live in [requirements](../docs/requirements/README.md) and [ADR](../docs/adr/README.md); historical design rationale lives in [documentation history](../docs/history/Documentation-History.md).
-
-## Window and camera flow
-
-UIContainer owns WindowState and the ui.windows reader. ApplicationControl consumes bounded typed window requests and invokes registered UI.Window functions through Gateway. Actions' WindowExecutionService serializes replacements per instance, joins cancellation and delegates lifecycle to WindowContentLifecycle. CameraCoordinator implements pause/resume/close, retaining photo ownership independently of view mounting. Camera.Capture.open is the photo-window opening entry and combines real presentation with capture readiness, adding windowID. Camera.Perception.openVision independently enables background vision/following without a photo window.
-
-UI manages geometry, focus, stacking, retained identity and UIKit completion. It never owns device leases or photo disposition. A photo close decision is rendered as UI values and interpreted by the Camera domain; cancel retains the window, save/discard must complete before cleanup and dismissal. Foundation dependencies remain unchanged. Details: [UI](UI/README.md), [window execution](Actions/UI/Navigation/README.md), [camera](Actions/Camera/README.md).
-
-Photography Skill closes the photo window through Camera.Capture.close after the matching Task's successful final disposition, then awaits the close receipt before Task termination. BasicSkill respects that cleanup on completion, cancellation and replacement. Failure retains the Task; pending photos remain subject to user disposition. Closing photography leaves independently enabled background vision running.
-
-### Shared Camera demand and visible-surface lens control
-
-Photo and background vision are independent Actions-owned demands over one PlatformKit Camera capability. Either demand keeps capture active; the second consumer reuses the same immutable native stream, and only the last close releases capture. Minimizing retains photo demand but unmounts its renderer. App background clears both demands and joins cleanup; foreground alone does not reopen either. YOLO/tracking is created only for visual demand and never drawn in the photo window.
-
-UI owns actual surface ordering, safe-area geometry and presentation completion. Actions reads the same lensOwner projection as the buttons: the highest visible camera surface can switch; an expanded visible photo window outranks Face, while minimization yields to visible enabled Face vision. Other windows confer no camera rights. Transitions fence new switches and join admitted native work. PlatformKit alone changes input/captures photos; successful switching updates both displays, invalidates the old pose scope and reacquires tracking. Native running/facing/phase facts are published at platform.vision.camera, independently of business intent. The photo window uses native image aspect plus chrome/controls; generic windows retain their default size.
-
-### Photo/video completion and microphone flow
-
-Camera UI settings/countdown/start-stop/disposition requests flow through Photographer → Gateway → declared Camera.Capture/Video Actions. Assistant's Photography Skill uses the same declarations, selected facts and separate operation receipts. CameraCoordinator keeps photo/video demand independent of background Vision; both consume the same PlatformKit camera session and immutable preview. UI's file player and window activity labels are presentation-only.
-
-Before recording, Actions blocks new voice audio playback, joins VoiceSessionCoordinator's microphone pause and full native audio-owner release, and retains the prior listening generation. AppleCamera then reserves PlatformKit.Audio's native owner, adds microphone/movie output to its existing graph and waits for didStart. didFinish removes/releases native audio; Actions resumes only valid foreground listening intent, validates/publishes a pending local file through StorageMedia, and offers save/ignore. Collection into the App album is a separate commit. Album playback uses a bounded local URL; system export joins a Photos transaction through VisionContainer. No movie is passed into model/history image decoding.
-
-The recording owner survives minimized/hidden content; recording locks lens switching on both surfaces. Close stops/joins before media decisions; background stops/finalizes and preserves the pending clip without automatic foreground recording. Actual native recording facts belong to PlatformKit, business phase/settings to Actions, display/geometry to UI, and durable inclusion to Storage. Detailed limits/failures live in [Camera Actions](Actions/Camera/README.md), [Platform Vision](PlatformKit/Vision/README.md), [Listening](Actions/Speech/Listening/README.md) and [Media](Storage/Database/Media/README.md).
-
-Photo/movie execution freezes the UI camera window’s sensor-to-interface angle and passes it to PlatformKit’s validated output connection. Perception retains independent gravity-upright frame coordinates; encoded photo metadata/movie transforms determine later media display. No Foundation dependency on UI or Actions is introduced.
-
-## 通用双呈现灵动岛
-
-UIContainer.island统一拥有前台和系统内容。Actions根服务从已有Task/Camera/Voice/连接状态发布中立紧凑内容，目标任务额外声明通用IslandDetail(text,thumbnail)和阶段身份；UI组件负责完整前台布局/动效、原生ActivityKit提交及各自回执。App根只挂载IslandHost；WidgetKit独立扩展消费共享摘要，系统权限失败不会使前台状态消失。
-
-有效文字或缩略图首次出现即默认展开，普通更新尊重用户收起，清空详情收回。每个详情活动独立保存展示偏好，详情与无详情实时状态分别按优先级选择。展开下方复用详情活动primary和目标描述；顶部继续切换语音、相机、加载等实时指标，不影响任务详情及收起偏好。只有展开区显示正文/图片，两端共用这些语义，系统展开时机由iOS决定。动画设计在基础组件内，业务不传尺寸/弹簧参数。前台真实挂载完成与系统请求提交分别报告；系统实际展示由iOS决定。频谱测量仅更新前台附件，不逐帧发送Action/原生摘要。
-
-根失活清空前台旧代并停止隐藏渲染，原生保留当前完整活动及明确暂停状态；stop加入清理。系统岛点击固定唤回既有场景，内容不携带导航目的地，不跳转到记录/相机页。进程终止由App原生回调调用UI有界尽力清理；iOS不保证强杀回调，过期外观与下次启动清理不能保证划掉立即消失。Camera继续走Photographer→Gateway→声明式Action。灵动岛状态不替代Task/设备事实，不拥有后台设备运行。见[UI](UI/README.md)、[组件](UI/Components/README.md)、[Actions Runtime](Actions/UI/Runtime/README.md)。
-
-缩略图由UI中立类型化接口注册并提供有界显示资源引用，Actions传入图片数据但不设计呈现，系统侧不共享图片。左右指标以primary/secondary独立选择符号效果、loading、真实频谱或进度，预设效果由组件实现；旧字段仅在解码边界迁移。
-
-应用running后的Scene可见性与根会话可用性分离：App按ManagedService.continuesInBackground保留Model/Platform/UI/Actions/Gateway/Agents，Scene通知只关闭Camera/视觉跟随和前台设备服务、本地Window/Island渲染。用户已开启的Audio、VAD/ASR、对话/业务执行和回复继续；UI保留同一会话事实与Island活动generation，ActivityKit接收实时摘要，返回前台重新显示最新内容。完整invalidate/stop仍逆序取消加入所有工作。后台持续运行依赖真实录音/播放与OS授权，不由Live Activity保证；前台专属Action仍由所属能力拒绝。
-
-UI模块根保留UIContainer、UIFailure和UIStateSnapshot整体契约；内部以Root归档根页面组合与导航，Shared归档非视觉通用机制，Components按Island/Window聚合完整公共组件，Conversation拥有Face原生绘制与Metal资源。根UIContainer唯一构造子能力；输入/回执类型随功能owner，Shared不依赖具体功能。目录不新增Swift target或跨模块依赖，Widget仍只编译独立共享显示源。详见[UI目录与边界](UI/README.md)。
-
-App内灵动岛系统状态链路：PlatformKit持有原生网络/电池事实→App构造适配为UI自有只读值→Island组件按本地挂载生命周期刷新并布局。UI根视图根据真实挂载标志隐藏/恢复原生状态栏；Actions/Agents不提交或修改系统状态。两基础模块保持独立，组件不重复开启系统观察。

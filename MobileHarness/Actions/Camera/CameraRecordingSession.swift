@@ -62,6 +62,9 @@ import UI
         activity(phase == .recording ? "录制中" : phase == .finishing ? "正在收尾" : nil)
     }
     func start(duration: Int, invocation: any FunctionInput) async throws -> CameraVideoReceipt {
+        guard (1...600).contains(duration) else {
+            throw ActionArguments.ValidationError.invalidValue("durationSeconds")
+        }
         guard foreground() else { throw CameraControlError.notForeground }
         guard !busy, clip == nil else { throw CameraControlError.busy }
         mayResumeAudio = true
@@ -77,13 +80,22 @@ import UI
             session: invocation.context.sessionID, input: invocation.context.inputID)
         let task = Task<CameraVideoReceipt, any Error> {
             do {
+                let current = presentation.snapshot.settings
+                if current.mode != "video" || current.flash != "off" || current.durationSeconds != duration {
+                    try await CameraCaptureConfiguration.apply(
+                        .init(
+                            mode: "video", delaySeconds: current.delaySeconds, flash: "off", zoom: current.zoom,
+                            durationSeconds: duration), camera: camera, presentation: presentation)
+                }
+                try Task.checkCancellation()
+                guard foreground() else { throw CameraControlError.notForeground }
                 audioHeld = true
                 try await acquireAudio()
                 try Task.checkCancellation()
                 guard foreground() else { throw CameraControlError.notForeground }
-                guard let rotation = presentation.snapshot.photoCaptureRotation else {
-                    throw CameraControlError.unavailable
-                }
+                let rotation = try await presentation.waitForPhotoCaptureRotation()
+                try Task.checkCancellation()
+                guard foreground() else { throw CameraControlError.notForeground }
                 let id = try await camera.beginRecording(durationSeconds: duration, rotation: CGFloat(rotation))
                 nativeID = id
                 phase(.recording, id: id)
@@ -123,8 +135,9 @@ import UI
             nativeID = nil
             clip = Clip(id: id, movie: movie, owner: owner)
             phase(.finishing, id: id)
+            let receipt = try await prepareClip()
             try await returnAudio()
-            return try await prepareClip()
+            return receipt
         } catch {
             nativeID = nil
             phase(.failed, id: id)
@@ -157,7 +170,31 @@ import UI
         presentation.present(.message(selected.movie.stopReason == "sizeLimit" ? "录像已达到文件大小上限，请保存或忽略" : nil))
         return CameraVideoReceipt(
             recordingID: selected.id, state: "ready", mediaID: mediaID,
-            durationSeconds: info.duration, stopReason: selected.movie.stopReason)
+            durationSeconds: info.duration, stopReason: selected.movie.stopReason, fileName: file.lastPathComponent)
+    }
+    /// Joins the existing session without owning a UI request slot. Cancellation stops only this recording.
+    func wait(_ id: String) async throws -> CameraVideoReceipt {
+        guard self.id == id || presentation.snapshot.recording.id == id, let completion else {
+            throw CameraControlError.unavailable
+        }
+        let cancellation = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingOldest(1))
+        let stopper = Task {
+            for await _ in cancellation.stream {
+                guard nativeID == id else { return }
+                // Native finish can win this race; the joined completion is the authoritative outcome.
+                _ = try? await camera.stopRecording(id)
+            }
+        }
+        let result = await withTaskCancellationHandler {
+            await completion.result
+        } onCancel: {
+            cancellation.continuation.yield(())
+        }
+        cancellation.continuation.finish()
+        await stopper.value
+        let receipt = try result.get()
+        try Task.checkCancellation()
+        return receipt
     }
     func stop(_ id: String) async throws -> CameraVideoReceipt {
         guard self.id == id || presentation.snapshot.recording.id == id, let completion else {
@@ -188,7 +225,7 @@ import UI
         try await photos.collectVideo(mediaID, owner: selected.owner)
         let receipt = CameraVideoReceipt(
             recordingID: id, state: "saved", mediaID: mediaID,
-            durationSeconds: prepared.durationSeconds, stopReason: prepared.stopReason)
+            durationSeconds: prepared.durationSeconds, stopReason: prepared.stopReason, fileName: prepared.fileName)
         saved = receipt
         clip = nil
         presentation.present(.recordedVideo(nil))
@@ -226,4 +263,54 @@ private struct CameraRecordingCleanupFailure: Error, LocalizedError {
     let primary: any Error
     let cleanup: any Error
     var errorDescription: String? { primary.localizedDescription + "；清理失败：" + cleanup.localizedDescription }
+}
+
+/// Shared native configuration transaction for explicit settings and recording preparation.
+@MainActor enum CameraCaptureConfiguration {
+    static func preparePhoto(camera: any CameraCapturing, presentation: any CameraPresenting) async throws {
+        let current = presentation.snapshot.settings
+        guard current.mode != "photo" else { return }
+        try await apply(
+            .init(
+                mode: "photo", delaySeconds: current.delaySeconds, flash: current.flash,
+                zoom: current.zoom, durationSeconds: current.durationSeconds),
+            camera: camera, presentation: presentation)
+    }
+    static func apply(
+        _ settings: CameraCaptureSettings, camera: any CameraCapturing, presentation: any CameraPresenting
+    ) async throws {
+        try settings.validate()
+        try Task.checkCancellation()
+        let previous = presentation.snapshot.settings
+        let configured: CameraPhotoConfiguration
+        do {
+            try await camera.setVideoMode(settings.mode == "video")
+            try Task.checkCancellation()
+            configured = try await camera.configurePhoto(
+                flash: CameraFlash(rawValue: settings.flash) ?? .off, zoom: settings.zoom)
+            try Task.checkCancellation()
+        } catch {
+            let original = error
+            // Configuration can partially commit. Join rollback with an uncancelled owner.
+            let cleanup = Task {
+                try await camera.setVideoMode(previous.mode == "video")
+                _ = try await camera.configurePhoto(
+                    flash: CameraFlash(rawValue: previous.flash) ?? .off, zoom: previous.zoom)
+            }
+            do { try await cleanup.value } catch {
+                presentation.present(.message("拍摄设置恢复失败：" + error.localizedDescription))
+                throw NativeCleanupFailure(errors: [original, error])
+            }
+            throw original
+        }
+        var display = CameraSettings()
+        display.mode = settings.mode
+        display.delaySeconds = settings.delaySeconds
+        display.flash = configured.flash.rawValue
+        display.zoom = configured.zoom
+        display.durationSeconds = settings.durationSeconds
+        display.maximumZoom = configured.maximumZoom
+        display.supportedFlash = configured.supportedFlash.map(\.rawValue)
+        presentation.present(.settings(display))
+    }
 }

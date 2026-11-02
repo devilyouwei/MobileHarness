@@ -15,6 +15,7 @@ public struct ActionReport: Equatable, Sendable {
             public static let invalidArguments = Self(rawValue: "invalidArguments")
             public static let unavailable = Self(rawValue: "unavailable")
             public static let handlerFailed = Self(rawValue: "handlerFailed")
+            public static let dependencyFailed = Self(rawValue: "dependencyFailed")
             public static let cancelled = Self(rawValue: "cancelled")
             public static let resultCapacityExceeded = Self(rawValue: "resultCapacityExceeded")
         }

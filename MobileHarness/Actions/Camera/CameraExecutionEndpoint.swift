@@ -14,9 +14,14 @@ import FunctionContracts
         self.rootSessionID = rootSessionID
         self.validateSession = validateSession
     }
-    public func startRecording(invocation: any FunctionInput) async throws -> CameraVideoReceipt {
+    public func startRecording(durationSeconds: Int?, invocation: any FunctionInput) async throws -> CameraVideoReceipt
+    {
         try validate(invocation)
-        return try await camera.startRecording(invocation: invocation)
+        return try await camera.startRecording(durationSeconds: durationSeconds, invocation: invocation)
+    }
+    public func waitForRecording(_ id: String, invocation: any FunctionInput) async throws -> CameraVideoReceipt {
+        try validate(invocation)
+        return try await camera.waitForRecording(id, invocation: invocation)
     }
     public func stopRecording(_ id: String, invocation: any FunctionInput) async throws -> CameraVideoReceipt {
         try validate(invocation)

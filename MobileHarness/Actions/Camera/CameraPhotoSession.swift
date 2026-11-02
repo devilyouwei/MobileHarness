@@ -230,7 +230,10 @@ import FunctionContracts
                 try Task.checkCancellation()
                 guard foreground, revision == expectedRevision else { throw CancellationError() }
                 try ensureCaptureAvailable()
-                guard let rotation = state.photoCaptureRotation else { throw CameraControlError.unavailable }
+                let rotation = try await presentation.waitForPhotoCaptureRotation()
+                try Task.checkCancellation()
+                guard foreground, revision == expectedRevision else { throw CancellationError() }
+                try ensureCaptureAvailable()
                 let data = try await camera.capturePhoto(rotation: CGFloat(rotation))
                 try Task.checkCancellation()
                 guard foreground, state.isVisible, revision == expectedRevision else { throw CancellationError() }

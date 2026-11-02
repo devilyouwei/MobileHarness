@@ -36,6 +36,8 @@ Budget resolution validates the definition and uses dynamicTimeout before static
 
 ActionReport holds at most 256 entries. Paths are nonempty up to 128 bytes; details hold at most 16 pairs, keys up to 64 bytes and values up to 512 bytes. Entry states are succeeded, failed, cancelled and notStarted. Independent execution failure is retained alongside prior child results. Producer failure codes are nonempty up to 64 bytes and some value initializers enforce preconditions; callers must provide valid identifiers.
 
+A dependencyFailed leaf is notStarted because an earlier prerequisite failed; the earlier failure retains its original code and details. Successful stored child evidence does not replace a finite value receipt; failed/cancelled evidence takes precedence.
+
 Failure classification prefers actual producer/report failure over pure cancellation. Real failures with successes are partialFailure; real failure without success is failed; cancellation-only is cancelled. ExecutionFailurePreserving prevents resource/scheduling cancellation checks from replacing a real failed report. NativeCleanupFailure retains original errors without performing retry or cleanup.
 
 ActionRequestSlot admits only matching request/session once. Completion is rejected before admission, after closure or after a prior result. take consumes the result/failure and closes; close releases retained content. Role permission is checked before Gateway, independently of this attachment's business scope.
@@ -54,4 +56,4 @@ CameraControlCapability distinguishes photo setEnabled/flip from setPerceptionEn
 
 ## Capture configuration and movie receipts
 
-CameraCaptureSettings is a complete validated settings value (photo/video mode, countdown, flash, zoom, duration). CameraControlCapability includes configure/cancel and typed recording start/stop/save/ignore. CameraVideoReceipt separates recording, ready, saved and ignored, carrying recordingID, optional mediaID/duration/stopReason. These values contain no native device or UI implementation. Defaults on capability test adapters reject unavailable operations rather than fabricating a recording.
+CameraCaptureSettings is a complete validated settings value (photo/video mode, countdown, flash, zoom, duration). CameraControlCapability includes configure/cancel and typed recording start/wait/stop/save/ignore. Start accepts an optional validated duration override; its domain owner prepares video mode and otherwise preserves current capture preferences. CameraVideoReceipt separates recording, ready, saved and ignored, carrying recordingID, optional mediaID/duration/stopReason/fileName (a display basename, never a file URL). These values contain no native device or UI implementation. Defaults on capability test adapters reject unavailable operations rather than fabricating a recording.

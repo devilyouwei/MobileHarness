@@ -1,5 +1,51 @@
 # Face、通用 Window 与 App 内灵动岛
 
+## 2026-11-03 组合拍摄等待首帧（152）
+
+已实现；完整check退出0、四项iOS构建及真机资源/签名校验通过，2026110303已安装并启动。真实摄录待用户验收；NativePresentation无完成摘要，不宣称原生Metal验收通过。详见[152验证记录](../validation/Window-Camera.md)。
+
+附件 task_116 的执行回执显示 open 成功、takePhoto 随即 unavailable；原生运行回执早于 UI 接纳首帧，导致拍摄方向尚未建立。修复范围如下，不更改 Gateway 的 ReAct 调度语义，不以固定延时伪造就绪。
+
+- UI/Camera/UICameraContainer 在 CameraPresenting 增加类型化首帧方向等待接口；同根最多一个等待者，超限明确 busy。接纳新鲜视频帧时完成，不向 Facts 发布逐帧事件；根令牌与视频 generation 拒绝过期回执。取消、后台、停止、渲染失败解除等待，10秒无有效首帧返回明确超时，计时任务取消并加入。
+- CameraState 的只读拍摄方向只接受新鲜帧。Actions/Camera 的 open 在窗口挂载、采集运行后等待首帧；PhotoSession 在倒计时结束、RecordingSession 在配置与音频交接后再次等待有效方向并重验生命周期。失败保留已打开的错误窗口，不触发实际拍摄。原生 Foundation 继续拥有设备状态，UI 仅确认呈现几何。
+- 在既有 UI 测试文件覆盖延迟首帧、复用、容量、超时、取消、后台/根停止及旧帧拒绝；保留组合步骤顺序与终态反馈回归。同步 UI/Camera、Actions/Camera 以及模块技术文档，记录自动化、四项构建、资源/签名与真机安装结果；不将替身测试视为真实摄录验收。
+
+## 2026-11-03 拍摄组合入口与失败策略（151）
+
+已实现并通过完整检查、四项iOS构建和资源／签名校验，真机2026110302已安装启动。原生Metal用例无完成摘要，真实模型／摄录验收待用户确认；见[151验证记录](../validation/Window-Camera.md)。
+
+- takePhoto/startRecording 保持现有地址、参数和 UI Tool 路由，内部组合 Camera.Capture.open 与真实拍摄。open 幂等复用／恢复唯一拍摄窗口，等待挂载和采集就绪；不打开背景视觉。takePhoto 自动准备照片模式，保留镜头、zoom、倒计时等已有设置；录像沿用150的自动video准备和时长。openCamera 保留为只打开预览或显式镜头／参数准备入口，Skill 默认直接拍摄而不先分轮open/configure。删除takePhoto旧的重复最小化恢复分支，窗口准备统一归open。
+- Actions/Support 的 ActionComposition.sequence 增加 failurePolicy：默认continueOnFailure保持机械臂现有执行；stopOnFailure在失败后标记后续叶子notStarted（dependencyFailed），不执行副作用。策略逐层独立；单步超时也服从所选失败策略，保持机械臂既有行为。整个组合取消／截止时阻止后续执行并加入已启动工作。并行与重复节点不另加策略。保留路径、失败、预算和容量限制。
+- 组合提供类型化最终结果执行接口，准备步骤成功后才运行结果步骤；保留步骤报告，同时返回最终照片或录像回执。FunctionExecutor和Gateway/Output/Scheduling/ChannelScheduler仅在子报告有失败／取消时覆盖业务value，成功报告不能吞掉mediaID等结果；不新增ActionCompletion变体。内部步骤不再入Gateway、不单独产生ReAct；录像模型调用仍等ready且UI短回执仍允许手动stop。
+- 文件归属：Support/ActionComposition及FunctionExecutor负责通用机制，Contracts/ActionReport负责未启动原因；Camera既有CaptureActions/VideoActions及新的同目录CameraCaptureWorkflow.swift负责组合，Coordinator负责模式准入／状态保留，CameraModule保持显式绑定。无新目录。同步Support、Contracts、Camera、Skills、Gateway/Scheduling和总体技术README。
+- 预算包含open与最终拍摄，照片110秒（60+50），录像终态780秒（60+720）、UI短启动120秒（60+60）。权限／容量／busy／配置失败停止链条，保留已打开窗口和待处置媒体，不隐式重试或删除。已发生的照片／文件效果不因后续错误伪造回滚。
+- 回归覆盖默认机械臂继续、失败即停与嵌套、取消／超时、类型化结果与失败报告；相机关闭／已开／最小化、照片／视频模式切换、失败不拍摄、设置及背景视觉保持、真实Action/Skill链的单次终态。运行完整check和四项iOS构建，资源签名校验后安装真机，真实摄录／模型验收单列。
+
+## 2026-11-02 Overall README organization
+
+Reorganize the appended window, camera, recording and Island descriptions in `MobileHarness/README.md` into the existing lifecycle, UI-request, camera, media and presentation workflow sections. Keep cross-module ownership, interfaces, data flow and completion boundaries in English. Retain component algorithms, layout, resource limits and module structure in the existing owning READMEs (UI, Island, Camera and Runtime); avoid duplicate contracts. Reconcile Scene continuity wording with the implemented App lifecycle. Preserve unrelated working-tree changes and create no directories. Validate relative links, section placement, English-only overall prose and diff formatting; this documentation-only change requires no build.
+
+Completed: cross-module descriptions are integrated into the existing sections; duplicated module details remain authoritative in their owning READMEs. Verified all relative file targets in the overall README, English-only text, paired code fences, final scenario-map placement and `git diff --check` for the edited documents. No code, build, automated-test, model or device acceptance claim is made.
+
+## 2026-11-02 录像自动模式与 Skill 示例（150）
+
+已实现，完整检查及四项iOS构建通过，已安装并启动真机版本2026110301；真实语音/录像验收待用户确认，见[150验证记录](../validation/Window-Camera.md)。
+
+- startRecording 在已开启的拍摄窗口内自动准备 video 模式，不要求先 configureCamera；保留现有镜头、变焦、照片倒计时，录像闪光设为 off。新增可选 durationSeconds（1…600），省略沿用当前时长设置，定时录像也不必单独配置。仍不隐式打开窗口或处理待处置媒体。
+- VideoActions 纯校验参数后将可选时长经 CameraControlCapability/CameraExecutionEndpoint 传到 CameraCoordinator。Coordinator 保持采集/镜头/待处置准入并在短启动期间持有变更门；CameraRecordingSession 将视频准备纳入同一启动任务，先配置成功再获取音频和开始原生录制。现有 configureCapture 与录像共用一个原生配置/回滚实现，放在既有 CameraRecordingSession.swift，不新增目录。失败或取消不开始录像，配置失败加入回滚后报告；不重置不相关设置。
+- 保留149的默认终态等待、UI Tool启动短回执、独立停止及单次 ReAct；不改Gateway调度。更新Photography revision和文档，拍照/录像分列示例：普通开始、限时开始、ready询问、保存/忽略、关闭窗口及完成匹配Task。保持既有Skill总字节上限，删除重复说明为示例留空间。
+- 自动化验证照片模式直接录像、配置顺序/回滚/取消、已有video不重复切换、设置保留、时长校验，以及真实Skill示例解析和并存容量。执行完整check.sh、四项iOS构建/资源签名校验并安装真机；原生录制和真实模型验收单列。
+
+## 2026-11-02 录像完成反馈与手动停止修复（149）
+
+已按以下边界实现并安装2026110221；自动化、构建及待做真机闭环见[149验证记录](../validation/Window-Camera.md)。原生/真实模型验收不以构建或替身回归替代。
+
+- 已核对：Photographer 的按钮请求为 ToolCall，经 DirectExecutionDispatcher，不进入 ChannelScheduler。业务路由保持 Agent → Gateway → Actions，不修改调度器或绕过准入。UI facade/Photographer 的单请求槽与模型 Action 的通道等待是不同的约束。
+- VideoActions.startRecording 增加纯校验的 waitForCompletion（默认 true）。默认启动后等待该录像实际收尾，原 Action 仅返回一次 ready 或失败，沿既有执行身份续推；不在 recording 阶段产生业务值 ReAct。Photographer 固定按钮 Tool 显式传 false，只等待 didStart，从而释放 UI 请求槽；停止仍是独立 Tool，能结束模型发起的长录像。业务实现不读取或分支判断 Action/Tool 协议。
+- CameraControlCapability/CameraExecutionEndpoint/CameraCoordinator 增加类型化 waitForRecording；CameraRecordingSession 共用唯一 completion，取消等待时停止对应原生录像并加入清理，不能操作后续录像。600秒录制上限外预留启动/文件收尾预算，默认执行预算720秒；按钮短启动预算保持60秒。限时/手动结束合流且不增加第二条终态事件，避免重复通知。
+- 文件验证、pending存储、ready呈现后再归还聆听；CameraVideoReceipt 增加不含路径的 fileName，保留 mediaID、实际时长、stopReason，明确 ready 不是 saved。失败仍释放音频且保留可处置素材。普通取消不产生 ready 续推，真实收尾失败不能被取消掩盖。
+- 同步 Camera/Contracts/Photographer/Skills 技术文档、总体跨模块流程及 Photography 指令。补充启动接纳/终态等待、手动Tool跨调度停止、自动结束、失败、取消与单次结果回归。执行 check.sh、build-ios.sh；真实模型和设备验收独立记录，不扩大到关键词感知或其他审查项。
+
 ## 2026-11-02 紧凑岛外侧留白微调（148）
 
 后续147、148一并随2026110220安装真机；自动启动被锁屏拒绝，待用户解锁确认观感。

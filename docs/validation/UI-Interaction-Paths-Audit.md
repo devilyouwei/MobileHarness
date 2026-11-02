@@ -24,7 +24,7 @@ This makes equivalent discovery operations follow different admission, correlati
 
 MossValidationView invokes [SpeechDiagnosticWorkflow](../../MobileHarness/Actions/System/Diagnostics/SpeechDiagnosticWorkflow.swift) directly. It loads a model, synthesizes audio and plays through the native audio capability without Agent/Gateway execution. The DEBUG chat validation similarly invokes ChatDiagnosticWorkflow through a validation closure. Neither operation is presentation-only. Audio detection, by contrast, already uses typed requests consumed by ApplicationControl and the Speech.Detection.run endpoint.
 
-The diagnostic bypass is explicitly documented in the existing [diagnostics design](../../MobileHarness/Actions/System/Diagnostics/README.md); it is not a newly discovered regression. It conflicts with applying the new routing rule universally. Either migrate diagnostic business requests to the standard path or explicitly scope and document a diagnostic execution exception; do not classify them as direct UI response.
+The diagnostic bypass is explicitly documented in the existing [diagnostics design](../../MobileHarness/Actions/System/Diagnostics/README.md); it is not a newly discovered regression. It conflicts with applying the established routing rule universally. Either migrate diagnostic business requests to the standard path or explicitly scope and document a diagnostic execution exception; do not classify them as direct UI response.
 
 ### 3. Touch transaction completion is not consistent across roles
 
@@ -33,6 +33,11 @@ The diagnostic bypass is explicitly documented in the existing [diagnostics desi
 The discrepancy means an incomplete history output sequence can appear successful where analogous adapters reject it. This is a static protocol gap, not a reproduced user-visible failure. Require an explicit successful terminal condition consistently; add failure-case regression coverage when implementing the change.
 
 ## Consistency observations
+
+- Rechecked after the task_104 recording investigation: the two bypasses above remain in source. Manual camera start/stop/save operations correctly submit typed requests to Photographer and execute through Gateway/Actions. Agent handling here is deterministic, not model inference. The earlier conversational suggestion to bypass Agents for manual business clicks was incorrect and is withdrawn.
+- Recording start acknowledgement, terminal-session delivery to the original task, and playback-failure ReAct repetition are completion/concurrency/feedback issues, not evidence that the manual button route is wrong. Preserve business routing while separating short control requests from the long-lived recording session; do not hold the UI request slot until recording ends. See [recording investigation](Window-Camera.md).
+- Window focus and dragging are presentation-only. Camera window transitions also coordinate lens handoff and capture lifecycle through CameraCoordinator.beginWindowTransition/pauseWindow/resumeWindow/closeWindow; their business route cannot be classified as redundant solely because the initiating control is a title-bar button.
+- The Memory completion finding above is a completion-contract gap, not an Agent/Gateway routing bypass. No runtime reproduction of that gap was performed.
 
 - Shared input mechanics are already centralized in AgentUIRequests.consumeUI: ordinary/control consumers, processing identity, cancellation, deadline and original reply completion. UIRequests owns capacity and generation fencing. These mechanisms should remain shared.
 - ApplicationControl, Photographer and Memory independently stage and drain outputs with similar begin/finish, bounded loops, result inspection and detached joined cleanup. Domain limits and transaction stages differ legitimately; repeated envelope execution and terminal/error interpretation are candidates for a shared mechanism, with domain policy retained in each role.

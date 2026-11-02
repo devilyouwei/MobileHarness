@@ -55,14 +55,18 @@ extension CameraActions {
     @Action(
         domain: "Camera", module: "Capture", title: "takePhoto",
         doc:
-            "Capture once with the ready foreground camera, show preview and return mediaID/image evidence. Does not save to Photos.",
-        parameters: [], timeout: .seconds(50))
+            "Open or restore the Camera window, prepare photo mode and capture once; return mediaID/image evidence. No separate openCamera needed. Does not save to Photos.",
+        parameters: [], timeout: .seconds(110))
     public static func takePhoto(invocation: any FunctionInput, using camera: any CameraControlCapability) async throws
         -> String
     {
         try ActionArguments(invocation.call.parameters).validateAllowedKeys([])
         try Task.checkCancellation()
-        let receipt = try await camera.takePhoto(invocation: invocation)
+        let receipt = try await CameraCaptureWorkflow.run(
+            invocation: invocation, camera: camera, capture: "takePhoto", timeout: .seconds(50)
+        ) {
+            try await camera.takePhoto(invocation: invocation)
+        }
         return String(decoding: try JSONEncoder().encode(receipt), as: UTF8.self)
     }
 

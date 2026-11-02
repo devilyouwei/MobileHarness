@@ -702,3 +702,87 @@ extension NativePresentationTests {
     }
     #expect(CameraPresentationSnapshot(CameraState()).photoCaptureRotation == nil)
 }
+
+@Test @MainActor func captureReadinessWaitsForFreshFrameInsteadOfNativeRunningFlag() async throws {
+    let root = UIContainer()
+    try root.start()
+    root.camera.present(.isVisible(true))
+    var completed = false
+    let pending = Task { @MainActor in
+        let angle = try await root.camera.waitForPhotoCaptureRotation()
+        completed = true
+        return angle
+    }
+    try await awaitCameraState { root.camera.hasPendingPreviewWaiter }
+    #expect(!completed)
+    #expect(throws: CameraFramePresentationError.self) {
+        try root.camera.presentVideo(frame(1, age: .seconds(1)))
+    }
+    #expect(!completed)
+    try root.camera.presentVideo(frame(2))
+    let angle = try await pending.value
+    #expect(completed)
+    #expect(angle == root.camera.snapshot.photoCaptureRotation)
+    let reused = try await root.camera.waitForPhotoCaptureRotation()
+    #expect(reused == angle)
+    #expect(!root.camera.hasPendingPreviewWaiter)
+    await root.stop()
+}
+
+@Test(arguments: ["cancel", "background", "stop", "generation", "renderer", "timeout"])
+@MainActor func captureReadinessAlwaysReleasesItsWaiter(_ cause: String) async throws {
+    let root = UIContainer()
+    try root.start()
+    let oldToken = root.camera.token
+    let pending = Task { @MainActor in
+        try await root.camera.waitForPhotoCaptureRotation(
+            timeout: cause == "timeout" ? .milliseconds(60) : .seconds(10))
+    }
+    try await awaitCameraState { root.camera.hasPendingPreviewWaiter }
+    switch cause {
+    case "cancel": pending.cancel()
+    case "background":
+        try root.setForeground(false)
+        try root.setForeground(true)
+        #expect(throws: UIContainerError.self) { try root.camera.presentVideo(frame(1), token: oldToken) }
+    case "stop": await root.stop()
+    case "generation": root.camera.present(.isVisible(false))
+    case "renderer":
+        root.camera.state.presentRendererFailure(
+            "fixture", generation: root.camera.state.videoGeneration, surface: .capture)
+    default: break
+    }
+    switch await pending.result {
+    case .success: Issue.record("Readiness incorrectly succeeded: \(cause)")
+    case .failure(let error):
+        switch cause {
+        case "cancel": #expect(error is CancellationError)
+        case "timeout": #expect(error as? CameraPreviewReadinessError == .timedOut)
+        case "renderer": #expect(error as? CameraPreviewReadinessError == .rendererFailed("fixture"))
+        default: #expect(error is UIContainerError)
+        }
+    }
+    #expect(!root.camera.hasPendingPreviewWaiter)
+    if cause != "stop" {
+        root.camera.present(.isVisible(false))
+        let retry = Task { @MainActor in try await root.camera.waitForPhotoCaptureRotation() }
+        try await awaitCameraState { root.camera.hasPendingPreviewWaiter }
+        try root.camera.presentVideo(frame(2))
+        _ = try await retry.value
+    }
+    await root.stop()
+}
+
+@Test @MainActor func captureReadinessRejectsOverflowWithoutReplacingCurrentWaiter() async throws {
+    let root = UIContainer()
+    try root.start()
+    let pending = Task { @MainActor in try await root.camera.waitForPhotoCaptureRotation() }
+    try await awaitCameraState { root.camera.hasPendingPreviewWaiter }
+    await #expect(throws: CameraPreviewReadinessError.busy) { try await root.camera.waitForPhotoCaptureRotation() }
+    try root.camera.presentVideo(frame(1))
+    _ = try await pending.value
+    await #expect(throws: CameraPreviewReadinessError.invalidTimeout) {
+        try await root.camera.waitForPhotoCaptureRotation(timeout: .zero)
+    }
+    await root.stop()
+}

@@ -313,7 +313,8 @@ private func skillResponseExamples(_ id: String) throws -> [String] {
             #expect(prompt.contains("never Vision.close"))
             #expect(prompt.contains("Cancelled/failed close retains Task/window"))
             #expect(prompt.contains("Reshoot retains the SAME Task/window"))
-            #expect(!prompt.contains("11111111-2222-4333-8444-555555555555"))
+            #expect(!prompt.contains("<savePhoto mediaID=\"11111111-2222-4333-8444-555555555555\""))
+            #expect(!prompt.contains("<ignorePhoto mediaID=\"11111111-2222-4333-8444-555555555555\""))
         }
     }
 }
@@ -340,7 +341,7 @@ private func skillResponseExamples(_ id: String) throws -> [String] {
         #expect(!finish.calls.contains { $0.actionPath.domain == "Camera" })
         closures += 1
     }
-    #expect(closures == 2)
+    #expect(closures == 4)
 }
 
 @Test(.actionCatalog) func bundledCompletionAndIntentExamplesSeparateTaskClosureFromStandaloneSuccess() throws {
@@ -445,4 +446,21 @@ func businessSkillTeachingCannotFinishAnAbsentOrUnrelatedTask(skill: String) thr
     let business = trace.calls.filter { $0.actionPath.domain != "Speech" && $0.actionPath.domain != "UI" }
     #expect(business.count == 1 && business.first?.actionPath.description == "Agent.Task.finishTask")
     #expect(business.first?.parameters["continueDecision"] == nil)
+}
+
+@Test(.actionCatalog) func photographyExamplesCoverVideoLifecycleWithoutModeSetup() throws {
+    let examples = try skillResponseExamples("photography")
+    let starts = examples.filter { $0.contains("<startRecording") }
+    #expect(starts.count >= 3)
+    #expect(starts.contains { $0.contains("durationSeconds=\"10\"") })
+    #expect(starts.contains { $0 == "<startRecording/>" })
+    #expect(
+        starts.allSatisfy {
+            !$0.contains("configureCamera") && !$0.contains("openCamera") && !$0.contains("waitForCompletion=\"false\"")
+        })
+    #expect(examples.contains { $0.contains("<saveVideo recordingID=") })
+    #expect(examples.contains { $0.contains("<ignoreVideo recordingID=") })
+    #expect(examples.contains { $0.contains("视频已保存") && $0.contains("<finishTask") })
+    #expect(examples.contains { $0.contains("视频已忽略") && $0.contains("<finishTask") })
+    #expect(examples.contains { $0.contains("录像已结束") && !$0.contains("<startRecording") })
 }

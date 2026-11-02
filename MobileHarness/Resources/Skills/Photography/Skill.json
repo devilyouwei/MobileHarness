@@ -1,7 +1,7 @@
 {
   "version": 3,
   "id": "photography",
-  "revision": 33,
+  "revision": 36,
   "description": "拍照/录像: photo/video window, countdown, flash, zoom, timed audio recording and save/ignore. Background vision/tracking belongs to application-control. Use a Task for continuing media decisions.",
   "dependencies": [],
   "useActions": [

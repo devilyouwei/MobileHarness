@@ -102,7 +102,7 @@ public final class CameraState {
     }
     /// Sensor-to-window angle of the current preview, frozen by the capture caller at shutter time.
     public var photoCaptureRotation: Double? {
-        guard videoFrame != nil, let previewBasis else { return nil }
+        guard let videoFrame, (try? validate(videoFrame)) != nil, let previewBasis else { return nil }
         return Double(previewBasis.displayRotation(photoOrientation) * 90)
     }
     public private(set) var photoAspect: Double = 3.0 / 4.0
@@ -125,6 +125,7 @@ public final class CameraState {
         let failure = UIFailure(
             component: "camera.renderer", operation: "render", underlying: CameraRendererFailure(message: message))
         onFailure(failure.component, failure.operation, failure)
+        defer { onFactsChanged?() }
         if surface == .capture {
             photoRendererFailure = message
         } else {

@@ -114,3 +114,116 @@ private actor CompositionCounter {
     #expect(report.entries.last?.status == .notStarted)
     #expect(await counter.count == 1)
 }
+
+@Test(.actionCatalog, arguments: [false, true])
+func compositionSequencePolicyStopsOnlyDependentWork(_ stop: Bool) async throws {
+    let counter = CompositionCounter()
+    let composition = try ActionComposition(
+        .sequence(
+            [
+                .action("open", []) { throw CameraControlError.permissionDenied },
+                .parallel([
+                    .action("capture", []) {
+                        await counter.increment()
+                        return .completed
+                    },
+                    .repeated(
+                        2,
+                        .action("other", []) {
+                            await counter.increment()
+                            return .completed
+                        }),
+                ]),
+            ], failurePolicy: stop ? .stopOnFailure : .continueOnFailure))
+    let report = try await composition.run()
+    #expect(await counter.count == (stop ? 0 : 3))
+    #expect(report.entries.count == 4)
+    #expect(report.entries.first?.code?.rawValue == "permissionDenied")
+    #expect(
+        report.entries.dropFirst().allSatisfy {
+            $0.status == (stop ? .notStarted : .succeeded) && $0.code == (stop ? .dependencyFailed : nil)
+        })
+}
+
+@Test(.actionCatalog) func compositionNestedPoliciesPreserveOuterContinue() async throws {
+    let counter = CompositionCounter()
+    let report = try await ActionComposition(
+        .sequence([
+            .sequence(
+                [
+                    .action("failed", []) { .report(.failure(.handlerFailed)) },
+                    .action("blocked", []) {
+                        await counter.increment()
+                        return .completed
+                    },
+                ], failurePolicy: .stopOnFailure),
+            .action("recovery", []) {
+                await counter.increment()
+                return .completed
+            },
+        ])
+    ).run()
+    #expect(await counter.count == 1)
+    #expect(report.entries.map(\.status) == [.failed, .notStarted, .succeeded])
+}
+
+@Test(.actionCatalog, arguments: [false, true])
+func compositionLeafTimeoutFollowsSelectedPolicy(_ stop: Bool) async throws {
+    let counter = CompositionCounter()
+    let report = try await ActionComposition(
+        .sequence(
+            [
+                .action("slow", [], budget: .init(expected: .zero, timeout: .milliseconds(10))) {
+                    try await Task.sleep(for: .seconds(10))
+                    return .completed
+                },
+                .action("never", []) {
+                    await counter.increment()
+                    return .completed
+                },
+            ], failurePolicy: stop ? .stopOnFailure : .continueOnFailure)
+    ).run()
+    #expect(await counter.count == (stop ? 0 : 1))
+    #expect(report.hasFailures)
+    #expect(report.entries.last?.status == (stop ? .notStarted : .succeeded))
+    #expect(report.entries.last?.code == (stop ? .dependencyFailed : nil))
+}
+
+@Test(.actionCatalog, arguments: [false, true])
+func compositionTypedResultPreservesPayloadAndFailureEvidence(_ fail: Bool) async throws {
+    let input = FunctionInvocation(
+        call: .init(actionPath: .init(domain: "Fixture", module: "Composite", function: "capture")),
+        context: .init(source: "assistant", sessionID: "session", inputID: "input"),
+        executionID: UUID().uuidString, results: ActionReportStore())
+    let counter = CompositionCounter()
+    let definition = ActionFunction(
+        path: input.call.actionPath, displayName: "Capture fixture", kind: .finite, completion: "Actual result",
+        completing: { input in
+            let preparation = try ActionComposition(
+                .action("open", []) {
+                    if fail { throw CameraControlError.permissionDenied }
+                    return .completed
+                })
+            let value: String = try await preparation.run(
+                returning: "capture", budget: .default, results: input.results
+            ) {
+                await counter.increment()
+                return "media_151"
+            }
+            return .value(value)
+        })
+    let result = try await FunctionExecutor.perform(input, definition: definition)
+    let report = try #require(await input.results.snapshot())
+    #expect(await counter.count == (fail ? 0 : 1))
+    if fail {
+        guard case .report(let failure) = result else {
+            Issue.record("Failure must retain report")
+            return
+        }
+        #expect(failure.hasFailures)
+        #expect(failure.entries.last?.code == .dependencyFailed)
+    } else {
+        #expect(result == .value("media_151"))
+        #expect(report.entries.map(\.status) == [.succeeded, .succeeded])
+    }
+}

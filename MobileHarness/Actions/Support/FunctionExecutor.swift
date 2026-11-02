@@ -39,7 +39,12 @@ public struct FunctionExecutor: Sendable {
             if report.executionFailure != nil { return returned }
             completion = returned
         } else if let report = await invocation.results.snapshot(), definition.kind == .finite {
-            completion = .report(report)
+            if case .value = returned, !report.hasFailures, !report.isCancelled {
+                try Task.checkCancellation()
+                completion = returned
+            } else {
+                completion = .report(report)
+            }
         } else {
             try Task.checkCancellation()
             completion = returned
