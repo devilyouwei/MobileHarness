@@ -16,7 +16,7 @@ UIDiagnosticsContainer 唯一创建 SpeechDiagnosticState 和 AudioDetectionStat
 | ChatValidationView.swift | DEBUG 下的页面级聊天检查 |
 | AudioDetectionWorkflow.swift | 音频检测状态／接口、类型化输入及设置内嵌 Section |
 
-✅ 音频检测状态、显示协议、类型化输入及 Section 统一归 AudioDetectionWorkflow.swift；Container 请求由负责角色直接消费。
+音频检测状态、显示协议、类型化输入及 Section 统一归 AudioDetectionWorkflow.swift；Container 请求由负责角色直接消费。
 
 ## 合成与聊天诊断
 
@@ -32,17 +32,17 @@ AudioDetectionSnapshot 区分输入、空间支持、实际布局、回退、PCM
 
 ## 生命周期与待完成项
 
-✅ 展示更新经过共享 UI 根接纳；停止后的迟到结果不能修改状态。后台保留诊断事实，设备是否继续或停止由外部执行拥有者决定。UI stop 不是录音或播放停止回执。
+展示更新经过共享 UI 根接纳；停止后的迟到结果不能修改状态。后台保留诊断事实，设备是否继续或停止由外部执行拥有者决定。UI stop 不是录音或播放停止回执。
 
-❌ 实际模型、声音质量、音频路由和设备连续性验收仍独立进行。
+实际模型、声音质量、音频路由和设备连续性验收仍独立进行。
 
 [UI 根](../README.md) · [设置嵌入入口](../Settings/README.md)
 
 ## 直连链路当前契约
 
-✅ 检测页面提交类型化请求，业务计时及执行交给 Agent／Actions，显示刷新仍由 UI 持有。
+检测页面提交类型化请求，业务计时及执行交给 Agent／Actions，显示刷新仍由 UI 持有。
 
-✅ DEBUG ChatValidationView 增加串行再次验证入口，实际请求完成后才可重试，用于同进程冷／热调用测量；任务仍有限且页面退出取消，结果／错误来自原能力，不授予业务或设备操作权限。
+DEBUG ChatValidationView 增加串行再次验证入口，实际请求完成后才可重试，用于同进程冷／热调用测量；任务仍有限且页面退出取消，结果／错误来自原能力，不授予业务或设备操作权限。
 
 ## Passive state observation
 

@@ -15,19 +15,21 @@ import Gateway
                 id: "storage", dependencies: ["diagnostics"], start: { try await services.storage.start() },
                 stop: { try await services.storage.stop() }),
             ManagedService(
-                id: "model", dependencies: ["storage", "diagnostics"],
+                id: "model", dependencies: ["storage", "diagnostics"], continuesInBackground: true,
                 start: { try await services.model.start() }, invalidate: services.model.invalidate,
-                foreground: { try await services.model.setForeground($0) },
+                foreground: { if $0 { try await services.model.setForeground(true) } },
                 stop: { try await services.model.stop() }),
             ManagedService(
-                id: "platform", dependencies: ["diagnostics"], start: { try services.platform.start() },
+                id: "platform", dependencies: ["diagnostics"], continuesInBackground: true,
+                start: { try services.platform.start() },
                 invalidate: services.platform.invalidate,
-                foreground: { try await services.platform.setForeground($0) },
+                foreground: { if $0 { try await services.platform.setForeground(true) } },
                 stop: { try await services.platform.stop() }),
             ManagedService(
-                id: "ui", dependencies: ["diagnostics"], start: { try services.uiContainer.start() },
+                id: "ui", dependencies: ["diagnostics"], continuesInBackground: true,
+                start: { try services.uiContainer.start() },
                 invalidate: services.uiContainer.invalidate,
-                foreground: { try services.uiContainer.setForeground($0) },
+                foreground: { try services.uiContainer.setSceneActive($0) },
                 stop: { await services.uiContainer.stop() }),
             ManagedService(
                 id: "executionBindings", dependencies: ["storage", "platform", "ui", "model"],
@@ -55,18 +57,20 @@ import Gateway
                     if let failure { throw failure }
                 }),
             ManagedService(
-                id: "actions", dependencies: ["executionBindings"], start: { try services.actions.start() },
-                invalidate: services.actions.invalidate, foreground: services.actions.setForeground,
+                id: "actions", dependencies: ["executionBindings"], continuesInBackground: true,
+                start: { try services.actions.start() },
+                invalidate: services.actions.invalidate, foreground: services.actions.setSceneActive,
                 stop: services.actions.stop),
             ManagedService(
-                id: "gateway", dependencies: ["actions"], start: services.gateway.start,
-                invalidate: services.gateway.invalidate, foreground: services.gateway.setForeground,
+                id: "gateway", dependencies: ["actions"], continuesInBackground: true, start: services.gateway.start,
+                invalidate: services.gateway.invalidate,
+                foreground: { if $0 { try await services.gateway.setForeground(true) } },
                 stop: services.gateway.stop),
             ManagedService(
-                id: "agents", dependencies: ["gateway"],
+                id: "agents", dependencies: ["gateway"], continuesInBackground: true,
                 start: services.agents.start,
                 invalidate: services.agents.invalidate,
-                foreground: services.agents.setForeground,
+                foreground: services.agents.setSceneActive,
                 stop: services.agents.stop),
             ManagedService(
                 id: "homePreparation", dependencies: ["agents"], start: {},
@@ -80,6 +84,7 @@ import Gateway
             services: descriptions.map { service in
                 ManagedService(
                     id: service.id, dependencies: service.dependencies,
+                    continuesInBackground: service.continuesInBackground,
                     start: {
                         do { try await service.start() } catch {
                             services.containerFailures.report(

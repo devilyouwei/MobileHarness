@@ -85,19 +85,17 @@ import Testing
 }
 
 @Test(arguments: [CGFloat(568), 667, 852, 1024])
-func homeTaskStaysAboveCaptionThroughPromotion(viewportHeight: CGFloat) {
+func homeCaptionKeepsItsSpaceAfterTaskMovesToIsland(viewportHeight: CGFloat) {
     let diameter = min(CGFloat(390) * 0.84, 360)
     let waiting = ConversationCaptionLayout(
         viewportHeight: viewportHeight, faceDiameter: diameter,
-        hasTranscript: false, finalized: false, hasTask: true, hasActivity: false)
+        hasTranscript: false, finalized: false, hasActivity: false)
     for finalized in [false, true] {
         for hasActivity in [false, true] {
             let layout = ConversationCaptionLayout(
                 viewportHeight: viewportHeight, faceDiameter: diameter,
-                hasTranscript: true, finalized: finalized, hasTask: true, hasActivity: hasActivity)
-            #expect(layout.taskCenterY == waiting.taskCenterY)
-            #expect(layout.taskCenterY - 9 >= 72)
-            #expect(layout.captionCenterY - layout.captionHeight / 2 >= layout.taskCenterY + 9 + 8)
+                hasTranscript: true, finalized: finalized, hasActivity: hasActivity)
+            #expect(layout.captionCenterY - layout.captionHeight / 2 >= 72)
             if finalized {
                 #expect(layout.captionCenterY == waiting.captionCenterY)
             } else {
@@ -107,7 +105,7 @@ func homeTaskStaysAboveCaptionThroughPromotion(viewportHeight: CGFloat) {
     }
     let noTask = ConversationCaptionLayout(
         viewportHeight: viewportHeight, faceDiameter: diameter,
-        hasTranscript: true, finalized: false, hasTask: false, hasActivity: false)
+        hasTranscript: true, finalized: false, hasActivity: false)
     #expect(noTask.captionCenterY == viewportHeight - 120)
 }
 

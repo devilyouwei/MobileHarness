@@ -381,19 +381,22 @@ for field in ('voicePhase', 'presentationPhase', 'voiceStatus', 'audioLevel', 'e
 ui = targets.get('UI', {})
 if ui.get('path') != 'MobileHarness/UI':
     errors.append('UI must compile MobileHarness/UI')
-ui_dependencies = [next(iter(d.values()))[0] for d in ui.get('dependencies', [])]
-if ui_dependencies:
-    errors.append('UI must have no project dependencies')
+if ui.get('dependencies'):
+    errors.append('UI must have no project or third-party dependencies')
 allowed_ui = {'Foundation', 'CoreGraphics', 'Observation', 'SwiftUI', 'UIKit'}
 # Public rendering frameworks are confined to the native rendering implementations.
 native_ui_imports = {
+    'Components/Island/IslandActivityAttributes.swift': {'ActivityKit'},
+    'Components/Island/IslandSystemPresentation.swift': {'ActivityKit'},
+    'Components/Island/IslandActivityWidget.swift': {'ActivityKit', 'WidgetKit'},
     'Components/LocalVideoPlayer.swift': {'AVKit'},
+    'Components/Island/IslandState.swift': {'ImageIO'},
     'Settings/AlbumView.swift': {'PhotosUI', 'CoreTransferable', 'UniformTypeIdentifiers', 'ImageIO'},
     'Camera/CameraVideoFrame.swift': {'CoreVideo'},
     'Camera/CameraFrameView.swift': {'CoreVideo', 'Metal', 'QuartzCore', 'Synchronization'},
     'Components/VoiceBars.swift': {'QuartzCore'},
-    'Components/NativeCompanionSurface.swift': {'QuartzCore'},
-    'Components/MetalHaloRenderer.swift': {'Metal', 'QuartzCore', 'Synchronization'},
+    'Conversation/NativeCompanionSurface.swift': {'QuartzCore'},
+    'Conversation/MetalHaloRenderer.swift': {'Metal', 'QuartzCore', 'Synchronization'},
 }
 if 'Canvas {' in (ROOT / 'MobileHarness/UI/Components/VoiceBars.swift').read_text():
     errors.append('Voice spectrum must use native retained layers, not Canvas')
@@ -471,7 +474,7 @@ for source in (ROOT / 'MobileHarness').rglob('*.swift'):
 state_sources = [
     'Actions/ActionsContainer.swift', 'Agents/AgentContainer.swift', 'Gateway/GatewayContainer.swift',
     'ModelKit/ModelContainer.swift', 'PlatformKit/PlatformContainer.swift',
-    'Storage/Support/Contracts/StorageStateSnapshot.swift', 'UI/UIContainer.swift',
+    'Storage/Support/Contracts/StorageStateSnapshot.swift', 'UI/UIStateSnapshot.swift',
     'App/Composition/ApplicationStateInspection.swift',
 ]
 canonical_value_codec = None
@@ -676,7 +679,8 @@ for name, target in targets.items():
 for source in (ROOT / 'MobileHarness').rglob('*.swift'):
     owners = source_owners.get(source.resolve(), [])
     host_source = source.is_relative_to(ROOT / 'MobileHarness/App') and source.name not in {'ApplicationLifecycle.swift', 'ApplicationContainer.swift', 'ApplicationStateInspection.swift'}
-    if len(owners) != (0 if host_source else 1):
+    widget_entry = source == ROOT / 'MobileHarness/UI/Components/Island/IslandActivityWidget.swift'
+    if len(owners) != (0 if host_source or widget_entry else 1):
         errors.append(f'Unexpected source owners {owners}: {source.relative_to(ROOT)}')
 for root in ('UI', 'PlatformKit', 'ModelKit', 'Storage'):
     for source in (ROOT / 'MobileHarness' / root).rglob('*.swift'):
@@ -841,7 +845,7 @@ for source in (ROOT / 'MobileHarness/App').rglob('*.swift'):
         errors.append(f'App must call Storage runtime ports, not backend lifecycle details: {source.relative_to(ROOT)}')
 storage_registration = (ROOT / 'MobileHarness/App/Composition/ModuleRegistration.swift').read_text()
 if not all(value in storage_registration for value in (
-    'id: "storage"', 'id: "platform"', 'id: "ui"', 'services.uiContainer.start()', 'services.uiContainer.invalidate', 'services.uiContainer.setForeground($0)', 'services.uiContainer.stop()', 'dependencies: ["storage", "platform", "ui", "model"]', 'services.storage.start()', 'services.storage.stop()',
+    'id: "storage"', 'id: "platform"', 'id: "ui"', 'services.uiContainer.start()', 'services.uiContainer.invalidate', 'services.uiContainer.setSceneActive($0)', 'services.uiContainer.stop()', 'dependencies: ["storage", "platform", "ui", "model"]', 'services.storage.start()', 'services.storage.stop()',
 )):
     errors.append('App must register the actual Storage runtime before its consumers')
 for source in (ROOT / 'MobileHarness/App/Lifecycle').glob('*.swift'):
@@ -891,6 +895,33 @@ project = json.loads(subprocess.check_output([
     'plutil', '-convert', 'json', '-o', '-', str(ROOT / 'MobileHarness.xcodeproj/project.pbxproj')
 ], text=True))
 project_objects = project['objects']
+# The extension is a separate process: only its entry and neutral attributes are compiled there.
+widget_targets = [(key, value) for key, value in project_objects.items()
+                  if value.get('isa') == 'PBXNativeTarget' and value.get('name') == 'MobileHarnessLiveActivity']
+if len(widget_targets) != 1:
+    errors.append('Expected exactly one native Live Activity extension target')
+else:
+    widget_id, widget = widget_targets[0]
+    if widget.get('productType') != 'com.apple.product-type.app-extension' or widget.get('dependencies') or widget.get('packageProductDependencies'):
+        errors.append('Widget extension must not depend on project runtime or package products')
+    compiled = []
+    for phase_id in widget.get('buildPhases', []):
+        phase = project_objects[phase_id]
+        if phase.get('isa') == 'PBXSourcesBuildPhase':
+            compiled.extend(project_objects[project_objects[item]['fileRef']]['path'] for item in phase.get('files', []))
+    if set(compiled) != {'MobileHarness/UI/Components/Island/IslandActivityWidget.swift', 'MobileHarness/UI/Components/Island/IslandActivityAttributes.swift', 'MobileHarness/UI/Components/Island/IslandIndicators.swift'} or len(compiled) != 3:
+        errors.append('Widget extension may compile only its view entry, shared content and shared indicators')
+    for item in project_objects.values():
+        if item.get('isa') != 'PBXNativeTarget' or item.get('name') not in {'MobileHarness', 'MobileHarnessSimulator'}:
+            continue
+        dependencies = [project_objects[key].get('target') for key in item.get('dependencies', [])]
+        embeds = [project_objects[file].get('fileRef') for key in item.get('buildPhases', [])
+                  if project_objects[key].get('isa') == 'PBXCopyFilesBuildPhase'
+                  and str(project_objects[key].get('dstSubfolderSpec')) == '13'
+                  for file in project_objects[key].get('files', [])]
+        if widget_id not in dependencies or widget.get('productReference') not in embeds:
+            errors.append(f"App must build and embed the Live Activity: {item.get('name')}")
+
 execution_roots = {f'MobileHarness/{module}' for module in ('Agents', 'Gateway', 'Actions')}
 execution_references = {}
 for identifier, item in project_objects.items():
@@ -1361,7 +1392,7 @@ for source in (ROOT / 'MobileHarness').rglob('*.swift'):
         raise SystemExit(f'UI root must own presentation construction: {source.relative_to(ROOT)}')
 ui_root_source = (ROOT / 'MobileHarness/UI/UIContainer.swift').read_text()
 ui_registry_source = (ROOT / 'MobileHarness/App/Composition/ApplicationContainer.swift').read_text()
-for property_name in ('home', 'camera', 'settings', 'modelResources', 'navigation', 'history', 'album', 'devices', 'diagnostics', 'windows'):
+for property_name in ('home', 'camera', 'settings', 'modelResources', 'navigation', 'history', 'album', 'devices', 'diagnostics', 'windows', 'island'):
     if f'public let {property_name}:' not in ui_root_source or f'self.ui().{property_name}' not in ui_registry_source:
         raise SystemExit(f'UI root and App must share the {property_name} capability.')
 conversation_view_source = (ROOT / 'MobileHarness/UI/Conversation/ConversationView.swift').read_text()
@@ -1372,7 +1403,7 @@ for source in (ROOT / 'MobileHarness/Agents').rglob('*.swift'):
         continue  # Read-only view-provider fields, not business mutation handles.
     if re.search(r':\s*(?:' + '|'.join(ui_model_names[:9]) + r')\b', source.read_text()):
         raise SystemExit(f'Agent business consumers require narrow presentation interfaces: {source.relative_to(ROOT)}')
-print('UI root owns ten capabilities and presentation construction; App shares them through explicit registration.')
+print('UI root owns eleven capabilities and presentation construction; App shares them through explicit registration.')
 
 native_audio_source = (ROOT / 'MobileHarness/PlatformKit/Audio/AppleAudioIO.swift').read_text()
 if re.search(r'\.report\(\s*"audio"\s*,\s*"routeChanged"', native_audio_source):
@@ -1389,6 +1420,18 @@ if 'private actor NativePlaybackGraph' not in audio_io or 'AVAudioPlayerNode()' 
 
 # UI organization: keep one owner per feature and retire comparison-only paths.
 ui_root = ROOT / 'MobileHarness/UI'
+for name in ('UIContainer.swift', 'UIFailure.swift', 'UIStateSnapshot.swift'):
+    source = ui_root / name
+    if not source.is_file() or list(ui_root.rglob(name)) != [source]:
+        raise SystemExit(f'UI module entry/contracts require a unique root owner: {name}')
+for declaration in ('typealias UIFailureReporting', 'enum UIContainerError'):
+    if declaration not in (ui_root / 'UIFailure.swift').read_text():
+        raise SystemExit(f'UI failure contract must own {declaration}')
+for source in (ui_root / 'Shared').glob('*.swift'):
+    if imported_modules(source.read_text()) != {'Foundation'}:
+        raise SystemExit(f'Shared UI mechanisms must stay Foundation-only: {source.name}')
+    if re.search(r'\b(?:HomeInput|CameraInput|CameraSettings|SettingsInput|SettingsReply|ResourcesInput|ResourcesReply|HistoryInput|HistoryReply|DeviceInput|NavigationState|CloudSettingsDraft)\b', source.read_text()):
+        raise SystemExit(f'Feature types leaked into shared UI mechanisms: {source.name}')
 retired_ui_files = (
     'Components/CompanionEyes.swift', 'Camera/PoseOverlayProjection.swift',
     'Conversation/ExecutionLogState.swift', 'Conversation/PresentationPorts.swift',
@@ -1403,13 +1446,15 @@ ui_sources = '\n'.join(source.read_text() for source in ui_root.rglob('*.swift')
 if re.search(r'\b(?:ConversationVisualPreview|ActionActivityVisualPreview|OSSignposter|sensorPoint)\b', ui_sources):
     raise SystemExit('UI must not retain synthetic preview routes, comparison probes or legacy projection')
 for relative, declarations in {
-    'UIContainer.swift': ('class UINavigationContainer', 'class NavigationState'),
-    'Settings/SettingsState.swift': ('class UISettingsContainer', 'struct SettingsProviderOperations'),
-    'Settings/ModelResourcesState.swift': ('class UIModelResourcesContainer', 'protocol ModelResourcesOperating'),
-    'Settings/ConversationHistoryState.swift': ('class UIHistoryContainer',),
-    'Settings/BluetoothSettingsState.swift': ('class UIDeviceSettingsContainer',),
+    'Root/NavigationState.swift': ('class UINavigationContainer', 'class NavigationState'),
+    'Conversation/UIHomeContainer.swift': ('enum HomeInput',),
+    'Camera/UICameraContainer.swift': ('struct CameraInput',),
+    'Settings/SettingsState.swift': ('class UISettingsContainer', 'struct SettingsProviderOperations', 'enum SettingsInput', 'enum SettingsReply'),
+    'Settings/ModelResourcesState.swift': ('class UIModelResourcesContainer', 'protocol ModelResourcesOperating', 'enum ResourcesInput', 'enum ResourcesReply'),
+    'Settings/ConversationHistoryState.swift': ('class UIHistoryContainer', 'enum HistoryInput', 'enum HistoryReply'),
+    'Settings/BluetoothSettingsState.swift': ('class UIDeviceSettingsContainer', 'struct DeviceInput'),
     'Diagnostics/AudioDetectionWorkflow.swift': ('class AudioDetectionState', 'struct AudioDetectionSection'),
-    'Components/NativeCompanionSurface.swift': ('struct CompanionEyes',),
+    'Conversation/NativeCompanionSurface.swift': ('struct CompanionEyes',),
 }.items():
     content = (ui_root / relative).read_text()
     if any(declaration not in content for declaration in declarations):
@@ -1462,7 +1507,7 @@ for source in (ROOT / 'MobileHarness').rglob('*.swift'):
 for marker in ('Factory<ModelContainer>', 'Factory<ModelLanguageContainer>', 'Factory<ModelSpeechContainer>', 'Factory<ModelVisionContainer>', 'Factory<ModelArtifactsContainer>'):
     if marker not in ui_registration:
         raise SystemExit(f'Missing App model registration: {marker}')
-for marker in ('id: "model"', 'services.model.start()', 'services.model.invalidate', 'services.model.setForeground($0)', 'services.model.stop()'):
+for marker in ('id: "model"', 'services.model.start()', 'services.model.invalidate', 'foreground: { if $0 { try await services.model.setForeground(true) } }', 'services.model.stop()'):
     if marker not in storage_registration:
         raise SystemExit(f'Missing model lifecycle connection: {marker}')
 print('Instance-local model root, injected ports and lifecycle ownership checks pass.')

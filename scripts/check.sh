@@ -22,6 +22,6 @@ runtime_suites='LiveRuntimeTests|NativePresentationTests'
 test_status=0
 swift test "${test_args[@]}" --skip "$runtime_suites" || test_status=1
 swift test "${test_args[@]}" --filter "$runtime_suites" || test_status=1
-plutil -lint MobileHarness.xcodeproj/project.pbxproj MobileHarness/Resources/PrivacyInfo.xcprivacy Config/MobileHarness.entitlements
+plutil -lint MobileHarness.xcodeproj/project.pbxproj MobileHarness/Resources/PrivacyInfo.xcprivacy Config/MobileHarness.entitlements Config/AppInfo.plist Config/IslandInfo.plist
 
 exit "$test_status"

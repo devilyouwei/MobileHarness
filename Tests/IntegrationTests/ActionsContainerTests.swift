@@ -335,3 +335,42 @@ private enum NativePauseFailure: Error { case failed }
     #expect(root.state == .suspended)
     await #expect(throws: ActionsFailure.self) { try await root.stop() }
 }
+
+@Test(.actionCatalog, .timeLimit(.minutes(1))) @MainActor
+func sceneBackgroundPreservesRunningActionsAndPreparedTickets() async throws {
+    let entered = ContainerGate()
+    let release = ContainerGate()
+    var sceneEvents: [Bool] = []
+    var invalidations = 0
+    let function = ActionFunction(
+        path: containerPath, displayName: "Fixture", kind: .finite, completion: "Joined.",
+        handler: { _ in
+            await entered.release()
+            await release.wait()
+            try Task.checkCancellation()
+        })
+    let root = ActionsContainer()
+    try root.configure(
+        BehaviorAssembly(capabilityModules: [ContainerModule(definitions: [function])]),
+        invalidateNative: { invalidations += 1 },
+        nativeForeground: { sceneEvents.append($0) })
+    try root.start()
+    let first = try await root.execution.prepare(containerInput(), .action)
+    let prepared = try await root.execution.prepare(containerInput(), .action)
+    let execution = Task { try await root.execution.execute(first) }
+    await entered.wait()
+    try await root.setSceneActive(false)
+    #expect(root.state == .running && invalidations == 1)
+    await release.release()
+    #expect(try await execution.value == .completed)
+    #expect(try await root.execution.execute(prepared) == .completed)
+    let background = try await root.execution.prepare(containerInput(), .action)
+    #expect(try await root.execution.execute(background) == .completed)
+    try await root.setSceneActive(true)
+    #expect(sceneEvents == [false, true])
+    root.invalidate()
+    await #expect(throws: ActionsContainerError.unavailable) {
+        try await root.execution.prepare(containerInput(), .action)
+    }
+    try await root.stop()
+}

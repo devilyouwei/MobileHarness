@@ -137,6 +137,8 @@
             let album = PhotoAlbumService(
                 photos: photos, export: { [platform] data in try await platform.vision.savePhoto(data) },
                 exportVideo: { [platform] file in try await platform.vision.saveVideo(file) })
+            let island = IslandPresentationService(state: ui.island)
+            let islandDomains = IslandDomainPresentation(service: island, home: ui.home, camera: ui.camera.state)
             let windowExecution = WindowExecutionService(
                 state: ui.windows, lifecycles: [WindowContent.camera.rawValue: camera])
             let assembly = try BehaviorAssembly(
@@ -148,7 +150,7 @@
                     store: request.conversations,
                     photo: { [photos] id, input in try await photos.readForInput(id, source: "assistant", input: input)
                     }),
-                album: album, windows: windowExecution, modelResources: resourceAdapter,
+                album: album, windows: windowExecution, island: island, modelResources: resourceAdapter,
                 resourcePreferences: preferences,
                 resourceInventory: resourceAdapter,
                 resourcePresentation: ResourcePresentationAdapter(
@@ -168,7 +170,15 @@
                 assembly,
                 cleanup: [
                     { await mutations.shutdown() }, { await windowExecution.stop() },
-                ], workers: [{ [camera] in await camera.observe() }, { [bluetooth] in await bluetooth.run() }],
+                    {
+                        await islandDomains.stop()
+                        island.stop()
+                    },
+                ],
+                workers: [
+                    { await islandDomains.run() }, { [camera] in await camera.observe() },
+                    { [bluetooth] in await bluetooth.run() },
+                ],
                 invalidateNative: { [camera, bluetooth] in
                     camera.setForeground(false)
                     bluetooth.setForeground(false)

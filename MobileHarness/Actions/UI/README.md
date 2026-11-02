@@ -57,3 +57,7 @@ Notice 的非空文字限 1024 UTF-8 字节，tone 为 info/warning/error（默�
 [Actions 设计](../README.md) · [公共函数契约](../Support/Contracts/README.md)
 
 WindowModule and WindowExecutionService in Navigation provide generic window controls. UI owns presentation; injected WindowContentLifecycle owns domain pause/resume/close. No device or Task state is copied into the window manager.
+
+Runtime中的IslandPresentationService通过UI组件端口接纳领域呈现及UI.Island声明，不拥有活动版本或动画完成规则；Actions根拥有IslandDomainPresentation观察生命周期。设备和任务仍由原领域拥有，灵动岛只展示既有呈现事实。Island有限展示操作与长期活动寿命分别完成，具体见[Runtime](Runtime/README.md)。
+
+灵动岛领域适配声明中立摘要、阶段提醒与详情内容；UI独占前台组件动画/挂载、ActivityKit提交、容量合并和结束生命周期。系统框架不进入Actions；UI.Island.setPresentation设置compact/expanded，后者要求通用detail；尺寸/动画由组件管理。

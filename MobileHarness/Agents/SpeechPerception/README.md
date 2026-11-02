@@ -148,7 +148,7 @@ Publication is one-way. A subscriber rejection cannot stop inference; output pro
 
 最多四个 source/incarnation/revision 围栏的 replyActivity 快照及一个 pending final root 抑制新句接纳。最终识别先关接纳再发布，Assistant 匹配回复事实接管 occupancy；释放依赖真实终态／生命周期，没有占用定时器。半双工暂停保留逻辑同意，Actions 加入已确认语句、播放 drain 和音频清理后才恢复；用户撤销后不自动恢复。
 
-startInput 只订阅当前已开启采集代。半双工关闭只取消空闲取帧，当前包自然处理完退出；完整 close/stop 先取消识别，再加入原生任务、获取模型和发布者。恢复最多 32 个可取消当前包等待者，只等待已接纳工作，不承载 PCM。UI 回执确认策略接纳；原生停机和播放终态由执行服务单独确认。
+startInput 只订阅当前已开启采集代。回复半双工暂停保留该订阅并丢弃未获准入的帧；设备关闭时取消空闲取帧、加入当前包，完整 close/stop 先取消识别，再加入原生任务、获取模型和发布者。恢复最多 32 个可取消当前包等待者，只等待已接纳工作，不承载 PCM。UI 回执确认策略接纳；原生停机和播放终态由执行服务单独确认。
 
 ## 声源算法
 
@@ -178,3 +178,9 @@ AudioDetectionAgentSession also declares the neutral connection/observation type
 stateSnapshot projects local installation/closure and existing work or Agent lifecycle/queue counters directly from memory. Reading starts no role, persistence restoration or inference. Initialization remains in the existing owner lifecycle. The root catalog binds independent readers without sampling roles or maintaining another mutable role-state registry.
 
 SpeechPerceptionContainer.presentation returns one complete SpeechSessionPresentation for an installed interaction. It includes typed conversation/activity/detection state, request interfaces and diagnostics; App does not combine optional child fields. Identity remains stable for that interaction. Stop invalidates the debug validation entry and releases the projection after joining shutdown; stale validation requests fail explicitly.
+
+ASR创建、输入或结果失败属于当前识别轮次终态：保留原始agent.error，取消并加入该轮ASR/VAD，校验采集代/会话/运行态后重建下一轮。失败清空未提交字幕并finishTranscript，使用统一transition(.empty)写Context/listening、结束识别绑定，并在采集开启且聆听许可未撤销/未暂停时提交listening呈现；不能只改内部phase。processing是等待ASR收尾，不等于已提交LLM。恢复不发布speech.final、不重开麦克风、不改变用户同意；关闭/换代的迟到清理不复活旧会话。UI工具/通信失败继续报告，UI保持既有会话/序号/采集与回复占用围栏。
+
+ReplyActivity的新revision/incarnation只表示占用事实更新，接纳时必须推进来源围栏并处理pendingFinal确认；只有四来源合并后的paused值改变才提交Speech.Listening.update。相同空闲、同态忙碌、另一个来源仍占用时的单方结束不会重复调用设备策略。此规则切断关闭→取消回复→空闲回执→再次关闭的反馈环；显式用户开关和原生采集结束仍走既有执行路径，不采用节流或日志过滤。
+
+场景隐藏不撤销根语音许可或取消识别。回复占用期间原生输入订阅继续排空帧，admitsMicrophone为false时直接丢弃，不调用VAD/ASR或生成输入；实际关闭/中断仍取消加入。此半双工准入与设备持续录音分离，避免把播放声音识别为下一句。

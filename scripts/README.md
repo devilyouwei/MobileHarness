@@ -122,3 +122,13 @@ The boundary checker rejects App references to ActionsBusinessAssembly, Bluetoot
 App responsibility checks reject independent Agent startup from UI preparation, optional bootstrap invocation, resource-context/holding interpretation in adapters and model warmup implementation in ServiceFactories.
 
 The UI native-rendering allowlist permits AVKit only in Components/LocalVideoPlayer.swift for local-file playback. Camera.Video declarations follow the existing filename-to-module ownership check in VideoActions.swift; capture, permissions and media storage remain forbidden UI responsibilities.
+
+UI根边界检查包含island第十一个子能力，要求App装配复用同一实例。Island Actions源码沿用执行层Xcode引用检查。
+
+UI保持零包产品依赖，ActivityKit仅允许Attributes与原生driver，WidgetKit仅允许Widget入口。边界检查确认Widget只编译三个中立UI源文件，两个App目标均依赖并嵌入扩展；verify-app-island-resources.py校验Live Activity声明、URL scheme、扩展ID/版本/入口/可执行文件和已移除的旧SDK资源。build-ios.sh在App构建后执行此校验。
+
+生命周期绑定检查区分UI场景呈现端口与根停止端口；Model后台连续运行、仅前台重新接纳，不再要求每次Scene隐藏都完整暂停。
+
+Widget源边界精确包含IslandActivityAttributes、IslandIndicators和IslandActivityWidget；原生ActivityKit驱动只允许在UI/Components/Island/IslandSystemPresentation及共享Attributes中导入。
+
+UI目录检查要求Container、Failure、StateSnapshot在模块根有唯一声明归属，错误回调及ContainerError归Failure；不限制根文件总数。Shared仅依赖Foundation且不包含功能输入/导航类型；输入与回执跟随现有功能owner，Face原生实现归Conversation。Widget和Metal打包路径随组件归档更新。

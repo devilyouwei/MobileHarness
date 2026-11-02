@@ -1,7 +1,7 @@
 {
   "version": 3,
   "id": "application-control",
-  "revision": 17,
+  "revision": 19,
   "description": "打开视觉、跟踪、人物/姿态跟随: background vision through Vision.open, without a photo window. Also page/window navigation and resource/provider/Bluetooth controls.",
   "dependencies": [],
   "useActions": [
@@ -106,12 +106,19 @@
       "callType": "action",
       "alias": "Vision.retry",
       "channel": "Camera"
+    },
+    {
+      "path": "UI.Island.setPresentation",
+      "callType": "action",
+      "alias": "Island.setPresentation",
+      "channel": "Display"
     }
   ],
   "useStates": [
     "ui.windows",
     "ui.camera",
-    "platform.vision.camera"
+    "platform.vision.camera",
+    "ui.island"
   ],
   "useInstructions": [
     "Instructions.md"

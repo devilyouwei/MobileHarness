@@ -58,3 +58,5 @@ VisionContainer additionally indexes and registers platform.vision.camera. This 
 ## Camera/audio cooperation
 
 PlatformContainer injects AudioContainer's native owner reservation into VisionContainer's AppleCamera. One capture session supplies preview plus photo or movie output; movie microphone use is mutually exclusive with other native audio owners. Native start/terminal callbacks define recording completion. VisionContainer owns a single joined photo/video Photos-import slot. These are foundation capability constraints; listening intent, window behavior, recording duration choice and media collection remain with callers.
+
+PlatformContainer.systemStatus() exposes a typed read of resident power/network facts for host adapters. PlatformSystemStatus belongs to Core; reading neither starts monitoring nor samples hardware. UI types and display policy are not dependencies.

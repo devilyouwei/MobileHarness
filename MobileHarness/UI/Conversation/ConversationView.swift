@@ -49,19 +49,6 @@ import Foundation
     }
 
     @MainActor
-    private struct ConversationIslandHeader: View {
-        let state: ConversationState
-        let activity: ActionActivityState
-        let layout: HomeBluetoothLayout
-        var body: some View {
-            HomeBluetoothIndicator(
-                status: state.bluetoothStatus, layout: layout,
-                playbackBands: layout.attachesToIsland ? state.playbackSpectrum : [],
-                speaking: state.voicePhase == .speaking, hasTask: activity.hasOngoingTask)
-        }
-    }
-
-    @MainActor
     public struct ConversationView: View {
         @Bindable var state: ConversationState
         @Bindable var activity: ActionActivityState
@@ -89,7 +76,6 @@ import Foundation
                 let presentationNotice = state.assistantReply.isEmpty ? activity.visibleNotice : nil
                 let diameter = min(geometry.size.width * 0.84, 360.0)
                 ZStack {
-                    ConversationAtmosphere()
                     ConversationCompanion(
                         state: state, reduceMotion: reduceMotion,
                         faceWidth: min(geometry.size.width, 600),
@@ -134,25 +120,7 @@ import Foundation
                         let layout = ConversationCaptionLayout(
                             viewportHeight: geometry.size.height, faceDiameter: diameter,
                             hasTranscript: !state.liveTranscript.isEmpty, finalized: state.transcriptFinalized,
-                            hasTask: activity.currentTaskID != nil, hasActivity: !activity.items.isEmpty)
-                        if activity.currentTaskID != nil {
-                            Label {
-                                Text("任务：" + activity.currentTaskTitle)
-                                    .lineLimit(1)
-                                    .truncationMode(.tail)
-                            } icon: {
-                                Image(systemName: "scope").accessibilityHidden(true)
-                            }
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundStyle(.white.opacity(0.6))
-                            .frame(height: 18)
-                            .accessibilityElement(children: .ignore)
-                            .accessibilityLabel("当前任务：" + activity.currentTaskTitle)
-                            .accessibilityIdentifier("conversation.currentTask")
-                            .allowsHitTesting(false)
-                            .frame(width: min(geometry.size.width - 56, 440))
-                            .position(x: geometry.size.width / 2, y: layout.taskCenterY)
-                        }
+                            hasActivity: !activity.items.isEmpty)
                         FadingCaption(
                             text: state.liveTranscript, reduceMotion: reduceMotion, color: .cyan,
                             finalized: state.transcriptFinalized, generation: state.token
@@ -243,22 +211,11 @@ import Foundation
 
                     }
 
-                    let bluetoothLayout = HomeBluetoothLayout(
-                        viewportWidth: geometry.size.width, safeAreaTop: geometry.safeAreaInsets.top)
-                    ConversationIslandHeader(state: state, activity: activity, layout: bluetoothLayout)
-                        .frame(width: bluetoothLayout.size.width, height: bluetoothLayout.size.height)
-                        .position(bluetoothLayout.center)
                     ConversationVoiceBars(state: state, placement: .bottom, reduceMotion: reduceMotion)
                         .frame(width: geometry.size.width, height: 100 + geometry.safeAreaInsets.bottom)
                         .position(
                             x: geometry.size.width / 2,
                             y: geometry.size.height + geometry.safeAreaInsets.bottom / 2 - 50)
-                    if !bluetoothLayout.attachesToIsland {
-                        ConversationVoiceBars(state: state, placement: .reply, reduceMotion: reduceMotion)
-                            .frame(width: 174, height: 34)
-                            .position(x: geometry.size.width / 2, y: 17)
-                            .opacity(state.voicePhase == .speaking ? 1 : 0)
-                    }
                     VStack {
                         Spacer(minLength: 0)
                         if activity.hasRecords || activity.observationUnavailable {
@@ -322,7 +279,6 @@ import Foundation
         public var body: some View {
             GeometryReader { geometry in
                 ZStack {
-                    ConversationAtmosphere()
                     CompanionEyes(
                         phase: error == nil ? .idle : .failed, reduceMotion: reduceMotion,
                         expression: .closed,
@@ -351,23 +307,6 @@ import Foundation
                 }
             }
             .preferredColorScheme(.dark)
-        }
-    }
-
-    /// Leaves the existing camera visible, with a quiet navy veil for contrast.
-    @MainActor
-    private struct ConversationAtmosphere: View {
-        public var body: some View {
-            LinearGradient(
-                colors: [
-                    Color(red: 0.015, green: 0.035, blue: 0.075).opacity(0.82),
-                    .black.opacity(0.45), Color(red: 0.01, green: 0.025, blue: 0.055).opacity(0.9),
-                ],
-                startPoint: .top, endPoint: .bottom
-            )
-            .ignoresSafeArea()
-            .allowsHitTesting(false)
-            .accessibilityHidden(true)
         }
     }
 

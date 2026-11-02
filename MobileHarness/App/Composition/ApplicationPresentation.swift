@@ -46,6 +46,7 @@
             return sessionPresentation
         }
         public var windows: WindowState { features.windows }
+        public var island: IslandState { features.island }
         public var navigation: NavigationState { features.navigation }
         public var cameraState: CameraState { features.photographer.cameraState }
         public var cameraControls: any CameraControlling { features.photographer.cameraControls }

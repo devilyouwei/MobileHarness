@@ -119,3 +119,5 @@ ApplicationEnvironmentInputsTests exercises the existing bounded per-category wo
 WindowExecutionTests supplies lifecycle probes and synthetic UI receipts to verify failure retention, resume ordering, per-instance replacement and close preemption, plus Action input validation. It does not claim real camera/animation acceptance.
 
 Window lifecycle regressions assert the transition gate spans presentation completion and releases on failure. These pure workflow tests do not exercise physical camera capture or iPhone rendering.
+
+后台持续服务回归验证Scene隐藏时不invalidate持续根、默认视觉服务仍失效，返回不重复start，根stop仍完整invalidate并逆依赖停止。

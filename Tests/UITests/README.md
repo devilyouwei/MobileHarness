@@ -78,7 +78,6 @@ CaptionPresentationTests 覆盖部分文本→最终修订、定稿与移动不�
 
 ✅ UI根停止后start／setForeground断言UIFailure；相机领域呈现的过期／代际错误保持原协议，避免将逐帧拒绝误作根故障。
 
-✅ 已实现：HomeBluetoothLayoutTests覆盖不同竖屏尺寸与安全区下的居中、对称扩展、岛边接合，以及非灵动岛／横屏／平板的安全区回退；几何测试不代替iPhone原生路径动画验收。
 
 
 ✅ 覆盖加载表情在未聆听时显示、终态清理、同revision冲突／旧revision拒绝、前后台及旧根拒绝；眼睛拓扑测试包含loading形状。
@@ -93,9 +92,7 @@ CaptionPresentationTests 覆盖部分文本→最终修订、定稿与移动不�
 
 ✅ 请求等待属于可被有限表情演出覆盖的装饰，不使真实表情动作报 busy；模型实际加载仍保留原有独占契约。
 
-✅ 已实现：HomeBluetoothLayoutTests验证两侧等宽、整体居中、蓝牙轮廓无内侧空隙与完整可见、对称预留图标位置、直线段频谱底边共用布局；EyeGeometryTests验证回复频谱所有柱根共用水平基线、全部向下、端点覆盖组件传入宽度及无曲线路径，保留无效输入／拓扑／失活回归。
 
-✅ 已实现：HomeBluetoothLayoutTests覆盖圆弧排除、紧凑／展开的直线段缩放、连接／连接中／断连与任务组合、后台、800ms内灰色收回和重连；任务快照回归区分未结束任务／终态历史及过滤。原生动画实际时序仍需iPhone验收。
 
 ## 类型化输入回执
 
@@ -144,3 +141,38 @@ Window regression covers image-aspect sizing, visible camera lens authority, min
 Photo geometry tests retain all four image corners under fit, rotation and mirroring. Observation tests ensure unchanged frame dimensions do not invalidate the root-facing photoAspect value. They do not replace physical lens field-of-view measurements.
 
 Shutter-orientation regression checks both native portrait sensor references across all window/gravity quarter-turn combinations, frozen snapshots, Face/window independence and missing-frame rejection. It validates geometry values, not native JPEG metadata or a physical shutter.
+
+
+
+
+
+
+
+
+
+
+系统灵动岛验证覆盖活动容量/owner/revision/generation、原生提交合并/迟到状态/权限失败、阶段提醒去重与上限、后台暂停与根清理、导航白名单；Actions/Skill验证expanded请求与旧自定义几何拒绝、Task身份/中文状态/终态移除。自动化不证明系统动画或真机视觉效果。
+
+灵动岛双呈现回归覆盖通用详情阶段/收起/结束、普通状态拒绝展开、相机优先整活动切换、后台只保留当前活动摘要、真实渲染回执围栏、频谱不重发摘要及系统失败下前台独立。布局检查左右同边距、硬件保护和有界标准圆角矩形；不替代真机动画验收。
+
+IslandStateTests还覆盖收紧边距后的硬件避让/展开布局，以及上滑收起的方向和位移边界；真实UIKit命中、动画及系统状态栏覆盖需真机验证。
+
+Island内容回归覆盖无阶段详情自动展开、逐活动收起记忆、整活动抢占/恢复、无详情拒绝展开、旧字段单向迁移、指标编码、真实ImageIO缩略图缩放、归属/绑定/容量/取消与清理。系统快照仅包含当前活动，图片不进入原生摘要。
+
+紧凑岛几何回归覆盖受测402pt设备的14pt顶坐标/36.67pt固定高度、左右槽零内间距、外侧5pt留白、单侧无空翼、硬件中心不随内容移动及展开还原复用同一紧凑frame。
+
+收起重开回归覆盖中央黑区、左右槽命中与内容保留、圆角外透传，以及竖屏相机初始位置避开普通展开岛、保持取景比例和底部安全区；不等同于UIKit真机触控验收。
+
+Island后台连续性测试验证同代活动仍可更新系统摘要、无paused副本，手动收起偏好和身份在返回前台后保留，根停止结束原生活动；使用系统驱动替身，不代表锁屏音频真机验收。
+
+聆听计时覆盖elapsed编码/非法日期、固定高度与硬件对齐，以及连续聆听跨后台/领域更新保持起点、重新聆听重计。
+
+系统状态条回归覆盖向外挤压后才隐藏网络/电池、各种视口不遮业务或越界、真实本地挂载和前后台/失活标志、未知电量及失败清空/报告去重；状态栏系统合成由真机验收。
+
+系统状态与业务同壳回归验证所有可见元素被实际岛身容纳、统一左右内边距与垂直中线、展开/紧凑坐标转换不漂移，以及电池轮廓固定、填充随电量变化、端帽独立和未知空填充。
+
+灵动岛展开几何验证顶部业务与系统状态共同下移、硬件区固定、详情间距与底部留白，并保持完整业务双翼的系统状态避让。
+
+Island几何回归覆盖紧凑黑色背景只包含业务、全宽系统状态坐标不变、展开背景包含完整容器，以及紧凑透明系统状态区域不接纳展开点击。
+
+Island兼容解码测试覆盖旧destination/linkTitle被忽略、重新编码不再携带导航字段，系统快照仍固定唤回App。业务状态与任务详情的身份、图片及代际验证由既有用例保持。

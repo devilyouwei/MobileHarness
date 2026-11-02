@@ -28,6 +28,7 @@ public enum AssistantStateBindings {
         "actions.robot.motion": .init(path: "actions.robot.motion", fields: ["targetCounts"]),
         "ui.navigation": .init(
             path: "ui.navigation", fields: ["path", "phase", "current", "overlay", "content"]),
+        "ui.island": .init(path: "ui.island", fields: ["activities", "selectedID", "expanded", "width", "height"]),
         "ui.windows": .init(path: "ui.windows", fields: ["windows", "focusedID"]),
         "platform.vision.camera": .init(
             path: "platform.vision.camera",

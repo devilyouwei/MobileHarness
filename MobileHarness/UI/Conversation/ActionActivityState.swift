@@ -109,7 +109,6 @@ public final class ActionActivityState {
     @ObservationIgnored var presentationAdmission: UIPresentationAdmission?
     public var isPresentationAvailable: Bool { presentationAdmission.map { $0.started && !$0.stopped } ?? true }
 
-    var hasOngoingTask: Bool { currentTaskID != nil || tasks.contains { !$0.isTerminal } }
     public internal(set) var currentTaskID: String?
     public internal(set) var skillOwnership: [String: String] = [:]
     public var backgroundTaskCount: Int { tasks.filter { $0.execution == "background" && !$0.isTerminal }.count }

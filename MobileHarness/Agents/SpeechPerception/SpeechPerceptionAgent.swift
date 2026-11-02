@@ -270,9 +270,13 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
             else { throw CommunicationError.unauthorized }
             try activity.validate()
             try await prepareSignal(input)
+            let wasPaused = listeningPolicy.paused
             guard try listeningPolicy.accept(activity, source: input.metadata.source, incarnation: incarnation) else {
                 return
             }
+            // A newer occupancy receipt advances its source fence, not necessarily device policy.
+            // In particular, off -> cancel reply -> idle receipt must not enqueue another off.
+            guard listeningPolicy.paused != wasPaused else { return }
         }
         try applyListeningPolicy(parent: input)
     }
@@ -502,7 +506,9 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
         try emit(.control("agent.finished"), input: input)
     }
     /// Owns phase state, presentation and optional observation as one explicit transition.
-    private func transition(to next: SpeechPhase, input: AgentInput, publish: Bool = true) async throws {
+    private func transition(
+        to next: SpeechPhase, input: AgentInput, publish: Bool = true, present: Bool = true
+    ) async throws {
         // Empty is a published outcome, not a persistent capture mode.
         let storedPhase = next == .empty ? SpeechPhase.listening : next
         try await contextRepository.update {
@@ -513,7 +519,7 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
                 retainingLast: SpeechPerceptionSignalPreprocessor.evidenceCapacity)
         }
         phase = storedPhase
-        try presentPhase(next, input: input)
+        if present { try presentPhase(next, input: input) }
         if publish { try await communicate(.speechPhase(next), parent: input) }
     }
     private func resetListening(after input: AgentInput) async throws {
@@ -682,22 +688,44 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
 
     /// A failed utterance does not close the resident Agent, microphone or output stream.
     private func recoverRecognition(_ error: any Error) async {
-        if let activeInput {
+        let failedInput = activeInput
+        let failedSession = sessionID
+        let failedGeneration = nativeCaptureGeneration
+        let failedRecognition = recognitionTurn
+        let failedSegmenter = segmenter
+        if let activeInput = failedInput {
             reportError(error, input: activeInput)
             if listeningPolicy.pendingFinal == activeInput.metadata.rootID {
                 listeningPolicy.pendingFinal = nil
                 do { try applyListeningPolicy(parent: activeInput) } catch { reportError(error, input: activeInput) }
             }
         }
-        await recognitionTurn?.cancel()
-        await segmenter?.cancel()
+        await failedRecognition?.cancel()
+        await failedSegmenter?.cancel()
+        guard lifecycle == .running, sessionID == failedSession, nativeCaptureGeneration == failedGeneration else {
+            return
+        }
         segmenter = nil
         await resampler.reset()
+        guard lifecycle == .running, sessionID == failedSession, nativeCaptureGeneration == failedGeneration else {
+            return
+        }
         soundEstimator.reset()
-        awaitingReply = residentListening && (!listeningPolicy.enabled || listeningPolicy.paused)
+        awaitingReply = residentListening && (!captureOpen || !listeningPolicy.enabled || listeningPolicy.paused)
         phase = .listening
         prepareRecognitionTurn()
         // VAD is rebuilt lazily on the next frame, keeping repeated provider failures recoverable.
+        guard let failedInput else { return }
+        do {
+            try emit(.toolCall(Self.transcript.call(["text": ""])), input: failedInput)
+            try emit(.toolCall(Self.finishTranscript.call([:])), input: failedInput)
+            try emit(.control("agent.finished"), input: failedInput)
+        } catch { reportError(error, input: failedInput) }
+        do {
+            // Complete the failed recognition binding as well as its visible processing state.
+            // Revoked consent or reply occupancy must never be presented as active listening.
+            try await transition(to: .empty, input: failedInput, present: !awaitingReply)
+        } catch { reportError(error, input: failedInput) }
     }
 
     private func enqueueSound(

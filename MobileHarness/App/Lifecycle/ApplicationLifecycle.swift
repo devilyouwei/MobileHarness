@@ -3,6 +3,7 @@ import Foundation
 /// A static service graph. Modules implement their own work; the host only orders it.
 public struct ManagedService: Sendable {
     public let id: String
+    public let continuesInBackground: Bool
     public let dependencies: Set<String>
     public let start: @MainActor @Sendable () async throws -> Void
     public let invalidate: @MainActor @Sendable () -> Void
@@ -10,13 +11,14 @@ public struct ManagedService: Sendable {
     public let stop: @MainActor @Sendable () async throws -> Void
 
     public init(
-        id: String, dependencies: Set<String> = [],
+        id: String, dependencies: Set<String> = [], continuesInBackground: Bool = false,
         start: @escaping @MainActor @Sendable () async throws -> Void,
         invalidate: @escaping @MainActor @Sendable () -> Void = {},
         foreground: @escaping @MainActor @Sendable (Bool) async throws -> Void = { _ in },
         stop: @escaping @MainActor @Sendable () async throws -> Void
     ) {
         self.id = id
+        self.continuesInBackground = continuesInBackground
         self.dependencies = dependencies
         self.start = start
         self.invalidate = invalidate
@@ -170,7 +172,9 @@ public struct ApplicationLifecycleFailure: Error {
         if !foreground {
             if state == .running { suspensionPending = true }
             // Runs synchronously even while a native/model start is suspended.
-            for service in services.reversed() { service.invalidate() }
+            for service in services.reversed() where state != .running || !service.continuesInBackground {
+                service.invalidate()
+            }
             if state == .starting, startingServices {
                 startupSuspended = true
                 startup?.cancel()

@@ -650,3 +650,31 @@ func homePreparationDoesNotShowLoadingForObjectAssemblyAndFencesLateReports() as
     #expect(workflow.state == .inactive)
     await workflow.stop()
 }
+
+@Test @MainActor func backgroundContinuingServiceKeepsWorkButRootStopStillInvalidates() async throws {
+    var events: [String] = []
+    let lifecycle = try ApplicationLifecycle(services: [
+        .init(
+            id: "voice", continuesInBackground: true, start: { events.append("voice start") },
+            invalidate: { events.append("voice invalidate") },
+            foreground: { events.append("voice scene \($0)") }, stop: { events.append("voice stop") }),
+        .init(
+            id: "visual", dependencies: ["voice"], start: {},
+            invalidate: { events.append("visual invalidate") },
+            foreground: { events.append("visual scene \($0)") }, stop: { events.append("visual stop") }),
+    ])
+    try await lifecycle.start()
+    events.removeAll()
+    lifecycle.setForeground(false)
+    try await lifecycle.waitForForeground()
+    #expect(!events.contains("voice invalidate"))
+    #expect(events.contains("visual invalidate"))
+    #expect(events.contains("voice scene false"))
+    #expect(lifecycle.state == .running)
+    lifecycle.setForeground(true)
+    try await lifecycle.waitForForeground()
+    #expect(!events.contains("voice start"))
+    try await lifecycle.stop()
+    #expect(events.contains("voice invalidate"))
+    #expect(events.filter { $0.hasSuffix(" stop") } == ["visual stop", "voice stop"])
+}

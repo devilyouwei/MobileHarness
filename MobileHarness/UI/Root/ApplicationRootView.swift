@@ -36,25 +36,22 @@
                             }
                         }
                     }
+                    .background {
+                        LinearGradient(
+                            colors: [Color(red: 0.08, green: 0.20, blue: 0.32), .black],
+                            startPoint: .top, endPoint: .bottom
+                        )
+                        .ignoresSafeArea()
+                        .allowsHitTesting(false)
+                        .accessibilityHidden(true)
+                    }
                     .navigationContext(.home, content: .ready)
                 } destination: { destination in
                     destinationView(destination)
                         .navigationContext(destination.contextPage)
                         .id(assembly.navigation.generation)
                 }
-                .overlay {
-                    WindowHost(state: assembly.windows) { item in
-                        if item.content == WindowContent.camera.rawValue {
-                            AnyView(
-                                CameraWindowContent(
-                                    camera: assembly.cameraState, controls: assembly.cameraControls,
-                                    rendersPreview: !assembly.windows.isCovered(item.id)
-                                ) { assembly.cameraPreview() })
-                        } else {
-                            AnyView(Text("窗口内容不可用").foregroundStyle(.white))
-                        }
-                    }
-                }
+                .overlay { windowOverlay }
                 .environment(\.navigationContext, assembly.navigation)
                 .onChange(of: assembly.navigation.path, initial: true) { _, path in
                     assembly.cameraState.windows = assembly.windows
@@ -64,6 +61,8 @@
                 .onChange(of: container?.conversation.hasActiveInteraction) { _, _ in
                     assembly.interactionActivityChanged()
                 }
+                .background { IslandHost(state: assembly.island).allowsHitTesting(false) }
+                .statusBarHidden(assembly.island.replacesSystemStatusBar)
                 .onChange(of: assembly.cameraState.photoAspect) { _, aspect in
                     if let item = assembly.windows.windows.first(where: { $0.content == WindowContent.camera.rawValue })
                     {
@@ -80,6 +79,23 @@
                     await prepare()
                 }
             }
+        }
+
+        private var windowOverlay: some View {
+            WindowHost(
+                state: assembly.windows, topBoundary: assembly.island.localFrame.map { Double($0.maxY) }
+            ) { item in
+                if item.content == WindowContent.camera.rawValue {
+                    AnyView(
+                        CameraWindowContent(
+                            camera: assembly.cameraState, controls: assembly.cameraControls,
+                            rendersPreview: !assembly.windows.isCovered(item.id)
+                        ) { assembly.cameraPreview() })
+                } else {
+                    AnyView(Text("窗口内容不可用").foregroundStyle(.white))
+                }
+            }
+            .ignoresSafeArea(.container)
         }
 
         @ViewBuilder private func destinationView(_ destination: AppDestination) -> some View {

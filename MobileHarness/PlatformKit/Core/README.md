@@ -24,3 +24,5 @@ PlatformStateSource also declares the complete Business/Runtime field sets for e
 
 
 NativeStateCollection registers notifications before baseline sampling. MainActor serializes both the baseline and source refresh, so a queued notification refreshes from current native truth after the baseline; an old baseline cannot overwrite a newer committed event. Bursts merge into one finite source set and one worker. The network owner independently retains its generation-fenced latest event. Permission changes are reconciled after native permission operations, Bluetooth power events and foreground resume. Snapshot reads perform no sampling or restoration. Invalidation retires the generation before removing observers/cancelling the worker and timer; the root joins the worker, and late old-generation callbacks cannot modify a resumed collection. Deinitialization also removes observers and invalidates the clock.
+
+PlatformSystemStatus将既有power/network缓存解码为类型化电量、充电、低电量模式和网络路径类型，由根systemStatus()提供只读能力。缺失电量保留nil，越界值明确失败；路径未满足不声称连接或信号强度。该投影不增加观察器、计时器或原生采样。

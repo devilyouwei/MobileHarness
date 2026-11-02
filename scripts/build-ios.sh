@@ -18,5 +18,6 @@ for scheme in MobileHarnessSimulator ModelKitRuntime ModelKitNemotron ModelKitSi
         CODE_SIGNING_ALLOWED=NO build
     if [[ "$scheme" == MobileHarnessSimulator ]]; then
         python3 scripts/verify-app-agent-resources.py "$simulator_derived_data/Build/Products/Debug-iphonesimulator/MobileHarnessSimulator.app"
+        python3 scripts/verify-app-island-resources.py "$simulator_derived_data/Build/Products/Debug-iphonesimulator/MobileHarnessSimulator.app"
     fi
 done

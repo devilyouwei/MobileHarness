@@ -66,7 +66,7 @@ final class PublicStateFixtureOwner: Sendable {
         try context.register("actions.robot", source: ContainerContextSource { ContainerContextValue(false) })
         try context.register(
             "actions.robot.motion", source: ContainerContextSource { ContainerContextValue([String: String]()) })
-        for name in ["ui.navigation", "ui.camera", "ui.album", "ui.home.expression", "ui.windows"] {
+        for name in ["ui.navigation", "ui.camera", "ui.album", "ui.home.expression", "ui.windows", "ui.island"] {
             try context.register(name, source: ContainerContextSource { ContainerContextValue([String: String]()) })
         }
         return context

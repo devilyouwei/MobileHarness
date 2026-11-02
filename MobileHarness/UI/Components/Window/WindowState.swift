@@ -9,9 +9,10 @@ public enum WindowSizing: Sendable, Equatable {
             return .initial(width: width, height: height)
         }
         let chrome = 52 + controls
-        let w = max(1, min(width - 32, max(1, height - chrome) * aspect))
+        let topInset = height > width ? min(80, max(0, height - chrome - 1)) : 0
+        let w = max(1, min(width - 32, max(1, height - topInset - chrome) * aspect))
         let h = w / aspect + chrome
-        return .init(x: (width - w) / 2, y: max(0, (height - h) / 2), width: w, height: h)
+        return .init(x: (width - w) / 2, y: max(topInset, (height - h) / 2), width: w, height: h)
     }
 }
 
@@ -31,6 +32,13 @@ public struct WindowGeometry: Equatable, Sendable {
         self.y = y
         self.width = width
         self.height = height
+    }
+    /// Screen-edge shell expressed in the same safe-area-relative coordinates as normal windows.
+    static func maximized(viewport: CGRect, safe: CGRect, topBoundary: Double?) -> Self {
+        let top = min(viewport.maxY - 1, max(viewport.minY, topBoundary.map { $0 + 4 } ?? safe.minY))
+        return .init(
+            x: viewport.minX - safe.minX, y: top - safe.minY,
+            width: max(1, viewport.width), height: max(1, viewport.maxY - top))
     }
     public static func initial(width: Double, height: Double) -> Self {
         .init(x: 16, y: height / 6, width: max(1, width - 32), height: height * 2 / 3)
@@ -70,6 +78,7 @@ public struct WindowPresentation: Identifiable, Sendable {
     public private(set) var available = false
     public private(set) var width: Double = 0
     public private(set) var height: Double = 0
+    public private(set) var maximizedFrame: WindowGeometry?
     @ObservationIgnored private var waiters: [UUID: CheckedContinuation<Void, any Error>] = [:]
     public let requests = UIRequests<WindowInput, Void>()
     @ObservationIgnored private var inputs: [UUID: Task<Void, Never>] = [:]
@@ -105,11 +114,12 @@ public struct WindowPresentation: Identifiable, Sendable {
         windows.removeAll()
         focusedID = nil
     }
-    public func layout(width: Double, height: Double) {
+    public func layout(width: Double, height: Double, maximized: WindowGeometry? = nil) {
         guard width.isFinite, height.isFinite, width > 0, height > 0 else { return }
         let first = self.width == 0
         self.width = width
         self.height = height
+        maximizedFrame = maximized
         for i in windows.indices {
             if first {
                 windows[i].normal = windows[i].sizing.initial(width: width, height: height)
@@ -136,7 +146,7 @@ public struct WindowPresentation: Identifiable, Sendable {
         switch item.mode {
         case .normal: item.normal
         case .minimized: item.card
-        case .maximized: .init(x: 0, y: 0, width: width, height: height)
+        case .maximized: maximizedFrame ?? .init(x: 0, y: 0, width: width, height: height)
         }
     }
     public func isCovered(_ id: UUID) -> Bool {

@@ -350,3 +350,8 @@ public final class UIDeviceSettingsContainer {
     func stopPresentation() { state.pendingPresentation = nil }
     init(admission: UIPresentationAdmission) { state.presentationAdmission = admission }
 }
+
+public struct DeviceInput: Sendable {
+    public let parameters: [String: String]
+    public init(_ parameters: [String: String]) { self.parameters = parameters }
+}

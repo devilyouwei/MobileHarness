@@ -7,17 +7,22 @@
         let items: [WindowPresentation]
         let available: Bool
         let generation: UUID
+        let topBoundary: Double?
+        let maximizedFrame: WindowGeometry?
         let content: (WindowPresentation) -> AnyView
-        public init(state: WindowState, content: @escaping (WindowPresentation) -> AnyView) {
+        public init(state: WindowState, topBoundary: Double? = nil, content: @escaping (WindowPresentation) -> AnyView)
+        {
             self.state = state
             self.items = state.windows
             self.available = state.available
             self.generation = state.generation
+            self.topBoundary = topBoundary
+            self.maximizedFrame = state.maximizedFrame
             self.content = content
         }
         public func makeUIView(context: Context) -> WindowHostView { WindowHostView() }
         public func updateUIView(_ view: WindowHostView, context: Context) {
-            view.update(state: state, items: items, content: content)
+            view.update(state: state, items: items, topBoundary: topBoundary, content: content)
         }
         public static func dismantleUIView(_ view: WindowHostView, coordinator: ()) { view.retire() }
     }
@@ -36,6 +41,8 @@
         private weak var state: WindowState?
         private var generation: UUID?
         private var layoutFrame = CGRect.zero
+        private var layoutMaximum: WindowGeometry?
+        private var topBoundary: Double?
         private var usableFrame: CGRect { bounds.inset(by: safeAreaInsets) }
         public override func safeAreaInsetsDidChange() {
             super.safeAreaInsetsDidChange()
@@ -84,9 +91,14 @@
             super.layoutSubviews()
             let safe = usableFrame
             guard let state, safe.width > 0, safe.height > 0 else { return }
-            if layoutFrame != safe {
+            let boundary = topBoundary.map { value in
+                window.map { convert(CGPoint(x: 0, y: value), from: $0).y } ?? value
+            }
+            let maximum = WindowGeometry.maximized(viewport: bounds, safe: safe, topBoundary: boundary)
+            if layoutFrame != safe || layoutMaximum != maximum {
                 layoutFrame = safe
-                state.layout(width: safe.width, height: safe.height)
+                layoutMaximum = maximum
+                state.layout(width: safe.width, height: safe.height, maximized: maximum)
             }
         }
         public func retire() {
@@ -103,8 +115,15 @@
                 }
             }
         }
-        func update(state: WindowState, items: [WindowPresentation], content: (WindowPresentation) -> AnyView) {
+        func update(
+            state: WindowState, items: [WindowPresentation], topBoundary: Double?,
+            content: (WindowPresentation) -> AnyView
+        ) {
             self.state = state
+            if self.topBoundary != topBoundary {
+                self.topBoundary = topBoundary
+                setNeedsLayout()
+            }
             if generation != state.generation {
                 retire()
                 generation = state.generation
@@ -119,7 +138,10 @@
                 }
             }
             for item in items {
-                let root = AnyView(WindowChrome(item: item, state: state, content: content(item)))
+                let root = AnyView(
+                    WindowChrome(
+                        item: item, state: state, content: content(item),
+                        contentInsets: item.mode == .maximized ? safeAreaInsets : .zero))
                 let fresh = panes[item.id] == nil
                 var pane =
                     panes[item.id] ?? Pane(host: UIHostingController(rootView: root), surface: UIView(), revision: 0)
@@ -127,12 +149,13 @@
                 let surface = pane.surface
                 if fresh {
                     surface.backgroundColor = .clear
+                    pane.host.safeAreaRegions = []
                     let hosted = pane.host.view!
                     hosted.backgroundColor = .clear
                     hosted.autoresizingMask = [.flexibleWidth, .flexibleHeight]
-                    hosted.layer.cornerRadius = item.mode == .minimized ? 16 : 24
+                    hosted.layer.cornerRadius = item.mode == .minimized ? 16 : item.mode == .maximized ? 0 : 24
                     hosted.layer.masksToBounds = true
-                    hosted.layer.borderWidth = 0.5
+                    hosted.layer.borderWidth = item.mode == .maximized ? 0 : 0.5
                     hosted.layer.borderColor = UIColor.white.withAlphaComponent(0.25).cgColor
                     surface.addSubview(hosted)
                     surface.layer.shadowColor = UIColor.black.cgColor
@@ -149,7 +172,9 @@
                 let target = CGRect(
                     x: usableFrame.minX + geometry.x, y: usableFrame.minY + geometry.y, width: geometry.width,
                     height: geometry.height)
-                if pane.revision == item.revision && (pane.animator == nil || pane.target == target) {
+                if pane.revision == item.revision && (pane.animator == nil || pane.target == target)
+                    && (item.mode != .maximized || pane.target == target)
+                {
                     if pane.animator == nil { surface.frame = target }
                     panes[item.id] = pane
                     continue
@@ -186,7 +211,8 @@
                     surface.transform = .identity
                     surface.frame = target
                     surface.alpha = closing ? 0 : 1
-                    hosted.layer.cornerRadius = item.mode == .minimized ? 16 : 24
+                    hosted.layer.cornerRadius = item.mode == .minimized ? 16 : item.mode == .maximized ? 0 : 24
+                    hosted.layer.borderWidth = item.mode == .maximized ? 0 : 0.5
                 }
                 let generation = state.generation
                 animator.addCompletion { [weak self, weak state] position in
@@ -219,6 +245,7 @@
         let item: WindowPresentation
         let state: WindowState
         let content: AnyView
+        let contentInsets: UIEdgeInsets
         @State private var dragOrigin: WindowGeometry?
         @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
         @Environment(\.colorSchemeContrast) private var contrast
@@ -298,6 +325,9 @@
                 if let failure = item.failure { Text(failure).font(.caption).padding(8) }
                 if item.mode != .minimized { content.frame(maxWidth: .infinity, maxHeight: .infinity).clipped() }
             }
+            .padding(.leading, contentInsets.left)
+            .padding(.trailing, contentInsets.right)
+            .padding(.bottom, contentInsets.bottom)
             .foregroundStyle(item.mode == .minimized ? Color.black : Color.white)
             .background(item.mode == .minimized ? Color.clear : Color.black)
 

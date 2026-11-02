@@ -357,7 +357,7 @@ private actor ContextReadBarrier {
         names
             == (AssistantStateBindings.sourceNames.filter { $0.hasPrefix("platform.system.") } + [
                 "actions.camera", "agents.applicationcontrol", "platform.vision.camera", "ui.album", "ui.camera",
-                "ui.navigation", "ui.windows",
+                "ui.navigation", "ui.windows", "ui.island",
             ]).sorted())
     _ = try skills.control("releaseSkills", arguments: ["skills": "[\"photography\"]"], inputID: "input", fixed: fixed)
     owner.camera.update { $0.running = true }
@@ -423,7 +423,7 @@ private actor ContextReadBarrier {
     #expect(try await read().business["overridden"] == .flag(false))
     #expect(try await read().business["effective"] == .text("smile"))
     let children = try await ui.stateSnapshot().children.map(\.path)
-    #expect(children.count == 10 && Set(children).count == 10)
+    #expect(children.count == 11 && Set(children).count == 11)
     await ui.stop()
 }
 

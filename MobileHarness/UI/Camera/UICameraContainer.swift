@@ -188,3 +188,26 @@ public final class UICameraContainer: CameraPresenting, CameraFactsObserving {
         await state.stopPresentation()
     }
 }
+
+public struct CameraInput: Sendable {
+    public enum Operation: String, Sendable {
+        case open, close, flip, retry, takePhoto, savePhoto, ignorePhoto, configure, cancelCapture, startRecording,
+            stopRecording, saveVideo, ignoreVideo, perceptionOpen, perceptionClose,
+            perceptionFlip, perceptionRetry
+    }
+    public let operation: Operation
+    public let recordingID: String?
+    public let settings: CameraSettings?
+    public let facing: CameraDirection?
+    public let mediaID: String?
+    public init(
+        _ operation: Operation, facing: CameraDirection? = nil, mediaID: String? = nil, settings: CameraSettings? = nil,
+        recordingID: String? = nil
+    ) {
+        self.operation = operation
+        self.settings = settings
+        self.recordingID = recordingID
+        self.facing = facing
+        self.mediaID = mediaID
+    }
+}

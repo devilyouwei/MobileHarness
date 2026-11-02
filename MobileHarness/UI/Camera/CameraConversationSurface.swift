@@ -22,11 +22,20 @@
         }
         public var body: some View {
             ZStack {
-                Color.black.ignoresSafeArea()
                 if camera.perceptionEnabled && camera.isVisible && camera.faceVisible
                     && (camera.windows?.hasVisibleBackground() ?? true)
                 {
-                    CameraFrameView(state: camera).ignoresSafeArea().opacity(0.30)
+                    CameraFrameView(state: camera)
+                        .overlay {
+                            LinearGradient(
+                                colors: [
+                                    Color(red: 0.015, green: 0.035, blue: 0.075).opacity(0.82),
+                                    .black.opacity(0.45), Color(red: 0.01, green: 0.025, blue: 0.055).opacity(0.9),
+                                ],
+                                startPoint: .top, endPoint: .bottom
+                            )
+                        }
+                        .ignoresSafeArea().opacity(0.30)
                         .allowsHitTesting(false).accessibilityHidden(true)
                 }
                 content().environment(\.eyeGaze, camera.displayGaze)

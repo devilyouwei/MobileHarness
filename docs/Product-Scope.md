@@ -30,3 +30,7 @@ MobileHarness 在 Apple 原生应用中连接感知、Agent 决策与执行，�
 用户相册、日记式记忆、Resource 状态接入和自主构图/运镜等按 [需求索引](requirements/README.md) 维护。通用跨平台、任意系统/第三方 App 控制和不受系统调度限制的后台自治不属于当前交付范围。
 
 [Roadmap](Roadmap.md#acceptance-work) 和 [验证索引](validation/README.md) 区分代码实现、构建、模型测试、原生界面与物理设备验收。本文不把历史演示或有限试验提升为完整质量、延迟或安全结论。
+
+通用灵动岛同时支持App内图标/实际回复频谱及ActivityKit系统摘要。前台目标任务以目标图标和目标文字自动展开、结束收回，其他状态保持紧凑；组件提供统一内容/详情接口并拥有动画。系统呈现由iOS决定，不能强制前台常驻系统岛；系统失败不影响App组件。设备控制仍在Camera窗口，系统不承载实时频谱或扩展后台设备运行。
+
+内容接口重构采用primary/secondary指标与可选detail(text,thumbnail)：有效详情默认展开，手动收起保留内容；优先级整体切换活动并保存各自展示偏好。缩略图本轮仅App内有界显示，系统保留图标/文字。交互与动效由UI组件统一拥有；见[实施计划](requirements/Face-Window-Island-Plan.md)。

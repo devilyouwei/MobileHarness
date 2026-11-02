@@ -211,6 +211,9 @@ public final class PlatformContainer: PlatformStateReading {
         }
         return facts
     }
+    public func systemStatus() throws -> PlatformSystemStatus {
+        try PlatformSystemStatus(power: snapshot(.power), network: snapshot(.network))
+    }
     public func snapshot(_ source: PlatformStateSource) throws -> Data {
         try admission.check()
         if source == .network { return try connectivity.networkSnapshot() }

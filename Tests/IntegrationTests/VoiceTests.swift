@@ -890,34 +890,63 @@ private actor NativeRateVADProbe: VoiceActivityCapability, VoiceActivitySession 
 private actor FailOnceRecognition: SpeechRecognitionCapability {
     var availability: CapabilityAvailability { .available }
     private var attempts = 0
+    let failsAtFinish: Bool
+    init(failsAtFinish: Bool) { self.failsAtFinish = failsAtFinish }
     func transcribe(_ request: SpeechRecognitionRequest) async throws -> SpeechRecognitionSession {
         attempts += 1
-        if attempts == 1 { throw CapabilityError.unavailable("synthetic ASR failure") }
+        if attempts == 1 {
+            if !failsAtFinish { throw CapabilityError.unavailable("synthetic ASR failure") }
+            let pair = InferenceSession<TranscriptionEvent>.make(
+                context: request.context, limits: try StreamLimits(), estimatedBytes: { $0.estimatedBytes })
+            return SpeechRecognitionSession(
+                output: pair.session, format: request.format, sendAudio: { _ in },
+                finishInput: {
+                    pair.emitter.fail(
+                        NSError(
+                            domain: "SFSpeechErrorDomain", code: 1,
+                            userInfo: [NSLocalizedDescriptionKey: "RecogRejected"]))
+                })
+        }
         return try await RecognitionFixture(text: "recovered", includeFinal: true).transcribe(request)
     }
 }
 
-@Test(.actionCatalog, .timeLimit(.minutes(1))) func speechRecognitionFailureReportsAndNextUtteranceStillPublishes()
-    async throws
-{
+@Test(.actionCatalog, .timeLimit(.minutes(1)), arguments: [false, true])
+func speechRecognitionFailureReportsAndNextUtteranceStillPublishes(failsAtFinish: Bool) async throws {
     let session = UUID().uuidString
+    let context = try AgentContextRepository(
+        agent: AgentID(rawValue: "speechPerception"), scope: UUID().uuidString,
+        state: SpeechPerceptionContextState())
     let agent = try SpeechPerceptionAgent(
-        recognition: FailOnceRecognition(), vad: EndpointVAD(), sessionID: session,
-        context: try AgentContextRepository(
-            agent: AgentID(rawValue: "speechPerception"), scope: UUID().uuidString,
-            state: SpeechPerceptionContextState())
-    )
+        recognition: FailOnceRecognition(failsAtFinish: failsAtFinish), vad: EndpointVAD(), sessionID: session,
+        context: context)
+    let observed = Mutex((phases: [SpeechPhase](), displays: [String](), sealed: 0))
     let events = AsyncStream<String>.makeStream(bufferingPolicy: .bufferingOldest(16))
     try await agent.bind(
         AgentMessaging { message, _, _ in
             if case .transcript(let text, true)? = message.perception { events.continuation.yield(text) }
+            if case .speechPhase(let phase)? = message.perception {
+                observed.withLock { $0.phases.append(phase) }
+            }
             return DeliveryReport()
         })
     try await agent.start()
     let pump = Task {
+        var failed = false
         for await envelope in fixtureOutputs(agent) {
             if case .control(let message) = envelope.output, message.hasPrefix("agent.error:") {
+                failed = true
                 events.continuation.yield("error")
+            }
+            if case .toolCall(let call) = envelope.output {
+                if call.toolPath == "UI.Caption.finishTranscript" { observed.withLock { $0.sealed += 1 } }
+                if call.toolPath == "UI.VoiceState.setVoiceState", let state = call.arguments["state"] {
+                    observed.withLock { $0.displays.append(state) }
+                    if failed && state == "listening" {
+                        failed = false
+                        events.continuation.yield("listening")
+                    }
+                }
             }
         }
     }
@@ -937,6 +966,11 @@ private actor FailOnceRecognition: SpeechRecognitionCapability {
     try await processMicrophoneFixture(frame(true), using: agent)
     try await processMicrophoneFixture(frame(false), using: agent)
     #expect(await values.next() == "error")
+    #expect(await values.next() == "listening")
+    #expect(try await context.snapshot().state.phase == "listening")
+    #expect(observed.withLock { $0.sealed } == 1)
+    #expect(observed.withLock { $0.displays.last } == "listening")
+    if failsAtFinish { #expect(observed.withLock { $0.displays.contains("processing") }) }
     #expect(await agent.status().lifecycle == .running)
     try await processMicrophoneFixture(frame(true), using: agent)
     try await processMicrophoneFixture(frame(false), using: agent)
@@ -946,6 +980,7 @@ private actor FailOnceRecognition: SpeechRecognitionCapability {
     #expect(await agent.status().lifecycle == .running)
     await agent.stop()
     await pump.value
+    #expect(observed.withLock { $0.phases.filter { $0 == .empty }.count } == 1)
 }
 
 @Test(.actionCatalog) func speechListeningResumesAfterPauseBeforeAnyCaptureFrame() async throws {
@@ -1596,4 +1631,111 @@ func coldRecognitionRejectsOverflowWithoutDroppingPreviouslyQueuedPCM() async th
     await #expect(throws: HarnessError.self) {
         try await agent.setListening(enabled: true, sessionID: session)
     }
+}
+
+@Test(.actionCatalog, .timeLimit(.minutes(1)))
+func repeatedListeningTogglesAndIdleReplyReceiptsDoNotReissueActions() async throws {
+    let session = UUID().uuidString
+    let incarnation = UUID().uuidString
+    let agent = try SpeechPerceptionAgent(
+        recognition: RecognitionFixture(text: "", includeFinal: false), vad: NativeRateVADProbe(),
+        sessionID: session, interactionSessionID: session, residentListening: true,
+        context: try AgentContextRepository(
+            agent: .speechPerception, scope: UUID().uuidString, state: SpeechPerceptionContextState()))
+    try await agent.start()
+    let probe = PerceptionListeningProbe()
+    let pump = Task { for await output in agent.outputs { await probe.record(output) } }
+    for toggle in 0..<6 {
+        try await agent.receive(ListeningIntent().input(sessionID: session))
+        // Every shutdown can acknowledge cancellation with a newer idle revision.
+        // Echoes must stop at the fact receiver, even when all four producers report.
+        for revision in 1...32 {
+            for source in ["assistant", "photographer", "memory", "applicationControl"] {
+                try await agent.receive(
+                    replyActivityInput(
+                        session: session, source: source, incarnation: incarnation,
+                        revision: UInt64(toggle * 32 + revision)))
+            }
+        }
+    }
+    // Updating the fence was necessary: this old busy fact must not pause/reissue off.
+    try await agent.receive(
+        replyActivityInput(session: session, incarnation: incarnation, revision: 1, inputs: ["late"]))
+    await agent.stop()
+    await pump.value
+    let values = await probe.values
+    #expect(values.count == 6)
+    #expect(values.map(\.enabled) == [true, false, true, false, true, false])
+    #expect(values.allSatisfy { !$0.paused })
+    #expect(values.map(\.revision) == [1, 2, 3, 4, 5, 6])
+}
+
+@Test(.actionCatalog, .timeLimit(.minutes(1)))
+func listeningActionsTrackAggregateOccupancyRatherThanReceiptRevisions() async throws {
+    let session = UUID().uuidString
+    let incarnation = UUID().uuidString
+    let agent = try SpeechPerceptionAgent(
+        recognition: RecognitionFixture(text: "", includeFinal: false), vad: NativeRateVADProbe(),
+        sessionID: session, interactionSessionID: session, residentListening: true,
+        context: try AgentContextRepository(
+            agent: .speechPerception, scope: UUID().uuidString, state: SpeechPerceptionContextState()))
+    try await agent.start()
+    let probe = PerceptionListeningProbe()
+    let pump = Task { for await output in agent.outputs { await probe.record(output) } }
+    try await agent.receive(ListeningIntent(enabled: true).input(sessionID: session))
+    for source in ["assistant", "photographer"] {
+        for revision in 1...16 {
+            try await agent.receive(
+                replyActivityInput(
+                    session: session, source: source, incarnation: incarnation,
+                    revision: UInt64(revision), inputs: ["reply-\(revision)"]))
+        }
+    }
+    for source in ["assistant", "photographer"] {
+        try await agent.receive(
+            replyActivityInput(session: session, source: source, incarnation: incarnation, revision: 17))
+    }
+    // Same state from a replacement producer also advances its fence without executing.
+    try await agent.receive(
+        replyActivityInput(session: session, incarnation: UUID().uuidString, revision: 1))
+    await agent.stop()
+    await pump.value
+    let values = await probe.values
+    #expect(values.count == 3)
+    #expect(values.allSatisfy { $0.enabled })
+    #expect(values.map(\.paused) == [false, true, false])
+}
+
+@Test(.actionCatalog, .timeLimit(.minutes(1)))
+func listeningOffCancellationFeedbackDoesNotScheduleAnotherOff() async throws {
+    let session = UUID().uuidString
+    let agent = try SpeechPerceptionAgent(
+        recognition: RecognitionFixture(text: "", includeFinal: false), vad: NativeRateVADProbe(),
+        sessionID: session, interactionSessionID: session, residentListening: true,
+        context: try AgentContextRepository(
+            agent: .speechPerception, scope: UUID().uuidString, state: SpeechPerceptionContextState()))
+    try await agent.start()
+    var output = agent.outputs.makeAsyncIterator()
+    try await agent.receive(ListeningIntent(enabled: false).input(sessionID: session))
+    let off = try #require(await output.next())
+    guard case .actionCall(let call) = off.output else {
+        Issue.record("Expected listening shutdown")
+        await agent.stop()
+        return
+    }
+    #expect(call.parameters["enabled"] == "false")
+    // The cancellation performed by this off Action acknowledges an idle reply.
+    try await agent.receive(
+        replyActivityInput(session: session, incarnation: UUID().uuidString, revision: 1))
+    _ = try #require(await output.next())  // Original off's agent.finished.
+    try await agent.receive(ListeningIntent(enabled: true).input(sessionID: session))
+    let next = try #require(await output.next())
+    guard case .actionCall(let nextCall) = next.output else {
+        Issue.record("Expected next explicit user intent")
+        await agent.stop()
+        return
+    }
+    #expect(nextCall.parameters["enabled"] == "true")
+    #expect(nextCall.parameters["revision"] == "2")
+    await agent.stop()
 }

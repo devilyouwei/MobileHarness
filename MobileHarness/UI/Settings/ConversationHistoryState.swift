@@ -476,3 +476,20 @@ public final class UIHistoryContainer {
         state.presentationAdmission = admission
     }
 }
+
+public enum HistoryInput: Sendable {
+    case refresh, startNew
+    case summarize(String)
+    case delete(String)
+    case conversation(String)
+    case message(String)
+    case page(String, UInt64, String?)
+    case archives(Int64)
+    case photo(String, String)
+}
+public enum HistoryReply: Sendable {
+    case completed
+    case conversation(HistoryConversation)
+    case archives([HistoryConversation])
+    case photo(Data?)
+}

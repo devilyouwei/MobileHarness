@@ -69,11 +69,14 @@ let package = Package(
                 .product(name: "SwiftSyntaxMacros", package: "swift-syntax"),
             ], path: "Macros/BehaviorDefinitions", exclude: ["README.md"]),
         .target(
-            name: "UI", dependencies: [], path: "MobileHarness/UI",
+            name: "UI", dependencies: [],
+            path: "MobileHarness/UI",
             exclude: [
-                "README.md", "Camera/README.md", "Components/README.md", "Conversation/README.md",
-                "Settings/README.md", "Diagnostics/README.md",
-            ], resources: [.process("Components/ListeningHalo.metal")]),
+                "README.md", "Root/README.md", "Shared/README.md", "Camera/README.md", "Components/README.md",
+                "Conversation/README.md",
+                "Components/Island/README.md", "Components/Window/README.md",
+                "Settings/README.md", "Diagnostics/README.md", "Components/Island/IslandActivityWidget.swift",
+            ], resources: [.process("Conversation/ListeningHalo.metal")]),
 
         .target(
             name: "AppLifecycle", dependencies: [], path: "MobileHarness/App/Lifecycle",

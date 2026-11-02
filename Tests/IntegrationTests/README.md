@@ -183,7 +183,6 @@ Resource-context regressions cover inherited lease resolution, missing-owner rej
 
 聆听控制回归由 ActionAuthoringTests、BehaviorAssemblyTests 与 VoiceTests 覆盖：公开无参数入口、参数拒绝、失败/取消、根会话和弱绑定端点校验，以及许可撤销后回复终态不重开、显式再次启用和不递归排队。受控替身不证明真机麦克风停机或模型退出意图命中。
 
-WindowGatewayTests follows the real typed UI request → ApplicationControl → Gateway → WindowModule chain, using synthetic renderer receipts. It verifies shared Skill aliases and that BasicSkill remains unchanged. Fixed State fixtures include ui.windows; UI root registry assertions include its tenth child. These checks do not exercise native window animations or camera hardware.
 
 Perception camera UI intent is exercised through Photographer, fixed Perception Actions and Gateway with a test capability. Camera Foundation snapshot reads are checked for no lazy creation or device activation. Synthetic camera fixtures publish actual-state fields separately from business intent; device results remain independent.
 
@@ -198,3 +197,28 @@ Camera preparation also uses a padded synthetic mirrored JPEG to verify that nor
 CameraEnhancementTests checks pure settings rejection, monotonic countdown deadlines/cancellation, domain recording stop/join/audio-release/background behavior, idempotent collection and file-backed video ownership/retention/image isolation. Native recording callbacks and metadata in domain tests are explicit fixtures, not camera/microphone acceptance. PhotographerCameraTests routes all added UI operations through the actual role/Gateway/declared-Action chain. PromptTemplateTests covers loaded aliases, task cleanup ordering and the enlarged Photography catalog budget.
 
 Recording handoff tests exercise the production VoiceRecordingAudioHandoff with an explicit suspended native-stop receipt: microphone sample stop retains ownership, recording admission waits for release, cancellation still joins, and cleanup failure rejects admission. Recording tests assert the actual window-derived angle reaches the native port. Native audio ownership and encoded file orientation still require device acceptance.
+
+
+
+
+
+
+
+
+系统灵动岛验证覆盖活动容量/owner/revision/generation、原生提交合并/迟到状态/权限失败、阶段提醒去重与上限、后台暂停与根清理、导航白名单；Actions/Skill验证expanded请求与旧自定义几何拒绝、Task身份/中文状态/终态移除。自动化不证明系统动画或真机视觉效果。
+
+灵动岛双呈现回归覆盖通用详情阶段/收起/结束、普通状态拒绝展开、相机优先整活动切换、后台只保留当前活动摘要、真实渲染回执围栏、频谱不重发摘要及系统失败下前台独立。布局检查左右同边距、硬件保护和有界标准圆角矩形；不替代真机动画验收。
+
+Island集成校验新primary/secondary内容与Action解析、指定活动的展示偏好修改、任务自动详情以及系统权限失败与前台独立；图片端口只注册显示资源，不扩大BasicSkill。
+
+VoiceTests的ASR失败回归覆盖创建失败及结束输入后的SFSpeechErrorDomain拒识替身：错误保留、字幕封口、Context及显示回到listening、empty轮次终态、下一句成功发布。此替身验证控制流，不等于Apple ASR真机识别验收。
+
+VoiceTests还验证六次toggle与四来源共768条新revision空闲回执只产生六次聆听Action，迟到busy不能越过已更新围栏；多来源busy更新只在聚合进入/离开占用时各发一次暂停/恢复，替换incarnation的同态事实不重复执行。
+
+ActionsContainer场景回归验证后台保留在途Action、已有准备票据及新请求接纳，原生场景关闭仍执行；完整invalidate继续拒绝新执行。
+
+聆听计时覆盖elapsed编码/非法日期、固定高度与硬件对齐，以及连续聆听跨后台/领域更新保持起点、重新聆听重计。
+
+灵动岛整理回归确认setPresentation目录只保留activityID/size，过时布局/动画请求在纯参数入口拒绝；业务域投影与通用执行保持分离，已有生命周期/优先级/计时回归继续适用。
+
+PlatformSystemStatus测试验证驻留电量未知/充电/低电量字段、网络路径类型及离线语义、非法电量拒绝；不进行原生网络或电池采样。

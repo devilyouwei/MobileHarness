@@ -395,7 +395,7 @@ func businessSkillTeachingCannotFinishAnAbsentOrUnrelatedTask(skill: String) thr
     #expect(base.utf8.count < 25_000)
     _ = try skills.control("loadSkills", arguments: ["skills": "[\"photography\"]"], inputID: "budget", fixed: fixed)
     let photography = try AssistantContextState.systemPrompt(skills.registry(fixed: fixed), skills: skills)
-    #expect(photography.utf8.count < 36_000)
+    #expect(photography.utf8.count < 38_000)
     #expect(photography.contains("Action closeCamera:"))
     #expect(photography.contains("Task is not device authorization"))
     #expect(!photography.contains("skillOwnership/loadedSkills"))

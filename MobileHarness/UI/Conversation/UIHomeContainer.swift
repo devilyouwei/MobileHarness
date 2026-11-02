@@ -80,3 +80,7 @@ public enum ListeningInput: Sendable, Equatable {
     case toggle
     case press(Bool)
 }
+
+public enum HomeInput: Sendable {
+    case text(String)
+}

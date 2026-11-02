@@ -5,6 +5,45 @@ import Foundation
     import AVFAudio
 #endif
 
+/// Typed projection of the existing resident power/network facts. No sampler or permission effects.
+public struct PlatformSystemStatus: Sendable {
+    public enum Network: String, Sendable { case unknown, offline, wifi, cellular, wired, other }
+    public let network: Network
+    public let batteryLevel: Double?
+    public let charging: Bool
+    public let lowPower: Bool
+    private struct Power: Decodable {
+        let batteryLevel: Double?
+        let batteryState: String
+        let lowPowerMode: Bool
+    }
+    private struct Path: Decodable {
+        let status: String
+        let interfaces: [String]
+    }
+    init(power: Data, network: Data) throws {
+        let power = try JSONDecoder().decode(Power.self, from: power)
+        let path = try JSONDecoder().decode(Path.self, from: network)
+        if let level = power.batteryLevel, !level.isFinite || !(0...1).contains(level) {
+            throw PlatformStateError.invalidSnapshot
+        }
+        batteryLevel = power.batteryLevel
+        charging = power.batteryState == "charging" || power.batteryState == "full"
+        lowPower = power.lowPowerMode
+        switch path.status {
+        case "satisfied":
+            self.network =
+                path.interfaces.contains("wifi")
+                ? .wifi
+                : path.interfaces.contains("cellular")
+                    ? .cellular
+                    : path.interfaces.contains("wiredEthernet") ? .wired : .other
+        case "unsatisfied", "requiresConnection": self.network = .offline
+        default: self.network = .unknown
+        }
+    }
+}
+
 /// Native facts only. Source selection and model-context envelopes belong to the caller.
 public enum PlatformStateSource: String, CaseIterable, Sendable {
     case time, power, thermal, network, permissions, audio, locale, accessibility

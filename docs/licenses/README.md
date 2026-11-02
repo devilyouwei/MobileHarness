@@ -18,3 +18,5 @@ Purpose: preserve license notices for model artifacts and runtime dependencies. 
 ✅ Gemma4-Apache-2.0.txt and CoreAIModels-BSD-3-Clause.txt accompany the new Gemma/CoreAILM integration; current file lists stage these notices. ❌ Notices do not establish model quality/device acceptance.
 
 ✅ GRDB.swift7.11.1 is the Storage-owned SQLite adapter. [GRDB-MIT.txt](GRDB-MIT.txt) preserves its original MIT notice. GRDB uses Apple’s system SQLite; no database engine or dependency is exposed to UI/ModelKit/PlatformKit.
+
+[Isle-MIT.txt](Isle-MIT.txt)仅保留121版使用提交a47b8cf62891c820729c9939660ac24094705202的历史许可证据。原生重构已移除SDK依赖、锁定记录与包内许可副本；当前实现不分发Isle代码。IslandActivityWidget分区按1998code/iOS16-Live-Activities的WidgetDemo.swift适配，源码保留来源注释；未复制送餐素材或保活代码，未添加第三方运行库。该仓库未提供已核实的许可证文件，不将其标为MIT。

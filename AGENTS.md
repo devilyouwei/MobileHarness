@@ -27,6 +27,14 @@ Read the relevant documentation before designing or implementing a change. Docum
 - Consult the architecture and dependency sections in `MobileHarness/README.md` and the owning module README for dependency and flow design before choosing where code belongs.
 - Treat existing dependencies that conflict with these principles as outstanding migration work, not as precedent for new dependencies.
 
+### Source Organization
+
+- 根目录放模块入口和整体契约；Shared／Support 放可复用机制；具体能力跟随所属目录。
+- Keep module roots and module-wide contracts (such as structured failures and state snapshots) discoverable together. Shared/Support owns reusable mechanisms; capability-specific interfaces, child containers, state and rendering stay with their capability owner.
+- Decide placement by responsibility, not merely by `public` visibility, reuse count, or a fixed number of root files. Keep closely related small declarations together rather than introducing a file for every type.
+- Preserve existing compiled-target and dependency boundaries. A documented shared-contract target may own module-wide contracts in Support/Contracts; application composition may keep its root in Composition. Do not relocate these solely for visual symmetry.
+- A UI Root directory owns root-page composition and navigation; it is distinct from the UI module's root API directory.
+
 ## 3. Obtain Approval Before Adding Directories or Modules
 
 - Obtain explicit user approval before creating any new directory, including a new first-level module under `MobileHarness/`.

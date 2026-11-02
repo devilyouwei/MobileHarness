@@ -94,6 +94,21 @@ public final class ApplicationContainer: ManagedContainer, @unchecked Sendable {
             MainActor.assumeIsolated {
                 UIContainer(
                     configuration: self.uiConfiguration,
+                    systemStatus: { [platform = self.platform()] in
+                        let value = try platform.systemStatus()
+                        let network: IslandDeviceStatus.Network
+                        switch value.network {
+                        case .unknown: network = .unknown
+                        case .offline: network = .offline
+                        case .wifi: network = .wifi
+                        case .cellular: network = .cellular
+                        case .wired: network = .wired
+                        case .other: network = .other
+                        }
+                        return .init(
+                            network: network, batteryLevel: value.batteryLevel,
+                            charging: value.charging, lowPower: value.lowPower)
+                    },
                     onFailure: self.containerFailures().sink(module: "ui", details: Self.failureDetails))
             }
         }.cached
@@ -107,6 +122,7 @@ public final class ApplicationContainer: ManagedContainer, @unchecked Sendable {
     @MainActor public var modelResourcesPresentation: Factory<UIModelResourcesContainer> {
         self { MainActor.assumeIsolated { self.ui().modelResources } }
     }
+    @MainActor public var islandPresentation: Factory<IslandState> { self { self.ui().island }.cached }
     @MainActor public var windowPresentation: Factory<WindowState> { self { self.ui().windows }.cached }
     @MainActor public var navigationPresentation: Factory<UINavigationContainer> {
         self { MainActor.assumeIsolated { self.ui().navigation } }

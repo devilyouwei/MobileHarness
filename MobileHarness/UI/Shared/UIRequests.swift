@@ -162,11 +162,6 @@ public enum UIRequestError: Error, Sendable, Equatable {
             generation = UUID()
         }
     }
-    /// Explicit controls cancel directly; they do not enter the ordinary request FIFO.
-    public func cancelOutstanding() {
-        failPending(CancellationError())
-        generation = UUID()
-    }
     public func stop() {
         guard !stopped else { return }
         stopped = true
@@ -179,73 +174,4 @@ public enum UIRequestError: Error, Sendable, Equatable {
         consumer = nil
         consumerID = nil
     }
-}
-
-public enum HomeInput: Sendable {
-    case text(String)
-}
-public struct CameraInput: Sendable {
-    public enum Operation: String, Sendable {
-        case open, close, flip, retry, takePhoto, savePhoto, ignorePhoto, configure, cancelCapture, startRecording,
-            stopRecording, saveVideo, ignoreVideo, perceptionOpen, perceptionClose,
-            perceptionFlip, perceptionRetry
-    }
-    public let operation: Operation
-    public let recordingID: String?
-    public let settings: CameraSettings?
-    public let facing: CameraDirection?
-    public let mediaID: String?
-    public init(
-        _ operation: Operation, facing: CameraDirection? = nil, mediaID: String? = nil, settings: CameraSettings? = nil,
-        recordingID: String? = nil
-    ) {
-        self.operation = operation
-        self.settings = settings
-        self.recordingID = recordingID
-        self.facing = facing
-        self.mediaID = mediaID
-    }
-}
-public enum SettingsInput: Sendable {
-    case restore
-    case discover(CloudSettingsDraft)
-    case save(CloudSettingsDraft)
-}
-public enum SettingsReply: Sendable {
-    case draft(CloudSettingsDraft)
-    case models([String])
-    case completed
-}
-public enum ResourcesInput: Sendable {
-    case refresh(UInt64?)
-    case restore
-    case save(ModelResourceSourceDraft)
-    case download(String, ModelResourceSourceDraft)
-    case cancel(String)
-    case remove(String)
-}
-public enum ResourcesReply: Sendable {
-    case snapshot(ModelResourceViewSnapshot)
-    case source(ModelResourceSourceDraft)
-    case completed
-}
-public enum HistoryInput: Sendable {
-    case refresh, startNew
-    case summarize(String)
-    case delete(String)
-    case conversation(String)
-    case message(String)
-    case page(String, UInt64, String?)
-    case archives(Int64)
-    case photo(String, String)
-}
-public enum HistoryReply: Sendable {
-    case completed
-    case conversation(HistoryConversation)
-    case archives([HistoryConversation])
-    case photo(Data?)
-}
-public struct DeviceInput: Sendable {
-    public let parameters: [String: String]
-    public init(_ parameters: [String: String]) { self.parameters = parameters }
 }

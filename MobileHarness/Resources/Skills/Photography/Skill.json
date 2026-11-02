@@ -1,7 +1,7 @@
 {
   "version": 3,
   "id": "photography",
-  "revision": 31,
+  "revision": 33,
   "description": "拍照/录像: photo/video window, countdown, flash, zoom, timed audio recording and save/ignore. Background vision/tracking belongs to application-control. Use a Task for continuing media decisions.",
   "dependencies": [],
   "useActions": [
@@ -118,6 +118,12 @@
       "callType": "action",
       "alias": "Window.close",
       "channel": "Display"
+    },
+    {
+      "path": "UI.Island.setPresentation",
+      "callType": "action",
+      "alias": "Island.setPresentation",
+      "channel": "Display"
     }
   ],
   "useStates": [
@@ -125,7 +131,8 @@
     "ui.camera",
     "ui.album",
     "ui.windows",
-    "platform.vision.camera"
+    "platform.vision.camera",
+    "ui.island"
   ],
   "useInstructions": [
     "Instructions.md"

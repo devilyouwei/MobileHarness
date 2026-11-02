@@ -294,3 +294,17 @@ public final class UIModelResourcesContainer {
     public var presentation: any ModelResourcesPresenting { state }
     init(admission: UIPresentationAdmission) { state.presentationAdmission = admission }
 }
+
+public enum ResourcesInput: Sendable {
+    case refresh(UInt64?)
+    case restore
+    case save(ModelResourceSourceDraft)
+    case download(String, ModelResourceSourceDraft)
+    case cancel(String)
+    case remove(String)
+}
+public enum ResourcesReply: Sendable {
+    case snapshot(ModelResourceViewSnapshot)
+    case source(ModelResourceSourceDraft)
+    case completed
+}

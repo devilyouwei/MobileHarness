@@ -8,7 +8,7 @@
 | --- | --- |
 | [技术需求](requirements/technical/README.md) | 四项架构改进中，公开 State 基础与首批 useState 已实现；更多事实、统一错误处理和 App 端到端验收仍待完成；存储接口子项已完成，整份需求保持开放。 |
 | [产品需求](requirements/product/README.md) | “用户”板块的独立相册和日记式记忆，以及多云端模型管理、WebKit HTML 呈现和持续聆听/打断判断。 |
-| [交叉需求](requirements/README.md#技术与产品交叉需求) | 公开 State 的后续治理/验收、摄影构图与运镜、[Face 窗口与 App 内灵动岛](requirements/Face-Window-Island-Plan.md)（窗口/拍照、双用途共享采集及镜头准入已实现并通过自动化和构建、已安装真机；倒计时/闪光灯/变焦、有声录像及相册处置已实现并安装2026110110，真机验收待完成；独立App内灵动岛、更多页面窗口化及完整实测待续）。 |
+| [交叉需求](requirements/README.md#技术与产品交叉需求) | 公开 State 的后续治理/验收、摄影构图与运镜、[Face 窗口与 App 内灵动岛](requirements/Face-Window-Island-Plan.md)（窗口/拍照、双用途共享采集及镜头准入已实现并通过自动化和构建、已安装真机；倒计时/闪光灯/变焦、有声录像及相册处置已实现并安装2026110110，真机验收待完成；原生App内胶囊与系统Live Activity双呈现已实现，已签名并安装2026110123，真实Face聆听紧凑/详情展开与工具栏已复验，录像/说话/系统新展开布局等完整实测待续）。 |
 | [待细化方向](requirements/README.md#其他待细化方向) | 更多模型能力、原生事件交互、快慢认知和多窗口等；细化前先核对当前实现。 |
 
 需求范围与验收标准只在需求正文维护，本页不重复副本，也不从早期“待做”记录推断今天仍然缺失。原范围全部完成才整份归档；后续独立修复和扩展另行跟踪。
@@ -80,3 +80,7 @@
 每个代码分支：先更新拥有目录 README（跨模块先更新总体设计），实现并清除替代路径，执行 check.sh 和可用的 build-ios.sh；报告实际通过、失败与未执行项。行为变化增加有意义的回归测试。真实模型、原生 UI、物理动作和功耗/内存/热状态独立记录，不能用构建代替。必要验收未完成时保留需求开放。每个阶段收尾再决定下一支，不创建后台自动任务或自动合并。
 
 - Container reflexivity: implementation and acceptance are tracked in [the technical requirement](requirements/technical/Container-Reflexivity.md); [validation evidence](validation/Container-Reflexivity.md) separates automated/build results from native/model/device acceptance.
+
+126恢复前台组件并保留系统岛，统一图标/详情语义，目标Task为首个通用detail场景；App动效和系统动效由各自组件拥有。用户真机视觉验收开放，不操作模拟器界面，见Window-Camera验证与Face-Window-Island计划。
+
+内容接口重构采用primary/secondary指标与可选detail(text,thumbnail)：有效详情默认展开，手动收起保留内容；优先级整体切换活动并保存各自展示偏好。缩略图本轮仅App内有界显示，系统保留图标/文字。交互与动效由UI组件统一拥有；见[实施计划](requirements/Face-Window-Island-Plan.md)。

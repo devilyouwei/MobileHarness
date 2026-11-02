@@ -192,6 +192,12 @@ import Foundation
             }
         }
     }
+    /// Scene visibility gates native visual/device services without cancelling ongoing voice/business work.
+    public func setSceneActive(_ active: Bool) async throws {
+        guard state == .running else { throw ActionsContainerError.unavailable }
+        if !active { invalidateNative() }
+        try await nativeForeground(active)
+    }
     public func setForeground(_ active: Bool) async throws {
         guard state == .running || state == .suspended else { throw ActionsContainerError.stopped }
         if !active { invalidate() }

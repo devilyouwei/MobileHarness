@@ -54,3 +54,7 @@ ApplicationPresentation.prepare requires AppComposition bootstrap; it never star
 Agents declares foreground model requirements. ModelKit returns preparation steps with native readiness and warmup semantics. App owns only activation by scene/home visibility, interaction gating, the generic preparation worker and structural UI-state adaptation. Resource context resolution, lease lookup, coordinated acquisition and settlement interpretation are Gateway operations; App adapters forward those operations across public protocols. Model error publication classification belongs to Agents' failure channel, while App injects error sinks and structurally projects module errors.
 
 ApplicationStateInspection supports exact reads, descriptors and explicit bounded trees. It contains no health ranking, diagnostic allowlist or historical-failure projection. The failure journal remains with its existing owner.
+
+前台及系统灵动岛由UI基础模块拥有；App复用同一根IslandState并转发生命周期。系统岛链接固定mobileharness://island，激活既有场景，保留离开前的导航和窗口；冷启动遵循正常首页流程。UI根不分发旧岛链接到记录/相机/蓝牙。原生终止回调仅调用UI拥有的有界ActivityKit清理端口，不保证强杀回调。主App与Simulator目标均嵌入MobileHarnessLiveActivity扩展；Widget只编译UI中立摘要及Widget入口，不接入App业务装配。
+
+已启动图通过continuesInBackground声明后台连续性，首次启动/替换/根停止仍执行完整失效。Scene不可见仅停止视觉与前台设备服务，保留已开启的语音会话、执行链和同源Live Activity。实现及约束见Composition与Lifecycle；不创建后台轮询/静音播放保活。

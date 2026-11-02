@@ -222,7 +222,7 @@ The diagram summarizes permitted dependency directions between logical groups. I
 
 Every arrow in this figure means **compile-time dependency**. Dashed arrows identify neutral contract imports; solid arrows identify public module or support-mechanism dependencies. Gateway invokes the injected `ActionsExecutionPort` without importing Actions. Agents receives immutable descriptors and host ports without importing Actions, CallRuntime or ExecutionRuntime. Foundation-frame edges mean selected public capabilities, not a dependency on every foundation.
 
-System frameworks and approved third-party libraries are external dependencies and are omitted from the graph for readability. Dependencies between targets inside one foundation remain internal to that foundation and must be acyclic. In the current target graph, UI and PlatformKit have no package-target dependencies; ModelKit and Storage each contain multiple targets within their own SDK boundary. [Package.swift](../Package.swift) defines those exact build units.
+System frameworks and approved third-party libraries are external dependencies and are omitted from the graph for readability. Dependencies between targets inside one foundation remain internal to that foundation and must be acyclic. In the current target graph, UI has no package-target dependencies and uses Apple presentation frameworks; PlatformKit has no package-target dependencies; ModelKit and Storage each contain multiple targets within their own SDK boundary. [Package.swift](../Package.swift) defines those exact build units.
 
 **Foundation isolation is mandatory.** UI, PlatformKit, ModelKit and Storage must not import one another or any other project module. Their external dependencies are limited to system frameworks and approved third-party libraries. Targets within the same foundation may depend on that foundation's own contracts and mechanisms. A foundation that needs an external facility defines a neutral port in its own API; an upper-layer adapter supplies the implementation. Injecting an adapter must not introduce foreign project types or a hidden business dependency into the foundation's contract.
 
@@ -590,6 +590,56 @@ The [Action lifecycle responsibility matrix](#action-lifecycle-responsibilities)
 After admission, Gateway does not query Skill permission again. Agents revokes authority by explicitly cancelling the corresponding execution scope. The business executor rechecks current conditions after queueing. Preparation has no business effects; its single-use credential is tied to the container catalog revision. Rejection, cancellation and shutdown discard retained preparation. Result delivery retry never reruns business work.
 
 UI request sources, cognitive consumers and business owners are separate. Missing consumers, full capacity, closed roots and stale generations fail explicitly. Replies resolve the original request. Model-selected operations and deterministic UI requests use the same registered business functions and validators. Local navigation does not create an inference round. Full history and media use private typed attachments rather than model parameters. Root-owned mutations, title jobs and observations survive page lifetime. See [Actions](Actions/README.md), [Gateway Output](Gateway/Output/README.md) and [Agent adapters](Agents/Support/README.md).
+
+#### Two UI interaction paths
+
+UI interactions are classified by responsibility: **presentation-only interaction** changes local presentation, while **business interaction** requests business data or operations. Touch and voice are input methods, not the classification criterion.
+
+**Business interaction** follows the Agent/Gateway/Actions path and has two input branches. Touch business requests reach their responsible Agent for deterministic handling. Voice input passes through speech perception, then reaches a cognitive Agent for intent interpretation and call selection. Both branches invoke business functions through Gateway and Actions, sharing the same implementation when calling the same function. Agent handling does not always require model inference.
+
+**Presentation-only interaction** responds directly to local presentation interactions such as navigation, dragging and expansion. These interactions update presentation state without entering Agent decision-making or Action execution. A page can use both paths according to the responsibility of each operation.
+
+```mermaid
+flowchart TB
+    subgraph Paths["Interaction paths"]
+        direction LR
+        subgraph Direct["Presentation-only interaction"]
+            direction TB
+            Click["Click / gesture"] --> Local["Local presentation<br/>e.g. navigate, drag, expand"]
+        end
+        subgraph Controlled["Business interaction · Agent-controlled"]
+            direction LR
+            subgraph TouchPath["Touch"]
+                direction TB
+                Touch["UI business request"] --> Owner["Responsible Agent"]
+                Owner --> TouchGateway["Gateway"]
+                TouchGateway --> TouchActions["Actions"]
+            end
+            subgraph VoicePath["Voice"]
+                direction TB
+                Voice["Voice input"] --> Perception["Speech perception"]
+                Perception --> Cognition["Cognitive Agent"]
+                Cognition --> VoiceGateway["Gateway"]
+                VoiceGateway --> VoiceActions["Actions"]
+            end
+        end
+    end
+    Local --> UI["UI<br/>Presentation state and rendering"]
+    TouchActions --> UI
+    VoiceActions --> UI
+    style Paths fill:transparent,stroke:transparent
+    style Direct fill:#e7f6fc,stroke:#3985a4
+    style Controlled fill:#faf7fd,stroke:#8261b5
+    style TouchPath fill:transparent,stroke:transparent
+    style VoicePath fill:transparent,stroke:transparent
+    style UI fill:#e7f6fc,stroke:#3985a4
+```
+
+The two Actions nodes represent the same shared execution capability. Actions owns business execution and submits presentation updates through injected UI interfaces; UI owns the resulting state and rendering. Execution feedback returns to the requesting Agent and does not automatically become displayed content. Direct responses remain limited to presentation responsibilities; device effects and domain lifecycle coordination belong to the Agent/Gateway/Actions path.
+
+**Routing rule for development:** keep changes limited to UI presentation state on the direct path. Route business data queries or mutations, persistence, device operations and domain lifecycle coordination through the responsible Agent → Gateway → Actions. Classify by the actual effect, not by whether the input is a click or voice command. A combined interaction may use both paths: opening a page is presentation-only, while loading its business data uses the business path; closing a window that must stop capture requires business lifecycle coordination. UI handlers submit business intent rather than implementing the business operation themselves. Voice-selected presentation commands still enter through Agent execution; presentation-only classification does not bypass that voice decision path.
+
+Execution and completion contracts follow the shared workflow above; local presentation details belong to the [UI module](UI/README.md).
 
 ### 4. Page navigation and visible page context
 
@@ -1633,3 +1683,19 @@ Before recording, Actions blocks new voice audio playback, joins VoiceSessionCoo
 The recording owner survives minimized/hidden content; recording locks lens switching on both surfaces. Close stops/joins before media decisions; background stops/finalizes and preserves the pending clip without automatic foreground recording. Actual native recording facts belong to PlatformKit, business phase/settings to Actions, display/geometry to UI, and durable inclusion to Storage. Detailed limits/failures live in [Camera Actions](Actions/Camera/README.md), [Platform Vision](PlatformKit/Vision/README.md), [Listening](Actions/Speech/Listening/README.md) and [Media](Storage/Database/Media/README.md).
 
 Photo/movie execution freezes the UI camera window’s sensor-to-interface angle and passes it to PlatformKit’s validated output connection. Perception retains independent gravity-upright frame coordinates; encoded photo metadata/movie transforms determine later media display. No Foundation dependency on UI or Actions is introduced.
+
+## 通用双呈现灵动岛
+
+UIContainer.island统一拥有前台和系统内容。Actions根服务从已有Task/Camera/Voice/连接状态发布中立紧凑内容，目标任务额外声明通用IslandDetail(text,thumbnail)和阶段身份；UI组件负责完整前台布局/动效、原生ActivityKit提交及各自回执。App根只挂载IslandHost；WidgetKit独立扩展消费共享摘要，系统权限失败不会使前台状态消失。
+
+有效文字或缩略图首次出现即默认展开，普通更新尊重用户收起，清空详情收回。每个详情活动独立保存展示偏好，详情与无详情实时状态分别按优先级选择。展开下方复用详情活动primary和目标描述；顶部继续切换语音、相机、加载等实时指标，不影响任务详情及收起偏好。只有展开区显示正文/图片，两端共用这些语义，系统展开时机由iOS决定。动画设计在基础组件内，业务不传尺寸/弹簧参数。前台真实挂载完成与系统请求提交分别报告；系统实际展示由iOS决定。频谱测量仅更新前台附件，不逐帧发送Action/原生摘要。
+
+根失活清空前台旧代并停止隐藏渲染，原生保留当前完整活动及明确暂停状态；stop加入清理。系统岛点击固定唤回既有场景，内容不携带导航目的地，不跳转到记录/相机页。进程终止由App原生回调调用UI有界尽力清理；iOS不保证强杀回调，过期外观与下次启动清理不能保证划掉立即消失。Camera继续走Photographer→Gateway→声明式Action。灵动岛状态不替代Task/设备事实，不拥有后台设备运行。见[UI](UI/README.md)、[组件](UI/Components/README.md)、[Actions Runtime](Actions/UI/Runtime/README.md)。
+
+缩略图由UI中立类型化接口注册并提供有界显示资源引用，Actions传入图片数据但不设计呈现，系统侧不共享图片。左右指标以primary/secondary独立选择符号效果、loading、真实频谱或进度，预设效果由组件实现；旧字段仅在解码边界迁移。
+
+应用running后的Scene可见性与根会话可用性分离：App按ManagedService.continuesInBackground保留Model/Platform/UI/Actions/Gateway/Agents，Scene通知只关闭Camera/视觉跟随和前台设备服务、本地Window/Island渲染。用户已开启的Audio、VAD/ASR、对话/业务执行和回复继续；UI保留同一会话事实与Island活动generation，ActivityKit接收实时摘要，返回前台重新显示最新内容。完整invalidate/stop仍逆序取消加入所有工作。后台持续运行依赖真实录音/播放与OS授权，不由Live Activity保证；前台专属Action仍由所属能力拒绝。
+
+UI模块根保留UIContainer、UIFailure和UIStateSnapshot整体契约；内部以Root归档根页面组合与导航，Shared归档非视觉通用机制，Components按Island/Window聚合完整公共组件，Conversation拥有Face原生绘制与Metal资源。根UIContainer唯一构造子能力；输入/回执类型随功能owner，Shared不依赖具体功能。目录不新增Swift target或跨模块依赖，Widget仍只编译独立共享显示源。详见[UI目录与边界](UI/README.md)。
+
+App内灵动岛系统状态链路：PlatformKit持有原生网络/电池事实→App构造适配为UI自有只读值→Island组件按本地挂载生命周期刷新并布局。UI根视图根据真实挂载标志隐藏/恢复原生状态栏；Actions/Agents不提交或修改系统状态。两基础模块保持独立，组件不重复开启系统观察。

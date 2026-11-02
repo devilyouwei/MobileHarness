@@ -66,6 +66,7 @@ import UI
                 }, cache: storage.cache, files: files, camera: camera,
                 cameraPresentation: presentation,
                 cameraUI: uiContainer.camera, albumUI: uiContainer.album, windows: uiContainer.windows,
+                island: uiContainer.island,
                 cameraAccess: AppCameraAccess(hosts.camera),
                 deviceAccess: AppDeviceAccess(hosts.device),
                 facades: hosts.facades,

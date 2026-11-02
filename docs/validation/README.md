@@ -6,6 +6,7 @@
 
 | 文档 | 职责 |
 | --- | --- |
+| [UI interaction paths audit](UI-Interaction-Paths-Audit.md) | Static routing and consistency audit of presentation-only, touch-business and voice-business interactions; deviations and validation limits. |
 | [Container 状态与模型上下文](Container-State-Context.md) | 容器快照、Skill v3、StorageState移除、自动化证据及独立原生验收。 |
 | [镜头切换准入](Camera-Control-Availability.md) | 全局模型准备与原生相机按钮解耦，状态回归及真机验收边界。 |
 | [基础相册](Album.md) | App 收录、格式保持导入、独立系统导出、容量保护及删除恢复；真机验收与自动化区分。 |

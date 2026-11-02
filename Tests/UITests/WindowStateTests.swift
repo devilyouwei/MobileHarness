@@ -230,3 +230,58 @@ func imageWindowFitsSafeAreaWithoutChangingImageRatio(_ size: (Double, Double)) 
     #expect(camera.lensOwner == nil)
     await windows.stop()
 }
+
+@Test func portraitCameraDefaultClearsOrdinaryExpandedIslandWithoutCropping() {
+    let frame = WindowSizing.image(aspect: 3.0 / 4.0, controlsHeight: 140).initial(width: 402, height: 778)
+    let island = IslandPlacement.resolve(
+        viewport: CGSize(width: 402, height: 874), safeTop: 62, safeBottom: 34,
+        expanded: true, detailHeight: 44)
+    #expect(frame.y + 62 >= island.frame.maxY + 12)
+    #expect(frame.y + frame.height <= 778)
+    #expect(abs(frame.width / (frame.height - 192) - 0.75) < 0.00001)
+    #expect(WindowSizing.standard.initial(width: 402, height: 778) == WindowGeometry.initial(width: 402, height: 778))
+}
+
+@Test(arguments: [
+    (CGRect(x: 0, y: 0, width: 402, height: 874), CGRect(x: 0, y: 62, width: 402, height: 778)),
+    (CGRect(x: 0, y: 0, width: 874, height: 402), CGRect(x: 62, y: 0, width: 750, height: 381)),
+])
+func windowMaximizedShellTouchesScreenEdgesAndReservesOnlyTop(_ viewport: CGRect, _ safe: CGRect) {
+    for boundary: Double? in [nil, 51, 142] {
+        let frame = WindowGeometry.maximized(viewport: viewport, safe: safe, topBoundary: boundary)
+        #expect(frame.x + Double(safe.minX) == Double(viewport.minX))
+        #expect(frame.width == Double(viewport.width))
+        #expect(frame.y + Double(safe.minY) == boundary.map { $0 + 4 } ?? Double(safe.minY))
+        #expect(frame.y + Double(safe.minY) + frame.height == Double(viewport.maxY))
+    }
+}
+
+@Test @MainActor func windowIslandReservationKeepsNormalAndCardAndMaximizedRestore() async throws {
+    let state = WindowState()
+    let viewport = CGRect(x: 0, y: 0, width: 402, height: 874)
+    let safe = CGRect(x: 0, y: 62, width: 402, height: 778)
+    let compact = WindowGeometry.maximized(viewport: viewport, safe: safe, topBoundary: 51)
+    let expanded = WindowGeometry.maximized(viewport: viewport, safe: safe, topBoundary: 142)
+    state.layout(width: safe.width, height: safe.height, maximized: compact)
+    state.setAvailable(true)
+    let id = try await presentFixture(state)
+    try state.move(id, x: 12, y: 160)
+    let normal = try state.find(id).normal
+    let card = try state.find(id).card
+    for command in [WindowCommand.maximize, .minimize, .restore, .restore] {
+        let revision = try state.find(id).revision
+        let change = Task { try await state.change(id, command: command) }
+        try await windowEventually { (try? state.find(id).revision) != revision }
+        try acknowledge(state, id)
+        try await change.value
+        if command == .maximize {
+            #expect(state.frame(try state.find(id)) == compact)
+            state.layout(width: safe.width, height: safe.height, maximized: expanded)
+            #expect(state.frame(try state.find(id)) == expanded)
+        }
+        #expect(try state.find(id).normal == normal && state.find(id).card == card)
+        if try state.find(id).mode == .maximized { #expect(state.frame(try state.find(id)) == expanded) }
+    }
+    #expect(try state.find(id).mode == .normal && state.frame(state.find(id)) == normal)
+    await state.stop()
+}

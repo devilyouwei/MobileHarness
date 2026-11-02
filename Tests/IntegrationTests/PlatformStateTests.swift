@@ -336,3 +336,26 @@ private func nativeObject(_ data: Data) throws -> [String: Any] {
 @Test func platformAudioScopeStateHasStableRawValues() {
     #expect(AudioContainer.Scope.allCases.map(\.rawValue) == ["voice", "diagnostic", "detection", "camera"])
 }
+
+@Test func typedSystemStatusPreservesNativeUnknownPowerAndNetworkMeaning() throws {
+    let unknownPower = Data(#"{"batteryLevel":null,"batteryState":"unknown","lowPowerMode":false}"#.utf8)
+    let knownPower = Data(#"{"batteryLevel":0.85,"batteryState":"charging","lowPowerMode":true}"#.utf8)
+    let cases: [(String, [String], PlatformSystemStatus.Network)] = [
+        ("unknown", [], .unknown), ("unsatisfied", ["wifi"], .offline),
+        ("requiresConnection", ["cellular"], .offline), ("satisfied", ["wifi"], .wifi),
+        ("satisfied", ["cellular"], .cellular), ("satisfied", ["wiredEthernet"], .wired),
+        ("satisfied", ["other"], .other),
+    ]
+    for (status, interfaces, expected) in cases {
+        let network = try NativeNetworkSnapshot(status: status, interfaces: interfaces).encoded()
+        let unknown = try PlatformSystemStatus(power: unknownPower, network: network)
+        #expect(unknown.batteryLevel == nil && !unknown.charging && unknown.network == expected)
+        let known = try PlatformSystemStatus(power: knownPower, network: network)
+        #expect(known.batteryLevel == 0.85 && known.charging && known.lowPower)
+    }
+    let network = try NativeNetworkSnapshot().encoded()
+    #expect(throws: (any Error).self) {
+        try PlatformSystemStatus(
+            power: Data(#"{"batteryLevel":2,"batteryState":"charging","lowPowerMode":false}"#.utf8), network: network)
+    }
+}

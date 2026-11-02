@@ -51,7 +51,6 @@ JSON 分享延迟编码实际展示的 Codable 值，保留原始 requestJSON；
 
 子容器统一创建状态，业务只读协议＋类型化提交；根停止后拒绝更新，后台允许保留事实。设置 revision、资源 generation、分页 ticket 独立于根接纳。
 
-
 [UI 根](../README.md) · [音频检测](../Diagnostics/README.md)
 
 历史消息读取有页面所有者、取消／身份校验与加入；目录在通用执行器解析，按原JSON身份缓存，时间线仅随加载／分页重建并预分组。资源下载源编辑提交窄控制接口，页面不轮询自动保存；外部唯一工作流合并初始恢复并拥有防抖、停止与错误上报。
@@ -59,7 +58,6 @@ JSON 分享延迟编码实际展示的 Codable 值，保留原始 requestJSON；
 历史详情读取的容量约束：一个实际读取与一个最新候选，取消清除候选并取消实际读取；候选替换不创建等待任务链，实际读取完成后才接纳下一项。
 
 已实现：devices呈现Action维护独立连接摘要，设置页展示该状态；详细设备／机械臂控制资格仍消费原真实状态，不由显示摘要解锁设备。
-
 
 ## Direct container contract
 
@@ -120,3 +118,5 @@ The State operation attribute belongs to ui.album. ui.navigation reflects naviga
 ## Album video presentation
 
 Album items carry MIME; video/quicktime shows a play badge and opens a local-file player using AlbumInput.video → AlbumReply.video(URL). Thumbnail requests remain image Data and are decoded by the existing thumbnail renderer. Export/delete share existing typed requests and busy/admission behavior, with media-aware labels. Leaving detail clears the URL/player. The photo picker still imports static photos only; video capture comes from Camera.
+
+SettingsInput/Reply、ResourcesInput/Reply、HistoryInput/Reply、DeviceInput分别与SettingsState、ModelResourcesState、ConversationHistoryState、BluetoothSettingsState同文件；通用传输位于Shared/UIRequests，具体输入类型由本目录拥有。

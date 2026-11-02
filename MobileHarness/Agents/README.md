@@ -93,3 +93,9 @@ Background visual demand alone adds the vision model requirement. Photographer r
 ## Photo/video UI flow
 
 Photographer consumes typed photo/video settings and recording controls through its existing single UI request path, emits fixed internal calls to Gateway and returns actual Action results. Assistant's Photography Skill governs conversational capture decisions and Task/window closure; it does not start background vision. Recording disables microphone listening, so the Skill uses a stop button or native duration limit rather than promising a voice stop. See [Photographer](Photographer/README.md) and [Assistant](Assistant/README.md).
+
+Photography与ApplicationControl共享Island.setPresentation和ui.island，Basic常驻目录不变。setPresentation设置前台compact/expanded，展开要求详情声明；业务Task观察源保持独立。Widget链接返回既有App入口，Camera操作继续通过Photographer。
+
+SpeechPerception失败轮次通过既有empty阶段和语音呈现工具完成清理，Assistant释放该轮识别绑定；恢复遵守采集/许可/回复占用，原始识别错误仍记录。语音呈现与灵动岛从同一状态恢复，详见[SpeechPerception](SpeechPerception/README.md)。
+
+setSceneActive(false)报告真实后台环境并加入VisionPerception停止，保留SpeechPerception和其他业务角色/决策；其余setForeground/invalidate保持完整暂停契约。Scene恢复不重建语音交互，不重新授予关闭的聆听许可。

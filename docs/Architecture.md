@@ -35,3 +35,11 @@ Window presentation is a UI-root capability above persistent Face/navigation. Ty
 Background vision/following and photo-window demand independently reuse one PlatformKit Camera. Actions releases capture only after both demands close; minimizing hides photo rendering without withdrawing demand. UI presentation ordering determines lens control, and Actions enforces the same holder before calling Foundation switching. Camera native phase/running/facing State is owned by platform.vision.camera; UI intent and presentation are separate facts.
 
 Photo/video share the same Camera window and Foundation capture session. Camera Actions owns countdown, configuration, recording completion and pending-media decisions. Recording joins listening pause before native microphone reservation; terminal native cleanup releases audio before generation-fenced listening restoration. Storage publishes a bounded file-backed movie and separately records App album inclusion; UI plays only a supplied local URL. Background invalidates listening restoration and joins recording finalization, while minimized windows retain recording with an activity label. See [Camera](../MobileHarness/Actions/Camera/README.md) and [validation](validation/Window-Camera.md).
+
+UI根统一前台IslandHost与系统ActivityKit呈现；Actions只发布中立内容、可选detail和阶段身份。只有目标Task投影详情，通用组件拥有前台动效/挂载，系统拥有原生动效，两端失败独立。频谱仅更新前台，不提交逐帧Action。Widget白名单导航回App已有入口，设备生命周期仍由其原有所有者管理。
+
+内容接口重构采用primary/secondary指标与可选detail(text,thumbnail)：有效详情默认展开，手动收起保留内容；优先级整体切换活动并保存各自展示偏好。缩略图本轮仅App内有界显示，系统保留图标/文字。交互与动效由UI组件统一拥有；见[实施计划](requirements/Face-Window-Island-Plan.md)。
+
+## UI interaction paths
+
+Choose the interaction path by responsibility. Presentation-only interactions update local UI state directly. Business data queries, mutations, persistence, device operations and domain lifecycle coordination go through the responsible Agent → Gateway → Actions. Touch and voice are input methods; both use the same business execution path when requesting the same operation. UI handlers submit business intent rather than performing business operations. Both paths use UI-owned rendering. See [Two UI interaction paths](../MobileHarness/README.md#two-ui-interaction-paths).

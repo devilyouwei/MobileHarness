@@ -1223,7 +1223,7 @@ func assistantCapturesWithoutTaskWhenNoFollowUpIsRequested(supportsImages: Bool)
     let expression = try AgentConfigurations.skill("expression-interaction")
     #expect(Set(expression.useActions.map(\.path)) == ["UI.Expression.express", "UI.Expression.setExpression"])
     let application = try AgentConfigurations.skill("application-control")
-    #expect(application.useActions.count == 17 && !application.useActions.contains { $0.path.hasPrefix("NexArm.") })
+    #expect(application.useActions.count == 18 && !application.useActions.contains { $0.path.hasPrefix("NexArm.") })
     let robot = try AgentConfigurations.skill("robot-interaction")
     #expect(robot.useActions.count == 11 && robot.useActions.allSatisfy { $0.path.hasPrefix("NexArm.") })
     for registry in try AgentConfigurations.skillRegistries() {

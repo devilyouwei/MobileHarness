@@ -540,7 +540,8 @@ public enum VoiceReplyCancellation {
                 return
             }
             handlingTurn = true
-            try await microphone.setEnabled(false)
+            // SpeechPerception gates recognition and drains suppressed packets. Keep native audio alive
+            // across model latency so an already-enabled conversation can continue in the background.
             guard revision == listeningRevision, voiceGeneration == generation else { return }
             presentationPhase = .processing
             state.present(.voiceStatus("正在回复 · 聆听已暂停"))
@@ -668,7 +669,7 @@ public enum VoiceReplyCancellation {
                     }
                 }
                 handlingTurn = true
-                try await microphone.setEnabled(false)
+                // Playback admission already suppresses VAD/ASR; retain the native capture generation.
                 guard acceptsPlayback(invocation.context), !videoAudioHeld else { throw CancellationError() }
                 try await speechPlayback.play(audioID: audioID, invocation: invocation) {
                     [weak self] stream, invocation in

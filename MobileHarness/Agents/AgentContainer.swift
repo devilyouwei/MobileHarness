@@ -30,6 +30,7 @@ import StorageFiles
         @ObservationIgnored private let audio: AudioContainer
         @ObservationIgnored private let cameraDevice: any CameraCapturing
         private let albumUI: UIAlbumContainer
+        public let island: IslandState
         public let windows: WindowState
         private let cameraUI: UICameraContainer
         @ObservationIgnored private let languageModels: any ModelLanguageProviding
@@ -107,7 +108,7 @@ import StorageFiles
             repositories: @escaping @Sendable () throws -> AgentRepositories,
             cache: CacheContainer, files: FilesContainer,
             camera: any CameraCapturing, cameraPresentation: any CameraPresenting,
-            cameraUI: UICameraContainer, albumUI: UIAlbumContainer, windows: WindowState,
+            cameraUI: UICameraContainer, albumUI: UIAlbumContainer, windows: WindowState, island: IslandState,
             cameraAccess: any AgentCameraAccess, deviceAccess: any AgentDeviceAccess, facades: AgentUIFacades,
             audio: AudioContainer,
             languageModels: any ModelLanguageProviding, speechModels: any ModelSpeechProviding,
@@ -137,6 +138,7 @@ import StorageFiles
             self.albumUI = albumUI
             self.cameraUI = cameraUI
             self.windows = windows
+            self.island = island
             self.camera = cameraAccess
             self.bluetooth = deviceAccess
             self.languageModels = languageModels
@@ -166,6 +168,17 @@ import StorageFiles
         public func start() async throws(AgentFailure) { try await lifecycle.start() }
         public func invalidate() { lifecycle.invalidate() }
         public func setForeground(_ value: Bool) async throws(AgentFailure) { try await lifecycle.setForeground(value) }
+        public func setSceneActive(_ value: Bool) async throws {
+            if value { try await lifecycle.setForeground(true) }
+            foreground = value
+            guard !isolatedPresentation else { return }
+            reportEnvironment(.scene, value: value ? "active" : "background")
+            if !value {
+                visionPerception.invalidate()
+                try await visionPerception.suspend()
+            }
+        }
+
         public func stop() async throws(AgentFailure) { try await lifecycle.stop() }
         @ObservationIgnored private var runtimeValue: AgentRuntime?
         public func reportModelPreparation(loading: Bool) {

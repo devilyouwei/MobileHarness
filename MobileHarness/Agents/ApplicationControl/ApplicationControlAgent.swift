@@ -279,7 +279,9 @@ public actor ApplicationControlAgent: Agent {
             try receiveFailure(input, message: message)
             return
         }
-        if case .toolResult(let result) = input.payload, windowCalls.contains(result.callID) {
+        if case .toolResult(let result) = input.payload,
+            windowCalls.contains(result.callID)
+        {
             guard lifecycle == .running || lifecycle == .paused else { throw HarnessError.notRunning }
             guard input.metadata.origin == .runtime, input.metadata.source == "runtime",
                 input.sessionID == sessionID, input.taskScope == nil

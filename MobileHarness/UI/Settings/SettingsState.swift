@@ -284,3 +284,14 @@ public final class UISettingsContainer {
         state.invalidateRevision()
     }
 }
+
+public enum SettingsInput: Sendable {
+    case restore
+    case discover(CloudSettingsDraft)
+    case save(CloudSettingsDraft)
+}
+public enum SettingsReply: Sendable {
+    case draft(CloudSettingsDraft)
+    case models([String])
+    case completed
+}

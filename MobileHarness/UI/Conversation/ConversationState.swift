@@ -180,18 +180,16 @@ public final class ConversationState {
 public struct ConversationCaptionLayout: Sendable {
     public let captionHeight: CGFloat
     public let captionCenterY: CGFloat
-    public let taskCenterY: CGFloat
 
     public init(
         viewportHeight: CGFloat, faceDiameter: CGFloat,
-        hasTranscript: Bool, finalized: Bool, hasTask: Bool, hasActivity: Bool
+        hasTranscript: Bool, finalized: Bool, hasActivity: Bool
     ) {
         captionHeight = min(100, viewportHeight * 0.16)
         let promotedTop = max(72, viewportHeight * 0.40 - faceDiameter * 0.5 - 31 - captionHeight * 0.5)
-        taskCenterY = promotedTop + 9
         let captionCenter: CGFloat
         if finalized || !hasTranscript {
-            captionCenter = promotedTop + (hasTask ? 26 : 0) + captionHeight * 0.5
+            captionCenter = promotedTop + captionHeight * 0.5
         } else {
             captionCenter = viewportHeight - (hasActivity ? 240 : 120)
         }

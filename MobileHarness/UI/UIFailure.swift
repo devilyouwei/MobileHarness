@@ -59,3 +59,6 @@ public struct UIFailure: Error, Sendable, CustomStringConvertible {
         }
     }
 }
+
+public typealias UIFailureReporting = @Sendable (String, String, any Error) -> Void
+public enum UIContainerError: Error, Sendable, Equatable { case unavailable, stopped, stale }

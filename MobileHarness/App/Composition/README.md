@@ -47,7 +47,7 @@ Stop reverses dependencies and retains ports through Agent, Gateway and Actions 
 
 ## Foreground, replacement and errors
 
-Only active Scene opens admission. Inactivation synchronously fences roots, then joins required suspension. A successfully rolled-back startup interrupted by system inactivity waits for active before replacing its scope. One replacement task coalesces events; cleanup failure retains the old scope/error and prevents duplicate native owners.
+Initial startup requires an active Scene. Once running, model/platform/UI/Actions/Gateway/Agents declare background continuity: scene loss keeps voice, inference and accepted business work alive while UI detaches local surfaces and Actions/Agents stop camera, tracking and foreground device work. Full invalidation remains reserved for startup rollback, replacement and root shutdown. A successfully rolled-back startup interrupted by system inactivity waits for active before replacing its scope. One replacement task coalesces events; cleanup failure retains the old scope/error and prevents duplicate native owners.
 
 Background URLSession completion can use the same model/storage scope before foreground startup. Replacement joins those roots even if they never reached the graph's started set. No camera/audio/UI inference is started by background restoration.
 
@@ -84,3 +84,9 @@ ApplicationPresentation requires bootstrap and delegates complete session availa
 ApplicationContainer caches the root window capability; AgentContainer and ApplicationPresentation receive that same WindowState. The root attaches WindowHost above persistent navigation. Navigation visibility affects home model preparation but no longer calls camera admission; Actions handles camera scene and window lifecycle.
 
 ApplicationPresentation.cameraPreview builds the photo renderer with showsPose=false. The root retains the separate Face background visual renderer, shares the same native camera injection, and uses actual native image aspect to update the camera window sizing policy. Composition creates no second capture session.
+
+组合注入同一个UIContainer.island到AgentContainer与ApplicationPresentation；根页面挂载前台IslandHost，系统岛点击只恢复既有场景，Actions业务装配拥有活动适配。App只传递基础呈现端口，不计算活动优先级或控制相机。
+
+IslandState自身管理ActivityKit摘要和SwiftUI本地呈现，组合层不创建第二个系统活动owner。系统链接不改变导航/窗口/展开偏好；后台仅拆本地呈现，系统摘要随真实会话继续。根停止加入清理，进程终止的尽力清理端口属于UI，App delegate只转发。
+
+ApplicationContainer injects IslandDeviceStatusReading into UI construction. Its closure structurally maps PlatformContainer.systemStatus() typed power/network fields into UI-owned values. It owns no polling, native sampler or presentation rule; the visible Island component controls cached-read lifetime and layout.

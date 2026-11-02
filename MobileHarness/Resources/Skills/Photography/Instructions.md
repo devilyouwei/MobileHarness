@@ -69,3 +69,7 @@ Closed that Task’s window successfully:
 ```xml
 照片已忽略。<finishTask summary="照片已忽略"/>
 ```
+
+Island.setPresentation uses an actual activityID from ui.island and size=compact/expanded. Only content with detail text or a registered thumbnail can expand; icon-only states cannot. New detail auto-expands, ordinary updates preserve manual collapse, and collapsing keeps the content. Each detail activity retains its own expansion preference; detail content and transient status indicators are selected independently by priority. Status changes do not replace the task description or reopen collapsed details. Goal Tasks supply detail automatically. Do not create duplicate activities or expand on every progress update. Omit animation/width/height: shell animation belongs to the component; primary/secondary indicators may select supported icon effects. Submitted is not proof of a settled animation. localStatus/systemStatus are independent; iOS controls system expansion.
+
+Compact indicators may include a component-owned elapsed timer. Listening supplies its timer automatically; do not issue periodic updates or add detail text just to show elapsed time.

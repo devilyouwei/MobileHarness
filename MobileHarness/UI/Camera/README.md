@@ -57,14 +57,11 @@ Face 右上角保留胶囊式视觉／跟随开关（eye 图标）和设置入�
 
 呈现错误保留原 throw／注入故障报告；stale、unavailable 和 stopped 等正常接纳拒绝不产生逐帧异常。GPU 故障清空并隐藏对应原生表面，不伪造完成；重启创建新代际。
 
-
 [UI 根](../README.md) · [原生组件](../Components/README.md) · [验证记录](../../../docs/validation/PlatformKit-Containers.md)
 
 宿主准备门禁禁止新开相机，已开启相机仍可关闭；镜头切换仅依据相机自身状态，设置入口不受门禁影响；保留原相机忙碌及权限围栏。
 
-
 CameraState将渲染故障包装为UIFailure后同步交宿主，保留原技术描述和包装源码位置。CameraPresenting的帧新鲜度／方向／代际拒绝保持原领域错误及独立画面／骨架行为，不逐帧升级为全局Toast。
-
 
 ## Direct container contract
 
@@ -96,7 +93,6 @@ UICameraContainer.stateSnapshot 在 Business 显式输出 enabled/perceptionEnab
 
 The owning stateSnapshot entry point reads current local business/capability values and runtime admission/work facts in the owner's isolation domain. It performs no action, acquisition or device activation. The module root composes the explicitly selected fields; unknown diagnostic coverage is not healthy evidence. Domain-specific completion and failure contracts above remain authoritative.
 
-
 ## Interface-based preview geometry
 
 CameraVideoFrame retains the native portrait sensor reference independently of its gravity-upright source rotation/size. CameraPreviewBasis and CameraPreviewGeometry convert model-space joints and camera texture sampling into the actual window interface coordinates before aspect-fill and display-axis mirroring. Metal image and skeleton use the same display dimensions/crop; capture gravity changes do not swap the framing of a portrait-locked interface. Mailbox equality and mesh cache keys include source reference and interface orientation. Frames without a sensor reference preserve the supplied upright-frame geometry.
@@ -122,3 +118,7 @@ CameraSettings carries full mode/countdown/flash/zoom/duration selections plus a
 CameraRecordingPresentation separates idle/starting/recording/finishing/ready/failed. Ready clips use a local URL and LocalVideoPlayer; save/ignore remains available on a retained failed clip. Busy states disable incompatible controls. Both visual surfaces disable lens switching throughout recording startup/active/finalization, including minimized recording. Window aspect follows real preview dimensions plus140pt controls and52pt chrome. Hidden content does not retain preview/player rendering; business recording continues under its domain owner.
 
 CameraState.photoCaptureRotation and CameraPresentationSnapshot expose the current photo window’s sensor-to-interface quarter-turn angle as a read-only scalar. It combines the native portrait sensor reference with photoOrientation, independently of Face orientation and gravity. Without an admitted frame/basis it is nil. Actions snapshots it at the shutter or recording start; the UI does not reorient existing encoded media when the device moves.
+
+CameraInput与UICameraContainer同文件，描述拍照/录像/背景视觉的UI输入；Shared只传递泛型请求，不解释这些操作。
+
+背景视觉容器透明，由Root提供首页底色。视频内部叠加暗色对比渐变后，以30%透明度合成到首页；该对比层只随背景视频显示，不再覆盖无视频首页。窗口内拍摄预览保持原黑色底。

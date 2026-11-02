@@ -19,3 +19,7 @@
 - 签名设备性能、导出兼容性及后台传输的独立验收。
 
 ✅ AppInfo.plist 设置 NSAppTransportSecurity.NSAllowsArbitraryLoads=true，以支持用户配置任意域名或 IP 的 HTTP 模型服务；不同时设置会覆盖该值的 NSAllowsLocalNetworking 等细粒度 ATS 项。NSLocalNetworkUsageDescription 声明加载局域网模型列表和发送对话的用途。HTTPS 使用系统证书验证。策略依据 [Apple ATS 文档](https://developer.apple.com/documentation/bundleresources/information-property-list/nsapptransportsecurity/nsallowsarbitraryloads)。
+
+AppInfo.plist声明NSSupportsLiveActivities及固定mobileharness URL scheme。IslandInfo.plist声明com.apple.widgetkit-extension；MobileHarnessLiveActivity扩展被两个App目标显式依赖并嵌入PlugIns，bundle ID为宿主ID加.island，版本与宿主一致。扩展使用同一共享构建设置但不继承App内存entitlement，不声明相机/麦克风、App Groups、推送或后台保活能力。
+
+AppInfo.plist的UIBackgroundModes声明audio，用于用户已开启会话的后台录音和语音播放；扩展不声明该模式。系统中断和终止仍影响运行，Live Activity不提供后台执行时间。
