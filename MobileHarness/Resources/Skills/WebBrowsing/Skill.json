@@ -1,0 +1,76 @@
+{
+  "version": 3,
+  "id": "web-browsing",
+  "revision": 2,
+  "description": "打开网址、浏览网页、读取正文和截图观察；支持页面导航与逐屏查看。",
+  "dependencies": [],
+  "useActions": [
+    {
+      "path": "Web.Page.browse",
+      "callType": "action",
+      "alias": "Web.browse",
+      "channel": "Display"
+    },
+    {
+      "path": "Web.Page.snapshot",
+      "callType": "action",
+      "alias": "Web.snapshot",
+      "channel": "Display"
+    },
+    {
+      "path": "Web.Page.inspect",
+      "callType": "action",
+      "alias": "Web.inspect",
+      "channel": "Display"
+    },
+    {
+      "path": "Web.Page.navigate",
+      "callType": "action",
+      "alias": "Web.navigate",
+      "channel": "Display"
+    },
+    {
+      "path": "UI.Window.focus",
+      "callType": "action",
+      "alias": "Window.focus",
+      "channel": "Display"
+    },
+    {
+      "path": "UI.Window.minimize",
+      "callType": "action",
+      "alias": "Window.minimize",
+      "channel": "Display"
+    },
+    {
+      "path": "UI.Window.maximize",
+      "callType": "action",
+      "alias": "Window.maximize",
+      "channel": "Display"
+    },
+    {
+      "path": "UI.Window.restore",
+      "callType": "action",
+      "alias": "Window.restore",
+      "channel": "Display"
+    },
+    {
+      "path": "UI.Window.move",
+      "callType": "action",
+      "alias": "Window.move",
+      "channel": "Display"
+    },
+    {
+      "path": "UI.Window.close",
+      "callType": "action",
+      "alias": "Window.close",
+      "channel": "Display"
+    }
+  ],
+  "useStates": [
+    "ui.web",
+    "ui.windows"
+  ],
+  "useInstructions": [
+    "Instructions.md"
+  ]
+}

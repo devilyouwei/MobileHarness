@@ -156,7 +156,7 @@ private func nativeObject(_ data: Data) throws -> [String: Any] {
     context.close()
 }
 
-@Test func assistantPlatformContextRejectsMalformedOversizedAndRetiredReads() async throws {
+@Test func assistantPlatformContextMarksMalformedUnknownAndRejectsOversizeOrClosedReads() async throws {
     let mode = FixtureFactCell(0)
     let context = AgentStateContext()
     try AssistantStateBindings.register(in: context) { _ in
@@ -164,9 +164,9 @@ private func nativeObject(_ data: Data) throws -> [String: Any] {
         return String(repeating: "x", count: 256 * 1024 + 1)
     }
     try context.open(session: "state-session")
-    await #expect(throws: DecodingError.self) {
-        try await context.snapshot(session: "state-session", names: ["platform.system.time"])
-    }
+    #expect(
+        try await context.snapshot(session: "state-session", names: ["platform.system.time"]).contains(
+            "stateUnavailable"))
     mode.update { $0 = 1 }
     await #expect(throws: ContainerContextError.capacityExceeded) {
         try await context.snapshot(session: "state-session", names: ["platform.system.network"])

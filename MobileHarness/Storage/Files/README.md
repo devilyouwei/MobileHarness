@@ -2,7 +2,7 @@
 
 ## 职责与接口
 
-✅ StorageFiles 只依赖 StorageCore、Foundation/Synchronization。FilesContainer 配置 settings/photos/models 三个命名空间，公开 document(Value.self, in:name:) 与 file(namespace:)。具体业务 Codable 类型留在调用方；照片字节、配置文档与模型目录共享文件拥有者，但保留不同访问能力。
+✅ StorageFiles 只依赖 StorageCore、Foundation/Synchronization。FilesContainer 配置 settings/photos/models/workspaces 四个命名空间，公开 document(Value.self, in:name:) 与 file(namespace:)。具体业务 Codable 类型留在调用方；照片字节、配置文档与模型目录共享文件拥有者，但保留不同访问能力。
 
 DocumentStore 提供 load/refresh/invalidate、UUID revision 的 save/CAS 和 replace。FileDocumentStore 保留 envelope version 1、默认 64 KiB、按文件的进程内 CAS 锁和原子替换；MemoryDocumentStore 是显式内存替身。FileStore 提供有界 read/info、putIfAbsent、remove 和有界列举；DiskFileStore 另提供真实目录、空间预留和发布，MemoryFileStore 是显式内存替身，不伪造文件 URL。
 
@@ -33,3 +33,7 @@ FilesContainer.stateSnapshot returns StorageCore.StorageStateSnapshot directly; 
 ## Bounded file-backed media
 
 FileStore.importFile and fileURL support bounded local-file resources without whole-file Data. DiskFileStore rejects symbolic links/non-regular files, invalid paths, empty/oversized sources and existing destinations. Import copies to a confined temporary file, applies data protection, validates byte count, synchronizes/closes and atomically moves without overwrite. Cancellation before publication removes the temporary copy; publication/cleanup failures remain explicit. fileURL requires a present bounded file inside the namespace; caller lifetime/disposition remains above Files. MemoryFileStore explicitly rejects these native-file operations.
+
+## Consumer workspaces and native file witnesses
+
+FilesContainer.workspaces is a separate opaque namespace, explicitly configured by App (defaulting to WebWorkspaces beside settings for compatible callers). Generic document CAS and disk publication apply without a project schema in Storage. DiskFileStore explicitly implements async fileURL/importFile witnesses so concrete and FileStore existential callers both reach the real disk implementation; unsupported backends retain the explicit default failure.

@@ -139,8 +139,23 @@
                 exportVideo: { [platform] file in try await platform.vision.saveVideo(file) })
             let island = IslandPresentationService(state: ui.island)
             let islandDomains = IslandDomainPresentation(service: island, home: ui.home, camera: ui.camera.state)
+            let web = WebExecutionService(
+                page: ui.web, windows: ui.windows,
+                workspace: WebWorkspace(
+                    disk: try files.file(files.workspaces),
+                    index: try files.document(
+                        WebWorkspaceIndex.self, in: files.workspaces,
+                        name: "index.json", maximumBytes: 4 * 1024 * 1024)),
+                model: model.language,
+                saveImage: { [photos] data, input in
+                    try await photos.save(
+                        data,
+                        owner: StorageOwner(
+                            namespace: "photos", source: input.context.source,
+                            session: input.context.sessionID, input: input.context.inputID))
+                })
             let windowExecution = WindowExecutionService(
-                state: ui.windows, lifecycles: [WindowContent.camera.rawValue: camera])
+                state: ui.windows, lifecycles: [WindowContent.camera.rawValue: camera, WindowContent.web.rawValue: web])
             let assembly = try BehaviorAssembly(
                 presentation: presentation, playback: endpoints.speech, pose: presentation,
                 historyPresentation: history, camera: endpoints.camera,
@@ -150,7 +165,7 @@
                     store: request.conversations,
                     photo: { [photos] id, input in try await photos.readForInput(id, source: "assistant", input: input)
                     }),
-                album: album, windows: windowExecution, island: island, modelResources: resourceAdapter,
+                album: album, windows: windowExecution, web: web, island: island, modelResources: resourceAdapter,
                 resourcePreferences: preferences,
                 resourceInventory: resourceAdapter,
                 resourcePresentation: ResourcePresentationAdapter(
@@ -169,7 +184,7 @@
             try actions.configure(
                 assembly,
                 cleanup: [
-                    { await mutations.shutdown() }, { await windowExecution.stop() },
+                    { await mutations.shutdown() }, { await windowExecution.stop() }, { await web.stop() },
                     {
                         await islandDomains.stop()
                         island.stop()

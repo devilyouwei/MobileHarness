@@ -176,3 +176,11 @@ Island后台连续性测试验证同代活动仍可更新系统摘要、无pause
 Island几何回归覆盖紧凑黑色背景只包含业务、全宽系统状态坐标不变、展开背景包含完整容器，以及紧凑透明系统状态区域不接纳展开点击。
 
 Island兼容解码测试覆盖旧destination/linkTitle被忽略、重新编码不再携带导航字段，系统快照仍固定唤回App。业务状态与任务详情的身份、图片及代际验证由既有用例保持。
+
+WebPageTests covers URL privilege boundaries plus real macOS WebKit local HTML/CSS/JS loading and visible JPEG snapshots. WebSimulatorAcceptance is a separately compiled iOS test host using production WebPageContainer/WebPageView; scripts/test-webkit-simulator.sh runs it on a booted simulator and writes local/remote snapshots plus structured evidence. Its authored fixture does not claim LLM generation acceptance.
+
+Web原生本地加载测试同时验证State只暴露local内容类型、隐藏文件URL，关闭后回到empty。
+
+导航覆盖回归验证首页边界同步暂停本地Island、展开／收起偏好跨嵌套路径和后台往返恢复、期间内容更新与活动结束、根失活清理。窗口回归验证导航遮挡时内容／背景不可见、无镜头权限，返回保留身份／位置／模式／回执。状态测试不代替iOS原生层级、交互返回和状态栏的真机验收。
+
+WindowStateTests还覆盖标题自适应宽度、320pt封顶／窄屏约束、真实原生字体测量、字号变化时保留卡片中心／普通几何和最大化恢复模式。图标回归覆盖系统符号、组合emoji、PNG实际解码／96像素等比缩图、非法输入拒绝以及关闭清理；不替代iOS渲染、截断和触控验收。

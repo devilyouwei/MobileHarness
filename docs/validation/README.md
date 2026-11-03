@@ -89,3 +89,11 @@
 [BasicSkill 聆听控制](Listening-Actions.md)：启停 Action、许可与会话边界的自动化证据，以及独立真机验收步骤。
 
 - [Window / Camera](Window-Camera.md)：通用窗口、Action 请求链和拍照迁移的自动化证据与独立真机验收边界。
+
+[WebKit 与绘图 Actions](WebKit-Actions.md)记录受限多文件编辑、真实macOS/iOS WebKit、远程浏览/截图和独立模型替身验收；真实模型与物理设备范围单独标注。
+
+[Web Skill 上下文修复](Web-Skill-State-Fix.md)：ui.web漏注册的失败复现、动态打包Skill状态回归及真机修正版交付。
+
+[Web Skill 教学优化](Web-Skill-Teaching.md)：浏览/绘图分轮示例、项目复用、Task与失败边界及协议/预算验证。
+
+[Skill 驱动 State 观察](Skill-State-Observation.md)：统一resolver、完整Business与部分读取失败隔离的验证。

@@ -46,12 +46,12 @@
                         .accessibilityHidden(true)
                     }
                     .navigationContext(.home, content: .ready)
+                    .overlay { windowOverlay }
                 } destination: { destination in
                     destinationView(destination)
                         .navigationContext(destination.contextPage)
                         .id(assembly.navigation.generation)
                 }
-                .overlay { windowOverlay }
                 .environment(\.navigationContext, assembly.navigation)
                 .onChange(of: assembly.navigation.path, initial: true) { _, path in
                     assembly.cameraState.windows = assembly.windows
@@ -91,6 +91,8 @@
                             camera: assembly.cameraState, controls: assembly.cameraControls,
                             rendersPreview: !assembly.windows.isCovered(item.id)
                         ) { assembly.cameraPreview() })
+                } else if item.content == WindowContent.web.rawValue {
+                    AnyView(WebPageView(page: assembly.web))
                 } else {
                     AnyView(Text("窗口内容不可用").foregroundStyle(.white))
                 }

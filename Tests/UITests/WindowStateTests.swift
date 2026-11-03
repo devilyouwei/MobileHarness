@@ -1,4 +1,5 @@
 import Foundation
+import ImageIO
 import Testing
 
 @testable import UI
@@ -14,8 +15,12 @@ import Testing
     let item = try state.find(id)
     state.complete(id, revision: item.revision, generation: state.generation, success: true)
 }
-@MainActor private func presentFixture(_ state: WindowState, _ name: String = "fixture") async throws -> UUID {
-    let opening = Task { try await state.present(content: .init(rawValue: name, singleInstance: true), title: name) }
+@MainActor private func presentFixture(
+    _ state: WindowState, _ name: String = "fixture", title: String? = nil, icon: WindowIcon? = nil
+) async throws -> UUID {
+    let opening = Task {
+        try await state.present(content: .init(rawValue: name, singleInstance: true), title: title ?? name, icon: icon)
+    }
     try await windowEventually { state.windows.contains { $0.content == name } }
     let id = try #require(state.windows.first { $0.content == name }?.id)
     try acknowledge(state, id)
@@ -283,5 +288,144 @@ func windowMaximizedShellTouchesScreenEdgesAndReservesOnlyTop(_ viewport: CGRect
         if try state.find(id).mode == .maximized { #expect(state.frame(try state.find(id)) == expanded) }
     }
     #expect(try state.find(id).mode == .normal && state.frame(state.find(id)) == normal)
+    await state.stop()
+}
+
+@Test @MainActor func navigationCoversWindowWithoutChangingIdentityGeometryOrMode() async throws {
+    let root = UIContainer()
+    try root.start()
+    let state = root.windows
+    state.layout(width: 390, height: 750)
+    let id = try await presentFixture(state, WindowContent.camera.rawValue)
+    try state.move(id, x: 20, y: 100)
+    let original = try state.find(id)
+    let camera = CameraState()
+    camera.windows = state
+    camera.faceVisible = true
+    camera.perceptionEnabled = true
+    #expect(camera.lensOwner == .capture)
+    root.navigation.state.show(.settings)
+    #expect(state.isCovered(id) && !state.hasVisibleContent(id, topInset: 52, bottomInset: 140))
+    #expect(!state.hasVisibleBackground() && camera.lensOwner == nil)
+    root.navigation.state.show(.album)
+    #expect(state.isCovered(id))
+    root.navigation.state.show(nil)
+    let restored = try state.find(id)
+    #expect(restored.id == original.id && restored.mode == original.mode && restored.normal == original.normal)
+    #expect(restored.revision == original.revision && restored.presentationConfirmed)
+    #expect(!state.isCovered(id) && camera.lensOwner == .capture)
+    await root.stop()
+}
+
+@Test @MainActor func windowCardsFitTitlesAndCapLongTextWithinNarrowViewports() async throws {
+    let state = WindowState()
+    state.layout(width: 390, height: 750)
+    state.setAvailable(true)
+    let short = try await presentFixture(state, "camera", title: "相机", icon: .system(name: "camera.fill"))
+    let web = try await presentFixture(state, "web", title: "网页与绘图", icon: .system(name: "globe"))
+    let long = try await presentFixture(state, "long", title: String(repeating: "长标题", count: 50), icon: .emoji("🎨"))
+    let mixed = try await presentFixture(state, "mixed", title: "Sketch 👩🏽‍🎨 草稿")
+    #expect(try state.find(short).card.width < state.find(web).card.width)
+    #expect(try state.find(web).card.width < state.find(mixed).card.width)
+    #expect(try state.find(web).card.width < 240)
+    #expect(try state.find(long).card.width == 320)
+    #expect(try state.find(mixed).icon == nil)
+    for item in state.windows {
+        #expect(item.card.x >= 0 && item.card.x + item.card.width <= state.width)
+        #expect(item.card.width >= 128)
+    }
+    state.layout(width: 200, height: 750)
+    for item in state.windows {
+        #expect(item.card.width <= 168 && item.card.x + item.card.width <= 200)
+    }
+    state.layout(width: 390, height: 750)
+    #expect(try state.find(long).card.width == 320)
+    await state.stop()
+}
+
+@Test @MainActor func windowCardFontChangesKeepCenterAndNormalGeometryIndependent() async throws {
+    let state = WindowState()
+    state.layout(width: 600, height: 750)
+    state.setAvailable(true)
+    let id = try await presentFixture(state, "font", title: "网页与绘图", icon: .emoji("👩🏽‍🎨"))
+    try state.move(id, x: 20, y: 90)
+    let normal = try state.find(id).normal
+    for command in [WindowCommand.maximize, .minimize] {
+        let revision = try state.find(id).revision
+        let task = Task { try await state.change(id, command: command) }
+        try await windowEventually { (try? state.find(id).revision) != revision }
+        try acknowledge(state, id)
+        try await task.value
+    }
+    try state.move(id, x: 100, y: 200)
+    let previous = try state.find(id)
+    state.layout(width: 600, height: 750, titleSize: 24)
+    let larger = try state.find(id)
+    #expect(larger.card.width > previous.card.width)
+    #expect(larger.card.x + larger.card.width / 2 == previous.card.x + previous.card.width / 2)
+    #expect(larger.card.y == 200 && larger.normal == normal && larger.icon == .emoji("👩🏽‍🎨"))
+    #expect(larger.mode == .minimized && larger.restoreMode == .maximized)
+    #expect(state.frame(larger) == larger.card && larger.presentationConfirmed)
+    state.layout(width: 600, height: 750, titleSize: .nan)
+    #expect(state.cardTitleSize == 24)
+    state.layout(width: 600, height: 750, titleSize: 15)
+    #expect(try state.find(id).card == previous.card)
+    await state.stop()
+}
+
+@Test @MainActor func windowIconsRejectInvalidPayloadsBeforeCreatingWindows() async throws {
+    let state = WindowState()
+    state.setAvailable(true)
+    for icon in [
+        WindowIcon.system(name: ""), .system(name: "mobileharness.invalid.symbol"),
+        .emoji("word"), .emoji("A"), .emoji("🎨🎨"),
+        .image(Data()), .image(Data("broken image".utf8)), .image(Data(count: 1024 * 1024 + 1)),
+    ] {
+        await #expect(throws: WindowError.invalidIcon) {
+            try await state.present(content: .init(rawValue: "invalid"), title: "Invalid", icon: icon)
+        }
+        #expect(state.windows.isEmpty)
+    }
+    for emoji in ["🎨", "👩🏽‍🎨", "🇨🇳", "1️⃣"] {
+        #expect(try WindowIcon.emoji(emoji).prepared() == .emoji(emoji))
+    }
+    await state.stop()
+}
+
+@Test @MainActor func windowCustomIconIsBoundedAndRetainedUntilWindowCloses() async throws {
+    let context = try #require(
+        CGContext(
+            data: nil, width: 400, height: 200, bitsPerComponent: 8, bytesPerRow: 1600,
+            space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+    context.setFillColor(CGColor(red: 0.2, green: 0.5, blue: 0.8, alpha: 1))
+    context.fill(CGRect(x: 0, y: 0, width: 400, height: 200))
+    let sourceImage = try #require(context.makeImage())
+    let sourceData = NSMutableData()
+    let destination = try #require(CGImageDestinationCreateWithData(sourceData, "public.png" as CFString, 1, nil))
+    CGImageDestinationAddImage(destination, sourceImage, nil)
+    try #require(CGImageDestinationFinalize(destination))
+    let state = WindowState()
+    state.setAvailable(true)
+    // Opening before the first native layout must still receive correct card geometry later.
+    let id = try await presentFixture(state, "custom", title: "Custom artwork", icon: .image(sourceData as Data))
+    state.layout(width: 390, height: 750)
+    let item = try state.find(id)
+    guard case .image(let data) = item.icon else {
+        Issue.record("Missing custom icon")
+        return
+    }
+    let source = try #require(CGImageSourceCreateWithData(data as CFData, nil))
+    let decoded = try #require(CGImageSourceCreateImageAtIndex(source, 0, nil))
+    #expect(decoded.width == 96 && decoded.height == 48)
+    #expect(item.card.width >= 128 && item.card.width <= 320 && item.card.height == 48)
+    for command in [WindowCommand.minimize, .restore, .close] {
+        let revision = try state.find(id).revision
+        let task = Task { try await state.change(id, command: command) }
+        try await windowEventually { (try? state.find(id).revision) != revision }
+        if command != .close { #expect(try state.find(id).icon == item.icon) }
+        try acknowledge(state, id)
+        try await task.value
+    }
+    #expect(state.windows.isEmpty)
     await state.stop()
 }

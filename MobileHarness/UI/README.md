@@ -26,7 +26,7 @@ Root组合功能视图与公共组件，功能拥有自身状态和输入类型�
 
 ## 直接接口与数据流
 
-根构造时创建十一个稳定子能力，不在首次回复或页面切换时补建：
+根构造时创建十二个稳定子能力，不在首次回复或页面切换时补建：
 
 | 子能力 | 状态owner |
 | --- | --- |
@@ -36,11 +36,12 @@ Root组合功能视图与公共组件，功能拥有自身状态和输入类型�
 | navigation | Root/UINavigationContainer |
 | diagnostics | Diagnostics/UIDiagnosticsContainer |
 | windows | Components/Window/WindowState |
+| web | Components/Web/WebPageContainer |
 | island | Components/Island/IslandState |
 
 页面→子容器类型化请求→注入消费者→业务执行→UI呈现值→状态→原生绘制。请求接纳与完成独立，有界容量、取消和迟到回执规则见Shared；公开类型名称保持稳定。home聆听控制使用独立单槽源，普通请求最多64个在途。
 
-UIContainer.stateSnapshot只返回自身生命周期事实及十一子能力的路径索引；各owner只投影已有事实，不采样设备、不递归读取其他owner。密钥、URL、草稿、字幕和媒体字节不进入公开快照；业务操作失败与UI呈现健康分别表达。
+UIContainer.stateSnapshot只返回自身生命周期事实及十二子能力的路径索引；各owner只投影已有事实，不采样设备、不递归读取其他owner。密钥、URL、草稿、字幕和媒体字节不进入公开快照；业务操作失败与UI呈现健康分别表达。
 
 ## 生命周期与完成
 
@@ -48,7 +49,7 @@ UIContainer.stateSnapshot只返回自身生命周期事实及十一子能力的�
 
 setSceneActive与完整invalidate/setForeground分开：后台关闭窗口接纳、相机与App内岛渲染，保留正在运行会话的呈现token、已接纳输入和事实。同一Island活动继续更新系统Live Activity，返回前台挂载当前内容。UI不决定后台音频或设备的业务生命周期。
 
-Face原生树与导航保持身份；页面打开/返回不停止根聆听。窗口内容以插槽挂载，最小化停止隐藏内容绘制，业务设备暂停/关闭由消费者执行。相机后台关闭开启意图，回前台需要明确重开；UI不擅自恢复采集。
+Face和首页WindowHost原生树与导航保持身份；层级为首页→Window→本地Island→导航页。UIContainer接收NavigationState的首页边界变化，同步更新窗口宿主可见性及Island本地呈现，组件不互相引用。导航页遮挡窗口且暂停本地Island，返回恢复展开偏好；页面打开/返回不停止根聆听。窗口内容以插槽挂载，最小化停止隐藏内容绘制，业务设备暂停/关闭由消费者执行。相机后台关闭开启意图，回前台需要明确重开；UI不擅自恢复采集。
 
 原生渲染器拥有自己的显示链与GPU完成屏障；接纳不代表上屏，页面settled不代表动画完成。UIFailure保留原始错误和清理失败，有限动画使用身份/版本回执，旧代拒绝不会成为逐帧故障广播。
 
@@ -63,3 +64,7 @@ Face原生树与导航保持身份；页面打开/返回不停止根聆听。窗
 灵动岛默认系统状态通过根构造的只读UI值端口注入，本地组件拥有刷新/布局及实际挂载标志；Root绑定系统状态栏隐藏和恢复。系统状态不进入Action内容接口，UI不创建平台采样器。见[Island](Components/Island/README.md#默认系统状态条)。
 
 CameraPresenting exposes a bounded, cancellable fresh-frame geometry receipt for capture startup. UICameraContainer resolves it from admitted camera frames or lifecycle failure, without broadcasting frame traffic as Facts; Actions awaits the receipt before requesting device capture. See [Camera](Camera/README.md) for admission, deadlines and cleanup.
+
+[Web](Components/Web/README.md) is the twelfth stable child capability, owned by UIContainer. It creates WKWebView on demand and exposes load/observe/snapshot/navigation receipts; Window.web supplies a single presentation slot. App injects this capability directly into ApplicationRootProviding. UI imports WebKit only in the owning component and never imports model, business or storage modules.
+
+Window接受调用方提供的系统图标、emoji或图片字节；组件拥有校验、规范化和最小化卡片的有界自适应布局，UI不读取业务文件／URL。详细尺寸与资源边界见[Window](Components/Window/README.md)。

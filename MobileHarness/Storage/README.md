@@ -18,7 +18,7 @@ flowchart TB
  Cache --> Buffers[BufferCache / images / 自定义命名空间]
  DB --> Repos[chat / tasks / media / devices]
  Repos --> SQLite[SQLiteDatabaseStorage]
- Files --> Names[settings / photos / models]
+ Files --> Names[settings / photos / models / workspaces]
  Consumer --> Audio
  Consumer --> Repos
  Consumer --> Names
@@ -88,3 +88,5 @@ Cache budgets/retained bytes, audio scopes, file handles and database/root lifec
 ## File-backed video album resources
 
 Actions supplies native-validated movie metadata and a local source; StorageMedia serializes ready-file publication and explicit album inclusion using StorageFiles and MediaRepository. Video playback/export obtains a bounded local URL after ownership or album-membership checks. The existing photos namespace and retention policy hold both photos and movies; image/model reads remain image-only. Storage does not inspect AV assets or manage microphones. See [Media](Database/Media/README.md) and [Files](Files/README.md).
+
+FilesContainer also exposes an independently configured workspaces namespace. App selects its root; StorageFiles provides generic controlled files/documents without interpreting web projects or generation tasks. Content, version retention and publication policy belong to the consuming Actions capability.

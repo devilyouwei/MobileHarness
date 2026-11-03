@@ -96,7 +96,7 @@ import Testing
 @Test(.actionCatalog) func allBundledSkillsHaveValidBoundedEffectiveCatalogs() throws {
     let fixedCapabilities = try AssistantAgent.runtimeCapabilities(
         AgentConfigurations.load(named: "Assistant").capabilities)
-    for skill in ["photography", "history-query", "application-control"] {
+    for skill in ["photography", "history-query", "application-control", "web-browsing", "web-drawing"] {
         var state = AgentTaskSkillState()
         try state.initialize(
             fixed: fixedCapabilities, baseSkills: try AgentConfigurations.baseSkills(named: "Assistant"))

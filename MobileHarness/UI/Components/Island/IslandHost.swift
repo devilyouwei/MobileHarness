@@ -94,7 +94,7 @@ enum IslandInteraction {
         init(state: IslandState) {
             self.state = state
             revision = state.localRevision
-            available = state.available && state.sceneActive
+            available = state.available && state.sceneActive && state.localPresentationVisible
             status = state.statusBar.value
             statusDate = state.statusBar.date
         }
@@ -176,7 +176,9 @@ enum IslandInteraction {
             state?.localDetached()
         }
         func accepts(_ point: CGPoint) -> Bool {
-            guard let state, state.available, state.sceneActive, state.compact != nil, placement != nil else {
+            guard let state, state.available, state.sceneActive, state.localPresentationVisible,
+                state.compact != nil, placement != nil
+            else {
                 return false
             }
             let container = surface.layer.presentation()?.frame ?? surface.frame
@@ -232,7 +234,8 @@ enum IslandInteraction {
             animator.startAnimation()
         }
         func render() {
-            guard let state, let source = window, let scene = source.windowScene, state.available, state.sceneActive
+            guard let state, let source = window, let scene = source.windowScene, state.available, state.sceneActive,
+                state.localPresentationVisible
             else {
                 if overlay != nil { detach() }
                 return

@@ -25,7 +25,8 @@ public final class UIContainer {
                 "available": .flag(isAvailable), "rejectedUpdates": .unsigned(rejectedUpdates),
             ],
             children: [
-                .init(path: "ui.island"), .init(path: "ui.windows"), .init(path: "ui.home"), .init(path: "ui.camera"),
+                .init(path: "ui.island"), .init(path: "ui.windows"), .init(path: "ui.web"), .init(path: "ui.home"),
+                .init(path: "ui.camera"),
                 .init(path: "ui.settings"),
                 .init(path: "ui.modelresources"), .init(path: "ui.navigation"), .init(path: "ui.album"),
                 .init(path: "ui.history"), .init(path: "ui.devices"), .init(path: "ui.diagnostics"),
@@ -37,6 +38,7 @@ public final class UIContainer {
             "ui": UIStateSnapshot.reader(of: self) { try await $0.stateSnapshot() }
         ]
         readers["ui.island"] = UIStateSnapshot.reader(of: island) { try await $0.stateSnapshot() }
+        readers["ui.web"] = UIStateSnapshot.reader(of: web) { try await $0.stateSnapshot() }
         readers["ui.windows"] = UIStateSnapshot.reader(of: windows) { try await $0.stateSnapshot() }
         readers["ui.camera"] = UIStateSnapshot.reader(of: camera) { try await $0.stateSnapshot() }
         readers["ui.settings"] = UIStateSnapshot.reader(of: settings) { try await $0.stateSnapshot() }
@@ -51,6 +53,7 @@ public final class UIContainer {
     }
     public let island: IslandState
     public let windows: WindowState = WindowState()
+    public let web = WebPageContainer()
     public let home: UIHomeContainer
     public let camera: UICameraContainer
     public let settings: UISettingsContainer
@@ -78,9 +81,14 @@ public final class UIContainer {
         history = UIHistoryContainer(title: configuration.historyTitle, admission: admission)
         devices = UIDeviceSettingsContainer(admission: admission)
         diagnostics = UIDiagnosticsContainer(admission: admission)
+        navigation.state.onHomeVisibilityChanged = { [weak windows, weak island] visible in
+            windows?.isHostVisible = visible
+            island?.setLocalPresentationVisible(visible)
+        }
     }
     private func setInputAvailable(_ value: Bool) {
         windows.setAvailable(value)
+        web.setAvailable(value)
         island.setAvailable(value)
         home.requests.setAvailable(value)
         home.listeningRequests.setAvailable(value)
@@ -118,6 +126,7 @@ public final class UIContainer {
             throw UIFailure(component: "root", operation: "setSceneActive", underlying: UIContainerError.unavailable)
         }
         windows.setAvailable(active)
+        web.setAvailable(active)
         camera.setAvailable(active)
         island.setSceneActive(active)
     }
@@ -147,6 +156,7 @@ public final class UIContainer {
         settings.clearSensitiveDraft()
         devices.stopPresentation()
         admission.close()
+        web.close()
         await windows.stop()
         await island.stop()
         home.requests.stop()

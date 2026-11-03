@@ -19,7 +19,7 @@ public enum WindowSizing: Sendable, Equatable {
 public enum WindowMode: String, Sendable { case normal, minimized, maximized }
 public enum WindowPhase: String, Sendable { case opening, settled, changing, closing }
 public enum WindowError: String, Error, Sendable, LocalizedError {
-    case unavailable, capacity, missing, invalidPosition, interrupted, busy
+    case unavailable, capacity, missing, invalidPosition, invalidIcon, interrupted, busy
 }
 
 public struct WindowGeometry: Equatable, Sendable {
@@ -55,6 +55,7 @@ public struct WindowPresentation: Identifiable, Sendable {
     public let id: UUID
     public let content: String
     public let title: String
+    public let icon: WindowIcon?
     public let color: Int
     public var sizing: WindowSizing = .standard
     public var mode: WindowMode = .normal
@@ -76,9 +77,12 @@ public struct WindowPresentation: Identifiable, Sendable {
     public private(set) var focusedID: UUID?
     public private(set) var generation = UUID()
     public private(set) var available = false
+    /// Retained home windows may be covered by navigation without ending their lifetime.
+    public internal(set) var isHostVisible = true
     public private(set) var width: Double = 0
     public private(set) var height: Double = 0
     public private(set) var maximizedFrame: WindowGeometry?
+    public private(set) var cardTitleSize = WindowCardLayout.defaultTitleSize
     @ObservationIgnored private var waiters: [UUID: CheckedContinuation<Void, any Error>] = [:]
     public let requests = UIRequests<WindowInput, Void>()
     @ObservationIgnored private var inputs: [UUID: Task<Void, Never>] = [:]
@@ -114,17 +118,23 @@ public struct WindowPresentation: Identifiable, Sendable {
         windows.removeAll()
         focusedID = nil
     }
-    public func layout(width: Double, height: Double, maximized: WindowGeometry? = nil) {
+    public func layout(width: Double, height: Double, maximized: WindowGeometry? = nil, titleSize: Double? = nil) {
         guard width.isFinite, height.isFinite, width > 0, height > 0 else { return }
+        if let titleSize, titleSize.isFinite, titleSize > 0 { cardTitleSize = titleSize }
         let first = self.width == 0
         self.width = width
         self.height = height
         maximizedFrame = maximized
         for i in windows.indices {
+            let cardWidth = WindowCardLayout.width(title: windows[i].title, viewport: width, fontSize: cardTitleSize)
             if first {
                 windows[i].normal = windows[i].sizing.initial(width: width, height: height)
                 windows[i].card = .init(
-                    x: max(0, width - 176), y: max(0, height - 64 - Double(i) * 56), width: 160, height: 48)
+                    x: max(0, width - cardWidth - 16), y: max(0, height - 64 - Double(i) * 56),
+                    width: cardWidth, height: 48)
+            } else {
+                windows[i].card.x += (windows[i].card.width - cardWidth) / 2
+                windows[i].card.width = cardWidth
             }
             let desired = windows[i].sizing.initial(width: width, height: height)
             windows[i].normal.width = desired.width
@@ -164,6 +174,7 @@ public struct WindowPresentation: Identifiable, Sendable {
         hasVisibleArea(.init(x: 0, y: 0, width: width, height: height), above: -1)
     }
     private func hasVisibleArea(_ target: WindowGeometry, above index: Int) -> Bool {
+        guard isHostVisible else { return false }
         let safe = CGRect(x: 0, y: 0, width: width, height: height)
         var remaining = [
             CGRect(x: target.x, y: target.y, width: target.width, height: target.height).intersection(safe)
@@ -188,7 +199,9 @@ public struct WindowPresentation: Identifiable, Sendable {
         guard let item = windows.first(where: { $0.id == id }) else { throw WindowError.missing }
         return item
     }
-    public func present(content: WindowContent, title: String, sizing: WindowSizing = .standard) async throws -> UUID {
+    public func present(
+        content: WindowContent, title: String, icon: WindowIcon? = nil, sizing: WindowSizing = .standard
+    ) async throws -> UUID {
         guard available else { throw WindowError.unavailable }
         if content.singleInstance, let item = windows.first(where: { $0.content == content.rawValue }) {
             guard item.phase == .settled else { throw WindowError.busy }
@@ -197,13 +210,17 @@ public struct WindowPresentation: Identifiable, Sendable {
             return item.id
         }
         guard windows.count < 4 else { throw WindowError.capacity }
+        let icon = try icon?.prepared()
+        let cardWidth = WindowCardLayout.width(title: title, viewport: width, fontSize: cardTitleSize)
         let id = UUID()
         windows.append(
             .init(
-                id: id, content: content.rawValue, title: title, color: Int.random(in: 0..<6), sizing: sizing,
+                id: id, content: content.rawValue, title: title, icon: icon, color: Int.random(in: 0..<6),
+                sizing: sizing,
                 normal: sizing.initial(width: width, height: height),
                 card: .init(
-                    x: max(0, width - 176), y: max(0, height - 64 - Double(windows.count) * 56), width: 160, height: 48)
+                    x: max(0, width - cardWidth - 16), y: max(0, height - 64 - Double(windows.count) * 56),
+                    width: cardWidth, height: 48)
             ))
         focusedID = id
         try await wait(id)
@@ -393,6 +410,7 @@ public struct WindowContent: RawRepresentable, Sendable, Equatable {
         self.rawValue = rawValue
         self.singleInstance = singleInstance
     }
+    public static let web = Self(rawValue: "web", singleInstance: true)
     public static let camera = Self(rawValue: "camera", singleInstance: true)
 }
 public struct WindowInput: Sendable {

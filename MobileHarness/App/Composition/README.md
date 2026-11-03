@@ -57,11 +57,11 @@ ForegroundPreparation is activated after the lifecycle foreground barrier and vi
 
 ## Native State capability binding
 
-ServiceFactories injects the complete ApplicationStateInspection.snapshot read into AgentContainer. Native facts retain PlatformContainer ownership; Assistant selects their Business fields. This binding adds no App sampler, JSON schema conversion or extra lifecycle node. Platform startup owns passive native observation; Agents selects per-request reads, and roots retain their existing reverse cleanup order. Neither Actions nor Gateway is an intermediary for native State reads.
+ServiceFactories injects the complete ApplicationStateInspection.snapshot read into AgentContainer. Native facts retain PlatformContainer ownership; Assistant projects their complete Business dictionaries. This binding adds no App sampler, JSON schema conversion or extra lifecycle node. Platform startup owns passive native observation; Agents selects per-request reads, and roots retain their existing reverse cleanup order. Neither Actions nor Gateway is an intermediary for native State reads.
 
 ## Observation and query composition
 
-App binds complete inspection.snapshot(path:) reads and reports scene/model preparation to Agents. Assistant owns its source field selection; App does not convert or filter domain schemas. Navigation State includes UI-owned page and album context. Specific business query Actions retain their owning services; App binds no generic environment/last-result callback from Agents into Actions.
+App binds complete inspection.snapshot(path:) reads and reports scene/model preparation to Agents. Skill owns exact-path selection; Assistant projects Business; App does not convert or filter domain schemas. Navigation State includes UI-owned page and album context. Specific business query Actions retain their owning services; App binds no generic environment/last-result callback from Agents into Actions.
 
 ## Internal state inspection
 
@@ -71,7 +71,7 @@ App binds complete inspection.snapshot(path:) reads and reports scene/model prep
 
 `inspectTree(path:depth:)` is explicit internal caller orchestration: read a node, follow its indices within depth 16 / 256 nodes / 256 KiB, and materialize a separate Tree. Trees preserve each owner’s health without ranking or aggregating it. Tree traversal is not an Assistant source or model tool.
 
-App binds only exact snapshot(path:) into Agents. Assistant owns Business field selection for canonical Skill-declared paths. No alias or system.health/system.diagnostics scan can reveal an undeclared descendant. The weak Agent catalog binding avoids retaining the Agent root through its injected read callback. Lifetime, execution, UI and device behavior remain owned by their existing modules.
+App binds only exact snapshot(path:) into Agents. Assistant projects complete Business for Skill-declared paths through a unified resolver. No alias or system.health/system.diagnostics scan can reveal an undeclared descendant. The weak Agent catalog binding avoids retaining the Agent root through its injected read callback. Lifetime, execution, UI and device behavior remain owned by their existing modules.
 
 App explicitly sequences execution preparation: AgentContainer prepares cognitive inputs; ActionsContainer.configureBusiness owns business assembly preparation and returns execution/catalog/host ports; the Agent preparation validates Skill coverage and returns Gateway configuration; App configures Gateway and calls AgentContainer.bindExecution with the resulting facilities. The executionBindings lifecycle node retains this configuration boundary for partial-start rollback and reverse cleanup. Actions owns internal function binding; App owns the cross-module sequence.
 
@@ -90,3 +90,5 @@ ApplicationPresentation.cameraPreview builds the photo renderer with showsPose=f
 IslandState自身管理ActivityKit摘要和SwiftUI本地呈现，组合层不创建第二个系统活动owner。系统链接不改变导航/窗口/展开偏好；后台仅拆本地呈现，系统摘要随真实会话继续。根停止加入清理，进程终止的尽力清理端口属于UI，App delegate只转发。
 
 ApplicationContainer injects IslandDeviceStatusReading into UI construction. Its closure structurally maps PlatformContainer.systemStatus() typed power/network fields into UI-owned values. It owns no polling, native sampler or presentation rule; the visible Island component controls cached-read lifetime and layout.
+
+Web presentation is injected directly from UIContainer into ApplicationPresentation/ApplicationRootProviding. ApplicationContainer configures the separate WebWorkspaces filesystem location. ActionsBusinessAssembly owns editor, browser, storage publication and screenshot services; App adds no editing logic or worker.

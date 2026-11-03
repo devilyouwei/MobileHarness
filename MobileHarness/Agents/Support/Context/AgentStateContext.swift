@@ -5,12 +5,20 @@ import Synchronization
 /// A bounded read-capability registry. It owns no business state or Task projection.
 public final class AgentStateContext: Sendable {
     private struct Registry: Sendable {
+        var resolver: (@Sendable (String) async throws -> Data)?
         var closed = false
         var sessions: [String: UUID] = [:]
         var sources: [String: any ContainerContextProviding] = [:]
     }
     private let registry = Mutex(Registry())
     public init() {}
+    public func resolve(using read: @escaping @Sendable (String) async throws -> Data) throws {
+        try registry.withLock { value in
+            guard !value.closed else { throw ContainerContextError.closed }
+            guard value.resolver == nil else { throw ContainerContextError.duplicate }
+            value.resolver = read
+        }
+    }
     public func register(_ name: String, source: any ContainerContextProviding) throws {
         try registry.withLock { value in
             guard !value.closed else { throw ContainerContextError.closed }
@@ -40,7 +48,12 @@ public final class AgentStateContext: Sendable {
             value -> (UUID, [(String, any ContainerContextProviding)]) in
             guard !value.closed, let generation = value.sessions[session] else { throw ContainerContextError.closed }
             let sources = try names.sorted().map { name -> (String, any ContainerContextProviding) in
-                guard let source = value.sources[name] else { throw ContainerContextError.missing }
+                guard
+                    let source = value.sources[name]
+                        ?? value.resolver.map({ read in
+                            ContainerContextSource(encoded: { try await read(name) })
+                        })
+                else { throw ContainerContextError.missing }
                 return (name, source)
             }
             return (generation, sources)
@@ -66,6 +79,7 @@ public final class AgentStateContext: Sendable {
             value.closed = true
             value.sessions.removeAll()
             value.sources.removeAll()
+            value.resolver = nil
         }
     }
 }

@@ -36,3 +36,7 @@ RetainedFullScreenCover 通过 UIKit overFullScreen 保留首页及相机挂载�
 LocalVideoPlayer uses AVKit VideoPlayer only for an already-owned local file URL. It owns one AVPlayer, pauses/replaces it on URL change, pauses on scene inactivity, and releases it on disappearance. It never requests camera/microphone/Photos permission or decides file disposition. Playback is manual. AVKit is permitted only for this rendering file by the import boundary checker.
 
 [UI模块](../README.md)
+
+## Web pages
+
+[Web](Web/README.md) owns native WebKit loading, page observation, viewport snapshots and remote/local URL policies. Window supplies its shell; WebPageView mounts the retained renderer. Its native operation receipts and lifetime belong to WebPageContainer, not a SwiftUI page task.

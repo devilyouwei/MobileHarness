@@ -121,3 +121,5 @@ WindowExecutionTests supplies lifecycle probes and synthetic UI receipts to veri
 Window lifecycle regressions assert the transition gate spans presentation completion and releases on failure. These pure workflow tests do not exercise physical camera capture or iPhone rendering.
 
 后台持续服务回归验证Scene隐藏时不invalidate持续根、默认视觉服务仍失效，返回不重复start，根stop仍完整invalidate并逆依赖停止。
+
+WebWorkspaceTests exercises read-before-edit, unique replacements, path/byte limits, persisted immutable revisions, stale-write rejection, reopening, deletion and the private multi-request editor with a scripted model. Tests also cover cancellation, latest-render image feedback and full Action create/save/partial-update sequencing with an explicit page test double. These deterministic model replies are explicit test doubles and do not establish real model generation quality.

@@ -131,28 +131,11 @@ AgentStateContext 管理只读来源和会话接纳，不持有Task副本；关�
 
 ## Container context read path
 
-AgentStateContext stores named read capabilities and session generations, never business facts or a Task mirror. [AssistantStateBindings](../../Assistant/AssistantStateBindings.swift) registers the exact canonical source paths used by bundled Skills. App's injected read returns one complete classified node; Assistant alone selects the approved Business fields. Generic Context/Chat and original Containers do not impose Assistant policy on other callers.
+AgentStateContext owns a single exact-path resolver and session generations, never facts or a Task mirror. App supplies the classified node reader; AssistantStateBindings adapts the complete Business dictionary. Skill.useStates alone selects sources on each request. No path or field list is duplicated in Assistant. Nested Business arrays/objects remain intact; Runtime, health/issues, metadata and child indices are excluded. Reads never traverse children or start devices.
 
-| Skill source | Own Business attributes |
-| --- | --- |
-| agents.applicationcontrol | admitted modelPreparation; no scene/sequences |
-| actions.camera | camera/photo activity, permission requirements, facing and media identities |
-| actions.robot | connection/control phase, jogging/tracking goals and observed positions/freshness |
-| actions.robot.motion | active targetCounts; no execution locks/revisions/busy instrumentation |
-| ui.navigation | owned path, confirmed page/content/overlay; album operation remains ui.album-owned |
-| ui.camera / ui.album | camera presentation; album content/list/operation |
-| ui.home.expression | base/effective/overridden/transitioning/loading; no renderer instrumentation |
-| platform.system.time/power/thermal/network/permissions/audio/locale/accessibility | explicitly selected passive native Business facts |
+A missing, unreadable or malformed node becomes availability=unknown/value=null with diagnostic.path and diagnostic.code=stateUnavailable. Exception messages and producer diagnostics are not copied. Other selected sources continue. Cancellation, context closure, generation changes and byte/count limits remain fatal. The adapter bounds raw nodes at256KiB; Context bounds32 names,64 sessions,8KiB/source and16KiB total. Sources are read sequentially outside the lock and generation is checked after collection. Empty selection performs no reads. There is no polling, caching or retry.
 
-Every source reads one node. children indices are not followed, decoded as recursive state or injected as Business. Selecting a does not select a.b; selecting a.b.c needs no ancestor State selection. There is no whole-tree system.health/system.diagnostics source, alias, wildcard, state discovery tool or loadState.
-
-The effective loaded Skills' useStates are unioned, deduplicated and sorted on each actual request. BasicSkill selects agents.applicationcontrol, ui.navigation and eight platform.system.* sources. ExpressionInteraction selects ui.home.expression; RobotInteraction explicitly selects actions.robot and actions.robot.motion; Photography selects actions.camera/ui.camera/ui.album; ApplicationControl and HistoryQuery add no State source. Release changes subsequent disclosure without stopping a producer or removing its registration.
-
-Missing observations remain null/unknown. Availability describes selected observation coverage, not execution permission or physical readiness. Source errors propagate. Nested location and motor-target fields are also explicit. The registry bounds 256 sources, 64 sessions, 32 selected names, 8 KiB/source and 16 KiB total; Chat's complete dynamic block also has a 16 KiB bound. Collection reads sequentially outside the registry lock, checks cancellation and validates the session generation afterward. No fact cache, stream, polling, Signal or Action is created.
-
-## Native platform sources
-
-Native sources retain PlatformKit ownership. The root catalog locates one source without sampling other sources or starting any monitor/device. Existing SDK observations follow their original lifecycle; state reads do not request permission, activate capture/audio, scan or probe. Time/permission/path unknowns remain factual data, not authorizations. See [PlatformKit](../../../PlatformKit/README.md#native-state-port).
+Explicit register(source:) remains available for standalone typed hosts/test fixtures (256 entries); those ports own their serialization/failure semantics. Production installs only the unified resolver. Closing removes both ports and resolver. This mechanism does not decide Skill scope or execution permission.
 
 ## Private Task and Skill projection
 
@@ -174,3 +157,5 @@ The producer classifies its own complete node data; Assistant chooses Business f
 residentSnapshot() returns the last initialized committed Context without acquiring the transaction slot, restoring persistence or mutating state. Before initialization it returns nil; an in-flight commit leaves the previous committed value readable. Role State reads use their owning Agent’s residentContext() accessor; Agent start() performs the existing initialization through snapshot(). Operational snapshot()/transaction semantics remain unchanged, including validation, recovery and explicit persistence failure.
 
 ui.windows reports windowID/title/content/mode/phase and focusedID from the UI owner. Photography and ApplicationControl select it explicitly; BasicSkill remains unchanged. It contains no capture, media or Task authority.
+
+WebBrowsing/WebDrawing选择ui.web与ui.windows；ui.web由生产者提供content/url业务字段，本地路径保持unknown。Skill加载改变下一轮读取集合，新增来源无需修改角色路径清单。

@@ -15,8 +15,11 @@ import UI
 
 private actor BehaviorEndpoint: UIPresentationCapability, UIUpdateCapability, SpeechPlaybackCapability,
     PosePresentationCapability, CameraControlCapability, HistoryPresentationCapability, ResourcePresentationCapability,
-    TaskControlCapability, WindowControlCapability, IslandControlCapability
+    TaskControlCapability, WindowControlCapability, IslandControlCapability, WebCapability
 {
+    func perform(_ operation: String, invocation: any FunctionInput) async throws -> String {
+        throw CancellationError()
+    }
     func performIsland(_ command: IslandCommand, invocation: any FunctionInput) async throws -> String {
         throw CancellationError()
     }
@@ -92,7 +95,7 @@ private func behaviorInvocation(_ function: String, parameters: [String: String]
         history: HistoryQueryService(store: ConversationHistoryStore()),
         historyMutations: HistoryMutationService(
             store: ConversationHistoryStore(), summarizeTitle: { _ in "Unused fixture title" }),
-        windows: endpoint, island: endpoint, modelResources: UnusedModelResourceCapability(),
+        windows: endpoint, web: endpoint, island: endpoint, modelResources: UnusedModelResourceCapability(),
         resourcePreferences: UnusedModelResourcePreferencesCapability(), resourceInventory: UnusedResourceInventory(),
         resourcePresentation: endpoint, providerDiscovery: UnusedProviderDiscovery(),
         providerSettings: UnusedProviderSettings(), device: UnusedDeviceControl(), taskControl: endpoint,

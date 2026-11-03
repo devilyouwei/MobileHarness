@@ -158,6 +158,7 @@ import UI
             registry: registry, containerFailures: containerFailures,
             uiContainer: uiContainer, platform: platform, storage: storage, model: model,
             actions: actions, gateway: gateway, agents: agents, inspection: inspection, actionAssembly: actionAssembly,
-            ui: ApplicationPresentation(features: agents, home: home), homePreparation: homePreparation)
+            ui: ApplicationPresentation(features: agents, home: home, web: uiContainer.web),
+            homePreparation: homePreparation)
     }
 }

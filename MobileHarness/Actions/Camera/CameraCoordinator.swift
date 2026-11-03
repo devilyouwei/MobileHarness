@@ -234,7 +234,8 @@
                 if let windows {
                     do {
                         _ = try await windows.present(
-                            content: .camera, title: "相机", sizing: .image(aspect: 3.0 / 4.0, controlsHeight: 140))
+                            content: .camera, title: "相机", icon: .emoji("📷"),
+                            sizing: .image(aspect: 3.0 / 4.0, controlsHeight: 140))
                     } catch let error as WindowError {
                         throw WindowExecutionFailure(error: error)
                     }

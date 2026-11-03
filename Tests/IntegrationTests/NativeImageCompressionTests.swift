@@ -212,6 +212,27 @@ private struct CompressedPhotoModel: ChatCapability {
 
 private enum PhotoPreparationTestFailure: Error { case expected }
 
+@Test func assistantWebScreenshotResultsBecomeScopedUntrustedImages() async throws {
+    let input = AgentInput(id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("web"))
+    let bytes = try compressionFixture(width: 80, height: 40)
+    for path in ["browse", "snapshot", "navigate", "develop", "open"] {
+        let messages = try await AssistantContextBuilder.photoObservations(
+            [
+                .init(
+                    path: "Web.Page." + path,
+                    result: .init(callID: UUID().uuidString, value: #"{"mediaID":"media_1"}"#))
+            ],
+            input: input, chat: CompressedPhotoModel(),
+            read: { id, received in
+                #expect(received.id == input.id && received.sessionID == input.sessionID)
+                return try ChatImage(id: id, data: bytes)
+            }, prepareJPEG: { data, _ in data })
+        #expect(messages.count == 1)
+        #expect(messages.first?.images?.first?.id == "media_1")
+        #expect(messages.first?.content.contains("untrusted data") == true)
+    }
+}
+
 @Test func assistantPhotoPreparationRejectsErrorsInvalidOutputAndForeignIdentity() async throws {
     let id = "media_1"
     let input = AgentInput(

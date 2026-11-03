@@ -1,5 +1,30 @@
 # Window / Camera 验证
 
+## 2026-11-03 现有窗口切换emoji
+
+- 全部生产创建入口核对：CameraCoordinator的相机窗口使用📷；WebExecutionService的网页与绘图窗口使用🌐。两者消费已有WindowIcon.emoji，未增加能力或目录。
+- 对应拥有目录README已同步；此前系统图标实施记录作为历史证据保留。
+- 四项iOS构建及App Skill／Live Activity资源校验通过。全量普通阶段UI187项通过；Integration982项中residentNativeStateObservationDuringSeedingWinsOverTheBaseline抛出invalidSnapshot，随后使用完整Xcode工具链单独运行`swift test --skip-build --filter residentNativeStateObservationDuringSeedingWinsOverTheBaseline`，退出0、1项通过。首次失败仍保留，不视为全量通过；该用例位于未修改的PlatformStateTests，与窗口图标调用链独立。LiveRuntimeTests串行225项通过；check.sh最终退出1，原因是上述首次普通阶段失败。边界／Python6项／格式／plist／git diff检查通过。
+- NativePresentationTests在cameraNativeMetalDrawStopAndLayerHandoff开始后没有整组结束摘要，不宣称整组通过。本次没有执行真机安装／视觉验收。
+
+## 2026-11-03 最小化卡片宽度与图标
+
+- 实现：卡片根据原生semibold标题测量伸缩，128…320pt并受安全视口减32pt限制；左右44pt固定图标／关闭槽，标题单行尾部省略。相机／网页创建端分别注入camera.fill／globe，通用窗口还支持单个组合emoji和显式图片字节。
+- 图标输入校验：系统symbol须原生可用；自定义图片最多1MiB、宽高各4096以内，ImageIO解码并等比转为最长边96像素PNG，窗口持有规范化数据，关闭／根停止释放。无文件／网络读取或额外异步任务。
+- 新增4项状态／原生字体／ImageIO回归均通过：`windowCardsFitTitlesAndCapLongTextWithinNarrowViewports`、`windowCardFontChangesKeepCenterAndNormalGeometryIndependent`、`windowIconsRejectInvalidPayloadsBeforeCreatingWindows`、`windowCustomIconIsBoundedAndRetainedUntilWindowCloses`。覆盖不同文字长度、320pt封顶、200pt窄视口、24pt字体与中心保留、普通／最大化恢复模式、复合emoji、错误输入、400×200图片变为96×48、首次布局和关闭清理。
+- `./scripts/check.sh` 退出0：模块边界、Python6项、严格Swift格式及plist校验通过；普通UI187项、Integration981项及LiveRuntimeTests串行225项通过。NativePresentationTests在cameraNativeMetalDrawStopAndLayerHandoff开始后没有整组结束摘要，不宣称该原生UI组通过。`./scripts/build-ios.sh`退出0，MobileHarnessSimulator／ModelKitRuntime／ModelKitNemotron／ModelKitSilero四目标BUILD SUCCEEDED，App Skill和Live Activity资源校验通过。`git diff --check`通过。
+- 本次未执行真机安装／触控或iOS视觉截图验收；需检查原生短／长标题、三个图标类型、最大宽度省略、大字号、横竖屏、拖动／单击恢复及关闭按钮。状态／字体／图片回归和模拟器构建不等于这些视觉结果。
+
+
+## 2026-11-03 首页 Window／Island 与导航层级
+
+- 实现：WindowHost 从整个导航容器的 overlay 移入持久首页；NavigationState 在首页边界同步通知 UIContainer，窗口可见面积与本地 Island 呈现随导航遮挡变化。首次离开保存展开偏好，多级导航不重置，返回只恢复仍存在的活动；业务任务、窗口身份和系统 Live Activity 生命周期独立。
+- 新增状态回归：`navigationSuspendsHomeOverlaysAndRestoresIslandPreference` 两组展开／收起参数、`navigationDoesNotRestoreEndedIslandActivitiesOrOldRootPreferences`、`navigationCoversWindowWithoutChangingIdentityGeometryOrMode` 全部通过。覆盖嵌套路径、直接回首页、活动内容／阶段更新、活动结束、新活动、后台与根失活、窗口身份／尺寸／模式／回执保留及隐藏镜头权限。
+- `./scripts/build-ios.sh` 退出0：MobileHarnessSimulator、ModelKitRuntime、ModelKitNemotron、ModelKitSilero 四目标 BUILD SUCCEEDED；App Skill资源及Live Activity嵌入资源校验通过。
+- `./scripts/check.sh` 退出0：边界检查、Python测试、Swift格式检查与plist校验通过；普通阶段包含 UI 183 项和 Integration 981 项，LiveRuntimeTests 串行225项通过。NativePresentationTests 日志在 cameraRenewedFrameSurvivesThePreviousDeadline 开始后没有完整结束摘要，不能作为原生 UI 整组通过的证据。另行使用完整 Xcode 工具链运行 `swift test --skip-build --filter deepNavigationRetainsNativeHomeAndItsWorkUntilRootDestruction`，退出0且有明确1项通过摘要，确认多级导航期间原生首页实例／任务保留和根销毁清理。
+- 没有执行本次真机安装、真实触控或 iOS 交互返回验收。需在真机分别验证：展开／收起进入设置后返回，多级页面回首页，返回手势取消，网页／相机窗口普通／最大化／最小化模式，以及导航期间系统状态栏恢复。自动化状态断言和模拟器编译不代替这些视觉结果。
+
+
 ## 2026-11-03 组合拍摄首帧竞态（152）
 
 - 证据：已只读复制连接 iPhone 的 records.sqlite 与 WAL 到 /tmp/task116-records.sqlite；task_116 的持久化观察与用户RTF一致：root.0.open succeeded，root.1.takePhoto failed/unavailable，随后生成失败回复。截图中的上一轮是startTask反馈，不能单独作为提前完成证据。数据库在线复制并非事务级导出，未修改手机数据库。

@@ -386,6 +386,9 @@ if ui.get('dependencies'):
 allowed_ui = {'Foundation', 'CoreGraphics', 'Observation', 'SwiftUI', 'UIKit'}
 # Public rendering frameworks are confined to the native rendering implementations.
 native_ui_imports = {
+    'Components/Window/WindowAppearance.swift': {'AppKit', 'ImageIO'},
+    'Components/Web/WebPageContainer.swift': {'WebKit', 'AppKit'},
+    'Components/Web/WebPageView.swift': {'WebKit'},
     'Components/Island/IslandActivityAttributes.swift': {'ActivityKit'},
     'Components/Island/IslandSystemPresentation.swift': {'ActivityKit'},
     'Components/Island/IslandActivityWidget.swift': {'ActivityKit', 'WidgetKit'},
@@ -504,7 +507,7 @@ for source in (ROOT / 'MobileHarness').rglob('*.swift'):
     content = source.read_text()
     if any(re.search(r'\b' + retired + r'\b', content) for retired in ('ToolInvocation', 'ToolExecutionContext', 'ToolHandler', 'ToolCompletionHandler')):
         errors.append(f'Retired protocol-specific implementation contract: {source.relative_to(ROOT)}')
-for domain in ('UI', 'Speech', 'Camera', 'History', 'System', 'NexArm'):
+for domain in ('UI', 'Speech', 'Camera', 'History', 'System', 'NexArm', 'Web'):
     for source in (actions_root / domain).rglob('*.swift'):
         if source.resolve() in integration_sources:
             continue
@@ -523,7 +526,7 @@ if 'ToolHandler' in macro_implementation or 'ToolCompletionHandler' in macro_imp
     errors.append('@Action factories must bind canonical handlers only')
 if (actions_root / 'ToolMacro.swift').exists():
     errors.append('Retired @Tool macro must not be recreated')
-expected_domains = {'UI', 'Speech', 'Camera', 'History', 'System', 'NexArm'}
+expected_domains = {'UI', 'Speech', 'Camera', 'History', 'System', 'NexArm', 'Web'}
 domains = {p.name for p in actions_root.iterdir() if p.is_dir()} - {'Support'}
 if domains != expected_domains:
     errors.append(f'Executable business domains must be classified explicitly: {domains}')

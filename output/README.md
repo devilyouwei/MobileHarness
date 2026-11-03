@@ -13,3 +13,5 @@ Purpose: keep reviewable generated artifacts separate from production sources. E
 Do not store model weights, signing credentials, or user media here. Preserve historical reports rather than rewriting them after prompt or configuration changes.
 
 ✅ qwen35-mlx-2026-09-25 records MLX integration validation and distinguishes runnable inference from XML Action quality acceptance.
+
+`webkit-acceptance-2026-11-03.jpg` / `.json` are iOS 27 simulator evidence from the standalone production-WebKit test host: authored local diagram fixture, JavaScript update/animation, remote HTTPS observation and snapshots. They are not LLM-generated acceptance or physical-device evidence; see [validation](../docs/validation/WebKit-Actions.md).

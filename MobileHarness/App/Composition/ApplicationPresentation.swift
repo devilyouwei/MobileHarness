@@ -14,6 +14,7 @@
     @MainActor @Observable public final class ApplicationPresentation: ApplicationRootProviding {
         private let features: AgentContainer
         private let home: UIHomeContainer
+        public let web: WebPageContainer
         public var onHomeVisibilityChanged: (@MainActor (Bool) -> Void)?
         public var onPreparationRequested: (@MainActor () -> Void)?
         public var onInteractionActivityChanged: (@MainActor () -> Void)?
@@ -29,9 +30,10 @@
         public var onRetry: (() -> Void)?
         private var startupFailure: (any Error)?
         public var startupIssue: String? { startupFailure.map { String(describing: $0) } }
-        public init(features: AgentContainer, home: UIHomeContainer) {
+        public init(features: AgentContainer, home: UIHomeContainer, web: WebPageContainer) {
             self.features = features
             self.home = home
+            self.web = web
             features.onModelConfigurationChanged = { [weak self] in self?.onPreparationRequested?() }
         }
         @ObservationIgnored private var sessionPresentation: SessionPresentation?

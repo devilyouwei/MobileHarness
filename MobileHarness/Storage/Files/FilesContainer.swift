@@ -26,12 +26,17 @@ public final class FilesContainer: Sendable {
     public let settings: FileNamespace
     public let photos: FileNamespace
     public let models: FileNamespace
-    public init(settings: URL, photos: URL, models: URL, failures: StorageFailureReporter = .init()) {
+    public let workspaces: FileNamespace
+    public init(
+        settings: URL, photos: URL, models: URL, workspaces: URL? = nil, failures: StorageFailureReporter = .init()
+    ) {
         self.failures = failures
         access = FileAccess(failures: failures)
         self.settings = FileNamespace(root: settings, owner: id)
         self.photos = FileNamespace(root: photos, owner: id)
         self.models = FileNamespace(root: models, owner: id)
+        self.workspaces = FileNamespace(
+            root: workspaces ?? settings.deletingLastPathComponent().appendingPathComponent("WebWorkspaces"), owner: id)
     }
     public func stateSnapshot() async throws -> StorageStateSnapshot {
         try Task.checkCancellation()

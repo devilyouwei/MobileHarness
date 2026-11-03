@@ -8,6 +8,7 @@ public enum CapabilityModules {
             UIModule.declarations,
             NavigationModule.declarations,
             WindowModule.declarations,
+            WebModule.declarations,
             IslandModule.declarations,
             ResourcePresentationModule.declarations,
             SpeechModule.declarations,
@@ -29,6 +30,7 @@ public enum CapabilityModules {
         historyMutations: any HistoryMutationCapability, fullHistory: (any HistoryFullReadCapability)? = nil,
         album: (any PhotoAlbumCapability)? = nil,
         windows: (any WindowControlCapability)? = nil,
+        web: (any WebCapability)? = nil,
         island: (any IslandControlCapability)? = nil,
         modelResources: any ModelResourceCapability,
         resourcePreferences: any ModelResourcePreferencesCapability,
@@ -66,6 +68,7 @@ public enum CapabilityModules {
         if let controls = taskControl {
             modules.append(TaskControlModule(capability: controls))
         }
+        if let web { modules.append(WebModule(web: web)) }
         if let windows { modules.append(WindowModule(windows: windows)) }
         if let island { modules.append(IslandModule(island: island)) }
         return modules

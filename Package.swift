@@ -74,7 +74,7 @@ let package = Package(
             exclude: [
                 "README.md", "Root/README.md", "Shared/README.md", "Camera/README.md", "Components/README.md",
                 "Conversation/README.md",
-                "Components/Island/README.md", "Components/Window/README.md",
+                "Components/Island/README.md", "Components/Window/README.md", "Components/Web/README.md",
                 "Settings/README.md", "Diagnostics/README.md", "Components/Island/IslandActivityWidget.swift",
             ], resources: [.process("Conversation/ListeningHalo.metal")]),
 
@@ -147,6 +147,7 @@ let package = Package(
             path: "MobileHarness/Actions",
             exclude: [
                 "Camera/README.md",
+                "Web/README.md",
                 "History/README.md",
                 "NexArm/Connection/README.md",
                 "NexArm/Motion/README.md",

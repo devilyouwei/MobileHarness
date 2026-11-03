@@ -1,5 +1,30 @@
 # Face、通用 Window 与 App 内灵动岛
 
+## 2026-11-03 现有窗口使用emoji
+
+已实现：项目实际创建Window的入口只有CameraCoordinator和WebExecutionService，分别将系统图标改为📷和🌐，使用已有WindowIcon.emoji接口。两个拥有目录README已同步，保留通用系统图标／图片能力和已有布局。UI回归、串行运行时测试和四项iOS构建通过；全量check因平台状态用例首次失败退出1，该用例单独复核通过，原生UI整组缺少结束摘要。详见[验证记录](../validation/Window-Camera.md)。
+
+## 2026-11-03 最小化卡片自适应宽度与窗口图标
+
+已实现：最小化卡片按标题实际字体宽度伸缩，最小128pt、最大320pt，同时不超过安全视口宽度减32pt；达到上限后单行尾部省略。左右各44pt分别保留图标位和关闭按钮，标题两侧各8pt间距。窗口身份、普通／最大化位置、卡片拖动与恢复规则不变。新增4项回归、完整check脚本与四项iOS构建通过；原生UI整组缺少结束摘要，真机视觉／触控仍待验收，见[验证记录](../validation/Window-Camera.md)。
+
+- UI/Components/Window 新增同目录 WindowAppearance.swift，拥有通用 WindowIcon（系统symbol、单个emoji、自定义图片Data）及原生字体测量／卡片宽度规则。无图标时保持左槽。图片最多1MiB、尺寸最多4096×4096，接纳时ImageIO缩放为最长边96像素PNG；错误明确invalidIcon，不读文件／网络，不增加异步任务。
+- WindowState.present增加可选icon参数，随窗口身份保留规范化图标；layout/present依据标题和字体更新卡片宽度，旋转／字体变化保留卡片中心并约束到安全范围，普通窗口几何独立。WindowHost使用同字号渲染和测量，观察Dynamic Type变化；最小化图标22pt，图片等比完整显示，不侵占标题／关闭命中。
+- Actions/Camera/CameraCoordinator、Actions/Web/WebExecutionService在创建窗口时分别提供camera.fill／globe系统图标；通用UI不根据业务content猜图标。UI/Window、UI模块、Actions/Camera、Actions/Web及总体设计同步接口说明。
+- Xcode工程为WindowAppearance增加源码导航引用，编译所有权仍由UI包目标持有。scripts/check-modelkit-boundaries.py仅为新WindowAppearance文件声明原生AppKit测量与ImageIO图标处理权限，保持UI零项目依赖。Tests/UITests/WindowStateTests覆盖中英文／emoji标题、短长宽度／封顶／窄屏／字体尺寸变化、位置与模式保留、各类图标、非法图片／符号及清理；更新测试和脚本README。
+- 执行完整check与四项iOS构建，记录实际结果；真实iOS图标、截断、关闭按钮及拖动触控验收单列，不把状态测试或编译当成真机效果。
+
+
+## 2026-11-03 首页覆盖层与导航隔离
+
+已实现：Window只覆盖首页，层级固定为首页 → Window → 本地灵动岛 → 其他导航页；进入导航页期间本地岛退出呈现，系统状态栏恢复，返回首页恢复进入前的详情展开／收起偏好。新增状态回归、首页原生持久挂载单独复核、完整check脚本及四项iOS构建通过；NativePresentation整组缺少完成摘要，真机视觉／手势待验收。详见[验证记录](../validation/Window-Camera.md)。
+
+- UI/Root/ApplicationRootView 将 WindowHost 移入持久首页内容，保留窗口实例、尺寸、模式与任务，导航层负责覆盖和阻断首页触摸／无障碍。不关闭业务窗口或采集任务。
+- UI/Root/NavigationState 在路径跨越首页边界时同步通知 UIContainer；模块根将首页可见性传给 WindowState 和 IslandState，不引入跨模块依赖，不依赖页面 onAppear/onDisappear。
+- WindowState 的宿主可见性参与遮挡／内容／背景可见面积判断，使导航页下的相机窗口不取得可见镜头权限。呈现回执仍只代表窗口壳就绪，不代表未被导航遮挡。
+- IslandState 分离本地呈现可见性与业务活动／系统 Live Activity。首次离开首页保存最多8活动的展开偏好，多级 push/pop 不重复覆盖；回首页只恢复仍存在且有详情的活动，已结束活动不复活，新活动按自身默认偏好。根失活清理保存值，前后台切换不解除导航遮挡。IslandHost 停止本地绘制、命中、状态条刷新及布局占位，迟到回执不能重新挂载。
+- 回归覆盖原先展开／收起、嵌套路径和直接返回、期间内容更新／结束、后台往返、窗口状态保留及可见镜头权限；更新 UI、Root、Window、Island README 与总体设计。运行完整 check 和 iOS build，并明确原生转场／真实触控的验收范围。
+
 ## 2026-11-03 组合拍摄等待首帧（152）
 
 已实现；完整check退出0、四项iOS构建及真机资源/签名校验通过，2026110303已安装并启动。真实摄录待用户验收；NativePresentation无完成摘要，不宣称原生Metal验收通过。详见[152验证记录](../validation/Window-Camera.md)。

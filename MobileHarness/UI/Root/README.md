@@ -14,7 +14,7 @@
 
 UIContainer仍在模块根装配导航子容器。功能页面通过导航上下文修饰器确认展示状态，Root组合其实际内容；Root不要求功能页面创建根实例。导航路径变化推进generation并进入transitioning，匹配页面确认后settled；settled只表示页面出现，不代表动画、GPU或业务完成。旧代确认拒绝。相册上下文消费UIAlbumContainer的已有快照，不读取存储。
 
-Face与导航保持稳定兄弟节点；Window和Island覆盖其上，透明区域保留透传。页面导航不关闭根聆听，不重新授予相机采集。后台停渲染及根停止由UIContainer/对应组件处理，不用页面消失替代设备清理。
+Face与导航保持稳定兄弟节点；WindowHost属于持久首页内容，位于Face之上、NavigationStack之下，透明区域保留透传。导航页覆盖整个首页和窗口，并阻断其触摸与无障碍。NavigationState仅在路径跨越首页边界时同步通知UIContainer，由模块根更新窗口可见性和本地Island呈现；多级导航不重复保存偏好。其他导航页处于最高层，本地Island退出挂载并恢复系统状态栏，回首页恢复此前展开／收起偏好。页面导航不关闭根聆听，不重新授予相机采集。后台停渲染及根停止由UIContainer/对应组件处理，不用页面消失替代设备清理。
 
 [UI模块](../README.md) · [共享机制](../Shared/README.md) · [公共组件](../Components/README.md)
 
@@ -25,3 +25,5 @@ ApplicationRootView根据IslandState.replacesSystemStatusBar绑定系统状态�
 Root将IslandState.localFrame底边传给WindowHost的通用topBoundary，WindowHost以全屏视口挂载，最大化外壳贴左右/底边并避开岛身。Root只做组件几何组合，Window和Island互不引用，也不根据Task/Camera状态决定尺寸。
 
 首页和启动占位共用根组合的纵向背景渐变：顶部RGB(0.08, 0.20, 0.32)，底部黑色，延伸到安全区域外。背景不参与命中和无障碍；相机视觉、Face和覆盖组件按原层级叠加，导航页保持自身背景。
+
+ApplicationRootProviding exposes the UI-owned web capability. ApplicationRootView mounts WebPageView for WindowContent.web; this composition adds no model, file or business access to Root.

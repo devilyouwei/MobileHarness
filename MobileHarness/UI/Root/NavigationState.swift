@@ -34,6 +34,7 @@ public enum AppDestination: String, Codable, Hashable, Sendable {
 @Observable
 public final class NavigationState {
     @ObservationIgnored var presentationAdmission: UIPresentationAdmission?
+    @ObservationIgnored var onHomeVisibilityChanged: ((Bool) -> Void)?
     public var isPresentationAvailable: Bool { presentationAdmission.map { $0.started && !$0.stopped } ?? true }
 
     public internal(set) var path: [AppDestination] = [] {
@@ -42,6 +43,7 @@ public final class NavigationState {
             phase = .transitioning
             overlay = nil
             content = .idle
+            if oldValue.isEmpty != path.isEmpty { onHomeVisibilityChanged?(path.isEmpty) }
         }
     }
     public enum Phase: String, Encodable, Sendable { case transitioning, settled }

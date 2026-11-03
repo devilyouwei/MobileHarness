@@ -100,3 +100,9 @@ ActionsBusinessAssembly connects CameraCoordinator's recording audio hold to the
 IslandModule提供双端内容发布/更新/结束和compact/expanded展示请求。领域仅发布中立状态、阶段身份和导航入口；UI拥有有界身份账本、串行ActivityKit写入和失败状态。ActionsBusinessAssembly构造唯一服务与根领域观察，不读取硬件或观察自身Action记录，实际频谱只送前台组件，不逐帧提交Action/原生摘要；shutdown加入观察和蓝牙到期任务。
 
 setSceneActive只调用原生场景服务的失活/加入端口，不暂停Actions根或取消其他已接纳Action；Camera与Bluetooth所属服务保持既有前台门。完整setForeground(false)/invalidate/stop仍执行全部取消。语音会话的半双工准入与持续采集见Speech/Listening。
+
+## Web operations
+
+[Web](Web/README.md) owns remote browsing, local graphics workspaces and private multi-request code generation. ActionsBusinessAssembly injects ModelKit.language, StorageFiles.workspaces, UI.web/windows and the scope-bound image-store closure. WebModule declares eight Web.Page operations; BehaviorProtocolBindings exposes direct returning Action/Tool bindings. WebExecutionService is the sole finite-work owner, rejects concurrent calls and joins cancellation on close/stop. UI owns native rendering; Storage owns filesystem confinement; Assistant owns task policy and image analysis.
+
+Camera与Web在创建UI窗口时显式提供各自图标。Actions只选择显示身份，UI.Window拥有图标接纳、最小化尺寸和原生渲染；不新增函数参数或资源访问链路。

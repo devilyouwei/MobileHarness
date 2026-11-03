@@ -13,4 +13,4 @@
 
 ## 新增交互需求
 
-[多云端模型、HTML 呈现与持续语音感知](Model-Web-Speech-Plan.md)：三项独立需求均待实施，含配置保存与选择、WebKit HTML 绘图呈现、持续聆听及打断判断。
+[多云端模型、HTML 呈现与持续语音感知](Model-Web-Speech-Plan.md)：三项独立需求分别跟踪；WebKit浏览/截图和独立模型绘图功能已实现，实施与验证见[交付归档](../../completed/WebKit-Actions-Plan.md)，模型配置与持续语音验收保留原范围。

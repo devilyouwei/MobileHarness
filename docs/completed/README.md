@@ -73,3 +73,13 @@
 ## BasicSkill 聆听控制
 
 [聆听启停 Actions](Listening-Actions-Plan.md)：无参数 startListening/stopListening、统一许可 owner、原生清理加入及 BasicSkill 教学。代码、文档和自动检查已完成；独立真实模型/真机验收见 [验证记录](../validation/Listening-Actions.md)。
+
+## WebKit 与网页 Actions（2026-11-03）
+
+[WebKit 浏览与本地绘图](WebKit-Actions-Plan.md)：8项Action、独立多轮模型编辑、多文件局部修改、隔离版本工作区、截图观察和两个Skill。完整检查、四项iOS构建、真实macOS WebKit与iOS模拟器验证通过；真实模型和物理设备验收边界见[验证记录](../validation/WebKit-Actions.md)。
+
+[Web Skill 上下文接入修复](Web-Skill-State-Fix.md)（2026-11-03）：补齐ui.web显式注册、被动业务事实和全部打包Skill加载/采集/释放回归；自动检查、iOS构建和真机修正版交付见[验证记录](../validation/Web-Skill-State-Fix.md)。
+
+[Web Skill 教学优化](Web-Skill-Teaching.md)（2026-11-03）：浏览/绘图revision2、分轮示例和项目复用教学；示例解析、提示预算、完整检查与四项iOS构建通过。
+
+[Skill 驱动 State 观察](Skill-State-Observation.md)（2026-11-03）：Skill独占范围选择、统一App读取、完整Business及单项unknown诊断；验证见[专项记录](../validation/Skill-State-Observation.md)。

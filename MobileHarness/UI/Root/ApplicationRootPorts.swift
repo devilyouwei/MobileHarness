@@ -23,6 +23,7 @@
         func retry()
         var session: (any ApplicationSessionProviding)? { get }
         var windows: WindowState { get }
+        var web: WebPageContainer { get }
         var island: IslandState { get }
         var navigation: NavigationState { get }
         var cameraState: CameraState { get }

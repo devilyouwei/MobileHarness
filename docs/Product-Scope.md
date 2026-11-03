@@ -34,3 +34,7 @@ MobileHarness 在 Apple 原生应用中连接感知、Agent 决策与执行，�
 通用灵动岛同时支持App内图标/实际回复频谱及ActivityKit系统摘要。前台目标任务以目标图标和目标文字自动展开、结束收回，其他状态保持紧凑；组件提供统一内容/详情接口并拥有动画。系统呈现由iOS决定，不能强制前台常驻系统岛；系统失败不影响App组件。设备控制仍在Camera窗口，系统不承载实时频谱或扩展后台设备运行。
 
 内容接口重构采用primary/secondary指标与可选detail(text,thumbnail)：有效详情默认展开，手动收起保留内容；优先级整体切换活动并保存各自展示偏好。缩略图本轮仅App内有界显示，系统保留图标/文字。交互与动效由UI组件统一拥有；见[实施计划](requirements/Face-Window-Island-Plan.md)。
+
+## 网页与交互图形
+
+Assistant 可加载网页浏览 Skill 访问HTTP/HTTPS页面、提取文字、逐屏查看截图，并控制窗口。绘图 Skill 接受自然语言任务，由独立模型上下文开发本地HTML/CSS/JS，支持已有项目的局部修改、渲染、重开与删除。源码保存在受控工作区，生成代码不经过主助手输出协议；图像分析受当前模型能力约束。容量、脚本/网络边界及真实验收范围见[Web设计](../MobileHarness/Actions/Web/README.md)与[验证记录](validation/WebKit-Actions.md)。

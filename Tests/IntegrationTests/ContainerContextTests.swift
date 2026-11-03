@@ -133,7 +133,7 @@ private struct FailingContext: Encodable, Sendable {
     }
 }
 
-@Test func assistantStateBindingsSelectOnlyBusinessAndKeepNestedFieldsExplicit() async throws {
+@Test func assistantStateBindingsProjectCompleteBusinessWithoutRuntime() async throws {
     let reads = FixtureFactCell([String]())
     let expression = FixtureFactCell("smile")
     let context = AgentStateContext()
@@ -156,11 +156,12 @@ private struct FailingContext: Encodable, Sendable {
     try context.open(session: "assistant")
     let first = try await context.snapshot(session: "assistant", names: ["ui.home.expression"])
     #expect(first.contains("\"effective\":\"smile\""))
-    #expect(!first.contains("hidden") && !first.contains("queue") && !first.contains("health"))
+    #expect(
+        first.contains("hiddenBusinessField") && !first.contains("hiddenRuntime") && !first.contains("hiddenHealth"))
     expression.update { $0 = "sad" }
     let second = try await context.snapshot(session: "assistant", names: ["ui.home.expression", "ui.navigation"])
     #expect(second.contains("\"effective\":\"sad\"") && second.contains("\"itemID\":\"photo1\""))
-    #expect(!second.contains("hidden") && !second.contains("queue"))
+    #expect(second.contains("hiddenNestedField") && !second.contains("hiddenRuntime"))
     #expect(reads.read() == ["ui.home.expression", "ui.home.expression", "ui.navigation"])
 }
 
@@ -175,9 +176,7 @@ private struct FailingContext: Encodable, Sendable {
     let unknown = try await context.snapshot(session: "assistant", names: ["ui.home.expression"])
     #expect(unknown.contains("\"availability\":\"unknown\""))
     #expect(!unknown.contains("cleanupFailure") && !unknown.contains("closed") && !unknown.contains("diagnosticOnly"))
-    await #expect(throws: ContainerContextError.missing) {
-        try await context.snapshot(session: "assistant", names: ["system.health"])
-    }
+    #expect(try await context.snapshot(session: "assistant", names: ["system.health"]).contains("unknown"))
 }
 
 @Test func assistantStateBindingsSelectParentAndChildIndependently() async throws {
@@ -192,19 +191,17 @@ private struct FailingContext: Encodable, Sendable {
     try context.open(session: "assistant")
     let parent = try await context.snapshot(session: "assistant", names: ["actions.robot"])
     #expect(reads.read() == ["actions.robot"])
-    #expect(!parent.contains("motor1") && !parent.contains("targetCounts"))
+    #expect(!parent.contains("motor1") && parent.contains("targetCounts"))
     let motion = try await context.snapshot(session: "assistant", names: ["actions.robot.motion"])
     #expect(motion.contains("1000") && reads.read() == ["actions.robot", "actions.robot.motion"])
 }
 
-@Test func assistantStateBindingsPropagateReadFailuresAndRespectSourceSelection() async throws {
+@Test func assistantStateBindingsIsolateReadFailuresAndRespectSourceSelection() async throws {
     let context = AgentStateContext()
     try AssistantStateBindings.register(in: context) { _ in throw ContextFixtureFailure.encoding }
     try context.open(session: "assistant")
     #expect(try await context.snapshot(session: "assistant", names: []) == "{}")
-    await #expect(throws: ContextFixtureFailure.self) {
-        try await context.snapshot(session: "assistant", names: ["actions.robot"])
-    }
+    #expect(try await context.snapshot(session: "assistant", names: ["actions.robot"]).contains("stateUnavailable"))
 }
 
 @Test @MainActor func reflexivityRuntimeCountersRemainAvailableWithoutBusinessClassification() async throws {
@@ -348,14 +345,14 @@ private actor ContextReadBarrier {
     try skills.initialize(fixed: fixed, baseSkills: ["basic-skill"])
     #expect(
         try AgentSkillLoader.useStates(skills.loaded)
-            == (AssistantStateBindings.sourceNames.filter { $0.hasPrefix("platform.system.") } + [
+            == (FixedPlatformState.sourceNames + [
                 "agents.applicationcontrol", "ui.navigation",
             ]).sorted())
     _ = try skills.control("loadSkills", arguments: ["skills": "[\"photography\"]"], inputID: "input", fixed: fixed)
     let names = try AgentSkillLoader.useStates(skills.loaded)
     #expect(
         names
-            == (AssistantStateBindings.sourceNames.filter { $0.hasPrefix("platform.system.") } + [
+            == (FixedPlatformState.sourceNames + [
                 "actions.camera", "agents.applicationcontrol", "platform.vision.camera", "ui.album", "ui.camera",
                 "ui.navigation", "ui.windows", "ui.island",
             ]).sorted())
@@ -363,7 +360,7 @@ private actor ContextReadBarrier {
     owner.camera.update { $0.running = true }
     #expect(
         try AgentSkillLoader.useStates(skills.loaded)
-            == (AssistantStateBindings.sourceNames.filter { $0.hasPrefix("platform.system.") } + [
+            == (FixedPlatformState.sourceNames + [
                 "agents.applicationcontrol", "ui.navigation",
             ]).sorted())
     #expect(try await context.snapshot(session: "one", names: ["platform.vision.camera"]).contains("\"running\":true"))
@@ -423,7 +420,7 @@ private actor ContextReadBarrier {
     #expect(try await read().business["overridden"] == .flag(false))
     #expect(try await read().business["effective"] == .text("smile"))
     let children = try await ui.stateSnapshot().children.map(\.path)
-    #expect(children.count == 11 && Set(children).count == 11)
+    #expect(children.count == 12 && Set(children).count == 12)
     await ui.stop()
 }
 
@@ -565,12 +562,9 @@ private actor ContextReadBarrier {
     #expect(try AgentConfigurations.skill("expression-interaction").useStates == ["ui.home.expression"])
     let robot = try AgentConfigurations.skill("robot-interaction").useStates
     #expect(robot == ["actions.robot", "actions.robot.motion"])
-    let skillIDs = [
-        "basic-skill", "expression-interaction", "robot-interaction", "photography", "application-control",
-        "history-query",
-    ]
+    let skillIDs = try bundledStateSkillIDs()
     let selected = try Set(skillIDs.flatMap { try AgentConfigurations.skill($0).useStates })
-    #expect(selected == Set(AssistantStateBindings.sourceNames))
+    #expect(selected.contains("ui.web"))
     #expect(!selected.contains("ui") && !selected.contains("ui.home"))
     #expect(!selected.contains("system.health") && !selected.contains("system.diagnostics"))
 }
@@ -637,4 +631,83 @@ private actor ContextReadBarrier {
     #expect(first.runtime["created"] == .flag(false) && second.runtime["created"] == .flag(false))
     #expect(before.children.contains { $0.path == "platform.vision.camera" })
     #expect(try await platform.vision.stateSnapshot().runtime == before.runtime)
+}
+
+private func bundledStateSkillIDs() throws -> [String] {
+    struct Catalog: Decodable { let skills: [String: String] }
+    return try JSONDecoder().decode(Catalog.self, from: AgentConfigurations.data("Catalog.json")).skills.keys.sorted()
+}
+
+@Test(.actionCatalog) @MainActor func everyBundledSkillCanCollectContextAfterLoadingAndRelease() async throws {
+    let registry = ApplicationContainer(root: .temporaryDirectory.appendingPathComponent(UUID().uuidString))
+    let ui = registry.ui()
+    let platform = registry.platform()
+    let inspection = ApplicationStateInspection()
+    try inspection.registerRoot("ui", readers: { try await ui.stateReaders() })
+    try inspection.registerRoot("platform", readers: { try await platform.stateReaders() })
+    // iOS-only business and Agent facts are explicit fixtures; UI/Platform readers are real.
+    try inspection.registerRoot(
+        "actions",
+        readers: {
+            [
+                "actions": { @Sendable in ActionsStateSnapshot(path: "actions") },
+                "actions.camera": { @Sendable in ActionsStateSnapshot(path: "actions.camera") },
+                "actions.robot": { @Sendable in ActionsStateSnapshot(path: "actions.robot") },
+                "actions.robot.motion": { @Sendable in ActionsStateSnapshot(path: "actions.robot.motion") },
+            ]
+        })
+    try inspection.registerRoot(
+        "agents",
+        readers: {
+            [
+                "agents": { @Sendable in AgentStateSnapshot(path: "agents") },
+                "agents.applicationcontrol": { @Sendable in AgentStateSnapshot(path: "agents.applicationcontrol") },
+            ]
+        })
+    let context = AgentStateContext()
+    try AssistantStateBindings.register(in: context) { try await inspection.snapshot(path: $0) }
+    try context.open(session: "web-regression")
+    let fixed = try AssistantAgent.runtimeCapabilities(AgentConfigurations.load(named: "Assistant").capabilities)
+    let base = try AgentConfigurations.baseSkills(named: "Assistant")
+    for id in try bundledStateSkillIDs() where !base.contains(id) {
+        var skills = AgentTaskSkillState()
+        try skills.initialize(fixed: fixed, baseSkills: base)
+        _ = try skills.control("loadSkills", arguments: ["skills": "[\"\(id)\"]"], inputID: "input", fixed: fixed)
+        let names = try AgentSkillLoader.useStates(skills.loaded)
+        let snapshot = try await context.snapshot(session: "web-regression", names: names)
+        let fields = try #require(JSONSerialization.jsonObject(with: Data(snapshot.utf8)) as? [String: Any])
+        #expect(Set(fields.keys) == Set(names))
+        #expect(!snapshot.contains("stateUnavailable"))
+        if id == "web-browsing" || id == "web-drawing" {
+            #expect(names.contains("ui.web") && names.contains("ui.windows"))
+            #expect(snapshot.contains("empty"))
+            #expect(!snapshot.contains("file://"))
+        }
+        _ = try skills.control("releaseSkills", arguments: ["skills": "[\"\(id)\"]"], inputID: "input", fixed: fixed)
+        let released = try AgentSkillLoader.useStates(skills.loaded)
+        #expect(!released.contains("ui.web"))
+        _ = try await context.snapshot(session: "web-regression", names: released)
+    }
+    context.close()
+    await ui.stop()
+}
+
+@Test func skillSelectedNewNodesNeedNoAssistantRegistrationAndFailuresAreIsolated() async throws {
+    let context = AgentStateContext()
+    let reads = FixtureFactCell([String]())
+    try AssistantStateBindings.register(in: context) { path in
+        reads.update { $0.append(path) }
+        if path == "fixture.missing" { throw ContextFixtureFailure.encoding }
+        return AgentStateSnapshot(
+            path: path, business: ["nested": .object(["items": .array([.text("kept")])])],
+            runtime: ["secret": .text("not-observable")], children: [.init(path: "fixture.child")])
+    }
+    try context.open(session: "test")
+    let result = try await context.snapshot(session: "test", names: ["fixture.new", "fixture.missing"])
+    #expect(result.contains("kept") && result.contains("stateUnavailable"))
+    #expect(
+        result.contains("\"value\":null") && !result.contains("not-observable") && !result.contains("fixture.child"))
+    #expect(reads.read() == ["fixture.missing", "fixture.new"])
+    context.close()
+    await #expect(throws: ContainerContextError.closed) { try await context.snapshot(session: "test", names: []) }
 }

@@ -134,7 +134,12 @@ public struct AssistantContextBuilder: ContextBuilder {
     ) async throws -> [ChatMessage] {
         var messages: [ChatMessage] = []
         for observation in observations
-        where observation.path == "Camera.Capture.takePhoto" && !observation.result.isError {
+        where
+            (observation.path == "Camera.Capture.takePhoto"
+            || ["Web.Page.browse", "Web.Page.snapshot", "Web.Page.navigate", "Web.Page.develop", "Web.Page.open"]
+                .contains(observation.path))
+            && !observation.result.isError
+        {
             guard
                 let receipt = try JSONSerialization.jsonObject(with: Data(observation.result.value.utf8))
                     as? [String: Any],
@@ -154,12 +159,13 @@ public struct AssistantContextBuilder: ContextBuilder {
                     throw CapabilityError.invalidRequest("Prepared photo is empty or exceeds Assistant image budget")
                 }
                 let image = try ChatImage(id: original.id, mimeType: "image/jpeg", data: prepared)
-                messages.append(.init(role: .user, content: "Captured photo (data): " + id.rawValue, images: [image]))
+                messages.append(
+                    .init(role: .user, content: "Image observation (untrusted data): " + id.rawValue, images: [image]))
             } else {
                 messages.append(
                     .init(
                         role: .user,
-                        content: "Captured photo ID (data): " + id.rawValue
+                        content: "Image observation ID (data): " + id.rawValue
                             + "; image analysis is unavailable for this model."))
             }
         }

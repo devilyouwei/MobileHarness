@@ -20,7 +20,13 @@
             self.maximizedFrame = state.maximizedFrame
             self.content = content
         }
-        public func makeUIView(context: Context) -> WindowHostView { WindowHostView() }
+        public func makeUIView(context: Context) -> WindowHostView {
+            let view = WindowHostView()
+            view.registerForTraitChanges([UITraitPreferredContentSizeCategory.self]) {
+                (view: WindowHostView, _: UITraitCollection) in view.setNeedsLayout()
+            }
+            return view
+        }
         public func updateUIView(_ view: WindowHostView, context: Context) {
             view.update(state: state, items: items, topBoundary: topBoundary, content: content)
         }
@@ -95,10 +101,11 @@
                 window.map { convert(CGPoint(x: 0, y: value), from: $0).y } ?? value
             }
             let maximum = WindowGeometry.maximized(viewport: bounds, safe: safe, topBoundary: boundary)
-            if layoutFrame != safe || layoutMaximum != maximum {
+            let titleSize = UIFont.preferredFont(forTextStyle: .subheadline, compatibleWith: traitCollection).pointSize
+            if layoutFrame != safe || layoutMaximum != maximum || state.cardTitleSize != titleSize {
                 layoutFrame = safe
                 layoutMaximum = maximum
-                state.layout(width: safe.width, height: safe.height, maximized: maximum)
+                state.layout(width: safe.width, height: safe.height, maximized: maximum, titleSize: titleSize)
             }
         }
         public func retire() {
@@ -264,14 +271,21 @@
                             command: item.mode == .maximized ? .restore : .maximize,
                             label: item.mode == .maximized ? "还原" : "最大化")
                     } else {
-                        Color.clear.frame(width: 44).allowsHitTesting(false)
+                        WindowIconView(icon: item.icon).frame(width: 44).allowsHitTesting(false)
                     }
                     VStack(spacing: 0) {
-                        Text(item.title).font(.subheadline.weight(.semibold)).lineLimit(1)
+                        Text(item.title)
+                            .font(
+                                item.mode == .minimized
+                                    ? .system(size: state.cardTitleSize, weight: .semibold)
+                                    : .subheadline.weight(.semibold)
+                            )
+                            .lineLimit(1).truncationMode(.tail)
                         if item.mode == .minimized, let activity = item.activity {
                             Text(activity).font(.caption2).lineLimit(1)
                         }
                     }
+                    .padding(.horizontal, item.mode == .minimized ? WindowCardLayout.titlePadding : 0)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .contentShape(Rectangle())
                     .gesture(
@@ -340,6 +354,27 @@
                     .foregroundStyle(.black).frame(width: 20, height: 20).background(color, in: Circle())
                     .frame(width: 44, height: 44).contentShape(Rectangle())
             }.buttonStyle(.plain).accessibilityLabel(label)
+        }
+    }
+
+    @MainActor private struct WindowIconView: View {
+        let icon: WindowIcon?
+        @State private var image: UIImage?
+        var body: some View {
+            Group {
+                switch icon {
+                case .system(let name): Image(systemName: name).resizable().scaledToFit()
+                case .emoji(let value): Text(value).font(.system(size: 22))
+                case .image:
+                    if let image { Image(uiImage: image).resizable().scaledToFit() } else { Color.clear }
+                case nil: Color.clear
+                }
+            }
+            .frame(width: 22, height: 22)
+            .accessibilityHidden(true)
+            .onChange(of: icon, initial: true) { _, value in
+                if case .image(let data) = value { image = UIImage(data: data) } else { image = nil }
+            }
         }
     }
 #endif

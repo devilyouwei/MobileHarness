@@ -215,7 +215,7 @@ Assistant 消费根注入的只读容器来源，Task／Skill 来自自身私有
 
 ## Basic native observations
 
-BasicSkill includes eight passive platform.* sources in addition to ui.navigation. These enter CURRENT STATE through Assistant-owned field selection over the complete classified State read. Native time, power, thermal, path, permissions, audio, locale and accessibility are observations; they never override frozen capability authorization or current business execution checks. Task/Skill projection remains private AGENT CONTEXT. See [Context](../Support/Context/README.md#native-platform-sources).
+BasicSkill includes eight passive platform.* sources in addition to ui.navigation. These enter CURRENT STATE through projection of the producer-owned complete Business dictionary. Native time, power, thermal, path, permissions, audio, locale and accessibility are observations; they never override frozen capability authorization or current business execution checks. Task/Skill projection remains private AGENT CONTEXT. See [Context](../Support/Context/README.md#native-platform-sources).
 
 ## Passive container state
 
@@ -223,18 +223,16 @@ stateSnapshot projects local installation/closure, Agent lifecycle/queue counter
 
 ## State selection ownership
 
-[AssistantStateBindings.swift](AssistantStateBindings.swift) registers canonical exact paths from App-injected local State reads. It chooses explicit Business fields, including nested location/target keys. Runtime, health/issues, metadata, child indices and new unselected fields do not enter CURRENT STATE. Missing observations remain unknown; source errors propagate. Selecting a parent never expands descendants, and a child can be selected without its ancestors. There are no alias or whole-tree health/diagnostic sources.
-
-Skill useStates selects the next request's reads. Container stateSnapshot() async throws samples only its own node; descriptors come from the returned value. Generic AgentStateContext/Chat remains policy-neutral for other callers.
-
-Navigation State selection includes only navigation-owned path/phase/location/overlay/content. Album operations come from the independently selected ui.album node; navigation grants no implicit album operation read.
-
-AssistantStateBindings selects windows and focusedID from ui.windows only when a loaded Skill requests it. Photography and ApplicationControl share the same Window.* aliases; window facts are sampled with the other current-state sources.
-
-Assistant State selection reads actual Camera running/phase/facing/photo dimensions from platform.vision.camera. actions.camera contributes branch intents, lensOwner, business availability and media identity. ui.camera contributes presentation readiness and ordering. The Camera native child is selected by Photography/ApplicationControl Skills and is absent from BasicSkill’s resident selection.
+Skill.useStates is the sole exact-path observation selection. AssistantStateBindings installs one App-backed resolver, not a path or field allowlist. It projects the producer's complete Business dictionary, retaining objects/arrays, while excluding Runtime, health/issues, metadata and children. Missing/unreadable/malformed nodes return unknown/null plus a bounded path/code diagnostic; cancellation, closed context and capacity failures still propagate. Selecting a parent does not traverse children. New Skill sources need only a producer and App read route, with no Assistant registration change.
 
 ## Photography state selection
 
 Photography loads capture/video Actions and settings/recording fields from actions.camera: mode, delaySeconds, flash, supportedFlash, zoom, maximumZoom, durationSeconds, countdown, recordingPhase and recordingID. Native platform.vision.camera independently supplies actual running/recording/lens/zoom. State selection does not activate the camera or confer permission. Photo/video instructions require separate configuration/start receipts, real media IDs and window cleanup before matching Task completion.
 
 ui.island投影包含活动身份、标题、系统选择及提交状态；前台目标展开与localStatus可读，系统实际几何未知，不携带频谱或设备权威状态。Island.setPresentation设置前台compact/expanded，expanded要求已提供的detail；系统可见性/时长仍由iOS决定；实际摄影/录像仍调用Camera声明。
+
+## Web image observations
+
+The existing photo observation hook also recognizes successful Web.Page browse/snapshot/navigate/develop/open receipts. It resolves their mediaID through the same scope-bound image read and image preparation port. The user image message labels the payload as untrusted data. Unsupported image models receive an explicit unavailable observation and can use the bounded page text in the Action result. Generated code and the Web editor transcript never enter the Assistant parser or history.
+
+WebBrowsing/WebDrawing通过ui.web读取content（empty/local/remote）及有界远程url，并通过ui.windows读取窗口身份。统一resolver按Skill声明读取这两个来源；本地文件路径与WebKit运行指标不进入Assistant上下文。

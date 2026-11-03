@@ -713,7 +713,7 @@ Manual navigation uses App-injected callbacks and AgentContainer forwarding with
 
 UI owns NavigationStack and path generations. A path change enters transitioning; a matching visible-page acknowledgment settles it. Settled does not mean data, animation or GPU completion. Details, object IDs, pickers and confirmation sheets remain distinct from the top-level path. Stale callbacks cannot overwrite the current detail.
 
-Face remains a persistent sibling of navigation. WindowHost overlays both without a fullscreen hit mask. Settings/history/album preserve Face rendering and listening; the Camera window lifecycle controls capture independently of navigation. Minimize hides window rendering while retaining capture/recording demand; restore confirms current readiness; background clears capture intent and foreground requires an explicit reopen. `useStates` supplies page facts to subsequent decisions; execution checks live conditions. See [UI](UI/README.md) and [navigation](Actions/UI/Navigation/README.md).
+Face remains a persistent sibling of navigation. WindowHost overlays only the retained home surface, below NavigationStack and the local Island. Navigation pages take precedence over all home overlays: UIContainer synchronously projects home visibility into window visibility and local Island suspension, retaining window identity and the Island expansion preference until returning home. Settings/history/album preserve Face rendering and listening; the Camera window lifecycle controls capture independently of navigation. Minimize hides window rendering while retaining capture/recording demand; restore confirms current readiness; background clears capture intent and foreground requires an explicit reopen. `useStates` supplies page facts to subsequent decisions; execution checks live conditions. See [UI](UI/README.md) and [navigation](Actions/UI/Navigation/README.md).
 
 ### 5. Skill composition, Task and model context
 
@@ -800,11 +800,11 @@ Each module root exposes `stateReaders() async throws`: a metadata catalog mappi
 ```mermaid
 flowchart LR
  Owners["Existing module / node owners"] --> Catalog["stateReaders metadata catalog<br/>Path → readonly capability"]
- Skill["Loaded Skill.useStates<br/>Explicit exact paths"] --> Select["Assistant source selection"]
+ Skill["Loaded Skill.useStates<br/>Explicit exact paths"] --> Select["Skill-selected exact paths"]
  Catalog --> Resolve["App exact-path lookup"]
  Select --> Resolve
  Resolve --> Local["One stateSnapshot read<br/>Own data + child indices"]
- Local --> Business["Assistant-owned Business field selection"]
+ Local --> Business["Producer Business projection; no field allowlist"]
  Business --> Context["CURRENT STATE"]
 ```
 
@@ -1695,3 +1695,15 @@ Independent fences include UI generation, capture generation, endpoint incarnati
 | Navigation/inactivity | UI lifetime or App invalidation → owned cancellation/join. | Committed creations remain; root cleanup outlives pages. |
 
 Automated checks, iOS builds, real-model samples, native UI and physical-device acceptance are separate evidence categories maintained in [validation](../docs/validation/README.md). Requirements and decisions live in [requirements](../docs/requirements/README.md) and [ADR](../docs/adr/README.md); historical design rationale lives in [documentation history](../docs/history/Documentation-History.md).
+
+## Web browsing and local graphics
+
+Actions owns [Web](Actions/Web/README.md) business operations and the independent editing loop. Assistant submits natural-language tasks through Skill-bound Web.Page calls; Gateway preserves ordinary direct-return execution and cancellation. Actions invokes the same ModelKit.language instance with private request contexts, publishes immutable HTML/CSS/JS versions through StorageFiles.workspaces, and asks UI.web to load the published entry. Code and editing observations remain inside Actions. UI has no model or storage dependency.
+
+UIContainer owns the WebKit page capability and Window.web presents it through the App-injected root port. Load completion, observation and visible-viewport snapshot are separate native receipts. Remote and local pages use isolated website data contexts; local read access is confined to a version directory. Root scene loss rejects native presentation work; Actions shutdown joins its finite editor task before foundations close.
+
+Screenshot JPEGs use the existing scope-protected StorageMedia records. Web Action results carry mediaID; Assistant's image observation hook reads these records using the same source/session/input ownership and model-image budget as camera results. Page text and screenshot content are untrusted observations, never executable Assistant instructions. Browse/open/develop receipts expose actual window/project/revision identities; saved versions survive a subsequent render failure.
+
+Window appearance metadata crosses the existing Actions → UI presentation interface: each content owner supplies its title and optional system symbol, emoji or image bytes. UI validates and owns the retained icon and bounded minimized-card layout; it performs no business resource lookup. See [Window](UI/Components/Window/README.md).
+
+State observation uses one App-backed resolver: Skill.useStates alone selects exact nodes, and their complete Business fields enter CURRENT STATE. Missing/read-failed nodes yield unknown/null with a bounded path/code diagnostic; cancellation, closure and capacity remain request failures. See [Context](Agents/Support/Context/README.md#container-context-read-path).

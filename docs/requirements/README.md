@@ -53,7 +53,7 @@
 | 类型 | 待办 | 正文来源 |
 | --- | --- | --- |
 | 新增功能 | 多云端模型 URL/Key 配置保存、管理与选择 | [新增需求 §1](product/Model-Web-Speech-Plan.md#1-多云端模型配置与选择) |
-| 新增功能 | WebKit HTML/CSS/脚本富内容与绘图组件 | [新增需求 §2](product/Model-Web-Speech-Plan.md#2-webkit-html-内容呈现组件) |
+| 独立验收 | WebKit浏览/截图与绘图功能已实现，真实模型/物理设备验收见专项记录 | [新增需求 §2](product/Model-Web-Speech-Plan.md#2-webkit-html-内容呈现组件) |
 | 新增功能 | 持续聆听与回复期间打断判断、取消及输入交接 | [新增需求 §3](product/Model-Web-Speech-Plan.md#3-持续聆听与打断判断的-speech-perception-agent) |
 | 功能 | 用户相册、摄影媒体聚合与视频完整链路 | [用户相册](product/User-Album-Memory-Plan.md) |
 | 功能 | 日记式记忆、周期增量整理、摘要/关键词/embedding 与来源检索页面 | [用户记忆](product/User-Album-Memory-Plan.md) |
@@ -66,3 +66,5 @@
 | 待细化 | Agent-driven 剩余接入、更多模型能力、原生 Tool 事件交互、快慢认知与算力路由、活动监督与多窗口 | [待细化方向](#其他待细化方向) |
 
 本汇总不将已完成的 State 基础、App 结构迁移、存储抽象、云端 Tool 调用或半双工聆听重复列为开发任务。未设交付顺序；新增三项的实现前设计需同步更新相关源码 README。
+
+[WebKit 与网页 Actions](../completed/WebKit-Actions-Plan.md) 已完成远程浏览/截图、独立模型绘图、局部编辑工作区及运行时 skills；独立模型/设备验收见专项验证记录。

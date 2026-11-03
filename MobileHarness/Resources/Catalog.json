@@ -15,6 +15,8 @@
     "robot-interaction": "Skills/RobotInteraction/Skill.json",
     "photography": "Skills/Photography/Skill.json",
     "history-query": "Skills/HistoryQuery/Skill.json",
-    "application-control": "Skills/ApplicationControl/Skill.json"
+    "application-control": "Skills/ApplicationControl/Skill.json",
+    "web-browsing": "Skills/WebBrowsing/Skill.json",
+    "web-drawing": "Skills/WebDrawing/Skill.json"
   }
 }

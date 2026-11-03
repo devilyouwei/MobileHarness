@@ -120,3 +120,5 @@ Photo capture freezes presentation.snapshot.photoCaptureRotation after countdown
 Camera既有呈现状态由根IslandDomainPresentation投影为倒计时、照片处理、录像和待处置系统摘要。原生岛Link返回App相机入口；取消倒计时/停止录像/保存仍在Camera窗口复用UICameraContainer→Photographer→Gateway→Camera Action链，停止请求绑定recordingID。领域不等待系统动画执行设备动作，系统呈现不释放Camera。
 
 Opening and native session running are not interchangeable with capture geometry readiness. The automatic open step awaits fresh preview geometry before completing. PhotoSession rechecks after the countdown; RecordingSession rechecks after mode configuration and microphone handoff. Both revalidate foreground/cancellation after the wait before calling Foundation. Missing initial frames wait for admission rather than immediately returning unavailable; a bounded timeout or root invalidation fails the current Action and never fabricates a capture result. The UI owns frame waiting only; Actions retains device/lifecycle authority.
+
+CameraCoordinator创建相机Window时提供UI.WindowIcon.emoji("📷")；图标属于显示元数据，图标资源校验和卡片尺寸由UI Window组件拥有，不参与设备权限或采集生命周期。

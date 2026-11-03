@@ -132,3 +132,7 @@ UI保持零包产品依赖，ActivityKit仅允许Attributes与原生driver，Wid
 Widget源边界精确包含IslandActivityAttributes、IslandIndicators和IslandActivityWidget；原生ActivityKit驱动只允许在UI/Components/Island/IslandSystemPresentation及共享Attributes中导入。
 
 UI目录检查要求Container、Failure、StateSnapshot在模块根有唯一声明归属，错误回调及ContainerError归Failure；不限制根文件总数。Shared仅依赖Foundation且不包含功能输入/导航类型；输入与回执跟随现有功能owner，Face原生实现归Conversation。Widget和Metal打包路径随组件归档更新。
+
+`test-webkit-simulator.sh` compiles a standalone test host from production UI Web sources, installs it into the currently booted iOS 27 simulator, and validates local multi-file HTML/CSS/JS, a revised page, remote HTTPS loading and visible JPEG snapshots. It creates a temporary test app, never modifies the main app configuration or credentials, and prints the evidence location. `check-modelkit-boundaries.py` confines WebKit/AppKit imports to Web's native renderer and classifies the Web Action domain explicitly.
+
+UI原生框架白名单将WindowAppearance的AppKit字体测量和ImageIO图标校验／缩图限定在Window目录的拥有文件，UI仍无项目／第三方依赖。

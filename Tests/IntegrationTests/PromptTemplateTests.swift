@@ -393,7 +393,9 @@ func businessSkillTeachingCannotFinishAnAbsentOrUnrelatedTask(skill: String) thr
     var skills = AgentTaskSkillState()
     try skills.initialize(fixed: fixed, baseSkills: AgentConfigurations.baseSkills(named: "Assistant"))
     let base = try AssistantContextState.systemPrompt(skills.registry(fixed: fixed), skills: skills)
-    #expect(base.utf8.count < 25_000)
+    // Two discoverable Web skills add bounded metadata; model request limits are unchanged.
+    #expect(base.utf8.count < 26_000)
+    #expect(base.contains("web-browsing") && base.contains("web-drawing"))
     _ = try skills.control("loadSkills", arguments: ["skills": "[\"photography\"]"], inputID: "budget", fixed: fixed)
     let photography = try AssistantContextState.systemPrompt(skills.registry(fixed: fixed), skills: skills)
     #expect(photography.utf8.count < 38_000)
@@ -463,4 +465,54 @@ func businessSkillTeachingCannotFinishAnAbsentOrUnrelatedTask(skill: String) thr
     #expect(examples.contains { $0.contains("视频已保存") && $0.contains("<finishTask") })
     #expect(examples.contains { $0.contains("视频已忽略") && $0.contains("<finishTask") })
     #expect(examples.contains { $0.contains("录像已结束") && !$0.contains("<startRecording") })
+}
+
+@Test(.actionCatalog, arguments: ["web-browsing", "web-drawing"])
+func webSkillExamplesParseAgainstTheirEffectiveCatalogAndStayWithinBudget(skill: String) throws {
+    let config = try AgentConfigurations.load(named: "Assistant")
+    let fixed = try AssistantAgent.runtimeCapabilities(config.capabilities)
+    var skills = AgentTaskSkillState()
+    try skills.initialize(fixed: fixed, baseSkills: AgentConfigurations.baseSkills(named: "Assistant"))
+    _ = try skills.control("loadSkills", arguments: ["skills": "[\"\(skill)\"]"], inputID: "web-example", fixed: fixed)
+    let catalog = try skills.registry(fixed: fixed)
+    let examples = try skillResponseExamples(skill)
+    #expect(!examples.isEmpty)
+    var paths: Set<String> = []
+    var creates = 0
+    var revisions = 0
+    for example in examples {
+        var trace = GenerationTrace(
+            capabilities: catalog, textMapping: AssistantAgent.mapText,
+            segmentation: try AssistantAgent.textSegmentation)
+        for character in example { try trace.append(String(character)) }
+        trace.finish()
+        #expect(trace.parserError == nil, "Invalid bundled response: \(example)")
+        #expect(!trace.events.contains { if case .rejected = $0 { true } else { false } })
+        let business = trace.calls.filter {
+            $0.actionPath.domain == "Web" || $0.actionPath.description.hasPrefix("UI.Window.")
+        }
+        #expect(business.count <= 1)  // Dependent effects belong to the request after real feedback.
+        #expect(!trace.calls.contains { $0.actionPath.domain == "Agent" })  // These examples are standalone work.
+        for call in business {
+            let path = call.actionPath.description
+            paths.insert(path)
+            if let id = call.parameters["projectID"] { #expect(UUID(uuidString: id) != nil) }
+            if let id = call.parameters["windowID"] { #expect(UUID(uuidString: id) != nil) }
+            if path == "Web.Page.develop" {
+                #expect(call.parameters["task"]?.isEmpty == false)
+                if call.parameters["projectID"] == nil { creates += 1 } else { revisions += 1 }
+            }
+        }
+    }
+    if skill == "web-browsing" {
+        #expect(
+            paths.isSuperset(of: ["Web.Page.browse", "Web.Page.navigate", "Web.Page.inspect", "Web.Page.snapshot"]))
+    } else {
+        #expect(creates > 0 && revisions > 0)
+        #expect(paths.isSuperset(of: ["Web.Page.projects", "Web.Page.open", "Web.Page.delete"]))
+    }
+    let prompt = try AssistantContextState.systemPrompt(catalog, skills: skills)
+    #expect(prompt.utf8.count < 38_000)
+    #expect(prompt.contains(try AgentConfigurations.skillInstructions(skill)))
+    print("Web prompt UTF8 budget: \(skill)=\(prompt.utf8.count)")
 }

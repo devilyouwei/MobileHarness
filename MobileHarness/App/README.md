@@ -37,7 +37,7 @@ Application observations flow to the Agents-owned summary source; App does not b
 
 ## Reflexive composition
 
-App binds the seven already-owned module state ports into the exact-path ApplicationStateInspection reader registry. Generic structural encoding stays in that composition adapter; modules own domain fields and state transitions. Agents receives the complete unfiltered inspection read. Assistant selects explicit Business fields in its own source bindings, while Skill useStates continues progressive disclosure. Other internal consumers choose independently. No tree tool, background sampler or automatic repair is added. See [Composition](Composition/README.md#internal-state-inspection).
+App binds the seven already-owned module state ports into the exact-path ApplicationStateInspection reader registry. Generic structural encoding stays in that composition adapter; modules own domain fields and state transitions. Agents receives the complete unfiltered inspection read. Skill useStates alone selects exact nodes; Assistant projects the producer-owned complete Business dictionary. Other internal consumers choose independently. No tree tool, background sampler or automatic repair is added. See [Composition](Composition/README.md#internal-state-inspection).
 
 Container snapshots are local; App exact-path resolution does not sample ancestors. Full diagnostic traversal is an explicit inspectTree operation, not the read callback injected into Assistant.
 

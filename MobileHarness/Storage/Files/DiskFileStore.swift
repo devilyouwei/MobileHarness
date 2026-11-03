@@ -84,14 +84,14 @@ public actor DiskFileStore: FileStore {
             throw error
         }
     }
-    public func fileURL(_ key: String, maximumBytes: Int) throws -> URL {
+    public func fileURL(_ key: String, maximumBytes: Int) async throws -> URL {
         try access.check()
         guard maximumBytes > 0, let info = try info(key), info.bytes > 0, info.bytes <= maximumBytes else {
             throw FileStorageError.capacityExceeded
         }
         return try location(key)
     }
-    public func importFile(_ source: URL, key: String, maximumBytes: Int) throws {
+    public func importFile(_ source: URL, key: String, maximumBytes: Int) async throws {
         try access.check()
         try Task.checkCancellation()
         guard source.isFileURL, maximumBytes > 0 else { throw FileStorageError.invalidFile }
