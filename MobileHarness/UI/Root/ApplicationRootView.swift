@@ -91,6 +91,15 @@
                             camera: assembly.cameraState, controls: assembly.cameraControls,
                             rendersPreview: !assembly.windows.isCovered(item.id)
                         ) { assembly.cameraPreview() })
+                } else if item.content == WindowContent.artifact.rawValue {
+                    AnyView(
+                        Group {
+                            if let page = assembly.web.sessions[item.id] {
+                                WebPageView(page: page)
+                            } else {
+                                ProgressView()
+                            }
+                        })
                 } else if item.content == WindowContent.web.rawValue {
                     AnyView(WebPageView(page: assembly.web))
                 } else {
@@ -111,7 +120,16 @@
                     save: saveSettings)
             case .bluetooth: BluetoothSettingsView(state: assembly.bluetoothState, controls: assembly.bluetoothControls)
             case .album: AlbumView(album: assembly.album)
-            case .history: AgentRecordsView(destinations: assembly.recordDestinations)
+            case .assistantHistory, .writerHistory:
+                let id = destination == .assistantHistory ? "assistant" : "writer"
+                Group {
+                    if let record = assembly.recordDestinations.first(where: { $0.id == id }) {
+                        record.makeView().environment(\.recordContextID, id).navigationContext(
+                            .agentRecords, itemID: id)
+                    } else {
+                        Text("记录服务暂不可用")
+                    }
+                }
             case .recognition, .synthesis, .vision:
                 ModelResourcesView(
                     state: assembly.modelResources, controls: assembly.modelResourceControls,

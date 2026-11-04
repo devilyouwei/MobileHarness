@@ -57,3 +57,8 @@ CameraControlCapability distinguishes photo setEnabled/flip from setPerceptionEn
 ## Capture configuration and movie receipts
 
 CameraCaptureSettings is a complete validated settings value (photo/video mode, countdown, flash, zoom, duration). CameraControlCapability includes configure/cancel and typed recording start/wait/stop/save/ignore. Start accepts an optional validated duration override; its domain owner prepares video mode and otherwise preserves current capture preferences. CameraVideoReceipt separates recording, ready, saved and ignored, carrying recordingID, optional mediaID/duration/stopReason/fileName (a display basename, never a file URL). These values contain no native device or UI implementation. Defaults on capability test adapters reject unavailable operations rather than fabricating a recording.
+
+
+ArtifactStreaming 是已接纳编辑的流式续写端口，streamID 与 taskID 必须匹配；追加施加背压，complete/abort/release 显式结束与清理，snapshot 返回实际渲染图片。它不包含模型或角色实现。
+
+ProviderSettings.writerThinking为私有布尔配置，默认false，跨暂存/呈现端口传递，不携带模型枚举或凭据序列化。生产Writer租约策略由Actions业务装配选择。

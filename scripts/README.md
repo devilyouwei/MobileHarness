@@ -136,3 +136,19 @@ UI目录检查要求Container、Failure、StateSnapshot在模块根有唯一声�
 `test-webkit-simulator.sh` compiles a standalone test host from production UI Web sources, installs it into the currently booted iOS 27 simulator, and validates local multi-file HTML/CSS/JS, a revised page, remote HTTPS loading and visible JPEG snapshots. It creates a temporary test app, never modifies the main app configuration or credentials, and prints the evidence location. `check-modelkit-boundaries.py` confines WebKit/AppKit imports to Web's native renderer and classifies the Web Action domain explicitly.
 
 UI原生框架白名单将WindowAppearance的AppKit字体测量和ImageIO图标校验／缩图限定在Window目录的拥有文件，UI仍无项目／第三方依赖。
+
+## Writer 双模型回归
+
+`python3 scripts/evaluate-writer.py --output-prefix /tmp/writer-regression-unique` reads only `ALIYUN_API_URL` and `ALIYUN_API_KEY` from ignored `.env.local`; credentials enter test child environments, never logs/arguments. It runs the production Responses adapter with Writer thinking enabled and provider-default output tokens. Actual model IDs are `qwen3.8-max` and `deepseek-v4.1-flash`; the explicitly reported `deepseek4.1-flash` spelling maps to the latter, as verified by this provider's model inventory. There is no runtime model fallback.
+
+The script builds the opt-in Swift tests, runs a no-model macOS WebKit resource-reload/click preflight, then executes both providers in separate processes. `--models`, `--cases`, `--seconds` and `--skip-build` select the experiment. Resume cases require `multifile` in the selection. New output prefixes prevent overwriting evidence. The 36-request and default 600-second per-case bounds apply only to the paid experiment, not production Writer or model output. An outer process timeout is recorded as exit124. Case results checkpoint immediately; `requests.json` updates during streams so incomplete cases remain diagnosable.
+
+Each model output contains `records.sqlite`, workspace index/files, complete per-case history JSON, request timing/tool/usage traces, render DOM/errors and `report.json`; the prefix summary records hashes and whether sources changed during the run. Artifacts contain synthetic test content. Keep credentials and device/user databases out of reports. Detailed evidence and platform limitations belong to [validation](../docs/validation/Writer-Model-Regression.md).
+
+`--skip-build --test-binary /absolute/path/to/IntegrationTests.xctest/Contents/MacOS/IntegrationTests` reuses an explicitly built test bundle without taking the SwiftPM build lock. The WebKit preflight runs through the same test helper; the summary also records the binary SHA-256. Use a binary built from the recorded source revision.
+
+## Writer records native simulator acceptance
+
+`test-writer-records-simulator.sh` runs actual XCTest clicks against the built application without requiring Simulator.app. Set `WRITER_SIMULATOR_ID` to an isolated booted simulator and `WRITER_SIMULATOR_SEED` to one completed synthetic `evaluate-writer.py` output root. It refuses an existing database, seeds only that simulator, and builds a temporary UI-test runner from `Tests/UITests/WriterRecordsNativeAcceptance.swift`. It checks separate Settings entries, Writer task/request rows, header operations, file navigation and conversation sharing. The printed xcresult contains retained screenshots. It never seeds physical-device data or configures credentials. Synthetic history with real native clicks is distinct from live voice/model acceptance.
+
+Writer evaluator --thinking enabled/minimum changes only the paid experiment Provider configuration (default enabled). Reports record the actual value; production Writer configuration and provider output defaults are unchanged. Use the original diagram goal for latency comparisons.

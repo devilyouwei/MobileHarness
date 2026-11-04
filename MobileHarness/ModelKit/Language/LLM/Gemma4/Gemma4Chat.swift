@@ -55,7 +55,7 @@ public actor Gemma4Chat: ChatCapability {
                 onTermination: { reason in
                     if case .finished = reason { return }
                     control.cancel()
-                })
+                }, waitForCompletion: { await control.waitForCompletion() })
             let resource = resource
             let emitter = pair.emitter
             let task = Task {

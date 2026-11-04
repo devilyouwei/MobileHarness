@@ -23,29 +23,6 @@ import Foundation
     }
 
     @MainActor
-    public struct AgentRecordsView: View {
-        private let destinations: [AgentRecordDestination]
-        public init(destinations: [AgentRecordDestination]) { self.destinations = destinations }
-        public var body: some View {
-            List(destinations) { destination in
-                NavigationLink {
-                    destination.makeView()
-                        .environment(\.recordContextID, destination.id)
-                        .navigationContext(.agentRecords, itemID: destination.id)
-                } label: {
-                    VStack(alignment: .leading, spacing: 5) {
-                        Text(destination.name)
-                        Text(destination.summary).font(.caption).foregroundStyle(.secondary)
-                    }
-                }
-                .accessibilityIdentifier("records.agent.\(destination.id)")
-            }
-            .navigationTitle("Agent 记录").navigationBarTitleDisplayMode(.inline)
-            .preferredColorScheme(.dark)
-        }
-    }
-
-    @MainActor
     public struct ConversationHistoryView: View {
         @Bindable private var state: ConversationHistoryState
         private let controls: any ConversationHistoryControlling
@@ -947,7 +924,7 @@ import Foundation
     }
 
     @MainActor
-    private struct HistoryImagePreview: View {
+    struct HistoryImagePreview: View {
         let data: Data
         @State private var image: UIImage?
         @State private var failed = false
@@ -977,7 +954,7 @@ import Foundation
     }
 
     @MainActor
-    private enum HistoryImageDecoder {
+    enum HistoryImageDecoder {
         static func decode(_ data: Data, maximumPixelSize: Int) async -> UIImage? {
             guard !Task.isCancelled, data.count <= 4 * 1024 * 1024, let image = UIImage(data: data) else { return nil }
             let longestSide = max(image.size.width, image.size.height)

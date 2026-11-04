@@ -588,7 +588,7 @@ private actor SignalFeedbackRecorder: Agent {
     let configuration = try AgentConfiguration(
         data: Data(
             #"""
-            {"version":6,"id":"assistant","actions":{},"tools":[],"communication":{
+            {"version":7,"id":"assistant","actions":{},"tools":[],"communication":{
             "inputs":[{"contract":"tool.result","version":1,"kind":"toolResult"}],
             "subscriptions":[],"publications":[],"sends":[]}}
             """#.utf8))

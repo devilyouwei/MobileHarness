@@ -14,3 +14,5 @@
 | [SpeechDiagnosticWorkflow.swift](SpeechDiagnosticWorkflow.swift) | 显式语音诊断的加载、合成、播放及清理 |
 
 [所属域设计](../README.md) · [Actions 模块](../../README.md)
+
+聊天诊断请求不指定输出 token 预算，使用已选模型的 Provider 默认值。

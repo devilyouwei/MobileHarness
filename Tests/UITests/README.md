@@ -157,7 +157,7 @@ Shutter-orientation regression checks both native portrait sensor references acr
 
 IslandStateTests还覆盖收紧边距后的硬件避让/展开布局，以及上滑收起的方向和位移边界；真实UIKit命中、动画及系统状态栏覆盖需真机验证。
 
-Island内容回归覆盖无阶段详情自动展开、逐活动收起记忆、整活动抢占/恢复、无详情拒绝展开、旧字段单向迁移、指标编码、真实ImageIO缩略图缩放、归属/绑定/容量/取消与清理。系统快照仅包含当前活动，图片不进入原生摘要。
+Island内容回归覆盖无阶段详情自动展开、逐活动收起记忆、整活动抢占/恢复、无详情拒绝展开、旧快照拒绝、当前指标编码、真实ImageIO缩略图缩放、归属/绑定/容量/取消与清理。系统快照仅包含当前活动，图片不进入原生摘要。
 
 紧凑岛几何回归覆盖受测402pt设备的14pt顶坐标/36.67pt固定高度、左右槽零内间距、外侧5pt留白、单侧无空翼、硬件中心不随内容移动及展开还原复用同一紧凑frame。
 
@@ -175,7 +175,7 @@ Island后台连续性测试验证同代活动仍可更新系统摘要、无pause
 
 Island几何回归覆盖紧凑黑色背景只包含业务、全宽系统状态坐标不变、展开背景包含完整容器，以及紧凑透明系统状态区域不接纳展开点击。
 
-Island兼容解码测试覆盖旧destination/linkTitle被忽略、重新编码不再携带导航字段，系统快照仍固定唤回App。业务状态与任务详情的身份、图片及代际验证由既有用例保持。
+Island解码只接收当前快照形态；对未知附加字段遵循标准 Codable 忽略规则，编码只包含当前字段，系统快照固定唤回App。业务状态与任务详情的身份、图片及代际验证由既有用例保持。
 
 WebPageTests covers URL privilege boundaries plus real macOS WebKit local HTML/CSS/JS loading and visible JPEG snapshots. WebSimulatorAcceptance is a separately compiled iOS test host using production WebPageContainer/WebPageView; scripts/test-webkit-simulator.sh runs it on a booted simulator and writes local/remote snapshots plus structured evidence. Its authored fixture does not claim LLM generation acceptance.
 
@@ -184,3 +184,23 @@ Web原生本地加载测试同时验证State只暴露local内容类型、隐藏�
 导航覆盖回归验证首页边界同步暂停本地Island、展开／收起偏好跨嵌套路径和后台往返恢复、期间内容更新与活动结束、根失活清理。窗口回归验证导航遮挡时内容／背景不可见、无镜头权限，返回保留身份／位置／模式／回执。状态测试不代替iOS原生层级、交互返回和状态栏的真机验收。
 
 WindowStateTests还覆盖标题自适应宽度、320pt封顶／窄屏约束、真实原生字体测量、字号变化时保留卡片中心／普通几何和最大化恢复模式。图标回归覆盖系统符号、组合emoji、PNG实际解码／96像素等比缩图、非法输入拒绝以及关闭清理；不替代iOS渲染、截断和触控验收。
+
+WebSimulatorAcceptance 还验证两页面独立、草稿禁用脚本、完整检查点运行脚本，以及关闭一个页面不关闭另一个。该测试使用生产 WebPageContainer，但不包含真实模型或 Writer 完整应用流程。
+
+WebSimulatorAcceptance 还验证嵌套入口使用显式受控作品根加载兄弟目录脚本，避免入口移动后误把读取范围缩小到子目录。
+
+WebSimulatorAcceptance 使用独立页面验证 HTML/CSS/JS 的 PDF 导出，以及长中文文档的 A4 多页/可选文字，使用 PDFKit 检查页数与末尾内容。该测试不代替设置页系统分享或真实模型创作验收。
+
+IslandHeader画布回归覆盖22pt／44pt槽、单／双侧状态、展开／收起、竖屏硬件保护布局与横屏备用布局，以及父容器动画中途更换目标。验证画布尺寸固定、内容全局坐标与背景／硬件基准一致；纯几何验证不代替UIKit动画或真机间歇错位复现。
+
+Island priority cases use the current semantic priority field; ordering and same-tier recency belong to UI. Geometry, animation completion fencing, navigation hiding and independent detail/status tests remain separate from physical animation acceptance.
+
+`WriterRecordsNativeAcceptance.swift` is compiled only by the separate WRITER_UI_ACCEPTANCE iOS runner. It launches the actual app and clicks Settings, task history, header operations, files, native request details and the system share sheet. A completed local evaluation supplies synthetic history in a fresh isolated simulator; no physical database is replaced. See `scripts/test-writer-records-simulator.sh`. Screenshots and test results are native UI evidence, not real-device speech acceptance.
+
+Web原生用例加载两个本地页面，验证ui.web列出全部窗口UUID与标题、隐藏本地URL，并在移除会话后移除摘要。
+
+原生Web回归以500ms有界DOM读取制造并发，验证随后文档导航抢先取消旧查询、新页面成功加载，防止共享查询把创作渲染变成busy错误。
+
+Writer思考草稿默认false、编辑推进revision、还原独立于Assistant选择；思考开关仅在Writer云端模型区呈现。
+
+Island end regressions cover ending before first present, duplicate end, cross-owner rejection, stale revision rejection and newer-run presentation without resurrecting old content.

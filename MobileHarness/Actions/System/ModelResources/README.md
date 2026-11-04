@@ -35,3 +35,5 @@ ModelResourcePreferencesService 是 actor，惰性获取注入的 DocumentStore�
 ## Execution ownership and lifecycle
 
 ModelResourcesClient and ModelResourceInteractionWorkflow are Actions-owned UI facades. The root closes admission, cancels/joins restoration, autosave and up to 32 admitted UI operation workers. Coalesced source restoration has at most 32 waiters and explicit shutdown. ApplicationControl consumes typed intent and authorizes functions; actual preference/artifact services remain Actions-owned.
+
+资源偏好必须显式包含当前 endpoint、allowsCellular、useCustomRecognition、useCustomSynthesis；不接受旧单开关。安装收据只接受当前相对路径，不修复旧 UUID 前缀。网络失败后同一有效下载计划的续传属于当前恢复机制，仍可使用。

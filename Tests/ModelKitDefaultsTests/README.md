@@ -10,3 +10,5 @@
 ✅ 模型根停止后start／setForeground的错误断言使用ModelFailure；底层能力端口仍验证原始InferenceAdmissionError，明确根与领域接口边界。
 
 Preparation-step tests cover requested-order deduplication, registered-but-not-ready status and explicit rejection after root shutdown, without loading models.
+
+ChatExecutionTests exercises root-owned local FIFO (one active/eight pending), overflow, immediate cancellation slot reuse, native cleanup joining, failure advancement and retained completed handles, using an explicit fake Chat provider. Immutable cloud selections/configuration reuse and root retirement are checked without HTTP. Provider HTTP concurrency is tested in OpenAIChatTests.

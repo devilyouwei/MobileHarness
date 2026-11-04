@@ -124,6 +124,11 @@ public actor OutputGateway {
         else { return false }
         return task.kind == .cancel || task.kind == .result
     }
+    /// Occupancy snapshots describe execution lifetime; cancelling effects must not cancel their retirement facts.
+    private static func isReplyActivity(_ output: AgentOutput) -> Bool {
+        guard case .communication(let call) = output else { return false }
+        return call.message.contract == ReplyActivity.contract && call.message.content(as: ReplyActivity.self) != nil
+    }
     private static func isInterruption(_ envelope: OutputEnvelope) -> Bool {
         guard envelope.inputMetadata.origin == .local, envelope.inputMetadata.source == "runtime",
 
@@ -144,7 +149,8 @@ public actor OutputGateway {
             }
             directExecutions[id] = .init(
                 scope: OutputScope(envelope),
-                interruption: Self.isInterruption(envelope) || Self.isCleanupCommunication(envelope.output), task: task)
+                interruption: Self.isInterruption(envelope) || Self.isCleanupCommunication(envelope.output)
+                    || Self.isReplyActivity(envelope.output), task: task)
             defer { directExecutions[id] = nil }
             return try await withTaskCancellationHandler {
                 try await task.value
@@ -619,7 +625,8 @@ public actor OutputGateway {
         }
         do {
             if !terminal {
-                guard !isCancelled(scope) || Self.isInterruption(envelope) else { throw CancellationError() }
+                guard !isCancelled(scope) || Self.isInterruption(envelope) || Self.isReplyActivity(envelope.output)
+                else { throw CancellationError() }
                 if envelope.roundID != nil {
                     guard outputScopes.count < 128 || outputScopes.contains(scope) else { throw HarnessError.queueFull }
                     outputScopes.insert(scope)

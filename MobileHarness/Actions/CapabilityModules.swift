@@ -9,6 +9,7 @@ public enum CapabilityModules {
             NavigationModule.declarations,
             WindowModule.declarations,
             WebModule.declarations,
+            ArtifactsModule.declarations,
             IslandModule.declarations,
             ResourcePresentationModule.declarations,
             SpeechModule.declarations,
@@ -31,6 +32,7 @@ public enum CapabilityModules {
         album: (any PhotoAlbumCapability)? = nil,
         windows: (any WindowControlCapability)? = nil,
         web: (any WebCapability)? = nil,
+        artifacts: (any ArtifactCapability)? = nil,
         island: (any IslandControlCapability)? = nil,
         modelResources: any ModelResourceCapability,
         resourcePreferences: any ModelResourcePreferencesCapability,
@@ -69,6 +71,7 @@ public enum CapabilityModules {
             modules.append(TaskControlModule(capability: controls))
         }
         if let web { modules.append(WebModule(web: web)) }
+        if let artifacts { modules.append(ArtifactsModule(artifacts: artifacts)) }
         if let windows { modules.append(WindowModule(windows: windows)) }
         if let island { modules.append(IslandModule(island: island)) }
         return modules

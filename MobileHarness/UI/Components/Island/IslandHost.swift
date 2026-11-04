@@ -13,6 +13,13 @@ struct IslandPlacement: Equatable, Sendable {
     let trailingSlot: CGRect?
     let contentTop: Double
     let corner: Double
+    /// Keep the SwiftUI header's canvas stable as indicators change width. UIKit moves
+    /// its origin opposite to the animated shell, preserving scene-space alignment.
+    func headerCanvas(viewport: CGSize, shell: CGRect) -> CGRect {
+        CGRect(
+            x: -shell.minX, y: -shell.minY + header.minY - compact.minY,
+            width: viewport.width, height: viewport.height)
+    }
     static func resolve(
         viewport: CGSize, safeTop: Double, safeBottom: Double, expanded: Bool, detailHeight: Double,
         hasSecondary: Bool = true, primaryWidth: CGFloat = IslandCompactMetrics.slotWidth,
@@ -135,6 +142,7 @@ enum IslandInteraction {
         private var placement: IslandPlacement?
         private var safeTop = 0.0
         private var closing = false
+        private var isRendering = false
         override func didMoveToWindow() {
             super.didMoveToWindow()
             if window == nil { detach() } else { render() }
@@ -218,8 +226,8 @@ enum IslandInteraction {
                 self.surface.layer.cornerRadius = IslandCompactMetrics.height / 2
                 self.backdrop.frame = self.surface.bounds
                 self.backdrop.layer.cornerRadius = IslandCompactMetrics.height / 2
-                self.headerHosting?.view.frame = placement.compact.offsetBy(
-                    dx: -self.surface.frame.minX, dy: -self.surface.frame.minY)
+                self.headerHosting?.view.frame = IslandStatusBarLayout.contentFrame(
+                    viewport: self.viewport, shell: self.surface.frame)
                 self.statusBar.frame = IslandStatusBarLayout.contentFrame(
                     viewport: self.viewport, shell: self.surface.frame)
                 if UIAccessibility.isReduceMotionEnabled { self.surface.alpha = 0 }
@@ -234,6 +242,12 @@ enum IslandInteraction {
             animator.startAnimation()
         }
         func render() {
+            guard !isRendering else {
+                setNeedsLayout()
+                return
+            }
+            isRendering = true
+            defer { isRendering = false }
             guard let state, let source = window, let scene = source.windowScene, state.available, state.sceneActive,
                 state.localPresentationVisible
             else {
@@ -280,8 +294,8 @@ enum IslandInteraction {
             let body = IslandLocalBody(
                 state: state, content: state.detailActivity?.content ?? content, detail: detail, placement: next)
             let headerBody = IslandLocalHeader(
-                state: state, content: header, housingWidth: next.protected?.width ?? 0)
-            let headerFrame = next.header.offsetBy(dx: -next.frame.minX, dy: -next.frame.minY)
+                state: state, content: header, placement: next)
+            let headerFrame = next.headerCanvas(viewport: viewport, shell: next.frame)
             if fresh {
                 let overlay = IslandOverlayWindow(windowScene: scene)
                 overlay.renderer = self
@@ -328,7 +342,7 @@ enum IslandInteraction {
                 backdrop.frame = surface.bounds
                 backdrop.layer.cornerRadius = IslandCompactMetrics.height / 2
                 hosting.view.frame = surface.bounds
-                headerHosting.view.frame = next.compact.offsetBy(dx: -surface.frame.minX, dy: -surface.frame.minY)
+                headerHosting.view.frame = next.headerCanvas(viewport: viewport, shell: surface.frame)
                 statusBar.frame = IslandStatusBarLayout.contentFrame(viewport: source.bounds.size, shell: surface.frame)
                 statusBar.arrange(placement: next)
                 overlay.isHidden = false
@@ -400,30 +414,55 @@ enum IslandInteraction {
                     settle.addCompletion { [weak self, weak state] end in
                         guard let self, self.animationID == token, end == .end else { return }
                         self.animator = nil
+                        self.settleLayout(next)
                         state?.localCompleted(generation: generation, revision: revision)
                     }
                     self.animator = settle
                     settle.startAnimation()
                 } else {
                     self.animator = nil
+                    self.settleLayout(next)
                     state?.localCompleted(generation: generation, revision: revision)
                 }
             }
             self.animator = animator
             animator.startAnimation()
         }
+        private func settleLayout(_ target: IslandPlacement) {
+            let wasRendering = isRendering
+            isRendering = true
+            defer { isRendering = wasRendering }
+            UIView.performWithoutAnimation {
+                surface.frame = target.frame
+                surface.alpha = 1
+                surface.layer.cornerRadius = target.corner
+                backdrop.frame = target.background.offsetBy(dx: -target.frame.minX, dy: -target.frame.minY)
+                backdrop.layer.cornerRadius = target.corner
+                hosting?.view.frame = surface.bounds
+                headerHosting?.view.frame = target.headerCanvas(viewport: viewport, shell: target.frame)
+                statusBar.frame = IslandStatusBarLayout.contentFrame(viewport: viewport, shell: target.frame)
+                statusBar.arrange(placement: target)
+                surface.layoutIfNeeded()
+            }
+        }
     }
 
     private struct IslandLocalHeader: View {
         let state: IslandState
         let content: IslandContent?
-        let housingWidth: CGFloat
+        let placement: IslandPlacement
         var body: some View {
-            if let content {
-                IslandCompactView(
-                    content: content, bands: state.bands, spectrumActive: state.spectrumActive,
-                    housingWidth: housingWidth)
+            ZStack(alignment: .topLeading) {
+                if let content {
+                    IslandCompactView(
+                        content: content, bands: state.bands, spectrumActive: state.spectrumActive,
+                        housingWidth: placement.protected?.width ?? 0
+                    )
+                    .frame(width: placement.compact.width, height: placement.compact.height)
+                    .position(x: placement.compact.midX, y: placement.compact.midY)
+                }
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
     }
 
@@ -505,7 +544,7 @@ enum IslandInteraction {
             .padding(.leading, IslandCompactMetrics.outerPadding)
             .padding(.trailing, housingWidth > 0 && content.secondary == nil ? 0 : IslandCompactMetrics.outerPadding)
             .frame(height: IslandCompactMetrics.height)
-            .foregroundStyle(content.tone == .recording ? Color.red : .cyan)
+            .foregroundStyle(content.tone == .recording ? Color.red : content.tone == .purple ? .purple : .cyan)
             .accessibilityElement(children: .ignore).accessibilityLabel(content.title)
         }
     }
@@ -534,7 +573,8 @@ enum IslandInteraction {
         public var body: some View {
             HStack(alignment: .center, spacing: 10) {
                 IslandIndicatorView(value: primary, size: 24, bands: bands, spectrumActive: spectrumActive)
-                    .foregroundStyle(tone == .recording ? Color.red : .cyan).frame(width: 24, height: 32)
+                    .foregroundStyle(tone == .recording ? Color.red : tone == .purple ? .purple : .cyan).frame(
+                        width: 24, height: 32)
                 if let text = detail.normalized?.text {
                     ViewThatFits(in: .vertical) {
                         description(text)

@@ -34,7 +34,7 @@ flowchart TB
 | Files                                | StorageFiles    | 文档、字节和受控目录；只依赖 StorageCore                      |
 | Database 根                          | StorageDatabase | 数据库生命周期协议与四个领域端口                              |
 | Database/Chat、Tasks、Media、Devices | 独立领域目标    | 记录契约；Chat 使用 Tasks，Media 组合 Files                   |
-| Database/SQLite                      | StorageSQLite   | 共享连接池、领域 SQL 适配、迁移、恢复与关闭；独占 GRDB        |
+| Database/SQLite                      | StorageSQLite   | 共享连接池、当前 schema 初始化、恢复与关闭；独占 GRDB        |
 
 每份源码只有一个编译拥有者。没有统一业务查询 DSL，没有自动内存回退或跨文件/SQL 事务。
 
@@ -54,7 +54,7 @@ flowchart TB
 
 ❌ 持久化音视频、额外数据库后端、原生播放转换零拷贝不在本轮。自动化、构建、真实模型/UI/设备结果分别见 [验证记录](../../docs/validation/Validation-History.md)。
 
-✅ 对话用量增加可选缓存读/写输入计数，兼容旧证据无字段；不更改数据库表或迁移版本。
+对话缓存读/写 token 计数是 Provider 可选观测；缺失表示未报告。
 
 ## 统一容器异常通道
 
@@ -73,7 +73,7 @@ flowchart TB
 
 ## 基础相册实施契约
 
-✅ Media扩展独立相册收录元数据与照片资源操作，SQLite迁移默认不收录旧媒体；已收录照片不FIFO淘汰。
+Media 包含相册元数据与资源操作；已收录照片不 FIFO 淘汰。
 
 ## Container 上下文
 
@@ -90,3 +90,7 @@ Cache budgets/retained bytes, audio scopes, file handles and database/root lifec
 Actions supplies native-validated movie metadata and a local source; StorageMedia serializes ready-file publication and explicit album inclusion using StorageFiles and MediaRepository. Video playback/export obtains a bounded local URL after ownership or album-membership checks. The existing photos namespace and retention policy hold both photos and movies; image/model reads remain image-only. Storage does not inspect AV assets or manage microphones. See [Media](Database/Media/README.md) and [Files](Files/README.md).
 
 FilesContainer also exposes an independently configured workspaces namespace. App selects its root; StorageFiles provides generic controlled files/documents without interpreting web projects or generation tasks. Content, version retention and publication policy belong to the consuming Actions capability.
+
+委托记录继续使用共享 Chat/Task 后端：稳定任务绑定对话与项目，每次执行创建新的 Task 行；分页、身份检查和来源关联由领域仓库拥有，不引入单独数据库。运行策略、上下文恢复与取消决策属于 Agents，详见 [Tasks](Database/Tasks/README.md)。
+
+TaskRepository 同时提供按执行查询和原子终态/通知持久化；通知由领域拥有 opaque payload，存储只校验身份并管理分页和独立送达/退休证据。该能力使用现有 SQLite，不拥有上层重试或准入策略。详见 [Tasks](Database/Tasks/README.md)。

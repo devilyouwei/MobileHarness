@@ -89,13 +89,13 @@ ActionsContainer.makeBusiness receives ActionsDependencies, creates the private 
 
 Speech 的公开聆听启停由 BasicSkill 经 Gateway 调用。Actions 通过中立感知端口取得权威策略 revision 后直接应用并加入原生清理，不将模型输入当作内部策略快照。关闭 Action 不取消并等待其所属回复；生命周期与手势停机仍沿用回复取消契约。详见 [聆听设计](Speech/Listening/README.md)。
 
-The Window module binds six generic presentation controls in the standard catalog and direct/returning policy. WindowExecutionService delegates business lifecycle through WindowContentLifecycle; CameraCoordinator supplies the first implementation. The same UI state and finite receipts are used for model and button requests.
+The Window module binds six generic presentation controls in the standard catalog with scheduled Actions and direct/returning Tools. WindowExecutionService delegates business lifecycle through WindowContentLifecycle; CameraCoordinator supplies the first implementation. The same UI state and finite receipts are used for model and button requests.
 
-Camera coordinates independent photo and background visual demand over one PlatformKit capture capability. CameraModule binds Capture and Perception explicitly; Perception uses openVision/closeVision/retryVision/flipVision in the unified CameraActions namespace. Both groups use direct/returning Action and Tool policies. Business lens admission reads UI presentation ordering, then invokes the same native switch; device running/facing State belongs solely to platform.vision.camera.
+Camera coordinates independent photo and background visual demand over one PlatformKit capture capability. CameraModule binds Capture and Perception explicitly; Perception uses openVision/closeVision/retryVision/flipVision in the unified CameraActions namespace. Both groups use scheduled Action and direct/returning Tool policies. Business lens admission reads UI presentation ordering, then invokes the same native switch; device running/facing State belongs solely to platform.vision.camera.
 
 ## Photo/video and listening coordination
 
-ActionsBusinessAssembly connects CameraCoordinator's recording audio hold to the active VoiceSessionCoordinator and injects joined image/video export through PlatformKit.Vision. CameraRecordingSession owns recording completion and pending media independently of window mounting; speech owns listening generation/restoration. Camera, UI, PlatformKit and Storage keep separate facts and completion contracts. The fixed Capture/Video/Perception entry points remain domain-owned @Actions; direct-return protocol policy is shared by all three Camera modules. See [Camera](Camera/README.md) and [Listening](Speech/Listening/README.md).
+ActionsBusinessAssembly connects CameraCoordinator's recording audio hold to the active VoiceSessionCoordinator and injects joined image/video export through PlatformKit.Vision. CameraRecordingSession owns recording completion and pending media independently of window mounting; speech owns listening generation/restoration. Camera, UI, PlatformKit and Storage keep separate facts and completion contracts. The fixed Capture/Video/Perception entry points remain domain-owned @Actions; scheduled Action and direct Tool projections are shared by all three Camera modules. See [Camera](Camera/README.md) and [Listening](Speech/Listening/README.md).
 
 IslandModule提供双端内容发布/更新/结束和compact/expanded展示请求。领域仅发布中立状态、阶段身份和导航入口；UI拥有有界身份账本、串行ActivityKit写入和失败状态。ActionsBusinessAssembly构造唯一服务与根领域观察，不读取硬件或观察自身Action记录，实际频谱只送前台组件，不逐帧提交Action/原生摘要；shutdown加入观察和蓝牙到期任务。
 
@@ -103,6 +103,18 @@ setSceneActive只调用原生场景服务的失活/加入端口，不暂停Actio
 
 ## Web operations
 
-[Web](Web/README.md) owns remote browsing, local graphics workspaces and private multi-request code generation. ActionsBusinessAssembly injects ModelKit.language, StorageFiles.workspaces, UI.web/windows and the scope-bound image-store closure. WebModule declares eight Web.Page operations; BehaviorProtocolBindings exposes direct returning Action/Tool bindings. WebExecutionService is the sole finite-work owner, rejects concurrent calls and joins cancellation on close/stop. UI owns native rendering; Storage owns filesystem confinement; Assistant owns task policy and image analysis.
+[Web](Web/README.md) owns remote browsing, inspection, navigation and screenshot execution. [Artifacts](Artifacts/README.md) owns project storage, streaming edit transactions, immutable versions and multi-window presentation. ActionsBusinessAssembly injects foundation ports and returns a task-bound streaming continuation; short literal patches validate fresh read ownership and unique matches before atomic replacement; no development model runs inside Actions. Writer selects explicit rendering or per-edit streaming previews; Artifacts performs bounded native file operations and reports render evidence without deciding creative policy.
 
 Camera与Web在创建UI窗口时显式提供各自图标。Actions只选择显示身份，UI.Window拥有图标接纳、最小化尺寸和原生渲染；不新增函数参数或资源访问链路。
+
+生产 BehaviorAssembly 将公开 Action 投影为 scheduled 执行，Tool 投影保留 direct；同一函数可有两种协议适配，业务实现及资源检查仍共享。Assistant 所有 Skill 函数采用 XML Action；Writer 使用独立 Tool 目录。显式测试/宿主注入的注册策略不被生产投影重写。
+
+UI.Island 工具接纳生产者自有的通用语义内容，不管理 Writer 任务生命周期。Writer 与 Assistant 各自由本角色执行所有者通过 Gateway 内部展示工具发布或撤下任务岛；UI/Runtime 的领域观察只投影语音、相机和连接，不反向解读 Agent 任务日志。组件负责语义优先级排序及实际动画/布局。
+
+Artifacts exposes an internal direct workspace preview capability to Writer. Source intake only checkpoints the draft; Writer schedules safe script-disabled snapshots independently of the content stream. Explicit render joins pending previews and executes complete scripts; finish requires a current successful render and publishes once. The UI/Storage modules do not own creative-loop or progress policies.
+
+Web页面读取/截图/导航可按windowID选择既有Writer会话，仍经业务执行与原生验证；作品编辑授权保持Writer域。装配只注入UI根会话查询。
+
+Writer新模型选择读取独立writerThinking，默认minimum；显式开启时enabled。Assistant配置策略不变，当前执行保持配置快照。
+
+Island business execution has one typed Action entry, IslandActions.execute. Agent invocations reach it through Gateway and the registered string adapter; camera/voice/Bluetooth presentation calls it directly through producer-bound endpoints inside Actions. Internal composition does not involve Gateway, transport or synthetic FunctionInvocation. Ownership/revision/generation checks and receipts are shared. The domain observer owns three latest commands, one wake-up slot and one joined expiry/retry timer. Spectrum data and UI's own gestures/layout/lifecycle retain their specialized interfaces. See [Runtime](UI/Runtime/README.md).

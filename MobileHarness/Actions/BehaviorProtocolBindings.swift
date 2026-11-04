@@ -5,6 +5,11 @@ import FunctionContracts
 /// Host-owned registration profiles, grouped by module rather than model aliases or function lists.
 public struct BehaviorProtocolBindings {
     public static func bind(_ function: ActionFunction) throws -> ActionBinding {
+        if function.path.domain == "Artifacts" {
+            return ActionBinding(
+                function: function, protocols: [.action, .tool], executionPolicy: .direct,
+                directResultPolicy: .returning)
+        }
         if function.path.domain == "Web" {
             return ActionBinding(
                 function: function, protocols: [.action, .tool],
@@ -49,8 +54,7 @@ public struct BehaviorProtocolBindings {
         }
         if function.path.domain == "Agent", function.path.module == "Task" {
             return ActionBinding(
-                function: function, protocols: [.action], executionPolicy: .direct,
-                directResultPolicy: .returning)
+                function: function, protocols: [.action], executionPolicy: .scheduled(channel: "Control"))
         }
         if function.path.domain == "UI", function.path.module == "Expression", function.path.function == "setLoading" {
             return ActionBinding(

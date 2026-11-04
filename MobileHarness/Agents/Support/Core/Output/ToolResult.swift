@@ -21,7 +21,7 @@ public struct ToolResult: Codable, Equatable, Sendable {
     public var requiresReasoning: Bool {
         if isCancellationOnly { return false }
         if hasFailure { return true }
-        // Legacy native results carry their explicit value without a canonical completion case.
+        // Current native tool values carry business output without an Action completion case.
         return completion?.hasBusinessOutput ?? true
     }
     public init(

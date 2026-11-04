@@ -29,6 +29,7 @@ public final class SQLiteChatRepository: ChatRepository {
         CREATE INDEX message_kind ON messages(dialog_id,kind,position);
         CREATE INDEX message_task ON messages(task_id,position,id);
         CREATE INDEX message_detail ON messages(detail_hash);
+        CREATE INDEX message_active ON messages(id) WHERE state='generating';
         CREATE TABLE task_messages(task_id INTEGER NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
                                 message_id INTEGER NOT NULL REFERENCES messages(id) ON DELETE CASCADE, PRIMARY KEY(task_id,message_id));
         CREATE TABLE message_media(message_id INTEGER NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
@@ -342,13 +343,31 @@ public final class SQLiteChatRepository: ChatRepository {
                     [key, Int64(after)] + (task.map { [$0] } ?? []) + [Int64(limit), Int64(offset)])
             ).map { row in
                 let taskKey: Int64? = row["task_id"]
-                return MessagePreview(
+                var preview = MessagePreview(
                     id: SQLiteRecordKey.id(.message, row["id"]), clientID: row["client_id"], inputID: row["input_id"],
                     input: row["input"], response: row["response"],
                     date: Date(timeIntervalSince1970: row["created_at"]),
                     position: UInt64(row["position"] as Int64), state: row["state"],
                     taskID: taskKey.map { SQLiteRecordKey.id(.task, $0) }, isObservation: row["observation"],
                     isInput: row["role"] as String == "user")
+                preview.ordinal = row["ordinal"]
+                let metadata: Data = row["preview_metadata"]
+                if !metadata.isEmpty,
+                    let envelope = try JSONSerialization.jsonObject(with: metadata) as? [String: Any],
+                    let value = envelope["value"] as? [String: Any]
+                {
+                    preview.metadata = value["producerMetadata"] as? [String: String] ?? [:]
+                    if let decision = value["decisionMetadata"] as? [String: Any] {
+                        preview.metadata["phase"] = decision["mode"] as? String
+                        preview.metadata["runID"] = decision["runID"] as? String
+                    }
+                    if let calls = value["toolCalls"] as? [[String: Any]],
+                        calls.contains(where: { $0["state"] as? String == "received" })
+                    {
+                        preview.metadata["toolsPending"] = "true"
+                    }
+                }
+                return preview
             }
         }
     }
@@ -543,11 +562,12 @@ public final class SQLiteChatRepository: ChatRepository {
     private static func previewSQL(task: Bool) -> String {
         let filter = task ? "AND m.task_id=?" : "AND (t.compression_hash IS NULL OR m.position=t.first_position)"
         return """
-            SELECT m.id,m.client_id,m.input_id,m.position,m.created_at,m.state,m.task_id,m.role,CASE WHEN m.role='user' THEN '' ELSE m.preview END AS response,
+            SELECT m.id,m.client_id,m.input_id,m.position,m.created_at,m.state,m.task_id,m.role,e.data AS preview_metadata,
+                (SELECT COUNT(*) FROM messages r WHERE r.dialog_id=m.dialog_id AND r.kind='response' AND r.position<=m.position) AS ordinal,CASE WHEN m.role='user' THEN '' ELSE m.preview END AS response,
                 CASE WHEN m.role='user' THEN m.preview ELSE COALESCE((SELECT o.preview FROM messages o WHERE o.dialog_id=m.dialog_id AND o.client_id=m.client_id AND o.role='user' AND o.kind='observation'),
                     (SELECT u.preview FROM messages u WHERE u.dialog_id=m.dialog_id AND u.client_id=m.input_id AND u.role='user' AND u.kind='input'),'') END AS input,
                 EXISTS(SELECT 1 FROM messages o WHERE o.dialog_id=m.dialog_id AND o.client_id=m.client_id AND o.role='user' AND o.kind='observation') AS observation
-            FROM messages m LEFT JOIN tasks t ON t.id=m.task_id WHERE m.dialog_id=? AND (m.role='assistant' OR (m.role='user' AND ((m.kind='input' AND NOT EXISTS(SELECT 1 FROM messages a WHERE a.dialog_id=m.dialog_id AND a.role='assistant' AND a.input_id=m.client_id)) OR (m.kind='observation' AND NOT EXISTS(SELECT 1 FROM messages a WHERE a.dialog_id=m.dialog_id AND a.role='assistant' AND a.client_id=m.client_id))))) AND m.position>? \(filter)
+            FROM messages m JOIN evidence e ON e.hash=m.detail_hash LEFT JOIN tasks t ON t.id=m.task_id WHERE m.dialog_id=? AND (m.role='assistant' OR (m.role='user' AND ((m.kind='input' AND NOT EXISTS(SELECT 1 FROM messages a WHERE a.dialog_id=m.dialog_id AND a.role='assistant' AND a.input_id=m.client_id)) OR (m.kind='observation' AND NOT EXISTS(SELECT 1 FROM messages a WHERE a.dialog_id=m.dialog_id AND a.role='assistant' AND a.client_id=m.client_id))))) AND m.position>? \(filter)
             ORDER BY m.position,m.id LIMIT ? OFFSET ?
             """
     }

@@ -18,24 +18,6 @@ public struct ModelResourcePreferences: Codable, Sendable, Equatable {
         self.useCustomRecognition = useCustomRecognition
         self.useCustomSynthesis = useCustomSynthesis
     }
-    private enum CodingKeys: String, CodingKey {
-        case endpoint, allowsCellular, useCustomRecognition, useCustomSynthesis, preferDownloadedSpeech
-    }
-    public init(from decoder: any Decoder) throws {
-        let values = try decoder.container(keyedBy: CodingKeys.self)
-        endpoint = try values.decode(String.self, forKey: .endpoint)
-        allowsCellular = try values.decode(Bool.self, forKey: .allowsCellular)
-        let legacy = try values.decodeIfPresent(Bool.self, forKey: .preferDownloadedSpeech) ?? true
-        useCustomRecognition = try values.decodeIfPresent(Bool.self, forKey: .useCustomRecognition) ?? legacy
-        useCustomSynthesis = try values.decodeIfPresent(Bool.self, forKey: .useCustomSynthesis) ?? legacy
-    }
-    public func encode(to encoder: any Encoder) throws {
-        var values = encoder.container(keyedBy: CodingKeys.self)
-        try values.encode(endpoint, forKey: .endpoint)
-        try values.encode(allowsCellular, forKey: .allowsCellular)
-        try values.encode(useCustomRecognition, forKey: .useCustomRecognition)
-        try values.encode(useCustomSynthesis, forKey: .useCustomSynthesis)
-    }
     public func encoded() throws -> String {
         let data = try JSONEncoder().encode(self)
         guard data.count <= 2048 else { throw ModelResourcePreferenceError.invalidSource }
@@ -90,7 +72,7 @@ public actor ModelResourcePreferencesService: ModelResourcePreferencesCapability
         if !ResourceModelGroup.recognition.isInstalled(in: ids) { valid.useCustomRecognition = false }
         if !ResourceModelGroup.synthesis.isInstalled(in: ids) { valid.useCustomSynthesis = false }
         try Task.checkCancellation()
-        // Preserve migration write criteria; endpoint canonicalization alone does not force a write.
+        // Persist actual preference changes; endpoint canonicalization alone does not force a write.
         if valid.allowsCellular != value.allowsCellular || valid.useCustomRecognition != value.useCustomRecognition
             || valid.useCustomSynthesis != value.useCustomSynthesis
         {

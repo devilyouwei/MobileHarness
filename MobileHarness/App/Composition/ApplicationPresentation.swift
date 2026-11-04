@@ -30,7 +30,9 @@
         public var onRetry: (() -> Void)?
         private var startupFailure: (any Error)?
         public var startupIssue: String? { startupFailure.map { String(describing: $0) } }
-        public init(features: AgentContainer, home: UIHomeContainer, web: WebPageContainer) {
+        public init(
+            features: AgentContainer, home: UIHomeContainer, web: WebPageContainer,
+        ) {
             self.features = features
             self.home = home
             self.web = web
@@ -64,7 +66,7 @@
         public var recordDestinations: [AgentRecordDestination] {
             let state = features.memory.historyState
             let controls = features.memory.history
-            return [
+            var destinations = [
                 AgentRecordDestination(
                     id: "assistant", name: "Assistant 聊天记录",
                     summary: "对话、Task 摘要与完整请求记录"
@@ -72,6 +74,13 @@
                     ConversationHistoryView(state: state, controls: controls)
                 }
             ]
+            if let artifacts = features.writer.artifacts {
+                destinations.append(
+                    AgentRecordDestination(id: "writer", name: "Writer 任务记录", summary: "委托任务、对话与作品文件") {
+                        WriterRecordsView(controls: self.features.writer, artifacts: artifacts)
+                    })
+            }
+            return destinations
         }
         public func navigate(_ destination: AppDestination?) { features.navigate(destination) }
         public func cameraPreview() -> AnyView {

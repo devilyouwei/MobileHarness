@@ -30,7 +30,7 @@ flowchart LR
 
 PerceptionMessage 区分 speech.final、speech.partial、speech.phase、sound.source、vision.pose、speech.synthesize 与 speech.cancel。AgentMessage 持有类型化内容及验证闭包；一般编码上限为 16 KiB，姿态为 256 KiB。最终转写非空且最多 4096 UTF-8 字节，预览最多 16300 字节；合成文本非空且最多 2000 字节，locale 为 auto／zh-CN／en-US。
 
-ReplyActivity 是 revision 递增的完整占用快照，input/task 列表各最多 128 项且不能重复；它描述回复工作，不授予麦克风控制权。姿态和声源的算法及发布节奏由 [VisionPerception](../../VisionPerception/README.md) 与 [SpeechPerception](../../SpeechPerception/README.md) 拥有。
+ReplyActivity 是 revision 递增的完整占用快照，input/task 列表各最多 128 项且不能重复；它描述回复工作；认证Assistant可以携带最近一次成功Writer汇报的completedReportID及单调reportStartedAt，SpeechPerception据此解释一次性播毕启听政策，其他来源不能提供这两个字段。姿态和声源的算法及发布节奏由 [VisionPerception](../../VisionPerception/README.md) 与 [SpeechPerception](../../SpeechPerception/README.md) 拥有。
 
 AgentTaskContent 保存最多 4096 字节的业务文本与 running／waitingUser／completed 阶段；waitingUser 要求 interactionID。AgentTaskInputIntent 显式指向既有 taskID 与 interactionID，标识各最多 128 字节；运行时所有权由可信上下文提供。AgentBackgroundTaskRequest 要求 background、目标、业务契约及合法 JSON 载荷，并拒绝向自身委派；目标实际支持范围由注入声明和运行期授权继续校验。
 
@@ -40,8 +40,21 @@ AgentFixedTaskInput.unwrap 只接受 request／input，核对 requester 为 Assi
 
 准入检查成功后才调用执行角色提供的 decode，再验证返回消息的内容和大小。生成的角色输入使用原 rootID 作为处理身份，保留 session、source、incarnation、capturedAt、sequence、root／parent、hops、deadline、turn 与 taskScope。具体契约选择、私有取消／retire 的来源限制由所属角色负责，公共机制不建立角色载荷分派表。
 
-本目录的值不拥有消费任务、队列或原生资源。消息投递接纳与 Task 终态分别建模；注册、输出消费和停止加入由各角色 ExecutionSession 拥有。当前边界不包含远程传输或持久化投递。
+本目录的值不拥有消费任务、队列或原生资源。消息投递接纳与 Task 终态分别建模；注册、输出消费和停止加入由各角色 ExecutionSession 拥有。当前边界不包含远程传输或通用持久化投递；Writer在域内持有有界投递worker，并通过既有 TaskRepository 保存终态待送达事实。
 
 ## Native inputs and internal messages
 
 Native CameraFrame/PCM and typed UI/container observations reach their owning roles directly. This directory owns derived semantic messages and role-originated coordination, not a universal external-media Signal format. Perception and cognition use the same Agent communication boundary; neither denotes a new module or container. Execution requests are separate from role messages and share Gateway only for their respective transport/scheduling facilities. The cross-module view is maintained in the [overall input and Signal design](../../../README.md#native-input-and-internal-signals).
+
+
+writer.author 是 Writer 的生产后台任务契约。Assistant 通过默认 startTask(execution=background,executor=writer) 附加当前用户输入和单行目标，Writer 接纳后立即释放调用方；progress 回报运行阶段，result 退休执行权限。追加输入在文件检查点消费，显式 cancel 加入取消清理。
+
+WriterTaskEvent 的可选 taskID 是长期作品任务，runID 必须匹配可信 scope.id；新版本回报携带两者，接收端同时校验业务绑定。每次续作创建新 scope，不重新打开已终止的通信任务。历史请求保存稳定身份，实时传输/去重使用执行身份。
+
+WriterTaskEvent.failure 是可选 WriterFailureDiagnostic：分类、错误码、阶段、摘要、诊断字段和关联原因均为业务事实。通信值不依赖 Storage；Writer 拥有到持久化 DTO 的转换。失败消息沿既有认证、去重和 FIFO 进入 Assistant，诊断不能授权重委托或改变调度。
+
+WriterTaskCompletion（writer.completion）封装已结束的 Writer AgentTaskSignal，限定后台 assistant→writer 身份及业务事件/终态配对。通过无 taskScope 的普通角色通信递送，只携带事实，不恢复旧执行授权。Assistant 额外核对共享 SQLite 中不可变通知与任务归属；控制退休和用户汇报独立接纳。该契约不引入 Gateway 调度机制或通用持久消息设施。
+
+WriterTaskEvent.request optionally carries WriterRequestProgress(inputID, number, phase, attempt, path). Number counts actual model attempts across the stable task; task/run identity is still verified through the trusted envelope and binding. Request progress is a task fact, not model reasoning. Assistant stores incoming facts, coalesces ordinary progress into one latest pending reply and retains formal FIFO for user-input requests and terminal events. Delivery acceptance does not gate Writer execution.
+
+WriterRequestProgress用于关联实际请求及其累计计数。请求开始只在Writer内部呈现；Assistant普通progress的request字段关联刚完成步骤中的最新请求，可包含内容子请求。步骤汇报在该轮工具效果/持久结果与预览屏障之后发出，不表示下一请求已完成。

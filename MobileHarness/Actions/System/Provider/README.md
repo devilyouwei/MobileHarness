@@ -36,7 +36,7 @@ ProviderSettingsService 在 MainActor 上拥有 saved/restored/changing、一个
 
 save 排斥其它更改和在途恢复：校验选项，prepare 获得 apply，加入 beginChange 屏障，持久化后应用，最终 endChange。应用失败时用独立 Task 加入持久化旧值回滚；回滚失败同时保留两个安全原因。此回滚是文档回滚，不保证原生状态能撤销。summary 仅在 restored 后返回 cloudEnabled/selectedCloudModel。
 
-ProviderSettingsStore 是 actor，以 busy 排斥重叠读写，保存 version=1 的配置文档和 credentialID 引用。ProviderCredentialStorage 注入原生凭据读写；原文 key 不存入配置文档。迁移旧凭据时，先提交新文档，再重新读取并核对，成功后移除旧记录。
+ProviderSettingsStore 是 actor，以 busy 排斥重叠读写，保存 version=1 的配置文档和 credentialID 引用。ProviderCredentialStorage 注入原生凭据读写；原文 key 不存入配置文档。只读取当前文档与 credentialID 引用；不读取旧 Keychain 配置，不将单 Provider 文档转换成列表。
 
 替换时先写新凭据，再按 revision 保存文档；文档失败时尽力删除新凭据，提交成功后尽力删除旧凭据。凭据清理是 best effort，可能留下无引用记录，不将已提交配置改判为未提交。原生凭据策略及原始网络错误不进入协议结果；安全失败码与有界摘要由 ProviderSettingsError 提供。
 
@@ -45,9 +45,9 @@ ProviderSettingsStore 是 actor，以 busy 排斥重叠读写，保存 version=1
 
 ## 多 Provider 管理
 
-沿用私有设置事务传递至多 32 个 URL 唯一的 provider；当前配置与其余配置一起保存。UI 在加载模型上方提供单选、编辑、删除和末行添加，删除当前项关闭云端并要求重新选择。保存提交后生效，Key 保持钥匙串存储，旧单配置恢复为首项。
+沿用私有设置事务传递至多 32 个 URL 唯一的 provider；当前配置与其余配置一起保存。“智能体大脑”先显示名称/URL 的 Provider 管理列表，末行添加，左滑编辑/删除；不设置全局 Provider 单选。Assistant 和 Writer 各自选择 Provider/模型，本地选项隐藏二级模型。删除 Provider 将引用它的草稿选择切换为本地。保存提交后生效，Key 保持钥匙串存储；Provider 列表只从当前文档读取。
 
-Provider 名称通过私有配置链路保存，旧数据以 URL 主机名补齐。新增/编辑采用独立 modal 草稿（name/url/key），默认生成未占用的 Provider N 名称；取消不修改选择和凭据，确认校验 URL 唯一性与名称。列表名称为主、URL 单行省略为辅，保留三字段粘贴和 Key 脱敏。
+Provider 名称与稳定 ID 是当前文档的必填字段，通过私有配置链路保存。新增/编辑采用独立 modal 草稿（name/url/key），默认生成未占用的 Provider N 名称；取消不修改选择和凭据，确认校验 URL 唯一性与名称。列表名称为主、URL 单行省略为辅，保留三字段粘贴和 Key 脱敏。
 
 ProviderSettingsRequests 对 HTTP/HTTPS 的域名及 IP 配置采用一致的准入规则；安全错误提示同时列出两种协议。真实发现和推理的 URL 校验由 [OpenAI 适配器](../../../ModelKit/Language/LLM/OpenAI/README.md) 拥有。
 
@@ -56,3 +56,10 @@ SettingsProviderAdapter 的结果呈现调用显式忽略 UI 返回的接纳布�
 ## Execution ownership and lifecycle
 
 ProviderSettingsClient is an Actions-owned facade with coalesced restoration (at most 32 waiters) and joined shutdown. Provider draft/configuration and staging ports live in FunctionContracts; ApplicationControl owns cognitive authorization. UI SettingsFormController owns bounded discovery presentation workers and exposes joined shutdown, invoked by Actions cleanup.
+
+
+设置文档包含 Assistant 选择 cloud、其余 providers 列表及 Writer 选择；每个 Provider 的稳定 id/name 和 writerModel 必填，writerProviderID 可为空以表示本地，后续编辑保留 Provider ID。Writer 获取明确选择的配置，使用已有钥匙串凭据，未选云端 Provider 时使用共享本地串行能力，不回退 Assistant。
+
+模型发现按稳定 Provider ID 缓存，页面进入刷新两个已选 Provider，切换 Provider 和编辑凭据自动查询；同 Provider 可共享列表而不共享 Agent 的模型选择。返回值经 ApplicationControl/Gateway 后由表单控制器呈现，凭据快照/请求 ID 阻止迟到覆盖。最多 32 个查询（包括尚未退出的取消任务），溢出明确显示错误；离页取消，根关闭加入。刷新不清空已保存模型，失败提供重试。保存仍走既有业务事务，密钥留钥匙串。
+
+Writer配置的writerThinking是独立选择，默认false；可选持久覆盖缺省表示当前角色默认低思考。恢复/保存/回滚通过原有事务传递，不改Provider/模型选择。新委托/续作模型选择按布尔值选择minimum/enabled，Assistant保持minimum；当前执行及其恢复时的模型选择持有原配置。

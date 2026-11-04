@@ -7,7 +7,7 @@ import Testing
 
 private func document() -> [String: Any] {
     [
-        "version": 6,
+        "version": 7,
         "communication": [
             "inputs": [
                 ["contract": "tool.result", "version": 1, "kind": "toolResult"]
@@ -25,7 +25,6 @@ private func document() -> [String: Any] {
                             "description": "Caption text.", "constraints": "Nonblank, at most 2000 UTF-8 bytes.",
                         ]
                     ],
-                    "examples": ["<render text=\"hello\"/>"],
                 ]
             ], "main": [],
         ],
@@ -69,7 +68,7 @@ func agentConfigurationRejectsInvalidDocuments(_ mutation: String) throws {
         action["parameters"] = [parameter]
     case "unknownTextAction": root["textActions"] = ["say"]
     case "invalidTextSchema":
-        parameter["name"] = "other"
+        parameter["required"] = "not a boolean"
         action["parameters"] = [parameter]
     case "duplicateChannel": root["channels"] = ["main", "main"]
     case "duplicateTextAction": root["textActions"] = ["render", "render"]
@@ -124,7 +123,7 @@ func agentConfigurationRejectsInvalidDocuments(_ mutation: String) throws {
     #expect(active.tools.isEmpty)
     #expect(!active.actions.contains { $0.path.domain == "Camera" })
     #expect(active.actions.contains { $0.alias == "startTask" })
-    #expect(active.actions.filter { $0.path.domain == "Agent" && $0.path.module == "Task" }.count == 5)
+    #expect(active.actions.filter { $0.path.domain == "Agent" && $0.path.module == "Task" }.count == 6)
     let agent = try AssistantAgent(
         stateContext: try publicStateFixture(),
         chat: FixedTextChat(),
@@ -132,7 +131,9 @@ func agentConfigurationRejectsInvalidDocuments(_ mutation: String) throws {
             agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState())
     )
     let registry = agent.descriptor.capabilities
-    #expect(registry.internalActions.count == 4 && registry.internalTools.isEmpty)
+    #expect(registry.internalActions.count == 4)
+    #expect(Set(registry.internalTools.map(\.path)) == ["UI.Island.present", "UI.Island.end"])
+    #expect(registry.tools.isEmpty)
     #expect(registry.internalActions.contains { $0.path.description == "UI.Expression.setReplyWaiting" })
     #expect(!registry.actions.contains { $0.path.description == "UI.Expression.setReplyWaiting" })
     #expect(!registry.internalActions.contains { $0.path.description == "Speech.Listening.update" })
@@ -212,13 +213,13 @@ func agentConfigurationRejectsInvalidDocuments(_ mutation: String) throws {
     try skills.initialize(fixed: maximum, baseSkills: try AgentConfigurations.baseSkills(named: "Assistant"))
     let registry = try skills.registry(fixed: maximum)
     let prompt = try AssistantAgent.systemPrompt(capabilities: registry)
-    #expect(prompt.contains("Available Channels: Control, Display, ListeningControl, Robot, Speech\n"))
+    #expect(prompt.contains("Available Channels: Control, Display, ListeningControl, Speech\n"))
     #expect(prompt.contains("Action express:"))
     #expect(prompt.contains("Use listed default Channels."))
-    #expect(prompt.contains("Action dance:"))
+    #expect(!prompt.contains("Action dance:"))
     #expect(!prompt.contains("Action takePhoto:"))
     #expect(prompt.contains("# BasicSkill"))
-    #expect(prompt.contains("played on the independent Speech Channel"))
+    #expect(prompt.contains("audio on independent Speech"))
     for text in [
         "Action say:", "Action print:", "playAudio", "audioID", "beginReplyTurn", "runtimeInfo", "not callable",
     ] {
@@ -357,12 +358,12 @@ func malformedNativeToolsFailExplicitly(_ mutation: String) throws {
     let generic = try CapabilityContextBuilder.build(effective)
     #expect(generic.contains("SCHEDULING: CHANNEL, EXECUTION CONSTRAINTS, WAIT"))
     #expect(generic.contains("Action express:"))
-    #expect(!generic.contains("automatically converted to audio"))
+    #expect(!generic.contains("becomes audio on independent Speech"))
     #expect(!generic.contains("audio playback"))
     #expect(!generic.contains("Speak-then-act"))
     let assistant = try AssistantAgent.systemPrompt(capabilities: config.capabilities)
-    #expect(assistant.contains("automatically converted to audio"))
-    #expect(assistant.contains("put the entire spoken text inside"))
+    #expect(assistant.contains("becomes audio on independent Speech"))
+    #expect(assistant.contains("put ALL speech inside"))
 }
 
 @Test(.actionCatalog, arguments: ["v5", "missingDomain", "dottedModule", "missingBinding", "unknownBinding"])
@@ -555,4 +556,10 @@ func skillUseStateRejectsInvalidDeclarations(_ mutation: String) throws {
     }
     let data = try JSONSerialization.data(withJSONObject: json)
     #expect(throws: (any Error).self) { try JSONDecoder().decode(AgentConfigurations.Skill.self, from: data) }
+}
+
+@Test func agentConfigurationRejectsRetiredDocumentVersion() throws {
+    var old = document()
+    old["version"] = 6
+    #expect(throws: AgentConfigurationError.self) { try decode(old) }
 }

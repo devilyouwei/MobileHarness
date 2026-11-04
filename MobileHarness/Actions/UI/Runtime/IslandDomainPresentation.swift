@@ -3,7 +3,7 @@ import Observation
 import UI
 
 /// Projects already-owned display facts; never samples devices or interprets execution-log Actions.
-/// One newest wake-up slot, one observer worker and one joined expiration timer.
+/// One newest wake-up slot, three latest Action commands, one observer and one joined expiration/retry timer.
 @MainActor public final class IslandDomainPresentation {
     private let service: any IslandDomainPresenting
     private let home: UIHomeContainer
@@ -14,26 +14,59 @@ import UI
     private var bluetooth: BluetoothConnectionStatus?
     private var bluetoothUntil: Date?
     private var generation: UUID?
-    private var running = false
     private var listeningStartedAt: Date?
     public init(service: any IslandDomainPresenting, home: UIHomeContainer, camera: CameraState) {
         self.service = service
         self.home = home
         self.camera = camera
     }
+    private struct Snapshot {
+        let generation: UUID
+        let contents: [(IslandDomain, IslandContent?)]
+        let spectrum: [Float]
+        let speaking: Bool
+    }
+    private struct Publication {
+        let id = UUID()
+        let actions: any IslandActionCalling
+        var revision: UInt64 = 0
+        var desired: IslandContent?
+        var pending: IslandCommand?
+        mutating func prepare(_ content: IslandContent?) throws {
+            guard content != desired else { return }
+            revision += 1
+            pending = try IslandCommand(
+                operation: content == nil ? .end : .present, id: id, revision: revision, content: content)
+            desired = content
+        }
+    }
+    private var publications: [IslandDomain: Publication] = [:]
+    private var retryAt: Date?
+    private var worker: Task<Void, Never>?
+    private var stopped = false
     public func run() async {
-        guard !running else { return }
-        running = true
-        defer { running = false }
+        guard !stopped, worker == nil else { return }
+        let task = Task { await observe() }
+        worker = task
+        await withTaskCancellationHandler {
+            await task.value
+        } onCancel: {
+            task.cancel()
+        }
+        worker = nil
+    }
+    private func observe() async {
         wake.continuation.yield(())
         for await _ in wake.stream {
             if Task.isCancelled { break }
             let signal = wake.continuation
-            withObservationTracking {
-                refresh()
+            let snapshot = withObservationTracking {
+                capture()
             } onChange: {
                 signal.yield(())
             }
+            if let snapshot { await publish(snapshot) }
+            if Task.isCancelled { break }
             await armTimer()
         }
         clock?.cancel()
@@ -41,13 +74,32 @@ import UI
         clock = nil
     }
     public func stop() async {
+        guard !stopped else { return }
+        stopped = true
         wake.continuation.finish()
+        worker?.cancel()
+        await worker?.value
         clock?.cancel()
         await clock?.value
         clock = nil
+        // Root workers are joined before their bound Action endpoints are retired.
+        if service.islandAvailable, generation == service.islandGeneration {
+            for domain in IslandDomain.allCases {
+                guard var entry = publications[domain], entry.revision > 0 else { continue }
+                entry.revision += 1
+                do {
+                    let command = try IslandCommand(operation: .end, id: entry.id, revision: entry.revision)
+                    _ = try await entry.actions.perform(command)
+                } catch { service.reportIslandFailure(error) }
+            }
+        }
+        publications.removeAll()
     }
     private func armTimer() async {
-        let future = bluetoothUntil.flatMap { $0 > Date() ? $0 : nil }
+        let now = Date()
+        let deadlines = service.islandAvailable ? [bluetoothUntil, retryAt].compactMap { $0 } : []
+        if deadlines.contains(where: { $0 <= now }) { wake.continuation.yield(()) }
+        let future = deadlines.filter { $0 > now }.min()
         guard future != timerDeadline else { return }
         timerDeadline = future
         clock?.cancel()
@@ -60,125 +112,104 @@ import UI
             if !Task.isCancelled { signal.yield(()) }
         }
     }
-    private func refresh() {
-        guard service.islandAvailable else { return }
-        if generation != service.islandGeneration {
-            generation = service.islandGeneration
+    /// Read all observable facts synchronously; Action side effects are outside observation tracking.
+    private func capture() -> Snapshot? {
+        guard service.islandAvailable else { return nil }
+        let current = service.islandGeneration
+        if generation != current {
+            generation = current
+            publications.removeAll()
+            retryAt = nil
             bluetooth = home.conversation.bluetoothStatus
             bluetoothUntil = nil
             listeningStartedAt = nil
         }
-        do {
-            try bluetoothContent()
-            try taskContent()
-            try service.publishDomain("camera", content: Self.cameraContent(camera))
-            let phase = home.conversation.voicePhase
-            if phase == .listening {
-                if listeningStartedAt == nil { listeningStartedAt = Date() }
-            } else {
-                listeningStartedAt = nil
-            }
-            try service.publishDomain(
-                "voice", content: Self.voiceContent(phase, startedAt: listeningStartedAt ?? Date()))
-            try service.publishSpectrum(home.conversation.playbackSpectrum, active: phase == .speaking)
-        } catch { service.reportIslandFailure(error) }
+        let phase = home.conversation.voicePhase
+        if phase == .listening {
+            if listeningStartedAt == nil { listeningStartedAt = Date() }
+        } else {
+            listeningStartedAt = nil
+        }
+        return Snapshot(
+            generation: current,
+            contents: [
+                (.bluetooth, bluetoothContent()), (.camera, Self.cameraContent(camera)),
+                (.voice, Self.voiceContent(phase, startedAt: listeningStartedAt ?? Date())),
+            ], spectrum: home.conversation.playbackSpectrum, speaking: phase == .speaking)
     }
-    private func bluetoothContent() throws {
+    private func publish(_ snapshot: Snapshot) async {
+        retryAt = nil
+        for (domain, content) in snapshot.contents {
+            guard !Task.isCancelled, service.islandAvailable, service.islandGeneration == snapshot.generation else {
+                return
+            }
+            var entry = publications[domain] ?? Publication(actions: service.islandActions(for: domain))
+            do {
+                try entry.prepare(content)
+                publications[domain] = entry
+                guard let command = entry.pending else { continue }
+                _ = try await entry.actions.perform(command)
+                publications[domain]?.pending = nil
+            } catch {
+                if Task.isCancelled { return }
+                guard service.islandGeneration == snapshot.generation else { return }
+                service.reportIslandFailure(error)
+                retryAt = Date().addingTimeInterval(0.5)
+            }
+        }
+        guard !Task.isCancelled, service.islandGeneration == snapshot.generation else { return }
+        do { try service.publishSpectrum(snapshot.spectrum, active: snapshot.speaking) } catch {
+            service.reportIslandFailure(error)
+        }
+    }
+    private func bluetoothContent() -> IslandContent? {
         let value = home.conversation.bluetoothStatus
         if bluetooth != value {
             bluetooth = value
             bluetoothUntil = Date().addingTimeInterval(3)
         }
         let temporary = (bluetoothUntil ?? .distantPast) > Date()
-        if value == .disconnected && !temporary {
-            try service.publishDomain("bluetooth", content: nil)
-            return
-        }
-        try service.publishDomain(
-            "bluetooth",
-            content: .init(
-                title: "蓝牙", subtitle: value.title,
-                primary: .symbol(
-                    name: value.isConnecting ? "antenna.radiowaves.left.and.right" : "dot.radiowaves.left.and.right"),
-                tone: value == .disconnected ? .warning : .blue, rank: temporary ? 70 : 0,
-                secondary: value.isConnecting ? .loading : nil))
+        if !temporary { bluetoothUntil = nil }
+        if value == .disconnected && !temporary { return nil }
+        return .init(
+            title: "蓝牙", subtitle: value.title,
+            primary: .symbol(
+                name: value.isConnecting ? "antenna.radiowaves.left.and.right" : "dot.radiowaves.left.and.right"),
+            tone: value == .disconnected ? .warning : .blue, priority: temporary ? .high : .background,
+            secondary: value.isConnecting ? .loading : nil)
     }
-    private func taskContent() throws {
-        let state = home.activity
-        let active = state.tasks.filter { !$0.isTerminal }
-        let current = state.currentTaskID.flatMap { id in
-            state.tasks.first { $0.id == id }
-        }
-        let currentID = current?.isTerminal == true ? nil : state.currentTaskID
-        guard let key = currentID ?? active.first?.id else {
-            try service.publishDomain("task", content: nil)
-            return
-        }
-        let item = active.first { $0.id == key }
-        let title =
-            currentID != nil && !state.currentTaskTitle.isEmpty
-            ? state.currentTaskTitle : item?.title ?? "任务进行中"
-        let rawStatus =
-            currentID != nil && !state.currentTaskStatus.isEmpty
-            ? state.currentTaskStatus : item?.phase.rawValue ?? "正在执行"
-        let status = Self.taskStatus(rawStatus)
-        let additional = active.filter { $0.id != key }.count
-        try service.publishDomain(
-            "task",
-            content: .init(
-                title: String(title.trimmingCharacters(in: .whitespacesAndNewlines).prefix(80)).isEmpty
-                    ? "任务进行中" : String(title.prefix(80)),
-                subtitle: String((status + (additional > 0 ? " · 另有 \(additional) 个任务" : "")).prefix(160)),
-                primary: .symbol(name: "scope"), tone: .blue, rank: 85,
-                secondary: item?.phase == .waitingUser ? nil : .loading,
-                liveActivity: true, expansionID: key,
-                detail: .init(text: String(title.prefix(320)))))
-    }
-
-    static func taskStatus(_ value: String) -> String {
-        switch value {
-        case "waitingUser": "等待你的操作"
-        case "running", "executing": "正在执行"
-        case "pending", "queued": "等待执行"
-        case "paused", "suspended": "已暂停"
-        case "completed", "succeeded": "已完成"
-        case "failed": "执行失败"
-        case "cancelled", "canceled": "已取消"
-        default: value
-        }
-    }
-
     public static func voiceContent(_ phase: VoicePhase, startedAt: Date = Date()) -> IslandContent? {
         switch phase {
         case .listening:
             .init(
-                title: "正在聆听", primary: .symbol(name: "mic.fill", effect: .pulse), tone: .blue, rank: 60,
+                title: "正在聆听", primary: .symbol(name: "mic.fill", effect: .pulse), tone: .blue, priority: .normal,
                 secondary: .elapsed(startedAt: startedAt))
         case .speaking:
             .init(
-                title: "正在说话", primary: .symbol(name: "speaker.wave.2.fill"), tone: .blue, rank: 65,
+                title: "正在说话", primary: .symbol(name: "speaker.wave.2.fill"), tone: .blue, priority: .high,
                 secondary: .spectrum)
         case .processing:
-            .init(title: "正在思考", primary: .symbol(name: "sparkles"), rank: 55, secondary: .loading)
+            .init(title: "正在思考", primary: .symbol(name: "sparkles"), priority: .low, secondary: .loading)
         case .idle, .loading, .failed: nil
         }
     }
     public static func cameraContent(_ camera: CameraState) -> IslandContent? {
         if let remaining = camera.countdown {
             return .init(
-                title: "拍照倒计时", subtitle: "\(remaining) 秒", primary: .symbol(name: "timer"), rank: 100,
+                title: "拍照倒计时", subtitle: "\(remaining) 秒", primary: .symbol(name: "timer"), priority: .critical,
                 secondary: .progress(1 / Double(max(1, remaining))),
                 liveActivity: true)
         }
         if camera.photoBusy {
             return .init(
-                title: "正在处理照片", primary: .symbol(name: "camera.aperture"), rank: 100, secondary: .loading)
+                title: "正在处理照片", primary: .symbol(name: "camera.aperture"), priority: .critical, secondary: .loading)
         }
         let recording = camera.recording
         if recording.active {
             let title = recording.phase == .starting ? "正在启动录像" : recording.phase == .finishing ? "录像正在收尾" : "正在录像"
             return .init(
-                title: title, subtitle: "聆听已暂停", primary: .symbol(name: "video.fill"), tone: .recording, rank: 90,
+                title: title, subtitle: "聆听已暂停", primary: .symbol(name: "video.fill"), tone: .recording,
+                priority: .attention,
                 secondary: recording.phase == .recording
                     ? .symbol(name: "record.circle.fill", effect: .pulse) : .loading,
                 startedAt: recording.phase == .recording ? recording.startedAt : nil,
@@ -186,12 +217,12 @@ import UI
         }
         if camera.recordedVideo != nil {
             return .init(
-                title: "录像待处置", subtitle: "打开相机保存或忽略", primary: .symbol(name: "video"), rank: 80)
+                title: "录像待处置", subtitle: "打开相机保存或忽略", primary: .symbol(name: "video"), priority: .high)
         }
         #if os(iOS)
             if camera.capturedPhoto != nil {
                 return .init(
-                    title: "照片待处置", subtitle: "打开相机保存或忽略", primary: .symbol(name: "photo"), rank: 80)
+                    title: "照片待处置", subtitle: "打开相机保存或忽略", primary: .symbol(name: "photo"), priority: .high)
             }
         #endif
         return nil

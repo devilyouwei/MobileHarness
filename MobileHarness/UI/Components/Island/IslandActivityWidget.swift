@@ -66,7 +66,9 @@ struct MobileHarnessLiveActivity: Widget {
                                 animated: false, measuredSpectrum: false
                             )
                             .font(.system(size: 24, weight: .medium))
-                            .foregroundStyle(snapshot.detailTone == "recording" ? Color.red : .cyan)
+                            .foregroundStyle(
+                                snapshot.detailTone == "recording"
+                                    ? Color.red : snapshot.detailTone == "purple" ? .purple : .cyan)
                             Text(text).font(.subheadline.weight(.medium)).multilineTextAlignment(.leading)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                         }.padding(.vertical, 4)
@@ -76,7 +78,7 @@ struct MobileHarnessLiveActivity: Widget {
                 IslandIndicatorView(value: snapshot.primary, animated: false, measuredSpectrum: false).font(
                     .system(size: IslandCompactMetrics.symbolSize, weight: .medium)
                 )
-                .foregroundStyle(snapshot.tone == "recording" ? Color.red : .cyan)
+                .foregroundStyle(snapshot.tone == "recording" ? Color.red : snapshot.tone == "purple" ? .purple : .cyan)
                 .accessibilityLabel(snapshot.title)
             } compactTrailing: {
                 IslandActivityAccessory(value: snapshot, stale: context.isStale)
@@ -85,11 +87,12 @@ struct MobileHarnessLiveActivity: Widget {
                     ).font(
                         .system(size: IslandCompactMetrics.symbolSize)
                     )
-                    .foregroundStyle(snapshot.tone == "recording" ? Color.red : .cyan)
+                    .foregroundStyle(
+                        snapshot.tone == "recording" ? Color.red : snapshot.tone == "purple" ? .purple : .cyan)
             } minimal: {
                 IslandIndicatorView(value: snapshot.primary, animated: false, measuredSpectrum: false)
             }
-            .keylineTint(snapshot.tone == "recording" ? .red : .cyan)
+            .keylineTint(snapshot.tone == "recording" ? .red : snapshot.tone == "purple" ? .purple : .cyan)
             .widgetURL(snapshot.navigationURL)
         }
     }

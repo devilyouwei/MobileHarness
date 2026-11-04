@@ -175,7 +175,7 @@ private func taskFixtureConfiguration(parent: Bool) throws -> AgentConfiguration
                 [
                     "alias": "fixtureCapture",
                     "path": ["domain": "Fixture", "module": "Camera", "function": "capture"],
-                    "parameters": [], "examples": ["<fixtureCapture/>"],
+                    "parameters": [],
                     "doc": "Synthetic capture; no physical camera.",
                 ]
             ]
@@ -191,7 +191,7 @@ private func taskFixtureConfiguration(parent: Bool) throws -> AgentConfiguration
     return try AgentConfiguration(
         contracts: AgentContracts.communication,
         data: JSONSerialization.data(withJSONObject: [
-            "version": 6, "id": id, "actions": actions, "tools": [],
+            "version": 7, "id": id, "actions": actions, "tools": [],
             "communication": [
                 "inputs": inputs, "subscriptions": [], "publications": [],
                 "sends": sends.map { ["contract": $0, "target": peer] },

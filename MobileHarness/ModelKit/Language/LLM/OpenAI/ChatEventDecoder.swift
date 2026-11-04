@@ -2,7 +2,7 @@ import CoreFoundation
 import Foundation
 import ModelKit
 
-/// Incremental SSE framing, bounded before UTF-8 decoding (including unterminated lines).
+/// Incremental SSE framing. Only the current frame is retained; completed frames release their bytes.
 struct ChatEventDecoder {
     let toolNames: [String: String]
     private let timing: ChatTiming?
@@ -20,7 +20,6 @@ struct ChatEventDecoder {
     private var calls: [Int: Pending] = [:]
     private var line: [UInt8] = []
     private var data = ""
-    private var total = 0
     private var previousCR = false
     private(set) var finished = false
     private(set) var done = false
@@ -38,15 +37,12 @@ struct ChatEventDecoder {
     }
 
     mutating func consume(_ byte: UInt8) throws -> [ChatEvent] {
-        total += 1
-        guard total <= 8 * 1024 * 1024 else { throw OpenAIChatError.responseTooLarge }
         if byte == 10, previousCR {
             previousCR = false
             return []
         }
         previousCR = byte == 13
         if byte == 10 || byte == 13 { return try endLine() }
-        guard line.count < 65536 else { throw OpenAIChatError.responseTooLarge }
         line.append(byte)
         return []
     }
@@ -65,9 +61,6 @@ struct ChatEventDecoder {
         if text.hasPrefix("data:") {
             var value = text.dropFirst(5)
             if value.first == " " { value = value.dropFirst() }
-            guard data.utf8.count + value.utf8.count + 1 <= 65536 else {
-                throw OpenAIChatError.responseTooLarge
-            }
             if !data.isEmpty { data += "\n" }
             data += value
         }
@@ -94,7 +87,7 @@ struct ChatEventDecoder {
             guard let text = object["delta"] as? String else {
                 throw failure(.invalidText, stage: .event, field: "delta")
             }
-            return text.isEmpty ? [] : [.text(text)]
+            return Self.textEvents(text)
         case "response.output_item.added":
             let (index, item) = try outputItem(object)
             guard let type = item["type"] as? String else {
@@ -137,7 +130,11 @@ struct ChatEventDecoder {
                     .invalidToolArguments, stage: .toolArguments, field: "delta", index: index, name: call.name)
             }
             call.arguments += delta
-            guard call.arguments.utf8.count <= 4096 else { throw OpenAIChatError.responseTooLarge }
+            guard call.arguments.utf8.count <= 4096 else {
+                throw failure(
+                    .invalidToolArguments, stage: .toolArguments, field: "arguments.exceeds4096", index: index,
+                    name: call.name)
+            }
             calls[index] = call
             timing?.recordToolArguments(delta)
             return []
@@ -274,6 +271,27 @@ struct ChatEventDecoder {
             return []
         default: throw failure(.unsupportedOutput, stage: .event, field: "type")
         }
+    }
+
+    /// Backpressure limits event size, not the provider's total output or SSE frame size.
+    private static func textEvents(_ text: String) -> [ChatEvent] {
+        if text.isEmpty { return [] }
+        if text.utf8.count <= 32768 { return [.text(text)] }
+        var result: [ChatEvent] = []
+        var chunk = ""
+        var bytes = 0
+        for scalar in text.unicodeScalars {
+            let count = scalar.utf8.count
+            if bytes + count > 32768 {
+                result.append(.text(chunk))
+                chunk = ""
+                bytes = 0
+            }
+            chunk.unicodeScalars.append(scalar)
+            bytes += count
+        }
+        if !chunk.isEmpty { result.append(.text(chunk)) }
+        return result
     }
 
     private func outputItem(_ object: [String: Any]) throws -> (Int, [String: Any]) {

@@ -191,7 +191,8 @@ public final class ApplicationContainer: ManagedContainer, @unchecked Sendable {
                 settings: self.root.appendingPathComponent("Settings", isDirectory: true),
                 photos: self.root.appendingPathComponent("CapturedPhotos", isDirectory: true),
                 models: self.root.appendingPathComponent("Models", isDirectory: true),
-                workspaces: self.root.appendingPathComponent("WebWorkspaces", isDirectory: true), failures: failures)
+                workspaces: self.root.appendingPathComponent("ArtifactWorkspaces", isDirectory: true),
+                failures: failures)
             return StorageContainer(
                 database: SQLiteDatabaseFactory.make(
                     databaseURL: self.root.appendingPathComponent("records.sqlite"), failures: failures),

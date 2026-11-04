@@ -59,6 +59,32 @@ public enum WebPagePolicy {
     public final class WebPageContainer: NSObject, WebPagePresenting, WKNavigationDelegate,
         WKUIDelegate
     {
+        public private(set) var sessions: [UUID: WebPageContainer] = [:]
+        public func createSession(windowID: UUID) throws -> WebPageContainer {
+            if let page = sessions[windowID] { return page }
+            guard sessions.count < 4 else { throw WebPageError.busy }
+            let page = WebPageContainer()
+            page.setAvailable(available)
+            sessions[windowID] = page
+            return page
+        }
+        public func removeSession(windowID: UUID) {
+            sessions.removeValue(forKey: windowID)?.close()
+        }
+        public func closeSessions() {
+            for page in sessions.values { page.close() }
+            sessions.removeAll()
+        }
+        public func loadLocal(_ entry: URL, executesScripts: Bool, readAccessRoot: URL? = nil) async throws
+            -> WebPageObservation
+        {
+            let root = readAccessRoot ?? entry.deletingLastPathComponent()
+            try WebPagePolicy.local(entry, root: root)
+            try await prepare(local: root)
+            webView.configuration.defaultWebpagePreferences.allowsContentJavaScript = executesScripts
+            try await waitForNavigation { webView.loadFileURL(entry, allowingReadAccessTo: root) }
+            return try await observe()
+        }
         private var nativeView: WKWebView?
         public var webView: WKWebView {
             if let nativeView { return nativeView }
@@ -106,6 +132,7 @@ public enum WebPagePolicy {
         }
         public func setAvailable(_ value: Bool) {
             available = value
+            for page in sessions.values { page.setAvailable(value) }
             if !value {
                 nativeCancel?()
                 nativeView?.stopLoading()
@@ -115,19 +142,32 @@ public enum WebPagePolicy {
                 nativeView?.isHidden = false
             }
         }
+        private var pageBusiness: [String: UIStateSnapshot.Value] {
+            [
+                "content": .text(address.isEmpty ? "empty" : localRoot == nil ? "remote" : "local"),
+                "url": !address.isEmpty && localRoot == nil && address.utf8.count <= 256 ? .text(address) : .unknown,
+                "title": nativeView?.title.flatMap { $0.utf8.count <= 128 ? .text($0) : nil } ?? .unknown,
+            ]
+        }
         public func stateSnapshot() async throws -> UIStateSnapshot {
-            .init(
-                path: "ui.web",
-                business: [
-                    "content": .text(address.isEmpty ? "empty" : localRoot == nil ? "remote" : "local"),
-                    "url": !address.isEmpty && localRoot == nil && address.utf8.count <= 4096
-                        ? .text(address) : .unknown,
-                ],
+            try Task.checkCancellation()
+            var business = pageBusiness
+            business["sessions"] = .array(
+                sessions.keys.sorted { $0.uuidString < $1.uuidString }.map { id in
+                    guard let page = sessions[id] else { return .unknown }
+                    return .object([
+                        "windowID": .text(id.uuidString), "page": .object(page.pageBusiness),
+                        "loading": .flag(page.loading), "available": .flag(page.available),
+                    ])
+                })
+            return .init(
+                path: "ui.web", business: business,
                 runtime: ["available": .flag(available), "loading": .flag(loading)])
         }
         private func prepare(local root: URL?) async throws {
             guard available else { throw WebPageError.unavailable }
-            guard pending == nil, !loading, !preparing, nativeCancel == nil else { throw WebPageError.busy }
+            guard pending == nil, !loading, !preparing else { throw WebPageError.busy }
+            nativeCancel?()
             preparing = true
             defer { preparing = false }
             if root != localRoot || (root == nil && webView.url?.isFileURL == true) {
@@ -163,10 +203,36 @@ public enum WebPagePolicy {
             try await waitForNavigation { webView.loadFileURL(entry, allowingReadAccessTo: root) }
             return try await observe()
         }
+        #if os(iOS)
+            /// Dedicated export owners call this on an independent page, never the live editor page.
+            public func exportLocalPDF(_ entry: URL, readAccessRoot: URL) async throws -> Data {
+                try WebPagePolicy.local(entry, root: readAccessRoot)
+                try await prepare(local: readAccessRoot)
+                webView.frame = CGRect(x: 0, y: 0, width: 595.28, height: 841.89)
+                _ = try await loadLocal(entry, executesScripts: true, readAccessRoot: readAccessRoot)
+                try Task.checkCancellation()
+                let renderer = WebPDFPageRenderer()
+                renderer.addPrintFormatter(webView.viewPrintFormatter(), startingAtPageAt: 0)
+                let count = renderer.numberOfPages
+                guard (1...100).contains(count) else { throw WebPageError.snapshotFailed }
+                renderer.prepare(forDrawingPages: NSRange(location: 0, length: count))
+                let data = UIGraphicsPDFRenderer(bounds: renderer.paperRect).pdfData { context in
+                    for index in 0..<count {
+                        if Task.isCancelled { break }
+                        context.beginPage()
+                        renderer.drawPage(at: index, in: renderer.paperRect)
+                    }
+                }
+                try Task.checkCancellation()
+                guard !data.isEmpty, data.count <= 16 * 1024 * 1024 else { throw WebPageError.snapshotFailed }
+                return data
+            }
+        #endif
         private func waitForNavigation(_ begin: () -> WKNavigation?) async throws {
             guard available else { throw WebPageError.unavailable }
             guard pending == nil, !loading else { throw WebPageError.busy }
             try Task.checkCancellation()
+            nativeCancel?()
             let token = UUID()
             generation = token
             loading = true
@@ -404,5 +470,12 @@ public enum WebPagePolicy {
             }
             return nil
         }
+    }
+#endif
+
+#if os(iOS) && canImport(WebKit)
+    @MainActor private final class WebPDFPageRenderer: UIPrintPageRenderer {
+        override var paperRect: CGRect { CGRect(x: 0, y: 0, width: 595.28, height: 841.89) }
+        override var printableRect: CGRect { paperRect.insetBy(dx: 28, dy: 28) }
     }
 #endif

@@ -48,7 +48,7 @@ Skill 是可复用的流程与能力集合，Task 是运行时目标、状态和
 
 ### useStates 与当前事实
 
-BasicSkill读取agents.applicationcontrol、ui.navigation及八个platform.*来源；Photography读取actions.camera、ui.camera、ui.album；RobotInteraction读取actions.robot。加载与依赖合并后去重排序，每次实际模型请求重新读取。CURRENT STATE是数据，不是指令；availability和value表达来源事实。Task／Skill从Agent私有决策快照生成AGENT CONTEXT，不注册公共task。
+BasicSkill读取agents.applicationcontrol、agents.writer、ui.navigation、全局ui.windows及八个platform.*来源；Photography读取actions.camera、ui.camera、ui.album；RobotInteraction读取actions.robot。加载与依赖合并后去重排序，每次实际模型请求重新读取。CURRENT STATE是数据，不是指令；availability和value表达来源事实。Task／Skill从Agent私有决策快照生成AGENT CONTEXT，不注册公共task。
 
 声明不启动设备；释放Skill不销毁Container。来源由上层装配提供，Container显式维护快照schema，不使用运行时反射。容量、生命周期和采集失败见[Context](../../Agents/Support/Context/README.md)。
 
@@ -123,12 +123,11 @@ BasicSkill Instructions.md先检查CURRENT STATE：已有足够事实直接回�
 | --- | --- |
 | basic-skill / BasicSkill | 常驻任务/Skill 编排、自动 State 选择及交互执行规则。 |
 | expression-interaction / ExpressionInteraction | 表情互动，仅注册双眼表情 Actions。 |
-| robot-interaction / RobotInteraction | 默认机械臂交互动作。 |
+| robot-interaction / RobotInteraction | 按需加载的机械臂交互动作及其状态观察。 |
 | photography / Photography | Assistant 内的摄影任务流程和相机 Actions。 |
 | history-query / HistoryQuery | 历史只读查询 Actions。 |
 | application-control / ApplicationControl | 应用配置、资源、设备及 UI 能力。 |
 | web-browsing / WebBrowsing | 远程网页访问、正文与截图观察、逐屏导航及网页窗口控制。 |
-| web-drawing / WebDrawing | 文字任务驱动本地网页绘图、同项目局部修改及作品管理。 |
 
 资源仅随 App 打包，无远程下载或热更新。
 
@@ -212,4 +211,9 @@ Photography与ApplicationControl增加Island.setPresentation以及ui.island事�
 
 ## Web skills
 
-WebBrowsing teaches direct browse followed by evidence-based answers, selective text/image refresh and one-at-a-time viewport navigation. WebDrawing depends on it and teaches text-only development, same-project revisions, saved-project recovery and explicit deletion. Both distinguish window/project/media/version identities, preserve BasicSkill Task ownership and separate dependent calls across real result boundaries. Single operations need no Task; a completed drawing may remain visible. Examples use canonical XML aliases and explicitly hypothetical identities. Failed execution is not automatically replayed; a successful but imperfect drawing permits one focused same-project correction. Neither exposes code-generation tools to the main Assistant. Each complete Web-loaded prompt, including dependencies, is checked against a38,000-byte UTF-8 budget.
+
+BasicSkill 默认暴露统一 startTask、前台 finishTask、支持后台 taskID 的 cancelTask 及输入专用 sendMessage，教学 foreground/current Agent 与 background/executor 的区别。后台 Writer 无需先建立前台任务或加载 Skill，单任务忙碌需确认替代，用户补充带 interactionID。Writing 提供 Artifact_library 与项目管理教学，不重复注册委托入口。Writer 独立后台执行；Assistant 不生成源码。浏览仍由 WebBrowsing 承担。Assistant 当前所有 Skills 均声明 action 和显式 Channel；Writer 的原生工具目录由自身工作流拥有。通用 Skill schema 保留 tool 能力，但不用于 Assistant 当前资源。
+
+BasicSkill的Writer教学要求将阶段事实、追问和终态简短汇报给用户，不由通知重委托；运行时拥有播放排空后的启听衔接，不靠模型生成startListening。
+
+Skill description是未加载时的能力发现索引，说明触发场景与职责边界。BasicSkill默认观察全窗口摘要；web-browsing增加根/Writer页面观察、定向截图和导航，application-control增加通用窗口控制，writing管理已保存作品。没有加载Skill不等于不存在可加载能力；指令要求根据可用目录加载后再判断可见性，State摘要与实际正文/截图证据明确区分。

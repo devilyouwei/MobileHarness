@@ -73,7 +73,8 @@ public actor ModelResource<Model: Sendable>: ModelResourceLifecycle {
         let id: String
         var cancel: (@Sendable () -> Void)?
     }
-    private var activeLease: ActiveLease?
+    private var activeLeases: [String: ActiveLease] = [:]
+    private let concurrent: Bool
     private var unloading = false
     private var maintenance = false
     private var closed = false
@@ -81,9 +82,11 @@ public actor ModelResource<Model: Sendable>: ModelResourceLifecycle {
     private var drained: CheckedContinuation<Void, Never>?
 
     fileprivate init(
-        maximumLoadWaiters: Int, admission: InferenceAdmission, loader: @escaping @Sendable () async throws -> Model
+        maximumLoadWaiters: Int, admission: InferenceAdmission, concurrent: Bool,
+        loader: @escaping @Sendable () async throws -> Model
     ) {
         self.maximumLoadWaiters = maximumLoadWaiters
+        self.concurrent = concurrent
         self.admission = admission
         self.loader = loader
     }
@@ -93,9 +96,9 @@ public actor ModelResource<Model: Sendable>: ModelResourceLifecycle {
         let generation = try admission.check()
         guard !closed else { throw CapabilityError.sessionClosed }
         guard !unloading, !maintenance else { throw CapabilityError.unavailable("Model is under maintenance") }
-        guard activeLease == nil else { throw CapabilityError.inputBusy }
+        guard concurrent || activeLeases.isEmpty else { throw CapabilityError.inputBusy }
         let id = UUID().uuidString
-        activeLease = ActiveLease(id: id)
+        activeLeases[id] = ActiveLease(id: id)
         do {
             let model = try await ensureLoaded()
             try admission.validate(generation)
@@ -110,16 +113,18 @@ public actor ModelResource<Model: Sendable>: ModelResourceLifecycle {
 
     /// Install after creating the session/worker; handles shutdown-before-install races.
     public func setCancellation(_ id: String, _ cancel: @escaping @Sendable () -> Void) {
-        guard activeLease?.id == id else { return }
-        activeLease?.cancel = cancel
+        guard activeLeases[id] != nil else { return }
+        activeLeases[id]?.cancel = cancel
         if closed || (try? admission.check()) == nil { cancel() }
     }
 
     public func release(_ id: String) {
-        guard activeLease?.id == id else { return }
-        activeLease = nil
-        drained?.resume()
-        drained = nil
+        guard activeLeases[id] != nil else { return }
+        activeLeases[id] = nil
+        if activeLeases.isEmpty {
+            drained?.resume()
+            drained = nil
+        }
     }
 
     private func ensureLoaded(reportLoading: @Sendable (Bool) async -> Void = { _ in }) async throws -> Model {
@@ -166,7 +171,7 @@ public actor ModelResource<Model: Sendable>: ModelResourceLifecycle {
     }
     fileprivate func endMaintenance() { maintenance = false }
 
-    fileprivate var inferenceActive: Bool { activeLease != nil }
+    fileprivate var inferenceActive: Bool { !activeLeases.isEmpty }
     fileprivate var state: ModelResourceState {
         if closed { return .closed }
         if unloading || maintenance { return .unloading }
@@ -193,19 +198,19 @@ public actor ModelResource<Model: Sendable>: ModelResourceLifecycle {
 
     fileprivate func suspend() async {
         loading?.cancel()
-        activeLease?.cancel?()
+        for lease in activeLeases.values { lease.cancel?() }
         if unloading {
             await withCheckedContinuation { unloadFinished = $0 }
             return
         }
         if let loading { _ = await loading.result }
-        if activeLease != nil { await withCheckedContinuation { drained = $0 } }
+        if !activeLeases.isEmpty { await withCheckedContinuation { drained = $0 } }
     }
 
     fileprivate func shutdown() async {
         closed = true
         loading?.cancel()
-        activeLease?.cancel?()
+        for lease in activeLeases.values { lease.cancel?() }
         // An in-progress unload already owns the sole drain continuation.
         if unloading { await withCheckedContinuation { unloadFinished = $0 } }
         unloading = true
@@ -214,7 +219,9 @@ public actor ModelResource<Model: Sendable>: ModelResourceLifecycle {
     }
 
     fileprivate func unloadIfIdle() -> Bool {
-        guard !closed, !unloading, !maintenance, loading == nil, activeLease == nil, model != nil else { return false }
+        guard !closed, !unloading, !maintenance, loading == nil, activeLeases.isEmpty, model != nil else {
+            return false
+        }
         model = nil
         return true
     }
@@ -224,7 +231,7 @@ public actor ModelResource<Model: Sendable>: ModelResourceLifecycle {
         if let loading { _ = try? await loading.value }
         self.loading = nil
         loadID = nil
-        if activeLease != nil { await withCheckedContinuation { drained = $0 } }
+        if !activeLeases.isEmpty { await withCheckedContinuation { drained = $0 } }
         model = nil
     }
 }
@@ -263,6 +270,7 @@ public final class ModelContext: Sendable {
     }
 
     public func resource<Model: Sendable>(
+        concurrent: Bool = false,
         loader: @escaping @Sendable () async throws -> Model
     ) throws -> ModelResource<Model> {
         try state.withLock {
@@ -270,7 +278,9 @@ public final class ModelContext: Sendable {
                 throw CapabilityError.invalidRequest("One resource per context; context is sealed")
             }
             let gate = loadGate
-            let resource = ModelResource(maximumLoadWaiters: maximumLoadWaiters, admission: admission) {
+            let resource = ModelResource(
+                maximumLoadWaiters: maximumLoadWaiters, admission: admission, concurrent: concurrent
+            ) {
                 try await gate.run(loader)
             }
             $0.resource = resource

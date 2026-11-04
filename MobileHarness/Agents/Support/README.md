@@ -50,3 +50,13 @@ AgentGatewayAssembly accepts SignalTransport and GatewayAdmission capabilities, 
 NativeFailureClassification handles model and platform lifecycle admission failures in the failure channel. Suppression retains original journal evidence; cleanup failures remain publishable. sink accepts module identity and structural error details without a separate caller-owned publication predicate.
 
 AgentUIRequests keeps the default single ordinary worker; callers can explicitly select at most4 concurrent workers, used by independent windows. Each request retains its cancellation handle and deadline; group shutdown cancels and joins all children. The separate control stream remains one worker and one outstanding slot.
+
+通信输出在轮次之外独立消费（16项队列、最多4项并发），其他输出经256项有界队列送入原轮次屏障；溢出明确失败，关闭取消并加入所有消费者。调度 Action 在模型轮次结束后生成的通信仍可经 Gateway 获取回执，不能被等待该 Action 的轮次屏障阻塞。
+
+Skill 文档必须显式给出 useInstructions；任务 scope 的 execution 是必需字段。不补全旧文档/旧信封缺失字段；当前可选观测和原生 ToolResult 的无 Action completion 值不属于兼容分支。
+
+## Agent-owned Island publication
+
+IndependentOutputWorkflow.swift also owns AgentIslandPublication, the shared transport mechanism used by role-owned presentation adapters. It accepts neutral IslandContent or an end intent, retains one immutable in-flight command and one replaceable latest pending command, and uses a stable activity/session identity with monotonically increasing revisions. Gateway execution remains producer-bound; model-visible tools and prompts are unchanged. Failed publication retains bounded evidence and retries the latest state every500ms independently of creative work and peer reporting. Stop closes admission, cancels and joins the worker, then joins one final registered end call before producer retirement; Gateway supplies the call deadline and cleanup failure remains observable. Roles own business phases and terminal fencing; UI owns selection, layout and animation.
+
+ReplyActivity 是独立于回复执行取消的生命周期事实。OutputGateway 在 cancelCalls 的 producer/scope 取消围栏期间仍接纳类型化占用快照，并保留已经进入直接投递的快照；普通 Action、Tool 与其他通信仍按原执行取消规则处理。事实照常经过 producer/incarnation/session、通信契约及接收者权限校验，SpeechPerception 用来源 revision/incarnation 合并占用。此例外不跨越网关关闭或根生命周期准入，也不跳过真实播放清理；用户关闭许可与其他角色占用仍由感知策略保留。

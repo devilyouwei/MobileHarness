@@ -1,0 +1,21 @@
+{
+  "integrity": "ok",
+  "baseSHA256": "0cac6585ac6612c116b197715fe5296acffa17e734500540b451a7411638a6ac",
+  "WAL": "copy failed CoreDevice7000/POSIX60; base snapshot only",
+  "tasks": [
+    {
+      "id": 9,
+      "goal": "绘制一份简单的测试流程图",
+      "state": "cancelled",
+      "startedAt": 1793788204.4020782,
+      "finishedAt": 1793788342.0489569
+    },
+    {
+      "id": 10,
+      "goal": "绘制一张 Transformer 模型的架构图，包含输入嵌入、位置编码、多头注意力机制、前馈神经网络、编码器与解码器堆叠结构等核心组件",
+      "state": "running",
+      "startedAt": 1793788461.002987,
+      "finishedAt": null
+    }
+  ]
+}

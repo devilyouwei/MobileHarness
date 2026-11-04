@@ -280,7 +280,7 @@ private actor HistoryModel: ChatCapability {
     #expect(try await store.snapshot().past.first?.summaryTitle == title)
     #expect(try await store.snapshot().current.turns.isEmpty)
     let request = try #require(await model.requests.first)
-    #expect(request.maximumOutputTokens == 64)
+    #expect(request.maximumOutputTokens == nil)
     #expect(!request.messages[0].content.contains("CALLABLE ACTIONS"))
     await #expect(throws: (any Error).self) {
         try await ConversationTitleGenerator.summarize(archived, using: HistoryModel("<wait/>"))

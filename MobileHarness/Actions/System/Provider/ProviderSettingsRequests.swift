@@ -34,7 +34,11 @@ public final class ProviderSettingsRequests: ProviderSettingsCapability, Provide
         guard value.url.utf8.count <= 2048, value.key.utf8.count <= 4096, value.model.utf8.count <= 512 else {
             throw ProviderSettingsError.invalidConfiguration
         }
-        guard value.providers.count <= 32,
+        guard value.writerModel.utf8.count <= 512,
+            value.writerProviderID == nil
+                || (value.providers.contains { $0.id == value.writerProviderID } && !value.writerModel.isEmpty),
+            Set(value.providers.map(\.id)).count == value.providers.count,
+            value.providers.count <= 32,
             Set(value.providers.map(\.url)).count == value.providers.count,
             value.providers.allSatisfy({ provider in
                 guard let url = URL(string: provider.url) else { return false }

@@ -9,6 +9,7 @@ import PlatformKit
 import StorageCache
 import StorageChat
 import StorageCore
+import StorageMedia
 import UI
 
 /// App binds native services to these narrow role-facing ports. No business implementation is imported.
@@ -72,6 +73,10 @@ public typealias AgentBusinessRequest = ActionAssemblyRequest<
     any ExecutionFailureReporting, any ModelArtifactsManaging, StoredConversation
 >
 @MainActor public struct AgentBusinessBindings {
+    public let artifactStreaming: (any ArtifactStreaming)?
+    public let writerArtifacts: (any WriterArtifactsControlling)?
+    public let writerPhotos: CapturedPhotoStore?
+    public let writerModel: (@Sendable () async throws -> ChatModel)?
     public let executor: ActionsExecutionPort
     public let catalog: ActionCatalogSnapshot
     public let settings: any ProviderSettingsStaging
@@ -91,6 +96,10 @@ public typealias AgentBusinessRequest = ActionAssemblyRequest<
     public let makeVoice: @MainActor (AgentVoiceHost) throws -> AgentVoiceExecution
     public init(
         executor: ActionsExecutionPort, catalog: ActionCatalogSnapshot,
+        artifactStreaming: (any ArtifactStreaming)? = nil,
+        writerArtifacts: (any WriterArtifactsControlling)? = nil,
+        writerPhotos: CapturedPhotoStore? = nil,
+        writerModel: (@Sendable () async throws -> ChatModel)? = nil,
         settings: any ProviderSettingsStaging, discovery: any ProviderDiscoveryStaging,
         providerPresentation: any ProviderPresentationRegistering, tasks: any TaskControlBinding,
         resources: [ResourceDefinition],
@@ -106,6 +115,10 @@ public typealias AgentBusinessRequest = ActionAssemblyRequest<
         decodeResources: @escaping @Sendable (String) throws -> ModelResourceViewSnapshot,
         makeVoice: @escaping @MainActor (AgentVoiceHost) throws -> AgentVoiceExecution
     ) {
+        self.artifactStreaming = artifactStreaming
+        self.writerArtifacts = writerArtifacts
+        self.writerPhotos = writerPhotos
+        self.writerModel = writerModel
         self.executor = executor
         self.catalog = catalog
         self.settings = settings

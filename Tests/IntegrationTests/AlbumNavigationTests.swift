@@ -17,8 +17,7 @@ func conversationalAlbumNavigationUsesRegisteredAliasAndRealPresentation() async
     let sessionID = UUID().uuidString
     let provider = ProviderPresentationAdapter(
         state: ui.settings.presentation, sessionID: sessionID,
-        settings: ProviderSettingsRequests(service: ResourceProviderPersistence().service()),
-        discovery: ProviderDiscoveryRequests { _ in [] })
+        settings: ProviderSettingsRequests(service: ResourceProviderPersistence().service()))
     let presentation = ResourcePresentationAdapter(
         state: ui.modelResources.presentation, sessionID: sessionID, provider: provider,
         navigation: ui.navigation.presentation, acknowledge: {})

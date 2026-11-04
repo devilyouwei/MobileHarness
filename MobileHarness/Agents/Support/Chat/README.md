@@ -144,7 +144,7 @@ The driver's secondary queues use synchronous checked yields. They do not suspen
 
 ## 生命周期、时序与错误
 
-worker 独立于 UI 页面；结果必须匹配 call/round/task/session/incarnation 与封闭屏障。pause／interrupt 取消并加入当前 Decision，保留 Task／Skill 与公开状态作用域，目标回到 waitingUser，被中断 Decision 不扣闲置次数；close 关闭匹配会话，stop 关闭全部。输出传输失败也必须清理。Reply occupancy 是有界完整 revision 快照，证据提交先于占用移交；终态事实释放占用，不使用租约定时器，也不授予麦克风权。
+worker 独立于 UI 页面；结果必须匹配 call/round/task/session/incarnation 与封闭屏障。pause／interrupt 取消并加入当前 Decision，保留 Task／Skill 与公开状态作用域，目标回到 waitingUser，被中断 Decision 不扣闲置次数；close 关闭匹配会话，stop 关闭全部。输出传输失败也必须清理。Reply occupancy 是有界完整 revision 快照，证据提交先于占用移交；终态事实释放占用，不使用租约定时器，聆听政策仍由SpeechPerception解释。
 
 ChatTiming 由支持的 provider 在请求发出及首个非空文本或已校验身份的原生工具参数增量时取单调样本；取先到者，排除私有推理和工具执行时间。不支持计时或没有有效增量时不产生 TTFT；driver 沿用同一快照持久化链路。消费、ASR、TTS 与 UI 耗时不是模型首 token 时延。网络传输自身超时和实时感知 freshness 不作为整个决策时限。
 
@@ -163,7 +163,7 @@ ChatTiming 由支持的 provider 在请求发出及首个非空文本或已校�
 | Tool `isError`, nonnil non-cancellation `failureCode`, failed report | Real failure takes precedence over absence of business output; continue. |
 | Unknown Action/Tool alias or invalid parameters | Parser-local rejection becomes a correlated error result (`invalidInvocation` or `communicationRejected`), without executing the call. Forbidden Channel/malformed markup ends the generation as a real Agent failure. |
 | Handler exception, Action timeout, resource/permission/admission rejection with reliable terminal feedback | Continue from the real failure. A closed scheduling tree alone does not authorize continuation: call results and the round receipt must remain reliable. |
-| Failed model communication | Continue from the error. Successful send/publish admission is a `.completed` acknowledgment. Background progress/results update state without independently invoking Chat. |
+| Failed model communication | Continue from the error. Successful send/publish admission is a `.completed` acknowledgment. Other background progress/results update control state; Writer business facts follow the domain FIFO contract below. |
 | Chat request/stream/consumer failure within `collect` | Record the failed attempt, join admitted effects and terminate the decision. Includes HTTP/network/provider errors, output parsing, unsupported output and per-request limits. No automatic Agent retry. |
 | Observation/image enrichment construction failure | Terminate the decision with the real error and retained execution evidence; never fabricate an image or repeat capture. |
 | Round closure failure with a prior generation error and every call result already present | Retain both causes and terminate the input; round closure/delivery uncertainty never authorizes a retry. |
@@ -193,3 +193,37 @@ AgentChatWorker 默认 TextSegmentationPolicy 为首段 Han/其他字符 20/60�
 The request still derives capabilities, teaching and useStates from the same committed effective Skill set. Canonical domain sources are selected only by their explicit Skill paths; there is no Assistant whole-tree health or diagnostics source. There is no loadState or model-visible internal tree. Owner state reads do not change Skill retention or Task ownership; missing/read-failed observations become unknown with a bounded path/code diagnostic; cancellation, closure and capacity still abort request construction.
 
 residentContext() exposes only the repository’s initialized committed in-memory Context for Container State reflection. It performs no initialization or persistence I/O; operational contextSnapshot() keeps its existing private-context contract.
+
+
+
+
+Task 控制的默认 XML Action startTask 通过 execution=foreground/background 分流；后台 executor=writer 支持单任务委托，sendMessage 仅补充输入，cancelTask(taskID) 请求取消。前台只接受 goal/skills/execution，后台不经过前台 Skill 状态转移。委托不创建前台 Task，独立任务没有前台 parent；短目标与当前真实输入进入 Writer。通知不能修改不属于它的前台 Task，也不进入该 Task 的历史压缩来源。
+
+Writer started/progress events update durable control facts and one latest pending summary. Only admitted summaries, userInput and terminal reports enter the common 32-item FIFO with final speech/text. Duplicate sequences do not trigger another reply. Summary admission waits for current playback and peer replies; terminal reports keep their independent persistent delivery. Reports never import private source-dialog context or restart Writer.
+
+Writer 的 task.result 仅关闭控制身份，不进入回复队列，也不作为通知开始模型处理的屏障。writer.completion 独立经过认证角色通信，核对 SQLite 的任务、执行、终态和不可变通知；通知确认或跨对话的已存输入身份防止重复回复。续作后旧 run 的终态仅确认接收，不改变新执行或触发模型。新根中的回复使用当前交互身份。委托、取消替代和消息发送前读取可信执行状态关闭过期私有 Task/view，不等待通知。进程重启只恢复待送达通知；已接纳输入仍遵循 Chat interrupted 恢复，不自动重放语音或创作。
+
+模型历史 read-token/begin 短事务与 Assistant 输入接纳共用 admission gate，避免并发接纳使请求历史令牌失效；模型生成和工具执行不占此锁。
+
+后台委托注册失败和递送失败均进入清理；内存任务失败/终态与 SQLite 任务关闭分别执行，任一步失败仍尝试另一项并汇总清理错误。通信通过独立于轮次屏障的输出消费链路递送，模型仍使用 XML Action 调度。
+
+Writer 事件输入只授权向用户汇报或提问，不授权 startTask/finishTask/cancelTask 生命周期操作。委托只从当前真实文本/最终语音输入获取原文；每项输入只可尝试一次实际委托，拒绝后须新的用户输入才能重试。busy/参数校验拒绝未尝试实际委托，可在同项输入内按用户已确认的替代意图修正。Writer 通知不伪装用户输入，也不能退化为 goal 作为原文。
+
+Writer 失败输入包含生产者提供的分类、阶段、网络/HTTP原因、模型及耗时事实；Assistant向用户汇报这些事实，不把 transport/http阶段推测成某个HTTP状态或服务端报错，不自动重试。
+
+详细Writer失败投影沿用4KiB观察输入边界，优先保留身份和分类/关键网络事实；过长文本按UTF-8有效边界投影并明确标记截断，原始事件及Writer请求诊断不受投影删减。
+
+
+Writer事实仅在当前Decision、真实round/playback屏障及前台委托回复占用清空后开始；foreground结果/等待用户播放收尾解除占用时立即drain，仍遵守已接纳输入FIFO。Writer回复的处理起点使用单调时间，只有成功Decision在真实屏障后发布completedReportID/reportStartedAt；保留最近一次成功事实随完整ReplyActivity快照重复携带，避免并发通信消费者先递送新版快照而漏掉完成。取消/失败不发布新的成功事实。SpeechPerception据用户停止/生命周期围栏决定播毕启听，模型不调用startListening完成该衔接。
+
+ReplyActivity发布端只在占用进入/退出、会话变化、新的最终语音root确认或新的成功Writer汇报时发送完整快照。同态排队文本/Writer输入仅更新本地集合，不逐项发布，避免32项接纳突发挤满16项通信消费队列；最终语音确认不能被合并。模型输入、SQLite证据和FIFO仍逐项保留，通信队列容量不变。
+
+## Writer普通进度合并
+
+认证started/progress先作为control事实持久更新任务视图，最新普通摘要仅一项，不占32项正式输入容量。独立摘要worker等待当前模型/播放/peer屏障和既有FIFO排空，普通回复开始间隔至少10秒；接纳时使用独立输入身份，预留容量、持久化work后进入共用队列，一旦接纳不替换或重排。userInput及终态保持原FIFO/持久重投并清除未接纳普通摘要；暂停/停止加入worker。摘要失败保留最新待处理事实并显式记录，不能重跑Writer创作。
+
+The ordinary-progress worker rechecks the pending event identity after asynchronous state reads, so a replaced or terminal-cleared summary is never consumed as the latest one. Formal FIFO admission and playback completion remain the gates for beginning an ordinary reply.
+
+Writer普通进度是完成步骤的事实；请求开始不会进入Assistant摘要队列。全局窗口摘要由BasicSkill选择ui.windows，其他页面能力按Skill目录渐进加载；公共容器State与创建窗口的Agent身份无关。
+
+ChatDriver scopes request consumption with InferenceSession.withCleanup, joining the SDK request worker on normal/error/cancellation exits. It owns no model-instance lease and does not unload shared clients.

@@ -52,11 +52,14 @@ private final class ProviderTransactionFixture: ProviderSettingsPersistence {
     fixture.events.removeAll()
     await #expect(throws: ProviderSettingsError.self) {
         _ = try await service.save(
-            .init(enabled: true, url: "https://example.invalid", key: "fixture-secret", model: "new"))
+            .init(
+                enabled: true, url: "https://example.invalid", key: "fixture-secret", model: "new", writerThinking: true
+            ))
     }
     #expect(fixture.events == ["prepare:new", "begin", "persist:new", "apply:new", "persist:old", "end"])
     #expect(fixture.value?.model == "old")
     #expect(try await service.restore().model == "old")
+    #expect(try await service.restore().writerThinking == false)
 }
 @Test(.actionCatalog) @MainActor func providerSettingsValidationPrecedesPersistenceAndBarrier() async throws {
     let fixture = ProviderTransactionFixture()
@@ -168,21 +171,8 @@ private final class ProviderSettingsClock: @unchecked Sendable {
 }
 private final class ProviderCredentialFixture: ProviderCredentialStorage, @unchecked Sendable {
     private let lock = NSLock()
-    private var old: Data?
     private var keys: [String: Data] = [:]
     private var actions: [String] = []
-    init() throws {
-        old = try JSONSerialization.data(withJSONObject: [
-            "url": "https://example.invalid", "key": "fixture-secret", "model": "legacy",
-        ])
-    }
-    func legacy() throws -> Data? { lock.withLock { old } }
-    func removeLegacy() throws {
-        lock.withLock {
-            actions.append("removeLegacy")
-            old = nil
-        }
-    }
     func key(id: String) throws -> Data? {
         lock.withLock {
             actions.append("readKey")
@@ -204,17 +194,18 @@ private final class ProviderCredentialFixture: ProviderCredentialStorage, @unche
     var events: [String] { lock.withLock { actions } }
     var keyCount: Int { lock.withLock { keys.count } }
 }
-@Test(.actionCatalog) func providerSettingsStoreVerifiesLegacyMigrationAndCleansFailedCredentialCommit() async throws {
+@Test(.actionCatalog) func providerSettingsStorePersistsCurrentFormatAndCleansFailedCredentialCommit() async throws {
     let url = FileManager.default.temporaryDirectory.appendingPathComponent(
         "provider-settings-\(UUID().uuidString).json")
     defer { try? FileManager.default.removeItem(at: url) }
-    let credentials = try ProviderCredentialFixture()
+    let credentials = ProviderCredentialFixture()
     let store = ProviderSettingsStore(
         credentials: credentials, document: { try FileDocumentStore<UserSettingsDocument>(url: url) })
-    let value = try #require(try await store.load())
-    #expect(value.enabled)
-    #expect(value.key == "fixture-secret")
-    #expect(credentials.events == ["insertKey", "readKey", "removeLegacy"])
+    #expect(try await store.load() == nil)
+    let value = ProviderSettings(enabled: true, url: "https://example.invalid", key: "fixture-secret", model: "current")
+    try await store.save(value)
+    #expect(try await store.load()?.key == "fixture-secret")
+    #expect(credentials.events == ["insertKey", "readKey"])
     #expect(!(try String(contentsOf: url, encoding: .utf8)).contains("fixture-secret"))
     // External replacement invalidates the revision; new credential must be removed before returning failure.
     try Data("external replacement".utf8).write(to: url, options: .atomic)
@@ -288,7 +279,7 @@ private final class ProviderCredentialFixture: ProviderCredentialStorage, @unche
     #expect(throws: ProviderDiscoveryError.self) { try ProviderModelList.eligible([""]) }
 }
 
-@Test(.actionCatalog) @MainActor func providerSettingsRestoresOriginalDocumentAndCredentialWithoutReset() async throws {
+@Test(.actionCatalog) @MainActor func providerSettingsRejectsOldShapeAndRoundTripsCurrentDocument() async throws {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     defer { try? FileManager.default.removeItem(at: root) }
     let url = root.appendingPathComponent("Settings/settings.json")
@@ -297,32 +288,25 @@ private final class ProviderCredentialFixture: ProviderCredentialStorage, @unche
         #"{"version":1,"revision":"00000000-0000-0000-0000-000000000123","value":{"version":1,"cloud":{"enabled":true,"url":"https://example.invalid/v1","model":"configured-model","credentialID":"existing-credential"}}}"#
             .utf8)
     try original.write(to: url)
-    let credentials = try ProviderCredentialFixture()
+    let credentials = ProviderCredentialFixture()
     try credentials.insertKey(Data("fixture-secret".utf8), id: "existing-credential")
     let store = ProviderSettingsStore(
         credentials: credentials, document: { try FileDocumentStore<UserSettingsDocument>(url: url) })
-    var applied: ProviderSettings?
-    let service = ProviderSettingsService(
-        store: store,
-        runtime: .init(
-            initial: .init(enabled: false, url: "https://default.invalid", key: "", model: "default"),
-            prepare: { value in { applied = value } }, beginChange: {}, endChange: {}))
-    let restored = try await service.restore()
-    #expect(restored.enabled && restored.model == "configured-model")
-    #expect(restored.url == "https://example.invalid/v1" && restored.key == "fixture-secret")
-    #expect(applied == restored)
-    #expect(credentials.events == ["insertKey", "readKey"])
+    await #expect(throws: (any Error).self) { try await store.load() }
     #expect(try Data(contentsOf: url) == original)
-    let updated = ProviderSettings(
-        enabled: restored.enabled, url: restored.url, key: restored.key, model: "updated-model")
-    _ = try await service.save(updated)
+    #expect(credentials.events == ["insertKey"])
+    try FileManager.default.removeItem(at: url)
+    let current = ProviderSettingsStore(
+        credentials: credentials, document: { try FileDocumentStore<UserSettingsDocument>(url: url) })
+    #expect(try await current.load() == nil)
+    let value = ProviderSettings(
+        enabled: true, url: "https://example.invalid/v1", key: "fixture-secret", model: "current-model")
+    try await current.save(value)
     let reopened = ProviderSettingsStore(
         credentials: credentials, document: { try FileDocumentStore<UserSettingsDocument>(url: url) })
-    #expect(try await reopened.load() == updated)
-    let output = try Data(contentsOf: url)
-    let envelope = try #require(JSONSerialization.jsonObject(with: output) as? [String: Any])
-    #expect(envelope["version"] as? Int == 1)
-    #expect(!String(decoding: output, as: UTF8.self).contains("fixture-secret"))
+    #expect(try await reopened.load() == value)
+    #expect(!String(decoding: try Data(contentsOf: url), as: UTF8.self).contains("fixture-secret"))
+
 }
 
 @Test(.actionCatalog, .timeLimit(.minutes(1))) @MainActor
@@ -334,7 +318,7 @@ func settingsContainerRunsInItsAgentWithPrivateStagingAndActualPresentation() as
     let discovery = ProviderDiscoveryRequests { _ in ["fixture-model"] }
     let session = UUID().uuidString
     let providerPresentation = ProviderPresentationAdapter(
-        state: ui.settings.presentation, sessionID: session, settings: requests, discovery: discovery)
+        state: ui.settings.presentation, sessionID: session, settings: requests)
     let presentation = ResourcePresentationAdapter(
         state: ui.modelResources.presentation, sessionID: session, provider: providerPresentation,
         navigation: ui.navigation.presentation, acknowledge: {})
@@ -351,12 +335,13 @@ func settingsContainerRunsInItsAgentWithPrivateStagingAndActualPresentation() as
     }
     #expect(restored.key == "fixture-secret" && restored.model == "old")
     #expect(ui.settings.state.key == "fixture-secret")
+    let previousModels = ui.settings.state.modelCatalogs
     guard case .models(let models) = try await ui.settings.requests.submit(.discover(restored)) else {
         Issue.record("Discovery must return actual models")
         await host.shutdown()
         return
     }
-    #expect(models == ["fixture-model"] && ui.settings.state.models == models)
+    #expect(models == ["fixture-model"] && ui.settings.state.modelCatalogs == previousModels)
     fixture.rollbackFails = true
     do {
         _ = try await ui.settings.requests.submit(
@@ -377,7 +362,7 @@ func settingsContainerRunsInItsAgentWithPrivateStagingAndActualPresentation() as
 @Test(.actionCatalog) func multipleProvidersSurviveReopenAndDeletionWithoutPlaintextKeys() async throws {
     let url = FileManager.default.temporaryDirectory.appendingPathComponent("providers-\(UUID().uuidString).json")
     defer { try? FileManager.default.removeItem(at: url) }
-    let credentials = try ProviderCredentialFixture()
+    let credentials = ProviderCredentialFixture()
     let store = ProviderSettingsStore(
         credentials: credentials, document: { try FileDocumentStore<UserSettingsDocument>(url: url) })
     _ = try await store.load()
@@ -414,4 +399,75 @@ func settingsContainerRunsInItsAgentWithPrivateStagingAndActualPresentation() as
             .init(enabled: true, url: url, key: "", model: "test-model", providers: [provider]), sessionID: "http-test")
         requests.discard(id, sessionID: "http-test")
     }
+}
+
+@Test(.actionCatalog) @MainActor func writerModelSelectionIsIndependentAndPersistsStableProviderIdentity() async throws
+{
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let url = root.appendingPathComponent("settings.json")
+    let credentials = ProviderCredentialFixture()
+    let store = ProviderSettingsStore(
+        credentials: credentials, document: { try FileDocumentStore<UserSettingsDocument>(url: url) })
+    let provider = ProviderSettings(
+        enabled: false, url: "https://writer.example.invalid", key: "fixture-writer-key", model: "assistant-choice",
+        id: "stable-provider")
+    let settings = ProviderSettings(
+        enabled: false, url: provider.url, key: provider.key, model: "assistant-choice", providers: [provider],
+        writerProviderID: provider.id, writerModel: "writer-choice", writerThinking: true)
+    _ = try await store.load()
+    try await store.save(settings)
+    let restored = try #require(await store.load())
+    #expect(restored.writerProviderID == "stable-provider")
+    #expect(restored.writerModel == "writer-choice" && restored.writerThinking)
+    #expect(restored.providers.first?.id == "stable-provider")
+    let service = ProviderSettingsService(
+        store: store, runtime: .init(initial: settings, prepare: { _ in {} }, beginChange: {}, endChange: {}))
+    let selected = try await service.writerConfiguration()
+    #expect(selected.model == "writer-choice" && selected.writerThinking)
+    #expect(selected.key == "fixture-writer-key")
+    #expect(try await service.restore().model == "assistant-choice")
+    #expect(!String(decoding: try Data(contentsOf: url), as: UTF8.self).contains("fixture-writer-key"))
+}
+
+@Test(.actionCatalog) @MainActor func writerLocalSelectionDoesNotInheritAssistantCloud() async throws {
+    let fixture = ProviderTransactionFixture()
+    let service = fixture.service()
+    _ = try await service.restore()
+    let value = ProviderSettings(enabled: true, url: "https://assistant.test/v1", key: "fixture", model: "assistant")
+    _ = try await service.save(value)
+    let writer = try await service.writerConfiguration()
+    #expect(!writer.enabled && writer.url.isEmpty && writer.key.isEmpty && writer.model.isEmpty)
+    #expect(try await service.restore().model == "assistant")
+}
+
+@Test(.actionCatalog) @MainActor func writerThinkingDefaultsLowAndExplicitChoiceSurvivesReopen() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let url = root.appendingPathComponent("settings.json")
+    let credentials = ProviderCredentialFixture()
+    let store = ProviderSettingsStore(
+        credentials: credentials, document: { try FileDocumentStore<UserSettingsDocument>(url: url) })
+    let provider = ProviderSettings(
+        enabled: false, url: "https://writer.test", key: "fixture", model: "assistant", id: "p")
+    func value(_ thinking: Bool = false) -> ProviderSettings {
+        .init(
+            enabled: false, url: provider.url, key: provider.key, model: "assistant", providers: [provider],
+            writerProviderID: provider.id, writerModel: "writer", writerThinking: thinking)
+    }
+    #expect(!value().writerThinking)
+    _ = try await store.load()
+    try await store.save(value())
+    #expect(try await store.load()?.writerThinking == false)
+    try await store.save(value(true))
+    let reopened = ProviderSettingsStore(
+        credentials: credentials, document: { try FileDocumentStore<UserSettingsDocument>(url: url) })
+    let restored = try #require(await reopened.load())
+    #expect(restored.writerThinking)
+    let service = ProviderSettingsService(
+        store: reopened, runtime: .init(initial: value(), prepare: { _ in {} }, beginChange: {}, endChange: {}))
+    #expect(try await service.writerConfiguration().writerThinking)
+    _ = try await service.save(value(false))
+    #expect(try await service.writerConfiguration().writerThinking == false)
+    #expect(try await service.restore().model == "assistant")
 }

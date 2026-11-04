@@ -1,8 +1,8 @@
 {
   "version": 3,
   "id": "history-query",
-  "revision": 13,
-  "description": "Read-only paged conversation search and recall with native history Tools; no history mutation.",
+  "revision": 14,
+  "description": "Read-only search/recall of past Assistant chats. Current pages: web-browsing.",
   "dependencies": [],
   "useActions": [
     {

@@ -3,6 +3,7 @@
     import Foundation
     import FunctionContracts
     import ModelKit
+    import ModelKitOpenAI
     import ModelKitDefaults
     import ModelKitRuntime
     import PlatformKit
@@ -80,20 +81,20 @@
         }
         func prepare(_ request: ActionsBusinessRequest) throws -> ActionsBusinessBindings {
             let files = self.files
-            let providerSettings = ProviderSettingsRequests(
-                service: ProviderSettingsService(
-                    store: ProviderSettingsStore(
-                        credentials: SettingsCredentialAdapter(),
-                        document: {
-                            try files.document(UserSettingsDocument.self, in: files.settings, name: "settings.json")
-                        }),
-                    runtime: SettingsProviderAdapter.runtime(
-                        language: model.language,
-                        beginChange: request.maintenance.beginSettings, endChange: request.maintenance.endSettings)))
+            let providerService = ProviderSettingsService(
+                store: ProviderSettingsStore(
+                    credentials: SettingsCredentialAdapter(),
+                    document: {
+                        try files.document(UserSettingsDocument.self, in: files.settings, name: "settings.json")
+                    }),
+                runtime: SettingsProviderAdapter.runtime(
+                    language: model.language,
+                    beginChange: request.maintenance.beginSettings, endChange: request.maintenance.endSettings))
+            let providerSettings = ProviderSettingsRequests(service: providerService)
             let discovery = ProviderDiscoveryRequests(discover: SettingsProviderAdapter.discoverModels)
             let providerPresentation = ProviderPresentationAdapter(
                 state: ui.settings.presentation, sessionID: request.sessionID,
-                settings: providerSettings, discovery: discovery)
+                settings: providerSettings)
             let history = HistoryPresentationAdapter(
                 state: ui.history.presentation, store: request.conversations, sessionID: request.sessionID)
             let endpoints = ActionEndpoints(
@@ -139,14 +140,25 @@
                 exportVideo: { [platform] file in try await platform.vision.saveVideo(file) })
             let island = IslandPresentationService(state: ui.island)
             let islandDomains = IslandDomainPresentation(service: island, home: ui.home, camera: ui.camera.state)
+            let workspace = ArtifactWorkspace(
+                disk: try files.file(files.workspaces),
+                index: try files.document(
+                    ArtifactWorkspaceIndex.self, in: files.workspaces,
+                    name: "index.json", maximumBytes: 8 * 1024 * 1024))
+            let exports = ArtifactExportService(workspace: workspace, disk: try files.file(files.workspaces))
+            let artifactPresentation = ArtifactPresentation(
+                pages: ui.web, windows: ui.windows, disk: try files.file(files.workspaces))
+            let artifacts = ArtifactService(
+                workspace: workspace,
+                prepare: { id, deleting in try await artifactPresentation.prepare(id: id, deleting: deleting) },
+                capture: { id in try await artifactPresentation.snapshot(id: id) },
+                present: { id, title, entry, files, preview in
+                    try await artifactPresentation.present(
+                        id: id, title: title, entry: entry, files: files, preview: preview)
+                })
             let web = WebExecutionService(
                 page: ui.web, windows: ui.windows,
-                workspace: WebWorkspace(
-                    disk: try files.file(files.workspaces),
-                    index: try files.document(
-                        WebWorkspaceIndex.self, in: files.workspaces,
-                        name: "index.json", maximumBytes: 4 * 1024 * 1024)),
-                model: model.language,
+                pageForWindow: { [pages = ui.web] id in pages.sessions[id] },
                 saveImage: { [photos] data, input in
                     try await photos.save(
                         data,
@@ -155,7 +167,11 @@
                             session: input.context.sessionID, input: input.context.inputID))
                 })
             let windowExecution = WindowExecutionService(
-                state: ui.windows, lifecycles: [WindowContent.camera.rawValue: camera, WindowContent.web.rawValue: web])
+                state: ui.windows,
+                lifecycles: [
+                    WindowContent.camera.rawValue: camera, WindowContent.web.rawValue: web,
+                    WindowContent.artifact.rawValue: artifactPresentation,
+                ])
             let assembly = try BehaviorAssembly(
                 presentation: presentation, playback: endpoints.speech, pose: presentation,
                 historyPresentation: history, camera: endpoints.camera,
@@ -165,7 +181,8 @@
                     store: request.conversations,
                     photo: { [photos] id, input in try await photos.readForInput(id, source: "assistant", input: input)
                     }),
-                album: album, windows: windowExecution, web: web, island: island, modelResources: resourceAdapter,
+                album: album, windows: windowExecution, web: web, artifacts: artifacts, island: island,
+                modelResources: resourceAdapter,
                 resourcePreferences: preferences,
                 resourceInventory: resourceAdapter,
                 resourcePresentation: ResourcePresentationAdapter(
@@ -211,6 +228,16 @@
                 })
             return ActionsBusinessBindings(
                 executor: actions.execution, catalog: try actions.catalog(),
+                artifactStreaming: artifacts, writerArtifacts: exports, writerPhotos: photos,
+                writerModel: { [model] in
+                    let selected = try await providerService.writerConfiguration()
+                    let configuration =
+                        try selected.enabled
+                        ? OpenAIChatConfiguration(
+                            baseURL: OpenAIChatConfiguration.endpoint(selected.url), apiKey: selected.key,
+                            model: selected.model, thinking: selected.writerThinking ? .enabled : .minimum) : nil
+                    return try await model.language.chatModel(configuration: configuration)
+                },
                 settings: providerSettings, discovery: discovery, providerPresentation: providerPresentation,
                 tasks: endpoints.tasks,
                 resources: resources,

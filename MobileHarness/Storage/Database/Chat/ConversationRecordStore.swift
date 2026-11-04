@@ -31,10 +31,18 @@ public actor ConversationRecordStore {
         self.tasks = tasks
         self.agent = agent
     }
+    public func containsInput(_ id: String) async throws -> Bool {
+        guard let dialog = try await repository.dialogForInput(id) else { return false }
+        return try await repository.dialog(dialog, includingRecovery: false).agent == agent
+    }
     private func ownedDialog(_ id: String) async throws -> DialogRecord {
         let row = try await repository.dialog(id, includingRecovery: false)
         guard row.agent == agent else { throw RecordStorageError.missingRecord }
         return row
+    }
+    private static func state(_ raw: String) throws -> ConversationRecord.State {
+        guard let value = ConversationRecord.State(rawValue: raw) else { throw RecordStorageError.invalidRecord }
+        return value
     }
     private static func decodeInput(_ row: MessageRecord) throws -> ConversationRecord {
         if !row.detail.isEmpty { return try JSONDecoder().decode(ConversationRecord.self, from: row.detail) }
@@ -42,7 +50,7 @@ public actor ConversationRecordStore {
             id: row.clientID, date: row.date, user: row.body, request: [], model: "",
             maximumOutputTokens: nil, temperature: 0)
         turn.historyOrder = row.order
-        turn.state = ConversationRecord.State(rawValue: row.state) ?? .interrupted
+        turn.state = try Self.state(row.state)
         return turn
     }
     private static func decodeResponse(_ row: MessageRecord) throws -> ConversationModelRequest {
@@ -54,7 +62,7 @@ public actor ConversationRecordStore {
         } else {
             request = try JSONDecoder().decode(ConversationModelRequest.self, from: row.detail)
         }
-        request.state = ConversationRecord.State(rawValue: row.state) ?? .interrupted
+        request.state = try Self.state(row.state)
         return request
     }
     private func metadata(_ row: DialogRecord) -> StoredConversation {
@@ -123,7 +131,7 @@ public actor ConversationRecordStore {
                         changes[key] = fingerprint
                     }
                 }
-                guard request.state != .generating else { continue }
+                guard request.state != .generating || request.producerMetadata != nil else { continue }
                 var detail = request
                 detail.response = ""
                 detail.input = ""
@@ -265,6 +273,14 @@ public actor ConversationRecordStore {
 }
 
 extension ConversationRecordStore {
+    public func requestCount(_ id: String) async throws -> Int {
+        _ = try await ownedDialog(id)
+        return try await repository.timelineCount(dialog: id)
+    }
+    public func requestPreviews(_ id: String, after: UInt64, limit: Int = 20) async throws -> [MessagePreview] {
+        _ = try await ownedDialog(id)
+        return try await repository.previews(dialog: id, after: after, taskID: nil, limit: limit, offset: 0)
+    }
     public func page(
         _ id: String, after: UInt64 = 0, taskID: String? = nil, limit: Int = HistoryPaging.pageSize, offset: Int = 0
     )
@@ -282,7 +298,7 @@ extension ConversationRecordStore {
             request.messageID = preview.id
             request.historyOrder = preview.position
             request.response = preview.response
-            request.state = ConversationRecord.State(rawValue: preview.state) ?? .interrupted
+            request.state = try Self.state(preview.state)
             request.isObservation = preview.isObservation
             var turn = ConversationRecord(
                 id: preview.inputID, date: preview.date, user: preview.input, request: [], model: "",
@@ -312,7 +328,7 @@ extension ConversationRecordStore {
                 historyTaskID: selected.taskID, date: selected.date)
             request.messageID = id
             request.historyOrder = selected.order
-            request.state = ConversationRecord.State(rawValue: selected.state) ?? .interrupted
+            request.state = try Self.state(selected.state)
             request.isObservation = selected.kind == "observation"
             turn.modelRequests = [request]
             var result = StoredConversation(id: "detail")

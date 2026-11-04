@@ -104,8 +104,7 @@ func resourceFixturePolicy() throws -> CommunicationPolicy {
     let providerPresentation =
         uiProviderPresentation
         ?? ProviderPresentationAdapter(
-            state: settingsUI.presentation, sessionID: sessionID, settings: settingsRequests,
-            discovery: discoveryRequests)
+            state: settingsUI.presentation, sessionID: sessionID, settings: settingsRequests)
     let actualPresentation: any ResourcePresentationCapability =
         presentation is UnusedResourcePresentation
         ? ResourcePresentationAdapter(

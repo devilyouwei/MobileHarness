@@ -113,7 +113,7 @@ Provider 名称持久化、默认名称生成、独立弹窗草稿、重复 URL 
 
 ## 基础相册实施契约
 
-✅ 覆盖相册迁移／收录／保护保留／分页／删除清理／导入字节与权限失败，区别自动化与真机验收。
+✅ 覆盖旧库丢弃／相册收录／保护保留／分页／删除清理／导入字节与权限失败，区别自动化与真机验收。
 
 Photography完成示例使用明确的“App相册”文案；保持与BasicSkill各自的独立成功示例解析和不结束无关Task的断言。
 
@@ -230,3 +230,57 @@ Bundled Skill catalog validation includes web-browsing/web-drawing and their dep
 Web Skill教学回归逐字符解析实际Instructions.md中的XML示例，使用各Skill及依赖展开后的真实目录，验证别名/参数可接受、依赖调用分轮、创建与修改身份，以及完整已加载提示词的大小预算。它验证教学制品和执行协议一致，不代替真实模型遵循度测试。
 
 Skill状态回归覆盖任意新路径无需Assistant登记、生产者完整Business嵌套、未知来源与有效来源混合采集、诊断固定原因码及关闭/取消/容量边界。旧字段白名单断言改为公开Business与内部Runtime的分类边界。
+
+
+Writing 替代旧绘图 Skill，原生工具覆盖纳入统一能力测试；agents.writer 被纳入全部 Skill 状态读取测试的显式 Agent fixture。
+
+WriterAgentTests 通过真实 AgentManager/通信与 Gateway DirectExecutionDispatcher 连接脚本模型和实际作品存储，验证后台接纳、流式编辑、发布与终态回报；呈现是明确 fixture。
+
+Writer 工具集成回归使用真实 Artifacts 服务与呈现探针，验证默认不渲染、单次流式预览及最终刷新、关联文件上下文、搜索分页、目录移动/差异/草稿恢复、显式渲染后发布和运行错误阻止发布。它不替代真实模型或原生 WebKit 验收。
+
+Writer 历史回归验证同一 SQLite 的角色隔离、重开后完整请求/工具结果/取消状态、图像引用的 Writer 输入所有权，以及真实 Gateway 后台创作同时提交 SQLite 历史、经 Gateway 归档。图片字节夹具只验证存储契约，不作为原生解码证据。
+
+Writer 委托回归覆盖默认目录XML Action、保持已有前台 Task、主动事件触发模型、与用户输入 FIFO、重复消息去重、单任务竞争与错误 interactionID 拒收、完成证据满队列后同 ID 重送，以及模型获取前窗口呈现。呈现/模型仍为明确替身，真实 Gateway 与 SQLite 链路独立验证。
+
+Assistant 协议回归检查所有内置 Skill 仅暴露 XML Action、BasicSkill 包含前后台任务控制、身份提示说明协作角色与委托范围；真实 Scheduler 驱动 XML 委托，生产绑定检查 Action scheduled/Tool direct，Writer 独立工具执行保持覆盖。
+
+Writer 委托故障回归通过真实 Assistant XML、Gateway/Scheduler 和 SQLite 验证：模型在 failed 事件中尝试重委托被宿主拒绝；原用户输入内重复委托也不创建第二项任务，新用户输入仍可再次尝试。Writer 端点与模型使用替身，不代表真实模型或设备验收。
+
+Writer失败回归覆盖先list成功后第二次模型请求timeout，实际Gateway记录modelTransport分类并向Assistant传送完整诊断；SQLite重开及通用UI DTO还原诊断，模型/阶段/输入ID/耗时和独立清理原因均保留。模型为替身，不代表真实Qwen请求成功。
+
+
+Writer自主任务回归覆盖：汇报接收端暂不可用时创作/发布仍完成、同事件重投、暂停恢复、Assistant close不取消Writer、跨对话阶段汇报及共享FIFO。受控播放Action验证Writer输入等待排空；原生ReplyActivity完成事实只在成功边界出现。VoiceTests验证非聆听不提交反向取消Action、成功汇报后启听、失败/暂停/明确停止及重复/乱序完成不误开。模型、播放和peer占用事实为明确替身，不能替代真机语音验收。
+
+占用发布回归保留32项满队列场景，确认同态busy合并不会使通信消费者queueFull；单独验证首项输入与两个不同最终语音root都得到完整快照确认，排队文本不重复发布busy。
+
+Writer independence regressions use real Gateway/SQLite with scripted models: rejected user notifications do not retain the creative slot, execution retirement supports successive delegations beyond the live-grant bound, and database reopen redelivers immutable events without another model lease or file creation. Assistant fixtures cover canonical-state reconciliation before new/resumed delegations and stale terminal messages after a new run.
+
+Writer task-Island regressions use actual Gateway direct, Island Actions/UI state and SQLite with scripted model/rendering. A rejecting Assistant does not prevent start/file-step/terminal display; unavailable presentation retains only the latest task state, old-run callbacks are ignored, and root stop joins its publisher. Component tests cover semantic priority independent of producer names, speech/status coexistence, manual collapse and new-stage expansion. No model is asked to call Island tools. These are not native animation or real-provider acceptance.
+
+Writer failure fixtures retain exhausted attempt counts and classified causes. SQLite reopen verifies the active failed native call and unexecuted siblings have paired outcomes. Assistant notification does not redelegate or rerun generation.
+
+## Writer real-provider workflows
+
+`WriterModelEvaluationTests` is gated by `MH_WRITER_EVAL=1` and uses production WriterAgent, authenticated Gateway direct tools, ArtifactService, persistent StorageFiles and SQLite. The requester accepts notifications without creating an Assistant model response. Each new task has its own dialog/project; resume verifies stable task/project and a fresh run. Request traces, complete conversation evidence, artifacts and per-case outcomes are saved outside the repository.
+
+The six cases cover a simple SVG/HTML diagram, multi-file counter, local edits on resume, search/move/remove, Markdown and an intentional JavaScript error followed by repair. The macOS WebKit adapter executes HTML/local JS, records DOM/errors and checks counter clicks. Markdown is displayed as escaped text in this adapter; this is not acceptance of the production Markdown renderer, screenshots, iOS navigation, PDF export or speech. `MH_WRITER_RENDER_EVAL=1` enables a separate no-model WebKit preflight checking changed scripts are reloaded before paid tests.
+
+Evaluation-only bounds are 36 actual requests and a configurable per-case deadline, with explicit cancellation/reporting; production Writer/output budgets are unchanged. Raw model text/tool/usage/failure data and SQLite remain available for stall diagnosis. Run and credential handling: [scripts](../../scripts/README.md#writer-双模型回归). Dated results: [Writer model regression](../../docs/validation/Writer-Model-Regression.md).
+
+Writer continuous-progress regressions cover default partial previews before source completion, slow presentation independent of source intake, coalescing/cancellation and hidden-window suppression, actual-attempt progress, SQLite request metadata/counts/pages and reopen isolation. Assistant progress tests verify latest-value replacement alongside the unchanged formal user/question/terminal FIFO. Natural model termination validates/publishes through actual Gateway effects and stores runtime evidence separately from native model calls. Real-provider evaluation records preview frame times and first non-placeholder content; model latency remains measurable rather than hidden by a production timeout.
+
+默认Assistant Skill回归使用真实UI WindowState和公开State reader，验证未加载窗口Skill也能发现Writer窗口；加载web-browsing后可解析带windowID的调度Action。
+
+受控Qwen场景显式注册agents.writer，避免基础Skill新增来源后在发出模型请求前missing；两个Writer窗口场景验证默认发现、按需加载与真实windowID参数。页面和窗口效果为替身，只有模型/Assistant/Gateway协议实际执行。
+
+Writer evaluator --thinking enabled/minimum changes only the paid experiment Provider configuration (default enabled). Reports record the actual value; production Writer configuration and provider output defaults are unchanged. Use the original diagram goal for latency comparisons.
+
+Writer思考选择回归验证默认minimum、显式开启的凭据/配置往返与重开、Writer配置投影和保存失败回滚；Assistant模型选择保持独立。
+
+Robot Skill exposure is explicit. Assistant starts with BasicSkill and expression only; AgentTaskSkillTests covers discovery, load/release, State selection and frozen earlier catalogs. AgentSpecialistTests exercises scheduled XML loadSkills followed by the Robot Action without a foreground Task or delegation. Deterministic NexArm/Bluetooth/recovery/serial fixtures use loadedRobotAssistantContext to seed a recently loaded robot-interaction Skill through the production state transition before supplying fixed motion text. This fixture setup neither adds robot-interaction to production baseSkills nor changes fixed-host Task policy. Real-provider discovery scenarios start with the unmodified default catalog.
+
+Island lifecycle regressions cover role-owned task publication, all Writer terminal states ending their own activity, late-progress/run fencing, retained voice activity, latest-state retry and joined shutdown, plus Assistant foreground Skill projection. Writer Gateway/SQLite lifecycle fixtures assert terminal Island removal independently of notification delivery.
+
+Island Action integration also covers registered/raw and container-local typed execution equivalence, producer ownership and shared presentation scope, stale generation/stopped endpoint rejection, same-version retry/new-fact replacement, no repeated presentation for frequency-only updates, root rebind, and domain cleanup preserving peer Agent activities. Domain probes implement typed Action calls without a Gateway or UI renderer.
+
+VoiceTests 的语音打断回归使用真实生产者绑定、OutputGateway/InputGateway 和 SpeechPerception，受控播放清理及投递屏障固定取消与空闲事实重叠，覆盖取消前已在途和取消中才提交两种顺序。验证取消仍拒绝普通播放、空闲事实释放半双工占用、关闭许可保持关闭、旧 revision 不复活占用，以及连续五次显式启停可重开感知采集。模型与播放为替身，不代表真机麦克风、光效或灵动岛验收。

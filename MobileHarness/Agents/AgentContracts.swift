@@ -7,6 +7,7 @@ extension AgentID {
     public static let speechPerception = AgentID(rawValue: "speechPerception")
     public static let visionPerception = AgentID(rawValue: "visionPerception")
     public static let photographer = AgentID(rawValue: "photographer")
+    public static let writer = AgentID(rawValue: "writer")
     public static let memory = AgentID(rawValue: "memory")
     public static let applicationControl = AgentID(rawValue: "applicationControl")
     public static let assistant = AgentID(rawValue: "assistant")
@@ -17,6 +18,15 @@ public enum AgentContracts {
         get throws {
             try CommunicationContracts(
                 additional: AgentTaskSignal.contracts + [
+                    CommunicationContract(
+                        name: WriterTaskCompletion.contract, kind: .observation, maximumBytes: 131072,
+                        startsNewWork: true,
+                        validateMessage: { message in
+                            guard let value = message.content(as: WriterTaskCompletion.self) else {
+                                throw CommunicationError.invalidPayload
+                            }
+                            try value.validate()
+                        }),
                     CommunicationContract(
                         name: ReplyActivity.contract, kind: .observation, maximumBytes: 16384,
                         startsNewWork: true,

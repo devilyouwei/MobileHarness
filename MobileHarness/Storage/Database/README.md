@@ -4,7 +4,7 @@
 
 ✅ DatabaseStorage 提供 start/stop 与抛错的 chat/tasks/media/devices 端口；DatabaseRepositories 是不含 SQL 类型的值集合。领域仓库分别编译并返回拥有的数据，不暴露 GRDB、连接或表对象。Storage 根只依赖该协议；AppStorage 选择 SQLiteDatabaseFactory。
 
-SQLiteDatabaseStorage 在后台任务完成目录、打开、迁移和恢复后才发布端口；失败/关闭不可重开。重复启停共享任务，停止先关闭接纳，再加入初始化和在途操作。原始错误与清理错误分别保留。应用业务先提交终态，再停止数据库。
+SQLiteDatabaseStorage 在后台任务完成目录、打开、当前 schema 初始化和恢复后才发布端口；失败/关闭不可重开。重复启停共享任务，停止先关闭接纳，再加入初始化和在途操作。原始错误与清理错误分别保留。应用业务先提交终态，再停止数据库。
 
 ## 子目录与关系
 
@@ -18,7 +18,7 @@ SQLiteDatabaseStorage 在后台任务完成目录、打开、迁移和恢复后�
 
 ## 统一容器异常通道
 
-✅ SQLiteDatabaseFactory 接收 StorageFailureReporter，根及后端读/写/迁移/关闭错误进入相同宿主回调；DatabaseStorage 不导入框架事件。后端选择仍属于 App。
+✅ SQLiteDatabaseFactory 接收 StorageFailureReporter，根及后端读/写/初始化/关闭错误进入相同宿主回调；DatabaseStorage 不导入框架事件。后端选择仍属于 App。
 
 ## 基础相册实施契约
 
@@ -31,3 +31,5 @@ DatabaseStorage.stateSnapshot returns StorageCore.StorageStateSnapshot with its 
 ## Media kinds
 
 The existing media repository includes bounded video reservations and shared explicit album inclusion. SQLiteMediaRepository stores kind/MIME plus the existing dimension/origin fields; file copying remains in Files and native movie inspection belongs to PlatformKit callers. There is no separate video database or migration. See [Media](Media/README.md).
+
+Chat request headers support neutral producer metadata and lightweight paged summaries/counts. Explicit request-boundary checkpoints may persist generating metadata without flushing every text delta. Task latest-update queries include delegated phase changes; Storage does not interpret Writer phases or choose speech/UI behavior.

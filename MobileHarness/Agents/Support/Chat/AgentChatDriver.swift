@@ -31,65 +31,69 @@ public enum AgentChatDriver {
         defer { session.cancel() }
         let text = AsyncThrowingStream<String, any Error>.makeStream(bufferingPolicy: .bufferingOldest(8192))
         let native = AsyncThrowingStream<ChatToolCall, any Error>.makeStream(bufferingPolicy: .bufferingOldest(128))
-        return try await withTaskCancellationHandler {
-            try await withThrowingTaskGroup(of: String.self) { group in
-                group.addTask { try await consumers.text(text.stream) }
-                group.addTask {
-                    try await consumers.native(native.stream)
-                    return ""
-                }
-                group.addTask {
-                    var finished = false
-                    var recordedTiming = false
-                    var bytes = 0
-                    var fragments = 0
-                    for try await event in session.events {
-                        try Task.checkCancellation()
-                        guard !finished else { throw CapabilityError.invalidRequest("Events after chat completion") }
-                        if !recordedTiming, let snapshot = timing.snapshot {
-                            let terminal: Bool
-                            if case .finished = event { terminal = true } else { terminal = false }
-                            if snapshot.firstTokenAt != nil || terminal {
-                                try await consumers.timing(snapshot)
-                                recordedTiming = true
-                            }
-                        }
-                        try await consumers.evidence(event)
-                        switch event {
-                        case .text(let delta):
-                            bytes += delta.utf8.count
-                            fragments += 1
-                            guard bytes <= 65_536, fragments <= 8192 else { throw GenerationError.limitExceeded }
-                            guard case .enqueued = text.continuation.yield(delta) else {
-                                throw GenerationError.limitExceeded
-                            }
-                        case .toolCall(let call):
-                            guard case .enqueued = native.continuation.yield(call) else {
-                                throw GenerationError.limitExceeded
-                            }
-                        case .usage: break
-                        case .finished: finished = true
-                        }
+        return try await session.withCleanup {
+            return try await withTaskCancellationHandler {
+                try await withThrowingTaskGroup(of: String.self) { group in
+                    group.addTask { try await consumers.text(text.stream) }
+                    group.addTask {
+                        try await consumers.native(native.stream)
+                        return ""
                     }
-                    guard finished else { throw CapabilityError.unavailable("Chat returned no completed answer") }
-                    text.continuation.finish()
-                    native.continuation.finish()
-                    return ""
+                    group.addTask {
+                        var finished = false
+                        var recordedTiming = false
+                        var bytes = 0
+                        var fragments = 0
+                        for try await event in session.events {
+                            try Task.checkCancellation()
+                            guard !finished else {
+                                throw CapabilityError.invalidRequest("Events after chat completion")
+                            }
+                            if !recordedTiming, let snapshot = timing.snapshot {
+                                let terminal: Bool
+                                if case .finished = event { terminal = true } else { terminal = false }
+                                if snapshot.firstTokenAt != nil || terminal {
+                                    try await consumers.timing(snapshot)
+                                    recordedTiming = true
+                                }
+                            }
+                            try await consumers.evidence(event)
+                            switch event {
+                            case .text(let delta):
+                                bytes += delta.utf8.count
+                                fragments += 1
+                                guard bytes <= 65_536, fragments <= 8192 else { throw GenerationError.limitExceeded }
+                                guard case .enqueued = text.continuation.yield(delta) else {
+                                    throw GenerationError.limitExceeded
+                                }
+                            case .toolCall(let call):
+                                guard case .enqueued = native.continuation.yield(call) else {
+                                    throw GenerationError.limitExceeded
+                                }
+                            case .usage: break
+                            case .finished: finished = true
+                            }
+                        }
+                        guard finished else { throw CapabilityError.unavailable("Chat returned no completed answer") }
+                        text.continuation.finish()
+                        native.continuation.finish()
+                        return ""
+                    }
+                    defer {
+                        group.cancelAll()
+                        session.cancel()
+                        text.continuation.finish(throwing: CancellationError())
+                        native.continuation.finish(throwing: CancellationError())
+                    }
+                    var answer = ""
+                    for try await value in group where !value.isEmpty { answer = value }
+                    return answer
                 }
-                defer {
-                    group.cancelAll()
-                    session.cancel()
-                    text.continuation.finish(throwing: CancellationError())
-                    native.continuation.finish(throwing: CancellationError())
-                }
-                var answer = ""
-                for try await value in group where !value.isEmpty { answer = value }
-                return answer
+            } onCancel: {
+                session.cancel()
+                text.continuation.finish(throwing: CancellationError())
+                native.continuation.finish(throwing: CancellationError())
             }
-        } onCancel: {
-            session.cancel()
-            text.continuation.finish(throwing: CancellationError())
-            native.continuation.finish(throwing: CancellationError())
         }
     }
 }

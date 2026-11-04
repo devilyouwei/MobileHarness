@@ -2,6 +2,27 @@ import Foundation
 import StorageCore
 import StorageTasks
 
+/// Producer-classified evidence. Storage persists values without interpreting Agent/provider policy.
+public struct ConversationFailureDiagnostic: Codable, Sendable, Equatable {
+    public let category: String
+    public let code: String
+    public let stage: String
+    public let message: String
+    public let details: [String: String]
+    public let causes: [ConversationFailureDiagnostic]
+    public init(
+        category: String, code: String, stage: String, message: String,
+        details: [String: String] = [:], causes: [ConversationFailureDiagnostic] = []
+    ) {
+        self.category = category
+        self.code = code
+        self.stage = stage
+        self.message = message
+        self.details = details
+        self.causes = causes
+    }
+}
+
 public enum ConversationHistoryError: Error, Equatable, Sendable {
     case busy, capacityExceeded, invalidRecord, missingTurn, emptyConversation, conflict
 }
@@ -42,6 +63,7 @@ public struct ConversationToolCall: Codable, Sendable, Identifiable {
     public var state: State = .received
     public var output: String?
     public var error: String?
+    public var failureDiagnostic: ConversationFailureDiagnostic?
     public init(id: String, providerID: String, name: String, argumentsJSON: String) {
         self.id = id
         self.providerID = providerID
@@ -61,6 +83,7 @@ public struct ConversationGenerationRound: Codable, Sendable, Identifiable {
 
 /// Exact per-request Skill and task evidence.
 public struct ConversationDecisionMetadata: Codable, Sendable {
+    public var runID: String? = nil
     public let taskID: String?
     public let mode: String
     public let skills: [String: Int]
@@ -82,6 +105,7 @@ public struct ConversationDecisionMetadata: Codable, Sendable {
 
 /// One model invocation, nested under the input that owns its execution lifecycle.
 public struct ConversationModelRequest: Codable, Sendable, Identifiable {
+    public var producerMetadata: [String: String]? = nil
     public var messageID: String? = nil
     public var inputMessageID: String? = nil
     public var isObservation: Bool? = nil
@@ -101,6 +125,7 @@ public struct ConversationModelRequest: Codable, Sendable, Identifiable {
     public var state: ConversationRecord.State = .generating
     public var finishReason: String?
     public var error: String?
+    public var failureDiagnostic: ConversationFailureDiagnostic?
     public init(
         id: String, input: String, requestJSON: String, decisionMetadata: ConversationDecisionMetadata? = nil,
         historyTaskID: String? = nil, date: Date = Date()
@@ -135,6 +160,7 @@ public struct ConversationRecord: Codable, Sendable, Identifiable {
     public var state: State = .generating
     public var finishReason: String?
     public var error: String?
+    public var failureDiagnostic: ConversationFailureDiagnostic?
     public var executionError: String?
     public var raw: String { response }
 }
@@ -473,6 +499,14 @@ public actor ConversationHistoryStore {
         guard let records else { throw ConversationHistoryError.missingTurn }
         return try await records.message(id)
     }
+    public func requestPreviews(_ id: String, after: UInt64) async throws -> [MessagePreview] {
+        guard let records else { throw ConversationHistoryError.missingTurn }
+        return try await records.requestPreviews(id, after: after)
+    }
+    public func requestCount(_ id: String) async throws -> Int {
+        if let records { return try await records.requestCount(id) }
+        return try await conversation(id).turns.reduce(0) { $0 + ($1.modelRequests?.count ?? 0) }
+    }
     public func dialogMetadata(_ id: String) async throws -> StoredConversation {
         if let records {
             do { return try await records.dialogMetadata(id) } catch RecordStorageError.missingRecord {
@@ -511,6 +545,15 @@ public actor ConversationHistoryStore {
         return result
     }
 
+    /// Identity-only duplicate lookup across this Agent's dialogs; never imports old dialog context.
+    public func containsInput(_ id: String) async throws -> Bool {
+        try await acquireWrite()
+        defer { releaseWrite() }
+        try await load()
+        if value.current.turns.contains(where: { $0.id == id }) { return true }
+        if let records { return try await records.containsInput(id) }
+        return value.past.contains { $0.turns.contains { $0.id == id } }
+    }
     /// Reads records and a fence atomically, without selecting model context.
     public func readCurrent() async throws -> ConversationReadSnapshot {
         try await acquireWrite()
@@ -690,7 +733,9 @@ public actor ConversationHistoryStore {
         }
     }
 
-    public func finishModelRequest(_ id: String, reason: String?, error: String? = nil) async throws {
+    public func finishModelRequest(
+        _ id: String, reason: String?, error: String? = nil, failureDiagnostic: ConversationFailureDiagnostic? = nil
+    ) async throws {
         try await updateTurn(id) { turn in
             guard let index = turn.modelRequests?.indices.last,
                 turn.modelRequests?[index].state == .generating
@@ -698,6 +743,7 @@ public actor ConversationHistoryStore {
             turn.modelRequests?[index].state = error == nil ? .completed : .failed
             turn.modelRequests?[index].finishReason = reason
             turn.modelRequests?[index].error = error.map { String($0.prefix(4096)) }
+            turn.modelRequests?[index].failureDiagnostic = failureDiagnostic
             return true
         }
         try await checkpoint()
@@ -747,7 +793,7 @@ public actor ConversationHistoryStore {
 
     public func recordToolOutcome(
         _ callID: String, for id: String, state: ConversationToolCall.State,
-        output: String? = nil, error: String? = nil
+        output: String? = nil, error: String? = nil, failureDiagnostic: ConversationFailureDiagnostic? = nil
     ) async throws {
         guard state != .received, (output?.utf8.count ?? 0) <= 65536 else {
             throw ConversationHistoryError.invalidRecord
@@ -758,6 +804,7 @@ public actor ConversationHistoryStore {
             turn.toolCalls?[index].state = state
             turn.toolCalls?[index].output = output
             turn.toolCalls?[index].error = error.map { String($0.prefix(4096)) }
+            turn.toolCalls?[index].failureDiagnostic = failureDiagnostic
             for request in turn.modelRequests?.indices ?? 0..<0 {
                 if let call = turn.modelRequests?[request].toolCalls.firstIndex(where: { $0.id == callID }),
                     let outcome = turn.toolCalls?[index]
@@ -823,7 +870,8 @@ public actor ConversationHistoryStore {
     }
 
     public func finish(
-        _ id: String, state: ConversationRecord.State, reason: String? = nil, error: String? = nil
+        _ id: String, state: ConversationRecord.State, reason: String? = nil, error: String? = nil,
+        failureDiagnostic: ConversationFailureDiagnostic? = nil
     ) async throws {
         try await acquireWrite()
         defer { releaseWrite() }
@@ -836,6 +884,7 @@ public actor ConversationHistoryStore {
         next.current.turns[index].state = state
         next.current.turns[index].finishReason = reason
         next.current.turns[index].error = error.map { String($0.prefix(4096)) }
+        next.current.turns[index].failureDiagnostic = failureDiagnostic
         if next.current.turns[index].modelRequests?.isEmpty ?? true,
             !(next.current.turns[index].toolCalls?.isEmpty ?? true)
         {
@@ -856,6 +905,7 @@ public actor ConversationHistoryStore {
             next.current.turns[index].modelRequests?[request].finishReason = reason
             let failure = next.current.turns[index].error
             next.current.turns[index].modelRequests?[request].error = failure
+            next.current.turns[index].modelRequests?[request].failureDiagnostic = failureDiagnostic
         }
         do {
             try await commit(next)

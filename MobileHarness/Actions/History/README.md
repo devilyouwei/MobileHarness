@@ -68,3 +68,5 @@ list 的 turnCount 是存储的输入块数量；read 的 total 是 indexedHisto
 ## Execution ownership and lifecycle
 
 HistoryReadInvocation is ActionRequestSlot<UI.HistoryInput, UI.HistoryReply>. HistoryActions converts the typed request, executes the same HistoryFullReadCapability and returns a typed private result. Session/input and duplicate checks remain local; role/Task authorization stays in Memory. ConversationHistoryWorkflow belongs to Actions and joins mutation/paging workers at shutdown. ActionsContainer retains title jobs and business services.
+
+ConversationHistoryWorkflow.records 为独立 Agent 仓库组合相同的分页/完整请求/图片展示；修改通过注入的 Agent 意图接口执行，不能直接从 UI workflow 删除仓库。Writer 的存储与 Agent 意图由 App 显式组合，不改变 Assistant 的 Memory 路径。

@@ -186,14 +186,14 @@ func uiExpressionCancellationJoinsWaitAndPreservesRendererFailure() async throws
     let state = SettingsState(initial: CloudSettingsDraft(enabled: true, url: "https://old", key: "old", model: "old"))
     let previous = state.revision
     state.url = "https://new"
-    #expect(!state.presentModels(["stale"], notice: "stale", revision: previous))
+    #expect(!state.presentNotice("stale", revision: previous))
     #expect(!state.presentFailure("stale", revision: previous))
     #expect(
         !state.presentRestored(
             CloudSettingsDraft(enabled: false, url: "https://old", key: "old", model: "old"), revision: previous))
-    #expect(state.url == "https://new" && state.models.isEmpty && state.error == nil)
-    #expect(state.presentModels(["new"], notice: "current", revision: state.revision))
-    #expect(state.models == ["new"] && state.notice == "current")
+    #expect(state.url == "https://new" && state.modelCatalogs.isEmpty && state.error == nil)
+    #expect(state.presentNotice("current", revision: state.revision))
+    #expect(state.modelCatalogs.isEmpty && state.notice == "current")
 }
 
 @Test func replyWaitingKeepsIndependentSequenceAndRejectsOldDecision() {

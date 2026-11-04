@@ -144,9 +144,9 @@ Publication is one-way. A subscriber rejection cannot stop inference; output pro
 
 ## 聆听、取消与完成
 
-同意只在本会话有效；撤销／暂停推进接纳 epoch，并在异步提交后重验 UI 代际，拒绝迟到启用。原生 owner 的 `stopListening(sessionID:)` 只撤销并发布内部策略，不能重新同意。公开启停 Action 通过 `setListening(enabled:sessionID:)` 更新同一许可：校验 resident/root 会话与运行态（paused 时仅允许关闭），推进 admission epoch 并返回单调 revision 的中立 ListeningPolicy；关闭同时清空 pendingFinal 并关闭新句接纳。此调用不发布第二个 Action，由原执行方直接应用返回策略并确认原生完成。回复活动只改变 paused，不改变 enabled；物理停止不依赖 UI 队列可用。
+同意只在本会话有效；撤销／暂停推进接纳 epoch，并在异步提交后重验 UI 代际，拒绝迟到启用。原生 owner 的 `stopListening(sessionID:)` 只撤销并发布内部策略，不能重新同意。公开启停 Action 通过 `setListening(enabled:sessionID:)` 更新同一许可：校验 resident/root 会话与运行态（paused 时仅允许关闭），推进 admission epoch 并返回单调 revision 的中立 ListeningPolicy；关闭同时清空 pendingFinal 并关闭新句接纳。此调用不发布第二个 Action，由原执行方直接应用返回策略并确认原生完成。普通回复活动只改变paused。认证Assistant的成功Writer汇报完成事实可使enabled变为true，经现有Speech.Listening.update执行启听；物理停止不依赖UI队列可用。
 
-最多四个 source/incarnation/revision 围栏的 replyActivity 快照及一个 pending final root 抑制新句接纳。最终识别先关接纳再发布，Assistant 匹配回复事实接管 occupancy；释放依赖真实终态／生命周期，没有占用定时器。半双工暂停保留逻辑同意，Actions 加入已确认语句、播放 drain 和音频清理后才恢复；用户撤销后不自动恢复。
+最多四个 source/incarnation/revision 围栏的 replyActivity 快照及一个 pending final root 抑制新句接纳。最终识别先关接纳再发布，Assistant 匹配回复事实接管 occupancy；释放依赖真实终态／生命周期，没有占用定时器。半双工暂停保留逻辑同意，Actions 加入已确认语句、播放 drain 和音频清理后才恢复；用户撤销推进单调时间围栏，早于撤销开始的汇报不能重新启听。新的汇报在撤销后实际开始并成功播毕时可按汇报政策启听。
 
 startInput 只订阅当前已开启采集代。回复半双工暂停保留该订阅并丢弃未获准入的帧；设备关闭时取消空闲取帧、加入当前包，完整 close/stop 先取消识别，再加入原生任务、获取模型和发布者。恢复最多 32 个可取消当前包等待者，只等待已接纳工作，不承载 PCM。UI 回执确认策略接纳；原生停机和播放终态由执行服务单独确认。
 
@@ -181,6 +181,9 @@ SpeechPerceptionContainer.presentation returns one complete SpeechSessionPresent
 
 ASR创建、输入或结果失败属于当前识别轮次终态：保留原始agent.error，取消并加入该轮ASR/VAD，校验采集代/会话/运行态后重建下一轮。失败清空未提交字幕并finishTranscript，使用统一transition(.empty)写Context/listening、结束识别绑定，并在采集开启且聆听许可未撤销/未暂停时提交listening呈现；不能只改内部phase。processing是等待ASR收尾，不等于已提交LLM。恢复不发布speech.final、不重开麦克风、不改变用户同意；关闭/换代的迟到清理不复活旧会话。UI工具/通信失败继续报告，UI保持既有会话/序号/采集与回复占用围栏。
 
-ReplyActivity的新revision/incarnation只表示占用事实更新，接纳时必须推进来源围栏并处理pendingFinal确认；只有四来源合并后的paused值改变才提交Speech.Listening.update。相同空闲、同态忙碌、另一个来源仍占用时的单方结束不会重复调用设备策略。此规则切断关闭→取消回复→空闲回执→再次关闭的反馈环；显式用户开关和原生采集结束仍走既有执行路径，不采用节流或日志过滤。
+ReplyActivity以来源revision/incarnation验证占用及成功汇报事实，接纳时必须推进来源围栏并处理pendingFinal确认；只有已启听时合并paused改变，或成功汇报使enabled改变，才提交Speech.Listening.update。关闭聆听时单纯占用改变不提交关闭Action，避免反向取消主动播报。相同空闲、同态忙碌、另一个来源仍占用时的单方结束不会重复调用设备策略。此规则切断关闭→取消回复→空闲回执→再次关闭的反馈环；显式用户开关和原生采集结束仍走既有执行路径，不采用节流或日志过滤。
 
 场景隐藏不撤销根语音许可或取消识别。回复占用期间原生输入订阅继续排空帧，admitsMicrophone为false时直接丢弃，不调用VAD/ASR或生成输入；实际关闭/中断仍取消加入。此半双工准入与设备持续录音分离，避免把播放声音识别为下一句。
+
+
+汇报完成事实携带回复开始的进程单调时间；明确停止、原生采集结束、暂停及根关闭推进本地撤销围栏。来源incarnation/revision丢弃乱序快照，完成事实可独立于更早的占用快照接纳；较新停止之后的旧完成及重复完成不得重新启听。policy不直接操作设备，实际启动、权限和播放屏障继续归Actions；失败/取消回复没有成功完成事实。

@@ -410,6 +410,7 @@ public struct WindowContent: RawRepresentable, Sendable, Equatable {
         self.rawValue = rawValue
         self.singleInstance = singleInstance
     }
+    public static let artifact = Self(rawValue: "artifact", singleInstance: false)
     public static let web = Self(rawValue: "web", singleInstance: true)
     public static let camera = Self(rawValue: "camera", singleInstance: true)
 }

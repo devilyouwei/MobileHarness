@@ -1,8 +1,8 @@
 {
   "version": 3,
   "id": "basic-skill",
-  "revision": 37,
-  "description": "Task and Skill orchestration, current State summaries and a single continuing foreground goal.",
+  "revision": 42,
+  "description": "Task/Skill coordination, Writer delegation and current app/window State.",
   "dependencies": [],
   "useActions": [
     {
@@ -46,11 +46,18 @@
       "callType": "action",
       "alias": "stopListening",
       "channel": "ListeningControl"
+    },
+    {
+      "path": "Agent.Task.sendMessage",
+      "callType": "action",
+      "alias": "sendMessage",
+      "channel": "Control"
     }
   ],
   "useStates": [
     "agents.applicationcontrol",
     "ui.navigation",
+    "ui.windows",
     "platform.system.time",
     "platform.system.power",
     "platform.system.thermal",
@@ -58,7 +65,8 @@
     "platform.system.permissions",
     "platform.system.audio",
     "platform.system.locale",
-    "platform.system.accessibility"
+    "platform.system.accessibility",
+    "agents.writer"
   ],
   "useInstructions": [
     "Instructions.md"

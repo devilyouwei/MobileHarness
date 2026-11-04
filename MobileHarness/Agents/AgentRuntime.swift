@@ -103,6 +103,7 @@ import StorageFiles
             containerFailures: ContainerFailureChannel, home: UIHomeContainer,
             assistantContainer: AssistantContainer, applicationControlContainer: ApplicationControlContainer,
             memoryContainer: MemoryContainer, photographerContainer: PhotographerContainer,
+            writerContainer: WriterContainer,
             stateContext: AgentStateContext, cache: CacheContainer,
             chatRecords: any ChatRepository, taskRecords: any TaskRepository,
             cameraUI: UICameraContainer, albumUI: UIAlbumContainer? = nil, windowsUI: WindowState? = nil,
@@ -114,6 +115,7 @@ import StorageFiles
             modelName: @escaping @Sendable () async throws -> String = { "Unspecified model" },
             chatProvider: @escaping @Sendable () async throws -> any ChatCapability
         ) throws -> AgentExecutionPreparation {
+            try writerContainer.configureHistory(chat: chatRecords, tasks: taskRecords)
             let contextScope = UUID().uuidString
             let assistantContext = try AgentContextRepository(
                 agent: .assistant, scope: contextScope, state: AssistantContextState())
@@ -176,7 +178,7 @@ import StorageFiles
                     contracts: AgentContracts.communication,
                     configurations: [
                         "Assistant", "SpeechPerception", "VisionPerception", "Photographer", "SpeechSynthesis",
-                        "Memory", "ApplicationControl",
+                        "Memory", "ApplicationControl", "Writer",
                     ]
                     .map {
                         try AgentConfigurations.load(named: $0)
@@ -207,6 +209,7 @@ import StorageFiles
                             AgentConfigurations.load(named: "Photographer").capabilities),
                         AgentConfigurations.load(named: "SpeechSynthesis").capabilities,
                         historyAgent.descriptor.capabilities, applicationControlAgent.descriptor.capabilities,
+                        WriterAgent.capabilities(),
                     ] + AgentConfigurations.skillRegistries())
                 let configuration = AgentGatewayConfiguration(
                     executor: execution, catalog: catalog, policy: policy, resources: business.resources,
@@ -249,7 +252,7 @@ import StorageFiles
                         stateContext: stateContext, cameraControl: cameraControl, chatProvider: chatProvider,
                         modelName: modelName, assistantContainer: assistantContainer,
                         applicationControlContainer: applicationControlContainer, memoryContainer: memoryContainer,
-                        photographerContainer: photographerContainer)
+                        photographerContainer: photographerContainer, writerContainer: writerContainer)
                 }
             }
         }
@@ -263,7 +266,7 @@ import StorageFiles
             chatProvider: @escaping @Sendable () async throws -> any ChatCapability,
             modelName: @escaping @Sendable () async throws -> String, assistantContainer: AssistantContainer,
             applicationControlContainer: ApplicationControlContainer, memoryContainer: MemoryContainer,
-            photographerContainer: PhotographerContainer
+            photographerContainer: PhotographerContainer, writerContainer: WriterContainer
         ) throws {
             self.contextScope = contextScope
             self.uiHome = home
@@ -284,6 +287,12 @@ import StorageFiles
             self.actions = actions
             self.output = gateway
             self.business = business
+            guard let streaming = business.artifactStreaming, let writerModel = business.writerModel else {
+                throw WriterFailure.unavailable
+            }
+            writerContainer.bindArtifacts(business.writerArtifacts)
+            writerContainer.bindPhotos(business.writerPhotos)
+            try writerContainer.install(manager: manager, output: gateway, model: writerModel, streaming: streaming)
             actionActivity = activity
             business.bindResources(resources, actions)
             business.bindDeferredFailure { result in
@@ -352,6 +361,7 @@ import StorageFiles
             let activity = actionActivity
             let input = input
             let manager = manager
+            let interaction = interaction
             let main = interaction.agent
             let gateway = output
             let actions = actions
@@ -375,6 +385,7 @@ import StorageFiles
                 var previous: [String: String] = [:]
                 for await skills in main.skillUpdates {
                     guard !Task.isCancelled else { return }
+                    await interaction.presentTaskState(skills)
                     let active = skills.tasks.first { $0.id == skills.activeTaskID }
                     activity.presentTaskState(
                         id: active?.id, title: active?.goal ?? "", status: active?.status ?? "",

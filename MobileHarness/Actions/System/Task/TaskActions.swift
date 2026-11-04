@@ -2,6 +2,20 @@ import FunctionContracts
 
 extension SystemActions {
     @Action(
+        domain: "Agent", module: "Task", title: "sendMessage",
+        doc:
+            "Send user input to background work.",
+        parameters: [
+            .init("taskID", description: "Actual background task ID"),
+            .init("text", description: "Relevant user answer or correction"),
+            .init("interactionID", required: false, description: "Pending question ID"),
+        ], timeout: .seconds(30))
+    public static func sendMessage(_ input: any FunctionInput, capability: any TaskControlCapability) async throws
+        -> ActionCompletion
+    {
+        .value(try await capability.controlTask("sendMessage", arguments: input.call.parameters, invocation: input))
+    }
+    @Action(
         domain: "Agent", module: "Task", title: "loadSkills",
         doc: "Atomically load Skills; returns committed state for the following request.",
         parameters: [
@@ -30,28 +44,38 @@ extension SystemActions {
     @Action(
         domain: "Agent", module: "Task", title: "startTask",
         doc:
-            "Start a new goal and load its Skills; rejects an existing foreground Task until it is closed. Foreground omits background-only fields.",
+            "Start foreground here or delegate background; acceptance preserves foreground work.",
         parameters: [
-            .init("goal", type: .string, required: true, description: "Task goal", constraints: "Bounded text"),
             .init(
-                "skills", type: .string, required: false, description: "Optional JSON array of Skill IDs",
+                "goal", type: .string, required: true,
+                description: "Goal; Writer: one line, <=1024 UTF-8 bytes, no code", constraints: "Bounded text"),
+            .init(
+                "skills", type: .string, required: false,
+                description: "JSON Skill IDs; omit for Writer",
                 constraints: "Bounded text"),
             .init(
                 "execution", type: .string, required: false, description: "foreground (default) or background",
                 constraints: "Bounded text"),
             .init(
-                "target", type: .string, required: false,
-                description: "Background only: required executor Agent ID; omit for foreground",
+                "executor", type: .string, required: false,
+                description: "Background executor ID: writer",
                 constraints: "Bounded text"),
+            .init("taskID", required: false, description: "Writer only: actual saved task to resume"),
+            .init(
+                "replaceCurrent", type: .boolean, required: false,
+                description: "Writer only: authorized replacement after cleanup",
+                values: ["true", "false"]),
+            .init("title", required: false, description: "Writer work title"),
+            .init("entry", required: false, description: "Writer entry: index.html/document.md/document.txt"),
             .init(
                 "businessContract", type: .string, required: false,
-                description: "Background only: declared business contract; omit for foreground",
+                description: "Non-Writer background only: registered contract",
                 constraints: "Bounded text"),
             .init(
                 "payload", type: .string, required: false,
-                description: "Background only: business JSON; omit for foreground",
+                description: "Non-Writer background only: contract JSON",
                 constraints: "Bounded text"),
-        ], completion: "Committed task/Skill transition", timeout: .seconds(5))
+        ], completion: "Foreground committed, or background accepted", timeout: .seconds(30))
     public static func startTask(_ input: any FunctionInput, capability: any TaskControlCapability) async throws
         -> ActionCompletion
     {
@@ -60,7 +84,7 @@ extension SystemActions {
     @Action(
         domain: "Agent", module: "Task", title: "finishTask",
         doc:
-            "Close the current Task. Ends this decision by default; continueDecision is only for an explicit remaining new goal. Summary describes the actual outcome.",
+            "Finish foreground only; background completion belongs to its executor. continueDecision requires a remaining new goal.",
         parameters: [
             .init(
                 "summary", type: .string, required: true, description: "summary", constraints: "Nonempty bounded text"),
@@ -77,10 +101,15 @@ extension SystemActions {
     }
     @Action(
         domain: "Agent", module: "Task", title: "cancelTask",
-        doc: "Cancel the active Task after cleanup joins; returns committed state. Completed effects are not undone.",
+        doc:
+            "Cancel foreground; taskID requests background cleanup. Await its terminal.",
         parameters: [
-            .init("reason", type: .string, required: true, description: "reason", constraints: "Nonempty bounded text")
-        ], completion: "Committed task/Skill transition", timeout: .seconds(5))
+            .init(
+                "reason", type: .string, required: true, description: "User cancellation reason",
+                constraints: "Nonempty bounded text"),
+            .init(
+                "taskID", required: false, description: "Actual background task ID; omit for current foreground Task"),
+        ], completion: "Foreground cancelled, or background cancellation delivered", timeout: .seconds(30))
     public static func cancelTask(_ input: any FunctionInput, capability: any TaskControlCapability) async throws
         -> ActionCompletion
     {

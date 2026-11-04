@@ -33,7 +33,7 @@ Each request resets backend cache. Event stream currently retains 4096 events of
 
 ## Admission and timing
 
-One model lease rejects overlap; cancellation joins backend cleanup before release; unload drains the lease. There is no waiting request queue. Sample optional model-interface start immediately before native generate after resource/tokenization, then first nonempty delta before emission. Loading, tokenization, persistence/UI/voice are excluded; missing timing is not fabricated.
+One model lease rejects overlap; cancellation joins backend cleanup before release; unload drains the lease. Provider 直接调用仍拒绝重叠；ModelLanguageContainer 的本地请求由根拥有的 SerialChat FIFO 统一排队。 Sample optional model-interface start immediately before native generate after resource/tokenization, then first nonempty delta before emission. Loading, tokenization, persistence/UI/voice are excluded; missing timing is not fabricated.
 
 Managed local text generation, explicit unsupported inputs and provider timing are implemented.
 

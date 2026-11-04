@@ -152,12 +152,16 @@ func liveProviderPreservesConsecutiveUsers() async throws {
     ] {
         let configuration = try OpenAIChatConfiguration(
             baseURL: OpenAIChatConfiguration.endpoint("https://api.openai.com/v1"), apiKey: "test-only", model: model)
+        let request = try configuration.request(ChatRequest(messages: [.init(role: .user, content: "Hi")]))
+        let data = try #require(request.httpBody)
+        let body = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        let effort = (body["reasoning"] as? [String: String])?["effort"]
         #expect(
-            throws: CapabilityError.invalidRequest(
-                "Selected OpenAI model cannot disable thinking; choose a non-thinking model")
-        ) {
-            try configuration.request(ChatRequest(messages: [.init(role: .user, content: "Hi")]))
-        }
+            effort
+                == (model == "gpt-5.4-pro"
+                    ? "medium" : ["gpt-5", "gpt-5-mini", "gpt-5-nano"].contains(model) ? "minimal" : "low"))
+        #expect(body["temperature"] == nil)
+
     }
 }
 
@@ -204,7 +208,7 @@ private func decode(_ text: String) throws -> [ChatEvent] {
     #expect(try decode("data: {\ndata: \"type\": \"response.in_progress\"}\n\n").isEmpty)
 }
 
-@Test func rejectsMalformedUnsupportedAndOversizeStreams() throws {
+@Test func rejectsMalformedAndUnsupportedStreams() throws {
     #expect(throws: OpenAIChatError.truncatedStream) { try decode("data: [DONE]\n\n") }
     expectResponseFailure(.malformedEvent) { try decode("data: {broken}\n\n") }
     expectResponseFailure(.unsupportedOutput) {
@@ -212,7 +216,6 @@ private func decode(_ text: String) throws -> [ChatEvent] {
             "data: {\"type\":\"response.output_item.added\",\"output_index\":0,\"item\":{\"type\":\"unsupported\"}}\n\n"
         )
     }
-    #expect(throws: OpenAIChatError.responseTooLarge) { try decode(String(repeating: "x", count: 65537)) }
 }
 
 private final class StubProtocol: URLProtocol, @unchecked Sendable {
@@ -383,8 +386,12 @@ func pausedLongCloudReplyCanCancelOrShutdown(shutdown: Bool) async throws {
     let chat = try await manager.get(.chat)
     let request = try ChatRequest(messages: [.init(role: .user, content: "Hello")])
     let session = try await chat.chat(request)
-    await #expect(throws: CapabilityError.inputBusy) { try await chat.chat(request) }
+    let overlap = try await chat.chat(request)
     session.cancel()
+    await session.waitForCompletion()
+    #expect(overlap.phase == .running)
+    overlap.cancel()
+    await overlap.waitForCompletion()
     var iterator = session.events.makeAsyncIterator()
     await #expect(throws: CancellationError.self) { try await iterator.next() }
     // unload joins the cancelled request before reusing its admission lease.
@@ -419,8 +426,12 @@ private final class ErrorProtocol: URLProtocol, @unchecked Sendable {
             return settings
         })
     let session = try await chat.chat(ChatRequest(messages: [.init(role: .user, content: "Hi")]))
-    await #expect(throws: OpenAIChatError.httpStatus(401)) {
+    do {
         for try await _ in session.events {}
+        Issue.record("Expected HTTP failure")
+    } catch let error as OpenAIChatError {
+        #expect(error.chatFailure.reason == .httpStatus && error.chatFailure.statusCode == 401)
+        #expect(!error.description.contains("secret-provider-response"))
     }
 }
 
@@ -461,10 +472,12 @@ private final class ErrorProtocol: URLProtocol, @unchecked Sendable {
                 throw CapabilityError.invalidRequest("candidate failure")
             })
     }
-    await #expect(throws: CapabilityError.inputBusy) { try await old.chat(request) }
+    let overlap = try await old.chat(request)
     try await manager.replace(registration("cloud"))
     var events = session.events.makeAsyncIterator()
     await #expect(throws: CancellationError.self) { try await events.next() }
+    #expect(overlap.phase == .cancelled)
+    await overlap.waitForCompletion()
     await #expect(throws: CapabilityError.sessionClosed) { try await old.chat(request) }
     let replacement = try await manager.get(.chat)
     let replaced = (replacement as AnyObject) !== (old as AnyObject)
@@ -564,6 +577,13 @@ private final class AnonymousModelListProtocol: URLProtocol, @unchecked Sendable
     #expect(throws: CapabilityError.self) {
         try ChatRequest(messages: chat.messages, maximumOutputTokens: 0)
     }
+}
+
+@Test func explicitOutputBudgetIsNotCappedByAnUnrelatedModelLimit() throws {
+    let chat = try ChatRequest(messages: [.init(role: .user, content: "Hello")], maximumOutputTokens: 131072)
+    let data = try #require(try config().request(chat).httpBody)
+    let body = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
+    #expect(body["max_output_tokens"] as? Int == 131072)
 }
 
 @Test func streamReportsTerminalUsageAndRejectsInvalidCounts() throws {
@@ -1401,4 +1421,211 @@ func liveOllamaResponsesReasoningCompatibility() async throws {
         try await context.unload()
         throw error
     }
+}
+
+@Test func enabledThinkingIsIndependentFromMinimumConfiguration() throws {
+    let input = try ChatRequest(messages: [.init(role: .user, content: "Create a page")])
+    for model in ["gpt-5.1", "gpt-5.4-pro", "gpt-6.1-sol", "gpt-5-pro", "gpt-4o-mini"] {
+        let configuration = try OpenAIChatConfiguration(
+            baseURL: OpenAIChatConfiguration.endpoint("https://api.openai.com/v1"), apiKey: "test", model: model,
+            thinking: .enabled)
+        let data = try #require(configuration.request(input).httpBody)
+        let body = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        if model == "gpt-4o-mini" {
+            #expect(body["reasoning"] == nil)
+        } else {
+            #expect((body["reasoning"] as? [String: String])?["effort"] == (model == "gpt-5-pro" ? "high" : "medium"))
+            #expect(body["temperature"] == nil)
+        }
+    }
+    let qwen = try OpenAIChatConfiguration(
+        baseURL: OpenAIChatConfiguration.endpoint("https://dashscope.aliyuncs.com/compatible-mode/v1"),
+        apiKey: "test", model: "qwen3.8-flash", thinking: .enabled)
+    let data = try #require(qwen.request(input).httpBody)
+    let body = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
+    #expect(body["enable_thinking"] as? Bool == true)
+    #expect(body["reasoning"] == nil)
+}
+
+@Test(arguments: [-1001, -1003, -1202, -1009, -1005, -999])
+func transportDiagnosticsKeepURLCodeWithoutLeakingURLs(code: Int) {
+    let native = NSError(
+        domain: NSURLErrorDomain, code: code,
+        userInfo: [NSURLErrorFailingURLErrorKey: URL(string: "https://secret.example/path?key=PRIVATE") as Any])
+    let failure = OpenAIChatError.transportFailure(native, stage: .stream).chatFailure
+    #expect(failure.networkCode == code && failure.stage == .stream)
+    #expect(
+        failure.networkReason?.rawValue
+            == [
+                -1001: "timeout", -1003: "dns", -1202: "tls", -1009: "offline", -1005: "connection", -999: "cancelled",
+            ][code])
+    #expect(!failure.description.contains("PRIVATE") && !failure.description.contains("secret.example"))
+}
+
+@Test func httpDiagnosticPreservesProviderFieldsAndRedactsCredentials() throws {
+    let configuration = try OpenAIChatConfiguration(
+        baseURL: #require(URL(string: "https://example.test/v1")), apiKey: "PRIVATE-API-KEY", model: "fixture")
+    let failureURL = try #require(URL(string: "https://example.test/v1/responses"))
+    let response = try #require(
+        HTTPURLResponse(
+            url: failureURL, statusCode: 400, httpVersion: nil,
+            headerFields: ["x-request-id": "req-fixture"]))
+    let body = try JSONSerialization.data(withJSONObject: [
+        "error": [
+            "code": "invalid_parameter", "type": "invalid_request_error", "param": "reasoning.effort",
+            "message":
+                "Unsupported reasoning.effort PRIVATE-API-KEY Bearer OTHER_SECRET https://example.test/?key=URL_SECRET",
+        ]
+    ])
+    let failure = configuration.httpFailure(response, body: body).chatFailure
+    #expect(failure.statusCode == 400 && failure.providerCode == "invalid_parameter")
+    #expect(failure.providerType == "invalid_request_error" && failure.providerParameter == "reasoning.effort")
+    #expect(
+        failure.requestID == "req-fixture" && failure.providerMessage?.contains("Unsupported reasoning.effort") == true)
+    for secret in ["PRIVATE-API-KEY", "OTHER_SECRET", "URL_SECRET", "https://"] {
+        #expect(!failure.description.contains(secret))
+    }
+}
+
+private final class TimeoutFailureProtocol: URLProtocol, @unchecked Sendable {
+    override class func canInit(with request: URLRequest) -> Bool { true }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+    override func startLoading() { client?.urlProtocol(self, didFailWithError: URLError(.timedOut)) }
+    override func stopLoading() {}
+}
+
+@Test func realRequestPathRetainsTransportTimeoutEvidence() async throws {
+    let chat = try OpenAIChat(
+        context: ModelContext(loadGate: ModelLoadGate(maximumConcurrentLoads: 4), maximumLoadWaiters: 32),
+        configuration: config(),
+        sessionConfiguration: {
+            let settings = URLSessionConfiguration.ephemeral
+            settings.protocolClasses = [TimeoutFailureProtocol.self]
+            return settings
+        })
+    let session = try await chat.chat(ChatRequest(messages: [.init(role: .user, content: "Hello")]))
+    do {
+        for try await _ in session.events {}
+        Issue.record("Expected timeout")
+    } catch let error as OpenAIChatError {
+        #expect(error.chatFailure.networkReason == .timeout && error.chatFailure.networkCode == -1001)
+        #expect(error.chatFailure.stage == .http)
+    }
+}
+
+private final class HeartbeatStreamProtocol: URLProtocol, @unchecked Sendable {
+    private let worker = Mutex<Task<Void, Never>?>(nil)
+    override class func canInit(with request: URLRequest) -> Bool { true }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+    override func startLoading() {
+        guard let url = request.url,
+            let response = HTTPURLResponse(
+                url: url, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "text/event-stream"])
+        else { return }
+        client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+        let task = Task.detached { @Sendable [self] in
+            do {
+                for _ in 0..<8 {
+                    self.client?.urlProtocol(self, didLoad: Data(": reasoning heartbeat\n\n".utf8))
+                    try await Task.sleep(for: .milliseconds(200))
+                }
+                self.client?.urlProtocol(
+                    self,
+                    didLoad: Data(
+                        "data: {\"type\":\"response.completed\",\"response\":{\"status\":\"completed\",\"output\":[]}}\n\n"
+                            .utf8))
+                self.client?.urlProtocolDidFinishLoading(self)
+            } catch {}
+        }
+        worker.withLock { $0 = task }
+    }
+    override func stopLoading() { worker.withLock { $0?.cancel() } }
+}
+
+@Test func activeStreamingOutlivesIdleTimeoutWithoutArtificialResourceDeadline() async throws {
+    let settings = URLSessionConfiguration.ephemeral
+    let resourceDeadline = settings.timeoutIntervalForResource
+    let residency = ChatNetworkSession(configuration: settings, timeout: 1)
+    #expect(residency.session.configuration.timeoutIntervalForRequest == 1)
+    #expect(residency.session.configuration.timeoutIntervalForResource == resourceDeadline)
+    residency.session.invalidateAndCancel()
+    let configuration = try OpenAIChatConfiguration(
+        baseURL: #require(URL(string: "https://example.test/v1")), apiKey: "fixture", model: "fixture", timeout: 1)
+    let chat = try OpenAIChat(
+        context: ModelContext(loadGate: ModelLoadGate(maximumConcurrentLoads: 4), maximumLoadWaiters: 32),
+        configuration: configuration,
+        sessionConfiguration: {
+            let settings = URLSessionConfiguration.ephemeral
+            settings.protocolClasses = [HeartbeatStreamProtocol.self]
+            return settings
+        })
+    let started = ContinuousClock.now
+    let session = try await chat.chat(ChatRequest(messages: [.init(role: .user, content: "Think then answer")]))
+    var finished = false
+    for try await event in session.events { if case .finished = event { finished = true } }
+    #expect(finished && started.duration(to: .now) > .seconds(1))
+}
+
+@Test func largeSSEFramesAndLongStreamsDoNotLimitGeneratedOutput() throws {
+    let source = String(repeating: "中文🌍e\u{301}", count: 20_000)
+    let frame =
+        "data: "
+        + String(
+            decoding: try JSONSerialization.data(withJSONObject: [
+                "type": "response.output_text.delta", "delta": source,
+            ]), as: UTF8.self) + "\n\n"
+    let events = try decode(frame)
+    let chunks = events.compactMap { event -> String? in
+        if case .text(let text) = event { return text }
+        return nil
+    }
+    #expect(chunks.count > 1 && chunks.joined() == source)
+    #expect(chunks.allSatisfy { $0.utf8.count <= 32768 })
+    // A Responses terminal event repeats the full output; it must not fail at 64KiB.
+    let terminal =
+        "data: "
+        + String(
+            decoding: try JSONSerialization.data(withJSONObject: [
+                "type": "response.completed",
+                "response": [
+                    "status": "completed",
+                    "output": [
+                        ["type": "message", "content": [["type": "output_text", "text": source]]]
+                    ],
+                ],
+            ]), as: UTF8.self) + "\n\n"
+    #expect(try decode(terminal) == [.finished(.stop)])
+    var decoder = ChatEventDecoder()
+    let heartbeat = ":" + String(repeating: " ", count: 65_536) + "\n\n"
+    for _ in 0..<129 {
+        for byte in heartbeat.utf8 { _ = try decoder.consume(byte) }
+    }
+    var final: [ChatEvent] = []
+    for byte in terminal.utf8 { final += try decoder.consume(byte) }
+    #expect(final == [.finished(.stop)])
+}
+
+@Test(.timeLimit(.minutes(1))) func sharedCloudClientRunsMultipleSessionsAndCancelsOnlyMatchingRequest() async throws {
+    let context = try ModelContext(loadGate: ModelLoadGate(maximumConcurrentLoads: 4), maximumLoadWaiters: 32)
+    let capability = try OpenAIChat(
+        context: context, configuration: config(),
+        sessionConfiguration: {
+            let settings = URLSessionConfiguration.ephemeral
+            settings.protocolClasses = [HangingProtocol.self]
+            return settings
+        })
+    var sessions: [InferenceSession<ChatEvent>] = []
+    for _ in 0..<12 {
+        sessions.append(try await capability.chat(ChatRequest(messages: [.init(role: .user, content: "held")])))
+    }
+    #expect(await context.inferenceActive)
+    sessions[0].cancel()
+    await sessions[0].waitForCompletion()
+    #expect(sessions[0].phase == .cancelled)
+    #expect(sessions.dropFirst().allSatisfy { $0.phase == .running })
+    #expect(await context.inferenceActive)
+    await context.shutdown()
+    for session in sessions { await session.waitForCompletion() }
+    #expect(!((await context.inferenceActive)))
+    #expect(sessions.allSatisfy { $0.phase == .cancelled })
 }

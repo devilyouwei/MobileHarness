@@ -1,5 +1,14 @@
 # Face、通用 Window 与 App 内灵动岛
 
+## 2026-11-03 灵动岛黑色边缘与内容偶发错位
+
+已实施针对性修复：紧凑岛标题改用固定画布，消除会随计时宽度变化的独立header宿主尺寸；阻止多入口同步布局重入，并在有效动画结束时统一校正目标。两项新增回归、UI189项、串行运行时225项及四项iOS构建通过；全量check因3个范围外用例失败退出1，原生UI整组缺少结束摘要。用户截图的真机间歇触发链尚未复现，需继续视觉验收，详见[验证记录](../validation/Window-Camera.md)。
+
+- UI/Components/Island/IslandHost.swift：标题宿主改用与状态条一致的全视口固定画布，按IslandPlacement.compact定位内容；通过逆向父容器偏移保持全局位置，展开顶部6pt下移仍由UIKit frame动画承担。标题内容宽度变化不再改变宿主画布宽度。背景、命中和占位仍使用同一IslandPlacement。
+- render设置同步重入保护，嵌套布局只请求下一次布局，不重复构造／覆盖animator。两段开场、展开／收起在有效动画完成后无动画统一写回目标frame／corner／alpha／内容及状态条坐标，再发localCompleted；被新token取代的动画不能校正新目标。
+- Tests/UITests/IslandStateTests.swift补充固定画布坐标回归：单侧／双侧状态、22pt普通槽／44pt计时槽、展开／收起、硬件保护区／非硬件布局及父容器中途位置，验证背景与内容共享同一全局基准，不从截图宣称已证明唯一根因。
+- 更新Island与测试README，保留其他在途紫色主题等改动。运行完整check和四项iOS构建；记录实际结果与尚未覆盖的真机间歇复现／转场验收。本次不改变跨模块接口或系统Widget外壳。
+
 ## 2026-11-03 现有窗口使用emoji
 
 已实现：项目实际创建Window的入口只有CameraCoordinator和WebExecutionService，分别将系统图标改为📷和🌐，使用已有WindowIcon.emoji接口。两个拥有目录README已同步，保留通用系统图标／图片能力和已有布局。UI回归、串行运行时测试和四项iOS构建通过；全量check因平台状态用例首次失败退出1，该用例单独复核通过，原生UI整组缺少结束摘要。详见[验证记录](../validation/Window-Camera.md)。
@@ -748,3 +757,26 @@ Action 命名按现有统一 CameraActions 命名空间约束落地：新增 Per
 ### 本轮交付检查
 
 共享采集需求、独立背景视觉与拍摄呈现、Foundation Camera State、镜头可见层级准入和相机窗口按图像比例布局已写入实现；自动化和构建结果见 validation/Window-Camera.md。录像、独立灵动岛、真机四边取景一致性和功耗测量继续独立验收，不能以编译替代。
+
+
+### Writer 自有状态呈现与当前优先级契约（2026-11-04）
+
+Writer 不再从 Assistant Task 日志生成岛内容，改由自身生命周期经 Gateway direct 发布。IslandContent 的数字 rank 由当前语义 priority 替代；通用 UI 定义排序、双区域布局和动画，不识别 Writer 等业务生产者。具体范围、所有权、有界展示 worker 及验收记录入口见 [Writer 计划](Writer-Agent-Plan.md) 的 Writer 自有灵动岛章节。
+
+## 2026-11-04 Agent 任务岛结束与所有权修订
+
+Writer 终态改为撤下自身活动，取消此前保留最终结果的展示约定；Assistant 前台任务由本角色执行会话发布，不再由 Actions 从日志推导。相机、语音和连接仍由能力业务拥有者维护，UI 统一编排。实施范围及 UI end 幂等围栏见 [Writer 计划](Writer-Agent-Plan.md#agent-自有灵动岛终态撤下2026-11-04)，验证记录见 [Writer 验证](../validation/Writer-Agent.md)。
+
+## 2026-11-05 Island Action 统一执行入口
+
+按用户确认：Agent 经 Gateway 调用注册的 Island Action／Tool；Actions container 内部业务直接调用同一套 Island Action 类型化执行接口，不经 Gateway、不构造通信或假的 FunctionInvocation。统一的是业务执行，不把内部函数组合变成跨容器通信。UI 手势、布局、动画、根生命周期及频谱数据保留组件／专用接口。
+
+IslandActions.swift 增加校验一致的类型化命令、可信调用上下文、类型化回执及绑定所有者的内部调用端口。外部入口只解析参数、从 invocation 派生身份、序列化回执；内外均调用同一 executor，检查 owner、revision、generation、结束幂等和 UI 能力失败。内部端口只由 Actions 装配绑定 camera/voice/bluetooth 三个固定领域，模型不能指定内部 owner。setPresentation 同样检查所有者。删除 publishDomain→publishSlot 的业务旁路，不修改基础 UI 的通用槽接口。
+
+IslandDomainPresentation 保留领域文案和观察职责，在同步 Observation 快照之后异步调用 Action；每领域稳定活动ID与递增版本，重复内容不发送，相同失败版本可重投，新事实替代旧事实。一个观察 worker、一个 newest 唤醒槽、每领域一个最新待发命令（三个固定领域）、一个合并蓝牙过期与500ms失败重试的计时器；停止取消／加入 worker 和计时器并结束自己活动，旧 generation 的端口不得在新根写入。频谱不经 Action。
+
+涉及 Actions/UI/Runtime、ActionsBusinessAssembly（若装配签名需要）、IntegrationTests 夹具与回归、Actions/UI/Runtime／UI／模块 README 和整体设计。所有改动使用现有目录。验证内外执行等价、无 Gateway 内部调用、真实领域状态变更／结束、owner／版本／代际拒绝、失败重投／新事实覆盖、频谱不推进活动版本、停止清理；执行 check.sh 和 build-ios.sh，记录自动化与设备验收的区别。
+
+权限细化：setPresentation 的外部授权是共享呈现控制（已有 Skill 可展开 Writer 活动），保留该行为；内部领域端口仅允许控制自身活动。两者由可信上下文的呈现范围决定，模型参数不能扩大范围。内容发布／更新／结束始终校验活动 owner，不把共享展开权限误用于内容写入。
+
+本节统一执行入口及业务旁路替换已完成，技术README已同步。完整检查、最终专项回归和四目标iOS构建通过；测试夹具调整、日志路径及尚未进行的真机验收见 [Window/Island验证记录](../validation/Window-Camera.md#2026-11-05-island-action-内外统一执行)。

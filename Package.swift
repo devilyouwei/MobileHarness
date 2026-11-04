@@ -147,7 +147,7 @@ let package = Package(
             path: "MobileHarness/Actions",
             exclude: [
                 "Camera/README.md",
-                "Web/README.md",
+                "Web/README.md", "Artifacts/README.md",
                 "History/README.md",
                 "NexArm/Connection/README.md",
                 "NexArm/Motion/README.md",
@@ -202,7 +202,8 @@ let package = Package(
             exclude: [
                 "Actions",
                 "Agents/ApplicationControl/README.md", "Agents/Assistant/README.md", "Agents/Memory/README.md",
-                "Agents/Photographer/README.md", "Agents/README.md", "Agents/SpeechPerception/README.md",
+                "Agents/Writer/README.md", "Agents/Photographer/README.md", "Agents/README.md",
+                "Agents/SpeechPerception/README.md",
                 "Agents/SpeechSynthesis/README.md", "Agents/Support/Chat/README.md",
                 "Agents/Support/Communication/README.md", "Agents/Support/Context/README.md", "Agents/Support/Core",
                 "Agents/Support/Core/Capability/README.md", "Agents/Support/Core/Communication/README.md",
@@ -413,7 +414,7 @@ let package = Package(
             exclude: ["README.md"], resources: [.copy("Scenarios")]),
         .testTarget(
             name: "ModelKitDefaultsTests",
-            dependencies: ["ModelKit", "ModelKitRuntime", "ModelKitDefaults"],
+            dependencies: ["ModelKit", "ModelKitRuntime", "ModelKitDefaults", "ModelKitOpenAI"],
             exclude: ["README.md"]),
         .testTarget(name: "ModelKitTests", dependencies: ["ModelKit"], exclude: ["README.md"]),
         .testTarget(

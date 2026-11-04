@@ -28,6 +28,10 @@ private final class ControlledSettings: SettingsOperating {
 func settingsSaveKeepsOneOperationAcrossPageLifetimeAndCanRetryAfterFailure() async throws {
     let operation = ControlledSettings()
     let state = SettingsState(initial: operation.original)
+    #expect(!state.writerThinking)
+    let beforeThinking = state.revision
+    state.writerThinking = true
+    #expect(state.revision > beforeThinking)
     let controls = SettingsFormController(
         state: state, operations: operation, defaultModel: operation.original.model)
     var started = operation.started.stream.makeAsyncIterator()
@@ -36,7 +40,7 @@ func settingsSaveKeepsOneOperationAcrossPageLifetimeAndCanRetryAfterFailure() as
     await started.next()
     #expect(state.isSaving && !state.canSave && !state.canLoad)
     #expect(await controls.save() == false)
-    #expect(operation.saves.count == 1)
+    #expect(operation.saves.count == 1 && operation.saves[0].writerThinking)
     #expect(operation.saves[0].url == "https://example.test/v2")
     // View disappearance cancels only discovery, never an admitted configuration transaction.
     controls.cancelDiscovery()
@@ -70,7 +74,13 @@ func restoringSettingsAgainPreservesUnsavedFormEdits() async throws {
     var release: CheckedContinuation<Void, Never>?
     var ended = false
     func restore() async throws -> CloudSettingsDraft {
-        .init(enabled: true, url: "https://example.test", key: "test", model: "test")
+        .init(
+            enabled: true, url: "https://example.test", key: "test", model: "test",
+            providers: [
+                .init(
+                    enabled: true, url: "https://example.test", key: "test", model: "test", name: "Test",
+                    id: "test-provider")
+            ])
     }
     func save(_ draft: CloudSettingsDraft) async throws {}
     func discover(_ draft: CloudSettingsDraft) async throws -> [String] {
@@ -88,7 +98,7 @@ func restoringSettingsAgainPreservesUnsavedFormEdits() async throws {
     let fixture = DiscoveryCleanupFixture()
     let state = SettingsState(initial: try await fixture.restore())
     let controls = SettingsFormController(state: state, operations: fixture, defaultModel: "test")
-    controls.loadModels()
+    controls.loadModels(providerID: try #require(state.providers.first).id)
     var started = fixture.started.stream.makeAsyncIterator()
     await started.next()
     controls.cancelDiscovery()
@@ -97,7 +107,52 @@ func restoringSettingsAgainPreservesUnsavedFormEdits() async throws {
     #expect(!fixture.ended)
     fixture.release?.resume()
     await stop.value
-    #expect(fixture.ended && !state.models.contains("late"))
+    #expect(fixture.ended && !state.modelCatalogs.values.contains(["late"]))
     await #expect(throws: CancellationError.self) { try await controls.restore() }
     #expect(await controls.save() == false)
+}
+
+@MainActor private final class BrainDiscoveryFixture: SettingsOperating {
+    var pending: [(CloudSettingsDraft, CheckedContinuation<[String], any Error>)] = []
+    func restore() async throws -> CloudSettingsDraft { .init(enabled: false, url: "", key: "", model: "") }
+    func discover(_ draft: CloudSettingsDraft) async throws -> [String] {
+        try await withCheckedThrowingContinuation { pending.append((draft, $0)) }
+    }
+    func save(_ draft: CloudSettingsDraft) async throws {}
+}
+@Test(.timeLimit(.minutes(1))) @MainActor func brainModelListsAreIndependentAndFenceEditedCredentials() async throws {
+    let a = CloudSettingsDraft(enabled: false, url: "https://a.test", key: "a", model: "", name: "A", id: "a")
+    let b = CloudSettingsDraft(enabled: false, url: "https://b.test", key: "b", model: "", name: "B", id: "b")
+    let state = SettingsState(
+        initial: .init(
+            enabled: true, url: a.url, key: a.key, model: "saved-a",
+            providers: [a, b], writerProviderID: b.id, writerModel: "saved-b"))
+    let fixture = BrainDiscoveryFixture()
+    let controls = SettingsFormController(state: state, operations: fixture, defaultModel: "unused")
+    controls.refreshModels()
+    while fixture.pending.count < 2 { await Task.yield() }
+    #expect(Set(fixture.pending.map { $0.0.id }) == ["a", "b"])
+    for (draft, result) in fixture.pending { result.resume(returning: ["loaded-" + draft.id]) }
+    while !state.loadingProviderIDs.isEmpty { await Task.yield() }
+    #expect(state.modelCatalogs["a"] == ["loaded-a"] && state.modelCatalogs["b"] == ["loaded-b"])
+    #expect(state.selectedModel == "saved-a" && state.writerModel == "saved-b")
+    fixture.pending.removeAll()
+    controls.loadModels(providerID: "a")
+    while fixture.pending.count < 1 { await Task.yield() }
+    var changed = a
+    changed.key = "replacement"
+    state.upsertProvider(changed)
+    controls.loadModels(providerID: "a")
+    while fixture.pending.count < 2 { await Task.yield() }
+    fixture.pending[1].1.resume(returning: ["current"])
+    fixture.pending[0].1.resume(returning: ["stale"])
+    while !state.loadingProviderIDs.isEmpty { await Task.yield() }
+    #expect(state.modelCatalogs["a"] == ["current"])
+    #expect(state.writerModel == "saved-b")
+    state.removeProvider("a")
+    #expect(state.assistantProviderID == nil && !state.isEnabled)
+    #expect(state.writerProviderID == "b")
+    state.removeProvider("b")
+    #expect(state.writerProviderID == nil && state.writerModel.isEmpty)
+    await controls.shutdown()
 }

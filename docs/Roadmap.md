@@ -6,6 +6,7 @@
 
 | 分类 | 当前范围与正文来源 |
 | --- | --- |
+| [统一记录与记忆管理](requirements/Unified-Memory-Plan.md) | 后续大项：MemorySkill 汇集 Writer 记录、聊天记录和综合记忆，评估演进独立 Memory Agent；当前 History 与 Writing Skill 保持现状。 |
 | [技术需求](requirements/technical/README.md) | 四项架构改进中，公开 State 基础与首批 useState 已实现；更多事实、统一错误处理和 App 端到端验收仍待完成；存储接口子项已完成，整份需求保持开放。 |
 | [产品需求](requirements/product/README.md) | “用户”板块的独立相册和日记式记忆，以及多云端模型管理、WebKit HTML 呈现和持续聆听/打断判断。 |
 | [交叉需求](requirements/README.md#技术与产品交叉需求) | 公开 State 的后续治理/验收、摄影构图与运镜、[Face 窗口与 App 内灵动岛](requirements/Face-Window-Island-Plan.md)（窗口/拍照、双用途共享采集及镜头准入已实现并通过自动化和构建、已安装真机；倒计时/闪光灯/变焦、有声录像及相册处置已实现并安装2026110110，真机验收待完成；原生App内胶囊与系统Live Activity双呈现已实现，已签名并安装2026110123，真实Face聆听紧凑/详情展开与工具栏已复验，录像/说话/系统新展开布局等完整实测待续）。 |

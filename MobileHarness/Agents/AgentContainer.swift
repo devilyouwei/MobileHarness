@@ -63,7 +63,7 @@ import StorageFiles
                 } ?? [],
                 children: [
                     .init(path: "agents.assistant"), .init(path: "agents.applicationcontrol"),
-                    .init(path: "agents.memory"), .init(path: "agents.photographer"),
+                    .init(path: "agents.writer"), .init(path: "agents.memory"), .init(path: "agents.photographer"),
                     .init(path: "agents.speechperception"), .init(path: "agents.speechsynthesis"),
                     .init(path: "agents.visionperception"),
                 ])
@@ -75,6 +75,7 @@ import StorageFiles
                 "agents.applicationcontrol": AgentStateSnapshot.reader(of: applicationControl) {
                     try await $0.stateSnapshot()
                 },
+                "agents.writer": AgentStateSnapshot.reader(of: writer) { try await $0.stateSnapshot() },
                 "agents.memory": AgentStateSnapshot.reader(of: memory) { try await $0.stateSnapshot() },
                 "agents.photographer": AgentStateSnapshot.reader(of: photographer) { try await $0.stateSnapshot() },
                 "agents.speechperception": AgentStateSnapshot.reader(of: speechPerception) {
@@ -149,6 +150,7 @@ import StorageFiles
         }
         public let assistant: AssistantContainer
         public let applicationControl: ApplicationControlContainer
+        public let writer = WriterContainer()
         public let memory: MemoryContainer
         public let photographer: PhotographerContainer
         public let speechPerception: SpeechPerceptionContainer
@@ -171,6 +173,7 @@ import StorageFiles
         public func setSceneActive(_ value: Bool) async throws {
             if value { try await lifecycle.setForeground(true) }
             foreground = value
+            try await writer.setForeground(value)
             guard !isolatedPresentation else { return }
             reportEnvironment(.scene, value: value ? "active" : "background")
             if !value {
@@ -267,7 +270,7 @@ import StorageFiles
                 maintenance: maintenance,
                 containerFailures: containerFailures, home: homeUI,
                 assistantContainer: assistant, applicationControlContainer: applicationControl,
-                memoryContainer: memory, photographerContainer: photographer,
+                memoryContainer: memory, photographerContainer: photographer, writerContainer: writer,
                 stateContext: try makeStateContext(), cache: cacheStorage,
                 chatRecords: try repositories().chat, taskRecords: try repositories().tasks,
                 cameraUI: cameraUI, albumUI: albumUI, windowsUI: windows, settingsUI: settingsUI,
@@ -339,6 +342,7 @@ import StorageFiles
             try await applicationControl.start()
             try await photographer.start()
             try await memory.start()
+            try await writer.start()
             try await assistant.start()
             runtime.connectFailures()
         }
@@ -372,6 +376,7 @@ import StorageFiles
             var errors: [any Error] = []
             do { try await assistant.stop() } catch { errors.append(error) }
             do { try await photographer.stop() } catch { errors.append(error) }
+            do { try await writer.stop() } catch { errors.append(error) }
             do { try await memory.stop() } catch { errors.append(error) }
             do { try await applicationControl.stop() } catch { errors.append(error) }
             if let primary = errors.first {
@@ -405,6 +410,7 @@ import StorageFiles
                 do { try await visionPerception.suspend() } catch { errors.append(error) }
                 do { try await applicationControl.setForeground(false) } catch { errors.append(error) }
                 do { try await photographer.setForeground(false) } catch { errors.append(error) }
+                do { try await writer.setForeground(false) } catch { errors.append(error) }
                 do { try await memory.setForeground(false) } catch { errors.append(error) }
                 do { try await assistant.setForeground(false) } catch { errors.append(error) }
                 if let primary = errors.first {
@@ -417,6 +423,7 @@ import StorageFiles
             try await applicationControl.setForeground(true)
             try await photographer.setForeground(true)
             try await memory.setForeground(true)
+            try await writer.setForeground(true)
             try await assistant.setForeground(true)
             guard lifecycle.isForegroundRequested else { return }
             applyNativeForeground(true)

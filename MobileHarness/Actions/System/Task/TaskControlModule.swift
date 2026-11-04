@@ -7,6 +7,9 @@ public struct TaskControlModule: CapabilityModule {
     public init(capability: any TaskControlCapability) { self.capability = capability }
     public var definitions: [ActionFunction] {
         [
+            SystemActions.sendMessageDefinition(completing: {
+                try await SystemActions.sendMessage($0, capability: capability)
+            }),
             SystemActions.loadSkillsDefinition(completing: {
                 try await SystemActions.loadSkills($0, capability: capability)
             }),

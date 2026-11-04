@@ -69,7 +69,7 @@ func navigationSuspendsHomeOverlaysAndRestoresIslandPreference(_ expanded: Bool)
     island.localCompleted(generation: generation, revision: revision)
     #expect(!island.replacesSystemStatusBar && island.localStatus == "detached")
 
-    navigation.present(.path([.settings, .history]))
+    navigation.present(.path([.settings, .assistantHistory]))
     // Even a new phase cannot overwrite the preference captured on leaving home.
     content.expansionID = "next-phase"
     content.detail = .init(text: "最新详情")
@@ -95,7 +95,7 @@ func navigationSuspendsHomeOverlaysAndRestoresIslandPreference(_ expanded: Bool)
     let content = IslandContent(title: "目标", primary: .symbol(name: "scope"), detail: .init(text: "详情"))
     let original = try #require(try root.island.publishSlot(owner: "goal", content: content))
     try root.island.setExpanded(false)
-    root.navigation.state.show(.history)
+    root.navigation.state.show(.assistantHistory)
     try root.island.publishSlot(owner: "goal", content: nil)
     let replacement = try #require(try root.island.publishSlot(owner: "replacement", content: content))
     root.navigation.state.show(nil)

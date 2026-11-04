@@ -181,10 +181,10 @@ private func nativeObject(_ data: Data) throws -> [String: Any] {
     let basic = try AgentConfigurations.skill("basic-skill")
     #expect(
         basic.useStates.sorted() == [
-            "agents.applicationcontrol", "platform.system.accessibility", "platform.system.audio",
+            "agents.applicationcontrol", "agents.writer", "platform.system.accessibility", "platform.system.audio",
             "platform.system.locale", "platform.system.network",
             "platform.system.permissions", "platform.system.power", "platform.system.thermal", "platform.system.time",
-            "ui.navigation",
+            "ui.navigation", "ui.windows",
         ])
     #expect(!basic.useStates.contains("platform.location") && !basic.useStates.contains("platform.magneticAttachment"))
 }

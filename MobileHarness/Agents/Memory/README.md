@@ -101,7 +101,7 @@ flowchart LR
 
 ## 标题算法
 
-从整个会话等距抽样至多 32 轮，user/assistant 每段最多 80 Characters。两条消息，64-token 输出预算、temperature=0，30 秒截止后取消并加入。只接受 stop、单行非空且至多 80 Characters 的文本；拒绝 Tool、动作、截断及空结果，不执行输出，也不自动重试。供应商编码归 ModelKit。
+从整个会话等距抽样至多 32 轮，user/assistant 每段最多 80 Characters。两条消息，输出 token 预算留空以使用模型默认值、temperature=0，30 秒截止后取消并加入。只接受 stop、单行非空且至多 80 Characters 的文本；拒绝 Tool、动作、截断及空结果，不执行输出，也不自动重试。供应商编码归 ModelKit。
 
 ## 状态、生命周期与失败
 

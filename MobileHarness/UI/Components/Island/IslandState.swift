@@ -64,7 +64,8 @@ public struct IslandActivity: Identifiable, Equatable, Sendable {
     }
     public var ranked: [IslandActivity] {
         activities.sorted {
-            $0.content.rank == $1.content.rank ? $0.order > $1.order : $0.content.rank > $1.content.rank
+            $0.content.priority == $1.content.priority
+                ? $0.order > $1.order : $0.content.priority.order > $1.content.priority.order
         }
     }
     /// Detail and transient indicators have independent arbitration and lifetimes.
@@ -240,7 +241,21 @@ public struct IslandActivity: Identifiable, Equatable, Sendable {
     public func end(id: UUID, owner: String, revision: UInt64) async throws {
         try Task.checkCancellation()
         let expected = generation
-        try remove(id: id, owner: owner, revision: revision, generation: expected)
+        if activities.contains(where: { $0.id == id }) {
+            try remove(id: id, owner: owner, revision: revision, generation: expected)
+        } else {
+            guard available, !stopped else { throw IslandError.unavailable }
+            guard revision > 0 else { throw IslandError.stale }
+            guard !owner.isEmpty, owner.utf8.count <= 256 else { throw IslandError.invalid }
+            if let known = ledger[id] {
+                guard known.owner == owner else { throw IslandError.owner }
+                guard revision >= known.revision else { throw IslandError.stale }
+            } else {
+                guard ledger.count < 256 else { throw IslandError.capacity }
+            }
+            // End may precede a coalesced first present or retry a locally applied end.
+            ledger[id] = (owner, revision)
+        }
         try await flushSystem(expectedGeneration: expected)
     }
     public func requestAttention(id: UUID) async throws {

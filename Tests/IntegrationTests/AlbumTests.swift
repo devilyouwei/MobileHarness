@@ -9,11 +9,11 @@ import PlatformKit
 import StorageCore
 import StorageFiles
 import StorageMedia
-import StorageSQLite
 import Testing
 import UI
 
 @testable import Agents
+@testable import StorageSQLite
 
 #if canImport(ImageIO)
     import ImageIO
@@ -194,20 +194,32 @@ private actor AlbumFailingRemoveStore: FileStore {
 #if canImport(SQLite3)
     import SQLite3
 
-    @Test func albumMigrationKeepsLegacyReadyMediaOutsideAlbum() async throws {
+    @Test func oldSchemaIsDiscardedInsteadOfMigratingMediaAndHistory() async throws {
         let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".sqlite")
         defer { try? FileManager.default.removeItem(at: url) }
         var handle: OpaquePointer?
         #expect(sqlite3_open(url.path, &handle) == SQLITE_OK)
         let database = try #require(handle)
-        let seed = """
-            CREATE TABLE grdb_migrations(identifier TEXT NOT NULL PRIMARY KEY);
-            INSERT INTO grdb_migrations VALUES('records-v1'),('record-lifecycle-v2');
-            CREATE TABLE media_files(id INTEGER PRIMARY KEY AUTOINCREMENT,kind TEXT NOT NULL,mime TEXT NOT NULL,
-              relative_path TEXT NOT NULL UNIQUE,bytes INTEGER NOT NULL,source TEXT NOT NULL,session_id TEXT NOT NULL,
-              input_id TEXT NOT NULL,created_at REAL NOT NULL,captured_at REAL,state TEXT NOT NULL,failure TEXT);
-            INSERT INTO media_files VALUES(1,'image','image/jpeg','legacy.jpg',2,'assistant','album-session','album-input',123,123,'ready',NULL);
-            """
+        let seed =
+            SQLiteChatRepository.schemaSQL + SQLiteTaskRepository.schemaSQL + SQLiteDeviceRepository.schemaSQL + """
+                CREATE TABLE grdb_migrations(identifier TEXT NOT NULL PRIMARY KEY);
+                INSERT INTO grdb_migrations VALUES('records-v1'),('record-lifecycle-v2');
+                CREATE TABLE media_files(id INTEGER PRIMARY KEY AUTOINCREMENT,kind TEXT NOT NULL,mime TEXT NOT NULL,
+                  relative_path TEXT NOT NULL UNIQUE,bytes INTEGER NOT NULL,source TEXT NOT NULL,session_id TEXT NOT NULL,
+                  input_id TEXT NOT NULL,created_at REAL NOT NULL,captured_at REAL,state TEXT NOT NULL,failure TEXT);
+                INSERT INTO media_files VALUES(1,'image','image/jpeg','legacy.jpg',2,'assistant','album-session','album-input',123,123,'ready',NULL);
+                INSERT INTO dialogs(id,agent,created_at,input_count) VALUES(1,'assistant',123,1),(2,'writer',123,1);
+                INSERT INTO evidence(hash,data) VALUES('old-evidence',X'00');
+                INSERT INTO tasks(id,dialog_id,agent,executor,execution,goal,status,created_at)
+                  VALUES(1,2,'writer','writer','background','old goal','completed',123);
+                INSERT INTO delegated_tasks(id,agent,dialog_id,goal,current_run_id,updated_at)
+                  VALUES(1,'writer',2,'old goal',1,123);
+                INSERT INTO delegated_runs(run_id,task_id,input) VALUES(1,1,'old input');
+                INSERT INTO messages(dialog_id,client_id,input_id,role,kind,position,created_at,body,preview,state,detail_hash)
+                  VALUES(1,'old-assistant','old-assistant','user','input',1,123,'old','old','completed','old-evidence'),
+                        (2,'old-writer','old-writer','user','input',1,123,'old','old','completed','old-evidence');
+                INSERT INTO devices(native_id,name,selected,reconnect) VALUES('old-device','old device',1,1);
+                """
         let seeded = sqlite3_exec(database, seed, nil, nil, nil)
         sqlite3_close(database)
         #expect(seeded == SQLITE_OK)
@@ -216,7 +228,11 @@ private actor AlbumFailingRemoveStore: FileStore {
         try await files.putIfAbsent(Data([1, 2]), key: "legacy.jpg")
         let store = CapturedPhotoStore(repository: records.media, files: files)
         #expect(try await store.albumPage().items.isEmpty)
-        #expect(try await store.readForInput("media_1", source: "assistant", input: "album-input") == Data([1, 2]))
+        #expect(try await store.readForInput("media_1", source: "assistant", input: "album-input") == nil)
+        #expect(try await records.chat.current(agent: "assistant").count == 0)
+        #expect(try await records.chat.current(agent: "writer").count == 0)
+        #expect(try await records.tasks.delegatedTasks(agent: "writer", before: nil, limit: 50).isEmpty)
+        #expect(try await records.devices.selectedDevice() == nil)
         try await records.shutdown()
     }
 #endif

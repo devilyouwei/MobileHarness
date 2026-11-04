@@ -9,7 +9,7 @@ import Testing
     state.key = "editable-fixture"
     #expect(state.revision == revision + 2)
     #expect(!state.isLoading && !state.isSaving)
-    #expect(state.models.isEmpty)
+    #expect(state.modelCatalogs.isEmpty)
 }
 
 @Test @MainActor func providerRestorePreservesMultipleProvidersAndRejectsLateResults() {
@@ -71,4 +71,15 @@ import Testing
         editing.url = ""
         #expect(try editing.validated(existing: [value]).url == value.url)
     }
+}
+
+@Test @MainActor func writerThinkingDraftRestoresIndependentlyOfAssistantSelection() {
+    let draft = CloudSettingsDraft(enabled: true, url: "https://assistant.test", key: "fixture", model: "assistant")
+    let state = SettingsState(initial: draft)
+    #expect(!state.writerThinking)
+    state.writerThinking = true
+    #expect(state.selectedModel == "assistant")
+    let revision = state.revision
+    #expect(state.presentRestored(draft, revision: revision))
+    #expect(!state.writerThinking && state.selectedModel == "assistant")
 }

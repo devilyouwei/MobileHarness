@@ -30,7 +30,7 @@ public struct AgentTaskScope: Codable, Sendable, Equatable {
             requester: try value.decode(AgentID.self, forKey: .requester),
             executor: try value.decode(AgentID.self, forKey: .executor),
             sessionID: try value.decode(String.self, forKey: .sessionID),
-            execution: try value.decodeIfPresent(AgentTaskExecution.self, forKey: .execution) ?? .foreground)
+            execution: try value.decode(AgentTaskExecution.self, forKey: .execution))
     }
 
 }

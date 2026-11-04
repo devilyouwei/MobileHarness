@@ -39,3 +39,11 @@ liveProviderPreservesConsecutiveUsers 从调用进程获取 HARNESS_LIVE_CHAT_UR
 
 
 Reasoning summary regressions cover filtering, malformed indices/parts, truncation and preserved native-call indices. liveOllamaResponsesReasoningCompatibility is opt-in via HARNESS_LIVE_OLLAMA=1 plus HARNESS_LIVE_CHAT_URL/MODEL; it uses no API key, synthetic prompts/tool receipts, and validates text, one native call and a continuation without device effects. [Validation evidence](../../docs/validation/Provider-Management.md).
+
+思考策略编码测试分别验证 minimum/enabled：关闭、最低支持档位、启用推理时 temperature 兼容、普通模型不接收未知参数及 DashScope 参数隔离。仅离线构造实际请求 JSON，不冒称远程模型已接受。
+
+HTTP/传输诊断回归覆盖实际URLSession请求路径的timeout数值、DNS/TLS/离线/断连/取消分类、HTTP状态与请求ID/参数/服务端错误的脱敏保留；持续SSE心跳可超过idle timeout总时长完成，资源时限不被设成idle值。网络由URLProtocol替身提供，不能作为真实服务端验收。
+
+Responses framing regressions cover deltas and repeated terminal output exceeding64KiB, valid Unicode chunk boundaries and streams exceeding8MiB. Bounded event queues remain separate from total output; malformed protocol and native arguments still fail explicitly.
+
+Shared-client concurrency uses twelve held URLProtocol requests against one actual OpenAIChat/resource context. It verifies per-session cancellation, continued occupancy by other requests and joined root shutdown; no real provider requests are issued.

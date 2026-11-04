@@ -18,6 +18,8 @@ public struct StreamLimits: Equatable, Sendable {
     }
 }
 
+public enum InferencePhase: Sendable, Equatable { case queued, running, finished, failed, cancelled }
+
 public enum SessionTermination: Sendable {
     case finished
     case failed(any Error)
@@ -29,9 +31,29 @@ public final class InferenceSession<Event: Sendable>: Sendable {
     public let context: InferenceContext
     public let events: InferenceEvents<Event>
     private let storage: SessionStorage<Event>
+    private let cleanup: @Sendable () async -> Void
+    public var phase: InferencePhase { storage.phase }
+    public func waitForCompletion() async { await cleanup() }
+    /// Join this request's native cleanup on every consumer exit, including early return.
+    public func withCleanup<Value: Sendable>(_ operation: @Sendable () async throws -> Value) async throws -> Value {
+        do {
+            let value = try await operation()
+            cancel()
+            await cleanup()
+            return value
+        } catch {
+            cancel()
+            await cleanup()
+            throw error
+        }
+    }
 
-    private init(context: InferenceContext, storage: SessionStorage<Event>, stream: AsyncThrowingStream<Event, Error>) {
+    private init(
+        context: InferenceContext, storage: SessionStorage<Event>, stream: AsyncThrowingStream<Event, Error>,
+        cleanup: @escaping @Sendable () async -> Void
+    ) {
         self.context = context
+        self.cleanup = cleanup
         self.storage = storage
         events = InferenceEvents(storage: storage, stream: stream)
     }
@@ -41,18 +63,20 @@ public final class InferenceSession<Event: Sendable>: Sendable {
         context: InferenceContext = InferenceContext(),
         limits: StreamLimits,
         estimatedBytes: @escaping @Sendable (Event) -> Int,
-        onTermination: @escaping @Sendable (SessionTermination) -> Void = { _ in }
+        onTermination: @escaping @Sendable (SessionTermination) -> Void = { _ in },
+        phase: InferencePhase = .running,
+        waitForCompletion: @escaping @Sendable () async -> Void = {}
     ) -> (session: InferenceSession<Event>, emitter: InferenceEmitter<Event>) {
         let policy: AsyncThrowingStream<Event, Error>.Continuation.BufferingPolicy =
             limits.capacity.map { .bufferingOldest($0) } ?? .unbounded
         let pair = AsyncThrowingStream<Event, Error>.makeStream(bufferingPolicy: policy)
         let storage = SessionStorage(
-            continuation: pair.continuation, capacity: limits.capacity, onTermination: onTermination)
+            continuation: pair.continuation, capacity: limits.capacity, onTermination: onTermination, phase: phase)
         pair.continuation.onTermination = { termination in
             if case .cancelled = termination { storage.end(.cancelled) }
         }
         return (
-            InferenceSession(context: context, storage: storage, stream: pair.stream),
+            InferenceSession(context: context, storage: storage, stream: pair.stream, cleanup: waitForCompletion),
             InferenceEmitter(
                 storage: storage, maximumEventBytes: limits.maximumEventBytes, estimatedBytes: estimatedBytes)
         )
@@ -140,8 +164,11 @@ public struct InferenceEmitter<Event: Sendable>: Sendable {
         try yield(event)
     }
 
+    public func markRunning() { storage.markRunning() }
     public func finish() { storage.end(.finished) }
-    public func fail(_ error: any Error) { storage.end(.failed(error)) }
+    public func fail(_ error: any Error) {
+        if error is CancellationError { storage.end(.cancelled) } else { storage.end(.failed(error)) }
+    }
 }
 
 private final class SessionStorage<Event: Sendable>: Sendable {
@@ -151,6 +178,7 @@ private final class SessionStorage<Event: Sendable>: Sendable {
         var failureObserver: (@Sendable (any Error) -> Void)?
         var observationInstalled = false
         var consumerClaimed = false
+        var phase: InferencePhase = .running
         var outstanding = 0
         var capacityWaiter: CheckedContinuation<Void, Error>?
     }
@@ -160,12 +188,15 @@ private final class SessionStorage<Event: Sendable>: Sendable {
 
     init(
         continuation: AsyncThrowingStream<Event, Error>.Continuation, capacity: Int?,
-        onTermination: @escaping @Sendable (SessionTermination) -> Void
+        onTermination: @escaping @Sendable (SessionTermination) -> Void, phase: InferencePhase
     ) {
         self.capacity = capacity
-        state = Mutex(State(continuation: continuation))
+        state = Mutex(State(continuation: continuation, phase: phase))
         self.onTermination = onTermination
     }
+
+    var phase: InferencePhase { state.withLock { $0.phase } }
+    func markRunning() { state.withLock { if $0.termination == nil { $0.phase = .running } } }
 
     func claimConsumer() -> Bool {
         state.withLock {
@@ -247,12 +278,18 @@ private final class SessionStorage<Event: Sendable>: Sendable {
         let continuation = state.withLock { state -> AsyncThrowingStream<Event, Error>.Continuation? in
             guard state.termination == nil else {
                 // Cancellation also suppresses completed-but-not-yet-consumed buffered events.
-                if case .finished = state.termination, case .cancelled = termination {
+                if case .finished = state.termination, case .cancelled = termination, state.outstanding > 0 {
                     state.termination = .cancelled
+                    state.phase = .cancelled
                 }
                 return nil
             }
             state.termination = termination
+            switch termination {
+            case .finished: state.phase = .finished
+            case .failed: state.phase = .failed
+            case .cancelled: state.phase = .cancelled
+            }
             let continuation = state.continuation
             state.continuation = nil
             return continuation

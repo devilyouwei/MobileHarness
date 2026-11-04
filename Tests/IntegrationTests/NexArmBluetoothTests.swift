@@ -2728,7 +2728,7 @@ extension LiveRuntimeTests {
             stateContext: try publicStateFixture(),
             chat: chat,
             context: try AgentContextRepository(
-                agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState())
+                agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: loadedRobotAssistantContext())
         )
         let speech = try await bindSpeechRequests(assistant)
         let manager = AgentManager()
@@ -3029,7 +3029,7 @@ extension LiveRuntimeTests {
             stateContext: try publicStateFixture(),
             chat: BluetoothRecoveryChat(),
             context: try AgentContextRepository(
-                agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState())
+                agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: loadedRobotAssistantContext())
         )
         let manager = AgentManager()
         let session = UUID().uuidString

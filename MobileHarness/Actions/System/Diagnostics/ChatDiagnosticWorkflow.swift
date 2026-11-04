@@ -17,7 +17,7 @@ import FunctionContracts
                     messages: [
                         .init(role: .system, content: "你是中文助手，直接简短回答。"),
                         .init(role: .user, content: "我有3个苹果，又买了2个，吃掉1个，还剩几个？只回答数字。"),
-                    ], maximumOutputTokens: 32, temperature: 0))
+                    ], temperature: 0))
             defer { session.cancel() }
             var answer = ""
             for try await event in session.events {

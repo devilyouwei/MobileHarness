@@ -156,6 +156,7 @@ public final class UIContainer {
         settings.clearSensitiveDraft()
         devices.stopPresentation()
         admission.close()
+        web.closeSessions()
         web.close()
         await windows.stop()
         await island.stop()

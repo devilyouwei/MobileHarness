@@ -1,7 +1,11 @@
 import Foundation
 
-/// Private configuration value; decoding exists only for the legacy credential record.
-public struct ProviderSettings: Decodable, Equatable, Sendable {
+/// Private in-process configuration; credentials never enter a Codable payload.
+public struct ProviderSettings: Equatable, Sendable {
+    public let id: String
+    public let writerProviderID: String?
+    public let writerModel: String
+    public let writerThinking: Bool
     public let providers: [ProviderSettings]
     public let name: String
     public let enabled: Bool
@@ -9,8 +13,13 @@ public struct ProviderSettings: Decodable, Equatable, Sendable {
     public let key: String
     public let model: String
     public init(
-        enabled: Bool, url: String, key: String, model: String, providers: [ProviderSettings] = [], name: String = ""
+        enabled: Bool, url: String, key: String, model: String, providers: [ProviderSettings] = [], name: String = "",
+        id: String? = nil, writerProviderID: String? = nil, writerModel: String = "", writerThinking: Bool = false
     ) {
+        self.id = id ?? url
+        self.writerProviderID = writerProviderID
+        self.writerModel = writerModel
+        self.writerThinking = writerThinking
         self.name = name.isEmpty ? (URL(string: url)?.host ?? "Provider") : name
         self.providers = providers
         self.enabled = enabled
@@ -18,16 +27,7 @@ public struct ProviderSettings: Decodable, Equatable, Sendable {
         self.key = key
         self.model = model
     }
-    private enum CodingKeys: String, CodingKey { case enabled, url, key, model, name }
-    public init(from decoder: any Decoder) throws {
-        let values = try decoder.container(keyedBy: CodingKeys.self)
-        name = try values.decodeIfPresent(String.self, forKey: .name) ?? "Provider"
-        providers = []
-        enabled = try values.decodeIfPresent(Bool.self, forKey: .enabled) ?? true
-        url = try values.decode(String.self, forKey: .url)
-        key = try values.decode(String.self, forKey: .key)
-        model = try values.decode(String.self, forKey: .model)
-    }
+
 }
 /// Secret-bearing host values deliberately have no Codable conformance.
 public struct ProviderDiscoveryConfiguration: Sendable {
@@ -38,7 +38,7 @@ public struct ProviderDiscoveryConfiguration: Sendable {
         self.key = key
     }
 }
-public enum ProviderPresentationOperation: Sendable { case restore, save, discovery }
+public enum ProviderPresentationOperation: Sendable { case restore, save }
 @MainActor public protocol ProviderSettingsStaging: Sendable {
     func stageRestore(sessionID: String) throws -> String
     func stageSave(_ value: ProviderSettings, sessionID: String) throws -> String

@@ -1,0 +1,536 @@
+{
+  "version": 1,
+  "createdAt": "2026-11-04T07:41:02.550538+00:00",
+  "sourceHashes": {
+    "MobileHarness/Actions/Artifacts/ArtifactContentParser.swift": "cf694265050380337f4a1ab1745b8c691c9eab5f88e3cb66e44b9e5b7558598a",
+    "MobileHarness/Actions/Artifacts/ArtifactEditing.swift": "a95a8424ddaea93ee9cbc38852f39e4730cd3383194d4b84b96cf330cf3e0f29",
+    "MobileHarness/Actions/Artifacts/ArtifactExport.swift": "936bd0376bedd32f9c809ec3bbbb7d1577d1faa82b36f718d0e07131efb70302",
+    "MobileHarness/Actions/Artifacts/ArtifactPresentation.swift": "8b23f31c4156d9866ea7800b169207c8958dc88c7794b68b963ff89b544e7953",
+    "MobileHarness/Actions/Artifacts/ArtifactService.swift": "81d6796b1903c15be6cf578f25f4c00072382e67ba724d09efa0b5c7a5617109",
+    "MobileHarness/Actions/Artifacts/ArtifactWorkspace.swift": "9501a22a38649bab643fe3c98a3f21abeaf142caaa490099b0e5861453d59ace",
+    "MobileHarness/Actions/Artifacts/ArtifactsActions.swift": "d15908117f094f61aa871773bfca063be499c0dbcafd5844f3ea60fbdfa2d745",
+    "MobileHarness/Actions/Artifacts/ArtifactsModule.swift": "aa0aaa2b2317453998b60ea49b0eb89214d5447b52952532d9d1968685623847",
+    "MobileHarness/Actions/Artifacts/WorkspaceActions.swift": "414fd56fe60c97bfde9240633bdc6ce2447af42f42adddee9f56b891e305afb5",
+    "MobileHarness/Agents/Writer/WriterAgent.swift": "65e7a99a91cf9cca271c3b6c0049141775a37f63eedab35dd4ef38d678df0fbf",
+    "MobileHarness/Agents/Writer/WriterContainer.swift": "fc709d6ccec59407ecd9d5737c038aeefd26d17e52357dd3153764489750ab58",
+    "MobileHarness/Agents/Writer/WriterDiagnostics.swift": "4854bd1432c64188e55fe404f674985f4435f098837c0a97f425990eac554334",
+    "MobileHarness/Agents/Writer/WriterHistory.swift": "0d00e7821f3cbb54cdaa573893a4c4b1760e247218e63b947a24032a09d76b16",
+    "MobileHarness/Agents/Writer/WriterIslandPresentation.swift": "0e1406f1ce3158a114916bea38741fd82137099d29548220b12e4fc24d035a21",
+    "MobileHarness/Agents/Writer/WriterNotifications.swift": "1f023200bab908a319714f67ce185ae48ed00e248f092522d3b841e7e6aaa46f",
+    "MobileHarness/Agents/Writer/WriterRecovery.swift": "9749432474d6f6d12db182b436599682c45a33deb18d60f812c72afc6b37cfa1",
+    "MobileHarness/Agents/Writer/WriterWorkflow.swift": "10b235e9c36b8a6686b0de31267e6a159ec31af7c9be01fd4bda880b1c728c4c",
+    "MobileHarness/ModelKit/Language/LLM/OpenAI/ChatEventDecoder.swift": "9cdeb45f397baa82aedb3946bab774e951d275026fe64963a9b2a145498a1d70",
+    "MobileHarness/ModelKit/Language/LLM/OpenAI/ChatHTTPFailure.swift": "e89b4d2d50374dfd36a8e2bf60d114061c7c48a521f4c6f874e61e8cd537d4b9",
+    "MobileHarness/ModelKit/Language/LLM/OpenAI/OpenAIChat.swift": "2cdaa756dd7cd6939f73d6044eb45baa533c544cbaad682d2b025fc0b9e2ff50",
+    "MobileHarness/ModelKit/Language/LLM/OpenAI/OpenAIChatConfiguration.swift": "618b5d77a7a28b40fbc7f7a68a089af5fe5c352ed4158eeb6ea5489d2d6f75b5",
+    "Tests/IntegrationTests/WriterModelEvaluationTests.swift": "b145fd3907447433c4d81c8bd42fb4881a8f38ea7e0587632547bba5c590c63d",
+    "scripts/evaluate-writer.py": "ab5298d6145277d6a3591f669eeeb663142ae79809e9b4fc532d6486897fecf8"
+  },
+  "sourceUnchanged": true,
+  "requestedModels": [
+    "qwen3.8-max",
+    "deepseek-v4.1-flash"
+  ],
+  "binarySHA256": "b2f2992ba64c13d489c15dee86ea5e5d3536326546b1232bae2962d706c6873e",
+  "binaryUnchanged": true,
+  "results": [
+    {
+      "model": "qwen3.8-max",
+      "exitCode": 0,
+      "root": "/tmp/writer-real-20261104-e-qwen3.8-max",
+      "log": "/tmp/writer-real-20261104-e-qwen3.8-max.log",
+      "complete": true,
+      "passed": 6,
+      "cases": [
+        {
+          "contentRequests": 1,
+          "files": {
+            "index.html": 1940
+          },
+          "goal": "画一张最简单的中文测试流程图：开始→测试→结束，三个节点和两个箭头。只需一个index.html，使用内联SVG，无交互、无主题切换、无外部资源。",
+          "id": "diagram",
+          "issues": [],
+          "lastDOM": {
+            "button": 0,
+            "errors": [],
+            "svg": 1,
+            "text": "中文测试流程图\n开始\n测试\n结束",
+            "title": "中文测试流程图"
+          },
+          "passed": true,
+          "projectID": "AC24D8FA-750F-4FCF-90B0-FC83954B4B6C",
+          "renderCount": 2,
+          "requests": 6,
+          "runID": "task_1",
+          "seconds": 77.75466203689575,
+          "status": "completed",
+          "taskID": "task_1"
+        },
+        {
+          "contentRequests": 3,
+          "files": {
+            "app.js": 211,
+            "index.html": 387,
+            "style.css": 414
+          },
+          "goal": "制作一个极简计数器demo，恰好三个文件index.html、style.css、app.js。标题是计数器，按钮id=increment，数字id=count，初始0，点击加1。HTML用相对路径引用CSS和JS。HTML里保留注释KEEP_ME。不要额外功能。",
+          "id": "multifile",
+          "issues": [],
+          "lastDOM": {
+            "button": 1,
+            "counterAfter": "1",
+            "counterBefore": "0",
+            "errors": [],
+            "svg": 0,
+            "text": "计数器\n\n1\n\n+1",
+            "title": "计数器"
+          },
+          "passed": true,
+          "projectID": "02940F66-B2C5-40CF-9C0E-E4E67833C1F2",
+          "renderCount": 4,
+          "requests": 9,
+          "runID": "task_2",
+          "seconds": 69.16881108283997,
+          "status": "completed",
+          "taskID": "task_2"
+        },
+        {
+          "contentRequests": 0,
+          "files": {
+            "app.js": 211,
+            "index.html": 411,
+            "style.css": 414
+          },
+          "goal": "继续已有计数器，只将页面标题和主标题改为“中文测试计数器”；先读取并使用reference局部修改。保留KEEP_ME注释，app.js与style.css必须逐字节不变，其余内容不变。",
+          "id": "partial-resume",
+          "issues": [],
+          "lastDOM": {
+            "button": 1,
+            "counterAfter": "1",
+            "counterBefore": "0",
+            "errors": [],
+            "svg": 0,
+            "text": "中文测试计数器\n\n1\n\n+1",
+            "title": "中文测试计数器"
+          },
+          "passed": true,
+          "projectID": "02940F66-B2C5-40CF-9C0E-E4E67833C1F2",
+          "renderCount": 6,
+          "requests": 7,
+          "runID": "task_3",
+          "seconds": 29.697209000587463,
+          "status": "completed",
+          "taskID": "task_2"
+        },
+        {
+          "contentRequests": 1,
+          "files": {
+            "assets/main.js": 211,
+            "index.html": 419,
+            "style.css": 414
+          },
+          "goal": "在现有计数器项目先list并search定位app.js引用，用move将app.js移到assets/main.js，然后读取index.html并仅修改脚本路径。新增notes.txt内容临时备注，读取它，再用remove删除notes.txt。保留计数器功能和KEEP_ME。最后render检查再finish。",
+          "id": "file-operations",
+          "issues": [],
+          "lastDOM": {
+            "button": 1,
+            "counterAfter": "1",
+            "counterBefore": "0",
+            "errors": [],
+            "svg": 0,
+            "text": "中文测试计数器\n\n1\n\n+1",
+            "title": "中文测试计数器"
+          },
+          "passed": true,
+          "projectID": "02940F66-B2C5-40CF-9C0E-E4E67833C1F2",
+          "renderCount": 8,
+          "requests": 13,
+          "runID": "task_4",
+          "seconds": 51.5791939496994,
+          "status": "completed",
+          "taskID": "task_2"
+        },
+        {
+          "contentRequests": 1,
+          "files": {
+            "document.md": 287
+          },
+          "goal": "写一个简短Markdown测试报告document.md，标题Writer测试报告，包含三个步骤的有序列表、一个两列表格和一段JS代码示例，总共不超过20行。不需要HTML。",
+          "id": "markdown",
+          "issues": [],
+          "lastDOM": {
+            "button": 0,
+            "errors": [],
+            "svg": 0,
+            "text": "# Writer 测试报告\n## 测试步骤\n1. 准备测试文件\n2. 执行写入操作\n3. 校验输出结果\n\n## 结果对照\n\n| 项目 | 结果 |\n| --- | --- |\n| 标题 | 通过 |\n| 列表 | 通过 |\n| 表格 | 通过 |\n\n## 代码示例\n```js\nconsole.log(\"Writer test\");\nconst ok = true;\n```",
+            "title": ""
+          },
+          "passed": true,
+          "projectID": "A60EFF8F-F00D-44DA-B769-E5FF7149E6EE",
+          "renderCount": 10,
+          "requests": 6,
+          "runID": "task_5",
+          "seconds": 74.76708889007568,
+          "status": "completed",
+          "taskID": "task_5"
+        },
+        {
+          "contentRequests": 2,
+          "files": {
+            "app.js": 215,
+            "index.html": 313
+          },
+          "goal": "创建最小两个文件index.html和app.js。为了测试修复循环，先让app.js执行throw new Error(\"WRITER_TEST\")，调用render观察错误；随后读取app.js，用reference修复为给按钮id=increment添加点击计数逻辑，count初始0。重新render确认无错误，最后finish。无其他功能。",
+          "id": "javascript-repair",
+          "issues": [],
+          "lastDOM": {
+            "button": 1,
+            "counterAfter": "1",
+            "counterBefore": "0",
+            "errors": [],
+            "svg": 0,
+            "text": "Increment 1",
+            "title": "Counter"
+          },
+          "passed": true,
+          "projectID": "2DA8423F-14DD-4820-9BD3-BA63CFB062E3",
+          "renderCount": 13,
+          "requests": 9,
+          "runID": "task_6",
+          "seconds": 53.056215047836304,
+          "status": "completed",
+          "taskID": "task_6"
+        }
+      ],
+      "requestMetrics": {
+        "requests": 50,
+        "firstEventMedianSeconds": 3.9686535596847534,
+        "firstEventMaximumSeconds": 47.228168964385986,
+        "failedRequests": 0,
+        "outputBudgets": [
+          "provider default"
+        ]
+      },
+      "sqliteEvidence": {
+        "integrity": "ok",
+        "taskBindings": [
+          [
+            1,
+            "writer",
+            1,
+            "AC24D8FA-750F-4FCF-90B0-FC83954B4B6C",
+            1
+          ],
+          [
+            2,
+            "writer",
+            2,
+            "02940F66-B2C5-40CF-9C0E-E4E67833C1F2",
+            4
+          ],
+          [
+            5,
+            "writer",
+            3,
+            "A60EFF8F-F00D-44DA-B769-E5FF7149E6EE",
+            5
+          ],
+          [
+            6,
+            "writer",
+            4,
+            "2DA8423F-14DD-4820-9BD3-BA63CFB062E3",
+            6
+          ]
+        ],
+        "runBindings": [
+          [
+            1,
+            1
+          ],
+          [
+            2,
+            2
+          ],
+          [
+            2,
+            3
+          ],
+          [
+            2,
+            4
+          ],
+          [
+            5,
+            5
+          ],
+          [
+            6,
+            6
+          ]
+        ]
+      },
+      "evidenceSHA256": {
+        "records.sqlite": "7015d62b998113b08fcd6d29cedf2755cdcc0856dc29088b84877d53b72c08f5",
+        "workspace-index.json": "2d8f97eba8fd54ff93140be967b9b9345d1e6fffc496fc31f536a19ee25777bc",
+        "requests.json": "9750870fde166bc1b8a0577cfcf5816e7c941156c65d3d461986411431ae7c4e",
+        "renders.json": "94442a01d77941363744f1cd5ede8c71eea26431361dfa98fd13c76cdb6fdbb5",
+        "diagram-history.json": "a4ff10759c4baecca306dc61f541a5b3b4a667f0dd9b42e8820e57219c1d8157",
+        "multifile-history.json": "1819ff00bfe0819db70b8b25c32d3b033e4ea318b472b3a2f44d4dd9752d2699",
+        "partial-resume-history.json": "84922eff1e9f554f1d528be4fc3b3ad932c7b3a0618e4f18398ca6ab75c8cf13",
+        "file-operations-history.json": "9490697ee8c42ebbff91f31765e609d17959192e0431aad6fd5ff0874a8d7d8e",
+        "markdown-history.json": "4efce8ad63d5eacfd928895d7d76a4adc17e7ce68e35d3874fbc8217d76d6e2d",
+        "javascript-repair-history.json": "a0b78a6fa7e9b504f7816f778dc8deafe71da8e13dfa4f964f7878a0de411639"
+      }
+    },
+    {
+      "model": "deepseek-v4.1-flash",
+      "exitCode": 0,
+      "root": "/tmp/writer-real-20261104-e-deepseek-v4.1-flash",
+      "log": "/tmp/writer-real-20261104-e-deepseek-v4.1-flash.log",
+      "complete": true,
+      "passed": 6,
+      "cases": [
+        {
+          "contentRequests": 1,
+          "files": {
+            "index.html": 2155
+          },
+          "goal": "画一张最简单的中文测试流程图：开始→测试→结束，三个节点和两个箭头。只需一个index.html，使用内联SVG，无交互、无主题切换、无外部资源。",
+          "id": "diagram",
+          "issues": [],
+          "lastDOM": {
+            "button": 0,
+            "errors": [],
+            "svg": 1,
+            "text": "开始\n测试\n结束",
+            "title": "中文测试流程图"
+          },
+          "passed": true,
+          "projectID": "A3285897-7BE0-4187-AC73-E255A0B94283",
+          "renderCount": 3,
+          "requests": 8,
+          "runID": "task_1",
+          "seconds": 41.73618507385254,
+          "status": "completed",
+          "taskID": "task_1"
+        },
+        {
+          "contentRequests": 3,
+          "files": {
+            "app.js": 271,
+            "index.html": 441,
+            "style.css": 1588
+          },
+          "goal": "制作一个极简计数器demo，恰好三个文件index.html、style.css、app.js。标题是计数器，按钮id=increment，数字id=count，初始0，点击加1。HTML用相对路径引用CSS和JS。HTML里保留注释KEEP_ME。不要额外功能。",
+          "id": "multifile",
+          "issues": [],
+          "lastDOM": {
+            "button": 1,
+            "counterAfter": "1",
+            "counterBefore": "0",
+            "errors": [],
+            "svg": 0,
+            "text": "计数器\n1\n加1",
+            "title": "计数器"
+          },
+          "passed": true,
+          "projectID": "3349BBEA-8963-4F54-89ED-3178B7CF3B5E",
+          "renderCount": 5,
+          "requests": 10,
+          "runID": "task_2",
+          "seconds": 42.61754500865936,
+          "status": "completed",
+          "taskID": "task_2"
+        },
+        {
+          "contentRequests": 0,
+          "files": {
+            "app.js": 271,
+            "index.html": 465,
+            "style.css": 1588
+          },
+          "goal": "继续已有计数器，只将页面标题和主标题改为“中文测试计数器”；先读取并使用reference局部修改。保留KEEP_ME注释，app.js与style.css必须逐字节不变，其余内容不变。",
+          "id": "partial-resume",
+          "issues": [],
+          "lastDOM": {
+            "button": 1,
+            "counterAfter": "1",
+            "counterBefore": "0",
+            "errors": [],
+            "svg": 0,
+            "text": "中文测试计数器\n1\n加1",
+            "title": "中文测试计数器"
+          },
+          "passed": true,
+          "projectID": "3349BBEA-8963-4F54-89ED-3178B7CF3B5E",
+          "renderCount": 7,
+          "requests": 7,
+          "runID": "task_3",
+          "seconds": 10.67075502872467,
+          "status": "completed",
+          "taskID": "task_2"
+        },
+        {
+          "contentRequests": 1,
+          "files": {
+            "assets/main.js": 271,
+            "index.html": 473,
+            "style.css": 1588
+          },
+          "goal": "在现有计数器项目先list并search定位app.js引用，用move将app.js移到assets/main.js，然后读取index.html并仅修改脚本路径。新增notes.txt内容临时备注，读取它，再用remove删除notes.txt。保留计数器功能和KEEP_ME。最后render检查再finish。",
+          "id": "file-operations",
+          "issues": [],
+          "lastDOM": {
+            "button": 1,
+            "counterAfter": "1",
+            "counterBefore": "0",
+            "errors": [],
+            "svg": 0,
+            "text": "中文测试计数器\n1\n加1",
+            "title": "中文测试计数器"
+          },
+          "passed": true,
+          "projectID": "3349BBEA-8963-4F54-89ED-3178B7CF3B5E",
+          "renderCount": 9,
+          "requests": 10,
+          "runID": "task_4",
+          "seconds": 15.461034059524536,
+          "status": "completed",
+          "taskID": "task_2"
+        },
+        {
+          "contentRequests": 1,
+          "files": {
+            "document.md": 345
+          },
+          "goal": "写一个简短Markdown测试报告document.md，标题Writer测试报告，包含三个步骤的有序列表、一个两列表格和一段JS代码示例，总共不超过20行。不需要HTML。",
+          "id": "markdown",
+          "issues": [],
+          "lastDOM": {
+            "button": 0,
+            "errors": [],
+            "svg": 0,
+            "text": "# Writer测试报告\n\n1. 准备测试环境与样例输入。\n2. 运行 Writer 生成并检查 Markdown 结构。\n3. 核对列表、表格和代码块显示。\n\n| 项目 | 结果 |\n| --- | --- |\n| 有序列表 | 通过 |\n| 两列表格 | 通过 |\n| JS 示例 | 通过 |\n\n```js\nconst report = { status: \"passed\" };\nconsole.log(report.status);\n```",
+            "title": ""
+          },
+          "passed": true,
+          "projectID": "7899FC85-64CC-4505-8002-E90D8F1ED338",
+          "renderCount": 11,
+          "requests": 5,
+          "runID": "task_5",
+          "seconds": 13.027780055999756,
+          "status": "completed",
+          "taskID": "task_5"
+        },
+        {
+          "contentRequests": 2,
+          "files": {
+            "app.js": 251,
+            "index.html": 405
+          },
+          "goal": "创建最小两个文件index.html和app.js。为了测试修复循环，先让app.js执行throw new Error(\"WRITER_TEST\")，调用render观察错误；随后读取app.js，用reference修复为给按钮id=increment添加点击计数逻辑，count初始0。重新render确认无错误，最后finish。无其他功能。",
+          "id": "javascript-repair",
+          "issues": [],
+          "lastDOM": {
+            "button": 1,
+            "counterAfter": "1",
+            "counterBefore": "0",
+            "errors": [],
+            "svg": 0,
+            "text": "计数器\n\n当前计数：1\n\n增加",
+            "title": "计数器"
+          },
+          "passed": true,
+          "projectID": "37293262-ED7B-4C8D-86BD-156C30AC8289",
+          "renderCount": 14,
+          "requests": 9,
+          "runID": "task_6",
+          "seconds": 13.768926978111267,
+          "status": "completed",
+          "taskID": "task_6"
+        }
+      ],
+      "requestMetrics": {
+        "requests": 49,
+        "firstEventMedianSeconds": 1.614212989807129,
+        "firstEventMaximumSeconds": 20.51520001888275,
+        "failedRequests": 0,
+        "outputBudgets": [
+          "provider default"
+        ]
+      },
+      "sqliteEvidence": {
+        "integrity": "ok",
+        "taskBindings": [
+          [
+            1,
+            "writer",
+            1,
+            "A3285897-7BE0-4187-AC73-E255A0B94283",
+            1
+          ],
+          [
+            2,
+            "writer",
+            2,
+            "3349BBEA-8963-4F54-89ED-3178B7CF3B5E",
+            4
+          ],
+          [
+            5,
+            "writer",
+            3,
+            "7899FC85-64CC-4505-8002-E90D8F1ED338",
+            5
+          ],
+          [
+            6,
+            "writer",
+            4,
+            "37293262-ED7B-4C8D-86BD-156C30AC8289",
+            6
+          ]
+        ],
+        "runBindings": [
+          [
+            1,
+            1
+          ],
+          [
+            2,
+            2
+          ],
+          [
+            2,
+            3
+          ],
+          [
+            2,
+            4
+          ],
+          [
+            5,
+            5
+          ],
+          [
+            6,
+            6
+          ]
+        ]
+      },
+      "evidenceSHA256": {
+        "records.sqlite": "bc0b08e1f64609ba6dcf8428b97e0c78588312bfd4c9af7d16bee0a37f4ea804",
+        "workspace-index.json": "7f1d1beeff9cb86e83ed80312f4dc1b51fac73bdda9cc31d250f5aa183c46296",
+        "requests.json": "c655d0a93701b50b0c8df8df66212aa0484da2b05d877908513174fee755724e",
+        "renders.json": "74419aab7969674906f1a38c8fdd0c2857d8d2ee64ac96d09aa6e1d77a5b82bb",
+        "diagram-history.json": "5567a710fc5cba47b110dc5163b4d214c4eae9931daee80fff6c9af95158eef7",
+        "multifile-history.json": "66ee45e4d2257d0b56d05fc584890afbca4baee60bf6845ad527d64eb45e39bd",
+        "partial-resume-history.json": "5155281d0e65d0e54c810d2acdb3b1bc15cb022a996a843cad82d4c9d7f71765",
+        "file-operations-history.json": "291fe4fed850d2c75d35728896abe88e79dc2da88ec97aed9b6acb27b1c8557c",
+        "markdown-history.json": "dbb33d4b413f648db3c8fd634acaf174db4756951540a9330f3574c9b22fd6bd",
+        "javascript-repair-history.json": "12e12a30fdf4727033c3b5241d7f1d4f79b84de8c3e0c9ced232001e11bfbb39"
+      }
+    }
+  ]
+}

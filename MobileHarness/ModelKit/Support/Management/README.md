@@ -156,3 +156,7 @@ ModelManager exposes registered resource state snapshots and inference-lease act
 ModelState has stable raw values and finite cases for registration/resource State reflection. Container Runtime and resource child descriptors share that vocabulary; no debug description is used as the State wire value.
 
 ModelManager.resourceIDs returns registry identities only. resourceStateSnapshot(id) reads one selected resource; module metadata catalogs never enumerate all resource state values. Capability parent State contains indices, with resource phase/lease reflection available only through the exact resource reader.
+
+ChatDefaults 注册工厂接受中立 ModelID，ModelScope 按固定云端配置复用注册客户端；本地使用共享 chat 注册。SerialChat 拥有一运行、默认八等待的 FIFO，满时明确拒绝；取消运行加入底层清理后推进，停止清空等待并加入运行。模拟器本地明确不可用，不伪装原生工具支持。
+
+HF 只使用当前传输计划和完成文件；不从 .hub-snapshot 搬迁旧 SDK 文件。安装收据失效应显式删除/重新下载，不自动修复旧路径。

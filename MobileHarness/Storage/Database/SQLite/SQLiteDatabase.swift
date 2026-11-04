@@ -61,17 +61,19 @@ internal final class SQLiteDatabase: Sendable {
         }
         pool = try DatabasePool(path: url.path, configuration: configuration)
     }
-    func migrate(_ changes: [(name: String, statements: [String])]) throws {
+    /// Development storage has one current format. Unknown schemas are discarded, never upgraded.
+    func prepareSchema(_ statements: [String]) throws {
         do {
-            var migrations = DatabaseMigrator()
-            for change in changes {
-                migrations.registerMigration(change.name) { db in
-                    for sql in change.statements { try db.execute(sql: sql) }
-                }
+            let currentVersion = 20_261_104
+            let installed = try pool.read { db in try Int.fetchOne(db, sql: "PRAGMA user_version") ?? 0 }
+            guard installed != currentVersion else { return }
+            try pool.erase()
+            try pool.write { db in
+                for sql in statements { try db.execute(sql: sql) }
+                try db.execute(sql: "PRAGMA user_version = \(currentVersion)")
             }
-            try migrations.migrate(pool)
         } catch {
-            failures.report("database.sqlite", "migrate", error)
+            failures.report("database.sqlite", "prepareSchema", error)
             throw error
         }
     }

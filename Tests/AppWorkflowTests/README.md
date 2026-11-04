@@ -123,3 +123,30 @@ Window lifecycle regressions assert the transition gate spans presentation compl
 后台持续服务回归验证Scene隐藏时不invalidate持续根、默认视觉服务仍失效，返回不重复start，根stop仍完整invalidate并逆依赖停止。
 
 WebWorkspaceTests exercises read-before-edit, unique replacements, path/byte limits, persisted immutable revisions, stale-write rejection, reopening, deletion and the private multi-request editor with a scripted model. Tests also cover cancellation, latest-render image feedback and full Action create/save/partial-update sequencing with an explicit page test double. These deterministic model replies are explicit test doubles and do not establish real model generation quality.
+
+
+WriterWorkflowTests 使用脚本模型验证原生控制/原始内容流分离、逐字符传递与截断不提交；WebWorkspaceTests 验证通用作品兼容、MD 入口、草稿/发布隔离和过期编辑引用。替身不证明真实模型遵循。
+
+Writer 文件回归还覆盖关联片段与 Unicode 行读取、按文件引用隔离、目录移动的整批校验/恢复、历史版本原生读取，以及追加用户要求和格式规则传入内容请求。
+
+ArtifactArchive 的 ZIP 输出通过独立系统 unzip 校验目录结构/CRC；仅测试进程调用桌面校验工具，手机生产代码不执行 Shell。
+
+智能体大脑表单回归覆盖两个 Provider 并行发现、独立模型选择、稳定身份编辑后迟到结果拒绝、删除引用与关闭加入；查询使用注入替身，不代表真实 Provider 或原生菜单验收。
+
+Current persistence regressions reject retired speech preference switches, missing independent speech fields and Artifact indexes/projects missing current entry/draft/deletion fields; current documents still round-trip and workspaces reopen their versions.
+
+Writer/Artifacts 回归覆盖10个独立作品、18次保留版本、超过64KiB的原生模型内容流、超过32文件/256KiB项目的发布与历史读取；失败工具参数规范化去重及修改草稿后的再次验证均通过真实工作流驱动，模型为显式脚本替身。读取参数错误独立于存储容量。
+
+WriterWorkflowTests验证超过原固定控制轮数后仍由模型finish正常结束，并在有界上下文裁剪后保留当前目标和工具配对；使用脚本模型，不对实际Provider生成质量作结论。
+
+Writer recovery fixtures cover transient/permanent model failures, finite exhaustion, plain-text/batch correction, fresh streams after partial content, uncertain commit and cleanup non-replay, and cancellable backoff. Scripted models retain nil output budgets; productive loops remain unrestricted.
+
+Writer raw-code regressions cover split outer fences, normal JS template literals, legitimate Markdown fences, fresh transaction recovery with corrective instruction, and three failed format attempts without publication. Writer integration tests separately verify schema descriptions/enums and reject undeclared arguments before execution, then permit model correction with complete persisted tool pairs.
+
+Exact replace regressions assert unchanged surrounding UTF-8/newlines/related files, fresh read ownership, unique matches within a narrowed range, empty replacement deletion, stale/cross-file reference rejection, and failure atomicity. This is a deterministic patch operation, separate from model-generated fragment streaming.
+
+WriterWorkflow tests cover natural no-tool termination through the shared finalizer, one progress event per actual request, late accepted revisions and paired native-call results. Fixture revisions are consumed once, matching the production port. No loop-count or output-token budget is added to production behavior.
+
+Writer回合边界回归验证控制/内容请求、文件提交、预览加入、完成汇报、下一请求的顺序；Web定向回归验证Writer窗口读取/截图隔离、无根页面创建、真实目标回执及错误ID拒绝。
+
+设置保存回归检查Writer思考布尔值进入实际保存请求，失败后保留草稿，沿原有单次事务/页面寿命屏障恢复。

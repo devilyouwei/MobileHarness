@@ -2,7 +2,7 @@
 
 ## Responsibility and implementation
 
-SQLiteDatabase is internal to StorageSQLite and owns DatabasePool, configuration, bounded write admission, migration execution, transaction dispatch and temporary-test-file cleanup. It accepts SQL migrations from domain adapters and contains no business schema/query.
+SQLiteDatabase is internal to StorageSQLite and owns DatabasePool, configuration, bounded write admission, current-schema preparation, transaction dispatch and temporary-test-file cleanup. It accepts the current SQL schema from domain adapters and contains no business schema/query.
 
 ## Direct relationships
 
@@ -14,9 +14,9 @@ WAL, foreign keys, synchronous FULL, four readers; one writer/16 waiters, overfl
 
 [Parent](../README.md)
 
-accept named domain-supplied migrations, including partial unfinished-message and unfinished-Task indexes. Generic database support owns pool/transactions only; ORM records and lifecycle SQL remain with the domains.
+Current domain schemas include partial unfinished-message and unfinished-Task indexes. Generic database support owns pool/transactions only; ORM records and lifecycle SQL remain with the domains.
 
-✅ 共享读写生命周期门最多接纳 64 个操作，写入仍最多 17 个；溢出 busy。beginClosing 同步拒绝新操作；shutdown 合并一个后台任务，加入在途操作后关闭池，失败原样返回且不重开。初始化失败同步关闭未暴露的池，保留迁移与关闭错误。临时文件仅在关闭成功后删除。
+✅ 共享读写生命周期门最多接纳 64 个操作，写入仍最多 17 个；溢出 busy。beginClosing 同步拒绝新操作；shutdown 合并一个后台任务，加入在途操作后关闭池，失败原样返回且不重开。初始化失败同步关闭未暴露的池，保留初始化与关闭错误。临时文件仅在关闭成功后删除。
 
 ## 待实现
 
@@ -28,14 +28,14 @@ accept named domain-supplied migrations, including partial unfinished-message an
 
 ## 统一容器异常通道
 
-✅ SQLiteDatabaseFactory/Storage/Repositories 把报告器传到 SQLiteDatabase；中央读写、迁移、准备、关闭异常原样保留并报告。不得将 SQL/参数当作事件额外字段，诊断不写回数据库、不重试事务。
+✅ SQLiteDatabaseFactory/Storage/Repositories 把报告器传到 SQLiteDatabase；中央读写、准备、关闭异常原样保留并报告。不得将 SQL/参数当作事件额外字段，诊断不写回数据库、不重试事务。
 
 
 ✅ 初始化与清理复合失败统一使用StorageCore.StorageFailure，不再使用独立准备失败类型；underlying保留初始化主错误，cleanupErrors保留附加错误。未确认清理继续阻止旧作用域被复用，stop不丢弃多项清理错误。
 
 ## 基础相册实施契约
 
-✅ 添加相册元数据迁移和索引，旧media_files不自动收录；领域SQL继续由SQLiteMediaRepository拥有。
+相册元数据和索引直接属于当前 media_files schema；领域 SQL 由 SQLiteMediaRepository 拥有。
 
 ## Passive state reads
 
@@ -46,3 +46,9 @@ SQLite stateSnapshot returns the same StorageCore classified State as the Storag
 ## Video media rows
 
 SQLiteMediaRepository reserves kind=video/MIME=video/quicktime/.mov rows without album_added_at. It uses existing dimensions/origin fields and explicit collection, so no new migration or second album table is needed. reservePhoto rejects video metadata. Shared ready/collection/deleting/deleted predicates and keyset pagination apply to both media kinds; SQL never validates a native asset or owns file copying.
+
+SQLiteRepositories 提供一个当前 schema；SQLiteDatabase 只在 PRAGMA user_version 匹配当前标识时重开。空库和未知/旧 schema 经 GRDB barrier erase 清空全部表后，一次事务建表并写入当前标识。不注册历史迁移，不导入旧消息或媒体；同格式的事务、WAL、崩溃恢复与关闭屏障仍适用。
+
+Task 领域在数据库发布前幂等建立 task_notifications 及未确认索引，使用同一 pool/外键/写事务。终态与通知原子写入，送达和退休分别确认；初始化失败沿既有路径关闭未发布的 pool。此表不导入旧消息协议，也不改变当前 schema 的开发期清库规则。
+
+Light message previews read producer metadata from the existing evidence header without expanding source chunks. Delegated phase updates also update time; terminal projections include current-run finished_at. No schema migration, derived counter table or database reset is required.

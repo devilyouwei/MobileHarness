@@ -875,7 +875,7 @@
           ],
           "parameters": {
             "openPage": {
-              "destination": "history"
+              "destination": "assistantHistory"
             }
           },
           "forbidden": [
@@ -1038,6 +1038,7 @@
         {
           "user": "点一次头。",
           "required": [
+            "loadSkills",
             "nodHead"
           ],
           "parameters": {
@@ -1049,6 +1050,10 @@
             "startTask",
             "moveMotor",
             "resetArm"
+          ],
+          "first": "loadSkills",
+          "loaded": [
+            "robot-interaction"
           ]
         }
       ]
@@ -1104,6 +1109,7 @@
         {
           "user": "点一次头。",
           "required": [
+            "loadSkills",
             "nodHead"
           ],
           "counts": {
@@ -1113,6 +1119,10 @@
             "resetArm",
             "resetMotor",
             "moveMotor"
+          ],
+          "first": "loadSkills",
+          "loaded": [
+            "robot-interaction"
           ]
         }
       ],
@@ -2102,6 +2112,62 @@
               }
             }
           ]
+        }
+      ]
+    },
+    {
+      "id": "writer-window-discover-read",
+      "category": "shared-writer-window",
+      "writerWindow": true,
+      "turns": [
+        {
+          "user": "看看Writer画的那个窗口里写了什么文字。",
+          "required": [
+            "loadSkills",
+            "Web.inspect"
+          ],
+          "parameters": {
+            "Web.inspect": {
+              "windowID": "51A7AF0A-64CE-43E8-B1CC-98E6C9657209"
+            }
+          },
+          "forbidden": [
+            "startTask",
+            "Web.browse"
+          ],
+          "first": "loadSkills",
+          "loaded": [
+            "web-browsing"
+          ],
+          "task": false
+        }
+      ]
+    },
+    {
+      "id": "writer-window-discover-maximize",
+      "category": "shared-writer-window",
+      "writerWindow": true,
+      "turns": [
+        {
+          "user": "把Writer的流程图窗口放大。",
+          "required": [
+            "loadSkills",
+            "Window.maximize"
+          ],
+          "parameters": {
+            "Window.maximize": {
+              "windowID": "51A7AF0A-64CE-43E8-B1CC-98E6C9657209"
+            }
+          },
+          "forbidden": [
+            "startTask",
+            "Web.browse"
+          ],
+          "first": "loadSkills",
+          "loaded": [
+            "application-control"
+          ],
+          "task": false
         }
       ]
     }

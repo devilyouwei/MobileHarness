@@ -3,6 +3,7 @@ import Synchronization
 
 /// Safe protocol evidence, independent of Agent policy, UI strings and provider response bodies.
 public struct ChatFailureDiagnostic: Equatable, Sendable, CustomStringConvertible {
+    public enum NetworkReason: String, Sendable { case timeout, dns, tls, connection, offline, cancelled, other }
     public enum Reason: String, Sendable {
         case malformedEvent = "response.malformedEvent"
         case invalidText = "response.invalidText"
@@ -25,7 +26,7 @@ public struct ChatFailureDiagnostic: Equatable, Sendable, CustomStringConvertibl
         case transport
     }
     public enum Stage: String, Sendable {
-        case http, framing, event, toolStart, toolArguments, toolEnd, completion, usage, reasoning
+        case http, stream, framing, event, toolStart, toolArguments, toolEnd, completion, usage, reasoning
     }
     public let reason: Reason
     public let stage: Stage
@@ -37,9 +38,17 @@ public struct ChatFailureDiagnostic: Equatable, Sendable, CustomStringConvertibl
     public let declaredCount: Int
     public let statusCode: Int?
     public let providerCode: String?
+    public let networkReason: NetworkReason?
+    public let networkCode: Int?
+    public let requestID: String?
+    public let providerType: String?
+    public let providerParameter: String?
+    public let providerMessage: String?
     public init(
         _ reason: Reason, stage: Stage, event: String? = nil, field: String? = nil, outputIndex: Int? = nil,
-        toolName: String? = nil, declaredNames: [String] = [], statusCode: Int? = nil, providerCode: String? = nil
+        toolName: String? = nil, declaredNames: [String] = [], statusCode: Int? = nil, providerCode: String? = nil,
+        networkReason: NetworkReason? = nil, networkCode: Int? = nil, requestID: String? = nil,
+        providerType: String? = nil, providerParameter: String? = nil, providerMessage: String? = nil
     ) {
         self.reason = reason
         self.stage = stage
@@ -51,6 +60,12 @@ public struct ChatFailureDiagnostic: Equatable, Sendable, CustomStringConvertibl
         self.declaredCount = declaredNames.count
         self.statusCode = statusCode
         self.providerCode = providerCode.map { Self.identifier($0, limit: 128) }
+        self.networkReason = networkReason
+        self.networkCode = networkCode
+        self.requestID = requestID.map { Self.identifier($0, limit: 128) }
+        self.providerType = providerType.map { Self.identifier($0, limit: 128) }
+        self.providerParameter = providerParameter.map { Self.identifier($0, limit: 128) }
+        self.providerMessage = providerMessage.map { String($0.prefix(1024)) }
     }
     private static func identifier(_ value: String, limit: Int) -> String {
         guard !value.isEmpty, value.utf8.count <= limit,
@@ -70,6 +85,12 @@ public struct ChatFailureDiagnostic: Equatable, Sendable, CustomStringConvertibl
         }
         if let statusCode { lines.append("httpStatus=\(statusCode)") }
         if let providerCode { lines.append("providerCode=\(providerCode)") }
+        if let networkReason { lines.append("networkReason=\(networkReason.rawValue)") }
+        if let networkCode { lines.append("networkCode=\(networkCode)") }
+        if let requestID { lines.append("requestID=\(requestID)") }
+        if let providerType { lines.append("providerType=\(providerType)") }
+        if let providerParameter { lines.append("providerParameter=\(providerParameter)") }
+        if let providerMessage { lines.append("providerMessage=\(providerMessage)") }
         return lines.joined(separator: "\n")
     }
 }
@@ -305,4 +326,14 @@ public protocol ChatCapability: Capability {
 extension ChatCapability {
     public var supportsToolCalls: Bool { get async { false } }
     public var supportsImages: Bool { get async { false } }
+}
+
+/// Immutable model selection handle. Inference resources and concurrency belong to the SDK.
+public struct ChatModel: Sendable {
+    public let modelName: String?
+    public let capability: any ChatCapability
+    public init(capability: any ChatCapability, modelName: String? = nil) {
+        self.capability = capability
+        self.modelName = modelName
+    }
 }

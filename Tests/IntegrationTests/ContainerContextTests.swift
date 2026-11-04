@@ -346,14 +346,15 @@ private actor ContextReadBarrier {
     #expect(
         try AgentSkillLoader.useStates(skills.loaded)
             == (FixedPlatformState.sourceNames + [
-                "agents.applicationcontrol", "ui.navigation",
+                "agents.applicationcontrol", "agents.writer", "ui.navigation", "ui.windows",
             ]).sorted())
     _ = try skills.control("loadSkills", arguments: ["skills": "[\"photography\"]"], inputID: "input", fixed: fixed)
     let names = try AgentSkillLoader.useStates(skills.loaded)
     #expect(
         names
             == (FixedPlatformState.sourceNames + [
-                "actions.camera", "agents.applicationcontrol", "platform.vision.camera", "ui.album", "ui.camera",
+                "actions.camera", "agents.applicationcontrol", "agents.writer", "platform.vision.camera", "ui.album",
+                "ui.camera",
                 "ui.navigation", "ui.windows", "ui.island",
             ]).sorted())
     _ = try skills.control("releaseSkills", arguments: ["skills": "[\"photography\"]"], inputID: "input", fixed: fixed)
@@ -361,7 +362,7 @@ private actor ContextReadBarrier {
     #expect(
         try AgentSkillLoader.useStates(skills.loaded)
             == (FixedPlatformState.sourceNames + [
-                "agents.applicationcontrol", "ui.navigation",
+                "agents.applicationcontrol", "agents.writer", "ui.navigation", "ui.windows",
             ]).sorted())
     #expect(try await context.snapshot(session: "one", names: ["platform.vision.camera"]).contains("\"running\":true"))
 }
@@ -380,14 +381,14 @@ private actor ContextReadBarrier {
     #expect(!json.contains("inputIDs") && !json.contains("executor") && !json.contains("taskSkillRoots"))
 }
 
-@Test func skillInstructionsDefaultOrderAndPathValidation() throws {
+@Test func skillInstructionsRequireExplicitCurrentPaths() throws {
     let skill = try AgentConfigurations.skill("basic-skill")
     var json = try #require(JSONSerialization.jsonObject(with: JSONEncoder().encode(skill)) as? [String: Any])
     json.removeValue(forKey: "useInstructions")
     func decode() throws -> AgentConfigurations.Skill {
         try JSONDecoder().decode(AgentConfigurations.Skill.self, from: JSONSerialization.data(withJSONObject: json))
     }
-    #expect(try decode().useInstructions == ["Instructions.md"])
+    #expect(throws: DecodingError.self) { try decode() }
     json["useInstructions"] = ["Second.md", "First.md"]
     #expect(try decode().useInstructions == ["Second.md", "First.md"])
     json["useInstructions"] = []
@@ -661,6 +662,7 @@ private func bundledStateSkillIDs() throws -> [String] {
         readers: {
             [
                 "agents": { @Sendable in AgentStateSnapshot(path: "agents") },
+                "agents.writer": { @Sendable in AgentStateSnapshot(path: "agents.writer") },
                 "agents.applicationcontrol": { @Sendable in AgentStateSnapshot(path: "agents.applicationcontrol") },
             ]
         })
@@ -678,7 +680,7 @@ private func bundledStateSkillIDs() throws -> [String] {
         let fields = try #require(JSONSerialization.jsonObject(with: Data(snapshot.utf8)) as? [String: Any])
         #expect(Set(fields.keys) == Set(names))
         #expect(!snapshot.contains("stateUnavailable"))
-        if id == "web-browsing" || id == "web-drawing" {
+        if id == "web-browsing" {
             #expect(names.contains("ui.web") && names.contains("ui.windows"))
             #expect(snapshot.contains("empty"))
             #expect(!snapshot.contains("file://"))
@@ -710,4 +712,40 @@ private func bundledStateSkillIDs() throws -> [String] {
     #expect(reads.read() == ["fixture.missing", "fixture.new"])
     context.close()
     await #expect(throws: ContainerContextError.closed) { try await context.snapshot(session: "test", names: []) }
+}
+
+@Test(.actionCatalog) @MainActor func assistantDefaultStateSeesSharedArtifactWindowsBeforeLoadingWindowSkills()
+    async throws
+{
+    let ui = UIContainer()
+    ui.windows.layout(width: 390, height: 750)
+    ui.windows.setAvailable(true)
+    let creation = Task { try await ui.windows.present(content: .artifact, title: "Writer shared canvas") }
+    let deadline = ContinuousClock.now + .seconds(20)
+    while ui.windows.windows.isEmpty {
+        guard ContinuousClock.now < deadline else { throw WindowError.unavailable }
+        await Task.yield()
+    }
+    let item = try #require(ui.windows.windows.first)
+    ui.windows.complete(item.id, revision: item.revision, generation: ui.windows.generation, success: true)
+    let id = try await creation.value
+    let inspection = ApplicationStateInspection()
+    try inspection.registerRoot("ui", readers: { try await ui.stateReaders() })
+    let context = AgentStateContext()
+    try AssistantStateBindings.register(in: context) { try await inspection.snapshot(path: $0) }
+    try context.open(session: "shared-window")
+    let fixed = try AssistantAgent.runtimeCapabilities(AgentConfigurations.load(named: "Assistant").capabilities)
+    var skills = AgentTaskSkillState()
+    try skills.initialize(fixed: fixed, baseSkills: AgentConfigurations.baseSkills(named: "Assistant"))
+    #expect(!skills.loaded.contains("web-browsing") && !skills.loaded.contains("application-control"))
+    #expect(try AgentSkillLoader.useStates(skills.loaded).contains("ui.windows"))
+    let state = try await context.snapshot(session: "shared-window", names: ["ui.windows"])
+    #expect(state.contains(id.uuidString) && state.contains("Writer shared canvas") && state.contains("artifact"))
+    _ = try skills.control("loadSkills", arguments: ["skills": "[\"web-browsing\"]"], inputID: "inspect", fixed: fixed)
+    let directory = try skills.registry(fixed: fixed)
+    let query = try directory.resolveAction("Web.inspect", parameters: ["windowID": id.uuidString])
+    #expect(query.parameters["windowID"] == id.uuidString)
+    #expect(try AgentSkillLoader.useStates(skills.loaded).contains("ui.web"))
+    context.close(session: "shared-window")
+    await ui.windows.stop()
 }

@@ -1,6 +1,7 @@
 #if os(iOS)
     import Foundation
     import FunctionContracts
+    import ModelKit
     import ModelKitDefaults
     import PlatformKit
     import StorageChat
@@ -100,6 +101,10 @@
         }
     }
     @MainActor public struct ActionsBusinessBindings {
+        public let artifactStreaming: (any ArtifactStreaming)?
+        public let writerArtifacts: (any WriterArtifactsControlling)?
+        public let writerPhotos: CapturedPhotoStore?
+        public let writerModel: (@Sendable () async throws -> ChatModel)?
         public let executor: ActionsExecutionPort
         public let catalog: ActionCatalogSnapshot
         public let settings: any ProviderSettingsStaging
@@ -123,6 +128,10 @@
         public let makeVoice: @MainActor (ActionsVoiceHost) throws -> ActionsVoiceExecution
         public init(
             executor: ActionsExecutionPort, catalog: ActionCatalogSnapshot,
+            artifactStreaming: (any ArtifactStreaming)? = nil,
+            writerArtifacts: (any WriterArtifactsControlling)? = nil,
+            writerPhotos: CapturedPhotoStore? = nil,
+            writerModel: (@Sendable () async throws -> ChatModel)? = nil,
             settings: any ProviderSettingsStaging, discovery: any ProviderDiscoveryStaging,
             providerPresentation: any ProviderPresentationRegistering, tasks: any TaskControlBinding,
             resources: [ResourceDefinition],
@@ -143,6 +152,10 @@
             decodeResources: @escaping @Sendable (String) throws -> ModelResourceViewSnapshot,
             makeVoice: @escaping @MainActor (ActionsVoiceHost) throws -> ActionsVoiceExecution
         ) {
+            self.artifactStreaming = artifactStreaming
+            self.writerArtifacts = writerArtifacts
+            self.writerPhotos = writerPhotos
+            self.writerModel = writerModel
             self.executor = executor
             self.catalog = catalog
             self.settings = settings

@@ -1,6 +1,7 @@
 #if WEBKIT_ACCEPTANCE && os(iOS)
     import Foundation
     import SwiftUI
+    import PDFKit
 
     /// Standalone test host compiled with the production UI files by test-webkit-simulator.sh.
     @main @MainActor struct WebSimulatorAcceptance: App {
@@ -61,6 +62,62 @@
                     evidence["local-\(version)"] =
                         "HTML/CSS/JS loaded; screenshot \(bytes.count) bytes; " + rendered.text
                 }
+                let projectRoot = root.appendingPathComponent("version-2").resolvingSymlinksInPath()
+                let nested = projectRoot.appendingPathComponent("pages")
+                try files.createDirectory(at: nested, withIntermediateDirectories: true)
+                let nestedEntry = nested.appendingPathComponent("index.html")
+                try """
+                <!doctype html><meta charset=utf-8><link rel=stylesheet href=../style.css>
+                <b id=result>waiting</b><span id=tick>0</span><script src=../app.js></script>
+                <script>const p=document.createElement("p"); p.textContent="CSS:"+getComputedStyle(document.body).color; document.body.append(p);</script>
+                """.write(to: nestedEntry, atomically: true, encoding: .utf8)
+                let nestedResult = try await page.loadLocal(
+                    nestedEntry, executesScripts: true, readAccessRoot: projectRoot)
+                guard nestedResult.text.contains("更新已呈现"), nestedResult.text.contains("CSS:rgb(32, 60, 54)"),
+                    nestedResult.diagnostics.isEmpty
+                else {
+                    throw WebPageError.navigationFailed
+                }
+                evidence["nested-entry"] = "Nested entry loads sibling project scripts under explicit confined root."
+                let exporter = WebPageContainer()
+                exporter.setAvailable(true)
+                let pdfBytes = try await exporter.exportLocalPDF(nestedEntry, readAccessRoot: projectRoot)
+                guard let pdf = PDFDocument(data: pdfBytes), pdf.pageCount > 0,
+                    pdf.string?.contains("更新已呈现") == true
+                else { throw WebPageError.snapshotFailed }
+                try pdfBytes.write(to: root.appendingPathComponent("writer-page.pdf"))
+                let document = projectRoot.appendingPathComponent("document.html")
+                let paragraphs = (1...140).map { "<p>Writer 文档测试 · 第 \($0) 段 · 可选择的文字</p>" }.joined()
+                try ("<!doctype html><meta charset=utf-8><style>body{font:16px system-ui}</style>" + paragraphs).write(
+                    to: document, atomically: true, encoding: .utf8)
+                let documentBytes = try await exporter.exportLocalPDF(document, readAccessRoot: projectRoot)
+                guard let pages = PDFDocument(data: documentBytes), pages.pageCount > 1,
+                    pages.string?.contains("140") == true
+                else { throw WebPageError.snapshotFailed }
+                try documentBytes.write(to: root.appendingPathComponent("writer-document.pdf"))
+                evidence["writer-pdf"] =
+                    "HTML CSS JS exported; long Unicode document has \(pages.pageCount) selectable-text A4 pages."
+                exporter.close()
+                let windowA = UUID()
+                let windowB = UUID()
+                let first = try page.createSession(windowID: windowA)
+                let second = try page.createSession(windowID: windowB)
+                let local = root.appendingPathComponent("version-2/index.html").resolvingSymlinksInPath()
+                _ = try await first.loadLocal(local, executesScripts: false)
+                _ = try await second.loadLocal(local, executesScripts: true)
+                try await Task.sleep(for: .milliseconds(300))
+                let disabled = try await first.observe()
+                let enabled = try await second.observe()
+                guard disabled.text.contains("等待脚本"), !disabled.text.contains("更新已呈现"),
+                    enabled.text.contains("更新已呈现")
+                else { throw WebPageError.navigationFailed }
+                page.removeSession(windowID: windowA)
+                guard page.sessions[windowA] == nil, page.sessions[windowB] != nil else {
+                    throw WebPageError.navigationFailed
+                }
+                evidence["writer-preview-isolation"] =
+                    "Two independent pages; draft JavaScript disabled; checkpoint JavaScript enabled; closing one retains the other."
+                page.closeSessions()
                 let remote = try await page.loadRemote(URL(string: "https://example.com")!)
                 evidence["remote-observed"] = remote.title + ": " + remote.text + "; " + remote.diagnostics
                 guard remote.title == "Example Domain", !remote.text.isEmpty else {

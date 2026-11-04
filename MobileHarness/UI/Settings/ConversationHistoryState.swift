@@ -226,6 +226,7 @@ public struct HistoryNativeToolCall: Codable, Sendable, Equatable {
 }
 
 public struct HistoryDecisionMetadata: Codable, Sendable {
+    public var runID: String? = nil
     public var taskGoal: String? = nil
     public var execution: String? = nil
     public let taskID: String?
@@ -239,6 +240,19 @@ public struct HistoryDecisionMetadata: Codable, Sendable {
     }
 }
 
+public struct HistoryFailureDiagnostic: Codable, Sendable, Equatable {
+    public let category: String
+    public let code: String
+    public let stage: String
+    public let message: String
+    public let details: [String: String]
+    public let causes: [HistoryFailureDiagnostic]
+}
+
+public struct HistoryRuntimeEffect: Codable, Sendable, Identifiable {
+    public let id: String
+    public let resultsJSON: String
+}
 public struct HistoryModelRequest: Codable, Sendable, Identifiable {
     public var messageID: String? = nil
     public var isObservation: Bool? = nil
@@ -258,6 +272,7 @@ public struct HistoryModelRequest: Codable, Sendable, Identifiable {
     public let state: HistoryTurn.State
     public let finishReason: String?
     public let error: String?
+    public var failureDiagnostic: HistoryFailureDiagnostic? = nil
 }
 
 public struct HistoryTokenUsage: Codable, Sendable, Equatable {
@@ -286,6 +301,7 @@ public struct HistoryToolCall: Codable, Sendable, Identifiable {
     public var state: State = .received
     public let output: String?
     public let error: String?
+    public var failureDiagnostic: HistoryFailureDiagnostic? = nil
     public init(id: String, providerID: String, name: String, argumentsJSON: String) {
         self.id = id
         self.providerID = providerID
@@ -297,6 +313,7 @@ public struct HistoryToolCall: Codable, Sendable, Identifiable {
 }
 
 public struct HistoryTurn: Codable, Sendable, Identifiable {
+    public var generationRounds: [HistoryRuntimeEffect]? = nil
     public var messageID: String? = nil
     public var historyOrder: UInt64? = nil
     public enum State: String, Codable, Sendable { case generating, completed, failed, cancelled, interrupted }
@@ -319,6 +336,7 @@ public struct HistoryTurn: Codable, Sendable, Identifiable {
     public var state: State = .generating
     public let finishReason: String?
     public let error: String?
+    public var failureDiagnostic: HistoryFailureDiagnostic? = nil
     public let executionError: String?
     public var historyTaskID: String? = nil
     public var decisionMetadata: HistoryDecisionMetadata? = nil

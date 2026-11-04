@@ -39,7 +39,8 @@ public enum SettingsProviderAdapter {
                         configuration = try OpenAIChatConfiguration(
                             baseURL: OpenAIChatConfiguration.endpoint(value.url),
                             apiKey: value.key,
-                            model: value.model.isEmpty ? OpenAIChatConfiguration.defaultModel : value.model)
+                            model: value.model.isEmpty ? OpenAIChatConfiguration.defaultModel : value.model,
+                            thinking: .minimum)
                     } else {
                         configuration = nil
                     }
@@ -111,15 +112,12 @@ public enum SettingsProviderAdapter {
     private let state: any SettingsPresenting
     private let sessionID: String
     private let settings: ProviderSettingsRequests
-    private let discovery: ProviderDiscoveryRequests
     public init(
-        state: any SettingsPresenting, sessionID: String, settings: ProviderSettingsRequests,
-        discovery: ProviderDiscoveryRequests
+        state: any SettingsPresenting, sessionID: String, settings: ProviderSettingsRequests
     ) {
         self.state = state
         self.sessionID = sessionID
         self.settings = settings
-        self.discovery = discovery
     }
     public func register(_ id: String, operation: Operation) throws {
         guard entries.count < 32 else { throw ProviderDiscoveryError.capacityExceeded }
@@ -141,13 +139,6 @@ public enum SettingsProviderAdapter {
             return
         }
         switch entry.operation {
-        case .discovery:
-            let models = try await discovery.result(id, sessionID: sessionID)
-            try state.requirePresentation()
-            _ = state.presentModels(
-                models,
-                notice: models.isEmpty ? "此服务没有返回可识别的聊天模型" : "请选择用于对话的模型",
-                revision: entry.revision)
         case .restore:
             let value = try settings.result(id, sessionID: sessionID)
             try state.requirePresentation()
@@ -156,13 +147,14 @@ public enum SettingsProviderAdapter {
                     enabled: value.enabled, url: value.url, key: value.key,
                     model: value.model.isEmpty ? SettingsProviderAdapter.initial.model : value.model,
                     providers: value.providers.map {
-                        .init(enabled: false, url: $0.url, key: $0.key, model: $0.model, name: $0.name)
-                    }),
+                        .init(enabled: false, url: $0.url, key: $0.key, model: $0.model, name: $0.name, id: $0.id)
+                    }, writerProviderID: value.writerProviderID, writerModel: value.writerModel,
+                    writerThinking: value.writerThinking),
                 revision: entry.revision)
         case .save:
             let value = try settings.result(id, sessionID: sessionID)
             try state.requirePresentation()
-            _ = state.presentNotice(value.enabled ? "已保存，云端模型立即生效" : "已切换为本地模型", revision: entry.revision)
+            _ = state.presentNotice("已保存智能体大脑配置", revision: entry.revision)
         }
     }
 }

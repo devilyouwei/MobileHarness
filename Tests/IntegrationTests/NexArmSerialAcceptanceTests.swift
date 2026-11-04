@@ -238,7 +238,7 @@ import Testing
             stateContext: try publicStateFixture(),
             chat: FixedTextChat(text: markup),
             context: try AgentContextRepository(
-                agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState())
+                agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: loadedRobotAssistantContext())
         )
         let manager = AgentManager()
         let session = UUID().uuidString

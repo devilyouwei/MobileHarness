@@ -526,7 +526,7 @@ if 'ToolHandler' in macro_implementation or 'ToolCompletionHandler' in macro_imp
     errors.append('@Action factories must bind canonical handlers only')
 if (actions_root / 'ToolMacro.swift').exists():
     errors.append('Retired @Tool macro must not be recreated')
-expected_domains = {'UI', 'Speech', 'Camera', 'History', 'System', 'NexArm', 'Web'}
+expected_domains = {'UI', 'Speech', 'Camera', 'History', 'System', 'NexArm', 'Web', 'Artifacts'}
 domains = {p.name for p in actions_root.iterdir() if p.is_dir()} - {'Support'}
 if domains != expected_domains:
     errors.append(f'Executable business domains must be classified explicitly: {domains}')
@@ -1165,8 +1165,8 @@ for group, version in [('agents', 7), ('skills', 3)]:
         for function in functions:
             if len(function['path'].split('.')) != 3 or function['callType'] not in ('action', 'tool'):
                 errors.append(f'Invalid function binding: {relative}')
-            if function['callType'] != 'action' or not function.get('channel'):
-                errors.append(f'Bundled Skills require Action calls with an explicit Channel: {relative}')
+            if function['callType'] == 'action' and not function.get('channel'):
+                errors.append(f'Action Skill bindings require an explicit Channel: {relative}')
             if function['path'] == 'Agent.Communication.send' and function['callType'] != 'action':
                 errors.append(f'send must be Action: {relative}')
 if any(p for group in ('Agents', 'Skills') for p in (asset_root / group).rglob('*.swift')):

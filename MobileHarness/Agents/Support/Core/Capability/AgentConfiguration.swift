@@ -51,7 +51,7 @@ public struct AgentConfiguration: Sendable {
         do { decoded = try JSONDecoder().decode(Document.self, from: data) } catch {
             throw AgentConfigurationError.invalidFormat
         }
-        guard decoded.version == 6 || decoded.version == 7 else {
+        guard decoded.version == 7 else {
             throw AgentConfigurationError.unsupportedVersion(decoded.version)
         }
         version = decoded.version
@@ -114,17 +114,6 @@ public struct AgentConfiguration: Sendable {
                     optionalParameters: Set(tool.function.parameters.properties.keys)
                         .subtracting(tool.function.parameters.required), definition: tool)
             }, channels: Set(decoded.actions.keys))
-        // Legacy imported configurations may carry examples; validate them without rendering or storing them in live metadata.
-        for entries in decoded.actions.values {
-            for entry in entries {
-                guard let action = capabilities.actions.first(where: { $0.alias == entry.alias }) else {
-                    throw AgentConfigurationError.invalidField("actions.alias")
-                }
-                for example in entry.examples ?? [] {
-                    try Self.validateExample(example, for: action, registry: capabilities)
-                }
-            }
-        }
         agentID = AgentID(rawValue: decoded.id)
     }
 
@@ -135,37 +124,15 @@ public struct AgentConfiguration: Sendable {
         return value
     }
 
-    private static func validateExample(
-        _ example: String, for action: ActionRegistration, registry: CapabilityRegistry
-    ) throws {
-        var parser = FunctionTokenParser()
-        let tokens = try parser.append(example) + parser.finish()
-        var demonstratesAction = false
-        for token in tokens {
-            switch token {
-            case .action(let alias, let parameters, let channel):
-                _ = try registry.resolveAction(alias, parameters: parameters, channel: channel)
-                if alias == action.alias { demonstratesAction = true }
-            case .text(let text, let channel):
-                if !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                    if let channel, !registry.channels.contains(channel) { throw GenerationError.forbiddenChannel }
-                }
-            case .boundary, .scheduling: break
-            }
-        }
-        guard demonstratesAction else { throw AgentConfigurationError.invalidField("actions.examples") }
-    }
-
     private static func entry(_ raw: Any, field: String) throws -> [String: Any] {
         let keys: Set<String> = [
-            "alias", "path", "doc", "parameters", "examples",
+            "alias", "path", "doc", "parameters",
         ]
-        guard let rawValue = raw as? [String: Any] else { throw AgentConfigurationError.invalidField(field) }
+        guard raw is [String: Any] else { throw AgentConfigurationError.invalidField(field) }
         let value = try dictionary(
-            raw, keys: rawValue["examples"] == nil ? keys.subtracting(["examples"]) : keys, field: field)
+            raw, keys: keys, field: field)
         try prose(value["doc"], field: "\(field).doc")
-        guard let parameters = value["parameters"] as? [Any], parameters.count <= 32,
-            value["examples"] == nil || (value["examples"] as? [Any]).map { (1...8).contains($0.count) } == true
+        guard let parameters = value["parameters"] as? [Any], parameters.count <= 32
         else { throw AgentConfigurationError.invalidField(field) }
         var names = Set<String>()
         for rawParameter in parameters {
@@ -178,7 +145,6 @@ public struct AgentConfiguration: Sendable {
             try prose(parameter["description"], field: "\(field).parameters.description")
             try prose(parameter["constraints"], field: "\(field).parameters.constraints", allowEmpty: true)
         }
-        for example in value["examples"] as? [Any] ?? [] { try prose(example, field: "\(field).examples") }
         return value
     }
 
@@ -235,7 +201,6 @@ public struct AgentConfiguration: Sendable {
             let path: Path
             let doc: String
             let parameters: [CapabilityDocumentation.Parameter]
-            let examples: [String]?
             var documentation: CapabilityDocumentation {
                 CapabilityDocumentation(doc: doc, parameters: parameters)
             }

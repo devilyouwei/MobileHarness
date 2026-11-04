@@ -18,18 +18,6 @@ public struct WebModule: CapabilityModule {
             WebActions.navigateDefinition(completing: { [web] in
                 .value(try await WebActions.navigate(invocation: $0, using: web))
             }),
-            WebActions.developDefinition(completing: { [web] in
-                .value(try await WebActions.develop(invocation: $0, using: web))
-            }),
-            WebActions.openDefinition(completing: { [web] in
-                .value(try await WebActions.open(invocation: $0, using: web))
-            }),
-            WebActions.projectsDefinition(completing: { [web] in
-                .value(try await WebActions.projects(invocation: $0, using: web))
-            }),
-            WebActions.deleteDefinition(completing: { [web] in
-                .value(try await WebActions.delete(invocation: $0, using: web))
-            }),
         ]
     }
 }

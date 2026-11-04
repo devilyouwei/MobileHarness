@@ -10,15 +10,9 @@ public final class SQLiteMediaRepository: MediaRepository {
         CREATE TABLE media_files(id INTEGER PRIMARY KEY AUTOINCREMENT, kind TEXT NOT NULL, mime TEXT NOT NULL,
                                 relative_path TEXT NOT NULL UNIQUE, bytes INTEGER NOT NULL, source TEXT NOT NULL,
                                 session_id TEXT NOT NULL, input_id TEXT NOT NULL, created_at REAL NOT NULL, captured_at REAL,
-                                state TEXT NOT NULL, failure TEXT);
+                                state TEXT NOT NULL, failure TEXT,album_added_at REAL,photo_width INTEGER,photo_height INTEGER,photo_origin TEXT);
         CREATE INDEX media_owner ON media_files(source,input_id,id);
         CREATE INDEX media_retention ON media_files(state,created_at,id);
-        """
-    internal static let albumMigrationSQL = """
-        ALTER TABLE media_files ADD COLUMN album_added_at REAL;
-        ALTER TABLE media_files ADD COLUMN photo_width INTEGER;
-        ALTER TABLE media_files ADD COLUMN photo_height INTEGER;
-        ALTER TABLE media_files ADD COLUMN photo_origin TEXT;
         CREATE INDEX album_order ON media_files(COALESCE(captured_at,created_at) DESC,id DESC)
           WHERE album_added_at IS NOT NULL AND state='ready';
         """

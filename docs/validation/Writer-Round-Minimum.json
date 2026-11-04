@@ -1,0 +1,76 @@
+{
+  "version": 1,
+  "createdAt": "2026-11-04T11:12:55.899580+00:00",
+  "sourceHashes": {
+    "MobileHarness/Actions/Artifacts/ArtifactContentParser.swift": "cf694265050380337f4a1ab1745b8c691c9eab5f88e3cb66e44b9e5b7558598a",
+    "MobileHarness/Actions/Artifacts/ArtifactEditing.swift": "a95a8424ddaea93ee9cbc38852f39e4730cd3383194d4b84b96cf330cf3e0f29",
+    "MobileHarness/Actions/Artifacts/ArtifactExport.swift": "936bd0376bedd32f9c809ec3bbbb7d1577d1faa82b36f718d0e07131efb70302",
+    "MobileHarness/Actions/Artifacts/ArtifactPresentation.swift": "8b23f31c4156d9866ea7800b169207c8958dc88c7794b68b963ff89b544e7953",
+    "MobileHarness/Actions/Artifacts/ArtifactService.swift": "d00429604aa6b7e80c1b40dda922401d20dc48d2dc4d6bfce548f570c06f4a92",
+    "MobileHarness/Actions/Artifacts/ArtifactWorkspace.swift": "df7c2108a2bf7c9a9037cc2048d5a09d31e12f847353b1d53e8f130ef33c4191",
+    "MobileHarness/Actions/Artifacts/ArtifactsActions.swift": "d15908117f094f61aa871773bfca063be499c0dbcafd5844f3ea60fbdfa2d745",
+    "MobileHarness/Actions/Artifacts/ArtifactsModule.swift": "aa0aaa2b2317453998b60ea49b0eb89214d5447b52952532d9d1968685623847",
+    "MobileHarness/Actions/Artifacts/WorkspaceActions.swift": "afa369115a17e6379e0fcb661af7fe1fabdd2e7c37664e019a933fd502f417bb",
+    "MobileHarness/Agents/Writer/WriterAgent.swift": "3289dcc2bc19c9ef4ddaae4f21c633c06b226f7472f638a1eadc9d69e32925d7",
+    "MobileHarness/Agents/Writer/WriterContainer.swift": "d33ba0f9712471539029905ea255cc8864cbec3052923a7bdd33e721fb80c3af",
+    "MobileHarness/Agents/Writer/WriterDiagnostics.swift": "4854bd1432c64188e55fe404f674985f4435f098837c0a97f425990eac554334",
+    "MobileHarness/Agents/Writer/WriterHistory.swift": "41a58d0b20ce6e816baae089da3e8c519805bcc471aa082303058d8f0d4756f5",
+    "MobileHarness/Agents/Writer/WriterIslandPresentation.swift": "0e1406f1ce3158a114916bea38741fd82137099d29548220b12e4fc24d035a21",
+    "MobileHarness/Agents/Writer/WriterNotifications.swift": "1f023200bab908a319714f67ce185ae48ed00e248f092522d3b841e7e6aaa46f",
+    "MobileHarness/Agents/Writer/WriterPreview.swift": "f68de288c042d115aa9f49451cc51e6283279fa83f026b5bdb057b2bc981abc7",
+    "MobileHarness/Agents/Writer/WriterRecovery.swift": "9749432474d6f6d12db182b436599682c45a33deb18d60f812c72afc6b37cfa1",
+    "MobileHarness/Agents/Writer/WriterWorkflow.swift": "c258923f2876a26997c8f02bef5713627797f2cc7cf542c2037de25177172f38",
+    "MobileHarness/ModelKit/Language/LLM/OpenAI/ChatEventDecoder.swift": "9cdeb45f397baa82aedb3946bab774e951d275026fe64963a9b2a145498a1d70",
+    "MobileHarness/ModelKit/Language/LLM/OpenAI/ChatHTTPFailure.swift": "e89b4d2d50374dfd36a8e2bf60d114061c7c48a521f4c6f874e61e8cd537d4b9",
+    "MobileHarness/ModelKit/Language/LLM/OpenAI/OpenAIChat.swift": "2cdaa756dd7cd6939f73d6044eb45baa533c544cbaad682d2b025fc0b9e2ff50",
+    "MobileHarness/ModelKit/Language/LLM/OpenAI/OpenAIChatConfiguration.swift": "618b5d77a7a28b40fbc7f7a68a089af5fe5c352ed4158eeb6ea5489d2d6f75b5",
+    "Tests/IntegrationTests/WriterModelEvaluationTests.swift": "18cd2ba983fccd8fc8b25bf7a648933a798b38d0cba013d0d5af3b132db3ec80",
+    "scripts/evaluate-writer.py": "05927140d7786ccc59761ace2ca56af3d0425e3125bedf8204f8dfdcd0f671b5"
+  },
+  "sourceUnchanged": true,
+  "requestedModels": [
+    "qwen3.8-max"
+  ],
+  "thinking": "minimum",
+  "binarySHA256": "4a87915e8a385a80cb55d9b0cc4360646a12f8b5f3b5db2ab7f33182ff160f75",
+  "binaryUnchanged": true,
+  "results": [
+    {
+      "model": "qwen3.8-max",
+      "exitCode": 0,
+      "root": "/tmp/writer-round-minimum-qwen3.8-max",
+      "log": "/tmp/writer-round-minimum-qwen3.8-max.log",
+      "complete": true,
+      "passed": 1,
+      "cases": [
+        {
+          "contentRequests": 1,
+          "files": {
+            "index.html": 5666
+          },
+          "firstVisibleSeconds": 12.936725854873657,
+          "goal": "绘制一份简单的测试流程图",
+          "id": "diagram",
+          "issues": [],
+          "lastDOM": {
+            "button": 0,
+            "errors": [],
+            "nodes": 10,
+            "svg": 1,
+            "text": "简单测试流程图\n开始\n编写测试用例\n执行测试\n是否通过？\n是\n否\n修复缺陷\n重新测试\n返回执行测试\n结束\n起止节点\n处理步骤\n判断节点",
+            "title": "测试流程图"
+          },
+          "passed": true,
+          "previewFrames": 44,
+          "projectID": "ECBDF50E-5BCD-49E8-96AD-1814A2EEB43A",
+          "renderCount": 45,
+          "requests": 4,
+          "runID": "task_1",
+          "seconds": 47.03693902492523,
+          "status": "completed",
+          "taskID": "task_1"
+        }
+      ]
+    }
+  ]
+}

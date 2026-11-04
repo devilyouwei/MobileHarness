@@ -42,7 +42,7 @@ public enum IslandIndicator: Equatable, Hashable, Sendable, Codable {
         case .symbol:
             self = .symbol(
                 name: try c.decode(String.self, forKey: .symbol),
-                effect: try c.decodeIfPresent(IslandIconEffect.self, forKey: .effect) ?? .none)
+                effect: try c.decode(IslandIconEffect.self, forKey: .effect))
         case .elapsed: self = .elapsed(startedAt: try c.decode(Date.self, forKey: .startedAt))
         case .loading: self = .loading
         case .spectrum: self = .spectrum
@@ -66,18 +66,10 @@ public enum IslandIndicator: Equatable, Hashable, Sendable, Codable {
             try c.encode(value, forKey: .value)
         }
     }
-    static func decodeLegacy(_ trailing: String?, progress: Double?) -> Self? {
-        switch trailing {
-        case "loading": .loading
-        case "spectrum": .spectrum
-        case "progress": .progress(progress ?? 0)
-        case "recording": .symbol(name: "record.circle.fill", effect: .pulse)
-        default: nil
-        }
-    }
+
 }
 
-public enum IslandTone: String, Codable, Sendable { case neutral, blue, success, warning, recording }
+public enum IslandTone: String, Codable, Sendable { case neutral, blue, purple, success, warning, recording }
 public typealias IslandThumbnailID = UUID
 public struct IslandDetail: Equatable, Codable, Sendable {
     public var text: String?
@@ -93,13 +85,27 @@ public struct IslandDetail: Equatable, Codable, Sendable {
     }
     public func validate() throws { if let text, text.count > 320 { throw IslandError.invalid } }
 }
+/// Semantic importance; ordering belongs to the component, independent of business owners.
+public enum IslandPriority: String, Codable, Sendable {
+    case background, low, normal, high, attention, critical
+    var order: Int {
+        switch self {
+        case .background: 0
+        case .low: 1
+        case .normal: 2
+        case .high: 3
+        case .attention: 4
+        case .critical: 5
+        }
+    }
+}
 public struct IslandContent: Equatable, Sendable, Codable {
     public var title: String
     public var subtitle: String
     public var primary: IslandIndicator
     public var secondary: IslandIndicator?
     public var tone: IslandTone
-    public var rank: Int
+    public var priority: IslandPriority
     public var startedAt: Date?
     public var deadline: Date?
     public var liveActivity: Bool?
@@ -107,7 +113,8 @@ public struct IslandContent: Equatable, Sendable, Codable {
     public var detail: IslandDetail?
     public init(
         title: String, subtitle: String = "", primary: IslandIndicator, tone: IslandTone = .neutral,
-        rank: Int = 0, secondary: IslandIndicator? = nil, startedAt: Date? = nil, deadline: Date? = nil,
+        priority: IslandPriority = .background, secondary: IslandIndicator? = nil, startedAt: Date? = nil,
+        deadline: Date? = nil,
         liveActivity: Bool? = nil, expansionID: String? = nil, detail: IslandDetail? = nil
     ) {
         self.title = title
@@ -115,7 +122,7 @@ public struct IslandContent: Equatable, Sendable, Codable {
         self.primary = primary
         self.secondary = secondary
         self.tone = tone
-        self.rank = rank
+        self.priority = priority
         self.startedAt = startedAt
         self.deadline = deadline
         self.liveActivity = liveActivity
@@ -124,7 +131,7 @@ public struct IslandContent: Equatable, Sendable, Codable {
     }
     public func validate() throws {
         guard !title.isEmpty, title.count <= 80, subtitle.count <= 160, primary.isValid,
-            secondary?.isValid ?? true, (0...100).contains(rank),
+            secondary?.isValid ?? true,
             expansionID.map({ !$0.isEmpty && $0.utf8.count <= 256 }) ?? true,
             startedAt.map({ $0.timeIntervalSince1970.isFinite }) ?? true,
             deadline.map({ $0.timeIntervalSince1970.isFinite }) ?? true
@@ -132,30 +139,21 @@ public struct IslandContent: Equatable, Sendable, Codable {
         try detail?.validate()
     }
     private enum CodingKeys: String, CodingKey {
-        case title, subtitle, primary, secondary, tone, rank, startedAt, deadline, liveActivity, expansionID,
-            detail, symbol, trailing, progress
+        case title, subtitle, primary, secondary, tone, priority, startedAt, deadline, liveActivity, expansionID,
+            detail
     }
     public init(from decoder: any Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         title = try c.decode(String.self, forKey: .title)
-        subtitle = try c.decodeIfPresent(String.self, forKey: .subtitle) ?? ""
-        tone = try c.decodeIfPresent(IslandTone.self, forKey: .tone) ?? .neutral
-        rank = try c.decodeIfPresent(Int.self, forKey: .rank) ?? 0
+        subtitle = try c.decode(String.self, forKey: .subtitle)
+        tone = try c.decode(IslandTone.self, forKey: .tone)
+        priority = try c.decode(IslandPriority.self, forKey: .priority)
         startedAt = try c.decodeIfPresent(Date.self, forKey: .startedAt)
         deadline = try c.decodeIfPresent(Date.self, forKey: .deadline)
         liveActivity = try c.decodeIfPresent(Bool.self, forKey: .liveActivity)
         expansionID = try c.decodeIfPresent(String.self, forKey: .expansionID)
-        if let indicator = try c.decodeIfPresent(IslandIndicator.self, forKey: .primary) {
-            primary = indicator
-        } else {
-            let legacy = try c.decode(String.self, forKey: .symbol)
-            primary = .symbol(name: legacy.isEmpty ? "circle.dotted" : legacy)
-        }
-        secondary =
-            try c.decodeIfPresent(IslandIndicator.self, forKey: .secondary)
-            ?? IslandIndicator.decodeLegacy(
-                c.decodeIfPresent(String.self, forKey: .trailing),
-                progress: c.decodeIfPresent(Double.self, forKey: .progress))
+        primary = try c.decode(IslandIndicator.self, forKey: .primary)
+        secondary = try c.decodeIfPresent(IslandIndicator.self, forKey: .secondary)
         detail = try c.decodeIfPresent(IslandDetail.self, forKey: .detail)?.normalized
     }
     public func encode(to encoder: any Encoder) throws {
@@ -165,7 +163,7 @@ public struct IslandContent: Equatable, Sendable, Codable {
         try c.encode(primary, forKey: .primary)
         try c.encodeIfPresent(secondary, forKey: .secondary)
         try c.encode(tone, forKey: .tone)
-        try c.encode(rank, forKey: .rank)
+        try c.encode(priority, forKey: .priority)
         try c.encodeIfPresent(startedAt, forKey: .startedAt)
         try c.encodeIfPresent(deadline, forKey: .deadline)
         try c.encodeIfPresent(liveActivity, forKey: .liveActivity)
@@ -201,7 +199,7 @@ struct IslandSystemSnapshot: Codable, Hashable, Sendable {
     }
     enum IslandErrorPayload: Error { case tooLarge }
     static var openURL: URL? { URL(string: "mobileharness://island") }
-    // Whole-island taps resume the existing scene, regardless of legacy destination metadata.
+    // Whole-island taps resume the existing scene, without interpreting destination metadata.
     var navigationURL: URL? { Self.openURL }
 
     func presentation(stale: Bool) -> Self {
@@ -222,60 +220,6 @@ struct IslandSystemSnapshot: Codable, Hashable, Sendable {
         return value
     }
 
-}
-
-// Keep ActivityKit's already-persisted snapshots readable when upgrading an installed app.
-extension IslandSystemSnapshot {
-    private enum CodingKeys: String, CodingKey {
-        case generation, activityID, title, subtitle, primary, secondary, tone, startedAt, deadline, updatedAt, endedAt,
-            paused, attentionID, detailText, detailPrimary, detailTone, hasStatus, symbol, trailing, progress
-    }
-    init(from decoder: any Decoder) throws {
-        let c = try decoder.container(keyedBy: CodingKeys.self)
-        generation = try c.decode(UUID.self, forKey: .generation)
-        activityID = try c.decode(UUID.self, forKey: .activityID)
-        title = try c.decode(String.self, forKey: .title)
-        subtitle = try c.decode(String.self, forKey: .subtitle)
-        tone = try c.decode(String.self, forKey: .tone)
-        updatedAt = try c.decode(Date.self, forKey: .updatedAt)
-        paused = try c.decodeIfPresent(Bool.self, forKey: .paused) ?? false
-        startedAt = try c.decodeIfPresent(Date.self, forKey: .startedAt)
-        deadline = try c.decodeIfPresent(Date.self, forKey: .deadline)
-        endedAt = try c.decodeIfPresent(Date.self, forKey: .endedAt)
-        attentionID = try c.decodeIfPresent(String.self, forKey: .attentionID)
-        detailText = try c.decodeIfPresent(String.self, forKey: .detailText)
-        detailPrimary = try c.decodeIfPresent(IslandIndicator.self, forKey: .detailPrimary)
-        detailTone = try c.decodeIfPresent(String.self, forKey: .detailTone)
-        hasStatus = try c.decodeIfPresent(Bool.self, forKey: .hasStatus) ?? (detailText == nil)
-        primary =
-            try c.decodeIfPresent(IslandIndicator.self, forKey: .primary)
-            ?? .symbol(name: c.decodeIfPresent(String.self, forKey: .symbol) ?? "circle.dotted")
-        secondary =
-            try c.decodeIfPresent(IslandIndicator.self, forKey: .secondary)
-            ?? IslandIndicator.decodeLegacy(
-                c.decodeIfPresent(String.self, forKey: .trailing),
-                progress: c.decodeIfPresent(Double.self, forKey: .progress))
-    }
-    func encode(to encoder: any Encoder) throws {
-        var c = encoder.container(keyedBy: CodingKeys.self)
-        try c.encode(generation, forKey: .generation)
-        try c.encode(activityID, forKey: .activityID)
-        try c.encode(title, forKey: .title)
-        try c.encode(subtitle, forKey: .subtitle)
-        try c.encode(primary, forKey: .primary)
-        try c.encodeIfPresent(secondary, forKey: .secondary)
-        try c.encode(tone, forKey: .tone)
-        try c.encodeIfPresent(startedAt, forKey: .startedAt)
-        try c.encodeIfPresent(deadline, forKey: .deadline)
-        try c.encode(updatedAt, forKey: .updatedAt)
-        try c.encodeIfPresent(endedAt, forKey: .endedAt)
-        try c.encode(paused, forKey: .paused)
-        try c.encodeIfPresent(attentionID, forKey: .attentionID)
-        try c.encodeIfPresent(detailText, forKey: .detailText)
-        try c.encodeIfPresent(detailPrimary, forKey: .detailPrimary)
-        try c.encodeIfPresent(detailTone, forKey: .detailTone)
-        try c.encode(hasStatus, forKey: .hasStatus)
-    }
 }
 
 #if os(iOS)

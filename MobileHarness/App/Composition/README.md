@@ -91,4 +91,8 @@ IslandState自身管理ActivityKit摘要和SwiftUI本地呈现，组合层不创
 
 ApplicationContainer injects IslandDeviceStatusReading into UI construction. Its closure structurally maps PlatformContainer.systemStatus() typed power/network fields into UI-owned values. It owns no polling, native sampler or presentation rule; the visible Island component controls cached-read lifetime and layout.
 
-Web presentation is injected directly from UIContainer into ApplicationPresentation/ApplicationRootProviding. ApplicationContainer configures the separate WebWorkspaces filesystem location. ActionsBusinessAssembly owns editor, browser, storage publication and screenshot services; App adds no editing logic or worker.
+Web presentation is injected directly from UIContainer into ApplicationPresentation/ApplicationRootProviding. ApplicationContainer configures the separate WebWorkspaces filesystem location. ActionsBusinessAssembly owns browser, deterministic artifact storage/presentation and screenshot services; Writer owns model editing; App adds no editing logic or worker.
+
+ApplicationPresentation 将 WriterContainer 的 WriterRecordsControlling 与 Actions 的 WriterArtifactsControlling 注入 Writer 专属任务页面；不再为 Writer 组装 Assistant 会话历史管理或标题工作流。任务、消息、图片读取由 WriterContainer 提供；文件预览与导出由 Actions 根管理。
+
+Settings uses independent assistantHistory/writerHistory routes to injected record destinations. Writer request summaries are projected by WriterContainer; App does not parse SQL, model calls or progress policy.

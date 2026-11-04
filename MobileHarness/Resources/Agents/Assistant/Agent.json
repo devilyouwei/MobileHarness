@@ -57,6 +57,11 @@
         "contract": "task.cancel",
         "version": 1,
         "kind": "observation"
+      },
+      {
+        "contract": "writer.completion",
+        "version": 1,
+        "kind": "observation"
       }
     ],
     "subscriptions": [
@@ -118,13 +123,24 @@
       {
         "contract": "task.cancel",
         "target": "applicationControl"
+      },
+      {
+        "contract": "task.request",
+        "target": "writer"
+      },
+      {
+        "contract": "task.input",
+        "target": "writer"
+      },
+      {
+        "contract": "task.cancel",
+        "target": "writer"
       }
     ]
   },
   "baseSkills": [
     "basic-skill",
-    "expression-interaction",
-    "robot-interaction"
+    "expression-interaction"
   ],
   "backgroundTasks": []
 }

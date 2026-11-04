@@ -9,7 +9,7 @@ public actor OpenAIChat: ChatCapability {
 
     public init(context: ModelContext, configuration: OpenAIChatConfiguration) throws {
         self.configuration = configuration
-        resource = try context.resource {
+        resource = try context.resource(concurrent: true) {
             ChatNetworkSession(configuration: .ephemeral, timeout: configuration.timeout)
         }
     }
@@ -19,7 +19,7 @@ public actor OpenAIChat: ChatCapability {
         sessionConfiguration: @escaping @Sendable () -> URLSessionConfiguration
     ) throws {
         self.configuration = configuration
-        resource = try context.resource {
+        resource = try context.resource(concurrent: true) {
             ChatNetworkSession(configuration: sessionConfiguration(), timeout: configuration.timeout)
         }
     }
@@ -40,12 +40,13 @@ public actor OpenAIChat: ChatCapability {
             onTermination: { reason in
                 if case .finished = reason { return }
                 control.cancel()
-            })
+            }, waitForCompletion: { await control.waitForCompletion() })
         let network = lease.model.session
         let resource = resource
         let emitter = pair.emitter
         let task = Task {
             defer { control.finish() }
+            var transportStage = ChatFailureDiagnostic.Stage.http
             do {
                 try Task.checkCancellation()
                 request.timing?.start()
@@ -55,11 +56,23 @@ public actor OpenAIChat: ChatCapability {
                     throw OpenAIChatError.responseFailure(.init(.invalidHTTPResponse, stage: .http))
                 }
                 guard (200..<300).contains(response.statusCode) else {
-                    throw OpenAIChatError.httpStatus(response.statusCode)
+                    var body = Data()
+                    do {
+                        for try await byte in bytes {
+                            try Task.checkCancellation()
+                            guard body.count < 16_384 else { break }
+                            body.append(byte)
+                        }
+                    } catch {
+                        try Task.checkCancellation()
+                        // The received HTTP status remains authoritative even if its optional body cannot finish.
+                    }
+                    throw configuration.httpFailure(response, body: body)
                 }
                 guard response.mimeType?.lowercased() == "text/event-stream" else {
                     throw OpenAIChatError.responseFailure(.init(.unexpectedContentType, stage: .http))
                 }
+                transportStage = .stream
                 var decoder = ChatEventDecoder(
                     toolNames: OpenAIChatConfiguration.toolNames(request.tools), timing: request.timing)
                 var finish: ChatEvent?
@@ -83,7 +96,7 @@ public actor OpenAIChat: ChatCapability {
                 } else if error is OpenAIChatError || error is CapabilityError {
                     emitter.fail(error)
                 } else {
-                    emitter.fail(OpenAIChatError.transport)
+                    emitter.fail(OpenAIChatError.transportFailure(error, stage: transportStage))
                 }
             }
         }
@@ -108,6 +121,7 @@ private final class RequestControl: Sendable {
     private let state = Mutex(State())
     private let worker = InferenceTaskControl()
     func install(_ task: Task<Void, Never>) throws { try worker.install(task) }
+    func waitForCompletion() async { await worker.waitForCompletion() }
     func finish() {
         worker.finish()
         state.withLock { $0.http = nil }
@@ -128,10 +142,10 @@ private final class RequestControl: Sendable {
 }
 
 /// Resource residency owns connection reuse and final teardown, independently of any request.
-private final class ChatNetworkSession: Sendable {
+final class ChatNetworkSession: Sendable {
     let session: URLSession
     init(configuration: URLSessionConfiguration, timeout: TimeInterval) {
-        configuration.timeoutIntervalForResource = timeout
+        configuration.timeoutIntervalForRequest = timeout
         configuration.httpCookieStorage = nil
         configuration.urlCache = nil
         session = URLSession(configuration: configuration, delegate: NoRedirects(), delegateQueue: nil)

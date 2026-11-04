@@ -28,7 +28,7 @@ public final class UINavigationContainer {
 }
 
 public enum AppDestination: String, Codable, Hashable, Sendable {
-    case settings, language, recognition, synthesis, vision, bluetooth, history, album
+    case settings, language, recognition, synthesis, vision, bluetooth, assistantHistory, writerHistory, album
 }
 @MainActor
 @Observable
@@ -80,7 +80,8 @@ public final class NavigationState {
         let allowed =
             location.page.rawValue == destination
             || (destination == "album" && location.page == .albumPhoto)
-            || (destination == "history" && [.agentRecords, .conversation, .turn].contains(location.page))
+            || (["assistantHistory", "writerHistory"].contains(destination)
+                && [.agentRecords, .conversation, .turn].contains(location.page))
         guard allowed else { return false }
         self.current = location
         self.content = content

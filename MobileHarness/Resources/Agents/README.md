@@ -144,3 +144,8 @@ Assistant 的 Agent/Provider 异常终止当前 Decision 并保留历史/效果�
 ✅ ApplicationControl 的配置声明 container.failure/runtime.failure observation 输入和 runtime 来源订阅。Assistant 保留容器异常的被动订阅；异常呈现使用角色代码中的内部权限，不向模型扩展函数目录。
 
 ✅ 通信注册表只保留 Agent 消息与执行反馈；删除本地 UI／媒体／环境／故障的历史 schema 和仅供外部来源的测试声明，本地类型自身继续验证。
+
+
+Writer 是面向作品的独立生成角色，声明 writer.author 后台任务和向 Assistant 的 progress/result 通信；其工作流与原生工具目录由代码拥有，不加载 Assistant XML 提示词。
+
+Assistant身份Instruction说明独立Writer循环、会话/聆听关闭不取消委托，以及面向用户的阶段事实汇报；播放衔接和播毕启听属于运行时政策，模型不为自动衔接产生startListening。

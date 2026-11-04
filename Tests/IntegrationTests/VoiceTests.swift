@@ -1034,9 +1034,12 @@ private actor PerceptionListeningProbe {
 
 private func replyActivityInput(
     session: String, source: String = "assistant", incarnation: String, revision: UInt64,
-    inputs: [String] = [], tasks: [String] = [], root: String = UUID().uuidString
+    inputs: [String] = [], tasks: [String] = [], root: String = UUID().uuidString,
+    completedReportID: String? = nil, reportStartedAt: TimeInterval? = nil
 ) -> AgentInput {
-    let activity = ReplyActivity(revision: revision, inputs: inputs, tasks: tasks, acknowledgedRoot: root)
+    let activity = ReplyActivity(
+        revision: revision, inputs: inputs, tasks: tasks, acknowledgedRoot: root,
+        completedReportID: completedReportID, reportStartedAt: reportStartedAt)
     let payload = InputPayload.observation(activity.message)
     return AgentInput(
         id: UUID().uuidString,
@@ -1076,12 +1079,11 @@ func speechPerceptionOwnsConsentAcrossCaptureEpochsAndRejectsStaleActivity() asy
     await agent.stop()
     await pump.value
     let values = await probe.values
-    #expect(values.count == 5)
+    try #require(values.count == 4)
     #expect(values[0].enabled && !values[0].paused)
     #expect(values[1].enabled && values[1].paused)
     #expect(!values[2].enabled && values[2].paused)
-    #expect(!values[3].enabled && !values[3].paused)
-    #expect(values[4].enabled && !values[4].paused)
+    #expect(values[3].enabled && !values[3].paused)
     #expect(zip(values, values.dropFirst()).allSatisfy { $0.revision < $1.revision })
 }
 
@@ -1382,7 +1384,7 @@ func finalASRGatesNextUtteranceBeforePublicationUntilReplyCompletes() async thro
     try await agent.receive(ListeningIntent().input(sessionID: session))
     await agent.stop()
     await pump.value
-    #expect(await probe.values.map(\.enabled) == [true, true, false, false, false, true, false])
+    #expect(await probe.values.map(\.enabled) == [true, true, false, false, true, false])
     #expect(try JSONDecoder().decode(ListeningIntent.self, from: Data("{}".utf8)).enabled == nil)
 }
 
@@ -1624,10 +1626,9 @@ func coldRecognitionRejectsOverflowWithoutDroppingPreviouslyQueuedPCM() async th
     await agent.stop()
     await pump.value
     let updates = await probe.values
-    #expect(updates.count == 3)  // Direct Action control does not recursively enqueue updates.
+    try #require(updates.count == 2)  // Off-state occupancy does not enqueue a cancel-reply Action.
     #expect(updates[0].enabled && updates[0].paused)
-    #expect(!updates[1].enabled && !updates[1].paused)
-    #expect(updates[2].enabled && !updates[2].paused)
+    #expect(updates[1].enabled && !updates[1].paused)
     await #expect(throws: HarnessError.self) {
         try await agent.setListening(enabled: true, sessionID: session)
     }
@@ -1738,4 +1739,220 @@ func listeningOffCancellationFeedbackDoesNotScheduleAnotherOff() async throws {
     #expect(nextCall.parameters["enabled"] == "true")
     #expect(nextCall.parameters["revision"] == "2")
     await agent.stop()
+}
+
+@Test(.actionCatalog, arguments: ["off", "on", "stop", "failed", "paused", "reordered"])
+func writerReportCompletionOwnsOneShotListeningWithoutCancellingOffPlayback(mode: String) async throws {
+    let session = UUID().uuidString
+    let incarnation = UUID().uuidString
+    let agent = try SpeechPerceptionAgent(
+        recognition: RecognitionFixture(text: "", includeFinal: false), vad: NativeRateVADProbe(),
+        sessionID: session, interactionSessionID: session, residentListening: true,
+        context: try AgentContextRepository(
+            agent: .speechPerception, scope: UUID().uuidString, state: SpeechPerceptionContextState()))
+    try await agent.start()
+    let probe = PerceptionListeningProbe()
+    let pump = Task { for await output in agent.outputs { await probe.record(output) } }
+    if mode == "on" { try await agent.receive(ListeningIntent(enabled: true).input(sessionID: session)) }
+    let id = UUID().uuidString
+    let startedAt = ProcessInfo.processInfo.systemUptime
+    let occupied = replyActivityInput(
+        session: session, incarnation: incarnation, revision: 1, inputs: [id])
+    if mode != "reordered" { try await agent.receive(occupied) }
+    if mode == "stop" { try await agent.receive(ListeningIntent(enabled: false).input(sessionID: session)) }
+    if mode == "paused" {
+        try await agent.pause()
+        try await agent.resume()
+    }
+    let completed = replyActivityInput(
+        session: session, incarnation: incarnation, revision: 2,
+        completedReportID: mode == "failed" ? nil : id, reportStartedAt: mode == "failed" ? nil : startedAt)
+    try await agent.receive(completed)
+    try await agent.receive(completed)  // Duplicate revision never applies twice.
+    if mode == "reordered" { try await agent.receive(occupied) }
+    await agent.stop()
+    await pump.value
+    let values = await probe.values
+    switch mode {
+    case "failed", "paused": #expect(values.isEmpty)
+    case "stop": #expect(values.map(\.enabled) == [false])
+    case "on": #expect(values.map(\.paused) == [false, true, false])
+    default: #expect(values.count == 1 && values.first?.enabled == true && values.first?.paused == false)
+    }
+}
+
+@Test func onlyAssistantMayReportWriterReplyCompletionAndNewStopFencesDuplicates() throws {
+    var policy = SpeechListeningPolicy()
+    let incarnation = UUID().uuidString
+    let startedAt = ProcessInfo.processInfo.systemUptime
+    let fact = ReplyActivity(
+        revision: 1, inputs: [], tasks: [], acknowledgedRoot: "root",
+        completedReportID: "report", reportStartedAt: startedAt)
+    #expect(throws: CommunicationError.unauthorized) {
+        try policy.accept(fact, source: "memory", incarnation: incarnation)
+    }
+    #expect(try policy.accept(fact, source: "assistant", incarnation: incarnation))
+    #expect(policy.enabled)
+    policy.enabled = false
+    policy.revokeReportListening()
+    let repeated = ReplyActivity(
+        revision: 2, inputs: [], tasks: [], acknowledgedRoot: "root",
+        completedReportID: "report", reportStartedAt: startedAt)
+    #expect(try policy.accept(repeated, source: "assistant", incarnation: incarnation))
+    #expect(!policy.enabled)
+    let next = ReplyActivity(
+        revision: 3, inputs: [], tasks: [], acknowledgedRoot: "root",
+        completedReportID: "new-report", reportStartedAt: ProcessInfo.processInfo.systemUptime)
+    #expect(try policy.accept(next, source: "assistant", incarnation: incarnation))
+    #expect(policy.enabled)
+}
+
+/// Holds actual scheduled cleanup so lifecycle publication deterministically overlaps cancellation.
+private actor InterruptedReplyCleanupGate {
+    let started = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingOldest(1))
+    let cancelling = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingOldest(1))
+    private var cleanup: CheckedContinuation<Void, Never>?
+    func play() async throws {
+        started.continuation.yield(())
+        do { try await Task.sleep(for: .seconds(30)) } catch {
+            await withCheckedContinuation {
+                cleanup = $0
+                cancelling.continuation.yield(())
+            }
+            throw error
+        }
+    }
+    func release() {
+        cleanup?.resume()
+        cleanup = nil
+    }
+}
+
+private actor ReplyActivityDeliveryGate {
+    let entered = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingOldest(1))
+    private var pending: CheckedContinuation<Void, Never>?
+    func hold() async {
+        await withCheckedContinuation {
+            pending = $0
+            entered.continuation.yield(())
+        }
+    }
+    func release() {
+        pending?.resume()
+        pending = nil
+    }
+}
+
+@Test(.actionCatalog, .timeLimit(.minutes(1)), arguments: [false, true])
+func interruptedReplyPublishesIdleDuringPlaybackCleanupAndListeningCanRestart(_ alreadyDelivering: Bool) async throws {
+    let session = UUID().uuidString
+    let reply = AgentInput(id: UUID().uuidString, sessionID: session, payload: .text("reply"))
+    let manager = AgentManager()
+    let speech = try SpeechPerceptionAgent(
+        recognition: RecognitionFixture(text: "", includeFinal: false), vad: NativeRateVADProbe(),
+        sessionID: session, interactionSessionID: session, residentListening: true,
+        context: try AgentContextRepository(
+            agent: .speechPerception, scope: UUID().uuidString, state: SpeechPerceptionContextState()))
+    let assistant = try AssistantAgent(
+        stateContext: try publicStateFixture(), chat: FixedTextChat(text: ""),
+        context: try AgentContextRepository(
+            agent: .assistant, scope: UUID().uuidString, state: AssistantContextState()))
+    try await manager.register(speech, sessionID: session)
+    try await manager.register(assistant, sessionID: session)
+    try await manager.start(.speechPerception)
+    try await manager.start(.assistant)
+    let policy = try CommunicationPolicy(
+        contracts: AgentContracts.communication, configurations: AgentConfigurations.all())
+    let input = InputGateway(manager: manager, policy: policy)
+    let gate = InterruptedReplyCleanupGate()
+    let delivery = ReplyActivityDeliveryGate()
+    let binding = ActionBinding(
+        path: .init(domain: "Speech", module: "Playback", function: "speak"),
+        displayName: "Controlled playback", kind: .finite, completion: "Joined playback cleanup.",
+        completing: { _ in
+            try await gate.play()
+            return .completed
+        })
+    let output = await OutputGateway(
+        manager: manager, requests: input, tools: ToolRegistry(),
+        actions: ChannelScheduler(registry: try ActionRegistry(definitions: [binding])), policy: policy,
+        sink: { envelope in
+            if alreadyDelivering, envelope.sequence == 3 { await delivery.hold() }
+        })
+    _ = try await output.consumer(for: speech)
+    let consumer = try await output.consumer(for: assistant)
+    func activity(_ revision: UInt64, occupied: Bool) throws -> OutputEnvelope {
+        OutputEnvelope(
+            source: .assistant, context: reply.context,
+            output: .communication(
+                try CommunicationAction(
+                    message: ReplyActivity(
+                        revision: revision, inputs: occupied ? [reply.id] : [], tasks: [],
+                        acknowledgedRoot: reply.metadata.rootID
+                    ).message)), sequence: revision)
+    }
+    _ = try await speech.setListening(enabled: true, sessionID: session)
+    #expect(!(try await consumer.execute(activity(1, occupied: true))).isError)
+    await input.flushPublications()
+    #expect(try await speech.setListening(enabled: true, sessionID: session).paused)
+    let playback = OutputEnvelope(
+        source: .assistant, context: reply.context,
+        output: .actionCall(
+            ActionCall(
+                actionPath: .init(domain: "Speech", module: "Playback", function: "speak"), channel: "Speech",
+                parameters: ["audioID": UUID().uuidString])),
+        sequence: 2)
+    #expect(!(try await consumer.execute(playback)).isError)
+    var started = gate.started.stream.makeAsyncIterator()
+    _ = await started.next()
+    _ = try await speech.setListening(enabled: false, sessionID: session)
+    let pendingActivity: Task<OutputExecutionResult, any Error>?
+    if alreadyDelivering {
+        let fact = try activity(3, occupied: false)
+        pendingActivity = Task { try await consumer.execute(fact) }
+        var entered = delivery.entered.stream.makeAsyncIterator()
+        _ = await entered.next()
+    } else {
+        pendingActivity = nil
+    }
+    let cancellation = Task { try await output.cancelCalls(for: assistant, sessionID: session) }
+    var cancelling = gate.cancelling.stream.makeAsyncIterator()
+    _ = await cancelling.next()
+    // Ordinary effects remain cancelled; the factual terminal snapshot must still reach perception.
+    #expect(try await consumer.execute(playback).isCancellationOnly)
+    let synthesis = OutputEnvelope(
+        source: .assistant, context: reply.context,
+        output: .communication(
+            try CommunicationAction(
+                message: .speechSynthesis(SpeechSynthesisInput(text: "cancelled")),
+                target: AgentID(rawValue: "speechSynthesis"))), sequence: 4)
+    #expect(try await consumer.execute(synthesis).isCancellationOnly)
+    let terminal: Result<OutputExecutionResult, any Error>
+    if let pendingActivity {
+        await delivery.release()
+        terminal = await pendingActivity.result
+    } else {
+        terminal = .success(try await consumer.execute(activity(3, occupied: false)))
+    }
+    await input.flushPublications()
+    let stopped = try await speech.setListening(enabled: false, sessionID: session)
+    #expect(!stopped.enabled && !stopped.paused)
+    await gate.release()
+    try await cancellation.value
+    switch terminal {
+    case .success(let result): #expect(!result.isError && !result.isCancellationOnly)
+    case .failure(let error): Issue.record("Reply lifecycle publication was cancelled: \(error)")
+    }
+    // A late older occupied snapshot cannot reintroduce the retired reply barrier.
+    #expect(!(try await consumer.execute(activity(1, occupied: true))).isError)
+    await input.flushPublications()
+    for _ in 0..<5 {
+        let restarted = try await speech.setListening(enabled: true, sessionID: session)
+        #expect(restarted.enabled && !restarted.paused)
+        try await speech.openCapture(sessionID: UUID().uuidString)
+        await speech.closeCapture()
+        _ = try await speech.setListening(enabled: false, sessionID: session)
+    }
+    await output.shutdown()
+    await manager.stopAll()
 }

@@ -19,3 +19,5 @@ Design goals: explicit ownership, capability boundaries and no duplicate product
 全 Action 迁移保留 qwen-workflows.json 的全部业务输入/断言与稳定 ID；部分 ID/category 含 tool/native 是既有场景身份，不声明当前调用协议。协议由真实生产目录和额外 Action-only/no-native 校验确定。
 
 Robot-prefixed cases cover motor anatomy, signed relative angles, native parameters, ambiguous absolute angle origins, axis limits, readiness, ordered multi-motor/gesture composition and conditional failure. `robotSequence` asserts the exact count, order, axis and required parameters of every NexArm call; it is evaluation data and is never injected into model prompts. The full fixture is bounded to 96 scenarios.
+
+writer-window-discover-read/maximize从默认目录开始；公开Writer artifact窗口身份来自合成State。用户只要求看文字或放大，断言按需加载与指定ID的XML Action，不把评分字段注入请求。

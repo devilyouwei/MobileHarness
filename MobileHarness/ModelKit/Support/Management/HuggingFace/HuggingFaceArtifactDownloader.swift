@@ -63,22 +63,6 @@ public struct HuggingFaceArtifactDownloader: ModelArtifactDownloader {
                     ofItemAtPath: manifest.path)
             #endif
         }
-        // Upgrade in-flight snapshots from the former SDK transport without losing complete files.
-        let legacy = directory.appendingPathComponent(".hub-snapshot")
-        let legacySelection = artifact.source.stripPrefix.map { legacy.appendingPathComponent($0) } ?? legacy
-        for member in plan.members {
-            let target = directory.appendingPathComponent(member.path)
-            let old = legacySelection.appendingPathComponent(member.path)
-            if !FileManager.default.fileExists(atPath: target.path),
-                HubBackgroundTransfer.isComplete(old, bytes: member.bytes),
-                old.resolvingSymlinksInPath().path.hasPrefix(directory.resolvingSymlinksInPath().path + "/")
-            {
-                try FileManager.default.createDirectory(
-                    at: target.deletingLastPathComponent(), withIntermediateDirectories: true)
-                try FileManager.default.moveItem(at: old, to: target)
-            }
-        }
-        try? FileManager.default.removeItem(at: legacy)
         let transfer = try HubBackgroundTransfer(
             root: directory, plan: plan, allowsCellular: source.allowsCellular, progress: progress)
         try await transfer.run()

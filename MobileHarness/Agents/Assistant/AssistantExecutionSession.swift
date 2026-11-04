@@ -3,11 +3,14 @@ import Foundation
 import Gateway
 import PlatformKit
 import StorageCore
+import UI
 
 /// Application-owned entry transport. Admission never waits for reasoning or child completion.
 public actor AssistantExecutionSession {
     public nonisolated let agent: AssistantAgent
     public private(set) var cleanupFailure: AgentFailure?
+    private let island = AgentIslandPublication()
+    public var presentationFailure: String? { get async { await island.lastFailure } }
     private var registeredForCleanup = false
     private let manager: AgentManager
     private let output: OutputGateway
@@ -42,6 +45,24 @@ public actor AssistantExecutionSession {
                 try Task.checkCancellation()
                 try await manager.start(.assistant)
                 let consumer = try await output.consumer(for: agent)
+                await island.bind { operation, parameters, session in
+                    let result = try await consumer.executeReturning(
+                        .init(
+                            source: .assistant, context: .init(sessionID: session, source: "assistant"),
+                            output: .toolCall(
+                                .init(id: UUID().uuidString, toolPath: "UI.Island." + operation, arguments: parameters)),
+                            sequence: UInt64(parameters["revision"] ?? "") ?? 0))
+                    if result.isCancellationOnly { throw CancellationError() }
+                    guard !result.isError, result.tool != nil else {
+                        throw AgentFailure(
+                            component: "assistant", operation: "island." + operation,
+                            underlying: NSError(
+                                domain: "Island", code: 1,
+                                userInfo: [NSLocalizedDescriptionKey: result.failure ?? "Island presentation rejected"])
+                        )
+                    }
+                }
+                await island.start()
                 pump = Task {
                     do {
                         try await IndependentOutputWorkflow.consumeGeneration(agent.outputs) { envelope in
@@ -61,6 +82,7 @@ public actor AssistantExecutionSession {
                 guard !closed else { throw CommunicationError.scopeClosed }
                 started = true
             } catch {
+                await island.stop()
                 await removeRegistration()
                 pump?.cancel()
                 await pump?.value
@@ -98,6 +120,31 @@ public actor AssistantExecutionSession {
         _ = try await (model, calls)
     }
 
+    /// Receives the existing role-owned Skill snapshot; task logs are not a presentation authority.
+    func presentTaskState(_ skills: AgentTaskSkillState) async {
+        guard !closed else { return }
+        await island.submit(Self.taskContent(skills))
+    }
+    static func taskContent(_ skills: AgentTaskSkillState) -> IslandContent? {
+        guard let task = skills.tasks.first(where: { $0.id == skills.activeTaskID }),
+            !["completed", "succeeded", "cancelled", "failed", "interrupted"].contains(task.status)
+        else { return nil }
+        let status: String
+        switch task.status {
+        case "waitingUser": status = "等待你的操作"
+        case "pending", "queued": status = "等待执行"
+        case "paused", "suspended": status = "已暂停"
+        case "cancelling": status = "正在取消"
+        default: status = "正在执行"
+        }
+        return .init(
+            title: String(task.goal.prefix(80)), subtitle: status,
+            primary: .symbol(name: "scope"), tone: .blue, priority: .normal,
+            secondary: ["waitingUser", "paused", "suspended"].contains(task.status) ? nil : .loading,
+            liveActivity: true, expansionID: task.id,
+            detail: .init(text: String(task.goal.prefix(320))))
+    }
+
     private func sendControl(_ control: AssistantSessionControl, sessionID: String) async throws {
         try await agent.receive(control.input(sessionID: sessionID))
     }
@@ -119,6 +166,7 @@ public actor AssistantExecutionSession {
         let task = Task {
             starting?.cancel()
             _ = await starting?.result
+            await island.stop()
             await removeRegistration()
             pump?.cancel()
             await pump?.value

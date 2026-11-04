@@ -37,7 +37,7 @@ InferenceEvents permits one iterator. Check failure/cancellation before and afte
 
 ## Managed resource lifetime
 
-A ModelContext owns at most one ModelResource. Coalesce load within the injected maximumLoadWaiters; ModelLoadGate enforces injected maximumConcurrentLoads without a pending loader queue. Core declares no registration/construction state or runtime limit defaults. Reserve one active inference including system speech; busy work rejects with no request queue. Cancelled waiters do not cancel other loads. Lease IDs fence late release/callback registration. OperationAdmission separately rejects overlapping backend operations.
+A ModelContext owns at most one ModelResource. Coalesce load within the injected maximumLoadWaiters; ModelLoadGate enforces injected maximumConcurrentLoads without a pending loader queue. Core declares no registration/construction state or runtime limit defaults. 资源默认只允许一个活动租约；显式 concurrent 资源支持多个独立租约，取消按 ID 关联，卸载等待所有活动请求退出。Chat FIFO 由 Management 拥有，Core 不维护 Agent 或本地任务队列。 Cancelled waiters do not cancel other loads. Lease IDs fence late release/callback registration. OperationAdmission separately rejects overlapping backend operations.
 
 Unload gates new load/acquire and waits for active lease cleanup; completion releases usage, not weights. Shutdown additionally cancels registered active work and is terminal. Atomic memory pressure eviction skips loading/active/closing resources. Maintenance SPI gates retained handles through unload/disk removal; partial barriers release on failure.
 
@@ -73,3 +73,7 @@ ModelLoadGate requires an explicit positive maximumConcurrentLoads. ModelContext
 ## Passive inference activity
 
 ModelContext's management SPI reads an existing resource's inferenceActive flag. The flag follows its authoritative active lease, including acquire/cleanup barriers; it creates no resource and performs no load. Resource phase and lease activity are separate observations.
+
+InferenceSession.phase exposes queued/running/finished/failed/cancelled; emitter marks execution start. Chat adapters bind waitForCompletion to their native worker cleanup. Cancelling a stream suppresses delivery immediately, while its owner can join actual provider exit before releasing serial execution.
+
+InferenceSession.withCleanup scopes event consumption and joins native cleanup on success, parse/storage errors, early return and cancellation. An already drained normal terminal remains finished; cancelling unconsumed buffered output still suppresses its delivery.

@@ -27,7 +27,7 @@ public enum ConversationTitleGenerator {
             messages: [
                 .init(role: .system, content: try templates.render("title.system")),
                 .init(role: .user, content: try templates.render("title.user", variables: ["excerpts": excerpts])),
-            ], maximumOutputTokens: 64, temperature: 0)
+            ], temperature: 0)
         return try await withThrowingTaskGroup(of: String.self) { group in
             group.addTask {
                 let session = try await chat.chat(request)

@@ -219,12 +219,40 @@ func assistantReportsReplyActivityWithoutOwningListening() async throws {
     try await pump.value
 }
 
+private actor SpecialistRobotModel: ChatCapability {
+    nonisolated let availability: CapabilityAvailability = .available
+    var requests: [ChatRequest] = []
+    func chat(_ request: ChatRequest) throws -> InferenceSession<ChatEvent> {
+        requests.append(request)
+        let pair = InferenceSession<ChatEvent>.make(limits: try StreamLimits(), estimatedBytes: { $0.estimatedBytes })
+        let text =
+            requests.count == 1
+            ? "<loadSkills skills='[\"robot-interaction\"]'/>" : "<dance cycles=\"1\"/>"
+        try pair.emitter.yield(.text(text))
+        try pair.emitter.yield(.finished(.stop))
+        pair.emitter.finish()
+        return pair.session
+    }
+}
+private struct SpecialistTaskControls: TaskControlCapability {
+    let agent: AssistantAgent
+    func controlTask(_ operation: String, arguments: [String: String], invocation: any FunctionInput) async throws
+        -> String
+    {
+        try await agent.controlTask(
+            operation, arguments: arguments, source: invocation.context.source,
+            sessionID: invocation.context.sessionID, inputID: invocation.context.inputID,
+            decisionID: invocation.context.decisionID)
+    }
+}
+
 @Test(.actionCatalog, .timeLimit(.minutes(1))) func assistantExecutesRobotActionWithoutDelegation() async throws {
     let context = try AgentContextRepository(
         agent: AgentID.assistant, scope: UUID().uuidString, state: AssistantContextState()
     )
+    let model = SpecialistRobotModel()
     let assistant = try AssistantAgent(
-        stateContext: try publicStateFixture(), chat: FixedTextChat(text: "<dance cycles=\"1\"/>"), context: context)
+        stateContext: try publicStateFixture(), chat: model, context: context)
     let manager = AgentManager()
     let policy = try CommunicationPolicy(
         contracts: AgentContracts.communication,
@@ -247,7 +275,12 @@ func assistantReportsReplyActivityWithoutOwningListening() async throws {
             await effects.capture(invocation.context.source)
             return .completed
         })
-    let scheduler = ChannelScheduler(registry: try ActionRegistry(definitions: [binding]), resources: resources) {
+    let controls = TaskControlModule(capability: SpecialistTaskControls(agent: assistant))
+    let assembly = try BehaviorAssembly(capabilityModules: [controls])
+    let taskBindings = try controls.definitions.map { try assembly.actions.definition(for: $0.path) }
+    let scheduler = ChannelScheduler(
+        registry: try ActionRegistry(definitions: [binding] + taskBindings), resources: resources
+    ) {
         await input.deliverActionResult($0)
     }
     let gateway = await OutputGateway(
@@ -269,6 +302,10 @@ func assistantReportsReplyActivityWithoutOwningListening() async throws {
             .init(id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("跳舞")), to: .assistant)
         try await specialistEventually { await effects.finished.contains(.assistant) }
         #expect(await effects.owners == ["assistant"])
+        let requests = await model.requests
+        #expect(requests.count == 2)
+        #expect(requests.first?.messages.first?.content.contains("Action dance:") == false)
+        #expect(requests.last?.messages.first?.content.contains("Action dance:") == true)
         #expect(await effects.failures.isEmpty)
         let snapshot = try await context.snapshot()
         #expect(snapshot.state.taskViews?.isEmpty != false)
@@ -453,4 +490,46 @@ func assistantOwnsHomeRequestsAndPreservesUIRequestGenerationAndTurn() async thr
     await agent.stop()
     await #expect(throws: UIRequestError.unavailable) { try await ui.home.requests.submit(.text("late")) }
     await ui.stop()
+}
+
+private actor ReplyOccupancyBlockedModel: ChatCapability {
+    nonisolated let availability: CapabilityAvailability = .available
+    private var emitter: InferenceEmitter<ChatEvent>?
+    func chat(_ request: ChatRequest) throws -> InferenceSession<ChatEvent> {
+        let pair = InferenceSession<ChatEvent>.make(limits: try .init(), estimatedBytes: { $0.estimatedBytes })
+        emitter = pair.emitter
+        return pair.session
+    }
+}
+
+@Test(.actionCatalog, .timeLimit(.minutes(1)))
+func assistantCoalescesQueuedTextOccupancyButAcknowledgesEveryFinalSpeechRoot() async throws {
+    let session = UUID().uuidString
+    let agent = try AssistantAgent(
+        stateContext: try publicStateFixture(), reportsReplyActivity: true, chat: ReplyOccupancyBlockedModel(),
+        context: try AgentContextRepository(agent: .assistant, scope: UUID().uuidString, state: AssistantContextState())
+    )
+    try await agent.start()
+    let probe = ReplyActivityProbe()
+    let pump = Task { for await output in agent.outputs { await probe.record(output.output) } }
+    try await agent.receive(.init(id: "first", sessionID: session, payload: .text("Keep first reply occupied")))
+    for index in 0..<8 {
+        try await agent.receive(.init(id: "text-\(index)", sessionID: session, payload: .text("Queued text")))
+    }
+    for root in ["final-one", "final-two"] {
+        let payload = InputPayload.observation(.transcript("Final speech", final: true))
+        try await agent.receive(
+            .init(
+                id: root, sessionID: session, payload: payload,
+                metadata: InputMetadata(
+                    payload: payload, source: "speechPerception", incarnation: "speech-fixture", origin: .agent,
+                    rootID: root)))
+    }
+    await agent.stop()
+    await pump.value
+    let values = await probe.values
+    let busy = values.filter { !$0.inputs.isEmpty || !$0.tasks.isEmpty }
+    #expect(busy.count == 3)
+    #expect(busy.map(\.acknowledgedRoot) == ["first", "final-one", "final-two"])
+    #expect(values.last?.inputs.isEmpty == true && values.last?.tasks.isEmpty == true)
 }

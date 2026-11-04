@@ -46,3 +46,31 @@ Explicit liveOllamaResponsesReasoningCompatibility passed against the real servi
 ## Optional provider URL
 
 2026-10-25: Blank or whitespace-only URL input now resolves to the official https://api.openai.com/v1 endpoint on modal confirmation. The name/key remain unchanged. Explicit and implicit official endpoints share duplicate detection; editing the existing official provider with a blank URL is allowed. The form labels URL optional and explains the default. Added blankProviderURLResolvesToOpenAIDefaultAndPreventsDuplicates. All four simulator builds and the signed physical-device build passed; final resource and strict/deep signature checks passed. Installed on iPhone 17 Pro with data preserved (/tmp/provider-empty-install.json). Full scripts/check.sh passed (including 221 native runtime tests), as did git diff --check. No real OpenAI request was made for this change.
+
+## 智能体大脑与独立模型（2026-11-03）
+
+设置入口和页面改名“智能体大脑”。Provider 管理列表只展示名称/URL，末行添加，原生 swipeActions 编辑/删除；下方 Assistant/Writer 分别选择 Provider/模型，本地选项隐藏模型菜单，最后本地模型资源。进入页面自动刷新已选服务，模型列表按 Provider ID 缓存，保存选择不会被列表刷新清空。
+
+复用旧配置/钥匙串：Assistant 保留 cloud 兼容投影，Writer 使用已有独立字段；Writer 选择本地不继承 Assistant 云端。编辑稳定身份、删除清理双方引用、旧凭据请求迟到不覆盖新列表。删除了全局模型列表及旧发现结果呈现旁路，发现返回值由表单控制器按 Provider 投影。查询有界、离页取消、根关闭加入。
+
+思考策略由 Actions 按角色选择，ModelKit 适配 minimum/enabled；最低策略对不支持关闭的已知模型采用支持的最小档，不再一概拒绝。启用推理时兼容移除不支持的 temperature。参考 [OpenAI reasoning](https://developers.openai.com/api/docs/guides/reasoning)、[deployment compatibility](https://developers.openai.com/api/docs/guides/deployment-checklist)、[Alibaba thinking](https://www.alibabacloud.com/help/en/model-studio/deep-thinking.md)。未知服务/别名的具体能力不伪造，失败不自动重试。
+
+本地 Writer 选项有独立租约路径，但当前 Gemma4Chat 不支持 native tools；页面明确说明此限制，不能将选择本地等同于 Writer 可以执行创作。模拟器也不具备真实 Gemma CoreAI 能力。本轮没有修改 Gemma 工具协议。
+
+- scripts/check.sh 通过（/tmp/agent-brain-check.log）：993 项 IntegrationTests、155 项 AppWorkflowTests、225 项 LiveRuntimeTests，以及其他目标、格式、模块边界、Python/plist。
+- 清理旧列表后的定向测试通过（/tmp/agent-brain-final-focused.log）：37 项集成、7 项表单工作流及相关参数测试。覆盖独立配置/文档恢复、Writer 本地不继承 Assistant、乱序发现、编辑凭据隔离、删除引用、取消加入，以及实际思考请求 JSON。
+- 首轮开发编译曾因 OS 可用性保护、嵌套测试宏和已移除初始化参数失败，均已修正。旧发现测试曾期待查询直接覆盖全局列表，现按新的 Provider 隔离契约检查返回值且不改写其他选择。
+- 首轮 scripts/build-ios.sh 四目标通过（/tmp/agent-brain-ios.log），最终清理后的构建另记。
+- 尝试通过电脑工具访问 Simulator 及其完整应用路径均返回 Invalid app；未完成新页面原生目测、滑动/菜单交互或真实 Provider 请求验收。本轮不安装真机、不读取或写入真实凭据、不提交代码。
+
+最终清理后的 scripts/build-ios.sh 四目标全部通过（/tmp/agent-brain-ios-final.log），Agent/Skill 与 Live Activity 资源校验通过。根容器与旧 revision 呈现回归补测通过（/tmp/agent-brain-ui-regression.log，8 项 LiveRuntimeTests + 1 项表单呈现）。git diff --check 通过；源码保持未提交。
+
+### 智能体大脑版本真机安装（2026-11-03）
+
+按用户要求，用现有签名配置构建当前工作区 MobileHarness Debug 成功（/tmp/agent-brain-device-build.log）；30 项 Agent/Skill 及 Live Activity 打包校验通过。已覆盖安装至 Youwei’s iPhone 17 Pro（dev.mobileharness.app，安装序号 5724，/tmp/agent-brain-device-install.log），未卸载或清除数据。devicectl 启动成功（/tmp/agent-brain-device-launch.log）。安装/启动不等同于页面交互、真实 Provider 或 Writer 模型验收。
+
+### 设置删除确认与保存 Toast（2026-11-03）
+
+Provider 删除使用原生 alert，取消不修改草稿，确认使用弹窗捕获的 Provider ID。保存等待实际 Bool 回执，成功显示3秒 Toast，失败显示实际错误6秒；恢复失败也显示 Toast。移除常驻保存状态行，保留按钮忙态与根拥有的保存操作。
+
+验证：`scripts/check.sh` 退出0（日志 `/tmp/settings-feedback-check.log`）；`scripts/build-ios.sh` 四个目标成功、退出0（`/tmp/settings-feedback-build.log`）；`git diff --check` 通过。本次尚未重新安装真机，弹窗与 Toast 的原生交互尚待真机验收。

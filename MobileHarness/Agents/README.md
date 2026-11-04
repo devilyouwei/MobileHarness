@@ -38,6 +38,7 @@ App binds camera/device/voice and maintenance collaboration through neutral port
 | [Assistant](Assistant/README.md) | Home text, Chat and private decision context; receives speech finals, requests synthesis and delegates fixed Tasks; selects dynamic Skills. |
 | [ApplicationControl](ApplicationControl/README.md) | Settings/resources/devices/diagnostics requests and device/artifact/failure observations; owns administrative and diagnostic policy. |
 | [Memory](Memory/README.md) | History requests and private context; authorizes history calls and fixed Task results. |
+| [Writer](Writer/README.md) | Background authoring tasks, native tools, raw file streams, fixed model selections and recoverable artifacts. |
 | [Photographer](Photographer/README.md) | Camera/album requests, pose and tracking availability; owns capture/tracking intent and policy. Consumes PlatformKit position-update cadence; tracking dispatch retains only the newest pending intent. |
 | [SpeechPerception](SpeechPerception/README.md) | Listening requests, native PCM, VAD/ASR and sound-source computation; owns consent/half-duplex policy and transcript messages. |
 | [SpeechSynthesis](SpeechSynthesis/README.md) | Directed synthesis/cancel, TTS and owned cache production; does not issue playback calls itself. |
@@ -70,13 +71,13 @@ App creates one AgentContainer and starts it after Gateway. Stable role subconta
 
 Each direct input source has a long-lived owning consumer rather than per-frame forwarding tasks. ProcessingContext carries request/session/generation/turn and causality, without granting authority. UI request/reply generations and native stream generations remain distinct. Roles own their decision, subscriptions and model producers; Actions owns actual voice/camera/device execution and interaction facades. Passive activity projection interprets Agent/Task evidence here and never executes callable effects.
 
-Stop closes cognitive admission, cancels and joins role work, and retains original terminal/cleanup ports while Gateway and Actions drain. App releases bindings only afterward. Role shutdown does not globally stop borrowed scheduler/transport roots. Primary and cleanup failures remain explicit; a failed cleanup prevents replacing native owners. Conversation interruption can retain Task/Skill, while session closure releases them; neither automatically replays effects.
+Stop closes cognitive admission, cancels and joins role work, and retains original terminal/cleanup ports while Gateway and Actions drain. App releases bindings only afterward. Role shutdown does not globally stop borrowed scheduler/transport roots. Primary and cleanup failures remain explicit; a failed cleanup prevents replacing native owners. Conversation interruption can retain Task/Skill, while session closure releases them; neither automatically replays effects. Reply occupancy facts remain deliverable during execution cancellation, including in-flight publication; producer/session authorization and receiver revision fences still apply, so perception can release retired reply barriers without renewing revoked listening consent.
 
 Public containers expose UI-owned state/control interfaces and narrow role capabilities, without exposing mutable registries, raw handlers or private role state. Capacity, algorithms and failure contracts live in the linked role and [Support](Support/README.md) READMEs.
 
 ## Reflexive state reads and disclosure
 
-`AgentContainer.stateSnapshot() async throws` reads only root lifecycle/health and returns seven role path indices. stateReaders() binds independent weak-owner role readers using local AgentStateSnapshot, without reading private role context during discovery. Roles expose lifecycle, queue counters, installation/closure and private task/Skill counts or phases; no messages, goals, credentials or reasoning are copied into this inspection view. Root lifecycle failure is separate from normal suspension. Role State reads use Agent.residentContext() and the repository’s last initialized committed memory. They never restore persistence, wait for a pending write or trigger startup. Before initialization the context fields are unknown; Agent start retains restoration and failure ownership.
+`AgentContainer.stateSnapshot() async throws` reads only root lifecycle/health and returns eight role path indices. stateReaders() binds independent weak-owner role readers using local AgentStateSnapshot, without reading private role context during discovery. Roles expose lifecycle, queue counters, installation/closure and private task/Skill counts or phases; no messages, goals, credentials or reasoning are copied into this inspection view. Root lifecycle failure is separate from normal suspension. Role State reads use Agent.residentContext() and the repository’s last initialized committed memory. They never restore persistence, wait for a pending write or trigger startup. Before initialization the context fields are unknown; Agent start retains restoration and failure ownership.
 
 One unified resolver is installed without a path allowlist. The effective loaded Skill useStates union selects exact nodes on each real request; registration does not disclose state. ExpressionInteraction selects ui.home.expression and RobotInteraction explicitly adds actions.robot.motion. There is no whole-tree health/diagnostic source, implicit descendant grant, model discovery, loadState, polling or new recovery authority.
 
@@ -99,3 +100,16 @@ Photography与ApplicationControl共享Island.setPresentation和ui.island，Basic
 SpeechPerception失败轮次通过既有empty阶段和语音呈现工具完成清理，Assistant释放该轮识别绑定；恢复遵守采集/许可/回复占用，原始识别错误仍记录。语音呈现与灵动岛从同一状态恢复，详见[SpeechPerception](SpeechPerception/README.md)。
 
 setSceneActive(false)报告真实后台环境并加入VisionPerception停止，保留SpeechPerception和其他业务角色/决策；其余setForeground/invalidate保持完整暂停契约。Scene恢复不重建语音交互，不重新授予关闭的聆听许可。
+
+
+Writer 为独立创作角色，拥有原生工具控制与无工具内容流的独立工作流；小范围修改通过新鲜读取引用和唯一literal replace直接执行，新建/大段修改使用独立内容流。独立模型配置、一项后台任务、每任务八条修订、检查点继续和取消由角色管理。通过 Gateway 直接调用 Artifacts，不使用 XML 或 Channel；根容器加入其生命周期与 agents.writer 状态。Writer 自己选择格式 Instruction、关联文件内容引用和显式/按次流式渲染时机，文件执行仍由 Artifacts 的确定性业务工具完成。自有循环不设固定轮数/整任务期限，Assistant关闭不终止已委托创作。
+
+Writer 的长期任务与每次执行分离：Assistant 使用 XML startTask(execution=background,executor=writer) 新建/续作，并可显式请求取消替代；Writer 通过 Gateway direct 执行文件业务，自己报告完成/失败，Assistant 发起的取消在清理后确认。WriterContainer 发布任务记录读取接口供 UI，模型上下文和目录仅来自同一长期任务。详见 [Writer](Writer/README.md)。
+
+Writer creation and report delivery have separate workers; rejected progress cannot affect creative completion or admission. Ordinary Assistant progress is coalesced and rate-limited, while questions and terminal notices retain the formal FIFO and real playback barriers. See [Writer](Writer/README.md) and [Chat](Support/Chat/README.md).
+
+Writer 任务岛由 Writer 域拥有，以独立有界展示 worker 经 Gateway direct 调用 UI.Island.present。它不依赖 Assistant 通知接纳或执行日志投影；Agents 提交语义内容，UI Island 统一拥有优先级仲裁、布局与动画。详见 [Writer](Writer/README.md#自有任务岛)。
+
+Writer owns bounded recovery for model requests and tool correction, preserving each real attempt, complete native pairing and draft transaction evidence. Recovery does not redelegate, change models, replay uncertain commits or limit productive total rounds/time. See [Writer recovery](Writer/README.md#bounded-recovery).
+
+Agent task presentation belongs to the executing role: Writer publishes its creative lifecycle and AssistantExecutionSession publishes its own foreground Skill task. Both use registered Gateway Island tools with code-owned permissions, outside model-visible catalogs. Terminal state ends only the owner's activity; passive task logs are history rather than UI authority. Shared latest-value transport is described in [Support](Support/README.md); UI arbitrates all producers without interpreting role identities.

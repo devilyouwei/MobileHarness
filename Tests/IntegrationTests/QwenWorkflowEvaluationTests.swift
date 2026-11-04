@@ -28,6 +28,7 @@ private struct QwenCase: Codable, Sendable {
     var robotConnected: Bool?
     var robotAvailable: Bool?
     var failure: String?
+    var writerWindow: Bool?
 }
 private struct QwenTurn: Codable, Sendable {
     let user: String
@@ -116,10 +117,28 @@ private struct QwenRobotFact: Encodable, Sendable {
     let connected: Bool
     let controlAvailable: Bool
 }
+private struct QwenWindowFacts: Encodable, Sendable {
+    struct Item: Encodable, Sendable {
+        let windowID = "51A7AF0A-64CE-43E8-B1CC-98E6C9657209"
+        let title = "Writer 流程图"
+        let content = "artifact"
+        let mode = "normal"
+        let phase = "settled"
+    }
+    static let id = "51A7AF0A-64CE-43E8-B1CC-98E6C9657209"
+    let windows: [Item]
+    let focusedID: String?
+    init(enabled: Bool) {
+        windows = enabled ? [Item()] : []
+        focusedID = enabled ? Self.id : nil
+    }
+}
 private final class QwenFacts: Sendable {
     let camera: FixtureFactCell<FixtureCameraFact>
     let robot: QwenRobotFact
+    let writerWindow: Bool
     init(scenario: QwenCase) {
+        writerWindow = scenario.writerWindow ?? false
         var value = FixtureCameraFact(
             enabled: scenario.cameraEnabled ?? false, running: scenario.cameraEnabled ?? false)
         value.busy = scenario.cameraBusy ?? false
@@ -137,14 +156,29 @@ private final class QwenFacts: Sendable {
                 ContainerContextValue(["scene": "active", "modelPreparation": "idle"])
             })
         try context.register(
+            "agents.writer",
+            source: ContainerContextSource {
+                ContainerContextValue(["phase": "idle"])
+            })
+        try context.register(
             "actions.camera", source: ContainerContextSource { [self] in ContainerContextValue(camera.read().business) }
         )
         try context.register("actions.robot", source: ContainerContextSource { [self] in ContainerContextValue(robot) })
         try context.register(
             "actions.robot.motion", source: ContainerContextSource { ContainerContextValue([String: String]()) })
-        for name in ["ui.navigation", "ui.camera", "ui.album", "ui.home.expression", "ui.windows", "ui.island"] {
+        for name in ["ui.navigation", "ui.camera", "ui.album", "ui.home.expression", "ui.island"] {
             try context.register(name, source: ContainerContextSource { ContainerContextValue([String: String]()) })
         }
+        try context.register(
+            "ui.windows",
+            source: ContainerContextSource { [self] in
+                ContainerContextValue(QwenWindowFacts(enabled: writerWindow))
+            })
+        try context.register(
+            "ui.web",
+            source: ContainerContextSource {
+                ContainerContextValue(["content": "empty"])
+            })
         return context
     }
     func change(_ update: @Sendable (inout FixtureCameraFact) -> Void) throws { camera.update(update) }
@@ -308,6 +342,15 @@ private actor QwenEffects {
         case "History.Conversation.read":
             guard args["id"] == "dialog_17" else { throw QwenEvalError.syntheticFailure }
             return .value(#"{"id":"dialog_17","turns":[{"user":"帮我拍张照","assistant":"照片已拍好"}],"nextOffset":null}"#)
+        case "Web.Page.inspect":
+            guard scenario.writerWindow == true, args["windowID"] == QwenWindowFacts.id else {
+                throw QwenEvalError.syntheticFailure
+            }
+            return .value(
+                try Self.json([
+                    "windowID": QwenWindowFacts.id, "title": "Writer 流程图",
+                    "text": "开始 → 执行测试 → 结束", "diagnostics": "",
+                ]))
         case "UI.Navigation.open": return .value("presented")
         default:
             if path.hasPrefix("NexArm.") && scenario.failure == "robotPartial" {

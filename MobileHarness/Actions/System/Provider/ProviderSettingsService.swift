@@ -60,6 +60,18 @@ public struct ProviderSettingsRuntime {
 /// Business transaction; native and lifecycle operations are injected, without UI types.
 @MainActor
 public final class ProviderSettingsService {
+    public func writerConfiguration() async throws -> ProviderSettings {
+        let value = try await restore()
+        guard let selected = value.writerProviderID else {
+            return ProviderSettings(enabled: false, url: "", key: "", model: "")
+        }
+        guard let provider = value.providers.first(where: { $0.id == selected }),
+            !value.writerModel.isEmpty
+        else { throw ProviderSettingsError.invalidSelection }
+        return ProviderSettings(
+            enabled: true, url: provider.url, key: provider.key, model: value.writerModel, name: provider.name,
+            id: provider.id, writerThinking: value.writerThinking)
+    }
     private let store: any ProviderSettingsPersistence
     private let runtime: ProviderSettingsRuntime
     private var saved: ProviderSettings?

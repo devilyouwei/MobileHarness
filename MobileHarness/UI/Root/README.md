@@ -27,3 +27,8 @@ Root将IslandState.localFrame底边传给WindowHost的通用topBoundary，Window
 首页和启动占位共用根组合的纵向背景渐变：顶部RGB(0.08, 0.20, 0.32)，底部黑色，延伸到安全区域外。背景不参与命中和无障碍；相机视觉、Face和覆盖组件按原层级叠加，导航页保持自身背景。
 
 ApplicationRootProviding exposes the UI-owned web capability. ApplicationRootView mounts WebPageView for WindowContent.web; this composition adds no model, file or business access to Root.
+
+
+Root 对 artifact 窗口呈现对应 Web 会话；会话创建前显示等待视图，不创建业务任务。
+
+Settings routes assistantHistory/writerHistory directly to the injected record view, preserving recordContextID and agentRecords/conversation/turn navigation confirmations. Root does not parse task or model data.

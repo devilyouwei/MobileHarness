@@ -6,7 +6,7 @@ UIContainer持有唯一IslandState。上游提交UI自有IslandContent、身份/
 
 | 文件 | 职责 |
 | --- | --- |
-| IslandActivityAttributes.swift | 共享内容、详情、指标、错误、系统快照及必要兼容解码；不包含View |
+| IslandActivityAttributes.swift | 共享内容、详情、指标、错误、系统快照及当前格式解码；不包含View |
 | IslandState.swift | 活动排序、版本围栏、展开偏好、图片资源、根生命周期与ui.island事实 |
 | IslandHost.swift | App宿主、几何、动画回执、紧凑/展开内容布局与手势 |
 | IslandIndicators.swift | 两端共用图标、进度、计时、频谱投影和尺寸常量 |
@@ -22,7 +22,7 @@ IslandContent的primary/secondary分别表示左右IslandIndicator，支持symbo
 
 有效文字或图片即支持展开，首次出现或明确新expansionID默认展开。空白文字且无图归一化为无详情。每个活动独立保存手动收起偏好，普通更新不重新展开，清空详情立即收起。无详情内容不可强制展开；收起只改变偏好，不清除内容或停止业务。
 
-有详情活动与无详情实时活动分别按rank优先、同级最新选择。展开正文持续显示所选详情，顶部独立切换实时状态；无实时状态时展开顶部不重复详情图标。紧凑态选择实时状态，没有实时状态才回退详情身份。系统投影先过滤liveActivity=false，再遵循同一选择规则。ui.island的detailID/statusID分别表示两组选择，selectedID表示系统快照身份锚点；组件不识别业务owner名称。
+有详情活动与无详情实时活动分别按语义priority优先、同级最新选择。展开正文持续显示所选详情，顶部独立切换实时状态；无实时状态时展开顶部不重复详情图标。紧凑态选择实时状态，没有实时状态才回退详情身份。系统投影先过滤liveActivity=false，再遵循同一选择规则。ui.island的detailID/statusID分别表示两组选择，selectedID表示系统快照身份锚点；组件不识别业务owner名称。
 
 ```json
 {
@@ -45,7 +45,7 @@ UI模块根通过setLocalPresentationVisible提供本地可见性，Island不读
 
 IslandHost使用场景非key透明UIWindow，挂载前设公开UIWindow.Level.alert并保持到拆卸。覆盖控制器固定深色外观；Root根据replacesSystemStatusBar隐藏原状态栏，由同组件时间/网络/电池接管。关闭动画完成才恢复系统状态栏，后台/根失活立即恢复。系统隐私指示器不由组件控制。
 
-IslandPlacement.frame是左右留16pt、最大宽420pt的统一内容容器，compact是中央业务区域，background是黑色背景范围。紧凑background仅覆盖compact，系统状态保留在两端透明区域；展开background覆盖完整容器及详情。透明surface统一承载背景、正文、顶部业务和状态条，裁剪与坐标转换随同一动画变化。黑色背景圆角外及透明系统状态区域触摸透传。
+IslandPlacement.frame是左右留16pt、最大宽420pt的统一内容容器，compact是中央业务区域，background是黑色背景范围。紧凑background仅覆盖compact，系统状态保留在两端透明区域；展开background覆盖完整容器及详情。透明surface统一承载背景、正文、顶部业务和状态条，裁剪与坐标转换随同一动画变化。顶部业务hosting使用全视口固定画布，在compact矩形内明确定位内容；画布原点与surface反向移动，展开时另加6pt垂直偏移，因此22pt普通槽与44pt计时槽切换不改变hosting尺寸，也不让SwiftUI居中布局与UIKit宽度动画竞争。黑色背景圆角外及透明系统状态区域触摸透传。
 
 IslandCompactMetrics统一紧凑高度110/3pt、中央硬件保护区376/3pt、图标槽22pt、符号18pt。计时使用44pt槽、16pt等宽数字，仅增宽不增高；内容槽紧邻中央保护区，无内侧padding，仅外侧8pt。顶部按safeTop−48校准；受测402×874pt设备为14pt。非适配竖屏使用无硬件保护区的安全区备用布局。隐藏状态栏暂时使安全区归零时保留同视口基准，旋转重算。
 
@@ -59,7 +59,7 @@ IslandCompactMetrics统一紧凑高度110/3pt、中央硬件保护区376/3pt、�
 
 UIViewPropertyAnimator拥有可中断的frame/corner过渡，捕获当前presentation值后接续。首次紧凑显示先用300ms、阻尼0.76展开至全宽，再仅将黑色背景以520ms、阻尼0.72收回中央；两端系统状态位置不变。展开/收起620ms、阻尼0.76，退出220ms。Reduce Motion直接设置目标背景，使用120ms短淡入并停用循环符号效果。
 
-两段开场共享动画身份与generation/localRevision，最后一段实际完成才回执；新目标、关闭、失活均取消或接续当前段，不以固定延时伪造完成。submitted是接纳状态，不表示实际settled或业务成功。顶部hosting直接观察频带与活跃标志，音频帧不推进localRevision，不重启外壳动画。
+两段开场共享动画身份与generation/localRevision，最后一段实际完成才回执；新目标、关闭、失活均取消或接续当前段，不以固定延时伪造完成。render与终点校正期间拒绝同步布局重入，只请求下一次布局；同一调用栈不会重复创建或替换animator。有效token的最后一段完成后，统一无动画写回surface、黑色背景、正文、标题画布、状态条及圆角／透明度目标，再发localCompleted，过期token不校正新目标。submitted是接纳状态，不表示实际settled或业务成功。顶部hosting直接观察频带与活跃标志，音频帧不推进localRevision，不重启外壳动画。
 
 localFrame只读发布scene窗口坐标的目标占用矩形，布局变化不推进内容revision或系统摘要。Root把底边适配成Window的通用topBoundary，Island不持有WindowState，Actions不能设置几何。真实拆卸/后台清空该占用。
 
@@ -81,16 +81,24 @@ IslandCompactView/IslandExpandedView复用IslandIndicatorView。App频谱将32�
 
 两端内边距统一16pt，空间不足先同步压缩到10pt，再隐藏靠近业务的网络、随后电池；时间无法容纳才隐藏。业务尺寸不受系统状态挤压。状态条不接收触摸；挂载/恢复系统状态栏及模态页面行为须真机验收。
 
-## 系统呈现、兼容与结束
+## 系统呈现与结束
 
 IslandActivityWidget由ActivityKit/WidgetKit决定原生外壳、compact/minimal/expanded及锁屏位置、动画和展开时机。系统摘要以详情活动为身份锚点，primary/secondary消费实时状态，detailPrimary/detailTone独立保留详情语义，hasStatus控制顶部。紧凑区不放描述文字；不能承诺连续频谱或任意循环动效。参考[1998code Demo](https://github.com/1998code/iOS16-Live-Activities/blob/main/WidgetDemo/WidgetDemo.swift)。
 
 IslandSystemPresentation仅有一个在途写入、一个可替换最新值，30秒心跳、60秒staleDate。禁用/被用户移除/失败停止心跳；系统失败独立于本地呈现，错误保留在ui.island。每阶段提醒账本最多256项。驱动安装主动提交空快照，清理上次进程活动；根停止串行加入结束操作。
 
-共享快照限制3500字节，指标使用kind/symbol/effect/value/startedAt编码。旧symbol/trailing/progress仅在解码边界转换，旧detail.symbol和destination/linkTitle忽略，不存储或再次编码。缺少detailPrimary时渲染回退primary，缺少hasStatus时按旧详情规则兼容，不保留第二套渲染器。
+共享快照限制3500字节，指标使用kind/symbol/effect/value/startedAt编码。只读取当前快照字段，不转换旧symbol/trailing/progress；detailPrimary为当前可选详情指标，hasStatus为当前必填顶部状态标志。
 
 系统isStale/paused/ended投影明确的过期/暂停/结束状态，去掉运行指标、计时和旧目标；stale不表示实际结束。App原生终止回调调用IslandProcessLifecycle.endBeforeTermination，在独立任务执行ActivityKit.end(.immediate)，最多同步等待1秒，超时返回false由App记录。这仅用于进程退出，不用于普通Scene切换或后台保活。
 
 iOS可能直接结束挂起进程且不发送终止回调；本地代码不能保证划掉App后立即移除系统活动。过期外观与下次启动清理是兜底，不是自动end。正常根stop使用异步串行清理。
 
 [UI模块](../../README.md) · [公共组件](../README.md)
+
+IslandTone 支持通用 purple，App 与系统扩展使用同一颜色语义。组件不根据 Agent 身份选色；业务投影负责提供 tone、priority、expansionID 和详情。
+
+IslandContent、IslandIndicator 和 ActivityKit ContentState 只解码当前字段；不读取 symbol/trailing/progress 旧快照形态，也不为缺少当前必需字段补默认值。当前可选时间、图片和详情仍为可选；启动时结束已有系统活动，不恢复旧快照。
+
+IslandPriority 只接受 background、low、normal、high、attention、critical，排序顺序由组件定义；调用方提交重要性语义，不提交动画、布局或全局数字权重。相同等级按实际内容最后更新选择，重复相同内容不改变顺序。详情和实时状态仍独立仲裁，组件不根据 Writer、Assistant 等生产者名字分支。当前 IslandContent JSON 必须有 priority，不读取旧 rank 字段。
+
+End is idempotent for an absent activity under the same owner and a nondecreasing revision. An end received before first presentation records a fence in the existing bounded ledger, preventing late older content from appearing. A retry after local removal can still join system reconciliation. Owner, positive revision, root availability and ledger capacity checks remain enforced; explicit remove retains its strict existing-activity contract.

@@ -124,6 +124,8 @@ public struct TaskCompressionRecord: Sendable {
     }
 }
 public struct MessagePreview: Sendable {
+    public var metadata: [String: String] = [:]
+    public var ordinal: Int = 0
     public let id: String
     public let clientID: String
     public let inputID: String

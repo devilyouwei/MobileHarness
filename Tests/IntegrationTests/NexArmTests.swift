@@ -329,6 +329,19 @@ private func runNexArmAssistantBase(link: any NexArmLink, cycles: Int) async thr
     }
 }
 
+/// Deterministic motion fixtures explicitly seed a recently loaded Skill; no foreground Task is needed.
+func loadedRobotAssistantContext() throws -> AssistantContextState {
+    let fixed = try AssistantAgent.runtimeCapabilities(AgentConfigurations.load(named: "Assistant").capabilities)
+    var skills = AgentTaskSkillState()
+    try skills.initialize(fixed: fixed, baseSkills: AgentConfigurations.baseSkills(named: "Assistant"))
+    _ = try skills.control(
+        "loadSkills", arguments: ["skills": "[\"robot-interaction\"]"],
+        inputID: "robot-fixture", fixed: fixed)
+    var state = AssistantContextState()
+    state.skillState = skills
+    return state
+}
+
 func runNexArmAssistantAction(cycles: Int, move: @escaping @Sendable (Int) async throws -> Void) async throws {
     try await runNexArmAssistantMarkup("<shakeBase cycles=\"\(cycles)\"/>", function: "shakeBase", move: move)
 }
@@ -339,15 +352,15 @@ private func runNexArmAssistantMarkup(
         throw NexArmError.invalidMotion
     }
 ) async throws {
-    let defaultBindings =
+    let motionBindings =
         try AgentConfigurations.skill("expression-interaction").useActions
         + AgentConfigurations.skill("robot-interaction").useActions
     let assistant = try AgentChatWorker<AssistantContextState>(
         stateContext: try publicStateFixture(),
         chat: FixedTextChat(text: markup),
         context: try AgentContextRepository(
-            agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState()),
-        capabilities: AgentConfigurations.registry(defaultBindings)
+            agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: loadedRobotAssistantContext()),
+        capabilities: AgentConfigurations.registry(motionBindings)
     )
     let manager = AgentManager()
     let session = UUID().uuidString

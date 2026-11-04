@@ -37,7 +37,9 @@ final class ApplicationActionAssembly {
     func prepare(_ request: AgentBusinessRequest, actions: ActionsContainer) throws -> AgentBusinessBindings {
         let ports = try actions.configureBusiness(request: request)
         return AgentBusinessBindings(
-            executor: ports.executor, catalog: ports.catalog, settings: ports.settings,
+            executor: ports.executor, catalog: ports.catalog, artifactStreaming: ports.artifactStreaming,
+            writerArtifacts: ports.writerArtifacts, writerPhotos: ports.writerPhotos,
+            writerModel: ports.writerModel, settings: ports.settings,
             discovery: ports.discovery, providerPresentation: ports.providerPresentation, tasks: ports.tasks,
             resources: ports.resources, connectionFacts: ports.connectionFacts,
             trackingAvailable: ports.trackingAvailable,

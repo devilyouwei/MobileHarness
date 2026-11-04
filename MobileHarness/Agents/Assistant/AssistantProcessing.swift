@@ -36,7 +36,10 @@ public struct AssistantContextState: AgentChatContextState {
     public static let agentID = AgentID.assistant
     public static let configurationName = "Assistant"
     public static func runtimeCapabilities(_ capabilities: CapabilityRegistry) throws -> CapabilityRegistry {
-        return try AgentChatWorker<Self>.runtimeCapabilities(capabilities)
+        return try AgentChatWorker<Self>.runtimeCapabilities(capabilities).adding(internalTools: [
+            .init(path: "UI.Island.present", required: ["activityID", "revision", "content"]),
+            .init(path: "UI.Island.end", required: ["activityID", "revision"]),
+        ])
     }
     public static func preprocess(_ input: AgentInput, state: Self) throws -> SignalDisposition {
         try AssistantSignalPreprocessor().classify(input, state: state)
@@ -136,7 +139,7 @@ public struct AssistantContextBuilder: ContextBuilder {
         for observation in observations
         where
             (observation.path == "Camera.Capture.takePhoto"
-            || ["Web.Page.browse", "Web.Page.snapshot", "Web.Page.navigate", "Web.Page.develop", "Web.Page.open"]
+            || ["Web.Page.browse", "Web.Page.snapshot", "Web.Page.navigate"]
                 .contains(observation.path))
             && !observation.result.isError
         {

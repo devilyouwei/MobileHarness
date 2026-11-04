@@ -4,6 +4,7 @@ import FunctionContracts
 
 /// Pure behavior assembly. Device creation and runtime lifetime stay with the host.
 public struct BehaviorAssembly: Sendable {
+    private struct ScheduledActions: ActionModule { let definitions: [ActionBinding] }
     public let bindings: [ActionBinding]
     public let functions: FunctionRegistry
     public let actions: ActionRegistry
@@ -20,6 +21,7 @@ public struct BehaviorAssembly: Sendable {
         album: (any PhotoAlbumCapability)? = nil,
         windows: (any WindowControlCapability)? = nil,
         web: (any WebCapability)? = nil,
+        artifacts: (any ArtifactCapability)? = nil,
         island: (any IslandControlCapability)? = nil,
         modelResources: any ModelResourceCapability, resourcePreferences: any ModelResourcePreferencesCapability,
         resourceInventory: any ModelResourceInventoryCapability,
@@ -42,7 +44,7 @@ public struct BehaviorAssembly: Sendable {
             presentation: presentation, playback: playback, pose: pose,
             historyPresentation: historyPresentation, camera: camera,
             history: history, historyMutations: historyMutations, fullHistory: fullHistory, album: album,
-            windows: windows, web: web, island: island,
+            windows: windows, web: web, artifacts: artifacts, island: island,
             modelResources: modelResources,
             resourcePreferences: resourcePreferences, resourceInventory: resourceInventory,
             resourcePresentation: resourcePresentation, providerDiscovery: providerDiscovery,
@@ -58,7 +60,14 @@ public struct BehaviorAssembly: Sendable {
         let catalog = try CapabilityCatalog(modules: capabilityModules)
         let bindings = try ActionBindingCatalog(definitions: catalog.definitions.map(BehaviorProtocolBindings.bind))
         try self.init(
-            actionModules: [bindings.actions], toolModules: [bindings.tools],
+            actionModules: [
+                ScheduledActions(
+                    definitions: bindings.actions.definitions.map {
+                        ActionBinding(
+                            function: $0.function, protocols: [.action], executionPolicy: .scheduled(channel: "main"),
+                            directResultPolicy: $0.directResultPolicy)
+                    })
+            ], toolModules: [bindings.tools],
             functions: FunctionRegistry(definitions: catalog.definitions))
     }
 

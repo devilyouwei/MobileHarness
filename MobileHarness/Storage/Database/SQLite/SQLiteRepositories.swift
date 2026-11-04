@@ -16,23 +16,11 @@ public final class SQLiteRepositories: Sendable {
     public init(url: URL, removeOnClose: Bool = false, failures: StorageFailureReporter = .init()) throws {
         let database = try SQLiteDatabase(url: url, removeOnClose: removeOnClose, failures: failures)
         do {
-            try database.migrate([
-                (
-                    "records-v1",
-                    [
-                        SQLiteChatRepository.schemaSQL, SQLiteTaskRepository.schemaSQL, SQLiteMediaRepository.schemaSQL,
-                        SQLiteDeviceRepository.schemaSQL,
-                    ]
-                ),
-                (
-                    "record-lifecycle-v2",
-                    [
-                        "CREATE INDEX message_active ON messages(id) WHERE state='generating'",
-                        "CREATE INDEX task_active ON tasks(id) WHERE status IN ('running','finishing')",
-                    ]
-                ),
-                ("photo-album-v3", [SQLiteMediaRepository.albumMigrationSQL]),
+            try database.prepareSchema([
+                SQLiteChatRepository.schemaSQL, SQLiteTaskRepository.schemaSQL,
+                SQLiteMediaRepository.schemaSQL, SQLiteDeviceRepository.schemaSQL,
             ])
+            try SQLiteTaskRepository.prepareNotifications(database)
         } catch {
             let primary = error
             do { try database.closeUnpublished() } catch {

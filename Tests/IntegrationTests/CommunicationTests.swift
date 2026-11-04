@@ -26,7 +26,7 @@ func communicationConfiguration(_ id: String, subscribes: Bool = false, publishe
     return try AgentConfiguration(
         contracts: AgentContracts.communication,
         data: JSONSerialization.data(withJSONObject: [
-            "version": 6, "id": id, "actions": [String: [String]](), "tools": [],
+            "version": 7, "id": id, "actions": [String: [String]](), "tools": [],
             "communication": communication,
         ]))
 }
@@ -303,7 +303,7 @@ private func registeredFixtureConfiguration(
     try AgentConfiguration(
         contracts: contracts,
         data: JSONSerialization.data(withJSONObject: [
-            "version": 6, "id": id, "actions": [String: [String]](), "tools": [],
+            "version": 7, "id": id, "actions": [String: [String]](), "tools": [],
             "communication": [
                 "inputs": [["contract": "fixture.custom", "version": 1, "kind": "observation"]],
                 "subscriptions": publishes

@@ -32,6 +32,13 @@ public final class InferenceTaskControl: Sendable {
         }
     }
 
+    public var isCancelled: Bool { state.withLock { $0.cancelled } }
+
+    public func waitForCompletion() async {
+        let task = state.withLock { $0.task }
+        await task?.value
+    }
+
     public func cancel() {
         let task = state.withLock { value in
             value.cancelled = true

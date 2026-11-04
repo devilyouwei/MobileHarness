@@ -40,3 +40,8 @@ WindowContent.web is a single-instance generic content slot. Its render surface 
 WindowHost监听原生字体类别，使用subheadline实际字号提交layout；卡片标题以同字号、semibold渲染和测量。测量只在创建／布局变化发生，拖动不逐帧测量标题。标题区域保留单击恢复和拖动，左侧图标为装饰，不接管关闭按钮事件；无障碍仍读取标题。
 
 WindowState.present的可选icon参数接收WindowIcon.system(name:)、emoji单个组合字符或image(Data)，首次创建时校验，随后与窗口身份一起保留；单实例复用保留原图标。业务调用者决定图标，组件不根据content猜测。自定义图片输入最多1MiB、宽高各不超过4096，接纳时解码首帧并按方向缩为最长边96像素PNG，保留透明度和比例；渲染到22pt等比框。非法符号、emoji或图片抛出invalidIcon，不创建窗口，不以空白伪装成功。图片只来自显式字节，不读磁盘／网络，关闭窗口或根停止释放状态持有的图标，渲染缓存随视图销毁。图标数据不进入状态快照。
+
+
+artifact 内容为多实例作品窗口，页面由 Web sessions 按 windowID 隔离。创作任务由 Writer 根持有；最小化/关闭仅改变页面呈现，不结束作品任务。
+
+ui.windows投影同一WindowState的全部窗口，包含Writer的artifact窗口；来源Agent不参与过滤。Skill只选择是否观察此公开State，不能改变窗口所有权或实例。页面正文/截图通过对应Web会话的显式业务能力获取，窗口摘要不表示看到了页面像素。

@@ -29,7 +29,7 @@ BluetoothSettingsState 分开呈现可用性、发现、连接、传输问题、
 
 ## 历史值、分页与导航
 
-AgentRecordsView 是注入的记录页面入口，当前 Assistant 提供实际会话记录。ConversationHistoryView 不构造业务总结或持久化结果；只有原始 modelRequests 投影为请求行，不伪造续轮／任务。
+Settings routes directly to injected Assistant chat records and Writer task records through assistantHistory/writerHistory; there is no intermediate records hub. Original model requests remain the source of request rows.
 
 Task 压缩行以实际 historyTaskID、input/request 来源对及 historyOrder 校验，在原请求位置展示；展开源记录独立分页。不同 Task 的 source、request-time task 快照和 live execution 状态保持区别。缺失证据不补造。
 
@@ -77,9 +77,9 @@ SettingsFormController 只拥有草稿规范化、默认选项、请求忙态和
 
 ## 多 Provider 管理
 
-沿用私有设置事务传递至多 32 个 URL 唯一的 provider；当前配置与其余配置一起保存。UI 在加载模型上方提供单选、编辑、删除和末行添加，删除当前项关闭云端并要求重新选择。保存提交后生效，Key 保持钥匙串存储，旧单配置恢复为首项。
+沿用私有设置事务传递至多 32 个 URL 唯一的 provider；当前配置与其余配置一起保存。“智能体大脑”先显示名称/URL 的 Provider 管理列表，末行添加，左滑编辑/删除；不设置全局 Provider 单选。Assistant 和 Writer 各自选择 Provider/模型，本地选项隐藏二级模型。删除 Provider 将引用它的草稿选择切换为本地。保存提交后生效，Key 保持钥匙串存储；Provider 列表只从当前文档读取。
 
-Provider 名称通过私有配置链路保存，旧数据以 URL 主机名补齐。新增/编辑采用独立 modal 草稿（name/url/key），默认生成未占用的 Provider N 名称；取消不修改选择和凭据，确认校验 URL 唯一性与名称。列表名称为主、URL 单行省略为辅，保留三字段粘贴和 Key 脱敏。
+Provider 名称与稳定 ID 是当前文档的必填字段，通过私有配置链路保存。新增/编辑采用独立 modal 草稿（name/url/key），默认生成未占用的 Provider N 名称；取消不修改选择和凭据，确认校验 URL 唯一性与名称。列表名称为主、URL 单行省略为辅，保留三字段粘贴和 Key 脱敏。
 
 ProviderEditorDraft 同时接纳 HTTP 与 HTTPS（域名或 IP，可带端口和路径）；保留名称、URL 唯一性、凭据长度和容量校验，错误提示不再要求仅 HTTPS。实际网络策略见 [Config](../../../Config/README.md)。
 
@@ -87,7 +87,7 @@ Implemented: Provider URL input is optional. Blank/whitespace input resolves to 
 
 ## 用户板块入口
 
-SettingsView 用户板块依次呈现“记忆”“相册”“Agent 记录”。记忆为无点击行为的静态 Label；相册进入独立照片管理页面，Agent 记录继续使用现有导航。
+SettingsView 用户板块依次呈现“记忆”“相册”“Assistant 聊天记录”“Writer 任务记录”。记忆为无点击行为的静态 Label；其余入口直接进入各自注入的页面，记录入口不经过聚合页。
 
 ## 基础相册实施契约
 
@@ -120,3 +120,20 @@ The State operation attribute belongs to ui.album. ui.navigation reflects naviga
 Album items carry MIME; video/quicktime shows a play badge and opens a local-file player using AlbumInput.video → AlbumReply.video(URL). Thumbnail requests remain image Data and are decoded by the existing thumbnail renderer. Export/delete share existing typed requests and busy/admission behavior, with media-aware labels. Leaving detail clears the URL/player. The photo picker still imports static photos only; video capture comes from Camera.
 
 SettingsInput/Reply、ResourcesInput/Reply、HistoryInput/Reply、DeviceInput分别与SettingsState、ModelResourcesState、ConversationHistoryState、BluetoothSettingsState同文件；通用传输位于Shared/UIRequests，具体输入类型由本目录拥有。
+
+
+模型表单包含独立 Writer Provider 与模型名称。Provider 具有稳定 id，编辑 URL 保留 id；Writer 选择通过既有设置事务保存，不改变 Assistant 选择。
+
+## Writer 记录与作品
+
+UIHistoryContainer owns Assistant conversations. WriterRecordsView displays 20-item task pages with a purple icon, goal, task ID, canonical status, update time and full request count. WriterRequestItem provides lightweight pages; full text, native calls/results and errors load only on request-detail navigation. Visible state refreshes every two seconds without reopening loaded source.
+
+The task header shows its icon/goal, first start time, status and total rounds, followed by directory browsing and conversation export buttons. Request rows have icons, cumulative model-attempt numbers and run separators. WriterArtifactsControlling still owns snapshot reads, native previews and source/ZIP/PDF export; task operations do not use a toolbar menu.
+
+模型发现按稳定 Provider ID 缓存，页面进入刷新两个已选 Provider，切换 Provider 和编辑凭据自动查询；同 Provider 可共享列表而不共享 Agent 的模型选择。返回值经 ApplicationControl/Gateway 后由表单控制器呈现，凭据快照/请求 ID 阻止迟到覆盖。最多 32 个查询（包括尚未退出的取消任务），溢出明确显示错误；离页取消，根关闭加入。刷新不清空已保存模型，失败提供重试。保存仍走既有业务事务，密钥留钥匙串。
+
+Provider 左滑删除先显示原生确认弹窗，取消不改变草稿。保存按钮保留忙态，实际保存回执完成后显示成功（3秒）或失败（6秒）Toast，不再占用常驻表单行；失败保留实际错误。页面只有一个可替换 Toast，展示计时随页面取消，已接纳的保存仍由根拥有。恢复失败也以 Toast 提示，模型发现错误保留各 Provider 的重试入口。
+
+Writer请求与工具详情消费UI自有HistoryFailureDiagnostic，展示消息、分类、错误码、阶段、诊断字段和关联清理原因。UI不解析网络错误类型或执行重试，也不依赖Agents/ModelKit；数据由现有历史投影传入。
+
+Writer云模型区提供深度思考开关，草稿默认false，编辑递增revision，通过既有保存/还原端口传递。UI仅保存布尔值，不解释Provider推理参数；保存后对新建/续作委托生效，当前执行不变。本地选择隐藏此云端选项。

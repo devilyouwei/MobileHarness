@@ -5,21 +5,22 @@ import Testing
 
 @testable import UI
 
-@MainActor private func islandItem(_ state: IslandState, owner: String, rank: Int) throws -> UUID {
+@MainActor private func islandItem(_ state: IslandState, owner: String, priority: IslandPriority) throws -> UUID {
     let id = UUID()
     try state.publish(
-        id: id, owner: owner, revision: 1, content: .init(title: owner, primary: .symbol(name: "circle"), rank: rank),
+        id: id, owner: owner, revision: 1,
+        content: .init(title: owner, primary: .symbol(name: "circle"), priority: priority),
         generation: state.generation, creating: true)
     return id
 }
 @Test @MainActor func islandEqualRankUsesLatestAndBackgroundInvalidatesOwners() throws {
     let state = IslandState()
     state.setAvailable(true)
-    let first = try islandItem(state, owner: "first", rank: 50)
-    let second = try islandItem(state, owner: "second", rank: 50)
+    let first = try islandItem(state, owner: "first", priority: .normal)
+    let second = try islandItem(state, owner: "second", priority: .normal)
     try state.publish(
         id: second, owner: "second", revision: 2,
-        content: .init(title: "更新", primary: .symbol(name: "circle"), rank: 50), generation: state.generation,
+        content: .init(title: "更新", primary: .symbol(name: "circle"), priority: .normal), generation: state.generation,
         creating: false)
     #expect(state.selectedID == second)
     let old = state.generation
@@ -36,9 +37,9 @@ import Testing
 @Test @MainActor func islandCapacityOwnerAndRevisionRejectionsDoNotRemoveOtherActivities() throws {
     let state = IslandState()
     state.setAvailable(true)
-    let id = try islandItem(state, owner: "first", rank: 50)
-    for index in 1..<8 { _ = try islandItem(state, owner: "item\(index)", rank: 0) }
-    #expect(throws: IslandError.capacity) { _ = try islandItem(state, owner: "overflow", rank: 100) }
+    let id = try islandItem(state, owner: "first", priority: .normal)
+    for index in 1..<8 { _ = try islandItem(state, owner: "item\(index)", priority: .background) }
+    #expect(throws: IslandError.capacity) { _ = try islandItem(state, owner: "overflow", priority: .critical) }
     #expect(throws: IslandError.owner) {
         try state.remove(id: id, owner: "wrong", revision: 2, generation: state.generation)
     }
@@ -50,7 +51,7 @@ import Testing
 @Test @MainActor func islandEndedActivityRejectsLateCreationAndCanResumeOnlyAtANewerRevision() throws {
     let state = IslandState()
     state.setAvailable(true)
-    let id = try islandItem(state, owner: "task", rank: 50)
+    let id = try islandItem(state, owner: "task", priority: .normal)
     try state.remove(id: id, owner: "task", revision: 2, generation: state.generation)
     #expect(throws: IslandError.stale) {
         try state.publish(
@@ -92,8 +93,8 @@ import Testing
 @Test @MainActor func islandRankingUsesPriorityThenLatestAndReturnsAfterRemoval() throws {
     let state = IslandState()
     state.setAvailable(true)
-    let low = try islandItem(state, owner: "low", rank: 10)
-    let high = try islandItem(state, owner: "high", rank: 90)
+    let low = try islandItem(state, owner: "low", priority: .low)
+    let high = try islandItem(state, owner: "high", priority: .attention)
     #expect(state.selectedID == high)
     try state.remove(id: high, owner: "high", revision: 2, generation: state.generation)
     #expect(state.selectedID == low)
@@ -172,7 +173,8 @@ import Testing
     try state.publishSlot(owner: "custom", content: goal)
     #expect(state.expanded)
     let ordinary = try #require(
-        try state.publishSlot(owner: "ordinary", content: .init(title: "声音", primary: .symbol(name: "mic"), rank: 100)))
+        try state.publishSlot(
+            owner: "ordinary", content: .init(title: "声音", primary: .symbol(name: "mic"), priority: .critical)))
     #expect(state.compact?.id == ordinary && state.expandedID == id && state.expanded)
     #expect(throws: IslandError.invalid) { try state.setExpanded(true, id: ordinary) }
     try state.publishSlot(owner: "custom", content: nil)
@@ -238,7 +240,7 @@ func islandLocalPlacementHasAlignedSlotsAndNoNeck(_ viewport: CGSize) throws {
 @Test @MainActor func islandContentControlsExpansionAndKeepsPerActivityPreference() throws {
     let state = IslandState()
     state.setAvailable(true)
-    var goal = IslandContent(title: "目标", primary: .symbol(name: "scope"), rank: 50, detail: .init(text: "拍照"))
+    var goal = IslandContent(title: "目标", primary: .symbol(name: "scope"), priority: .normal, detail: .init(text: "拍照"))
     let goalID = try #require(try state.publishSlot(owner: "goal", content: goal))
     #expect(state.expanded && state.detail?.text == "拍照")
     try state.setExpanded(false)
@@ -246,7 +248,8 @@ func islandLocalPlacementHasAlignedSlotsAndNoNeck(_ viewport: CGSize) throws {
     try state.publishSlot(owner: "goal", content: goal)
     #expect(!state.expanded && state.detailActivity?.content.detail?.text == "拍照并保存")
     let other = try #require(
-        try state.publishSlot(owner: "camera", content: .init(title: "录像", primary: .symbol(name: "video"), rank: 90)))
+        try state.publishSlot(
+            owner: "camera", content: .init(title: "录像", primary: .symbol(name: "video"), priority: .attention)))
     #expect(state.compact?.id == other && state.detail == nil && !state.expanded)
     #expect(state.detailActivity?.id == goalID)
     try state.setExpanded(true)
@@ -255,7 +258,8 @@ func islandLocalPlacementHasAlignedSlotsAndNoNeck(_ viewport: CGSize) throws {
     try state.publishSlot(owner: "camera", content: nil)
     #expect(state.compact?.id == goalID && !state.expanded)
     try state.setExpanded(true)
-    try state.publishSlot(owner: "camera", content: .init(title: "录像", primary: .symbol(name: "video"), rank: 90))
+    try state.publishSlot(
+        owner: "camera", content: .init(title: "录像", primary: .symbol(name: "video"), priority: .attention))
     try state.publishSlot(owner: "camera", content: nil)
     #expect(state.expanded && state.compact?.content.primary == goal.primary)
     goal.detail = .init(text: "   ")
@@ -266,11 +270,10 @@ func islandLocalPlacementHasAlignedSlotsAndNoNeck(_ viewport: CGSize) throws {
     #expect(state.expanded)
 }
 
-@Test func islandNewIndicatorWireAndLegacyDecodeHaveOneCanonicalForm() throws {
+@Test func islandCurrentIndicatorWireRejectsOldContent() throws {
     let old = Data(#"{"title":"目标","symbol":"scope","trailing":"loading","detail":{"symbol":"flag","text":"拍照"}}"#.utf8)
-    let value = try JSONDecoder().decode(IslandContent.self, from: old)
-    #expect(value.primary == .symbol(name: "scope") && value.secondary == .loading)
-    #expect(value.detail?.text == "拍照")
+    #expect(throws: DecodingError.self) { try JSONDecoder().decode(IslandContent.self, from: old) }
+    let value = IslandContent(title: "目标", primary: .symbol(name: "scope"), secondary: .loading)
     let canonical = try #require(try JSONSerialization.jsonObject(with: JSONEncoder().encode(value)) as? [String: Any])
     #expect(canonical["symbol"] == nil && canonical["trailing"] == nil && canonical["primary"] != nil)
     for indicator in [
@@ -589,15 +592,17 @@ func islandSystemStatusesNeverOverlapBusinessOrLeaveViewport(_ width: CGFloat) {
 @Test @MainActor func islandTaskDetailSurvivesEveryTransientStatusAndIndependentEnd() throws {
     let state = IslandState()
     state.setAvailable(true)
-    let goal = IslandContent(title: "目标", primary: .symbol(name: "scope"), rank: 85, detail: .init(text: "拍摄窗边的植物"))
+    let goal = IslandContent(
+        title: "目标", primary: .symbol(name: "scope"), priority: .normal, detail: .init(text: "拍摄窗边的植物"))
     let goalID = try #require(try state.publishSlot(owner: "arbitrary-detail-owner", content: goal))
     #expect(state.expanded && state.headerActivity == nil)
     for status in [
         IslandContent(
-            title: "聆听", primary: .symbol(name: "mic.fill"), rank: 60, secondary: .elapsed(startedAt: Date())),
-        IslandContent(title: "说话", primary: .symbol(name: "speaker.wave.2.fill"), rank: 65, secondary: .spectrum),
-        IslandContent(title: "拍摄", primary: .symbol(name: "camera.fill"), rank: 100, secondary: .loading),
-        IslandContent(title: "等待", primary: .symbol(name: "sparkles"), rank: 55, secondary: .loading),
+            title: "聆听", primary: .symbol(name: "mic.fill"), priority: .normal, secondary: .elapsed(startedAt: Date())),
+        IslandContent(
+            title: "说话", primary: .symbol(name: "speaker.wave.2.fill"), priority: .high, secondary: .spectrum),
+        IslandContent(title: "拍摄", primary: .symbol(name: "camera.fill"), priority: .critical, secondary: .loading),
+        IslandContent(title: "等待", primary: .symbol(name: "sparkles"), priority: .low, secondary: .loading),
     ] {
         try state.publishSlot(owner: "arbitrary-status-owner", content: status)
         #expect(state.expanded && state.expandedID == goalID && state.detail?.text == goal.detail?.text)
@@ -663,4 +668,95 @@ func islandSystemStatusesNeverOverlapBusinessOrLeaveViewport(_ width: CGFloat) {
         IslandInteraction.contains(
             CGPoint(x: compact.compact.midX, y: compact.compact.midY),
             frame: compact.background, corner: compact.corner))
+}
+
+@Test func islandHeaderCanvasKeepsIndicatorsAnchoredAsContentWidthChanges() throws {
+    for viewport in [CGSize(width: 402, height: 874), CGSize(width: 874, height: 402)] {
+        let safeTop = viewport.height > viewport.width ? 62.0 : 0
+        for expanded in [false, true] {
+            for secondaryWidth in [CGFloat(22), 44] {
+                for hasSecondary in [false, true] {
+                    let placement = IslandPlacement.resolve(
+                        viewport: viewport, safeTop: safeTop, safeBottom: 34, expanded: expanded,
+                        detailHeight: 80, hasSecondary: hasSecondary, secondaryWidth: secondaryWidth)
+                    let initial = placement.protected ?? placement.compact.insetBy(dx: 12, dy: 0)
+                    for fraction in [CGFloat(0), 0.13, 0.5, 0.91, 1] {
+                        let shell = CGRect(
+                            x: initial.minX + (placement.frame.minX - initial.minX) * fraction,
+                            y: initial.minY + (placement.frame.minY - initial.minY) * fraction,
+                            width: initial.width + (placement.frame.width - initial.width) * fraction,
+                            height: initial.height + (placement.frame.height - initial.height) * fraction)
+                        let canvas = placement.headerCanvas(viewport: viewport, shell: shell)
+                        #expect(canvas.size == viewport)
+                        let globalHeader = placement.compact.offsetBy(
+                            dx: shell.minX + canvas.minX, dy: shell.minY + canvas.minY)
+                        #expect(abs(globalHeader.minX - placement.header.minX) < 0.001)
+                        #expect(abs(globalHeader.minY - placement.header.minY) < 0.001)
+                        #expect(globalHeader.size == placement.header.size)
+                        #expect(placement.background.contains(placement.leadingSlot))
+                        if let trailing = placement.trailingSlot {
+                            #expect(placement.background.contains(trailing))
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Test func islandHeaderCanvasDoesNotResizeWhenTimerAppearsOrDisappears() throws {
+    let viewport = CGSize(width: 402, height: 874)
+    let placements = [false, true].flatMap { expanded in
+        [false, true].flatMap { secondary in
+            [CGFloat(22), 44].map { width in
+                IslandPlacement.resolve(
+                    viewport: viewport, safeTop: 62, safeBottom: 34, expanded: expanded,
+                    detailHeight: 80, hasSecondary: secondary, secondaryWidth: width)
+            }
+        }
+    }
+    // A replacement can arrive at any point in the previous shell animation.
+    for previous in placements {
+        for next in placements {
+            let shell = CGRect(
+                x: (previous.compact.minX + previous.frame.minX) / 2, y: previous.frame.minY,
+                width: (previous.compact.width + previous.frame.width) / 2,
+                height: (previous.compact.height + previous.frame.height) / 2)
+            let before = previous.headerCanvas(viewport: viewport, shell: shell)
+            let after = next.headerCanvas(viewport: viewport, shell: shell)
+            #expect(before.size == after.size && before.minX == after.minX)
+            let offset = next.header.minY - next.compact.minY
+            #expect(abs(after.minY + shell.minY - offset) < 0.001)
+            let finalCanvas = next.headerCanvas(viewport: viewport, shell: next.frame)
+            let header = next.compact.offsetBy(
+                dx: finalCanvas.minX + next.frame.minX, dy: finalCanvas.minY + next.frame.minY)
+            #expect(header == next.header)
+            #expect(next.protected == previous.protected)
+        }
+    }
+}
+
+@Test @MainActor func islandEndBeforePresentAndDuplicateEndKeepOwnerRevisionFence() async throws {
+    let state = IslandState()
+    state.setAvailable(true)
+    let id = UUID()
+    try await state.end(id: id, owner: "writer", revision: 2)
+    try await state.end(id: id, owner: "writer", revision: 2)
+    #expect(state.activities.isEmpty)
+    #expect(throws: IslandError.stale) {
+        try state.publish(
+            id: id, owner: "writer", revision: 1,
+            content: .init(title: "迟到", primary: .symbol(name: "circle")), generation: state.generation, creating: true)
+    }
+    await #expect(throws: IslandError.owner) { try await state.end(id: id, owner: "other", revision: 3) }
+    await #expect(throws: IslandError.stale) { try await state.end(id: id, owner: "writer", revision: 1) }
+    try state.publish(
+        id: id, owner: "writer", revision: 3,
+        content: .init(title: "新任务", primary: .symbol(name: "circle")), generation: state.generation, creating: true)
+    await #expect(throws: IslandError.stale) { try await state.end(id: id, owner: "writer", revision: 2) }
+    #expect(state.activities.count == 1)
+    try await state.end(id: id, owner: "writer", revision: 4)
+    try await state.end(id: id, owner: "writer", revision: 4)
+    #expect(state.activities.isEmpty)
+    await state.stop()
 }

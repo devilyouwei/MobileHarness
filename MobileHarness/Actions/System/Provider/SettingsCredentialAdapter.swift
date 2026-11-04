@@ -2,11 +2,9 @@ import Foundation
 import FunctionContracts
 import Security
 
-/// Raw native credential access; reference replacement/migration belongs to Actions.
+/// Raw native credential access; reference replacement belongs to Actions.
 nonisolated public struct SettingsCredentialAdapter: ProviderCredentialStorage {
     public init() {}
-    public func legacy() throws -> Data? { try read(service: "dev.mobileharness.cloud-chat", account: "configuration") }
-    public func removeLegacy() throws { try remove(service: "dev.mobileharness.cloud-chat", account: "configuration") }
     public func key(id: String) throws -> Data? { try read(service: "dev.mobileharness.cloud-chat.keys", account: id) }
     public func removeKey(id: String) throws { try remove(service: "dev.mobileharness.cloud-chat.keys", account: id) }
     public func insertKey(_ data: Data, id: String) throws {

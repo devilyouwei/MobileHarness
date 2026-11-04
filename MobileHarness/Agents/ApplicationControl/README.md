@@ -162,7 +162,7 @@ ApplicationControlFunctions 只声明代码拥有的内部调用权限；Applica
 
 沿用私有设置事务传递至多 32 个 URL 唯一的 provider；当前配置与其余配置一起保存。UI 在加载模型上方提供单选、编辑、删除和末行添加，删除当前项关闭云端并要求重新选择。保存提交后生效，Key 保持钥匙串存储，旧单配置恢复为首项。
 
-Provider 名称通过私有配置链路保存，旧数据以 URL 主机名补齐。新增/编辑采用独立 modal 草稿（name/url/key），默认生成未占用的 Provider N 名称；取消不修改选择和凭据，确认校验 URL 唯一性与名称。列表名称为主、URL 单行省略为辅，保留三字段粘贴和 Key 脱敏。
+Provider 名称和稳定 ID 通过私有配置链路保存，当前持久文档必须显式包含这些字段。新增/编辑采用独立 modal 草稿（name/url/key），默认生成未占用的 Provider N 名称；取消不修改选择和凭据，确认校验 URL 唯一性与名称。列表名称为主、URL 单行省略为辅，保留三字段粘贴和 Key 脱敏。
 
 ProviderSettingsClient 的连接失败提示允许 HTTP/HTTPS；配置仍通过私有请求链路传递，网络与主机能力策略由 [Provider Actions](../../Actions/System/Provider/README.md) 和 [Config](../../../Config/README.md) 拥有。
 
@@ -183,3 +183,5 @@ stateSnapshot projects local installation/closure, Agent lifecycle/queue counter
 WindowState.requests is a typed UI source consumed with maximum concurrency4 plus the existing one-slot control source. Code-owned permissions enumerate the six UI.Window tools; the handler supplies only windowID and uses the identity-bound Gateway consumer. It does not operate camera devices or choose photo disposition. Shutdown closes and joins the same root subscriptions.
 
 系统灵动岛仅通过App白名单导航入口返回现有页面，设备控制使用Camera窗口原有请求源；本角色不持有灵动岛专用交互队列或导航回执集合。
+
+设置桥接完整传递Writer独立思考布尔选择，保存/还原继续经既有Gateway私有请求ID，不新增模型可见写配置Action。

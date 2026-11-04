@@ -4,8 +4,6 @@ import StorageCore
 import StorageFiles
 
 public protocol ProviderCredentialStorage: Sendable {
-    func legacy() throws -> Data?
-    func removeLegacy() throws
     func key(id: String) throws -> Data?
     func insertKey(_ data: Data, id: String) throws
     func removeKey(id: String) throws
@@ -14,10 +12,14 @@ public protocol ProviderCredentialStorage: Sendable {
 public struct UserSettingsDocument: Codable, Sendable {
     let version: Int
     let cloud: CloudRecord?
-    var providers: [CloudRecord]? = nil
+    var providers: [CloudRecord] = []
+    var writerProviderID: String? = nil
+    var writerModel: String = ""
+    var writerThinking: Bool? = nil
 
     struct CloudRecord: Codable, Sendable {
-        var name: String? = nil
+        var name: String
+        var id: String
         let enabled: Bool
         let url: String
         let model: String
@@ -25,7 +27,7 @@ public struct UserSettingsDocument: Codable, Sendable {
     }
 }
 
-/// Business schema and credential migration; Storage owns document consistency.
+/// Current business schema and credential references; Storage owns document consistency.
 public actor ProviderSettingsStore: ProviderSettingsPersistence {
     private var document: (any DocumentStore<UserSettingsDocument>)?
     private var snapshot: DocumentSnapshot<UserSettingsDocument>?
@@ -55,31 +57,24 @@ public actor ProviderSettingsStore: ProviderSettingsPersistence {
         do {
             snapshot = try await documents().refresh()
             if let snapshot {
-                guard snapshot.value.version == 1, (snapshot.value.providers?.count ?? 0) <= 32 else {
+                guard snapshot.value.version == 1, snapshot.value.providers.count <= 32 else {
                     throw ProviderSettingsError.persistence
                 }
                 let current = try resolve(snapshot.value.cloud)
-                let others = try (snapshot.value.providers ?? []).compactMap { try resolve($0) }
+                let others = try snapshot.value.providers.compactMap { try resolve($0) }
                 let value = current.map {
                     ProviderSettings(
                         enabled: $0.enabled, url: $0.url, key: $0.key, model: $0.model,
-                        providers: snapshot.value.providers == nil ? [$0] : others, name: $0.name)
+                        providers: others, name: $0.name, id: $0.id,
+                        writerProviderID: snapshot.value.writerProviderID, writerModel: snapshot.value.writerModel,
+                        writerThinking: snapshot.value.writerThinking ?? false
+                    )
                 }
                 loaded = true
                 return value
             }
-            let value = try credentials.legacy().map { try JSONDecoder().decode(ProviderSettings.self, from: $0) }
             loaded = true
-            if let value {
-                try await persist(value)
-                // Remove the original only after the document and its credential can be read back.
-                let verified = try await documents().refresh()
-                guard let verified, try resolve(verified.value.cloud) == value else {
-                    throw ProviderSettingsError.persistence
-                }
-                try credentials.removeLegacy()
-            }
-            return value
+            return nil
         } catch {
             loaded = false
             throw error
@@ -103,15 +98,18 @@ public actor ProviderSettingsStore: ProviderSettingsPersistence {
                 let id = UUID().uuidString
                 try credentials.insertKey(Data(item.key.utf8), id: id)
                 inserted.append(id)
-                var record = UserSettingsDocument.CloudRecord(
-                    enabled: item.enabled, url: item.url, model: item.model, credentialID: id)
-                record.name = item.name
+                let record = UserSettingsDocument.CloudRecord(
+                    name: item.name, id: item.id, enabled: item.enabled, url: item.url, model: item.model,
+                    credentialID: id)
                 records.append(record)
             }
             let current = records.first
             let others = Array(records.dropFirst())
             var document = UserSettingsDocument(version: 1, cloud: current)
             document.providers = others
+            document.writerProviderID = value?.writerProviderID
+            document.writerModel = value?.writerModel ?? ""
+            document.writerThinking = value?.writerThinking
             snapshot = try await documents().save(document, expecting: snapshot?.revision)
         } catch {
             for id in inserted { try? credentials.removeKey(id: id) }
@@ -127,7 +125,8 @@ public actor ProviderSettingsStore: ProviderSettingsPersistence {
             throw ProviderSettingsError.persistence
         }
         return ProviderSettings(
-            enabled: record.enabled, url: record.url, key: key, model: record.model, name: record.name ?? "")
+            enabled: record.enabled, url: record.url, key: key, model: record.model, name: record.name,
+            id: record.id)
     }
 
 }

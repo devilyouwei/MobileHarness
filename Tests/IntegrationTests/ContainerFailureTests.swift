@@ -84,7 +84,7 @@ private actor FailedDiagnosticDatabase: DatabaseStorage {
         manager = AgentManager()
         let configurations = try [
             "Assistant", "SpeechPerception", "SpeechSynthesis", "VisionPerception", "Photographer", "Memory",
-            "ApplicationControl",
+            "ApplicationControl", "Writer",
         ].map { try AgentConfigurations.load(named: $0) }
         let policy = try CommunicationPolicy(
             contracts: AgentContracts.communication, configurations: configurations)
@@ -201,7 +201,7 @@ private actor FailedDiagnosticDatabase: DatabaseStorage {
     let manager = AgentManager()
     let configurations = try [
         "Assistant", "SpeechPerception", "SpeechSynthesis", "VisionPerception", "Photographer", "Memory",
-        "ApplicationControl",
+        "ApplicationControl", "Writer",
     ].map {
         try AgentConfigurations.load(named: $0)
     }

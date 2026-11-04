@@ -63,6 +63,8 @@ final class PublicStateFixtureOwner: Sendable {
             source: ContainerContextSource { [self] in
                 ContainerContextValue(camera.read().business)
             })
+        try context.register(
+            "agents.writer", source: ContainerContextSource { ContainerContextValue(["phase": "idle"]) })
         try context.register("actions.robot", source: ContainerContextSource { ContainerContextValue(false) })
         try context.register(
             "actions.robot.motion", source: ContainerContextSource { ContainerContextValue([String: String]()) })

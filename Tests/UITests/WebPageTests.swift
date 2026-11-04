@@ -63,5 +63,66 @@ import UI
             let closed = try await page.stateSnapshot()
             #expect(closed.business["content"] == .text("empty") && closed.business["url"] == .unknown)
         }
+
+        @Test @MainActor func webSessionStateListsAllOwnersAndHidesLocalPaths() async throws {
+            let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+            try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+            defer { try? FileManager.default.removeItem(at: root) }
+            let pages = WebPageContainer()
+            pages.setAvailable(true)
+            defer {
+                pages.closeSessions()
+                pages.close()
+            }
+            var ids: [UUID] = []
+            for title in ["Writer A", "Writer B"] {
+                let id = UUID()
+                ids.append(id)
+                let page = try pages.createSession(windowID: id)
+                let entry = root.appendingPathComponent(id.uuidString + ".html")
+                try "<title>\(title)</title><h1>\(title)</h1>".write(to: entry, atomically: true, encoding: .utf8)
+                _ = try await page.loadLocal(entry)
+            }
+            let state = try await pages.stateSnapshot()
+            #expect(state.business["content"] == .text("empty"))
+            guard case .array(let sessions) = state.business["sessions"] else {
+                Issue.record("Missing session facts")
+                return
+            }
+            #expect(sessions.count == 2)
+            let json = String(decoding: try JSONEncoder().encode(state), as: UTF8.self)
+            for id in ids { #expect(json.contains(id.uuidString)) }
+            #expect(json.contains("Writer A") && json.contains("Writer B"))
+            #expect(!json.contains(root.path) && !json.contains("file:"))
+            pages.removeSession(windowID: ids[0])
+            guard case .array(let remaining) = try await pages.stateSnapshot().business["sessions"] else {
+                Issue.record("Missing remaining page")
+                return
+            }
+            #expect(remaining.count == 1)
+        }
+
+        @Test @MainActor func webNavigationPreemptsInFlightInspectionInsteadOfRejectingRender() async throws {
+            let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+            try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+            defer { try? FileManager.default.removeItem(at: root) }
+            let old = root.appendingPathComponent("old.html")
+            let updated = root.appendingPathComponent("updated.html")
+            try "<h1>Old</h1>".write(to: old, atomically: true, encoding: .utf8)
+            try "<h1>Updated</h1>".write(to: updated, atomically: true, encoding: .utf8)
+            let page = WebPageContainer()
+            page.setAvailable(true)
+            defer { page.close() }
+            _ = try await page.loadLocal(old)
+            _ = try await page.webView.evaluateJavaScript(
+                "Object.defineProperty(document.body,'innerText',{get(){const until=Date.now()+500;while(Date.now()<until){};return 'Old';}});true"
+            )
+            let read = Task { try await page.observe() }
+            try await Task.sleep(for: .milliseconds(30))
+            let result = try await page.loadLocal(updated)
+            #expect(result.text.contains("Updated"))
+            await #expect(throws: CancellationError.self) { try await read.value }
+            #expect(!page.loading)
+        }
     }
 #endif

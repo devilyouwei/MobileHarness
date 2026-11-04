@@ -82,10 +82,11 @@ func saturatedControlMemoryRestoresPreferencesAcrossRootGatewayAndRetainsBounded
     #expect(try await reopened.snapshot().records.isEmpty)
     #expect(try await preferences.refresh()?.value == saved)
 }
-@Test(.actionCatalog) func preferenceLegacyDocumentAndViewDraftRemainWireCompatible() throws {
+@Test(.actionCatalog) func preferenceCurrentFormatRejectsRemovedSingleSwitch() throws {
     let raw = Data(#"{"endpoint":"https://hf-mirror.com","allowsCellular":false,"preferDownloadedSpeech":true}"#.utf8)
-    let value = try JSONDecoder().decode(ModelResourcePreferences.self, from: raw)
-    #expect(value.useCustomRecognition && value.useCustomSynthesis && !value.allowsCellular)
+    #expect(throws: DecodingError.self) { try JSONDecoder().decode(ModelResourcePreferences.self, from: raw) }
+    let value = ModelResourcePreferences(
+        endpoint: "https://hf-mirror.com", allowsCellular: false, useCustomRecognition: true, useCustomSynthesis: true)
     let view = try JSONDecoder().decode(ModelResourceSourceDraft.self, from: JSONEncoder().encode(value))
     #expect(view.endpoint == value.endpoint && view.useCustomSynthesis)
 }

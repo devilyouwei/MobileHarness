@@ -14,12 +14,16 @@ public struct OpenAIChatConfiguration: Sendable, Equatable, CustomStringConverti
         return url
     }
 
+    public enum Thinking: Sendable { case minimum, enabled }
+    public let thinking: Thinking
     public let baseURL: URL
     public let model: String
     public let timeout: TimeInterval
     private let apiKey: String
 
-    public init(baseURL: URL, apiKey: String, model: String, timeout: TimeInterval = 60) throws {
+    public init(baseURL: URL, apiKey: String, model: String, timeout: TimeInterval = 60, thinking: Thinking = .minimum)
+        throws
+    {
         guard ["http", "https"].contains(baseURL.scheme?.lowercased() ?? ""), baseURL.host?.isEmpty == false,
             baseURL.user == nil, baseURL.password == nil, baseURL.query == nil, baseURL.fragment == nil,
             !apiKey.contains(where: { $0.isNewline }),
@@ -30,6 +34,7 @@ public struct OpenAIChatConfiguration: Sendable, Equatable, CustomStringConverti
         self.apiKey = apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
         self.model = model
         self.timeout = timeout
+        self.thinking = thinking
     }
 
     public var description: String { "OpenAIChatConfiguration(credentials: redacted)" }
@@ -86,6 +91,14 @@ public struct OpenAIChatConfiguration: Sendable, Equatable, CustomStringConverti
         return ids.filter { seen.insert($0).inserted }
     }
 
+    func redactedProviderMessage(_ message: String) -> String {
+        var value = apiKey.isEmpty ? message : message.replacingOccurrences(of: apiKey, with: "[redacted]")
+        for pattern in [#"(?i)Bearer\s+[^\s,;\"']+"#, #"\bsk-[A-Za-z0-9_-]+"#, #"(?i)https?://[^\s<>\"']+"#] {
+            value = value.replacingOccurrences(of: pattern, with: "[redacted]", options: .regularExpression)
+        }
+        return String(value.map { $0.isNewline || $0.isWhitespace ? " " : $0 }.prefix(1024))
+    }
+
     static func toolNames(_ tools: [ChatToolDefinition], historical: [ChatToolCall] = []) -> [String: String] {
         var names = tools.map(\.name)
         var seen = Set(names)
@@ -102,9 +115,8 @@ public struct OpenAIChatConfiguration: Sendable, Equatable, CustomStringConverti
 
     func request(_ chat: ChatRequest) throws -> URLRequest {
         guard chat.messages.count <= 64,
-            chat.messages.reduce(0, { $0 + $1.content.utf8.count }) <= 65536,
-            chat.maximumOutputTokens.map({ $0 <= 32768 }) ?? true
-        else { throw CapabilityError.invalidRequest("Cloud chat exceeds message or output limits") }
+            chat.messages.reduce(0, { $0 + $1.content.utf8.count }) <= 65536
+        else { throw CapabilityError.invalidRequest("Cloud chat exceeds message limits") }
         var request = URLRequest(url: baseURL.appendingPathComponent("responses"))
         request.httpMethod = "POST"
         request.timeoutInterval = timeout
@@ -149,7 +161,7 @@ public struct OpenAIChatConfiguration: Sendable, Equatable, CustomStringConverti
             "stream": true, "store": false,
         ]
         if let maximum = chat.maximumOutputTokens { body["max_output_tokens"] = maximum }
-        try disableThinking(in: &body)
+        applyThinking(in: &body)
         if !chat.tools.isEmpty {
             body["tools"] = try chat.tools.map { tool in
                 guard let object = try JSONSerialization.jsonObject(with: tool.declaration) as? [String: Any],
@@ -168,7 +180,7 @@ public struct OpenAIChatConfiguration: Sendable, Equatable, CustomStringConverti
         return request
     }
 
-    private func disableThinking(in body: inout [String: Any]) throws {
+    private func applyThinking(in body: inout [String: Any]) {
         let host = baseURL.host?.lowercased() ?? ""
         let name = model.lowercased()
         let isAliyun =
@@ -178,28 +190,37 @@ public struct OpenAIChatConfiguration: Sendable, Equatable, CustomStringConverti
                 "cn-hongkong.dashscope.aliyuncs.com", "coding.dashscope.aliyuncs.com",
             ].contains(host)
         if isAliyun {
-            body["reasoning"] = ["effort": "none"]
-            body["enable_thinking"] = false
+            body["enable_thinking"] = thinking == .enabled
+            if thinking == .minimum { body["reasoning"] = ["effort": "none"] }
             return
         }
-        let isOpenAIReasoning =
+        let reasoning =
             name == "gpt-5" || name.hasPrefix("gpt-5-") || name.hasPrefix("gpt-5.")
             || name == "gpt-6" || name.hasPrefix("gpt-6-") || name.hasPrefix("gpt-6.")
             || ["o1", "o3", "o4"].contains(where: { name == $0 || name.hasPrefix($0 + "-") })
-        guard isOpenAIReasoning, !name.hasSuffix("-chat-latest") else { return }
-        guard name != "gpt-5", !name.hasPrefix("gpt-5-"),
-            !name.contains("-pro"), !name.contains("-codex"),
-            !name.hasPrefix("gpt-6-astra"), !name.hasPrefix("gpt-6.1-sol"),
-            !["o1", "o3", "o4"].contains(where: { name == $0 || name.hasPrefix($0 + "-") })
-        else {
-            throw CapabilityError.invalidRequest(
-                "Selected OpenAI model cannot disable thinking; choose a non-thinking model")
+        guard reasoning, !name.hasSuffix("-chat-latest") else { return }
+        let minimum: String
+        if name == "gpt-5-pro" || name.hasPrefix("gpt-5-pro-") || name.hasPrefix("o1-pro") {
+            minimum = "high"
+        } else if name.contains("-pro") {
+            minimum = "medium"
+        } else if name.contains("-codex") || name.hasPrefix("gpt-6-astra") || name.hasPrefix("gpt-6.1-sol")
+            || ["o1", "o3", "o4"].contains(where: { name == $0 || name.hasPrefix($0 + "-") })
+        {
+            minimum = "low"
+        } else if name == "gpt-5" || name.hasPrefix("gpt-5-") {
+            minimum = "minimal"
+        } else {
+            minimum = "none"
         }
-        body["reasoning"] = ["effort": "none"]
+        let effort = thinking == .minimum ? minimum : (minimum == "high" ? "high" : "medium")
+        body["reasoning"] = ["effort": effort]
+        if effort != "none" { body.removeValue(forKey: "temperature") }
+
     }
 }
 
-/// Deliberately excludes response bodies, URLs and credentials from surfaced failures.
+/// Excludes raw response bodies, URLs and credentials; retains safe structured provider/network evidence.
 public enum OpenAIChatError: Error, Equatable, Sendable, ChatFailureProviding, CustomStringConvertible {
     case httpStatus(Int)
     case invalidResponse

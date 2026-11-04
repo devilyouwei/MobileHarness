@@ -86,3 +86,10 @@ Stage 标识 http/framing/event/toolStart/toolArguments/toolEnd/completion/usage
 ✅ 本地Gemma在ModelKit内按后端有效窗口适配，当前iOS缓存安全限制比4096更小；接口及算法见 [Gemma4](Gemma4/README.md)。
 
 ✅ 按用户要求，本地Gemma排查版本移除所有system，仅保留有界对话输入；云端及通用请求不变，详见Gemma4目录契约。
+
+
+ChatModel 保存固定模型选择的 ChatCapability 和可选 modelName；无 close/reopen，资源由 SDK 根管理。调用方按自身业务生命周期保留句柄，不把任务身份或协议交给 ModelKit。本地请求由默认八项等待的一运行 FIFO 处理，云端同客户端可并发；选择与推理 session 分离。
+
+ChatFailureDiagnostic carries safe provider HTTP fields and network classification/code as capability evidence. Adapters sanitize messages and preserve received HTTP status, request ID and protocol-stage evidence; consumers own user-facing explanations and retry policy. See [Responses adapter](OpenAI/README.md).
+
+The Responses adapter retains each active SSE frame without a cumulative stream/line/frame output-size ceiling. Large text deltas use Unicode-safe event chunks and the existing bounded backpressured queue. Provider output defaults remain unchanged; recovery belongs to the consuming Agent.

@@ -215,7 +215,7 @@ private enum PhotoPreparationTestFailure: Error { case expected }
 @Test func assistantWebScreenshotResultsBecomeScopedUntrustedImages() async throws {
     let input = AgentInput(id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("web"))
     let bytes = try compressionFixture(width: 80, height: 40)
-    for path in ["browse", "snapshot", "navigate", "develop", "open"] {
+    for path in ["browse", "snapshot", "navigate"] {
         let messages = try await AssistantContextBuilder.photoObservations(
             [
                 .init(

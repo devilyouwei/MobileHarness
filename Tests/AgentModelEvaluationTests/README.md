@@ -19,3 +19,5 @@ Chat output-token budgets are optional and default to nil. Assistant/cloud reque
 ✅ 千问共用 Action/Tool 工作流由 [IntegrationTests](../IntegrationTests/README.md#千问-action--tool-回归) 执行生产 Agent/Gateway 链路；本目录只拥有场景数据。`scripts/evaluate-qwen.py` 显式读取被忽略的本地 ENV，仅将阿里凭据传入测试子进程，不访问 OpenAI。报告区分协议/流程失败、传输失败和合成设备反馈。
 
 内置 Skill 的生产目录为 Action-only；共享云场景同时检查真实请求没有原生 Tool 声明。底层 Tool/混合协议测试在 IntegrationTests 独立保留，不以生产 Skill 注册作为 native fixture。
+
+Writer 的独立原生协议回归位于 `IntegrationTests/WriterModelEvaluationTests.swift`，不是 Assistant XML/Skill 场景。`scripts/evaluate-writer.py` 分别运行 Qwen 与 DeepSeek，使用实际 Writer/Gateway/Storage 和本机 WebKit。凭据隔离、复现和限制见 [scripts](../../scripts/README.md#writer-双模型回归)，结果见 [专项报告](../../docs/validation/Writer-Model-Regression.md)。

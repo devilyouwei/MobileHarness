@@ -1,0 +1,126 @@
+{
+  "date": "2026-11-04",
+  "model": "qwen3.8-max",
+  "scope": "Real Qwen / OpenAI Responses, production Agent/Gateway, synthetic device/storage executors",
+  "sourceUnchanged": true,
+  "command": "python3 scripts/evaluate-qwen.py --models qwen3.8-max --cases robot-single-gesture,robot-no-automatic-recovery --skip-build --output-prefix /tmp/robot-skill-on-demand-model",
+  "sourceHashes": {
+    "MobileHarness/Resources/Agents/Assistant/Agent.json": "3488ceb6834892371a0a2bd5625cae165ab198fb26b4f63d57985014549b427d",
+    "MobileHarness/Resources/Skills/BasicSkill/Instructions.md": "82201bebad9d4c5eb3165bd9d204598ec56ec64dbce80ae7d5d787d0514515c0",
+    "MobileHarness/Resources/Skills/RobotInteraction/Skill.json": "52fe2460ee628fc663ce7f87d851bda840a508dcd0a50ca7aa1cb309a094c147",
+    "Tests/AgentModelEvaluationTests/Scenarios/qwen-workflows.json": "50ee398dae3cdbeb4c11416f1f714fc8c8e6b9cbc709025d975b3c5d06641701"
+  },
+  "cases": [
+    {
+      "id": "robot-single-gesture",
+      "seconds": 2.8937169313430786,
+      "runtimeIssues": [],
+      "turns": [
+        {
+          "calls": [
+            {
+              "alias": "loadSkills",
+              "channel": "Control",
+              "input": "1D80A8D0-5E8F-4C61-8CBA-EE2A9ABEF7EA",
+              "kind": "action",
+              "parameters": {
+                "skills": "[\"robot-interaction\"]"
+              },
+              "path": "Agent.Task.loadSkills",
+              "round": "499BFCC0-D6C5-4D29-8D02-381EC240EE3C",
+              "waitPath": []
+            },
+            {
+              "alias": "nodHead",
+              "channel": "Robot",
+              "input": "1D80A8D0-5E8F-4C61-8CBA-EE2A9ABEF7EA",
+              "kind": "action",
+              "parameters": {
+                "cycles": "1"
+              },
+              "path": "NexArm.Gesture.nodHead",
+              "round": "74F21757-C726-4FDF-811B-7828A6A02BE6",
+              "waitPath": []
+            }
+          ],
+          "input": "1D80A8D0-5E8F-4C61-8CBA-EE2A9ABEF7EA",
+          "issues": [],
+          "loaded": [
+            "basic-skill",
+            "expression-interaction",
+            "robot-interaction"
+          ]
+        }
+      ],
+      "requests": 2
+    },
+    {
+      "id": "robot-no-automatic-recovery",
+      "seconds": 3.465896964073181,
+      "runtimeIssues": [],
+      "turns": [
+        {
+          "calls": [
+            {
+              "alias": "loadSkills",
+              "channel": "Control",
+              "input": "413552A6-502E-42BD-9733-D0E00822CAA6",
+              "kind": "action",
+              "parameters": {
+                "skills": "[\"robot-interaction\"]"
+              },
+              "path": "Agent.Task.loadSkills",
+              "round": "8E0B38D9-70E0-40F5-B4FF-1A27FADDA0A2",
+              "waitPath": []
+            },
+            {
+              "alias": "nodHead",
+              "channel": "Robot",
+              "input": "413552A6-502E-42BD-9733-D0E00822CAA6",
+              "kind": "action",
+              "parameters": {
+                "cycles": "1"
+              },
+              "path": "NexArm.Gesture.nodHead",
+              "round": "07C8091C-F2AA-4FD5-9F21-E151EAF45CFF",
+              "waitPath": []
+            },
+            {
+              "alias": "Speech.Playback.speak",
+              "channel": "Speech",
+              "input": "413552A6-502E-42BD-9733-D0E00822CAA6",
+              "kind": "action",
+              "parameters": {
+                "audioID": "A86092BF-DC39-43FB-8828-0FD8C76C9F1D",
+                "text": "点头动作执行失败了，暂时无法完成。"
+              },
+              "path": "Speech.Playback.speak",
+              "round": "5F7DD4BF-CEBC-4381-A5FE-52FAF7B26130",
+              "waitPath": []
+            },
+            {
+              "alias": "UI.Caption.print",
+              "channel": "Display",
+              "input": "413552A6-502E-42BD-9733-D0E00822CAA6",
+              "kind": "action",
+              "parameters": {
+                "text": "点头动作执行失败了，暂时无法完成。"
+              },
+              "path": "UI.Caption.print",
+              "round": "5F7DD4BF-CEBC-4381-A5FE-52FAF7B26130",
+              "waitPath": []
+            }
+          ],
+          "input": "413552A6-502E-42BD-9733-D0E00822CAA6",
+          "issues": [],
+          "loaded": [
+            "basic-skill",
+            "expression-interaction",
+            "robot-interaction"
+          ]
+        }
+      ],
+      "requests": 3
+    }
+  ]
+}

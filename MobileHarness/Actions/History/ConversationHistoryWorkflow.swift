@@ -223,3 +223,41 @@ public final class ConversationHistoryWorkflow: ConversationHistoryControlling {
     }
     public func preview(_ turn: HistoryTurn) -> String { previewOutput(turn) }
 }
+
+extension ConversationHistoryWorkflow {
+    /// Reuses the same paged history presentation for a separately scoped Agent repository.
+    @MainActor public static func records(
+        store: ConversationHistoryStore, state: ConversationHistoryState,
+        mutate: @escaping @MainActor (String, String?) async throws -> Void,
+        readPhoto: @escaping @MainActor (String, String) async throws -> Data? = { _, _ in nil }
+    )
+        -> ConversationHistoryWorkflow
+    {
+        let refresh: @MainActor () async throws -> Void = {
+            let snapshot = try await HistoryPresentationAdapter.listPresentation(store)
+            try state.requirePresentation()
+            state.present(snapshot, status: nil)
+        }
+        return ConversationHistoryWorkflow(
+            state: state, prepare: {}, refresh: refresh,
+            deleteArchive: { id in
+                try await mutate("delete", id)
+                try await refresh()
+            },
+            startNew: {
+                try await mutate("startNew", nil)
+                try await refresh()
+            },
+            summarize: { id in
+                try await mutate("title", id)
+                try await refresh()
+            }, previewOutput: { $0.response },
+            readConversation: { try await HistoryPresentationAdapter.conversation(store.page($0)) },
+            readPhoto: readPhoto,
+            readMessage: { try await HistoryPresentationAdapter.conversation(store.message($0)) },
+            readPage: { try await HistoryPresentationAdapter.conversation(store.page($0, after: $1, taskID: $2)) },
+            readArchives: { cursor in
+                try await store.archivePage(before: cursor).map { try HistoryPresentationAdapter.conversation($0) }
+            })
+    }
+}

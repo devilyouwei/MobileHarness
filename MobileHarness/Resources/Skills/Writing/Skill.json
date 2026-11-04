@@ -1,0 +1,22 @@
+{
+  "version": 3,
+  "id": "writing",
+  "revision": 5,
+  "description": "Manage saved works and Writer revisions. Create: default background startTask; view pages: web-browsing.",
+  "dependencies": [],
+  "useActions": [
+    {
+      "path": "Artifacts.Workspace.perform",
+      "callType": "action",
+      "alias": "Artifact_library",
+      "channel": "Display"
+    }
+  ],
+  "useStates": [
+    "agents.writer",
+    "ui.windows"
+  ],
+  "useInstructions": [
+    "Instructions.md"
+  ]
+}

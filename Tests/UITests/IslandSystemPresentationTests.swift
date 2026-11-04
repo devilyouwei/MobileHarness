@@ -38,7 +38,7 @@ private func systemSnapshot(_ title: String) -> IslandSystemSnapshot {
     snapshot.title = String(repeating: "大", count: 1500)
     #expect(throws: IslandSystemSnapshot.IslandErrorPayload.self) { _ = try snapshot.validatedPayload() }
 }
-@Test func islandSystemSnapshotReadsPersistedOlderActivityAfterUpgrade() throws {
+@Test func islandSystemSnapshotRejectsRetiredPersistedShape() throws {
     let value = systemSnapshot("旧版本活动")
     var object = try #require(try JSONSerialization.jsonObject(with: value.validatedPayload()) as? [String: Any])
     for key in [
@@ -50,13 +50,10 @@ private func systemSnapshot(_ title: String) -> IslandSystemSnapshot {
     object["symbol"] = "timer"
     object["trailing"] = "recording"
     object["detailSymbol"] = "old-detail-icon"
-    let decoded = try JSONDecoder().decode(
-        IslandSystemSnapshot.self, from: JSONSerialization.data(withJSONObject: object))
-    #expect(decoded.activityID == value.activityID && decoded.title == value.title)
-    #expect(!decoded.paused && decoded.attentionID == nil)
-    #expect(
-        decoded.primary == .symbol(name: "timer")
-            && decoded.secondary == .symbol(name: "record.circle.fill", effect: .pulse))
+    #expect(throws: DecodingError.self) {
+        try JSONDecoder().decode(IslandSystemSnapshot.self, from: JSONSerialization.data(withJSONObject: object))
+    }
+
 }
 @Test @MainActor func islandSystemWriterCoalescesAndIgnoresLateNativeStatus() async throws {
     let driver = IslandSystemProbe()
@@ -124,11 +121,11 @@ private func systemSnapshot(_ title: String) -> IslandSystemSnapshot {
     let task = UUID()
     try state.publish(
         id: task, owner: "task", revision: 1,
-        content: .init(title: "任务", primary: .symbol(name: "timer"), rank: 50, liveActivity: true),
+        content: .init(title: "任务", primary: .symbol(name: "timer"), priority: .normal, liveActivity: true),
         generation: state.generation, creating: true)
     try state.publish(
         id: UUID(), owner: "voice", revision: 1,
-        content: .init(title: "说话", primary: .symbol(name: "speaker.wave.2"), rank: 65, secondary: .spectrum),
+        content: .init(title: "说话", primary: .symbol(name: "speaker.wave.2"), priority: .high, secondary: .spectrum),
         generation: state.generation, creating: true)
     let deadline = ContinuousClock.now + .seconds(3)
     while state.systemStatus != .active && ContinuousClock.now < deadline { await Task.yield() }
@@ -166,9 +163,10 @@ private func systemSnapshot(_ title: String) -> IslandSystemSnapshot {
     try state.publishSlot(
         owner: "goal",
         content: .init(
-            title: "目标", primary: .symbol(name: "scope"), rank: 85,
+            title: "目标", primary: .symbol(name: "scope"), priority: .normal,
             expansionID: "goal-one", detail: .init(text: "拍摄一张照片")))
-    try state.publishSlot(owner: "camera", content: .init(title: "拍照中", primary: .symbol(name: "camera"), rank: 100))
+    try state.publishSlot(
+        owner: "camera", content: .init(title: "拍照中", primary: .symbol(name: "camera"), priority: .critical))
     try await state.flushSystem(expectedGeneration: state.generation)
     let snapshot = try #require(driver.values.last.flatMap { $0 })
     #expect(snapshot.primary == state.compact?.content.primary)
@@ -193,9 +191,10 @@ private func systemSnapshot(_ title: String) -> IslandSystemSnapshot {
     try state.publishSlot(
         owner: "goal",
         content: .init(
-            title: "目标", primary: .symbol(name: "scope"), rank: 85,
+            title: "目标", primary: .symbol(name: "scope"), priority: .normal,
             expansionID: "goal-one", detail: .init(text: "拍摄一张照片")))
-    try state.publishSlot(owner: "camera", content: .init(title: "拍照中", primary: .symbol(name: "camera"), rank: 100))
+    try state.publishSlot(
+        owner: "camera", content: .init(title: "拍照中", primary: .symbol(name: "camera"), priority: .critical))
     try await state.flushSystem(expectedGeneration: state.generation)
     state.setAvailable(false)
     let deadline = ContinuousClock.now + .seconds(3)
@@ -243,7 +242,7 @@ private func systemSnapshot(_ title: String) -> IslandSystemSnapshot {
         try state.publishSlot(
             owner: "goal",
             content: .init(
-                title: "目标", primary: .symbol(name: "scope"), rank: 85,
+                title: "目标", primary: .symbol(name: "scope"), priority: .normal,
                 expansionID: "one", detail: .init(text: "拍照"))))
     try await state.flushSystem(expectedGeneration: state.generation)
     let initial = try #require(driver.values.last.flatMap { $0 })
@@ -251,12 +250,12 @@ private func systemSnapshot(_ title: String) -> IslandSystemSnapshot {
     try state.publishSlot(
         owner: "local",
         content: .init(
-            title: "本地状态", primary: .symbol(name: "bell"), rank: 100, liveActivity: false))
+            title: "本地状态", primary: .symbol(name: "bell"), priority: .critical, liveActivity: false))
     for symbol in ["mic.fill", "speaker.wave.2.fill", "camera.fill", "sparkles"] {
         try state.publishSlot(
             owner: "status",
             content: .init(
-                title: symbol, primary: .symbol(name: symbol), rank: 55, secondary: .loading))
+                title: symbol, primary: .symbol(name: symbol), priority: .low, secondary: .loading))
         try await state.flushSystem(expectedGeneration: state.generation)
         let snapshot = try #require(driver.values.last.flatMap { $0 })
         #expect(snapshot.activityID == goal && snapshot.attentionID == initial.attentionID)

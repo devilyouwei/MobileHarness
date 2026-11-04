@@ -2,6 +2,10 @@ import Foundation
 import Observation
 
 public struct CloudSettingsDraft: Sendable, Equatable {
+    public var id: String
+    public var writerProviderID: String?
+    public var writerModel: String
+    public var writerThinking: Bool
     public var providers: [CloudSettingsDraft] = []
     public var name: String
     public var enabled: Bool
@@ -9,8 +13,13 @@ public struct CloudSettingsDraft: Sendable, Equatable {
     public var key: String
     public var model: String
     public init(
-        enabled: Bool, url: String, key: String, model: String, providers: [CloudSettingsDraft] = [], name: String = ""
+        enabled: Bool, url: String, key: String, model: String, providers: [CloudSettingsDraft] = [], name: String = "",
+        id: String? = nil, writerProviderID: String? = nil, writerModel: String = "", writerThinking: Bool = false
     ) {
+        self.id = id ?? url
+        self.writerProviderID = writerProviderID
+        self.writerModel = writerModel
+        self.writerThinking = writerThinking
         self.name = name.isEmpty ? (URL(string: url)?.host ?? "Provider") : name
         self.providers = providers
         self.enabled = enabled
@@ -24,11 +33,13 @@ public struct CloudSettingsDraft: Sendable, Equatable {
 public struct ProviderEditorDraft: Identifiable {
     public let id = UUID()
     public let originalURL: String?
+    public let providerID: String?
     public var name: String
     public var url: String
     public var key: String
     public var model: String
     public init(provider: CloudSettingsDraft?, existing: [CloudSettingsDraft]) {
+        providerID = provider?.id
         originalURL = provider?.url
         var number = 1
         while existing.contains(where: { $0.name == "Provider \(number)" }) { number += 1 }
@@ -52,7 +63,7 @@ public struct ProviderEditorDraft: Identifiable {
         guard originalURL != nil || existing.count < 32 else { throw ProviderEditorError.capacity }
         let key = key.trimmingCharacters(in: .whitespacesAndNewlines)
         guard key.utf8.count <= 4096 else { throw ProviderEditorError.key }
-        return .init(enabled: false, url: url, key: key, model: model, name: name)
+        return .init(enabled: false, url: url, key: key, model: model, name: name, id: providerID ?? UUID().uuidString)
     }
 }
 public enum ProviderEditorError: LocalizedError {
@@ -79,10 +90,10 @@ public protocol SettingsOperating: AnyObject {
 @MainActor
 public protocol SettingsControlling: AnyObject {
     func restore() async throws
-    func loadModels()
+    func loadModels(providerID: String)
+    func refreshModels()
     func save() async -> Bool
     func cancelDiscovery()
-    func credentialsChanged()
 }
 
 /// Editable form values only. Execution and lifetime are supplied through SettingsControlling.
@@ -93,25 +104,80 @@ public final class SettingsState {
     public var isPresentationAvailable: Bool { presentationAdmission.map { $0.started && !$0.stopped } ?? true }
 
     public var providers: [CloudSettingsDraft] = []
+    public var modelCatalogs: [String: [String]] = [:]
+    public var loadingProviderIDs: Set<String> = []
+    public var modelErrors: [String: String] = [:]
     public internal(set) var isEnabled: Bool
     public internal(set) var url: String { didSet { if oldValue != url { revision += 1 } } }
     public internal(set) var key: String { didSet { if oldValue != key { revision += 1 } } }
     public internal(set) var selectedModel: String
-    public internal(set) var models: [String] = []
     public internal(set) var isLoading = false
     public internal(set) var isSaving = false
     public internal(set) var error: String?
     public internal(set) var notice: String?
     public private(set) var revision: UInt64 = 0
+    public var writerProviderID: String? { didSet { if oldValue != writerProviderID { revision += 1 } } }
+    public var writerModel = "" { didSet { if oldValue != writerModel { revision += 1 } } }
+    public var writerThinking = false { didSet { if oldValue != writerThinking { revision += 1 } } }
     public init(initial: CloudSettingsDraft) {
+        writerProviderID = initial.writerProviderID
+        writerModel = initial.writerModel
+        writerThinking = initial.writerThinking
         providers = initial.providers
         isEnabled = initial.enabled
         url = initial.url
         key = initial.key
         selectedModel = initial.model
     }
+    public var assistantProviderID: String? {
+        isEnabled ? providers.first(where: { $0.url == url })?.id : nil
+    }
+    public func selectAssistantProvider(_ id: String?) {
+        guard let provider = providers.first(where: { $0.id == id }) else {
+            isEnabled = false
+            url = ""
+            key = ""
+            selectedModel = ""
+            return
+        }
+        isEnabled = true
+        url = provider.url
+        key = provider.key
+        selectedModel = ""
+        invalidateRevision()
+    }
+    public func selectWriterProvider(_ id: String?) {
+        writerProviderID = id
+        writerModel = ""
+    }
+    public func upsertProvider(_ provider: CloudSettingsDraft) {
+        let assistantID = assistantProviderID
+        if let index = providers.firstIndex(where: { $0.id == provider.id }) {
+            providers[index] = provider
+        } else {
+            providers.append(provider)
+        }
+        if assistantID == provider.id {
+            url = provider.url
+            key = provider.key
+        }
+        modelCatalogs[provider.id] = nil
+        modelErrors[provider.id] = nil
+        invalidateRevision()
+    }
+    public func removeProvider(_ id: String) {
+        if assistantProviderID == id { selectAssistantProvider(nil) }
+        if writerProviderID == id { selectWriterProvider(nil) }
+        providers.removeAll { $0.id == id }
+        modelCatalogs[id] = nil
+        modelErrors[id] = nil
+        invalidateRevision()
+    }
     public var canLoad: Bool { !isLoading && !isSaving }
-    public var canSave: Bool { !isLoading && !isSaving && (!isEnabled || !selectedModel.isEmpty) }
+    public var canSave: Bool {
+        !isSaving && (!isEnabled || !selectedModel.isEmpty)
+            && (writerProviderID == nil || (!writerModel.isEmpty && providers.contains { $0.id == writerProviderID }))
+    }
     @discardableResult
     public func presentFailure(_ message: String, revision: UInt64) -> Bool {
         guard presentationAdmission?.acceptsRetained() ?? true else { return false }
@@ -121,28 +187,17 @@ public final class SettingsState {
         return true
     }
     @discardableResult
-    public func presentModels(_ values: [String], notice: String, revision: UInt64) -> Bool {
-        guard presentationAdmission?.acceptsRetained() ?? true else { return false }
-        guard revision == self.revision else { return false }
-        models = values
-        if !values.isEmpty && !values.contains(selectedModel) { selectedModel = "" }
-        self.notice = notice
-        isLoading = false
-        error = nil
-        return true
-    }
-    @discardableResult
     public func presentRestored(_ value: CloudSettingsDraft, revision: UInt64) -> Bool {
         guard presentationAdmission?.acceptsRetained() ?? true else { return false }
         guard revision == self.revision else { return false }
-        providers =
-            value.providers.isEmpty && !value.url.isEmpty
-            ? [.init(enabled: false, url: value.url, key: value.key, model: value.model)] : value.providers
+        writerProviderID = value.writerProviderID
+        writerModel = value.writerModel
+        writerThinking = value.writerThinking
+        providers = value.providers
         isEnabled = value.enabled
         url = value.url
         key = value.key
         selectedModel = value.model
-        models = value.model.isEmpty ? [] : [value.model]
         error = nil
         return true
     }
@@ -171,7 +226,6 @@ public final class SettingsState {
         case .url(let value): url = value
         case .key(let value): key = value
         case .selectedModel(let value): selectedModel = value
-        case .models(let value): models = value
         case .isLoading(let value): isLoading = value
         case .isSaving(let value): isSaving = value
         case .error(let value): error = value
@@ -188,7 +242,6 @@ public enum SettingsUpdate {
     case url(String)
     case key(String)
     case selectedModel(String)
-    case models([String])
     case isLoading(Bool)
     case isSaving(Bool)
     case error(String?)
@@ -198,11 +251,16 @@ public enum SettingsUpdate {
 @MainActor
 public protocol SettingsPresenting: UIPresentationAccess {
     var providers: [CloudSettingsDraft] { get set }
+    var modelCatalogs: [String: [String]] { get set }
+    var loadingProviderIDs: Set<String> { get set }
+    var modelErrors: [String: String] { get set }
+    var writerProviderID: String? { get set }
+    var writerModel: String { get set }
+    var writerThinking: Bool { get set }
     var isEnabled: Bool { get }
     var url: String { get }
     var key: String { get }
     var selectedModel: String { get }
-    var models: [String] { get }
     var isLoading: Bool { get }
     var isSaving: Bool { get }
     var error: String? { get }
@@ -213,7 +271,6 @@ public protocol SettingsPresenting: UIPresentationAccess {
     @discardableResult
     func present(_ update: SettingsUpdate) -> Bool
     func presentFailure(_ message: String, revision: UInt64) -> Bool
-    func presentModels(_ values: [String], notice: String, revision: UInt64) -> Bool
     func presentRestored(_ value: CloudSettingsDraft, revision: UInt64) -> Bool
     func presentNotice(_ message: String, revision: UInt64) -> Bool
     func invalidateRevision()
@@ -278,7 +335,9 @@ public final class UISettingsContainer {
     func clearSensitiveDraft() {
         state.key = ""
         state.providers = []
-        state.models = []
+        state.modelCatalogs = [:]
+        state.modelErrors = [:]
+        state.loadingProviderIDs = []
         state.isLoading = false
         state.isSaving = false
         state.invalidateRevision()

@@ -44,4 +44,4 @@ Persisted bounded file plans, native transfer reattachment and explicit cleanup 
 
 - Full iPhone relaunch, force-quit and server-dependent resume acceptance remains outstanding; native transfer guarantees are limited by the OS and server. [Resource acceptance roadmap](../../../../../docs/Roadmap.md) tracks those trials.
 
-✅ 单次读取／解码 .hub-plan.json，基于同一 ID/revision/endpoint 快照决定复用；计划不匹配时按原下载流程重新获取元数据，不二次读取本地计划。保留 .hub-snapshot 中完整下载文件的受控迁移，兼容恢复不作为可随意删除的演示代码。
+✅ 单次读取／解码 .hub-plan.json，基于同一 ID/revision/endpoint 快照决定复用；计划不匹配时按原下载流程重新获取元数据，不二次读取本地计划。只复用当前 .hub-plan/.hub-resume 所属且校验通过的文件，不导入旧 .hub-snapshot。

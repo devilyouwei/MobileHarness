@@ -3,6 +3,86 @@ import Foundation
 import FunctionContracts
 import StorageCore
 
+/// Writer-owned failure facts; persistence and presentation adapters project this value explicitly.
+public struct WriterFailureDiagnostic: Codable, Sendable, Equatable {
+    public let category: String
+    public let code: String
+    public let stage: String
+    public let message: String
+    public let details: [String: String]
+    public let causes: [WriterFailureDiagnostic]
+    public init(
+        category: String, code: String, stage: String, message: String,
+        details: [String: String] = [:], causes: [WriterFailureDiagnostic] = []
+    ) {
+        self.category = category
+        self.code = code
+        self.stage = stage
+        self.message = message
+        self.details = details
+        self.causes = causes
+    }
+}
+
+/// Writer business evidence carried by the existing authenticated task transport.
+public struct WriterRequestProgress: Codable, Sendable, Equatable {
+    public let inputID: String
+    public let number: Int
+    public let phase: String
+    public let attempt: Int
+    public let path: String?
+    public init(inputID: String, number: Int, phase: String, attempt: Int, path: String? = nil) {
+        self.inputID = inputID
+        self.number = number
+        self.phase = phase
+        self.attempt = attempt
+        self.path = path
+    }
+}
+public struct WriterTaskEvent: Codable, Sendable, Equatable {
+    public enum Kind: String, Codable, Sendable {
+        case started, progress, userInput, completed, failed, cancelled
+    }
+    public let version: Int
+    public let eventID: String
+    public let sequence: UInt64
+    public let kind: Kind
+    public let projectID: String?
+    public let windowID: String?
+    public let taskID: String?
+    public let runID: String?
+    public let failure: WriterFailureDiagnostic?
+    public let request: WriterRequestProgress?
+    public init(
+        sequence: UInt64, kind: Kind, projectID: String? = nil, windowID: String? = nil, taskID: String? = nil,
+        runID: String? = nil, failure: WriterFailureDiagnostic? = nil, request: WriterRequestProgress? = nil,
+        eventID: String = UUID().uuidString
+    ) {
+        version = 1
+        self.eventID = eventID
+        self.sequence = sequence
+        self.kind = kind
+        self.projectID = projectID
+        self.windowID = windowID
+        self.taskID = taskID
+        self.runID = runID
+        self.failure = failure
+        self.request = request
+    }
+    public func validate() throws {
+        if let request {
+            guard request.number > 0, request.attempt > 0, !request.inputID.isEmpty, request.inputID.utf8.count <= 128,
+                !request.phase.isEmpty
+            else { throw CommunicationError.invalidPayload }
+        }
+        guard version == 1, UUID(uuidString: eventID) != nil, sequence > 0,
+            [taskID, runID].allSatisfy({ $0.map { !$0.isEmpty && $0.utf8.count <= 128 } ?? true })
+        else {
+            throw CommunicationError.invalidPayload
+        }
+    }
+}
+
 /// Public task content, separate from private inference history and trusted UI commands.
 public struct AgentTaskContent: Codable, Sendable, Equatable {
     public enum Stage: String, Codable, Sendable { case running, waitingUser, completed }
@@ -10,12 +90,18 @@ public struct AgentTaskContent: Codable, Sendable, Equatable {
     public let stage: Stage
     public let interactionID: String?
     public let artifactID: String?
-    public init(text: String, stage: Stage = .running, interactionID: String? = nil, artifactID: String? = nil)
+    public let writerEvent: WriterTaskEvent?
+    public init(
+        text: String, stage: Stage = .running, interactionID: String? = nil, artifactID: String? = nil,
+        writerEvent: WriterTaskEvent? = nil
+    )
         throws
     {
         guard !text.isEmpty, text.utf8.count <= 4096,
             stage != .waitingUser || interactionID != nil
         else { throw CommunicationError.invalidPayload }
+        try writerEvent?.validate()
+        self.writerEvent = writerEvent
         self.text = text
         self.stage = stage
         self.interactionID = interactionID
@@ -34,7 +120,34 @@ public struct AgentTaskContent: Codable, Sendable, Equatable {
         let content = try JSONDecoder().decode(Self.self, from: signal.data)
         return try Self(
             text: content.text, stage: content.stage,
-            interactionID: content.interactionID, artifactID: content.artifactID)
+            interactionID: content.interactionID, artifactID: content.artifactID, writerEvent: content.writerEvent)
+    }
+}
+
+/// A completed Writer fact outlives the execution grant. Gateway authenticates the role;
+/// the Assistant validates its persisted task/run/event binding before admitting a reply.
+public struct WriterTaskCompletion: Codable, Sendable, Equatable {
+    public static let contract = "writer.completion"
+    public let signal: AgentTaskSignal
+    public init(_ signal: AgentTaskSignal) throws {
+        self.signal = signal
+        try validate()
+    }
+    public func validate() throws {
+        try signal.validate()
+        let content = try AgentTaskContent.decode(signal)
+        guard signal.kind == .result, signal.scope.requester == .assistant, signal.scope.executor == .writer,
+            signal.scope.execution == .background, content.stage == .completed, let event = content.writerEvent,
+            event.runID == signal.scope.id, event.taskID != nil,
+            (event.kind == .completed && signal.status == .succeeded)
+                || (event.kind == .failed && signal.status == .failed)
+                || (event.kind == .cancelled && signal.status == .cancelled)
+        else {
+            throw CommunicationError.invalidPayload
+        }
+    }
+    public var message: AgentMessage {
+        AgentMessage(contract: Self.contract, content: self, maximumBytes: 131072, validate: { try $0.validate() })
     }
 }
 
@@ -48,8 +161,12 @@ public struct AgentTaskView: Codable, Sendable {
     public var skills: [String]?
     public var createdAt: Date?
     public var terminal: Bool
+    public var businessTaskID: String?
+    public var writerEvent: WriterTaskEvent?
+    public var originDialog: String?
     public init(scope: AgentTaskScope, content: AgentTaskContent, terminal: Bool = false) {
         self.scope = scope
+        writerEvent = content.writerEvent
         stage = content.stage
         text = content.text
         interactionID = content.interactionID

@@ -30,28 +30,13 @@ actor ModelArtifactStorageAdapter: ModelArtifactStorage {
     public func installed(_ artifact: ModelArtifact) async throws -> Bool {
         let path = "installed/\(artifact.directory)/.installation.json"
         guard let data = try await files.read(path, maximumBytes: 4 * 1024 * 1024) else { return false }
-        var marker = try JSONDecoder().decode(Marker.self, from: data)
+        let marker = try JSONDecoder().decode(Marker.self, from: data)
         guard marker.id == artifact.id, marker.revision == artifact.revision else {
             throw ModelArtifactError.incompatible
         }
         guard marker.files.count <= 16384, !marker.files.isEmpty
         else { return false }
-        var repairingLegacyPaths = false
-        if !Set(artifact.requiredFiles).isSubset(of: Set(marker.files.map(\.path))) {
-            // The former /var vs /private/var length subtraction prepended the staging UUID's
-            // last seven hex digits to every receipt path. Repair only this exact known shape.
-            let components = marker.files.map { $0.path.split(separator: "/", omittingEmptySubsequences: false) }
-            guard let prefix = components.first?.first, prefix.count == 7,
-                prefix.allSatisfy({ "0123456789ABCDEF".contains($0) }),
-                components.allSatisfy({ $0.count > 1 && $0.first == prefix })
-            else { return false }
-            let remapped = zip(marker.files, components).map { member, path in
-                Member(path: path.dropFirst().joined(separator: "/"), bytes: member.bytes)
-            }
-            guard Set(artifact.requiredFiles).isSubset(of: Set(remapped.map(\.path))) else { return false }
-            marker = Marker(id: marker.id, revision: marker.revision, files: remapped)
-            repairingLegacyPaths = true
-        }
+        guard Set(artifact.requiredFiles).isSubset(of: Set(marker.files.map(\.path))) else { return false }
         let directory = try await files.directory("installed/\(artifact.directory)")
         var total: Int64 = 0
         for member in marker.files {
@@ -66,10 +51,7 @@ actor ModelArtifactStorageAdapter: ModelArtifactStorage {
                 values?.fileSize.map(Int64.init) == member.bytes
             else { return false }
         }
-        if repairingLegacyPaths {
-            try JSONEncoder().encode(marker).write(
-                to: directory.appendingPathComponent(".installation.json"), options: .atomic)
-        }
+
         return true
     }
     public func installedBytes(_ artifact: ModelArtifact) async throws -> Int64? {

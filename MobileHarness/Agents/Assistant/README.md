@@ -176,11 +176,11 @@ block-beta
 
 基础列表来自 [Agent.json](../../Resources/Agents/Assistant/Agent.json) 的 baseSkills；[AgentSkillLoader](../Support/AgentSkillLoader.swift) 展开当前激活项的依赖并合并函数绑定，⑤拼接对应 Instructions.md，⑥通过 [CapabilityContextBuilder](../Support/Core/Capability/CapabilityContextBuilder.swift) 渲染当前 Action 目录。别名/Channel 来自 Skill 绑定，描述、参数与约束来自真实 @Action 声明；⑦由同一目录渲染器追加。实际请求的独立 system 数据消息同时包含 AGENT CONTEXT 和 CURRENT STATE；放置规则见上文 Context 与 Builder。
 
-[共享 Chat Worker](../Support/Chat/README.md) 在每次新输入及 ReACT 请求中按当前 Skill 快照重新组装 system/工具定义；已发出的请求与历史证据不重写。system 正文最多 64 KiB，超限明确失败。当前会话的 Task 目标/阶段及已加载 Skill ID 进入 AGENT CONTEXT；选定的相机/机械臂/UI 事实进入 CURRENT STATE，Skill 归属/剩余次数保持私有；历史与真实 ReACT 执行观察保留在各自消息中；原生 Tool 定义放在 request.tools，仅模型支持 Tool Calls 时提供，均不属于上图的 system 正文。
+[共享 Chat Worker](../Support/Chat/README.md) 在每次新输入及 ReACT 请求中按当前 Skill 快照重新组装 system/工具定义；已发出的请求与历史证据不重写。system 正文最多 64 KiB，超限明确失败。当前会话的 Task 目标/阶段及已加载 Skill ID 进入 AGENT CONTEXT；选定的相机/机械臂/UI 事实进入 CURRENT STATE，Skill 归属/剩余次数保持私有；历史与真实 ReACT 执行观察保留在各自消息中；Assistant 当前基础与可加载 Skills 均只声明 XML Action，request.tools 为空；Writer 的原生工具定义由其独立工作流提供。
 
 ## Task 与 Skill 生命周期
 
-基础 Skill 为 basic-skill、expression-interaction、robot-interaction。无 Task 的加载/合法使用将近期项计数重置为 5，每次完整闲置用户 Decision 扣 1；Task 等待期间暂停无关近期项计数。Task 只接管指定、加载或实际使用的项，等待用户时保留，终态屏障后回收。生命周期合图及容量/LRU、依赖与原子回滚见 [Context](../Support/Context/README.md#task-and-skill-lifecycle)。
+基础 Skill 为 basic-skill、expression-interaction。机械臂 robot-interaction 为可发现的按需 Skill，加载后才注入动作、教学及 actions.robot/actions.robot.motion 观察；可按近期/Task 生命周期释放。无 Task 的加载/合法使用将近期项计数重置为 5，每次完整闲置用户 Decision 扣 1；Task 等待期间暂停无关近期项计数。Task 只接管指定、加载或实际使用的项，等待用户时保留，终态屏障后回收。生命周期合图及容量/LRU、依赖与原子回滚见 [Context](../Support/Context/README.md#task-and-skill-lifecycle)。
 
 已注册 Camera 函数不要求 Task。单次拍照、保存/忽略当前预览或相机控制可直接使用 Skill；必须先确认当前目录存在函数，缺失才加载 photography。媒体引用来自实际捕获结果或当前 displayedMediaID，忽略别名为 ignorePhoto。
 
@@ -233,6 +233,21 @@ ui.island投影包含活动身份、标题、系统选择及提交状态；前�
 
 ## Web image observations
 
-The existing photo observation hook also recognizes successful Web.Page browse/snapshot/navigate/develop/open receipts. It resolves their mediaID through the same scope-bound image read and image preparation port. The user image message labels the payload as untrusted data. Unsupported image models receive an explicit unavailable observation and can use the bounded page text in the Action result. Generated code and the Web editor transcript never enter the Assistant parser or history.
+The existing photo observation hook also recognizes successful Web.Page browse/snapshot/navigate receipts. It resolves their mediaID through the same scope-bound image read and image preparation port. The user image message labels the payload as untrusted data. Unsupported image models receive an explicit unavailable observation and can use the bounded page text in the Action result. Generated code and the Writer transcript never enter the Assistant parser or history.
 
-WebBrowsing/WebDrawing通过ui.web读取content（empty/local/remote）及有界远程url，并通过ui.windows读取窗口身份。统一resolver按Skill声明读取这两个来源；本地文件路径与WebKit运行指标不进入Assistant上下文。
+WebBrowsing通过ui.web读取content（empty/local/remote）及有界远程url，并通过ui.windows读取窗口身份。统一resolver按Skill声明读取这两个来源；本地文件路径与WebKit运行指标不进入Assistant上下文。
+
+默认 XML Action startTask(execution=background,executor=writer) 将单行目标和当前输入交给 Writer，无须前台 Task 或加载 Writing。sendMessage 定向补充，cancelTask(taskID,reason) 请求后台取消，finishTask 只结束前台工作。Writer 追问与终态作为正式输入，与文本和最终语音共用 FIFO，模型面向用户回复；进度事实同样由输入队列触发简短汇报。Writer 仅接纳一项任务，Assistant 观察忙碌状态并在新目标前询问是否取消当前任务。原始源码不进入 Assistant 请求，通知不拥有前台 Task。
+
+身份提示显式说明 Assistant 的协调/汇报职责、Writer 创作边界和其他运行时角色；当前创作后台执行者为 Writer，由 startTask 的 executor 选择。通信授权与角色资源不会自动成为可调用目录，不注入其他角色私有提示词。公开状态按当前 Skill.useStates 读取。
+
+
+委托后的Writer运行不随Assistant会话结束或语音打断取消。受认证阶段事实保留任务来源，进入当前对话的有界FIFO；Writer输入等待当前真实播放及前台委托回复收尾。成功汇报在真实播放屏障之后经ReplyActivity提交完成事实，由SpeechPerception决定播毕启听，Assistant模型不负责麦克风恢复。
+
+Writer 的 busy、取消替代和定向消息判断先与 SQLite 执行状态对账。创作清理完成即结束占用，不等待 task.result 接纳或用户通知；持久终态通知独立进入当前对话 FIFO，跨执行迟到与跨对话重复由可信任务绑定及已存输入身份过滤。
+
+默认BasicSkill观察全局ui.windows，包含Writer窗口。Assistant按可用Skill说明加载页面观察或窗口控制能力，不能将未加载目录解释为看不到所有窗口；窗口摘要与实际截图/正文证据区分。Writer发来的普通进度描述刚完成的回合步骤，沿现有合并队列汇报。
+
+## 自有任务岛
+
+AssistantExecutionSession 消费 AgentRuntime 已有的本角色 Skill 状态订阅，按 activeTaskID 与前台任务阶段构造目标详情；不从其他 Agent 的任务日志推断展示。完成／取消／失败或清除前台任务时提交 end，关闭执行会话前加入展示清理。复用 Support 的 AgentIslandPublication，经身份绑定 Gateway 调用注册的 UI.Island.present/end 内部展示工具；权限仅供运行时代码使用，不暴露给模型，不改变 Assistant 的 XML Action 调度协议，也不创建 Writer 的前台 Task。展示失败可通过 presentationFailure 查询。相机、蓝牙、实际语音播放／频谱仍由各自 Actions 能力拥有者维护，UI 统一决定布局、动画与优先级。

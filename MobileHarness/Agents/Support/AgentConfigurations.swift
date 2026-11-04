@@ -73,7 +73,7 @@ public enum AgentConfigurations {
             dependencies = try fields.decode([String].self, forKey: .dependencies)
             useActions = try fields.decode([Binding].self, forKey: .useActions)
             useStates = try fields.decode([String].self, forKey: .useStates)
-            useInstructions = try fields.decodeIfPresent([String].self, forKey: .useInstructions) ?? ["Instructions.md"]
+            useInstructions = try fields.decode([String].self, forKey: .useInstructions)
             guard version == 3, revision > 0, dependencies.count <= 16,
                 useActions.count <= 128, Set(useActions.map(\.path)).count == useActions.count,
                 useStates.count <= 16, Set(useStates).count == useStates.count,

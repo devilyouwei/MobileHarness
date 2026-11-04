@@ -22,6 +22,7 @@
 
 | 需求 | 未实现范围 |
 | --- | --- |
+| [统一记录与记忆管理](Unified-Memory-Plan.md) | 后续以 MemorySkill 统一 Writer 记录、聊天记录和综合记忆，评估独立 Memory Agent；当前 History/Writing 暂不调整。 |
 | [State 公开寄存器与 useState](Resource-State-Plan.md) | 首批 camera/robot/task、作用域与每轮上下文已实施；真实模型/UI/物理验收及后续 Trigger/写入源治理另行跟进。 |
 | [Face 窗口与 App 内灵动岛](Face-Window-Island-Plan.md) | 通用窗口/拍照首版已安装真机；取景比例、双用途共享采集和可见层级镜头权限已实现并自动化验证，本轮真机验收及独立岛保留。 |
 | [摄影构图与运镜](Photographer-Proposal.md) | 摄影任务的构图和跟随体验，以及相应感知契约、运动策略与完成/安全边界。 |
@@ -68,3 +69,7 @@
 本汇总不将已完成的 State 基础、App 结构迁移、存储抽象、云端 Tool 调用或半双工聆听重复列为开发任务。未设交付顺序；新增三项的实现前设计需同步更新相关源码 README。
 
 [WebKit 与网页 Actions](../completed/WebKit-Actions-Plan.md) 已完成远程浏览/截图、独立模型绘图、局部编辑工作区及运行时 skills；独立模型/设备验收见专项验证记录。
+
+[WriterAgent 流式创作](Writer-Agent-Plan.md)：独立创作角色、通用作品工作区、流式预览与后台委托；实施中。
+
+[语音打断后的聆听恢复](Listening-Interruption-Recovery-Plan.md)：修复取消期间回复空闲事实被拦截造成的重新启听卡死；真机复验独立记录。

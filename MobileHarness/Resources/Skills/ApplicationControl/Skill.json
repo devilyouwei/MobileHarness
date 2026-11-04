@@ -1,8 +1,8 @@
 {
   "version": 3,
   "id": "application-control",
-  "revision": 19,
-  "description": "打开视觉、跟踪、人物/姿态跟随: background vision through Vision.open, without a photo window. Also page/window navigation and resource/provider/Bluetooth controls.",
+  "revision": 20,
+  "description": "Manage all windows (including Writer), app pages/settings, Bluetooth and background vision.",
   "dependencies": [],
   "useActions": [
     {

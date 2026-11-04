@@ -38,7 +38,7 @@ Agents uses the frozen capability catalog before submission to Gateway. Gateway 
 
 ```mermaid
 flowchart LR
- J["AgentConfiguration：JSON v6/v7"]:::host
+ J["AgentConfiguration：JSON v7"]:::host
  V["结构／身份／通信声明验证"]:::host
  R["CapabilityRegistry：可见 Action／Tool"]:::host
  I["代码持有 InternalAction／InternalTool"]:::host
@@ -77,3 +77,5 @@ CapabilityContextBuilder 从当前不可变目录渲染 Channel、Action 别名�
 无可见 Tool 使用 Action-only protocol/boundary；存在 Tool 使用双协议教学，native 定义另交请求。模板读取／渲染失败明确传播。角色身份、业务示例与 Skill 步骤由上层提供。
 
 restrictingCommunication 仅保留原声明中允许的 contract，对新不可变配置重新验证，不新增 source/target/grant，不改缓存资源。Core 不认识诊断场景或具体角色。
+
+Agent 配置只接受当前 version=7；Action 配置字段不包含内嵌 examples，示例属于明确引用的 Instruction。不解析旧版导入配置。

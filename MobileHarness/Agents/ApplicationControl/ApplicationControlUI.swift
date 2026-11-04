@@ -181,8 +181,9 @@ extension ApplicationControlAgent {
                     .init(
                         enabled: draft.enabled, url: draft.url, key: draft.key, model: draft.model,
                         providers: draft.providers.map {
-                            .init(enabled: false, url: $0.url, key: $0.key, model: $0.model, name: $0.name)
-                        }),
+                            .init(enabled: false, url: $0.url, key: $0.key, model: $0.model, name: $0.name, id: $0.id)
+                        }, writerProviderID: draft.writerProviderID, writerModel: draft.writerModel,
+                        writerThinking: draft.writerThinking),
                     sessionID: sessionID)
             } else {
                 operation = .restore
@@ -202,8 +203,9 @@ extension ApplicationControlAgent {
                     .init(
                         enabled: stored.enabled, url: stored.url, key: stored.key, model: stored.model,
                         providers: stored.providers.map {
-                            .init(enabled: false, url: $0.url, key: $0.key, model: $0.model, name: $0.name)
-                        }))
+                            .init(enabled: false, url: $0.url, key: $0.key, model: $0.model, name: $0.name, id: $0.id)
+                        }, writerProviderID: stored.writerProviderID, writerModel: stored.writerModel,
+                        writerThinking: stored.writerThinking))
             } catch {
                 await settings.discard(id, sessionID: sessionID)
                 await presentation.discard(id)
@@ -212,10 +214,9 @@ extension ApplicationControlAgent {
         case .discover(let draft):
             let id = try await discovery.stage(.init(url: draft.url, key: draft.key), sessionID: sessionID)
             do {
-                try await presentation.register(id, operation: .discovery)
                 guard
                     let raw = try await executeUI(
-                        ProviderDiscoveryIntent(requestID: id, presentation: true).input(sessionID: sessionID),
+                        ProviderDiscoveryIntent(requestID: id, presentation: false).input(sessionID: sessionID),
                         context: context, provider: true)
                 else { throw CommunicationError.invalidPayload }
                 guard raw.utf8.count <= 65_536 else { throw CommunicationError.invalidPayload }
@@ -224,11 +225,9 @@ extension ApplicationControlAgent {
                     throw CommunicationError.invalidPayload
                 }
                 await discovery.discard(id, sessionID: sessionID)
-                await presentation.discard(id)
                 return .models(models)
             } catch {
                 await discovery.discard(id, sessionID: sessionID)
-                await presentation.discard(id)
                 throw error
             }
         }

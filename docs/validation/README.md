@@ -6,6 +6,7 @@
 
 | 文档 | 职责 |
 | --- | --- |
+| [WriterAgent](Writer-Agent.md) | 流式创作、后台任务、工作区回归及原生 WebKit 验证，区分真实模型和真机验收。 |
 | [UI interaction paths audit](UI-Interaction-Paths-Audit.md) | Static routing and consistency audit of presentation-only, touch-business and voice-business interactions; deviations and validation limits. |
 | [Container 状态与模型上下文](Container-State-Context.md) | 容器快照、Skill v3、StorageState移除、自动化证据及独立原生验收。 |
 | [镜头切换准入](Camera-Control-Availability.md) | 全局模型准备与原生相机按钮解耦，状态回归及真机验收边界。 |
@@ -97,3 +98,14 @@
 [Web Skill 教学优化](Web-Skill-Teaching.md)：浏览/绘图分轮示例、项目复用、Task与失败边界及协议/预算验证。
 
 [Skill 驱动 State 观察](Skill-State-Observation.md)：统一resolver、完整Business与部分读取失败隔离的验证。
+
+- [Writer 本机双模型多流程回归](Writer-Model-Regression.md)：真实 Qwen/DeepSeek、生产 Writer/Gateway/Storage、macOS WebKit、逐任务诊断及明确平台边界。
+
+- [Writer 快速完成与持续进度](Writer-Continuous-Progress.md)：task_6 真机只读基线、默认流式预览、逐请求进度、自然收尾及独立任务记录页；双模型与原生页面证据分别列示。
+
+- [Writer回合完成与窗口可见性](Writer-Round-Window-Visibility.md)：完成步骤汇报、默认全窗口State、定向Web查询及真实Qwen Skill发现回归；慢请求与设备快照限制单列。
+- [Unified Task Actions](Task-Action-Unification.md): foreground/background startTask, executor routing, cancellation acknowledgement and regression evidence.
+
+- [ModelKit Chat concurrency](ModelKit-Chat-Concurrency.md): shared cloud sessions, root-owned local FIFO, cancellation/cleanup, immutable selections and Writer resource-ownership cleanup.
+
+[语音打断后重新聆听](Listening-Interruption-Recovery.md)：取消期间回复终态事实投递与连续重开回归；真机验收另列。

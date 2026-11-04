@@ -16,7 +16,7 @@
                     destination(.recognition, title: "音频识别", icon: "waveform", identifier: "settings.recognition.open")
                     destination(
                         .synthesis, title: "语音合成", icon: "speaker.wave.2", identifier: "settings.synthesis.open")
-                    destination(.language, title: "大模型", icon: "brain", identifier: "settings.language.open")
+                    destination(.language, title: "智能体大脑", icon: "brain", identifier: "settings.language.open")
                     destination(.vision, title: "视觉识别", icon: "viewfinder", identifier: "settings.vision.open")
                 }
                 Section("外接设备") {
@@ -29,8 +29,11 @@
                         .accessibilityIdentifier("settings.user.memory")
                     destination(.album, title: "相册", icon: "photo.on.rectangle", identifier: "settings.user.album")
                     destination(
-                        .history, title: "Agent 记录", icon: "doc.text.magnifyingglass",
-                        identifier: "settings.agent.records")
+                        .assistantHistory, title: "Assistant 聊天记录", icon: "bubble.left.and.bubble.right",
+                        identifier: "settings.assistant.records")
+                    destination(
+                        .writerHistory, title: "Writer 任务记录", icon: "pencil.and.outline",
+                        identifier: "settings.writer.records")
                 }
             }
             .navigationTitle("设置").navigationBarTitleDisplayMode(.inline)
@@ -53,7 +56,14 @@
     @MainActor
     public struct LanguageModelSettingsView: View {
         @State private var providerEditor: ProviderEditorDraft?
-        @State private var deletingURL: String?
+        @State private var deletingID: String?
+        @State private var toast: SaveToast?
+
+        private struct SaveToast: Identifiable {
+            let id = UUID()
+            let text: String
+            let succeeded: Bool
+        }
         @Bindable var settings: SettingsState
         let settingsControls: any SettingsControlling
         let modelResources: ModelResourcesState?
@@ -73,103 +83,33 @@
         }
         public var body: some View {
             Form {
-                Section {
-                    Toggle(
-                        "使用云端大模型",
-                        isOn: Binding(
-                            get: { settings.isEnabled },
-                            set: { settings.isEnabled = $0 }
-                        )
-                    )
-                    .accessibilityIdentifier("settings.cloud.enabled")
-                } footer: {
-                    Text("关闭后使用本地 Gemma 4 E2B，需先下载模型。")
-                }
-                Section {
-                    ForEach(settings.providers, id: \.url) { provider in
-                        HStack {
-                            Button {
-                                if let index = settings.providers.firstIndex(where: { $0.url == settings.url }) {
-                                    settings.providers[index].model = settings.selectedModel
-                                }
-                                settingsControls.cancelDiscovery()
-                                settings.url = provider.url
-                                settings.key = provider.key
-                                settings.selectedModel = provider.model
-                                settings.models = provider.model.isEmpty ? [] : [provider.model]
-                                settings.isEnabled = true
-                            } label: {
-                                HStack(spacing: 12) {
-                                    Image(systemName: settings.url == provider.url ? "checkmark.circle.fill" : "circle")
-                                        .font(.title3)
-                                    VStack(alignment: .leading, spacing: 4) {
-                                        Text(provider.name).font(.body.weight(.medium)).foregroundStyle(.primary)
-                                            .lineLimit(1).truncationMode(.tail)
-                                        Text(provider.url).font(.caption).foregroundStyle(.secondary)
-                                            .lineLimit(1).truncationMode(.middle)
-                                    }
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                    .multilineTextAlignment(.leading)
-                                }
-                                .contentShape(Rectangle())
-                            }
-                            Spacer()
-                            Button {
-                                var value = provider
-                                if settings.url == value.url { value.model = settings.selectedModel }
-                                providerEditor = ProviderEditorDraft(provider: value, existing: settings.providers)
-                            } label: {
-                                Image(systemName: "pencil")
-                            }
-                            .accessibilityLabel("编辑 \(provider.name)")
-                            Button(role: .destructive) {
-                                deletingURL = provider.url
-                            } label: {
-                                Image(systemName: "trash")
-                            }.accessibilityLabel("删除 \(provider.name)")
-                        }.buttonStyle(.borderless)
+                Section("Provider") {
+                    ForEach(settings.providers, id: \.id) { provider in
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(provider.name).font(.body.weight(.medium)).lineLimit(1)
+                            Text(provider.url).font(.caption).foregroundStyle(.secondary)
+                                .lineLimit(1).truncationMode(.middle)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                            Button("删除", role: .destructive) { deletingID = provider.id }
+                            Button("编辑") {
+                                providerEditor = ProviderEditorDraft(provider: provider, existing: settings.providers)
+                            }.tint(.blue)
+                        }
                     }
                     Button("添加 Provider", systemImage: "plus.circle") {
                         providerEditor = ProviderEditorDraft(provider: nil, existing: settings.providers)
                     }.disabled(settings.providers.count >= 32)
-                    Button(action: settingsControls.loadModels) {
-                        HStack {
-                            Text(settings.isLoading ? "正在加载模型…" : "加载模型")
-                            Spacer()
-                            if settings.isLoading { ProgressView() }
-                        }
-                    }
-                    .disabled(!settings.canLoad)
-                    .accessibilityIdentifier("settings.cloud.load")
-                    if !settings.models.isEmpty {
-                        Picker("对话模型", selection: $settings.selectedModel) {
-                            Text("请选择模型").tag("")
-                            ForEach(settings.models, id: \.self) { Text($0).tag($0) }
-                        }
-                        .accessibilityIdentifier("settings.cloud.model")
-                    } else {
-                        LabeledContent("默认对话模型", value: settings.selectedModel)
-                    }
-                } header: {
-                    Text("云端服务")
-                } footer: {
-                    Text("一个 URL 对应一个 Provider。选择和编辑后，点击保存应用配置。")
                 }
-                if settings.isSaving || settings.error != nil || settings.notice != nil {
-                    Section {
-                        Text(settings.isSaving ? "正在保存…" : (settings.error ?? settings.notice ?? ""))
-                            .foregroundStyle(settings.error == nil ? Color.secondary : .red)
-                            .frame(maxWidth: .infinity, minHeight: 24, alignment: .leading)
-                            .accessibilityIdentifier("settings.status")
-                    }
-                    .transaction { $0.animation = nil }
-                }
+                agentSection(writer: false)
+                agentSection(writer: true)
                 if let modelResources, let modelResourceControls {
                     ModelResourceSections(state: modelResources, controls: modelResourceControls, group: .language)
                 }
             }
             .disabled(settings.isSaving)
-            .navigationTitle("大模型")
+            .navigationTitle("智能体大脑")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar(.visible, for: .navigationBar)
             // Keep native back navigation mounted; the App-owned save continues across navigation.
@@ -177,7 +117,12 @@
                 ToolbarItem(placement: .confirmationAction) {
                     Button {
                         Task {
-                            _ = await save()
+                            toast = nil
+                            let succeeded = await save()
+                            toast = SaveToast(
+                                text: succeeded ? "保存成功" : (settings.error ?? "保存失败，请重试"),
+                                succeeded: succeeded
+                            )
                         }
                     } label: {
                         Text("保存")
@@ -193,42 +138,124 @@
             }
             .sheet(item: $providerEditor) { draft in
                 ProviderEditorView(initial: draft, existing: settings.providers) { value in
-                    if let index = settings.providers.firstIndex(where: { $0.url == settings.url }) {
-                        settings.providers[index].model = settings.selectedModel
-                    }
-                    if let index = settings.providers.firstIndex(where: { $0.url == draft.originalURL }) {
-                        settings.providers[index] = value
-                    } else {
-                        settings.providers.append(value)
-                    }
-                    if draft.originalURL == nil || settings.url == draft.originalURL {
-                        settingsControls.cancelDiscovery()
-                        settings.url = value.url
-                        settings.key = value.key
-                        settings.selectedModel = value.model
-                        settings.models = value.model.isEmpty ? [] : [value.model]
+                    settings.upsertProvider(value)
+                    if settings.assistantProviderID == value.id || settings.writerProviderID == value.id {
+                        settingsControls.loadModels(providerID: value.id)
                     }
                 }
             }
-            .confirmationDialog(
-                "删除此 Provider？删除当前项将关闭云端，保存后生效。",
-                isPresented: Binding(get: { deletingURL != nil }, set: { if !$0 { deletingURL = nil } })
-            ) {
+            .alert(
+                "删除 Provider？",
+                isPresented: Binding(get: { deletingID != nil }, set: { if !$0 { deletingID = nil } }),
+                presenting: deletingID
+            ) { id in
+                Button("取消", role: .cancel) { deletingID = nil }
                 Button("删除", role: .destructive) {
-                    guard let url = deletingURL else { return }
-                    settings.providers.removeAll { $0.url == url }
-                    if settings.url == url {
-                        settingsControls.cancelDiscovery()
-                        settings.url = ""
-                        settings.key = ""
-                        settings.isEnabled = false
-                        settings.selectedModel = ""
-                        settings.models = []
+                    settings.removeProvider(id)
+                    deletingID = nil
+                }
+            } message: { _ in
+                Text("删除后，使用它的智能体将改为本地模型，保存后生效。")
+            }
+            .overlay(alignment: .bottom) {
+                if let toast {
+                    Label(
+                        toast.text,
+                        systemImage: toast.succeeded ? "checkmark.circle.fill" : "exclamationmark.circle.fill"
+                    )
+                    .font(.subheadline)
+                    .foregroundStyle(toast.succeeded ? Color.primary : Color.red)
+                    .padding()
+                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
+                    .padding()
+                    .accessibilityIdentifier("settings.saveToast")
+                    .allowsHitTesting(false)
+                }
+            }
+            .task(id: toast?.id) {
+                guard let current = toast else { return }
+                do { try await Task.sleep(for: .seconds(current.succeeded ? 3 : 6)) } catch { return }
+                if toast?.id == current.id { toast = nil }
+            }
+            .task {
+                do {
+                    try await settingsControls.restore()
+                    try Task.checkCancellation()
+                    settingsControls.refreshModels()
+                } catch {
+                    if !Task.isCancelled {
+                        settings.present(.error(error.localizedDescription))
+                        toast = SaveToast(text: error.localizedDescription, succeeded: false)
                     }
-                    deletingURL = nil
                 }
             }
             .onDisappear { settingsControls.cancelDiscovery() }
+        }
+        @ViewBuilder private func agentSection(writer: Bool) -> some View {
+            let selected = writer ? settings.writerProviderID : settings.assistantProviderID
+            let model = writer ? settings.writerModel : settings.selectedModel
+            Section {
+                Picker(
+                    "Provider",
+                    selection: Binding<String?>(
+                        get: { writer ? settings.writerProviderID : settings.assistantProviderID },
+                        set: { id in
+                            if writer {
+                                settings.selectWriterProvider(id)
+                            } else {
+                                settings.selectAssistantProvider(id)
+                            }
+                            if let id { settingsControls.loadModels(providerID: id) }
+                        })
+                ) {
+                    Text("本地模型").tag(String?.none)
+                    ForEach(settings.providers, id: \.id) { provider in
+                        Text(provider.name).tag(Optional(provider.id))
+                    }
+                }
+                .pickerStyle(.menu)
+                .accessibilityIdentifier(writer ? "settings.writer.provider" : "settings.assistant.provider")
+                if let id = selected {
+                    let values = settings.modelCatalogs[id] ?? []
+                    Picker(
+                        "模型",
+                        selection: Binding(
+                            get: { writer ? settings.writerModel : settings.selectedModel },
+                            set: { if writer { settings.writerModel = $0 } else { settings.selectedModel = $0 } })
+                    ) {
+                        Text("请选择模型").tag("")
+                        if !model.isEmpty && !values.contains(model) { Text(model).tag(model) }
+                        ForEach(values, id: \.self) { Text($0).tag($0) }
+                    }
+                    .pickerStyle(.menu)
+                    .accessibilityIdentifier(writer ? "settings.writer.model" : "settings.assistant.model")
+                    if writer {
+                        Toggle(
+                            "深度思考",
+                            isOn: Binding(get: { settings.writerThinking }, set: { settings.writerThinking = $0 })
+                        )
+                        .accessibilityIdentifier("settings.writer.thinking")
+                    }
+                    if settings.loadingProviderIDs.contains(id) {
+                        HStack {
+                            ProgressView()
+                            Text("正在加载模型…").foregroundStyle(.secondary)
+                        }
+                    } else if let error = settings.modelErrors[id] {
+                        Text(error).font(.caption).foregroundStyle(.red)
+                        Button("重新加载模型") { settingsControls.loadModels(providerID: id) }
+                    }
+                }
+            } header: {
+                Text(writer ? "Writer Agent" : "Assistant Agent")
+            } footer: {
+                Text(
+                    writer
+                        ? (selected == nil
+                            ? "本地 Gemma 当前不支持 Writer 所需的原生工具调用，请选择支持工具的 Provider。"
+                            : "默认关闭或使用最低思考，优先响应速度；可开启深度思考。保存后用于新建或续作委托，当前执行保持原配置。")
+                        : "对话协调模型，默认关闭思考；无法关闭时使用最低思考档位。")
+            }
         }
     }
 

@@ -55,6 +55,16 @@ HistoryPaging.pageSize supplies the shared20-item default for archived dialogs a
 
 ✅ 本目录的领域端口由 DatabaseStorage 发布；SQL 适配器统一归 Database/SQLite 编译，业务调用方不导入 SQLite 后端。
 
-✅ ConversationTokenUsage 透传可选 cachedInput/cacheWriteInput；原始请求保存稳定 system 与当前 State 分开的消息。旧 Codable 数据缺失字段可读。
+✅ ConversationTokenUsage 透传可选 cachedInput/cacheWriteInput；原始请求保存稳定 system 与当前 State 分开的消息。缓存计量为真实可选观测，未返回时保持 nil；未知记录状态报 invalidRecord。
 
 ✅ ConversationHistoryStore.admitUserInput 在一个写入 gate 内选择当前会话并接纳无模型请求的用户记录；begin 继续要求精确 read token，用于实际请求快照，不放宽旧 token／外来 token 检查。共用有界记录校验与实际 checkpoint，失败不伪造接纳。
+
+Writer consumes the same repository contracts with agent=writer. Its model requests are independent inputs with exact text/tool evidence; delegated task provenance stays in decision metadata and does not join Assistant-owned task compression sources. No new schema or alternate persistence path is introduced.
+
+Writer 每个长期委托对应独立 dialog；StorageTasks 事务切换当前 Writer dialog 并创建新执行，历史仓库在终态检查点之后同步该身份。原生工具与文本保存在共享 evidence/message 契约中；decisionMetadata 保存稳定 taskID 和本次 runID。续作使用相同对话，普通 Assistant 会话轮转规则不变。
+
+ConversationFailureDiagnostic 是中立持久化值（category/code/stage/message/details/causes），请求、工具及输入终态可关联该值。Storage不解释Agent/Provider分类；现有SQLite evidence保存结构化数据并随历史读取/分享还原，无独立诊断库。未提供诊断的记录保持缺失，不从错误字符串猜测信息。
+
+ConversationRecordStore.containsInput 只按输入身份查找持久对话并验证当前 Agent 归属，不读取其他对话正文。ConversationHistoryStore 在写门内结合当前缓存和持久身份查询，为业务输入跨对话去重提供证据；不把其他会话上下文导入当前模型。
+
+Producer metadata can persist at request admission with generating state; this does not commit source deltas per token or change metadata-free producers. MessagePreview carries small metadata and a global ordinal. Reads retain Agent ownership checks; totals do not depend on loaded page size.

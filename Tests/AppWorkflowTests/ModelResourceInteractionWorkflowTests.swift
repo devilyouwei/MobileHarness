@@ -181,11 +181,12 @@ import Testing
     #expect(!state.isBusy(state.items[0]))
 }
 
-@Test func olderDownloadPreferencesDefaultToDownloadedSpeech() throws {
-    let value = try JSONDecoder().decode(
-        ModelResourceSourceDraft.self,
-        from: Data("{\"endpoint\":\"https://huggingface.co\",\"allowsCellular\":false}".utf8))
-    #expect(value.useCustomRecognition)
+@Test func incompleteDownloadPreferencesAreRejected() throws {
+    #expect(throws: DecodingError.self) {
+        try JSONDecoder().decode(
+            ModelResourceSourceDraft.self,
+            from: Data(#"{"endpoint":"https://huggingface.co","allowsCellular":false}"#.utf8))
+    }
     let system = ModelResourceSourceDraft(useCustomRecognition: false, useCustomSynthesis: false)
     #expect(
         try JSONDecoder().decode(ModelResourceSourceDraft.self, from: JSONEncoder().encode(system))
@@ -205,11 +206,13 @@ import Testing
     #expect(!state.saving)
 }
 
-@Test func speechPreferencesMigrateLegacySwitchAndRoundTripIndependentModes() throws {
-    let legacy = try JSONDecoder().decode(
-        ModelResourceSourceDraft.self,
-        from: Data(#"{"endpoint":"https://hf-mirror.com","allowsCellular":true,"preferDownloadedSpeech":false}"#.utf8))
-    #expect(!legacy.useCustomRecognition && !legacy.useCustomSynthesis)
+@Test func speechPreferencesRejectOldSwitchAndRoundTripCurrentFormat() throws {
+    #expect(throws: DecodingError.self) {
+        try JSONDecoder().decode(
+            ModelResourceSourceDraft.self,
+            from: Data(
+                #"{"endpoint":"https://hf-mirror.com","allowsCellular":true,"preferDownloadedSpeech":false}"#.utf8))
+    }
     let draft = ModelResourceSourceDraft(useCustomRecognition: true, useCustomSynthesis: false)
     let data = try JSONEncoder().encode(draft)
     let restored = try JSONDecoder().decode(ModelResourceSourceDraft.self, from: data)

@@ -12,6 +12,12 @@ public protocol ModelResourceControlling: Sendable {
 }
 public protocol ModelLanguageProviding: ChatCapability, ModelResourceControlling {
     func configure(_ configuration: OpenAIChatConfiguration?) async throws
+    func chatModel(configuration: OpenAIChatConfiguration?) async throws -> ChatModel
+}
+extension ModelLanguageProviding {
+    public func chatModel(configuration: OpenAIChatConfiguration?) async throws -> ChatModel {
+        throw CapabilityError.unavailable("Configured chat is not supported by this host")
+    }
 }
 public protocol ModelSpeechProviding: Sendable {
     var recognition: any SpeechRecognitionCapability { get }
@@ -64,11 +70,13 @@ public struct ModelArtifactConfiguration: Sendable {
     public init(
         resources: URL,
         prepareArtifacts: (@Sendable () async throws -> ModelArtifactConfiguration)? = nil,
-        onFailure: @escaping @Sendable (String, String, any Error) -> Void = { _, _, _ in }
+        onFailure: @escaping @Sendable (String, String, any Error) -> Void = { _, _, _ in },
+        maximumPendingLocalChats: Int = 8
     ) {
         let admission = InferenceAdmission(open: false)
         let scope = ModelScope(
-            resources: resources, admission: admission, prepareArtifacts: prepareArtifacts, onFailure: onFailure)
+            resources: resources, admission: admission, prepareArtifacts: prepareArtifacts, onFailure: onFailure,
+            maximumPendingLocalChats: maximumPendingLocalChats)
         self.admission = admission
         self.scope = scope
         language = ModelLanguageContainer(scope: scope)
@@ -169,15 +177,24 @@ private actor ModelScope {
     private var waiters = 0
     private var updating = false
     private var cloudChat: OpenAIChatConfiguration?
+    private struct CloudBinding {
+        let configuration: OpenAIChatConfiguration
+        let id: ModelID
+        let capability: Task<any ChatCapability, Error>
+    }
+    private var cloudBindings: [CloudBinding] = []
+    private var localChat: SerialChat?
+    private let maximumPendingLocalChats: Int
     init(
         resources: URL, admission: InferenceAdmission,
         prepareArtifacts: (@Sendable () async throws -> ModelArtifactConfiguration)?,
-        onFailure: @escaping @Sendable (String, String, any Error) -> Void
+        onFailure: @escaping @Sendable (String, String, any Error) -> Void, maximumPendingLocalChats: Int
     ) {
         self.resources = resources
         self.admission = admission
         self.prepareArtifacts = prepareArtifacts
         failure = onFailure
+        self.maximumPendingLocalChats = maximumPendingLocalChats
     }
     func stateSnapshot(_ component: String, capabilities: [ProvidedCapability]) async throws -> ModelStateSnapshot {
         try Task.checkCancellation()
@@ -290,25 +307,74 @@ private actor ModelScope {
             throw error
         }
     }
-    func configureChat(_ configuration: OpenAIChatConfiguration?) async throws {
-        do {
-            guard #available(iOS 27, macOS 27, *) else {
-                throw CapabilityError.unavailable("Model configuration requires OS 27")
-            }
-            guard !updating else { throw CapabilityError.inputBusy }
-            updating = true
-            defer { updating = false }
-            try await perform("language", "configure", inference: false) { [resources, cloudChat] manager in
-                if cloudChat != configuration {
-                    try await manager.replace(
-                        DefaultModelAssembly.chatRegistration(resources: resources, configuration: configuration))
+    func chatModel(configuration: OpenAIChatConfiguration?) throws -> ChatModel {
+        try admission.checkAlive()
+        guard !closed else { throw InferenceAdmissionError.stopped }
+        return ChatModel(
+            capability: ConfiguredChat(scope: self, configuration: configuration), modelName: configuration?.model)
+    }
+    private func cloud(_ configuration: OpenAIChatConfiguration) async throws -> any ChatCapability {
+        if let binding = cloudBindings.first(where: { $0.configuration == configuration }) {
+            return try await binding.capability.value
+        }
+        let id = ModelID("cloud-chat-" + UUID().uuidString)
+        let task = Task<any ChatCapability, Error> { [resources] in
+            try await self.perform("language", "configureCloud", inference: false) { manager in
+                guard #available(iOS 27, macOS 27, *) else {
+                    throw CapabilityError.unavailable("Cloud chat requires OS 27")
                 }
+                try await manager.register(
+                    DefaultModelAssembly.chatRegistration(resources: resources, configuration: configuration, id: id))
+                return try await manager.get(id, as: .chat, load: false)
             }
-            cloudChat = configuration
-        } catch {
-            report("language", "configure", error)
+        }
+        cloudBindings.append(CloudBinding(configuration: configuration, id: id, capability: task))
+        do { return try await task.value } catch {
+            cloudBindings.removeAll { $0.id == id }
             throw error
         }
+    }
+    func selectedChatID() async throws -> ModelID {
+        guard let configuration = cloudChat else { return ModelID("chat") }
+        _ = try await cloud(configuration)
+        guard let id = cloudBindings.first(where: { $0.configuration == configuration })?.id else {
+            throw CapabilityError.sessionClosed
+        }
+        return id
+    }
+    func selectedChat() async throws -> any ChatCapability {
+        if let cloudChat { return try await cloud(cloudChat) }
+        return try await perform("language", "localChat") { try await $0.get(.chat, load: false) }
+    }
+    func chat(_ request: ChatRequest, configuration: OpenAIChatConfiguration?) async throws -> InferenceSession<
+        ChatEvent
+    > {
+        let generation = try admission.check()
+        if let configuration {
+            let capability = try await cloud(configuration)
+            try admission.validate(generation)
+            return try await capability.chat(request)
+        }
+        if localChat == nil {
+            localChat = try SerialChat(maximumPending: maximumPendingLocalChats) { [weak self] in
+                guard let self else { throw CapabilityError.sessionClosed }
+                return try await self.perform("language", "localChat") { try await $0.get(.chat, load: false) }
+            }
+        }
+        guard let localChat else { throw CapabilityError.sessionClosed }
+        return try await localChat.chat(request)
+    }
+    func defaultChat(_ request: ChatRequest) async throws -> InferenceSession<ChatEvent> {
+        try await chat(request, configuration: cloudChat)
+    }
+    func configureChat(_ configuration: OpenAIChatConfiguration?) async throws {
+        guard !updating else { throw CapabilityError.inputBusy }
+        updating = true
+        defer { updating = false }
+        try admission.checkAlive()
+        guard !closed else { throw InferenceAdmissionError.stopped }
+        if let configuration { _ = try await cloud(configuration) }
+        cloudChat = configuration
     }
     func configureSpeech(recognition: Bool, synthesis: Bool) async throws {
         do {
@@ -338,6 +404,7 @@ private actor ModelScope {
         }
     }
     func suspend() async {
+        await localChat?.cancelAll()
         if let assembly, let manager = try? await assembly.value { await manager.suspend() }
     }
     func memoryPressure() async {
@@ -345,6 +412,10 @@ private actor ModelScope {
     }
     func stop() async throws {
         closed = true
+        await localChat?.cancelAll()
+        for binding in cloudBindings { binding.capability.cancel() }
+        for binding in cloudBindings { _ = await binding.capability.result }
+        cloudBindings.removeAll()
         assembly?.cancel()
         guard let assembly else { return }
         let manager: ModelManager
@@ -368,6 +439,17 @@ private actor ModelScope {
     }
 }
 
+private struct ConfiguredChat: ChatCapability {
+    let scope: ModelScope
+    let configuration: OpenAIChatConfiguration?
+    var availability: CapabilityAvailability { .available }
+    var supportsToolCalls: Bool { configuration != nil }
+    var supportsImages: Bool { configuration != nil }
+    func chat(_ request: ChatRequest) async throws -> InferenceSession<ChatEvent> {
+        try await scope.chat(request, configuration: configuration)
+    }
+}
+
 public final class ModelLanguageContainer: ModelLanguageProviding, Sendable {
     public func stateSnapshot() async throws -> ModelStateSnapshot {
         try Task.checkCancellation()
@@ -378,42 +460,43 @@ public final class ModelLanguageContainer: ModelLanguageProviding, Sendable {
     fileprivate init(scope: ModelScope) { self.scope = scope }
     public var availability: CapabilityAvailability {
         get async {
-            do { return try await scope.perform("language", "availability") { try await $0.availability(.chat) } } catch
-            { return .unavailable(reason: String(describing: error)) }
+            do { return await (try await scope.selectedChat()).availability } catch {
+                return .unavailable(reason: String(describing: error))
+            }
         }
     }
-    public var supportsToolCalls: Bool {
-        get async {
-            (try? await scope.perform("language", "toolSupport") {
-                await (try await $0.get(.chat, load: false)).supportsToolCalls
-            }) ?? false
-        }
+    public var supportsToolCalls: Bool { get async { (try? await scope.selectedChat().supportsToolCalls) ?? false } }
+    public var supportsImages: Bool { get async { (try? await scope.selectedChat().supportsImages) ?? false } }
+    public func chatModel(configuration: OpenAIChatConfiguration?) async throws -> ChatModel {
+        try await scope.chatModel(configuration: configuration)
     }
-    public var supportsImages: Bool {
-        get async {
-            (try? await scope.perform("language", "imageSupport") {
-                await (try await $0.get(.chat, load: false)).supportsImages
-            }) ?? false
-        }
+    public func chat(_ request: ChatRequest, using configuration: OpenAIChatConfiguration?) async throws
+        -> InferenceSession<ChatEvent>
+    {
+        try await scope.chat(request, configuration: configuration)
     }
     public func configure(_ configuration: OpenAIChatConfiguration?) async throws {
         try await scope.configureChat(configuration)
     }
     public func warmup() async throws { try await warmup(reportLoading: { _ in }) }
     public func warmup(reportLoading: @escaping @Sendable (Bool) async -> Void) async throws {
-        try await scope.perform("language", "warmup") { try await $0.warmup(.chat, reportLoading: reportLoading) }
+        let id = try await scope.selectedChatID()
+        try await scope.perform("language", "warmup") { try await $0.warmup(id, reportLoading: reportLoading) }
     }
-    public func load() async throws { try await scope.perform("language", "load") { try await $0.load(.chat) } }
+    public func load() async throws {
+        let id = try await scope.selectedChatID()
+        try await scope.perform("language", "load") { try await $0.load(id) }
+    }
     public func unload() async throws {
-        try await scope.perform("language", "unload", inference: false) { try await $0.unload(.chat) }
+        let id = try await scope.selectedChatID()
+        try await scope.perform("language", "unload", inference: false) { try await $0.unload(id) }
     }
     public func status() async throws -> ModelState {
-        try await scope.perform("language", "status", inference: false) { try await $0.status(.chat) }
+        let id = try await scope.selectedChatID()
+        return try await scope.perform("language", "status", inference: false) { try await $0.status(id) }
     }
     public func chat(_ request: ChatRequest) async throws -> InferenceSession<ChatEvent> {
-        let session = try await scope.perform("language", "chat") {
-            try await (try await $0.get(.chat, load: false)).chat(request)
-        }
+        let session = try await scope.defaultChat(request)
         session.observeFailure { [scope] in scope.report("language", "chat.stream", $0) }
         return session
     }

@@ -1,6 +1,6 @@
 ## Application and device control
 ### Scope and functions
-This Skill handles conversational navigation, resource/provider queries, transfers and Bluetooth. It does not delegate a conversation. A touch navigation/filter is local UI work.
+App pages, provider/resources, Bluetooth and all windows (including Writer). Use ui.windows IDs; controls leave tasks running. Page text/images: web-browsing.
 Read-only queries are XML Actions on the Query Channel: ModelResources.snapshot reads installed resource groups, transfers and progress; Provider.readSettings reads confirmed cloud-enabled status and selected model; Bluetooth.readStatus reads power, connection and discovered device IDs. All take no arguments. Use the exact current catalog aliases. Query Actions return business data, not just completion acknowledgments.
 ### Navigation and queries
 Use openPage only for requested navigation, not as a substitute for a device operation/query or as recovery from a failed query. Valid destinations come from its catalog. Current State may answer a known connection fact; power/discovery, provider settings and resource inventory require the matching query when absent.
@@ -44,24 +44,3 @@ Requested download, only with all values confirmed (placeholders below are not r
 ```xml
 <ModelResources.download id="RESOURCE_ID" endpoint="SOURCE_ENDPOINT" allowsCellular="false"/>
 ```
-
-### Windows
-Use Window.focus/minimize/maximize/restore/move/close only with a windowID from CURRENT STATE ui.windows or actual openCamera feedback. move takes normalized x/y in 0...1. Camera has one window: openCamera opens/restores it. Minimize hides rendering and gives lens control to visible enabled background vision; capture remains active. Restore reclaims lens control. Closing an unresolved photo asks save/ignore/cancel inside the window; cancellation retains it. After backgrounding, opening requires an explicit user request. Window completion is not capture success.
-
-### Background vision / following
-“打开视觉/开启视觉/打开跟踪/开启跟踪/打开跟随/人物跟踪/人物跟随/姿态跟随” means Vision.open: background mirror plus YOLO/following. Vision.close disables that branch only. Photography is independent and uses the photography Skill. Never open vision merely to take a photo. Both branches share one camera lens and stream; platform.vision.camera is the authoritative running/phase/facing source. UI intent does not prove hardware readiness.
-Use Vision.flip facing="front|back" only when ui.camera.lensOwner=perception, perceptionEnabled, visible and not busy. An expanded visible photo window owns switching; minimized/closed photo windows give it back to visible background vision. A denied flip is not queued: explain which surface has control. Vision.retry requires an explicit retry. Permissions require system settings. Closing either branch leaves the other running; both closed stop Camera.
-
-Explicit background vision/tracking request, after this Skill is loaded:
-```xml
-<Vision.open/>
-```
-After its confirmed completion, report the result once. To stop only background vision/tracking:
-```xml
-<Vision.close/>
-```
-Do not use openPage vision: that opens model settings, not the background camera. Do not use openCamera for tracking; it opens the photo window.
-
-Island.setPresentation uses an actual activityID from ui.island and size=compact/expanded. Only content with detail text or a registered thumbnail can expand; icon-only states cannot. New detail auto-expands, ordinary updates preserve manual collapse, and collapsing keeps the content. Each detail activity retains its own expansion preference; detail content and transient status indicators are selected independently by priority. Status changes do not replace the task description or reopen collapsed details. Goal Tasks supply detail automatically. Do not create duplicate activities or expand on every progress update. Omit animation/width/height: shell animation belongs to the component; primary/secondary indicators may select supported icon effects. Submitted is not proof of a settled animation. localStatus/systemStatus are independent; iOS controls system expansion.
-
-Compact indicators may include a component-owned elapsed timer. Listening supplies its timer automatically; do not issue periodic updates or add detail text just to show elapsed time.

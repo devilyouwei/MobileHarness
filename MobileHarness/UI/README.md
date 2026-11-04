@@ -41,7 +41,7 @@ Root组合功能视图与公共组件，功能拥有自身状态和输入类型�
 
 页面→子容器类型化请求→注入消费者→业务执行→UI呈现值→状态→原生绘制。请求接纳与完成独立，有界容量、取消和迟到回执规则见Shared；公开类型名称保持稳定。home聆听控制使用独立单槽源，普通请求最多64个在途。
 
-UIContainer.stateSnapshot只返回自身生命周期事实及十二子能力的路径索引；各owner只投影已有事实，不采样设备、不递归读取其他owner。密钥、URL、草稿、字幕和媒体字节不进入公开快照；业务操作失败与UI呈现健康分别表达。
+UIContainer.stateSnapshot只返回自身生命周期事实及十二子能力的路径索引；各owner只投影已有事实，不采样设备、不递归读取其他owner。密钥、本地URL、草稿、字幕和媒体字节不进入公开快照；业务操作失败与UI呈现健康分别表达。
 
 ## 生命周期与完成
 
@@ -68,3 +68,7 @@ CameraPresenting exposes a bounded, cancellable fresh-frame geometry receipt for
 [Web](Components/Web/README.md) is the twelfth stable child capability, owned by UIContainer. It creates WKWebView on demand and exposes load/observe/snapshot/navigation receipts; Window.web supplies a single presentation slot. App injects this capability directly into ApplicationRootProviding. UI imports WebKit only in the owning component and never imports model, business or storage modules.
 
 Window接受调用方提供的系统图标、emoji或图片字节；组件拥有校验、规范化和最小化卡片的有界自适应布局，UI不读取业务文件／URL。详细尺寸与资源边界见[Window](Components/Window/README.md)。
+
+Island 是多来源 App 状态的通用呈现中心：业务拥有事实和内容，组件拥有语义优先级顺序、详情/实时状态两路仲裁、布局、可中断动画和展开偏好。生产者使用同一内容接口，UI 不识别具体 Agent；Writer 自己发布任务内容不增加 UI 对 Agents 的依赖。
+
+ui.web被动摘要包含根页面及按windowID的会话；ui.windows跨创建者提供全部窗口。两者保持各自状态所有权，公开读取不创建页面或执行脚本。

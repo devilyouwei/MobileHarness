@@ -76,24 +76,7 @@ public struct ModelResourceSourceDraft: Codable, Sendable {
         self.useCustomRecognition = useCustomRecognition
         self.useCustomSynthesis = useCustomSynthesis
     }
-    private enum CodingKeys: String, CodingKey {
-        case endpoint, allowsCellular, useCustomRecognition, useCustomSynthesis, preferDownloadedSpeech
-    }
-    public init(from decoder: any Decoder) throws {
-        let values = try decoder.container(keyedBy: CodingKeys.self)
-        endpoint = try values.decode(String.self, forKey: .endpoint)
-        allowsCellular = try values.decode(Bool.self, forKey: .allowsCellular)
-        let legacy = try values.decodeIfPresent(Bool.self, forKey: .preferDownloadedSpeech) ?? true
-        useCustomRecognition = try values.decodeIfPresent(Bool.self, forKey: .useCustomRecognition) ?? legacy
-        useCustomSynthesis = try values.decodeIfPresent(Bool.self, forKey: .useCustomSynthesis) ?? legacy
-    }
-    public func encode(to encoder: any Encoder) throws {
-        var values = encoder.container(keyedBy: CodingKeys.self)
-        try values.encode(endpoint, forKey: .endpoint)
-        try values.encode(allowsCellular, forKey: .allowsCellular)
-        try values.encode(useCustomRecognition, forKey: .useCustomRecognition)
-        try values.encode(useCustomSynthesis, forKey: .useCustomSynthesis)
-    }
+
 }
 /// Passive presentation snapshot; eligibility is supplied by the business layer.
 public struct ModelResourceViewSnapshot: Sendable {

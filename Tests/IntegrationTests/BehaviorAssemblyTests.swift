@@ -15,12 +15,13 @@ import UI
 
 private actor BehaviorEndpoint: UIPresentationCapability, UIUpdateCapability, SpeechPlaybackCapability,
     PosePresentationCapability, CameraControlCapability, HistoryPresentationCapability, ResourcePresentationCapability,
-    TaskControlCapability, WindowControlCapability, IslandControlCapability, WebCapability
+    TaskControlCapability, WindowControlCapability, IslandControlCapability, WebCapability, ArtifactCapability
 {
+    func perform(invocation: any FunctionInput) async throws -> String { throw CancellationError() }
     func perform(_ operation: String, invocation: any FunctionInput) async throws -> String {
         throw CancellationError()
     }
-    func performIsland(_ command: IslandCommand, invocation: any FunctionInput) async throws -> String {
+    func performIsland(_ command: IslandCommand, context: IslandActionContext) async throws -> IslandReceipt {
         throw CancellationError()
     }
     func performWindow(_ operation: WindowOperation, id: UUID, x: Double?, y: Double?, invocation: any FunctionInput)
@@ -95,7 +96,8 @@ private func behaviorInvocation(_ function: String, parameters: [String: String]
         history: HistoryQueryService(store: ConversationHistoryStore()),
         historyMutations: HistoryMutationService(
             store: ConversationHistoryStore(), summarizeTitle: { _ in "Unused fixture title" }),
-        windows: endpoint, web: endpoint, island: endpoint, modelResources: UnusedModelResourceCapability(),
+        windows: endpoint, web: endpoint, artifacts: endpoint, island: endpoint,
+        modelResources: UnusedModelResourceCapability(),
         resourcePreferences: UnusedModelResourcePreferencesCapability(), resourceInventory: UnusedResourceInventory(),
         resourcePresentation: endpoint, providerDiscovery: UnusedProviderDiscovery(),
         providerSettings: UnusedProviderSettings(), device: UnusedDeviceControl(), taskControl: endpoint,
@@ -103,6 +105,15 @@ private func behaviorInvocation(_ function: String, parameters: [String: String]
         shakeBase: { _, _ in throw CancellationError() },
         aim: { _, _, _ in throw ActionExecutionFailure(code: .handlerFailed, message: "Fixture dependency unavailable")
         })
+    for binding in assembly.bindings {
+        if binding.protocols.contains(.action) {
+            #expect({ if case .scheduled = binding.executionPolicy { true } else { false } }())
+        } else {
+            #expect({ if case .direct = binding.executionPolicy { true } else { false } }())
+        }
+    }
+    #expect(await assembly.tools.handler(for: "Agent.Task.startTask") == nil)
+    #expect(await assembly.tools.handler(for: "Artifacts.Workspace.perform") != nil)
     try BehaviorCoverage.validate(
         actions: assembly.actions, toolPaths: assembly.toolPaths,
         capabilities: [

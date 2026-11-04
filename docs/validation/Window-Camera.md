@@ -1,5 +1,14 @@
 # Window / Camera 验证
 
+## 2026-11-03 灵动岛黑色边缘／内容错位
+
+- 用户20:33截图显示紧凑胶囊与麦克风／计时内容错位；源码存在按22pt／44pt指标变化重设header hosting宽度、与背景独立动画，以及多个UIKit布局入口同步重入的风险。本次修复针对这些可见风险，不声称截图已证明唯一触发链。
+- 实现：header hosting改为固定全视口画布，在compact位置明确放置内容，反向补偿父surface位移；展开6pt垂直移动仍由UIKit承担。render和最终布局校正禁止同步重入；有效动画token完成后统一写回背景／内容／状态条目标再完成回执，旧token不能改新目标。未修改其他在途purple主题代码。
+- 两项新增定向回归通过：islandHeaderCanvasKeepsIndicatorsAnchoredAsContentWidthChanges与islandHeaderCanvasDoesNotResizeWhenTimerAppearsOrDisappears。覆盖竖屏硬件／横屏备用布局、普通／计时槽、单／双侧、展开／收起及父容器动画中途更换目标。完整普通UI189项通过。
+- `./scripts/build-ios.sh`退出0，MobileHarnessSimulator／ModelKitRuntime／ModelKitNemotron／ModelKitSilero四目标BUILD SUCCEEDED，App Skill及Live Activity资源校验通过。
+- 完整check普通阶段Integration991项中3个用例失败、共5项issue：assistantInstructionBudgetsKeepCatalogAndSafetyRules（两项字节预算）、residentNativeStateObservationDuringSeedingWinsOverTheBaseline（invalidSnapshot）、writerWaitingAndCompletionEnterAssistantModelFIFO（前台分支完成通知／模型请求数量）。这些测试及其业务实现不在本次修改范围，未为本次修复改写断言。`LiveRuntimeTests`串行225项通过；check.sh最终退出1，保留上述普通阶段失败。边界检查、Python6项、严格Swift格式、plist及git diff检查通过。NativePresentationTests在cameraNativeMetalDrawStopAndLayerHandoff开始后没有整组结束摘要，不宣称整组通过。
+- 没有执行本次真机安装或重现用户间歇性偏移。需真机观察聆听计时出现／消失、快速状态切换、开场两段动画中断、展开／收起、导航往返和前后台恢复；纯几何回归和编译不能代替这些原生时序／视觉验收。
+
 ## 2026-11-03 现有窗口切换emoji
 
 - 全部生产创建入口核对：CameraCoordinator的相机窗口使用📷；WebExecutionService的网页与绘图窗口使用🌐。两者消费已有WindowIcon.emoji，未增加能力或目录。
@@ -624,3 +633,21 @@ iPhone17 Pro原位安装成功，安装序列5460；系统启动请求成功，�
 - 最终任务示例由Device Hub截图按钮保存为/Users/devil/Desktop/Screenshot iPhone 18 Pro 11-02-2026 at 2.48.28 PM.png（实际文件名PM前含窄空格），副本/tmp/island141-task.png。最终测试页留在模拟器供用户切换场景确认。未进行真实业务闭环、系统Live Activity交互、性能或功耗测量，未commit。
 
 - 后续用户明确请求安装真机：Debug签名构建2026110215成功（/tmp/island141-device.log），25项Agent资源、Widget身份/版本/声明和codesign --verify --deep --strict分别退出0（/tmp/island141-agent-resources.log、/tmp/island141-island-resources.log、/tmp/island141-signature.log）。安装到00008150-000579D114C2401C成功，databaseSequenceNumber5588（/tmp/island141-install.log）。自动启动被锁屏拒绝，CoreDeviceError10002/Locked（/tmp/island141-launch.log）；只能确认安装，解锁后可手动打开，不声称真机视觉已验收。未修改代码、未commit。
+
+## 2026-11-05 Island Action 内外统一执行
+
+需求范围：Agent 经 Gateway 调用注册的 UI.Island 接口；Actions container 内部语音／相机／蓝牙直接调用同一 IslandActions.execute 类型化接口，不经 Gateway、不构造通信 invocation。保留专用频谱以及组件手势、布局和生命周期接口。接口命令、可信 owner／generation／呈现范围和回执位于 Actions/UI/Runtime/IslandActions.swift；域观察只负责快照、绑定端口和有界最新命令。
+
+专项回归日志：/tmp/island-unified-focused-pass.log。新增内外入口回执／内容等价、跨 owner 拒绝、内部呈现范围、外部共享展开保留、旧 generation／停止端口拒绝、失败同版本重投及新事实替换、频谱不推进活动版本、清理保留 Agent 活动。首轮新增共享展开测试错误地假定收起非选中活动会收起当前活动，断言已修正为保留另一个选中活动的展开偏好；生产行为未因此改动。专项最终20项集成用例及对应UI包测试通过；另补充根换代恢复与执行中取消加入用例，后续最终专项结果续记。
+
+完整检查 /tmp/island-unified-check.log 的主集成1022项通过（约64秒），原生阶段、最终专项和四目标 iOS 构建结果在下文记录。未调用新的真实模型、未安装／操作真机、未读取或清空真机 SQLite；自动化不等于设备上的视觉／语音／Live Activity 验收。
+
+最终 ./scripts/check.sh 退出0：主集成1022项通过，独立原生阶段225项通过（日志 /tmp/island-unified-check.log），架构／模块边界、Python检查、Swift格式及plist通过。最后补充测试后再次执行 swift test --filter 'island|Island'，22项集成及对应UI包用例通过（/tmp/island-unified-focused-final.log），包含执行中取消加入和根代际恢复；生产代码在完整检查期间未再修改。内部执行分支及领域发布用例不需要Gateway或通信；FunctionInvocation只用于注册入口的对照测试。git diff --check通过。四目标iOS构建串行在测试结束后执行，避免构建干扰原生实时测试。
+
+最终 ./scripts/build-ios.sh 退出0（/tmp/island-unified-ios.log），MobileHarnessSimulator、ModelKitRuntime、ModelKitNemotron、ModelKitSilero 四目标构建及应用Agent/Skill、Live Activity资源校验通过。未执行真机安装或交互验收；设备视觉与语音验收仍需另行进行。
+
+### 同版真机安装（2026-11-05）
+
+按用户后续安装要求，使用既有本地签名构建 MobileHarness / Debug iPhoneOS，命令行构建号2026110501；未修改仓库签名配置。构建退出0（/tmp/island-unified-device-build.log），严格深层签名、30项Agent/Skill资源及Live Activity扩展身份／版本校验通过。首次设备连接被重置，用户连接后恢复。
+
+已原位安装到 iPhone17 Pro，bundle dev.mobileharness.app，安装流水5892（/tmp/island-unified-device-install.log及.json）。独立设备应用清单确认0.1.0 / 2026110501（/tmp/island-unified-device-after.json），启动成功、进程20223（/tmp/island-unified-device-launch.log及.json）。未卸载、清空或直接改写真机SQLite。安装和系统启动不等于本轮语音、状态收起或Live Activity视觉体验验收通过。
