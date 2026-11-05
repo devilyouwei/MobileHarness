@@ -347,7 +347,7 @@ private func islandInput(_ function: String, parameters: [String: String], sourc
         }
     }
     await writer.start()
-    await writer.begin(runID: "writer-run", goal: "画流程图")
+    await writer.begin(delegateID: "writer-run", goal: "画流程图")
     try await wait { ui.island.detailActivity?.owner.hasPrefix("writer:") == true }
     #expect(ui.island.detailActivity?.content.tone == .purple)
     #expect(ui.island.expanded)
@@ -355,14 +355,14 @@ private func islandInput(_ function: String, parameters: [String: String], sourc
     try ui.island.publishSlot(owner: "test.voice", content: IslandDomainPresentation.voiceContent(.speaking))
     #expect(ui.island.headerActivity?.content.primary == .symbol(name: "speaker.wave.2.fill"))
     try ui.island.setExpanded(false, id: id)
-    await writer.update(runID: "writer-run", phase: .running, step: "正在绘制节点")
+    await writer.update(delegateID: "writer-run", phase: .running, step: "正在绘制节点")
     try await wait { ui.island.detailActivity?.content.detail?.text?.contains("正在绘制节点") == true }
     #expect(ui.island.detailActivity?.id == id)
     #expect(!ui.island.expanded)
-    await writer.update(runID: "writer-run", phase: .completed, step: "作品已保存")
+    await writer.update(delegateID: "writer-run", phase: .completed, step: "作品已保存")
     try await wait { ui.island.detailActivity == nil }
     #expect(ui.island.headerActivity?.owner == "test.voice")
-    await writer.update(runID: "writer-run", phase: .running, step: "迟到进度")
+    await writer.update(delegateID: "writer-run", phase: .running, step: "迟到进度")
     // Assistant Task logs are no longer a producer of Writer Island content.
     ui.home.activity.updateTask(
         .init(id: "stale", parentID: nil, requester: "assistant", executor: "writer", title: "旧日志", phase: .running),
@@ -417,14 +417,14 @@ private actor WriterIslandPublicationProbe {
         }
     }
     await writer.start()
-    await writer.begin(runID: "old", goal: "旧任务")
+    await writer.begin(delegateID: "old", goal: "旧任务")
     let deadline = ContinuousClock.now + .seconds(3)
     while await probe.calls == 0, ContinuousClock.now < deadline { await Task.yield() }
     #expect(await probe.calls == 1)
-    for i in 0..<100 { await writer.update(runID: "old", phase: .running, step: "旧步骤 \(i)") }
-    await writer.begin(runID: "new", goal: String(repeating: "长目标", count: 400))
-    await writer.update(runID: "new", phase: .running, step: "新任务步骤")
-    await writer.update(runID: "old", phase: .completed, step: "迟到旧终态")
+    for i in 0..<100 { await writer.update(delegateID: "old", phase: .running, step: "旧步骤 \(i)") }
+    await writer.begin(delegateID: "new", goal: String(repeating: "长目标", count: 400))
+    await writer.update(delegateID: "new", phase: .running, step: "新任务步骤")
+    await writer.update(delegateID: "old", phase: .completed, step: "迟到旧终态")
     await probe.allow()
     let publicationDeadline = ContinuousClock.now + .seconds(3)
     while state.detailActivity == nil, ContinuousClock.now < publicationDeadline { await Task.yield() }
@@ -440,7 +440,7 @@ private actor WriterIslandPublicationProbe {
     await writer.stop()
     #expect(state.activities.isEmpty)
     let stopped = await probe.calls
-    await writer.update(runID: "new", phase: .running, step: "迟到回调")
+    await writer.update(delegateID: "new", phase: .running, step: "迟到回调")
     try await Task.sleep(for: .milliseconds(550))
     #expect(await probe.calls == stopped)
     await state.stop()
@@ -491,17 +491,17 @@ private actor WriterIslandPublicationProbe {
     await writer.start()
     for phase in [WriterIslandPresentation.Phase.completed, .failed, .cancelled, .interrupted] {
         let run = UUID().uuidString
-        await writer.begin(runID: run, goal: "测试终态")
+        await writer.begin(delegateID: run, goal: "测试终态")
         let start = ContinuousClock.now + .seconds(3)
         while state.detailActivity == nil, ContinuousClock.now < start { await Task.yield() }
         try #require(state.detailActivity != nil)
-        await writer.update(runID: run, phase: .waitingUser)
-        await writer.update(runID: run, phase: .cancelling)
-        await writer.update(runID: run, phase: phase)
+        await writer.update(delegateID: run, phase: .waitingUser)
+        await writer.update(delegateID: run, phase: .cancelling)
+        await writer.update(delegateID: run, phase: phase)
         let end = ContinuousClock.now + .seconds(3)
         while state.detailActivity != nil, ContinuousClock.now < end { await Task.yield() }
         #expect(state.activities.isEmpty)
-        await writer.update(runID: run, phase: .running, step: "迟到")
+        await writer.update(delegateID: run, phase: .running, step: "迟到")
         await Task.yield()
         #expect(state.activities.isEmpty)
     }

@@ -52,19 +52,24 @@ private func windowInput(_ operation: String = "minimize", parameters: [String: 
     let service = WindowExecutionService(state: state, lifecycles: ["fixture": probe])
     probe.fails = true
     await #expect(throws: WindowExecutionFailure.self) {
-        try await service.performWindow(.minimize, id: id, x: nil, y: nil, invocation: windowInput())
+        try await service.performWindow(
+            .minimize, id: try #require(state.reference(for: id)), x: nil, y: nil, invocation: windowInput())
     }
     #expect(try state.find(id).mode == .normal)
     #expect(!probe.transitioning)
     probe.fails = false
     let minimize = Task {
-        try await service.performWindow(.minimize, id: id, x: nil, y: nil, invocation: windowInput())
+        try await service.performWindow(
+            .minimize, id: try #require(state.reference(for: id)), x: nil, y: nil, invocation: windowInput())
     }
     try await awaitWindow { (try? state.find(id).mode) == .minimized }
     let item = try state.find(id)
     state.complete(id, revision: item.revision, generation: state.generation, success: true)
     try await minimize.value
-    let restore = Task { try await service.performWindow(.restore, id: id, x: nil, y: nil, invocation: windowInput()) }
+    let restore = Task {
+        try await service.performWindow(
+            .restore, id: try #require(state.reference(for: id)), x: nil, y: nil, invocation: windowInput())
+    }
     try await awaitWindow { (try? state.find(id).mode) == .normal }
     #expect(!probe.events.contains("resume"))
     #expect(probe.transitioning)
@@ -75,7 +80,8 @@ private func windowInput(_ operation: String = "minimize", parameters: [String: 
     #expect(!probe.transitioning)
     probe.fails = true
     await #expect(throws: WindowExecutionFailure.self) {
-        try await service.performWindow(.close, id: id, x: nil, y: nil, invocation: windowInput())
+        try await service.performWindow(
+            .close, id: try #require(state.reference(for: id)), x: nil, y: nil, invocation: windowInput())
     }
     #expect(try state.find(id).phase == .settled)
     await service.stop()
@@ -90,13 +96,23 @@ private func windowInput(_ operation: String = "minimize", parameters: [String: 
     let service = WindowExecutionService(state: state, lifecycles: [:])
     await #expect(throws: (any Error).self) {
         try await WindowActions.move(
-            invocation: windowInput("move", parameters: ["windowID": first.uuidString, "x": "nan", "y": "0"]),
+            invocation: windowInput(
+                "move", parameters: ["windowID": try #require(state.reference(for: first)), "x": "nan", "y": "0"]),
             using: service)
     }
-    let a = Task { try await service.performWindow(.maximize, id: first, x: nil, y: nil, invocation: windowInput()) }
-    let b = Task { try await service.performWindow(.maximize, id: second, x: nil, y: nil, invocation: windowInput()) }
+    let a = Task {
+        try await service.performWindow(
+            .maximize, id: try #require(state.reference(for: first)), x: nil, y: nil, invocation: windowInput())
+    }
+    let b = Task {
+        try await service.performWindow(
+            .maximize, id: try #require(state.reference(for: second)), x: nil, y: nil, invocation: windowInput())
+    }
     try await awaitWindow { state.windows.allSatisfy { $0.mode == .maximized } }
-    let closing = Task { try await service.performWindow(.close, id: first, x: nil, y: nil, invocation: windowInput()) }
+    let closing = Task {
+        try await service.performWindow(
+            .close, id: try #require(state.reference(for: first)), x: nil, y: nil, invocation: windowInput())
+    }
     try await awaitWindow { (try? state.find(first).phase) == .closing }
     await #expect(throws: (any Error).self) { try await a.value }
     #expect(try state.find(second).phase == .changing)
@@ -108,5 +124,25 @@ private func windowInput(_ operation: String = "minimize", parameters: [String: 
     try await b.value
     #expect(state.windows.count == 1 && state.windows.first?.id == second)
     await service.stop()
+    await state.stop()
+}
+
+@Test @MainActor func windowReferencesExposeReadableAliasesAndNeverResolveUUIDs() async throws {
+    let state = WindowState()
+    state.layout(width: 390, height: 750)
+    state.setAvailable(true)
+    let first = try await windowFixture(state, content: "one")
+    let second = try await windowFixture(state, content: "two")
+    #expect(state.reference(for: first) == "window_1")
+    #expect(state.reference(for: second) == "window_2")
+    #expect(try state.resolve(reference: "window_2") == second)
+    await #expect(throws: WindowError.busy) {
+        try await state.present(content: .artifact, title: "Duplicate", windowID: first)
+    }
+    #expect(state.reference(for: first) == "window_1")
+    #expect(throws: WindowError.missing) { try state.resolve(reference: first.uuidString) }
+    let snapshot = try await state.stateSnapshot()
+    let text = String(decoding: try JSONEncoder().encode(snapshot), as: UTF8.self)
+    #expect(text.contains("window_1") && !text.contains(first.uuidString) && !text.contains(second.uuidString))
     await state.stop()
 }

@@ -67,7 +67,7 @@ public final class ConversationState {
     public var showsModelRetry: Bool { !hasActiveInteraction && modelPreparation.showsRetry }
     public internal(set) var isReady = false
     public internal(set) var voiceStatus = "按住双眼，开启聆听"
-    public internal(set) var isVoiceActive = false { didSet { if !isVoiceActive { resetCaptions() } } }
+    public internal(set) var isVoiceActive = false { didSet { if !isVoiceActive { replyWaitingRequest = nil } } }
     public internal(set) var listeningAnimationID: String?
     /// Normalized content-space origin; latched by the renderer on each new listening generation.
     public internal(set) var listeningLightOrigin: ListeningLightOrigin?
@@ -95,8 +95,9 @@ public final class ConversationState {
     public func presentTranscript(_ text: String) {
         guard presentationAdmission?.acceptsLive() ?? true else { return }
         liveTranscript = text
+        transcriptFinalized = false
     }
-    public func beginReply() {
+    public func clearReply() {
         guard presentationAdmission?.acceptsLive() ?? true else { return }
         assistantReply = ""
         replyWaitingRequest = nil
@@ -424,7 +425,7 @@ public protocol ConversationPresenting: UIPresentationAccess {
     func present(_ update: ConversationUpdate) -> Bool
     func presentPlaybackSpectrum(_ values: [Float])
     func presentTranscript(_ text: String)
-    func beginReply()
+    func clearReply()
     func presentReplyWaiting(_ enabled: Bool, requestID: String)
     func appendReply(_ text: String)
     func presentVoiceStatus(_ status: String, clearMicrophone: Bool)

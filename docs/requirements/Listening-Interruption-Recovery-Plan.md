@@ -23,3 +23,19 @@
 ## 实施结果
 
 代码、两种取消/投递时序的回归、所属技术文档与总体流程说明已完成；旧实现稳定复现失败，修复后定向及全量检查、四个 iOS 模拟器构建通过。原范围中的真机复验尚未执行，因此本计划保留在 requirements。证据及限制见[验证记录](../validation/Listening-Interruption-Recovery.md)。
+
+## 2026-11-05 字幕按新的人声轮次由 Agent 收尾
+
+按用户确认实施：新一轮VAD确认人声起点才切换字幕，开启麦克风／恢复聆听／ASR或回复结束均不清除上一轮字幕。SpeechPerception在新识别轮次建立后、首段ASR到达前，显式调用setTranscript空文本开启自己的字幕；复用已有speech.phase(speaking)作为发给Assistant的新输入开始控制事件，重复同轮不重新清理。最终文本仍通过speech.final进入正式FIFO；开始事件不请求LLM。
+
+Assistant独立接纳开始事件并经Gateway调用新增内部Display Action UI.Caption.clearReply，不伪装回复开始、不加入正在执行的模型round。按会话／可信发送者incarnation／turn做单调去重，最多32个会话标记，关闭会话释放；满载明确拒绝，不自动覆盖会话。clearReply只操作本来源回复字幕，使用来源序号、识别轮次和已退休的当前回复输入身份拒绝迟到内容及旧请求续轮；新输入对应的新回复、队列中较早委托输入的新回复仍可建立独立身份。现有语音开口打断路径保持。
+
+Actions的ConversationPresentation不再因识别轮次变化清空双方字幕；仅校验会话、轮次和序号。转写更新只更新自己的槽并解除该槽定稿标记，Assistant显式clearReply只清自己的槽并退休旧回复身份。UI HomeEffects删除回复结束时清除转写和350ms回复淡出清理，不按业务阶段决定清理。根失效／会话关闭保留通用整体清理。失败识别仍封口并恢复许可，不再主动抹掉本轮已有转写。
+
+涉及SpeechPerception、Assistant共享Chat执行、Actions/UI/Conversation与相关端口／装配／注册、UI/Conversation及测试README；均使用现有目录，不改通信协议、Gateway调度设计、ModelKit或数据库结构。实现后同步各拥有者及整体技术文档。覆盖新声起点先于ASR、同轮重复／旧代乱序、各槽独立、终态后保留、旧回复无法复活、旧输入新回复仍可呈现、无开始事件LLM请求、取消／根失效，并执行check.sh和build-ios.sh；真实模型／真机验收单独记录。
+
+并发细化：clearReply可附带Assistant代码保存的replyInputID，冻结“开口时要退休的回复请求”，不由模型指定。这样即使旧请求在清理前后续轮，仍不能重新打开字幕；而之后真正开始的新请求不会被迟到的清理误删。UI按来源保留当前退休请求和清理序号（来源最多32个，沿用既有生产者账本），不按识别turn大小禁止旧委托输入发起的新回复。
+
+收尾审计补充：isVoiceActive=false目前也隐式resetCaptions，会使关闭／重建麦克风绕过Agent字幕政策。该联动一并移除，停止聆听只撤下等待指示并改变呈现门，字幕继续保留。UIHome.invalidate显式调用resetCaptions作为真实根生命周期清理；显式会话重置端口仍可整体清理。相应睡眠／根失效回归同步调整。
+
+本节实现及技术README已同步：双字幕由各自Agent在新人声起点显式切换，移除UI轮次／回复到期／聆听开关的交叉清理，保留根生命周期清理。完整自动化与四目标iOS构建通过；夹具修订、证据和未执行的真机验收见 [验证记录](../validation/Listening-Interruption-Recovery.md#2026-11-05-agent-自有字幕与人声起点)。

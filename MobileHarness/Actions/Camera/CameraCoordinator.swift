@@ -54,10 +54,12 @@
         private var failed = false
         private var revision = 0
         private var worker: Task<Void, Never>?
-        private let photos: CapturedPhotoStore
+        private let photos: MediaStore
         private let windows: WindowState?
         public func windowID() async -> String? {
-            windows?.windows.first(where: { $0.content == WindowContent.camera.rawValue })?.id.uuidString
+            windows?.windows.first(where: { $0.content == WindowContent.camera.rawValue }).flatMap {
+                windows?.reference(for: $0.id)
+            }
         }
 
         var acquireRecordingAudio: @MainActor () async throws -> Void = {}
@@ -123,7 +125,7 @@
             })
 
         public init(
-            camera: any CameraCapturing, presentation: any CameraPresenting, photos: CapturedPhotoStore,
+            camera: any CameraCapturing, presentation: any CameraPresenting, photos: MediaStore,
             photoCues: any CuePlaying, windows: WindowState? = nil,
 
             makeRuntime: @escaping () throws -> CameraRuntimeDependencies,

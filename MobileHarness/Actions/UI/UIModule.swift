@@ -100,6 +100,12 @@ public struct UIModule: CapabilityModule {
                         try await updates.presentTranscript($0, invocation: $1)
                     }
                 }),
+            UIActions.clearReplyDefinition(
+                handler: { [updates] invocation in
+                    try await UIActions.clearReply(invocation: invocation) {
+                        try await updates.clearReply(invocation: $0)
+                    }
+                }),
             UIActions.beginReplyTurnDefinition(
                 handler: { [updates] invocation in
                     try await UIActions.beginReplyTurn(invocation: invocation) {

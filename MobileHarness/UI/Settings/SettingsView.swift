@@ -12,31 +12,35 @@
         }
         public var body: some View {
             List {
-                Section("AI 模型") {
-                    destination(.recognition, title: "音频识别", icon: "waveform", identifier: "settings.recognition.open")
+                Section("AI Models") {
                     destination(
-                        .synthesis, title: "语音合成", icon: "speaker.wave.2", identifier: "settings.synthesis.open")
-                    destination(.language, title: "智能体大脑", icon: "brain", identifier: "settings.language.open")
-                    destination(.vision, title: "视觉识别", icon: "viewfinder", identifier: "settings.vision.open")
+                        .recognition, title: "Speech Recognition", icon: "waveform",
+                        identifier: "settings.recognition.open")
+                    destination(
+                        .synthesis, title: "Speech Synthesis", icon: "speaker.wave.2",
+                        identifier: "settings.synthesis.open")
+                    destination(.language, title: "Agent Brains", icon: "brain", identifier: "settings.language.open")
+                    destination(
+                        .vision, title: "Vision Recognition", icon: "viewfinder", identifier: "settings.vision.open")
                 }
-                Section("外接设备") {
+                Section("External Devices") {
                     destination(
-                        .bluetooth, title: "蓝牙外设", icon: "antenna.radiowaves.left.and.right",
+                        .bluetooth, title: "Bluetooth", icon: "bluetooth",
                         identifier: "settings.bluetooth.open")
                 }
-                Section("用户") {
-                    Label("记忆", systemImage: "brain.head.profile")
-                        .accessibilityIdentifier("settings.user.memory")
-                    destination(.album, title: "相册", icon: "photo.on.rectangle", identifier: "settings.user.album")
+                Section("User") {
+                    destination(.album, title: "Album", icon: "photo.on.rectangle", identifier: "settings.user.album")
                     destination(
-                        .assistantHistory, title: "Assistant 聊天记录", icon: "bubble.left.and.bubble.right",
+                        .assistantHistory, title: "My Assistant", icon: "bubble.left.and.bubble.right",
                         identifier: "settings.assistant.records")
                     destination(
-                        .writerHistory, title: "Writer 任务记录", icon: "pencil.and.outline",
+                        .writerHistory, title: "My Writer", icon: "pencil.and.outline",
                         identifier: "settings.writer.records")
+                    Label("Memory", systemImage: "brain.head.profile")
+                        .accessibilityIdentifier("settings.user.memory")
                 }
             }
-            .navigationTitle("设置").navigationBarTitleDisplayMode(.inline)
+            .navigationTitle("Settings").navigationBarTitleDisplayMode(.inline)
             .toolbar(.visible, for: .navigationBar).preferredColorScheme(.dark)
         }
         private func destination(_ page: AppDestination, title: String, icon: String, identifier: String) -> some View {
@@ -44,12 +48,36 @@
                 navigate(page)
             } label: {
                 HStack {
-                    Label(title, systemImage: icon)
+                    if page == .bluetooth {
+                        Label {
+                            Text(title)
+                        } icon: {
+                            BluetoothSymbol()
+                                .stroke(style: StrokeStyle(lineWidth: 1.8, lineCap: .round, lineJoin: .round))
+                                .frame(width: 18, height: 22)
+                        }
+                    } else {
+                        Label(title, systemImage: icon)
+                    }
                     Spacer()
                     if page == .bluetooth { Text(bluetooth.summary).foregroundStyle(.secondary).font(.subheadline) }
                     Image(systemName: "chevron.right").foregroundStyle(.secondary)
                 }
             }.accessibilityIdentifier(identifier)
+        }
+    }
+
+    private struct BluetoothSymbol: Shape {
+        func path(in rect: CGRect) -> Path {
+            var path = Path()
+            path.move(to: CGPoint(x: rect.width * 0.4, y: rect.minY))
+            path.addLine(to: CGPoint(x: rect.width * 0.4, y: rect.maxY))
+            path.addLine(to: CGPoint(x: rect.width * 0.85, y: rect.height * 0.72))
+            path.addLine(to: CGPoint(x: rect.width * 0.1, y: rect.height * 0.25))
+            path.move(to: CGPoint(x: rect.width * 0.1, y: rect.height * 0.75))
+            path.addLine(to: CGPoint(x: rect.width * 0.85, y: rect.height * 0.28))
+            path.addLine(to: CGPoint(x: rect.width * 0.4, y: rect.minY))
+            return path
         }
     }
 

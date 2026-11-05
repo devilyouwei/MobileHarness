@@ -75,7 +75,7 @@ import UI
     }
     private func target(_ raw: String?) async throws -> (any WebPagePresenting, UUID) {
         if let raw {
-            guard let id = UUID(uuidString: raw) else { throw ActionExecutionError.invalidInvocation }
+            let id = try windows.resolve(reference: raw)
             let window = try windows.find(id)
             guard window.phase != .closing else { throw WebPageError.unavailable }
             let selected: any WebPagePresenting
@@ -115,14 +115,14 @@ import UI
             mediaID = nil
         }
         let receipt = Receipt(
-            windowID: window,
+            windowID: window.flatMap { windows.reference(for: $0) },
             url: observation.url.hasPrefix("file:") ? nil : observation.url,
             title: observation.title, text: observation.text, diagnostics: observation.diagnostics,
             mediaID: mediaID)
         return String(decoding: try JSONEncoder().encode(receipt), as: UTF8.self)
     }
     private struct Receipt: Encodable {
-        let windowID: UUID?
+        let windowID: String?
         let url: String?
         let title: String
         let text: String

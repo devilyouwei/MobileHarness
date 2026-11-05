@@ -32,7 +32,7 @@ public actor OpenAIChat: ChatCapability {
 
     public func chat(_ request: ChatRequest) async throws -> InferenceSession<ChatEvent> {
         let http = try configuration.request(request)
-        let limits = try StreamLimits(capacity: 128, maximumEventBytes: 65568)
+        let limits = try StreamLimits(capacity: 128, maximumEventBytes: nil)
         let lease = try await resource.acquire()
         let control = RequestControl()
         let pair = InferenceSession<ChatEvent>.make(

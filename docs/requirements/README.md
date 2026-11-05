@@ -12,6 +12,8 @@
 
 ## 技术需求
 
+[Storage数据库与Workspace重构](Storage-Database-Refactor.md) 将对话回合、完整模型日志、前台任务与Writer委托归入十张业务表，源码使用无版本控制的当前目录；实施与验收见该计划。
+
 [四项核心架构改进](technical/Core-Architecture-Improvement-Plan.md) 中，通用内存状态机制与 App 结构迁移已实施；更多事实/Trigger/写入源治理、统一错误分类与分层展示及端到端验收仍待完成；第 4 项存储抽象接口已完成。原需求整份保留在本目录，不能按单项完成归档；独立的 [Storage 接口分离实施记录](../completed/Storage-Repository-Plan.md) 按其自身完整范围归档。
 
 ## 产品需求
@@ -73,3 +75,5 @@
 [WriterAgent 流式创作](Writer-Agent-Plan.md)：独立创作角色、通用作品工作区、流式预览与后台委托；实施中。
 
 [语音打断后的聆听恢复](Listening-Interruption-Recovery-Plan.md)：修复取消期间回复空闲事实被拦截造成的重新启听卡死；真机复验独立记录。
+
+[Assistant 多源输入协调](Assistant-MultiSource-Input-Coordination.md)：输入分类、回复触发边界和语义合并的分析提案；尚未实施，不改变现有正式输入 FIFO 契约。

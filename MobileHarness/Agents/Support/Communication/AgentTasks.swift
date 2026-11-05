@@ -47,25 +47,28 @@ public struct WriterTaskEvent: Codable, Sendable, Equatable {
     public let eventID: String
     public let sequence: UInt64
     public let kind: Kind
-    public let projectID: String?
+    public let workspaceID: String?
+    public let goal: String?
     public let windowID: String?
     public let taskID: String?
-    public let runID: String?
+    public let delegateID: String?
     public let failure: WriterFailureDiagnostic?
     public let request: WriterRequestProgress?
     public init(
-        sequence: UInt64, kind: Kind, projectID: String? = nil, windowID: String? = nil, taskID: String? = nil,
-        runID: String? = nil, failure: WriterFailureDiagnostic? = nil, request: WriterRequestProgress? = nil,
+        sequence: UInt64, kind: Kind, workspaceID: String? = nil, goal: String? = nil, windowID: String? = nil,
+        taskID: String? = nil,
+        delegateID: String? = nil, failure: WriterFailureDiagnostic? = nil, request: WriterRequestProgress? = nil,
         eventID: String = UUID().uuidString
     ) {
-        version = 1
+        version = 2
         self.eventID = eventID
         self.sequence = sequence
         self.kind = kind
-        self.projectID = projectID
+        self.goal = goal
+        self.workspaceID = workspaceID
         self.windowID = windowID
         self.taskID = taskID
-        self.runID = runID
+        self.delegateID = delegateID
         self.failure = failure
         self.request = request
     }
@@ -75,8 +78,8 @@ public struct WriterTaskEvent: Codable, Sendable, Equatable {
                 !request.phase.isEmpty
             else { throw CommunicationError.invalidPayload }
         }
-        guard version == 1, UUID(uuidString: eventID) != nil, sequence > 0,
-            [taskID, runID].allSatisfy({ $0.map { !$0.isEmpty && $0.utf8.count <= 128 } ?? true })
+        guard version == 2, UUID(uuidString: eventID) != nil, sequence > 0,
+            [taskID, delegateID].allSatisfy({ $0.map { !$0.isEmpty && $0.utf8.count <= 128 } ?? true })
         else {
             throw CommunicationError.invalidPayload
         }
@@ -138,7 +141,7 @@ public struct WriterTaskCompletion: Codable, Sendable, Equatable {
         let content = try AgentTaskContent.decode(signal)
         guard signal.kind == .result, signal.scope.requester == .assistant, signal.scope.executor == .writer,
             signal.scope.execution == .background, content.stage == .completed, let event = content.writerEvent,
-            event.runID == signal.scope.id, event.taskID != nil,
+            event.delegateID == signal.scope.id, event.taskID != nil,
             (event.kind == .completed && signal.status == .succeeded)
                 || (event.kind == .failed && signal.status == .failed)
                 || (event.kind == .cancelled && signal.status == .cancelled)

@@ -8,7 +8,9 @@ extension SystemActions {
         parameters: [
             .init("taskID", description: "Actual background task ID"),
             .init("text", description: "Relevant user answer or correction"),
-            .init("interactionID", required: false, description: "Pending question ID"),
+            .init(
+                "executor",
+                description: "Owning Agent ID, e.g. writer; runtime resolves delegation and pending question"),
         ], timeout: .seconds(30))
     public static func sendMessage(_ input: any FunctionInput, capability: any TaskControlCapability) async throws
         -> ActionCompletion
@@ -108,7 +110,10 @@ extension SystemActions {
                 "reason", type: .string, required: true, description: "User cancellation reason",
                 constraints: "Nonempty bounded text"),
             .init(
-                "taskID", required: false, description: "Actual background task ID; omit for current foreground Task"),
+                "taskID", required: false,
+                description: "Agent-local background task_N; omit for current foreground Task"),
+            .init(
+                "executor", required: false, description: "Required with background taskID; owning Agent, e.g. writer"),
         ], completion: "Foreground cancelled, or background cancellation delivered", timeout: .seconds(30))
     public static func cancelTask(_ input: any FunctionInput, capability: any TaskControlCapability) async throws
         -> ActionCompletion

@@ -3,22 +3,35 @@ import Foundation
 import FunctionContracts
 import Gateway
 
+private enum GatewayOutputMode: Sendable { case protocolFeedback, returningFeedback, internalCompletion }
+
 /// A producer-bound port; the source cannot select or replace its registration identity.
 public struct GatewayOutputConsumer: Sendable {
-    public enum AdmissionError: Error, CustomStringConvertible, LocalizedError {
-        case returningFeedbackRequired
-        public var description: String { "Call requires returning feedback" }
+    public enum AdmissionError: Error, Equatable, CustomStringConvertible, LocalizedError {
+        case returningFeedbackRequired, internalCallRequired
+        public var description: String {
+            switch self {
+            case .returningFeedbackRequired: "Call requires returning feedback"
+            case .internalCallRequired: "Internal completion requires a declared internal tool outside a model round"
+            }
+        }
         public var errorDescription: String? { description }
     }
-    private let consume: @Sendable (OutputEnvelope, Bool) async throws -> OutputExecutionResult
-    fileprivate init(_ consume: @escaping @Sendable (OutputEnvelope, Bool) async throws -> OutputExecutionResult) {
+    private let consume: @Sendable (OutputEnvelope, GatewayOutputMode) async throws -> OutputExecutionResult
+    fileprivate init(
+        _ consume: @escaping @Sendable (OutputEnvelope, GatewayOutputMode) async throws -> OutputExecutionResult
+    ) {
         self.consume = consume
     }
     @discardableResult public func execute(_ envelope: OutputEnvelope) async throws -> OutputExecutionResult {
-        try await consume(envelope, false)
+        try await consume(envelope, .protocolFeedback)
     }
     @discardableResult public func executeReturning(_ envelope: OutputEnvelope) async throws -> OutputExecutionResult {
-        try await consume(envelope, true)
+        try await consume(envelope, .returningFeedback)
+    }
+    /// Gateway-authorized runtime presentation. Completion belongs to the caller, not the Agent inbox.
+    @discardableResult public func executeInternal(_ envelope: OutputEnvelope) async throws -> OutputExecutionResult {
+        try await consume(envelope, .internalCompletion)
     }
 }
 private enum OutputProducerBinding {
@@ -205,18 +218,26 @@ public actor OutputGateway {
 
     public func consumer(for producer: any Agent) async throws -> GatewayOutputConsumer {
         let id = producer.descriptor.id
+        let internalTools = Set(producer.descriptor.capabilities.internalTools.map(\.path))
         let incarnation = try await manager.outputIdentity(for: producer)
         try await requests.bindEndpoint(producer, incarnation: incarnation)
-        return GatewayOutputConsumer { [self] envelope, requiresReturning in
+        return GatewayOutputConsumer { [self] envelope, mode in
             guard envelope.source == id else { throw CommunicationError.unauthorized }
             try await manager.validate(id, incarnation: incarnation, sessionID: envelope.sessionID)
-            if requiresReturning {
+            if mode == .returningFeedback {
                 guard case .toolCall(let call) = envelope.output, await returnsToolResult(for: call) else {
                     throw GatewayOutputConsumer.AdmissionError.returningFeedbackRequired
                 }
             }
-            return try await OutputProducerBinding.$identity.withValue(.init(agent: id, incarnation: incarnation)) {
-                try await execute(envelope)
+            if mode == .internalCompletion {
+                guard envelope.roundID == nil, case .toolCall(let call) = envelope.output,
+                    internalTools.contains(call.toolPath)
+                else { throw GatewayOutputConsumer.AdmissionError.internalCallRequired }
+            }
+            return try await AgentToolFeedbackDelivery.$internalCompletion.withValue(mode == .internalCompletion) {
+                try await OutputProducerBinding.$identity.withValue(.init(agent: id, incarnation: incarnation)) {
+                    try await execute(envelope)
+                }
             }
         }
     }

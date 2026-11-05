@@ -186,6 +186,22 @@ block-beta
 
 教学只允许以当前活跃且匹配的 Task/目标决定 finishTask/cancelTask。无 Task 操作完成直接回复；不确定是否放弃旧目标时先询问并保留 Task，明确切换时关闭旧目标或释放无关近期 Skill。finishTask 通常结束决策，显式 continueDecision=true 才继续同一输入剩余新目标，cancelTask 结束该决策。Skill 释放不代表保存、忽略或关闭相机。
 
+## 对其他 Agent 的委托
+
+Assistant 拥有用户意图、委托请求和面向用户的沟通；执行 Agent 拥有接纳后的业务工作、进度、清理与终态。跨模块时序见[总体委托流程](../../README.md#assistant-agent-delegation)。委托通过已有 Task Action 和认证角色通信，不调用另一个 Agent 的私有方法，不复制它的提示词、模型上下文或执行循环。
+
+| 阶段 | Assistant 与运行时契约 |
+| --- | --- |
+| 发起 | `startTask(goal, execution=background, executor, …)` 走 Control Channel 的 XML Action；Actions 校验后调用注入的 Task 控制端口。运行时检查目标通信权限、业务契约与能力，持久化 UUID `delegateID`，再发送绑定 requester/executor/session 的 `task.request`。 |
+| 接纳 | 执行者验证来源、scope 与自身容量，并绑定其拥有的业务任务；回执只确认接纳。后台委托不切换 Assistant 前台 Task 或有效 Skill 目录；`finishTask` 只结束当前前台目标。 |
+| 观察 | `task.progress`/`task.result` 由共享 Chat 更新关联控制状态；是否进入用户回复由具体业务事件政策决定，不能将所有进度当成新的用户指令。公开状态仍由当前 Skill 的 `useStates` 选择。 |
+| 补充与取消 | 使用 `executor + taskID` 定位已绑定任务；运行时解析当前委托，回答追问时还校验本次输入捕获的问题身份。模型不提供 delegate/event/interaction UUID。取消接纳只表示已递送，必须等待执行者清理及终态证据。 |
+| 失败 | 配置、权限、接纳、持久化和递送失败显式返回；回执成功不等于业务完成，回报事实不授予重试、重新委托或改变前台 Task 的权限。 |
+
+通信输出由 [Support 独立消费者](../Support/README.md#lifetime-bounds-and-failures) 持续递送，不受等待该 Task Action 的模型轮次屏障阻塞。角色根拥有消费者及其取消/加入；通信队列与输出队列各自有界，溢出明确失败。消息值与固定任务准入见 [Communication](../Support/Communication/README.md)，执行参数见 [Task Actions](../../Actions/System/Task/README.md)。
+
+当前公开创作执行者是 Writer；通用 `startTask` 路径只向已声明且授权的目标开放，并不表示所有 Agent 都支持后台业务。当前 `sendMessage` 的补充输入适配也仅支持 Writer。Writer 的单行目标/原始输入、忙碌与替代、长期作品任务、普通进度合并、追问 FIFO 和独立持久终态通知见 [Writer 委托与主动事件](../Writer/README.md#委托与主动事件)。其运行不随 Assistant 聆听停止、语音打断或对话关闭而取消；这属于该执行角色的生命周期契约，不能推定为所有角色的统一行为。
+
 ## ReACT、历史与失败
 
 共享 [Chat](../Support/Chat/README.md) 根据真实业务值/失败和轮次屏障继续；Agent/Provider/解析异常不自动重试。Action 模型观察使用轮内序号、别名、状态、结构化值；拒绝明确未执行，失败保留效果不确定性和部分结果。原生 Tool 配对及完整执行日志保持完整。
@@ -215,7 +231,7 @@ Assistant 消费根注入的只读容器来源，Task／Skill 来自自身私有
 
 ## Basic native observations
 
-BasicSkill includes eight passive platform.* sources in addition to ui.navigation. These enter CURRENT STATE through projection of the producer-owned complete Business dictionary. Native time, power, thermal, path, permissions, audio, locale and accessibility are observations; they never override frozen capability authorization or current business execution checks. Task/Skill projection remains private AGENT CONTEXT. See [Context](../Support/Context/README.md#native-platform-sources).
+BasicSkill includes eight passive platform.* sources in addition to ui.navigation. These enter CURRENT STATE through projection of the producer-owned complete Business dictionary. Native time, power, thermal, path, permissions, audio, locale and accessibility are observations; they never override frozen capability authorization or current business execution checks. Task/Skill projection remains private AGENT CONTEXT. See [Context](../Support/Context/README.md#current-facts-before-explicit-queries).
 
 ## Passive container state
 
@@ -237,17 +253,16 @@ The existing photo observation hook also recognizes successful Web.Page browse/s
 
 WebBrowsing通过ui.web读取content（empty/local/remote）及有界远程url，并通过ui.windows读取窗口身份。统一resolver按Skill声明读取这两个来源；本地文件路径与WebKit运行指标不进入Assistant上下文。
 
-默认 XML Action startTask(execution=background,executor=writer) 将单行目标和当前输入交给 Writer，无须前台 Task 或加载 Writing。sendMessage 定向补充，cancelTask(taskID,reason) 请求后台取消，finishTask 只结束前台工作。Writer 追问与终态作为正式输入，与文本和最终语音共用 FIFO，模型面向用户回复；进度事实同样由输入队列触发简短汇报。Writer 仅接纳一项任务，Assistant 观察忙碌状态并在新目标前询问是否取消当前任务。原始源码不进入 Assistant 请求，通知不拥有前台 Task。
-
-身份提示显式说明 Assistant 的协调/汇报职责、Writer 创作边界和其他运行时角色；当前创作后台执行者为 Writer，由 startTask 的 executor 选择。通信授权与角色资源不会自动成为可调用目录，不注入其他角色私有提示词。公开状态按当前 Skill.useStates 读取。
-
-
-委托后的Writer运行不随Assistant会话结束或语音打断取消。受认证阶段事实保留任务来源，进入当前对话的有界FIFO；Writer输入等待当前真实播放及前台委托回复收尾。成功汇报在真实播放屏障之后经ReplyActivity提交完成事实，由SpeechPerception决定播毕启听，Assistant模型不负责麦克风恢复。
-
-Writer 的 busy、取消替代和定向消息判断先与 SQLite 执行状态对账。创作清理完成即结束占用，不等待 task.result 接纳或用户通知；持久终态通知独立进入当前对话 FIFO，跨执行迟到与跨对话重复由可信任务绑定及已存输入身份过滤。
-
 默认BasicSkill观察全局ui.windows，包含Writer窗口。Assistant按可用Skill说明加载页面观察或窗口控制能力，不能将未加载目录解释为看不到所有窗口；窗口摘要与实际截图/正文证据区分。Writer发来的普通进度描述刚完成的回合步骤，沿现有合并队列汇报。
 
 ## 自有任务岛
 
 AssistantExecutionSession 消费 AgentRuntime 已有的本角色 Skill 状态订阅，按 activeTaskID 与前台任务阶段构造目标详情；不从其他 Agent 的任务日志推断展示。完成／取消／失败或清除前台任务时提交 end，关闭执行会话前加入展示清理。复用 Support 的 AgentIslandPublication，经身份绑定 Gateway 调用注册的 UI.Island.present/end 内部展示工具；权限仅供运行时代码使用，不暴露给模型，不改变 Assistant 的 XML Action 调度协议，也不创建 Writer 的前台 Task。展示失败可通过 presentationFailure 查询。相机、蓝牙、实际语音播放／频谱仍由各自 Actions 能力拥有者维护，UI 统一决定布局、动画与优先级。
+
+## 输入开始与自有回复字幕
+
+SpeechPerception的speech.phase(speaking)由Assistant作为控制输入处理，不启动LLM或占正式回复FIFO。按会话、可信发送者incarnation和识别turn单调去重，最多32个会话标记，关闭会话释放；满载明确拒绝。接纳新起点后经Gateway提交内部Display Action UI.Caption.clearReply，冻结当时的回复请求身份，随后结束该控制输入的输出记账；不借用beginReplyTurn、不把调用计入正在进行的模型round，也不清转写槽。原有语音打断路径不变。正常结束保留回复字幕，旧请求续轮被呈现围栏退休，实际新回复可以建立自己的身份。该动作不加入模型可见目录或Skill。
+
+前台Task灵动岛通过GatewayOutputConsumer.executeInternal调用已声明的UI.Island内部工具，
+其结果只由AssistantExecutionSession的呈现worker消费。独立呈现会话不生成Assistant输入或
+回复占用；任务/模型会话与呈现会话保持独立。内部字幕/等待态的执行回执不触发模型ReACT。

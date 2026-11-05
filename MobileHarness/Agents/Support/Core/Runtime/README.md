@@ -84,3 +84,5 @@ AgentAdmissionGate 用锁保护短 permit 与有界 FIFO 等待者；取消移�
 AgentRoundCoordinator 每轮最多登记 120 个调用，去重实际结果，在所有调用完成并 seal 后计算 needsReasoning；显式业务值或真实失败允许续推，纯取消不允许。ActionResultInbox 默认保留 128 个终态（可配 1–512），按 executionID 去重并累计淘汰，不是工作队列。
 
 AgentTaskBudget 跨同一输入的续轮累计用量，正数可选限制显式生效，生产 request/native 上限为 nil；计数饱和安全。新的用户输入有独立 Decision 预算，即使仍属于同一前台 Task。provider 网络和 Action 执行截止时间另有 owner，不等于整个 Decision 时限。
+
+AgentRoundCoordinator validates call/round pairing and single outcome ownership without truncating or rejecting values by byte count. Model-visible projections are caller-owned.

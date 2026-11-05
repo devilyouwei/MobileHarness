@@ -3,6 +3,7 @@ import StorageChat
 import StorageCore
 import StorageDatabase
 import StorageDevices
+import StorageFiles
 import StorageMedia
 import StorageTasks
 import Synchronization
@@ -21,6 +22,7 @@ public enum SQLiteDatabaseFactory {
 
 /// Owns one persistent storage scope; failed or stopped scopes are never reopened.
 public actor SQLiteDatabaseStorage: DatabaseStorage {
+    public nonisolated var workspaces: any WorkspaceRepository { get throws { try repositories().workspaces } }
     public nonisolated var chat: any ChatRepository { get throws { try repositories().chat } }
     public nonisolated var tasks: any TaskRepository { get throws { try repositories().tasks } }
     public nonisolated var media: any MediaRepository { get throws { try repositories().media } }
@@ -156,7 +158,8 @@ private final class DatabaseAccess: Sendable {
             guard !value.closed else { throw RecordStorageError.closed }
             guard value.ready, let backend = value.backend else { throw RecordStorageError.notReady }
             return DatabaseRepositories(
-                chat: backend.chat, tasks: backend.tasks, media: backend.media, devices: backend.devices)
+                chat: backend.chat, tasks: backend.tasks, media: backend.media, devices: backend.devices,
+                workspaces: backend.workspaces)
         }
     }
     func closeAdmission() {

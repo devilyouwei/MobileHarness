@@ -126,3 +126,109 @@ import UI
         }
     }
 #endif
+
+#if os(macOS)
+    extension NativePresentationTests {
+        @Test @MainActor func webPreviewPatchesRetainNativeDocumentAnchorZoomAndScriptIsolation() async throws {
+            _ = NSApplication.shared
+            let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+                .resolvingSymlinksInPath()
+            try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+            defer { try? FileManager.default.removeItem(at: root) }
+            let page = WebPageContainer()
+            page.setAvailable(true)
+            let window = NSWindow(
+                contentRect: NSRect(x: 0, y: 0, width: 520, height: 420), styleMask: [.titled], backing: .buffered,
+                defer: false)
+            window.isReleasedWhenClosed = false
+            window.contentView = page.webView
+            window.makeKeyAndOrderFront(nil)
+            defer {
+                page.close()
+                window.close()
+            }
+            func version(_ number: Int, extra: Bool) throws -> (URL, String) {
+                let directory = root.appendingPathComponent("version-\(number)")
+                try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+                let rows = (0..<80).map { "<section id='row\($0)'>Row \($0)</section>" }.joined()
+                let html = """
+                    <!doctype html><html><head><meta name=viewport content='width=device-width,initial-scale=1'>
+                    <title>Preview \(number)</title><link rel=stylesheet href=style.css></head><body>
+                    \(extra ? "<aside id='inserted' style='height:250px'>New content above</aside>" : "")
+                    \(rows)<button id=button onclick="document.body.dataset.ran='event'">Click</button>
+                    <script>document.body.dataset.ran='script';</script></body></html>
+                    """
+                try "body{margin:0;color:\(number == 1 ? "rgb(10,20,30)" : "rgb(40,50,60)")}section{height:100px}"
+                    .write(
+                        to: directory.appendingPathComponent("style.css"), atomically: true, encoding: .utf8)
+                let entry = directory.appendingPathComponent("index.html")
+                try html.write(to: entry, atomically: true, encoding: .utf8)
+                return (entry, html)
+            }
+            let first = try version(1, extra: false)
+            _ = try await page.updateLocalPreview(first.1, entry: first.0, readAccessRoot: root)
+            let view = page.webView
+            window.contentView = view
+            view.pageZoom = 1.25
+            _ = try await view.evaluateJavaScript(
+                "window.keptDocument=document;window.keptNode=document.getElementById('row40');scrollTo(0,4000)")
+            try await Task.sleep(for: .milliseconds(300))
+            let before = try #require(
+                try await view.evaluateJavaScript(
+                    "JSON.stringify({y:scrollY,top:document.getElementById('row40').getBoundingClientRect().top})")
+                    as? String)
+            let old = try #require(try JSONSerialization.jsonObject(with: Data(before.utf8)) as? [String: Double])
+            for number in 2...3 {
+                let next = try version(number, extra: true)
+                let result = try await page.updateLocalPreview(next.1, entry: next.0, readAccessRoot: root)
+                #expect(result.title == "Preview \(number)")
+                #expect(page.webView === view && view.pageZoom == 1.25)
+                let value = try #require(
+                    try await view.evaluateJavaScript(
+                        """
+                        JSON.stringify({same:window.keptDocument===document && window.keptNode===document.getElementById('row40'),
+                        top:document.getElementById('row40').getBoundingClientRect().top,color:getComputedStyle(document.body).color,
+                        safe:!document.body.dataset.ran && document.scripts.length===0 && !document.getElementById('button').hasAttribute('onclick')})
+                        """) as? String)
+                let metrics = try #require(try JSONSerialization.jsonObject(with: Data(value.utf8)) as? [String: Any])
+                #expect(metrics["same"] as? Bool == true && metrics["safe"] as? Bool == true)
+                #expect(metrics["color"] as? String == "rgb(40, 50, 60)")
+                #expect(abs((metrics["top"] as? Double ?? 99999) - (old["top"] ?? 0)) < 3)
+            }
+            // A failed stylesheet must leave the last valid document visible.
+            let broken = first.1.replacingOccurrences(of: "href=style.css", with: "href=missing.css")
+            await #expect(throws: (any Error).self) {
+                try await page.updateLocalPreview(broken, entry: first.0, readAccessRoot: root)
+            }
+            #expect(page.webView === view)
+            #expect(try await page.observe().title == "Preview 3")
+            let cancelled = Task { @MainActor in
+                try await page.updateLocalPreview(first.1, entry: first.0, readAccessRoot: root)
+            }
+            cancelled.cancel()
+            await #expect(throws: CancellationError.self) { try await cancelled.value }
+            #expect(try await page.observe().title == "Preview 3")
+            // Wheel/touch state is shared across content worlds. A patch must not scroll against it.
+            _ = try await view.callAsyncJavaScript(
+                """
+                globalThis.hostScrolls=0;const originalScroll=window.scrollTo.bind(window);
+                window.scrollTo=(...args)=>{globalThis.hostScrolls++;return originalScroll(...args);};
+                dispatchEvent(new WheelEvent('wheel',{deltaY:120})); return 'ready';
+                """, arguments: [:], in: nil, contentWorld: .defaultClient)
+            let gesture = try version(4, extra: true)
+            _ = try await page.updateLocalPreview(gesture.1, entry: gesture.0, readAccessRoot: root)
+            #expect(
+                try await view.callAsyncJavaScript(
+                    "return globalThis.hostScrolls;", arguments: [:], in: nil, contentWorld: .defaultClient) as? Int
+                    == 0)
+            let entry = try version(5, extra: true).0
+            let offset = try #require(try await view.evaluateJavaScript("scrollY") as? Double)
+            _ = try await page.loadLocal(entry, executesScripts: true, readAccessRoot: root, preservingViewport: true)
+            #expect(page.webView === view && view.pageZoom == 1.25)
+            let restored = try #require(try await view.evaluateJavaScript("scrollY") as? Double)
+            #expect(abs(restored - offset) < 3)
+            let executed = try await view.evaluateJavaScript("document.body.dataset.ran") as? String
+            #expect(executed == "script")
+        }
+    }
+#endif

@@ -4,7 +4,7 @@ import StorageChat
 import StorageCore
 import UI
 
-public enum HistoryImageLoadingError: Error { case invalidReference, busy, oversizedImage }
+public enum HistoryImageLoadingError: Error { case invalidReference, busy, oversizedImage, missingImage }
 
 /// One root-owned history operation slot. Cancel keeps admission closed until cleanup finishes.
 @MainActor
@@ -216,7 +216,8 @@ public final class ConversationHistoryWorkflow: ConversationHistoryControlling {
         else { throw HistoryImageLoadingError.invalidReference }
         let data = try await readPhoto(mediaID.rawValue, inputID.uuidString)
         try Task.checkCancellation()
-        guard data.map({ !$0.isEmpty && $0.count <= 4 * 1024 * 1024 }) ?? true else {
+        guard let data else { throw HistoryImageLoadingError.missingImage }
+        guard !data.isEmpty && data.count <= 4 * 1024 * 1024 else {
             throw HistoryImageLoadingError.oversizedImage
         }
         return data

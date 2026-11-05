@@ -227,3 +227,27 @@ The ordinary-progress worker rechecks the pending event identity after asynchron
 Writer普通进度是完成步骤的事实；请求开始不会进入Assistant摘要队列。全局窗口摘要由BasicSkill选择ui.windows，其他页面能力按Skill目录渐进加载；公共容器State与创建窗口的Agent身份无关。
 
 ChatDriver scopes request consumption with InferenceSession.withCleanup, joining the SDK request worker on normal/error/cancellation exits. It owns no model-instance lease and does not unload shared clients.
+
+Assistant在receive控制路径接纳新的speech.phase(speaking)时发布独立的clearReply内部Action，不经模型生成、正式输入FIFO或当前round调用登记。会话／source incarnation／turn去重有32会话上限，关闭会话删除标记。begunInputID绑定当前回复请求并作为清理目标传出，避免迟到clear删除新请求或旧请求继续打开已退休字幕。正式ASR final、用户文本及Writer消息的FIFO不变。
+
+Background startTask persists an Assistant-generated UUID delegation request without precreating the executor task. Acceptance returns the executor-owned task_N through the trusted repository binding. Writer event model input contains Agent/task/window/goal/stage facts, not delegate/event/interaction UUIDs. sendMessage and background cancelTask require executor + taskID; the runtime resolves the current delegation and, for answers, validates the question captured for that Assistant input.
+
+## Model request recording
+
+Agents owns AgentModelRequestRecording over existing ChatRequest/ChatEvent values. Complete submitted
+messages, tools, sampling parameters, context identity and all exposed response events are persisted in
+model_request_log alongside actual model identity, timing, errors and local tool outcomes. ModelKit has
+no history/audit interface or storage hooks. Raw HTTP/SSE and unexposed adapter options or reasoning
+are outside this record; normalized events are never presented as raw provider bodies.
+
+Assistant reply-activity snapshots retain the latest admitted final-speech acknowledgment for the
+interaction session. Later text, Writer, task-feedback and terminal publications carry that same root;
+finishing an older input cannot replace it. SpeechPerception can therefore release its pending-final
+gate from the newest complete snapshot even when transport overtakes the original acknowledgment.
+Occupancy and explicit listening consent remain independent; no task waiting state forces a microphone
+restart or bypasses playback drain.
+
+内部呈现的执行完成与模型观察分开：声明为internalActions/internalTools的回执可用于执行
+屏障和历史留证，但不作为ReACT观察或续轮理由。内部执行失败保留原始回执并结束为运行失败，
+不让模型修复UI呈现。Assistant只接纳与当前原生模型调用配对的ToolResult，未配对的结果不能
+进入正式输入FIFO。其他输入开口的clearReply不加入正在生成的另一输入的调用账本。

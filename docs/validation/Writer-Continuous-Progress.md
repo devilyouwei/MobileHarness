@@ -76,3 +76,29 @@ Qwen内容首事件等待148.56秒、内容请求183.02秒；DeepSeek47.43/55.41
 本次交付未提交commit，没有增加模型输出上限、生产总轮数或整任务超时。真机语音及Writer窗口体验等待实际交互验收；真实Assistant播报延迟尚无数值证据。机器结果包含最终源码哈希、构建/检查/安装日志摘要及截图哈希，凭据检查未发现.env.local密钥值。
 
 解锁启动后的只读base快照integrity_check=ok，原真机task_6 completed及task_5 failed记录仍在，证明安装未清空历史。WAL复制仍返回CoreDevice7000/POSIX60，不能从base推断本次是否产生新执行或最新进度。调查后删除临时SQLite副本，设备文件保持原样；真实新任务仍等待用户测试反馈。
+
+## 2026-11-05 连续 HTML 预览与视口回归
+
+本次处理流式生成/编辑触发原生页面重建、黑闪和滚动/缩放丢失。实际路径改为项目稳定文件根 + 稳定宿主 HTML + 两个轮换资源版本；流式检查点仅做宿主隔离 DOM 更新，完整运行仍导航执行脚本。未调用真实模型，未修改或清空真机 SQLite。
+
+定向原生 macOS WebKit 测试已通过：同一 document/WKWebView/带 id 节点持续存在；上方插入250px内容后阅读锚点误差小于3px；pageZoom=1.25保持；相对 CSS 换版，脚本和事件属性不在预览执行；缺失 CSS 保留最后有效画面，模拟 wheel 事件时宿主不主动 scrollTo。Artifacts 实际存储/窗口/页面串联覆盖嵌套入口、连续五版、旧槽回收、资源加载和完整运行后的 reload，两资源槽各仅一版本。窗口动画回执由测试提供。
+
+调查中真实测试发现并修正两类问题：测试窗口最初挂载的是配置安全根前的旧原生 view，导致 elementFromPoint 无可见尺寸（修正测试挂载）；删除初始 document URL 所属槽导致后续本地 CSS 加载失败（生产改用稳定宿主）。iOS 模拟器流式阶段确认六次更新保留原生1.5倍缩放、offset2400，并可继续滚动到2700。完整导航早期运行出现缩放回落到1.0/offset1800；修正为等待新内容帧同步，并避免重复赋值 pageZoom。随后覆盖完整运行与再次编辑，均保持1.5/2700；失败运行不计为通过。
+
+iOS 27 / iPhone 18 Pro 模拟器使用生产 WebPageContainer/WebPageView 的独立宿主，最后两次执行通过（第二次另覆盖完整运行后再次编辑）。原生页面与带 id 节点未替换；预览禁脚本，完整运行执行脚本；远程 HTTPS、截图及现有 PDF 回归同轮通过。日志 /tmp/web-preview-simulator-frame.log、/tmp/web-preview-simulator-transition.log；结果位于脚本打印的模拟器 Documents/acceptance.json。完整脚本及构建结果见下列补充。真机连续拖动/双指缩放和肉眼闪烁尚未验收；程序化 WebView 测试仅证明视口与文档连续性，不能证明所有设备每一帧均无闪烁。
+
+| iOS程序化阶段 | 原生缩放 | 纵向 offset |
+| --- | ---: | ---: |
+| 初始阅读 | 1.5 | 2400 |
+| 连续预览 2–5 | 每次1.5 | 每次2400 |
+| 继续向下滚动并更新第6版 | 1.5 | 2700 |
+| 第7版完整脚本运行，等待原生布局稳定后 | 1.5 | 2700 |
+| 第8版再次编辑／切回安全预览 | 1.5 | 2700 |
+
+SDK 机制参考：[WKWebView](https://developer.apple.com/documentation/webkit/wkwebview)、[allowsContentJavaScript](https://developer.apple.com/documentation/webkit/wkwebpagepreferences/allowscontentjavascript)。使用公开 WebKit/UIKit API，不注入页面特权通信桥或引入第三方 DOM 库。
+
+最终自动化记录：
+
+- /tmp/web-preview-check.log：scripts/check.sh exit0，边界/格式/资源/plist检查通过；主体Integration 1024项、LiveRuntime226项通过。审阅发现 NativePresentationTests 在既有 cameraNativeMetalDrawStopAndLayerHandoff 启动后没有完整终态输出，不能把脚本exit0解释为该原生UI套件全部执行通过；本次未修改该Metal用例或检查脚本。
+- 因此另跑 swift test --skip-build --filter 'web[A-Z]|artifactPreviewRotates'，/tmp/web-preview-webkit-final.log exit0：5项UI Web/URL、2项集成、4项工作区/共享窗口回归均通过，其中新增取消后保留页面断言通过。
+- scripts/build-ios.sh exit0，四个 scheme（MobileHarnessSimulator、ModelKitRuntime、ModelKitNemotron、ModelKitSilero）全部 BUILD SUCCEEDED，30项Skill资源及原生Live Activity验证通过；证据 /tmp/web-preview-ios.log。未安装真机或调用真实模型；不将独立模拟器宿主或编译结果描述为真机手势验收。

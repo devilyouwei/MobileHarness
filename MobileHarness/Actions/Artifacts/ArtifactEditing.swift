@@ -1,17 +1,19 @@
 import Foundation
+import StorageCore
 
-/// The latest recoverable draft; publishing remains a separate versioned operation.
+/// Current recoverable content; acceptance remains separate from editing and rendering.
 public struct ArtifactCheckpoint: Codable, Sendable {
-    public let projectID: UUID
+    public let workspaceID: WorkspaceID
     public let baseRevision: UUID?
     public let title: String
     public let entry: String
     public let draft: ArtifactDraft
     public let interrupted: Bool
     public init(
-        projectID: UUID, baseRevision: UUID?, title: String, entry: String, draft: ArtifactDraft, interrupted: Bool
+        workspaceID: WorkspaceID, baseRevision: UUID?, title: String, entry: String, draft: ArtifactDraft,
+        interrupted: Bool
     ) {
-        self.projectID = projectID
+        self.workspaceID = workspaceID
         self.baseRevision = baseRevision
         self.title = title
         self.entry = entry
@@ -24,7 +26,7 @@ public struct ArtifactCheckpoint: Codable, Sendable {
 /// One stream, no queue; callers await append, so content is never dropped under load.
 public actor ArtifactEditing {
     public struct Read: Encodable, Sendable {
-        public let reference: UUID
+        public let reference: String
         public let path: String
         public let offset: Int
         public let nextOffset: Int
@@ -48,7 +50,8 @@ public actor ArtifactEditing {
     }
     private var draft: ArtifactDraft
     private var versions: [String: UInt64] = [:]
-    private var references: [UUID: Selection] = [:]
+    private var references: [String: Selection] = [:]
+    private var nextReference: UInt64 = 0
     private var stream: Stream?
     private var closed = false
     public init(draft: ArtifactDraft) { self.draft = draft }
@@ -57,7 +60,9 @@ public actor ArtifactEditing {
         guard !closed else { throw ArtifactWorkspaceError.conflict }
         guard references.count < 128 else { throw ArtifactWorkspaceError.readReferenceLimit }
         let text = try draft.read(path, offset: offset, limit: limit)
-        let id = UUID()
+        guard nextReference < UInt64.max else { throw ArtifactWorkspaceError.readReferenceLimit }
+        nextReference += 1
+        let id = "read_\(nextReference)"
         references[id] = Selection(
             path: path, start: offset, end: offset + text.count, generation: versions[path, default: 0])
         return Read(
@@ -77,7 +82,7 @@ public actor ArtifactEditing {
         let length = lines.dropFirst(line - 1).prefix(count).reduce(0) { $0 + $1.count + 1 }
         return try read(path: path, offset: offset, limit: min(2500, max(1, length)))
     }
-    public func relatedContext(_ ids: [UUID]) throws -> String {
+    public func relatedContext(_ ids: [String]) throws -> String {
         guard ids.count <= 8 else { throw ArtifactWorkspaceError.relatedContextLimit }
         var result = ""
         for id in ids {
@@ -133,7 +138,7 @@ public actor ArtifactEditing {
         }
         draft = value
     }
-    public func begin(path: String, reference: UUID? = nil, start: Int? = nil, end: Int? = nil) throws -> UUID {
+    public func begin(path: String, reference: String? = nil, start: Int? = nil, end: Int? = nil) throws -> UUID {
         guard !closed else { throw ArtifactWorkspaceError.conflict }
         guard stream == nil else { throw ArtifactWorkspaceError.busy }
         try ArtifactDraft.validatePath(path)
@@ -192,7 +197,7 @@ public actor ArtifactEditing {
         stream = nil
     }
     /// Exact patch inside a fresh read range. No generated fragment can alter surrounding bytes.
-    public func replace(path: String, reference: UUID, old: String, new: String) throws -> ArtifactDraft {
+    public func replace(path: String, reference: String, old: String, new: String) throws -> ArtifactDraft {
         guard !closed, stream == nil, let read = references[reference], read.path == path,
             read.generation == versions[path, default: 0], let original = draft.files[path]
         else { throw ArtifactWorkspaceError.readRequired }
@@ -211,7 +216,7 @@ public actor ArtifactEditing {
         invalidate(path)
         return next
     }
-    public func remove(path: String, reference: UUID) throws -> ArtifactDraft {
+    public func remove(path: String, reference: String) throws -> ArtifactDraft {
         guard !closed, stream == nil, let read = references[reference], read.path == path,
             read.generation == versions[path, default: 0]
         else { throw ArtifactWorkspaceError.readRequired }

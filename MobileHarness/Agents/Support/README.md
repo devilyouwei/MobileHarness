@@ -60,3 +60,16 @@ Skill 文档必须显式给出 useInstructions；任务 scope 的 execution 是�
 IndependentOutputWorkflow.swift also owns AgentIslandPublication, the shared transport mechanism used by role-owned presentation adapters. It accepts neutral IslandContent or an end intent, retains one immutable in-flight command and one replaceable latest pending command, and uses a stable activity/session identity with monotonically increasing revisions. Gateway execution remains producer-bound; model-visible tools and prompts are unchanged. Failed publication retains bounded evidence and retries the latest state every500ms independently of creative work and peer reporting. Stop closes admission, cancels and joins the worker, then joins one final registered end call before producer retirement; Gateway supplies the call deadline and cleanup failure remains observable. Roles own business phases and terminal fencing; UI owns selection, layout and animation.
 
 ReplyActivity 是独立于回复执行取消的生命周期事实。OutputGateway 在 cancelCalls 的 producer/scope 取消围栏期间仍接纳类型化占用快照，并保留已经进入直接投递的快照；普通 Action、Tool 与其他通信仍按原执行取消规则处理。事实照常经过 producer/incarnation/session、通信契约及接收者权限校验，SpeechPerception 用来源 revision/incarnation 合并占用。此例外不跨越网关关闭或根生命周期准入，也不跳过真实播放清理；用户关闭许可与其他角色占用仍由感知策略保留。
+
+InputGateway accepts complete Action/Tool value completions without an observation-byte quota; trusted source/session identity, task permissions and result status consistency remain mandatory. Per-agent model context selection is separate from result delivery.
+
+执行记录的内部呈现路径投影包含UI.Caption.clearReply，与print/beginReplyTurn等统一交给UI的
+内部动作过滤器；真实失败仍可见。该分类不改变Action权限、调度或实际执行。
+
+GatewayOutputConsumer区分模型/Agent协议反馈与内部完成结果。executeInternal只接受本注册角色
+声明的internalTools且roundID为空；调用仍经过Gateway的权限、资源和执行验证，真实完成或
+失败仅返回内部调用方，不向InputGateway递送ToolResult。execute与executeReturning保持原有
+协议反馈，配对的模型工具结果仍按调用身份回到Agent。内部灵动岛呈现使用executeInternal。
+
+默认内部动作过滤同时覆盖识别字幕/封口、回复字幕、等待态、语音状态和灵动岛呈现，不把这些
+成功的运行时维护调用混入业务记录；用户打开内部动作后可查看。失败仍沿现有诊断策略可见。

@@ -1855,11 +1855,11 @@ extension LiveRuntimeTests {
         #expect(workflow.state.transportIssue == nil)
         await link.health(false)
         try await until { workflow.state.transportIssue != nil }
-        #expect(workflow.state.status(for: try link.businessID) == "已连接，异常")
+        #expect(workflow.state.status(for: try link.businessID) == "Connected, issue")
         #expect(workflow.state.canControl(try link.businessID))
         await link.health(true)
         try await until { workflow.state.transportIssue == nil }
-        #expect(workflow.state.status(for: try link.businessID) == "已连接")
+        #expect(workflow.state.status(for: try link.businessID) == "Connected")
         #expect(await link.connects == 1)
         await link.health(false)
         try await until { workflow.state.transportIssue != nil }
@@ -3145,10 +3145,10 @@ extension LiveRuntimeTests {
         try await until { await link.connects == 2 && workflow.state.phase == .connected }
         #expect(await link.waitingForObservationEnd)
         let currentDeviceID = try link.businessID
-        #expect(workflow.state.summary == "已连接" && workflow.state.status(for: currentDeviceID) == "已连接")
+        #expect(workflow.state.summary == "Connected" && workflow.state.status(for: currentDeviceID) == "Connected")
         await link.releaseObservationEnd()
         await #expect(throws: NexArmError.disconnected) { try await action.value }
-        #expect(workflow.state.phase == .connected && workflow.state.summary == "已连接")
+        #expect(workflow.state.phase == .connected && workflow.state.summary == "Connected")
         workflow.disconnect()
         await workflow.waitUntilIdle()
         observer.cancel()

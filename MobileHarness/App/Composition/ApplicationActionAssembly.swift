@@ -19,6 +19,7 @@ final class ApplicationActionAssembly {
     ) -> ActionsDependencies {
         ActionsDependencies(
             files: storage.files, model: model, platform: platform, ui: ui,
+            workspaces: { try storage.database.workspaces },
             media: { try storage.database.media }, devices: { try storage.database.devices },
             previewHistory: MemoryContainer.previewHistory,
             makeCameraRuntime: { [weak self] in

@@ -2,6 +2,7 @@ import Actions
 import Foundation
 import FunctionContracts
 import ModelKit
+import StorageCore
 import StorageFiles
 import Testing
 import UI
@@ -21,75 +22,17 @@ import UI
     #expect(throws: ArtifactWorkspaceError.existingFile) { try draft.create("index.html", content: "new") }
 }
 
-@Test func artifactPersistenceRequiresCurrentEntryAndIndexFields() throws {
+@Test func artifactProjectEncodingRequiresEntryField() throws {
     let project = ArtifactProject(
-        id: UUID(), revision: UUID(), title: "Current", files: ["index.html": "index.html"], previousVersions: [])
+        id: try #require(WorkspaceID(agent: "writer", taskID: "task_1")), revision: UUID(), title: "Current",
+        files: ["index.html": "index.html"])
     let encoded = try JSONEncoder().encode(project)
     #expect(try JSONDecoder().decode(ArtifactProject.self, from: encoded) == project)
     var oldProject = try #require(JSONSerialization.jsonObject(with: encoded) as? [String: Any])
     oldProject.removeValue(forKey: "entryPath")
     let oldProjectData = try JSONSerialization.data(withJSONObject: oldProject)
     #expect(throws: DecodingError.self) { try JSONDecoder().decode(ArtifactProject.self, from: oldProjectData) }
-    #expect(throws: DecodingError.self) {
-        try JSONDecoder().decode(ArtifactWorkspaceIndex.self, from: Data(#"{"projects":[]}"#.utf8))
-    }
-    let index = try JSONDecoder().decode(
-        ArtifactWorkspaceIndex.self, from: JSONEncoder().encode(ArtifactWorkspaceIndex()))
-    #expect(index.projects.isEmpty && index.pendingDeletions.isEmpty && index.drafts.isEmpty)
-}
 
-@Test func webWorkspacePersistsVersionsAndRejectsStaleWrites() async throws {
-    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-    defer { try? FileManager.default.removeItem(at: root) }
-    let disk = try DiskFileStore(root: root)
-    let index = try FileDocumentStore<ArtifactWorkspaceIndex>(url: root.appendingPathComponent("index.json"))
-    let workspace = ArtifactWorkspace(disk: disk, index: index)
-    let id = UUID()
-    var draft = try ArtifactDraft(files: ["index.html": "<h1>First</h1>", "assets/style.css": "h1 {color:red}"])
-    let first = try await workspace.publish(id: id, expecting: nil, title: "Graph", draft: draft)
-    let firstURL = try await workspace.entry(first)
-    _ = try draft.read("index.html")
-    try draft.replace("index.html", old: "First", new: "Second")
-    let second = try await workspace.publish(id: id, expecting: first.revision, title: "Graph", draft: draft)
-    #expect(try String(contentsOf: firstURL, encoding: .utf8) == "<h1>First</h1>")
-    let secondURL = try await workspace.entry(second)
-    #expect(try String(contentsOf: secondURL, encoding: .utf8) == "<h1>Second</h1>")
-    await #expect(throws: ArtifactWorkspaceError.conflict) {
-        try await workspace.publish(id: id, expecting: first.revision, title: "Graph", draft: draft)
-    }
-    let reopened = ArtifactWorkspace(
-        disk: disk, index: try FileDocumentStore(url: root.appendingPathComponent("index.json")))
-    #expect(try await reopened.project(id).revision == second.revision)
-    let restored = try await reopened.version(id, revision: first.revision)
-    #expect(restored.files["index.html"] == "<h1>First</h1>")
-    #expect(restored.files["assets/style.css"] == "h1 {color:red}")
-    try await reopened.delete(id)
-    #expect(try await reopened.list().isEmpty)
-    #expect(!FileManager.default.fileExists(atPath: firstURL.path))
-}
-
-@Test func webWorkspaceRetainsDeletionIdentityWhenConfinedCleanupFails() async throws {
-    let files = FileManager.default
-    let root = files.temporaryDirectory.appendingPathComponent(UUID().uuidString).resolvingSymlinksInPath()
-    defer { try? files.removeItem(at: root) }
-    let index = try MemoryDocumentStore<ArtifactWorkspaceIndex>()
-    let workspace = ArtifactWorkspace(disk: try DiskFileStore(root: root), index: index)
-    let id = UUID()
-    _ = try await workspace.publish(
-        id: id, expecting: nil, title: "Delete",
-        draft: ArtifactDraft(files: ["index.html": "<p>safe</p>"]))
-    let original = root.appendingPathComponent(id.uuidString)
-    let held = root.appendingPathComponent("held")
-    try files.moveItem(at: original, to: held)
-    try files.createSymbolicLink(at: original, withDestinationURL: held)
-    await #expect(throws: FileStorageError.invalidPath) { try await workspace.delete(id) }
-    #expect(try await index.load()?.value.pendingDeletions == [id])
-    #expect(files.fileExists(atPath: held.path))
-    try files.removeItem(at: original)
-    try files.moveItem(at: held, to: original)
-    try await workspace.delete(id)
-    #expect(try await index.load()?.value.pendingDeletions == [])
-    #expect(!files.fileExists(atPath: original.path))
 }
 
 @Test func artifactStreamsAreAtomicAndRejectStaleRanges() async throws {
@@ -108,23 +51,6 @@ import UI
     try await editor.append("partial", to: cancelled)
     try await editor.cancel(cancelled)
     #expect(await editor.snapshot().files["new.txt"] == nil)
-}
-
-@Test func artifactMarkdownPublishesAndCheckpointDoesNotReplaceVersion() async throws {
-    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-    defer { try? FileManager.default.removeItem(at: root) }
-    let index = try MemoryDocumentStore<ArtifactWorkspaceIndex>()
-    let workspace = ArtifactWorkspace(disk: try DiskFileStore(root: root), index: index)
-    let id = UUID()
-    let initial = try ArtifactDraft(files: ["document.md": "# Hello"])
-    let saved = try await workspace.publish(id: id, expecting: nil, title: "Note", draft: initial, entry: "document.md")
-    try await workspace.checkpoint(
-        .init(
-            projectID: id, baseRevision: saved.revision, title: "Note", entry: "document.md",
-            draft: ArtifactDraft(files: ["document.md": "# Unfinished"]), interrupted: true))
-    #expect(try await workspace.project(id).files == initial.files)
-    #expect(try await workspace.checkpoint(for: id)?.interrupted == true)
-    #expect(try await workspace.entry(saved).lastPathComponent == "document.md")
 }
 
 @Test func artifactZIPPreservesNestedUTF8SourcesWithoutShell() throws {
@@ -146,63 +72,6 @@ import UI
     #expect(process.terminationStatus == 0)
     #expect(String(decoding: data, as: UTF8.self).contains("assets/style.css"))
     #expect(throws: ArtifactWorkspaceError.invalidPath) { try ArtifactArchive.zip(["../bad.txt": "bad"]) }
-}
-
-@Test func workspaceKeepsProjectsAndVersionsBeyondFormerQuotas() async throws {
-    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-    defer { try? FileManager.default.removeItem(at: root) }
-    let index = try FileDocumentStore<ArtifactWorkspaceIndex>(
-        url: root.appendingPathComponent("index.json"), maximumBytes: 8 * 1024 * 1024)
-    let workspace = ArtifactWorkspace(disk: try DiskFileStore(root: root), index: index)
-    let ids = (0..<10).map { _ in UUID() }
-    for id in ids {
-        let draft = try ArtifactDraft(files: ["index.html": "<h1>Project</h1>"])
-        try await workspace.checkpoint(
-            .init(
-                projectID: id, baseRevision: nil, title: "Project", entry: "index.html", draft: draft, interrupted: true
-            ))
-        _ = try await workspace.publish(id: id, expecting: nil, title: "Project", draft: draft)
-    }
-    let id = try #require(ids.first)
-    var project = try await workspace.project(id)
-    let original = project.revision
-    for revision in 0..<18 {
-        project = try await workspace.publish(
-            id: id, expecting: project.revision, title: "Revised",
-            draft: ArtifactDraft(files: ["index.html": "<h1>Revision \(revision)</h1>"]))
-    }
-    #expect(project.previousVersions.count == 18)
-    #expect(try await workspace.version(id, revision: original).files["index.html"] == "<h1>Project</h1>")
-    let reopened = ArtifactWorkspace(
-        disk: try DiskFileStore(root: root),
-        index: try FileDocumentStore(url: root.appendingPathComponent("index.json"), maximumBytes: 8 * 1024 * 1024))
-    #expect(try await reopened.list().count == 10)
-    #expect(try await reopened.project(id).previousVersions.count == 18)
-}
-
-@Test func largeMultiFileDraftStreamsPublishesAndRestoresWithoutSourceQuota() async throws {
-    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-    defer { try? FileManager.default.removeItem(at: root) }
-    let source = "<h1>" + String(repeating: "中文🌍", count: 24_000) + "</h1>"
-    let editor = ArtifactEditing(draft: try ArtifactDraft())
-    let stream = try await editor.begin(path: "index.html")
-    for chunk in ["<h1>", String(repeating: "中文🌍", count: 24_000), "</h1>"] {
-        try await editor.append(chunk, to: stream)
-    }
-    var draft = try await editor.finish(stream)
-    for number in 0..<40 { try draft.create("files/file\(number).txt", content: String(repeating: "x", count: 2048)) }
-    #expect(draft.files.count > 32 && source.utf8.count > 65_536)
-    let workspace = ArtifactWorkspace(
-        disk: try DiskFileStore(root: root),
-        index: try FileDocumentStore(url: root.appendingPathComponent("index.json"), maximumBytes: 8 * 1024 * 1024))
-    let id = UUID()
-    let first = try await workspace.publish(id: id, expecting: nil, title: "Large", draft: draft)
-    let entry = try await workspace.entry(first)
-    #expect(try String(contentsOf: entry, encoding: .utf8).hasSuffix(source))
-    _ = try draft.read("index.html")
-    try draft.replace("index.html", old: "<h1>", new: "<h1 class=updated>")
-    _ = try await workspace.publish(id: id, expecting: first.revision, title: "Large", draft: draft)
-    #expect(try await workspace.version(id, revision: first.revision).files["index.html"] == source)
 }
 
 @Test func archiveRejectsZIP64RequirementsBeforeWritingTruncatedCounts() throws {
@@ -265,17 +134,18 @@ private func webWindowInput(_ command: String, windowID: String, extra: [String:
     let service = WebExecutionService(
         page: root, windows: windows, pageForWindow: { pages[$0] },
         saveImage: { _, _ in "media_1" })
-    let result = try await service.perform("inspect", invocation: webWindowInput("inspect", windowID: first.uuidString))
+    let result = try await service.perform(
+        "inspect", invocation: webWindowInput("inspect", windowID: try #require(windows.reference(for: first))))
     let values = try #require(JSONSerialization.jsonObject(with: Data(result.utf8)) as? [String: Any])
     #expect(values["text"] as? String == "Diagram A")
-    #expect(values["windowID"] as? String == first.uuidString)
+    #expect(values["windowID"] as? String == (try #require(windows.reference(for: first))))
     #expect(values["url"] == nil)
     let screenshot = try await service.perform(
-        "snapshot", invocation: webWindowInput("snapshot", windowID: second.uuidString))
+        "snapshot", invocation: webWindowInput("snapshot", windowID: try #require(windows.reference(for: second))))
     #expect(screenshot.contains("media_1"))
     #expect(a.reads == 1 && a.snapshots == 0 && b.snapshots == 1 && root.reads == 0)
     #expect(windows.windows.count == 2)
-    await #expect(throws: ActionExecutionError.self) {
+    await #expect(throws: WindowError.self) {
         try await service.perform("inspect", invocation: webWindowInput("inspect", windowID: "not-a-uuid"))
     }
     await #expect(throws: WindowError.missing) {

@@ -20,7 +20,7 @@ public final class ConversationHistoryState {
         archive = snapshot
         self.status = status
     }
-    public init(title: String = "Assistant 聊天记录") {
+    public init(title: String = "My Assistant") {
         self.title = title
     }
 
@@ -226,7 +226,7 @@ public struct HistoryNativeToolCall: Codable, Sendable, Equatable {
 }
 
 public struct HistoryDecisionMetadata: Codable, Sendable {
-    public var runID: String? = nil
+    public var delegateID: String? = nil
     public var taskGoal: String? = nil
     public var execution: String? = nil
     public let taskID: String?
@@ -263,6 +263,7 @@ public struct HistoryModelRequest: Codable, Sendable, Identifiable {
     public let requestJSON: String
     public var historyTaskID: String? = nil
     public var decisionMetadata: HistoryDecisionMetadata? = nil
+    public var modelRequestCompletedAt: Date? = nil
     public let modelRequestStartedAt: Date?
     public let firstTokenLatency: Double?
     public let firstTokenAt: Date?

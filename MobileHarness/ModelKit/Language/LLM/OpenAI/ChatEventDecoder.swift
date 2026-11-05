@@ -130,11 +130,6 @@ struct ChatEventDecoder {
                     .invalidToolArguments, stage: .toolArguments, field: "delta", index: index, name: call.name)
             }
             call.arguments += delta
-            guard call.arguments.utf8.count <= 4096 else {
-                throw failure(
-                    .invalidToolArguments, stage: .toolArguments, field: "arguments.exceeds4096", index: index,
-                    name: call.name)
-            }
             calls[index] = call
             timing?.recordToolArguments(delta)
             return []
@@ -311,7 +306,7 @@ struct ChatEventDecoder {
         guard let name = toolNames[wireName] else {
             throw failure(.undeclaredTool, stage: .completion, field: "name", index: index, name: wireName)
         }
-        guard let arguments = item["arguments"] as? String, arguments.utf8.count <= 4096,
+        guard let arguments = item["arguments"] as? String,
             (try? JSONDecoder().decode([String: String].self, from: Data(arguments.utf8))) != nil
         else {
             throw failure(.invalidToolArguments, stage: .toolEnd, field: "arguments", index: index, name: wireName)

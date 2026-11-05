@@ -148,8 +148,8 @@ private actor WriterEvaluationChat: ChatCapability {
         completion = nil
         if let error { pending?.resume(throwing: error) } else { pending?.resume() }
     }
-    func show(_ id: UUID, entry: String, files: [String: String], preview: Bool) async throws -> String {
-        let directory = root.appendingPathComponent(id.uuidString).appendingPathComponent(UUID().uuidString)
+    func show(_ id: WorkspaceID, entry: String, files: [String: String], preview: Bool) async throws -> String {
+        let directory = root.appendingPathComponent(id.rawValue).appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         for (path, content) in files {
             let file = directory.appendingPathComponent(path)
@@ -271,10 +271,7 @@ func writerRealModelWorkflowRegression() async throws {
     let model = WriterEvaluationChat(provider: provider, trace: root.appendingPathComponent("requests.json"))
     let records = try SQLiteRepositories(url: root.appendingPathComponent("records.sqlite"))
     let disk = try DiskFileStore(root: root.appendingPathComponent("workspaces"))
-    let workspace = ArtifactWorkspace(
-        disk: disk,
-        index: try FileDocumentStore<ArtifactWorkspaceIndex>(
-            url: root.appendingPathComponent("workspace-index.json"), maximumBytes: Int.max - 1))
+    let workspace = ArtifactWorkspace(disk: disk, catalog: records.workspaces)
     let renderer = await WriterEvaluationRenderer(root: root.appendingPathComponent("render"))
     let artifacts = ArtifactService(
         workspace: workspace,
@@ -319,17 +316,18 @@ func writerRealModelWorkflowRegression() async throws {
             let previous = scenario.resumes.flatMap { tasks[$0] }
             if scenario.resumes != nil, previous?.status != "completed" { throw WriterEvaluationError.missingTask }
             var before: ArtifactProject?
-            if let raw = previous?.projectID, let id = UUID(uuidString: raw) {
+            if let raw = previous?.workspaceID, let id = WorkspaceID(rawValue: raw) {
                 before = try await workspace.project(id)
             }
-            let task = try await records.tasks.beginDelegation(
+            let task = try await records.tasks.seedDelegation(
                 taskID: previous?.id, goal: scenario.goal, input: scenario.goal, sourceDialog: nil, agent: "writer")
             item["taskID"] = task.id
-            item["runID"] = task.runID
+            item["delegateID"] = task.delegateID
             let scope = AgentTaskScope(
-                id: task.runID, requester: .assistant, executor: .writer, sessionID: session, execution: .background)
+                id: task.delegateID, requester: .assistant, executor: .writer, sessionID: session,
+                execution: .background)
             var data = ["request": scenario.goal, "goal": scenario.goal, "entry": scenario.entry, "taskID": task.id]
-            if let project = task.projectID { data["projectID"] = project }
+            data["workspaceID"] = task.workspaceID
             let signal = try AgentTaskSignal(
                 kind: .request, scope: scope, businessContract: "writer.author", data: JSONEncoder().encode(data))
             let receipt = try await messaging.send(
@@ -360,11 +358,11 @@ func writerRealModelWorkflowRegression() async throws {
                 }
                 try await Task.sleep(for: .milliseconds(100))
             }
-            if let current = tasks[scenario.resumes ?? scenario.id], let raw = current.projectID,
-                let id = UUID(uuidString: raw)
+            if let current = tasks[scenario.resumes ?? scenario.id],
+                let id = WorkspaceID(rawValue: current.workspaceID)
             {
                 if let project = try? await workspace.project(id) {
-                    item["projectID"] = raw
+                    item["workspaceID"] = current.workspaceID
                     item["files"] = project.files.mapValues { $0.utf8.count }
                     let html = project.files[scenario.entry] ?? ""
                     if html.isEmpty { issues.append("Missing entry") }
@@ -381,8 +379,8 @@ func writerRealModelWorkflowRegression() async throws {
                             issues.append("Unrelated file changed: \(path)")
                         }
                         if !html.contains("中文测试计数器") { issues.append("Title not modified") }
-                        if previous?.id != current.id || previous?.projectID != current.projectID
-                            || previous?.runID == current.runID
+                        if previous?.id != current.id || previous?.workspaceID != current.workspaceID
+                            || previous?.delegateID == current.delegateID
                         {
                             issues.append("Resume identity mismatch")
                         }
@@ -437,7 +435,7 @@ func writerRealModelWorkflowRegression() async throws {
             let calls = archive.current.turns.flatMap { $0.modelRequests ?? [] }.flatMap(\.toolCalls)
             if calls.contains(where: { $0.state == .received }) { issues.append("Unpaired tool call") }
         } catch { issues.append(String(describing: error)) }
-        let requestRecords = await model.records.filter { $0["scope"] == item["runID"] as? String }
+        let requestRecords = await model.records.filter { $0["scope"] == item["delegateID"] as? String }
         item["requests"] = requestRecords.count
         item["contentRequests"] = requestRecords.filter { $0["phase"] == "content" }.count
         item["seconds"] = Date().timeIntervalSince(start)
@@ -463,10 +461,10 @@ func writerRealModelWorkflowRegression() async throws {
     try await context.unload()
     let reopened = try SQLiteRepositories(url: root.appendingPathComponent("records.sqlite"))
     let restored = try ConversationRecordStore(repository: reopened.chat, tasks: reopened.tasks, agent: "writer")
-    let projects = tasks.values.compactMap(\.projectID)
+    let projects = tasks.values.compactMap(\.workspaceID)
     #expect(Set(projects).count == projects.count)
     for task in tasks.values {
-        #expect(try await reopened.tasks.delegatedTask(task.id, agent: "writer").projectID == task.projectID)
+        #expect(try await reopened.tasks.delegatedTask(task.id, agent: "writer").workspaceID == task.workspaceID)
         let history = try await restored.read(task.dialogID)
         let calls = history.turns.flatMap { $0.modelRequests ?? [] }.flatMap(\.toolCalls)
         #expect(!history.turns.isEmpty)
@@ -482,7 +480,7 @@ func writerEvaluationWebKitReloadsLocalResourcesAndChecksClick() async throws {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     defer { try? FileManager.default.removeItem(at: root) }
     let renderer = await WriterEvaluationRenderer(root: root)
-    let id = UUID()
+    let id = try #require(WorkspaceID(agent: "writer", taskID: "task_1"))
     let html =
         "<!doctype html><meta charset='utf-8'><button id='increment'>+</button><span id='count'>0</span><script src='app.js'></script>"
     _ = try await renderer.show(

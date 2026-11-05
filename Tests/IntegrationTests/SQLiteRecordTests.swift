@@ -179,8 +179,8 @@ func sqliteHundredThousandMessagesHaveBoundedIndexedPages() async throws {
     let pageTime = ContinuousClock.now - seeded
     let plan = try db.chat.previewQueryPlan(dialog: dialog.id, after: 99_900)
     let taskPlan = try db.chat.previewQueryPlan(dialog: dialog.id, after: 99_900, taskID: task)
-    #expect(plan.contains { $0.contains("message_order") && $0.contains("position>?") })
-    #expect(taskPlan.contains { $0.contains("message_task") && $0.contains("position>?") })
+    #expect(plan.contains { $0.contains("request_order") && $0.contains("position>?") })
+    #expect(taskPlan.contains { $0.contains("request_order") && $0.contains("position>?") })
     #expect(!plan.contains { $0.contains("TEMP B-TREE") || $0.contains("SCAN m") })
     #expect(!taskPlan.contains { $0.contains("TEMP B-TREE") || $0.contains("SCAN m") })
     var maxPayloadBytes = 0
@@ -198,11 +198,11 @@ func sqliteHundredThousandMessagesHaveBoundedIndexedPages() async throws {
         order: 100_001, date: Date(), body: "one new message", state: "completed", detail: Data("{}".utf8))
     try db.chat.save(dialog: dialog.id, revision: 101, recovery: nil, messages: [added], summaries: [])
     let changedRows = db.lastWriteChanges
-    #expect(changedRows <= 4)
-    #expect(try db.chat.storageStatistics().messages == 100_001)
+    #expect(changedRows <= 8)
+    #expect(try db.chat.storageStatistics().messages == 50_001)
     try db.chat.save(dialog: dialog.id, revision: 101, recovery: nil, messages: [added], summaries: [])
-    #expect(try db.chat.storageStatistics().messages == 100_001)
-    #expect(db.lastWriteChanges <= 4)
+    #expect(try db.chat.storageStatistics().messages == 50_001)
+    #expect(db.lastWriteChanges <= 8)
     #if os(macOS)
         var usage = rusage()
         #expect(getrusage(RUSAGE_SELF, &usage) == 0)
@@ -328,7 +328,7 @@ func sqliteHundredThousandMessagesHaveBoundedIndexedPages() async throws {
             completedAt: Date(), sources: sources)
     ]
     try await records.saveCurrent(.init(conversation: window))
-    #expect(try db.chat.storageStatistics().messages == 48)
+    #expect(try db.chat.storageStatistics().messages == 24)
     #expect(try db.chat.taskSources(task).count == 3)
     let first = try await records.page(dialog)
     var display = try await HistoryPresentationAdapter.conversation(first)
@@ -357,10 +357,10 @@ func sqliteHundredThousandMessagesHaveBoundedIndexedPages() async throws {
         return
     }
     #expect(saved.taskID == task && saved.reportedSummary == "done")
-    #expect(try db.chat.storageStatistics().messages == 48)
+    #expect(try db.chat.storageStatistics().messages == 24)
 }
 
-@Test func sqliteLargeSnapshotsDeduplicateAndKeepExactUnicodeStrings() async throws {
+@Test func sqliteLargeSnapshotsKeepFullIndependentJSONAndExactUnicodeStrings() async throws {
     let db = try SQLiteRepositories.temporary()
     let dialog = try await db.chat.current(agent: "fixture")
     let prompt = String(repeating: "提示词🙂 with spaces\n", count: 2000)
@@ -387,8 +387,8 @@ func sqliteHundredThousandMessagesHaveBoundedIndexedPages() async throws {
         #expect(json["requestJSON"] == text && json["catalogJSON"] == catalog)
     }
     let statistics = try db.chat.storageStatistics()
-    #expect(statistics.sharedChunks > 0)
-    #expect(statistics.evidenceBytes < (prompt.utf8.count + catalog.utf8.count) * 2)
+    #expect(statistics.requests == 3)
+    #expect(statistics.requestLogBytes > (prompt.utf8.count + catalog.utf8.count) * 3)
 }
 
 @Test func sqliteAgentPartitionAndSharedEvidenceSurviveDeletion() async throws {
@@ -430,11 +430,14 @@ func sqliteHundredThousandMessagesHaveBoundedIndexedPages() async throws {
     var cursor: Int64?
     var orders: [UInt64] = []
     var identifiers: Set<String> = []
-    while let item = try await db.chat.messages(dialog: dialog.id, after: cursor, limit: 1).first {
-        orders.append(item.order)
-        let id = try #require(item.id)
-        #expect(identifiers.insert(id).inserted)
-        cursor = try BusinessRecordID.number(id, kind: .message)
+    while true {
+        let page = try db.chat.messagePage(dialog: dialog.id, after: cursor, limit: 1)
+        for item in page.records where item.role == "assistant" {
+            orders.append(item.order)
+            #expect(identifiers.insert(try #require(item.id)).inserted)
+        }
+        guard let next = page.next else { break }
+        cursor = next
     }
     #expect(orders == [1, 1, 2, 2, 3, 3])
     #expect(identifiers.count == 6)
@@ -488,7 +491,9 @@ func sqliteHundredThousandMessagesHaveBoundedIndexedPages() async throws {
     #expect(identities.count == 2)
     #expect(identities.first?.state == "completed")
     #expect(identities.last?.id == responseID && identities.last?.state == "generating")
-    #expect(identities.last?.body.isEmpty == true && identities.last?.detail.isEmpty == true)
+    #expect(identities.last?.body.isEmpty == true)
+    let header = try JSONDecoder().decode(ConversationModelRequest.self, from: #require(identities.last?.detail))
+    #expect(header.id == requestID && header.requestJSON == "[]" && header.response.isEmpty)
     let writes = db.committedWriteCount
     for _ in 0..<100 { try await store.append("chunk", to: input) }
     #expect(db.committedWriteCount == writes)

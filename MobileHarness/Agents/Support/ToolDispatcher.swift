@@ -2,6 +2,9 @@ import AgentCore
 import FunctionContracts
 import Gateway
 
+/// Scoped by the producer-bound consumer; child execution tasks inherit the result owner.
+enum AgentToolFeedbackDelivery { @TaskLocal static var internalCompletion = false }
+
 /// Native call adapter: native calls execute directly without Channel/wait; feedback crosses InputGateway.
 struct ToolDispatcher: Sendable {
     let catalog: ActionCatalogSnapshot
@@ -57,6 +60,7 @@ struct ToolDispatcher: Sendable {
         guard let result else { return nil }
         if Task.isCancelled, result.completion?.hasExecutionFailure == true { return result }
         try Task.checkCancellation()
+        if AgentToolFeedbackDelivery.internalCompletion { return result }
         if envelope.roundID == nil, descriptor?.directResultPolicy == .completionOnly { return result }
         let failure: String?
         do {

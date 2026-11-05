@@ -17,7 +17,9 @@ public enum WindowActions {
         let args = ActionArguments(invocation.call.parameters)
         try args.validateAllowedKeys(["windowID"])
         let raw = try args.requiredString("windowID", maximumUTF8Bytes: 36)
-        guard let id = UUID(uuidString: raw) else { throw ActionArguments.ValidationError.invalidValue("windowID") }
+        let id = raw
+        guard raw.hasPrefix("window_"), let number = UInt64(raw.dropFirst(7)), number > 0, raw == "window_\(number)"
+        else { throw ActionArguments.ValidationError.invalidValue("windowID") }
         try Task.checkCancellation()
         try await windows.performWindow(.focus, id: id, x: nil, y: nil, invocation: invocation)
         return "presented"
@@ -37,7 +39,9 @@ public enum WindowActions {
         let args = ActionArguments(invocation.call.parameters)
         try args.validateAllowedKeys(["windowID"])
         let raw = try args.requiredString("windowID", maximumUTF8Bytes: 36)
-        guard let id = UUID(uuidString: raw) else { throw ActionArguments.ValidationError.invalidValue("windowID") }
+        let id = raw
+        guard raw.hasPrefix("window_"), let number = UInt64(raw.dropFirst(7)), number > 0, raw == "window_\(number)"
+        else { throw ActionArguments.ValidationError.invalidValue("windowID") }
         try Task.checkCancellation()
         try await windows.performWindow(.minimize, id: id, x: nil, y: nil, invocation: invocation)
         return "presented"
@@ -57,7 +61,9 @@ public enum WindowActions {
         let args = ActionArguments(invocation.call.parameters)
         try args.validateAllowedKeys(["windowID"])
         let raw = try args.requiredString("windowID", maximumUTF8Bytes: 36)
-        guard let id = UUID(uuidString: raw) else { throw ActionArguments.ValidationError.invalidValue("windowID") }
+        let id = raw
+        guard raw.hasPrefix("window_"), let number = UInt64(raw.dropFirst(7)), number > 0, raw == "window_\(number)"
+        else { throw ActionArguments.ValidationError.invalidValue("windowID") }
         try Task.checkCancellation()
         try await windows.performWindow(.maximize, id: id, x: nil, y: nil, invocation: invocation)
         return "presented"
@@ -77,7 +83,9 @@ public enum WindowActions {
         let args = ActionArguments(invocation.call.parameters)
         try args.validateAllowedKeys(["windowID"])
         let raw = try args.requiredString("windowID", maximumUTF8Bytes: 36)
-        guard let id = UUID(uuidString: raw) else { throw ActionArguments.ValidationError.invalidValue("windowID") }
+        let id = raw
+        guard raw.hasPrefix("window_"), let number = UInt64(raw.dropFirst(7)), number > 0, raw == "window_\(number)"
+        else { throw ActionArguments.ValidationError.invalidValue("windowID") }
         try Task.checkCancellation()
         try await windows.performWindow(.restore, id: id, x: nil, y: nil, invocation: invocation)
         return "presented"
@@ -99,7 +107,9 @@ public enum WindowActions {
         let args = ActionArguments(invocation.call.parameters)
         try args.validateAllowedKeys(["windowID", "x", "y"])
         let raw = try args.requiredString("windowID", maximumUTF8Bytes: 36)
-        guard let id = UUID(uuidString: raw) else { throw ActionArguments.ValidationError.invalidValue("windowID") }
+        let id = raw
+        guard raw.hasPrefix("window_"), let number = UInt64(raw.dropFirst(7)), number > 0, raw == "window_\(number)"
+        else { throw ActionArguments.ValidationError.invalidValue("windowID") }
         let x = try args.requiredFiniteDouble("x", range: 0...1)
         let y = try args.requiredFiniteDouble("y", range: 0...1)
         guard x.isFinite, y.isFinite, (0...1).contains(x), (0...1).contains(y) else {
@@ -124,7 +134,9 @@ public enum WindowActions {
         let args = ActionArguments(invocation.call.parameters)
         try args.validateAllowedKeys(["windowID"])
         let raw = try args.requiredString("windowID", maximumUTF8Bytes: 36)
-        guard let id = UUID(uuidString: raw) else { throw ActionArguments.ValidationError.invalidValue("windowID") }
+        let id = raw
+        guard raw.hasPrefix("window_"), let number = UInt64(raw.dropFirst(7)), number > 0, raw == "window_\(number)"
+        else { throw ActionArguments.ValidationError.invalidValue("windowID") }
         try Task.checkCancellation()
         try await windows.performWindow(.close, id: id, x: nil, y: nil, invocation: invocation)
         return "presented"

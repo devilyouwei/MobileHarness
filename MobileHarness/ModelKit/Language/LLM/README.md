@@ -45,8 +45,8 @@ Cloud serialization preserves every original message boundary. Gemma fits an inf
 
 | Field | Bound / validation |
 | --- | --- |
-| Messages | 非空，最多 64 条；content 与 native ID/name/arguments 合计最多 65,536 UTF-8 字节。 |
-| Native history | 只允许 assistant 声明 calls；ID 全请求唯一，结果逐项配对且 pending 集合最终为空；call ID/name/arguments 最多 512/64/4096 字节。 |
+| Messages | 非空，最多 64 条；content 与 native ID/name 合计最多 65,536 UTF-8 字节；原生参数没有固定字节上限，实际 token 窗口由 Provider 判定。 |
+| Native history | 只允许 assistant 声明 calls；ID 全请求唯一，结果逐项配对且 pending 集合最终为空；call ID/name 最多 512/64 字节，arguments 不设置固定长度限制。 |
 | Images | 只允许 user role；JPEG/PNG 非空，单张 ≤4 MiB，总计最多四张/16 MiB。 |
 | Tools | 名称唯一，最多 128；定义分别及合计 ≤65,536 字节；中立 function envelope 必须有名称和参数对象。 |
 | Generation options | temperature 为有限 0…2；显式 maximumOutputTokens 必须正数，nil 不设置输出预算。额外 provider 限制由适配器拥有。 |

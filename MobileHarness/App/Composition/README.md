@@ -95,4 +95,8 @@ Web presentation is injected directly from UIContainer into ApplicationPresentat
 
 ApplicationPresentation 将 WriterContainer 的 WriterRecordsControlling 与 Actions 的 WriterArtifactsControlling 注入 Writer 专属任务页面；不再为 Writer 组装 Assistant 会话历史管理或标题工作流。任务、消息、图片读取由 WriterContainer 提供；文件预览与导出由 Actions 根管理。
 
-Settings uses independent assistantHistory/writerHistory routes to injected record destinations. Writer request summaries are projected by WriterContainer; App does not parse SQL, model calls or progress policy.
+Settings uses independent assistantHistory/writerHistory routes to injected My Assistant/My Writer record destinations. Writer request summaries are projected by WriterContainer; App does not parse SQL, model calls or progress policy.
+
+普通Scene转发保持Writer创作连续，仅通知其预览可见性；Actions在前台恢复Artifacts最新快照，UI继续独立管理原生表面可用性。显式根暂停/替换/关闭沿原清理图执行，不借用Scene事件暂停Writer模型循环。
+
+ActionsDependencies receives a lazy WorkspaceRepository getter from the existing Storage database, alongside media/device getters. It is resolved after foundation readiness and creates no parallel database or JSON catalog.

@@ -1,6 +1,7 @@
 #if os(iOS)
     import CallRuntime
     import Foundation
+    import StorageDatabase
     import FunctionContracts
     import ModelKit
     import ModelKitOpenAI
@@ -17,11 +18,12 @@
     @MainActor @available(iOS 27, *)
     final class ActionsBusinessAssembly {
         unowned let actions: ActionsContainer
+        let workspaces: @Sendable () throws -> any WorkspaceRepository
         let files: FilesContainer
         let model: ModelContainer
         let platform: PlatformContainer
         let ui: UIContainer
-        let photos: CapturedPhotoStore
+        let photos: MediaStore
         let bluetooth: BluetoothWorkflow
         let device: NexArmDeviceAdapter
         let previewHistory: @MainActor (HistoryTurn) -> String
@@ -31,13 +33,15 @@
         private let connectVision: @MainActor (String, Bool, any CameraOutputHandling) async throws -> Void
         private var endpoints: ActionEndpoints?
         init(
-            actions: ActionsContainer, files: FilesContainer, model: ModelContainer,
-            platform: PlatformContainer, ui: UIContainer, photos: CapturedPhotoStore, bluetooth: BluetoothWorkflow,
+            actions: ActionsContainer, files: FilesContainer,
+            workspaces: @escaping @Sendable () throws -> any WorkspaceRepository, model: ModelContainer,
+            platform: PlatformContainer, ui: UIContainer, photos: MediaStore, bluetooth: BluetoothWorkflow,
             previewHistory: @escaping @MainActor (HistoryTurn) -> String,
             makeCameraRuntime: @escaping @MainActor () throws -> CameraRuntimeDependencies,
             connectVision: @escaping @MainActor (String, Bool, any CameraOutputHandling) async throws -> Void
         ) {
             self.actions = actions
+            self.workspaces = workspaces
             self.files = files
             self.model = model
             self.platform = platform
@@ -141,10 +145,7 @@
             let island = IslandPresentationService(state: ui.island)
             let islandDomains = IslandDomainPresentation(service: island, home: ui.home, camera: ui.camera.state)
             let workspace = ArtifactWorkspace(
-                disk: try files.file(files.workspaces),
-                index: try files.document(
-                    ArtifactWorkspaceIndex.self, in: files.workspaces,
-                    name: "index.json", maximumBytes: 8 * 1024 * 1024))
+                disk: try files.file(files.workspaces), catalog: try workspaces())
             let exports = ArtifactExportService(workspace: workspace, disk: try files.file(files.workspaces))
             let artifactPresentation = ArtifactPresentation(
                 pages: ui.web, windows: ui.windows, disk: try files.file(files.workspaces))
@@ -152,6 +153,9 @@
                 workspace: workspace,
                 prepare: { id, deleting in try await artifactPresentation.prepare(id: id, deleting: deleting) },
                 capture: { id in try await artifactPresentation.snapshot(id: id) },
+                describe: { id, title, subtitle in
+                    await artifactPresentation.describe(id: id, title: title, subtitle: subtitle)
+                },
                 present: { id, title, entry, files, preview in
                     try await artifactPresentation.present(
                         id: id, title: title, entry: entry, files: files, preview: preview)
@@ -215,11 +219,13 @@
                     camera.setForeground(false)
                     bluetooth.setForeground(false)
                 },
-                nativeForeground: { [camera, bluetooth] active in
+                nativeForeground: { [camera, bluetooth, artifactPresentation] active in
                     if active {
                         camera.setForeground(true)
                         bluetooth.setForeground(true)
+                        try await artifactPresentation.setSceneActive(true)
                     } else {
+                        try await artifactPresentation.setSceneActive(false)
                         var failure: (any Error)?
                         do { try await camera.shutdown() } catch { failure = error }
                         await bluetooth.waitUntilIdle()

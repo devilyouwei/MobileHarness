@@ -55,11 +55,11 @@ actor WriterNotifications {
                 }
                 for row in page {
                     try Task.checkCancellation()
-                    cursor = try BusinessRecordID.number(row.runID, kind: .task)
+                    cursor = row.position
                     do {
                         let completion = try JSONDecoder().decode(WriterTaskCompletion.self, from: row.data)
                         try completion.validate()
-                        guard completion.signal.scope.id == row.runID,
+                        guard completion.signal.scope.id == row.delegateID,
                             try AgentTaskContent.decode(completion.signal).writerEvent?.eventID == row.eventID,
                             let sender
                         else { throw CommunicationError.invalidPayload }
@@ -71,7 +71,7 @@ actor WriterNotifications {
                         let rejected = report.failure ?? report.rejected[.assistant]
                         let accepted = rejected == nil && report.delivered.contains(.assistant)
                         try await tasks.finishTaskNotification(
-                            row.runID, agent: "writer", retirement: retirement,
+                            row.delegateID, agent: "writer", retirement: retirement,
                             completed: retirement || accepted,
                             failure: accepted ? nil : rejected ?? "Assistant unavailable")
                         if !accepted { failures[retirement] = rejected ?? "Assistant unavailable" }
@@ -82,7 +82,7 @@ actor WriterNotifications {
                         // A previous process's grant cannot be reopened. Retain the closed-grant
                         // evidence and continue delivering the independently authenticated fact.
                         try await tasks.finishTaskNotification(
-                            row.runID, agent: "writer", retirement: retirement,
+                            row.delegateID, agent: "writer", retirement: retirement,
                             completed: retirement && message.contains("scopeClosed"), failure: message)
                     }
                 }

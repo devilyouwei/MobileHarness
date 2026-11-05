@@ -294,7 +294,7 @@ private actor LiveTextChat: ChatCapability {
 private func photographyAcceptance(
     live: Bool, cameraFacts: Bool = true, rejectFirst: Bool = false, run: Int = 0, replaceForeground: Bool = false,
     captureOnly: Bool = false, supportsImages: Bool = false, followUpAlias: String? = nil,
-    expireBeforeFollowUp: Bool = false
+    expireBeforeFollowUp: Bool = false, persistent: Bool = false
 )
     async throws
 {
@@ -313,7 +313,14 @@ private func photographyAcceptance(
     let context = try AgentContextRepository(
         agent: AgentID.assistant, scope: UUID().uuidString, state: AssistantContextState()
     )
-    let store = ConversationHistoryStore()
+    let persistentRecords = try persistent ? SQLiteRepositories.temporary() : nil
+    let store: ConversationHistoryStore
+    if let persistentRecords {
+        store = try AssistantConversationStorage.store(
+            repository: context, chat: persistentRecords.chat, tasks: persistentRecords.tasks)
+    } else {
+        store = ConversationHistoryStore()
+    }
     let publicOwner = PublicStateFixtureOwner(ready: cameraFacts)
     let publicContext = try publicOwner.context()
     let agent = try AssistantAgent(
@@ -621,7 +628,13 @@ private func photographyAcceptance(
     #expect(await effects.owners.allSatisfy { $0 == "assistant" })
     #expect(await effects.owners.count == (live && run == 2 ? 4 : 2))
     if live && run == 1 { #expect(await effects.paths.contains("Camera.Capture.ignorePhoto")) }
-    let archive = try await store.snapshot()
+    var archive = try await store.snapshot()
+    if let persistentRecords {
+        archive.current = try await ConversationRecordStore(
+            repository: persistentRecords.chat, tasks: persistentRecords.tasks
+        )
+        .read(archive.current.id)
+    }
     let requests = try #require(archive.current.turns.first?.modelRequests)
     let rounds = try #require(archive.current.turns.first?.generationRounds)
     #expect(rounds[rejectFirst ? 1 : 0].resultsJSON.contains("Agent.Task.startTask"))
@@ -731,7 +744,13 @@ private func photographyAcceptance(
             #expect(restarted?.activeTaskID != nil && restarted?.activeTaskID != active)
             #expect(restarted?.tasks.count == 2 && restarted?.tasks.last?.status == "waitingUser")
             #expect(await effects.failures.isEmpty)
-            let history = try await store.snapshot()
+            var history = try await store.snapshot()
+            if let persistentRecords {
+                history.current = try await ConversationRecordStore(
+                    repository: persistentRecords.chat, tasks: persistentRecords.tasks
+                )
+                .read(history.current.id)
+            }
             #expect(history.current.turns.count == 3)
             let allRequests = await stub.requests
             #expect(allRequests[5].messages.contains { $0.content.contains("Task history") })
@@ -746,10 +765,20 @@ private func photographyAcceptance(
                 history.current.turns.last?.modelRequests?.last?.decisionMetadata?.taskID == restarted?.activeTaskID)
         }
     }
+    if let persistentRecords {
+        let id = try await store.readCurrent().current.id
+        let raw = try await ConversationRecordStore(repository: persistentRecords.chat, tasks: persistentRecords.tasks)
+            .read(id)
+        let taskRequests = raw.turns.flatMap { $0.modelRequests ?? [] }.filter { $0.response.contains("<startTask") }
+        #expect(taskRequests.count == 2)
+        #expect(taskRequests.allSatisfy { $0.historyTaskID != nil && $0.state == .completed })
+        #expect(try await persistentRecords.chat.dialog(id).count == 3)
+    }
     await agent.stop()
     _ = try await pump.value
     await gateway.shutdown()
     await manager.stopAll()
+    if let persistentRecords { try await persistentRecords.shutdown() }
 }
 
 @Test(.actionCatalog) func cancelledTaskRejectsLateASRInsteadOfCapturingNewTask() async throws {
@@ -928,6 +957,9 @@ private func photographyAcceptance(
 @Test(.actionCatalog, .timeLimit(.minutes(1))) func backgroundTaskSendReportsNeverGrabForegroundOrInvokeChat()
     async throws
 {
+    let database = try SQLiteRepositories.temporary()
+    let history = ConversationHistoryStore(
+        records: try ConversationRecordStore(repository: database.chat, tasks: database.tasks, agent: "assistant"))
     let session = UUID().uuidString
     let context = try AgentContextRepository(
         agent: AgentID.assistant, scope: UUID().uuidString, state: AssistantContextState()
@@ -935,13 +967,13 @@ private func photographyAcceptance(
     let model = SkillModel(mediaID: "media_1")
     let assistant = try AssistantAgent(
         stateContext: try publicStateFixture(),
-        chat: model, context: context,
+        chat: model, conversations: history, context: context,
         backgroundSupport: { target, contract, skills in
             guard target == .memory, contract == "demo.background", skills.isEmpty else {
                 throw CommunicationError.unsupportedContract
             }
         })
-    let child = ObservationRecorder(id: "memory")
+    let child = ObservationRecorder(id: "memory", tasks: database.tasks)
     let configurations = try AgentConfigurations.all()
     let policy = try CommunicationPolicy(
         contracts: AgentContracts.communication, configurations: configurations)
@@ -998,6 +1030,7 @@ private func photographyAcceptance(
     await assistant.stop()
     await child.stop()
     await output.shutdown()
+    try await database.shutdown()
 }
 
 @Test(.actionCatalog) func agentCatalogLookupUsesBundleResourceSemantics() throws {
@@ -1039,7 +1072,7 @@ private struct TaskControlAcknowledgmentFixture: TaskControlCapability {
                 parameters: [
                     "loadSkills": ["skills": "[]"], "releaseSkills": ["skills": "[]"], "startTask": ["goal": "fixture"],
                     "finishTask": ["summary": "fixture"], "cancelTask": ["reason": "fixture"],
-                    "sendMessage": ["taskID": "fixture", "text": "answer"],
+                    "sendMessage": ["executor": "writer", "taskID": "task_1", "text": "answer"],
                 ][function.path.function] ?? [:]),
             context: .init(
                 source: "assistant", sessionID: UUID().uuidString, inputID: UUID().uuidString,
@@ -2343,7 +2376,7 @@ func writerWaitingAndCompletionEnterAssistantModelFIFO(foreground: Bool, outcome
         backgroundSupport: { target, _, _ in
             guard target == .writer else { throw CommunicationError.unsupportedContract }
         })
-    let child = ObservationRecorder(id: "writer", reject: outcome.hasPrefix("rejected"))
+    let child = ObservationRecorder(id: "writer", reject: outcome.hasPrefix("rejected"), tasks: database.tasks)
     let speech = ObservationRecorder(id: "speechSynthesis")
     let manager = AgentManager()
     try await manager.register(assistant, sessionID: session)
@@ -2442,7 +2475,7 @@ func writerWaitingAndCompletionEnterAssistantModelFIFO(foreground: Bool, outcome
     #expect(payload["request"] == "帮我画一个蓝色的流程图")
     let port = try await output.messaging(for: .writer)
     if outcome == "cancelTask" {
-        let stable = try #require(payload["taskID"])
+        let stable = try await database.tasks.delegation(request.scope.id, agent: "writer").taskID
         try await skillEventually { await log.finishedDecisions.count == 1 }
         for (operation, arguments) in [
             ("delegateTask", ["target": "writer", "goal": "obsolete"]),
@@ -2476,7 +2509,7 @@ func writerWaitingAndCompletionEnterAssistantModelFIFO(foreground: Bool, outcome
         #expect(try await context.snapshot().state.taskViews?[request.scope.id]?.terminal == false)
         #expect(try await context.snapshot().state.skillState?.activeTaskID == priorTask)
         #expect(
-            try await database.tasks.delegatedRun(request.scope.id, agent: "writer").cancellationReason
+            try await database.tasks.delegation(request.scope.id, agent: "writer").cancellationReason
                 == "User cancelled")
         let ended = try await fixtureWriterCompletion(
             AgentTaskContent(
@@ -2503,7 +2536,7 @@ func writerWaitingAndCompletionEnterAssistantModelFIFO(foreground: Bool, outcome
         return
     }
     if ["deferredNew", "deferredResume"].contains(outcome) {
-        let stable = try #require(payload["taskID"])
+        let stable = try await database.tasks.delegation(request.scope.id, agent: "writer").taskID
         let content = try AgentTaskContent(
             text: "first complete", stage: .completed, writerEvent: .init(sequence: 1, kind: .completed))
         let old = try await fixtureWriterCompletion(
@@ -2547,7 +2580,7 @@ func writerWaitingAndCompletionEnterAssistantModelFIFO(foreground: Bool, outcome
         return
     }
     if ["replace", "replaceFailed", "resume"].contains(outcome) {
-        let stable = try #require(payload["taskID"])
+        let stable = try await database.tasks.delegation(request.scope.id, agent: "writer").taskID
         if outcome == "resume" {
             let done = try AgentTaskContent(
                 text: "first complete", stage: .completed, writerEvent: .init(sequence: 1, kind: .completed))
@@ -2851,7 +2884,10 @@ func writerWaitingAndCompletionEnterAssistantModelFIFO(foreground: Bool, outcome
         position = next
     } while true
     #expect(eventTurns.count == 2)
-    #expect(eventTurns.allSatisfy { $0.user.contains("eventID") && $0.user.contains("sequence") })
+    #expect(
+        eventTurns.allSatisfy {
+            $0.user.contains("agent=writer") && !$0.user.contains("eventID=") && !$0.user.contains("delegateID=")
+        })
     #expect(
         eventTurns.flatMap { $0.modelRequests ?? [] }.allSatisfy {
             $0.historyTaskID == nil && $0.decisionMetadata?.mode == "writer.event"
@@ -2893,7 +2929,8 @@ private actor WriterNoticeModel: ChatCapability {
         }
         if let taskID = cancellationTask {
             cancellationTask = nil
-            try pair.emitter.yield(.text("<cancelTask taskID=\"" + taskID + "\" reason=\"User cancelled\"/>"))
+            try pair.emitter.yield(
+                .text("<cancelTask executor=\"writer\" taskID=\"" + taskID + "\" reason=\"User cancelled\"/>"))
             try pair.emitter.yield(.finished(.stop))
         } else if delegate {
             delegate = false
@@ -2963,4 +3000,8 @@ private func writerFixturePeerInput(_ signal: AgentTaskSignal) throws -> AgentIn
         metadata: InputMetadata(
             payload: payload, source: "memory", incarnation: "fixture-memory", origin: .agent,
             rootID: signal.scope.id))
+}
+
+@Test(.actionCatalog) func assistantPhotographyForegroundTasksPersistThroughSQLite() async throws {
+    try await photographyAcceptance(live: false, persistent: true)
 }

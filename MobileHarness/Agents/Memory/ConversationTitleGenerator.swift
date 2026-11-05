@@ -9,7 +9,10 @@ public enum ConversationTitleGenerator {
         let amount = min(32, count)
         return (0..<amount).map { amount == 1 ? 0 : $0 * (count - 1) / (amount - 1) }
     }
-    public static func summarize(_ conversation: StoredConversation, using chat: any ChatCapability) async throws
+    public static func summarize(
+        _ conversation: StoredConversation, using chat: any ChatCapability,
+        journal: @escaping @Sendable (ConversationModelRequest) async throws -> Void = { _ in }
+    ) async throws
         -> String
     {
         guard !conversation.turns.isEmpty else { throw ConversationHistoryError.emptyConversation }
@@ -28,41 +31,56 @@ public enum ConversationTitleGenerator {
                 .init(role: .system, content: try templates.render("title.system")),
                 .init(role: .user, content: try templates.render("title.user", variables: ["excerpts": excerpts])),
             ], temperature: 0)
+        let audit = try AgentModelRequestRecording(request)
+        let prepared = request
         return try await withThrowingTaskGroup(of: String.self) { group in
             group.addTask {
-                let session = try await chat.chat(request)
-                defer { session.cancel() }
-                return try await withTaskCancellationHandler {
-                    var title = ""
-                    var finished = false
-                    for try await event in session.events {
-                        try Task.checkCancellation()
-                        guard !finished else { throw CapabilityError.invalidRequest("Events after title completion") }
-                        switch event {
-                        case .text(let delta):
-                            guard title.utf8.count + delta.utf8.count <= 1024 else {
-                                throw CapabilityError.eventTooLarge
+                let journal = TitleRequestJournal(
+                    input: excerpts, requestJSON: try audit.snapshot().requestJSON, audit: audit, persist: journal)
+                try await journal.begin()
+                do {
+                    let session = try await chat.chat(prepared)
+                    defer { session.cancel() }
+                    let result = try await session.withCleanup {
+                        try await withTaskCancellationHandler {
+                            var finished = false
+                            for try await event in session.events {
+                                audit.record(event)
+                                try Task.checkCancellation()
+                                guard !finished else {
+                                    throw CapabilityError.invalidRequest("Events after title completion")
+                                }
+                                switch event {
+                                case .text(let delta):
+                                    try await journal.append(delta)
+                                case .usage(let usage):
+                                    await journal.usage(usage)
+                                case .toolCall:
+                                    throw CapabilityError.invalidRequest("Unexpected title tool call")
+                                case .finished(let reason):
+                                    guard reason == .stop else {
+                                        throw CapabilityError.invalidRequest("Incomplete conversation title")
+                                    }
+                                    finished = true
+                                }
                             }
-                            title += delta
-                        case .usage: break
-                        case .toolCall:
-                            throw CapabilityError.invalidRequest("Unexpected title tool call")
-                        case .finished(let reason):
-                            guard reason == .stop else {
-                                throw CapabilityError.invalidRequest("Incomplete conversation title")
+                            let result = await journal.text.trimmingCharacters(in: .whitespacesAndNewlines)
+                            guard finished, !result.isEmpty, result.count <= 80,
+                                !result.contains("\n"), !result.contains("<"), !result.contains(">")
+                            else {
+                                throw CapabilityError.invalidRequest("Invalid conversation title")
                             }
-                            finished = true
+                            return result
+                        } onCancel: {
+                            session.cancel()
                         }
                     }
-                    let result = title.trimmingCharacters(in: .whitespacesAndNewlines)
-                    guard finished, !result.isEmpty, result.count <= 80,
-                        !result.contains("\n"), !result.contains("<"), !result.contains(">")
-                    else {
-                        throw CapabilityError.invalidRequest("Invalid conversation title")
-                    }
+                    try await journal.finish(error: nil)
                     return result
-                } onCancel: {
-                    session.cancel()
+                } catch {
+                    let primary = error
+                    try await Task { try await journal.finish(error: primary) }.value
+                    throw primary
                 }
             }
             group.addTask {
@@ -72,5 +90,41 @@ public enum ConversationTitleGenerator {
             defer { group.cancelAll() }
             return try await group.next() ?? ""
         }
+    }
+}
+
+private actor TitleRequestJournal {
+    private var record: ConversationModelRequest
+    private let audit: AgentModelRequestRecording
+    private let persist: @Sendable (ConversationModelRequest) async throws -> Void
+    var text: String { record.response }
+    init(
+        input: String, requestJSON: String, audit: AgentModelRequestRecording,
+        persist: @escaping @Sendable (ConversationModelRequest) async throws -> Void
+    ) {
+        self.audit = audit
+        self.persist = persist
+        record = .init(id: UUID().uuidString, input: input, requestJSON: requestJSON)
+        record.producerMetadata = ["purpose": "title"]
+        record.modelRequestStartedAt = Date()
+    }
+    func begin() async throws { try await persist(record) }
+    func append(_ delta: String) throws {
+        guard record.response.utf8.count + delta.utf8.count <= 1024 else { throw CapabilityError.eventTooLarge }
+        record.response += delta
+    }
+    func usage(_ value: ChatTokenUsage) {
+        record.tokenUsage = .init(
+            input: value.input, generated: value.generated, total: value.total, cachedInput: value.cachedInput,
+            cacheWriteInput: value.cacheWriteInput)
+    }
+    func finish(error: (any Error)?) async throws {
+        record.state = error == nil ? .completed : error is CancellationError ? .cancelled : .failed
+        record.error = error.map(String.init(describing:))
+        record.finishReason = error == nil ? "stop" : "error"
+        record.modelRequestCompletedAt = Date()
+        record.requestParametersJSON = try audit.snapshot().requestJSON
+        record.responseEventsJSON = try audit.snapshot().responseJSON
+        try await persist(record)
     }
 }

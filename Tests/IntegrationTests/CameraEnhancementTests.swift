@@ -151,7 +151,7 @@ private actor RecordingCameraFixture: CameraCapturing {
     let source = root.appendingPathComponent("source.mov")
     try Data(repeating: 7, count: 32).write(to: source)
     let records = try SQLiteRepositories(url: root.appendingPathComponent("store.sqlite"))
-    let store = CapturedPhotoStore(
+    let store = MediaStore(
         repository: records.media, files: try DiskFileStore(root: root.appendingPathComponent("media")))
     let ui = UIContainer()
     try ui.start()
@@ -212,7 +212,7 @@ private actor RecordingCameraFixture: CameraCapturing {
     let source = root.appendingPathComponent("source.mov")
     try Data([1, 2, 3]).write(to: source)
     let records = try SQLiteRepositories(url: root.appendingPathComponent("store.sqlite"))
-    let store = CapturedPhotoStore(
+    let store = MediaStore(
         repository: records.media, files: try DiskFileStore(root: root.appendingPathComponent("media")))
     let ui = UIContainer()
     try ui.start()
@@ -262,11 +262,11 @@ private actor RecordingCameraFixture: CameraCapturing {
     let source = root.appendingPathComponent("source.mov")
     try Data([1, 2, 3]).write(to: source)
     let records = try SQLiteRepositories(url: root.appendingPathComponent("store.sqlite"))
-    let store = CapturedPhotoStore(
+    let store = MediaStore(
         repository: records.media, files: try DiskFileStore(root: root.appendingPathComponent("media")),
         limits: .init(maximumPhotos: 1, maximumBytes: 8, overflowPolicy: .evictOldest))
     let owner = StorageOwner(namespace: "photos", source: "assistant", session: "s", input: "i")
-    let metadata = PhotoMetadata(mime: "video/quicktime", width: 1920, height: 1080, capturedAt: nil, origin: "camera")
+    let metadata = MediaMetadata(mime: "video/quicktime", width: 1920, height: 1080, capturedAt: nil, origin: "camera")
     let id = try await store.saveVideo(source, owner: owner, metadata: metadata)
     #expect(try Data(contentsOf: await store.videoURL(id, owner: owner)) == Data([1, 2, 3]))
     await #expect(throws: FileStorageError.invalidFile) { _ = try await store.videoURL(id) }
@@ -299,7 +299,7 @@ private actor RecordingCameraFixture: CameraCapturing {
     var releaseCount = 0
     let session = CameraRecordingSession(
         camera: native,
-        photos: CapturedPhotoStore(repository: records.media, files: try MemoryFileStore()), presentation: ui.camera,
+        photos: MediaStore(repository: records.media, files: try MemoryFileStore()), presentation: ui.camera,
         foreground: { true },
         acquireAudio: {
             entered.continuation.yield(())
@@ -378,7 +378,7 @@ func recordingTerminalWaitJoinsSingleFileAndPublishesBeforeAudioResume(_ ending:
     let file = root.appendingPathComponent("recording.mov")
     try Data([1, 2, 3]).write(to: file)
     let records = try SQLiteRepositories(url: root.appendingPathComponent("store.sqlite"))
-    let store = CapturedPhotoStore(
+    let store = MediaStore(
         repository: records.media, files: try DiskFileStore(root: root.appendingPathComponent("media")))
     let ui = UIContainer()
     try ui.start()
@@ -464,7 +464,7 @@ func recordingConfigurationFailureOrCancellationRollsBackWithoutAudioOrCapture(_
     await camera.configureFailure(held: cancel)
     var audioAcquired = 0
     let session = CameraRecordingSession(
-        camera: camera, photos: CapturedPhotoStore(repository: records.media, files: try MemoryFileStore()),
+        camera: camera, photos: MediaStore(repository: records.media, files: try MemoryFileStore()),
         presentation: ui.camera, foreground: { true }, acquireAudio: { audioAcquired += 1 },
         releaseAudio: { _ in Issue.record("No audio was acquired") }, activity: { _ in })
     let starting = Task { try await session.start(duration: 10, invocation: captureInput()) }

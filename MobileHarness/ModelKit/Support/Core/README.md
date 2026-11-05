@@ -31,7 +31,7 @@ flowchart LR
 
 InferenceContext carries opaque requestID/scopeID values. Core never interprets an application scope or selects a provider.
 
-StreamLimits defaults to capacity 64/maximumEventBytes 4096. Positive finite capacity×bytes is overflow-checked; nil permits unbounded event count but retains per-event validation. InferenceEmitter.yield rejects a full buffer; it never silently drops. yieldSuspending lets one serialized producer wait for capacity and wakes on consume/cancel/termination; it does not wait when capacity is nil. A second producer capacity waiter fails.
+StreamLimits defaults to capacity 64/maximumEventBytes 4096. Positive finite capacity×bytes is overflow-checked; nil capacity permits unbounded event count; maximumEventBytes=nil removes the single-event byte ceiling independently of count admission. Negative byte estimates remain invalid. InferenceEmitter.yield rejects a full buffer; it never silently drops. yieldSuspending lets one serialized producer wait for capacity and wakes on consume/cancel/termination; it does not wait when capacity is nil. A second producer capacity waiter fails.
 
 InferenceEvents permits one iterator. Check failure/cancellation before and after awaiting next; terminal error prevents delivery of buffered events. Normal finish drains accepted events. Cancel, consumer cancellation or handle destruction triggers a fast nonblocking adapter termination callback; consumers breaking early must cancel explicitly. Byte estimates are payload accounting, not measured total process memory.
 

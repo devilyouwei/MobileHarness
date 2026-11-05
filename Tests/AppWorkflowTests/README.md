@@ -150,3 +150,9 @@ WriterWorkflow tests cover natural no-tool termination through the shared finali
 Writer回合边界回归验证控制/内容请求、文件提交、预览加入、完成汇报、下一请求的顺序；Web定向回归验证Writer窗口读取/截图隔离、无根页面创建、真实目标回执及错误ID拒绝。
 
 设置保存回归检查Writer思考布尔值进入实际保存请求，失败后保留草稿，沿原有单次事务/页面寿命屏障恢复。
+
+Caption ownership regressions verify independent slot updates, retained final/user/reply text after playback, explicit onset cleanup, retired request continuations and delayed clears preserving genuinely new replies, including replies for older queued input turns.
+
+Writer regressions verify parameters above 64 KiB reach execution/next request intact, actual errors enter retry/subsequent context, and aborted content retry includes the failure cause.
+
+Workspace editing/UI regressions remain backend-independent. SQLite persistence, over-8MiB catalogs, concurrent CAS and deletion recovery live in IntegrationTests/WorkspaceRepositoryTests; Writer long-result tests distinguish complete execution evidence from model-only excerpts.

@@ -143,7 +143,7 @@ public struct CapabilityRegistry: Sendable {
     ) throws {
         let keys = Set(values.keys)
         guard required.isSubset(of: keys), ignoringUnknownKeys || keys.isSubset(of: required.union(optional)),
-            values.count <= 32, values.allSatisfy({ validName($0.key) && $0.value.utf8.count <= 4096 })
+            values.count <= 32, values.allSatisfy({ validName($0.key) })
         else { throw GenerationError.invalidParameters }
     }
 }

@@ -54,8 +54,8 @@ public enum ConversationHistoryPresentation {
     }
 
     public static func title(_ conversation: HistoryConversation) -> String {
-        if conversation.archivedAt != nil { return conversation.summaryTitle ?? "待生成标题" }
-        return conversation.latestUser ?? conversation.turns.last?.user ?? "新对话"
+        if conversation.archivedAt != nil { return conversation.summaryTitle ?? "Title Pending" }
+        return conversation.latestUser ?? conversation.turns.last?.user ?? "New Conversation"
     }
     /// Export the page's original Codable value; preserve raw request strings and evidence.
     public static func jsonData<Value: Encodable>(_ value: Value, maximumBytes: Int = 32 * 1024 * 1024) throws -> Data {
@@ -199,3 +199,17 @@ extension HistoryTurn {
 }
 
 public enum HistoryJSONExportError: Error { case capacityExceeded }
+
+/// Compact list timestamps use their source date; no inferred activity time.
+public enum HistoryListPresentation {
+    public static func date(_ date: Date, relativeTo now: Date = Date(), calendar: Calendar = .current) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.calendar = calendar
+        formatter.timeZone = calendar.timeZone
+        formatter.dateFormat =
+            calendar.component(.year, from: date) == calendar.component(.year, from: now)
+            ? "MM/dd HH:mm" : "yyyy/MM/dd HH:mm"
+        return formatter.string(from: date)
+    }
+}

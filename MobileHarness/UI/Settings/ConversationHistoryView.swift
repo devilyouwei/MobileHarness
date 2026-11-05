@@ -49,30 +49,33 @@ import Foundation
                 Section {
                     if let current = state.archive?.current {
                         if (current.turnCount ?? current.turns.count) == 0 {
-                            Text("此 Agent 尚无对话记录。").foregroundStyle(.secondary)
+                            Text("No conversations yet.").foregroundStyle(.secondary)
                         } else {
                             NavigationLink {
                                 ConversationHistoryDetail(conversation: current, controls: controls).id(current.id)
                             } label: {
                                 row(current)
                             }
+                            .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
                         }
 
-                        Button("开始新对话", systemImage: "square.and.pencil") { controls.startNew() }
+                        Button("New Conversation", systemImage: "square.and.pencil") { controls.startNew() }
                             .disabled(state.isBusy || (current.turnCount ?? current.turns.count) == 0)
                             .accessibilityIdentifier("history.new")
                     } else if state.status == nil {
-                        ProgressView("加载对话…")
+                        ProgressView("Loading conversations…")
                     } else {
-                        Button("重试加载") { Task { await reload() } }
+                        Button("Retry") { Task { await reload() } }
                     }
                 } header: {
-                    Text("当前对话")
+                    Text("Current Conversation")
                 } footer: {
-                    Text("开始新对话后，当前对话会移至已归档记录。")
+                    Text("Starting a new conversation archives the current one.")
                 }
                 Section {
-                    if state.archive?.past.isEmpty == true { Text("暂无历史对话").foregroundStyle(.secondary) }
+                    if state.archive?.past.isEmpty == true {
+                        Text("No past conversations.").foregroundStyle(.secondary)
+                    }
                     ForEach(state.archive?.past ?? []) { conversation in
                         NavigationLink {
                             ConversationHistoryDetail(conversation: conversation, controls: controls).id(
@@ -80,13 +83,14 @@ import Foundation
                         } label: {
                             row(conversation)
                         }
+                        .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
                         .swipeActions {
-                            Button("删除", role: .destructive) { deleting = conversation }
+                            Button("Delete", role: .destructive) { deleting = conversation }
                         }
                         if conversation.summaryTitle == nil {
-                            Button("重新生成标题") { controls.summarize(conversation.id) }.disabled(state.isBusy)
+                            Button("Regenerate Title") { controls.summarize(conversation.id) }.disabled(state.isBusy)
                             if let error = conversation.titleError {
-                                Text("标题生成失败：\(error)").font(.caption).foregroundStyle(.secondary)
+                                Text("Title generation failed: \(error)").font(.caption).foregroundStyle(.secondary)
                             }
                         }
                     }
@@ -97,9 +101,9 @@ import Foundation
                         ) { retry in await controls.loadMoreArchives(retry: retry) }
                     }
                 } header: {
-                    Text("过去的对话")
+                    Text("Past Conversations")
                 } footer: {
-                    Text("历史记录仅保存在此设备。")
+                    Text("History is stored only on this device.")
                 }
             }
             .navigationContext(
@@ -118,17 +122,17 @@ import Foundation
             .onDisappear { controls.cancel() }
             .onChange(of: scenePhase) { _, phase in if phase != .active { controls.cancel() } }
             .alert(
-                "删除这段历史对话？",
+                "Delete this conversation?",
                 isPresented: Binding(
                     get: { deleting != nil }, set: { if !$0 { deleting = nil } })
             ) {
-                Button("取消", role: .cancel) { deleting = nil }
-                Button("删除", role: .destructive) {
+                Button("Cancel", role: .cancel) { deleting = nil }
+                Button("Delete", role: .destructive) {
                     if let selected = deleting { controls.delete(selected.id) }
                     deleting = nil
                 }
             } message: {
-                Text("删除后无法恢复。")
+                Text("This cannot be undone.")
             }
         }
 
@@ -138,18 +142,62 @@ import Foundation
         }
 
         private func row(_ conversation: HistoryConversation) -> some View {
-            HStack(alignment: .top, spacing: 12) {
-                Image(systemName: "text.bubble").foregroundStyle(.secondary).frame(width: 24)
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(verbatim: ConversationHistoryPresentation.title(conversation)).lineLimit(2)
-                    Text(
-                        "\(conversation.turnCount ?? conversation.turns.count) 轮 · \(conversation.createdAt.formatted(date: .abbreviated, time: .shortened))"
-                    )
-                    .font(.caption).foregroundStyle(.secondary)
+            HistoryRecordRow(
+                title: ConversationHistoryPresentation.title(conversation), icon: "text.bubble", tint: .blue
+            ) {
+                ViewThatFits(in: .horizontal) {
+                    HStack {
+                        Text("\(conversation.turnCount ?? conversation.turns.count) turns").fixedSize()
+                        Spacer(minLength: 8)
+                        conversationDate(conversation)
+                    }
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("\(conversation.turnCount ?? conversation.turns.count) turns")
+                        conversationDate(conversation).frame(maxWidth: .infinity, alignment: .trailing)
+                    }
                 }
             }
         }
+        private func conversationDate(_ conversation: HistoryConversation) -> some View {
+            Text(HistoryListPresentation.date(conversation.createdAt))
+                .fixedSize()
+                .accessibilityLabel(
+                    "Started " + conversation.createdAt.formatted(date: .complete, time: .shortened))
+        }
 
+    }
+
+    struct HistoryRecordRow<Metadata: View>: View {
+        let title: String
+        let icon: String
+        let tint: Color
+        let metadata: Metadata
+        init(title: String, icon: String, tint: Color, @ViewBuilder metadata: () -> Metadata) {
+            self.title = title
+            self.icon = icon
+            self.tint = tint
+            self.metadata = metadata()
+        }
+        var body: some View {
+            HStack(alignment: .center, spacing: 12) {
+                Image(systemName: icon)
+                    .font(.system(size: 20))
+                    .foregroundStyle(tint)
+                    .frame(width: 24)
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(verbatim: title)
+                        .font(.body)
+                        .foregroundStyle(.primary)
+                        .lineLimit(2)
+                        .truncationMode(.tail)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    metadata.font(.caption).foregroundStyle(.secondary)
+                }
+            }
+            .padding(.vertical, 12)
+            .alignmentGuide(.listRowSeparatorLeading) { _ in 36 }
+        }
     }
 
     private struct HistoryPagingTrigger<Cursor: Hashable & Sendable>: Hashable, Sendable {
@@ -872,7 +920,7 @@ import Foundation
         @State private var inspecting = false
 
         var body: some View {
-            Group {
+            ZStack {
                 if let thumbnail {
                     Button {
                         inspecting = true
@@ -891,22 +939,22 @@ import Foundation
                         .frame(width: 112, height: 84)
                 }
             }
-            .task(id: retry) {
+            .frame(width: 112, height: 84)
+            .task(id: "\(turnID):\(reference.id):\(retry)") {
                 loading = true
                 failed = false
                 do {
                     let bytes = try await controls.imageData(reference.id, for: turnID)
                     try Task.checkCancellation()
-                    if let bytes {
-                        guard let image = await HistoryImageDecoder.decode(bytes, maximumPixelSize: 320) else {
-                            throw HistoryImageDecodeError.invalidImage
-                        }
-                        try Task.checkCancellation()
-                        data = bytes
-                        thumbnail = image
-                    }
+                    guard let bytes,
+                        let image = await HistoryImageDecoder.decode(bytes, maximumPixelSize: 320)
+                    else { throw HistoryImageDecodeError.invalidImage }
+                    try Task.checkCancellation()
+                    data = bytes
+                    thumbnail = image
                 } catch {
-                    if !Task.isCancelled { failed = true }
+                    guard !Task.isCancelled else { return }
+                    failed = true
                 }
                 loading = false
             }

@@ -1629,3 +1629,36 @@ private final class HeartbeatStreamProtocol: URLProtocol, @unchecked Sendable {
     #expect(!((await context.inferenceActive)))
     #expect(sessions.allSatisfy { $0.phase == .cancelled })
 }
+
+@Test func largeNativeArgumentsStreamRoundTripWithoutPayloadCeiling() throws {
+    let arguments = String(
+        decoding: try JSONEncoder().encode(
+            ["newText": String(repeating: "<div>source</div>", count: 10000)]), as: UTF8.self)
+    let added: [String: Any] = [
+        "type": "function_call", "id": "item-large", "call_id": "large", "name": "Edit_0",
+    ]
+    var item = added
+    item["arguments"] = arguments
+    var wire = try eventWire(["type": "response.output_item.added", "output_index": 0, "item": added])
+    for start in stride(from: 0, to: arguments.count, by: 3000) {
+        wire += try eventWire([
+            "type": "response.function_call_arguments.delta", "output_index": 0, "item_id": "item-large",
+            "delta": String(arguments.dropFirst(start).prefix(3000)),
+        ])
+    }
+    wire += try eventWire(["type": "response.output_item.done", "output_index": 0, "item": item])
+    wire += try eventWire(["type": "response.completed", "response": ["status": "completed", "output": [item]]])
+    var decoder = ChatEventDecoder(toolNames: ["Edit_0": "Edit"])
+    var events: [ChatEvent] = []
+    for byte in wire.utf8 { events += try decoder.consume(byte) }
+    let call = ChatToolCall(id: "large", name: "Edit", argumentsJSON: arguments)
+    #expect(events == [.toolCall(call), .finished(.toolCalls)])
+    let request = try ChatRequest(messages: [
+        .init(role: .assistant, content: "", toolCalls: [call]),
+        .init(role: .tool, content: "Saved", toolCallID: call.id),
+    ])
+    let body = try #require(config().request(request).httpBody)
+    let json = try #require(JSONSerialization.jsonObject(with: body) as? [String: Any])
+    let input = try #require(json["input"] as? [[String: Any]])
+    #expect(input.first?["arguments"] as? String == arguments)
+}

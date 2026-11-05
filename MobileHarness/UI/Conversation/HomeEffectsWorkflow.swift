@@ -7,8 +7,6 @@ public final class HomeEffectsWorkflow: HomeEffectsPresenting {
     var presentationAdmission: UIPresentationAdmission?
     private let activity: ActionActivityState
     private weak var conversation: ConversationState?
-    private var replyExpiry: Task<Void, Never>?
-    private var replyFadeID: String?
     private var noticeExpiry: Task<Void, Never>?
     private var lightExpiry: Task<Void, Never>?
     private var noticeOwner: PresentationOwner?
@@ -16,38 +14,13 @@ public final class HomeEffectsWorkflow: HomeEffectsPresenting {
     public init(activity: ActionActivityState) { self.activity = activity }
     public func bind(_ state: ConversationState) { conversation = state }
     deinit {
-        replyExpiry?.cancel()
         noticeExpiry?.cancel()
         lightExpiry?.cancel()
     }
-    public func replyDidBegin() {
-        replyExpiry?.cancel()
-        replyFadeID = nil
-        conversation?.assistantReplyOpacity = 1
-    }
+    public func replyDidBegin() { conversation?.assistantReplyOpacity = 1 }
     public func replyDidFinish() {
-        guard presentationAdmission?.acceptsLive() ?? true, let conversation, conversation.isVoiceActive
-        else { return }
-        conversation.replyWaitingRequest = nil
-        if conversation.transcriptFinalized {
-            conversation.liveTranscript = ""
-            conversation.transcriptFinalized = false
-        }
-        guard replyFadeID == nil, !conversation.assistantReply.isEmpty else { return }
-        let id = UUID().uuidString
-        let text = conversation.assistantReply
-        replyFadeID = id
-        conversation.assistantReplyOpacity = 0
-        let previousReply = replyExpiry
-        previousReply?.cancel()
-        replyExpiry = Task { [weak self] in
-            await previousReply?.value
-            do { try await Task.sleep(for: .milliseconds(350)) } catch { return }
-            guard let self, self.replyFadeID == id else { return }
-            if self.conversation?.assistantReply == text { self.conversation?.assistantReply = "" }
-            self.conversation?.assistantReplyOpacity = 1
-            self.replyFadeID = nil
-        }
+        guard presentationAdmission?.acceptsLive() ?? true else { return }
+        conversation?.replyWaitingRequest = nil
     }
     public func stop() {
         replyDidBegin()
@@ -59,10 +32,9 @@ public final class HomeEffectsWorkflow: HomeEffectsPresenting {
         lightOwner = nil
     }
     public func stopAndWait() async {
-        let tasks = [replyExpiry, noticeExpiry, lightExpiry]
+        let tasks = [noticeExpiry, lightExpiry]
         stop()
         for task in tasks { await task?.value }
-        replyExpiry = nil
         noticeExpiry = nil
         lightExpiry = nil
         conversation = nil

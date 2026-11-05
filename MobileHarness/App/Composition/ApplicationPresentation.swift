@@ -68,7 +68,7 @@
             let controls = features.memory.history
             var destinations = [
                 AgentRecordDestination(
-                    id: "assistant", name: "Assistant 聊天记录",
+                    id: "assistant", name: "My Assistant",
                     summary: "对话、Task 摘要与完整请求记录"
                 ) {
                     ConversationHistoryView(state: state, controls: controls)
@@ -76,7 +76,7 @@
             ]
             if let artifacts = features.writer.artifacts {
                 destinations.append(
-                    AgentRecordDestination(id: "writer", name: "Writer 任务记录", summary: "委托任务、对话与作品文件") {
+                    AgentRecordDestination(id: "writer", name: "My Writer", summary: "委托任务、对话与作品文件") {
                         WriterRecordsView(controls: self.features.writer, artifacts: artifacts)
                     })
             }

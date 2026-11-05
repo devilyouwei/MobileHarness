@@ -206,11 +206,18 @@ extension ActionActivityState {
     #expect(item.issueDescriptions == ["第1项：执行失败"])
 }
 
-@Test @MainActor func executionLogInternalFilteringMatchesHomeAndPreservesFailures() {
+@Test(arguments: [
+    "UI.Caption.print", "UI.Caption.clearReply", "UI.Caption.beginReplyTurn", "UI.Caption.setTranscript",
+    "UI.Caption.finishTranscript", "UI.Expression.setReplyWaiting", "UI.VoiceState.setVoiceState",
+    "Speech.Listening.update", "UI.Island.present", "UI.Island.update", "UI.Island.end", "UI.Island.setPresentation",
+]) @MainActor func executionLogInternalFilteringMatchesHomeAndPreservesFailures(
+    _ function: String
+) {
+    let parts = function.split(separator: ".").map(String.init)
     func caption(_ phase: ActionExecutionRecord.Phase) -> ActionActivityItem {
         .init(
             execution: .init(
-                id: UUID().uuidString, path: .init(domain: "UI", module: "Caption", function: "print"),
+                id: UUID().uuidString, path: .init(domain: parts[0], module: parts[1], function: parts[2]),
                 displayName: "字幕", source: AgentID.assistant.rawValue, sessionID: UUID().uuidString,
                 inputID: UUID().uuidString, channel: "Display",
                 semantics: .finite, phase: phase, admittedAt: .now))

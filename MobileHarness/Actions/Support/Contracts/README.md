@@ -28,7 +28,7 @@ Address segments are ASCII identifiers, at most 64 UTF-8 bytes; first character 
 
 Declarations require a valid address, nonempty description up to 2,048 bytes, at most 32 distinct parameters and bounded descriptions/constraints. Enum lists have at most 32 unique entries. Native schemas encode transport arguments as strings while retaining required/enumerated constraints; semantic integer/number/boolean parsing remains explicit. Function display name is nonempty up to 256 bytes, completion description up to 512 bytes, resource sets at most eight and timeout in (0, 86,400] seconds. CapabilityCatalog accepts at most 32 modules and 256 canonical functions and rejects duplicates.
 
-validateInput checks path, at most 32 arguments, keys up to 64 bytes and values up to 65,536 bytes. Declared parameters enforce allowed keys, required values, enumerations and scalar types. Definitions without declared parameters rely on their pure validator for domain decoding. Macro-generated validators reuse the leading pure argument-validation block; authors keep effects after injected capability use. The same validator runs during preparation and execution.
+validateInput checks path, at most 32 arguments, keys up to 64 bytes, without a generic argument-value byte ceiling. Declared parameters enforce allowed keys, required values, enumerations and scalar types. Definitions without declared parameters rely on their pure validator for domain decoding. Macro-generated validators reuse the leading pure argument-validation block; authors keep effects after injected capability use. The same validator runs during preparation and execution.
 
 Budget resolution validates the definition and uses dynamicTimeout before static/default timeout. The default is 30 seconds; expected duration is nonnegative and timeout positive, at least expected and at most 86,400 seconds. Serial budgets sum; parallel budgets take maxima; empty composition uses zero expected and a 100-ms timeout. Budget values do not themselves stop work.
 
@@ -59,6 +59,12 @@ CameraControlCapability distinguishes photo setEnabled/flip from setPerceptionEn
 CameraCaptureSettings is a complete validated settings value (photo/video mode, countdown, flash, zoom, duration). CameraControlCapability includes configure/cancel and typed recording start/wait/stop/save/ignore. Start accepts an optional validated duration override; its domain owner prepares video mode and otherwise preserves current capture preferences. CameraVideoReceipt separates recording, ready, saved and ignored, carrying recordingID, optional mediaID/duration/stopReason/fileName (a display basename, never a file URL). These values contain no native device or UI implementation. Defaults on capability test adapters reject unavailable operations rather than fabricating a recording.
 
 
-ArtifactStreaming 是已接纳编辑的流式续写端口，streamID 与 taskID 必须匹配；追加施加背压，complete/abort/release 显式结束与清理，snapshot 返回实际渲染图片。它不包含模型或角色实现。
+ArtifactStreaming 是已接纳编辑的流式续写端口，streamID 与 delegateID 必须匹配；追加施加背压，complete/abort/release 显式结束与清理，snapshot 返回实际渲染图片。它不包含模型或角色实现。
 
 ProviderSettings.writerThinking为私有布尔配置，默认false，跨暂存/呈现端口传递，不携带模型枚举或凭据序列化。生产Writer租约策略由Actions业务装配选择。
+
+VoicePresentationHandling的clearReply是独立回复槽操作，由可信调用上下文及可选replyInputID限定；与setTranscript/finishTranscript分离，不把输入开始伪装成回复开始。
+
+ToolResponse preserves complete value results without a generic payload-length rejection. Source/round identity, return policy and completion/report validity remain independent checks.
+
+WindowControlCapability takes a readable window_N string. The owning UI WindowState maps it to native identity inside the Window execution service; generic contracts do not allocate or interpret UI identities.

@@ -2,7 +2,7 @@ import Foundation
 import StorageCore
 import StorageFiles
 
-public struct PhotoMetadata: Sendable, Equatable {
+public struct MediaMetadata: Sendable, Equatable {
     public let mime: String
     public let width: Int
     public let height: Int
@@ -30,13 +30,13 @@ public struct PhotoMetadata: Sendable, Equatable {
         else { throw FileStorageError.invalidFile }
     }
 }
-public struct AlbumPhotoRecord: Sendable, Equatable {
+public struct AlbumMediaRecord: Sendable, Equatable {
     public let id: String
-    public let metadata: PhotoMetadata
+    public let metadata: MediaMetadata
     public let addedAt: Date
     public let createdAt: Date
     public let bytes: Int
-    public init(id: String, metadata: PhotoMetadata, addedAt: Date, createdAt: Date, bytes: Int) {
+    public init(id: String, metadata: MediaMetadata, addedAt: Date, createdAt: Date, bytes: Int) {
         self.id = id
         self.metadata = metadata
         self.addedAt = addedAt
@@ -54,9 +54,9 @@ public struct AlbumCursor: Sendable, Equatable, Codable {
     }
 }
 public struct AlbumPage: Sendable {
-    public let items: [AlbumPhotoRecord]
+    public let items: [AlbumMediaRecord]
     public let next: AlbumCursor?
-    public init(items: [AlbumPhotoRecord], next: AlbumCursor?) {
+    public init(items: [AlbumMediaRecord], next: AlbumCursor?) {
         self.items = items
         self.next = next
     }

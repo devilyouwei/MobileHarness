@@ -961,3 +961,44 @@ func assistantReplyWaitingEndsOnFirstOutputAndAllRequestTerminations(outcome: St
     #expect(answer.contains { $0.output == .control("agent.finished") })
     await agent.stop()
 }
+
+@Test(.actionCatalog, .timeLimit(.minutes(1)), arguments: [false, true])
+func internalCaptionAcknowledgmentAndFailureNeverTriggerModelReACT(_ failed: Bool) async throws {
+    let model = ChatFixture()
+    let store = ConversationHistoryStore()
+    let agent = try AssistantAgent(
+        stateContext: publicStateFixture(), chat: model, conversations: store,
+        context: AgentContextRepository(agent: .assistant, scope: UUID().uuidString, state: AssistantContextState()))
+    _ = try await bindSpeechRequests(agent)
+    try await agent.start()
+    var outputs = FixtureGenerationOutputs(
+        agent: agent,
+        actionCompletion: { call in
+            if call.actionPath.description == "UI.Caption.print" {
+                return failed ? (.completed, .handlerFailed) : (.value("Internal caption acknowledgment"), nil)
+            }
+            return (.completed, nil)
+        }
+    ).makeAsyncIterator()
+    try await agent.receive(.init(id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("hello")))
+    let emitted = try await completedTurn(&outputs)
+    #expect(await model.requests.count == 1)
+    let terminal = emitted.last?.output
+    if failed {
+        guard case .control(let value) = terminal else {
+            Issue.record("Expected internal presentation failure")
+            await agent.stop()
+            return
+        }
+        #expect(value.contains("agent.error:") && value.contains("Internal execution failed"))
+    } else {
+        #expect(terminal == .control("agent.finished"))
+    }
+    let history = try await store.snapshot()
+    #expect(history.current.turns.first?.modelRequests?.count == 1)
+    let journal = try #require(history.current.turns.first?.generationRounds?.last?.resultsJSON)
+    let rows = try #require(JSONSerialization.jsonObject(with: Data(journal.utf8)) as? [[String: Any]])
+    let captions = rows.filter { $0["path"] as? String == "UI.Caption.print" }
+    #expect(!captions.isEmpty && captions.allSatisfy { $0["requiresReasoning"] as? Bool == false })
+    await agent.stop()
+}

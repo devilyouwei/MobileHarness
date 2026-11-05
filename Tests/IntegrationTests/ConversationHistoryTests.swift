@@ -177,15 +177,15 @@ private func journal(at url: URL) throws -> ConversationHistoryStore {
     #expect(try await store.snapshot().past.isEmpty)
 }
 
-@Test(.actionCatalog) func rawOverflowPreservesPrefixAndAdmissionFailureDoesNotOverwriteJournal() async throws {
+@Test(.actionCatalog) func largeResponseIsPreservedAndAdmissionFailureDoesNotOverwriteJournal() async throws {
     let store = ConversationHistoryStore()
     let id = UUID().uuidString
     _ = try await store.beginFixture(id: id, user: "original", system: "system", model: "fixture")
     let prefix = String(repeating: "x", count: 262144)
     try await store.append(prefix, to: id)
-    await #expect(throws: ConversationHistoryError.capacityExceeded) { try await store.append("x", to: id) }
-    try await store.finish(id, state: .failed, error: "overflow")
-    #expect(try await store.snapshot().current.turns.first?.raw == prefix)
+    try await store.append("x", to: id)
+    try await store.finish(id, state: .completed)
+    #expect(try await store.snapshot().current.turns.first?.raw == prefix + "x")
     await #expect(throws: ConversationHistoryError.invalidRecord) {
         try await store.beginFixture(
             id: UUID().uuidString, user: String(repeating: "x", count: 4097), system: "system",

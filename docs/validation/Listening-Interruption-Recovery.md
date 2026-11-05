@@ -39,3 +39,15 @@
 4. 分别覆盖多句回复、多个角色仍有合法占用、蓝牙/耳机路由及系统音频中断；记录设备/iOS/路由与模型版本。
 
 自动化通过与模拟器构建不能代替以上设备验收。临时日志路径不作为持久附件，本报告保存运行结论与证据范围。
+
+## 2026-11-05 Agent 自有字幕与人声起点
+
+SpeechPerception确认新VAD轮次后、首段ASR前显式开启自己的空字幕；Assistant消费既有speaking控制事件，经内部Display Action clearReply清自己的槽，不请求LLM、不占正式FIFO。各自正常结束及停止／恢复聆听保留文本。根失效显式清理，不依赖麦克风布尔状态间接清理。
+
+Actions分离字幕槽与围栏：clearReply带可选replyInputID冻结旧请求，旧请求续轮不能复活字幕；迟到清理不能删除已经建立的新请求，较早排队输入仍可用新请求身份回复。移除UI回复结束清理、350ms到期淡出和识别换轮时清双方字幕。ASR失败封口保留已有文字；ModelKit及数据库结构未修改。
+
+定向日志 /tmp/caption-ownership-focus-pass.log：ASR首段前空字幕、最终文本唯一递交、开口清理只发Assistant Action且模型供应器不得被调用、重复事件单次清理、独立槽、旧续轮／迟到清理、完成后保留通过。首次测试宏不能直接断言mutating成员，改用捕获局部的辅助函数；旧ASR夹具断言“不发送空字幕”已改为新声起点先发送空字幕。首轮完整检查原生阶段因机械臂测试夹具未注册新增内部Action产生11项missingHandler，补齐对应夹具；随后完整检查主集成1024项、独立原生225项通过（/tmp/caption-ownership-check-final.log）。最后补充停止聆听保留、UI槽清理API语义命名及根失效用例，最终完整检查结果在下文续记。
+
+以上均为本机自动化／替身识别与模型断言，不是新的真实ASR、真实模型或真机交互验收。本轮未安装真机，设备仍为前次2026110501版本。最终iOS构建和未执行范围分别记录。
+
+最终完整检查 ./scripts/check.sh 退出0（/tmp/caption-ownership-check-complete.log）：1024项主集成、225项独立原生测试以及其余包测试、Python／模块边界／Swift格式／plist检查通过；停止／恢复聆听保留两个槽、根失效清理用例通过。当前源码随后完成 ./scripts/build-ios.sh 四目标构建，退出0（/tmp/caption-ownership-ios.log），应用Agent/Skill与Live Activity资源校验通过。git diff --check通过。未运行新的真实模型／ASR或安装真机；不将构建、替身语音流和本机原生测试视为真机语音体验验收。

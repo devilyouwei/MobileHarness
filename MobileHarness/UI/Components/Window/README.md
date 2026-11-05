@@ -45,3 +45,9 @@ WindowState.present的可选icon参数接收WindowIcon.system(name:)、emoji单�
 artifact 内容为多实例作品窗口，页面由 Web sessions 按 windowID 隔离。创作任务由 Writer 根持有；最小化/关闭仅改变页面呈现，不结束作品任务。
 
 ui.windows投影同一WindowState的全部窗口，包含Writer的artifact窗口；来源Agent不参与过滤。Skill只选择是否观察此公开State，不能改变窗口所有权或实例。页面正文/截图通过对应Web会话的显式业务能力获取，窗口摘要不表示看到了页面像素。
+
+WindowPresentation公开通用subtitle，setPresentation只更新标题/副标题和最小化卡片测量宽度，不聚焦、恢复、导航或改变正常frame；可在Scene隐藏时缓存。ui.windows投影受限subtitle供所有观察者读取。present新建时可接收宿主预留windowID，拒绝重复身份；单实例复用仍返回已有身份，首次呈现回执仍受revision/generation约束。
+
+窗口标题与内容工具栏副标题分工独立；Root将artifact窗口的subtitle传入通用WebPageView，Window/Web均不解释Writer步骤或Task。
+
+WindowState owns monotonically allocated window_N references for external Action/State use. Internal UUIDs continue to fence native presentation, asynchronous inputs and animations. reference(for:) and resolve(reference:) are the single mapping; closed/missing references and UUID strings cannot address a live window. All creators share this namespace.

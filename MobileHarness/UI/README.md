@@ -72,3 +72,15 @@ Window接受调用方提供的系统图标、emoji或图片字节；组件拥有
 Island 是多来源 App 状态的通用呈现中心：业务拥有事实和内容，组件拥有语义优先级顺序、详情/实时状态两路仲裁、布局、可中断动画和展开偏好。生产者使用同一内容接口，UI 不识别具体 Agent；Writer 自己发布任务内容不增加 UI 对 Agents 的依赖。
 
 ui.web被动摘要包含根页面及按windowID的会话；ui.windows跨创建者提供全部窗口。两者保持各自状态所有权，公开读取不创建页面或执行脚本。
+
+Conversation字幕槽只执行各自业务拥有者显式提交的更新／清理，不因回复结束或聆听开关丢弃文字。根失效通过UIHomeContainer显式清理两个槽；具体呈现与所有权边界见 [Conversation](Conversation/README.md)。
+
+Web 的连续本地预览在受控读取根内复用原生表面和文档，以隔离宿主 DOM 更新保持滚动、缩放及触控；完整本地导航提供视口恢复和过渡覆盖。调用方拥有快照文件与根授权，UI 不感知作品任务。具体更新、取消和失败契约见 [Web](Components/Web/README.md)。
+
+Writer记录页消费Writer投影的累计执行时长、当前执行起点及Chat请求时间证据，展示紧凑元信息、最新状态和可展开源码；UI不统计数据库或采集模型计时。详情布局与未知耗时规则见[Settings](Settings/README.md)。
+
+Window提供可更新标题/副标题及宿主预留身份，Root把副标题组合到Web内容栏。业务名称、重名区分和步骤属于调用方；UI只缓存、测量、截断和呈现，场景失活不清除这些事实。
+
+Writer请求行编号徽章默认灰色，仅失败为红色，并呈现调用方给定操作标题；状态中文标签与时间并排。UI不访问工具参数或请求模型命名，完整规则见[Settings](Settings/README.md)。
+
+记录入口和列表使用My Assistant/My Writer命名；Settings目录内共用记录行几何与紧凑日期显示，不增加存储读取或把会话创建时间推断成活跃时间。默认historyTitle为My Assistant，仍支持宿主显式覆盖。

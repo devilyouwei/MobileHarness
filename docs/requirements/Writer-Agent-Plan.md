@@ -373,3 +373,149 @@ Agents/Support 的共享发布机制维护稳定 owner/session、递增 revision
 实现细化：合并队列可能在首次 present 前只留下 end，系统提交失败也可能发生在本地已撤下之后。UI.Island.end 因而需要同 owner/revision 的幂等结束，并在未显示过的活动上保留现有有界 ledger 中的结束围栏，防止迟到旧 present 复活；不改变 remove 的严格编辑契约。权限、根 generation、正 revision、ledger 容量与跨 owner 拒绝不放宽。相关 UI 契约和回归同步维护。
 
 本节代码与技术 README 已同步：共用发布器、Writer 终态结束／迟到围栏、Assistant 自有前台任务展示、日志旁路移除及 UI end 幂等均已落地。完整自动化通过；构建与真机验收边界统一记录在 [Writer 验证](../validation/Writer-Agent.md#2026-11-04-agent-自有任务岛结束)，不将构建等同于设备体验验收。
+
+## 2026-11-05 无感流式预览与视口保持
+
+真机反馈：生成／编辑HTML时反复黑闪、手势被打断，无法向下阅读。根因是ArtifactPresentation每次切换双缓冲目录，并把该目录作为WebKit读取根；UI prepare判定根变化后close/recreate WKWebView，随后整页导航又重置文档与滚动／缩放。
+
+实施：Artifacts保留每项目两个可清理快照槽，每槽使用唯一版本子路径避免本地资源缓存串版；读取根固定为该项目预览根，不扩大到别的项目。UI增加受控本地preview更新能力：首帧或由完整脚本页切入时建立禁用内容脚本的文档，后续在同一WKWebView／document内执行宿主隔离content world的DOM差异更新。保留可复用元素（优先id/data-key）、不重建根body，不逐次导航；版本／代际／取消围栏阻止迟到更新。脚本、事件属性、活动嵌入及refresh不进入增量预览，完整脚本仍只在显式完整渲染运行。样式先在不生效状态准备，准备完成再同步提交，避免短暂裸页；资源加载失败明确上报且保留旧画面。
+
+视口在实际DOM提交前采样；保留视口内可复用元素的相对位置，元素缺失时保留可用滚动坐标并依法钳制。用户正在拖动／缩放／惯性滚动时不强行scrollTo，不接管触控。复用WebView自然保留缩放。完整本地重新渲染保留同一原生视图、相对缩放与滚动位置；iOS以旧画面快照作为短过渡遮罩，直到新页布局与视口恢复，遮罩不接管触摸。真正更换远程／本地安全域仍走原有隔离，关闭／不可用释放过渡与待处理工作。
+
+修改范围：Actions/Artifacts/ArtifactPresentation及README、UI/Components/Web的原生实现与README、既有WebKit/Artifacts测试和模拟器验收入口、模块及整体设计。使用既有目录，不新增依赖／框架调度器，不改变Writer模型循环或源码输出限制。一个原生变更在途、零排队；沿用查询／截图取消优先级、10秒原生操作和25秒导航期限。样式准备、取消及旧版本有界清理，不保留无界快照或observer。
+
+验证真实WebKit文档／原生view身份持续不变、按内容局部更新、样式与相对资源刷新、脚本禁用及显式运行、滚动／锚点／缩放、交互期间不抢位置、完整render视口恢复、取消／根关闭／观察并发；运行check.sh与build-ios.sh及现有模拟器WebKit验收，真机交互结果独立记录。前一字幕任务的未提交修改保留。
+
+验证细化：真实 WebKit 发现删除最初 document URL 所在快照后，后续文件子资源会失去有效加载来源。因此在同一项目预览根保留一个稳定宿主 HTML 文件；双槽仍只保存两个资源版本，宿主 DOM 通过受信 base 指向当前版本。UI 增量接口单独接受资源入口，不把资源基址与 document 身份混用。iOS 完整导航结束时原生缩放边界可能尚未更新，视口恢复需在有界布局等待后执行，不能在临时 maxZoom=1 时误钳制用户缩放。
+
+本节实现已完成并同步 Artifacts/Web、UI及整体技术契约：稳定宿主与双槽资源、同文档 DOM 更新、样式准备与失败保留、视口/缩放恢复和完整运行过渡均已落地。check.sh、四个iOS构建及定向WebKit/模拟器验证已执行；既有Metal原生套件日志缺口、未进行真实模型和真机手势验收的边界见 [连续预览验证](../validation/Writer-Continuous-Progress.md#2026-11-05-连续-html-预览与视口回归)。不将自动化文档连续性等同每帧无闪的物理验收。
+
+## 2026-11-05 Writer 记录排版与耗时
+
+任务列表目标最多两行尾部省略；下一行左侧依次任务ID、累计轮数、最新状态标签，右侧更新时间。详情头部依次目标/ID、开始时间、累计持续时间、执行轮次、最新状态，目录/导出保留位置；请求行去图标与“第X轮”等冗余，改用简单编号，保留阶段/文件/时间/结果证据及run分隔。
+
+Writer通过既有ChatTiming采集Provider首个公开token延迟，不把接收事件时间伪装为TTFT。Storage现有请求证据增加可选完成时间，沿原SQLite证据链保存；没有真实采样时明确未知。请求详情展示首token耗时和总耗时，文件内容响应默认折叠，工具参数/结果也可折叠，正文不截断。总耗时从实际模型开始（若无Provider采样则本次请求接纳时间）到记录完成，失败/取消保留已知计时。
+
+Task仓库现有run查询暴露已有finished_at；Writer投影每次run耗时并累加，运行中用当前时间延续，续作间隔不算执行耗时，不扫描全文请求。UI仅消费通用显示值，不读Storage或ModelKit。涉及UI/Settings、Agents/Writer、Storage Chat/Tasks/SQLite及其技术README；不新增目录、数据库表或模型输出限制。验证SQLite重开、计时和累计耗时、折叠排版；运行check.sh与build-ios.sh，模拟器/真实模型/真机证据独立记录。
+
+本节实现与技术README已同步；完成SQLite重开、Provider采样链路替身、跨run累计/未知耗时、12种Writer流程、模拟器实际点击/源码折叠及四目标构建。完整脚本与末尾定向回归均执行，原生Metal日志缺口和首次UI测试标识失败单独保留。证据及真机/真实模型边界见[Writer验证](../validation/Writer-Agent.md#2026-11-05-writer-记录布局与计时)。
+
+## 2026-11-05 作品标题、副标题与后台连续执行
+
+窗口标题由Writer创作域维护简洁作品名，避免统一“作品”。新项目先用委托title或goal派生的短名立即开窗，首个edit可同调用携带语义title，不新增命名模型请求；续作默认保留已持久标题，仅明确改名或新作品时调整。提供rename用于明确改名；重名仅在窗口显示层加稳定区分后缀，不改作品索引标题。灰色Web栏消费通用窗口subtitle：先为原始目标，后为真实模型/文件/渲染步骤、等待和终态，禁止使用源码或思维内容。Writer经Gateway direct的Artifacts describe更新，Action内部直调UI；不经Assistant代管。WindowState拥有通用可更新title/subtitle和被动投影，UI不理解Writer业务。
+
+普通scene变化只通知Writer预览可见性，不调用pause/resume创作生命周期；Assistant现有后台连续路径保持。真正根暂停/关闭仍加入工作清理。WriterPreview在场景隐藏时取消并加入自身预览worker，保留最新刷新意图；回前台重新启用，不把最小化/关闭与后台混同。Artifacts保留每项目最新快照，后台不新建窗口、不执行WebKit，返回deferred证据；源码和发布可继续，不能宣称完成视觉验证。回前台由Artifacts恢复已有窗口/后台首次作品的最新画面；显式关闭/最小化不被恢复逻辑重开。渲染期间切后台和截图竞争也降为真实deferred/nil，不能让Writer因不可见页面失败。新建窗口等待回执时切后台，不把仍保留的窗口误标为用户关闭。
+
+更新范围：Agents根/Writer/预览与指令，Actions Artifacts/装配生命周期，UI Window/Web/Root通用呈现及对应README/整体设计；不新增目录、框架调度器或ModelKit修改。明确iOS系统可挂起进程；此改动保证应用不因scene主动暂停Agent，不承诺无限后台CPU时间，不借用虚假音频保活。测试标题持久化/续作/重复名、副标题阶段与身份隔离、后台持续模型/文件处理、无渲染/安全发布、前台恢复与关闭/最小化尊重；执行check.sh/build-ios.sh，设备/真实模型验收分开记录。
+
+窗口创建允许宿主预留通用windowID，Artifacts在等待呈现回执前绑定该身份；切后台中断回执时可准确保留所属窗口，不按标题或未绑定窗口猜测归属。回前台恢复仍只遍历最多四份自有快照，不能影响其他项目或Agent。
+
+本节代码及技术README已对齐：角色Scene通知与显式暂停分离，运行中/首次呈现/最小化及取消边界均有回归；标题通过现有创作调用完善，副标题经Gateway direct提交。完整检查、收尾Writer回归和四目标iOS构建完成。先前iOS条件编译接线失败已修正并保留证据；真机/真实模型及iOS首页点击未执行，见[Writer验证](../validation/Writer-Agent.md#2026-11-05-作品窗口命名副标题和后台连续性)。
+
+## 2026-11-05 请求轮次行：编号徽章与操作标题
+
+请求行改为左侧垂直居中的彩色数字徽章，右侧两行：实际操作标题（可尾部省略）与时间/中文状态标签。写入/修改/读取/渲染/保存使用稳定语义配色，失败/取消状态优先强调；重试保留独立编号并在标题标记。run分隔和请求详情不改变。
+
+标题由Writer根据当前原生工具名、参数中的目标文件及简短编辑指令派生，多操作有序去重组合；文件内容请求使用“编写 filename”，生成中或没有工具事实的轮次使用中性标题。不得从源码/工具结果/思维文本猜测，不额外调用LLM，不把接收工具调用等同执行成功。
+
+Storage MessagePreview扩展中立的工具名/参数摘要，通过现有preview_metadata证据读取，无额外全文请求或逐行详情查询；不解析Writer命令，不新增表或兼容旧协议。WriterContainer负责业务标题/配色投影，UI仅消费标题、通用tint和已有状态。涉及Storage Chat/SQLite、Agents/Writer、UI/Settings与测试README，保持既有目录和模块边界。先回归多工具、重试、未知/失败/取消和SQLite重开，再运行check.sh、build-ios.sh及原生模拟器记录页验收；真实模型/真机另行记录。
+
+本节实现及技术README已同步。标题取实际工具事实，编号徽章与双行布局、中文状态/重试、工具失败优先及原生滚动查找均完成验证；完整检查、四目标构建与模拟器验收结果见[Writer验证](../validation/Writer-Agent.md#2026-11-05-请求行彩色编号和操作标题)。UI首轮同名请求定位失败已保留并修正，未安装真机。
+
+## 2026-11-05 Writer任务标题正文色
+
+按真机反馈调整UI/Settings/WriterRecordsView：任务列表goal和详情头部goal使用系统primary正文色，紫色只应用Writer图标，避免整段目标染色。沿用既有截断/布局/编号徽章/状态标签，不改变数据或Agent逻辑。同步Settings技术README和验证记录；执行check.sh/build-ios.sh，不为纯颜色样式增加实现镜像测试。
+
+本节颜色修正、技术README及验证记录已同步；完整检查、四目标构建和原生模拟器截图验收完成，未安装真机。证据见[Writer验证](../validation/Writer-Agent.md#2026-11-05-writer任务标题正文色)。
+
+## 2026-11-05 请求数字徽标双色
+
+按反馈将请求轮次数字徽标统一为默认灰色，仅failed显示红色；取消、中断、进行中及完成均使用默认灰色。保留操作标题、重试说明和状态标签。移除Writer到UI的操作配色枚举与参数，Writer仅投影标题和真实状态，UI负责两色呈现。涉及WriterContainer、WriterRecordsView及既有测试，更新相关技术README并运行check.sh/build-ios.sh，原生模拟器截图单独验收。
+
+本节实现和技术README已对齐，四目标构建与原生模拟器记录页通过；完整检查的两项非Writer失败独立复跑通过，完整脚本仍记失败及原生套件日志缺口。证据见docs/validation/Writer-Agent.md的同日数字徽标双色记录。
+
+## 2026-11-05 My Assistant / My Writer 列表视觉统一
+
+采用同目录通用记录行：左侧20pt图标、24pt固定栏，与右侧整块文字居中；右侧17pt系统正文标题两行尾省略，6pt间隔后12pt灰色辅助行，行上下约12pt留白。Assistant图标蓝色、Writer柔和紫色；箭头保留原生导航灰色，分隔线对齐文字。Writer顶部用与Assistant一致的分区起始间距。页面名统一My Assistant/My Writer；Assistant分区、按钮及列表辅助说明英文，不翻译用户原文和完整请求证据。
+
+真实数据口径：Assistant只显示已有turnCount（缺失才使用已知turns.count）和createdAt，明确为会话开始时间，不伪造最新活跃时间。Writer显示稳定taskID、任务累计requestCount（真实模型请求尝试数）、最新status/phase及updatedAt；不以已加载页大小当轮次。状态短标签Completed/Failed/Running/Waiting/Paused/Cancelled/Interrupted/Unknown，未知不可误标失败。完成绿色、失败红色、活动蓝色、取消/中断灰色。元信息与标题左对齐，日期靠右；今年MM/dd HH:mm，跨年yyyy/MM/dd HH:mm，采用当前日历时区，使用紧凑24小时显示。窄屏/大字体无法容纳时以第二辅助行保留全部字段，不挤掉状态或日期。无需增加数据库读取或模型请求。
+
+修改UI/Settings现有Presentation/View/State与UI默认historyTitle；App Composition记录目的地名称同步。共用视觉组件及日期格式保持UI目录内，无新目录/模块，不动业务流程/存储。同步Settings、UI、Composition技术README；日期边界/状态事实自动化与原生列表导航截图验证，运行check.sh/build-ios.sh。真机安装另行请求执行。
+
+本节实现与UI/Settings、UI根及Composition技术README已同步；检查脚本和四目标构建通过，Writer实际列表及Assistant空态导航模拟器验收完成。Assistant有记录行及大字体/窄屏截图的证据限制、原生通用套件日志缺口见docs/validation/Writer-Agent.md同日记录。
+
+## 2026-11-05 task_28 工具参数与错误反馈修复
+
+移除ModelKit Responses增量/完成解析、ChatRequest历史校验、Writer控制输出的4096字节参数硬限。参数不得通过ChatRequest累计文本预算或事件单项字节上限再次被拒；原生参数交给Provider实际上下文约束，文字上下文/身份/配对及队列事件数仍保留现有约束。StreamLimits增加显式无单事件字节上限选项，云端Chat及默认路由桥使用该策略并保持128项背压，其他能力默认不变。不得增加模型输出token上限。
+
+Writer控制重试在新请求中追加结构化上次错误（分类、code、stage、details、实际副作用和修正建议），失败请求没有执行workspace工具，不伪造tool结果；成功后将这些反馈纳入后续loop。内容重试在abort并确认清理后携带实际原因，不能只说previous attempt failed。工具执行错误继续使用真实call_id的tool结果并补足结构化诊断。清理/提交不确定和取消保持不重放。最多3次恢复不变。
+
+参考DeepSeek Harness agent.ts的session日志投影、请求失败钩子、原生工具调用/结果，再核对其工具执行错误路径。Writer运行中保留有界完整调用组，续作恢复最近控制请求选定上下文而非完整数据库历史；本次不承诺全量历史或实现新摘要Agent。恢复失败尝试时加入其真实诊断，避免续作再次盲重试。已有上下文选择预算不扩大到参数payload，Provider决定其真实token窗口。保持system/原始目标、最新结果和错误配对，不将failed request当作已执行操作。
+
+涉及ModelKit Core/Management/Language LLM/OpenAI、Agents Writer及既有测试目录，不新增模块/目录/数据库结构，不清空真机数据。更新各拥有目录README及总体技术边界；验证大参数流（超过4KiB和64KiB）、历史往返、原生配对、错误反馈跨轮保留、内容重试、续作诊断、取消与恢复耗尽。执行check.sh/build-ios.sh，替身与真实模型证据分开。
+
+补充链路核对：Actions通用validateInput另有每参数65536字节限制，会在Gateway direct之后再次拒绝大代码补丁；本次一并移除通用参数值字节限制，保留键/参数数量/声明类型及领域校验。更新Actions/Support/Contracts README及大参数验证。单次短意图、路径等领域语义约束不作为通用源码参数上限。DeepSeek tools/pipeline.ts的toolErrorResult将Error文本与isError写入原调用结果，证明工具失败应作为下一步上下文事实而不是仅通知UI。
+
+补充持久化核对：ConversationHistory.recordToolCall也有4096字节参数拒绝，AgentCore的完整native ToolCallParser同样存在；一并取消并验证SQLite重开后参数完整、失败续作带诊断。保留现有存储整体容量/显式错误，不新增单参数或输出预算。
+
+SQLite大参数回归发现preview只识别内联argumentsJSON，忽略当前codec的分块字符串；修正为只解包该调用的参数字段，不加载完整请求/源码上下文，保留真实操作标题与工具状态。更新SQLite README并以重开列表投影验证。
+
+进一步移除单次requestJSON的512KiB历史写入拒绝，避免完整大参数在下一轮请求快照里再次触发隐性单参数上限；沿用现有整体历史内存容量与明确溢出，SQLite大参数测试跨过512KiB并记录下一次配对请求快照。
+
+native解析器的CapabilityRegistry共享参数校验仍有每值4096字节，最后移除该通用值上限，保留参数集合/必填/枚举及别名权限校验；XML单tag限额不变。补充完整native解析及权限校验大参数回归。
+
+本节已实施并同步受影响的ModelKit/Agents/Storage/Actions及整体技术README。全量检查、最终9项定向回归和四目标/收尾主应用构建证据见docs/validation/Writer-Agent.md；真实模型与task_28真机复测未执行，未清库。
+
+## 2026-11-05 SQLite作品目录及源码/观察容量修正
+
+移除StorageChat响应累积256KiB及工具结果64KiB、Writer观察12000字节的硬拒绝；模型上下文选择仍是独立策略，完整源码和实际结果不因这些单项字节数失败。通用Action/Tool完成值也取消64KiB硬拒绝，避免已完成效果在Gateway返回途中伪装失败。队列数量、沙盒、配对和整体内存生命周期约束不变。
+
+作品不再使用ArtifactWorkspaceIndex全局JSON。StorageFiles公开中立WorkspaceRepository契约及版本/草稿/目录值，StorageSQLite在同一SQLite pool用workspaces、workspace_revisions、workspace_files关系表保存项目身份、版本、草稿和文件索引/内容；不把整个旧JSON塞进BLOB。目录摘要不读取源码，项目/版本按ID读取。草稿和版本元信息/文件行在事务提交；发布的不可变文件仍由StorageFiles写入项目版本目录供WebKit/导出。Actions先写版本文件再以CAS提交数据库，失败只清理本次版本；删除先置deleting，清理文件后删数据库行，失败保留待清理状态。Writer任务projectID仍可信逻辑绑定，不修改Agent调度。
+
+现有StorageDatabase发布workspace端口，App/Actions依赖装配注入；不新建模块或目录，不依赖Actions/Agents进入基础层。删除旧索引类型、JSON读写与测试，没有旧索引导入/兼容回退。新增schema标识沿已有开发期规则重建旧数据库；本次不连接设备清库。测试改用当前SQLite后端，覆盖并发CAS、草稿/版本重开、跨项目超过旧8MiB、删除清理失败、超过256KiB源码、长观察/结果持久化和Gateway返回。更新所有相关README及验证记录，运行check.sh/build-ios.sh，真实模型/设备另记。
+
+返回链路还包含InputGateway及AgentRoundCoordinator对完成值的64KiB拒绝，一并移除，保持身份、轮次、配对和失败报告校验；否则长结果会在离开Artifacts后被拒。技术README同步这些当前契约。
+
+长观察完整保存/返回后，Writer仅在模型投影层按既有48KB上下文预算为本批工具结果生成显式首尾摘录（提示完整结果已持久化、可分页读取），防止成功操作因下一请求无法容纳而直接失败。摘录预算从固定目标/指令和当前响应及调用数推导，不引入新的单结果拒绝上限，不截断实际文件或工具执行证据。
+
+边界检查要求SQLite后端只由AppStorage与IntegrationTests依赖；因此将涉及SQLite的作品持久化测试归入现有IntegrationTests目录，AppWorkflowTests保留纯编辑/UI行为，不扩大其后端依赖。StorageDatabase/StorageSQLite显式依赖StorageFiles的中立WorkspaceRepository契约，更新边界图白名单以反映该直接接口，保留禁止基础层依赖业务和后端泄漏的检查。
+
+最终结果记录链路补充：Writer运行时收尾也通过recordGenerationRound保存实际返回值，原有262144字节拒绝会再次阻断长结果，因此取消这项单轮结果记录上限，并在大源码/结果SQLite回归中覆盖收尾证据保存。整体历史接纳容量不变。
+
+全量回归发现两项旧测试仍断言已移除的字节拒绝：ActionsContainer的超长完成值、CapabilityRegistry对待丢弃未知参数的4KiB限制。更新为验证长完成值成功返回、未知参数正规化丢弃；状态Action的完成种类约束、XML原始tag限额及参数数量/键名校验继续覆盖。
+
+## 2026-11-05 Writer任务详情头部紧凑布局
+
+仅调整UI/Settings/WriterRecordsView.swift：将任务目标与独立ID行合并为一个水平头部，左侧紫色图标按整个文本块垂直居中，右侧上方使用caption灰色等宽taskID，下方完整显示goal并允许自然换行，不省略。保留任务信息、文件浏览和导出操作顺序。执行轮次徽标数字由body缩小为subheadline，沿用灰色／失败红色语义及原触控行。同步Settings技术README及验证记录，执行check.sh与build-ios.sh；不修改任务数据及业务接口。
+
+## 2026-11-05 Agent所有权、可读任务与内部委托身份统一
+
+用户授权重建开发SQLite，不保留旧ID协议兼容。前台任务由Assistant创建管理；后台任务由被委托Agent接纳时创建管理。外部业务主键为agent_id + task_id，task_N在Agent内原子递增、删除不复用。Assistant运行时生成UUID delegate_id，一次逻辑委托及其重投复用，续作生成新UUID；替换runID/run_id/DelegatedRun等旧名，通信scope明确关联delegate。Writer在接纳时通过Storage分配/恢复Task、独立对话和绑定，不再由Assistant预建Writer任务；Assistant仅保留委托及来源关联，Writer通过started/终态回复可信taskID。取消/补充从agent+task定位当前委托，interactionID由运行时解析，不向模型暴露UUID。
+
+去除独立project_id；StorageFiles定义中立WorkspaceID(agent,taskID)及安全路径，WorkspaceRepository用复合身份及SQLite结构化列管理版本/草稿，物理目录为ArtifactWorkspaces/<agent>/task_N/<revision>/...。任务无永久完成语义，列表的执行状态是最新委托投影。Writer/Artifacts/UI业务值、文件浏览导出、恢复、预览、版本及窗口关联统一使用工作区身份，内部revision等UUID保留。
+
+模型可见window_N由Window组件分配，内部UUID继续维护动画/异步回执，通过统一映射供Action/State使用，不暴露内部UUID。taskID、windowID携带标题/目标/阶段等owner投影，其他内部delegate/event/interaction/request/session/dialog/revision及因果链ID不作为模型填写参数。原生Provider tool_call_id按原协议保留；人可见请求轮次仅序号，不充当身份。持久dialog身份使用UUID，SQLite内部整数主键允许保留作连接键。
+
+涉及Storage/Support、Files、Database/Tasks/Chat/SQLite，Agents/Writer与Support/Communication/Chat/Core及配置，Actions/Artifacts/System/Task/窗口，UI/Settings/Window，App装配与脚本/测试。保持编译依赖和现有模块目录，不引入新目录/调度器。先更新本计划，实施后协调各owner README和总体设计。验证Agent内编号隔离/不复用、委托幂等、目标Agent准入、续作同目录/新委托、来源会话删除、迟到事件/取消围栏、模型可见身份无UUID泄漏、SQLite重开、文件路径/导出/预览与窗口映射，运行check.sh与build-ios.sh。设备数据库仅在后续明确安装/操作时按schema规则重建。
+
+历史查询本身也需要模型可操作的可读引用，因此对话保留dialog_N作为历史查询reference，另外在SQLite对话行记录独立UUID traceID用于内部溯源；整数连接键不作为UUID使用。二者是当前契约的两层身份，而非旧协议回退。其他内部请求／委托／事件／交互均使用原生或UUID身份，展示只使用轮次／委托序号。
+
+文件编辑工具的读取引用、savepoint和版本选择也属于模型需要回填的句柄，一并改为read_N、savepoint_N、revision_N；内部流事务/持久版本仍使用UUID，由Artifacts在域内映射。避免只隐藏通信UUID、却让编辑工具继续要求模型抄写UUID。
+
+命名收尾：ArtifactStreaming的会话键实际是一次委托的执行权限，参数统一命名delegateID，避免继续把UUID称作taskID。Artifacts仅在Gateway通用执行上下文边界读取taskID（其框架含义为scope），随即转换为域内delegateID；不改框架调度契约。持久作品taskID仍为Agent-local数字身份。相关原生调用与替身同步，不留旧参数兼容重载。
+
+本节ID改造已实现，相关Storage/Agents/Actions/UI技术契约及提示词已同步；主检查与收尾定向回归证据见docs/validation/Writer-Agent.md的2026-11-05身份改造小节。设备及真实模型未验收，本轮未安装或操作设备数据。
+
+## 2026-11-05 总体设计悬空内容归位（文档整理完成）
+
+本次仅整理当前技术文档，不改变代码、运行时接口或模块边界，不新增目录。实施范围：
+
+- `MobileHarness/README.md`：移除 Part III 之后悬空的 Web/Writer 增补；通用 Assistant 委托时序、认证、接纳与完成边界归入角色通信章节，网页/作品数据流、设置、历史、模型、字幕、Island 和场景生命周期分别归入既有主题。总体设计保留跨模块契约并链接细节拥有者。
+- `MobileHarness/Agents/Assistant/README.md`：从 Web 观察章节拆出对其他 Agent 的委托契约，描述调用、运行时身份解析、结果消费与取消边界；明确通用传输机制与当前已接入 Writer 的产品能力不同。
+- `MobileHarness/Agents/Writer/README.md`：集中 Writer 的创作流程图、主动事件/持久通知、Assistant 接收侧政策链接、模型/文件恢复、历史与呈现细节；合并重复段落并将尾部内容归入对应小节。
+- `MobileHarness/Agents/README.md` 与 `MobileHarness/Actions/System/Task/README.md`：同步委托导航、所有权与当前公开参数，避免将运行时 UUID 或 Writer 专属行为写成所有执行者的通用能力。
+- `docs/history/Documentation-History.md`：记录本次归位及验证范围；当前技术 README 不保存整理经过。
+
+验证按当前源码核对委托/接收/取消与场景行为，检查变更文档相对路径、章节锚点、Mermaid 结构和差异格式。文档修改不运行代码构建，不据此声称模型、原生 UI 或真机验收。
+
+归位与文档检查已完成，结果见[文档整理记录](../history/Documentation-History.md#2026-11-05--委托流程与总体设计尾部归位)。此项完成不改变本计划其他实施或独立验收事项的状态。

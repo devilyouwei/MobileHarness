@@ -68,7 +68,7 @@ public struct ActionFunction: Sendable {
     public func validateInput(_ call: FunctionRequest) throws {
         guard call.actionPath == path else { throw ActionExecutionError.invalidInvocation }
         guard call.parameters.count <= 32,
-            call.parameters.allSatisfy({ $0.key.utf8.count <= 64 && $0.value.utf8.count <= 65_536 })
+            call.parameters.allSatisfy({ $0.key.utf8.count <= 64 })
         else { throw ActionArguments.ValidationError.invalidKeys }
         guard let declaration, !declaration.parameters.isEmpty else { return }
         let arguments = ActionArguments(call.parameters)

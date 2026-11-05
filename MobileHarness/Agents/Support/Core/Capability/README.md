@@ -79,3 +79,5 @@ CapabilityContextBuilder 从当前不可变目录渲染 Channel、Action 别名�
 restrictingCommunication 仅保留原声明中允许的 contract，对新不可变配置重新验证，不新增 source/target/grant，不改缓存资源。Core 不认识诊断场景或具体角色。
 
 Agent 配置只接受当前 version=7；Action 配置字段不包含内嵌 examples，示例属于明确引用的 Instruction。不解析旧版导入配置。
+
+Native parameter values have no generic byte ceiling in capability resolution/permission checks. Required/optional keys, key names/count, alias ownership and declared enums remain validated; concrete domains own semantic constraints. XML generation retains its separate tag grammar limits.

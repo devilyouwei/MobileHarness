@@ -86,7 +86,7 @@ public actor DiskFileStore: FileStore {
     }
     public func fileURL(_ key: String, maximumBytes: Int) async throws -> URL {
         try access.check()
-        guard maximumBytes > 0, let info = try info(key), info.bytes > 0, info.bytes <= maximumBytes else {
+        guard maximumBytes > 0, let info = try info(key), info.bytes >= 0, info.bytes <= maximumBytes else {
             throw FileStorageError.capacityExceeded
         }
         return try location(key)
@@ -248,6 +248,62 @@ public actor DiskFileStore: FileStore {
             access.failures.report("files.bytes", "putIfAbsent", error)
             throw error
         }
+    }
+    /// Atomic replacement inside this sandbox, including empty text files.
+    public func replace(_ data: Data, key: String) throws {
+        do {
+            try access.check()
+            guard data.count <= maximumBytes else { throw FileStorageError.capacityExceeded }
+            let destination = try location(key)
+            try FileManager.default.createDirectory(
+                at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
+            #if os(iOS)
+                try data.write(
+                    to: destination,
+                    options: [
+                        .atomic,
+                        objectProtection == .afterFirstUnlock
+                            ? .completeFileProtectionUntilFirstUserAuthentication : .completeFileProtection,
+                    ])
+            #else
+                try data.write(to: destination, options: .atomic)
+            #endif
+            let handle = try FileHandle(forWritingTo: destination)
+            defer { try? handle.close() }
+            try handle.synchronize()
+        } catch {
+            access.failures.report("files.bytes", "replace", error)
+            throw error
+        }
+    }
+    /// A coherent directory read within this actor turn. No symlinks or outside-root paths.
+    public func textFiles(in relative: String) throws -> [String: String] {
+        try access.check()
+        let directory = try location(relative)
+        guard FileManager.default.fileExists(atPath: directory.path) else { throw FileStorageError.invalidFile }
+        let fault = ListingFault()
+        guard
+            let enumerator = FileManager.default.enumerator(
+                at: directory, includingPropertiesForKeys: [.isRegularFileKey, .isSymbolicLinkKey],
+                errorHandler: { _, error in
+                    fault.error.withLock { $0 = error }
+                    return false
+                })
+        else { throw FileStorageError.invalidFile }
+        var result: [String: String] = [:]
+        while let url = enumerator.nextObject() as? URL {
+            let values = try url.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey])
+            guard values.isSymbolicLink != true else { throw FileStorageError.invalidPath }
+            guard values.isRegularFile == true else { continue }
+            let path = try Self.relativePath(of: url, within: directory)
+            _ = try location(relative + "/" + path)
+            guard let text = String(data: try Data(contentsOf: url), encoding: .utf8) else {
+                throw FileStorageError.invalidFile
+            }
+            result[path] = text
+        }
+        if let error = fault.error.withLock({ $0 }) { throw error }
+        return result
     }
     public func listObjects(cursor: String?, limit: Int) throws -> BinaryObjectPage {
         do {

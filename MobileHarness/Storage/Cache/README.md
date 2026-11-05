@@ -28,3 +28,5 @@ CacheBuffer 持有不可变 Data，Cache 存取只转交相同实例。CacheLeas
 ## Passive state reads
 
 CacheContainer.stateSnapshot returns StorageCore.StorageStateSnapshot directly, with all budgets, handle counts and closure in Runtime and a matching snapshot.stateDescriptor. BufferCache.runtimeStatistics is the low-level locked observation used to compose the container State; it is not another container State format. It neither acquires a buffer lease nor creates an audio scope. Retained bytes include live leased storage, so removing a key does not imply memory release.
+
+CacheContainer.swift owns the Cache entry/lifecycle and namespaces; BufferCache.swift owns immutable buffers and leases.

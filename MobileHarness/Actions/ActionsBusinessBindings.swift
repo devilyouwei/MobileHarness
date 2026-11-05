@@ -6,6 +6,7 @@
     import PlatformKit
     import StorageChat
     import StorageDevices
+    import StorageDatabase
     import StorageFiles
     import StorageMedia
     import StorageCore
@@ -32,6 +33,7 @@
         let model: ModelContainer
         let platform: PlatformContainer
         let ui: UIContainer
+        let workspaces: @Sendable () throws -> any WorkspaceRepository
         let media: @Sendable () throws -> any MediaRepository
         let devices: @Sendable () throws -> any DeviceRepository
         let previewHistory: @MainActor (HistoryTurn) -> String
@@ -39,6 +41,7 @@
         let connectVision: @MainActor (String, Bool, any CameraOutputHandling) async throws -> Void
         public init(
             files: FilesContainer, model: ModelContainer, platform: PlatformContainer, ui: UIContainer,
+            workspaces: @escaping @Sendable () throws -> any WorkspaceRepository,
             media: @escaping @Sendable () throws -> any MediaRepository,
             devices: @escaping @Sendable () throws -> any DeviceRepository,
             previewHistory: @escaping @MainActor (HistoryTurn) -> String,
@@ -49,6 +52,7 @@
             self.model = model
             self.platform = platform
             self.ui = ui
+            self.workspaces = workspaces
             self.media = media
             self.devices = devices
             self.previewHistory = previewHistory
@@ -103,7 +107,7 @@
     @MainActor public struct ActionsBusinessBindings {
         public let artifactStreaming: (any ArtifactStreaming)?
         public let writerArtifacts: (any WriterArtifactsControlling)?
-        public let writerPhotos: CapturedPhotoStore?
+        public let writerPhotos: MediaStore?
         public let writerModel: (@Sendable () async throws -> ChatModel)?
         public let executor: ActionsExecutionPort
         public let catalog: ActionCatalogSnapshot
@@ -130,7 +134,7 @@
             executor: ActionsExecutionPort, catalog: ActionCatalogSnapshot,
             artifactStreaming: (any ArtifactStreaming)? = nil,
             writerArtifacts: (any WriterArtifactsControlling)? = nil,
-            writerPhotos: CapturedPhotoStore? = nil,
+            writerPhotos: MediaStore? = nil,
             writerModel: (@Sendable () async throws -> ChatModel)? = nil,
             settings: any ProviderSettingsStaging, discovery: any ProviderDiscoveryStaging,
             providerPresentation: any ProviderPresentationRegistering, tasks: any TaskControlBinding,

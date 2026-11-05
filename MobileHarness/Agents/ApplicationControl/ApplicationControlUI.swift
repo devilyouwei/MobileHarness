@@ -79,7 +79,8 @@ extension ApplicationControlAgent {
             })
         else { throw CommunicationError.invalidPayload }
         guard windowCalls.count < 5 else { throw CommunicationError.capacityExceeded }
-        let call = try permission.call(["windowID": value.id.uuidString])
+        guard let reference = await uiWindows?.reference(for: value.id) else { throw CommunicationError.scopeClosed }
+        let call = try permission.call(["windowID": reference])
         windowCalls.insert(call.id)
         defer { windowCalls.remove(call.id) }
         let result = try await consumer.executeReturning(

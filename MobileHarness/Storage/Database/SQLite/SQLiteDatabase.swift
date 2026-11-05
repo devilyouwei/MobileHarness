@@ -64,7 +64,7 @@ internal final class SQLiteDatabase: Sendable {
     /// Development storage has one current format. Unknown schemas are discarded, never upgraded.
     func prepareSchema(_ statements: [String]) throws {
         do {
-            let currentVersion = 20_261_104
+            let currentVersion = 20_261_107
             let installed = try pool.read { db in try Int.fetchOne(db, sql: "PRAGMA user_version") ?? 0 }
             guard installed != currentVersion else { return }
             try pool.erase()

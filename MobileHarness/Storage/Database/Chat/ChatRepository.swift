@@ -7,6 +7,7 @@ public enum HistoryPaging {
 }
 
 public struct DialogRecord: Sendable {
+    public let traceID: UUID
     public let id: String
     public let agent: String
     public let createdAt: Date
@@ -19,10 +20,11 @@ public struct DialogRecord: Sendable {
     public let latestUser: String?
     public init(
         id: String, agent: String, createdAt: Date, archivedAt: Date?, title: String?, titleError: String?,
-        revision: UInt64, recovery: Data?, count: Int, latestUser: String?
+        revision: UInt64, recovery: Data?, count: Int, latestUser: String?, traceID: UUID = UUID()
     ) {
         self.id = id
         self.agent = agent
+        self.traceID = traceID
         self.createdAt = createdAt
         self.archivedAt = archivedAt
         self.title = title
@@ -44,9 +46,10 @@ public struct MessageIdentity: Sendable {
     public let date: Date
     public let taskID: String?
     public let replyTo: String?
+    public let detail: Data?
     public init(
         clientID: String, inputID: String, role: String, kind: String, order: UInt64, date: Date,
-        taskID: String? = nil, replyTo: String? = nil
+        taskID: String? = nil, replyTo: String? = nil, detail: Data? = nil
     ) {
         self.clientID = clientID
         self.inputID = inputID
@@ -56,6 +59,7 @@ public struct MessageIdentity: Sendable {
         self.date = date
         self.taskID = taskID
         self.replyTo = replyTo
+        self.detail = detail
     }
 }
 
@@ -123,7 +127,19 @@ public struct TaskCompressionRecord: Sendable {
         self.detail = detail
     }
 }
+/// Lightweight invocation facts only; full tool results remain in message evidence.
+public struct MessageToolPreview: Sendable {
+    public let name: String
+    public let argumentsJSON: String
+    public let state: String
+    public init(name: String, argumentsJSON: String, state: String = "received") {
+        self.name = name
+        self.argumentsJSON = argumentsJSON
+        self.state = state
+    }
+}
 public struct MessagePreview: Sendable {
+    public var toolCalls: [MessageToolPreview] = []
     public var metadata: [String: String] = [:]
     public var ordinal: Int = 0
     public let id: String
@@ -165,8 +181,17 @@ public struct TaskSourceRecord: Sendable {
         self.position = position
     }
 }
+public struct MessagePage: Sendable {
+    public let records: [MessageRecord]
+    public let next: Int64?
+    public init(records: [MessageRecord], next: Int64?) {
+        self.records = records
+        self.next = next
+    }
+}
 public protocol ChatRepository: Sendable {
     var storageScope: UUID { get }
+    func saveAuxiliaryRequest(dialog: String, request: ConversationModelRequest) async throws
     func current(agent: String, includingRecovery: Bool) async throws -> DialogRecord
     func listDialogs(agent: String, before: Int64?, limit: Int) async throws -> [DialogRecord]
     func dialog(_ id: String, includingRecovery: Bool) async throws -> DialogRecord
@@ -175,6 +200,7 @@ public protocol ChatRepository: Sendable {
         dialog id: String, revision: UInt64, recovery: Data?, messages: [MessageRecord],
         summaries: [TaskCompressionRecord]
     ) async throws -> [MessageReference]
+    func messagePage(dialog id: String, after: Int64?, limit: Int) async throws -> MessagePage
     func messages(dialog id: String, after: Int64?, limit: Int) async throws
         -> [MessageRecord]
     func compressionData(dialog id: String, taskIDs: [String]?) async throws -> [Data]

@@ -497,8 +497,8 @@ func webSkillExamplesParseAgainstTheirEffectiveCatalogAndStayWithinBudget(skill:
         for call in business {
             let path = call.actionPath.description
             paths.insert(path)
-            if let id = call.parameters["projectID"] { #expect(UUID(uuidString: id) != nil) }
-            if let id = call.parameters["windowID"] { #expect(UUID(uuidString: id) != nil) }
+            if let id = call.parameters["workspaceID"] { #expect(WorkspaceID(rawValue: id) != nil) }
+            if let id = call.parameters["windowID"] { #expect(id.hasPrefix("window_")) }
 
         }
     }
@@ -525,8 +525,8 @@ func webSkillExamplesParseAgainstTheirEffectiveCatalogAndStayWithinBudget(skill:
     let basic = try AgentSkillLoader.registry(["basic-skill"], fixed: fixed)
     for (name, arguments) in [
         ("startTask", ["execution": "background", "executor": "writer", "goal": "绘制流程图"]),
-        ("sendMessage", ["taskID": "task_1", "text": "蓝色", "interactionID": "question_1"]),
-        ("cancelTask", ["taskID": "task_1", "reason": "User cancelled"]),
+        ("sendMessage", ["executor": "writer", "taskID": "task_1", "text": "蓝色"]),
+        ("cancelTask", ["executor": "writer", "taskID": "task_1", "reason": "User cancelled"]),
     ] {
         #expect(try basic.resolveAction(name, parameters: arguments).channel == "Control")
         #expect(throws: GenerationError.unknownCapability) { try basic.resolveTool(name, arguments: arguments) }
@@ -552,6 +552,6 @@ func webSkillExamplesParseAgainstTheirEffectiveCatalogAndStayWithinBudget(skill:
     #expect(prompt.contains("BasicSkill starts independent background Writer work"))
     #expect(prompt.contains("never invent sends/contracts"))
     #expect(prompt.contains("<startTask execution=\"background\" executor="))
-    #expect(prompt.contains("<sendMessage taskID="))
+    #expect(prompt.contains("<sendMessage executor="))
     #expect(!prompt.contains("two distinct call protocols"))
 }

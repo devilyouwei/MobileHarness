@@ -32,3 +32,5 @@ ApplicationRootProviding exposes the UI-owned web capability. ApplicationRootVie
 Root 对 artifact 窗口呈现对应 Web 会话；会话创建前显示等待视图，不创建业务任务。
 
 Settings routes assistantHistory/writerHistory directly to the injected record view, preserving recordContextID and agentRecords/conversation/turn navigation confirmations. Root does not parse task or model data.
+
+artifact窗口将WindowPresentation.subtitle注入WebPageView工具栏；Root只组合通用显示值，不生成作品名或解释Writer状态。

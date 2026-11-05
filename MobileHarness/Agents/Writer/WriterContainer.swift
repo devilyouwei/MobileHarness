@@ -13,8 +13,8 @@ import UI
 @MainActor public final class WriterContainer {
     private var agent: WriterAgent?
     private var tasks: (any TaskRepository)?
-    private var photos: CapturedPhotoStore?
-    public func bindPhotos(_ photos: CapturedPhotoStore?) { self.photos = photos }
+    private var photos: MediaStore?
+    public func bindPhotos(_ photos: MediaStore?) { self.photos = photos }
     public func historyImage(_ id: String, input: String) async throws -> Data? {
         guard !closed, let photos else { throw WriterFailure.unavailable }
         return try await photos.readForInput(id, source: "writer", input: input)
@@ -59,6 +59,7 @@ import UI
             throw primary
         }
     }
+    func setSceneActive(_ active: Bool) async { await agent?.setSceneActive(active) }
     func setForeground(_ active: Bool) async throws {
         if active { try await agent?.resume() } else { try await agent?.pause() }
     }
@@ -87,8 +88,8 @@ extension WriterContainer: WriterRecordsControlling {
     }
     private static func item(_ record: DelegatedTaskRecord) -> WriterTaskItem {
         var value = WriterTaskItem(
-            id: record.id, dialogID: record.dialogID, goal: record.goal, projectID: record.projectID,
-            runID: record.runID, status: record.status, failure: record.failure, updatedAt: record.updatedAt)
+            id: record.id, dialogID: record.dialogID, goal: record.goal, workspaceID: record.workspaceID,
+            delegateID: record.delegateID, status: record.status, failure: record.failure, updatedAt: record.updatedAt)
         value.phase = record.phase
         return value
     }
@@ -97,6 +98,18 @@ extension WriterContainer: WriterRecordsControlling {
         var item = Self.item(record)
         item.startedAt = try await historyStore.dialogMetadata(record.dialogID).createdAt
         item.requestCount = try await historyStore.requestCount(record.dialogID)
+        guard let tasks else { throw WriterFailure.unavailable }
+        for run in try await tasks.delegations(record.id, agent: "writer") {
+            if let end = run.finishedAt {
+                item.completedDuration = item.completedDuration.map {
+                    $0 + max(0, end.timeIntervalSince(run.createdAt))
+                }
+            } else if ["running", "finishing"].contains(run.status) {
+                item.activeSince = run.createdAt
+            } else {
+                item.completedDuration = nil
+            }
+        }
         return item
     }
     public func task(_ id: String) async throws -> WriterTaskItem {
@@ -109,11 +122,17 @@ extension WriterContainer: WriterRecordsControlling {
         let record = try await tasks.delegatedTask(taskID, agent: "writer")
         let rows = try await historyStore.requestPreviews(record.dialogID, after: after)
         let items = rows.map { row in
-            WriterRequestItem(
-                id: row.id, position: row.position, number: row.ordinal, runID: row.metadata["runID"] ?? record.runID,
+            let label = WriterRequestNaming.summary(
+                phase: row.metadata["phase"] ?? "模型请求", path: row.metadata["path"], calls: row.toolCalls)
+            return WriterRequestItem(
+                id: row.id, position: row.position, number: row.ordinal,
+                delegateID: row.metadata["delegateID"] ?? record.delegateID,
                 phase: row.metadata["phase"] ?? "模型请求", path: row.metadata["path"],
                 attempt: Int(row.metadata["attempt"] ?? "1") ?? 1,
-                date: row.date, state: row.metadata["toolsPending"] == "true" ? "executing" : row.state)
+                date: row.date,
+                state: WriterRequestNaming.state(
+                    request: row.state, calls: row.toolCalls, pending: row.metadata["toolsPending"] == "true"),
+                title: label)
         }
         return .init(items: items, nextPosition: rows.count == 20 ? rows.last?.position : nil)
     }
@@ -128,7 +147,7 @@ extension WriterContainer: WriterRecordsControlling {
     public func shareTask(_ id: String) async throws -> String {
         guard !closed, let tasks, let historyStore else { throw WriterFailure.unavailable }
         let item = try await task(id)
-        let runs = try await tasks.delegatedRuns(id, agent: "writer")
+        let delegations = try await tasks.delegations(id, agent: "writer")
         var after: UInt64 = 0
         var messages: [StoredConversation] = []
         var bytes = 0
@@ -148,13 +167,68 @@ extension WriterContainer: WriterRecordsControlling {
         } while true
         struct Export: Encodable {
             let task: WriterTaskItem
-            let runs: [DelegatedRunRecord]
+            let delegations: [DelegationRecord]
             let messages: [StoredConversation]
         }
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        let data = try encoder.encode(Export(task: item, runs: runs, messages: messages))
+        let data = try encoder.encode(Export(task: item, delegations: delegations, messages: messages))
         guard data.count <= 32 * 1024 * 1024 else { throw WriterFailure.capacity }
         return String(decoding: data, as: UTF8.self)
+    }
+}
+
+/// Writer owns operation semantics; Storage only supplies invocation facts and UI only renders labels.
+enum WriterRequestNaming {
+    static func state(request: String, calls: [MessageToolPreview], pending: Bool = false) -> String {
+        if ["failed", "cancelled", "interrupted"].contains(request) { return request }
+        if calls.contains(where: { $0.state == "failed" }) { return "failed" }
+        if calls.contains(where: { $0.state == "cancelled" }) { return "cancelled" }
+        if pending || calls.contains(where: { $0.state == "received" }) { return "executing" }
+        return request
+    }
+    static func summary(phase: String, path: String?, calls: [MessageToolPreview]) -> String {
+        func file(_ path: String?) -> String {
+            guard let path, !path.isEmpty else { return "文件" }
+            return path.count <= 40 ? path : (path as NSString).lastPathComponent
+        }
+        if phase == "文件内容请求" { return "编写 " + file(path) }
+        var titles: [String] = []
+        for call in calls {
+            let args = (try? JSONDecoder().decode([String: String].self, from: Data(call.argumentsJSON.utf8))) ?? [:]
+            let title: String
+            switch args["command"] {
+            case "list": title = "查看工作区"
+            case "read": title = "读取 " + file(args["path"])
+            case "search": title = "查找文件内容"
+            case "edit":
+                let instruction = args["instruction"]?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                let brief =
+                    !instruction.isEmpty && instruction.count <= 40
+                    && !instruction.contains(where: { "\n\r<>{}".contains($0) || $0.asciiValue == 96 })
+                title = brief ? instruction : (args["reference"] == nil ? "编写 " : "修改 ") + file(args["path"])
+            case "replace": title = "修改 " + file(args["path"])
+            case "move": title = "移动 " + file(args["path"])
+            case "remove", "removeTree": title = "删除 " + file(args["path"])
+            case "render": title = "渲染并检查页面"
+            case "finish": title = "保存作品"
+            case "ask": title = "等待补充信息"
+            case "rename": title = "修改作品名称"
+            case "savepoint": title = "保存编辑检查点"
+            case "restore": title = "恢复草稿"
+            case "diff": title = "检查文件差异"
+            default: title = "处理创作步骤"
+            }
+            if !titles.contains(title) {
+                titles.append(title)
+            }
+        }
+        guard let first = titles.first else { return "处理创作步骤" }
+        let title =
+            titles.count == 1
+            ? first
+            : titles.prefix(2).joined(separator: "、")
+                + (titles.count > 2 ? "等\(titles.count)项操作" : "")
+        return title
     }
 }

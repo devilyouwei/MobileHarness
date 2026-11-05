@@ -169,9 +169,9 @@ func historyDoesNotFoldMismatchedOrUnfinishedTaskPreviews(_ invalid: String) thr
 }
 
 @Test func historyTitlesUsePresentationFallbacksAndRawInput() throws {
-    #expect(ConversationHistoryPresentation.title(try conversation()) == "新对话")
+    #expect(ConversationHistoryPresentation.title(try conversation()) == "New Conversation")
     #expect(ConversationHistoryPresentation.title(try conversation(user: "  original input  ")) == "  original input  ")
-    #expect(ConversationHistoryPresentation.title(try conversation(archived: true)) == "待生成标题")
+    #expect(ConversationHistoryPresentation.title(try conversation(archived: true)) == "Title Pending")
     #expect(ConversationHistoryPresentation.title(try conversation(archived: true, title: "Summary")) == "Summary")
 }
 private func conversation(archived: Bool = false, title: String? = nil, user: String? = nil) throws
@@ -604,4 +604,60 @@ func historyFunctionCatalogRejectsCorruptSnapshotsRatherThanInventingEmptyGroups
         _ = try await cancelled.value
         Issue.record("Cancelled catalog parsing must reject its result")
     } catch is CancellationError {}
+}
+
+@Test func writerTaskElapsedFreezesCompletedRunsAndExtendsOnlyActiveRun() {
+    var task = WriterTaskItem(
+        id: "task_1", dialogID: "dialog_1", goal: "test", workspaceID: nil, delegateID: "task_2",
+        status: "running", failure: nil, updatedAt: Date(timeIntervalSince1970: 100))
+    task.completedDuration = 62
+    task.activeSince = Date(timeIntervalSince1970: 100)
+    #expect(task.elapsed(at: Date(timeIntervalSince1970: 110)) == 72)
+    #expect(task.elapsed(at: Date(timeIntervalSince1970: 99)) == 62)
+    task.activeSince = nil
+    #expect(task.elapsed(at: Date(timeIntervalSince1970: 9000)) == 62)
+    #expect(WriterRecordPresentation.duration(62) == "1 分 2 秒")
+    #expect(WriterRecordPresentation.duration(3662) == "1 小时 1 分 2 秒")
+    task.completedDuration = nil
+    #expect(WriterRecordPresentation.duration(task.elapsed(at: Date())) == "未知")
+}
+@Test func writerRequestTimingDistinguishesUnknownActiveAndCompleted() {
+    var request = HistoryModelRequest(
+        id: "request", date: Date(timeIntervalSince1970: 100), input: "", requestJSON: "[]",
+        modelRequestStartedAt: nil, firstTokenLatency: nil, firstTokenAt: nil, response: "",
+        toolCalls: [], tokenUsage: nil, state: .completed, finishReason: "stop", error: nil)
+    #expect(WriterRecordPresentation.firstToken(request) == "首 token 耗时：未知")
+    #expect(WriterRecordPresentation.requestDuration(request, at: Date()) == "总计耗时：未知")
+    request.modelRequestCompletedAt = Date(timeIntervalSince1970: 102)
+    #expect(WriterRecordPresentation.requestDuration(request, at: Date()) == "总计耗时：2.000 秒")
+    let active = HistoryModelRequest(
+        id: "active", date: Date(timeIntervalSince1970: 100), input: "", requestJSON: "[]",
+        modelRequestStartedAt: Date(timeIntervalSince1970: 101), firstTokenLatency: 0.5,
+        firstTokenAt: Date(timeIntervalSince1970: 101.5), response: "", toolCalls: [], tokenUsage: nil,
+        state: .generating, finishReason: nil, error: nil)
+    #expect(WriterRecordPresentation.firstToken(active) == "首 token 耗时：0.500 秒")
+    #expect(WriterRecordPresentation.requestDuration(active, at: Date(timeIntervalSince1970: 103)) == "总计耗时：2.000 秒")
+
+}
+
+@Test func writerRequestRowsShowConciseTitlesRetryAndLocalizedStatus() {
+    let request = WriterRequestItem(
+        id: "request", position: 1, number: 12, delegateID: "run", phase: "control", path: nil,
+        attempt: 2, date: Date(), state: "cancelled", title: "修改流程图布局")
+    #expect(request.displayTitle == "修改流程图布局（重试）")
+    #expect(request.statusTitle == "已取消")
+    #expect(request.number == 12)
+}
+
+@Test func historyListDatesRespectCalendarYearAndTimeZoneWithoutInferringActivity() throws {
+    let parser = ISO8601DateFormatter()
+    let now = try #require(parser.date(from: "2025-12-31T17:00:00Z"))
+    let current = try #require(parser.date(from: "2025-12-31T16:05:00Z"))
+    let previous = try #require(parser.date(from: "2025-12-31T15:59:00Z"))
+    var calendar = Calendar(identifier: .gregorian)
+    calendar.timeZone = try #require(TimeZone(secondsFromGMT: 8 * 3600))
+    #expect(HistoryListPresentation.date(current, relativeTo: now, calendar: calendar) == "01/01 00:05")
+    #expect(HistoryListPresentation.date(previous, relativeTo: now, calendar: calendar) == "2025/12/31 23:59")
+    calendar.timeZone = try #require(TimeZone(secondsFromGMT: 0))
+    #expect(HistoryListPresentation.date(current, relativeTo: now, calendar: calendar) == "12/31 16:05")
 }

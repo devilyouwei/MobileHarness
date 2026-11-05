@@ -95,7 +95,7 @@
                     AnyView(
                         Group {
                             if let page = assembly.web.sessions[item.id] {
-                                WebPageView(page: page)
+                                WebPageView(page: page, subtitle: item.subtitle)
                             } else {
                                 ProgressView()
                             }

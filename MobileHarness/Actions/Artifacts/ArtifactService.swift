@@ -1,5 +1,6 @@
 import Foundation
 import FunctionContracts
+import StorageCore
 
 public protocol ArtifactCapability: Sendable {
     func perform(invocation: any FunctionInput) async throws -> String
@@ -7,10 +8,10 @@ public protocol ArtifactCapability: Sendable {
 
 /// Deterministic, task-scoped editing. Model cognition never enters this owner.
 public actor ArtifactService: ArtifactCapability, ArtifactStreaming {
-    public typealias Present = @Sendable (UUID, String, String, [String: String], Bool) async throws -> String
+    public typealias Present = @Sendable (WorkspaceID, String, String, [String: String], Bool) async throws -> String
     private struct Session {
-        let id: UUID
-        let title: String
+        let id: WorkspaceID
+        var title: String
         var entry: String
         let editor: ArtifactEditing
         var revision: UUID?
@@ -25,20 +26,24 @@ public actor ArtifactService: ArtifactCapability, ArtifactStreaming {
     }
     private let workspace: ArtifactWorkspace
     private let present: Present
-    private let prepare: @Sendable (UUID, Bool) async throws -> Void
-    private let capture: @Sendable (UUID) async throws -> Data?
+    private let prepare: @Sendable (WorkspaceID, Bool) async throws -> Void
+    private let describe: @Sendable (WorkspaceID, String?, String?) async throws -> Void
+    private let capture: @Sendable (WorkspaceID) async throws -> Data?
     private var sessions: [String: Session] = [:]
     private var admitting: Set<String> = []
-    private var lockedProjects: Set<UUID> = []
+    private var lockedProjects: Set<WorkspaceID> = []
     public init(
-        workspace: ArtifactWorkspace, prepare: @escaping @Sendable (UUID, Bool) async throws -> Void = { _, _ in },
-        capture: @escaping @Sendable (UUID) async throws -> Data? = { _ in nil },
+        workspace: ArtifactWorkspace,
+        prepare: @escaping @Sendable (WorkspaceID, Bool) async throws -> Void = { _, _ in },
+        capture: @escaping @Sendable (WorkspaceID) async throws -> Data? = { _ in nil },
+        describe: @escaping @Sendable (WorkspaceID, String?, String?) async throws -> Void = { _, _, _ in },
         present: @escaping Present
     ) {
         self.prepare = prepare
         self.workspace = workspace
         self.present = present
         self.capture = capture
+        self.describe = describe
     }
     public func perform(invocation: any FunctionInput) async throws -> String {
         let args = invocation.call.parameters
@@ -48,7 +53,9 @@ public actor ArtifactService: ArtifactCapability, ArtifactStreaming {
             case "projects":
                 return try encode(await workspace.inventory())
             case "open", "delete":
-                guard let raw = args["projectID"], let id = UUID(uuidString: raw), !lockedProjects.contains(id) else {
+                guard let owner = args["executor"], let task = args["taskID"],
+                    let id = WorkspaceID(agent: owner, taskID: task), !lockedProjects.contains(id)
+                else {
                     throw ArtifactWorkspaceError.busy
                 }
                 lockedProjects.insert(id)
@@ -67,30 +74,27 @@ public actor ArtifactService: ArtifactCapability, ArtifactStreaming {
             default: throw ActionExecutionError.invalidInvocation
             }
         }
-        guard let taskID = invocation.context.taskID, invocation.context.source == "writer" else {
+        guard let delegateID = invocation.context.taskID, invocation.context.source == "writer" else {
             throw ActionExecutionError.invalidInvocation
         }
         switch command {
         case "start", "resume":
-            guard sessions[taskID] == nil, !admitting.contains(taskID), sessions.count + admitting.count < 1 else {
+            guard sessions[delegateID] == nil, !admitting.contains(delegateID), sessions.count + admitting.count < 1
+            else {
                 throw ArtifactWorkspaceError.busy
             }
-            let id: UUID
-            if let value = args["projectID"] {
-                guard let parsed = UUID(uuidString: value) else { throw ArtifactWorkspaceError.invalidPath }
-                id = parsed
-            } else {
-                id = UUID()
-            }
+            guard let raw = args["workspaceID"], let id = WorkspaceID(rawValue: raw),
+                id.agent == invocation.context.source
+            else { throw ArtifactWorkspaceError.invalidPath }
             guard !lockedProjects.contains(id) else { throw ArtifactWorkspaceError.busy }
-            admitting.insert(taskID)
+            admitting.insert(delegateID)
             lockedProjects.insert(id)
-            defer { admitting.remove(taskID) }
+            defer { admitting.remove(delegateID) }
             do {
-                let original = try await workspace.list().first(where: { $0.id == id })
+                let original = try await workspace.published(id)
                 let checkpoint = try await workspace.checkpoint(for: id)
                 guard
-                    args["projectID"] == nil || args["createProject"] == "true" || original != nil || checkpoint != nil
+                    args["createWorkspace"] == "true" || original != nil || checkpoint != nil
                 else {
                     throw ArtifactWorkspaceError.missingProject
                 }
@@ -104,9 +108,9 @@ public actor ArtifactService: ArtifactCapability, ArtifactStreaming {
                 let draft = try checkpoint?.draft ?? ArtifactDraft(files: original?.files ?? [:])
                 try await workspace.checkpoint(
                     .init(
-                        projectID: id, baseRevision: original?.revision,
+                        workspaceID: id, baseRevision: original?.revision,
                         title: title, entry: entry, draft: draft, interrupted: true))
-                sessions[taskID] = Session(
+                sessions[delegateID] = Session(
                     id: id, title: title, entry: entry, editor: ArtifactEditing(draft: draft),
                     revision: original?.revision)
                 if command == "start" { try await prepare(id, false) }
@@ -117,10 +121,11 @@ public actor ArtifactService: ArtifactCapability, ArtifactStreaming {
                         ? "<!doctype html><meta charset=utf-8><h2>Writer</h2><p>正在准备创作…</p>" : "正在准备创作…"
                 }
                 let presentation = try await present(id, title, entry, visible, true)
+                try await describe(id, title, args["subtitle"])
                 let details = (try? JSONDecoder().decode([String: String].self, from: Data(presentation.utf8))) ?? [:]
-                return try encode(["projectID": id.uuidString, "entry": entry, "windowID": details["windowID"] ?? ""])
+                return try encode(["workspaceID": id.rawValue, "entry": entry, "windowID": details["windowID"] ?? ""])
             } catch {
-                sessions.removeValue(forKey: taskID)
+                sessions.removeValue(forKey: delegateID)
                 lockedProjects.remove(id)
                 throw error
             }
@@ -128,7 +133,28 @@ public actor ArtifactService: ArtifactCapability, ArtifactStreaming {
             return try encode(await workspace.inventory())
         default: break
         }
-        guard var session = sessions[taskID] else { throw ArtifactWorkspaceError.missingProject }
+        guard var session = sessions[delegateID] else { throw ArtifactWorkspaceError.missingProject }
+        if command == "describe" {
+            try await describe(session.id, nil, args["subtitle"])
+            return "Presentation metadata accepted; closed windows remain closed."
+        }
+        if command == "rename" || command == "edit", let title = args["title"] {
+            guard !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, title.utf8.count <= 160 else {
+                throw ArtifactWorkspaceError.invalidTitle
+            }
+            if command == "rename" {
+                session.title = title
+                let draft = await session.editor.snapshot()
+                try await workspace.checkpoint(
+                    .init(
+                        workspaceID: session.id, baseRevision: session.revision, title: title, entry: session.entry,
+                        draft: draft,
+                        interrupted: true))
+                sessions[delegateID] = session
+                try await describe(session.id, title, nil)
+                return "Title updated: " + title
+            }
+        }
         if command == "preview" {
             let visible: ArtifactDraft
             if let stream = session.stream {
@@ -141,7 +167,7 @@ public actor ArtifactService: ArtifactCapability, ArtifactStreaming {
                 return try encode(["status": "unchanged"])
             }
             session.previewFiles = visible.files
-            sessions[taskID] = session
+            sessions[delegateID] = session
             return try await present(session.id, session.title, session.entry, visible.files, true)
         }
         guard session.stream == nil else { throw ArtifactWorkspaceError.busy }
@@ -202,7 +228,7 @@ public actor ArtifactService: ArtifactCapability, ArtifactStreaming {
             if movingEntry, let destination { session.entry = destination + session.entry.dropFirst(path.count) }
             session.rendered = false
             session.generation += 1
-            sessions[taskID] = session
+            sessions[delegateID] = session
             try await save(session, draft)
             return "Draft updated. Repair affected links/imports, then render the complete change set."
         case "diff":
@@ -230,33 +256,12 @@ public actor ArtifactService: ArtifactCapability, ArtifactStreaming {
                 SearchResult(
                     matches: changes, total: paths.count,
                     nextOffset: offset + changes.count < paths.count ? offset + changes.count : nil))
-        case "versions":
-            let project = try await workspace.project(session.id)
-            return try encode((project.previousVersions + [project.revision]).map(\.uuidString))
-        case "restoreVersion":
-            guard let raw = args["revision"], let revision = UUID(uuidString: raw) else {
-                throw ArtifactWorkspaceError.invalidPath
-            }
-            let draft = try await workspace.version(session.id, revision: revision)
-            let entry = args["entry"] ?? session.entry
-            guard draft.files[entry] != nil,
-                ["html", "md", "txt"].contains((entry as NSString).pathExtension.lowercased())
-            else {
-                throw ArtifactWorkspaceError.missingFile
-            }
-            try await session.editor.restore(draft)
-            session.entry = entry
-            session.rendered = false
-            session.generation += 1
-            sessions[taskID] = session
-            try await save(session, draft)
-            return "Historical version restored to draft only. Render and finish to publish a new version."
         case "savepoint":
             guard session.stream == nil else { throw ArtifactWorkspaceError.busy }
             guard session.savepoints.count < 8 else { throw ArtifactWorkspaceError.savepointLimit }
-            let id = UUID().uuidString
+            let id = "savepoint_\(session.savepoints.count + 1)"
             session.savepoints[id] = (await session.editor.snapshot(), session.entry)
-            sessions[taskID] = session
+            sessions[delegateID] = session
             return try encode(["savepoint": id])
         case "restore":
             guard let id = args["savepoint"], let (draft, entry) = session.savepoints[id] else {
@@ -266,74 +271,74 @@ public actor ArtifactService: ArtifactCapability, ArtifactStreaming {
             session.entry = entry
             session.rendered = false
             session.generation += 1
-            sessions[taskID] = session
+            sessions[delegateID] = session
             try await save(session, draft)
             return "Savepoint restored. Render before finishing."
         case "edit":
             guard let path = args["path"], let instruction = args["instruction"], !instruction.isEmpty,
                 instruction.utf8.count <= 2048
             else { throw ArtifactWorkspaceError.invalidPath }
-            let reference = args["reference"].flatMap(UUID.init(uuidString:))
+            let reference = args["reference"]
             if args["reference"] != nil && reference == nil { throw ArtifactWorkspaceError.readRequired }
             let rawRefs = (args["contextReferences"] ?? "").split(separator: ",").map {
                 $0.trimmingCharacters(in: .whitespaces)
             }
-            let refs = rawRefs.compactMap(UUID.init(uuidString:))
-            guard refs.count == rawRefs.count else { throw ArtifactWorkspaceError.readRequired }
-            let related = try await session.editor.relatedContext(refs)
+            let related = try await session.editor.relatedContext(rawRefs)
             let lower = try optionalInteger(args, "start")
             let upper = try optionalInteger(args, "end")
             let base = await session.editor.snapshot()
             let id = try await session.editor.begin(
                 path: path, reference: reference,
                 start: lower, end: upper)
+            if let title = args["title"] { session.title = title }
             session.stream = id
             session.previewFiles = nil
             session.editBase = base
             session.generation += 1
             session.rendered = false
-            sessions[taskID] = session
+            sessions[delegateID] = session
+            if let title = args["title"] { try await describe(session.id, title, nil) }
             let context = try await session.editor.context(for: id) + related
             return try encode([
                 "streamID": id.uuidString, "instruction": "File: \(path)\n\(instruction)",
                 "context": context,
             ])
         case "replace":
-            guard let path = args["path"], let raw = args["reference"], let reference = UUID(uuidString: raw),
+            guard let path = args["path"], let raw = args["reference"], let reference = Optional(raw),
                 let old = args["oldText"], let new = args["newText"]
             else { throw ArtifactWorkspaceError.readRequired }
             let before = await session.editor.snapshot()
             let draft = try await session.editor.replace(path: path, reference: reference, old: old, new: new)
             session.rendered = false
             session.generation += 1
-            sessions[taskID] = session
+            sessions[delegateID] = session
             try await workspace.checkpoint(
                 .init(
-                    projectID: session.id, baseRevision: session.revision,
+                    workspaceID: session.id, baseRevision: session.revision,
                     title: session.title, entry: session.entry, draft: draft, interrupted: true))
             return try encode(Self.changes(before: before.files, after: draft.files))
         case "remove":
             guard let path = args["path"], path != session.entry,
-                let raw = args["reference"], let reference = UUID(uuidString: raw)
+                let raw = args["reference"], let reference = Optional(raw)
             else { throw ArtifactWorkspaceError.readRequired }
             let draft = try await session.editor.remove(path: path, reference: reference)
             session.rendered = false
             session.generation += 1
-            sessions[taskID] = session
+            sessions[delegateID] = session
             try await workspace.checkpoint(
                 .init(
-                    projectID: session.id, baseRevision: session.revision,
+                    workspaceID: session.id, baseRevision: session.revision,
                     title: session.title, entry: session.entry, draft: draft, interrupted: true))
             return "File removed from draft."
         case "render":
             guard session.stream == nil else { throw ArtifactWorkspaceError.busy }
             let draft = await session.editor.snapshot()
             let result = try await present(session.id, session.title, session.entry, draft.files, false)
-            guard sessions[taskID] != nil else { throw ArtifactWorkspaceError.conflict }
+            guard sessions[delegateID] != nil else { throw ArtifactWorkspaceError.conflict }
             session.verification =
                 (try? JSONDecoder().decode([String: String].self, from: Data(result.utf8)))?["status"] ?? "unverified"
             session.rendered = true
-            sessions[taskID] = session
+            sessions[delegateID] = session
             return "Draft revision: \(session.generation). Rendering is execution evidence, not semantic acceptance.\n"
                 + result
         case "finish":
@@ -344,73 +349,75 @@ public actor ArtifactService: ArtifactCapability, ArtifactStreaming {
             let project = try await workspace.publish(
                 id: session.id, expecting: session.revision, title: session.title, draft: draft, entry: session.entry)
             session.revision = project.revision
-            sessions[taskID] = session
+            sessions[delegateID] = session
             return try encode([
-                "projectID": project.id.uuidString, "revision": project.revision.uuidString,
+                "workspaceID": project.id.rawValue, "revision": project.revision.uuidString,
                 "summary": String((args["summary"] ?? "作品已保存").prefix(512)),
                 "verification": session.verification,
             ])
         default: throw ArtifactWorkspaceError.invalidPath
         }
     }
-    public func append(streamID: String, taskID: String, text: String) async throws {
-        guard var session = sessions[taskID], let id = UUID(uuidString: streamID), session.stream == id else {
+    public func append(streamID: String, delegateID: String, text: String) async throws {
+        guard var session = sessions[delegateID], let id = UUID(uuidString: streamID), session.stream == id else {
             throw ArtifactWorkspaceError.conflict
         }
         try Task.checkCancellation()
         try await session.editor.append(text, to: id)
         if session.lastCheckpoint.duration(to: .now) >= .milliseconds(200) {
             session.lastCheckpoint = .now
-            sessions[taskID] = session
+            sessions[delegateID] = session
             let preview = try await session.editor.preview(id)
             try await workspace.checkpoint(
                 .init(
-                    projectID: session.id, baseRevision: session.revision,
+                    workspaceID: session.id, baseRevision: session.revision,
                     title: session.title, entry: session.entry, draft: preview, interrupted: true))
 
         }
     }
-    public func complete(streamID: String, taskID: String) async throws -> String {
-        guard var session = sessions[taskID], let id = UUID(uuidString: streamID), session.stream == id else {
+    public func complete(streamID: String, delegateID: String) async throws -> String {
+        guard var session = sessions[delegateID], let id = UUID(uuidString: streamID), session.stream == id else {
             throw ArtifactWorkspaceError.conflict
         }
         let draft = try await session.editor.finish(id)
         session.stream = nil
-        sessions[taskID] = session
+        sessions[delegateID] = session
         try await workspace.checkpoint(
             .init(
-                projectID: session.id, baseRevision: session.revision,
+                workspaceID: session.id, baseRevision: session.revision,
                 title: session.title, entry: session.entry, draft: draft, interrupted: true))
 
         let changes = Self.changes(before: session.editBase?.files ?? [:], after: draft.files)
         session.editBase = nil
-        guard sessions[taskID] != nil else { throw ArtifactWorkspaceError.conflict }
-        sessions[taskID] = session
+        guard sessions[delegateID] != nil else { throw ArtifactWorkspaceError.conflict }
+        sessions[delegateID] = session
         return try encode(changes)
     }
-    public func abort(streamID: String, taskID: String) async throws {
-        guard var session = sessions[taskID], let id = UUID(uuidString: streamID), session.stream == id else { return }
+    public func abort(streamID: String, delegateID: String) async throws {
+        guard var session = sessions[delegateID], let id = UUID(uuidString: streamID), session.stream == id else {
+            return
+        }
         let preview = try await session.editor.preview(id)
         try await workspace.checkpoint(
             .init(
-                projectID: session.id, baseRevision: session.revision,
+                workspaceID: session.id, baseRevision: session.revision,
                 title: session.title, entry: session.entry, draft: preview, interrupted: true))
         try await session.editor.cancel(id)
         session.stream = nil
-        sessions[taskID] = session
+        sessions[delegateID] = session
     }
-    public func snapshot(taskID: String) async throws -> Data? {
-        guard let session = sessions[taskID], session.rendered else { return nil }
+    public func snapshot(delegateID: String) async throws -> Data? {
+        guard let session = sessions[delegateID], session.rendered else { return nil }
         return try await capture(session.id)
     }
-    public func release(taskID: String) async throws {
-        guard let session = sessions[taskID] else { return }
+    public func release(delegateID: String) async throws {
+        guard let session = sessions[delegateID] else { return }
         var failure: (any Error)?
         if let stream = session.stream {
-            do { try await abort(streamID: stream.uuidString, taskID: taskID) } catch { failure = error }
+            do { try await abort(streamID: stream.uuidString, delegateID: delegateID) } catch { failure = error }
         }
         await session.editor.close()
-        sessions.removeValue(forKey: taskID)
+        sessions.removeValue(forKey: delegateID)
         lockedProjects.remove(session.id)
         if let failure { throw failure }
     }
@@ -430,7 +437,7 @@ public actor ArtifactService: ArtifactCapability, ArtifactStreaming {
     private func save(_ session: Session, _ draft: ArtifactDraft) async throws {
         try await workspace.checkpoint(
             .init(
-                projectID: session.id, baseRevision: session.revision,
+                workspaceID: session.id, baseRevision: session.revision,
                 title: session.title, entry: session.entry, draft: draft, interrupted: true))
     }
     /// Bounded change evidence; source is not echoed into the control history.

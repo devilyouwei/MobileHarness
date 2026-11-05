@@ -54,7 +54,6 @@ extension ToolResponse {
             value = String(
                 decoding: try JSONSerialization.data(withJSONObject: object, options: [.sortedKeys]), as: UTF8.self)
         }
-        if case .value = completion, value.utf8.count > 65_536 { throw ActionExecutionError.invalidCompletion }
         guard policy == .returning || isError else { return nil }
         return ToolResponse(
             callID: callID, value: value, isError: isError, failureCode: failureCode(completion, isError: isError),

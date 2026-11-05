@@ -212,7 +212,7 @@ Photography与ApplicationControl增加Island.setPresentation以及ui.island事�
 ## Web skills
 
 
-BasicSkill 默认暴露统一 startTask、前台 finishTask、支持后台 taskID 的 cancelTask 及输入专用 sendMessage，教学 foreground/current Agent 与 background/executor 的区别。后台 Writer 无需先建立前台任务或加载 Skill，单任务忙碌需确认替代，用户补充带 interactionID。Writing 提供 Artifact_library 与项目管理教学，不重复注册委托入口。Writer 独立后台执行；Assistant 不生成源码。浏览仍由 WebBrowsing 承担。Assistant 当前所有 Skills 均声明 action 和显式 Channel；Writer 的原生工具目录由自身工作流拥有。通用 Skill schema 保留 tool 能力，但不用于 Assistant 当前资源。
+BasicSkill 默认暴露统一 startTask、前台 finishTask、支持后台 taskID 的 cancelTask 及输入专用 sendMessage，教学 foreground/current Agent 与 background/executor 的区别。后台 Writer 无需先建立前台任务或加载 Skill，单任务忙碌需确认替代，用户补充由运行时关联 interactionID。Writing 提供 Artifact_library 与项目管理教学，不重复注册委托入口。Writer 独立后台执行；Assistant 不生成源码。浏览仍由 WebBrowsing 承担。Assistant 当前所有 Skills 均声明 action 和显式 Channel；Writer 的原生工具目录由自身工作流拥有。通用 Skill schema 保留 tool 能力，但不用于 Assistant 当前资源。
 
 BasicSkill的Writer教学要求将阶段事实、追问和终态简短汇报给用户，不由通知重委托；运行时拥有播放排空后的启听衔接，不靠模型生成startListening。
 

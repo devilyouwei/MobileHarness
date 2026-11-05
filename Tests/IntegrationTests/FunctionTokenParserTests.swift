@@ -51,10 +51,10 @@ private func generator() throws -> AgentGenerator {
         try missing.append("<perform operaton='disconnect' extra='ignored'/>") == [
             .rejected(CallRejection(kind: .action, alias: "perform", reason: .invalidParameters))
         ])
-    #expect(throws: GenerationError.invalidParameters) {
+    #expect(
         try capabilities.resolveAction(
-            "perform", parameters: ["operation": "disconnect", "extra": String(repeating: "x", count: 4097)])
-    }
+            "perform", parameters: ["operation": "disconnect", "extra": String(repeating: "x", count: 4097)]
+        ).parameters == ["operation": "disconnect"])
     var excessive = ["operation": "disconnect"]
     for index in 0..<32 { excessive["extra\(index)"] = "ignored" }
     #expect(throws: GenerationError.invalidParameters) {
@@ -200,10 +200,18 @@ func functionTokenParserRejectsTruncatedCompletion(_ source: String) throws {
         ])
 }
 
-private struct MarkupChat: ChatCapability {
-    let availability: CapabilityAvailability = .available
+private actor MarkupChat: ChatCapability {
+    nonisolated let availability: CapabilityAvailability = .available
     let markup: String
+    let subsequent: String?
+    private var count = 0
+    init(markup: String, subsequent: String? = nil) {
+        self.markup = markup
+        self.subsequent = subsequent
+    }
     func chat(_ request: ChatRequest) throws -> InferenceSession<ChatEvent> {
+        count += 1
+        let markup = count > 1 ? subsequent ?? self.markup : self.markup
         let pair = InferenceSession<ChatEvent>.make(limits: try StreamLimits(), estimatedBytes: { $0.estimatedBytes })
         for part in [String(markup.prefix(7)), String(markup.dropFirst(7))] { try pair.emitter.yield(.text(part)) }
         try pair.emitter.yield(.finished(.stop))
@@ -212,14 +220,14 @@ private struct MarkupChat: ChatCapability {
     }
 }
 
-@Test(.actionCatalog) func assistantEmitsResolvedMarkupAndLiteralToolResultsCannotExecuteTags() async throws {
+@Test(.actionCatalog) func assistantEmitsResolvedMarkupAndRejectsUnpairedToolResults() async throws {
     let agent = try AssistantAgent(
         stateContext: try publicStateFixture(),
         chat: MarkupChat(markup: "<channel.Speech>你好<express emotion='smile'/></channel.Speech>尾巴"),
         context: try AgentContextRepository(
             agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState())
     )
-    let speechRequests = try await bindSpeechRequests(agent)
+    _ = try await bindSpeechRequests(agent)
     try await agent.start()
     var outputs = FixtureGenerationOutputs(agent: agent).makeAsyncIterator()
     try await agent.receive(
@@ -238,20 +246,18 @@ private struct MarkupChat: ChatCapability {
     #expect(calls.map(\.channel) == ["Speech", "Display", "Speech", "Speech", "Display"])
     #expect(calls[2].actionPath.function == "express")
     let result = ToolResult(callID: UUID().uuidString, value: "<express emotion='smile'/>")
-    try await agent.receive(
-        AgentInput(
-            id: UUID().uuidString, sessionID: UUID().uuidString, payload: .toolResult(result)))
-    let literal = try #require(try await outputs.next()).output
-    #expect(
-        await speechRequests.restored(literal)
-            == .actionCall(expectedActionCall(name: "say", parameters: ["text": "<express emotion='smile'/>"])))
+    await #expect(throws: CommunicationError.unauthorized) {
+        try await agent.receive(
+            AgentInput(id: UUID().uuidString, sessionID: UUID().uuidString, payload: .toolResult(result)))
+    }
+    #expect(await agent.status().queuedInputs == 0)
     await agent.stop()
 }
 
 @Test(.actionCatalog) func incompleteModelMarkupFailsTurnAndFreshTurnGetsFreshParser() async throws {
     let agent = try AssistantAgent(
         stateContext: try publicStateFixture(),
-        chat: MarkupChat(markup: "<channel.Speech>未结束"),
+        chat: MarkupChat(markup: "<channel.Speech>未结束", subsequent: "recovered"),
         context: try AgentContextRepository(
             agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState())
     )
@@ -270,7 +276,7 @@ private struct MarkupChat: ChatCapability {
     try await agent.receive(
         AgentInput(
             id: UUID().uuidString, sessionID: UUID().uuidString,
-            payload: .toolResult(ToolResult(callID: UUID().uuidString, value: "recovered"))))
+            payload: .text("请继续回复")))
     #expect(
         await speechRequests.restored(try #require(try await outputs.next()).output)
             == .actionCall(expectedActionCall(name: "say", parameters: ["text": "recovered"])))
@@ -453,4 +459,15 @@ func invalidWaitSyntaxIsRejected(_ source: String) throws {
     #expect(events.compactMap(\.actionCall).count == 2)
     #expect(events[2] == .rejected(CallRejection(kind: .action, alias: "unknown", reason: .unknownCapability)))
     #expect(events[3] == .rejected(CallRejection(kind: .action, alias: "express", reason: .invalidParameters)))
+}
+
+@Test func nativeToolResolutionPreservesLargeArgumentsAndPermissionChecks() throws {
+    let registry = try CapabilityRegistry(tools: [
+        ToolRegistration(alias: "edit", path: "Artifacts.Workspace.perform", requiredParameters: ["newText"])
+    ])
+    let text = String(repeating: "source", count: 20000)
+    let json = try JSONEncoder().encode(["newText": text])
+    let call = try ToolCallParser.parse(
+        id: UUID().uuidString, alias: "edit", argumentsJSON: json, capabilities: registry)
+    #expect(call.arguments["newText"] == text && registry.permits(call))
 }

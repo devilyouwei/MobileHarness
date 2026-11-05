@@ -53,9 +53,6 @@ public struct FunctionExecutor: Sendable {
         return completion
     }
     public static func validate(completion: ActionCompletion, kind: ActionFunction.Kind) throws {
-        if case .value(let value) = completion, value.utf8.count > 65_536 {
-            throw ActionExecutionError.invalidCompletion
-        }
         if case .activityStarted(let id) = completion, id.isEmpty || id.utf8.count > 128 {
             throw ActionExecutionError.invalidCompletion
         }

@@ -1,5 +1,6 @@
 import Foundation
 import FunctionContracts
+import StorageCore
 import StorageFiles
 import UI
 
@@ -9,19 +10,59 @@ import UI
         private let pages: WebPageContainer
         private let windows: WindowState
         private let disk: DiskFileStore
-        private var bindings: [UUID: UUID] = [:]
-        private var dismissed: Set<UUID> = []
-        private var slots: [UUID: Int] = [:]
+        private var bindings: [WorkspaceID: UUID] = [:]
+        private var dismissed: Set<WorkspaceID> = []
+        private var slots: [WorkspaceID: Int] = [:]
         private struct Latest {
-            let title: String
+            var title: String
+            var subtitle: String? = nil
             let entry: String
             let files: [String: String]
             let preview: Bool
         }
-        private var latest: [UUID: Latest] = [:]
-        private var rendering: Set<UUID> = []
-        private var waiters: [UUID: [(UUID, CheckedContinuation<Void, any Error>)]] = [:]
-        private func acquire(_ id: UUID) async throws {
+        private var latest: [WorkspaceID: Latest] = [:]
+        private var sceneActive = true
+        private var serials: [WorkspaceID: Int] = [:]
+        private var serial = 0
+        public func describe(id: WorkspaceID, title: String?, subtitle: String?) {
+            guard latest[id] != nil else { return }
+            if let title { latest[id]?.title = title }
+            if let subtitle { latest[id]?.subtitle = subtitle }
+            refreshLabels()
+        }
+        private func refreshLabels() {
+            let live = bindings.filter { pair in windows.windows.contains { $0.id == pair.value } }
+            for (project, window) in live {
+                guard let value = latest[project] else { continue }
+                let peers = live.keys.filter { latest[$0]?.title == value.title }
+                    .sorted { (serials[$0] ?? 0) < (serials[$1] ?? 0) }
+                let suffix = peers.count > 1 ? " · " + String((peers.firstIndex(of: project) ?? 0) + 1) : ""
+                windows.setPresentation(window, title: value.title + suffix, subtitle: value.subtitle)
+            }
+        }
+        public func setSceneActive(_ active: Bool) async throws {
+            guard sceneActive != active else { return }
+            sceneActive = active
+            guard active else { return }
+            var failure: (any Error)?
+            for (id, value) in Array(latest) where !dismissed.contains(id) {
+                do {
+                    if let window = bindings[id], try windows.find(window).mode == .minimized { continue }
+                    _ = try await present(
+                        id: id, title: value.title, entry: value.entry, files: value.files, preview: value.preview,
+                        restoring: true)
+                } catch {
+                    if let window = bindings[id] { windows.report(window, message: String(describing: error)) }
+                    if failure == nil { failure = error }
+                }
+            }
+            if let failure { throw failure }
+        }
+        private var canRender: Bool { sceneActive && windows.available && pages.isAvailable }
+
+        private var rendering: Set<WorkspaceID> = []
+        private var waiters: [WorkspaceID: [(UUID, CheckedContinuation<Void, any Error>)]] = [:]
+        private func acquire(_ id: WorkspaceID) async throws {
             try Task.checkCancellation()
             if rendering.insert(id).inserted { return }
             guard (waiters[id]?.count ?? 0) < 2 else { throw WebPageError.busy }
@@ -42,7 +83,7 @@ import UI
                 throw error
             }
         }
-        private func release(_ id: UUID) {
+        private func release(_ id: WorkspaceID) {
             if waiters[id]?.isEmpty == false {
                 waiters[id]?.removeFirst().1.resume()
             } else {
@@ -55,40 +96,75 @@ import UI
             self.windows = windows
             self.disk = disk
         }
-        public func present(id: UUID, title: String, entry: String, files: [String: String], preview: Bool) async throws
+        public func present(
+            id: WorkspaceID, title: String, entry: String, files: [String: String], preview: Bool,
+            restoring: Bool = false
+        ) async throws
             -> String
         {
             try await acquire(id)
             defer { release(id) }
+            guard !restoring || latest[id] != nil else {
+                return try report(status: "unavailable", detail: "Window presentation retired.")
+            }
+            let current = restoring ? latest[id] : nil
+            let title = current?.title ?? title
+            let entry = current?.entry ?? entry
+            let files = current?.files ?? files
+            let preview = current?.preview ?? preview
             guard !dismissed.contains(id) else {
                 return try report(
                     status: "unavailable", detail: "Window closed; draft retained. Visual verification unavailable.")
+            }
+            guard latest[id] != nil || latest.count < 4 else { throw WebPageError.busy }
+            let subtitle = latest[id]?.subtitle
+            latest[id] = Latest(title: title, subtitle: subtitle, entry: entry, files: files, preview: preview)
+            guard canRender else {
+                return try report(
+                    status: "deferred", detail: "Scene hidden; files continue. Rendering deferred until foreground.")
             }
             let window: UUID
             if let existing = bindings[id], windows.windows.contains(where: { $0.id == existing }) {
                 window = existing
             } else {
                 guard bindings.count < 4 else { throw WebPageError.busy }
+                let reserved = UUID()
+                bindings[id] = reserved
+                serial += 1
+                serials[id] = serial
                 do {
-                    window = try await windows.present(content: .artifact, title: title, icon: .emoji("📝"))
-                } catch WindowError.interrupted {
-                    dismissed.insert(id)
+                    window = try await windows.present(
+                        content: .artifact, title: title, icon: .emoji("📝"), windowID: reserved)
+                } catch {
+                    let retained = windows.windows.contains { $0.id == reserved }
+                    if !retained {
+                        bindings.removeValue(forKey: id)
+                        serials.removeValue(forKey: id)
+                    }
+                    try Task.checkCancellation()
+                    if !canRender {
+                        refreshLabels()
+                        return try report(
+                            status: "deferred", detail: "Scene hidden during window presentation; files retained.")
+                    }
                     latest.removeValue(forKey: id)
+                    guard error as? WindowError == .interrupted else { throw error }
+                    dismissed.insert(id)
                     return try report(
                         status: "unavailable", detail: "Window closed; draft retained. Visual verification unavailable."
                     )
                 }
-                bindings[id] = window
             }
-            latest[id] = Latest(title: title, entry: entry, files: files, preview: preview)
-            let page = try pages.createSession(windowID: window)
+            refreshLabels()
+            let page = try pages.createSession(windowID: window, reference: windows.reference(for: window))
             guard try windows.find(window).mode != .minimized else {
                 return try report(
                     status: "unavailable", detail: "Window minimized; draft retained. Visual verification unavailable.")
             }
             let slot = ((slots[id] ?? 0) + 1) % 2
-            let prefix = "previews/" + id.uuidString + "/" + String(slot)
-            try await disk.remove(prefix)
+            let slotRoot = "previews/" + id.rawValue + "/" + String(slot)
+            try await disk.remove(slotRoot)
+            let prefix = slotRoot + "/" + UUID().uuidString
             var rendered = files
             if !entry.hasSuffix(".html") {
                 rendered["index.html"] = ArtifactTextRendering.html(
@@ -106,11 +182,36 @@ import UI
             do {
                 var readRoot = url
                 for _ in target.split(separator: "/") { readRoot.deleteLastPathComponent() }
-                observation = try await page.loadLocal(
-                    url, executesScripts: !preview && entry.hasSuffix(".html"), readAccessRoot: readRoot)
+                // Stable project confinement, fresh resource URLs, and a retained native surface.
+                readRoot.deleteLastPathComponent()
+                readRoot.deleteLastPathComponent()
+                if preview {
+                    // Keep the document's file origin alive while rotating its resource snapshots.
+                    let hostKey = "previews/" + id.rawValue + "/preview.html"
+                    if try await disk.info(hostKey) == nil {
+                        try await disk.putIfAbsent(
+                            Data(
+                                "<!doctype html><meta name=viewport content='width=device-width,initial-scale=1'><body></body>"
+                                    .utf8),
+                            key: hostKey)
+                    }
+                    let host = try await disk.fileURL(hostKey, maximumBytes: Int.max)
+                    observation = try await page.updateLocalPreview(
+                        rendered[target] ?? "", entry: url, readAccessRoot: readRoot, documentEntry: host)
+                } else {
+                    observation = try await page.loadLocal(
+                        url, executesScripts: entry.hasSuffix(".html"), readAccessRoot: readRoot,
+                        preservingViewport: true)
+                }
             } catch {
+                try Task.checkCancellation()
+                if !canRender {
+                    return try report(
+                        status: "deferred", detail: "Scene hidden during render; files retained.",
+                        window: windows.reference(for: window) ?? "")
+                }
                 if dismissed.contains(id) {
-                    try await disk.remove("previews/" + id.uuidString)
+                    try await disk.remove("previews/" + id.rawValue)
                     return try report(
                         status: "unavailable", detail: "Window closed; draft retained. Visual verification unavailable."
                     )
@@ -120,7 +221,8 @@ import UI
             slots[id] = slot
             return try report(
                 status: preview ? "preview" : (observation.diagnostics.isEmpty ? "observed" : "errors"),
-                detail: "", window: window.uuidString, text: observation.text, diagnostics: observation.diagnostics)
+                detail: "", window: windows.reference(for: window) ?? "", text: observation.text,
+                diagnostics: observation.diagnostics)
         }
         private func report(
             status: String, detail: String, window: String = "", text: String = "", diagnostics: String = ""
@@ -131,43 +233,53 @@ import UI
                     "text": String(text.prefix(1200)), "diagnostics": String(diagnostics.prefix(512)),
                 ]), as: UTF8.self)
         }
-        public func prepare(id: UUID, deleting: Bool) async throws {
+        public func prepare(id: WorkspaceID, deleting: Bool) async throws {
             dismissed.remove(id)
             if deleting {
                 latest.removeValue(forKey: id)
-                try await disk.remove("previews/" + id.uuidString)
+                try await disk.remove("previews/" + id.rawValue)
                 if let window = bindings[id], windows.windows.contains(where: { $0.id == window }) {
                     try await windows.change(window, command: .close)
                     pages.removeSession(windowID: window)
                 }
                 bindings.removeValue(forKey: id)
                 slots.removeValue(forKey: id)
+                serials.removeValue(forKey: id)
+                refreshLabels()
             } else if let window = bindings[id], !windows.windows.contains(where: { $0.id == window }) {
                 bindings.removeValue(forKey: id)
-            } else if !deleting, let window = bindings[id], try windows.find(window).mode == .minimized {
+            } else if !deleting, canRender, let window = bindings[id], try windows.find(window).mode == .minimized {
                 try await windows.change(window, command: .restore)
             }
         }
-        public func snapshot(id: UUID) async throws -> Data? {
+        public func snapshot(id: WorkspaceID) async throws -> Data? {
+            try Task.checkCancellation()
+            guard canRender else { return nil }
             guard let window = bindings[id], !dismissed.contains(id), let item = try? windows.find(window),
                 item.mode != .minimized,
                 let page = pages.sessions[window]
             else { return nil }
             do { return try await page.snapshot() } catch {
-                if dismissed.contains(id) { return nil }
+                if !canRender || dismissed.contains(id) || error as? WebPageError == .notVisible
+                    || error as? WebPageError == .unavailable
+                {
+                    return nil
+                }
                 throw error
             }
         }
         public func pauseWindow(invocation: any FunctionInput) async throws {}
         public func resumeWindow(invocation: any FunctionInput) async throws {
-            guard let text = invocation.call.parameters["windowID"], let window = UUID(uuidString: text),
+            guard let text = invocation.call.parameters["windowID"], let window = try? windows.resolve(reference: text),
                 let project = bindings.first(where: { $0.value == window })?.key, let value = latest[project]
             else { return }
             _ = try await present(
-                id: project, title: value.title, entry: value.entry, files: value.files, preview: value.preview)
+                id: project, title: value.title, entry: value.entry, files: value.files, preview: value.preview,
+                restoring: true)
         }
         public func closeWindow(invocation: any FunctionInput) async throws {
-            guard let text = invocation.call.parameters["windowID"], let window = UUID(uuidString: text) else { return }
+            guard let text = invocation.call.parameters["windowID"], let window = try? windows.resolve(reference: text)
+            else { return }
             let projects = bindings.filter { $0.value == window }.map(\.key)
             for project in projects { dismissed.insert(project) }
             pages.removeSession(windowID: window)
@@ -177,7 +289,9 @@ import UI
                 latest.removeValue(forKey: project)
                 bindings.removeValue(forKey: project)
                 slots.removeValue(forKey: project)
-                try await disk.remove("previews/" + project.uuidString)
+                serials.removeValue(forKey: project)
+                refreshLabels()
+                try await disk.remove("previews/" + project.rawValue)
             }
         }
     }

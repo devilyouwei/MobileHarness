@@ -4,12 +4,15 @@ import Synchronization
 /// Event admission policy. A nil capacity lets finite-generation adapters retain all pending events.
 public struct StreamLimits: Equatable, Sendable {
     public let capacity: Int?
-    public let maximumEventBytes: Int
+    public let maximumEventBytes: Int?
 
-    public init(capacity: Int? = 64, maximumEventBytes: Int = 4096) throws {
-        guard maximumEventBytes > 0 else { throw CapabilityError.invalidRequest("Invalid stream limits") }
+    public init(capacity: Int? = 64, maximumEventBytes: Int? = 4096) throws {
+        if let maximumEventBytes {
+            guard maximumEventBytes > 0 else { throw CapabilityError.invalidRequest("Invalid stream limits") }
+        }
         if let capacity {
-            guard capacity > 0, !capacity.multipliedReportingOverflow(by: maximumEventBytes).overflow else {
+            guard capacity > 0 else { throw CapabilityError.invalidRequest("Invalid stream limits") }
+            if let maximumEventBytes, capacity.multipliedReportingOverflow(by: maximumEventBytes).overflow {
                 throw CapabilityError.invalidRequest("Invalid stream limits")
             }
         }
@@ -130,12 +133,12 @@ public struct InferenceEvents<Event: Sendable>: AsyncSequence, Sendable {
 /// Adapters serialize their emissions. Overflow fails the session instead of dropping output silently.
 public struct InferenceEmitter<Event: Sendable>: Sendable {
     fileprivate let storage: SessionStorage<Event>
-    fileprivate let maximumEventBytes: Int
+    fileprivate let maximumEventBytes: Int?
     fileprivate let estimatedBytes: @Sendable (Event) -> Int
 
     public func yield(_ event: Event) throws {
         let bytes = estimatedBytes(event)
-        guard bytes >= 0, bytes <= maximumEventBytes else {
+        guard bytes >= 0, maximumEventBytes.map({ bytes <= $0 }) ?? true else {
             storage.end(.failed(CapabilityError.eventTooLarge))
             throw CapabilityError.eventTooLarge
         }
@@ -155,7 +158,7 @@ public struct InferenceEmitter<Event: Sendable>: Sendable {
     /// Serialized producers may suspend instead of failing on a full event buffer.
     public func yieldSuspending(_ event: Event) async throws {
         let bytes = estimatedBytes(event)
-        guard bytes >= 0, bytes <= maximumEventBytes else {
+        guard bytes >= 0, maximumEventBytes.map({ bytes <= $0 }) ?? true else {
             storage.end(.failed(CapabilityError.eventTooLarge))
             throw CapabilityError.eventTooLarge
         }

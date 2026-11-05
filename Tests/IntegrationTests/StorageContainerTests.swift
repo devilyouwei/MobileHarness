@@ -122,6 +122,7 @@ private actor FailingContainerDatabase: DatabaseStorage {
     private var stops = 0
     nonisolated var chat: any ChatRepository { get throws { throw RecordStorageError.notReady } }
     nonisolated var tasks: any TaskRepository { get throws { throw RecordStorageError.notReady } }
+    nonisolated var workspaces: any WorkspaceRepository { get throws { throw RecordStorageError.notReady } }
     nonisolated var media: any MediaRepository { get throws { throw RecordStorageError.notReady } }
     nonisolated var devices: any DeviceRepository { get throws { throw RecordStorageError.notReady } }
     func start() throws {
@@ -172,6 +173,7 @@ private actor WaitingContainerDatabase: DatabaseStorage {
     private var stopped = false
     nonisolated var chat: any ChatRepository { get throws { throw RecordStorageError.notReady } }
     nonisolated var tasks: any TaskRepository { get throws { throw RecordStorageError.notReady } }
+    nonisolated var workspaces: any WorkspaceRepository { get throws { throw RecordStorageError.notReady } }
     nonisolated var media: any MediaRepository { get throws { throw RecordStorageError.notReady } }
     nonisolated var devices: any DeviceRepository { get throws { throw RecordStorageError.notReady } }
     func start() async throws {
@@ -225,6 +227,7 @@ private actor StateReadSpyDatabase: DatabaseStorage {
     private var stateReads = 0
     nonisolated var chat: any ChatRepository { get throws { throw ContainerFixtureError.invalid } }
     nonisolated var tasks: any TaskRepository { get throws { throw ContainerFixtureError.invalid } }
+    nonisolated var workspaces: any WorkspaceRepository { get throws { throw ContainerFixtureError.invalid } }
     nonisolated var media: any MediaRepository { get throws { throw ContainerFixtureError.invalid } }
     nonisolated var devices: any DeviceRepository { get throws { throw ContainerFixtureError.invalid } }
     func start() async throws {}

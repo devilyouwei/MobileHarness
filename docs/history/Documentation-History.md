@@ -850,3 +850,42 @@ Task 表示任意目标及其状态/上下文；Skill 表示可复用流程和�
 | 后续新增的页面状态与App相册 | Part III 4、5、12 |
 
 本次仅修正文档：核对当前源码／模块README、相对链接、历史兼容锚点、Mermaid代码块结构、图例与依赖方向及git差异格式；未运行构建或将文档修复描述为真机／模型验证。原始Word及历史设计源保持原样。本记录只说明演进，现行契约见[总体技术设计](../../MobileHarness/README.md)。
+
+## 2026-11-05 — 委托流程与总体设计尾部归位
+
+本次按现有源码整理总体 README 在 Part III 之后追加的 Web/Writer、设置、存储、模型及呈现段落；不修改运行时代码或新增目录。通用流程以 Assistant 对已声明且授权的执行 Agent 的委托为边界，Writer 内部实现归 Writer 目录。当前正文不再保留悬空的尾部增补，也不将 Writer 专有通知机制推广为 Gateway 通用持久通信能力。
+
+| 原尾部主题 | 当前正文归属 |
+| --- | --- |
+| 委托接纳、通信输出、补充/取消及终态边界 | [总体设计 Part III §2](../../MobileHarness/README.md#assistant-agent-delegation)、[Assistant 委托契约](../../MobileHarness/Agents/Assistant/README.md#对其他-agent-的委托) |
+| Writer 控制/内容请求、步骤、预览、恢复及主动通知 | [Writer 流程与局部契约](../../MobileHarness/Agents/Writer/README.md#创作执行流程)；共享消费机制仍由 Chat/Support 拥有 |
+| 远程网页、作品文件与预览/导出、窗口身份和标题 | [Part III §3](../../MobileHarness/README.md#web-browsing-and-artifact-presentation)，细节链接 Artifacts/Web/Window |
+| 公开 State 的精确选择与读取失败 | Part III §6 与 Context 读取契约 |
+| 识别/回复字幕、汇报后的聆听恢复 | Part III §11—12 与 SpeechPerception/Assistant/Caption |
+| Provider、Assistant/Writer 模型与思考设置 | Part III §17 与 Provider/Settings |
+| 长期任务/委托身份、SQLite 作品目录、请求计时和记录 | Part III §18 与 Writer/Storage/Artifacts |
+| 模型并发、源码流与业务恢复边界 | Part III §19 与 ModelKit/Writer |
+| 角色自有 Island | Part III §20 与角色/Island 文档 |
+| Scene 隐藏、预览恢复、根暂停与取消 | Part III §21 与 App/Agents/Artifacts/Writer |
+
+Agents 模块文档同步将委托、场景生命周期和角色呈现移入对应章节；Assistant 的 Web 观察章节仅保留页面观察，Writer 接收政策通过链接引用。Writer 合并重复步骤说明，将请求计时/行标题归入历史，将失败反馈/恢复上下文归入恢复章节。Task Actions 参数说明对齐现有 executor + taskID 控制接口，移除模型传 interactionID 的旧描述。已有失效的 Assistant 平台观察锚点修复为现行 Context 章节。
+
+验证证据：对照 AgentChatWorker 的 startBackground、任务控制与 Writer 事件接收，AgentContainer/ModuleRegistration 的 scene 路由及 Writer/Artifacts/ModelKit 当前契约核对正文；受影响技术文档及本次新增计划/历史记录的本地链接和章节锚点、Markdown 代码围栏及差异空白检查通过；历史正文中的旧路径保持原记录。使用本机已有 Mermaid 解析器检查总体设计、Agents、Assistant、Writer 的全部32个图，语法解析通过；未进行图像渲染验收。只修改文档，未运行 scripts/check.sh、iOS 构建、真实模型或真机验收。此前工作树的代码与其他文档修改保留，原始 Word 设计源不变。
+
+## 2026-11-05 — Part III 容器生命周期章节精简
+
+按用户要求将总体设计第一节改为容器化、依赖、启动与生命周期，按容器所有权、依赖与启动、生命周期三块保留设计契约。合并重复装配描述，精简依赖图和说明，同步执行流程中的章节引用；其余 Part III 正文保持原样。详细实现仍由 App/Composition 和 App/Lifecycle 维护。
+
+对照 ModuleRegistration 的依赖与启动注册、生命周期及组合目录契约核对；修改图的 Mermaid 解析、章节范围、相对链接及差异格式检查通过。文档修改未运行代码测试、iOS 构建或真实设备验收。
+
+## 2026-11-05 — Part III 输入与 Signal 章节精简
+
+总体设计第二节按输入与执行流、Signal 契约、Assistant 委托整理，将重复输入/通信图合并为一张运行时流向图，保留并精简通用委托时序图。保留直接输入与内部 Signal 的边界、Agents 语义认证/Gateway 中立传输/Actions 业务执行职责，以及身份围栏、接纳、清理、终态与独立通知契约；Writer 细节继续归角色文档。
+
+核对 Agents InputGateway、Communication 与 Gateway SignalTransport 当前契约；两张修改图通过 Mermaid 语法解析，9个章节链接/锚点、两个公共锚点及差异格式检查通过。范围检查确认总体 README 仅第二节改变；未运行代码测试、构建、图像渲染或真实模型/设备验收。
+
+## 2026-11-05 — Signal 概念统一与三类输入
+
+按用户确定的设计概念，总体 README 将 Agent 输入统一称为 Signal，以编号列表描述 External Signal（设备与屏幕 IO）、Internal Signal（Agent 间消息/数据）、Execution Feedback（Action 执行反馈）。分类图按三类来源组织，实线为输入、虚线为执行请求；具体路径保留直接订阅、Gateway 消息传输和执行结果递送。同步 Part I 概念入口；第二节契约表改为列表，原有委托流程保留。此整理不新增传输协议或修改运行时。
+
+范围核对、三类列表/无表格检查、10处链接和锚点、两张 Mermaid 图语法解析及差异格式检查通过。仅修改文档，未运行构建、图像渲染或模型/设备验收。

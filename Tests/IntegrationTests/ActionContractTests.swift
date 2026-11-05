@@ -595,3 +595,17 @@ func actionStoredResultsRetainSubsequentHandlerFailure(_ reported: Bool) async t
         #expect(throws: (any Error).self) { try definition.validateInput(call) }
     }
 }
+
+@Test func actionContractDoesNotImposeASourceParameterByteLimit() throws {
+    let path = ActionIdentifier(domain: "Fixture", module: "Control", function: "perform")
+    let definition = ActionFunction(
+        path: path, displayName: "Patch", kind: .finite, completion: "Saved", handler: { _ in })
+    try definition.validateInput(
+        FunctionRequest(
+            actionPath: path, parameters: ["newText": String(repeating: "source", count: 20000)]))
+}
+
+@Test func functionValueCompletionDoesNotImposeAnObservationByteLimit() throws {
+    let value = String(repeating: "result", count: 20000)
+    try FunctionExecutor.validate(completion: .value(value), kind: .finite)
+}

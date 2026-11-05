@@ -75,7 +75,7 @@ public typealias AgentBusinessRequest = ActionAssemblyRequest<
 @MainActor public struct AgentBusinessBindings {
     public let artifactStreaming: (any ArtifactStreaming)?
     public let writerArtifacts: (any WriterArtifactsControlling)?
-    public let writerPhotos: CapturedPhotoStore?
+    public let writerPhotos: MediaStore?
     public let writerModel: (@Sendable () async throws -> ChatModel)?
     public let executor: ActionsExecutionPort
     public let catalog: ActionCatalogSnapshot
@@ -98,7 +98,7 @@ public typealias AgentBusinessRequest = ActionAssemblyRequest<
         executor: ActionsExecutionPort, catalog: ActionCatalogSnapshot,
         artifactStreaming: (any ArtifactStreaming)? = nil,
         writerArtifacts: (any WriterArtifactsControlling)? = nil,
-        writerPhotos: CapturedPhotoStore? = nil,
+        writerPhotos: MediaStore? = nil,
         writerModel: (@Sendable () async throws -> ChatModel)? = nil,
         settings: any ProviderSettingsStaging, discovery: any ProviderDiscoveryStaging,
         providerPresentation: any ProviderPresentationRegistering, tasks: any TaskControlBinding,

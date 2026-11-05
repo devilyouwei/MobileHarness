@@ -17,7 +17,7 @@ private actor WriterScriptModel: ChatCapability {
         guard !scripts.isEmpty else { throw WriterFailure.incomplete }
         let script = scripts.removeFirst()
         let pair = InferenceSession<ChatEvent>.make(
-            limits: try .init(capacity: 256, maximumEventBytes: 65568), estimatedBytes: { $0.estimatedBytes })
+            limits: try .init(capacity: 256, maximumEventBytes: nil), estimatedBytes: { $0.estimatedBytes })
         for event in script { try pair.emitter.yield(event) }
         pair.emitter.finish()
         return pair.session
@@ -462,6 +462,12 @@ private actor WriterRetryEditor {
         }, append: { try await probe.append($0, $1) }, complete: { try await probe.complete($0) },
         abort: { try await probe.abort($0) })
     #expect(try await WriterWorkflow(model: model).run(goal: "Demo", scope: "run", tools: tools) == "Done")
+    let requests = await model.requests
+    #expect(
+        requests[2].messages.contains {
+            $0.role == .user && $0.content.contains("writer.incomplete")
+                && $0.content.contains("Failed source stream aborted")
+        })
     let streams = await probe.streams
     #expect(streams.count == 2 && Set(streams).count == 2)
     #expect(await probe.aborted == 1)
@@ -689,4 +695,56 @@ private actor WriterRoundBoundaryProbe {
             "start1", "edit", "refresh", "report1", "start2", "append", "commit", "refresh", "report2",
             "start3", "render", "refresh", "report3", "start4", "finish",
         ])
+}
+
+@Test func writerRequestRecoveryFeedsActualCauseAndRetainsItAfterSuccess() async throws {
+    let model = WriterRetryModel([
+        .failure(.init(.invalidToolArguments, stage: .toolArguments, field: "arguments")),
+        .events(writerControl("read", "read")), .events(writerControl("finish", "finish")),
+    ])
+    let tools = WriterTools(
+        definitions: [try writerDefinition()],
+        execute: { $0.id == "finish" ? .finished("Done") : .observation("File is ready") },
+        append: { _, _ in }, complete: { _ in "" }, abort: { _ in })
+    #expect(try await WriterWorkflow(model: model).run(goal: "Demo", scope: "run", tools: tools) == "Done")
+    let requests = await model.requests
+    #expect(requests.count == 3)
+    for index in [1, 2] {
+        #expect(
+            requests[index].messages.contains {
+                $0.role == .user && $0.content.contains("tool.invalidArguments")
+                    && $0.content.contains("No workspace tool") && $0.content.contains("arguments")
+            })
+    }
+    #expect(requests[2].messages.contains { $0.role == .tool && $0.toolCallID == "read" })
+}
+
+@Test func writerAcceptsLargeNativePatchAndCarriesItIntoNextRequest() async throws {
+    let arguments = String(
+        decoding: try JSONEncoder().encode(
+            ["command": "replace", "newText": String(repeating: "source", count: 20000)]), as: UTF8.self)
+    let call = ChatToolCall(id: "large", name: "workspace", argumentsJSON: arguments)
+    let model = WriterScriptModel([[.toolCall(call), .finished(.toolCalls)], writerControl("finish", "finish")])
+    let tools = WriterTools(
+        definitions: [try writerDefinition()],
+        execute: { $0.id == "finish" ? .finished("Done") : .observation("Patch saved") },
+        append: { _, _ in }, complete: { _ in "" }, abort: { _ in })
+    #expect(try await WriterWorkflow(model: model).run(goal: "Patch", scope: "run", tools: tools) == "Done")
+    let request = try #require(await model.requests.last)
+    #expect(request.messages.flatMap(\.toolCalls).contains { $0.argumentsJSON == arguments })
+}
+
+@Test func writerLongObservationDoesNotFailAnExecutedToolAndKeepsAContextExcerpt() async throws {
+    let result = String(repeating: "long file contents ", count: 10000)
+    let model = WriterScriptModel([writerControl("read", "read"), writerControl("finish", "finish")])
+    let tools = WriterTools(
+        definitions: [try writerDefinition()],
+        execute: { $0.id == "finish" ? .finished("Done") : .observation(result) },
+        append: { _, _ in }, complete: { _ in "" }, abort: { _ in })
+    #expect(try await WriterWorkflow(model: model).run(goal: "Inspect", scope: "run", tools: tools) == "Done")
+    let request = try #require(await model.requests.last)
+    let observation = try #require(request.messages.last { $0.role == .tool })
+    #expect(observation.content.contains("Runtime context excerpt"))
+    #expect(observation.content.contains("complete tool result is recorded"))
+    #expect(observation.toolCallID == "read")
 }

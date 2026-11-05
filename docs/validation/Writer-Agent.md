@@ -287,3 +287,169 @@ No runtime code, local signing settings, SQLite or artifact history was changed/
 最终 `./scripts/check.sh` 退出0，日志 `/tmp/agent-island-check-final.log`：主集成1017项通过，独立原生阶段225项通过（约206秒），其余包测试、架构边界、Swift格式和plist检查通过。`git diff --check` 通过。原生阶段结束后串行执行 `./scripts/build-ios.sh`，避免并行构建干扰实时测试。
 
 最终 `./scripts/build-ios.sh` 退出0，日志 `/tmp/agent-island-ios.log`：MobileHarnessSimulator、ModelKitRuntime、ModelKitNemotron、ModelKitSilero 四目标全部构建成功，应用 Agent/Skill 与 Island 扩展资源检查通过。iOS 条件编译的 AgentRuntime 订阅显式捕获 AssistantExecutionSession，不额外捕获根所有者；该路径由此构建验证。以上没有执行新的真实模型、模拟器手动交互或真机视觉验收。
+
+## 2026-11-05 Writer 记录布局与计时
+
+范围：任务列表目标两行省略，元信息横排与状态标签；详情头部持续时间/累计轮次/最新状态；请求编号与默认折叠文件响应；Provider首token与请求完成时间经SQLite持久化。任务时长累加各run生命周期，续作之间空档不计入；运行中的值按页面原有刷新推进，缺失完成证据显示未知而不阻断列表。
+
+自动化：/tmp/writer-records-focused.log 通过2项UI格式测试及2项Writer集成测试（含12种工作流模式）；/tmp/writer-records-check.log 的check.sh exit0，主体1024项、LiveRuntime226项通过，边界/格式/plist检查完成。与上次检查相同，NativePresentationTests在既有Metal用例启动后没有完整结束记录，不以脚本exit0宣称此原生UI套件全通过。
+
+最后增加缺失时长与真实Controller续作累计断言后，/tmp/writer-records-final-focused.log exit0：2项UI格式测试及2项Writer集成测试（含12种工作流模式）通过。真实模型未调用；手工采样与替身模型只证明计时链路，不代表Provider实际性能。不清空真机或模拟器既有SQLite。
+
+iOS构建：scripts/build-ios.sh exit0，MobileHarnessSimulator、ModelKitRuntime、ModelKitNemotron、ModelKitSilero四个scheme全部BUILD SUCCEEDED；30项Skill资源与Live Activity校验通过。日志 /tmp/writer-records-ios.log。
+
+原生点击：复用既有 Writer Records Acceptance 隔离模拟器的合成task_6，不重新seed或替换records.sqlite；从现有验收脚本生成临时runner并安装新模拟器app。/tmp/writer-records-native-ui-pass.log exit0，单项完整点击验收39.145秒；证据 /tmp/mobileharness-writer-records-layout.1vWhzv/WriterUI.xcresult。涵盖分离入口、两行省略/横排状态标签、详情耗时/最新状态、文件浏览和PDF/ZIP分享、编号请求详情、首token/总耗时字段、文件源码默认隐藏及点击展开、任务对话导出。目视审阅原生列表和头部截图，时间在右、状态标签在左，字段顺序符合需求。合成旧请求无Provider采样时显示未知，不伪造耗时。
+
+首次原生点击 /tmp/writer-records-native-ui.log exit65：源码确已展开，但SwiftUI的DisclosureGroup标识继承覆盖了子Text标识，测试等待子标识失败。修正为断言实际DOCTYPE源码文本展开/隐藏，未修改页面行为；复跑通过。该失败保留，不改写为通过。真机未安装，真实Provider性能未测量；截图/模拟器点击不等同真机触控体验验收。
+
+### 本轮真机安装
+
+2026-11-05，使用当前工作区构建MobileHarness真机Debug包，版本0.1.0 / 2026110502。/tmp/writer-records-device-build.log 中BUILD SUCCEEDED，codesign严格校验、30项Skill资源与Live Activity检查通过。devicectl覆盖安装至iPhone17 Pro，设备回执sequence5924；随后启动成功，安装列表确认bundle版本2026110502。未卸载应用、清空SQLite或覆盖作品目录。
+
+此包包含Writer记录/计时、连续HTML预览和此前字幕生命周期修改。安装与启动不代表真实模型、双指缩放/滚动、语音字幕或历史页面已完成真机交互验收；这些仍需在设备上实际操作确认。
+
+## 2026-11-05 作品窗口命名、副标题和后台连续性
+
+实现：新项目从title/goal得到初始短名，首个edit可完善语义名称；rename保存标题，续作保留。灰色栏通过Window通用subtitle消费原始目标与实际操作，不使用HTML标题推导。Writer普通Scene通知仅影响预览worker，后台模型、文件和上报继续；渲染返回deferred并保留最新快照，前台恢复使用项目锁后的最新数据，最小化不自动还原。完成消息保留未进行视觉验证的事实。
+
+定向 /tmp/writer-naming-scene-final-focused.log exit0，窗口元信息测试及5项Writer/Artifacts用例通过（包含13种工作流模式）。/tmp/writer-window-background-check.log 的check.sh exit0，主体1026项、LiveRuntime227项通过，格式/边界/资源/plist校验通过；NativePresentationTests仍在既有Metal用例开始后无完整终态输出，不将脚本exit0当作原生UI套件全通过。
+
+收尾 /tmp/writer-window-background-final-confirmed.log exit0：4项UI、27项集成/Writer及23项内容流回归通过。覆盖真实Storage/Gateway链路、编辑命名和显式改名的检查点/发布/续作保留、重名顺序和操作副标题；真实macOS WebKit下后台不加载、首次开窗回执中断后保留同一预留身份、前台显示最新后台源码、最小化/后台prepare不恢复。模型生成中隐藏Scene的模式仍以4次模型请求完成，角色保持running；这是替身模型证据，不是iOS系统后台时长承诺。
+
+完成消息新增deferred警告后，/tmp/writer-background-deferred-confirmed.log exit0，13模式通过；后台render替身明确返回deferred，终态报告附“未进行页面视觉验证”，不把文件保存伪装为视觉验收。初始名使用既有160 UTF-8字节标题契约，Unicode组合emoji的兜底也有覆盖；不新增模型输出限制。
+
+构建过程中修正了私有可用性读取、checkpoint参数标签，以及iOS条件编译下副标题初始化和跨MainActor回调遗漏；失败构建日志 /tmp/writer-window-background-ios.log、/tmp/writer-window-background-ios-final.log 保留。最终 /tmp/writer-window-background-ios-verified.log exit0，MobileHarnessSimulator、ModelKitRuntime、ModelKitNemotron、ModelKitSilero四个scheme全部BUILD SUCCEEDED；30项Skill资源与原生Live Activity检查通过。Unicode兜底名追加回归 /tmp/writer-window-title-unicode.log exit0。无真实Provider请求、无真机安装/后台调度或iOS首页窗口点击验收；没有清空SQLite、安装额外依赖或引入后台保活手段。
+
+系统边界参考[Apple后台执行说明](https://developer.apple.com/documentation/uikit/extending-your-app-s-background-execution-time)：应用不主动pause角色，与系统是否给进程执行时间分别处理。
+
+## 2026-11-05 请求行彩色编号和操作标题
+
+请求行改为左侧居中的彩色数字徽章，右侧显示实际操作标题，下一行时间/中文状态标签；重试保持独立编号及标题后缀。Writer从现有原生工具描述摘要派生标题，读取、文件生成、修改、渲染、保存分别可辨，多工具有序去重；没有新增模型请求或持久格式/表。请求失败/取消优先，工具失败不会被模型completed覆盖。
+
+/tmp/writer-request-row-focused.log 与 /tmp/writer-request-row-final-focused.log exit0：UI显示值、标题合并/源码指令过滤、实际工具状态与请求状态区分，以及SQLite重开后Controller标题/tint/中文状态投影通过。收尾pending/cancelled优先级断言也通过。/tmp/writer-request-row-check.log 的check.sh exit0，主体1027项、LiveRuntime227项通过，格式/边界/plist检查完成；既有NativePresentationTests在Metal用例后无完整终态输出的限制仍保留，不能以脚本exit0宣称原生UI套件全部通过。
+
+/tmp/writer-request-row-ios.log exit0，四个scheme全部BUILD SUCCEEDED，30项Skill与Live Activity资源校验通过。/tmp/writer-request-row-native-ui-pass.log exit0，Writer原生点击验收45.772秒通过；证据 /tmp/mobileharness-writer-records-layout.XhtUcJ/WriterUI.xcresult。复用已有隔离模拟器的合成task_6，未覆盖或清空SQLite，未请求真实模型或安装真机。
+
+原生截图已目视核对：写入/修改紫色、渲染青色、读取橙色、保存绿色，数字随两行内容垂直居中，时间和中文状态同一行。展开源码、文件预览、PDF/ZIP分享及任务导出回归通过。截图 /tmp/writer-request-row-attachments/3E30AE51-4413-4FC6-BBB5-435030A8B88F.png。
+
+首次UI验收 /tmp/writer-request-row-native-ui.log exit65：控制轮次和文件生成轮次都可能叫“编写 index.html”，列表只实例化可见行，旧定位逻辑只遍历到第一条控制请求。改为有界滚动查找尚未尝试的同名请求，并以实际源码折叠组确认目标，未修改产品逻辑来迎合测试；复跑通过。真机触控/视觉体验尚未验收。
+
+### 彩色编号与窗口/后台修正的真机安装
+
+2026-11-05，当前工作区MobileHarness真机Debug构建0.1.0 / 2026110503，/tmp/writer-request-row-device-build.log BUILD SUCCEEDED；codesign严格检查、30项Skill及Live Activity资源校验通过。覆盖安装至iPhone17 Pro，设备回执sequence5932；随后devicectl启动成功，安装列表确认版本2026110503。未卸载、清空SQLite或覆盖作品目录。
+
+安装包包含请求行彩色编号/操作标题、窗口简洁命名/副标题以及Writer场景连续性修正。此记录只证明安装和启动，不将它等同真实模型或真机后台/触控体验验收。
+
+## 2026-11-05 Writer任务标题正文色
+
+任务列表和详情头部的goal Text独立使用system primary，紫色仅施加Writer图标。未改数据、Agent逻辑、状态标签或编号配色，未新增样式镜像单测。
+
+/tmp/writer-title-color-check.log 的check.sh exit0，既有回归与边界/格式/plist检查完成；NativePresentationTests的Metal用例缺少完整结束记录仍是已知证据限制，不以脚本exit0宣称该原生套件完整通过。/tmp/writer-title-color-ios.log exit0，四个scheme BUILD SUCCEEDED，30项Skill及Live Activity资源校验通过。
+
+复用既有合成数据隔离模拟器，/tmp/writer-title-color-native-ui.log exit0，原生记录页点击回归49.120秒通过。证据 /tmp/mobileharness-writer-records-layout.IpJtFc/WriterUI.xcresult。目视核对列表和详情截图：标题为白色正文，Writer图标仍紫色，其他标签/徽章保留语义颜色。列表截图 /tmp/writer-title-color-attachments/4E11CA94-495E-4FAD-BC33-60DA9FCE1DC0.png，详情截图 /tmp/writer-title-color-attachments/CC5DF855-61DA-4C44-9288-A97D0AE4AFC2.png。未安装真机，未调用真实模型，未清空数据库。
+
+### 标题正文色真机安装
+
+2026-11-05，当前工作区真机Debug构建0.1.0 / 2026110504，/tmp/writer-title-color-device-build.log BUILD SUCCEEDED；codesign严格检查、30项Skill和Live Activity校验通过。覆盖安装到iPhone17 Pro，设备回执sequence5940，随后启动成功，安装列表确认2026110504。未卸载或清空SQLite/作品。此次只确认安装与启动，标题颜色的真机视觉体验仍需实际查看。
+
+## 2026-11-05 请求数字徽标双色
+
+数字徽标默认灰色，仅failed为红色，取消/中断也使用默认灰色；删除操作类别tint枚举及跨层传参。状态标签、正文标题及请求事实保留。
+
+- scripts/build-ios.sh 四目标构建通过，日志 /tmp/writer-gray-badges-ios.log。
+- 原生模拟器任务记录完整交互通过，57.498秒；复用既有替身任务数据，未清空设备SQLite。证据 /tmp/mobileharness-writer-records-layout.dRAb1k/WriterUI.xcresult。截图核对写入、读取、渲染、保存编号均为灰色；该截图不包含failed行，不宣称红色行原生截图验收。
+- scripts/check.sh 首阶段1027项中两项失败：residentNativeStateObservationDuringSeedingWinsOverTheBaseline（invalidSnapshot）和slowTrackingDispatchExecutesOnlyTheNewestPendingTarget（目标位置断言）。日志 /tmp/writer-gray-badges-check.log，复核结果另记。
+- 本次未安装真机，未调用真实模型。
+
+复核：check.sh最终退出1；两项失败用例独立复跑均通过，Writer标题用例也通过，共3项，见 /tmp/writer-gray-badges-targeted.log。Writer行显示测试在完整首阶段通过。LiveRuntimeTests 227项通过（207.794秒）。NativePresentationTests日志到webNativeLoadsLocalJavaScriptAndCapturesVisiblePixels开始后无该套件结束证据，不计为整套通过。完整检查仍保留失败结果，不以局部复跑冒充全绿。git diff --check及修改文件格式检查通过。
+
+## 2026-11-05 My Assistant / My Writer 列表视觉统一
+
+实现同目录通用HistoryRecordRow：蓝色Assistant图标、柔和紫色Writer图标，固定图标栏并垂直居中；正文标题两行尾省略，灰色辅助行及紧凑日期。Writer显示真实任务ID/累计请求数/最新状态/更新时间；Assistant使用已有会话轮次/创建时间。窄宽度和大字体的辅助信息允许堆叠，不新增查询/模型请求。页面名称及Assistant列表分区/操作英文化；用户原文保持。
+
+- scripts/check.sh退出0，1027项集成主阶段通过（64.581秒），LiveRuntimeTests 227项通过（205.074秒），日期跨年/时区边界测试通过；格式、边界和plist校验通过。NativePresentationTests仍存在既有日志缺口：cameraNativeMetalDrawStopAndLayerHandoff开始后无套件结束证据，不计整套原生测试通过。日志 /tmp/agent-records-layout-check.log。
+- scripts/build-ios.sh四个目标全部构建成功，Skill与Live Activity资源校验通过，日志 /tmp/agent-records-layout-ios.log。
+- 独立iOS原生模拟器验收通过（56.338秒）：Settings→My Assistant→返回→My Writer→任务→文件/预览/导出/请求详情，未新建/删除Assistant会话、未清空SQLite。证据 /tmp/mobileharness-writer-records-layout.626ZSg/WriterUI.xcresult。
+- Writer列表截图人工确认图标、双行标题、同一行ID/轮次/状态/右侧日期及分隔线对齐。当前Assistant模拟器没有会话，截图只验证空态/分区/新建入口，不能作为实际会话行蓝色图标或长标题的原生截图验收；该行使用同一组件并传入蓝色。超大字体、窄屏和失败状态截图尚未单独验收。
+- git diff --check通过；本次未调用真实模型、未安装真机。
+
+## 2026-11-05 真机 task_28 只读调查
+
+按用户要求读取真机records.sqlite及WAL的本机副本，quick_check=ok，设备数据库无修改。此为运行中分别复制的只读调查副本，不宣称具备应用级原子备份语义；task_28终态已完成，关联证据完整。额外只读读取ArtifactWorkspaces/index.json确认草稿。调查结束删除临时数据库及索引副本，未写入仓库。
+
+任务目标Draw a software engineering flowchart，原始输入为绘制软件工程流程图。taskID=task_28、runID=task_28、Writer dialog_id=26，来源Assistant dialog_id=25；只存在一次委托执行。qwen3.8-max，共11次请求尝试（10控制+1内容），12:43:54.645至12:46:23.900，149.255秒。
+
+- 第1轮edit接纳，第2轮内容生成完成，7078 UTF-8字节HTML，模型耗时44.608秒。
+- 第3轮render成功，12:44:42至12:44:43，诊断为空。
+- 第4/5/6轮分段读取，第7轮663字节replace仅修改SVG viewBox成功，第8轮再次读取。
+- 第9/10/11轮分别失败约25.640/26.621/26.169秒，累计78.430秒；均为writer.model.tool.invalidArguments，providerStage=toolArguments，event=response.function_call_arguments.delta，field=arguments.exceeds4096。
+- 实际触发点为ModelKit OpenAI ChatEventDecoder累计工具参数的4096 UTF-8字节本地上限，不是HTTP/Provider输出token限制或文件空间不足。同类上限还位于完整工具调用解析、ChatRequest历史校验、WriterWorkflow控制响应校验。
+- 三次失败请求去掉持久化截图引用ID后，上下文完全一致；规范化hash前16位d9361ad37b6525e0。每次截图保存为不同media ID，但字节数均83135。WriterRecovery将invalidToolArguments归入可重试，control重复同一请求，不反馈超限原因或改写编辑方案。
+- 失败前模型正文表明准备替换较大的SVG片段；被拒工具参数delta不进入完整toolCall历史，三条失败记录toolCalls均空，无法从SQLite复原最终参数/证明具体完整命令，不能将推断当作完整调用证据。
+- tasks.status=failed，task_notifications failed终态已送达并退休，无通知失败。delegated_tasks.phase仍为running，查询实际终态从current_run_id关联tasks.status读取；此字段残留不等于仍执行，但阶段命名有整理空间。
+- index.json中存在interrupted=true的任务草稿，index.html=7078字节、viewBox已为700×780；未发布作品。保留草稿不等于成功完成。
+
+存储核对：同一SQLite，dialogs/tasks用agent区分，messages通过dialog_id确定Agent；role=assistant是模型消息角色，不代表Assistant Agent。delegated_tasks稳定任务，delegated_runs每次执行并引用tasks；续作新建run行。Writer记录按专属dialog关联，task_28为11条输入+11条响应，messages.task_id全部NULL，taskID/runID在detail evidence的decisionMetadata/producerMetadata；task_messages仅有Assistant来源关联（本快照96条），不能拿它查询Writer全部轮次。文本在messages.body，原生调用/结果/完整请求/诊断在evidence及evidence_refs分块；不是逐工具单独SQL行。message_media/media_files保存截图等引用与元信息。作品project_id逻辑绑定StorageFiles，草稿在索引文档，发布文件在项目版本目录，不存在artifacts SQL表。本快照6个Assistant对话、20个Writer对话、8个Assistant前台tasks行、20个Writer后台tasks行、20条delegated_tasks及20条delegated_runs；共享tasks自增ID解释为何Writer任务名已到task_28但仅有20项。
+
+本次仅调查，无代码修改、无模型复跑或设备数据库清理；修复需另行实施并覆盖大参数、编辑反馈及重试分类。
+
+## 2026-11-05 task_28 参数长度与恢复上下文修复
+
+参考源码（本日读取）：DeepSeek Harness packages/core/agent-loop/src/agent.ts 基于session日志投影构造请求，保存assistant/message并区分agent/request-error重试策略；packages/core/tools/src/pipeline.ts的toolErrorResult将原调用错误写为Error文本/isError结果。来源：
+https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/core/agent-loop/src/agent.ts
+https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/core/tools/src/pipeline.ts
+不据此宣称其默认每次发送全量历史；Writer继续使用本框架的任务局部有界上下文。
+
+实现：移除Responses增量/完成解析、ChatRequest原生历史、Writer控制响应、Storage原生调用记录、通用Action参数值及native解析/能力解析的4096/65536字节参数上限。ChatRequest/Writer文字预算不计不透明原生参数；Provider真实token窗口仍生效。云端和SerialChat的128项事件队列保留背压和取消，单事件字节上限显式为nil；其他能力默认不变。移除requestJSON单次512KiB限制，既有整体历史容量仍明确报错。SQLite摘要仅解包工具参数自身的分块，保持标题/状态，不展开完整请求。未新增模型输出token上限。
+
+控制重试追加真实结构化失败观察并在后续loop保留；内容重试abort清理成功后携带实际原因。工具结果保留原call_id和诊断，取消/提交不确定/清理失败不盲重放。续作恢复最新控制请求的选定历史并加入失败诊断；已接纳修订同步到固定目标，避免旧组裁剪丢失要求。完整数据库记录与模型上下文选择保持区分，未改表结构或实现新历史存储方案。
+
+验证：
+- scripts/check.sh退出0。1028项集成主阶段通过（64.916秒），LiveRuntimeTests 227项通过（205.052秒），其他已结束测试/格式/边界/plist检查通过。日志 /tmp/writer-recovery-check.log。NativePresentationTests仍有既有日志缺口：cameraNativeMetalDrawStopAndLayerHandoff开始后无套件结束证据，不能视为整套原生UI通过。
+- 首轮定向命令误用CommandLineTools，Metal编译不可用；切换DEVELOPER_DIR后通过。首次新Action测试接口类型写错已纠正。大参数SQLite重开初次揭示列表摘要忽略分块参数，已修正并重新通过。
+- 脚本后对最终修改定向复核：9项通过，涵盖超过4KiB/64KiB的分片native参数与历史回传、128队列路径依赖的无单事件字节上限机制、Action和Capability大参数解析、真实错误跨重试/后续请求保留、内容abort及错误反馈、固定目标修订、超过512KiB参数及下一请求快照SQLite重开/失败续作诊断。日志 /tmp/writer-recovery-complete.log。全量脚本早于最后的requestJSON上限与Capability收尾修改，此两项由最终定向回归验证。
+- scripts/build-ios.sh四目标通过（/tmp/writer-recovery-ios.log）；收尾源码再构建MobileHarnessSimulator成功（/tmp/writer-recovery-ios-complete.log）。30项Skill及Live Activity打包校验通过。
+- 最终swift format lint与git diff --check通过。均为离线替身/确定性回归，无真实Provider调用，无新增原生UI交互/真机安装；未清空或修改真机SQLite。task_28未被重新执行，不能将离线回归当作真机该任务验收。
+
+## 2026-11-05 作品 SQLite 目录及长源码／观察结果
+
+将全局作品 JSON 索引替换为共享 SQLite 的 workspaces、workspace_revisions、workspace_files：项目目录只查元信息，文件正文按版本保存为 TEXT，草稿替换与发布 CAS 在数据库事务内完成。物理版本目录仍服务 WebKit／导出；跨文件系统与数据库不具备单一事务，发布失败只清理本次目录，删除清理失败保留数据库标记。旧 JSON 不导入；沿用开发期 schema 不匹配重建策略。本次未连接、清空或安装真机。
+
+取消响应累积256KiB、Writer观察12000字节、通用执行／返回／历史工具结果64KiB及运行时收尾结果256KiB的单项拒绝。原始工具结果和源码完整保存；模型请求视图仍受既有上下文预算管理，超长工具观察显示带明确说明的 UTF-8 安全首尾摘录。分页、沙盒、身份／调用配对、队列及整体历史内存接纳策略保持原契约。
+
+验证证据：
+- SQLite／作品及长结果定向12项通过（/tmp/writer-sqlite-catalog-complete-targeted.log）：超过旧8MiB聚合规模、多项目草稿／版本重开、并发发布仅一个成功、删除清理失败、长响应及超过256KiB工具结果和运行时收尾记录、长观察上下文摘录。
+- 首次全量脚本发现两个旧测试仍断言已移除的长度拒绝；更新为长结果成功返回及未知参数正规化，保留状态完成种类、XML原始tag、数量和键名校验。重跑主集成阶段1038项通过（64.863秒）；最后摘录换行调整及两项旧断言定向3项通过（/tmp/writer-sqlite-catalog-final-targeted.log）。
+- scripts/build-ios.sh四目标成功（/tmp/writer-sqlite-catalog-ios.log）；最后源码收尾后MobileHarnessSimulator再次构建成功（/tmp/writer-sqlite-catalog-final-ios.log）。30项Skill及原生Live Activity打包校验通过。
+- 源码边界检查、git diff --check通过。均为离线确定性／替身回归和编译，不代表真实模型、原生交互或真机验收；没有执行task_28重试。
+- 最终scripts/check.sh退出0（/tmp/writer-sqlite-catalog-recheck.log），LiveRuntimeTests另227项通过（205.568秒），格式、边界、Python和plist检查通过。NativePresentationTests仍有既有证据缺口：cameraNativeMetalDrawStopAndLayerHandoff开始后没有该套件结束记录，不能声称整套原生UI验收通过。
+
+### SQLite作品目录与长结果修正真机安装
+
+2026-11-05，当前工作区构建MobileHarness真机Debug版本0.1.0（2026110506），日志/tmp/writer-sqlite-device-build.log显示BUILD SUCCEEDED。codesign严格校验、30项Skill与Live Activity打包检查通过。devicectl覆盖安装到iPhone17 Pro成功，回执sequence5956；终止旧进程并启动新版本成功，设备应用列表确认版本2026110506。未卸载应用或手工清库；新schema启动沿既有开发期规则重建旧结构SQLite，不导入旧JSON作品目录。安装／启动仅证明部署成功，不代表语音、真实模型、Writer创作或页面交互验收完成。
+
+## 2026-11-05 任务详情合并头部与缩小轮次数字
+
+WriterRecordsView将goal行与独立taskID行合为一个HStack：24pt图标列垂直居中，文字列上方为secondary caption等宽taskID，下方为primary body完整goal，按可用宽度自然换行，不截断。任务信息与文件／导出行保持顺序；轮次数字从body改为subheadline，保持徽标灰色／失败红色及整行点击区域。
+
+scripts/build-ios.sh退出0，四个scheme均BUILD SUCCEEDED，Skill与Live Activity资源检查通过（/tmp/writer-detail-header-ios.log）。主回归1038项通过（66.036秒）。此次仅布局修改，未添加镜像实现的测试；没有原生UI截图验收、真实模型调用或真机安装。
+
+最终scripts/check.sh退出0（/tmp/writer-detail-header-check.log），独立LiveRuntimeTests 227项通过（207.872秒），格式、边界、Python及plist检查通过；git diff --check通过。NativePresentationTests沿用既有证据限制：cameraNativeMetalDrawStopAndLayerHandoff开始后没有套件完成记录，不据此声称完整原生UI验收通过。
+
+## 2026-11-05 Agent-owned task IDs、UUID委托与工作区目录
+
+范围：前台Assistant任务仍由Assistant创建；后台Writer任务改为Writer接纳时通过Storage分配Agent-local task_N。Assistant只生成并记录UUID delegate_id和请求来源。SQLite将tasks、delegated_tasks、delegations分开；后者保存每次目标、输入、取消原因和终态，任务状态仅投影最新委托。去掉独立项目身份，WorkspaceID为agent/task_N，实际发布文件位于该目录下的不可变revision子目录。source对话删除不级联作品任务；同一委托重投幂等、不同委托续作保留对话和目录，旧委托不能更新当前阶段。
+
+对模型只公开owner/task/goal/stage等业务元信息。WindowState统一映射window_N；编辑读取、撤销点和历史版本使用read_N、savepoint_N、revision_N。UUID delegate/event/interaction/request/revision及消息因果证据留在内部；Provider原生tool_call_id不重写。sendMessage/cancelTask使用executor + taskID，运行时关联委托和待答交互。Writer事件协议为version2。对话另存UUID traceID，dialog_N作为可读历史查询reference保留；这不是旧协议回退。ArtifactStreaming以delegateID明确命名执行会话，避免将UUID混称taskID。任务分享使用delegations字段，不输出旧runs结构。
+
+验证与失败记录：
+- 初轮编译发现工作区从UUID切换后仍有少数类型/参数标签及旧夹具未同步，均修正；重新打开数据库也发现通知表准备缺少幂等CREATE，已恢复初始化幂等，未添加旧schema迁移。
+- 首次完整check在旧断言/夹具中报告5项失败：旧schema种子缺新增字段、模型工具目录缺executor、通用受委托替身未执行owner接纳、状态仍断言原生UUID等。分别修正当前测试契约；通用注册契约的测试仍覆盖后台委托不抢占前台，不删除该能力或放松框架边界。
+- 最终scripts/check.sh退出0（/tmp/agent-identity-final-check.log）：主集成1040项通过（66.762秒），独立LiveRuntimeTests227项通过（208.536秒），其他结束的测试阶段、Python/格式/边界/plist检查通过。NativePresentationTests仍有既有证据缺口：cameraNativeMetalDrawStopAndLayerHandoff开始后无套件结束记录，不声称整套原生UI验收通过。
+- 完整脚本后收尾包括重复窗口身份的编号稳定围栏、流式端口delegateID命名和模型目录隐藏运行时workspaceID。最终定向68项通过（4项UI、36项集成、28项工作流；/tmp/agent-identity-complete-targeted.log）。覆盖Agent间同名task_1、委托注册不预建Writer任务、错误owner拒绝、重复接纳、忙碌拒绝、续作同目录、新UUID、旧委托围栏、SQLite重开、目录穿越、实际agent/task_N文件路径、窗口别名及UUID拒绝、完整Writer多模式/Gateway/FIFO/通知回归。
+- 最后源码的边界检查、严格swift format lint及git diff --check通过（/tmp/agent-identity-complete-boundaries.log、/tmp/agent-identity-complete-format.log）。未调用真实Provider、未安装真机、未连接/清空设备SQLite。schema变更沿现有开发期策略在下次启动重建旧结构，不导入旧JSON或旧ID。
+- 最终源码scripts/build-ios.sh退出0，MobileHarnessSimulator、ModelKitRuntime、ModelKitNemotron、ModelKitSilero四目标全部BUILD SUCCEEDED，30项Skill及原生Live Activity打包校验通过（/tmp/agent-identity-complete-build-ios.log）。构建与离线替身不等同真机、真实Provider或文件导出交互验收。
+
+### Agent任务身份改造真机安装
+
+2026-11-05，当前工作区构建MobileHarness真机Debug版本0.1.0（2026110507），/tmp/agent-identity-device-build.log显示BUILD SUCCEEDED。codesign严格校验、30项Skill和Live Activity资源检查通过。devicectl覆盖安装到iPhone17 Pro成功，回执sequence5964；终止旧进程并启动新版本成功，设备应用列表确认2026110507。未卸载应用、未手工修改设备数据库；新版schema沿已授权的开发期规则在启动时重建旧SQLite，不迁移旧ID。此记录证明构建、安装与启动，不代表Writer真实模型、语音、目录／窗口／历史等真机交互验收完成。

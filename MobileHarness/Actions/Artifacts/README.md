@@ -1,10 +1,8 @@
-# Artifacts — 作品与版本
+# Artifacts — 当前作品与编辑
 
-本目录拥有确定性文件操作、作品索引、不可变版本和可恢复草稿，不执行模型请求。ArtifactWorkspace 使用既有 StorageFiles 工作区命名空间，项目必须包含 entryPath，索引必须包含 drafts 与 pendingDeletions。支持 HTML/CSS/JS/SVG/JSON/TXT/MD；作品数、版本数、文件数和源码大小没有额外业务配额，不按累计任务数拒绝创作。Storage 现有文件/文档容量、磁盘 I/O 与路径保护仍适用；路径禁止穿越、隐藏段和符号链接。
+本目录拥有确定性文件编辑、格式验证、运行渲染和导出，不执行模型请求。ArtifactWorkspace使用StorageDatabase.WorkspaceStore协调当前目录与SQLite文件索引；StorageFiles拥有沙盒和原子文件操作。源码仅保存在agent/task_N/relative-path，不保存持久历史版本。支持HTML/CSS/JS/SVG/JSON/TXT/MD，不新增源码或任务累计配额。
 
-发布先写不可变文件再 CAS 更新索引；失败清理新版本，清理失败保留双重错误。checkpoint 保存每项目最新草稿并核对基础版本，不替换已发布内容；成功发布移除对应草稿。编辑事务的所有权及流边界见 ArtifactEditing.swift。
-
-ArtifactsModule 暴露 Artifacts.Workspace.perform；Assistant 通过 Writing 的 XML Action 调度作品管理，Writer 通过 Gateway direct 原生 Tool 编辑作品。Assistant 仅能列出、打开、删除作品；Writer 的可信 taskID 绑定编辑会话，模型参数不能更改所有者。ArtifactService 拥有单项会话准入及项目单写锁；ArtifactEditing 拥有单流、128 个按文件版本失效的读取引用和范围修改。remove 要求有效读取引用且禁止入口删除。完整文件内容通过中立 ArtifactStreaming 端口背压追加，不通过 Tool 参数。发布要求最新草稿已进行显式渲染，存在已报告的运行错误时拒绝发布；窗口不可见时显式返回不能进行视觉验证，不能把保存等同视觉验收。
+ArtifactsModule 暴露 Artifacts.Workspace.perform；Assistant 通过 Writing 的 XML Action 调度作品管理，Writer 通过 Gateway direct 原生 Tool 编辑作品。Assistant 仅能列出、打开、删除作品；Writer 的可信 delegateID 绑定编辑会话，agent/taskID 定位持久工作区，模型参数不能更改所有者。ArtifactService 拥有单项会话准入及项目单写锁；ArtifactEditing 拥有单流、128 个按文件版本失效的读取引用和范围修改。remove 要求有效读取引用且禁止入口删除。完整文件内容通过中立 ArtifactStreaming 端口背压追加，不通过 Tool 参数。发布要求最新草稿已进行显式渲染，存在已报告的运行错误时拒绝发布；窗口不可见时显式返回不能进行视觉验证，不能把保存等同视觉验收。
 
 ArtifactPresentation 连接 UI 页面/窗口与 StorageFiles 临时预览；每作品双缓冲目录，最多四个页面。关闭清理预览和页面、不取消 Writer，流不会重开窗口；新委托 start 或显式 open 才解除关闭标记。删除清理窗口绑定及预览。TXT 转义显示；Markdown 支持标题、引用、列表、围栏代码、强调和 HTTP(S) 链接，其余语法保留可读文本。Writer内部preview命令按ArtifactContentParser安全检查点读取当前流或草稿，由Writer自有worker决定呈现；它不证明 HTML/JavaScript 语法有效。未完成草稿禁用脚本，完整渲染由 WebKit 执行并返回诊断/截图。项目索引可列出仅有草稿的中断作品，用户可显式委托恢复。
 
@@ -16,7 +14,6 @@ ArtifactPresentation 连接 UI 页面/窗口与 StorageFiles 临时预览；每�
 
 read 返回内容、起始行、字符范围、文件版本和宿主引用；line/limit 选择 1...100 行，返回内容最多 2500 字符，通过 nextOffset 继续。修改文件只失效该文件引用，其他引用继续有效。edit 的 contextReferences 最多八项、合计 24KB；宿主校验版本后装配关联片段，不接受模型伪造来源。字符 start/end 可进一步缩小已读取范围。参数数值解析失败明确拒绝。
 
-search 支持字面匹配和路径前缀过滤，每页16项，行片段120字符，返回总数、nextOffset 及片段截断标记。savepoint 每个活动编辑会话最多八项，保存完整草稿与入口；暂停、追问或释放会话后不保留这些临时撤销点，持久草稿与已发布历史独立保留；restore 恢复草稿并失效变化文件引用。diff 返回相对 savepoint 的分页前后片段（每页两文件、各300字符），注明截断。编辑完成返回变化路径、首个变化行和字节数。versions/restoreVersion 通过受控 Storage 分页读取保留版本；历史版本的文件快照不保存入口元数据，若入口已改名，调用者需提供对应 entry。恢复只改变草稿，发布产生新版本，不覆盖历史。
 
 ## 预览与诊断
 
@@ -38,9 +35,9 @@ ArtifactService 只拥有作品业务，不提供历史 startNew/delete/title �
 
 任务文件预览使用独立暂存快照与 UI 受控 WebPageContainer，本地资源根、网络阻断和导航策略保持一致。预览和导出各仅一个 worker、零等待队列；根关闭取消并加入，预览离页请求取消并清理。首次临时目录清理由共用的准备任务合并，不能在首次导出时删除正在展示的预览。SVG 使用 HTML 宿主渲染；CSS/JS/JSON 转义显示并可作为文本 PDF 导出。分享关闭才清理对应导出文件。
 
-新项目的首次 checkpoint 在模型开始前通过 DiskFileStore.directory 建立项目 UUID 根；索引提交失败清理新根，保留原始与清理错误。续作复用已绑定项目目录，版本文件保持原不可变布局。
+新项目的首次checkpoint在模型开始前建立agent/task_N目录；续作直接修改当前文件。SQL写租约排除并发写者，单文件原子替换后提交索引；失败保留真实文件和草稿状态，后续读取校验索引，不从模型日志恢复代码。
 
-start 的 createProject 参数由受信 Writer 运行时为未完成初始化的预留项目传入，不暴露给模型工具 schema；模型循环不允许 start/resume。已有就绪项目缺失保持 missingProject。预览与 PDF 的临时 HTML 使用与发布一致的 UTF-8 BOM，源文件导出保持原始 UTF-8 文本。
+start 的 createWorkspace 参数由受信 Writer 运行时为未完成初始化的预留项目传入，不暴露给模型工具 schema；模型循环不允许 start/resume。已有就绪项目缺失保持 missingProject。预览与 PDF 的临时 HTML 使用与发布一致的 UTF-8 BOM，源文件导出保持原始 UTF-8 文本。
 
 工具失败区分 invalidReadRange、readReferenceLimit、relatedContextLimit、savepointLimit、invalidTitle 与 invalidQuery，并附具体修正范围；不将参数错误或读取引用数量解释为作品磁盘不足。窗口并发不足仍明确 busy。
 
@@ -48,4 +45,31 @@ ZIP 导出依据标准 ZIP 的字段宽度预检条目数、源码字节和偏�
 
 局部编辑 context 明确选区是否以换行开始/结束；内容作者应在非空替换中保留这些分隔符，避免相邻行被合并。宿主不猜测源码、不自动插入换行，原子替换仍只覆盖读取引用选区。
 
-replace使用fresh read引用约束字面旧文本，唯一匹配后原子替换为新文本，保留选区外及选区内未匹配部分；无匹配/多匹配明确ambiguousMatch，过期/跨文件引用readRequired。空新文本删除匹配，禁止空旧文本。成功修改失效该文件引用、保存草稿并清除render状态；引用/匹配校验失败不改变草稿，不发布版本；后续Storage检查点失败明确传播，不伪装保存成功。操作完全使用StorageFiles和内存字符串，不执行shell。
+replace使用fresh read引用约束字面旧文本，唯一匹配后原子替换为新文本，保留选区外及选区内未匹配部分；无匹配/多匹配明确ambiguousMatch，过期/跨文件引用readRequired。空新文本删除匹配，禁止空旧文本。成功修改失效该文件引用、保存草稿并清除render状态；引用/匹配校验失败不改变草稿，不修改当前文件；后续Storage检查点失败明确传播，不伪装保存成功。操作完全使用StorageFiles和内存字符串，不执行shell。
+
+连续呈现以每项目 previews/<workspaceID> 作为稳定 WebKit 读取根，两个快照槽各保存一个唯一版本子目录，另保留一个稳定 preview.html 宿主文件直到项目关闭；相对资源使用新版本 URL，避免复用过期 CSS/图片缓存。只回收非当前槽，不因版本变化更换原生页面。preview 调用 UI 的同文档增量能力，完整 render 调用保留视口的本地导航；新页面/安全域仍由 UI 隔离。取消及项目锁继续覆盖写入、呈现和清理，关闭作品不重开窗口。
+
+## 标题、副标题与后台快照
+
+会话标题在start接纳，首个edit的可选title随后续文件检查点保存；rename独立持久化标题，续作沿用。describe为Writer运行时更新操作subtitle，不改源码或模型上下文。ArtifactPresentation将这些通用显示值提交WindowState；重名仅在活动窗口显示层加稳定创建顺序后缀，业务标题不带序号。
+
+每项目最多一份latest快照，最多四项目；Scene隐藏不创建窗口/写预览资源/调用WebKit，返回deferred并保留最新文件。显式render可留下deferred验证证据供finish保存，不能宣称视觉检查通过。前台恢复经项目锁重新读取最新快照，避免排队旧副本覆盖新文件或名称；关闭/删除已退休的快照不复活，最小化不恢复。恢复和元信息更新不经Gateway，因为属于Action容器内部。
+
+窗口身份在等待首次呈现前预留并绑定，切后台导致回执中断时保留同一窗口，不按标题猜测归属。正在渲染时隐藏转换为deferred，截图不可见返回nil；其他渲染/磁盘错误仍明确传播。UI窗口生命周期与Writer执行独立。后台CPU/进程存活由系统控制，本能力不伪造后台运行权限。
+
+## Workspace and editing identities
+
+
+
+Assistant library open/delete accepts executor + taskID and derives WorkspaceID; inventory includes owner/task/title/entry/state. Runtime-only workspaceID remains a deterministic compound value for Writer setup and UI file previews, not another allocated identity.
+
+## Current workspace persistence
+
+ArtifactWorkspace validates formats and delegates current-directory storage to StorageDatabase.WorkspaceStore.
+The neutral repository indexes files in shared SQLite; source bytes live only in StorageFiles at
+agent/task_N/relative-path. Checkpoints replace current files, and finish marks the current content
+accepted after rendering. No historical version catalogue or restore-version tool exists. The UUID
+current token fences stale publication; it is not a retained version. Temporary editor savepoints are
+in-memory undo state for one active session. Web/render/export snapshots remain separately owned,
+short-lived copies and never create workspace history. Missing files fail explicitly. Active task deletion
+requires Writer cancellation/join before directory cleanup and metadata deletion.

@@ -1,7 +1,9 @@
 import Foundation
 import StorageChat
 import StorageCore
+import StorageDatabase
 import StorageDevices
+import StorageFiles
 import StorageMedia
 import StorageTasks
 
@@ -10,6 +12,7 @@ public final class SQLiteRepositories: Sendable {
     public let chat: SQLiteChatRepository
     public let tasks: SQLiteTaskRepository
     public let media: SQLiteMediaRepository
+    public let workspaces: SQLiteWorkspaceRepository
     public let devices: SQLiteDeviceRepository
     var lastWriteChanges: Int { database.lastWriteChanges }
     var committedWriteCount: Int { database.committedWriteCount }
@@ -18,9 +21,8 @@ public final class SQLiteRepositories: Sendable {
         do {
             try database.prepareSchema([
                 SQLiteChatRepository.schemaSQL, SQLiteTaskRepository.schemaSQL,
-                SQLiteMediaRepository.schemaSQL, SQLiteDeviceRepository.schemaSQL,
+                SQLiteMediaRepository.schemaSQL, SQLiteDeviceRepository.schemaSQL, SQLiteWorkspaceRepository.schemaSQL,
             ])
-            try SQLiteTaskRepository.prepareNotifications(database)
         } catch {
             let primary = error
             do { try database.closeUnpublished() } catch {
@@ -34,6 +36,7 @@ public final class SQLiteRepositories: Sendable {
         tasks = SQLiteTaskRepository(database: database)
         media = SQLiteMediaRepository(database: database)
         devices = SQLiteDeviceRepository(database: database)
+        workspaces = SQLiteWorkspaceRepository(database: database)
     }
     public static func temporary() throws -> SQLiteRepositories {
         try SQLiteRepositories(

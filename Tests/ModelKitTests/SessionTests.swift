@@ -176,3 +176,19 @@ private final class EndCounter: Sendable {
     cancelled.session.cancel()
     #expect(late.count == 1)
 }
+
+@Test func boundedEventCountCanCarryLargePayloadWithoutByteCeiling() async throws {
+    let source = String(repeating: "source", count: 20000)
+    let pair = InferenceSession<String>.make(
+        limits: try StreamLimits(capacity: 1, maximumEventBytes: nil), estimatedBytes: { $0.utf8.count })
+    try pair.emitter.yield(source)
+    let producer = Task {
+        try await pair.emitter.yieldSuspending("next")
+        pair.emitter.finish()
+    }
+    var iterator = pair.session.events.makeAsyncIterator()
+    #expect(try await iterator.next() == source)
+    #expect(try await iterator.next() == "next")
+    try await producer.value
+    #expect(try await iterator.next() == nil)
+}

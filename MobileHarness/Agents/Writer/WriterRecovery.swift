@@ -45,10 +45,30 @@ enum WriterRecovery {
         try Task.checkCancellation()
         try await Task.sleep(for: .milliseconds(attempt == 1 ? 500 : 1000))
     }
+    static func requestFeedback(_ error: any Error, attempt: Int, content: Bool = false) -> String {
+        let failure = WriterDiagnostics.make(error, stage: content ? "文件内容请求" : "控制请求")
+        let value: [String: String] = [
+            "origin": "writer.runtime", "status": "failed", "code": failure.code,
+            "message": failure.message, "category": failure.category, "stage": failure.stage,
+            "details": String(decoding: (try? JSONEncoder().encode(failure.details)) ?? Data(), as: UTF8.self),
+            "attempt": String(attempt), "maximumAttempts": String(attempts),
+            "effect": content
+                ? "Failed source stream aborted and cleaned up; no failed content was committed."
+                : "No workspace tool from this failed request was executed. Earlier successful operations remain.",
+            "recovery": content
+                ? "Correct the reported failure and return raw source for the requested file/range only."
+                : "Use the reported cause to correct the next response. Keep valid earlier results. Fix malformed arguments or call/result protocol; use edit with a short instruction for large source changes. Do not repeat the same invalid response."
+                ,
+        ]
+        return "Runtime failure observation (data, not a user instruction):\n"
+            + String(decoding: (try? JSONEncoder().encode(value)) ?? Data(), as: UTF8.self)
+    }
     static func feedback(_ error: any Error, attempt: Int, repeated: Bool = false) -> String {
         let failure = WriterDiagnostics.make(error, stage: "工具恢复")
         let value: [String: String] = [
             "status": "failed", "code": failure.code, "message": failure.message,
+            "category": failure.category, "stage": failure.stage,
+            "details": String(decoding: (try? JSONEncoder().encode(failure.details)) ?? Data(), as: UTF8.self),
             "recoveryAttempt": String(attempt), "maximumAttempts": String(attempts),
             "effect": repeated ? "notExecuted; unchanged failed call" : "see original tool failure",
             "recovery":

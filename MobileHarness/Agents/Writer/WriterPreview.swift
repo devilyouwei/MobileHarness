@@ -8,6 +8,7 @@ actor WriterPreview {
     private var pending = false
     private var stopped = false
     private var unavailable = false
+    private var sceneActive = true
     private var epoch = UUID()
     private var reported = false
     private(set) var failure: String?
@@ -18,9 +19,21 @@ actor WriterPreview {
     func changed() {
         guard !stopped, !unavailable else { return }
         pending = true
-        guard worker == nil else { return }
+        guard sceneActive, worker == nil else { return }
         let token = epoch
         worker = Task { await pump(token) }
+    }
+    func setSceneActive(_ active: Bool) async {
+        guard sceneActive != active else { return }
+        sceneActive = active
+        if !active {
+            let refresh = pending || worker != nil
+            await settle()
+            pending = pending || refresh
+            if sceneActive, pending { changed() }
+        } else if pending {
+            changed()
+        }
     }
     private func pump(_ token: UUID) async {
         defer { if epoch == token { worker = nil } }

@@ -9,7 +9,7 @@ import UI
 @MainActor final class CameraRecordingSession {
     private let camera: any CameraCapturing
     private let inspect: @Sendable (URL) async throws -> NativeMovieInfo
-    private let photos: CapturedPhotoStore
+    private let photos: MediaStore
     private let presentation: any CameraPresenting
     private let foreground: @MainActor () -> Bool
     private let acquireAudio: @MainActor () async throws -> Void
@@ -36,7 +36,7 @@ import UI
     var hasClip: Bool { clip != nil }
     var id: String? { clip?.id ?? nativeID }
     init(
-        camera: any CameraCapturing, photos: CapturedPhotoStore, presentation: any CameraPresenting,
+        camera: any CameraCapturing, photos: MediaStore, presentation: any CameraPresenting,
         foreground: @escaping @MainActor () -> Bool,
         acquireAudio: @escaping @MainActor () async throws -> Void,
         releaseAudio: @escaping @MainActor (Bool) async throws -> Void,

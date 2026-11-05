@@ -204,3 +204,17 @@ Web原生用例加载两个本地页面，验证ui.web列出全部窗口UUID与�
 Writer思考草稿默认false、编辑推进revision、还原独立于Assistant选择；思考开关仅在Writer云端模型区呈现。
 
 Island end regressions cover ending before first present, duplicate end, cross-owner rejection, stale revision rejection and newer-run presentation without resurrecting old content.
+
+Caption lifecycle coverage retains user/reply text across listening off/on and verifies explicit root invalidation still clears both slots and the finalized marker.
+
+WebPageTests 的真实 macOS WebKit 回归覆盖同文档/节点/原生表面身份、相对 CSS 更新、脚本禁用、插入内容的阅读锚点、缩放、样式失败保留旧画面、取消更新不改变画面及交互期不主动滚动；完整脚本导航验证视口恢复。WebSimulatorAcceptance 在实际 iOS WebView 中验证多次增量更新、原生缩放/滚动继续和完整运行恢复；它使用程序化滚动，不替代真机手势验收。scripts/test-webkit-simulator.sh 可通过 WEBKIT_SIMULATOR_ID 指定设备。
+
+ConversationHistoryPresentationTests 验证Writer累计终止执行时长不随查看时间增长、仅当前执行递增，以及缺失首token/结束证据显示未知。Writer原生页面验收另核对耗时字段和折叠交互。
+
+WindowStateTests覆盖元信息更新不聚焦/恢复/移动正常frame，并允许后台缓存；Web工具栏副标题通过通用参数注入。角色生成标题/操作语义由集成测试验证。
+
+请求行显示值测试覆盖简洁操作标题、重试后缀和中文状态；原生Writer记录验收根据“编写 index.html”等用户可读标题定位请求，不依赖内部phase名称。
+
+WriterRecordsNativeAcceptance同时核对Settings首页英文标题、User四项命名及纵向顺序，使用稳定导航标识继续原有任务记录流程。
+
+记录列表日期测试覆盖时区跨年边界和同年短格式；原生验收保留现有数据，打开My Assistant核对分区并截图，再继续My Writer任务/文件流程，不点击新建或删除会话。

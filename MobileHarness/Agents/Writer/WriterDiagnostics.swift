@@ -135,8 +135,8 @@ enum WriterDiagnostics {
             case "start", "resume": toolStage = "工作区准备"
             case "render": toolStage = "渲染"
             case "finish": toolStage = "发布"
-            case "edit", "replace", "move", "remove", "removeTree", "restore", "restoreVersion": toolStage = "文件编辑"
-            case "read", "list", "search", "diff", "versions": toolStage = "文件读取"
+            case "edit", "replace", "move", "remove", "removeTree", "restore": toolStage = "文件编辑"
+            case "read", "list", "search", "diff": toolStage = "文件读取"
             default: toolStage = stage
             }
             return .init(

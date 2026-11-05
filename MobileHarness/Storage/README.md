@@ -1,96 +1,62 @@
 # Storage — Cache / Database / Files
 
-✅ StorageFailure.swift 迁至模块根，与 StorageContainer.swift 并列；异常仍编译于无项目依赖的 StorageCore，容器仍编译于 Storage，公开类型和行为保持。
+## Responsibilities and boundaries
 
-## 职责与边界
+Storage provides temporary bytes, structured persistence and confined filesystem capabilities. App owns
+construction, paths, dependency injection and lifecycle. Storage never imports Agents, Actions, Gateway,
+UI, PlatformKit or ModelKit, and does not decide model work, scheduling, rendering or user messages.
 
-Storage 提供临时字节、结构化持久化和文件能力。App 选择位置与数据库实现，通过独立 ApplicationContainer 注册根实例并调度生命周期；业务模块获得所需子接口，不访问全局容器。Storage 不依赖 Agents、Actions、Gateway、UI、PlatformKit 或 ModelKit，也不解释业务状态、配置类型和模型选择。
+## Direct relationships and internal design
 
-## 上下游与数据流
+| Owner | Interface and downstream relationship |
+| --- | --- |
+| StorageContainer | Composes CacheContainer, DatabaseStorage and FilesContainer; App starts/stops it |
+| StorageCore | Root StorageFailure and Support contracts: IDs, classified snapshots, gates and errors; no project dependencies |
+| StorageCache | CacheContainer entry, immutable byte leases, namespaced buffers and audio scopes; depends on Core |
+| StorageFiles | Generic documents, controlled paths, bytes and directories; depends on Core |
+| StorageDatabase | Database lifecycle/ports and Workspaces file/index coordination; consumes domain contracts and Files |
+| StorageChat / StorageTasks | Conversation rounds, requests, summaries and delegation contracts; Chat consumes Tasks |
+| StorageMedia / StorageDevices | Media publication and device records; Media consumes Files |
+| StorageSQLite | SQL implementations and one GRDB pool; implements all database ports |
 
 ```mermaid
-flowchart TB
- App[App / AppStorage] -.->|创建、注入、启停| Root[StorageContainer]
+flowchart LR
+ App --> Root[StorageContainer]
  Root --> Cache[CacheContainer]
  Root --> DB[DatabaseStorage]
  Root --> Files[FilesContainer]
- Cache --> Audio[会话 AudioCache]
- Cache --> Buffers[BufferCache / images / 自定义命名空间]
- DB --> Repos[chat / tasks / media / devices]
- Repos --> SQLite[SQLiteDatabaseStorage]
- Files --> Names[settings / photos / models / workspaces]
- Consumer --> Audio
- Consumer --> Repos
- Consumer --> Names
+ DB --> Ports[Chat / Tasks / Media / Devices / Workspaces]
+ Ports --> SQL[Shared SQLite pool]
+ WorkspaceStore --> Files
+ WorkspaceStore --> WorkspaceRepository
 ```
 
-## 内部结构与编译
+## Lifecycle and data flow
 
-| 目录                                 | 编译目标        | 责任与依赖                                                    |
-| ------------------------------------ | --------------- | ------------------------------------------------------------- |
-| 根 StorageContainer.swift            | Storage         | 三类容器组合、启动回滚与加入停止；依赖自身子目标，不依赖 GRDB |
-| 根 StorageFailure.swift、Support      | StorageCore     | 公共身份、错误、State 数据契约、容量门、有界流和租约；无项目/第三方依赖       |
-| Cache（含 Audio）                    | StorageCache    | 不可变字节、租约、音频作用域；只依赖 StorageCore              |
-| Files                                | StorageFiles    | 文档、字节和受控目录；只依赖 StorageCore                      |
-| Database 根                          | StorageDatabase | 数据库生命周期协议与四个领域端口                              |
-| Database/Chat、Tasks、Media、Devices | 独立领域目标    | 记录契约；Chat 使用 Tasks，Media 组合 Files                   |
-| Database/SQLite                      | StorageSQLite   | 共享连接池、当前 schema 初始化、恢复与关闭；独占 GRDB        |
+Construction creates no directories or database. Start prepares Files and opens/recovers the database
+before publishing ports. Failure retains original and cleanup errors. Stop closes admission, joins
+startup and in-flight work, closes Cache/Files and shuts down the database; repeated stops join the
+same result. Existing handles reject new work after closure. App stops consumers before storage.
+SQLite uses WAL, FULL synchronization, foreign keys, four readers, one writer plus sixteen waiting
+writes and at most sixty-four admitted operations. Overflow fails explicitly; failed persistence never
+becomes memory-only success. Recovery records interrupted facts and never replays model/device work.
 
-每份源码只有一个编译拥有者。没有统一业务查询 DSL，没有自动内存回退或跨文件/SQL 事务。
+## Persistence contracts
 
-## 生命周期与一致性
+[Database](Database/README.md) owns ten domain tables and shared request logs. Writer task identity is
+agent/task_N; Assistant conversations and foreground tasks remain separate. Raw rounds survive task
+summary projection. Full model protocol logs are JSON TEXT without chunk/evidence storage. Development
+schema mismatch rebuilds SQLite without importing older formats; credentials and models are outside it.
 
-✅ 构造根容器不打开数据库或创建目录。start 准备 Files 并启动数据库；失败关闭内存/文件能力、清理数据库并保留原始与清理错误；清理成功的正常取消以 StorageFailure 保留原始 CancellationError。重复启动共享准备任务，失败/停止作用域不复用。stop 同步关闭 Cache/Files 接纳，取消并加入启动，关闭 Cache/Files、加入数据库停止；重复停止共享结果。应用消费者先停止，再释放存储；重试只在原作用域清理成功后创建新根。
+[Workspaces](Database/Workspaces/README.md) coordinates current filesystem source and SQL metadata.
+No source body or historical file version is stored in SQLite. [Files](Files/README.md) owns generic
+atomic replacement and sandbox checks. Media files remain independent of conversation deletion.
+[Cache](Cache/README.md) owns temporary buffers; [Support](Support/README.md) owns reusable contracts.
 
-✅ DatabaseStorage 的 chat/tasks/media/devices 在准备前、关闭后抛错。SQLite 以 WAL、FULL、外键、四读者和一个写者运行；最多 64 个接纳操作，写入一个执行者加 16 等待者。旧仓库引用也受关闭屏障约束。恢复仅修复未完成事实，不重放设备动作。
+## Observation and failure reporting
 
-✅ Container自行维护运行事实；Cache保存不可变缓冲区。数据库和文件写入成功才承诺对应持久化，不把内存成功解释为重启可恢复。Task/Skill 业务状态仍由 Agents 维护；照片发布仍由 CapturedPhotoStore 组合数据库元数据和文件。
-
-数据库 schema、ID、配置 envelope version 1、文件路径、照片恢复与仅回收未收录媒体的 FIFO 契约适用。Models 的文件目录能力是真实路径，不用内存实现伪造文件 URL。业务错误保留在生产者；Storage 不生成用户文案。
-
-## 子目录与待完成
-
-[Cache](Cache/README.md) · [Database](Database/README.md) · [Files](Files/README.md) · [公共机制](Support/README.md)
-
-❌ 持久化音视频、额外数据库后端、原生播放转换零拷贝不在本轮。自动化、构建、真实模型/UI/设备结果分别见 [验证记录](../../docs/validation/Validation-History.md)。
-
-对话缓存读/写 token 计数是 Provider 可选观测；缺失表示未报告。
-
-## 统一容器异常通道
-
-✅ StorageCore 的原生 StorageFailureReporter 使用注入的 Sendable 回调，不认识 Signal。Storage 根及 Cache/Files/SQLite 的操作、后台失败与清理保留原错误并同步报告，由 App 连接 Gateway；报告不改变底层领域接口的返回值或完成边界；根生命周期使用明确的 StorageFailure 类型化抛错。
-
-报告器由 App 同时传给 Files、SQLite 后端和 Storage 根；根把它传给自身创建的 Cache。外部自建后端由构造者明确注入，不通过全局通知或隐式查找补绑定。
-
-## 契约与重复报告整理
-
-✅ StorageError/DocumentStorageError/RecordStorageError 集中在共享契约文件，值错误统一 Error/Equatable/Sendable。AudioCache 私有接纳检查只翻译／抛错，公开操作报告该接纳错误一次；原始失败、释放／取消及数据库 schema 保持，Storage 不生成 Signal。
-
-✅ 已实现：StorageFailureReporter 保留取消在内的原始错误回调，底层领域调用方仍接收原始 throw，根异常的 underlying 保留原始对象；宿主保留诊断，正常取消不广播业务故障。
-
-
-✅ StorageFailure由StorageCore拥有，根start／stop使用throws(StorageFailure)，报告器统一交付同形结构；底层Cache／Files／数据库协议仍可抛领域错误。清理错误与underlying主错误分离，原始取消通过isCancellation判断；结构定义见根目录 [StorageFailure.swift](StorageFailure.swift)，公共机制见[公共契约](Support/Contracts/README.md)。
-
-## 基础相册实施契约
-
-Media 包含相册元数据与资源操作；已收录照片不 FIFO 淘汰。
-
-## Container 上下文
-
-✅ Storage仅拥有Cache／Database／Files及其生命周期；运行状态和模型上下文来源属于外部容器。照片、聊天、任务等领域记录仍由所属数据库契约持久化，不建立公共运行状态镜像。
-
-## Reflexive state reads
-
-`StorageStateSnapshot` is owned by [StorageCore contracts](Support/Contracts/StorageStateSnapshot.swift). StorageContainer, CacheContainer, FilesContainer and DatabaseStorage return this same classified Codable/Sendable structure directly. The root returns its own data and three child indices; stateReaders() provides independent read capabilities without sampling the children. All reads use stateSnapshot() async throws, and descriptors come from the returned value. Cache reports entry/retained-byte budgets and audio-scope counts; files reports existing handle counts and closure; database reports its lifecycle phase. Reads never create directories, acquire repository handles, open SQLite or read content. DatabaseStorage's default observation is unknown for backends without an implementation. SQLite owns its ready/stopping/stopped/failed evidence. Snapshot collection does not assert cross-backend atomicity.
-
-Cache budgets/retained bytes, audio scopes, file handles and database/root lifecycle belong to Runtime. A root lifecycle failure is engineering evidence under health/issues; it does not synthesize a Business problem summary. Domain repository/operation outcomes keep their typed owning interfaces. Consumers select from the same complete State read.
-
-## File-backed video album resources
-
-Actions supplies native-validated movie metadata and a local source; StorageMedia serializes ready-file publication and explicit album inclusion using StorageFiles and MediaRepository. Video playback/export obtains a bounded local URL after ownership or album-membership checks. The existing photos namespace and retention policy hold both photos and movies; image/model reads remain image-only. Storage does not inspect AV assets or manage microphones. See [Media](Database/Media/README.md) and [Files](Files/README.md).
-
-FilesContainer also exposes an independently configured workspaces namespace. App selects its root; StorageFiles provides generic controlled files/documents without interpreting web projects or generation tasks. Content, version retention and publication policy belong to the consuming Actions capability.
-
-委托记录继续使用共享 Chat/Task 后端：稳定任务绑定对话与项目，每次执行创建新的 Task 行；分页、身份检查和来源关联由领域仓库拥有，不引入单独数据库。运行策略、上下文恢复与取消决策属于 Agents，详见 [Tasks](Database/Tasks/README.md)。
-
-TaskRepository 同时提供按执行查询和原子终态/通知持久化；通知由领域拥有 opaque payload，存储只校验身份并管理分页和独立送达/退休证据。该能力使用现有 SQLite，不拥有上层重试或准入策略。详见 [Tasks](Database/Tasks/README.md)。
+StorageCore snapshots expose classified lifecycle, admission and resource facts without opening files,
+creating directories or accessing repositories. Unknown backend state remains unknown. No public
+snapshot pretends several backends were atomically sampled. StorageFailureReporter is an injected
+Sendable callback; App connects it to diagnostics. It never interprets business errors or changes the
+throwing result. StorageFailure preserves underlying errors, cancellation and cleanup errors separately.

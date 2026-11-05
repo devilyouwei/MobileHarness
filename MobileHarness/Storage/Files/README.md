@@ -32,8 +32,16 @@ FilesContainer.stateSnapshot returns StorageCore.StorageStateSnapshot directly; 
 
 ## Bounded file-backed media
 
-FileStore.importFile and fileURL support bounded local-file resources without whole-file Data. DiskFileStore rejects symbolic links/non-regular files, invalid paths, empty/oversized sources and existing destinations. Import copies to a confined temporary file, applies data protection, validates byte count, synchronizes/closes and atomically moves without overwrite. Cancellation before publication removes the temporary copy; publication/cleanup failures remain explicit. fileURL requires a present bounded file inside the namespace; caller lifetime/disposition remains above Files. MemoryFileStore explicitly rejects these native-file operations.
+FileStore.importFile and fileURL support bounded local-file resources without whole-file Data. DiskFileStore rejects symbolic links/non-regular files, invalid paths, empty/oversized import sources and existing destinations. Import copies to a confined temporary file, applies data protection, validates byte count, synchronizes/closes and atomically moves without overwrite. Cancellation before publication removes the temporary copy; publication/cleanup failures remain explicit. fileURL requires a present bounded file inside the namespace; caller lifetime/disposition remains above Files. MemoryFileStore explicitly rejects these native-file operations.
 
 ## Consumer workspaces and native file witnesses
 
 FilesContainer.workspaces is a separate opaque namespace, explicitly configured by App (defaulting to WebWorkspaces beside settings for compatible callers). Generic document CAS and disk publication apply without a project schema in Storage. DiskFileStore explicitly implements async fileURL/importFile witnesses so concrete and FileStore existential callers both reach the real disk implementation; unsupported backends retain the explicit default failure.
+
+## Current directories
+
+DiskFileStore.replace atomically replaces an existing file or creates it, including empty text/CSS/JS.
+textFiles reads a confined directory in one actor turn, rejecting symbolic links, invalid UTF-8 and missing
+directories. Generic fileURL permits empty files; media-specific validators still reject invalid assets.
+Workspace contracts and file/index coordination belong to [Database/Workspaces](../Database/Workspaces/README.md),
+not Files. Source files live at agent/task_N/relative-path; Files has no project, version or rendering policy.

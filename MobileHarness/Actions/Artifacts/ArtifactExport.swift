@@ -1,4 +1,5 @@
 import Foundation
+import StorageCore
 import StorageFiles
 import UI
 
@@ -74,7 +75,7 @@ public enum ArtifactArchive {
             self.disk = disk
         }
         public func read(_ id: String) async throws -> WriterArtifactSnapshot {
-            guard !closed, let uuid = UUID(uuidString: id) else { throw ArtifactWorkspaceError.invalidPath }
+            guard !closed, let uuid = WorkspaceID(rawValue: id) else { throw ArtifactWorkspaceError.invalidPath }
             if let draft = try await workspace.checkpoint(for: uuid) {
                 return .init(
                     item: .init(id: id, title: draft.title, state: "draft", entry: draft.entry),

@@ -173,7 +173,7 @@ import StorageFiles
         public func setSceneActive(_ value: Bool) async throws {
             if value { try await lifecycle.setForeground(true) }
             foreground = value
-            try await writer.setForeground(value)
+            await writer.setSceneActive(value)
             guard !isolatedPresentation else { return }
             reportEnvironment(.scene, value: value ? "active" : "background")
             if !value {
@@ -281,7 +281,12 @@ import StorageFiles
                     guard let self else { throw CancellationError() }
                     let chat = try await self.makeHistoryChat()
                     try Task.checkCancellation()
-                    return try await ConversationTitleGenerator.summarize(conversation, using: chat)
+                    let records = try self.repositories().chat
+                    return try await ConversationTitleGenerator.summarize(
+                        conversation, using: chat,
+                        journal: { request in
+                            try await records.saveAuxiliaryRequest(dialog: conversation.id, request: request)
+                        })
                 },
                 modelName: { [weak self] in
                     guard let self else { throw CancellationError() }

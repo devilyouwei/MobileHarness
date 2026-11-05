@@ -9,9 +9,9 @@ public enum CameraStorageFactory {
         repository: @escaping @Sendable () throws -> any MediaRepository,
         files: @escaping @Sendable () throws -> any FileStore
     )
-        -> CapturedPhotoStore
+        -> MediaStore
     {
-        CapturedPhotoStore(
+        MediaStore(
             repository: repository,
             files: files,
             limits: .init(maximumPhotos: 1024, maximumBytes: 2 * 1024 * 1024 * 1024, overflowPolicy: .evictOldest))

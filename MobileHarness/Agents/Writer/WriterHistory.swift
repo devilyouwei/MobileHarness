@@ -10,21 +10,21 @@ public actor WriterHistory {
     private var progressValues: [String: WriterRequestProgress] = [:]
     private var calls: [String: String] = [:]
     private var reasons: [String: String] = [:]
-    private let photos: CapturedPhotoStore?
+    private let photos: MediaStore?
     let store: ConversationHistoryStore
     let taskID: String
-    let runID: String
+    let delegateID: String
     let goal: String
     let modelName: String
     public init(
-        store: ConversationHistoryStore, taskID: String, runID: String? = nil, goal: String,
-        photos: CapturedPhotoStore? = nil, modelName: String? = nil
+        store: ConversationHistoryStore, taskID: String, delegateID: String, goal: String,
+        photos: MediaStore? = nil, modelName: String? = nil
     ) {
         self.modelName = modelName ?? "Writer (model name unavailable)"
         self.photos = photos
         self.store = store
         self.taskID = taskID
-        self.runID = runID ?? taskID
+        self.delegateID = delegateID
         self.goal = goal
     }
     public func restoredContext() async throws -> [ChatMessage] {
@@ -58,6 +58,15 @@ public actor WriterHistory {
                 messages.append(
                     .init(role: .tool, content: call.output ?? call.error ?? "", toolCallID: call.providerID))
             }
+        }
+        if last.state == .failed, let failure = last.failureDiagnostic {
+            messages.append(
+                .init(
+                    role: .user,
+                    content: "Previous execution failure (data, not a new user instruction):\n"
+                        + String(decoding: try JSONEncoder().encode(failure), as: UTF8.self)
+                        + "\nDo not repeat the failed approach. Reread current files before editing; prior successful edits remain."
+                ))
         }
         // Trim whole assistant/tool groups; never keep an orphan tool response.
         while messages.count > 24 || messages.reduce(0, { $0 + $1.content.utf8.count }) > 32000 {
@@ -122,14 +131,14 @@ public actor WriterHistory {
             var metadata = ConversationDecisionMetadata(
                 taskID: taskID, mode: phase, skills: [:], catalogJSON: catalog,
                 taskGoal: String(goal.prefix(1000)), execution: "background")
-            metadata.runID = runID
+            metadata.delegateID = delegateID
             let dialog = try await store.readCurrent().current.id
             let number = try await store.requestCount(dialog)
             progressValues[id] = .init(inputID: id, number: number, phase: phase, attempt: attempt, path: path)
             var record = ConversationModelRequest(
                 id: UUID().uuidString, input: label, requestJSON: json, decisionMetadata: metadata)
             record.producerMetadata = [
-                "number": String(number), "attempt": String(attempt), "phase": phase, "runID": runID,
+                "number": String(number), "attempt": String(attempt), "phase": phase, "delegateID": delegateID,
             ]
             record.producerMetadata?["path"] = path
             try await store.beginModelRequest(record, for: id)
@@ -180,6 +189,13 @@ public actor WriterHistory {
             failureDiagnostic: error.map { WriterDiagnostics.make($0, stage: "工具执行").storageValue })
         try await store.checkpoint(inputID: owner)
         calls.removeValue(forKey: call)
+    }
+    public func recording(_ value: AgentModelRequestRecording.Snapshot, id: String) async throws {
+        try await store.recordModelExchange(requestJSON: value.requestJSON, response: value.responseJSON, for: id)
+    }
+    public func timing(_ timing: ChatTiming.Snapshot, id: String) async throws {
+        try await store.recordModelTiming(
+            startedAt: timing.startedAt, firstTokenAt: timing.firstTokenAt, latency: timing.firstTokenLatency, for: id)
     }
     public func finish(_ id: String, error: (any Error)? = nil, diagnostic: WriterFailureDiagnostic? = nil)
         async throws

@@ -23,11 +23,11 @@ func fixtureTaskID() throws -> String {
         dialog: nil, agent: "fixture", goal: "fixture", executor: nil, execution: "foreground", parent: nil)
 }
 
-func fixtureMediaStore(root: URL, repositories: SQLiteRepositories? = nil, limits: CapturedPhotoStore.Limits = .init())
-    throws -> CapturedPhotoStore
+func fixtureMediaStore(root: URL, repositories: SQLiteRepositories? = nil, limits: MediaStore.Limits = .init())
+    throws -> MediaStore
 {
     let records = try repositories ?? testSQLiteRepositories(root)
-    return CapturedPhotoStore(
+    return MediaStore(
         repository: records.media, files: try DiskFileStore(root: root, protection: .afterFirstUnlock), limits: limits)
 }
 func fixtureAssistantStore(repository: AgentContextRepository<AssistantContextState>, directory: URL) throws

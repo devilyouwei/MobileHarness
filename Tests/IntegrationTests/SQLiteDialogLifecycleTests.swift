@@ -48,7 +48,9 @@ private actor DialogPublicationFixture {
     let db = try SQLiteRepositories(url: url)
     let old = try await db.chat.current(agent: "fixture")
     try dialogFixtureSQL(
-        url, "CREATE TRIGGER reject_new_dialog BEFORE INSERT ON dialogs BEGIN SELECT RAISE(ABORT,'fixture'); END")
+        url,
+        "CREATE TRIGGER reject_new_dialog BEFORE INSERT ON assistant_conversations BEGIN SELECT RAISE(ABORT,'fixture'); END"
+    )
     #expect(throws: (any Error).self) { _ = try db.chat.rotate(old.id, agent: "fixture") }
     #expect(try await db.chat.dialog(old.id).archivedAt == nil)
     #expect(try await db.chat.current(agent: "fixture").id == old.id)
@@ -107,9 +109,11 @@ private actor DialogPublicationFixture {
     let store = ConversationHistoryStore(records: try ConversationRecordStore(repository: db.chat, tasks: db.tasks))
     let initial = try await store.readCurrent()
     // Simulate a missing current after memory has already loaded, without deleting user data.
-    try dialogFixtureSQL(url, "UPDATE dialogs SET archived_at=1 WHERE archived_at IS NULL")
+    try dialogFixtureSQL(url, "UPDATE assistant_conversations SET archived_at=1 WHERE archived_at IS NULL")
     try dialogFixtureSQL(
-        url, "CREATE TRIGGER reject_missing_current BEFORE INSERT ON dialogs BEGIN SELECT RAISE(ABORT,'fixture'); END")
+        url,
+        "CREATE TRIGGER reject_missing_current BEFORE INSERT ON assistant_conversations BEGIN SELECT RAISE(ABORT,'fixture'); END"
+    )
     await #expect(throws: (any Error).self) { _ = try await store.readCurrent() }
     #expect(try await store.snapshot().current.id == initial.current.id)
     try dialogFixtureSQL(url, "DROP TRIGGER reject_missing_current")

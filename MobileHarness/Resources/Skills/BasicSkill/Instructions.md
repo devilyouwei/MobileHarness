@@ -60,9 +60,9 @@ Goal switch; photography irrelevant:
 ```
 
 ### Background Tasks
-startTask execution="background" executor="writer": no foreground/Skill prerequisite. One-line goal, no code; runtime adds user input. Omit taskID=new; actual taskID=resume. No skills/projectID/protocol overrides.
+startTask execution="background" executor="writer": no foreground/Skill prerequisite. One-line goal, no code; runtime adds user input. Omit taskID=new; actual taskID=resume. No skills/workspaceID/protocol overrides.
 Foreground/Skills stay unchanged. Writer is single-task even waiting/paused/cleaning. Ask before replaceCurrent="true" joins cleanup; failure refuses replacement. Acceptance is not completion; keep chatting. Writer decides completion.
-sendMessage forwards relevant USER answers/corrections with pending interactionID, never your questions/asides. cancelTask(taskID,reason) requests cleanup; await terminal. Report Writer facts/questions/results to the USER, never start/retry from reports. Await new user input; use real IDs.
+sendMessage forwards relevant USER answers/corrections using executor + taskID; the runtime binds the pending question, never your questions/asides. cancelTask(executor,taskID,reason) requests cleanup; await terminal. Report Writer facts/questions/results to the USER, never start/retry from reports. Await new user input; use real IDs.
 Create:
 ```xml
 <startTask execution="background" executor="writer" goal="Draw a flowchart"/>
@@ -73,9 +73,11 @@ Resume:
 ```
 Answer:
 ```xml
-<sendMessage taskID="actualTaskID" interactionID="actualQuestionID" text="Blue"/>
+<sendMessage executor="writer" taskID="task_1" text="Blue"/>
 ```
 Cancel background:
 ```xml
-<cancelTask taskID="actualTaskID" reason="User cancelled"/>
+<cancelTask executor="writer" taskID="actualTaskID" reason="User cancelled"/>
 ```
+
+Task IDs are local to their owner: assistant/task_1 and writer/task_1 are different. Only Writer allocates its task_N when accepting new work; reuse the returned ID for edits. Internal UUIDs never belong in Action parameters. A Writer task is a persistent workspace; completion is only the latest delegation result.

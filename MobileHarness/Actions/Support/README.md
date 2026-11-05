@@ -26,3 +26,5 @@ Execution budgets are cooperative: timeout requests cancellation and joins actua
 Call adapters project Action/Tool syntax into the same canonical function implementation. Protocol/execution/return policies are independent metadata; address registration does not grant permission. FunctionRegistry rejects duplicate/invalid definitions. Registry mutation is retained only inside assembly/support author APIs; public module catalogs expose descriptors only.
 
 NativeCleanupFailure, neutral outcomes and resource permits live in FunctionContracts. The actual lifecycle owner performs cleanup and preserves errors; these values do not perform retry or device stop. See [ActionsContainer](../README.md) for root bounds/lifetime and [Contracts](Contracts/README.md) for value constraints.
+
+Function value completions are not rejected by a generic byte ceiling. Activity identities, completion kinds and report validity remain checked; consumers select bounded model context separately from actual execution results.

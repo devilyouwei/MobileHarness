@@ -1,70 +1,54 @@
-# StorageChat — Conversation Contracts and Checkpoints
+# Chat rounds, requests and checkpoints
 
-## Ownership and direct relationships
+StorageChat depends on StorageCore and StorageTasks. ConversationRecords.swift owns values;
+ConversationHistory.swift owns the in-memory workflow; ConversationRecordStore.swift adapts it to
+ChatRepository. SQLiteChatRepository compiles in StorageSQLite and implements the contract there.
+Agents own prompt selection, Task semantics, execution, cancellation and model configuration.
 
-Depends on StorageCore mechanisms and StorageTasks contracts. Agents own admission, summaries/context selection and execution. Actions/App consume history operations; App injects ChatRepository and TaskRepository from one backend family. SQLiteChatRepository remains in this directory but compiles solely in StorageSQLite and owns dialog/message/evidence/source schema and SQL.
+## Physical records and projections
 
-```mermaid
-flowchart LR
- Agent --> History[ConversationHistoryStore]
- History --> Adapter[ConversationRecordStore]
- Adapter --> Contract[ChatRepository]
- Adapter --> Task[TaskRepository]
- SQLite[SQLiteChatRepository] -.-> Contract
- SQLite --> Pool[Shared SQLiteDatabase]
-```
+messages stores one original business round, with input/output and optional structured metadata.
+Foreground-task boundaries split a round into segments with the same original input identity. Logical
+input counts remain distinct-input counts. A round belongs to assistant_conversations XOR writer_tasks.
+Writer does not create an Assistant conversation or participate in foreground-task compression.
 
-## Files and interfaces
+Each actual invocation lives in model_request_log, with a UUID request identity, phase/attempt/provenance,
+request/context JSON, full actual response, native call/result pairs, timing, usage and errors. Agent-submitted request parameters and received ChatEvents are separate from local tool outcomes;
+no raw HTTP/SSE is claimed. Dynamic system/State
+is preserved in request logs, never ordinary user text. The Messages adapter strips request system
+arrays from round metadata. Full snapshots intentionally duplicate context; no chunk/dedup codec exists.
+Auxiliary conversation-title inference uses a log with a conversation owner and no fabricated round.
 
-- ChatRepository.swift: neutral dialog/message/preview/compression/source values and async record contract.
-- ConversationRecordStore.swift: protocol-to-history adapter, exact evidence restoration, dirty-input fingerprints, chronological windows/pages and archive/title operations. Its paired repositories must share storageScope; namespace mismatch fails before reads/writes.
-- ConversationHistory.swift: authoritative memory projection, read tokens, bounded writes, complete-message checkpoints and Task source ownership. Standalone ephemeral mode retains records/IDs in memory and uses MemoryTaskRepository; it does not instantiate a database.
-- SQLiteChatRepository.swift: indexed queries, schema, message UUID/role upserts, exact UTF-8 evidence deduplication and atomic compression/message/source updates. No backend implementation is imported by the contract/history target.
+History APIs project input/observation/response values from rounds and logs. message_N identifies a
+round; request_N addresses a request detail. Raw enumeration paginates rounds with an explicit next
+cursor, preserving all nested logs. Request previews read small columns and producer/tool metadata;
+complete payloads load on detail/export. Request ordinals count the whole owning history, not a page.
 
-## Save and recovery
+## Summaries and context
 
-User admission, each finished Assistant generation and each ReACT observation commit independently. Delta never persists. Cancellation/failure saves received body and actual terminal state; generation completion differs from execution completion. Failed checkpoint retains dirty state, fingerprints and error for idempotent retry; the Agent starts no next model request. Root history writes admit16 waiters. The adapter uses a separate shared StorageOperationGate across async checkpoint/rotation/title/deletion awaits, keeping cache publication ordered without holding SQL transactions.
+assistant_tasks contains the summary, first-source anchor and source/summary revisions. Saving changed
+request evidence invalidates an older summary. Only a terminal, nonempty summary/failure with matching
+coverage folds sources; missing, stale or failed summaries leave originals visible. Expanded/raw reads
+retain the complete original rounds and request pairings. Writer never uses this folding mechanism.
+The existing bounded recent context window remains independent of complete durable history.
 
-App runs startup recovery before admitting work; generating message identities become interrupted, and normalized Task/source rows produce interrupted compression without a live-state recovery blob. Ten projected blocks plus admitted unanswered inputs reconstruct the context; completed records remain durable after offloading. Current fingerprints are pruned to that window. Runtime restoration and Task interpretation remain Agent-owned; unfinished work is not replayed. ConversationCheckpoint is a capture DTO, ConversationArchive a memory/display DTO; neither is an obsolete file format.
+## Lifecycle and failures
 
-## Task, queries and archives
+Complete user admission, observations and request completion checkpoint independently; source token
+deltas do not cause SQL writes. Failure/cancellation stores received text and actual terminal evidence.
+Model completion differs from Action/delegation completion. Dirty checkpoints remain retryable after
+failed publication. History has sixteen waiting writers; its adapter also serializes asynchronous
+checkpoints/rotation. Publication caches change only after SQL success. Paired Chat/Tasks must share
+storageScope. Agent ownership checks reject foreign history.
 
-TaskRepository commits running records before activation. SQLite checkpoints link raw messages and Task summaries to the first source position, including sources already offloaded from context; full sources remain available in20-item pages. Raw enumeration resolves the message cursor to (position, primary key), retaining tied user/Assistant rows. Preview queries read bounded preview columns; details load actual body/evidence by message ID. Agent identity checks reject foreign dialogs. Late outcomes locate their original input by index instead of scanning archives.
+Assistant current/archived rotation is atomic; late updates to existing archived records remain valid,
+new archived inserts fail. Writer current history is selected from its accepted task, not a globally
+rotated Writer conversation. Startup interrupts generating records without rerunning work. Root lifecycle
+and database closure are shared with all repository ports. Memory-only mode is explicit and ephemeral.
 
-Current/archive rotation is atomic in the backend; asynchronous titles read at most32 caller-selected excerpts and never block creation of a new current dialog. Durable archive/turn counts have no old64/256 file-format cap. Memory history remains bounded32MiB; user/system/model limits4KiB/64KiB/512B, single-input response256KiB, request JSON512KiB/observation64KiB and single Task8192 sources. Overflows fail explicitly.
-
-[Storage](../../README.md) · [Tasks](../Tasks/README.md) · [Agent Chat](../../../Agents/Support/Chat/README.md)
-
-Cancellation completion: ordinary gate callers reject cancellation before their body; captured Chat checkpoints instead run a joined, store-owned operation independent of the cancelled caller, so cancelled/failed messages still commit. An actual cancelled-Task terminal checkpoint regression verifies received text and both terminal message states.
-
-insert completed user messages and reserve Assistant identities before model admission, attach user/Assistant/observation message IDs to memory values, and never persist generating response bodies. User acceptance is its completion boundary; Assistant generation completes independently of action outcomes; each ReACT observation completes before the next model admission. Empty reserved rows recover as interrupted with truthful empty content. Interrupted Task compression is rebuilt from normalized SQL facts; live Task/Skill worker state is not serialized. Message/dialog writes use private GRDB records.
-
-ConversationHistory.begin commits a complete user message directly, then attaches the returned SQL identity to memory. ChatRepository.save and ConversationRecordStore.saveCurrent return committed identity receipts in submitted-message order. Evidence fingerprints omit the separately stored user primary key. Failed publication retries the same runtime UUID idempotently. Assistant reservations and per-observation checkpoints use their own completion boundaries.
-
-ConversationHistory tracks pending current synchronization, reloads SQL current before read/admission/rotation, and rejects mismatches with active/dirty work. A committed rotation clears persisted old dirty inputs, then publishes the new window; publication failure retains the synchronization fence for retry without a second rotation. Synchronization uses exact-ID comparison. SQLiteChatRepository rejects new message rows on archived dialogs, validates Agent ownership during rotation and permits existing-row late updates. Missing current is created transactionally; failures propagate rather than fabricating a draft.
-
-paging that can initialize/recover current and dirty-input checkpoint publication use the same history operation gate; memory-only paging delegates to the existing gated conversation read.
-
-HistoryPaging.pageSize supplies the shared20-item default for archived dialogs and timeline/Task previews; App uses the same value for archive EOF validation. Internal raw-message enumeration retains its independent50-row batch and complete-record reads remain complete.
-
-## 待实现
-
-- Additional persistent Chat backends and cross-process/sync/replay semantics are unimplemented. Real model/native UI acceptance is separate from contract tests.
-
-## Storage 容器关系
-
-✅ 本目录的领域端口由 DatabaseStorage 发布；SQL 适配器统一归 Database/SQLite 编译，业务调用方不导入 SQLite 后端。
-
-✅ ConversationTokenUsage 透传可选 cachedInput/cacheWriteInput；原始请求保存稳定 system 与当前 State 分开的消息。缓存计量为真实可选观测，未返回时保持 nil；未知记录状态报 invalidRecord。
-
-✅ ConversationHistoryStore.admitUserInput 在一个写入 gate 内选择当前会话并接纳无模型请求的用户记录；begin 继续要求精确 read token，用于实际请求快照，不放宽旧 token／外来 token 检查。共用有界记录校验与实际 checkpoint，失败不伪造接纳。
-
-Writer consumes the same repository contracts with agent=writer. Its model requests are independent inputs with exact text/tool evidence; delegated task provenance stays in decision metadata and does not join Assistant-owned task compression sources. No new schema or alternate persistence path is introduced.
-
-Writer 每个长期委托对应独立 dialog；StorageTasks 事务切换当前 Writer dialog 并创建新执行，历史仓库在终态检查点之后同步该身份。原生工具与文本保存在共享 evidence/message 契约中；decisionMetadata 保存稳定 taskID 和本次 runID。续作使用相同对话，普通 Assistant 会话轮转规则不变。
-
-ConversationFailureDiagnostic 是中立持久化值（category/code/stage/message/details/causes），请求、工具及输入终态可关联该值。Storage不解释Agent/Provider分类；现有SQLite evidence保存结构化数据并随历史读取/分享还原，无独立诊断库。未提供诊断的记录保持缺失，不从错误字符串猜测信息。
-
-ConversationRecordStore.containsInput 只按输入身份查找持久对话并验证当前 Agent 归属，不读取其他对话正文。ConversationHistoryStore 在写门内结合当前缓存和持久身份查询，为业务输入跨对话去重提供证据；不把其他会话上下文导入当前模型。
-
-Producer metadata can persist at request admission with generating state; this does not commit source deltas per token or change metadata-free producers. MessagePreview carries small metadata and a global ordinal. Reads retain Agent ownership checks; totals do not depend on loaded page size.
+A reserved request may acquire a foreground task after startTask executes. SQLite resolves the request
+UUID before selecting a segment and atomically moves only a previously unassigned request to that task.
+The request_N address, input and evidence stay stable; prior requests remain in their original segment.
+A sole request can retain its existing round. Cross-owner/input moves and established-task rebinding
+are conflicts. Pending-input reads consider every segment of the logical input, preventing an empty
+source segment from appearing unanswered after transfer.

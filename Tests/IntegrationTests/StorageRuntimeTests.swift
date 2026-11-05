@@ -201,7 +201,7 @@ private func waitForStorageClosed(_ storage: SQLiteDatabaseStorage) async throws
         try await storage.start()
         let address = try records.database.read { db in
             var statement: OpaquePointer?
-            let code = sqlite3_prepare_v2(db.sqliteConnection, "SELECT * FROM tasks", -1, &statement, nil)
+            let code = sqlite3_prepare_v2(db.sqliteConnection, "SELECT * FROM assistant_tasks", -1, &statement, nil)
             guard code == SQLITE_OK, let statement else { throw StorageRuntimeFixtureError.open }
             return Int(bitPattern: statement)
         }
@@ -219,7 +219,7 @@ private func waitForStorageClosed(_ storage: SQLiteDatabaseStorage) async throws
 
     @Test func mediaProviderDoesNotCacheNotReady() async throws {
         let storage = SQLiteDatabaseStorage { try SQLiteRepositories.temporary() }
-        let photos = CapturedPhotoStore(
+        let photos = MediaStore(
             repository: { try storage.repositories().media }, files: .success(try MemoryFileStore()))
         let owner = StorageOwner(namespace: "photos", source: "fixture", session: "session", input: "input")
         await #expect(throws: RecordStorageError.notReady) { try await photos.save(Data([1, 2, 3]), owner: owner) }

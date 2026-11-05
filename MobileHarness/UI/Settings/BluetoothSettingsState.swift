@@ -170,20 +170,20 @@ public final class BluetoothSettingsState {
     /// Latest connection/communication status never consumes Action/Tool execution outcomes.
     public var summary: String { connectionTitle }
     public func status(for id: String) -> String {
-        (selected?.id ?? (recoveryStage == .idle ? nil : recoveryDeviceID)) == id ? connectionTitle : "未连接"
+        (selected?.id ?? (recoveryStage == .idle ? nil : recoveryDeviceID)) == id ? connectionTitle : "Not Connected"
     }
     private var connectionTitle: String {
         switch phase {
-        case .connected: transportIssue == nil ? "已连接" : "已连接，异常"
-        case .connecting: recoveryStage == .connecting ? "正在重连…" : "正在连接…"
-        case .disconnecting: "正在断开…"
-        case .failed: "未连接"
+        case .connected: transportIssue == nil ? "Connected" : "Connected, issue"
+        case .connecting: recoveryStage == .connecting ? "Reconnecting…" : "Connecting…"
+        case .disconnecting: "Disconnecting…"
+        case .failed: "Not Connected"
         case .idle:
             switch recoveryStage {
-            case .cleaning, .waiting, .connecting: "正在重连…"
-            case .waitingForBluetooth: "等待蓝牙开启"
-            case .failed: "未连接"
-            case .idle, .suspended: "未连接"
+            case .cleaning, .waiting, .connecting: "Reconnecting…"
+            case .waitingForBluetooth: "Waiting for Bluetooth"
+            case .failed: "Not Connected"
+            case .idle, .suspended: "Not Connected"
             }
         }
     }

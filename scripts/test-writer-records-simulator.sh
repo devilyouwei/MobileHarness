@@ -20,7 +20,6 @@ with sqlite3.connect(f"file:{seed/'records.sqlite'}?mode=ro",uri=True) as source
     with sqlite3.connect(root/'records.sqlite') as target:
         source.backup(target)
 shutil.copytree(seed/'workspaces',root/'ArtifactWorkspaces',dirs_exist_ok=True)
-shutil.copy2(seed/'workspace-index.json',root/'ArtifactWorkspaces/index.json')
 PY
 python3 - "$writer_ui_work" "$PWD/Tests/UITests/WriterRecordsNativeAcceptance.swift" <<'PY'
 import sys

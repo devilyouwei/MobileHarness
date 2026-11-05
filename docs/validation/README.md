@@ -109,3 +109,6 @@
 - [ModelKit Chat concurrency](ModelKit-Chat-Concurrency.md): shared cloud sessions, root-owned local FIFO, cancellation/cleanup, immutable selections and Writer resource-ownership cleanup.
 
 [语音打断后重新聆听](Listening-Interruption-Recovery.md)：取消期间回复终态事实投递与连续重开回归；真机验收另列。
+
+[Storage database and current Writer workspace](Storage-Database-Refactor.md) records the ten-table
+refactor, Agent-only model recording, current-file recovery and automated/build/native acceptance limits.

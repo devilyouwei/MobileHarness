@@ -67,7 +67,7 @@ actor SerialChat {
         let id = UUID()
         let control = InferenceTaskControl()
         let pair = InferenceSession<ChatEvent>.make(
-            context: request.context, limits: try StreamLimits(capacity: 128, maximumEventBytes: 65568),
+            context: request.context, limits: try StreamLimits(capacity: 128, maximumEventBytes: nil),
             estimatedBytes: { $0.estimatedBytes },
             onTermination: { reason in
                 if case .finished = reason { return }

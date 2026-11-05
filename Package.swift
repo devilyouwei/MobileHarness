@@ -142,7 +142,7 @@ let package = Package(
             dependencies: [
                 "BehaviorDefinitions", "CallRuntime", "ExecutionRuntime", "FunctionContracts", "ModelKit",
                 "ModelKitDefaults", "ModelKitHub", "ModelKitOpenAI", "ModelKitRuntime", "PlatformKit", "StorageCache",
-                "StorageChat", "StorageCore", "StorageDevices", "StorageFiles", "StorageMedia", "UI",
+                "StorageChat", "StorageCore", "StorageDevices", "StorageFiles", "StorageDatabase", "StorageMedia", "UI",
             ],
             path: "MobileHarness/Actions",
             exclude: [
@@ -241,13 +241,17 @@ let package = Package(
             exclude: ["README.md"]),
         .target(
             name: "StorageDatabase",
-            dependencies: ["StorageCore", "StorageChat", "StorageTasks", "StorageMedia", "StorageDevices"],
+            dependencies: [
+                "StorageCore", "StorageFiles", "StorageChat", "StorageTasks", "StorageMedia", "StorageDevices",
+            ],
             path: "MobileHarness/Storage/Database",
-            exclude: ["README.md", "Chat", "Tasks", "Media", "Devices", "SQLite"], sources: ["DatabaseStorage.swift"]),
+            exclude: ["README.md", "Chat", "Tasks", "Media", "Devices", "SQLite", "Workspaces/README.md"],
+            sources: ["DatabaseStorage.swift", "Workspaces"]),
         .target(
             name: "StorageSQLite",
             dependencies: [
-                "StorageCore", "StorageDatabase", "StorageChat", "StorageTasks", "StorageMedia", "StorageDevices",
+                "StorageCore", "StorageDatabase", "StorageFiles", "StorageChat", "StorageTasks", "StorageMedia",
+                "StorageDevices",
                 .product(name: "GRDB", package: "GRDB.swift"),
             ],
             path: "MobileHarness/Storage/Database/SQLite", exclude: ["README.md"]),

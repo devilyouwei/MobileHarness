@@ -66,7 +66,7 @@ public struct BehaviorProtocolBindings {
             return ActionBinding(function: function, protocols: [.action, .tool], executionPolicy: .direct)
         }
         let group = function.path.domain + "." + function.path.module
-        if group == "UI.Caption", ["print", "beginReplyTurn"].contains(function.path.function) {
+        if group == "UI.Caption", ["print", "beginReplyTurn", "clearReply"].contains(function.path.function) {
             return ActionBinding(function: function, protocols: [.action, .tool], executionPolicy: .direct)
         }
         switch group {

@@ -54,7 +54,8 @@ public struct WindowGeometry: Equatable, Sendable {
 public struct WindowPresentation: Identifiable, Sendable {
     public let id: UUID
     public let content: String
-    public let title: String
+    public var title: String
+    public var subtitle: String? = nil
     public let icon: WindowIcon?
     public let color: Int
     public var sizing: WindowSizing = .standard
@@ -195,12 +196,23 @@ public struct WindowPresentation: Identifiable, Sendable {
         }
         return remaining.contains { !$0.isEmpty && !$0.isNull }
     }
+    @ObservationIgnored private var nextReference: UInt64 = 0
+    @ObservationIgnored private var references: [UUID: String] = [:]
+    public func reference(for id: UUID) -> String? {
+        guard windows.contains(where: { $0.id == id }) else { return nil }
+        return references[id]
+    }
+    public func resolve(reference: String) throws -> UUID {
+        guard let id = windows.first(where: { references[$0.id] == reference })?.id else { throw WindowError.missing }
+        return id
+    }
     public func find(_ id: UUID) throws -> WindowPresentation {
         guard let item = windows.first(where: { $0.id == id }) else { throw WindowError.missing }
         return item
     }
     public func present(
-        content: WindowContent, title: String, icon: WindowIcon? = nil, sizing: WindowSizing = .standard
+        content: WindowContent, title: String, icon: WindowIcon? = nil, sizing: WindowSizing = .standard,
+        windowID: UUID? = nil
     ) async throws -> UUID {
         guard available else { throw WindowError.unavailable }
         if content.singleInstance, let item = windows.first(where: { $0.content == content.rawValue }) {
@@ -212,7 +224,12 @@ public struct WindowPresentation: Identifiable, Sendable {
         guard windows.count < 4 else { throw WindowError.capacity }
         let icon = try icon?.prepared()
         let cardWidth = WindowCardLayout.width(title: title, viewport: width, fontSize: cardTitleSize)
-        let id = UUID()
+        let id = windowID ?? UUID()
+        guard !windows.contains(where: { $0.id == id }) else { throw WindowError.busy }
+        references = references.filter { key, _ in windows.contains { $0.id == key } }
+        guard nextReference < UInt64.max else { throw WindowError.busy }
+        nextReference += 1
+        references[id] = "window_\(nextReference)"
         windows.append(
             .init(
                 id: id, content: content.rawValue, title: title, icon: icon, color: Int.random(in: 0..<6),
@@ -232,6 +249,18 @@ public struct WindowPresentation: Identifiable, Sendable {
         let item = windows.remove(at: index)
         windows.append(item)
         focusedID = id
+    }
+    /// Business-neutral display metadata. Does not focus, restore or reopen a window.
+    public func setPresentation(_ id: UUID, title: String? = nil, subtitle: String? = nil) {
+        guard !stopped, let i = windows.firstIndex(where: { $0.id == id }) else { return }
+        if let title, !title.isEmpty, windows[i].title != title {
+            windows[i].title = title
+            let measured = WindowCardLayout.width(title: title, viewport: width, fontSize: cardTitleSize)
+            windows[i].card.x += (windows[i].card.width - measured) / 2
+            windows[i].card.width = measured
+            windows[i].card = windows[i].card.constrained(width: width, height: height, card: true)
+        }
+        if let subtitle { windows[i].subtitle = subtitle.isEmpty ? nil : String(subtitle.prefix(160)) }
     }
     public func setActivity(_ id: UUID, label: String?) {
         guard let i = windows.firstIndex(where: { $0.id == id }) else { return }
@@ -371,12 +400,14 @@ public struct WindowPresentation: Identifiable, Sendable {
         return .init(
             path: "ui.windows",
             business: [
-                "focusedID": focusedID.map { .text($0.uuidString) } ?? .unknown,
+                "focusedID": focusedID.flatMap { reference(for: $0) }.map { .text($0) } ?? .unknown,
                 "windows": .array(
                     windows.map {
                         .object([
-                            "windowID": .text($0.id.uuidString), "title": .text($0.title), "content": .text($0.content),
+                            "windowID": .text(reference(for: $0.id) ?? "unknown"), "title": .text($0.title),
+                            "content": .text($0.content),
                             "mode": .text($0.mode.rawValue), "phase": .text($0.phase.rawValue),
+                            "subtitle": $0.subtitle.map { .text(String($0.prefix(64))) } ?? .unknown,
                         ])
                     }),
             ], runtime: ["available": .flag(available)])

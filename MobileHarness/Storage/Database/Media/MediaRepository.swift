@@ -27,24 +27,24 @@ public struct MediaFileRecord: Sendable {
 }
 
 public protocol MediaRepository: Sendable {
-    func reserveVideo(bytes: Int, owner: StorageOwner, metadata: PhotoMetadata, createdAt: Date) async throws
+    func reserveVideo(bytes: Int, owner: StorageOwner, metadata: MediaMetadata, createdAt: Date) async throws
         -> MediaFileRecord
     func reserveMedia(bytes: Int, source: String, session: String, input: String, date: Date) async throws
         -> MediaFileRecord
-    func reservePhoto(bytes: Int, owner: StorageOwner, metadata: PhotoMetadata, createdAt: Date) async throws
+    func reservePhoto(bytes: Int, owner: StorageOwner, metadata: MediaMetadata, createdAt: Date) async throws
         -> MediaFileRecord
-    func collectPhoto(_ id: String, metadata: PhotoMetadata?, at: Date) async throws
+    func collectPhoto(_ id: String, metadata: MediaMetadata?, at: Date) async throws
     func albumPage(before: AlbumCursor?, limit: Int) async throws -> AlbumPage
-    func albumPhoto(_ id: String) async throws -> AlbumPhotoRecord?
-    func deletePhoto(_ id: String) async throws
-    func pendingPhotoDeletions() async throws -> [MediaFileRecord]
+    func albumMedia(_ id: String) async throws -> AlbumMediaRecord?
+    func deleteAlbumMedia(_ id: String) async throws
+    func pendingMediaDeletions() async throws -> [MediaFileRecord]
     func media(_ id: String) async throws -> MediaFileRecord?
     func retainedMedia() async throws -> [MediaFileRecord]
     func setMedia(_ id: String, state: String, failure: String?) async throws
 }
 
 extension MediaRepository {
-    public func reserveVideo(bytes: Int, owner: StorageOwner, metadata: PhotoMetadata, createdAt: Date) async throws
+    public func reserveVideo(bytes: Int, owner: StorageOwner, metadata: MediaMetadata, createdAt: Date) async throws
         -> MediaFileRecord
     { throw FileStorageError.invalidFile }
 

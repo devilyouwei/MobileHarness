@@ -65,6 +65,7 @@ private actor DiagnosticPublicationGate {
 private actor FailedDiagnosticDatabase: DatabaseStorage {
     nonisolated var chat: any ChatRepository { get throws { throw RecordStorageError.notReady } }
     nonisolated var tasks: any TaskRepository { get throws { throw RecordStorageError.notReady } }
+    nonisolated var workspaces: any WorkspaceRepository { get throws { throw RecordStorageError.notReady } }
     nonisolated var media: any MediaRepository { get throws { throw RecordStorageError.notReady } }
     nonisolated var devices: any DeviceRepository { get throws { throw RecordStorageError.notReady } }
     func start() throws { throw InjectedContainerFailure.startup }

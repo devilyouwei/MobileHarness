@@ -6,6 +6,7 @@ import Foundation
 import FunctionContracts
 import Gateway
 import StorageCore
+import StorageTasks
 import Testing
 
 @testable import Agents
@@ -39,8 +40,10 @@ actor ObservationRecorder: Agent {
     var lifecycle: AgentLifecycle = .registered
     let reject: Bool
     let blockText: String?
+    let ownedTasks: (any TaskRepository)?
     nonisolated let admissions = AsyncStream<String>.makeStream(bufferingPolicy: .bufferingOldest(16))
-    init(id: String, reject: Bool = false, blockText: String? = nil) {
+    init(id: String, reject: Bool = false, blockText: String? = nil, tasks: (any TaskRepository)? = nil) {
+        self.ownedTasks = tasks
         self.blockText = blockText
         self.reject = reject
         descriptor = AgentDescriptor(id: AgentID(rawValue: id), name: id, inputs: [.observation], outputs: [])
@@ -59,6 +62,18 @@ actor ObservationRecorder: Agent {
             try await Task.sleep(for: .seconds(30))
         }
         try Task.checkCancellation()
+        if let ownedTasks, case .observation(let message) = input.payload,
+            let signal = message.content(as: AgentTaskSignal.self), signal.kind == .request,
+            signal.scope.execution == .background
+        {
+            let payload = try JSONDecoder().decode([String: String].self, from: signal.data)
+            _ = try await ownedTasks.beginDelegation(
+                delegateID: signal.scope.id, taskID: payload["taskID"],
+                goal: payload["goal"] ?? signal.goal ?? payload["request"] ?? "",
+                input: signal.scope.executor == .writer
+                    ? payload["request"] ?? "" : String(decoding: signal.data, as: UTF8.self),
+                sourceDialog: nil, agent: signal.scope.executor.rawValue)
+        }
         inputs.append(input)
     }
 }

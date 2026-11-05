@@ -7,6 +7,7 @@ public protocol UIUpdateCapability: Sendable {
     func presentTranscript(_ text: String, invocation: any FunctionInput) async throws
     func finishTranscript(invocation: any FunctionInput) async throws
     func beginReplyTurn(invocation: any FunctionInput) async throws
+    func clearReply(invocation: any FunctionInput) async throws
     func setReplyWaiting(_ enabled: Bool, requestID: String, invocation: any FunctionInput) async throws
     func presentVoiceState(_ state: UIActions.VoiceState, invocation: any FunctionInput) async throws
     func present(_ target: UIActions.Gaze, invocation: any FunctionInput) async throws

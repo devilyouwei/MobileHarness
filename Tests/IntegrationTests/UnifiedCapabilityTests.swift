@@ -487,3 +487,54 @@ private struct PureFunctionFixture: CapabilityModule {
     await gateway.shutdown()
     await manager.stopAll()
 }
+
+@Test(.actionCatalog) func internalToolCompletionStaysWithCallerAndPreservesOrdinaryFeedback() async throws {
+    let path = ActionIdentifier(domain: "Fixture", module: "Internal", function: "present")
+    let log = UnifiedFixtureLog()
+    let binding = ActionBinding(
+        path: path, displayName: "Internal fixture", kind: .finite, completion: "Actual completion",
+        protocols: [.tool], executionPolicy: .direct, directResultPolicy: .returning,
+        completing: { invocation in
+            await log.record(invocation.call.parameters["mode"] ?? "ok")
+            if invocation.call.parameters["mode"] == "fail" { throw HarnessError.invalidTransition }
+            return .value("accepted")
+        })
+    let agent = UnifiedReceiptAgent(
+        capabilities: try .init(internalTools: [
+            .init(path: path.description, optional: ["mode"])
+        ]))
+    let manager = AgentManager()
+    let session = UUID().uuidString
+    try await manager.register(agent, sessionID: session)
+    try await manager.start(agent.descriptor.id)
+    let gateway = await OutputGateway(
+        manager: manager, requests: InputGateway(manager: manager),
+        tools: try ToolRegistry(modules: [UnifiedFixtureModule(definitions: [binding]).tools]),
+        actions: ChannelScheduler(registry: ActionRegistry()), sink: { _ in })
+    let consumer = try await gateway.consumer(for: agent)
+    func envelope(_ mode: String = "ok", round: String? = nil, path value: String? = nil) -> OutputEnvelope {
+        .init(
+            source: agent.descriptor.id,
+            context: .init(sessionID: session, source: "fixture"),
+            output: .toolCall(
+                .init(id: UUID().uuidString, toolPath: value ?? path.description, arguments: ["mode": mode])),
+            roundID: round)
+    }
+    let success = try await consumer.executeInternal(envelope())
+    #expect(!success.isError && success.tool?.value == "accepted")
+    let failure = try await consumer.executeInternal(envelope("fail"))
+    #expect(failure.isError && failure.tool?.isError == true)
+    #expect(await agent.receipts.isEmpty)
+    await #expect(throws: GatewayOutputConsumer.AdmissionError.internalCallRequired) {
+        try await consumer.executeInternal(envelope(round: UUID().uuidString))
+    }
+    await #expect(throws: GatewayOutputConsumer.AdmissionError.internalCallRequired) {
+        try await consumer.executeInternal(envelope(path: "Fixture.Other.run"))
+    }
+    #expect(await log.values.count == 2)
+    let ordinary = try await consumer.executeReturning(envelope())
+    #expect(!ordinary.isError)
+    #expect(await agent.receipts.count == 1)
+    await gateway.shutdown()
+    await manager.stopAll()
+}

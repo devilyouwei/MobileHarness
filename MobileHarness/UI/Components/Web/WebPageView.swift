@@ -4,12 +4,16 @@
 
     public struct WebPageView: View {
         private let page: WebPageContainer
-        public init(page: WebPageContainer) { self.page = page }
+        private let subtitle: String?
+        public init(page: WebPageContainer, subtitle: String? = nil) {
+            self.page = page
+            self.subtitle = subtitle
+        }
         public var body: some View {
             VStack(spacing: 0) {
                 HStack {
                     Image(systemName: page.address.hasPrefix("file:") ? "doc.richtext" : "globe")
-                    Text(page.address.hasPrefix("file:") ? "本地作品" : page.address)
+                    Text(subtitle ?? (page.address.hasPrefix("file:") ? "本地作品" : page.address))
                         .font(.caption).lineLimit(1).textSelection(.enabled)
                     Spacer()
                     if page.loading { ProgressView().controlSize(.small) }

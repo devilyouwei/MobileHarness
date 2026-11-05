@@ -74,3 +74,16 @@ Explicit liveOllamaResponsesReasoningCompatibility passed against the real servi
 Provider 删除使用原生 alert，取消不修改草稿，确认使用弹窗捕获的 Provider ID。保存等待实际 Bool 回执，成功显示3秒 Toast，失败显示实际错误6秒；恢复失败也显示 Toast。移除常驻保存状态行，保留按钮忙态与根拥有的保存操作。
 
 验证：`scripts/check.sh` 退出0（日志 `/tmp/settings-feedback-check.log`）；`scripts/build-ios.sh` 四个目标成功、退出0（`/tmp/settings-feedback-build.log`）；`git diff --check` 通过。本次尚未重新安装真机，弹窗与 Toast 的原生交互尚待真机验收。
+
+## 2026-11-05 Settings 首页英文入口
+
+Settings 首页分区/入口/标题及蓝牙状态摘要英文化；User顺序为Album、My Assistant、My Writer、Memory。蓝牙标志由私有SwiftUI Shape绘制，其他图标、分区和模型入口顺序保持。子页面及历史正文不在本次全面翻译范围。
+
+- scripts/check.sh退出0；1027项主测试通过（64.315秒），LiveRuntimeTests 227项通过（208.443秒），格式/边界/plist校验通过。NativePresentationTests仍存在既有日志缺口：cameraNativeMetalDrawStopAndLayerHandoff开始后没有该套件结束证据，不能宣称整套原生测试通过。日志 /tmp/settings-english-check.log。
+- scripts/build-ios.sh四目标成功，应用Skill和Live Activity资源校验通过，日志 /tmp/settings-english-ios.log。
+- 独立iOS原生模拟器验收通过（52.942秒）：实际核对Settings英文标题、四项英文名称及纵向顺序，继续任务/文件/请求/导出导航。截图人工确认蓝牙标志与其他图标保持；复用替身任务，不调用真实模型、不清空设备数据。证据 /tmp/mobileharness-writer-records-layout.cY0jIc/WriterUI.xcresult，日志 /tmp/settings-english-native-ui.log。
+- git diff --check通过。未安装真机，本次无真实蓝牙硬件验收。
+
+### 2026-11-05 Settings 英文首页真机安装
+
+按用户要求构建并覆盖安装到已配对 iPhone 17 Pro，版本0.1.0（2026110505）。设备构建成功，严格深层签名、30项Skill和Live Activity资源校验通过；安装回执序号5948，随后devicectl确认应用成功启动并读回版本。覆盖安装保留现有应用数据，没有卸载或清空SQLite。日志 /tmp/settings-english-device-build.log、/tmp/settings-english-device-install.log、/tmp/settings-english-device-launch.log、/tmp/settings-english-device-version.log。仅确认安装和启动，未代替用户完成真机触控/模型/蓝牙验收；当前安装亦包含数字徽标双色修改。

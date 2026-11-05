@@ -46,7 +46,7 @@ public actor AssistantExecutionSession {
                 try await manager.start(.assistant)
                 let consumer = try await output.consumer(for: agent)
                 await island.bind { operation, parameters, session in
-                    let result = try await consumer.executeReturning(
+                    let result = try await consumer.executeInternal(
                         .init(
                             source: .assistant, context: .init(sessionID: session, source: "assistant"),
                             output: .toolCall(

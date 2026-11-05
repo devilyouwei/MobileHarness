@@ -472,11 +472,15 @@ public enum VoiceReplyCancellation {
             enabled: Bool, paused: Bool, revision: UInt64, feedback: SpeechActions.ListeningFeedback,
             invocation: any FunctionInput, cancelReply: Bool
         ) async throws {
+            let received =
+                "voice.policy.received revision=\(revision) enabled=\(enabled) paused=\(paused) current=\(listeningRevision)"
+            Logger(subsystem: "dev.mobileharness", category: "SpeechListening").notice("\(received, privacy: .public)")
             guard invocation.context.sessionID == runtime.interactionSessionID,
                 revision > listeningRevision
             else { return }
             listeningRevision = revision
             listeningPaused = paused
+            traceListening("policy.applied")
             let previousPause = listeningPause
             listeningPause = nil
             previousPause?.cancel()
@@ -620,16 +624,26 @@ public enum VoiceReplyCancellation {
             guard accepts(session: sessionID), !listeningPaused, !hasPlaybackBarrier, !videoAudioHeld else { return }
             handlingTurn = false
         }
+        private func traceListening(_ point: String) {
+            let value =
+                "voice.\(point) revision=\(listeningRevision) paused=\(listeningPaused) playback=\(playbackCount) generation=\(voiceGeneration != nil) capture=\(captureEpoch != nil) handling=\(handlingTurn) video=\(videoAudioHeld)"
+            Logger(subsystem: "dev.mobileharness", category: "SpeechListening").notice("\(value, privacy: .public)")
+        }
         private func resumeListening(generation: String) async throws {
+            traceListening("resume.begin")
+            defer { traceListening("resume.end") }
             func canResume() -> Bool {
                 voiceGeneration == generation && !listeningPaused && !hasPlaybackBarrier && !videoAudioHeld
             }
             guard canResume() else { return }
-            do { try await speech?.resumeListening() } catch is CancellationError { try Task.checkCancellation() } catch
-            {
+            do { try await speech?.resumeListening() } catch is CancellationError {
+                traceListening("resume.cancelled")
+                try Task.checkCancellation()
+            } catch {
                 state.present(.voiceStatus("语音识别恢复失败：\(error)"))
                 throw error
             }
+            traceListening("resume.perceptionReturned")
             guard voiceGeneration == generation else { return }
             guard canResume() else {
                 _ = await speech?.acquirePlaybackAdmission()
@@ -647,6 +661,7 @@ public enum VoiceReplyCancellation {
             // Commit after resume acknowledgment; its emitted perception update may arrive while admission is closed.
             presentationPhase = .listening
             state.present(.voiceStatus("正在聆听 · 停顿后自动识别"))
+            traceListening("resume.committed")
             runtime.endpoints.presentation.homeEffects.replyDidFinish()
         }
         public func play(audioID: String, invocation: any FunctionInput) async throws {
@@ -686,6 +701,7 @@ public enum VoiceReplyCancellation {
 
         private func finishPlayback() async -> (any Error)? {
             playbackCount -= 1
+            traceListening("playback.finished")
             guard let generation = voiceGeneration else { return nil }
             // Join immediate restoration even if the playback Action was cancelled. Consent/session/policy
             // fences inside resumeListening prevent a user-off or another reply from reopening capture.
@@ -735,6 +751,9 @@ public enum VoiceReplyCancellation {
         }
         public func setReplyWaiting(_ enabled: Bool, requestID: String, invocation: any FunctionInput) throws {
             try projection.setReplyWaiting(enabled, requestID: requestID, invocation: invocation)
+        }
+        public func clearReply(invocation: any FunctionInput) throws {
+            try projection.clearReply(invocation: invocation)
         }
         public func beginReplyTurn(invocation: any FunctionInput) throws {
             try projection.beginReplyTurn(invocation: invocation)

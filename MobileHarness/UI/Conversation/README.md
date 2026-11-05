@@ -29,9 +29,9 @@ UIHomeContainer 唯一创建 ConversationState、ActionActivityState、HomeEffec
 
 半秒长按提交一次聆听切换；零距离拖动只提供按压和归一化光源位置，不直接打开设备。辅助功能激活使用相同控制端口。停止意图可打断回复；实际聆听和播放状态由外部执行者投影。
 
-业务确认一轮结束并恢复聆听时，HomeEffectsWorkflow.replyDidFinish 同步清除已定稿用户字幕并重置定稿标记，回复沿用既有350ms淡出。无文字回复也清理已完成用户字幕；下一轮未定稿转写不清除，旧回复到期任务不能清理新输入。
+HomeEffectsWorkflow.replyDidFinish只撤下回复等待指示，不清空转写或回复文本、不启动回复到期淡出。字幕结束后保留，清理由各自拥有者显式提交；UI不根据ASR／播报完成决定业务寿命。
 
-识别与回复分别占位：新的已接纳识别轮次清除前轮两段字幕，定稿的用户文本移到眼睛上方，回复期间保留两段字幕；回到聆听后的展示清理由外部完成策略触发。consent-off 清除字幕；普通生命周期暂停使旧 scope 失效。视图不推断 ASR 或播放完成。
+识别与回复分别占位：SpeechPerception在确认新的人声轮次后显式提交空转写，presentTranscript只更新用户槽并解除该槽定稿标记；Assistant收到输入开始控制事件后单独清理回复槽。定稿的用户文本移到眼睛上方，回复及恢复聆听期间保留两段字幕。停止聆听保留字幕，只撤下等待指示并改变呈现门；根失效或显式会话重置才整体清理。普通生命周期暂停使旧scope失效。视图不推断 ASR 或播放完成。
 
 ConversationCaptionLayout只计算字幕，任务目标由根灵动岛展开区显示，Face不重复放置任务条或预留空位。用户字幕位置只随定稿边界动画。Components 在显示边界保留最新320个完整 Characters。
 
@@ -47,7 +47,7 @@ ExecutionIssue 保留分类、短提示、最多2048字符详情及轮次关联�
 
 Toast 为最多三行的黄色图标／文字，不拦截触摸，无回复时占用状态区。事实异常优先于装饰 Notice；装饰光不改变聆听同意或设备状态。
 
-HomeEffectsWorkflow 拥有独立、可替换、按身份围栏的 Notice／光效到期任务和350ms回复清理任务。回复清理由外部完成策略触发；新文本、新轮次、停止可取消，stopAndWait 加入任务。Toast 到期由根拥有，不依赖页面存活。
+HomeEffectsWorkflow只拥有独立、可替换、按身份围栏的Notice／光效到期任务，stopAndWait加入这些任务。回复字幕没有到期任务；ConversationState.clearReply只清回复槽，presentTranscript只更新转写槽，二者的业务调用时机归各自Agent。Toast到期由根拥有，不依赖页面存活。
 
 ## 生命周期与约束
 

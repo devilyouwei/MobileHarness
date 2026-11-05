@@ -5,7 +5,6 @@ public enum ToolCallParser {
     public static func parse(id: String, alias: String, argumentsJSON: Data, capabilities: CapabilityRegistry) throws
         -> ToolCall
     {
-        guard argumentsJSON.count <= 4096 else { throw GenerationError.limitExceeded }
         let arguments: [String: String]
         do { arguments = try JSONDecoder().decode([String: String].self, from: argumentsJSON) } catch {
             throw GenerationError.invalidParameters

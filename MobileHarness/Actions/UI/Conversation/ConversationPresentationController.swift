@@ -36,7 +36,7 @@
             -> Bool
         {
             guard state.accepts(token) else { return false }
-            return conversationPresentation.accept(context, update: update, state: state)
+            return conversationPresentation.accept(context, update: update)
         }
 
         public func presentTranscript(_ text: String, invocation: any FunctionInput) throws {
@@ -67,6 +67,19 @@
             state.presentReplyWaiting(enabled, requestID: requestID)
         }
 
+        public func clearReply(invocation: any FunctionInput) throws {
+            try Task.checkCancellation()
+            try state.requirePresentation()
+            guard state.accepts(token) else { throw CancellationError() }
+            guard state.isVoiceActive, acceptsSession(invocation.context.sessionID) else { throw CancellationError() }
+            guard
+                conversationPresentation.accept(
+                    invocation.context, update: .clearReply,
+                    retiringInputID: invocation.call.parameters["replyInputID"])
+            else { return }
+            effects.replyDidBegin()
+            state.clearReply()
+        }
         public func beginReplyTurn(invocation: any FunctionInput) throws {
             try Task.checkCancellation()
             try state.requirePresentation()
@@ -74,7 +87,7 @@
             guard state.isVoiceActive, acceptsSession(invocation.context.sessionID) else { throw CancellationError() }
             guard acceptPresentation(invocation.context, update: .beginReply) else { return }
             effects.replyDidBegin()
-            state.beginReply()
+            state.clearReply()
             resetExpression()
         }
 

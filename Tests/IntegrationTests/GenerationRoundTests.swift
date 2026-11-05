@@ -1445,7 +1445,7 @@ func decisionContinuesThroughThirtySixRoundsAndOneHundredFortyFourNativeEffects(
     let owner = StorageOwner(
         namespace: "photos", source: "assistant", session: UUID().uuidString,
         input: UUID().uuidString)
-    let limits = CapturedPhotoStore.Limits(maximumPhotos: 3, maximumBytes: 12, overflowPolicy: .evictOldest)
+    let limits = MediaStore.Limits(maximumPhotos: 3, maximumBytes: 12, overflowPolicy: .evictOldest)
     let store = try fixtureMediaStore(root: root, limits: limits)
     var ids: [String] = []
     for index in 0..<8 { ids.append(try await store.save(Data(repeating: UInt8(index), count: 4), owner: owner)) }

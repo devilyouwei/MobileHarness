@@ -346,3 +346,22 @@ import Testing
     #expect(!state.showsLoadingExpression)
     await root.stop()
 }
+
+@Test @MainActor func listeningToggleRetainsOwnedCaptionsUntilRootInvalidation() async throws {
+    let root = UIContainer()
+    try root.start()
+    try root.setForeground(true)
+    let state = root.home.conversation
+    state.isVoiceActive = true
+    state.presentTranscript("retained user")
+    state.finishUserTranscript()
+    state.appendReply("retained reply")
+    state.isVoiceActive = false
+    #expect(state.liveTranscript == "retained user" && state.transcriptFinalized)
+    #expect(state.assistantReply == "retained reply")
+    state.isVoiceActive = true
+    #expect(state.liveTranscript == "retained user" && state.assistantReply == "retained reply")
+    root.invalidate()
+    #expect(state.liveTranscript.isEmpty && !state.transcriptFinalized && state.assistantReply.isEmpty)
+    await root.stop()
+}

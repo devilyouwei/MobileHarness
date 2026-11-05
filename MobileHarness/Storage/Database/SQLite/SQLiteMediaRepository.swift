@@ -64,7 +64,7 @@ public final class SQLiteMediaRepository: MediaRepository {
             guard db.changesCount == 1 else { throw RecordStorageError.missingRecord }
         }
     }
-    public func reserveVideo(bytes: Int, owner: StorageOwner, metadata: PhotoMetadata, createdAt: Date) throws
+    public func reserveVideo(bytes: Int, owner: StorageOwner, metadata: MediaMetadata, createdAt: Date) throws
         -> MediaFileRecord
     {
         try metadata.validate()
@@ -86,7 +86,7 @@ public final class SQLiteMediaRepository: MediaRepository {
                 source: owner.source, session: owner.session, input: owner.input, state: "pending")
         }
     }
-    public func reservePhoto(bytes: Int, owner: StorageOwner, metadata: PhotoMetadata, createdAt: Date) throws
+    public func reservePhoto(bytes: Int, owner: StorageOwner, metadata: MediaMetadata, createdAt: Date) throws
         -> MediaFileRecord
     {
         try metadata.validate()
@@ -106,7 +106,7 @@ public final class SQLiteMediaRepository: MediaRepository {
                 session: owner.session, input: owner.input, state: "pending")
         }
     }
-    public func collectPhoto(_ id: String, metadata: PhotoMetadata?, at date: Date) throws {
+    public func collectPhoto(_ id: String, metadata: MediaMetadata?, at date: Date) throws {
         if let metadata { try metadata.validate() }
         let key = try BusinessRecordID.number(id, kind: .media)
         try database.write { db in
@@ -145,7 +145,7 @@ public final class SQLiteMediaRepository: MediaRepository {
             return AlbumPage(items: items, next: next)
         }
     }
-    public func albumPhoto(_ id: String) throws -> AlbumPhotoRecord? {
+    public func albumMedia(_ id: String) throws -> AlbumMediaRecord? {
         let key = try BusinessRecordID.number(id, kind: .media)
         return try database.read { db in
             try Row.fetchOne(
@@ -154,7 +154,7 @@ public final class SQLiteMediaRepository: MediaRepository {
             ).map(Self.album)
         }
     }
-    public func deletePhoto(_ id: String) throws {
+    public func deleteAlbumMedia(_ id: String) throws {
         let key = try BusinessRecordID.number(id, kind: .media)
         try database.write { db in
             try db.execute(
@@ -164,16 +164,16 @@ public final class SQLiteMediaRepository: MediaRepository {
             guard db.changesCount == 1 else { throw RecordStorageError.missingRecord }
         }
     }
-    public func pendingPhotoDeletions() throws -> [MediaFileRecord] {
+    public func pendingMediaDeletions() throws -> [MediaFileRecord] {
         try database.read { db in
             try Row.fetchAll(db, sql: "SELECT * FROM media_files WHERE state='deleting' ORDER BY id LIMIT 128").map(
                 Self.media)
         }
     }
-    private static func album(_ row: Row) -> AlbumPhotoRecord {
-        AlbumPhotoRecord(
+    private static func album(_ row: Row) -> AlbumMediaRecord {
+        AlbumMediaRecord(
             id: SQLiteRecordKey.id(.media, row["id"]),
-            metadata: PhotoMetadata(
+            metadata: MediaMetadata(
                 mime: row["mime"], width: row["photo_width"], height: row["photo_height"],
                 capturedAt: (row["captured_at"] as Double?).map(Date.init(timeIntervalSince1970:)),
                 origin: row["photo_origin"]), addedAt: Date(timeIntervalSince1970: row["album_added_at"]),

@@ -38,7 +38,7 @@ import FunctionContracts
         private let camera: any CameraCapturing
         private let presentation: any CameraPresenting
         private var state: CameraPresentationSnapshot { presentation.snapshot }
-        private let photos: CapturedPhotoStore
+        private let photos: MediaStore
         private let photoCues: any CuePlaying
         private let isForeground: @MainActor () -> Bool
         private let captureRevision: @MainActor () -> Int
@@ -53,7 +53,7 @@ import FunctionContracts
         private var photoFeedbackContext: ActionExecutionContext?
         var isBusy: Bool { photoTask != nil || photoCommand != nil }
         init(
-            camera: any CameraCapturing, presentation: any CameraPresenting, photos: CapturedPhotoStore,
+            camera: any CameraCapturing, presentation: any CameraPresenting, photos: MediaStore,
             photoCues: any CuePlaying,
             isForeground: @escaping @MainActor () -> Bool, captureRevision: @escaping @MainActor () -> Int,
             ensureCaptureAvailable: @escaping @MainActor () throws -> Void
@@ -132,7 +132,7 @@ import FunctionContracts
                     guard foreground, state.capturedPhoto?.id == selected.id else { throw CancellationError() }
                     try await photos.collect(
                         selected.id, owner: selected.owner,
-                        metadata: PhotoMetadata(
+                        metadata: MediaMetadata(
                             mime: info.mime, width: info.width, height: info.height, capturedAt: info.capturedAt,
                             origin: "camera"))
                     // App album collection remains committed if subsequent feedback fails.

@@ -2,7 +2,7 @@
 
 WebPageContainer 由 UIContainer 持有，零项目模块依赖。WebPagePresenting 暴露远程/本地加载、观察、截图、前后导航、reload、up/down/top/bottom滚动及关闭；WebPageView 在 Window.web 单实例插槽挂载同一 WKWebView。Root 只组合视图，业务任务与文件由 Actions 拥有。
 
-只接纳 HTTP/HTTPS 远程地址或调用方提供的受控本地入口。本地读取范围默认是入口父目录，宿主可通过 loadLocal(executesScripts:readAccessRoot:) 指定受控版本根以支持嵌套入口及兄弟目录资源；入口必须处于该根内，拒绝越界导航及符号链接；本地配置用 WebKit content rules 阻止 HTTP/WebSocket 子资源。远程与本地切换替换 WKWebView 和非持久化网站数据上下文，不提供特权 JS 桥接，不放宽证书策略或使用私有 API。
+只接纳 HTTP/HTTPS 远程地址或调用方提供的受控本地入口。本地读取范围默认是入口父目录，宿主可通过 loadLocal(executesScripts:readAccessRoot:) 指定受控读取根以支持嵌套入口及兄弟目录资源；入口必须处于该根内，拒绝越界导航及符号链接；本地配置用 WebKit content rules 阻止 HTTP/WebSocket 子资源。远程与本地切换替换 WKWebView 和非持久化网站数据上下文，不提供特权 JS 桥接，不放宽证书策略或使用私有 API。
 
 单个原生加载，零排队，25秒期限；导航 delegate 完成/失败、取消、进程退出与根失活结束等待。JS观察和截图各有10秒期限及代际围栏；期限到达释放当前原生页面。close 清理导航、代理并释放原生表面，下次访问时按需重建。UI 停止释放页面；窗口最小化取消 Action 工作并卸载可见表面，作品保存寿命独立。
 
@@ -12,8 +12,6 @@ WebPagePolicy 是纯URL校验接口；原生行为需真实WebKit验证，替身
 
 ui.web的Business被动投影content（empty/local/remote）和不超过256 UTF-8字节的远程url；空白/本地页面url为unknown。本地文件路径不披露，available/loading仍属于Runtime。读取State不创建WKWebView、不导航或执行脚本。
 
-
-WebPageContainer 的根浏览页面保持独立；sessions 按窗口 UUID 持有最多4个创作页面。UI 根按 artifact 窗口选择对应页面。流式本地预览关闭页面脚本，完整检查点才允许执行；根失活传递到全部页面，根停止释放会话。
 
 WebPageContainer 的根页面用于远程浏览；sessions 按窗口 UUID 持有至多四个独立页面，createSession/removeSession/closeSessions 管理生命周期。可用性传播至子页面；loadLocal(executesScripts:) 在导航前设置页面 JavaScript 偏好，供上层区分草稿预览与完整运行。UI 不拥有作品索引、模型或任务。
 
@@ -29,3 +27,19 @@ ui.web由根WebPageContainer维护根浏览页和按windowID索引的全部sessi
 根加至多4个会话的观察适配单来源8KiB上限：缓存标题最多128 UTF-8字节，公开远程URL最多256字节，超长字段投影unknown；窗口ID与其余事实继续存在。完整标题/URL/正文仍由显式页面观察接口返回。
 
 新导航/文档更新优先于在途JS观察或截图：显式取消旧native读取，再开始加载，旧回调由token/generation拒绝；导航之间仍busy拒绝，不排队。共享窗口的只读检查不会占住原生查询槽阻断随后创作渲染。该优先级不识别上层Agent身份。
+
+## 连续本地预览与视口
+
+同一受控读取根内，updateLocalPreview 首帧建立禁用页面脚本的文档，后续在宿主隔离的 defaultClient world 内更新 DOM；不导航、不更换 WKWebView/document/body。按 id/data-key 优先复用节点，未标记节点按类型和顺序复用；源码作为参数解析，不拼接为宿主代码。增量预览移除脚本、事件属性、活动嵌入与 refresh，资源 URL 按新入口解析；本地样式先禁用准备，成功后同步切换，失败保留旧文档并报告。远程子资源仍被现有内容规则阻断。
+
+实际提交前采样当前视口，按可保留阅读锚点补偿插入造成的位移；用户触摸、滚轮或惯性滚动时不主动纠正位置。原生视图持续存在，保持滚动手势和缩放。内容删除导致原位置不存在时受 WebKit 的合法范围约束，不承诺保留已经删除的节点。
+
+documentEntry 可指定同一根内的稳定宿主文件，entry 则指向当前资源版本；文档宿主与可回收资源 URL 分离，避免删除初始文件导致本地来源失效。调用方拥有文件写入与保留，UI 不创建目录。
+
+loadLocal(preservingViewport:) 用于必须执行完整脚本的导航，保存相对原生缩放和内容坐标，等待新内容帧同步到原生视图后恢复并钳制到新内容范围；原生缩放边界尚未更新时最多等待500ms，不重复写入未变化的 pageZoom；iOS 使用不拦截触控的旧页面快照覆盖加载过渡。从完整脚本页切回稳定预览宿主时，过渡覆盖与原视口一直保留至首个 DOM 检查点完成，避免空宿主导致滚动归零。只有增量预览保持同一 document，完整渲染仍会重新执行脚本。reload 使用最新入口，不依赖已回收快照的原 document URL。
+
+文档修改独占一个在途槽、零等待；观察/截图/导航在修改期间明确 busy，修改开始前取消旧只读原生调用。异步样式准备受取消、预览序号、原生代际和既有10秒期限约束；隐藏/关闭取消待提交预览，旧回调不能覆盖新页面。该组件仅处理通用 HTML 与视口，不识别 Writer、项目或 Storage。
+
+WebPageView可接收外部通用subtitle，优先用于顶部灰色栏；未提供时本地页沿用“本地作品”、远程页显示地址。subtitle不导航、不执行脚本，也不来自页面源码。isAvailable是根可用性的只读缓存，供业务呈现者决定是否延后渲染，读取不创建WKWebView。
+
+Window-backed sessions receive the owning WindowState readable reference at creation. ui.web publishes window_N or unknown, never native UUIDs; page/session lifecycle still uses private IDs.

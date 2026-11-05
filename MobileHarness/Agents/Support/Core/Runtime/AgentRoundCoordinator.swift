@@ -26,7 +26,7 @@ public struct AgentRoundCoordinator: Sendable {
     }
     public mutating func accept(_ result: ToolResult, roundID: String) throws {
         guard !cancelled, roundID == id, result.roundID == nil || result.roundID == id,
-            result.value.utf8.count <= 65_536, let index = calls.firstIndex(where: { $0.id == result.callID }),
+            let index = calls.firstIndex(where: { $0.id == result.callID }),
             !calls[index].terminal
         else {
             throw CommunicationError.unauthorized

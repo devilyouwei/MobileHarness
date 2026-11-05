@@ -2,6 +2,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 export DEVELOPER_DIR="${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer}"
+simulator="${WEBKIT_SIMULATOR_ID:-booted}"
 work="$(mktemp -d /tmp/mobileharness-webkit.XXXXXX)"
 app="$work/WebKitAcceptance.app"
 mkdir -p "$app"
@@ -21,10 +22,10 @@ cat > "$app/Info.plist" <<'PLIST'
 <key>UILaunchScreen</key><dict/><key>LSRequiresIPhoneOS</key><true/></dict></plist>
 PLIST
 codesign --force --sign - "$app"
-xcrun simctl install booted "$app"
-container="$(xcrun simctl get_app_container booted dev.mobileharness.web-acceptance data)"
+xcrun simctl install "$simulator" "$app"
+container="$(xcrun simctl get_app_container "$simulator" dev.mobileharness.web-acceptance data)"
 rm -f "$container/Documents/acceptance.json"
-xcrun simctl launch --terminate-running-process booted dev.mobileharness.web-acceptance
+xcrun simctl launch --terminate-running-process "$simulator" dev.mobileharness.web-acceptance
 for _ in $(seq 1 55); do
   if [[ -f "$container/Documents/acceptance.json" ]]; then
     python3 - "$container/Documents/acceptance.json" <<'PY'

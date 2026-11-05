@@ -108,7 +108,7 @@ private actor PausedBinaryStore: FileStore {
 @Test func mediaAsyncPublicationSerializesReadsAndRejectsQueueOverflow() async throws {
     let records = try SQLiteRepositories.temporary()
     let files = PausedBinaryStore(base: try MemoryFileStore())
-    let store = CapturedPhotoStore(repository: records.media, files: files)
+    let store = MediaStore(repository: records.media, files: files)
     let owner = StorageOwner(
         namespace: "photos", source: "fixture", session: UUID().uuidString, input: UUID().uuidString)
     let publication = Task { try await store.save(Data([1, 2]), owner: owner) }

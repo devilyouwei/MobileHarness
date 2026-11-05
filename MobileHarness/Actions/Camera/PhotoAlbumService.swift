@@ -19,14 +19,14 @@ public protocol PhotoAlbumCapability: Sendable {
     func perform(_ input: AlbumInput, owner: StorageOwner) async throws -> AlbumReply
 }
 public actor PhotoAlbumService: PhotoAlbumCapability {
-    private let photos: CapturedPhotoStore
+    private let photos: MediaStore
     private let export: @Sendable (Data) async throws -> Void
     private let exportVideo: @Sendable (URL) async throws -> Void
     private var mutating = false
     private var originals = 0
     private var thumbnails = 0
     public init(
-        photos: CapturedPhotoStore, export: @escaping @Sendable (Data) async throws -> Void,
+        photos: MediaStore, export: @escaping @Sendable (Data) async throws -> Void,
         exportVideo: @escaping @Sendable (URL) async throws -> Void = { _ in throw PhotoAlbumError.unavailable }
     ) {
         self.photos = photos
@@ -75,7 +75,7 @@ public actor PhotoAlbumService: PhotoAlbumCapability {
                         let info = try await NativeAlbumImage.inspect(data)
                         _ = try await photos.importPhoto(
                             data, owner: owner,
-                            metadata: PhotoMetadata(
+                            metadata: MediaMetadata(
                                 mime: info.mime, width: info.width, height: info.height, capturedAt: info.capturedAt,
                                 origin: "import"))
                         count += 1

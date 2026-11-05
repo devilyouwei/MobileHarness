@@ -3,64 +3,168 @@ internal import GRDB
 import StorageChat
 import StorageCore
 
+/// Shared round storage with independently addressable model-request evidence.
 public final class SQLiteChatRepository: ChatRepository {
     public var storageScope: UUID { database.storageScope }
     private let database: SQLiteDatabase
     internal init(database: SQLiteDatabase) { self.database = database }
     internal static let schemaSQL = """
-        CREATE TABLE dialogs(id INTEGER PRIMARY KEY AUTOINCREMENT, agent TEXT NOT NULL,
-                                created_at REAL NOT NULL, archived_at REAL, title TEXT, title_error TEXT,
-                                revision INTEGER NOT NULL DEFAULT 0, input_count INTEGER NOT NULL DEFAULT 0, latest_input TEXT, recovery BLOB);
-        CREATE UNIQUE INDEX current_dialog ON dialogs(agent) WHERE archived_at IS NULL;
-        CREATE INDEX dialog_archive ON dialogs(agent,id DESC) WHERE archived_at IS NOT NULL;
-        CREATE TABLE evidence(hash TEXT PRIMARY KEY, data BLOB NOT NULL);
-        CREATE TABLE evidence_refs(parent_hash TEXT NOT NULL REFERENCES evidence(hash) ON DELETE CASCADE,
-                                child_hash TEXT NOT NULL REFERENCES evidence(hash),PRIMARY KEY(parent_hash,child_hash));
-        CREATE INDEX evidence_child ON evidence_refs(child_hash);
-        CREATE TABLE messages(id INTEGER PRIMARY KEY AUTOINCREMENT, dialog_id INTEGER NOT NULL REFERENCES dialogs(id) ON DELETE CASCADE,
-                                client_id TEXT NOT NULL, input_id TEXT NOT NULL, role TEXT NOT NULL, kind TEXT NOT NULL,
-                                position INTEGER NOT NULL, created_at REAL NOT NULL, body TEXT NOT NULL, preview TEXT NOT NULL, state TEXT NOT NULL,
-                                reply_to_message_id INTEGER REFERENCES messages(id) ON DELETE SET NULL,
-                                task_id INTEGER REFERENCES tasks(id) ON DELETE SET NULL, detail_hash TEXT NOT NULL REFERENCES evidence(hash),
-                                UNIQUE(dialog_id,client_id,role));
-        CREATE INDEX message_order ON messages(dialog_id,position,id);
-        CREATE INDEX message_input ON messages(dialog_id,input_id);
-        CREATE INDEX message_origin ON messages(input_id,dialog_id);
-        CREATE INDEX message_kind ON messages(dialog_id,kind,position);
-        CREATE INDEX message_task ON messages(task_id,position,id);
-        CREATE INDEX message_detail ON messages(detail_hash);
-        CREATE INDEX message_active ON messages(id) WHERE state='generating';
-        CREATE TABLE task_messages(task_id INTEGER NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
-                                message_id INTEGER NOT NULL REFERENCES messages(id) ON DELETE CASCADE, PRIMARY KEY(task_id,message_id));
-        CREATE TABLE message_media(message_id INTEGER NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
-                                media_id INTEGER NOT NULL REFERENCES media_files(id), PRIMARY KEY(message_id,media_id));
-        CREATE INDEX media_message ON message_media(media_id,message_id);
+        CREATE TABLE assistant_conversations(id INTEGER PRIMARY KEY AUTOINCREMENT,
+          identity TEXT NOT NULL UNIQUE,agent TEXT NOT NULL,created_at REAL NOT NULL,archived_at REAL,
+          title TEXT,title_error TEXT,revision INTEGER NOT NULL DEFAULT 0,input_count INTEGER NOT NULL DEFAULT 0,
+          latest_input TEXT,recovery BLOB);
+        CREATE UNIQUE INDEX current_conversation ON assistant_conversations(agent) WHERE archived_at IS NULL;
+        CREATE TABLE messages(id INTEGER PRIMARY KEY AUTOINCREMENT,
+          conversation_id INTEGER REFERENCES assistant_conversations(id) ON DELETE CASCADE,
+          writer_task_id INTEGER REFERENCES writer_tasks(id) ON DELETE CASCADE,
+          client_id TEXT NOT NULL,input_id TEXT NOT NULL,segment TEXT NOT NULL DEFAULT '',
+          task_id INTEGER REFERENCES assistant_tasks(id) ON DELETE SET NULL,position INTEGER NOT NULL,
+          created_at REAL NOT NULL,user_text TEXT NOT NULL DEFAULT '',response_text TEXT NOT NULL DEFAULT '',
+          state TEXT NOT NULL DEFAULT 'generating',detail_json TEXT NOT NULL DEFAULT '',
+          CHECK((conversation_id IS NULL)!=(writer_task_id IS NULL)));
+        CREATE UNIQUE INDEX conversation_round ON messages(conversation_id,client_id,segment) WHERE conversation_id IS NOT NULL;
+        CREATE UNIQUE INDEX writer_round ON messages(writer_task_id,client_id,segment) WHERE writer_task_id IS NOT NULL;
+        CREATE INDEX message_order ON messages(conversation_id,position,id);
+        CREATE INDEX writer_message_order ON messages(writer_task_id,position,id);
+        CREATE INDEX message_input ON messages(input_id);
+        CREATE INDEX message_task ON messages(task_id,position);
+        CREATE TABLE model_request_log(id INTEGER PRIMARY KEY AUTOINCREMENT,request_id TEXT NOT NULL UNIQUE,
+          message_id INTEGER REFERENCES messages(id) ON DELETE CASCADE,
+          conversation_id INTEGER REFERENCES assistant_conversations(id) ON DELETE CASCADE,
+          delegate_id TEXT REFERENCES agent_delegations(delegate_id) ON DELETE SET NULL,agent TEXT NOT NULL,
+          purpose TEXT NOT NULL DEFAULT 'generation',position INTEGER NOT NULL,created_at REAL NOT NULL,
+          input_text TEXT NOT NULL DEFAULT '',response_text TEXT NOT NULL DEFAULT '',state TEXT NOT NULL DEFAULT 'generating',
+          request_json TEXT NOT NULL DEFAULT '',detail_json TEXT NOT NULL DEFAULT '',preview_json TEXT NOT NULL DEFAULT '{}',
+          CHECK((message_id IS NOT NULL AND conversation_id IS NULL AND purpose='generation') OR
+                (message_id IS NULL AND conversation_id IS NOT NULL AND purpose='title')));
+        CREATE INDEX request_message ON model_request_log(message_id,position,id);
+        CREATE INDEX request_order ON model_request_log(position,id);
+        CREATE INDEX request_delegation ON model_request_log(delegate_id,id);
+        CREATE TABLE message_media(id INTEGER PRIMARY KEY AUTOINCREMENT,
+          message_id INTEGER REFERENCES messages(id) ON DELETE CASCADE,
+          request_id INTEGER REFERENCES model_request_log(id) ON DELETE CASCADE,
+          media_id INTEGER NOT NULL REFERENCES media_files(id),
+          CHECK((message_id IS NULL)!=(request_id IS NULL)));
+        CREATE UNIQUE INDEX message_media_link ON message_media(message_id,media_id) WHERE message_id IS NOT NULL;
+        CREATE UNIQUE INDEX request_media_link ON message_media(request_id,media_id) WHERE request_id IS NOT NULL;
         """
+    private struct Owner {
+        let column: String
+        let key: Int64
+        let agent: String
+    }
+    private static func owner(_ id: String, db: Database) throws -> Owner {
+        if let workspace = WorkspaceID(rawValue: id) {
+            guard
+                let key = try Int64.fetchOne(
+                    db, sql: "SELECT id FROM writer_tasks WHERE agent=? AND number=?",
+                    arguments: [workspace.agent, try BusinessRecordID.number(workspace.taskID, kind: .task)])
+            else { throw RecordStorageError.missingRecord }
+            return Owner(column: "writer_task_id", key: key, agent: workspace.agent)
+        }
+        let key = try BusinessRecordID.number(id, kind: .dialog)
+        guard
+            let agent = try String.fetchOne(
+                db, sql: "SELECT agent FROM assistant_conversations WHERE id=?", arguments: [key])
+        else { throw RecordStorageError.missingRecord }
+        return Owner(column: "conversation_id", key: key, agent: agent)
+    }
+    private static func dialogID(_ row: Row, db: Database) throws -> String {
+        if let key: Int64 = row["conversation_id"] { return SQLiteRecordKey.id(.dialog, key) }
+        guard let key: Int64 = row["writer_task_id"],
+            let task = try Row.fetchOne(db, sql: "SELECT agent,number FROM writer_tasks WHERE id=?", arguments: [key])
+        else { throw RecordStorageError.missingRecord }
+        return "\(task["agent"] as String)/task_\(task["number"] as Int64)"
+    }
+    private static func metadata(_ row: Row, recovery: Bool = true) throws -> DialogRecord {
+        guard let identity = UUID(uuidString: row["identity"]) else { throw RecordStorageError.invalidRecord }
+        let archived: Double? = row["archived_at"]
+        return DialogRecord(
+            id: SQLiteRecordKey.id(.dialog, row["id"]), agent: row["agent"],
+            createdAt: Date(timeIntervalSince1970: row["created_at"]),
+            archivedAt: archived.map(Date.init(timeIntervalSince1970:)),
+            title: row["title"], titleError: row["title_error"], revision: UInt64(row["revision"] as Int64),
+            recovery: recovery ? row["recovery"] : nil, count: row["input_count"], latestUser: row["latest_input"],
+            traceID: identity)
+    }
+    public func saveAuxiliaryRequest(dialog id: String, request: ConversationModelRequest) throws {
+        let conversation = try BusinessRecordID.number(id, kind: .dialog)
+        try database.write { db in
+            guard
+                let agent = try String.fetchOne(
+                    db, sql: "SELECT agent FROM assistant_conversations WHERE id=?", arguments: [conversation])
+            else { throw RecordStorageError.missingRecord }
+            let detail = String(decoding: try JSONEncoder().encode(request), as: UTF8.self)
+            try db.execute(
+                sql:
+                    "INSERT INTO model_request_log(request_id,conversation_id,agent,purpose,position,created_at,input_text,response_text,state,request_json,detail_json) VALUES(?,?,?,'title',0,?,?,?,?,?,?) ON CONFLICT(request_id) DO UPDATE SET response_text=excluded.response_text,state=excluded.state,request_json=excluded.request_json,detail_json=excluded.detail_json WHERE model_request_log.conversation_id=excluded.conversation_id AND model_request_log.purpose='title'",
+                arguments: [
+                    request.id, conversation, agent, request.date.timeIntervalSince1970, request.input,
+                    request.response, request.state.rawValue, request.requestParametersJSON ?? request.requestJSON,
+                    detail,
+                ])
+            guard db.changesCount == 1 else { throw RecordStorageError.conflict }
+        }
+    }
     public func current(agent: String, includingRecovery: Bool = true) throws -> DialogRecord {
-        if let row = try database.read({ db in
+        if let writer = try database.read({ db in
             try Row.fetchOne(
                 db,
                 sql:
-                    "SELECT \(includingRecovery ? "*" : Self.dialogMetadataColumns) FROM dialogs WHERE agent=? AND archived_at IS NULL",
+                    "SELECT agent,number FROM writer_tasks WHERE agent=? AND current_delegate_id IS NOT NULL ORDER BY updated_at DESC,id DESC LIMIT 1",
                 arguments: [agent])
         }) {
-            return Self.dialog(row)
+            return try dialog("\(agent)/task_\(writer["number"] as Int64)", includingRecovery: includingRecovery)
+        }
+        guard agent != "writer" else { throw RecordStorageError.missingRecord }
+        if let existing = try database.read({ db in
+            try Row.fetchOne(
+                db, sql: "SELECT * FROM assistant_conversations WHERE agent=? AND archived_at IS NULL",
+                arguments: [agent])
+        }) {
+            return try Self.metadata(existing, recovery: includingRecovery)
         }
         return try database.write { db in
             if try Int.fetchOne(
-                db, sql: "SELECT COUNT(*) FROM dialogs WHERE agent=? AND archived_at IS NULL", arguments: [agent]) == 0
+                db, sql: "SELECT COUNT(*) FROM assistant_conversations WHERE agent=? AND archived_at IS NULL",
+                arguments: [agent]) == 0
             {
-                var dialog = SQLiteDialogRow(agent: agent, createdAt: Date().timeIntervalSince1970)
-                try dialog.insert(db)
+                try db.execute(
+                    sql: "INSERT INTO assistant_conversations(identity,agent,created_at) VALUES(?,?,?)",
+                    arguments: [UUID().uuidString, agent, Date().timeIntervalSince1970])
             }
             guard
                 let row = try Row.fetchOne(
-                    db,
-                    sql:
-                        "SELECT \(includingRecovery ? "*" : Self.dialogMetadataColumns) FROM dialogs WHERE agent=? AND archived_at IS NULL",
+                    db, sql: "SELECT * FROM assistant_conversations WHERE agent=? AND archived_at IS NULL",
                     arguments: [agent])
             else { throw RecordStorageError.missingRecord }
-            return Self.dialog(row)
+            return try Self.metadata(row, recovery: includingRecovery)
+        }
+    }
+    public func dialog(_ id: String, includingRecovery: Bool = true) throws -> DialogRecord {
+        try database.read { db in
+            let owner = try Self.owner(id, db: db)
+            if owner.column == "conversation_id" {
+                guard
+                    let row = try Row.fetchOne(
+                        db, sql: "SELECT * FROM assistant_conversations WHERE id=?", arguments: [owner.key])
+                else { throw RecordStorageError.missingRecord }
+                return try Self.metadata(row, recovery: includingRecovery)
+            }
+            guard let row = try Row.fetchOne(db, sql: "SELECT * FROM writer_tasks WHERE id=?", arguments: [owner.key]),
+                let identity = UUID(uuidString: row["identity"])
+            else { throw RecordStorageError.missingRecord }
+            return DialogRecord(
+                id: id, agent: owner.agent, createdAt: Date(timeIntervalSince1970: row["created_at"]),
+                archivedAt: nil, title: row["goal"], titleError: nil,
+                revision: UInt64(row["history_revision"] as Int64),
+                recovery: nil,
+                count: try Int.fetchOne(
+                    db, sql: "SELECT COUNT(DISTINCT input_id) FROM messages WHERE writer_task_id=?",
+                    arguments: [owner.key]) ?? 0,
+                latestUser: try String.fetchOne(
+                    db, sql: "SELECT user_text FROM messages WHERE writer_task_id=? ORDER BY position DESC LIMIT 1",
+                    arguments: [owner.key]), traceID: identity)
         }
     }
     public func listDialogs(agent: String, before: Int64? = nil, limit: Int = HistoryPaging.pageSize) throws
@@ -70,668 +174,657 @@ public final class SQLiteChatRepository: ChatRepository {
         return try database.read { db in
             try Row.fetchAll(
                 db,
-                sql: """
-                    SELECT d.id,d.agent,d.created_at,d.archived_at,d.title,d.title_error,d.revision,d.input_count,d.latest_input,NULL AS recovery FROM dialogs d WHERE agent=? AND archived_at IS NOT NULL \(before == nil ? "" : "AND id<?") ORDER BY id DESC LIMIT ?
-                    """,
-                arguments: StatementArguments([agent])
-                    + (before.map { StatementArguments([$0]) } ?? StatementArguments()) + StatementArguments([limit])
-            ).map(Self.dialog)
+                sql:
+                    "SELECT * FROM assistant_conversations WHERE agent=? AND archived_at IS NOT NULL AND id<? ORDER BY id DESC LIMIT ?",
+                arguments: [agent, before ?? Int64.max, limit]
+            ).map { try Self.metadata($0, recovery: false) }
         }
     }
-    private static func dialog(_ row: Row) -> DialogRecord {
-        let number: Int64 = row["id"]
-        let archived: Double? = row["archived_at"]
-        return DialogRecord(
-            id: SQLiteRecordKey.id(.dialog, number), agent: row["agent"],
-            createdAt: Date(timeIntervalSince1970: row["created_at"]),
-            archivedAt: archived.map(Date.init(timeIntervalSince1970:)), title: row["title"],
-            titleError: row["title_error"],
-            revision: UInt64(row["revision"] as Int64), recovery: row["recovery"], count: row["input_count"] ?? 0,
-            latestUser: row["latest_input"])
-    }
-    public func dialog(_ id: String, includingRecovery: Bool = true) throws -> DialogRecord {
-        let key = try BusinessRecordID.number(id, kind: .dialog)
-        return try database.read { db in
-            guard
-                let row = try Row.fetchOne(
-                    db, sql: "SELECT \(includingRecovery ? "*" : Self.dialogMetadataColumns) FROM dialogs WHERE id=?",
-                    arguments: [key])
-            else {
-                throw RecordStorageError.missingRecord
-            }
-            return Self.dialog(row)
+    private static func round(
+        owner: Owner, client: String, input: String, task: String?, position: UInt64, date: Date,
+        allowArchived: Bool = false, db: Database
+    ) throws -> Int64 {
+        guard position <= Int64.max else { throw RecordStorageError.invalidRecord }
+        if task == nil && client == input,
+            let existing = try Int64.fetchOne(
+                db, sql: "SELECT id FROM messages WHERE \(owner.column)=? AND input_id=? ORDER BY id LIMIT 1",
+                arguments: [owner.key, input])
+        {
+            return existing
         }
+        let segment = owner.column == "conversation_id" ? task ?? "" : ""
+        if let existing = try Int64.fetchOne(
+            db, sql: "SELECT id FROM messages WHERE \(owner.column)=? AND client_id=? AND segment=?",
+            arguments: [owner.key, input, segment])
+        {
+            return existing
+        }
+        let taskKey =
+            owner.column == "conversation_id" ? try task.map { try BusinessRecordID.number($0, kind: .task) } : nil
+        if let taskKey,
+            let base = try Row.fetchOne(
+                db,
+                sql:
+                    "SELECT id FROM messages WHERE conversation_id=? AND client_id=? AND segment='' AND NOT EXISTS(SELECT 1 FROM model_request_log WHERE message_id=messages.id)",
+                arguments: [owner.key, input])
+        {
+            let key: Int64 = base["id"]
+            try db.execute(
+                sql: "UPDATE messages SET segment=?,task_id=? WHERE id=?", arguments: [segment, taskKey, key])
+            return key
+        }
+        if owner.column == "conversation_id", !allowArchived,
+            try Double.fetchOne(
+                db, sql: "SELECT archived_at FROM assistant_conversations WHERE id=?", arguments: [owner.key]) != nil
+        {
+            throw RecordStorageError.conflict
+        }
+        // Segments retain the same original input. Only the first one owns the admission counter.
+        let original = try Row.fetchOne(
+            db,
+            sql:
+                "SELECT user_text,detail_json FROM messages WHERE \(owner.column)=? AND input_id=? ORDER BY id LIMIT 1",
+            arguments: [owner.key, input])
+        try db.execute(
+            sql:
+                "INSERT INTO messages(\(owner.column),client_id,input_id,segment,task_id,position,created_at,user_text,detail_json) VALUES(?,?,?,?,?,?,?,?,?)",
+            arguments: [
+                owner.key, input, input, segment, taskKey, Int64(position), date.timeIntervalSince1970,
+                original?["user_text"] as String? ?? "", original?["detail_json"] as String? ?? "",
+            ])
+        return db.lastInsertedRowID
     }
+    /// A request is reserved before Actions run. startTask may attach that same request later.
+    private static func requestRound(
+        owner: Owner, client: String, input: String, task: String?, position: UInt64, date: Date, db: Database
+    ) throws -> Int64 {
+        guard
+            let original = try Row.fetchOne(
+                db,
+                sql: "SELECT m.* FROM model_request_log r JOIN messages m ON m.id=r.message_id WHERE r.request_id=?",
+                arguments: [client])
+        else {
+            return try round(
+                owner: owner, client: client, input: input, task: task, position: position, date: date, db: db)
+        }
+        guard original[owner.column] as Int64? == owner.key, original["input_id"] as String == input else {
+            throw RecordStorageError.conflict
+        }
+        let previous: Int64 = original["id"]
+        let existingTask: Int64? = original["task_id"]
+        let desiredTask =
+            owner.column == "conversation_id" ? try task.map { try BusinessRecordID.number($0, kind: .task) } : nil
+        if existingTask == desiredTask { return previous }
+        guard existingTask == nil, let desiredTask,
+            let targetTask = try Row.fetchOne(
+                db, sql: "SELECT dialog_id FROM assistant_tasks WHERE id=? AND agent=?",
+                arguments: [desiredTask, owner.agent]),
+            (targetTask["dialog_id"] as Int64?).map({ $0 == owner.key }) ?? true
+        else { throw RecordStorageError.conflict }
+        try db.execute(
+            sql:
+                "UPDATE assistant_tasks SET dialog_id=COALESCE(dialog_id,?),source_revision=source_revision+1 WHERE id=?",
+            arguments: [owner.key, desiredTask])
+        let segment = task ?? ""
+        let destination = try Int64.fetchOne(
+            db, sql: "SELECT id FROM messages WHERE conversation_id=? AND input_id=? AND segment=?",
+            arguments: [owner.key, input, segment])
+        let count =
+            try Int.fetchOne(
+                db, sql: "SELECT COUNT(*) FROM model_request_log WHERE message_id=?", arguments: [previous]) ?? 0
+        if destination == nil && count == 1 {
+            try db.execute(
+                sql: "UPDATE messages SET task_id=?,segment=? WHERE id=?", arguments: [desiredTask, segment, previous])
+            return previous
+        }
+        let next =
+            try destination
+            ?? round(
+                owner: owner, client: client, input: input, task: task, position: position, date: date,
+                allowArchived: true, db: db)
+        try db.execute(
+            sql: "UPDATE model_request_log SET message_id=? WHERE request_id=? AND message_id=?",
+            arguments: [next, client, previous])
+        guard db.changesCount == 1 else { throw RecordStorageError.conflict }
+        try db.execute(
+            sql:
+                "INSERT OR IGNORE INTO message_media(message_id,media_id) SELECT ?,media_id FROM message_media WHERE message_id=?",
+            arguments: [next, previous])
+        try refreshRound(previous, db: db)
+        try refreshRound(next, db: db)
+        return next
+    }
+    private static func refreshRound(_ id: Int64, db: Database) throws {
+        try db.execute(
+            sql:
+                "UPDATE messages SET response_text=(SELECT COALESCE(group_concat(response_text,''),'') FROM (SELECT response_text FROM model_request_log WHERE message_id=? ORDER BY position,id)),state=COALESCE((SELECT state FROM model_request_log WHERE message_id=? ORDER BY position DESC,id DESC LIMIT 1),'completed') WHERE id=?",
+            arguments: [id, id, id])
+    }
+    private static let hasInputRequest =
+        "EXISTS(SELECT 1 FROM model_request_log r JOIN messages z ON z.id=r.message_id WHERE z.conversation_id IS m.conversation_id AND z.writer_task_id IS m.writer_task_id AND z.input_id=m.input_id)"
     public func beginMessage(dialog id: String, identity: MessageIdentity) throws -> String {
-        let dialog = try BusinessRecordID.number(id, kind: .dialog)
-        guard identity.order <= Int64.max, !identity.clientID.isEmpty, identity.clientID.utf8.count <= 128,
-            !identity.inputID.isEmpty, identity.inputID.utf8.count <= 128,
-            (identity.role == "assistant" && identity.kind == "response")
-                || (identity.role == "user" && ["input", "observation"].contains(identity.kind))
-        else { throw RecordStorageError.invalidRecord }
-        let task = try identity.taskID.map { try BusinessRecordID.number($0, kind: .task) }
-        let reply = try identity.replyTo.map { try BusinessRecordID.number($0, kind: .message) }
-        return try database.write { db in
+        try database.write { db in
+            let owner = try Self.owner(id, db: db)
+            let round: Int64
+            if identity.kind == "input" {
+                round = try Self.round(
+                    owner: owner, client: identity.clientID, input: identity.inputID, task: identity.taskID,
+                    position: identity.order, date: identity.date, db: db)
+            } else {
+                round = try Self.requestRound(
+                    owner: owner, client: identity.clientID, input: identity.inputID, task: identity.taskID,
+                    position: identity.order, date: identity.date, db: db)
+            }
+            if identity.role == "user" && identity.kind == "input" { return SQLiteRecordKey.id(.message, round) }
+            guard identity.role == "assistant" || identity.kind == "observation" else {
+                throw RecordStorageError.invalidRecord
+            }
+            try db.execute(
+                sql:
+                    "INSERT OR IGNORE INTO model_request_log(request_id,message_id,agent,position,created_at) VALUES(?,?,?,?,?)",
+                arguments: [
+                    identity.clientID, round, owner.agent, Int64(identity.order), identity.date.timeIntervalSince1970,
+                ])
+            if db.changesCount == 1 {
+                try db.execute(
+                    sql:
+                        "UPDATE assistant_tasks SET source_revision=source_revision+1 WHERE id=(SELECT task_id FROM messages WHERE id=?)",
+                    arguments: [round])
+            }
             guard
-                try Int.fetchOne(
-                    db, sql: "SELECT COUNT(*) FROM dialogs WHERE id=? AND archived_at IS NULL", arguments: [dialog])
-                    == 1
+                let key = try Int64.fetchOne(
+                    db, sql: "SELECT id FROM model_request_log WHERE request_id=? AND message_id=?",
+                    arguments: [identity.clientID, round])
             else { throw RecordStorageError.conflict }
-            if let existing = try SQLiteMessageRow.fetchOne(
-                db, key: ["dialog_id": dialog, "client_id": identity.clientID, "role": identity.role])
-            {
-                guard existing.inputID == identity.inputID, existing.kind == identity.kind else {
-                    throw RecordStorageError.invalidRecord
-                }
-                return SQLiteRecordKey.id(.message, try existing.requireID())
+            if let detail = identity.detail {
+                let header = try JSONSerialization.jsonObject(with: detail) as? [String: Any]
+                try db.execute(
+                    sql: "UPDATE model_request_log SET request_json=?,detail_json=? WHERE id=? AND detail_json=''",
+                    arguments: [header?["requestJSON"] as? String ?? "", String(decoding: detail, as: UTF8.self), key])
             }
-            if let reply {
-                guard
-                    try Int64.fetchOne(db, sql: "SELECT dialog_id FROM messages WHERE id=?", arguments: [reply])
-                        == dialog
-                else { throw RecordStorageError.invalidRecord }
-            }
-            var row = SQLiteMessageRow(
-                dialogID: dialog, clientID: identity.clientID, inputID: identity.inputID,
-                role: identity.role, kind: identity.kind, position: Int64(identity.order),
-                createdAt: identity.date.timeIntervalSince1970, body: "", preview: "", state: "generating",
-                replyToMessageID: reply, taskID: task, detailHash: try Self.blob(Data(), in: db))
-            try row.insert(db)
-            let number = try row.requireID()
-            if let task {
-                try db.execute(sql: "INSERT INTO task_messages VALUES(?,?)", arguments: [task, number])
-            }
-            return SQLiteRecordKey.id(.message, number)
+            return SQLiteRecordKey.id(.request, key)
         }
     }
     @discardableResult public func save(
         dialog id: String, revision: UInt64, recovery: Data?, messages: [MessageRecord],
         summaries: [TaskCompressionRecord]
     ) throws -> [MessageReference] {
-        let key = try BusinessRecordID.number(id, kind: .dialog)
-        guard revision <= Int64.max else { throw RecordStorageError.invalidRecord }
-        return try database.write { db in
+        try database.write { db in
+            let owner = try Self.owner(id, db: db)
             var references: [MessageReference] = []
-            guard
-                let dialog = try SQLiteDialogRow.fetchOne(
-                    db, sql: "SELECT id,agent,created_at,archived_at FROM dialogs WHERE id=?", arguments: [key])
-            else { throw RecordStorageError.missingRecord }
             for message in messages {
-                guard message.order <= Int64.max else { throw RecordStorageError.invalidRecord }
-                let hash = try Self.packDetail(message.detail, in: db)
-                let task = try message.taskID.map { try BusinessRecordID.number($0, kind: .task) }
-                let parent: Int64?
-                if message.kind == "observation" {
-                    parent = try Int64.fetchOne(
-                        db,
-                        sql:
-                            "SELECT id FROM messages WHERE dialog_id=? AND input_id=? AND role='assistant' AND position<=? ORDER BY position DESC LIMIT 1",
-                        arguments: [key, message.inputID, Int64(message.order)])
-                } else if message.role == "assistant" {
-                    parent =
-                        try Int64.fetchOne(
-                            db,
-                            sql:
-                                "SELECT id FROM messages WHERE dialog_id=? AND client_id=? AND role='user' AND kind='observation'",
-                            arguments: [key, message.clientID])
-                        ?? Int64.fetchOne(
-                            db,
-                            sql:
-                                "SELECT id FROM messages WHERE dialog_id=? AND client_id=? AND role='user' AND kind='input'",
-                            arguments: [key, message.inputID])
+                let round: Int64
+                if message.kind == "input" {
+                    round = try Self.round(
+                        owner: owner, client: message.clientID, input: message.inputID, task: message.taskID,
+                        position: message.order, date: message.date, db: db)
                 } else {
-                    parent = nil
+                    round = try Self.requestRound(
+                        owner: owner, client: message.clientID, input: message.inputID, task: message.taskID,
+                        position: message.order, date: message.date, db: db)
                 }
-                let existing = try SQLiteMessageRow.fetchOne(
-                    db, key: ["dialog_id": key, "client_id": message.clientID, "role": message.role])
-                guard dialog.archivedAt == nil || existing != nil else { throw RecordStorageError.conflict }
-                if let id = message.id {
-                    guard existing?.id == BusinessRecordID(rawValue: id)?.number,
-                        BusinessRecordID(rawValue: id)?.kind == .message
-                    else { throw RecordStorageError.invalidRecord }
-                }
-                guard existing.map({ $0.inputID == message.inputID && $0.kind == message.kind }) ?? true else {
-                    throw RecordStorageError.invalidRecord
-                }
-                var row = SQLiteMessageRow(
-                    id: existing?.id, dialogID: key, clientID: message.clientID, inputID: message.inputID,
-                    role: message.role, kind: message.kind, position: existing?.position ?? Int64(message.order),
-                    createdAt: existing?.createdAt ?? message.date.timeIntervalSince1970, body: message.body,
-                    preview: String(message.body.prefix(240)), state: message.state,
-                    replyToMessageID: existing?.replyToMessageID ?? parent, taskID: task, detailHash: hash)
-                try row.save(db)
-                let insertedID = try row.requireID()
-                references.append(
-                    MessageReference(
-                        id: SQLiteRecordKey.id(.message, insertedID), clientID: message.clientID, role: message.role))
-                if message.kind == "input", existing == nil || existing?.detailHash == Self.emptyDetailHash {
+                let detail = String(decoding: message.detail, as: UTF8.self)
+                if message.kind == "input" {
+                    let hadInput =
+                        try Int.fetchOne(
+                            db,
+                            sql:
+                                "SELECT COUNT(*) FROM messages WHERE \(owner.column)=? AND input_id=? AND detail_json!=''",
+                            arguments: [owner.key, message.inputID]) ?? 0
                     try db.execute(
-                        sql: "UPDATE dialogs SET input_count=input_count+1,latest_input=? WHERE id=?",
-                        arguments: [String(message.body.prefix(80)), key])
-                }
-                let messageKey = row.id
-                if let task, let messageKey {
-                    try db.execute(
-                        sql: "INSERT OR IGNORE INTO task_messages VALUES(?,?)", arguments: [task, messageKey])
-                }
-                if let messageKey {
-                    // References are explicit JSON media IDs; raw body is never interpreted as instructions.
-                    if let json = try? JSONSerialization.jsonObject(with: message.detail) {
-                        for media in Self.mediaReferences(json) {
-                            if let reference = BusinessRecordID(rawValue: media), reference.kind == .media {
-                                try db.execute(
-                                    sql: "INSERT OR IGNORE INTO message_media SELECT ?,id FROM media_files WHERE id=?",
-                                    arguments: [messageKey, reference.number])
-                            }
-                        }
+                        sql:
+                            "UPDATE messages SET user_text=?,detail_json=?,state=CASE WHEN NOT EXISTS(SELECT 1 FROM model_request_log WHERE message_id=messages.id) THEN ? ELSE state END WHERE \(owner.column)=? AND input_id=?",
+                        arguments: [message.body, detail, message.state, owner.key, message.inputID])
+                    if hadInput == 0 && owner.column == "conversation_id" {
+                        try db.execute(
+                            sql:
+                                "UPDATE assistant_conversations SET input_count=input_count+1,latest_input=? WHERE id=?",
+                            arguments: [String(message.body.prefix(80)), owner.key])
                     }
+                    references.append(
+                        .init(id: SQLiteRecordKey.id(.message, round), clientID: message.clientID, role: message.role))
+                    try Self.linkMedia(message.detail, message: round, request: nil, db: db)
+                    continue
                 }
+                try db.execute(
+                    sql:
+                        "INSERT OR IGNORE INTO model_request_log(request_id,message_id,agent,position,created_at) VALUES(?,?,?,?,?)",
+                    arguments: [
+                        message.clientID, round, owner.agent, Int64(message.order), message.date.timeIntervalSince1970,
+                    ])
+                guard
+                    let log = try Row.fetchOne(
+                        db, sql: "SELECT * FROM model_request_log WHERE request_id=? AND message_id=?",
+                        arguments: [message.clientID, round])
+                else { throw RecordStorageError.conflict }
+                let key: Int64 = log["id"]
+                if message.kind == "observation" {
+                    try db.execute(
+                        sql: "UPDATE model_request_log SET input_text=? WHERE id=?", arguments: [message.body, key])
+                } else {
+                    let payload =
+                        message.detail.isEmpty
+                        ? nil : try JSONSerialization.jsonObject(with: message.detail) as? [String: Any]
+                    let decision = payload?["decisionMetadata"] as? [String: Any]
+                    let metadata = payload?["producerMetadata"] as? [String: String] ?? [:]
+                    let delegate = decision?["delegateID"] as? String ?? metadata["delegateID"]
+                    var preview: [String: Any] = [:]
+                    preview["producerMetadata"] = payload?["producerMetadata"]
+                    preview["decisionMetadata"] = decision.map {
+                        ["mode": $0["mode"] ?? "", "delegateID": $0["delegateID"] ?? ""]
+                    }
+                    preview["toolCalls"] = (payload?["toolCalls"] as? [[String: Any]])?.map {
+                        [
+                            "name": $0["name"] ?? "", "argumentsJSON": $0["argumentsJSON"] ?? "",
+                            "state": $0["state"] ?? "",
+                        ]
+                    }
+                    let previewJSON = String(
+                        decoding: try JSONSerialization.data(withJSONObject: preview), as: UTF8.self)
+                    if log["detail_json"] as String != detail || log["response_text"] as String != message.body {
+                        try db.execute(
+                            sql:
+                                "UPDATE assistant_tasks SET source_revision=source_revision+1 WHERE id=(SELECT task_id FROM messages WHERE id=?)",
+                            arguments: [round])
+                    }
+                    try db.execute(
+                        sql:
+                            "UPDATE model_request_log SET delegate_id=?,input_text=CASE WHEN input_text='' THEN ? ELSE input_text END,response_text=?,state=?,request_json=?,detail_json=?,preview_json=? WHERE id=?",
+                        arguments: [
+                            delegate, payload?["input"] as? String ?? "", message.body, message.state,
+                            payload?["requestParametersJSON"] as? String ?? payload?["requestJSON"] as? String ?? "",
+                            detail, previewJSON, key,
+                        ])
+                    try Self.refreshRound(round, db: db)
+                }
+                references.append(
+                    .init(id: SQLiteRecordKey.id(.request, key), clientID: message.clientID, role: message.role))
+                try Self.linkMedia(message.detail, message: nil, request: key, db: db)
             }
             for summary in summaries {
                 let task = try BusinessRecordID.number(summary.id, kind: .task)
-                let hash = try Self.blob(summary.detail, in: db)
                 try db.execute(
                     sql:
-                        "UPDATE tasks SET dialog_id=?,goal=?,status=?,summary=?,failure=?,finished_at=?,compression_hash=?,first_position=(SELECT MIN(position) FROM messages WHERE task_id=tasks.id AND role='assistant') WHERE id=?",
+                        "UPDATE assistant_tasks SET dialog_id=?,goal=?,status=?,summary=?,failure=?,finished_at=?,compression_json=?,summary_revision=source_revision,first_position=(SELECT MIN(r.position) FROM model_request_log r JOIN messages m ON m.id=r.message_id WHERE m.task_id=assistant_tasks.id) WHERE id=? AND agent=?",
                     arguments: [
-                        key, summary.goal, summary.status, summary.summary, summary.failure,
-                        summary.finishedAt.timeIntervalSince1970, hash, task,
+                        owner.key, summary.goal, summary.status, summary.summary, summary.failure,
+                        summary.finishedAt.timeIntervalSince1970, String(decoding: summary.detail, as: UTF8.self), task,
+                        owner.agent,
                     ])
-                for source in summary.sources {
-                    try db.execute(
-                        sql:
-                            "INSERT OR IGNORE INTO task_messages SELECT ?,id FROM messages WHERE dialog_id=? AND client_id=?",
-                        arguments: [task, key, source])
-                }
+                guard db.changesCount == 1 else { throw RecordStorageError.missingRecord }
             }
-            try db.execute(
-                sql: "UPDATE dialogs SET revision=?,recovery=? WHERE id=?", arguments: [Int64(revision), recovery, key])
+            guard revision <= Int64.max else { throw RecordStorageError.invalidRecord }
+            if owner.column == "conversation_id" {
+                try db.execute(
+                    sql: "UPDATE assistant_conversations SET revision=?,recovery=? WHERE id=?",
+                    arguments: [Int64(revision), recovery, owner.key])
+            } else {
+                try db.execute(
+                    sql: "UPDATE writer_tasks SET history_revision=? WHERE id=?",
+                    arguments: [Int64(revision), owner.key])
+            }
             return references
         }
     }
-    public func messages(dialog id: String, after: Int64? = nil, limit: Int = 50) throws
-        -> [MessageRecord]
-    {
-        let key = try BusinessRecordID.number(id, kind: .dialog)
+    private static func inputRecord(_ row: Row) -> MessageRecord {
+        MessageRecord(
+            clientID: row["client_id"], inputID: row["input_id"], role: "user", kind: "input",
+            order: UInt64(row["position"] as Int64), date: Date(timeIntervalSince1970: row["created_at"]),
+            body: row["user_text"],
+            state: (row["detail_json"] as String).isEmpty && (row["user_text"] as String).isEmpty
+                ? row["state"] : "completed", detail: Data((row["detail_json"] as String).utf8),
+            id: SQLiteRecordKey.id(.message, row["id"]))
+    }
+    private static func records(_ row: Row, db: Database, request: Int64? = nil) throws -> [MessageRecord] {
+        var result = [inputRecord(row)]
+        let task: Int64? = row["task_id"]
+        for log in try Row.fetchAll(
+            db,
+            sql:
+                "SELECT * FROM model_request_log WHERE message_id=? \(request == nil ? "" : "AND id=?") ORDER BY position,id",
+            arguments: StatementArguments([row["id"] as Int64])
+                + (request.map { StatementArguments([$0]) } ?? StatementArguments()))
+        {
+            let id = SQLiteRecordKey.id(.request, log["id"])
+            let input: String = log["input_text"]
+            if !input.isEmpty {
+                result.append(
+                    MessageRecord(
+                        clientID: log["request_id"], inputID: row["input_id"], role: "user", kind: "observation",
+                        order: UInt64(log["position"] as Int64), date: Date(timeIntervalSince1970: log["created_at"]),
+                        body: input, state: "completed", taskID: task.map { SQLiteRecordKey.id(.task, $0) },
+                        detail: Data(), id: nil))
+            }
+            result.append(
+                MessageRecord(
+                    clientID: log["request_id"], inputID: row["input_id"], role: "assistant", kind: "response",
+                    order: UInt64(log["position"] as Int64), date: Date(timeIntervalSince1970: log["created_at"]),
+                    body: log["response_text"], state: log["state"], taskID: task.map { SQLiteRecordKey.id(.task, $0) },
+                    detail: Data((log["detail_json"] as String).utf8), id: id))
+        }
+        if (row["detail_json"] as String).isEmpty && (row["user_text"] as String).isEmpty { result.removeFirst() }
+        return result
+    }
+    public func messagePage(dialog id: String, after: Int64? = nil, limit: Int = 50) throws -> MessagePage {
         guard (1...50).contains(limit) else { throw RecordStorageError.invalidRecord }
         return try database.read { db in
-            var position: Int64 = 0
+            let owner = try Self.owner(id, db: db)
+            var position: Int64 = -1
             if let after {
                 guard
-                    let stored = try Int64.fetchOne(
-                        db, sql: "SELECT position FROM messages WHERE dialog_id=? AND id=?", arguments: [key, after])
+                    let found = try Int64.fetchOne(
+                        db, sql: "SELECT position FROM messages WHERE id=? AND \(owner.column)=?",
+                        arguments: [after, owner.key])
                 else { throw RecordStorageError.missingRecord }
-                position = stored
+                position = found
             }
             let rows = try Row.fetchAll(
                 db,
-                sql: """
-                    SELECT m.*,e.data FROM messages m JOIN evidence e ON e.hash=m.detail_hash
-                    WHERE dialog_id=? AND (m.position,m.id)>(?,?) ORDER BY m.position,m.id LIMIT ?
-                    """, arguments: [key, position, after ?? 0, limit])
-            return try rows.map { row in
-                let task: Int64? = row["task_id"]
-                return MessageRecord(
-                    clientID: row["client_id"], inputID: row["input_id"], role: row["role"], kind: row["kind"],
-                    order: UInt64(row["position"] as Int64), date: Date(timeIntervalSince1970: row["created_at"]),
-                    body: row["body"], state: row["state"], taskID: task.map { SQLiteRecordKey.id(.task, $0) },
-                    detail: try Self.unpackDetail(row["data"], in: db), id: SQLiteRecordKey.id(.message, row["id"]))
-            }
+                sql:
+                    "SELECT * FROM messages WHERE \(owner.column)=? AND (position,id)>(?,?) ORDER BY position,id LIMIT ?",
+                arguments: [owner.key, position, after ?? 0, limit + 1])
+            let page = Array(rows.prefix(limit))
+            return MessagePage(
+                records: try page.flatMap { try Self.records($0, db: db) },
+                next: rows.count > limit ? page.last?["id"] : nil)
         }
     }
+    public func messages(dialog id: String, after: Int64? = nil, limit: Int = 50) throws -> [MessageRecord] {
+        try messagePage(dialog: id, after: after, limit: limit).records
+    }
+    private static let validSummary =
+        "t.compression_json IS NOT NULL AND t.summary_revision=t.source_revision AND (COALESCE(t.summary,'')!='' OR COALESCE(t.failure,'')!='') AND t.status NOT IN ('running','finishing')"
     public func compressionData(dialog id: String, taskIDs: [String]? = nil) throws -> [Data] {
-        let key = try BusinessRecordID.number(id, kind: .dialog)
-        let tasks = try taskIDs.map { try $0.map { try BusinessRecordID.number($0, kind: .task) } }
-        if tasks?.isEmpty == true { return [] }
-        return try database.read { db in
-            let filter =
-                tasks.map { " AND t.id IN (" + Array(repeating: "?", count: $0.count).joined(separator: ",") + ")" }
+        try database.read { db in
+            let owner = try Self.owner(id, db: db)
+            guard owner.column == "conversation_id" else { return [] }
+            let filter = try taskIDs.map { try $0.map { try BusinessRecordID.number($0, kind: .task) } }
+            if filter?.isEmpty == true { return [] }
+            let clause =
+                filter.map { " AND t.id IN (" + Array(repeating: "?", count: $0.count).joined(separator: ",") + ")" }
                 ?? ""
-            return try Data.fetchAll(
+            return try String.fetchAll(
                 db,
-                sql: "SELECT e.data FROM tasks t JOIN evidence e ON t.compression_hash=e.hash WHERE t.dialog_id=?"
-                    + filter + " ORDER BY t.id", arguments: StatementArguments([key] + (tasks ?? [])))
+                sql: "SELECT t.compression_json FROM assistant_tasks t WHERE t.dialog_id=? AND (\(Self.validSummary))"
+                    + clause + " ORDER BY t.id", arguments: StatementArguments([owner.key] + (filter ?? []))
+            ).map { Data($0.utf8) }
         }
     }
     public func rotate(_ id: String, agent: String) throws -> DialogRecord {
         let key = try BusinessRecordID.number(id, kind: .dialog)
-        return try database.write { db in
+        try database.write { db in
             try db.execute(
-                sql: "UPDATE dialogs SET archived_at=? WHERE id=? AND agent=? AND archived_at IS NULL",
+                sql: "UPDATE assistant_conversations SET archived_at=? WHERE id=? AND agent=? AND archived_at IS NULL",
                 arguments: [Date().timeIntervalSince1970, key, agent])
             guard db.changesCount == 1 else { throw RecordStorageError.missingRecord }
-            var dialog = SQLiteDialogRow(agent: agent, createdAt: Date().timeIntervalSince1970)
-            try dialog.insert(db)
-            guard
-                let row = try Row.fetchOne(
-                    db, sql: "SELECT * FROM dialogs WHERE id=?", arguments: [db.lastInsertedRowID])
-            else { throw RecordStorageError.missingRecord }
-            return Self.dialog(row)
+            try db.execute(
+                sql: "INSERT INTO assistant_conversations(identity,agent,created_at) VALUES(?,?,?)",
+                arguments: [UUID().uuidString, agent, Date().timeIntervalSince1970])
         }
+        return try current(agent: agent)
     }
     public func setTitle(_ title: String?, error: String?, dialog id: String) throws {
         let key = try BusinessRecordID.number(id, kind: .dialog)
         try database.write { db in
-            try db.execute(sql: "UPDATE dialogs SET title=?,title_error=? WHERE id=?", arguments: [title, error, key])
+            try db.execute(
+                sql: "UPDATE assistant_conversations SET title=?,title_error=? WHERE id=?",
+                arguments: [title, error, key])
         }
     }
     public func deleteDialog(_ id: String) throws {
         let key = try BusinessRecordID.number(id, kind: .dialog)
         try database.write { db in
-            try db.execute(sql: "DELETE FROM dialogs WHERE id=? AND archived_at IS NOT NULL", arguments: [key])
-            guard db.changesCount == 1 else { throw RecordStorageError.missingRecord }
             try db.execute(
-                sql:
-                    "DELETE FROM evidence WHERE hash IN (SELECT e.hash FROM evidence e WHERE NOT EXISTS(SELECT 1 FROM messages m WHERE m.detail_hash=e.hash) AND NOT EXISTS(SELECT 1 FROM tasks t WHERE t.compression_hash=e.hash) AND NOT EXISTS(SELECT 1 FROM evidence_refs r WHERE r.child_hash=e.hash) LIMIT 128)"
-            )
+                sql: "DELETE FROM assistant_conversations WHERE id=? AND archived_at IS NOT NULL", arguments: [key])
+            guard db.changesCount == 1 else { throw RecordStorageError.missingRecord }
         }
+    }
+    private static func previewSQL(task: Bool) -> String {
+        let filter = task ? "m.task_id=?" : "(NOT (\(validSummary)) OR r.position=t.first_position OR t.id IS NULL)"
+        return """
+            SELECT r.id,r.request_id,r.position,r.created_at,r.state,r.preview_json,substr(r.input_text,1,240) AS input_text,substr(r.response_text,1,240) AS response_text,m.input_id,substr(m.user_text,1,240) AS user_text,m.task_id,
+            (SELECT COUNT(*) FROM model_request_log x JOIN messages z ON z.id=x.message_id WHERE z.conversation_id IS m.conversation_id AND z.writer_task_id IS m.writer_task_id AND x.position<=r.position) AS ordinal
+            FROM model_request_log r INDEXED BY request_order JOIN messages m ON m.id=r.message_id LEFT JOIN assistant_tasks t ON t.id=m.task_id
+            WHERE m.%@=? AND r.position>? AND \(filter) ORDER BY r.position,r.id LIMIT ? OFFSET ?
+            """
     }
     public func previews(
         dialog id: String, after: UInt64 = 0, taskID: String? = nil, limit: Int = HistoryPaging.pageSize,
         offset: Int = 0
-    )
-        throws -> [MessagePreview]
-    {
-        let key = try BusinessRecordID.number(id, kind: .dialog)
-        let task = try taskID.map { try BusinessRecordID.number($0, kind: .task) }
+    ) throws -> [MessagePreview] {
         guard after <= Int64.max, (1...50).contains(limit), offset >= 0 else { throw RecordStorageError.invalidRecord }
         return try database.read { db in
-            try Row.fetchAll(
-                db,
-                sql: Self.previewSQL(task: task != nil),
+            let owner = try Self.owner(id, db: db)
+            let task = try taskID.map { try BusinessRecordID.number($0, kind: .task) }
+            let sql = Self.previewSQL(task: task != nil).replacingOccurrences(of: "%@", with: owner.column)
+            let rows = try Row.fetchAll(
+                db, sql: sql,
                 arguments: StatementArguments(
-                    [key, Int64(after)] + (task.map { [$0] } ?? []) + [Int64(limit), Int64(offset)])
-            ).map { row in
-                let taskKey: Int64? = row["task_id"]
-                var preview = MessagePreview(
-                    id: SQLiteRecordKey.id(.message, row["id"]), clientID: row["client_id"], inputID: row["input_id"],
-                    input: row["input"], response: row["response"],
-                    date: Date(timeIntervalSince1970: row["created_at"]),
-                    position: UInt64(row["position"] as Int64), state: row["state"],
-                    taskID: taskKey.map { SQLiteRecordKey.id(.task, $0) }, isObservation: row["observation"],
-                    isInput: row["role"] as String == "user")
-                preview.ordinal = row["ordinal"]
-                let metadata: Data = row["preview_metadata"]
-                if !metadata.isEmpty,
-                    let envelope = try JSONSerialization.jsonObject(with: metadata) as? [String: Any],
-                    let value = envelope["value"] as? [String: Any]
+                    [owner.key, Int64(after)] + (task.map { [$0] } ?? []) + [Int64(limit + offset), 0]))
+            var results = try rows.map { row in
+                let task: Int64? = row["task_id"]
+                let input: String = row["input_text"]
+                var result = MessagePreview(
+                    id: SQLiteRecordKey.id(.request, row["id"]), clientID: row["request_id"], inputID: row["input_id"],
+                    input: String((input.isEmpty ? row["user_text"] as String : input).prefix(240)),
+                    response: String((row["response_text"] as String).prefix(240)),
+                    date: Date(timeIntervalSince1970: row["created_at"]), position: UInt64(row["position"] as Int64),
+                    state: row["state"], taskID: task.map { SQLiteRecordKey.id(.task, $0) },
+                    isObservation: !input.isEmpty, isInput: false)
+                result.ordinal = row["ordinal"]
+                if let metadata = try JSONSerialization.jsonObject(with: Data((row["preview_json"] as String).utf8))
+                    as? [String: Any]
                 {
-                    preview.metadata = value["producerMetadata"] as? [String: String] ?? [:]
-                    if let decision = value["decisionMetadata"] as? [String: Any] {
-                        preview.metadata["phase"] = decision["mode"] as? String
-                        preview.metadata["runID"] = decision["runID"] as? String
+                    result.metadata = metadata["producerMetadata"] as? [String: String] ?? [:]
+                    if let decision = metadata["decisionMetadata"] as? [String: String] {
+                        result.metadata["phase"] = decision["mode"]
+                        result.metadata["delegateID"] = decision["delegateID"]
                     }
-                    if let calls = value["toolCalls"] as? [[String: Any]],
-                        calls.contains(where: { $0["state"] as? String == "received" })
-                    {
-                        preview.metadata["toolsPending"] = "true"
+                    result.toolCalls = (metadata["toolCalls"] as? [[String: String]] ?? []).compactMap {
+                        guard let name = $0["name"], let arguments = $0["argumentsJSON"] else { return nil }
+                        return .init(name: name, argumentsJSON: arguments, state: $0["state"] ?? "received")
+                    }
+                    if result.toolCalls.contains(where: { $0.state == "received" }) {
+                        result.metadata["toolsPending"] = "true"
                     }
                 }
-                return preview
+                return result
             }
+            let pending = try Row.fetchAll(
+                db,
+                sql:
+                    "SELECT id,client_id,input_id,substr(user_text,1,240) AS user_text,position,created_at,state,task_id FROM messages m WHERE \(owner.column)=? AND position>? AND NOT \(Self.hasInputRequest) \(task == nil ? "" : "AND task_id=?") ORDER BY position,id LIMIT ?",
+                arguments: StatementArguments(
+                    [owner.key, Int64(after)] + (task.map { [$0] } ?? []) + [Int64(limit + offset)]))
+            results += pending.map { row in
+                let key: Int64? = row["task_id"]
+                return MessagePreview(
+                    id: SQLiteRecordKey.id(.message, row["id"]), clientID: row["client_id"], inputID: row["input_id"],
+                    input: row["user_text"], response: "", date: Date(timeIntervalSince1970: row["created_at"]),
+                    position: UInt64(row["position"] as Int64), state: row["state"],
+                    taskID: key.map { SQLiteRecordKey.id(.task, $0) }, isObservation: false, isInput: true)
+            }
+            return Array(results.sorted { ($0.position, $0.id) < ($1.position, $1.id) }.dropFirst(offset).prefix(limit))
         }
     }
     public func messageEvidence(_ id: String) throws -> [MessageRecord] {
-        let key = try BusinessRecordID.number(id, kind: .message)
+        guard let key = BusinessRecordID(rawValue: id), [.message, .request].contains(key.kind) else {
+            throw RecordStorageError.invalidID
+        }
         return try database.read { db in
-            guard
-                let row = try Row.fetchOne(
-                    db, sql: "SELECT dialog_id,client_id,input_id FROM messages WHERE id=?", arguments: [key])
-            else { throw RecordStorageError.missingRecord }
-            let dialog: Int64 = row["dialog_id"]
-            let client: String = row["client_id"]
-            let input: String = row["input_id"]
-            return try Row.fetchAll(
-                db,
-                sql: """
-                    SELECT m.*,e.data FROM messages m JOIN evidence e ON e.hash=m.detail_hash
-                    WHERE m.dialog_id=? AND ((m.client_id=? AND m.kind='input') OR m.client_id=?) ORDER BY m.id
-                    """, arguments: [dialog, input, client]
-            ).map { row in
-                let task: Int64? = row["task_id"]
-                return MessageRecord(
-                    clientID: row["client_id"], inputID: row["input_id"], role: row["role"], kind: row["kind"],
-                    order: UInt64(row["position"] as Int64), date: Date(timeIntervalSince1970: row["created_at"]),
-                    body: row["body"],
-                    state: row["state"], taskID: task.map { SQLiteRecordKey.id(.task, $0) },
-                    detail: try Self.unpackDetail(row["data"], in: db),
-                    id: SQLiteRecordKey.id(.message, row["id"]))
+            let sql =
+                key.kind == .message
+                ? "SELECT * FROM messages WHERE id=?"
+                : "SELECT m.* FROM messages m JOIN model_request_log r ON r.message_id=m.id WHERE r.id=?"
+            guard let row = try Row.fetchOne(db, sql: sql, arguments: [key.number]) else {
+                throw RecordStorageError.missingRecord
             }
+            return try Self.records(row, db: db, request: key.kind == .request ? key.number : nil)
         }
     }
     public func taskSources(_ id: String) throws -> [TaskSourceRecord] {
-        let key = try BusinessRecordID.number(id, kind: .task)
+        let task = try BusinessRecordID.number(id, kind: .task)
         return try database.read { db in
-            let rows = try Row.fetchAll(
+            try Row.fetchAll(
                 db,
                 sql:
-                    "SELECT m.input_id,m.client_id,m.position FROM task_messages s JOIN messages m ON m.id=s.message_id WHERE s.task_id=? AND m.role='assistant' ORDER BY m.position LIMIT 8193",
-                arguments: [key])
-            guard rows.count <= 8192 else { throw RecordStorageError.invalidRecord }
-            return rows.map {
-                TaskSourceRecord(
-                    inputID: $0["input_id"], requestID: $0["client_id"], position: UInt64($0["position"] as Int64))
+                    "SELECT m.input_id,r.request_id,r.position FROM model_request_log r JOIN messages m ON m.id=r.message_id WHERE m.task_id=? ORDER BY r.position,r.id",
+                arguments: [task]
+            ).map {
+                .init(inputID: $0["input_id"], requestID: $0["request_id"], position: UInt64($0["position"] as Int64))
             }
         }
     }
     public func latestPreviews(dialog id: String, limit: Int = 10) throws -> [MessagePreview] {
-        let key = try BusinessRecordID.number(id, kind: .dialog)
-        return try database.read { db in
-            let ids = try Int64.fetchAll(
-                db,
-                sql: """
-                    SELECT m.id FROM messages m LEFT JOIN tasks t ON t.id=m.task_id
-                    WHERE m.dialog_id=? AND m.role='assistant' AND (t.compression_hash IS NULL OR m.position=t.first_position)
-                    ORDER BY m.position DESC LIMIT ?
-                    """, arguments: [key, limit])
-            return try ids.reversed().compactMap { rowID in
-                guard
-                    let row = try Row.fetchOne(
-                        db, sql: "SELECT client_id,input_id,position,created_at,state,task_id FROM messages WHERE id=?",
-                        arguments: [rowID])
-                else { return nil }
-                let task: Int64? = row["task_id"]
-                return MessagePreview(
-                    id: SQLiteRecordKey.id(.message, rowID), clientID: row["client_id"], inputID: row["input_id"],
-                    input: "",
-                    response: "",
-                    date: Date(timeIntervalSince1970: row["created_at"]), position: UInt64(row["position"] as Int64),
-                    state: row["state"], taskID: task.map { SQLiteRecordKey.id(.task, $0) }, isObservation: false,
-                    isInput: false)
-            }
-        }
+        let count = try timelineCount(dialog: id)
+        return try previews(dialog: id, limit: limit, offset: max(0, count - limit))
     }
     public func unfinishedUserMessages(dialog id: String) throws -> [MessageRecord] {
-        let key = try BusinessRecordID.number(id, kind: .dialog)
-        return try database.read { db in
-            try Row.fetchAll(
+        try database.read { db in
+            let owner = try Self.owner(id, db: db)
+            return try Row.fetchAll(
                 db,
-                sql: """
-                    SELECT m.*,e.data FROM messages m JOIN evidence e ON e.hash=m.detail_hash
-                    WHERE m.dialog_id=? AND m.role='user' AND
-                        ((m.kind='input' AND NOT EXISTS(SELECT 1 FROM messages a WHERE a.dialog_id=m.dialog_id AND a.input_id=m.client_id AND a.role='assistant'))
-                        OR (m.kind='observation' AND NOT EXISTS(SELECT 1 FROM messages a WHERE a.dialog_id=m.dialog_id AND a.client_id=m.client_id AND a.role='assistant')))
-                    ORDER BY m.position DESC LIMIT 32
-                    """, arguments: [key]
-            ).map { row in
-                let task: Int64? = row["task_id"]
-                return MessageRecord(
-                    clientID: row["client_id"], inputID: row["input_id"], role: row["role"], kind: row["kind"],
-                    order: UInt64(row["position"] as Int64), date: Date(timeIntervalSince1970: row["created_at"]),
-                    body: row["body"], state: row["state"],
-                    taskID: task.map { SQLiteRecordKey.id(.task, $0) },
-                    detail: try Self.unpackDetail(row["data"], in: db),
-                    id: SQLiteRecordKey.id(.message, row["id"]))
-            }
+                sql:
+                    "SELECT * FROM messages m WHERE \(owner.column)=? AND NOT \(Self.hasInputRequest)",
+                arguments: [owner.key]
+            ).map(Self.inputRecord)
         }
     }
     public func timelineCount(dialog id: String) throws -> Int {
-        let key = try BusinessRecordID.number(id, kind: .dialog)
-        return try database.read { db in
-            try Int.fetchOne(
-                db,
-                sql:
-                    "SELECT COUNT(*) FROM messages m LEFT JOIN tasks t ON t.id=m.task_id WHERE m.dialog_id=? AND (m.role='assistant' OR (m.role='user' AND ((m.kind='input' AND NOT EXISTS(SELECT 1 FROM messages a WHERE a.dialog_id=m.dialog_id AND a.role='assistant' AND a.input_id=m.client_id)) OR (m.kind='observation' AND NOT EXISTS(SELECT 1 FROM messages a WHERE a.dialog_id=m.dialog_id AND a.role='assistant' AND a.client_id=m.client_id))))) AND (t.compression_hash IS NULL OR m.position=t.first_position)",
-                arguments: [key]) ?? 0
+        try database.read { db in
+            let owner = try Self.owner(id, db: db)
+            let requests =
+                try Int.fetchOne(
+                    db,
+                    sql:
+                        "SELECT COUNT(*) FROM model_request_log r JOIN messages m ON m.id=r.message_id LEFT JOIN assistant_tasks t ON t.id=m.task_id WHERE m.\(owner.column)=? AND (t.id IS NULL OR NOT (\(Self.validSummary)) OR r.position=t.first_position)",
+                    arguments: [owner.key]) ?? 0
+            let pending =
+                try Int.fetchOne(
+                    db,
+                    sql:
+                        "SELECT COUNT(*) FROM messages m WHERE \(owner.column)=? AND NOT \(Self.hasInputRequest)",
+                    arguments: [owner.key]) ?? 0
+            return requests + pending
         }
     }
     public func titleRows(dialog id: String, positions: [Int]) throws -> [MessagePreview] {
-        let key = try BusinessRecordID.number(id, kind: .dialog)
-        guard positions.count <= 32, positions.allSatisfy({ $0 >= 0 }) else { throw RecordStorageError.invalidRecord }
-        return try database.read { db in
-            try positions.compactMap { offset in
-                guard
-                    let row = try Row.fetchOne(
-                        db,
-                        sql: """
-                            SELECT u.id,u.client_id,u.created_at,u.position,substr(u.preview,1,80) AS input,
-                                COALESCE((SELECT substr(a.preview,1,80) FROM messages a WHERE a.dialog_id=u.dialog_id AND a.input_id=u.client_id AND a.role='assistant' ORDER BY a.position DESC LIMIT 1),'') AS response
-                            FROM messages u WHERE u.dialog_id=? AND u.kind='input' ORDER BY u.position LIMIT 1 OFFSET ?
-                            """, arguments: [key, offset])
-                else { return nil }
-                return MessagePreview(
-                    id: SQLiteRecordKey.id(.message, row["id"]), clientID: row["client_id"], inputID: row["client_id"],
-                    input: row["input"], response: row["response"],
-                    date: Date(timeIntervalSince1970: row["created_at"]), position: UInt64(row["position"] as Int64),
-                    state: "completed", taskID: nil, isObservation: false, isInput: false)
-            }
-        }
+        try positions.flatMap { try previews(dialog: id, limit: 1, offset: $0) }
     }
     public func dialogForInput(_ input: String) throws -> String? {
         try database.read { db in
-            let matches = try Int64.fetchAll(
-                db, sql: "SELECT DISTINCT dialog_id FROM messages WHERE input_id=? LIMIT 2", arguments: [input])
-            guard matches.count <= 1 else { throw RecordStorageError.invalidRecord }
-            return matches.first.map { SQLiteRecordKey.id(.dialog, $0) }
+            let rows = try Row.fetchAll(
+                db, sql: "SELECT DISTINCT conversation_id,writer_task_id FROM messages WHERE input_id=? LIMIT 2",
+                arguments: [input])
+            guard rows.count <= 1 else { throw RecordStorageError.invalidRecord }
+            return try rows.first.map { try Self.dialogID($0, db: db) }
         }
     }
     public func inputRows(_ input: String, dialog id: String) throws -> [MessageRecord] {
-        let key = try BusinessRecordID.number(id, kind: .dialog)
-        return try database.read { db in
-            try Row.fetchAll(
-                db,
-                sql:
-                    "SELECT m.*,e.data FROM messages m JOIN evidence e ON e.hash=m.detail_hash WHERE m.dialog_id=? AND m.input_id=? ORDER BY m.position,m.id",
-                arguments: [key, input]
-            ).map { row in
-                let task: Int64? = row["task_id"]
-                return MessageRecord(
-                    clientID: row["client_id"], inputID: row["input_id"], role: row["role"], kind: row["kind"],
-                    order: UInt64(row["position"] as Int64), date: Date(timeIntervalSince1970: row["created_at"]),
-                    body: row["body"], state: row["state"], taskID: task.map { SQLiteRecordKey.id(.task, $0) },
-                    detail: try Self.unpackDetail(row["data"], in: db), id: SQLiteRecordKey.id(.message, row["id"]))
-            }
+        try database.read { db in
+            let owner = try Self.owner(id, db: db)
+            return try Row.fetchAll(
+                db, sql: "SELECT * FROM messages WHERE \(owner.column)=? AND input_id=? ORDER BY position,id",
+                arguments: [owner.key, input]
+            ).flatMap { try Self.records($0, db: db) }
         }
     }
     public func dialogForMessage(_ id: String) throws -> String {
-        let key = try BusinessRecordID.number(id, kind: .message)
+        guard let key = BusinessRecordID(rawValue: id), [.message, .request].contains(key.kind) else {
+            throw RecordStorageError.invalidID
+        }
         return try database.read { db in
             guard
-                let dialog = try Int64.fetchOne(db, sql: "SELECT dialog_id FROM messages WHERE id=?", arguments: [key])
+                let row = try Row.fetchOne(
+                    db,
+                    sql: key.kind == .message
+                        ? "SELECT * FROM messages WHERE id=?"
+                        : "SELECT m.* FROM messages m JOIN model_request_log r ON r.message_id=m.id WHERE r.id=?",
+                    arguments: [key.number])
             else { throw RecordStorageError.missingRecord }
-            return SQLiteRecordKey.id(.dialog, dialog)
+            return try Self.dialogID(row, db: db)
         }
     }
-    private static func blob(_ data: Data, in db: Database) throws -> String {
-        let hash = ContentFingerprint.digest(data).map { String(format: "%02x", $0) }.joined()
-        try db.execute(sql: "INSERT OR IGNORE INTO evidence(hash,data) VALUES(?,?)", arguments: [hash, data])
-        return hash
-    }
-    private static let emptyDetailHash = ContentFingerprint.digest(Data()).map { String(format: "%02x", $0) }.joined()
     private static func mediaReferences(_ value: Any) -> Set<String> {
-        if let dictionary = value as? [String: Any] {
-            var result: Set<String> = []
-            for (key, value) in dictionary {
-                if key == "mediaID" || key == "id", let id = value as? String, id.hasPrefix("media_") {
-                    result.insert(id)
+        if let object = value as? [String: Any] {
+            return object.reduce(into: Set<String>()) { result, pair in
+                if ["mediaID", "id"].contains(pair.key), let raw = pair.value as? String,
+                    BusinessRecordID(rawValue: raw)?.kind == .media
+                {
+                    result.insert(raw)
                 }
-                result.formUnion(mediaReferences(value))
+                result.formUnion(mediaReferences(pair.value))
             }
-            return result
         }
         if let array = value as? [Any] {
             return array.reduce(into: Set<String>()) { $0.formUnion(mediaReferences($1)) }
         }
-        if let string = value as? String, let bytes = string.data(using: .utf8),
-            let nested = try? JSONSerialization.jsonObject(with: bytes)
-        {
+        if let text = value as? String, let nested = try? JSONSerialization.jsonObject(with: Data(text.utf8)) {
             return mediaReferences(nested)
         }
         return []
     }
-    private static func previewSQL(task: Bool) -> String {
-        let filter = task ? "AND m.task_id=?" : "AND (t.compression_hash IS NULL OR m.position=t.first_position)"
-        return """
-            SELECT m.id,m.client_id,m.input_id,m.position,m.created_at,m.state,m.task_id,m.role,e.data AS preview_metadata,
-                (SELECT COUNT(*) FROM messages r WHERE r.dialog_id=m.dialog_id AND r.kind='response' AND r.position<=m.position) AS ordinal,CASE WHEN m.role='user' THEN '' ELSE m.preview END AS response,
-                CASE WHEN m.role='user' THEN m.preview ELSE COALESCE((SELECT o.preview FROM messages o WHERE o.dialog_id=m.dialog_id AND o.client_id=m.client_id AND o.role='user' AND o.kind='observation'),
-                    (SELECT u.preview FROM messages u WHERE u.dialog_id=m.dialog_id AND u.client_id=m.input_id AND u.role='user' AND u.kind='input'),'') END AS input,
-                EXISTS(SELECT 1 FROM messages o WHERE o.dialog_id=m.dialog_id AND o.client_id=m.client_id AND o.role='user' AND o.kind='observation') AS observation
-            FROM messages m JOIN evidence e ON e.hash=m.detail_hash LEFT JOIN tasks t ON t.id=m.task_id WHERE m.dialog_id=? AND (m.role='assistant' OR (m.role='user' AND ((m.kind='input' AND NOT EXISTS(SELECT 1 FROM messages a WHERE a.dialog_id=m.dialog_id AND a.role='assistant' AND a.input_id=m.client_id)) OR (m.kind='observation' AND NOT EXISTS(SELECT 1 FROM messages a WHERE a.dialog_id=m.dialog_id AND a.role='assistant' AND a.client_id=m.client_id))))) AND m.position>? \(filter)
-            ORDER BY m.position,m.id LIMIT ? OFFSET ?
-            """
-    }
-    private static func packDetail(_ data: Data, in db: Database) throws -> String {
-        let value = try JSONSerialization.jsonObject(with: data, options: .fragmentsAllowed)
-        var references: Set<String> = []
-        func pack(_ node: Any) throws -> Any {
-            if let text = node as? String, text.utf8.count >= 4096 {
-                let bytes = Data(text.utf8)
-                var chunks: [String] = []
-                for offset in stride(from: 0, to: bytes.count, by: 4096) {
-                    let hash = try blob(bytes.subdata(in: offset..<min(bytes.count, offset + 4096)), in: db)
-                    chunks.append(hash)
-                    references.insert(hash)
-                }
-                return ["_textChunks": chunks, "_byteCount": bytes.count] as [String: Any]
-            }
-            if let object = node as? [String: Any] { return try object.mapValues(pack) }
-            if let array = node as? [Any] { return try array.map(pack) }
-            return node
+    private static func linkMedia(_ detail: Data, message: Int64?, request: Int64?, db: Database) throws {
+        guard !detail.isEmpty, let json = try? JSONSerialization.jsonObject(with: detail) else { return }
+        for raw in mediaReferences(json) {
+            let media = try BusinessRecordID.number(raw, kind: .media)
+            try db.execute(
+                sql:
+                    "INSERT OR IGNORE INTO message_media(message_id,request_id,media_id) SELECT ?,?,id FROM media_files WHERE id=?",
+                arguments: [message, request, media])
         }
-        let packed = try pack(value)
-        let envelope: [String: Any] = ["codec": 1, "value": packed]
-        let encoded = try JSONSerialization.data(withJSONObject: envelope, options: .sortedKeys)
-        let hash = try blob(encoded, in: db)
-        for child in references {
-            try db.execute(sql: "INSERT OR IGNORE INTO evidence_refs VALUES(?,?)", arguments: [hash, child])
-        }
-        return hash
     }
-    private static func unpackDetail(_ data: Data, in db: Database) throws -> Data {
-        if data.isEmpty { return data }  // Reserved identity has no content/evidence yet.
-        guard let envelope = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-            envelope["codec"] as? Int == 1, let value = envelope["value"]
-        else { throw RecordStorageError.invalidRecord }
-        func unpack(_ node: Any) throws -> Any {
-            if let object = node as? [String: Any] {
-                if let chunks = object["_textChunks"] as? [String], let size = object["_byteCount"] as? Int,
-                    object.count == 2
-                {
-                    guard size >= 0, size <= 32 * 1024 * 1024, chunks.count <= 8192 else {
-                        throw RecordStorageError.invalidRecord
-                    }
-                    var bytes = Data()
-                    bytes.reserveCapacity(size)
-                    for hash in chunks {
-                        guard
-                            let part = try Data.fetchOne(
-                                db, sql: "SELECT data FROM evidence WHERE hash=?", arguments: [hash]),
-                            part.count <= 4096
-                        else { throw RecordStorageError.missingRecord }
-                        bytes.append(part)
-                        guard bytes.count <= size else { throw RecordStorageError.invalidRecord }
-                    }
-                    guard bytes.count == size, let text = String(data: bytes, encoding: .utf8) else {
-                        throw RecordStorageError.invalidRecord
-                    }
-                    return text
-                }
-                return try object.mapValues(unpack)
-            }
-            if let array = node as? [Any] { return try array.map(unpack) }
-            return node
-        }
-        return try JSONSerialization.data(withJSONObject: unpack(value), options: [.sortedKeys, .fragmentsAllowed])
-    }
-    public func storageStatistics() throws -> (messages: Int, evidenceBytes: Int, sharedChunks: Int) {
+    public func storageStatistics() throws -> (messages: Int, requests: Int, requestLogBytes: Int) {
         try database.read { db in
             (
                 try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM messages") ?? 0,
-                try Int.fetchOne(db, sql: "SELECT COALESCE(SUM(length(data)),0) FROM evidence") ?? 0,
-                try Int.fetchOne(db, sql: "SELECT COUNT(DISTINCT child_hash) FROM evidence_refs") ?? 0
+                try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM model_request_log") ?? 0,
+                try Int.fetchOne(
+                    db, sql: "SELECT COALESCE(SUM(length(detail_json)+length(request_json)),0) FROM model_request_log")
+                    ?? 0
             )
         }
     }
     func previewQueryPlan(dialog id: String, after: UInt64, taskID: String? = nil) throws -> [String] {
-        let key = try BusinessRecordID.number(id, kind: .dialog)
-        let task = try taskID.map { try BusinessRecordID.number($0, kind: .task) }
-        guard after <= Int64.max else { throw RecordStorageError.invalidRecord }
-        return try database.read { db in
-            try Row.fetchAll(
-                db, sql: "EXPLAIN QUERY PLAN " + Self.previewSQL(task: task != nil),
-                arguments: StatementArguments(
-                    [key, Int64(after)] + (task.map { [$0] } ?? []) + [Int64(HistoryPaging.pageSize), 0])
-            )
-            .map { $0["detail"] as String }
+        try database.read { db in
+            let owner = try Self.owner(id, db: db)
+            let task = try taskID.map { try BusinessRecordID.number($0, kind: .task) }
+            return try Row.fetchAll(
+                db,
+                sql: "EXPLAIN QUERY PLAN "
+                    + Self.previewSQL(task: task != nil).replacingOccurrences(of: "%@", with: owner.column),
+                arguments: StatementArguments([owner.key, Int64(after)] + (task.map { [$0] } ?? []) + [20, 0])
+            ).map { $0["detail"] }
         }
     }
-    private static let dialogMetadataColumns =
-        "id,agent,created_at,archived_at,title,title_error,revision,input_count,latest_input,NULL AS recovery"
     internal func recoverInFlight() throws {
         try database.write { db in
+            try db.execute(sql: "UPDATE model_request_log SET state='interrupted' WHERE state='generating'")
             try db.execute(sql: "UPDATE messages SET state='interrupted' WHERE state='generating'")
             for task in try Row.fetchAll(
-                db,
-                sql:
-                    "SELECT id,dialog_id,goal,failure,finished_at FROM tasks WHERE status='interrupted' AND compression_hash IS NULL AND dialog_id IS NOT NULL"
-            ) {
-                let taskID: Int64 = task["id"]
+                db, sql: "SELECT * FROM assistant_tasks WHERE status='interrupted' AND compression_json IS NULL")
+            {
+                let key: Int64 = task["id"]
                 let sources = try Row.fetchAll(
                     db,
                     sql:
-                        "SELECT input_id,client_id FROM messages WHERE task_id=? AND role='assistant' ORDER BY position,id",
-                    arguments: [taskID])
+                        "SELECT m.input_id,r.request_id,r.position FROM model_request_log r JOIN messages m ON m.id=r.message_id WHERE m.task_id=? ORDER BY r.position,r.id",
+                    arguments: [key])
                 guard !sources.isEmpty else { continue }
-                let compression = ConversationTaskCompression(
-                    taskID: SQLiteRecordKey.id(.task, taskID), goal: task["goal"], status: .interrupted,
+                let value = ConversationTaskCompression(
+                    taskID: SQLiteRecordKey.id(.task, key), goal: task["goal"], status: .interrupted,
                     reportedSummary: nil, failure: task["failure"],
                     completedAt: Date(timeIntervalSince1970: task["finished_at"]),
-                    sources: sources.map { .init(inputID: $0["input_id"], requestID: $0["client_id"]) })
-                let hash = try Self.blob(JSONEncoder().encode(compression), in: db)
+                    sources: sources.map { .init(inputID: $0["input_id"], requestID: $0["request_id"]) })
                 try db.execute(
                     sql:
-                        "UPDATE tasks SET compression_hash=?,first_position=(SELECT MIN(position) FROM messages WHERE task_id=? AND role='assistant') WHERE id=?",
-                    arguments: [hash, taskID, taskID])
+                        "UPDATE assistant_tasks SET compression_json=?,summary_revision=source_revision,first_position=? WHERE id=?",
+                    arguments: [
+                        String(decoding: try JSONEncoder().encode(value), as: UTF8.self),
+                        sources.first?["position"] as Int64?, key,
+                    ])
             }
+
         }
     }
-}
-
-/// Private ORM mapping. Stored records never escape the SQLite backend.
-private struct SQLiteMessageRow: Codable, FetchableRecord, MutablePersistableRecord {
-    static let databaseTableName = "messages"
-    var id: Int64?
-    var dialogID: Int64
-    var clientID: String
-    var inputID: String
-    var role: String
-    var kind: String
-    var position: Int64
-    var createdAt: Double
-    var body: String
-    var preview: String
-    var state: String
-    var replyToMessageID: Int64?
-    var taskID: Int64?
-    var detailHash: String
-    enum CodingKeys: String, CodingKey {
-        case id, role, kind, position, body, preview, state
-        case dialogID = "dialog_id"
-        case clientID = "client_id"
-        case inputID = "input_id"
-        case createdAt = "created_at"
-        case replyToMessageID = "reply_to_message_id"
-        case taskID = "task_id"
-        case detailHash = "detail_hash"
-    }
-    mutating func didInsert(_ inserted: InsertionSuccess) { id = inserted.rowID }
-    func requireID() throws -> Int64 {
-        guard let id else { throw RecordStorageError.invalidRecord }
-        return id
-    }
-}
-
-private struct SQLiteDialogRow: Codable, FetchableRecord, MutablePersistableRecord {
-    static let databaseTableName = "dialogs"
-    var id: Int64?
-    var agent: String
-    var createdAt: Double
-    var archivedAt: Double? = nil
-    enum CodingKeys: String, CodingKey {
-        case id, agent
-        case createdAt = "created_at"
-        case archivedAt = "archived_at"
-    }
-    mutating func didInsert(_ inserted: InsertionSuccess) { id = inserted.rowID }
 }

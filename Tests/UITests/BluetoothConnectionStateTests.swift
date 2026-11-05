@@ -12,13 +12,13 @@ func bluetoothConnectionLabelsIgnoreExecutionMessagesAndManualActivity() {
     state.jogging = true
     state.error = "动作反馈超时"
     state.notice = "未收到位置反馈"
-    #expect(state.summary == "已连接")
-    #expect(state.status(for: device.id) == "已连接")
-    #expect(state.status(for: UUID().uuidString) == "未连接")
+    #expect(state.summary == "Connected")
+    #expect(state.status(for: device.id) == "Connected")
+    #expect(state.status(for: UUID().uuidString) == "Not Connected")
     // Execution presentation messages do not change native connection status.
     state.error = nil
     state.notice = nil
-    #expect(state.controlReady && state.summary == "已连接")
+    #expect(state.controlReady && state.summary == "Connected")
 }
 
 @Test @MainActor
@@ -28,19 +28,19 @@ func bluetoothConnectionLabelsFollowCurrentRecovery() {
     state.selected = device
     state.error = "旧动作异常"
     state.phase = .connecting
-    #expect(state.status(for: device.id) == "正在连接…")
+    #expect(state.status(for: device.id) == "Connecting…")
     state.phase = .idle
     state.recoveryStage = .waiting
-    #expect(state.summary == "正在重连…")
+    #expect(state.summary == "Reconnecting…")
     state.recoveryStage = .waitingForBluetooth
-    #expect(state.summary == "等待蓝牙开启")
+    #expect(state.summary == "Waiting for Bluetooth")
     state.phase = .failed
     state.recoveryStage = .failed
-    #expect(state.summary == "未连接" && state.status(for: device.id) == "未连接")
+    #expect(state.summary == "Not Connected" && state.status(for: device.id) == "Not Connected")
     state.phase = .idle
     state.recoveryStage = .idle
     state.availability = .available
-    #expect(state.summary == "未连接" && state.canScan)
+    #expect(state.summary == "Not Connected" && state.canScan)
 }
 
 @Test @MainActor
@@ -125,13 +125,13 @@ func bluetoothConnectedWarningUsesOnlyCurrentNativeIssue() {
     #expect(state.currentMessage(for: device.id) == nil)
     let nativeIssue = "发送设备指令失败（CBErrorDomain 7）"
     state.transportIssue = nativeIssue
-    #expect(state.status(for: device.id) == "已连接，异常")
+    #expect(state.status(for: device.id) == "Connected, issue")
     #expect(state.hasConnectionIssue(device.id))
     #expect(state.currentMessage(for: device.id) == nativeIssue)
     #expect(!state.hasConnectionIssue(UUID().uuidString))
     #expect(state.currentMessage(for: UUID().uuidString) == nil)
     state.transportIssue = nil
-    #expect(state.status(for: device.id) == "已连接")
+    #expect(state.status(for: device.id) == "Connected")
     #expect(!state.hasConnectionIssue(device.id))
     #expect(state.currentMessage(for: device.id) == nil)
 }
@@ -144,12 +144,12 @@ func bluetoothOpenDetailDisablesAllMotorAdmissionAfterDisconnect() {
     state.phase = .connected
     #expect(state.canControl(device.id))
     state.transportIssue = "暂未收到新的机械臂位置反馈"
-    #expect(state.status(for: device.id) == "已连接，异常")
+    #expect(state.status(for: device.id) == "Connected, issue")
     #expect(state.canControl(device.id))
     state.phase = .disconnecting
     #expect(!state.canControl(device.id))
     state.phase = .idle
-    #expect(state.status(for: device.id) == "未连接")
+    #expect(state.status(for: device.id) == "Not Connected")
     #expect(!state.canControl(device.id))
     #expect(!state.canControl(UUID().uuidString))
 }
@@ -162,8 +162,8 @@ func bluetoothCurrentStateDoesNotBorrowAnotherDevicesRecoveryOrRetainIdleError()
     state.selected = current
     state.recoveryDeviceID = old.id
     state.phase = .connected
-    #expect(state.status(for: old.id) == "未连接")
-    #expect(state.status(for: current.id) == "已连接")
+    #expect(state.status(for: old.id) == "Not Connected")
+    #expect(state.status(for: current.id) == "Connected")
     state.error = "Previous connection failure"
     state.phase = .idle
     state.recoveryStage = .idle

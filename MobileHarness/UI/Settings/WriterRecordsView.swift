@@ -40,34 +40,41 @@ public struct WriterTaskItem: Identifiable, Sendable, Codable {
     public let id: String
     public let dialogID: String
     public let goal: String
-    public let projectID: String?
-    public let runID: String
+    public let workspaceID: String?
+    public let delegateID: String
     public let status: String
     public let failure: String?
     public let updatedAt: Date
     public var startedAt: Date? = nil
     public var requestCount: Int = 0
+    public var completedDuration: TimeInterval? = 0
+    public var activeSince: Date? = nil
     public var phase: String? = nil
     public init(
-        id: String, dialogID: String, goal: String, projectID: String?, runID: String, status: String, failure: String?,
+        id: String, dialogID: String, goal: String, workspaceID: String?, delegateID: String, status: String,
+        failure: String?,
         updatedAt: Date
     ) {
         self.id = id
         self.dialogID = dialogID
         self.goal = goal
-        self.projectID = projectID
-        self.runID = runID
+        self.workspaceID = workspaceID
+        self.delegateID = delegateID
         self.status = status
         self.failure = failure
         self.updatedAt = updatedAt
     }
+    public func elapsed(at date: Date) -> TimeInterval? {
+        completedDuration.map { $0 + (activeSince.map { max(0, date.timeIntervalSince($0)) } ?? 0) }
+    }
     public var statusTitle: String {
         switch status {
-        case "running", "finishing": phase == "waitingUser" ? "进行中 · 等待补充" : phase == "paused" ? "进行中 · 已暂停" : "进行中"
-        case "completed", "succeeded": "成功"
-        case "cancelled": "已取消"
-        case "interrupted": "异常中断"
-        default: "异常失败"
+        case "running", "finishing": phase == "waitingUser" ? "Waiting" : phase == "paused" ? "Paused" : "Running"
+        case "completed", "succeeded": "Completed"
+        case "cancelled": "Cancelled"
+        case "interrupted": "Interrupted"
+        case "failed": "Failed"
+        default: "Unknown"
         }
     }
 }
@@ -75,29 +82,39 @@ public struct WriterRequestItem: Identifiable, Sendable {
     public let id: String
     public let position: UInt64
     public let number: Int
-    public let runID: String
+    public let delegateID: String
     public let phase: String
     public let path: String?
     public let attempt: Int
     public let date: Date
     public let state: String
+    public let title: String
     public init(
-        id: String, position: UInt64, number: Int, runID: String, phase: String, path: String?, attempt: Int,
-        date: Date, state: String
+        id: String, position: UInt64, number: Int, delegateID: String, phase: String, path: String?, attempt: Int,
+        date: Date, state: String, title: String = "创作步骤"
     ) {
         self.id = id
         self.position = position
         self.number = number
-        self.runID = runID
+        self.delegateID = delegateID
         self.phase = phase
         self.path = path
         self.attempt = attempt
         self.date = date
         self.state = state
+        self.title = title
     }
-    public var icon: String {
-        state == "failed"
-            ? "exclamationmark.triangle" : attempt > 1 ? "arrow.clockwise" : path == nil ? "brain" : "doc.text"
+    public var displayTitle: String { title + (attempt > 1 ? "（重试）" : "") }
+    public var statusTitle: String {
+        switch state {
+        case "generating": "生成中"
+        case "executing": "执行中"
+        case "completed": "已完成"
+        case "failed": "失败"
+        case "cancelled": "已取消"
+        case "interrupted": "已中断"
+        default: "未知"
+        }
     }
 }
 public struct WriterRequestPage: Sendable {
@@ -124,6 +141,27 @@ public struct WriterFilePreview: Sendable {
         self.root = root
     }
 }
+public enum WriterRecordPresentation {
+    public static func duration(_ seconds: TimeInterval?) -> String {
+        guard let seconds, seconds.isFinite, seconds >= 0, seconds < Double(Int.max) else { return "未知" }
+        let value = Int(seconds)
+        return value >= 3600
+            ? "\(value / 3600) 小时 \(value / 60 % 60) 分 \(value % 60) 秒"
+            : value >= 60 ? "\(value / 60) 分 \(value % 60) 秒" : "\(value) 秒"
+    }
+    public static func firstToken(_ request: HistoryModelRequest) -> String {
+        guard let latency = request.firstTokenLatency, latency.isFinite, latency >= 0 else {
+            return "首 token 耗时：未知"
+        }
+        return "首 token 耗时：\(String(format: "%.3f", latency)) 秒"
+    }
+    public static func requestDuration(_ request: HistoryModelRequest, at now: Date) -> String {
+        let end = request.modelRequestCompletedAt ?? (request.state == .generating ? now : nil)
+        guard let end else { return "总计耗时：未知" }
+        let elapsed = max(0, end.timeIntervalSince(request.modelRequestStartedAt ?? request.date))
+        return "总计耗时：\(String(format: "%.3f", elapsed)) 秒"
+    }
+}
 #if os(iOS)
     import SwiftUI
     import UIKit
@@ -143,24 +181,31 @@ public struct WriterFilePreview: Sendable {
         public var body: some View {
             List {
                 if let failure { Text(failure).foregroundStyle(.red) }
-                ForEach(items) { item in
-                    NavigationLink {
-                        WriterTaskDetail(seed: item, controls: controls, artifacts: artifacts)
-                    } label: {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Label(item.goal, systemImage: "pencil.and.outline").foregroundStyle(.purple)
-                            Text("\(item.id) · \(item.requestCount) 轮").font(.caption.monospaced()).foregroundStyle(
-                                .secondary)
-                            Text(item.statusTitle).font(.caption).foregroundStyle(
-                                .secondary)
-                            Text(item.updatedAt, format: .dateTime.year().month().day().hour().minute()).font(.caption2)
-                                .foregroundStyle(.secondary)
+                Section {
+                    ForEach(items) { item in
+                        NavigationLink {
+                            WriterTaskDetail(seed: item, controls: controls, artifacts: artifacts)
+                        } label: {
+                            HistoryRecordRow(
+                                title: item.goal, icon: "pencil.and.outline",
+                                tint: Color(red: 0.65, green: 0.5, blue: 0.82)
+                            ) {
+                                ViewThatFits(in: .horizontal) {
+                                    metadata(item, stacked: false)
+                                    metadata(item, stacked: true)
+                                }
+                            }
                         }
-                    }.accessibilityIdentifier("writer.task." + item.id)
+                        .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
+                        .accessibilityIdentifier("writer.task." + item.id)
+                    }
+                    if items.isEmpty && !loading && failure == nil { Text("No writing tasks yet.") }
+                    if more {
+                        Button(loading ? "Loading…" : "Load More") { Task { await load(reset: false) } }
+                            .disabled(loading)
+                    }
                 }
-                if items.isEmpty && !loading && failure == nil { Text("暂无创作任务") }
-                if more { Button(loading ? "正在加载…" : "加载更多") { Task { await load(reset: false) } }.disabled(loading) }
-            }.navigationTitle("Writer 任务记录").task {
+            }.navigationTitle("My Writer").navigationBarTitleDisplayMode(.inline).task {
                 await load(reset: true)
                 while !Task.isCancelled {
                     do {
@@ -172,6 +217,45 @@ public struct WriterFilePreview: Sendable {
                     }
                 }
             }.refreshable { await load(reset: true) }
+        }
+        @ViewBuilder private func metadata(_ item: WriterTaskItem, stacked: Bool) -> some View {
+            if stacked {
+                VStack(alignment: .leading, spacing: 4) {
+                    taskFacts(item)
+                    taskDate(item).frame(maxWidth: .infinity, alignment: .trailing)
+                }
+            } else {
+                HStack(spacing: 8) {
+                    taskFacts(item).fixedSize()
+                    Spacer(minLength: 0)
+                    taskDate(item)
+                }
+            }
+        }
+        private func taskFacts(_ item: WriterTaskItem) -> some View {
+            HStack(spacing: 5) {
+                Text(item.id)
+                Text("·")
+                Text("\(item.requestCount) turns")
+                Text(item.statusTitle)
+                    .font(.caption2)
+                    .padding(.horizontal, 5).padding(.vertical, 2)
+                    .foregroundStyle(statusColor(item.status))
+                    .background(statusColor(item.status).opacity(0.12), in: Capsule())
+            }
+        }
+        private func taskDate(_ item: WriterTaskItem) -> some View {
+            Text(HistoryListPresentation.date(item.updatedAt))
+                .fixedSize()
+                .accessibilityLabel("Last updated " + item.updatedAt.formatted(date: .complete, time: .shortened))
+        }
+        private func statusColor(_ status: String) -> Color {
+            switch status {
+            case "running", "finishing": .blue
+            case "completed", "succeeded": .green
+            case "failed": .red
+            default: .secondary
+            }
         }
         private func refreshStates() async throws {
             guard !loading, !items.isEmpty else { return }
@@ -211,17 +295,28 @@ public struct WriterFilePreview: Sendable {
         var body: some View {
             List {
                 Section {
-                    Label((current ?? seed).goal, systemImage: "pencil.and.outline").foregroundStyle(.purple)
-                        .accessibilityIdentifier("writer.task.goal")
-                    Text((current ?? seed).id).font(.caption.monospaced()).foregroundStyle(.secondary)
+                    HStack(alignment: .center, spacing: 12) {
+                        Image(systemName: "pencil.and.outline").foregroundStyle(.purple)
+                            .frame(width: 24)
+                        VStack(alignment: .leading, spacing: 5) {
+                            Text((current ?? seed).id).font(.caption.monospaced()).foregroundStyle(.secondary)
+                            Text(verbatim: (current ?? seed).goal).font(.body).foregroundStyle(.primary)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .accessibilityIdentifier("writer.task.goal")
+                        }.frame(maxWidth: .infinity, alignment: .leading)
+                    }
                     if let date = (current ?? seed).startedAt {
                         LabeledContent("开始时间", value: date.formatted(date: .abbreviated, time: .standard))
                             .accessibilityIdentifier("writer.task.started")
                     }
-                    LabeledContent("状态", value: (current ?? seed).statusTitle)
+                    LabeledContent(
+                        "持续时间", value: WriterRecordPresentation.duration((current ?? seed).elapsed(at: .now))
+                    )
+                    .accessibilityIdentifier("writer.task.duration")
                     LabeledContent("执行轮次", value: String((current ?? seed).requestCount))
+                    LabeledContent("最新状态", value: (current ?? seed).statusTitle)
                     if let error = (current ?? seed).failure { Text(error).foregroundStyle(.red) }
-                    if let project = (current ?? seed).projectID {
+                    if let project = (current ?? seed).workspaceID {
                         NavigationLink {
                             WriterArtifactDetail(
                                 item: .init(id: project, title: seed.goal, state: "draft", entry: "index.html"),
@@ -241,21 +336,39 @@ public struct WriterFilePreview: Sendable {
                 if let failure { Text(failure).foregroundStyle(.red) }
                 Section("执行轮次") {
                     ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
-                        if index == 0 || items[index - 1].runID != item.runID {
-                            Text("执行 · " + item.runID).font(.caption).foregroundStyle(.secondary)
+                        if index == 0 || items[index - 1].delegateID != item.delegateID {
+                            Text(
+                                "委托 "
+                                    + String(
+                                        items.prefix(index + 1).enumerated().filter {
+                                            $0.offset == 0 || items[$0.offset - 1].delegateID != $0.element.delegateID
+                                        }.count)
+                            ).font(.caption).foregroundStyle(.secondary)
                         }
                         NavigationLink {
                             WriterRequestDetail(messageID: item.id, controls: controls)
                         } label: {
-                            VStack(alignment: .leading, spacing: 5) {
-                                Label("第\(item.number)轮 · " + item.phase, systemImage: item.icon)
-                                if let path = item.path { Text(path).font(.caption.monospaced()) }
-                                Text(item.date, format: .dateTime.month().day().hour().minute().second()).font(
-                                    .caption2
-                                ).foregroundStyle(.secondary)
-                                Text(item.state + (item.attempt > 1 ? " · 第\(item.attempt)次尝试" : "")).font(.caption)
-                                    .foregroundStyle(item.state == "failed" ? .red : .secondary)
-                            }
+                            HStack(alignment: .center, spacing: 12) {
+                                Text(String(item.number)).font(
+                                    .system(.subheadline, design: .rounded).weight(.semibold).monospacedDigit()
+                                )
+                                .frame(minWidth: 34, minHeight: 36).padding(.horizontal, 3)
+                                .foregroundStyle(numberTint(item))
+                                .background(numberTint(item).opacity(0.14), in: RoundedRectangle(cornerRadius: 10))
+                                .accessibilityLabel("第\(item.number)轮")
+                                VStack(alignment: .leading, spacing: 7) {
+                                    Text(verbatim: item.displayTitle).font(.body).foregroundStyle(.primary)
+                                        .lineLimit(2).truncationMode(.tail)
+                                    HStack(spacing: 8) {
+                                        Text(item.date, format: .dateTime.month().day().hour().minute().second())
+                                            .foregroundStyle(.secondary).lineLimit(1)
+                                        Spacer(minLength: 0)
+                                        Text(item.statusTitle).padding(.horizontal, 6).padding(.vertical, 2)
+                                            .foregroundStyle(stateTint(item.state))
+                                            .background(stateTint(item.state).opacity(0.12), in: Capsule()).fixedSize()
+                                    }.font(.caption2)
+                                }
+                            }.padding(.vertical, 3)
                         }.accessibilityIdentifier("writer.request." + item.id)
                     }
                     if let next { Button("加载更多") { Task { await load(after: next, reset: false) } }.disabled(reading) }
@@ -289,6 +402,18 @@ public struct WriterFilePreview: Sendable {
                             }
                         }
                 }
+        }
+        private func stateTint(_ state: String) -> Color {
+            switch state {
+            case "failed": .red
+            case "cancelled": .secondary
+            case "interrupted": .orange
+            case "completed": .green
+            default: .blue
+            }
+        }
+        private func numberTint(_ item: WriterRequestItem) -> Color {
+            item.state == "failed" ? .red : .gray
         }
         private func load(after: UInt64, reset: Bool) async {
             guard !reading else { return }
@@ -333,7 +458,7 @@ public struct WriterFilePreview: Sendable {
                 if let failure { Text(failure).foregroundStyle(.red) }
                 ForEach(loaded?.turns ?? []) { input in
                     Section("请求") {
-                        Text(input.user).textSelection(.enabled)
+                        DisclosureGroup("请求输入") { Text(input.user).textSelection(.enabled) }
                         Text("模型 · " + input.model)
                         Text(input.date, style: .time)
                         if let maximum = input.maximumOutputTokens { Text("最大输出 · \(maximum)") }
@@ -352,7 +477,20 @@ public struct WriterFilePreview: Sendable {
                     }
                     ForEach(input.modelRequests ?? []) { request in
                         Section(request.decisionMetadata?.mode ?? "模型请求") {
-                            if !request.response.isEmpty { Text(request.response).textSelection(.enabled) }
+                            Text(WriterRecordPresentation.firstToken(request))
+                                .accessibilityIdentifier("writer.request.ttft")
+                            Text(WriterRecordPresentation.requestDuration(request, at: .now))
+                                .accessibilityIdentifier("writer.request.duration")
+                            if !request.response.isEmpty {
+                                if request.decisionMetadata?.mode == "文件内容请求" {
+                                    DisclosureGroup("文件内容") {
+                                        Text(request.response).font(.system(.caption, design: .monospaced))
+                                            .textSelection(.enabled).accessibilityIdentifier("writer.request.source")
+                                    }.accessibilityIdentifier("writer.request.content")
+                                } else {
+                                    Text(request.response).textSelection(.enabled)
+                                }
+                            }
                             Text(request.state.rawValue)
                             if let reason = request.finishReason { Text("结束原因 · " + reason) }
                             ForEach(imageIDs(request.requestJSON), id: \.self) { id in
@@ -373,10 +511,14 @@ public struct WriterFilePreview: Sendable {
                         }
                         ForEach(request.toolCalls) { call in
                             Section("Tool · " + call.name) {
-                                Text(call.argumentsJSON).font(.system(.caption, design: .monospaced)).textSelection(
-                                    .enabled)
+                                DisclosureGroup("调用参数") {
+                                    Text(call.argumentsJSON).font(.system(.caption, design: .monospaced)).textSelection(
+                                        .enabled)
+                                }
                                 Text(call.state.rawValue)
-                                if let output = call.output { Text(output).textSelection(.enabled) }
+                                if let output = call.output {
+                                    DisclosureGroup("调用结果") { Text(output).textSelection(.enabled) }
+                                }
                                 if let diagnostic = call.failureDiagnostic {
                                     WriterFailureDetail(diagnostic: diagnostic)
                                 } else if let error = call.error {

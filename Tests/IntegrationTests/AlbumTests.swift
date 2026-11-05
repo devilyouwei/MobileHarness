@@ -22,8 +22,8 @@ import UI
 
 private let albumOwner = StorageOwner(
     namespace: "photos", source: "assistant", session: "album-session", input: "album-input")
-private func albumMetadata(_ mime: String = "image/jpeg", date: Date? = nil) -> PhotoMetadata {
-    PhotoMetadata(mime: mime, width: 2, height: 3, capturedAt: date, origin: "import")
+private func albumMetadata(_ mime: String = "image/jpeg", date: Date? = nil) -> MediaMetadata {
+    MediaMetadata(mime: mime, width: 2, height: 3, capturedAt: date, origin: "import")
 }
 
 @Test func albumCollectionIsSeparateFromReadyAndSurvivesReopening() async throws {
@@ -31,7 +31,7 @@ private func albumMetadata(_ mime: String = "image/jpeg", date: Date? = nil) -> 
     defer { try? FileManager.default.removeItem(at: url) }
     let files = try MemoryFileStore()
     let first = try SQLiteRepositories(url: url)
-    let store = CapturedPhotoStore(repository: first.media, files: files)
+    let store = MediaStore(repository: first.media, files: files)
     let id = try await store.save(Data([1, 2, 3]), owner: albumOwner)
     #expect(try await store.albumPage().items.isEmpty)
     try await store.collect(id, owner: albumOwner, metadata: albumMetadata())
@@ -39,7 +39,7 @@ private func albumMetadata(_ mime: String = "image/jpeg", date: Date? = nil) -> 
     #expect(try await store.albumPage().items.map(\.id) == [id])
     try await first.shutdown()
     let second = try SQLiteRepositories(url: url)
-    let reopened = CapturedPhotoStore(repository: second.media, files: files)
+    let reopened = MediaStore(repository: second.media, files: files)
     #expect(try await reopened.readAlbum(id) == Data([1, 2, 3]))
     #expect(try await reopened.albumPage().items.count == 1)
     try await second.shutdown()
@@ -48,7 +48,7 @@ private func albumMetadata(_ mime: String = "image/jpeg", date: Date? = nil) -> 
 @Test func albumRetentionNeverEvictsCollectedPhotoAndRejectsFullCapacity() async throws {
     let records = try SQLiteRepositories.temporary()
     let files = try MemoryFileStore()
-    let store = CapturedPhotoStore(
+    let store = MediaStore(
         repository: records.media, files: files,
         limits: .init(maximumPhotos: 2, maximumBytes: 8, overflowPolicy: .evictOldest))
     let kept = try await store.save(Data([1, 2]), owner: albumOwner)
@@ -66,7 +66,7 @@ private func albumMetadata(_ mime: String = "image/jpeg", date: Date? = nil) -> 
 @Test func albumPaginationOrdersEqualDatesByStableIDAndImportsKeepBytes() async throws {
     let records = try SQLiteRepositories.temporary()
     let files = try MemoryFileStore()
-    let store = CapturedPhotoStore(
+    let store = MediaStore(
         repository: records.media, files: files,
         limits: .init(maximumPhotos: 64, maximumBytes: 1024, overflowPolicy: .reject))
     let date = Date(timeIntervalSince1970: 12345)
@@ -109,13 +109,13 @@ private actor AlbumFailingRemoveStore: FileStore {
 @Test func albumDeleteCommitsBeforeCleanupAndRecoveryNeverResurrectsPhoto() async throws {
     let records = try SQLiteRepositories.temporary()
     let files = try AlbumFailingRemoveStore()
-    let store = CapturedPhotoStore(repository: records.media, files: files)
+    let store = MediaStore(repository: records.media, files: files)
     let id = try await store.importPhoto(Data([1, 2]), owner: albumOwner, metadata: albumMetadata())
     await #expect(throws: (any Error).self) { try await store.deleteAlbum(id) }
-    #expect(try records.media.albumPhoto(id) == nil)
+    #expect(try records.media.albumMedia(id) == nil)
     #expect(try records.media.media(id)?.state == "deleting")
     await files.allowRemove()
-    let reopened = CapturedPhotoStore(repository: records.media, files: files)
+    let reopened = MediaStore(repository: records.media, files: files)
     #expect(try await reopened.albumPage().items.isEmpty)
     #expect(try records.media.media(id)?.state == "deleted")
     #expect(try await reopened.readForInput(id, source: albumOwner.source, input: albumOwner.input) == nil)
@@ -144,7 +144,7 @@ private actor AlbumFailingRemoveStore: FileStore {
         let info = try await NativeAlbumImage.inspect(data)
         #expect(info.width == 2 && info.height == 3)
         let records = try SQLiteRepositories.temporary()
-        let store = CapturedPhotoStore(repository: records.media, files: try MemoryFileStore())
+        let store = MediaStore(repository: records.media, files: try MemoryFileStore())
         let service = PhotoAlbumService(photos: store, export: { _ in })
         _ = try await service.perform(.importPhotos([AlbumImportSource { data }]), owner: albumOwner)
         let id = try #require(try await store.albumPage().items.first?.id)
@@ -155,7 +155,7 @@ private actor AlbumFailingRemoveStore: FileStore {
     }
     @Test func albumServiceImportsIndividualResultsPreservesFilesAndExportFailureRetainsPhoto() async throws {
         let records = try SQLiteRepositories.temporary()
-        let store = CapturedPhotoStore(repository: records.media, files: try MemoryFileStore())
+        let store = MediaStore(repository: records.media, files: try MemoryFileStore())
         let service = PhotoAlbumService(photos: store, export: { _ in throw PhotoAlbumError.unavailable })
         let jpeg = try albumImage(.jpeg)
         let png = try albumImage(.png)
@@ -200,37 +200,28 @@ private actor AlbumFailingRemoveStore: FileStore {
         var handle: OpaquePointer?
         #expect(sqlite3_open(url.path, &handle) == SQLITE_OK)
         let database = try #require(handle)
-        let seed =
-            SQLiteChatRepository.schemaSQL + SQLiteTaskRepository.schemaSQL + SQLiteDeviceRepository.schemaSQL + """
-                CREATE TABLE grdb_migrations(identifier TEXT NOT NULL PRIMARY KEY);
-                INSERT INTO grdb_migrations VALUES('records-v1'),('record-lifecycle-v2');
-                CREATE TABLE media_files(id INTEGER PRIMARY KEY AUTOINCREMENT,kind TEXT NOT NULL,mime TEXT NOT NULL,
-                  relative_path TEXT NOT NULL UNIQUE,bytes INTEGER NOT NULL,source TEXT NOT NULL,session_id TEXT NOT NULL,
-                  input_id TEXT NOT NULL,created_at REAL NOT NULL,captured_at REAL,state TEXT NOT NULL,failure TEXT);
-                INSERT INTO media_files VALUES(1,'image','image/jpeg','legacy.jpg',2,'assistant','album-session','album-input',123,123,'ready',NULL);
-                INSERT INTO dialogs(id,agent,created_at,input_count) VALUES(1,'assistant',123,1),(2,'writer',123,1);
-                INSERT INTO evidence(hash,data) VALUES('old-evidence',X'00');
-                INSERT INTO tasks(id,dialog_id,agent,executor,execution,goal,status,created_at)
-                  VALUES(1,2,'writer','writer','background','old goal','completed',123);
-                INSERT INTO delegated_tasks(id,agent,dialog_id,goal,current_run_id,updated_at)
-                  VALUES(1,'writer',2,'old goal',1,123);
-                INSERT INTO delegated_runs(run_id,task_id,input) VALUES(1,1,'old input');
-                INSERT INTO messages(dialog_id,client_id,input_id,role,kind,position,created_at,body,preview,state,detail_hash)
-                  VALUES(1,'old-assistant','old-assistant','user','input',1,123,'old','old','completed','old-evidence'),
-                        (2,'old-writer','old-writer','user','input',1,123,'old','old','completed','old-evidence');
-                INSERT INTO devices(native_id,name,selected,reconnect) VALUES('old-device','old device',1,1);
-                """
+        let seed = """
+            PRAGMA user_version=1;
+            CREATE TABLE dialogs(id INTEGER PRIMARY KEY,body TEXT);
+            INSERT INTO dialogs VALUES(1,'old assistant'),(2,'old writer');
+            CREATE TABLE media_files(id INTEGER PRIMARY KEY,relative_path TEXT);
+            INSERT INTO media_files VALUES(1,'legacy.jpg');
+            CREATE TABLE tasks(id INTEGER PRIMARY KEY,goal TEXT);
+            INSERT INTO tasks VALUES(1,'old task');
+            CREATE TABLE devices(id INTEGER PRIMARY KEY,name TEXT);
+            INSERT INTO devices VALUES(1,'old device');
+            """
         let seeded = sqlite3_exec(database, seed, nil, nil, nil)
         sqlite3_close(database)
         #expect(seeded == SQLITE_OK)
         let records = try SQLiteRepositories(url: url)
         let files = try MemoryFileStore()
         try await files.putIfAbsent(Data([1, 2]), key: "legacy.jpg")
-        let store = CapturedPhotoStore(repository: records.media, files: files)
+        let store = MediaStore(repository: records.media, files: files)
         #expect(try await store.albumPage().items.isEmpty)
         #expect(try await store.readForInput("media_1", source: "assistant", input: "album-input") == nil)
         #expect(try await records.chat.current(agent: "assistant").count == 0)
-        #expect(try await records.chat.current(agent: "writer").count == 0)
+        await #expect(throws: RecordStorageError.missingRecord) { try await records.chat.current(agent: "writer") }
         #expect(try await records.tasks.delegatedTasks(agent: "writer", before: nil, limit: 50).isEmpty)
         #expect(try await records.devices.selectedDevice() == nil)
         try await records.shutdown()
@@ -251,7 +242,7 @@ private actor AlbumExportGate {
 }
 @Test func albumExportRejectsOverlappingMutationAndJoinsCommittedWork() async throws {
     let records = try SQLiteRepositories.temporary()
-    let store = CapturedPhotoStore(repository: records.media, files: try MemoryFileStore())
+    let store = MediaStore(repository: records.media, files: try MemoryFileStore())
     let id = try await store.importPhoto(Data([1, 2]), owner: albumOwner, metadata: albumMetadata())
     let gate = AlbumExportGate()
     let service = PhotoAlbumService(photos: store, export: { _ in await gate.wait() })
@@ -282,7 +273,7 @@ func albumUIRequestsExecuteThroughPhotographerAndGateway() async throws {
     let ui = UIContainer()
     try ui.start()
     let records = try SQLiteRepositories.temporary()
-    let store = CapturedPhotoStore(repository: records.media, files: try MemoryFileStore())
+    let store = MediaStore(repository: records.media, files: try MemoryFileStore())
     let id = try await store.importPhoto(Data([1, 2]), owner: albumOwner, metadata: albumMetadata())
     let service = PhotoAlbumService(photos: store, export: { _ in throw PhotoAlbumError.unavailable })
     let manager = AgentManager()

@@ -179,7 +179,7 @@ stateSnapshot projects local installation/closure and existing work or Agent lif
 
 SpeechPerceptionContainer.presentation returns one complete SpeechSessionPresentation for an installed interaction. It includes typed conversation/activity/detection state, request interfaces and diagnostics; App does not combine optional child fields. Identity remains stable for that interaction. Stop invalidates the debug validation entry and releases the projection after joining shutdown; stale validation requests fail explicitly.
 
-ASR创建、输入或结果失败属于当前识别轮次终态：保留原始agent.error，取消并加入该轮ASR/VAD，校验采集代/会话/运行态后重建下一轮。失败清空未提交字幕并finishTranscript，使用统一transition(.empty)写Context/listening、结束识别绑定，并在采集开启且聆听许可未撤销/未暂停时提交listening呈现；不能只改内部phase。processing是等待ASR收尾，不等于已提交LLM。恢复不发布speech.final、不重开麦克风、不改变用户同意；关闭/换代的迟到清理不复活旧会话。UI工具/通信失败继续报告，UI保持既有会话/序号/采集与回复占用围栏。
+ASR创建、输入或结果失败属于当前识别轮次终态：保留原始agent.error，取消并加入该轮ASR/VAD，校验采集代/会话/运行态后重建下一轮。失败保留本轮已有字幕并finishTranscript封口，使用统一transition(.empty)写Context/listening、结束识别绑定，并在采集开启且聆听许可未撤销/未暂停时提交listening呈现；不能只改内部phase。processing是等待ASR收尾，不等于已提交LLM。恢复不发布speech.final、不重开麦克风、不改变用户同意；关闭/换代的迟到清理不复活旧会话。UI工具/通信失败继续报告，UI保持既有会话/序号/采集与回复占用围栏。
 
 ReplyActivity以来源revision/incarnation验证占用及成功汇报事实，接纳时必须推进来源围栏并处理pendingFinal确认；只有已启听时合并paused改变，或成功汇报使enabled改变，才提交Speech.Listening.update。关闭聆听时单纯占用改变不提交关闭Action，避免反向取消主动播报。相同空闲、同态忙碌、另一个来源仍占用时的单方结束不会重复调用设备策略。此规则切断关闭→取消回复→空闲回执→再次关闭的反馈环；显式用户开关和原生采集结束仍走既有执行路径，不采用节流或日志过滤。
 
@@ -187,3 +187,11 @@ ReplyActivity以来源revision/incarnation验证占用及成功汇报事实，�
 
 
 汇报完成事实携带回复开始的进程单调时间；明确停止、原生采集结束、暂停及根关闭推进本地撤销围栏。来源incarnation/revision丢弃乱序快照，完成事实可独立于更早的占用快照接纳；较新停止之后的旧完成及重复完成不得重新启听。policy不直接操作设备，实际启动、权限和播放屏障继续归Actions；失败/取消回复没有成功完成事实。
+
+## 新人声字幕生命周期
+
+processFrame在VAD确认新轮并创建AgentTurn后、发送语音阶段或ASR首段文本前，显式调用UI.Caption.setTranscript空文本开启本轮字幕。麦克风启用／恢复不创建这个字幕边界。speech.phase(speaking)同时是给Assistant的新输入开始控制事实；同一识别轮内的阶段变化不重复清转写。partial/final只更新自己的槽，finishTranscript封口但不清空；失败恢复只封口已有文本并恢复许可，不抹掉已有转写。下一轮确认人声才替换上轮字幕。最终非空speech.final仍是唯一进入Assistant正式输入FIFO的识别文本，开始事实不要求Assistant推理。
+
+SpeechListening日志只记录策略与生命周期检查点：enabled/paused、pending-final是否存在、占用来源
+数量、capture/awaiting/nativeProcessing与phase，以及恢复的join/reset边界。不记录原始语音、图片
+或模型正文。它与原有私有内容日志分开，用于区分策略未释放、恢复未到达和DSP重建停滞。

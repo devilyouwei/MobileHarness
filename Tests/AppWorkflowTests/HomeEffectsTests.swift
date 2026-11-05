@@ -57,7 +57,7 @@ import Testing
     #expect(activity.notice == nil)
 }
 
-@Test @MainActor func noticeVisibilityRestoresRetainedBottomCaptionsAndSleepClearsBoth() {
+@Test @MainActor func noticeVisibilityRestoresRetainedBottomCaptionsAndSleepRetainsBoth() {
     let state = ConversationState()
     state.isVoiceActive = true
     state.liveTranscript = "用户说话"
@@ -69,11 +69,11 @@ import Testing
     #expect(ConversationCaptionVisibility.reply(hasNotice: false))
     #expect(ConversationCaptionVisibility.user(isListening: true, finalized: true, hasNotice: true))
     state.isVoiceActive = false
-    #expect(state.liveTranscript.isEmpty && state.assistantReply.isEmpty && !state.transcriptFinalized)
+    #expect(state.liveTranscript == "用户说话" && state.assistantReply == "正在回复" && !state.transcriptFinalized)
     #expect(state.displayedExpression == .closed)
 }
 
-@Test @MainActor func replyEndFadeCannotClearAReplacementOrSleepingSession() async throws {
+@Test @MainActor func replyEndRetainsCaptionsUntilTheirOwnerClearsOrSessionCloses() async throws {
     let state = ConversationState()
     state.isVoiceActive = true
     let effects = HomeEffectsWorkflow(activity: ActionActivityState())
@@ -82,24 +82,26 @@ import Testing
     state.assistantReply = "第一段"
     #expect(state.assistantReplyOpacity == 1)
     effects.replyDidFinish()
-    #expect(state.assistantReplyOpacity == 0 && state.assistantReply == "第一段")
+    #expect(state.assistantReplyOpacity == 1 && state.assistantReply == "第一段")
     effects.replyDidBegin()
     state.assistantReply = "第二段"
     try await Task.sleep(for: .milliseconds(450))
     #expect(state.assistantReply == "第二段" && state.assistantReplyOpacity == 1)
     effects.replyDidFinish()
     try await Task.sleep(for: .milliseconds(450))
-    #expect(state.assistantReply.isEmpty && state.assistantReplyOpacity == 1)
+    #expect(state.assistantReply == "第二段" && state.assistantReplyOpacity == 1)
     state.assistantReply = "关闭时的字幕"
     effects.replyDidFinish()
     state.isVoiceActive = false
     effects.replyDidBegin()
+    #expect(state.assistantReply == "关闭时的字幕")
+    state.resetCaptions()
     #expect(state.assistantReply.isEmpty && state.liveTranscript.isEmpty)
     effects.stop()
 }
 
 @Test(arguments: ["", "本轮回复"]) @MainActor
-func listeningRestorationClearsFinalUserCaptionEvenWithoutReplyText(reply: String) async {
+func listeningRestorationRetainsFinalUserCaptionEvenWithoutReplyText(reply: String) async {
     let state = ConversationState()
     state.isVoiceActive = true
     state.presentTranscript("本轮用户输入")
@@ -110,12 +112,12 @@ func listeningRestorationClearsFinalUserCaptionEvenWithoutReplyText(reply: Strin
 
     effects.replyDidFinish()
 
-    #expect(state.liveTranscript.isEmpty && !state.transcriptFinalized)
+    #expect(state.liveTranscript == "本轮用户输入" && state.transcriptFinalized)
     #expect(state.isVoiceActive && state.assistantReply == reply)
     await effects.stopAndWait()
 }
 
-@Test @MainActor func listeningRestorationPreservesNextPartialTranscriptThroughReplyExpiry() async throws {
+@Test @MainActor func listeningRestorationPreservesNextPartialTranscriptThroughReplyCompletion() async throws {
     let state = ConversationState()
     state.isVoiceActive = true
     state.presentTranscript("下一轮正在说话")
@@ -125,11 +127,8 @@ func listeningRestorationClearsFinalUserCaptionEvenWithoutReplyText(reply: Strin
 
     effects.replyDidFinish()
     #expect(state.liveTranscript == "下一轮正在说话" && !state.transcriptFinalized)
-    let deadline = ContinuousClock.now + .seconds(3)
-    while !state.assistantReply.isEmpty, ContinuousClock.now < deadline {
-        try await Task.sleep(for: .milliseconds(10))
-    }
-    #expect(state.assistantReply.isEmpty)
+    try await Task.sleep(for: .milliseconds(450))
+    #expect(state.assistantReply == "上一轮回复")
     #expect(state.liveTranscript == "下一轮正在说话" && !state.transcriptFinalized)
     await effects.stopAndWait()
 }

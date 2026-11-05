@@ -47,3 +47,5 @@ HTTP/传输诊断回归覆盖实际URLSession请求路径的timeout数值、DNS/
 Responses framing regressions cover deltas and repeated terminal output exceeding64KiB, valid Unicode chunk boundaries and streams exceeding8MiB. Bounded event queues remain separate from total output; malformed protocol and native arguments still fail explicitly.
 
 Shared-client concurrency uses twelve held URLProtocol requests against one actual OpenAIChat/resource context. It verifies per-session cancellation, continued occupancy by other requests and joined root shutdown; no real provider requests are issued.
+
+Large native-argument regression streams payloads beyond 4 KiB and 64 KiB, validates terminal identity/arguments and reserializes a paired transcript without truncation.

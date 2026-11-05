@@ -9,11 +9,14 @@ extension ArtifactsActions {
             .init(
                 "command",
                 description:
-                    "projects/open/delete for Assistant; start/preview/list/read/search/edit/replace/remove/move/removeTree/diff/savepoint/restore/versions/restoreVersion/render/finish for Writer"
+                    "projects/open/delete for Assistant; start/describe/rename/preview/list/read/search/edit/replace/remove/move/removeTree/diff/savepoint/restore/render/finish for Writer"
             ),
-            .init("createProject", required: false, description: "Runtime only: initialize a reserved project ID"),
-            .init("projectID", required: false, description: "Existing project ID; absent creates a project"),
-            .init("title", required: false, description: "Project title"),
+            .init("createWorkspace", required: false, description: "Runtime only: initialize an agent/task workspace"),
+            .init("executor", required: false, description: "Assistant library: owning Agent ID, e.g. writer"),
+            .init("taskID", required: false, description: "Assistant library: owning Agent-local task_N"),
+            .init("workspaceID", required: false, description: "Runtime: registered agent/task_N workspace identity"),
+            .init("title", required: false, description: "Concise artifact title; edit/rename may update it"),
+            .init("subtitle", required: false, description: "Runtime only: current goal or actual operation"),
             .init("entry", required: false, description: "Entry file: index.html, document.md or document.txt"),
             .init("path", required: false, description: "Relative file path"),
             .init("offset", required: false, description: "Character offset for paginated read"),
@@ -28,7 +31,6 @@ extension ArtifactsActions {
                 "contextReferences", required: false, description: "Comma-separated read IDs for related source context"
             ),
             .init("destination", required: false, description: "Relative destination for file or directory move"),
-            .init("revision", required: false, description: "Retained revision ID for restoreVersion"),
             .init("savepoint", required: false, description: "Task-local draft savepoint ID to restore"),
             .init("oldText", required: false, description: "replace only: exact nonempty text within fresh read range"),
             .init(

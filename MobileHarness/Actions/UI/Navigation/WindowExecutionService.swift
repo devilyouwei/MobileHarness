@@ -31,9 +31,11 @@ extension WindowContentLifecycle {
         self.lifecycles = lifecycles
     }
     public func performWindow(
-        _ operation: WindowOperation, id: UUID, x: Double?, y: Double?, invocation: any FunctionInput
+        _ operation: WindowOperation, id: String, x: Double?, y: Double?, invocation: any FunctionInput
     ) async throws {
-        do { try await execute(operation, id: id, x: x, y: y, invocation: invocation) } catch let error as WindowError {
+        do {
+            try await execute(operation, id: state.resolve(reference: id), x: x, y: y, invocation: invocation)
+        } catch let error as WindowError {
             throw WindowExecutionFailure(error: error)
         }
     }

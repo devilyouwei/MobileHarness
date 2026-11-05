@@ -86,7 +86,7 @@ Examples illustrate syntax; aliases/parameters must be declared by the caller. S
 | Attributes / incomplete entity | 32 per tag / 16 characters |
 | Combined lexical depth / waits | 8 / 32 |
 | Pending sentence text | 2000 UTF-8 bytes, independent of soft character limits |
-| Native argument JSON | 4096 UTF-8 bytes; string values only |
+| Native argument JSON | No fixed byte ceiling; string values only |
 
 UTF-8 decoding handles arbitrary byte boundaries. Text segmentation uses sentence/safe-word boundaries and explicit soft limits of 1–2000 Characters; no timer flush exists. Text mapping returns at most eight ordered events per chunk; generation permits 120 calls. Wait count is 32 and combined lexical depth eight. Native Tool parsing is separate and creates no XML aliases or Channel/wait membership.
 

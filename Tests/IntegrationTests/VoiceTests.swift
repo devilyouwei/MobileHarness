@@ -560,7 +560,7 @@ private actor EndpointVADSession: VoiceActivitySession {
     let displayed = await captions.displayedText
     #expect(displayed.contains("partial"))
     #expect(Array(displayed.suffix(2)) == ["你好", "sealed"])
-    #expect(!displayed.contains(""))
+    #expect(displayed.first == "")
     await scheduler.shutdown()
     await #expect(throws: HarnessError.notRunning) {
         try await processMicrophoneFixture(
@@ -619,14 +619,17 @@ private actor EndpointVADSession: VoiceActivitySession {
     }
 }
 
-@Test(.actionCatalog, .timeLimit(.minutes(1))) func speechOnsetRecordsRecognitionWithoutChangingTheCurrentReply()
+@Test(.actionCatalog, .timeLimit(.minutes(1))) func speechOnsetClearsOnlyAssistantReplyWithoutInvokingModel()
     async throws
 {
     let session = UUID().uuidString
     let manager = AgentManager()
     let assistant = try AssistantAgent(
         stateContext: try publicStateFixture(),
-        chat: FixedTextChat(text: "must not generate"),
+        chatProvider: {
+            Issue.record("Input onset must not request a model")
+            throw CancellationError()
+        },
         context: try AgentContextRepository(
             agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState())
     )
@@ -642,9 +645,10 @@ private actor EndpointVADSession: VoiceActivitySession {
     let probe = VoiceProbe()
     let scheduler = ChannelScheduler(
         registry: try testActionRegistry(handlers: [
-            .init(domain: "UI", module: "Caption", function: "beginReplyTurn"): { invocation in
-                try await UIActions.beginReplyTurn(invocation: invocation) { _ in
-                    await probe.displayed("reply and expression cleared atomically")
+            .init(domain: "UI", module: "Caption", function: "clearReply"): { invocation in
+                try await UIActions.clearReply(invocation: invocation) { _ in
+                    #expect(invocation.context.source == "assistant" && invocation.context.decisionID == nil)
+                    await probe.displayed("cleared")
                 }
             }
         ]))
@@ -652,6 +656,9 @@ private actor EndpointVADSession: VoiceActivitySession {
     let output = await OutputGateway(
         manager: manager, requests: input, tools: tools,
         actions: scheduler, policy: policy, sink: { _ in })
+    let pump = Task {
+        for await envelope in fixtureOutputs(assistant) { try await output.dispatch(envelope) }
+    }
     let port = try await output.messaging(for: .speechPerception)
     let parent = AgentInput(
         id: UUID().uuidString,
@@ -662,17 +669,15 @@ private actor EndpointVADSession: VoiceActivitySession {
         turn: AgentTurn(id: UUID().uuidString, ordinal: 1))
     try await port.publish(.speechPhase(.speaking), parent: parent)
     await input.flushPublications()
-    // Signal delivery alone cannot mutate the presentation handler's state.
-    #expect(await probe.displayedText.isEmpty)
-    // Onset records the utterance/focus binding without erasing the current reply or invoking the model.
+    let deadline = ContinuousClock.now + .seconds(5)
+    while await probe.displayedText.isEmpty, ContinuousClock.now < deadline { await Task.yield() }
+    #expect(await probe.displayedText == ["cleared"])
     try await port.publish(.speechPhase(.speaking), parent: parent)
     await input.flushPublications()
     #expect(await assistant.status().queuedInputs == 0)
     await assistant.stop()
-    var outputs: [OutputEnvelope] = []
-    for await envelope in fixtureOutputs(assistant) { outputs.append(envelope) }
-    #expect(outputs.isEmpty)
-    #expect(await probe.displayedText.isEmpty)
+    try await pump.value
+    #expect(await probe.displayedText == ["cleared"])
     await scheduler.shutdown()
     await manager.stopAll()
 }

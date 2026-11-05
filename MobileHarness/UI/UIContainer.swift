@@ -6,7 +6,7 @@ public struct UIConfiguration: Sendable {
     public let historyTitle: String
     public init(
         settings: CloudSettingsDraft = .init(enabled: false, url: "", key: "", model: ""),
-        historyTitle: String = "Assistant"
+        historyTitle: String = "My Assistant"
     ) {
         self.settings = settings
         self.historyTitle = historyTitle

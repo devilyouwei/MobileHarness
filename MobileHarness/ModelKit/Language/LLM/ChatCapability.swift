@@ -251,13 +251,14 @@ public struct ChatRequest: Sendable {
                 }
                 for call in message.toolCalls {
                     guard !call.id.isEmpty, call.id.utf8.count <= 512, !call.name.isEmpty,
-                        call.name.utf8.count <= 64, call.argumentsJSON.utf8.count <= 4096,
+                        call.name.utf8.count <= 64,
                         callIDs.insert(call.id).inserted
                     else {
                         throw CapabilityError.invalidRequest("Invalid native call transcript")
                     }
                     pending.insert(call.id)
-                    bytes += call.id.utf8.count + call.name.utf8.count + call.argumentsJSON.utf8.count
+                    // Native arguments are opaque payload; the provider owns its actual token window.
+                    bytes += call.id.utf8.count + call.name.utf8.count
                 }
             }
         }

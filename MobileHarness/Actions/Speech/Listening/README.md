@@ -38,3 +38,9 @@ stopListening 先撤销感知许可，再同步停止原生播放、失效采集
 beginVideoAudio retains the existing voice generation, blocks listening start/resume and new speech/cue playback, joins microphone.setEnabled(false), then joins full AudioInputOutput.stop and checks cleanupFailure before allowing native recording. Stopping input samples alone does not release the shared native voice owner. The handoff does not cancel the current reply, so a voice-originated recording Action cannot wait for itself. A cancelled pause still joins native cleanup; cleanup failure prevents recording admission. It does not erase user listening intent. endVideoAudio releases the hold and resumes only if the caller remains foreground, the same non-nil generation is current, readiness remains valid, settings are unchanged and reply/playback barriers allow it. User-off, shutdown or background cannot be undone by a late recording completion. A voice owner bound during an existing recording inherits a hold without inventing earlier listening intent. Full stop closes the old native event subscription; actual listening resume binds a new subscription after microphone admission. Cancelled event observers cannot stop the resumed generation. Native microphone ownership is independently enforced by PlatformKit.
 
 回复等待/播放的半双工暂停只通过SpeechPerception的awaitingReply/paused阻止VAD/ASR，并持续消费丢弃被抑制的PCM；不再关闭ListeningCaptureWorkflow，从而保留同一原生音频代和后台录音会话。恢复复用已有capture；原生playAndRecord支持输出并存。录像麦克风交接、用户关闭、系统中断、根停止仍真实停机；无静音音频或伪造播放。后台连续性依赖系统音频许可，不能保证系统终止后执行。
+
+字幕呈现端口包含独立clearReply，调用ConversationPresentationController验证会话／身份后只清回复槽。正常播放完成及恢复聆听不清用户转写或回复字幕；新的识别轮次由SpeechPerception开启自己的槽，Assistant处理开口控制事实后清自己的槽。原生音频打断／采集与UI字幕生命周期分别完成。
+
+SpeechListening日志记录策略收到/应用的revision和enabled/paused、播放计数、采集代是否存在、
+恢复调用/返回/提交及取消边界。只有状态与计数公开；既有内容日志仍保持private。日志不改变
+采集许可、播放屏障或恢复策略，也不把调用开始当作实际恢复成功。

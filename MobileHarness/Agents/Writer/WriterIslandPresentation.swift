@@ -23,39 +23,39 @@ actor WriterIslandPresentation {
     }
     typealias Sender = AgentIslandPublication.Sender
     private let publication = AgentIslandPublication()
-    private var runID: String?
+    private var delegateID: String?
     private var goal = ""
     private var phase = Phase.starting
     private var step = ""
     var lastFailure: String? { get async { await publication.lastFailure } }
     func bind(_ sender: @escaping Sender) async { await publication.bind(sender) }
     func start() async { await publication.start() }
-    func begin(runID: String, goal: String) async {
-        self.runID = runID
+    func begin(delegateID: String, goal: String) async {
+        self.delegateID = delegateID
         self.goal = goal
         phase = .starting
         step = "已接纳委托，正在准备作品窗口。"
         await enqueue()
     }
-    func update(runID: String, phase: Phase, step: String? = nil) async {
-        guard self.runID == runID, !self.phase.terminal else { return }
+    func update(delegateID: String, phase: Phase, step: String? = nil) async {
+        guard self.delegateID == delegateID, !self.phase.terminal else { return }
         self.phase = phase
         if let step { self.step = step }
         await enqueue()
     }
     private func enqueue() async {
-        guard let runID else { return }
+        guard let delegateID else { return }
         await publication.submit(
-            phase.terminal ? nil : Self.content(runID: runID, goal: goal, phase: phase, step: step))
+            phase.terminal ? nil : Self.content(delegateID: delegateID, goal: goal, phase: phase, step: step))
     }
-    static func content(runID: String, goal: String, phase: Phase, step: String) -> IslandContent {
+    static func content(delegateID: String, goal: String, phase: Phase, step: String) -> IslandContent {
         let stage = phase == .waitingUser ? phase.rawValue : "active"
         return IslandContent(
             title: String(("Writer · " + goal).prefix(80)),
             subtitle: phase.title, primary: .symbol(name: "pencil.and.outline"), tone: .purple,
             priority: phase == .waitingUser ? .attention : .high,
             secondary: phase == .waitingUser || phase == .paused ? nil : .loading,
-            liveActivity: true, expansionID: runID + ":" + stage,
+            liveActivity: true, expansionID: delegateID + ":" + stage,
             detail: .init(
                 text: String(
                     ("Writer · " + phase.title + " · " + String(goal.prefix(100)) + "\n" + String(step.prefix(180)))

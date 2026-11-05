@@ -314,8 +314,8 @@ expected_storage = {
     'StorageChat': {'StorageCore', 'StorageTasks'},
     'StorageMedia': {'StorageCore', 'StorageFiles'},
     'StorageDevices': {'StorageCore'},
-    'StorageDatabase': {'StorageCore', 'StorageChat', 'StorageTasks', 'StorageMedia', 'StorageDevices'},
-    'StorageSQLite': {'StorageCore', 'StorageDatabase', 'StorageChat', 'StorageTasks', 'StorageMedia', 'StorageDevices', 'GRDB'},
+    'StorageDatabase': {'StorageCore', 'StorageFiles', 'StorageChat', 'StorageTasks', 'StorageMedia', 'StorageDevices'},
+    'StorageSQLite': {'StorageCore', 'StorageFiles', 'StorageDatabase', 'StorageChat', 'StorageTasks', 'StorageMedia', 'StorageDevices', 'GRDB'},
     'Storage': {'StorageCore', 'StorageCache', 'StorageFiles', 'StorageDatabase'},
 }
 for name, expected in expected_storage.items():
@@ -623,7 +623,7 @@ for source in list((ROOT / 'MobileHarness').rglob('*.swift')) + list((ROOT / 'Te
 expected_business = {
     'Actions': {'BehaviorDefinitions', 'CallRuntime', 'ExecutionRuntime', 'FunctionContracts',
         'ModelKit', 'ModelKitDefaults', 'ModelKitHub', 'ModelKitOpenAI', 'ModelKitRuntime', 'PlatformKit',
-        'StorageCore', 'StorageFiles', 'StorageChat', 'StorageMedia', 'StorageCache', 'StorageDevices', 'UI'},
+        'StorageCore', 'StorageFiles', 'StorageDatabase', 'StorageChat', 'StorageMedia', 'StorageCache', 'StorageDevices', 'UI'},
     'Agents': {'AgentCore', 'Gateway', 'FunctionContracts',
         'ModelKit', 'ModelKitDefaults', 'ModelKitHub', 'ModelKitRuntime', 'PlatformKit', 'UI',
         'StorageCore', 'StorageFiles', 'StorageChat', 'StorageMedia', 'StorageCache', 'StorageTasks', 'StorageDevices'},

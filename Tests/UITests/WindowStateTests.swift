@@ -429,3 +429,21 @@ func windowMaximizedShellTouchesScreenEdgesAndReservesOnlyTop(_ viewport: CGRect
     #expect(state.windows.isEmpty)
     await state.stop()
 }
+
+@Test @MainActor func windowPresentationMetadataDoesNotFocusRestoreOrMoveItsNormalFrame() async throws {
+    let state = WindowState()
+    state.layout(width: 390, height: 750)
+    state.setAvailable(true)
+    let first = try await presentFixture(state, "one")
+    let second = try await presentFixture(state, "two")
+    let frame = try state.find(first).normal
+    state.setPresentation(first, title: "Software flowchart", subtitle: "Writing index.html")
+    #expect(try state.find(first).normal == frame)
+    #expect(state.focusedID == second)
+    #expect(try state.find(first).title == "Software flowchart")
+    #expect(try state.find(first).subtitle == "Writing index.html")
+    state.setAvailable(false)
+    state.setPresentation(first, subtitle: "Saved while scene is hidden")
+    #expect(try state.find(first).subtitle == "Saved while scene is hidden")
+    await state.stop()
+}

@@ -148,6 +148,10 @@ public final class RuntimePresentation: UIPresentationCapability, UIUpdateCapabi
         guard let voice else { throw ActionHostError.scopeClosed }
         try voice.setReplyWaiting(enabled, requestID: requestID, invocation: invocation)
     }
+    public func clearReply(invocation: any FunctionInput) async throws {
+        guard let voice else { throw ActionHostError.scopeClosed }
+        try voice.clearReply(invocation: invocation)
+    }
     public func beginReplyTurn(invocation: any FunctionInput) async throws {
         guard let voice else { throw ActionHostError.scopeClosed }
         try voice.beginReplyTurn(invocation: invocation)

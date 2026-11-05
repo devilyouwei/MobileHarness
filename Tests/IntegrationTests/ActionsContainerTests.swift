@@ -141,7 +141,7 @@ private func containerInput(_ parameters: [String: String] = [:], path: ActionId
     try await root.stop()
 }
 
-@Test(.actionCatalog, arguments: [false, true]) @MainActor func actionsValidateActualCompletionAndOutputSize(
+@Test(.actionCatalog, arguments: [false, true]) @MainActor func actionsValidateCompletionKindWithoutAnOutputByteCeiling(
     oversized: Bool
 ) async throws {
     let function = ActionFunction(
@@ -149,7 +149,11 @@ private func containerInput(_ parameters: [String: String] = [:], path: ActionId
         completion: "Joined.", completing: { _ in .value(String(repeating: "x", count: oversized ? 65_537 : 1)) })
     let root = try containerRoot([function])
     let ticket = try await root.execution.prepare(containerInput(), .action)
-    await #expect(throws: ActionExecutionError.invalidCompletion) { try await root.execution.execute(ticket) }
+    if oversized {
+        #expect(try await root.execution.execute(ticket) == .value(String(repeating: "x", count: 65_537)))
+    } else {
+        await #expect(throws: ActionExecutionError.invalidCompletion) { try await root.execution.execute(ticket) }
+    }
     try await root.stop()
 }
 

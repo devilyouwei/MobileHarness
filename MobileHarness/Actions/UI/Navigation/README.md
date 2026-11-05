@@ -30,3 +30,5 @@ WindowActions supplies focus/minimize/maximize/restore/move/close with pure wind
 All six use scheduled Action and direct/returning Tool bindings. Finite transitions wait for UIKit receipts, fenced by UI revision/generation. Invalid identity, closed root, resource/permission failure, busy domain and cleanup failures propagate; completed presentation never means captured/saved media.
 
 WindowContentLifecycle.beginWindowTransition/endWindowTransition bracket lifecycle work and real UI completion. Domains can fence new device operations and join existing work before a presentation handoff. Default implementations are no-ops for content without such coordination. Failure/cancellation always releases a successfully acquired transition scope; minimized/restore semantics remain domain-owned.
+
+Window Action parameters use canonical window_N strings. WindowExecutionService resolves them through WindowState before native lifecycle/animation work; internal UUIDs remain private. No parsing fallback accepts UUID Action parameters.

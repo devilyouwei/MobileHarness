@@ -49,12 +49,16 @@ Native CameraFrame/PCM and typed UI/container observations reach their owning ro
 
 writer.author 是 Writer 的生产后台任务契约。Assistant 通过默认 startTask(execution=background,executor=writer) 附加当前用户输入和单行目标，Writer 接纳后立即释放调用方；progress 回报运行阶段，result 退休执行权限。追加输入在文件检查点消费，显式 cancel 加入取消清理。
 
-WriterTaskEvent 的可选 taskID 是长期作品任务，runID 必须匹配可信 scope.id；新版本回报携带两者，接收端同时校验业务绑定。每次续作创建新 scope，不重新打开已终止的通信任务。历史请求保存稳定身份，实时传输/去重使用执行身份。
+WriterTaskEvent 的可选 taskID 是长期作品任务，delegateID 必须匹配可信 scope.id；新版本回报携带两者，接收端同时校验业务绑定。每次续作创建新 scope，不重新打开已终止的通信任务。历史请求保存稳定身份，实时传输/去重使用执行身份。
 
 WriterTaskEvent.failure 是可选 WriterFailureDiagnostic：分类、错误码、阶段、摘要、诊断字段和关联原因均为业务事实。通信值不依赖 Storage；Writer 拥有到持久化 DTO 的转换。失败消息沿既有认证、去重和 FIFO 进入 Assistant，诊断不能授权重委托或改变调度。
 
 WriterTaskCompletion（writer.completion）封装已结束的 Writer AgentTaskSignal，限定后台 assistant→writer 身份及业务事件/终态配对。通过无 taskScope 的普通角色通信递送，只携带事实，不恢复旧执行授权。Assistant 额外核对共享 SQLite 中不可变通知与任务归属；控制退休和用户汇报独立接纳。该契约不引入 Gateway 调度机制或通用持久消息设施。
 
-WriterTaskEvent.request optionally carries WriterRequestProgress(inputID, number, phase, attempt, path). Number counts actual model attempts across the stable task; task/run identity is still verified through the trusted envelope and binding. Request progress is a task fact, not model reasoning. Assistant stores incoming facts, coalesces ordinary progress into one latest pending reply and retains formal FIFO for user-input requests and terminal events. Delivery acceptance does not gate Writer execution.
+WriterTaskEvent.request optionally carries WriterRequestProgress(inputID, number, phase, attempt, path). Number counts actual model attempts across the stable task; task/delegation identity is still verified through the trusted envelope and binding. Request progress is a task fact, not model reasoning. Assistant stores incoming facts, coalesces ordinary progress into one latest pending reply and retains formal FIFO for user-input requests and terminal events. Delivery acceptance does not gate Writer execution.
 
 WriterRequestProgress用于关联实际请求及其累计计数。请求开始只在Writer内部呈现；Assistant普通progress的request字段关联刚完成步骤中的最新请求，可包含内容子请求。步骤汇报在该轮工具效果/持久结果与预览屏障之后发出，不表示下一请求已完成。
+
+Assistant creates the delegation UUID; Writer allocates its own Agent-local task on acceptance. AgentTaskScope.id is the delegation identity for background requests; event taskID is the stable Agent-local workspace task. Writer events retain internal event/interaction/delegate IDs for verification, while model input projects only Agent/task/goal/phase/window metadata. Public sendMessage/cancelTask uses executor + taskID; runtime injects current delegation and pending interaction after ownership and captured-question checks.
+
+WriterTaskEvent version 2 carries the stable task key, current goal and optional derived workspace/window metadata, alongside internal UUID delegation/event/question evidence. artifactID for Writer is a reference to the same derived workspace, not an independently allocated project identity.

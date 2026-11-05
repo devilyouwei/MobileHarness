@@ -375,7 +375,9 @@ private enum HistoryPhotoFixtureError: Error { case failed }
         default: return Data([1])
         }
     }
-    #expect(try await workflow.imageData(photo, for: round) == nil)
+    await #expect(throws: HistoryImageLoadingError.missingImage) {
+        try await workflow.imageData(photo, for: round)
+    }
     await #expect(throws: HistoryPhotoFixtureError.failed) {
         try await workflow.imageData(photo, for: round)
     }

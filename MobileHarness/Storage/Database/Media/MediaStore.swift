@@ -3,7 +3,7 @@ import StorageCore
 import StorageFiles
 
 /// Owned JPEG bytes with SQLite metadata. A public media ID is returned only after ready commits.
-public actor CapturedPhotoStore {
+public actor MediaStore {
     public enum OverflowPolicy: Sendable { case reject, evictOldest }
     public struct Limits: Sendable {
         public let maximumPhotos: Int
@@ -68,7 +68,7 @@ public actor CapturedPhotoStore {
             limits.maximumBytes <= 32 * 1024 * 1024 * 1024
         else { throw FileStorageError.invalidFile }
         do {
-            for item in try await repository.pendingPhotoDeletions() {
+            for item in try await repository.pendingMediaDeletions() {
                 try await files.remove(item.path)
                 try await repository.setMedia(item.id, state: "deleted")
             }
@@ -103,7 +103,7 @@ public actor CapturedPhotoStore {
         }
         cleanupFinished = page.next == nil
     }
-    public func saveVideo(_ file: URL, owner: StorageOwner, metadata: PhotoMetadata) async throws -> String {
+    public func saveVideo(_ file: URL, owner: StorageOwner, metadata: MediaMetadata) async throws -> String {
         try await operationGate.withAccess { [self] in
             try Task.checkCancellation()
             guard owner.namespace == "photos", !owner.source.isEmpty, owner.source.utf8.count <= 64,
@@ -156,7 +156,7 @@ public actor CapturedPhotoStore {
     public func isAlbumVideo(_ id: String) async throws -> Bool {
         try await operationGate.withAccess { [self] in
             try await prepare()
-            guard let item = try await makeRepository().albumPhoto(id) else { throw FileStorageError.invalidFile }
+            guard let item = try await makeRepository().albumMedia(id) else { throw FileStorageError.invalidFile }
             return item.metadata.mime == "video/quicktime"
         }
     }
@@ -172,7 +172,7 @@ public actor CapturedPhotoStore {
                     item.input == owner.input
                 else { throw FileStorageError.invalidFile }
             } else {
-                guard try await repository.albumPhoto(id) != nil else { throw FileStorageError.invalidFile }
+                guard try await repository.albumMedia(id) != nil else { throw FileStorageError.invalidFile }
             }
             let files = try makeFiles()
             guard try await files.info(item.path)?.bytes == item.bytes else { throw FileStorageError.invalidFile }
@@ -212,7 +212,7 @@ public actor CapturedPhotoStore {
         }
     }
     private func saveLocked(
-        _ data: Data, owner: StorageOwner, capturedAt: Date = Date(), metadata: PhotoMetadata? = nil
+        _ data: Data, owner: StorageOwner, capturedAt: Date = Date(), metadata: MediaMetadata? = nil
     ) async throws -> String {
         try Task.checkCancellation()
         let repository = try makeRepository()
@@ -271,7 +271,7 @@ public actor CapturedPhotoStore {
         }
         return item.id
     }
-    public func collect(_ id: String, owner: StorageOwner, metadata: PhotoMetadata) async throws {
+    public func collect(_ id: String, owner: StorageOwner, metadata: MediaMetadata) async throws {
         guard metadata.mime != "video/quicktime" else { throw FileStorageError.invalidFile }
         try await operationGate.withAccess { [self] in
             try await prepare()
@@ -284,7 +284,7 @@ public actor CapturedPhotoStore {
             try await repository.collectPhoto(id, metadata: metadata, at: Date())
         }
     }
-    public func importPhoto(_ data: Data, owner: StorageOwner, metadata: PhotoMetadata) async throws -> String {
+    public func importPhoto(_ data: Data, owner: StorageOwner, metadata: MediaMetadata) async throws -> String {
         try await operationGate.withAccess { [self] in
             let id = try await saveLocked(data, owner: owner, metadata: metadata)
             // Once bytes commit, finish the matching collection transaction before returning.
@@ -302,7 +302,7 @@ public actor CapturedPhotoStore {
         try await operationGate.withAccess { [self] in
             try await prepare()
             let repository = try makeRepository()
-            guard try await repository.albumPhoto(id) != nil, let item = try await repository.media(id) else {
+            guard try await repository.albumMedia(id) != nil, let item = try await repository.media(id) else {
                 throw FileStorageError.invalidFile
             }
             return try await bytes(item, maximumBytes: 32 * 1024 * 1024)
@@ -315,7 +315,7 @@ public actor CapturedPhotoStore {
             let files = try makeFiles()
             guard let item = try await repository.media(id) else { throw FileStorageError.invalidFile }
             try Task.checkCancellation()
-            try await repository.deletePhoto(id)
+            try await repository.deleteAlbumMedia(id)
             // Logical deletion is committed even if physical cleanup fails.
             do {
                 try await files.remove(item.path)

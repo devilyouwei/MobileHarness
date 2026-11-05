@@ -82,7 +82,7 @@ public enum AgentCommunicationAdapter {
                 parentID: input.taskScope?.id ?? input.id, requester: sender,
                 executor: target, sessionID: input.sessionID)
         } else {
-            guard let existing, arguments["taskID"].flatMap(BusinessRecordID.parse) == existing.id,
+            guard let existing, arguments["taskID"] == existing.id,
                 existing.sessionID == input.sessionID,
                 target == (kind == .input || kind == .cancel ? existing.executor : existing.requester)
             else { throw CommunicationError.scopeClosed }

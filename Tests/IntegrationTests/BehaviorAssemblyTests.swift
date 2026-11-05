@@ -24,7 +24,7 @@ private actor BehaviorEndpoint: UIPresentationCapability, UIUpdateCapability, Sp
     func performIsland(_ command: IslandCommand, context: IslandActionContext) async throws -> IslandReceipt {
         throw CancellationError()
     }
-    func performWindow(_ operation: WindowOperation, id: UUID, x: Double?, y: Double?, invocation: any FunctionInput)
+    func performWindow(_ operation: WindowOperation, id: String, x: Double?, y: Double?, invocation: any FunctionInput)
         async throws
     { throw CancellationError() }
     func controlTask(_ operation: String, arguments: [String: String], invocation: any FunctionInput) async throws
@@ -60,6 +60,7 @@ private actor BehaviorEndpoint: UIPresentationCapability, UIUpdateCapability, Sp
     func presentTranscript(_ text: String, invocation: any FunctionInput) async throws {}
     func finishTranscript(invocation: any FunctionInput) async throws {}
     func beginReplyTurn(invocation: any FunctionInput) async throws {}
+    func clearReply(invocation: any FunctionInput) async throws {}
     func setReplyWaiting(_ enabled: Bool, requestID: String, invocation: any FunctionInput) async throws {}
     func presentVoiceState(_ state: UIActions.VoiceState, invocation: any FunctionInput) async throws {}
     func presentExpression(_ emotion: UIActions.Emotion, invocation: any FunctionInput) async throws {
@@ -446,6 +447,7 @@ private actor LockedTaskRequests {
     func presentTranscript(_ text: String, invocation: any FunctionInput) throws {}
     func finishTranscript(invocation: any FunctionInput) throws {}
     func beginReplyTurn(invocation: any FunctionInput) throws {}
+    func clearReply(invocation: any FunctionInput) throws {}
     func setReplyWaiting(_ enabled: Bool, requestID: String, invocation: any FunctionInput) throws {}
     func presentVoiceState(_ state: UIActions.VoiceState, invocation: any FunctionInput) throws {}
     func presentExpression(_ emotion: UIActions.Emotion, invocation: any FunctionInput) async throws {}

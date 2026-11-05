@@ -1,35 +1,46 @@
-# Structured Database Storage
+# Structured database storage
 
-## 职责与接口
+DatabaseStorage owns lifecycle and five repository ports: Chat, Tasks, Media, Devices and Workspaces.
+DatabaseRepositories is an SQL-free value bundle. App selects SQLiteDatabaseFactory. StorageDatabase
+uses StorageCore, domain contracts and StorageFiles; it owns Workspaces coordination but no Agent
+execution policy. StorageSQLite alone owns GRDB. All ports share one lifecycle and storageScope.
 
-✅ DatabaseStorage 提供 start/stop 与抛错的 chat/tasks/media/devices 端口；DatabaseRepositories 是不含 SQL 类型的值集合。领域仓库分别编译并返回拥有的数据，不暴露 GRDB、连接或表对象。Storage 根只依赖该协议；AppStorage 选择 SQLiteDatabaseFactory。
+## Domains and relations
 
-SQLiteDatabaseStorage 在后台任务完成目录、打开、当前 schema 初始化和恢复后才发布端口；失败/关闭不可重开。重复启停共享任务，停止先关闭接纳，再加入初始化和在途操作。原始错误与清理错误分别保留。应用业务先提交终态，再停止数据库。
+| Table | Ownership and relation |
+| --- | --- |
+| assistant_conversations | Assistant topic/archival headers; owns rounds and foreground tasks |
+| messages | One business round or foreground-task segment; Conversation XOR Writer Task owner |
+| assistant_tasks | Foreground task identity, status, summary and source/summary revision fence |
+| writer_tasks | Agent-local stable task, history header and current workspace metadata; no permanent completion |
+| agent_delegations | Individual assignment, source, execution outcome and independent reporting/retirement receipts |
+| model_request_log | Individual model attempt, full protocol/request/result evidence; round FK or auxiliary conversation FK |
+| workspace_files | Current file path/size/fingerprint index; belongs to Writer Task, no content/version columns |
+| media_files | Image/movie files, ownership, album inclusion and cleanup facts |
+| message_media | Round XOR request references to media; protects retained media |
+| devices | Native identity, readable key, selection and reconnect facts |
 
-## 子目录与关系
+```mermaid
+erDiagram
+ assistant_conversations ||--o{ messages : contains
+ assistant_conversations ||--o{ assistant_tasks : contains
+ assistant_tasks o|--o{ messages : groups
+ writer_tasks ||--o{ messages : contains
+ writer_tasks ||--o{ agent_delegations : receives
+ writer_tasks ||--o{ workspace_files : indexes
+ messages o|--o{ model_request_log : traces
+ agent_delegations o|--o{ model_request_log : groups
+ messages o|--o{ message_media : references
+ model_request_log o|--o{ message_media : references
+ media_files ||--o{ message_media : links
+```
 
-[Chat](Chat/README.md) 使用 [Tasks](Tasks/README.md) 完成会话检查点及任务关联；[Media](Media/README.md) 保存媒体元数据并组合 Files；[Devices](Devices/README.md) 保存设备记录。[SQLite](SQLite/README.md) 独占 GRDB，并编译这些领域的 SQL 实现。四类仓库共用同一 storageScope 和池，不能混用不同运行作用域的 Chat/Tasks。
+[Chat](Chat/README.md) owns round/request projections and summaries, [Tasks](Tasks/README.md) owns
+foreground/delegation records, [Workspaces](Workspaces/README.md) coordinates Files/index,
+[Media](Media/README.md) combines file publication with records, [Devices](Devices/README.md) owns
+peripheral records. [SQLite](SQLite/README.md) implements each port in the shared pool.
 
-## 待完成
-
-❌ 新数据库后端、跨进程运行态和跨文件/SQL 原子事务不在本轮。
-
-[Storage](../README.md)
-
-## 统一容器异常通道
-
-✅ SQLiteDatabaseFactory 接收 StorageFailureReporter，根及后端读/写/初始化/关闭错误进入相同宿主回调；DatabaseStorage 不导入框架事件。后端选择仍属于 App。
-
-## 基础相册实施契约
-
-✅ media端口扩展照片格式／尺寸／时间／来源与相册收录查询，继续使用同一后端和命名空间。
-
-## Passive state reads
-
-DatabaseStorage.stateSnapshot returns StorageCore.StorageStateSnapshot with its phase in Runtime and declared DatabasePhase values, without accessing repositories. Unsupported backends default to unknown. The phase vocabulary is unknown/cold/starting/ready/stopping/stopped/failed; lifecycle evidence belongs to the backend rather than inferred repository getter success.
-
-## Media kinds
-
-The existing media repository includes bounded video reservations and shared explicit album inclusion. SQLiteMediaRepository stores kind/MIME plus the existing dimension/origin fields; file copying remains in Files and native movie inspection belongs to PlatformKit callers. There is no separate video database or migration. See [Media](Media/README.md).
-
-Chat request headers support neutral producer metadata and lightweight paged summaries/counts. Explicit request-boundary checkpoints may persist generating metadata without flushing every text delta. Task latest-update queries include delegated phase changes; Storage does not interpret Writer phases or choose speech/UI behavior.
+Startup publishes ports only after schema preparation/recovery. Admission closes before shutdown joins
+in-flight operations. Original and cleanup failures remain explicit. Passive snapshots expose phase,
+never repository data. Files and SQL have no shared transaction; WorkspaceStore repairs interrupted
+indexes from authoritative files rather than replaying business work.

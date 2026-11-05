@@ -525,6 +525,9 @@ func assistantCoalescesQueuedTextOccupancyButAcknowledgesEveryFinalSpeechRoot() 
                     payload: payload, source: "speechPerception", incarnation: "speech-fixture", origin: .agent,
                     rootID: root)))
     }
+    // A later non-speech input must not erase the final-speech acknowledgment carried
+    // by newer complete snapshots; the receiver may see only the newest revision.
+    try await agent.receive(.init(id: "later-text", sessionID: session, payload: .text("Queued after speech")))
     await agent.stop()
     await pump.value
     let values = await probe.values
@@ -532,4 +535,49 @@ func assistantCoalescesQueuedTextOccupancyButAcknowledgesEveryFinalSpeechRoot() 
     #expect(busy.count == 3)
     #expect(busy.map(\.acknowledgedRoot) == ["first", "final-one", "final-two"])
     #expect(values.last?.inputs.isEmpty == true && values.last?.tasks.isEmpty == true)
+    let latest = try #require(values.last)
+    #expect(latest.acknowledgedRoot == "final-two")
+    var listening = SpeechListeningPolicy()
+    listening.enabled = true
+    listening.pendingFinal = "final-two"
+    _ = try listening.accept(latest, source: "assistant", incarnation: "assistant-fixture")
+    #expect(listening.pendingFinal == nil && !listening.paused)
+
+}
+
+@Test(.actionCatalog, .timeLimit(.minutes(1)))
+func directIslandResultMustNotBecomeAssistantInputDuringAReply() async throws {
+    let session = UUID().uuidString
+    let agent = try AssistantAgent(
+        stateContext: publicStateFixture(), reportsReplyActivity: true, chat: ReplyOccupancyBlockedModel(),
+        context: AgentContextRepository(agent: .assistant, scope: UUID().uuidString, state: AssistantContextState()))
+    let manager = AgentManager()
+    try await manager.register(agent)
+    try await manager.start(.assistant)
+    let path = ActionIdentifier(domain: "UI", module: "Island", function: "present")
+    let binding = ActionBinding(
+        path: path, displayName: "Island fixture", kind: .finite, completion: "Presentation acknowledged",
+        protocols: [.tool], executionPolicy: .direct, directResultPolicy: .returning,
+        completing: { _ in .value("presented") })
+    let gateway = await OutputGateway(
+        manager: manager, requests: InputGateway(manager: manager),
+        tools: try ToolRegistry(modules: [SpecialistTools(definitions: [binding])]),
+        actions: ChannelScheduler(registry: ActionRegistry()), sink: { _ in })
+    let consumer = try await gateway.consumer(for: agent)
+    try await agent.receive(.init(id: UUID().uuidString, sessionID: session, payload: .text("Photo review pending")))
+    try await specialistEventually { await agent.status().queuedInputs == 0 }
+    let result = try await consumer.executeInternal(
+        .init(
+            source: .assistant, context: .init(sessionID: "independent-island", source: "assistant"),
+            output: .toolCall(
+                .init(
+                    id: UUID().uuidString, toolPath: path.description,
+                    arguments: [
+                        "activityID": UUID().uuidString, "revision": "1", "content": "{}",
+                    ]))))
+    #expect(!result.isError && result.tool?.value == "presented")
+    #expect(await agent.status().queuedInputs == 0)
+    await agent.stop()
+    await gateway.shutdown()
+    await manager.stopAll()
 }

@@ -284,3 +284,19 @@ Island lifecycle regressions cover role-owned task publication, all Writer termi
 Island Action integration also covers registered/raw and container-local typed execution equivalence, producer ownership and shared presentation scope, stale generation/stopped endpoint rejection, same-version retry/new-fact replacement, no repeated presentation for frequency-only updates, root rebind, and domain cleanup preserving peer Agent activities. Domain probes implement typed Action calls without a Gateway or UI renderer.
 
 VoiceTests 的语音打断回归使用真实生产者绑定、OutputGateway/InputGateway 和 SpeechPerception，受控播放清理及投递屏障固定取消与空闲事实重叠，覆盖取消前已在途和取消中才提交两种顺序。验证取消仍拒绝普通播放、空闲事实释放半双工占用、关闭许可保持关闭、旧 revision 不复活占用，以及连续五次显式启停可重开感知采集。模型与播放为替身，不代表真机麦克风、光效或灵动岛验收。
+
+Voice regressions verify SpeechPerception emits an empty caption at confirmed onset before ASR text; Assistant routes the existing speaking control event into its own clearReply Action exactly once without inference or formal FIFO work. Caption completion, empty/failure recovery and session fencing remain separate from speech playback.
+
+WriterAgentTests 在 LiveRuntimeTests 的真实 WebKit 阶段验证 ArtifactPresentation 的嵌套入口、双槽唯一版本资源、稳定原生文档及回收旧文件后的 reload；窗口完成回执由测试注入，不宣称真实窗口动画验收。
+
+Writer历史SQLite回归核对Provider计时、请求完成时间及run结束时间在重开和UI投影后保留；不将手工注入采样当作真实模型时延测量。
+
+Writer参数化回归加入文件生成中Scene隐藏后仍以原请求数完成的模式；预览测试验证只取消呈现、保留最新意图并恢复。原生Artifacts回归覆盖后台不加载/新建窗口、首次呈现中断保留预留身份、恢复最新文件、重名后缀与副标题、最小化尊重，以及编辑命名/显式改名的持久化和续作保留。
+
+Writer请求标题回归覆盖原生多工具有序去重、短指令与源码过滤、文件生成阶段，以及请求完成后工具仍在执行/失败/取消的区分；SQLite重开后控制器直接投影工具事实与操作标题，无逐行详情读取。
+
+Writer SQLite reopen verifies large native arguments and resumed failure diagnosis; Action input validation accepts source above 64 KiB with existing declaration/identity checks.
+
+Large-source persistence verifies responses above256KiB and tool results above64KiB survive SQLite reopen. Function value validation no longer rejects long observations; input/round identity checks remain independently covered. Writer model evaluation stores its catalog in the same records.sqlite.
+
+WorkspaceRepositoryTests owns relational catalog integration: over-8MiB independent projects, draft/version reopen, concurrent CAS, stale writes and deletion cleanup retry. AppWorkflowTests does not import the SQLite backend.

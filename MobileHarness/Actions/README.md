@@ -118,3 +118,11 @@ Web页面读取/截图/导航可按windowID选择既有Writer会话，仍经业�
 Writer新模型选择读取独立writerThinking，默认minimum；显式开启时enabled。Assistant配置策略不变，当前执行保持配置快照。
 
 Island business execution has one typed Action entry, IslandActions.execute. Agent invocations reach it through Gateway and the registered string adapter; camera/voice/Bluetooth presentation calls it directly through producer-bound endpoints inside Actions. Internal composition does not involve Gateway, transport or synthetic FunctionInvocation. Ownership/revision/generation checks and receipts are shared. The domain observer owns three latest commands, one wake-up slot and one joined expiry/retry timer. Spectrum data and UI's own gestures/layout/lifecycle retain their specialized interfaces. See [Runtime](UI/Runtime/README.md).
+
+Caption execution keeps recognition and reply ownership separate: setTranscript/finishTranscript affect only recognition, while code-owned clearReply retires a caller's old reply request without starting a new reply. Presentation guards reject stale continuations and delayed clears; the Agent decides the boundary, and UI retains text through playback/listening transitions. See [Conversation execution](UI/Conversation/README.md).
+
+Artifacts拥有作品窗口的简洁标题/操作副标题、每项目最新快照和场景恢复。Writer通过Gateway提交命名/步骤；Actions内部直接更新UI，不重新通信。场景隐藏时保留文件与业务执行，渲染返回deferred；恢复不重开用户关闭或最小化的窗口。详见[Artifacts](Artifacts/README.md)。
+
+Artifacts receives the shared SQLite WorkspaceRepository through ActionsDependencies; Actions owns file/SQL publication ordering, editing and rendering, while Storage owns relational persistence. Generic value results have no single-result byte quota; model context remains an Agent concern.
+
+Artifacts consumes the neutral StorageDatabase.Workspaces contracts/coordinator and StorageFiles primitives. It never imports SQLite/GRDB; formats, rendering and acceptance remain Actions responsibilities.

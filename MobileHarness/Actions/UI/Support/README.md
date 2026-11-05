@@ -14,3 +14,5 @@
 | [UIPresentationTypes.swift](../../Support/Contracts/UIPresentationTypes.swift) | 跨文字／语音状态／视线使用的中立值与错误 |
 
 [所属域设计](../README.md) · [公共契约](../../Support/Contracts/README.md)
+
+UIPresentationCapabilities包含clearReply窄端口；它只转交经过会话验证的回复字幕清理，不执行ASR／播报策略或清除用户转写。

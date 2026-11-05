@@ -58,6 +58,7 @@ public final class UIHomeContainer {
         conversation.modelPreparation = .inactive
         effectOwner.stop()
         expressionOwner.resetExpression()
+        conversation.resetCaptions()
         conversation.isVoiceActive = false
         conversation.isReplyActive = false
         conversation.listeningAnimationID = nil

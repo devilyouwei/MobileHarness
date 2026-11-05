@@ -87,7 +87,7 @@ Implemented: Provider URL input is optional. Blank/whitespace input resolves to 
 
 ## 用户板块入口
 
-SettingsView 用户板块依次呈现“记忆”“相册”“Assistant 聊天记录”“Writer 任务记录”。记忆为无点击行为的静态 Label；其余入口直接进入各自注入的页面，记录入口不经过聚合页。
+SettingsView 首页使用英文标题、分区、入口及蓝牙状态摘要；User 区依次呈现 Album、My Assistant、My Writer、Memory。Memory 为无点击行为的静态 Label；其余入口直接进入各自注入的页面，记录入口不经过聚合页。AI Models 和 External Devices 保持原有分区及入口顺序。蓝牙入口使用同文件私有矢量 BluetoothSymbol，其余入口图标不变；子页面及历史正文独立维护语言。
 
 ## 基础相册实施契约
 
@@ -128,7 +128,7 @@ SettingsInput/Reply、ResourcesInput/Reply、HistoryInput/Reply、DeviceInput分
 
 UIHistoryContainer owns Assistant conversations. WriterRecordsView displays 20-item task pages with a purple icon, goal, task ID, canonical status, update time and full request count. WriterRequestItem provides lightweight pages; full text, native calls/results and errors load only on request-detail navigation. Visible state refreshes every two seconds without reopening loaded source.
 
-The task header shows its icon/goal, first start time, status and total rounds, followed by directory browsing and conversation export buttons. Request rows have icons, cumulative model-attempt numbers and run separators. WriterArtifactsControlling still owns snapshot reads, native previews and source/ZIP/PDF export; task operations do not use a toolbar menu.
+Task goals and Assistant conversation titles use the same HistoryRecordRow: a vertically centered 20pt icon in a 24pt column, body title with two-line tail truncation, 6pt gap, caption metadata and 12pt vertical padding. Assistant icons are blue; Writer icons are muted purple. Titles use primary text and separators begin at the text column. My Assistant keeps Current Conversation/Past Conversations and New Conversation; My Writer opens the task list directly. Assistant metadata shows actual turnCount (falling back to loaded turns only when absent) and createdAt, never an inferred last-active date. Writer metadata shows stable task ID, cumulative requestCount, short latest-status capsule and updatedAt. Success is green, failure red, active blue and cancelled/interrupted/unknown neutral; waiting/paused remain distinct labels. Metadata and dates share a line where space permits and stack at narrow widths/large text sizes without dropping fields. HistoryListPresentation formats dates in the supplied/current calendar and time zone as MM/dd HH:mm or yyyy/MM/dd HH:mm across years. Task header combines a vertically centered purple icon with a text column: small secondary monospaced task ID above the full wrapping goal. First start, cumulative duration, total rounds, latest status and existing file/export actions follow in their original order. Request-row number badges use smaller subheadline digits and remain gray, red only for failed requests; titles, retries, timestamps and state capsules remain unchanged. WriterArtifactsControlling owns snapshot reads, native previews and source/ZIP/PDF export.
 
 模型发现按稳定 Provider ID 缓存，页面进入刷新两个已选 Provider，切换 Provider 和编辑凭据自动查询；同 Provider 可共享列表而不共享 Agent 的模型选择。返回值经 ApplicationControl/Gateway 后由表单控制器呈现，凭据快照/请求 ID 阻止迟到覆盖。最多 32 个查询（包括尚未退出的取消任务），溢出明确显示错误；离页取消，根关闭加入。刷新不清空已保存模型，失败提供重试。保存仍走既有业务事务，密钥留钥匙串。
 
@@ -137,3 +137,13 @@ Provider 左滑删除先显示原生确认弹窗，取消不改变草稿。保�
 Writer请求与工具详情消费UI自有HistoryFailureDiagnostic，展示消息、分类、错误码、阶段、诊断字段和关联清理原因。UI不解析网络错误类型或执行重试，也不依赖Agents/ModelKit；数据由现有历史投影传入。
 
 Writer云模型区提供深度思考开关，草稿默认false，编辑递增revision，通过既有保存/还原端口传递。UI仅保存布尔值，不解释Provider推理参数；保存后对新建/续作委托生效，当前执行不变。本地选择隐藏此云端选项。
+
+Writer请求详情展示Provider首个公开token延迟和请求总耗时；缺失采样显示未知，不以UI接收时间代替。完成时间冻结，进行中显示读取快照时的耗时。文件内容响应及工具参数/结果默认DisclosureGroup折叠，展开后保留完整文本和复制。任务执行时长由Writer提供各run累计值与当前run开始时间，UI只做格式化，随既有2秒摘要刷新推进。
+
+Writer任务列表和详情目标标题使用系统primary正文色，Writer图标独立使用紫色；颜色不从Label父级传递到整段目标文字。深浅模式和高对比度由系统语义正文色适配，编号徽章默认灰色、失败红色，状态标签保留独立语义配色。
+
+Writer task records represent agent-owned workspaces; status is the latest delegation result. Delegation groups use local display ordinals, never UUID text. Internal delegateID remains available only in full evidence/export, while window/file controls use readable owner/task and window_N references.
+
+历史缩略图使用固定112×84预览容器持有异步加载任务，加载身份包含请求、媒体和重试次数；
+占位、图片和失败按钮的切换不替换任务所有者。缺失字节、读取和解码失败显示重试，取消不提交
+空白完成状态；原图查看仍保留原始字节，并通过Actions验证原输入的图片引用。

@@ -101,6 +101,7 @@ public actor ConversationRecordStore {
             var input = turn
             // The SQL primary key is published after INSERT and is not duplicated in evidence.
             input.messageID = nil
+            input.request = []
             input.response = ""
             input.modelRequests = nil
             input.toolCalls = nil
@@ -212,14 +213,13 @@ public actor ConversationRecordStore {
         var records: [MessageRecord] = []
         var cursor: Int64?
         while true {
-            let page = try await repository.messages(dialog: id, after: cursor)
-            records += page
-            guard page.count == 50, let last = page.last?.id,
-                let key = BusinessRecordID(rawValue: last)
-            else { break }
-            cursor = key.number
+            let page = try await repository.messagePage(dialog: id, after: cursor, limit: 50)
+            records += page.records
+            guard let next = page.next else { break }
+            cursor = next
         }
-        for item in records where item.kind == "input" {
+        var seenInputs: Set<String> = []
+        for item in records where item.kind == "input" && seenInputs.insert(item.inputID).inserted {
             var turn = try Self.decodeInput(item)
             turn.messageID = item.id
             turn.user = item.body
@@ -232,6 +232,12 @@ public actor ConversationRecordStore {
                 request.response = response.body
                 request.input =
                     records.first { $0.clientID == response.clientID && $0.kind == "observation" }?.body ?? item.body
+                if turn.request.isEmpty,
+                    let original = try? JSONDecoder().decode(
+                        [ConversationMessage].self, from: Data(request.requestJSON.utf8))
+                {
+                    turn.request = original
+                }
                 turn.modelRequests?.append(request)
             }
             turn.response = (turn.modelRequests ?? []).map(\.response).joined()
@@ -357,7 +363,7 @@ extension ConversationRecordStore {
         var result = metadata(try await ownedDialog(id))
         result.isWindow = true
         var turns: [String: ConversationRecord] = [:]
-        for preview in try await repository.latestPreviews(dialog: id) {
+        for preview in try await repository.latestPreviews(dialog: id) where !preview.isInput {
             let rows = try await repository.messageEvidence(preview.id)
             guard let input = rows.first(where: { $0.kind == "input" }),
                 let response = rows.first(where: { $0.id == preview.id })
@@ -371,6 +377,12 @@ extension ConversationRecordStore {
             request.response = response.body
             request.input = rows.first(where: { $0.kind == "observation" })?.body ?? input.body
             request.isObservation = rows.contains { $0.kind == "observation" }
+            if turn.request.isEmpty,
+                let original = try? JSONDecoder().decode(
+                    [ConversationMessage].self, from: Data(request.requestJSON.utf8))
+            {
+                turn.request = original
+            }
             turn.modelRequests?.append(request)
             turns[input.clientID] = turn
         }
@@ -429,6 +441,12 @@ extension ConversationRecordStore {
             request.response = response.body
             request.input =
                 rows.first { $0.clientID == response.clientID && $0.kind == "observation" }?.body ?? user.body
+            if turn.request.isEmpty,
+                let original = try? JSONDecoder().decode(
+                    [ConversationMessage].self, from: Data(request.requestJSON.utf8))
+            {
+                turn.request = original
+            }
             turn.modelRequests?.append(request)
         }
         turn.response = (turn.modelRequests ?? []).map(\.response).joined()
