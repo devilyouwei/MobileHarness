@@ -130,3 +130,7 @@ Typed camera intent also includes perceptionOpen/perceptionClose/perceptionFlip/
 ## Capture enhancement requests
 
 CameraInput maps to a bounded PhotographerCameraIntent containing optional complete CameraCaptureSettings or a UUID recordingID. Intent validation enforces operation-specific fields before the role invokes fixed Capture.configure/cancelCapture or Video.startRecording/stopRecording/saveVideo/ignoreVideo. For startRecording the fixed Tool supplies waitForCompletion=false, acknowledging native startup without retaining the request until the movie ends. UI stop remains a separate ToolCall; it does not enter ChannelScheduler or model inference and can stop an Assistant's scheduled recording whose default completion waits for the ready file. The single pending request and source/session checks are shared with photo/lens controls; file/native work remains in Actions. UI countdown cancellation cancels and joins its existing request, or submits the fixed cancelCapture operation when the countdown was started elsewhere.
+
+## 自有摄影岛
+
+Photographer在既有camera.observeFacts输入中选择倒计时、照片处理、录像和待处置内容，以自身Gateway身份调用内部Island工具。没有独立的跨角色UI观察器；具体内容在PhotographerUI，通用发布/重试机制在Support。暂停输入撤下活动；停止在权限退休前加入最终end，presentationFailure在角色和容器runtime可查。相机窗口、保存/忽略退场及提示音仍是Camera Action事务的一部分，实际执行回执不由展示推断。

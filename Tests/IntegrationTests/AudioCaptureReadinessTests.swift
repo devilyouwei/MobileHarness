@@ -3,6 +3,97 @@ import Testing
 
 @testable import PlatformKit
 
+#if os(iOS) || os(macOS)
+    import AVFoundation
+    import Synchronization
+
+    @Test(arguments: [false, true])
+    func spatialNativeFailurePreservesOriginalErrorBeforeAndAfterReadiness(ready: Bool) async throws {
+        let center = NotificationCenter()
+        let session = AVCaptureSession()
+        let source = MicrophoneCapture()
+        let readiness = AudioCaptureReadiness()
+        let reports = Mutex<[PlatformFailure]>([])
+        let admission = PlatformAdmission { _, _, error in
+            if let failure = error as? PlatformFailure { reports.withLock { $0.append(failure) } }
+        }
+        let observer = SpatialAudioObservation(
+            session: session, source: source, readiness: readiness, admission: admission, center: center)
+        defer { observer.invalidate() }
+        let input = try source.subscribe()
+        if ready {
+            readiness.resolve(.success(()))
+            try await readiness.wait()
+        }
+        let original = NSError(
+            domain: AVFoundationErrorDomain, code: -11819,  // iOS media-services reset captured in the device report.
+            userInfo: [NSLocalizedDescriptionKey: "Media services reset", "diagnostic": "preserved"])
+        center.post(
+            name: AVCaptureSession.runtimeErrorNotification, object: session,
+            userInfo: [AVCaptureSessionErrorKey: original])
+        center.post(name: AVCaptureSession.wasInterruptedNotification, object: session)
+        #expect(observer.failure as NSError? == original)
+        #expect(!source.isActive)
+        if !ready {
+            do {
+                try await readiness.wait()
+                Issue.record("Startup must retain the native failure")
+            } catch { #expect(error as NSError == original) }
+        }
+        do {
+            for try await _ in input.frames {}
+            Issue.record("PCM must terminate with the native failure")
+        } catch { #expect(error as NSError == original) }
+        let failures = reports.withLock { $0 }
+        #expect(failures.count == 1)
+        let failure = try #require(failures.first)
+        #expect(failure.component == "audio.spatial" && failure.operation == "nativeEvent")
+        #expect(failure.underlying as NSError == original)
+        #expect((failure.underlying as NSError).userInfo["diagnostic"] as? String == "preserved")
+    }
+
+    @Test(arguments: [false, true])
+    func spatialNativeMissingErrorAndInterruptionHaveDistinctFailures(interrupted: Bool) async throws {
+        let center = NotificationCenter()
+        let session = AVCaptureSession()
+        let source = MicrophoneCapture()
+        let readiness = AudioCaptureReadiness()
+        let observer = SpatialAudioObservation(
+            session: session, source: source, readiness: readiness, admission: nil, center: center)
+        defer { observer.invalidate() }
+        center.post(
+            name: interrupted ? AVCaptureSession.wasInterruptedNotification : AVCaptureSession.runtimeErrorNotification,
+            object: session)
+        let expected: AudioIOError = interrupted ? .interrupted : .runtimeFailed
+        await #expect(throws: expected) { try await readiness.wait() }
+        let input = try source.subscribe()
+        await #expect(throws: expected) { for try await _ in input.frames {} }
+    }
+
+    @Test func spatialNativeObserverIgnoresOtherSessionsAndNotificationsAfterStop() async throws {
+        let center = NotificationCenter()
+        let session = AVCaptureSession()
+        let source = MicrophoneCapture()
+        let readiness = AudioCaptureReadiness()
+        let reports = Mutex(0)
+        let observer = SpatialAudioObservation(
+            session: session, source: source, readiness: readiness,
+            admission: PlatformAdmission { _, _, _ in reports.withLock { $0 += 1 } }, center: center)
+        center.post(name: AVCaptureSession.runtimeErrorNotification, object: AVCaptureSession())
+        #expect(observer.failure == nil && source.isActive)
+        observer.invalidate()
+        readiness.resolve(.failure(CancellationError()))
+        source.finish()
+        center.post(name: AVCaptureSession.runtimeErrorNotification, object: session)
+        center.post(name: AVCaptureSession.wasInterruptedNotification, object: session)
+        #expect(observer.failure == nil)
+        #expect(reports.withLock { $0 } == 0)
+        await #expect(throws: CancellationError.self) { try await readiness.wait() }
+        let input = try source.subscribe()
+        for try await _ in input.frames { Issue.record("Stopped source has no frames") }
+    }
+#endif
+
 private enum CaptureReadinessFixtureError: Error, Equatable { case invalidPCM }
 
 @Test(.actionCatalog) func audioCaptureReadinessRequiresPCMInsteadOfSessionStartup() async {

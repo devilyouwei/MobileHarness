@@ -14,10 +14,12 @@
     public final class SpeechPerceptionContainer {
         public func stateSnapshot() async throws -> AgentStateSnapshot {
             try Task.checkCancellation()
+            let presentationFailure = await agent?.presentationFailure
             let status = await agent?.status()
             return AgentStateSnapshot(
                 path: "agents.speechperception",
                 runtime: [
+                    "presentationFailure": presentationFailure.map { .text($0) } ?? .unknown,
                     "rolePhase": status.map { .text($0.lifecycle.rawValue) } ?? .unknown,
                     "queuedInputs": status.map { .count($0.queuedInputs) } ?? .unknown,
                     "processedInputs": status.map { .count($0.processedInputs) } ?? .unknown, "closed": .flag(closed),
@@ -69,6 +71,7 @@
             manager = runtime.manager
             try await runtime.manager.start(.speechPerception)
             let consumer = try await runtime.output.consumer(for: value)
+            await value.bindPresentation(consumer)
             outputTask = Task {
                 do {
                     try await IndependentOutputWorkflow.consumeSignals(value.outputs) { envelope in

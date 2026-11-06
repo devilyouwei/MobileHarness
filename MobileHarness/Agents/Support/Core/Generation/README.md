@@ -120,3 +120,5 @@ FunctionTokenPrompts.json 包含 protocol、Action-only protocol、catalog 与 b
 同一响应可为已确定的多步输出连续 wait，每组内不同 Channel 可并行；依赖结果才能选择的步骤必须等待真实反馈。同名 Channel 跨 Task 独立，资源约束另外校验；模板不授予执行权。
 
 SentenceFunctionBuffer 支持首段软长度与后续长度，首段状态跨 XML／scope flush 保留；按句子／安全单词边界及显式长度 flush，无计时 flush。实际语音分段默认值由 Chat 调用者配置。
+
+GenerationEvent.runtimeAction保留代码展开来源；AgentGenerator把TextMapping输出的Action标为runtimeAction，XML显式调用保持action。actionCall统一读取两类执行值，GenerationTrace与历史预览显示两者；共享Chat按来源决定结果是否能进入模型观察，不能按函数路径推断。

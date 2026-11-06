@@ -247,7 +247,4 @@ gate from the newest complete snapshot even when transport overtakes the origina
 Occupancy and explicit listening consent remain independent; no task waiting state forces a microphone
 restart or bypasses playback drain.
 
-内部呈现的执行完成与模型观察分开：声明为internalActions/internalTools的回执可用于执行
-屏障和历史留证，但不作为ReACT观察或续轮理由。内部执行失败保留原始回执并结束为运行失败，
-不让模型修复UI呈现。Assistant只接纳与当前原生模型调用配对的ToolResult，未配对的结果不能
-进入正式输入FIFO。其他输入开口的clearReply不加入正在生成的另一输入的调用账本。
+内部执行与模型观察按每次调用的modelGenerated来源分开，不能根据internalActions/internalTools目录或路径推测。AgentGenerator将代码的自然文本展开标记为runtimeAction；显式模型Action、Tool及解析拒绝保持模型来源。字幕/播放/等待态可加入本轮执行屏障和历史留证，但内部值、失败、异常不进入ReACT观察，也不触发续轮；内部执行失败由worker按运行失败处理。未关联的Tool反馈拒绝，不作为新输入启动推理。共享Chat提供等待事实回调，角色决定展示文案和调用。

@@ -44,3 +44,7 @@ beginVideoAudio retains the existing voice generation, blocks listening start/re
 SpeechListening日志记录策略收到/应用的revision和enabled/paused、播放计数、采集代是否存在、
 恢复调用/返回/提交及取消边界。只有状态与计数公开；既有内容日志仍保持private。日志不改变
 采集许可、播放屏障或恢复策略，也不把调用开始当作实际恢复成功。
+
+## 播放事实与展示归属
+
+VoiceNativeEffects在首个有效PCM和播放drain/失败清理边界加入activeChanged回调；VoiceSessionCoordinator将audioID和active沿VoiceSessionConnections传回SpeechSynthesis。回调不依赖页面和UI状态观察，不改变原始播放错误。频谱worker仍由播放器持有、取消并加入，通过专用UI端口更新平滑数值及清零；不逐帧提交Island Action。聆听激活的音效/震动仍与采集接纳共同完成，展示角色不能绕过原生资源与清理。

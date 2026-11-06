@@ -73,3 +73,5 @@ GatewayOutputConsumer区分模型/Agent协议反馈与内部完成结果。execu
 
 默认内部动作过滤同时覆盖识别字幕/封口、回复字幕、等待态、语音状态和灵动岛呈现，不把这些
 成功的运行时维护调用混入业务记录；用户打开内部动作后可查看。失败仍沿现有诊断策略可见。
+
+AgentIslandPublication.permissions和bind(consumer:source:)只复用内部工具声明、可信身份接入及结果检查。内容、时机和终态仍在角色目录；成功/错误/异常在调用者自己的发布循环处理。SpeechPerception/SpeechSynthesis/Photographer/ApplicationControl复用相同机制，互不代发。App绑定的播放事实回调只报告实际audioID开始/结束，不包含角色展示策略。

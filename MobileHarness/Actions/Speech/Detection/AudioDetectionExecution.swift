@@ -85,6 +85,7 @@ private func diagnosticError(_ error: any Error) -> any Error {
         case .overflow: return AudioDetectionError.overflow
         case .busy: return AudioDetectionError.busy
         case .interrupted: return AudioDetectionError.interrupted
+        case .startFailed, .runtimeFailed: return error
         }
     }
     return error

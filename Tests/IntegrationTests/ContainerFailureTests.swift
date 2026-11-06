@@ -117,7 +117,10 @@ private actor FailedDiagnosticDatabase: DatabaseStorage {
                             .value(
                                 try await UIActions.showBluetoothSettings(invocation: invocation, using: presentation))
                         }),
-                    ].map(BehaviorProtocolBindings.bind))
+                    ].map(BehaviorProtocolBindings.bind)),
+                DiagnosticTools(
+                    definitions: try IslandModule(island: IslandPresentationService(state: ui.island)).definitions.map(
+                        BehaviorProtocolBindings.bind)),
             ]),
             policy: policy, sink: { _ in })
         runtime = ApplicationControlExecutionSession(

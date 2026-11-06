@@ -6,7 +6,7 @@ import StorageFiles
 public enum ArtifactWorkspaceError: String, Error, Sendable, CustomStringConvertible {
     case invalidPath, missingFile, existingFile, ambiguousMatch, readRequired, missingProject, conflict, busy
     case invalidReadRange, readReferenceLimit, relatedContextLimit, savepointLimit, invalidTitle, invalidQuery
-    case renderRequired
+    case renderRequired, closed
     case archiveFormatLimit
     public var description: String {
         let detail: String

@@ -195,3 +195,7 @@ processFrame在VAD确认新轮并创建AgentTurn后、发送语音阶段或ASR�
 SpeechListening日志只记录策略与生命周期检查点：enabled/paused、pending-final是否存在、占用来源
 数量、capture/awaiting/nativeProcessing与phase，以及恢复的join/reset边界。不记录原始语音、图片
 或模型正文。它与原有私有内容日志分开，用于区分策略未释放、恢复未到达和DSP重建停滞。
+
+## 自有灵动岛
+
+SpeechPerception在capture、聆听许可、识别phase和播放准入边界直接更新自有活动：可接纳输入时显示聆听/人声，ASR收尾显示识别；等待回复、关闭采集或停止撤下。连续聆听/人声保留elapsed起点，退出后重新计时，不依赖UI.voicePhase。容器绑定本角色consumer，复用共享有界发布，展示失败通过presentationFailure及容器runtime公开；停止在身份退休前加入最终end。不调用Assistant或SpeechSynthesis代发；字幕边界保持独立。

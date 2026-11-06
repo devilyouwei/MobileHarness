@@ -111,11 +111,11 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
         var result: ToolResult?
         var actionResult: ActionResult?
         var rejection: CallRejection?
+        var modelGenerated = true
     }
     private var roundID: String?
     private var roundCalls: [RoundCall] = []
     private var roundReceipt: GenerationRoundResult?
-    private var retiredCalls: [String] = []
     private var generationCalls = 0
     private var roundContinuationInputText = ""
     private var roundSuffixCount = 1
@@ -161,6 +161,9 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
     }
     private var captionInputStarts: [String: (incarnation: String?, turn: AgentTurn)] = [:]
     private var replyWaitingRequest: String?
+    private var replyPresentation: (@Sendable (Bool) async -> Void)?
+    /// Generic request-latency facts. The role owns content and calls its own presentation tools.
+    func bindReplyWaiting(_ callback: @escaping @Sendable (Bool) async -> Void) { replyPresentation = callback }
     private static var replyWaiting: InternalAction {
         InternalAction(
             domain: "UI", module: "Expression", function: "setReplyWaiting", channel: "Display",
@@ -567,9 +570,7 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
             try acceptResult(result, at: index)
             return
         }
-        if case .toolResult(let result) = input.payload,
-            State.agentID == .assistant || retiredCalls.contains(result.callID)
-        {
+        if case .toolResult = input.payload {
             // A native result must match an in-flight model call. Runtime display completions
             // belong to their internal caller and can never become another Assistant input.
             throw CommunicationError.unauthorized
@@ -1333,8 +1334,7 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
         ]
     }
     private func isInternalRuntimeCall(_ call: RoundCall) -> Bool {
-        descriptor.capabilities.internalActions.contains { $0.path.description == call.path }
-            || descriptor.capabilities.internalTools.contains { $0.path == call.path }
+        !call.modelGenerated
     }
     private func observationName(_ call: RoundCall) -> String {
         call.rejection?.alias
@@ -1392,7 +1392,6 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
         roundCalls[index].result = result
     }
     private func retireRound() {
-        retiredCalls = Array((retiredCalls + roundCalls.map(\.id)).suffix(128))
         roundCalls.removeAll()
         deferredCommunications.removeAll()
         roundReceipt = nil
@@ -1435,13 +1434,14 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
             decoding: try JSONSerialization.data(withJSONObject: object, options: [.sortedKeys]), as: UTF8.self)
     }
     @discardableResult
-    private func emitAction(_ call: ActionCall, for input: AgentInput) throws -> Bool {
+    private func emitAction(_ call: ActionCall, for input: AgentInput, modelGenerated: Bool = false) throws -> Bool {
         guard roundID != nil, activeInput?.id == input.id else { return emit(.actionCall(call), for: input) }
         guard roundCalls.count < 120 else { throw GenerationError.limitExceeded }
         let id = UUID().uuidString
 
         try roundCoordinator?.register(id: id)
-        roundCalls.append(.init(id: id, path: call.actionPath.description, tool: false, native: nil))
+        roundCalls.append(
+            .init(id: id, path: call.actionPath.description, tool: false, native: nil, modelGenerated: modelGenerated))
         return emit(.actionCall(call), for: input, callID: id)
     }
 
@@ -1471,9 +1471,11 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
         }
     }
     /// Presentation calls participate in the round, but never count as a model-generated answer.
-    private func finishReplyWaiting(_ requestID: String, input: AgentInput) throws {
+    private func finishReplyWaiting(_ requestID: String, input: AgentInput) async throws {
         guard replyWaitingRequest == requestID else { return }
         replyWaitingRequest = nil
+        await replyPresentation?(false)
+        guard reportsReplyActivity, input.turn != nil else { return }
         // Cancellation closes the round; reply occupancy/lifecycle clears its UI projection.
         guard !Task.isCancelled else { return }
         guard
@@ -1492,6 +1494,10 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
                     Self.replyWaiting.call(["enabled": "true", "requestID": requestID]), for: input)
             else { throw HarnessError.queueFull }
             replyWaitingRequest = requestID
+        }
+        if let replyPresentation {
+            replyWaitingRequest = requestID
+            await replyPresentation(true)
         }
         let startCalls = generationCalls
         let result: Result<String, any Error>
@@ -1527,7 +1533,7 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
             result = .failure(error)
         }
         // Runs for errors before a stream exists as well as cancellation of a live stream.
-        try finishReplyWaiting(requestID, input: input)
+        try await finishReplyWaiting(requestID, input: input)
         let answer = try result.get()
         guard generationCalls > startCalls else {
             throw CapabilityError.unavailable("LLM returned no speakable answer")
@@ -1760,7 +1766,9 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
                 try await recordSkillUse(path: call.toolPath, callType: "tool", input: input)
                 continue
             }
-            guard case .action(let original) = event else { continue }
+            guard let original = event.actionCall else { continue }
+            let modelGenerated: Bool
+            if case .action = event { modelGenerated = true } else { modelGenerated = false }
             var call = original
             if AgentCommunicationAdapter.isCommunication(call.actionPath.description) {
                 try reserveGeneratedCall(count: &count)
@@ -1770,7 +1778,7 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
                     roundCalls.append(
                         .init(
                             id: id, path: call.actionPath.description,
-                            tool: false, native: nil))
+                            tool: false, native: nil, modelGenerated: modelGenerated))
                 }
                 if call.parameters["kind"] == "result", roundID != nil {
                     deferredCommunications.append((id, call.actionPath.description, call.parameters, false))
@@ -1805,7 +1813,9 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
                 do {
                     try Task.checkCancellation()
                     call = try Self.playback.call(["audioID": request.audioID], channel: original.channel)
-                    guard try emitAction(call, for: input) else { throw HarnessError.queueFull }
+                    guard try emitAction(call, for: input, modelGenerated: modelGenerated) else {
+                        throw HarnessError.queueFull
+                    }
                 } catch {
                     let cleanup = try CommunicationAction(message: .cancelSpeech(request.audioID), target: target)
                     try await communicationReceipts.register(cleanup.id)
@@ -1820,7 +1830,7 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
                 }
                 continue
             }
-            guard try emitAction(call, for: input) else { throw HarnessError.queueFull }
+            guard try emitAction(call, for: input, modelGenerated: modelGenerated) else { throw HarnessError.queueFull }
             try await recordSkillUse(path: call.actionPath.description, callType: "action", input: input)
         }
     }

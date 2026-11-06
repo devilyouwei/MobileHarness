@@ -10,6 +10,7 @@ import StorageCache
 import StorageCore
 import Synchronization
 import Testing
+import UI
 
 @testable import Agents
 @testable import PlatformKit
@@ -1960,4 +1961,95 @@ func interruptedReplyPublishesIdleDuringPlaybackCleanupAndListeningCanRestart(_ 
     }
     await output.shutdown()
     await manager.stopAll()
+}
+
+// Role-owned presentation calls use each role's Gateway identity, never another Agent's inbox.
+@Test(.actionCatalog, .timeLimit(.minutes(1)), arguments: [false, true]) @MainActor
+func speechRolesOwnIndependentIslandsAndJoinShutdown(initiallyUnavailable: Bool) async throws {
+    let state = UI.IslandState()
+    state.setAvailable(!initiallyUnavailable)
+    let service = IslandPresentationService(state: state)
+    let manager = AgentManager()
+    let policy = try CommunicationPolicy(
+        contracts: AgentContracts.communication, configurations: AgentConfigurations.all())
+    let input = InputGateway(manager: manager, policy: policy)
+    let assembly = try BehaviorAssembly(capabilityModules: [IslandModule(island: service)])
+    let output = await OutputGateway(
+        manager: manager, requests: input, tools: assembly.tools, policy: policy, sink: { _ in })
+    let session = UUID().uuidString
+    let perception = try SpeechPerceptionAgent(
+        recognition: RecognitionFixture(text: "", includeFinal: false), vad: NativeRateVADProbe(),
+        sessionID: session, interactionSessionID: session, residentListening: true,
+        context: AgentContextRepository(
+            agent: .speechPerception, scope: UUID().uuidString, state: SpeechPerceptionContextState()))
+    let synthesis = try SpeechSynthesisAgent(
+        synthesis: SynthesisFixture(probe: VoiceProbe()), store: AudioCache(),
+        context: AgentContextRepository(
+            agent: .init(rawValue: "speechSynthesis"), scope: UUID().uuidString, state: SpeechSynthesisContextState()))
+    try await manager.register(perception)
+    try await manager.register(synthesis)
+    try await manager.start(perception.descriptor.id)
+    try await manager.start(synthesis.descriptor.id)
+    await perception.bindPresentation(try await output.consumer(for: perception))
+    await synthesis.bindPresentation(try await output.consumer(for: synthesis))
+    func wait(_ condition: () -> Bool) async throws {
+        let deadline = ContinuousClock.now + .seconds(4)
+        while !condition(), ContinuousClock.now < deadline { await Task.yield() }
+        try #require(condition())
+    }
+    _ = try await perception.setListening(enabled: true, sessionID: session)
+    try await perception.openCapture(sessionID: session)
+    if initiallyUnavailable {
+        let failureDeadline = ContinuousClock.now + .seconds(4)
+        while await perception.presentationFailure == nil, ContinuousClock.now < failureDeadline { await Task.yield() }
+        #expect(await perception.presentationFailure != nil)
+        #expect(await perception.status().lifecycle == .running)
+        state.setAvailable(true)
+    }
+    try await wait { state.activities.contains { $0.owner.hasPrefix("speechPerception:") } }
+    let listening = try #require(state.activities.first { $0.owner.hasPrefix("speechPerception:") })
+    #expect(listening.content.title == "正在聆听")
+    try await perception.pause()
+    try await wait { state.activities.isEmpty }
+    try await perception.resume()
+    try await wait { state.activities.contains { $0.owner.hasPrefix("speechPerception:") } }
+    let resumed = try #require(state.activities.first { $0.owner.hasPrefix("speechPerception:") })
+    await synthesis.playbackChanged(audioID: "first", active: true)
+    try await wait { state.headerActivity?.owner.hasPrefix("speechSynthesis:") == true }
+    #expect(state.headerActivity?.content.secondary == .spectrum)
+    let job = try SpeechSynthesisInput(text: "生产完成不能撤下仍在播放的活动")
+    try await synthesis.receive(
+        .init(
+            id: UUID().uuidString, sessionID: session,
+            payload: .observation(.speechSynthesis(job)),
+            metadata: .init(
+                payload: .observation(.speechSynthesis(job)), source: "assistant", rootID: UUID().uuidString,
+                parentID: UUID().uuidString)))
+    let productionDeadline = ContinuousClock.now + .seconds(4)
+    while await synthesis.status().processedInputs == 0, ContinuousClock.now < productionDeadline { await Task.yield() }
+    #expect(await synthesis.status().processedInputs == 1)
+    #expect(state.headerActivity?.owner.hasPrefix("speechSynthesis:") == true)
+    #expect(state.activities.contains { $0.id == resumed.id && $0.content.secondary == resumed.content.secondary })
+    await synthesis.playbackChanged(audioID: "second", active: true)
+    await synthesis.playbackChanged(audioID: "first", active: false)
+    #expect(state.headerActivity?.owner.hasPrefix("speechSynthesis:") == true)
+    await synthesis.playbackChanged(audioID: "second", active: false)
+    try await wait { state.headerActivity?.owner.hasPrefix("speechPerception:") == true }
+    #expect(await perception.acquirePlaybackAdmission())
+    try await wait { state.activities.isEmpty }
+    try await perception.resumeListening()
+    try await wait { state.headerActivity?.owner.hasPrefix("speechPerception:") == true }
+    await synthesis.playbackChanged(audioID: "third", active: true)
+    try await wait { state.headerActivity?.owner.hasPrefix("speechSynthesis:") == true }
+    await perception.stop()
+    #expect(!state.activities.contains { $0.owner.hasPrefix("speechPerception:") })
+    #expect(state.activities.contains { $0.owner.hasPrefix("speechSynthesis:") })
+    await synthesis.stop()
+    #expect(state.activities.isEmpty)
+    await synthesis.playbackChanged(audioID: "late", active: true)
+    #expect(state.activities.isEmpty)
+    #expect(await perception.presentationFailure == nil)
+    #expect(await synthesis.presentationFailure == nil)
+    await output.shutdown()
+    await state.stop()
 }

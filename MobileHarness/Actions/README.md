@@ -97,7 +97,7 @@ Camera coordinates independent photo and background visual demand over one Platf
 
 ActionsBusinessAssembly connects CameraCoordinator's recording audio hold to the active VoiceSessionCoordinator and injects joined image/video export through PlatformKit.Vision. CameraRecordingSession owns recording completion and pending media independently of window mounting; speech owns listening generation/restoration. Camera, UI, PlatformKit and Storage keep separate facts and completion contracts. The fixed Capture/Video/Perception entry points remain domain-owned @Actions; scheduled Action and direct Tool projections are shared by all three Camera modules. See [Camera](Camera/README.md) and [Listening](Speech/Listening/README.md).
 
-IslandModule提供双端内容发布/更新/结束和compact/expanded展示请求。领域仅发布中立状态、阶段身份和导航入口；UI拥有有界身份账本、串行ActivityKit写入和失败状态。ActionsBusinessAssembly构造唯一服务与根领域观察，不读取硬件或观察自身Action记录，实际频谱只送前台组件，不逐帧提交Action/原生摘要；shutdown加入观察和蓝牙到期任务。
+IslandModule提供双端内容发布/更新/结束和compact/expanded请求；UI拥有身份账本、布局、动画和系统提交。ActionsBusinessAssembly构造唯一执行服务，各Agent用自身身份调用。播放频谱跟随实际播放器经专用UI端口更新，不逐帧提交Action；角色停止清理自己的活动和发布任务。
 
 setSceneActive只调用原生场景服务的失活/加入端口，不暂停Actions根或取消其他已接纳Action；Camera与Bluetooth所属服务保持既有前台门。完整setForeground(false)/invalidate/stop仍执行全部取消。语音会话的半双工准入与持续采集见Speech/Listening。
 
@@ -109,15 +109,15 @@ Camera与Web在创建UI窗口时显式提供各自图标。Actions只选择显�
 
 生产 BehaviorAssembly 将公开 Action 投影为 scheduled 执行，Tool 投影保留 direct；同一函数可有两种协议适配，业务实现及资源检查仍共享。Assistant 所有 Skill 函数采用 XML Action；Writer 使用独立 Tool 目录。显式测试/宿主注入的注册策略不被生产投影重写。
 
-UI.Island 工具接纳生产者自有的通用语义内容，不管理 Writer 任务生命周期。Writer 与 Assistant 各自由本角色执行所有者通过 Gateway 内部展示工具发布或撤下任务岛；UI/Runtime 的领域观察只投影语音、相机和连接，不反向解读 Agent 任务日志。组件负责语义优先级排序及实际动画/布局。
+UI.Island工具执行生产者自己决定的语义内容。Writer与Assistant管理自身任务，Assistant另管理推理等待；SpeechPerception管理聆听/识别，SpeechSynthesis管理合成/真实播放，Photographer和ApplicationControl管理摄影与连接展示。Actions不从UI状态或任务日志推断角色展示。
 
-Artifacts exposes an internal direct workspace preview capability to Writer. Source intake only checkpoints the draft; Writer schedules safe script-disabled snapshots independently of the content stream. Explicit render joins pending previews and executes complete scripts; finish requires a current successful render and publishes once. The UI/Storage modules do not own creative-loop or progress policies.
+Writer workspace commands, including preview/describe, enter through Gateway direct tools. The admitted edit returns a stream identity; source append/complete/abort use the host-bound ArtifactStreaming continuation with delegate/stream validation and caller backpressure. Revoke closes ordinary continuation admission; release joins actual work before retiring the editor, and Actions root shutdown provides final cleanup. Tool completion, file completion and Writer task completion are separate boundaries. Source intake only checkpoints the draft; independently scheduled safe previews do not block it. Explicit render joins pending previews and executes complete scripts; finish requires a current successful render and publishes once. Detailed bounds and failure semantics belong to [Artifacts](Artifacts/README.md#执行与续写生命周期); the UI/Storage modules do not own creative-loop or progress policies.
 
 Web页面读取/截图/导航可按windowID选择既有Writer会话，仍经业务执行与原生验证；作品编辑授权保持Writer域。装配只注入UI根会话查询。
 
 Writer新模型选择读取独立writerThinking，默认minimum；显式开启时enabled。Assistant配置策略不变，当前执行保持配置快照。
 
-Island business execution has one typed Action entry, IslandActions.execute. Agent invocations reach it through Gateway and the registered string adapter; camera/voice/Bluetooth presentation calls it directly through producer-bound endpoints inside Actions. Internal composition does not involve Gateway, transport or synthetic FunctionInvocation. Ownership/revision/generation checks and receipts are shared. The domain observer owns three latest commands, one wake-up slot and one joined expiry/retry timer. Spectrum data and UI's own gestures/layout/lifecycle retain their specialized interfaces. See [Runtime](UI/Runtime/README.md).
+Island business execution has one typed entry, IslandActions.execute. Each role calls registered internal tools through its own Gateway identity. The shared execution service validates commands and returns actual receipts; it owns no business-phase observer. Playback spectra and UI gestures/layout/lifecycle retain their specialized interfaces. See [Runtime](UI/Runtime/README.md).
 
 Caption execution keeps recognition and reply ownership separate: setTranscript/finishTranscript affect only recognition, while code-owned clearReply retires a caller's old reply request without starting a new reply. Presentation guards reject stale continuations and delayed clears; the Agent decides the boundary, and UI retains text through playback/listening transitions. See [Conversation execution](UI/Conversation/README.md).
 

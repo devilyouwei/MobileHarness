@@ -7,6 +7,7 @@ import Gateway
 import ModelKit
 import StorageChat
 import StorageCore
+import StorageDatabase
 import StorageFiles
 import StorageMedia
 import StorageSQLite
@@ -499,6 +500,315 @@ func writerBackgroundRoleUsesDirectGatewayAndPublishesActualArtifact(mode: Int)
     _ = try await service.perform(invocation: invocation("three", ["command": "start", "workspaceID": project]))
     try await service.release(delegateID: "two")
     try await service.release(delegateID: "three")
+}
+
+private actor WriterLifetimeLatch {
+    private(set) var opened = false
+    private var waiters: [CheckedContinuation<Void, Never>] = []
+    func wait() async {
+        if opened { return }
+        await withCheckedContinuation { waiters.append($0) }
+    }
+    func open() {
+        opened = true
+        let pending = waiters
+        waiters.removeAll()
+        for waiter in pending { waiter.resume() }
+    }
+}
+
+private func writerLifetimeInvocation(_ parameters: [String: String], session: String = "session")
+    -> FunctionInvocation
+{
+    .init(
+        call: .init(
+            actionPath: ActionIdentifier(domain: "Artifacts", module: "Workspace", function: "perform"),
+            parameters: parameters.merging(["workspaceID": "writer/task_1", "createWorkspace": "true"]) {
+                existing, _ in existing
+            }),
+        context: .init(source: "writer", sessionID: session, inputID: UUID().uuidString, taskID: "delegate"),
+        executionID: UUID().uuidString, results: ActionReportStore())
+}
+
+@Test(.actionCatalog) func writerStreamingRevocationRejectsLateAndCrossSessionWork() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let records = try await workspaceFixtureRepositories()
+    let workspace = ArtifactWorkspace(disk: try DiskFileStore(root: root), catalog: records.workspaces)
+    let service = ArtifactService(workspace: workspace, present: { _, _, _, _, _ in "fixture" })
+    _ = try await service.perform(invocation: writerLifetimeInvocation(["command": "start"]))
+    await #expect(throws: ActionExecutionError.invalidInvocation) {
+        try await service.perform(invocation: writerLifetimeInvocation(["command": "list"], session: "other"))
+    }
+    let response = try await service.perform(
+        invocation: writerLifetimeInvocation(["command": "edit", "path": "index.html", "instruction": "Create"]))
+    let stream = try #require(JSONDecoder().decode([String: String].self, from: Data(response.utf8))["streamID"])
+    try await service.append(streamID: stream, delegateID: "delegate", text: "<p>preserved</p>")
+    let cancelledCompletion = Task {
+        withUnsafeCurrentTask { $0?.cancel() }
+        return try await service.complete(streamID: stream, delegateID: "delegate")
+    }
+    await #expect(throws: CancellationError.self) { try await cancelledCompletion.value }
+    await service.revoke(delegateID: "delegate")
+    await #expect(throws: ArtifactWorkspaceError.conflict) {
+        try await service.append(streamID: stream, delegateID: "delegate", text: "late")
+    }
+    await #expect(throws: ArtifactWorkspaceError.conflict) {
+        try await service.complete(streamID: stream, delegateID: "delegate")
+    }
+    await #expect(throws: ArtifactWorkspaceError.conflict) {
+        try await service.perform(invocation: writerLifetimeInvocation(["command": "finish"]))
+    }
+    // Cleanup remains legal after revocation and retains the partial draft.
+    try await service.abort(streamID: stream, delegateID: "delegate")
+    try await service.release(delegateID: "delegate")
+    let id = try #require(WorkspaceID(rawValue: "writer/task_1"))
+    #expect(try await workspace.checkpoint(for: id)?.draft.files["index.html"] == "<p>preserved</p>")
+    _ = try await service.perform(invocation: writerLifetimeInvocation(["command": "resume"]))
+    await #expect(throws: ArtifactWorkspaceError.conflict) {
+        try await service.append(streamID: stream, delegateID: "delegate", text: "old generation")
+    }
+    let cancelled = Task {
+        withUnsafeCurrentTask { $0?.cancel() }
+        return try await service.perform(invocation: writerLifetimeInvocation(["command": "rename", "title": "late"]))
+    }
+    await #expect(throws: CancellationError.self) { try await cancelled.value }
+    try await service.shutdown()
+    await #expect(throws: ArtifactWorkspaceError.closed) {
+        try await service.perform(invocation: writerLifetimeInvocation(["command": "start"]))
+    }
+    try await records.shutdown()
+}
+
+@Test(.actionCatalog, arguments: [false, true])
+@MainActor func writerStreamingCleanupJoinsEffectsAndDoesNotBlockSource(shutdown: Bool) async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let records = try await workspaceFixtureRepositories()
+    let workspace = ArtifactWorkspace(disk: try DiskFileStore(root: root), catalog: records.workspaces)
+    let entered = WriterLifetimeLatch()
+    let cancelled = WriterLifetimeLatch()
+    let unblock = WriterLifetimeLatch()
+    let finished = WriterLifetimeLatch()
+    let service = ArtifactService(
+        workspace: workspace,
+        present: { _, _, _, files, _ in
+            if files["index.html"] == "<p>first</p>" {
+                await entered.open()
+                // Deliberately noncooperative effect: cancellation must still join actual exit.
+                await withTaskCancellationHandler {
+                    await unblock.wait()
+                } onCancel: {
+                    Task { await cancelled.open() }
+                }
+            }
+            return "fixture"
+        })
+    let actions = ActionsContainer()
+    try actions.configure(
+        BehaviorAssembly(capabilityModules: [ArtifactsModule(artifacts: service)]),
+        cleanup: [{ try await service.shutdown() }])
+    try actions.start()
+    _ = try await service.perform(invocation: writerLifetimeInvocation(["command": "start"]))
+    let response = try await service.perform(
+        invocation: writerLifetimeInvocation(["command": "edit", "path": "index.html", "instruction": "Create"]))
+    let stream = try #require(JSONDecoder().decode([String: String].self, from: Data(response.utf8))["streamID"])
+    try await service.append(streamID: stream, delegateID: "delegate", text: "<p>first</p>")
+    let preview = Task { try await service.perform(invocation: writerLifetimeInvocation(["command": "preview"])) }
+    await entered.wait()
+    // A slow renderer must not back up model content intake or overwrite its latest session.
+    try await service.append(streamID: stream, delegateID: "delegate", text: "<p>second</p>")
+    let cleanup = Task {
+        if shutdown { try await actions.stop() } else { try await service.release(delegateID: "delegate") }
+        await finished.open()
+    }
+    await cancelled.wait()
+    #expect(await finished.opened == false)
+    await #expect(throws: shutdown ? ArtifactWorkspaceError.closed : ArtifactWorkspaceError.conflict) {
+        try await service.append(streamID: stream, delegateID: "delegate", text: "late")
+    }
+    let repeated = Task {
+        if shutdown { try await actions.stop() } else { try await service.release(delegateID: "delegate") }
+    }
+    await unblock.open()
+    await #expect(throws: CancellationError.self) { try await preview.value }
+    try await cleanup.value
+    try await repeated.value
+    let id = try #require(WorkspaceID(rawValue: "writer/task_1"))
+    #expect(try await workspace.checkpoint(for: id)?.draft.files["index.html"] == "<p>first</p><p>second</p>")
+    if !shutdown {
+        _ = try await service.perform(invocation: writerLifetimeInvocation(["command": "resume"]))
+        try await service.release(delegateID: "delegate")
+    }
+    try await actions.stop()
+    try await records.shutdown()
+}
+
+@Test(.actionCatalog) func writerShutdownJoinsPendingWorkspaceAdmission() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let records = try await workspaceFixtureRepositories()
+    let workspace = ArtifactWorkspace(disk: try DiskFileStore(root: root), catalog: records.workspaces)
+    let entered = WriterLifetimeLatch()
+    let cancelled = WriterLifetimeLatch()
+    let unblock = WriterLifetimeLatch()
+    let finished = WriterLifetimeLatch()
+    let service = ArtifactService(
+        workspace: workspace,
+        present: { _, _, _, _, _ in
+            await entered.open()
+            await withTaskCancellationHandler {
+                await unblock.wait()
+            } onCancel: {
+                Task { await cancelled.open() }
+            }
+            return "fixture"
+        })
+    let start = Task { try await service.perform(invocation: writerLifetimeInvocation(["command": "start"])) }
+    await entered.wait()
+    await #expect(throws: ArtifactWorkspaceError.busy) {
+        try await service.perform(invocation: writerLifetimeInvocation(["command": "edit", "path": "index.html"]))
+    }
+    let close = Task {
+        try await service.shutdown()
+        await finished.open()
+    }
+    await cancelled.wait()
+    #expect(await finished.opened == false)
+    await unblock.open()
+    await #expect(throws: CancellationError.self) { try await start.value }
+    try await close.value
+    await #expect(throws: ArtifactWorkspaceError.closed) {
+        try await service.perform(invocation: writerLifetimeInvocation(["command": "resume"]))
+    }
+    try await records.shutdown()
+}
+
+@Test(.actionCatalog) func writerCleanupFailureRemainsVisibleAndFencesAdmission() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let records = try await workspaceFixtureRepositories()
+    let workspace = ArtifactWorkspace(disk: try DiskFileStore(root: root), catalog: records.workspaces)
+    let service = ArtifactService(workspace: workspace, present: { _, _, _, _, _ in "fixture" })
+    _ = try await service.perform(invocation: writerLifetimeInvocation(["command": "start"]))
+    let response = try await service.perform(
+        invocation: writerLifetimeInvocation(["command": "edit", "path": "index.html", "instruction": "Create"]))
+    let stream = try #require(JSONDecoder().decode([String: String].self, from: Data(response.utf8))["streamID"])
+    try await service.append(streamID: stream, delegateID: "delegate", text: "<p>draft</p>")
+    // Explicit filesystem failure fixture: checkpoint cannot create files beneath a regular file.
+    let directory = root.appendingPathComponent("writer/task_1")
+    try FileManager.default.removeItem(at: directory)
+    try Data("blocked".utf8).write(to: directory)
+    await #expect(throws: NativeCleanupFailure.self) { try await service.release(delegateID: "delegate") }
+    await #expect(throws: NativeCleanupFailure.self) { try await service.release(delegateID: "delegate") }
+    await #expect(throws: ArtifactWorkspaceError.closed) {
+        try await service.perform(invocation: writerLifetimeInvocation(["command": "resume"]))
+    }
+    await #expect(throws: NativeCleanupFailure.self) { try await service.shutdown() }
+    await #expect(throws: NativeCleanupFailure.self) { try await service.shutdown() }
+    try await records.shutdown()
+}
+
+@Test(.actionCatalog) func writerCancelledAdmissionCanResumeAfterRelease() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let records = try await workspaceFixtureRepositories()
+    let workspace = ArtifactWorkspace(disk: try DiskFileStore(root: root), catalog: records.workspaces)
+    let entered = WriterLifetimeLatch()
+    let unblock = WriterLifetimeLatch()
+    let service = ArtifactService(
+        workspace: workspace,
+        present: { _, _, _, _, _ in
+            if await !entered.opened {
+                await entered.open()
+                await unblock.wait()
+                try Task.checkCancellation()
+            }
+            return "fixture"
+        })
+    let start = Task { try await service.perform(invocation: writerLifetimeInvocation(["command": "start"])) }
+    await entered.wait()
+    await service.revoke(delegateID: "delegate")
+    await unblock.open()
+    await #expect(throws: CancellationError.self) { try await start.value }
+    // start has already removed its session; release must still retire the revocation fence.
+    try await service.release(delegateID: "delegate")
+    _ = try await service.perform(invocation: writerLifetimeInvocation(["command": "resume"]))
+    try await service.shutdown()
+    try await records.shutdown()
+}
+
+private actor WriterCheckpointProbe: WorkspaceRepository {
+    let base: any WorkspaceRepository
+    let entered = WriterLifetimeLatch()
+    let unblock = WriterLifetimeLatch()
+    private var armed = false
+    private(set) var wasCancelled = false
+    init(base: any WorkspaceRepository) { self.base = base }
+    func arm() { armed = true }
+    func directory() async throws -> [WorkspaceSummary] { try await base.directory() }
+    func workspace(_ id: WorkspaceID) async throws -> WorkspaceSummary? { try await base.workspace(id) }
+    func claim(_ id: WorkspaceID, expecting: UUID?, lease: UUID) async throws {
+        try await base.claim(id, expecting: expecting, lease: lease)
+    }
+    func commit(_ value: WorkspaceSummary, lease: UUID) async throws {
+        if armed {
+            armed = false
+            await entered.open()
+            await unblock.wait()
+            wasCancelled = Task.isCancelled
+        }
+        try await base.commit(value, lease: lease)
+    }
+    func release(_ id: WorkspaceID, lease: UUID) async throws { try await base.release(id, lease: lease) }
+    func markDeleting(_ id: WorkspaceID) async throws { try await base.markDeleting(id) }
+    func finishDeleting(_ id: WorkspaceID) async throws { try await base.finishDeleting(id) }
+}
+
+@Test(.actionCatalog, arguments: [false, true])
+func writerCheckpointRevocationDistinguishesCommitFromCleanup(aborting: Bool) async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let records = try await workspaceFixtureRepositories()
+    let probe = WriterCheckpointProbe(base: records.workspaces)
+    let workspace = ArtifactWorkspace(disk: try DiskFileStore(root: root), catalog: probe)
+    let service = ArtifactService(workspace: workspace, present: { _, _, _, _, _ in "fixture" })
+    _ = try await service.perform(invocation: writerLifetimeInvocation(["command": "start"]))
+    let response = try await service.perform(
+        invocation: writerLifetimeInvocation(["command": "edit", "path": "index.html", "instruction": "Create"]))
+    let stream = try #require(JSONDecoder().decode([String: String].self, from: Data(response.utf8))["streamID"])
+    try await service.append(streamID: stream, delegateID: "delegate", text: "<p>checkpoint</p>")
+    await probe.arm()
+    let write = Task {
+        if aborting {
+            try await service.abort(streamID: stream, delegateID: "delegate")
+        } else {
+            _ = try await service.complete(streamID: stream, delegateID: "delegate")
+        }
+    }
+    await probe.entered.wait()
+    // A second mutation cannot enter while checkpoint persistence is suspended.
+    await #expect(throws: ArtifactWorkspaceError.busy) {
+        try await service.perform(invocation: writerLifetimeInvocation(["command": "rename", "title": "late"]))
+    }
+    await service.revoke(delegateID: "delegate")
+    let release = Task { try await service.release(delegateID: "delegate") }
+    await probe.unblock.open()
+    if aborting {
+        try await write.value
+    } else {
+        await #expect(throws: CancellationError.self) { try await write.value }
+    }
+    try await release.value
+    #expect(await probe.wasCancelled == !aborting)
+    let id = try #require(WorkspaceID(rawValue: "writer/task_1"))
+    #expect(try await workspace.checkpoint(for: id)?.draft.files["index.html"] == "<p>checkpoint</p>")
+    _ = try await service.perform(invocation: writerLifetimeInvocation(["command": "resume"]))
+    await #expect(throws: ArtifactWorkspaceError.conflict) {
+        try await service.complete(streamID: stream, delegateID: "delegate")
+    }
+    try await service.shutdown()
+    try await records.shutdown()
 }
 
 private actor WriterRenderProbe {

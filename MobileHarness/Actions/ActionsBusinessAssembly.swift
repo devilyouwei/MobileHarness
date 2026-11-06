@@ -143,7 +143,6 @@
                 photos: photos, export: { [platform] data in try await platform.vision.savePhoto(data) },
                 exportVideo: { [platform] file in try await platform.vision.saveVideo(file) })
             let island = IslandPresentationService(state: ui.island)
-            let islandDomains = IslandDomainPresentation(service: island, home: ui.home, camera: ui.camera.state)
             let workspace = ArtifactWorkspace(
                 disk: try files.file(files.workspaces), catalog: try workspaces())
             let exports = ArtifactExportService(workspace: workspace, disk: try files.file(files.workspaces))
@@ -206,13 +205,13 @@
                 assembly,
                 cleanup: [
                     { await mutations.shutdown() }, { await windowExecution.stop() }, { await web.stop() },
+                    { try await artifacts.shutdown() },
                     {
-                        await islandDomains.stop()
                         island.stop()
                     },
                 ],
                 workers: [
-                    { await islandDomains.run() }, { [camera] in await camera.observe() },
+                    { [camera] in await camera.observe() },
                     { [bluetooth] in await bluetooth.run() },
                 ],
                 invalidateNative: { [camera, bluetooth] in
@@ -268,7 +267,14 @@
             let lifecycle = VoiceSessionCoordinator(
                 runtime: VoiceSessionConnections(
                     endpoints: endpoints,
-                    interactionSessionID: host.sessionID, cancelReply: host.cancelReply, adaptFailure: host.adaptFailure
+                    interactionSessionID: host.sessionID, cancelReply: host.cancelReply,
+                    adaptFailure: host.adaptFailure,
+                    playbackChanged: host.playbackChanged,
+                    playbackSpectrum: { [island = ui.island] values, active in
+                        do { try island.spectrum(values, active: active, generation: island.generation) } catch {
+                            island.report(error)
+                        }
+                    }
                 ),
                 state: ui.home.conversation, audio: platform.audio.io(.voice), cue: platform.audio.cue(.voice),
                 haptic: platform.audio.haptic(.voice), recognition: speech.recognition, synthesis: speech.synthesis,

@@ -8,7 +8,7 @@ public struct GenerationTrace: Sendable {
     public private(set) var fragments: [String] = []
     public private(set) var events: [GenerationEvent] = []
     public var calls: [ActionCall] {
-        events.compactMap { if case .action(let call) = $0 { call } else { nil } }
+        events.compactMap(\.actionCall)
     }
     public private(set) var parserError: String?
     public private(set) var finished = false

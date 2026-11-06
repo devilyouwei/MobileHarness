@@ -49,7 +49,7 @@ UIContainer.stateSnapshot只返回自身生命周期事实及十二子能力的�
 
 setSceneActive与完整invalidate/setForeground分开：后台关闭窗口接纳、相机与App内岛渲染，保留正在运行会话的呈现token、已接纳输入和事实。同一Island活动继续更新系统Live Activity，返回前台挂载当前内容。UI不决定后台音频或设备的业务生命周期。
 
-Face和首页WindowHost原生树与导航保持身份；层级为首页→Window→本地Island→导航页。UIContainer接收NavigationState的首页边界变化，同步更新窗口宿主可见性及Island本地呈现，组件不互相引用。导航页遮挡窗口且暂停本地Island，返回恢复展开偏好；页面打开/返回不停止根聆听。窗口内容以插槽挂载，最小化停止隐藏内容绘制，业务设备暂停/关闭由消费者执行。相机后台关闭开启意图，回前台需要明确重开；UI不擅自恢复采集。
+Face和首页WindowHost原生树与导航保持身份；层级为首页→Window→导航页→全局本地Island。UIContainer接收NavigationState的首页边界变化，仅更新首页窗口宿主可见性。Island使用根拥有的单一覆盖窗口，所有页面持续更新同一活动和展开偏好；导航不拆卸Island、不改变状态栏接管，页面打开/返回不停止根聆听。窗口内容以插槽挂载，最小化停止隐藏内容绘制，业务设备暂停/关闭由消费者执行。相机后台关闭开启意图，回前台需要明确重开；UI不擅自恢复采集。
 
 原生渲染器拥有自己的显示链与GPU完成屏障；接纳不代表上屏，页面settled不代表动画完成。UIFailure保留原始错误和清理失败，有限动画使用身份/版本回执，旧代拒绝不会成为逐帧故障广播。
 

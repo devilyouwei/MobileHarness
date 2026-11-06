@@ -35,11 +35,13 @@ IslandContent的primary/secondary分别表示左右IslandIndicator，支持symbo
 
 progress.value范围0...1；elapsed.startedAt为默认Swift Codable Date，即2001-01-01 UTC起的秒数。detail.thumbnail只能是已注册UUID，不能传路径、URL或Base64。内容不携带导航目的地/按钮，整个系统岛点击固定mobileharness://island，只恢复App已有场景，不改变页面或启动设备。
 
-## 导航遮挡与恢复
+## 全局呈现与页面导航
 
-UI模块根通过setLocalPresentationVisible提供本地可见性，Island不读取导航路径。首次离开首页保存当前最多8活动的展开偏好，并停止本地宿主、命中、状态条刷新与布局占位；expanded/detail反映本地收起态，原生活动内容、系统摘要和业务生命周期继续。多级push/pop不重复保存，只有回首页才恢复仍存在且有详情的活动偏好；活动结束立即移除对应保存值，新活动使用自身默认偏好，不复活旧活动。根失活清理保存值，前后台切换不会解除导航遮挡。
+UIContainer 持有唯一根 IslandState，ApplicationRootView 在常驻导航容器外挂载 IslandHost。独立 scene 覆盖窗口位于首页、设置、记录、相册及其详情页之上；导航不拆卸宿主、不停止状态条刷新、不修改 localRevision 或活动身份。实时内容、频带和详情更新直接进入同一组件。
 
-本地挂载、布局预留和完成回执均检查本地可见性；导航期间迟到回执不得恢复状态栏接管。组件保留根拥有的内容与资源，普通导航不调用setAvailable(false)或结束Live Activity。
+展开/收起偏好直接属于活动，在任意页面修改后跨 push/pop 保留；不额外保存首页偏好，也不在返回首页时覆盖用户的新选择。普通内容更新保留偏好，新 expansionID 使用既有默认展开规则，活动结束删除其偏好，根失活清空旧代内容。
+
+本地挂载、布局预留、命中与完成回执检查根可用性和 sceneActive；后台拆卸与旧代回执围栏仍生效。恢复前台时在当前页面重新挂载，导航不控制根聆听、播放或系统 Live Activity 生命周期。首页窗口仍由导航可见性单独遮挡。
 
 ## 本地容器、布局与交互
 

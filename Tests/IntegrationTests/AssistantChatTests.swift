@@ -1002,3 +1002,63 @@ func internalCaptionAcknowledgmentAndFailureNeverTriggerModelReACT(_ failed: Boo
     #expect(!captions.isEmpty && captions.allSatisfy { $0["requiresReasoning"] as? Bool == false })
     await agent.stop()
 }
+
+private actor PresentationOriginChat: ChatCapability {
+    let availability: CapabilityAvailability = .available
+    var requests: [ChatRequest] = []
+    func chat(_ request: ChatRequest) throws -> InferenceSession<ChatEvent> {
+        requests.append(request)
+        let pair = InferenceSession<ChatEvent>.make(limits: try StreamLimits(), estimatedBytes: { $0.estimatedBytes })
+        if requests.count == 1 {
+            try pair.emitter.yield(.text("普通回答。<caption text=\"explicit\"/>"))
+        } else {
+            try pair.emitter.yield(.text("已完成。"))
+        }
+        try pair.emitter.yield(.finished(.stop))
+        pair.emitter.finish()
+        return pair.session
+    }
+}
+
+@Test(.actionCatalog, .timeLimit(.minutes(1)), arguments: [false, true])
+func sameActionPathUsesInvocationOriginForModelFeedback(failed: Bool) async throws {
+    let model = PresentationOriginChat()
+    let history = ConversationHistoryStore()
+    let catalog = try CapabilityRegistry(
+        actions: [
+            .init(
+                alias: "caption", path: .init(domain: "UI", module: "Caption", function: "print"),
+                defaultChannel: "Display", requiredParameters: ["text"])
+        ], channels: ["Speech", "Display"])
+    let agent = try FixtureNativeAgent(
+        chat: model, conversations: history,
+        context: AgentContextRepository(agent: .assistant, scope: UUID().uuidString, state: FixtureNativeChatState()),
+        capabilities: catalog)
+    _ = try await bindSpeechRequests(agent)
+    try await agent.start()
+    var outputs = FixtureGenerationOutputs(
+        agent: agent,
+        actionCompletion: { call in
+            if call.parameters["text"] == "explicit" {
+                return failed ? (.completed, .handlerFailed) : (.value("model-owned receipt"), nil)
+            }
+            if call.actionPath.description == "UI.Caption.print" { return (.value("runtime-only receipt"), nil) }
+            return (.completed, nil)
+        }
+    ).makeAsyncIterator()
+    try await agent.receive(.init(id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("测试调用来源")))
+    let completed = try await completedTurn(&outputs)
+    #expect(completed.last?.output == .control("agent.finished"))
+    let requests = await model.requests
+    #expect(requests.count == 2)
+    let feedback = requests.last?.messages.map(\.content).joined(separator: "\n") ?? ""
+    #expect(!feedback.contains("runtime-only receipt"))
+    let record = try await history.snapshot()
+    let rounds = try #require(record.current.turns.first?.generationRounds)
+    let firstRound = try #require(rounds.first)
+    let rows = try #require(JSONSerialization.jsonObject(with: Data(firstRound.resultsJSON.utf8)) as? [[String: Any]])
+    let captions = rows.filter { $0["path"] as? String == "UI.Caption.print" }
+    #expect(captions.contains { $0["internal"] as? Bool == true && $0["requiresReasoning"] as? Bool == false })
+    #expect(captions.contains { $0["internal"] as? Bool == false && $0["requiresReasoning"] as? Bool == true })
+    await agent.stop()
+}

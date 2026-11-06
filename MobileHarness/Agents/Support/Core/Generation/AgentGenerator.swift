@@ -93,7 +93,10 @@ public struct AgentGenerator: Sendable {
             let calls = try mapTextCalls(chunk, textChannel)
             guard !calls.isEmpty, calls.count <= 8 else { throw GenerationError.limitExceeded }
             try reserve(calls.count)
-            output += calls
+            output += calls.map { event in
+                if case .action(let call) = event { return .runtimeAction(call) }
+                return event
+            }
         }
         return output
     }

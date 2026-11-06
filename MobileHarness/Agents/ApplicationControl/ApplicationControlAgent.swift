@@ -131,7 +131,7 @@ public actor ApplicationControlAgent: Agent {
                     ApplicationControlFunctions.providerDiscovery, ApplicationControlFunctions.providerRestoration,
                     ApplicationControlFunctions.providerSaving, ApplicationControlFunctions.providerPresentation,
                     ApplicationControlFunctions.deviceControl, ApplicationControlFunctions.navigation,
-                ] + ApplicationControlFunctions.windows))
+                ] + ApplicationControlFunctions.windows + AgentIslandPublication.permissions))
         taskCoordinator = AgentFixedTaskCoordinator(context: self.contextRepository)
         self.sessionID = sessionID
         let pair = AsyncStream<OutputEnvelope>.makeStream(
@@ -149,7 +149,45 @@ public actor ApplicationControlAgent: Agent {
         guard sequence > 0 else { throw CommunicationError.invalidPayload }
         try await receive(fact.input(sessionID: sessionID, sequence: sequence))
     }
-    public func observeConnection(_ facts: NexArmConnectionFacts) throws {
+    let island = AgentIslandPublication()
+    private var islandExpiry: Task<Void, Never>?
+    private var islandConnectionRevision: UInt64 = 0
+    public func finishPresentation() async { await island.stop() }
+    public var presentationFailure: String? { get async { await island.lastFailure } }
+    private var islandConnectionState: ApplicationControlBluetoothState?
+    private func updateConnectionIsland() async {
+        guard let state = bluetoothPresented, state != islandConnectionState else { return }
+        islandConnectionState = state
+        await presentConnectionIsland(state)
+    }
+    private func presentConnectionIsland(_ state: ApplicationControlBluetoothState) async {
+        islandConnectionRevision += 1
+        let revision = islandConnectionRevision
+        let previous = islandExpiry
+        previous?.cancel()
+        await previous?.value
+        guard revision == islandConnectionRevision else { return }
+        await island.submit(Self.connectionContent(state, temporary: true))
+        islandExpiry = Task { [weak self] in
+            do { try await Task.sleep(for: .seconds(3)) } catch { return }
+            await self?.expireConnectionIsland(state, revision: revision)
+        }
+    }
+    private func expireConnectionIsland(_ state: ApplicationControlBluetoothState, revision: UInt64) async {
+        guard !Task.isCancelled, revision == islandConnectionRevision else { return }
+        await island.submit(Self.connectionContent(state, temporary: false))
+    }
+    static func connectionContent(_ state: ApplicationControlBluetoothState, temporary: Bool) -> IslandContent? {
+        if state == .disconnected && !temporary { return nil }
+        let title = state == .connected ? "已连接" : state == .connecting ? "正在连接" : "未连接"
+        return .init(
+            title: "蓝牙", subtitle: title,
+            primary: .symbol(
+                name: state == .connecting ? "antenna.radiowaves.left.and.right" : "dot.radiowaves.left.and.right"),
+            tone: state == .disconnected ? .warning : .blue, priority: temporary ? .high : .background,
+            secondary: state == .connecting ? .loading : nil)
+    }
+    public func observeConnection(_ facts: NexArmConnectionFacts) async throws {
         guard lifecycle == .running || lifecycle == .paused else { throw HarnessError.notRunning }
         let phase: ApplicationControlBluetoothState
         if facts.availability != .available {
@@ -164,6 +202,7 @@ public actor ApplicationControlAgent: Agent {
         bluetoothState = phase
         let context = ProcessingContext(sessionID: sessionID, source: "runtime")
         try presentBluetooth(phase, input: context.input(.event("connection.changed")))
+        await updateConnectionIsland()
     }
     public func observeFailure(_ event: ContainerFailureEvent) async throws {
         try event.validate()
@@ -216,6 +255,10 @@ public actor ApplicationControlAgent: Agent {
     }
     public func stop() async {
         await stopUIInputs()
+        islandExpiry?.cancel()
+        await islandExpiry?.value
+        islandExpiry = nil
+        await island.stop()
         uiExecution.consumer = nil
         admission.close()
         lifecycle = .stopped
@@ -248,7 +291,10 @@ public actor ApplicationControlAgent: Agent {
     // MARK: - Input processing
 
     public func receive(_ input: AgentInput) async throws {
-        do { try await receiveSignal(input) } catch {
+        do {
+            try await receiveSignal(input)
+            await updateConnectionIsland()
+        } catch {
             if (error as? CommunicationError) == .invalidPayload {
                 ContainerInputMetrics.rejected(input, role: "ApplicationControl")
             }

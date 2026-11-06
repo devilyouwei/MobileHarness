@@ -14,7 +14,7 @@
 
 UIContainer仍在模块根装配导航子容器。功能页面通过导航上下文修饰器确认展示状态，Root组合其实际内容；Root不要求功能页面创建根实例。导航路径变化推进generation并进入transitioning，匹配页面确认后settled；settled只表示页面出现，不代表动画、GPU或业务完成。旧代确认拒绝。相册上下文消费UIAlbumContainer的已有快照，不读取存储。
 
-Face与导航保持稳定兄弟节点；WindowHost属于持久首页内容，位于Face之上、NavigationStack之下，透明区域保留透传。导航页覆盖整个首页和窗口，并阻断其触摸与无障碍。NavigationState仅在路径跨越首页边界时同步通知UIContainer，由模块根更新窗口可见性和本地Island呈现；多级导航不重复保存偏好。其他导航页处于最高层，本地Island退出挂载并恢复系统状态栏，回首页恢复此前展开／收起偏好。页面导航不关闭根聆听，不重新授予相机采集。后台停渲染及根停止由UIContainer/对应组件处理，不用页面消失替代设备清理。
+Face与导航保持稳定兄弟节点；WindowHost属于持久首页内容，位于Face之上、NavigationStack之下，透明区域保留透传。导航页覆盖整个首页和窗口，并阻断其触摸与无障碍。NavigationState仅在路径跨越首页边界时同步通知UIContainer更新首页窗口可见性。IslandHost挂载在常驻导航容器外，使用独立scene覆盖窗口全局显示；设置、记录、相册和详情页均可查看最新状态、展开及收起，导航不改变Island身份、展开偏好或状态栏接管。页面导航不关闭根聆听，不重新授予相机采集。后台停渲染及根停止由UIContainer/对应组件处理，不用页面消失替代设备清理。
 
 [UI模块](../README.md) · [共享机制](../Shared/README.md) · [公共组件](../Components/README.md)
 

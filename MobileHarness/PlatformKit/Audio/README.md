@@ -56,6 +56,8 @@ HapticFeedbackProviding使用公开支持检查、缓存生成器和一个有主
 
 ## 原生事件、错误与约束
 
+空间采集的通知桥绑定单个 AVCaptureSession 和采集代际。runtimeError 保留原生 NSError 及其 domain/code/userInfo；无原生错误时为 runtimeFailed，原生中断为 interrupted，无法启动为 startFailed。首个终止事件同时结束首帧等待和 PCM 源并报告 PlatformFailure，后续通知不能改写主因；首帧已就绪后的失败仍终止 PCM 源。启动返回前再次检查已收到的原生失败。停止先关闭通知接纳和 PCM 源，再停止并加入回调，清理期间通知不新增故障。只有真实 PCM 验证失败使用 invalidFormat。
+
 NativeAudioEvent 是事实而非Error。路由按前后输入／输出portType+UID比较，categoryChange/override及同设备重配不打断流；实际设备变化、不可用路由和缺少旧快照保守投递routeChanged，不直接上报容器故障。
 
 中断仅在began且实例有活动采集／播放时报告AudioIOError.interrupted；ended不重复终止。格式、连续性、overflow、执行和清理失败保留原throw及注入报告。事件两个worker由原生所有者取消并加入，不由页面持有。

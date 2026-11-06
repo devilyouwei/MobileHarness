@@ -257,7 +257,7 @@ WebBrowsing通过ui.web读取content（empty/local/remote）及有界远程url�
 
 ## 自有任务岛
 
-AssistantExecutionSession 消费 AgentRuntime 已有的本角色 Skill 状态订阅，按 activeTaskID 与前台任务阶段构造目标详情；不从其他 Agent 的任务日志推断展示。完成／取消／失败或清除前台任务时提交 end，关闭执行会话前加入展示清理。复用 Support 的 AgentIslandPublication，经身份绑定 Gateway 调用注册的 UI.Island.present/end 内部展示工具；权限仅供运行时代码使用，不暴露给模型，不改变 Assistant 的 XML Action 调度协议，也不创建 Writer 的前台 Task。展示失败可通过 presentationFailure 查询。相机、蓝牙、实际语音播放／频谱仍由各自 Actions 能力拥有者维护，UI 统一决定布局、动画与优先级。
+AssistantExecutionSession管理两条独立活动：消费本角色Skill状态的任务岛，以及共享Chat请求等待回调驱动的推理等待岛。共享层只报告开始/首个输出/异常结束；文案和UI.Island内部调用由Assistant拥有。各活动独立身份、版本与结束，停止先加入展示清理再退休角色权限。Gateway executeInternal结果由调用方处理，不进入模型输入；presentationFailure保留展示错误。其他角色自己的语音、摄影或连接展示不由Assistant代发。
 
 ## 输入开始与自有回复字幕
 

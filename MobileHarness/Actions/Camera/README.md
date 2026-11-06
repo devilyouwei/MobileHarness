@@ -117,7 +117,7 @@ PhotoAlbumService routes video thumbnails through NativeAlbumMovie and returns v
 
 Photo capture freezes presentation.snapshot.photoCaptureRotation after countdown/readiness checks, immediately before the native shutter. Recording freezes the same window-derived angle after audio handoff and before beginRecording. Missing live geometry rejects unavailable; gravity-only rotation and Face orientation do not override the photo window. Native JPEG metadata and movie transforms remain authoritative for thumbnail, playback and storage; Actions does not rotate or crop encoded media after capture.
 
-Camera既有呈现状态由根IslandDomainPresentation投影为倒计时、照片处理、录像和待处置系统摘要。原生岛Link返回App相机入口；取消倒计时/停止录像/保存仍在Camera窗口复用UICameraContainer→Photographer→Gateway→Camera Action链，停止请求绑定recordingID。领域不等待系统动画执行设备动作，系统呈现不释放Camera。
+Photographer沿其既有相机事实输入管理倒计时、照片处理、录像和待处置灵动岛，以自身身份调用Gateway内部展示工具。Camera仍拥有原生事务和窗口/音效执行；系统岛不控制设备或释放相机，点击唤回App当前页面。取消倒计时、停止录像和保存继续经UICameraContainer→Photographer→Gateway→Camera Action，停止请求绑定recordingID。
 
 Opening and native session running are not interchangeable with capture geometry readiness. The automatic open step awaits fresh preview geometry before completing. PhotoSession rechecks after the countdown; RecordingSession rechecks after mode configuration and microphone handoff. Both revalidate foreground/cancellation after the wait before calling Foundation. Missing initial frames wait for admission rather than immediately returning unavailable; a bounded timeout or root invalidation fails the current Action and never fabricates a capture result. The UI owns frame waiting only; Actions retains device/lifecycle authority.
 

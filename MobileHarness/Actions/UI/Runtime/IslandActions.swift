@@ -174,20 +174,11 @@ public struct IslandCommand: Sendable {
     }
 
 }
-/// Constructed only by the registered adapter or the container's domain binding.
+/// Trusted invocation identity; activity content never chooses its producer.
 public struct IslandActionContext: Sendable {
     public let owner: String
-    fileprivate let generation: UUID?
-    fileprivate let sharedPresentation: Bool
     fileprivate init(invocation: any FunctionInput) {
         owner = invocation.context.source + ":" + invocation.context.sessionID
-        generation = nil
-        sharedPresentation = true
-    }
-    fileprivate init(domain: IslandDomain, generation: UUID) {
-        owner = "domain." + domain.rawValue
-        self.generation = generation
-        sharedPresentation = false
     }
 }
 public struct IslandReceipt: Codable, Sendable {
@@ -212,46 +203,22 @@ public struct IslandReceipt: Codable, Sendable {
 public protocol IslandControlCapability: Sendable {
     func performIsland(_ command: IslandCommand, context: IslandActionContext) async throws -> IslandReceipt
 }
-public enum IslandDomain: String, CaseIterable, Sendable { case camera, voice, bluetooth }
-/// Trusted, producer-bound Action calls inside the Actions container; no invocation or transport.
-public protocol IslandActionCalling: Sendable {
-    func perform(_ command: IslandCommand) async throws -> IslandReceipt
-}
-private struct IslandBoundActions: IslandActionCalling {
-    let service: any IslandControlCapability
-    let context: IslandActionContext
-    func perform(_ command: IslandCommand) async throws -> IslandReceipt {
-        try await IslandActions.execute(command, context: context, using: service)
-    }
-}
-/// Observation environment and high-frequency data, separate from business Action execution.
-@MainActor public protocol IslandDomainPresenting: AnyObject {
-    var islandAvailable: Bool { get }
-    var islandGeneration: UUID { get }
-    func islandActions(for domain: IslandDomain) -> any IslandActionCalling
-    func publishSpectrum(_ values: [Float], active: Bool) throws
-    func reportIslandFailure(_ error: any Error)
-}
 /// Display image ownership uses the same owner identifier as its published activity.
 @MainActor public protocol IslandThumbnailPresenting: AnyObject {
     func registerThumbnail(_ data: Data, owner: String, generation: UUID) async throws -> IslandThumbnailID
     func releaseThumbnail(_ id: IslandThumbnailID, owner: String, generation: UUID) throws
 }
-/// Shared execution implementation for domain adapters and declared Actions; UI owns only presentation.
+/// Registered role calls share this execution service; UI owns presentation, not role policy.
 @MainActor
-public final class IslandPresentationService: IslandControlCapability, IslandDomainPresenting, IslandThumbnailPresenting
-{
+public final class IslandPresentationService: IslandControlCapability, IslandThumbnailPresenting {
     private let state: IslandState
     private var stopped = false
-    public var islandAvailable: Bool { !stopped && state.available }
-    public var islandGeneration: UUID { state.generation }
     public init(state: IslandState) { self.state = state }
     public func performIsland(_ command: IslandCommand, context: IslandActionContext) async throws -> IslandReceipt {
         try Task.checkCancellation()
         guard !stopped else { throw IslandError.unavailable }
         let owner = context.owner
         let generation = state.generation
-        if let expected = context.generation, expected != generation { throw IslandError.stale }
         switch command.operation {
         case .present, .update:
             guard let content = command.content else { throw IslandError.invalid }
@@ -262,10 +229,9 @@ public final class IslandPresentationService: IslandControlCapability, IslandDom
             try await state.end(id: command.id, owner: owner, revision: command.revision)
         case .setPresentation:
             guard let size = command.size else { throw IslandError.invalid }
-            guard let activity = state.activities.first(where: { $0.id == command.id }) else {
+            guard state.activities.contains(where: { $0.id == command.id }) else {
                 throw IslandError.missing
             }
-            guard context.sharedPresentation || activity.owner == owner else { throw IslandError.owner }
             if size == .expanded {
                 try await state.requestAttention(id: command.id)
             } else {
@@ -279,10 +245,6 @@ public final class IslandPresentationService: IslandControlCapability, IslandDom
             activityID: command.id.uuidString, state: "submitted", presentation: "localAndSystem",
             localStatus: state.localStatus, systemStatus: state.systemStatus.rawValue)
     }
-    public func islandActions(for domain: IslandDomain) -> any IslandActionCalling {
-        IslandBoundActions(service: self, context: .init(domain: domain, generation: state.generation))
-    }
-
     public func registerThumbnail(_ data: Data, owner: String, generation: UUID) async throws -> IslandThumbnailID {
         guard !stopped else { throw IslandError.unavailable }
         return try await state.registerThumbnail(data, owner: owner, generation: generation)
@@ -291,10 +253,5 @@ public final class IslandPresentationService: IslandControlCapability, IslandDom
         guard !stopped else { throw IslandError.unavailable }
         try state.releaseThumbnail(id, owner: owner, generation: generation)
     }
-    public func publishSpectrum(_ values: [Float], active: Bool) throws {
-        guard !stopped else { throw IslandError.unavailable }
-        try state.spectrum(values, active: active, generation: state.generation)
-    }
-    public func reportIslandFailure(_ error: any Error) { state.report(error) }
     public func stop() { stopped = true }
 }

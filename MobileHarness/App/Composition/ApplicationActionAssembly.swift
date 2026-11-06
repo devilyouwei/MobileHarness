@@ -56,7 +56,8 @@ final class ApplicationActionAssembly {
                 let voice = try ports.makeVoice(
                     ActionsVoiceHost(
                         sessionID: host.sessionID, cancelReply: host.cancelReply,
-                        detection: host.detection, adaptFailure: SpeechPlaybackFailure.adapting))
+                        detection: host.detection, adaptFailure: SpeechPlaybackFailure.adapting,
+                        playbackChanged: host.playbackChanged))
                 return AgentVoiceExecution(
                     lifecycle: AppVoiceLifecycle(value: voice.lifecycle), spectrum: voice.spectrum,
                     diagnostic: voice.diagnostic, stopDiagnostic: voice.stopDiagnostic,

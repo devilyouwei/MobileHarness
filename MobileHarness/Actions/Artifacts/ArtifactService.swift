@@ -11,6 +11,7 @@ public actor ArtifactService: ArtifactCapability, ArtifactStreaming {
     public typealias Present = @Sendable (WorkspaceID, String, String, [String: String], Bool) async throws -> String
     private struct Session {
         let id: WorkspaceID
+        let sessionID: String
         var title: String
         var entry: String
         let editor: ArtifactEditing
@@ -32,6 +33,20 @@ public actor ArtifactService: ArtifactCapability, ArtifactStreaming {
     private var sessions: [String: Session] = [:]
     private var admitting: Set<String> = []
     private var lockedProjects: Set<WorkspaceID> = []
+    private enum Lane { case mutation, observation }
+    private struct Work {
+        let delegateID: String?
+        let lane: Lane
+        let cleanup: Bool
+        let cancel: @Sendable () -> Void
+        let join: @Sendable () async -> Void
+    }
+    private var work: [UUID: Work] = [:]
+    private var revoked: Set<String> = []
+    private var releases: [String: Task<Void, any Error>] = [:]
+    private var shutdownTask: Task<Void, any Error>?
+    private var closed = false
+    private var cleanupFailure: (any Error)?
     public init(
         workspace: ArtifactWorkspace,
         prepare: @escaping @Sendable (WorkspaceID, Bool) async throws -> Void = { _, _ in },
@@ -46,6 +61,16 @@ public actor ArtifactService: ArtifactCapability, ArtifactStreaming {
         self.describe = describe
     }
     public func perform(invocation: any FunctionInput) async throws -> String {
+        let owner = invocation.context.source == "writer" ? invocation.context.taskID : nil
+        if let owner, let session = sessions[owner], session.sessionID != invocation.context.sessionID {
+            throw ActionExecutionError.invalidInvocation
+        }
+        let lane: Lane = invocation.call.parameters["command"] == "preview" ? .observation : .mutation
+        return try await run(delegateID: owner, lane: lane) {
+            try await self.performAdmitted(invocation: invocation)
+        }
+    }
+    private func performAdmitted(invocation: any FunctionInput) async throws -> String {
         let args = invocation.call.parameters
         guard let command = args["command"] else { throw ArtifactWorkspaceError.missingFile }
         if invocation.context.source == "assistant" {
@@ -111,7 +136,8 @@ public actor ArtifactService: ArtifactCapability, ArtifactStreaming {
                         workspaceID: id, baseRevision: original?.revision,
                         title: title, entry: entry, draft: draft, interrupted: true))
                 sessions[delegateID] = Session(
-                    id: id, title: title, entry: entry, editor: ArtifactEditing(draft: draft),
+                    id: id, sessionID: invocation.context.sessionID,
+                    title: title, entry: entry, editor: ArtifactEditing(draft: draft),
                     revision: original?.revision)
                 if command == "start" { try await prepare(id, false) }
                 var visible = draft.files
@@ -166,9 +192,12 @@ public actor ArtifactService: ArtifactCapability, ArtifactStreaming {
             guard let entry = visible.files[session.entry], !entry.isEmpty else {
                 return try encode(["status": "unchanged"])
             }
-            session.previewFiles = visible.files
-            sessions[delegateID] = session
-            return try await present(session.id, session.title, session.entry, visible.files, true)
+            let result = try await present(session.id, session.title, session.entry, visible.files, true)
+            // A preview awaits independently of streaming. Never write its old Session over a newer edit.
+            if sessions[delegateID]?.generation == session.generation {
+                sessions[delegateID]?.previewFiles = visible.files
+            }
+            return result
         }
         guard session.stream == nil else { throw ArtifactWorkspaceError.busy }
         switch command {
@@ -359,6 +388,11 @@ public actor ArtifactService: ArtifactCapability, ArtifactStreaming {
         }
     }
     public func append(streamID: String, delegateID: String, text: String) async throws {
+        try await run(delegateID: delegateID) {
+            try await self.appendAdmitted(streamID: streamID, delegateID: delegateID, text: text)
+        }
+    }
+    private func appendAdmitted(streamID: String, delegateID: String, text: String) async throws {
         guard var session = sessions[delegateID], let id = UUID(uuidString: streamID), session.stream == id else {
             throw ArtifactWorkspaceError.conflict
         }
@@ -376,6 +410,11 @@ public actor ArtifactService: ArtifactCapability, ArtifactStreaming {
         }
     }
     public func complete(streamID: String, delegateID: String) async throws -> String {
+        try await run(delegateID: delegateID) {
+            try await self.completeAdmitted(streamID: streamID, delegateID: delegateID)
+        }
+    }
+    private func completeAdmitted(streamID: String, delegateID: String) async throws -> String {
         guard var session = sessions[delegateID], let id = UUID(uuidString: streamID), session.stream == id else {
             throw ArtifactWorkspaceError.conflict
         }
@@ -394,32 +433,134 @@ public actor ArtifactService: ArtifactCapability, ArtifactStreaming {
         return try encode(changes)
     }
     public func abort(streamID: String, delegateID: String) async throws {
+        try await run(delegateID: delegateID, cleanup: true) {
+            try await self.abortAdmitted(streamID: streamID, delegateID: delegateID)
+        }
+    }
+    private func abortAdmitted(streamID: String, delegateID: String) async throws {
         guard var session = sessions[delegateID], let id = UUID(uuidString: streamID), session.stream == id else {
             return
         }
-        let preview = try await session.editor.preview(id)
-        try await workspace.checkpoint(
-            .init(
-                workspaceID: session.id, baseRevision: session.revision,
-                title: session.title, entry: session.entry, draft: preview, interrupted: true))
-        try await session.editor.cancel(id)
+        var errors: [any Error] = []
+        do {
+            let preview = try await session.editor.preview(id)
+            try await workspace.checkpoint(
+                .init(
+                    workspaceID: session.id, baseRevision: session.revision,
+                    title: session.title, entry: session.entry, draft: preview, interrupted: true))
+        } catch { errors.append(error) }
+        do { try await session.editor.cancel(id) } catch { errors.append(error) }
         session.stream = nil
         sessions[delegateID] = session
+        if !errors.isEmpty { throw NativeCleanupFailure(errors: errors) }
     }
     public func snapshot(delegateID: String) async throws -> Data? {
+        try await run(delegateID: delegateID, lane: .observation) {
+            try await self.snapshotAdmitted(delegateID: delegateID)
+        }
+    }
+    private func snapshotAdmitted(delegateID: String) async throws -> Data? {
         guard let session = sessions[delegateID], session.rendered else { return nil }
         return try await capture(session.id)
     }
+    public func revoke(delegateID: String) {
+        let selected = work.values.filter { $0.delegateID == delegateID }
+        guard sessions[delegateID] != nil || !selected.isEmpty || releases[delegateID] != nil else { return }
+        revoked.insert(delegateID)
+        for operation in selected where !operation.cleanup { operation.cancel() }
+    }
     public func release(delegateID: String) async throws {
+        if let shutdownTask { return try await shutdownTask.value }
+        if let release = releases[delegateID] { return try await release.value }
+        if let cleanupFailure { throw cleanupFailure }
+        revoke(delegateID: delegateID)
+        let selected = work.values.filter { $0.delegateID == delegateID }
+        guard sessions[delegateID] != nil || !selected.isEmpty else {
+            revoked.remove(delegateID)
+            return
+        }
+        let release = Task {
+            for operation in selected { await operation.join() }
+            try await self.releaseAdmitted(delegateID: delegateID)
+        }
+        releases[delegateID] = release
+        defer {
+            releases[delegateID] = nil
+            revoked.remove(delegateID)
+        }
+        do { try await release.value } catch {
+            cleanupFailure = error
+            closed = true
+            throw error
+        }
+    }
+    private func releaseAdmitted(delegateID: String) async throws {
         guard let session = sessions[delegateID] else { return }
         var failure: (any Error)?
         if let stream = session.stream {
-            do { try await abort(streamID: stream.uuidString, delegateID: delegateID) } catch { failure = error }
+            do { try await abortAdmitted(streamID: stream.uuidString, delegateID: delegateID) } catch {
+                failure = error
+            }
         }
         await session.editor.close()
         sessions.removeValue(forKey: delegateID)
         lockedProjects.remove(session.id)
         if let failure { throw failure }
+    }
+    /// The Actions root closes admission before joining effects, including host streaming continuations.
+    public func shutdown() async throws {
+        if let shutdownTask { return try await shutdownTask.value }
+        closed = true
+        let selected = Array(work.values)
+        for operation in selected where !operation.cleanup { operation.cancel() }
+        let retiring = releases
+        let shutdown = Task {
+            for operation in selected { await operation.join() }
+            var errors: [any Error] = []
+            for release in retiring.values {
+                do { try await release.value } catch { errors.append(error) }
+            }
+            for id in Array(self.sessions.keys) where retiring[id] == nil {
+                do { try await self.releaseAdmitted(delegateID: id) } catch { errors.append(error) }
+            }
+            if let failure = self.cleanupFailure, errors.isEmpty { errors.append(failure) }
+            if !errors.isEmpty { throw NativeCleanupFailure(errors: errors) }
+        }
+        shutdownTask = shutdown
+        try await shutdown.value
+    }
+    /// Zero waiting slots: source intake uses caller backpressure; previews have a separate lane.
+    private func run<Value: Sendable>(
+        delegateID: String?, lane: Lane = .mutation, cleanup: Bool = false,
+        operation: @escaping @Sendable () async throws -> Value
+    ) async throws -> Value {
+        try Task.checkCancellation()
+        guard !closed else { throw ArtifactWorkspaceError.closed }
+        if let delegateID {
+            guard releases[delegateID] == nil, cleanup || !revoked.contains(delegateID) else {
+                throw ArtifactWorkspaceError.conflict
+            }
+            guard !work.values.contains(where: { $0.delegateID == delegateID && $0.lane == lane }) else {
+                throw ArtifactWorkspaceError.busy
+            }
+        }
+        guard work.count < 8 else { throw ArtifactWorkspaceError.busy }
+        let id = UUID()
+        let task = Task {
+            defer { self.work[id] = nil }
+            try Task.checkCancellation()
+            let result = try await operation()
+            try Task.checkCancellation()
+            return result
+        }
+        work[id] = Work(
+            delegateID: delegateID, lane: lane, cleanup: cleanup,
+            cancel: { task.cancel() }, join: { _ = await task.result })
+        return try await withTaskCancellationHandler {
+            try await task.value
+        } onCancel: {
+            task.cancel()
+        }
     }
     private struct SearchResult: Encodable {
         let matches: [[String: String]]

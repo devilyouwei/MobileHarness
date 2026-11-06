@@ -62,7 +62,8 @@ enum HistoryExecutionPreview {
                 case .scheduling(.endWait): return prefix + "</wait>"
                 case .rejected(let rejection): return prefix + "[Rejected] \(rejection.alias): \(rejection.reason)"
                 case .tool(let call): return prefix + "[Tool] \(call.toolPath) \(call.arguments)"
-                case .action(let call): return prefix + "[\(call.channel)] \(call.actionPath) \(call.parameters)"
+                case .action(let call), .runtimeAction(let call):
+                    return prefix + "[\(call.channel)] \(call.actionPath) \(call.parameters)"
                 }
             }
             return ([trace.parserError ?? "已接收内容的解析结果；不代表实际执行顺序。"] + lines).joined(separator: "\n")

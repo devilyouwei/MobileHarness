@@ -14,6 +14,9 @@ public actor PhotographerAgent: Agent {
 
     // MARK: - State and dependencies
 
+    let island = AgentIslandPublication()
+    public func finishPresentation() async { await island.stop() }
+    public var presentationFailure: String? { get async { await island.lastFailure } }
     var cameraFacts: Task<Void, Never>?
     var cameraFactSequence: UInt64 = 0
     let cameraObservationFailure: @Sendable (any Error) -> Void
@@ -49,9 +52,10 @@ public actor PhotographerAgent: Agent {
     // MARK: - Registration
 
     public static func runtimeCapabilities(_ capabilities: CapabilityRegistry) throws -> CapabilityRegistry {
-        try PhotographerCameraWorkflow.runtimeCapabilities(capabilities).adding(internalTools: [
-            aimPermission, InternalTool(path: "Camera.Album.perform"),
-        ])
+        try PhotographerCameraWorkflow.runtimeCapabilities(capabilities).adding(
+            internalTools: [
+                aimPermission, InternalTool(path: "Camera.Album.perform"),
+            ] + AgentIslandPublication.permissions)
     }
 
     public init(
@@ -124,6 +128,7 @@ public actor PhotographerAgent: Agent {
 
     public func stop() async {
         await stopUIInputs()
+        await island.stop()
         uiExecution.consumer = nil
         admission.close()
         lifecycle = .stopped

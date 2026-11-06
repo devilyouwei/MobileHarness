@@ -59,7 +59,7 @@ CameraControlCapability distinguishes photo setEnabled/flip from setPerceptionEn
 CameraCaptureSettings is a complete validated settings value (photo/video mode, countdown, flash, zoom, duration). CameraControlCapability includes configure/cancel and typed recording start/wait/stop/save/ignore. Start accepts an optional validated duration override; its domain owner prepares video mode and otherwise preserves current capture preferences. CameraVideoReceipt separates recording, ready, saved and ignored, carrying recordingID, optional mediaID/duration/stopReason/fileName (a display basename, never a file URL). These values contain no native device or UI implementation. Defaults on capability test adapters reject unavailable operations rather than fabricating a recording.
 
 
-ArtifactStreaming 是已接纳编辑的流式续写端口，streamID 与 delegateID 必须匹配；追加施加背压，complete/abort/release 显式结束与清理，snapshot 返回实际渲染图片。它不包含模型或角色实现。
+ArtifactStreaming 是已接纳编辑的宿主续写端口，streamID 与 delegateID 必须匹配；追加施加背压，complete 结束单次写入，snapshot 返回实际渲染图片。revoke 关闭普通准入并请求取消，不等待清理；已开始的 abort 不被它再次取消。abort 保存中断草稿并关闭流，release 是合并并发调用的会话清理屏障：加入在途操作后释放编辑资源，失败保留。恢复必须经工具重新接纳，旧流身份无效。它不包含模型或角色实现；服务容量和根关闭契约见 [Artifacts](../../Artifacts/README.md#执行与续写生命周期)。
 
 ProviderSettings.writerThinking为私有布尔配置，默认false，跨暂存/呈现端口传递，不携带模型枚举或凭据序列化。生产Writer租约策略由Actions业务装配选择。
 

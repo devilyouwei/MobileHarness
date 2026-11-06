@@ -119,3 +119,5 @@ Memory uses neutral ActionRequestSlot<HistoryInput, HistoryReply> for private fu
 ## Passive container state
 
 stateSnapshot projects local installation/closure, Agent lifecycle/queue counters and initialized committed task/Skill fields without message content. residentContext() reads the repository’s last committed memory only; context fields are unknown before initialization. Agent start owns initialization/restoration and its failures. The root catalog binds independent readers without sampling roles or maintaining another mutable role-state registry.
+
+HistoryExecutionPreview同时解释显式action和自然文本展开的runtimeAction，预览不授予执行权或模型续轮权；调用来源与ReACT规则由[共享Chat](../Support/Chat/README.md)维护。

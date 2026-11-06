@@ -204,7 +204,7 @@ private func skillResponseExamples(_ id: String) throws -> [String] {
                 #expect(inGroup)
                 groups.append(current)
                 inGroup = false
-            case .action(let call):
+            case .action(let call), .runtimeAction(let call):
                 #expect(inGroup)
                 current.append(call)
             default:

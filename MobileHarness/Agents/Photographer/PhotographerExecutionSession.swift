@@ -135,6 +135,7 @@ public actor PhotographerExecutionSession {
     private func removeRegistration() async {
         guard registeredForCleanup else { return }
         do {
+            await agent.finishPresentation()
             try await manager.remove(.photographer)
             registeredForCleanup = false
         } catch {

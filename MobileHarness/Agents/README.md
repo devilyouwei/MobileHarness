@@ -69,6 +69,8 @@ Assistant's scheduled `startTask(execution=background, executor=…)` enters the
 
 Writer is the current public creative executor. It owns its control/content model workflow, stable task/dialog/workspace, input checkpoints and independent report delivery; Gateway direct calls reach Actions.Artifacts for deterministic file work. WriterContainer exposes records to UI and joins role-owned workers. Recovery, progress/reply policy, persistent terminal notifications and task-specific limits belong to [Writer](Writer/README.md), with shared consumers in [Chat](Support/Chat/README.md). They are not implicit capabilities of every Agent or Gateway transport.
 
+Writer's admitted edits continue through an injected ArtifactStreaming port rather than per-chunk Gateway calls. Cancel/pause/stop revoke that continuation and join model, preview and Actions release before finishing or resuming the run. Gateway tool completion only acknowledges its finite operation; it does not end the creative task. The detailed contract belongs to [Writer](Writer/README.md) and its direct execution counterpart [Artifacts](../Actions/Artifacts/README.md#执行与续写生命周期).
+
 ## Lifetime, inputs and failures
 
 <a id="agent-container"></a>
@@ -110,3 +112,5 @@ Photography与ApplicationControl共享Island.setPresentation和ui.island，Basic
 Agent task presentation belongs to the executing role: Writer publishes its creative lifecycle and AssistantExecutionSession publishes its own foreground Skill task. Both use registered Gateway Island tools with code-owned permissions, outside model-visible catalogs. Terminal state ends only the owner's activity; passive task logs are history rather than UI authority. Shared latest-value transport is described in [Support](Support/README.md); UI arbitrates all producers without interpreting role identities. Writer titles/operation subtitles similarly reach Actions-owned presentation through producer-bound Gateway direct calls.
 
 SpeechPerception owns recognition-caption onset; Assistant independently handles the speaking control fact and clears only its own reply without inference. Final ASR text retains the formal FIFO. A failed perception round emits the existing empty-phase fact and joins presentation cleanup; Assistant releases that recognition binding. Restoration follows capture/consent/reply occupancy, preserving the original recognition error. Caption lifetime is not inferred by UI from playback completion. See [SpeechPerception](SpeechPerception/README.md) and [Assistant](Assistant/README.md#输入开始与自有回复字幕).
+
+各角色均通过自己绑定的 Gateway consumer 调用内部灵动岛工具：SpeechPerception 拥有聆听/识别，SpeechSynthesis 拥有合成/真实播放，Photographer 沿既有相机输入处理摄影，ApplicationControl 沿连接输入处理蓝牙提示；Assistant 仅管理自身任务、推理等待和本身输出。Actions 不设集中 UI 状态观察器代发。内部调用结果（含异常）由所属执行者处理，只有显式 LLM 调用反馈能触发 ReACT；共享机制见 [Support/Chat](Support/Chat/README.md)。

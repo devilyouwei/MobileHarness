@@ -9,6 +9,7 @@
     public final class PhotographerContainer {
         public func stateSnapshot() async throws -> AgentStateSnapshot {
             try Task.checkCancellation()
+            let presentationFailure = await session?.agent.presentationFailure
             let status = await session?.agent.status()
             let context = await session?.agent.residentContext()
             return AgentStateSnapshot(
@@ -18,6 +19,7 @@
                         ?? .unknown
                 ],
                 runtime: [
+                    "presentationFailure": presentationFailure.map { .text($0) } ?? .unknown,
                     "rolePhase": status.map { .text($0.lifecycle.rawValue) } ?? .unknown,
                     "queuedInputs": status.map { .count($0.queuedInputs) } ?? .unknown,
                     "processedInputs": status.map { .count($0.processedInputs) } ?? .unknown,

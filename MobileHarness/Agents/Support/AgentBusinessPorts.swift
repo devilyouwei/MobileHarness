@@ -38,13 +38,16 @@ import UI
     public let sessionID: String
     public let cancelReply: @MainActor () async throws -> Void
     public let detection: AudioDetectionConnections
+    public let playbackChanged: @Sendable (String, Bool) async -> Void
     public init(
         sessionID: String, cancelReply: @escaping @MainActor () async throws -> Void,
-        detection: AudioDetectionConnections
+        detection: AudioDetectionConnections,
+        playbackChanged: @escaping @Sendable (String, Bool) async -> Void = { _, _ in }
     ) {
         self.sessionID = sessionID
         self.cancelReply = cancelReply
         self.detection = detection
+        self.playbackChanged = playbackChanged
     }
 }
 @MainActor public struct AgentVoiceExecution {

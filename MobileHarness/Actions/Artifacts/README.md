@@ -4,6 +4,14 @@
 
 ArtifactsModule 暴露 Artifacts.Workspace.perform；Assistant 通过 Writing 的 XML Action 调度作品管理，Writer 通过 Gateway direct 原生 Tool 编辑作品。Assistant 仅能列出、打开、删除作品；Writer 的可信 delegateID 绑定编辑会话，agent/taskID 定位持久工作区，模型参数不能更改所有者。ArtifactService 拥有单项会话准入及项目单写锁；ArtifactEditing 拥有单流、128 个按文件版本失效的读取引用和范围修改。remove 要求有效读取引用且禁止入口删除。完整文件内容通过中立 ArtifactStreaming 端口背压追加，不通过 Tool 参数。发布要求最新草稿已进行显式渲染，存在已报告的运行错误时拒绝发布；窗口不可见时显式返回不能进行视觉验证，不能把保存等同视觉验收。
 
+## 执行与续写生命周期
+
+Gateway 的 edit 工具完成表示已创建编辑流，不表示文件已写完或委托已完成。工具入口同时校验原始 sessionID 与 delegateID，续写校验 delegateID/streamID；恢复经 start/resume 创建新会话和新的流身份。Writer 拥有模型与委托生命周期，Actions 拥有实际效果和编辑资源，内容分片无需重复提交 Gateway。
+
+ArtifactService 跟踪全部工具、追加、完成、中止和截图操作：全局最多八项、零等待队列；每委托最多一个变更操作和一个预览/截图操作，竞争显式 busy。追加由调用者逐次等待形成背压。预览独立于变更通道，返回时只更新仍匹配编辑代次的预览字段，不用旧会话副本覆盖新的写入或完成状态。取消请求会传播到实际任务并等待其退出；非协作依赖仍需真实返回，不能宣称已停。
+
+revoke 立即关闭该委托普通准入并取消在途普通操作，已开始的 abort 只等待、不再次取消。release 合并并发调用，先围栏并加入在途工作，再保存中断草稿、关闭 editor 和释放项目锁。abort 的检查点失败仍尝试关闭流，原始错误和清理错误保留。release 清理失败后服务关闭准入，后续 release/shutdown 继续返回失败。Actions 根调用 shutdown 关闭全部准入、取消/加入普通工作并清理剩余会话，先于依赖的窗口服务关闭。已发生的文件效果不回滚；被取消的工具不得把已落盘内容描述为从未发生。
+
 ArtifactPresentation 连接 UI 页面/窗口与 StorageFiles 临时预览；每作品双缓冲目录，最多四个页面。关闭清理预览和页面、不取消 Writer，流不会重开窗口；新委托 start 或显式 open 才解除关闭标记。删除清理窗口绑定及预览。TXT 转义显示；Markdown 支持标题、引用、列表、围栏代码、强调和 HTTP(S) 链接，其余语法保留可读文本。Writer内部preview命令按ArtifactContentParser安全检查点读取当前流或草稿，由Writer自有worker决定呈现；它不证明 HTML/JavaScript 语法有效。未完成草稿禁用脚本，完整渲染由 WebKit 执行并返回诊断/截图。项目索引可列出仅有草稿的中断作品，用户可显式委托恢复。
 
 同项目呈现通过独立串行门合并为安全磁盘/导航顺序，最多两个可取消等待者，超限显式 busy；不同项目仍可独立进行。关闭先标记页面退出，导航中断返回“草稿保留、视觉验证不可用”，再加入呈现并清理双缓冲目录；最小化期间保留最新快照供恢复时呈现。Assistant 打开/删除同样持有项目锁。
@@ -53,7 +61,7 @@ replace使用fresh read引用约束字面旧文本，唯一匹配后原子替换
 
 会话标题在start接纳，首个edit的可选title随后续文件检查点保存；rename独立持久化标题，续作沿用。describe为Writer运行时更新操作subtitle，不改源码或模型上下文。ArtifactPresentation将这些通用显示值提交WindowState；重名仅在活动窗口显示层加稳定创建顺序后缀，业务标题不带序号。
 
-每项目最多一份latest快照，最多四项目；Scene隐藏不创建窗口/写预览资源/调用WebKit，返回deferred并保留最新文件。显式render可留下deferred验证证据供finish保存，不能宣称视觉检查通过。前台恢复经项目锁重新读取最新快照，避免排队旧副本覆盖新文件或名称；关闭/删除已退休的快照不复活，最小化不恢复。恢复和元信息更新不经Gateway，因为属于Action容器内部。
+每项目最多一份latest快照，最多四项目；Scene隐藏不创建窗口/写预览资源/调用WebKit，返回deferred并保留最新文件。显式render可留下deferred验证证据供finish保存，不能宣称视觉检查通过。前台恢复经项目锁重新读取最新快照，避免排队旧副本覆盖新文件或名称；关闭/删除已退休的快照不复活，最小化不恢复。场景恢复及已接纳命令内的呈现更新属于 Actions 内部；Writer 发起的 preview/describe 命令仍经 Gateway direct。
 
 窗口身份在等待首次呈现前预留并绑定，切后台导致回执中断时保留同一窗口，不按标题猜测归属。正在渲染时隐藏转换为deferred，截图不可见返回nil；其他渲染/磁盘错误仍明确传播。UI窗口生命周期与Writer执行独立。后台CPU/进程存活由系统控制，本能力不伪造后台运行权限。
 

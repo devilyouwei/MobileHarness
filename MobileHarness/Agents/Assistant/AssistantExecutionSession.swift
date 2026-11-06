@@ -10,7 +10,13 @@ public actor AssistantExecutionSession {
     public nonisolated let agent: AssistantAgent
     public private(set) var cleanupFailure: AgentFailure?
     private let island = AgentIslandPublication()
-    public var presentationFailure: String? { get async { await island.lastFailure } }
+    private let waitingIsland = AgentIslandPublication()
+    public var presentationFailure: String? {
+        get async {
+            let failures = [await island.lastFailure, await waitingIsland.lastFailure].compactMap { $0 }
+            return failures.isEmpty ? nil : failures.joined(separator: "; ")
+        }
+    }
     private var registeredForCleanup = false
     private let manager: AgentManager
     private let output: OutputGateway
@@ -63,6 +69,11 @@ public actor AssistantExecutionSession {
                     }
                 }
                 await island.start()
+                await waitingIsland.bind(consumer: consumer, source: .assistant)
+                await waitingIsland.start()
+                await agent.bindReplyWaiting { [waitingIsland] waiting in
+                    await waitingIsland.submit(waiting ? Self.waitingContent : nil)
+                }
                 pump = Task {
                     do {
                         try await IndependentOutputWorkflow.consumeGeneration(agent.outputs) { envelope in
@@ -82,6 +93,7 @@ public actor AssistantExecutionSession {
                 guard !closed else { throw CommunicationError.scopeClosed }
                 started = true
             } catch {
+                await waitingIsland.stop()
                 await island.stop()
                 await removeRegistration()
                 pump?.cancel()
@@ -145,6 +157,9 @@ public actor AssistantExecutionSession {
             detail: .init(text: String(task.goal.prefix(320))))
     }
 
+    static var waitingContent: IslandContent {
+        .init(title: "正在思考", primary: .symbol(name: "sparkles"), priority: .low, secondary: .loading)
+    }
     private func sendControl(_ control: AssistantSessionControl, sessionID: String) async throws {
         try await agent.receive(control.input(sessionID: sessionID))
     }
@@ -166,6 +181,7 @@ public actor AssistantExecutionSession {
         let task = Task {
             starting?.cancel()
             _ = await starting?.result
+            await waitingIsland.stop()
             await island.stop()
             await removeRegistration()
             pump?.cancel()

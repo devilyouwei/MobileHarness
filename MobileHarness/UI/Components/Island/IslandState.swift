@@ -15,13 +15,11 @@ public struct IslandActivity: Identifiable, Equatable, Sendable {
     public private(set) var generation = UUID()
     public private(set) var available = false
     public private(set) var sceneActive = true
-    public private(set) var localPresentationVisible = true
     public var expandedID: UUID? { detailActivity?.id }
     public var expanded: Bool {
-        localPresentationVisible && (detailActivity.map { presentation[$0.id] ?? false } ?? false)
+        detailActivity.map { presentation[$0.id] ?? false } ?? false
     }
     private var presentation: [UUID: Bool] = [:]
-    private var retainedPresentation: [UUID: Bool]?
     private struct Thumbnail {
         let owner: String
         let data: Data
@@ -48,7 +46,7 @@ public struct IslandActivity: Identifiable, Equatable, Sendable {
     /// Scene-window coordinates; layout reservation only, never a business control input.
     public private(set) var localFrame: CGRect?
     func reserveLocalFrame(_ frame: CGRect) {
-        guard available, sceneActive, localPresentationVisible else { return }
+        guard available, sceneActive else { return }
         if localFrame != frame { localFrame = frame }
     }
     let statusBar: IslandStatusBarState
@@ -58,7 +56,7 @@ public struct IslandActivity: Identifiable, Equatable, Sendable {
         statusBar = IslandStatusBarState(read: systemStatus, onFailure: onFailure)
     }
     func localMounted() {
-        guard available, sceneActive, localPresentationVisible, compact != nil, !replacesSystemStatusBar else { return }
+        guard available, sceneActive, compact != nil, !replacesSystemStatusBar else { return }
         replacesSystemStatusBar = true
         statusBar.start()
     }
@@ -140,22 +138,7 @@ public struct IslandActivity: Identifiable, Equatable, Sendable {
     }
     private func localChanged() {
         localRevision &+= 1
-        localStatus = sceneActive && localPresentationVisible ? "pending" : "detached"
-    }
-    /// Navigation suspends only local presentation; activity and system lifetimes remain independent.
-    func setLocalPresentationVisible(_ visible: Bool) {
-        guard localPresentationVisible != visible else { return }
-        if visible {
-            for item in activities where item.content.detail != nil {
-                if let expanded = retainedPresentation?[item.id] { presentation[item.id] = expanded }
-            }
-            retainedPresentation = nil
-        } else {
-            retainedPresentation = presentation
-        }
-        localPresentationVisible = visible
-        if !visible { localDetached() }
-        localChanged()
+        localStatus = sceneActive ? "pending" : "detached"
     }
     public func setSceneActive(_ active: Bool) {
         guard sceneActive != active else { return }
@@ -171,7 +154,7 @@ public struct IslandActivity: Identifiable, Equatable, Sendable {
         statusBar.stop()
     }
     func localCompleted(generation: UUID, revision: UInt64) {
-        guard available, sceneActive, localPresentationVisible,
+        guard available, sceneActive,
             self.generation == generation, localRevision == revision
         else { return }
         localStatus = "settled"
@@ -201,7 +184,6 @@ public struct IslandActivity: Identifiable, Equatable, Sendable {
             slots.removeAll()
             attentionOverride = nil
             presentation.removeAll()
-            retainedPresentation = nil
             thumbnails.removeAll()
             thumbnailWorker?.cancel()
             spectrumActive = false
@@ -340,7 +322,6 @@ public struct IslandActivity: Identifiable, Equatable, Sendable {
         if let image = activities[i].content.detail?.thumbnail { thumbnails[image] = nil }
         activities.remove(at: i)
         presentation[id] = nil
-        retainedPresentation?[id] = nil
         if attentionOverride?.id == id { attentionOverride = nil }
         localChanged()
         synchronizeSystemPresentation()

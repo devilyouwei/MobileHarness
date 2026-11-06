@@ -6,6 +6,9 @@
 
 | 文档 | 职责 |
 | --- | --- |
+| [全局灵动岛](Global-In-App-Island.md) | 设置/记录/相册中的全局状态与展开偏好、导航及生命周期回归、原生界面验收限制。 |
+| [原生音视频故障诊断](Native-Media-Failure-Diagnosis.md) | 保存照片后媒体服务重置的现场证据、错误保真回归及真机调查限制。 |
+| [Writer 执行与续写生命周期](Writer-Execution-Lifetime.md) | 工具接纳后的续写权限、取消/清理并发回归、Simulator 构建与历史失败记录。 |
 | [WriterAgent](Writer-Agent.md) | 流式创作、后台任务、工作区回归及原生 WebKit 验证，区分真实模型和真机验收。 |
 | [UI interaction paths audit](UI-Interaction-Paths-Audit.md) | Static routing and consistency audit of presentation-only, touch-business and voice-business interactions; deviations and validation limits. |
 | [Container 状态与模型上下文](Container-State-Context.md) | 容器快照、Skill v3、StorageState移除、自动化证据及独立原生验收。 |
@@ -112,3 +115,5 @@
 
 [Storage database and current Writer workspace](Storage-Database-Refactor.md) records the ten-table
 refactor, Agent-only model recording, current-file recovery and automated/build/native acceptance limits.
+
+- [Agent 展示调用与反馈所有权](Agent-Presentation-Ownership.md)：角色独立灵动岛、内部调用与模型反馈隔离、回归及构建证据。

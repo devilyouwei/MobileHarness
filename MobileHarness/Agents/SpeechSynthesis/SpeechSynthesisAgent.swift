@@ -3,6 +3,7 @@ import Foundation
 import ModelKit
 import StorageCache
 import StorageCore
+import UI
 
 /// Shared directed synthesis service. One FIFO worker, independent of playback Channels.
 public actor SpeechSynthesisAgent: Agent {
@@ -27,6 +28,35 @@ public actor SpeechSynthesisAgent: Agent {
     private var worker: Task<Void, Never>?
     private var active: String?
     private var processed = 0
+    private let island = AgentIslandPublication()
+    private var playing: String?
+    public var presentationFailure: String? { get async { await island.lastFailure } }
+    public func bindPresentation(_ consumer: GatewayOutputConsumer) async {
+        await island.bind(consumer: consumer, source: descriptor.id)
+        await island.start()
+        await refreshIsland()
+    }
+    /// The native playback owner joins these low-frequency callbacks before completing its Action.
+    public func playbackChanged(audioID: String, active: Bool) async {
+        guard lifecycle != .stopped else { return }
+        if active { playing = audioID } else if playing == audioID { playing = nil }
+        await refreshIsland()
+    }
+    private func refreshIsland() async {
+        let content: IslandContent?
+        if lifecycle == .stopped || lifecycle == .failed {
+            content = nil
+        } else if playing != nil {
+            content = .init(
+                title: "正在说话", primary: .symbol(name: "speaker.wave.2.fill"),
+                tone: .blue, priority: .high, secondary: .spectrum)
+        } else if active != nil {
+            content = .init(title: "正在合成语音", primary: .symbol(name: "waveform"), priority: .low, secondary: .loading)
+        } else {
+            content = nil
+        }
+        await island.submit(content)
+    }
 
     // MARK: - Registration
 
@@ -43,7 +73,8 @@ public actor SpeechSynthesisAgent: Agent {
         guard config.agentID.rawValue == "speechSynthesis" else { throw AgentConfigurationError.identityMismatch }
         descriptor = AgentDescriptor(
             id: config.agentID, name: "Speech Synthesis",
-            inputs: Set(config.communication.inputs.map(\.kind)), outputs: [], capabilities: config.capabilities)
+            inputs: Set(config.communication.inputs.map(\.kind)), outputs: [.toolCall],
+            capabilities: try config.capabilities.adding(internalTools: AgentIslandPublication.permissions))
         self.synthesis = synthesis
         self.store = store
         let stream = AsyncStream<OutputEnvelope>.makeStream(
@@ -76,6 +107,8 @@ public actor SpeechSynthesisAgent: Agent {
         pending?.cancel()
         for id in ids { await store.fail(id, error: CancellationError()) }
         await pending?.value
+        playing = nil
+        await island.stop()
         continuation.finish()
     }
 
@@ -142,12 +175,7 @@ public actor SpeechSynthesisAgent: Agent {
         worker = Task { await produce(request, input: input) }
     }
     private func produce(_ request: SpeechSynthesisInput, input: AgentInput) async {
-        defer {
-            worker = nil
-            active = nil
-            processed += 1
-            drain()
-        }
+        await refreshIsland()
         do {
             let audio = try await store.begin(request.audioID)
             try Task.checkCancellation()
@@ -220,6 +248,11 @@ public actor SpeechSynthesisAgent: Agent {
                 continuation.finish()
             }
         }
+        active = nil
+        await refreshIsland()
+        worker = nil
+        processed += 1
+        drain()
     }
 
     // MARK: - Context

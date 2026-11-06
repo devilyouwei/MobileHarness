@@ -33,7 +33,7 @@
             guard session.canAddInput(input), session.canAddOutput(output) else {
                 log.error("Spatial capture rejected input/output graph")
                 session.commitConfiguration()
-                throw AudioIOError.invalidFormat
+                throw AudioIOError.startFailed
             }
             input.multichannelAudioMode = .firstOrderAmbisonics
             output.spatialAudioChannelLayoutTag = kAudioChannelLayoutTag_HOA_ACN_SN3D | 4
@@ -54,12 +54,16 @@
                 log.error(
                     "Spatial capture startup: running=\(self.session.isRunning, privacy: .public), interrupted=\(self.session.isInterrupted, privacy: .public)"
                 )
-                source.finish(throwing: AudioIOError.invalidFormat)
+                let error =
+                    observation?.failure
+                    ?? (session.isInterrupted ? AudioIOError.interrupted : AudioIOError.startFailed)
+                source.finish(throwing: error)
                 stop()
-                throw AudioIOError.invalidFormat
+                throw error
             }
             do {
                 try await readiness.wait()
+                if let error = observation?.failure { throw error }
             } catch {
                 stop()
                 throw error
@@ -67,47 +71,14 @@
             return source
         }
         func stop() {
-            session.stopRunning()
-            callbackQueue.sync {}  // Join callbacks before allowing a replacement capture backend.
+            observation?.invalidate()
             receiver?.readiness.resolve(.failure(CancellationError()))
             receiver?.source.finish()
+            session.stopRunning()
+            callbackQueue.sync {}  // Join callbacks before allowing a replacement capture backend.
             receiver = nil
             observation = nil
         }
-    }
-
-    private final class SpatialAudioObservation: @unchecked Sendable {
-        private let tokens: [NSObjectProtocol]
-        private static let log = Logger(subsystem: "dev.mobileharness", category: "AudioCapture")
-        init(
-            session: AVCaptureSession, source: MicrophoneCapture,
-            readiness: AudioCaptureReadiness,
-            admission: PlatformAdmission?
-        ) {
-            tokens = [
-                NotificationCenter.default.addObserver(
-                    forName: AVCaptureSession.runtimeErrorNotification, object: session, queue: nil
-                ) { notification in
-                    let error = notification.userInfo?[AVCaptureSessionErrorKey] as? NSError
-                    Self.log.error(
-                        "Spatial capture runtime error: domain=\(error?.domain ?? "unknown", privacy: .public), code=\(error?.code ?? 0, privacy: .public)"
-                    )
-                    admission?.report("audio.spatial", "nativeEvent", AudioIOError.invalidFormat)
-                    readiness.resolve(.failure(AudioIOError.invalidFormat))
-                    source.finish(throwing: AudioIOError.invalidFormat)
-                },
-                NotificationCenter.default.addObserver(
-                    forName: AVCaptureSession.wasInterruptedNotification, object: session, queue: nil
-                ) { notification in
-                    let reason = notification.userInfo?[AVCaptureSessionInterruptionReasonKey] as? NSNumber
-                    Self.log.error("Spatial capture interrupted: reason=\(reason?.intValue ?? 0, privacy: .public)")
-                    admission?.report("audio.spatial", "nativeEvent", AudioIOError.invalidFormat)
-                    readiness.resolve(.failure(AudioIOError.invalidFormat))
-                    source.finish(throwing: AudioIOError.invalidFormat)
-                },
-            ]
-        }
-        deinit { for token in tokens { NotificationCenter.default.removeObserver(token) } }
     }
 
     /// Immutable bridge plus mutex-protected sequence. Never touches App/MainActor state.
@@ -243,5 +214,78 @@
                 source.finish(throwing: error)
             }
         }
+    }
+#endif
+
+#if os(iOS) || os(macOS)
+    import AVFoundation
+    import Foundation
+    import OSLog
+    import Synchronization
+
+    /// One capture generation. Native errors remain identical in startup, PCM and diagnostics.
+    final class SpatialAudioObservation: @unchecked Sendable {
+        private struct State {
+            var active = true
+            var failure: (any Error)?
+        }
+        private static let log = Logger(subsystem: "dev.mobileharness", category: "AudioCapture")
+        private let state = Mutex(State())
+        private var tokens: [NSObjectProtocol] = []
+        private let center: NotificationCenter
+        private let source: MicrophoneCapture
+        private let readiness: AudioCaptureReadiness
+        private let admission: PlatformAdmission?
+        var failure: (any Error)? { state.withLock { $0.failure } }
+
+        init(
+            session: AVCaptureSession, source: MicrophoneCapture,
+            readiness: AudioCaptureReadiness, admission: PlatformAdmission?,
+            center: NotificationCenter = .default
+        ) {
+            self.center = center
+            self.source = source
+            self.readiness = readiness
+            self.admission = admission
+            tokens = [
+                center.addObserver(
+                    forName: AVCaptureSession.runtimeErrorNotification, object: session, queue: nil
+                ) { [weak self] notification in
+                    let error: any Error =
+                        notification.userInfo?[AVCaptureSessionErrorKey] as? NSError
+                        ?? AudioIOError.runtimeFailed
+                    self?.fail(error)
+                },
+                center.addObserver(
+                    forName: AVCaptureSession.wasInterruptedNotification, object: session, queue: nil
+                ) { [weak self] notification in
+                    #if os(iOS)
+                        let reason = notification.userInfo?[AVCaptureSessionInterruptionReasonKey] as? NSNumber
+                        Self.log.error("Spatial capture interrupted: reason=\(reason?.intValue ?? 0, privacy: .public)")
+                    #endif
+                    self?.fail(AudioIOError.interrupted)
+                },
+            ]
+        }
+
+        private func fail(_ error: any Error) {
+            let accepted = state.withLock {
+                guard $0.active, source.isActive else { return false }
+                $0.active = false
+                $0.failure = error
+                readiness.resolve(.failure(error))
+                source.finish(throwing: error)
+                return true
+            }
+            guard accepted else { return }
+            let native = error as NSError
+            Self.log.error(
+                "Spatial capture native failure: domain=\(native.domain, privacy: .public), code=\(native.code, privacy: .public)"
+            )
+            admission?.report("audio.spatial", "nativeEvent", error)
+        }
+
+        func invalidate() { state.withLock { $0.active = false } }
+        deinit { for token in tokens { center.removeObserver(token) } }
     }
 #endif

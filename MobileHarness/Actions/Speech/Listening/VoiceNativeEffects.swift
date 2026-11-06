@@ -12,12 +12,14 @@
         public let cue: any CuePlaying
         private var preparedCue: (request: UIActions.CueRequest, pcm: PlaybackPCM)?
         public var feedbackStart: (context: ActionExecutionContext, gate: ListeningFeedbackStart)?
+        private let spectrum: @MainActor ([Float], Bool) -> Void
         private let audio: any AudioInputOutput
         private let state: any ConversationPresenting
         public init(
             audio: any AudioInputOutput, state: any ConversationPresenting, cue: any CuePlaying,
-            haptic: any HapticFeedbackProviding
+            haptic: any HapticFeedbackProviding, spectrum: @escaping @MainActor ([Float], Bool) -> Void = { _, _ in }
         ) {
+            self.spectrum = spectrum
             self.cue = cue
             self.haptic = haptic
             self.audio = audio
@@ -73,20 +75,21 @@
             _ stream: AudioStream, context: ActionExecutionContext,
             validate: @escaping @MainActor () throws -> Void,
             currentSession: @escaping @MainActor () -> Bool,
-            activeChanged: @escaping @MainActor (Bool) -> Void
+            activeChanged: @escaping @MainActor (Bool) async -> Void
         ) async throws {
             try validate()
             let displayToken = state.token
+            var started = false
             let meter = Task { [weak self] in
                 while !Task.isCancelled {
                     guard let self, currentSession() else { return }
                     guard let spectrum = await self.audio.playbackSpectrum(), !Task.isCancelled, currentSession() else {
                         return
                     }
-                    self.state.present(
-                        .playbackSpectrum(
-                            AudioSpectrum.smooth(spectrum, previous: self.state.playbackSpectrum)),
-                        token: displayToken)
+                    let smoothed = AudioSpectrum.smooth(spectrum, previous: self.state.playbackSpectrum)
+                    if self.state.present(.playbackSpectrum(smoothed), token: displayToken) {
+                        self.spectrum(smoothed, true)
+                    }
                     do { try await Task.sleep(for: .milliseconds(33)) } catch { return }
                 }
             }
@@ -95,8 +98,9 @@
                 await meter.value
                 if currentSession() {
                     state.present(.playbackSpectrum(AudioSpectrum.silence), token: displayToken)
-                    activeChanged(false)
+                    self.spectrum(AudioSpectrum.silence, false)
                 }
+                if started { await activeChanged(false) }
             }
             do {
                 try await audio.playStream { [weak self] in
@@ -112,7 +116,10 @@
                     let samples = frame.data.withUnsafeBytes { bytes in
                         (0..<frame.sampleCount).map { bytes.loadUnaligned(fromByteOffset: $0 * 4, as: Float.self) }
                     }
-                    activeChanged(true)
+                    if !started {
+                        started = true
+                        await activeChanged(true)
+                    }
                     return PlaybackPCM(samples: samples, sampleRate: frame.format.sampleRate)
                 }
             } catch {

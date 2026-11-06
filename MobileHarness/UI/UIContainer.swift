@@ -81,9 +81,8 @@ public final class UIContainer {
         history = UIHistoryContainer(title: configuration.historyTitle, admission: admission)
         devices = UIDeviceSettingsContainer(admission: admission)
         diagnostics = UIDiagnosticsContainer(admission: admission)
-        navigation.state.onHomeVisibilityChanged = { [weak windows, weak island] visible in
+        navigation.state.onHomeVisibilityChanged = { [weak windows] visible in
             windows?.isHostVisible = visible
-            island?.setLocalPresentationVisible(visible)
         }
     }
     private func setInputAvailable(_ value: Bool) {

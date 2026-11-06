@@ -402,6 +402,30 @@ private actor OutputStreamReader {
 /// Agent-owned display transport. Business content stays with the role, arbitration stays in UI.
 /// One in-flight command and one replaceable latest command; end participates in the same revision fence.
 actor AgentIslandPublication {
+    nonisolated static let permissions: [InternalTool] = [
+        .init(path: "UI.Island.present", required: ["activityID", "revision", "content"]),
+        .init(path: "UI.Island.end", required: ["activityID", "revision"]),
+    ]
+    func bind(consumer: GatewayOutputConsumer, source: AgentID) {
+        bind { operation, parameters, session in
+            let result = try await consumer.executeInternal(
+                OutputEnvelope(
+                    source: source, context: .init(sessionID: session, source: source.rawValue),
+                    output: .toolCall(
+                        .init(id: UUID().uuidString, toolPath: "UI.Island." + operation, arguments: parameters)),
+                    sequence: UInt64(parameters["revision"] ?? "") ?? 0))
+            if result.isCancellationOnly { throw CancellationError() }
+            guard !result.isError, result.tool != nil else {
+                throw AgentFailure(
+                    component: source.rawValue, operation: "island." + operation,
+                    underlying: NSError(
+                        domain: "Island", code: 1,
+                        userInfo: [
+                            NSLocalizedDescriptionKey: result.failure ?? result.tool?.value ?? "Island execution failed"
+                        ]))
+            }
+        }
+    }
     typealias Sender = @Sendable (String, [String: String], String) async throws -> Void
     private let activityID = UUID().uuidString
     private let sessionID = UUID().uuidString

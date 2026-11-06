@@ -132,7 +132,10 @@
                     sessionID: runtime.interactionSessionID,
                     cancelReply: runtime.voiceDependencies.cancelReply,
                     detection: AudioDetectionAgentSession.connections(
-                        recognition: recognition, vad: vad, gateway: runtime.observations)))
+                        recognition: recognition, vad: vad, gateway: runtime.observations),
+                    playbackChanged: { [weak synthesisContainer] id, active in
+                        await synthesisContainer?.playbackChanged(audioID: id, active: active)
+                    }))
             let spectrum = native.spectrum
             diagnostic = native.diagnostic
             stopDiagnostic = native.stopDiagnostic

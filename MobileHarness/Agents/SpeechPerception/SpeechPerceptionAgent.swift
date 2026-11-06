@@ -38,6 +38,34 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
     private static let transcript = InternalTool(path: "UI.Caption.setTranscript", required: ["text"])
     private static let voiceState = InternalTool(path: "UI.VoiceState.setVoiceState", required: ["state"])
     private static let finishTranscript = InternalTool(path: "UI.Caption.finishTranscript")
+    private let island = AgentIslandPublication()
+    private var islandListeningStart: Date?
+    public var presentationFailure: String? { get async { await island.lastFailure } }
+    public func bindPresentation(_ consumer: GatewayOutputConsumer) async {
+        await island.bind(consumer: consumer, source: descriptor.id)
+        await island.start()
+        await refreshIsland()
+    }
+    private func refreshIsland() async {
+        let visible =
+            lifecycle == .running && mode == .speechAndSoundSource && captureOpen
+            && (!residentListening || listeningPolicy.enabled) && (!awaitingReply || phase == .processing)
+        let content: IslandContent?
+        if !visible {
+            islandListeningStart = nil
+            content = nil
+        } else if phase == .processing {
+            islandListeningStart = nil
+            content = .init(title: "正在识别", primary: .symbol(name: "waveform"), priority: .low, secondary: .loading)
+        } else {
+            if islandListeningStart == nil { islandListeningStart = Date() }
+            content = .init(
+                title: phase == .speaking ? "正在听你说" : "正在聆听",
+                primary: .symbol(name: "mic.fill", effect: .pulse), tone: .blue, priority: .normal,
+                secondary: .elapsed(startedAt: islandListeningStart ?? Date()))
+        }
+        await island.submit(content)
+    }
     private var resultInbox = ActionResultInbox()
     private let continuation: AsyncStream<OutputEnvelope>.Continuation
     private let recognition: any SpeechRecognitionCapability
@@ -121,7 +149,7 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
             internalTools: [
                 transcript, voiceState, finishTranscript,
                 InternalTool(path: "Speech.Listening.prepare", required: ["pressed"]),
-            ])
+            ] + AgentIslandPublication.permissions)
     }
 
     // MARK: - Lifecycle
@@ -133,6 +161,7 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
             try Task.checkCancellation()
             lifecycle = .running
             try await startUIInputs()
+            await refreshIsland()
             return
         }
         let session = try await vad.detectVoiceActivity(
@@ -144,6 +173,7 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
         segmenter = VoiceActivitySegmenter(session: session)
         lifecycle = .running
         try await startUIInputs()
+        await refreshIsland()
         prepareRecognitionTurn()
     }
     public func pause() async throws {
@@ -151,6 +181,7 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
         await stopUIInputs()
         guard lifecycle == .running else { throw HarnessError.invalidTransition }
         lifecycle = .paused
+        await refreshIsland()
         listeningPolicy.revokeReportListening()
         if microphoneInput != nil { await closeCapture() }
         pendingSound = nil
@@ -162,19 +193,21 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
         await stopUIInputs()
         lifecycle = .running
         try await startUIInputs()
+        await refreshIsland()
         soundLayout = nil
         soundRate = nil
     }
     /// Runtime flow control, independent of a full audio inbox.
     public func isUtteranceActive() -> Bool { phase == .speaking || phase == .processing }
-    public func acquirePlaybackAdmission() -> Bool {
+    public func acquirePlaybackAdmission() async -> Bool {
         guard lifecycle == .running, !isUtteranceActive() else { return false }
         awaitingReply = true
+        await refreshIsland()
         traceListening("playback.acquired")
         return true
     }
-    public func pauseAudioAdmission() throws {
-        guard acquirePlaybackAdmission() else { throw CapabilityError.inputBusy }
+    public func pauseAudioAdmission() async throws {
+        guard await acquirePlaybackAdmission() else { throw CapabilityError.inputBusy }
     }
     private func traceListening(_ point: String) {
         let value =
@@ -194,6 +227,7 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
         guard let activeInput else {
             awaitingReply = false
             phase = .listening
+            await refreshIsland()
             return
         }
         traceListening("resume.reset.begin")
@@ -218,6 +252,7 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
         recognitionTurn = nil
         segmenter = nil
         activeInput = nil
+        await island.stop()
         continuation.finish()
     }
 
@@ -232,10 +267,12 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
         captureOpen = true
         awaitingReply = listeningPolicy.paused
         phase = .listening
+        await refreshIsland()
         prepareRecognitionTurn()
     }
     public func closeCapture() async {
         captureOpen = false
+        await refreshIsland()
         nativeInput?.cancel()
         await recognitionTurn?.cancel()
         await segmenter?.cancel()
@@ -301,9 +338,9 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
             guard listeningPolicy.paused != wasPaused || listeningPolicy.enabled != wasEnabled else { return }
         }
         traceListening("policy.accept")
-        try applyListeningPolicy(parent: input)
+        try await applyListeningPolicy(parent: input)
     }
-    private func applyListeningPolicy(parent: AgentInput) throws {
+    private func applyListeningPolicy(parent: AgentInput) async throws {
         guard let interactionSessionID else { throw CommunicationError.scopeClosed }
         listeningPolicy.revision += 1
         let payload = InputPayload.text("Listening policy")
@@ -324,6 +361,7 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
                     "revision": String(listeningPolicy.revision),
                 ])), input: command)
         try emit(.control("agent.finished"), input: command)
+        await refreshIsland()
         traceListening("policy.emitted")
     }
 
@@ -341,12 +379,14 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
             awaitingReply = true
         }
         listeningPolicy.revision += 1
-        return SpeechActions.ListeningPolicy(
+        let policy = SpeechActions.ListeningPolicy(
             enabled: listeningPolicy.enabled, paused: listeningPolicy.paused, revision: listeningPolicy.revision)
+        await refreshIsland()
+        return policy
     }
 
     /// Lifecycle revocation is independent of UI availability and cannot grant renewed consent.
-    public func stopListening(sessionID: String) throws {
+    public func stopListening(sessionID: String) async throws {
         guard residentListening, sessionID == interactionSessionID,
             lifecycle == .running || lifecycle == .paused
         else { throw HarnessError.notRunning }
@@ -357,7 +397,7 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
         listeningPolicy.revokeReportListening()
         guard wasEnabled else { return }
         let context = ProcessingContext(sessionID: sessionID, source: "runtime")
-        try applyListeningPolicy(parent: context.input(.event("listening.revoked")))
+        try await applyListeningPolicy(parent: context.input(.event("listening.revoked")))
     }
     private func startUIInputs() async throws {
         guard let uiHome, let interactionSessionID else { return }
@@ -545,6 +585,7 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
                 retainingLast: SpeechPerceptionSignalPreprocessor.evidenceCapacity)
         }
         phase = storedPhase
+        await refreshIsland()
         if present { try presentPhase(next, input: input) }
         if publish { try await communicate(.speechPhase(next), parent: input) }
     }
@@ -697,10 +738,11 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
             return
         }
         phase = .listening
+        await refreshIsland()
         if residentListening {
             listeningPolicy.pendingFinal = input.metadata.rootID
             traceListening("final.pending")
-            try applyListeningPolicy(parent: input)
+            try await applyListeningPolicy(parent: input)
         }
         try await communicate(.transcript(text, final: true), parent: input)
         // The reply producer reports occupancy; no subscriber receipt is expected.
@@ -725,7 +767,9 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
             reportError(error, input: activeInput)
             if listeningPolicy.pendingFinal == activeInput.metadata.rootID {
                 listeningPolicy.pendingFinal = nil
-                do { try applyListeningPolicy(parent: activeInput) } catch { reportError(error, input: activeInput) }
+                do { try await applyListeningPolicy(parent: activeInput) } catch {
+                    reportError(error, input: activeInput)
+                }
             }
         }
         await failedRecognition?.cancel()
@@ -741,6 +785,7 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
         soundEstimator.reset()
         awaitingReply = residentListening && (!captureOpen || !listeningPolicy.enabled || listeningPolicy.paused)
         phase = .listening
+        await refreshIsland()
         prepareRecognitionTurn()
         // VAD is rebuilt lazily on the next frame, keeping repeated provider failures recoverable.
         guard let failedInput else { return }

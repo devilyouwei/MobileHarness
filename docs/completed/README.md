@@ -1,5 +1,7 @@
 # 已完成需求归档
 
+- [Writer 执行与续写生命周期](Writer-Execution-Lifetime.md)（2026-11-06）：工具接纳与直接续写的边界、撤销、互斥、加入清理、根关闭及自动验证。
+
 本目录集中保存原定范围已经全部完成的需求与实施计划。归档的是一次明确的交付范围，后续独立 bug 修复或 feature 扩展不影响原需求的完成状态。当前实现以源码 README 为准，归档文档保留当时的目标、决策和实施记录。
 
 ## 归档规则
@@ -83,3 +85,9 @@
 [Web Skill 教学优化](Web-Skill-Teaching.md)（2026-11-03）：浏览/绘图revision2、分轮示例和项目复用教学；示例解析、提示预算、完整检查与四项iOS构建通过。
 
 [Skill 驱动 State 观察](Skill-State-Observation.md)（2026-11-03）：Skill独占范围选择、统一App读取、完整Business及单项unknown诊断；验证见[专项记录](../validation/Skill-State-Observation.md)。
+
+## Agent 展示调用与反馈所有权（2026-11-06）
+
+[角色内聚展示与调用来源隔离](Agent-Presentation-Ownership-Plan.md)：语音/相机/连接角色自有灵动岛、共享机制边界及仅模型调用可反馈续轮；完整检查与四项 iOS 构建通过，见 [验证记录](../validation/Agent-Presentation-Ownership.md)。
+
+- [App 内灵动岛全局显示](Global-In-App-Island.md)：保持顶部位置，所有页面共享实时状态与展开偏好；验证及设备限制见专项记录。

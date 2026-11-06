@@ -16,6 +16,7 @@ WindowStateTests 验证窗口在向左右拖动、Action位置更新及安全区
 
 | 文件 | 契约 |
 | --- | --- |
+| NavigationContextTests | 页面上下文与代际；设置/多层记录/相册中的全局 Island 状态、展开偏好、频带、后台恢复及根失活围栏 |
 | SettingsStateTests | 草稿与已确认值、独立语音模式、操作准入、错误/显式重试与保留未提交编辑 |
 | BluetoothConnectionStateTests | 连接/打开详情/不可用意图、已连接与记忆分组、失效回调、断连操作约束 |
 | AudioDetectionStateTests | PCM freshness 与方向独立过期、quiet/unavailable、可执行角度清理 |

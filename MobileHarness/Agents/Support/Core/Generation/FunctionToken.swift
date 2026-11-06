@@ -41,10 +41,15 @@ public struct CallRejection: Error, Equatable, Sendable {
 public enum GenerationEvent: Equatable, Sendable {
     case rejected(CallRejection)
     case action(ActionCall)
+    /// Code-generated execution, including natural-text presentation. Never model feedback.
+    case runtimeAction(ActionCall)
     case tool(ToolCall)
     case scheduling(SchedulingDirective)
 
     public var actionCall: ActionCall? {
-        if case .action(let call) = self { call } else { nil }
+        switch self {
+        case .action(let call), .runtimeAction(let call): call
+        default: nil
+        }
     }
 }

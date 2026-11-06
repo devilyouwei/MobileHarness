@@ -185,3 +185,7 @@ WindowState.requests is a typed UI source consumed with maximum concurrency4 plu
 系统灵动岛仅通过App白名单导航入口返回现有页面，设备控制使用Camera窗口原有请求源；本角色不持有灵动岛专用交互队列或导航回执集合。
 
 设置桥接完整传递Writer独立思考布尔选择，保存/还原继续经既有Gateway私有请求ID，不新增模型可见写配置Action。
+
+## 自有连接岛
+
+连接输入经角色自己的分类/接纳后调用UI.Island内部工具。状态变化先显示high优先级临时提示，角色持有一个可替换、可取消加入的3秒到期任务；到期连接状态降为background，断开撤下。展示不读取UI.bluetoothStatus，也不委托Assistant；窗口/诊断/设置的既有调用职责不变。presentationFailure在角色和容器runtime公开，停止在身份退休前加入最终end和计时器清理。

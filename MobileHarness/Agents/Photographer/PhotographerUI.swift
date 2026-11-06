@@ -5,7 +5,11 @@ import Gateway
 import UI
 
 extension PhotographerAgent {
-    public func bindUIExecution(_ consumer: GatewayOutputConsumer) { uiExecution.consumer = consumer }
+    public func bindUIExecution(_ consumer: GatewayOutputConsumer) async {
+        uiExecution.consumer = consumer
+        await island.bind(consumer: consumer, source: descriptor.id)
+        await island.start()
+    }
     func startUIInputs() async throws {
         if let uiAlbum {
             let source = await uiAlbum.requests
@@ -26,6 +30,7 @@ extension PhotographerAgent {
         cameraFacts?.cancel()
         await cameraFacts?.value
         cameraFacts = nil
+        await island.submit(nil)
         await uiInputs.retire(for: descriptor.id)()
     }
     private func handleAlbum(_ value: AlbumInput, context: ProcessingContext) async throws -> AlbumReply {
@@ -53,6 +58,7 @@ extension PhotographerAgent {
         cameraFacts = Task { [self] in
             for await value in stream {
                 guard !Task.isCancelled else { return }
+                await island.submit(Self.cameraContent(value))
                 cameraFactSequence += 1
                 let sequence = cameraFactSequence
                 let fact = await MainActor.run {
@@ -122,5 +128,43 @@ extension PhotographerAgent {
             do { try await cleanup.value } catch { throw NativeCleanupFailure(errors: [original, error]) }
             throw error
         }
+    }
+}
+
+// Photographer owns camera activity semantics; execution facts arrive on its existing input.
+extension PhotographerAgent {
+    @MainActor static func cameraContent(_ camera: CameraPresentationSnapshot) -> IslandContent? {
+        if let remaining = camera.countdown {
+            return .init(
+                title: "拍照倒计时", subtitle: "\(remaining) 秒", primary: .symbol(name: "timer"), priority: .critical,
+                secondary: .progress(1 / Double(max(1, remaining))),
+                liveActivity: true)
+        }
+        if camera.photoBusy {
+            return .init(
+                title: "正在处理照片", primary: .symbol(name: "camera.aperture"), priority: .critical, secondary: .loading)
+        }
+        let recording = camera.recording
+        if recording.active {
+            let title = recording.phase == .starting ? "正在启动录像" : recording.phase == .finishing ? "录像正在收尾" : "正在录像"
+            return .init(
+                title: title, subtitle: "聆听已暂停", primary: .symbol(name: "video.fill"), tone: .recording,
+                priority: .attention,
+                secondary: recording.phase == .recording
+                    ? .symbol(name: "record.circle.fill", effect: .pulse) : .loading,
+                startedAt: recording.phase == .recording ? recording.startedAt : nil,
+                liveActivity: true)
+        }
+        if camera.recordedVideo != nil {
+            return .init(
+                title: "录像待处置", subtitle: "打开相机保存或忽略", primary: .symbol(name: "video"), priority: .high)
+        }
+        #if os(iOS)
+            if camera.capturedPhoto != nil {
+                return .init(
+                    title: "照片待处置", subtitle: "打开相机保存或忽略", primary: .symbol(name: "photo"), priority: .high)
+            }
+        #endif
+        return nil
     }
 }

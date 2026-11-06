@@ -5,7 +5,11 @@ import Gateway
 import UI
 
 extension ApplicationControlAgent {
-    public func bindUIExecution(_ consumer: GatewayOutputConsumer) { uiExecution.consumer = consumer }
+    public func bindUIExecution(_ consumer: GatewayOutputConsumer) async {
+        uiExecution.consumer = consumer
+        await island.bind(consumer: consumer, source: descriptor.id)
+        await island.start()
+    }
     func startUIInputs() async throws {
         do {
             if let uiWindows {
@@ -21,7 +25,7 @@ extension ApplicationControlAgent {
                     do {
                         for try await fact in stream {
                             try Task.checkCancellation()
-                            try observeConnection(fact)
+                            try await observeConnection(fact)
                         }
                     } catch { if !Task.isCancelled { observationFailure(error) } }
                 }

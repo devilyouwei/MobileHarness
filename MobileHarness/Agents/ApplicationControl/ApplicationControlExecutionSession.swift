@@ -54,6 +54,7 @@ public actor ApplicationControlExecutionSession {
             } catch {
                 let original = error
                 do {
+                    await agent.finishPresentation()
                     try await manager.remove(.applicationControl)
                     registered = false
                 } catch { throw NativeCleanupFailure(errors: [original, error]) }
@@ -88,7 +89,10 @@ public actor ApplicationControlExecutionSession {
             starting?.cancel()
             _ = await starting?.result
             if registered {
-                do { try await manager.remove(.applicationControl) } catch {
+                do {
+                    await agent.finishPresentation()
+                    try await manager.remove(.applicationControl)
+                } catch {
                     lastExecutionFailure = String(describing: error)
                     cleanupFailure = AgentFailure(
                         component: "applicationControl", operation: "stop",

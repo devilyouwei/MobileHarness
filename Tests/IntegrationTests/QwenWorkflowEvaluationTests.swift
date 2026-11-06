@@ -664,7 +664,7 @@ func qwenExpressionSequenceScoringRejectsBrokenGroups(variant: String) async thr
     for event in trace.events {
         let output: AgentOutput
         switch event {
-        case .action(let call): output = .actionCall(call)
+        case .action(let call), .runtimeAction(let call): output = .actionCall(call)
         case .scheduling(let directive): output = .scheduling(directive)
         default:
             Issue.record("Unexpected fixture event")

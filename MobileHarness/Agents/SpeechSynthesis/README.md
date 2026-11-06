@@ -49,7 +49,7 @@ flowchart LR
 
 角色间消息经 Gateway 递送；基础能力通过构造注入，输入订阅由角色持有。角色、Skill 与 Task 授权归 Agents；Actions 来源的协作接口由 App 以中立窄端口绑定，Agents 不导入 Actions、CallRuntime 或 ExecutionRuntime。
 
-这里 Gateway 仅递送定向消息；本角色 descriptor.outputs 为空，无业务 Action／Tool／发布／send 输出。播放由请求方的执行链控制，不应画成本角色发出 Playback Action。
+Gateway递送定向合成消息，并执行本角色的UI.Island内部展示工具；descriptor.outputs仅开放toolCall，内部工具不暴露给模型。播放Action仍由请求方的输出执行链调用，SpeechSynthesis通过注入的播放事实回调管理自己的说话展示，不让Assistant代发。
 
 ## 内部结构与播放衔接
 
@@ -105,3 +105,9 @@ The worker advances after synthesis terminal state without waiting for playback.
 ## Passive container state
 
 stateSnapshot projects local installation/closure and existing work or Agent lifecycle/queue counters directly from memory. Reading starts no role, persistence restoration or inference. Initialization remains in the existing owner lifecycle. The root catalog binds independent readers without sampling roles or maintaining another mutable role-state registry.
+
+## 自有灵动岛与播放事实
+
+角色在生产工作开始/完成/失败时管理合成岛；实际播放器在首个有效PCM及drain/失败清理后，加入App绑定的playbackChanged(audioID,active)回调。SpeechSynthesis管理当前播放身份，旧audioID结束不能撤下新播放，生产完成不等于播放完成。播放优先显示“正在说话”和频谱指标，无播放而仍有生产时显示合成。频谱数值由真实播放器直送UI专用数据端口，本角色只提交语义内容。
+
+内部UI.Island工具用自身consumer执行，成功/失败/异常由共享发布机制处理并通过presentationFailure及容器runtime公开，不经Assistant或模型反馈。stop关闭角色准入，加入生产任务和最终展示end后才退休身份；迟到播放事实不复活活动。一个串行producer、一个当前播放身份和一个最新待发展示维持有界生命周期。

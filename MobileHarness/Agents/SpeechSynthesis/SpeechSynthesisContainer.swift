@@ -11,10 +11,12 @@
     public final class SpeechSynthesisContainer {
         public func stateSnapshot() async throws -> AgentStateSnapshot {
             try Task.checkCancellation()
+            let presentationFailure = await agent?.presentationFailure
             let status = await agent?.status()
             return AgentStateSnapshot(
                 path: "agents.speechsynthesis",
                 runtime: [
+                    "presentationFailure": presentationFailure.map { .text($0) } ?? .unknown,
                     "rolePhase": status.map { .text($0.lifecycle.rawValue) } ?? .unknown,
                     "queuedInputs": status.map { .count($0.queuedInputs) } ?? .unknown,
                     "processedInputs": status.map { .count($0.processedInputs) } ?? .unknown, "closed": .flag(closed),
@@ -37,9 +39,14 @@
             agent = value
             manager = runtime.manager
             try await runtime.manager.start(value.descriptor.id)
+            await value.bindPresentation(try await runtime.output.consumer(for: value))
+        }
+        func playbackChanged(audioID: String, active: Bool) async {
+            await agent?.playbackChanged(audioID: audioID, active: active)
         }
         func endSession() async throws {
             guard let agent, let manager else { return }
+            await agent.stop()
             try await manager.remove(agent.descriptor.id)
             self.agent = nil
             self.manager = nil

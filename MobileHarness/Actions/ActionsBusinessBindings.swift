@@ -74,13 +74,16 @@
         public let cancelReply: @MainActor () async throws -> Void
         public let adaptFailure: @Sendable (any Error) -> any Error
         public let detection: AudioDetectionConnections
+        public let playbackChanged: @Sendable (String, Bool) async -> Void
         public init(
             sessionID: String, cancelReply: @escaping @MainActor () async throws -> Void,
-            detection: AudioDetectionConnections, adaptFailure: @escaping @Sendable (any Error) -> any Error
+            detection: AudioDetectionConnections, adaptFailure: @escaping @Sendable (any Error) -> any Error,
+            playbackChanged: @escaping @Sendable (String, Bool) async -> Void = { _, _ in }
         ) {
             self.sessionID = sessionID
             self.cancelReply = cancelReply
             self.detection = detection
+            self.playbackChanged = playbackChanged
             self.adaptFailure = adaptFailure
         }
     }

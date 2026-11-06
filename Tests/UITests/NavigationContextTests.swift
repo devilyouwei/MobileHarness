@@ -47,7 +47,7 @@ import Testing
 }
 
 @Test(arguments: [false, true]) @MainActor
-func navigationSuspendsHomeOverlaysAndRestoresIslandPreference(_ expanded: Bool) async throws {
+func navigationKeepsGlobalIslandLiveAndInteractive(_ expanded: Bool) async throws {
     let root = UIContainer()
     try root.start()
     let navigation = root.navigation.state
@@ -57,39 +57,55 @@ func navigationSuspendsHomeOverlaysAndRestoresIslandPreference(_ expanded: Bool)
     let id = try #require(try island.publishSlot(owner: "goal", content: content))
     try island.setExpanded(expanded)
     island.localMounted()
-    island.reserveLocalFrame(CGRect(x: 16, y: 14, width: 370, height: 100))
+    let frame = CGRect(x: 16, y: 14, width: 370, height: 100)
+    island.reserveLocalFrame(frame)
     let generation = island.generation
     let revision = island.localRevision
+    island.localCompleted(generation: generation, revision: revision)
 
     navigation.show(.settings)
-    #expect(!root.windows.isHostVisible && !island.localPresentationVisible && !island.expanded)
-    #expect(island.detail == nil && island.localFrame == nil && !island.replacesSystemStatusBar)
-    #expect(!island.statusBar.active && island.available && island.generation == generation)
-    island.localMounted()
-    island.localCompleted(generation: generation, revision: revision)
-    #expect(!island.replacesSystemStatusBar && island.localStatus == "detached")
+    #expect(!root.windows.isHostVisible && island.expanded == expanded)
+    #expect(island.localFrame == frame && island.replacesSystemStatusBar && island.statusBar.active)
+    #expect(island.available && island.generation == generation)
+    #expect(island.localRevision == revision && island.localStatus == "settled")
 
+    // A user's choice on Settings remains authoritative across deeper pages and ordinary content updates.
+    try island.setExpanded(!expanded)
     navigation.present(.path([.settings, .assistantHistory]))
-    // Even a new phase cannot overwrite the preference captured on leaving home.
-    content.expansionID = "next-phase"
     content.detail = .init(text: "最新详情")
     try island.publishSlot(owner: "goal", content: content)
-    #expect(!island.expanded && island.detailActivity?.id == id)
-    try root.setSceneActive(false)
-    try root.setSceneActive(true)
-    #expect(!island.localPresentationVisible && !island.expanded && !root.windows.isHostVisible)
-    navigation.path = [.settings]
-    #expect(!island.localPresentationVisible)
-    navigation.path = []
-    #expect(root.windows.isHostVisible && island.localPresentationVisible && island.expanded == expanded)
+    #expect(island.expanded == !expanded && island.detailActivity?.id == id)
     #expect(island.detailActivity?.content.detail?.text == "最新详情")
-    #expect(island.generation == generation)
+    let listening = IslandContent(title: "正在聆听", primary: .spectrum)
+    let statusID = try #require(try island.publishSlot(owner: "audio", content: listening))
+    try island.spectrum(Array(repeating: 0.25, count: 32), active: true, generation: generation)
+    navigation.show(.album)
+    #expect(island.compact?.id == statusID && island.statusActivity?.content.title == "正在聆听")
+    let playback = IslandContent(title: "正在播放", primary: .symbol(name: "speaker.wave.2"))
+    try island.publishSlot(owner: "audio", content: playback)
+    #expect(island.statusActivity?.content == playback && island.expanded == !expanded)
+    #expect(island.spectrumActive && island.bands == Array(repeating: 0.25, count: 32))
+
+    let beforeBackground = island.localRevision
+    try root.setSceneActive(false)
+    #expect(island.localFrame == nil && !island.replacesSystemStatusBar && !island.statusBar.active)
     island.localMounted()
-    #expect(island.replacesSystemStatusBar)
+    island.localCompleted(generation: generation, revision: beforeBackground)
+    #expect(island.localStatus == "detached" && !island.replacesSystemStatusBar)
+    try root.setSceneActive(true)
+    #expect(island.expanded == !expanded && !root.windows.isHostVisible)
+    #expect(island.statusActivity?.content == playback && island.generation == generation)
+    island.localMounted()
+    #expect(island.replacesSystemStatusBar && island.statusBar.active)
+    navigation.path = [.settings]
+    navigation.path = []
+    #expect(root.windows.isHostVisible && island.expanded == !expanded)
+    #expect(island.replacesSystemStatusBar && island.detailActivity?.id == id)
     await root.stop()
+    #expect(island.activities.isEmpty && !island.statusBar.active && !island.replacesSystemStatusBar)
 }
 
-@Test @MainActor func navigationDoesNotRestoreEndedIslandActivitiesOrOldRootPreferences() async throws {
+@Test @MainActor func globalIslandRemovesEndedActivitiesAndRejectsOldRootPreferencesOnAnyPage() async throws {
     let root = UIContainer()
     try root.start()
     let content = IslandContent(title: "目标", primary: .symbol(name: "scope"), detail: .init(text: "详情"))
@@ -97,17 +113,22 @@ func navigationSuspendsHomeOverlaysAndRestoresIslandPreference(_ expanded: Bool)
     try root.island.setExpanded(false)
     root.navigation.state.show(.assistantHistory)
     try root.island.publishSlot(owner: "goal", content: nil)
+    #expect(root.island.compact == nil)
     let replacement = try #require(try root.island.publishSlot(owner: "replacement", content: content))
-    root.navigation.state.show(nil)
     #expect(root.island.expanded && root.island.detailActivity?.id == replacement)
-    #expect(!root.island.activities.contains { $0.id == original })
-
     try root.island.setExpanded(false)
+    root.navigation.state.show(nil)
+    #expect(!root.island.expanded && !root.island.activities.contains { $0.id == original })
+
     root.navigation.state.show(.album)
+    let previousGeneration = root.island.generation
     try root.setForeground(false)
     try root.setForeground(true)
+    #expect(root.island.activities.isEmpty && root.island.generation != previousGeneration)
     try root.island.publishSlot(owner: "replacement", content: content)
-    #expect(!root.island.localPresentationVisible)
+    #expect(root.island.expanded && !root.windows.isHostVisible)
+    root.island.localMounted()
+    #expect(root.island.replacesSystemStatusBar)
     root.navigation.state.show(nil)
     #expect(root.island.expanded)
     await root.stop()

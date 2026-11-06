@@ -121,9 +121,11 @@ public actor WriterAgent: Agent {
     public func pause() async throws {
         guard lifecycle == .running else { return }
         lifecycle = .paused
-        suspending.formUnion(workers.keys)
-        for worker in workers.values { worker.cancel() }
-        for worker in Array(workers.values) { await worker.value }
+        let selected = workers
+        suspending.formUnion(selected.keys)
+        for worker in selected.values { worker.cancel() }
+        for id in selected.keys { await streaming.revoke(delegateID: id) }
+        for worker in selected.values { await worker.value }
         reportWorker?.cancel()
         await reportWorker?.value
         await notifications.pause()
@@ -156,8 +158,10 @@ public actor WriterAgent: Agent {
     }
     public func stop() async {
         lifecycle = .stopped
-        for worker in workers.values { worker.cancel() }
-        for worker in Array(workers.values) { await worker.value }
+        let selected = workers
+        for worker in selected.values { worker.cancel() }
+        for id in selected.keys { await streaming.revoke(delegateID: id) }
+        for worker in selected.values { await worker.value }
         for (id, input) in inputs {
             if let scope = input.taskScope {
                 do {
@@ -239,9 +243,10 @@ public actor WriterAgent: Agent {
             phases[id] = "cancelling"
             await island.update(delegateID: id, phase: .cancelling, step: "正在停止模型并清理文件操作。")
             cancelling.insert(id)
-            if let worker = workers[id] {
-                worker.cancel()
-            } else {
+            let worker = workers[id]
+            worker?.cancel()
+            await streaming.revoke(delegateID: id)
+            if worker == nil {
                 workers[id] = Task {
                     do {
                         try await streaming.release(delegateID: id)

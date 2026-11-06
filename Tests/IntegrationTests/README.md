@@ -25,7 +25,7 @@ PromptTemplateTests 通过生产目录和增量解析器读取 ExpressionInterac
 | RuntimeTests / AgentArchitectureTests / CommunicationTests | 接纳、incarnation/来源/会话、root/parent 关联、原子状态、根服务清理与有界输出 |
 | ActionContractTests / ActionLifecycleTests / ActionObservationTests | 函数预算、共享执行、资源 lease/fence、Channel/wait、结果预留/重投递、接管、纯取消及完整终态 |
 | VoiceTests / SentenceFunctionTests / SpeechPlaybackTests | VAD/ASR、冷加载期间前缀完整性/有序衔接、缓冲时长/内存/包数上限及取消隔离、分段、字幕/合成、PCM handle、播放与半双工边界 |
-| AudioCaptureReadinessTests / AudioSampleBufferReaderTests | 首帧准备、格式、mono/FOA/planar PCM、溢出/失败与取消 |
+| AudioCaptureReadinessTests / AudioSampleBufferReaderTests | 首帧准备、格式、mono/FOA/planar PCM、溢出/失败与取消；不打开硬件的原生通知错误保真、中断分类、重复及停止后事件围栏 |
 | PhotographyPipelineTests / CameraSamplingTests | 原生帧输入、最新态替换、共享姿态推理、skeleton/gaze 投影 |
 | Resource/Provider/Settings 用例 | 私有参数暂存、保存/绑定/呈现顺序、版本冲突、资源准入及失败后状态 |
 | Storage 用例 | domain 仓库、配置文档、提交身份、完整消息 checkpoint、容量/损坏/并发与缓存 |
@@ -236,6 +236,8 @@ Writing 替代旧绘图 Skill，原生工具覆盖纳入统一能力测试；age
 
 WriterAgentTests 通过真实 AgentManager/通信与 Gateway DirectExecutionDispatcher 连接脚本模型和实际作品存储，验证后台接纳、流式编辑、发布与终态回报；呈现是明确 fixture。
 
+Writer 续写生命周期回归使用真实 ArtifactService/SQLite、可控非协作呈现与检查点阻塞：跨 session、撤销后及恢复后的旧流被拒绝；取消的 complete 不接纳；变更竞争显式 busy，预览不阻塞追加；release/Actions 根关闭等待在途效果并拒绝迟到操作；已开始的 abort 不被撤销再次取消。文件系统失败夹具检查清理失败持续可见及关闭准入。测试区分工具接纳、文件写入和委托终态，不证明真实模型或原生 WebKit 行为。
+
 Writer 工具集成回归使用真实 Artifacts 服务与呈现探针，验证默认不渲染、单次流式预览及最终刷新、关联文件上下文、搜索分页、目录移动/差异/草稿恢复、显式渲染后发布和运行错误阻止发布。它不替代真实模型或原生 WebKit 验收。
 
 Writer 历史回归验证同一 SQLite 的角色隔离、重开后完整请求/工具结果/取消状态、图像引用的 Writer 输入所有权，以及真实 Gateway 后台创作同时提交 SQLite 历史、经 Gateway 归档。图片字节夹具只验证存储契约，不作为原生解码证据。
@@ -300,3 +302,5 @@ Writer SQLite reopen verifies large native arguments and resumed failure diagnos
 Large-source persistence verifies responses above256KiB and tool results above64KiB survive SQLite reopen. Function value validation no longer rejects long observations; input/round identity checks remain independently covered. Writer model evaluation stores its catalog in the same records.sqlite.
 
 WorkspaceRepositoryTests owns relational catalog integration: over-8MiB independent projects, draft/version reopen, concurrent CAS, stale writes and deletion cleanup retry. AppWorkflowTests does not import the SQLite backend.
+
+Agent展示所有权回归在IslandIntegrationTests、VoiceTests和AssistantChatTests：验证各角色通过自身Gateway身份独立发布/结束，展示不可用重试，合成完成与播放完成区分，迟到结束与停机隔离，以及同一路径按LLM/内部来源决定ReACT。模型文本测试和历史预览同时接受显式action与代码展开runtimeAction；诊断装配包含实际Island执行工具。所有语音/模型结果使用测试替身，不代表原生音频或真实模型验收。

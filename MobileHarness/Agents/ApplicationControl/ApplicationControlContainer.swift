@@ -10,6 +10,7 @@
     public final class ApplicationControlContainer {
         public func stateSnapshot() async throws -> AgentStateSnapshot {
             try Task.checkCancellation()
+            let presentationFailure = await session?.agent.presentationFailure
             let status = await session?.agent.status()
             let context = await session?.agent.residentContext()
             let environment = try await contextSnapshotIfAvailable()
@@ -21,6 +22,7 @@
                         ?? .unknown,
                 ],
                 runtime: [
+                    "presentationFailure": presentationFailure.map { .text($0) } ?? .unknown,
                     "scene": environment.map { .text($0.scene) } ?? .unknown,
                     "sceneSequence": environment?.sceneSequence.map { .unsigned($0) } ?? .unknown,
                     "modelPreparationSequence": environment?.modelPreparationSequence.map { .unsigned($0) }

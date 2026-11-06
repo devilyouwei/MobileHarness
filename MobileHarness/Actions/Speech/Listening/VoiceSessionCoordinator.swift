@@ -75,7 +75,8 @@ public enum VoiceReplyCancellation {
         public var beforeVoiceStart: @MainActor () async -> Void = {}
         private var startupTask: Task<Void, Error>?
         private var startupID: String?
-        private lazy var nativeEffects = VoiceNativeEffects(audio: audio, state: state, cue: cue, haptic: haptic)
+        private lazy var nativeEffects = VoiceNativeEffects(
+            audio: audio, state: state, cue: cue, haptic: haptic, spectrum: runtime.playbackSpectrum)
         private var voiceGeneration: String? {
             didSet {
                 if voiceGeneration == nil {
@@ -689,7 +690,7 @@ public enum VoiceReplyCancellation {
                 try await speechPlayback.play(audioID: audioID, invocation: invocation) {
                     [weak self] stream, invocation in
                     guard let self else { throw CancellationError() }
-                    try await self.play(stream, envelope: invocation.context)
+                    try await self.play(stream, audioID: audioID, envelope: invocation.context)
                 }
             } catch {
                 playbackFailure = error
@@ -718,7 +719,7 @@ public enum VoiceReplyCancellation {
             }
         }
 
-        private func play(_ stream: AudioStream, envelope: ActionExecutionContext) async throws {
+        private func play(_ stream: AudioStream, audioID: String, envelope: ActionExecutionContext) async throws {
             try await nativeEffects.play(
                 stream, context: envelope,
                 validate: { [weak self] in
@@ -726,7 +727,11 @@ public enum VoiceReplyCancellation {
                         throw CancellationError()
                     }
                 }, currentSession: { [weak self] in self?.accepts(session: envelope.sessionID) ?? false },
-                activeChanged: { [weak self] in self?.playbackActive = $0 })
+                activeChanged: { [weak self] active in
+                    guard let self else { return }
+                    self.playbackActive = active
+                    await self.runtime.playbackChanged(audioID, active)
+                })
         }
         private func accepts(session: String) -> Bool {
             session == runtime.interactionSessionID || session == voiceGeneration

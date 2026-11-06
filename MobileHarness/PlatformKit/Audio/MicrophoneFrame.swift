@@ -82,7 +82,9 @@ public protocol AudioCaptureObserving: Sendable {
     func stop() async
 }
 
-public enum AudioIOError: Error, Equatable { case microphoneDenied, invalidFormat, overflow, busy, interrupted }
+public enum AudioIOError: Error, Equatable {
+    case microphoneDenied, invalidFormat, overflow, busy, interrupted, startFailed, runtimeFailed
+}
 
 /// The native generation and its single ordered source; no forwarding queue.
 public struct MicrophoneCaptureInput: Sendable {
